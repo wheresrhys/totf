@@ -4,6 +4,9 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"db:schema:build": "cat ./supabase/schema/*.sql > ./supabase/schema_build.sql",
+		"db:schema:apply": "psql \"postgresql: //postgres:postgres@localhost:54322/postgres\" -f ./supabase/schema_build.sql",
+		"db:schema:new-migra": "supabase db diff --local -f my_feature_update",
 		"db:sync:prod": "supabase migration up --linked --debug --include-all",
 		"db:sync:local": "supabase db reset && npm run db:seed:local",
 		"db:seed:local": "npm run db:import:local ./data/end25.csv",
@@ -18,7 +21,7 @@
 		"next:dev": "dotenvx run -f .env.dev -- next dev --turbopack",
 		"next:prod": "./scripts/load-prod-env.sh next dev --turbopack",
 		"next:build": "dotenvx run -f .env.dev -- next build --turbopack --debug",
-		"lint": "npx prettier -w app supabase/migrations scripts lib docs && npx eslint",
+		"lint": "npx prettier -w app supabase/schema scripts lib docs && npx eslint",
 		"type:check": "tsc --noEmit",
 		"type:check:open": "tsx scripts/open-type-errors.ts",
 		"qa:bloat": "find app -type f -exec wc -l {} + | awk '$1 > 150 {print $1, $2}'",

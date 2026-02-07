@@ -52,3 +52,5 @@ next-env.d.ts
 .cursor/debug.log
 
 supabase/snippets
+supabase/schema_build.sql
+supabase/migrations
