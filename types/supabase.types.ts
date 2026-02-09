@@ -145,6 +145,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      daitch_mokotoff: { Args: { "": string }; Returns: string[] }
+      dmetaphone: { Args: { "": string }; Returns: string }
+      dmetaphone_alt: { Args: { "": string }; Returns: string }
+      fuzzy_search_rings: {
+        Args: { q: string }
+        Returns: {
+          closeness_score: number
+          ring_no: string
+          species_name: string
+        }[]
+      }
       metrics_by_period_and_species: {
         Args: {
           filters?: Database["public"]["CompositeTypes"]["top_metrics_filter_params"]
@@ -191,6 +202,7 @@ export type Database = {
           wing_length: number
         }[]
       }
+      soundex: { Args: { "": string }; Returns: string }
       species_stats: {
         Args: {
           from_date?: string
@@ -217,6 +229,7 @@ export type Database = {
           species_name: string
         }[]
       }
+      text_soundex: { Args: { "": string }; Returns: string }
       top_metrics_by_period: {
         Args: {
           filters?: Database["public"]["CompositeTypes"]["top_metrics_filter_params"]
@@ -235,38 +248,6 @@ export type Database = {
           metric_name: string
           result_limit: number
           temporal_unit: string
-        }
-        Returns: {
-          metric_value: number
-          species_name: string
-          visit_date: string
-        }[]
-      }
-      top_periods_by_metric: {
-        Args: {
-          exact_months_filter?: string[]
-          metric_name: string
-          month_filter?: number
-          months_filter?: number[]
-          result_limit: number
-          species_filter?: string
-          temporal_unit: string
-          year_filter?: number
-        }
-        Returns: {
-          metric_value: number
-          visit_date: string
-        }[]
-      }
-      top_species_by_metric: {
-        Args: {
-          exact_months_filter?: string[]
-          metric_name: string
-          month_filter?: number
-          months_filter?: number[]
-          result_limit: number
-          temporal_unit: string
-          year_filter?: number
         }
         Returns: {
           metric_value: number

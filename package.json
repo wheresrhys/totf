@@ -7,7 +7,7 @@
 		"db:schema:pull": "supabase migration fetch --yes && supabase db pull || true",
 		"db:schema:build": "{ echo \"BEGIN;\"; echo \"DROP SCHEMA IF EXISTS public CASCADE;\"; cat ./supabase/schema/*.sql; echo \"COMMIT;\"; }> ./supabase/schema_build.sql",
 		"db:schema:apply": "npm run db:schema:build && psql \"postgresql://postgres:postgres@localhost:54322/postgres\" -f ./supabase/schema_build.sql && echo 'local schema applied to local db'",
-		"db:migration:prepare": "npm run db:schema:pull && npm run db:schema:apply && supabase db diff --local -f $(git rev-parse --abbrev-ref HEAD)",
+		"db:migration:prepare": "npm run db:schema:pull && npm run db:schema:apply && supabase db diff --local -f $(git rev-parse --abbrev-ref HEAD) && npm run db:types",
 		"db:diff": "npm run db:schema:pull && supabase db diff --local",
 		"db:migration:push": "supabase migration up --linked --debug --include-all",
 		"db:sync:local": "npm run db:schema:pull && supabase db reset && npm run db:seed:local",
