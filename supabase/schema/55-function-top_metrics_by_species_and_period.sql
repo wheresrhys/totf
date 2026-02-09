@@ -27,7 +27,9 @@ BEGIN
   FROM
     by_period_and_species
   ORDER BY
-    "by_period_and_species"."metric_value" DESC
+    "by_period_and_species"."metric_value" DESC,
+    "by_period_and_species"."visit_date" DESC,
+    "by_period_and_species"."species_name" DESC
   LIMIT result_limit;
 END;
 $$;

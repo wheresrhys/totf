@@ -24,7 +24,8 @@ BEGIN
   GROUP BY
     "by_period_and_species"."visit_date"
   ORDER BY
-    SUM("by_period_and_species"."metric_value") DESC
+    SUM("by_period_and_species"."metric_value") DESC,
+		"by_period_and_species"."visit_date" DESC
   LIMIT result_limit;
 END;
 $$;
