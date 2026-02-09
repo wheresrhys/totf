@@ -20,8 +20,6 @@ type PageProps = { searchParams: Promise<SearchParams> };
 
 async function searchByRing({ q }: SearchParams) {
 	const uppercaseQuery = q.toUpperCase();
-	// 1. fetch by uppercase ring number - exact match
-	//   if success, redirect
 	const exactMatch = await supabase
 		.from('Birds')
 		.select('id')
@@ -44,8 +42,6 @@ function SearchResults({
 	params: SearchParams;
 	data: SearchResult[];
 }) {
-	// TODO force search bar to be expanded with query in the input
-	// proabbly need to await params in global nav
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Search results</PrimaryHeading>
