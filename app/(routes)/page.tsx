@@ -5,10 +5,10 @@ import {
 } from '../components/StatsAccordion';
 import { getSeasonMonths, getSeasonName } from '../models/seasons';
 import { BootstrapPageData } from '../components/layout/BootstrapPageData';
-import { RingSearchForm } from '../components/RingSearchForm';
 import { PageWrapper } from '../components/shared/DesignSystem';
 import { getTopStats } from '../isomorphic/stats-data-tables';
 import { TopMetricsFilterParams } from '../models/db';
+
 function getStatConfigs(
 	date: Date
 ): { heading: string; stats: StatConfig[] }[] {
@@ -148,7 +148,6 @@ async function fetchInitialData(): Promise<StatsAccordionModel[]> {
 function HomePageContent({ data }: { data: StatsAccordionModel[] }) {
 	return (
 		<PageWrapper>
-			<RingSearchForm />
 			<StatsAccordion data={data} />
 		</PageWrapper>
 	);
