@@ -27,7 +27,8 @@ BEGIN
     sp.species_name,
     b.ring_no
   ORDER BY
-    encounters DESC
+    encounters DESC,
+		ring_no DESC
   LIMIT result_limit;
 END;
 $$;
