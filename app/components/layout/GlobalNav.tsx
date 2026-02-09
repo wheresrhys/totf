@@ -1,8 +1,8 @@
 import Link from 'next/link';
-
+import { RingSearchForm } from './RingSearchForm';
 export default function GlobalNav() {
 	return (
-		<nav className="navbar shadow-base-300/20 shadow-sm">
+		<><nav className="navbar shadow-base-300/20 shadow-sm">
 			<div className="w-full md:flex md:items-center md:gap-2">
 				<div className="flex items-center justify-between">
 					<div className="navbar-start items-center justify-between max-md:w-full">
@@ -43,5 +43,7 @@ export default function GlobalNav() {
 				</div>
 			</div>
 		</nav>
+		<RingSearchForm />
+		</>
 	);
 }
