@@ -18,22 +18,6 @@ type SearchResult = {
 type SearchParams = { q: string };
 type PageProps = { searchParams: Promise<SearchParams> };
 
-async function getParticalMatches(q: string): Promise<SearchResult[]> {
-	const matches = await supabase
-		.from('Birds')
-		.select('ring_no, species:Species(species_name)')
-		.like('ring_no', `%${q}%`)
-		.then(catchSupabaseErrors);
-	return (
-		matches
-			? matches.map(({ ring_no, species: { species_name } }) => ({
-					ring_no,
-					species_name
-				}))
-			: []
-	) as SearchResult[];
-}
-
 async function searchByRing({ q }: SearchParams) {
 	const uppercaseQuery = q.toUpperCase();
 	// 1. fetch by uppercase ring number - exact match
@@ -71,7 +55,7 @@ function SearchResults({
 				<RingSearchForm q={q} buttonText="Search again" />
 			</div>
 			<BoxyList>
-				{data.map(({ ring_no, species_name, closeness_score }) => (
+				{data.map(({ ring_no, species_name }) => (
 					<li key={ring_no}>
 						<Link className="link" href={`/bird/${ring_no}`}>
 							{ring_no}: {species_name}
