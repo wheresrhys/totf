@@ -62,7 +62,7 @@ describe('species page', () => {
 			'Most caught birds: 3 encounters each BVB4353  ADZ0566  BVB4581  BVB4401 '
 		);
 		expect(statsLineItems[6].textContent).toBe(
-			'Top sessions: 4  on  3 Dec 2025 3  on  16 Dec 2025 3  on  9 Nov 2025 2  on  8 Nov 2025 2  on  20 Dec 2025 '
+			'Top sessions: 4  on  3 Dec 2025 3  on  16 Dec 2025 3  on  9 Nov 2025 2  on  20 Dec 2025 2  on  8 Nov 2025 '
 		);
 	});
 	it('should show table of every individual bird when less than 20 records', async () => {
