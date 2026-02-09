@@ -39,9 +39,9 @@ describe('bird page', () => {
 		const encounterTable = await screen.findByTestId('single-bird-table');
 		verifyTableData(encounterTable, [
 			['Date', 'Time', 'Age', 'Sex', 'Wing', 'Weight'],
-			['2025-11-09', '07:20:00', '3', 'U', '55', '11.3'],
-			['2025-12-20', '08:35:00', '2', 'F', '55', '11.7'],
-			['2026-01-14', '08:00:00', '4', 'F', '56', '11.1']
+			['09 Nov 2025', '07:20:00', '3', 'U', '55', '11.3'],
+			['20 Dec 2025', '08:35:00', '2', 'F', '55', '11.7'],
+			['14 Jan 2026', '08:00:00', '4', 'F', '56', '11.1']
 		]);
 	});
 });

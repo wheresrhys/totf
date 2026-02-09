@@ -7,18 +7,23 @@ import { AccordionTableBody } from './shared/AccordionTableBody';
 import {
 	SortableTable,
 	type ColumnConfig,
-	type RowModelWithRawData
+	type RowModelWithRawData,
+	getFormattedValue
 } from './shared/SortableTable';
 
 type RowModel = {
 	ringNo: string;
 	encounterCount: number;
 	sex: string;
-	firstEncounterDate: string;
-	lastEncounterDate: string;
+	firstEncounterDate: Date;
+	lastEncounterDate: Date;
 	lastEncounterAgeCode: string;
 	provenAge: number;
 };
+
+function dateFormatter(date: Date): string {
+	return formatDate(date, 'dd MMM yyyy');
+}
 
 const columnConfigs = {
 	ringNo: {
@@ -32,10 +37,12 @@ const columnConfigs = {
 		label: 'Sex'
 	},
 	firstEncounterDate: {
-		label: 'First'
+		label: 'First',
+		formatter: dateFormatter
 	},
 	lastEncounterDate: {
-		label: 'Last'
+		label: 'Last',
+		formatter: dateFormatter
 	},
 	lastEncounterAgeCode: {
 		label: 'Last aged'
@@ -67,10 +74,14 @@ function BirdDetailsTable({
 	return <SingleBirdTable encounters={encounters} isInline={true} />;
 }
 
+const cellFormatter = getFormattedValue<RowModel>(columnConfigs);
+
 function BirdRow({ model: bird }: { model: RowModel }) {
 	return orderedColumnProperties
 		.slice(1)
-		.map((prop) => <td key={prop}>{bird[prop]}</td>);
+		.map((prop) => (
+			<td key={prop}>{cellFormatter(bird[prop as keyof RowModel], prop)}</td>
+		));
 }
 
 function rowDataTransform(bird: EnrichedBirdOfSpecies): RowModel {
@@ -78,8 +89,8 @@ function rowDataTransform(bird: EnrichedBirdOfSpecies): RowModel {
 		ringNo: bird.ring_no,
 		encounterCount: bird.encounters.length,
 		sex: `${bird.sex}${bird.sexCertainty < 0.5 ? '?' : ''}`,
-		firstEncounterDate: formatDate(bird.firstEncounterDate, 'dd MMM yyyy'),
-		lastEncounterDate: formatDate(bird.lastEncounterDate, 'dd MMM yyyy'),
+		firstEncounterDate: bird.firstEncounterDate,
+		lastEncounterDate: bird.lastEncounterDate,
 		lastEncounterAgeCode: `${bird.lastEncounter.age_code}${bird.lastEncounter.is_juv ? 'J' : ''}`,
 		provenAge: bird.provenAge
 	};

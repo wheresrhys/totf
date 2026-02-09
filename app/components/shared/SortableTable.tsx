@@ -5,14 +5,22 @@ import { useState } from 'react';
 export type ColumnConfig = {
 	label: string;
 	invertSort?: boolean;
+	formatter?: (value: unknown) => string;
 };
 
 export type RowModelWithRawData<RawRowData, RowModel> = RowModel & {
 	_rawRowData: RawRowData;
 };
 
-export function SortableBodyCell() {
-	return <td>rats</td>;
+export function getFormattedValue<RowModel>(
+	columnConfigs: Record<keyof RowModel, ColumnConfig>
+) {
+	return (rawValue: unknown, property: keyof RowModel) => {
+		const formatter = columnConfigs[property].formatter as (
+			value: unknown
+		) => string;
+		return formatter ? formatter(rawValue) : (rawValue as string);
+	};
 }
 
 type SortableTableProps<RawRowData, RowModel> = {
