@@ -1,5 +1,5 @@
 'use client';
-import { type Session } from '@/app/(routes)/sessions/page';
+import { type SessionWithEncountersCount } from '@/app/models/session';
 import { AccordionItem } from '@/app/components/shared/Accordion';
 import {
 	BoxyList,
@@ -10,30 +10,39 @@ import { StatOutput } from './shared/StatOutput';
 import { format as formatDate } from 'date-fns';
 
 function groupByDateMethod(methodName: 'getFullYear' | 'getMonth') {
-	return function (sessions: Session[] | null): Session[][] {
+	return function (
+		sessions: SessionWithEncountersCount[] | null
+	): SessionWithEncountersCount[][] {
 		if (!sessions) return [];
 		return Object.entries(
-			sessions.reduce((acc: Record<string, Session[]>, session) => {
-				const date = new Date(session.visit_date);
-				const groupByValue = String(date[methodName]());
-				acc[groupByValue] = acc[groupByValue] || [];
-				acc[groupByValue].push(session);
-				return acc;
-			}, {})
+			sessions.reduce(
+				(acc: Record<string, SessionWithEncountersCount[]>, session) => {
+					const date = new Date(session.visit_date);
+					const groupByValue = String(date[methodName]());
+					acc[groupByValue] = acc[groupByValue] || [];
+					acc[groupByValue].push(session);
+					return acc;
+				},
+				{}
+			)
 		)
 			.map(([groupByValue, sessions]) => ({ groupByValue, sessions }))
 			.sort((a, b) => {
 				if (a.groupByValue === b.groupByValue) return 0;
 				return Number(a.groupByValue) > Number(b.groupByValue) ? -1 : 1;
 			})
-			.map(({ sessions }) => sessions) as Session[][];
+			.map(({ sessions }) => sessions) as SessionWithEncountersCount[][];
 	};
 }
 
 const groupByYear = groupByDateMethod('getFullYear');
 const groupByMonth = groupByDateMethod('getMonth');
 
-function SessionsOfMonth({ model: month }: { model: Session[] }) {
+function SessionsOfMonth({
+	model: month
+}: {
+	model: SessionWithEncountersCount[];
+}) {
 	return (
 		<ol className="list-inside list-none py-3">
 			{month.map((session) => (
@@ -53,7 +62,11 @@ function SessionsOfMonth({ model: month }: { model: Session[] }) {
 	);
 }
 
-function MonthHeading({ model: month }: { model: Session[] }) {
+function MonthHeading({
+	model: month
+}: {
+	model: SessionWithEncountersCount[];
+}) {
 	return (
 		<span>
 			<span className="font-bold">
@@ -80,7 +93,7 @@ function MonthsOfYear({
 	model: { yearData, setExpandedMonth, expandedMonth }
 }: {
 	model: {
-		yearData: Session[][];
+		yearData: SessionWithEncountersCount[][];
 		yearString: string;
 		setExpandedMonth: (month: string | false) => void;
 		expandedMonth: string | false;
@@ -109,11 +122,15 @@ function MonthsOfYear({
 	);
 }
 
-function getYearString(year: Session[][]) {
+function getYearString(year: SessionWithEncountersCount[][]) {
 	return String(new Date(year[0][0].visit_date).getFullYear());
 }
 
-export function HistoryAccordion({ sessions }: { sessions: Session[] | null }) {
+export function SessionHistoryCalendar({
+	sessions
+}: {
+	sessions: SessionWithEncountersCount[] | null;
+}) {
 	const calendar = groupByYear(sessions || []).map(groupByMonth);
 	const [expandedMonth, setExpandedMonth] = useState<string | false>(false);
 	const [expandedYear, setExpandedYear] = useState(getYearString(calendar[0]));
