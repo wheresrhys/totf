@@ -5,7 +5,11 @@ import {
 } from '../components/StatsAccordion';
 import { getSeasonMonths, getSeasonName } from '../models/seasons';
 import { BootstrapPageData } from '../components/layout/BootstrapPageData';
-import { BoxyList, PageWrapper, SecondaryHeading } from '../components/shared/DesignSystem';
+import {
+	BoxyList,
+	PageWrapper,
+	SecondaryHeading
+} from '../components/shared/DesignSystem';
 import { getTopStats } from '../isomorphic/stats-data-tables';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import { TopMetricsFilterParams } from '../models/db';
@@ -79,7 +83,7 @@ function getStatConfigs(
 				{
 					id: `most-varied-session-this-${getSeasonName(date)}`,
 					category: `This ${getSeasonName(date)}`,
-					unit: 'Birds',
+					unit: 'Species',
 					dataArguments: {
 						temporal_unit: 'day',
 						metric_name: 'species',
@@ -163,8 +167,6 @@ async function fetchInitialData(): Promise<PageModel> {
 		recentSessions: await fetchRecentSessions()
 	};
 }
-
-
 
 function RecentSessions({ data }: { data: SessionWithEncountersCount[] }) {
 	return (

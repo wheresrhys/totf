@@ -7,7 +7,9 @@ import {
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
 
-export async function fetchAllSessions(): Promise<SessionWithEncountersCount[]> {
+export async function fetchAllSessions(): Promise<
+	SessionWithEncountersCount[]
+> {
 	return supabase
 		.from('Sessions')
 		.select('id, visit_date, encounters:Encounters(count)')

@@ -10,16 +10,21 @@ import { StatOutput } from './shared/StatOutput';
 import { format as formatDate } from 'date-fns';
 
 function groupByDateMethod(methodName: 'getFullYear' | 'getMonth') {
-	return function (sessions: SessionWithEncountersCount[] | null): SessionWithEncountersCount[][] {
+	return function (
+		sessions: SessionWithEncountersCount[] | null
+	): SessionWithEncountersCount[][] {
 		if (!sessions) return [];
 		return Object.entries(
-			sessions.reduce((acc: Record<string, SessionWithEncountersCount[]>, session) => {
-				const date = new Date(session.visit_date);
-				const groupByValue = String(date[methodName]());
-				acc[groupByValue] = acc[groupByValue] || [];
-				acc[groupByValue].push(session);
-				return acc;
-			}, {})
+			sessions.reduce(
+				(acc: Record<string, SessionWithEncountersCount[]>, session) => {
+					const date = new Date(session.visit_date);
+					const groupByValue = String(date[methodName]());
+					acc[groupByValue] = acc[groupByValue] || [];
+					acc[groupByValue].push(session);
+					return acc;
+				},
+				{}
+			)
 		)
 			.map(([groupByValue, sessions]) => ({ groupByValue, sessions }))
 			.sort((a, b) => {
@@ -33,7 +38,11 @@ function groupByDateMethod(methodName: 'getFullYear' | 'getMonth') {
 const groupByYear = groupByDateMethod('getFullYear');
 const groupByMonth = groupByDateMethod('getMonth');
 
-function SessionsOfMonth({ model: month }: { model: SessionWithEncountersCount[] }) {
+function SessionsOfMonth({
+	model: month
+}: {
+	model: SessionWithEncountersCount[];
+}) {
 	return (
 		<ol className="list-inside list-none py-3">
 			{month.map((session) => (
@@ -53,7 +62,11 @@ function SessionsOfMonth({ model: month }: { model: SessionWithEncountersCount[]
 	);
 }
 
-function MonthHeading({ model: month }: { model: SessionWithEncountersCount[] }) {
+function MonthHeading({
+	model: month
+}: {
+	model: SessionWithEncountersCount[];
+}) {
 	return (
 		<span>
 			<span className="font-bold">
@@ -113,7 +126,11 @@ function getYearString(year: SessionWithEncountersCount[][]) {
 	return String(new Date(year[0][0].visit_date).getFullYear());
 }
 
-export function SessionHistoryCalendar({ sessions }: { sessions: SessionWithEncountersCount[] | null }) {
+export function SessionHistoryCalendar({
+	sessions
+}: {
+	sessions: SessionWithEncountersCount[] | null;
+}) {
 	const calendar = groupByYear(sessions || []).map(groupByMonth);
 	const [expandedMonth, setExpandedMonth] = useState<string | false>(false);
 	const [expandedYear, setExpandedYear] = useState(getYearString(calendar[0]));
