@@ -5,10 +5,17 @@ import {
 } from '../components/StatsAccordion';
 import { getSeasonMonths, getSeasonName } from '../models/seasons';
 import { BootstrapPageData } from '../components/layout/BootstrapPageData';
-import { PageWrapper } from '../components/shared/DesignSystem';
+import { BoxyList, PageWrapper, SecondaryHeading } from '../components/shared/DesignSystem';
 import { getTopStats } from '../isomorphic/stats-data-tables';
+import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import { TopMetricsFilterParams } from '../models/db';
+import type { SessionWithEncountersCount } from '../models/session';
+import { StatOutput } from '../components/shared/StatOutput';
 
+type PageModel = {
+	stats: StatsAccordionModel[];
+	recentSessions: SessionWithEncountersCount[];
+};
 function getStatConfigs(
 	date: Date
 ): { heading: string; stats: StatConfig[] }[] {
@@ -121,41 +128,80 @@ function getStatConfigs(
 	];
 }
 
-async function fetchInitialData(): Promise<StatsAccordionModel[]> {
-	const statConfigs = getStatConfigs(new Date());
-	return Promise.all(
-		statConfigs.map(async (panelGroup) => {
-			const panels = await Promise.all(
-				panelGroup.stats.map(async (panel) => {
-					const data = await getTopStats(Boolean(panel.bySpecies), {
-						...panel.dataArguments,
-						result_limit: 1
-					});
-					return {
-						definition: panel,
-						data: data ?? []
-					};
-				})
-			);
-			return {
-				heading: panelGroup.heading,
-				stats: panels
-			};
-		})
-	);
+async function fetchRecentSessions(): Promise<SessionWithEncountersCount[]> {
+	return supabase
+		.from('Sessions')
+		.select('visit_date, encounters:Encounters(count)')
+		.order('visit_date', { ascending: false })
+		.limit(3)
+		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
 }
 
-function HomePageContent({ data }: { data: StatsAccordionModel[] }) {
+async function fetchInitialData(): Promise<PageModel> {
+	const statConfigs = getStatConfigs(new Date());
+	return {
+		stats: await Promise.all(
+			statConfigs.map(async (panelGroup) => {
+				const panels = await Promise.all(
+					panelGroup.stats.map(async (panel) => {
+						const data = await getTopStats(Boolean(panel.bySpecies), {
+							...panel.dataArguments,
+							result_limit: 1
+						});
+						return {
+							definition: panel,
+							data: data ?? []
+						};
+					})
+				);
+				return {
+					heading: panelGroup.heading,
+					stats: panels
+				};
+			})
+		),
+		recentSessions: await fetchRecentSessions()
+	};
+}
+
+
+
+function RecentSessions({ data }: { data: SessionWithEncountersCount[] }) {
+	return (
+		<div>
+			<SecondaryHeading>Recent Sessions</SecondaryHeading>
+			<BoxyList>
+				{data.map((session) => (
+					<li key={session.id}>
+						<StatOutput
+							unit="birds"
+							value={session.encounters[0].count}
+							speciesName={''}
+							visitDate={session.visit_date}
+							showUnit={true}
+							temporalUnit="day"
+							dateFormat="EEEE do MMMM"
+						/>
+						{/* <Link href={`/session/${session.id}`}>{session.visit_date}</Link> */}
+					</li>
+				))}
+			</BoxyList>
+		</div>
+	);
+}
+function HomePageContent({ data }: { data: PageModel }) {
+	console.log('asdasd', data);
 	return (
 		<PageWrapper>
-			<StatsAccordion data={data} />
+			<RecentSessions data={data.recentSessions} />
+			<StatsAccordion data={data.stats} />
 		</PageWrapper>
 	);
 }
 
 export default async function Home() {
 	return (
-		<BootstrapPageData<StatsAccordionModel[]>
+		<BootstrapPageData<PageModel>
 			getCacheKeys={() => ['home-stats']}
 			dataFetcher={fetchInitialData}
 			PageComponent={HomePageContent}
