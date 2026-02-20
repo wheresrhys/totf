@@ -18,7 +18,7 @@ BEGIN
     CASE
       WHEN metric_name = 'encounters' THEN count(e.*)
       WHEN metric_name = 'individuals' THEN count(DISTINCT b.ring_no)
-      ELSE count(e.*)
+      ELSE 1
     END::BIGINT AS metric_value
   FROM
     public."Birds" b
