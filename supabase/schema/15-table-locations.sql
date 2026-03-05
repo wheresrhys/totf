@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "public"."Locations" (
 	"location_name" "text" NOT NULL,
-  "ringing_group_id" bigint NOT NULL,
+	"ringing_group_id" bigint NOT NULL,
 	"id" bigint NOT NULL
 );
 
