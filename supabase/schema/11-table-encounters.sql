@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS "public"."Encounters" (
 	"bird_id" bigint NOT NULL,
 	"session_id" bigint NOT NULL,
 	"location_id" bigint NOT NULL,
+	"ringing_group_id" bigint NOT NULL,
 	"age_code" smallint NOT NULL,
 	"minimum_years" smallint NOT NULL
 );

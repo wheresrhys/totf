@@ -22,3 +22,8 @@ CREATE INDEX "idx_encounters_location_id" ON "public"."Encounters" USING "btree"
 
 ALTER TABLE ONLY "public"."Encounters"
 ADD CONSTRAINT "encounters_location_id_fkey" FOREIGN KEY ("location_id") REFERENCES "public"."Sessions" ("id");
+
+CREATE INDEX "idx_encounters_ringing_group_id" ON "public"."Encounters" USING "btree" ("ringing_group_id");
+
+ALTER TABLE ONLY "public"."Encounters"
+ADD CONSTRAINT "encounters_ringing_group_id_fkey" FOREIGN KEY ("ringing_group_id") REFERENCES "public"."Sessions" ("id");
