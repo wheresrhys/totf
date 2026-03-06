@@ -24,7 +24,7 @@ ALTER TABLE ONLY "public"."Locations"
 ADD CONSTRAINT "Locations_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "public"."Locations"
-ADD CONSTRAINT "Locations_group_name_unique" UNIQUE ("group_name");
+ADD CONSTRAINT "Locations_location_name_unique" UNIQUE ("location_name");
 
 GRANT ALL ON TABLE "public"."Locations" TO "anon";
 

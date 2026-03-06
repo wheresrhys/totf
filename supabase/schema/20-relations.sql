@@ -20,11 +20,8 @@ ADD CONSTRAINT "locations_ringing_group_id_fkey" FOREIGN KEY ("ringing_group_id"
 
 -- ADD AFTER DATA MIGRATION
 -- CREATE INDEX "idx_encounters_location_id" ON "public"."Encounters" USING "btree" ("location_id");
-
 -- ALTER TABLE ONLY "public"."Encounters"
 -- ADD CONSTRAINT "encounters_location_id_fkey" FOREIGN KEY ("location_id") REFERENCES "public"."Locations" ("id");
-
 -- CREATE INDEX "idx_encounters_ringing_group_id" ON "public"."Encounters" USING "btree" ("ringing_group_id");
-
 -- ALTER TABLE ONLY "public"."Encounters"
 -- ADD CONSTRAINT "encounters_ringing_group_id_fkey" FOREIGN KEY ("ringing_group_id") REFERENCES "public"."RingingGroups" ("id");
