@@ -202,7 +202,7 @@ async function upsert<DataInsertModel>(
 			ignoreDuplicates: false
 		})
 		.select(returnType === 'id' ? 'id' : '*')
-		.single()
+		.single();
 
 	if (upsertError) throw upsertError;
 	return upsertResult.id;
@@ -282,7 +282,6 @@ async function importCSV(options: ImportOptions): Promise<void> {
 					'species_name'
 				);
 
-
 				// 2. Upsert Bird (create if doesn't exist) and get ID
 				const birdId = await upsert<BirdsInsert>(
 					'Birds',
@@ -316,28 +315,33 @@ async function importCSV(options: ImportOptions): Promise<void> {
 				// 4. Insert Encounter (always create new)
 				const age_code: number = Number(String(row.age).replace('J', ''));
 
-				const encounterResult = await upsert<EncountersInsert>('Encounters', {
-					age_code,
-					minimum_years: Math.max(0, Math.floor(age_code / 2 - 1)),
-					breeding_condition: row.breeding_condition as string | null,
-					capture_time: row.capture_time as string,
-					extra_text: row.extra_text as string | null,
-					is_juv: String(row.age).endsWith('J') as boolean,
-					moult_code: row.moult_code as string | null,
-					old_greater_coverts: row.old_greater_coverts
-						? Number(row.old_greater_coverts)
-						: null,
-					record_type: row.record_type as string,
-					bird_id: birdId,
-					session_id: sessionId,
-					location_id: locationId,
-					ringing_group_id: ringingGroupId,
-					scheme: row.scheme as string,
-					sex: row.sex as string,
-					sexing_method: row.sexing_method as string | null,
-					weight: row.weight ? Number(row.weight) : null,
-					wing_length: row.wing_length ? Number(row.wing_length) : null
-				}, 'bird_id,session_id' as keyof EncountersInsert, 'row') as unknown as EncounterRow;
+				const encounterResult = (await upsert<EncountersInsert>(
+					'Encounters',
+					{
+						age_code,
+						minimum_years: Math.max(0, Math.floor(age_code / 2 - 1)),
+						breeding_condition: row.breeding_condition as string | null,
+						capture_time: row.capture_time as string,
+						extra_text: row.extra_text as string | null,
+						is_juv: String(row.age).endsWith('J') as boolean,
+						moult_code: row.moult_code as string | null,
+						old_greater_coverts: row.old_greater_coverts
+							? Number(row.old_greater_coverts)
+							: null,
+						record_type: row.record_type as string,
+						bird_id: birdId,
+						session_id: sessionId,
+						location_id: locationId,
+						ringing_group_id: ringingGroupId,
+						scheme: row.scheme as string,
+						sex: row.sex as string,
+						sexing_method: row.sexing_method as string | null,
+						weight: row.weight ? Number(row.weight) : null,
+						wing_length: row.wing_length ? Number(row.wing_length) : null
+					},
+					'bird_id,session_id' as keyof EncountersInsert,
+					'row'
+				)) as unknown as EncounterRow;
 
 				return encounterResult;
 			} catch (error) {

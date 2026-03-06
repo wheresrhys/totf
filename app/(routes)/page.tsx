@@ -174,7 +174,7 @@ function RecentSessions({ data }: { data: SessionWithEncountersCount[] }) {
 			<SecondaryHeading>Recent Sessions</SecondaryHeading>
 			<BoxyList>
 				{data.map((session) => (
-					<li key={session.id}>
+					<li key={session.visit_date}>
 						<StatOutput
 							unit="birds"
 							value={session.encounters[0].count}
@@ -184,7 +184,6 @@ function RecentSessions({ data }: { data: SessionWithEncountersCount[] }) {
 							temporalUnit="day"
 							dateFormat="EEEE do MMMM"
 						/>
-						{/* <Link href={`/session/${session.id}`}>{session.visit_date}</Link> */}
 					</li>
 				))}
 			</BoxyList>
@@ -192,7 +191,6 @@ function RecentSessions({ data }: { data: SessionWithEncountersCount[] }) {
 	);
 }
 function HomePageContent({ data }: { data: PageModel }) {
-	console.log('asdasd', data);
 	return (
 		<PageWrapper>
 			<RecentSessions data={data.recentSessions} />
