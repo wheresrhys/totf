@@ -44,10 +44,12 @@ export type Database = {
           extra_text: string | null
           id: number
           is_juv: boolean
+          location_id: number | null
           minimum_years: number
           moult_code: string | null
           old_greater_coverts: number | null
           record_type: string
+          ringing_group_id: number | null
           scheme: string
           session_id: number
           sex: string
@@ -63,10 +65,12 @@ export type Database = {
           extra_text?: string | null
           id?: number
           is_juv?: boolean
+          location_id?: number | null
           minimum_years: number
           moult_code?: string | null
           old_greater_coverts?: number | null
           record_type: string
+          ringing_group_id?: number | null
           scheme: string
           session_id: number
           sex: string
@@ -82,10 +86,12 @@ export type Database = {
           extra_text?: string | null
           id?: number
           is_juv?: boolean
+          location_id?: number | null
           minimum_years?: number
           moult_code?: string | null
           old_greater_coverts?: number | null
           record_type?: string
+          ringing_group_id?: number | null
           scheme?: string
           session_id?: number
           sex?: string
@@ -109,6 +115,47 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      Locations: {
+        Row: {
+          id: number
+          location_name: string
+          ringing_group_id: number
+        }
+        Insert: {
+          id?: number
+          location_name: string
+          ringing_group_id: number
+        }
+        Update: {
+          id?: number
+          location_name?: string
+          ringing_group_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_ringing_group_id_fkey"
+            columns: ["ringing_group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      RingingGroups: {
+        Row: {
+          group_name: string
+          id: number
+        }
+        Insert: {
+          group_name: string
+          id?: number
+        }
+        Update: {
+          group_name?: string
+          id?: number
+        }
+        Relationships: []
       }
       Sessions: {
         Row: {
