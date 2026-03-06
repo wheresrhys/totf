@@ -44,12 +44,12 @@ export type Database = {
           extra_text: string | null
           id: number
           is_juv: boolean
-          location_id: number | null
+          location_id: number
           minimum_years: number
           moult_code: string | null
           old_greater_coverts: number | null
           record_type: string
-          ringing_group_id: number | null
+          ringing_group_id: number
           scheme: string
           session_id: number
           sex: string
@@ -65,12 +65,12 @@ export type Database = {
           extra_text?: string | null
           id?: number
           is_juv?: boolean
-          location_id?: number | null
+          location_id: number
           minimum_years: number
           moult_code?: string | null
           old_greater_coverts?: number | null
           record_type: string
-          ringing_group_id?: number | null
+          ringing_group_id: number
           scheme: string
           session_id: number
           sex: string
@@ -86,12 +86,12 @@ export type Database = {
           extra_text?: string | null
           id?: number
           is_juv?: boolean
-          location_id?: number | null
+          location_id?: number
           minimum_years?: number
           moult_code?: string | null
           old_greater_coverts?: number | null
           record_type?: string
-          ringing_group_id?: number | null
+          ringing_group_id?: number
           scheme?: string
           session_id?: number
           sex?: string
@@ -105,6 +105,20 @@ export type Database = {
             columns: ["bird_id"]
             isOneToOne: false
             referencedRelation: "Birds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounters_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "Locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounters_ringing_group_id_fkey"
+            columns: ["ringing_group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
             referencedColumns: ["id"]
           },
           {
