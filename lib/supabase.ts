@@ -10,6 +10,14 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
+export function createSupabaseClientWithJwt(jwt: string) {
+	return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+		global: {
+			headers: { Authorization: `Bearer ${jwt}` }
+		}
+	});
+}
+
 export function catchSupabaseErrors<T>({
 	data,
 	error
