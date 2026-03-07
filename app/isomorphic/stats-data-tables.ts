@@ -1,3 +1,4 @@
+'use server';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import type {
 	TopPeriodsResult,
