@@ -51,7 +51,10 @@ function SpeciesDetailsTable({
 					<tr key={encounter.id}>
 						<td>{encounter.capture_time}</td>
 						<td>
-							<NoPrefetchLink className="link" href={`/bird/${encounter.bird.ring_no}`}>
+							<NoPrefetchLink
+								className="link"
+								href={`/bird/${encounter.bird.ring_no}`}
+							>
 								{encounter.bird.ring_no}
 							</NoPrefetchLink>
 						</td>

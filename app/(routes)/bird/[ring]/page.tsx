@@ -64,7 +64,10 @@ function BirdSummary({
 	return (
 		<PageWrapper>
 			<PrimaryHeading>
-				<NoPrefetchLink className="link" href={`/species/${bird.species?.species_name}`}>
+				<NoPrefetchLink
+					className="link"
+					href={`/species/${bird.species?.species_name}`}
+				>
 					{bird.species?.species_name}
 				</NoPrefetchLink>{' '}
 				{ring}
