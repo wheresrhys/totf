@@ -21,20 +21,25 @@ async function fetchRingingGroups(): Promise<RingingGroup[]> {
 		.then(catchSupabaseErrors) as Promise<RingingGroup[]>;
 }
 
+async function PopulatedNav() {
+	const [groups, selectedGroupId] = await Promise.all([
+		fetchRingingGroups(),
+		getGroupId()
+	]);
+	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
+}
+
 export default async function RootLayout({
 	children
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
-	const [groups, selectedGroupId] = await Promise.all([
-		fetchRingingGroups(),
-		getGroupId()
-	]);
-
 	return (
 		<html lang="en">
 			<body>
-				<GlobalNav groups={groups} selectedGroupId={selectedGroupId} />
+				<Suspense>
+					<PopulatedNav />
+				</Suspense>
 				{children}
 				<Suspense>
 					<LoadFlyonUI />
