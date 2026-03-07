@@ -28,7 +28,7 @@ BEGIN
     FROM "Species" sp
     LEFT JOIN "Birds" b ON b.species_id = sp.id
     LEFT JOIN "Encounters" e ON b.id = e.bird_id
-    LEFT JOIN "SessionsLegacy" ss ON ss.id = e.session_legacy_id
+    LEFT JOIN "Sessions" ss ON ss.id = e.session_id
     WHERE sp.species_name = species_name_param
     ORDER BY
       b.id,
@@ -64,7 +64,7 @@ BEGIN
   FROM top_birds tb
   JOIN "Birds" b ON b.id = tb.id
   LEFT JOIN "Encounters" e ON b.id = e.bird_id
-  LEFT JOIN "SessionsLegacy" ss ON ss.id = e.session_legacy_id
+  LEFT JOIN "Sessions" ss ON ss.id = e.session_id
   ORDER BY
     ss.visit_date DESC,
     e.capture_time DESC;

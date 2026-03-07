@@ -19,7 +19,7 @@ async function fetchSessionData({
 	date
 }: PageParams): Promise<SessionEncounter[] | null> {
 	const data = (await supabase
-		.from('SessionsLegacy')
+		.from('Sessions')
 		.select(
 			`
 		id,
@@ -44,15 +44,17 @@ async function fetchSessionData({
 	`
 		)
 		.eq('visit_date', date)
-		.maybeSingle()
 		.then(catchSupabaseErrors)) as {
 		id: number;
 		encounters: SessionEncounter[];
-	} | null;
-	if (!data) {
+	}[];
+	if (data.length === 0) {
 		return null;
 	}
-	return data.encounters;
+	if (data.length > 1) {
+		throw new Error(`Multiple sessions per date not implemented yet`);
+	}
+	return data[0].encounters;
 }
 
 function groupBySpecies(
