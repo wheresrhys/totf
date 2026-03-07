@@ -1,4 +1,10 @@
-import type { EncounterRow, BirdRow, SpeciesRow, SessionRow } from './db';
+import type {
+	EncounterRow,
+	BirdRow,
+	SpeciesRow,
+	SessionRow,
+	LocationRow
+} from './db';
 
 export type SessionEncounter = EncounterRow & {
 	bird: BirdRow & {
@@ -8,4 +14,5 @@ export type SessionEncounter = EncounterRow & {
 
 export type SessionWithEncountersCount = SessionRow & {
 	encounters: { count: number }[];
+	location: LocationRow;
 };

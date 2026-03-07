@@ -84,3 +84,11 @@ export function UnwrappedBadgeList({ items }: { items: string[] }) {
 		</Fragment>
 	);
 }
+
+export function printLocationName(locationName: string) {
+	const match = /\(([^)]+)\)/g.exec(locationName);
+	if (match) {
+		return match[1];
+	}
+	return locationName;
+}

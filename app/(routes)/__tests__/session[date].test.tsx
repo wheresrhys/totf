@@ -1,24 +1,30 @@
 import { expect, describe, it } from 'vitest';
 import { render, screen, getAllByRole } from '@testing-library/react';
-import Page from '../session/[date]/page';
+import Page from '../session/[...params]/page';
 import { verifyTableData } from './helpers/verify-table-data';
 
 describe('session page', () => {
 	it('should show correct heading', async () => {
 		render(
 			await Page({
-				params: new Promise((resolve) => resolve({ date: '2025-12-03' }))
+				params: new Promise((resolve) =>
+					resolve({ params: ['2025-12-03', undefined] })
+				)
 			})
 		);
 		const heading = await screen.findByRole('heading', {
 			level: 1
 		});
-		expect(heading.textContent).toBe('Wed 3rd December 2025');
+		expect(heading.textContent).toBe(
+			'Wed 3rd December 2025Walthamstow Wetlands'
+		);
 	});
 	it('should show headline stats', async () => {
 		render(
 			await Page({
-				params: new Promise((resolve) => resolve({ date: '2025-12-03' }))
+				params: new Promise((resolve) =>
+					resolve({ params: ['2025-12-03', undefined] })
+				)
 			})
 		);
 
@@ -35,7 +41,9 @@ describe('session page', () => {
 	it('should show table of every species', async () => {
 		render(
 			await Page({
-				params: new Promise((resolve) => resolve({ date: '2025-12-03' }))
+				params: new Promise((resolve) =>
+					resolve({ params: ['2025-12-03', undefined] })
+				)
 			})
 		);
 		const speciesTable = await screen.findByTestId('session-table');
