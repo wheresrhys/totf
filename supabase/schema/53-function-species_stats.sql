@@ -39,7 +39,7 @@ CREATE OR REPLACE FUNCTION "public"."species_stats" (
     FROM public."Species" sp
     JOIN public."Birds" b ON sp.id = b.species_id
     LEFT JOIN public."Encounters" e ON b.id = e.bird_id
-    LEFT JOIN public."SessionsLegacy" sess ON e.session_legacy_id = sess.id
+    LEFT JOIN public."Sessions" sess ON e.session_id = sess.id
     WHERE (from_date IS NULL OR sess.visit_date >=from_date)
      AND (to_date IS NULL OR sess.visit_date<=to_date)
      AND (species_name_filter IS NULL OR sp.species_name = species_name_filter)
