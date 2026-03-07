@@ -51,6 +51,7 @@ function SessionsOfMonth({
 						unit="birds"
 						value={session.encounters[0].count}
 						speciesName={''}
+						location={session.location}
 						visitDate={session.visit_date}
 						showUnit={true}
 						temporalUnit="day"

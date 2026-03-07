@@ -14,7 +14,9 @@ export async function fetchAllSessions(): Promise<
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Sessions')
-		.select('id, visit_date, encounters:Encounters(count)')
+		.select(
+			'id, visit_date, location: Locations(id, location_name), encounters:Encounters(count)'
+		)
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
 }

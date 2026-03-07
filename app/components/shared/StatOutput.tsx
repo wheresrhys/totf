@@ -1,5 +1,7 @@
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
+import type { LocationRow } from '@/app/models/db';
+import { printLocationName } from './DesignSystem';
 export type TemporalUnit = 'day' | 'month' | 'year';
 export type StatOutputModel = {
 	value: number;
@@ -10,6 +12,7 @@ export type StatOutputModel = {
 	temporalUnit: TemporalUnit;
 	dateFormat?: string;
 	classes?: string;
+	location?: LocationRow;
 };
 
 const connectingVerbMap: Record<TemporalUnit, 'in' | 'on'> = {
@@ -32,7 +35,8 @@ export function StatOutput({
 	visitDate,
 	showUnit,
 	temporalUnit,
-	classes
+	classes,
+	location
 }: StatOutputModel) {
 	return (
 		<span className={classes}>
@@ -41,7 +45,10 @@ export function StatOutput({
 			</span>{' '}
 			{connectingVerbMap[temporalUnit as TemporalUnit] as string}{' '}
 			{temporalUnit === 'day' ? (
-				<NoPrefetchLink className="link" href={`/session/${visitDate}`}>
+				<NoPrefetchLink
+					className="link"
+					href={`/session/${visitDate}${location ? `/loc-${location.id}` : ''}`}
+				>
 					{formatDate(
 						new Date(visitDate as string),
 						dateFormat || dateFormatMap[temporalUnit as TemporalUnit]
@@ -53,6 +60,7 @@ export function StatOutput({
 					dateFormat || dateFormatMap[temporalUnit as TemporalUnit]
 				)
 			)}
+			{location ? ` at ${printLocationName(location.location_name)}` : ''}
 		</span>
 	);
 }
