@@ -3,20 +3,38 @@ import './globals.css';
 import GlobalNav from './components/layout/GlobalNav';
 import LoadFlyonUI from './components/layout/LoadFlyonUI';
 import { Suspense } from 'react';
+import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getGroupId } from '@/lib/group-auth';
+
 export const metadata: Metadata = {
 	title: 'Top of the Flocks',
 	description: 'Leaderboard for bird ringing data'
 };
 
-export default function RootLayout({
+type RingingGroup = { id: number; group_name: string };
+
+async function fetchRingingGroups(): Promise<RingingGroup[]> {
+	return supabase
+		.from('RingingGroups')
+		.select('id, group_name')
+		.order('group_name')
+		.then(catchSupabaseErrors) as Promise<RingingGroup[]>;
+}
+
+export default async function RootLayout({
 	children
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
+	const [groups, selectedGroupId] = await Promise.all([
+		fetchRingingGroups(),
+		getGroupId()
+	]);
+
 	return (
 		<html lang="en">
 			<body>
-				<GlobalNav />
+				<GlobalNav groups={groups} selectedGroupId={selectedGroupId} />
 				{children}
 				<Suspense>
 					<LoadFlyonUI />
