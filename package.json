@@ -11,7 +11,7 @@
 		"db:diff": "npm run db:schema:pull && supabase db diff --local",
 		"db:migration:push": "supabase migration up --linked --debug --include-all",
 		"db:sync:local": "npm run db:schema:pull && supabase db reset && npm run db:seed:local",
-		"db:seed:local": "npm run db:import:local ./data/end25.csv",
+		"db:seed:local": "npm run db:import:local ./data/end25.csv \"Walthamstow Wetlands\"",
 		"db:local:start": "supabase start",
 		"db:local:console": "open http://localhost:54323/project/default",
 		"db:types": "supabase gen types typescript --local --schema public > ./types/supabase.types.ts",

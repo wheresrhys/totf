@@ -21,6 +21,7 @@ type RingingGroupsInsert =
 	Database['public']['Tables']['RingingGroups']['Insert'];
 type LocationsInsert = Database['public']['Tables']['Locations']['Insert'];
 type EncounterRow = Database['public']['Tables']['Encounters']['Row'];
+type EncounterInsertWithTrigger = Omit<EncountersInsert, 'ringing_group_id'>;
 
 interface ImportOptions {
 	csvFilePath: string;
@@ -315,7 +316,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 				// 4. Insert Encounter (always create new)
 				const age_code: number = Number(String(row.age).replace('J', ''));
 
-				const encounterResult = (await upsert<EncountersInsert>(
+				const encounterResult = (await upsert<EncounterInsertWithTrigger>(
 					'Encounters',
 					{
 						age_code,
@@ -332,14 +333,13 @@ async function importCSV(options: ImportOptions): Promise<void> {
 						bird_id: birdId,
 						session_id: sessionId,
 						location_id: locationId,
-						ringing_group_id: ringingGroupId,
 						scheme: row.scheme as string,
 						sex: row.sex as string,
 						sexing_method: row.sexing_method as string | null,
 						weight: row.weight ? Number(row.weight) : null,
 						wing_length: row.wing_length ? Number(row.wing_length) : null
 					},
-					'bird_id,session_id' as keyof EncountersInsert,
+					'bird_id,session_id' as keyof EncounterInsertWithTrigger,
 					'row'
 				)) as unknown as EncounterRow;
 
@@ -360,7 +360,7 @@ if (args.length < 2) {
 		'Usage: npm run db:import:{local|prod} -- <csv-file-path> <ringing-group-name>'
 	);
 	console.log(
-		'Example: npm run db:import:{local|prod} -- data/birds.csv bird_sightings'
+		'Example: npm run db:import:{local|prod} -- data/birds.csv "Walthamstow Wetlands"'
 	);
 	process.exit(1);
 }

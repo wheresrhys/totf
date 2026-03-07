@@ -1,5 +1,4 @@
-CREATE OR REPLACE FUNCTION "public"."set_encounter_ringing_group_id"()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION "public"."set_encounter_ringing_group_id" () RETURNS TRIGGER AS $$
 BEGIN
   SELECT "ringing_group_id"
   INTO NEW."ringing_group_id"
@@ -14,8 +13,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER "trigger_set_encounter_ringing_group_id"
-BEFORE INSERT OR UPDATE OF "location_id"
-ON "public"."Encounters"
-FOR EACH ROW
-EXECUTE FUNCTION "public"."set_encounter_ringing_group_id"();
+CREATE OR REPLACE TRIGGER "trigger_set_encounter_ringing_group_id" BEFORE INSERT
+OR
+UPDATE OF "location_id" ON "public"."Encounters" FOR EACH ROW
+EXECUTE FUNCTION "public"."set_encounter_ringing_group_id" ();
