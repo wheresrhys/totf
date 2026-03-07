@@ -16,7 +16,6 @@ import { Database } from '../types/supabase.types';
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Database['public']['Tables']['Birds']['Insert'];
 type EncountersInsert = Database['public']['Tables']['Encounters']['Insert'];
-type SessionsInsert = Database['public']['Tables']['Sessions']['Insert'];
 type SessionsLegacyInsert =
 	Database['public']['Tables']['SessionsLegacy']['Insert'];
 type RingingGroupsInsert =
@@ -314,13 +313,6 @@ async function importCSV(options: ImportOptions): Promise<void> {
 					},
 					'visit_date'
 				);
-				const sessionId = await upsert<SessionsInsert>(
-					'Sessions',
-					{
-						visit_date: visitDate
-					},
-					'visit_date'
-				);
 
 				// 4. Insert Encounter (always create new)
 				const age_code: number = Number(String(row.age).replace('J', ''));
@@ -340,7 +332,6 @@ async function importCSV(options: ImportOptions): Promise<void> {
 							: null,
 						record_type: row.record_type as string,
 						bird_id: birdId,
-						session_id: sessionId,
 						session_legacy_id: sessionLegacyId,
 						location_id: locationId,
 						scheme: row.scheme as string,
@@ -349,7 +340,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 						weight: row.weight ? Number(row.weight) : null,
 						wing_length: row.wing_length ? Number(row.wing_length) : null
 					},
-					'bird_id,session_id' as keyof EncounterInsertWithTrigger,
+					'bird_id,session_legacy_id' as keyof EncounterInsertWithTrigger,
 					'row'
 				)) as unknown as EncounterRow;
 
