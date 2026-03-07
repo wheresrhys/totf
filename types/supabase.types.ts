@@ -44,7 +44,6 @@ export type Database = {
           extra_text: string | null
           id: number
           is_juv: boolean
-          location_id: number
           minimum_years: number
           moult_code: string | null
           old_greater_coverts: number | null
@@ -52,7 +51,6 @@ export type Database = {
           ringing_group_id: number
           scheme: string
           session_id: number
-          session_legacy_id: number
           sex: string
           sexing_method: string | null
           weight: number | null
@@ -66,7 +64,6 @@ export type Database = {
           extra_text?: string | null
           id?: number
           is_juv?: boolean
-          location_id: number
           minimum_years: number
           moult_code?: string | null
           old_greater_coverts?: number | null
@@ -74,7 +71,6 @@ export type Database = {
           ringing_group_id: number
           scheme: string
           session_id: number
-          session_legacy_id: number
           sex: string
           sexing_method?: string | null
           weight?: number | null
@@ -88,7 +84,6 @@ export type Database = {
           extra_text?: string | null
           id?: number
           is_juv?: boolean
-          location_id?: number
           minimum_years?: number
           moult_code?: string | null
           old_greater_coverts?: number | null
@@ -96,7 +91,6 @@ export type Database = {
           ringing_group_id?: number
           scheme?: string
           session_id?: number
-          session_legacy_id?: number
           sex?: string
           sexing_method?: string | null
           weight?: number | null
@@ -111,13 +105,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "encounters_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "Locations"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "encounters_ringing_group_id_fkey"
             columns: ["ringing_group_id"]
             isOneToOne: false
@@ -129,13 +116,6 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "Sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encounters_session_legacy_id_fkey"
-            columns: ["session_legacy_id"]
-            isOneToOne: false
-            referencedRelation: "SessionsLegacy"
             referencedColumns: ["id"]
           },
         ]
@@ -206,21 +186,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      SessionsLegacy: {
-        Row: {
-          id: number
-          visit_date: string
-        }
-        Insert: {
-          id?: number
-          visit_date: string
-        }
-        Update: {
-          id?: number
-          visit_date?: string
-        }
-        Relationships: []
       }
       Species: {
         Row: {
