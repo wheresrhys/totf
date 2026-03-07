@@ -22,6 +22,10 @@ type RingingGroupsInsert =
 type LocationsInsert = Database['public']['Tables']['Locations']['Insert'];
 type EncounterRow = Database['public']['Tables']['Encounters']['Row'];
 
+interface ImportOptions {
+	csvFilePath: string;
+	ringingGroupName: string;
+}
 type DemonColumnNames =
 	| 'entered_by'
 	| 'nest_link_code'
@@ -185,10 +189,6 @@ function convertDateFormat(dateString: string): string {
 	return dateString.split('/').reverse().join('-');
 }
 
-interface ImportOptions {
-	csvFilePath: string;
-}
-
 async function upsert<DataInsertModel>(
 	tableName: string,
 	upsertData: DataInsertModel,
@@ -209,7 +209,7 @@ async function upsert<DataInsertModel>(
 }
 
 async function importCSV(options: ImportOptions): Promise<void> {
-	const { csvFilePath } = options;
+	const { csvFilePath, ringingGroupName } = options;
 
 	if (!fs.existsSync(csvFilePath)) {
 		console.error(`Error: File not found: ${csvFilePath}`);
@@ -227,7 +227,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 	const ringingGroupId = await upsert<RingingGroupsInsert>(
 		'RingingGroups',
 		{
-			group_name: 'Walthamstow Wetlands'
+			group_name: ringingGroupName
 		},
 		'group_name'
 	);
@@ -355,14 +355,18 @@ async function importCSV(options: ImportOptions): Promise<void> {
 // Main execution
 const args = process.argv.slice(2);
 
-if (args.length < 1) {
-	console.log('Usage: npm run import -- <csv-file-path> <table-name>');
-	console.log('Example: npm run import -- data/birds.csv bird_sightings');
+if (args.length < 2) {
+	console.log(
+		'Usage: npm run db:import:{local|prod} -- <csv-file-path> <ringing-group-name>'
+	);
+	console.log(
+		'Example: npm run db:import:{local|prod} -- data/birds.csv bird_sightings'
+	);
 	process.exit(1);
 }
 
 const csvFilePath = path.resolve(args[0]);
-importCSV({ csvFilePath })
+importCSV({ csvFilePath, ringingGroupName: args[1] })
 	.then(() => process.exit(0))
 	.catch((error) => {
 		console.error('Import failed:', error);
