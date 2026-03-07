@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS "public"."Encounters" (
 	"is_juv" boolean DEFAULT FALSE NOT NULL,
 	"id" bigint NOT NULL,
 	"bird_id" bigint NOT NULL,
-	"session_id" bigint,
+	"session_id" bigint NOT NULL,
 	"session_legacy_id" bigint NOT NULL,
 	"location_id" bigint NOT NULL,
 	"ringing_group_id" bigint NOT NULL,
@@ -43,8 +43,9 @@ ADD CONSTRAINT "Encounters_pkey" PRIMARY KEY ("id");
 ALTER TABLE ONLY "public"."Encounters"
 ADD CONSTRAINT "encounters_bird_id_session_legacy_id_unique" UNIQUE ("bird_id", "session_legacy_id");
 
--- ALTER TABLE ONLY "public"."Encounters"
--- ADD CONSTRAINT "encounters_bird_id_session_id_unique" UNIQUE ("bird_id", "session_id");
+ALTER TABLE ONLY "public"."Encounters"
+ADD CONSTRAINT "encounters_bird_id_session_id_unique" UNIQUE ("bird_id", "session_id");
+
 GRANT ALL ON TABLE "public"."Encounters" TO "anon";
 
 GRANT ALL ON TABLE "public"."Encounters" TO "authenticated";
