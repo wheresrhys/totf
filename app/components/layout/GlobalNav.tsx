@@ -99,7 +99,11 @@ export default function GlobalNav() {
 				</Expander>
 				<Expander id="ring-search-form-wrapper" isExpanded={showSearchForm}>
 					<div className="p-4 pt-0">
-						<RingSearchForm searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>} />
+						<RingSearchForm
+							searchInputRef={
+								searchInputRef as React.RefObject<HTMLInputElement>
+							}
+						/>
 					</div>
 				</Expander>
 			</nav>
