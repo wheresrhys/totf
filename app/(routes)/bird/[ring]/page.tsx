@@ -12,7 +12,7 @@ import {
 	type EnrichedStandaloneBird,
 	type StandaloneBird
 } from '@/app/models/bird';
-import Link from 'next/link';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 
 type PageParams = { ring: string };
 type PageProps = { params: Promise<PageParams> };
@@ -64,9 +64,9 @@ function BirdSummary({
 	return (
 		<PageWrapper>
 			<PrimaryHeading>
-				<Link className="link" href={`/species/${bird.species?.species_name}`}>
+				<NoPrefetchLink className="link" href={`/species/${bird.species?.species_name}`}>
 					{bird.species?.species_name}
-				</Link>{' '}
+				</NoPrefetchLink>{' '}
 				{ring}
 			</PrimaryHeading>
 			<BadgeList

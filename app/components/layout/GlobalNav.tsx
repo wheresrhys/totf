@@ -1,15 +1,15 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
 export function NavItems({ classes }: { classes: string }) {
 	return (
 		<ul className={classes}>
 			<li>
-				<Link href="/sessions">Sessions</Link>
+				<NoPrefetchLink href="/sessions">Sessions</NoPrefetchLink>
 			</li>
 			<li>
-				<Link href="/species">Species</Link>
+				<NoPrefetchLink href="/species">Species</NoPrefetchLink>
 			</li>
 		</ul>
 	);
@@ -58,13 +58,13 @@ export default function GlobalNav() {
 		<>
 			<nav className="w-full shadow-base-300/20 shadow-sm">
 				<div className="w-full flex px-6 py-4">
-					<Link
+					<NoPrefetchLink
 						className="link text-base-content link-neutral text-xl font-bold no-underline flex items-center gap-2 text-nowrap"
 						href="/"
 					>
 						<span className="icon-[fluent-emoji-flat--blackbird] size-8"></span>
 						Top of the Flocks
-					</Link>
+					</NoPrefetchLink>
 					<div className="flex justify-end w-full gap-2 items-center">
 						<div className="md:hidden flex items-center gap-2">
 							<button

@@ -6,7 +6,7 @@ import {
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
 
 type SearchResult = {
@@ -53,9 +53,9 @@ function SearchResults({
 			<BoxyList>
 				{data.map(({ ring_no, species_name }) => (
 					<li key={ring_no}>
-						<Link className="link" href={`/bird/${ring_no}`}>
+						<NoPrefetchLink className="link" href={`/bird/${ring_no}`}>
 							{ring_no}: {species_name}
-						</Link>
+						</NoPrefetchLink>
 					</li>
 				))}
 			</BoxyList>

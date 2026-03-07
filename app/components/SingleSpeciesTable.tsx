@@ -2,7 +2,7 @@
 import { format as formatDate } from 'date-fns';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import { SingleBirdTable } from '@/app/components/SingleBirdTable';
-import Link from 'next/link';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { AccordionTableBody } from './shared/AccordionTableBody';
 import {
 	SortableTable,
@@ -58,9 +58,9 @@ const orderedColumnProperties = Object.keys(
 
 function RingNumberCell({ model: { ringNo } }: { model: RowModel }) {
 	return (
-		<Link className="link" href={`/bird/${ringNo}`}>
+		<NoPrefetchLink className="link" href={`/bird/${ringNo}`}>
 			{ringNo}
-		</Link>
+		</NoPrefetchLink>
 	);
 }
 

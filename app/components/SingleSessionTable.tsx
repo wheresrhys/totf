@@ -1,7 +1,7 @@
 'use client';
 
 import { type SessionEncounter } from '@/app/models/session';
-import Link from 'next/link';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { InlineTable } from './shared/DesignSystem';
 import { AccordionTableBody } from './shared/AccordionTableBody';
 export type SpeciesWithEncounters = {
@@ -20,9 +20,9 @@ function SpeciesNameCell({
 	model: RowModelWithRawData<SpeciesWithEncounters, RowModel>;
 }) {
 	return (
-		<Link className="link text-wrap" href={`/species/${species}`}>
+		<NoPrefetchLink className="link text-wrap" href={`/species/${species}`}>
 			{species}
-		</Link>
+		</NoPrefetchLink>
 	);
 }
 
@@ -51,9 +51,9 @@ function SpeciesDetailsTable({
 					<tr key={encounter.id}>
 						<td>{encounter.capture_time}</td>
 						<td>
-							<Link className="link" href={`/bird/${encounter.bird.ring_no}`}>
+							<NoPrefetchLink className="link" href={`/bird/${encounter.bird.ring_no}`}>
 								{encounter.bird.ring_no}
-							</Link>
+							</NoPrefetchLink>
 						</td>
 						<td>{encounter.record_type}</td>
 						<td>{encounter.age_code}</td>

@@ -1,5 +1,5 @@
 import { BoxyList } from '@/app/components/shared/DesignSystem';
-import Link from 'next/link';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import type { PageData } from '@/app/(routes)/species/[speciesName]/page';
 import { StatOutput } from './shared/StatOutput';
 import { UnwrappedBadgeList } from './shared/DesignSystem';
@@ -65,13 +65,13 @@ export function SingleSpeciesStats({
 						Oldest birds: {speciesStats.max_proven_age} years old:
 					</span>
 					{oldestBirds.map((bird) => (
-						<Link
+						<NoPrefetchLink
 							key={bird.ring_no}
 							className="badge badge-outline link"
 							href={`/bird/${bird.ring_no}`}
 						>
 							{bird.ring_no}
-						</Link>
+						</NoPrefetchLink>
 					))}
 				</li>
 			) : (
@@ -85,13 +85,13 @@ export function SingleSpeciesStats({
 						{speciesStats.max_encountered_bird} encounters each
 					</span>
 					{mostCaughtBirds.map((bird) => (
-						<Link
+						<NoPrefetchLink
 							key={bird.ring_no}
 							className="badge badge-outline link"
 							href={`/bird/${bird.ring_no}`}
 						>
 							{bird.ring_no}
-						</Link>
+						</NoPrefetchLink>
 					))}
 				</li>
 			) : (

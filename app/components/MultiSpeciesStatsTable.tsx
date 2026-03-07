@@ -9,7 +9,7 @@ import {
 	SortableTable,
 	type ColumnConfig
 } from '@/app/components/shared/SortableTable';
-import Link from 'next/link';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 
 function MultiSpeciesTableBody({ data }: { data: SpeciesStatsRow[] }) {
 	return (
@@ -19,12 +19,12 @@ function MultiSpeciesTableBody({ data }: { data: SpeciesStatsRow[] }) {
 					{speciesStatConfigs.map((column) =>
 						column.property === 'species_name' ? (
 							<td key={column.property}>
-								<Link
+								<NoPrefetchLink
 									className="link text-wrap"
 									href={`/species/${species.species_name}`}
 								>
 									{species.species_name}
-								</Link>
+								</NoPrefetchLink>
 							</td>
 						) : (
 							<td key={column.property}>{species[column.property]}</td>

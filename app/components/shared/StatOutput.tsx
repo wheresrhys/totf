@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
 export type TemporalUnit = 'day' | 'month' | 'year';
 export type StatOutputModel = {
@@ -41,12 +41,12 @@ export function StatOutput({
 			</span>{' '}
 			{connectingVerbMap[temporalUnit as TemporalUnit] as string}{' '}
 			{temporalUnit === 'day' ? (
-				<Link className="link" href={`/session/${visitDate}`}>
+				<NoPrefetchLink className="link" href={`/session/${visitDate}`}>
 					{formatDate(
 						new Date(visitDate as string),
 						dateFormat || dateFormatMap[temporalUnit as TemporalUnit]
 					)}
-				</Link>
+				</NoPrefetchLink>
 			) : (
 				formatDate(
 					new Date(visitDate as string),
