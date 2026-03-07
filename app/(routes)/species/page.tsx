@@ -13,7 +13,7 @@ export type PageData = {
 
 async function fetchYears(): Promise<number[]> {
 	const dates = (await supabase
-		.from('SessionsLegacy')
+		.from('Sessions')
 		.select('visit_date')
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors)) as { visit_date: string }[];

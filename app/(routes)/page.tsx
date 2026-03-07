@@ -134,7 +134,7 @@ function getStatConfigs(
 
 async function fetchRecentSessions(): Promise<SessionWithEncountersCount[]> {
 	return supabase
-		.from('SessionsLegacy')
+		.from('Sessions')
 		.select('visit_date, encounters:Encounters(count)')
 		.order('visit_date', { ascending: false })
 		.limit(3)
