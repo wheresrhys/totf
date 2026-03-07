@@ -4,6 +4,7 @@ export type SpeciesRow = Database['public']['Tables']['Species']['Row'];
 export type SessionRow = Database['public']['Tables']['Sessions']['Row'];
 export type EncounterRow = Database['public']['Tables']['Encounters']['Row'];
 export type BirdRow = Database['public']['Tables']['Birds']['Row'];
+export type LocationRow = Database['public']['Tables']['Locations']['Row'];
 
 export type TopPeriodsResult =
 	Database['public']['Functions']['top_metrics_by_period']['Returns'][number];
