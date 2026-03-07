@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
 export function NavItems({ classes }: { classes: string }) {
@@ -37,6 +37,7 @@ function Expander({
 export default function GlobalNav() {
 	const [showSearchForm, setShowSearchForm] = useState(false);
 	const [showMobileNav, setShowMobileNav] = useState(false);
+	const searchInputRef = useRef<HTMLInputElement>(null);
 
 	const toggleNav = () => {
 		setShowSearchForm(false);
@@ -44,10 +45,15 @@ export default function GlobalNav() {
 	};
 
 	const toggleSearch = () => {
-		setShowSearchForm(!showSearchForm);
 		setShowMobileNav(false);
+		setShowSearchForm(!showSearchForm);
 	};
 
+	useEffect(() => {
+		if (showSearchForm) {
+			searchInputRef.current?.focus();
+		}
+	}, [showSearchForm]);
 	return (
 		<>
 			<nav className="w-full shadow-base-300/20 shadow-sm">
@@ -93,7 +99,7 @@ export default function GlobalNav() {
 				</Expander>
 				<Expander id="ring-search-form-wrapper" isExpanded={showSearchForm}>
 					<div className="p-4 pt-0">
-						<RingSearchForm />
+						<RingSearchForm searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>} />
 					</div>
 				</Expander>
 			</nav>
