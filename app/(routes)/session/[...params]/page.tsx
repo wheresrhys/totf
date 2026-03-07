@@ -9,14 +9,15 @@ import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import {
 	BadgeList,
 	PageWrapper,
-	PrimaryHeading
+	PrimaryHeading,
+	printLocationName
 } from '@/app/components/shared/DesignSystem';
 import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
 
-type PageParams = { date: string, location: number | undefined };
-type PageProps = { params: Promise<[string, string | undefined]> };
+type PageParams = { date: string; location: number | undefined };
+type PageProps = { params: Promise<{ params: [string, string | undefined] }> };
 
 type DayData = {
 	encounters: SessionEncounter[];
@@ -28,18 +29,22 @@ type SessionLocation = {
 	location_id: number;
 	location: LocationRow;
 	encounters: SessionEncounter[];
-}
+};
 
-async function getPageParams (pageProps: PageProps): Promise<PageParams> {
+async function getPageParams(pageProps: PageProps): Promise<PageParams> {
 	const pageParams = await pageProps.params;
 	return {
 		date: pageParams.params[0],
-		location: pageParams.params[1] ? Number(pageParams.params[1].substring(4)) : undefined
-	}
+		location: pageParams.params[1]
+			? Number(pageParams.params[1].substring(4))
+			: undefined
+	};
 }
 
-async function fetchSessionData({ date, location }: PageParams): Promise<DayData | null> {
-
+async function fetchSessionData({
+	date,
+	location
+}: PageParams): Promise<DayData | null> {
 	const data = (await supabase
 		.from('Sessions')
 		.select(
@@ -96,7 +101,6 @@ async function fetchSessionData({ date, location }: PageParams): Promise<DayData
 			locations: data.map((item) => item.location)
 		};
 	}
-
 }
 
 function groupBySpecies(
@@ -118,15 +122,6 @@ function groupBySpecies(
 		});
 }
 
-function printName(locationName: string) {
-	const match = /\(([^)]+)\)/g.exec(locationName);
-	console.log(match);
-	if (match) {
-		return match[1];
-	}
-	return locationName;
-}
-
 function Locations({
 	locations,
 	date,
@@ -134,24 +129,35 @@ function Locations({
 }: {
 	locations: LocationRow[];
 	date: string;
-	location: number | undefined;
+	selectedLocation: number | undefined;
 }) {
 	return (
 		<small className="text-sm text-gray-500">
 			{locations.length === 1
-				? printName(locations[0].location_name)
+				? printLocationName(locations[0].location_name)
 				: locations.map((location, index) => (
 						<Fragment key={location.id}>
 							{index > 0 ? ', ' : ''}
-							{selectedLocation && selectedLocation === location.id ? printName(location.location_name) : <Link
-								className="link"
-								href={`/session/${date}/loc-${location.id}`}
-							>
-								{printName(location.location_name)}
-							</Link>}
-
+							{selectedLocation && selectedLocation === location.id ? (
+								printLocationName(location.location_name)
+							) : (
+								<Link
+									className="link"
+									href={`/session/${date}/loc-${location.id}`}
+								>
+									{printLocationName(location.location_name)}
+								</Link>
+							)}
 						</Fragment>
-				))}{selectedLocation ? <>, <Link className="link" href={`/session/${date}`}>View all</Link></> : null}
+					))}
+			{selectedLocation && locations.length > 1 ? (
+				<>
+					,{' '}
+					<Link className="link" href={`/session/${date}`}>
+						View all
+					</Link>
+				</>
+			) : null}
 		</small>
 	);
 }
@@ -161,7 +167,7 @@ function SessionSummary({
 	params: { date, location }
 }: {
 	data: DayData;
-	params: { date: string, location: number | undefined };
+	params: { date: string; location: number | undefined };
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
 
@@ -170,7 +176,11 @@ function SessionSummary({
 			<PrimaryHeading>
 				{formatDate(new Date(date), 'EEE do MMMM yyyy')}
 				<br />
-				<Locations locations={dayData.locations} date={date} selectedLocation={location} />
+				<Locations
+					locations={dayData.locations}
+					date={date}
+					selectedLocation={location}
+				/>
 			</PrimaryHeading>
 			<BadgeList
 				testId="session-stats"
