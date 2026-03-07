@@ -1,5 +1,6 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import {
 	BoxyList,
 	PageWrapper,
@@ -19,6 +20,7 @@ type SearchParams = { q: string };
 type PageProps = { searchParams: Promise<SearchParams> };
 
 async function searchByRing({ q }: SearchParams) {
+	const supabase = await getAuthenticatedSupabaseClient();
 	const uppercaseQuery = q.toUpperCase();
 	const exactMatch = await supabase
 		.from('Birds')

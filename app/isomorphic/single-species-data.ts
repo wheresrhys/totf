@@ -7,7 +7,8 @@ import {
 	type EnrichedBirdOfSpecies
 } from '@/app/models/bird';
 import type { PaginatedBirdsResult } from '@/app/models/db';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 
 function convertPaginatedBirdResultsToBirds(
 	paginatedBirdResults: PaginatedBirdsResult[]
@@ -41,6 +42,7 @@ function convertPaginatedBirdResultsToBirds(
 }
 
 export async function fetchPageOfBirds(species: string, page: number = 0) {
+	const supabase = await getAuthenticatedSupabaseClient();
 	const paginatedBirdResults = (await supabase
 		.rpc('paginated_birds_table', {
 			species_name_param: species,

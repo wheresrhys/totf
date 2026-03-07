@@ -2,7 +2,8 @@ import {
 	SessionTable,
 	type SpeciesWithEncounters
 } from '@/app/components/SingleSessionTable';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionEncounter } from '@/app/models/session';
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import {
@@ -18,6 +19,7 @@ type PageProps = { params: Promise<PageParams> };
 async function fetchSessionData({
 	date
 }: PageParams): Promise<SessionEncounter[] | null> {
+	const supabase = await getAuthenticatedSupabaseClient();
 	const data = (await supabase
 		.from('Sessions')
 		.select(

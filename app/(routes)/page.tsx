@@ -11,7 +11,8 @@ import {
 	SecondaryHeading
 } from '../components/shared/DesignSystem';
 import { getTopStats } from '../isomorphic/stats-data-tables';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import { TopMetricsFilterParams } from '../models/db';
 import type { SessionWithEncountersCount } from '../models/session';
 import { StatOutput } from '../components/shared/StatOutput';
@@ -133,6 +134,7 @@ function getStatConfigs(
 }
 
 async function fetchRecentSessions(): Promise<SessionWithEncountersCount[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Sessions')
 		.select('visit_date, encounters:Encounters(count)')

@@ -1,6 +1,7 @@
 import { SessionHistoryCalendar } from '@/app/components/SessionHistoryCalendar';
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 import {
 	PageWrapper,
@@ -10,6 +11,7 @@ import {
 export async function fetchAllSessions(): Promise<
 	SessionWithEncountersCount[]
 > {
+	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Sessions')
 		.select('id, visit_date, encounters:Encounters(count)')

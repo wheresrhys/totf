@@ -1,7 +1,8 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { MultiSpeciesStatsTable } from '@/app/components/MultiSpeciesStatsTable';
 import { fetchSpeciesData } from '@/app/isomorphic/multi-species-data';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SpeciesStatsRow } from '@/app/models/db';
 
 //TODO get year/date range from URL params
@@ -12,6 +13,7 @@ export type PageData = {
 };
 
 async function fetchYears(): Promise<number[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
 	const dates = (await supabase
 		.from('Sessions')
 		.select('visit_date')

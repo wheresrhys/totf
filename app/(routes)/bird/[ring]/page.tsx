@@ -1,5 +1,6 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import { SingleBirdTable } from '@/app/components/SingleBirdTable';
 import { format as formatDate } from 'date-fns';
 import {
@@ -18,6 +19,7 @@ type PageParams = { ring: string };
 type PageProps = { params: Promise<PageParams> };
 
 async function fetchBirdData({ ring }: PageParams) {
+	const supabase = await getAuthenticatedSupabaseClient();
 	const data = (await supabase
 		.from('Birds')
 		.select(
