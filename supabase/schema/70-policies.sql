@@ -1,0 +1,26 @@
+-- CREATE POLICY "group_encounters_access" ON "Sessions"
+-- FOR SELECT USING (
+--   ringing_group_id = current_setting('app.current_group_id')::bigint
+-- );
+
+-- CREATE POLICY "group_locations_access" ON "Sessions"
+-- FOR SELECT USING (
+--   ringing_group_id = current_setting('app.current_group_id')::bigint
+-- );
+
+-- CREATE POLICY "group_sessions_access" ON "Sessions"
+-- FOR SELECT USING (
+--   location_id IN (
+--     SELECT id FROM "Locations"
+--     WHERE ringing_group_id = current_setting('app.current_group_id')::bigint
+--   )
+-- );
+
+-- CREATE POLICY "group_birds_access" ON "Birds"
+-- FOR SELECT USING (
+--   EXISTS (
+--     SELECT 1 FROM "Encounters"
+--     WHERE "Encounters".bird_id = "Birds".id
+--     AND "Encounters".ringing_group_id = current_setting('app.current_group_id')::bigint
+--   )
+-- );
