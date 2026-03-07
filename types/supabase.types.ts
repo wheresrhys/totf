@@ -51,7 +51,6 @@ export type Database = {
           record_type: string
           ringing_group_id: number
           scheme: string
-          session_id: number
           session_legacy_id: number
           sex: string
           sexing_method: string | null
@@ -73,7 +72,6 @@ export type Database = {
           record_type: string
           ringing_group_id: number
           scheme: string
-          session_id: number
           session_legacy_id: number
           sex: string
           sexing_method?: string | null
@@ -95,7 +93,6 @@ export type Database = {
           record_type?: string
           ringing_group_id?: number
           scheme?: string
-          session_id?: number
           session_legacy_id?: number
           sex?: string
           sexing_method?: string | null
@@ -122,13 +119,6 @@ export type Database = {
             columns: ["ringing_group_id"]
             isOneToOne: false
             referencedRelation: "RingingGroups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encounters_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "Sessions"
             referencedColumns: ["id"]
           },
           {
@@ -178,21 +168,6 @@ export type Database = {
         Update: {
           group_name?: string
           id?: number
-        }
-        Relationships: []
-      }
-      Sessions: {
-        Row: {
-          id: number
-          visit_date: string
-        }
-        Insert: {
-          id?: number
-          visit_date: string
-        }
-        Update: {
-          id?: number
-          visit_date?: string
         }
         Relationships: []
       }
