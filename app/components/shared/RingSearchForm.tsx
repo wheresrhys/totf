@@ -3,10 +3,12 @@ import { useRouter } from 'next/navigation';
 
 export function RingSearchForm({
 	q,
-	buttonText = 'Search'
+	buttonText = 'Search',
+	searchInputRef
 }: {
 	q?: string;
 	buttonText?: string;
+	searchInputRef?: React.RefObject<HTMLInputElement>;
 }) {
 	const router = useRouter();
 	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -22,6 +24,7 @@ export function RingSearchForm({
 			onSubmit={handleSubmit}
 		>
 			<input
+				ref={searchInputRef}
 				className="input input-bordered"
 				type="text"
 				name="ring"
