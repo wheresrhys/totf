@@ -23,7 +23,7 @@ BEGIN
   FROM
     public."Birds" b
     LEFT JOIN public."Encounters" e ON b.id = e.bird_id
-    LEFT JOIN public."Sessions" sess ON e.session_id = sess.id
+    LEFT JOIN public."SessionsLegacy" sess ON e.session_legacy_id = sess.id
     LEFT JOIN public."Species" sp ON b.species_id = sp.id
   WHERE
     sess.visit_date IS NOT NULL

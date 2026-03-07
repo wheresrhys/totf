@@ -19,7 +19,7 @@ BEGIN
   FROM public."Encounters" en
     LEFT JOIN public."Birds" b on  b.id=en.bird_id
     LEFT JOIN public."Species" sp on sp.id=b.species_id
-    LEFT JOIN public."Sessions" sess on sess.id=en.session_id
+    LEFT JOIN public."SessionsLegacy" sess on sess.id=en.session_legacy_id
   WHERE
     (species_filter IS NULL OR sp.species_name ilike species_filter) AND
     (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)

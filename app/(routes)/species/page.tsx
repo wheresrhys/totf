@@ -15,7 +15,7 @@ export type PageData = {
 async function fetchYears(): Promise<number[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const dates = (await supabase
-		.from('Sessions')
+		.from('SessionsLegacy')
 		.select('visit_date')
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors)) as { visit_date: string }[];

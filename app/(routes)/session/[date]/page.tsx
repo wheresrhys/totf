@@ -21,7 +21,7 @@ async function fetchSessionData({
 }: PageParams): Promise<SessionEncounter[] | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const data = (await supabase
-		.from('Sessions')
+		.from('SessionsLegacy')
 		.select(
 			`
 		id,

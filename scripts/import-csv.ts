@@ -17,6 +17,8 @@ type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Database['public']['Tables']['Birds']['Insert'];
 type EncountersInsert = Database['public']['Tables']['Encounters']['Insert'];
 type SessionsInsert = Database['public']['Tables']['Sessions']['Insert'];
+type SessionsLegacyInsert =
+	Database['public']['Tables']['SessionsLegacy']['Insert'];
 type RingingGroupsInsert =
 	Database['public']['Tables']['RingingGroups']['Insert'];
 type LocationsInsert = Database['public']['Tables']['Locations']['Insert'];
@@ -305,6 +307,13 @@ async function importCSV(options: ImportOptions): Promise<void> {
 
 				// 3. Upsert Session (create if doesn't exist) and get ID
 				const visitDate = convertDateFormat(row.visit_date as string);
+				const sessionLegacyId = await upsert<SessionsLegacyInsert>(
+					'SessionsLegacy',
+					{
+						visit_date: visitDate
+					},
+					'visit_date'
+				);
 				const sessionId = await upsert<SessionsInsert>(
 					'Sessions',
 					{
@@ -332,6 +341,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 						record_type: row.record_type as string,
 						bird_id: birdId,
 						session_id: sessionId,
+						session_legacy_id: sessionLegacyId,
 						location_id: locationId,
 						scheme: row.scheme as string,
 						sex: row.sex as string,
