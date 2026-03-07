@@ -1,7 +1,12 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
+import { setGroup } from '@/app/actions/set-group';
+
+type RingingGroup = { id: number; group_name: string };
+
 export function NavItems({ classes }: { classes: string }) {
 	return (
 		<ul className={classes}>
@@ -12,6 +17,42 @@ export function NavItems({ classes }: { classes: string }) {
 				<NoPrefetchLink href="/species">Species</NoPrefetchLink>
 			</li>
 		</ul>
+	);
+}
+
+function GroupSwitcher({
+	groups,
+	selectedGroupId
+}: {
+	groups: RingingGroup[];
+	selectedGroupId: number | null;
+}) {
+	const router = useRouter();
+
+	async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+		const groupId = parseInt(e.target.value, 10);
+		await setGroup(groupId);
+		router.refresh();
+	}
+
+	return (
+		<select
+			className="select select-sm"
+			value={selectedGroupId ?? ''}
+			onChange={handleChange}
+			aria-label="Select ringing group"
+		>
+			{selectedGroupId === null && (
+				<option value="" disabled>
+					Select group
+				</option>
+			)}
+			{groups.map((group) => (
+				<option key={group.id} value={group.id}>
+					{group.group_name}
+				</option>
+			))}
+		</select>
 	);
 }
 
@@ -34,7 +75,13 @@ function Expander({
 	);
 }
 
-export default function GlobalNav() {
+export default function GlobalNav({
+	groups,
+	selectedGroupId
+}: {
+	groups: RingingGroup[];
+	selectedGroupId: number | null;
+}) {
 	const [showSearchForm, setShowSearchForm] = useState(false);
 	const [showMobileNav, setShowMobileNav] = useState(false);
 	const searchInputRef = useRef<HTMLInputElement>(null);
@@ -88,13 +135,20 @@ export default function GlobalNav() {
 								></span>
 							</button>
 						</div>
-						<div className="hidden md:flex">
+						<div className="hidden md:flex items-center gap-2">
+							<GroupSwitcher
+								groups={groups}
+								selectedGroupId={selectedGroupId}
+							/>
 							<RingSearchForm />
 							<NavItems classes="menu menu-horizontal gap-2 p-0 text-base" />
 						</div>
 					</div>
 				</div>
 				<Expander id="mobile-nav" isExpanded={showMobileNav}>
+					<div className="p-4 flex justify-end">
+						<GroupSwitcher groups={groups} selectedGroupId={selectedGroupId} />
+					</div>
 					<NavItems classes="p-4 text-right *:p-2 *:mt-1 *:mb-1 *:hover:bg-base-200 *:rounded" />
 				</Expander>
 				<Expander id="ring-search-form-wrapper" isExpanded={showSearchForm}>

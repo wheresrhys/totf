@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
+import { getGroupId } from '@/lib/group-auth';
 
 export type DefaultPageParams = Record<string, string>;
 export type DefaultPageProps = { params: Promise<DefaultPageParams> };
@@ -40,10 +41,12 @@ export async function fetchDataWithCache<DataType, ParamsType>(
 	cacheKeys: string[],
 	ttl: number = 3600 // 1 hour
 ): Promise<DataType | null> {
-	return unstable_cache(async () => dataFetcher(params), cacheKeys, {
+	const groupId = await getGroupId();
+	const scopedKeys = [String(groupId), ...cacheKeys];
+	return unstable_cache(async () => dataFetcher(params), scopedKeys, {
 		// 1 day in production, 1 second in development to allow for quick testing
 		revalidate: process.env.VERCEL_ENV === 'production' ? ttl : 1,
-		tags: cacheKeys
+		tags: scopedKeys
 	})();
 }
 

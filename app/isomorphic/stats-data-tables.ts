@@ -1,4 +1,6 @@
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+'use server';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import type {
 	TopPeriodsResult,
 	TopSpeciesResult,
@@ -13,6 +15,7 @@ export type TopStatsArgsWithoutLimit = Omit<TopStatsArguments, 'result_limit'>;
 export async function getTopPeriodsByMetric(
 	options: TopPeriodsArgs
 ): Promise<TopPeriodsResult[] | null> {
+	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('top_metrics_by_period', options)
 		.then(catchSupabaseErrors);
@@ -21,6 +24,7 @@ export async function getTopPeriodsByMetric(
 export async function getTopSpeciesByMetric(
 	options: TopSpeciesArgs
 ): Promise<TopSpeciesResult[] | null> {
+	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('top_metrics_by_species_and_period', options)
 		.then(catchSupabaseErrors);
