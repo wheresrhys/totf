@@ -8,6 +8,7 @@ export type DefaultPageProps = { params: Promise<DefaultPageParams> };
 export type BootstrapPageDataProps<DataType, PagePropsType, ParamsType> = {
 	pageProps?: PagePropsType;
 	loading?: React.ReactNode;
+	ttl?: number;
 	getCacheKeys: (params: ParamsType) => string[];
 	getParams?: (pageProps: PagePropsType) => Promise<ParamsType>;
 	dataFetcher: (params: ParamsType) => Promise<DataType | null>;
@@ -36,10 +37,12 @@ export async function defaultGetParams<
 export async function fetchDataWithCache<DataType, ParamsType>(
 	params: ParamsType,
 	dataFetcher: (params: ParamsType) => Promise<DataType | null>,
-	cacheKeys: string[]
+	cacheKeys: string[],
+	ttl: number = 3600 // 1 hour
 ): Promise<DataType | null> {
 	return unstable_cache(async () => dataFetcher(params), cacheKeys, {
-		revalidate: process.env.VERCEL_ENV === 'production' ? 3600 * 24 * 7 : 1, // 7 days in production, 1 second in development
+		// 1 day in production, 1 second in development to allow for quick testing
+		revalidate: process.env.VERCEL_ENV === 'production' ? ttl : 1,
 		tags: cacheKeys
 	})();
 }
@@ -49,7 +52,8 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 	getParams,
 	dataFetcher,
 	getCacheKeys,
-	PageComponent
+	PageComponent,
+	ttl
 }: BootstrapPageDataProps<DataType, PagePropsType, ParamsType>) {
 	let params: ParamsType;
 	if (getParams) {
@@ -63,7 +67,8 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 	const data = await fetchDataWithCache<DataType, ParamsType>(
 		params,
 		dataFetcher,
-		getCacheKeys(params)
+		getCacheKeys(params),
+		ttl
 	);
 	if (!data) {
 		notFound();

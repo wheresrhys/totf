@@ -111,6 +111,7 @@ export default async function SessionPage(props: PageProps) {
 			getCacheKeys={(params) => ['session', params.date as string]}
 			dataFetcher={fetchSessionData}
 			PageComponent={SessionSummary}
+			ttl={3600 * 24 * 7} // 1 week because once a session is complete the data does not change
 		/>
 	);
 }
