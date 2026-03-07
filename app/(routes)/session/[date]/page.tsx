@@ -4,25 +4,37 @@ import {
 } from '@/app/components/SingleSessionTable';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionEncounter } from '@/app/models/session';
+import type { LocationRow } from '@/app/models/db';
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import {
 	BadgeList,
 	PageWrapper,
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
+import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
+import { Fragment } from 'react';
 
 type PageParams = { date: string };
 type PageProps = { params: Promise<PageParams> };
 
+type DayData = {
+	encounters: SessionEncounter[];
+	locations: LocationRow[];
+}
+
 async function fetchSessionData({
 	date
-}: PageParams): Promise<SessionEncounter[] | null> {
+}: PageParams): Promise<DayData | null> {
 	const data = (await supabase
 		.from('Sessions')
 		.select(
 			`
 		id,
+		location:Locations (
+			id,
+			location_name
+		),
 		encounters:Encounters(
 			id,
 			session_id,
@@ -46,15 +58,22 @@ async function fetchSessionData({
 		.eq('visit_date', date)
 		.then(catchSupabaseErrors)) as {
 		id: number;
+		location: LocationRow;
 		encounters: SessionEncounter[];
 	}[];
 	if (data.length === 0) {
 		return null;
 	}
-	if (data.length > 1) {
-		throw new Error(`Multiple sessions per date not implemented yet`);
+	if (data.length === 1) {
+		return {
+			encounters: data[0].encounters,
+			locations: [data[0].location]
+		}
 	}
-	return data[0].encounters;
+	return {
+		encounters: data.flatMap((item) => item.encounters),
+		locations: data.map((item) => item.location)
+	}
 }
 
 function groupBySpecies(
@@ -76,29 +95,37 @@ function groupBySpecies(
 		});
 }
 
+function Locations({ locations, date }: { locations: LocationRow[]; date: string }) {
+	return <small className="text-sm text-gray-500">{
+		locations.length === 1 ? locations[0].location_name : locations.map((location, index) => <Fragment key={location.id} >{index > 0 ? ', ' : ''}<Link className="link" href={`/session/${date}/location-${location.id}`}>{location.location_name}</Link></Fragment>)
+		}
+	</small>;
+
+}
+
 function SessionSummary({
-	data: session,
+	data: dayData,
 	params: { date }
 }: {
-	data: SessionEncounter[];
+	data: DayData;
 	params: { date: string };
 }) {
-	const speciesList = groupBySpecies(session);
+	const speciesList = groupBySpecies(dayData.encounters);
 
 	return (
 		<PageWrapper>
 			<PrimaryHeading>
-				{formatDate(new Date(date), 'EEE do MMMM yyyy')}
+				{formatDate(new Date(date), 'EEE do MMMM yyyy')}<br /><Locations locations={dayData.locations} date={date}/>
 			</PrimaryHeading>
 			<BadgeList
 				testId="session-stats"
 				items={[
-					`${session.length} birds`,
+					`${dayData.encounters.length} birds`,
 					`${speciesList.length} species`,
-					`${session.filter((encounter) => encounter.record_type === 'N').length} new`,
-					`${session.filter((encounter) => encounter.record_type === 'S').length} retraps`,
-					`${session.filter((encounter) => encounter.minimum_years >= 1).length} adults`,
-					`${session.filter((encounter) => encounter.minimum_years === 0).length} juvs`
+					`${dayData.encounters.filter((encounter) => encounter.record_type === 'N').length} new`,
+					`${dayData.encounters.filter((encounter) => encounter.record_type === 'S').length} retraps`,
+					`${dayData.encounters.filter((encounter) => encounter.minimum_years >= 1).length} adults`,
+					`${dayData.encounters.filter((encounter) => encounter.minimum_years === 0).length} juvs`
 				]}
 			/>
 			<SessionTable speciesList={speciesList} />
@@ -108,7 +135,7 @@ function SessionSummary({
 
 export default async function SessionPage(props: PageProps) {
 	return (
-		<BootstrapPageData<SessionEncounter[], PageProps, PageParams>
+		<BootstrapPageData<DayData, PageProps, PageParams>
 			pageProps={props}
 			getCacheKeys={(params) => ['session', params.date as string]}
 			dataFetcher={fetchSessionData}

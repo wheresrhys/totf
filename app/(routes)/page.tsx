@@ -135,7 +135,7 @@ function getStatConfigs(
 async function fetchRecentSessions(): Promise<SessionWithEncountersCount[]> {
 	return supabase
 		.from('Sessions')
-		.select('visit_date, encounters:Encounters(count)')
+		.select('id,visit_date, encounters:Encounters(count)')
 		.order('visit_date', { ascending: false })
 		.limit(3)
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
@@ -174,7 +174,7 @@ function RecentSessions({ data }: { data: SessionWithEncountersCount[] }) {
 			<SecondaryHeading>Recent Sessions</SecondaryHeading>
 			<BoxyList>
 				{data.map((session) => (
-					<li key={session.visit_date}>
+					<li key={session.id}>
 						<StatOutput
 							unit="birds"
 							value={session.encounters[0].count}
