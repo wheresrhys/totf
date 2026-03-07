@@ -312,7 +312,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 						visit_date: visitDate,
 						location_id: locationId
 					},
-					'visit_date,location_id'
+					'visit_date,location_id' as keyof SessionsInsert
 				);
 
 				// 4. Insert Encounter (always create new)
