@@ -1,1 +1,1 @@
-export const SPECIES_PAGE_BATCH_SIZE = 20;
+export const SPECIES_PAGE_BATCH_SIZE = 100;
