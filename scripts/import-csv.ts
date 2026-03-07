@@ -18,6 +18,7 @@ type BirdsInsert = Database['public']['Tables']['Birds']['Insert'];
 type EncountersInsert = Database['public']['Tables']['Encounters']['Insert'];
 type SessionsLegacyInsert =
 	Database['public']['Tables']['SessionsLegacy']['Insert'];
+type SessionsInsert = Database['public']['Tables']['Sessions']['Insert'];
 type RingingGroupsInsert =
 	Database['public']['Tables']['RingingGroups']['Insert'];
 type LocationsInsert = Database['public']['Tables']['Locations']['Insert'];
@@ -314,6 +315,15 @@ async function importCSV(options: ImportOptions): Promise<void> {
 					'visit_date'
 				);
 
+				const sessionId = await upsert<SessionsInsert>(
+					'Sessions',
+					{
+						visit_date: visitDate,
+						location_id: locationId
+					},
+					'visit_date,location_id'
+				);
+
 				// 4. Insert Encounter (always create new)
 				const age_code: number = Number(String(row.age).replace('J', ''));
 
@@ -333,6 +343,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 						record_type: row.record_type as string,
 						bird_id: birdId,
 						session_legacy_id: sessionLegacyId,
+						session_id: sessionId,
 						location_id: locationId,
 						scheme: row.scheme as string,
 						sex: row.sex as string,
