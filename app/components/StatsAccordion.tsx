@@ -7,7 +7,7 @@ import type { TopPeriodsResult, TopSpeciesResult } from '@/app/models/db';
 import {
 	getTopStats,
 	type TopStatsArgsWithoutLimit
-} from '@/app/isomorphic/stats-data-tables';
+} from '@/app/actions/stats-data-tables';
 import type { TemporalUnit } from './shared/StatOutput';
 
 export type StatConfig = {

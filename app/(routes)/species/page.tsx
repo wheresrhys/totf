@@ -1,6 +1,6 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { MultiSpeciesStatsTable } from '@/app/components/MultiSpeciesStatsTable';
-import { fetchSpeciesData } from '@/app/isomorphic/multi-species-data';
+import { fetchSpeciesData } from '@/app/actions/multi-species-data';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import type { SpeciesStatsRow } from '@/app/models/db';
 
