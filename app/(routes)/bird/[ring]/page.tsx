@@ -37,7 +37,7 @@ async function fetchBirdData({ ring }: PageParams) {
 				sex,
 				weight,
 				wing_length,
-				session:Sessions(
+				session:SessionsLegacy(
 					visit_date
 				)
 		)

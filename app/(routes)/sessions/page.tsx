@@ -11,7 +11,7 @@ export async function fetchAllSessions(): Promise<
 	SessionWithEncountersCount[]
 > {
 	return supabase
-		.from('Sessions')
+		.from('SessionsLegacy')
 		.select('id, visit_date, encounters:Encounters(count)')
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
