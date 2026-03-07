@@ -15,22 +15,37 @@ import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
 
-type PageParams = { date: string };
-type PageProps = { params: Promise<PageParams> };
+type PageParams = { date: string, location: number | undefined };
+type PageProps = { params: Promise<[string, string | undefined]> };
 
 type DayData = {
 	encounters: SessionEncounter[];
 	locations: LocationRow[];
+};
+
+type SessionLocation = {
+	id: number;
+	location_id: number;
+	location: LocationRow;
+	encounters: SessionEncounter[];
 }
 
-async function fetchSessionData({
-	date
-}: PageParams): Promise<DayData | null> {
+async function getPageParams (pageProps: PageProps): Promise<PageParams> {
+	const pageParams = await pageProps.params;
+	return {
+		date: pageParams.params[0],
+		location: pageParams.params[1] ? Number(pageParams.params[1].substring(4)) : undefined
+	}
+}
+
+async function fetchSessionData({ date, location }: PageParams): Promise<DayData | null> {
+
 	const data = (await supabase
 		.from('Sessions')
 		.select(
 			`
 		id,
+		location_id,
 		location:Locations (
 			id,
 			location_name
@@ -56,11 +71,7 @@ async function fetchSessionData({
 	`
 		)
 		.eq('visit_date', date)
-		.then(catchSupabaseErrors)) as {
-		id: number;
-		location: LocationRow;
-		encounters: SessionEncounter[];
-	}[];
+		.then(catchSupabaseErrors)) as SessionLocation[];
 	if (data.length === 0) {
 		return null;
 	}
@@ -68,12 +79,24 @@ async function fetchSessionData({
 		return {
 			encounters: data[0].encounters,
 			locations: [data[0].location]
+		};
+	}
+	if (location) {
+		const sessionData = data.find((item) => item.location_id === location);
+		if (!sessionData) {
+			return null;
 		}
+		return {
+			encounters: sessionData.encounters,
+			locations: data.map((item) => item.location)
+		};
+	} else {
+		return {
+			encounters: data.flatMap((item) => item.encounters),
+			locations: data.map((item) => item.location)
+		};
 	}
-	return {
-		encounters: data.flatMap((item) => item.encounters),
-		locations: data.map((item) => item.location)
-	}
+
 }
 
 function groupBySpecies(
@@ -95,27 +118,59 @@ function groupBySpecies(
 		});
 }
 
-function Locations({ locations, date }: { locations: LocationRow[]; date: string }) {
-	return <small className="text-sm text-gray-500">{
-		locations.length === 1 ? locations[0].location_name : locations.map((location, index) => <Fragment key={location.id} >{index > 0 ? ', ' : ''}<Link className="link" href={`/session/${date}/location-${location.id}`}>{location.location_name}</Link></Fragment>)
-		}
-	</small>;
+function printName(locationName: string) {
+	const match = /\(([^)]+)\)/g.exec(locationName);
+	console.log(match);
+	if (match) {
+		return match[1];
+	}
+	return locationName;
+}
 
+function Locations({
+	locations,
+	date,
+	selectedLocation
+}: {
+	locations: LocationRow[];
+	date: string;
+	location: number | undefined;
+}) {
+	return (
+		<small className="text-sm text-gray-500">
+			{locations.length === 1
+				? printName(locations[0].location_name)
+				: locations.map((location, index) => (
+						<Fragment key={location.id}>
+							{index > 0 ? ', ' : ''}
+							{selectedLocation && selectedLocation === location.id ? printName(location.location_name) : <Link
+								className="link"
+								href={`/session/${date}/loc-${location.id}`}
+							>
+								{printName(location.location_name)}
+							</Link>}
+
+						</Fragment>
+				))}{selectedLocation ? <>, <Link className="link" href={`/session/${date}`}>View all</Link></> : null}
+		</small>
+	);
 }
 
 function SessionSummary({
 	data: dayData,
-	params: { date }
+	params: { date, location }
 }: {
 	data: DayData;
-	params: { date: string };
+	params: { date: string, location: number | undefined };
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
 
 	return (
 		<PageWrapper>
 			<PrimaryHeading>
-				{formatDate(new Date(date), 'EEE do MMMM yyyy')}<br /><Locations locations={dayData.locations} date={date}/>
+				{formatDate(new Date(date), 'EEE do MMMM yyyy')}
+				<br />
+				<Locations locations={dayData.locations} date={date} selectedLocation={location} />
 			</PrimaryHeading>
 			<BadgeList
 				testId="session-stats"
@@ -140,6 +195,7 @@ export default async function SessionPage(props: PageProps) {
 			getCacheKeys={(params) => ['session', params.date as string]}
 			dataFetcher={fetchSessionData}
 			PageComponent={SessionSummary}
+			getParams={getPageParams}
 			ttl={3600 * 24 * 7} // 1 week because once a session is complete the data does not change
 		/>
 	);

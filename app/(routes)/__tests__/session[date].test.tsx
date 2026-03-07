@@ -1,6 +1,6 @@
 import { expect, describe, it } from 'vitest';
 import { render, screen, getAllByRole } from '@testing-library/react';
-import Page from '../session/[date]/page';
+import Page from '../session/[...params]/page';
 import { verifyTableData } from './helpers/verify-table-data';
 
 describe('session page', () => {
