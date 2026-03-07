@@ -10,7 +10,7 @@ import {
 import { SingleSpeciesStats } from '@/app/components/SingleSpeciesStats';
 import type { SpeciesStatsRow } from '@/app/models/db';
 import 'chartkick/chart.js';
-import { fetchPageOfBirds } from '../isomorphic/single-species-data';
+import { fetchPageOfBirds } from '../actions/single-species-data';
 import { useOnInView } from 'react-intersection-observer';
 import { WeightVsWingLengthChart } from '@/app/components/WeightAndWingChart';
 import { SingleSpeciesFilters } from '@/app/components/SingleSpeciesFilters';

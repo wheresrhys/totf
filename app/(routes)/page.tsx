@@ -10,7 +10,7 @@ import {
 	PageWrapper,
 	SecondaryHeading
 } from '../components/shared/DesignSystem';
-import { getTopStats } from '../isomorphic/stats-data-tables';
+import { getTopStats } from '../actions/stats-data-tables';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { TopMetricsFilterParams } from '../models/db';

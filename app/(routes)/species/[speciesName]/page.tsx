@@ -1,10 +1,10 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { getTopPeriodsByMetric } from '@/app/isomorphic/stats-data-tables';
+import { getTopPeriodsByMetric } from '@/app/actions/stats-data-tables';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import { SpeciesPageWithFilters } from '@/app/components/SingleSpeciesPage';
-import { fetchPageOfBirds } from '@/app/isomorphic/single-species-data';
+import { fetchPageOfBirds } from '@/app/actions/single-species-data';
 import type {
 	SpeciesStatsRow,
 	TopMetricsFilterParams,
