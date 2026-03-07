@@ -10,7 +10,7 @@ import {
 	PageWrapper,
 	SecondaryHeading
 } from '../components/shared/DesignSystem';
-import { getTopStats } from '../isomorphic/stats-data-tables';
+import { getTopStats } from '../actions/stats-data-tables';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import { TopMetricsFilterParams } from '../models/db';
 import type { SessionWithEncountersCount } from '../models/session';
