@@ -211,11 +211,11 @@ export default async function SessionPage(props: PageProps) {
 	return (
 		<BootstrapPageData<DayData, PageProps, PageParams>
 			pageProps={props}
-			getCacheKeys={(params) => ['session', params.date as string]}
+			getCacheKeys={(params) => params.location ? ['session', params.date as string, `loc-${params.location}`] : ['session', params.date as string]}
 			dataFetcher={fetchSessionData}
 			PageComponent={SessionSummary}
 			getParams={getPageParams}
-			ttl={3600 * 24 * 7} // 1 week because once a session is complete the data does not change
+			ttl={1} // don't cache while debugging failures3600 * 24 * 7} // 1 week because once a session is complete the data does not change
 		/>
 	);
 }
