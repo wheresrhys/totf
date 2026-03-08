@@ -210,6 +210,15 @@ export type Database = {
       daitch_mokotoff: { Args: { "": string }; Returns: string[] }
       dmetaphone: { Args: { "": string }; Returns: string }
       dmetaphone_alt: { Args: { "": string }; Returns: string }
+      find_discrepencies: {
+        Args: never
+        Returns: {
+          bird_id: number
+          discrepency_type: string
+          ring_no: string
+          species_name: string
+        }[]
+      }
       fuzzy_search_rings: {
         Args: { q: string }
         Returns: {
