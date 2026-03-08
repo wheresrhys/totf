@@ -34,7 +34,7 @@ type SessionLocation = {
 
 async function getPageParams(pageProps: PageProps): Promise<PageParams> {
 	const pageParams = await pageProps.params;
-	console.log(`pageParams: ${JSON.stringify(pageParams)}`);
+	console.warn(`pageParams: ${JSON.stringify(pageParams)}`);
 	return {
 		date: pageParams.params[0],
 		location: pageParams.params[1]
@@ -80,13 +80,13 @@ async function fetchSessionData({
 		)
 		.eq('visit_date', date)
 		.then(catchSupabaseErrors)) as SessionLocation[];
-	console.log(`data length: ${data.length}`);
+	console.warn(`data length: ${data.length}`);
 	if (data.length === 0) {
-		console.log('returning null');
+		console.warn('returning null');
 		return null;
 	}
 	if (data.length === 1) {
-		console.log('returning first and only session');
+		console.warn('returning first and only session');
 		return {
 			encounters: data[0].encounters,
 			locations: [data[0].location]
@@ -95,16 +95,16 @@ async function fetchSessionData({
 	if (location) {
 		const sessionData = data.find((item) => item.location_id === location);
 		if (!sessionData) {
-			console.log('location is incorrect - returning null');
+			console.warn('location is incorrect - returning null');
 			return null;
 		}
-		console.log('returning session data for location');
+		console.warn('returning session data for location');
 		return {
 			encounters: sessionData.encounters,
 			locations: data.map((item) => item.location)
 		};
 	} else {
-		console.log('returning session data for all locations');
+		console.warn('returning session data for all locations');
 		return {
 			encounters: data.flatMap((item) => item.encounters),
 			locations: data.map((item) => item.location)
