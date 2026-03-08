@@ -34,7 +34,6 @@ type SessionLocation = {
 
 async function getPageParams(pageProps: PageProps): Promise<PageParams> {
 	const pageParams = await pageProps.params;
-	console.warn(`pageParams: ${JSON.stringify(pageParams)}`);
 	return {
 		date: pageParams.params[0],
 		location: pageParams.params[1]
@@ -80,13 +79,10 @@ async function fetchSessionData({
 		)
 		.eq('visit_date', date)
 		.then(catchSupabaseErrors)) as SessionLocation[];
-	console.warn(`data length: ${data.length}`);
 	if (data.length === 0) {
-		console.warn('returning null');
 		return null;
 	}
 	if (data.length === 1) {
-		console.warn('returning first and only session');
 		return {
 			encounters: data[0].encounters,
 			locations: [data[0].location]
@@ -95,16 +91,13 @@ async function fetchSessionData({
 	if (location) {
 		const sessionData = data.find((item) => item.location_id === location);
 		if (!sessionData) {
-			console.warn('location is incorrect - returning null');
 			return null;
 		}
-		console.warn('returning session data for location');
 		return {
 			encounters: sessionData.encounters,
 			locations: data.map((item) => item.location)
 		};
 	} else {
-		console.warn('returning session data for all locations');
 		return {
 			encounters: data.flatMap((item) => item.encounters),
 			locations: data.map((item) => item.location)
@@ -211,11 +204,15 @@ export default async function SessionPage(props: PageProps) {
 	return (
 		<BootstrapPageData<DayData, PageProps, PageParams>
 			pageProps={props}
-			getCacheKeys={(params) => params.location ? ['session', params.date as string, `loc-${params.location}`] : ['session', params.date as string]}
+			getCacheKeys={(params) =>
+				params.location
+					? ['session', params.date as string, `loc-${params.location}`]
+					: ['session', params.date as string]
+			}
 			dataFetcher={fetchSessionData}
 			PageComponent={SessionSummary}
 			getParams={getPageParams}
-			ttl={1} // don't cache while debugging failures3600 * 24 * 7} // 1 week because once a session is complete the data does not change
+			ttl={3600 * 24 * 7} // 1 week because once a session is complete the data does not change
 		/>
 	);
 }
