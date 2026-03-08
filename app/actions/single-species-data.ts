@@ -1,4 +1,3 @@
-'use server';
 import { SPECIES_PAGE_BATCH_SIZE } from '@/app/constants';
 import {
 	orderBirdsByRecency,
