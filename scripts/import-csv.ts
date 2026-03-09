@@ -14,8 +14,14 @@ import csvParser from 'csv-parser';
 import { Database } from '../types/supabase.types';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
-type BirdsInsert = Omit<Database['public']['Tables']['Birds']['Insert'], 'last_encountered_timestamp'>;
-type EncountersInsert = Omit<Database['public']['Tables']['Encounters']['Insert'], 'ringing_group_id' | 'max_hatch_year' | 'min_hatch_year'>;
+type BirdsInsert = Omit<
+	Database['public']['Tables']['Birds']['Insert'],
+	'last_encountered_timestamp'
+>;
+type EncountersInsert = Omit<
+	Database['public']['Tables']['Encounters']['Insert'],
+	'ringing_group_id' | 'max_hatch_year' | 'min_hatch_year'
+>;
 type SessionsInsert = Database['public']['Tables']['Sessions']['Insert'];
 type RingingGroupsInsert =
 	Database['public']['Tables']['RingingGroups']['Insert'];
