@@ -191,8 +191,9 @@ function SessionSummary({
 					`${speciesList.length} species`,
 					`${dayData.encounters.filter((encounter) => encounter.record_type === 'N').length} new`,
 					`${dayData.encounters.filter((encounter) => encounter.record_type === 'S').length} retraps`,
-					`${dayData.encounters.filter((encounter) => encounter.minimum_years >= 1).length} adults`,
-					`${dayData.encounters.filter((encounter) => encounter.minimum_years === 0).length} juvs`
+					`${dayData.encounters.filter((encounter) => encounter.age_code > 3).length} adults`,
+					`${dayData.encounters.filter((encounter) => [1, 3].includes(encounter.age_code)).length} juvs`,
+					`${dayData.encounters.filter((encounter) => encounter.age_code === 2).length} unknown age`
 				]}
 			/>
 			<SessionTable speciesList={speciesList} />

@@ -28,6 +28,8 @@ function convertPaginatedBirdResultsToBirds(
 			age_code: result.age_code,
 			is_juv: result.is_juv,
 			minimum_years: result.minimum_years,
+			// min_hatch_year: result.min_hatch_year,
+			// max_hatch_year: result.max_hatch_year,
 			record_type: result.record_type,
 			sex: result.sex,
 			weight: result.weight,

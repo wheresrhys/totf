@@ -77,18 +77,6 @@ export function orderEncountersByRecency(
 	return encounters.sort(pairwiseSortEncounters(direction));
 }
 
-export function addProvenAgeToBird<BirdType extends BasicBird>(
-	bird: BirdType
-): EnrichedBirdWithEncounters<BirdType> {
-	(bird as EnrichedBirdWithEncounters<BirdType>).provenAge =
-		bird.encounters[0].minimum_years +
-		new Date(
-			bird.encounters[bird.encounters.length - 1].session.visit_date
-		).getFullYear() -
-		new Date(bird.encounters[0].session.visit_date).getFullYear();
-	return bird as EnrichedBirdWithEncounters<BirdType>;
-}
-
 function getSex(encounters: EncounterOfBird[]): [Sex, number] {
 	const counts = encounters.reduce(
 		(tallies, encounter) => {
@@ -112,11 +100,21 @@ function getSex(encounters: EncounterOfBird[]): [Sex, number] {
 
 function getProvenAge(
 	encounters: EncounterOfBird[],
+	lastEncounterDate: Date,
 	isOrdered: boolean = false
 ): number {
+	if (encounters[0].max_hatch_year) {
+		return (
+			lastEncounterDate.getFullYear() -
+			Math.min(...encounters.map((encounter) => encounter.max_hatch_year))
+		);
+	}
+
 	if (!isOrdered) {
 		encounters = orderEncountersByRecency(encounters, 'asc');
 	}
+
+	// legacy calculation - clean up once minimum years is gone from the database
 	return (
 		encounters[0].minimum_years +
 		new Date(
@@ -134,16 +132,17 @@ export function enrichBird<BirdType extends BasicBird>(
 		'asc'
 	);
 	const [sex, sexCertainty] = getSex(orderedEncounters);
+	const lastEncounterDate = new Date(
+		orderedEncounters[orderedEncounters.length - 1].session.visit_date
+	);
 	return {
 		...bird,
 		encounters: orderedEncounters,
 		sex,
 		sexCertainty,
 		firstEncounterDate: new Date(orderedEncounters[0].session.visit_date),
-		lastEncounterDate: new Date(
-			orderedEncounters[orderedEncounters.length - 1].session.visit_date
-		),
+		lastEncounterDate,
 		lastEncounter: orderedEncounters[orderedEncounters.length - 1],
-		provenAge: getProvenAge(orderedEncounters, true)
+		provenAge: getProvenAge(orderedEncounters, lastEncounterDate, true)
 	};
 }
