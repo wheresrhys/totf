@@ -42,14 +42,13 @@ BEGIN
     RAISE EXCEPTION 'Session % not found or has no location', NEW."session_id";
   END IF;
 
-  -- Update Birds.latest_encounter_date when session date is newer
+  -- Update Birds.last_encountered_timestamp when encounter timestamp is newer
   UPDATE "public"."Birds" b
-  SET last_encounter_date = s.visit_date
+  SET last_encountered_timestamp = (s.visit_date + COALESCE(NEW.capture_time, '00:00:00'::time))
   FROM "public"."Sessions" s
   WHERE b.id = NEW.bird_id
     AND s.id = NEW.session_id
-    AND (b.last_encounter_date IS NULL OR s.visit_date > b.last_encounter_date);
-
+    AND (b.last_encountered_timestamp IS NULL OR (s.visit_date + COALESCE(NEW.capture_time, '00:00:00'::time)) > b.last_encountered_timestamp);
 
   RETURN NEW;
 END;
@@ -57,5 +56,6 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER "trigger_set_encounter_generated_fields" BEFORE INSERT
 OR
-UPDATE OF "session_id" ON "public"."Encounters" FOR EACH ROW
+UPDATE OF "session_id",
+"capture_time" ON "public"."Encounters" FOR EACH ROW
 EXECUTE FUNCTION "public"."set_encounter_generated_fields" ();

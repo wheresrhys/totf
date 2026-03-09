@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS "public"."Birds" (
 	"ring_no" "text" NOT NULL,
 	"id" bigint NOT NULL,
 	"species_id" bigint NOT NULL,
-	"last_encounter_date" date
+	"last_encountered_timestamp" timestamp without time zone
 );
 
 ALTER TABLE "public"."Birds" OWNER TO "postgres";
