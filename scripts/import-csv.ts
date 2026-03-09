@@ -14,14 +14,19 @@ import csvParser from 'csv-parser';
 import { Database } from '../types/supabase.types';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
-type BirdsInsert = Database['public']['Tables']['Birds']['Insert'];
-type EncountersInsert = Database['public']['Tables']['Encounters']['Insert'];
+type BirdsInsert = Omit<
+	Database['public']['Tables']['Birds']['Insert'],
+	'last_encountered_timestamp'
+>;
+type EncountersInsert = Omit<
+	Database['public']['Tables']['Encounters']['Insert'],
+	'ringing_group_id' | 'max_hatch_year' | 'min_hatch_year'
+>;
 type SessionsInsert = Database['public']['Tables']['Sessions']['Insert'];
 type RingingGroupsInsert =
 	Database['public']['Tables']['RingingGroups']['Insert'];
 type LocationsInsert = Database['public']['Tables']['Locations']['Insert'];
 type EncounterRow = Database['public']['Tables']['Encounters']['Row'];
-type EncounterInsertWithTrigger = Omit<EncountersInsert, 'ringing_group_id'>;
 
 interface ImportOptions {
 	csvFilePath: string;
@@ -318,7 +323,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 				// 4. Insert Encounter (always create new)
 				const age_code: number = Number(String(row.age).replace('J', ''));
 
-				const encounterResult = (await upsert<EncounterInsertWithTrigger>(
+				const encounterResult = (await upsert<EncountersInsert>(
 					'Encounters',
 					{
 						age_code,
@@ -340,7 +345,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 						weight: row.weight ? Number(row.weight) : null,
 						wing_length: row.wing_length ? Number(row.wing_length) : null
 					},
-					'bird_id,session_id' as keyof EncounterInsertWithTrigger,
+					'bird_id,session_id' as keyof EncountersInsert,
 					'row'
 				)) as unknown as EncounterRow;
 
