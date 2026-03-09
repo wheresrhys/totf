@@ -101,6 +101,7 @@ WITH
 from "Birds" b
 JOIN "Encounters" e on e.bird_id = b.id
 JOIN "Species" s on s.id = b.species_id
+WHERE e.wing_length IS NOT NULL
 GROUP by b.id, b.ring_no, s.species_name)
 
 SELECT
