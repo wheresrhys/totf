@@ -16,6 +16,9 @@ export function NavItems({ classes }: { classes: string }) {
 			<li>
 				<NoPrefetchLink href="/species">Species</NoPrefetchLink>
 			</li>
+			<li>
+				<NoPrefetchLink href="/mistakes">Mistakes</NoPrefetchLink>
+			</li>
 		</ul>
 	);
 }
