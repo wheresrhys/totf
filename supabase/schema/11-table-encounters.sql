@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS "public"."Encounters" (
 	"ringing_group_id" bigint NOT NULL,
 	"age_code" smallint NOT NULL,
 	"minimum_years" smallint NOT NULL,
-	"max_hatch_year" smallint NOT NULL,
-	"min_hatch_year" smallint NOT NULL
+	"max_hatch_year" smallint,
+	"min_hatch_year" smallint
 );
 
 ALTER TABLE "public"."Encounters" OWNER TO "postgres";
