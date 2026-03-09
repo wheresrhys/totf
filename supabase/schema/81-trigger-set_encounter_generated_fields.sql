@@ -48,7 +48,7 @@ BEGIN
   FROM "public"."Sessions" s
   WHERE b.id = NEW.bird_id
     AND s.id = NEW.session_id
-    AND (b.latest_encounter_date IS NULL OR s.visit_date > b.last_encounter_date);
+    AND (b.last_encounter_date IS NULL OR s.visit_date > b.last_encounter_date);
 
 
   RETURN NEW;
