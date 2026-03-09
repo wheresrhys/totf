@@ -44,6 +44,8 @@ export type Database = {
           extra_text: string | null
           id: number
           is_juv: boolean
+          max_hatch_year: number
+          min_hatch_year: number
           minimum_years: number
           moult_code: string | null
           old_greater_coverts: number | null
@@ -64,6 +66,8 @@ export type Database = {
           extra_text?: string | null
           id?: number
           is_juv?: boolean
+          max_hatch_year: number
+          min_hatch_year: number
           minimum_years: number
           moult_code?: string | null
           old_greater_coverts?: number | null
@@ -84,6 +88,8 @@ export type Database = {
           extra_text?: string | null
           id?: number
           is_juv?: boolean
+          max_hatch_year?: number
+          min_hatch_year?: number
           minimum_years?: number
           moult_code?: string | null
           old_greater_coverts?: number | null

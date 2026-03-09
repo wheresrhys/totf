@@ -77,6 +77,7 @@ type RowModel = {
 	retraps: number;
 	adults: number;
 	juvs: number;
+	unknownAge: number;
 };
 
 function rowDataTransform(data: SpeciesWithEncounters): RowModel {
@@ -88,9 +89,12 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 		retraps: data.encounters.filter(
 			(encounter) => encounter.record_type === 'S'
 		).length,
-		adults: data.encounters.filter((encounter) => encounter.minimum_years >= 1)
+		adults: data.encounters.filter((encounter) => encounter.age_code > 3)
 			.length,
-		juvs: data.encounters.filter((encounter) => encounter.minimum_years === 0)
+		juvs: data.encounters.filter((encounter) =>
+			[1, 3].includes(encounter.age_code)
+		).length,
+		unknownAge: data.encounters.filter((encounter) => encounter.age_code === 2)
 			.length
 	};
 }
@@ -114,6 +118,9 @@ const columnConfigs = {
 	},
 	juvs: {
 		label: 'Juvs'
+	},
+	unknownAge: {
+		label: 'Unknown Age'
 	}
 } as Record<keyof RowModel, ColumnConfig>;
 
