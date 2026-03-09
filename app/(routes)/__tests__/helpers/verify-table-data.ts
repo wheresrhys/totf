@@ -17,12 +17,15 @@ export function verifyTableData(
 	} else {
 		expect(rowEls).toHaveLength(data.length - 1);
 	}
-	data.slice(1).map((row, index) => {
-		const rowEl = rowEls[index];
+	data.slice(1).map((row, rowIndex) => {
+		const rowEl = rowEls[rowIndex];
 		const cells = getAllByRole(rowEl, 'cell');
 		expect(cells).toHaveLength(row.length);
-		row.map((cell, index) => {
-			expect(cells[index].textContent.trim()).toBe(String(cell));
+		row.map((cell, columnIndex) => {
+			expect(
+				cells[columnIndex].textContent.trim(),
+				`Cell ${columnIndex + 1} in row ${rowIndex + 1} should be ${cell}`
+			).toBe(String(cell));
 		});
 	});
 }
