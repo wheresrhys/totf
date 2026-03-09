@@ -44,11 +44,11 @@ BEGIN
 
   -- Update Birds.latest_encounter_date when session date is newer
   UPDATE "public"."Birds" b
-  SET latest_encounter_date = s.visit_date
+  SET last_encounter_date = s.visit_date
   FROM "public"."Sessions" s
   WHERE b.id = NEW.bird_id
     AND s.id = NEW.session_id
-    AND (b.latest_encounter_date IS NULL OR s.visit_date > b.latest_encounter_date);
+    AND (b.latest_encounter_date IS NULL OR s.visit_date > b.last_encounter_date);
 
 
   RETURN NEW;
