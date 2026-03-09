@@ -12,19 +12,19 @@ export type Database = {
       Birds: {
         Row: {
           id: number
-          last_encountered_timestamp: string | null
+          last_encountered_timestamp: string
           ring_no: string
           species_id: number
         }
         Insert: {
           id?: number
-          last_encountered_timestamp?: string | null
+          last_encountered_timestamp?: string
           ring_no: string
           species_id: number
         }
         Update: {
           id?: number
-          last_encountered_timestamp?: string | null
+          last_encountered_timestamp?: string
           ring_no?: string
           species_id?: number
         }
