@@ -90,7 +90,6 @@ export default function GlobalNav({
 	groups: RingingGroupRow[];
 	selectedGroupId: number | null;
 }) {
-
 	selectedGroupId = useRingingGroup() ?? selectedGroupId;
 	const pathname = usePathname();
 	const [showSearchForm, setShowSearchForm] = useState(false);
@@ -135,7 +134,7 @@ export default function GlobalNav({
 		setShowSearchForm(false);
 		setShowMobileNav(false);
 		setShowGroupSwitcher(!selectedGroupId);
-	}, [pathname]);
+	}, [pathname, selectedGroupId]);
 	return (
 		<>
 			<nav className="w-full shadow-base-300/20 shadow-sm">
@@ -147,9 +146,11 @@ export default function GlobalNav({
 						<span className="mr-2 icon-[fluent-emoji-flat--blackbird] size-8 flex-shrink-0 flex-grow-0"></span>
 						<span className="flex items-center gap-x-2 flex-wrap">
 							<span>Top of the Flocks</span>
-							{selectedGroupId ? <span className="text-sm font-medium">
-								{selectedGroup.group_name}
-							</span> : null}
+							{selectedGroupId ? (
+								<span className="text-sm font-medium">
+									{selectedGroup.group_name}
+								</span>
+							) : null}
 						</span>
 					</NoPrefetchLink>
 

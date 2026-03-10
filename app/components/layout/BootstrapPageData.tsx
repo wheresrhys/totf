@@ -14,7 +14,7 @@ export type BootstrapPageDataProps<DataType, PagePropsType, ParamsType> = {
 	getParams?: (pageProps: PagePropsType) => Promise<ParamsType>;
 	dataFetcher: (
 		params: ParamsType,
-		groupId: number | null
+		groupId: number
 	) => Promise<DataType | null>;
 	PageComponent: (props: {
 		params: ParamsType;
@@ -48,10 +48,10 @@ export async function fetchDataWithCache<DataType, ParamsType>({
 	params: ParamsType;
 	dataFetcher: (
 		params: ParamsType,
-		groupId: number | null
+		groupId: number
 	) => Promise<DataType | null>;
 	cacheKeys: string[];
-	groupId: number | null;
+	groupId: number;
 	ttl?: number;
 }): Promise<DataType | null> {
 	return unstable_cache(async () => dataFetcher(params, groupId), cacheKeys, {
@@ -85,6 +85,7 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 		: cacheKeys;
 
 	if (!groupId) {
+		// TODO this should trigger a proper authorisation flow
 		return <p>Select a group to view data on this site</p>;
 	}
 	const data = await fetchDataWithCache<DataType, ParamsType>({
