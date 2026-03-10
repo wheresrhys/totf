@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
 import type { RingingGroupRow } from '@/app/models/db';
@@ -38,6 +39,47 @@ function Expander({
 	);
 }
 
+function GroupSwitcher({
+	groups,
+	selectedGroupId
+}: {
+	groups: RingingGroupRow[];
+	selectedGroupId: number | null;
+}) {
+	// const router = useRouter();
+
+	async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+		const groupId = parseInt(e.target.value, 10);
+		// await setGroup(groupId);
+		// router.refresh();
+		console.log('groupId', groupId);
+	}
+
+	if (groups.length === 1) {
+		return null;
+	}
+
+	return (
+		<select
+			className="select select-bordered md:w-1/3"
+			value={selectedGroupId ?? ''}
+			onChange={handleChange}
+			aria-label="Select ringing group"
+		>
+			{selectedGroupId === null && (
+				<option value="" disabled>
+					Select group
+				</option>
+			)}
+			{groups.map((group) => (
+				<option key={group.id} value={group.id}>
+					{group.group_name}
+				</option>
+			))}
+		</select>
+	);
+}
+
 export default function GlobalNav({
 	groups,
 	selectedGroupId
@@ -45,8 +87,10 @@ export default function GlobalNav({
 	groups: RingingGroupRow[];
 	selectedGroupId: number;
 }) {
+	const pathname = usePathname();
 	const [showSearchForm, setShowSearchForm] = useState(false);
 	const [showMobileNav, setShowMobileNav] = useState(false);
+	const [showGroupSwitcher, setShowGroupSwitcher] = useState(false);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const selectedGroup = groups.find(
 		(group) => group.id === selectedGroupId
@@ -54,12 +98,20 @@ export default function GlobalNav({
 
 	const toggleNav = () => {
 		setShowSearchForm(false);
+		setShowGroupSwitcher(false);
 		setShowMobileNav(!showMobileNav);
 	};
 
 	const toggleSearch = () => {
 		setShowMobileNav(false);
+		setShowGroupSwitcher(false);
 		setShowSearchForm(!showSearchForm);
+	};
+
+	const toggleGroupSwitcher = () => {
+		setShowMobileNav(false);
+		setShowSearchForm(false);
+		setShowGroupSwitcher(!showGroupSwitcher);
 	};
 
 	useEffect(() => {
@@ -67,6 +119,13 @@ export default function GlobalNav({
 			searchInputRef.current?.focus();
 		}
 	}, [showSearchForm]);
+
+	// Reset expandable UI state when route changes
+	useEffect(() => {
+		setShowSearchForm(false);
+		setShowMobileNav(false);
+		setShowGroupSwitcher(false);
+	}, [pathname]);
 	return (
 		<>
 			<nav className="w-full shadow-base-300/20 shadow-sm">
@@ -83,6 +142,7 @@ export default function GlobalNav({
 							</span>
 						</span>
 					</NoPrefetchLink>
+
 					<div className="flex justify-end w-full gap-2 items-center">
 						<div className="lg:hidden flex items-center gap-2">
 							<button
@@ -114,6 +174,17 @@ export default function GlobalNav({
 						<div className="hidden md:flex">
 							<NavItems classes="menu menu-horizontal gap-2 p-0 text-base" />
 						</div>
+						{groups.length > 1 ? (
+							<button
+								type="button"
+								className="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square"
+								aria-controls="group-switcher"
+								aria-label="Toggle Group Switcher"
+								onClick={toggleGroupSwitcher}
+							>
+								<span className="icon-[tabler--users-group] size-4"></span>
+							</button>
+						) : null}
 					</div>
 				</div>
 				<Expander id="mobile-nav" isExpanded={showMobileNav}>
@@ -126,6 +197,11 @@ export default function GlobalNav({
 								searchInputRef as React.RefObject<HTMLInputElement>
 							}
 						/>
+					</div>
+				</Expander>
+				<Expander id="group-switcher" isExpanded={showGroupSwitcher}>
+					<div className="p-4 pt-0 flex justify-end">
+						<GroupSwitcher groups={groups} selectedGroupId={selectedGroupId} />
 					</div>
 				</Expander>
 			</nav>
