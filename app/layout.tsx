@@ -34,7 +34,9 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body>
-				<PopulatedNav />
+				<Suspense>
+					<PopulatedNav />
+				</Suspense>
 				{children}
 				<Suspense>
 					<LoadFlyonUI />
