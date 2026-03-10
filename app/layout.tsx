@@ -13,13 +13,11 @@ export const metadata: Metadata = {
 import type { RingingGroupRow } from './models/db';
 
 async function fetchRingingGroups(): Promise<RingingGroupRow[]> {
-	return (
-		supabase
-			.from('RingingGroups')
-			.select('id, group_name')
-			// .order('group_name')
-			.then(catchSupabaseErrors) as Promise<RingingGroupRow[]>
-	);
+	return supabase
+		.from('RingingGroups')
+		.select('id, group_name')
+		.order('group_name')
+		.then(catchSupabaseErrors) as Promise<RingingGroupRow[]>;
 }
 
 async function PopulatedNav() {

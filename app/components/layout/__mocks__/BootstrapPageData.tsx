@@ -32,7 +32,10 @@ export function BootstrapPageData<
 				}
 
 				setParams(resolvedParams);
-				const fetchedData = await bootstrapProps.dataFetcher(resolvedParams);
+				const fetchedData = await bootstrapProps.dataFetcher(
+					resolvedParams,
+					null
+				);
 				setData(fetchedData);
 			} catch (error) {
 				console.error('Error loading data in BootstrapPageData mock:', error);
