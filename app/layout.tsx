@@ -3,10 +3,28 @@ import './globals.css';
 import GlobalNav from './components/layout/GlobalNav';
 import LoadFlyonUI from './components/layout/LoadFlyonUI';
 import { Suspense } from 'react';
+import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 export const metadata: Metadata = {
 	title: 'Top of the Flocks',
 	description: 'Leaderboard for bird ringing data'
 };
+import type { RingingGroupRow } from './models/db';
+
+async function fetchRingingGroups(): Promise<RingingGroupRow[]> {
+	return supabase
+		.from('RingingGroups')
+		.select('id, group_name')
+		.order('group_name')
+		.then(catchSupabaseErrors) as Promise<RingingGroupRow[]>;
+}
+
+async function PopulatedNav() {
+	const [groups] = await Promise.all([fetchRingingGroups()]);
+	// this is deliberately inefficient as we only have one group
+	// setting things up in preparation for multi-tenancy
+	const selectedGroupId = groups[0].id;
+	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
+}
 
 export default function RootLayout({
 	children
@@ -16,7 +34,7 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body>
-				<GlobalNav />
+				<PopulatedNav />
 				{children}
 				<Suspense>
 					<LoadFlyonUI />
