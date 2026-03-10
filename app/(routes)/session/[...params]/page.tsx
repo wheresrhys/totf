@@ -61,7 +61,6 @@ async function fetchSessionData({
 			id,
 			session_id,
 			age_code,
-			minimum_years,
 			capture_time,
 			record_type,
 			sex,

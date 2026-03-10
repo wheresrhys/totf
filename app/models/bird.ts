@@ -100,27 +100,11 @@ function getSex(encounters: EncounterOfBird[]): [Sex, number] {
 
 function getProvenAge(
 	encounters: EncounterOfBird[],
-	lastEncounterDate: Date,
-	isOrdered: boolean = false
+	lastEncounterDate: Date
 ): number {
-	if (encounters[0].max_hatch_year) {
-		return (
-			lastEncounterDate.getFullYear() -
-			Math.min(...encounters.map((encounter) => encounter.max_hatch_year))
-		);
-	}
-
-	if (!isOrdered) {
-		encounters = orderEncountersByRecency(encounters, 'asc');
-	}
-
-	// legacy calculation - clean up once minimum years is gone from the database
 	return (
-		encounters[0].minimum_years +
-		new Date(
-			encounters[encounters.length - 1].session.visit_date
-		).getFullYear() -
-		new Date(encounters[0].session.visit_date).getFullYear()
+		lastEncounterDate.getFullYear() -
+		Math.min(...encounters.map((encounter) => encounter.max_hatch_year))
 	);
 }
 
@@ -143,6 +127,6 @@ export function enrichBird<BirdType extends BasicBird>(
 		firstEncounterDate: new Date(orderedEncounters[0].session.visit_date),
 		lastEncounterDate,
 		lastEncounter: orderedEncounters[orderedEncounters.length - 1],
-		provenAge: getProvenAge(orderedEncounters, lastEncounterDate, true)
+		provenAge: getProvenAge(orderedEncounters, lastEncounterDate)
 	};
 }
