@@ -1,5 +1,6 @@
 'use client';
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { setGroupCookie, getGroupCookie } from '@/app/actions/group-cookie';
 
 const RingingGroupContext = createContext<{
 	ringingGroup: number | null;
@@ -20,7 +21,10 @@ export function useSetRingingGroup() {
 	const ctx = useContext(RingingGroupContext);
 	if (!ctx)
 		throw new Error('useRingingGroup must be used within RingingGroupProvider');
-	return ctx.setRingingGroup;
+	return (groupId: number) => {
+		ctx.setRingingGroup(groupId);
+		setGroupCookie(groupId);
+	};
 }
 
 export function RingingGroupProvider({
@@ -30,6 +34,13 @@ export function RingingGroupProvider({
 }) {
 	const [ringingGroup, setRingingGroup] = useState<number | null>(null);
 
+	useEffect(() => {
+		getGroupCookie().then((groupId) => {
+			if (groupId) {
+				setRingingGroup(groupId);
+			}
+		});
+	}, []);
 	return (
 		<RingingGroupContext.Provider
 			value={{

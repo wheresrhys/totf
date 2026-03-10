@@ -5,10 +5,8 @@ import LoadFlyonUI from './components/layout/LoadFlyonUI';
 import { Suspense } from 'react';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import { getGroupId } from '@/lib/group-auth';
-import {
-	RingingGroupProvider,
-	useRingingGroup
-} from './components/layout/RingingGroupProvider';
+import { RingingGroupProvider } from './components/layout/RingingGroupProvider';
+import { getGroupCookie } from './actions/group-cookie';
 export const metadata: Metadata = {
 	title: 'Top of the Flocks',
 	description: 'Leaderboard for bird ringing data'
@@ -29,7 +27,7 @@ async function PopulatedNav() {
 	const groups = await fetchRingingGroups();
 	// this is deliberately inefficient as we only have one group
 	// setting things up in preparation for multi-tenancy
-	const selectedGroupId = 1;
+	const selectedGroupId = (await getGroupCookie()) ?? 1;
 	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
 }
 

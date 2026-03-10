@@ -80,17 +80,20 @@ function Expander({
 
 function GroupSwitcher({
 	groups,
-	selectedGroupId
+	selectedGroupId,
+	onChange
 }: {
 	groups: RingingGroupRow[];
 	selectedGroupId: number | null;
+	onChange: () => void;
 }) {
 	const router = useRouter();
 	const setRingingGroup = useSetRingingGroup();
 	async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
 		const groupId = parseInt(e.target.value, 10);
-		setRingingGroup(groupId);
+		await setRingingGroup(groupId);
 		// await setGroup(groupId);
+		onChange();
 		router.refresh();
 	}
 
@@ -160,12 +163,13 @@ export default function GlobalNav({
 		}
 	}, [showSearchForm]);
 
-	// Reset expandable UI state when route changes
-	useEffect(() => {
+	function collapseAll() {
 		setShowSearchForm(false);
 		setShowMobileNav(false);
 		setShowGroupSwitcher(false);
-	}, [pathname]);
+	}
+	// Reset expandable UI state when route changes
+	useEffect(collapseAll, [pathname]);
 	return (
 		<>
 			<nav className="w-full shadow-base-300/20 shadow-sm">
@@ -244,7 +248,11 @@ export default function GlobalNav({
 				</Expander>
 				<Expander id="group-switcher" isExpanded={showGroupSwitcher}>
 					<div className="p-4 pt-0 flex justify-end">
-						<GroupSwitcher groups={groups} selectedGroupId={selectedGroupId} />
+						<GroupSwitcher
+							groups={groups}
+							selectedGroupId={selectedGroupId}
+							onChange={collapseAll}
+						/>
 					</div>
 				</Expander>
 			</nav>
