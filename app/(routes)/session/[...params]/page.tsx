@@ -105,16 +105,23 @@ async function fetchSessionData(
 		if (!sessionData) {
 			return null;
 		}
-		return {
-			encounters: encountersBySessionId[sessionData.id],
-			locations
-		};
-	} else {
-		return {
-			encounters,
-			locations
-		};
+
+		const authorisedSessionData = authorisedSessions.find(
+			(item) => item.location_id === location
+		);
+		if (authorisedSessionData) {
+			return {
+				encounters: encountersBySessionId[sessionData.id],
+				locations
+			};
+		}
 	}
+	// Note that this covers the best case - returning all enounters and locations where everything is authorised - and the worst - where nothing is authorised and none of the above match
+	// this is really weird, so shodul change it to be clearer
+	return {
+		encounters,
+		locations
+	};
 }
 
 function groupBySpecies(
