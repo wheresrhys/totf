@@ -22,6 +22,7 @@
 		"next:dev": "dotenvx run -f .env.dev -- next dev --turbopack",
 		"next:prod": "./scripts/load-prod-env.sh next dev --turbopack",
 		"next:build:prod": "./scripts/load-prod-env.sh next build --turbopack --debug",
+		"next:build:dev": "dotenvx run -f .env.dev -- next build --turbopack --debug",
 		"next:start:prod": "./scripts/load-prod-env.sh next start",
 		"lint": "npx prettier -w app supabase/schema scripts lib && npx eslint",
 		"type:check": "tsc --noEmit",
