@@ -88,13 +88,14 @@ export default function GlobalNav({
 	selectedGroupId
 }: {
 	groups: RingingGroupRow[];
-	selectedGroupId: number;
+	selectedGroupId: number | null;
 }) {
+
 	selectedGroupId = useRingingGroup() ?? selectedGroupId;
 	const pathname = usePathname();
 	const [showSearchForm, setShowSearchForm] = useState(false);
 	const [showMobileNav, setShowMobileNav] = useState(false);
-	const [showGroupSwitcher, setShowGroupSwitcher] = useState(false);
+	const [showGroupSwitcher, setShowGroupSwitcher] = useState(!selectedGroupId);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const selectedGroup = groups.find(
 		(group) => group.id === selectedGroupId
@@ -130,7 +131,11 @@ export default function GlobalNav({
 		setShowGroupSwitcher(false);
 	}
 	// Reset expandable UI state when route changes
-	useEffect(collapseAll, [pathname]);
+	useEffect(() => {
+		setShowSearchForm(false);
+		setShowMobileNav(false);
+		setShowGroupSwitcher(!selectedGroupId);
+	}, [pathname]);
 	return (
 		<>
 			<nav className="w-full shadow-base-300/20 shadow-sm">
@@ -142,9 +147,9 @@ export default function GlobalNav({
 						<span className="mr-2 icon-[fluent-emoji-flat--blackbird] size-8 flex-shrink-0 flex-grow-0"></span>
 						<span className="flex items-center gap-x-2 flex-wrap">
 							<span>Top of the Flocks</span>
-							<span className="text-sm font-medium">
+							{selectedGroupId ? <span className="text-sm font-medium">
 								{selectedGroup.group_name}
-							</span>
+							</span> : null}
 						</span>
 					</NoPrefetchLink>
 
