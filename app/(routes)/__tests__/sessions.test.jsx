@@ -29,7 +29,7 @@ describe('session list page', () => {
 	it('first session list accordion should be expanded by default', async () => {
 		render(await Page());
 		const accordionGroups = await screen.findAllByTestId('year-accordion-item');
-		expect(accordionGroups).toHaveLength(2);
+		expect(accordionGroups).toHaveLength(4);
 		const firstYearAccordionItem = accordionGroups[0];
 		const firstYearAccordionItemButton = getAllByRole(
 			firstYearAccordionItem,
