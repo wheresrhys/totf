@@ -35,7 +35,7 @@ CREATE OR REPLACE FUNCTION "public"."species_stats" (
       e.wing_length,
       sess.id AS session_id,
       sess.visit_date,
-      e.minimum_years
+      e.max_hatch_year
     FROM public."Species" sp
     JOIN public."Birds" b ON sp.id = b.species_id
     LEFT JOIN public."Encounters" e ON b.id = e.bird_id
@@ -52,7 +52,7 @@ CREATE OR REPLACE FUNCTION "public"."species_stats" (
       COUNT(*) AS encounter_count,
       MIN(visit_date) AS first_visit,
       MAX(visit_date) AS last_visit,
-      MIN(minimum_years) AS min_years_at_first,
+      MIN(max_hatch_year) AS min_max_hatch_year,
       EXTRACT(EPOCH FROM (MAX(visit_date)::timestamp - MIN(visit_date)::timestamp)) / 86400.0 AS time_span_days
     FROM species_encounters
     WHERE encounter_id IS NOT NULL
@@ -64,11 +64,7 @@ CREATE OR REPLACE FUNCTION "public"."species_stats" (
       species_id,
       MAX(bird_stats.encounter_count) AS max_encounter_count,
       MAX(bird_stats.time_span_days) AS max_time_span,
-      MAX(
-        bird_stats.min_years_at_first +
-        EXTRACT(YEAR FROM bird_stats.last_visit) -
-        EXTRACT(YEAR FROM bird_stats.first_visit)
-      ) AS max_proven_age
+      MAX(EXTRACT(YEAR FROM bird_stats.last_visit) - bird_stats.min_max_hatch_year) AS max_proven_age
     FROM bird_stats
     GROUP BY species_id
   ),

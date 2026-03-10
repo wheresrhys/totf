@@ -20,8 +20,5 @@ export type TopMetricsFilterParams =
 export type SpeciesStatsRow =
 	Database['public']['Functions']['species_stats']['Returns'][number];
 
-export type PaginatedBirdsResult =
-	Database['public']['Functions']['paginated_birds_table']['Returns'][number];
-
 export type DiscrepenciesResult =
 	Database['public']['Functions']['find_discrepencies']['Returns'][number];

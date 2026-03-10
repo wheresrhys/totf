@@ -49,7 +49,6 @@ export type Database = {
           is_juv: boolean
           max_hatch_year: number
           min_hatch_year: number
-          minimum_years: number
           moult_code: string | null
           old_greater_coverts: number | null
           record_type: string
@@ -71,7 +70,6 @@ export type Database = {
           is_juv?: boolean
           max_hatch_year: number
           min_hatch_year: number
-          minimum_years: number
           moult_code?: string | null
           old_greater_coverts?: number | null
           record_type: string
@@ -93,7 +91,6 @@ export type Database = {
           is_juv?: boolean
           max_hatch_year?: number
           min_hatch_year?: number
-          minimum_years?: number
           moult_code?: string | null
           old_greater_coverts?: number | null
           record_type?: string
@@ -258,28 +255,6 @@ export type Database = {
           encounters: number
           ring_no: string
           species_name: string
-        }[]
-      }
-      paginated_birds_table: {
-        Args: {
-          result_limit: number
-          result_offset?: number
-          species_name_param: string
-        }
-        Returns: {
-          age_code: number
-          bird_id: number
-          capture_time: string
-          encounter_id: number
-          is_juv: boolean
-          minimum_years: number
-          record_type: string
-          ring_no: string
-          session_id: number
-          sex: string
-          visit_date: string
-          weight: number
-          wing_length: number
         }[]
       }
       soundex: { Args: { "": string }; Returns: string }
