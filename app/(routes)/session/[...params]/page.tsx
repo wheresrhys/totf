@@ -24,13 +24,6 @@ type DayData = {
 	locations: LocationRow[];
 };
 
-type SessionLocation = {
-	id: number;
-	location_id: number;
-	location: LocationRow;
-	encounters: SessionEncounter[];
-};
-
 async function getPageParams(pageProps: PageProps): Promise<PageParams> {
 	const pageParams = await pageProps.params;
 	return {
@@ -41,26 +34,38 @@ async function getPageParams(pageProps: PageProps): Promise<PageParams> {
 	};
 }
 
-async function fetchSessionData({
-	date,
-	location
-}: PageParams): Promise<DayData | null> {
-	const data = (await supabase
+async function fetchSessionData(
+	{ date, location }: PageParams,
+	groupId: number | null
+): Promise<DayData | null> {
+
+	const sessions = await supabase
 		.from('Sessions')
 		.select(
+			'id, location_id, location:Locations (id, location_name, ringing_group_id)'
+		)
+		.eq('visit_date', date)
+		.then(catchSupabaseErrors);
+
+	if (!sessions) {
+		return null;
+	}
+
+	const authorisedSessions = sessions.filter(
+		(session) => session.location.ringing_group_id === groupId
+	);
+	const locations = authorisedSessions.map((item) => item.location);
+
+	let encountersFetcher = supabase
+		.from('Encounters')
+		.select(
 			`
-		id,
-		location_id,
-		location:Locations (
-			id,
-			location_name
-		),
-		encounters:Encounters(
 			id,
 			session_id,
 			age_code,
 			capture_time,
 			record_type,
+			ringing_group_id,
 			sex,
 			weight,
 			wing_length,
@@ -70,34 +75,50 @@ async function fetchSessionData({
 					id,
 					species_name
 				)
-			)
+
 		)
 	`
 		)
-		.eq('visit_date', date)
-		.then(catchSupabaseErrors)) as SessionLocation[];
-	if (data.length === 0) {
-		return null;
+		.in(
+			'session_id',
+			authorisedSessions.map((session) => session.id)
+		);
+
+	if (groupId) {
+		encountersFetcher = encountersFetcher.eq('ringing_group_id', groupId);
 	}
-	if (data.length === 1) {
+	const encounters = (await encountersFetcher.then(
+		catchSupabaseErrors
+	)) as SessionEncounter[];
+
+	const encountersBySessionId = encounters.reduce(
+		(acc: Record<number, SessionEncounter[]>, encounter) => {
+			acc[encounter.session_id] = acc[encounter.session_id] || [];
+			acc[encounter.session_id].push(encounter);
+			return acc;
+		},
+		{}
+	);
+
+	if (Object.keys(encountersBySessionId).length === 1) {
 		return {
-			encounters: data[0].encounters,
-			locations: [data[0].location]
+			encounters,
+			locations: [authorisedSessions[0].location]
 		};
 	}
 	if (location) {
-		const sessionData = data.find((item) => item.location_id === location);
+		const sessionData = sessions.find((item) => item.location_id === location);
 		if (!sessionData) {
 			return null;
 		}
 		return {
-			encounters: sessionData.encounters,
-			locations: data.map((item) => item.location)
+			encounters: encountersBySessionId[sessionData.id],
+			locations
 		};
 	} else {
 		return {
-			encounters: data.flatMap((item) => item.encounters),
-			locations: data.map((item) => item.location)
+			encounters,
+			locations
 		};
 	}
 }
@@ -170,6 +191,13 @@ function SessionSummary({
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
 
+	if (dayData.locations.length === 0) {
+		return (
+			<PageWrapper>
+				<p>Not authorised to view any sessions on this date</p>
+			</PageWrapper>
+		);
+	}
 	return (
 		<PageWrapper>
 			<PrimaryHeading>
