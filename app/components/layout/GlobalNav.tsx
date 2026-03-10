@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
+import type { RingingGroupRow } from '@/app/models/db';
 export function NavItems({ classes }: { classes: string }) {
 	return (
 		<ul className={classes}>
@@ -37,10 +38,19 @@ function Expander({
 	);
 }
 
-export default function GlobalNav() {
+export default function GlobalNav({
+	groups,
+	selectedGroupId
+}: {
+	groups: RingingGroupRow[];
+	selectedGroupId: number;
+}) {
 	const [showSearchForm, setShowSearchForm] = useState(false);
 	const [showMobileNav, setShowMobileNav] = useState(false);
 	const searchInputRef = useRef<HTMLInputElement>(null);
+	const selectedGroup = groups.find(
+		(group) => group.id === selectedGroupId
+	) as RingingGroupRow;
 
 	const toggleNav = () => {
 		setShowSearchForm(false);
@@ -65,8 +75,13 @@ export default function GlobalNav() {
 						className="link text-base-content link-neutral text-xl font-bold no-underline flex items-center gap-2 text-nowrap"
 						href="/"
 					>
-						<span className="icon-[fluent-emoji-flat--blackbird] size-8"></span>
-						Top of the Flocks
+						<span className="mr-2 icon-[fluent-emoji-flat--blackbird] size-8 flex-shrink-0 flex-grow-0"></span>
+						<span className="flex items-center gap-x-2 flex-wrap">
+							<span>Top of the Flocks</span>
+							<span className="text-sm font-medium">
+								{selectedGroup.group_name}
+							</span>
+						</span>
 					</NoPrefetchLink>
 					<div className="flex justify-end w-full gap-2 items-center">
 						<div className="md:hidden flex items-center gap-2">
