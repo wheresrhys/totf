@@ -10,6 +10,21 @@ export const metadata: Metadata = {
 	title: 'Top of the Flocks',
 	description: 'Leaderboard for bird ringing data'
 };
+import type { RingingGroupRow } from './models/db';
+
+async function fetchRingingGroups(): Promise<RingingGroupRow[]> {
+	return supabase
+		.from('RingingGroups')
+		.select('id, group_name')
+		.order('group_name')
+		.then(catchSupabaseErrors) as Promise<RingingGroupRow[]>;
+}
+
+async function PopulatedNav() {
+	const [groups] = await Promise.all([fetchRingingGroups()]);
+	const selectedGroupId = groups[0].id;
+	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
+}
 
 type RingingGroup = { id: number; group_name: string };
 
