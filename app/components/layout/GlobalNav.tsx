@@ -1,8 +1,9 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
+import { useSetRingingGroup, useRingingGroup } from './RingingGroupProvider';
 import type { RingingGroupRow } from '@/app/models/db';
 export function NavItems({ classes }: { classes: string }) {
 	return (
@@ -46,13 +47,13 @@ function GroupSwitcher({
 	groups: RingingGroupRow[];
 	selectedGroupId: number | null;
 }) {
-	// const router = useRouter();
-
+	const router = useRouter();
+	const setRingingGroup = useSetRingingGroup();
 	async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
 		const groupId = parseInt(e.target.value, 10);
+		setRingingGroup(groupId);
 		// await setGroup(groupId);
-		// router.refresh();
-		console.log('groupId', groupId);
+		router.refresh();
 	}
 
 	if (groups.length === 1) {
@@ -87,6 +88,7 @@ export default function GlobalNav({
 	groups: RingingGroupRow[];
 	selectedGroupId: number;
 }) {
+	selectedGroupId = useRingingGroup() ?? selectedGroupId;
 	const pathname = usePathname();
 	const [showSearchForm, setShowSearchForm] = useState(false);
 	const [showMobileNav, setShowMobileNav] = useState(false);

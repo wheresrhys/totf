@@ -4,6 +4,10 @@ import GlobalNav from './components/layout/GlobalNav';
 import LoadFlyonUI from './components/layout/LoadFlyonUI';
 import { Suspense } from 'react';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import {
+	RingingGroupProvider,
+	useRingingGroup
+} from './components/layout/RingingGroupProvider';
 export const metadata: Metadata = {
 	title: 'Top of the Flocks',
 	description: 'Leaderboard for bird ringing data'
@@ -36,13 +40,15 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body>
-				<Suspense>
-					<PopulatedNav />
-				</Suspense>
-				{children}
-				<Suspense>
-					<LoadFlyonUI />
-				</Suspense>
+				<RingingGroupProvider>
+					<Suspense>
+						<PopulatedNav />
+					</Suspense>
+					{children}
+					<Suspense>
+						<LoadFlyonUI />
+					</Suspense>
+				</RingingGroupProvider>
 				{/* Force icon imports */}
 				<span className="hidden icon-[tabler--calendar] icon-[tabler--calendar-week] icon-[tabler--chevron-up] icon-[tabler--chevron-down] icon-[tabler--x] icon-[tabler--menu-2]"></span>
 			</body>
