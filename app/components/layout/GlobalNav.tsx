@@ -82,6 +82,25 @@ function GroupSwitcher({
 		</select>
 	);
 }
+class ExpanderManager {
+	expanders: Record<string, (isExpanded: boolean) => void> = {};
+	register(id: string, setter: (isExpanded: boolean) => void) {
+		this.expanders[id] = setter;
+	}
+	collapseAll() {
+		Object.values(this.expanders).forEach((setter) => setter(false));
+	}
+	change(toggleId: string, isExpanded: boolean) {
+		Object.entries(this.expanders).forEach(([id, setter]) => {
+			if (id === toggleId) {
+				setter(isExpanded);
+			} else {
+				setter(false);
+			}
+		});
+
+	}
+}
 
 export default function GlobalNav({
 	groups,
@@ -92,49 +111,28 @@ export default function GlobalNav({
 }) {
 	selectedGroupId = useRingingGroup() ?? selectedGroupId;
 	const pathname = usePathname();
+	const expanderManager = new ExpanderManager();
 	const [showSearchForm, setShowSearchForm] = useState(false);
+	expanderManager.register('search', setShowSearchForm);
 	const [showMobileNav, setShowMobileNav] = useState(false);
+	expanderManager.register('mobileNav', setShowMobileNav);
 	const [showGroupSwitcher, setShowGroupSwitcher] = useState(!selectedGroupId);
+	expanderManager.register('groupSwitcher', setShowGroupSwitcher);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const selectedGroup = groups.find(
 		(group) => group.id === selectedGroupId
 	) as RingingGroupRow;
 
-	const toggleNav = () => {
-		setShowSearchForm(false);
-		setShowGroupSwitcher(false);
-		setShowMobileNav(!showMobileNav);
-	};
-
-	const toggleSearch = () => {
-		setShowMobileNav(false);
-		setShowGroupSwitcher(false);
-		setShowSearchForm(!showSearchForm);
-	};
-
-	const toggleGroupSwitcher = () => {
-		setShowMobileNav(false);
-		setShowSearchForm(false);
-		setShowGroupSwitcher(!showGroupSwitcher);
-	};
+	// Reset expandable UI state when route changes
+	useEffect(() => {
+		expanderManager.change('groupSwitcher', !selectedGroupId);
+	}, [pathname, selectedGroupId]);
 
 	useEffect(() => {
 		if (showSearchForm) {
 			searchInputRef.current?.focus();
 		}
 	}, [showSearchForm]);
-
-	function collapseAll() {
-		setShowSearchForm(false);
-		setShowMobileNav(false);
-		setShowGroupSwitcher(false);
-	}
-	// Reset expandable UI state when route changes
-	useEffect(() => {
-		setShowSearchForm(false);
-		setShowMobileNav(false);
-		setShowGroupSwitcher(!selectedGroupId);
-	}, [pathname, selectedGroupId]);
 	return (
 		<>
 			<nav className="w-full shadow-base-300/20 shadow-sm">
@@ -161,7 +159,9 @@ export default function GlobalNav({
 								className="btn-sm btn-square"
 								aria-controls="ring-search-form-wrapper"
 								aria-label="Search for a ring number"
-								onClick={toggleSearch}
+								onClick={() => {
+									expanderManager.change('search', !showSearchForm);
+								}}
 							>
 								<span className="icon-[tabler--search] collapse-open:hidden size-7"></span>
 							</button>
@@ -172,7 +172,9 @@ export default function GlobalNav({
 								className="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square"
 								aria-controls="mobile-nav"
 								aria-label="Toggle navigation"
-								onClick={toggleNav}
+								onClick={() => {
+									expanderManager.change('mobileNav', !showMobileNav);
+								}}
 							>
 								<span
 									className={`${showMobileNav ? 'icon-[tabler--x]' : 'icon-[tabler--menu-2]'}  collapse-open:hidden size-4`}
@@ -191,7 +193,9 @@ export default function GlobalNav({
 								className="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square"
 								aria-controls="group-switcher"
 								aria-label="Toggle Group Switcher"
-								onClick={toggleGroupSwitcher}
+								onClick={() => {
+									expanderManager.change('groupSwitcher', !showGroupSwitcher);
+								}}
 							>
 								<span className="icon-[tabler--users-group] size-4"></span>
 							</button>
@@ -215,7 +219,7 @@ export default function GlobalNav({
 						<GroupSwitcher
 							groups={groups}
 							selectedGroupId={selectedGroupId}
-							onChange={collapseAll}
+							onChange={() => expanderManager.collapseAll()}
 						/>
 					</div>
 				</Expander>
