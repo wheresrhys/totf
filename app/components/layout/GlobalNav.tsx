@@ -54,7 +54,6 @@ function GroupSwitcher({
 	async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
 		const groupId = parseInt(e.target.value, 10);
 		await setRingingGroup(groupId);
-		// await setGroup(groupId);
 		onChange();
 		router.refresh();
 	}
