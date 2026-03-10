@@ -123,7 +123,7 @@ export default function GlobalNav({
 						</span>
 					</NoPrefetchLink>
 					<div className="flex justify-end w-full gap-2 items-center">
-						<div className="md:hidden flex items-center gap-2">
+						<div className="lg:hidden flex items-center gap-2">
 							<button
 								type="button"
 								className="btn-sm btn-square"
@@ -133,6 +133,8 @@ export default function GlobalNav({
 							>
 								<span className="icon-[tabler--search] collapse-open:hidden size-7"></span>
 							</button>
+						</div>
+						<div className="md:hidden flex items-center gap-2">
 							<button
 								type="button"
 								className="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square"
@@ -145,12 +147,10 @@ export default function GlobalNav({
 								></span>
 							</button>
 						</div>
-						<div className="hidden md:flex items-center gap-2">
-							<GroupSwitcher
-								groups={groups}
-								selectedGroupId={selectedGroupId}
-							/>
+						<div className="hidden lg:flex mr-2">
 							<RingSearchForm />
+						</div>
+						<div className="hidden md:flex">
 							<NavItems classes="menu menu-horizontal gap-2 p-0 text-base" />
 						</div>
 					</div>

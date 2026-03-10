@@ -22,6 +22,8 @@ async function fetchRingingGroups(): Promise<RingingGroupRow[]> {
 
 async function PopulatedNav() {
 	const [groups] = await Promise.all([fetchRingingGroups()]);
+	// this is deliberately inefficient as we only have one group
+	// setting things up in preparation for multi-tenancy
 	const selectedGroupId = groups[0].id;
 	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
 }
