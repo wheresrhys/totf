@@ -38,7 +38,6 @@ async function fetchSessionData(
 	{ date, location }: PageParams,
 	groupId: number | null
 ): Promise<DayData | null> {
-
 	const sessions = await supabase
 		.from('Sessions')
 		.select(

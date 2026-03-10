@@ -24,7 +24,7 @@ async function PopulatedNav() {
 	const groups = await fetchRingingGroups();
 	// this is deliberately inefficient as we only have one group
 	// setting things up in preparation for multi-tenancy
-	const selectedGroupId = (await getGroupCookie()) ?? 1;
+	const selectedGroupId = (await getGroupCookie());
 	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
 }
 

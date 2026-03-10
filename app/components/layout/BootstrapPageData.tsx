@@ -83,6 +83,10 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 	const groupScopedCacheKeys = groupId
 		? [String(groupId), ...cacheKeys]
 		: cacheKeys;
+
+	if (!groupId) {
+		return <p>Select a group to view data on this site</p>;
+	}
 	const data = await fetchDataWithCache<DataType, ParamsType>({
 		params,
 		dataFetcher,
