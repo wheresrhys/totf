@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
 
-type PageParams = { date: string; location: number | undefined };
+type PageParams = { date: string; locationId: number | undefined };
 type PageProps = { params: Promise<{ params: [string, string | undefined] }> };
 
 type DayData = {
@@ -28,14 +28,14 @@ async function getPageParams(pageProps: PageProps): Promise<PageParams> {
 	const pageParams = await pageProps.params;
 	return {
 		date: pageParams.params[0],
-		location: pageParams.params[1]
+		locationId: pageParams.params[1]
 			? Number(pageParams.params[1].substring(4))
 			: undefined
 	};
 }
 
 async function fetchSessionData(
-	{ date, location }: PageParams,
+	{ date, locationId }: PageParams,
 	groupId: number
 ): Promise<DayData | null> {
 	const sessions = await supabase
@@ -53,7 +53,18 @@ async function fetchSessionData(
 	const authorisedSessions = sessions.filter(
 		(session) => session.location.ringing_group_id === groupId
 	);
+	if (authorisedSessions.length === 0) {
+		return {
+			encounters: [],
+			locations: []
+		};
+	}
+
 	const locations = authorisedSessions.map((item) => item.location);
+
+	if (locationId && !locations.find((item) => item.id === locationId)) {
+		return null;
+	}
 
 	const encounters = (await supabase
 		.from('Encounters')
@@ -85,43 +96,25 @@ async function fetchSessionData(
 		.eq('ringing_group_id', groupId)
 		.then(catchSupabaseErrors)) as SessionEncounter[];
 
-	const encountersBySessionId = encounters.reduce(
-		(acc: Record<number, SessionEncounter[]>, encounter) => {
-			acc[encounter.session_id] = acc[encounter.session_id] || [];
-			acc[encounter.session_id].push(encounter);
-			return acc;
-		},
-		{}
-	);
-
-	if (Object.keys(encountersBySessionId).length === 1) {
+	if (locationId) {
+		const sessionId = authorisedSessions.find(
+			(item) => item.location_id === locationId
+		)?.id;
+		if (!sessionId) {
+			throw new Error('Inconsistent data: session id not found');
+		}
+		return {
+			encounters: encounters.filter(
+				(encounter) => encounter.session_id === sessionId
+			),
+			locations
+		};
+	} else {
 		return {
 			encounters,
-			locations: [authorisedSessions[0].location]
+			locations
 		};
 	}
-	if (location) {
-		const sessionData = sessions.find((item) => item.location_id === location);
-		if (!sessionData) {
-			return null;
-		}
-
-		const authorisedSessionData = authorisedSessions.find(
-			(item) => item.location_id === location
-		);
-		if (authorisedSessionData) {
-			return {
-				encounters: encountersBySessionId[sessionData.id],
-				locations
-			};
-		}
-	}
-	// Note that this covers the best case - returning all enounters and locations where everything is authorised - and the worst - where nothing is authorised and none of the above match
-	// this is really weird, so shodul change it to be clearer
-	return {
-		encounters,
-		locations
-	};
 }
 
 function groupBySpecies(
@@ -185,10 +178,10 @@ function Locations({
 
 function SessionSummary({
 	data: dayData,
-	params: { date, location }
+	params: { date, locationId }
 }: {
 	data: DayData;
-	params: { date: string; location: number | undefined };
+	params: { date: string; locationId: number | undefined };
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
 
@@ -207,7 +200,7 @@ function SessionSummary({
 				<Locations
 					locations={dayData.locations}
 					date={date}
-					selectedLocation={location}
+					selectedLocation={locationId}
 				/>
 			</PrimaryHeading>
 			<BadgeList
@@ -232,8 +225,8 @@ export default async function SessionPage(props: PageProps) {
 		<BootstrapPageData<DayData, PageProps, PageParams>
 			pageProps={props}
 			getCacheKeys={(params) =>
-				params.location
-					? ['session', params.date as string, `loc-${params.location}`]
+				params.locationId
+					? ['session', params.date as string, `loc-${params.locationId}`]
 					: ['session', params.date as string]
 			}
 			dataFetcher={fetchSessionData}
