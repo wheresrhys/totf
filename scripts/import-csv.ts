@@ -327,7 +327,6 @@ async function importCSV(options: ImportOptions): Promise<void> {
 					'Encounters',
 					{
 						age_code,
-						minimum_years: Math.max(0, Math.floor(age_code / 2 - 1)),
 						breeding_condition: row.breeding_condition as string | null,
 						capture_time: row.capture_time as string,
 						extra_text: row.extra_text as string | null,

@@ -19,8 +19,7 @@ export async function fetchPageOfBirds(species: string, page: number = 0) {
 	const paginatedBirdResults = (await supabase
 		.from('Birds')
 		.select(
-			`
-			id,
+			`id,
 			ring_no,
 			last_encountered_timestamp,
 			encounters:Encounters (
