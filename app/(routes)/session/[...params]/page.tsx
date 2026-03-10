@@ -36,7 +36,7 @@ async function getPageParams(pageProps: PageProps): Promise<PageParams> {
 
 async function fetchSessionData(
 	{ date, location }: PageParams,
-	groupId: number | null
+	groupId: number
 ): Promise<DayData | null> {
 	const sessions = await supabase
 		.from('Sessions')
@@ -55,7 +55,7 @@ async function fetchSessionData(
 	);
 	const locations = authorisedSessions.map((item) => item.location);
 
-	let encountersFetcher = supabase
+	const encounters = (await supabase
 		.from('Encounters')
 		.select(
 			`
@@ -81,14 +81,9 @@ async function fetchSessionData(
 		.in(
 			'session_id',
 			authorisedSessions.map((session) => session.id)
-		);
-
-	if (groupId) {
-		encountersFetcher = encountersFetcher.eq('ringing_group_id', groupId);
-	}
-	const encounters = (await encountersFetcher.then(
-		catchSupabaseErrors
-	)) as SessionEncounter[];
+		)
+		.eq('ringing_group_id', groupId)
+		.then(catchSupabaseErrors)) as SessionEncounter[];
 
 	const encountersBySessionId = encounters.reduce(
 		(acc: Record<number, SessionEncounter[]>, encounter) => {

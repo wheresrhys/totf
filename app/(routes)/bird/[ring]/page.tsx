@@ -17,7 +17,7 @@ import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 type PageParams = { ring: string };
 type PageProps = { params: Promise<PageParams> };
 
-async function fetchBirdData({ ring }: PageParams, groupId: number | null) {
+async function fetchBirdData({ ring }: PageParams, groupId: number) {
 	const bird = (await supabase
 		.from('Birds')
 		.select(
@@ -36,7 +36,7 @@ async function fetchBirdData({ ring }: PageParams, groupId: number | null) {
 		return null;
 	}
 
-	let encountersFetcher = supabase
+	const encounters = (await supabase
 		.from('Encounters')
 		.select(
 			`
@@ -57,15 +57,9 @@ async function fetchBirdData({ ring }: PageParams, groupId: number | null) {
 				)
 	`
 		)
-		.eq('bird_id', bird.id);
-
-	if (groupId) {
-		encountersFetcher = encountersFetcher.eq('ringing_group_id', groupId);
-	}
-
-	const encounters = (await encountersFetcher.then(
-		catchSupabaseErrors
-	)) as EncounterOfBird[];
+		.eq('bird_id', bird.id)
+		.eq('ringing_group_id', groupId)
+		.then(catchSupabaseErrors)) as EncounterOfBird[];
 
 	return { ...bird, encounters } as StandaloneBird;
 }
