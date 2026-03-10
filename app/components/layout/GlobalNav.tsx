@@ -1,8 +1,9 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
+import { useSetRingingGroup, useRingingGroup } from './RingingGroupProvider';
 import type { RingingGroupRow } from '@/app/models/db';
 export function NavItems({ classes }: { classes: string }) {
 	return (
@@ -41,18 +42,21 @@ function Expander({
 
 function GroupSwitcher({
 	groups,
-	selectedGroupId
+	selectedGroupId,
+	onChange
 }: {
 	groups: RingingGroupRow[];
 	selectedGroupId: number | null;
+	onChange: () => void;
 }) {
-	// const router = useRouter();
-
+	const router = useRouter();
+	const setRingingGroup = useSetRingingGroup();
 	async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
 		const groupId = parseInt(e.target.value, 10);
+		await setRingingGroup(groupId);
 		// await setGroup(groupId);
-		// router.refresh();
-		console.log('groupId', groupId);
+		onChange();
+		router.refresh();
 	}
 
 	if (groups.length === 1) {
@@ -87,6 +91,7 @@ export default function GlobalNav({
 	groups: RingingGroupRow[];
 	selectedGroupId: number;
 }) {
+	selectedGroupId = useRingingGroup() ?? selectedGroupId;
 	const pathname = usePathname();
 	const [showSearchForm, setShowSearchForm] = useState(false);
 	const [showMobileNav, setShowMobileNav] = useState(false);
@@ -120,12 +125,13 @@ export default function GlobalNav({
 		}
 	}, [showSearchForm]);
 
-	// Reset expandable UI state when route changes
-	useEffect(() => {
+	function collapseAll() {
 		setShowSearchForm(false);
 		setShowMobileNav(false);
 		setShowGroupSwitcher(false);
-	}, [pathname]);
+	}
+	// Reset expandable UI state when route changes
+	useEffect(collapseAll, [pathname]);
 	return (
 		<>
 			<nav className="w-full shadow-base-300/20 shadow-sm">
@@ -201,7 +207,11 @@ export default function GlobalNav({
 				</Expander>
 				<Expander id="group-switcher" isExpanded={showGroupSwitcher}>
 					<div className="p-4 pt-0 flex justify-end">
-						<GroupSwitcher groups={groups} selectedGroupId={selectedGroupId} />
+						<GroupSwitcher
+							groups={groups}
+							selectedGroupId={selectedGroupId}
+							onChange={collapseAll}
+						/>
 					</div>
 				</Expander>
 			</nav>

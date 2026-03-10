@@ -4,6 +4,8 @@ import GlobalNav from './components/layout/GlobalNav';
 import LoadFlyonUI from './components/layout/LoadFlyonUI';
 import { Suspense } from 'react';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { RingingGroupProvider } from './components/layout/RingingGroupProvider';
+import { getGroupCookie } from './actions/group-cookie';
 export const metadata: Metadata = {
 	title: 'Top of the Flocks',
 	description: 'Leaderboard for bird ringing data'
@@ -24,7 +26,7 @@ async function PopulatedNav() {
 	const groups = await fetchRingingGroups();
 	// this is deliberately inefficient as we only have one group
 	// setting things up in preparation for multi-tenancy
-	const selectedGroupId = 1;
+	const selectedGroupId = (await getGroupCookie()) ?? 1;
 	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
 }
 
@@ -36,13 +38,15 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body>
-				<Suspense>
-					<PopulatedNav />
-				</Suspense>
-				{children}
-				<Suspense>
-					<LoadFlyonUI />
-				</Suspense>
+				<RingingGroupProvider>
+					<Suspense>
+						<PopulatedNav />
+					</Suspense>
+					{children}
+					<Suspense>
+						<LoadFlyonUI />
+					</Suspense>
+				</RingingGroupProvider>
 				{/* Force icon imports */}
 				<span className="hidden icon-[tabler--calendar] icon-[tabler--calendar-week] icon-[tabler--chevron-up] icon-[tabler--chevron-down] icon-[tabler--x] icon-[tabler--menu-2]"></span>
 			</body>
