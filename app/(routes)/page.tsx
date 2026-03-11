@@ -140,7 +140,9 @@ function getStatConfigs(
 	];
 }
 
-async function fetchRecentSessions(groupId: number): Promise<SessionWithEncountersCount[]> {
+async function fetchRecentSessions(
+	groupId: number
+): Promise<SessionWithEncountersCount[]> {
 	return supabase
 		.from('Sessions')
 		.select('id,visit_date, encounters:Encounters(count)')
