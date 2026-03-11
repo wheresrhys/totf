@@ -6,8 +6,8 @@ import { StatOutput } from './shared/StatOutput';
 import type { TopPeriodsResult, TopSpeciesResult } from '@/app/models/db';
 import {
 	getTopStats,
-	type TopStatsArgsWithoutLimit
-} from '@/app/actions/stats-data-tables';
+	type UserTopStatsArgs
+} from '@/app/actions/top-performers';
 import type { TemporalUnit } from './shared/StatOutput';
 
 export type StatConfig = {
@@ -15,7 +15,7 @@ export type StatConfig = {
 	category: string;
 	unit: string;
 	bySpecies?: boolean;
-	dataArguments: TopStatsArgsWithoutLimit;
+	dataArguments: UserTopStatsArgs;
 };
 
 export type AccordionItemModel = {

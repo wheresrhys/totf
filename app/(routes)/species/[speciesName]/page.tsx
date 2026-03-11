@@ -1,6 +1,6 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
-import { getTopPeriodsByMetric } from '@/app/actions/stats-data-tables';
+import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import { SpeciesPageWithFilters } from '@/app/components/SingleSpeciesPage';
 import { fetchPageOfBirds } from '@/app/actions/single-species-data';
