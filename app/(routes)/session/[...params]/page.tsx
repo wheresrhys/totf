@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
 
-type PageParams = { date: string; location: number | undefined };
+type PageParams = { date: string; locationId: number | undefined };
 type PageProps = { params: Promise<{ params: [string, string | undefined] }> };
 
 type DayData = {
@@ -24,43 +24,50 @@ type DayData = {
 	locations: LocationRow[];
 };
 
-type SessionLocation = {
-	id: number;
-	location_id: number;
-	location: LocationRow;
-	encounters: SessionEncounter[];
-};
-
 async function getPageParams(pageProps: PageProps): Promise<PageParams> {
 	const pageParams = await pageProps.params;
 	return {
 		date: pageParams.params[0],
-		location: pageParams.params[1]
+		locationId: pageParams.params[1]
 			? Number(pageParams.params[1].substring(4))
 			: undefined
 	};
 }
 
-async function fetchSessionData({
-	date,
-	location
-}: PageParams): Promise<DayData | null> {
-	const data = (await supabase
+async function fetchSessionData(
+	{ date, locationId }: PageParams,
+	groupId: number
+): Promise<DayData | null> {
+	let sessions = await supabase
 		.from('Sessions')
 		.select(
+			'id, location_id, location:Locations (id, location_name, ringing_group_id)'
+		)
+		.eq('visit_date', date)
+		.eq('ringing_group_id', groupId)
+		.then(catchSupabaseErrors);
+
+	if (!sessions || sessions.length === 0) {
+		return { encounters: [], locations: [] };
+	}
+
+	if (locationId) {
+		sessions = sessions.filter((item) => item.location_id === locationId);
+		if (sessions.length === 0) {
+			return { encounters: [], locations: [] };
+		}
+	}
+
+	const encounters = (await supabase
+		.from('Encounters')
+		.select(
 			`
-		id,
-		location_id,
-		location:Locations (
-			id,
-			location_name
-		),
-		encounters:Encounters(
 			id,
 			session_id,
 			age_code,
 			capture_time,
 			record_type,
+			ringing_group_id,
 			sex,
 			weight,
 			wing_length,
@@ -70,36 +77,21 @@ async function fetchSessionData({
 					id,
 					species_name
 				)
-			)
+
 		)
 	`
 		)
-		.eq('visit_date', date)
-		.then(catchSupabaseErrors)) as SessionLocation[];
-	if (data.length === 0) {
-		return null;
-	}
-	if (data.length === 1) {
-		return {
-			encounters: data[0].encounters,
-			locations: [data[0].location]
-		};
-	}
-	if (location) {
-		const sessionData = data.find((item) => item.location_id === location);
-		if (!sessionData) {
-			return null;
-		}
-		return {
-			encounters: sessionData.encounters,
-			locations: data.map((item) => item.location)
-		};
-	} else {
-		return {
-			encounters: data.flatMap((item) => item.encounters),
-			locations: data.map((item) => item.location)
-		};
-	}
+		.in(
+			'session_id',
+			sessions.map((session) => session.id)
+		)
+		.eq('ringing_group_id', groupId)
+		.then(catchSupabaseErrors)) as SessionEncounter[];
+
+	return {
+		encounters,
+		locations: sessions.map((item) => item.location)
+	};
 }
 
 function groupBySpecies(
@@ -163,13 +155,24 @@ function Locations({
 
 function SessionSummary({
 	data: dayData,
-	params: { date, location }
+	params: { date, locationId }
 }: {
 	data: DayData;
-	params: { date: string; location: number | undefined };
+	params: { date: string; locationId: number | undefined };
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
 
+	if (dayData.locations.length === 0) {
+		return (
+			<PageWrapper>
+				<p>
+					No session found: either no session occurred on this date{' '}
+					{locationId ? 'at this location ' : ''}, or you are not authorised to
+					view it
+				</p>
+			</PageWrapper>
+		);
+	}
 	return (
 		<PageWrapper>
 			<PrimaryHeading>
@@ -178,7 +181,7 @@ function SessionSummary({
 				<Locations
 					locations={dayData.locations}
 					date={date}
-					selectedLocation={location}
+					selectedLocation={locationId}
 				/>
 			</PrimaryHeading>
 			<BadgeList
@@ -203,8 +206,8 @@ export default async function SessionPage(props: PageProps) {
 		<BootstrapPageData<DayData, PageProps, PageParams>
 			pageProps={props}
 			getCacheKeys={(params) =>
-				params.location
-					? ['session', params.date as string, `loc-${params.location}`]
+				params.locationId
+					? ['session', params.date as string, `loc-${params.locationId}`]
 					: ['session', params.date as string]
 			}
 			dataFetcher={fetchSessionData}
