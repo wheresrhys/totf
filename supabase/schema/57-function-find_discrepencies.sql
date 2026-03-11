@@ -1,4 +1,6 @@
-CREATE OR REPLACE FUNCTION "public"."find_discrepencies" () RETURNS TABLE (
+CREATE OR REPLACE FUNCTION "public"."find_discrepencies" (
+	"ringing_group_filter" bigint DEFAULT NULL::bigint
+) RETURNS TABLE (
 	"bird_id" bigint,
 	"ring_no" "text",
 	"species_name" "text",
@@ -61,6 +63,8 @@ WITH
 			JOIN "Birds" b ON e.bird_id = b.id
 			JOIN "Sessions" s ON s.id = e.session_id
 			JOIN "Species" sp ON sp.id = b.species_id
+		WHERE
+			(ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
 	),
 	hatch_year_differences AS (
 		SELECT
@@ -88,6 +92,7 @@ WITH
 			JOIN "Species" s ON s.id = b.species_id
 		WHERE
 			NOT e.sex ILIKE 'u'
+			AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
 		GROUP BY
 			b.id,
 			b.ring_no,
@@ -102,6 +107,7 @@ from "Birds" b
 JOIN "Encounters" e on e.bird_id = b.id
 JOIN "Species" s on s.id = b.species_id
 WHERE e.wing_length IS NOT NULL
+AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
 GROUP by b.id, b.ring_no, s.species_name)
 
 SELECT
@@ -139,10 +145,10 @@ WHERE max_wing_length - min_wing_length >= 5;
 END;
 $$;
 
-ALTER FUNCTION "public"."find_discrepencies" () OWNER TO "postgres";
+ALTER FUNCTION "public"."find_discrepencies" ("ringing_group_filter" bigint) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION "public"."find_discrepencies" () TO "anon";
+GRANT ALL ON FUNCTION "public"."find_discrepencies" ("ringing_group_filter" bigint) TO "anon";
 
-GRANT ALL ON FUNCTION "public"."find_discrepencies" () TO "authenticated";
+GRANT ALL ON FUNCTION "public"."find_discrepencies" ("ringing_group_filter" bigint) TO "authenticated";
 
-GRANT ALL ON FUNCTION "public"."find_discrepencies" () TO "service_role";
+GRANT ALL ON FUNCTION "public"."find_discrepencies" ("ringing_group_filter" bigint) TO "service_role";
