@@ -47,6 +47,8 @@ async function fetchSpeciesData(
 	params: PageParams,
 	groupId: number
 ): Promise<PageData | null> {
+
+	const supabase = await getAuthenticatedSupabaseClient();
 	const { id: speciesId } = (await supabase
 		.from('Species')
 		.select('id')

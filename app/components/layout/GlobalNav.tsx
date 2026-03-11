@@ -23,42 +23,6 @@ export function NavItems({ classes }: { classes: string }) {
 	);
 }
 
-function GroupSwitcher({
-	groups,
-	selectedGroupId
-}: {
-	groups: RingingGroup[];
-	selectedGroupId: number | null;
-}) {
-	const router = useRouter();
-
-	async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-		const groupId = parseInt(e.target.value, 10);
-		await setGroup(groupId);
-		router.refresh();
-	}
-
-	return (
-		<select
-			className="select select-sm"
-			value={selectedGroupId ?? ''}
-			onChange={handleChange}
-			aria-label="Select ringing group"
-		>
-			{selectedGroupId === null && (
-				<option value="" disabled>
-					Select group
-				</option>
-			)}
-			{groups.map((group) => (
-				<option key={group.id} value={group.id}>
-					{group.group_name}
-				</option>
-			))}
-		</select>
-	);
-}
-
 function Expander({
 	id,
 	children,

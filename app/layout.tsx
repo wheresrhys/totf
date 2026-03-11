@@ -27,24 +27,6 @@ async function PopulatedNav() {
 	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
 }
 
-type RingingGroup = { id: number; group_name: string };
-
-async function fetchRingingGroups(): Promise<RingingGroup[]> {
-	return supabase
-		.from('RingingGroups')
-		.select('id, group_name')
-		.order('group_name')
-		.then(catchSupabaseErrors) as Promise<RingingGroup[]>;
-}
-
-async function PopulatedNav() {
-	const [groups, selectedGroupId] = await Promise.all([
-		fetchRingingGroups(),
-		getGroupId()
-	]);
-	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
-}
-
 export default async function RootLayout({
 	children
 }: Readonly<{
