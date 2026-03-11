@@ -1,5 +1,8 @@
 import { SessionHistoryCalendar } from '@/app/components/SessionHistoryCalendar';
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import {
+	BootstrapPageData,
+	type DefaultPageParams
+} from '@/app/components/layout/BootstrapPageData';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 import {
@@ -7,14 +10,16 @@ import {
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
 
-export async function fetchAllSessions(): Promise<
-	SessionWithEncountersCount[]
-> {
+export async function fetchAllSessions(
+	params: DefaultPageParams,
+	groupId: number
+): Promise<SessionWithEncountersCount[]> {
 	return supabase
 		.from('Sessions')
 		.select(
 			'id, visit_date, location: Locations(id, location_name), encounters:Encounters(count)'
 		)
+		.eq('ringing_group_id', groupId)
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
 }
