@@ -14,20 +14,16 @@ export const metadata: Metadata = {
 import type { RingingGroupRow } from './models/db';
 
 async function fetchRingingGroups(): Promise<RingingGroupRow[]> {
-	return (
-		supabase
-			.from('RingingGroups')
-			.select('id, group_name')
-			// .order('group_name')
-			.then(catchSupabaseErrors) as Promise<RingingGroupRow[]>
-	);
+	return supabase
+		.from('RingingGroups')
+		.select('id, group_name')
+		.order('group_name')
+		.then(catchSupabaseErrors) as Promise<RingingGroupRow[]>;
 }
 
 async function PopulatedNav() {
 	const groups = await fetchRingingGroups();
-	// this is deliberately inefficient as we only have one group
-	// setting things up in preparation for multi-tenancy
-	const selectedGroupId = (await getGroupCookie()) ?? 1;
+	const selectedGroupId = await getGroupCookie();
 	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
 }
 

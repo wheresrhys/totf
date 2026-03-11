@@ -1,6 +1,6 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
 import { setGroup } from '@/app/actions/set-group';
+import { useState, useRef, useEffect, useReducer } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
@@ -92,7 +92,6 @@ function GroupSwitcher({
 	async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
 		const groupId = parseInt(e.target.value, 10);
 		await setRingingGroup(groupId);
-		// await setGroup(groupId);
 		onChange();
 		router.refresh();
 	}
@@ -121,55 +120,76 @@ function GroupSwitcher({
 		</select>
 	);
 }
+type ExpanderId = 'search' | 'mobileNav' | 'groupSwitcher';
+type ExpanderAction =
+	| { type: 'toggle'; id: ExpanderId }
+	| { type: 'collapseAll' }
+	| { type: 'set'; id: ExpanderId; value: boolean };
+
+function expanderReducer(
+	state: Record<ExpanderId, boolean>,
+	action: ExpanderAction
+) {
+	const falsyState = Object.fromEntries(
+		Object.keys(state).map((id) => [id, false])
+	) as Record<ExpanderId, boolean>;
+
+	switch (action.type) {
+		case 'toggle':
+			return { ...falsyState, [action.id]: !state[action.id] };
+		case 'set':
+			return { ...falsyState, [action.id]: action.value };
+		case 'collapseAll':
+			return falsyState;
+	}
+}
 
 export default function GlobalNav({
 	groups,
 	selectedGroupId
 }: {
 	groups: RingingGroupRow[];
-	selectedGroupId: number;
+	selectedGroupId: number | null;
 }) {
 	selectedGroupId = useRingingGroup() ?? selectedGroupId;
 	const pathname = usePathname();
-	const [showSearchForm, setShowSearchForm] = useState(false);
-	const [showMobileNav, setShowMobileNav] = useState(false);
-	const [showGroupSwitcher, setShowGroupSwitcher] = useState(false);
+	const router = useRouter();
+	const setRingingGroup = useSetRingingGroup();
+	const [expanders, expandersDispatch] = useReducer(expanderReducer, {
+		search: false,
+		mobileNav: false,
+		groupSwitcher: !selectedGroupId
+	} as Record<ExpanderId, boolean>);
+	const groupsCount = groups.length;
+	const firstGroupId = groups[0].id;
+
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const selectedGroup = groups.find(
 		(group) => group.id === selectedGroupId
 	) as RingingGroupRow;
 
-	const toggleNav = () => {
-		setShowSearchForm(false);
-		setShowGroupSwitcher(false);
-		setShowMobileNav(!showMobileNav);
-	};
-
-	const toggleSearch = () => {
-		setShowMobileNav(false);
-		setShowGroupSwitcher(false);
-		setShowSearchForm(!showSearchForm);
-	};
-
-	const toggleGroupSwitcher = () => {
-		setShowMobileNav(false);
-		setShowSearchForm(false);
-		setShowGroupSwitcher(!showGroupSwitcher);
-	};
+	// Reset expandable UI state when route changes
+	useEffect(() => {
+		expandersDispatch({
+			type: 'set',
+			id: 'groupSwitcher',
+			value: !selectedGroupId
+		});
+	}, [pathname, selectedGroupId]);
 
 	useEffect(() => {
-		if (showSearchForm) {
+		if (groupsCount === 1 && selectedGroupId !== firstGroupId) {
+			setRingingGroup(firstGroupId).then(() => {
+				router.refresh();
+			});
+		}
+	}, [groupsCount, firstGroupId, selectedGroupId, router, setRingingGroup]);
+
+	useEffect(() => {
+		if (expanders.search) {
 			searchInputRef.current?.focus();
 		}
-	}, [showSearchForm]);
-
-	function collapseAll() {
-		setShowSearchForm(false);
-		setShowMobileNav(false);
-		setShowGroupSwitcher(false);
-	}
-	// Reset expandable UI state when route changes
-	useEffect(collapseAll, [pathname]);
+	}, [expanders.search]);
 	return (
 		<>
 			<nav className="w-full shadow-base-300/20 shadow-sm">
@@ -181,9 +201,11 @@ export default function GlobalNav({
 						<span className="mr-2 icon-[fluent-emoji-flat--blackbird] size-8 flex-shrink-0 flex-grow-0"></span>
 						<span className="flex items-center gap-x-2 flex-wrap">
 							<span>Top of the Flocks</span>
-							<span className="text-sm font-medium">
-								{selectedGroup.group_name}
-							</span>
+							{selectedGroupId ? (
+								<span className="text-sm font-medium">
+									{selectedGroup.group_name}
+								</span>
+							) : null}
 						</span>
 					</NoPrefetchLink>
 
@@ -194,7 +216,9 @@ export default function GlobalNav({
 								className="btn-sm btn-square"
 								aria-controls="ring-search-form-wrapper"
 								aria-label="Search for a ring number"
-								onClick={toggleSearch}
+								onClick={() => {
+									expandersDispatch({ type: 'toggle', id: 'search' });
+								}}
 							>
 								<span className="icon-[tabler--search] collapse-open:hidden size-7"></span>
 							</button>
@@ -205,10 +229,12 @@ export default function GlobalNav({
 								className="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square"
 								aria-controls="mobile-nav"
 								aria-label="Toggle navigation"
-								onClick={toggleNav}
+								onClick={() => {
+									expandersDispatch({ type: 'toggle', id: 'mobileNav' });
+								}}
 							>
 								<span
-									className={`${showMobileNav ? 'icon-[tabler--x]' : 'icon-[tabler--menu-2]'}  collapse-open:hidden size-4`}
+									className={`${expanders.mobileNav ? 'icon-[tabler--x]' : 'icon-[tabler--menu-2]'}  collapse-open:hidden size-4`}
 								></span>
 							</button>
 						</div>
@@ -224,20 +250,19 @@ export default function GlobalNav({
 								className="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square"
 								aria-controls="group-switcher"
 								aria-label="Toggle Group Switcher"
-								onClick={toggleGroupSwitcher}
+								onClick={() => {
+									expandersDispatch({ type: 'toggle', id: 'groupSwitcher' });
+								}}
 							>
 								<span className="icon-[tabler--users-group] size-4"></span>
 							</button>
 						) : null}
 					</div>
 				</div>
-				<Expander id="mobile-nav" isExpanded={showMobileNav}>
-					<div className="p-4 flex justify-end">
-						<GroupSwitcher groups={groups} selectedGroupId={selectedGroupId} />
-					</div>
+				<Expander id="mobile-nav" isExpanded={expanders.mobileNav}>
 					<NavItems classes="p-4 text-right *:p-2 *:mt-1 *:mb-1 *:hover:bg-base-200 *:rounded" />
 				</Expander>
-				<Expander id="ring-search-form-wrapper" isExpanded={showSearchForm}>
+				<Expander id="ring-search-form-wrapper" isExpanded={expanders.search}>
 					<div className="p-4 pt-0">
 						<RingSearchForm
 							searchInputRef={
@@ -246,12 +271,12 @@ export default function GlobalNav({
 						/>
 					</div>
 				</Expander>
-				<Expander id="group-switcher" isExpanded={showGroupSwitcher}>
+				<Expander id="group-switcher" isExpanded={expanders.groupSwitcher}>
 					<div className="p-4 pt-0 flex justify-end">
 						<GroupSwitcher
 							groups={groups}
 							selectedGroupId={selectedGroupId}
-							onChange={collapseAll}
+							onChange={() => expandersDispatch({ type: 'collapseAll' })}
 						/>
 					</div>
 				</Expander>
