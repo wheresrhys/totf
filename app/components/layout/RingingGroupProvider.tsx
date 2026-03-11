@@ -21,9 +21,9 @@ export function useSetRingingGroup() {
 	const ctx = useContext(RingingGroupContext);
 	if (!ctx)
 		throw new Error('useRingingGroup must be used within RingingGroupProvider');
-	return (groupId: number) => {
+	return async (groupId: number) => {
 		ctx.setRingingGroup(groupId);
-		setGroupCookie(groupId);
+		await setGroupCookie(groupId);
 	};
 }
 
