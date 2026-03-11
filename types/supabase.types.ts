@@ -271,6 +271,7 @@ export type Database = {
       species_stats: {
         Args: {
           from_date?: string
+          ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
         }

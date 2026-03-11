@@ -19,6 +19,7 @@ export type BootstrapPageDataProps<DataType, PagePropsType, ParamsType> = {
 	PageComponent: (props: {
 		params: ParamsType;
 		data: DataType;
+		groupId: number;
 	}) => React.ReactNode;
 };
 
@@ -98,7 +99,7 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 	if (!data) {
 		notFound();
 	}
-	return <PageComponent params={params} data={data} />;
+	return <PageComponent params={params} data={data} groupId={groupId} />;
 }
 
 export function BootstrapPageData<
