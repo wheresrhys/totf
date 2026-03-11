@@ -4,7 +4,6 @@ import GlobalNav from './components/layout/GlobalNav';
 import LoadFlyonUI from './components/layout/LoadFlyonUI';
 import { Suspense } from 'react';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
-import { getGroupId } from '@/lib/group-auth';
 import { RingingGroupProvider } from './components/layout/RingingGroupProvider';
 import { getGroupCookie } from './actions/group-cookie';
 export const metadata: Metadata = {

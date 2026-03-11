@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
-import { getGroupId } from '@/lib/group-auth';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 
 export type DefaultPageParams = Record<string, string>;

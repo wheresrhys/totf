@@ -12,7 +12,6 @@ export async function fetchPageOfBirds(
 	groupId: number,
 	page: number = 0
 ) {
-
 	const supabase = await getAuthenticatedSupabaseClient();
 	const paginatedBirdResults = (await supabase
 		.from('Birds')
