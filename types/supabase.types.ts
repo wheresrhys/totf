@@ -171,16 +171,19 @@ export type Database = {
         Row: {
           id: number
           location_id: number
+          ringing_group_id: number
           visit_date: string
         }
         Insert: {
           id?: number
           location_id: number
+          ringing_group_id: number
           visit_date: string
         }
         Update: {
           id?: number
           location_id?: number
+          ringing_group_id?: number
           visit_date?: string
         }
         Relationships: [
@@ -189,6 +192,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "Locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessions_ringing_group_id_fkey"
+            columns: ["ringing_group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
             referencedColumns: ["id"]
           },
         ]
