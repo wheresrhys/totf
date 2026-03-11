@@ -332,6 +332,7 @@ export type Database = {
         exact_months_filter: string[] | null
         months_filter: number[] | null
         species_filter: string | null
+        ringing_group_filter: number | null
       }
     }
   }

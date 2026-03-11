@@ -5,12 +5,15 @@ import type {
 	TopPeriodsResult,
 	TopSpeciesResult,
 	TopPeriodsArgs,
-	TopSpeciesArgs
+	TopSpeciesArgs,
+	TopMetricsFilterParams
 } from '@/app/models/db';
 
 export type TopStatsResult = TopPeriodsResult | TopSpeciesResult;
 export type TopStatsArguments = TopPeriodsArgs | TopSpeciesArgs;
-export type TopStatsArgsWithoutLimit = Omit<TopStatsArguments, 'result_limit'>;
+export type UserTopStatsArgs = Omit<TopStatsArguments, 'result_limit'> & {
+	filters: Omit<TopMetricsFilterParams, 'ringing_group_filter'>;
+};
 
 export async function getTopPeriodsByMetric(
 	options: TopPeriodsArgs
