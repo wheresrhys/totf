@@ -227,7 +227,7 @@ export type Database = {
       dmetaphone: { Args: { "": string }; Returns: string }
       dmetaphone_alt: { Args: { "": string }; Returns: string }
       find_discrepencies: {
-        Args: never
+        Args: { ringing_group_filter?: number }
         Returns: {
           bird_id: number
           discrepency_type: string
@@ -271,6 +271,7 @@ export type Database = {
       species_stats: {
         Args: {
           from_date?: string
+          ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
         }
@@ -331,6 +332,7 @@ export type Database = {
         exact_months_filter: string[] | null
         months_filter: number[] | null
         species_filter: string | null
+        ringing_group_filter: number | null
       }
     }
   }

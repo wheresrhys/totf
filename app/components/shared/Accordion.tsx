@@ -6,6 +6,7 @@ type HeadingComponent<ItemModel> = React.ComponentType<{
 type ContentComponent<ItemModel> = React.ComponentType<{
 	model: ItemModel;
 	expandedId: string | false;
+	groupId?: number;
 }>;
 
 export function AccordionItem<ItemModel>({

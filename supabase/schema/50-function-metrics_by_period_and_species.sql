@@ -32,6 +32,7 @@ BEGIN
     AND (filters IS NULL OR filters.exact_months_filter IS NULL OR TO_CHAR(sess.visit_date, 'YYYY-MM') = ANY(filters.exact_months_filter))
     AND (filters IS NULL OR filters.months_filter IS NULL OR EXTRACT(MONTH FROM sess.visit_date) = ANY(filters.months_filter))
     AND (filters IS NULL OR filters.species_filter IS NULL OR sp.species_name = filters.species_filter)
+    AND (filters IS NULL OR filters.ringing_group_filter IS NULL OR (e.ringing_group_id = filters.ringing_group_filter AND sess.ringing_group_id = filters.ringing_group_filter))
   GROUP BY
     date_trunc(temporal_unit, sess.visit_date), sp.species_name;
 END;

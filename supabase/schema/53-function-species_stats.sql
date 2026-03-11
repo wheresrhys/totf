@@ -1,7 +1,8 @@
 CREATE OR REPLACE FUNCTION "public"."species_stats" (
 	"species_name_filter" "text" DEFAULT NULL::"text",
 	"from_date" "date" DEFAULT NULL::"date",
-	"to_date" "date" DEFAULT NULL::"date"
+	"to_date" "date" DEFAULT NULL::"date",
+	"ringing_group_filter" bigint DEFAULT NULL::bigint
 ) RETURNS TABLE (
 	"species_name" "text",
 	"bird_count" bigint,
@@ -43,6 +44,7 @@ CREATE OR REPLACE FUNCTION "public"."species_stats" (
     WHERE (from_date IS NULL OR sess.visit_date >=from_date)
      AND (to_date IS NULL OR sess.visit_date<=to_date)
      AND (species_name_filter IS NULL OR sp.species_name = species_name_filter)
+     AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
   ),
   bird_stats AS (
     -- Calculate per-bird statistics once
@@ -120,23 +122,27 @@ $$;
 ALTER FUNCTION "public"."species_stats" (
 	"species_name_filter" "text",
 	"from_date" "date",
-	"to_date" "date"
+	"to_date" "date",
+	"ringing_group_filter" bigint
 ) OWNER TO "postgres";
 
 GRANT ALL ON FUNCTION "public"."species_stats" (
 	"species_name_filter" "text",
 	"from_date" "date",
-	"to_date" "date"
+	"to_date" "date",
+	"ringing_group_filter" bigint
 ) TO "anon";
 
 GRANT ALL ON FUNCTION "public"."species_stats" (
 	"species_name_filter" "text",
 	"from_date" "date",
-	"to_date" "date"
+	"to_date" "date",
+	"ringing_group_filter" bigint
 ) TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."species_stats" (
 	"species_name_filter" "text",
 	"from_date" "date",
-	"to_date" "date"
+	"to_date" "date",
+	"ringing_group_filter" bigint
 ) TO "service_role";

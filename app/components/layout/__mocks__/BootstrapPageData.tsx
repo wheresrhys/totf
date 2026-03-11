@@ -53,5 +53,7 @@ export function BootstrapPageData<
 		return <div>No data available</div>;
 	}
 
-	return <bootstrapProps.PageComponent params={params} data={data} />;
+	return (
+		<bootstrapProps.PageComponent params={params} data={data} groupId={1} />
+	);
 }
