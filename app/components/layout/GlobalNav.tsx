@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect, useReducer } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
@@ -82,23 +82,27 @@ function GroupSwitcher({
 		</select>
 	);
 }
-class ExpanderManager {
-	expanders: Record<string, (isExpanded: boolean) => void> = {};
-	register(id: string, setter: (isExpanded: boolean) => void) {
-		this.expanders[id] = setter;
-	}
-	collapseAll() {
-		Object.values(this.expanders).forEach((setter) => setter(false));
-	}
-	change(toggleId: string, isExpanded: boolean) {
-		Object.entries(this.expanders).forEach(([id, setter]) => {
-			if (id === toggleId) {
-				setter(isExpanded);
-			} else {
-				setter(false);
-			}
-		});
+type ExpanderId = 'search' | 'mobileNav' | 'groupSwitcher';
+type ExpanderAction =
+	| { type: 'toggle'; id: ExpanderId }
+	| { type: 'collapseAll' }
+	| { type: 'set'; id: ExpanderId; value: boolean };
 
+function expanderReducer(
+	state: Record<ExpanderId, boolean>,
+	action: ExpanderAction
+) {
+	const falsyState = Object.fromEntries(
+		Object.keys(state).map((id) => [id, false])
+	) as Record<ExpanderId, boolean>;
+
+	switch (action.type) {
+		case 'toggle':
+			return { ...falsyState, [action.id]: !state[action.id] };
+		case 'set':
+			return { ...falsyState, [action.id]: action.value };
+		case 'collapseAll':
+			return falsyState;
 	}
 }
 
@@ -111,13 +115,13 @@ export default function GlobalNav({
 }) {
 	selectedGroupId = useRingingGroup() ?? selectedGroupId;
 	const pathname = usePathname();
-	const expanderManager = new ExpanderManager();
-	const [showSearchForm, setShowSearchForm] = useState(false);
-	expanderManager.register('search', setShowSearchForm);
-	const [showMobileNav, setShowMobileNav] = useState(false);
-	expanderManager.register('mobileNav', setShowMobileNav);
-	const [showGroupSwitcher, setShowGroupSwitcher] = useState(!selectedGroupId);
-	expanderManager.register('groupSwitcher', setShowGroupSwitcher);
+
+	const [expanders, expandersDispatch] = useReducer(expanderReducer, {
+		search: false,
+		mobileNav: false,
+		groupSwitcher: !selectedGroupId
+	} as Record<ExpanderId, boolean>);
+
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const selectedGroup = groups.find(
 		(group) => group.id === selectedGroupId
@@ -125,14 +129,18 @@ export default function GlobalNav({
 
 	// Reset expandable UI state when route changes
 	useEffect(() => {
-		expanderManager.change('groupSwitcher', !selectedGroupId);
+		expandersDispatch({
+			type: 'set',
+			id: 'groupSwitcher',
+			value: !selectedGroupId
+		});
 	}, [pathname, selectedGroupId]);
 
 	useEffect(() => {
-		if (showSearchForm) {
+		if (expanders.search) {
 			searchInputRef.current?.focus();
 		}
-	}, [showSearchForm]);
+	}, [expanders.search]);
 	return (
 		<>
 			<nav className="w-full shadow-base-300/20 shadow-sm">
@@ -160,7 +168,7 @@ export default function GlobalNav({
 								aria-controls="ring-search-form-wrapper"
 								aria-label="Search for a ring number"
 								onClick={() => {
-									expanderManager.change('search', !showSearchForm);
+									expandersDispatch({ type: 'toggle', id: 'search' });
 								}}
 							>
 								<span className="icon-[tabler--search] collapse-open:hidden size-7"></span>
@@ -173,11 +181,11 @@ export default function GlobalNav({
 								aria-controls="mobile-nav"
 								aria-label="Toggle navigation"
 								onClick={() => {
-									expanderManager.change('mobileNav', !showMobileNav);
+									expandersDispatch({ type: 'toggle', id: 'mobileNav' });
 								}}
 							>
 								<span
-									className={`${showMobileNav ? 'icon-[tabler--x]' : 'icon-[tabler--menu-2]'}  collapse-open:hidden size-4`}
+									className={`${expanders.mobileNav ? 'icon-[tabler--x]' : 'icon-[tabler--menu-2]'}  collapse-open:hidden size-4`}
 								></span>
 							</button>
 						</div>
@@ -194,7 +202,7 @@ export default function GlobalNav({
 								aria-controls="group-switcher"
 								aria-label="Toggle Group Switcher"
 								onClick={() => {
-									expanderManager.change('groupSwitcher', !showGroupSwitcher);
+									expandersDispatch({ type: 'toggle', id: 'groupSwitcher' });
 								}}
 							>
 								<span className="icon-[tabler--users-group] size-4"></span>
@@ -202,10 +210,10 @@ export default function GlobalNav({
 						) : null}
 					</div>
 				</div>
-				<Expander id="mobile-nav" isExpanded={showMobileNav}>
+				<Expander id="mobile-nav" isExpanded={expanders.mobileNav}>
 					<NavItems classes="p-4 text-right *:p-2 *:mt-1 *:mb-1 *:hover:bg-base-200 *:rounded" />
 				</Expander>
-				<Expander id="ring-search-form-wrapper" isExpanded={showSearchForm}>
+				<Expander id="ring-search-form-wrapper" isExpanded={expanders.search}>
 					<div className="p-4 pt-0">
 						<RingSearchForm
 							searchInputRef={
@@ -214,12 +222,12 @@ export default function GlobalNav({
 						/>
 					</div>
 				</Expander>
-				<Expander id="group-switcher" isExpanded={showGroupSwitcher}>
+				<Expander id="group-switcher" isExpanded={expanders.groupSwitcher}>
 					<div className="p-4 pt-0 flex justify-end">
 						<GroupSwitcher
 							groups={groups}
 							selectedGroupId={selectedGroupId}
-							onChange={() => expanderManager.collapseAll()}
+							onChange={() => expandersDispatch({ type: 'collapseAll' })}
 						/>
 					</div>
 				</Expander>
