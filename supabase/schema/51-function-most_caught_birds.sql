@@ -2,6 +2,7 @@ CREATE OR REPLACE FUNCTION "public"."most_caught_birds" (
 	"result_limit" integer DEFAULT 5,
 	"species_filter" "text" DEFAULT NULL::"text",
 	"year_filter" integer DEFAULT NULL::integer
+	"ringing_group_filter" bigint DEFAULT NULL::bigint
 ) RETURNS TABLE (
 	"species_name" "text",
 	"ring_no" "text",
@@ -23,6 +24,7 @@ BEGIN
   WHERE
     (species_filter IS NULL OR sp.species_name ilike species_filter) AND
     (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
+		AND (ringing_group_filter IS NULL OR en.ringing_group_id = ringing_group_filter)
   GROUP BY
     sp.species_name,
     b.ring_no
@@ -36,23 +38,27 @@ $$;
 ALTER FUNCTION "public"."most_caught_birds" (
 	"result_limit" integer,
 	"species_filter" "text",
-	"year_filter" integer
+	"year_filter" integer,
+	"ringing_group_filter" bigint
 ) OWNER TO "postgres";
 
 GRANT ALL ON FUNCTION "public"."most_caught_birds" (
 	"result_limit" integer,
 	"species_filter" "text",
-	"year_filter" integer
+	"year_filter" integer,
+	"ringing_group_filter" bigint
 ) TO "anon";
 
 GRANT ALL ON FUNCTION "public"."most_caught_birds" (
 	"result_limit" integer,
 	"species_filter" "text",
-	"year_filter" integer
+	"year_filter" integer,
+	"ringing_group_filter" bigint
 ) TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."most_caught_birds" (
 	"result_limit" integer,
 	"species_filter" "text",
-	"year_filter" integer
+	"year_filter" integer,
+	"ringing_group_filter" bigint
 ) TO "service_role";
