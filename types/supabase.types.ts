@@ -227,7 +227,7 @@ export type Database = {
       dmetaphone: { Args: { "": string }; Returns: string }
       dmetaphone_alt: { Args: { "": string }; Returns: string }
       find_discrepencies: {
-        Args: never
+        Args: { ringing_group_filter?: number }
         Returns: {
           bird_id: number
           discrepency_type: string

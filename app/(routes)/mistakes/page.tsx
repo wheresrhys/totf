@@ -1,15 +1,21 @@
 import { DiscrepenciesResult } from '@/app/models/db';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import {
+	BootstrapPageData,
+	DefaultPageParams
+} from '@/app/components/layout/BootstrapPageData';
 import {
 	PageWrapper,
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { MistakesTable } from '@/app/components/MistakesTable';
 
-export async function fetchMistakes(): Promise<DiscrepenciesResult[]> {
+export async function fetchMistakes(
+	_: DefaultPageParams,
+	groupId: number
+): Promise<DiscrepenciesResult[]> {
 	return supabase
-		.rpc('find_discrepencies')
+		.rpc('find_discrepencies', { ringing_group_filter: groupId })
 		.then(catchSupabaseErrors) as Promise<DiscrepenciesResult[]>;
 }
 
