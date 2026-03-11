@@ -141,11 +141,12 @@ function getStatConfigs(
 	];
 }
 
-async function fetchRecentSessions(): Promise<SessionWithEncountersCount[]> {
+async function fetchRecentSessions(groupId: number): Promise<SessionWithEncountersCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Sessions')
 		.select('id,visit_date, encounters:Encounters(count)')
+		.eq('ringing_group_id', groupId)
 		.order('visit_date', { ascending: false })
 		.limit(3)
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
@@ -181,7 +182,7 @@ async function fetchInitialData(
 				};
 			})
 		),
-		recentSessions: await fetchRecentSessions()
+		recentSessions: await fetchRecentSessions(groupId)
 	};
 }
 
