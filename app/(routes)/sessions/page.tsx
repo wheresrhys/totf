@@ -1,22 +1,27 @@
 import { SessionHistoryCalendar } from '@/app/components/SessionHistoryCalendar';
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
+import {
+	BootstrapPageData,
+	type DefaultPageParams
+} from '@/app/components/layout/BootstrapPageData';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 import {
 	PageWrapper,
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
 
-export async function fetchAllSessions(): Promise<
-	SessionWithEncountersCount[]
-> {
+export async function fetchAllSessions(
+	params: DefaultPageParams,
+	groupId: number
+): Promise<SessionWithEncountersCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Sessions')
 		.select(
 			'id, visit_date, location: Locations(id, location_name), encounters:Encounters(count)'
 		)
+		.eq('ringing_group_id', groupId)
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
 }
