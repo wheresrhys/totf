@@ -1,16 +1,19 @@
+'use server';
 import { SPECIES_PAGE_BATCH_SIZE } from '@/app/constants';
 import {
 	enrichBird,
 	type BirdOfSpecies,
 	type EnrichedBirdOfSpecies
 } from '@/app/models/bird';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 
 export async function fetchPageOfBirds(
 	speciesId: number,
 	groupId: number,
 	page: number = 0
 ) {
+	const supabase = await getAuthenticatedSupabaseClient();
 	const paginatedBirdResults = (await supabase
 		.from('Birds')
 		.select(

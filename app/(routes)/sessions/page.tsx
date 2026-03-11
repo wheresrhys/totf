@@ -3,7 +3,8 @@ import {
 	BootstrapPageData,
 	type DefaultPageParams
 } from '@/app/components/layout/BootstrapPageData';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 import {
 	PageWrapper,
@@ -14,6 +15,7 @@ export async function fetchAllSessions(
 	params: DefaultPageParams,
 	groupId: number
 ): Promise<SessionWithEncountersCount[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Sessions')
 		.select(
