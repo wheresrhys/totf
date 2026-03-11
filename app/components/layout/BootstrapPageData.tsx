@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
+import { getGroupCookie } from '@/app/actions/group-cookie';
 
 export type DefaultPageParams = Record<string, string>;
 export type DefaultPageProps = { params: Promise<DefaultPageParams> };
@@ -11,7 +12,10 @@ export type BootstrapPageDataProps<DataType, PagePropsType, ParamsType> = {
 	ttl?: number;
 	getCacheKeys: (params: ParamsType) => string[];
 	getParams?: (pageProps: PagePropsType) => Promise<ParamsType>;
-	dataFetcher: (params: ParamsType) => Promise<DataType | null>;
+	dataFetcher: (
+		params: ParamsType,
+		groupId: number
+	) => Promise<DataType | null>;
 	PageComponent: (props: {
 		params: ParamsType;
 		data: DataType;
@@ -34,13 +38,23 @@ export async function defaultGetParams<
 	return decodedParams;
 }
 
-export async function fetchDataWithCache<DataType, ParamsType>(
-	params: ParamsType,
-	dataFetcher: (params: ParamsType) => Promise<DataType | null>,
-	cacheKeys: string[],
-	ttl: number = 3600 // 1 hour
-): Promise<DataType | null> {
-	return unstable_cache(async () => dataFetcher(params), cacheKeys, {
+export async function fetchDataWithCache<DataType, ParamsType>({
+	params,
+	dataFetcher,
+	cacheKeys,
+	groupId,
+	ttl = 3600 // 1 hour
+}: {
+	params: ParamsType;
+	dataFetcher: (
+		params: ParamsType,
+		groupId: number
+	) => Promise<DataType | null>;
+	cacheKeys: string[];
+	groupId: number;
+	ttl?: number;
+}): Promise<DataType | null> {
+	return unstable_cache(async () => dataFetcher(params, groupId), cacheKeys, {
 		// 1 day in production, 1 second in development to allow for quick testing
 		revalidate: process.env.VERCEL_ENV === 'production' ? ttl : 1,
 		tags: cacheKeys
@@ -64,12 +78,23 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 		params = {} as ParamsType;
 	}
 
-	const data = await fetchDataWithCache<DataType, ParamsType>(
+	const groupId = await getGroupCookie();
+	const cacheKeys = getCacheKeys(params);
+	const groupScopedCacheKeys = groupId
+		? [String(groupId), ...cacheKeys]
+		: cacheKeys;
+
+	if (!groupId) {
+		// TODO this should trigger a proper authorisation flow
+		return <p>Select a group to view data on this site</p>;
+	}
+	const data = await fetchDataWithCache<DataType, ParamsType>({
 		params,
 		dataFetcher,
-		getCacheKeys(params),
-		ttl
-	);
+		cacheKeys: groupScopedCacheKeys,
+		ttl,
+		groupId
+	});
 	if (!data) {
 		notFound();
 	}
