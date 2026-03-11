@@ -2,7 +2,8 @@ CREATE TABLE IF NOT EXISTS "public"."Birds" (
 	"ring_no" "text" NOT NULL,
 	"id" bigint NOT NULL,
 	"species_id" bigint NOT NULL,
-	"last_encountered_timestamp" timestamp without time zone NOT NULL DEFAULT '0001-01-01 00:00:00'::timestamp without time zone
+	"last_encountered_timestamp" timestamp without time zone NOT NULL DEFAULT '0001-01-01 00:00:00'::timestamp without time zone,
+	"ringing_group_ids" BIGINT[] NOT NULL DEFAULT '{}'
 );
 
 ALTER TABLE "public"."Birds" OWNER TO "postgres";
@@ -26,6 +27,8 @@ ADD CONSTRAINT "Birds_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "public"."Birds"
 ADD CONSTRAINT "birds_ring_no_unique" UNIQUE ("ring_no");
+
+CREATE INDEX idx_birds_ringing_group_ids ON "public"."Birds" USING GIN (ringing_group_ids);
 
 GRANT ALL ON TABLE "public"."Birds" TO "anon";
 
