@@ -55,11 +55,12 @@ export async function fetchDataWithCache<DataType, ParamsType>({
 	groupId: number;
 	ttl?: number;
 }): Promise<DataType | null> {
-	return unstable_cache(async () => dataFetcher(params, groupId), cacheKeys, {
-		// 1 day in production, 1 second in development to allow for quick testing
-		revalidate: process.env.VERCEL_ENV === 'production' ? ttl : 1,
-		tags: cacheKeys
-	})();
+	return dataFetcher(params, groupId);
+	// return unstable_cache(async () => dataFetcher(params, groupId), cacheKeys, {
+	// 	// 1 day in production, 1 second in development to allow for quick testing
+	// 	revalidate: process.env.VERCEL_ENV === 'production' ? ttl : 1,
+	// 	tags: cacheKeys
+	// })();
 }
 
 export async function LoadWithData<DataType, PagePropsType, ParamsType>({
