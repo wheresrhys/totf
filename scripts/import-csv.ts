@@ -22,7 +22,10 @@ type EncountersInsert = Omit<
 	Database['public']['Tables']['Encounters']['Insert'],
 	'ringing_group_id' | 'max_hatch_year' | 'min_hatch_year'
 >;
-type SessionsInsert = Omit<Database['public']['Tables']['Sessions']['Insert'], 'ringing_group_id'>;
+type SessionsInsert = Omit<
+	Database['public']['Tables']['Sessions']['Insert'],
+	'ringing_group_id'
+>;
 type RingingGroupsInsert =
 	Database['public']['Tables']['RingingGroups']['Insert'];
 type LocationsInsert = Database['public']['Tables']['Locations']['Insert'];
