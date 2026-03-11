@@ -35,9 +35,7 @@ export function RingingGroupProvider({
 	initialGroupId?: number | null;
 }) {
 	// Use server-fetched cookie as initial state to avoid hydration mismatch
-	const [ringingGroup, setRingingGroup] = useState<number>(
-		initialGroupId ?? 0
-	);
+	const [ringingGroup, setRingingGroup] = useState<number>(initialGroupId ?? 0);
 
 	useEffect(() => {
 		getGroupCookie().then((groupId) => {
