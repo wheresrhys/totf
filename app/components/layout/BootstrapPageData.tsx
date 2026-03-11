@@ -1,5 +1,4 @@
 import { Suspense } from 'react';
-import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 

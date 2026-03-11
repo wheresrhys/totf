@@ -3,7 +3,7 @@ import { useRef, useEffect, useReducer } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
-import { useSetRingingGroup, useRingingGroup } from './RingingGroupProvider';
+import { useSetRingingGroup } from './RingingGroupProvider';
 import type { RingingGroupRow } from '@/app/models/db';
 export function NavItems({ classes }: { classes: string }) {
 	return (
@@ -113,7 +113,6 @@ export default function GlobalNav({
 	groups: RingingGroupRow[];
 	selectedGroupId: number | null;
 }) {
-	selectedGroupId = useRingingGroup() ?? selectedGroupId;
 	const pathname = usePathname();
 	const router = useRouter();
 	const setRingingGroup = useSetRingingGroup();
@@ -124,7 +123,6 @@ export default function GlobalNav({
 	} as Record<ExpanderId, boolean>);
 	const groupsCount = groups.length;
 	const firstGroupId = groups[0].id;
-
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const selectedGroup = groups.find(
 		(group) => group.id === selectedGroupId

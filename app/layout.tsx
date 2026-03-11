@@ -20,30 +20,35 @@ async function fetchRingingGroups(): Promise<RingingGroupRow[]> {
 		.then(catchSupabaseErrors) as Promise<RingingGroupRow[]>;
 }
 
-async function PopulatedNav() {
-	const groups = await fetchRingingGroups();
-	const selectedGroupId = await getGroupCookie();
-	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
+async function AuthorisedView({ children }: { children: React.ReactNode }) {
+	const [initialGroupId, groups] = await Promise.all([
+		getGroupCookie(),
+		fetchRingingGroups()
+	]);
+	return (
+		<Suspense>
+			<RingingGroupProvider initialGroupId={initialGroupId}>
+				<GlobalNav groups={groups} selectedGroupId={initialGroupId} />
+				{children}
+			</RingingGroupProvider>
+		</Suspense>
+	);
 }
 
-export default async function RootLayout({
+export default function RootLayout({
 	children
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
-	const initialGroupId = await getGroupCookie();
 	return (
 		<html lang="en">
 			<body>
-				<RingingGroupProvider initialGroupId={initialGroupId}>
-					<Suspense>
-						<PopulatedNav />
-					</Suspense>
-					{children}
-					<Suspense>
-						<LoadFlyonUI />
-					</Suspense>
-				</RingingGroupProvider>
+				<Suspense>
+					<AuthorisedView>{children}</AuthorisedView>
+				</Suspense>
+				<Suspense>
+					<LoadFlyonUI />
+				</Suspense>
 				{/* Force icon imports */}
 				<span className="hidden icon-[tabler--calendar] icon-[tabler--calendar-week] icon-[tabler--chevron-up] icon-[tabler--chevron-down] icon-[tabler--x] icon-[tabler--menu-2]"></span>
 			</body>

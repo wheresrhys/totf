@@ -1,9 +1,6 @@
 import { SignJWT } from 'jose';
-import { cookies } from 'next/headers';
-import { createSupabaseClientWithJwt } from '@/lib/supabase';
-import { getGroupCookie } from '@/app/actions/group-cookie';
-
-const COOKIE_NAME = 'selected_group_id';
+import { createSupabaseClientWithJwt } from './supabase';
+import { getGroupCookie } from '../app/actions/group-cookie';
 
 export async function generateGroupJwt(groupId: number): Promise<string> {
 	const secret = process.env.SUPABASE_JWT_SECRET;
