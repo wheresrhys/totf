@@ -10,44 +10,67 @@ import type {
 	TopMetricsFilterParams,
 	TopPeriodsResult
 } from '@/app/models/db';
-type PageParams = { speciesName: string };
+export type PageParams = { speciesName: string };
 type PageProps = { params: Promise<PageParams> };
 
-export type PageData = {
+export type FullFatPageData = {
 	topSessions: TopPeriodsResult[];
 	birds: EnrichedBirdOfSpecies[];
 	speciesStats: SpeciesStatsRow;
+	speciesId: number;
 };
+export type PageData = FullFatPageData | { speciesId: number };
 
-function getTopSessions(species: string) {
+function getTopSessions(species: string, groupId: number) {
 	return getTopPeriodsByMetric({
 		temporal_unit: 'day',
 		metric_name: 'encounters',
-		filters: { species_filter: species } as TopMetricsFilterParams,
+		filters: {
+			species_filter: species,
+			ringing_group_filter: groupId
+		} as TopMetricsFilterParams,
 		result_limit: 5
 	}) as Promise<TopPeriodsResult[]>;
 }
 
-async function getSpeciesStats(species: string) {
+async function getSpeciesStats(species: string, groupId: number) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('species_stats', {
-			species_name_filter: species
+			species_name_filter: species,
+			ringing_group_filter: groupId
 		})
 		.then(catchSupabaseErrors) as Promise<SpeciesStatsRow[]>;
 }
 
-async function fetchSpeciesData(params: PageParams): Promise<PageData | null> {
+async function fetchSpeciesData(
+	params: PageParams,
+	groupId: number
+): Promise<PageData | null> {
+	const { id: speciesId } = (await supabase
+		.from('Species')
+		.select('id')
+		.eq('species_name', params.speciesName)
+		.single()
+		.then(catchSupabaseErrors)) as { id: number };
+	if (!speciesId) {
+		throw new Error(`Species ${params.speciesName} not found`);
+	}
 	const [topSessions, birds, speciesStats] = await Promise.all([
-		getTopSessions(params.speciesName),
-		fetchPageOfBirds(params.speciesName),
-		getSpeciesStats(params.speciesName)
+		getTopSessions(params.speciesName, groupId),
+		fetchPageOfBirds(speciesId, groupId),
+		getSpeciesStats(params.speciesName, groupId)
 	]);
-	if (birds.length === 0) return null;
+	if (birds.length === 0) {
+		return {
+			speciesId
+		};
+	}
 	return {
 		topSessions,
 		birds,
-		speciesStats: speciesStats[0]
+		speciesStats: speciesStats[0],
+		speciesId
 	};
 }
 

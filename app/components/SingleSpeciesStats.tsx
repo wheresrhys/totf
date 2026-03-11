@@ -1,6 +1,6 @@
 import { BoxyList } from '@/app/components/shared/DesignSystem';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import type { PageData } from '@/app/(routes)/species/[speciesName]/page';
+import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/page';
 import { StatOutput } from './shared/StatOutput';
 import { UnwrappedBadgeList } from './shared/DesignSystem';
 import type { SpeciesStatsRow } from '@/app/models/db';
@@ -43,7 +43,7 @@ export function SingleSpeciesStats({
 	topSessions,
 	birds,
 	speciesStats
-}: PageData) {
+}: FullFatPageData) {
 	if (!speciesStats) return null;
 	const mostCaughtBirds =
 		speciesStats.max_encountered_bird && speciesStats.max_encountered_bird > 1
