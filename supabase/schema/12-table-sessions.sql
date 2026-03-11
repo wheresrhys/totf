@@ -2,8 +2,7 @@ CREATE TABLE IF NOT EXISTS "public"."Sessions" (
 	"id" bigint NOT NULL,
 	"visit_date" "date" NOT NULL,
 	"location_id" bigint NOT NULL,
-	-- TODO make not null and add index
-	"ringing_group_id" bigint
+	"ringing_group_id" bigint NOT NULL
 );
 
 ALTER TABLE "public"."Sessions" OWNER TO "postgres";

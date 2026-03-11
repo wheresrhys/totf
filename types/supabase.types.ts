@@ -171,19 +171,19 @@ export type Database = {
         Row: {
           id: number
           location_id: number
-          ringing_group_id: number | null
+          ringing_group_id: number
           visit_date: string
         }
         Insert: {
           id?: number
           location_id: number
-          ringing_group_id?: number | null
+          ringing_group_id: number
           visit_date: string
         }
         Update: {
           id?: number
           location_id?: number
-          ringing_group_id?: number | null
+          ringing_group_id?: number
           visit_date?: string
         }
         Relationships: [
