@@ -16,6 +16,19 @@ vi.mock('next/link', () => ({
 	},
 }));
 
+vi.mock('./app/actions/group-cookie', () => ({
+  getGroupCookie: vi.fn().mockResolvedValue(1),
+  setGroupCookie: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./lib/group-auth', async (importOriginal) => {
+  const { supabase } = await import('./lib/supabase');
+  return {
+    ...(await importOriginal<typeof import('./lib/group-auth')>()),
+    getAuthenticatedSupabaseClient: vi.fn().mockResolvedValue(supabase),
+  };
+});
+
 
 // Create mock functions that can be accessed in tests
 export const mockPush = vi.fn();
