@@ -9,6 +9,7 @@ import {
 	type UserTopStatsArgs
 } from '@/app/actions/top-performers';
 import type { TemporalUnit } from './shared/StatOutput';
+import { useRingingGroup } from './layout/RingingGroupProvider';
 
 export type StatConfig = {
 	id: string;
@@ -28,6 +29,10 @@ export type StatsAccordionModel = {
 	stats: AccordionItemModel[];
 };
 
+type AccordionItemModelWithGroupId = AccordionItemModel & {
+	groupId: number;
+};
+
 function hasData(data: TopPeriodsResult[] | null): data is TopPeriodsResult[] {
 	return data !== null;
 }
@@ -36,7 +41,7 @@ function ContentComponent({
 	model,
 	expandedId
 }: {
-	model: AccordionItemModel;
+	model: AccordionItemModelWithGroupId;
 	expandedId: string | false;
 }) {
 	const [data, setData] = useState<TopPeriodsResult[] | null>(model.data);
@@ -55,6 +60,10 @@ function ContentComponent({
 				}, 100);
 				getTopStats(Boolean(model.definition.bySpecies), {
 					...model.definition.dataArguments,
+					filters: {
+						...(model.definition.dataArguments.filters ?? {}),
+						ringing_group_filter: model.groupId
+					},
 					result_limit: 5
 				})
 					.then((data) => {
@@ -76,7 +85,8 @@ function ContentComponent({
 		isLoading,
 		model.definition.id,
 		model.definition.bySpecies,
-		model.definition.dataArguments
+		model.definition.dataArguments,
+		model.groupId
 	]);
 
 	return hasData(data) ? (
@@ -106,7 +116,7 @@ function ContentComponent({
 		<span>No data available</span>
 	);
 }
-function HeadingComponent({ model }: { model: AccordionItemModel }) {
+function HeadingComponent({ model }: { model: AccordionItemModelWithGroupId }) {
 	return (
 		<span>
 			<span className="font-bold">{model.definition.category}:</span>{' '}
@@ -119,9 +129,10 @@ function HeadingComponent({ model }: { model: AccordionItemModel }) {
 
 export function StatsAccordion({ data }: { data: StatsAccordionModel[] }) {
 	const [expanded, setExpanded] = useState<string | false>(false);
+	const groupId = useRingingGroup();
 	useEffect(() => {
 		setExpanded(false);
-	}, []);
+	}, [groupId]);
 	return (
 		<>
 			{data.map(({ heading, stats }) => (
@@ -130,11 +141,11 @@ export function StatsAccordion({ data }: { data: StatsAccordionModel[] }) {
 					<BoxyList>
 						{stats.map((item) => (
 							<AccordionItem
-								key={item.definition.id}
+								key={`${groupId}-${item.definition.id}`}
 								id={item.definition.id}
 								HeadingComponent={HeadingComponent}
 								ContentComponent={ContentComponent}
-								model={item}
+								model={{ ...item, groupId }}
 								onToggle={setExpanded}
 								expandedId={expanded}
 							/>

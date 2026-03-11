@@ -3,10 +3,10 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { setGroupCookie, getGroupCookie } from '@/app/actions/group-cookie';
 
 const RingingGroupContext = createContext<{
-	ringingGroup: number | null;
+	ringingGroup: number;
 	setRingingGroup: (groupId: number) => void;
 }>({
-	ringingGroup: null,
+	ringingGroup: 0,
 	setRingingGroup: () => {}
 });
 
@@ -32,7 +32,9 @@ export function RingingGroupProvider({
 }: {
 	children: React.ReactNode;
 }) {
-	const [ringingGroup, setRingingGroup] = useState<number | null>(null);
+	// this can never actually be accessed in the app when unset, but using 0
+	// rather than null here just makes the type system happier
+	const [ringingGroup, setRingingGroup] = useState<number>(0);
 
 	useEffect(() => {
 		getGroupCookie().then((groupId) => {
