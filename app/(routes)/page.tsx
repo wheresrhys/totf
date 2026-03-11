@@ -141,7 +141,9 @@ function getStatConfigs(
 	];
 }
 
-async function fetchRecentSessions(groupId: number): Promise<SessionWithEncountersCount[]> {
+async function fetchRecentSessions(
+	groupId: number
+): Promise<SessionWithEncountersCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Sessions')
