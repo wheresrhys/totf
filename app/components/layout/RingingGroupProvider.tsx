@@ -28,13 +28,16 @@ export function useSetRingingGroup() {
 }
 
 export function RingingGroupProvider({
-	children
+	children,
+	initialGroupId = null
 }: {
 	children: React.ReactNode;
+	initialGroupId?: number | null;
 }) {
-	// this can never actually be accessed in the app when unset, but using 0
-	// rather than null here just makes the type system happier
-	const [ringingGroup, setRingingGroup] = useState<number>(0);
+	// Use server-fetched cookie as initial state to avoid hydration mismatch
+	const [ringingGroup, setRingingGroup] = useState<number>(
+		initialGroupId ?? 0
+	);
 
 	useEffect(() => {
 		getGroupCookie().then((groupId) => {

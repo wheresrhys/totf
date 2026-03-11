@@ -26,15 +26,16 @@ async function PopulatedNav() {
 	return <GlobalNav groups={groups} selectedGroupId={selectedGroupId} />;
 }
 
-export default function RootLayout({
+export default async function RootLayout({
 	children
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
+	const initialGroupId = await getGroupCookie();
 	return (
 		<html lang="en">
 			<body>
-				<RingingGroupProvider>
+				<RingingGroupProvider initialGroupId={initialGroupId}>
 					<Suspense>
 						<PopulatedNav />
 					</Suspense>
