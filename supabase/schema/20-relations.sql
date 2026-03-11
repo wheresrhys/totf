@@ -22,6 +22,12 @@ CREATE INDEX "idx_locations_ringing_group_id" ON "public"."Locations" USING "btr
 ALTER TABLE ONLY "public"."Locations"
 ADD CONSTRAINT "locations_ringing_group_id_fkey" FOREIGN KEY ("ringing_group_id") REFERENCES "public"."RingingGroups" ("id");
 
+-- Many Locations per RingingGroup
+CREATE INDEX "idx_sessions_ringing_group_id" ON "public"."Sessions" USING "btree" ("ringing_group_id");
+
+ALTER TABLE ONLY "public"."Sessions"
+ADD CONSTRAINT "sessions_ringing_group_id_fkey" FOREIGN KEY ("ringing_group_id") REFERENCES "public"."RingingGroups" ("id");
+
 -- Many Sessions per Location
 CREATE INDEX "idx_sessions_location_id" ON "public"."Sessions" USING "btree" ("location_id");
 
