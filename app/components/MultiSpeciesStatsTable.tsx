@@ -48,9 +48,11 @@ const sortableColumnConfigs = speciesStatConfigs.reduce(
 );
 
 export function MultiSpeciesStatsTable({
-	data: { speciesStats: initialSpeciesStats, years }
+	data: { speciesStats: initialSpeciesStats, years },
+	groupId
 }: {
 	data: PageData;
+	groupId: number;
 }) {
 	const formRef = useRef<HTMLFormElement>(null);
 	const [year, setYear] = useState<number | null>(null);
@@ -59,11 +61,12 @@ export function MultiSpeciesStatsTable({
 	const [toDate, setToDate] = useState<string | null>(null);
 	const [speciesStats, setSpeciesStats] =
 		useState<SpeciesStatsRow[]>(initialSpeciesStats);
+
 	useEffect(() => {
-		fetchSpeciesData(fromDate ?? undefined, toDate ?? undefined).then(
+		fetchSpeciesData(groupId, fromDate ?? undefined, toDate ?? undefined).then(
 			setSpeciesStats
 		);
-	}, [fromDate, toDate]);
+	}, [groupId, fromDate, toDate]);
 
 	function clearSettings() {
 		setYear(null);

@@ -1,4 +1,7 @@
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import {
+	BootstrapPageData,
+	DefaultPageParams
+} from '@/app/components/layout/BootstrapPageData';
 import { MultiSpeciesStatsTable } from '@/app/components/MultiSpeciesStatsTable';
 import { fetchSpeciesData } from '@/app/actions/multi-species-data';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
@@ -12,11 +15,12 @@ export type PageData = {
 	years: number[];
 };
 
-async function fetchYears(): Promise<number[]> {
+async function fetchYears(groupId: number): Promise<number[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const dates = (await supabase
 		.from('Sessions')
 		.select('visit_date')
+		.eq('ringing_group_id', groupId)
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors)) as { visit_date: string }[];
 
@@ -25,10 +29,13 @@ async function fetchYears(): Promise<number[]> {
 	] as number[];
 }
 
-async function fetchInitialPageData(): Promise<PageData> {
+async function fetchInitialPageData(
+	_: DefaultPageParams,
+	groupId: number
+): Promise<PageData> {
 	const [speciesStats, years] = await Promise.all([
-		fetchSpeciesData(),
-		fetchYears()
+		fetchSpeciesData(groupId),
+		fetchYears(groupId)
 	]);
 	return {
 		speciesStats,
