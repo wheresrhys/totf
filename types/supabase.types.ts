@@ -14,18 +14,21 @@ export type Database = {
           id: number
           last_encountered_timestamp: string
           ring_no: string
+          ringing_group_ids: number[]
           species_id: number
         }
         Insert: {
           id?: number
           last_encountered_timestamp?: string
           ring_no: string
+          ringing_group_ids?: number[]
           species_id: number
         }
         Update: {
           id?: number
           last_encountered_timestamp?: string
           ring_no?: string
+          ringing_group_ids?: number[]
           species_id?: number
         }
         Relationships: [
@@ -258,6 +261,7 @@ export type Database = {
       most_caught_birds: {
         Args: {
           result_limit?: number
+          ringing_group_filter?: number
           species_filter?: string
           year_filter?: number
         }

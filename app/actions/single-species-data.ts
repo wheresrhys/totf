@@ -6,22 +6,18 @@ import {
 } from '@/app/models/bird';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 
-export async function fetchPageOfBirds(species: string, page: number = 0) {
-	const { id: speciesId } = (await supabase
-		.from('Species')
-		.select('id')
-		.eq('species_name', species)
-		.single()
-		.then(catchSupabaseErrors)) as { id: number };
-	if (!speciesId) {
-		throw new Error(`Species ${species} not found`);
-	}
+export async function fetchPageOfBirds(
+	speciesId: number,
+	groupId: number,
+	page: number = 0
+) {
 	const paginatedBirdResults = (await supabase
 		.from('Birds')
 		.select(
 			`id,
 			ring_no,
 			last_encountered_timestamp,
+			ringing_group_ids,
 			encounters:Encounters (
 				id,
 				capture_time,
@@ -40,6 +36,7 @@ export async function fetchPageOfBirds(species: string, page: number = 0) {
 			)`
 		)
 		.eq('species_id', speciesId)
+		.contains('ringing_group_ids', [groupId])
 		.order('last_encountered_timestamp', { ascending: false })
 		.range(
 			page * SPECIES_PAGE_BATCH_SIZE,

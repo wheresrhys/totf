@@ -1,34 +1,28 @@
 'use client';
 import { SpeciesTable } from '@/app/components/SingleSpeciesTable';
-import { type TopPeriodsResult } from '@/app/models/db';
-import { EnrichedBirdOfSpecies } from '@/app/models/bird';
 import { useState } from 'react';
 import {
 	PageWrapper,
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { SingleSpeciesStats } from '@/app/components/SingleSpeciesStats';
-import type { SpeciesStatsRow } from '@/app/models/db';
 import 'chartkick/chart.js';
 import { fetchPageOfBirds } from '../actions/single-species-data';
 import { useOnInView } from 'react-intersection-observer';
 import { WeightVsWingLengthChart } from '@/app/components/WeightAndWingChart';
 import { SingleSpeciesFilters } from '@/app/components/SingleSpeciesFilters';
+import type {
+	FullFatPageData,
+	PageData,
+	PageParams
+} from '@/app/(routes)/species/[speciesName]/page';
 
-type PageParams = { speciesName: string };
-
-export type PageData = {
-	topSessions: TopPeriodsResult[];
-	birds: EnrichedBirdOfSpecies[];
-	speciesStats: SpeciesStatsRow;
-};
-
-export function SpeciesPageWithFilters({
-	params: { speciesName },
-	data
+function SpeciesData({
+	data,
+	groupId
 }: {
-	params: PageParams;
-	data: PageData;
+	data: FullFatPageData;
+	groupId: number;
 }) {
 	const [retrappedOnly, setRetrappedOnly] = useState(false);
 	const [sexedOnly, setSexedOnly] = useState(false);
@@ -38,7 +32,7 @@ export function SpeciesPageWithFilters({
 	async function loadMoreBirds() {
 		const nextPage = page + 1;
 		setPage(nextPage);
-		const newBirds = await fetchPageOfBirds(speciesName, nextPage);
+		const newBirds = await fetchPageOfBirds(data.speciesId, groupId, nextPage);
 		setLoadedBirds([
 			...loadedBirds,
 			...newBirds.filter((bird) => !loadedIds.includes(bird.id))
@@ -67,10 +61,8 @@ export function SpeciesPageWithFilters({
 	if (sexedOnly) {
 		birds = birds.filter((bird) => bird.sex !== 'U');
 	}
-
 	return (
-		<PageWrapper>
-			<PrimaryHeading>{speciesName}</PrimaryHeading>
+		<>
 			<SingleSpeciesStats {...data} />
 			{showChart ? <WeightVsWingLengthChart birds={birds} /> : null}
 			<SingleSpeciesFilters
@@ -90,6 +82,31 @@ export function SpeciesPageWithFilters({
 				>
 					<div className="loading loading-spinner loading-xl"></div>
 				</div>
+			)}
+		</>
+	);
+}
+
+function fullFatTypeGuard(data: PageData): data is FullFatPageData {
+	return 'birds' in data;
+}
+
+export function SpeciesPageWithFilters({
+	params: { speciesName },
+	data,
+	groupId
+}: {
+	params: PageParams;
+	data: PageData;
+	groupId: number;
+}) {
+	return (
+		<PageWrapper>
+			<PrimaryHeading>{speciesName}</PrimaryHeading>
+			{fullFatTypeGuard(data) ? (
+				<SpeciesData data={data} groupId={groupId} />
+			) : (
+				<p>Not authorised to view any encounter data for this species</p>
 			)}
 		</PageWrapper>
 	);

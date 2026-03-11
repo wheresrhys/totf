@@ -1,7 +1,8 @@
 CREATE OR REPLACE FUNCTION "public"."most_caught_birds" (
 	"result_limit" integer DEFAULT 5,
 	"species_filter" "text" DEFAULT NULL::"text",
-	"year_filter" integer DEFAULT NULL::integer "ringing_group_filter" bigint DEFAULT NULL::bigint
+	"year_filter" integer DEFAULT NULL::integer,
+	"ringing_group_filter" bigint DEFAULT NULL::bigint
 ) RETURNS TABLE (
 	"species_name" "text",
 	"ring_no" "text",
