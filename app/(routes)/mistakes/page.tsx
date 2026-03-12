@@ -1,5 +1,6 @@
 import { DiscrepenciesResult } from '@/app/models/db';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import {
 	BootstrapPageData,
 	DefaultPageParams
@@ -14,6 +15,7 @@ export async function fetchMistakes(
 	_: DefaultPageParams,
 	groupId: number
 ): Promise<DiscrepenciesResult[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('find_discrepencies', { ringing_group_filter: groupId })
 		.then(catchSupabaseErrors) as Promise<DiscrepenciesResult[]>;

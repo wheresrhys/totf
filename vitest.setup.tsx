@@ -2,6 +2,11 @@ import { vi, afterAll } from 'vitest';
 import React, { ReactNode, act } from 'react';
 import { configMocks } from 'jsdom-testing-mocks';
 
+// avoids happy-dom's fetch teardown which leads to all sorts of
+// abort errors in tests
+import { fetch as nodeFetch } from 'undici';
+globalThis.fetch = nodeFetch as typeof fetch;
+
 configMocks({ act, afterAll });
 
 global.IS_REACT_ACT_ENVIRONMENT = true
@@ -16,6 +21,10 @@ vi.mock('next/link', () => ({
 	},
 }));
 
+vi.mock('./app/actions/group-cookie', () => ({
+  getGroupCookie: vi.fn().mockResolvedValue(1),
+  setGroupCookie: vi.fn().mockResolvedValue(undefined),
+}));
 
 // Create mock functions that can be accessed in tests
 export const mockPush = vi.fn();

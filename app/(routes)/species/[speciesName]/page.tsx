@@ -1,5 +1,6 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import { SpeciesPageWithFilters } from '@/app/components/SingleSpeciesPage';
@@ -33,6 +34,7 @@ function getTopSessions(species: string, groupId: number) {
 }
 
 async function getSpeciesStats(species: string, groupId: number) {
+	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('species_stats', {
 			species_name_filter: species,
@@ -45,6 +47,7 @@ async function fetchSpeciesData(
 	params: PageParams,
 	groupId: number
 ): Promise<PageData | null> {
+	const supabase = await getAuthenticatedSupabaseClient();
 	const { id: speciesId } = (await supabase
 		.from('Species')
 		.select('id')
