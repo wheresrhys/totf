@@ -5,7 +5,7 @@ import {
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionEncounter } from '@/app/models/session';
-import type { LocationRow } from '@/app/models/db';
+import type { LocationRow, SessionRow } from '@/app/models/db';
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import {
 	BadgeList,
@@ -40,14 +40,14 @@ async function fetchSessionData(
 	groupId: number
 ): Promise<DayData | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	let sessions = await supabase
+	let sessions = (await supabase
 		.from('Sessions')
 		.select(
 			'id, location_id, location:Locations (id, location_name, ringing_group_id)'
 		)
 		.eq('visit_date', date)
 		.eq('ringing_group_id', groupId)
-		.then(catchSupabaseErrors);
+		.then(catchSupabaseErrors)) as (SessionRow & { location: LocationRow })[];
 
 	if (!sessions || sessions.length === 0) {
 		return { encounters: [], locations: [] };
