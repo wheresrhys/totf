@@ -61,8 +61,12 @@ export function MultiSpeciesStatsTable({
 	const [toDate, setToDate] = useState<string | null>(null);
 	const [speciesStats, setSpeciesStats] =
 		useState<SpeciesStatsRow[]>(initialSpeciesStats);
-
+	const isFirstRender = useRef(true);
 	useEffect(() => {
+		if (isFirstRender.current) {
+			isFirstRender.current = false;
+			return;
+		}
 		fetchSpeciesData(groupId, fromDate ?? undefined, toDate ?? undefined).then(
 			setSpeciesStats
 		);

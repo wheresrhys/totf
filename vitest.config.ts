@@ -7,6 +7,6 @@ export default defineConfig({
 
   test: {
     setupFiles: ['./vitest.setup.tsx'],
-    environment: 'jsdom',
+    environment: 'happy-dom',
   },
 })

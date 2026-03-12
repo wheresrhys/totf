@@ -38,18 +38,18 @@ function SpeciesData({
 			...newBirds.filter((bird) => !loadedIds.includes(bird.id))
 		]);
 	}
+	const isFullyLoaded =
+		loadedBirds.length >= (data.speciesStats.bird_count ?? 0);
 
 	const loadMoreRef = useOnInView(
 		(inView) => {
-			if (inView) {
+			if (inView && !isFullyLoaded) {
 				loadMoreBirds();
 			}
 		},
 		{ threshold: 0 }
 	);
 
-	const isFullyLoaded =
-		loadedBirds.length >= (data.speciesStats.bird_count ?? 0);
 	const [showChart, setShowChart] = useState(false);
 	let birds = loadedBirds;
 	const loadedIds = loadedBirds.map((bird) => bird.id);
