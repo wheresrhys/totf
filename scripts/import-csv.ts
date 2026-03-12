@@ -7,11 +7,13 @@
  * Example: npm run import -- data.csv
  */
 import { pRateLimit } from 'p-ratelimit';
-import { createClient } from '@supabase/supabase-js';
+import { getAuthenticatedSupabaseClientForGroup } from '../lib/group-auth';
+import { supabase } from '../lib/supabase';
 import fs from 'fs';
 import path from 'path';
 import csvParser from 'csv-parser';
 import { Database } from '../types/supabase.types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Omit<
@@ -151,20 +153,6 @@ type DemonColumnNames =
 
 type DemonRow = Record<DemonColumnNames, string>;
 
-// Environment variables are loaded via 1Password CLI when running with npm run import
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-	console.error('Error: Missing required environment variables');
-	console.error(
-		'Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY'
-	);
-	process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
 // create a rate limiter that allows up to 30 API calls per second,
 // with max concurrency of 10
 const limit = pRateLimit({
@@ -173,8 +161,6 @@ const limit = pRateLimit({
 	concurrency: 30 // no more than 10 running at once
 	// maxDelay: 2000              // an API call delayed > 2 sec is rejected
 }) as <T>(fn: () => Promise<T>) => Promise<T>;
-
-// const limit = (fn => fn()) as <T>(fn: () => Promise<T>) => Promise<T>;
 
 // Helper function to transform empty strings to null
 function transformEmptyStringsToNull(
@@ -198,23 +184,24 @@ function convertDateFormat(dateString: string): string {
 	return dateString.split('/').reverse().join('-');
 }
 
-async function upsert<DataInsertModel>(
-	tableName: string,
-	upsertData: DataInsertModel,
-	uniqueColumn: keyof DataInsertModel,
-	returnType: 'id' | 'row' = 'id'
-): Promise<number> {
-	const { data: upsertResult, error: upsertError } = await supabase
-		.from(tableName)
-		.upsert(upsertData, {
-			onConflict: uniqueColumn as string,
-			ignoreDuplicates: false
-		})
-		.select(returnType === 'id' ? 'id' : '*')
-		.single();
+function createUpserter(supabaseClient: SupabaseClient) {
+	return async <DataInsertModel>(
+		tableName: string,
+		upsertData: DataInsertModel,
+		uniqueColumn: keyof DataInsertModel
+	): Promise<number> => {
+		const { data: upsertResult, error: upsertError } = await supabaseClient
+			.from(tableName)
+			.upsert(upsertData, {
+				onConflict: uniqueColumn as string,
+				ignoreDuplicates: false
+			})
+			.select('id')
+			.single();
 
-	if (upsertError) throw upsertError;
-	return upsertResult.id;
+		if (upsertError) throw upsertError;
+		return upsertResult.id;
+	};
 }
 
 async function importCSV(options: ImportOptions): Promise<void> {
@@ -233,7 +220,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 	const pendingRows: (Promise<void> | null)[] = [];
 
 	// 0. Upsert Ringing Group (create if doesn't exist) and get ID
-	const ringingGroupId = await upsert<RingingGroupsInsert>(
+	const ringingGroupId = await createUpserter(supabase)<RingingGroupsInsert>(
 		'RingingGroups',
 		{
 			group_name: ringingGroupName
@@ -241,6 +228,10 @@ async function importCSV(options: ImportOptions): Promise<void> {
 		'group_name'
 	);
 
+	const groupSupabaseClient =
+		await getAuthenticatedSupabaseClientForGroup(ringingGroupId);
+
+	const upsert = createUpserter(groupSupabaseClient);
 	return new Promise((resolve, reject) => {
 		fs.createReadStream(csvFilePath)
 			.pipe(csvParser())
@@ -347,8 +338,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 						weight: row.weight ? Number(row.weight) : null,
 						wing_length: row.wing_length ? Number(row.wing_length) : null
 					},
-					'bird_id,session_id' as keyof EncountersInsert,
-					'row'
+					'bird_id,session_id' as keyof EncountersInsert
 				)) as unknown as EncounterRow;
 
 				return encounterResult;

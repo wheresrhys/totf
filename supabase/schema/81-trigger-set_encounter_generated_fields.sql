@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION "public"."set_encounter_generated_fields" () RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION "public"."set_encounter_generated_fields" () RETURNS TRIGGER SECURITY DEFINER AS $$
 BEGIN
   SELECT
     l."ringing_group_id",
