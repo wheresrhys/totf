@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION "public"."add_bird_ringing_group_id" () RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION "public"."add_bird_ringing_group_id" () RETURNS TRIGGER SECURITY DEFINER AS $$
 BEGIN
   UPDATE "public"."Birds"
   SET ringing_group_ids = CASE
@@ -17,7 +17,7 @@ CREATE OR REPLACE TRIGGER "trigger_add_bird_ringing_group_id"
 AFTER INSERT ON "public"."Encounters" FOR EACH ROW
 EXECUTE FUNCTION "public"."add_bird_ringing_group_id" ();
 
-CREATE OR REPLACE FUNCTION "public"."remove_bird_ringing_group_id" () RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION "public"."remove_bird_ringing_group_id" () RETURNS TRIGGER SECURITY DEFINER AS $$
 BEGIN
   UPDATE "public"."Birds"
   SET ringing_group_ids = COALESCE(array_remove(ringing_group_ids, OLD.ringing_group_id), '{}')
@@ -35,7 +35,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER "trigger_remove_bird_ringing_group_id" BEFORE DELETE ON "public"."Encounters" FOR EACH ROW
 EXECUTE FUNCTION "public"."remove_bird_ringing_group_id" ();
 
-CREATE OR REPLACE FUNCTION "public"."update_bird_ringing_group_id" () RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION "public"."update_bird_ringing_group_id" () RETURNS TRIGGER SECURITY DEFINER AS $$
 BEGIN
   -- Only act when ringing_group_id actually changed
   IF OLD.ringing_group_id IS DISTINCT FROM NEW.ringing_group_id THEN

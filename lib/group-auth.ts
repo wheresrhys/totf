@@ -23,11 +23,10 @@ export async function generateGroupJwt(groupId: number): Promise<string> {
 		.setExpirationTime('1d')
 		.sign(encodedSecret);
 }
-export async function getAuthenticatedSupabaseClient() {
-	const groupId = await getGroupCookie();
-	if (groupId === null) {
-		throw new Error('No group selected');
-	}
+
+export async function getAuthenticatedSupabaseClientForGroup(
+	groupId: number
+): Promise<SupabaseClient> {
 	let client = authenticatedClientCache.get(groupId);
 	if (!client) {
 		const jwt = await generateGroupJwt(groupId);
@@ -35,4 +34,12 @@ export async function getAuthenticatedSupabaseClient() {
 		authenticatedClientCache.set(groupId, client);
 	}
 	return client;
+}
+
+export async function getAuthenticatedSupabaseClient() {
+	const groupId = await getGroupCookie();
+	if (groupId === null) {
+		throw new Error('No group selected');
+	}
+	return getAuthenticatedSupabaseClientForGroup(groupId);
 }
