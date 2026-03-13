@@ -17,22 +17,46 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 ) RETURNS TABLE (
 	"species_name" "text",
 	"time_period" "date",
-	"bird_count" bigint,
-	"encounter_count" bigint,
+
 	"session_count" bigint,
-	"max_weight" real,
+  "bird_count" bigint,
+	"encounter_count" bigint,
+  "new_bird_count" bigint,
+  "max_per_session" bigint,
+  "max_new_per_session" bigint,
+
+
+  "max_weight" real,
 	"avg_weight" numeric,
 	"min_weight" real,
 	"median_weight" numeric,
-	"max_wing" smallint,
+
+  "max_wing" smallint,
 	"avg_wing" numeric,
 	"min_wing" smallint,
 	"median_wing" numeric,
-	"max_encountered_bird" bigint,
+
+  "max_encountered_bird" bigint,
 	"pct_retrapped" numeric,
-	"max_time_span" numeric,
-	"max_per_session" bigint,
-	"max_proven_age" numeric
+	"max_time_span_days" numeric,
+  "max_proven_age" numeric
+
+
+-- total birds
+-- total new birds
+-- total new juvs/3's
+-- ratio of new to old / juv to adult (not can use min hatch year here)
+-- total encounters
+-- total sessions
+-- total effort
+-- effort per encounter
+-- effort per session
+-- total species
+-- average encounters per session
+-- busiest year/month
+-- most caught bird
+-- most caught species
+-- do new max proven age calc based on min max hatch year
 ) LANGUAGE "plpgsql" AS $$
   BEGIN
   RETURN QUERY
@@ -46,6 +70,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
       e.id AS encounter_id,
       e.weight,
       e.wing_length,
+      e.record_type,
       sess.id AS session_id,
       sess.visit_date,
       e.max_hatch_year,
@@ -76,7 +101,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     WHERE re.encounter_id IS NOT NULL
     GROUP BY re.species_id, re.bird_id, re.session_month, re.session_year
   ),
-  aggregated_stats AS (
+  stats_per_species_period AS (
     -- Aggregate bird-level stats to species level
     SELECT
       CASE WHEN group_by_species THEN spbm.species_id ELSE NULL::bigint END AS species_id,
@@ -86,7 +111,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
         ELSE NULL::date
       END AS time_period,
       MAX(spbm.encounter_count) AS max_encounter_count,
-      MAX(spbm.time_span_days) AS max_time_span,
+      MAX(spbm.time_span_days) AS max_time_span_days,
       MAX(EXTRACT(YEAR FROM spbm.last_visit) - spbm.min_max_hatch_year) AS max_proven_age
     FROM stats_per_bird_month spbm
     GROUP BY CASE
@@ -105,7 +130,8 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
       re.session_id,
       date_trunc('month', re.visit_date)::DATE AS session_month,
       date_trunc('year', re.visit_date)::DATE AS session_year,
-      COUNT(*) AS encounter_count
+      COUNT(*) AS encounter_count,
+      COUNT(CASE WHEN re.record_type = 'N' THEN 1 END) AS new_encounter_count
     FROM raw_encounters re
     WHERE re.session_id IS NOT NULL
     GROUP BY re.species_id, re.session_id, date_trunc('month', re.visit_date)::DATE, date_trunc('year', re.visit_date)::DATE
@@ -119,7 +145,8 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
         WHEN group_by_time_period = 'year' THEN sc.session_year
         ELSE NULL::date
       END AS time_period,
-      MAX(sc.encounter_count) AS max_per_session
+      MAX(sc.encounter_count) AS max_per_session,
+      MAX(sc.new_encounter_count) AS max_new_per_session
     FROM session_counts sc
     GROUP BY CASE
       WHEN group_by_species THEN sc.species_id
@@ -131,34 +158,45 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     END
   )
   SELECT
-    CASE WHEN group_by_species THEN raw_enc.species_name ELSE NULL::text END AS "species_name",
+
+	  CASE WHEN group_by_species THEN raw_enc.species_name ELSE NULL::text END AS "species_name",
     CASE
       WHEN group_by_time_period = 'month' THEN raw_enc.session_month
       WHEN group_by_time_period = 'year' THEN raw_enc.session_year
     ELSE NULL::date END AS "time_period",
-    COUNT(DISTINCT raw_enc.bird_id) AS "bird_count",
-    COUNT(raw_enc.encounter_id) AS "encounter_count",
+
     COUNT(DISTINCT raw_enc.visit_date) AS "session_count",
+    COUNT(DISTINCT raw_enc.bird_id) AS "bird_count",
+    COUNT(DISTINCT raw_enc.encounter_id) AS "encounter_count",
+
+    COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' THEN raw_enc.encounter_id END) AS "new_bird_count",
+    agg_sess.max_per_session AS "max_per_session",
+    agg_sess.max_new_per_session AS "max_new_per_session",
+
     MAX(raw_enc.weight) AS "max_weight",
     ROUND(AVG(raw_enc.weight)::numeric, 1) AS "avg_weight",
     MIN(raw_enc.weight) AS "min_weight",
     ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY raw_enc.weight)::numeric, 1) AS "median_weight",
+
     MAX(raw_enc.wing_length) AS "max_wing",
     ROUND(AVG(raw_enc.wing_length)::numeric, 1) AS "avg_wing",
     MIN(raw_enc.wing_length) AS "min_wing",
     ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY raw_enc.wing_length)::numeric, 0) AS "median_wing",
+
     agg_sta.max_encounter_count AS "max_encountered_bird",
     ROUND(
       100 * COUNT(DISTINCT CASE WHEN bm_stats.encounter_count > 1 THEN raw_enc.bird_id END)::numeric /
       NULLIF(COUNT(DISTINCT raw_enc.bird_id), 0)::numeric,
       0
     ) AS "pct_retrapped",
-    ROUND(agg_sta.max_time_span, 0) AS "max_time_span",
-    agg_sess.max_per_session AS "max_per_session",
+    ROUND(agg_sta.max_time_span_days, 0) AS "max_time_span_days",
     agg_sta.max_proven_age AS "max_proven_age"
+
+
+
   FROM raw_encounters raw_enc
   LEFT JOIN stats_per_bird_month bm_stats ON raw_enc.bird_id = bm_stats.bird_id
-  LEFT JOIN aggregated_stats agg_sta ON CASE WHEN group_by_species THEN raw_enc.species_id = agg_sta.species_id ELSE true END
+  LEFT JOIN stats_per_species_period agg_sta ON CASE WHEN group_by_species THEN raw_enc.species_id = agg_sta.species_id ELSE true END
   AND
   CASE
     WHEN group_by_time_period = 'month' THEN raw_enc.session_month = agg_sta.time_period
@@ -181,7 +219,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     WHEN group_by_time_period = 'month' THEN raw_enc.session_month
     WHEN group_by_time_period = 'year' THEN raw_enc.session_year
     ELSE NULL::date
-  END, agg_sta.max_encounter_count, agg_sta.max_time_span, agg_sess.max_per_session, agg_sta.max_proven_age;
+  END, agg_sta.max_encounter_count, agg_sta.max_time_span_days, agg_sess.max_per_session, agg_sta.max_proven_age, agg_sess.max_new_per_session ;
 
 END;
 $$;
