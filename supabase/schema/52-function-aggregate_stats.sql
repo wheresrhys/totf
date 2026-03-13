@@ -63,70 +63,70 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
   stats_per_bird_month AS (
     -- Calculate per-bird statistics once
     SELECT
-      species_id,
-      bird_id,
-      session_month,
-      session_year,
+      re.species_id,
+      re.bird_id,
+      re.session_month,
+      re.session_year,
       COUNT(*) AS encounter_count,
-      MIN(visit_date) AS first_visit,
-      MAX(visit_date) AS last_visit,
-      MIN(max_hatch_year) AS min_max_hatch_year,
-      EXTRACT(EPOCH FROM (MAX(visit_date)::timestamp - MIN(visit_date)::timestamp)) / 86400.0 AS time_span_days
-    FROM raw_encounters
-    WHERE encounter_id IS NOT NULL
-    GROUP BY species_id, bird_id, session_month, session_year
+      MIN(re.visit_date) AS first_visit,
+      MAX(re.visit_date) AS last_visit,
+      MIN(re.max_hatch_year) AS min_max_hatch_year,
+      EXTRACT(EPOCH FROM (MAX(re.visit_date)::timestamp - MIN(re.visit_date)::timestamp)) / 86400.0 AS time_span_days
+    FROM raw_encounters re
+    WHERE re.encounter_id IS NOT NULL
+    GROUP BY re.species_id, re.bird_id, re.session_month, re.session_year
   ),
   aggregated_stats AS (
     -- Aggregate bird-level stats to species level
     SELECT
-      CASE WHEN group_by_species THEN species_id ELSE NULL::bigint END AS species_id,
+      CASE WHEN group_by_species THEN spbm.species_id ELSE NULL::bigint END AS species_id,
       CASE
-        WHEN group_by_time_period = 'month' THEN session_month
-        WHEN group_by_time_period = 'year' THEN session_year
+        WHEN group_by_time_period = 'month' THEN spbm.session_month
+        WHEN group_by_time_period = 'year' THEN spbm.session_year
         ELSE NULL::date
       END AS time_period,
-      MAX(stats_per_bird_month.encounter_count) AS max_encounter_count,
-      MAX(stats_per_bird_month.time_span_days) AS max_time_span,
-      MAX(EXTRACT(YEAR FROM stats_per_bird_month.last_visit) - stats_per_bird_month.min_max_hatch_year) AS max_proven_age
-    FROM stats_per_bird_month
+      MAX(spbm.encounter_count) AS max_encounter_count,
+      MAX(spbm.time_span_days) AS max_time_span,
+      MAX(EXTRACT(YEAR FROM spbm.last_visit) - spbm.min_max_hatch_year) AS max_proven_age
+    FROM stats_per_bird_month spbm
     GROUP BY CASE
-      WHEN group_by_species THEN species_id
+      WHEN group_by_species THEN spbm.species_id
       ELSE NULL::bigint
     END, CASE
-      WHEN group_by_time_period = 'month' THEN session_month
-      WHEN group_by_time_period = 'year' THEN session_year
+      WHEN group_by_time_period = 'month' THEN spbm.session_month
+      WHEN group_by_time_period = 'year' THEN spbm.session_year
       ELSE NULL::date
     END
   ),
   session_counts AS (
     -- Count encounters per session per species
     SELECT
-      species_id,
-      session_id,
-      date_trunc('month', visit_date)::DATE AS session_month,
-      date_trunc('year', visit_date)::DATE AS session_year,
+      re.species_id,
+      re.session_id,
+      date_trunc('month', re.visit_date)::DATE AS session_month,
+      date_trunc('year', re.visit_date)::DATE AS session_year,
       COUNT(*) AS encounter_count
-    FROM raw_encounters
-    WHERE session_id IS NOT NULL
-    GROUP BY species_id, session_id, session_month, session_year, visit_date
+    FROM raw_encounters re
+    WHERE re.session_id IS NOT NULL
+    GROUP BY re.species_id, re.session_id, date_trunc('month', re.visit_date)::DATE, date_trunc('year', re.visit_date)::DATE
   ),
   aggregated_session_counts AS (
     -- Get max encounters per session per species
     SELECT
-      CASE WHEN group_by_species THEN species_id ELSE NULL::bigint END AS species_id,
+      CASE WHEN group_by_species THEN sc.species_id ELSE NULL::bigint END AS species_id,
       CASE
-        WHEN group_by_time_period = 'month' THEN session_month
-        WHEN group_by_time_period = 'year' THEN session_year
+        WHEN group_by_time_period = 'month' THEN sc.session_month
+        WHEN group_by_time_period = 'year' THEN sc.session_year
         ELSE NULL::date
       END AS time_period,
-      MAX(session_counts.encounter_count) AS max_per_session
-    FROM session_counts
+      MAX(sc.encounter_count) AS max_per_session
+    FROM session_counts sc
     GROUP BY CASE
-      WHEN group_by_species THEN species_id
+      WHEN group_by_species THEN sc.species_id
       ELSE NULL::bigint
     END, CASE
-      WHEN group_by_time_period = 'month' THEN session_month
-      WHEN group_by_time_period = 'year' THEN session_year
+      WHEN group_by_time_period = 'month' THEN sc.session_month
+      WHEN group_by_time_period = 'year' THEN sc.session_year
       ELSE NULL::date
     END
   )
@@ -167,16 +167,19 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
   END
   LEFT JOIN aggregated_session_counts agg_sess ON CASE WHEN group_by_species THEN raw_enc.species_id = agg_sess.species_id ELSE true END
   AND CASE
-    WHEN group_by_time_period = 'month' THEN raw_enc.session_month = agg_sta.time_period
-    WHEN group_by_time_period = 'year' THEN raw_enc.session_year = agg_sta.time_period
+    WHEN group_by_time_period = 'month' THEN raw_enc.session_month = agg_sess.time_period
+    WHEN group_by_time_period = 'year' THEN raw_enc.session_year = agg_sess.time_period
     ELSE true
   END
   GROUP BY CASE
     WHEN group_by_species THEN raw_enc.species_id
     ELSE NULL::bigint
   END, CASE
-    WHEN group_by_time_period = 'month' THEN session_month
-    WHEN group_by_time_period = 'year' THEN session_year
+    WHEN group_by_species THEN raw_enc.species_name
+    ELSE NULL::text
+  END,CASE
+    WHEN group_by_time_period = 'month' THEN raw_enc.session_month
+    WHEN group_by_time_period = 'year' THEN raw_enc.session_year
     ELSE NULL::date
   END, agg_sta.max_encounter_count, agg_sta.max_time_span, agg_sess.max_per_session, agg_sta.max_proven_age;
 
