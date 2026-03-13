@@ -45,14 +45,14 @@ export function SingleSpeciesFilters({
 	showStatsHistory: boolean;
 }) {
 	return (
-		<form className="mt-7 flex justify-end gap-2">
+		<form className="mt-7 flex justify-end gap-2 flex-wrap">
 			{showStatsHistory ? null : (
 				<button
 					type="button"
 					className="btn btn-secondary btn-sm"
 					onClick={() => setShowStatsHistory(true)}
 				>
-					View stats history
+					Stats history
 				</button>
 			)}
 			{showWeightVsWingChart ? null : (
@@ -61,7 +61,7 @@ export function SingleSpeciesFilters({
 					className="btn btn-secondary btn-sm"
 					onClick={() => setShowWeightVsWingChart(true)}
 				>
-					View wing-weight chart
+					Size plot
 				</button>
 			)}
 			<Switch
