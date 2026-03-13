@@ -3,7 +3,7 @@ import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/page';
 import { StatOutput } from './shared/StatOutput';
 import { UnwrappedBadgeList } from './shared/DesignSystem';
-import type { SpeciesStatsRow } from '@/app/models/db';
+import type { AggregateStatsRow } from '@/app/models/db';
 import type { SpeciesStatConfig } from '@/app/models/species-stats';
 import { speciesStatConfigs } from '@/app/models/species-stats';
 
@@ -22,7 +22,11 @@ const statsByCategory: Record<string, SpeciesStatConfig[]> =
 		{} as Record<string, SpeciesStatConfig[]>
 	);
 
-function StatsByCategory({ speciesStats }: { speciesStats: SpeciesStatsRow }) {
+function StatsByCategory({
+	speciesStats
+}: {
+	speciesStats: AggregateStatsRow;
+}) {
 	return categoryOrder.map((categoryName) => {
 		const subStats = statsByCategory[categoryName];
 		return (
@@ -31,7 +35,7 @@ function StatsByCategory({ speciesStats }: { speciesStats: SpeciesStatsRow }) {
 				<UnwrappedBadgeList
 					items={subStats.map(
 						(stat) =>
-							`${stat.prefix ? `${stat.prefix} ` : ''}${speciesStats[stat.property as keyof SpeciesStatsRow]}${stat.suffix ? ` ${stat.suffix}` : ''}`
+							`${stat.prefix ? `${stat.prefix} ` : ''}${speciesStats[stat.property as keyof AggregateStatsRow]}${stat.suffix ? ` ${stat.suffix}` : ''}`
 					)}
 				/>
 			</li>
@@ -45,21 +49,21 @@ export function SingleSpeciesStats({
 	speciesStats
 }: FullFatPageData) {
 	if (!speciesStats) return null;
-	const mostCaughtBirds =
-		speciesStats.max_encountered_bird && speciesStats.max_encountered_bird > 1
-			? birds.filter(
-					(bird) => bird.encounters.length === speciesStats.max_encountered_bird
-				)
-			: [];
-	const oldestBirds =
-		speciesStats.max_proven_age && speciesStats.max_proven_age > 1
-			? birds.filter((bird) => bird.provenAge === speciesStats.max_proven_age)
-			: [];
+	// const mostCaughtBirds =
+	// 	speciesStats.max_encountered_bird && speciesStats.max_encountered_bird > 1
+	// 		? birds.filter(
+	// 				(bird) => bird.encounters.length === speciesStats.max_encountered_bird
+	// 			)
+	// 		: [];
+	// const oldestBirds =
+	// 	speciesStats.max_proven_age && speciesStats.max_proven_age > 1
+	// 		? birds.filter((bird) => bird.provenAge === speciesStats.max_proven_age)
+	// 		: [];
 
 	return (
 		<BoxyList testId="headline-stats">
 			<StatsByCategory speciesStats={speciesStats} />
-			{oldestBirds.length ? (
+			{/* {oldestBirds.length ? (
 				<li className="flex items-center gap-2 flex-wrap">
 					<span className="text-nowrap">
 						Oldest birds: {speciesStats.max_proven_age} years old:
@@ -76,9 +80,9 @@ export function SingleSpeciesStats({
 				</li>
 			) : (
 				<li>No notably old birds</li>
-			)}
+			)} */}
 			{/* todo: longest gap between first and last caught */}
-			{mostCaughtBirds.length > 0 ? (
+			{/* {mostCaughtBirds.length > 0 ? (
 				<li className="flex items-center gap-2 flex-wrap">
 					<span className="text-nowrap">
 						Most caught bird{mostCaughtBirds.length > 1 ? 's' : ''}:{' '}
@@ -96,7 +100,7 @@ export function SingleSpeciesStats({
 				</li>
 			) : (
 				<li>No birds retrapped</li>
-			)}
+			)} */}
 			<li className="flex items-center gap-2 flex-wrap">
 				<span className="text-nowrap">Top sessions:</span>{' '}
 				{topSessions.map((session) => (

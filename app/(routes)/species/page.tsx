@@ -6,12 +6,12 @@ import { MultiSpeciesStatsTable } from '@/app/components/MultiSpeciesStatsTable'
 import { fetchSpeciesData } from '@/app/actions/multi-species-data';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import type { SpeciesStatsRow } from '@/app/models/db';
+import type { AggregateStatsRow } from '@/app/models/db';
 
 //TODO get year/date range from URL params
 
 export type PageData = {
-	speciesStats: SpeciesStatsRow[];
+	speciesStats: AggregateStatsRow[];
 	years: number[];
 };
 

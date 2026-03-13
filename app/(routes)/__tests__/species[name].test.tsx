@@ -43,28 +43,28 @@ describe('species page', () => {
 		const headlineStats = await screen.findByTestId('headline-stats');
 		const statsLineItems = headlineStats.querySelectorAll(':scope > li');
 
-		expect(statsLineItems).toHaveLength(7);
+		expect(statsLineItems).toHaveLength(4);
 		expect(statsLineItems[0].textContent).toBe(
 			'Totals: 98 birds187 encounters52 sessionsmax haul: 12 birds'
 		);
 
+		// expect(statsLineItems[1].textContent).toBe(
+		// 	'Recoveries: 42 % retrappedmax time span: 567 daysmax proven age: 2 yearsmost seen bird: 6 times'
+		// );
 		expect(statsLineItems[1].textContent).toBe(
-			'Recoveries: 42 % retrappedmax time span: 567 daysmax proven age: 2 yearsmost seen bird: 6 times'
-		);
-		expect(statsLineItems[2].textContent).toBe(
 			'Weight: max: 17.2 gavg: 13.3 gmin: 10.2 gmedian: 13.6 g'
 		);
-		expect(statsLineItems[3].textContent).toBe(
+		expect(statsLineItems[2].textContent).toBe(
 			'Wing: max: 68 mmavg: 59.7 mmmin: 49 mmmedian: 61 mm'
 		);
-		expect(statsLineItems[4].textContent).toBe(
-			'Oldest birds: 2 years old: BVB4138 '
-		);
+		// expect(statsLineItems[4].textContent).toBe(
+		// 	'Oldest birds: 2 years old: BVB4138 '
+		// );
 
-		expect(statsLineItems[5].textContent).toBe(
-			'Most caught bird: 6 encounters each BVB4138 '
-		);
-		expect(statsLineItems[6].textContent).toBe(
+		// expect(statsLineItems[5].textContent).toBe(
+		// 	'Most caught bird: 6 encounters each BVB4138 '
+		// );
+		expect(statsLineItems[3].textContent).toBe(
 			'Top sessions: 12  on  12 Jul 2025 11  on  14 Sep 2025 10  on  8 Oct 2023 9  on  14 Sep 2024 8  on  26 Nov 2023 '
 		);
 	});

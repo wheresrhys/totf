@@ -10,6 +10,7 @@ import 'chartkick/chart.js';
 import { fetchPageOfBirds } from '../actions/single-species-data';
 import { useOnInView } from 'react-intersection-observer';
 import { WeightVsWingLengthChart } from '@/app/components/WeightAndWingChart';
+import { StatsHistoryChart } from '@/app/components/StatsHistoryChart';
 import { SingleSpeciesFilters } from '@/app/components/SingleSpeciesFilters';
 import type {
 	FullFatPageData,
@@ -50,7 +51,8 @@ function SpeciesData({
 		{ threshold: 0 }
 	);
 
-	const [showChart, setShowChart] = useState(false);
+	const [showWeightVsWingChart, setShowWeightVsWingChart] = useState(false);
+	const [showStatsHistory, setShowStatsHistory] = useState(false);
 	let birds = loadedBirds;
 	const loadedIds = loadedBirds.map((bird) => bird.id);
 	if (retrappedOnly) {
@@ -64,14 +66,19 @@ function SpeciesData({
 	return (
 		<>
 			<SingleSpeciesStats {...data} />
-			{showChart ? <WeightVsWingLengthChart birds={birds} /> : null}
+			{showWeightVsWingChart ? <WeightVsWingLengthChart birds={birds} /> : null}
+			{showStatsHistory ? (
+				<StatsHistoryChart statsHistory={data.speciesStatsHistory} />
+			) : null}
 			<SingleSpeciesFilters
 				retrappedOnly={retrappedOnly}
 				setRetrappedOnly={setRetrappedOnly}
 				setSexedOnly={setSexedOnly}
 				sexedOnly={sexedOnly}
-				setShowChart={setShowChart}
-				showChart={showChart}
+				setShowWeightVsWingChart={setShowWeightVsWingChart}
+				showWeightVsWingChart={showWeightVsWingChart}
+				setShowStatsHistory={setShowStatsHistory}
+				showStatsHistory={showStatsHistory}
 			/>
 			<SpeciesTable birds={birds} />
 			{isFullyLoaded ? null : (

@@ -115,6 +115,7 @@ CREATE OR REPLACE FUNCTION "public"."species_stats" (
   LEFT JOIN species_bird_aggregates sba ON se.species_id = sba.species_id
   LEFT JOIN species_session_max ssm ON se.species_id = ssm.species_id
   GROUP BY se.species_name, sba.max_encounter_count, sba.max_time_span, ssm.max_per_session, sba.max_proven_age;
+  ORDER BY se.species_name ASC;
 
 END;
 $$;
