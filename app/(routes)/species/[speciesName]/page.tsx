@@ -6,7 +6,7 @@ import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import { SpeciesPageWithFilters } from '@/app/components/SingleSpeciesPage';
 import { fetchPageOfBirds } from '@/app/actions/single-species-data';
 import type {
-	SpeciesStatsRow,
+	AggregateStatsRow,
 	TopMetricsFilterParams,
 	TopPeriodsResult
 } from '@/app/models/db';
@@ -16,7 +16,7 @@ type PageProps = { params: Promise<PageParams> };
 export type FullFatPageData = {
 	topSessions: TopPeriodsResult[];
 	birds: EnrichedBirdOfSpecies[];
-	speciesStats: SpeciesStatsRow;
+	speciesStats: AggregateStatsRow;
 	speciesId: number;
 };
 export type PageData = FullFatPageData | { speciesId: number };
@@ -36,11 +36,11 @@ function getTopSessions(species: string, groupId: number) {
 async function getSpeciesStats(species: string, groupId: number) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('species_stats', {
+		.rpc('aggregate_stats', {
 			species_name_filter: species,
 			ringing_group_filter: groupId
 		})
-		.then(catchSupabaseErrors) as Promise<SpeciesStatsRow[]>;
+		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
 }
 
 async function fetchSpeciesData(

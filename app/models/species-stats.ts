@@ -1,8 +1,8 @@
-import type { SpeciesStatsRow } from './db';
+import type { AggregateStatsRow } from './db';
 
 export type SpeciesStatConfig = {
 	label: string;
-	property: keyof SpeciesStatsRow;
+	property: keyof AggregateStatsRow;
 	suffix?: string;
 	category?: string;
 	prefix?: string;
@@ -41,33 +41,33 @@ export const speciesStatConfigs: SpeciesStatConfig[] = [
 		suffix: 'birds'
 	},
 
-	{
-		label: '% Birds retrapped',
-		property: 'pct_retrapped',
-		category: 'Recoveries',
-		suffix: '% retrapped'
-	},
-	{
-		label: 'Max time span',
-		property: 'max_time_span',
-		category: 'Recoveries',
-		prefix: 'max time span:',
-		suffix: 'days'
-	},
-	{
-		label: 'Max proven age',
-		property: 'max_proven_age',
-		category: 'Recoveries',
-		prefix: 'max proven age:',
-		suffix: 'years'
-	},
-	{
-		label: 'Most caught bird',
-		property: 'max_encountered_bird',
-		category: 'Recoveries',
-		prefix: 'most seen bird:',
-		suffix: 'times'
-	},
+	// {
+	// 	label: '% Birds retrapped',
+	// 	property: 'pct_retrapped',
+	// 	category: 'Recoveries',
+	// 	suffix: '% retrapped'
+	// },
+	// {
+	// 	label: 'Max time span',
+	// 	property: 'max_time_span_days',
+	// 	category: 'Recoveries',
+	// 	prefix: 'max time span:',
+	// 	suffix: 'days'
+	// },
+	// {
+	// 	label: 'Max proven age',
+	// 	property: 'max_proven_age',
+	// 	category: 'Recoveries',
+	// 	prefix: 'max proven age:',
+	// 	suffix: 'years'
+	// },
+	// {
+	// 	label: 'Most caught bird',
+	// 	property: 'max_encountered_bird',
+	// 	category: 'Recoveries',
+	// 	prefix: 'most seen bird:',
+	// 	suffix: 'times'
+	// },
 	{
 		label: 'Max weight',
 		property: 'max_weight',

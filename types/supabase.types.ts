@@ -226,6 +226,41 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aggregate_stats: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: {
+          avg_encounters_per_session: number
+          avg_weight: number
+          avg_wing: number
+          bird_count: number
+          effort_per_encounter: string
+          effort_per_session: string
+          encounter_count: number
+          juv_count: number
+          max_new_per_session: number
+          max_per_session: number
+          max_weight: number
+          max_wing: number
+          median_weight: number
+          median_wing: number
+          min_weight: number
+          min_wing: number
+          new_bird_count: number
+          new_juv_count: number
+          session_count: number
+          species_count: number
+          species_name: string
+          time_period: string
+          total_effort: string
+        }[]
+      }
       daitch_mokotoff: { Args: { "": string }; Returns: string[] }
       dmetaphone: { Args: { "": string }; Returns: string }
       dmetaphone_alt: { Args: { "": string }; Returns: string }
