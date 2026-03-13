@@ -46,8 +46,9 @@ function StatsByCategory({
 export function SingleSpeciesStats({
 	topSessions,
 	birds,
-	speciesStats
-}: FullFatPageData) {
+	speciesStats,
+	groupId
+}: FullFatPageData & { groupId: number }) {
 	if (!speciesStats) return null;
 	// const mostCaughtBirds =
 	// 	speciesStats.max_encountered_bird && speciesStats.max_encountered_bird > 1
@@ -111,6 +112,7 @@ export function SingleSpeciesStats({
 						temporalUnit="day"
 						classes="badge badge-outline"
 						dateFormat="d MMM yyyy"
+						groupId={groupId}
 					/>
 				))}
 			</li>

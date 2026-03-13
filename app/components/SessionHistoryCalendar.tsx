@@ -39,9 +39,9 @@ const groupByYear = groupByDateMethod('getFullYear');
 const groupByMonth = groupByDateMethod('getMonth');
 
 function SessionsOfMonth({
-	model: month
+	model: { groupId, monthData: month }
 }: {
-	model: SessionWithEncountersCount[];
+	model: { groupId: number; monthData: SessionWithEncountersCount[] };
 }) {
 	return (
 		<ol className="list-inside list-none py-3">
@@ -56,6 +56,7 @@ function SessionsOfMonth({
 						showUnit={true}
 						temporalUnit="day"
 						dateFormat="EEEE do"
+						groupId={groupId}
 					/>
 				</li>
 			))}
@@ -64,9 +65,9 @@ function SessionsOfMonth({
 }
 
 function MonthHeading({
-	model: month
+	model: { monthData: month }
 }: {
-	model: SessionWithEncountersCount[];
+	model: { monthData: SessionWithEncountersCount[] };
 }) {
 	return (
 		<span>
@@ -91,13 +92,13 @@ function YearHeading({
 }
 
 function MonthsOfYear({
-	model: { yearData, setExpandedMonth, expandedMonth }
+	model: { yearData, setExpandedMonth, expandedMonth, groupId }
 }: {
 	model: {
 		yearData: SessionWithEncountersCount[][];
-		yearString: string;
 		setExpandedMonth: (month: string | false) => void;
 		expandedMonth: string | false;
+		groupId: number;
 	};
 }) {
 	return (
@@ -111,7 +112,7 @@ function MonthsOfYear({
 							id={id}
 							HeadingComponent={MonthHeading}
 							ContentComponent={SessionsOfMonth}
-							model={month}
+							model={{ monthData: month, groupId }}
 							onToggle={setExpandedMonth}
 							expandedId={expandedMonth}
 							icon="calendar-week"
@@ -128,9 +129,11 @@ function getYearString(year: SessionWithEncountersCount[][]) {
 }
 
 export function SessionHistoryCalendar({
-	sessions
+	sessions,
+	groupId
 }: {
 	sessions: SessionWithEncountersCount[] | null;
+	groupId: number;
 }) {
 	const calendar = groupByYear(sessions || []).map(groupByMonth);
 	const [expandedMonth, setExpandedMonth] = useState<string | false>(false);
@@ -155,7 +158,8 @@ export function SessionHistoryCalendar({
 							yearString,
 							yearData: year,
 							setExpandedMonth,
-							expandedMonth
+							expandedMonth,
+							groupId
 						}}
 						onToggle={() => {
 							setExpandedYear(yearString);

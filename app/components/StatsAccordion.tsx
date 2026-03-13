@@ -9,7 +9,6 @@ import {
 	type UserTopStatsArgs
 } from '@/app/actions/top-performers';
 import type { TemporalUnit } from './shared/StatOutput';
-import { useRingingGroup } from './layout/RingingGroupProvider';
 
 export type StatConfig = {
 	id: string;
@@ -105,6 +104,7 @@ function ContentComponent({
 						temporalUnit={
 							model.definition.dataArguments.temporal_unit as TemporalUnit
 						}
+						groupId={model.groupId}
 					/>
 				</li>
 			))}
@@ -127,9 +127,8 @@ function HeadingComponent({ model }: { model: AccordionItemModelWithGroupId }) {
 	);
 }
 
-export function StatsAccordion({ data }: { data: StatsAccordionModel[] }) {
+export function StatsAccordion({ data, groupId }: { data: StatsAccordionModel[], groupId: number }) {
 	const [expanded, setExpanded] = useState<string | false>(false);
-	const groupId = useRingingGroup();
 	useEffect(() => {
 		setExpanded(false);
 	}, [groupId]);

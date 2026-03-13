@@ -186,7 +186,13 @@ async function fetchInitialData(
 	};
 }
 
-function RecentSessions({ data }: { data: SessionWithEncountersCount[] }) {
+function RecentSessions({
+	data,
+	groupId
+}: {
+	data: SessionWithEncountersCount[];
+	groupId: number;
+}) {
 	return (
 		<div>
 			<SecondaryHeading>Recent Sessions</SecondaryHeading>
@@ -201,6 +207,7 @@ function RecentSessions({ data }: { data: SessionWithEncountersCount[] }) {
 							showUnit={true}
 							temporalUnit="day"
 							dateFormat="EEEE do MMMM"
+							groupId={groupId}
 						/>
 					</li>
 				))}
@@ -208,11 +215,17 @@ function RecentSessions({ data }: { data: SessionWithEncountersCount[] }) {
 		</div>
 	);
 }
-function HomePageContent({ data }: { data: PageModel }) {
+function HomePageContent({
+	data,
+	groupId
+}: {
+	data: PageModel;
+	groupId: number;
+}) {
 	return (
 		<PageWrapper>
-			<RecentSessions data={data.recentSessions} />
-			<StatsAccordion data={data.stats} />
+			<RecentSessions data={data.recentSessions} groupId={groupId} />
+			<StatsAccordion data={data.stats} groupId={groupId} />
 		</PageWrapper>
 	);
 }

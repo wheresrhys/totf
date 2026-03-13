@@ -26,11 +26,17 @@ export async function fetchAllSessions(
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
 }
 
-function ListAllSessions({ data }: { data: SessionWithEncountersCount[] }) {
+function ListAllSessions({
+	data,
+	groupId
+}: {
+	data: SessionWithEncountersCount[];
+	groupId: number;
+}) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Session history</PrimaryHeading>
-			<SessionHistoryCalendar sessions={data} />
+			<SessionHistoryCalendar sessions={data} groupId={groupId} />
 		</PageWrapper>
 	);
 }
