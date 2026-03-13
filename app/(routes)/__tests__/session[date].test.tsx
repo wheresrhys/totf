@@ -8,7 +8,7 @@ describe('session page', () => {
 		render(
 			await Page({
 				params: new Promise((resolve) =>
-					resolve({ params: ['2023-09-30', undefined] })
+					resolve({ params: ['group', '1', '2023-09-30'] })
 				)
 			})
 		);
@@ -23,7 +23,7 @@ describe('session page', () => {
 		render(
 			await Page({
 				params: new Promise((resolve) =>
-					resolve({ params: ['2023-09-30', undefined] })
+					resolve({ params: ['group', '1', '2023-09-30'] })
 				)
 			})
 		);
@@ -43,7 +43,7 @@ describe('session page', () => {
 		render(
 			await Page({
 				params: new Promise((resolve) =>
-					resolve({ params: ['2023-09-30', undefined] })
+					resolve({ params: ['group', '1', '2023-09-30'] })
 				)
 			})
 		);

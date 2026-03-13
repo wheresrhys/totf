@@ -13,6 +13,7 @@ export type StatOutputModel = {
 	dateFormat?: string;
 	classes?: string;
 	location?: LocationRow;
+	groupId?: number;
 };
 
 const connectingVerbMap: Record<TemporalUnit, 'in' | 'on'> = {
@@ -36,8 +37,14 @@ export function StatOutput({
 	showUnit,
 	temporalUnit,
 	classes,
-	location
+	location,
+	groupId
 }: StatOutputModel) {
+	if (temporalUnit === 'day' && !groupId) {
+		throw new Error(
+			'groupId is required to output stats for day temporal unit'
+		);
+	}
 	return (
 		<span className={classes}>
 			<span className="font-bold">
@@ -47,7 +54,7 @@ export function StatOutput({
 			{temporalUnit === 'day' ? (
 				<NoPrefetchLink
 					className="link"
-					href={`/session/${visitDate}${location ? `/loc-${location.id}` : ''}`}
+					href={`/session/group/${groupId}/${visitDate}${location ? `/site/${location.id}` : ''}`}
 				>
 					{formatDate(
 						new Date(visitDate as string),

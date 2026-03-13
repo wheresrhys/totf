@@ -65,7 +65,7 @@ function SpeciesData({
 	}
 	return (
 		<>
-			<SingleSpeciesStats {...data} />
+			<SingleSpeciesStats {...data} groupId={groupId} />
 			{showWeightVsWingChart ? <WeightVsWingLengthChart birds={birds} /> : null}
 			{showStatsHistory ? (
 				<StatsHistoryChart statsHistory={data.speciesStatsHistory} />

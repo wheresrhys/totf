@@ -17,8 +17,18 @@ import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
 
-type PageParams = { date: string; locationId: number | undefined };
-type PageProps = { params: Promise<{ params: [string, string | undefined] }> };
+type PageParams = {
+	groupId: number;
+	date: string;
+	locationId: number | undefined;
+};
+type PageProps = {
+	params: Promise<{
+		params:
+			| ['group', string, string]
+			| ['group', string, string, 'site', string];
+	}>;
+};
 
 type DayData = {
 	encounters: SessionEncounter[];
@@ -28,16 +38,15 @@ type DayData = {
 async function getPageParams(pageProps: PageProps): Promise<PageParams> {
 	const pageParams = await pageProps.params;
 	return {
-		date: pageParams.params[0],
-		locationId: pageParams.params[1]
-			? Number(pageParams.params[1].substring(4))
-			: undefined
+		groupId: Number(pageParams.params[1]),
+		date: pageParams.params[2],
+		locationId: pageParams.params[4] ? Number(pageParams.params[4]) : undefined
 	};
 }
 
 async function fetchSessionData(
-	{ date, locationId }: PageParams,
-	groupId: number
+	{ groupId: paramGroupId, date, locationId }: PageParams
+	// groupId: number
 ): Promise<DayData | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	let sessions = (await supabase
@@ -46,7 +55,11 @@ async function fetchSessionData(
 			'id, location_id, location:Locations (id, location_name, ringing_group_id)'
 		)
 		.eq('visit_date', date)
-		.eq('ringing_group_id', groupId)
+		// use paramGroupId to fetch the data as in cases where one group
+		// shareds a link with a member of another group, we want the page to
+		// still attempt to fetch their data
+		// (will do something about granting permission across groups later)
+		.eq('ringing_group_id', paramGroupId)
 		.then(catchSupabaseErrors)) as (SessionRow & { location: LocationRow })[];
 
 	if (!sessions || sessions.length === 0) {
@@ -87,7 +100,7 @@ async function fetchSessionData(
 			'session_id',
 			sessions.map((session) => session.id)
 		)
-		.eq('ringing_group_id', groupId)
+		.eq('ringing_group_id', paramGroupId)
 		.then(catchSupabaseErrors)) as SessionEncounter[];
 
 	return {
@@ -118,11 +131,13 @@ function groupBySpecies(
 function Locations({
 	locations,
 	date,
-	selectedLocation
+	selectedLocation,
+	groupId
 }: {
 	locations: LocationRow[];
 	date: string;
 	selectedLocation: number | undefined;
+	groupId: number;
 }) {
 	return (
 		<small className="text-sm text-gray-500">
@@ -136,7 +151,7 @@ function Locations({
 							) : (
 								<Link
 									className="link"
-									href={`/session/${date}/loc-${location.id}`}
+									href={`/session/group/${groupId}/${date}/site/${location.id}`}
 								>
 									{printLocationName(location.location_name)}
 								</Link>
@@ -146,7 +161,7 @@ function Locations({
 			{selectedLocation && locations.length > 1 ? (
 				<>
 					,{' '}
-					<Link className="link" href={`/session/${date}`}>
+					<Link className="link" href={`/session/group/${groupId}/${date}`}>
 						View all
 					</Link>
 				</>
@@ -157,10 +172,10 @@ function Locations({
 
 function SessionSummary({
 	data: dayData,
-	params: { date, locationId }
+	params: { date, locationId, groupId }
 }: {
 	data: DayData;
-	params: { date: string; locationId: number | undefined };
+	params: { date: string; locationId: number | undefined; groupId: number };
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
 
@@ -184,6 +199,7 @@ function SessionSummary({
 					locations={dayData.locations}
 					date={date}
 					selectedLocation={locationId}
+					groupId={groupId}
 				/>
 			</PrimaryHeading>
 			<BadgeList
