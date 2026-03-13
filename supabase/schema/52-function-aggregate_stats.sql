@@ -21,13 +21,15 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 	"total_effort" interval,
 	"effort_per_session" interval,
 	"effort_per_encounter" interval,
+	"avg_encounters_per_session" numeric,
+  "max_per_session" bigint,
+
 	"species_count" bigint,
 	"bird_count" bigint,
 	"encounter_count" bigint,
 	"new_bird_count" bigint,
 	"juv_count" bigint,
 	"new_juv_count" bigint,
-	"max_per_session" bigint,
 	"max_new_per_session" bigint,
 	"max_weight" real,
 	"avg_weight" numeric,
@@ -42,11 +44,9 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 	"max_time_span_days" numeric,
 	"max_proven_age" numeric
 	-- ratio of new to old / juv to adult (not can use min hatch year here)
-	-- average encounters per session
 	-- busiest year/month
 	-- most caught bird
 	-- most caught species
-	-- do new max proven age calc based on min max hatch year
 ) LANGUAGE "plpgsql" AS $$
   BEGIN
   RETURN QUERY
@@ -139,6 +139,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
       END AS time_period,
       MAX(sc.encounter_count) AS max_per_session,
       MAX(sc.new_encounter_count) AS max_new_per_session
+      AVG(sc.encounter_count) AS avg_encounters_per_session
     FROM session_counts sc
     GROUP BY CASE
       WHEN group_by_species THEN sc.species_id
@@ -190,6 +191,8 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     effort.total_effort AS "total_effort",
     effort.effort_per_session,
     effort.total_effort / COUNT(DISTINCT raw_enc.encounter_id) AS "effort_per_encounter",
+    agg_sess.avg_encounters_per_session AS "avg_encounters_per_session",
+    agg_sess.max_per_session AS "max_per_session",
     COUNT(DISTINCT raw_enc.species_id) AS "species_count",
     COUNT(DISTINCT raw_enc.bird_id) AS "bird_count",
     COUNT(DISTINCT raw_enc.encounter_id) AS "encounter_count",
@@ -199,8 +202,9 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' THEN raw_enc.bird_id END) AS "new_bird_count",
     COUNT(DISTINCT CASE WHEN raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END) AS "juv_count",
     COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' AND raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END) AS "new_juv_count",
-    agg_sess.max_per_session AS "max_per_session",
+
     agg_sess.max_new_per_session AS "max_new_per_session",
+
 
     MAX(raw_enc.weight) AS "max_weight",
     ROUND(AVG(raw_enc.weight)::numeric, 1) AS "avg_weight",
