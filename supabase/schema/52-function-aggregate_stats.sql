@@ -17,46 +17,39 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 ) RETURNS TABLE (
 	"species_name" "text",
 	"time_period" "date",
-
 	"session_count" bigint,
-  "bird_count" bigint,
+	"bird_count" bigint,
 	"encounter_count" bigint,
-  "new_bird_count" bigint,
-  "max_per_session" bigint,
-  "max_new_per_session" bigint,
-
-
-  "max_weight" real,
+	"new_bird_count" bigint,
+  "juv_count" bigint,
+  "new_juv_count" bigint,
+	"max_per_session" bigint,
+	"max_new_per_session" bigint,
+	"max_weight" real,
 	"avg_weight" numeric,
 	"min_weight" real,
 	"median_weight" numeric,
-
-  "max_wing" smallint,
+	"max_wing" smallint,
 	"avg_wing" numeric,
 	"min_wing" smallint,
 	"median_wing" numeric,
-
-  "max_encountered_bird" bigint,
+	"max_encountered_bird" bigint,
 	"pct_retrapped" numeric,
 	"max_time_span_days" numeric,
-  "max_proven_age" numeric
-
-
--- total birds
--- total new birds
--- total new juvs/3's
--- ratio of new to old / juv to adult (not can use min hatch year here)
--- total encounters
--- total sessions
--- total effort
--- effort per encounter
--- effort per session
--- total species
--- average encounters per session
--- busiest year/month
--- most caught bird
--- most caught species
--- do new max proven age calc based on min max hatch year
+	"max_proven_age" numeric
+	-- total new juvs/3's
+	-- ratio of new to old / juv to adult (not can use min hatch year here)
+	-- total encounters
+	-- total sessions
+	-- total effort
+	-- effort per encounter
+	-- effort per session
+	-- total species
+	-- average encounters per session
+	-- busiest year/month
+	-- most caught bird
+	-- most caught species
+	-- do new max proven age calc based on min max hatch year
 ) LANGUAGE "plpgsql" AS $$
   BEGIN
   RETURN QUERY
@@ -71,6 +64,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
       e.weight,
       e.wing_length,
       e.record_type,
+      e.age_code,
       sess.id AS session_id,
       sess.visit_date,
       e.max_hatch_year,
@@ -169,7 +163,9 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     COUNT(DISTINCT raw_enc.bird_id) AS "bird_count",
     COUNT(DISTINCT raw_enc.encounter_id) AS "encounter_count",
 
-    COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' THEN raw_enc.encounter_id END) AS "new_bird_count",
+    COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' THEN raw_enc.bird_id END) AS "new_bird_count",
+    COUNT(DISTINCT CASE WHEN raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END) AS "juv_count",
+    COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' AND raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END) AS "new_juv_count",
     agg_sess.max_per_session AS "max_per_session",
     agg_sess.max_new_per_session AS "max_new_per_session",
 
