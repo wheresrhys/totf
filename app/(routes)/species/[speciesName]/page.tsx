@@ -17,6 +17,7 @@ export type FullFatPageData = {
 	topSessions: TopPeriodsResult[];
 	birds: EnrichedBirdOfSpecies[];
 	speciesStats: AggregateStatsRow;
+	speciesStatsHistory: AggregateStatsRow[];
 	speciesId: number;
 };
 export type PageData = FullFatPageData | { speciesId: number };
@@ -43,6 +44,17 @@ async function getSpeciesStats(species: string, groupId: number) {
 		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
 }
 
+async function getSpeciesStatsHistory(species: string, groupId: number) {
+	const supabase = await getAuthenticatedSupabaseClient();
+	return supabase
+		.rpc('aggregate_stats', {
+			species_name_filter: species,
+			ringing_group_filter: groupId,
+			group_by_time_period: 'month'
+		})
+		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
+}
+
 async function fetchSpeciesData(
 	params: PageParams,
 	groupId: number
@@ -57,11 +69,13 @@ async function fetchSpeciesData(
 	if (!speciesId) {
 		throw new Error(`Species ${params.speciesName} not found`);
 	}
-	const [topSessions, birds, speciesStats] = await Promise.all([
-		getTopSessions(params.speciesName, groupId),
-		fetchPageOfBirds(speciesId, groupId),
-		getSpeciesStats(params.speciesName, groupId)
-	]);
+	const [topSessions, birds, speciesStats, speciesStatsHistory] =
+		await Promise.all([
+			getTopSessions(params.speciesName, groupId),
+			fetchPageOfBirds(speciesId, groupId),
+			getSpeciesStats(params.speciesName, groupId),
+			getSpeciesStatsHistory(params.speciesName, groupId)
+		]);
 	if (birds.length === 0) {
 		return {
 			speciesId
@@ -71,6 +85,7 @@ async function fetchSpeciesData(
 		topSessions,
 		birds,
 		speciesStats: speciesStats[0],
+		speciesStatsHistory,
 		speciesId
 	};
 }

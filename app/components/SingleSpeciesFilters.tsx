@@ -30,25 +30,38 @@ export function SingleSpeciesFilters({
 	setRetrappedOnly,
 	sexedOnly,
 	setSexedOnly,
-	setShowChart,
-	showChart
+	setShowWeightVsWingChart,
+	showWeightVsWingChart,
+	setShowStatsHistory,
+	showStatsHistory
 }: {
 	retrappedOnly: boolean;
 	setRetrappedOnly: (retrappedOnly: boolean) => void;
 	sexedOnly: boolean;
 	setSexedOnly: (sexedOnly: boolean) => void;
-	setShowChart: (showChart: boolean) => void;
-	showChart: boolean;
+	setShowWeightVsWingChart: (showWeightVsWingChart: boolean) => void;
+	showWeightVsWingChart: boolean;
+	setShowStatsHistory: (showStatsHistory: boolean) => void;
+	showStatsHistory: boolean;
 }) {
 	return (
 		<form className="mt-7 flex justify-end gap-2">
-			{showChart ? null : (
+			{showStatsHistory ? null : (
 				<button
 					type="button"
 					className="btn btn-secondary btn-sm"
-					onClick={() => setShowChart(true)}
+					onClick={() => setShowStatsHistory(true)}
 				>
-					View graph
+					View stats history
+				</button>
+			)}
+			{showWeightVsWingChart ? null : (
+				<button
+					type="button"
+					className="btn btn-secondary btn-sm"
+					onClick={() => setShowWeightVsWingChart(true)}
+				>
+					View wing-weight chart
 				</button>
 			)}
 			<Switch
