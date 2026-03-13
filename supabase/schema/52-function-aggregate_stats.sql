@@ -40,7 +40,59 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 ) LANGUAGE "plpgsql" AS $$
   BEGIN
   RETURN QUERY
-  WITH raw_encounters AS (
+  WITH species_spine AS (
+    SELECT
+      sp.id AS species_id,
+      sp.species_name
+    FROM public."Species" as sp
+    WHERE (species_name_filter IS NULL OR sp.species_name = species_name_filter)
+    AND group_by_species
+
+    UNION ALL
+
+    SELECT NULL::bigint, NULL::text
+    WHERE NOT group_by_species
+  ), session_date_range AS (
+    SELECT
+      MIN(sess.visit_date) AS min_date,
+      MAX(sess.visit_date) AS max_date
+    FROM public."Sessions" as sess
+    WHERE (from_date IS NULL OR sess.visit_date >= from_date)
+      AND (to_date IS NULL OR sess.visit_date <= to_date)
+  ), period_spine AS (
+    SELECT date_trunc('month', d)::date AS time_period
+    FROM session_date_range sdr,
+    LATERAL generate_series(
+      date_trunc('month', COALESCE(sdr.min_date, from_date, CURRENT_DATE))::timestamp,
+      date_trunc('month', COALESCE(sdr.max_date, to_date, CURRENT_DATE))::timestamp,
+      '1 month'::interval
+    ) d
+    WHERE group_by_time_period = 'month'
+      AND sdr.min_date IS NOT NULL
+      AND sdr.max_date IS NOT NULL
+
+    UNION ALL
+
+    SELECT date_trunc('year', d)::date AS time_period
+    FROM session_date_range sdr,
+    LATERAL generate_series(
+      date_trunc('year', COALESCE(sdr.min_date, from_date, CURRENT_DATE))::timestamp,
+      date_trunc('year', COALESCE(sdr.max_date, to_date, CURRENT_DATE))::timestamp,
+      '1 year'::interval
+    ) d
+    WHERE group_by_time_period = 'year'
+      AND sdr.min_date IS NOT NULL
+      AND sdr.max_date IS NOT NULL
+
+    UNION ALL
+
+    SELECT NULL::date
+    WHERE group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year')
+  ), spine AS (
+    SELECT s.species_id, s.species_name, p.time_period
+    FROM species_spine s
+    CROSS JOIN period_spine p
+  ), raw_encounters AS (
     -- Pre-aggregate all encounter data per species
     SELECT
       sp.id AS species_id,
@@ -171,28 +223,28 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
   )
   SELECT
 
-	  CASE WHEN group_by_species THEN raw_enc.species_name ELSE NULL::text END AS "species_name",
+	  CASE WHEN group_by_species THEN spine.species_name ELSE NULL::text END AS "species_name",
     CASE
-      WHEN group_by_time_period = 'month' THEN raw_enc.session_month
-      WHEN group_by_time_period = 'year' THEN raw_enc.session_year
+      WHEN group_by_time_period = 'month' THEN spine.time_period
+      WHEN group_by_time_period = 'year' THEN spine.time_period
     ELSE NULL::date END AS "time_period",
 
-    COUNT(DISTINCT raw_enc.visit_date) AS "session_count",
-    effort.total_effort AS "total_effort",
-    effort.effort_per_session,
-    effort.total_effort / COUNT(DISTINCT raw_enc.encounter_id) AS "effort_per_encounter",
-    agg_sess.avg_encounters_per_session AS "avg_encounters_per_session",
-    agg_sess.max_per_session AS "max_per_session",
+    COALESCE(COUNT(DISTINCT raw_enc.visit_date), 0) AS "session_count",
+    COALESCE(effort.total_effort, '00:00:00'::interval) AS "total_effort",
+    COALESCE(effort.effort_per_session, '00:00:00'::interval) AS "effort_per_session",
+    COALESCE(effort.total_effort / NULLIF(COUNT(DISTINCT raw_enc.encounter_id), 0), '00:00:00'::interval) AS "effort_per_encounter",
+    COALESCE(agg_sess.avg_encounters_per_session, 0) AS "avg_encounters_per_session",
+    COALESCE(agg_sess.max_per_session, 0) AS "max_per_session",
 
-    COUNT(DISTINCT raw_enc.species_id) AS "species_count",
-    COUNT(DISTINCT raw_enc.bird_id) AS "bird_count",
-    COUNT(DISTINCT raw_enc.encounter_id) AS "encounter_count",
+    COALESCE(COUNT(DISTINCT raw_enc.species_id), 0) AS "species_count",
+    COALESCE(COUNT(DISTINCT raw_enc.bird_id), 0) AS "bird_count",
+    COALESCE(COUNT(DISTINCT raw_enc.encounter_id), 0) AS "encounter_count",
 
-    COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' THEN raw_enc.bird_id END) AS "new_bird_count",
-    COUNT(DISTINCT CASE WHEN raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END) AS "juv_count",
-    COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' AND raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END) AS "new_juv_count",
+    COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' THEN raw_enc.bird_id END), 0) AS "new_bird_count",
+    COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END), 0) AS "juv_count",
+    COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' AND raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END), 0) AS "new_juv_count",
 
-    agg_sess.max_new_per_session AS "max_new_per_session",
+    COALESCE(agg_sess.max_new_per_session, 0) AS "max_new_per_session",
 
 
     MAX(raw_enc.weight) AS "max_weight",
@@ -216,36 +268,43 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 
 
 
-  FROM raw_encounters raw_enc
+  FROM spine
+  LEFT JOIN raw_encounters raw_enc ON
+  (NOT group_by_species OR spine.species_id = raw_enc.species_id)
+  AND (
+    (group_by_time_period = 'month' AND spine.time_period = raw_enc.session_month)
+    OR (group_by_time_period = 'year' AND spine.time_period = raw_enc.session_year)
+    OR (group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year'))
+  )
   -- LEFT JOIN stats_per_bird_month bm_stats ON raw_enc.bird_id = bm_stats.bird_id
   LEFT JOIN effort_per_period effort ON
   CASE
-    WHEN group_by_time_period = 'month' THEN raw_enc.session_month = effort.time_period
-    WHEN group_by_time_period = 'year' THEN raw_enc.session_year = effort.time_period
+    WHEN group_by_time_period = 'month' THEN spine.time_period = effort.time_period
+    WHEN group_by_time_period = 'year' THEN spine.time_period = effort.time_period
     ELSE true
   END
-  LEFT JOIN stats_per_species_period agg_sta ON CASE WHEN group_by_species THEN raw_enc.species_id = agg_sta.species_id ELSE true END
+  LEFT JOIN stats_per_species_period agg_sta ON CASE WHEN group_by_species THEN spine.species_id = agg_sta.species_id ELSE true END
   AND
   CASE
-    WHEN group_by_time_period = 'month' THEN raw_enc.session_month = agg_sta.time_period
-    WHEN group_by_time_period = 'year' THEN raw_enc.session_year = agg_sta.time_period
+    WHEN group_by_time_period = 'month' THEN spine.time_period = agg_sta.time_period
+    WHEN group_by_time_period = 'year' THEN spine.time_period = agg_sta.time_period
     ELSE true
   END
-  LEFT JOIN aggregated_session_counts agg_sess ON CASE WHEN group_by_species THEN raw_enc.species_id = agg_sess.species_id ELSE true END
+  LEFT JOIN aggregated_session_counts agg_sess ON CASE WHEN group_by_species THEN spine.species_id = agg_sess.species_id ELSE true END
   AND CASE
-    WHEN group_by_time_period = 'month' THEN raw_enc.session_month = agg_sess.time_period
-    WHEN group_by_time_period = 'year' THEN raw_enc.session_year = agg_sess.time_period
+    WHEN group_by_time_period = 'month' THEN spine.time_period = agg_sess.time_period
+    WHEN group_by_time_period = 'year' THEN spine.time_period = agg_sess.time_period
     ELSE true
   END
   GROUP BY CASE
-    WHEN group_by_species THEN raw_enc.species_id
+    WHEN group_by_species THEN spine.species_id
     ELSE NULL::bigint
   END, CASE
-    WHEN group_by_species THEN raw_enc.species_name
+    WHEN group_by_species THEN spine.species_name
     ELSE NULL::text
   END,CASE
-    WHEN group_by_time_period = 'month' THEN raw_enc.session_month
-    WHEN group_by_time_period = 'year' THEN raw_enc.session_year
+    WHEN group_by_time_period = 'month' THEN spine.time_period
+    WHEN group_by_time_period = 'year' THEN spine.time_period
     ELSE NULL::date
   END, agg_sta.max_encounter_count, agg_sess.max_per_session,
   -- agg_sta.max_proven_age, agg_sta.max_time_span_days,
