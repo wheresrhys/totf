@@ -12,12 +12,32 @@ function getCounts(statsHistory: AggregateStatsRow[]): LineChartData[] {
 			data: statsHistory.map((row) => [row.time_period, row.bird_count])
 		},
 		{
-			name: 'juvs',
-			data: statsHistory.map((row) => [row.time_period, row.juv_count])
-		},
-		{
 			name: 'sessions',
 			data: statsHistory.map((row) => [row.time_period, row.session_count])
+		}
+	];
+}
+
+function getYoungsters(statsHistory: AggregateStatsRow[]): LineChartData[] {
+	return [
+		{
+			name: '3j',
+			data: statsHistory.map((row) => [row.time_period, row['3j_count']])
+		},
+		{
+			name: '3',
+			data: statsHistory.map((row) => [row.time_period, row['3_count']])
+		},
+		{
+			name: '(3j + 3)',
+			data: statsHistory.map((row) => [
+				row.time_period,
+				row['3j_count'] + row['3_count']
+			])
+		},
+		{
+			name: "new 3's",
+			data: statsHistory.map((row) => [row.time_period, row.new_3_count])
 		}
 	];
 }
@@ -62,6 +82,18 @@ export function StatsHistoryChart({
 			<LineChart
 				min={0}
 				data={getCounts(statsHistory)}
+				xtitle="Year"
+				ytitle="Value"
+				library={{
+					elements: {
+						point: { radius: 1 },
+						line: { cubicInterpolationMode: 'monotone' }
+					}
+				}}
+			/>
+			<LineChart
+				min={0}
+				data={getYoungsters(statsHistory)}
 				xtitle="Year"
 				ytitle="Value"
 				library={{

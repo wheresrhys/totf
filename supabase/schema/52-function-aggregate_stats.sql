@@ -18,8 +18,9 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 	"bird_count" bigint,
 	"encounter_count" bigint,
 	"new_bird_count" bigint,
-	"juv_count" bigint,
-	"new_juv_count" bigint,
+	"3j_count" bigint,
+	"3_count" bigint,
+	"new_3_count" bigint,
 	"max_new_per_session" bigint,
 	"max_weight" real,
 	"avg_weight" numeric,
@@ -29,6 +30,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 	"avg_wing" numeric,
 	"min_wing" smallint,
 	"median_wing" numeric
+	-- distinguish between first year and actual Juv in stats
 	-- "max_encountered_bird" bigint,
 	-- "pct_retrapped" numeric,
 	-- "max_time_span_days" numeric,
@@ -104,6 +106,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
       e.wing_length,
       e.record_type,
       e.age_code,
+      e.is_juv,
       sess.id AS session_id,
       sess.visit_date,
       e.max_hatch_year,
@@ -241,8 +244,9 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     COALESCE(COUNT(DISTINCT raw_enc.encounter_id), 0) AS "encounter_count",
 
     COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' THEN raw_enc.bird_id END), 0) AS "new_bird_count",
-    COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END), 0) AS "juv_count",
-    COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' AND raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END), 0) AS "new_juv_count",
+    COALESCE(COUNT(DISTINCT CASE WHEN (raw_enc.is_juv OR raw_enc.age_code = 1) THEN raw_enc.bird_id END), 0) AS "3j_count",
+    COALESCE(COUNT(DISTINCT CASE WHEN (raw_enc.age_code = 3 AND NOT raw_enc.is_juv) THEN raw_enc.bird_id END), 0) AS "3_count",
+    COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' AND raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END), 0) AS "new_3_count",
 
     COALESCE(agg_sess.max_new_per_session, 0) AS "max_new_per_session",
 
