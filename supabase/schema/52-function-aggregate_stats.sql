@@ -18,11 +18,12 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 	"species_name" "text",
 	"time_period" "date",
 	"session_count" bigint,
+	"total_effort" interval,
 	"bird_count" bigint,
 	"encounter_count" bigint,
 	"new_bird_count" bigint,
-  "juv_count" bigint,
-  "new_juv_count" bigint,
+	"juv_count" bigint,
+	"new_juv_count" bigint,
 	"max_per_session" bigint,
 	"max_new_per_session" bigint,
 	"max_weight" real,
@@ -37,10 +38,8 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 	"pct_retrapped" numeric,
 	"max_time_span_days" numeric,
 	"max_proven_age" numeric
-	-- total new juvs/3's
+
 	-- ratio of new to old / juv to adult (not can use min hatch year here)
-	-- total encounters
-	-- total sessions
 	-- total effort
 	-- effort per encounter
 	-- effort per session
@@ -68,6 +67,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
       sess.id AS session_id,
       sess.visit_date,
       e.max_hatch_year,
+      e.capture_time,
       date_trunc('month', sess.visit_date)::DATE AS session_month,
       date_trunc('year', sess.visit_date)::DATE AS session_year
     FROM public."Species" sp
@@ -150,6 +150,32 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
       WHEN group_by_time_period = 'year' THEN sc.session_year
       ELSE NULL::date
     END
+  ), session_effort AS (
+    SELECT
+      re.session_id,
+      -- realistically the minimum effort per session is 2 hours
+      GREATEST(MAX(re.capture_time) - MIN(re.capture_time), '02:00:00'::interval) AS total_effort
+    FROM raw_encounters re
+    GROUP BY re.session_id
+  ), effort_per_species_period AS (
+    SELECT
+      CASE WHEN group_by_species THEN re.species_id ELSE NULL::bigint END AS species_id,
+      CASE WHEN group_by_species THEN re.species_name ELSE NULL::text END AS species_name,
+      CASE
+        WHEN group_by_time_period = 'month' THEN re.session_month
+        WHEN group_by_time_period = 'year' THEN re.session_year
+        ELSE NULL::date
+      END AS time_period,
+      SUM(sess_effort.total_effort) AS total_effort
+    FROM (
+      SELECT DISTINCT re.species_id, re.species_name, re.session_id,
+            date_trunc('month', visit_date)::DATE AS session_month,
+            date_trunc('year', re.visit_date)::DATE AS session_year
+      FROM raw_encounters as re
+      WHERE re.session_id IS NOT NULL
+    ) re
+    JOIN session_effort sess_effort ON re.session_id = sess_effort.session_id
+    GROUP BY 1, 2, 3
   )
   SELECT
 
@@ -160,6 +186,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     ELSE NULL::date END AS "time_period",
 
     COUNT(DISTINCT raw_enc.visit_date) AS "session_count",
+    effort.total_effort,
     COUNT(DISTINCT raw_enc.bird_id) AS "bird_count",
     COUNT(DISTINCT raw_enc.encounter_id) AS "encounter_count",
 
@@ -192,6 +219,13 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 
   FROM raw_encounters raw_enc
   LEFT JOIN stats_per_bird_month bm_stats ON raw_enc.bird_id = bm_stats.bird_id
+  LEFT JOIN effort_per_species_period effort ON CASE WHEN group_by_species THEN raw_enc.species_id = effort.species_id ELSE true END
+  AND
+  CASE
+    WHEN group_by_time_period = 'month' THEN raw_enc.session_month = effort.time_period
+    WHEN group_by_time_period = 'year' THEN raw_enc.session_year = effort.time_period
+    ELSE true
+  END
   LEFT JOIN stats_per_species_period agg_sta ON CASE WHEN group_by_species THEN raw_enc.species_id = agg_sta.species_id ELSE true END
   AND
   CASE
@@ -215,7 +249,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     WHEN group_by_time_period = 'month' THEN raw_enc.session_month
     WHEN group_by_time_period = 'year' THEN raw_enc.session_year
     ELSE NULL::date
-  END, agg_sta.max_encounter_count, agg_sta.max_time_span_days, agg_sess.max_per_session, agg_sta.max_proven_age, agg_sess.max_new_per_session ;
+  END, agg_sta.max_encounter_count, agg_sta.max_time_span_days, agg_sess.max_per_session, agg_sta.max_proven_age, agg_sess.max_new_per_session, effort.total_effort ;
 
 END;
 $$;
