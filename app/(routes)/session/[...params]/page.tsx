@@ -23,7 +23,11 @@ type PageParams = {
 	locationId: number | undefined;
 };
 type PageProps = {
-	params: Promise<{ params: [string,string, string, string | undefined] }>;
+	params: Promise<{
+		params:
+			| ['group', string, string]
+			| ['group', string, string, 'site', string];
+	}>;
 };
 
 type DayData = {
@@ -36,9 +40,7 @@ async function getPageParams(pageProps: PageProps): Promise<PageParams> {
 	return {
 		groupId: Number(pageParams.params[1]),
 		date: pageParams.params[2],
-		locationId: pageParams.params[3]
-			? Number(pageParams.params[3].substring(4))
-			: undefined
+		locationId: pageParams.params[4] ? Number(pageParams.params[4]) : undefined
 	};
 }
 
@@ -149,7 +151,7 @@ function Locations({
 							) : (
 								<Link
 									className="link"
-									href={`/session/group/${groupId}/${date}/loc-${location.id}`}
+									href={`/session/group/${groupId}/${date}/site/${location.id}`}
 								>
 									{printLocationName(location.location_name)}
 								</Link>

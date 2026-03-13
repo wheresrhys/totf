@@ -127,7 +127,13 @@ function HeadingComponent({ model }: { model: AccordionItemModelWithGroupId }) {
 	);
 }
 
-export function StatsAccordion({ data, groupId }: { data: StatsAccordionModel[], groupId: number }) {
+export function StatsAccordion({
+	data,
+	groupId
+}: {
+	data: StatsAccordionModel[];
+	groupId: number;
+}) {
 	const [expanded, setExpanded] = useState<string | false>(false);
 	useEffect(() => {
 		setExpanded(false);
