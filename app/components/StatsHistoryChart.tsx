@@ -1,7 +1,7 @@
 import { LineChart, type LineChartData } from 'react-chartkick';
 import type { AggregateStatsRow } from '@/app/models/db';
 
-function getChartData(statsHistory: AggregateStatsRow[]): LineChartData[] {
+function getCounts(statsHistory: AggregateStatsRow[]): LineChartData[] {
 	return [
 		{
 			name: 'encounters',
@@ -22,24 +22,67 @@ function getChartData(statsHistory: AggregateStatsRow[]): LineChartData[] {
 	];
 }
 
+function getSizes(statsHistory: AggregateStatsRow[]): LineChartData[] {
+	return [
+		{
+			name: 'max weight',
+			data: statsHistory.map((row) => [row.time_period, row.max_weight])
+		},
+		{
+			name: 'median weight',
+			data: statsHistory.map((row) => [row.time_period, row.median_weight])
+		},
+		{
+			name: 'min weight',
+			data: statsHistory.map((row) => [row.time_period, row.min_weight])
+		},
+
+		{
+			name: 'max wing',
+			data: statsHistory.map((row) => [row.time_period, row.max_wing])
+		},
+		{
+			name: 'median wing',
+			data: statsHistory.map((row) => [row.time_period, row.median_wing])
+		},
+		{
+			name: 'min wing',
+			data: statsHistory.map((row) => [row.time_period, row.min_wing])
+		}
+	];
+}
+
 export function StatsHistoryChart({
 	statsHistory
 }: {
 	statsHistory: AggregateStatsRow[];
 }) {
-	const chartData = getChartData(statsHistory);
 	return (
-		<LineChart
-			min={0}
-			data={chartData}
-			xtitle="Year"
-			ytitle="Value"
-			library={{
-				elements: {
-					point: { radius: 1 },
-					line: { cubicInterpolationMode: 'monotone' }
-				}
-			}}
-		/>
+		<>
+			<LineChart
+				min={0}
+				data={getCounts(statsHistory)}
+				xtitle="Year"
+				ytitle="Value"
+				library={{
+					elements: {
+						point: { radius: 1 },
+						line: { cubicInterpolationMode: 'monotone' }
+					}
+				}}
+			/>
+			<LineChart
+				min={0}
+				data={getSizes(statsHistory)}
+				xtitle="Year"
+				ytitle="Value"
+				library={{
+					elements: {
+						point: { radius: 1 },
+						line: { cubicInterpolationMode: 'monotone' }
+					}
+				}}
+			/>
+		</>
 	);
 }
