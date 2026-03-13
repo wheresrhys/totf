@@ -19,6 +19,9 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 	"time_period" "date",
 	"session_count" bigint,
 	"total_effort" interval,
+  "effort_per_session" interval,
+  "effort_per_encounter" interval,
+  "species_count" bigint,
 	"bird_count" bigint,
 	"encounter_count" bigint,
 	"new_bird_count" bigint,
@@ -38,12 +41,8 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 	"pct_retrapped" numeric,
 	"max_time_span_days" numeric,
 	"max_proven_age" numeric
-
 	-- ratio of new to old / juv to adult (not can use min hatch year here)
-	-- total effort
-	-- effort per encounter
-	-- effort per session
-	-- total species
+  -- Note - need to think carefully about whether session count and effort should be a global thing per period, and ignore any species filtering/grouping... makes more sense this way
 	-- average encounters per session
 	-- busiest year/month
 	-- most caught bird
@@ -187,8 +186,13 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 
     COUNT(DISTINCT raw_enc.visit_date) AS "session_count",
     effort.total_effort,
+    effort.total_effort / COUNT(DISTINCT raw_enc.session_id) AS "effort_per_session",
+    effort.total_effort / COUNT(DISTINCT raw_enc.encounter_id) AS "effort_per_encounter",
+    COUNT(DISTINCT raw_enc.species_id) AS "species_count",
     COUNT(DISTINCT raw_enc.bird_id) AS "bird_count",
     COUNT(DISTINCT raw_enc.encounter_id) AS "encounter_count",
+
+
 
     COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' THEN raw_enc.bird_id END) AS "new_bird_count",
     COUNT(DISTINCT CASE WHEN raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END) AS "juv_count",
