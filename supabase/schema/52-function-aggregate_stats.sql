@@ -19,9 +19,9 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 	"time_period" "date",
 	"session_count" bigint,
 	"total_effort" interval,
-  "effort_per_session" interval,
-  "effort_per_encounter" interval,
-  "species_count" bigint,
+	"effort_per_session" interval,
+	"effort_per_encounter" interval,
+	"species_count" bigint,
 	"bird_count" bigint,
 	"encounter_count" bigint,
 	"new_bird_count" bigint,
@@ -42,7 +42,6 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 	"max_time_span_days" numeric,
 	"max_proven_age" numeric
 	-- ratio of new to old / juv to adult (not can use min hatch year here)
-  -- Note - need to think carefully about whether session count and effort should be a global thing per period, and ignore any species filtering/grouping... makes more sense this way
 	-- average encounters per session
 	-- busiest year/month
 	-- most caught bird
@@ -156,25 +155,28 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
       GREATEST(MAX(re.capture_time) - MIN(re.capture_time), '02:00:00'::interval) AS total_effort
     FROM raw_encounters re
     GROUP BY re.session_id
-  ), effort_per_species_period AS (
+  ), effort_per_period AS (
     SELECT
-      CASE WHEN group_by_species THEN re.species_id ELSE NULL::bigint END AS species_id,
-      CASE WHEN group_by_species THEN re.species_name ELSE NULL::text END AS species_name,
       CASE
         WHEN group_by_time_period = 'month' THEN re.session_month
         WHEN group_by_time_period = 'year' THEN re.session_year
         ELSE NULL::date
       END AS time_period,
-      SUM(sess_effort.total_effort) AS total_effort
+      SUM(sess_effort.total_effort) AS total_effort,
+      SUM(sess_effort.total_effort) / COUNT(DISTINCT re.session_id) AS effort_per_session
     FROM (
-      SELECT DISTINCT re.species_id, re.species_name, re.session_id,
-            date_trunc('month', visit_date)::DATE AS session_month,
+      SELECT DISTINCT re.session_id,
+            date_trunc('month', re.visit_date)::DATE AS session_month,
             date_trunc('year', re.visit_date)::DATE AS session_year
       FROM raw_encounters as re
-      WHERE re.session_id IS NOT NULL
     ) re
     JOIN session_effort sess_effort ON re.session_id = sess_effort.session_id
-    GROUP BY 1, 2, 3
+    GROUP BY
+      CASE
+        WHEN group_by_time_period = 'month' THEN re.session_month
+        WHEN group_by_time_period = 'year' THEN re.session_year
+        ELSE NULL::date
+      END
   )
   SELECT
 
@@ -185,8 +187,8 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     ELSE NULL::date END AS "time_period",
 
     COUNT(DISTINCT raw_enc.visit_date) AS "session_count",
-    effort.total_effort,
-    effort.total_effort / COUNT(DISTINCT raw_enc.session_id) AS "effort_per_session",
+    effort.total_effort AS "total_effort",
+    effort.effort_per_session,
     effort.total_effort / COUNT(DISTINCT raw_enc.encounter_id) AS "effort_per_encounter",
     COUNT(DISTINCT raw_enc.species_id) AS "species_count",
     COUNT(DISTINCT raw_enc.bird_id) AS "bird_count",
@@ -223,8 +225,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 
   FROM raw_encounters raw_enc
   LEFT JOIN stats_per_bird_month bm_stats ON raw_enc.bird_id = bm_stats.bird_id
-  LEFT JOIN effort_per_species_period effort ON CASE WHEN group_by_species THEN raw_enc.species_id = effort.species_id ELSE true END
-  AND
+  LEFT JOIN effort_per_period effort ON
   CASE
     WHEN group_by_time_period = 'month' THEN raw_enc.session_month = effort.time_period
     WHEN group_by_time_period = 'year' THEN raw_enc.session_year = effort.time_period
@@ -253,7 +254,7 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     WHEN group_by_time_period = 'month' THEN raw_enc.session_month
     WHEN group_by_time_period = 'year' THEN raw_enc.session_year
     ELSE NULL::date
-  END, agg_sta.max_encounter_count, agg_sta.max_time_span_days, agg_sess.max_per_session, agg_sta.max_proven_age, agg_sess.max_new_per_session, effort.total_effort ;
+  END, agg_sta.max_encounter_count, agg_sta.max_time_span_days, agg_sess.max_per_session, agg_sta.max_proven_age, agg_sess.max_new_per_session, effort.total_effort, effort.effort_per_session ;
 
 END;
 $$;
