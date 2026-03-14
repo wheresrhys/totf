@@ -220,13 +220,27 @@ async function importCSV(options: ImportOptions): Promise<void> {
 	const pendingRows: (Promise<void> | null)[] = [];
 
 	// 0. Upsert Ringing Group (create if doesn't exist) and get ID
-	const ringingGroupId = await createUpserter(supabase)<RingingGroupsInsert>(
-		'RingingGroups',
-		{
-			group_name: ringingGroupName
-		},
-		'group_name'
-	);
+	// client just needs to have a group id - doenst need to be valid
+	let ringingGroupId: number;
+	const { data: ringingGroupData, error: ringingGroupError } = await supabase
+		.from('RingingGroups')
+		.select('id')
+		.eq('group_name', ringingGroupName)
+		.maybeSingle();
+	if (ringingGroupError) {
+		throw ringingGroupError;
+	}
+	if (ringingGroupData) {
+		ringingGroupId = ringingGroupData.id;
+	} else {
+		ringingGroupId = await createUpserter(supabase)<RingingGroupsInsert>(
+			'RingingGroups',
+			{
+				group_name: ringingGroupName
+			},
+			'group_name'
+		);
+	}
 
 	const groupSupabaseClient =
 		await getAuthenticatedSupabaseClientForGroup(ringingGroupId);
