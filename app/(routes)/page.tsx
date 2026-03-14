@@ -14,10 +14,10 @@ import {
 	SecondaryHeading
 } from '../components/shared/DesignSystem';
 import { getTopStats, type UserTopStatsArgs } from '../actions/top-performers';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
-import { StatOutput } from '../components/shared/StatOutput';
-
+import { SessionsByDay } from '../components/SessionHistoryCalendar';
 type PageModel = {
 	stats: StatsAccordionModel[];
 	recentSessions: SessionWithEncountersCount[];
@@ -143,9 +143,12 @@ function getStatConfigs(
 async function fetchRecentSessions(
 	groupId: number
 ): Promise<SessionWithEncountersCount[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Sessions')
-		.select('id,visit_date, encounters:Encounters(count)')
+		.select(
+			'id, visit_date, location_id, ringing_group_id, location:Locations(location_name), encounters:Encounters(count)'
+		)
 		.eq('ringing_group_id', groupId)
 		.order('visit_date', { ascending: false })
 		.limit(3)
@@ -197,20 +200,11 @@ function RecentSessions({
 		<div>
 			<SecondaryHeading>Recent Sessions</SecondaryHeading>
 			<BoxyList>
-				{data.map((session) => (
-					<li key={session.id}>
-						<StatOutput
-							unit="birds"
-							value={session.encounters[0].count}
-							speciesName={''}
-							visitDate={session.visit_date}
-							showUnit={true}
-							temporalUnit="day"
-							dateFormat="EEEE do MMMM"
-							groupId={groupId}
-						/>
-					</li>
-				))}
+				<SessionsByDay
+					sessions={data}
+					groupId={groupId}
+					dateFormat="EEEE do MMMM"
+				/>
 			</BoxyList>
 		</div>
 	);

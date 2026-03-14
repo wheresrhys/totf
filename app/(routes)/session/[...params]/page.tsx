@@ -65,7 +65,7 @@ async function fetchSessionData(
 	if (!sessions || sessions.length === 0) {
 		return { encounters: [], locations: [] };
 	}
-
+	const locations = sessions.map((item) => item.location);
 	if (locationId) {
 		sessions = sessions.filter((item) => item.location_id === locationId);
 		if (sessions.length === 0) {
@@ -105,7 +105,7 @@ async function fetchSessionData(
 
 	return {
 		encounters,
-		locations: sessions.map((item) => item.location)
+		locations
 	};
 }
 
@@ -140,17 +140,18 @@ function Locations({
 	groupId: number;
 }) {
 	return (
-		<small className="text-sm text-gray-500">
+		<small className="text-sm text-gray-500 flex flex-wrap gap-2 mt-2">
 			{locations.length === 1
 				? printLocationName(locations[0].location_name)
-				: locations.map((location, index) => (
+				: locations.map((location) => (
 						<Fragment key={location.id}>
-							{index > 0 ? ', ' : ''}
 							{selectedLocation && selectedLocation === location.id ? (
-								printLocationName(location.location_name)
+								<span className="badge badge-secondary">
+									{printLocationName(location.location_name)}
+								</span>
 							) : (
 								<Link
-									className="link"
+									className="link badge badge-outline"
 									href={`/session/group/${groupId}/${date}/site/${location.id}`}
 								>
 									{printLocationName(location.location_name)}
@@ -160,8 +161,10 @@ function Locations({
 					))}
 			{selectedLocation && locations.length > 1 ? (
 				<>
-					,{' '}
-					<Link className="link" href={`/session/group/${groupId}/${date}`}>
+					<Link
+						className="link badge badge-outline"
+						href={`/session/group/${groupId}/${date}`}
+					>
 						View all
 					</Link>
 				</>

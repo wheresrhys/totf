@@ -1,5 +1,4 @@
 import { BoxyList } from '@/app/components/shared/DesignSystem';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/page';
 import { StatOutput } from './shared/StatOutput';
 import { UnwrappedBadgeList } from './shared/DesignSystem';
