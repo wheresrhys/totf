@@ -86,9 +86,13 @@ export function UnwrappedBadgeList({ items }: { items: string[] }) {
 }
 
 export function printLocationName(locationName: string) {
-	const match = /\(([^)]+)\)/g.exec(locationName);
-	if (match) {
-		return match[1];
-	}
-	return locationName;
+	const hasParentheses = /\(/.test(locationName);
+	if (!hasParentheses) return locationName;
+	const openingParenthesesIndex = locationName.indexOf('(');
+	const closingParenthesesIndex = locationName.lastIndexOf(')');
+	const parenthesizedPart = locationName.substring(
+		openingParenthesesIndex + 1,
+		closingParenthesesIndex
+	);
+	return parenthesizedPart;
 }

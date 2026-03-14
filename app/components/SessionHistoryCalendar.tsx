@@ -3,7 +3,8 @@ import { type SessionWithEncountersCount } from '@/app/models/session';
 import { AccordionItem } from '@/app/components/shared/Accordion';
 import {
 	BoxyList,
-	SecondaryHeading
+	SecondaryHeading,
+	printLocationName
 } from '@/app/components/shared/DesignSystem';
 import { useState, useEffect } from 'react';
 import { StatOutput } from './shared/StatOutput';
@@ -95,7 +96,7 @@ export function SessionsByDay({
 										className="link"
 										href={`/session/group/${groupId}/${session.visit_date}/site/${session.location.id}`}
 									>
-										{session.location.location_name}
+										{printLocationName(session.location.location_name)}
 									</NoPrefetchLink>
 								</>
 							))}
