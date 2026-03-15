@@ -14,7 +14,7 @@ const columnConfigs: Record<keyof MostCaughtResult, ColumnConfig> = {
 	ring_no: {
 		label: 'Bird'
 	},
-	encounters: {
+	encounter_count: {
 		label: 'Encounters'
 	}
 };
@@ -35,7 +35,7 @@ function MostCaughtTableBody({
 						</NoPrefetchLink>
 					</td>
 
-					<td>{bird.encounters}</td>
+					<td>{bird.encounter_count}</td>
 				</tr>
 			))}
 		</tbody>

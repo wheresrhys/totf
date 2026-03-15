@@ -19,7 +19,7 @@ export async function fetchMostCaught(
 	return supabase
 		.rpc('most_caught_birds', {
 			ringing_group_filter: groupId,
-			result_limit: 100
+			significance_threshold: 3
 		})
 		.then(catchSupabaseErrors) as Promise<MostCaughtResult[]>;
 }
