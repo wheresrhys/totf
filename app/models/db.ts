@@ -24,3 +24,5 @@ export type AggregateStatsRow =
 
 export type DiscrepenciesResult =
 	Database['public']['Functions']['find_discrepencies']['Returns'][number];
+export type MostCaughtResult =
+	Database['public']['Functions']['most_caught_birds']['Returns'][number];

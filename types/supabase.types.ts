@@ -296,13 +296,15 @@ export type Database = {
       }
       most_caught_birds: {
         Args: {
+          max_per_species?: number
           result_limit?: number
           ringing_group_filter?: number
+          significance_threshold?: number
           species_filter?: string
           year_filter?: number
         }
         Returns: {
-          encounters: number
+          encounter_count: number
           ring_no: string
           species_name: string
         }[]
