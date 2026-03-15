@@ -17,6 +17,9 @@ export function NavItems({ classes }: { classes: string }) {
 			<li>
 				<NoPrefetchLink href="/mistakes">Mistakes</NoPrefetchLink>
 			</li>
+			<li>
+				<NoPrefetchLink href="/most-caught">Most Caught</NoPrefetchLink>
+			</li>
 		</ul>
 	);
 }
