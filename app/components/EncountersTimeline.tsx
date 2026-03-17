@@ -11,7 +11,7 @@ export function EncountersTimeline({
 	maxYear = maxYear ?? dates[dates.length - 1].getFullYear();
 	const startDate = new Date(minYear, 0, 1);
 	const endDate = new Date(maxYear, 11, 31);
-	const years = [...Array(maxYear - minYear)].map(
+	const years = [...Array(maxYear + 1 - minYear)].map(
 		(_, index) => minYear + index
 	);
 	const dateRange = endDate.getTime() - startDate.getTime();
