@@ -3,7 +3,8 @@ import { SpeciesTable } from '@/app/components/SingleSpeciesTable';
 import { useState } from 'react';
 import {
 	PageWrapper,
-	PrimaryHeading
+	PrimaryHeading,
+	SecondaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { SingleSpeciesStats } from '@/app/components/SingleSpeciesStats';
 import 'chartkick/chart.js';
@@ -17,6 +18,7 @@ import type {
 	PageData,
 	PageParams
 } from '@/app/(routes)/species/[speciesName]/page';
+import { NotableRetrapsTable } from './NotableRetrapsTable';
 
 function SpeciesData({
 	data,
@@ -66,6 +68,8 @@ function SpeciesData({
 	return (
 		<>
 			<SingleSpeciesStats {...data} groupId={groupId} />
+			<SecondaryHeading>Notable Retraps</SecondaryHeading>
+			<NotableRetrapsTable data={data.notableRetraps} omitSpeciesName={true} />
 			{showWeightVsWingChart ? (
 				<WeightVsWingLengthChart birds={data.graphableEncounterData} />
 			) : null}
