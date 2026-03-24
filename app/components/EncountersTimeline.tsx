@@ -62,11 +62,11 @@ export function EncountersTimeline({
 			{points.map(({ position, encounter }) => (
 				<div
 					key={position.toString()}
-					className="absolute bottom-4"
+					className={`absolute ${encounter ? 'bottom-4' : 'bottom-5'}`}
 					style={{ left: `${position}%` }}
 				>
 					<div
-						className={` w-4 h-4 rounded-full text-center text-xs  outline outline-2  outline-black ${encounter?.is_juv ? 'bg-white text-black ' : 'bg-black text-white'}`}
+						className={`${encounter ? 'w-4 h-4 outline outline-2 outline-black' : 'w-2 h-2'} rounded-full text-center text-xs ${encounter?.is_juv ? 'bg-white text-black ' : 'bg-black text-white'}`}
 					>
 						{encounter?.age_code ?? ''}
 					</div>

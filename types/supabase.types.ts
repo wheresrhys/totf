@@ -305,6 +305,7 @@ export type Database = {
         }
         Returns: {
           encounter_count: number
+          encounter_dates: string[]
           ring_no: string
           species_name: string
         }[]
