@@ -49,7 +49,7 @@ export function SingleSpeciesStats({
 	groupId
 }: FullFatPageData & { groupId: number }) {
 	if (!speciesStats) return null;
-	// const mostCaughtBirds =
+	// const NotableRetrapsBirds =
 	// 	speciesStats.max_encountered_bird && speciesStats.max_encountered_bird > 1
 	// 		? birds.filter(
 	// 				(bird) => bird.encounters.length === speciesStats.max_encountered_bird
@@ -82,13 +82,13 @@ export function SingleSpeciesStats({
 				<li>No notably old birds</li>
 			)} */}
 			{/* todo: longest gap between first and last caught */}
-			{/* {mostCaughtBirds.length > 0 ? (
+			{/* {NotableRetrapsBirds.length > 0 ? (
 				<li className="flex items-center gap-2 flex-wrap">
 					<span className="text-nowrap">
-						Most caught bird{mostCaughtBirds.length > 1 ? 's' : ''}:{' '}
+						Most caught bird{NotableRetrapsBirds.length > 1 ? 's' : ''}:{' '}
 						{speciesStats.max_encountered_bird} encounters each
 					</span>
-					{mostCaughtBirds.map((bird) => (
+					{NotableRetrapsBirds.map((bird) => (
 						<NoPrefetchLink
 							key={bird.ring_no}
 							className="badge badge-outline link"
