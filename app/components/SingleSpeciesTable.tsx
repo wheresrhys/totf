@@ -92,7 +92,7 @@ function rowDataTransform(bird: EnrichedBirdOfSpecies): RowModel {
 		firstEncounterDate: bird.firstEncounterDate,
 		lastEncounterDate: bird.lastEncounterDate,
 		lastEncounterAgeCode: `${bird.lastEncounter.age_code}${bird.lastEncounter.is_juv ? 'J' : ''}`,
-		provenAge: bird.provenAge
+		provenAge: bird.proven_age
 	};
 }
 
