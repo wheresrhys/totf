@@ -1,7 +1,6 @@
-CREATE OR REPLACE FUNCTION "public"."trg_encounters_refresh_bird_proven_age" () RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION "public"."trg_encounters_refresh_bird_proven_age" () RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER
+SET
+	search_path = public AS $$
 DECLARE
   v_bird_id bigint;
 BEGIN
@@ -40,8 +39,7 @@ $$;
 
 CREATE OR REPLACE TRIGGER "trigger_encounters_refresh_bird_proven_age"
 AFTER INSERT
-OR
-DELETE
+OR DELETE
 OR
 UPDATE ON "public"."Encounters" FOR EACH ROW
 EXECUTE FUNCTION "public"."trg_encounters_refresh_bird_proven_age" ();
