@@ -98,11 +98,7 @@ function BirdSummary({
 							`Proven Age: ${enrichedBird.provenAge}`
 						]}
 					/>
-					<EncountersTimeline
-						dates={enrichedBird.encounters.map(
-							(encounter) => new Date(encounter.session.visit_date)
-						)}
-					/>
+					<EncountersTimeline encounters={enrichedBird.encounters} />
 					<SingleBirdTable encounters={enrichedBird.encounters} />
 				</>
 			) : (
