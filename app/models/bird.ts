@@ -20,7 +20,6 @@ type BasicBird = BirdRow & EncountersInterface;
 
 export type EnrichedBirdWithEncounters<BirdType extends BasicBird> =
 	BirdType & {
-		provenAge: number;
 		sex: Sex;
 		sexCertainty: number;
 		firstEncounterDate: Date;
@@ -101,16 +100,6 @@ export function getSexOfBird(encounters: EncounterOfBird[]): {
 	}
 }
 
-function getProvenAge(
-	encounters: EncounterOfBird[],
-	lastEncounterDate: Date
-): number {
-	return (
-		lastEncounterDate.getFullYear() -
-		Math.min(...encounters.map((encounter) => encounter.max_hatch_year))
-	);
-}
-
 export function enrichBird<BirdType extends BasicBird>(
 	bird: BirdType
 ): EnrichedBirdWithEncounters<BirdType> {
@@ -127,7 +116,6 @@ export function enrichBird<BirdType extends BasicBird>(
 		...getSexOfBird(orderedEncounters),
 		firstEncounterDate: new Date(orderedEncounters[0].session.visit_date),
 		lastEncounterDate,
-		lastEncounter: orderedEncounters[orderedEncounters.length - 1],
-		provenAge: getProvenAge(orderedEncounters, lastEncounterDate)
+		lastEncounter: orderedEncounters[orderedEncounters.length - 1]
 	};
 }

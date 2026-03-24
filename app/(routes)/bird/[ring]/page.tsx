@@ -26,6 +26,7 @@ async function fetchBirdData({ ring }: PageParams, groupId: number) {
 		.select(
 			`id,
 			ring_no,
+			proven_age,
 			species:Species (
 				species_name
 			)
@@ -95,7 +96,7 @@ function BirdSummary({
 							`First: ${formatDate(enrichedBird.firstEncounterDate, 'dd MMMM yyyy')}`,
 							`Last: ${formatDate(enrichedBird.lastEncounterDate, 'dd MMMM yyyy')}`,
 							`Sex: ${enrichedBird.sex}${enrichedBird.sexCertainty < 0.5 ? `?` : ''}`,
-							`Proven Age: ${enrichedBird.provenAge}`
+							`Proven Age: ${enrichedBird.proven_age}`
 						]}
 					/>
 					<EncountersTimeline encounters={enrichedBird.encounters} />

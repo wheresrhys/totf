@@ -21,6 +21,7 @@ export async function fetchPageOfBirds(
 			ring_no,
 			last_encountered_timestamp,
 			ringing_group_ids,
+			proven_age,
 			encounters:Encounters (
 				id,
 				capture_time,

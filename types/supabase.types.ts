@@ -13,6 +13,7 @@ export type Database = {
         Row: {
           id: number
           last_encountered_timestamp: string
+          proven_age: number
           ring_no: string
           ringing_group_ids: number[]
           species_id: number
@@ -20,6 +21,7 @@ export type Database = {
         Insert: {
           id?: number
           last_encountered_timestamp?: string
+          proven_age?: number
           ring_no: string
           ringing_group_ids?: number[]
           species_id: number
@@ -27,6 +29,7 @@ export type Database = {
         Update: {
           id?: number
           last_encountered_timestamp?: string
+          proven_age?: number
           ring_no?: string
           ringing_group_ids?: number[]
           species_id?: number
