@@ -1,7 +1,6 @@
 import { type Sex } from '@/app/models/bird';
 import { useState } from 'react';
 import { ScatterChart, type ScatterChartData } from 'react-chartkick';
-import type { EncounterRow } from '@/app/models/db';
 
 type GraphableEncounterData = {
 	age_code: number;
