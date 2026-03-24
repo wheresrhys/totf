@@ -6,24 +6,43 @@ import {
 	type RowModelWithRawData
 } from '@/app/components/shared/SortableTable';
 import { MostCaughtResult } from '@/app/models/db';
+import { EncountersTimeline } from './EncountersTimeline';
 
 const columnConfigs: Record<keyof MostCaughtResult, ColumnConfig> = {
 	species_name: {
 		label: 'Species'
 	},
 	ring_no: {
-		label: 'Bird'
+		label: 'Ring'
 	},
 	encounter_count: {
-		label: 'Encounters'
+		label: 'Count'
+	},
+	encounter_dates: {
+		label: 'Timeline'
 	}
 };
+
+function getMaxMinYear(birds: MostCaughtResult[]): {
+	maxYear: number;
+	minYear: number;
+} {
+	const allYears = birds.flatMap((bird) =>
+		bird.encounter_dates.map((date) => new Date(date).getFullYear())
+	);
+
+	return {
+		maxYear: Math.max(...allYears),
+		minYear: Math.min(...allYears)
+	};
+}
 
 function MostCaughtTableBody({
 	data
 }: {
 	data: RowModelWithRawData<MostCaughtResult, MostCaughtResult>[];
 }) {
+	const maxMinYear = getMaxMinYear(data);
 	return (
 		<tbody>
 			{data.map((bird) => (
@@ -36,6 +55,12 @@ function MostCaughtTableBody({
 					</td>
 
 					<td>{bird.encounter_count}</td>
+					<td>
+						<EncountersTimeline
+							encounters={bird.encounter_dates.map((date) => new Date(date))}
+							{...maxMinYear}
+						/>
+					</td>
 				</tr>
 			))}
 		</tbody>

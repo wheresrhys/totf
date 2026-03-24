@@ -14,6 +14,7 @@ import {
 	type EncounterOfBird
 } from '@/app/models/bird';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+import { EncountersTimeline } from '@/app/components/EncountersTimeline';
 
 type PageParams = { ring: string };
 type PageProps = { params: Promise<PageParams> };
@@ -97,6 +98,7 @@ function BirdSummary({
 							`Proven Age: ${enrichedBird.provenAge}`
 						]}
 					/>
+					<EncountersTimeline encounters={enrichedBird.encounters} />
 					<SingleBirdTable encounters={enrichedBird.encounters} />
 				</>
 			) : (
