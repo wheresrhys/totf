@@ -42,12 +42,38 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
 ) LANGUAGE "plpgsql" AS $$
   BEGIN
   RETURN QUERY
-  WITH species_spine AS (
+  WITH raw_encounters AS (
+    -- Pre-aggregate all encounter data per species
     SELECT
       sp.id AS species_id,
-      sp.species_name
-    FROM public."Species" as sp
-    WHERE (species_name_filter IS NULL OR sp.species_name = species_name_filter)
+      sp.species_name,
+      b.id AS bird_id,
+      b.ring_no,
+      e.id AS encounter_id,
+      e.weight,
+      e.wing_length,
+      e.record_type,
+      e.age_code,
+      e.is_juv,
+      sess.id AS session_id,
+      sess.visit_date,
+      e.max_hatch_year,
+      e.capture_time,
+      date_trunc('month', sess.visit_date)::DATE AS session_month,
+      date_trunc('year', sess.visit_date)::DATE AS session_year
+    FROM public."Species" sp
+    JOIN public."Birds" b ON sp.id = b.species_id
+    LEFT JOIN public."Encounters" e ON b.id = e.bird_id
+    LEFT JOIN public."Sessions" sess ON e.session_id = sess.id
+    WHERE (from_date IS NULL OR sess.visit_date >=from_date)
+     AND (to_date IS NULL OR sess.visit_date<=to_date)
+     AND (species_name_filter IS NULL OR sp.species_name = species_name_filter)
+     AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
+  ), species_spine AS (
+    SELECT
+      DISTINCT re.species_id, re.species_name
+    FROM raw_encounters as re
+    WHERE (species_name_filter IS NULL OR re.species_name = species_name_filter)
     AND group_by_species
 
     UNION ALL
@@ -94,33 +120,6 @@ CREATE OR REPLACE FUNCTION "public"."aggregate_stats" (
     SELECT s.species_id, s.species_name, p.time_period
     FROM species_spine s
     CROSS JOIN period_spine p
-  ), raw_encounters AS (
-    -- Pre-aggregate all encounter data per species
-    SELECT
-      sp.id AS species_id,
-      sp.species_name,
-      b.id AS bird_id,
-      b.ring_no,
-      e.id AS encounter_id,
-      e.weight,
-      e.wing_length,
-      e.record_type,
-      e.age_code,
-      e.is_juv,
-      sess.id AS session_id,
-      sess.visit_date,
-      e.max_hatch_year,
-      e.capture_time,
-      date_trunc('month', sess.visit_date)::DATE AS session_month,
-      date_trunc('year', sess.visit_date)::DATE AS session_year
-    FROM public."Species" sp
-    JOIN public."Birds" b ON sp.id = b.species_id
-    LEFT JOIN public."Encounters" e ON b.id = e.bird_id
-    LEFT JOIN public."Sessions" sess ON e.session_id = sess.id
-    WHERE (from_date IS NULL OR sess.visit_date >=from_date)
-     AND (to_date IS NULL OR sess.visit_date<=to_date)
-     AND (species_name_filter IS NULL OR sp.species_name = species_name_filter)
-     AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
   ),
   stats_per_bird_month AS (
     -- Calculate per-bird statistics once
