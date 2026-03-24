@@ -5,6 +5,9 @@ import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import { SpeciesPageWithFilters } from '@/app/components/SingleSpeciesPage';
 import { fetchPageOfBirds } from '@/app/actions/single-species-data';
+import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
+import type { SexedGraphableBird } from '@/app/components/WeightAndWingChart';
+import type { GraphableBird } from '@/app/components/WeightAndWingChart';
 import type {
 	AggregateStatsRow,
 	TopMetricsFilterParams,
@@ -18,9 +21,37 @@ export type FullFatPageData = {
 	birds: EnrichedBirdOfSpecies[];
 	speciesStats: AggregateStatsRow;
 	speciesStatsHistory: AggregateStatsRow[];
+	graphableEncounterData: SexedGraphableBird[];
 	speciesId: number;
 };
 export type PageData = FullFatPageData | { speciesId: number };
+
+export async function fetchGraphableEncounterData(
+	speciesId: number,
+	groupId: number
+): Promise<SexedGraphableBird[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
+	const paginatedBirdResults = (await supabase
+		.from('Birds')
+		.select(
+			`encounters:Encounters (
+				age_code,
+				sex,
+				weight,
+				wing_length
+			)`
+		)
+		.eq('species_id', speciesId)
+		.contains('ringing_group_ids', [groupId])
+		.then(catchSupabaseErrors)) as GraphableBird[];
+	return paginatedBirdResults.map(
+		(bird) =>
+			({
+				...bird,
+				...getSexOfBird(bird.encounters as EncounterOfBird[])
+			}) as SexedGraphableBird
+	);
+}
 
 function getTopSessions(species: string, groupId: number) {
 	return getTopPeriodsByMetric({
@@ -69,13 +100,19 @@ async function fetchSpeciesData(
 	if (!speciesId) {
 		throw new Error(`Species ${params.speciesName} not found`);
 	}
-	const [topSessions, birds, speciesStats, speciesStatsHistory] =
-		await Promise.all([
-			getTopSessions(params.speciesName, groupId),
-			fetchPageOfBirds(speciesId, groupId),
-			getSpeciesStats(params.speciesName, groupId),
-			getSpeciesStatsHistory(params.speciesName, groupId)
-		]);
+	const [
+		topSessions,
+		birds,
+		speciesStats,
+		speciesStatsHistory,
+		graphableEncounterData
+	] = await Promise.all([
+		getTopSessions(params.speciesName, groupId),
+		fetchPageOfBirds(speciesId, groupId),
+		getSpeciesStats(params.speciesName, groupId),
+		getSpeciesStatsHistory(params.speciesName, groupId),
+		fetchGraphableEncounterData(speciesId, groupId)
+	]);
 	if (birds.length === 0) {
 		return {
 			speciesId
@@ -86,6 +123,7 @@ async function fetchSpeciesData(
 		birds,
 		speciesStats: speciesStats[0],
 		speciesStatsHistory,
+		graphableEncounterData,
 		speciesId
 	};
 }
