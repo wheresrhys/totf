@@ -5,15 +5,18 @@ import {
 	SortableTable,
 	type RowModelWithRawData
 } from '@/app/components/shared/SortableTable';
-import { MostCaughtResult } from '@/app/models/db';
+import { NotableRetrapsResult } from '@/app/models/db';
 import { EncountersTimeline } from './EncountersTimeline';
 
-const columnConfigs: Record<keyof MostCaughtResult, ColumnConfig> = {
+const columnConfigs: Record<keyof NotableRetrapsResult, ColumnConfig> = {
 	species_name: {
 		label: 'Species'
 	},
 	ring_no: {
 		label: 'Ring'
+	},
+	proven_age: {
+		label: 'Proven age'
 	},
 	encounter_count: {
 		label: 'Count'
@@ -23,7 +26,7 @@ const columnConfigs: Record<keyof MostCaughtResult, ColumnConfig> = {
 	}
 };
 
-function getMaxMinYear(birds: MostCaughtResult[]): {
+function getMaxMinYear(birds: NotableRetrapsResult[]): {
 	maxYear: number;
 	minYear: number;
 } {
@@ -37,10 +40,10 @@ function getMaxMinYear(birds: MostCaughtResult[]): {
 	};
 }
 
-function MostCaughtTableBody({
+function NotableRetrapsTableBody({
 	data
 }: {
-	data: RowModelWithRawData<MostCaughtResult, MostCaughtResult>[];
+	data: RowModelWithRawData<NotableRetrapsResult, NotableRetrapsResult>[];
 }) {
 	const maxMinYear = getMaxMinYear(data);
 	return (
@@ -53,7 +56,7 @@ function MostCaughtTableBody({
 							{bird.ring_no}
 						</NoPrefetchLink>
 					</td>
-
+					<td>{bird.proven_age}</td>
 					<td>{bird.encounter_count}</td>
 					<td>
 						<EncountersTimeline
@@ -66,13 +69,13 @@ function MostCaughtTableBody({
 		</tbody>
 	);
 }
-export function MostCaughtTable({ data }: { data: MostCaughtResult[] }) {
+export function NotableRetrapsTable({ data }: { data: NotableRetrapsResult[] }) {
 	return (
-		<SortableTable<MostCaughtResult, MostCaughtResult>
+		<SortableTable<NotableRetrapsResult, NotableRetrapsResult>
 			columnConfigs={columnConfigs}
 			data={data}
-			rowDataTransform={(row: MostCaughtResult): MostCaughtResult => row}
-			TableBodyComponent={MostCaughtTableBody}
+			rowDataTransform={(row: NotableRetrapsResult): NotableRetrapsResult => row}
+			TableBodyComponent={NotableRetrapsTableBody}
 		/>
 	);
 }

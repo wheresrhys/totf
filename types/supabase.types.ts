@@ -313,6 +313,24 @@ export type Database = {
           species_name: string
         }[]
       }
+      notable_retraps: {
+        Args: {
+          min_encounter_count?: number
+          min_proven_age?: number
+          result_limit?: number
+          result_limit_per_species?: number
+          ringing_group_filter?: number
+          species_filter?: string
+          year_filter?: number
+        }
+        Returns: {
+          encounter_count: number
+          encounter_dates: string[]
+          proven_age: number
+          ring_no: string
+          species_name: string
+        }[]
+      }
       soundex: { Args: { "": string }; Returns: string }
       text_soundex: { Args: { "": string }; Returns: string }
       top_metrics_by_period: {
