@@ -1,7 +1,20 @@
-import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
+import { type Sex } from '@/app/models/bird';
 import { useState } from 'react';
 import { ScatterChart, type ScatterChartData } from 'react-chartkick';
 import type { EncounterRow } from '@/app/models/db';
+
+type GraphableEncounterData = {
+	age_code: number;
+	sex: string;
+	weight: number;
+	wing_length: number;
+};
+
+export type GraphableBird = { encounters: GraphableEncounterData[] };
+export type SexedGraphableBird = GraphableBird & {
+	sex: Sex;
+	sexCertainty: number;
+};
 
 //function to find the median of the given array
 function median(arr: number[]): number {
@@ -20,7 +33,10 @@ function addNoiseToWingLength(x: number | null) {
 	return x + (Math.random() - 0.5) * 0.3;
 }
 
-function getMedian(bird: EnrichedBirdOfSpecies, property: keyof EncounterRow) {
+function getMedian(
+	bird: SexedGraphableBird,
+	property: keyof GraphableEncounterData
+) {
 	return median(
 		bird.encounters
 			.map((encounter) => encounter[property])
@@ -29,14 +45,14 @@ function getMedian(bird: EnrichedBirdOfSpecies, property: keyof EncounterRow) {
 }
 
 function getNoisyMedian(
-	bird: EnrichedBirdOfSpecies,
-	property: keyof EncounterRow
+	bird: SexedGraphableBird,
+	property: keyof GraphableEncounterData
 ) {
 	return addNoiseToWingLength(getMedian(bird, property));
 }
 
 function getWingWeightXYBird(
-	bird: EnrichedBirdOfSpecies
+	bird: SexedGraphableBird
 ): [number, number] | null {
 	const wing = getNoisyMedian(bird, 'wing_length');
 	const weight = getMedian(bird, 'weight');
@@ -55,7 +71,7 @@ function isValidPoint(
 }
 
 function getWingWeightXYEncounter(
-	encounter: EncounterRow
+	encounter: GraphableEncounterData
 ): [number, number] | null {
 	const point = [
 		addNoiseToWingLength(encounter.wing_length),
@@ -65,7 +81,7 @@ function getWingWeightXYEncounter(
 }
 
 function getChartData(
-	birds: EnrichedBirdOfSpecies[],
+	birds: SexedGraphableBird[],
 	chartGrouping: 'sex' | 'age'
 ): ScatterChartData[] {
 	if (chartGrouping === 'sex') {
@@ -122,7 +138,7 @@ function getChartData(
 export function WeightVsWingLengthChart({
 	birds
 }: {
-	birds: EnrichedBirdOfSpecies[];
+	birds: SexedGraphableBird[];
 }) {
 	const [chartGrouping, setChartGrouping] = useState<'sex' | 'age'>('sex');
 	const chartData = getChartData(birds, chartGrouping);

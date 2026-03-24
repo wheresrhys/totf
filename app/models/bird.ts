@@ -12,7 +12,7 @@ export type StandaloneBird = BirdOfSpecies & {
 	species: SpeciesRow;
 };
 
-type Sex = 'M' | 'F' | 'U';
+export type Sex = 'M' | 'F' | 'U';
 
 type EncountersInterface = { encounters: readonly EncounterOfBird[] };
 
@@ -77,7 +77,10 @@ export function orderEncountersByRecency(
 	return encounters.sort(pairwiseSortEncounters(direction));
 }
 
-function getSex(encounters: EncounterOfBird[]): [Sex, number] {
+export function getSexOfBird(encounters: EncounterOfBird[]): {
+	sex: Sex;
+	sexCertainty: number;
+} {
 	const counts = encounters.reduce(
 		(tallies, encounter) => {
 			tallies[encounter.sex]++;
@@ -86,15 +89,15 @@ function getSex(encounters: EncounterOfBird[]): [Sex, number] {
 		{ M: 0, F: 0, U: 0 } as Record<string, number>
 	);
 	if (counts['U'] === encounters.length) {
-		return ['U', 1];
+		return { sex: 'U', sexCertainty: 1 };
 	}
 	if (counts['M'] === counts['F']) {
-		return ['U', 0.5];
+		return { sex: 'U', sexCertainty: 0.5 };
 	}
 	if (counts['M'] > counts['F']) {
-		return ['M', counts['M'] / encounters.length];
+		return { sex: 'M', sexCertainty: counts['M'] / encounters.length };
 	} else {
-		return ['F', counts['F'] / encounters.length];
+		return { sex: 'F', sexCertainty: counts['F'] / encounters.length };
 	}
 }
 
@@ -115,15 +118,13 @@ export function enrichBird<BirdType extends BasicBird>(
 		bird.encounters as EncounterOfBird[],
 		'asc'
 	);
-	const [sex, sexCertainty] = getSex(orderedEncounters);
 	const lastEncounterDate = new Date(
 		orderedEncounters[orderedEncounters.length - 1].session.visit_date
 	);
 	return {
 		...bird,
 		encounters: orderedEncounters,
-		sex,
-		sexCertainty,
+		...getSexOfBird(orderedEncounters),
 		firstEncounterDate: new Date(orderedEncounters[0].session.visit_date),
 		lastEncounterDate,
 		lastEncounter: orderedEncounters[orderedEncounters.length - 1],
