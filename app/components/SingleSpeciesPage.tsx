@@ -8,7 +8,10 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { SingleSpeciesStats } from '@/app/components/SingleSpeciesStats';
 import 'chartkick/chart.js';
-import { fetchPageOfBirds } from '../actions/single-species-data';
+import {
+	fetchPageOfBirds,
+	fetchNotableRetraps
+} from '../actions/single-species-data';
 import { useOnInView } from 'react-intersection-observer';
 import { WeightVsWingLengthChart } from '@/app/components/WeightAndWingChart';
 import { StatsHistoryChart } from '@/app/components/StatsHistoryChart';
@@ -19,7 +22,6 @@ import type {
 	PageParams
 } from '@/app/(routes)/species/[speciesName]/page';
 import { NotableRetrapsTable } from './NotableRetrapsTable';
-import { fetchNotableRetraps } from '@/app/actions/notable-retraps';
 import type { NotableRetrapsResult } from '@/app/models/db';
 
 function NotableRetrapsSection({
@@ -100,10 +102,10 @@ function SpeciesData({
 				/>
 			) : null}
 			{showWeightVsWingChart ? (
-				<WeightVsWingLengthChart birds={data.graphableEncounterData} />
+				<WeightVsWingLengthChart speciesId={data.speciesId} groupId={groupId} />
 			) : null}
 			{showStatsHistory ? (
-				<StatsHistoryChart statsHistory={data.speciesStatsHistory} />
+				<StatsHistoryChart speciesName={data.speciesName} groupId={groupId} />
 			) : null}
 			<SingleSpeciesFilters
 				retrappedOnly={retrappedOnly}
