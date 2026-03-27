@@ -69,12 +69,18 @@ function NotableRetrapsTableBody({
 		</tbody>
 	);
 }
-export function NotableRetrapsTable({ data }: { data: NotableRetrapsResult[] }) {
+export function NotableRetrapsTable({
+	data
+}: {
+	data: NotableRetrapsResult[];
+}) {
 	return (
 		<SortableTable<NotableRetrapsResult, NotableRetrapsResult>
 			columnConfigs={columnConfigs}
 			data={data}
-			rowDataTransform={(row: NotableRetrapsResult): NotableRetrapsResult => row}
+			rowDataTransform={(row: NotableRetrapsResult): NotableRetrapsResult =>
+				row
+			}
 			TableBodyComponent={NotableRetrapsTableBody}
 		/>
 	);
