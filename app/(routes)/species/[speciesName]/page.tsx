@@ -3,7 +3,7 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
-import { SpeciesPageWithFilters } from '@/app/components/SingleSpeciesPage';
+import { SingleSpeciesPage } from '@/app/components/SingleSpeciesPage';
 import { fetchPageOfBirds } from '@/app/actions/single-species-data';
 
 import type {
@@ -84,7 +84,7 @@ export default async function SpeciesPage(props: PageProps) {
 			pageProps={props}
 			getCacheKeys={(params: PageParams) => ['species', params.speciesName]}
 			dataFetcher={fetchSpeciesData}
-			PageComponent={SpeciesPageWithFilters}
+			PageComponent={SingleSpeciesPage}
 		/>
 	);
 }

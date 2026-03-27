@@ -13,10 +13,6 @@ function getCounts(statsHistory: AggregateStatsRow[]): LineChartData[] {
 		{
 			name: 'birds',
 			data: statsHistory.map((row) => [row.time_period, row.bird_count])
-		},
-		{
-			name: 'sessions',
-			data: statsHistory.map((row) => [row.time_period, row.session_count])
 		}
 	];
 }
@@ -84,8 +80,11 @@ export function StatsHistoryChart({
 }) {
 	const [statsHistory, setStatsHistory] = useState<AggregateStatsRow[]>([]);
 	useEffect(() => {
-		getSpeciesStatsHistory(speciesName, groupId).then(setStatsHistory);
-	}, [speciesName, groupId]);
+		if (statsHistory.length > 0) return;
+		getSpeciesStatsHistory(speciesName, groupId).then((data) => {
+			setStatsHistory(data);
+		});
+	}, [speciesName, groupId, statsHistory.length]);
 	return (
 		<>
 			<SecondaryHeading>Stats History</SecondaryHeading>

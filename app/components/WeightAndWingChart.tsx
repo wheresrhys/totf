@@ -147,10 +147,11 @@ export function WeightVsWingLengthChart({
 		SexedGraphableBird[]
 	>([]);
 	useEffect(() => {
-		fetchGraphableEncounterData(speciesId, groupId).then(
-			setGraphableEncounterData
-		);
-	}, [speciesId, groupId]);
+		if (graphableEncounterData.length > 0) return;
+		fetchGraphableEncounterData(speciesId, groupId).then((data) => {
+			setGraphableEncounterData(data);
+		});
+	}, [speciesId, groupId, graphableEncounterData.length]);
 	const chartData = getChartData(graphableEncounterData, chartGrouping);
 	return (
 		<>
