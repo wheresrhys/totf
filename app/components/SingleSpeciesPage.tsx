@@ -1,6 +1,6 @@
 'use client';
 import { SpeciesTable } from '@/app/components/SingleSpeciesTable';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
 	PageWrapper,
 	PrimaryHeading,
@@ -19,6 +19,31 @@ import type {
 	PageParams
 } from '@/app/(routes)/species/[speciesName]/page';
 import { NotableRetrapsTable } from './NotableRetrapsTable';
+import { fetchNotableRetraps } from '@/app/actions/notable-retraps';
+import type { NotableRetrapsResult } from '@/app/models/db';
+
+function NotableRetrapsSection({
+	speciesName,
+	groupId
+}: {
+	speciesName: string;
+	groupId: number;
+}) {
+	const [notableRetraps, setNotableRetraps] = useState<NotableRetrapsResult[]>(
+		[]
+	);
+	useEffect(() => {
+		fetchNotableRetraps(speciesName, groupId).then((data) => {
+			setNotableRetraps(data);
+		});
+	}, [speciesName, groupId]);
+	return (
+		<>
+			<SecondaryHeading>Notable Retraps</SecondaryHeading>
+			<NotableRetrapsTable data={notableRetraps} omitSpeciesName={true} />
+		</>
+	);
+}
 
 function SpeciesData({
 	data,
@@ -31,7 +56,7 @@ function SpeciesData({
 	const [sexedOnly, setSexedOnly] = useState(false);
 	const [loadedBirds, setLoadedBirds] = useState(data.birds);
 	const [page, setPage] = useState(0);
-
+	const [showNotableRetraps, setShowNotableRetraps] = useState(false);
 	async function loadMoreBirds() {
 		const nextPage = page + 1;
 		setPage(nextPage);
@@ -68,8 +93,12 @@ function SpeciesData({
 	return (
 		<>
 			<SingleSpeciesStats {...data} groupId={groupId} />
-			<SecondaryHeading>Notable Retraps</SecondaryHeading>
-			<NotableRetrapsTable data={data.notableRetraps} omitSpeciesName={true} />
+			{showNotableRetraps ? (
+				<NotableRetrapsSection
+					speciesName={data.speciesName}
+					groupId={groupId}
+				/>
+			) : null}
 			{showWeightVsWingChart ? (
 				<WeightVsWingLengthChart birds={data.graphableEncounterData} />
 			) : null}
@@ -81,6 +110,8 @@ function SpeciesData({
 				setRetrappedOnly={setRetrappedOnly}
 				setSexedOnly={setSexedOnly}
 				sexedOnly={sexedOnly}
+				setShowNotableRetraps={setShowNotableRetraps}
+				showNotableRetraps={showNotableRetraps}
 				setShowWeightVsWingChart={setShowWeightVsWingChart}
 				showWeightVsWingChart={showWeightVsWingChart}
 				setShowStatsHistory={setShowStatsHistory}

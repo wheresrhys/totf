@@ -10,7 +10,6 @@ import type { SexedGraphableBird } from '@/app/components/WeightAndWingChart';
 import type { GraphableBird } from '@/app/components/WeightAndWingChart';
 import type {
 	AggregateStatsRow,
-	NotableRetrapsResult,
 	TopMetricsFilterParams,
 	TopPeriodsResult
 } from '@/app/models/db';
@@ -23,26 +22,10 @@ export type FullFatPageData = {
 	speciesStats: AggregateStatsRow;
 	speciesStatsHistory: AggregateStatsRow[];
 	graphableEncounterData: SexedGraphableBird[];
-	notableRetraps: NotableRetrapsResult[];
 	speciesId: number;
+	speciesName: string;
 };
 export type PageData = FullFatPageData | { speciesId: number };
-
-async function fetchNotableRetraps(
-	speciesName: string,
-	groupId: number
-): Promise<NotableRetrapsResult[]> {
-	const supabase = await getAuthenticatedSupabaseClient();
-	return supabase
-		.rpc('notable_retraps', {
-			ringing_group_filter: groupId,
-			species_filter: speciesName,
-			result_limit: 10,
-			min_proven_age: 3,
-			min_encounter_count: 6
-		})
-		.then(catchSupabaseErrors) as Promise<NotableRetrapsResult[]>;
-}
 
 async function fetchGraphableEncounterData(
 	speciesId: number,
@@ -123,15 +106,13 @@ async function fetchSpeciesData(
 		birds,
 		speciesStats,
 		speciesStatsHistory,
-		graphableEncounterData,
-		notableRetraps
+		graphableEncounterData
 	] = await Promise.all([
 		getTopSessions(params.speciesName, groupId),
 		fetchPageOfBirds(speciesId, groupId),
 		getSpeciesStats(params.speciesName, groupId),
 		getSpeciesStatsHistory(params.speciesName, groupId),
-		fetchGraphableEncounterData(speciesId, groupId),
-		fetchNotableRetraps(params.speciesName, groupId)
+		fetchGraphableEncounterData(speciesId, groupId)
 	]);
 	if (birds.length === 0) {
 		return {
@@ -144,8 +125,8 @@ async function fetchSpeciesData(
 		speciesStats: speciesStats[0],
 		speciesStatsHistory,
 		graphableEncounterData,
-		notableRetraps,
-		speciesId
+		speciesId,
+		speciesName: params.speciesName
 	};
 }
 

@@ -33,7 +33,9 @@ export function SingleSpeciesFilters({
 	setShowWeightVsWingChart,
 	showWeightVsWingChart,
 	setShowStatsHistory,
-	showStatsHistory
+	showStatsHistory,
+	showNotableRetraps,
+	setShowNotableRetraps
 }: {
 	retrappedOnly: boolean;
 	setRetrappedOnly: (retrappedOnly: boolean) => void;
@@ -43,9 +45,20 @@ export function SingleSpeciesFilters({
 	showWeightVsWingChart: boolean;
 	setShowStatsHistory: (showStatsHistory: boolean) => void;
 	showStatsHistory: boolean;
+	showNotableRetraps: boolean;
+	setShowNotableRetraps: (showNotableRetraps: boolean) => void;
 }) {
 	return (
 		<form className="mt-7 flex justify-end gap-2 flex-wrap">
+			{showNotableRetraps ? null : (
+				<button
+					type="button"
+					className="btn btn-secondary btn-sm"
+					onClick={() => setShowNotableRetraps(true)}
+				>
+					Notable retraps
+				</button>
+			)}
 			{showStatsHistory ? null : (
 				<button
 					type="button"
