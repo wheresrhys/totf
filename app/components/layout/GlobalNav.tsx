@@ -18,7 +18,10 @@ export function NavItems({ classes }: { classes: string }) {
 				<NoPrefetchLink href="/mistakes">Mistakes</NoPrefetchLink>
 			</li>
 			<li>
-				<NoPrefetchLink href="/retraps">Notable retraps</NoPrefetchLink>
+				<NoPrefetchLink href="/retraps">Retraps</NoPrefetchLink>
+			</li>
+			<li>
+				<NoPrefetchLink href="/effort">Effort</NoPrefetchLink>
 			</li>
 		</ul>
 	);

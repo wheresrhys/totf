@@ -26,18 +26,30 @@ declare module 'react-chartkick' {
     colors?: string[];
     min: number | null;
     library: {
-      elements: {
-        point: {
+      elements?: {
+        point?: {
           radius: number;
         };
-        line: {
+        line?: {
           cubicInterpolationMode: string;
         };
       };
+      /** Chart.js scale options (e.g. dual y-axes) */
+      scales?: Record<
+        string,
+        {
+          type?: string;
+          position?: string;
+          title?: { display?: boolean; text?: string };
+          grid?: { drawOnChartArea?: boolean };
+          max?: number;
+        }
+      >;
     };
   };
   export type LineChartData = {
     name: string;
-    data: [string,number][];
+    data: [string, number][];
+    dataset?: Record<string, unknown>;
   };
 }
