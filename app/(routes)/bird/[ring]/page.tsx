@@ -99,7 +99,9 @@ function BirdSummary({
 							`Proven Age: ${enrichedBird.proven_age}`
 						]}
 					/>
-					<EncountersTimeline encounters={enrichedBird.encounters} />
+					<div className="m-2">
+						<EncountersTimeline encounters={enrichedBird.encounters} />
+					</div>
 					<SingleBirdTable encounters={enrichedBird.encounters} />
 				</>
 			) : (

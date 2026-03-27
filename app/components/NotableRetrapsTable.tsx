@@ -8,10 +8,10 @@ import {
 import { NotableRetrapsResult } from '@/app/models/db';
 import { EncountersTimeline } from './EncountersTimeline';
 
-const columnConfigs: Record<keyof NotableRetrapsResult, ColumnConfig> = {
-	species_name: {
-		label: 'Species'
-	},
+const columnConfigsWithoutSpeciesName: Record<
+	keyof Omit<NotableRetrapsResult, 'species_name'>,
+	ColumnConfig
+> = {
 	ring_no: {
 		label: 'Ring'
 	},
@@ -24,6 +24,16 @@ const columnConfigs: Record<keyof NotableRetrapsResult, ColumnConfig> = {
 	encounter_dates: {
 		label: 'Timeline'
 	}
+};
+
+const columnConfigsWithSpeciesName: Record<
+	keyof NotableRetrapsResult,
+	ColumnConfig
+> = {
+	species_name: {
+		label: 'Species'
+	},
+	...columnConfigsWithoutSpeciesName
 };
 
 function getMaxMinYear(birds: NotableRetrapsResult[]): {
@@ -41,16 +51,18 @@ function getMaxMinYear(birds: NotableRetrapsResult[]): {
 }
 
 function NotableRetrapsTableBody({
-	data
+	data,
+	omitSpeciesName = false
 }: {
 	data: RowModelWithRawData<NotableRetrapsResult, NotableRetrapsResult>[];
+	omitSpeciesName?: boolean;
 }) {
 	const maxMinYear = getMaxMinYear(data);
 	return (
 		<tbody>
 			{data.map((bird) => (
 				<tr key={`${bird.ring_no}`}>
-					<td>{bird.species_name}</td>
+					{omitSpeciesName ? null : <td>{bird.species_name}</td>}
 					<td>
 						<NoPrefetchLink className="link" href={`/bird/${bird.ring_no}`}>
 							{bird.ring_no}
@@ -69,19 +81,65 @@ function NotableRetrapsTableBody({
 		</tbody>
 	);
 }
-export function NotableRetrapsTable({
+
+function NotableRetrapsTableBodyWithoutSpeciesName({
 	data
 }: {
-	data: NotableRetrapsResult[];
+	data: RowModelWithRawData<
+		NotableRetrapsResult,
+		Omit<NotableRetrapsResult, 'species_name'>
+	>[];
 }) {
 	return (
+		<NotableRetrapsTableBody
+			data={
+				data as RowModelWithRawData<
+					NotableRetrapsResult,
+					NotableRetrapsResult
+				>[]
+			}
+			omitSpeciesName={true}
+		/>
+	);
+}
+
+function NotableRetrapsTableBodyWithSpeciesName({
+	data
+}: {
+	data: RowModelWithRawData<NotableRetrapsResult, NotableRetrapsResult>[];
+}) {
+	return <NotableRetrapsTableBody data={data} omitSpeciesName={false} />;
+}
+
+export function NotableRetrapsTable({
+	data,
+	omitSpeciesName = false
+}: {
+	data: NotableRetrapsResult[];
+	omitSpeciesName?: boolean;
+}) {
+	return omitSpeciesName ? (
+		<SortableTable<
+			NotableRetrapsResult,
+			Omit<NotableRetrapsResult, 'species_name'>
+		>
+			columnConfigs={columnConfigsWithoutSpeciesName}
+			data={data}
+			rowDataTransform={(
+				row: NotableRetrapsResult
+			): Omit<NotableRetrapsResult, 'species_name'> =>
+				row as Omit<NotableRetrapsResult, 'species_name'>
+			}
+			TableBodyComponent={NotableRetrapsTableBodyWithoutSpeciesName}
+		/>
+	) : (
 		<SortableTable<NotableRetrapsResult, NotableRetrapsResult>
-			columnConfigs={columnConfigs}
+			columnConfigs={columnConfigsWithSpeciesName}
 			data={data}
 			rowDataTransform={(row: NotableRetrapsResult): NotableRetrapsResult =>
 				row
 			}
-			TableBodyComponent={NotableRetrapsTableBody}
+			TableBodyComponent={NotableRetrapsTableBodyWithSpeciesName}
 		/>
 	);
 }

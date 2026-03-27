@@ -1,5 +1,8 @@
 import { LineChart, type LineChartData } from 'react-chartkick';
 import type { AggregateStatsRow } from '@/app/models/db';
+import { useEffect, useState } from 'react';
+import { getSpeciesStatsHistory } from '../actions/single-species-data';
+import { SecondaryHeading } from './shared/DesignSystem';
 
 function getCounts(statsHistory: AggregateStatsRow[]): LineChartData[] {
 	return [
@@ -10,10 +13,6 @@ function getCounts(statsHistory: AggregateStatsRow[]): LineChartData[] {
 		{
 			name: 'birds',
 			data: statsHistory.map((row) => [row.time_period, row.bird_count])
-		},
-		{
-			name: 'sessions',
-			data: statsHistory.map((row) => [row.time_period, row.session_count])
 		}
 	];
 }
@@ -73,12 +72,22 @@ function getSizes(statsHistory: AggregateStatsRow[]): LineChartData[] {
 }
 
 export function StatsHistoryChart({
-	statsHistory
+	speciesName,
+	groupId
 }: {
-	statsHistory: AggregateStatsRow[];
+	speciesName: string;
+	groupId: number;
 }) {
+	const [statsHistory, setStatsHistory] = useState<AggregateStatsRow[]>([]);
+	useEffect(() => {
+		if (statsHistory.length > 0) return;
+		getSpeciesStatsHistory(speciesName, groupId).then((data) => {
+			setStatsHistory(data);
+		});
+	}, [speciesName, groupId, statsHistory.length]);
 	return (
 		<>
+			<SecondaryHeading>Stats History</SecondaryHeading>
 			<LineChart
 				min={0}
 				data={getCounts(statsHistory)}

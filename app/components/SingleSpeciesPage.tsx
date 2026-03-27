@@ -1,22 +1,87 @@
 'use client';
 import { SpeciesTable } from '@/app/components/SingleSpeciesTable';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
 	PageWrapper,
-	PrimaryHeading
+	PrimaryHeading,
+	SecondaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { SingleSpeciesStats } from '@/app/components/SingleSpeciesStats';
 import 'chartkick/chart.js';
-import { fetchPageOfBirds } from '../actions/single-species-data';
+import {
+	fetchPageOfBirds,
+	fetchNotableRetraps
+} from '../actions/single-species-data';
 import { useOnInView } from 'react-intersection-observer';
 import { WeightVsWingLengthChart } from '@/app/components/WeightAndWingChart';
 import { StatsHistoryChart } from '@/app/components/StatsHistoryChart';
-import { SingleSpeciesFilters } from '@/app/components/SingleSpeciesFilters';
 import type {
 	FullFatPageData,
 	PageData,
 	PageParams
 } from '@/app/(routes)/species/[speciesName]/page';
+import { NotableRetrapsTable } from './NotableRetrapsTable';
+import type { NotableRetrapsResult } from '@/app/models/db';
+
+function ConditionalTabPanel({
+	loadedTabs,
+	tabId,
+	activeTabId,
+	children
+}: {
+	loadedTabs: Set<string>;
+	tabId: string;
+	activeTabId: string;
+	children: React.ReactNode;
+}) {
+	if (loadedTabs.has(tabId)) {
+		return tabId === activeTabId ? (
+			<div>{children}</div>
+		) : (
+			<div className="hidden" aria-hidden="true">
+				{children}
+			</div>
+		);
+	}
+	return null;
+}
+
+function NotableRetrapsSection({
+	speciesName,
+	groupId
+}: {
+	speciesName: string;
+	groupId: number;
+}) {
+	const [notableRetraps, setNotableRetraps] = useState<NotableRetrapsResult[]>(
+		[]
+	);
+	const [isLoaded, setIsLoaded] = useState(false);
+	useEffect(() => {
+		if (notableRetraps.length > 0) return;
+		fetchNotableRetraps(speciesName, groupId).then((data) => {
+			setNotableRetraps(data);
+			setIsLoaded(true);
+		});
+	}, [speciesName, groupId, notableRetraps.length]);
+	return (
+		<>
+			<SecondaryHeading>Notable Retraps</SecondaryHeading>
+			{notableRetraps.length > 0 ? (
+				<NotableRetrapsTable data={notableRetraps} omitSpeciesName={true} />
+			) : isLoaded ? (
+				<p>No notable retraps found</p>
+			) : (
+				<div className="loading loading-spinner loading-xl"></div>
+			)}
+			{isLoaded ? null : (
+				<div className="flex items-center justify-center">
+					<div className="loading loading-spinner loading-xl"></div>
+				</div>
+			)}
+		</>
+	);
+}
 
 function SpeciesData({
 	data,
@@ -25,10 +90,18 @@ function SpeciesData({
 	data: FullFatPageData;
 	groupId: number;
 }) {
-	const [retrappedOnly, setRetrappedOnly] = useState(false);
-	const [sexedOnly, setSexedOnly] = useState(false);
 	const [loadedBirds, setLoadedBirds] = useState(data.birds);
 	const [page, setPage] = useState(0);
+	const [loadedTabs, setLoadedTabs] = useState<Set<string>>(
+		new Set(['bird-list'])
+	);
+
+	const [activeTab, setActiveTab] = useState('bird-list');
+	function handleTabClick(event: React.MouseEvent<HTMLButtonElement>) {
+		const tab = event.currentTarget.id.replace('tabs-control-', '');
+		setLoadedTabs((prev) => new Set([...prev, tab]));
+		setActiveTab(tab);
+	}
 
 	async function loadMoreBirds() {
 		const nextPage = page + 1;
@@ -51,47 +124,89 @@ function SpeciesData({
 		{ threshold: 0 }
 	);
 
-	const [showWeightVsWingChart, setShowWeightVsWingChart] = useState(false);
-	const [showStatsHistory, setShowStatsHistory] = useState(false);
-	let birds = loadedBirds;
 	const loadedIds = loadedBirds.map((bird) => bird.id);
-	if (retrappedOnly) {
-		birds = birds.filter((bird) =>
-			bird.encounters.some((encounter) => encounter.record_type === 'S')
-		);
-	}
-	if (sexedOnly) {
-		birds = birds.filter((bird) => bird.sex !== 'U');
-	}
 	return (
 		<>
 			<SingleSpeciesStats {...data} groupId={groupId} />
-			{showWeightVsWingChart ? (
-				<WeightVsWingLengthChart birds={data.graphableEncounterData} />
-			) : null}
-			{showStatsHistory ? (
-				<StatsHistoryChart statsHistory={data.speciesStatsHistory} />
-			) : null}
-			<SingleSpeciesFilters
-				retrappedOnly={retrappedOnly}
-				setRetrappedOnly={setRetrappedOnly}
-				setSexedOnly={setSexedOnly}
-				sexedOnly={sexedOnly}
-				setShowWeightVsWingChart={setShowWeightVsWingChart}
-				showWeightVsWingChart={showWeightVsWingChart}
-				setShowStatsHistory={setShowStatsHistory}
-				showStatsHistory={showStatsHistory}
-			/>
-			<SpeciesTable birds={birds} />
-			{isFullyLoaded ? null : (
-				<div
-					ref={loadMoreRef}
-					data-testid="infinite-scroll-loader"
-					className="flex items-center justify-center"
+			<nav
+				className="bg-base-200 rounded-field w-fit space-x-1 overflow-x-auto p-1 mt-4"
+				aria-label="Tabs"
+				role="tablist"
+				aria-orientation="horizontal"
+			>
+				<button
+					type="button"
+					id="tabs-control-bird-list"
+					className={`btn  ${activeTab === 'bird-list' ? 'btn-default' : 'btn-secondary'}`}
+					onClick={handleTabClick}
 				>
-					<div className="loading loading-spinner loading-xl"></div>
-				</div>
-			)}
+					Bird list
+				</button>
+				<button
+					type="button"
+					id="tabs-control-retraps"
+					className={`btn ${activeTab === 'retraps' ? 'btn-default' : 'btn-secondary'}`}
+					onClick={handleTabClick}
+				>
+					Retraps
+				</button>
+				<button
+					type="button"
+					id="tabs-control-stats-history"
+					className={`btn ${activeTab === 'stats-history' ? 'btn-default' : 'btn-secondary'}`}
+					onClick={handleTabClick}
+				>
+					Stats history
+				</button>
+				<button
+					type="button"
+					id="tabs-control-size-plot"
+					className={`btn ${activeTab === 'size-plot' ? 'btn-default' : 'btn-secondary'}`}
+					onClick={handleTabClick}
+				>
+					Size plot
+				</button>
+			</nav>
+			<ConditionalTabPanel
+				loadedTabs={loadedTabs}
+				tabId="bird-list"
+				activeTabId={activeTab}
+			>
+				<SpeciesTable birds={loadedBirds} />
+				{isFullyLoaded ? null : (
+					<div
+						ref={loadMoreRef}
+						data-testid="infinite-scroll-loader"
+						className="flex items-center justify-center"
+					>
+						<div className="loading loading-spinner loading-xl"></div>
+					</div>
+				)}
+			</ConditionalTabPanel>
+			<ConditionalTabPanel
+				loadedTabs={loadedTabs}
+				tabId="retraps"
+				activeTabId={activeTab}
+			>
+				<NotableRetrapsSection
+					speciesName={data.speciesName}
+					groupId={groupId}
+				/>
+			</ConditionalTabPanel>
+			<ConditionalTabPanel
+				loadedTabs={loadedTabs}
+				tabId="stats-history"
+				activeTabId={activeTab}
+			>
+				<StatsHistoryChart speciesName={data.speciesName} groupId={groupId} />
+			</ConditionalTabPanel>
+			<ConditionalTabPanel
+				loadedTabs={loadedTabs}
+				tabId="size-plot"
+				activeTabId={activeTab}
+			>
+				<WeightVsWingLengthChart speciesId={data.speciesId} groupId={groupId} />
+			</ConditionalTabPanel>
 		</>
 	);
 }
@@ -100,7 +215,7 @@ function fullFatTypeGuard(data: PageData): data is FullFatPageData {
 	return 'birds' in data;
 }
 
-export function SpeciesPageWithFilters({
+export function SingleSpeciesPage({
 	params: { speciesName },
 	data,
 	groupId

@@ -11,7 +11,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { NotableRetrapsTable } from '@/app/components/NotableRetrapsTable';
 
-export async function fetchNotableRetraps(
+async function fetchNotableRetraps(
 	_: DefaultPageParams,
 	groupId: number
 ): Promise<NotableRetrapsResult[]> {

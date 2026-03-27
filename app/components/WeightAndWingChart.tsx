@@ -1,7 +1,8 @@
 import { type Sex } from '@/app/models/bird';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScatterChart, type ScatterChartData } from 'react-chartkick';
-
+import { fetchGraphableEncounterData } from '../actions/single-species-data';
+import { SecondaryHeading } from './shared/DesignSystem';
 type GraphableEncounterData = {
 	age_code: number;
 	sex: string;
@@ -135,14 +136,26 @@ function getChartData(
 }
 
 export function WeightVsWingLengthChart({
-	birds
+	speciesId,
+	groupId
 }: {
-	birds: SexedGraphableBird[];
+	speciesId: number;
+	groupId: number;
 }) {
 	const [chartGrouping, setChartGrouping] = useState<'sex' | 'age'>('sex');
-	const chartData = getChartData(birds, chartGrouping);
+	const [graphableEncounterData, setGraphableEncounterData] = useState<
+		SexedGraphableBird[]
+	>([]);
+	useEffect(() => {
+		if (graphableEncounterData.length > 0) return;
+		fetchGraphableEncounterData(speciesId, groupId).then((data) => {
+			setGraphableEncounterData(data);
+		});
+	}, [speciesId, groupId, graphableEncounterData.length]);
+	const chartData = getChartData(graphableEncounterData, chartGrouping);
 	return (
 		<>
+			<SecondaryHeading>Wing vs Weight</SecondaryHeading>
 			<div className="mt-3 mb-3 flex justify-end">
 				<div
 					id="toggle-count"

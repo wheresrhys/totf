@@ -40,7 +40,7 @@ export function EncountersTimeline({
 	});
 
 	return (
-		<div className="relative flex m-2 p-2">
+		<div className="relative flex">
 			{years.map((year) => (
 				<div key={year} className="flex-1">
 					<div className="">{year}</div>
@@ -62,7 +62,7 @@ export function EncountersTimeline({
 			{points.map(({ position, encounter }) => (
 				<div
 					key={position.toString()}
-					className={`absolute ${encounter ? 'bottom-4' : 'bottom-5'}`}
+					className={`absolute ${encounter ? 'bottom-2' : 'bottom-1'}`}
 					style={{ left: `${position}%` }}
 				>
 					<div
