@@ -173,6 +173,7 @@ async function fetchInitialData(
 							},
 							result_limit: 1
 						});
+
 						return {
 							definition: panel,
 							data: data ?? []

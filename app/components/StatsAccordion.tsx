@@ -33,7 +33,7 @@ type AccordionItemModelWithGroupId = AccordionItemModel & {
 };
 
 function hasData(data: TopPeriodsResult[] | null): data is TopPeriodsResult[] {
-	return data !== null;
+	return data !== null && data.length > 0;
 }
 
 function ContentComponent({
@@ -120,9 +120,9 @@ function HeadingComponent({ model }: { model: AccordionItemModelWithGroupId }) {
 	return (
 		<span>
 			<span className="font-bold">{model.definition.category}:</span>{' '}
-			<span>
+			{hasData(model.data) ? <span>
 				{model.data[0].metric_value} {model.definition.unit}
-			</span>
+			</span> : <span>No data available</span>}
 		</span>
 	);
 }
