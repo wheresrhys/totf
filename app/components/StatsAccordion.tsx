@@ -120,9 +120,13 @@ function HeadingComponent({ model }: { model: AccordionItemModelWithGroupId }) {
 	return (
 		<span>
 			<span className="font-bold">{model.definition.category}:</span>{' '}
-			{hasData(model.data) ? <span>
-				{model.data[0].metric_value} {model.definition.unit}
-			</span> : <span>No data available</span>}
+			{hasData(model.data) ? (
+				<span>
+					{model.data[0].metric_value} {model.definition.unit}
+				</span>
+			) : (
+				<span>No data available</span>
+			)}
 		</span>
 	);
 }
