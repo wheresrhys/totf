@@ -377,8 +377,11 @@ if (args.length < 2) {
 	process.exit(1);
 }
 
+
 const csvFilePath = path.resolve(args[0]);
-importCSV({ csvFilePath, ringingGroupName: args[1] })
+const ringingGroupName = (args[1] === 'w' || args[1] === 'W') ? "Walthamstow Wetlands" : args[1];
+
+importCSV({ csvFilePath, ringingGroupName })
 	.then(() => process.exit(0))
 	.catch((error) => {
 		console.error('Import failed:', error);
