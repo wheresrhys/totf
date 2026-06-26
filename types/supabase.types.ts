@@ -162,14 +162,17 @@ export type Database = {
         Row: {
           group_name: string
           id: number
+          password_hash: string | null
         }
         Insert: {
           group_name: string
           id?: number
+          password_hash?: string | null
         }
         Update: {
           group_name?: string
           id?: number
+          password_hash?: string | null
         }
         Relationships: []
       }
