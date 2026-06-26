@@ -25,7 +25,7 @@ SELECT fm.ring_no,
         sp.species_name
 FROM fuzzy_matches fm
 JOIN "Species" sp on fm.species_id = sp.id
-WHERE fm.levenshtein < 3 OR fm.ring_no like '%q%'
+WHERE fm.levenshtein < 3 OR fm.ring_no like CONCAT('%', q, '%')
 ORDER BY closeness_score ASC;
 END;
 $$;
