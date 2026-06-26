@@ -24,7 +24,7 @@
 		"next:build:prod": "./scripts/load-prod-env.sh next build --turbopack --debug",
 		"next:build:dev": "dotenvx run -f .env.dev -- next build --turbopack --debug",
 		"next:start:prod": "./scripts/load-prod-env.sh next start",
-		"lint": "npx prettier -w app supabase/schema scripts lib && npx eslint",
+		"lint": "npx prettier -w app scripts lib && npx eslint",
 		"type:check": "tsc --noEmit",
 		"type:check:open": "tsx scripts/open-type-errors.ts",
 		"qa:bloat": "find app -type f -exec wc -l {} + | awk '$1 > 150 {print $1, $2}'",
