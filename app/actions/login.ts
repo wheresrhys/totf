@@ -22,9 +22,6 @@ export async function loginGroup(
 		.eq('id', groupId)
 		.single();
 
-
-	console.log(group)
-
 	if (!group?.password_hash) {
 		return {
 			success: false,
