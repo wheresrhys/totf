@@ -25,9 +25,7 @@ This is a Next.js application that provides a leaderboard for bird ringing data.
 
 ### DB management
 - db:schema:pull - ensures supabase/migrations contains an up to date history: avoids getting errors when trying to push a migration
-- db:schema:build - builds a (as yet unused) schema file from the supabase/schema directory
-- db:schema:apply - runs db:schema:build and applies it to the local database
-- db:migration:prepare -  Runs the previous 3 tasks to diff the new local schema with prod, then creates a new migration, named after the current branch name
+- db:schema:apply - Applies schema changes to the local db and constructs a migration
 - db:migration:push- pushes the prepared migration to prod
 - db:sync:local - makes sure the local database is running the latest prod schema
 - db:seed:local - populates the local database with some test data
