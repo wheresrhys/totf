@@ -1,8 +1,4 @@
-CREATE FUNCTION public.trg_set_encounter_generated_fields()
-  RETURNS TRIGGER
-  LANGUAGE plpgsql
-  SECURITY DEFINER
-  AS $function$
+CREATE FUNCTION public.trg_set_encounter_generated_fields () RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $function$
 BEGIN
   SELECT
     l."ringing_group_id",
@@ -58,8 +54,8 @@ BEGIN
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.trg_set_encounter_generated_fields() TO anon;
+GRANT ALL ON FUNCTION public.trg_set_encounter_generated_fields () TO anon;
 
-GRANT ALL ON FUNCTION public.trg_set_encounter_generated_fields() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_set_encounter_generated_fields () TO authenticated;
 
-GRANT ALL ON FUNCTION public.trg_set_encounter_generated_fields() TO service_role;
+GRANT ALL ON FUNCTION public.trg_set_encounter_generated_fields () TO service_role;

@@ -1,23 +1,21 @@
 CREATE FUNCTION public.notable_retraps (
-  result_limit             integer DEFAULT NULL::integer,
-  result_limit_per_species integer DEFAULT NULL::integer,
-  min_proven_age           integer DEFAULT NULL::integer,
-  min_encounter_count      integer DEFAULT NULL::integer,
-  species_filter           text    DEFAULT NULL::text,
-  year_filter              integer DEFAULT NULL::integer,
-  ringing_group_filter     bigint  DEFAULT NULL::bigint
-)
-  RETURNS TABLE (
-    species_name    text,
-    ring_no         text,
-    encounter_count bigint,
-    encounter_dates date[],
-    proven_age      smallint
-  )
-  LANGUAGE plpgsql
-  STABLE
-  SET search_path TO 'public', 'pg_catalog'
-  AS $function$
+	result_limit integer DEFAULT NULL::integer,
+	result_limit_per_species integer DEFAULT NULL::integer,
+	min_proven_age integer DEFAULT NULL::integer,
+	min_encounter_count integer DEFAULT NULL::integer,
+	species_filter text DEFAULT NULL::text,
+	year_filter integer DEFAULT NULL::integer,
+	ringing_group_filter bigint DEFAULT NULL::bigint
+) RETURNS TABLE (
+	species_name text,
+	ring_no text,
+	encounter_count bigint,
+	encounter_dates date[],
+	proven_age smallint
+) LANGUAGE plpgsql STABLE
+SET
+	search_path TO 'public',
+	'pg_catalog' AS $function$
 BEGIN
   RETURN QUERY
 	WITH bird_encounter_counts AS (
@@ -64,8 +62,32 @@ BEGIN
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.notable_retraps(integer, integer, integer, integer, text, integer, bigint) TO anon;
+GRANT ALL ON FUNCTION public.notable_retraps (
+	integer,
+	integer,
+	integer,
+	integer,
+	text,
+	integer,
+	bigint
+) TO anon;
 
-GRANT ALL ON FUNCTION public.notable_retraps(integer, integer, integer, integer, text, integer, bigint) TO authenticated;
+GRANT ALL ON FUNCTION public.notable_retraps (
+	integer,
+	integer,
+	integer,
+	integer,
+	text,
+	integer,
+	bigint
+) TO authenticated;
 
-GRANT ALL ON FUNCTION public.notable_retraps(integer, integer, integer, integer, text, integer, bigint) TO service_role;
+GRANT ALL ON FUNCTION public.notable_retraps (
+	integer,
+	integer,
+	integer,
+	integer,
+	text,
+	integer,
+	bigint
+) TO service_role;

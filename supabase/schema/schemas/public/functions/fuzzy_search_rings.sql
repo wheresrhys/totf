@@ -1,15 +1,11 @@
-CREATE FUNCTION public.fuzzy_search_rings (
-  q text
-)
-  RETURNS TABLE (
-    ring_no         text,
-    closeness_score numeric,
-    species_name    text
-  )
-  LANGUAGE plpgsql
-  STABLE
-  SET search_path TO 'public', 'pg_catalog'
-  AS $function$
+CREATE FUNCTION public.fuzzy_search_rings (q text) RETURNS TABLE (
+	ring_no text,
+	closeness_score numeric,
+	species_name text
+) LANGUAGE plpgsql STABLE
+SET
+	search_path TO 'public',
+	'pg_catalog' AS $function$
 BEGIN
   RETURN QUERY
 WITH fuzzy_matches as (SELECT
@@ -34,8 +30,8 @@ ORDER BY closeness_score ASC;
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.fuzzy_search_rings(text) TO anon;
+GRANT ALL ON FUNCTION public.fuzzy_search_rings (text) TO anon;
 
-GRANT ALL ON FUNCTION public.fuzzy_search_rings(text) TO authenticated;
+GRANT ALL ON FUNCTION public.fuzzy_search_rings (text) TO authenticated;
 
-GRANT ALL ON FUNCTION public.fuzzy_search_rings(text) TO service_role;
+GRANT ALL ON FUNCTION public.fuzzy_search_rings (text) TO service_role;

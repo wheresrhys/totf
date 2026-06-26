@@ -1,1 +1,3 @@
-CREATE EXTENSION fuzzystrmatch WITH SCHEMA public;
+CREATE EXTENSION fuzzystrmatch
+WITH
+	SCHEMA public;

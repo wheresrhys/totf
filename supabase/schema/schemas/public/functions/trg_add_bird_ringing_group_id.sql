@@ -1,8 +1,4 @@
-CREATE FUNCTION public.trg_add_bird_ringing_group_id()
-  RETURNS TRIGGER
-  LANGUAGE plpgsql
-  SECURITY DEFINER
-  AS $function$
+CREATE FUNCTION public.trg_add_bird_ringing_group_id () RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $function$
 BEGIN
   UPDATE "public"."Birds"
   SET ringing_group_ids = CASE
@@ -17,8 +13,8 @@ BEGIN
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.trg_add_bird_ringing_group_id() TO anon;
+GRANT ALL ON FUNCTION public.trg_add_bird_ringing_group_id () TO anon;
 
-GRANT ALL ON FUNCTION public.trg_add_bird_ringing_group_id() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_add_bird_ringing_group_id () TO authenticated;
 
-GRANT ALL ON FUNCTION public.trg_add_bird_ringing_group_id() TO service_role;
+GRANT ALL ON FUNCTION public.trg_add_bird_ringing_group_id () TO service_role;

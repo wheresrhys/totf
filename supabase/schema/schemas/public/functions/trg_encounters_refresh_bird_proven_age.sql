@@ -1,9 +1,6 @@
-CREATE FUNCTION public.trg_encounters_refresh_bird_proven_age()
-  RETURNS TRIGGER
-  LANGUAGE plpgsql
-  SECURITY DEFINER
-  SET search_path TO 'public'
-  AS $function$
+CREATE FUNCTION public.trg_encounters_refresh_bird_proven_age () RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER
+SET
+	search_path TO 'public' AS $function$
 DECLARE
   v_bird_id bigint;
 BEGIN
@@ -40,8 +37,8 @@ BEGIN
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.trg_encounters_refresh_bird_proven_age() TO anon;
+GRANT ALL ON FUNCTION public.trg_encounters_refresh_bird_proven_age () TO anon;
 
-GRANT ALL ON FUNCTION public.trg_encounters_refresh_bird_proven_age() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_encounters_refresh_bird_proven_age () TO authenticated;
 
-GRANT ALL ON FUNCTION public.trg_encounters_refresh_bird_proven_age() TO service_role;
+GRANT ALL ON FUNCTION public.trg_encounters_refresh_bird_proven_age () TO service_role;

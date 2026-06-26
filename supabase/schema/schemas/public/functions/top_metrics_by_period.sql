@@ -1,17 +1,12 @@
 CREATE FUNCTION public.top_metrics_by_period (
-  temporal_unit text,
-  metric_name   text,
-  result_limit  integer,
-  filters       public.top_metrics_filter_params DEFAULT NULL::public.top_metrics_filter_params
-)
-  RETURNS TABLE (
-    visit_date   date,
-    metric_value bigint
-  )
-  LANGUAGE plpgsql
-  STABLE
-  SET search_path TO 'public', 'pg_catalog'
-  AS $function$
+	temporal_unit text,
+	metric_name text,
+	result_limit integer,
+	filters public.top_metrics_filter_params DEFAULT NULL::public.top_metrics_filter_params
+) RETURNS TABLE (visit_date date, metric_value bigint) LANGUAGE plpgsql STABLE
+SET
+	search_path TO 'public',
+	'pg_catalog' AS $function$
 BEGIN
   RETURN QUERY
   WITH by_period_and_species AS (
@@ -35,8 +30,23 @@ BEGIN
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.top_metrics_by_period(text, text, integer, public.top_metrics_filter_params) TO anon;
+GRANT ALL ON FUNCTION public.top_metrics_by_period (
+	text,
+	text,
+	integer,
+	public.top_metrics_filter_params
+) TO anon;
 
-GRANT ALL ON FUNCTION public.top_metrics_by_period(text, text, integer, public.top_metrics_filter_params) TO authenticated;
+GRANT ALL ON FUNCTION public.top_metrics_by_period (
+	text,
+	text,
+	integer,
+	public.top_metrics_filter_params
+) TO authenticated;
 
-GRANT ALL ON FUNCTION public.top_metrics_by_period(text, text, integer, public.top_metrics_filter_params) TO service_role;
+GRANT ALL ON FUNCTION public.top_metrics_by_period (
+	text,
+	text,
+	integer,
+	public.top_metrics_filter_params
+) TO service_role;

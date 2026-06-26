@@ -1,21 +1,19 @@
 CREATE FUNCTION public.most_caught_birds (
-  result_limit           integer DEFAULT NULL::integer,
-  max_per_species        integer DEFAULT NULL::integer,
-  significance_threshold integer DEFAULT 3,
-  species_filter         text    DEFAULT NULL::text,
-  year_filter            integer DEFAULT NULL::integer,
-  ringing_group_filter   bigint  DEFAULT NULL::bigint
-)
-  RETURNS TABLE (
-    species_name    text,
-    ring_no         text,
-    encounter_count bigint,
-    encounter_dates date[]
-  )
-  LANGUAGE plpgsql
-  STABLE
-  SET search_path TO 'public', 'pg_catalog'
-  AS $function$
+	result_limit integer DEFAULT NULL::integer,
+	max_per_species integer DEFAULT NULL::integer,
+	significance_threshold integer DEFAULT 3,
+	species_filter text DEFAULT NULL::text,
+	year_filter integer DEFAULT NULL::integer,
+	ringing_group_filter bigint DEFAULT NULL::bigint
+) RETURNS TABLE (
+	species_name text,
+	ring_no text,
+	encounter_count bigint,
+	encounter_dates date[]
+) LANGUAGE plpgsql STABLE
+SET
+	search_path TO 'public',
+	'pg_catalog' AS $function$
 BEGIN
   RETURN QUERY
 	WITH bird_encounter_counts AS (
@@ -53,8 +51,8 @@ BEGIN
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.most_caught_birds(integer, integer, integer, text, integer, bigint) TO anon;
+GRANT ALL ON FUNCTION public.most_caught_birds (integer, integer, integer, text, integer, bigint) TO anon;
 
-GRANT ALL ON FUNCTION public.most_caught_birds(integer, integer, integer, text, integer, bigint) TO authenticated;
+GRANT ALL ON FUNCTION public.most_caught_birds (integer, integer, integer, text, integer, bigint) TO authenticated;
 
-GRANT ALL ON FUNCTION public.most_caught_birds(integer, integer, integer, text, integer, bigint) TO service_role;
+GRANT ALL ON FUNCTION public.most_caught_birds (integer, integer, integer, text, integer, bigint) TO service_role;

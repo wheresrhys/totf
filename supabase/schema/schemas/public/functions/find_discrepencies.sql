@@ -1,16 +1,12 @@
-CREATE FUNCTION public.find_discrepencies (
-  ringing_group_filter bigint DEFAULT NULL::bigint
-)
-  RETURNS TABLE (
-    bird_id          bigint,
-    ring_no          text,
-    species_name     text,
-    discrepency_type text
-  )
-  LANGUAGE plpgsql
-  STABLE
-  SET search_path TO 'public', 'pg_catalog'
-  AS $function$
+CREATE FUNCTION public.find_discrepencies (ringing_group_filter bigint DEFAULT NULL::bigint) RETURNS TABLE (
+	bird_id bigint,
+	ring_no text,
+	species_name text,
+	discrepency_type text
+) LANGUAGE plpgsql STABLE
+SET
+	search_path TO 'public',
+	'pg_catalog' AS $function$
 BEGIN
   RETURN QUERY
 
@@ -147,8 +143,8 @@ WHERE max_wing_length - min_wing_length >= 5;
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.find_discrepencies(bigint) TO anon;
+GRANT ALL ON FUNCTION public.find_discrepencies (bigint) TO anon;
 
-GRANT ALL ON FUNCTION public.find_discrepencies(bigint) TO authenticated;
+GRANT ALL ON FUNCTION public.find_discrepencies (bigint) TO authenticated;
 
-GRANT ALL ON FUNCTION public.find_discrepencies(bigint) TO service_role;
+GRANT ALL ON FUNCTION public.find_discrepencies (bigint) TO service_role;

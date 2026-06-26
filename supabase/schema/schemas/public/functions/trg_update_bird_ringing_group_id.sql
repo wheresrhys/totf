@@ -1,8 +1,4 @@
-CREATE FUNCTION public.trg_update_bird_ringing_group_id()
-  RETURNS TRIGGER
-  LANGUAGE plpgsql
-  SECURITY DEFINER
-  AS $function$
+CREATE FUNCTION public.trg_update_bird_ringing_group_id () RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $function$
 BEGIN
   -- Only act when ringing_group_id actually changed
   IF OLD.ringing_group_id IS DISTINCT FROM NEW.ringing_group_id THEN
@@ -35,8 +31,8 @@ BEGIN
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.trg_update_bird_ringing_group_id() TO anon;
+GRANT ALL ON FUNCTION public.trg_update_bird_ringing_group_id () TO anon;
 
-GRANT ALL ON FUNCTION public.trg_update_bird_ringing_group_id() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_update_bird_ringing_group_id () TO authenticated;
 
-GRANT ALL ON FUNCTION public.trg_update_bird_ringing_group_id() TO service_role;
+GRANT ALL ON FUNCTION public.trg_update_bird_ringing_group_id () TO service_role;
