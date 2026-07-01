@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import { RingingGroupProvider } from './components/layout/RingingGroupProvider';
 import { getGroupCookie } from './actions/group-cookie';
+import { LoginModal } from './components/layout/LoginModal';
 export const metadata: Metadata = {
 	title: 'Top of the Flocks',
 	description: 'Leaderboard for bird ringing data'
@@ -25,10 +26,17 @@ async function AuthorisedView({ children }: { children: React.ReactNode }) {
 		getGroupCookie(),
 		fetchRingingGroups()
 	]);
+
+	if (!initialGroupId) {
+		return <LoginModal groups={groups} />;
+	}
+
+	const selectedGroup = groups.find((g) => g.id === initialGroupId)!;
+
 	return (
 		<Suspense>
 			<RingingGroupProvider initialGroupId={initialGroupId}>
-				<GlobalNav groups={groups} selectedGroupId={initialGroupId} />
+				<GlobalNav groups={[selectedGroup]} selectedGroupId={initialGroupId} />
 				{children}
 			</RingingGroupProvider>
 		</Suspense>
