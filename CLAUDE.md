@@ -116,6 +116,8 @@ Tests render async server components directly with `await Page({ params: Promise
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (public) |
 | `SUPABASE_JWT_SECRET` | Used to sign group JWTs (must match Supabase project's JWT secret) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (bypasses RLS — admin scripts only) |
+| `PASSWORD_PEPPER` | Secret appended to passwords before bcrypt hashing — must match across app and `set-group-password` script |
 
 Local values are in `.env.dev`. Production values are managed via 1Password (see `scripts/load-prod-env.sh`).
 
@@ -129,3 +131,14 @@ npm run db:import:prod ./path/to/data.csv "Group Name"
 ```
 
 The import script (`scripts/import-csv.ts`) upserts Species, RingingGroups, Birds, Locations, Sessions, and Encounters in dependency order, rate-limited to 30 req/s.
+
+## Setting group passwords
+
+After creating a group, set its login password with:
+
+```sh
+npm run set-group-password:local "Group Name" "password"
+npm run set-group-password:prod "Group Name" "password"
+```
+
+Passwords are bcrypt-hashed with a pepper from the `PASSWORD_PEPPER` env var.
