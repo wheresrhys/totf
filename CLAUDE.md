@@ -60,7 +60,7 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
 2. Run `npm run db:diff` to see what changed vs. prod.
 3. Update files in `supabase/schema/` to match the intended state.
 4. Run `npm run db:schema:apply` to generate a migration named after the current branch and apply it to the local db
-5. You may want to use `npm run db:seed:local` to repopulate teh db with test data
+5. You may want to use `npm run db:seed:local` to repopulate the db with test data
 6. Inspect the generated migration file before pushing.
 7. Deploy schema changes with `npm run db:migration:push`.
 
@@ -116,6 +116,7 @@ Tests render async server components directly with `await Page({ params: Promise
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (public) |
 | `SUPABASE_JWT_SECRET` | Used to sign group JWTs (must match Supabase project's JWT secret) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (bypasses RLS — admin scripts only) |
 
 Local values are in `.env.dev`. Production values are managed via 1Password (see `scripts/load-prod-env.sh`).
 
@@ -129,3 +130,14 @@ npm run db:import:prod ./path/to/data.csv "Group Name"
 ```
 
 The import script (`scripts/import-csv.ts`) upserts Species, RingingGroups, Birds, Locations, Sessions, and Encounters in dependency order, rate-limited to 30 req/s.
+
+## Setting group passwords
+
+After creating a group, set its login password with:
+
+```sh
+npm run set-group-password:local "Group Name" "password"
+npm run set-group-password:prod "Group Name" "password"
+```
+
+Passwords are bcrypt-hashed with a per-group random salt stored in the `password_salt` column of `RingingGroups`.

@@ -1,6 +1,8 @@
 CREATE TABLE public."RingingGroups" (
 	group_name text NOT NULL,
-	id bigint DEFAULT nextval('public."RingingGroups_id_seq"'::regclass) NOT NULL
+	id bigint DEFAULT nextval('public."RingingGroups_id_seq"'::regclass) NOT NULL,
+	password_hash text,
+	password_salt text
 );
 
 CREATE POLICY ringing_groups_access ON public."RingingGroups" FOR
