@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { supabase } from '../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../lib/group-auth';
@@ -7,12 +8,6 @@ const [groupName, password] = process.argv.slice(2);
 
 if (!groupName || !password) {
 	console.error('Usage: set-group-password <groupName> <password>');
-	process.exit(1);
-}
-
-const pepper = process.env.PASSWORD_PEPPER;
-if (!pepper) {
-	console.error('PASSWORD_PEPPER env var is required');
 	process.exit(1);
 }
 
@@ -27,12 +22,13 @@ if (fetchError || !group) {
 	process.exit(1);
 }
 
-const hash = await bcrypt.hash(password + pepper, 12);
+const salt = randomBytes(32).toString('hex');
+const hash = await bcrypt.hash(password + salt, 12);
 
 const authedClient = await getAuthenticatedSupabaseClientForGroup(group.id);
 const { error } = await authedClient
 	.from('RingingGroups')
-	.update({ password_hash: hash })
+	.update({ password_hash: hash, password_salt: salt })
 	.eq('id', group.id);
 
 if (error) {
