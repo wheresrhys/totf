@@ -9,12 +9,19 @@ CREATE INDEX idx_locations_ringing_group_id ON public."Locations" (ringing_group
 CREATE POLICY group_locations_access ON public."Locations" FOR
 SELECT
 	USING (
-		(
-			ringing_group_id = (
-				(
+		ringing_group_id = (
+			(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
+		)::bigint
+		OR EXISTS (
+			SELECT
+				1
+			FROM
+				public."GroupDataSharing"
+			WHERE
+				from_group_id = ringing_group_id
+				AND to_group_id = (
 					(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
-				)
-			)::bigint
+				)::bigint
 		)
 	);
 

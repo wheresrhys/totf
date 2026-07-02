@@ -17,12 +17,19 @@ EXECUTE FUNCTION public.trg_set_session_generated_fields ();
 CREATE POLICY group_sessions_access ON public."Sessions" FOR
 SELECT
 	USING (
-		(
-			ringing_group_id = (
-				(
+		ringing_group_id = (
+			(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
+		)::bigint
+		OR EXISTS (
+			SELECT
+				1
+			FROM
+				public."GroupDataSharing"
+			WHERE
+				from_group_id = ringing_group_id
+				AND to_group_id = (
 					(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
-				)
-			)::bigint
+				)::bigint
 		)
 	);
 
