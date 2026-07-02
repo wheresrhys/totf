@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getGroupCookie } from '@/app/actions/group-cookie';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 
 export default async function CrossGroupLayout({
 	children,
@@ -20,6 +21,17 @@ export default async function CrossGroupLayout({
 		redirect('/');
 	}
 
-	// GroupDataSharing check added in PR #250
-	notFound();
+	const supabase = await getAuthenticatedSupabaseClient();
+	const { data } = await supabase
+		.from('GroupDataSharing')
+		.select('id')
+		.eq('from_group_id', viewedGroupId)
+		.eq('to_group_id', loggedInGroupId)
+		.maybeSingle();
+
+	if (!data) {
+		notFound();
+	}
+
+	return children;
 }

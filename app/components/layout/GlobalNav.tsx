@@ -6,23 +6,30 @@ import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
 import { useSetRingingGroup } from './RingingGroupProvider';
 import { logout } from '@/app/actions/logout';
 import type { RingingGroupRow } from '@/app/models/db';
-export function NavItems({ classes }: { classes: string }) {
+
+export function NavItems({
+	classes,
+	basePath = ''
+}: {
+	classes: string;
+	basePath?: string;
+}) {
 	return (
 		<ul className={classes}>
 			<li>
-				<NoPrefetchLink href="/sessions">Sessions</NoPrefetchLink>
+				<NoPrefetchLink href={`${basePath}/sessions`}>Sessions</NoPrefetchLink>
 			</li>
 			<li>
-				<NoPrefetchLink href="/species">Species</NoPrefetchLink>
+				<NoPrefetchLink href={`${basePath}/species`}>Species</NoPrefetchLink>
 			</li>
 			<li>
-				<NoPrefetchLink href="/mistakes">Mistakes</NoPrefetchLink>
+				<NoPrefetchLink href={`${basePath}/mistakes`}>Mistakes</NoPrefetchLink>
 			</li>
 			<li>
-				<NoPrefetchLink href="/retraps">Retraps</NoPrefetchLink>
+				<NoPrefetchLink href={`${basePath}/retraps`}>Retraps</NoPrefetchLink>
 			</li>
 			<li>
-				<NoPrefetchLink href="/effort">Effort</NoPrefetchLink>
+				<NoPrefetchLink href={`${basePath}/effort`}>Effort</NoPrefetchLink>
 			</li>
 		</ul>
 	);
@@ -49,20 +56,27 @@ function Expander({
 
 function GroupSwitcher({
 	groups,
-	selectedGroupId,
+	loggedInGroupId,
+	selectedValue,
 	onChange
 }: {
 	groups: RingingGroupRow[];
-	selectedGroupId: number | null;
+	loggedInGroupId: number | null;
+	selectedValue: number | null;
 	onChange: () => void;
 }) {
 	const router = useRouter();
 	const setRingingGroup = useSetRingingGroup();
+
 	async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
 		const groupId = parseInt(e.target.value, 10);
-		await setRingingGroup(groupId);
 		onChange();
-		router.refresh();
+		if (groupId === loggedInGroupId) {
+			await setRingingGroup(groupId);
+			router.push('/');
+		} else {
+			router.push(`/group/${groupId}`);
+		}
 	}
 
 	if (groups.length === 1) {
@@ -72,11 +86,11 @@ function GroupSwitcher({
 	return (
 		<select
 			className="select select-bordered md:w-1/3"
-			value={selectedGroupId ?? ''}
+			value={selectedValue ?? ''}
 			onChange={handleChange}
 			aria-label="Select ringing group"
 		>
-			{selectedGroupId === null && (
+			{selectedValue === null && (
 				<option value="" disabled>
 					Select group
 				</option>
@@ -115,10 +129,10 @@ function expanderReducer(
 
 export default function GlobalNav({
 	groups,
-	selectedGroupId
+	loggedInGroupId
 }: {
 	groups: RingingGroupRow[];
-	selectedGroupId: number | null;
+	loggedInGroupId: number | null;
 }) {
 	const pathname = usePathname();
 	const router = useRouter();
@@ -126,31 +140,36 @@ export default function GlobalNav({
 	const [expanders, expandersDispatch] = useReducer(expanderReducer, {
 		search: false,
 		mobileNav: false,
-		userMenu: !selectedGroupId
+		userMenu: !loggedInGroupId
 	} as Record<ExpanderId, boolean>);
 	const groupsCount = groups.length;
 	const firstGroupId = groups[0].id;
 	const searchInputRef = useRef<HTMLInputElement>(null);
-	const selectedGroup = groups.find(
-		(group) => group.id === selectedGroupId
-	) as RingingGroupRow;
+
+	const crossGroupMatch = pathname.match(/^\/group\/(\d+)/);
+	const viewedGroupId = crossGroupMatch ? Number(crossGroupMatch[1]) : null;
+	const basePath = viewedGroupId ? `/group/${viewedGroupId}` : '';
+	const displayGroupId = viewedGroupId ?? loggedInGroupId;
+	const displayGroup = groups.find((g) => g.id === displayGroupId) as
+		| RingingGroupRow
+		| undefined;
 
 	// Reset expandable UI state when route changes
 	useEffect(() => {
 		expandersDispatch({
 			type: 'set',
 			id: 'userMenu',
-			value: !selectedGroupId
+			value: !loggedInGroupId
 		});
-	}, [pathname, selectedGroupId]);
+	}, [pathname, loggedInGroupId]);
 
 	useEffect(() => {
-		if (groupsCount === 1 && selectedGroupId !== firstGroupId) {
+		if (groupsCount === 1 && loggedInGroupId !== firstGroupId) {
 			setRingingGroup(firstGroupId).then(() => {
 				router.refresh();
 			});
 		}
-	}, [groupsCount, firstGroupId, selectedGroupId, router, setRingingGroup]);
+	}, [groupsCount, firstGroupId, loggedInGroupId, router, setRingingGroup]);
 
 	useEffect(() => {
 		if (expanders.search) {
@@ -163,14 +182,14 @@ export default function GlobalNav({
 				<div className="w-full flex px-6 py-4">
 					<NoPrefetchLink
 						className="link text-base-content link-neutral text-xl font-bold no-underline flex items-center gap-2 text-nowrap"
-						href="/"
+						href={basePath || '/'}
 					>
 						<span className="mr-2 icon-[fluent-emoji-flat--blackbird] size-8 flex-shrink-0 flex-grow-0"></span>
 						<span className="flex items-center gap-x-2 flex-wrap">
 							<span>Top of the Flocks</span>
-							{selectedGroupId ? (
+							{displayGroup ? (
 								<span className="text-sm font-medium">
-									{selectedGroup.group_name}
+									{displayGroup.group_name}
 								</span>
 							) : null}
 						</span>
@@ -209,7 +228,10 @@ export default function GlobalNav({
 							<RingSearchForm />
 						</div>
 						<div className="hidden md:flex">
-							<NavItems classes="menu menu-horizontal gap-2 p-0 text-base" />
+							<NavItems
+								classes="menu menu-horizontal gap-2 p-0 text-base"
+								basePath={basePath}
+							/>
 						</div>
 						<button
 							type="button"
@@ -225,7 +247,10 @@ export default function GlobalNav({
 					</div>
 				</div>
 				<Expander id="mobile-nav" isExpanded={expanders.mobileNav}>
-					<NavItems classes="p-4 text-right *:p-2 *:mt-1 *:mb-1 *:hover:bg-base-200 *:rounded" />
+					<NavItems
+						classes="p-4 text-right *:p-2 *:mt-1 *:mb-1 *:hover:bg-base-200 *:rounded"
+						basePath={basePath}
+					/>
 				</Expander>
 				<Expander id="ring-search-form-wrapper" isExpanded={expanders.search}>
 					<div className="p-4 pt-0">
@@ -241,7 +266,8 @@ export default function GlobalNav({
 						{groups.length > 1 && (
 							<GroupSwitcher
 								groups={groups}
-								selectedGroupId={selectedGroupId}
+								loggedInGroupId={loggedInGroupId}
+								selectedValue={viewedGroupId ?? loggedInGroupId}
 								onChange={() => expandersDispatch({ type: 'collapseAll' })}
 							/>
 						)}
