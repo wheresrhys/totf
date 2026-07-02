@@ -4,6 +4,7 @@ import GlobalNav from './components/layout/GlobalNav';
 import LoadFlyonUI from './components/layout/LoadFlyonUI';
 import { Suspense } from 'react';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { RingingGroupProvider } from './components/layout/RingingGroupProvider';
 import { getGroupCookie } from './actions/group-cookie';
 import { LoginModal } from './components/layout/LoginModal';
@@ -21,22 +22,40 @@ async function fetchRingingGroups(): Promise<RingingGroupRow[]> {
 		.then(catchSupabaseErrors) as Promise<RingingGroupRow[]>;
 }
 
+async function fetchAccessibleGroups(
+	allGroups: RingingGroupRow[]
+): Promise<RingingGroupRow[]> {
+	const authenticatedClient = await getAuthenticatedSupabaseClient();
+	const sharingRows = (await authenticatedClient
+		.from('GroupDataSharing')
+		.select('from_group_id')
+		.then(catchSupabaseErrors)) as { from_group_id: number }[];
+
+	if (!sharingRows || sharingRows.length === 0) return [];
+	const accessibleIds = new Set(sharingRows.map((r) => r.from_group_id));
+	return allGroups.filter((g) => accessibleIds.has(g.id));
+}
+
 async function AuthorisedView({ children }: { children: React.ReactNode }) {
-	const [initialGroupId, groups] = await Promise.all([
+	const [loggedInGroupId, allGroups] = await Promise.all([
 		getGroupCookie(),
 		fetchRingingGroups()
 	]);
 
-	if (!initialGroupId) {
-		return <LoginModal groups={groups} />;
+	if (!loggedInGroupId) {
+		return <LoginModal groups={allGroups} />;
 	}
 
-	const selectedGroup = groups.find((g) => g.id === initialGroupId)!;
+	const ownGroup = allGroups.find((g) => g.id === loggedInGroupId)!;
+	const accessibleGroups = await fetchAccessibleGroups(allGroups);
 
 	return (
 		<Suspense>
-			<RingingGroupProvider initialGroupId={initialGroupId}>
-				<GlobalNav groups={[selectedGroup]} selectedGroupId={initialGroupId} />
+			<RingingGroupProvider initialGroupId={loggedInGroupId}>
+				<GlobalNav
+					groups={[ownGroup, ...accessibleGroups]}
+					loggedInGroupId={loggedInGroupId}
+				/>
 				{children}
 			</RingingGroupProvider>
 		</Suspense>

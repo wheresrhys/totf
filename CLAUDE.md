@@ -24,10 +24,17 @@ A leaderboard/statistics dashboard for bird ringing data. Bird ringing groups (o
 
 There are no per-person logins. Authentication is group-scoped:
 
-1. The selected group is stored in a `selected_group_id` HTTP-only cookie.
+1. The logged-in group is stored in a `selected_group_id` HTTP-only cookie.
 2. Server actions call `getAuthenticatedSupabaseClient()` (`lib/group-auth.ts`), which reads the cookie and returns a Supabase client carrying a **custom JWT** embedding `app_metadata.ringing_group_id`.
-3. All RLS policies on the database read `ringing_group_id` from this JWT — so the database itself enforces data isolation.
+3. RLS policies on the database read `ringing_group_id` from this JWT — so the database itself enforces data isolation.
 4. Clients are cached in an LRU cache (100 entries, 5-minute TTL) to avoid re-signing JWTs on every request.
+
+### Cross-group data sharing
+
+Groups can grant other groups read access to their data via the `GroupDataSharing` table (`from_group_id` → `to_group_id`). The relationship is non-commutative and non-transitive. The JWT always carries the **logged-in** group's ID; RLS policies allow reading shared data via a `GroupDataSharing` EXISTS check, without switching the JWT.
+
+`loggedInGroupId` = group from the cookie (always the authenticated user's group).
+`viewedGroupId` = group whose data is currently being displayed (may differ when browsing another group's pages).
 
 **Important:** Multi-tenancy via RLS is only partially implemented. See [issue #149](https://github.com/wheresrhys/totf/issues/149) for current status. Do not assume that all tables are fully isolated — verify before adding features that rely on group isolation.
 
@@ -43,6 +50,7 @@ Tables (PascalCase in Postgres, matching generated TypeScript types in `types/su
 | `Sessions` | A ringing session (date + location) |
 | `Encounters` | One bird captured once in one session, with measurements |
 | `Locations` | Ringing sites, owned by a group |
+| `GroupDataSharing` | Non-commutative read-access grants between groups (`from_group_id` shares data with `to_group_id`) |
 
 Key design notes:
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
@@ -71,6 +79,16 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
 - Errors from Supabase calls are handled via `catchSupabaseErrors()`.
 - RPC calls go through `.rpc('function_name', args)` on the Supabase client.
 - TypeScript types for DB rows come from `app/models/db.ts`, which re-exports from the auto-generated types.
+
+## Route structure
+
+- Own-group pages: `/`, `/sessions`, `/species`, `/species/[name]`, `/effort`, `/mistakes`, `/retraps`
+- Cross-group pages: `/group/[id]/`, `/group/[id]/sessions`, `/group/[id]/species`, etc.
+- Session detail: `/group/[id]/session/[date]` and `/group/[id]/session/[date]/site/[locationId]`
+- Bird detail: `/bird/[ring]` — always global, no group prefix
+- Import: own-group only, no cross-group variant
+
+Cross-group pages live in `app/group/[id]/`. Thin page wrappers import own-group page components and pass `viewedGroupId` extracted from URL params. `app/group/[id]/layout.tsx` enforces authorization (checks `GroupDataSharing` row exists).
 
 ## Code conventions
 
