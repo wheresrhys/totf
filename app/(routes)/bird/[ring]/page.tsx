@@ -19,7 +19,7 @@ import { EncountersTimeline } from '@/app/components/EncountersTimeline';
 type PageParams = { ring: string };
 type PageProps = { params: Promise<PageParams> };
 
-async function fetchBirdData({ ring }: PageParams, groupId: number) {
+async function fetchBirdData({ ring }: PageParams, _viewedGroupId: number) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const bird = (await supabase
 		.from('Birds')
@@ -62,7 +62,6 @@ async function fetchBirdData({ ring }: PageParams, groupId: number) {
 	`
 		)
 		.eq('bird_id', bird.id)
-		.eq('ringing_group_id', groupId)
 		.then(catchSupabaseErrors)) as EncounterOfBird[];
 
 	return { ...bird, encounters } as StandaloneBird;
@@ -70,12 +69,19 @@ async function fetchBirdData({ ring }: PageParams, groupId: number) {
 
 function BirdSummary({
 	params: { ring },
-	data: bird
+	data: bird,
+	viewedGroupId: loggedInGroupId
 }: {
 	params: PageParams;
 	data: StandaloneBird;
+	viewedGroupId: number;
 }) {
 	const enrichedBird = bird.encounters.length ? enrichBird(bird) : null;
+	const sharedEncounterCount = enrichedBird
+		? enrichedBird.encounters.filter(
+				(e) => e.ringing_group_id !== loggedInGroupId
+			).length
+		: 0;
 	return (
 		<PageWrapper>
 			<PrimaryHeading>
@@ -91,13 +97,18 @@ function BirdSummary({
 				<>
 					<BadgeList
 						testId="bird-stats"
-						items={[
-							`${enrichedBird.encounters.length} encounters`,
-							`First: ${formatDate(enrichedBird.firstEncounterDate, 'dd MMMM yyyy')}`,
-							`Last: ${formatDate(enrichedBird.lastEncounterDate, 'dd MMMM yyyy')}`,
-							`Sex: ${enrichedBird.sex}${enrichedBird.sexCertainty < 0.5 ? `?` : ''}`,
-							`Proven Age: ${enrichedBird.proven_age}`
-						]}
+						items={
+							[
+								`${enrichedBird.encounters.length} encounters`,
+								sharedEncounterCount > 0
+									? `${sharedEncounterCount} from another group`
+									: null,
+								`First: ${formatDate(enrichedBird.firstEncounterDate, 'dd MMMM yyyy')}`,
+								`Last: ${formatDate(enrichedBird.lastEncounterDate, 'dd MMMM yyyy')}`,
+								`Sex: ${enrichedBird.sex}${enrichedBird.sexCertainty < 0.5 ? `?` : ''}`,
+								`Proven Age: ${enrichedBird.proven_age}`
+							].filter(Boolean) as string[]
+						}
 					/>
 					<div className="m-2">
 						<EncountersTimeline encounters={enrichedBird.encounters} />
