@@ -21,10 +21,14 @@ vi.mock('next/link', () => ({
 	},
 }));
 
-vi.mock('./app/actions/group-cookie', () => ({
-  getGroupCookie: vi.fn().mockResolvedValue(1),
-  setGroupCookie: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock('./app/actions/group-cookie', async () => {
+  const { generateGroupJwt } = await import('./lib/jwt');
+  return {
+    getGroupCookie: vi.fn().mockResolvedValue(1),
+    setGroupCookie: vi.fn().mockResolvedValue(undefined),
+    getGroupJwt: vi.fn().mockImplementation(() => generateGroupJwt(1)),
+  };
+});
 
 // Create mock functions that can be accessed in tests
 export const mockPush = vi.fn();
