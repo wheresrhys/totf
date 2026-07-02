@@ -141,7 +141,7 @@ function getStatConfigs(
 }
 
 async function fetchRecentSessions(
-	groupId: number
+	viewedGroupId: number
 ): Promise<SessionWithEncountersCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
@@ -149,7 +149,7 @@ async function fetchRecentSessions(
 		.select(
 			'id, visit_date, location_id, ringing_group_id, location:Locations(location_name), encounters:Encounters(count)'
 		)
-		.eq('ringing_group_id', groupId)
+		.eq('ringing_group_id', viewedGroupId)
 		.order('visit_date', { ascending: false })
 		.limit(3)
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
@@ -157,7 +157,7 @@ async function fetchRecentSessions(
 
 async function fetchInitialData(
 	_: DefaultPageParams,
-	groupId: number
+	viewedGroupId: number
 ): Promise<PageModel> {
 	const statConfigs = getStatConfigs(new Date());
 	return {
@@ -169,7 +169,7 @@ async function fetchInitialData(
 							...panel.dataArguments,
 							filters: {
 								...(panel.dataArguments.filters ?? {}),
-								ringing_group_filter: groupId
+								ringing_group_filter: viewedGroupId
 							},
 							result_limit: 1
 						});
@@ -186,16 +186,16 @@ async function fetchInitialData(
 				};
 			})
 		),
-		recentSessions: await fetchRecentSessions(groupId)
+		recentSessions: await fetchRecentSessions(viewedGroupId)
 	};
 }
 
 function RecentSessions({
 	data,
-	groupId
+	viewedGroupId
 }: {
 	data: SessionWithEncountersCount[];
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	return (
 		<div>
@@ -203,7 +203,7 @@ function RecentSessions({
 			<BoxyList>
 				<SessionsByDay
 					sessions={data}
-					groupId={groupId}
+					viewedGroupId={viewedGroupId}
 					dateFormat="EEEE do MMMM"
 				/>
 			</BoxyList>
@@ -212,22 +212,30 @@ function RecentSessions({
 }
 function HomePageContent({
 	data,
-	groupId
+	viewedGroupId
 }: {
 	data: PageModel;
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	return (
 		<PageWrapper>
-			<RecentSessions data={data.recentSessions} groupId={groupId} />
-			<StatsAccordion data={data.stats} groupId={groupId} />
+			<RecentSessions
+				data={data.recentSessions}
+				viewedGroupId={viewedGroupId}
+			/>
+			<StatsAccordion data={data.stats} viewedGroupId={viewedGroupId} />
 		</PageWrapper>
 	);
 }
 
-export default async function Home() {
+export default async function Home({
+	viewedGroupId
+}: {
+	viewedGroupId?: number;
+} = {}) {
 	return (
 		<BootstrapPageData<PageModel>
+			viewedGroupId={viewedGroupId}
 			getCacheKeys={() => ['home-stats']}
 			dataFetcher={fetchInitialData}
 			PageComponent={HomePageContent}

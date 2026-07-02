@@ -23,31 +23,31 @@ export type FullFatPageData = {
 };
 export type PageData = FullFatPageData | { speciesId: number };
 
-function getTopSessions(species: string, groupId: number) {
+function getTopSessions(species: string, viewedGroupId: number) {
 	return getTopPeriodsByMetric({
 		temporal_unit: 'day',
 		metric_name: 'encounters',
 		filters: {
 			species_filter: species,
-			ringing_group_filter: groupId
+			ringing_group_filter: viewedGroupId
 		} as TopMetricsFilterParams,
 		result_limit: 5
 	}) as Promise<TopPeriodsResult[]>;
 }
 
-async function getSpeciesStats(species: string, groupId: number) {
+async function getSpeciesStats(species: string, viewedGroupId: number) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('aggregate_stats', {
 			species_name_filter: species,
-			ringing_group_filter: groupId
+			ringing_group_filter: viewedGroupId
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
 }
 
 async function fetchSpeciesData(
 	params: PageParams,
-	groupId: number
+	viewedGroupId: number
 ): Promise<PageData | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const { id: speciesId } = (await supabase
@@ -60,9 +60,9 @@ async function fetchSpeciesData(
 		throw new Error(`Species ${params.speciesName} not found`);
 	}
 	const [topSessions, birds, speciesStats] = await Promise.all([
-		getTopSessions(params.speciesName, groupId),
-		fetchPageOfBirds(speciesId, groupId),
-		getSpeciesStats(params.speciesName, groupId)
+		getTopSessions(params.speciesName, viewedGroupId),
+		fetchPageOfBirds(speciesId, viewedGroupId),
+		getSpeciesStats(params.speciesName, viewedGroupId)
 	]);
 	if (birds.length === 0) {
 		return {
@@ -78,10 +78,13 @@ async function fetchSpeciesData(
 	};
 }
 
-export default async function SpeciesPage(props: PageProps) {
+export default async function SpeciesPage(
+	props: PageProps & { viewedGroupId?: number }
+) {
 	return (
 		<BootstrapPageData<PageData, PageProps, PageParams>
 			pageProps={props}
+			viewedGroupId={props.viewedGroupId}
 			getCacheKeys={(params: PageParams) => ['species', params.speciesName]}
 			dataFetcher={fetchSpeciesData}
 			PageComponent={SingleSpeciesPage}

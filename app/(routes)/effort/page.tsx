@@ -18,9 +18,9 @@ import { PayOffEffortChart } from '@/app/components/PayOffEffortChart';
 
 export async function fetchPayOffPageData(
 	_params: DefaultPageParams,
-	groupId: number
+	viewedGroupId: number
 ): Promise<PayOffStatsData | null> {
-	return fetchPayOffStats(groupId);
+	return fetchPayOffStats(viewedGroupId);
 }
 
 function formatAvgEncounters(n: number | null | undefined): string {
@@ -109,7 +109,7 @@ function PayOffPageContent({
 	data
 }: {
 	data: PayOffStatsData;
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	return (
 		<PageWrapper>
@@ -126,9 +126,14 @@ function PayOffPageContent({
 	);
 }
 
-export default function PayOffPage() {
+export default function PayOffPage({
+	viewedGroupId
+}: {
+	viewedGroupId?: number;
+} = {}) {
 	return (
 		<BootstrapPageData<PayOffStatsData>
+			viewedGroupId={viewedGroupId}
 			getCacheKeys={() => ['sessions', 'pay-off']}
 			dataFetcher={fetchPayOffPageData}
 			PageComponent={PayOffPageContent}
