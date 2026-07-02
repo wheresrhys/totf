@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"db:schema:pull": "supabase migration fetch --yes && supabase db pull --schema public || true",
-		"db:schema:apply": "npx supabase db schema declarative sync && npx supabase migration up --local && echo 'local schema applied to local db' && npm run db:types",
+		"db:schema:apply": "MIGRATION_NAME=$(git rev-parse --abbrev-ref HEAD | sed 's/[^a-zA-Z0-9]/_/g') && npx supabase db schema declarative sync --name \"$MIGRATION_NAME\" && npx supabase migration up --local && echo 'local schema applied to local db' && npm run db:types",
 		"db:diff": "npm run db:schema:pull && supabase db diff --local",
 		"db:migration:push": "supabase migration up --linked --debug --include-all",
 		"db:sync:local": "npm run db:schema:pull && supabase db reset && npm run db:seed:local",
