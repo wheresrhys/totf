@@ -9,16 +9,17 @@ export type BootstrapPageDataProps<DataType, PagePropsType, ParamsType> = {
 	pageProps?: PagePropsType;
 	loading?: React.ReactNode;
 	ttl?: number;
+	viewedGroupId?: number;
 	getCacheKeys: (params: ParamsType) => string[];
 	getParams?: (pageProps: PagePropsType) => Promise<ParamsType>;
 	dataFetcher: (
 		params: ParamsType,
-		groupId: number
+		viewedGroupId: number
 	) => Promise<DataType | null>;
 	PageComponent: (props: {
 		params: ParamsType;
 		data: DataType;
-		groupId: number;
+		viewedGroupId: number;
 	}) => React.ReactNode;
 };
 
@@ -42,19 +43,19 @@ export async function fetchDataWithCache<DataType, ParamsType>({
 	params,
 	dataFetcher,
 	cacheKeys,
-	groupId,
+	viewedGroupId,
 	ttl = 3600 // 1 hour
 }: {
 	params: ParamsType;
 	dataFetcher: (
 		params: ParamsType,
-		groupId: number
+		viewedGroupId: number
 	) => Promise<DataType | null>;
 	cacheKeys: string[];
-	groupId: number;
+	viewedGroupId: number;
 	ttl?: number;
 }): Promise<DataType | null> {
-	return dataFetcher(params, groupId);
+	return dataFetcher(params, viewedGroupId);
 	// return unstable_cache(async () => dataFetcher(params, groupId), cacheKeys, {
 	// 	// 1 day in production, 1 second in development to allow for quick testing
 	// 	revalidate: process.env.VERCEL_ENV === 'production' ? ttl : 1,
@@ -68,7 +69,8 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 	dataFetcher,
 	getCacheKeys,
 	PageComponent,
-	ttl
+	ttl,
+	viewedGroupId: viewedGroupIdProp
 }: BootstrapPageDataProps<DataType, PagePropsType, ParamsType>) {
 	let params: ParamsType;
 	if (getParams) {
@@ -79,13 +81,14 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 		params = {} as ParamsType;
 	}
 
-	const groupId = await getGroupCookie();
+	const loggedInGroupId = await getGroupCookie();
+	const viewedGroupId = viewedGroupIdProp ?? loggedInGroupId;
 	const cacheKeys = getCacheKeys(params);
-	const groupScopedCacheKeys = groupId
-		? [String(groupId), ...cacheKeys]
+	const groupScopedCacheKeys = viewedGroupId
+		? [String(viewedGroupId), ...cacheKeys]
 		: cacheKeys;
 
-	if (!groupId) {
+	if (!viewedGroupId) {
 		// TODO this should trigger a proper authorisation flow
 		return <p>Select a group to view data on this site</p>;
 	}
@@ -94,12 +97,14 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 		dataFetcher,
 		cacheKeys: groupScopedCacheKeys,
 		ttl,
-		groupId
+		viewedGroupId
 	});
 	if (!data) {
 		notFound();
 	}
-	return <PageComponent params={params} data={data} groupId={groupId} />;
+	return (
+		<PageComponent params={params} data={data} viewedGroupId={viewedGroupId} />
+	);
 }
 
 export function BootstrapPageData<

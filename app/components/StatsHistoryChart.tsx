@@ -73,18 +73,18 @@ function getSizes(statsHistory: AggregateStatsRow[]): LineChartData[] {
 
 export function StatsHistoryChart({
 	speciesName,
-	groupId
+	viewedGroupId
 }: {
 	speciesName: string;
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	const [statsHistory, setStatsHistory] = useState<AggregateStatsRow[]>([]);
 	useEffect(() => {
 		if (statsHistory.length > 0) return;
-		getSpeciesStatsHistory(speciesName, groupId).then((data) => {
+		getSpeciesStatsHistory(speciesName, viewedGroupId).then((data) => {
 			setStatsHistory(data);
 		});
-	}, [speciesName, groupId, statsHistory.length]);
+	}, [speciesName, viewedGroupId, statsHistory.length]);
 	return (
 		<>
 			<SecondaryHeading>Stats History</SecondaryHeading>

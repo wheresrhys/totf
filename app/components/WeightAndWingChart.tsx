@@ -137,10 +137,10 @@ function getChartData(
 
 export function WeightVsWingLengthChart({
 	speciesId,
-	groupId
+	viewedGroupId
 }: {
 	speciesId: number;
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	const [chartGrouping, setChartGrouping] = useState<'sex' | 'age'>('sex');
 	const [graphableEncounterData, setGraphableEncounterData] = useState<
@@ -148,10 +148,10 @@ export function WeightVsWingLengthChart({
 	>([]);
 	useEffect(() => {
 		if (graphableEncounterData.length > 0) return;
-		fetchGraphableEncounterData(speciesId, groupId).then((data) => {
+		fetchGraphableEncounterData(speciesId, viewedGroupId).then((data) => {
 			setGraphableEncounterData(data);
 		});
-	}, [speciesId, groupId, graphableEncounterData.length]);
+	}, [speciesId, viewedGroupId, graphableEncounterData.length]);
 	const chartData = getChartData(graphableEncounterData, chartGrouping);
 	return (
 		<>

@@ -13,12 +13,12 @@ import { NotableRetrapsTable } from '@/app/components/NotableRetrapsTable';
 
 async function fetchNotableRetraps(
 	_: DefaultPageParams,
-	groupId: number
+	viewedGroupId: number
 ): Promise<NotableRetrapsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('notable_retraps', {
-			ringing_group_filter: groupId,
+			ringing_group_filter: viewedGroupId,
 			result_limit_per_species: 5,
 			min_proven_age: 3,
 			min_encounter_count: 6
@@ -34,9 +34,14 @@ function ListNotableRetraps({ data }: { data: NotableRetrapsResult[] }) {
 		</PageWrapper>
 	);
 }
-export default async function NotableRetrapsPage() {
+export default async function NotableRetrapsPage({
+	viewedGroupId
+}: {
+	viewedGroupId?: number;
+} = {}) {
 	return (
 		<BootstrapPageData<NotableRetrapsResult[]>
+			viewedGroupId={viewedGroupId}
 			getCacheKeys={() => ['notable-retraps']}
 			dataFetcher={fetchNotableRetraps}
 			PageComponent={ListNotableRetraps}

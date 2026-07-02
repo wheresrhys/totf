@@ -13,7 +13,7 @@ export type StatOutputModel = {
 	dateFormat?: string;
 	classes?: string;
 	location?: LocationRow;
-	groupId?: number;
+	viewedGroupId?: number;
 	link?: boolean;
 };
 
@@ -39,12 +39,12 @@ export function StatOutput({
 	temporalUnit,
 	classes,
 	location,
-	groupId,
+	viewedGroupId,
 	link = true
 }: StatOutputModel) {
-	if (temporalUnit === 'day' && !groupId) {
+	if (temporalUnit === 'day' && !viewedGroupId) {
 		throw new Error(
-			'groupId is required to output stats for day temporal unit'
+			'viewedGroupId is required to output stats for day temporal unit'
 		);
 	}
 	return (
@@ -56,7 +56,7 @@ export function StatOutput({
 			{temporalUnit === 'day' && link ? (
 				<NoPrefetchLink
 					className="link"
-					href={`/session/group/${groupId}/${visitDate}${location ? `/site/${location.id}` : ''}`}
+					href={`/session/group/${viewedGroupId}/${visitDate}${location ? `/site/${location.id}` : ''}`}
 				>
 					{formatDate(
 						new Date(visitDate as string),

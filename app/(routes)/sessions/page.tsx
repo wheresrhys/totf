@@ -13,7 +13,7 @@ import {
 
 export async function fetchAllSessions(
 	params: DefaultPageParams,
-	groupId: number
+	viewedGroupId: number
 ): Promise<SessionWithEncountersCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
@@ -21,29 +21,34 @@ export async function fetchAllSessions(
 		.select(
 			'id, visit_date, location: Locations(id, location_name), encounters:Encounters(count)'
 		)
-		.eq('ringing_group_id', groupId)
+		.eq('ringing_group_id', viewedGroupId)
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
 }
 
 function ListAllSessions({
 	data,
-	groupId
+	viewedGroupId
 }: {
 	data: SessionWithEncountersCount[];
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Session history</PrimaryHeading>
-			<SessionHistoryCalendar sessions={data} groupId={groupId} />
+			<SessionHistoryCalendar sessions={data} viewedGroupId={viewedGroupId} />
 		</PageWrapper>
 	);
 }
 
-export default async function SessionsPage() {
+export default async function SessionsPage({
+	viewedGroupId
+}: {
+	viewedGroupId?: number;
+} = {}) {
 	return (
 		<BootstrapPageData<SessionWithEncountersCount[]>
+			viewedGroupId={viewedGroupId}
 			getCacheKeys={() => ['sessions']}
 			dataFetcher={fetchAllSessions}
 			PageComponent={ListAllSessions}

@@ -46,8 +46,8 @@ export function SingleSpeciesStats({
 	topSessions,
 	birds,
 	speciesStats,
-	groupId
-}: FullFatPageData & { groupId: number }) {
+	viewedGroupId
+}: FullFatPageData & { viewedGroupId: number }) {
 	if (!speciesStats) return null;
 	// const NotableRetrapsBirds =
 	// 	speciesStats.max_encountered_bird && speciesStats.max_encountered_bird > 1
@@ -111,7 +111,7 @@ export function SingleSpeciesStats({
 						temporalUnit="day"
 						classes="badge badge-outline"
 						dateFormat="d MMM yyyy"
-						groupId={groupId}
+						viewedGroupId={viewedGroupId}
 					/>
 				))}
 			</li>
