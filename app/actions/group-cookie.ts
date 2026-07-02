@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers';
 import { generateGroupJwt, verifyGroupJwt } from '@/lib/jwt';
 
-const COOKIE_NAME = 'session_id';
+const COOKIE_NAME = 'TOTFSession';
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
 export async function setGroupCookie(groupId: number): Promise<void> {
