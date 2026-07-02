@@ -48,10 +48,10 @@ function ConditionalTabPanel({
 
 function NotableRetrapsSection({
 	speciesName,
-	groupId
+	viewedGroupId
 }: {
 	speciesName: string;
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	const [notableRetraps, setNotableRetraps] = useState<NotableRetrapsResult[]>(
 		[]
@@ -59,11 +59,11 @@ function NotableRetrapsSection({
 	const [isLoaded, setIsLoaded] = useState(false);
 	useEffect(() => {
 		if (notableRetraps.length > 0) return;
-		fetchNotableRetraps(speciesName, groupId).then((data) => {
+		fetchNotableRetraps(speciesName, viewedGroupId).then((data) => {
 			setNotableRetraps(data);
 			setIsLoaded(true);
 		});
-	}, [speciesName, groupId, notableRetraps.length]);
+	}, [speciesName, viewedGroupId, notableRetraps.length]);
 	return (
 		<>
 			<SecondaryHeading>Notable Retraps</SecondaryHeading>
@@ -85,10 +85,10 @@ function NotableRetrapsSection({
 
 function SpeciesData({
 	data,
-	groupId
+	viewedGroupId
 }: {
 	data: FullFatPageData;
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	const [loadedBirds, setLoadedBirds] = useState(data.birds);
 	const [page, setPage] = useState(0);
@@ -106,7 +106,11 @@ function SpeciesData({
 	async function loadMoreBirds() {
 		const nextPage = page + 1;
 		setPage(nextPage);
-		const newBirds = await fetchPageOfBirds(data.speciesId, groupId, nextPage);
+		const newBirds = await fetchPageOfBirds(
+			data.speciesId,
+			viewedGroupId,
+			nextPage
+		);
 		setLoadedBirds([
 			...loadedBirds,
 			...newBirds.filter((bird) => !loadedIds.includes(bird.id))
@@ -127,7 +131,7 @@ function SpeciesData({
 	const loadedIds = loadedBirds.map((bird) => bird.id);
 	return (
 		<>
-			<SingleSpeciesStats {...data} groupId={groupId} />
+			<SingleSpeciesStats {...data} viewedGroupId={viewedGroupId} />
 			<nav
 				className="bg-base-200 rounded-field w-fit space-x-1 overflow-x-auto p-1 mt-4"
 				aria-label="Tabs"
@@ -190,7 +194,7 @@ function SpeciesData({
 			>
 				<NotableRetrapsSection
 					speciesName={data.speciesName}
-					groupId={groupId}
+					viewedGroupId={viewedGroupId}
 				/>
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
@@ -198,14 +202,20 @@ function SpeciesData({
 				tabId="stats-history"
 				activeTabId={activeTab}
 			>
-				<StatsHistoryChart speciesName={data.speciesName} groupId={groupId} />
+				<StatsHistoryChart
+					speciesName={data.speciesName}
+					viewedGroupId={viewedGroupId}
+				/>
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
 				tabId="size-plot"
 				activeTabId={activeTab}
 			>
-				<WeightVsWingLengthChart speciesId={data.speciesId} groupId={groupId} />
+				<WeightVsWingLengthChart
+					speciesId={data.speciesId}
+					viewedGroupId={viewedGroupId}
+				/>
 			</ConditionalTabPanel>
 		</>
 	);
@@ -218,17 +228,17 @@ function fullFatTypeGuard(data: PageData): data is FullFatPageData {
 export function SingleSpeciesPage({
 	params: { speciesName },
 	data,
-	groupId
+	viewedGroupId
 }: {
 	params: PageParams;
 	data: PageData;
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>{speciesName}</PrimaryHeading>
 			{fullFatTypeGuard(data) ? (
-				<SpeciesData data={data} groupId={groupId} />
+				<SpeciesData data={data} viewedGroupId={viewedGroupId} />
 			) : (
 				<p>Not authorised to view any encounter data for this species</p>
 			)}

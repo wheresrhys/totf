@@ -14,7 +14,7 @@ import type { SexedGraphableBird } from '@/app/components/WeightAndWingChart';
 import type { AggregateStatsRow } from '@/app/models/db';
 export async function fetchPageOfBirds(
 	speciesId: number,
-	groupId: number,
+	viewedGroupId: number,
 	page: number = 0
 ) {
 	const supabase = await getAuthenticatedSupabaseClient();
@@ -44,7 +44,7 @@ export async function fetchPageOfBirds(
 			)`
 		)
 		.eq('species_id', speciesId)
-		.contains('ringing_group_ids', [groupId])
+		.contains('ringing_group_ids', [viewedGroupId])
 		.order('last_encountered_timestamp', { ascending: false })
 		.range(
 			page * SPECIES_PAGE_BATCH_SIZE,
@@ -56,12 +56,12 @@ export async function fetchPageOfBirds(
 
 export async function fetchNotableRetraps(
 	speciesName: string,
-	groupId: number
+	viewedGroupId: number
 ): Promise<NotableRetrapsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('notable_retraps', {
-			ringing_group_filter: groupId,
+			ringing_group_filter: viewedGroupId,
 			species_filter: speciesName,
 			result_limit: 10,
 			min_proven_age: 3,
@@ -72,7 +72,7 @@ export async function fetchNotableRetraps(
 
 export async function fetchGraphableEncounterData(
 	speciesId: number,
-	groupId: number
+	viewedGroupId: number
 ): Promise<SexedGraphableBird[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const paginatedBirdResults = (await supabase
@@ -86,7 +86,7 @@ export async function fetchGraphableEncounterData(
 			)`
 		)
 		.eq('species_id', speciesId)
-		.contains('ringing_group_ids', [groupId])
+		.contains('ringing_group_ids', [viewedGroupId])
 		.then(catchSupabaseErrors)) as GraphableBird[];
 	return paginatedBirdResults.map(
 		(bird) =>
@@ -97,12 +97,15 @@ export async function fetchGraphableEncounterData(
 	);
 }
 
-export async function getSpeciesStatsHistory(species: string, groupId: number) {
+export async function getSpeciesStatsHistory(
+	species: string,
+	viewedGroupId: number
+) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('aggregate_stats', {
 			species_name_filter: species,
-			ringing_group_filter: groupId,
+			ringing_group_filter: viewedGroupId,
 			group_by_time_period: 'month'
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;

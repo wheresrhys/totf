@@ -4,7 +4,7 @@ import { catchSupabaseErrors } from '@/lib/supabase';
 import type { AggregateStatsRow } from '@/app/models/db';
 
 export async function fetchSpeciesData(
-	groupId: number,
+	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
 ): Promise<AggregateStatsRow[]> {
@@ -13,7 +13,7 @@ export async function fetchSpeciesData(
 		.rpc('aggregate_stats', {
 			from_date: fromDate,
 			to_date: toDate,
-			ringing_group_filter: groupId,
+			ringing_group_filter: viewedGroupId,
 			group_by_species: true
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;

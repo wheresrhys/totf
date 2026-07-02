@@ -49,10 +49,10 @@ const sortableColumnConfigs = speciesStatConfigs.reduce(
 
 export function MultiSpeciesStatsTable({
 	data: { speciesStats: initialSpeciesStats, years },
-	groupId
+	viewedGroupId
 }: {
 	data: PageData;
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	const formRef = useRef<HTMLFormElement>(null);
 	const [year, setYear] = useState<number | null>(null);
@@ -67,10 +67,12 @@ export function MultiSpeciesStatsTable({
 			isFirstRender.current = false;
 			return;
 		}
-		fetchSpeciesData(groupId, fromDate ?? undefined, toDate ?? undefined).then(
-			setSpeciesStats
-		);
-	}, [groupId, fromDate, toDate]);
+		fetchSpeciesData(
+			viewedGroupId,
+			fromDate ?? undefined,
+			toDate ?? undefined
+		).then(setSpeciesStats);
+	}, [viewedGroupId, fromDate, toDate]);
 
 	function clearSettings() {
 		setYear(null);

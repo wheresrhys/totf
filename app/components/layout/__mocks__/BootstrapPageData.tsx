@@ -54,6 +54,10 @@ export function BootstrapPageData<
 	}
 
 	return (
-		<bootstrapProps.PageComponent params={params} data={data} groupId={1} />
+		<bootstrapProps.PageComponent
+			params={params}
+			data={data}
+			viewedGroupId={1}
+		/>
 	);
 }

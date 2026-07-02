@@ -13,11 +13,11 @@ import { MistakesTable } from '@/app/components/MistakesTable';
 
 export async function fetchMistakes(
 	_: DefaultPageParams,
-	groupId: number
+	viewedGroupId: number
 ): Promise<DiscrepenciesResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('find_discrepencies', { ringing_group_filter: groupId })
+		.rpc('find_discrepencies', { ringing_group_filter: viewedGroupId })
 		.then(catchSupabaseErrors) as Promise<DiscrepenciesResult[]>;
 }
 
@@ -29,9 +29,14 @@ function ListMistakes({ data }: { data: DiscrepenciesResult[] }) {
 		</PageWrapper>
 	);
 }
-export default async function MistakesPage() {
+export default async function MistakesPage({
+	viewedGroupId
+}: {
+	viewedGroupId?: number;
+} = {}) {
 	return (
 		<BootstrapPageData<DiscrepenciesResult[]>
+			viewedGroupId={viewedGroupId}
 			getCacheKeys={() => ['mistakes']}
 			dataFetcher={fetchMistakes}
 			PageComponent={ListMistakes}
