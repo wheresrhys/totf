@@ -14,18 +14,28 @@ OR
 UPDATE OF location_id ON public."Sessions" FOR EACH ROW
 EXECUTE FUNCTION public.trg_set_session_generated_fields ();
 
+-- SELECT: grants access if the session belongs to the logged-in group, or if the session's group
+-- has granted read access to the logged-in group via GroupDataSharing
 CREATE POLICY group_sessions_access ON public."Sessions" FOR
 SELECT
 	USING (
-		(
-			ringing_group_id = (
-				(
+		ringing_group_id = (
+			(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
+		)::bigint
+		OR EXISTS (
+			SELECT
+				1
+			FROM
+				public."GroupDataSharing"
+			WHERE
+				granter_group_id = ringing_group_id
+				AND recipient_group_id = (
 					(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
-				)
-			)::bigint
+				)::bigint
 		)
 	);
 
+-- INSERT: only the owning group can insert sessions
 CREATE POLICY group_sessions_insert ON public."Sessions" FOR INSERT
 WITH
 	CHECK (
@@ -38,6 +48,7 @@ WITH
 		)
 	);
 
+-- UPDATE: only the owning group can update sessions
 CREATE POLICY group_sessions_update ON public."Sessions"
 FOR UPDATE
 	USING (

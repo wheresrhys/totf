@@ -132,6 +132,42 @@ export type Database = {
           },
         ]
       }
+      GroupDataSharing: {
+        Row: {
+          created_at: string
+          granter_group_id: number
+          id: number
+          recipient_group_id: number
+        }
+        Insert: {
+          created_at?: string
+          granter_group_id: number
+          id?: number
+          recipient_group_id: number
+        }
+        Update: {
+          created_at?: string
+          granter_group_id?: number
+          id?: number
+          recipient_group_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_data_sharing_granter_group_id_fkey"
+            columns: ["granter_group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_data_sharing_recipient_group_id_fkey"
+            columns: ["recipient_group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       Locations: {
         Row: {
           id: number

@@ -6,18 +6,28 @@ CREATE TABLE public."Locations" (
 
 CREATE INDEX idx_locations_ringing_group_id ON public."Locations" (ringing_group_id);
 
+-- SELECT: grants access if the location belongs to the logged-in group, or if the location's group
+-- has granted read access to the logged-in group via GroupDataSharing
 CREATE POLICY group_locations_access ON public."Locations" FOR
 SELECT
 	USING (
-		(
-			ringing_group_id = (
-				(
+		ringing_group_id = (
+			(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
+		)::bigint
+		OR EXISTS (
+			SELECT
+				1
+			FROM
+				public."GroupDataSharing"
+			WHERE
+				granter_group_id = ringing_group_id
+				AND recipient_group_id = (
 					(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
-				)
-			)::bigint
+				)::bigint
 		)
 	);
 
+-- INSERT: only the owning group can insert locations
 CREATE POLICY group_locations_insert ON public."Locations" FOR INSERT
 WITH
 	CHECK (
@@ -30,6 +40,7 @@ WITH
 		)
 	);
 
+-- UPDATE: only the owning group can update locations
 CREATE POLICY group_locations_update ON public."Locations"
 FOR UPDATE
 	USING (
