@@ -43,12 +43,12 @@ const groupByMonth = groupByDateMethod('getMonth');
 export function SessionsByDay({
 	sessions,
 	wrapperClasses = '',
-	groupId,
+	viewedGroupId,
 	dateFormat
 }: {
 	sessions: SessionWithEncountersCount[];
 	wrapperClasses?: string;
-	groupId: number;
+	viewedGroupId: number;
 	dateFormat: string;
 }) {
 	const sessionsByDate: Record<string, SessionWithEncountersCount[]> = {};
@@ -71,7 +71,7 @@ export function SessionsByDay({
 							showUnit={true}
 							temporalUnit="day"
 							dateFormat={dateFormat}
-							groupId={groupId}
+							viewedGroupId={viewedGroupId}
 						/>
 					) : (
 						<>
@@ -86,7 +86,7 @@ export function SessionsByDay({
 								showUnit={true}
 								temporalUnit="day"
 								dateFormat={dateFormat}
-								groupId={groupId}
+								viewedGroupId={viewedGroupId}
 							/>{' '}
 							at{' '}
 							{daySessions.map((session, index) => (
@@ -94,7 +94,7 @@ export function SessionsByDay({
 									{index > 0 ? ', ' : null}
 									<NoPrefetchLink
 										className="link"
-										href={`/session/group/${groupId}/${session.visit_date}/site/${session.location.id}`}
+										href={`/group/${viewedGroupId}/session/${session.visit_date}/site/${session.location.id}`}
 									>
 										{printLocationName(session.location.location_name)}
 									</NoPrefetchLink>
@@ -109,16 +109,16 @@ export function SessionsByDay({
 }
 
 function SessionsOfMonth({
-	model: { groupId, monthData: month }
+	model: { viewedGroupId, monthData: month }
 }: {
-	model: { groupId: number; monthData: SessionWithEncountersCount[] };
+	model: { viewedGroupId: number; monthData: SessionWithEncountersCount[] };
 }) {
 	return (
 		<ol className="list-inside list-none py-3">
 			<SessionsByDay
 				sessions={month}
 				wrapperClasses="mb-2"
-				groupId={groupId}
+				viewedGroupId={viewedGroupId}
 				dateFormat="EEEE do"
 			/>
 		</ol>
@@ -153,13 +153,13 @@ function YearHeading({
 }
 
 function MonthsOfYear({
-	model: { yearData, setExpandedMonth, expandedMonth, groupId }
+	model: { yearData, setExpandedMonth, expandedMonth, viewedGroupId }
 }: {
 	model: {
 		yearData: SessionWithEncountersCount[][];
 		setExpandedMonth: (month: string | false) => void;
 		expandedMonth: string | false;
-		groupId: number;
+		viewedGroupId: number;
 	};
 }) {
 	return (
@@ -173,7 +173,7 @@ function MonthsOfYear({
 							id={id}
 							HeadingComponent={MonthHeading}
 							ContentComponent={SessionsOfMonth}
-							model={{ monthData: month, groupId }}
+							model={{ monthData: month, viewedGroupId }}
 							onToggle={setExpandedMonth}
 							expandedId={expandedMonth}
 							icon="calendar-week"
@@ -191,10 +191,10 @@ function getYearString(year: SessionWithEncountersCount[][]) {
 
 export function SessionHistoryCalendar({
 	sessions,
-	groupId
+	viewedGroupId
 }: {
 	sessions: SessionWithEncountersCount[] | null;
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	const calendar = groupByYear(sessions || []).map(groupByMonth);
 	const [expandedMonth, setExpandedMonth] = useState<string | false>(false);
@@ -220,7 +220,7 @@ export function SessionHistoryCalendar({
 							yearData: year,
 							setExpandedMonth,
 							expandedMonth,
-							groupId
+							viewedGroupId
 						}}
 						onToggle={() => {
 							setExpandedYear(yearString);

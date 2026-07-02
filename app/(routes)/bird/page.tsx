@@ -19,7 +19,7 @@ type SearchResult = {
 type SearchParams = { q: string };
 type PageProps = { searchParams: Promise<SearchParams> };
 
-async function searchByRing({ q }: SearchParams) {
+async function searchByRing({ q }: SearchParams, _viewedGroupId: number) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const uppercaseQuery = q.toUpperCase();
 	const exactMatch = await supabase
