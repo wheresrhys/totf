@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
 import { useSetRingingGroup } from './RingingGroupProvider';
+import { logout } from '@/app/actions/logout';
 import type { RingingGroupRow } from '@/app/models/db';
 export function NavItems({ classes }: { classes: string }) {
 	return (
@@ -88,7 +89,7 @@ function GroupSwitcher({
 		</select>
 	);
 }
-type ExpanderId = 'search' | 'mobileNav' | 'groupSwitcher';
+type ExpanderId = 'search' | 'mobileNav' | 'userMenu';
 type ExpanderAction =
 	| { type: 'toggle'; id: ExpanderId }
 	| { type: 'collapseAll' }
@@ -125,7 +126,7 @@ export default function GlobalNav({
 	const [expanders, expandersDispatch] = useReducer(expanderReducer, {
 		search: false,
 		mobileNav: false,
-		groupSwitcher: !selectedGroupId
+		userMenu: !selectedGroupId
 	} as Record<ExpanderId, boolean>);
 	const groupsCount = groups.length;
 	const firstGroupId = groups[0].id;
@@ -138,7 +139,7 @@ export default function GlobalNav({
 	useEffect(() => {
 		expandersDispatch({
 			type: 'set',
-			id: 'groupSwitcher',
+			id: 'userMenu',
 			value: !selectedGroupId
 		});
 	}, [pathname, selectedGroupId]);
@@ -210,19 +211,17 @@ export default function GlobalNav({
 						<div className="hidden md:flex">
 							<NavItems classes="menu menu-horizontal gap-2 p-0 text-base" />
 						</div>
-						{groups.length > 1 ? (
-							<button
-								type="button"
-								className="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square"
-								aria-controls="group-switcher"
-								aria-label="Toggle Group Switcher"
-								onClick={() => {
-									expandersDispatch({ type: 'toggle', id: 'groupSwitcher' });
-								}}
-							>
-								<span className="icon-[tabler--users-group] size-4"></span>
-							</button>
-						) : null}
+						<button
+							type="button"
+							className="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square"
+							aria-controls="user-menu"
+							aria-label="Toggle user menu"
+							onClick={() => {
+								expandersDispatch({ type: 'toggle', id: 'userMenu' });
+							}}
+						>
+							<span className="icon-[tabler--users-group] size-4"></span>
+						</button>
 					</div>
 				</div>
 				<Expander id="mobile-nav" isExpanded={expanders.mobileNav}>
@@ -237,13 +236,20 @@ export default function GlobalNav({
 						/>
 					</div>
 				</Expander>
-				<Expander id="group-switcher" isExpanded={expanders.groupSwitcher}>
-					<div className="p-4 pt-0 flex justify-end">
-						<GroupSwitcher
-							groups={groups}
-							selectedGroupId={selectedGroupId}
-							onChange={() => expandersDispatch({ type: 'collapseAll' })}
-						/>
+				<Expander id="user-menu" isExpanded={expanders.userMenu}>
+					<div className="p-4 pt-0 flex justify-end items-center gap-4">
+						{groups.length > 1 && (
+							<GroupSwitcher
+								groups={groups}
+								selectedGroupId={selectedGroupId}
+								onChange={() => expandersDispatch({ type: 'collapseAll' })}
+							/>
+						)}
+						<form action={logout}>
+							<button type="submit" className="link link-secondary text-sm">
+								Log out
+							</button>
+						</form>
 					</div>
 				</Expander>
 			</nav>

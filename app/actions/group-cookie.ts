@@ -27,3 +27,8 @@ export async function getGroupJwt(): Promise<string | null> {
 	const cookieStore = await cookies();
 	return cookieStore.get(COOKIE_NAME)?.value ?? null;
 }
+
+export async function deleteGroupCookie(): Promise<void> {
+	const cookieStore = await cookies();
+	cookieStore.delete(COOKIE_NAME);
+}
