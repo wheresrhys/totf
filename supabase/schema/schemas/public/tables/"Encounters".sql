@@ -54,12 +54,19 @@ EXECUTE FUNCTION public.trg_update_bird_ringing_group_id ();
 CREATE POLICY group_encounters_access ON public."Encounters" FOR
 SELECT
 	USING (
-		(
-			ringing_group_id = (
-				(
+		ringing_group_id = (
+			(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
+		)::bigint
+		OR EXISTS (
+			SELECT
+				1
+			FROM
+				public."GroupDataSharing"
+			WHERE
+				from_group_id = ringing_group_id
+				AND to_group_id = (
 					(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
-				)
-			)::bigint
+				)::bigint
 		)
 	);
 

@@ -16,21 +16,26 @@ SELECT
 	USING (
 		(
 			(
-				(
-					(
-						(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
-					)
-				)::bigint = ANY (ringing_group_ids)
-			)
+				(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
+			)::bigint = ANY (ringing_group_ids)
 			OR (
 				(ringing_group_ids = '{}'::BIGINT[])
 				AND (
 					(
-						(
-							(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
-						)
+						(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
 					)::bigint IS NOT NULL
 				)
+			)
+			OR EXISTS (
+				SELECT
+					1
+				FROM
+					public."GroupDataSharing" gds
+					JOIN unnest(ringing_group_ids) gid ON gid = gds.from_group_id
+				WHERE
+					gds.to_group_id = (
+						(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
+					)::bigint
 			)
 		)
 	);
