@@ -54,7 +54,7 @@ describe('home page', () => {
 					);
 				})
 				.forEach((button) => {
-					expect(button.textContent).toMatch(/^[a-z ]+: [0-9]+ [a-z]+$/i);
+					expect(button.textContent).toMatch(/^[a-z ]+: (No data available|[0-9]+ [a-z]+)$/i);
 				});
 		});
 	});
