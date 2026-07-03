@@ -3,8 +3,8 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
-import { SingleSpeciesPage } from '@/app/components/SingleSpeciesPage';
-import { fetchPageOfBirds } from '@/app/actions/single-species-data';
+import { SpPage } from '@/app/components/SpPage';
+import { fetchPageOfBirds } from '@/app/actions/sp-data';
 
 import type {
 	AggregateStatsRow,
@@ -87,7 +87,7 @@ export default async function SpeciesPage(
 			viewedGroupId={props.viewedGroupId}
 			getCacheKeys={(params: PageParams) => ['species', params.speciesName]}
 			dataFetcher={fetchSpeciesData}
-			PageComponent={SingleSpeciesPage}
+			PageComponent={SpPage}
 		/>
 	);
 }

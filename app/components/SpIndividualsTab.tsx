@@ -1,7 +1,7 @@
 'use client';
-import { SpeciesTable } from '@/app/components/SingleSpeciesTable';
+import { SpTable } from '@/app/components/SpTable';
 import { useState } from 'react';
-import { fetchPageOfBirds } from '../actions/single-species-data';
+import { fetchPageOfBirds } from '../actions/sp-data';
 import { useOnInView } from 'react-intersection-observer';
 import type { EnrichedBirdOfSpecies } from '@/app/models/bird';
 
@@ -43,7 +43,7 @@ export function SpIndividualsTab({
 
 	return (
 		<>
-			<SpeciesTable birds={loadedBirds} />
+			<SpTable birds={loadedBirds} />
 			{isFullyLoaded ? null : (
 				<div
 					ref={loadMoreRef}

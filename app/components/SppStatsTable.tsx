@@ -4,7 +4,7 @@ import { speciesStatConfigs } from '@/app/models/species-stats';
 import type { AggregateStatsRow } from '@/app/models/db';
 import type { PageData } from '@/app/(routes)/species/page';
 import { useState, useEffect, useRef } from 'react';
-import { fetchSpeciesData } from '@/app/actions/multi-species-data';
+import { fetchSpeciesData } from '@/app/actions/spp-data';
 import {
 	SortableTable,
 	type ColumnConfig
@@ -47,7 +47,7 @@ const sortableColumnConfigs = speciesStatConfigs.reduce(
 	{} as Record<keyof AggregateStatsRow, ColumnConfig>
 );
 
-export function MultiSpeciesStatsTable({
+export function SppStatsTable({
 	data: { speciesStats: initialSpeciesStats, years },
 	viewedGroupId
 }: {

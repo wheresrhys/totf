@@ -4,7 +4,7 @@ import {
 	PageWrapper,
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
-import { SingleSpeciesStats } from '@/app/components/SingleSpeciesStats';
+import { SpStats } from '@/app/components/SpStats';
 import 'chartkick/chart.js';
 import type {
 	FullFatPageData,
@@ -59,7 +59,7 @@ function SpeciesData({
 
 	return (
 		<>
-			<SingleSpeciesStats {...data} viewedGroupId={viewedGroupId} />
+			<SpStats {...data} viewedGroupId={viewedGroupId} />
 			<nav
 				className="bg-base-200 rounded-field w-fit space-x-1 overflow-x-auto p-1 mt-4"
 				aria-label="Tabs"
@@ -149,7 +149,7 @@ function fullFatTypeGuard(data: PageData): data is FullFatPageData {
 	return 'birds' in data;
 }
 
-export function SingleSpeciesPage({
+export function SpPage({
 	params: { speciesName },
 	data,
 	viewedGroupId

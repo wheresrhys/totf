@@ -96,7 +96,7 @@ function rowDataTransform(bird: EnrichedBirdOfSpecies): RowModel {
 	};
 }
 
-export function SpeciesTable({ birds }: { birds: EnrichedBirdOfSpecies[] }) {
+export function SpTable({ birds }: { birds: EnrichedBirdOfSpecies[] }) {
 	return (
 		<SortableTable<EnrichedBirdOfSpecies, RowModel>
 			columnConfigs={columnConfigs}

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
-import { fetchNotableRetraps } from '../actions/single-species-data';
+import { fetchNotableRetraps } from '../actions/sp-data';
 import { NotableRetrapsTable } from './NotableRetrapsTable';
 import type { NotableRetrapsResult } from '@/app/models/db';
 
