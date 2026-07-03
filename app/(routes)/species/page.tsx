@@ -2,8 +2,8 @@ import {
 	BootstrapPageData,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPageData';
-import { MultiSpeciesStatsTable } from '@/app/components/MultiSpeciesStatsTable';
-import { fetchSpeciesData } from '@/app/actions/multi-species-data';
+import { SppStatsTable } from '@/app/components/SppStatsTable';
+import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { AggregateStatsRow } from '@/app/models/db';
@@ -53,7 +53,7 @@ export default async function AllSpeciesPage({
 			viewedGroupId={viewedGroupId}
 			getCacheKeys={() => ['species']}
 			dataFetcher={fetchInitialPageData}
-			PageComponent={MultiSpeciesStatsTable}
+			PageComponent={SppStatsTable}
 		/>
 	);
 }

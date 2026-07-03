@@ -42,7 +42,7 @@ function StatsByCategory({
 	});
 }
 
-export function SingleSpeciesStats({
+export function SpStats({
 	topSessions,
 	birds,
 	speciesStats,

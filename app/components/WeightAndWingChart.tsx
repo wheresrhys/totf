@@ -1,7 +1,7 @@
 import { type Sex } from '@/app/models/bird';
 import { useEffect, useState } from 'react';
 import { ScatterChart, type ScatterChartData } from 'react-chartkick';
-import { fetchGraphableEncounterData } from '../actions/single-species-data';
+import { fetchGraphableEncounterData } from '../actions/sp-data';
 import { SecondaryHeading } from './shared/DesignSystem';
 type GraphableEncounterData = {
 	age_code: number;

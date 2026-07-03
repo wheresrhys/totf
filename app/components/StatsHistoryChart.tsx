@@ -1,7 +1,7 @@
 import { LineChart, type LineChartData } from 'react-chartkick';
 import type { AggregateStatsRow } from '@/app/models/db';
 import { useEffect, useState } from 'react';
-import { getSpeciesStatsHistory } from '../actions/single-species-data';
+import { getSpeciesStatsHistory } from '../actions/sp-data';
 import { SecondaryHeading } from './shared/DesignSystem';
 
 function getCounts(statsHistory: AggregateStatsRow[]): LineChartData[] {
