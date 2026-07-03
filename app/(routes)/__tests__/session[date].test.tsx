@@ -1,6 +1,6 @@
 import { expect, describe, it } from 'vitest';
 import { render, screen, getAllByRole } from '@testing-library/react';
-import Page from '../session/[...params]/page';
+import Page from '../../group/[groupId]/session/[date]/page';
 import { verifyTableData } from './helpers/verify-table-data';
 
 describe('session page', () => {
@@ -8,7 +8,7 @@ describe('session page', () => {
 		render(
 			await Page({
 				params: new Promise((resolve) =>
-					resolve({ params: ['group', '1', '2023-09-30'] })
+					resolve({ groupId: '1', date: '2023-09-30' })
 				)
 			})
 		);
@@ -23,7 +23,7 @@ describe('session page', () => {
 		render(
 			await Page({
 				params: new Promise((resolve) =>
-					resolve({ params: ['group', '1', '2023-09-30'] })
+					resolve({ groupId: '1', date: '2023-09-30' })
 				)
 			})
 		);
@@ -43,7 +43,7 @@ describe('session page', () => {
 		render(
 			await Page({
 				params: new Promise((resolve) =>
-					resolve({ params: ['group', '1', '2023-09-30'] })
+					resolve({ groupId: '1', date: '2023-09-30' })
 				)
 			})
 		);

@@ -94,7 +94,7 @@ export function SessionsByDay({
 									{index > 0 ? ', ' : null}
 									<NoPrefetchLink
 										className="link"
-										href={`/session/group/${viewedGroupId}/${session.visit_date}/site/${session.location.id}`}
+										href={`/group/${viewedGroupId}/session/${session.visit_date}/site/${session.location.id}`}
 									>
 										{printLocationName(session.location.location_name)}
 									</NoPrefetchLink>
