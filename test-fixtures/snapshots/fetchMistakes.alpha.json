@@ -1,0 +1,32 @@
+[
+  {
+    "bird_id": 448,
+    "ring_no": "ABTITMIS",
+    "species_name": "Blue Tit",
+    "discrepency_type": "age"
+  },
+  {
+    "bird_id": 436,
+    "ring_no": "AKINGF001",
+    "species_name": "Kingfisher",
+    "discrepency_type": "age"
+  },
+  {
+    "bird_id": 437,
+    "ring_no": "ARRETRAP",
+    "species_name": "Robin",
+    "discrepency_type": "age"
+  },
+  {
+    "bird_id": 448,
+    "ring_no": "ABTITMIS",
+    "species_name": "Blue Tit",
+    "discrepency_type": "sex"
+  },
+  {
+    "bird_id": 437,
+    "ring_no": "ARRETRAP",
+    "species_name": "Robin",
+    "discrepency_type": "wing_length"
+  }
+]

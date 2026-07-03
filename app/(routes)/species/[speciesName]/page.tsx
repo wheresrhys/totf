@@ -45,7 +45,7 @@ async function getSpeciesStats(species: string, viewedGroupId: number) {
 		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
 }
 
-async function fetchSpeciesData(
+export async function fetchSpPageData(
 	params: PageParams,
 	viewedGroupId: number
 ): Promise<PageData | null> {
@@ -86,7 +86,7 @@ export default async function SpeciesPage(
 			pageProps={props}
 			viewedGroupId={props.viewedGroupId}
 			getCacheKeys={(params: PageParams) => ['species', params.speciesName]}
-			dataFetcher={fetchSpeciesData}
+			dataFetcher={fetchSpPageData}
 			PageComponent={SpPage}
 		/>
 	);

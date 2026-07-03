@@ -15,7 +15,7 @@ export type PageData = {
 	years: number[];
 };
 
-async function fetchYears(viewedGroupId: number): Promise<number[]> {
+export async function fetchYears(viewedGroupId: number): Promise<number[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const dates = (await supabase
 		.from('Sessions')
@@ -29,7 +29,7 @@ async function fetchYears(viewedGroupId: number): Promise<number[]> {
 	] as number[];
 }
 
-async function fetchInitialPageData(
+export async function fetchSppListPageData(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
@@ -52,7 +52,7 @@ export default async function AllSpeciesPage({
 		<BootstrapPageData<PageData>
 			viewedGroupId={viewedGroupId}
 			getCacheKeys={() => ['species']}
-			dataFetcher={fetchInitialPageData}
+			dataFetcher={fetchSppListPageData}
 			PageComponent={SppStatsTable}
 		/>
 	);

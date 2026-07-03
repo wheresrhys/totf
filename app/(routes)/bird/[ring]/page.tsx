@@ -19,7 +19,10 @@ import { EncountersTimeline } from '@/app/components/EncountersTimeline';
 type PageParams = { ring: string };
 type PageProps = { params: Promise<PageParams> };
 
-async function fetchBirdData({ ring }: PageParams, _viewedGroupId: number) {
+export async function fetchBirdData(
+	{ ring }: PageParams,
+	_viewedGroupId: number
+) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const bird = (await supabase
 		.from('Birds')

@@ -1,0 +1,163 @@
+{
+  "id": 437,
+  "ring_no": "ARRETRAP",
+  "proven_age": 3,
+  "species": {
+    "species_name": "Robin"
+  },
+  "encounters": [
+    {
+      "bird_id": 437,
+      "id": 439,
+      "age_code": 5,
+      "is_juv": false,
+      "capture_time": "05:45:00",
+      "max_hatch_year": 2021,
+      "min_hatch_year": 2021,
+      "record_type": "S",
+      "sex": "M",
+      "ringing_group_id": 3,
+      "weight": 19,
+      "wing_length": 75,
+      "session": {
+        "visit_date": "2022-06-15"
+      }
+    },
+    {
+      "bird_id": 437,
+      "id": 458,
+      "age_code": 3,
+      "is_juv": false,
+      "capture_time": "06:00:00",
+      "max_hatch_year": 2021,
+      "min_hatch_year": 2021,
+      "record_type": "N",
+      "sex": "M",
+      "ringing_group_id": 3,
+      "weight": 18.5,
+      "wing_length": 74,
+      "session": {
+        "visit_date": "2021-06-20"
+      }
+    },
+    {
+      "bird_id": 437,
+      "id": 468,
+      "age_code": 5,
+      "is_juv": false,
+      "capture_time": "07:00:00",
+      "max_hatch_year": 2021,
+      "min_hatch_year": 2021,
+      "record_type": "S",
+      "sex": "M",
+      "ringing_group_id": 3,
+      "weight": 19.2,
+      "wing_length": 75,
+      "session": {
+        "visit_date": "2022-10-20"
+      }
+    },
+    {
+      "bird_id": 437,
+      "id": 474,
+      "age_code": 5,
+      "is_juv": false,
+      "capture_time": "05:45:00",
+      "max_hatch_year": 2022,
+      "min_hatch_year": 2022,
+      "record_type": "S",
+      "sex": "M",
+      "ringing_group_id": 3,
+      "weight": 19,
+      "wing_length": 75,
+      "session": {
+        "visit_date": "2023-05-12"
+      }
+    },
+    {
+      "bird_id": 437,
+      "id": 477,
+      "age_code": 5,
+      "is_juv": false,
+      "capture_time": "05:45:00",
+      "max_hatch_year": 2022,
+      "min_hatch_year": 2022,
+      "record_type": "S",
+      "sex": "M",
+      "ringing_group_id": 3,
+      "weight": 19.2,
+      "wing_length": 80,
+      "session": {
+        "visit_date": "2023-07-08"
+      }
+    },
+    {
+      "bird_id": 437,
+      "id": 481,
+      "age_code": 5,
+      "is_juv": false,
+      "capture_time": "05:45:00",
+      "max_hatch_year": 2023,
+      "min_hatch_year": 2023,
+      "record_type": "S",
+      "sex": "M",
+      "ringing_group_id": 3,
+      "weight": 19.3,
+      "wing_length": 80,
+      "session": {
+        "visit_date": "2024-05-10"
+      }
+    },
+    {
+      "bird_id": 437,
+      "id": 482,
+      "age_code": 5,
+      "is_juv": false,
+      "capture_time": "07:00:00",
+      "max_hatch_year": 2022,
+      "min_hatch_year": 2022,
+      "record_type": "S",
+      "sex": "M",
+      "ringing_group_id": 3,
+      "weight": 19.1,
+      "wing_length": 80,
+      "session": {
+        "visit_date": "2023-09-14"
+      }
+    },
+    {
+      "bird_id": 437,
+      "id": 446,
+      "age_code": 5,
+      "is_juv": false,
+      "capture_time": "06:00:00",
+      "max_hatch_year": 2021,
+      "min_hatch_year": 2021,
+      "record_type": "S",
+      "sex": "M",
+      "ringing_group_id": 3,
+      "weight": 19,
+      "wing_length": 75,
+      "session": {
+        "visit_date": "2022-04-30"
+      }
+    },
+    {
+      "bird_id": 437,
+      "id": 434,
+      "age_code": 5,
+      "is_juv": false,
+      "capture_time": "05:30:00",
+      "max_hatch_year": 2021,
+      "min_hatch_year": 2021,
+      "record_type": "S",
+      "sex": "M",
+      "ringing_group_id": 3,
+      "weight": 18.8,
+      "wing_length": 75,
+      "session": {
+        "visit_date": "2022-08-10"
+      }
+    }
+  ]
+}
