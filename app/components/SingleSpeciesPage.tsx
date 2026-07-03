@@ -11,10 +11,10 @@ import type {
 	PageData,
 	PageParams
 } from '@/app/(routes)/species/[speciesName]/page';
-import { BirdListTab } from './BirdListTab';
-import { RetrapsTab } from './RetrapsTab';
-import { StatsHistoryTab } from './StatsHistoryTab';
-import { WeightWingTab } from './WeightWingTab';
+import { SpIndividualsTab } from './SpIndividualsTab';
+import { SpNotableRetrapsTab } from './SpNotableRetrapsTab';
+import { SpStatsHistoryTab } from './SpStatsHistoryTab';
+import { SpWeightWingTab } from './SpWeightWingTab';
 
 function ConditionalTabPanel({
 	loadedTabs,
@@ -104,7 +104,7 @@ function SpeciesData({
 				tabId="bird-list"
 				activeTabId={activeTab}
 			>
-				<BirdListTab
+				<SpIndividualsTab
 					speciesId={data.speciesId}
 					viewedGroupId={viewedGroupId}
 					birds={data.birds}
@@ -116,7 +116,7 @@ function SpeciesData({
 				tabId="retraps"
 				activeTabId={activeTab}
 			>
-				<RetrapsTab
+				<SpNotableRetrapsTab
 					speciesName={data.speciesName}
 					viewedGroupId={viewedGroupId}
 				/>
@@ -126,7 +126,7 @@ function SpeciesData({
 				tabId="stats-history"
 				activeTabId={activeTab}
 			>
-				<StatsHistoryTab
+				<SpStatsHistoryTab
 					speciesName={data.speciesName}
 					viewedGroupId={viewedGroupId}
 				/>
@@ -136,7 +136,7 @@ function SpeciesData({
 				tabId="size-plot"
 				activeTabId={activeTab}
 			>
-				<WeightWingTab
+				<SpWeightWingTab
 					speciesId={data.speciesId}
 					viewedGroupId={viewedGroupId}
 				/>

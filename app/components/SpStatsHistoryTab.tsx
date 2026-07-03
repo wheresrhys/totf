@@ -1,7 +1,7 @@
 'use client';
 import { StatsHistoryChart } from '@/app/components/StatsHistoryChart';
 
-export function StatsHistoryTab({
+export function SpStatsHistoryTab({
 	speciesName,
 	viewedGroupId
 }: {

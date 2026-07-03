@@ -3,7 +3,7 @@ import { type SessionWithEncountersCount } from '@/app/models/session';
 import { format as formatDate } from 'date-fns';
 import { SessionsByDay } from './SessionHistoryCalendar';
 
-export function MonthGroupHeading({
+export function MonthSessionsHeading({
 	model: { monthData: month }
 }: {
 	model: { monthData: SessionWithEncountersCount[] };
@@ -22,7 +22,7 @@ export function MonthGroupHeading({
 	);
 }
 
-export function MonthGroupContent({
+export function MonthSessionsContent({
 	model: { viewedGroupId, monthData: month }
 }: {
 	model: { viewedGroupId: number; monthData: SessionWithEncountersCount[] };

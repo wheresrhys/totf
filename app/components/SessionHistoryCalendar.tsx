@@ -4,7 +4,7 @@ import { printLocationName } from '@/app/components/shared/DesignSystem';
 import { useState, useEffect } from 'react';
 import { StatOutput } from './shared/StatOutput';
 import { NoPrefetchLink } from './shared/NoPrefetchLink';
-import { YearGroup } from './YearGroup';
+import { YearSessions } from './YearSessions';
 
 function groupByDateMethod(methodName: 'getFullYear' | 'getMonth') {
 	return function (
@@ -129,7 +129,7 @@ export function SessionHistoryCalendar({
 			{calendar.map((year) => {
 				const yearString = getYearString(year);
 				return (
-					<YearGroup
+					<YearSessions
 						key={yearString}
 						year={year}
 						yearString={yearString}

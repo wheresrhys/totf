@@ -5,7 +5,7 @@ import { fetchPageOfBirds } from '../actions/single-species-data';
 import { useOnInView } from 'react-intersection-observer';
 import type { EnrichedBirdOfSpecies } from '@/app/models/bird';
 
-export function BirdListTab({
+export function SpIndividualsTab({
 	speciesId,
 	viewedGroupId,
 	birds: initialBirds,

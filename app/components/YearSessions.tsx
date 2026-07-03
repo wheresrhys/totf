@@ -7,7 +7,7 @@ import {
 	SecondaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { format as formatDate } from 'date-fns';
-import { MonthGroupHeading, MonthGroupContent } from './MonthGroup';
+import { MonthSessionsHeading, MonthSessionsContent } from './MonthSessions';
 
 function YearHeading({
 	model: { yearString }
@@ -36,8 +36,8 @@ function YearContent({
 						<AccordionItem
 							key={id}
 							id={id}
-							HeadingComponent={MonthGroupHeading}
-							ContentComponent={MonthGroupContent}
+							HeadingComponent={MonthSessionsHeading}
+							ContentComponent={MonthSessionsContent}
 							model={{ monthData: month, viewedGroupId }}
 							onToggle={setExpandedMonth}
 							expandedId={expandedMonth}
@@ -50,7 +50,7 @@ function YearContent({
 	);
 }
 
-export function YearGroup({
+export function YearSessions({
 	year,
 	yearString,
 	viewedGroupId,

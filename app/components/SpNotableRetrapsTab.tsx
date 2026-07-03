@@ -5,7 +5,7 @@ import { fetchNotableRetraps } from '../actions/single-species-data';
 import { NotableRetrapsTable } from './NotableRetrapsTable';
 import type { NotableRetrapsResult } from '@/app/models/db';
 
-export function RetrapsTab({
+export function SpNotableRetrapsTab({
 	speciesName,
 	viewedGroupId
 }: {
