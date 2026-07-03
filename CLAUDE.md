@@ -31,7 +31,7 @@ There are no per-person logins. Authentication is group-scoped:
 
 ### Cross-group data sharing
 
-Groups can grant other groups read access to their data via the `GroupDataSharing` table (`from_group_id` → `to_group_id`). The relationship is non-commutative and non-transitive. The JWT always carries the **logged-in** group's ID; RLS policies allow reading shared data via a `GroupDataSharing` EXISTS check, without switching the JWT.
+Groups can grant other groups read access to their data via the `GroupDataSharing` table (`granter_group_id` → `recipient_group_id`). The relationship is non-commutative and non-transitive. The JWT always carries the **logged-in** group's ID; RLS policies allow reading shared data via a `GroupDataSharing` EXISTS check, without switching the JWT.
 
 `loggedInGroupId` = group from the cookie (always the authenticated user's group).
 `viewedGroupId` = group whose data is currently being displayed (may differ when browsing another group's pages).
