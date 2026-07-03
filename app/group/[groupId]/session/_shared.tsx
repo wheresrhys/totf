@@ -6,7 +6,6 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionEncounter } from '@/app/models/session';
 import type { LocationRow, SessionRow } from '@/app/models/db';
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import {
 	BadgeList,
 	PageWrapper,
@@ -17,37 +16,22 @@ import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
 
-type PageParams = {
-	groupId: number;
+export type PageParams = {
+	viewedGroupId: number;
 	date: string;
 	locationId: number | undefined;
 };
-type PageProps = {
-	params: Promise<{
-		params:
-			| ['group', string, string]
-			| ['group', string, string, 'site', string];
-	}>;
-};
 
-type DayData = {
+export type DayData = {
 	encounters: SessionEncounter[];
 	locations: LocationRow[];
 };
 
-async function getPageParams(pageProps: PageProps): Promise<PageParams> {
-	const pageParams = await pageProps.params;
-	return {
-		groupId: Number(pageParams.params[1]),
-		date: pageParams.params[2],
-		locationId: pageParams.params[4] ? Number(pageParams.params[4]) : undefined
-	};
-}
-
-async function fetchSessionData(
-	{ groupId: paramGroupId, date, locationId }: PageParams
-	// groupId: number
-): Promise<DayData | null> {
+export async function fetchSessionData({
+	viewedGroupId,
+	date,
+	locationId
+}: PageParams): Promise<DayData | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	let sessions = (await supabase
 		.from('Sessions')
@@ -55,11 +39,7 @@ async function fetchSessionData(
 			'id, location_id, location:Locations (id, location_name, ringing_group_id)'
 		)
 		.eq('visit_date', date)
-		// use paramGroupId to fetch the data as in cases where one group
-		// shareds a link with a member of another group, we want the page to
-		// still attempt to fetch their data
-		// (will do something about granting permission across groups later)
-		.eq('ringing_group_id', paramGroupId)
+		.eq('ringing_group_id', viewedGroupId)
 		.then(catchSupabaseErrors)) as (SessionRow & { location: LocationRow })[];
 
 	if (!sessions || sessions.length === 0) {
@@ -92,7 +72,6 @@ async function fetchSessionData(
 					id,
 					species_name
 				)
-
 		)
 	`
 		)
@@ -100,7 +79,7 @@ async function fetchSessionData(
 			'session_id',
 			sessions.map((session) => session.id)
 		)
-		.eq('ringing_group_id', paramGroupId)
+		.eq('ringing_group_id', viewedGroupId)
 		.then(catchSupabaseErrors)) as SessionEncounter[];
 
 	return {
@@ -132,12 +111,12 @@ function Locations({
 	locations,
 	date,
 	selectedLocation,
-	groupId
+	viewedGroupId
 }: {
 	locations: LocationRow[];
 	date: string;
 	selectedLocation: number | undefined;
-	groupId: number;
+	viewedGroupId: number;
 }) {
 	return (
 		<small className="text-sm text-gray-500 flex flex-wrap gap-2 mt-2">
@@ -152,7 +131,7 @@ function Locations({
 							) : (
 								<Link
 									className="link badge badge-outline"
-									href={`/session/group/${groupId}/${date}/site/${location.id}`}
+									href={`/group/${viewedGroupId}/session/${date}/site/${location.id}`}
 								>
 									{printLocationName(location.location_name)}
 								</Link>
@@ -163,7 +142,7 @@ function Locations({
 				<>
 					<Link
 						className="link badge badge-outline"
-						href={`/session/group/${groupId}/${date}`}
+						href={`/group/${viewedGroupId}/session/${date}`}
 					>
 						View all
 					</Link>
@@ -173,12 +152,16 @@ function Locations({
 	);
 }
 
-function SessionSummary({
+export function SessionSummary({
 	data: dayData,
-	params: { date, locationId, groupId }
+	params: { date, locationId, viewedGroupId }
 }: {
 	data: DayData;
-	params: { date: string; locationId: number | undefined; groupId: number };
+	params: {
+		date: string;
+		locationId: number | undefined;
+		viewedGroupId: number;
+	};
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
 
@@ -202,7 +185,7 @@ function SessionSummary({
 					locations={dayData.locations}
 					date={date}
 					selectedLocation={locationId}
-					groupId={groupId}
+					viewedGroupId={viewedGroupId}
 				/>
 			</PrimaryHeading>
 			<BadgeList
@@ -219,22 +202,5 @@ function SessionSummary({
 			/>
 			<SessionTable speciesList={speciesList} />
 		</PageWrapper>
-	);
-}
-
-export default async function SessionPage(props: PageProps) {
-	return (
-		<BootstrapPageData<DayData, PageProps, PageParams>
-			pageProps={props}
-			getCacheKeys={(params) =>
-				params.locationId
-					? ['session', params.date as string, `loc-${params.locationId}`]
-					: ['session', params.date as string]
-			}
-			dataFetcher={fetchSessionData}
-			PageComponent={SessionSummary}
-			getParams={getPageParams}
-			ttl={3600 * 24 * 7} // 1 week because once a session is complete the data does not change
-		/>
 	);
 }
