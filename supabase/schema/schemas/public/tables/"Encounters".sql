@@ -51,18 +51,28 @@ AFTER
 UPDATE OF ringing_group_id ON public."Encounters" FOR EACH ROW
 EXECUTE FUNCTION public.trg_update_bird_ringing_group_id ();
 
+-- SELECT: grants access if the encounter belongs to the logged-in group, or if the encounter's group
+-- has granted read access to the logged-in group via GroupDataSharing
 CREATE POLICY group_encounters_access ON public."Encounters" FOR
 SELECT
 	USING (
-		(
-			ringing_group_id = (
-				(
+		ringing_group_id = (
+			(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
+		)::bigint
+		OR EXISTS (
+			SELECT
+				1
+			FROM
+				public."GroupDataSharing"
+			WHERE
+				granter_group_id = ringing_group_id
+				AND recipient_group_id = (
 					(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
-				)
-			)::bigint
+				)::bigint
 		)
 	);
 
+-- INSERT: only the owning group can insert encounters
 CREATE POLICY group_encounters_insert ON public."Encounters" FOR INSERT
 WITH
 	CHECK (
@@ -75,6 +85,7 @@ WITH
 		)
 	);
 
+-- UPDATE: only the owning group can update encounters
 CREATE POLICY group_encounters_update ON public."Encounters"
 FOR UPDATE
 	USING (
