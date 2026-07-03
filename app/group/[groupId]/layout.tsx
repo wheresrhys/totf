@@ -1,18 +1,33 @@
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getGroupCookie } from '@/app/actions/group-cookie';
+import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 
 export default async function CrossGroupLayout({
-	children
+	children,
+	params
 }: {
 	children: React.ReactNode;
 	params: Promise<{ groupId: string }>;
 }) {
+	const { groupId } = await params;
+	const viewedGroupId = Number(groupId);
 	const loggedInGroupId = await getGroupCookie();
 
 	if (!loggedInGroupId) {
 		redirect('/');
 	}
 
-	// Cross-group access control (GroupDataSharing check) added in PR #250
+	const supabase = await getAuthenticatedSupabaseClient();
+	const { data } = await supabase
+		.from('GroupDataSharing')
+		.select('id')
+		.eq('granter_group_id', viewedGroupId)
+		.eq('recipient_group_id', loggedInGroupId)
+		.maybeSingle();
+
+	if (!data) {
+		notFound();
+	}
+
 	return children;
 }
