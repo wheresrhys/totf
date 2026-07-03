@@ -1,0 +1,136 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { AccordionItem } from './shared/Accordion';
+import { StatOutput } from './shared/StatOutput';
+import type { TopPeriodsResult, TopSpeciesResult } from '@/app/models/db';
+import { getTopStats } from '@/app/actions/top-performers';
+import type { TemporalUnit } from './shared/StatOutput';
+import type { AccordionItemModel } from './StatsAccordion';
+
+type AccordionItemModelWithGroupId = AccordionItemModel & {
+	viewedGroupId: number;
+};
+
+function hasData(data: TopPeriodsResult[] | null): data is TopPeriodsResult[] {
+	return data !== null && data.length > 0;
+}
+
+function ItemContent({
+	model,
+	expandedId
+}: {
+	model: AccordionItemModelWithGroupId;
+	expandedId: string | false;
+}) {
+	const [data, setData] = useState<TopPeriodsResult[] | null>(model.data);
+	const [isLoading, setLoading] = useState(false);
+	const [isLoaded, setLoaded] = useState(false);
+
+	useEffect(() => {
+		if (expandedId === model.definition.id) {
+			let cancelSetLoading = false;
+			if (!isLoaded) {
+				// avoid the annoying microsecond flash of a spinner
+				setTimeout(() => {
+					if (!cancelSetLoading) {
+						setLoading(true);
+					}
+				}, 100);
+				getTopStats(Boolean(model.definition.bySpecies), {
+					...model.definition.dataArguments,
+					filters: {
+						...(model.definition.dataArguments.filters ?? {}),
+						ringing_group_filter: model.viewedGroupId
+					},
+					result_limit: 5
+				})
+					.then((data) => {
+						setData(data);
+					})
+					.catch((error) => {
+						console.error(error);
+					})
+					.finally(() => {
+						setLoaded(true);
+						cancelSetLoading = true;
+						setLoading(false);
+					});
+			}
+		}
+	}, [
+		expandedId,
+		isLoaded,
+		isLoading,
+		model.definition.id,
+		model.definition.bySpecies,
+		model.definition.dataArguments,
+		model.viewedGroupId
+	]);
+
+	return hasData(data) ? (
+		<ol className="list-inside list-none py-3">
+			{data.map((item) => (
+				<li
+					className="mb-2"
+					key={`${item.visit_date}-${(item as TopSpeciesResult).species_name} ?? ''`}
+				>
+					<StatOutput
+						value={item.metric_value}
+						speciesName={(item as TopSpeciesResult).species_name}
+						visitDate={item.visit_date}
+						showUnit={true}
+						unit={model.definition.unit}
+						temporalUnit={
+							model.definition.dataArguments.temporal_unit as TemporalUnit
+						}
+						viewedGroupId={model.viewedGroupId}
+					/>
+				</li>
+			))}
+			{isLoading && (
+				<span className="loading loading-spinner loading-xl"></span>
+			)}
+		</ol>
+	) : (
+		<span>No data available</span>
+	);
+}
+
+function ItemHeading({ model }: { model: AccordionItemModelWithGroupId }) {
+	return (
+		<span>
+			<span className="font-bold">{model.definition.category}:</span>{' '}
+			{hasData(model.data) ? (
+				<span>
+					{model.data[0].metric_value} {model.definition.unit}
+				</span>
+			) : (
+				<span>No data available</span>
+			)}
+		</span>
+	);
+}
+
+export function StatsAccordionItem({
+	item,
+	viewedGroupId,
+	expanded,
+	onToggle
+}: {
+	item: AccordionItemModel;
+	viewedGroupId: number;
+	expanded: string | false;
+	onToggle: (id: string | false) => void;
+}) {
+	return (
+		<AccordionItem
+			key={`${viewedGroupId}-${item.definition.id}`}
+			id={item.definition.id}
+			HeadingComponent={ItemHeading}
+			ContentComponent={ItemContent}
+			model={{ ...item, viewedGroupId }}
+			onToggle={onToggle}
+			expandedId={expanded}
+		/>
+	);
+}
