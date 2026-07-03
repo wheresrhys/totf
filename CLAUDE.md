@@ -50,7 +50,7 @@ Tables (PascalCase in Postgres, matching generated TypeScript types in `types/su
 | `Sessions` | A ringing session (date + location) |
 | `Encounters` | One bird captured once in one session, with measurements |
 | `Locations` | Ringing sites, owned by a group |
-| `GroupDataSharing` | Non-commutative read-access grants between groups (`from_group_id` shares data with `to_group_id`) |
+| `GroupDataSharing` | Non-commutative read-access grants between groups (`granter_group_id` shares data with `recipient_group_id`) |
 
 Key design notes:
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
