@@ -8,5 +8,6 @@ export default defineConfig({
   test: {
     setupFiles: ['./vitest.setup.tsx'],
     environment: 'happy-dom',
+    exclude: ['**/node_modules/**', 'supabase/__tests__/**'],
   },
 })
