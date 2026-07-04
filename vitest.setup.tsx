@@ -5,11 +5,12 @@ import { configMocks } from 'jsdom-testing-mocks';
 // avoids happy-dom's fetch teardown which leads to all sorts of
 // abort errors in tests
 import { fetch as nodeFetch } from 'undici';
-globalThis.fetch = nodeFetch as typeof fetch;
+globalThis.fetch = nodeFetch as unknown as typeof fetch;
 
 configMocks({ act, afterAll });
 
-global.IS_REACT_ACT_ENVIRONMENT = true
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(global as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock('./app/components/layout/BootstrapPageData');
 
