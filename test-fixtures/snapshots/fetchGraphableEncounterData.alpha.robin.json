@@ -1,0 +1,280 @@
+[
+  {
+    "encounters": [
+      {
+        "sex": "F",
+        "weight": 17,
+        "age_code": 3,
+        "wing_length": 72
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "F",
+        "weight": 16.8,
+        "age_code": 3,
+        "wing_length": 72
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 19.5,
+        "age_code": 5,
+        "wing_length": 74
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "F",
+        "weight": 17.2,
+        "age_code": 3,
+        "wing_length": 72
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 21,
+        "age_code": 5,
+        "wing_length": 76
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "U",
+        "weight": 18,
+        "age_code": 3,
+        "wing_length": 73
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 18,
+        "age_code": 3,
+        "wing_length": 74
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "F",
+        "weight": 16.8,
+        "age_code": 3,
+        "wing_length": 72
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 20,
+        "age_code": 5,
+        "wing_length": 75
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 19,
+        "age_code": 5,
+        "wing_length": 75
+      },
+      {
+        "sex": "M",
+        "weight": 18.5,
+        "age_code": 3,
+        "wing_length": 74
+      },
+      {
+        "sex": "M",
+        "weight": 19.2,
+        "age_code": 5,
+        "wing_length": 75
+      },
+      {
+        "sex": "M",
+        "weight": 19,
+        "age_code": 5,
+        "wing_length": 75
+      },
+      {
+        "sex": "M",
+        "weight": 19.2,
+        "age_code": 5,
+        "wing_length": 80
+      },
+      {
+        "sex": "M",
+        "weight": 19.3,
+        "age_code": 5,
+        "wing_length": 80
+      },
+      {
+        "sex": "M",
+        "weight": 19.1,
+        "age_code": 5,
+        "wing_length": 80
+      },
+      {
+        "sex": "M",
+        "weight": 19,
+        "age_code": 5,
+        "wing_length": 75
+      },
+      {
+        "sex": "M",
+        "weight": 18.8,
+        "age_code": 5,
+        "wing_length": 75
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 17.5,
+        "age_code": 3,
+        "wing_length": 73
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "U",
+        "weight": 18,
+        "age_code": 5,
+        "wing_length": 74
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "F",
+        "weight": 17.5,
+        "age_code": 3,
+        "wing_length": 73
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 18,
+        "age_code": 3,
+        "wing_length": 74
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 17.8,
+        "age_code": 3,
+        "wing_length": 73
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 17.2,
+        "age_code": 3,
+        "wing_length": 73
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 19.5,
+        "age_code": 5,
+        "wing_length": 75
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "F",
+        "weight": 17,
+        "age_code": 4,
+        "wing_length": 72
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "F",
+        "weight": 16.5,
+        "age_code": 3,
+        "wing_length": 72
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "F",
+        "weight": 17,
+        "age_code": 4,
+        "wing_length": 72
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 20.5,
+        "age_code": 5,
+        "wing_length": 75
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "M",
+        "weight": 18.5,
+        "age_code": 3,
+        "wing_length": 74
+      }
+    ]
+  },
+  {
+    "encounters": [
+      {
+        "sex": "F",
+        "weight": 16.9,
+        "age_code": 3,
+        "wing_length": 72
+      }
+    ]
+  }
+]

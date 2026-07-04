@@ -140,7 +140,7 @@ function getStatConfigs(
 	];
 }
 
-async function fetchRecentSessions(
+export async function fetchRecentSessions(
 	viewedGroupId: number
 ): Promise<SessionWithEncountersCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
@@ -155,7 +155,7 @@ async function fetchRecentSessions(
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
 }
 
-async function fetchInitialData(
+export async function fetchHomePageData(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<PageModel> {
@@ -237,7 +237,7 @@ export default async function Home({
 		<BootstrapPageData<PageModel>
 			viewedGroupId={viewedGroupId}
 			getCacheKeys={() => ['home-stats']}
-			dataFetcher={fetchInitialData}
+			dataFetcher={fetchHomePageData}
 			PageComponent={HomePageContent}
 		/>
 	);

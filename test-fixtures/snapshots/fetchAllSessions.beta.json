@@ -1,0 +1,15 @@
+[
+  {
+    "id": 489,
+    "visit_date": "2023-06-01",
+    "location": {
+      "id": 489,
+      "location_name": "Beta Site"
+    },
+    "encounters": [
+      {
+        "count": 3
+      }
+    ]
+  }
+]

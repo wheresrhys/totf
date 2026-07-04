@@ -1,0 +1,671 @@
+[
+  {
+    "id": 437,
+    "ring_no": "ARRETRAP",
+    "last_encountered_timestamp": "2024-05-10T05:45:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 3,
+    "encounters": [
+      {
+        "id": 439,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 19,
+        "session": {
+          "id": 435,
+          "visit_date": "2022-06-15"
+        },
+        "age_code": 5,
+        "record_type": "S",
+        "wing_length": 75,
+        "capture_time": "05:45:00",
+        "max_hatch_year": 2021,
+        "min_hatch_year": 2021
+      },
+      {
+        "id": 458,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 18.5,
+        "session": {
+          "id": 457,
+          "visit_date": "2021-06-20"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 74,
+        "capture_time": "06:00:00",
+        "max_hatch_year": 2021,
+        "min_hatch_year": 2021
+      },
+      {
+        "id": 468,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 19.2,
+        "session": {
+          "id": 465,
+          "visit_date": "2022-10-20"
+        },
+        "age_code": 5,
+        "record_type": "S",
+        "wing_length": 75,
+        "capture_time": "07:00:00",
+        "max_hatch_year": 2021,
+        "min_hatch_year": 2021
+      },
+      {
+        "id": 474,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 19,
+        "session": {
+          "id": 464,
+          "visit_date": "2023-05-12"
+        },
+        "age_code": 5,
+        "record_type": "S",
+        "wing_length": 75,
+        "capture_time": "05:45:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      },
+      {
+        "id": 477,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 19.2,
+        "session": {
+          "id": 476,
+          "visit_date": "2023-07-08"
+        },
+        "age_code": 5,
+        "record_type": "S",
+        "wing_length": 80,
+        "capture_time": "05:45:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      },
+      {
+        "id": 481,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 19.3,
+        "session": {
+          "id": 467,
+          "visit_date": "2024-05-10"
+        },
+        "age_code": 5,
+        "record_type": "S",
+        "wing_length": 80,
+        "capture_time": "05:45:00",
+        "max_hatch_year": 2023,
+        "min_hatch_year": 2023
+      },
+      {
+        "id": 482,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 19.1,
+        "session": {
+          "id": 480,
+          "visit_date": "2023-09-14"
+        },
+        "age_code": 5,
+        "record_type": "S",
+        "wing_length": 80,
+        "capture_time": "07:00:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      },
+      {
+        "id": 446,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 19,
+        "session": {
+          "id": 434,
+          "visit_date": "2022-04-30"
+        },
+        "age_code": 5,
+        "record_type": "S",
+        "wing_length": 75,
+        "capture_time": "06:00:00",
+        "max_hatch_year": 2021,
+        "min_hatch_year": 2021
+      },
+      {
+        "id": 434,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 18.8,
+        "session": {
+          "id": 437,
+          "visit_date": "2022-08-10"
+        },
+        "age_code": 5,
+        "record_type": "S",
+        "wing_length": 75,
+        "capture_time": "05:30:00",
+        "max_hatch_year": 2021,
+        "min_hatch_year": 2021
+      }
+    ]
+  },
+  {
+    "id": 450,
+    "ring_no": "SHARED01",
+    "last_encountered_timestamp": "2023-06-01T06:10:00",
+    "ringing_group_ids": [
+      3,
+      4
+    ],
+    "proven_age": 1,
+    "encounters": [
+      {
+        "id": 451,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 18,
+        "session": {
+          "id": 434,
+          "visit_date": "2022-04-30"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 74,
+        "capture_time": "07:00:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 485,
+    "ring_no": "AR0021",
+    "last_encountered_timestamp": "2023-05-12T06:15:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 1,
+    "encounters": [
+      {
+        "id": 470,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 19.5,
+        "session": {
+          "id": 464,
+          "visit_date": "2023-05-12"
+        },
+        "age_code": 5,
+        "record_type": "N",
+        "wing_length": 75,
+        "capture_time": "06:15:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 488,
+    "ring_no": "AR0020",
+    "last_encountered_timestamp": "2023-05-12T06:10:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 488,
+        "sex": "U",
+        "is_juv": false,
+        "weight": 18,
+        "session": {
+          "id": 464,
+          "visit_date": "2023-05-12"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 73,
+        "capture_time": "06:10:00",
+        "max_hatch_year": 2023,
+        "min_hatch_year": 2023
+      }
+    ]
+  },
+  {
+    "id": 479,
+    "ring_no": "AR0019",
+    "last_encountered_timestamp": "2023-05-12T06:05:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 1,
+    "encounters": [
+      {
+        "id": 472,
+        "sex": "F",
+        "is_juv": false,
+        "weight": 17,
+        "session": {
+          "id": 464,
+          "visit_date": "2023-05-12"
+        },
+        "age_code": 4,
+        "record_type": "N",
+        "wing_length": 72,
+        "capture_time": "06:05:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 0
+      }
+    ]
+  },
+  {
+    "id": 481,
+    "ring_no": "AR0018",
+    "last_encountered_timestamp": "2023-05-12T06:00:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 1,
+    "encounters": [
+      {
+        "id": 487,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 21,
+        "session": {
+          "id": 464,
+          "visit_date": "2023-05-12"
+        },
+        "age_code": 5,
+        "record_type": "N",
+        "wing_length": 76,
+        "capture_time": "06:00:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 477,
+    "ring_no": "AR0017",
+    "last_encountered_timestamp": "2023-05-12T05:55:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 483,
+        "sex": "F",
+        "is_juv": false,
+        "weight": 16.9,
+        "session": {
+          "id": 464,
+          "visit_date": "2023-05-12"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 72,
+        "capture_time": "05:55:00",
+        "max_hatch_year": 2023,
+        "min_hatch_year": 2023
+      }
+    ]
+  },
+  {
+    "id": 465,
+    "ring_no": "AR0016",
+    "last_encountered_timestamp": "2023-05-12T05:50:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 466,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 17.8,
+        "session": {
+          "id": 464,
+          "visit_date": "2023-05-12"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 73,
+        "capture_time": "05:50:00",
+        "max_hatch_year": 2023,
+        "min_hatch_year": 2023
+      }
+    ]
+  },
+  {
+    "id": 474,
+    "ring_no": "AR0015",
+    "last_encountered_timestamp": "2022-10-20T07:10:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 478,
+        "sex": "F",
+        "is_juv": false,
+        "weight": 17.2,
+        "session": {
+          "id": 465,
+          "visit_date": "2022-10-20"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 72,
+        "capture_time": "07:10:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 467,
+    "ring_no": "AR0014",
+    "last_encountered_timestamp": "2022-10-20T07:05:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 465,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 18.5,
+        "session": {
+          "id": 465,
+          "visit_date": "2022-10-20"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 74,
+        "capture_time": "07:05:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 463,
+    "ring_no": "AR0013",
+    "last_encountered_timestamp": "2022-08-10T05:45:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 459,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 18,
+        "session": {
+          "id": 437,
+          "visit_date": "2022-08-10"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 74,
+        "capture_time": "05:45:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 435,
+    "ring_no": "AR0012",
+    "last_encountered_timestamp": "2022-08-10T05:40:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 450,
+        "sex": "F",
+        "is_juv": false,
+        "weight": 16.8,
+        "session": {
+          "id": 437,
+          "visit_date": "2022-08-10"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 72,
+        "capture_time": "05:40:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 462,
+    "ring_no": "AR0011",
+    "last_encountered_timestamp": "2022-08-10T05:35:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 462,
+        "sex": "F",
+        "is_juv": false,
+        "weight": 17.5,
+        "session": {
+          "id": 437,
+          "visit_date": "2022-08-10"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 73,
+        "capture_time": "05:35:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 460,
+    "ring_no": "AR0010",
+    "last_encountered_timestamp": "2022-06-15T06:10:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 454,
+        "sex": "F",
+        "is_juv": false,
+        "weight": 17,
+        "session": {
+          "id": 435,
+          "visit_date": "2022-06-15"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 72,
+        "capture_time": "06:10:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 444,
+    "ring_no": "AR0009",
+    "last_encountered_timestamp": "2022-06-15T06:05:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 1,
+    "encounters": [
+      {
+        "id": 452,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 19.5,
+        "session": {
+          "id": 435,
+          "visit_date": "2022-06-15"
+        },
+        "age_code": 5,
+        "record_type": "N",
+        "wing_length": 74,
+        "capture_time": "06:05:00",
+        "max_hatch_year": 2021,
+        "min_hatch_year": 2021
+      }
+    ]
+  },
+  {
+    "id": 458,
+    "ring_no": "AR0008",
+    "last_encountered_timestamp": "2022-06-15T06:00:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 1,
+    "encounters": [
+      {
+        "id": 456,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 20.5,
+        "session": {
+          "id": 435,
+          "visit_date": "2022-06-15"
+        },
+        "age_code": 5,
+        "record_type": "N",
+        "wing_length": 75,
+        "capture_time": "06:00:00",
+        "max_hatch_year": 2021,
+        "min_hatch_year": 2021
+      }
+    ]
+  },
+  {
+    "id": 457,
+    "ring_no": "AR0007",
+    "last_encountered_timestamp": "2022-06-15T05:55:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 442,
+        "sex": "F",
+        "is_juv": false,
+        "weight": 16.5,
+        "session": {
+          "id": 435,
+          "visit_date": "2022-06-15"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 72,
+        "capture_time": "05:55:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 442,
+    "ring_no": "AR0006",
+    "last_encountered_timestamp": "2022-06-15T05:50:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 0,
+    "encounters": [
+      {
+        "id": 437,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 17.2,
+        "session": {
+          "id": 435,
+          "visit_date": "2022-06-15"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 73,
+        "capture_time": "05:50:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
+    "id": 440,
+    "ring_no": "AR0005",
+    "last_encountered_timestamp": "2022-04-30T06:30:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 1,
+    "encounters": [
+      {
+        "id": 443,
+        "sex": "U",
+        "is_juv": false,
+        "weight": 18,
+        "session": {
+          "id": 434,
+          "visit_date": "2022-04-30"
+        },
+        "age_code": 5,
+        "record_type": "N",
+        "wing_length": 74,
+        "capture_time": "06:30:00",
+        "max_hatch_year": 2021,
+        "min_hatch_year": 2021
+      }
+    ]
+  },
+  {
+    "id": 446,
+    "ring_no": "AR0004",
+    "last_encountered_timestamp": "2022-04-30T06:25:00",
+    "ringing_group_ids": [
+      3
+    ],
+    "proven_age": 1,
+    "encounters": [
+      {
+        "id": 445,
+        "sex": "F",
+        "is_juv": false,
+        "weight": 17,
+        "session": {
+          "id": 434,
+          "visit_date": "2022-04-30"
+        },
+        "age_code": 4,
+        "record_type": "N",
+        "wing_length": 72,
+        "capture_time": "06:25:00",
+        "max_hatch_year": 2021,
+        "min_hatch_year": 0
+      }
+    ]
+  }
+]
