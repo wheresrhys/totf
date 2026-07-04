@@ -12,7 +12,8 @@ export async function setGroupCookie(groupId: number): Promise<void> {
 	cookieStore.set(COOKIE_NAME, jwt, {
 		maxAge: ONE_YEAR_SECONDS,
 		httpOnly: true,
-		sameSite: 'strict',
+		secure: true,
+		sameSite: 'lax',
 		path: '/'
 	});
 }
