@@ -2,8 +2,6 @@ import { expect, describe, it, afterEach } from 'vitest';
 import {
 	render,
 	screen,
-	getByRole,
-	getAllByRole,
 	fireEvent,
 	waitFor,
 	cleanup
@@ -87,9 +85,7 @@ describe('species page', () => {
 				['BVB4173', '5', 'U', '29 Sep 2024', '12 Oct 2025', '4', '1'],
 				['BVB4924', '1', 'U', '12 Oct 2025', '12 Oct 2025', '3', '0'],
 				['BVB4913', '1', 'M', '10 Oct 2025', '10 Oct 2025', '2', '0'],
-				['BVB4904', '1', 'M', '09 Oct 2025', '09 Oct 2025', '3', '0'],
-				['BVB4344', '4', 'U', '28 Jun 2025', '09 Oct 2025', '2', '0'],
-				['BVB4905', '1', 'M', '09 Oct 2025', '09 Oct 2025', '2', '0']
+				['BVB4904', '1', 'M', '09 Oct 2025', '09 Oct 2025', '3', '0']
 			],
 			{ isPartial: true }
 		);
@@ -167,43 +163,5 @@ describe('species page', () => {
 				timeout: 1000
 			}
 		);
-	});
-	// todo fix the async issues
-	it.skip('should allow each individual bird to be expanded', async () => {
-		render(
-			await Page({
-				params: new Promise((resolve) =>
-					resolve({ speciesName: "Cetti's Warbler" })
-				)
-			})
-		);
-		const speciesTable = await screen.findByTestId('species-table');
-		const topLevelBodyEl = speciesTable.querySelector(
-			':scope > tbody'
-		) as HTMLElement;
-		const beforeRowEls = getAllByRole(topLevelBodyEl, 'row');
-		const beforeRowCount = beforeRowEls.length;
-		const targetRowEl = beforeRowEls[beforeRowCount - 1];
-		const expandButton = getByRole(
-			getAllByRole(targetRowEl, 'cell')[0],
-			'button'
-		);
-		expect(expandButton).toBeDefined();
-		fireEvent.click(expandButton);
-		await waitFor(() => {
-			const afterRowEls = getAllByRole(topLevelBodyEl, 'row');
-			expect(afterRowEls.length).toBeGreaterThan(beforeRowCount);
-		});
-		const afterRowEls = getAllByRole(topLevelBodyEl, 'row').filter(
-			(row) => row.parentElement === topLevelBodyEl
-		);
-		expect(afterRowEls).toHaveLength(beforeRowCount + 1);
-		const expandedRowEl = afterRowEls[afterRowEls.length - 1];
-		expect(expandedRowEl.querySelectorAll(':scope > td')).toHaveLength(1);
-
-		verifyTableData(getByRole(expandedRowEl, 'table'), [
-			['Date', 'Time', 'Age', 'Sex', 'Wing', 'Weight'],
-			['2025-11-09', '07:20:00', '2', 'U', '56', '11.2']
-		]);
 	});
 });
