@@ -96,18 +96,38 @@ You will need to ask your human to run `op signin` first
 
 ## Testing
 
+### Test suites
+
+Two separate Vitest configs:
+
+| Suite | Config | Command | Runs in |
+|---|---|---|---|
+| App tests | `vitest.config.ts` | `npm run test:nowatch` | pre-push hook + CI |
+| DB integration tests | `vitest.integration.config.ts` | `npm run test:integration` | pre-push hook (requires local Supabase) |
+
 ```sh
-npm test              # watch mode
-npm run test:nowatch  # single run
-npm run qa            # lint + type-check + tests
+npm test              # watch mode (app tests only)
+npm run test:nowatch  # single run (app tests)
+npm run test:integration  # DB integration tests against local Supabase
+npm run qa            # lint + type-check + app tests
 ```
 
-Tests use Vitest with happy-dom. Mocked in `vitest.setup.tsx`:
+The pre-push hook runs both suites. Local Supabase must be running (`npm run db:start:local`) and seeded (`npm run db:seed:e2e`) for integration tests to pass.
+
+### App tests (Vitest + happy-dom)
+
+Tests live in `__tests__/` directories alongside the code they test. Global mocks in `vitest.setup.tsx`:
 - `next/link`, `next/navigation`
 - `app/actions/group-cookie` (returns group ID `1`)
 - `BootstrapPageData` component
 
-Tests render async server components directly with `await Page({ params: Promise.resolve(...) })`.
+Page-level tests render async server components directly with `await Page({ params: Promise.resolve(...) })`.
+
+Snapshot fixture data lives in `test-fixtures/snapshots/` — use these as mock return values rather than inventing data inline.
+
+### DB integration tests (`supabase/__tests__/`)
+
+Test RPC functions and RLS policies against the real local database. Require `npm run db:seed:e2e` to populate test data before running. Use a separate Vitest node environment (no happy-dom).
 
 ## Environment variables
 

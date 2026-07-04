@@ -51,37 +51,6 @@ describe('StatsAccordionItem', () => {
 		);
 	});
 
-	it('renders heading with initial data', () => {
-		render(
-			<StatsAccordionItem
-				item={mockItemModel}
-				viewedGroupId={1}
-				expanded={false}
-				onToggle={mockOnToggle}
-			/>
-		);
-		const button = screen.getByRole('button');
-		expect(button.textContent).toContain('Top sessions:');
-		expect(button.textContent).toContain('11 birds');
-	});
-
-	it('shows "No data available" in heading when no initial data', () => {
-		const emptyItem: AccordionItemModel = {
-			...mockItemModel,
-			data: []
-		};
-		render(
-			<StatsAccordionItem
-				item={emptyItem}
-				viewedGroupId={1}
-				expanded={false}
-				onToggle={mockOnToggle}
-			/>
-		);
-		const button = screen.getByRole('button');
-		expect(button.textContent).toContain('No data available');
-	});
-
 	it('calls onToggle when button is clicked', () => {
 		render(
 			<StatsAccordionItem
@@ -95,22 +64,55 @@ describe('StatsAccordionItem', () => {
 		expect(mockOnToggle).toHaveBeenCalledWith('test-metric');
 	});
 
-	it('loads data via getTopStats when expanded', async () => {
-		const { getTopStats } = await import('@/app/actions/top-performers');
-		const itemWithNoData: AccordionItemModel = {
-			...mockItemModel,
-			data: []
-		};
-		render(
-			<StatsAccordionItem
-				item={itemWithNoData}
-				viewedGroupId={1}
-				expanded="test-metric"
-				onToggle={mockOnToggle}
-			/>
-		);
-		await waitFor(() => {
-			expect(vi.mocked(getTopStats)).toHaveBeenCalled();
+	describe('item.data prop', () => {
+		it('renders heading with metric value when data provided', () => {
+			render(
+				<StatsAccordionItem
+					item={mockItemModel}
+					viewedGroupId={1}
+					expanded={false}
+					onToggle={mockOnToggle}
+				/>
+			);
+			const button = screen.getByRole('button');
+			expect(button.textContent).toContain('Top sessions:');
+			expect(button.textContent).toContain('11 birds');
+		});
+
+		it('shows "No data available" in heading when data is empty', () => {
+			const emptyItem: AccordionItemModel = { ...mockItemModel, data: [] };
+			render(
+				<StatsAccordionItem
+					item={emptyItem}
+					viewedGroupId={1}
+					expanded={false}
+					onToggle={mockOnToggle}
+				/>
+			);
+			expect(screen.getByRole('button').textContent).toContain(
+				'No data available'
+			);
+		});
+	});
+
+	describe('expanded prop', () => {
+		it('loads data via getTopStats when expanded matches item id', async () => {
+			const { getTopStats } = await import('@/app/actions/top-performers');
+			const itemWithNoData: AccordionItemModel = {
+				...mockItemModel,
+				data: []
+			};
+			render(
+				<StatsAccordionItem
+					item={itemWithNoData}
+					viewedGroupId={1}
+					expanded="test-metric"
+					onToggle={mockOnToggle}
+				/>
+			);
+			await waitFor(() => {
+				expect(vi.mocked(getTopStats)).toHaveBeenCalled();
+			});
 		});
 	});
 });

@@ -26,44 +26,48 @@ describe('SppStatsTable', () => {
 		vi.clearAllMocks();
 	});
 
-	it('renders table with species rows from initial data', () => {
-		render(<SppStatsTable data={pageData} viewedGroupId={1} />);
-		const rows = document.querySelectorAll('tbody tr');
-		expect(rows.length).toBe(speciesDataSnapshot.length);
+	describe('initial render', () => {
+		it('renders species data rows from initial data', () => {
+			render(<SppStatsTable data={pageData} viewedGroupId={1} />);
+			const rows = document.querySelectorAll('tbody tr');
+			expect(rows.length).toBe(speciesDataSnapshot.length);
+		});
 	});
 
-	it('CES only checkbox is disabled when no year selected', () => {
-		render(<SppStatsTable data={pageData} viewedGroupId={1} />);
-		const cesCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
-		expect(cesCheckbox.disabled).toBe(true);
-	});
+	describe('year filter', () => {
+		it('CES only checkbox is disabled when no year selected', () => {
+			render(<SppStatsTable data={pageData} viewedGroupId={1} />);
+			const cesCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
+			expect(cesCheckbox.disabled).toBe(true);
+		});
 
-	it('CES only checkbox is enabled after year is selected', async () => {
-		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
-		vi.mocked(fetchSpeciesData).mockResolvedValue(
-			speciesDataSnapshot as unknown as AggregateStatsRow[]
-		);
-		render(<SppStatsTable data={pageData} viewedGroupId={1} />);
-		const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;
-		fireEvent.change(yearSelect, { target: { value: '2022' } });
-		const cesCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
-		expect(cesCheckbox.disabled).toBe(false);
-	});
-
-	it('triggers fetchSpeciesData when year changes', async () => {
-		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
-		vi.mocked(fetchSpeciesData).mockResolvedValue(
-			speciesDataSnapshot as unknown as AggregateStatsRow[]
-		);
-		render(<SppStatsTable data={pageData} viewedGroupId={1} />);
-		const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;
-		fireEvent.change(yearSelect, { target: { value: '2022' } });
-		await waitFor(() => {
-			expect(vi.mocked(fetchSpeciesData)).toHaveBeenCalledWith(
-				1,
-				'2022-01-01',
-				'2022-12-31'
+		it('CES only checkbox is enabled after year is selected', async () => {
+			const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+			vi.mocked(fetchSpeciesData).mockResolvedValue(
+				speciesDataSnapshot as unknown as AggregateStatsRow[]
 			);
+			render(<SppStatsTable data={pageData} viewedGroupId={1} />);
+			const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;
+			fireEvent.change(yearSelect, { target: { value: '2022' } });
+			const cesCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
+			expect(cesCheckbox.disabled).toBe(false);
+		});
+
+		it('triggers fetchSpeciesData with correct date range when year changes', async () => {
+			const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+			vi.mocked(fetchSpeciesData).mockResolvedValue(
+				speciesDataSnapshot as unknown as AggregateStatsRow[]
+			);
+			render(<SppStatsTable data={pageData} viewedGroupId={1} />);
+			const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;
+			fireEvent.change(yearSelect, { target: { value: '2022' } });
+			await waitFor(() => {
+				expect(vi.mocked(fetchSpeciesData)).toHaveBeenCalledWith(
+					1,
+					'2022-01-01',
+					'2022-12-31'
+				);
+			});
 		});
 	});
 });

@@ -35,28 +35,30 @@ describe('SpIndividualsTab', () => {
 		expect(rows?.length).toBe(birds.length);
 	});
 
-	it('hides infinite scroll loader when all birds loaded', () => {
-		render(
-			<SpIndividualsTab
-				speciesId={1}
-				viewedGroupId={1}
-				birds={birds}
-				birdCount={birds.length}
-			/>
-		);
-		expect(() => screen.getByTestId('infinite-scroll-loader')).toThrow();
-	});
+	describe('birdCount prop', () => {
+		it('hides infinite scroll loader when birdCount equals loaded birds', () => {
+			render(
+				<SpIndividualsTab
+					speciesId={1}
+					viewedGroupId={1}
+					birds={birds}
+					birdCount={birds.length}
+				/>
+			);
+			expect(() => screen.getByTestId('infinite-scroll-loader')).toThrow();
+		});
 
-	it('shows infinite scroll loader when more birds remain', () => {
-		render(
-			<SpIndividualsTab
-				speciesId={1}
-				viewedGroupId={1}
-				birds={birds}
-				birdCount={birds.length + 10}
-			/>
-		);
-		expect(screen.getByTestId('infinite-scroll-loader')).toBeDefined();
+		it('shows infinite scroll loader when birdCount exceeds loaded birds', () => {
+			render(
+				<SpIndividualsTab
+					speciesId={1}
+					viewedGroupId={1}
+					birds={birds}
+					birdCount={birds.length + 10}
+				/>
+			);
+			expect(screen.getByTestId('infinite-scroll-loader')).toBeDefined();
+		});
 	});
 
 	it('loads more birds when scroll loader enters view', async () => {
