@@ -59,6 +59,4 @@ describe('session page', () => {
 			['Kingfisher', '1', '1', '0', '1', '0', '0']
 		]);
 	});
-	// todo fix the async issues
-	it.skip('should allow each individual species to be expanded', async () => {});
 });
