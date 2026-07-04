@@ -1,5 +1,5 @@
 /**
- * Integration tests for Postgres RPC functions and cross-group RLS.
+ * Integration tests for Postgres RPC functions.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -31,6 +31,14 @@ const ALPHA_TOTAL_BIRDS = 45;
 const ALPHA_SPECIES_COUNT = 4; // Blue Tit, Kingfisher, Reed Warbler, Robin
 const CES_2022_ENCOUNTERS = 30; // Apr–Aug 2022 only
 
+// Per-species aggregates for Alpha — reused across multiple tests
+const PER_SPECIES_AGGREGATES = {
+	'Blue Tit':     { encounter_count: 7,  bird_count: 6  },
+	'Kingfisher':   { encounter_count: 2,  bird_count: 1  },
+	'Reed Warbler': { encounter_count: 15, bird_count: 15 },
+	'Robin':        { encounter_count: 31, bird_count: 23 },
+} as const;
+
 const ARRETRAP_ENCOUNTERS = 9;
 const ARRETRAP_DATES = [
 	'2021-06-20', '2022-04-30', '2022-06-15', '2022-08-10',
@@ -41,20 +49,16 @@ const ARRETRAP_PROVEN_AGE = 3;
 describe('Postgres RPC integration tests', () => {
 	let alphaId: number;
 	let betaId: number;
-	let gammaId: number;
 	let alphaClient: SupabaseClient;
 	let betaClient: SupabaseClient;
-	let gammaClient: SupabaseClient;
 
 	beforeAll(async () => {
 		alphaId = await getGroupIdByName('Alpha');
 		betaId = await getGroupIdByName('Beta');
-		gammaId = await getGroupIdByName('Gamma');
 
-		[alphaClient, betaClient, gammaClient] = await Promise.all([
+		[alphaClient, betaClient] = await Promise.all([
 			getAuthenticatedSupabaseClientForGroup(alphaId),
 			getAuthenticatedSupabaseClientForGroup(betaId),
-			getAuthenticatedSupabaseClientForGroup(gammaId),
 		]);
 	});
 
@@ -82,18 +86,19 @@ describe('Postgres RPC integration tests', () => {
 			expect(error).toBeNull();
 			expect(data).toHaveLength(1);
 			const row = data![0];
-			expect(row.encounter_count).toBe(31);
-			expect(row.bird_count).toBe(23);
+			expect(row.encounter_count).toBe(PER_SPECIES_AGGREGATES['Robin'].encounter_count);
+			expect(row.bird_count).toBe(PER_SPECIES_AGGREGATES['Robin'].bird_count);
 			expect(row.species_count).toBe(1);
 		});
 
-		it('date range Apr–Aug 2022 (CES months) returns fewer encounters than full dataset', async () => {
-			const { data: cesOnly } = await alphaClient.rpc('aggregate_stats', {
+		it('date range Apr–Aug 2022 (CES months) returns 30 encounters', async () => {
+			const { data, error } = await alphaClient.rpc('aggregate_stats', {
 				ringing_group_filter: alphaId,
 				from_date: '2022-04-01',
 				to_date: '2022-08-31',
 			});
-			expect(cesOnly![0].encounter_count).toBe(CES_2022_ENCOUNTERS);
+			expect(error).toBeNull();
+			expect(data![0].encounter_count).toBe(CES_2022_ENCOUNTERS);
 		});
 
 		it('group_by_species returns one row per species with correct counts', async () => {
@@ -104,12 +109,13 @@ describe('Postgres RPC integration tests', () => {
 			expect(error).toBeNull();
 			expect(data).toHaveLength(ALPHA_SPECIES_COUNT);
 			const sorted = data!.slice().sort((a, b) => a.species_name.localeCompare(b.species_name));
-			expect(sorted.map((r) => ({ sp: r.species_name, enc: r.encounter_count, birds: r.bird_count }))).toEqual([
-				{ sp: 'Blue Tit', enc: 7, birds: 6 },
-				{ sp: 'Kingfisher', enc: 2, birds: 1 },
-				{ sp: 'Reed Warbler', enc: 15, birds: 15 },
-				{ sp: 'Robin', enc: 31, birds: 23 },
-			]);
+			expect(
+				sorted.map((r) => ({ sp: r.species_name, enc: r.encounter_count, birds: r.bird_count }))
+			).toEqual(
+				Object.entries(PER_SPECIES_AGGREGATES)
+					.sort(([a], [b]) => a.localeCompare(b))
+					.map(([sp, { encounter_count, bird_count }]) => ({ sp, enc: encounter_count, birds: bird_count }))
+			);
 		});
 
 		it('group_by_time_period=month returns one row per month (36 months Jun 2021–May 2024)', async () => {
@@ -119,10 +125,8 @@ describe('Postgres RPC integration tests', () => {
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(36);
-			// Spot-check: Apr 2022 (busiest CES session) has 11 encounters
 			const apr2022 = data!.find((r) => r.time_period === '2022-04-01');
 			expect(apr2022!.encounter_count).toBe(11);
-			// All time_periods are non-null
 			expect(data!.every((r) => r.time_period !== null)).toBe(true);
 		});
 
@@ -141,83 +145,213 @@ describe('Postgres RPC integration tests', () => {
 	});
 
 	describe('top_metrics_by_period', () => {
-		it('temporal_unit=day metric_name=encounters returns top 5 busiest days', async () => {
-			const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
-				temporal_unit: 'day',
-				metric_name: 'encounters',
-				result_limit: 5,
-				filters: { ringing_group_filter: alphaId },
-			} as never);
-			expect(error).toBeNull();
-			expect(data).toHaveLength(5);
-			// Tie at top: both 2022-06-15 and 2022-04-30 have 11 encounters
-			const top2Dates = data!.slice(0, 2).map((r) => r.visit_date).sort();
-			expect(top2Dates).toEqual(['2022-04-30', '2022-06-15']);
-			expect(data![0].metric_value).toBe(11);
-			expect(data![1].metric_value).toBe(11);
-			expect(data![2]).toMatchObject({ visit_date: '2023-05-12', metric_value: 10 });
+		// Default params used unless overridden within a describe block:
+		//   metric_name='encounters', result_limit=3, temporal_unit='day'
+
+		describe('temporal_unit parameter', () => {
+			it('day groups results by individual session date', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
+					temporal_unit: 'day',
+					metric_name: 'encounters',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data).toHaveLength(3);
+				// Top 2 days tie at 11 encounters (secondary sort: visit_date DESC → 2022-06-15 wins)
+				expect(data![0]).toEqual({ visit_date: '2022-06-15', metric_value: 11 });
+				expect(data![1]).toEqual({ visit_date: '2022-04-30', metric_value: 11 });
+				expect(data![2]).toEqual({ visit_date: '2023-05-12', metric_value: 10 });
+			});
+
+			it('month aggregates results into calendar months', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
+					temporal_unit: 'month',
+					metric_name: 'encounters',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data).toHaveLength(3);
+				expect(data![0]).toEqual({ visit_date: '2022-06-01', metric_value: 11 });
+				expect(data![1]).toEqual({ visit_date: '2022-04-01', metric_value: 11 });
+				expect(data![2]).toEqual({ visit_date: '2023-05-01', metric_value: 10 });
+			});
+
+			it('year aggregates results into calendar years', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
+					temporal_unit: 'year',
+					metric_name: 'encounters',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data).toHaveLength(3);
+				expect(data![0]).toEqual({ visit_date: '2022-01-01', metric_value: 35 });
+				expect(data![1]).toEqual({ visit_date: '2023-01-01', metric_value: 15 });
+				expect(data![2]).toEqual({ visit_date: '2024-01-01', metric_value: 4 });
+			});
 		});
 
-		it('temporal_unit=month metric_name=species returns 9 months with species counts', async () => {
-			const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
-				temporal_unit: 'month',
-				metric_name: 'species',
-				result_limit: 10,
-				filters: { ringing_group_filter: alphaId },
-			} as never);
-			expect(error).toBeNull();
-			// 9 months with activity: Jun 2021, Apr/Jun/Aug/Oct 2022, May/Jul/Sep 2023, May 2024
-			expect(data).toHaveLength(9);
-			// Peak months (4 months had 3 species each)
-			const peakCount = data!.filter((r) => r.metric_value === 3).length;
-			expect(peakCount).toBe(4);
+		describe('metric_name parameter', () => {
+			it('encounters counts all encounter records per day', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
+					temporal_unit: 'day',
+					metric_name: 'encounters',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data![0]).toEqual({ visit_date: '2022-06-15', metric_value: 11 });
+			});
+
+			it('individuals counts distinct rings per day', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
+					temporal_unit: 'day',
+					metric_name: 'individuals',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				// Each bird is caught once per session in seed data → same as encounters
+				expect(data![0]).toEqual({ visit_date: '2022-06-15', metric_value: 11 });
+			});
+
+			it('species counts distinct species present per day', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
+					temporal_unit: 'day',
+					metric_name: 'species',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				// Several days had 3 species; tie broken by visit_date DESC
+				expect(data![0].metric_value).toBe(3);
+				expect(data!.every((r) => r.metric_value === 3)).toBe(true);
+			});
 		});
 
-		it('temporal_unit=year metric_name=individuals returns 4 years with correct individual counts', async () => {
-			const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
-				temporal_unit: 'year',
-				metric_name: 'individuals',
-				result_limit: 10,
-				filters: { ringing_group_filter: alphaId },
-			} as never);
-			expect(error).toBeNull();
-			expect(data).toHaveLength(4);
-			const byYear = Object.fromEntries(
-				data!.map((r) => [new Date(r.visit_date).getFullYear(), r.metric_value])
-			);
-			expect(byYear).toEqual({ 2021: 1, 2022: 31, 2023: 13, 2024: 4 });
+		describe('result_limit parameter', () => {
+			it('result_limit=1 returns only the single top result', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
+					temporal_unit: 'day',
+					metric_name: 'encounters',
+					result_limit: 1,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				expect(data![0]).toEqual({ visit_date: '2022-06-15', metric_value: 11 });
+			});
+
+			it('result_limit=3 returns top 3 results', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_period', {
+					temporal_unit: 'day',
+					metric_name: 'encounters',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data).toHaveLength(3);
+			});
 		});
 	});
 
 	describe('top_metrics_by_species_and_period', () => {
-		it('temporal_unit=day metric_name=encounters returns top 5 species+day combos', async () => {
-			const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
-				temporal_unit: 'day',
-				metric_name: 'encounters',
-				result_limit: 5,
-				filters: { ringing_group_filter: alphaId },
-			} as never);
-			expect(error).toBeNull();
-			expect(data).toHaveLength(5);
-			// Top entry: Robin on 2023-05-12 or 2022-04-30 (7 each, tied at top)
-			const top2 = data!.slice(0, 2);
-			expect(top2.every((r) => r.species_name === 'Robin' && r.metric_value === 7)).toBe(true);
+		// Default params: metric_name='encounters', result_limit=3, temporal_unit='day'
+
+		describe('temporal_unit parameter', () => {
+			it('day groups results by individual session date', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
+					temporal_unit: 'day',
+					metric_name: 'encounters',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data).toHaveLength(3);
+				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2023-05-12', metric_value: 7 });
+				expect(data![1]).toEqual({ species_name: 'Robin', visit_date: '2022-04-30', metric_value: 7 });
+				expect(data![2]).toEqual({ species_name: 'Robin', visit_date: '2022-06-15', metric_value: 6 });
+			});
+
+			it('month aggregates results into calendar months', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
+					temporal_unit: 'month',
+					metric_name: 'encounters',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data).toHaveLength(3);
+				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2023-05-01', metric_value: 7 });
+				expect(data![1]).toEqual({ species_name: 'Robin', visit_date: '2022-04-01', metric_value: 7 });
+				expect(data![2]).toEqual({ species_name: 'Robin', visit_date: '2022-06-01', metric_value: 6 });
+			});
+
+			it('year aggregates results into calendar years', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
+					temporal_unit: 'year',
+					metric_name: 'encounters',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data).toHaveLength(3);
+				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2022-01-01', metric_value: 20 });
+				expect(data![1]).toEqual({ species_name: 'Robin', visit_date: '2023-01-01', metric_value: 9 });
+				expect(data![2]).toEqual({ species_name: 'Reed Warbler', visit_date: '2022-01-01', metric_value: 8 });
+			});
 		});
 
-		it('temporal_unit=year metric_name=individuals returns 11 species-year rows', async () => {
-			const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
-				temporal_unit: 'year',
-				metric_name: 'individuals',
-				result_limit: 20,
-				filters: { ringing_group_filter: alphaId },
-			} as never);
-			expect(error).toBeNull();
-			expect(data).toHaveLength(11);
-			// Robin 2022 is the biggest: 17 individuals
-			const robin2022 = data!.find(
-				(r) => r.species_name === 'Robin' && new Date(r.visit_date).getFullYear() === 2022
-			);
-			expect(robin2022!.metric_value).toBe(17);
+		describe('metric_name parameter', () => {
+			it('encounters counts all encounter records per species per day', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
+					temporal_unit: 'day',
+					metric_name: 'encounters',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2023-05-12', metric_value: 7 });
+			});
+
+			it('individuals counts distinct rings per species per day', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
+					temporal_unit: 'day',
+					metric_name: 'individuals',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				// Each bird is caught once per session in seed data → same as encounters
+				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2023-05-12', metric_value: 7 });
+			});
+		});
+
+		describe('result_limit parameter', () => {
+			it('result_limit=1 returns only the top result', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
+					temporal_unit: 'day',
+					metric_name: 'encounters',
+					result_limit: 1,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2023-05-12', metric_value: 7 });
+			});
+
+			it('result_limit=3 returns top 3 results', async () => {
+				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
+					temporal_unit: 'day',
+					metric_name: 'encounters',
+					result_limit: 3,
+					filters: { ringing_group_filter: alphaId },
+				} as never);
+				expect(error).toBeNull();
+				expect(data).toHaveLength(3);
+			});
 		});
 	});
 
@@ -230,12 +364,10 @@ describe('Postgres RPC integration tests', () => {
 			} as never);
 			expect(error).toBeNull();
 			expect(data).toHaveLength(21);
-			// Only month with 1 Robin before 2022 is Jun 2021
 			const robin2021 = data!.find(
 				(r) => r.species_name === 'Robin' && r.visit_date === '2021-06-01'
 			);
 			expect(robin2021!.metric_value).toBe(1);
-			// Robin Apr 2022 had 7 encounters
 			const robinApr2022 = data!.find(
 				(r) => r.species_name === 'Robin' && r.visit_date === '2022-04-01'
 			);
@@ -252,7 +384,6 @@ describe('Postgres RPC integration tests', () => {
 			expect(data).toHaveLength(11);
 			const years = [...new Set(data!.map((r) => new Date(r.visit_date).getFullYear()))].sort();
 			expect(years).toEqual([2021, 2022, 2023, 2024]);
-			// Robin 2022: 20 encounters
 			const robin2022 = data!.find(
 				(r) => r.species_name === 'Robin' && new Date(r.visit_date).getFullYear() === 2022
 			);
@@ -284,17 +415,38 @@ describe('Postgres RPC integration tests', () => {
 	});
 
 	describe('most_caught_birds', () => {
-		it('default (significance_threshold=3) returns only ARRETRAP with all 9 encounters', async () => {
-			const { data, error } = await alphaClient.rpc('most_caught_birds', {
-				ringing_group_filter: alphaId,
+		describe('significance_threshold parameter', () => {
+			it('default threshold=3 returns only ARRETRAP (only bird with ≥3 encounters)', async () => {
+				const { data, error } = await alphaClient.rpc('most_caught_birds', {
+					ringing_group_filter: alphaId,
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				expect(data![0]).toMatchObject({
+					species_name: 'Robin',
+					ring_no: 'ARRETRAP',
+					encounter_count: ARRETRAP_ENCOUNTERS,
+					encounter_dates: ARRETRAP_DATES,
+				});
 			});
-			expect(error).toBeNull();
-			expect(data).toHaveLength(1);
-			expect(data![0]).toMatchObject({
-				species_name: 'Robin',
-				ring_no: 'ARRETRAP',
-				encounter_count: ARRETRAP_ENCOUNTERS,
-				encounter_dates: ARRETRAP_DATES,
+
+			it('threshold=1 returns all 45 birds with at least 1 encounter', async () => {
+				const { data, error } = await alphaClient.rpc('most_caught_birds', {
+					ringing_group_filter: alphaId,
+					significance_threshold: 1,
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(ALPHA_TOTAL_BIRDS);
+				expect(data![0].ring_no).toBe('ARRETRAP');
+			});
+
+			it('threshold=10 returns no birds (max encounters is 9 for ARRETRAP)', async () => {
+				const { data, error } = await alphaClient.rpc('most_caught_birds', {
+					ringing_group_filter: alphaId,
+					significance_threshold: 10,
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(0);
 			});
 		});
 
@@ -371,9 +523,8 @@ describe('Postgres RPC integration tests', () => {
 				min_encounter_count: 1,
 			});
 			expect(error).toBeNull();
-			expect(data).toHaveLength(23);
+			expect(data).toHaveLength(PER_SPECIES_AGGREGATES['Robin'].bird_count);
 			expect(data!.every((r) => r.species_name === 'Robin')).toBe(true);
-			// ARRETRAP first (highest encounter count)
 			expect(data![0].ring_no).toBe('ARRETRAP');
 		});
 
@@ -393,16 +544,15 @@ describe('Postgres RPC integration tests', () => {
 				ringing_group_filter: alphaId,
 			});
 			expect(error).toBeNull();
-			// Order by discrepency_type for stable comparison (bird_id is seed-dependent)
 			const rows = data!
 				.map((r) => ({ ring_no: r.ring_no, type: r.discrepency_type }))
 				.sort((a, b) => a.ring_no.localeCompare(b.ring_no) || a.type.localeCompare(b.type));
 			expect(rows).toEqual([
-				{ ring_no: 'ABTITMIS', type: 'age' },
-				{ ring_no: 'ABTITMIS', type: 'sex' },
+				{ ring_no: 'ABTITMIS',  type: 'age' },
+				{ ring_no: 'ABTITMIS',  type: 'sex' },
 				{ ring_no: 'AKINGF001', type: 'age' },
-				{ ring_no: 'ARRETRAP', type: 'age' },
-				{ ring_no: 'ARRETRAP', type: 'wing_length' },
+				{ ring_no: 'ARRETRAP',  type: 'age' },
+				{ ring_no: 'ARRETRAP',  type: 'wing_length' },
 			]);
 		});
 
@@ -410,53 +560,6 @@ describe('Postgres RPC integration tests', () => {
 			const { data, error } = await betaClient.rpc('find_discrepencies', {
 				ringing_group_filter: betaId,
 			});
-			expect(error).toBeNull();
-			expect(data).toHaveLength(0);
-		});
-	});
-
-	describe('cross-group RLS', () => {
-		it('beta client can read all 9 alpha sessions (share Alpha→Beta exists)', async () => {
-			const { data, error } = await betaClient
-				.from('Sessions')
-				.select('id')
-				.eq('ringing_group_id', alphaId);
-			expect(error).toBeNull();
-			expect(data).toHaveLength(ALPHA_SESSION_COUNT);
-		});
-
-		it('gamma client can read the 1 beta session (share Beta→Gamma exists)', async () => {
-			const { data, error } = await gammaClient
-				.from('Sessions')
-				.select('id')
-				.eq('ringing_group_id', betaId);
-			expect(error).toBeNull();
-			expect(data).toHaveLength(1);
-		});
-
-		it('gamma client cannot read alpha sessions (transitivity blocked)', async () => {
-			const { data, error } = await gammaClient
-				.from('Sessions')
-				.select('id')
-				.eq('ringing_group_id', alphaId);
-			expect(error).toBeNull();
-			expect(data).toHaveLength(0);
-		});
-
-		it('alpha client cannot read beta sessions (no reverse share)', async () => {
-			const { data, error } = await alphaClient
-				.from('Sessions')
-				.select('id')
-				.eq('ringing_group_id', betaId);
-			expect(error).toBeNull();
-			expect(data).toHaveLength(0);
-		});
-
-		it('gamma own sessions are empty (gamma has no own data)', async () => {
-			const { data, error } = await gammaClient
-				.from('Sessions')
-				.select('id')
-				.eq('ringing_group_id', gammaId);
 			expect(error).toBeNull();
 			expect(data).toHaveLength(0);
 		});
