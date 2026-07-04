@@ -245,6 +245,12 @@ export default function GlobalNav({
 								onChange={() => expandersDispatch({ type: 'collapseAll' })}
 							/>
 						)}
+						<NoPrefetchLink
+							href="/import"
+							className="link link-secondary text-sm"
+						>
+							Import data
+						</NoPrefetchLink>
 						<form action={logout}>
 							<button type="submit" className="link link-secondary text-sm">
 								Log out
