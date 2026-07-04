@@ -52,20 +52,20 @@
   {
     "encounters": [
       {
-        "sex": "U",
+        "sex": "M",
         "weight": 18,
         "age_code": 3,
-        "wing_length": 73
+        "wing_length": 74
       }
     ]
   },
   {
     "encounters": [
       {
-        "sex": "M",
+        "sex": "U",
         "weight": 18,
         "age_code": 3,
-        "wing_length": 74
+        "wing_length": 73
       }
     ]
   },
