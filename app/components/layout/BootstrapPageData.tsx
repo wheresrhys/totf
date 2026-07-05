@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
+import { connection } from 'next/server';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 
 export type DefaultPageParams = Record<string, string>;
@@ -81,6 +82,7 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 		params = {} as ParamsType;
 	}
 
+	await connection();
 	const loggedInGroupId = await getGroupCookie();
 	const viewedGroupId = viewedGroupIdProp ?? loggedInGroupId;
 	const cacheKeys = getCacheKeys(params);

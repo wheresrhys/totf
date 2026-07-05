@@ -16,6 +16,8 @@ export function BootstrapPageData<
 	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
+		let mounted = true;
+
 		async function loadData() {
 			try {
 				let resolvedParams: ParamsType;
@@ -31,18 +33,23 @@ export function BootstrapPageData<
 					resolvedParams = {} as ParamsType;
 				}
 
+				if (!mounted) return;
 				setParams(resolvedParams);
 				const fetchedData = await bootstrapProps.dataFetcher(resolvedParams, 1);
+				if (!mounted) return;
 				setData(fetchedData);
 			} catch (error) {
 				console.error('Error loading data in BootstrapPageData mock:', error);
-				setData(null);
+				if (mounted) setData(null);
 			} finally {
-				setIsLoading(false);
+				if (mounted) setIsLoading(false);
 			}
 		}
 
 		loadData();
+		return () => {
+			mounted = false;
+		};
 	}, [bootstrapProps]);
 
 	if (isLoading) {
