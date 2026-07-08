@@ -115,7 +115,7 @@ export function SessionHistoryCalendar({
 	viewedGroupId: number;
 }) {
 	const calendar = groupByYear(sessions || []).map(groupByMonth);
-	const thisYearString = getYearString(calendar[0]);
+	const thisYearString = calendar[0] ? getYearString(calendar[0]) : false;
 	const [expandedYear, setExpandedYear] = useState<string | false>(
 		thisYearString
 	);
@@ -123,6 +123,10 @@ export function SessionHistoryCalendar({
 	useEffect(() => {
 		setExpandedYear(thisYearString);
 	}, [thisYearString]);
+
+	if (calendar.length === 0) {
+		return null;
+	}
 
 	return (
 		<ol>
