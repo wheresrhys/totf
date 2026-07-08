@@ -14,8 +14,11 @@ type RowModel = {
 	capture_time: string;
 	age_code: string;
 	sex: string;
+	sexing_method: string | null;
+	breeding_condition: string | null;
 	wing_length: number | null;
 	weight: number | null;
+	moult_code: string | null;
 };
 
 function rowDataTransform(encounter: EncounterOfBird): RowModel {
@@ -24,8 +27,11 @@ function rowDataTransform(encounter: EncounterOfBird): RowModel {
 		capture_time: encounter.capture_time,
 		age_code: `${encounter.age_code}${encounter.is_juv ? 'J' : ''}`,
 		sex: encounter.sex,
+		sexing_method: encounter.sexing_method,
+		breeding_condition: encounter.breeding_condition,
 		wing_length: encounter.wing_length,
-		weight: encounter.weight
+		weight: encounter.weight,
+		moult_code: encounter.moult_code
 	};
 }
 
@@ -46,11 +52,20 @@ const columnConfigs = {
 	sex: {
 		label: 'Sex'
 	},
+	sexing_method: {
+		label: 'Sexing Method'
+	},
+	breeding_condition: {
+		label: 'Breeding Condition'
+	},
 	wing_length: {
 		label: 'Wing'
 	},
 	weight: {
 		label: 'Weight'
+	},
+	moult_code: {
+		label: 'Moult Code'
 	}
 } as Record<keyof RowModel, ColumnConfig>;
 

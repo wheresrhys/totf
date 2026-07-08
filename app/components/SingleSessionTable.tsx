@@ -42,8 +42,11 @@ function SpeciesDetailsTable({
 					<th>Type</th>
 					<th>Age</th>
 					<th>Sex</th>
+					<th>Sexing Method</th>
+					<th>Breeding Condition</th>
 					<th>Wing</th>
 					<th>Weight</th>
+					<th>Moult Code</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -61,8 +64,11 @@ function SpeciesDetailsTable({
 						<td>{encounter.record_type}</td>
 						<td>{encounter.age_code}</td>
 						<td>{encounter.sex}</td>
+						<td>{encounter.sexing_method}</td>
+						<td>{encounter.breeding_condition}</td>
 						<td>{encounter.wing_length}</td>
 						<td>{encounter.weight}</td>
+						<td>{encounter.moult_code}</td>
 					</tr>
 				))}
 			</tbody>
