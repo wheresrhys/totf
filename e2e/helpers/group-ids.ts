@@ -7,3 +7,4 @@ const groupIds = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, nu
 export const alphaId = groupIds.alpha
 export const betaId = groupIds.beta
 export const gammaId = groupIds.gamma
+export const deltaId = groupIds.delta

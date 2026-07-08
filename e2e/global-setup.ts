@@ -8,10 +8,10 @@ const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 function isAlreadySeeded(): boolean {
 	try {
 		const result = execSync(
-			`psql "${LOCAL_DB_URL}" -t -c "SELECT COUNT(*) FROM \\"RingingGroups\\" WHERE group_name IN ('Alpha', 'Beta', 'Gamma')"`,
+			`psql "${LOCAL_DB_URL}" -t -c "SELECT COUNT(*) FROM \\"RingingGroups\\" WHERE group_name IN ('Alpha', 'Beta', 'Gamma', 'Delta')"`,
 			{ encoding: 'utf8' }
 		)
-		return result.trim() === '3'
+		return result.trim() === '4'
 	} catch {
 		return false
 	}
@@ -19,7 +19,7 @@ function isAlreadySeeded(): boolean {
 
 function getGroupIds(): Record<string, number> {
 	const result = execSync(
-		`psql "${LOCAL_DB_URL}" -t -A -F , -c "SELECT lower(group_name), id FROM \\"RingingGroups\\" WHERE group_name IN ('Alpha', 'Beta', 'Gamma') ORDER BY group_name"`,
+		`psql "${LOCAL_DB_URL}" -t -A -F , -c "SELECT lower(group_name), id FROM \\"RingingGroups\\" WHERE group_name IN ('Alpha', 'Beta', 'Gamma', 'Delta') ORDER BY group_name"`,
 		{ encoding: 'utf8' }
 	)
 	const ids: Record<string, number> = {}

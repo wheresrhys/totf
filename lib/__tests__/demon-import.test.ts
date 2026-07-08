@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
 	transformEmptyStringsToNull,
 	convertDateFormat,
+	createUpserter,
 	CasualtyEncounterError,
 	processEncounterRow,
 	type DemonRow
@@ -155,6 +157,53 @@ describe('transformEmptyStringsToNull', () => {
 describe('convertDateFormat', () => {
 	it('converts DD/MM/YYYY to YYYY-MM-DD', () => {
 		expect(convertDateFormat('01/06/2024')).toBe('2024-06-01');
+	});
+});
+
+describe('createUpserter', () => {
+	let mockSingle: ReturnType<typeof vi.fn>;
+	let mockSelect: ReturnType<typeof vi.fn>;
+	let mockUpsertChain: ReturnType<typeof vi.fn>;
+	let mockFrom: ReturnType<typeof vi.fn>;
+	let upsert: ReturnType<typeof createUpserter>;
+
+	beforeEach(() => {
+		mockSingle = vi.fn();
+		mockSelect = vi.fn(() => ({ single: mockSingle }));
+		mockUpsertChain = vi.fn(() => ({ select: mockSelect }));
+		mockFrom = vi.fn(() => ({ upsert: mockUpsertChain }));
+		const mockClient = { from: mockFrom } as unknown as SupabaseClient;
+		upsert = createUpserter(mockClient);
+	});
+
+	it('calls supabase upsert on the correct table with provided data', async () => {
+		mockSingle.mockResolvedValue({ data: { id: 1 }, error: null });
+		await upsert('Species', { species_name: 'Robin' }, 'species_name');
+		expect(mockFrom).toHaveBeenCalledWith('Species');
+		expect(mockUpsertChain).toHaveBeenCalledWith(
+			{ species_name: 'Robin' },
+			{ onConflict: 'species_name', ignoreDuplicates: false }
+		);
+	});
+
+	it('returns the id from the upserted record', async () => {
+		mockSingle.mockResolvedValue({ data: { id: 99 }, error: null });
+		const result = await upsert(
+			'Species',
+			{ species_name: 'Robin' },
+			'species_name'
+		);
+		expect(result).toBe(99);
+	});
+
+	it('throws when supabase returns an error', async () => {
+		mockSingle.mockResolvedValue({
+			data: null,
+			error: { message: 'conflict error' }
+		});
+		await expect(
+			upsert('Species', { species_name: 'Robin' }, 'species_name')
+		).rejects.toMatchObject({ message: 'conflict error' });
 	});
 });
 

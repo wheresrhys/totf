@@ -33,6 +33,11 @@ export default defineConfig({
 			use: { storageState: 'e2e/.auth/gamma.json' },
 			dependencies: ['setup'],
 		},
+		{
+			name: 'delta',
+			use: { storageState: 'e2e/.auth/delta.json' },
+			dependencies: ['setup'],
+		},
 	],
 	webServer: {
 		command: 'npm run next:dev',
