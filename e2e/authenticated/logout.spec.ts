@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test.beforeEach(({ page }, testInfo) => {
+test.beforeEach(({}, testInfo) => {
 	test.skip(testInfo.project.name !== 'alpha', 'alpha only')
 })
 
