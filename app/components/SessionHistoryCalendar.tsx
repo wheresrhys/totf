@@ -125,7 +125,7 @@ export function SessionHistoryCalendar({
 	}, [thisYearString]);
 
 	if (calendar.length === 0) {
-		return null;
+		return <p>No session data available.</p>;
 	}
 
 	return (

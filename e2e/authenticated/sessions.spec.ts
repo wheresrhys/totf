@@ -21,8 +21,8 @@ test('beta: shows sessions in a single year', async ({ page }) => {
 	await expect(page.getByText('2021')).not.toBeVisible()
 })
 
-test('gamma: shows no sessions', async ({ page }) => {
+test('gamma: shows no session data message', async ({ page }) => {
 	test.skip(project() !== 'gamma', 'gamma only')
 	await page.goto('/sessions')
-	await expect(page.getByText('2023')).not.toBeVisible()
+	await expect(page.getByText('No session data available.')).toBeVisible()
 })

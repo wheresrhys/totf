@@ -40,8 +40,7 @@ test.describe('/group/[alphaId]/sessions — Alpha shares with Beta', () => {
 		await expect(
 			page.getByRole('heading', { name: 'Session history' })
 		).toBeVisible()
-		await expect(page.getByText('2021')).not.toBeVisible()
-		await expect(page.getByText('2024')).not.toBeVisible()
+		await expect(page.getByText('No session data available.')).toBeVisible()
 	})
 
 	test('alpha: own sessions visible (no redirect on sub-pages)', async ({ page }) => {
@@ -70,7 +69,7 @@ test.describe('/group/[betaId]/sessions — Beta shares with Gamma', () => {
 		await expect(
 			page.getByRole('heading', { name: 'Session history' })
 		).toBeVisible()
-		await expect(page.getByText('2023')).not.toBeVisible()
+		await expect(page.getByText('No session data available.')).toBeVisible()
 	})
 })
 
