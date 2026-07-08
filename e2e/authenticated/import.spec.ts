@@ -44,6 +44,7 @@ test.describe.serial('import flow', { tag: '@delta' }, () => {
 	test('imported session appears on /sessions page', async ({ page }) => {
 		await page.goto('/sessions')
 		await expect(page.getByText('2024')).toBeVisible()
+		await page.getByRole('button', { name: /March/ }).click()
 		await expect(page.getByRole('link', { name: /15th March/ })).toBeVisible()
 	})
 })
