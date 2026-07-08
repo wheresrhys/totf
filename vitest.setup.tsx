@@ -27,6 +27,7 @@ vi.mock('./app/actions/group-cookie', async () => {
   return {
     getGroupCookie: vi.fn().mockResolvedValue(1),
     setGroupCookie: vi.fn().mockResolvedValue(undefined),
+    deleteGroupCookie: vi.fn().mockResolvedValue(undefined),
     getGroupJwt: vi.fn().mockImplementation(() => generateGroupJwt(1)),
   };
 });
@@ -51,4 +52,5 @@ vi.mock('next/navigation', () => ({
   }),
   usePathname: () => '/',
   useSearchParams: () => new URLSearchParams(),
+  redirect: vi.fn(),
 }));
