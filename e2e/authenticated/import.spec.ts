@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test'
-import { execSync } from 'child_process'
+import { spawnSync } from 'child_process'
 import path from 'path'
 import { deltaId } from '../helpers/group-ids'
 
 const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
 function psql(sql: string) {
-	execSync(`psql "${LOCAL_DB_URL}" -c '${sql}'`, { stdio: 'pipe' })
+	const result = spawnSync('psql', [LOCAL_DB_URL, '-c', sql], { stdio: 'pipe', encoding: 'utf8' })
+	if (result.status !== 0) throw new Error(`psql failed: ${result.stderr}`)
 }
 
 test.describe.serial('import flow', { tag: '@delta' }, () => {
