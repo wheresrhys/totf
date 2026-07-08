@@ -45,9 +45,9 @@ async function main() {
 	// Step 2: Get Alpha ID
 	const alphaId = await getGroupId('Alpha');
 
-	// Step 3: Pre-create Beta + Gamma groups (INSERT is allowed for all; UPDATE is restricted)
+	// Step 3: Pre-create Beta, Gamma, and Delta groups (INSERT is allowed for all; UPDATE is restricted)
 	// Use ignoreDuplicates so re-running doesn't fail when group already exists.
-	for (const name of ['Beta', 'Gamma']) {
+	for (const name of ['Beta', 'Gamma', 'Delta']) {
 		await supabase
 			.from('RingingGroups')
 			.insert({ group_name: name })
@@ -59,8 +59,11 @@ async function main() {
 	}
 	const betaId = await getGroupId('Beta');
 	const gammaId = await getGroupId('Gamma');
+	const deltaId = await getGroupId('Delta');
 
-	console.log(`Groups: Alpha(${alphaId}), Beta(${betaId}), Gamma(${gammaId})`);
+	console.log(
+		`Groups: Alpha(${alphaId}), Beta(${betaId}), Gamma(${gammaId}), Delta(${deltaId})`
+	);
 
 	// Step 4: Insert GroupDataSharing via direct Postgres (bypasses RLS — no INSERT policy exists)
 	// Alpha shares with Beta; Beta shares with Gamma. Not transitive.
@@ -77,6 +80,7 @@ async function main() {
 	run(`npm run set-group-password:local -- "Alpha" "alphapassword"`);
 	run(`npm run set-group-password:local -- "Beta" "betapassword"`);
 	run(`npm run set-group-password:local -- "Gamma" "gammapassword"`);
+	run(`npm run set-group-password:local -- "Delta" "deltapassword"`);
 
 	// Step 7: Generate snapshot JSON fixtures
 	await generateSnapshots(alphaId, betaId, gammaId);

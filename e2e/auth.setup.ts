@@ -12,3 +12,7 @@ setup('authenticate as beta', async ({ page }) => {
 setup('authenticate as gamma', async ({ page }) => {
 	await loginAs('gamma', page)
 })
+
+setup('authenticate as delta', async ({ page }) => {
+	await loginAs('delta', page)
+})
