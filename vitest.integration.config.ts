@@ -4,6 +4,7 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
+    name: 'integration',
     include: ['supabase/__tests__/**/*.test.ts'],
     environment: 'node',
   },
