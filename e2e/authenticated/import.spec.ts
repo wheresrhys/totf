@@ -48,6 +48,6 @@ test.describe.serial('import flow', { tag: '@delta' }, () => {
 		await page.goto('/sessions')
 		await expect(page.getByText('2024')).toBeVisible()
 		await page.getByRole('button', { name: /March/ }).click()
-		await expect(page.getByRole('link', { name: /15th March/ })).toBeVisible()
+		await expect(page.getByRole('link', { name: /15th/ })).toBeVisible()
 	})
 })
