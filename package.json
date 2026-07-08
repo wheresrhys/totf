@@ -33,7 +33,7 @@
 		"test": "dotenvx run -f .env.dev -- vitest",
 		"test:nowatch": "dotenvx run -f .env.dev -- vitest run",
 		"test:integration": "dotenvx run -f .env.dev -- vitest run --config vitest.integration.config.ts",
-		"test:http": "dotenvx run -f .env.dev -- vitest run --config vitest.http.config.ts",
+		"test:http": "vitest run --config vitest.http.config.ts",
 		"qa": "npm run lint && npm run type:check && npm run test:nowatch",
 		"prepare": "husky"
 	},

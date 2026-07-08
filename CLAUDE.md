@@ -104,19 +104,19 @@ Three separate Vitest configs:
 |---|---|---|---|
 | App tests | `vitest.config.ts` | `npm run test:nowatch` | pre-push hook + CI |
 | DB integration tests | `vitest.integration.config.ts` | `npm run test:integration` | pre-push hook (requires local Supabase) |
-| HTTP tests | `vitest.http.config.ts` | `npm run test:http` | manually (requires Next.js dev server) |
+| HTTP tests | `vitest.http.config.ts` | `npm run test:http` | manually (auto-starts Next.js dev server if not running) |
 
 ```sh
 npm test              # watch mode (app tests only)
 npm run test:nowatch  # single run (app tests)
 npm run test:integration  # DB integration tests against local Supabase
-npm run test:http     # HTTP tests against local Next.js dev server (run npm run next:dev first)
+npm run test:http     # HTTP tests — starts dev server automatically if needed
 npm run qa            # lint + type-check + app tests
 ```
 
 The pre-push hook runs app tests and DB integration tests. Local Supabase must be running (`npm run db:start:local`) and seeded (`npm run db:seed:e2e`) for integration tests to pass.
 
-HTTP tests (`http-tests/`) require the Next.js dev server running at `http://localhost:3000` (or `TEST_BASE_URL` env var).
+HTTP tests (`http-tests/`) use `http-tests/global-setup.ts` to start/stop the Next.js dev server automatically. If a server is already running at `http://localhost:3000` (or `TEST_BASE_URL`), it reuses it and does not kill it after the suite.
 
 ### App tests (Vitest + happy-dom)
 
