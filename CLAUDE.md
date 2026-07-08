@@ -98,21 +98,25 @@ You will need to ask your human to run `op signin` first
 
 ### Test suites
 
-Two separate Vitest configs:
+Three separate Vitest configs:
 
 | Suite | Config | Command | Runs in |
 |---|---|---|---|
 | App tests | `vitest.config.ts` | `npm run test:nowatch` | pre-push hook + CI |
 | DB integration tests | `vitest.integration.config.ts` | `npm run test:integration` | pre-push hook (requires local Supabase) |
+| HTTP tests | `vitest.http.config.ts` | `npm run test:http` | manually (requires Next.js dev server) |
 
 ```sh
 npm test              # watch mode (app tests only)
 npm run test:nowatch  # single run (app tests)
 npm run test:integration  # DB integration tests against local Supabase
+npm run test:http     # HTTP tests against local Next.js dev server (run npm run next:dev first)
 npm run qa            # lint + type-check + app tests
 ```
 
-The pre-push hook runs both suites. Local Supabase must be running (`npm run db:start:local`) and seeded (`npm run db:seed:e2e`) for integration tests to pass.
+The pre-push hook runs app tests and DB integration tests. Local Supabase must be running (`npm run db:start:local`) and seeded (`npm run db:seed:e2e`) for integration tests to pass.
+
+HTTP tests (`http-tests/`) require the Next.js dev server running at `http://localhost:3000` (or `TEST_BASE_URL` env var).
 
 ### App tests (Vitest + happy-dom)
 
