@@ -35,7 +35,8 @@ function makeBirdDetailClient() {
 			Promise.resolve({ data: encountersData, error: null }).then(resolve)
 	});
 	return {
-		from: vi.fn()
+		from: vi
+			.fn()
 			.mockReturnValueOnce(makeBirdChain())
 			.mockReturnValueOnce(makeEncounterChain())
 	};
@@ -47,24 +48,32 @@ describe('bird detail page', () => {
 	});
 
 	beforeEach(() => {
-		mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeBirdDetailClient());
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+			makeBirdDetailClient()
+		);
 	});
 
 	it('renders species name and ring number as heading', async () => {
-		render(await Page({ params: Promise.resolve({ ring: birdFixture.ring_no }) }));
+		render(
+			await Page({ params: Promise.resolve({ ring: birdFixture.ring_no }) })
+		);
 		const heading = await screen.findByRole('heading', { level: 1 });
 		expect(heading.textContent).toContain(birdFixture.species.species_name);
 		expect(heading.textContent).toContain(birdFixture.ring_no);
 	});
 
 	it('renders encounter count in stats', async () => {
-		render(await Page({ params: Promise.resolve({ ring: birdFixture.ring_no }) }));
+		render(
+			await Page({ params: Promise.resolve({ ring: birdFixture.ring_no }) })
+		);
 		const stats = await screen.findByTestId('bird-stats');
 		expect(stats.textContent).toContain(`${encountersData.length} encounters`);
 	});
 
 	it('renders one table row per encounter', async () => {
-		render(await Page({ params: Promise.resolve({ ring: birdFixture.ring_no }) }));
+		render(
+			await Page({ params: Promise.resolve({ ring: birdFixture.ring_no }) })
+		);
 		const table = await screen.findByTestId('single-bird-table');
 		const rows = table.querySelectorAll('tbody tr');
 		expect(rows.length).toBe(encountersData.length);

@@ -69,7 +69,8 @@ function makeSessionClient() {
 			Promise.resolve({ data, error: null }).then(resolve)
 	});
 	return {
-		from: vi.fn()
+		from: vi
+			.fn()
 			.mockReturnValueOnce(makeChain(mockSessions))
 			.mockReturnValueOnce(makeChain(mockEncounters))
 	};
