@@ -1,9 +1,12 @@
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://localhost:54321'
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://localhost:54321';
 
 try {
-  const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(5000) })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+	await fetch(`${url}/rest/v1/`, {
+		signal: AbortSignal.timeout(5000)
+	});
 } catch (err) {
-  console.error(`\nError: Local Supabase not running (${err.message}).\nFix: npm run db:start:local\n`)
-  process.exit(1)
+	console.error(
+		`\nError: Local Supabase not running (${err.message}).\nFix: npm run db:start:local\n`
+	);
+	process.exit(1);
 }
