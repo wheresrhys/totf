@@ -21,7 +21,11 @@ async function fetchRingingGroups(): Promise<RingingGroupRow[]> {
 		.then(catchSupabaseErrors) as Promise<RingingGroupRow[]>;
 }
 
-async function AuthorisedView({ children }: { children: React.ReactNode }) {
+export async function AuthorisedView({
+	children
+}: {
+	children: React.ReactNode;
+}) {
 	const [initialGroupId, groups] = await Promise.all([
 		getGroupCookie(),
 		fetchRingingGroups()
