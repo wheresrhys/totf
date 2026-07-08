@@ -60,10 +60,13 @@ export async function fetchSessionData({
 			id,
 			session_id,
 			age_code,
+			breeding_condition,
 			capture_time,
+			moult_code,
 			record_type,
 			ringing_group_id,
 			sex,
+			sexing_method,
 			weight,
 			wing_length,
 			bird:Birds (

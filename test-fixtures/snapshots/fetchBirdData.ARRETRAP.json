@@ -21,7 +21,10 @@
       "wing_length": 75,
       "session": {
         "visit_date": "2022-06-15"
-      }
+      },
+      "sexing_method": null,
+      "breeding_condition": null,
+      "moult_code": null
     },
     {
       "bird_id": 437,
@@ -38,7 +41,10 @@
       "wing_length": 74,
       "session": {
         "visit_date": "2021-06-20"
-      }
+      },
+      "sexing_method": null,
+      "breeding_condition": null,
+      "moult_code": null
     },
     {
       "bird_id": 437,
@@ -55,7 +61,10 @@
       "wing_length": 75,
       "session": {
         "visit_date": "2022-10-20"
-      }
+      },
+      "sexing_method": null,
+      "breeding_condition": null,
+      "moult_code": null
     },
     {
       "bird_id": 437,
@@ -72,7 +81,10 @@
       "wing_length": 75,
       "session": {
         "visit_date": "2023-05-12"
-      }
+      },
+      "sexing_method": null,
+      "breeding_condition": null,
+      "moult_code": null
     },
     {
       "bird_id": 437,
@@ -89,7 +101,10 @@
       "wing_length": 80,
       "session": {
         "visit_date": "2023-07-08"
-      }
+      },
+      "sexing_method": null,
+      "breeding_condition": null,
+      "moult_code": null
     },
     {
       "bird_id": 437,
@@ -106,7 +121,10 @@
       "wing_length": 80,
       "session": {
         "visit_date": "2024-05-10"
-      }
+      },
+      "sexing_method": null,
+      "breeding_condition": null,
+      "moult_code": null
     },
     {
       "bird_id": 437,
@@ -123,7 +141,10 @@
       "wing_length": 80,
       "session": {
         "visit_date": "2023-09-14"
-      }
+      },
+      "sexing_method": null,
+      "breeding_condition": null,
+      "moult_code": null
     },
     {
       "bird_id": 437,
@@ -140,7 +161,10 @@
       "wing_length": 75,
       "session": {
         "visit_date": "2022-04-30"
-      }
+      },
+      "sexing_method": null,
+      "breeding_condition": null,
+      "moult_code": null
     },
     {
       "bird_id": 437,
@@ -157,7 +181,10 @@
       "wing_length": 75,
       "session": {
         "visit_date": "2022-08-10"
-      }
+      },
+      "sexing_method": null,
+      "breeding_condition": null,
+      "moult_code": null
     }
   ]
 }
