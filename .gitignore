@@ -54,3 +54,8 @@ next-env.d.ts
 supabase/snippets
 supabase/schema_build.sql
 supabase/migrations
+
+# playwright
+e2e/.auth/
+playwright-report/
+test-results/
