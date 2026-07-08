@@ -30,12 +30,14 @@
 		"type:check": "tsc --noEmit",
 		"type:check:open": "tsx scripts/open-type-errors.ts",
 		"qa:bloat": "find app -type f -exec wc -l {} + | awk '$1 > 150 {print $1, $2}'",
-		"test": "dotenvx run -f .env.dev -- vitest",
-		"test:nowatch": "dotenvx run -f .env.dev -- vitest run",
+		"pretest": "dotenvx run -f .env.dev -- node scripts/check-supabase.mjs",
+		"test": "dotenvx run -f .env.dev -- vitest --workspace vitest.workspace.ts",
+		"test:nowatch": "dotenvx run -f .env.dev -- vitest run --workspace vitest.workspace.ts",
+		"test:ci": "dotenvx run -f .env.dev -- vitest run --config vitest.config.ts",
 		"test:integration": "dotenvx run -f .env.dev -- vitest run --config vitest.integration.config.ts",
 		"test:http": "vitest run --config vitest.http.config.ts",
 		"test:e2e": "playwright test",
-		"qa": "npm run lint && npm run type:check && npm run test:nowatch",
+		"qa": "npm run lint && npm run type:check && npm run test:ci",
 		"prepare": "husky"
 	},
 	"dependencies": {
