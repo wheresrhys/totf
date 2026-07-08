@@ -12,11 +12,14 @@ function psql(sql: string) {
 
 test.describe.serial('import flow', { tag: '@delta' }, () => {
 	test.beforeAll(async () => {
+		// Disable trigger to avoid NOT NULL proven_age violation when all encounters for a bird are deleted
+		psql(`ALTER TABLE "Birds" DISABLE TRIGGER trg_encounters_refresh_bird_proven_age`)
 		psql(`DELETE FROM "Encounters" WHERE ringing_group_id = ${deltaId}`)
 		psql(`DELETE FROM "Sessions" WHERE ringing_group_id = ${deltaId}`)
 		psql(`DELETE FROM "Locations" WHERE ringing_group_id = ${deltaId}`)
 		psql(`UPDATE "Birds" SET ringing_group_ids = array_remove(ringing_group_ids, ${deltaId}) WHERE ${deltaId} = ANY(ringing_group_ids)`)
 		psql(`DELETE FROM "Birds" WHERE ringing_group_ids = '{}'`)
+		psql(`ALTER TABLE "Birds" ENABLE TRIGGER trg_encounters_refresh_bird_proven_age`)
 	})
 
 	test('uploads delta.csv and shows completion message', async ({ page }) => {
