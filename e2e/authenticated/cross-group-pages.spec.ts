@@ -1,14 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { alphaId } from '../helpers/group-ids'
 
-const project = () => test.info().project.name
 const knownDate = '2024-05-10'
 
-test.beforeEach(() => {
-	test.skip(project() !== 'beta', 'beta only')
-})
-
-test.describe('cross-group pages (beta user viewing alpha data)', () => {
+test.describe('cross-group pages (beta user viewing alpha data)', { tag: '@beta' }, () => {
 	test.describe('/group/[alphaId] (cross-group home)', () => {
 		test('shows Recent Sessions heading', async ({ page }) => {
 			await page.goto(`/group/${alphaId}`)
@@ -92,7 +87,7 @@ test.describe('cross-group pages (beta user viewing alpha data)', () => {
 	})
 })
 
-test.describe('cross-group session pages (beta user viewing alpha data)', () => {
+test.describe('cross-group session pages (beta user viewing alpha data)', { tag: '@beta' }, () => {
 	test.describe(`/group/[alphaId]/session/${knownDate}`, () => {
 		test('shows the session date as heading', async ({ page }) => {
 			await page.goto(`/group/${alphaId}/session/${knownDate}`)
