@@ -20,21 +20,25 @@ export default defineConfig({
 		},
 		{
 			name: 'alpha',
+			grep: /@alpha|@all/,
 			use: { storageState: 'e2e/.auth/alpha.json' },
 			dependencies: ['setup'],
 		},
 		{
 			name: 'beta',
+			grep: /@beta|@all/,
 			use: { storageState: 'e2e/.auth/beta.json' },
 			dependencies: ['setup'],
 		},
 		{
 			name: 'gamma',
+			grep: /@gamma|@all/,
 			use: { storageState: 'e2e/.auth/gamma.json' },
 			dependencies: ['setup'],
 		},
 		{
 			name: 'delta',
+			grep: /@delta|@all/,
 			use: { storageState: 'e2e/.auth/delta.json' },
 			dependencies: ['setup'],
 		},

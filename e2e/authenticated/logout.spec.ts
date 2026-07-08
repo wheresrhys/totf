@@ -1,10 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test.beforeEach(({}, testInfo) => {
-	test.skip(testInfo.project.name !== 'alpha', 'alpha only')
-})
-
-test.describe('logout flow', () => {
+test.describe('logout flow', { tag: '@alpha' }, () => {
 	test('login modal becomes visible after logout', async ({ page }) => {
 		await page.goto('/')
 		await page.getByRole('button', { name: 'Toggle user menu' }).click()
