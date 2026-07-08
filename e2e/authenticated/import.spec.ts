@@ -28,7 +28,7 @@ test.describe.serial('import flow', { tag: '@delta' }, () => {
 		const fileInput = page.locator('input[type="file"][name="csv"]')
 		await fileInput.setInputFiles(csvPath)
 
-		await page.click('button[type="submit"]')
+		await page.getByRole('button', { name: 'Import' }).click()
 
 		await expect(
 			page.getByText('Import complete: 10 rows imported successfully')
