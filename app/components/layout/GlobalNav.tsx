@@ -13,7 +13,15 @@ const moreLinks = [
 	{ href: '/ring-sequences', label: 'Ring Sequences' }
 ];
 
-export function DesktopNavItems({ classes }: { classes: string }) {
+export function DesktopNavItems({
+	classes,
+	moreExpanded,
+	onMoreClick
+}: {
+	classes: string;
+	moreExpanded: boolean;
+	onMoreClick: () => void;
+}) {
 	return (
 		<ul className={classes}>
 			<li>
@@ -22,23 +30,25 @@ export function DesktopNavItems({ classes }: { classes: string }) {
 			<li>
 				<NoPrefetchLink href="/species">Species</NoPrefetchLink>
 			</li>
-			<li className="dropdown dropdown-hover relative">
-				<button type="button" className="cursor-pointer">
+			<li className="relative">
+				<button type="button" className="cursor-pointer" onClick={onMoreClick}>
 					More
 					<span className="icon-[tabler--chevron-down] size-4 ml-1 inline-block align-middle"></span>
 				</button>
-				<ul className="dropdown-menu absolute left-0 top-full z-50 min-w-max bg-base-100 shadow-md rounded-md p-1 border border-base-content/10">
-					{moreLinks.map(({ href, label }) => (
-						<li key={href}>
-							<NoPrefetchLink
-								href={href}
-								className="block px-4 py-2 hover:bg-base-200 rounded"
-							>
-								{label}
-							</NoPrefetchLink>
-						</li>
-					))}
-				</ul>
+				{moreExpanded && (
+					<ul className="absolute left-0 top-full z-50 min-w-max bg-base-100 shadow-md rounded-md p-1 border border-base-content/10">
+						{moreLinks.map(({ href, label }) => (
+							<li key={href}>
+								<NoPrefetchLink
+									href={href}
+									className="block px-4 py-2 hover:bg-base-200 rounded"
+								>
+									{label}
+								</NoPrefetchLink>
+							</li>
+						))}
+					</ul>
+				)}
 			</li>
 		</ul>
 	);
@@ -123,7 +133,7 @@ function GroupSwitcher({
 		</select>
 	);
 }
-type ExpanderId = 'search' | 'mobileNav' | 'userMenu';
+type ExpanderId = 'search' | 'mobileNav' | 'userMenu' | 'moreMenu';
 type ExpanderAction =
 	| { type: 'toggle'; id: ExpanderId }
 	| { type: 'collapseAll' }
@@ -160,6 +170,7 @@ export default function GlobalNav({
 	const [expanders, expandersDispatch] = useReducer(expanderReducer, {
 		search: false,
 		mobileNav: false,
+		moreMenu: false,
 		userMenu: !selectedGroupId
 	} as Record<ExpanderId, boolean>);
 	const groupsCount = groups.length;
@@ -243,7 +254,13 @@ export default function GlobalNav({
 							<RingSearchForm />
 						</div>
 						<div className="hidden md:flex">
-							<DesktopNavItems classes="menu menu-horizontal gap-2 p-0 text-base" />
+							<DesktopNavItems
+								classes="menu menu-horizontal gap-2 p-0 text-base"
+								moreExpanded={expanders.moreMenu}
+								onMoreClick={() =>
+									expandersDispatch({ type: 'toggle', id: 'moreMenu' })
+								}
+							/>
 						</div>
 						<button
 							type="button"
