@@ -1,6 +1,14 @@
 import type { RingSequenceSummary } from '@/app/actions/ring-sequences';
 
-export type RingSizeName = 'AA' | 'A' | 'B, C, C2' | 'D' | 'E' | 'F' | 'SO' | 'Large';
+export type RingSizeName =
+	| 'AA'
+	| 'A'
+	| 'B, C, C2'
+	| 'D'
+	| 'E'
+	| 'F'
+	| 'SO'
+	| 'Large';
 
 export const RING_SIZE_ORDER: RingSizeName[] = [
 	'AA',
