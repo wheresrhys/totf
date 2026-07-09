@@ -219,12 +219,29 @@ describe('processEncounterRow', () => {
 		});
 	});
 
-	it('throws CasualtyEncounterError when ring_no is empty', async () => {
-		const row = makeDemonRow({ ring_no: '' });
-		await expect(
-			processEncounterRow(row, upsert, RINGING_GROUP_ID)
-		).rejects.toBeInstanceOf(CasualtyEncounterError);
-		expect(upsert).not.toHaveBeenCalled();
+	describe('casualty encounters', () => {
+		it('throws CasualtyEncounterError when ring_no is empty', async () => {
+			const row = makeDemonRow({ ring_no: '' });
+			await expect(
+				processEncounterRow(row, upsert, RINGING_GROUP_ID)
+			).rejects.toBeInstanceOf(CasualtyEncounterError);
+		});
+
+		it('does not call upsert when ring_no is empty', async () => {
+			const row = makeDemonRow({ ring_no: '' });
+			await expect(
+				processEncounterRow(row, upsert, RINGING_GROUP_ID)
+			).rejects.toBeInstanceOf(CasualtyEncounterError);
+			expect(upsert).not.toHaveBeenCalled();
+		});
+
+		it('processes normally when ring_no is present (already-ringed bird)', async () => {
+			const row = makeDemonRow({ ring_no: 'A123456' });
+			await expect(
+				processEncounterRow(row, upsert, RINGING_GROUP_ID)
+			).resolves.toBeDefined();
+			expect(upsert).toHaveBeenCalled();
+		});
 	});
 
 	it('upserts Species with the species name', async () => {
