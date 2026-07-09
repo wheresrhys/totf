@@ -373,6 +373,36 @@ export type Database = {
           species_name: string
         }[]
       }
+      ring_sequence_controls: {
+        Args: { ringing_group_filter?: number }
+        Returns: {
+          first_date: string
+          ring_no: string
+          species_name: string
+        }[]
+      }
+      ring_sequence_detail: {
+        Args: {
+          ring_length_filter: number
+          ringing_group_filter?: number
+          sequence_prefix_filter: string
+        }
+        Returns: {
+          ring_no: string
+          ringed_date: string
+          species_name: string
+        }[]
+      }
+      ring_sequence_summaries: {
+        Args: { ringing_group_filter?: number }
+        Returns: {
+          earliest_date: string
+          latest_date: string
+          ring_count: number
+          ring_length: number
+          sequence_prefix: string
+        }[]
+      }
       soundex: { Args: { "": string }; Returns: string }
       text_soundex: { Args: { "": string }; Returns: string }
       top_metrics_by_period: {
