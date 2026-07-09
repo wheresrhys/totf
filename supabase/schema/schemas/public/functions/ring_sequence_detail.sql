@@ -2,11 +2,7 @@ CREATE FUNCTION public.ring_sequence_detail (
 	sequence_prefix_filter text,
 	ring_length_filter int,
 	ringing_group_filter bigint DEFAULT NULL::bigint
-) RETURNS TABLE (
-	ring_no text,
-	species_name text,
-	ringed_date date
-) LANGUAGE plpgsql STABLE
+) RETURNS TABLE (ring_no text, species_name text, ringed_date date) LANGUAGE plpgsql STABLE
 SET
 	search_path TO 'public',
 	'pg_catalog' AS $function$

@@ -1,10 +1,4 @@
-CREATE FUNCTION public.ring_sequence_controls (
-	ringing_group_filter bigint DEFAULT NULL::bigint
-) RETURNS TABLE (
-	ring_no text,
-	species_name text,
-	first_date date
-) LANGUAGE plpgsql STABLE
+CREATE FUNCTION public.ring_sequence_controls (ringing_group_filter bigint DEFAULT NULL::bigint) RETURNS TABLE (ring_no text, species_name text, first_date date) LANGUAGE plpgsql STABLE
 SET
 	search_path TO 'public',
 	'pg_catalog' AS $function$

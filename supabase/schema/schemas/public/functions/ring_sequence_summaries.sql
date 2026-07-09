@@ -1,6 +1,4 @@
-CREATE FUNCTION public.ring_sequence_summaries (
-	ringing_group_filter bigint DEFAULT NULL::bigint
-) RETURNS TABLE (
+CREATE FUNCTION public.ring_sequence_summaries (ringing_group_filter bigint DEFAULT NULL::bigint) RETURNS TABLE (
 	sequence_prefix text,
 	ring_length int,
 	ring_count bigint,
