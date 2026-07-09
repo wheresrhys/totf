@@ -1,8 +1,17 @@
 'use client';
 import { useState } from 'react';
 import type { RingSequenceSummary } from '@/app/actions/ring-sequences';
+import {
+	groupSummariesByRingSize,
+	type RingSizeGroup
+} from '@/app/models/ring-sequences';
 import { AccordionItem } from './shared/Accordion';
-import { BoxyList, PageWrapper, PrimaryHeading } from './shared/DesignSystem';
+import {
+	BoxyList,
+	PageWrapper,
+	PrimaryHeading,
+	SecondaryHeading
+} from './shared/DesignSystem';
 import { RingSequenceControls } from './RingSequenceControls';
 import { RingSequenceDetail } from './RingSequenceDetail';
 
@@ -66,6 +75,44 @@ function ControlsContent({
 	);
 }
 
+function RingSizeSection({
+	group,
+	viewedGroupId,
+	expandedId,
+	onToggle
+}: {
+	group: RingSizeGroup;
+	viewedGroupId: number;
+	expandedId: string | false;
+	onToggle: (id: string | false) => void;
+}) {
+	return (
+		<li data-testid={`ring-size-${group.name}`}>
+			<SecondaryHeading>
+				{group.name} — {group.totalRingCount} rings
+			</SecondaryHeading>
+			<ul className="divide-base-content/25 divide-y">
+				{group.summaries.map((summary) => {
+					const id = `${summary.sequence_prefix}-${summary.ring_length}`;
+					const summaryModel: SequenceSummaryModel = { summary, viewedGroupId };
+					return (
+						<AccordionItem
+							key={id}
+							id={id}
+							model={summaryModel}
+							onToggle={onToggle}
+							expandedId={expandedId}
+							HeadingComponent={SequenceHeading}
+							ContentComponent={SequenceContent}
+							testId={`sequence-${id}`}
+						/>
+					);
+				})}
+			</ul>
+		</li>
+	);
+}
+
 export function RingSequencesPage({
 	data,
 	viewedGroupId
@@ -75,6 +122,7 @@ export function RingSequencesPage({
 	viewedGroupId: number;
 }) {
 	const [expandedId, setExpandedId] = useState<string | false>(false);
+	const ringSizeGroups = groupSummariesByRingSize(data);
 
 	return (
 		<PageWrapper>
@@ -89,22 +137,15 @@ export function RingSequencesPage({
 					ContentComponent={ControlsContent}
 					testId="controls-accordion"
 				/>
-				{data.map((summary) => {
-					const id = `${summary.sequence_prefix}-${summary.ring_length}`;
-					const summaryModel: SequenceSummaryModel = { summary, viewedGroupId };
-					return (
-						<AccordionItem
-							key={id}
-							id={id}
-							model={summaryModel}
-							onToggle={setExpandedId}
-							expandedId={expandedId}
-							HeadingComponent={SequenceHeading}
-							ContentComponent={SequenceContent}
-							testId={`sequence-${id}`}
-						/>
-					);
-				})}
+				{ringSizeGroups.map((group) => (
+					<RingSizeSection
+						key={group.name}
+						group={group}
+						viewedGroupId={viewedGroupId}
+						expandedId={expandedId}
+						onToggle={setExpandedId}
+					/>
+				))}
 			</BoxyList>
 		</PageWrapper>
 	);
