@@ -34,6 +34,33 @@ function getGroupIds(): Record<string, number> {
 	return ids
 }
 
+const BASE_URL = process.env.TEST_BASE_URL ?? 'http://localhost:3000'
+
+// Pre-warm Next.js page compilation before parallel workers start.
+// Without this, 4 workers simultaneously hit uncompiled routes, causing >30s
+// compilation timeouts on first request.
+async function warmupServer() {
+	const routes = [
+		'/',
+		'/sessions',
+		'/species',
+		'/mistakes',
+		'/retraps',
+		'/effort',
+		'/bird/ARRETRAP',
+		'/species/Robin',
+	]
+	console.log('Warming up server routes...')
+	await Promise.all(
+		routes.map((route) =>
+			fetch(`${BASE_URL}${route}`).catch(() => {
+				// Ignore errors (e.g. auth redirects); we only need compilation to run
+			})
+		)
+	)
+	console.log('Server warmup complete')
+}
+
 export default async function globalSetup() {
 	mkdirSync(path.join(ROOT, 'e2e', '.auth'), { recursive: true })
 	if (isAlreadySeeded()) {
@@ -48,4 +75,6 @@ export default async function globalSetup() {
 		JSON.stringify(groupIds, null, 2)
 	)
 	console.log('Group IDs:', groupIds)
+
+	await warmupServer()
 }

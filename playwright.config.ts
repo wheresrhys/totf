@@ -9,9 +9,11 @@ export default defineConfig({
 	retries: process.env.CI ? 2 : 0,
 	reporter: 'html',
 	globalSetup: './e2e/global-setup.ts',
+	timeout: 60_000,
 	use: {
 		baseURL: BASE_URL,
 		trace: 'on-first-retry',
+		actionTimeout: 60_000,
 	},
 	projects: [
 		{
