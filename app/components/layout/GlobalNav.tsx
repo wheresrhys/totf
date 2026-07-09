@@ -6,7 +6,14 @@ import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
 import { useSetRingingGroup } from './RingingGroupProvider';
 import { logout } from '@/app/actions/logout';
 import type { RingingGroupRow } from '@/app/models/db';
-export function NavItems({ classes }: { classes: string }) {
+const moreLinks = [
+	{ href: '/mistakes', label: 'Mistakes' },
+	{ href: '/retraps', label: 'Retraps' },
+	{ href: '/effort', label: 'Effort' },
+	{ href: '/ring-sequences', label: 'Ring Sequences' }
+];
+
+export function DesktopNavItems({ classes }: { classes: string }) {
 	return (
 		<ul className={classes}>
 			<li>
@@ -15,15 +22,42 @@ export function NavItems({ classes }: { classes: string }) {
 			<li>
 				<NoPrefetchLink href="/species">Species</NoPrefetchLink>
 			</li>
+			<li className="dropdown dropdown-hover relative">
+				<button type="button" className="cursor-pointer">
+					More
+					<span className="icon-[tabler--chevron-down] size-4 ml-1 inline-block align-middle"></span>
+				</button>
+				<ul className="dropdown-menu absolute left-0 top-full z-50 min-w-max bg-base-100 shadow-md rounded-md p-1 border border-base-content/10">
+					{moreLinks.map(({ href, label }) => (
+						<li key={href}>
+							<NoPrefetchLink
+								href={href}
+								className="block px-4 py-2 hover:bg-base-200 rounded"
+							>
+								{label}
+							</NoPrefetchLink>
+						</li>
+					))}
+				</ul>
+			</li>
+		</ul>
+	);
+}
+
+export function MobileNavItems({ classes }: { classes: string }) {
+	return (
+		<ul className={classes}>
 			<li>
-				<NoPrefetchLink href="/mistakes">Mistakes</NoPrefetchLink>
+				<NoPrefetchLink href="/sessions">Sessions</NoPrefetchLink>
 			</li>
 			<li>
-				<NoPrefetchLink href="/retraps">Retraps</NoPrefetchLink>
+				<NoPrefetchLink href="/species">Species</NoPrefetchLink>
 			</li>
-			<li>
-				<NoPrefetchLink href="/effort">Effort</NoPrefetchLink>
-			</li>
+			{moreLinks.map(({ href, label }) => (
+				<li key={href}>
+					<NoPrefetchLink href={href}>{label}</NoPrefetchLink>
+				</li>
+			))}
 		</ul>
 	);
 }
@@ -209,7 +243,7 @@ export default function GlobalNav({
 							<RingSearchForm />
 						</div>
 						<div className="hidden md:flex">
-							<NavItems classes="menu menu-horizontal gap-2 p-0 text-base" />
+							<DesktopNavItems classes="menu menu-horizontal gap-2 p-0 text-base" />
 						</div>
 						<button
 							type="button"
@@ -225,7 +259,7 @@ export default function GlobalNav({
 					</div>
 				</div>
 				<Expander id="mobile-nav" isExpanded={expanders.mobileNav}>
-					<NavItems classes="p-4 text-right *:p-2 *:mt-1 *:mb-1 *:hover:bg-base-200 *:rounded" />
+					<MobileNavItems classes="p-4 text-right *:p-2 *:mt-1 *:mb-1 *:hover:bg-base-200 *:rounded" />
 				</Expander>
 				<Expander id="ring-search-form-wrapper" isExpanded={expanders.search}>
 					<div className="p-4 pt-0">
