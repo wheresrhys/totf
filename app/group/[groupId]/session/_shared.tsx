@@ -1,5 +1,5 @@
 import {
-	SessionTable,
+	SessionTabs,
 	type SpeciesWithEncounters
 } from '@/app/components/SingleSessionTable';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
@@ -15,6 +15,8 @@ import {
 import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
+import { calculateSessionChronology } from '@/app/models/session-chronology';
+import { formatMinutesForDisplay } from '@/lib/postgres-interval';
 
 export type PageParams = {
 	viewedGroupId: number;
@@ -167,6 +169,7 @@ export function SessionSummary({
 	};
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
+	const chronology = calculateSessionChronology(dayData.encounters);
 
 	if (dayData.locations.length === 0) {
 		return (
@@ -200,10 +203,14 @@ export function SessionSummary({
 					`${dayData.encounters.filter((encounter) => encounter.record_type === 'S').length} retraps`,
 					`${dayData.encounters.filter((encounter) => encounter.age_code > 3).length} adults`,
 					`${dayData.encounters.filter((encounter) => [1, 3].includes(encounter.age_code)).length} juvs`,
-					`${dayData.encounters.filter((encounter) => encounter.age_code === 2).length} unknown age`
+					`${dayData.encounters.filter((encounter) => encounter.age_code === 2).length} unknown age`,
+					`Start: ${chronology.startTime ? chronology.startTime.slice(0, 5) : '–'}`,
+					`End: ${chronology.endTime ? chronology.endTime.slice(0, 5) : '–'}`,
+					`Duration: ${chronology.durationMinutes !== null ? formatMinutesForDisplay(chronology.durationMinutes) : '–'}`,
+					`Net rounds: ${chronology.netRounds.length}`
 				]}
 			/>
-			<SessionTable speciesList={speciesList} />
+			<SessionTabs speciesList={speciesList} netRounds={chronology.netRounds} />
 		</PageWrapper>
 	);
 }

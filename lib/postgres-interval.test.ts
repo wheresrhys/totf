@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	formatMinutesForDisplay,
 	formatPostgresIntervalForDisplay,
 	postgresIntervalToHours,
 	postgresIntervalToMinutes,
@@ -35,5 +36,23 @@ describe('postgresIntervalToMinutes', () => {
 describe('formatPostgresIntervalForDisplay', () => {
 	it('formats hours and minutes', () => {
 		expect(formatPostgresIntervalForDisplay('02:01:00')).toBe('2h 1m');
+	});
+});
+
+describe('formatMinutesForDisplay', () => {
+	it('returns "0m" for 0 minutes', () => {
+		expect(formatMinutesForDisplay(0)).toBe('0m');
+	});
+
+	it('returns minutes only for < 60 minutes', () => {
+		expect(formatMinutesForDisplay(45)).toBe('45m');
+	});
+
+	it('returns hours only when no remainder', () => {
+		expect(formatMinutesForDisplay(120)).toBe('2h');
+	});
+
+	it('returns hours and minutes', () => {
+		expect(formatMinutesForDisplay(90)).toBe('1h 30m');
 	});
 });

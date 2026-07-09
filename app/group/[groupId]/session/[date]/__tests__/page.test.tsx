@@ -120,6 +120,15 @@ describe('session detail page', () => {
 		expect(stats.textContent).toContain('1 retraps');
 	});
 
+	it('renders session chronology stats', async () => {
+		render(await renderPage());
+		const stats = await screen.findByTestId('session-stats');
+		expect(stats.textContent).toContain('Start: 08:00');
+		expect(stats.textContent).toContain('End: 08:30');
+		expect(stats.textContent).toContain('Duration: 30m');
+		expect(stats.textContent).toContain('Net rounds: 3');
+	});
+
 	it('renders one table row per species', async () => {
 		render(await renderPage());
 		const table = await screen.findByTestId('session-table');
