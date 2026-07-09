@@ -12,10 +12,7 @@ import {
 	PrimaryHeading,
 	SecondaryHeading
 } from './shared/DesignSystem';
-import { RingSequenceControls } from './RingSequenceControls';
 import { RingSequenceDetail } from './RingSequenceDetail';
-
-const CONTROLS_ID = 'controls';
 
 type SequenceSummaryModel = {
 	summary: RingSequenceSummary;
@@ -52,25 +49,6 @@ function SequenceContent({
 				viewedGroupId: model.viewedGroupId
 			}}
 			expandedId={expandedId}
-		/>
-	);
-}
-
-function ControlsHeading() {
-	return <span className="font-bold">Controls</span>;
-}
-
-function ControlsContent({
-	model,
-	expandedId
-}: {
-	model: { viewedGroupId: number };
-	expandedId: string | false;
-}) {
-	return (
-		<RingSequenceControls
-			viewedGroupId={model.viewedGroupId}
-			isExpanded={expandedId === CONTROLS_ID}
 		/>
 	);
 }
@@ -128,15 +106,6 @@ export function RingSequencesPage({
 		<PageWrapper>
 			<PrimaryHeading>Ring Sequences</PrimaryHeading>
 			<BoxyList>
-				<AccordionItem
-					id={CONTROLS_ID}
-					model={{ viewedGroupId }}
-					onToggle={setExpandedId}
-					expandedId={expandedId}
-					HeadingComponent={ControlsHeading}
-					ContentComponent={ControlsContent}
-					testId="controls-accordion"
-				/>
 				{ringSizeGroups.map((group) => (
 					<RingSizeSection
 						key={group.name}
