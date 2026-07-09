@@ -1,5 +1,6 @@
 import { Readable } from 'stream';
 import csvParser from 'csv-parser';
+import { pRateLimit } from 'p-ratelimit';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import {
@@ -57,11 +58,18 @@ export async function POST(request: Request): Promise<Response> {
 				controller.enqueue(encoder.encode(JSON.stringify(message) + '\n'));
 			}
 
+			const limit = pRateLimit({
+				interval: 1000,
+				rate: 30,
+				concurrency: 30
+			}) as <T>(fn: () => Promise<T>) => Promise<T>;
+
 			let processed = 0;
 			let successful = 0;
 			let failed = 0;
 			let startDate: string | null = null;
 			let endDate: string | null = null;
+			let timedOut = false;
 
 			try {
 				const rows: DemonRow[] = [];
@@ -73,35 +81,37 @@ export async function POST(request: Request): Promise<Response> {
 						.on('error', reject);
 				});
 
-				for (const row of rows) {
-					if (Date.now() > deadline) {
-						send({ type: 'timeout', processed, startDate, endDate });
-						return;
-					}
+				await Promise.all(
+					rows.map((row) =>
+						limit(async () => {
+							if (Date.now() > deadline) {
+								timedOut = true;
+								return;
+							}
+							try {
+								const { visitDate } = await processEncounterRow(
+									row,
+									upsert,
+									ringingGroupId
+								);
+								successful++;
+								if (startDate === null || visitDate < startDate)
+									startDate = visitDate;
+								if (endDate === null || visitDate > endDate) endDate = visitDate;
+							} catch (err) {
+								if (!(err instanceof CasualtyEncounterError)) failed++;
+							}
+							processed++;
+							if (processed % 10 === 0) send({ type: 'progress', processed });
+						})
+					)
+				);
 
-					try {
-						const { visitDate } = await processEncounterRow(
-							row,
-							upsert,
-							ringingGroupId
-						);
-						successful++;
-						if (startDate === null || visitDate < startDate)
-							startDate = visitDate;
-						if (endDate === null || visitDate > endDate) endDate = visitDate;
-					} catch (err) {
-						if (!(err instanceof CasualtyEncounterError)) {
-							failed++;
-						}
-					}
-
-					processed++;
-					if (processed % 10 === 0) {
-						send({ type: 'progress', processed });
-					}
+				if (timedOut) {
+					send({ type: 'timeout', processed, startDate, endDate });
+				} else {
+					send({ type: 'complete', processed, successful, failed });
 				}
-
-				send({ type: 'complete', processed, successful, failed });
 			} catch (err) {
 				send({
 					type: 'error',
