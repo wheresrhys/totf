@@ -5,6 +5,7 @@ import {
 	type RingSequenceControlRow
 } from '@/app/actions/ring-sequences';
 import { InlineTable } from './shared/DesignSystem';
+import { NoPrefetchLink } from './shared/NoPrefetchLink';
 
 export function RingSequenceControls({
 	viewedGroupId,
@@ -60,7 +61,11 @@ export function RingSequenceControls({
 			<tbody>
 				{data.map((row) => (
 					<tr key={row.ring_no}>
-						<td>{row.ring_no}</td>
+						<td>
+							<NoPrefetchLink className="link" href={`/bird/${row.ring_no}`}>
+								{row.ring_no}
+							</NoPrefetchLink>
+						</td>
 						<td>{row.species_name}</td>
 						<td>{row.first_date}</td>
 					</tr>

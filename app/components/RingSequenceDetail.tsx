@@ -7,6 +7,7 @@ import {
 import { findUnusedRings } from '@/app/models/ring-sequences';
 import { AccordionItem } from './shared/Accordion';
 import { BoxyList, InlineTable } from './shared/DesignSystem';
+import { NoPrefetchLink } from './shared/NoPrefetchLink';
 
 type SequenceDetailModel = {
 	sequencePrefix: string;
@@ -61,7 +62,11 @@ function SpeciesContent({
 			<tbody>
 				{model.rings.map((ring) => (
 					<tr key={ring.ring_no}>
-						<td>{ring.ring_no}</td>
+						<td>
+							<NoPrefetchLink className="link" href={`/bird/${ring.ring_no}`}>
+								{ring.ring_no}
+							</NoPrefetchLink>
+						</td>
 						<td>{ring.ringed_date}</td>
 					</tr>
 				))}
