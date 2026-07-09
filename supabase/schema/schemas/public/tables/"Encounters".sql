@@ -46,6 +46,10 @@ UPDATE OF session_id,
 capture_time ON public."Encounters" FOR EACH ROW
 EXECUTE FUNCTION public.trg_set_encounter_generated_fields ();
 
+CREATE TRIGGER trigger_trg_suppress_same_session_retrap BEFORE
+UPDATE ON public."Encounters" FOR EACH ROW
+EXECUTE FUNCTION public.trg_suppress_same_session_retrap ();
+
 CREATE TRIGGER trigger_trg_update_bird_ringing_group_id
 AFTER
 UPDATE OF ringing_group_id ON public."Encounters" FOR EACH ROW
