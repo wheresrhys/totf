@@ -97,7 +97,8 @@ export async function POST(request: Request): Promise<Response> {
 								successful++;
 								if (startDate === null || visitDate < startDate)
 									startDate = visitDate;
-								if (endDate === null || visitDate > endDate) endDate = visitDate;
+								if (endDate === null || visitDate > endDate)
+									endDate = visitDate;
 							} catch (err) {
 								if (!(err instanceof CasualtyEncounterError)) failed++;
 							}

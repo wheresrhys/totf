@@ -110,11 +110,17 @@ describe('RingSequencesPage', () => {
 			/>
 		);
 		const aaSection = screen.getByTestId('ring-size-AA');
-		expect(aaSection.querySelector('[data-testid="sequence-ARW-6"]')).toBeTruthy();
+		expect(
+			aaSection.querySelector('[data-testid="sequence-ARW-6"]')
+		).toBeTruthy();
 
 		const aSection = screen.getByTestId('ring-size-A');
-		expect(aSection.querySelector('[data-testid="sequence-ARW-7"]')).toBeTruthy();
-		expect(aSection.querySelector('[data-testid="sequence-ABT-7"]')).toBeTruthy();
+		expect(
+			aSection.querySelector('[data-testid="sequence-ARW-7"]')
+		).toBeTruthy();
+		expect(
+			aSection.querySelector('[data-testid="sequence-ABT-7"]')
+		).toBeTruthy();
 	});
 
 	it('omits ring size sections with no sequences', () => {
