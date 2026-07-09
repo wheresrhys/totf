@@ -1,0 +1,17 @@
+[
+  {
+    "ring_no": "A123456",
+    "species_name": "Robin",
+    "first_date": "2023-03-15"
+  },
+  {
+    "ring_no": "B789012",
+    "species_name": "Blue Tit",
+    "first_date": "2023-05-22"
+  },
+  {
+    "ring_no": "C345678",
+    "species_name": "Blackbird",
+    "first_date": "2024-01-10"
+  }
+]

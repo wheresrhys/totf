@@ -36,6 +36,7 @@ describe('DesktopNavItems', () => {
 		expect(screen.getByRole('link', { name: 'Retraps' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Effort' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Ring Sequences' })).toBeDefined();
+		expect(screen.getByRole('link', { name: 'Controls' })).toBeDefined();
 	});
 
 	it('More dropdown is hidden when moreExpanded is false', () => {
@@ -70,10 +71,10 @@ describe('DesktopNavItems', () => {
 describe('MobileNavItems', () => {
 	afterEach(cleanup);
 
-	it('renders all 6 links in a flat list', () => {
+	it('renders all 7 links in a flat list', () => {
 		render(<MobileNavItems classes="" />);
 		const links = screen.getAllByRole('link');
-		expect(links).toHaveLength(6);
+		expect(links).toHaveLength(7);
 	});
 
 	it('includes Sessions link', () => {
@@ -89,5 +90,10 @@ describe('MobileNavItems', () => {
 	it('includes Ring Sequences link', () => {
 		render(<MobileNavItems classes="" />);
 		expect(screen.getByRole('link', { name: 'Ring Sequences' })).toBeDefined();
+	});
+
+	it('includes Controls link', () => {
+		render(<MobileNavItems classes="" />);
+		expect(screen.getByRole('link', { name: 'Controls' })).toBeDefined();
 	});
 });

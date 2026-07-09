@@ -10,7 +10,8 @@ const moreLinks = [
 	{ href: '/mistakes', label: 'Mistakes' },
 	{ href: '/retraps', label: 'Retraps' },
 	{ href: '/effort', label: 'Effort' },
-	{ href: '/ring-sequences', label: 'Ring Sequences' }
+	{ href: '/ring-sequences', label: 'Ring Sequences' },
+	{ href: '/controls', label: 'Controls' }
 ];
 
 export function DesktopNavItems({
