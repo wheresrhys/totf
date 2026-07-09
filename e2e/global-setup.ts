@@ -47,6 +47,7 @@ async function warmupServer() {
 		'/mistakes',
 		'/retraps',
 		'/effort',
+		'/ring-sequences',
 		'/bird/ARRETRAP',
 		'/species/Robin',
 	]
