@@ -35,7 +35,6 @@ function SequenceContent({
 	model: SequenceSummaryModel;
 	expandedId: string | false;
 }) {
-	const accordionId = `${model.summary.sequence_prefix}-${model.summary.ring_length}`;
 	return (
 		<RingSequenceDetail
 			model={{
