@@ -1,60 +1,177 @@
 'use client';
+import { useState, useEffect } from 'react';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import {
-	type ColumnConfig,
-	SortableTable,
-	type RowModelWithRawData
-} from '@/app/components/shared/SortableTable';
-import { DiscrepenciesResult } from '@/app/models/db';
+import { AccordionTableBody } from '@/app/components/shared/AccordionTableBody';
+import { SingleBirdTable } from '@/app/components/SingleBirdTable';
+import { fetchBirdEncounters } from '@/app/actions/bird-encounters';
+import type { DiscrepenciesResult } from '@/app/models/db';
+import type { EncounterOfBird } from '@/app/models/bird';
+import type { RowModelWithRawData } from '@/app/components/shared/SortableTable';
 
-type MistakesTableRowModel = Omit<DiscrepenciesResult, 'bird_id'>;
-
-const columnConfigs: Record<keyof MistakesTableRowModel, ColumnConfig> = {
-	ring_no: {
-		label: 'Bird'
-	},
-	species_name: {
-		label: 'Species'
-	},
-	discrepency_type: {
-		label: 'Discrepency Type'
-	}
+type MistakesRowModel = {
+	ringNo: string;
+	speciesName: string;
 };
 
-function MistakesTableBody({
-	data
-}: {
-	data: RowModelWithRawData<DiscrepenciesResult, MistakesTableRowModel>[];
-}) {
-	return (
-		<tbody>
-			{data.map((mistake) => (
-				<tr key={`${mistake.ring_no}-${mistake.discrepency_type}`}>
-					<td>
-						<NoPrefetchLink className="link" href={`/bird/${mistake.ring_no}`}>
-							{mistake.ring_no}
-						</NoPrefetchLink>
-					</td>
-					<td>{mistake.species_name}</td>
-					<td>{mistake.discrepency_type}</td>
-				</tr>
-			))}
-		</tbody>
+function formatTabLabel(discrepancyType: string): string {
+	const withSpaces = discrepancyType.replace(/_/g, ' ');
+	return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+}
+
+function groupByDiscrepancyType(
+	mistakes: DiscrepenciesResult[]
+): Record<string, DiscrepenciesResult[]> {
+	return mistakes.reduce<Record<string, DiscrepenciesResult[]>>(
+		(grouped, mistake) => {
+			const type = mistake.discrepency_type;
+			if (!grouped[type]) {
+				grouped[type] = [];
+			}
+			grouped[type].push(mistake);
+			return grouped;
+		},
+		{}
 	);
 }
+
+export function makeHighlighter(
+	discrepancyType: string,
+	encounters: EncounterOfBird[]
+): (encounter: EncounterOfBird) => boolean {
+	if (discrepancyType === 'sex') {
+		return (enc) => !!enc.sex && enc.sex.toLowerCase() !== 'u';
+	}
+	if (discrepancyType === 'age') {
+		return (enc) => enc.age_code != null && enc.age_code >= 2;
+	}
+	if (discrepancyType === 'wing_length') {
+		const measured = encounters
+			.filter((e) => e.wing_length != null)
+			.map((e) => e.wing_length as number)
+			.sort((a, b) => a - b);
+		if (measured.length === 0) return () => false;
+		const mid = Math.floor(measured.length / 2);
+		const median =
+			measured.length % 2 === 0
+				? (measured[mid - 1] + measured[mid]) / 2
+				: measured[mid];
+		const maxDist = Math.max(...measured.map((m) => Math.abs(m - median)));
+		return (enc) =>
+			enc.wing_length != null && Math.abs(enc.wing_length - median) === maxDist;
+	}
+	return () => false;
+}
+
+function LazyBirdDetail({
+	model
+}: {
+	model: RowModelWithRawData<DiscrepenciesResult, MistakesRowModel>;
+}) {
+	const [encounters, setEncounters] = useState<EncounterOfBird[] | null>(null);
+	const { ring_no, discrepency_type } = model._rawRowData;
+
+	useEffect(() => {
+		fetchBirdEncounters(ring_no).then(setEncounters);
+	}, [ring_no]);
+
+	if (!encounters) {
+		return <p>Loading...</p>;
+	}
+
+	return (
+		<SingleBirdTable
+			encounters={encounters}
+			isInline={true}
+			highlightRow={makeHighlighter(discrepency_type, encounters)}
+		/>
+	);
+}
+
+function RingCell({
+	model
+}: {
+	model: RowModelWithRawData<DiscrepenciesResult, MistakesRowModel>;
+}) {
+	return (
+		<NoPrefetchLink className="link" href={`/bird/${model.ringNo}`}>
+			{model.ringNo}
+		</NoPrefetchLink>
+	);
+}
+
+function RestColumns({
+	model
+}: {
+	model: RowModelWithRawData<DiscrepenciesResult, MistakesRowModel>;
+}) {
+	return <td>{model.speciesName}</td>;
+}
+
+function MistakesDiscrepancyTable({
+	mistakes
+}: {
+	mistakes: DiscrepenciesResult[];
+}) {
+	const data: RowModelWithRawData<DiscrepenciesResult, MistakesRowModel>[] =
+		mistakes.map((mistake) => ({
+			ringNo: mistake.ring_no,
+			speciesName: mistake.species_name,
+			_rawRowData: mistake
+		}));
+
+	return (
+		<table className="table">
+			<thead>
+				<tr>
+					<th>Bird</th>
+					<th>Species</th>
+				</tr>
+			</thead>
+			<AccordionTableBody
+				data={data}
+				getKey={(item) => item.ringNo}
+				columnCount={2}
+				FirstColumnComponent={RingCell}
+				RestColumnsComponent={RestColumns}
+				ExpandedContentComponent={LazyBirdDetail}
+			/>
+		</table>
+	);
+}
+
 export function MistakesTable({
 	mistakes
 }: {
 	mistakes: DiscrepenciesResult[];
 }) {
+	const grouped = groupByDiscrepancyType(mistakes);
+	const discrepancyTypes = Object.keys(grouped);
+	const [activeTab, setActiveTab] = useState(discrepancyTypes[0] ?? '');
+
 	return (
-		<SortableTable<DiscrepenciesResult, MistakesTableRowModel>
-			columnConfigs={columnConfigs}
-			data={mistakes}
-			rowDataTransform={(row: DiscrepenciesResult): MistakesTableRowModel =>
-				row
-			}
-			TableBodyComponent={MistakesTableBody}
-		/>
+		<>
+			<nav
+				className="bg-base-200 rounded-field w-fit space-x-1 overflow-x-auto p-1 mt-4"
+				aria-label="Tabs"
+				role="tablist"
+				aria-orientation="horizontal"
+			>
+				{discrepancyTypes.map((type) => (
+					<button
+						key={type}
+						type="button"
+						className={`btn ${activeTab === type ? 'btn-default' : 'btn-secondary'}`}
+						onClick={() => setActiveTab(type)}
+					>
+						{formatTabLabel(type)}
+					</button>
+				))}
+			</nav>
+			{discrepancyTypes.map((type) =>
+				type === activeTab ? (
+					<MistakesDiscrepancyTable key={type} mistakes={grouped[type]} />
+				) : null
+			)}
+		</>
 	);
 }
