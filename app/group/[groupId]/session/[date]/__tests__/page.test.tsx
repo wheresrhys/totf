@@ -10,6 +10,19 @@ vi.mock('@/lib/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
+vi.mock('@/app/actions/session-highlights', () => ({
+	fetchSessionHighlights: vi.fn().mockResolvedValue([
+		{
+			type: 'session-total-record',
+			metric: 'encounters',
+			scope: 'all-time',
+			value: 3,
+			seasonName: 'winter',
+			year: 2024
+		}
+	])
+}));
+
 const TEST_DATE = '2024-03-15';
 const TEST_GROUP_ID = '1';
 
@@ -134,5 +147,12 @@ describe('session detail page', () => {
 		const table = await screen.findByTestId('session-table');
 		const rows = table.querySelectorAll('tbody tr');
 		expect(rows.length).toBe(2);
+	});
+
+	it('renders the highlights section on the date-level page', async () => {
+		render(await renderPage());
+		const highlights = await screen.findByTestId('session-highlights');
+		expect(highlights.textContent).toContain('Highlights');
+		expect(highlights.textContent).toContain('Busiest session ever — 3 birds');
 	});
 });

@@ -17,6 +17,7 @@ import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
 import { calculateSessionChronology } from '@/app/models/session-chronology';
 import { formatMinutesForDisplay } from '@/lib/postgres-interval';
+import { SessionHighlights } from '@/app/components/SessionHighlights';
 
 export type PageParams = {
 	viewedGroupId: number;
@@ -210,6 +211,9 @@ export function SessionSummary({
 					`Net rounds: ${chronology.netRounds.length}`
 				]}
 			/>
+			{locationId ? null : (
+				<SessionHighlights date={date} viewedGroupId={viewedGroupId} />
+			)}
 			<SessionTabs speciesList={speciesList} netRounds={chronology.netRounds} />
 		</PageWrapper>
 	);
