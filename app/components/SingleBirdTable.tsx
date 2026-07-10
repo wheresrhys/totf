@@ -97,10 +97,12 @@ function SingleBirdTableBody({
 
 export function SingleBirdTable({
 	encounters,
-	isInline = false
+	isInline = false,
+	highlightRow
 }: {
 	encounters: EncounterOfBird[];
 	isInline?: boolean;
+	highlightRow?: (encounter: EncounterOfBird) => boolean;
 }) {
 	if (isInline) {
 		return (
@@ -115,8 +117,12 @@ export function SingleBirdTable({
 				<tbody>
 					{encounters.map((encounter) => {
 						const rowModel = rowDataTransform(encounter);
+						const isHighlighted = highlightRow?.(encounter) ?? false;
 						return (
-							<tr key={encounter.id}>
+							<tr
+								key={encounter.id}
+								className={isHighlighted ? 'bg-warning/20' : undefined}
+							>
 								{orderedColumnProperties.map((property) => (
 									<td key={property}>
 										{cellFormatter(rowModel[property], property)}

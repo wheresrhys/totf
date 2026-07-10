@@ -37,25 +37,53 @@ describe('mistakes page', () => {
 		expect(heading.textContent).toBe('Mistakes');
 	});
 
-	it('renders table with snapshot data', async () => {
+	it('renders a tab for each discrepancy type', async () => {
 		render(await Page());
-		const table = await screen.findByRole('table');
-		const rows = table.querySelectorAll('tbody tr');
-		expect(rows.length).toBe(
-			(mistakesSnapshot as DiscrepenciesResult[]).length
-		);
-		const firstRow = rows[0];
-		const cells = firstRow.querySelectorAll('td');
-		expect(cells[0].textContent?.trim()).toBe(mistakesSnapshot[0].ring_no);
-		expect(cells[1].textContent).toBe(mistakesSnapshot[0].species_name);
-		expect(cells[2].textContent).toBe(mistakesSnapshot[0].discrepency_type);
+		const tabList = await screen.findByRole('tablist');
+		const tabs = tabList.querySelectorAll('button');
+		const types = [
+			...new Set(
+				(mistakesSnapshot as DiscrepenciesResult[]).map(
+					(m) => m.discrepency_type
+				)
+			)
+		];
+		expect(tabs.length).toBe(types.length);
 	});
 
-	it('renders empty state when no data', async () => {
-		mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeRpcClient([]));
+	it('shows only rows for the active tab', async () => {
 		render(await Page());
+		const tabList = await screen.findByRole('tablist');
+		const firstTab = tabList.querySelectorAll('button')[0];
+		const activeType = (mistakesSnapshot as DiscrepenciesResult[])[0]
+			.discrepency_type;
+		const expectedCount = (mistakesSnapshot as DiscrepenciesResult[]).filter(
+			(m) => m.discrepency_type === activeType
+		).length;
+		expect(firstTab.textContent).toBeTruthy();
 		const table = await screen.findByRole('table');
 		const rows = table.querySelectorAll('tbody tr');
-		expect(rows.length).toBe(0);
+		expect(rows.length).toBe(expectedCount);
+	});
+
+	it('renders ring_no as a link in each row', async () => {
+		render(await Page());
+		const table = await screen.findByRole('table');
+		const firstDataRow = table.querySelectorAll('tbody tr')[0];
+		const link = firstDataRow.querySelector('a');
+		expect(link).toBeTruthy();
+		const firstActiveType = (mistakesSnapshot as DiscrepenciesResult[])[0]
+			.discrepency_type;
+		const firstOfType = (mistakesSnapshot as DiscrepenciesResult[]).find(
+			(m) => m.discrepency_type === firstActiveType
+		)!;
+		expect(link?.getAttribute('href')).toBe(`/bird/${firstOfType.ring_no}`);
+	});
+
+	it('renders empty tab gracefully when no data', async () => {
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeRpcClient([]));
+		render(await Page());
+		const tabList = screen.queryByRole('tablist');
+		expect(tabList?.querySelectorAll('button').length ?? 0).toBe(0);
 	});
 });
