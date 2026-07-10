@@ -1,20 +1,11 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import {
-	BoxyList,
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
 import { redirect } from 'next/navigation';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
-
-type SearchResult = {
-	ring_no: string;
-	species_name: string;
-	closeness_score: number;
-};
+import {
+	BirdSearchResults,
+	type SearchResult
+} from '@/app/components/BirdSearchResults';
 
 type SearchParams = { q: string };
 type PageProps = { searchParams: Promise<SearchParams> };
@@ -37,34 +28,6 @@ async function searchByRing({ q }: SearchParams, _viewedGroupId: number) {
 		.then(catchSupabaseErrors);
 }
 
-function SearchResults({
-	params: { q },
-	data
-}: {
-	params: SearchParams;
-	data: SearchResult[];
-}) {
-	return (
-		<PageWrapper>
-			<PrimaryHeading>Search results</PrimaryHeading>
-			<p>No exact match found for {q}. Showing closest matches.</p>
-			<div className="mt-4 mb-4 w-full sm:w-1/2 lg:w-1/3 xl:w-1/4">
-				{' '}
-				<RingSearchForm q={q} buttonText="Search again" />
-			</div>
-			<BoxyList>
-				{data.map(({ ring_no, species_name }) => (
-					<li key={ring_no}>
-						<NoPrefetchLink className="link" href={`/bird/${ring_no}`}>
-							{ring_no}: {species_name}
-						</NoPrefetchLink>
-					</li>
-				))}
-			</BoxyList>
-		</PageWrapper>
-	);
-}
-
 export default async function BirdPage(props: PageProps) {
 	return (
 		<BootstrapPageData<SearchResult[], PageProps, SearchParams>
@@ -74,7 +37,7 @@ export default async function BirdPage(props: PageProps) {
 			})}
 			getCacheKeys={(params: SearchParams) => ['search', params.q]}
 			dataFetcher={searchByRing}
-			PageComponent={SearchResults}
+			PageComponent={BirdSearchResults}
 		/>
 	);
 }
