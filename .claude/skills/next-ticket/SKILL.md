@@ -37,7 +37,12 @@ gh issue view <number> --json labels --jq '[.labels[].name] | map(select(. == "s
 ```
 
 - Exactly one of `sonnet` / `opus` / `fable` → use it as the subagent model.
-- No model label (or several) → default to `sonnet` and tell the user which ticket lacked a label so they can fix it.
+- No model label (or several) → **estimate the ticket's complexity yourself** from the issue body (and parent context) and choose the model:
+  - `sonnet` — small, precisely specified, low-risk change (single function/component, clear spec, tests enumerated)
+  - `opus` — fiddly or multi-constraint work (complex SQL, seed-data churn rippling through existing tests, several interacting rules)
+  - `fable` — complex or foundational work that sets patterns other tickets will build on
+
+  Record the estimate by applying the chosen label to the ticket (`gh issue edit <number> --add-label <model>` — remove extras first if several were present), and tell the user the ticket was unlabelled, which model you chose, and why.
 
 ### 3. Spawn the implementation subagent
 
