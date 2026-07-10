@@ -20,6 +20,14 @@ A leaderboard/statistics dashboard for bird ringing data. Bird ringing groups (o
 - An **Encounter** is a single capture event: one bird, one session, with measurements.
 - A **Session** is a visit to a ringing location on a given date.
 
+## Creating GitHub tickets
+
+When creating a ticket, add exactly one model label reflecting implementation complexity — the `next-ticket` skill routes implementation to a subagent on that model:
+
+- `sonnet` — small, precisely specified, low-risk changes
+- `opus` — fiddly or multi-constraint work (complex SQL, seed-data churn, interacting rules)
+- `fable` — complex or foundational work that sets patterns others build on
+
 ## Authentication model
 
 There are no per-person logins. Authentication is group-scoped:
