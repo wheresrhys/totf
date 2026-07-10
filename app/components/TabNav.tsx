@@ -33,7 +33,7 @@ export function TabNav({
 					aria-current={activeTab === id ? 'true' : undefined}
 					className={
 						activeTab === id
-							? 'px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm whitespace-nowrap font-medium bg-base-100 border border-base-300 border-b-base-100 rounded-t-sm -mb-px'
+							? 'px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm whitespace-nowrap font-medium bg-base-100 border border-base-300 border-b-0 rounded-t-sm -mb-px'
 							: 'px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm whitespace-nowrap text-base-content/60 hover:text-base-content cursor-pointer'
 					}
 					onClick={() => onTabChange(id)}
