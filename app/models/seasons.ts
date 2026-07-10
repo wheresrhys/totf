@@ -39,8 +39,12 @@ export function getSeasonMonths(
 	const months = seasonToMonthsMap[season];
 	if (thisYear) {
 		if (season === Season.WINTER) {
-			return months.map(
-				(month) => `${year > 9 ? year - 1 : year}-${month}`
+			const monthIndex = date.getMonth();
+			const seasonStartYear = monthIndex >= 10 ? year : year - 1;
+			return months.map((month) =>
+				Number(month) >= 11
+					? `${seasonStartYear}-${month}`
+					: `${seasonStartYear + 1}-${month}`
 			) as string[];
 		}
 		return months.map((month) => `${year}-${month}`) as string[];
