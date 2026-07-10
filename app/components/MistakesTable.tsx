@@ -34,7 +34,7 @@ function groupByDiscrepancyType(
 	);
 }
 
-function makeHighlighter(
+export function makeHighlighter(
 	discrepancyType: string,
 	encounters: EncounterOfBird[]
 ): (encounter: EncounterOfBird) => boolean {
@@ -45,17 +45,19 @@ function makeHighlighter(
 		return (enc) => enc.age_code != null && enc.age_code >= 2;
 	}
 	if (discrepancyType === 'wing_length') {
-		return (enc) => {
-			if (enc.wing_length == null) return false;
-			const w = enc.wing_length;
-			const otherMeasured = encounters
-				.filter((other) => other !== enc && other.wing_length != null)
-				.map((other) => other.wing_length as number);
-			const diffCount = otherMeasured.filter(
-				(m) => Math.abs(m - w) >= 5
-			).length;
-			return diffCount > otherMeasured.length / 2;
-		};
+		const measured = encounters
+			.filter((e) => e.wing_length != null)
+			.map((e) => e.wing_length as number)
+			.sort((a, b) => a - b);
+		if (measured.length === 0) return () => false;
+		const mid = Math.floor(measured.length / 2);
+		const median =
+			measured.length % 2 === 0
+				? (measured[mid - 1] + measured[mid]) / 2
+				: measured[mid];
+		const maxDist = Math.max(...measured.map((m) => Math.abs(m - median)));
+		return (enc) =>
+			enc.wing_length != null && Math.abs(enc.wing_length - median) === maxDist;
 	}
 	return () => false;
 }
