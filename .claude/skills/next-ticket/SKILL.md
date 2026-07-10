@@ -18,10 +18,21 @@ gh issue list --label ready --state open --limit 50 --json number,title,createdA
   jq 'sort_by(.createdAt) | .[0]'
 ```
 
-Pick the **oldest** open issue (lowest `createdAt`). Read it in full:
+Pick the **oldest** open issue (lowest `createdAt`).
+
+Then check whether it has open child (sub-)issues labelled `ready`:
 
 ```sh
-gh issue view <number>
+gh api repos/{owner}/{repo}/issues/<number>/sub_issues \
+  --jq '[.[] | select(.state == "open" and (.labels | map(.name) | contains(["ready"])))] | .[0].number'
+```
+
+If it does, the parent issue is a tracking issue: **pick the first such child instead** (sub-issues are returned in their planned order). Recurse — if that child also has ready children, descend again. The parent stays open until all children are done; treat the child as the ticket for the rest of this skill, but read the parent too for shared context (design-decision comments, plan links).
+
+Read the chosen ticket in full:
+
+```sh
+gh issue view <number> --comments
 ```
 
 ### 2. Understand scope before touching any code
