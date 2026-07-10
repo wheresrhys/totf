@@ -77,4 +77,55 @@ describe('home page', () => {
 			expect(sessionLinks.length).toBe(0);
 		});
 	});
+
+	describe('with multiple sessions on the same date', () => {
+		it('renders all sessions from the last 3 distinct dates', async () => {
+			const sessionsWithSharedDate = [
+				{
+					id: 1,
+					visit_date: '2024-05-10',
+					location_id: 1,
+					ringing_group_id: 3,
+					location: { location_name: 'Site A' },
+					encounters: [{ count: 4 }]
+				},
+				{
+					id: 2,
+					visit_date: '2024-05-10',
+					location_id: 2,
+					ringing_group_id: 3,
+					location: { location_name: 'Site B' },
+					encounters: [{ count: 2 }]
+				},
+				{
+					id: 3,
+					visit_date: '2024-04-15',
+					location_id: 1,
+					ringing_group_id: 3,
+					location: { location_name: 'Site A' },
+					encounters: [{ count: 1 }]
+				},
+				{
+					id: 4,
+					visit_date: '2024-03-20',
+					location_id: 1,
+					ringing_group_id: 3,
+					location: { location_name: 'Site A' },
+					encounters: [{ count: 3 }]
+				}
+			];
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+				makeChainClient(sessionsWithSharedDate)
+			);
+			render(await Page());
+			const heading = await screen.findByRole('heading', {
+				name: 'Recent Sessions'
+			});
+			const sessionLinks =
+				heading.nextElementSibling?.querySelectorAll('a') ?? [];
+			// 2 sessions on same date: 1 day-total link (StatOutput) + 2 site links
+			// + 1 link each for the 2 single-session dates = 5 total
+			expect(sessionLinks.length).toBe(5);
+		});
+	});
 });

@@ -144,15 +144,20 @@ export async function fetchRecentSessions(
 	viewedGroupId: number
 ): Promise<SessionWithEncountersCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	return supabase
+	const sessions = (await supabase
 		.from('Sessions')
 		.select(
 			'id, visit_date, location_id, ringing_group_id, location:Locations(location_name), encounters:Encounters(count)'
 		)
 		.eq('ringing_group_id', viewedGroupId)
 		.order('visit_date', { ascending: false })
-		.limit(3)
-		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
+		.limit(30)
+		.then(catchSupabaseErrors)) as SessionWithEncountersCount[];
+	const recentDates = [...new Set(sessions.map((s) => s.visit_date))].slice(
+		0,
+		3
+	);
+	return sessions.filter((s) => recentDates.includes(s.visit_date));
 }
 
 export async function fetchHomePageData(
