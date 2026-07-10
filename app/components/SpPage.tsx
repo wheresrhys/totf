@@ -15,6 +15,7 @@ import { SpIndividualsTab } from './SpIndividualsTab';
 import { SpNotableRetrapsTab } from './SpNotableRetrapsTab';
 import { SpStatsHistoryTab } from './SpStatsHistoryTab';
 import { SpWeightWingTab } from './SpWeightWingTab';
+import { SpYearComparisonTab } from './SpYearComparisonTab';
 
 function ConditionalTabPanel({
 	loadedTabs,
@@ -84,11 +85,19 @@ function SpeciesData({
 				</button>
 				<button
 					type="button"
-					id="tabs-control-stats-history"
-					className={`btn ${activeTab === 'stats-history' ? 'btn-default' : 'btn-secondary'}`}
+					id="tabs-control-trend-charts"
+					className={`btn ${activeTab === 'trend-charts' ? 'btn-default' : 'btn-secondary'}`}
 					onClick={handleTabClick}
 				>
-					Stats history
+					Trend charts
+				</button>
+				<button
+					type="button"
+					id="tabs-control-year-comparison"
+					className={`btn ${activeTab === 'year-comparison' ? 'btn-default' : 'btn-secondary'}`}
+					onClick={handleTabClick}
+				>
+					Year comparison
 				</button>
 				<button
 					type="button"
@@ -123,10 +132,20 @@ function SpeciesData({
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
-				tabId="stats-history"
+				tabId="trend-charts"
 				activeTabId={activeTab}
 			>
 				<SpStatsHistoryTab
+					speciesName={data.speciesName}
+					viewedGroupId={viewedGroupId}
+				/>
+			</ConditionalTabPanel>
+			<ConditionalTabPanel
+				loadedTabs={loadedTabs}
+				tabId="year-comparison"
+				activeTabId={activeTab}
+			>
+				<SpYearComparisonTab
 					speciesName={data.speciesName}
 					viewedGroupId={viewedGroupId}
 				/>
