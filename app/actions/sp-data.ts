@@ -110,3 +110,17 @@ export async function getSpeciesStatsHistory(
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
 }
+
+export async function getSpeciesYearComparison(
+	species: string,
+	viewedGroupId: number
+) {
+	const supabase = await getAuthenticatedSupabaseClient();
+	return supabase
+		.rpc('aggregate_stats', {
+			species_name_filter: species,
+			ringing_group_filter: viewedGroupId,
+			group_by_time_period: 'year'
+		})
+		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
+}

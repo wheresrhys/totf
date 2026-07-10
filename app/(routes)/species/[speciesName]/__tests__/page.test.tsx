@@ -38,6 +38,10 @@ vi.mock('@/app/components/SpStatsHistoryTab', () => ({
 	SpStatsHistoryTab: () => <div data-testid="sp-stats-history-tab" />
 }));
 
+vi.mock('@/app/components/SpYearComparisonTab', () => ({
+	SpYearComparisonTab: () => <div data-testid="sp-year-comparison-tab" />
+}));
+
 vi.mock('@/app/components/SpWeightWingTab', () => ({
 	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
@@ -84,13 +88,16 @@ describe('species detail page', () => {
 			mockFetchPageOfBirds.mockResolvedValue(birds);
 		});
 
-		it('renders all 4 tab buttons: Bird list, Retraps, Stats history, Size plot', async () => {
+		it('renders all 5 tab buttons: Bird list, Retraps, Trend charts, Year comparison, Size plot', async () => {
 			render(await renderSpeciesPage());
 			await screen.findByTestId('sp-individuals-tab');
 			expect(screen.getByRole('button', { name: 'Bird list' })).toBeDefined();
 			expect(screen.getByRole('button', { name: 'Retraps' })).toBeDefined();
 			expect(
-				screen.getByRole('button', { name: 'Stats history' })
+				screen.getByRole('button', { name: 'Trend charts' })
+			).toBeDefined();
+			expect(
+				screen.getByRole('button', { name: 'Year comparison' })
 			).toBeDefined();
 			expect(screen.getByRole('button', { name: 'Size plot' })).toBeDefined();
 		});
@@ -111,12 +118,23 @@ describe('species detail page', () => {
 			});
 		});
 
-		describe('stats-history tab (click to activate)', () => {
-			it('renders SpStatsHistoryTab after clicking Stats history button', async () => {
+		describe('trend-charts tab (click to activate)', () => {
+			it('renders SpStatsHistoryTab after clicking Trend charts button', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-individuals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Stats history' }));
+				fireEvent.click(screen.getByRole('button', { name: 'Trend charts' }));
 				await screen.findByTestId('sp-stats-history-tab');
+			});
+		});
+
+		describe('year-comparison tab (click to activate)', () => {
+			it('renders SpYearComparisonTab after clicking Year comparison button', async () => {
+				render(await renderSpeciesPage());
+				await screen.findByTestId('sp-individuals-tab');
+				fireEvent.click(
+					screen.getByRole('button', { name: 'Year comparison' })
+				);
+				await screen.findByTestId('sp-year-comparison-tab');
 			});
 		});
 
