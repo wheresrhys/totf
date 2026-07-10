@@ -16,6 +16,7 @@ import { SpNotableRetrapsTab } from './SpNotableRetrapsTab';
 import { SpStatsHistoryTab } from './SpStatsHistoryTab';
 import { SpWeightWingTab } from './SpWeightWingTab';
 import { SpYearComparisonTab } from './SpYearComparisonTab';
+import { TabNav } from './TabNav';
 
 function ConditionalTabPanel({
 	loadedTabs,
@@ -52,8 +53,7 @@ function SpeciesData({
 	);
 	const [activeTab, setActiveTab] = useState('bird-list');
 
-	function handleTabClick(event: React.MouseEvent<HTMLButtonElement>) {
-		const tab = event.currentTarget.id.replace('tabs-control-', '');
+	function handleTabChange(tab: string) {
 		setLoadedTabs((prev) => new Set([...prev, tab]));
 		setActiveTab(tab);
 	}
@@ -61,53 +61,17 @@ function SpeciesData({
 	return (
 		<>
 			<SpStats {...data} viewedGroupId={viewedGroupId} />
-			<nav
-				className="bg-base-200 rounded-field w-fit space-x-1 overflow-x-auto p-1 mt-4"
-				aria-label="Tabs"
-				role="tablist"
-				aria-orientation="horizontal"
-			>
-				<button
-					type="button"
-					id="tabs-control-bird-list"
-					className={`btn  ${activeTab === 'bird-list' ? 'btn-default' : 'btn-secondary'}`}
-					onClick={handleTabClick}
-				>
-					Bird list
-				</button>
-				<button
-					type="button"
-					id="tabs-control-retraps"
-					className={`btn ${activeTab === 'retraps' ? 'btn-default' : 'btn-secondary'}`}
-					onClick={handleTabClick}
-				>
-					Retraps
-				</button>
-				<button
-					type="button"
-					id="tabs-control-trend-charts"
-					className={`btn ${activeTab === 'trend-charts' ? 'btn-default' : 'btn-secondary'}`}
-					onClick={handleTabClick}
-				>
-					Trend charts
-				</button>
-				<button
-					type="button"
-					id="tabs-control-year-comparison"
-					className={`btn ${activeTab === 'year-comparison' ? 'btn-default' : 'btn-secondary'}`}
-					onClick={handleTabClick}
-				>
-					Year comparison
-				</button>
-				<button
-					type="button"
-					id="tabs-control-size-plot"
-					className={`btn ${activeTab === 'size-plot' ? 'btn-default' : 'btn-secondary'}`}
-					onClick={handleTabClick}
-				>
-					Size plot
-				</button>
-			</nav>
+			<TabNav
+				tabs={[
+					{ id: 'bird-list', label: 'Bird list' },
+					{ id: 'retraps', label: 'Retraps' },
+					{ id: 'trend-charts', label: 'Trend charts' },
+					{ id: 'year-comparison', label: 'Year comparison' },
+					{ id: 'size-plot', label: 'Size plot' }
+				]}
+				activeTab={activeTab}
+				onTabChange={handleTabChange}
+			/>
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
 				tabId="bird-list"

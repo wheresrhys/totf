@@ -15,6 +15,7 @@ import {
 	SortableTable,
 	type RowModelWithRawData
 } from './shared/SortableTable';
+import { TabNav } from './TabNav';
 
 function SpeciesNameCell({
 	model: { species }
@@ -255,37 +256,19 @@ export function SessionTabs({
 	);
 	const [activeTab, setActiveTab] = useState('by-species');
 
-	function handleTabClick(event: React.MouseEvent<HTMLButtonElement>) {
-		const tab = event.currentTarget.id.replace('session-tabs-control-', '');
-		setLoadedTabs((prev) => new Set([...prev, tab]));
-		setActiveTab(tab);
-	}
-
 	return (
 		<>
-			<nav
-				className="bg-base-200 rounded-field w-fit space-x-1 overflow-x-auto p-1 mt-4"
-				aria-label="Tabs"
-				role="tablist"
-				aria-orientation="horizontal"
-			>
-				<button
-					type="button"
-					id="session-tabs-control-by-species"
-					className={`btn ${activeTab === 'by-species' ? 'btn-default' : 'btn-secondary'}`}
-					onClick={handleTabClick}
-				>
-					By species
-				</button>
-				<button
-					type="button"
-					id="session-tabs-control-by-time"
-					className={`btn ${activeTab === 'by-time' ? 'btn-default' : 'btn-secondary'}`}
-					onClick={handleTabClick}
-				>
-					By time
-				</button>
-			</nav>
+			<TabNav
+				tabs={[
+					{ id: 'by-species', label: 'By species' },
+					{ id: 'by-time', label: 'By time' }
+				]}
+				activeTab={activeTab}
+				onTabChange={(tab) => {
+					setLoadedTabs((prev) => new Set([...prev, tab]));
+					setActiveTab(tab);
+				}}
+			/>
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
 				tabId="by-species"

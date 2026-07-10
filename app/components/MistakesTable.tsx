@@ -7,6 +7,7 @@ import { fetchBirdEncounters } from '@/app/actions/bird-encounters';
 import type { DiscrepenciesResult } from '@/app/models/db';
 import type { EncounterOfBird } from '@/app/models/bird';
 import type { RowModelWithRawData } from '@/app/components/shared/SortableTable';
+import { TabNav } from '@/app/components/TabNav';
 
 type MistakesRowModel = {
 	ringNo: string;
@@ -150,23 +151,14 @@ export function MistakesTable({
 
 	return (
 		<>
-			<nav
-				className="bg-base-200 rounded-field w-fit space-x-1 overflow-x-auto p-1 mt-4"
-				aria-label="Tabs"
-				role="tablist"
-				aria-orientation="horizontal"
-			>
-				{discrepancyTypes.map((type) => (
-					<button
-						key={type}
-						type="button"
-						className={`btn ${activeTab === type ? 'btn-default' : 'btn-secondary'}`}
-						onClick={() => setActiveTab(type)}
-					>
-						{formatTabLabel(type)}
-					</button>
-				))}
-			</nav>
+			<TabNav
+				tabs={discrepancyTypes.map((type) => ({
+					id: type,
+					label: formatTabLabel(type)
+				}))}
+				activeTab={activeTab}
+				onTabChange={setActiveTab}
+			/>
 			{discrepancyTypes.map((type) =>
 				type === activeTab ? (
 					<MistakesDiscrepancyTable key={type} mistakes={grouped[type]} />
