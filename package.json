@@ -23,6 +23,8 @@
 		"build": "next build --turbopack",
 		"next:dev": "dotenvx run -f .env.dev -- next dev --turbopack",
 		"next:prod": "./scripts/load-prod-env.sh next dev --turbopack",
+		"next:prod:readonly": "./scripts/load-prod-readonly-env.sh next dev --turbopack",
+		"prod:readonly": "./scripts/load-prod-readonly-env.sh",
 		"next:build:prod": "./scripts/load-prod-env.sh next build --turbopack --debug",
 		"next:build:dev": "dotenvx run -f .env.dev -- next build --turbopack --debug",
 		"next:start:prod": "./scripts/load-prod-env.sh next start",

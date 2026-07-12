@@ -21,13 +21,27 @@ describe('generateGroupJwt', () => {
 		).toBe(groupId);
 	});
 
-	it('sets role to authenticated', async () => {
+	it('sets role to authenticated by default', async () => {
 		const token = await generateGroupJwt(1);
 
 		const encodedSecret = new TextEncoder().encode(TEST_SECRET);
 		const { payload } = await jwtVerify(token, encodedSecret);
 
 		expect(payload.role).toBe('authenticated');
+	});
+
+	it('sets role from SUPABASE_JWT_ROLE when set', async () => {
+		process.env.SUPABASE_JWT_ROLE = 'claude_readonly';
+		try {
+			const token = await generateGroupJwt(1);
+
+			const encodedSecret = new TextEncoder().encode(TEST_SECRET);
+			const { payload } = await jwtVerify(token, encodedSecret);
+
+			expect(payload.role).toBe('claude_readonly');
+		} finally {
+			delete process.env.SUPABASE_JWT_ROLE;
+		}
 	});
 });
 

@@ -102,6 +102,28 @@ npm run next:prod        # dev server pointing at prod Supabase
 ```
 You will need to ask your human to run `op signin` first
 
+### Read-only prod debugging (for Claude)
+
+Claude may debug against production data, but only in read-only mode:
+
+```sh
+npm run next:prod:readonly            # dev server against prod, writes blocked
+npm run prod:readonly -- tsx <file>   # run any script against prod, writes blocked
+```
+
+These sign group JWTs as the `claude_readonly` Postgres role (via `SUPABASE_JWT_ROLE`,
+see `supabase/schema/cluster/roles.sql`): it inherits `authenticated`'s RLS policies but
+PostgREST applies `transaction_read_only=on`, so every write fails at the database with
+error `25006`. The env also omits `SUPABASE_SERVICE_ROLE_KEY`.
+
+To fetch authenticated pages, mint a session cookie without a password:
+sign a JWT with `generateGroupJwt(groupId)` (run under `prod:readonly` so the role is
+read-only) and pass `Cookie: TOTFSession=<jwt>`.
+
+Claude must never run the writable prod commands (`next:prod`, `db:import:prod`,
+`set-group-password:prod`, `db:migration:push`) — these are denied in `.claude/settings.json`.
+The human runs `op signin` and deploys migrations.
+
 ## Testing
 
 ### Test suites

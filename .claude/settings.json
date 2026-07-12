@@ -1,0 +1,16 @@
+{
+	"permissions": {
+		"deny": [
+			"Bash(npm run db:migration:push*)",
+			"Bash(npm run db:import:prod*)",
+			"Bash(npm run set-group-password:prod*)",
+			"Bash(npm run next:prod)",
+			"Bash(npm run next:build:prod*)",
+			"Bash(npm run next:start:prod*)",
+			"Bash(supabase db push*)",
+			"Bash(npx supabase db push*)",
+			"Bash(supabase migration up --linked*)",
+			"Bash(npx supabase migration up --linked*)"
+		]
+	}
+}

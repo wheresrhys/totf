@@ -10,7 +10,8 @@ function getEncodedSecret(): Uint8Array {
 
 export async function generateGroupJwt(groupId: number): Promise<string> {
 	return new SignJWT({
-		role: 'authenticated',
+		// SUPABASE_JWT_ROLE=claude_readonly forces read-only DB access (see supabase/schema/cluster/roles.sql)
+		role: process.env.SUPABASE_JWT_ROLE ?? 'authenticated',
 		app_metadata: { ringing_group_id: groupId }
 	})
 		.setProtectedHeader({ alg: 'HS256' })
