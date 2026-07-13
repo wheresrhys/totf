@@ -8,6 +8,9 @@ import {
 import type { DaySpeciesMetricRow } from '@/app/models/db';
 
 const SESSION_DATE = '2024-09-15'; // autumn
+// A fixed "today" after the session's year and season, so current-period
+// flags are deterministically false unless a test passes its own today
+const PAST_PERIOD_TODAY = new Date('2025-06-01');
 
 // Prior days used across tests, chosen for their scope membership
 // relative to SESSION_DATE:
@@ -35,10 +38,11 @@ function statsFor(rows: DaySpeciesMetricRow[]): SessionStatsData {
 	};
 }
 
-function derive(rows: DaySpeciesMetricRow[]) {
+function derive(rows: DaySpeciesMetricRow[], today = PAST_PERIOD_TODAY) {
 	return deriveSessionTotalRecords({
 		date: SESSION_DATE,
-		stats: statsFor(rows)
+		stats: statsFor(rows),
+		today
 	});
 }
 
@@ -58,7 +62,10 @@ describe('deriveSessionTotalRecords', () => {
 			scope: 'all-time',
 			value: 74,
 			seasonName: 'autumn',
-			year: 2024
+			year: 2024,
+			isCurrentYear: false,
+			isCurrentSeason: false,
+			seasonPeriodLabel: 'autumn 2024'
 		});
 		// three species on the prior day vs two today — no variety record
 		expect(
@@ -180,6 +187,23 @@ describe('deriveSessionTotalRecords', () => {
 		);
 	});
 
+	it('marks the session year and season current when today falls within them', () => {
+		const highlights = derive(
+			[
+				...dayRows(SESSION_DATE, { Robin: 74 }),
+				...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 60 })
+			],
+			new Date('2024-10-20')
+		);
+		expect(highlights).toContainEqual(
+			expect.objectContaining({
+				metric: 'encounters',
+				isCurrentYear: true,
+				isCurrentSeason: true
+			})
+		);
+	});
+
 	it('counts zero-encounter sessions as prior sessions in scope', () => {
 		const stats: SessionStatsData = {
 			daySpeciesCounts: dayRows(SESSION_DATE, { Robin: 74 }),
@@ -209,6 +233,9 @@ function makeHighlight(
 		value: 74,
 		seasonName: 'autumn',
 		year: 2024,
+		isCurrentYear: false,
+		isCurrentSeason: false,
+		seasonPeriodLabel: 'autumn 2024',
 		...overrides
 	};
 }
@@ -226,16 +253,44 @@ describe('buildHighlightSentence — session-total-record', () => {
 		);
 	});
 
-	it('renders this-year busiest copy', () => {
+	it('renders this-year busiest copy as "this year" for a current-year session', () => {
+		expect(
+			buildHighlightSentence(
+				makeHighlight({ scope: 'this-year', isCurrentYear: true })
+			)
+		).toBe('Busiest session this year — 74 birds');
+	});
+
+	it('renders this-year busiest copy with the year for a past session', () => {
 		expect(buildHighlightSentence(makeHighlight({ scope: 'this-year' }))).toBe(
 			'Busiest session of 2024 — 74 birds'
 		);
 	});
 
-	it('renders this-season busiest copy', () => {
+	it('renders this-season busiest copy as "this <season>" for a current-season session', () => {
+		expect(
+			buildHighlightSentence(
+				makeHighlight({ scope: 'this-season', isCurrentSeason: true })
+			)
+		).toBe('Busiest session this autumn — 74 birds');
+	});
+
+	it('renders this-season busiest copy with the season period for a past session', () => {
 		expect(
 			buildHighlightSentence(makeHighlight({ scope: 'this-season' }))
-		).toBe('Busiest session this autumn — 74 birds');
+		).toBe('Busiest session in autumn 2024 — 74 birds');
+	});
+
+	it('renders past winter copy with the split-year label', () => {
+		expect(
+			buildHighlightSentence(
+				makeHighlight({
+					scope: 'this-season',
+					seasonName: 'winter',
+					seasonPeriodLabel: 'winter 2023/24'
+				})
+			)
+		).toBe('Busiest session in winter 2023/24 — 74 birds');
 	});
 
 	it('renders most-varied copy for the species metric', () => {

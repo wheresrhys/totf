@@ -52,6 +52,25 @@ export function getSeasonMonths(
 	return months.map((month) => Number(month)) as number[];
 }
 
+// "autumn 2023" / "spring 2024" / "winter 2023/24" — winter is labelled by its
+// start year because it spans the year end
+export function getSeasonPeriodLabel(date: Date): string {
+	const season = getSeasonName(date);
+	const year = date.getFullYear();
+	if (season === Season.WINTER) {
+		const seasonStartYear = date.getMonth() >= 10 ? year : year - 1;
+		const endYearSuffix = String(seasonStartYear + 1).slice(2);
+		return `${season} ${seasonStartYear}/${endYearSuffix}`;
+	}
+	return `${season} ${year}`;
+}
+
+export function isCurrentSeasonPeriod(date: Date, today: Date): boolean {
+	const seasonYearMonths = getSeasonMonths(date, true) as string[];
+	const todayYearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+	return seasonYearMonths.includes(todayYearMonth);
+}
+
 export function getCESMonths(
 	date: Date,
 	thisYear?: boolean

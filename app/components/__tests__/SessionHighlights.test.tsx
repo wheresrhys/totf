@@ -14,7 +14,10 @@ const mockHighlights: SessionHighlight[] = [
 		scope: 'all-time',
 		value: 74,
 		seasonName: 'autumn',
-		year: 2024
+		year: 2024,
+		isCurrentYear: false,
+		isCurrentSeason: false,
+		seasonPeriodLabel: 'autumn 2024'
 	},
 	{
 		type: 'session-total-record',
@@ -22,7 +25,10 @@ const mockHighlights: SessionHighlight[] = [
 		scope: 'this-season',
 		value: 18,
 		seasonName: 'autumn',
-		year: 2024
+		year: 2024,
+		isCurrentYear: true,
+		isCurrentSeason: true,
+		seasonPeriodLabel: 'autumn 2024'
 	}
 ];
 
