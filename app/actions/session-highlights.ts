@@ -1,6 +1,6 @@
 'use server';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
-import { catchSupabaseErrors } from '@/lib/supabase';
+import { fetchAllPaginatedRows } from '@/lib/supabase';
 import {
 	deriveSessionTotalRecords,
 	sortHighlights,
@@ -29,24 +29,31 @@ async function fetchSessionStats(
 	}
 	const supabase = await getAuthenticatedSupabaseClient();
 	const [daySpeciesCounts, sessionRows] = await Promise.all([
-		supabase
-			.rpc('metrics_by_period_and_species', {
-				temporal_unit: 'day',
-				metric_name: 'encounters',
-				filters: {
-					ringing_group_filter: viewedGroupId
-				} as TopMetricsFilterParams
-			})
-			.then(catchSupabaseErrors) as Promise<DaySpeciesMetricRow[] | null>,
-		supabase
-			.from('Sessions')
-			.select('visit_date')
-			.eq('ringing_group_id', viewedGroupId)
-			.then(catchSupabaseErrors) as Promise<{ visit_date: string }[] | null>
+		fetchAllPaginatedRows<DaySpeciesMetricRow>((fromRow, toRow) =>
+			supabase
+				.rpc('metrics_by_period_and_species', {
+					temporal_unit: 'day',
+					metric_name: 'encounters',
+					filters: {
+						ringing_group_filter: viewedGroupId
+					} as TopMetricsFilterParams
+				})
+				.order('visit_date')
+				.order('species_name')
+				.range(fromRow, toRow)
+		),
+		fetchAllPaginatedRows<{ visit_date: string }>((fromRow, toRow) =>
+			supabase
+				.from('Sessions')
+				.select('visit_date')
+				.eq('ringing_group_id', viewedGroupId)
+				.order('visit_date')
+				.range(fromRow, toRow)
+		)
 	]);
 	const stats: SessionStatsData = {
-		daySpeciesCounts: daySpeciesCounts ?? [],
-		sessionDates: (sessionRows ?? []).map((row) => row.visit_date)
+		daySpeciesCounts,
+		sessionDates: sessionRows.map((row) => row.visit_date)
 	};
 	sessionStatsCache.set(viewedGroupId, {
 		expiresAt: Date.now() + SESSION_STATS_CACHE_TTL_MS,
