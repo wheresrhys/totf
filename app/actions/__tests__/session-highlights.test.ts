@@ -11,8 +11,35 @@ vi.mock('@/lib/group-auth', () => ({
 
 const SESSION_DATE = '2024-09-15';
 const GROUP_ID = 1;
+const PAGE_SIZE = 1000;
 
+// Queries are paginated (PostgREST caps responses at 1000 rows), so the
+// mock builders serve rows page by page from these arrays
+let rpcPages: {
+	species_name: string;
+	visit_date: string;
+	metric_value: number;
+}[][];
+let sessionPages: { visit_date: string }[][];
+
+function pageForRange(pages: unknown[][], fromRow: number) {
+	return Promise.resolve({
+		data: pages[fromRow / PAGE_SIZE] ?? [],
+		error: null
+	});
+}
+
+const mockRpcOrder = vi.fn();
+const mockRpcRange = vi.fn();
+const rpcQueryBuilder = { order: mockRpcOrder, range: mockRpcRange };
 const mockRpc = vi.fn();
+
+const mockSessionsOrder = vi.fn();
+const mockSessionsRange = vi.fn();
+const sessionsQueryBuilder = {
+	order: mockSessionsOrder,
+	range: mockSessionsRange
+};
 const mockEq = vi.fn();
 const mockSelect = vi.fn(() => ({ eq: mockEq }));
 const mockFrom = vi.fn(() => ({ select: mockSelect }));
@@ -26,20 +53,25 @@ async function importFetchSessionHighlights() {
 }
 
 beforeEach(() => {
-	mockRpc.mockReset();
-	mockEq.mockReset();
-	mockRpc.mockResolvedValue({
-		data: [
+	vi.clearAllMocks();
+	rpcPages = [
+		[
 			{ species_name: 'Robin', visit_date: SESSION_DATE, metric_value: 74 },
 			{ species_name: 'Robin', visit_date: '2022-05-01', metric_value: 30 },
 			{ species_name: 'Wren', visit_date: '2022-05-01', metric_value: 30 }
-		],
-		error: null
-	});
-	mockEq.mockResolvedValue({
-		data: [{ visit_date: '2022-05-01' }, { visit_date: SESSION_DATE }],
-		error: null
-	});
+		]
+	];
+	sessionPages = [[{ visit_date: '2022-05-01' }, { visit_date: SESSION_DATE }]];
+	mockRpc.mockReturnValue(rpcQueryBuilder);
+	mockRpcOrder.mockReturnValue(rpcQueryBuilder);
+	mockRpcRange.mockImplementation((fromRow: number) =>
+		pageForRange(rpcPages, fromRow)
+	);
+	mockEq.mockReturnValue(sessionsQueryBuilder);
+	mockSessionsOrder.mockReturnValue(sessionsQueryBuilder);
+	mockSessionsRange.mockImplementation((fromRow: number) =>
+		pageForRange(sessionPages, fromRow)
+	);
 	mockGetAuthenticatedSupabaseClient.mockResolvedValue({
 		rpc: mockRpc,
 		from: mockFrom
@@ -85,6 +117,55 @@ describe('fetchSessionHighlights', () => {
 		expect(mockFrom).toHaveBeenCalledWith('Sessions');
 		expect(mockSelect).toHaveBeenCalledWith('visit_date');
 		expect(mockEq).toHaveBeenCalledWith('ringing_group_id', GROUP_ID);
+	});
+
+	it('requests deterministic ordering for paginated queries', async () => {
+		const fetchSessionHighlights = await importFetchSessionHighlights();
+		await fetchSessionHighlights({
+			date: SESSION_DATE,
+			viewedGroupId: GROUP_ID
+		});
+		expect(mockRpcOrder).toHaveBeenCalledWith('visit_date');
+		expect(mockRpcOrder).toHaveBeenCalledWith('species_name');
+		expect(mockRpcRange).toHaveBeenCalledWith(0, PAGE_SIZE - 1);
+		expect(mockSessionsOrder).toHaveBeenCalledWith('visit_date');
+		expect(mockSessionsRange).toHaveBeenCalledWith(0, PAGE_SIZE - 1);
+	});
+
+	it('derives highlights from rows beyond the first page', async () => {
+		rpcPages = [
+			Array.from({ length: PAGE_SIZE }, (_, index) => ({
+				species_name: `Species ${index}`,
+				visit_date: '2022-05-01',
+				metric_value: 1
+			})),
+			[
+				{
+					species_name: 'Robin',
+					visit_date: SESSION_DATE,
+					metric_value: 2000
+				}
+			]
+		];
+		const fetchSessionHighlights = await importFetchSessionHighlights();
+		const highlights = await fetchSessionHighlights({
+			date: SESSION_DATE,
+			viewedGroupId: GROUP_ID
+		});
+		expect(mockRpcRange).toHaveBeenCalledTimes(2);
+		expect(mockRpcRange).toHaveBeenNthCalledWith(
+			2,
+			PAGE_SIZE,
+			2 * PAGE_SIZE - 1
+		);
+		expect(highlights).toContainEqual(
+			expect.objectContaining({
+				type: 'session-total-record',
+				metric: 'encounters',
+				scope: 'all-time',
+				value: 2000
+			})
+		);
 	});
 
 	it('returns cached data within the TTL', async () => {
