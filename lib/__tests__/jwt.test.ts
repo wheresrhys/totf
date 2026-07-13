@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { jwtVerify } from 'jose';
 import { generateGroupJwt, verifyGroupJwt } from '../jwt';
 
@@ -7,6 +7,16 @@ const TEST_SECRET = 'test-secret-for-jwt-unit-tests';
 beforeAll(() => {
 	process.env.SUPABASE_JWT_SECRET = TEST_SECRET;
 });
+
+beforeEach(() => {
+	process.env.SUPABASE_JWT_ROLE = 'authenticated';
+});
+
+async function getPayload(token: string) {
+	const encodedSecret = new TextEncoder().encode(TEST_SECRET);
+	const { payload } = await jwtVerify(token, encodedSecret);
+	return payload;
+}
 
 describe('generateGroupJwt', () => {
 	it('produces a JWT with the correct ringing_group_id in app_metadata', async () => {
@@ -21,27 +31,38 @@ describe('generateGroupJwt', () => {
 		).toBe(groupId);
 	});
 
-	it('sets role to authenticated by default', async () => {
-		const token = await generateGroupJwt(1);
+	describe('role handling', () => {
+		it('signs role authenticated when SUPABASE_JWT_ROLE=authenticated', async () => {
+			process.env.SUPABASE_JWT_ROLE = 'authenticated';
 
-		const encodedSecret = new TextEncoder().encode(TEST_SECRET);
-		const { payload } = await jwtVerify(token, encodedSecret);
+			const payload = await getPayload(await generateGroupJwt(1));
 
-		expect(payload.role).toBe('authenticated');
-	});
+			expect(payload.role).toBe('authenticated');
+		});
 
-	it('sets role from SUPABASE_JWT_ROLE when set', async () => {
-		process.env.SUPABASE_JWT_ROLE = 'app_readonly';
-		try {
-			const token = await generateGroupJwt(1);
+		it('signs role app_readonly when SUPABASE_JWT_ROLE=app_readonly', async () => {
+			process.env.SUPABASE_JWT_ROLE = 'app_readonly';
 
-			const encodedSecret = new TextEncoder().encode(TEST_SECRET);
-			const { payload } = await jwtVerify(token, encodedSecret);
+			const payload = await getPayload(await generateGroupJwt(1));
 
 			expect(payload.role).toBe('app_readonly');
-		} finally {
+		});
+
+		it('throws when SUPABASE_JWT_ROLE is not set', async () => {
 			delete process.env.SUPABASE_JWT_ROLE;
-		}
+
+			await expect(generateGroupJwt(1)).rejects.toThrow(
+				'SUPABASE_JWT_ROLE environment variable is not set'
+			);
+		});
+
+		it('throws for an unrecognised SUPABASE_JWT_ROLE value', async () => {
+			process.env.SUPABASE_JWT_ROLE = 'service_role';
+
+			await expect(generateGroupJwt(1)).rejects.toThrow(
+				'Unrecognised SUPABASE_JWT_ROLE "service_role"'
+			);
+		});
 	});
 });
 

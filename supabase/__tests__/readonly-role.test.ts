@@ -33,16 +33,18 @@ describe('app_readonly role', () => {
 	let alphaId: number;
 	let authenticatedClient: SupabaseClient;
 	let readonlyClient: SupabaseClient;
+	let previousJwtRole: string | undefined;
 
 	beforeAll(async () => {
 		alphaId = await getGroupIdByName('Alpha');
 		authenticatedClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
+		previousJwtRole = process.env.SUPABASE_JWT_ROLE;
 		process.env.SUPABASE_JWT_ROLE = 'app_readonly';
 		readonlyClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
 	});
 
 	afterAll(() => {
-		delete process.env.SUPABASE_JWT_ROLE;
+		process.env.SUPABASE_JWT_ROLE = previousJwtRole;
 	});
 
 	it('allows SELECT with the same RLS scope as authenticated', async () => {

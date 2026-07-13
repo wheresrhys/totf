@@ -2,8 +2,10 @@
 
 # Load prod environment variables in WRITE mode. Human-only escape hatch —
 # used by db:import:prod and set-group-password:prod. Unlike load-prod-env.sh,
-# SUPABASE_JWT_ROLE is left unset so JWTs are signed as 'authenticated':
-# writes are permitted, still scoped to the target group by RLS.
+# JWTs are signed as 'authenticated': writes are permitted, still scoped to
+# the target group by RLS.
+
+export SUPABASE_JWT_ROLE=authenticated
 
 echo "⚠⚠⚠  PROD WRITE MODE — commands can modify production data  ⚠⚠⚠"
 

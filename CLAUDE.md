@@ -119,14 +119,15 @@ read-only against any server.
 
 **Prod writes are the explicit exception (human-only, denied to Claude):**
 `npm run db:import:prod` and `npm run set-group-password:prod` use
-`load-prod-write-env.sh`, which leaves `SUPABASE_JWT_ROLE` unset — JWTs are
-`authenticated`, writes allowed but still RLS-scoped to the target group. Break-glass
+`load-prod-write-env.sh`, which sets `SUPABASE_JWT_ROLE=authenticated` — writes
+allowed but still RLS-scoped to the target group. Break-glass
 web-import test against prod: `./scripts/load-prod-write-env.sh next dev --turbopack`
 (deliberately not an npm script). Migrations are deployed by the human
 (`npm run db:migration:push`).
 
-Note: the deployed Vercel app gets its env directly (no `SUPABASE_JWT_ROLE`), so
-production users are unaffected — groups can still import via the web UI.
+Note: the deployed Vercel app gets its env directly, with
+`SUPABASE_JWT_ROLE=authenticated` set in the Vercel project settings, so production
+users are unaffected — groups can still import via the web UI.
 
 ## Testing
 
@@ -174,6 +175,7 @@ Test RPC functions and RLS policies against the real local database. Require `np
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (public) |
 | `SUPABASE_JWT_SECRET` | Used to sign group JWTs (must match Supabase project's JWT secret) |
+| `SUPABASE_JWT_ROLE` | Postgres role embedded in signed group JWTs. **Required** — the app fails closed if unset. `authenticated` for normal read/write (local dev, Vercel prod, explicit prod-write commands); `app_readonly` for read-only prod access (set by `load-prod-env.sh`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (bypasses RLS — admin scripts only) |
 
 Local values are in `.env.dev`. Production values are managed via 1Password (see `scripts/load-prod-env.sh`).

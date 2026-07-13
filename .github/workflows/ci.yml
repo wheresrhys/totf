@@ -46,5 +46,6 @@ jobs:
           echo "SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long" > .env.dev
           echo "NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321" >> .env.dev
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy-anon-key" >> .env.dev
+          echo "SUPABASE_JWT_ROLE=authenticated" >> .env.dev
       - run: npm run test:ci
 
