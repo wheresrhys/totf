@@ -6,7 +6,7 @@ import {
 	type EnrichedBirdOfSpecies
 } from '@/app/models/bird';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
-import { catchSupabaseErrors } from '@/lib/supabase';
+import { catchSupabaseErrors, fetchAllPaginatedRows } from '@/lib/supabase';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/WeightAndWingChart';
@@ -75,20 +75,24 @@ export async function fetchGraphableEncounterData(
 	viewedGroupId: number
 ): Promise<SexedGraphableBird[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	const paginatedBirdResults = (await supabase
-		.from('Birds')
-		.select(
-			`encounters:Encounters (
-				age_code,
-				sex,
-				weight,
-				wing_length
-			)`
-		)
-		.eq('species_id', speciesId)
-		.contains('ringing_group_ids', [viewedGroupId])
-		.then(catchSupabaseErrors)) as GraphableBird[];
-	return paginatedBirdResults.map(
+	const graphableBirdResults = await fetchAllPaginatedRows<GraphableBird>(
+		(fromRow, toRow) =>
+			supabase
+				.from('Birds')
+				.select(
+					`encounters:Encounters (
+						age_code,
+						sex,
+						weight,
+						wing_length
+					)`
+				)
+				.eq('species_id', speciesId)
+				.contains('ringing_group_ids', [viewedGroupId])
+				.order('id')
+				.range(fromRow, toRow)
+	);
+	return graphableBirdResults.map(
 		(bird) =>
 			({
 				...bird,
