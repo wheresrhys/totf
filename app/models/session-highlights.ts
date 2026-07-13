@@ -1,5 +1,10 @@
 import { differenceInYears } from 'date-fns';
-import { getSeasonMonths, getSeasonName } from '@/app/models/seasons';
+import {
+	getSeasonMonths,
+	getSeasonName,
+	getSeasonPeriodLabel,
+	isCurrentSeasonPeriod
+} from '@/app/models/seasons';
 import type { DaySpeciesMetricRow } from '@/app/models/db';
 
 export const SESSION_TOTAL_METRICS = ['encounters', 'species'] as const;
@@ -29,6 +34,11 @@ export type SessionTotalRecordHighlight = {
 	value: number;
 	seasonName: string;
 	year: number;
+	// 'this year' / 'this autumn' copy is only correct while the session's
+	// period is still current; otherwise the sentence uses the absolute labels
+	isCurrentYear: boolean;
+	isCurrentSeason: boolean;
+	seasonPeriodLabel: string;
 	// Set only for all-time ties where the equalled record is over a year old
 	recordEqualledYearsAgo?: number;
 };
@@ -90,10 +100,12 @@ function getScopeMatcher(
 
 export function deriveSessionTotalRecords({
 	date,
-	stats
+	stats,
+	today = new Date()
 }: {
 	date: string;
 	stats: SessionStatsData;
+	today?: Date;
 }): SessionTotalRecordHighlight[] {
 	const sessionDate = new Date(date);
 	const dayTotals = buildDayTotals(stats, date);
@@ -118,7 +130,10 @@ export function deriveSessionTotalRecords({
 				scope,
 				value: sessionValue,
 				seasonName: getSeasonName(sessionDate),
-				year: sessionDate.getFullYear()
+				year: sessionDate.getFullYear(),
+				isCurrentYear: sessionDate.getFullYear() === today.getFullYear(),
+				isCurrentSeason: isCurrentSeasonPeriod(sessionDate, today),
+				seasonPeriodLabel: getSeasonPeriodLabel(sessionDate)
 			};
 			if (sessionValue > previousBest) {
 				highlights.push(baseHighlight);
@@ -183,9 +198,13 @@ function buildSessionTotalRecordSentence(
 		case 'any-season':
 			return `${descriptor} ${highlight.seasonName} session ever — ${valueCopy}`;
 		case 'this-year':
-			return `${descriptor} session of ${highlight.year} — ${valueCopy}`;
+			return highlight.isCurrentYear
+				? `${descriptor} session this year — ${valueCopy}`
+				: `${descriptor} session of ${highlight.year} — ${valueCopy}`;
 		case 'this-season':
-			return `${descriptor} session this ${highlight.seasonName} — ${valueCopy}`;
+			return highlight.isCurrentSeason
+				? `${descriptor} session this ${highlight.seasonName} — ${valueCopy}`
+				: `${descriptor} session in ${highlight.seasonPeriodLabel} — ${valueCopy}`;
 	}
 }
 
