@@ -11,7 +11,12 @@ if [ -n "$CI" ]; then
     exit 0
 fi
 
-echo "Loading environment variables from 1Password vault TOTF..."
+# Default to read-only prod access: JWTs are signed with the app_readonly role,
+# so Postgres rejects every write with error 25006 (see supabase/schema/cluster/roles.sql).
+# Prod writes require the explicit load-prod-write-env.sh wrapper.
+export SUPABASE_JWT_ROLE=app_readonly
+
+echo "Loading environment variables from 1Password vault TOTF (read-only mode)..."
 
 # Verify 1Password CLI is installed and authenticated
 if ! command -v op &> /dev/null; then

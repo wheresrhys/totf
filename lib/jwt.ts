@@ -1,5 +1,23 @@
 import { SignJWT, jwtVerify } from 'jose';
 
+// Fail closed: every environment must state which role it signs JWTs with.
+// authenticated = normal read/write access (RLS-scoped); app_readonly = writes
+// rejected by Postgres (see supabase/schema/cluster/roles.sql).
+const ALLOWED_JWT_ROLES = ['authenticated', 'app_readonly'];
+
+function getJwtRole(): string {
+	const role = process.env.SUPABASE_JWT_ROLE;
+	if (!role) {
+		throw new Error('SUPABASE_JWT_ROLE environment variable is not set');
+	}
+	if (!ALLOWED_JWT_ROLES.includes(role)) {
+		throw new Error(
+			`Unrecognised SUPABASE_JWT_ROLE "${role}" — expected one of: ${ALLOWED_JWT_ROLES.join(', ')}`
+		);
+	}
+	return role;
+}
+
 function getEncodedSecret(): Uint8Array {
 	const secret = process.env.SUPABASE_JWT_SECRET;
 	if (!secret) {
@@ -10,7 +28,7 @@ function getEncodedSecret(): Uint8Array {
 
 export async function generateGroupJwt(groupId: number): Promise<string> {
 	return new SignJWT({
-		role: 'authenticated',
+		role: getJwtRole(),
 		app_metadata: { ringing_group_id: groupId }
 	})
 		.setProtectedHeader({ alg: 'HS256' })
