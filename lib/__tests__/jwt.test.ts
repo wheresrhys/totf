@@ -31,14 +31,14 @@ describe('generateGroupJwt', () => {
 	});
 
 	it('sets role from SUPABASE_JWT_ROLE when set', async () => {
-		process.env.SUPABASE_JWT_ROLE = 'claude_readonly';
+		process.env.SUPABASE_JWT_ROLE = 'app_readonly';
 		try {
 			const token = await generateGroupJwt(1);
 
 			const encodedSecret = new TextEncoder().encode(TEST_SECRET);
 			const { payload } = await jwtVerify(token, encodedSecret);
 
-			expect(payload.role).toBe('claude_readonly');
+			expect(payload.role).toBe('app_readonly');
 		} finally {
 			delete process.env.SUPABASE_JWT_ROLE;
 		}

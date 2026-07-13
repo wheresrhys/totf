@@ -96,33 +96,37 @@ npm run db:sync:local    # reset local DB to prod schema + seed data
 npm run next:dev         # start Next.js dev server against local DB
 ```
 
-To develop against production data:
-```sh
-npm run next:prod        # dev server pointing at prod Supabase
-```
-You will need to ask your human to run `op signin` first
+### Developing against production data — read-only by default
 
-### Read-only prod debugging (for Claude)
-
-Claude may debug against production data, but only in read-only mode:
+All local runs against prod are **read-only**, for humans and Claude alike:
 
 ```sh
-npm run next:prod:readonly            # dev server against prod, writes blocked
-npm run prod:readonly -- tsx <file>   # run any script against prod, writes blocked
+npm run next:prod              # dev server against prod Supabase, writes blocked
+npm run prod:run -- tsx <file> # run any script against prod, writes blocked
 ```
 
-These sign group JWTs as the `claude_readonly` Postgres role (via `SUPABASE_JWT_ROLE`,
-see `supabase/schema/cluster/roles.sql`): it inherits `authenticated`'s RLS policies but
+Requires `op signin` first (human-only). `load-prod-env.sh` signs group JWTs as the
+`app_readonly` Postgres role (via `SUPABASE_JWT_ROLE`, see
+`supabase/schema/cluster/roles.sql`): it inherits `authenticated`'s privileges but
 PostgREST applies `transaction_read_only=on`, so every write fails at the database with
-error `25006`. The env also omits `SUPABASE_SERVICE_ROLE_KEY`.
+error `25006`. `SUPABASE_SERVICE_ROLE_KEY` lives only in the 1Password vault — it is in
+no env file and no code reads it.
 
-To fetch authenticated pages, mint a session cookie without a password:
-sign a JWT with `generateGroupJwt(groupId)` (run under `prod:readonly` so the role is
-read-only) and pass `Cookie: TOTFSession=<jwt>`.
+To fetch authenticated pages, mint a session cookie without a password: sign a JWT with
+`generateGroupJwt(groupId)` (run under `prod:run` so the role is read-only) and pass
+`Cookie: TOTFSession=<jwt>`. The role travels inside the cookie, so a readonly cookie is
+read-only against any server.
 
-Claude must never run the writable prod commands (`next:prod`, `db:import:prod`,
-`set-group-password:prod`, `db:migration:push`) — these are denied in `.claude/settings.json`.
-The human runs `op signin` and deploys migrations.
+**Prod writes are the explicit exception (human-only, denied to Claude):**
+`npm run db:import:prod` and `npm run set-group-password:prod` use
+`load-prod-write-env.sh`, which leaves `SUPABASE_JWT_ROLE` unset — JWTs are
+`authenticated`, writes allowed but still RLS-scoped to the target group. Break-glass
+web-import test against prod: `./scripts/load-prod-write-env.sh next dev --turbopack`
+(deliberately not an npm script). Migrations are deployed by the human
+(`npm run db:migration:push`).
+
+Note: the deployed Vercel app gets its env directly (no `SUPABASE_JWT_ROLE`), so
+production users are unaffected — groups can still import via the web UI.
 
 ## Testing
 

@@ -1,5 +1,5 @@
 /**
- * Integration tests for the claude_readonly role (read-only prod debugging mode).
+ * Integration tests for the app_readonly role (read-only prod debugging mode).
  *
  * The role inherits authenticated's RLS policies via membership, but PostgREST
  * applies transaction_read_only=on when impersonating it, so all writes fail
@@ -29,7 +29,7 @@ async function getGroupIdByName(name: string): Promise<number> {
 
 const READ_ONLY_TRANSACTION_ERROR_CODE = '25006';
 
-describe('claude_readonly role', () => {
+describe('app_readonly role', () => {
 	let alphaId: number;
 	let authenticatedClient: SupabaseClient;
 	let readonlyClient: SupabaseClient;
@@ -37,7 +37,7 @@ describe('claude_readonly role', () => {
 	beforeAll(async () => {
 		alphaId = await getGroupIdByName('Alpha');
 		authenticatedClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
-		process.env.SUPABASE_JWT_ROLE = 'claude_readonly';
+		process.env.SUPABASE_JWT_ROLE = 'app_readonly';
 		readonlyClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
 	});
 
