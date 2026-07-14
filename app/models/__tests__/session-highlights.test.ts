@@ -881,6 +881,7 @@ describe('deriveFirstEverSpecies', () => {
 	it('maps species whose earliest date is the session date to first-ever highlights', () => {
 		const highlights = deriveFirstEver([
 			speciesRow(SESSION_DATE, FIRECREST, 1),
+			speciesRow(LATER_DAY, FIRECREST, 2),
 			speciesRow(SESSION_DATE, REED_WARBLER, 3),
 			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 2)
 		]);
@@ -891,6 +892,31 @@ describe('deriveFirstEverSpecies', () => {
 		});
 		// Reed Warbler was seen before — not first-ever
 		expect(highlights.map((h) => h.speciesName)).not.toContain(REED_WARBLER);
+	});
+
+	it('sets onlyRecordCount when the species appears on no other day', () => {
+		const highlights = deriveFirstEver([
+			speciesRow(SESSION_DATE, FIRECREST, 3),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 2)
+		]);
+		expect(highlights).toEqual([
+			{
+				type: 'first-ever-species',
+				speciesName: FIRECREST,
+				onlyRecordCount: 3
+			}
+		]);
+	});
+
+	it('does not set onlyRecordCount when the species appears on a later day', () => {
+		const highlights = deriveFirstEver([
+			speciesRow(SESSION_DATE, FIRECREST, 3),
+			speciesRow(LATER_DAY, FIRECREST, 1),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 2)
+		]);
+		expect(highlights).toEqual([
+			{ type: 'first-ever-species', speciesName: FIRECREST }
+		]);
 	});
 
 	it("returns empty for the group's first-ever session", () => {
@@ -933,11 +959,48 @@ describe('deriveFirstOfYearSpecies', () => {
 	it('maps species first seen this year on the session date to first-of-year highlights', () => {
 		const highlights = deriveFirstOfYear([
 			speciesRow(SESSION_DATE, FIRECREST, 1),
+			speciesRow(LATER_DAY, FIRECREST, 2),
 			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 2),
 			speciesRow(SESSION_DATE, REED_WARBLER, 3),
 			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
 		]);
 		// Firecrest was seen in a previous year but not yet this year
+		expect(highlights).toEqual([
+			{
+				type: 'first-of-year-species',
+				speciesName: FIRECREST,
+				year: 2024,
+				isCurrentYear: false
+			}
+		]);
+	});
+
+	it('sets onlyRecordCount when the species appears on no other day this year', () => {
+		// Prior-year records are what make it first-of-year — they don't
+		// revoke the "only" copy
+		const highlights = deriveFirstOfYear([
+			speciesRow(SESSION_DATE, FIRECREST, 2),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 4),
+			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
+		]);
+		expect(highlights).toEqual([
+			{
+				type: 'first-of-year-species',
+				speciesName: FIRECREST,
+				year: 2024,
+				isCurrentYear: false,
+				onlyRecordCount: 2
+			}
+		]);
+	});
+
+	it('does not set onlyRecordCount when the species appears later in the same year', () => {
+		const highlights = deriveFirstOfYear([
+			speciesRow(SESSION_DATE, FIRECREST, 2),
+			speciesRow(LATER_DAY, FIRECREST, 1),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 4),
+			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
+		]);
 		expect(highlights).toEqual([
 			{
 				type: 'first-of-year-species',
@@ -1007,6 +1070,18 @@ describe('buildHighlightSentence — first-ever-species', () => {
 			'First ever Firecrest for the group'
 		);
 	});
+
+	it('renders only-record copy when the session holds the only record', () => {
+		expect(
+			buildHighlightSentence(makeFirstEverHighlight({ onlyRecordCount: 1 }))
+		).toBe('Only Firecrest record ever');
+	});
+
+	it('renders plural only-record copy for multiple encounters', () => {
+		expect(
+			buildHighlightSentence(makeFirstEverHighlight({ onlyRecordCount: 3 }))
+		).toBe('Only Firecrest records ever');
+	});
 });
 
 // ---- buildHighlightSentence — first-of-year-species ----
@@ -1034,5 +1109,19 @@ describe('buildHighlightSentence — first-of-year-species', () => {
 		expect(buildHighlightSentence(makeFirstOfYearHighlight())).toBe(
 			'First Firecrest of 2024'
 		);
+	});
+
+	it('renders only-record copy while the session year is current', () => {
+		expect(
+			buildHighlightSentence(
+				makeFirstOfYearHighlight({ isCurrentYear: true, onlyRecordCount: 1 })
+			)
+		).toBe('Only Firecrest record of the year');
+	});
+
+	it('renders plural only-record copy once the session year has passed', () => {
+		expect(
+			buildHighlightSentence(makeFirstOfYearHighlight({ onlyRecordCount: 3 }))
+		).toBe('Only Firecrest records of 2024');
 	});
 });

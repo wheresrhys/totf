@@ -67,6 +67,9 @@ export type SpeciesCountRecordHighlight = {
 export type FirstEverSpeciesHighlight = {
 	type: 'first-ever-species';
 	speciesName: string;
+	// Set only when the session holds the species' only records ever
+	// (no other day in the data, before or after); drives pluralisation
+	onlyRecordCount?: number;
 };
 
 export type FirstOfYearSpeciesHighlight = {
@@ -76,6 +79,9 @@ export type FirstOfYearSpeciesHighlight = {
 	// 'of the year' copy is only correct while the session's year is current;
 	// otherwise the sentence uses the absolute year
 	isCurrentYear: boolean;
+	// Set only when the session holds the species' only records this calendar
+	// year (no other day in the year, before or after); drives pluralisation
+	onlyRecordCount?: number;
 };
 
 export type SessionHighlight =
@@ -390,18 +396,29 @@ export function deriveFirstEverSpecies({
 	);
 	if (priorSessionDates.length === 0) return [];
 	// Find species with no appearance before this session
-	const speciesOnSession = sessionRows.map((row) => row.species_name);
-	return speciesOnSession
+	return sessionRows
 		.filter(
-			(speciesName) =>
+			(sessionRow) =>
 				!stats.daySpeciesCounts.some(
-					(row) => row.species_name === speciesName && row.visit_date < date
+					(row) =>
+						row.species_name === sessionRow.species_name &&
+						row.visit_date < date
 				)
 		)
-		.map((speciesName) => ({
-			type: 'first-ever-species' as const,
-			speciesName
-		}));
+		.map((sessionRow) => {
+			// The species' only records ever — later days revoke this, so a
+			// "first ever" can lose its "only" copy as more data arrives
+			const isOnlyRecord = !stats.daySpeciesCounts.some(
+				(row) =>
+					row.species_name === sessionRow.species_name &&
+					row.visit_date !== date
+			);
+			return {
+				type: 'first-ever-species' as const,
+				speciesName: sessionRow.species_name,
+				...(isOnlyRecord ? { onlyRecordCount: sessionRow.metric_value } : {})
+			};
+		});
 }
 
 // Returns a highlight for each species seen for the first time this calendar
@@ -430,11 +447,12 @@ export function deriveFirstOfYearSpecies({
 	if (priorSessionDatesThisYear.length === 0) return [];
 	const year = Number(date.slice(0, 4));
 	return sessionRows
-		.map((row) => row.species_name)
-		.filter((speciesName) => {
+		.filter((sessionRow) => {
 			const priorDates = stats.daySpeciesCounts
 				.filter(
-					(row) => row.species_name === speciesName && row.visit_date < date
+					(row) =>
+						row.species_name === sessionRow.species_name &&
+						row.visit_date < date
 				)
 				.map((row) => row.visit_date);
 			return (
@@ -442,12 +460,26 @@ export function deriveFirstOfYearSpecies({
 				!priorDates.some((priorDate) => priorDate.startsWith(yearPrefix))
 			);
 		})
-		.map((speciesName) => ({
-			type: 'first-of-year-species' as const,
-			speciesName,
-			year,
-			isCurrentYear: year === today.getFullYear()
-		}));
+		.map((sessionRow) => {
+			// The species' only records this calendar year — a later day in the
+			// same year revokes this; prior-year records don't (they're what
+			// makes it first-of-year rather than first-ever)
+			const isOnlyRecordThisYear = !stats.daySpeciesCounts.some(
+				(row) =>
+					row.species_name === sessionRow.species_name &&
+					row.visit_date !== date &&
+					row.visit_date.startsWith(yearPrefix)
+			);
+			return {
+				type: 'first-of-year-species' as const,
+				speciesName: sessionRow.species_name,
+				year,
+				isCurrentYear: year === today.getFullYear(),
+				...(isOnlyRecordThisYear
+					? { onlyRecordCount: sessionRow.metric_value }
+					: {})
+			};
+		});
 }
 
 const HIGHLIGHT_TYPE_PRIORITY: SessionHighlight['type'][] = [
@@ -523,6 +555,10 @@ function buildSpeciesCountRecordSentence(
 	return `Record day for ${speciesName} — ${valueCopy}, ${mostPhrase}`;
 }
 
+function buildOnlyRecordPhrase(speciesName: string, count: number): string {
+	return `Only ${speciesName} record${count > 1 ? 's' : ''}`;
+}
+
 export function buildHighlightSentence(highlight: SessionHighlight): string {
 	switch (highlight.type) {
 		case 'session-total-record':
@@ -530,10 +566,16 @@ export function buildHighlightSentence(highlight: SessionHighlight): string {
 		case 'species-count-record':
 			return buildSpeciesCountRecordSentence(highlight);
 		case 'first-ever-species':
-			return `First ever ${highlight.speciesName} for the group`;
-		case 'first-of-year-species':
-			return `First ${highlight.speciesName} ${
-				highlight.isCurrentYear ? 'of the year' : `of ${highlight.year}`
-			}`;
+			return highlight.onlyRecordCount !== undefined
+				? `${buildOnlyRecordPhrase(highlight.speciesName, highlight.onlyRecordCount)} ever`
+				: `First ever ${highlight.speciesName} for the group`;
+		case 'first-of-year-species': {
+			const yearPhrase = highlight.isCurrentYear
+				? 'of the year'
+				: `of ${highlight.year}`;
+			return highlight.onlyRecordCount !== undefined
+				? `${buildOnlyRecordPhrase(highlight.speciesName, highlight.onlyRecordCount)} ${yearPhrase}`
+				: `First ${highlight.speciesName} ${yearPhrase}`;
+		}
 	}
 }
