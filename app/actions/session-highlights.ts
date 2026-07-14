@@ -3,6 +3,7 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
 import {
 	deriveSessionTotalRecords,
+	deriveSpeciesRecords,
 	sortHighlights,
 	type SessionHighlight,
 	type SessionStatsData
@@ -70,5 +71,8 @@ export async function fetchSessionHighlights({
 	viewedGroupId: number;
 }): Promise<SessionHighlight[]> {
 	const stats = await fetchSessionStats(viewedGroupId);
-	return sortHighlights(deriveSessionTotalRecords({ date, stats }));
+	return sortHighlights([
+		...deriveSessionTotalRecords({ date, stats }),
+		...deriveSpeciesRecords({ date, stats })
+	]);
 }
