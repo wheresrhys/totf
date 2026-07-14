@@ -20,7 +20,6 @@ BEGIN
       JOIN public."Birds" b ON e.bird_id = b.id
       LEFT JOIN public."Species" sp ON b.species_id = sp.id
     WHERE sess.visit_date = session_date
-      AND e.ringing_group_id = ringing_group_filter
       AND sess.ringing_group_id = ringing_group_filter
   ),
   previous_visits AS (
@@ -28,7 +27,6 @@ BEGIN
     FROM public."Encounters" e
       JOIN public."Sessions" sess ON e.session_id = sess.id
     WHERE sess.visit_date < session_date
-      AND e.ringing_group_id = ringing_group_filter
       AND sess.ringing_group_id = ringing_group_filter
     GROUP BY e.bird_id
   )
