@@ -15,5 +15,15 @@
       "2024-05-10"
     ],
     "proven_age": 3
+  },
+  {
+    "species_name": "Wren",
+    "ring_no": "AWREN001",
+    "encounter_count": 2,
+    "encounter_dates": [
+      "2021-06-20",
+      "2024-05-10"
+    ],
+    "proven_age": 3
   }
 ]

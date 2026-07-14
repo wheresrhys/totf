@@ -39,15 +39,17 @@ describe('ring sequence RPC functions', () => {
 		]);
 	});
 
-	// Alpha seed has 6 ring sequences (all N-type encounters):
+	// Alpha seed has 7 ring sequences (all N-type encounters):
 	//   ARW (len 9): 15 Reed Warbler rings, 2022-06-15 – 2024-05-10
 	//   ABT (len 8): 6 Blue Tit rings,     2022-04-30 – 2023-05-12
 	//   AR0 (len 6): 21 Robin rings,        2022-04-30 – 2023-05-12
 	//   AKI (len 9): 1 Kingfisher ring,     2022-04-30 – 2022-04-30
 	//   SHA (len 8): 1 Robin ring,          2022-04-30 – 2022-04-30
 	//   ARR (len 8): 1 Robin ring,          2021-06-20 – 2021-06-20
+	//   AWR (len 8): 1 Wren ring,           2021-06-20 – 2021-06-20
 	//
 	// ARRETRAP has 1 N encounter + 8 S encounters; it falls in the ARR sequence.
+	// AWREN001 (Wren) has 1 N (2021-06-20) + 1 S (2024-05-10); only the N counts here.
 	// Beta seed has BCH (len 8): 2 Chaffinch rings, 2023-06-01 – 2023-06-01
 	// Beta also has 1 S encounter for SHARED01 (Robin, originally ringed by Alpha).
 
@@ -57,11 +59,12 @@ describe('ring sequence RPC functions', () => {
 				ringing_group_filter: alphaId,
 			});
 			expect(error).toBeNull();
-			expect(data).toHaveLength(6);
+			expect(data).toHaveLength(7);
 			const prefixes = data!.map((r) => r.sequence_prefix);
 			expect(prefixes).toContain('ARW');
 			expect(prefixes).toContain('ABT');
 			expect(prefixes).toContain('AR0');
+			expect(prefixes).toContain('AWR');
 		});
 
 		it('counts only distinct ring_nos per sequence', async () => {

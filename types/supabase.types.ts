@@ -403,6 +403,19 @@ export type Database = {
           sequence_prefix: string
         }[]
       }
+      session_long_absence_retraps: {
+        Args: {
+          min_gap_days?: number
+          ringing_group_filter: number
+          session_date: string
+        }
+        Returns: {
+          gap_days: number
+          previous_date: string
+          ring_no: string
+          species_name: string
+        }[]
+      }
       soundex: { Args: { "": string }; Returns: string }
       text_soundex: { Args: { "": string }; Returns: string }
       top_metrics_by_period: {

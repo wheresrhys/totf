@@ -102,5 +102,31 @@
     "avg_wing": 74.2,
     "min_wing": 72,
     "median_wing": 74
+  },
+  {
+    "species_name": "Wren",
+    "time_period": null,
+    "session_count": 2,
+    "total_effort": "18:00:00",
+    "effort_per_session": "02:00:00",
+    "effort_per_encounter": "09:00:00",
+    "avg_encounters_per_session": 1,
+    "max_per_session": 1,
+    "species_count": 1,
+    "bird_count": 1,
+    "encounter_count": 2,
+    "new_bird_count": 1,
+    "3j_count": 0,
+    "3_count": 1,
+    "new_3_count": 1,
+    "max_new_per_session": 1,
+    "max_weight": 9.2,
+    "avg_weight": 9.1,
+    "min_weight": 9,
+    "median_weight": 9.1,
+    "max_wing": 49,
+    "avg_wing": 48.5,
+    "min_wing": 48,
+    "median_wing": 49
   }
 ]
