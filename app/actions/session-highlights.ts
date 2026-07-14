@@ -1,9 +1,10 @@
 'use server';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
-import { fetchAllPaginatedRows } from '@/lib/supabase';
+import { catchSupabaseErrors, fetchAllPaginatedRows } from '@/lib/supabase';
 import {
 	deriveFirstEverSpecies,
 	deriveFirstOfYearSpecies,
+	deriveLongAbsenceRetraps,
 	deriveSessionTotalRecords,
 	deriveSpeciesRecords,
 	sortHighlights,
@@ -12,6 +13,7 @@ import {
 } from '@/app/models/session-highlights';
 import type {
 	DaySpeciesMetricRow,
+	LongAbsenceRetrapsResult,
 	TopMetricsFilterParams
 } from '@/app/models/db';
 
@@ -72,11 +74,22 @@ export async function fetchSessionHighlights({
 	date: string;
 	viewedGroupId: number;
 }): Promise<SessionHighlight[]> {
-	const stats = await fetchSessionStats(viewedGroupId);
+	const supabase = await getAuthenticatedSupabaseClient();
+	const [stats, longAbsenceRetrapResults] = await Promise.all([
+		fetchSessionStats(viewedGroupId),
+		supabase
+			.rpc('long_absence_retraps', {
+				session_date: date,
+				ringing_group_filter: viewedGroupId
+			})
+			.then(catchSupabaseErrors)
+			.then((results) => (results ?? []) as LongAbsenceRetrapsResult[])
+	]);
 	return sortHighlights([
 		...deriveSessionTotalRecords({ date, stats }),
 		...deriveSpeciesRecords({ date, stats }),
 		...deriveFirstEverSpecies({ date, stats }),
-		...deriveFirstOfYearSpecies({ date, stats })
+		...deriveFirstOfYearSpecies({ date, stats }),
+		...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date)
 	]);
 }

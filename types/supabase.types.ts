@@ -327,6 +327,19 @@ export type Database = {
           species_name: string
         }[]
       }
+      long_absence_retraps: {
+        Args: {
+          min_gap_days?: number
+          ringing_group_filter: number
+          session_date: string
+        }
+        Returns: {
+          gap_days: number
+          previous_date: string
+          ring_no: string
+          species_name: string
+        }[]
+      }
       metrics_by_period_and_species: {
         Args: {
           filters?: Database["public"]["CompositeTypes"]["top_metrics_filter_params"]
@@ -401,19 +414,6 @@ export type Database = {
           ring_count: number
           ring_length: number
           sequence_prefix: string
-        }[]
-      }
-      session_long_absence_retraps: {
-        Args: {
-          min_gap_days?: number
-          ringing_group_filter: number
-          session_date: string
-        }
-        Returns: {
-          gap_days: number
-          previous_date: string
-          ring_no: string
-          species_name: string
         }[]
       }
       soundex: { Args: { "": string }; Returns: string }

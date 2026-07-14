@@ -31,7 +31,10 @@ function pageForRange(pages: unknown[][], fromRow: number) {
 
 const mockRpcOrder = vi.fn();
 const mockRpcRange = vi.fn();
-const rpcQueryBuilder = { order: mockRpcOrder, range: mockRpcRange };
+// The paginated rpc (metrics_by_period_and_species) returns a query builder;
+// the non-paginated rpc (long_absence_retraps) returns a thenable.
+const paginatedRpcQueryBuilder = { order: mockRpcOrder, range: mockRpcRange };
+const mockLongAbsenceRpcResult = Promise.resolve({ data: [], error: null });
 const mockRpc = vi.fn();
 
 const mockSessionsOrder = vi.fn();
@@ -62,8 +65,14 @@ beforeEach(() => {
 		]
 	];
 	sessionPages = [[{ visit_date: '2022-05-01' }, { visit_date: SESSION_DATE }]];
-	mockRpc.mockReturnValue(rpcQueryBuilder);
-	mockRpcOrder.mockReturnValue(rpcQueryBuilder);
+	// Route rpc calls by function name: paginated vs non-paginated
+	mockRpc.mockImplementation((functionName: string) => {
+		if (functionName === 'long_absence_retraps') {
+			return mockLongAbsenceRpcResult;
+		}
+		return paginatedRpcQueryBuilder;
+	});
+	mockRpcOrder.mockReturnValue(paginatedRpcQueryBuilder);
 	mockRpcRange.mockImplementation((fromRow: number) =>
 		pageForRange(rpcPages, fromRow)
 	);
@@ -79,14 +88,24 @@ beforeEach(() => {
 });
 
 describe('fetchSessionHighlights', () => {
-	it('fetches day-species metrics once with the group filter', async () => {
+	it('fetches day-species metrics and long-absence retraps in parallel', async () => {
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		const highlights = await fetchSessionHighlights({
 			date: SESSION_DATE,
 			viewedGroupId: GROUP_ID
 		});
-		expect(mockRpc).toHaveBeenCalledTimes(1);
-		const [functionName, args] = mockRpc.mock.calls[0] as [
+		// Two rpc calls: metrics_by_period_and_species (paginated) and
+		// long_absence_retraps (non-paginated)
+		expect(mockRpc).toHaveBeenCalledTimes(2);
+		const rpcFunctionNames = mockRpc.mock.calls.map(
+			(call) => (call as [string, unknown])[0]
+		);
+		expect(rpcFunctionNames).toContain('metrics_by_period_and_species');
+		expect(rpcFunctionNames).toContain('long_absence_retraps');
+		const [, metricsArgs] = mockRpc.mock.calls.find(
+			(call) =>
+				(call as [string, unknown])[0] === 'metrics_by_period_and_species'
+		) as [
 			string,
 			{
 				temporal_unit: string;
@@ -94,10 +113,9 @@ describe('fetchSessionHighlights', () => {
 				filters: TopMetricsFilterParams;
 			}
 		];
-		expect(functionName).toBe('metrics_by_period_and_species');
-		expect(args.temporal_unit).toBe('day');
-		expect(args.metric_name).toBe('encounters');
-		expect(args.filters.ringing_group_filter).toBe(GROUP_ID);
+		expect(metricsArgs.temporal_unit).toBe('day');
+		expect(metricsArgs.metric_name).toBe('encounters');
+		expect(metricsArgs.filters.ringing_group_filter).toBe(GROUP_ID);
 		expect(highlights).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
@@ -180,7 +198,12 @@ describe('fetchSessionHighlights', () => {
 			date: '2022-05-01',
 			viewedGroupId: GROUP_ID
 		});
-		expect(mockRpc).toHaveBeenCalledTimes(1);
+		// metrics_by_period_and_species is cached (called once), but
+		// long_absence_retraps is per-session (called twice)
+		const metricsCalls = mockRpc.mock.calls.filter(
+			(call) => (call as [string])[0] === 'metrics_by_period_and_species'
+		);
+		expect(metricsCalls).toHaveLength(1);
 		expect(mockEq).toHaveBeenCalledTimes(1);
 		// the cached blob still serves other session dates — the 2022 session
 		// holds the most-varied record (2 species vs 1 on the 2024 day)

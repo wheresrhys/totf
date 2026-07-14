@@ -1,4 +1,4 @@
-CREATE FUNCTION public.session_long_absence_retraps (
+CREATE FUNCTION public.long_absence_retraps (
 	session_date date,
 	ringing_group_filter bigint,
 	min_gap_days integer DEFAULT 730
@@ -42,8 +42,8 @@ BEGIN
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.session_long_absence_retraps (date, bigint, integer) TO anon;
+GRANT ALL ON FUNCTION public.long_absence_retraps (date, bigint, integer) TO anon;
 
-GRANT ALL ON FUNCTION public.session_long_absence_retraps (date, bigint, integer) TO authenticated;
+GRANT ALL ON FUNCTION public.long_absence_retraps (date, bigint, integer) TO authenticated;
 
-GRANT ALL ON FUNCTION public.session_long_absence_retraps (date, bigint, integer) TO service_role;
+GRANT ALL ON FUNCTION public.long_absence_retraps (date, bigint, integer) TO service_role;

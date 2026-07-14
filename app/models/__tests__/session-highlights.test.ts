@@ -1,17 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import {
 	buildHighlightSentence,
+	deriveLongAbsenceRetraps,
 	deriveFirstEverSpecies,
 	deriveFirstOfYearSpecies,
 	deriveSessionTotalRecords,
 	deriveSpeciesRecords,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
+	type LongAbsenceRetrapHighlight,
 	type SessionStatsData,
 	type SessionTotalRecordHighlight,
 	type SpeciesCountRecordHighlight
 } from '../session-highlights';
-import type { DaySpeciesMetricRow } from '@/app/models/db';
+import type {
+	DaySpeciesMetricRow,
+	LongAbsenceRetrapsResult
+} from '@/app/models/db';
 
 const SESSION_DATE = '2024-09-15'; // autumn
 // A fixed "today" after the session's year and season, so current-period
@@ -1166,5 +1171,86 @@ describe('buildHighlightSentence — first-of-year-species', () => {
 				})
 			)
 		).toBe('Only Firecrest records of 2024');
+	});
+});
+
+// ---- deriveLongAbsenceRetraps ----
+
+function makeLongAbsenceRetrapResult(
+	overrides: Partial<LongAbsenceRetrapsResult> = {}
+): LongAbsenceRetrapsResult {
+	return {
+		ring_no: 'ARRETRAP',
+		species_name: 'Robin',
+		previous_date: '2021-06-20',
+		gap_days: 1000,
+		...overrides
+	};
+}
+
+describe('deriveLongAbsenceRetraps', () => {
+	it('maps rows to highlights preserving gap-descending order', () => {
+		const results: LongAbsenceRetrapsResult[] = [
+			makeLongAbsenceRetrapResult({
+				ring_no: 'AAA111',
+				species_name: 'Robin',
+				previous_date: '2020-01-01',
+				gap_days: 1500
+			}),
+			makeLongAbsenceRetrapResult({
+				ring_no: 'BBB222',
+				species_name: 'Wren',
+				previous_date: '2021-06-20',
+				gap_days: 1000
+			})
+		];
+		const highlights = deriveLongAbsenceRetraps(results, '2024-03-15');
+		expect(highlights).toHaveLength(2);
+		expect(highlights[0]).toMatchObject({
+			type: 'long-absence-retrap',
+			ringNo: 'AAA111',
+			speciesName: 'Robin',
+			previousDate: '2020-01-01'
+		});
+		expect(highlights[1]).toMatchObject({
+			type: 'long-absence-retrap',
+			ringNo: 'BBB222',
+			speciesName: 'Wren',
+			previousDate: '2021-06-20'
+		});
+	});
+});
+
+// ---- buildHighlightSentence — long-absence-retrap ----
+
+function makeLongAbsenceHighlight(
+	overrides: Partial<LongAbsenceRetrapHighlight> = {}
+): LongAbsenceRetrapHighlight {
+	return {
+		type: 'long-absence-retrap',
+		ringNo: 'ARRETRAP',
+		speciesName: 'Robin',
+		previousDate: '2021-06-20',
+		gapYears: 2,
+		gapMonths: 10,
+		...overrides
+	};
+}
+
+describe('buildHighlightSentence — long-absence-retrap', () => {
+	it('formats the gap as years and months with the previous date', () => {
+		expect(buildHighlightSentence(makeLongAbsenceHighlight())).toBe(
+			'Robin ARRETRAP recaught after 2 years, 10 months away (last seen 20 Jun 2021)'
+		);
+	});
+
+	it('formats a whole-year gap without a months clause', () => {
+		expect(
+			buildHighlightSentence(
+				makeLongAbsenceHighlight({ gapYears: 3, gapMonths: 0 })
+			)
+		).toBe(
+			'Robin ARRETRAP recaught after 3 years away (last seen 20 Jun 2021)'
+		);
 	});
 });
