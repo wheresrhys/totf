@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
 	buildHighlightSentence,
+	deriveFirstEverSpecies,
+	deriveFirstOfYearSpecies,
 	deriveSessionTotalRecords,
 	deriveSpeciesRecords,
+	type FirstEverSpeciesHighlight,
+	type FirstOfYearSpeciesHighlight,
 	type SessionStatsData,
 	type SessionTotalRecordHighlight,
 	type SpeciesCountRecordHighlight
@@ -855,5 +859,180 @@ describe('buildHighlightSentence — species-count-record', () => {
 				})
 			)
 		).toBe('Joint 3rd-best day for Reed Warbler ever — 8 birds');
+	});
+});
+
+// ---- deriveFirstEverSpecies ----
+
+const FIRECREST = 'Firecrest';
+
+function deriveFirstEver(rows: DaySpeciesMetricRow[], sessionDates?: string[]) {
+	const daySpeciesCounts = rows;
+	const stats: SessionStatsData = {
+		daySpeciesCounts,
+		sessionDates: sessionDates ?? [
+			...new Set(rows.map((row) => row.visit_date))
+		]
+	};
+	return deriveFirstEverSpecies({ date: SESSION_DATE, stats });
+}
+
+describe('deriveFirstEverSpecies', () => {
+	it('maps species whose earliest date is the session date to first-ever highlights', () => {
+		const highlights = deriveFirstEver([
+			speciesRow(SESSION_DATE, FIRECREST, 1),
+			speciesRow(SESSION_DATE, REED_WARBLER, 3),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 2)
+		]);
+		// Firecrest appears for the first time on the session date
+		expect(highlights).toContainEqual({
+			type: 'first-ever-species',
+			speciesName: FIRECREST
+		});
+		// Reed Warbler was seen before — not first-ever
+		expect(highlights.map((h) => h.speciesName)).not.toContain(REED_WARBLER);
+	});
+
+	it("returns empty for the group's first-ever session", () => {
+		// No prior session dates — every species would be first-ever, so suppress all
+		const highlights = deriveFirstEver(
+			[speciesRow(SESSION_DATE, FIRECREST, 1)],
+			[SESSION_DATE]
+		);
+		expect(highlights).toEqual([]);
+	});
+
+	it('returns empty when no species is new', () => {
+		const highlights = deriveFirstEver([
+			speciesRow(SESSION_DATE, REED_WARBLER, 5),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 3)
+		]);
+		expect(highlights).toEqual([]);
+	});
+});
+
+// ---- deriveFirstOfYearSpecies ----
+
+function deriveFirstOfYear(
+	rows: DaySpeciesMetricRow[],
+	{
+		sessionDates,
+		today = PAST_PERIOD_TODAY
+	}: { sessionDates?: string[]; today?: Date } = {}
+) {
+	const stats: SessionStatsData = {
+		daySpeciesCounts: rows,
+		sessionDates: sessionDates ?? [
+			...new Set(rows.map((row) => row.visit_date))
+		]
+	};
+	return deriveFirstOfYearSpecies({ date: SESSION_DATE, stats, today });
+}
+
+describe('deriveFirstOfYearSpecies', () => {
+	it('maps species first seen this year on the session date to first-of-year highlights', () => {
+		const highlights = deriveFirstOfYear([
+			speciesRow(SESSION_DATE, FIRECREST, 1),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 2),
+			speciesRow(SESSION_DATE, REED_WARBLER, 3),
+			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
+		]);
+		// Firecrest was seen in a previous year but not yet this year
+		expect(highlights).toEqual([
+			{
+				type: 'first-of-year-species',
+				speciesName: FIRECREST,
+				year: 2024,
+				isCurrentYear: false
+			}
+		]);
+	});
+
+	it('excludes first-ever species — the first-ever highlight covers them', () => {
+		const highlights = deriveFirstOfYear([
+			speciesRow(SESSION_DATE, FIRECREST, 1),
+			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
+		]);
+		expect(highlights).toEqual([]);
+	});
+
+	it('flags the current year when today is within the session year', () => {
+		const highlights = deriveFirstOfYear(
+			[
+				speciesRow(SESSION_DATE, FIRECREST, 1),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 2),
+				speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
+			],
+			{ today: new Date('2024-10-01') }
+		);
+		expect(highlights).toEqual([
+			expect.objectContaining({ speciesName: FIRECREST, isCurrentYear: true })
+		]);
+	});
+
+	it("returns empty for the group's first session of the year", () => {
+		// Prior sessions exist, but none this year — every species would be
+		// first of the year, so suppress all
+		const highlights = deriveFirstOfYear([
+			speciesRow(SESSION_DATE, FIRECREST, 1),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 2)
+		]);
+		expect(highlights).toEqual([]);
+	});
+
+	it('returns empty when every species was already seen this year', () => {
+		const highlights = deriveFirstOfYear([
+			speciesRow(SESSION_DATE, REED_WARBLER, 5),
+			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 3)
+		]);
+		expect(highlights).toEqual([]);
+	});
+});
+
+// ---- buildHighlightSentence — first-ever-species ----
+
+function makeFirstEverHighlight(
+	overrides: Partial<FirstEverSpeciesHighlight> = {}
+): FirstEverSpeciesHighlight {
+	return {
+		type: 'first-ever-species',
+		speciesName: 'Firecrest',
+		...overrides
+	};
+}
+
+describe('buildHighlightSentence — first-ever-species', () => {
+	it('renders first-ever copy', () => {
+		expect(buildHighlightSentence(makeFirstEverHighlight())).toBe(
+			'First ever Firecrest for the group'
+		);
+	});
+});
+
+// ---- buildHighlightSentence — first-of-year-species ----
+
+function makeFirstOfYearHighlight(
+	overrides: Partial<FirstOfYearSpeciesHighlight> = {}
+): FirstOfYearSpeciesHighlight {
+	return {
+		type: 'first-of-year-species',
+		speciesName: 'Firecrest',
+		year: 2024,
+		isCurrentYear: false,
+		...overrides
+	};
+}
+
+describe('buildHighlightSentence — first-of-year-species', () => {
+	it('renders "of the year" copy while the session year is current', () => {
+		expect(
+			buildHighlightSentence(makeFirstOfYearHighlight({ isCurrentYear: true }))
+		).toBe('First Firecrest of the year');
+	});
+
+	it('renders the absolute year once the session year has passed', () => {
+		expect(buildHighlightSentence(makeFirstOfYearHighlight())).toBe(
+			'First Firecrest of 2024'
+		);
 	});
 });
