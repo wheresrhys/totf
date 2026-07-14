@@ -107,19 +107,17 @@ type DayTotals = {
 	species: number;
 };
 
-// Highlights describe the session as it would have read on the day, so
-// every comparison only considers data up to and including the session date
-export function buildDayTotals(
-	{ daySpeciesCounts, sessionDates }: SessionStatsData,
-	sessionDate: string
-): DayTotals[] {
+// Highlights compare the session against every other session in scope,
+// whenever it happened — later data can erase or demote a record
+export function buildDayTotals({
+	daySpeciesCounts,
+	sessionDates
+}: SessionStatsData): DayTotals[] {
 	const totalsByDate = new Map<string, DayTotals>();
 	for (const date of sessionDates) {
-		if (date > sessionDate) continue;
 		totalsByDate.set(date, { date, encounters: 0, species: 0 });
 	}
 	for (const row of daySpeciesCounts) {
-		if (row.visit_date > sessionDate) continue;
 		const dayTotals = totalsByDate.get(row.visit_date) ?? {
 			date: row.visit_date,
 			encounters: 0,
@@ -164,7 +162,7 @@ export function deriveSessionTotalRecords({
 	today?: Date;
 }): SessionTotalRecordHighlight[] {
 	const sessionDate = new Date(date);
-	const dayTotals = buildDayTotals(stats, date);
+	const dayTotals = buildDayTotals(stats);
 	const currentDay = dayTotals.find((day) => day.date === date);
 	if (!currentDay) return [];
 
@@ -173,13 +171,15 @@ export function deriveSessionTotalRecords({
 		const sessionValue = currentDay[metric];
 		for (const scope of RECORD_SCOPES) {
 			const scopeMatcher = getScopeMatcher(scope, sessionDate);
-			const priorDays = dayTotals.filter(
-				(day) => day.date < date && scopeMatcher(day.date)
+			const otherDaysInScope = dayTotals.filter(
+				(day) => day.date !== date && scopeMatcher(day.date)
 			);
-			// A record is only meaningful against at least one prior session
-			// (otherwise the group's first session is trivially a record)
-			if (priorDays.length === 0) continue;
-			const previousBest = Math.max(...priorDays.map((day) => day[metric]));
+			// A record is only meaningful against at least one other session
+			// (otherwise the group's only session is trivially a record)
+			if (otherDaysInScope.length === 0) continue;
+			const bestOtherValue = Math.max(
+				...otherDaysInScope.map((day) => day[metric])
+			);
 			const baseHighlight: SessionTotalRecordHighlight = {
 				type: 'session-total-record',
 				metric,
@@ -191,23 +191,27 @@ export function deriveSessionTotalRecords({
 				isCurrentSeason: isCurrentSeasonPeriod(sessionDate, today),
 				seasonPeriodLabel: getSeasonPeriodLabel(sessionDate)
 			};
-			if (sessionValue > previousBest) {
+			if (sessionValue > bestOtherValue) {
 				highlights.push(baseHighlight);
 				break;
 			}
-			if (sessionValue === previousBest && scope === 'all-time') {
-				const mostRecentTieDate = priorDays
-					.filter((day) => day[metric] === previousBest)
+			if (sessionValue === bestOtherValue && scope === 'all-time') {
+				// The for-N-years copy describes how long the record stood, so
+				// only prior tied days count — a later-only tie is unreportable
+				const mostRecentPriorTieDate = otherDaysInScope
+					.filter((day) => day[metric] === bestOtherValue && day.date < date)
 					.map((day) => day.date)
 					.sort()
-					.at(-1)!;
-				const recordEqualledYearsAgo = differenceInYears(
-					sessionDate,
-					new Date(mostRecentTieDate)
-				);
-				if (recordEqualledYearsAgo >= 1) {
-					highlights.push({ ...baseHighlight, recordEqualledYearsAgo });
-					break;
+					.at(-1);
+				if (mostRecentPriorTieDate !== undefined) {
+					const recordEqualledYearsAgo = differenceInYears(
+						sessionDate,
+						new Date(mostRecentPriorTieDate)
+					);
+					if (recordEqualledYearsAgo >= 1) {
+						highlights.push({ ...baseHighlight, recordEqualledYearsAgo });
+						break;
+					}
 				}
 			}
 			// beaten or unreportable tie at this scope — a narrower scope may
@@ -218,20 +222,20 @@ export function deriveSessionTotalRecords({
 }
 
 // 2nd/3rd placements are only reported while the top tiers are sparsely
-// held: 2nd place needs fewer than three prior days at the top value, 3rd
-// place needs fewer than three prior days across the top two values. The
+// held: 2nd place needs fewer than three other days at the top value, 3rd
+// place needs fewer than three other days across the top two values. The
 // session must also equal or exceed an included tier value — a count below
-// every prior value is not a placement, however thin the history.
+// every other value is not a placement, however thin the history.
 function deriveAllTimePlacement(
 	sessionValue: number,
-	priorValues: number[]
+	otherValues: number[]
 ): { placementRank: 2 | 3; isJointPlacement: boolean } | null {
-	const distinctValuesDescending = [...new Set(priorValues)].sort(
+	const distinctValuesDescending = [...new Set(otherValues)].sort(
 		(a, b) => b - a
 	);
 	const [topValue, secondValue, thirdValue] = distinctValuesDescending;
 	const daysAt = (value: number) =>
-		priorValues.filter((priorValue) => priorValue === value).length;
+		otherValues.filter((otherValue) => otherValue === value).length;
 	const includedValues = [topValue];
 	if (secondValue !== undefined && daysAt(topValue) < 3) {
 		includedValues.push(secondValue);
@@ -244,14 +248,14 @@ function deriveAllTimePlacement(
 	}
 	const minIncludedValue = includedValues.at(-1)!;
 	if (sessionValue < minIncludedValue || sessionValue >= topValue) return null;
-	// The tier rule above means at most two prior days can outrank a
+	// The tier rule above means at most two other days can outrank a
 	// qualifying value, so the rank is always 2 or 3
-	const placementRank = (priorValues.filter(
-		(priorValue) => priorValue > sessionValue
+	const placementRank = (otherValues.filter(
+		(otherValue) => otherValue > sessionValue
 	).length + 1) as 2 | 3;
 	return {
 		placementRank,
-		isJointPlacement: priorValues.includes(sessionValue)
+		isJointPlacement: otherValues.includes(sessionValue)
 	};
 }
 
@@ -286,17 +290,17 @@ export function deriveSpeciesRecords({
 		if (sessionValue === 1) continue;
 		for (const scope of RECORD_SCOPES) {
 			const scopeMatcher = getScopeMatcher(scope, sessionDate);
-			const priorRows = stats.daySpeciesCounts.filter(
+			const otherRowsInScope = stats.daySpeciesCounts.filter(
 				(row) =>
 					row.species_name === speciesName &&
-					row.visit_date < date &&
+					row.visit_date !== date &&
 					scopeMatcher(row.visit_date)
 			);
-			// A record requires the species to appear on at least one prior day
+			// A record requires the species to appear on at least one other day
 			// in scope (otherwise it's first-ever territory, covered by #317)
-			if (priorRows.length === 0) continue;
-			const previousBest = Math.max(
-				...priorRows.map((row) => row.metric_value)
+			if (otherRowsInScope.length === 0) continue;
+			const bestOtherValue = Math.max(
+				...otherRowsInScope.map((row) => row.metric_value)
 			);
 			const baseHighlight: SpeciesCountRecordHighlight = {
 				type: 'species-count-record',
@@ -305,20 +309,26 @@ export function deriveSpeciesRecords({
 				value: sessionValue,
 				...sharedFields
 			};
-			if (sessionValue > previousBest) {
+			if (sessionValue > bestOtherValue) {
 				highlights.push(baseHighlight);
 				break;
 			}
-			if (sessionValue === previousBest && scope === 'all-time') {
-				const mostRecentTieDate = priorRows
-					.filter((row) => row.metric_value === previousBest)
+			if (sessionValue === bestOtherValue && scope === 'all-time') {
+				// The for-N-years copy describes how long the record stood, so
+				// only prior tied days count towards it; a tie held only by a
+				// later day still reads as a joint best day
+				const mostRecentPriorTieDate = otherRowsInScope
+					.filter(
+						(row) =>
+							row.metric_value === bestOtherValue && row.visit_date < date
+					)
 					.map((row) => row.visit_date)
 					.sort()
-					.at(-1)!;
-				const recordEqualledYearsAgo = differenceInYears(
-					sessionDate,
-					new Date(mostRecentTieDate)
-				);
+					.at(-1);
+				const recordEqualledYearsAgo =
+					mostRecentPriorTieDate === undefined
+						? 0
+						: differenceInYears(sessionDate, new Date(mostRecentPriorTieDate));
 				highlights.push(
 					recordEqualledYearsAgo >= 1
 						? { ...baseHighlight, recordEqualledYearsAgo }
@@ -329,7 +339,7 @@ export function deriveSpeciesRecords({
 			if (scope === 'all-time') {
 				const placement = deriveAllTimePlacement(
 					sessionValue,
-					priorRows.map((row) => row.metric_value)
+					otherRowsInScope.map((row) => row.metric_value)
 				);
 				if (placement) {
 					highlights.push({ ...baseHighlight, ...placement });

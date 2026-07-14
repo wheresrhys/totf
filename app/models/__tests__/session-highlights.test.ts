@@ -14,13 +14,15 @@ const SESSION_DATE = '2024-09-15'; // autumn
 // flags are deterministically false unless a test passes its own today
 const PAST_PERIOD_TODAY = new Date('2025-06-01');
 
-// Prior days used across tests, chosen for their scope membership
+// Comparison days used across tests, chosen for their scope membership
 // relative to SESSION_DATE:
 const PRIOR_AUTUMN_OTHER_YEAR = '2021-09-10'; // any-season only (3+ years ago)
 const PRIOR_SPRING_OTHER_YEAR = '2022-05-01'; // all-time only
 const PRIOR_SPRING_THIS_YEAR = '2024-05-01'; // this-year (and all-time)
 const PRIOR_THIS_SEASON = '2024-08-20'; // this-season (and all narrower)
-const LATER_DAY = '2024-10-01';
+const LATER_DAY = '2024-10-01'; // after the session, but in every scope
+const LATER_DAY_TWO = '2024-10-05';
+const LATER_DAY_THREE = '2024-10-20';
 // Additional all-time-only days for multi-day placement-tier scenarios
 const PRIOR_SPRING_YEAR_ONE = '2021-05-01';
 const PRIOR_SPRING_YEAR_ONE_LATER = '2021-05-15';
@@ -53,7 +55,7 @@ function derive(rows: DaySpeciesMetricRow[], today = PAST_PERIOD_TODAY) {
 }
 
 describe('deriveSessionTotalRecords', () => {
-	it('returns a busiest record when the session total beats all prior days in scope', () => {
+	it('returns a busiest record when the session total beats all other days in scope', () => {
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 40, Chiffchaff: 34 }),
 			...dayRows(PRIOR_SPRING_OTHER_YEAR, {
@@ -96,17 +98,71 @@ describe('deriveSessionTotalRecords', () => {
 		).toEqual([]);
 	});
 
-	it('ignores sessions after the session date', () => {
+	it('counts later sessions when finding records', () => {
+		// the later day beats the session in every scope — no record
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
 			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 60 }),
 			...dayRows(LATER_DAY, { Robin: 200, Chiffchaff: 200 })
+		]);
+		expect(
+			highlights.filter((highlight) => highlight.metric === 'encounters')
+		).toEqual([]);
+	});
+
+	it('holds a record when later sessions are all lower', () => {
+		const highlights = derive([
+			...dayRows(SESSION_DATE, { Robin: 74 }),
+			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 60 }),
+			...dayRows(LATER_DAY, { Robin: 50 })
 		]);
 		expect(highlights).toContainEqual(
 			expect.objectContaining({
 				metric: 'encounters',
 				scope: 'all-time',
 				value: 74
+			})
+		);
+	});
+
+	it('uses a later session as the comparison baseline', () => {
+		// previously suppressed as the group's first session; a later
+		// session now provides the required comparison
+		const highlights = derive([
+			...dayRows(SESSION_DATE, { Robin: 74 }),
+			...dayRows(LATER_DAY, { Robin: 50 })
+		]);
+		expect(highlights).toContainEqual(
+			expect.objectContaining({
+				metric: 'encounters',
+				scope: 'all-time',
+				value: 74
+			})
+		);
+	});
+
+	it('treats a tie held only by a later session as unreportable', () => {
+		const highlights = derive([
+			...dayRows(SESSION_DATE, { Robin: 74 }),
+			...dayRows(LATER_DAY, { Robin: 74 })
+		]);
+		expect(
+			highlights.filter((highlight) => highlight.metric === 'encounters')
+		).toEqual([]);
+	});
+
+	it('computes for-N-years from prior tied days even when a later day also ties', () => {
+		const highlights = derive([
+			...dayRows(SESSION_DATE, { Robin: 74 }),
+			...dayRows(PRIOR_AUTUMN_OTHER_YEAR, { Robin: 74 }),
+			...dayRows(LATER_DAY, { Robin: 74 })
+		]);
+		expect(highlights).toContainEqual(
+			expect.objectContaining({
+				metric: 'encounters',
+				scope: 'all-time',
+				value: 74,
+				recordEqualledYearsAgo: 3
 			})
 		);
 	});
@@ -186,8 +242,8 @@ describe('deriveSessionTotalRecords', () => {
 		).toEqual([]);
 	});
 
-	it('suppresses records when no prior session exists in scope', () => {
-		// the group's first-ever session would otherwise be a record for everything
+	it('suppresses records when no other session exists in scope', () => {
+		// the group's only session would otherwise be a record for everything
 		expect(derive(dayRows(SESSION_DATE, { Robin: 74, Chiffchaff: 3 }))).toEqual(
 			[]
 		);
@@ -210,7 +266,7 @@ describe('deriveSessionTotalRecords', () => {
 		);
 	});
 
-	it('counts zero-encounter sessions as prior sessions in scope', () => {
+	it('counts zero-encounter sessions as comparison sessions in scope', () => {
 		const stats: SessionStatsData = {
 			daySpeciesCounts: dayRows(SESSION_DATE, { Robin: 74 }),
 			sessionDates: [PRIOR_SPRING_OTHER_YEAR, SESSION_DATE]
@@ -370,8 +426,8 @@ describe('deriveSpeciesRecords', () => {
 		expect(speciesNames).toContain(ROBIN);
 	});
 
-	it('requires the species to appear on a prior day in scope', () => {
-		// Reed Warbler only appears on the session day — no prior day, no record
+	it('requires the species to appear on another day in scope', () => {
+		// Reed Warbler only appears on the session day — no other day, no record
 		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
 			speciesRow(PRIOR_SPRING_OTHER_YEAR, ROBIN, 3)
@@ -379,8 +435,7 @@ describe('deriveSpeciesRecords', () => {
 		expect(highlights.map((h) => h.speciesName)).not.toContain(REED_WARBLER);
 	});
 
-	it('ignores days after the session date', () => {
-		// A later day with more Reed Warblers should not affect the record
+	it('demotes the session to a placement when a later day has a higher count', () => {
 		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
 			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 5),
@@ -390,8 +445,41 @@ describe('deriveSpeciesRecords', () => {
 		expect(highlights[0]).toMatchObject({
 			speciesName: REED_WARBLER,
 			scope: 'all-time',
-			value: 10
+			value: 10,
+			placementRank: 2,
+			isJointPlacement: false
 		});
+	});
+
+	it('reports a joint best day when only a later day ties the session count', () => {
+		const highlights = deriveSpecies([
+			speciesRow(SESSION_DATE, REED_WARBLER, 10),
+			speciesRow(LATER_DAY, REED_WARBLER, 10)
+		]);
+		expect(highlights).toHaveLength(1);
+		expect(highlights[0]).toMatchObject({
+			speciesName: REED_WARBLER,
+			scope: 'all-time',
+			value: 10,
+			placementRank: 1,
+			isJointPlacement: true
+		});
+	});
+
+	it('keeps the for-N-years copy for an old prior tie even when a later day also ties', () => {
+		const highlights = deriveSpecies([
+			speciesRow(SESSION_DATE, REED_WARBLER, 10),
+			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 10),
+			speciesRow(LATER_DAY, REED_WARBLER, 10)
+		]);
+		expect(highlights).toContainEqual(
+			expect.objectContaining({
+				speciesName: REED_WARBLER,
+				scope: 'all-time',
+				value: 10,
+				recordEqualledYearsAgo: 3
+			})
+		);
 	});
 
 	it('reports an all-time tie older than a year as a for-N-years record', () => {
@@ -568,6 +656,17 @@ describe('deriveSpeciesRecords', () => {
 			expect(highlights).toHaveLength(1);
 			expect(highlights[0]).toMatchObject({ scope: 'any-season', value: 8 });
 			expect(highlights[0].placementRank).toBeUndefined();
+		});
+
+		it('counts later days when building placement tiers', () => {
+			// three later days at the top value block 2nd place
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 8),
+				speciesRow(LATER_DAY, REED_WARBLER, 10),
+				speciesRow(LATER_DAY_TWO, REED_WARBLER, 10),
+				speciesRow(LATER_DAY_THREE, REED_WARBLER, 10)
+			]);
+			expect(highlights).toHaveLength(0);
 		});
 
 		it('does not report 2nd place when three prior days share the top value', () => {
