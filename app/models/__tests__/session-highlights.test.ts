@@ -21,6 +21,10 @@ const PRIOR_SPRING_OTHER_YEAR = '2022-05-01'; // all-time only
 const PRIOR_SPRING_THIS_YEAR = '2024-05-01'; // this-year (and all-time)
 const PRIOR_THIS_SEASON = '2024-08-20'; // this-season (and all narrower)
 const LATER_DAY = '2024-10-01';
+// Additional all-time-only days for multi-day placement-tier scenarios
+const PRIOR_SPRING_YEAR_ONE = '2021-05-01';
+const PRIOR_SPRING_YEAR_ONE_LATER = '2021-05-15';
+const PRIOR_SPRING_YEAR_THREE = '2023-05-01';
 
 function dayRows(
 	date: string,
@@ -406,21 +410,41 @@ describe('deriveSpeciesRecords', () => {
 		);
 	});
 
-	it('ignores ties under a year old and ties in narrower scopes', () => {
-		// all-time tie under a year old — not reportable
-		const tooRecentTie = deriveSpecies([
+	it('reports an all-time tie under a year old as a joint best day', () => {
+		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
 			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 10) // 2024-05-01 — < 1 year
 		]);
-		expect(tooRecentTie).toHaveLength(0);
+		expect(highlights).toHaveLength(1);
+		expect(highlights[0]).toMatchObject({
+			speciesName: REED_WARBLER,
+			scope: 'all-time',
+			value: 10,
+			placementRank: 1,
+			isJointPlacement: true
+		});
+	});
 
-		// all-time beaten by a big non-autumn day, any-season tied — tie not reportable
-		const anySeasonTie = deriveSpecies([
+	it('ignores ties in narrower scopes', () => {
+		// all-time placements blocked by three days at the top value,
+		// any-season tied — the tie is not reportable there
+		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 20), // beats all-time
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 20),
+			speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 20),
+			speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 20),
 			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 10) // any-season tie
 		]);
-		expect(anySeasonTie).toHaveLength(0);
+		expect(highlights).toHaveLength(0);
+	});
+
+	it('never reports a species highlight when the session count is 1', () => {
+		// would otherwise be a record-equalling day
+		const highlights = deriveSpecies([
+			speciesRow(SESSION_DATE, REED_WARBLER, 1),
+			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 1)
+		]);
+		expect(highlights).toHaveLength(0);
 	});
 
 	it('sets current-period flags from the injected today', () => {
@@ -439,6 +463,158 @@ describe('deriveSpeciesRecords', () => {
 				isCurrentSeason: true
 			})
 		);
+	});
+
+	describe('all-time 2nd/3rd placements', () => {
+		it('reports a strict 2nd-best day when the session count falls between the two best prior values', () => {
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 5)
+			]);
+			expect(highlights).toHaveLength(1);
+			expect(highlights[0]).toMatchObject({
+				type: 'species-count-record',
+				speciesName: REED_WARBLER,
+				scope: 'all-time',
+				value: 8,
+				placementRank: 2,
+				isJointPlacement: false
+			});
+		});
+
+		it('reports a strict 3rd-best day when the session count falls between the 2nd and 3rd prior values', () => {
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 5),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 3)
+			]);
+			expect(highlights).toHaveLength(1);
+			expect(highlights[0]).toMatchObject({
+				placementRank: 3,
+				isJointPlacement: false
+			});
+		});
+
+		it('reports a joint 2nd-best day with no age gate when the session ties a recent 2nd-best value', () => {
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_THIS_SEASON, REED_WARBLER, 8) // < 1 month old
+			]);
+			expect(highlights).toHaveLength(1);
+			expect(highlights[0]).toMatchObject({
+				scope: 'all-time',
+				placementRank: 2,
+				isJointPlacement: true
+			});
+		});
+
+		it('reports a joint 3rd-best day when the session ties the 3rd-best value', () => {
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 5),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 5)
+			]);
+			expect(highlights).toHaveLength(1);
+			expect(highlights[0]).toMatchObject({
+				placementRank: 3,
+				isJointPlacement: true
+			});
+		});
+
+		it('reports both an all-time placement and a narrower-scope record for the same species', () => {
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_THIS_SEASON, REED_WARBLER, 3)
+			]);
+			expect(highlights).toHaveLength(2);
+			expect(highlights).toContainEqual(
+				expect.objectContaining({
+					scope: 'all-time',
+					placementRank: 2,
+					isJointPlacement: false
+				})
+			);
+			expect(highlights).toContainEqual(
+				expect.objectContaining({ scope: 'any-season', value: 8 })
+			);
+		});
+
+		it('does not report placements in narrower scopes', () => {
+			// three top days block all-time tiers; session beats this year's
+			// best but a this-year 2nd place is not a thing
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 20),
+				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 20),
+				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 20),
+				speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 10)
+			]);
+			expect(highlights).toHaveLength(0);
+		});
+
+		it('continues to narrower scopes when the session misses every included placement tier', () => {
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 20),
+				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 15),
+				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 12),
+				speciesRow(PRIOR_THIS_SEASON, REED_WARBLER, 5)
+			]);
+			expect(highlights).toHaveLength(1);
+			expect(highlights[0]).toMatchObject({ scope: 'any-season', value: 8 });
+			expect(highlights[0].placementRank).toBeUndefined();
+		});
+
+		it('does not report 2nd place when three prior days share the top value', () => {
+			// session would be rank 4
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_ONE_LATER, REED_WARBLER, 5)
+			]);
+			expect(highlights).toHaveLength(0);
+		});
+
+		it('does not report 3rd place when the top two tiers already cover three prior days', () => {
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 5),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SPRING_YEAR_ONE_LATER, REED_WARBLER, 4)
+			]);
+			expect(highlights).toHaveLength(0);
+		});
+
+		it('ranks by prior day count, so tying the 2nd value behind two joint-top days is joint 3rd', () => {
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 8)
+			]);
+			expect(highlights).toHaveLength(1);
+			expect(highlights[0]).toMatchObject({
+				placementRank: 3,
+				isJointPlacement: true
+			});
+		});
+
+		it('reports no placement when the session falls below all existing tier values', () => {
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 5),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 8)
+			]);
+			expect(highlights).toHaveLength(0);
+		});
 	});
 });
 
@@ -524,5 +700,61 @@ describe('buildHighlightSentence — species-count-record', () => {
 		).toBe(
 			'Record-equalling day for Reed Warbler — 12 caught, most for 2 years'
 		);
+	});
+
+	it('renders joint best placement copy', () => {
+		expect(
+			buildHighlightSentence(
+				makeSpeciesHighlight({ placementRank: 1, isJointPlacement: true })
+			)
+		).toBe('Joint best day for Reed Warbler ever — 12 birds');
+	});
+
+	it('renders 2nd-best placement copy', () => {
+		expect(
+			buildHighlightSentence(
+				makeSpeciesHighlight({
+					placementRank: 2,
+					isJointPlacement: false,
+					value: 8
+				})
+			)
+		).toBe('2nd-best day for Reed Warbler ever — 8 birds');
+	});
+
+	it('renders 3rd-best placement copy', () => {
+		expect(
+			buildHighlightSentence(
+				makeSpeciesHighlight({
+					placementRank: 3,
+					isJointPlacement: false,
+					value: 8
+				})
+			)
+		).toBe('3rd-best day for Reed Warbler ever — 8 birds');
+	});
+
+	it('renders joint 2nd-best placement copy', () => {
+		expect(
+			buildHighlightSentence(
+				makeSpeciesHighlight({
+					placementRank: 2,
+					isJointPlacement: true,
+					value: 8
+				})
+			)
+		).toBe('Joint 2nd-best day for Reed Warbler ever — 8 birds');
+	});
+
+	it('renders joint 3rd-best placement copy', () => {
+		expect(
+			buildHighlightSentence(
+				makeSpeciesHighlight({
+					placementRank: 3,
+					isJointPlacement: true,
+					value: 8
+				})
+			)
+		).toBe('Joint 3rd-best day for Reed Warbler ever — 8 birds');
 	});
 });
