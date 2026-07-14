@@ -3,6 +3,7 @@ import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SessionHighlights } from '../SessionHighlights';
 import type {
 	FirstEverSpeciesHighlight,
+	LongAbsenceRetrapHighlight,
 	SessionHighlight
 } from '@/app/models/session-highlights';
 
@@ -172,5 +173,30 @@ describe('SessionHighlights', () => {
 			.querySelectorAll('li');
 		expect(items.length).toBe(1);
 		expect(items[0].textContent).toBe('First ever Firecrest record');
+	});
+
+	it('renders long-absence sentences', async () => {
+		const longAbsenceHighlight: LongAbsenceRetrapHighlight = {
+			type: 'long-absence-retrap',
+			ringNo: 'ARRETRAP',
+			speciesName: 'Robin',
+			previousDate: '2021-06-20',
+			gapYears: 2,
+			gapMonths: 10
+		};
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([longAbsenceHighlight]);
+		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+		});
+		const items = screen
+			.getByTestId('session-highlights')
+			.querySelectorAll('li');
+		expect(items.length).toBe(1);
+		expect(items[0].textContent).toBe(
+			'Robin ARRETRAP recaught after 2 years, 10 months away (last seen 20 Jun 2021)'
+		);
 	});
 });

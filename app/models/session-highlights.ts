@@ -1,11 +1,18 @@
-import { differenceInYears } from 'date-fns';
+import {
+	differenceInYears,
+	format as formatDate,
+	intervalToDuration
+} from 'date-fns';
 import {
 	getSeasonMonths,
 	getSeasonName,
 	getSeasonPeriodLabel,
 	isCurrentSeasonPeriod
 } from '@/app/models/seasons';
-import type { DaySpeciesMetricRow } from '@/app/models/db';
+import type {
+	DaySpeciesMetricRow,
+	LongAbsenceRetrapRow
+} from '@/app/models/db';
 
 export const SESSION_TOTAL_METRICS = ['encounters', 'species'] as const;
 export type SessionTotalMetric = (typeof SESSION_TOTAL_METRICS)[number];
@@ -88,11 +95,23 @@ export type FirstOfYearSpeciesHighlight = {
 	isOnlyRecord: boolean;
 };
 
+export type LongAbsenceRetrapHighlight = {
+	type: 'long-absence-retrap';
+	ringNo: string;
+	speciesName: string;
+	// ISO date string of the previous encounter (e.g. "2021-06-20")
+	previousDate: string;
+	// Gap in whole years and months (zero months omitted from copy)
+	gapYears: number;
+	gapMonths: number;
+};
+
 export type SessionHighlight =
 	| SessionTotalRecordHighlight
 	| SpeciesCountRecordHighlight
 	| FirstEverSpeciesHighlight
-	| FirstOfYearSpeciesHighlight;
+	| FirstOfYearSpeciesHighlight
+	| LongAbsenceRetrapHighlight;
 
 type PeriodFields = {
 	scope: RecordScope;
@@ -480,11 +499,40 @@ export function deriveFirstOfYearSpecies({
 		}));
 }
 
+// Maps RPC rows to LongAbsenceRetrapHighlights, preserving the gap-descending
+// order returned by the RPC. The session date is needed to compute the
+// years+months gap relative to the day the bird was last seen.
+export function deriveLongAbsenceRetraps(
+	rows: LongAbsenceRetrapRow[],
+	sessionDate: string
+): LongAbsenceRetrapHighlight[] {
+	const sessionDateObj = new Date(sessionDate);
+	return rows.map((row) => {
+		const previousDateObj = new Date(row.previous_date);
+		const duration = intervalToDuration({
+			start: previousDateObj,
+			end: sessionDateObj
+		});
+		// intervalToDuration gives years+months+days+etc; we only want years and months
+		const gapYears = duration.years ?? 0;
+		const gapMonths = duration.months ?? 0;
+		return {
+			type: 'long-absence-retrap',
+			ringNo: row.ring_no,
+			speciesName: row.species_name,
+			previousDate: row.previous_date,
+			gapYears,
+			gapMonths
+		};
+	});
+}
+
 const HIGHLIGHT_TYPE_PRIORITY: SessionHighlight['type'][] = [
 	'session-total-record',
 	'species-count-record',
 	'first-ever-species',
-	'first-of-year-species'
+	'first-of-year-species',
+	'long-absence-retrap'
 ];
 
 export function sortHighlights(
@@ -574,6 +622,20 @@ export function buildHighlightSentence(highlight: SessionHighlight): string {
 				? 'of the year'
 				: `of ${highlight.year}`;
 			return `${highlight.isOnlyRecord ? 'Only' : 'First'} ${buildSpeciesRecordsPhrase(highlight)} ${yearPhrase}`;
+		}
+		case 'long-absence-retrap': {
+			const { ringNo, speciesName, previousDate, gapYears, gapMonths } =
+				highlight;
+			const yearsPart = `${gapYears} ${gapYears === 1 ? 'year' : 'years'}`;
+			const gapPhrase =
+				gapMonths === 0
+					? yearsPart
+					: `${yearsPart}, ${gapMonths} ${gapMonths === 1 ? 'month' : 'months'}`;
+			const formattedPreviousDate = formatDate(
+				new Date(previousDate),
+				'd MMM yyyy'
+			);
+			return `${speciesName} ${ringNo} recaught after ${gapPhrase} away (last seen ${formattedPreviousDate})`;
 		}
 	}
 }
