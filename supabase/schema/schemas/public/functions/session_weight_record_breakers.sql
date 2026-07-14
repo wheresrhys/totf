@@ -1,4 +1,4 @@
-CREATE FUNCTION public.session_weight_extremes (
+CREATE FUNCTION public.session_weight_record_breakers (
 	session_date date,
 	ringing_group_filter bigint,
 	min_prior_weighed integer DEFAULT 3
@@ -6,9 +6,9 @@ CREATE FUNCTION public.session_weight_extremes (
 	species_name text,
 	ring_no text,
 	weight numeric,
-	extreme_type text,
-	previous_extreme numeric,
-	previous_extreme_date date
+	record_type text,
+	previous_record numeric,
+	previous_record_date date
 ) LANGUAGE plpgsql STABLE
 SET
 	search_path TO 'public',
@@ -43,7 +43,7 @@ BEGIN
       AND e.ringing_group_id = ringing_group_filter
       AND e.weight IS NOT NULL
   ),
-  prior_extremes AS (
+  prior_records AS (
     SELECT
       pw.species_name AS species_name,
       MIN(pw.weight) AS min_weight,
@@ -53,8 +53,8 @@ BEGIN
     GROUP BY pw.species_name
     HAVING COUNT(*) >= min_prior_weighed
   )
-  SELECT extremes.species_name, extremes.ring_no, extremes.weight,
-    extremes.extreme_type, extremes.previous_extreme, extremes.previous_extreme_date
+  SELECT record_breakers.species_name, record_breakers.ring_no, record_breakers.weight,
+    record_breakers.record_type, record_breakers.previous_record, record_breakers.previous_record_date
   FROM (
     -- Heaviest: today's birds equalling or beating the prior maximum.
     (
@@ -62,17 +62,17 @@ BEGIN
         tw.species_name,
         tw.ring_no,
         tw.weight,
-        'heaviest'::text AS extreme_type,
-        pe.max_weight AS previous_extreme,
+        'heaviest'::text AS record_type,
+        pr.max_weight AS previous_record,
         (
           SELECT MAX(pw.visit_date)
           FROM prior_weighed pw
-          WHERE pw.species_name = pe.species_name
-            AND pw.weight = pe.max_weight
-        ) AS previous_extreme_date
+          WHERE pw.species_name = pr.species_name
+            AND pw.weight = pr.max_weight
+        ) AS previous_record_date
       FROM todays_weighed tw
-        JOIN prior_extremes pe ON tw.species_name = pe.species_name
-      WHERE tw.weight >= pe.max_weight
+        JOIN prior_records pr ON tw.species_name = pr.species_name
+      WHERE tw.weight >= pr.max_weight
       ORDER BY tw.species_name, tw.weight DESC
     )
 
@@ -84,27 +84,27 @@ BEGIN
         tw.species_name,
         tw.ring_no,
         tw.weight,
-        'lightest'::text AS extreme_type,
-        pe.min_weight AS previous_extreme,
+        'lightest'::text AS record_type,
+        pr.min_weight AS previous_record,
         (
           SELECT MAX(pw.visit_date)
           FROM prior_weighed pw
-          WHERE pw.species_name = pe.species_name
-            AND pw.weight = pe.min_weight
-        ) AS previous_extreme_date
+          WHERE pw.species_name = pr.species_name
+            AND pw.weight = pr.min_weight
+        ) AS previous_record_date
       FROM todays_weighed tw
-        JOIN prior_extremes pe ON tw.species_name = pe.species_name
-      WHERE tw.weight <= pe.min_weight
+        JOIN prior_records pr ON tw.species_name = pr.species_name
+      WHERE tw.weight <= pr.min_weight
       ORDER BY tw.species_name, tw.weight ASC
     )
-  ) AS extremes
+  ) AS record_breakers
   -- 'heaviest' sorts before 'lightest' so each species' heaviest row comes first.
-  ORDER BY extremes.species_name, extremes.extreme_type;
+  ORDER BY record_breakers.species_name, record_breakers.record_type;
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.session_weight_extremes (date, bigint, integer) TO anon;
+GRANT ALL ON FUNCTION public.session_weight_record_breakers (date, bigint, integer) TO anon;
 
-GRANT ALL ON FUNCTION public.session_weight_extremes (date, bigint, integer) TO authenticated;
+GRANT ALL ON FUNCTION public.session_weight_record_breakers (date, bigint, integer) TO authenticated;
 
-GRANT ALL ON FUNCTION public.session_weight_extremes (date, bigint, integer) TO service_role;
+GRANT ALL ON FUNCTION public.session_weight_record_breakers (date, bigint, integer) TO service_role;

@@ -416,16 +416,16 @@ export type Database = {
           sequence_prefix: string
         }[]
       }
-      session_weight_extremes: {
+      session_weight_record_breakers: {
         Args: {
           min_prior_weighed?: number
           ringing_group_filter: number
           session_date: string
         }
         Returns: {
-          extreme_type: string
-          previous_extreme: number
-          previous_extreme_date: string
+          previous_record: number
+          previous_record_date: string
+          record_type: string
           ring_no: string
           species_name: string
           weight: number
