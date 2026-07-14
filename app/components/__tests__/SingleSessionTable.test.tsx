@@ -8,7 +8,8 @@ import type { SessionEncounter } from '@/app/models/session';
 function makeEncounter(
 	id: number,
 	species: string,
-	capture_time: string
+	capture_time: string,
+	proven_age = 0
 ): SessionEncounter {
 	return {
 		id,
@@ -25,16 +26,18 @@ function makeEncounter(
 		wing_length: null,
 		bird: {
 			ring_no: `RING${id}`,
+			proven_age,
 			species: { id: 1, species_name: species }
 		}
 	} as unknown as SessionEncounter;
 }
 
-const robinEncounter = makeEncounter(1, 'Robin', '09:00:00');
+const robinEncounter = makeEncounter(1, 'Robin', '09:00:00', 3);
+const olderRobinEncounter = makeEncounter(3, 'Robin', '09:15:00', 7);
 const titmouseEncounter = makeEncounter(2, 'Blue Tit', '09:30:00');
 
 const speciesList: SpeciesWithEncounters[] = [
-	{ species: 'Robin', encounters: [robinEncounter] },
+	{ species: 'Robin', encounters: [robinEncounter, olderRobinEncounter] },
 	{ species: 'Blue Tit', encounters: [titmouseEncounter] }
 ];
 
@@ -61,6 +64,20 @@ describe('SessionTabs', () => {
 	it('shows species table by default', () => {
 		render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
 		expect(screen.getByTestId('session-table')).not.toBeNull();
+	});
+
+	it('shows the max proven age per species row', () => {
+		render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+		const robinRow = screen.getByText('Robin').closest('tr') as HTMLElement;
+		expect(robinRow.textContent).toContain('7');
+	});
+
+	it('shows proven age per encounter in the by-time view', () => {
+		render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+		fireEvent.click(screen.getByRole('button', { name: 'By time' }));
+		expect(
+			screen.getAllByRole('columnheader').map((c) => c.textContent)
+		).toContain('Proven Age');
 	});
 
 	it('shows chronological view when By time tab clicked', () => {

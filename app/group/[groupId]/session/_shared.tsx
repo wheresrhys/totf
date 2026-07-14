@@ -74,6 +74,7 @@ export async function fetchSessionData({
 			wing_length,
 			bird:Birds (
 				ring_no,
+				proven_age,
 				species:Species (
 					id,
 					species_name
@@ -111,6 +112,17 @@ function groupBySpecies(
 			}
 			return a.encounters.length < b.encounters.length ? 1 : -1;
 		});
+}
+
+function findOldestEncounter(
+	encounters: SessionEncounter[]
+): SessionEncounter | null {
+	return encounters.reduce<SessionEncounter | null>((oldest, encounter) => {
+		if (!oldest || encounter.bird.proven_age > oldest.bird.proven_age) {
+			return encounter;
+		}
+		return oldest;
+	}, null);
 }
 
 function Locations({
@@ -171,6 +183,7 @@ export function SessionSummary({
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
 	const chronology = calculateSessionChronology(dayData.encounters);
+	const oldestEncounter = findOldestEncounter(dayData.encounters);
 
 	if (dayData.locations.length === 0) {
 		return (
@@ -197,19 +210,24 @@ export function SessionSummary({
 			</PrimaryHeading>
 			<BadgeList
 				testId="session-stats"
-				items={[
-					`${dayData.encounters.length} birds`,
-					`${speciesList.length} species`,
-					`${dayData.encounters.filter((encounter) => encounter.record_type === 'N').length} new`,
-					`${dayData.encounters.filter((encounter) => encounter.record_type === 'S').length} retraps`,
-					`${dayData.encounters.filter((encounter) => encounter.age_code > 3).length} adults`,
-					`${dayData.encounters.filter((encounter) => [1, 3].includes(encounter.age_code)).length} juvs`,
-					`${dayData.encounters.filter((encounter) => encounter.age_code === 2).length} unknown age`,
-					`Start: ${chronology.startTime ? chronology.startTime.slice(0, 5) : '–'}`,
-					`End: ${chronology.endTime ? chronology.endTime.slice(0, 5) : '–'}`,
-					`Duration: ${chronology.durationMinutes !== null ? formatMinutesForDisplay(chronology.durationMinutes) : '–'}`,
-					`Net rounds: ${chronology.netRounds.length}`
-				]}
+				items={
+					[
+						`${dayData.encounters.length} birds`,
+						`${speciesList.length} species`,
+						`${dayData.encounters.filter((encounter) => encounter.record_type === 'N').length} new`,
+						`${dayData.encounters.filter((encounter) => encounter.record_type === 'S').length} retraps`,
+						`${dayData.encounters.filter((encounter) => encounter.age_code > 3).length} adults`,
+						`${dayData.encounters.filter((encounter) => [1, 3].includes(encounter.age_code)).length} juvs`,
+						`${dayData.encounters.filter((encounter) => encounter.age_code === 2).length} unknown age`,
+						`Start: ${chronology.startTime ? chronology.startTime.slice(0, 5) : '–'}`,
+						`End: ${chronology.endTime ? chronology.endTime.slice(0, 5) : '–'}`,
+						`Duration: ${chronology.durationMinutes !== null ? formatMinutesForDisplay(chronology.durationMinutes) : '–'}`,
+						`Net rounds: ${chronology.netRounds.length}`,
+						oldestEncounter && oldestEncounter.bird.proven_age > 0
+							? `Oldest: ${oldestEncounter.bird.proven_age} years — ${oldestEncounter.bird.species.species_name} (${oldestEncounter.bird.ring_no})`
+							: null
+					].filter(Boolean) as string[]
+				}
 			/>
 			{locationId ? null : (
 				<SessionHighlights date={date} viewedGroupId={viewedGroupId} />

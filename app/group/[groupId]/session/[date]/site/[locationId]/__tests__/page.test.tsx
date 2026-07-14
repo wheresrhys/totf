@@ -49,7 +49,11 @@ const mockEncounters = [
 		sexing_method: null,
 		weight: 18.5,
 		wing_length: 75,
-		bird: { ring_no: 'ABC001', species: { id: 1, species_name: 'Robin' } }
+		bird: {
+			ring_no: 'ABC001',
+			proven_age: 4,
+			species: { id: 1, species_name: 'Robin' }
+		}
 	}
 ];
 

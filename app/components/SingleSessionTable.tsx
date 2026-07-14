@@ -44,6 +44,7 @@ function SpeciesDetailsTable({
 					<th>Ring No</th>
 					<th>Type</th>
 					<th>Age</th>
+					<th>Proven Age</th>
 					<th>Sex</th>
 					<th>Sexing Method</th>
 					<th>Breeding Condition</th>
@@ -66,6 +67,7 @@ function SpeciesDetailsTable({
 						</td>
 						<td>{encounter.record_type}</td>
 						<td>{encounter.age_code}</td>
+						<td>{encounter.bird.proven_age}</td>
 						<td>{encounter.sex}</td>
 						<td>{encounter.sexing_method}</td>
 						<td>{encounter.breeding_condition}</td>
@@ -87,6 +89,7 @@ type RowModel = {
 	adults: number;
 	juvs: number;
 	unknownAge: number;
+	maxProvenAge: number;
 };
 
 function rowDataTransform(data: SpeciesWithEncounters): RowModel {
@@ -104,7 +107,10 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 			[1, 3].includes(encounter.age_code)
 		).length,
 		unknownAge: data.encounters.filter((encounter) => encounter.age_code === 2)
-			.length
+			.length,
+		maxProvenAge: Math.max(
+			...data.encounters.map((encounter) => encounter.bird.proven_age)
+		)
 	};
 }
 
@@ -130,6 +136,9 @@ const columnConfigs = {
 	},
 	unknownAge: {
 		label: 'Unknown Age'
+	},
+	maxProvenAge: {
+		label: 'Max Proven Age'
 	}
 } as Record<keyof RowModel, ColumnConfig>;
 
@@ -152,7 +161,7 @@ function SessionTableBody({
 		<AccordionTableBody<RowModelWithRawData<SpeciesWithEncounters, RowModel>>
 			data={data}
 			getKey={(speciesWithEncounters) => speciesWithEncounters.species}
-			columnCount={5}
+			columnCount={6}
 			FirstColumnComponent={SpeciesNameCell}
 			RestColumnsComponent={SpeciesRow}
 			ExpandedContentComponent={SpeciesDetailsTable}
@@ -175,6 +184,7 @@ function EncounterRow({ encounter }: { encounter: SessionEncounter }) {
 			<td>{encounter.bird.species.species_name}</td>
 			<td>{encounter.record_type}</td>
 			<td>{encounter.age_code}</td>
+			<td>{encounter.bird.proven_age}</td>
 			<td>{encounter.sex}</td>
 			<td>{encounter.sexing_method}</td>
 			<td>{encounter.breeding_condition}</td>
@@ -201,6 +211,7 @@ function ChronologicalView({ netRounds }: { netRounds: NetRound[] }) {
 								<th>Species</th>
 								<th>Type</th>
 								<th>Age</th>
+								<th>Proven Age</th>
 								<th>Sex</th>
 								<th>Sexing Method</th>
 								<th>Breeding Condition</th>
