@@ -8,7 +8,7 @@
     },
     "encounters": [
       {
-        "count": 4
+        "count": 5
       }
     ]
   },
@@ -112,7 +112,7 @@
     },
     "encounters": [
       {
-        "count": 1
+        "count": 2
       }
     ]
   }

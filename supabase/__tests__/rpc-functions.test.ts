@@ -26,9 +26,9 @@ async function getGroupIdByName(name: string): Promise<number> {
 // Seed has 9 Alpha sessions: 2021-06-20, 2022-04-30, 2022-06-15, 2022-08-10,
 // 2022-10-20, 2023-05-12, 2023-07-08, 2023-09-14, 2024-05-10
 const ALPHA_SESSION_COUNT = 9;
-const ALPHA_TOTAL_ENCOUNTERS = 55;
-const ALPHA_TOTAL_BIRDS = 45;
-const ALPHA_SPECIES_COUNT = 4; // Blue Tit, Kingfisher, Reed Warbler, Robin
+const ALPHA_TOTAL_ENCOUNTERS = 57;
+const ALPHA_TOTAL_BIRDS = 46;
+const ALPHA_SPECIES_COUNT = 5; // Blue Tit, Kingfisher, Reed Warbler, Robin, Wren
 const CES_2022_ENCOUNTERS = 30; // Apr–Aug 2022 only
 
 // Per-species aggregates for Alpha — reused across multiple tests
@@ -37,6 +37,7 @@ const PER_SPECIES_AGGREGATES = {
 	'Kingfisher':   { encounter_count: 2,  bird_count: 1  },
 	'Reed Warbler': { encounter_count: 15, bird_count: 15 },
 	'Robin':        { encounter_count: 31, bird_count: 23 },
+	'Wren':         { encounter_count: 2,  bird_count: 1  },
 } as const;
 
 const ARRETRAP_ENCOUNTERS = 9;
@@ -140,7 +141,7 @@ describe('Postgres RPC integration tests', () => {
 			const byYear = Object.fromEntries(
 				data!.map((r) => [new Date(r.time_period).getFullYear(), r.encounter_count])
 			);
-			expect(byYear).toEqual({ 2021: 1, 2022: 35, 2023: 15, 2024: 4 });
+			expect(byYear).toEqual({ 2021: 2, 2022: 35, 2023: 15, 2024: 5 });
 		});
 	});
 
@@ -189,7 +190,7 @@ describe('Postgres RPC integration tests', () => {
 				expect(data).toHaveLength(3);
 				expect(data![0]).toEqual({ visit_date: '2022-01-01', metric_value: 35 });
 				expect(data![1]).toEqual({ visit_date: '2023-01-01', metric_value: 15 });
-				expect(data![2]).toEqual({ visit_date: '2024-01-01', metric_value: 4 });
+				expect(data![2]).toEqual({ visit_date: '2024-01-01', metric_value: 5 });
 			});
 		});
 
@@ -356,14 +357,14 @@ describe('Postgres RPC integration tests', () => {
 	});
 
 	describe('metrics_by_period_and_species', () => {
-		it('temporal_unit=month returns 21 species-month rows', async () => {
+		it('temporal_unit=month returns 23 species-month rows', async () => {
 			const { data, error } = await alphaClient.rpc('metrics_by_period_and_species', {
 				temporal_unit: 'month',
 				metric_name: 'encounters',
 				filters: { ringing_group_filter: alphaId },
 			} as never);
 			expect(error).toBeNull();
-			expect(data).toHaveLength(21);
+			expect(data).toHaveLength(23);
 			const robin2021 = data!.find(
 				(r) => r.species_name === 'Robin' && r.visit_date === '2021-06-01'
 			);
@@ -374,14 +375,14 @@ describe('Postgres RPC integration tests', () => {
 			expect(robinApr2022!.metric_value).toBe(7);
 		});
 
-		it('temporal_unit=year returns 11 species-year rows spanning 2021–2024', async () => {
+		it('temporal_unit=year returns 13 species-year rows spanning 2021–2024', async () => {
 			const { data, error } = await alphaClient.rpc('metrics_by_period_and_species', {
 				temporal_unit: 'year',
 				metric_name: 'encounters',
 				filters: { ringing_group_filter: alphaId },
 			} as never);
 			expect(error).toBeNull();
-			expect(data).toHaveLength(11);
+			expect(data).toHaveLength(13);
 			const years = [...new Set(data!.map((r) => new Date(r.visit_date).getFullYear()))].sort();
 			expect(years).toEqual([2021, 2022, 2023, 2024]);
 			const robin2022 = data!.find(
@@ -430,7 +431,7 @@ describe('Postgres RPC integration tests', () => {
 				});
 			});
 
-			it('threshold=1 returns all 45 birds with at least 1 encounter', async () => {
+			it('threshold=1 returns all 46 birds with at least 1 encounter', async () => {
 				const { data, error } = await alphaClient.rpc('most_caught_birds', {
 					ringing_group_filter: alphaId,
 					significance_threshold: 1,
@@ -502,17 +503,25 @@ describe('Postgres RPC integration tests', () => {
 			});
 		});
 
-		it('min_proven_age=3 returns only ARRETRAP (proven_age=3)', async () => {
+		it('min_proven_age=3 returns ARRETRAP and the long-absence Wren (both proven_age=3)', async () => {
+			// AWREN001 was ringed as a juvenile in 2021 and recaught in 2024, so it is
+			// also a proven-age-3 bird. Ordered by encounter_count DESC → ARRETRAP first.
 			const { data, error } = await alphaClient.rpc('notable_retraps', {
 				ringing_group_filter: alphaId,
 				min_proven_age: 3,
 			});
 			expect(error).toBeNull();
-			expect(data).toHaveLength(1);
+			expect(data).toHaveLength(2);
 			expect(data![0]).toMatchObject({
 				ring_no: 'ARRETRAP',
 				encounter_count: ARRETRAP_ENCOUNTERS,
 				proven_age: ARRETRAP_PROVEN_AGE,
+			});
+			expect(data![1]).toMatchObject({
+				ring_no: 'AWREN001',
+				species_name: 'Wren',
+				encounter_count: 2,
+				proven_age: 3,
 			});
 		});
 
@@ -559,6 +568,73 @@ describe('Postgres RPC integration tests', () => {
 		it('beta group returns empty (clean data, no discrepancies)', async () => {
 			const { data, error } = await betaClient.rpc('find_discrepencies', {
 				ringing_group_filter: betaId,
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(0);
+		});
+	});
+
+	describe('session_long_absence_retraps', () => {
+		// Seed: AWREN001 (Wren) was ringed on 2021-06-20 and only recaught on
+		// 2024-05-10 — a 1055-day gap, the sole ≥730-day retrap in the seed.
+		it('returns the long-absence bird with correct previous_date and gap_days', async () => {
+			const { data, error } = await alphaClient.rpc('session_long_absence_retraps', {
+				session_date: '2024-05-10',
+				ringing_group_filter: alphaId,
+			});
+			expect(error).toBeNull();
+			expect(data).toEqual([
+				{
+					ring_no: 'AWREN001',
+					species_name: 'Wren',
+					previous_date: '2021-06-20',
+					gap_days: 1055,
+				},
+			]);
+		});
+
+		it('excludes retraps with gaps under min_gap_days', async () => {
+			// On 2024-05-10, ARRETRAP was last seen 2023-09-14 (239 days) — under the
+			// 730-day default, so only the Wren (1055 days) qualifies.
+			const { data, error } = await alphaClient.rpc('session_long_absence_retraps', {
+				session_date: '2024-05-10',
+				ringing_group_filter: alphaId,
+			});
+			expect(error).toBeNull();
+			expect(data!.map((r) => r.ring_no)).toEqual(['AWREN001']);
+		});
+
+		it('excludes birds ringed for the first time this session', async () => {
+			// 2021-06-20 is the group's first session: every bird is newly ringed,
+			// so none has a prior visit to compare against.
+			const { data, error } = await alphaClient.rpc('session_long_absence_retraps', {
+				session_date: '2021-06-20',
+				ringing_group_filter: alphaId,
+				min_gap_days: 1,
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(0);
+		});
+
+		it('honours a custom min_gap_days', async () => {
+			// Lowering the threshold to 200 days lets ARRETRAP (239 days) through
+			// alongside the Wren, ordered by gap_days DESC.
+			const { data, error } = await alphaClient.rpc('session_long_absence_retraps', {
+				session_date: '2024-05-10',
+				ringing_group_filter: alphaId,
+				min_gap_days: 200,
+			});
+			expect(error).toBeNull();
+			expect(data!.map((r) => ({ ring_no: r.ring_no, gap_days: r.gap_days }))).toEqual([
+				{ ring_no: 'AWREN001', gap_days: 1055 },
+				{ ring_no: 'ARRETRAP', gap_days: 239 },
+			]);
+		});
+
+		it('returns empty for a date with no session', async () => {
+			const { data, error } = await alphaClient.rpc('session_long_absence_retraps', {
+				session_date: '2099-01-01',
+				ringing_group_filter: alphaId,
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(0);
