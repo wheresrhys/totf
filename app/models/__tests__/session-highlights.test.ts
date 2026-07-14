@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
 	buildHighlightSentence,
+	deriveFirstEverSpecies,
 	deriveSessionTotalRecords,
 	deriveSpeciesRecords,
+	type FirstEverSpeciesHighlight,
 	type SessionStatsData,
 	type SessionTotalRecordHighlight,
 	type SpeciesCountRecordHighlight
@@ -855,5 +857,74 @@ describe('buildHighlightSentence — species-count-record', () => {
 				})
 			)
 		).toBe('Joint 3rd-best day for Reed Warbler ever — 8 birds');
+	});
+});
+
+// ---- deriveFirstEverSpecies ----
+
+const FIRECREST = 'Firecrest';
+
+function deriveFirstEver(rows: DaySpeciesMetricRow[], sessionDates?: string[]) {
+	const daySpeciesCounts = rows;
+	const stats: SessionStatsData = {
+		daySpeciesCounts,
+		sessionDates: sessionDates ?? [
+			...new Set(rows.map((row) => row.visit_date))
+		]
+	};
+	return deriveFirstEverSpecies({ date: SESSION_DATE, stats });
+}
+
+describe('deriveFirstEverSpecies', () => {
+	it('maps species whose earliest date is the session date to first-ever highlights', () => {
+		const highlights = deriveFirstEver([
+			speciesRow(SESSION_DATE, FIRECREST, 1),
+			speciesRow(SESSION_DATE, REED_WARBLER, 3),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 2)
+		]);
+		// Firecrest appears for the first time on the session date
+		expect(highlights).toContainEqual({
+			type: 'first-ever-species',
+			speciesName: FIRECREST
+		});
+		// Reed Warbler was seen before — not first-ever
+		expect(highlights.map((h) => h.speciesName)).not.toContain(REED_WARBLER);
+	});
+
+	it("returns empty for the group's first-ever session", () => {
+		// No prior session dates — every species would be first-ever, so suppress all
+		const highlights = deriveFirstEver(
+			[speciesRow(SESSION_DATE, FIRECREST, 1)],
+			[SESSION_DATE]
+		);
+		expect(highlights).toEqual([]);
+	});
+
+	it('returns empty when no species is new', () => {
+		const highlights = deriveFirstEver([
+			speciesRow(SESSION_DATE, REED_WARBLER, 5),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 3)
+		]);
+		expect(highlights).toEqual([]);
+	});
+});
+
+// ---- buildHighlightSentence — first-ever-species ----
+
+function makeFirstEverHighlight(
+	overrides: Partial<FirstEverSpeciesHighlight> = {}
+): FirstEverSpeciesHighlight {
+	return {
+		type: 'first-ever-species',
+		speciesName: 'Firecrest',
+		...overrides
+	};
+}
+
+describe('buildHighlightSentence — first-ever-species', () => {
+	it('renders first-ever copy', () => {
+		expect(buildHighlightSentence(makeFirstEverHighlight())).toBe(
+			'First ever Firecrest for the group'
+		);
 	});
 });

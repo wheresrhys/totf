@@ -2,6 +2,7 @@
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
 import {
+	deriveFirstEverSpecies,
 	deriveSessionTotalRecords,
 	deriveSpeciesRecords,
 	sortHighlights,
@@ -73,6 +74,7 @@ export async function fetchSessionHighlights({
 	const stats = await fetchSessionStats(viewedGroupId);
 	return sortHighlights([
 		...deriveSessionTotalRecords({ date, stats }),
-		...deriveSpeciesRecords({ date, stats })
+		...deriveSpeciesRecords({ date, stats }),
+		...deriveFirstEverSpecies({ date, stats })
 	]);
 }

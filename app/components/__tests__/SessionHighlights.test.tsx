@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SessionHighlights } from '../SessionHighlights';
-import type { SessionHighlight } from '@/app/models/session-highlights';
+import type {
+	FirstEverSpeciesHighlight,
+	SessionHighlight
+} from '@/app/models/session-highlights';
 
 vi.mock('@/app/actions/session-highlights', () => ({
 	fetchSessionHighlights: vi.fn()
@@ -148,5 +151,24 @@ describe('SessionHighlights', () => {
 		expect(items[1].textContent).toBe(
 			'Record day for Reed Warbler — 12 caught, the most ever'
 		);
+	});
+
+	it('renders first-ever sentences', async () => {
+		const firstEverHighlight: FirstEverSpeciesHighlight = {
+			type: 'first-ever-species',
+			speciesName: 'Firecrest'
+		};
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([firstEverHighlight]);
+		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+		});
+		const items = screen
+			.getByTestId('session-highlights')
+			.querySelectorAll('li');
+		expect(items.length).toBe(1);
+		expect(items[0].textContent).toBe('First ever Firecrest for the group');
 	});
 });

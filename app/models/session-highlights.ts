@@ -64,9 +64,15 @@ export type SpeciesCountRecordHighlight = {
 	isJointPlacement?: boolean;
 };
 
+export type FirstEverSpeciesHighlight = {
+	type: 'first-ever-species';
+	speciesName: string;
+};
+
 export type SessionHighlight =
 	| SessionTotalRecordHighlight
-	| SpeciesCountRecordHighlight;
+	| SpeciesCountRecordHighlight
+	| FirstEverSpeciesHighlight;
 
 type PeriodFields = {
 	scope: RecordScope;
@@ -354,9 +360,44 @@ export function deriveSpeciesRecords({
 	return highlights;
 }
 
+// Returns a highlight for each species seen for the first time on this session.
+// Suppressed entirely for the group's first-ever session (every species would
+// be first, making the highlights uninformative).
+export function deriveFirstEverSpecies({
+	date,
+	stats
+}: {
+	date: string;
+	stats: SessionStatsData;
+}): FirstEverSpeciesHighlight[] {
+	const sessionRows = stats.daySpeciesCounts.filter(
+		(row) => row.visit_date === date
+	);
+	if (sessionRows.length === 0) return [];
+	// Suppress on the group's first-ever session
+	const priorSessionDates = stats.sessionDates.filter(
+		(sessionDate) => sessionDate < date
+	);
+	if (priorSessionDates.length === 0) return [];
+	// Find species with no appearance before this session
+	const speciesOnSession = sessionRows.map((row) => row.species_name);
+	return speciesOnSession
+		.filter(
+			(speciesName) =>
+				!stats.daySpeciesCounts.some(
+					(row) => row.species_name === speciesName && row.visit_date < date
+				)
+		)
+		.map((speciesName) => ({
+			type: 'first-ever-species' as const,
+			speciesName
+		}));
+}
+
 const HIGHLIGHT_TYPE_PRIORITY: SessionHighlight['type'][] = [
 	'session-total-record',
-	'species-count-record'
+	'species-count-record',
+	'first-ever-species'
 ];
 
 export function sortHighlights(
@@ -431,5 +472,7 @@ export function buildHighlightSentence(highlight: SessionHighlight): string {
 			return buildSessionTotalRecordSentence(highlight);
 		case 'species-count-record':
 			return buildSpeciesCountRecordSentence(highlight);
+		case 'first-ever-species':
+			return `First ever ${highlight.speciesName} for the group`;
 	}
 }
