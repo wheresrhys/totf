@@ -30,3 +30,5 @@ export type NotableRetrapsResult =
 	Database['public']['Functions']['notable_retraps']['Returns'][number];
 export type LongAbsenceRetrapsResult =
 	Database['public']['Functions']['long_absence_retraps']['Returns'][number];
+export type StatsPerDayAndSpeciesRow =
+	Database['public']['Functions']['stats_per_day_and_species']['Returns'][number];

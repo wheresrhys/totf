@@ -8,7 +8,8 @@
  * Run with: npm run test:integration
  */
 
-import { describe, it, beforeAll, expect } from 'vitest';
+import { describe, it, beforeAll, afterAll, expect } from 'vitest';
+import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
 import { supabase } from '../../lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -50,16 +51,20 @@ const ARRETRAP_PROVEN_AGE = 3;
 describe('Postgres RPC integration tests', () => {
 	let alphaId: number;
 	let betaId: number;
+	let gammaId: number;
 	let alphaClient: SupabaseClient;
 	let betaClient: SupabaseClient;
+	let gammaClient: SupabaseClient;
 
 	beforeAll(async () => {
 		alphaId = await getGroupIdByName('Alpha');
 		betaId = await getGroupIdByName('Beta');
+		gammaId = await getGroupIdByName('Gamma');
 
-		[alphaClient, betaClient] = await Promise.all([
+		[alphaClient, betaClient, gammaClient] = await Promise.all([
 			getAuthenticatedSupabaseClientForGroup(alphaId),
 			getAuthenticatedSupabaseClientForGroup(betaId),
+			getAuthenticatedSupabaseClientForGroup(gammaId),
 		]);
 	});
 
@@ -638,6 +643,210 @@ describe('Postgres RPC integration tests', () => {
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(0);
+		});
+	});
+
+	describe('stats_per_day_and_species', () => {
+		it('returns encounter count, weighted birds count and weight extremes per day and species', async () => {
+			// Seed 2021-06-20: ARRETRAP (Robin, 18.5) and AWREN001 (Wren, 9.0).
+			const { data, error } = await alphaClient.rpc('stats_per_day_and_species', {
+				ringing_group_filter: alphaId,
+			});
+			expect(error).toBeNull();
+			const dayRows = data!.filter((row) => row.visit_date === '2021-06-20');
+			expect(dayRows).toHaveLength(2);
+			expect(dayRows).toContainEqual({
+				species_name: 'Robin',
+				visit_date: '2021-06-20',
+				encounter_count: 1,
+				weighted_birds_count: 1,
+				min_weight: 18.5,
+				max_weight: 18.5,
+			});
+			expect(dayRows).toContainEqual({
+				species_name: 'Wren',
+				visit_date: '2021-06-20',
+				encounter_count: 1,
+				weighted_birds_count: 1,
+				min_weight: 9,
+				max_weight: 9,
+			});
+		});
+
+		it('aggregates multiple weighted encounters on one day into a single row', async () => {
+			// Seed 2022-06-15 Robins: 19.0, 17.2, 16.5, 20.5, 19.5, 17.0 — six encounters.
+			const { data, error } = await alphaClient.rpc('stats_per_day_and_species', {
+				ringing_group_filter: alphaId,
+			});
+			expect(error).toBeNull();
+			const robinRow = data!.find(
+				(row) => row.visit_date === '2022-06-15' && row.species_name === 'Robin'
+			);
+			expect(robinRow).toEqual({
+				species_name: 'Robin',
+				visit_date: '2022-06-15',
+				encounter_count: 6,
+				weighted_birds_count: 6,
+				min_weight: 16.5,
+				max_weight: 20.5,
+			});
+		});
+
+		it("excludes other groups' data", async () => {
+			// Beta's only session is 2023-06-01 (two Chaffinches + its own SHARED01
+			// Robin encounter). None of Alpha's sessions appear despite Alpha→Beta
+			// sharing, because both Encounters and Sessions are group-filtered.
+			const { data, error } = await betaClient.rpc('stats_per_day_and_species', {
+				ringing_group_filter: betaId,
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(2);
+			expect(data).toContainEqual({
+				species_name: 'Chaffinch',
+				visit_date: '2023-06-01',
+				encounter_count: 2,
+				weighted_birds_count: 2,
+				min_weight: 18.5,
+				max_weight: 20,
+			});
+			expect(data).toContainEqual({
+				species_name: 'Robin',
+				visit_date: '2023-06-01',
+				encounter_count: 1,
+				weighted_birds_count: 1,
+				min_weight: 18.5,
+				max_weight: 18.5,
+			});
+		});
+
+		it('returns no rows for a group with no encounters', async () => {
+			const { data, error } = await gammaClient.rpc('stats_per_day_and_species', {
+				ringing_group_filter: gammaId,
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(0);
+		});
+
+		describe('unweighted encounters', () => {
+			// Seed encounters all carry a weight, so insert Delta-group encounters
+			// (one weighted, two unweighted) across two sessions and clean up after.
+			let deltaId: number;
+			let deltaClient: SupabaseClient;
+			let locationId: number;
+			let sessionIds: number[];
+			let birdIds: number[];
+
+			beforeAll(async () => {
+				deltaId = await getGroupIdByName('Delta');
+				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+				const { data: species } = await supabase
+					.from('Species')
+					.select('id')
+					.eq('species_name', 'Robin')
+					.single();
+
+				const { data: location, error: locationError } = await deltaClient
+					.from('Locations')
+					.insert({
+						location_name: 'Stats Per Day Test Location',
+						ringing_group_id: deltaId,
+					})
+					.select('id')
+					.single();
+				if (locationError) throw locationError;
+				locationId = location!.id;
+
+				const sessions = await Promise.all(
+					['2098-06-01', '2098-06-02'].map((visitDate) =>
+						deltaClient
+							.from('Sessions')
+							.insert({ visit_date: visitDate, location_id: locationId })
+							.select('id')
+							.single()
+					)
+				);
+				sessions.forEach(({ error }) => {
+					if (error) throw error;
+				});
+				sessionIds = sessions.map(({ data }) => data!.id);
+
+				const birds = await Promise.all(
+					['STATSTEST1', 'STATSTEST2', 'STATSTEST3'].map((ringNo) =>
+						deltaClient
+							.from('Birds')
+							.insert({ ring_no: ringNo, species_id: species!.id })
+							.select('id')
+							.single()
+					)
+				);
+				birds.forEach(({ error }) => {
+					if (error) throw error;
+				});
+				birdIds = birds.map(({ data }) => data!.id);
+
+				const baseEncounter = {
+					capture_time: '10:00:00',
+					scheme: 'BTO',
+					sex: 'M',
+					age_code: 1,
+					record_type: 'N',
+				};
+				const { error: encountersError } = await deltaClient
+					.from('Encounters')
+					.insert([
+						// 2098-06-01: one weighted + one unweighted encounter
+						{ ...baseEncounter, bird_id: birdIds[0], session_id: sessionIds[0], weight: 15 },
+						{ ...baseEncounter, bird_id: birdIds[1], session_id: sessionIds[0] },
+						// 2098-06-02: only an unweighted encounter
+						{ ...baseEncounter, bird_id: birdIds[2], session_id: sessionIds[1] },
+					]);
+				if (encountersError) throw encountersError;
+			});
+
+			afterAll(() => {
+				execSync(
+					`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+						`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
+						`DELETE FROM "Locations" WHERE id = ${locationId};'`
+				);
+			});
+
+			it('counts unweighted encounters in encounter_count but not weighted_birds_count', async () => {
+				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
+					ringing_group_filter: deltaId,
+				});
+				expect(error).toBeNull();
+				expect(
+					data!.find((row) => row.visit_date === '2098-06-01')
+				).toEqual({
+					species_name: 'Robin',
+					visit_date: '2098-06-01',
+					encounter_count: 2,
+					weighted_birds_count: 1,
+					min_weight: 15,
+					max_weight: 15,
+				});
+			});
+
+			it('returns null weight extremes and zero weighted_birds_count for a day with only unweighted encounters', async () => {
+				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
+					ringing_group_filter: deltaId,
+				});
+				expect(error).toBeNull();
+				expect(
+					data!.find((row) => row.visit_date === '2098-06-02')
+				).toEqual({
+					species_name: 'Robin',
+					visit_date: '2098-06-02',
+					encounter_count: 1,
+					weighted_birds_count: 0,
+					min_weight: null,
+					max_weight: null,
+				});
+			});
 		});
 	});
 });
