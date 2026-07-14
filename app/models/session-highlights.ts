@@ -57,6 +57,11 @@ export type SpeciesCountRecordHighlight = {
 	seasonPeriodLabel: string;
 	// Set only for all-time ties where the equalled record is over a year old
 	recordEqualledYearsAgo?: number;
+	// Set only for all-time placements: 1 for a tie with the current record
+	// under a year old, 2/3 for days ranking behind the record
+	placementRank?: 1 | 2 | 3;
+	// True when a prior day matches the session's count exactly
+	isJointPlacement?: boolean;
 };
 
 export type SessionHighlight =
@@ -212,6 +217,44 @@ export function deriveSessionTotalRecords({
 	return highlights;
 }
 
+// 2nd/3rd placements are only reported while the top tiers are sparsely
+// held: 2nd place needs fewer than three prior days at the top value, 3rd
+// place needs fewer than three prior days across the top two values. The
+// session must also equal or exceed an included tier value — a count below
+// every prior value is not a placement, however thin the history.
+function deriveAllTimePlacement(
+	sessionValue: number,
+	priorValues: number[]
+): { placementRank: 2 | 3; isJointPlacement: boolean } | null {
+	const distinctValuesDescending = [...new Set(priorValues)].sort(
+		(a, b) => b - a
+	);
+	const [topValue, secondValue, thirdValue] = distinctValuesDescending;
+	const daysAt = (value: number) =>
+		priorValues.filter((priorValue) => priorValue === value).length;
+	const includedValues = [topValue];
+	if (secondValue !== undefined && daysAt(topValue) < 3) {
+		includedValues.push(secondValue);
+		if (
+			thirdValue !== undefined &&
+			daysAt(topValue) + daysAt(secondValue) < 3
+		) {
+			includedValues.push(thirdValue);
+		}
+	}
+	const minIncludedValue = includedValues.at(-1)!;
+	if (sessionValue < minIncludedValue || sessionValue >= topValue) return null;
+	// The tier rule above means at most two prior days can outrank a
+	// qualifying value, so the rank is always 2 or 3
+	const placementRank = (priorValues.filter(
+		(priorValue) => priorValue > sessionValue
+	).length + 1) as 2 | 3;
+	return {
+		placementRank,
+		isJointPlacement: priorValues.includes(sessionValue)
+	};
+}
+
 export function deriveSpeciesRecords({
 	date,
 	stats,
@@ -239,6 +282,8 @@ export function deriveSpeciesRecords({
 	for (const sessionRow of sessionRows) {
 		const { species_name: speciesName, metric_value: sessionValue } =
 			sessionRow;
+		// A single bird is never a notable count, whatever the history says
+		if (sessionValue === 1) continue;
 		for (const scope of RECORD_SCOPES) {
 			const scopeMatcher = getScopeMatcher(scope, sessionDate);
 			const priorRows = stats.daySpeciesCounts.filter(
@@ -274,13 +319,26 @@ export function deriveSpeciesRecords({
 					sessionDate,
 					new Date(mostRecentTieDate)
 				);
-				if (recordEqualledYearsAgo >= 1) {
-					highlights.push({ ...baseHighlight, recordEqualledYearsAgo });
-					break;
+				highlights.push(
+					recordEqualledYearsAgo >= 1
+						? { ...baseHighlight, recordEqualledYearsAgo }
+						: { ...baseHighlight, placementRank: 1, isJointPlacement: true }
+				);
+				break;
+			}
+			if (scope === 'all-time') {
+				const placement = deriveAllTimePlacement(
+					sessionValue,
+					priorRows.map((row) => row.metric_value)
+				);
+				if (placement) {
+					highlights.push({ ...baseHighlight, ...placement });
+					// no break — a narrower scope may still hold a strict record,
+					// reported alongside the placement
 				}
 			}
-			// beaten or unreportable tie at this scope — a narrower scope may
-			// exclude the offending day and still hold a strict record
+			// beaten at this scope — a narrower scope may exclude the
+			// offending day and still hold a strict record
 		}
 	}
 	return highlights;
@@ -339,6 +397,13 @@ function buildSpeciesCountRecordSentence(
 	const valueCopy = `${value} caught`;
 	if (highlight.recordEqualledYearsAgo !== undefined) {
 		return `Record-equalling day for ${speciesName} — ${valueCopy}, most for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)}`;
+	}
+	if (highlight.placementRank !== undefined) {
+		const rankCopy = { 1: 'best', 2: '2nd-best', 3: '3rd-best' }[
+			highlight.placementRank
+		];
+		const jointPrefix = highlight.isJointPlacement ? 'Joint ' : '';
+		return `${jointPrefix}${rankCopy} day for ${speciesName} ever — ${value} birds`;
 	}
 	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight);
 	const mostPhrase =
