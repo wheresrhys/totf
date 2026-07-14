@@ -11,7 +11,7 @@ import {
 } from '@/app/models/seasons';
 import type {
 	DaySpeciesMetricRow,
-	LongAbsenceRetrapRow
+	LongAbsenceRetrapsResult
 } from '@/app/models/db';
 
 export const SESSION_TOTAL_METRICS = ['encounters', 'species'] as const;
@@ -503,12 +503,12 @@ export function deriveFirstOfYearSpecies({
 // order returned by the RPC. The session date is needed to compute the
 // years+months gap relative to the day the bird was last seen.
 export function deriveLongAbsenceRetraps(
-	rows: LongAbsenceRetrapRow[],
+	results: LongAbsenceRetrapsResult[],
 	sessionDate: string
 ): LongAbsenceRetrapHighlight[] {
 	const sessionDateObj = new Date(sessionDate);
-	return rows.map((row) => {
-		const previousDateObj = new Date(row.previous_date);
+	return results.map((result) => {
+		const previousDateObj = new Date(result.previous_date);
 		const duration = intervalToDuration({
 			start: previousDateObj,
 			end: sessionDateObj
@@ -518,9 +518,9 @@ export function deriveLongAbsenceRetraps(
 		const gapMonths = duration.months ?? 0;
 		return {
 			type: 'long-absence-retrap',
-			ringNo: row.ring_no,
-			speciesName: row.species_name,
-			previousDate: row.previous_date,
+			ringNo: result.ring_no,
+			speciesName: result.species_name,
+			previousDate: result.previous_date,
 			gapYears,
 			gapMonths
 		};

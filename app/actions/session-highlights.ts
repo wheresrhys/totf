@@ -13,7 +13,7 @@ import {
 } from '@/app/models/session-highlights';
 import type {
 	DaySpeciesMetricRow,
-	LongAbsenceRetrapRow,
+	LongAbsenceRetrapsResult,
 	TopMetricsFilterParams
 } from '@/app/models/db';
 
@@ -75,21 +75,21 @@ export async function fetchSessionHighlights({
 	viewedGroupId: number;
 }): Promise<SessionHighlight[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	const [stats, longAbsenceRetrapRows] = await Promise.all([
+	const [stats, longAbsenceRetrapResults] = await Promise.all([
 		fetchSessionStats(viewedGroupId),
 		supabase
-			.rpc('session_long_absence_retraps', {
+			.rpc('long_absence_retraps', {
 				session_date: date,
 				ringing_group_filter: viewedGroupId
 			})
 			.then(catchSupabaseErrors)
-			.then((rows) => (rows ?? []) as LongAbsenceRetrapRow[])
+			.then((results) => (results ?? []) as LongAbsenceRetrapsResult[])
 	]);
 	return sortHighlights([
 		...deriveSessionTotalRecords({ date, stats }),
 		...deriveSpeciesRecords({ date, stats }),
 		...deriveFirstEverSpecies({ date, stats }),
 		...deriveFirstOfYearSpecies({ date, stats }),
-		...deriveLongAbsenceRetraps(longAbsenceRetrapRows, date)
+		...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date)
 	]);
 }

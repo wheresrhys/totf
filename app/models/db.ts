@@ -28,5 +28,5 @@ export type DiscrepenciesResult =
 	Database['public']['Functions']['find_discrepencies']['Returns'][number];
 export type NotableRetrapsResult =
 	Database['public']['Functions']['notable_retraps']['Returns'][number];
-export type LongAbsenceRetrapRow =
-	Database['public']['Functions']['session_long_absence_retraps']['Returns'][number];
+export type LongAbsenceRetrapsResult =
+	Database['public']['Functions']['long_absence_retraps']['Returns'][number];

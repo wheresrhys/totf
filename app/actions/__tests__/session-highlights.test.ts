@@ -32,7 +32,7 @@ function pageForRange(pages: unknown[][], fromRow: number) {
 const mockRpcOrder = vi.fn();
 const mockRpcRange = vi.fn();
 // The paginated rpc (metrics_by_period_and_species) returns a query builder;
-// the non-paginated rpc (session_long_absence_retraps) returns a thenable.
+// the non-paginated rpc (long_absence_retraps) returns a thenable.
 const paginatedRpcQueryBuilder = { order: mockRpcOrder, range: mockRpcRange };
 const mockLongAbsenceRpcResult = Promise.resolve({ data: [], error: null });
 const mockRpc = vi.fn();
@@ -67,7 +67,7 @@ beforeEach(() => {
 	sessionPages = [[{ visit_date: '2022-05-01' }, { visit_date: SESSION_DATE }]];
 	// Route rpc calls by function name: paginated vs non-paginated
 	mockRpc.mockImplementation((functionName: string) => {
-		if (functionName === 'session_long_absence_retraps') {
+		if (functionName === 'long_absence_retraps') {
 			return mockLongAbsenceRpcResult;
 		}
 		return paginatedRpcQueryBuilder;
@@ -95,13 +95,13 @@ describe('fetchSessionHighlights', () => {
 			viewedGroupId: GROUP_ID
 		});
 		// Two rpc calls: metrics_by_period_and_species (paginated) and
-		// session_long_absence_retraps (non-paginated)
+		// long_absence_retraps (non-paginated)
 		expect(mockRpc).toHaveBeenCalledTimes(2);
 		const rpcFunctionNames = mockRpc.mock.calls.map(
 			(call) => (call as [string, unknown])[0]
 		);
 		expect(rpcFunctionNames).toContain('metrics_by_period_and_species');
-		expect(rpcFunctionNames).toContain('session_long_absence_retraps');
+		expect(rpcFunctionNames).toContain('long_absence_retraps');
 		const [, metricsArgs] = mockRpc.mock.calls.find(
 			(call) =>
 				(call as [string, unknown])[0] === 'metrics_by_period_and_species'
@@ -199,7 +199,7 @@ describe('fetchSessionHighlights', () => {
 			viewedGroupId: GROUP_ID
 		});
 		// metrics_by_period_and_species is cached (called once), but
-		// session_long_absence_retraps is per-session (called twice)
+		// long_absence_retraps is per-session (called twice)
 		const metricsCalls = mockRpc.mock.calls.filter(
 			(call) => (call as [string])[0] === 'metrics_by_period_and_species'
 		);
