@@ -48,7 +48,11 @@ const mockEncounters = [
 		sexing_method: null,
 		weight: 18.5,
 		wing_length: 75,
-		bird: { ring_no: 'ABC001', species: { id: 1, species_name: 'Robin' } }
+		bird: {
+			ring_no: 'ABC001',
+			proven_age: 5,
+			species: { id: 1, species_name: 'Robin' }
+		}
 	},
 	{
 		id: 2,
@@ -63,7 +67,11 @@ const mockEncounters = [
 		sexing_method: null,
 		weight: null,
 		wing_length: null,
-		bird: { ring_no: 'XYZ002', species: { id: 1, species_name: 'Robin' } }
+		bird: {
+			ring_no: 'XYZ002',
+			proven_age: 2,
+			species: { id: 1, species_name: 'Robin' }
+		}
 	},
 	{
 		id: 3,
@@ -78,7 +86,11 @@ const mockEncounters = [
 		sexing_method: null,
 		weight: 11.0,
 		wing_length: 55,
-		bird: { ring_no: 'DEF003', species: { id: 2, species_name: 'Blue Tit' } }
+		bird: {
+			ring_no: 'DEF003',
+			proven_age: 0,
+			species: { id: 2, species_name: 'Blue Tit' }
+		}
 	}
 ];
 
@@ -140,6 +152,12 @@ describe('session detail page', () => {
 		expect(stats.textContent).toContain('End: 08:30');
 		expect(stats.textContent).toContain('Duration: 30m');
 		expect(stats.textContent).toContain('Net rounds: 3');
+	});
+
+	it('renders the oldest-bird pill with proven age, species and ring number', async () => {
+		render(await renderPage());
+		const stats = await screen.findByTestId('session-stats');
+		expect(stats.textContent).toContain('Oldest: 5 years — Robin (ABC001)');
 	});
 
 	it('renders one table row per species', async () => {
