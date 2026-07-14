@@ -12,9 +12,8 @@ import {
 	type SessionStatsData
 } from '@/app/models/session-highlights';
 import type {
-	DaySpeciesMetricRow,
 	LongAbsenceRetrapsResult,
-	TopMetricsFilterParams
+	StatsPerDayAndSpeciesRow
 } from '@/app/models/db';
 
 // The stats blob only changes when new data is imported, so cache it
@@ -33,15 +32,11 @@ async function fetchSessionStats(
 		return cached.stats;
 	}
 	const supabase = await getAuthenticatedSupabaseClient();
-	const [daySpeciesCounts, sessionRows] = await Promise.all([
-		fetchAllPaginatedRows<DaySpeciesMetricRow>((fromRow, toRow) =>
+	const [daySpeciesStats, sessionRows] = await Promise.all([
+		fetchAllPaginatedRows<StatsPerDayAndSpeciesRow>((fromRow, toRow) =>
 			supabase
-				.rpc('metrics_by_period_and_species', {
-					temporal_unit: 'day',
-					metric_name: 'encounters',
-					filters: {
-						ringing_group_filter: viewedGroupId
-					} as TopMetricsFilterParams
+				.rpc('stats_per_day_and_species', {
+					ringing_group_filter: viewedGroupId
 				})
 				.order('visit_date')
 				.order('species_name')
@@ -57,7 +52,7 @@ async function fetchSessionStats(
 		)
 	]);
 	const stats: SessionStatsData = {
-		daySpeciesCounts,
+		daySpeciesStats,
 		sessionDates: sessionRows.map((row) => row.visit_date)
 	};
 	sessionStatsCache.set(viewedGroupId, {

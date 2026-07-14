@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { TopMetricsFilterParams } from '@/app/models/db';
+import type { StatsPerDayAndSpeciesRow } from '@/app/models/db';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -15,12 +15,23 @@ const PAGE_SIZE = 1000;
 
 // Queries are paginated (PostgREST caps responses at 1000 rows), so the
 // mock builders serve rows page by page from these arrays
-let rpcPages: {
-	species_name: string;
-	visit_date: string;
-	metric_value: number;
-}[][];
+let rpcPages: StatsPerDayAndSpeciesRow[][];
 let sessionPages: { visit_date: string }[][];
+
+function statsRow(
+	species_name: string,
+	visit_date: string,
+	encounter_count: number
+): StatsPerDayAndSpeciesRow {
+	return {
+		species_name,
+		visit_date,
+		encounter_count,
+		weighed_birds_count: 0,
+		min_weight: 0,
+		max_weight: 0
+	};
+}
 
 function pageForRange(pages: unknown[][], fromRow: number) {
 	return Promise.resolve({
@@ -31,7 +42,7 @@ function pageForRange(pages: unknown[][], fromRow: number) {
 
 const mockRpcOrder = vi.fn();
 const mockRpcRange = vi.fn();
-// The paginated rpc (metrics_by_period_and_species) returns a query builder;
+// The paginated rpc (stats_per_day_and_species) returns a query builder;
 // the non-paginated rpc (long_absence_retraps) returns a thenable.
 const paginatedRpcQueryBuilder = { order: mockRpcOrder, range: mockRpcRange };
 const mockLongAbsenceRpcResult = Promise.resolve({ data: [], error: null });
@@ -59,9 +70,9 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	rpcPages = [
 		[
-			{ species_name: 'Robin', visit_date: SESSION_DATE, metric_value: 74 },
-			{ species_name: 'Robin', visit_date: '2022-05-01', metric_value: 30 },
-			{ species_name: 'Wren', visit_date: '2022-05-01', metric_value: 30 }
+			statsRow('Robin', SESSION_DATE, 74),
+			statsRow('Robin', '2022-05-01', 30),
+			statsRow('Wren', '2022-05-01', 30)
 		]
 	];
 	sessionPages = [[{ visit_date: '2022-05-01' }, { visit_date: SESSION_DATE }]];
@@ -94,28 +105,18 @@ describe('fetchSessionHighlights', () => {
 			date: SESSION_DATE,
 			viewedGroupId: GROUP_ID
 		});
-		// Two rpc calls: metrics_by_period_and_species (paginated) and
+		// Two rpc calls: stats_per_day_and_species (paginated) and
 		// long_absence_retraps (non-paginated)
 		expect(mockRpc).toHaveBeenCalledTimes(2);
 		const rpcFunctionNames = mockRpc.mock.calls.map(
 			(call) => (call as [string, unknown])[0]
 		);
-		expect(rpcFunctionNames).toContain('metrics_by_period_and_species');
+		expect(rpcFunctionNames).toContain('stats_per_day_and_species');
 		expect(rpcFunctionNames).toContain('long_absence_retraps');
-		const [, metricsArgs] = mockRpc.mock.calls.find(
-			(call) =>
-				(call as [string, unknown])[0] === 'metrics_by_period_and_species'
-		) as [
-			string,
-			{
-				temporal_unit: string;
-				metric_name: string;
-				filters: TopMetricsFilterParams;
-			}
-		];
-		expect(metricsArgs.temporal_unit).toBe('day');
-		expect(metricsArgs.metric_name).toBe('encounters');
-		expect(metricsArgs.filters.ringing_group_filter).toBe(GROUP_ID);
+		const [, statsArgs] = mockRpc.mock.calls.find(
+			(call) => (call as [string, unknown])[0] === 'stats_per_day_and_species'
+		) as [string, { ringing_group_filter: number }];
+		expect(statsArgs.ringing_group_filter).toBe(GROUP_ID);
 		expect(highlights).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
@@ -154,18 +155,10 @@ describe('fetchSessionHighlights', () => {
 
 	it('derives highlights from rows beyond the first page', async () => {
 		rpcPages = [
-			Array.from({ length: PAGE_SIZE }, (_, index) => ({
-				species_name: `Species ${index}`,
-				visit_date: '2022-05-01',
-				metric_value: 1
-			})),
-			[
-				{
-					species_name: 'Robin',
-					visit_date: SESSION_DATE,
-					metric_value: 2000
-				}
-			]
+			Array.from({ length: PAGE_SIZE }, (_, index) =>
+				statsRow(`Species ${index}`, '2022-05-01', 1)
+			),
+			[statsRow('Robin', SESSION_DATE, 2000)]
 		];
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		const highlights = await fetchSessionHighlights({
@@ -198,10 +191,10 @@ describe('fetchSessionHighlights', () => {
 			date: '2022-05-01',
 			viewedGroupId: GROUP_ID
 		});
-		// metrics_by_period_and_species is cached (called once), but
+		// stats_per_day_and_species is cached (called once), but
 		// long_absence_retraps is per-session (called twice)
 		const metricsCalls = mockRpc.mock.calls.filter(
-			(call) => (call as [string])[0] === 'metrics_by_period_and_species'
+			(call) => (call as [string])[0] === 'stats_per_day_and_species'
 		);
 		expect(metricsCalls).toHaveLength(1);
 		expect(mockEq).toHaveBeenCalledTimes(1);

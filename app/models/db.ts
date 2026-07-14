@@ -19,8 +19,6 @@ export type TopSpeciesArgs =
 
 export type TopMetricsFilterParams =
 	Database['public']['CompositeTypes']['top_metrics_filter_params'];
-export type DaySpeciesMetricRow =
-	Database['public']['Functions']['metrics_by_period_and_species']['Returns'][number];
 export type AggregateStatsRow =
 	Database['public']['Functions']['aggregate_stats']['Returns'][number];
 
