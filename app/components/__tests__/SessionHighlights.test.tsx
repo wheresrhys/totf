@@ -156,7 +156,9 @@ describe('SessionHighlights', () => {
 	it('renders first-ever sentences', async () => {
 		const firstEverHighlight: FirstEverSpeciesHighlight = {
 			type: 'first-ever-species',
-			speciesName: 'Firecrest'
+			speciesName: 'Firecrest',
+			multipleIndividualsRecorded: false,
+			isOnlyRecord: false
 		};
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
@@ -169,6 +171,6 @@ describe('SessionHighlights', () => {
 			.getByTestId('session-highlights')
 			.querySelectorAll('li');
 		expect(items.length).toBe(1);
-		expect(items[0].textContent).toBe('First ever Firecrest for the group');
+		expect(items[0].textContent).toBe('First ever Firecrest record');
 	});
 });
