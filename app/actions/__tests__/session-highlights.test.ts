@@ -182,7 +182,15 @@ describe('fetchSessionHighlights', () => {
 		});
 		expect(mockRpc).toHaveBeenCalledTimes(1);
 		expect(mockEq).toHaveBeenCalledTimes(1);
-		// the cached blob still serves other session dates
-		expect(secondResult).toEqual([]);
+		// the cached blob still serves other session dates — the 2022 session
+		// holds the most-varied record (2 species vs 1 on the 2024 day)
+		expect(secondResult).toEqual([
+			expect.objectContaining({
+				type: 'session-total-record',
+				metric: 'species',
+				scope: 'all-time',
+				value: 2
+			})
+		]);
 	});
 });
