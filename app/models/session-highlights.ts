@@ -69,10 +69,20 @@ export type FirstEverSpeciesHighlight = {
 	speciesName: string;
 };
 
+export type FirstOfYearSpeciesHighlight = {
+	type: 'first-of-year-species';
+	speciesName: string;
+	year: number;
+	// 'of the year' copy is only correct while the session's year is current;
+	// otherwise the sentence uses the absolute year
+	isCurrentYear: boolean;
+};
+
 export type SessionHighlight =
 	| SessionTotalRecordHighlight
 	| SpeciesCountRecordHighlight
-	| FirstEverSpeciesHighlight;
+	| FirstEverSpeciesHighlight
+	| FirstOfYearSpeciesHighlight;
 
 type PeriodFields = {
 	scope: RecordScope;
@@ -394,10 +404,57 @@ export function deriveFirstEverSpecies({
 		}));
 }
 
+// Returns a highlight for each species seen for the first time this calendar
+// year on this session. First-ever species are excluded (the broader
+// first-ever highlight covers them), and the group's first session of the
+// year is suppressed entirely (every species would trivially be first of
+// the year).
+export function deriveFirstOfYearSpecies({
+	date,
+	stats,
+	today = new Date()
+}: {
+	date: string;
+	stats: SessionStatsData;
+	today?: Date;
+}): FirstOfYearSpeciesHighlight[] {
+	const sessionRows = stats.daySpeciesCounts.filter(
+		(row) => row.visit_date === date
+	);
+	if (sessionRows.length === 0) return [];
+	const yearPrefix = `${date.slice(0, 4)}-`;
+	// Suppress on the group's first session of the year
+	const priorSessionDatesThisYear = stats.sessionDates.filter(
+		(sessionDate) => sessionDate.startsWith(yearPrefix) && sessionDate < date
+	);
+	if (priorSessionDatesThisYear.length === 0) return [];
+	const year = Number(date.slice(0, 4));
+	return sessionRows
+		.map((row) => row.species_name)
+		.filter((speciesName) => {
+			const priorDates = stats.daySpeciesCounts
+				.filter(
+					(row) => row.species_name === speciesName && row.visit_date < date
+				)
+				.map((row) => row.visit_date);
+			return (
+				priorDates.length > 0 &&
+				!priorDates.some((priorDate) => priorDate.startsWith(yearPrefix))
+			);
+		})
+		.map((speciesName) => ({
+			type: 'first-of-year-species' as const,
+			speciesName,
+			year,
+			isCurrentYear: year === today.getFullYear()
+		}));
+}
+
 const HIGHLIGHT_TYPE_PRIORITY: SessionHighlight['type'][] = [
 	'session-total-record',
 	'species-count-record',
-	'first-ever-species'
+	'first-ever-species',
+	'first-of-year-species'
 ];
 
 export function sortHighlights(
@@ -474,5 +531,9 @@ export function buildHighlightSentence(highlight: SessionHighlight): string {
 			return buildSpeciesCountRecordSentence(highlight);
 		case 'first-ever-species':
 			return `First ever ${highlight.speciesName} for the group`;
+		case 'first-of-year-species':
+			return `First ${highlight.speciesName} ${
+				highlight.isCurrentYear ? 'of the year' : `of ${highlight.year}`
+			}`;
 	}
 }
