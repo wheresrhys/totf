@@ -98,14 +98,16 @@ describe('fetchSessionHighlights', () => {
 		expect(args.temporal_unit).toBe('day');
 		expect(args.metric_name).toBe('encounters');
 		expect(args.filters.ringing_group_filter).toBe(GROUP_ID);
-		expect(highlights).toEqual([
-			expect.objectContaining({
-				type: 'session-total-record',
-				metric: 'encounters',
-				scope: 'all-time',
-				value: 74
-			})
-		]);
+		expect(highlights).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					type: 'session-total-record',
+					metric: 'encounters',
+					scope: 'all-time',
+					value: 74
+				})
+			])
+		);
 	});
 
 	it('fetches session dates', async () => {

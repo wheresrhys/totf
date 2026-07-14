@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
 	buildHighlightSentence,
 	deriveSessionTotalRecords,
+	deriveSpeciesRecords,
 	type SessionStatsData,
-	type SessionTotalRecordHighlight
+	type SessionTotalRecordHighlight,
+	type SpeciesCountRecordHighlight
 } from '../session-highlights';
 import type { DaySpeciesMetricRow } from '@/app/models/db';
 
@@ -303,5 +305,224 @@ describe('buildHighlightSentence — session-total-record', () => {
 		expect(
 			buildHighlightSentence(makeHighlight({ recordEqualledYearsAgo: 3 }))
 		).toBe('Busiest session for 3 years — 74 birds');
+	});
+});
+
+// ---- deriveSpeciesRecords ----
+
+const REED_WARBLER = 'Reed Warbler';
+const ROBIN = 'Robin';
+
+function speciesRow(
+	date: string,
+	species: string,
+	count: number
+): DaySpeciesMetricRow {
+	return { visit_date: date, species_name: species, metric_value: count };
+}
+
+function statsForSpecies(rows: DaySpeciesMetricRow[]): SessionStatsData {
+	return {
+		daySpeciesCounts: rows,
+		sessionDates: [...new Set(rows.map((row) => row.visit_date))]
+	};
+}
+
+function deriveSpecies(rows: DaySpeciesMetricRow[], today = PAST_PERIOD_TODAY) {
+	return deriveSpeciesRecords({
+		date: SESSION_DATE,
+		stats: statsForSpecies(rows),
+		today
+	});
+}
+
+describe('deriveSpeciesRecords', () => {
+	it('reports the broadest scope achieved per species', () => {
+		// All-time beaten: prior autumn (any-season) had 5, but a spring day also had 5
+		// Session has 10, so it beats all-time
+		const highlights = deriveSpecies([
+			speciesRow(SESSION_DATE, REED_WARBLER, 10),
+			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 5),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 5)
+		]);
+		expect(highlights).toHaveLength(1);
+		expect(highlights[0]).toMatchObject({
+			type: 'species-count-record',
+			speciesName: REED_WARBLER,
+			scope: 'all-time',
+			value: 10
+		});
+	});
+
+	it('reports multiple species records from one session', () => {
+		const highlights = deriveSpecies([
+			speciesRow(SESSION_DATE, REED_WARBLER, 10),
+			speciesRow(SESSION_DATE, ROBIN, 8),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 5),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, ROBIN, 3)
+		]);
+		const speciesNames = highlights.map((h) => h.speciesName);
+		expect(speciesNames).toContain(REED_WARBLER);
+		expect(speciesNames).toContain(ROBIN);
+	});
+
+	it('requires the species to appear on a prior day in scope', () => {
+		// Reed Warbler only appears on the session day — no prior day, no record
+		const highlights = deriveSpecies([
+			speciesRow(SESSION_DATE, REED_WARBLER, 10),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, ROBIN, 3)
+		]);
+		expect(highlights.map((h) => h.speciesName)).not.toContain(REED_WARBLER);
+	});
+
+	it('ignores days after the session date', () => {
+		// A later day with more Reed Warblers should not affect the record
+		const highlights = deriveSpecies([
+			speciesRow(SESSION_DATE, REED_WARBLER, 10),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 5),
+			speciesRow(LATER_DAY, REED_WARBLER, 100)
+		]);
+		expect(highlights).toHaveLength(1);
+		expect(highlights[0]).toMatchObject({
+			speciesName: REED_WARBLER,
+			scope: 'all-time',
+			value: 10
+		});
+	});
+
+	it('reports an all-time tie older than a year as a for-N-years record', () => {
+		// Prior date is >1 year before SESSION_DATE (2024-09-15)
+		const highlights = deriveSpecies([
+			speciesRow(SESSION_DATE, REED_WARBLER, 10),
+			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 10) // 2021-09-10 — 3 years ago
+		]);
+		expect(highlights).toContainEqual(
+			expect.objectContaining({
+				speciesName: REED_WARBLER,
+				scope: 'all-time',
+				value: 10,
+				recordEqualledYearsAgo: 3
+			})
+		);
+	});
+
+	it('ignores ties under a year old and ties in narrower scopes', () => {
+		// all-time tie under a year old — not reportable
+		const tooRecentTie = deriveSpecies([
+			speciesRow(SESSION_DATE, REED_WARBLER, 10),
+			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 10) // 2024-05-01 — < 1 year
+		]);
+		expect(tooRecentTie).toHaveLength(0);
+
+		// all-time beaten by a big non-autumn day, any-season tied — tie not reportable
+		const anySeasonTie = deriveSpecies([
+			speciesRow(SESSION_DATE, REED_WARBLER, 10),
+			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 20), // beats all-time
+			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 10) // any-season tie
+		]);
+		expect(anySeasonTie).toHaveLength(0);
+	});
+
+	it('sets current-period flags from the injected today', () => {
+		// today during the session period: isCurrentYear and isCurrentSeason both true
+		const highlights = deriveSpecies(
+			[
+				speciesRow(SESSION_DATE, REED_WARBLER, 10),
+				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 5)
+			],
+			new Date('2024-10-20')
+		);
+		expect(highlights).toContainEqual(
+			expect.objectContaining({
+				speciesName: REED_WARBLER,
+				isCurrentYear: true,
+				isCurrentSeason: true
+			})
+		);
+	});
+});
+
+// ---- buildHighlightSentence — species-count-record ----
+
+function makeSpeciesHighlight(
+	overrides: Partial<SpeciesCountRecordHighlight>
+): SpeciesCountRecordHighlight {
+	return {
+		type: 'species-count-record',
+		speciesName: 'Reed Warbler',
+		scope: 'all-time',
+		value: 12,
+		seasonName: 'autumn',
+		year: 2024,
+		isCurrentYear: false,
+		isCurrentSeason: false,
+		seasonPeriodLabel: 'autumn 2024',
+		...overrides
+	};
+}
+
+describe('buildHighlightSentence — species-count-record', () => {
+	it('renders all-time copy', () => {
+		expect(buildHighlightSentence(makeSpeciesHighlight({}))).toBe(
+			'Record day for Reed Warbler — 12 caught, the most ever'
+		);
+	});
+
+	it('renders any-season copy', () => {
+		expect(
+			buildHighlightSentence(makeSpeciesHighlight({ scope: 'any-season' }))
+		).toBe('Record day for Reed Warbler — 12 caught, the most in any autumn');
+	});
+
+	it('renders current-year this-year copy ("this year")', () => {
+		expect(
+			buildHighlightSentence(
+				makeSpeciesHighlight({ scope: 'this-year', isCurrentYear: true })
+			)
+		).toBe('Record day for Reed Warbler — 12 caught, the most this year');
+	});
+
+	it('renders past-year this-year copy ("of 2024")', () => {
+		expect(
+			buildHighlightSentence(makeSpeciesHighlight({ scope: 'this-year' }))
+		).toBe('Record day for Reed Warbler — 12 caught, the most in 2024');
+	});
+
+	it('renders current-season this-season copy ("this autumn")', () => {
+		expect(
+			buildHighlightSentence(
+				makeSpeciesHighlight({ scope: 'this-season', isCurrentSeason: true })
+			)
+		).toBe('Record day for Reed Warbler — 12 caught, the most this autumn');
+	});
+
+	it('renders past-period this-season copy ("in autumn 2024")', () => {
+		expect(
+			buildHighlightSentence(makeSpeciesHighlight({ scope: 'this-season' }))
+		).toBe('Record day for Reed Warbler — 12 caught, the most in autumn 2024');
+	});
+
+	it('renders past winter copy ("in winter 2023/24")', () => {
+		expect(
+			buildHighlightSentence(
+				makeSpeciesHighlight({
+					scope: 'this-season',
+					seasonName: 'winter',
+					seasonPeriodLabel: 'winter 2023/24'
+				})
+			)
+		).toBe(
+			'Record day for Reed Warbler — 12 caught, the most in winter 2023/24'
+		);
+	});
+
+	it('renders record-equalling for-N-years copy', () => {
+		expect(
+			buildHighlightSentence(
+				makeSpeciesHighlight({ recordEqualledYearsAgo: 2 })
+			)
+		).toBe(
+			'Record-equalling day for Reed Warbler — 12 caught, most for 2 years'
+		);
 	});
 });

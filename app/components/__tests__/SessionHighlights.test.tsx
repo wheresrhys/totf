@@ -32,6 +32,31 @@ const mockHighlights: SessionHighlight[] = [
 	}
 ];
 
+const mockHighlightsWithSpeciesRecord: SessionHighlight[] = [
+	{
+		type: 'session-total-record',
+		metric: 'encounters',
+		scope: 'all-time',
+		value: 74,
+		seasonName: 'autumn',
+		year: 2024,
+		isCurrentYear: false,
+		isCurrentSeason: false,
+		seasonPeriodLabel: 'autumn 2024'
+	},
+	{
+		type: 'species-count-record',
+		speciesName: 'Reed Warbler',
+		scope: 'all-time',
+		value: 12,
+		seasonName: 'autumn',
+		year: 2024,
+		isCurrentYear: false,
+		isCurrentSeason: false,
+		seasonPeriodLabel: 'autumn 2024'
+	}
+];
+
 describe('SessionHighlights', () => {
 	afterEach(() => {
 		cleanup();
@@ -103,5 +128,25 @@ describe('SessionHighlights', () => {
 		});
 		expect(container.innerHTML).toBe('');
 		expect(consoleErrorSpy).toHaveBeenCalled();
+	});
+
+	it('renders species record sentences alongside session-total records', async () => {
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue(
+			mockHighlightsWithSpeciesRecord
+		);
+		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+		});
+		const items = screen
+			.getByTestId('session-highlights')
+			.querySelectorAll('li');
+		expect(items.length).toBe(2);
+		expect(items[0].textContent).toBe('Busiest session ever — 74 birds');
+		expect(items[1].textContent).toBe(
+			'Record day for Reed Warbler — 12 caught, the most ever'
+		);
 	});
 });

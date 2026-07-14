@@ -43,7 +43,58 @@ export type SessionTotalRecordHighlight = {
 	recordEqualledYearsAgo?: number;
 };
 
-export type SessionHighlight = SessionTotalRecordHighlight;
+export type SpeciesCountRecordHighlight = {
+	type: 'species-count-record';
+	speciesName: string;
+	scope: RecordScope;
+	value: number;
+	seasonName: string;
+	year: number;
+	// 'this year' / 'this autumn' copy is only correct while the session's
+	// period is still current; otherwise the sentence uses the absolute labels
+	isCurrentYear: boolean;
+	isCurrentSeason: boolean;
+	seasonPeriodLabel: string;
+	// Set only for all-time ties where the equalled record is over a year old
+	recordEqualledYearsAgo?: number;
+};
+
+export type SessionHighlight =
+	| SessionTotalRecordHighlight
+	| SpeciesCountRecordHighlight;
+
+type PeriodFields = {
+	scope: RecordScope;
+	seasonName: string;
+	year: number;
+	isCurrentYear: boolean;
+	isCurrentSeason: boolean;
+	seasonPeriodLabel: string;
+};
+
+// Returns the scope-qualified phrase for "this year" / "this season" scopes
+// where the copy changes depending on whether the period is still current.
+// Handles the shared conditional logic for both session-total and species-record families.
+// Returns null for all-time and any-season, which each family phrases differently.
+// yearPreposition: 'in' for species-count ("the most in 2024"),
+//                  'of' for session-total ("Busiest session of 2024")
+export function buildCurrentPeriodScopePhrase(
+	fields: PeriodFields,
+	yearPreposition: 'in' | 'of' = 'in'
+): string | null {
+	switch (fields.scope) {
+		case 'this-year':
+			return fields.isCurrentYear
+				? 'this year'
+				: `${yearPreposition} ${fields.year}`;
+		case 'this-season':
+			return fields.isCurrentSeason
+				? `this ${fields.seasonName}`
+				: `in ${fields.seasonPeriodLabel}`;
+		default:
+			return null;
+	}
+}
 
 type DayTotals = {
 	date: string;
@@ -161,8 +212,83 @@ export function deriveSessionTotalRecords({
 	return highlights;
 }
 
+export function deriveSpeciesRecords({
+	date,
+	stats,
+	today = new Date()
+}: {
+	date: string;
+	stats: SessionStatsData;
+	today?: Date;
+}): SpeciesCountRecordHighlight[] {
+	const sessionDate = new Date(date);
+	const sessionRows = stats.daySpeciesCounts.filter(
+		(row) => row.visit_date === date
+	);
+	if (sessionRows.length === 0) return [];
+
+	const sharedFields = {
+		seasonName: getSeasonName(sessionDate),
+		year: sessionDate.getFullYear(),
+		isCurrentYear: sessionDate.getFullYear() === today.getFullYear(),
+		isCurrentSeason: isCurrentSeasonPeriod(sessionDate, today),
+		seasonPeriodLabel: getSeasonPeriodLabel(sessionDate)
+	};
+
+	const highlights: SpeciesCountRecordHighlight[] = [];
+	for (const sessionRow of sessionRows) {
+		const { species_name: speciesName, metric_value: sessionValue } =
+			sessionRow;
+		for (const scope of RECORD_SCOPES) {
+			const scopeMatcher = getScopeMatcher(scope, sessionDate);
+			const priorRows = stats.daySpeciesCounts.filter(
+				(row) =>
+					row.species_name === speciesName &&
+					row.visit_date < date &&
+					scopeMatcher(row.visit_date)
+			);
+			// A record requires the species to appear on at least one prior day
+			// in scope (otherwise it's first-ever territory, covered by #317)
+			if (priorRows.length === 0) continue;
+			const previousBest = Math.max(
+				...priorRows.map((row) => row.metric_value)
+			);
+			const baseHighlight: SpeciesCountRecordHighlight = {
+				type: 'species-count-record',
+				speciesName,
+				scope,
+				value: sessionValue,
+				...sharedFields
+			};
+			if (sessionValue > previousBest) {
+				highlights.push(baseHighlight);
+				break;
+			}
+			if (sessionValue === previousBest && scope === 'all-time') {
+				const mostRecentTieDate = priorRows
+					.filter((row) => row.metric_value === previousBest)
+					.map((row) => row.visit_date)
+					.sort()
+					.at(-1)!;
+				const recordEqualledYearsAgo = differenceInYears(
+					sessionDate,
+					new Date(mostRecentTieDate)
+				);
+				if (recordEqualledYearsAgo >= 1) {
+					highlights.push({ ...baseHighlight, recordEqualledYearsAgo });
+					break;
+				}
+			}
+			// beaten or unreportable tie at this scope — a narrower scope may
+			// exclude the offending day and still hold a strict record
+		}
+	}
+	return highlights;
+}
+
 const HIGHLIGHT_TYPE_PRIORITY: SessionHighlight['type'][] = [
-	'session-total-record'
+	'session-total-record',
+	'species-count-record'
 ];
 
 export function sortHighlights(
@@ -183,34 +309,52 @@ const SESSION_TOTAL_METRIC_COPY: Record<
 	species: { descriptor: 'Most varied', unit: 'species' }
 };
 
+function buildYearsAgoCopy(yearsAgo: number): string {
+	return `${yearsAgo} ${yearsAgo === 1 ? 'year' : 'years'}`;
+}
+
 function buildSessionTotalRecordSentence(
 	highlight: SessionTotalRecordHighlight
 ): string {
 	const { descriptor, unit } = SESSION_TOTAL_METRIC_COPY[highlight.metric];
 	const valueCopy = `${highlight.value} ${unit}`;
 	if (highlight.recordEqualledYearsAgo !== undefined) {
-		const yearsCopy = `${highlight.recordEqualledYearsAgo} ${highlight.recordEqualledYearsAgo === 1 ? 'year' : 'years'}`;
-		return `${descriptor} session for ${yearsCopy} — ${valueCopy}`;
+		return `${descriptor} session for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)} — ${valueCopy}`;
 	}
-	switch (highlight.scope) {
-		case 'all-time':
-			return `${descriptor} session ever — ${valueCopy}`;
-		case 'any-season':
-			return `${descriptor} ${highlight.seasonName} session ever — ${valueCopy}`;
-		case 'this-year':
-			return highlight.isCurrentYear
-				? `${descriptor} session this year — ${valueCopy}`
-				: `${descriptor} session of ${highlight.year} — ${valueCopy}`;
-		case 'this-season':
-			return highlight.isCurrentSeason
-				? `${descriptor} session this ${highlight.seasonName} — ${valueCopy}`
-				: `${descriptor} session in ${highlight.seasonPeriodLabel} — ${valueCopy}`;
+	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight, 'of');
+	if (currentPeriodPhrase !== null) {
+		return `${descriptor} session ${currentPeriodPhrase} — ${valueCopy}`;
 	}
+	// Remaining cases: all-time and any-season (this-year / this-season handled above)
+	if (highlight.scope === 'any-season') {
+		return `${descriptor} ${highlight.seasonName} session ever — ${valueCopy}`;
+	}
+	return `${descriptor} session ever — ${valueCopy}`;
+}
+
+function buildSpeciesCountRecordSentence(
+	highlight: SpeciesCountRecordHighlight
+): string {
+	const { speciesName, value } = highlight;
+	const valueCopy = `${value} caught`;
+	if (highlight.recordEqualledYearsAgo !== undefined) {
+		return `Record-equalling day for ${speciesName} — ${valueCopy}, most for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)}`;
+	}
+	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight);
+	const mostPhrase =
+		currentPeriodPhrase !== null
+			? `the most ${currentPeriodPhrase}`
+			: highlight.scope === 'all-time'
+				? 'the most ever'
+				: `the most in any ${highlight.seasonName}`;
+	return `Record day for ${speciesName} — ${valueCopy}, ${mostPhrase}`;
 }
 
 export function buildHighlightSentence(highlight: SessionHighlight): string {
 	switch (highlight.type) {
 		case 'session-total-record':
 			return buildSessionTotalRecordSentence(highlight);
+		case 'species-count-record':
+			return buildSpeciesCountRecordSentence(highlight);
 	}
 }
