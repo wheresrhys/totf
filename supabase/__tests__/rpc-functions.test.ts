@@ -647,7 +647,7 @@ describe('Postgres RPC integration tests', () => {
 	});
 
 	describe('stats_per_day_and_species', () => {
-		it('returns encounter count, weighted birds count and weight extremes per day and species', async () => {
+		it('returns encounter count, weighed birds count and weight extremes per day and species', async () => {
 			// Seed 2021-06-20: ARRETRAP (Robin, 18.5) and AWREN001 (Wren, 9.0).
 			const { data, error } = await alphaClient.rpc('stats_per_day_and_species', {
 				ringing_group_filter: alphaId,
@@ -659,7 +659,7 @@ describe('Postgres RPC integration tests', () => {
 				species_name: 'Robin',
 				visit_date: '2021-06-20',
 				encounter_count: 1,
-				weighted_birds_count: 1,
+				weighed_birds_count: 1,
 				min_weight: 18.5,
 				max_weight: 18.5,
 			});
@@ -667,13 +667,13 @@ describe('Postgres RPC integration tests', () => {
 				species_name: 'Wren',
 				visit_date: '2021-06-20',
 				encounter_count: 1,
-				weighted_birds_count: 1,
+				weighed_birds_count: 1,
 				min_weight: 9,
 				max_weight: 9,
 			});
 		});
 
-		it('aggregates multiple weighted encounters on one day into a single row', async () => {
+		it('aggregates multiple weighed encounters on one day into a single row', async () => {
 			// Seed 2022-06-15 Robins: 19.0, 17.2, 16.5, 20.5, 19.5, 17.0 — six encounters.
 			const { data, error } = await alphaClient.rpc('stats_per_day_and_species', {
 				ringing_group_filter: alphaId,
@@ -686,7 +686,7 @@ describe('Postgres RPC integration tests', () => {
 				species_name: 'Robin',
 				visit_date: '2022-06-15',
 				encounter_count: 6,
-				weighted_birds_count: 6,
+				weighed_birds_count: 6,
 				min_weight: 16.5,
 				max_weight: 20.5,
 			});
@@ -705,7 +705,7 @@ describe('Postgres RPC integration tests', () => {
 				species_name: 'Chaffinch',
 				visit_date: '2023-06-01',
 				encounter_count: 2,
-				weighted_birds_count: 2,
+				weighed_birds_count: 2,
 				min_weight: 18.5,
 				max_weight: 20,
 			});
@@ -713,7 +713,7 @@ describe('Postgres RPC integration tests', () => {
 				species_name: 'Robin',
 				visit_date: '2023-06-01',
 				encounter_count: 1,
-				weighted_birds_count: 1,
+				weighed_birds_count: 1,
 				min_weight: 18.5,
 				max_weight: 18.5,
 			});
@@ -727,9 +727,9 @@ describe('Postgres RPC integration tests', () => {
 			expect(data).toHaveLength(0);
 		});
 
-		describe('unweighted encounters', () => {
+		describe('unweighed encounters', () => {
 			// Seed encounters all carry a weight, so insert Delta-group encounters
-			// (one weighted, two unweighted) across two sessions and clean up after.
+			// (one weighed, two unweighed) across two sessions and clean up after.
 			let deltaId: number;
 			let deltaClient: SupabaseClient;
 			let locationId: number;
@@ -795,10 +795,10 @@ describe('Postgres RPC integration tests', () => {
 				const { error: encountersError } = await deltaClient
 					.from('Encounters')
 					.insert([
-						// 2098-06-01: one weighted + one unweighted encounter
+						// 2098-06-01: one weighed + one unweighed encounter
 						{ ...baseEncounter, bird_id: birdIds[0], session_id: sessionIds[0], weight: 15 },
 						{ ...baseEncounter, bird_id: birdIds[1], session_id: sessionIds[0] },
-						// 2098-06-02: only an unweighted encounter
+						// 2098-06-02: only an unweighed encounter
 						{ ...baseEncounter, bird_id: birdIds[2], session_id: sessionIds[1] },
 					]);
 				if (encountersError) throw encountersError;
@@ -814,7 +814,7 @@ describe('Postgres RPC integration tests', () => {
 				);
 			});
 
-			it('counts unweighted encounters in encounter_count but not weighted_birds_count', async () => {
+			it('counts unweighed encounters in encounter_count but not weighed_birds_count', async () => {
 				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
 					ringing_group_filter: deltaId,
 				});
@@ -825,13 +825,13 @@ describe('Postgres RPC integration tests', () => {
 					species_name: 'Robin',
 					visit_date: '2098-06-01',
 					encounter_count: 2,
-					weighted_birds_count: 1,
+					weighed_birds_count: 1,
 					min_weight: 15,
 					max_weight: 15,
 				});
 			});
 
-			it('returns null weight extremes and zero weighted_birds_count for a day with only unweighted encounters', async () => {
+			it('returns null weight extremes and zero weighed_birds_count for a day with only unweighed encounters', async () => {
 				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
 					ringing_group_filter: deltaId,
 				});
@@ -842,7 +842,7 @@ describe('Postgres RPC integration tests', () => {
 					species_name: 'Robin',
 					visit_date: '2098-06-02',
 					encounter_count: 1,
-					weighted_birds_count: 0,
+					weighed_birds_count: 0,
 					min_weight: null,
 					max_weight: null,
 				});

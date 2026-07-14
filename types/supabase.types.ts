@@ -425,7 +425,7 @@ export type Database = {
           min_weight: number
           species_name: string
           visit_date: string
-          weighted_birds_count: number
+          weighed_birds_count: number
         }[]
       }
       text_soundex: { Args: { "": string }; Returns: string }

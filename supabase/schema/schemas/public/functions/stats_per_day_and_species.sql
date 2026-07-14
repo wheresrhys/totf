@@ -2,7 +2,7 @@ CREATE FUNCTION public.stats_per_day_and_species (ringing_group_filter bigint) R
 	species_name text,
 	visit_date date,
 	encounter_count bigint,
-	weighted_birds_count bigint,
+	weighed_birds_count bigint,
 	min_weight numeric,
 	max_weight numeric
 ) LANGUAGE plpgsql STABLE
@@ -15,7 +15,7 @@ BEGIN
     sp.species_name AS species_name,
     sess.visit_date AS visit_date,
     COUNT(e.*) AS encounter_count,
-    COUNT(e.*) FILTER (WHERE e.weight IS NOT NULL) AS weighted_birds_count,
+    COUNT(e.*) FILTER (WHERE e.weight IS NOT NULL) AS weighed_birds_count,
     MIN(e.weight::numeric) AS min_weight,
     MAX(e.weight::numeric) AS max_weight
   FROM
