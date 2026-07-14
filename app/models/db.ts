@@ -30,3 +30,5 @@ export type NotableRetrapsResult =
 	Database['public']['Functions']['notable_retraps']['Returns'][number];
 export type LongAbsenceRetrapsResult =
 	Database['public']['Functions']['long_absence_retraps']['Returns'][number];
+export type SessionWeightExtremesResult =
+	Database['public']['Functions']['session_weight_extremes']['Returns'][number];

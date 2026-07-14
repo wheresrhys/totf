@@ -640,4 +640,108 @@ describe('Postgres RPC integration tests', () => {
 			expect(data).toHaveLength(0);
 		});
 	});
+
+	describe('session_weight_extremes', () => {
+		// Seed Alpha weights (weighed encounters, per species and date):
+		//   Robin — prior to 2023-05-12 the heaviest was 20.5 (AR0008, 2022-06-15);
+		//     on 2023-05-12 AR0018 = 21.0 beats it, and 21 prior weighed encounters
+		//     comfortably clear the default min_prior_weighed of 3.
+		//   Reed Warbler — prior to 2022-08-10 min 11.0 (2022-06-15) / max 12.0
+		//     (2022-06-15) over 4 weighed encounters; on 2022-08-10 ARWRBL006 = 11.0
+		//     ties the lightest and ARWRBL007 = 12.1 beats the heaviest.
+		it('returns a heaviest record beating the prior max with enough prior weights', async () => {
+			const { data, error } = await alphaClient.rpc('session_weight_extremes', {
+				session_date: '2023-05-12',
+				ringing_group_filter: alphaId,
+			});
+			expect(error).toBeNull();
+			expect(data).toEqual([
+				{
+					species_name: 'Robin',
+					ring_no: 'AR0018',
+					weight: 21,
+					extreme_type: 'heaviest',
+					previous_extreme: 20.5,
+					previous_extreme_date: '2022-06-15',
+				},
+			]);
+		});
+
+		it('excludes species with fewer than min_prior_weighed prior weighed encounters', async () => {
+			// On 2022-04-30 the only prior weighed encounter is ARRETRAP (Robin, 18.5,
+			// 2021-06-20) — a single prior weight, below the default min of 3 — so no
+			// species qualifies for a comparison.
+			const { data, error } = await alphaClient.rpc('session_weight_extremes', {
+				session_date: '2022-04-30',
+				ringing_group_filter: alphaId,
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(0);
+		});
+
+		it('returns ties with previous_extreme and previous_extreme_date populated', async () => {
+			const { data, error } = await alphaClient.rpc('session_weight_extremes', {
+				session_date: '2022-08-10',
+				ringing_group_filter: alphaId,
+			});
+			expect(error).toBeNull();
+			expect(data).toEqual([
+				{
+					species_name: 'Reed Warbler',
+					ring_no: 'ARWRBL007',
+					weight: 12.1,
+					extreme_type: 'heaviest',
+					previous_extreme: 12,
+					previous_extreme_date: '2022-06-15',
+				},
+				{
+					species_name: 'Reed Warbler',
+					ring_no: 'ARWRBL006',
+					weight: 11,
+					extreme_type: 'lightest',
+					previous_extreme: 11,
+					previous_extreme_date: '2022-06-15',
+				},
+			]);
+		});
+
+		it('returns lightest extreme and one row per species when min_prior_weighed=1', async () => {
+			// On 2022-04-30 the sole prior weight is ARRETRAP (Robin, 18.5, 2021-06-20).
+			// With min_prior_weighed=1 the Robins beat it both ways: AR0003 (20.0) is the
+			// heaviest and AR0002 (16.8) the lightest — one row per (species, extreme).
+			const { data, error } = await alphaClient.rpc('session_weight_extremes', {
+				session_date: '2022-04-30',
+				ringing_group_filter: alphaId,
+				min_prior_weighed: 1,
+			});
+			expect(error).toBeNull();
+			expect(data).toEqual([
+				{
+					species_name: 'Robin',
+					ring_no: 'AR0003',
+					weight: 20,
+					extreme_type: 'heaviest',
+					previous_extreme: 18.5,
+					previous_extreme_date: '2021-06-20',
+				},
+				{
+					species_name: 'Robin',
+					ring_no: 'AR0002',
+					weight: 16.8,
+					extreme_type: 'lightest',
+					previous_extreme: 18.5,
+					previous_extreme_date: '2021-06-20',
+				},
+			]);
+		});
+
+		it('returns empty for a date with no session', async () => {
+			const { data, error } = await alphaClient.rpc('session_weight_extremes', {
+				session_date: '2099-01-01',
+				ringing_group_filter: alphaId,
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(0);
+		});
+	});
 });
