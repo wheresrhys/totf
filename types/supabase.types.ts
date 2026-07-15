@@ -315,6 +315,7 @@ export type Database = {
         Returns: {
           bird_id: number
           discrepency_type: string
+          last_encounter_date: string
           ring_no: string
           species_name: string
         }[]

@@ -559,14 +559,18 @@ describe('Postgres RPC integration tests', () => {
 			});
 			expect(error).toBeNull();
 			const rows = data!
-				.map((r) => ({ ring_no: r.ring_no, type: r.discrepency_type }))
+				.map((r) => ({
+					ring_no: r.ring_no,
+					type: r.discrepency_type,
+					last_encounter_date: r.last_encounter_date,
+				}))
 				.sort((a, b) => a.ring_no.localeCompare(b.ring_no) || a.type.localeCompare(b.type));
 			expect(rows).toEqual([
-				{ ring_no: 'ABTITMIS',  type: 'age' },
-				{ ring_no: 'ABTITMIS',  type: 'sex' },
-				{ ring_no: 'AKINGF001', type: 'age' },
-				{ ring_no: 'ARRETRAP',  type: 'age' },
-				{ ring_no: 'ARRETRAP',  type: 'wing_length' },
+				{ ring_no: 'ABTITMIS',  type: 'age',         last_encounter_date: '2022-06-15' },
+				{ ring_no: 'ABTITMIS',  type: 'sex',         last_encounter_date: '2022-06-15' },
+				{ ring_no: 'AKINGF001', type: 'age',         last_encounter_date: '2023-07-08' },
+				{ ring_no: 'ARRETRAP',  type: 'age',         last_encounter_date: '2024-05-10' },
+				{ ring_no: 'ARRETRAP',  type: 'wing_length', last_encounter_date: '2024-05-10' },
 			]);
 		});
 

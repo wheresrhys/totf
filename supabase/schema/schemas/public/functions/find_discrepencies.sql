@@ -2,7 +2,8 @@ CREATE FUNCTION public.find_discrepencies (ringing_group_filter bigint DEFAULT N
 	bird_id bigint,
 	ring_no text,
 	species_name text,
-	discrepency_type text
+	discrepency_type text,
+	last_encounter_date date
 ) LANGUAGE plpgsql STABLE
 SET
 	search_path TO 'public',
@@ -68,6 +69,7 @@ WITH
 		SELECT
 			MAX(hatch_ages.min_hatch_year) AS max_min_year,
 			MIN(hatch_ages.max_hatch_year) AS min_max_year,
+			MAX(hatch_ages.visit_date) AS last_encounter_date,
 			hatch_ages.bird_id as bird_id,
 			hatch_ages.ring_no as ring_no,
 			hatch_ages.species_name as species_name
@@ -83,10 +85,12 @@ WITH
 			b.id AS bird_id,
 			b.ring_no AS ring_no,
 			s.species_name,
-			count(DISTINCT e.sex) AS sex_count
+			count(DISTINCT e.sex) AS sex_count,
+			MAX(sess.visit_date) AS last_encounter_date
 		FROM
 			"Birds" b
 			JOIN "Encounters" e ON e.bird_id = b.id
+			JOIN "Sessions" sess ON sess.id = e.session_id
 			JOIN "Species" s ON s.id = b.species_id
 		WHERE
 			NOT e.sex ILIKE 'u'
@@ -100,9 +104,11 @@ WITH
   b.ring_no as ring_no,
   s.species_name,
   MAX(e.wing_length) as max_wing_length,
-  MIN(e.wing_length) as min_wing_length
+  MIN(e.wing_length) as min_wing_length,
+  MAX(sess.visit_date) as last_encounter_date
 from "Birds" b
 JOIN "Encounters" e on e.bird_id = b.id
+JOIN "Sessions" sess on sess.id = e.session_id
 JOIN "Species" s on s.id = b.species_id
 WHERE e.wing_length IS NOT NULL
 AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
@@ -112,7 +118,8 @@ SELECT
 	hatch_year_differences.bird_id as bird_id,
 	hatch_year_differences.ring_no as ring_no,
 	hatch_year_differences.species_name as species_name,
-	'age' as discrepency_type
+	'age' as discrepency_type,
+	hatch_year_differences.last_encounter_date as last_encounter_date
 FROM
 	hatch_year_differences
 WHERE
@@ -123,7 +130,8 @@ SELECT
 	sex_counts.bird_id as bird_id,
 	sex_counts.ring_no as ring_no,
 	sex_counts.species_name as species_name,
-  'sex' as discrepency_type
+  'sex' as discrepency_type,
+	sex_counts.last_encounter_date as last_encounter_date
 FROM
 	sex_counts
 WHERE
@@ -133,7 +141,8 @@ SELECT
   wing_lengths.bird_id as bird_id,
   wing_lengths.ring_no as ring_no,
   wing_lengths.species_name as species_name,
-  'wing_length' as discrepency_type
+  'wing_length' as discrepency_type,
+  wing_lengths.last_encounter_date as last_encounter_date
 FROM wing_lengths
 WHERE max_wing_length - min_wing_length >= 5;
 
