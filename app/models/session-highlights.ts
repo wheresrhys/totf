@@ -1,7 +1,9 @@
 import {
 	differenceInYears,
 	format as formatDate,
-	intervalToDuration
+	intervalToDuration,
+	isBefore,
+	subMonths
 } from 'date-fns';
 import {
 	getSeasonMonths,
@@ -107,6 +109,23 @@ export type LongAbsenceRetrapHighlight = {
 	gapMonths: number;
 };
 
+// A busiest/quietest comparison against the most recent prior session day
+// that equalled or exceeded (busiest) / equalled or undershot (quietest) the
+// session's encounter total — "Busiest session since 12 May 2023"
+export const SINCE_COMPARISON_KINDS = ['busiest', 'quietest'] as const;
+export type SinceComparisonKind = (typeof SINCE_COMPARISON_KINDS)[number];
+
+export type SinceComparisonHighlight = {
+	type: 'since-comparison';
+	kind: SinceComparisonKind;
+	// The session's encounter total
+	value: number;
+	// ISO date of the most recent prior session day that matched the
+	// comparison (undefined for a quietest-ever highlight — no prior day
+	// undershot or matched the session)
+	sinceDate?: string;
+};
+
 // Which end of the weight range broke a record this session
 export const WEIGHT_RECORD_EXTREMES = ['heaviest', 'lightest'] as const;
 export type WeightRecordExtreme = (typeof WEIGHT_RECORD_EXTREMES)[number];
@@ -126,6 +145,7 @@ export type WeightRecordHighlight = {
 
 export type SessionHighlight =
 	| SessionTotalRecordHighlight
+	| SinceComparisonHighlight
 	| SpeciesCountRecordHighlight
 	| FirstEverSpeciesHighlight
 	| FirstOfYearSpeciesHighlight
@@ -283,6 +303,92 @@ export function deriveSessionTotalRecords({
 		}
 	}
 	return highlights;
+}
+
+// Busiest/quietest-since compares the session's encounter total against
+// prior session days only (later days can't have happened yet from the
+// editorial's point of view):
+// - busiest-since: the most recent prior day whose total >= the session's;
+//   the session has been the busiest since that day. No qualifying prior day
+//   means the session is the busiest ever — suppressed here, since the
+//   all-time busiest record from the totals family already reports it.
+// - quietest-since: the most recent prior day whose total <= the session's;
+//   the session has been the quietest since that day. No qualifying prior day
+//   means "Quietest session ever", except on the group's first session.
+// Both are only reported when the since date is more than a month before the
+// session (a recent since date isn't editorial-worthy), and when both qualify
+// only the one with the earlier since date is reported.
+export function deriveSinceHighlights({
+	date,
+	stats
+}: {
+	date: string;
+	stats: SessionStatsData;
+}): SinceComparisonHighlight[] {
+	const sessionDate = new Date(date);
+	const dayTotals = buildDayTotals(stats);
+	const currentDay = dayTotals.find((day) => day.date === date);
+	if (!currentDay) return [];
+	const sessionValue = currentDay.encounters;
+	const priorDays = dayTotals
+		.filter((day) => day.date < date)
+		.sort((a, b) => a.date.localeCompare(b.date));
+
+	// A since date only counts as "more than a month before the session" when
+	// it falls strictly before the day one month prior to the session
+	const oneMonthBeforeSession = subMonths(sessionDate, 1);
+	const isOverAMonthBefore = (sinceDate: string) =>
+		isBefore(new Date(sinceDate), oneMonthBeforeSession);
+
+	const busiestSinceDate = priorDays
+		.filter((day) => day.encounters >= sessionValue)
+		.map((day) => day.date)
+		.at(-1);
+	const quietestSinceDate = priorDays
+		.filter((day) => day.encounters <= sessionValue)
+		.map((day) => day.date)
+		.at(-1);
+
+	const candidates: SinceComparisonHighlight[] = [];
+	// Busiest is suppressed with no qualifying prior day — that case is the
+	// all-time busiest record, already covered by the totals family
+	if (busiestSinceDate !== undefined && isOverAMonthBefore(busiestSinceDate)) {
+		candidates.push({
+			type: 'since-comparison',
+			kind: 'busiest',
+			value: sessionValue,
+			sinceDate: busiestSinceDate
+		});
+	}
+	if (quietestSinceDate === undefined) {
+		// No prior day matched or undershot — quietest ever, unless this is the
+		// group's first session (nothing to be quieter than)
+		if (priorDays.length > 0) {
+			candidates.push({
+				type: 'since-comparison',
+				kind: 'quietest',
+				value: sessionValue
+			});
+		}
+	} else if (isOverAMonthBefore(quietestSinceDate)) {
+		candidates.push({
+			type: 'since-comparison',
+			kind: 'quietest',
+			value: sessionValue,
+			sinceDate: quietestSinceDate
+		});
+	}
+
+	if (candidates.length < 2) return candidates;
+	// Both qualify — report only the one with the earlier since date. A
+	// quietest-ever highlight has no since date but reaches back further than
+	// any dated comparison, so it always wins the tie-break.
+	const earliest = candidates.reduce((earlier, candidate) => {
+		if (earlier.sinceDate === undefined) return earlier;
+		if (candidate.sinceDate === undefined) return candidate;
+		return candidate.sinceDate < earlier.sinceDate ? candidate : earlier;
+	});
+	return [earliest];
 }
 
 // 2nd/3rd placements are only reported while the top tiers are sparsely
@@ -637,6 +743,7 @@ export function deriveWeightRecordBreakers({
 
 const HIGHLIGHT_TYPE_PRIORITY: SessionHighlight['type'][] = [
 	'session-total-record',
+	'since-comparison',
 	'species-count-record',
 	'first-ever-species',
 	'first-of-year-species',
@@ -721,6 +828,26 @@ const WEIGHT_RECORD_DESCRIPTOR: Record<WeightRecordExtreme, string> = {
 	lightest: 'Lightest'
 };
 
+const SINCE_COMPARISON_DESCRIPTOR: Record<SinceComparisonKind, string> = {
+	busiest: 'Busiest',
+	quietest: 'Quietest'
+};
+
+function buildSinceComparisonSentence(
+	highlight: SinceComparisonHighlight
+): string {
+	const descriptor = SINCE_COMPARISON_DESCRIPTOR[highlight.kind];
+	const valueCopy = `${highlight.value} birds`;
+	if (highlight.sinceDate === undefined) {
+		return `${descriptor} session ever — ${valueCopy}`;
+	}
+	const formattedSinceDate = formatDate(
+		new Date(highlight.sinceDate),
+		'd MMM yyyy'
+	);
+	return `${descriptor} session since ${formattedSinceDate} — ${valueCopy}`;
+}
+
 function buildWeightRecordSentence(highlight: WeightRecordHighlight): string {
 	const { speciesName, extreme, weight } = highlight;
 	const descriptor = WEIGHT_RECORD_DESCRIPTOR[extreme];
@@ -734,6 +861,8 @@ export function buildHighlightSentence(highlight: SessionHighlight): string {
 	switch (highlight.type) {
 		case 'session-total-record':
 			return buildSessionTotalRecordSentence(highlight);
+		case 'since-comparison':
+			return buildSinceComparisonSentence(highlight);
 		case 'species-count-record':
 			return buildSpeciesCountRecordSentence(highlight);
 		case 'first-ever-species':

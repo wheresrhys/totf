@@ -201,6 +201,80 @@ describe('SessionHighlights', () => {
 		);
 	});
 
+	it('renders a full mixed set of highlights in priority order', async () => {
+		// One highlight from every family, already in priority order (the action
+		// sorts before returning); the component renders them as given
+		const mixedHighlights: SessionHighlight[] = [
+			{
+				type: 'session-total-record',
+				metric: 'encounters',
+				scope: 'all-time',
+				value: 74,
+				seasonName: 'autumn',
+				year: 2024,
+				isCurrentYear: false,
+				isCurrentSeason: false,
+				seasonPeriodLabel: 'autumn 2024'
+			},
+			{
+				type: 'since-comparison',
+				kind: 'quietest',
+				value: 3,
+				sinceDate: '2023-09-14'
+			},
+			{
+				type: 'species-count-record',
+				speciesName: 'Reed Warbler',
+				scope: 'all-time',
+				value: 12,
+				seasonName: 'autumn',
+				year: 2024,
+				isCurrentYear: false,
+				isCurrentSeason: false,
+				seasonPeriodLabel: 'autumn 2024'
+			},
+			{
+				type: 'first-ever-species',
+				speciesName: 'Firecrest',
+				multipleIndividualsRecorded: false,
+				isOnlyRecord: false
+			},
+			{
+				type: 'long-absence-retrap',
+				ringNo: 'ARRETRAP',
+				speciesName: 'Robin',
+				previousDate: '2021-06-20',
+				gapYears: 2,
+				gapMonths: 10
+			},
+			{
+				type: 'weight-record',
+				speciesName: 'Blue Tit',
+				extreme: 'heaviest',
+				weight: 13.1,
+				previousRecord: 13.0
+			}
+		];
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue(mixedHighlights);
+		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+		});
+		const items = screen
+			.getByTestId('session-highlights')
+			.querySelectorAll('li');
+		expect([...items].map((item) => item.textContent)).toEqual([
+			'Busiest session ever — 74 birds',
+			'Quietest session since 14 Sep 2023 — 3 birds',
+			'Record day for Reed Warbler — 12 caught, the most ever',
+			'First ever Firecrest record',
+			'Robin ARRETRAP recaught after 2 years, 10 months away (last seen 20 Jun 2021)',
+			'Heaviest Blue Tit ever weighed — 13.1g (previous record 13g)'
+		]);
+	});
+
 	it('renders weight record sentences', async () => {
 		const weightHighlight: WeightRecordHighlight = {
 			type: 'weight-record',
