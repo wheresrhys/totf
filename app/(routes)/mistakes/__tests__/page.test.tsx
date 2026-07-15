@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import Page from '../page';
 import mistakesSnapshot from '@/test-fixtures/snapshots/fetchMistakes.alpha.json';
 import type { DiscrepenciesResult } from '@/app/models/db';
@@ -78,6 +78,46 @@ describe('mistakes page', () => {
 			(m) => m.discrepency_type === firstActiveType
 		)!;
 		expect(link?.getAttribute('href')).toBe(`/bird/${firstOfType.ring_no}`);
+	});
+
+	it('renders a "Last seen" column header', async () => {
+		render(await Page());
+		const table = await screen.findByRole('table');
+		const headers = [...table.querySelectorAll('thead th')].map(
+			(th) => th.textContent
+		);
+		expect(headers).toContain('Species');
+		expect(headers).toContain('Last seen');
+	});
+
+	it("renders each row's formatted last encounter date", async () => {
+		render(await Page());
+		const table = await screen.findByRole('table');
+		// ARRETRAP (Robin) last seen 2024-05-10, in the 'age' tab
+		expect(table.textContent).toContain('10 May 2024');
+	});
+
+	it('sorts rows by species ascending on first render', async () => {
+		render(await Page());
+		const table = await screen.findByRole('table');
+		const firstRowSpecies = table
+			.querySelectorAll('tbody tr')[0]
+			.querySelectorAll('td')[1].textContent;
+		// age tab species: Blue Tit, Kingfisher, Robin -> Blue Tit first
+		expect(firstRowSpecies).toBe('Blue Tit');
+	});
+
+	it('re-sorts by last seen when the column header is clicked', async () => {
+		render(await Page());
+		const table = await screen.findByRole('table');
+		const lastSeenHeader = [...table.querySelectorAll('thead th')].find((th) =>
+			th.textContent?.includes('Last seen')
+		)!;
+		fireEvent.click(lastSeenHeader);
+		const rows = table.querySelectorAll('tbody tr');
+		// desc: most recent first -> ARRETRAP (Robin) 2024-05-10
+		expect(rows[0].textContent).toContain('Robin');
+		expect(rows[0].textContent).toContain('10 May 2024');
 	});
 
 	it('renders empty tab gracefully when no data', async () => {
