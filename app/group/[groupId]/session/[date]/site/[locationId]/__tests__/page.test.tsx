@@ -57,11 +57,18 @@ const mockEncounters = [
 	}
 ];
 
+const mockPreviousSession = [{ visit_date: '2024-03-01' }];
+const mockNextSession = [{ visit_date: '2024-04-01' }];
+
 function makeSessionClient() {
 	const makeChain = (data: unknown) => ({
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
 		in: vi.fn().mockReturnThis(),
+		lt: vi.fn().mockReturnThis(),
+		gt: vi.fn().mockReturnThis(),
+		order: vi.fn().mockReturnThis(),
+		limit: vi.fn().mockReturnThis(),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({ data, error: null }).then(resolve)
 	});
@@ -69,6 +76,8 @@ function makeSessionClient() {
 		from: vi
 			.fn()
 			.mockReturnValueOnce(makeChain(mockSessions))
+			.mockReturnValueOnce(makeChain(mockPreviousSession))
+			.mockReturnValueOnce(makeChain(mockNextSession))
 			.mockReturnValueOnce(makeChain(mockEncounters))
 	};
 }
