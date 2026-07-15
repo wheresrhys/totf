@@ -59,7 +59,7 @@ CREATE FUNCTION public.aggregate_stats (
     WHERE (from_date IS NULL OR sess.visit_date >=from_date)
      AND (to_date IS NULL OR sess.visit_date<=to_date)
      AND (species_name_filter IS NULL OR sp.species_name = species_name_filter)
-     AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
+     AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
   ), species_spine AS (
     SELECT
       DISTINCT re.species_id, re.species_name

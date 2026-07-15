@@ -12,7 +12,7 @@ BEGIN
   JOIN "Encounters" e  ON e.bird_id = b.id
   JOIN "Sessions"   s  ON s.id = e.session_id
   JOIN "Species"    sp ON sp.id = b.species_id
-  WHERE (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
+  WHERE (ringing_group_filter IS NULL OR s.ringing_group_id = ringing_group_filter)
   GROUP BY b.ring_no, sp.species_name
   HAVING COUNT(*) = COUNT(*) FILTER (WHERE e.record_type = 'S')
   ORDER BY b.ring_no;

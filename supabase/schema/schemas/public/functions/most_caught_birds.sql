@@ -29,7 +29,7 @@ BEGIN
   WHERE
     (species_filter IS NULL OR sp.species_name ilike species_filter) AND
     (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
-		AND (ringing_group_filter IS NULL OR en.ringing_group_id = ringing_group_filter)
+		AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
   GROUP BY
     sp.species_name,
     b.ring_no
