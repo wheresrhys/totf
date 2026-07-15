@@ -1,13 +1,13 @@
 'use server';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import type { AggregateStatsRow } from '@/app/models/db';
+import type { AggregateStatsResult } from '@/app/models/db';
 
 export async function fetchSpeciesData(
 	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsRow[]> {
+): Promise<AggregateStatsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('aggregate_stats', {
@@ -16,5 +16,5 @@ export async function fetchSpeciesData(
 			ringing_group_filter: viewedGroupId,
 			group_by_species: true
 		})
-		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
+		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
 }

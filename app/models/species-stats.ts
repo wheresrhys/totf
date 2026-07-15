@@ -1,8 +1,8 @@
-import type { AggregateStatsRow } from './db';
+import type { AggregateStatsResult } from './db';
 
 export type SpeciesStatConfig = {
 	label: string;
-	property: keyof AggregateStatsRow;
+	property: keyof AggregateStatsResult;
 	suffix?: string;
 	category?: string;
 	prefix?: string;

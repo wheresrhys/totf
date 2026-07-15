@@ -7,7 +7,7 @@ import {
 	type ColumnConfig,
 	type RowModelWithRawData
 } from '@/app/components/shared/SortableTable';
-import type { AggregateStatsRow } from '@/app/models/db';
+import type { AggregateStatsResult } from '@/app/models/db';
 
 const yearComparisonStatConfigs = speciesStatConfigs.filter(
 	(c) => c.property !== 'species_name'
@@ -22,12 +22,12 @@ const yearComparisonColumnConfigs = {
 		}),
 		{}
 	)
-} as Record<keyof AggregateStatsRow, ColumnConfig>;
+} as Record<keyof AggregateStatsResult, ColumnConfig>;
 
 function YearComparisonTableBody({
 	data
 }: {
-	data: RowModelWithRawData<AggregateStatsRow, AggregateStatsRow>[];
+	data: RowModelWithRawData<AggregateStatsResult, AggregateStatsResult>[];
 }) {
 	return (
 		<tbody>
@@ -50,7 +50,7 @@ export function SpYearComparisonTab({
 	speciesName: string;
 	viewedGroupId: number;
 }) {
-	const [yearData, setYearData] = useState<AggregateStatsRow[]>([]);
+	const [yearData, setYearData] = useState<AggregateStatsResult[]>([]);
 	const [isLoaded, setIsLoaded] = useState(false);
 
 	useEffect(() => {
@@ -74,7 +74,7 @@ export function SpYearComparisonTab({
 	}
 
 	return (
-		<SortableTable<AggregateStatsRow, AggregateStatsRow>
+		<SortableTable<AggregateStatsResult, AggregateStatsResult>
 			columnConfigs={yearComparisonColumnConfigs}
 			data={yearData}
 			initialSortColumn="time_period"

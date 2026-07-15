@@ -1,10 +1,10 @@
 import { LineChart, type LineChartData } from 'react-chartkick';
-import type { AggregateStatsRow } from '@/app/models/db';
+import type { AggregateStatsResult } from '@/app/models/db';
 import { useEffect, useState } from 'react';
 import { getSpeciesStatsHistory } from '../actions/sp-data';
 import { SecondaryHeading } from './shared/DesignSystem';
 
-function getCounts(statsHistory: AggregateStatsRow[]): LineChartData[] {
+function getCounts(statsHistory: AggregateStatsResult[]): LineChartData[] {
 	return [
 		{
 			name: 'encounters',
@@ -17,7 +17,7 @@ function getCounts(statsHistory: AggregateStatsRow[]): LineChartData[] {
 	];
 }
 
-function getYoungsters(statsHistory: AggregateStatsRow[]): LineChartData[] {
+function getYoungsters(statsHistory: AggregateStatsResult[]): LineChartData[] {
 	return [
 		{
 			name: '3j',
@@ -41,7 +41,7 @@ function getYoungsters(statsHistory: AggregateStatsRow[]): LineChartData[] {
 	];
 }
 
-function getSizes(statsHistory: AggregateStatsRow[]): LineChartData[] {
+function getSizes(statsHistory: AggregateStatsResult[]): LineChartData[] {
 	return [
 		{
 			name: 'max weight',
@@ -78,7 +78,7 @@ export function StatsHistoryChart({
 	speciesName: string;
 	viewedGroupId: number;
 }) {
-	const [statsHistory, setStatsHistory] = useState<AggregateStatsRow[]>([]);
+	const [statsHistory, setStatsHistory] = useState<AggregateStatsResult[]>([]);
 	useEffect(() => {
 		if (statsHistory.length > 0) return;
 		getSpeciesStatsHistory(speciesName, viewedGroupId).then((data) => {

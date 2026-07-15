@@ -12,7 +12,7 @@ import {
 	isCurrentSeasonPeriod
 } from '@/app/models/seasons';
 import type {
-	StatsPerDayAndSpeciesRow,
+	StatsPerDayAndSpeciesResult,
 	LongAbsenceRetrapsResult
 } from '@/app/models/db';
 
@@ -33,7 +33,7 @@ export type RecordScope = (typeof RECORD_SCOPES)[number];
 // weighed-bird counts, weight extremes) plus the full list of session
 // dates (so zero-encounter sessions still count)
 export type SessionStatsData = {
-	daySpeciesStats: StatsPerDayAndSpeciesRow[];
+	daySpeciesStats: StatsPerDayAndSpeciesResult[];
 	sessionDates: string[];
 };
 

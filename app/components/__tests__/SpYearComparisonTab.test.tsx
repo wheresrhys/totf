@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SpYearComparisonTab } from '../SpYearComparisonTab';
 import yearComparisonSnapshot from '@/test-fixtures/snapshots/getSpeciesYearComparison.alpha.robin.json';
-import type { AggregateStatsRow } from '@/app/models/db';
+import type { AggregateStatsResult } from '@/app/models/db';
 
 vi.mock('@/app/actions/sp-data', () => ({
 	getSpeciesYearComparison: vi.fn()
@@ -16,13 +16,13 @@ describe('SpYearComparisonTab', () => {
 	beforeEach(async () => {
 		const { getSpeciesYearComparison } = await import('@/app/actions/sp-data');
 		vi.mocked(getSpeciesYearComparison).mockResolvedValue(
-			yearComparisonSnapshot as unknown as AggregateStatsRow[]
+			yearComparisonSnapshot as unknown as AggregateStatsResult[]
 		);
 	});
 
 	it('shows a loading spinner while data is fetching', async () => {
 		const { getSpeciesYearComparison } = await import('@/app/actions/sp-data');
-		let resolveData!: (v: AggregateStatsRow[]) => void;
+		let resolveData!: (v: AggregateStatsResult[]) => void;
 		vi.mocked(getSpeciesYearComparison).mockReturnValue(
 			new Promise((resolve) => {
 				resolveData = resolve;
@@ -30,7 +30,7 @@ describe('SpYearComparisonTab', () => {
 		);
 		render(<SpYearComparisonTab speciesName="Robin" viewedGroupId={1} />);
 		expect(document.querySelector('.loading')).toBeDefined();
-		resolveData(yearComparisonSnapshot as unknown as AggregateStatsRow[]);
+		resolveData(yearComparisonSnapshot as unknown as AggregateStatsResult[]);
 	});
 
 	it('renders a row per year once loaded', async () => {

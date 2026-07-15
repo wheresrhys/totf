@@ -1,10 +1,10 @@
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import type { AggregateStatsRow } from '@/app/models/db';
+import type { AggregateStatsResult } from '@/app/models/db';
 
 export type PayOffStatsData = {
-	yearly: AggregateStatsRow[];
-	monthly: AggregateStatsRow[];
+	yearly: AggregateStatsResult[];
+	monthly: AggregateStatsResult[];
 };
 
 export async function fetchPayOffStats(
@@ -18,14 +18,14 @@ export async function fetchPayOffStats(
 				group_by_species: false,
 				group_by_time_period: 'year'
 			})
-			.then(catchSupabaseErrors) as Promise<AggregateStatsRow[] | null>,
+			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>,
 		supabase
 			.rpc('aggregate_stats', {
 				ringing_group_filter: viewedGroupId,
 				group_by_species: false,
 				group_by_time_period: 'month'
 			})
-			.then(catchSupabaseErrors) as Promise<AggregateStatsRow[] | null>
+			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
 	]);
 	if (yearly == null || monthly == null) {
 		return null;
