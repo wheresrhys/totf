@@ -91,6 +91,16 @@ export function makeHighlighter(
 	return () => false;
 }
 
+// Encounter data only changes when the group imports a CSV, so within a page
+// lifetime it is safe to reuse previously fetched results when a row is
+// collapsed and re-expanded. Failed fetches cache nothing, so re-expanding
+// the row retries.
+const cachedBirdEncounters = new Map<string, EncounterOfBird[]>();
+
+export function clearCachedBirdEncountersForTesting(): void {
+	cachedBirdEncounters.clear();
+}
+
 function LazyBirdDetail({
 	model
 }: {
@@ -100,7 +110,20 @@ function LazyBirdDetail({
 	const { ring_no, discrepency_type } = model._rawRowData;
 
 	useEffect(() => {
-		fetchBirdEncounters(ring_no).then(setEncounters);
+		const cached = cachedBirdEncounters.get(ring_no);
+		if (cached) {
+			setEncounters(cached);
+			return;
+		}
+		fetchBirdEncounters(ring_no).then(
+			(fetchedEncounters) => {
+				cachedBirdEncounters.set(ring_no, fetchedEncounters);
+				setEncounters(fetchedEncounters);
+			},
+			() => {
+				// Leave the loading state; re-expanding the row retries the fetch
+			}
+		);
 	}, [ring_no]);
 
 	if (!encounters) {

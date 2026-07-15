@@ -13,42 +13,6 @@ type AccordionTableProps<ItemModel> = {
 	columnCount: number;
 };
 
-// const [birdDetail, setBirdDetail] = useState<Encounter[]>(
-//   expandedBird === ring_no ? encounters : []
-// );
-// function toggleBirdDetail() {
-//   if (expandedBird === ring_no) {
-//     onExpand(null);
-//     setBirdDetail([]);
-//   } else {
-//     onExpand(ring_no);
-//     setBirdDetail(encounters);
-//   }
-// }
-
-// function ExpandableRowWrapper<ItemModel>({
-//   ExpandedContentComponent
-//   model
-// }: {
-//   ExpandedContentComponent: AccordionTableComponent<ItemModel>;
-//   model: ItemModel;
-// }) {
-
-//   const [expandedData, setExpandedData] = useState<Encounter[]>(
-//     expandedBird === ring_no ? encounters : []
-//   );
-//   function toggleBirdDetail() {
-//     if (expandedBird === ring_no) {
-//       onExpand(null);
-//       setBirdDetail([]);
-//     } else {
-//       onExpand(ring_no);
-//       setBirdDetail(encounters);
-//     }
-//   }
-
-// }
-
 export function AccordionTableBody<ItemModel>({
 	FirstColumnComponent,
 	RestColumnsComponent,
@@ -72,7 +36,6 @@ export function AccordionTableBody<ItemModel>({
 							<td className="flex justify-left gap-2">
 								<button
 									type="button"
-									// className="btn btn-outline btn-secondary btn-xs btn-square"
 									onClick={() => setExpandedRow(isExpanded ? false : rowId)}
 								>
 									<span
