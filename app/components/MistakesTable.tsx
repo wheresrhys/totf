@@ -1,18 +1,46 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { format as formatDate } from 'date-fns';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { AccordionTableBody } from '@/app/components/shared/AccordionTableBody';
 import { SingleBirdTable } from '@/app/components/SingleBirdTable';
 import { fetchBirdEncounters } from '@/app/actions/bird-encounters';
 import type { DiscrepenciesResult } from '@/app/models/db';
 import type { EncounterOfBird } from '@/app/models/bird';
-import type { RowModelWithRawData } from '@/app/components/shared/SortableTable';
+import {
+	SortableTable,
+	type ColumnConfig,
+	type RowModelWithRawData,
+	getFormattedValue
+} from '@/app/components/shared/SortableTable';
 import { TabNav } from '@/app/components/TabNav';
 
 type MistakesRowModel = {
 	ringNo: string;
 	speciesName: string;
+	lastEncounterDate: Date;
 };
+
+function dateFormatter(value: unknown): string {
+	return formatDate(value as Date, 'dd MMM yyyy');
+}
+
+const columnConfigs = {
+	ringNo: {
+		label: 'Bird',
+		invertSort: true
+	},
+	speciesName: {
+		label: 'Species',
+		invertSort: true
+	},
+	lastEncounterDate: {
+		label: 'Last seen',
+		formatter: dateFormatter
+	}
+} as Record<keyof MistakesRowModel, ColumnConfig>;
+
+const cellFormatter = getFormattedValue<MistakesRowModel>(columnConfigs);
 
 function formatTabLabel(discrepancyType: string): string {
 	const withSpaces = discrepancyType.replace(/_/g, ' ');
@@ -105,7 +133,20 @@ function RestColumns({
 }: {
 	model: RowModelWithRawData<DiscrepenciesResult, MistakesRowModel>;
 }) {
-	return <td>{model.speciesName}</td>;
+	return (
+		<>
+			<td>{model.speciesName}</td>
+			<td>{cellFormatter(model.lastEncounterDate, 'lastEncounterDate')}</td>
+		</>
+	);
+}
+
+function rowDataTransform(mistake: DiscrepenciesResult): MistakesRowModel {
+	return {
+		ringNo: mistake.ring_no,
+		speciesName: mistake.species_name,
+		lastEncounterDate: new Date(mistake.last_encounter_date)
+	};
 }
 
 function MistakesDiscrepancyTable({
@@ -113,30 +154,25 @@ function MistakesDiscrepancyTable({
 }: {
 	mistakes: DiscrepenciesResult[];
 }) {
-	const data: RowModelWithRawData<DiscrepenciesResult, MistakesRowModel>[] =
-		mistakes.map((mistake) => ({
-			ringNo: mistake.ring_no,
-			speciesName: mistake.species_name,
-			_rawRowData: mistake
-		}));
-
 	return (
-		<table className="table">
-			<thead>
-				<tr>
-					<th>Bird</th>
-					<th>Species</th>
-				</tr>
-			</thead>
-			<AccordionTableBody
-				data={data}
-				getKey={(item) => item.ringNo}
-				columnCount={2}
-				FirstColumnComponent={RingCell}
-				RestColumnsComponent={RestColumns}
-				ExpandedContentComponent={LazyBirdDetail}
-			/>
-		</table>
+		<SortableTable<DiscrepenciesResult, MistakesRowModel>
+			columnConfigs={columnConfigs}
+			data={mistakes}
+			initialSortColumn="speciesName"
+			rowDataTransform={rowDataTransform}
+			TableBodyComponent={({ data }) => (
+				<AccordionTableBody<
+					RowModelWithRawData<DiscrepenciesResult, MistakesRowModel>
+				>
+					data={data}
+					getKey={(item) => item.ringNo}
+					columnCount={Object.keys(columnConfigs).length}
+					FirstColumnComponent={RingCell}
+					RestColumnsComponent={RestColumns}
+					ExpandedContentComponent={LazyBirdDetail}
+				/>
+			)}
+		/>
 	);
 }
 
