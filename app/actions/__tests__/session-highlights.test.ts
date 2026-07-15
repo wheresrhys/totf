@@ -181,6 +181,43 @@ describe('fetchSessionHighlights', () => {
 		);
 	});
 
+	it('includes weight record highlights in the fan-out', async () => {
+		rpcPages = [
+			[
+				{
+					species_name: 'Blue Tit',
+					visit_date: SESSION_DATE,
+					encounter_count: 5,
+					weighed_birds_count: 5,
+					min_weight: 11,
+					max_weight: 13.1
+				},
+				{
+					species_name: 'Blue Tit',
+					visit_date: '2022-05-01',
+					encounter_count: 4,
+					weighed_birds_count: 4,
+					min_weight: 10.5,
+					max_weight: 13.0
+				}
+			]
+		];
+		const fetchSessionHighlights = await importFetchSessionHighlights();
+		const highlights = await fetchSessionHighlights({
+			date: SESSION_DATE,
+			viewedGroupId: GROUP_ID
+		});
+		expect(highlights).toContainEqual(
+			expect.objectContaining({
+				type: 'weight-record',
+				speciesName: 'Blue Tit',
+				extreme: 'heaviest',
+				weight: 13.1,
+				previousRecord: 13.0
+			})
+		);
+	});
+
 	it('returns cached data within the TTL', async () => {
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		await fetchSessionHighlights({

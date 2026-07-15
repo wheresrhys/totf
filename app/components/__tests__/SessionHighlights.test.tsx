@@ -4,7 +4,8 @@ import { SessionHighlights } from '../SessionHighlights';
 import type {
 	FirstEverSpeciesHighlight,
 	LongAbsenceRetrapHighlight,
-	SessionHighlight
+	SessionHighlight,
+	WeightRecordHighlight
 } from '@/app/models/session-highlights';
 
 vi.mock('@/app/actions/session-highlights', () => ({
@@ -197,6 +198,30 @@ describe('SessionHighlights', () => {
 		expect(items.length).toBe(1);
 		expect(items[0].textContent).toBe(
 			'Robin ARRETRAP recaught after 2 years, 10 months away (last seen 20 Jun 2021)'
+		);
+	});
+
+	it('renders weight record sentences', async () => {
+		const weightHighlight: WeightRecordHighlight = {
+			type: 'weight-record',
+			speciesName: 'Blue Tit',
+			extreme: 'heaviest',
+			weight: 13.1,
+			previousRecord: 13.0
+		};
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([weightHighlight]);
+		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+		});
+		const items = screen
+			.getByTestId('session-highlights')
+			.querySelectorAll('li');
+		expect(items.length).toBe(1);
+		expect(items[0].textContent).toBe(
+			'Heaviest Blue Tit ever weighed — 13.1g (previous record 13g)'
 		);
 	});
 });
