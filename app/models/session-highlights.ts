@@ -10,7 +10,7 @@ import {
 	isCurrentSeasonPeriod
 } from '@/app/models/seasons';
 import type {
-	DaySpeciesMetricRow,
+	StatsPerDayAndSpeciesRow,
 	LongAbsenceRetrapsResult
 } from '@/app/models/db';
 
@@ -27,10 +27,11 @@ export const RECORD_SCOPES = [
 export type RecordScope = (typeof RECORD_SCOPES)[number];
 
 // Everything needed to compare a session against the group's history,
-// fetched once per group: per-day-per-species encounter counts plus the
-// full list of session dates (so zero-encounter sessions still count)
+// fetched once per group: per-day-per-species stats (encounter counts,
+// weighed-bird counts, weight extremes) plus the full list of session
+// dates (so zero-encounter sessions still count)
 export type SessionStatsData = {
-	daySpeciesCounts: DaySpeciesMetricRow[];
+	daySpeciesStats: StatsPerDayAndSpeciesRow[];
 	sessionDates: string[];
 };
 
@@ -155,20 +156,20 @@ type DayTotals = {
 // Highlights compare the session against every other session in scope,
 // whenever it happened — later data can erase or demote a record
 export function buildDayTotals({
-	daySpeciesCounts,
+	daySpeciesStats,
 	sessionDates
 }: SessionStatsData): DayTotals[] {
 	const totalsByDate = new Map<string, DayTotals>();
 	for (const date of sessionDates) {
 		totalsByDate.set(date, { date, encounters: 0, species: 0 });
 	}
-	for (const row of daySpeciesCounts) {
+	for (const row of daySpeciesStats) {
 		const dayTotals = totalsByDate.get(row.visit_date) ?? {
 			date: row.visit_date,
 			encounters: 0,
 			species: 0
 		};
-		dayTotals.encounters += row.metric_value;
+		dayTotals.encounters += row.encounter_count;
 		dayTotals.species += 1;
 		totalsByDate.set(row.visit_date, dayTotals);
 	}
@@ -314,7 +315,7 @@ export function deriveSpeciesRecords({
 	today?: Date;
 }): SpeciesCountRecordHighlight[] {
 	const sessionDate = new Date(date);
-	const sessionRows = stats.daySpeciesCounts.filter(
+	const sessionRows = stats.daySpeciesStats.filter(
 		(row) => row.visit_date === date
 	);
 	if (sessionRows.length === 0) return [];
@@ -329,13 +330,13 @@ export function deriveSpeciesRecords({
 
 	const highlights: SpeciesCountRecordHighlight[] = [];
 	for (const sessionRow of sessionRows) {
-		const { species_name: speciesName, metric_value: sessionValue } =
+		const { species_name: speciesName, encounter_count: sessionValue } =
 			sessionRow;
 		// A single bird is never a notable count, whatever the history says
 		if (sessionValue === 1) continue;
 		for (const scope of RECORD_SCOPES) {
 			const scopeMatcher = getScopeMatcher(scope, sessionDate);
-			const otherRowsInScope = stats.daySpeciesCounts.filter(
+			const otherRowsInScope = stats.daySpeciesStats.filter(
 				(row) =>
 					row.species_name === speciesName &&
 					row.visit_date !== date &&
@@ -345,7 +346,7 @@ export function deriveSpeciesRecords({
 			// in scope (otherwise it's first-ever territory, covered by #317)
 			if (otherRowsInScope.length === 0) continue;
 			const bestOtherValue = Math.max(
-				...otherRowsInScope.map((row) => row.metric_value)
+				...otherRowsInScope.map((row) => row.encounter_count)
 			);
 			const baseHighlight: SpeciesCountRecordHighlight = {
 				type: 'species-count-record',
@@ -365,7 +366,7 @@ export function deriveSpeciesRecords({
 				const mostRecentPriorTieDate = otherRowsInScope
 					.filter(
 						(row) =>
-							row.metric_value === bestOtherValue && row.visit_date < date
+							row.encounter_count === bestOtherValue && row.visit_date < date
 					)
 					.map((row) => row.visit_date)
 					.sort()
@@ -384,7 +385,7 @@ export function deriveSpeciesRecords({
 			if (scope === 'all-time') {
 				const placement = deriveAllTimePlacement(
 					sessionValue,
-					otherRowsInScope.map((row) => row.metric_value)
+					otherRowsInScope.map((row) => row.encounter_count)
 				);
 				if (placement) {
 					highlights.push({ ...baseHighlight, ...placement });
@@ -409,7 +410,7 @@ export function deriveFirstEverSpecies({
 	date: string;
 	stats: SessionStatsData;
 }): FirstEverSpeciesHighlight[] {
-	const sessionRows = stats.daySpeciesCounts.filter(
+	const sessionRows = stats.daySpeciesStats.filter(
 		(row) => row.visit_date === date
 	);
 	if (sessionRows.length === 0) return [];
@@ -422,7 +423,7 @@ export function deriveFirstEverSpecies({
 	return sessionRows
 		.filter(
 			(sessionRow) =>
-				!stats.daySpeciesCounts.some(
+				!stats.daySpeciesStats.some(
 					(row) =>
 						row.species_name === sessionRow.species_name &&
 						row.visit_date < date
@@ -431,10 +432,10 @@ export function deriveFirstEverSpecies({
 		.map((sessionRow) => ({
 			type: 'first-ever-species' as const,
 			speciesName: sessionRow.species_name,
-			multipleIndividualsRecorded: sessionRow.metric_value > 1,
+			multipleIndividualsRecorded: sessionRow.encounter_count > 1,
 			// The species' only records ever — later days revoke this, so a
 			// "first ever" can lose its "only" copy as more data arrives
-			isOnlyRecord: !stats.daySpeciesCounts.some(
+			isOnlyRecord: !stats.daySpeciesStats.some(
 				(row) =>
 					row.species_name === sessionRow.species_name &&
 					row.visit_date !== date
@@ -456,7 +457,7 @@ export function deriveFirstOfYearSpecies({
 	stats: SessionStatsData;
 	today?: Date;
 }): FirstOfYearSpeciesHighlight[] {
-	const sessionRows = stats.daySpeciesCounts.filter(
+	const sessionRows = stats.daySpeciesStats.filter(
 		(row) => row.visit_date === date
 	);
 	if (sessionRows.length === 0) return [];
@@ -469,7 +470,7 @@ export function deriveFirstOfYearSpecies({
 	const year = Number(date.slice(0, 4));
 	return sessionRows
 		.filter((sessionRow) => {
-			const priorDates = stats.daySpeciesCounts
+			const priorDates = stats.daySpeciesStats
 				.filter(
 					(row) =>
 						row.species_name === sessionRow.species_name &&
@@ -486,11 +487,11 @@ export function deriveFirstOfYearSpecies({
 			speciesName: sessionRow.species_name,
 			year,
 			isCurrentYear: year === today.getFullYear(),
-			multipleIndividualsRecorded: sessionRow.metric_value > 1,
+			multipleIndividualsRecorded: sessionRow.encounter_count > 1,
 			// The species' only records this calendar year — a later day in the
 			// same year revokes this; prior-year records don't (they're what
 			// makes it first-of-year rather than first-ever)
-			isOnlyRecord: !stats.daySpeciesCounts.some(
+			isOnlyRecord: !stats.daySpeciesStats.some(
 				(row) =>
 					row.species_name === sessionRow.species_name &&
 					row.visit_date !== date &&

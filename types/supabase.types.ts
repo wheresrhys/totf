@@ -417,6 +417,17 @@ export type Database = {
         }[]
       }
       soundex: { Args: { "": string }; Returns: string }
+      stats_per_day_and_species: {
+        Args: { ringing_group_filter: number }
+        Returns: {
+          encounter_count: number
+          max_weight: number
+          min_weight: number
+          species_name: string
+          visit_date: string
+          weighed_birds_count: number
+        }[]
+      }
       text_soundex: { Args: { "": string }; Returns: string }
       top_metrics_by_period: {
         Args: {

@@ -19,8 +19,6 @@ export type TopSpeciesArgs =
 
 export type TopMetricsFilterParams =
 	Database['public']['CompositeTypes']['top_metrics_filter_params'];
-export type DaySpeciesMetricRow =
-	Database['public']['Functions']['metrics_by_period_and_species']['Returns'][number];
 export type AggregateStatsRow =
 	Database['public']['Functions']['aggregate_stats']['Returns'][number];
 
@@ -30,3 +28,5 @@ export type NotableRetrapsResult =
 	Database['public']['Functions']['notable_retraps']['Returns'][number];
 export type LongAbsenceRetrapsResult =
 	Database['public']['Functions']['long_absence_retraps']['Returns'][number];
+export type StatsPerDayAndSpeciesRow =
+	Database['public']['Functions']['stats_per_day_and_species']['Returns'][number];
