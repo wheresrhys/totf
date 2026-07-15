@@ -107,12 +107,30 @@ export type LongAbsenceRetrapHighlight = {
 	gapMonths: number;
 };
 
+// Which end of the weight range broke a record this session
+export const WEIGHT_RECORD_EXTREMES = ['heaviest', 'lightest'] as const;
+export type WeightRecordExtreme = (typeof WEIGHT_RECORD_EXTREMES)[number];
+
+export type WeightRecordHighlight = {
+	type: 'weight-record';
+	speciesName: string;
+	extreme: WeightRecordExtreme;
+	// The session's record-breaking weight, in grams
+	weight: number;
+	// The extreme across all other sessions (may postdate the session)
+	previousRecord: number;
+	// Set only for ties where the equalled record is over a year old — the
+	// number of full years the record has stood
+	recordEqualledYearsAgo?: number;
+};
+
 export type SessionHighlight =
 	| SessionTotalRecordHighlight
 	| SpeciesCountRecordHighlight
 	| FirstEverSpeciesHighlight
 	| FirstOfYearSpeciesHighlight
-	| LongAbsenceRetrapHighlight;
+	| LongAbsenceRetrapHighlight
+	| WeightRecordHighlight;
 
 type PeriodFields = {
 	scope: RecordScope;
@@ -528,12 +546,102 @@ export function deriveLongAbsenceRetraps(
 	});
 }
 
+// Minimum number of weighed encounters across other days for a species
+// before a weight record is worth reporting
+const MIN_WEIGHED_ENCOUNTERS_FOR_RECORD = 3;
+
+// Weight records are inherently all-time — a species' heaviest/lightest bird
+// this session is compared against every other day it was weighed, including
+// later days (which can erase a highlight). A record needs the species to have
+// been weighed at least three times across those other days.
+export function deriveWeightRecordBreakers({
+	date,
+	stats
+}: {
+	date: string;
+	stats: SessionStatsData;
+}): WeightRecordHighlight[] {
+	const sessionDate = new Date(date);
+	const sessionRows = stats.daySpeciesStats.filter(
+		(row) => row.visit_date === date && row.weighed_birds_count > 0
+	);
+	if (sessionRows.length === 0) return [];
+
+	const highlights: WeightRecordHighlight[] = [];
+	for (const sessionRow of sessionRows) {
+		const otherWeighedRows = stats.daySpeciesStats.filter(
+			(row) =>
+				row.species_name === sessionRow.species_name &&
+				row.visit_date !== date &&
+				row.weighed_birds_count > 0
+		);
+		const otherWeighedEncounters = otherWeighedRows.reduce(
+			(total, row) => total + row.weighed_birds_count,
+			0
+		);
+		if (otherWeighedEncounters < MIN_WEIGHED_ENCOUNTERS_FOR_RECORD) continue;
+
+		for (const extreme of WEIGHT_RECORD_EXTREMES) {
+			const isHeaviest = extreme === 'heaviest';
+			const sessionWeight = isHeaviest
+				? sessionRow.max_weight
+				: sessionRow.min_weight;
+			const otherWeights = otherWeighedRows.map((row) =>
+				isHeaviest ? row.max_weight : row.min_weight
+			);
+			// The record to beat: the biggest max (heaviest) / smallest min (lightest)
+			const previousRecord = isHeaviest
+				? Math.max(...otherWeights)
+				: Math.min(...otherWeights);
+			const beatsRecord = isHeaviest
+				? sessionWeight > previousRecord
+				: sessionWeight < previousRecord;
+			const baseHighlight: WeightRecordHighlight = {
+				type: 'weight-record',
+				speciesName: sessionRow.species_name,
+				extreme,
+				weight: sessionWeight,
+				previousRecord
+			};
+			if (beatsRecord) {
+				highlights.push(baseHighlight);
+				continue;
+			}
+			if (sessionWeight === previousRecord) {
+				// The for-N-years copy describes how long the record has stood, so
+				// only a prior day holding the extreme value counts — a tie held
+				// only by a later session is unreportable
+				const mostRecentPriorTieDate = otherWeighedRows
+					.filter(
+						(row) =>
+							(isHeaviest ? row.max_weight : row.min_weight) ===
+								previousRecord && row.visit_date < date
+					)
+					.map((row) => row.visit_date)
+					.sort()
+					.at(-1);
+				if (mostRecentPriorTieDate !== undefined) {
+					const recordEqualledYearsAgo = differenceInYears(
+						sessionDate,
+						new Date(mostRecentPriorTieDate)
+					);
+					if (recordEqualledYearsAgo >= 1) {
+						highlights.push({ ...baseHighlight, recordEqualledYearsAgo });
+					}
+				}
+			}
+		}
+	}
+	return highlights;
+}
+
 const HIGHLIGHT_TYPE_PRIORITY: SessionHighlight['type'][] = [
 	'session-total-record',
 	'species-count-record',
 	'first-ever-species',
 	'first-of-year-species',
-	'long-absence-retrap'
+	'long-absence-retrap',
+	'weight-record'
 ];
 
 export function sortHighlights(
@@ -608,6 +716,20 @@ function buildSpeciesRecordsPhrase(
 	return `${highlight.speciesName} record${highlight.multipleIndividualsRecorded ? 's' : ''}`;
 }
 
+const WEIGHT_RECORD_DESCRIPTOR: Record<WeightRecordExtreme, string> = {
+	heaviest: 'Heaviest',
+	lightest: 'Lightest'
+};
+
+function buildWeightRecordSentence(highlight: WeightRecordHighlight): string {
+	const { speciesName, extreme, weight } = highlight;
+	const descriptor = WEIGHT_RECORD_DESCRIPTOR[extreme];
+	if (highlight.recordEqualledYearsAgo !== undefined) {
+		return `${descriptor} ${speciesName} for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)} — ${weight}g`;
+	}
+	return `${descriptor} ${speciesName} ever weighed — ${weight}g (previous record ${highlight.previousRecord}g)`;
+}
+
 export function buildHighlightSentence(highlight: SessionHighlight): string {
 	switch (highlight.type) {
 		case 'session-total-record':
@@ -638,5 +760,7 @@ export function buildHighlightSentence(highlight: SessionHighlight): string {
 			);
 			return `${speciesName} ${ringNo} recaught after ${gapPhrase} away (last seen ${formattedPreviousDate})`;
 		}
+		case 'weight-record':
+			return buildWeightRecordSentence(highlight);
 	}
 }

@@ -6,12 +6,14 @@ import {
 	deriveFirstOfYearSpecies,
 	deriveSessionTotalRecords,
 	deriveSpeciesRecords,
+	deriveWeightRecordBreakers,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
 	type LongAbsenceRetrapHighlight,
 	type SessionStatsData,
 	type SessionTotalRecordHighlight,
-	type SpeciesCountRecordHighlight
+	type SpeciesCountRecordHighlight,
+	type WeightRecordHighlight
 } from '../session-highlights';
 import type {
 	StatsPerDayAndSpeciesRow,
@@ -1270,5 +1272,199 @@ describe('buildHighlightSentence — long-absence-retrap', () => {
 		).toBe(
 			'Robin ARRETRAP recaught after 3 years away (last seen 20 Jun 2021)'
 		);
+	});
+});
+
+// ---- deriveWeightRecordBreakers ----
+
+const BLUE_TIT = 'Blue Tit';
+
+function weightRow(
+	date: string,
+	species: string,
+	{
+		weighedBirds = 1,
+		minWeight,
+		maxWeight
+	}: { weighedBirds?: number; minWeight: number; maxWeight: number }
+): StatsPerDayAndSpeciesRow {
+	return {
+		visit_date: date,
+		species_name: species,
+		encounter_count: weighedBirds,
+		weighed_birds_count: weighedBirds,
+		min_weight: minWeight,
+		max_weight: maxWeight
+	};
+}
+
+function deriveWeights(rows: StatsPerDayAndSpeciesRow[]) {
+	return deriveWeightRecordBreakers({
+		date: SESSION_DATE,
+		stats: statsFor(rows)
+	});
+}
+
+describe('deriveWeightRecordBreakers', () => {
+	it('returns a heaviest record beating the max across all other sessions', () => {
+		const highlights = deriveWeights([
+			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+				weighedBirds: 3,
+				minWeight: 10.5,
+				maxWeight: 13.0
+			})
+		]);
+		expect(highlights).toContainEqual({
+			type: 'weight-record',
+			speciesName: BLUE_TIT,
+			extreme: 'heaviest',
+			weight: 13.1,
+			previousRecord: 13.0
+		});
+	});
+
+	it('returns a lightest record beating the min across all other sessions', () => {
+		const highlights = deriveWeights([
+			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 9.8, maxWeight: 12 }),
+			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+				weighedBirds: 3,
+				minWeight: 10.2,
+				maxWeight: 13.0
+			})
+		]);
+		expect(highlights).toContainEqual({
+			type: 'weight-record',
+			speciesName: BLUE_TIT,
+			extreme: 'lightest',
+			weight: 9.8,
+			previousRecord: 10.2
+		});
+	});
+
+	it('suppresses a would-be record beaten by a later session', () => {
+		const highlights = deriveWeights([
+			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+				weighedBirds: 3,
+				minWeight: 10.5,
+				maxWeight: 12.5
+			}),
+			weightRow(LATER_DAY, BLUE_TIT, { minWeight: 10.9, maxWeight: 14.0 })
+		]);
+		expect(highlights.map((h) => h.extreme)).not.toContain('heaviest');
+	});
+
+	it('requires at least 3 weighed encounters on other days', () => {
+		const highlights = deriveWeights([
+			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+				weighedBirds: 2,
+				minWeight: 10.5,
+				maxWeight: 13.0
+			})
+		]);
+		expect(highlights).toEqual([]);
+	});
+
+	it('reports a prior tie older than a year as a for-N-years record', () => {
+		const highlights = deriveWeights([
+			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+			weightRow(PRIOR_AUTUMN_OTHER_YEAR, BLUE_TIT, {
+				weighedBirds: 3,
+				minWeight: 10.5,
+				maxWeight: 13.1
+			})
+		]);
+		expect(highlights).toContainEqual({
+			type: 'weight-record',
+			speciesName: BLUE_TIT,
+			extreme: 'heaviest',
+			weight: 13.1,
+			previousRecord: 13.1,
+			recordEqualledYearsAgo: 3
+		});
+	});
+
+	it('ignores ties under a year old', () => {
+		const highlights = deriveWeights([
+			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+			weightRow(PRIOR_SPRING_THIS_YEAR, BLUE_TIT, {
+				weighedBirds: 3,
+				minWeight: 10.5,
+				maxWeight: 13.1
+			})
+		]);
+		expect(highlights.map((h) => h.extreme)).not.toContain('heaviest');
+	});
+
+	it('ignores ties held only by a later session', () => {
+		const highlights = deriveWeights([
+			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+				weighedBirds: 3,
+				minWeight: 10.5,
+				maxWeight: 12.0
+			}),
+			weightRow(LATER_DAY, BLUE_TIT, { minWeight: 11.5, maxWeight: 13.1 })
+		]);
+		expect(highlights.map((h) => h.extreme)).not.toContain('heaviest');
+	});
+
+	it('ignores species with no weighed encounter in the session', () => {
+		const highlights = deriveWeights([
+			weightRow(SESSION_DATE, BLUE_TIT, {
+				weighedBirds: 0,
+				minWeight: 0,
+				maxWeight: 0
+			}),
+			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+				weighedBirds: 3,
+				minWeight: 10.5,
+				maxWeight: 13.0
+			})
+		]);
+		expect(highlights).toEqual([]);
+	});
+});
+
+// ---- buildHighlightSentence — weight-record ----
+
+function makeWeightHighlight(
+	overrides: Partial<WeightRecordHighlight> = {}
+): WeightRecordHighlight {
+	return {
+		type: 'weight-record',
+		speciesName: BLUE_TIT,
+		extreme: 'heaviest',
+		weight: 13.1,
+		previousRecord: 13.0,
+		...overrides
+	};
+}
+
+describe('buildHighlightSentence — weight-record', () => {
+	it('renders heaviest copy with previous record', () => {
+		expect(buildHighlightSentence(makeWeightHighlight())).toBe(
+			'Heaviest Blue Tit ever weighed — 13.1g (previous record 13g)'
+		);
+	});
+
+	it('renders lightest copy with previous record', () => {
+		expect(
+			buildHighlightSentence(
+				makeWeightHighlight({
+					extreme: 'lightest',
+					weight: 9.8,
+					previousRecord: 10.2
+				})
+			)
+		).toBe('Lightest Blue Tit ever weighed — 9.8g (previous record 10.2g)');
+	});
+
+	it('renders heaviest-for-N-years copy for a tie', () => {
+		expect(
+			buildHighlightSentence(makeWeightHighlight({ recordEqualledYearsAgo: 4 }))
+		).toBe('Heaviest Blue Tit for 4 years — 13.1g');
 	});
 });
