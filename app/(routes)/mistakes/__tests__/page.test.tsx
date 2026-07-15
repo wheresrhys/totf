@@ -1,15 +1,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	fireEvent,
+	waitFor
+} from '@testing-library/react';
 import Page from '../page';
 import mistakesSnapshot from '@/test-fixtures/snapshots/fetchMistakes.alpha.json';
+import birdDataSnapshot from '@/test-fixtures/snapshots/fetchBirdData.ARRETRAP.json';
+import { clearCachedBirdEncountersForTesting } from '@/app/components/MistakesTable';
 import type { DiscrepenciesResult } from '@/app/models/db';
 
-const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
-	mockGetAuthenticatedSupabaseClient: vi.fn()
-}));
+const { mockGetAuthenticatedSupabaseClient, mockFetchBirdEncounters } =
+	vi.hoisted(() => ({
+		mockGetAuthenticatedSupabaseClient: vi.fn(),
+		mockFetchBirdEncounters: vi.fn()
+	}));
 
 vi.mock('@/lib/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
+}));
+
+vi.mock('@/app/actions/bird-encounters', () => ({
+	fetchBirdEncounters: mockFetchBirdEncounters
 }));
 
 function makeRpcClient(data: unknown) {
@@ -25,6 +39,9 @@ describe('mistakes page', () => {
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 			makeRpcClient(mistakesSnapshot)
 		);
+		mockFetchBirdEncounters.mockReset();
+		mockFetchBirdEncounters.mockResolvedValue(birdDataSnapshot.encounters);
+		clearCachedBirdEncountersForTesting();
 	});
 
 	afterEach(() => {
@@ -125,5 +142,103 @@ describe('mistakes page', () => {
 		render(await Page());
 		const tabList = screen.queryByRole('tablist');
 		expect(tabList?.querySelectorAll('button').length ?? 0).toBe(0);
+	});
+
+	describe('expanding a row to show bird encounter detail', () => {
+		async function renderPageAndAwaitMistakesTable() {
+			render(await Page());
+			// the BootstrapPageData mock loads data asynchronously
+			await screen.findByRole('table');
+		}
+
+		function findRowContaining(text: string): HTMLTableRowElement {
+			const mistakesTable = screen.getAllByRole('table')[0];
+			return [...mistakesTable.querySelectorAll('tbody tr')].find((row) =>
+				row.textContent?.includes(text)
+			)! as HTMLTableRowElement;
+		}
+
+		function clickRowToggle(ringNo: string) {
+			fireEvent.click(findRowContaining(ringNo).querySelector('button')!);
+		}
+
+		async function findEncounterDetailTable() {
+			// SingleBirdTable renders a nested table inside the expanded row
+			return waitFor(() => {
+				const tables = screen.getAllByRole('table');
+				expect(tables.length).toBe(2);
+				return tables[1];
+			});
+		}
+
+		function switchToTab(label: string) {
+			const tabList = screen.getByRole('tablist');
+			const tab = [...tabList.querySelectorAll('button')].find(
+				(button) => button.textContent === label
+			)!;
+			fireEvent.click(tab);
+		}
+
+		it('fetches and renders the bird encounter detail when a row is expanded', async () => {
+			await renderPageAndAwaitMistakesTable();
+			clickRowToggle('ABTITMIS');
+			await findEncounterDetailTable();
+			expect(mockFetchBirdEncounters).toHaveBeenCalledTimes(1);
+			expect(mockFetchBirdEncounters).toHaveBeenCalledWith('ABTITMIS');
+		});
+
+		it('does not refetch when the same row is collapsed and re-expanded', async () => {
+			await renderPageAndAwaitMistakesTable();
+			clickRowToggle('ABTITMIS');
+			await findEncounterDetailTable();
+			clickRowToggle('ABTITMIS');
+			expect(screen.getAllByRole('table').length).toBe(1);
+			clickRowToggle('ABTITMIS');
+			await findEncounterDetailTable();
+			expect(mockFetchBirdEncounters).toHaveBeenCalledTimes(1);
+		});
+
+		it('does not refetch when returning to a tab and re-expanding a previously viewed row', async () => {
+			await renderPageAndAwaitMistakesTable();
+			clickRowToggle('ABTITMIS');
+			await findEncounterDetailTable();
+			switchToTab('Sex');
+			switchToTab('Age');
+			clickRowToggle('ABTITMIS');
+			await findEncounterDetailTable();
+			expect(mockFetchBirdEncounters).toHaveBeenCalledTimes(1);
+		});
+
+		it('shows a loading message while encounter detail is being fetched', async () => {
+			mockFetchBirdEncounters.mockImplementation(() => new Promise(() => {}));
+			await renderPageAndAwaitMistakesTable();
+			clickRowToggle('ABTITMIS');
+			expect(screen.getByText('Loading...')).toBeTruthy();
+		});
+
+		it('fetches encounter detail separately for each expanded bird', async () => {
+			await renderPageAndAwaitMistakesTable();
+			clickRowToggle('ABTITMIS');
+			await findEncounterDetailTable();
+			clickRowToggle('AKINGF001');
+			await findEncounterDetailTable();
+			expect(mockFetchBirdEncounters).toHaveBeenCalledTimes(2);
+			expect(mockFetchBirdEncounters).toHaveBeenCalledWith('ABTITMIS');
+			expect(mockFetchBirdEncounters).toHaveBeenCalledWith('AKINGF001');
+		});
+
+		it('retries the fetch when re-expanding a row whose fetch failed', async () => {
+			mockFetchBirdEncounters.mockRejectedValueOnce(new Error('boom'));
+			await renderPageAndAwaitMistakesTable();
+			clickRowToggle('ABTITMIS');
+			await waitFor(() =>
+				expect(mockFetchBirdEncounters).toHaveBeenCalledTimes(1)
+			);
+			expect(screen.getByText('Loading...')).toBeTruthy();
+			clickRowToggle('ABTITMIS');
+			clickRowToggle('ABTITMIS');
+			await findEncounterDetailTable();
+			expect(mockFetchBirdEncounters).toHaveBeenCalledTimes(2);
+		});
 	});
 });
