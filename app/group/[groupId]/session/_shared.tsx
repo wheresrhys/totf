@@ -25,10 +25,45 @@ export type PageParams = {
 	locationId: number | undefined;
 };
 
+export type AdjacentSessionDates = {
+	previousSessionDate: string | null;
+	nextSessionDate: string | null;
+};
+
 export type DayData = {
 	encounters: SessionEncounter[];
 	locations: LocationRow[];
+	adjacentSessionDates: AdjacentSessionDates;
 };
+
+async function fetchAdjacentSessionDates(
+	supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>,
+	viewedGroupId: number,
+	date: string
+): Promise<AdjacentSessionDates> {
+	const [previousResult, nextResult] = await Promise.all([
+		supabase
+			.from('Sessions')
+			.select('visit_date')
+			.eq('ringing_group_id', viewedGroupId)
+			.lt('visit_date', date)
+			.order('visit_date', { ascending: false })
+			.limit(1)
+			.then(catchSupabaseErrors) as Promise<{ visit_date: string }[]>,
+		supabase
+			.from('Sessions')
+			.select('visit_date')
+			.eq('ringing_group_id', viewedGroupId)
+			.gt('visit_date', date)
+			.order('visit_date', { ascending: true })
+			.limit(1)
+			.then(catchSupabaseErrors) as Promise<{ visit_date: string }[]>
+	]);
+	return {
+		previousSessionDate: previousResult?.[0]?.visit_date ?? null,
+		nextSessionDate: nextResult?.[0]?.visit_date ?? null
+	};
+}
 
 export async function fetchSessionData({
 	viewedGroupId,
@@ -46,13 +81,26 @@ export async function fetchSessionData({
 		.then(catchSupabaseErrors)) as (SessionRow & { location: LocationRow })[];
 
 	if (!sessions || sessions.length === 0) {
-		return { encounters: [], locations: [] };
+		return {
+			encounters: [],
+			locations: [],
+			adjacentSessionDates: await fetchAdjacentSessionDates(
+				supabase,
+				viewedGroupId,
+				date
+			)
+		};
 	}
 	const locations = sessions.map((item) => item.location);
+	const adjacentSessionDates = await fetchAdjacentSessionDates(
+		supabase,
+		viewedGroupId,
+		date
+	);
 	if (locationId) {
 		sessions = sessions.filter((item) => item.location_id === locationId);
 		if (sessions.length === 0) {
-			return { encounters: [], locations: [] };
+			return { encounters: [], locations: [], adjacentSessionDates };
 		}
 	}
 
@@ -91,7 +139,8 @@ export async function fetchSessionData({
 
 	return {
 		encounters,
-		locations
+		locations,
+		adjacentSessionDates
 	};
 }
 
@@ -170,6 +219,39 @@ function Locations({
 	);
 }
 
+function SessionNavigation({
+	adjacentSessionDates,
+	viewedGroupId
+}: {
+	adjacentSessionDates: AdjacentSessionDates;
+	viewedGroupId: number;
+}) {
+	const { previousSessionDate, nextSessionDate } = adjacentSessionDates;
+	if (!previousSessionDate && !nextSessionDate) return null;
+	return (
+		<nav aria-label="Session navigation" className="flex gap-2 text-sm mt-1">
+			{previousSessionDate ? (
+				<Link
+					href={`/group/${viewedGroupId}/session/${previousSessionDate}`}
+					aria-label="Previous session"
+					className="link"
+				>
+					← Previous
+				</Link>
+			) : null}
+			{nextSessionDate ? (
+				<Link
+					href={`/group/${viewedGroupId}/session/${nextSessionDate}`}
+					aria-label="Next session"
+					className="link"
+				>
+					Next →
+				</Link>
+			) : null}
+		</nav>
+	);
+}
+
 export function SessionSummary({
 	data: dayData,
 	params: { date, locationId, viewedGroupId }
@@ -208,6 +290,10 @@ export function SessionSummary({
 					viewedGroupId={viewedGroupId}
 				/>
 			</PrimaryHeading>
+			<SessionNavigation
+				adjacentSessionDates={dayData.adjacentSessionDates}
+				viewedGroupId={viewedGroupId}
+			/>
 			<BadgeList
 				testId="session-stats"
 				items={

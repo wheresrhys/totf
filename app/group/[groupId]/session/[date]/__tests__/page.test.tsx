@@ -94,11 +94,18 @@ const mockEncounters = [
 	}
 ];
 
+const mockPreviousSession = [{ visit_date: '2024-03-01' }];
+const mockNextSession = [{ visit_date: '2024-04-01' }];
+
 function makeSessionClient() {
 	const makeChain = (data: unknown) => ({
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
 		in: vi.fn().mockReturnThis(),
+		lt: vi.fn().mockReturnThis(),
+		gt: vi.fn().mockReturnThis(),
+		order: vi.fn().mockReturnThis(),
+		limit: vi.fn().mockReturnThis(),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({ data, error: null }).then(resolve)
 	});
@@ -106,6 +113,8 @@ function makeSessionClient() {
 		from: vi
 			.fn()
 			.mockReturnValueOnce(makeChain(mockSessions))
+			.mockReturnValueOnce(makeChain(mockPreviousSession))
+			.mockReturnValueOnce(makeChain(mockNextSession))
 			.mockReturnValueOnce(makeChain(mockEncounters))
 	};
 }
@@ -172,5 +181,27 @@ describe('session detail page', () => {
 		const highlights = await screen.findByTestId('session-highlights');
 		expect(highlights.textContent).toContain('Highlights');
 		expect(highlights.textContent).toContain('Busiest session ever — 3 birds');
+	});
+
+	describe('session navigation', () => {
+		it('renders a "Previous" link pointing to the previous session date', async () => {
+			render(await renderPage());
+			const previousLink = await screen.findByRole('link', {
+				name: /previous session/i
+			});
+			expect(previousLink.getAttribute('href')).toBe(
+				`/group/${TEST_GROUP_ID}/session/${mockPreviousSession[0].visit_date}`
+			);
+		});
+
+		it('renders a "Next" link pointing to the next session date', async () => {
+			render(await renderPage());
+			const nextLink = await screen.findByRole('link', {
+				name: /next session/i
+			});
+			expect(nextLink.getAttribute('href')).toBe(
+				`/group/${TEST_GROUP_ID}/session/${mockNextSession[0].visit_date}`
+			);
+		});
 	});
 });
