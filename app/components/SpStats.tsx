@@ -2,7 +2,7 @@ import { BoxyList } from '@/app/components/shared/DesignSystem';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/page';
 import { StatOutput } from './shared/StatOutput';
 import { UnwrappedBadgeList } from './shared/DesignSystem';
-import type { AggregateStatsRow } from '@/app/models/db';
+import type { AggregateStatsResult } from '@/app/models/db';
 import type { SpeciesStatConfig } from '@/app/models/species-stats';
 import { speciesStatConfigs } from '@/app/models/species-stats';
 
@@ -51,7 +51,7 @@ function MeasurementCategory({
 function StatsByCategory({
 	speciesStats
 }: {
-	speciesStats: AggregateStatsRow;
+	speciesStats: AggregateStatsResult;
 }) {
 	return categoryOrder.map((categoryName) => {
 		if (categoryName === 'Weight') {
@@ -87,7 +87,7 @@ function StatsByCategory({
 				<UnwrappedBadgeList
 					items={subStats.map(
 						(stat) =>
-							`${stat.prefix ? `${stat.prefix} ` : ''}${speciesStats[stat.property as keyof AggregateStatsRow]}${stat.suffix ? ` ${stat.suffix}` : ''}`
+							`${stat.prefix ? `${stat.prefix} ` : ''}${speciesStats[stat.property as keyof AggregateStatsResult]}${stat.suffix ? ` ${stat.suffix}` : ''}`
 					)}
 				/>
 			</li>

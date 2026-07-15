@@ -12,7 +12,7 @@ import {
 	fetchPayOffStats,
 	type PayOffStatsData
 } from '@/app/actions/pay-off-stats';
-import type { AggregateStatsRow } from '@/app/models/db';
+import type { AggregateStatsResult } from '@/app/models/db';
 import { formatPostgresIntervalForDisplay } from '@/lib/postgres-interval';
 import { PayOffEffortChart } from '@/app/components/PayOffEffortChart';
 
@@ -29,10 +29,10 @@ function formatAvgEncounters(n: number | null | undefined): string {
 }
 
 /** Expects `yearly` from aggregate_stats with group_by_time_period 'year' (ascending by time_period). */
-function PayOffYearlyTable({ yearly }: { yearly: AggregateStatsRow[] }) {
+function PayOffYearlyTable({ yearly }: { yearly: AggregateStatsResult[] }) {
 	const metricRows: {
 		label: string;
-		cell: (row: AggregateStatsRow) => string;
+		cell: (row: AggregateStatsResult) => string;
 	}[] = [
 		{
 			label: 'Total ringing effort',

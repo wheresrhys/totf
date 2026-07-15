@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { StatsPerDayAndSpeciesRow } from '@/app/models/db';
+import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -15,14 +15,14 @@ const PAGE_SIZE = 1000;
 
 // Queries are paginated (PostgREST caps responses at 1000 rows), so the
 // mock builders serve rows page by page from these arrays
-let rpcPages: StatsPerDayAndSpeciesRow[][];
+let rpcPages: StatsPerDayAndSpeciesResult[][];
 let sessionPages: { visit_date: string }[][];
 
 function statsRow(
 	species_name: string,
 	visit_date: string,
 	encounter_count: number
-): StatsPerDayAndSpeciesRow {
+): StatsPerDayAndSpeciesResult {
 	return {
 		species_name,
 		visit_date,

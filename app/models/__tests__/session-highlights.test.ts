@@ -19,7 +19,7 @@ import {
 	type WeightRecordHighlight
 } from '../session-highlights';
 import type {
-	StatsPerDayAndSpeciesRow,
+	StatsPerDayAndSpeciesResult,
 	LongAbsenceRetrapsResult
 } from '@/app/models/db';
 
@@ -45,7 +45,7 @@ const PRIOR_SPRING_YEAR_THREE = '2023-05-01';
 function dayRows(
 	date: string,
 	speciesCounts: Record<string, number>
-): StatsPerDayAndSpeciesRow[] {
+): StatsPerDayAndSpeciesResult[] {
 	return Object.entries(speciesCounts).map(
 		([species_name, encounter_count]) => ({
 			species_name,
@@ -58,17 +58,20 @@ function dayRows(
 	);
 }
 
-function statsFor(rows: StatsPerDayAndSpeciesRow[]): SessionStatsData {
+function statsFor(results: StatsPerDayAndSpeciesResult[]): SessionStatsData {
 	return {
-		daySpeciesStats: rows,
-		sessionDates: [...new Set(rows.map((row) => row.visit_date))]
+		daySpeciesStats: results,
+		sessionDates: [...new Set(results.map((row) => row.visit_date))]
 	};
 }
 
-function derive(rows: StatsPerDayAndSpeciesRow[], today = PAST_PERIOD_TODAY) {
+function derive(
+	results: StatsPerDayAndSpeciesResult[],
+	today = PAST_PERIOD_TODAY
+) {
 	return deriveSessionTotalRecords({
 		date: SESSION_DATE,
-		stats: statsFor(rows),
+		stats: statsFor(results),
 		today
 	});
 }
@@ -311,13 +314,13 @@ describe('deriveSessionTotalRecords', () => {
 const WITHIN_A_MONTH = '2024-08-20';
 
 function deriveSince(
-	rows: StatsPerDayAndSpeciesRow[],
+	results: StatsPerDayAndSpeciesResult[],
 	sessionDates?: string[]
 ) {
 	const stats: SessionStatsData = {
-		daySpeciesStats: rows,
+		daySpeciesStats: results,
 		sessionDates: sessionDates ?? [
-			...new Set(rows.map((row) => row.visit_date))
+			...new Set(results.map((row) => row.visit_date))
 		]
 	};
 	return deriveSinceHighlights({ date: SESSION_DATE, stats });
@@ -531,7 +534,7 @@ function speciesRow(
 	date: string,
 	species: string,
 	count: number
-): StatsPerDayAndSpeciesRow {
+): StatsPerDayAndSpeciesResult {
 	return {
 		visit_date: date,
 		species_name: species,
@@ -542,20 +545,22 @@ function speciesRow(
 	};
 }
 
-function statsForSpecies(rows: StatsPerDayAndSpeciesRow[]): SessionStatsData {
+function statsForSpecies(
+	results: StatsPerDayAndSpeciesResult[]
+): SessionStatsData {
 	return {
-		daySpeciesStats: rows,
-		sessionDates: [...new Set(rows.map((row) => row.visit_date))]
+		daySpeciesStats: results,
+		sessionDates: [...new Set(results.map((row) => row.visit_date))]
 	};
 }
 
 function deriveSpecies(
-	rows: StatsPerDayAndSpeciesRow[],
+	results: StatsPerDayAndSpeciesResult[],
 	today = PAST_PERIOD_TODAY
 ) {
 	return deriveSpeciesRecords({
 		date: SESSION_DATE,
-		stats: statsForSpecies(rows),
+		stats: statsForSpecies(results),
 		today
 	});
 }
@@ -1027,14 +1032,13 @@ describe('buildHighlightSentence — species-count-record', () => {
 const FIRECREST = 'Firecrest';
 
 function deriveFirstEver(
-	rows: StatsPerDayAndSpeciesRow[],
+	results: StatsPerDayAndSpeciesResult[],
 	sessionDates?: string[]
 ) {
-	const daySpeciesStats = rows;
 	const stats: SessionStatsData = {
-		daySpeciesStats,
+		daySpeciesStats: results,
 		sessionDates: sessionDates ?? [
-			...new Set(rows.map((row) => row.visit_date))
+			...new Set(results.map((row) => row.visit_date))
 		]
 	};
 	return deriveFirstEverSpecies({ date: SESSION_DATE, stats });
@@ -1111,16 +1115,16 @@ describe('deriveFirstEverSpecies', () => {
 // ---- deriveFirstOfYearSpecies ----
 
 function deriveFirstOfYear(
-	rows: StatsPerDayAndSpeciesRow[],
+	results: StatsPerDayAndSpeciesResult[],
 	{
 		sessionDates,
 		today = PAST_PERIOD_TODAY
 	}: { sessionDates?: string[]; today?: Date } = {}
 ) {
 	const stats: SessionStatsData = {
-		daySpeciesStats: rows,
+		daySpeciesStats: results,
 		sessionDates: sessionDates ?? [
-			...new Set(rows.map((row) => row.visit_date))
+			...new Set(results.map((row) => row.visit_date))
 		]
 	};
 	return deriveFirstOfYearSpecies({ date: SESSION_DATE, stats, today });
@@ -1425,7 +1429,7 @@ function weightRow(
 		minWeight,
 		maxWeight
 	}: { weighedBirds?: number; minWeight: number; maxWeight: number }
-): StatsPerDayAndSpeciesRow {
+): StatsPerDayAndSpeciesResult {
 	return {
 		visit_date: date,
 		species_name: species,
@@ -1436,10 +1440,10 @@ function weightRow(
 	};
 }
 
-function deriveWeights(rows: StatsPerDayAndSpeciesRow[]) {
+function deriveWeights(results: StatsPerDayAndSpeciesResult[]) {
 	return deriveWeightRecordBreakers({
 		date: SESSION_DATE,
-		stats: statsFor(rows)
+		stats: statsFor(results)
 	});
 }
 

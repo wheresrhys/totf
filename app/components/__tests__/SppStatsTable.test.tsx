@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { SppStatsTable } from '../SppStatsTable';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
-import type { AggregateStatsRow } from '@/app/models/db';
+import type { AggregateStatsResult } from '@/app/models/db';
 import type { PageData } from '@/app/(routes)/species/page';
 
 vi.mock('@/app/actions/spp-data', () => ({
@@ -16,7 +16,7 @@ vi.mock('@/app/actions/spp-data', () => ({
 }));
 
 const pageData: PageData = {
-	speciesStats: speciesDataSnapshot as unknown as AggregateStatsRow[],
+	speciesStats: speciesDataSnapshot as unknown as AggregateStatsResult[],
 	years: [2021, 2022, 2023]
 };
 
@@ -44,7 +44,7 @@ describe('SppStatsTable', () => {
 		it('CES only checkbox is enabled after year is selected', async () => {
 			const { fetchSpeciesData } = await import('@/app/actions/spp-data');
 			vi.mocked(fetchSpeciesData).mockResolvedValue(
-				speciesDataSnapshot as unknown as AggregateStatsRow[]
+				speciesDataSnapshot as unknown as AggregateStatsResult[]
 			);
 			render(<SppStatsTable data={pageData} viewedGroupId={1} />);
 			const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;
@@ -56,7 +56,7 @@ describe('SppStatsTable', () => {
 		it('triggers fetchSpeciesData with correct date range when year changes', async () => {
 			const { fetchSpeciesData } = await import('@/app/actions/spp-data');
 			vi.mocked(fetchSpeciesData).mockResolvedValue(
-				speciesDataSnapshot as unknown as AggregateStatsRow[]
+				speciesDataSnapshot as unknown as AggregateStatsResult[]
 			);
 			render(<SppStatsTable data={pageData} viewedGroupId={1} />);
 			const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;

@@ -15,7 +15,7 @@ import {
 } from '@/app/models/session-highlights';
 import type {
 	LongAbsenceRetrapsResult,
-	StatsPerDayAndSpeciesRow
+	StatsPerDayAndSpeciesResult
 } from '@/app/models/db';
 
 // The stats blob only changes when new data is imported, so cache it
@@ -35,7 +35,7 @@ async function fetchSessionStats(
 	}
 	const supabase = await getAuthenticatedSupabaseClient();
 	const [daySpeciesStats, sessionRows] = await Promise.all([
-		fetchAllPaginatedRows<StatsPerDayAndSpeciesRow>((fromRow, toRow) =>
+		fetchAllPaginatedRows<StatsPerDayAndSpeciesResult>((fromRow, toRow) =>
 			supabase
 				.rpc('stats_per_day_and_species', {
 					ringing_group_filter: viewedGroupId

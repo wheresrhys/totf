@@ -7,7 +7,7 @@ import { SpPage } from '@/app/components/SpPage';
 import { fetchPageOfBirds } from '@/app/actions/sp-data';
 
 import type {
-	AggregateStatsRow,
+	AggregateStatsResult,
 	TopMetricsFilterParams,
 	TopPeriodsResult
 } from '@/app/models/db';
@@ -17,7 +17,7 @@ type PageProps = { params: Promise<PageParams> };
 export type FullFatPageData = {
 	topSessions: TopPeriodsResult[];
 	birds: EnrichedBirdOfSpecies[];
-	speciesStats: AggregateStatsRow;
+	speciesStats: AggregateStatsResult;
 	speciesId: number;
 	speciesName: string;
 };
@@ -42,7 +42,7 @@ async function getSpeciesStats(species: string, viewedGroupId: number) {
 			species_name_filter: species,
 			ringing_group_filter: viewedGroupId
 		})
-		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
+		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
 }
 
 export async function fetchSpPageData(

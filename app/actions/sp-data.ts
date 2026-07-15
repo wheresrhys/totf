@@ -11,7 +11,7 @@ import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/WeightAndWingChart';
 import type { SexedGraphableBird } from '@/app/components/WeightAndWingChart';
-import type { AggregateStatsRow } from '@/app/models/db';
+import type { AggregateStatsResult } from '@/app/models/db';
 export async function fetchPageOfBirds(
 	speciesId: number,
 	viewedGroupId: number,
@@ -108,7 +108,7 @@ export async function getSpeciesStatsHistory(
 			ringing_group_filter: viewedGroupId,
 			group_by_time_period: 'month'
 		})
-		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
+		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
 }
 
 export async function getSpeciesYearComparison(
@@ -122,5 +122,5 @@ export async function getSpeciesYearComparison(
 			ringing_group_filter: viewedGroupId,
 			group_by_time_period: 'year'
 		})
-		.then(catchSupabaseErrors) as Promise<AggregateStatsRow[]>;
+		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
 }
