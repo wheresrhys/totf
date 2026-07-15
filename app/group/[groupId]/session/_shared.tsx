@@ -229,7 +229,7 @@ function SessionNavigation({
 	const { previousSessionDate, nextSessionDate } = adjacentSessionDates;
 	if (!previousSessionDate && !nextSessionDate) return null;
 	return (
-		<nav aria-label="Session navigation" className="flex gap-2 text-sm mt-1">
+		<nav aria-label="Session navigation" className="flex gap-2 text-sm mb-2">
 			{previousSessionDate ? (
 				<Link
 					href={`/group/${viewedGroupId}/session/${previousSessionDate}`}
