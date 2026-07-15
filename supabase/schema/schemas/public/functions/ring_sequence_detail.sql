@@ -19,7 +19,7 @@ BEGIN
   WHERE e.record_type = 'N'
     AND LEFT(b.ring_no, 3) = sequence_prefix_filter
     AND LENGTH(b.ring_no) = ring_length_filter
-    AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
+    AND (ringing_group_filter IS NULL OR s.ringing_group_id = ringing_group_filter)
   ORDER BY b.ring_no;
 END;
 $function$;

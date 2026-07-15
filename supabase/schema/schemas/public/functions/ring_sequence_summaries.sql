@@ -20,7 +20,7 @@ BEGIN
   JOIN "Encounters" e ON e.bird_id = b.id
   JOIN "Sessions"   s ON s.id = e.session_id
   WHERE e.record_type = 'N'
-    AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
+    AND (ringing_group_filter IS NULL OR s.ringing_group_id = ringing_group_filter)
   GROUP BY LEFT(b.ring_no, 3), LENGTH(b.ring_no)
   ORDER BY MAX(s.visit_date) DESC, MIN(s.visit_date) DESC, LEFT(b.ring_no, 3) ASC;
 END;

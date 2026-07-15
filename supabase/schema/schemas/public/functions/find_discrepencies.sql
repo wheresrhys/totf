@@ -63,7 +63,7 @@ WITH
 			JOIN "Sessions" s ON s.id = e.session_id
 			JOIN "Species" sp ON sp.id = b.species_id
 		WHERE
-			(ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
+			(ringing_group_filter IS NULL OR s.ringing_group_id = ringing_group_filter)
 	),
 	hatch_year_differences AS (
 		SELECT
@@ -94,7 +94,7 @@ WITH
 			JOIN "Species" s ON s.id = b.species_id
 		WHERE
 			NOT e.sex ILIKE 'u'
-			AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
+			AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
 		GROUP BY
 			b.id,
 			b.ring_no,
@@ -111,7 +111,7 @@ JOIN "Encounters" e on e.bird_id = b.id
 JOIN "Sessions" sess on sess.id = e.session_id
 JOIN "Species" s on s.id = b.species_id
 WHERE e.wing_length IS NOT NULL
-AND (ringing_group_filter IS NULL OR e.ringing_group_id = ringing_group_filter)
+AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
 GROUP by b.id, b.ring_no, s.species_name)
 
 SELECT
