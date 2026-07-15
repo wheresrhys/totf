@@ -3,30 +3,35 @@
     "bird_id": 448,
     "ring_no": "ABTITMIS",
     "species_name": "Blue Tit",
-    "discrepency_type": "age"
+    "discrepency_type": "age",
+    "last_encounter_date": "2022-06-15"
   },
   {
     "bird_id": 436,
     "ring_no": "AKINGF001",
     "species_name": "Kingfisher",
-    "discrepency_type": "age"
+    "discrepency_type": "age",
+    "last_encounter_date": "2023-07-08"
   },
   {
     "bird_id": 437,
     "ring_no": "ARRETRAP",
     "species_name": "Robin",
-    "discrepency_type": "age"
+    "discrepency_type": "age",
+    "last_encounter_date": "2024-05-10"
   },
   {
     "bird_id": 448,
     "ring_no": "ABTITMIS",
     "species_name": "Blue Tit",
-    "discrepency_type": "sex"
+    "discrepency_type": "sex",
+    "last_encounter_date": "2022-06-15"
   },
   {
     "bird_id": 437,
     "ring_no": "ARRETRAP",
     "species_name": "Robin",
-    "discrepency_type": "wing_length"
+    "discrepency_type": "wing_length",
+    "last_encounter_date": "2024-05-10"
   }
 ]
