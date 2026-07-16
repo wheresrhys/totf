@@ -176,6 +176,28 @@ describe('SessionHighlights', () => {
 		expect(items[0].textContent).toBe('First ever Firecrest record');
 	});
 
+	it('renders rare-species sentences', async () => {
+		const rareSpeciesHighlight: SessionHighlight = {
+			type: 'rare-species',
+			speciesName: 'Firecrest',
+			totalSessionDays: 2
+		};
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([rareSpeciesHighlight]);
+		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+		});
+		const items = screen
+			.getByTestId('session-highlights')
+			.querySelectorAll('li');
+		expect(items.length).toBe(1);
+		expect(items[0].textContent).toBe(
+			'Rarely recorded — Firecrest seen on only 2 days ever'
+		);
+	});
+
 	it('renders long-absence sentences', async () => {
 		const longAbsenceHighlight: LongAbsenceRetrapHighlight = {
 			type: 'long-absence-retrap',
