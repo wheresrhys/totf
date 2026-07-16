@@ -252,7 +252,8 @@ describe('SessionHighlights', () => {
 				speciesName: 'Blue Tit',
 				extreme: 'heaviest',
 				weight: 13.1,
-				previousRecord: 13.0
+				placementRank: 1,
+				isJointPlacement: false
 			}
 		];
 		const { fetchSessionHighlights } =
@@ -271,7 +272,7 @@ describe('SessionHighlights', () => {
 			'Record day for Reed Warbler — 12 caught, the most ever',
 			'First ever Firecrest record',
 			'Robin ARRETRAP recaught after 2 years, 10 months away (last seen 20 Jun 2021)',
-			'Heaviest Blue Tit ever weighed — 13.1g (previous record 13g)'
+			'Heaviest Blue Tit ever weighed — 13.1g'
 		]);
 	});
 
@@ -281,7 +282,8 @@ describe('SessionHighlights', () => {
 			speciesName: 'Blue Tit',
 			extreme: 'heaviest',
 			weight: 13.1,
-			previousRecord: 13.0
+			placementRank: 1,
+			isJointPlacement: false
 		};
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
@@ -294,8 +296,6 @@ describe('SessionHighlights', () => {
 			.getByTestId('session-highlights')
 			.querySelectorAll('li');
 		expect(items.length).toBe(1);
-		expect(items[0].textContent).toBe(
-			'Heaviest Blue Tit ever weighed — 13.1g (previous record 13g)'
-		);
+		expect(items[0].textContent).toBe('Heaviest Blue Tit ever weighed — 13.1g');
 	});
 });

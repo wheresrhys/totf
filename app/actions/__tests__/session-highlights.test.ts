@@ -213,7 +213,8 @@ describe('fetchSessionHighlights', () => {
 				speciesName: 'Blue Tit',
 				extreme: 'heaviest',
 				weight: 13.1,
-				previousRecord: 13.0
+				placementRank: 1,
+				isJointPlacement: false
 			})
 		);
 	});
