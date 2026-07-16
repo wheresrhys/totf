@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { SessionHighlights } from '../SessionHighlights';
-import type {
+import {
 	FirstEverSpeciesHighlight,
 	LongAbsenceRetrapHighlight,
-	SessionHighlight,
+	RareSpeciesHighlight,
+	SessionTotalRecordHighlight,
+	SinceComparisonHighlight,
+	SpeciesCountRecordHighlight,
 	WeightRecordHighlight
 } from '@/app/models/session-highlights';
 
@@ -12,54 +16,45 @@ vi.mock('@/app/actions/session-highlights', () => ({
 	fetchSessionHighlights: vi.fn()
 }));
 
-const mockHighlights: SessionHighlight[] = [
-	{
-		type: 'session-total-record',
+const periodFields = {
+	seasonName: 'autumn',
+	year: 2024,
+	isCurrentYear: false,
+	isCurrentSeason: false,
+	seasonPeriodLabel: 'autumn 2024'
+} as const;
+
+// The action returns highlights already rendered (keyed <li> elements)
+const mockHighlights: ReactElement[] = [
+	new SessionTotalRecordHighlight({
 		metric: 'encounters',
 		scope: 'all-time',
 		value: 74,
-		seasonName: 'autumn',
-		year: 2024,
-		isCurrentYear: false,
-		isCurrentSeason: false,
-		seasonPeriodLabel: 'autumn 2024'
-	},
-	{
-		type: 'session-total-record',
+		...periodFields
+	}).render(),
+	new SessionTotalRecordHighlight({
 		metric: 'species',
 		scope: 'this-season',
 		value: 18,
-		seasonName: 'autumn',
-		year: 2024,
+		...periodFields,
 		isCurrentYear: true,
-		isCurrentSeason: true,
-		seasonPeriodLabel: 'autumn 2024'
-	}
+		isCurrentSeason: true
+	}).render()
 ];
 
-const mockHighlightsWithSpeciesRecord: SessionHighlight[] = [
-	{
-		type: 'session-total-record',
+const mockHighlightsWithSpeciesRecord: ReactElement[] = [
+	new SessionTotalRecordHighlight({
 		metric: 'encounters',
 		scope: 'all-time',
 		value: 74,
-		seasonName: 'autumn',
-		year: 2024,
-		isCurrentYear: false,
-		isCurrentSeason: false,
-		seasonPeriodLabel: 'autumn 2024'
-	},
-	{
-		type: 'species-count-record',
+		...periodFields
+	}).render(),
+	new SpeciesCountRecordHighlight({
 		speciesName: 'Reed Warbler',
 		scope: 'all-time',
 		value: 12,
-		seasonName: 'autumn',
-		year: 2024,
-		isCurrentYear: false,
-		isCurrentSeason: false,
-		seasonPeriodLabel: 'autumn 2024'
-	}
+		...periodFields
+	}).render()
 ];
 
 describe('SessionHighlights', () => {
@@ -77,7 +72,7 @@ describe('SessionHighlights', () => {
 	it('renders a loading spinner before data loads', async () => {
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
-		let resolveData!: (v: SessionHighlight[]) => void;
+		let resolveData!: (v: ReactElement[]) => void;
 		vi.mocked(fetchSessionHighlights).mockReturnValue(
 			new Promise((resolve) => {
 				resolveData = resolve;
@@ -156,15 +151,16 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders first-ever sentences', async () => {
-		const firstEverHighlight: FirstEverSpeciesHighlight = {
-			type: 'first-ever-species',
+		const firstEverHighlight = new FirstEverSpeciesHighlight({
 			speciesName: 'Firecrest',
 			multipleIndividualsRecorded: false,
 			isOnlyRecord: false
-		};
+		});
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
-		vi.mocked(fetchSessionHighlights).mockResolvedValue([firstEverHighlight]);
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([
+			firstEverHighlight.render()
+		]);
 		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
@@ -177,14 +173,15 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders rare-species sentences', async () => {
-		const rareSpeciesHighlight: SessionHighlight = {
-			type: 'rare-species',
+		const rareSpeciesHighlight = new RareSpeciesHighlight({
 			speciesName: 'Firecrest',
 			totalSessionDays: 2
-		};
+		});
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
-		vi.mocked(fetchSessionHighlights).mockResolvedValue([rareSpeciesHighlight]);
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([
+			rareSpeciesHighlight.render()
+		]);
 		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
@@ -199,17 +196,18 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders long-absence sentences', async () => {
-		const longAbsenceHighlight: LongAbsenceRetrapHighlight = {
-			type: 'long-absence-retrap',
+		const longAbsenceHighlight = new LongAbsenceRetrapHighlight({
 			ringNo: 'ARRETRAP',
 			speciesName: 'Robin',
 			previousDate: '2021-06-20',
 			gapYears: 2,
 			gapMonths: 10
-		};
+		});
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
-		vi.mocked(fetchSessionHighlights).mockResolvedValue([longAbsenceHighlight]);
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([
+			longAbsenceHighlight.render()
+		]);
 		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
@@ -224,59 +222,46 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders a full mixed set of highlights in priority order', async () => {
-		// One highlight from every family, already in priority order (the action
-		// sorts before returning); the component renders them as given
-		const mixedHighlights: SessionHighlight[] = [
-			{
-				type: 'session-total-record',
+		// One highlight from every family, already rendered in priority order
+		// (the action runs the highlight machine and renders before returning);
+		// the component renders the elements as given
+		const mixedHighlights: ReactElement[] = [
+			new SessionTotalRecordHighlight({
 				metric: 'encounters',
 				scope: 'all-time',
 				value: 74,
-				seasonName: 'autumn',
-				year: 2024,
-				isCurrentYear: false,
-				isCurrentSeason: false,
-				seasonPeriodLabel: 'autumn 2024'
-			},
-			{
-				type: 'since-comparison',
+				...periodFields
+			}).render(),
+			new SinceComparisonHighlight({
 				kind: 'quietest',
 				value: 3,
 				sinceDate: '2023-09-14'
-			},
-			{
-				type: 'species-count-record',
+			}).render(),
+			new SpeciesCountRecordHighlight({
 				speciesName: 'Reed Warbler',
 				scope: 'all-time',
 				value: 12,
-				seasonName: 'autumn',
-				year: 2024,
-				isCurrentYear: false,
-				isCurrentSeason: false,
-				seasonPeriodLabel: 'autumn 2024'
-			},
-			{
-				type: 'first-ever-species',
+				...periodFields
+			}).render(),
+			new FirstEverSpeciesHighlight({
 				speciesName: 'Firecrest',
 				multipleIndividualsRecorded: false,
 				isOnlyRecord: false
-			},
-			{
-				type: 'long-absence-retrap',
+			}).render(),
+			new LongAbsenceRetrapHighlight({
 				ringNo: 'ARRETRAP',
 				speciesName: 'Robin',
 				previousDate: '2021-06-20',
 				gapYears: 2,
 				gapMonths: 10
-			},
-			{
-				type: 'weight-record',
+			}).render(),
+			new WeightRecordHighlight({
 				speciesName: 'Blue Tit',
 				extreme: 'heaviest',
 				weight: 13.1,
 				placementRank: 1,
 				isJointPlacement: false
-			}
+			}).render()
 		];
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
@@ -299,17 +284,18 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders weight record sentences', async () => {
-		const weightHighlight: WeightRecordHighlight = {
-			type: 'weight-record',
+		const weightHighlight = new WeightRecordHighlight({
 			speciesName: 'Blue Tit',
 			extreme: 'heaviest',
 			weight: 13.1,
 			placementRank: 1,
 			isJointPlacement: false
-		};
+		});
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
-		vi.mocked(fetchSessionHighlights).mockResolvedValue([weightHighlight]);
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([
+			weightHighlight.render()
+		]);
 		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();

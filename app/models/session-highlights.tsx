@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import {
 	differenceInYears,
 	format as formatDate,
@@ -5,6 +6,7 @@ import {
 	isBefore,
 	subMonths
 } from 'date-fns';
+import type { HighlightPrinter } from '@/app/models/highlight-machine';
 import {
 	getSeasonMonths,
 	getSeasonName,
@@ -37,90 +39,171 @@ export type SessionStatsData = {
 	sessionDates: string[];
 };
 
-export type SessionTotalRecordHighlight = {
-	type: 'session-total-record';
-	metric: SessionTotalMetric;
-	scope: RecordScope;
-	value: number;
-	seasonName: string;
-	year: number;
-	// 'this year' / 'this autumn' copy is only correct while the session's
-	// period is still current; otherwise the sentence uses the absolute labels
-	isCurrentYear: boolean;
-	isCurrentSeason: boolean;
-	seasonPeriodLabel: string;
-	// Set only for all-time ties where the equalled record is over a year old
-	recordEqualledYearsAgo?: number;
-};
+// The data fields carried by a highlight class — everything except the
+// HighlightPrinter interface's fixed members
+export type HighlightFields<T extends HighlightPrinter> = Omit<
+	T,
+	'type' | 'render'
+>;
 
-export type SpeciesCountRecordHighlight = {
-	type: 'species-count-record';
-	speciesName: string;
-	scope: RecordScope;
-	value: number;
-	seasonName: string;
-	year: number;
+// Every highlight renders as a list item carrying its sentence; the sentence
+// doubles as the React key (as it did when the component built the sentences)
+function renderSentence(sentence: string): ReactElement {
+	return <li key={sentence}>{sentence}</li>;
+}
+
+export class SessionTotalRecordHighlight implements HighlightPrinter {
+	readonly type = 'session-total-record';
+	readonly metric!: SessionTotalMetric;
+	readonly scope!: RecordScope;
+	readonly value!: number;
+	readonly seasonName!: string;
+	readonly year!: number;
 	// 'this year' / 'this autumn' copy is only correct while the session's
 	// period is still current; otherwise the sentence uses the absolute labels
-	isCurrentYear: boolean;
-	isCurrentSeason: boolean;
-	seasonPeriodLabel: string;
+	readonly isCurrentYear!: boolean;
+	readonly isCurrentSeason!: boolean;
+	readonly seasonPeriodLabel!: string;
 	// Set only for all-time ties where the equalled record is over a year old
-	recordEqualledYearsAgo?: number;
+	readonly recordEqualledYearsAgo?: number;
+
+	constructor(fields: HighlightFields<SessionTotalRecordHighlight>) {
+		Object.assign(this, fields);
+	}
+
+	render(): ReactElement {
+		return renderSentence(buildSessionTotalRecordSentence(this));
+	}
+}
+
+export class SpeciesCountRecordHighlight implements HighlightPrinter {
+	readonly type = 'species-count-record';
+	readonly speciesName!: string;
+	readonly scope!: RecordScope;
+	readonly value!: number;
+	readonly seasonName!: string;
+	readonly year!: number;
+	// 'this year' / 'this autumn' copy is only correct while the session's
+	// period is still current; otherwise the sentence uses the absolute labels
+	readonly isCurrentYear!: boolean;
+	readonly isCurrentSeason!: boolean;
+	readonly seasonPeriodLabel!: string;
+	// Set only for all-time ties where the equalled record is over a year old
+	readonly recordEqualledYearsAgo?: number;
 	// Set only for all-time placements: 1 for a tie with the current record
 	// under a year old, 2/3 for days ranking behind the record
-	placementRank?: 1 | 2 | 3;
+	readonly placementRank?: 1 | 2 | 3;
 	// True when a prior day matches the session's count exactly
-	isJointPlacement?: boolean;
-};
+	readonly isJointPlacement?: boolean;
 
-export type FirstEverSpeciesHighlight = {
-	type: 'first-ever-species';
-	speciesName: string;
+	constructor(fields: HighlightFields<SpeciesCountRecordHighlight>) {
+		Object.assign(this, fields);
+	}
+
+	render(): ReactElement {
+		return renderSentence(buildSpeciesCountRecordSentence(this));
+	}
+}
+
+export class FirstEverSpeciesHighlight implements HighlightPrinter {
+	readonly type = 'first-ever-species';
+	readonly speciesName!: string;
 	// More than one encounter of the species this session — 'record' vs 'records'
-	multipleIndividualsRecorded: boolean;
+	readonly multipleIndividualsRecorded!: boolean;
 	// The session holds the species' only records ever (no other day in the
 	// data, before or after) — 'Only' copy instead of 'First'
-	isOnlyRecord: boolean;
-};
+	readonly isOnlyRecord!: boolean;
 
-export type FirstOfYearSpeciesHighlight = {
-	type: 'first-of-year-species';
-	speciesName: string;
-	year: number;
+	constructor(fields: HighlightFields<FirstEverSpeciesHighlight>) {
+		Object.assign(this, fields);
+	}
+
+	render(): ReactElement {
+		return renderSentence(
+			this.isOnlyRecord
+				? `Only ${buildSpeciesRecordsPhrase(this)} ever`
+				: `First ever ${buildSpeciesRecordsPhrase(this)}`
+		);
+	}
+}
+
+export class FirstOfYearSpeciesHighlight implements HighlightPrinter {
+	readonly type = 'first-of-year-species';
+	readonly speciesName!: string;
+	readonly year!: number;
 	// 'of the year' copy is only correct while the session's year is current;
 	// otherwise the sentence uses the absolute year
-	isCurrentYear: boolean;
+	readonly isCurrentYear!: boolean;
 	// More than one encounter of the species this session — 'record' vs 'records'
-	multipleIndividualsRecorded: boolean;
+	readonly multipleIndividualsRecorded!: boolean;
 	// The session holds the species' only records this calendar year (no other
 	// day in the year, before or after) — 'Only' copy instead of 'First'
-	isOnlyRecord: boolean;
-};
+	readonly isOnlyRecord!: boolean;
+
+	constructor(fields: HighlightFields<FirstOfYearSpeciesHighlight>) {
+		Object.assign(this, fields);
+	}
+
+	render(): ReactElement {
+		const yearPhrase = this.isCurrentYear ? 'of the year' : `of ${this.year}`;
+		return renderSentence(
+			`${this.isOnlyRecord ? 'Only' : 'First'} ${buildSpeciesRecordsPhrase(this)} ${yearPhrase}`
+		);
+	}
+}
 
 // A species the group has recorded on very few session days ever is always
 // worth a mention when it turns up again. Excludes first-ever appearances,
 // which the first-ever highlight covers with more specific copy.
 export const MAX_RARE_SPECIES_SESSION_DAYS = 3;
 
-export type RareSpeciesHighlight = {
-	type: 'rare-species';
-	speciesName: string;
+export class RareSpeciesHighlight implements HighlightPrinter {
+	readonly type = 'rare-species';
+	readonly speciesName!: string;
 	// Distinct session days the species has ever been recorded on (2–3 here;
 	// a count of 1 is a first-ever appearance, handled elsewhere)
-	totalSessionDays: number;
-};
+	readonly totalSessionDays!: number;
 
-export type LongAbsenceRetrapHighlight = {
-	type: 'long-absence-retrap';
-	ringNo: string;
-	speciesName: string;
+	constructor(fields: HighlightFields<RareSpeciesHighlight>) {
+		Object.assign(this, fields);
+	}
+
+	render(): ReactElement {
+		return renderSentence(
+			`Rarely recorded — ${this.speciesName} seen on only ${this.totalSessionDays} days ever`
+		);
+	}
+}
+
+export class LongAbsenceRetrapHighlight implements HighlightPrinter {
+	readonly type = 'long-absence-retrap';
+	readonly ringNo!: string;
+	readonly speciesName!: string;
 	// ISO date string of the previous encounter (e.g. "2021-06-20")
-	previousDate: string;
+	readonly previousDate!: string;
 	// Gap in whole years and months (zero months omitted from copy)
-	gapYears: number;
-	gapMonths: number;
-};
+	readonly gapYears!: number;
+	readonly gapMonths!: number;
+
+	constructor(fields: HighlightFields<LongAbsenceRetrapHighlight>) {
+		Object.assign(this, fields);
+	}
+
+	render(): ReactElement {
+		const yearsPart = `${this.gapYears} ${this.gapYears === 1 ? 'year' : 'years'}`;
+		const gapPhrase =
+			this.gapMonths === 0
+				? yearsPart
+				: `${yearsPart}, ${this.gapMonths} ${this.gapMonths === 1 ? 'month' : 'months'}`;
+		const formattedPreviousDate = formatDate(
+			new Date(this.previousDate),
+			'd MMM yyyy'
+		);
+		return renderSentence(
+			`${this.speciesName} ${this.ringNo} recaught after ${gapPhrase} away (last seen ${formattedPreviousDate})`
+		);
+	}
+}
 
 // A busiest/quietest comparison against the most recent prior session day
 // that equalled or exceeded (busiest) / equalled or undershot (quietest) the
@@ -128,43 +211,49 @@ export type LongAbsenceRetrapHighlight = {
 export const SINCE_COMPARISON_KINDS = ['busiest', 'quietest'] as const;
 export type SinceComparisonKind = (typeof SINCE_COMPARISON_KINDS)[number];
 
-export type SinceComparisonHighlight = {
-	type: 'since-comparison';
-	kind: SinceComparisonKind;
+export class SinceComparisonHighlight implements HighlightPrinter {
+	readonly type = 'since-comparison';
+	readonly kind!: SinceComparisonKind;
 	// The session's encounter total
-	value: number;
+	readonly value!: number;
 	// ISO date of the most recent prior session day that matched the
 	// comparison (undefined for a quietest-ever highlight — no prior day
 	// undershot or matched the session)
-	sinceDate?: string;
-};
+	readonly sinceDate?: string;
+
+	constructor(fields: HighlightFields<SinceComparisonHighlight>) {
+		Object.assign(this, fields);
+	}
+
+	render(): ReactElement {
+		return renderSentence(buildSinceComparisonSentence(this));
+	}
+}
 
 // Which end of the weight range the placement concerns this session
 export const WEIGHT_RECORD_EXTREMES = ['heaviest', 'lightest'] as const;
 export type WeightRecordExtreme = (typeof WEIGHT_RECORD_EXTREMES)[number];
 
-export type WeightRecordHighlight = {
-	type: 'weight-record';
-	speciesName: string;
-	extreme: WeightRecordExtreme;
+export class WeightRecordHighlight implements HighlightPrinter {
+	readonly type = 'weight-record';
+	readonly speciesName!: string;
+	readonly extreme!: WeightRecordExtreme;
 	// The session's weight for this extreme, in grams
-	weight: number;
+	readonly weight!: number;
 	// Where the session's weight ranks across every day the species was weighed
 	// (1 = heaviest/lightest ever, capped at the top 3)
-	placementRank: 1 | 2 | 3;
+	readonly placementRank!: 1 | 2 | 3;
 	// True when another day's extreme exactly matches the session's weight
-	isJointPlacement: boolean;
-};
+	readonly isJointPlacement!: boolean;
 
-export type SessionHighlight =
-	| SessionTotalRecordHighlight
-	| SinceComparisonHighlight
-	| SpeciesCountRecordHighlight
-	| FirstEverSpeciesHighlight
-	| FirstOfYearSpeciesHighlight
-	| RareSpeciesHighlight
-	| LongAbsenceRetrapHighlight
-	| WeightRecordHighlight;
+	constructor(fields: HighlightFields<WeightRecordHighlight>) {
+		Object.assign(this, fields);
+	}
+
+	render(): ReactElement {
+		return renderSentence(buildWeightRecordSentence(this));
+	}
+}
 
 type PeriodFields = {
 	scope: RecordScope;
@@ -278,8 +367,7 @@ export function deriveSessionTotalRecords({
 			const bestOtherValue = Math.max(
 				...otherDaysInScope.map((day) => day[metric])
 			);
-			const baseHighlight: SessionTotalRecordHighlight = {
-				type: 'session-total-record',
+			const baseFields = {
 				metric,
 				scope,
 				value: sessionValue,
@@ -290,7 +378,7 @@ export function deriveSessionTotalRecords({
 				seasonPeriodLabel: getSeasonPeriodLabel(sessionDate)
 			};
 			if (sessionValue > bestOtherValue) {
-				highlights.push(baseHighlight);
+				highlights.push(new SessionTotalRecordHighlight(baseFields));
 				break;
 			}
 			if (sessionValue === bestOtherValue && scope === 'all-time') {
@@ -307,7 +395,12 @@ export function deriveSessionTotalRecords({
 						new Date(mostRecentPriorTieDate)
 					);
 					if (recordEqualledYearsAgo >= 1) {
-						highlights.push({ ...baseHighlight, recordEqualledYearsAgo });
+						highlights.push(
+							new SessionTotalRecordHighlight({
+								...baseFields,
+								recordEqualledYearsAgo
+							})
+						);
 						break;
 					}
 				}
@@ -367,30 +460,33 @@ export function deriveSinceHighlights({
 	// Busiest is suppressed with no qualifying prior day — that case is the
 	// all-time busiest record, already covered by the totals family
 	if (busiestSinceDate !== undefined && isOverAMonthBefore(busiestSinceDate)) {
-		candidates.push({
-			type: 'since-comparison',
-			kind: 'busiest',
-			value: sessionValue,
-			sinceDate: busiestSinceDate
-		});
+		candidates.push(
+			new SinceComparisonHighlight({
+				kind: 'busiest',
+				value: sessionValue,
+				sinceDate: busiestSinceDate
+			})
+		);
 	}
 	if (quietestSinceDate === undefined) {
 		// No prior day matched or undershot — quietest ever, unless this is the
 		// group's first session (nothing to be quieter than)
 		if (priorDays.length > 0) {
-			candidates.push({
-				type: 'since-comparison',
-				kind: 'quietest',
-				value: sessionValue
-			});
+			candidates.push(
+				new SinceComparisonHighlight({
+					kind: 'quietest',
+					value: sessionValue
+				})
+			);
 		}
 	} else if (isOverAMonthBefore(quietestSinceDate)) {
-		candidates.push({
-			type: 'since-comparison',
-			kind: 'quietest',
-			value: sessionValue,
-			sinceDate: quietestSinceDate
-		});
+		candidates.push(
+			new SinceComparisonHighlight({
+				kind: 'quietest',
+				value: sessionValue,
+				sinceDate: quietestSinceDate
+			})
+		);
 	}
 
 	if (candidates.length < 2) return candidates;
@@ -486,15 +582,14 @@ export function deriveSpeciesRecords({
 			const bestOtherValue = Math.max(
 				...otherRowsInScope.map((row) => row.encounter_count)
 			);
-			const baseHighlight: SpeciesCountRecordHighlight = {
-				type: 'species-count-record',
+			const baseFields = {
 				speciesName,
 				scope,
 				value: sessionValue,
 				...sharedFields
 			};
 			if (sessionValue > bestOtherValue) {
-				highlights.push(baseHighlight);
+				highlights.push(new SpeciesCountRecordHighlight(baseFields));
 				break;
 			}
 			if (sessionValue === bestOtherValue && scope === 'all-time') {
@@ -514,9 +609,11 @@ export function deriveSpeciesRecords({
 						? 0
 						: differenceInYears(sessionDate, new Date(mostRecentPriorTieDate));
 				highlights.push(
-					recordEqualledYearsAgo >= 1
-						? { ...baseHighlight, recordEqualledYearsAgo }
-						: { ...baseHighlight, placementRank: 1, isJointPlacement: true }
+					new SpeciesCountRecordHighlight(
+						recordEqualledYearsAgo >= 1
+							? { ...baseFields, recordEqualledYearsAgo }
+							: { ...baseFields, placementRank: 1, isJointPlacement: true }
+					)
 				);
 				break;
 			}
@@ -526,7 +623,9 @@ export function deriveSpeciesRecords({
 					otherRowsInScope.map((row) => row.encounter_count)
 				);
 				if (placement) {
-					highlights.push({ ...baseHighlight, ...placement });
+					highlights.push(
+						new SpeciesCountRecordHighlight({ ...baseFields, ...placement })
+					);
 					// no break — a narrower scope may still hold a strict record,
 					// reported alongside the placement
 				}
@@ -567,18 +666,20 @@ export function deriveFirstEverSpecies({
 						row.visit_date < date
 				)
 		)
-		.map((sessionRow) => ({
-			type: 'first-ever-species' as const,
-			speciesName: sessionRow.species_name,
-			multipleIndividualsRecorded: sessionRow.encounter_count > 1,
-			// The species' only records ever — later days revoke this, so a
-			// "first ever" can lose its "only" copy as more data arrives
-			isOnlyRecord: !stats.daySpeciesStats.some(
-				(row) =>
-					row.species_name === sessionRow.species_name &&
-					row.visit_date !== date
-			)
-		}));
+		.map(
+			(sessionRow) =>
+				new FirstEverSpeciesHighlight({
+					speciesName: sessionRow.species_name,
+					multipleIndividualsRecorded: sessionRow.encounter_count > 1,
+					// The species' only records ever — later days revoke this, so a
+					// "first ever" can lose its "only" copy as more data arrives
+					isOnlyRecord: !stats.daySpeciesStats.some(
+						(row) =>
+							row.species_name === sessionRow.species_name &&
+							row.visit_date !== date
+					)
+				})
+		);
 }
 
 // Returns a highlight for each species seen for the first time this calendar
@@ -620,22 +721,24 @@ export function deriveFirstOfYearSpecies({
 				!priorDates.some((priorDate) => priorDate.startsWith(yearPrefix))
 			);
 		})
-		.map((sessionRow) => ({
-			type: 'first-of-year-species' as const,
-			speciesName: sessionRow.species_name,
-			year,
-			isCurrentYear: year === today.getFullYear(),
-			multipleIndividualsRecorded: sessionRow.encounter_count > 1,
-			// The species' only records this calendar year — a later day in the
-			// same year revokes this; prior-year records don't (they're what
-			// makes it first-of-year rather than first-ever)
-			isOnlyRecord: !stats.daySpeciesStats.some(
-				(row) =>
-					row.species_name === sessionRow.species_name &&
-					row.visit_date !== date &&
-					row.visit_date.startsWith(yearPrefix)
-			)
-		}));
+		.map(
+			(sessionRow) =>
+				new FirstOfYearSpeciesHighlight({
+					speciesName: sessionRow.species_name,
+					year,
+					isCurrentYear: year === today.getFullYear(),
+					multipleIndividualsRecorded: sessionRow.encounter_count > 1,
+					// The species' only records this calendar year — a later day in the
+					// same year revokes this; prior-year records don't (they're what
+					// makes it first-of-year rather than first-ever)
+					isOnlyRecord: !stats.daySpeciesStats.some(
+						(row) =>
+							row.species_name === sessionRow.species_name &&
+							row.visit_date !== date &&
+							row.visit_date.startsWith(yearPrefix)
+					)
+				})
+		);
 }
 
 // Returns a highlight for each species in the session that the group has ever
@@ -670,11 +773,13 @@ export function deriveRareSpecies({
 				// A species recorded on no earlier day is first-ever territory
 				[...speciesDays].some((visitDate) => visitDate < date)
 		)
-		.map(({ sessionRow, speciesDays }) => ({
-			type: 'rare-species' as const,
-			speciesName: sessionRow.species_name,
-			totalSessionDays: speciesDays.size
-		}));
+		.map(
+			({ sessionRow, speciesDays }) =>
+				new RareSpeciesHighlight({
+					speciesName: sessionRow.species_name,
+					totalSessionDays: speciesDays.size
+				})
+		);
 }
 
 // Maps RPC rows to LongAbsenceRetrapHighlights, preserving the gap-descending
@@ -694,14 +799,13 @@ export function deriveLongAbsenceRetraps(
 		// intervalToDuration gives years+months+days+etc; we only want years and months
 		const gapYears = duration.years ?? 0;
 		const gapMonths = duration.months ?? 0;
-		return {
-			type: 'long-absence-retrap',
+		return new LongAbsenceRetrapHighlight({
 			ringNo: result.ring_no,
 			speciesName: result.species_name,
 			previousDate: result.previous_date,
 			gapYears,
 			gapMonths
-		};
+		});
 	});
 }
 
@@ -775,38 +879,18 @@ export function deriveWeightRecordBreakers({
 				isHeaviest
 			);
 			if (placement) {
-				highlights.push({
-					type: 'weight-record',
-					speciesName: sessionRow.species_name,
-					extreme,
-					weight: sessionWeight,
-					...placement
-				});
+				highlights.push(
+					new WeightRecordHighlight({
+						speciesName: sessionRow.species_name,
+						extreme,
+						weight: sessionWeight,
+						...placement
+					})
+				);
 			}
 		}
 	}
 	return highlights;
-}
-
-const HIGHLIGHT_TYPE_PRIORITY: SessionHighlight['type'][] = [
-	'session-total-record',
-	'since-comparison',
-	'species-count-record',
-	'first-ever-species',
-	'first-of-year-species',
-	'rare-species',
-	'long-absence-retrap',
-	'weight-record'
-];
-
-export function sortHighlights(
-	highlights: SessionHighlight[]
-): SessionHighlight[] {
-	return [...highlights].sort(
-		(a, b) =>
-			HIGHLIGHT_TYPE_PRIORITY.indexOf(a.type) -
-			HIGHLIGHT_TYPE_PRIORITY.indexOf(b.type)
-	);
 }
 
 const SESSION_TOTAL_METRIC_COPY: Record<
@@ -921,43 +1005,4 @@ function buildWeightRecordSentence(highlight: WeightRecordHighlight): string {
 			? `${extremeWord[0].toUpperCase()}${extremeWord.slice(1)}`
 			: rankedExtreme;
 	return `${descriptor} ${speciesName} ever weighed — ${weight}g`;
-}
-
-export function buildHighlightSentence(highlight: SessionHighlight): string {
-	switch (highlight.type) {
-		case 'session-total-record':
-			return buildSessionTotalRecordSentence(highlight);
-		case 'since-comparison':
-			return buildSinceComparisonSentence(highlight);
-		case 'species-count-record':
-			return buildSpeciesCountRecordSentence(highlight);
-		case 'first-ever-species':
-			return highlight.isOnlyRecord
-				? `Only ${buildSpeciesRecordsPhrase(highlight)} ever`
-				: `First ever ${buildSpeciesRecordsPhrase(highlight)}`;
-		case 'first-of-year-species': {
-			const yearPhrase = highlight.isCurrentYear
-				? 'of the year'
-				: `of ${highlight.year}`;
-			return `${highlight.isOnlyRecord ? 'Only' : 'First'} ${buildSpeciesRecordsPhrase(highlight)} ${yearPhrase}`;
-		}
-		case 'rare-species':
-			return `Rarely recorded — ${highlight.speciesName} seen on only ${highlight.totalSessionDays} days ever`;
-		case 'long-absence-retrap': {
-			const { ringNo, speciesName, previousDate, gapYears, gapMonths } =
-				highlight;
-			const yearsPart = `${gapYears} ${gapYears === 1 ? 'year' : 'years'}`;
-			const gapPhrase =
-				gapMonths === 0
-					? yearsPart
-					: `${yearsPart}, ${gapMonths} ${gapMonths === 1 ? 'month' : 'months'}`;
-			const formattedPreviousDate = formatDate(
-				new Date(previousDate),
-				'd MMM yyyy'
-			);
-			return `${speciesName} ${ringNo} recaught after ${gapPhrase} away (last seen ${formattedPreviousDate})`;
-		}
-		case 'weight-record':
-			return buildWeightRecordSentence(highlight);
-	}
 }

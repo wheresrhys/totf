@@ -1,14 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactElement } from 'react';
 import {
 	BoxyList,
 	SecondaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { fetchSessionHighlights } from '@/app/actions/session-highlights';
-import {
-	buildHighlightSentence,
-	type SessionHighlight
-} from '@/app/models/session-highlights';
 
 export function SessionHighlights({
 	date,
@@ -17,7 +13,8 @@ export function SessionHighlights({
 	date: string;
 	viewedGroupId: number;
 }) {
-	const [highlights, setHighlights] = useState<SessionHighlight[]>([]);
+	// The action returns each highlight already rendered (a keyed <li>)
+	const [highlights, setHighlights] = useState<ReactElement[]>([]);
 	const [isLoaded, setIsLoaded] = useState(false);
 	useEffect(() => {
 		fetchSessionHighlights({ date, viewedGroupId })
@@ -43,12 +40,7 @@ export function SessionHighlights({
 	return (
 		<section data-testid="session-highlights">
 			<SecondaryHeading>Highlights</SecondaryHeading>
-			<BoxyList>
-				{highlights.map((highlight) => {
-					const sentence = buildHighlightSentence(highlight);
-					return <li key={sentence}>{sentence}</li>;
-				})}
-			</BoxyList>
+			<BoxyList>{highlights}</BoxyList>
 		</section>
 	);
 }
