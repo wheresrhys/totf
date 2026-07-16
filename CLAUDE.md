@@ -83,6 +83,7 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
 ## Code conventions
 
 - **Models** (`app/models/`) hold domain types and pure transformation logic — no I/O.
+  - Deliberate exception: session-highlight classes (`app/models/session-highlights.tsx`) are view-models implementing `HighlightPrinter` — each carries a `render()` returning JSX. `fetchSessionHighlights` runs them through the three-pass machine in `app/models/highlight-machine.ts` (`remove → order → combine`) and renders server-side, because class instances don't serialise across the server-action boundary (rendered elements do). Editorial refinements to highlights belong in a machine pass (removal/ordering/combining) or a class's `render()` (rewording).
 - **Actions** (`app/actions/`) are `'use server'` functions that fetch data and return typed results.
 - **Components** (`app/components/`) and page files receive data as props; they do not fetch.
 - Route pages are in `app/(routes)/` — the `(routes)` group is just for organisation, it doesn't affect URLs.
