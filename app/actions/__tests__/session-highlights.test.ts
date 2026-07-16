@@ -219,6 +219,28 @@ describe('fetchSessionHighlights', () => {
 		);
 	});
 
+	it('includes rare-species highlights in the fan-out', async () => {
+		rpcPages = [
+			[
+				statsRow('Firecrest', SESSION_DATE, 1),
+				statsRow('Firecrest', '2022-05-01', 1)
+			]
+		];
+		sessionPages = [
+			[{ visit_date: '2022-05-01' }, { visit_date: SESSION_DATE }]
+		];
+		const fetchSessionHighlights = await importFetchSessionHighlights();
+		const highlights = await fetchSessionHighlights({
+			date: SESSION_DATE,
+			viewedGroupId: GROUP_ID
+		});
+		expect(highlights).toContainEqual({
+			type: 'rare-species',
+			speciesName: 'Firecrest',
+			totalSessionDays: 2
+		});
+	});
+
 	it('returns cached data within the TTL', async () => {
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		await fetchSessionHighlights({
