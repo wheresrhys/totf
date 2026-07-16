@@ -126,7 +126,7 @@ export type SinceComparisonHighlight = {
 	sinceDate?: string;
 };
 
-// Which end of the weight range broke a record this session
+// Which end of the weight range the placement concerns this session
 export const WEIGHT_RECORD_EXTREMES = ['heaviest', 'lightest'] as const;
 export type WeightRecordExtreme = (typeof WEIGHT_RECORD_EXTREMES)[number];
 
@@ -134,13 +134,13 @@ export type WeightRecordHighlight = {
 	type: 'weight-record';
 	speciesName: string;
 	extreme: WeightRecordExtreme;
-	// The session's record-breaking weight, in grams
+	// The session's weight for this extreme, in grams
 	weight: number;
-	// The extreme across all other sessions (may postdate the session)
-	previousRecord: number;
-	// Set only for ties where the equalled record is over a year old — the
-	// number of full years the record has stood
-	recordEqualledYearsAgo?: number;
+	// Where the session's weight ranks across every day the species was weighed
+	// (1 = heaviest/lightest ever, capped at the top 3)
+	placementRank: 1 | 2 | 3;
+	// True when another day's extreme exactly matches the session's weight
+	isJointPlacement: boolean;
 };
 
 export type SessionHighlight =
@@ -653,13 +653,35 @@ export function deriveLongAbsenceRetraps(
 }
 
 // Minimum number of weighed encounters across other days for a species
-// before a weight record is worth reporting
+// before a weight placement is worth reporting
 const MIN_WEIGHED_ENCOUNTERS_FOR_RECORD = 3;
 
-// Weight records are inherently all-time — a species' heaviest/lightest bird
-// this session is compared against every other day it was weighed, including
-// later days (which can erase a highlight). A record needs the species to have
-// been weighed at least three times across those other days.
+// Ranks the session's extreme against every other day's extreme (heaviest =
+// larger is better, lightest = smaller is better). Returns null when the
+// session doesn't make the top 3. The rank counts how many other days hold a
+// strictly better extreme, so ties share a rank.
+function deriveWeightPlacement(
+	sessionWeight: number,
+	otherWeights: number[],
+	isHeaviest: boolean
+): { placementRank: 1 | 2 | 3; isJointPlacement: boolean } | null {
+	const isBetter = (candidate: number, reference: number) =>
+		isHeaviest ? candidate > reference : candidate < reference;
+	const betterDays = otherWeights.filter((weight) =>
+		isBetter(weight, sessionWeight)
+	).length;
+	const placementRank = betterDays + 1;
+	if (placementRank > 3) return null;
+	return {
+		placementRank: placementRank as 1 | 2 | 3,
+		isJointPlacement: otherWeights.includes(sessionWeight)
+	};
+}
+
+// Weight placements are inherently all-time — a species' heaviest/lightest bird
+// this session is ranked against every other day it was weighed, including
+// later days (which can demote a placement). A placement needs the species to
+// have been weighed at least three times across those other days.
 export function deriveWeightRecordBreakers({
 	date,
 	stats
@@ -667,7 +689,6 @@ export function deriveWeightRecordBreakers({
 	date: string;
 	stats: SessionStatsData;
 }): WeightRecordHighlight[] {
-	const sessionDate = new Date(date);
 	const sessionRows = stats.daySpeciesStats.filter(
 		(row) => row.visit_date === date && row.weighed_birds_count > 0
 	);
@@ -695,46 +716,19 @@ export function deriveWeightRecordBreakers({
 			const otherWeights = otherWeighedRows.map((row) =>
 				isHeaviest ? row.max_weight : row.min_weight
 			);
-			// The record to beat: the biggest max (heaviest) / smallest min (lightest)
-			const previousRecord = isHeaviest
-				? Math.max(...otherWeights)
-				: Math.min(...otherWeights);
-			const beatsRecord = isHeaviest
-				? sessionWeight > previousRecord
-				: sessionWeight < previousRecord;
-			const baseHighlight: WeightRecordHighlight = {
-				type: 'weight-record',
-				speciesName: sessionRow.species_name,
-				extreme,
-				weight: sessionWeight,
-				previousRecord
-			};
-			if (beatsRecord) {
-				highlights.push(baseHighlight);
-				continue;
-			}
-			if (sessionWeight === previousRecord) {
-				// The for-N-years copy describes how long the record has stood, so
-				// only a prior day holding the extreme value counts — a tie held
-				// only by a later session is unreportable
-				const mostRecentPriorTieDate = otherWeighedRows
-					.filter(
-						(row) =>
-							(isHeaviest ? row.max_weight : row.min_weight) ===
-								previousRecord && row.visit_date < date
-					)
-					.map((row) => row.visit_date)
-					.sort()
-					.at(-1);
-				if (mostRecentPriorTieDate !== undefined) {
-					const recordEqualledYearsAgo = differenceInYears(
-						sessionDate,
-						new Date(mostRecentPriorTieDate)
-					);
-					if (recordEqualledYearsAgo >= 1) {
-						highlights.push({ ...baseHighlight, recordEqualledYearsAgo });
-					}
-				}
+			const placement = deriveWeightPlacement(
+				sessionWeight,
+				otherWeights,
+				isHeaviest
+			);
+			if (placement) {
+				highlights.push({
+					type: 'weight-record',
+					speciesName: sessionRow.species_name,
+					extreme,
+					weight: sessionWeight,
+					...placement
+				});
 			}
 		}
 	}
@@ -823,9 +817,11 @@ function buildSpeciesRecordsPhrase(
 	return `${highlight.speciesName} record${highlight.multipleIndividualsRecorded ? 's' : ''}`;
 }
 
-const WEIGHT_RECORD_DESCRIPTOR: Record<WeightRecordExtreme, string> = {
-	heaviest: 'Heaviest',
-	lightest: 'Lightest'
+// The bare extreme word ('heaviest'/'lightest'), combined with a placement
+// prefix ('', '2nd-', '3rd-') and capitalised for the sentence
+const WEIGHT_RECORD_EXTREME_WORD: Record<WeightRecordExtreme, string> = {
+	heaviest: 'heaviest',
+	lightest: 'lightest'
 };
 
 const SINCE_COMPARISON_DESCRIPTOR: Record<SinceComparisonKind, string> = {
@@ -848,13 +844,29 @@ function buildSinceComparisonSentence(
 	return `${descriptor} session since ${formattedSinceDate} — ${valueCopy}`;
 }
 
+const WEIGHT_PLACEMENT_PREFIX: Record<1 | 2 | 3, string> = {
+	1: '',
+	2: '2nd-',
+	3: '3rd-'
+};
+
 function buildWeightRecordSentence(highlight: WeightRecordHighlight): string {
-	const { speciesName, extreme, weight } = highlight;
-	const descriptor = WEIGHT_RECORD_DESCRIPTOR[extreme];
-	if (highlight.recordEqualledYearsAgo !== undefined) {
-		return `${descriptor} ${speciesName} for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)} — ${weight}g`;
+	const { speciesName, extreme, weight, placementRank, isJointPlacement } =
+		highlight;
+	const extremeWord = WEIGHT_RECORD_EXTREME_WORD[extreme];
+	// "heaviest" / "2nd-heaviest" / "3rd-heaviest"
+	const rankedExtreme = `${WEIGHT_PLACEMENT_PREFIX[placementRank]}${extremeWord}`;
+	// A joint placement leads with "Joint"; otherwise the sentence opens with
+	// the extreme word, which is only capitalised when a rank prefix (a digit)
+	// isn't already sitting in front of it
+	if (isJointPlacement) {
+		return `Joint ${rankedExtreme} ${speciesName} ever weighed — ${weight}g`;
 	}
-	return `${descriptor} ${speciesName} ever weighed — ${weight}g (previous record ${highlight.previousRecord}g)`;
+	const descriptor =
+		placementRank === 1
+			? `${extremeWord[0].toUpperCase()}${extremeWord.slice(1)}`
+			: rankedExtreme;
+	return `${descriptor} ${speciesName} ever weighed — ${weight}g`;
 }
 
 export function buildHighlightSentence(highlight: SessionHighlight): string {
