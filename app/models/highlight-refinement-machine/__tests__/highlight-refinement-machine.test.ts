@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
-	combineHighlights,
+	combineOnlyOfYearHighlights,
+	combineSessionTotalRecords,
 	orderByScope,
-	removeRedundantHighlights,
+	removeBusiestSinceWhenBusiestRecordHeld,
+	removeNarrowerScopeSpeciesRecords,
 	runHighlightMachine
-} from '../highlight-refinement-machine';
+} from '..';
 import type {
 	FirstEverSpeciesHighlight,
 	FirstOfYearSpeciesHighlight,
@@ -17,7 +19,7 @@ import type {
 	SinceComparisonHighlight,
 	SpeciesCountRecordHighlight,
 	WeightRecordHighlight
-} from '../session-highlights';
+} from '@/app/models/session-highlights';
 
 const periodFields = {
 	seasonName: 'spring',
@@ -111,68 +113,38 @@ const weightRecord: WeightRecordHighlight = {
 	isJointPlacement: false
 };
 
-describe('removeRedundantHighlights', () => {
-	describe('Rem-1 — busiest-since dropped when a busiest record is held', () => {
-		it('drops a busiest-since comparison when a busiest session-total record is present', () => {
-			const removed = removeRedundantHighlights([
-				sessionTotalRecord('encounters', 'this-year', 120),
-				busiestSince
-			]);
-			expect(removed).toEqual([
-				sessionTotalRecord('encounters', 'this-year', 120)
-			]);
-		});
+// ---- Pass 1 — removal ----
 
-		it('keeps a busiest-since comparison when no busiest record is present', () => {
-			const removed = removeRedundantHighlights([
-				sessionTotalRecord('species', 'this-year', 15),
-				busiestSince
-			]);
-			expect(removed).toContainEqual(busiestSince);
-		});
-
-		it('never drops a quietest-since comparison', () => {
-			const removed = removeRedundantHighlights([
-				sessionTotalRecord('encounters', 'this-year', 120),
-				quietestSince
-			]);
-			expect(removed).toContainEqual(quietestSince);
-		});
+describe('removeBusiestSinceWhenBusiestRecordHeld (Rem-1)', () => {
+	it('drops a busiest-since comparison when a busiest session-total record is present', () => {
+		const removed = removeBusiestSinceWhenBusiestRecordHeld([
+			sessionTotalRecord('encounters', 'this-year', 120),
+			busiestSince
+		]);
+		expect(removed).toEqual([
+			sessionTotalRecord('encounters', 'this-year', 120)
+		]);
 	});
 
-	describe('Rem-2 — narrower-scope species records dropped', () => {
-		it('drops a this-year species record when the species holds an all-time record', () => {
-			const removed = removeRedundantHighlights([
-				speciesCountRecord('Reed Warbler', 'all-time', 67, {
-					placementRank: 2,
-					isJointPlacement: false
-				}),
-				speciesCountRecord('Reed Warbler', 'this-year', 67)
-			]);
-			expect(removed).toEqual([
-				speciesCountRecord('Reed Warbler', 'all-time', 67, {
-					placementRank: 2,
-					isJointPlacement: false
-				})
-			]);
-		});
+	it('keeps a busiest-since comparison when no busiest record is present', () => {
+		const removed = removeBusiestSinceWhenBusiestRecordHeld([
+			sessionTotalRecord('species', 'this-year', 15),
+			busiestSince
+		]);
+		expect(removed).toContainEqual(busiestSince);
+	});
 
-		it('keeps records for different species at their own broadest scope', () => {
-			const blueTit = speciesCountRecord('Blue Tit', 'this-year', 5);
-			const wren = speciesCountRecord('Wren', 'this-season', 3);
-			const removed = removeRedundantHighlights([blueTit, wren]);
-			expect(removed).toEqual([blueTit, wren]);
-		});
+	it('never drops a quietest-since comparison', () => {
+		const removed = removeBusiestSinceWhenBusiestRecordHeld([
+			sessionTotalRecord('encounters', 'this-year', 120),
+			quietestSince
+		]);
+		expect(removed).toContainEqual(quietestSince);
+	});
 
-		it('keeps the broadest of three scopes for one species', () => {
-			const anySeason = speciesCountRecord('Blackcap', 'any-season', 24);
-			const removed = removeRedundantHighlights([
-				speciesCountRecord('Blackcap', 'this-season', 24),
-				anySeason,
-				speciesCountRecord('Blackcap', 'this-year', 24)
-			]);
-			expect(removed).toEqual([anySeason]);
-		});
+	it('is a noop on unrelated highlights', () => {
+		const pool = [rareSpecies, weightRecord];
+		expect(removeBusiestSinceWhenBusiestRecordHeld(pool)).toEqual(pool);
 	});
 
 	it('does not mutate the input list', () => {
@@ -181,12 +153,54 @@ describe('removeRedundantHighlights', () => {
 			busiestSince
 		];
 		const snapshot = [...pool];
-		removeRedundantHighlights(pool);
+		removeBusiestSinceWhenBusiestRecordHeld(pool);
 		expect(pool).toEqual(snapshot);
 	});
 });
 
-describe('orderByScope', () => {
+describe('removeNarrowerScopeSpeciesRecords (Rem-2)', () => {
+	it('drops a this-year species record when the species holds an all-time record', () => {
+		const removed = removeNarrowerScopeSpeciesRecords([
+			speciesCountRecord('Reed Warbler', 'all-time', 67, {
+				placementRank: 2,
+				isJointPlacement: false
+			}),
+			speciesCountRecord('Reed Warbler', 'this-year', 67)
+		]);
+		expect(removed).toEqual([
+			speciesCountRecord('Reed Warbler', 'all-time', 67, {
+				placementRank: 2,
+				isJointPlacement: false
+			})
+		]);
+	});
+
+	it('keeps records for different species at their own broadest scope', () => {
+		const blueTit = speciesCountRecord('Blue Tit', 'this-year', 5);
+		const wren = speciesCountRecord('Wren', 'this-season', 3);
+		const removed = removeNarrowerScopeSpeciesRecords([blueTit, wren]);
+		expect(removed).toEqual([blueTit, wren]);
+	});
+
+	it('keeps the broadest of three scopes for one species', () => {
+		const anySeason = speciesCountRecord('Blackcap', 'any-season', 24);
+		const removed = removeNarrowerScopeSpeciesRecords([
+			speciesCountRecord('Blackcap', 'this-season', 24),
+			anySeason,
+			speciesCountRecord('Blackcap', 'this-year', 24)
+		]);
+		expect(removed).toEqual([anySeason]);
+	});
+
+	it('is a noop on non-species-record highlights', () => {
+		const pool = [busiestSince, weightRecord];
+		expect(removeNarrowerScopeSpeciesRecords(pool)).toEqual(pool);
+	});
+});
+
+// ---- Pass 2 — ordering ----
+
+describe('orderByScope (Ord-1)', () => {
 	it('interleaves session-total and species-count records by scope breadth', () => {
 		const ordered = orderByScope([
 			speciesCountRecord('Blue Tit', 'this-year', 5),
@@ -266,91 +280,118 @@ describe('orderByScope', () => {
 	});
 });
 
-describe('combineHighlights', () => {
-	describe('Comb-1 — busiest + most-varied over the same scope', () => {
-		it('merges same-scope encounters and species records into one combined record', () => {
-			const combined = combineHighlights([
-				sessionTotalRecord('encounters', 'this-year', 120),
-				sessionTotalRecord('species', 'this-year', 15)
-			]);
-			expect(combined).toEqual([
-				{
-					type: 'combined-session-total-record',
-					scope: 'this-year',
-					encounterValue: 120,
-					speciesValue: 15,
-					...periodFields
-				}
-			]);
-		});
+// ---- Pass 3 — combining ----
 
-		it('leaves records over different scopes separate', () => {
-			const encounters = sessionTotalRecord('encounters', 'all-time', 200);
-			const species = sessionTotalRecord('species', 'this-year', 15);
-			const combined = combineHighlights([encounters, species]);
-			expect(combined).toEqual([encounters, species]);
-		});
-
-		it('takes the list position of the encounters record', () => {
-			const combined = combineHighlights([
-				sessionTotalRecord('species', 'this-year', 15),
-				sessionTotalRecord('encounters', 'this-year', 120)
-			]);
-			expect(combined).toHaveLength(1);
-			expect(combined[0].type).toBe('combined-session-total-record');
-		});
+describe('combineSessionTotalRecords (Comb-1)', () => {
+	it('merges same-scope encounters and species records into one combined record', () => {
+		const combined = combineSessionTotalRecords([
+			sessionTotalRecord('encounters', 'this-year', 120),
+			sessionTotalRecord('species', 'this-year', 15)
+		]);
+		expect(combined).toEqual([
+			{
+				type: 'combined-session-total-record',
+				scope: 'this-year',
+				encounterValue: 120,
+				speciesValue: 15,
+				...periodFields
+			}
+		]);
 	});
 
-	describe('Comb-2 — only-of-year species merged', () => {
-		it('merges multiple only-of-year highlights into one listing every species', () => {
-			const combined = combineHighlights([
-				firstOfYear('Chaffinch', true),
-				firstOfYear('Goldfinch', true),
-				firstOfYear('Lesser Whitethroat', true)
-			]);
-			expect(combined).toEqual([
-				{
-					type: 'combined-only-of-year',
-					speciesNames: ['Chaffinch', 'Goldfinch', 'Lesser Whitethroat'],
-					year: 2026,
-					isCurrentYear: true
-				}
-			]);
-		});
+	it('leaves records over different scopes separate', () => {
+		const encounters = sessionTotalRecord('encounters', 'all-time', 200);
+		const species = sessionTotalRecord('species', 'this-year', 15);
+		const combined = combineSessionTotalRecords([encounters, species]);
+		expect(combined).toEqual([encounters, species]);
+	});
 
-		it('leaves a single only-of-year highlight unchanged', () => {
-			const only = firstOfYear('Chaffinch', true);
-			expect(combineHighlights([only])).toEqual([only]);
-		});
+	it('takes the list position of the encounters record', () => {
+		const combined = combineSessionTotalRecords([
+			sessionTotalRecord('species', 'this-year', 15),
+			sessionTotalRecord('encounters', 'this-year', 120)
+		]);
+		expect(combined).toHaveLength(1);
+		expect(combined[0].type).toBe('combined-session-total-record');
+	});
 
-		it('does not merge first-of-year (non-only) highlights', () => {
-			const first = firstOfYear('Chaffinch', false);
-			const secondFirst = firstOfYear('Goldfinch', false);
-			expect(combineHighlights([first, secondFirst])).toEqual([
-				first,
-				secondFirst
-			]);
-		});
-
-		it('merges only onlys, leaving first-of-year items in place', () => {
-			const firstA = firstOfYear('Robin', false);
-			const combined = combineHighlights([
-				firstA,
-				firstOfYear('Chaffinch', true),
-				firstOfYear('Goldfinch', true)
-			]);
-			expect(combined).toEqual([
-				firstA,
-				{
-					type: 'combined-only-of-year',
-					speciesNames: ['Chaffinch', 'Goldfinch'],
-					year: 2026,
-					isCurrentYear: true
-				}
-			]);
-		});
+	it('leaves a lone session-total record unchanged', () => {
+		const lone = sessionTotalRecord('encounters', 'this-year', 120);
+		expect(combineSessionTotalRecords([lone])).toEqual([lone]);
 	});
 });
+
+describe('combineOnlyOfYearHighlights (Comb-2)', () => {
+	it('leaves a single only-of-year highlight unchanged', () => {
+		const only = firstOfYear('Chaffinch', true);
+		expect(combineOnlyOfYearHighlights([only])).toEqual([only]);
+	});
+
+	it('merges two only-of-year highlights into one line listing both species', () => {
+		const combined = combineOnlyOfYearHighlights([
+			firstOfYear('Chaffinch', true),
+			firstOfYear('Goldfinch', true)
+		]);
+		expect(combined).toEqual([
+			{
+				type: 'combined-only-of-year',
+				speciesNames: ['Chaffinch', 'Goldfinch'],
+				year: 2026,
+				isCurrentYear: true
+			}
+		]);
+	});
+
+	it('merges three only-of-year highlights into one line listing all species', () => {
+		const combined = combineOnlyOfYearHighlights([
+			firstOfYear('Chaffinch', true),
+			firstOfYear('Goldfinch', true),
+			firstOfYear('Lesser Whitethroat', true)
+		]);
+		expect(combined).toEqual([
+			{
+				type: 'combined-only-of-year',
+				speciesNames: ['Chaffinch', 'Goldfinch', 'Lesser Whitethroat'],
+				year: 2026,
+				isCurrentYear: true
+			}
+		]);
+	});
+
+	it('does not merge first-of-year (non-only) highlights', () => {
+		const first = firstOfYear('Chaffinch', false);
+		const secondFirst = firstOfYear('Goldfinch', false);
+		expect(combineOnlyOfYearHighlights([first, secondFirst])).toEqual([
+			first,
+			secondFirst
+		]);
+	});
+
+	it('merges only onlys, leaving first-of-year items in place', () => {
+		const firstA = firstOfYear('Robin', false);
+		const combined = combineOnlyOfYearHighlights([
+			firstA,
+			firstOfYear('Chaffinch', true),
+			firstOfYear('Goldfinch', true)
+		]);
+		expect(combined).toEqual([
+			firstA,
+			{
+				type: 'combined-only-of-year',
+				speciesNames: ['Chaffinch', 'Goldfinch'],
+				year: 2026,
+				isCurrentYear: true
+			}
+		]);
+	});
+
+	it('is a noop on unrelated highlights', () => {
+		const pool = [rareSpecies, weightRecord];
+		expect(combineOnlyOfYearHighlights(pool)).toEqual(pool);
+	});
+});
+
+// ---- Full machine ----
 
 describe('runHighlightMachine', () => {
 	it('returns an empty list for an empty pool', () => {
