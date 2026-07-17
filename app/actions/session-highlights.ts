@@ -5,6 +5,7 @@ import {
 	deriveFirstEverSpecies,
 	deriveFirstOfYearSpecies,
 	deriveLongAbsenceRetraps,
+	deriveRareSpecies,
 	deriveSessionTotalRecords,
 	deriveSinceHighlights,
 	deriveSpeciesRecords,
@@ -88,6 +89,7 @@ export async function fetchSessionHighlights({
 		...deriveSpeciesRecords({ date, stats }),
 		...deriveFirstEverSpecies({ date, stats }),
 		...deriveFirstOfYearSpecies({ date, stats }),
+		...deriveRareSpecies({ date, stats }),
 		...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date),
 		...deriveWeightRecordBreakers({ date, stats })
 	]);

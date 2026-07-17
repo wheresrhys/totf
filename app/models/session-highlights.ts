@@ -98,6 +98,19 @@ export type FirstOfYearSpeciesHighlight = {
 	isOnlyRecord: boolean;
 };
 
+// A species the group has recorded on very few session days ever is always
+// worth a mention when it turns up again. Excludes first-ever appearances,
+// which the first-ever highlight covers with more specific copy.
+export const MAX_RARE_SPECIES_SESSION_DAYS = 3;
+
+export type RareSpeciesHighlight = {
+	type: 'rare-species';
+	speciesName: string;
+	// Distinct session days the species has ever been recorded on (2–3 here;
+	// a count of 1 is a first-ever appearance, handled elsewhere)
+	totalSessionDays: number;
+};
+
 export type LongAbsenceRetrapHighlight = {
 	type: 'long-absence-retrap';
 	ringNo: string;
@@ -149,6 +162,7 @@ export type SessionHighlight =
 	| SpeciesCountRecordHighlight
 	| FirstEverSpeciesHighlight
 	| FirstOfYearSpeciesHighlight
+	| RareSpeciesHighlight
 	| LongAbsenceRetrapHighlight
 	| WeightRecordHighlight;
 
@@ -624,6 +638,45 @@ export function deriveFirstOfYearSpecies({
 		}));
 }
 
+// Returns a highlight for each species in the session that the group has ever
+// recorded on only a handful of session days (MAX_RARE_SPECIES_SESSION_DAYS or
+// fewer, counting every day it appears before or after this session). A
+// species seen for the first time this session is excluded — the first-ever
+// highlight already covers it with more specific copy.
+export function deriveRareSpecies({
+	date,
+	stats
+}: {
+	date: string;
+	stats: SessionStatsData;
+}): RareSpeciesHighlight[] {
+	const sessionRows = stats.daySpeciesStats.filter(
+		(row) => row.visit_date === date
+	);
+	if (sessionRows.length === 0) return [];
+
+	return sessionRows
+		.map((sessionRow) => {
+			const speciesDays = new Set(
+				stats.daySpeciesStats
+					.filter((row) => row.species_name === sessionRow.species_name)
+					.map((row) => row.visit_date)
+			);
+			return { sessionRow, speciesDays };
+		})
+		.filter(
+			({ speciesDays }) =>
+				speciesDays.size <= MAX_RARE_SPECIES_SESSION_DAYS &&
+				// A species recorded on no earlier day is first-ever territory
+				[...speciesDays].some((visitDate) => visitDate < date)
+		)
+		.map(({ sessionRow, speciesDays }) => ({
+			type: 'rare-species' as const,
+			speciesName: sessionRow.species_name,
+			totalSessionDays: speciesDays.size
+		}));
+}
+
 // Maps RPC rows to LongAbsenceRetrapHighlights, preserving the gap-descending
 // order returned by the RPC. The session date is needed to compute the
 // years+months gap relative to the day the bird was last seen.
@@ -741,6 +794,7 @@ const HIGHLIGHT_TYPE_PRIORITY: SessionHighlight['type'][] = [
 	'species-count-record',
 	'first-ever-species',
 	'first-of-year-species',
+	'rare-species',
 	'long-absence-retrap',
 	'weight-record'
 ];
@@ -887,6 +941,8 @@ export function buildHighlightSentence(highlight: SessionHighlight): string {
 				: `of ${highlight.year}`;
 			return `${highlight.isOnlyRecord ? 'Only' : 'First'} ${buildSpeciesRecordsPhrase(highlight)} ${yearPhrase}`;
 		}
+		case 'rare-species':
+			return `Rarely recorded — ${highlight.speciesName} seen on only ${highlight.totalSessionDays} days ever`;
 		case 'long-absence-retrap': {
 			const { ringNo, speciesName, previousDate, gapYears, gapMonths } =
 				highlight;
