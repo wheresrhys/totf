@@ -155,6 +155,33 @@ export type WeightRecordHighlight = {
 	isJointPlacement: boolean;
 };
 
+// A combined session-total record: a session that holds both the busiest
+// (encounters) and most-varied (species) record over the *same* scope, merged
+// by the machine's combine pass into one "Busiest and most varied session"
+// line. Carries the value for each metric plus the shared period fields.
+export type CombinedSessionTotalRecordHighlight = {
+	type: 'combined-session-total-record';
+	scope: RecordScope;
+	encounterValue: number;
+	speciesValue: number;
+	seasonName: string;
+	year: number;
+	isCurrentYear: boolean;
+	isCurrentSeason: boolean;
+	seasonPeriodLabel: string;
+};
+
+// Multiple "Only <species> records of the year" highlights merged by the
+// machine's combine pass into one line listing every species. Always the
+// only-of-year variant (isOnlyRecord) — first-of-year items are never merged.
+export type CombinedOnlyOfYearHighlight = {
+	type: 'combined-only-of-year';
+	// Species names in the order the source highlights appeared
+	speciesNames: string[];
+	year: number;
+	isCurrentYear: boolean;
+};
+
 // The discriminated union the highlight machine's passes and the client
 // renderers both operate over. Highlights are plain serializable data so they
 // can cross the server-action -> client boundary; rendering happens client
@@ -167,7 +194,9 @@ export type SessionHighlight =
 	| FirstOfYearSpeciesHighlight
 	| RareSpeciesHighlight
 	| LongAbsenceRetrapHighlight
-	| WeightRecordHighlight;
+	| WeightRecordHighlight
+	| CombinedSessionTotalRecordHighlight
+	| CombinedOnlyOfYearHighlight;
 
 type DayTotals = {
 	date: string;

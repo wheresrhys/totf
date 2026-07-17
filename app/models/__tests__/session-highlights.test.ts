@@ -1847,3 +1847,73 @@ describe('render — since', () => {
 
 // The type-priority ordering previously tested here (sortHighlights) now
 // lives in the highlight machine — see highlight-refinement-machine.test.ts
+
+// The combine passes that produce these highlights live in the highlight
+// machine; here we only test that each combined variant renders its copy.
+describe('render — combined-session-total-record', () => {
+	const combinedFields = {
+		type: 'combined-session-total-record' as const,
+		encounterValue: 120,
+		speciesValue: 15,
+		seasonName: 'spring',
+		year: 2026,
+		isCurrentYear: true,
+		isCurrentSeason: true,
+		seasonPeriodLabel: 'spring 2026'
+	};
+
+	it('renders this-year copy for a current-year session', () => {
+		expect(renderedText({ ...combinedFields, scope: 'this-year' })).toBe(
+			'Busiest and most varied session this year — 120 birds from 15 species'
+		);
+	});
+
+	it('renders all-time copy', () => {
+		expect(renderedText({ ...combinedFields, scope: 'all-time' })).toBe(
+			'Busiest and most varied session ever — 120 birds from 15 species'
+		);
+	});
+
+	it('renders any-season copy with the season name', () => {
+		expect(renderedText({ ...combinedFields, scope: 'any-season' })).toBe(
+			'Busiest and most varied spring session ever — 120 birds from 15 species'
+		);
+	});
+});
+
+describe('render — combined-only-of-year', () => {
+	it('renders three species with commas and a trailing "and"', () => {
+		expect(
+			renderedText({
+				type: 'combined-only-of-year',
+				speciesNames: ['Chaffinch', 'Goldfinch', 'Lesser Whitethroat'],
+				year: 2026,
+				isCurrentYear: true
+			})
+		).toBe(
+			'Only Chaffinch, Goldfinch and Lesser Whitethroat records of the year'
+		);
+	});
+
+	it('renders two species joined by "and"', () => {
+		expect(
+			renderedText({
+				type: 'combined-only-of-year',
+				speciesNames: ['Chaffinch', 'Goldfinch'],
+				year: 2026,
+				isCurrentYear: true
+			})
+		).toBe('Only Chaffinch and Goldfinch records of the year');
+	});
+
+	it('renders the absolute year for a past-year session', () => {
+		expect(
+			renderedText({
+				type: 'combined-only-of-year',
+				speciesNames: ['Chaffinch', 'Goldfinch'],
+				year: 2024,
+				isCurrentYear: false
+			})
+		).toBe('Only Chaffinch and Goldfinch records of 2024');
+	});
+});

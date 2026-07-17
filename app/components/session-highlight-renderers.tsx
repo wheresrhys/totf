@@ -2,6 +2,8 @@
 import type { ReactElement } from 'react';
 import { format as formatDate } from 'date-fns';
 import type {
+	CombinedOnlyOfYearHighlight,
+	CombinedSessionTotalRecordHighlight,
 	FirstEverSpeciesHighlight,
 	FirstOfYearSpeciesHighlight,
 	LongAbsenceRetrapHighlight,
@@ -84,6 +86,40 @@ function buildSessionTotalRecordSentence(
 		return `${descriptor} ${highlight.seasonName} session ever — ${valueCopy}`;
 	}
 	return `${descriptor} session ever — ${valueCopy}`;
+}
+
+// "Busiest and most varied session <period> — N birds from M species".
+// Shares the session-total period phrasing so the scope reads identically to
+// the standalone busiest/most-varied lines it replaces.
+function buildCombinedSessionTotalRecordSentence(
+	highlight: CombinedSessionTotalRecordHighlight
+): string {
+	const valueCopy = `${highlight.encounterValue} birds from ${highlight.speciesValue} species`;
+	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight, 'of');
+	if (currentPeriodPhrase !== null) {
+		return `Busiest and most varied session ${currentPeriodPhrase} — ${valueCopy}`;
+	}
+	if (highlight.scope === 'any-season') {
+		return `Busiest and most varied ${highlight.seasonName} session ever — ${valueCopy}`;
+	}
+	return `Busiest and most varied session ever — ${valueCopy}`;
+}
+
+// "Only A, B and C records of the year" — a comma list with "and" before the
+// last name. Two names read "A and B"; the plural "records" is fixed because a
+// combined line always covers at least two species.
+function buildCombinedOnlyOfYearSentence(
+	highlight: CombinedOnlyOfYearHighlight
+): string {
+	const { speciesNames } = highlight;
+	const speciesList =
+		speciesNames.length === 2
+			? speciesNames.join(' and ')
+			: `${speciesNames.slice(0, -1).join(', ')} and ${speciesNames.at(-1)}`;
+	const yearPhrase = highlight.isCurrentYear
+		? 'of the year'
+		: `of ${highlight.year}`;
+	return `Only ${speciesList} records ${yearPhrase}`;
 }
 
 function buildSpeciesCountRecordSentence(
@@ -243,7 +279,11 @@ const HIGHLIGHT_RENDERERS: {
 	'long-absence-retrap': (highlight) =>
 		renderSentence(buildLongAbsenceRetrapSentence(highlight)),
 	'weight-record': (highlight) =>
-		renderSentence(buildWeightRecordSentence(highlight))
+		renderSentence(buildWeightRecordSentence(highlight)),
+	'combined-session-total-record': (highlight) =>
+		renderSentence(buildCombinedSessionTotalRecordSentence(highlight)),
+	'combined-only-of-year': (highlight) =>
+		renderSentence(buildCombinedOnlyOfYearSentence(highlight))
 };
 
 export function renderHighlight(highlight: SessionHighlight): ReactElement {
