@@ -128,12 +128,13 @@ describe('fetchSessionHighlights', () => {
 			(call) => (call as [string, unknown])[0] === 'stats_per_day_and_species'
 		) as [string, { ringing_group_filter: number }];
 		expect(statsArgs.ringing_group_filter).toBe(GROUP_ID);
-		// Every derived highlight, rendered in the machine's fixed type-priority
-		// order — a like-for-like guard on both the copy and the ordering
+		// Every derived highlight, ordered by the machine: the scoped record block
+		// (busiest all-time, then the all-time species record) leads, the
+		// quietest-since comparison follows, then the rare-species mention
 		expect(sentencesOf(highlights)).toEqual([
 			'Busiest session ever — 74 birds',
-			'Quietest session since 1 May 2022 — 74 birds',
 			'Record day for Robin — 74 caught, the most ever',
+			'Quietest session since 1 May 2022 — 74 birds',
 			'Rarely recorded — Robin seen on only 2 days ever'
 		]);
 	});

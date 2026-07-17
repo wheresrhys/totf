@@ -225,17 +225,17 @@ describe('SessionHighlights', () => {
 				...periodFields
 			},
 			{
-				type: 'since-comparison',
-				kind: 'quietest',
-				value: 3,
-				sinceDate: '2023-09-14'
-			},
-			{
 				type: 'species-count-record',
 				speciesName: 'Reed Warbler',
 				scope: 'all-time',
 				value: 12,
 				...periodFields
+			},
+			{
+				type: 'since-comparison',
+				kind: 'quietest',
+				value: 3,
+				sinceDate: '2023-09-14'
 			},
 			{
 				type: 'first-ever-species',
@@ -270,10 +270,13 @@ describe('SessionHighlights', () => {
 		const items = screen
 			.getByTestId('session-highlights')
 			.querySelectorAll('li');
+		// The machine sorts the scoped record block first (busiest all-time,
+		// then Reed Warbler all-time), then the quietest-since comparison, then
+		// the first/absence block, with weights last.
 		expect([...items].map((item) => item.textContent)).toEqual([
 			'Busiest session ever — 74 birds',
-			'Quietest session since 14 Sep 2023 — 3 birds',
 			'Record day for Reed Warbler — 12 caught, the most ever',
+			'Quietest session since 14 Sep 2023 — 3 birds',
 			'First ever Firecrest record',
 			'Robin ARRETRAP recaught after 2 years, 10 months away (last seen 20 Jun 2021)',
 			'Heaviest Blue Tit ever weighed — 13.1g'
