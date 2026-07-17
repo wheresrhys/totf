@@ -1,6 +1,7 @@
 'use server';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors, fetchAllPaginatedRows } from '@/lib/supabase';
+import { runHighlightMachine } from '@/app/models/highlight-refinement-machine';
 import {
 	deriveFirstEverSpecies,
 	deriveFirstOfYearSpecies,
@@ -10,7 +11,6 @@ import {
 	deriveSinceHighlights,
 	deriveSpeciesRecords,
 	deriveWeightRecordBreakers,
-	sortHighlights,
 	type SessionHighlight,
 	type SessionStatsData
 } from '@/app/models/session-highlights';
@@ -83,7 +83,7 @@ export async function fetchSessionHighlights({
 			.then(catchSupabaseErrors)
 			.then((results) => (results ?? []) as LongAbsenceRetrapsResult[])
 	]);
-	return sortHighlights([
+	const highlightPool = [
 		...deriveSessionTotalRecords({ date, stats }),
 		...deriveSinceHighlights({ date, stats }),
 		...deriveSpeciesRecords({ date, stats }),
@@ -92,5 +92,8 @@ export async function fetchSessionHighlights({
 		...deriveRareSpecies({ date, stats }),
 		...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date),
 		...deriveWeightRecordBreakers({ date, stats })
-	]);
+	];
+	// Highlights are plain data, so the machine's output serialises across the
+	// RSC boundary as-is; the client component renders each via renderHighlight.
+	return runHighlightMachine(highlightPool);
 }

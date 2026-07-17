@@ -1,6 +1,5 @@
 import {
 	differenceInYears,
-	format as formatDate,
 	intervalToDuration,
 	isBefore,
 	subMonths
@@ -156,6 +155,10 @@ export type WeightRecordHighlight = {
 	isJointPlacement: boolean;
 };
 
+// The discriminated union the highlight machine's passes and the client
+// renderers both operate over. Highlights are plain serializable data so they
+// can cross the server-action -> client boundary; rendering happens client
+// side (app/components/session-highlight-renderers.tsx).
 export type SessionHighlight =
 	| SessionTotalRecordHighlight
 	| SinceComparisonHighlight
@@ -165,39 +168,6 @@ export type SessionHighlight =
 	| RareSpeciesHighlight
 	| LongAbsenceRetrapHighlight
 	| WeightRecordHighlight;
-
-type PeriodFields = {
-	scope: RecordScope;
-	seasonName: string;
-	year: number;
-	isCurrentYear: boolean;
-	isCurrentSeason: boolean;
-	seasonPeriodLabel: string;
-};
-
-// Returns the scope-qualified phrase for "this year" / "this season" scopes
-// where the copy changes depending on whether the period is still current.
-// Handles the shared conditional logic for both session-total and species-record families.
-// Returns null for all-time and any-season, which each family phrases differently.
-// yearPreposition: 'in' for species-count ("the most in 2024"),
-//                  'of' for session-total ("Busiest session of 2024")
-export function buildCurrentPeriodScopePhrase(
-	fields: PeriodFields,
-	yearPreposition: 'in' | 'of' = 'in'
-): string | null {
-	switch (fields.scope) {
-		case 'this-year':
-			return fields.isCurrentYear
-				? 'this year'
-				: `${yearPreposition} ${fields.year}`;
-		case 'this-season':
-			return fields.isCurrentSeason
-				? `this ${fields.seasonName}`
-				: `in ${fields.seasonPeriodLabel}`;
-		default:
-			return null;
-	}
-}
 
 type DayTotals = {
 	date: string;
@@ -278,7 +248,7 @@ export function deriveSessionTotalRecords({
 			const bestOtherValue = Math.max(
 				...otherDaysInScope.map((day) => day[metric])
 			);
-			const baseHighlight: SessionTotalRecordHighlight = {
+			const baseHighlight = {
 				type: 'session-total-record',
 				metric,
 				scope,
@@ -288,7 +258,7 @@ export function deriveSessionTotalRecords({
 				isCurrentYear: sessionDate.getFullYear() === today.getFullYear(),
 				isCurrentSeason: isCurrentSeasonPeriod(sessionDate, today),
 				seasonPeriodLabel: getSeasonPeriodLabel(sessionDate)
-			};
+			} satisfies SessionTotalRecordHighlight;
 			if (sessionValue > bestOtherValue) {
 				highlights.push(baseHighlight);
 				break;
@@ -486,13 +456,13 @@ export function deriveSpeciesRecords({
 			const bestOtherValue = Math.max(
 				...otherRowsInScope.map((row) => row.encounter_count)
 			);
-			const baseHighlight: SpeciesCountRecordHighlight = {
+			const baseHighlight = {
 				type: 'species-count-record',
 				speciesName,
 				scope,
 				value: sessionValue,
 				...sharedFields
-			};
+			} satisfies SpeciesCountRecordHighlight;
 			if (sessionValue > bestOtherValue) {
 				highlights.push(baseHighlight);
 				break;
@@ -786,178 +756,4 @@ export function deriveWeightRecordBreakers({
 		}
 	}
 	return highlights;
-}
-
-const HIGHLIGHT_TYPE_PRIORITY: SessionHighlight['type'][] = [
-	'session-total-record',
-	'since-comparison',
-	'species-count-record',
-	'first-ever-species',
-	'first-of-year-species',
-	'rare-species',
-	'long-absence-retrap',
-	'weight-record'
-];
-
-export function sortHighlights(
-	highlights: SessionHighlight[]
-): SessionHighlight[] {
-	return [...highlights].sort(
-		(a, b) =>
-			HIGHLIGHT_TYPE_PRIORITY.indexOf(a.type) -
-			HIGHLIGHT_TYPE_PRIORITY.indexOf(b.type)
-	);
-}
-
-const SESSION_TOTAL_METRIC_COPY: Record<
-	SessionTotalMetric,
-	{ descriptor: string; unit: string }
-> = {
-	encounters: { descriptor: 'Busiest', unit: 'birds' },
-	species: { descriptor: 'Most varied', unit: 'species' }
-};
-
-function buildYearsAgoCopy(yearsAgo: number): string {
-	return `${yearsAgo} ${yearsAgo === 1 ? 'year' : 'years'}`;
-}
-
-function buildSessionTotalRecordSentence(
-	highlight: SessionTotalRecordHighlight
-): string {
-	const { descriptor, unit } = SESSION_TOTAL_METRIC_COPY[highlight.metric];
-	const valueCopy = `${highlight.value} ${unit}`;
-	if (highlight.recordEqualledYearsAgo !== undefined) {
-		return `${descriptor} session for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)} — ${valueCopy}`;
-	}
-	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight, 'of');
-	if (currentPeriodPhrase !== null) {
-		return `${descriptor} session ${currentPeriodPhrase} — ${valueCopy}`;
-	}
-	// Remaining cases: all-time and any-season (this-year / this-season handled above)
-	if (highlight.scope === 'any-season') {
-		return `${descriptor} ${highlight.seasonName} session ever — ${valueCopy}`;
-	}
-	return `${descriptor} session ever — ${valueCopy}`;
-}
-
-function buildSpeciesCountRecordSentence(
-	highlight: SpeciesCountRecordHighlight
-): string {
-	const { speciesName, value } = highlight;
-	const valueCopy = `${value} caught`;
-	if (highlight.recordEqualledYearsAgo !== undefined) {
-		return `Record-equalling day for ${speciesName} — ${valueCopy}, most for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)}`;
-	}
-	if (highlight.placementRank !== undefined) {
-		const rankCopy = { 1: 'best', 2: '2nd-best', 3: '3rd-best' }[
-			highlight.placementRank
-		];
-		const jointPrefix = highlight.isJointPlacement ? 'Joint ' : '';
-		return `${jointPrefix}${rankCopy} day for ${speciesName} ever — ${value} birds`;
-	}
-	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight);
-	const mostPhrase =
-		currentPeriodPhrase !== null
-			? `the most ${currentPeriodPhrase}`
-			: highlight.scope === 'all-time'
-				? 'the most ever'
-				: `the most in any ${highlight.seasonName}`;
-	return `Record day for ${speciesName} — ${valueCopy}, ${mostPhrase}`;
-}
-
-function buildSpeciesRecordsPhrase(
-	highlight: FirstEverSpeciesHighlight | FirstOfYearSpeciesHighlight
-): string {
-	return `${highlight.speciesName} record${highlight.multipleIndividualsRecorded ? 's' : ''}`;
-}
-
-// The bare extreme word ('heaviest'/'lightest'), combined with a placement
-// prefix ('', '2nd-', '3rd-') and capitalised for the sentence
-const WEIGHT_RECORD_EXTREME_WORD: Record<WeightRecordExtreme, string> = {
-	heaviest: 'heaviest',
-	lightest: 'lightest'
-};
-
-const SINCE_COMPARISON_DESCRIPTOR: Record<SinceComparisonKind, string> = {
-	busiest: 'Busiest',
-	quietest: 'Quietest'
-};
-
-function buildSinceComparisonSentence(
-	highlight: SinceComparisonHighlight
-): string {
-	const descriptor = SINCE_COMPARISON_DESCRIPTOR[highlight.kind];
-	const valueCopy = `${highlight.value} birds`;
-	if (highlight.sinceDate === undefined) {
-		return `${descriptor} session ever — ${valueCopy}`;
-	}
-	const formattedSinceDate = formatDate(
-		new Date(highlight.sinceDate),
-		'd MMM yyyy'
-	);
-	return `${descriptor} session since ${formattedSinceDate} — ${valueCopy}`;
-}
-
-const WEIGHT_PLACEMENT_PREFIX: Record<1 | 2 | 3, string> = {
-	1: '',
-	2: '2nd-',
-	3: '3rd-'
-};
-
-function buildWeightRecordSentence(highlight: WeightRecordHighlight): string {
-	const { speciesName, extreme, weight, placementRank, isJointPlacement } =
-		highlight;
-	const extremeWord = WEIGHT_RECORD_EXTREME_WORD[extreme];
-	// "heaviest" / "2nd-heaviest" / "3rd-heaviest"
-	const rankedExtreme = `${WEIGHT_PLACEMENT_PREFIX[placementRank]}${extremeWord}`;
-	// A joint placement leads with "Joint"; otherwise the sentence opens with
-	// the extreme word, which is only capitalised when a rank prefix (a digit)
-	// isn't already sitting in front of it
-	if (isJointPlacement) {
-		return `Joint ${rankedExtreme} ${speciesName} ever weighed — ${weight}g`;
-	}
-	const descriptor =
-		placementRank === 1
-			? `${extremeWord[0].toUpperCase()}${extremeWord.slice(1)}`
-			: rankedExtreme;
-	return `${descriptor} ${speciesName} ever weighed — ${weight}g`;
-}
-
-export function buildHighlightSentence(highlight: SessionHighlight): string {
-	switch (highlight.type) {
-		case 'session-total-record':
-			return buildSessionTotalRecordSentence(highlight);
-		case 'since-comparison':
-			return buildSinceComparisonSentence(highlight);
-		case 'species-count-record':
-			return buildSpeciesCountRecordSentence(highlight);
-		case 'first-ever-species':
-			return highlight.isOnlyRecord
-				? `Only ${buildSpeciesRecordsPhrase(highlight)} ever`
-				: `First ever ${buildSpeciesRecordsPhrase(highlight)}`;
-		case 'first-of-year-species': {
-			const yearPhrase = highlight.isCurrentYear
-				? 'of the year'
-				: `of ${highlight.year}`;
-			return `${highlight.isOnlyRecord ? 'Only' : 'First'} ${buildSpeciesRecordsPhrase(highlight)} ${yearPhrase}`;
-		}
-		case 'rare-species':
-			return `Rarely recorded — ${highlight.speciesName} seen on only ${highlight.totalSessionDays} days ever`;
-		case 'long-absence-retrap': {
-			const { ringNo, speciesName, previousDate, gapYears, gapMonths } =
-				highlight;
-			const yearsPart = `${gapYears} ${gapYears === 1 ? 'year' : 'years'}`;
-			const gapPhrase =
-				gapMonths === 0
-					? yearsPart
-					: `${yearsPart}, ${gapMonths} ${gapMonths === 1 ? 'month' : 'months'}`;
-			const formattedPreviousDate = formatDate(
-				new Date(previousDate),
-				'd MMM yyyy'
-			);
-			return `${speciesName} ${ringNo} recaught after ${gapPhrase} away (last seen ${formattedPreviousDate})`;
-		}
-		case 'weight-record':
-			return buildWeightRecordSentence(highlight);
-	}
 }

@@ -1,39 +1,37 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SessionHighlights } from '../SessionHighlights';
-import type {
-	FirstEverSpeciesHighlight,
-	LongAbsenceRetrapHighlight,
-	SessionHighlight,
-	WeightRecordHighlight
-} from '@/app/models/session-highlights';
+import type { SessionHighlight } from '@/app/models/session-highlights';
 
 vi.mock('@/app/actions/session-highlights', () => ({
 	fetchSessionHighlights: vi.fn()
 }));
 
+const periodFields = {
+	seasonName: 'autumn',
+	year: 2024,
+	isCurrentYear: false,
+	isCurrentSeason: false,
+	seasonPeriodLabel: 'autumn 2024'
+} as const;
+
+// The action returns plain highlight data; the component renders each element
 const mockHighlights: SessionHighlight[] = [
 	{
 		type: 'session-total-record',
 		metric: 'encounters',
 		scope: 'all-time',
 		value: 74,
-		seasonName: 'autumn',
-		year: 2024,
-		isCurrentYear: false,
-		isCurrentSeason: false,
-		seasonPeriodLabel: 'autumn 2024'
+		...periodFields
 	},
 	{
 		type: 'session-total-record',
 		metric: 'species',
 		scope: 'this-season',
 		value: 18,
-		seasonName: 'autumn',
-		year: 2024,
+		...periodFields,
 		isCurrentYear: true,
-		isCurrentSeason: true,
-		seasonPeriodLabel: 'autumn 2024'
+		isCurrentSeason: true
 	}
 ];
 
@@ -43,22 +41,14 @@ const mockHighlightsWithSpeciesRecord: SessionHighlight[] = [
 		metric: 'encounters',
 		scope: 'all-time',
 		value: 74,
-		seasonName: 'autumn',
-		year: 2024,
-		isCurrentYear: false,
-		isCurrentSeason: false,
-		seasonPeriodLabel: 'autumn 2024'
+		...periodFields
 	},
 	{
 		type: 'species-count-record',
 		speciesName: 'Reed Warbler',
 		scope: 'all-time',
 		value: 12,
-		seasonName: 'autumn',
-		year: 2024,
-		isCurrentYear: false,
-		isCurrentSeason: false,
-		seasonPeriodLabel: 'autumn 2024'
+		...periodFields
 	}
 ];
 
@@ -156,7 +146,7 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders first-ever sentences', async () => {
-		const firstEverHighlight: FirstEverSpeciesHighlight = {
+		const firstEverHighlight: SessionHighlight = {
 			type: 'first-ever-species',
 			speciesName: 'Firecrest',
 			multipleIndividualsRecorded: false,
@@ -199,7 +189,7 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders long-absence sentences', async () => {
-		const longAbsenceHighlight: LongAbsenceRetrapHighlight = {
+		const longAbsenceHighlight: SessionHighlight = {
 			type: 'long-absence-retrap',
 			ringNo: 'ARRETRAP',
 			speciesName: 'Robin',
@@ -224,19 +214,15 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders a full mixed set of highlights in priority order', async () => {
-		// One highlight from every family, already in priority order (the action
-		// sorts before returning); the component renders them as given
+		// One highlight from every family in priority order (the action runs the
+		// highlight machine before returning); the component renders each.
 		const mixedHighlights: SessionHighlight[] = [
 			{
 				type: 'session-total-record',
 				metric: 'encounters',
 				scope: 'all-time',
 				value: 74,
-				seasonName: 'autumn',
-				year: 2024,
-				isCurrentYear: false,
-				isCurrentSeason: false,
-				seasonPeriodLabel: 'autumn 2024'
+				...periodFields
 			},
 			{
 				type: 'since-comparison',
@@ -249,11 +235,7 @@ describe('SessionHighlights', () => {
 				speciesName: 'Reed Warbler',
 				scope: 'all-time',
 				value: 12,
-				seasonName: 'autumn',
-				year: 2024,
-				isCurrentYear: false,
-				isCurrentSeason: false,
-				seasonPeriodLabel: 'autumn 2024'
+				...periodFields
 			},
 			{
 				type: 'first-ever-species',
@@ -299,7 +281,7 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders weight record sentences', async () => {
-		const weightHighlight: WeightRecordHighlight = {
+		const weightHighlight: SessionHighlight = {
 			type: 'weight-record',
 			speciesName: 'Blue Tit',
 			extreme: 'heaviest',

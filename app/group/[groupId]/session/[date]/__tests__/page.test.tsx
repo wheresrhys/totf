@@ -11,6 +11,7 @@ vi.mock('@/lib/group-auth', () => ({
 }));
 
 vi.mock('@/app/actions/session-highlights', () => ({
+	// The action returns plain highlight data; the component renders each
 	fetchSessionHighlights: vi.fn().mockResolvedValue([
 		{
 			type: 'session-total-record',
@@ -18,7 +19,10 @@ vi.mock('@/app/actions/session-highlights', () => ({
 			scope: 'all-time',
 			value: 3,
 			seasonName: 'winter',
-			year: 2024
+			year: 2024,
+			isCurrentYear: false,
+			isCurrentSeason: false,
+			seasonPeriodLabel: 'winter 2023/24'
 		}
 	])
 }));

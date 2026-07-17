@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-	buildHighlightSentence,
 	deriveLongAbsenceRetraps,
 	deriveFirstEverSpecies,
 	deriveFirstOfYearSpecies,
@@ -9,21 +8,32 @@ import {
 	deriveSinceHighlights,
 	deriveSpeciesRecords,
 	deriveWeightRecordBreakers,
-	sortHighlights,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
 	type LongAbsenceRetrapHighlight,
 	type RareSpeciesHighlight,
-	type SessionStatsData,
+	type SessionHighlight,
 	type SessionTotalRecordHighlight,
 	type SinceComparisonHighlight,
 	type SpeciesCountRecordHighlight,
-	type WeightRecordHighlight
+	type WeightRecordHighlight,
+	type SessionStatsData
 } from '../session-highlights';
+import { renderHighlight } from '@/app/components/session-highlight-renderers';
 import type {
 	StatsPerDayAndSpeciesResult,
 	LongAbsenceRetrapsResult
 } from '@/app/models/db';
+
+// Overrides for the per-family highlight factories — every field bar the
+// fixed `type` discriminant
+type HighlightFields<T extends SessionHighlight> = Omit<T, 'type'>;
+
+// Each highlight renders <li key={sentence}>{sentence}</li>; the copy tests
+// assert on the sentence text
+function renderedText(highlight: SessionHighlight): string {
+	return (renderHighlight(highlight).props as { children: string }).children;
+}
 
 const SESSION_DATE = '2024-09-15'; // autumn
 // A fixed "today" after the session's year and season, so current-period
@@ -445,7 +455,7 @@ describe('deriveSinceHighlights', () => {
 });
 
 function makeHighlight(
-	overrides: Partial<SessionTotalRecordHighlight>
+	overrides: Partial<HighlightFields<SessionTotalRecordHighlight>>
 ): SessionTotalRecordHighlight {
 	return {
 		type: 'session-total-record',
@@ -461,50 +471,56 @@ function makeHighlight(
 	};
 }
 
-describe('buildHighlightSentence — session-total-record', () => {
+describe('render — element shape', () => {
+	it('renders a list item keyed by the sentence', () => {
+		const element = renderHighlight(makeHighlight({}));
+		expect(element.type).toBe('li');
+		expect(element.key).toBe('Busiest session ever — 74 birds');
+	});
+});
+
+describe('render — session-total-record', () => {
 	it('renders all-time busiest copy', () => {
-		expect(buildHighlightSentence(makeHighlight({}))).toBe(
+		expect(renderedText(makeHighlight({}))).toBe(
 			'Busiest session ever — 74 birds'
 		);
 	});
 
 	it('renders any-season busiest copy', () => {
-		expect(buildHighlightSentence(makeHighlight({ scope: 'any-season' }))).toBe(
+		expect(renderedText(makeHighlight({ scope: 'any-season' }))).toBe(
 			'Busiest autumn session ever — 74 birds'
 		);
 	});
 
 	it('renders this-year busiest copy as "this year" for a current-year session', () => {
 		expect(
-			buildHighlightSentence(
-				makeHighlight({ scope: 'this-year', isCurrentYear: true })
-			)
+			renderedText(makeHighlight({ scope: 'this-year', isCurrentYear: true }))
 		).toBe('Busiest session this year — 74 birds');
 	});
 
 	it('renders this-year busiest copy with the year for a past session', () => {
-		expect(buildHighlightSentence(makeHighlight({ scope: 'this-year' }))).toBe(
+		expect(renderedText(makeHighlight({ scope: 'this-year' }))).toBe(
 			'Busiest session of 2024 — 74 birds'
 		);
 	});
 
 	it('renders this-season busiest copy as "this <season>" for a current-season session', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeHighlight({ scope: 'this-season', isCurrentSeason: true })
 			)
 		).toBe('Busiest session this autumn — 74 birds');
 	});
 
 	it('renders this-season busiest copy with the season period for a past session', () => {
-		expect(
-			buildHighlightSentence(makeHighlight({ scope: 'this-season' }))
-		).toBe('Busiest session in autumn 2024 — 74 birds');
+		expect(renderedText(makeHighlight({ scope: 'this-season' }))).toBe(
+			'Busiest session in autumn 2024 — 74 birds'
+		);
 	});
 
 	it('renders past winter copy with the split-year label', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeHighlight({
 					scope: 'this-season',
 					seasonName: 'winter',
@@ -515,15 +531,15 @@ describe('buildHighlightSentence — session-total-record', () => {
 	});
 
 	it('renders most-varied copy for the species metric', () => {
-		expect(
-			buildHighlightSentence(makeHighlight({ metric: 'species', value: 18 }))
-		).toBe('Most varied session ever — 18 species');
+		expect(renderedText(makeHighlight({ metric: 'species', value: 18 }))).toBe(
+			'Most varied session ever — 18 species'
+		);
 	});
 
 	it('renders busiest-for-N-years copy for an all-time tie', () => {
-		expect(
-			buildHighlightSentence(makeHighlight({ recordEqualledYearsAgo: 3 }))
-		).toBe('Busiest session for 3 years — 74 birds');
+		expect(renderedText(makeHighlight({ recordEqualledYearsAgo: 3 }))).toBe(
+			'Busiest session for 3 years — 74 birds'
+		);
 	});
 });
 
@@ -888,10 +904,10 @@ describe('deriveSpeciesRecords', () => {
 	});
 });
 
-// ---- buildHighlightSentence — species-count-record ----
+// ---- render — species-count-record ----
 
 function makeSpeciesHighlight(
-	overrides: Partial<SpeciesCountRecordHighlight>
+	overrides: Partial<HighlightFields<SpeciesCountRecordHighlight>>
 ): SpeciesCountRecordHighlight {
 	return {
 		type: 'species-count-record',
@@ -907,50 +923,50 @@ function makeSpeciesHighlight(
 	};
 }
 
-describe('buildHighlightSentence — species-count-record', () => {
+describe('render — species-count-record', () => {
 	it('renders all-time copy', () => {
-		expect(buildHighlightSentence(makeSpeciesHighlight({}))).toBe(
+		expect(renderedText(makeSpeciesHighlight({}))).toBe(
 			'Record day for Reed Warbler — 12 caught, the most ever'
 		);
 	});
 
 	it('renders any-season copy', () => {
-		expect(
-			buildHighlightSentence(makeSpeciesHighlight({ scope: 'any-season' }))
-		).toBe('Record day for Reed Warbler — 12 caught, the most in any autumn');
+		expect(renderedText(makeSpeciesHighlight({ scope: 'any-season' }))).toBe(
+			'Record day for Reed Warbler — 12 caught, the most in any autumn'
+		);
 	});
 
 	it('renders current-year this-year copy ("this year")', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeSpeciesHighlight({ scope: 'this-year', isCurrentYear: true })
 			)
 		).toBe('Record day for Reed Warbler — 12 caught, the most this year');
 	});
 
 	it('renders past-year this-year copy ("of 2024")', () => {
-		expect(
-			buildHighlightSentence(makeSpeciesHighlight({ scope: 'this-year' }))
-		).toBe('Record day for Reed Warbler — 12 caught, the most in 2024');
+		expect(renderedText(makeSpeciesHighlight({ scope: 'this-year' }))).toBe(
+			'Record day for Reed Warbler — 12 caught, the most in 2024'
+		);
 	});
 
 	it('renders current-season this-season copy ("this autumn")', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeSpeciesHighlight({ scope: 'this-season', isCurrentSeason: true })
 			)
 		).toBe('Record day for Reed Warbler — 12 caught, the most this autumn');
 	});
 
 	it('renders past-period this-season copy ("in autumn 2024")', () => {
-		expect(
-			buildHighlightSentence(makeSpeciesHighlight({ scope: 'this-season' }))
-		).toBe('Record day for Reed Warbler — 12 caught, the most in autumn 2024');
+		expect(renderedText(makeSpeciesHighlight({ scope: 'this-season' }))).toBe(
+			'Record day for Reed Warbler — 12 caught, the most in autumn 2024'
+		);
 	});
 
 	it('renders past winter copy ("in winter 2023/24")', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeSpeciesHighlight({
 					scope: 'this-season',
 					seasonName: 'winter',
@@ -964,9 +980,7 @@ describe('buildHighlightSentence — species-count-record', () => {
 
 	it('renders record-equalling for-N-years copy', () => {
 		expect(
-			buildHighlightSentence(
-				makeSpeciesHighlight({ recordEqualledYearsAgo: 2 })
-			)
+			renderedText(makeSpeciesHighlight({ recordEqualledYearsAgo: 2 }))
 		).toBe(
 			'Record-equalling day for Reed Warbler — 12 caught, most for 2 years'
 		);
@@ -974,7 +988,7 @@ describe('buildHighlightSentence — species-count-record', () => {
 
 	it('renders joint best placement copy', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeSpeciesHighlight({ placementRank: 1, isJointPlacement: true })
 			)
 		).toBe('Joint best day for Reed Warbler ever — 12 birds');
@@ -982,7 +996,7 @@ describe('buildHighlightSentence — species-count-record', () => {
 
 	it('renders 2nd-best placement copy', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeSpeciesHighlight({
 					placementRank: 2,
 					isJointPlacement: false,
@@ -994,7 +1008,7 @@ describe('buildHighlightSentence — species-count-record', () => {
 
 	it('renders 3rd-best placement copy', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeSpeciesHighlight({
 					placementRank: 3,
 					isJointPlacement: false,
@@ -1006,7 +1020,7 @@ describe('buildHighlightSentence — species-count-record', () => {
 
 	it('renders joint 2nd-best placement copy', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeSpeciesHighlight({
 					placementRank: 2,
 					isJointPlacement: true,
@@ -1018,7 +1032,7 @@ describe('buildHighlightSentence — species-count-record', () => {
 
 	it('renders joint 3rd-best placement copy', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeSpeciesHighlight({
 					placementRank: 3,
 					isJointPlacement: true,
@@ -1325,10 +1339,10 @@ describe('deriveRareSpecies', () => {
 	});
 });
 
-// ---- buildHighlightSentence — rare-species ----
+// ---- render — rare-species ----
 
 function makeRareSpeciesHighlight(
-	overrides: Partial<RareSpeciesHighlight> = {}
+	overrides: Partial<HighlightFields<RareSpeciesHighlight>> = {}
 ): RareSpeciesHighlight {
 	return {
 		type: 'rare-species',
@@ -1338,24 +1352,24 @@ function makeRareSpeciesHighlight(
 	};
 }
 
-describe('buildHighlightSentence — rare-species', () => {
+describe('render — rare-species', () => {
 	it('renders the total session-day count', () => {
-		expect(buildHighlightSentence(makeRareSpeciesHighlight())).toBe(
+		expect(renderedText(makeRareSpeciesHighlight())).toBe(
 			'Rarely recorded — Firecrest seen on only 2 days ever'
 		);
 	});
 
 	it('renders a three-day count', () => {
 		expect(
-			buildHighlightSentence(makeRareSpeciesHighlight({ totalSessionDays: 3 }))
+			renderedText(makeRareSpeciesHighlight({ totalSessionDays: 3 }))
 		).toBe('Rarely recorded — Firecrest seen on only 3 days ever');
 	});
 });
 
-// ---- buildHighlightSentence — first-ever-species ----
+// ---- render — first-ever-species ----
 
 function makeFirstEverHighlight(
-	overrides: Partial<FirstEverSpeciesHighlight> = {}
+	overrides: Partial<HighlightFields<FirstEverSpeciesHighlight>> = {}
 ): FirstEverSpeciesHighlight {
 	return {
 		type: 'first-ever-species',
@@ -1366,30 +1380,30 @@ function makeFirstEverHighlight(
 	};
 }
 
-describe('buildHighlightSentence — first-ever-species', () => {
+describe('render — first-ever-species', () => {
 	it('renders first-ever copy', () => {
-		expect(buildHighlightSentence(makeFirstEverHighlight())).toBe(
+		expect(renderedText(makeFirstEverHighlight())).toBe(
 			'First ever Firecrest record'
 		);
 	});
 
 	it('renders plural first-ever copy for multiple individuals', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeFirstEverHighlight({ multipleIndividualsRecorded: true })
 			)
 		).toBe('First ever Firecrest records');
 	});
 
 	it('renders only-record copy when the session holds the only record', () => {
-		expect(
-			buildHighlightSentence(makeFirstEverHighlight({ isOnlyRecord: true }))
-		).toBe('Only Firecrest record ever');
+		expect(renderedText(makeFirstEverHighlight({ isOnlyRecord: true }))).toBe(
+			'Only Firecrest record ever'
+		);
 	});
 
 	it('renders plural only-record copy for multiple individuals', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeFirstEverHighlight({
 					isOnlyRecord: true,
 					multipleIndividualsRecorded: true
@@ -1399,10 +1413,10 @@ describe('buildHighlightSentence — first-ever-species', () => {
 	});
 });
 
-// ---- buildHighlightSentence — first-of-year-species ----
+// ---- render — first-of-year-species ----
 
 function makeFirstOfYearHighlight(
-	overrides: Partial<FirstOfYearSpeciesHighlight> = {}
+	overrides: Partial<HighlightFields<FirstOfYearSpeciesHighlight>> = {}
 ): FirstOfYearSpeciesHighlight {
 	return {
 		type: 'first-of-year-species',
@@ -1415,22 +1429,22 @@ function makeFirstOfYearHighlight(
 	};
 }
 
-describe('buildHighlightSentence — first-of-year-species', () => {
+describe('render — first-of-year-species', () => {
 	it('renders "of the year" copy while the session year is current', () => {
 		expect(
-			buildHighlightSentence(makeFirstOfYearHighlight({ isCurrentYear: true }))
+			renderedText(makeFirstOfYearHighlight({ isCurrentYear: true }))
 		).toBe('First Firecrest record of the year');
 	});
 
 	it('renders the absolute year once the session year has passed', () => {
-		expect(buildHighlightSentence(makeFirstOfYearHighlight())).toBe(
+		expect(renderedText(makeFirstOfYearHighlight())).toBe(
 			'First Firecrest record of 2024'
 		);
 	});
 
 	it('renders plural first-of-year copy for multiple individuals', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeFirstOfYearHighlight({ multipleIndividualsRecorded: true })
 			)
 		).toBe('First Firecrest records of 2024');
@@ -1438,7 +1452,7 @@ describe('buildHighlightSentence — first-of-year-species', () => {
 
 	it('renders only-record copy while the session year is current', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeFirstOfYearHighlight({ isCurrentYear: true, isOnlyRecord: true })
 			)
 		).toBe('Only Firecrest record of the year');
@@ -1446,7 +1460,7 @@ describe('buildHighlightSentence — first-of-year-species', () => {
 
 	it('renders plural only-record copy once the session year has passed', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeFirstOfYearHighlight({
 					isOnlyRecord: true,
 					multipleIndividualsRecorded: true
@@ -1503,10 +1517,10 @@ describe('deriveLongAbsenceRetraps', () => {
 	});
 });
 
-// ---- buildHighlightSentence — long-absence-retrap ----
+// ---- render — long-absence-retrap ----
 
 function makeLongAbsenceHighlight(
-	overrides: Partial<LongAbsenceRetrapHighlight> = {}
+	overrides: Partial<HighlightFields<LongAbsenceRetrapHighlight>> = {}
 ): LongAbsenceRetrapHighlight {
 	return {
 		type: 'long-absence-retrap',
@@ -1519,18 +1533,16 @@ function makeLongAbsenceHighlight(
 	};
 }
 
-describe('buildHighlightSentence — long-absence-retrap', () => {
+describe('render — long-absence-retrap', () => {
 	it('formats the gap as years and months with the previous date', () => {
-		expect(buildHighlightSentence(makeLongAbsenceHighlight())).toBe(
+		expect(renderedText(makeLongAbsenceHighlight())).toBe(
 			'Robin ARRETRAP recaught after 2 years, 10 months away (last seen 20 Jun 2021)'
 		);
 	});
 
 	it('formats a whole-year gap without a months clause', () => {
 		expect(
-			buildHighlightSentence(
-				makeLongAbsenceHighlight({ gapYears: 3, gapMonths: 0 })
-			)
+			renderedText(makeLongAbsenceHighlight({ gapYears: 3, gapMonths: 0 }))
 		).toBe(
 			'Robin ARRETRAP recaught after 3 years away (last seen 20 Jun 2021)'
 		);
@@ -1725,10 +1737,10 @@ describe('deriveWeightRecordBreakers', () => {
 	});
 });
 
-// ---- buildHighlightSentence — weight-record ----
+// ---- render — weight-record ----
 
 function makeWeightHighlight(
-	overrides: Partial<WeightRecordHighlight> = {}
+	overrides: Partial<HighlightFields<WeightRecordHighlight>> = {}
 ): WeightRecordHighlight {
 	return {
 		type: 'weight-record',
@@ -1741,32 +1753,28 @@ function makeWeightHighlight(
 	};
 }
 
-describe('buildHighlightSentence — weight-record', () => {
+describe('render — weight-record', () => {
 	it('renders heaviest-ever copy for a 1st placement', () => {
-		expect(buildHighlightSentence(makeWeightHighlight())).toBe(
+		expect(renderedText(makeWeightHighlight())).toBe(
 			'Heaviest Blue Tit ever weighed — 13.1g'
 		);
 	});
 
 	it('renders lightest-ever copy for a 1st placement', () => {
 		expect(
-			buildHighlightSentence(
-				makeWeightHighlight({ extreme: 'lightest', weight: 9.8 })
-			)
+			renderedText(makeWeightHighlight({ extreme: 'lightest', weight: 9.8 }))
 		).toBe('Lightest Blue Tit ever weighed — 9.8g');
 	});
 
 	it('renders 2nd-heaviest copy', () => {
 		expect(
-			buildHighlightSentence(
-				makeWeightHighlight({ placementRank: 2, weight: 12.9 })
-			)
+			renderedText(makeWeightHighlight({ placementRank: 2, weight: 12.9 }))
 		).toBe('2nd-heaviest Blue Tit ever weighed — 12.9g');
 	});
 
 	it('renders 3rd-lightest copy', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeWeightHighlight({
 					extreme: 'lightest',
 					placementRank: 3,
@@ -1777,14 +1785,14 @@ describe('buildHighlightSentence — weight-record', () => {
 	});
 
 	it('renders joint heaviest copy for a 1st-place tie', () => {
-		expect(
-			buildHighlightSentence(makeWeightHighlight({ isJointPlacement: true }))
-		).toBe('Joint heaviest Blue Tit ever weighed — 13.1g');
+		expect(renderedText(makeWeightHighlight({ isJointPlacement: true }))).toBe(
+			'Joint heaviest Blue Tit ever weighed — 13.1g'
+		);
 	});
 
 	it('renders joint 2nd-heaviest copy', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeWeightHighlight({
 					placementRank: 2,
 					isJointPlacement: true,
@@ -1795,10 +1803,10 @@ describe('buildHighlightSentence — weight-record', () => {
 	});
 });
 
-// ---- buildHighlightSentence — since ----
+// ---- render — since ----
 
 function makeSinceHighlight(
-	overrides: Partial<SinceComparisonHighlight> = {}
+	overrides: Partial<HighlightFields<SinceComparisonHighlight>> = {}
 ): SinceComparisonHighlight {
 	return {
 		type: 'since-comparison',
@@ -1809,16 +1817,16 @@ function makeSinceHighlight(
 	};
 }
 
-describe('buildHighlightSentence — since', () => {
+describe('render — since', () => {
 	it('renders busiest-since copy', () => {
-		expect(buildHighlightSentence(makeSinceHighlight())).toBe(
+		expect(renderedText(makeSinceHighlight())).toBe(
 			'Busiest session since 12 May 2023 — 41 birds'
 		);
 	});
 
 	it('renders quietest-since copy', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeSinceHighlight({
 					kind: 'quietest',
 					value: 3,
@@ -1830,45 +1838,12 @@ describe('buildHighlightSentence — since', () => {
 
 	it('renders quietest-ever copy', () => {
 		expect(
-			buildHighlightSentence(
+			renderedText(
 				makeSinceHighlight({ kind: 'quietest', value: 3, sinceDate: undefined })
 			)
 		).toBe('Quietest session ever — 3 birds');
 	});
 });
 
-// ---- sortHighlights ----
-
-describe('sortHighlights', () => {
-	it('orders highlights by fixed family priority', () => {
-		const weight: WeightRecordHighlight = makeWeightHighlight();
-		const longAbsence: LongAbsenceRetrapHighlight = makeLongAbsenceHighlight();
-		const firstOfYear: FirstOfYearSpeciesHighlight = makeFirstOfYearHighlight();
-		const firstEver: FirstEverSpeciesHighlight = makeFirstEverHighlight();
-		const rareSpecies: RareSpeciesHighlight = makeRareSpeciesHighlight();
-		const speciesRecord: SpeciesCountRecordHighlight = makeSpeciesHighlight({});
-		const since: SinceComparisonHighlight = makeSinceHighlight();
-		const total: SessionTotalRecordHighlight = makeHighlight({});
-		// Deliberately unsorted input
-		const sorted = sortHighlights([
-			weight,
-			longAbsence,
-			rareSpecies,
-			firstOfYear,
-			firstEver,
-			speciesRecord,
-			since,
-			total
-		]);
-		expect(sorted.map((highlight) => highlight.type)).toEqual([
-			'session-total-record',
-			'since-comparison',
-			'species-count-record',
-			'first-ever-species',
-			'first-of-year-species',
-			'rare-species',
-			'long-absence-retrap',
-			'weight-record'
-		]);
-	});
-});
+// The type-priority ordering previously tested here (sortHighlights) now
+// lives in the highlight machine — see highlight-refinement-machine.test.ts

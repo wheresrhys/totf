@@ -1,5 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
+import type { SessionHighlight } from '@/app/models/session-highlights';
+import { renderHighlight } from '@/app/components/session-highlight-renderers';
+
+// The action returns plain highlight data; rendering each gives the
+// <li key={sentence}>{sentence}</li> whose sentence we assert on
+function sentencesOf(highlights: SessionHighlight[]): string[] {
+	return highlights.map(
+		(highlight) =>
+			(renderHighlight(highlight).props as { children: string }).children
+	);
+}
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -117,16 +128,14 @@ describe('fetchSessionHighlights', () => {
 			(call) => (call as [string, unknown])[0] === 'stats_per_day_and_species'
 		) as [string, { ringing_group_filter: number }];
 		expect(statsArgs.ringing_group_filter).toBe(GROUP_ID);
-		expect(highlights).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({
-					type: 'session-total-record',
-					metric: 'encounters',
-					scope: 'all-time',
-					value: 74
-				})
-			])
-		);
+		// Every derived highlight, rendered in the machine's fixed type-priority
+		// order — a like-for-like guard on both the copy and the ordering
+		expect(sentencesOf(highlights)).toEqual([
+			'Busiest session ever — 74 birds',
+			'Quietest session since 1 May 2022 — 74 birds',
+			'Record day for Robin — 74 caught, the most ever',
+			'Rarely recorded — Robin seen on only 2 days ever'
+		]);
 	});
 
 	it('fetches session dates', async () => {
@@ -171,13 +180,8 @@ describe('fetchSessionHighlights', () => {
 			PAGE_SIZE,
 			2 * PAGE_SIZE - 1
 		);
-		expect(highlights).toContainEqual(
-			expect.objectContaining({
-				type: 'session-total-record',
-				metric: 'encounters',
-				scope: 'all-time',
-				value: 2000
-			})
+		expect(sentencesOf(highlights)).toContain(
+			'Busiest session ever — 2000 birds'
 		);
 	});
 
@@ -207,15 +211,8 @@ describe('fetchSessionHighlights', () => {
 			date: SESSION_DATE,
 			viewedGroupId: GROUP_ID
 		});
-		expect(highlights).toContainEqual(
-			expect.objectContaining({
-				type: 'weight-record',
-				speciesName: 'Blue Tit',
-				extreme: 'heaviest',
-				weight: 13.1,
-				placementRank: 1,
-				isJointPlacement: false
-			})
+		expect(sentencesOf(highlights)).toContain(
+			'Heaviest Blue Tit ever weighed — 13.1g'
 		);
 	});
 
@@ -234,11 +231,9 @@ describe('fetchSessionHighlights', () => {
 			date: SESSION_DATE,
 			viewedGroupId: GROUP_ID
 		});
-		expect(highlights).toContainEqual({
-			type: 'rare-species',
-			speciesName: 'Firecrest',
-			totalSessionDays: 2
-		});
+		expect(sentencesOf(highlights)).toContain(
+			'Rarely recorded — Firecrest seen on only 2 days ever'
+		);
 	});
 
 	it('returns cached data within the TTL', async () => {
@@ -260,13 +255,8 @@ describe('fetchSessionHighlights', () => {
 		expect(mockEq).toHaveBeenCalledTimes(1);
 		// the cached blob still serves other session dates — the 2022 session
 		// holds the most-varied record (2 species vs 1 on the 2024 day)
-		expect(secondResult).toEqual([
-			expect.objectContaining({
-				type: 'session-total-record',
-				metric: 'species',
-				scope: 'all-time',
-				value: 2
-			})
+		expect(sentencesOf(secondResult)).toEqual([
+			'Most varied session ever — 2 species'
 		]);
 	});
 });
