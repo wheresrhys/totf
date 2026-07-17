@@ -1,5 +1,5 @@
 import type { SessionHighlight } from '@/app/models/session-highlights';
-import { SCOPE_BREADTH_RANK } from './scope-breadth';
+import { SCOPE_BREADTH_RANK } from './order-by-scope';
 
 // Rem-2: when one species holds records at more than one scope, keep only the
 // broadest — a narrower-scope record is subsumed by the broader one (e.g. drop

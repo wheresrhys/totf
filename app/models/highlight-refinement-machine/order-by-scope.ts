@@ -1,5 +1,13 @@
-import type { SessionHighlight } from '@/app/models/session-highlights';
-import { SCOPE_BREADTH_RANK } from './scope-breadth';
+import {
+	RECORD_SCOPES,
+	type SessionHighlight
+} from '@/app/models/session-highlights';
+
+// Scopes ranked broadest-first (all-time = 0). Also used by the narrower-scope
+// removal rule.
+export const SCOPE_BREADTH_RANK = new Map(
+	RECORD_SCOPES.map((scope, index) => [scope, index])
+);
 
 // Ord-1: the scoped record block sorts strictly by scope breadth (all-time
 // first), interleaving session-total and species-count records. Everything else
