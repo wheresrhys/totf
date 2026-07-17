@@ -780,6 +780,10 @@ export function deriveLongAbsenceRetraps(
 // before a weight placement is worth reporting
 const MIN_WEIGHED_ENCOUNTERS_FOR_RECORD = 3;
 
+// Lower-ranked (2nd/3rd) heaviest placements only surface once a species is
+// well-recorded — more than this many encounters ever.
+const MIN_ENCOUNTERS_FOR_LOWER_HEAVIEST = 40;
+
 // Ranks the session's extreme against every other day's extreme (heaviest =
 // larger is better, lightest = smaller is better). Returns null when the
 // session doesn't make the top 3. The rank counts how many other days hold a
@@ -832,6 +836,10 @@ export function deriveWeightRecordBreakers({
 		);
 		if (otherWeighedEncounters < MIN_WEIGHED_ENCOUNTERS_FOR_RECORD) continue;
 
+		const speciesEncountersEver = stats.daySpeciesStats
+			.filter((row) => row.species_name === sessionRow.species_name)
+			.reduce((total, row) => total + row.encounter_count, 0);
+
 		for (const extreme of WEIGHT_RECORD_EXTREMES) {
 			const isHeaviest = extreme === 'heaviest';
 			const sessionWeight = isHeaviest
@@ -846,6 +854,15 @@ export function deriveWeightRecordBreakers({
 				isHeaviest
 			);
 			if (placement) {
+				// Editorial gates on lower-ranked (2nd/3rd) placements: 2nd/3rd
+				// lightest is never worth reporting; 2nd/3rd heaviest only once the
+				// species is well-recorded.
+				if (placement.placementRank > 1) {
+					if (extreme === 'lightest') continue;
+					if (speciesEncountersEver <= MIN_ENCOUNTERS_FOR_LOWER_HEAVIEST) {
+						continue;
+					}
+				}
 				highlights.push({
 					type: 'weight-record',
 					sortValue: TRAILING_SORT_VALUES['weight-record'],
