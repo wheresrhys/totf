@@ -1597,14 +1597,20 @@ function weightRow(
 	species: string,
 	{
 		weighedBirds = 1,
+		encounters,
 		minWeight,
 		maxWeight
-	}: { weighedBirds?: number; minWeight: number; maxWeight: number }
+	}: {
+		weighedBirds?: number;
+		encounters?: number;
+		minWeight: number;
+		maxWeight: number;
+	}
 ): StatsPerDayAndSpeciesResult {
 	return {
 		visit_date: date,
 		species_name: species,
-		encounter_count: weighedBirds,
+		encounter_count: encounters ?? weighedBirds,
 		weighed_birds_count: weighedBirds,
 		min_weight: minWeight,
 		max_weight: maxWeight
@@ -1661,7 +1667,11 @@ describe('deriveWeightRecordBreakers', () => {
 
 	it('reports a 2nd-heaviest placement when one other day is heavier', () => {
 		const highlights = deriveWeights([
-			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+			weightRow(SESSION_DATE, BLUE_TIT, {
+				encounters: 41,
+				minWeight: 11,
+				maxWeight: 13.1
+			}),
 			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 3,
 				minWeight: 10.5,
@@ -1682,7 +1692,11 @@ describe('deriveWeightRecordBreakers', () => {
 
 	it('reports a 3rd-heaviest placement when two other days are heavier', () => {
 		const highlights = deriveWeights([
-			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+			weightRow(SESSION_DATE, BLUE_TIT, {
+				encounters: 41,
+				minWeight: 11,
+				maxWeight: 13.1
+			}),
 			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 3,
 				minWeight: 10.5,
@@ -1738,7 +1752,11 @@ describe('deriveWeightRecordBreakers', () => {
 	it('counts later days when ranking placements', () => {
 		// the later day is heavier, demoting the session to 2nd
 		const highlights = deriveWeights([
-			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+			weightRow(SESSION_DATE, BLUE_TIT, {
+				encounters: 41,
+				minWeight: 11,
+				maxWeight: 13.1
+			}),
 			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 3,
 				minWeight: 10.5,
@@ -1777,6 +1795,98 @@ describe('deriveWeightRecordBreakers', () => {
 			})
 		]);
 		expect(highlights).toEqual([]);
+	});
+
+	describe('lower-ranked placement gates', () => {
+		it('drops a 2nd-lightest placement', () => {
+			// session is the 2nd-lightest ever; only 1st-lightest is worth reporting.
+			// Session max stays below the other day so no heaviest placement fires.
+			const highlights = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 9.8, maxWeight: 11 }),
+				weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+					weighedBirds: 3,
+					minWeight: 9.5,
+					maxWeight: 15
+				})
+			]);
+			expect(highlights).toEqual([]);
+		});
+
+		it('drops a 3rd-lightest placement', () => {
+			// two other days are lighter, so the session ranks 3rd-lightest.
+			const highlights = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 9.8, maxWeight: 11 }),
+				weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+					weighedBirds: 2,
+					minWeight: 9.5,
+					maxWeight: 15
+				}),
+				weightRow(LATER_DAY, BLUE_TIT, {
+					weighedBirds: 2,
+					minWeight: 9.0,
+					maxWeight: 15
+				})
+			]);
+			expect(highlights).toEqual([]);
+		});
+
+		it('drops a 2nd-heaviest placement for a sparsely-recorded species', () => {
+			// one other day is heavier (rank 2) but the species has only a handful
+			// of encounters ever, so the placement is not worth reporting.
+			const highlights = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+				weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+					weighedBirds: 3,
+					minWeight: 10.5,
+					maxWeight: 14
+				})
+			]);
+			expect(highlights.map((h) => h.extreme)).not.toContain('heaviest');
+		});
+
+		it('drops a 2nd-heaviest placement at exactly 40 encounters ever', () => {
+			// 1 (session) + 3 (weighed other day) + 36 (unweighed other day) = 40.
+			const highlights = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+				weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+					weighedBirds: 3,
+					minWeight: 10.5,
+					maxWeight: 14
+				}),
+				weightRow(LATER_DAY, BLUE_TIT, {
+					weighedBirds: 0,
+					encounters: 36,
+					minWeight: 0,
+					maxWeight: 0
+				})
+			]);
+			expect(highlights.map((h) => h.extreme)).not.toContain('heaviest');
+		});
+
+		it('keeps a 2nd-heaviest placement above 40 encounters, counting every day including unweighed', () => {
+			// 1 (session) + 3 (weighed other day) + 37 (unweighed other day) = 41.
+			const highlights = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+				weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+					weighedBirds: 3,
+					minWeight: 10.5,
+					maxWeight: 14
+				}),
+				weightRow(LATER_DAY, BLUE_TIT, {
+					weighedBirds: 0,
+					encounters: 37,
+					minWeight: 0,
+					maxWeight: 0
+				})
+			]);
+			expect(highlights).toContainEqual(
+				expect.objectContaining({
+					extreme: 'heaviest',
+					weight: 13.1,
+					placementRank: 2
+				})
+			);
+		});
 	});
 });
 
