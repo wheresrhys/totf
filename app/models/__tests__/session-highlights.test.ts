@@ -8,6 +8,8 @@ import {
 	deriveSinceHighlights,
 	deriveSpeciesRecords,
 	deriveWeightRecordBreakers,
+	scopedSortValue,
+	TRAILING_SORT_VALUES,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
 	type LongAbsenceRetrapHighlight,
@@ -100,6 +102,7 @@ describe('deriveSessionTotalRecords', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'session-total-record',
+			sortValue: scopedSortValue('all-time', 3),
 			metric: 'encounters',
 			scope: 'all-time',
 			value: 74,
@@ -353,6 +356,7 @@ describe('deriveSinceHighlights', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'since-comparison',
+				sortValue: TRAILING_SORT_VALUES['since-comparison'],
 				kind: 'busiest',
 				value: 41,
 				sinceDate: PRIOR_SPRING_THIS_YEAR
@@ -369,6 +373,7 @@ describe('deriveSinceHighlights', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'since-comparison',
+			sortValue: TRAILING_SORT_VALUES['since-comparison'],
 			kind: 'quietest',
 			value: 3,
 			sinceDate: PRIOR_SPRING_THIS_YEAR
@@ -390,6 +395,7 @@ describe('deriveSinceHighlights', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'since-comparison',
+				sortValue: TRAILING_SORT_VALUES['since-comparison'],
 				kind: 'quietest',
 				value: 5,
 				sinceDate: PRIOR_SPRING_THIS_YEAR
@@ -414,6 +420,7 @@ describe('deriveSinceHighlights', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'since-comparison',
+			sortValue: TRAILING_SORT_VALUES['since-comparison'],
 			kind: 'quietest',
 			value: 3
 		});
@@ -446,6 +453,7 @@ describe('deriveSinceHighlights', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'since-comparison',
+				sortValue: TRAILING_SORT_VALUES['since-comparison'],
 				kind: 'busiest',
 				value: 20,
 				sinceDate: PRIOR_SPRING_OTHER_YEAR
@@ -457,10 +465,9 @@ describe('deriveSinceHighlights', () => {
 function makeHighlight(
 	overrides: Partial<HighlightFields<SessionTotalRecordHighlight>>
 ): SessionTotalRecordHighlight {
-	return {
-		type: 'session-total-record',
-		metric: 'encounters',
-		scope: 'all-time',
+	const fields = {
+		metric: 'encounters' as const,
+		scope: 'all-time' as const,
 		value: 74,
 		seasonName: 'autumn',
 		year: 2024,
@@ -468,6 +475,14 @@ function makeHighlight(
 		isCurrentSeason: false,
 		seasonPeriodLabel: 'autumn 2024',
 		...overrides
+	};
+	return {
+		type: 'session-total-record',
+		sortValue: scopedSortValue(
+			fields.scope,
+			fields.metric === 'encounters' ? 3 : 2
+		),
+		...fields
 	};
 }
 
@@ -909,10 +924,9 @@ describe('deriveSpeciesRecords', () => {
 function makeSpeciesHighlight(
 	overrides: Partial<HighlightFields<SpeciesCountRecordHighlight>>
 ): SpeciesCountRecordHighlight {
-	return {
-		type: 'species-count-record',
+	const fields = {
 		speciesName: 'Reed Warbler',
-		scope: 'all-time',
+		scope: 'all-time' as const,
 		value: 12,
 		seasonName: 'autumn',
 		year: 2024,
@@ -920,6 +934,11 @@ function makeSpeciesHighlight(
 		isCurrentSeason: false,
 		seasonPeriodLabel: 'autumn 2024',
 		...overrides
+	};
+	return {
+		type: 'species-count-record',
+		sortValue: scopedSortValue(fields.scope, 1),
+		...fields
 	};
 }
 
@@ -1071,6 +1090,7 @@ describe('deriveFirstEverSpecies', () => {
 		// Firecrest appears for the first time on the session date
 		expect(highlights).toContainEqual({
 			type: 'first-ever-species',
+			sortValue: TRAILING_SORT_VALUES['first-ever-species'],
 			speciesName: FIRECREST,
 			multipleIndividualsRecorded: false,
 			isOnlyRecord: false
@@ -1087,6 +1107,7 @@ describe('deriveFirstEverSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-ever-species',
+				sortValue: TRAILING_SORT_VALUES['first-ever-species'],
 				speciesName: FIRECREST,
 				multipleIndividualsRecorded: true,
 				isOnlyRecord: true
@@ -1103,6 +1124,7 @@ describe('deriveFirstEverSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-ever-species',
+				sortValue: TRAILING_SORT_VALUES['first-ever-species'],
 				speciesName: FIRECREST,
 				multipleIndividualsRecorded: true,
 				isOnlyRecord: false
@@ -1159,6 +1181,7 @@ describe('deriveFirstOfYearSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-of-year-species',
+				sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
 				speciesName: FIRECREST,
 				year: 2024,
 				isCurrentYear: false,
@@ -1179,6 +1202,7 @@ describe('deriveFirstOfYearSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-of-year-species',
+				sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
 				speciesName: FIRECREST,
 				year: 2024,
 				isCurrentYear: false,
@@ -1198,6 +1222,7 @@ describe('deriveFirstOfYearSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-of-year-species',
+				sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
 				speciesName: FIRECREST,
 				year: 2024,
 				isCurrentYear: false,
@@ -1270,7 +1295,12 @@ describe('deriveRareSpecies', () => {
 			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 1)
 		]);
 		expect(highlights).toEqual([
-			{ type: 'rare-species', speciesName: FIRECREST, totalSessionDays: 2 }
+			{
+				type: 'rare-species',
+				sortValue: TRAILING_SORT_VALUES['rare-species'],
+				speciesName: FIRECREST,
+				totalSessionDays: 2
+			}
 		]);
 	});
 
@@ -1281,7 +1311,12 @@ describe('deriveRareSpecies', () => {
 			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, FIRECREST, 3)
 		]);
 		expect(highlights).toEqual([
-			{ type: 'rare-species', speciesName: FIRECREST, totalSessionDays: 3 }
+			{
+				type: 'rare-species',
+				sortValue: TRAILING_SORT_VALUES['rare-species'],
+				speciesName: FIRECREST,
+				totalSessionDays: 3
+			}
 		]);
 	});
 
@@ -1346,6 +1381,7 @@ function makeRareSpeciesHighlight(
 ): RareSpeciesHighlight {
 	return {
 		type: 'rare-species',
+		sortValue: TRAILING_SORT_VALUES['rare-species'],
 		speciesName: FIRECREST,
 		totalSessionDays: 2,
 		...overrides
@@ -1373,6 +1409,7 @@ function makeFirstEverHighlight(
 ): FirstEverSpeciesHighlight {
 	return {
 		type: 'first-ever-species',
+		sortValue: TRAILING_SORT_VALUES['first-ever-species'],
 		speciesName: 'Firecrest',
 		multipleIndividualsRecorded: false,
 		isOnlyRecord: false,
@@ -1420,6 +1457,7 @@ function makeFirstOfYearHighlight(
 ): FirstOfYearSpeciesHighlight {
 	return {
 		type: 'first-of-year-species',
+		sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
 		speciesName: 'Firecrest',
 		year: 2024,
 		isCurrentYear: false,
@@ -1524,6 +1562,7 @@ function makeLongAbsenceHighlight(
 ): LongAbsenceRetrapHighlight {
 	return {
 		type: 'long-absence-retrap',
+		sortValue: TRAILING_SORT_VALUES['long-absence-retrap'],
 		ringNo: 'ARRETRAP',
 		speciesName: 'Robin',
 		previousDate: '2021-06-20',
@@ -1591,6 +1630,7 @@ describe('deriveWeightRecordBreakers', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'weight-record',
+			sortValue: TRAILING_SORT_VALUES['weight-record'],
 			speciesName: BLUE_TIT,
 			extreme: 'heaviest',
 			weight: 13.1,
@@ -1610,6 +1650,7 @@ describe('deriveWeightRecordBreakers', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'weight-record',
+			sortValue: TRAILING_SORT_VALUES['weight-record'],
 			speciesName: BLUE_TIT,
 			extreme: 'lightest',
 			weight: 9.8,
@@ -1630,6 +1671,7 @@ describe('deriveWeightRecordBreakers', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'weight-record',
+			sortValue: TRAILING_SORT_VALUES['weight-record'],
 			speciesName: BLUE_TIT,
 			extreme: 'heaviest',
 			weight: 13.1,
@@ -1684,6 +1726,7 @@ describe('deriveWeightRecordBreakers', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'weight-record',
+			sortValue: TRAILING_SORT_VALUES['weight-record'],
 			speciesName: BLUE_TIT,
 			extreme: 'heaviest',
 			weight: 13.1,
@@ -1744,6 +1787,7 @@ function makeWeightHighlight(
 ): WeightRecordHighlight {
 	return {
 		type: 'weight-record',
+		sortValue: TRAILING_SORT_VALUES['weight-record'],
 		speciesName: BLUE_TIT,
 		extreme: 'heaviest',
 		weight: 13.1,
@@ -1810,6 +1854,7 @@ function makeSinceHighlight(
 ): SinceComparisonHighlight {
 	return {
 		type: 'since-comparison',
+		sortValue: TRAILING_SORT_VALUES['since-comparison'],
 		kind: 'busiest',
 		value: 41,
 		sinceDate: '2023-05-12',
@@ -1853,6 +1898,8 @@ describe('render — since', () => {
 describe('render — combined-session-total-record', () => {
 	const combinedFields = {
 		type: 'combined-session-total-record' as const,
+		// render tests don't depend on ordering; a placeholder value suffices
+		sortValue: 0,
 		encounterValue: 120,
 		speciesValue: 15,
 		seasonName: 'spring',
@@ -1886,6 +1933,7 @@ describe('render — combined-only-of-year', () => {
 		expect(
 			renderedText({
 				type: 'combined-only-of-year',
+				sortValue: 0,
 				speciesNames: ['Chaffinch', 'Goldfinch', 'Lesser Whitethroat'],
 				year: 2026,
 				isCurrentYear: true
@@ -1899,6 +1947,7 @@ describe('render — combined-only-of-year', () => {
 		expect(
 			renderedText({
 				type: 'combined-only-of-year',
+				sortValue: 0,
 				speciesNames: ['Chaffinch', 'Goldfinch'],
 				year: 2026,
 				isCurrentYear: true
@@ -1910,6 +1959,7 @@ describe('render — combined-only-of-year', () => {
 		expect(
 			renderedText({
 				type: 'combined-only-of-year',
+				sortValue: 0,
 				speciesNames: ['Chaffinch', 'Goldfinch'],
 				year: 2024,
 				isCurrentYear: false

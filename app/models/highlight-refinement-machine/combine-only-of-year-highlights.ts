@@ -1,7 +1,8 @@
-import type {
-	CombinedOnlyOfYearHighlight,
-	FirstOfYearSpeciesHighlight,
-	SessionHighlight
+import {
+	combinedSortValue,
+	type CombinedOnlyOfYearHighlight,
+	type FirstOfYearSpeciesHighlight,
+	type SessionHighlight
 } from '@/app/models/session-highlights';
 
 function isOnlyOfYear(
@@ -22,6 +23,7 @@ export function combineOnlyOfYearHighlights(
 	const [first] = onlyOfYear;
 	const combined: CombinedOnlyOfYearHighlight = {
 		type: 'combined-only-of-year',
+		sortValue: combinedSortValue(onlyOfYear),
 		speciesNames: onlyOfYear.map((highlight) => highlight.speciesName),
 		year: first.year,
 		isCurrentYear: first.isCurrentYear

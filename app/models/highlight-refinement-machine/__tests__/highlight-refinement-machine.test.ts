@@ -2,23 +2,26 @@ import { describe, it, expect } from 'vitest';
 import {
 	combineOnlyOfYearHighlights,
 	combineSessionTotalRecords,
-	orderByScope,
+	orderBySortValue,
 	removeBusiestSinceWhenBusiestRecordHeld,
 	removeNarrowerScopeSpeciesRecords,
 	runHighlightMachine
 } from '..';
-import type {
-	FirstEverSpeciesHighlight,
-	FirstOfYearSpeciesHighlight,
-	LongAbsenceRetrapHighlight,
-	RareSpeciesHighlight,
-	RecordScope,
-	SessionHighlight,
-	SessionTotalMetric,
-	SessionTotalRecordHighlight,
-	SinceComparisonHighlight,
-	SpeciesCountRecordHighlight,
-	WeightRecordHighlight
+import {
+	combinedSortValue,
+	scopedSortValue,
+	TRAILING_SORT_VALUES,
+	type FirstEverSpeciesHighlight,
+	type FirstOfYearSpeciesHighlight,
+	type LongAbsenceRetrapHighlight,
+	type RareSpeciesHighlight,
+	type RecordScope,
+	type SessionHighlight,
+	type SessionTotalMetric,
+	type SessionTotalRecordHighlight,
+	type SinceComparisonHighlight,
+	type SpeciesCountRecordHighlight,
+	type WeightRecordHighlight
 } from '@/app/models/session-highlights';
 
 const periodFields = {
@@ -36,6 +39,7 @@ function sessionTotalRecord(
 ): SessionTotalRecordHighlight {
 	return {
 		type: 'session-total-record',
+		sortValue: scopedSortValue(scope, metric === 'encounters' ? 3 : 2),
 		metric,
 		scope,
 		value,
@@ -51,6 +55,7 @@ function speciesCountRecord(
 ): SpeciesCountRecordHighlight {
 	return {
 		type: 'species-count-record',
+		sortValue: scopedSortValue(scope, 1),
 		speciesName,
 		scope,
 		value,
@@ -65,6 +70,7 @@ function firstOfYear(
 ): FirstOfYearSpeciesHighlight {
 	return {
 		type: 'first-of-year-species',
+		sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
 		speciesName,
 		year: 2026,
 		isCurrentYear: true,
@@ -75,29 +81,34 @@ function firstOfYear(
 
 const busiestSince: SinceComparisonHighlight = {
 	type: 'since-comparison',
+	sortValue: TRAILING_SORT_VALUES['since-comparison'],
 	kind: 'busiest',
 	value: 120,
 	sinceDate: '2025-09-06'
 };
 const quietestSince: SinceComparisonHighlight = {
 	type: 'since-comparison',
+	sortValue: TRAILING_SORT_VALUES['since-comparison'],
 	kind: 'quietest',
 	value: 3,
 	sinceDate: '2023-09-14'
 };
 const firstEverSpecies: FirstEverSpeciesHighlight = {
 	type: 'first-ever-species',
+	sortValue: TRAILING_SORT_VALUES['first-ever-species'],
 	speciesName: 'Firecrest',
 	multipleIndividualsRecorded: false,
 	isOnlyRecord: false
 };
 const rareSpecies: RareSpeciesHighlight = {
 	type: 'rare-species',
+	sortValue: TRAILING_SORT_VALUES['rare-species'],
 	speciesName: 'Wryneck',
 	totalSessionDays: 2
 };
 const longAbsenceRetrap: LongAbsenceRetrapHighlight = {
 	type: 'long-absence-retrap',
+	sortValue: TRAILING_SORT_VALUES['long-absence-retrap'],
 	ringNo: 'ARRETRAP',
 	speciesName: 'Robin',
 	previousDate: '2021-06-20',
@@ -106,6 +117,7 @@ const longAbsenceRetrap: LongAbsenceRetrapHighlight = {
 };
 const weightRecord: WeightRecordHighlight = {
 	type: 'weight-record',
+	sortValue: TRAILING_SORT_VALUES['weight-record'],
 	speciesName: 'Blue Tit',
 	extreme: 'heaviest',
 	weight: 13.1,
@@ -113,7 +125,7 @@ const weightRecord: WeightRecordHighlight = {
 	isJointPlacement: false
 };
 
-// ---- Pass 1 — removal ----
+// ---- Removal rules ----
 
 describe('removeBusiestSinceWhenBusiestRecordHeld (Rem-1)', () => {
 	it('drops a busiest-since comparison when a busiest session-total record is present', () => {
@@ -198,49 +210,66 @@ describe('removeNarrowerScopeSpeciesRecords (Rem-2)', () => {
 	});
 });
 
-// ---- Pass 2 — ordering ----
+// ---- Ordering (the machine's final rule, run after combining) ----
 
-describe('orderByScope (Ord-1)', () => {
-	it('interleaves session-total and species-count records by scope breadth', () => {
-		const ordered = orderByScope([
-			speciesCountRecord('Blue Tit', 'this-year', 5),
-			speciesCountRecord('Chiffchaff', 'this-season', 3),
-			sessionTotalRecord('encounters', 'all-time', 200),
-			speciesCountRecord('Blackcap', 'any-season', 24)
+describe('orderBySortValue (Ord-1)', () => {
+	it('orders scoped records by descending sort value (temporal + conceptual)', () => {
+		const ordered = orderBySortValue([
+			speciesCountRecord('Blackcap', 'any-season', 24), // 4.01
+			sessionTotalRecord('species', 'this-year', 15), // most varied 4.02
+			speciesCountRecord('Chiffchaff', 'this-season', 3), // 2.01
+			sessionTotalRecord('encounters', 'this-year', 120) // busiest 5.03
 		]);
-		expect(
-			ordered.map((highlight) =>
-				'scope' in highlight ? highlight.scope : null
-			)
-		).toEqual(['all-time', 'any-season', 'this-year', 'this-season']);
+		expect(ordered.map((highlight) => highlight.sortValue)).toEqual([
+			scopedSortValue('this-year', 3),
+			scopedSortValue('this-year', 2),
+			scopedSortValue('any-season', 1),
+			scopedSortValue('this-season', 1)
+		]);
 	});
 
-	it('places the combined session-total record by its own scope', () => {
+	it('breaks an equal-sum tie in favour of session measures', () => {
+		// busiest this-year (2 + 3) and an all-time single-species record (4 + 1)
+		// both sum to 5; the session measure wins on the conceptual tiebreak
+		const busiestThisYear = sessionTotalRecord('encounters', 'this-year', 120);
+		const allTimeSpecies = speciesCountRecord('Reed Warbler', 'all-time', 67, {
+			placementRank: 2,
+			isJointPlacement: false
+		});
+		const ordered = orderBySortValue([allTimeSpecies, busiestThisYear]);
+		expect(ordered).toEqual([busiestThisYear, allTimeSpecies]);
+	});
+
+	it('places a combined session-total record above the records it outranks', () => {
 		const combined: SessionHighlight = {
 			type: 'combined-session-total-record',
+			sortValue: combinedSortValue([
+				sessionTotalRecord('encounters', 'this-year', 120),
+				sessionTotalRecord('species', 'this-year', 15)
+			]),
 			scope: 'this-year',
 			encounterValue: 120,
 			speciesValue: 15,
 			...periodFields
 		};
-		const ordered = orderByScope([
-			speciesCountRecord('Chiffchaff', 'this-season', 3),
-			combined,
+		const ordered = orderBySortValue([
 			speciesCountRecord('Reed Warbler', 'all-time', 67, {
 				placementRank: 2,
 				isJointPlacement: false
-			})
+			}),
+			combined,
+			speciesCountRecord('Chiffchaff', 'this-season', 3)
 		]);
 		expect(ordered.map((highlight) => highlight.type)).toEqual([
-			'species-count-record',
 			'combined-session-total-record',
+			'species-count-record',
 			'species-count-record'
 		]);
-		expect(ordered[1]).toBe(combined);
+		expect(ordered[0]).toBe(combined);
 	});
 
 	it('sorts the record block, then quietest-since, first/rare/absence, weights last', () => {
-		const ordered = orderByScope([
+		const ordered = orderBySortValue([
 			weightRecord,
 			longAbsenceRetrap,
 			rareSpecies,
@@ -261,11 +290,11 @@ describe('orderByScope (Ord-1)', () => {
 		]);
 	});
 
-	it('preserves generation order within a shared scope', () => {
+	it('preserves generation order within an equal sort value', () => {
 		const blueTit = speciesCountRecord('Blue Tit', 'this-year', 5);
 		const cettis = speciesCountRecord("Cetti's Warbler", 'this-year', 5);
 		const dunnock = speciesCountRecord('Dunnock', 'this-year', 4);
-		const ordered = orderByScope([blueTit, cettis, dunnock]);
+		const ordered = orderBySortValue([blueTit, cettis, dunnock]);
 		expect(ordered).toEqual([blueTit, cettis, dunnock]);
 	});
 
@@ -275,12 +304,12 @@ describe('orderByScope (Ord-1)', () => {
 			sessionTotalRecord('encounters', 'all-time', 74)
 		];
 		const snapshot = [...pool];
-		orderByScope(pool);
+		orderBySortValue(pool);
 		expect(pool).toEqual(snapshot);
 	});
 });
 
-// ---- Pass 3 — combining ----
+// ---- Combining rules ----
 
 describe('combineSessionTotalRecords (Comb-1)', () => {
 	it('merges same-scope encounters and species records into one combined record', () => {
@@ -291,6 +320,10 @@ describe('combineSessionTotalRecords (Comb-1)', () => {
 		expect(combined).toEqual([
 			{
 				type: 'combined-session-total-record',
+				sortValue: combinedSortValue([
+					sessionTotalRecord('encounters', 'this-year', 120),
+					sessionTotalRecord('species', 'this-year', 15)
+				]),
 				scope: 'this-year',
 				encounterValue: 120,
 				speciesValue: 15,
@@ -335,6 +368,10 @@ describe('combineOnlyOfYearHighlights (Comb-2)', () => {
 		expect(combined).toEqual([
 			{
 				type: 'combined-only-of-year',
+				sortValue: combinedSortValue([
+					firstOfYear('Chaffinch', true),
+					firstOfYear('Goldfinch', true)
+				]),
 				speciesNames: ['Chaffinch', 'Goldfinch'],
 				year: 2026,
 				isCurrentYear: true
@@ -351,6 +388,11 @@ describe('combineOnlyOfYearHighlights (Comb-2)', () => {
 		expect(combined).toEqual([
 			{
 				type: 'combined-only-of-year',
+				sortValue: combinedSortValue([
+					firstOfYear('Chaffinch', true),
+					firstOfYear('Goldfinch', true),
+					firstOfYear('Lesser Whitethroat', true)
+				]),
 				speciesNames: ['Chaffinch', 'Goldfinch', 'Lesser Whitethroat'],
 				year: 2026,
 				isCurrentYear: true
@@ -378,6 +420,10 @@ describe('combineOnlyOfYearHighlights (Comb-2)', () => {
 			firstA,
 			{
 				type: 'combined-only-of-year',
+				sortValue: combinedSortValue([
+					firstOfYear('Chaffinch', true),
+					firstOfYear('Goldfinch', true)
+				]),
 				speciesNames: ['Chaffinch', 'Goldfinch'],
 				year: 2026,
 				isCurrentYear: true
@@ -432,16 +478,18 @@ describe('runHighlightMachine', () => {
 						: highlight.type
 			])
 		).toEqual([
-			['species-count-record', 'Reed Warbler'], // all-time placement
-			['species-count-record', 'Blackcap'], // any-season
-			['combined-session-total-record', 'combined-session-total-record'], // this-year
-			['species-count-record', 'Blue Tit'],
+			// the combined busiest/most-varied line for this-year (5.13) now heads
+			// the list, above the all-time single-species record (5.01)
+			['combined-session-total-record', 'combined-session-total-record'],
+			['species-count-record', 'Reed Warbler'], // all-time placement, 5.01
+			['species-count-record', 'Blackcap'], // any-season, 4.01
+			['species-count-record', 'Blue Tit'], // this-year, 3.01
 			['species-count-record', "Cetti's Warbler"],
 			['species-count-record', 'Dunnock'],
 			['species-count-record', 'Wren'],
-			['species-count-record', 'Chiffchaff'], // this-season
-			['combined-only-of-year', 'Chaffinch+Goldfinch+Lesser Whitethroat'],
-			['weight-record', 'Blue Tit']
+			['species-count-record', 'Chiffchaff'], // this-season, 2.01
+			['combined-only-of-year', 'Chaffinch+Goldfinch+Lesser Whitethroat'], // 0.8
+			['weight-record', 'Blue Tit'] // 0.0
 		]);
 	});
 });
