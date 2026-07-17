@@ -7,7 +7,10 @@ vi.mock('@/app/actions/session-highlights', () => ({
 	fetchSessionHighlights: vi.fn()
 }));
 
+// These mocks stand in for the machine's already-ordered output; the component
+// renders them in the given order, so the exact sortValue is immaterial here.
 const periodFields = {
+	sortValue: 0,
 	seasonName: 'autumn',
 	year: 2024,
 	isCurrentYear: false,
@@ -148,6 +151,7 @@ describe('SessionHighlights', () => {
 	it('renders first-ever sentences', async () => {
 		const firstEverHighlight: SessionHighlight = {
 			type: 'first-ever-species',
+			sortValue: 0,
 			speciesName: 'Firecrest',
 			multipleIndividualsRecorded: false,
 			isOnlyRecord: false
@@ -169,6 +173,7 @@ describe('SessionHighlights', () => {
 	it('renders rare-species sentences', async () => {
 		const rareSpeciesHighlight: SessionHighlight = {
 			type: 'rare-species',
+			sortValue: 0,
 			speciesName: 'Firecrest',
 			totalSessionDays: 2
 		};
@@ -191,6 +196,7 @@ describe('SessionHighlights', () => {
 	it('renders long-absence sentences', async () => {
 		const longAbsenceHighlight: SessionHighlight = {
 			type: 'long-absence-retrap',
+			sortValue: 0,
 			ringNo: 'ARRETRAP',
 			speciesName: 'Robin',
 			previousDate: '2021-06-20',
@@ -233,18 +239,21 @@ describe('SessionHighlights', () => {
 			},
 			{
 				type: 'since-comparison',
+				sortValue: 0,
 				kind: 'quietest',
 				value: 3,
 				sinceDate: '2023-09-14'
 			},
 			{
 				type: 'first-ever-species',
+				sortValue: 0,
 				speciesName: 'Firecrest',
 				multipleIndividualsRecorded: false,
 				isOnlyRecord: false
 			},
 			{
 				type: 'long-absence-retrap',
+				sortValue: 0,
 				ringNo: 'ARRETRAP',
 				speciesName: 'Robin',
 				previousDate: '2021-06-20',
@@ -253,6 +262,7 @@ describe('SessionHighlights', () => {
 			},
 			{
 				type: 'weight-record',
+				sortValue: 0,
 				speciesName: 'Blue Tit',
 				extreme: 'heaviest',
 				weight: 13.1,
@@ -286,6 +296,7 @@ describe('SessionHighlights', () => {
 	it('renders weight record sentences', async () => {
 		const weightHighlight: SessionHighlight = {
 			type: 'weight-record',
+			sortValue: 0,
 			speciesName: 'Blue Tit',
 			extreme: 'heaviest',
 			weight: 13.1,

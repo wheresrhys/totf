@@ -27,6 +27,59 @@ export const RECORD_SCOPES = [
 ] as const;
 export type RecordScope = (typeof RECORD_SCOPES)[number];
 
+// Scopes ranked broadest-first (all-time = 0). Used by the narrower-scope
+// removal rule and by the temporal component of a highlight's sort value.
+export const SCOPE_BREADTH_RANK = new Map(
+	RECORD_SCOPES.map((scope, index) => [scope, index])
+);
+
+// --- Highlight sort value ---
+//
+// Every highlight carries an explicit `sortValue`; the machine's final rule
+// simply sorts by it (higher first). A scoped record's value is the sum of its
+// temporal breadth (how far back the record reaches) and its conceptual breadth
+// (a whole-session measure outranks a single-species one), so session measures
+// for a recent period can outrank a single-species record over a broader one.
+//
+// Temporal points: all-time 4, any-season 3, this-year 2, this-season 1.
+function temporalPoints(scope: RecordScope): number {
+	return RECORD_SCOPES.length - SCOPE_BREADTH_RANK.get(scope)!;
+}
+
+// Conceptual points: session total (busiest) 3, session variety (most varied) 2,
+// single-species 1. A tiny fraction of the conceptual points is folded in so that
+// session measures win an equal-sum tie (e.g. busiest this-year beats a
+// single-species all-time record) without relying on derivation order.
+export function scopedSortValue(
+	scope: RecordScope,
+	conceptualPoints: number
+): number {
+	return temporalPoints(scope) + conceptualPoints + conceptualPoints / 100;
+}
+
+// Non-scoped families sort below every scoped record (min scoped value is
+// this-season single-species = 2.01), in a fixed editorial order spaced so the
+// combine increment cannot collide across families.
+export const TRAILING_SORT_VALUES = {
+	'since-comparison': 1.0,
+	'first-ever-species': 0.8,
+	'first-of-year-species': 0.6,
+	'rare-species': 0.4,
+	'long-absence-retrap': 0.2,
+	'weight-record': 0.0
+} as const;
+
+// Combining bumps the merged line above the parts it absorbed, by a step that
+// grows with how many highlights were merged — a session with many merged
+// records ranks its combined line higher.
+export const COMBINE_INCREMENT = 0.1;
+export function combinedSortValue(components: { sortValue: number }[]): number {
+	return (
+		Math.max(...components.map((component) => component.sortValue)) +
+		COMBINE_INCREMENT * (components.length - 1)
+	);
+}
+
 // Everything needed to compare a session against the group's history,
 // fetched once per group: per-day-per-species stats (encounter counts,
 // weighed-bird counts, weight extremes) plus the full list of session
@@ -38,6 +91,7 @@ export type SessionStatsData = {
 
 export type SessionTotalRecordHighlight = {
 	type: 'session-total-record';
+	sortValue: number;
 	metric: SessionTotalMetric;
 	scope: RecordScope;
 	value: number;
@@ -54,6 +108,7 @@ export type SessionTotalRecordHighlight = {
 
 export type SpeciesCountRecordHighlight = {
 	type: 'species-count-record';
+	sortValue: number;
 	speciesName: string;
 	scope: RecordScope;
 	value: number;
@@ -75,6 +130,7 @@ export type SpeciesCountRecordHighlight = {
 
 export type FirstEverSpeciesHighlight = {
 	type: 'first-ever-species';
+	sortValue: number;
 	speciesName: string;
 	// More than one encounter of the species this session — 'record' vs 'records'
 	multipleIndividualsRecorded: boolean;
@@ -85,6 +141,7 @@ export type FirstEverSpeciesHighlight = {
 
 export type FirstOfYearSpeciesHighlight = {
 	type: 'first-of-year-species';
+	sortValue: number;
 	speciesName: string;
 	year: number;
 	// 'of the year' copy is only correct while the session's year is current;
@@ -104,6 +161,7 @@ export const MAX_RARE_SPECIES_SESSION_DAYS = 3;
 
 export type RareSpeciesHighlight = {
 	type: 'rare-species';
+	sortValue: number;
 	speciesName: string;
 	// Distinct session days the species has ever been recorded on (2–3 here;
 	// a count of 1 is a first-ever appearance, handled elsewhere)
@@ -112,6 +170,7 @@ export type RareSpeciesHighlight = {
 
 export type LongAbsenceRetrapHighlight = {
 	type: 'long-absence-retrap';
+	sortValue: number;
 	ringNo: string;
 	speciesName: string;
 	// ISO date string of the previous encounter (e.g. "2021-06-20")
@@ -129,6 +188,7 @@ export type SinceComparisonKind = (typeof SINCE_COMPARISON_KINDS)[number];
 
 export type SinceComparisonHighlight = {
 	type: 'since-comparison';
+	sortValue: number;
 	kind: SinceComparisonKind;
 	// The session's encounter total
 	value: number;
@@ -144,6 +204,7 @@ export type WeightRecordExtreme = (typeof WEIGHT_RECORD_EXTREMES)[number];
 
 export type WeightRecordHighlight = {
 	type: 'weight-record';
+	sortValue: number;
 	speciesName: string;
 	extreme: WeightRecordExtreme;
 	// The session's weight for this extreme, in grams
@@ -161,6 +222,7 @@ export type WeightRecordHighlight = {
 // line. Carries the value for each metric plus the shared period fields.
 export type CombinedSessionTotalRecordHighlight = {
 	type: 'combined-session-total-record';
+	sortValue: number;
 	scope: RecordScope;
 	encounterValue: number;
 	speciesValue: number;
@@ -176,6 +238,7 @@ export type CombinedSessionTotalRecordHighlight = {
 // only-of-year variant (isOnlyRecord) — first-of-year items are never merged.
 export type CombinedOnlyOfYearHighlight = {
 	type: 'combined-only-of-year';
+	sortValue: number;
 	// Species names in the order the source highlights appeared
 	speciesNames: string[];
 	year: number;
@@ -279,6 +342,7 @@ export function deriveSessionTotalRecords({
 			);
 			const baseHighlight = {
 				type: 'session-total-record',
+				sortValue: scopedSortValue(scope, metric === 'encounters' ? 3 : 2),
 				metric,
 				scope,
 				value: sessionValue,
@@ -368,6 +432,7 @@ export function deriveSinceHighlights({
 	if (busiestSinceDate !== undefined && isOverAMonthBefore(busiestSinceDate)) {
 		candidates.push({
 			type: 'since-comparison',
+			sortValue: TRAILING_SORT_VALUES['since-comparison'],
 			kind: 'busiest',
 			value: sessionValue,
 			sinceDate: busiestSinceDate
@@ -379,6 +444,7 @@ export function deriveSinceHighlights({
 		if (priorDays.length > 0) {
 			candidates.push({
 				type: 'since-comparison',
+				sortValue: TRAILING_SORT_VALUES['since-comparison'],
 				kind: 'quietest',
 				value: sessionValue
 			});
@@ -386,6 +452,7 @@ export function deriveSinceHighlights({
 	} else if (isOverAMonthBefore(quietestSinceDate)) {
 		candidates.push({
 			type: 'since-comparison',
+			sortValue: TRAILING_SORT_VALUES['since-comparison'],
 			kind: 'quietest',
 			value: sessionValue,
 			sinceDate: quietestSinceDate
@@ -487,6 +554,7 @@ export function deriveSpeciesRecords({
 			);
 			const baseHighlight = {
 				type: 'species-count-record',
+				sortValue: scopedSortValue(scope, 1),
 				speciesName,
 				scope,
 				value: sessionValue,
@@ -568,6 +636,7 @@ export function deriveFirstEverSpecies({
 		)
 		.map((sessionRow) => ({
 			type: 'first-ever-species' as const,
+			sortValue: TRAILING_SORT_VALUES['first-ever-species'],
 			speciesName: sessionRow.species_name,
 			multipleIndividualsRecorded: sessionRow.encounter_count > 1,
 			// The species' only records ever — later days revoke this, so a
@@ -621,6 +690,7 @@ export function deriveFirstOfYearSpecies({
 		})
 		.map((sessionRow) => ({
 			type: 'first-of-year-species' as const,
+			sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
 			speciesName: sessionRow.species_name,
 			year,
 			isCurrentYear: year === today.getFullYear(),
@@ -671,6 +741,7 @@ export function deriveRareSpecies({
 		)
 		.map(({ sessionRow, speciesDays }) => ({
 			type: 'rare-species' as const,
+			sortValue: TRAILING_SORT_VALUES['rare-species'],
 			speciesName: sessionRow.species_name,
 			totalSessionDays: speciesDays.size
 		}));
@@ -695,6 +766,7 @@ export function deriveLongAbsenceRetraps(
 		const gapMonths = duration.months ?? 0;
 		return {
 			type: 'long-absence-retrap',
+			sortValue: TRAILING_SORT_VALUES['long-absence-retrap'],
 			ringNo: result.ring_no,
 			speciesName: result.species_name,
 			previousDate: result.previous_date,
@@ -776,6 +848,7 @@ export function deriveWeightRecordBreakers({
 			if (placement) {
 				highlights.push({
 					type: 'weight-record',
+					sortValue: TRAILING_SORT_VALUES['weight-record'],
 					speciesName: sessionRow.species_name,
 					extreme,
 					weight: sessionWeight,

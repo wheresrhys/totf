@@ -1,7 +1,8 @@
-import type {
-	CombinedSessionTotalRecordHighlight,
-	SessionHighlight,
-	SessionTotalRecordHighlight
+import {
+	combinedSortValue,
+	type CombinedSessionTotalRecordHighlight,
+	type SessionHighlight,
+	type SessionTotalRecordHighlight
 } from '@/app/models/session-highlights';
 
 // Comb-1: a session holding both the busiest (encounters) and most-varied
@@ -42,6 +43,7 @@ export function combineSessionTotalRecords(
 			const species = recordsByScope.get(highlight.scope)!.species!;
 			const combined: CombinedSessionTotalRecordHighlight = {
 				type: 'combined-session-total-record',
+				sortValue: combinedSortValue([highlight, species]),
 				scope: highlight.scope,
 				encounterValue: highlight.value,
 				speciesValue: species.value,
