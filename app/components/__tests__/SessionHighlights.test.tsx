@@ -1,16 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
-import type { ReactElement } from 'react';
 import { SessionHighlights } from '../SessionHighlights';
-import {
-	FirstEverSpeciesHighlight,
-	LongAbsenceRetrapHighlight,
-	RareSpeciesHighlight,
-	SessionTotalRecordHighlight,
-	SinceComparisonHighlight,
-	SpeciesCountRecordHighlight,
-	WeightRecordHighlight
-} from '@/app/models/session-highlights';
+import type { SessionHighlight } from '@/app/models/session-highlights';
 
 vi.mock('@/app/actions/session-highlights', () => ({
 	fetchSessionHighlights: vi.fn()
@@ -24,37 +15,41 @@ const periodFields = {
 	seasonPeriodLabel: 'autumn 2024'
 } as const;
 
-// The action returns highlights already rendered (keyed <li> elements)
-const mockHighlights: ReactElement[] = [
-	new SessionTotalRecordHighlight({
+// The action returns plain highlight data; the component renders each element
+const mockHighlights: SessionHighlight[] = [
+	{
+		type: 'session-total-record',
 		metric: 'encounters',
 		scope: 'all-time',
 		value: 74,
 		...periodFields
-	}).render(),
-	new SessionTotalRecordHighlight({
+	},
+	{
+		type: 'session-total-record',
 		metric: 'species',
 		scope: 'this-season',
 		value: 18,
 		...periodFields,
 		isCurrentYear: true,
 		isCurrentSeason: true
-	}).render()
+	}
 ];
 
-const mockHighlightsWithSpeciesRecord: ReactElement[] = [
-	new SessionTotalRecordHighlight({
+const mockHighlightsWithSpeciesRecord: SessionHighlight[] = [
+	{
+		type: 'session-total-record',
 		metric: 'encounters',
 		scope: 'all-time',
 		value: 74,
 		...periodFields
-	}).render(),
-	new SpeciesCountRecordHighlight({
+	},
+	{
+		type: 'species-count-record',
 		speciesName: 'Reed Warbler',
 		scope: 'all-time',
 		value: 12,
 		...periodFields
-	}).render()
+	}
 ];
 
 describe('SessionHighlights', () => {
@@ -72,7 +67,7 @@ describe('SessionHighlights', () => {
 	it('renders a loading spinner before data loads', async () => {
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
-		let resolveData!: (v: ReactElement[]) => void;
+		let resolveData!: (v: SessionHighlight[]) => void;
 		vi.mocked(fetchSessionHighlights).mockReturnValue(
 			new Promise((resolve) => {
 				resolveData = resolve;
@@ -151,16 +146,15 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders first-ever sentences', async () => {
-		const firstEverHighlight = new FirstEverSpeciesHighlight({
+		const firstEverHighlight: SessionHighlight = {
+			type: 'first-ever-species',
 			speciesName: 'Firecrest',
 			multipleIndividualsRecorded: false,
 			isOnlyRecord: false
-		});
+		};
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
-		vi.mocked(fetchSessionHighlights).mockResolvedValue([
-			firstEverHighlight.render()
-		]);
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([firstEverHighlight]);
 		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
@@ -173,15 +167,14 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders rare-species sentences', async () => {
-		const rareSpeciesHighlight = new RareSpeciesHighlight({
+		const rareSpeciesHighlight: SessionHighlight = {
+			type: 'rare-species',
 			speciesName: 'Firecrest',
 			totalSessionDays: 2
-		});
+		};
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
-		vi.mocked(fetchSessionHighlights).mockResolvedValue([
-			rareSpeciesHighlight.render()
-		]);
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([rareSpeciesHighlight]);
 		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
@@ -196,18 +189,17 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders long-absence sentences', async () => {
-		const longAbsenceHighlight = new LongAbsenceRetrapHighlight({
+		const longAbsenceHighlight: SessionHighlight = {
+			type: 'long-absence-retrap',
 			ringNo: 'ARRETRAP',
 			speciesName: 'Robin',
 			previousDate: '2021-06-20',
 			gapYears: 2,
 			gapMonths: 10
-		});
+		};
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
-		vi.mocked(fetchSessionHighlights).mockResolvedValue([
-			longAbsenceHighlight.render()
-		]);
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([longAbsenceHighlight]);
 		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
@@ -222,46 +214,51 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders a full mixed set of highlights in priority order', async () => {
-		// One highlight from every family, already rendered in priority order
-		// (the action runs the highlight machine and renders before returning);
-		// the component renders the elements as given
-		const mixedHighlights: ReactElement[] = [
-			new SessionTotalRecordHighlight({
+		// One highlight from every family in priority order (the action runs the
+		// highlight machine before returning); the component renders each.
+		const mixedHighlights: SessionHighlight[] = [
+			{
+				type: 'session-total-record',
 				metric: 'encounters',
 				scope: 'all-time',
 				value: 74,
 				...periodFields
-			}).render(),
-			new SinceComparisonHighlight({
+			},
+			{
+				type: 'since-comparison',
 				kind: 'quietest',
 				value: 3,
 				sinceDate: '2023-09-14'
-			}).render(),
-			new SpeciesCountRecordHighlight({
+			},
+			{
+				type: 'species-count-record',
 				speciesName: 'Reed Warbler',
 				scope: 'all-time',
 				value: 12,
 				...periodFields
-			}).render(),
-			new FirstEverSpeciesHighlight({
+			},
+			{
+				type: 'first-ever-species',
 				speciesName: 'Firecrest',
 				multipleIndividualsRecorded: false,
 				isOnlyRecord: false
-			}).render(),
-			new LongAbsenceRetrapHighlight({
+			},
+			{
+				type: 'long-absence-retrap',
 				ringNo: 'ARRETRAP',
 				speciesName: 'Robin',
 				previousDate: '2021-06-20',
 				gapYears: 2,
 				gapMonths: 10
-			}).render(),
-			new WeightRecordHighlight({
+			},
+			{
+				type: 'weight-record',
 				speciesName: 'Blue Tit',
 				extreme: 'heaviest',
 				weight: 13.1,
 				placementRank: 1,
 				isJointPlacement: false
-			}).render()
+			}
 		];
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
@@ -284,18 +281,17 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders weight record sentences', async () => {
-		const weightHighlight = new WeightRecordHighlight({
+		const weightHighlight: SessionHighlight = {
+			type: 'weight-record',
 			speciesName: 'Blue Tit',
 			extreme: 'heaviest',
 			weight: 13.1,
 			placementRank: 1,
 			isJointPlacement: false
-		});
+		};
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
-		vi.mocked(fetchSessionHighlights).mockResolvedValue([
-			weightHighlight.render()
-		]);
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([weightHighlight]);
 		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();

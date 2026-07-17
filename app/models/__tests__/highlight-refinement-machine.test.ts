@@ -3,14 +3,14 @@ import {
 	combineHighlights,
 	orderByScope,
 	removeRedundantHighlights,
-	runHighlightMachine,
-	type HighlightPrinter
-} from '../highlight-machine';
-import {
+	runHighlightMachine
+} from '../highlight-refinement-machine';
+import type {
 	FirstEverSpeciesHighlight,
 	FirstOfYearSpeciesHighlight,
 	LongAbsenceRetrapHighlight,
 	RareSpeciesHighlight,
+	SessionHighlight,
 	SessionTotalRecordHighlight,
 	SinceComparisonHighlight,
 	SpeciesCountRecordHighlight,
@@ -25,56 +25,64 @@ const periodFields = {
 	seasonPeriodLabel: 'autumn 2024'
 } as const;
 
-const sessionTotalRecord = new SessionTotalRecordHighlight({
+const sessionTotalRecord: SessionTotalRecordHighlight = {
+	type: 'session-total-record',
 	metric: 'encounters',
 	scope: 'all-time',
 	value: 74,
 	...periodFields
-});
-const sinceComparison = new SinceComparisonHighlight({
+};
+const sinceComparison: SinceComparisonHighlight = {
+	type: 'since-comparison',
 	kind: 'busiest',
 	value: 41,
 	sinceDate: '2023-05-12'
-});
-const speciesCountRecord = new SpeciesCountRecordHighlight({
+};
+const speciesCountRecord: SpeciesCountRecordHighlight = {
+	type: 'species-count-record',
 	speciesName: 'Reed Warbler',
 	scope: 'all-time',
 	value: 12,
 	...periodFields
-});
-const firstEverSpecies = new FirstEverSpeciesHighlight({
+};
+const firstEverSpecies: FirstEverSpeciesHighlight = {
+	type: 'first-ever-species',
 	speciesName: 'Firecrest',
 	multipleIndividualsRecorded: false,
 	isOnlyRecord: false
-});
-const firstOfYearSpecies = new FirstOfYearSpeciesHighlight({
+};
+const firstOfYearSpecies: FirstOfYearSpeciesHighlight = {
+	type: 'first-of-year-species',
 	speciesName: 'Blackcap',
 	year: 2024,
 	isCurrentYear: false,
 	multipleIndividualsRecorded: false,
 	isOnlyRecord: false
-});
-const rareSpecies = new RareSpeciesHighlight({
+};
+const rareSpecies: RareSpeciesHighlight = {
+	type: 'rare-species',
 	speciesName: 'Wryneck',
 	totalSessionDays: 2
-});
-const longAbsenceRetrap = new LongAbsenceRetrapHighlight({
+};
+const longAbsenceRetrap: LongAbsenceRetrapHighlight = {
+	type: 'long-absence-retrap',
 	ringNo: 'ARRETRAP',
 	speciesName: 'Robin',
 	previousDate: '2021-06-20',
 	gapYears: 2,
 	gapMonths: 10
-});
-const weightRecord = new WeightRecordHighlight({
+};
+const weightRecord: WeightRecordHighlight = {
+	type: 'weight-record',
 	speciesName: 'Blue Tit',
 	extreme: 'heaviest',
 	weight: 13.1,
 	placementRank: 1,
 	isJointPlacement: false
-});
+};
 
 // Deliberately unsorted pool covering every highlight type
-function makeMixedPool(): HighlightPrinter[] {
+function makeMixedPool(): SessionHighlight[] {
 	return [
 		weightRecord,
 		longAbsenceRetrap,
@@ -106,7 +114,7 @@ describe('runHighlightMachine', () => {
 		]);
 	});
 
-	it('passes the highlight instances through untouched', () => {
+	it('passes the highlight objects through untouched', () => {
 		const machined = runHighlightMachine(makeMixedPool());
 		expect(machined[0]).toBe(sessionTotalRecord);
 		expect(machined.at(-1)).toBe(weightRecord);
@@ -144,10 +152,11 @@ describe('orderByScope', () => {
 	});
 
 	it('preserves generation order within a type', () => {
-		const secondRareSpecies = new RareSpeciesHighlight({
+		const secondRareSpecies: RareSpeciesHighlight = {
+			type: 'rare-species',
 			speciesName: 'Hoopoe',
 			totalSessionDays: 3
-		});
+		};
 		const ordered = orderByScope([
 			rareSpecies,
 			secondRareSpecies,

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import type { HighlightPrinter } from '../highlight-machine';
 import {
 	deriveLongAbsenceRetraps,
 	deriveFirstEverSpecies,
@@ -9,26 +8,31 @@ import {
 	deriveSinceHighlights,
 	deriveSpeciesRecords,
 	deriveWeightRecordBreakers,
-	FirstEverSpeciesHighlight,
-	FirstOfYearSpeciesHighlight,
-	LongAbsenceRetrapHighlight,
-	RareSpeciesHighlight,
-	SessionTotalRecordHighlight,
-	SinceComparisonHighlight,
-	SpeciesCountRecordHighlight,
-	WeightRecordHighlight,
-	type HighlightFields,
+	type FirstEverSpeciesHighlight,
+	type FirstOfYearSpeciesHighlight,
+	type LongAbsenceRetrapHighlight,
+	type RareSpeciesHighlight,
+	type SessionHighlight,
+	type SessionTotalRecordHighlight,
+	type SinceComparisonHighlight,
+	type SpeciesCountRecordHighlight,
+	type WeightRecordHighlight,
 	type SessionStatsData
 } from '../session-highlights';
+import { renderHighlight } from '@/app/components/session-highlight-renderers';
 import type {
 	StatsPerDayAndSpeciesResult,
 	LongAbsenceRetrapsResult
 } from '@/app/models/db';
 
+// Overrides for the per-family highlight factories — every field bar the
+// fixed `type` discriminant
+type HighlightFields<T extends SessionHighlight> = Omit<T, 'type'>;
+
 // Each highlight renders <li key={sentence}>{sentence}</li>; the copy tests
 // assert on the sentence text
-function renderedText(highlight: HighlightPrinter): string {
-	return (highlight.render().props as { children: string }).children;
+function renderedText(highlight: SessionHighlight): string {
+	return (renderHighlight(highlight).props as { children: string }).children;
 }
 
 const SESSION_DATE = '2024-09-15'; // autumn
@@ -453,7 +457,8 @@ describe('deriveSinceHighlights', () => {
 function makeHighlight(
 	overrides: Partial<HighlightFields<SessionTotalRecordHighlight>>
 ): SessionTotalRecordHighlight {
-	return new SessionTotalRecordHighlight({
+	return {
+		type: 'session-total-record',
 		metric: 'encounters',
 		scope: 'all-time',
 		value: 74,
@@ -463,12 +468,12 @@ function makeHighlight(
 		isCurrentSeason: false,
 		seasonPeriodLabel: 'autumn 2024',
 		...overrides
-	});
+	};
 }
 
 describe('render — element shape', () => {
 	it('renders a list item keyed by the sentence', () => {
-		const element = makeHighlight({}).render();
+		const element = renderHighlight(makeHighlight({}));
 		expect(element.type).toBe('li');
 		expect(element.key).toBe('Busiest session ever — 74 birds');
 	});
@@ -904,7 +909,8 @@ describe('deriveSpeciesRecords', () => {
 function makeSpeciesHighlight(
 	overrides: Partial<HighlightFields<SpeciesCountRecordHighlight>>
 ): SpeciesCountRecordHighlight {
-	return new SpeciesCountRecordHighlight({
+	return {
+		type: 'species-count-record',
 		speciesName: 'Reed Warbler',
 		scope: 'all-time',
 		value: 12,
@@ -914,7 +920,7 @@ function makeSpeciesHighlight(
 		isCurrentSeason: false,
 		seasonPeriodLabel: 'autumn 2024',
 		...overrides
-	});
+	};
 }
 
 describe('render — species-count-record', () => {
@@ -1338,11 +1344,12 @@ describe('deriveRareSpecies', () => {
 function makeRareSpeciesHighlight(
 	overrides: Partial<HighlightFields<RareSpeciesHighlight>> = {}
 ): RareSpeciesHighlight {
-	return new RareSpeciesHighlight({
+	return {
+		type: 'rare-species',
 		speciesName: FIRECREST,
 		totalSessionDays: 2,
 		...overrides
-	});
+	};
 }
 
 describe('render — rare-species', () => {
@@ -1364,12 +1371,13 @@ describe('render — rare-species', () => {
 function makeFirstEverHighlight(
 	overrides: Partial<HighlightFields<FirstEverSpeciesHighlight>> = {}
 ): FirstEverSpeciesHighlight {
-	return new FirstEverSpeciesHighlight({
+	return {
+		type: 'first-ever-species',
 		speciesName: 'Firecrest',
 		multipleIndividualsRecorded: false,
 		isOnlyRecord: false,
 		...overrides
-	});
+	};
 }
 
 describe('render — first-ever-species', () => {
@@ -1410,14 +1418,15 @@ describe('render — first-ever-species', () => {
 function makeFirstOfYearHighlight(
 	overrides: Partial<HighlightFields<FirstOfYearSpeciesHighlight>> = {}
 ): FirstOfYearSpeciesHighlight {
-	return new FirstOfYearSpeciesHighlight({
+	return {
+		type: 'first-of-year-species',
 		speciesName: 'Firecrest',
 		year: 2024,
 		isCurrentYear: false,
 		multipleIndividualsRecorded: false,
 		isOnlyRecord: false,
 		...overrides
-	});
+	};
 }
 
 describe('render — first-of-year-species', () => {
@@ -1513,14 +1522,15 @@ describe('deriveLongAbsenceRetraps', () => {
 function makeLongAbsenceHighlight(
 	overrides: Partial<HighlightFields<LongAbsenceRetrapHighlight>> = {}
 ): LongAbsenceRetrapHighlight {
-	return new LongAbsenceRetrapHighlight({
+	return {
+		type: 'long-absence-retrap',
 		ringNo: 'ARRETRAP',
 		speciesName: 'Robin',
 		previousDate: '2021-06-20',
 		gapYears: 2,
 		gapMonths: 10,
 		...overrides
-	});
+	};
 }
 
 describe('render — long-absence-retrap', () => {
@@ -1732,14 +1742,15 @@ describe('deriveWeightRecordBreakers', () => {
 function makeWeightHighlight(
 	overrides: Partial<HighlightFields<WeightRecordHighlight>> = {}
 ): WeightRecordHighlight {
-	return new WeightRecordHighlight({
+	return {
+		type: 'weight-record',
 		speciesName: BLUE_TIT,
 		extreme: 'heaviest',
 		weight: 13.1,
 		placementRank: 1,
 		isJointPlacement: false,
 		...overrides
-	});
+	};
 }
 
 describe('render — weight-record', () => {
@@ -1797,12 +1808,13 @@ describe('render — weight-record', () => {
 function makeSinceHighlight(
 	overrides: Partial<HighlightFields<SinceComparisonHighlight>> = {}
 ): SinceComparisonHighlight {
-	return new SinceComparisonHighlight({
+	return {
+		type: 'since-comparison',
 		kind: 'busiest',
 		value: 41,
 		sinceDate: '2023-05-12',
 		...overrides
-	});
+	};
 }
 
 describe('render — since', () => {
@@ -1834,4 +1846,4 @@ describe('render — since', () => {
 });
 
 // The type-priority ordering previously tested here (sortHighlights) now
-// lives in the highlight machine — see highlight-machine.test.ts
+// lives in the highlight machine — see highlight-refinement-machine.test.ts

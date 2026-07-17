@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ReactElement } from 'react';
 import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
+import type { SessionHighlight } from '@/app/models/session-highlights';
+import { renderHighlight } from '@/app/components/session-highlight-renderers';
 
-// The action returns each highlight rendered as <li key={sentence}>{sentence}</li>
-function sentencesOf(highlights: ReactElement[]): string[] {
+// The action returns plain highlight data; rendering each gives the
+// <li key={sentence}>{sentence}</li> whose sentence we assert on
+function sentencesOf(highlights: SessionHighlight[]): string[] {
 	return highlights.map(
-		(element) => (element.props as { children: string }).children
+		(highlight) =>
+			(renderHighlight(highlight).props as { children: string }).children
 	);
 }
 

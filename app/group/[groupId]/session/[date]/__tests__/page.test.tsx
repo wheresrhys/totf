@@ -10,25 +10,22 @@ vi.mock('@/lib/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
-vi.mock('@/app/actions/session-highlights', async () => {
-	// The action returns highlights already rendered (keyed <li> elements)
-	const { SessionTotalRecordHighlight } =
-		await import('@/app/models/session-highlights');
-	return {
-		fetchSessionHighlights: vi.fn().mockResolvedValue([
-			new SessionTotalRecordHighlight({
-				metric: 'encounters',
-				scope: 'all-time',
-				value: 3,
-				seasonName: 'winter',
-				year: 2024,
-				isCurrentYear: false,
-				isCurrentSeason: false,
-				seasonPeriodLabel: 'winter 2023/24'
-			}).render()
-		])
-	};
-});
+vi.mock('@/app/actions/session-highlights', () => ({
+	// The action returns plain highlight data; the component renders each
+	fetchSessionHighlights: vi.fn().mockResolvedValue([
+		{
+			type: 'session-total-record',
+			metric: 'encounters',
+			scope: 'all-time',
+			value: 3,
+			seasonName: 'winter',
+			year: 2024,
+			isCurrentYear: false,
+			isCurrentSeason: false,
+			seasonPeriodLabel: 'winter 2023/24'
+		}
+	])
+}));
 
 const TEST_DATE = '2024-03-15';
 const TEST_GROUP_ID = '1';

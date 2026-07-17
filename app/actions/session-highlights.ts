@@ -1,8 +1,7 @@
 'use server';
-import type { ReactElement } from 'react';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors, fetchAllPaginatedRows } from '@/lib/supabase';
-import { runHighlightMachine } from '@/app/models/highlight-machine';
+import { runHighlightMachine } from '@/app/models/highlight-refinement-machine';
 import {
 	deriveFirstEverSpecies,
 	deriveFirstOfYearSpecies,
@@ -12,6 +11,7 @@ import {
 	deriveSinceHighlights,
 	deriveSpeciesRecords,
 	deriveWeightRecordBreakers,
+	type SessionHighlight,
 	type SessionStatsData
 } from '@/app/models/session-highlights';
 import type {
@@ -71,7 +71,7 @@ export async function fetchSessionHighlights({
 }: {
 	date: string;
 	viewedGroupId: number;
-}): Promise<ReactElement[]> {
+}): Promise<SessionHighlight[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const [stats, longAbsenceRetrapResults] = await Promise.all([
 		fetchSessionStats(viewedGroupId),
@@ -93,11 +93,7 @@ export async function fetchSessionHighlights({
 		...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date),
 		...deriveWeightRecordBreakers({ date, stats })
 	];
-	// Server-action return values must serialise across the RSC boundary.
-	// HighlightPrinter class instances don't (methods are stripped), so the
-	// highlights render here and the resulting elements — which do serialise —
-	// travel to the client component.
-	return runHighlightMachine(highlightPool).map((highlight) =>
-		highlight.render()
-	);
+	// Highlights are plain data, so the machine's output serialises across the
+	// RSC boundary as-is; the client component renders each via renderHighlight.
+	return runHighlightMachine(highlightPool);
 }
