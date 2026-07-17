@@ -994,7 +994,7 @@ describe('render — species-count-record', () => {
 		).toBe('Joint best day for Reed Warbler ever — 12 birds');
 	});
 
-	it('renders 2nd-best placement copy', () => {
+	it('renders second-best placement copy', () => {
 		expect(
 			renderedText(
 				makeSpeciesHighlight({
@@ -1003,10 +1003,10 @@ describe('render — species-count-record', () => {
 					value: 8
 				})
 			)
-		).toBe('2nd-best day for Reed Warbler ever — 8 birds');
+		).toBe('Second best day for Reed Warbler ever — 8 birds');
 	});
 
-	it('renders 3rd-best placement copy', () => {
+	it('renders third-best placement copy', () => {
 		expect(
 			renderedText(
 				makeSpeciesHighlight({
@@ -1015,10 +1015,10 @@ describe('render — species-count-record', () => {
 					value: 8
 				})
 			)
-		).toBe('3rd-best day for Reed Warbler ever — 8 birds');
+		).toBe('Third best day for Reed Warbler ever — 8 birds');
 	});
 
-	it('renders joint 2nd-best placement copy', () => {
+	it('renders joint second-best placement copy', () => {
 		expect(
 			renderedText(
 				makeSpeciesHighlight({
@@ -1027,10 +1027,10 @@ describe('render — species-count-record', () => {
 					value: 8
 				})
 			)
-		).toBe('Joint 2nd-best day for Reed Warbler ever — 8 birds');
+		).toBe('Joint second best day for Reed Warbler ever — 8 birds');
 	});
 
-	it('renders joint 3rd-best placement copy', () => {
+	it('renders joint third-best placement copy', () => {
 		expect(
 			renderedText(
 				makeSpeciesHighlight({
@@ -1039,7 +1039,7 @@ describe('render — species-count-record', () => {
 					value: 8
 				})
 			)
-		).toBe('Joint 3rd-best day for Reed Warbler ever — 8 birds');
+		).toBe('Joint third best day for Reed Warbler ever — 8 birds');
 	});
 });
 
