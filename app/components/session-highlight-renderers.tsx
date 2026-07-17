@@ -95,11 +95,16 @@ function buildSpeciesCountRecordSentence(
 		return `Record-equalling day for ${speciesName} — ${valueCopy}, most for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)}`;
 	}
 	if (highlight.placementRank !== undefined) {
-		const rankCopy = { 1: 'best', 2: '2nd-best', 3: '3rd-best' }[
+		const rankCopy = { 1: 'best', 2: 'second best', 3: 'third best' }[
 			highlight.placementRank
 		];
 		const jointPrefix = highlight.isJointPlacement ? 'Joint ' : '';
-		return `${jointPrefix}${rankCopy} day for ${speciesName} ever — ${value} birds`;
+		// Non-joint placements open the sentence, so capitalise the ordinal;
+		// with a "Joint " prefix the ordinal stays mid-sentence and lowercase.
+		const placementCopy = jointPrefix
+			? rankCopy
+			: rankCopy.charAt(0).toUpperCase() + rankCopy.slice(1);
+		return `${jointPrefix}${placementCopy} day for ${speciesName} ever — ${value} birds`;
 	}
 	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight);
 	const mostPhrase =
