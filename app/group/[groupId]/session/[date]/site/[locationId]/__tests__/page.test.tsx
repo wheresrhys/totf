@@ -18,11 +18,8 @@ vi.mock('@/app/actions/session-highlights', () => ({
 			metric: 'encounters',
 			scope: 'all-time',
 			value: 1,
-			seasonName: 'winter',
 			year: 2024,
-			isCurrentYear: false,
-			isCurrentSeason: false,
-			seasonPeriodLabel: 'winter 2023/24'
+			isCurrentYear: false
 		}
 	])
 }));

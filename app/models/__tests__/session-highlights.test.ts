@@ -44,10 +44,10 @@ const PAST_PERIOD_TODAY = new Date('2025-06-01');
 
 // Comparison days used across tests, chosen for their scope membership
 // relative to SESSION_DATE:
-const PRIOR_AUTUMN_OTHER_YEAR = '2021-09-10'; // any-season only (3+ years ago)
+const PRIOR_AUTUMN_OTHER_YEAR = '2021-09-10'; // all-time only (3+ years ago)
 const PRIOR_SUMMER_OTHER_YEAR = '2022-05-01'; // all-time only
 const PRIOR_SUMMER_THIS_YEAR = '2024-05-01'; // this-year (and all-time)
-const PRIOR_THIS_SEASON = '2024-08-20'; // this-season (and all narrower)
+const PRIOR_THIS_SEASON = '2024-08-20'; // this-year (and all-time)
 const LATER_DAY = '2024-10-01'; // after the session, but in every scope
 const LATER_DAY_TWO = '2024-10-05';
 const LATER_DAY_THREE = '2024-10-20';
@@ -106,11 +106,8 @@ describe('deriveSessionTotalRecords', () => {
 			metric: 'encounters',
 			scope: 'all-time',
 			value: 74,
-			seasonName: 'autumn',
 			year: 2024,
-			isCurrentYear: false,
-			isCurrentSeason: false,
-			seasonPeriodLabel: 'autumn 2024'
+			isCurrentYear: false
 		});
 		// three species on the prior day vs two today — no variety record
 		expect(
@@ -204,12 +201,11 @@ describe('deriveSessionTotalRecords', () => {
 		);
 	});
 
-	it('reports only all-time when all scopes are records', () => {
+	it('reports only all-time when every scope is a record', () => {
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
-			...dayRows(PRIOR_AUTUMN_OTHER_YEAR, { Robin: 60 }),
-			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 50 }),
-			...dayRows(PRIOR_THIS_SEASON, { Robin: 40 })
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 60 }),
+			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 50 })
 		]);
 		const encounterRecords = highlights.filter(
 			(highlight) => highlight.metric === 'encounters'
@@ -218,27 +214,15 @@ describe('deriveSessionTotalRecords', () => {
 		expect(encounterRecords[0].scope).toBe('all-time');
 	});
 
-	it('prefers any-season over this-year and this-year over this-season', () => {
-		// all-time beaten by a big summer day, but best autumn day is beaten
-		const anySeason = derive([
+	it('reports this-year when the all-time record is beaten but this year is not', () => {
+		// all-time beaten by a big prior-year day, but this year's best is beaten
+		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
 			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 100 }),
-			...dayRows(PRIOR_AUTUMN_OTHER_YEAR, { Robin: 60 })
+			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 60 })
 		]);
 		expect(
-			anySeason.find((highlight) => highlight.metric === 'encounters')?.scope
-		).toBe('any-season');
-
-		// all-time and any-season beaten by a big autumn day in another year,
-		// but this year's best is beaten
-		const thisYear = derive([
-			...dayRows(SESSION_DATE, { Robin: 74 }),
-			...dayRows(PRIOR_AUTUMN_OTHER_YEAR, { Robin: 100 }),
-			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 60 }),
-			...dayRows(PRIOR_THIS_SEASON, { Robin: 50 })
-		]);
-		expect(
-			thisYear.find((highlight) => highlight.metric === 'encounters')?.scope
+			highlights.find((highlight) => highlight.metric === 'encounters')?.scope
 		).toBe('this-year');
 	});
 
@@ -267,12 +251,13 @@ describe('deriveSessionTotalRecords', () => {
 		).toEqual([]);
 	});
 
-	it('ignores ties in narrower scopes', () => {
-		// all-time beaten, any-season tied — the tie is not reportable there
+	it('ignores a this-year tie', () => {
+		// all-time beaten by a prior-year day; this year's best merely ties the
+		// session, which is not a this-year record
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
 			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 100 }),
-			...dayRows(PRIOR_AUTUMN_OTHER_YEAR, { Robin: 74 })
+			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 74 })
 		]);
 		expect(
 			highlights.filter((highlight) => highlight.metric === 'encounters')
@@ -286,7 +271,7 @@ describe('deriveSessionTotalRecords', () => {
 		);
 	});
 
-	it('marks the session year and season current when today falls within them', () => {
+	it('marks the session year current when today falls within it', () => {
 		const highlights = derive(
 			[
 				...dayRows(SESSION_DATE, { Robin: 74 }),
@@ -297,8 +282,7 @@ describe('deriveSessionTotalRecords', () => {
 		expect(highlights).toContainEqual(
 			expect.objectContaining({
 				metric: 'encounters',
-				isCurrentYear: true,
-				isCurrentSeason: true
+				isCurrentYear: true
 			})
 		);
 	});
@@ -469,11 +453,8 @@ function makeHighlight(
 		metric: 'encounters' as const,
 		scope: 'all-time' as const,
 		value: 74,
-		seasonName: 'autumn',
 		year: 2024,
 		isCurrentYear: false,
-		isCurrentSeason: false,
-		seasonPeriodLabel: 'autumn 2024',
 		...overrides
 	};
 	return {
@@ -501,12 +482,6 @@ describe('render — session-total-record', () => {
 		);
 	});
 
-	it('renders any-season busiest copy', () => {
-		expect(renderedText(makeHighlight({ scope: 'any-season' }))).toBe(
-			'Busiest autumn session ever — 74 birds'
-		);
-	});
-
 	it('renders this-year busiest copy as "this year" for a current-year session', () => {
 		expect(
 			renderedText(makeHighlight({ scope: 'this-year', isCurrentYear: true }))
@@ -517,32 +492,6 @@ describe('render — session-total-record', () => {
 		expect(renderedText(makeHighlight({ scope: 'this-year' }))).toBe(
 			'Busiest session of 2024 — 74 birds'
 		);
-	});
-
-	it('renders this-season busiest copy as "this <season>" for a current-season session', () => {
-		expect(
-			renderedText(
-				makeHighlight({ scope: 'this-season', isCurrentSeason: true })
-			)
-		).toBe('Busiest session this autumn — 74 birds');
-	});
-
-	it('renders this-season busiest copy with the season period for a past session', () => {
-		expect(renderedText(makeHighlight({ scope: 'this-season' }))).toBe(
-			'Busiest session of autumn 2024 — 74 birds'
-		);
-	});
-
-	it('renders past winter copy with the split-year label', () => {
-		expect(
-			renderedText(
-				makeHighlight({
-					scope: 'this-season',
-					seasonName: 'winter',
-					seasonPeriodLabel: 'winter 2023/24'
-				})
-			)
-		).toBe('Busiest session of winter 2023/24 — 74 birds');
 	});
 
 	it('renders most-varied copy for the species metric', () => {
@@ -600,8 +549,7 @@ function deriveSpecies(
 
 describe('deriveSpeciesRecords', () => {
 	it('reports the broadest scope achieved per species', () => {
-		// All-time beaten: prior autumn (any-season) had 5, but a summer day also had 5
-		// Session has 10, so it beats all-time
+		// Two prior days had 5; the session has 10, so it beats the all-time record
 		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
 			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 5),
@@ -715,15 +663,15 @@ describe('deriveSpeciesRecords', () => {
 		});
 	});
 
-	it('ignores ties in narrower scopes', () => {
-		// all-time placements blocked by three days at the top value,
-		// any-season tied — the tie is not reportable there
+	it('ignores a this-year tie', () => {
+		// all-time placements blocked by three days at the top value; this year
+		// merely ties the session — a tie is not reportable in this-year
 		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
 			speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 20),
 			speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 20),
 			speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 20),
-			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 10) // any-season tie
+			speciesRow(PRIOR_THIS_SEASON, REED_WARBLER, 10) // this-year tie (2024)
 		]);
 		expect(highlights).toHaveLength(0);
 	});
@@ -737,8 +685,8 @@ describe('deriveSpeciesRecords', () => {
 		expect(highlights).toHaveLength(0);
 	});
 
-	it('sets current-period flags from the injected today', () => {
-		// today during the session period: isCurrentYear and isCurrentSeason both true
+	it('sets the current-year flag from the injected today', () => {
+		// today during the session year: isCurrentYear true
 		const highlights = deriveSpecies(
 			[
 				speciesRow(SESSION_DATE, REED_WARBLER, 10),
@@ -749,8 +697,7 @@ describe('deriveSpeciesRecords', () => {
 		expect(highlights).toContainEqual(
 			expect.objectContaining({
 				speciesName: REED_WARBLER,
-				isCurrentYear: true,
-				isCurrentSeason: true
+				isCurrentYear: true
 			})
 		);
 	});
@@ -845,7 +792,7 @@ describe('deriveSpeciesRecords', () => {
 				})
 			);
 			expect(highlights).toContainEqual(
-				expect.objectContaining({ scope: 'any-season', value: 8 })
+				expect.objectContaining({ scope: 'this-year', value: 8 })
 			);
 		});
 
@@ -871,7 +818,7 @@ describe('deriveSpeciesRecords', () => {
 				speciesRow(PRIOR_THIS_SEASON, REED_WARBLER, 5)
 			]);
 			expect(highlights).toHaveLength(1);
-			expect(highlights[0]).toMatchObject({ scope: 'any-season', value: 8 });
+			expect(highlights[0]).toMatchObject({ scope: 'this-year', value: 8 });
 			expect(highlights[0].placementRank).toBeUndefined();
 		});
 
@@ -941,11 +888,8 @@ function makeSpeciesHighlight(
 		speciesName: 'Reed Warbler',
 		scope: 'all-time' as const,
 		value: 12,
-		seasonName: 'autumn',
 		year: 2024,
 		isCurrentYear: false,
-		isCurrentSeason: false,
-		seasonPeriodLabel: 'autumn 2024',
 		...overrides
 	};
 	return {
@@ -962,12 +906,6 @@ describe('render — species-count-record', () => {
 		);
 	});
 
-	it('renders any-season copy', () => {
-		expect(renderedText(makeSpeciesHighlight({ scope: 'any-season' }))).toBe(
-			'Record day for Reed Warbler — 12 caught, the most in any autumn'
-		);
-	});
-
 	it('renders current-year this-year copy ("this year")', () => {
 		expect(
 			renderedText(
@@ -979,34 +917,6 @@ describe('render — species-count-record', () => {
 	it('renders past-year this-year copy ("of 2024")', () => {
 		expect(renderedText(makeSpeciesHighlight({ scope: 'this-year' }))).toBe(
 			'Record day for Reed Warbler — 12 caught, the most in 2024'
-		);
-	});
-
-	it('renders current-season this-season copy ("this autumn")', () => {
-		expect(
-			renderedText(
-				makeSpeciesHighlight({ scope: 'this-season', isCurrentSeason: true })
-			)
-		).toBe('Record day for Reed Warbler — 12 caught, the most this autumn');
-	});
-
-	it('renders past-period this-season copy ("in autumn 2024")', () => {
-		expect(renderedText(makeSpeciesHighlight({ scope: 'this-season' }))).toBe(
-			'Record day for Reed Warbler — 12 caught, the most in autumn 2024'
-		);
-	});
-
-	it('renders past winter copy ("in winter 2023/24")', () => {
-		expect(
-			renderedText(
-				makeSpeciesHighlight({
-					scope: 'this-season',
-					seasonName: 'winter',
-					seasonPeriodLabel: 'winter 2023/24'
-				})
-			)
-		).toBe(
-			'Record day for Reed Warbler — 12 caught, the most in winter 2023/24'
 		);
 	});
 
@@ -1921,11 +1831,8 @@ describe('render — combined-session-total-record', () => {
 		sortValue: 0,
 		encounterValue: 120,
 		speciesValue: 15,
-		seasonName: 'summer',
 		year: 2026,
-		isCurrentYear: true,
-		isCurrentSeason: true,
-		seasonPeriodLabel: 'summer 2026'
+		isCurrentYear: true
 	};
 
 	it('renders this-year copy for a current-year session', () => {
@@ -1937,12 +1844,6 @@ describe('render — combined-session-total-record', () => {
 	it('renders all-time copy', () => {
 		expect(renderedText({ ...combinedFields, scope: 'all-time' })).toBe(
 			'Busiest and most varied session ever — 120 birds from 15 species'
-		);
-	});
-
-	it('renders any-season copy with the season name', () => {
-		expect(renderedText({ ...combinedFields, scope: 'any-season' })).toBe(
-			'Busiest and most varied summer session ever — 120 birds from 15 species'
 		);
 	});
 });
@@ -1991,11 +1892,8 @@ describe('render — combined-species-count-record', () => {
 	const combinedFields = {
 		type: 'combined-species-count-record' as const,
 		sortValue: 0,
-		seasonName: 'summer',
 		year: 2026,
-		isCurrentYear: true,
-		isCurrentSeason: true,
-		seasonPeriodLabel: 'summer 2026'
+		isCurrentYear: true
 	};
 
 	it('renders three this-year species with commas and a trailing "and"', () => {
@@ -2030,27 +1928,6 @@ describe('render — combined-species-count-record', () => {
 				speciesNames: ['Blue Tit', 'Wren']
 			})
 		).toBe('Highest Blue Tit and Wren counts of 2024');
-	});
-
-	it('renders this-season copy for a current-season session', () => {
-		expect(
-			renderedText({
-				...combinedFields,
-				scope: 'this-season',
-				speciesNames: ['Robin', 'Dunnock']
-			})
-		).toBe('Highest Robin and Dunnock counts this summer');
-	});
-
-	it('renders the absolute season label for a past-season session', () => {
-		expect(
-			renderedText({
-				...combinedFields,
-				scope: 'this-season',
-				isCurrentSeason: false,
-				speciesNames: ['Robin', 'Dunnock']
-			})
-		).toBe('Highest Robin and Dunnock counts of summer 2026');
 	});
 });
 

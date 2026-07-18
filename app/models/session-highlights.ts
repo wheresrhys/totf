@@ -4,12 +4,6 @@ import {
 	isBefore,
 	subMonths
 } from 'date-fns';
-import {
-	getSeasonMonths,
-	getSeasonName,
-	getSeasonPeriodLabel,
-	isCurrentSeasonPeriod
-} from '@/app/models/seasons';
 import type {
 	StatsPerDayAndSpeciesResult,
 	LongAbsenceRetrapsResult
@@ -19,12 +13,7 @@ export const SESSION_TOTAL_METRICS = ['encounters', 'species'] as const;
 export type SessionTotalMetric = (typeof SESSION_TOTAL_METRICS)[number];
 
 // Broadest first — a record is reported at the broadest scope it holds
-export const RECORD_SCOPES = [
-	'all-time',
-	'any-season',
-	'this-year',
-	'this-season'
-] as const;
+export const RECORD_SCOPES = ['all-time', 'this-year'] as const;
 export type RecordScope = (typeof RECORD_SCOPES)[number];
 
 // Scopes ranked broadest-first (all-time = 0). Used by the narrower-scope
@@ -41,7 +30,7 @@ export const SCOPE_BREADTH_RANK = new Map(
 // (a whole-session measure outranks a single-species one), so session measures
 // for a recent period can outrank a single-species record over a broader one.
 //
-// Temporal points: all-time 4, any-season 3, this-year 2, this-season 1.
+// Temporal points: all-time 2, this-year 1.
 function temporalPoints(scope: RecordScope): number {
 	return RECORD_SCOPES.length - SCOPE_BREADTH_RANK.get(scope)!;
 }
@@ -58,7 +47,7 @@ export function scopedSortValue(
 }
 
 // Non-scoped families sort below every scoped record (min scoped value is
-// this-season single-species = 2.01), in a fixed editorial order spaced so the
+// this-year single-species = 2.01), in a fixed editorial order spaced so the
 // combine increment cannot collide across families.
 export const TRAILING_SORT_VALUES = {
 	'since-comparison': 1.0,
@@ -95,13 +84,10 @@ export type SessionTotalRecordHighlight = {
 	metric: SessionTotalMetric;
 	scope: RecordScope;
 	value: number;
-	seasonName: string;
 	year: number;
-	// 'this year' / 'this autumn' copy is only correct while the session's
-	// period is still current; otherwise the sentence uses the absolute labels
+	// 'this year' copy is only correct while the session's year is still current;
+	// otherwise the sentence uses the absolute year
 	isCurrentYear: boolean;
-	isCurrentSeason: boolean;
-	seasonPeriodLabel: string;
 	// Set only for all-time ties where the equalled record is over a year old
 	recordEqualledYearsAgo?: number;
 };
@@ -112,13 +98,10 @@ export type SpeciesCountRecordHighlight = {
 	speciesName: string;
 	scope: RecordScope;
 	value: number;
-	seasonName: string;
 	year: number;
-	// 'this year' / 'this autumn' copy is only correct while the session's
-	// period is still current; otherwise the sentence uses the absolute labels
+	// 'this year' copy is only correct while the session's year is still current;
+	// otherwise the sentence uses the absolute year
 	isCurrentYear: boolean;
-	isCurrentSeason: boolean;
-	seasonPeriodLabel: string;
 	// Set only for all-time ties where the equalled record is over a year old
 	recordEqualledYearsAgo?: number;
 	// Set only for all-time placements: 1 for a tie with the current record
@@ -226,11 +209,8 @@ export type CombinedSessionTotalRecordHighlight = {
 	scope: RecordScope;
 	encounterValue: number;
 	speciesValue: number;
-	seasonName: string;
 	year: number;
 	isCurrentYear: boolean;
-	isCurrentSeason: boolean;
-	seasonPeriodLabel: string;
 };
 
 // Multiple "Only <species> records of the year" highlights merged by the
@@ -271,24 +251,21 @@ export type CombinedFirstOfYearHighlight = {
 	isCurrentYear: boolean;
 };
 
-// Multiple "Record day for <species> — N caught, the most this year/season"
-// highlights over the *same* scope (this-year or this-season only) merged by
-// the machine's combine pass into one "Highest A, B and C counts of the year"
-// line. Drops the per-species count; keeps the shared period fields so the
-// renderer can phrase the scope. Broader scopes (all-time, any-season) never
-// merge — their copy is per-species (placements, "the most ever").
+// Multiple "Record day for <species> — N caught, the most this year"
+// highlights (all this-year scope) merged by the machine's combine pass into
+// one "Highest A, B and C counts of the year" line. Drops the per-species
+// count; keeps the shared year fields so the renderer can phrase the scope.
+// The all-time scope never merges — its copy is per-species (placements,
+// "the most ever").
 export type CombinedSpeciesCountRecordHighlight = {
 	type: 'combined-species-count-record';
 	sortValue: number;
-	// Only the current-period scopes carry combinable per-species copy
-	scope: 'this-year' | 'this-season';
+	// Only the this-year scope carries combinable per-species copy
+	scope: 'this-year';
 	// Species names in the order the source highlights appeared
 	speciesNames: string[];
-	seasonName: string;
 	year: number;
 	isCurrentYear: boolean;
-	isCurrentSeason: boolean;
-	seasonPeriodLabel: string;
 };
 
 // The discriminated union the highlight machine's passes and the client
@@ -346,17 +323,9 @@ function getScopeMatcher(
 	switch (scope) {
 		case 'all-time':
 			return () => true;
-		case 'any-season': {
-			const seasonMonths = getSeasonMonths(sessionDate, false) as number[];
-			return (date) => seasonMonths.includes(Number(date.slice(5, 7)));
-		}
 		case 'this-year': {
 			const yearPrefix = `${sessionDate.getFullYear()}-`;
 			return (date) => date.startsWith(yearPrefix);
-		}
-		case 'this-season': {
-			const seasonYearMonths = getSeasonMonths(sessionDate, true) as string[];
-			return (date) => seasonYearMonths.includes(date.slice(0, 7));
 		}
 	}
 }
@@ -395,11 +364,8 @@ export function deriveSessionTotalRecords({
 				metric,
 				scope,
 				value: sessionValue,
-				seasonName: getSeasonName(sessionDate),
 				year: sessionDate.getFullYear(),
-				isCurrentYear: sessionDate.getFullYear() === today.getFullYear(),
-				isCurrentSeason: isCurrentSeasonPeriod(sessionDate, today),
-				seasonPeriodLabel: getSeasonPeriodLabel(sessionDate)
+				isCurrentYear: sessionDate.getFullYear() === today.getFullYear()
 			} satisfies SessionTotalRecordHighlight;
 			if (sessionValue > bestOtherValue) {
 				highlights.push(baseHighlight);
@@ -590,11 +556,8 @@ export function deriveSpeciesRecords({
 	if (sessionRows.length === 0) return [];
 
 	const sharedFields = {
-		seasonName: getSeasonName(sessionDate),
 		year: sessionDate.getFullYear(),
-		isCurrentYear: sessionDate.getFullYear() === today.getFullYear(),
-		isCurrentSeason: isCurrentSeasonPeriod(sessionDate, today),
-		seasonPeriodLabel: getSeasonPeriodLabel(sessionDate)
+		isCurrentYear: sessionDate.getFullYear() === today.getFullYear()
 	};
 
 	const highlights: SpeciesCountRecordHighlight[] = [];

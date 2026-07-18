@@ -11,11 +11,8 @@ vi.mock('@/app/actions/session-highlights', () => ({
 // renders them in the given order, so the exact sortValue is immaterial here.
 const periodFields = {
 	sortValue: 0,
-	seasonName: 'autumn',
 	year: 2024,
-	isCurrentYear: false,
-	isCurrentSeason: false,
-	seasonPeriodLabel: 'autumn 2024'
+	isCurrentYear: false
 } as const;
 
 // The action returns plain highlight data; the component renders each element
@@ -30,11 +27,10 @@ const mockHighlights: SessionHighlight[] = [
 	{
 		type: 'session-total-record',
 		metric: 'species',
-		scope: 'this-season',
+		scope: 'this-year',
 		value: 18,
 		...periodFields,
-		isCurrentYear: true,
-		isCurrentSeason: true
+		isCurrentYear: true
 	}
 ];
 
@@ -92,7 +88,7 @@ describe('SessionHighlights', () => {
 		expect(items.length).toBe(2);
 		expect(items[0].textContent).toBe('Busiest session ever — 74 birds');
 		expect(items[1].textContent).toBe(
-			'Most varied session this autumn — 18 species'
+			'Most varied session this year — 18 species'
 		);
 	});
 
@@ -315,110 +311,5 @@ describe('SessionHighlights', () => {
 			.querySelectorAll('li');
 		expect(items.length).toBe(1);
 		expect(items[0].textContent).toBe('Heaviest Blue Tit ever weighed — 13.1g');
-	});
-
-	describe('season preposition', () => {
-		it('renders session-total-record past season with "of"', async () => {
-			const highlight: SessionHighlight = {
-				type: 'session-total-record',
-				metric: 'encounters',
-				scope: 'this-season',
-				value: 74,
-				...periodFields,
-				isCurrentSeason: false
-			};
-			const { fetchSessionHighlights } =
-				await import('@/app/actions/session-highlights');
-			vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
-			render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
-			await waitFor(() => {
-				expect(
-					screen.getByRole('heading', { name: 'Highlights' })
-				).toBeDefined();
-			});
-			const items = screen
-				.getByTestId('session-highlights')
-				.querySelectorAll('li');
-			expect(items[0].textContent).toBe(
-				'Busiest session of autumn 2024 — 74 birds'
-			);
-		});
-
-		it('renders combined-session-total-record past season with "of"', async () => {
-			const highlight: SessionHighlight = {
-				type: 'combined-session-total-record',
-				scope: 'this-season',
-				encounterValue: 74,
-				speciesValue: 18,
-				...periodFields,
-				isCurrentSeason: false
-			};
-			const { fetchSessionHighlights } =
-				await import('@/app/actions/session-highlights');
-			vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
-			render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
-			await waitFor(() => {
-				expect(
-					screen.getByRole('heading', { name: 'Highlights' })
-				).toBeDefined();
-			});
-			const items = screen
-				.getByTestId('session-highlights')
-				.querySelectorAll('li');
-			expect(items[0].textContent).toBe(
-				'Busiest and most varied session of autumn 2024 — 74 birds from 18 species'
-			);
-		});
-
-		it('renders combined-species-count-record past season with "of"', async () => {
-			const highlight: SessionHighlight = {
-				type: 'combined-species-count-record',
-				scope: 'this-season',
-				speciesNames: ['Blackcap', 'Wren'],
-				...periodFields,
-				isCurrentSeason: false
-			};
-			const { fetchSessionHighlights } =
-				await import('@/app/actions/session-highlights');
-			vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
-			render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
-			await waitFor(() => {
-				expect(
-					screen.getByRole('heading', { name: 'Highlights' })
-				).toBeDefined();
-			});
-			const items = screen
-				.getByTestId('session-highlights')
-				.querySelectorAll('li');
-			expect(items[0].textContent).toBe(
-				'Highest Blackcap and Wren counts of autumn 2024'
-			);
-		});
-
-		it('renders species-count-record past season with "in" (unchanged)', async () => {
-			const highlight: SessionHighlight = {
-				type: 'species-count-record',
-				speciesName: 'Reed Warbler',
-				scope: 'this-season',
-				value: 12,
-				...periodFields,
-				isCurrentSeason: false
-			};
-			const { fetchSessionHighlights } =
-				await import('@/app/actions/session-highlights');
-			vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
-			render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
-			await waitFor(() => {
-				expect(
-					screen.getByRole('heading', { name: 'Highlights' })
-				).toBeDefined();
-			});
-			const items = screen
-				.getByTestId('session-highlights')
-				.querySelectorAll('li');
-			expect(items[0].textContent).toBe(
-				'Record day for Reed Warbler — 12 caught, the most in autumn 2024'
-			);
-		});
 	});
 });

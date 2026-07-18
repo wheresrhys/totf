@@ -47,11 +47,8 @@ export function combineSessionTotalRecords(
 				scope: highlight.scope,
 				encounterValue: highlight.value,
 				speciesValue: species.value,
-				seasonName: highlight.seasonName,
 				year: highlight.year,
-				isCurrentYear: highlight.isCurrentYear,
-				isCurrentSeason: highlight.isCurrentSeason,
-				seasonPeriodLabel: highlight.seasonPeriodLabel
+				isCurrentYear: highlight.isCurrentYear
 			};
 			result.push(combined);
 			continue;
