@@ -24,100 +24,91 @@ export const SCOPE_BREADTH_RANK = new Map(
 
 // --- Highlight sort value ---
 //
-// Every highlight carries an explicit `sortValue`; the machine's final rule
-// simply sorts by it (higher first). A scoped record's value is the sum of its
-// temporal breadth (how far back the record reaches) and its conceptual breadth
-// (a whole-session measure outranks a single-species one), so session measures
-// for a recent period can outrank a single-species record over a broader one.
-//
+// Every highlight carries an explicit `sortValue`: a two-part key
+// `{ family, orderWithinFamily }`. The machine's final rule sorts by family
+// first — the fixed editorial priority in HIGHLIGHT_FAMILIES, earlier = higher —
+// then by `orderWithinFamily` (higher first) to order highlights sharing a
+// family. Family separation is structural: a family always outranks every family
+// listed after it, whatever `orderWithinFamily` values arise, so there are no
+// numeric bands to keep disjoint.
+
+// Families in editorial priority order, highest first. An "only ever" record
+// (the species' sole record in the data) heads the list, then plain first-ever,
+// rare-species and long-absence-retrap — all promoted above scoped records —
+// then the scoped records themselves, then the trailing context families.
+export const HIGHLIGHT_FAMILIES = [
+	'only-ever-species',
+	'first-ever-species',
+	'rare-species',
+	'long-absence-retrap',
+	'scoped-record',
+	'since-comparison',
+	'first-of-year-species',
+	'weight-record'
+] as const;
+export type HighlightFamily = (typeof HIGHLIGHT_FAMILIES)[number];
+
+export type SortValue = {
+	family: HighlightFamily;
+	// Orders highlights within one family, higher first. Fixed single-member
+	// families leave this 0; scoped records use their scope×concept value
+	// (scopedOrderWithinFamily); a combined line bumps it above the parts it
+	// absorbed (combinedSortValue).
+	orderWithinFamily: number;
+};
+
+// Builds the sortValue for a family whose members share one rank — the fixed
+// leading/trailing families, each with a single highlight type.
+export function familySortValue(family: HighlightFamily): SortValue {
+	return { family, orderWithinFamily: 0 };
+}
+
 // Temporal points: all-time 2, this-year 1.
 function temporalPoints(scope: RecordScope): number {
 	return RECORD_SCOPES.length - SCOPE_BREADTH_RANK.get(scope)!;
 }
 
+// A scoped record's order within the 'scoped-record' family: the sum of its
+// temporal breadth (how far back the record reaches) and its conceptual breadth
+// (a whole-session measure outranks a single-species one), so session measures
+// for a recent period can outrank a single-species record over a broader one.
 // Conceptual points: session total (busiest) 3, session variety (most varied) 2,
 // single-species 1. A tiny fraction of the conceptual points is folded in so that
 // session measures win an equal-sum tie (e.g. busiest this-year beats a
 // single-species all-time record) without relying on derivation order.
-export function scopedSortValue(
+export function scopedOrderWithinFamily(
 	scope: RecordScope,
 	conceptualPoints: number
 ): number {
 	return temporalPoints(scope) + conceptualPoints + conceptualPoints / 100;
 }
 
-// Non-scoped families don't earn a value from scope + concept the way records
-// do; instead each sits in a fixed editorial priority, either above every scoped
-// record (LEADING — promoted to head the list) or below every scoped record
-// (TRAILING). Rather than hand-pick magic numbers, we list each band's families
-// in priority order and space them off the scoped range, so the "always above /
-// always below a record" guarantee is enforced here rather than trusted to
-// comments. Spacing is wide enough that a heavily merged line (combined value =
-// base + combine increment per extra part) never crosses into a neighbour.
-
-// The scoped band a record's sortValue can occupy. Floor: this-year
-// single-species (1 + 1 + 0.01). Ceiling: a combined all-time busiest+most-varied
-// record (2 + 3 + 0.03, plus one combine increment) — comfortably under 6.
-const SCOPED_FLOOR = scopedSortValue('this-year', 1);
-const SCOPED_CEILING = 6;
-// Wider than any realistic combine increment, so merged lines stay in their band.
-const FAMILY_SPACING = 1;
-
-// Turns an ordered family list into a lookup of explicit sortValues, priority
-// descending (first family highest). Every value clears `boundary` by at least
-// one spacing step; `above` puts the whole band over the scoped ceiling, else
-// under the scoped floor. Within a band, sortValue always decreases with the
-// list index, so list order is the reported order.
-function familySortValues<Family extends string>(
-	families: readonly Family[],
-	boundary: number,
-	above: boolean
-): Record<Family, number> {
-	return Object.fromEntries(
-		families.map((family, index) => {
-			const stepsFromBoundary = above ? families.length - index : -(index + 1);
-			return [family, boundary + stepsFromBoundary * FAMILY_SPACING];
-		})
-	) as Record<Family, number>;
+export function scopedSortValue(
+	scope: RecordScope,
+	conceptualPoints: number
+): SortValue {
+	return {
+		family: 'scoped-record',
+		orderWithinFamily: scopedOrderWithinFamily(scope, conceptualPoints)
+	};
 }
-
-// Promoted above every scoped record, highest priority first: an "only ever"
-// record (the species' sole record in the data) outranks a plain first-ever,
-// then rare-species, then long-absence-retrap.
-const LEADING_FAMILIES = [
-	'only-ever-species',
-	'first-ever-species',
-	'rare-species',
-	'long-absence-retrap'
-] as const;
-export const LEADING_SORT_VALUES = familySortValues(
-	LEADING_FAMILIES,
-	SCOPED_CEILING,
-	true
-);
-
-// The remaining non-scoped families sort below every scoped record, highest
-// priority first.
-const TRAILING_FAMILIES = [
-	'since-comparison',
-	'first-of-year-species',
-	'weight-record'
-] as const;
-export const TRAILING_SORT_VALUES = familySortValues(
-	TRAILING_FAMILIES,
-	SCOPED_FLOOR,
-	false
-);
 
 // Combining bumps the merged line above the parts it absorbed, by a step that
 // grows with how many highlights were merged — a session with many merged
-// records ranks its combined line higher.
+// records ranks its combined line higher. Every part of a combine shares a
+// family, so the merged line inherits it and stays within that family.
 export const COMBINE_INCREMENT = 0.1;
-export function combinedSortValue(components: { sortValue: number }[]): number {
-	return (
-		Math.max(...components.map((component) => component.sortValue)) +
-		COMBINE_INCREMENT * (components.length - 1)
-	);
+export function combinedSortValue(
+	components: { sortValue: SortValue }[]
+): SortValue {
+	return {
+		family: components[0].sortValue.family,
+		orderWithinFamily:
+			Math.max(
+				...components.map((component) => component.sortValue.orderWithinFamily)
+			) +
+			COMBINE_INCREMENT * (components.length - 1)
+	};
 }
 
 // Everything needed to compare a session against the group's history,
@@ -131,7 +122,7 @@ export type SessionStatsData = {
 
 export type SessionTotalRecordHighlight = {
 	type: 'session-total-record';
-	sortValue: number;
+	sortValue: SortValue;
 	metric: SessionTotalMetric;
 	scope: RecordScope;
 	value: number;
@@ -145,7 +136,7 @@ export type SessionTotalRecordHighlight = {
 
 export type SpeciesCountRecordHighlight = {
 	type: 'species-count-record';
-	sortValue: number;
+	sortValue: SortValue;
 	speciesName: string;
 	scope: RecordScope;
 	value: number;
@@ -164,7 +155,7 @@ export type SpeciesCountRecordHighlight = {
 
 export type FirstEverSpeciesHighlight = {
 	type: 'first-ever-species';
-	sortValue: number;
+	sortValue: SortValue;
 	speciesName: string;
 	// More than one encounter of the species this session — 'record' vs 'records'
 	multipleIndividualsRecorded: boolean;
@@ -175,7 +166,7 @@ export type FirstEverSpeciesHighlight = {
 
 export type FirstOfYearSpeciesHighlight = {
 	type: 'first-of-year-species';
-	sortValue: number;
+	sortValue: SortValue;
 	speciesName: string;
 	year: number;
 	// 'of the year' copy is only correct while the session's year is current;
@@ -195,7 +186,7 @@ export const MAX_RARE_SPECIES_SESSION_DAYS = 3;
 
 export type RareSpeciesHighlight = {
 	type: 'rare-species';
-	sortValue: number;
+	sortValue: SortValue;
 	speciesName: string;
 	// Distinct session days the species has ever been recorded on (2–3 here;
 	// a count of 1 is a first-ever appearance, handled elsewhere)
@@ -204,7 +195,7 @@ export type RareSpeciesHighlight = {
 
 export type LongAbsenceRetrapHighlight = {
 	type: 'long-absence-retrap';
-	sortValue: number;
+	sortValue: SortValue;
 	ringNo: string;
 	speciesName: string;
 	// ISO date string of the previous encounter (e.g. "2021-06-20")
@@ -222,7 +213,7 @@ export type SinceComparisonKind = (typeof SINCE_COMPARISON_KINDS)[number];
 
 export type SinceComparisonHighlight = {
 	type: 'since-comparison';
-	sortValue: number;
+	sortValue: SortValue;
 	kind: SinceComparisonKind;
 	// The session's encounter total
 	value: number;
@@ -238,7 +229,7 @@ export type WeightRecordExtreme = (typeof WEIGHT_RECORD_EXTREMES)[number];
 
 export type WeightRecordHighlight = {
 	type: 'weight-record';
-	sortValue: number;
+	sortValue: SortValue;
 	speciesName: string;
 	extreme: WeightRecordExtreme;
 	// The session's weight for this extreme, in grams
@@ -256,7 +247,7 @@ export type WeightRecordHighlight = {
 // line. Carries the value for each metric plus the shared period fields.
 export type CombinedSessionTotalRecordHighlight = {
 	type: 'combined-session-total-record';
-	sortValue: number;
+	sortValue: SortValue;
 	scope: RecordScope;
 	encounterValue: number;
 	speciesValue: number;
@@ -269,7 +260,7 @@ export type CombinedSessionTotalRecordHighlight = {
 // only-of-year variant (isOnlyRecord) — first-of-year items are never merged.
 export type CombinedOnlyOfYearHighlight = {
 	type: 'combined-only-of-year';
-	sortValue: number;
+	sortValue: SortValue;
 	// Species names in the order the source highlights appeared
 	speciesNames: string[];
 	year: number;
@@ -283,7 +274,7 @@ export type CombinedOnlyOfYearHighlight = {
 // copy is always plural ("records") even if every part was singular.
 export type CombinedFirstEverHighlight = {
 	type: 'combined-first-ever';
-	sortValue: number;
+	sortValue: SortValue;
 	// Species names in the order the source highlights appeared
 	speciesNames: string[];
 };
@@ -295,7 +286,7 @@ export type CombinedFirstEverHighlight = {
 // first-ever, the combined copy is always plural.
 export type CombinedFirstOfYearHighlight = {
 	type: 'combined-first-of-year';
-	sortValue: number;
+	sortValue: SortValue;
 	// Species names in the order the source highlights appeared
 	speciesNames: string[];
 	year: number;
@@ -310,7 +301,7 @@ export type CombinedFirstOfYearHighlight = {
 // "the most ever").
 export type CombinedSpeciesCountRecordHighlight = {
 	type: 'combined-species-count-record';
-	sortValue: number;
+	sortValue: SortValue;
 	// Only the this-year scope carries combinable per-species copy
 	scope: 'this-year';
 	// Species names in the order the source highlights appeared
@@ -498,7 +489,7 @@ export function deriveSinceHighlights({
 	if (busiestSinceDate !== undefined && isOverAMonthBefore(busiestSinceDate)) {
 		candidates.push({
 			type: 'since-comparison',
-			sortValue: TRAILING_SORT_VALUES['since-comparison'],
+			sortValue: familySortValue('since-comparison'),
 			kind: 'busiest',
 			value: sessionValue,
 			sinceDate: busiestSinceDate
@@ -510,7 +501,7 @@ export function deriveSinceHighlights({
 		if (priorDays.length > 0) {
 			candidates.push({
 				type: 'since-comparison',
-				sortValue: TRAILING_SORT_VALUES['since-comparison'],
+				sortValue: familySortValue('since-comparison'),
 				kind: 'quietest',
 				value: sessionValue
 			});
@@ -518,7 +509,7 @@ export function deriveSinceHighlights({
 	} else if (isOverAMonthBefore(quietestSinceDate)) {
 		candidates.push({
 			type: 'since-comparison',
-			sortValue: TRAILING_SORT_VALUES['since-comparison'],
+			sortValue: familySortValue('since-comparison'),
 			kind: 'quietest',
 			value: sessionValue,
 			sinceDate: quietestSinceDate
@@ -724,9 +715,9 @@ export function deriveFirstEverSpecies({
 			return {
 				type: 'first-ever-species' as const,
 				// An "only ever" record heads the list, above a plain first-ever
-				sortValue: isOnlyRecord
-					? LEADING_SORT_VALUES['only-ever-species']
-					: LEADING_SORT_VALUES['first-ever-species'],
+				sortValue: familySortValue(
+					isOnlyRecord ? 'only-ever-species' : 'first-ever-species'
+				),
 				speciesName: sessionRow.species_name,
 				multipleIndividualsRecorded: sessionRow.encounter_count > 1,
 				isOnlyRecord
@@ -775,7 +766,7 @@ export function deriveFirstOfYearSpecies({
 		})
 		.map((sessionRow) => ({
 			type: 'first-of-year-species' as const,
-			sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
+			sortValue: familySortValue('first-of-year-species'),
 			speciesName: sessionRow.species_name,
 			year,
 			isCurrentYear: year === today.getFullYear(),
@@ -826,7 +817,7 @@ export function deriveRareSpecies({
 		)
 		.map(({ sessionRow, speciesDays }) => ({
 			type: 'rare-species' as const,
-			sortValue: LEADING_SORT_VALUES['rare-species'],
+			sortValue: familySortValue('rare-species'),
 			speciesName: sessionRow.species_name,
 			totalSessionDays: speciesDays.size
 		}));
@@ -851,7 +842,7 @@ export function deriveLongAbsenceRetraps(
 		const gapMonths = duration.months ?? 0;
 		return {
 			type: 'long-absence-retrap',
-			sortValue: LEADING_SORT_VALUES['long-absence-retrap'],
+			sortValue: familySortValue('long-absence-retrap'),
 			ringNo: result.ring_no,
 			speciesName: result.species_name,
 			previousDate: result.previous_date,
@@ -929,7 +920,7 @@ export function deriveWeightRecordBreakers({
 			if (placement) {
 				highlights.push({
 					type: 'weight-record',
-					sortValue: TRAILING_SORT_VALUES['weight-record'],
+					sortValue: familySortValue('weight-record'),
 					speciesName: sessionRow.species_name,
 					extreme,
 					weight: sessionWeight,

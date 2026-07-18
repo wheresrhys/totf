@@ -12,9 +12,8 @@ import {
 } from '..';
 import {
 	combinedSortValue,
+	familySortValue,
 	scopedSortValue,
-	LEADING_SORT_VALUES,
-	TRAILING_SORT_VALUES,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
 	type LongAbsenceRetrapHighlight,
@@ -72,7 +71,7 @@ function firstOfYear(
 ): FirstOfYearSpeciesHighlight {
 	return {
 		type: 'first-of-year-species',
-		sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
+		sortValue: familySortValue('first-of-year-species'),
 		speciesName,
 		year: 2026,
 		isCurrentYear: true,
@@ -88,9 +87,9 @@ function firstEver(
 ): FirstEverSpeciesHighlight {
 	return {
 		type: 'first-ever-species',
-		sortValue: isOnlyRecord
-			? LEADING_SORT_VALUES['only-ever-species']
-			: LEADING_SORT_VALUES['first-ever-species'],
+		sortValue: familySortValue(
+			isOnlyRecord ? 'only-ever-species' : 'first-ever-species'
+		),
 		speciesName,
 		multipleIndividualsRecorded,
 		isOnlyRecord
@@ -99,34 +98,34 @@ function firstEver(
 
 const busiestSince: SinceComparisonHighlight = {
 	type: 'since-comparison',
-	sortValue: TRAILING_SORT_VALUES['since-comparison'],
+	sortValue: familySortValue('since-comparison'),
 	kind: 'busiest',
 	value: 120,
 	sinceDate: '2025-09-06'
 };
 const quietestSince: SinceComparisonHighlight = {
 	type: 'since-comparison',
-	sortValue: TRAILING_SORT_VALUES['since-comparison'],
+	sortValue: familySortValue('since-comparison'),
 	kind: 'quietest',
 	value: 3,
 	sinceDate: '2023-09-14'
 };
 const firstEverSpecies: FirstEverSpeciesHighlight = {
 	type: 'first-ever-species',
-	sortValue: LEADING_SORT_VALUES['first-ever-species'],
+	sortValue: familySortValue('first-ever-species'),
 	speciesName: 'Firecrest',
 	multipleIndividualsRecorded: false,
 	isOnlyRecord: false
 };
 const rareSpecies: RareSpeciesHighlight = {
 	type: 'rare-species',
-	sortValue: LEADING_SORT_VALUES['rare-species'],
+	sortValue: familySortValue('rare-species'),
 	speciesName: 'Wryneck',
 	totalSessionDays: 2
 };
 const longAbsenceRetrap: LongAbsenceRetrapHighlight = {
 	type: 'long-absence-retrap',
-	sortValue: LEADING_SORT_VALUES['long-absence-retrap'],
+	sortValue: familySortValue('long-absence-retrap'),
 	ringNo: 'ARRETRAP',
 	speciesName: 'Robin',
 	previousDate: '2021-06-20',
@@ -135,7 +134,7 @@ const longAbsenceRetrap: LongAbsenceRetrapHighlight = {
 };
 const weightRecord: WeightRecordHighlight = {
 	type: 'weight-record',
-	sortValue: TRAILING_SORT_VALUES['weight-record'],
+	sortValue: familySortValue('weight-record'),
 	speciesName: 'Blue Tit',
 	extreme: 'heaviest',
 	weight: 13.1,
