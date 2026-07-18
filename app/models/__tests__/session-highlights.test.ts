@@ -9,7 +9,7 @@ import {
 	deriveSpeciesRecords,
 	deriveWeightRecordBreakers,
 	scopedSortValue,
-	TRAILING_SORT_VALUES,
+	familySortValue,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
 	type LongAbsenceRetrapHighlight,
@@ -340,7 +340,7 @@ describe('deriveSinceHighlights', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'since-comparison',
-				sortValue: TRAILING_SORT_VALUES['since-comparison'],
+				sortValue: familySortValue('since-comparison'),
 				kind: 'busiest',
 				value: 41,
 				sinceDate: PRIOR_SUMMER_THIS_YEAR
@@ -357,7 +357,7 @@ describe('deriveSinceHighlights', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'since-comparison',
-			sortValue: TRAILING_SORT_VALUES['since-comparison'],
+			sortValue: familySortValue('since-comparison'),
 			kind: 'quietest',
 			value: 3,
 			sinceDate: PRIOR_SUMMER_THIS_YEAR
@@ -379,7 +379,7 @@ describe('deriveSinceHighlights', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'since-comparison',
-				sortValue: TRAILING_SORT_VALUES['since-comparison'],
+				sortValue: familySortValue('since-comparison'),
 				kind: 'quietest',
 				value: 5,
 				sinceDate: PRIOR_SUMMER_THIS_YEAR
@@ -404,7 +404,7 @@ describe('deriveSinceHighlights', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'since-comparison',
-			sortValue: TRAILING_SORT_VALUES['since-comparison'],
+			sortValue: familySortValue('since-comparison'),
 			kind: 'quietest',
 			value: 3
 		});
@@ -437,7 +437,7 @@ describe('deriveSinceHighlights', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'since-comparison',
-				sortValue: TRAILING_SORT_VALUES['since-comparison'],
+				sortValue: familySortValue('since-comparison'),
 				kind: 'busiest',
 				value: 20,
 				sinceDate: PRIOR_SUMMER_OTHER_YEAR
@@ -1001,7 +1001,7 @@ describe('deriveFirstEverSpecies', () => {
 		// Firecrest appears for the first time on the session date
 		expect(highlights).toContainEqual({
 			type: 'first-ever-species',
-			sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+			sortValue: familySortValue('first-ever-species'),
 			speciesName: FIRECREST,
 			multipleIndividualsRecorded: false,
 			isOnlyRecord: false
@@ -1018,7 +1018,7 @@ describe('deriveFirstEverSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-ever-species',
-				sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+				sortValue: familySortValue('only-ever-species'),
 				speciesName: FIRECREST,
 				multipleIndividualsRecorded: true,
 				isOnlyRecord: true
@@ -1035,7 +1035,7 @@ describe('deriveFirstEverSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-ever-species',
-				sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+				sortValue: familySortValue('first-ever-species'),
 				speciesName: FIRECREST,
 				multipleIndividualsRecorded: true,
 				isOnlyRecord: false
@@ -1092,7 +1092,7 @@ describe('deriveFirstOfYearSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-of-year-species',
-				sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
+				sortValue: familySortValue('first-of-year-species'),
 				speciesName: FIRECREST,
 				year: 2024,
 				isCurrentYear: false,
@@ -1113,7 +1113,7 @@ describe('deriveFirstOfYearSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-of-year-species',
-				sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
+				sortValue: familySortValue('first-of-year-species'),
 				speciesName: FIRECREST,
 				year: 2024,
 				isCurrentYear: false,
@@ -1133,7 +1133,7 @@ describe('deriveFirstOfYearSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-of-year-species',
-				sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
+				sortValue: familySortValue('first-of-year-species'),
 				speciesName: FIRECREST,
 				year: 2024,
 				isCurrentYear: false,
@@ -1208,7 +1208,7 @@ describe('deriveRareSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'rare-species',
-				sortValue: TRAILING_SORT_VALUES['rare-species'],
+				sortValue: familySortValue('rare-species'),
 				speciesName: FIRECREST,
 				totalSessionDays: 2
 			}
@@ -1224,7 +1224,7 @@ describe('deriveRareSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'rare-species',
-				sortValue: TRAILING_SORT_VALUES['rare-species'],
+				sortValue: familySortValue('rare-species'),
 				speciesName: FIRECREST,
 				totalSessionDays: 3
 			}
@@ -1292,7 +1292,7 @@ function makeRareSpeciesHighlight(
 ): RareSpeciesHighlight {
 	return {
 		type: 'rare-species',
-		sortValue: TRAILING_SORT_VALUES['rare-species'],
+		sortValue: familySortValue('rare-species'),
 		speciesName: FIRECREST,
 		totalSessionDays: 2,
 		...overrides
@@ -1320,7 +1320,7 @@ function makeFirstEverHighlight(
 ): FirstEverSpeciesHighlight {
 	return {
 		type: 'first-ever-species',
-		sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+		sortValue: familySortValue('first-ever-species'),
 		speciesName: 'Firecrest',
 		multipleIndividualsRecorded: false,
 		isOnlyRecord: false,
@@ -1368,7 +1368,7 @@ function makeFirstOfYearHighlight(
 ): FirstOfYearSpeciesHighlight {
 	return {
 		type: 'first-of-year-species',
-		sortValue: TRAILING_SORT_VALUES['first-of-year-species'],
+		sortValue: familySortValue('first-of-year-species'),
 		speciesName: 'Firecrest',
 		year: 2024,
 		isCurrentYear: false,
@@ -1473,7 +1473,7 @@ function makeLongAbsenceHighlight(
 ): LongAbsenceRetrapHighlight {
 	return {
 		type: 'long-absence-retrap',
-		sortValue: TRAILING_SORT_VALUES['long-absence-retrap'],
+		sortValue: familySortValue('long-absence-retrap'),
 		ringNo: 'ARRETRAP',
 		speciesName: 'Robin',
 		previousDate: '2021-06-20',
@@ -1541,7 +1541,7 @@ describe('deriveWeightRecordBreakers', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'weight-record',
-			sortValue: TRAILING_SORT_VALUES['weight-record'],
+			sortValue: familySortValue('weight-record'),
 			speciesName: BLUE_TIT,
 			extreme: 'heaviest',
 			weight: 13.1,
@@ -1561,7 +1561,7 @@ describe('deriveWeightRecordBreakers', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'weight-record',
-			sortValue: TRAILING_SORT_VALUES['weight-record'],
+			sortValue: familySortValue('weight-record'),
 			speciesName: BLUE_TIT,
 			extreme: 'lightest',
 			weight: 9.8,
@@ -1582,7 +1582,7 @@ describe('deriveWeightRecordBreakers', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'weight-record',
-			sortValue: TRAILING_SORT_VALUES['weight-record'],
+			sortValue: familySortValue('weight-record'),
 			speciesName: BLUE_TIT,
 			extreme: 'heaviest',
 			weight: 13.1,
@@ -1637,7 +1637,7 @@ describe('deriveWeightRecordBreakers', () => {
 		]);
 		expect(highlights).toContainEqual({
 			type: 'weight-record',
-			sortValue: TRAILING_SORT_VALUES['weight-record'],
+			sortValue: familySortValue('weight-record'),
 			speciesName: BLUE_TIT,
 			extreme: 'heaviest',
 			weight: 13.1,
@@ -1716,7 +1716,7 @@ function makeWeightHighlight(
 ): WeightRecordHighlight {
 	return {
 		type: 'weight-record',
-		sortValue: TRAILING_SORT_VALUES['weight-record'],
+		sortValue: familySortValue('weight-record'),
 		speciesName: BLUE_TIT,
 		extreme: 'heaviest',
 		weight: 13.1,
@@ -1783,7 +1783,7 @@ function makeSinceHighlight(
 ): SinceComparisonHighlight {
 	return {
 		type: 'since-comparison',
-		sortValue: TRAILING_SORT_VALUES['since-comparison'],
+		sortValue: familySortValue('since-comparison'),
 		kind: 'busiest',
 		value: 41,
 		sinceDate: '2023-05-12',
@@ -1828,7 +1828,7 @@ describe('render — combined-session-total-record', () => {
 	const combinedFields = {
 		type: 'combined-session-total-record' as const,
 		// render tests don't depend on ordering; a placeholder value suffices
-		sortValue: 0,
+		sortValue: familySortValue('scoped-record'),
 		encounterValue: 120,
 		speciesValue: 15,
 		year: 2026,
@@ -1853,7 +1853,7 @@ describe('render — combined-only-of-year', () => {
 		expect(
 			renderedText({
 				type: 'combined-only-of-year',
-				sortValue: 0,
+				sortValue: familySortValue('scoped-record'),
 				speciesNames: ['Chaffinch', 'Goldfinch', 'Lesser Whitethroat'],
 				year: 2026,
 				isCurrentYear: true
@@ -1867,7 +1867,7 @@ describe('render — combined-only-of-year', () => {
 		expect(
 			renderedText({
 				type: 'combined-only-of-year',
-				sortValue: 0,
+				sortValue: familySortValue('scoped-record'),
 				speciesNames: ['Chaffinch', 'Goldfinch'],
 				year: 2026,
 				isCurrentYear: true
@@ -1879,7 +1879,7 @@ describe('render — combined-only-of-year', () => {
 		expect(
 			renderedText({
 				type: 'combined-only-of-year',
-				sortValue: 0,
+				sortValue: familySortValue('scoped-record'),
 				speciesNames: ['Chaffinch', 'Goldfinch'],
 				year: 2024,
 				isCurrentYear: false
@@ -1891,7 +1891,7 @@ describe('render — combined-only-of-year', () => {
 describe('render — combined-species-count-record', () => {
 	const combinedFields = {
 		type: 'combined-species-count-record' as const,
-		sortValue: 0,
+		sortValue: familySortValue('scoped-record'),
 		year: 2026,
 		isCurrentYear: true
 	};
@@ -1936,7 +1936,7 @@ describe('render — combined-first-ever', () => {
 		expect(
 			renderedText({
 				type: 'combined-first-ever',
-				sortValue: 0,
+				sortValue: familySortValue('scoped-record'),
 				speciesNames: ['Blackbird', 'Blackcap', "Cetti's Warbler"]
 			})
 		).toBe("First ever Blackbird, Blackcap and Cetti's Warbler records");
@@ -1946,7 +1946,7 @@ describe('render — combined-first-ever', () => {
 		expect(
 			renderedText({
 				type: 'combined-first-ever',
-				sortValue: 0,
+				sortValue: familySortValue('scoped-record'),
 				speciesNames: ['Blackbird', 'Blackcap']
 			})
 		).toBe('First ever Blackbird and Blackcap records');
@@ -1958,7 +1958,7 @@ describe('render — combined-first-ever', () => {
 		expect(
 			renderedText({
 				type: 'combined-first-ever',
-				sortValue: 0,
+				sortValue: familySortValue('scoped-record'),
 				speciesNames: ['Blackbird', 'Blackcap']
 			})
 		).toMatch(/records$/);
@@ -1970,7 +1970,7 @@ describe('render — combined-first-of-year', () => {
 		expect(
 			renderedText({
 				type: 'combined-first-of-year',
-				sortValue: 0,
+				sortValue: familySortValue('scoped-record'),
 				speciesNames: ['Blackbird', 'Blackcap', "Cetti's Warbler"],
 				year: 2026,
 				isCurrentYear: true
@@ -1982,7 +1982,7 @@ describe('render — combined-first-of-year', () => {
 		expect(
 			renderedText({
 				type: 'combined-first-of-year',
-				sortValue: 0,
+				sortValue: familySortValue('scoped-record'),
 				speciesNames: ['Blackbird', 'Blackcap'],
 				year: 2026,
 				isCurrentYear: true
@@ -1994,7 +1994,7 @@ describe('render — combined-first-of-year', () => {
 		expect(
 			renderedText({
 				type: 'combined-first-of-year',
-				sortValue: 0,
+				sortValue: familySortValue('scoped-record'),
 				speciesNames: ['Blackbird', 'Blackcap'],
 				year: 2024,
 				isCurrentYear: false
@@ -2006,7 +2006,7 @@ describe('render — combined-first-of-year', () => {
 		expect(
 			renderedText({
 				type: 'combined-first-of-year',
-				sortValue: 0,
+				sortValue: familySortValue('scoped-record'),
 				speciesNames: ['Blackbird', 'Blackcap'],
 				year: 2026,
 				isCurrentYear: true
