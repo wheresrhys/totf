@@ -13,6 +13,7 @@ import {
 import {
 	combinedSortValue,
 	scopedSortValue,
+	LEADING_SORT_VALUES,
 	TRAILING_SORT_VALUES,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
@@ -87,7 +88,9 @@ function firstEver(
 ): FirstEverSpeciesHighlight {
 	return {
 		type: 'first-ever-species',
-		sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+		sortValue: isOnlyRecord
+			? LEADING_SORT_VALUES['only-ever-species']
+			: LEADING_SORT_VALUES['first-ever-species'],
 		speciesName,
 		multipleIndividualsRecorded,
 		isOnlyRecord
@@ -110,20 +113,20 @@ const quietestSince: SinceComparisonHighlight = {
 };
 const firstEverSpecies: FirstEverSpeciesHighlight = {
 	type: 'first-ever-species',
-	sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+	sortValue: LEADING_SORT_VALUES['first-ever-species'],
 	speciesName: 'Firecrest',
 	multipleIndividualsRecorded: false,
 	isOnlyRecord: false
 };
 const rareSpecies: RareSpeciesHighlight = {
 	type: 'rare-species',
-	sortValue: TRAILING_SORT_VALUES['rare-species'],
+	sortValue: LEADING_SORT_VALUES['rare-species'],
 	speciesName: 'Wryneck',
 	totalSessionDays: 2
 };
 const longAbsenceRetrap: LongAbsenceRetrapHighlight = {
 	type: 'long-absence-retrap',
-	sortValue: TRAILING_SORT_VALUES['long-absence-retrap'],
+	sortValue: LEADING_SORT_VALUES['long-absence-retrap'],
 	ringNo: 'ARRETRAP',
 	speciesName: 'Robin',
 	previousDate: '2021-06-20',
@@ -285,12 +288,14 @@ describe('orderBySortValue (Ord-1)', () => {
 		expect(ordered[0]).toBe(combined);
 	});
 
-	it('sorts the record block, then quietest-since, first/rare/absence, weights last', () => {
+	it('promotes only-ever, first-ever, rare and long-absence above the record block, weights last', () => {
+		const onlyEverSpecies = firstEver('Hoopoe', true);
 		const ordered = orderBySortValue([
 			weightRecord,
 			longAbsenceRetrap,
 			rareSpecies,
 			firstEverSpecies,
+			onlyEverSpecies,
 			quietestSince,
 			speciesCountRecord('Reed Warbler', 'all-time', 67, {
 				placementRank: 2,
@@ -298,13 +303,18 @@ describe('orderBySortValue (Ord-1)', () => {
 			})
 		]);
 		expect(ordered.map((highlight) => highlight.type)).toEqual([
-			'species-count-record',
-			'since-comparison',
-			'first-ever-species',
+			// only-ever heads the list, then first-ever, rare and long-absence,
+			// all above the scoped record block and the trailing since/weight lines
+			'first-ever-species', // Hoopoe — only-ever, top priority
+			'first-ever-species', // Firecrest — plain first-ever
 			'rare-species',
 			'long-absence-retrap',
+			'species-count-record',
+			'since-comparison',
 			'weight-record'
 		]);
+		// the only-ever record is first, ahead of the plain first-ever
+		expect(ordered[0]).toBe(onlyEverSpecies);
 	});
 
 	it('preserves generation order within an equal sort value', () => {

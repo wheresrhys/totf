@@ -9,6 +9,7 @@ import {
 	deriveSpeciesRecords,
 	deriveWeightRecordBreakers,
 	scopedSortValue,
+	LEADING_SORT_VALUES,
 	TRAILING_SORT_VALUES,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
@@ -1001,7 +1002,7 @@ describe('deriveFirstEverSpecies', () => {
 		// Firecrest appears for the first time on the session date
 		expect(highlights).toContainEqual({
 			type: 'first-ever-species',
-			sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+			sortValue: LEADING_SORT_VALUES['first-ever-species'],
 			speciesName: FIRECREST,
 			multipleIndividualsRecorded: false,
 			isOnlyRecord: false
@@ -1018,7 +1019,7 @@ describe('deriveFirstEverSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-ever-species',
-				sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+				sortValue: LEADING_SORT_VALUES['only-ever-species'],
 				speciesName: FIRECREST,
 				multipleIndividualsRecorded: true,
 				isOnlyRecord: true
@@ -1035,7 +1036,7 @@ describe('deriveFirstEverSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'first-ever-species',
-				sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+				sortValue: LEADING_SORT_VALUES['first-ever-species'],
 				speciesName: FIRECREST,
 				multipleIndividualsRecorded: true,
 				isOnlyRecord: false
@@ -1208,7 +1209,7 @@ describe('deriveRareSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'rare-species',
-				sortValue: TRAILING_SORT_VALUES['rare-species'],
+				sortValue: LEADING_SORT_VALUES['rare-species'],
 				speciesName: FIRECREST,
 				totalSessionDays: 2
 			}
@@ -1224,7 +1225,7 @@ describe('deriveRareSpecies', () => {
 		expect(highlights).toEqual([
 			{
 				type: 'rare-species',
-				sortValue: TRAILING_SORT_VALUES['rare-species'],
+				sortValue: LEADING_SORT_VALUES['rare-species'],
 				speciesName: FIRECREST,
 				totalSessionDays: 3
 			}
@@ -1292,7 +1293,7 @@ function makeRareSpeciesHighlight(
 ): RareSpeciesHighlight {
 	return {
 		type: 'rare-species',
-		sortValue: TRAILING_SORT_VALUES['rare-species'],
+		sortValue: LEADING_SORT_VALUES['rare-species'],
 		speciesName: FIRECREST,
 		totalSessionDays: 2,
 		...overrides
@@ -1320,7 +1321,7 @@ function makeFirstEverHighlight(
 ): FirstEverSpeciesHighlight {
 	return {
 		type: 'first-ever-species',
-		sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+		sortValue: LEADING_SORT_VALUES['first-ever-species'],
 		speciesName: 'Firecrest',
 		multipleIndividualsRecorded: false,
 		isOnlyRecord: false,
@@ -1473,7 +1474,7 @@ function makeLongAbsenceHighlight(
 ): LongAbsenceRetrapHighlight {
 	return {
 		type: 'long-absence-retrap',
-		sortValue: TRAILING_SORT_VALUES['long-absence-retrap'],
+		sortValue: LEADING_SORT_VALUES['long-absence-retrap'],
 		ringNo: 'ARRETRAP',
 		speciesName: 'Robin',
 		previousDate: '2021-06-20',

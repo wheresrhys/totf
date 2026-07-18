@@ -46,17 +46,68 @@ export function scopedSortValue(
 	return temporalPoints(scope) + conceptualPoints + conceptualPoints / 100;
 }
 
-// Non-scoped families sort below every scoped record (min scoped value is
-// this-year single-species = 2.01), in a fixed editorial order spaced so the
-// combine increment cannot collide across families.
-export const TRAILING_SORT_VALUES = {
-	'since-comparison': 1.0,
-	'first-ever-species': 0.8,
-	'first-of-year-species': 0.6,
-	'rare-species': 0.4,
-	'long-absence-retrap': 0.2,
-	'weight-record': 0.0
-} as const;
+// Non-scoped families don't earn a value from scope + concept the way records
+// do; instead each sits in a fixed editorial priority, either above every scoped
+// record (LEADING — promoted to head the list) or below every scoped record
+// (TRAILING). Rather than hand-pick magic numbers, we list each band's families
+// in priority order and space them off the scoped range, so the "always above /
+// always below a record" guarantee is enforced here rather than trusted to
+// comments. Spacing is wide enough that a heavily merged line (combined value =
+// base + combine increment per extra part) never crosses into a neighbour.
+
+// The scoped band a record's sortValue can occupy. Floor: this-year
+// single-species (1 + 1 + 0.01). Ceiling: a combined all-time busiest+most-varied
+// record (2 + 3 + 0.03, plus one combine increment) — comfortably under 6.
+const SCOPED_FLOOR = scopedSortValue('this-year', 1);
+const SCOPED_CEILING = 6;
+// Wider than any realistic combine increment, so merged lines stay in their band.
+const FAMILY_SPACING = 1;
+
+// Turns an ordered family list into a lookup of explicit sortValues, priority
+// descending (first family highest). Every value clears `boundary` by at least
+// one spacing step; `above` puts the whole band over the scoped ceiling, else
+// under the scoped floor. Within a band, sortValue always decreases with the
+// list index, so list order is the reported order.
+function familySortValues<Family extends string>(
+	families: readonly Family[],
+	boundary: number,
+	above: boolean
+): Record<Family, number> {
+	return Object.fromEntries(
+		families.map((family, index) => {
+			const stepsFromBoundary = above ? families.length - index : -(index + 1);
+			return [family, boundary + stepsFromBoundary * FAMILY_SPACING];
+		})
+	) as Record<Family, number>;
+}
+
+// Promoted above every scoped record, highest priority first: an "only ever"
+// record (the species' sole record in the data) outranks a plain first-ever,
+// then rare-species, then long-absence-retrap.
+const LEADING_FAMILIES = [
+	'only-ever-species',
+	'first-ever-species',
+	'rare-species',
+	'long-absence-retrap'
+] as const;
+export const LEADING_SORT_VALUES = familySortValues(
+	LEADING_FAMILIES,
+	SCOPED_CEILING,
+	true
+);
+
+// The remaining non-scoped families sort below every scoped record, highest
+// priority first.
+const TRAILING_FAMILIES = [
+	'since-comparison',
+	'first-of-year-species',
+	'weight-record'
+] as const;
+export const TRAILING_SORT_VALUES = familySortValues(
+	TRAILING_FAMILIES,
+	SCOPED_FLOOR,
+	false
+);
 
 // Combining bumps the merged line above the parts it absorbed, by a step that
 // grows with how many highlights were merged — a session with many merged
@@ -662,19 +713,25 @@ export function deriveFirstEverSpecies({
 						row.visit_date < date
 				)
 		)
-		.map((sessionRow) => ({
-			type: 'first-ever-species' as const,
-			sortValue: TRAILING_SORT_VALUES['first-ever-species'],
-			speciesName: sessionRow.species_name,
-			multipleIndividualsRecorded: sessionRow.encounter_count > 1,
+		.map((sessionRow) => {
 			// The species' only records ever — later days revoke this, so a
 			// "first ever" can lose its "only" copy as more data arrives
-			isOnlyRecord: !stats.daySpeciesStats.some(
+			const isOnlyRecord = !stats.daySpeciesStats.some(
 				(row) =>
 					row.species_name === sessionRow.species_name &&
 					row.visit_date !== date
-			)
-		}));
+			);
+			return {
+				type: 'first-ever-species' as const,
+				// An "only ever" record heads the list, above a plain first-ever
+				sortValue: isOnlyRecord
+					? LEADING_SORT_VALUES['only-ever-species']
+					: LEADING_SORT_VALUES['first-ever-species'],
+				speciesName: sessionRow.species_name,
+				multipleIndividualsRecorded: sessionRow.encounter_count > 1,
+				isOnlyRecord
+			};
+		});
 }
 
 // Returns a highlight for each species seen for the first time this calendar
@@ -769,7 +826,7 @@ export function deriveRareSpecies({
 		)
 		.map(({ sessionRow, speciesDays }) => ({
 			type: 'rare-species' as const,
-			sortValue: TRAILING_SORT_VALUES['rare-species'],
+			sortValue: LEADING_SORT_VALUES['rare-species'],
 			speciesName: sessionRow.species_name,
 			totalSessionDays: speciesDays.size
 		}));
@@ -794,7 +851,7 @@ export function deriveLongAbsenceRetraps(
 		const gapMonths = duration.months ?? 0;
 		return {
 			type: 'long-absence-retrap',
-			sortValue: TRAILING_SORT_VALUES['long-absence-retrap'],
+			sortValue: LEADING_SORT_VALUES['long-absence-retrap'],
 			ringNo: result.ring_no,
 			speciesName: result.species_name,
 			previousDate: result.previous_date,
