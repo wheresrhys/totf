@@ -11,7 +11,7 @@ describe('getSeasonMonths', () => {
 		expect(getSeasonMonths(date, false)).toEqual([11, 12, 1, 2, 3]);
 	});
 
-	it('returns YYYY-MM strings for a spring date', () => {
+	it('returns YYYY-MM strings for a summer date', () => {
 		const date = new Date('2024-05-10');
 		expect(getSeasonMonths(date, true)).toEqual([
 			'2024-04',
@@ -45,8 +45,8 @@ describe('getSeasonMonths', () => {
 });
 
 describe('getSeasonPeriodLabel', () => {
-	it('labels a spring date with its calendar year', () => {
-		expect(getSeasonPeriodLabel(new Date('2024-05-10'))).toBe('spring 2024');
+	it('labels a summer date with its calendar year', () => {
+		expect(getSeasonPeriodLabel(new Date('2024-05-10'))).toBe('summer 2024');
 	});
 
 	it('labels an autumn date with its calendar year', () => {
