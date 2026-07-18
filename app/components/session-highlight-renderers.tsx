@@ -4,6 +4,7 @@ import { format as formatDate } from 'date-fns';
 import type {
 	CombinedOnlyOfYearHighlight,
 	CombinedSessionTotalRecordHighlight,
+	CombinedSpeciesCountRecordHighlight,
 	FirstEverSpeciesHighlight,
 	FirstOfYearSpeciesHighlight,
 	LongAbsenceRetrapHighlight,
@@ -120,6 +121,29 @@ function buildCombinedOnlyOfYearSentence(
 		? 'of the year'
 		: `of ${highlight.year}`;
 	return `Only ${speciesList} records ${yearPhrase}`;
+}
+
+// "Highest A, B and C counts of the year" — the single-species "the most this
+// year/season" record copy, folded into one species-list line that drops each
+// per-species count. Year and season each phrase their period the way the
+// standalone record line does (absolute label once the period is past).
+function buildCombinedSpeciesCountRecordSentence(
+	highlight: CombinedSpeciesCountRecordHighlight
+): string {
+	const { speciesNames } = highlight;
+	const speciesList =
+		speciesNames.length === 2
+			? speciesNames.join(' and ')
+			: `${speciesNames.slice(0, -1).join(', ')} and ${speciesNames.at(-1)}`;
+	const periodPhrase =
+		highlight.scope === 'this-year'
+			? highlight.isCurrentYear
+				? 'of the year'
+				: `of ${highlight.year}`
+			: highlight.isCurrentSeason
+				? `this ${highlight.seasonName}`
+				: `in ${highlight.seasonPeriodLabel}`;
+	return `Highest ${speciesList} counts ${periodPhrase}`;
 }
 
 function buildSpeciesCountRecordSentence(
@@ -283,7 +307,9 @@ const HIGHLIGHT_RENDERERS: {
 	'combined-session-total-record': (highlight) =>
 		renderSentence(buildCombinedSessionTotalRecordSentence(highlight)),
 	'combined-only-of-year': (highlight) =>
-		renderSentence(buildCombinedOnlyOfYearSentence(highlight))
+		renderSentence(buildCombinedOnlyOfYearSentence(highlight)),
+	'combined-species-count-record': (highlight) =>
+		renderSentence(buildCombinedSpeciesCountRecordSentence(highlight))
 };
 
 export function renderHighlight(highlight: SessionHighlight): ReactElement {

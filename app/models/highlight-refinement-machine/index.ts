@@ -3,12 +3,14 @@ import { removeBusiestSinceWhenBusiestRecordHeld } from './remove-busiest-since-
 import { removeNarrowerScopeSpeciesRecords } from './remove-narrower-scope-species-records';
 import { combineSessionTotalRecords } from './combine-session-total-records';
 import { combineOnlyOfYearHighlights } from './combine-only-of-year-highlights';
+import { combineYearAndSeasonSpeciesCounts } from './combine-year-and-season-species-counts';
 import { orderBySortValue } from './order-by-sort-value';
 
 export { removeBusiestSinceWhenBusiestRecordHeld } from './remove-busiest-since-when-busiest-record-held';
 export { removeNarrowerScopeSpeciesRecords } from './remove-narrower-scope-species-records';
 export { combineSessionTotalRecords } from './combine-session-total-records';
 export { combineOnlyOfYearHighlights } from './combine-only-of-year-highlights';
+export { combineYearAndSeasonSpeciesCounts } from './combine-year-and-season-species-counts';
 export { orderBySortValue } from './order-by-sort-value';
 
 type HighlightRule = (highlights: SessionHighlight[]) => SessionHighlight[];
@@ -25,6 +27,7 @@ const RULES: HighlightRule[] = [
 	removeNarrowerScopeSpeciesRecords, // Rem-2
 	combineSessionTotalRecords, // Comb-1
 	combineOnlyOfYearHighlights, // Comb-2
+	combineYearAndSeasonSpeciesCounts, // Comb-3
 	orderBySortValue // Ord-1
 ];
 
