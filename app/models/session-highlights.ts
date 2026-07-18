@@ -525,10 +525,29 @@ export function deriveSinceHighlights({
 // place needs fewer than three other days across the top two values. The
 // session must also equal or exceed an included tier value — a count below
 // every other value is not a placement, however thin the history.
+//
+// A 2nd place may be joint (tying other days is still notable, however many
+// days share the value), but a 3rd place is only reported when it is unique —
+// a joint 3rd merely repeats an already-lesser record and isn't worth a line.
+type Placement = { placementRank: 1 | 2 | 3; isJointPlacement: boolean };
+
+// Turns a count of strictly-better other days into a placement. Ties share a
+// rank (they're the same value). A joint 3rd is suppressed — it merely repeats
+// an already-lesser record; joint 1st/2nd stay. Returns null outside the top 3.
+function resolvePlacement(
+	betterDaysCount: number,
+	isJointPlacement: boolean
+): Placement | null {
+	const placementRank = betterDaysCount + 1;
+	if (placementRank > 3) return null;
+	if (placementRank === 3 && isJointPlacement) return null;
+	return { placementRank: placementRank as 1 | 2 | 3, isJointPlacement };
+}
+
 function deriveAllTimePlacement(
 	sessionValue: number,
 	otherValues: number[]
-): { placementRank: 2 | 3; isJointPlacement: boolean } | null {
+): Placement | null {
 	const distinctValuesDescending = [...new Set(otherValues)].sort(
 		(a, b) => b - a
 	);
@@ -547,15 +566,12 @@ function deriveAllTimePlacement(
 	}
 	const minIncludedValue = includedValues.at(-1)!;
 	if (sessionValue < minIncludedValue || sessionValue >= topValue) return null;
-	// The tier rule above means at most two other days can outrank a
-	// qualifying value, so the rank is always 2 or 3
-	const placementRank = (otherValues.filter(
+	// The tier rule above means at most two other days can outrank a qualifying
+	// value, so resolvePlacement always yields a 2nd or 3rd here (never 1st)
+	const betterDays = otherValues.filter(
 		(otherValue) => otherValue > sessionValue
-	).length + 1) as 2 | 3;
-	return {
-		placementRank,
-		isJointPlacement: otherValues.includes(sessionValue)
-	};
+	).length;
+	return resolvePlacement(betterDays, otherValues.includes(sessionValue));
 }
 
 export function deriveSpeciesRecords({
@@ -832,23 +848,19 @@ const MIN_WEIGHED_ENCOUNTERS_FOR_RECORD = 3;
 // Ranks the session's extreme against every other day's extreme (heaviest =
 // larger is better, lightest = smaller is better). Returns null when the
 // session doesn't make the top 3. The rank counts how many other days hold a
-// strictly better extreme, so ties share a rank.
+// strictly better extreme, so ties share a rank. A joint 3rd is suppressed —
+// it merely repeats a lesser record; joint 1st/2nd are still worth reporting.
 function deriveWeightPlacement(
 	sessionWeight: number,
 	otherWeights: number[],
 	isHeaviest: boolean
-): { placementRank: 1 | 2 | 3; isJointPlacement: boolean } | null {
+): Placement | null {
 	const isBetter = (candidate: number, reference: number) =>
 		isHeaviest ? candidate > reference : candidate < reference;
 	const betterDays = otherWeights.filter((weight) =>
 		isBetter(weight, sessionWeight)
 	).length;
-	const placementRank = betterDays + 1;
-	if (placementRank > 3) return null;
-	return {
-		placementRank: placementRank as 1 | 2 | 3,
-		isJointPlacement: otherWeights.includes(sessionWeight)
-	};
+	return resolvePlacement(betterDays, otherWeights.includes(sessionWeight));
 }
 
 // Weight placements are inherently all-time — a species' heaviest/lightest bird
