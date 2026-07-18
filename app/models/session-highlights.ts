@@ -525,6 +525,10 @@ export function deriveSinceHighlights({
 // place needs fewer than three other days across the top two values. The
 // session must also equal or exceed an included tier value — a count below
 // every other value is not a placement, however thin the history.
+//
+// A 2nd place may be joint (tying other days is still notable, however many
+// days share the value), but a 3rd place is only reported when it is unique —
+// a joint 3rd merely repeats an already-lesser record and isn't worth a line.
 function deriveAllTimePlacement(
 	sessionValue: number,
 	otherValues: number[]
@@ -552,10 +556,10 @@ function deriveAllTimePlacement(
 	const placementRank = (otherValues.filter(
 		(otherValue) => otherValue > sessionValue
 	).length + 1) as 2 | 3;
-	return {
-		placementRank,
-		isJointPlacement: otherValues.includes(sessionValue)
-	};
+	const isJointPlacement = otherValues.includes(sessionValue);
+	// A joint 3rd best just repeats an existing 3rd-best day — suppress it
+	if (placementRank === 3 && isJointPlacement) return null;
+	return { placementRank, isJointPlacement };
 }
 
 export function deriveSpeciesRecords({
@@ -832,7 +836,8 @@ const MIN_WEIGHED_ENCOUNTERS_FOR_RECORD = 3;
 // Ranks the session's extreme against every other day's extreme (heaviest =
 // larger is better, lightest = smaller is better). Returns null when the
 // session doesn't make the top 3. The rank counts how many other days hold a
-// strictly better extreme, so ties share a rank.
+// strictly better extreme, so ties share a rank. A joint 3rd is suppressed —
+// it merely repeats a lesser record; joint 1st/2nd are still worth reporting.
 function deriveWeightPlacement(
 	sessionWeight: number,
 	otherWeights: number[],
@@ -845,10 +850,10 @@ function deriveWeightPlacement(
 	).length;
 	const placementRank = betterDays + 1;
 	if (placementRank > 3) return null;
-	return {
-		placementRank: placementRank as 1 | 2 | 3,
-		isJointPlacement: otherWeights.includes(sessionWeight)
-	};
+	const isJointPlacement = otherWeights.includes(sessionWeight);
+	// A joint 3rd best just repeats an existing 3rd-best day — suppress it
+	if (placementRank === 3 && isJointPlacement) return null;
+	return { placementRank: placementRank as 1 | 2 | 3, isJointPlacement };
 }
 
 // Weight placements are inherently all-time — a species' heaviest/lightest bird

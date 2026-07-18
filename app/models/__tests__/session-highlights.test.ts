@@ -801,16 +801,31 @@ describe('deriveSpeciesRecords', () => {
 			});
 		});
 
-		it('reports a joint 3rd-best day when the session ties the 3rd-best value', () => {
+		it('does not report a joint 3rd-best day when the session ties the 3rd-best value', () => {
+			// A joint 3rd merely repeats an already-lesser record — suppressed
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 5),
 				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
 				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 8),
 				speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 5)
 			]);
+			expect(highlights).toHaveLength(0);
+		});
+
+		it('reports a joint 2nd-best day even when many other days share the tied value', () => {
+			// Ties for 2nd stay notable however many days hold the value — only
+			// the top value's day count gates whether 2nd place is reported
+			const highlights = deriveSpecies([
+				speciesRow(SESSION_DATE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 8),
+				speciesRow(PRIOR_THIS_SEASON, REED_WARBLER, 8)
+			]);
 			expect(highlights).toHaveLength(1);
 			expect(highlights[0]).toMatchObject({
-				placementRank: 3,
+				scope: 'all-time',
+				placementRank: 2,
 				isJointPlacement: true
 			});
 		});
@@ -894,18 +909,16 @@ describe('deriveSpeciesRecords', () => {
 			expect(highlights).toHaveLength(0);
 		});
 
-		it('ranks by prior day count, so tying the 2nd value behind two joint-top days is joint 3rd', () => {
+		it('suppresses a joint 3rd when tying the 2nd value behind two joint-top days', () => {
+			// Two joint-top days rank the session 3rd, and it ties another day at
+			// that value — a joint 3rd, so it is suppressed
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 8),
 				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
 				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 10),
 				speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 8)
 			]);
-			expect(highlights).toHaveLength(1);
-			expect(highlights[0]).toMatchObject({
-				placementRank: 3,
-				isJointPlacement: true
-			});
+			expect(highlights).toHaveLength(0);
 		});
 
 		it('reports no placement when the session falls below all existing tier values', () => {
@@ -1047,18 +1060,6 @@ describe('render — species-count-record', () => {
 				})
 			)
 		).toBe('Joint second best day for Reed Warbler ever — 8 birds');
-	});
-
-	it('renders joint third-best placement copy', () => {
-		expect(
-			renderedText(
-				makeSpeciesHighlight({
-					placementRank: 3,
-					isJointPlacement: true,
-					value: 8
-				})
-			)
-		).toBe('Joint third best day for Reed Warbler ever — 8 birds');
 	});
 });
 
@@ -1733,6 +1734,24 @@ describe('deriveWeightRecordBreakers', () => {
 			placementRank: 1,
 			isJointPlacement: true
 		});
+	});
+
+	it('suppresses a joint 3rd placement when two days are heavier and another ties', () => {
+		// Two heavier days rank the session 3rd, and a fourth day matches its
+		// weight — a joint 3rd, which repeats a lesser record and is suppressed
+		const highlights = deriveWeights([
+			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+			weightRow(PRIOR_SUMMER_OTHER_YEAR, BLUE_TIT, {
+				weighedBirds: 3,
+				minWeight: 10.5,
+				maxWeight: 14.0
+			}),
+			weightRow(LATER_DAY, BLUE_TIT, { minWeight: 10.9, maxWeight: 13.8 }),
+			weightRow(LATER_DAY_TWO, BLUE_TIT, { minWeight: 10.8, maxWeight: 13.1 })
+		]);
+		expect(highlights.map((highlight) => highlight.extreme)).not.toContain(
+			'heaviest'
+		);
 	});
 
 	it('counts later days when ranking placements', () => {
