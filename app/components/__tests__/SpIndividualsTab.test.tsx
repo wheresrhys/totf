@@ -35,6 +35,43 @@ describe('SpIndividualsTab', () => {
 		expect(rows?.length).toBe(birds.length);
 	});
 
+	it('renders Wing and Weight range columns', () => {
+		render(
+			<SpIndividualsTab
+				speciesId={1}
+				viewedGroupId={1}
+				birds={birds}
+				birdCount={birds.length}
+			/>
+		);
+		const headers = [...document.querySelectorAll('th')].map(
+			(th) => th.textContent
+		);
+		expect(headers).toContain('Wing');
+		expect(headers).toContain('Weight');
+	});
+
+	it('renders a wing range with its bold parenthesised dominant value', () => {
+		render(
+			<SpIndividualsTab
+				speciesId={1}
+				viewedGroupId={1}
+				birds={birds}
+				birdCount={birds.length}
+			/>
+		);
+		// ARRETRAP has wing lengths 74–80 with a dominant (majority) value of 75.
+		const arretrapRow = [...document.querySelectorAll('tbody tr')].find((row) =>
+			row.textContent?.includes('ARRETRAP')
+		);
+		expect(arretrapRow?.textContent).toContain('74 - 80 (75)');
+		expect(
+			[...(arretrapRow?.querySelectorAll('strong') ?? [])].map(
+				(el) => el.textContent
+			)
+		).toContain('(75)');
+	});
+
 	describe('birdCount prop', () => {
 		it('hides infinite scroll loader when birdCount equals loaded birds', () => {
 			render(
