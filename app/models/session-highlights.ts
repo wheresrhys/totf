@@ -245,6 +245,32 @@ export type CombinedOnlyOfYearHighlight = {
 	isCurrentYear: boolean;
 };
 
+// Multiple "First ever <species> record(s)" highlights merged by the machine's
+// combine pass into one "First ever A, B and C records" line. Only the "First
+// ever" variant merges — "Only <species> records ever" (isOnlyRecord) items are
+// left per-species. A combined line always covers at least two species, so the
+// copy is always plural ("records") even if every part was singular.
+export type CombinedFirstEverHighlight = {
+	type: 'combined-first-ever';
+	sortValue: number;
+	// Species names in the order the source highlights appeared
+	speciesNames: string[];
+};
+
+// Multiple "First <species> record(s) of the year" highlights merged by the
+// machine's combine pass into one "First A, B and C records of the year" line.
+// Only the "First of year" variant merges — the "Only ... of the year"
+// (isOnlyRecord) items combine separately (CombinedOnlyOfYearHighlight). As with
+// first-ever, the combined copy is always plural.
+export type CombinedFirstOfYearHighlight = {
+	type: 'combined-first-of-year';
+	sortValue: number;
+	// Species names in the order the source highlights appeared
+	speciesNames: string[];
+	year: number;
+	isCurrentYear: boolean;
+};
+
 // Multiple "Record day for <species> — N caught, the most this year/season"
 // highlights over the *same* scope (this-year or this-season only) merged by
 // the machine's combine pass into one "Highest A, B and C counts of the year"
@@ -280,6 +306,8 @@ export type SessionHighlight =
 	| WeightRecordHighlight
 	| CombinedSessionTotalRecordHighlight
 	| CombinedOnlyOfYearHighlight
+	| CombinedFirstEverHighlight
+	| CombinedFirstOfYearHighlight
 	| CombinedSpeciesCountRecordHighlight;
 
 type DayTotals = {

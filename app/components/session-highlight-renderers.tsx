@@ -2,6 +2,8 @@
 import type { ReactElement } from 'react';
 import { format as formatDate } from 'date-fns';
 import type {
+	CombinedFirstEverHighlight,
+	CombinedFirstOfYearHighlight,
 	CombinedOnlyOfYearHighlight,
 	CombinedSessionTotalRecordHighlight,
 	CombinedSpeciesCountRecordHighlight,
@@ -106,21 +108,45 @@ function buildCombinedSessionTotalRecordSentence(
 	return `Busiest and most varied session ever — ${valueCopy}`;
 }
 
-// "Only A, B and C records of the year" — a comma list with "and" before the
-// last name. Two names read "A and B"; the plural "records" is fixed because a
-// combined line always covers at least two species.
+// A comma list with "and" before the last name: two names read "A and B",
+// three "A, B and C". Combined highlights always list at least two species.
+function buildSpeciesList(speciesNames: string[]): string {
+	return speciesNames.length === 2
+		? speciesNames.join(' and ')
+		: `${speciesNames.slice(0, -1).join(', ')} and ${speciesNames.at(-1)}`;
+}
+
+// "of the year" while the year is still current; otherwise "of <year>".
+function buildOfYearPhrase(highlight: {
+	isCurrentYear: boolean;
+	year: number;
+}): string {
+	return highlight.isCurrentYear ? 'of the year' : `of ${highlight.year}`;
+}
+
+// "Only A, B and C records of the year" — the plural "records" is fixed because
+// a combined line always covers at least two species.
 function buildCombinedOnlyOfYearSentence(
 	highlight: CombinedOnlyOfYearHighlight
 ): string {
-	const { speciesNames } = highlight;
-	const speciesList =
-		speciesNames.length === 2
-			? speciesNames.join(' and ')
-			: `${speciesNames.slice(0, -1).join(', ')} and ${speciesNames.at(-1)}`;
-	const yearPhrase = highlight.isCurrentYear
-		? 'of the year'
-		: `of ${highlight.year}`;
-	return `Only ${speciesList} records ${yearPhrase}`;
+	return `Only ${buildSpeciesList(highlight.speciesNames)} records ${buildOfYearPhrase(highlight)}`;
+}
+
+// "First ever A, B and C records" — merges multiple singular/plural "First ever
+// <species> record(s)" lines. Always plural "records": a combined line lists at
+// least two species.
+function buildCombinedFirstEverSentence(
+	highlight: CombinedFirstEverHighlight
+): string {
+	return `First ever ${buildSpeciesList(highlight.speciesNames)} records`;
+}
+
+// "First A, B and C records of the year" — merges multiple "First <species>
+// record(s) of the year" lines. Always plural "records" (see first-ever above).
+function buildCombinedFirstOfYearSentence(
+	highlight: CombinedFirstOfYearHighlight
+): string {
+	return `First ${buildSpeciesList(highlight.speciesNames)} records ${buildOfYearPhrase(highlight)}`;
 }
 
 // "Highest A, B and C counts of the year" — the single-species "the most this
@@ -130,16 +156,10 @@ function buildCombinedOnlyOfYearSentence(
 function buildCombinedSpeciesCountRecordSentence(
 	highlight: CombinedSpeciesCountRecordHighlight
 ): string {
-	const { speciesNames } = highlight;
-	const speciesList =
-		speciesNames.length === 2
-			? speciesNames.join(' and ')
-			: `${speciesNames.slice(0, -1).join(', ')} and ${speciesNames.at(-1)}`;
+	const speciesList = buildSpeciesList(highlight.speciesNames);
 	const periodPhrase =
 		highlight.scope === 'this-year'
-			? highlight.isCurrentYear
-				? 'of the year'
-				: `of ${highlight.year}`
+			? buildOfYearPhrase(highlight)
 			: highlight.isCurrentSeason
 				? `this ${highlight.seasonName}`
 				: `in ${highlight.seasonPeriodLabel}`;
@@ -308,6 +328,10 @@ const HIGHLIGHT_RENDERERS: {
 		renderSentence(buildCombinedSessionTotalRecordSentence(highlight)),
 	'combined-only-of-year': (highlight) =>
 		renderSentence(buildCombinedOnlyOfYearSentence(highlight)),
+	'combined-first-ever': (highlight) =>
+		renderSentence(buildCombinedFirstEverSentence(highlight)),
+	'combined-first-of-year': (highlight) =>
+		renderSentence(buildCombinedFirstOfYearSentence(highlight)),
 	'combined-species-count-record': (highlight) =>
 		renderSentence(buildCombinedSpeciesCountRecordSentence(highlight))
 };

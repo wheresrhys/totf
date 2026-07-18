@@ -3,6 +3,8 @@ import { removeBusiestSinceWhenBusiestRecordHeld } from './remove-busiest-since-
 import { removeNarrowerScopeSpeciesRecords } from './remove-narrower-scope-species-records';
 import { combineSessionTotalRecords } from './combine-session-total-records';
 import { combineOnlyOfYearHighlights } from './combine-only-of-year-highlights';
+import { combineFirstEverHighlights } from './combine-first-ever-highlights';
+import { combineFirstOfYearHighlights } from './combine-first-of-year-highlights';
 import { combineYearAndSeasonSpeciesCounts } from './combine-year-and-season-species-counts';
 import { orderBySortValue } from './order-by-sort-value';
 
@@ -10,6 +12,8 @@ export { removeBusiestSinceWhenBusiestRecordHeld } from './remove-busiest-since-
 export { removeNarrowerScopeSpeciesRecords } from './remove-narrower-scope-species-records';
 export { combineSessionTotalRecords } from './combine-session-total-records';
 export { combineOnlyOfYearHighlights } from './combine-only-of-year-highlights';
+export { combineFirstEverHighlights } from './combine-first-ever-highlights';
+export { combineFirstOfYearHighlights } from './combine-first-of-year-highlights';
 export { combineYearAndSeasonSpeciesCounts } from './combine-year-and-season-species-counts';
 export { orderBySortValue } from './order-by-sort-value';
 
@@ -28,6 +32,8 @@ const RULES: HighlightRule[] = [
 	combineSessionTotalRecords, // Comb-1
 	combineOnlyOfYearHighlights, // Comb-2
 	combineYearAndSeasonSpeciesCounts, // Comb-3
+	combineFirstEverHighlights, // Comb-4
+	combineFirstOfYearHighlights, // Comb-5
 	orderBySortValue // Ord-1
 ];
 
