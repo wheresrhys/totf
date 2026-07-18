@@ -20,8 +20,8 @@ type RowModel = {
 	ringNo: string;
 	encounterCount: number;
 	sex: string;
-	wingRange: MeasurementRange;
-	weightRange: MeasurementRange;
+	wingRange: MeasurementRange | null;
+	weightRange: MeasurementRange | null;
 	firstEncounterDate: Date;
 	lastEncounterDate: Date;
 	lastEncounterAgeCode: string;
@@ -100,7 +100,7 @@ function BirdRow({ model: bird }: { model: RowModel }) {
 		.map((prop) => (
 			<td key={prop}>
 				{rangeColumnProperties.has(prop) ? (
-					<MeasurementRangeCell range={bird[prop] as MeasurementRange} />
+					<MeasurementRangeCell range={bird[prop] as MeasurementRange | null} />
 				) : (
 					cellFormatter(bird[prop as keyof RowModel], prop)
 				)}

@@ -14,52 +14,37 @@ describe('MeasurementRangeCell', () => {
 		cleanup();
 	});
 
-	it('renders nothing for an empty range', () => {
-		const container = renderCell({ kind: 'empty' });
+	it('renders nothing for a null range', () => {
+		const container = renderCell(null);
 		expect(container.textContent).toBe('');
 	});
 
-	it('renders a single value', () => {
-		const container = renderCell({ kind: 'single', value: 67 });
+	it('renders a single value when min = max', () => {
+		const container = renderCell({ min: 67, max: 67 });
 		expect(container.textContent).toBe('67');
 		expect(container.querySelector('strong')).toBeNull();
 	});
 
 	it('renders a plain range', () => {
-		const container = renderCell({ kind: 'range', min: 67, max: 69 });
+		const container = renderCell({ min: 67, max: 69 });
 		expect(container.textContent).toBe('67 - 69');
 		expect(container.querySelector('strong')).toBeNull();
 	});
 
 	it('bolds a dominant value equal to the min endpoint', () => {
-		const container = renderCell({
-			kind: 'range',
-			min: 67,
-			max: 69,
-			dominant: 67
-		});
+		const container = renderCell({ min: 67, max: 69, dominant: 67 });
 		expect(container.textContent).toBe('67 - 69');
 		expect(container.querySelector('strong')?.textContent).toBe('67');
 	});
 
 	it('bolds a dominant value equal to the max endpoint', () => {
-		const container = renderCell({
-			kind: 'range',
-			min: 67,
-			max: 69,
-			dominant: 69
-		});
+		const container = renderCell({ min: 67, max: 69, dominant: 69 });
 		expect(container.textContent).toBe('67 - 69');
 		expect(container.querySelector('strong')?.textContent).toBe('69');
 	});
 
 	it('appends a bold parenthesised dominant value inside the range', () => {
-		const container = renderCell({
-			kind: 'range',
-			min: 67,
-			max: 70,
-			dominant: 69
-		});
+		const container = renderCell({ min: 67, max: 70, dominant: 69 });
 		expect(container.textContent).toBe('67 - 70 (69)');
 		expect(container.querySelector('strong')?.textContent).toBe('(69)');
 	});

@@ -5,14 +5,17 @@
  * See issue #377.
  */
 
-export type MeasurementRange =
-	| { kind: 'empty' }
-	| { kind: 'single'; value: number }
-	| { kind: 'range'; min: number; max: number }
-	// A range with a dominant value that falls outside [min, max] is impossible,
-	// so a dominant value is only ever attached to a range when it equals one of
-	// the endpoints (emphasised endpoint) or sits strictly between them (aside).
-	| { kind: 'range'; min: number; max: number; dominant: number };
+// Every set of measurements maps to a range (min/max); a single measurement, or
+// several equal ones, is simply a range where min === max. Collapsing that to a
+// lone value is a presentational decision (see MeasurementRangeCell), not a
+// property of the data. A dominant value falling outside [min, max] is
+// impossible, so `dominant` only ever equals an endpoint (emphasised endpoint) or
+// sits strictly between them (aside).
+export type MeasurementRange = {
+	min: number;
+	max: number;
+	dominant?: number;
+};
 
 /**
  * Filters an encounter's raw measurement values down to the numbers actually
@@ -36,28 +39,28 @@ function findDominantValue(measurements: number[]): number | null {
 }
 
 /**
- * Summarises a set of measurement values as a range for display. When
+ * Summarises a set of measurement values as a range. Returns null when no
+ * measurements were recorded (there is no range to describe). When
  * `withDominant` is true (used for wing length), a dominant value is attached
- * to ranges where one exists.
+ * where one exists.
  */
 export function deriveMeasurementRange(
 	values: readonly (number | null | undefined)[],
 	{ withDominant = false }: { withDominant?: boolean } = {}
-): MeasurementRange {
+): MeasurementRange | null {
 	const measurements = collectMeasurements(values);
 	if (measurements.length === 0) {
-		return { kind: 'empty' };
+		return null;
 	}
-	const min = Math.min(...measurements);
-	const max = Math.max(...measurements);
-	if (min === max) {
-		return { kind: 'single', value: min };
-	}
+	const range: MeasurementRange = {
+		min: Math.min(...measurements),
+		max: Math.max(...measurements)
+	};
 	if (withDominant) {
 		const dominant = findDominantValue(measurements);
 		if (dominant !== null) {
-			return { kind: 'range', min, max, dominant };
+			range.dominant = dominant;
 		}
 	}
-	return { kind: 'range', min, max };
+	return range;
 }
