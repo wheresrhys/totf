@@ -316,4 +316,109 @@ describe('SessionHighlights', () => {
 		expect(items.length).toBe(1);
 		expect(items[0].textContent).toBe('Heaviest Blue Tit ever weighed — 13.1g');
 	});
+
+	describe('season preposition', () => {
+		it('renders session-total-record past season with "of"', async () => {
+			const highlight: SessionHighlight = {
+				type: 'session-total-record',
+				metric: 'encounters',
+				scope: 'this-season',
+				value: 74,
+				...periodFields,
+				isCurrentSeason: false
+			};
+			const { fetchSessionHighlights } =
+				await import('@/app/actions/session-highlights');
+			vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
+			render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+			await waitFor(() => {
+				expect(
+					screen.getByRole('heading', { name: 'Highlights' })
+				).toBeDefined();
+			});
+			const items = screen
+				.getByTestId('session-highlights')
+				.querySelectorAll('li');
+			expect(items[0].textContent).toBe(
+				'Busiest session of autumn 2024 — 74 birds'
+			);
+		});
+
+		it('renders combined-session-total-record past season with "of"', async () => {
+			const highlight: SessionHighlight = {
+				type: 'combined-session-total-record',
+				scope: 'this-season',
+				encounterValue: 74,
+				speciesValue: 18,
+				...periodFields,
+				isCurrentSeason: false
+			};
+			const { fetchSessionHighlights } =
+				await import('@/app/actions/session-highlights');
+			vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
+			render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+			await waitFor(() => {
+				expect(
+					screen.getByRole('heading', { name: 'Highlights' })
+				).toBeDefined();
+			});
+			const items = screen
+				.getByTestId('session-highlights')
+				.querySelectorAll('li');
+			expect(items[0].textContent).toBe(
+				'Busiest and most varied session of autumn 2024 — 74 birds from 18 species'
+			);
+		});
+
+		it('renders combined-species-count-record past season with "of"', async () => {
+			const highlight: SessionHighlight = {
+				type: 'combined-species-count-record',
+				scope: 'this-season',
+				speciesNames: ['Blackcap', 'Wren'],
+				...periodFields,
+				isCurrentSeason: false
+			};
+			const { fetchSessionHighlights } =
+				await import('@/app/actions/session-highlights');
+			vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
+			render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+			await waitFor(() => {
+				expect(
+					screen.getByRole('heading', { name: 'Highlights' })
+				).toBeDefined();
+			});
+			const items = screen
+				.getByTestId('session-highlights')
+				.querySelectorAll('li');
+			expect(items[0].textContent).toBe(
+				'Highest Blackcap and Wren counts of autumn 2024'
+			);
+		});
+
+		it('renders species-count-record past season with "in" (unchanged)', async () => {
+			const highlight: SessionHighlight = {
+				type: 'species-count-record',
+				speciesName: 'Reed Warbler',
+				scope: 'this-season',
+				value: 12,
+				...periodFields,
+				isCurrentSeason: false
+			};
+			const { fetchSessionHighlights } =
+				await import('@/app/actions/session-highlights');
+			vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
+			render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+			await waitFor(() => {
+				expect(
+					screen.getByRole('heading', { name: 'Highlights' })
+				).toBeDefined();
+			});
+			const items = screen
+				.getByTestId('session-highlights')
+				.querySelectorAll('li');
+			expect(items[0].textContent).toBe(
+				'Record day for Reed Warbler — 12 caught, the most in autumn 2024'
+			);
+		});
+	});
 });

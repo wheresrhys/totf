@@ -42,9 +42,13 @@ type PeriodFields = {
 // Returns null for all-time and any-season, which each family phrases differently.
 // yearPreposition: 'in' for species-count ("the most in 2024"),
 //                  'of' for session-total ("Busiest session of 2024")
+// seasonPreposition: 'in' for species-count ("the most in autumn 2024"),
+//                    'of' for session-total ("Busiest session of autumn 2024")
+//                        and combined-species-count ("Highest Blackcap counts of autumn 2024")
 function buildCurrentPeriodScopePhrase(
 	fields: PeriodFields,
-	yearPreposition: 'in' | 'of' = 'in'
+	yearPreposition: 'in' | 'of' = 'in',
+	seasonPreposition: 'in' | 'of' = 'in'
 ): string | null {
 	switch (fields.scope) {
 		case 'this-year':
@@ -54,7 +58,7 @@ function buildCurrentPeriodScopePhrase(
 		case 'this-season':
 			return fields.isCurrentSeason
 				? `this ${fields.seasonName}`
-				: `in ${fields.seasonPeriodLabel}`;
+				: `${seasonPreposition} ${fields.seasonPeriodLabel}`;
 		default:
 			return null;
 	}
@@ -80,7 +84,11 @@ function buildSessionTotalRecordSentence(
 	if (highlight.recordEqualledYearsAgo !== undefined) {
 		return `${descriptor} session for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)} — ${valueCopy}`;
 	}
-	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight, 'of');
+	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(
+		highlight,
+		'of',
+		'of'
+	);
 	if (currentPeriodPhrase !== null) {
 		return `${descriptor} session ${currentPeriodPhrase} — ${valueCopy}`;
 	}
@@ -98,7 +106,11 @@ function buildCombinedSessionTotalRecordSentence(
 	highlight: CombinedSessionTotalRecordHighlight
 ): string {
 	const valueCopy = `${highlight.encounterValue} birds from ${highlight.speciesValue} species`;
-	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight, 'of');
+	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(
+		highlight,
+		'of',
+		'of'
+	);
 	if (currentPeriodPhrase !== null) {
 		return `Busiest and most varied session ${currentPeriodPhrase} — ${valueCopy}`;
 	}
@@ -162,7 +174,7 @@ function buildCombinedSpeciesCountRecordSentence(
 			? buildOfYearPhrase(highlight)
 			: highlight.isCurrentSeason
 				? `this ${highlight.seasonName}`
-				: `in ${highlight.seasonPeriodLabel}`;
+				: `of ${highlight.seasonPeriodLabel}`;
 	return `Highest ${speciesList} counts ${periodPhrase}`;
 }
 
