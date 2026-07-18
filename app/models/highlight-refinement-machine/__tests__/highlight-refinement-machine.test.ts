@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+	combineFirstEverHighlights,
+	combineFirstOfYearHighlights,
 	combineOnlyOfYearHighlights,
 	combineSessionTotalRecords,
 	combineYearAndSeasonSpeciesCounts,
@@ -67,7 +69,8 @@ function speciesCountRecord(
 
 function firstOfYear(
 	speciesName: string,
-	isOnlyRecord: boolean
+	isOnlyRecord: boolean,
+	multipleIndividualsRecorded = false
 ): FirstOfYearSpeciesHighlight {
 	return {
 		type: 'first-of-year-species',
@@ -75,7 +78,21 @@ function firstOfYear(
 		speciesName,
 		year: 2026,
 		isCurrentYear: true,
-		multipleIndividualsRecorded: false,
+		multipleIndividualsRecorded,
+		isOnlyRecord
+	};
+}
+
+function firstEver(
+	speciesName: string,
+	isOnlyRecord: boolean,
+	multipleIndividualsRecorded = false
+): FirstEverSpeciesHighlight {
+	return {
+		type: 'first-ever-species',
+		sortValue: TRAILING_SORT_VALUES['first-ever-species'],
+		speciesName,
+		multipleIndividualsRecorded,
 		isOnlyRecord
 	};
 }
@@ -527,6 +544,204 @@ describe('combineYearAndSeasonSpeciesCounts (Comb-3)', () => {
 	});
 });
 
+describe('combineFirstEverHighlights (Comb-4)', () => {
+	it('leaves a single first-ever highlight unchanged', () => {
+		const only = firstEver('Firecrest', false);
+		expect(combineFirstEverHighlights([only])).toEqual([only]);
+	});
+
+	it('merges two first-ever highlights into one line listing both species', () => {
+		const combined = combineFirstEverHighlights([
+			firstEver('Blackbird', false),
+			firstEver('Blackcap', false)
+		]);
+		expect(combined).toEqual([
+			{
+				type: 'combined-first-ever',
+				sortValue: combinedSortValue([
+					firstEver('Blackbird', false),
+					firstEver('Blackcap', false)
+				]),
+				speciesNames: ['Blackbird', 'Blackcap']
+			}
+		]);
+	});
+
+	it('merges three first-ever highlights into one line listing all species', () => {
+		const combined = combineFirstEverHighlights([
+			firstEver('Blackbird', false),
+			firstEver('Blackcap', false),
+			firstEver("Cetti's Warbler", false)
+		]);
+		expect(combined).toEqual([
+			{
+				type: 'combined-first-ever',
+				sortValue: combinedSortValue([
+					firstEver('Blackbird', false),
+					firstEver('Blackcap', false),
+					firstEver("Cetti's Warbler", false)
+				]),
+				speciesNames: ['Blackbird', 'Blackcap', "Cetti's Warbler"]
+			}
+		]);
+	});
+
+	it('merges regardless of each part being singular or plural', () => {
+		const combined = combineFirstEverHighlights([
+			firstEver('Blackbird', false, false),
+			firstEver('Blackcap', false, true)
+		]);
+		expect(combined).toEqual([
+			expect.objectContaining({
+				type: 'combined-first-ever',
+				speciesNames: ['Blackbird', 'Blackcap']
+			})
+		]);
+	});
+
+	it('never merges "Only ... ever" (isOnlyRecord) highlights', () => {
+		const firstA = firstEver('Robin', true);
+		const firstB = firstEver('Wren', true);
+		expect(combineFirstEverHighlights([firstA, firstB])).toEqual([
+			firstA,
+			firstB
+		]);
+	});
+
+	it('merges only the first-ever items, leaving "only ever" items in place', () => {
+		const onlyEver = firstEver('Robin', true);
+		const combined = combineFirstEverHighlights([
+			onlyEver,
+			firstEver('Blackbird', false),
+			firstEver('Blackcap', false)
+		]);
+		expect(combined).toEqual([
+			onlyEver,
+			{
+				type: 'combined-first-ever',
+				sortValue: combinedSortValue([
+					firstEver('Blackbird', false),
+					firstEver('Blackcap', false)
+				]),
+				speciesNames: ['Blackbird', 'Blackcap']
+			}
+		]);
+	});
+
+	it('takes the list position of the first first-ever highlight', () => {
+		const combined = combineFirstEverHighlights([
+			firstEver('Blackbird', false),
+			rareSpecies,
+			firstEver('Blackcap', false)
+		]);
+		expect(combined.map((highlight) => highlight.type)).toEqual([
+			'combined-first-ever',
+			'rare-species'
+		]);
+	});
+
+	it('is a noop on unrelated highlights', () => {
+		const pool = [rareSpecies, weightRecord];
+		expect(combineFirstEverHighlights(pool)).toEqual(pool);
+	});
+});
+
+describe('combineFirstOfYearHighlights (Comb-5)', () => {
+	it('leaves a single first-of-year highlight unchanged', () => {
+		const only = firstOfYear('Robin', false);
+		expect(combineFirstOfYearHighlights([only])).toEqual([only]);
+	});
+
+	it('merges two first-of-year highlights into one line listing both species', () => {
+		const combined = combineFirstOfYearHighlights([
+			firstOfYear('Blackbird', false),
+			firstOfYear('Blackcap', false)
+		]);
+		expect(combined).toEqual([
+			{
+				type: 'combined-first-of-year',
+				sortValue: combinedSortValue([
+					firstOfYear('Blackbird', false),
+					firstOfYear('Blackcap', false)
+				]),
+				speciesNames: ['Blackbird', 'Blackcap'],
+				year: 2026,
+				isCurrentYear: true
+			}
+		]);
+	});
+
+	it('merges three first-of-year highlights into one line listing all species', () => {
+		const combined = combineFirstOfYearHighlights([
+			firstOfYear('Blackbird', false),
+			firstOfYear('Blackcap', false),
+			firstOfYear("Cetti's Warbler", false)
+		]);
+		expect(combined).toEqual([
+			{
+				type: 'combined-first-of-year',
+				sortValue: combinedSortValue([
+					firstOfYear('Blackbird', false),
+					firstOfYear('Blackcap', false),
+					firstOfYear("Cetti's Warbler", false)
+				]),
+				speciesNames: ['Blackbird', 'Blackcap', "Cetti's Warbler"],
+				year: 2026,
+				isCurrentYear: true
+			}
+		]);
+	});
+
+	it('merges regardless of each part being singular or plural', () => {
+		const combined = combineFirstOfYearHighlights([
+			firstOfYear('Blackbird', false, false),
+			firstOfYear('Blackcap', false, true)
+		]);
+		expect(combined).toEqual([
+			expect.objectContaining({
+				type: 'combined-first-of-year',
+				speciesNames: ['Blackbird', 'Blackcap']
+			})
+		]);
+	});
+
+	it('never merges "Only ... of the year" (isOnlyRecord) highlights', () => {
+		const onlyA = firstOfYear('Chaffinch', true);
+		const onlyB = firstOfYear('Goldfinch', true);
+		expect(combineFirstOfYearHighlights([onlyA, onlyB])).toEqual([
+			onlyA,
+			onlyB
+		]);
+	});
+
+	it('merges only the first-of-year items, leaving "only of year" items in place', () => {
+		const onlyOfYear = firstOfYear('Chaffinch', true);
+		const combined = combineFirstOfYearHighlights([
+			onlyOfYear,
+			firstOfYear('Blackbird', false),
+			firstOfYear('Blackcap', false)
+		]);
+		expect(combined).toEqual([
+			onlyOfYear,
+			{
+				type: 'combined-first-of-year',
+				sortValue: combinedSortValue([
+					firstOfYear('Blackbird', false),
+					firstOfYear('Blackcap', false)
+				]),
+				speciesNames: ['Blackbird', 'Blackcap'],
+				year: 2026,
+				isCurrentYear: true
+			}
+		]);
+	});
+
+	it('is a noop on unrelated highlights', () => {
+		const pool = [rareSpecies, weightRecord];
+		expect(combineFirstOfYearHighlights(pool)).toEqual(pool);
+	});
+});
+
 // ---- Full machine ----
 
 describe('runHighlightMachine', () => {
@@ -583,6 +798,30 @@ describe('runHighlightMachine', () => {
 			['species-count-record', 'Chiffchaff'], // this-season, 2.01 (lone, unmerged)
 			['combined-only-of-year', 'Chaffinch+Goldfinch+Lesser Whitethroat'], // 0.8
 			['weight-record', 'Blue Tit'] // 0.0
+		]);
+	});
+
+	it('folds first-ever and first-of-year highlights into their own combined lines', () => {
+		const pool: SessionHighlight[] = [
+			firstEver('Blackbird', false),
+			firstEver('Blackcap', false),
+			firstEver("Cetti's Warbler", false),
+			firstOfYear('Chiffchaff', false),
+			firstOfYear('Whitethroat', false),
+			weightRecord
+		];
+		const machined = runHighlightMachine(pool);
+		expect(
+			machined.map((highlight) =>
+				'speciesNames' in highlight
+					? [highlight.type, highlight.speciesNames.join('+')]
+					: [highlight.type]
+			)
+		).toEqual([
+			// first-ever (0.8 + 0.2 = 1.0) above first-of-year (0.6 + 0.1 = 0.7)
+			['combined-first-ever', "Blackbird+Blackcap+Cetti's Warbler"],
+			['combined-first-of-year', 'Chiffchaff+Whitethroat'],
+			['weight-record']
 		]);
 	});
 });

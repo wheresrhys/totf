@@ -2034,3 +2034,87 @@ describe('render — combined-species-count-record', () => {
 		).toBe('Highest Robin and Dunnock counts in summer 2026');
 	});
 });
+
+describe('render — combined-first-ever', () => {
+	it('renders three species with commas and a trailing "and"', () => {
+		expect(
+			renderedText({
+				type: 'combined-first-ever',
+				sortValue: 0,
+				speciesNames: ['Blackbird', 'Blackcap', "Cetti's Warbler"]
+			})
+		).toBe("First ever Blackbird, Blackcap and Cetti's Warbler records");
+	});
+
+	it('renders two species joined by "and"', () => {
+		expect(
+			renderedText({
+				type: 'combined-first-ever',
+				sortValue: 0,
+				speciesNames: ['Blackbird', 'Blackcap']
+			})
+		).toBe('First ever Blackbird and Blackcap records');
+	});
+
+	it('always reads "records" (plural) regardless of the merged parts', () => {
+		// The combined line covers at least two species, so the copy is fixed
+		// plural even when each source highlight was singular
+		expect(
+			renderedText({
+				type: 'combined-first-ever',
+				sortValue: 0,
+				speciesNames: ['Blackbird', 'Blackcap']
+			})
+		).toMatch(/records$/);
+	});
+});
+
+describe('render — combined-first-of-year', () => {
+	it('renders three species with commas and a trailing "and"', () => {
+		expect(
+			renderedText({
+				type: 'combined-first-of-year',
+				sortValue: 0,
+				speciesNames: ['Blackbird', 'Blackcap', "Cetti's Warbler"],
+				year: 2026,
+				isCurrentYear: true
+			})
+		).toBe("First Blackbird, Blackcap and Cetti's Warbler records of the year");
+	});
+
+	it('renders two species joined by "and"', () => {
+		expect(
+			renderedText({
+				type: 'combined-first-of-year',
+				sortValue: 0,
+				speciesNames: ['Blackbird', 'Blackcap'],
+				year: 2026,
+				isCurrentYear: true
+			})
+		).toBe('First Blackbird and Blackcap records of the year');
+	});
+
+	it('renders the absolute year for a past-year session', () => {
+		expect(
+			renderedText({
+				type: 'combined-first-of-year',
+				sortValue: 0,
+				speciesNames: ['Blackbird', 'Blackcap'],
+				year: 2024,
+				isCurrentYear: false
+			})
+		).toBe('First Blackbird and Blackcap records of 2024');
+	});
+
+	it('always reads "records" (plural) regardless of the merged parts', () => {
+		expect(
+			renderedText({
+				type: 'combined-first-of-year',
+				sortValue: 0,
+				speciesNames: ['Blackbird', 'Blackcap'],
+				year: 2026,
+				isCurrentYear: true
+			})
+		).toMatch(/records of the year$/);
+	});
+});
