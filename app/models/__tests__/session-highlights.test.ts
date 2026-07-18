@@ -1967,3 +1967,70 @@ describe('render — combined-only-of-year', () => {
 		).toBe('Only Chaffinch and Goldfinch records of 2024');
 	});
 });
+
+describe('render — combined-species-count-record', () => {
+	const combinedFields = {
+		type: 'combined-species-count-record' as const,
+		sortValue: 0,
+		seasonName: 'spring',
+		year: 2026,
+		isCurrentYear: true,
+		isCurrentSeason: true,
+		seasonPeriodLabel: 'spring 2026'
+	};
+
+	it('renders three this-year species with commas and a trailing "and"', () => {
+		expect(
+			renderedText({
+				...combinedFields,
+				scope: 'this-year',
+				speciesNames: ["Cetti's Warbler", 'Chiffchaff', 'Whitethroat']
+			})
+		).toBe(
+			"Highest Cetti's Warbler, Chiffchaff and Whitethroat counts of the year"
+		);
+	});
+
+	it('renders two this-year species joined by "and"', () => {
+		expect(
+			renderedText({
+				...combinedFields,
+				scope: 'this-year',
+				speciesNames: ['Blue Tit', 'Wren']
+			})
+		).toBe('Highest Blue Tit and Wren counts of the year');
+	});
+
+	it('renders the absolute year for a past-year session', () => {
+		expect(
+			renderedText({
+				...combinedFields,
+				scope: 'this-year',
+				isCurrentYear: false,
+				year: 2024,
+				speciesNames: ['Blue Tit', 'Wren']
+			})
+		).toBe('Highest Blue Tit and Wren counts of 2024');
+	});
+
+	it('renders this-season copy for a current-season session', () => {
+		expect(
+			renderedText({
+				...combinedFields,
+				scope: 'this-season',
+				speciesNames: ['Robin', 'Dunnock']
+			})
+		).toBe('Highest Robin and Dunnock counts this spring');
+	});
+
+	it('renders the absolute season label for a past-season session', () => {
+		expect(
+			renderedText({
+				...combinedFields,
+				scope: 'this-season',
+				isCurrentSeason: false,
+				speciesNames: ['Robin', 'Dunnock']
+			})
+		).toBe('Highest Robin and Dunnock counts in spring 2026');
+	});
+});

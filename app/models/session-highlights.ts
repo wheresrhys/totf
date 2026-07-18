@@ -245,6 +245,26 @@ export type CombinedOnlyOfYearHighlight = {
 	isCurrentYear: boolean;
 };
 
+// Multiple "Record day for <species> — N caught, the most this year/season"
+// highlights over the *same* scope (this-year or this-season only) merged by
+// the machine's combine pass into one "Highest A, B and C counts of the year"
+// line. Drops the per-species count; keeps the shared period fields so the
+// renderer can phrase the scope. Broader scopes (all-time, any-season) never
+// merge — their copy is per-species (placements, "the most ever").
+export type CombinedSpeciesCountRecordHighlight = {
+	type: 'combined-species-count-record';
+	sortValue: number;
+	// Only the current-period scopes carry combinable per-species copy
+	scope: 'this-year' | 'this-season';
+	// Species names in the order the source highlights appeared
+	speciesNames: string[];
+	seasonName: string;
+	year: number;
+	isCurrentYear: boolean;
+	isCurrentSeason: boolean;
+	seasonPeriodLabel: string;
+};
+
 // The discriminated union the highlight machine's passes and the client
 // renderers both operate over. Highlights are plain serializable data so they
 // can cross the server-action -> client boundary; rendering happens client
@@ -259,7 +279,8 @@ export type SessionHighlight =
 	| LongAbsenceRetrapHighlight
 	| WeightRecordHighlight
 	| CombinedSessionTotalRecordHighlight
-	| CombinedOnlyOfYearHighlight;
+	| CombinedOnlyOfYearHighlight
+	| CombinedSpeciesCountRecordHighlight;
 
 type DayTotals = {
 	date: string;
