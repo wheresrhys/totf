@@ -26,11 +26,11 @@ import {
 } from '@/app/models/session-highlights';
 
 const periodFields = {
-	seasonName: 'spring',
+	seasonName: 'summer',
 	year: 2026,
 	isCurrentYear: true,
 	isCurrentSeason: true,
-	seasonPeriodLabel: 'spring 2026'
+	seasonPeriodLabel: 'summer 2026'
 } as const;
 
 function sessionTotalRecord(

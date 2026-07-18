@@ -45,16 +45,16 @@ const PAST_PERIOD_TODAY = new Date('2025-06-01');
 // Comparison days used across tests, chosen for their scope membership
 // relative to SESSION_DATE:
 const PRIOR_AUTUMN_OTHER_YEAR = '2021-09-10'; // any-season only (3+ years ago)
-const PRIOR_SPRING_OTHER_YEAR = '2022-05-01'; // all-time only
-const PRIOR_SPRING_THIS_YEAR = '2024-05-01'; // this-year (and all-time)
+const PRIOR_SUMMER_OTHER_YEAR = '2022-05-01'; // all-time only
+const PRIOR_SUMMER_THIS_YEAR = '2024-05-01'; // this-year (and all-time)
 const PRIOR_THIS_SEASON = '2024-08-20'; // this-season (and all narrower)
 const LATER_DAY = '2024-10-01'; // after the session, but in every scope
 const LATER_DAY_TWO = '2024-10-05';
 const LATER_DAY_THREE = '2024-10-20';
 // Additional all-time-only days for multi-day placement-tier scenarios
-const PRIOR_SPRING_YEAR_ONE = '2021-05-01';
-const PRIOR_SPRING_YEAR_ONE_LATER = '2021-05-15';
-const PRIOR_SPRING_YEAR_THREE = '2023-05-01';
+const PRIOR_SUMMER_YEAR_ONE = '2021-05-01';
+const PRIOR_SUMMER_YEAR_ONE_LATER = '2021-05-15';
+const PRIOR_SUMMER_YEAR_THREE = '2023-05-01';
 
 function dayRows(
 	date: string,
@@ -94,7 +94,7 @@ describe('deriveSessionTotalRecords', () => {
 	it('returns a busiest record when the session total beats all other days in scope', () => {
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 40, Chiffchaff: 34 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, {
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, {
 				Robin: 20,
 				Chiffchaff: 20,
 				Wren: 20
@@ -121,7 +121,7 @@ describe('deriveSessionTotalRecords', () => {
 	it('returns a most-varied record from per-day species counts', () => {
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 1, Chiffchaff: 1, Wren: 1 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 30, Chiffchaff: 30 })
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 30, Chiffchaff: 30 })
 		]);
 		expect(highlights).toContainEqual(
 			expect.objectContaining({
@@ -139,7 +139,7 @@ describe('deriveSessionTotalRecords', () => {
 		// the later day beats the session in every scope — no record
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 60 }),
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 60 }),
 			...dayRows(LATER_DAY, { Robin: 200, Chiffchaff: 200 })
 		]);
 		expect(
@@ -150,7 +150,7 @@ describe('deriveSessionTotalRecords', () => {
 	it('holds a record when later sessions are all lower', () => {
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 60 }),
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 60 }),
 			...dayRows(LATER_DAY, { Robin: 50 })
 		]);
 		expect(highlights).toContainEqual(
@@ -208,7 +208,7 @@ describe('deriveSessionTotalRecords', () => {
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
 			...dayRows(PRIOR_AUTUMN_OTHER_YEAR, { Robin: 60 }),
-			...dayRows(PRIOR_SPRING_THIS_YEAR, { Robin: 50 }),
+			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 50 }),
 			...dayRows(PRIOR_THIS_SEASON, { Robin: 40 })
 		]);
 		const encounterRecords = highlights.filter(
@@ -219,10 +219,10 @@ describe('deriveSessionTotalRecords', () => {
 	});
 
 	it('prefers any-season over this-year and this-year over this-season', () => {
-		// all-time beaten by a big spring day, but best autumn day is beaten
+		// all-time beaten by a big summer day, but best autumn day is beaten
 		const anySeason = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 100 }),
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 100 }),
 			...dayRows(PRIOR_AUTUMN_OTHER_YEAR, { Robin: 60 })
 		]);
 		expect(
@@ -234,7 +234,7 @@ describe('deriveSessionTotalRecords', () => {
 		const thisYear = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
 			...dayRows(PRIOR_AUTUMN_OTHER_YEAR, { Robin: 100 }),
-			...dayRows(PRIOR_SPRING_THIS_YEAR, { Robin: 60 }),
+			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 60 }),
 			...dayRows(PRIOR_THIS_SEASON, { Robin: 50 })
 		]);
 		expect(
@@ -260,7 +260,7 @@ describe('deriveSessionTotalRecords', () => {
 	it('ignores ties under a year old', () => {
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
-			...dayRows(PRIOR_SPRING_THIS_YEAR, { Robin: 74 })
+			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 74 })
 		]);
 		expect(
 			highlights.filter((highlight) => highlight.metric === 'encounters')
@@ -271,7 +271,7 @@ describe('deriveSessionTotalRecords', () => {
 		// all-time beaten, any-season tied — the tie is not reportable there
 		const highlights = derive([
 			...dayRows(SESSION_DATE, { Robin: 74 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 100 }),
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 100 }),
 			...dayRows(PRIOR_AUTUMN_OTHER_YEAR, { Robin: 74 })
 		]);
 		expect(
@@ -290,7 +290,7 @@ describe('deriveSessionTotalRecords', () => {
 		const highlights = derive(
 			[
 				...dayRows(SESSION_DATE, { Robin: 74 }),
-				...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 60 })
+				...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 60 })
 			],
 			new Date('2024-10-20')
 		);
@@ -306,7 +306,7 @@ describe('deriveSessionTotalRecords', () => {
 	it('counts zero-encounter sessions as comparison sessions in scope', () => {
 		const stats: SessionStatsData = {
 			daySpeciesStats: dayRows(SESSION_DATE, { Robin: 74 }),
-			sessionDates: [PRIOR_SPRING_OTHER_YEAR, SESSION_DATE]
+			sessionDates: [PRIOR_SUMMER_OTHER_YEAR, SESSION_DATE]
 		};
 		const highlights = deriveSessionTotalRecords({
 			date: SESSION_DATE,
@@ -344,13 +344,13 @@ function deriveSince(
 describe('deriveSinceHighlights', () => {
 	it('returns busiest-since using the most recent prior session day with an equal-or-higher total', () => {
 		// two prior days at/above the session total; the more recent one
-		// (PRIOR_SPRING_THIS_YEAR) is the since date. A newer, quieter day gives
+		// (PRIOR_SUMMER_THIS_YEAR) is the since date. A newer, quieter day gives
 		// quietest-since a later since date, so busiest wins the earlier-date
 		// tie-break and is the only highlight.
 		const highlights = deriveSince([
 			...dayRows(SESSION_DATE, { Robin: 41 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 50 }),
-			...dayRows(PRIOR_SPRING_THIS_YEAR, { Robin: 45 }),
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 50 }),
+			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 45 }),
 			...dayRows('2024-07-01', { Robin: 10 })
 		]);
 		expect(highlights).toEqual([
@@ -359,7 +359,7 @@ describe('deriveSinceHighlights', () => {
 				sortValue: TRAILING_SORT_VALUES['since-comparison'],
 				kind: 'busiest',
 				value: 41,
-				sinceDate: PRIOR_SPRING_THIS_YEAR
+				sinceDate: PRIOR_SUMMER_THIS_YEAR
 			}
 		]);
 	});
@@ -367,8 +367,8 @@ describe('deriveSinceHighlights', () => {
 	it('returns quietest-since using the most recent prior session day with an equal-or-lower total', () => {
 		const highlights = deriveSince([
 			...dayRows(SESSION_DATE, { Robin: 3 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 1 }),
-			...dayRows(PRIOR_SPRING_THIS_YEAR, { Robin: 2 }),
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 1 }),
+			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 2 }),
 			...dayRows(WITHIN_A_MONTH, { Robin: 40 })
 		]);
 		expect(highlights).toContainEqual({
@@ -376,21 +376,21 @@ describe('deriveSinceHighlights', () => {
 			sortValue: TRAILING_SORT_VALUES['since-comparison'],
 			kind: 'quietest',
 			value: 3,
-			sinceDate: PRIOR_SPRING_THIS_YEAR
+			sinceDate: PRIOR_SUMMER_THIS_YEAR
 		});
 	});
 
 	it('counts zero-encounter session days in quietest comparisons', () => {
-		// PRIOR_SPRING_THIS_YEAR is a zero-encounter session day (no rows) — it
+		// PRIOR_SUMMER_THIS_YEAR is a zero-encounter session day (no rows) — it
 		// undershoots the session and, being the most recent qualifying day, is
 		// the quietest-since date. No prior day reaches the session total, so
 		// busiest is suppressed and only the zero-day-driven quietest is left.
 		const highlights = deriveSince(
 			[
 				...dayRows(SESSION_DATE, { Robin: 5 }),
-				...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 3 })
+				...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 3 })
 			],
-			[PRIOR_SPRING_OTHER_YEAR, PRIOR_SPRING_THIS_YEAR, SESSION_DATE]
+			[PRIOR_SUMMER_OTHER_YEAR, PRIOR_SUMMER_THIS_YEAR, SESSION_DATE]
 		);
 		expect(highlights).toEqual([
 			{
@@ -398,7 +398,7 @@ describe('deriveSinceHighlights', () => {
 				sortValue: TRAILING_SORT_VALUES['since-comparison'],
 				kind: 'quietest',
 				value: 5,
-				sinceDate: PRIOR_SPRING_THIS_YEAR
+				sinceDate: PRIOR_SUMMER_THIS_YEAR
 			}
 		]);
 	});
@@ -406,7 +406,7 @@ describe('deriveSinceHighlights', () => {
 	it('suppresses busiest when no prior day qualifies (duplicate of all-time record)', () => {
 		const highlights = deriveSince([
 			...dayRows(SESSION_DATE, { Robin: 100 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 40 })
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 40 })
 		]);
 		expect(highlights.map((highlight) => highlight.kind)).not.toContain(
 			'busiest'
@@ -416,7 +416,7 @@ describe('deriveSinceHighlights', () => {
 	it('reports quietest-ever when no prior day qualifies and prior sessions exist', () => {
 		const highlights = deriveSince([
 			...dayRows(SESSION_DATE, { Robin: 3 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 40 })
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 40 })
 		]);
 		expect(highlights).toContainEqual({
 			type: 'since-comparison',
@@ -443,12 +443,12 @@ describe('deriveSinceHighlights', () => {
 	});
 
 	it('reports only the comparison with the earlier since date when both qualify', () => {
-		// busiest-since reaches back to the older spring day; quietest-since only
+		// busiest-since reaches back to the older summer day; quietest-since only
 		// to the more recent one — busiest wins
 		const highlights = deriveSince([
 			...dayRows(SESSION_DATE, { Robin: 20 }),
-			...dayRows(PRIOR_SPRING_OTHER_YEAR, { Robin: 30 }),
-			...dayRows(PRIOR_SPRING_THIS_YEAR, { Robin: 10 })
+			...dayRows(PRIOR_SUMMER_OTHER_YEAR, { Robin: 30 }),
+			...dayRows(PRIOR_SUMMER_THIS_YEAR, { Robin: 10 })
 		]);
 		expect(highlights).toEqual([
 			{
@@ -456,7 +456,7 @@ describe('deriveSinceHighlights', () => {
 				sortValue: TRAILING_SORT_VALUES['since-comparison'],
 				kind: 'busiest',
 				value: 20,
-				sinceDate: PRIOR_SPRING_OTHER_YEAR
+				sinceDate: PRIOR_SUMMER_OTHER_YEAR
 			}
 		]);
 	});
@@ -600,12 +600,12 @@ function deriveSpecies(
 
 describe('deriveSpeciesRecords', () => {
 	it('reports the broadest scope achieved per species', () => {
-		// All-time beaten: prior autumn (any-season) had 5, but a spring day also had 5
+		// All-time beaten: prior autumn (any-season) had 5, but a summer day also had 5
 		// Session has 10, so it beats all-time
 		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
 			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 5),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 5)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 5)
 		]);
 		expect(highlights).toHaveLength(1);
 		expect(highlights[0]).toMatchObject({
@@ -620,8 +620,8 @@ describe('deriveSpeciesRecords', () => {
 		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
 			speciesRow(SESSION_DATE, ROBIN, 8),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 5),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, ROBIN, 3)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 5),
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 3)
 		]);
 		const speciesNames = highlights.map((h) => h.speciesName);
 		expect(speciesNames).toContain(REED_WARBLER);
@@ -632,7 +632,7 @@ describe('deriveSpeciesRecords', () => {
 		// Reed Warbler only appears on the session day — no other day, no record
 		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, ROBIN, 3)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 3)
 		]);
 		expect(highlights.map((h) => h.speciesName)).not.toContain(REED_WARBLER);
 	});
@@ -640,7 +640,7 @@ describe('deriveSpeciesRecords', () => {
 	it('demotes the session to a placement when a later day has a higher count', () => {
 		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 5),
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 5),
 			speciesRow(LATER_DAY, REED_WARBLER, 100)
 		]);
 		expect(highlights).toHaveLength(1);
@@ -703,7 +703,7 @@ describe('deriveSpeciesRecords', () => {
 	it('reports an all-time tie under a year old as a joint best day', () => {
 		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
-			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 10) // 2024-05-01 — < 1 year
+			speciesRow(PRIOR_SUMMER_THIS_YEAR, REED_WARBLER, 10) // 2024-05-01 — < 1 year
 		]);
 		expect(highlights).toHaveLength(1);
 		expect(highlights[0]).toMatchObject({
@@ -720,9 +720,9 @@ describe('deriveSpeciesRecords', () => {
 		// any-season tied — the tie is not reportable there
 		const highlights = deriveSpecies([
 			speciesRow(SESSION_DATE, REED_WARBLER, 10),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 20),
-			speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 20),
-			speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 20),
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 20),
+			speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 20),
+			speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 20),
 			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 10) // any-season tie
 		]);
 		expect(highlights).toHaveLength(0);
@@ -742,7 +742,7 @@ describe('deriveSpeciesRecords', () => {
 		const highlights = deriveSpecies(
 			[
 				speciesRow(SESSION_DATE, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 5)
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 5)
 			],
 			new Date('2024-10-20')
 		);
@@ -759,8 +759,8 @@ describe('deriveSpeciesRecords', () => {
 		it('reports a strict 2nd-best day when the session count falls between the two best prior values', () => {
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 8),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 5)
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 5)
 			]);
 			expect(highlights).toHaveLength(1);
 			expect(highlights[0]).toMatchObject({
@@ -776,9 +776,9 @@ describe('deriveSpeciesRecords', () => {
 		it('reports a strict 3rd-best day when the session count falls between the 2nd and 3rd prior values', () => {
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 5),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 8),
-				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 3)
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 3)
 			]);
 			expect(highlights).toHaveLength(1);
 			expect(highlights[0]).toMatchObject({
@@ -790,7 +790,7 @@ describe('deriveSpeciesRecords', () => {
 		it('reports a joint 2nd-best day with no age gate when the session ties a recent 2nd-best value', () => {
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 8),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
 				speciesRow(PRIOR_THIS_SEASON, REED_WARBLER, 8) // < 1 month old
 			]);
 			expect(highlights).toHaveLength(1);
@@ -804,9 +804,9 @@ describe('deriveSpeciesRecords', () => {
 		it('reports a joint 3rd-best day when the session ties the 3rd-best value', () => {
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 5),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 8),
-				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 5)
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 5)
 			]);
 			expect(highlights).toHaveLength(1);
 			expect(highlights[0]).toMatchObject({
@@ -818,7 +818,7 @@ describe('deriveSpeciesRecords', () => {
 		it('reports both an all-time placement and a narrower-scope record for the same species', () => {
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 8),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
 				speciesRow(PRIOR_THIS_SEASON, REED_WARBLER, 3)
 			]);
 			expect(highlights).toHaveLength(2);
@@ -839,10 +839,10 @@ describe('deriveSpeciesRecords', () => {
 			// best but a this-year 2nd place is not a thing
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 8),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 20),
-				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 20),
-				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 20),
-				speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 10)
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 20),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 20),
+				speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 20),
+				speciesRow(PRIOR_SUMMER_THIS_YEAR, REED_WARBLER, 10)
 			]);
 			expect(highlights).toHaveLength(0);
 		});
@@ -850,9 +850,9 @@ describe('deriveSpeciesRecords', () => {
 		it('continues to narrower scopes when the session misses every included placement tier', () => {
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 8),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 20),
-				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 15),
-				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 12),
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 20),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 15),
+				speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 12),
 				speciesRow(PRIOR_THIS_SEASON, REED_WARBLER, 5)
 			]);
 			expect(highlights).toHaveLength(1);
@@ -875,10 +875,10 @@ describe('deriveSpeciesRecords', () => {
 			// session would be rank 4
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 8),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_ONE_LATER, REED_WARBLER, 5)
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE_LATER, REED_WARBLER, 5)
 			]);
 			expect(highlights).toHaveLength(0);
 		});
@@ -886,10 +886,10 @@ describe('deriveSpeciesRecords', () => {
 		it('does not report 3rd place when the top two tiers already cover three prior days', () => {
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 5),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 8),
-				speciesRow(PRIOR_SPRING_YEAR_ONE_LATER, REED_WARBLER, 4)
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 8),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE_LATER, REED_WARBLER, 4)
 			]);
 			expect(highlights).toHaveLength(0);
 		});
@@ -897,9 +897,9 @@ describe('deriveSpeciesRecords', () => {
 		it('ranks by prior day count, so tying the 2nd value behind two joint-top days is joint 3rd', () => {
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 8),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_THREE, REED_WARBLER, 8)
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_THREE, REED_WARBLER, 8)
 			]);
 			expect(highlights).toHaveLength(1);
 			expect(highlights[0]).toMatchObject({
@@ -911,8 +911,8 @@ describe('deriveSpeciesRecords', () => {
 		it('reports no placement when the session falls below all existing tier values', () => {
 			const highlights = deriveSpecies([
 				speciesRow(SESSION_DATE, REED_WARBLER, 5),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 10),
-				speciesRow(PRIOR_SPRING_YEAR_ONE, REED_WARBLER, 8)
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 10),
+				speciesRow(PRIOR_SUMMER_YEAR_ONE, REED_WARBLER, 8)
 			]);
 			expect(highlights).toHaveLength(0);
 		});
@@ -1085,7 +1085,7 @@ describe('deriveFirstEverSpecies', () => {
 			speciesRow(SESSION_DATE, FIRECREST, 1),
 			speciesRow(LATER_DAY, FIRECREST, 2),
 			speciesRow(SESSION_DATE, REED_WARBLER, 3),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 2)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 2)
 		]);
 		// Firecrest appears for the first time on the session date
 		expect(highlights).toContainEqual({
@@ -1102,7 +1102,7 @@ describe('deriveFirstEverSpecies', () => {
 	it('flags isOnlyRecord when the species appears on no other day', () => {
 		const highlights = deriveFirstEver([
 			speciesRow(SESSION_DATE, FIRECREST, 3),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 2)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 2)
 		]);
 		expect(highlights).toEqual([
 			{
@@ -1119,7 +1119,7 @@ describe('deriveFirstEverSpecies', () => {
 		const highlights = deriveFirstEver([
 			speciesRow(SESSION_DATE, FIRECREST, 3),
 			speciesRow(LATER_DAY, FIRECREST, 1),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 2)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 2)
 		]);
 		expect(highlights).toEqual([
 			{
@@ -1144,7 +1144,7 @@ describe('deriveFirstEverSpecies', () => {
 	it('returns empty when no species is new', () => {
 		const highlights = deriveFirstEver([
 			speciesRow(SESSION_DATE, REED_WARBLER, 5),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, REED_WARBLER, 3)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 3)
 		]);
 		expect(highlights).toEqual([]);
 	});
@@ -1173,9 +1173,9 @@ describe('deriveFirstOfYearSpecies', () => {
 		const highlights = deriveFirstOfYear([
 			speciesRow(SESSION_DATE, FIRECREST, 1),
 			speciesRow(LATER_DAY, FIRECREST, 2),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 2),
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 2),
 			speciesRow(SESSION_DATE, REED_WARBLER, 3),
-			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
+			speciesRow(PRIOR_SUMMER_THIS_YEAR, REED_WARBLER, 2)
 		]);
 		// Firecrest was seen in a previous year but not yet this year
 		expect(highlights).toEqual([
@@ -1196,8 +1196,8 @@ describe('deriveFirstOfYearSpecies', () => {
 		// revoke the "only" copy
 		const highlights = deriveFirstOfYear([
 			speciesRow(SESSION_DATE, FIRECREST, 2),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 4),
-			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 4),
+			speciesRow(PRIOR_SUMMER_THIS_YEAR, REED_WARBLER, 2)
 		]);
 		expect(highlights).toEqual([
 			{
@@ -1216,8 +1216,8 @@ describe('deriveFirstOfYearSpecies', () => {
 		const highlights = deriveFirstOfYear([
 			speciesRow(SESSION_DATE, FIRECREST, 2),
 			speciesRow(LATER_DAY, FIRECREST, 1),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 4),
-			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 4),
+			speciesRow(PRIOR_SUMMER_THIS_YEAR, REED_WARBLER, 2)
 		]);
 		expect(highlights).toEqual([
 			{
@@ -1235,7 +1235,7 @@ describe('deriveFirstOfYearSpecies', () => {
 	it('excludes first-ever species — the first-ever highlight covers them', () => {
 		const highlights = deriveFirstOfYear([
 			speciesRow(SESSION_DATE, FIRECREST, 1),
-			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
+			speciesRow(PRIOR_SUMMER_THIS_YEAR, REED_WARBLER, 2)
 		]);
 		expect(highlights).toEqual([]);
 	});
@@ -1244,8 +1244,8 @@ describe('deriveFirstOfYearSpecies', () => {
 		const highlights = deriveFirstOfYear(
 			[
 				speciesRow(SESSION_DATE, FIRECREST, 1),
-				speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 2),
-				speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 2)
+				speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 2),
+				speciesRow(PRIOR_SUMMER_THIS_YEAR, REED_WARBLER, 2)
 			],
 			{ today: new Date('2024-10-01') }
 		);
@@ -1259,7 +1259,7 @@ describe('deriveFirstOfYearSpecies', () => {
 		// first of the year, so suppress all
 		const highlights = deriveFirstOfYear([
 			speciesRow(SESSION_DATE, FIRECREST, 1),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 2)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 2)
 		]);
 		expect(highlights).toEqual([]);
 	});
@@ -1267,7 +1267,7 @@ describe('deriveFirstOfYearSpecies', () => {
 	it('returns empty when every species was already seen this year', () => {
 		const highlights = deriveFirstOfYear([
 			speciesRow(SESSION_DATE, REED_WARBLER, 5),
-			speciesRow(PRIOR_SPRING_THIS_YEAR, REED_WARBLER, 3)
+			speciesRow(PRIOR_SUMMER_THIS_YEAR, REED_WARBLER, 3)
 		]);
 		expect(highlights).toEqual([]);
 	});
@@ -1292,7 +1292,7 @@ describe('deriveRareSpecies', () => {
 	it('highlights a species seen on only two session days ever', () => {
 		const highlights = deriveRare([
 			speciesRow(SESSION_DATE, FIRECREST, 1),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 1)
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 1)
 		]);
 		expect(highlights).toEqual([
 			{
@@ -1307,7 +1307,7 @@ describe('deriveRareSpecies', () => {
 	it('highlights a species seen on exactly three session days ever', () => {
 		const highlights = deriveRare([
 			speciesRow(SESSION_DATE, FIRECREST, 2),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 1),
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 1),
 			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, FIRECREST, 3)
 		]);
 		expect(highlights).toEqual([
@@ -1324,7 +1324,7 @@ describe('deriveRareSpecies', () => {
 		// prior + session + two later = 4 days, above the threshold
 		const highlights = deriveRare([
 			speciesRow(SESSION_DATE, FIRECREST, 1),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 1),
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 1),
 			speciesRow(LATER_DAY, FIRECREST, 1),
 			speciesRow(LATER_DAY_TWO, FIRECREST, 1)
 		]);
@@ -1334,9 +1334,9 @@ describe('deriveRareSpecies', () => {
 	it('excludes a species seen on more than three session days ever', () => {
 		const highlights = deriveRare([
 			speciesRow(SESSION_DATE, FIRECREST, 1),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 1),
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 1),
 			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, FIRECREST, 1),
-			speciesRow(PRIOR_SPRING_THIS_YEAR, FIRECREST, 1)
+			speciesRow(PRIOR_SUMMER_THIS_YEAR, FIRECREST, 1)
 		]);
 		expect(highlights).toEqual([]);
 	});
@@ -1353,7 +1353,7 @@ describe('deriveRareSpecies', () => {
 	it('reports multiple rare species from one session', () => {
 		const highlights = deriveRare([
 			speciesRow(SESSION_DATE, FIRECREST, 1),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, FIRECREST, 1),
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 1),
 			speciesRow(SESSION_DATE, REED_WARBLER, 1),
 			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 1)
 		]);
@@ -1366,9 +1366,9 @@ describe('deriveRareSpecies', () => {
 	it('does not highlight common species', () => {
 		const highlights = deriveRare([
 			speciesRow(SESSION_DATE, ROBIN, 5),
-			speciesRow(PRIOR_SPRING_OTHER_YEAR, ROBIN, 4),
+			speciesRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 4),
 			speciesRow(PRIOR_AUTUMN_OTHER_YEAR, ROBIN, 3),
-			speciesRow(PRIOR_SPRING_THIS_YEAR, ROBIN, 6)
+			speciesRow(PRIOR_SUMMER_THIS_YEAR, ROBIN, 6)
 		]);
 		expect(highlights).toEqual([]);
 	});
@@ -1622,7 +1622,7 @@ describe('deriveWeightRecordBreakers', () => {
 	it('ranks the heaviest bird 1st when its max beats every other day', () => {
 		const highlights = deriveWeights([
 			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
-			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+			weightRow(PRIOR_SUMMER_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 3,
 				minWeight: 10.5,
 				maxWeight: 13.0
@@ -1642,7 +1642,7 @@ describe('deriveWeightRecordBreakers', () => {
 	it('ranks the lightest bird 1st when its min beats every other day', () => {
 		const highlights = deriveWeights([
 			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 9.8, maxWeight: 12 }),
-			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+			weightRow(PRIOR_SUMMER_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 3,
 				minWeight: 10.2,
 				maxWeight: 13.0
@@ -1662,7 +1662,7 @@ describe('deriveWeightRecordBreakers', () => {
 	it('reports a 2nd-heaviest placement when one other day is heavier', () => {
 		const highlights = deriveWeights([
 			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
-			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+			weightRow(PRIOR_SUMMER_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 3,
 				minWeight: 10.5,
 				maxWeight: 12.5
@@ -1683,7 +1683,7 @@ describe('deriveWeightRecordBreakers', () => {
 	it('reports a 3rd-heaviest placement when two other days are heavier', () => {
 		const highlights = deriveWeights([
 			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
-			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+			weightRow(PRIOR_SUMMER_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 3,
 				minWeight: 10.5,
 				maxWeight: 14.0
@@ -1704,7 +1704,7 @@ describe('deriveWeightRecordBreakers', () => {
 		// three other days are heavier, so the session ranks 4th
 		const highlights = deriveWeights([
 			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
-			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+			weightRow(PRIOR_SUMMER_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 3,
 				minWeight: 10.5,
 				maxWeight: 14.0
@@ -1739,7 +1739,7 @@ describe('deriveWeightRecordBreakers', () => {
 		// the later day is heavier, demoting the session to 2nd
 		const highlights = deriveWeights([
 			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
-			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+			weightRow(PRIOR_SUMMER_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 3,
 				minWeight: 10.5,
 				maxWeight: 12.0
@@ -1754,7 +1754,7 @@ describe('deriveWeightRecordBreakers', () => {
 	it('requires at least 3 weighed encounters on other days', () => {
 		const highlights = deriveWeights([
 			weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
-			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+			weightRow(PRIOR_SUMMER_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 2,
 				minWeight: 10.5,
 				maxWeight: 13.0
@@ -1770,7 +1770,7 @@ describe('deriveWeightRecordBreakers', () => {
 				minWeight: 0,
 				maxWeight: 0
 			}),
-			weightRow(PRIOR_SPRING_OTHER_YEAR, BLUE_TIT, {
+			weightRow(PRIOR_SUMMER_OTHER_YEAR, BLUE_TIT, {
 				weighedBirds: 3,
 				minWeight: 10.5,
 				maxWeight: 13.0
@@ -1902,11 +1902,11 @@ describe('render — combined-session-total-record', () => {
 		sortValue: 0,
 		encounterValue: 120,
 		speciesValue: 15,
-		seasonName: 'spring',
+		seasonName: 'summer',
 		year: 2026,
 		isCurrentYear: true,
 		isCurrentSeason: true,
-		seasonPeriodLabel: 'spring 2026'
+		seasonPeriodLabel: 'summer 2026'
 	};
 
 	it('renders this-year copy for a current-year session', () => {
@@ -1923,7 +1923,7 @@ describe('render — combined-session-total-record', () => {
 
 	it('renders any-season copy with the season name', () => {
 		expect(renderedText({ ...combinedFields, scope: 'any-season' })).toBe(
-			'Busiest and most varied spring session ever — 120 birds from 15 species'
+			'Busiest and most varied summer session ever — 120 birds from 15 species'
 		);
 	});
 });
@@ -1972,11 +1972,11 @@ describe('render — combined-species-count-record', () => {
 	const combinedFields = {
 		type: 'combined-species-count-record' as const,
 		sortValue: 0,
-		seasonName: 'spring',
+		seasonName: 'summer',
 		year: 2026,
 		isCurrentYear: true,
 		isCurrentSeason: true,
-		seasonPeriodLabel: 'spring 2026'
+		seasonPeriodLabel: 'summer 2026'
 	};
 
 	it('renders three this-year species with commas and a trailing "and"', () => {
@@ -2020,7 +2020,7 @@ describe('render — combined-species-count-record', () => {
 				scope: 'this-season',
 				speciesNames: ['Robin', 'Dunnock']
 			})
-		).toBe('Highest Robin and Dunnock counts this spring');
+		).toBe('Highest Robin and Dunnock counts this summer');
 	});
 
 	it('renders the absolute season label for a past-season session', () => {
@@ -2031,6 +2031,6 @@ describe('render — combined-species-count-record', () => {
 				isCurrentSeason: false,
 				speciesNames: ['Robin', 'Dunnock']
 			})
-		).toBe('Highest Robin and Dunnock counts in spring 2026');
+		).toBe('Highest Robin and Dunnock counts in summer 2026');
 	});
 });

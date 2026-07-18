@@ -1,12 +1,12 @@
 export const Season = {
 	WINTER: 'winter',
-	SPRING: 'spring',
+	SUMMER: 'summer',
 	AUTUMN: 'autumn'
 } as const;
 
 const seasonToMonthsMap = {
 	[Season.WINTER]: ['11', '12', '01', '02', '03'],
-	[Season.SPRING]: ['04', '05', '06', '07'],
+	[Season.SUMMER]: ['04', '05', '06', '07'],
 	[Season.AUTUMN]: ['08', '09', '10']
 } as const;
 
@@ -14,10 +14,10 @@ const monthsToSeasonMap = [
 	Season.WINTER,
 	Season.WINTER,
 	Season.WINTER,
-	Season.SPRING,
-	Season.SPRING,
-	Season.SPRING,
-	Season.SPRING,
+	Season.SUMMER,
+	Season.SUMMER,
+	Season.SUMMER,
+	Season.SUMMER,
 	Season.AUTUMN,
 	Season.AUTUMN,
 	Season.AUTUMN,
@@ -52,7 +52,7 @@ export function getSeasonMonths(
 	return months.map((month) => Number(month)) as number[];
 }
 
-// "autumn 2023" / "spring 2024" / "winter 2023/24" — winter is labelled by its
+// "autumn 2023" / "summer 2024" / "winter 2023/24" — winter is labelled by its
 // start year because it spans the year end
 export function getSeasonPeriodLabel(date: Date): string {
 	const season = getSeasonName(date);
