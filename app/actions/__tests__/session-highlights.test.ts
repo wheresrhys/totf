@@ -65,9 +65,27 @@ const sessionsQueryBuilder = {
 	order: mockSessionsOrder,
 	range: mockSessionsRange
 };
-const mockEq = vi.fn();
-const mockSelect = vi.fn(() => ({ eq: mockEq }));
-const mockFrom = vi.fn(() => ({ select: mockSelect }));
+const mockSessionsEq = vi.fn();
+const mockSessionsSelect = vi.fn(() => ({ eq: mockSessionsEq }));
+
+let statsVersion = 100;
+const mockEncountersLimit = vi.fn();
+const mockEncountersOrder = vi.fn(() => ({ limit: mockEncountersLimit }));
+const mockEncountersEq = vi.fn(() => ({ order: mockEncountersOrder }));
+const mockEncountersSelect = vi.fn(() => ({ eq: mockEncountersEq }));
+
+const mockFrom = vi.fn((table: string) => {
+	if (table === 'Sessions') {
+		return { select: mockSessionsSelect };
+	}
+	// Encounters — version query
+	return { select: mockEncountersSelect };
+});
+
+// Keep a single mockEq/mockSelect alias so existing tests that reference them
+// still work (they only call from('Sessions') paths).
+const mockEq = mockSessionsEq;
+const mockSelect = mockSessionsSelect;
 
 // the action memoises the stats blob at module scope, so each test
 // imports a fresh copy of the module
@@ -79,6 +97,7 @@ async function importFetchSessionHighlights() {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	statsVersion = 100;
 	rpcPages = [
 		[
 			statsRow('Robin', SESSION_DATE, 74),
@@ -98,10 +117,15 @@ beforeEach(() => {
 	mockRpcRange.mockImplementation((fromRow: number) =>
 		pageForRange(rpcPages, fromRow)
 	);
-	mockEq.mockReturnValue(sessionsQueryBuilder);
+	// Sessions from() chain
+	mockSessionsEq.mockReturnValue(sessionsQueryBuilder);
 	mockSessionsOrder.mockReturnValue(sessionsQueryBuilder);
 	mockSessionsRange.mockImplementation((fromRow: number) =>
 		pageForRange(sessionPages, fromRow)
+	);
+	// Encounters from() chain — version query
+	mockEncountersLimit.mockImplementation(() =>
+		Promise.resolve({ data: [{ id: statsVersion }], error: null })
 	);
 	mockGetAuthenticatedSupabaseClient.mockResolvedValue({
 		rpc: mockRpc,
@@ -237,7 +261,7 @@ describe('fetchSessionHighlights', () => {
 		);
 	});
 
-	it('returns cached data within the TTL', async () => {
+	it('serves cached stats when the data version is unchanged', async () => {
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		await fetchSessionHighlights({
 			date: SESSION_DATE,
@@ -253,9 +277,65 @@ describe('fetchSessionHighlights', () => {
 			(call) => (call as [string])[0] === 'stats_per_day_and_species'
 		);
 		expect(metricsCalls).toHaveLength(1);
-		expect(mockEq).toHaveBeenCalledTimes(1);
+		expect(mockSessionsEq).toHaveBeenCalledTimes(1);
+		// version query is run on each call
+		expect(mockEncountersLimit).toHaveBeenCalledTimes(2);
 		// the cached blob still serves other session dates — the 2022 session
 		// holds the most-varied record (2 species vs 1 on the 2024 day)
+		expect(sentencesOf(secondResult)).toEqual([
+			'Most varied session ever — 2 species'
+		]);
+	});
+
+	it('re-fetches stats when the data version changes', async () => {
+		const fetchSessionHighlights = await importFetchSessionHighlights();
+		statsVersion = 100;
+		await fetchSessionHighlights({
+			date: SESSION_DATE,
+			viewedGroupId: GROUP_ID
+		});
+		statsVersion = 101;
+		await fetchSessionHighlights({
+			date: SESSION_DATE,
+			viewedGroupId: GROUP_ID
+		});
+		const metricsCalls = mockRpc.mock.calls.filter(
+			(call) => (call as [string])[0] === 'stats_per_day_and_species'
+		);
+		expect(metricsCalls).toHaveLength(2);
+	});
+
+	it('queries max Encounters id for the viewed group', async () => {
+		const fetchSessionHighlights = await importFetchSessionHighlights();
+		await fetchSessionHighlights({
+			date: SESSION_DATE,
+			viewedGroupId: GROUP_ID
+		});
+		expect(mockFrom).toHaveBeenCalledWith('Encounters');
+		expect(mockEncountersSelect).toHaveBeenCalledWith('id');
+		expect(mockEncountersEq).toHaveBeenCalledWith('ringing_group_id', GROUP_ID);
+		expect(mockEncountersOrder).toHaveBeenCalledWith('id', {
+			ascending: false
+		});
+		expect(mockEncountersLimit).toHaveBeenCalledWith(1);
+	});
+
+	it('treats a group with no encounters as version 0', async () => {
+		mockEncountersLimit.mockResolvedValue({ data: [], error: null });
+		const fetchSessionHighlights = await importFetchSessionHighlights();
+		await fetchSessionHighlights({
+			date: SESSION_DATE,
+			viewedGroupId: GROUP_ID
+		});
+		const secondResult = await fetchSessionHighlights({
+			date: '2022-05-01',
+			viewedGroupId: GROUP_ID
+		});
+		// stats_per_day_and_species should be cached (called once)
+		const metricsCalls = mockRpc.mock.calls.filter(
+			(call) => (call as [string])[0] === 'stats_per_day_and_species'
+		);
+		expect(metricsCalls).toHaveLength(1);
 		expect(sentencesOf(secondResult)).toEqual([
 			'Most varied session ever — 2 species'
 		]);
