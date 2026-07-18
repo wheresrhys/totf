@@ -529,7 +529,7 @@ describe('render — session-total-record', () => {
 
 	it('renders this-season busiest copy with the season period for a past session', () => {
 		expect(renderedText(makeHighlight({ scope: 'this-season' }))).toBe(
-			'Busiest session in autumn 2024 — 74 birds'
+			'Busiest session of autumn 2024 — 74 birds'
 		);
 	});
 
@@ -542,7 +542,7 @@ describe('render — session-total-record', () => {
 					seasonPeriodLabel: 'winter 2023/24'
 				})
 			)
-		).toBe('Busiest session in winter 2023/24 — 74 birds');
+		).toBe('Busiest session of winter 2023/24 — 74 birds');
 	});
 
 	it('renders most-varied copy for the species metric', () => {
@@ -2050,7 +2050,7 @@ describe('render — combined-species-count-record', () => {
 				isCurrentSeason: false,
 				speciesNames: ['Robin', 'Dunnock']
 			})
-		).toBe('Highest Robin and Dunnock counts in summer 2026');
+		).toBe('Highest Robin and Dunnock counts of summer 2026');
 	});
 });
 
