@@ -153,13 +153,13 @@ describe('fetchSessionHighlights', () => {
 			(call) => (call as [string, unknown])[0] === 'stats_per_day_and_species'
 		) as [string, { ringing_group_filter: number }];
 		expect(statsArgs.ringing_group_filter).toBe(GROUP_ID);
-		// Every derived highlight, ordered by the machine: the promoted rare-species
-		// mention now heads the list, above the scoped record block (busiest
-		// all-time, then the all-time species record) and the quietest-since line
+		// Robin is a rare species here (seen on only 2 days ever), so the machine's
+		// rare-species suppression (Rem-3) drops Robin's own count/weight lines
+		// (its species record). Session-wide records — busiest session, quietest
+		// since — are not tied to the rare species and survive.
 		expect(sentencesOf(highlights)).toEqual([
 			'Rarely recorded — Robin seen on only 2 days ever',
 			'Busiest session ever — 74 birds',
-			'Record day for Robin — 74 caught, the most ever',
 			'Quietest session since 1 May 2022 — 74 birds'
 		]);
 	});
@@ -212,6 +212,9 @@ describe('fetchSessionHighlights', () => {
 	});
 
 	it('includes weight record highlights in the fan-out', async () => {
+		// Blue Tit appears on enough session days to be a common (non-rare)
+		// species, so the rare-species suppression (Rem-3) doesn't drop its
+		// weight record — this test is about the weight fan-out, not suppression
 		rpcPages = [
 			[
 				{
@@ -231,7 +234,33 @@ describe('fetchSessionHighlights', () => {
 					weighed_birds_count: 4,
 					min_weight: 10.5,
 					max_weight: 13.0
+				},
+				{
+					species_name: 'Blue Tit',
+					visit_date: '2022-06-01',
+					encounter_count: 4,
+					juv_count: 0,
+					weighed_birds_count: 4,
+					min_weight: 10.7,
+					max_weight: 12.8
+				},
+				{
+					species_name: 'Blue Tit',
+					visit_date: '2022-07-01',
+					encounter_count: 4,
+					juv_count: 0,
+					weighed_birds_count: 4,
+					min_weight: 10.8,
+					max_weight: 12.9
 				}
+			]
+		];
+		sessionPages = [
+			[
+				{ visit_date: '2022-05-01' },
+				{ visit_date: '2022-06-01' },
+				{ visit_date: '2022-07-01' },
+				{ visit_date: SESSION_DATE }
 			]
 		];
 		const fetchSessionHighlights = await importFetchSessionHighlights();

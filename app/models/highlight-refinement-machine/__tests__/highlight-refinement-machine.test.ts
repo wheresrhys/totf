@@ -7,6 +7,7 @@ import {
 	combineYearSpeciesCounts,
 	orderBySortValue,
 	removeBusiestSinceWhenBusiestRecordHeld,
+	removeCountAndWeightHighlightsForRareSpecies,
 	removeNarrowerScopeSpeciesRecords,
 	runHighlightMachine
 } from '..';
@@ -21,6 +22,7 @@ import {
 	type RareSpeciesHighlight,
 	type RecordScope,
 	type SessionHighlight,
+	type SessionTotalJuvRecordHighlight,
 	type SessionTotalMetric,
 	type SessionTotalRecordHighlight,
 	type SinceComparisonHighlight,
@@ -80,6 +82,19 @@ function speciesJuvCountRecord(
 		value,
 		...periodFields,
 		...extra
+	};
+}
+
+function sessionTotalJuvRecord(
+	scope: RecordScope,
+	value: number
+): SessionTotalJuvRecordHighlight {
+	return {
+		type: 'session-total-juv-record',
+		sortValue: juvSortValue('juv-session-total', scope),
+		scope,
+		value,
+		...periodFields
 	};
 }
 
@@ -263,6 +278,98 @@ describe('removeNarrowerScopeSpeciesRecords (Rem-2)', () => {
 	it('is a noop on non-species-record highlights', () => {
 		const pool = [busiestSince, weightRecord];
 		expect(removeNarrowerScopeSpeciesRecords(pool)).toEqual(pool);
+	});
+});
+
+describe('removeCountAndWeightHighlightsForRareSpecies (Rem-3)', () => {
+	// A weight record for the rare species itself (rareSpecies is 'Wryneck')
+	const wryneckWeight: WeightRecordHighlight = {
+		type: 'weight-record',
+		sortValue: familySortValue('weight-record'),
+		speciesName: 'Wryneck',
+		extreme: 'heaviest',
+		weight: 30.2,
+		placementRank: 1,
+		isJointPlacement: false
+	};
+
+	it("drops the rare species' own count and weight highlights", () => {
+		const removed = removeCountAndWeightHighlightsForRareSpecies([
+			rareSpecies,
+			speciesCountRecord('Wryneck', 'all-time', 2),
+			speciesJuvCountRecord('Wryneck', 'this-year', 1),
+			wryneckWeight
+		]);
+		expect(removed).toEqual([rareSpecies]);
+	});
+
+	it("keeps other species' count and weight highlights, and session-wide records", () => {
+		const pool = [
+			rareSpecies,
+			sessionTotalRecord('encounters', 'this-year', 120),
+			sessionTotalJuvRecord('all-time', 8),
+			speciesCountRecord('Reed Warbler', 'this-year', 67),
+			speciesJuvCountRecord('Reed Warbler', 'all-time', 12),
+			busiestSince,
+			quietestSince,
+			weightRecord // Blue Tit
+		];
+		expect(removeCountAndWeightHighlightsForRareSpecies(pool)).toEqual(pool);
+	});
+
+	it('leaves the pool untouched when no rare-species highlight is present', () => {
+		const pool = [
+			sessionTotalRecord('encounters', 'this-year', 120),
+			speciesCountRecord('Reed Warbler', 'this-year', 67),
+			weightRecord
+		];
+		expect(removeCountAndWeightHighlightsForRareSpecies(pool)).toEqual(pool);
+	});
+
+	it("keeps the rare species' non-count/weight highlights alongside it", () => {
+		const removed = removeCountAndWeightHighlightsForRareSpecies([
+			rareSpecies,
+			firstEverSpecies,
+			longAbsenceRetrap,
+			firstOfYear('Chaffinch', true),
+			wryneckWeight
+		]);
+		expect(removed).toEqual([
+			rareSpecies,
+			firstEverSpecies,
+			longAbsenceRetrap,
+			firstOfYear('Chaffinch', true)
+		]);
+	});
+
+	it("drops each rare species' own records when several rare species are present", () => {
+		const secondRare: RareSpeciesHighlight = {
+			type: 'rare-species',
+			sortValue: familySortValue('rare-species'),
+			speciesName: 'Hawfinch',
+			totalSessionDays: 3
+		};
+		const removed = removeCountAndWeightHighlightsForRareSpecies([
+			rareSpecies,
+			secondRare,
+			wryneckWeight,
+			speciesCountRecord('Hawfinch', 'all-time', 3),
+			weightRecord, // Blue Tit — not rare, kept
+			sessionTotalRecord('encounters', 'this-year', 120)
+		]);
+		expect(removed).toEqual([
+			rareSpecies,
+			secondRare,
+			weightRecord,
+			sessionTotalRecord('encounters', 'this-year', 120)
+		]);
+	});
+
+	it('does not mutate the input list', () => {
+		const pool = [rareSpecies, wryneckWeight];
+		const snapshot = [...pool];
+		removeCountAndWeightHighlightsForRareSpecies(pool);
+		expect(pool).toEqual(snapshot);
 	});
 });
 
@@ -816,6 +923,43 @@ describe('runHighlightMachine', () => {
 			],
 			['combined-only-of-year', 'Chaffinch+Goldfinch+Lesser Whitethroat'], // 0.8
 			['weight-record', 'Blue Tit'] // 0.0
+		]);
+	});
+
+	it("suppresses a rare species' own count and weight highlights but keeps other species' and session-wide records", () => {
+		const wryneckWeight: WeightRecordHighlight = {
+			type: 'weight-record',
+			sortValue: familySortValue('weight-record'),
+			speciesName: 'Wryneck',
+			extreme: 'heaviest',
+			weight: 30.2,
+			placementRank: 1,
+			isJointPlacement: false
+		};
+		const pool: SessionHighlight[] = [
+			rareSpecies, // Wryneck
+			speciesCountRecord('Wryneck', 'all-time', 2), // dropped — rare species' own
+			wryneckWeight, // dropped — rare species' own
+			firstEverSpecies,
+			sessionTotalRecord('encounters', 'this-year', 120), // kept — session-wide
+			speciesCountRecord('Reed Warbler', 'this-year', 67), // kept — other species
+			weightRecord // Blue Tit — kept — other species
+		];
+		const machined = runHighlightMachine(pool);
+		// The rare bird's own count/weight lines are dropped; other species' and
+		// session-wide records survive. first-ever above rare by sort value.
+		expect(
+			machined.map((highlight) =>
+				'speciesName' in highlight
+					? [highlight.type, highlight.speciesName]
+					: [highlight.type]
+			)
+		).toEqual([
+			['first-ever-species', 'Firecrest'],
+			['rare-species', 'Wryneck'],
+			['session-total-record'],
+			['species-count-record', 'Reed Warbler'],
+			['weight-record', 'Blue Tit']
 		]);
 	});
 
