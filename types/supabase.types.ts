@@ -422,6 +422,7 @@ export type Database = {
         Args: { ringing_group_filter: number }
         Returns: {
           encounter_count: number
+          juv_count: number
           max_weight: number
           min_weight: number
           species_name: string

@@ -663,6 +663,7 @@ describe('Postgres RPC integration tests', () => {
 				species_name: 'Robin',
 				visit_date: '2021-06-20',
 				encounter_count: 1,
+				juv_count: 0,
 				weighed_birds_count: 1,
 				min_weight: 18.5,
 				max_weight: 18.5,
@@ -671,6 +672,7 @@ describe('Postgres RPC integration tests', () => {
 				species_name: 'Wren',
 				visit_date: '2021-06-20',
 				encounter_count: 1,
+				juv_count: 0,
 				weighed_birds_count: 1,
 				min_weight: 9,
 				max_weight: 9,
@@ -690,6 +692,7 @@ describe('Postgres RPC integration tests', () => {
 				species_name: 'Robin',
 				visit_date: '2022-06-15',
 				encounter_count: 6,
+				juv_count: 0,
 				weighed_birds_count: 6,
 				min_weight: 16.5,
 				max_weight: 20.5,
@@ -709,6 +712,7 @@ describe('Postgres RPC integration tests', () => {
 				species_name: 'Chaffinch',
 				visit_date: '2023-06-01',
 				encounter_count: 2,
+				juv_count: 0,
 				weighed_birds_count: 2,
 				min_weight: 18.5,
 				max_weight: 20,
@@ -717,6 +721,7 @@ describe('Postgres RPC integration tests', () => {
 				species_name: 'Robin',
 				visit_date: '2023-06-01',
 				encounter_count: 1,
+				juv_count: 0,
 				weighed_birds_count: 1,
 				min_weight: 18.5,
 				max_weight: 18.5,
@@ -829,6 +834,7 @@ describe('Postgres RPC integration tests', () => {
 					species_name: 'Robin',
 					visit_date: '2098-06-01',
 					encounter_count: 2,
+					juv_count: 0,
 					weighed_birds_count: 1,
 					min_weight: 15,
 					max_weight: 15,
@@ -846,9 +852,108 @@ describe('Postgres RPC integration tests', () => {
 					species_name: 'Robin',
 					visit_date: '2098-06-02',
 					encounter_count: 1,
+					juv_count: 0,
 					weighed_birds_count: 0,
 					min_weight: null,
 					max_weight: null,
+				});
+			});
+		});
+
+		describe('juvenile encounters', () => {
+			// Seed encounters carry no juveniles, so insert Delta-group encounters
+			// (three juvenile + two adult Robins on one day) and clean up after.
+			let deltaId: number;
+			let deltaClient: SupabaseClient;
+			let locationId: number;
+			let sessionId: number;
+			let birdIds: number[];
+
+			beforeAll(async () => {
+				deltaId = await getGroupIdByName('Delta');
+				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+				const { data: species } = await supabase
+					.from('Species')
+					.select('id')
+					.eq('species_name', 'Robin')
+					.single();
+
+				const { data: location, error: locationError } = await deltaClient
+					.from('Locations')
+					.insert({
+						location_name: 'Juv Stats Test Location',
+						ringing_group_id: deltaId,
+					})
+					.select('id')
+					.single();
+				if (locationError) throw locationError;
+				locationId = location!.id;
+
+				const { data: session, error: sessionError } = await deltaClient
+					.from('Sessions')
+					.insert({ visit_date: '2099-06-01', location_id: locationId })
+					.select('id')
+					.single();
+				if (sessionError) throw sessionError;
+				sessionId = session!.id;
+
+				const birds = await Promise.all(
+					['JUVTEST1', 'JUVTEST2', 'JUVTEST3', 'JUVTEST4', 'JUVTEST5'].map(
+						(ringNo) =>
+							deltaClient
+								.from('Birds')
+								.insert({ ring_no: ringNo, species_id: species!.id })
+								.select('id')
+								.single()
+					)
+				);
+				birds.forEach(({ error }) => {
+					if (error) throw error;
+				});
+				birdIds = birds.map(({ data }) => data!.id);
+
+				const baseEncounter = {
+					capture_time: '10:00:00',
+					scheme: 'BTO',
+					sex: 'M',
+					age_code: 1,
+					record_type: 'N',
+					session_id: sessionId,
+				};
+				const { error: encountersError } = await deltaClient
+					.from('Encounters')
+					.insert([
+						{ ...baseEncounter, bird_id: birdIds[0], is_juv: true },
+						{ ...baseEncounter, bird_id: birdIds[1], is_juv: true },
+						{ ...baseEncounter, bird_id: birdIds[2], is_juv: true },
+						{ ...baseEncounter, bird_id: birdIds[3], is_juv: false },
+						{ ...baseEncounter, bird_id: birdIds[4], is_juv: false },
+					]);
+				if (encountersError) throw encountersError;
+			});
+
+			afterAll(() => {
+				execSync(
+					`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+						`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Sessions" WHERE id = ${sessionId};` +
+						`DELETE FROM "Locations" WHERE id = ${locationId};'`
+				);
+			});
+
+			it('counts only juvenile encounters in juv_count, all encounters in encounter_count', async () => {
+				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
+					ringing_group_filter: deltaId,
+				});
+				expect(error).toBeNull();
+				const row = data!.find((row) => row.visit_date === '2099-06-01');
+				expect(row).toMatchObject({
+					species_name: 'Robin',
+					visit_date: '2099-06-01',
+					encounter_count: 5,
+					juv_count: 3,
 				});
 			});
 		});

@@ -38,6 +38,7 @@ function statsRow(
 		species_name,
 		visit_date,
 		encounter_count,
+		juv_count: 0,
 		weighed_birds_count: 0,
 		min_weight: 0,
 		max_weight: 0
@@ -217,6 +218,7 @@ describe('fetchSessionHighlights', () => {
 					species_name: 'Blue Tit',
 					visit_date: SESSION_DATE,
 					encounter_count: 5,
+					juv_count: 0,
 					weighed_birds_count: 5,
 					min_weight: 11,
 					max_weight: 13.1
@@ -225,6 +227,7 @@ describe('fetchSessionHighlights', () => {
 					species_name: 'Blue Tit',
 					visit_date: '2022-05-01',
 					encounter_count: 4,
+					juv_count: 0,
 					weighed_birds_count: 4,
 					min_weight: 10.5,
 					max_weight: 13.0
