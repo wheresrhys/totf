@@ -5,10 +5,13 @@ import {
 	deriveFirstOfYearSpecies,
 	deriveRareSpecies,
 	deriveSessionTotalRecords,
+	deriveSessionTotalJuvRecords,
 	deriveSinceHighlights,
 	deriveSpeciesRecords,
+	deriveSpeciesJuvRecords,
 	deriveWeightRecordBreakers,
 	scopedSortValue,
+	juvSortValue,
 	familySortValue,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
@@ -16,8 +19,10 @@ import {
 	type RareSpeciesHighlight,
 	type SessionHighlight,
 	type SessionTotalRecordHighlight,
+	type SessionTotalJuvRecordHighlight,
 	type SinceComparisonHighlight,
 	type SpeciesCountRecordHighlight,
+	type SpeciesJuvCountRecordHighlight,
 	type WeightRecordHighlight,
 	type SessionStatsData
 } from '../session-highlights';
@@ -972,6 +977,351 @@ describe('render — species-count-record', () => {
 				})
 			)
 		).toBe('Joint second best day for Reed Warbler ever — 8 birds');
+	});
+});
+
+// ---- juvenile highlights ----
+
+// A per-day-per-species row carrying a juvenile count (and a matching encounter
+// count, always >= the juv count so the data is internally consistent).
+function juvRow(
+	date: string,
+	species: string,
+	juvCount: number,
+	encounterCount = juvCount
+): StatsPerDayAndSpeciesResult {
+	return {
+		visit_date: date,
+		species_name: species,
+		encounter_count: encounterCount,
+		juv_count: juvCount,
+		weighed_birds_count: 0,
+		min_weight: 0,
+		max_weight: 0
+	};
+}
+
+function deriveTotalJuvs(
+	results: StatsPerDayAndSpeciesResult[],
+	today = PAST_PERIOD_TODAY
+) {
+	return deriveSessionTotalJuvRecords({
+		date: SESSION_DATE,
+		stats: statsForSpecies(results),
+		today
+	});
+}
+
+function deriveSpeciesJuvs(
+	results: StatsPerDayAndSpeciesResult[],
+	today = PAST_PERIOD_TODAY
+) {
+	return deriveSpeciesJuvRecords({
+		date: SESSION_DATE,
+		stats: statsForSpecies(results),
+		today
+	});
+}
+
+describe('deriveSessionTotalJuvRecords', () => {
+	it('reports a most-juveniles record when the session juv total beats every day in scope', () => {
+		const highlights = deriveTotalJuvs([
+			juvRow(SESSION_DATE, ROBIN, 12),
+			juvRow(SESSION_DATE, REED_WARBLER, 8),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 5)
+		]);
+		expect(highlights).toContainEqual({
+			type: 'session-total-juv-record',
+			sortValue: juvSortValue('juv-session-total', 'all-time'),
+			scope: 'all-time',
+			value: 20,
+			year: 2024,
+			isCurrentYear: false
+		});
+	});
+
+	it('sums juveniles across species for the session total', () => {
+		const highlights = deriveTotalJuvs([
+			juvRow(SESSION_DATE, ROBIN, 3),
+			juvRow(SESSION_DATE, REED_WARBLER, 4),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 6)
+		]);
+		// 3 + 4 = 7 beats the prior day's 6
+		expect(highlights).toContainEqual(
+			expect.objectContaining({ scope: 'all-time', value: 7 })
+		);
+	});
+
+	it('returns nothing when the session has no juveniles', () => {
+		const highlights = deriveTotalJuvs([
+			juvRow(SESSION_DATE, ROBIN, 0, 40),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 0, 5)
+		]);
+		expect(highlights).toHaveLength(0);
+	});
+
+	it('reports only the broadest scope when the session is a record in every scope', () => {
+		const highlights = deriveTotalJuvs([
+			juvRow(SESSION_DATE, ROBIN, 20),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 10),
+			juvRow(PRIOR_SUMMER_THIS_YEAR, ROBIN, 8)
+		]);
+		expect(highlights).toHaveLength(1);
+		expect(highlights[0].scope).toBe('all-time');
+	});
+
+	it('reports this-year when the all-time record is beaten but this year is not', () => {
+		const highlights = deriveTotalJuvs([
+			juvRow(SESSION_DATE, ROBIN, 20),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 30), // beats all-time
+			juvRow(PRIOR_SUMMER_THIS_YEAR, ROBIN, 10) // this year, lower
+		]);
+		expect(highlights).toHaveLength(1);
+		expect(highlights[0].scope).toBe('this-year');
+	});
+
+	it('reports an all-time tie older than a year as a for-N-years record', () => {
+		const highlights = deriveTotalJuvs([
+			juvRow(SESSION_DATE, ROBIN, 12),
+			juvRow(PRIOR_AUTUMN_OTHER_YEAR, ROBIN, 12) // 2021 — 3 years ago
+		]);
+		expect(highlights).toContainEqual(
+			expect.objectContaining({
+				scope: 'all-time',
+				value: 12,
+				recordEqualledYearsAgo: 3
+			})
+		);
+	});
+
+	it('treats a tie held only by a later day as unreportable', () => {
+		const highlights = deriveTotalJuvs([
+			juvRow(SESSION_DATE, ROBIN, 12),
+			juvRow(LATER_DAY, ROBIN, 12)
+		]);
+		expect(highlights).toHaveLength(0);
+	});
+
+	it('sets the current-year flag from the injected today', () => {
+		const highlights = deriveTotalJuvs(
+			[
+				juvRow(SESSION_DATE, ROBIN, 12),
+				juvRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 5)
+			],
+			new Date('2024-10-20')
+		);
+		expect(highlights[0].isCurrentYear).toBe(true);
+	});
+});
+
+describe('deriveSpeciesJuvRecords', () => {
+	it('reports the broadest scope achieved per species', () => {
+		const highlights = deriveSpeciesJuvs([
+			juvRow(SESSION_DATE, REED_WARBLER, 10),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 5)
+		]);
+		expect(highlights).toHaveLength(1);
+		expect(highlights[0]).toMatchObject({
+			type: 'species-juv-count-record',
+			speciesName: REED_WARBLER,
+			scope: 'all-time',
+			value: 10
+		});
+	});
+
+	it('only produces a highlight when the juv count is greater than 4', () => {
+		// A session juv count of exactly 4 is below the threshold
+		const atThreshold = deriveSpeciesJuvs([
+			juvRow(SESSION_DATE, REED_WARBLER, 4),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 2)
+		]);
+		expect(atThreshold).toHaveLength(0);
+		// 5 clears it
+		const aboveThreshold = deriveSpeciesJuvs([
+			juvRow(SESSION_DATE, REED_WARBLER, 5),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 2)
+		]);
+		expect(aboveThreshold).toHaveLength(1);
+	});
+
+	it('requires the species to appear on another day in scope', () => {
+		const highlights = deriveSpeciesJuvs([
+			juvRow(SESSION_DATE, REED_WARBLER, 10),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 8)
+		]);
+		expect(highlights.map((h) => h.speciesName)).not.toContain(REED_WARBLER);
+	});
+
+	it('demotes the session to a placement when a later day has a higher juv count', () => {
+		const highlights = deriveSpeciesJuvs([
+			juvRow(SESSION_DATE, REED_WARBLER, 10),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 5),
+			juvRow(LATER_DAY, REED_WARBLER, 100)
+		]);
+		expect(highlights).toHaveLength(1);
+		expect(highlights[0]).toMatchObject({
+			speciesName: REED_WARBLER,
+			scope: 'all-time',
+			value: 10,
+			placementRank: 2,
+			isJointPlacement: false
+		});
+	});
+
+	it('reports an all-time tie older than a year as a for-N-years record', () => {
+		const highlights = deriveSpeciesJuvs([
+			juvRow(SESSION_DATE, REED_WARBLER, 10),
+			juvRow(PRIOR_AUTUMN_OTHER_YEAR, REED_WARBLER, 10) // 3 years ago
+		]);
+		expect(highlights).toContainEqual(
+			expect.objectContaining({
+				speciesName: REED_WARBLER,
+				scope: 'all-time',
+				value: 10,
+				recordEqualledYearsAgo: 3
+			})
+		);
+	});
+
+	it('reports an all-time tie under a year old as a joint best day', () => {
+		const highlights = deriveSpeciesJuvs([
+			juvRow(SESSION_DATE, REED_WARBLER, 10),
+			juvRow(PRIOR_SUMMER_THIS_YEAR, REED_WARBLER, 10) // < 1 year
+		]);
+		expect(highlights).toHaveLength(1);
+		expect(highlights[0]).toMatchObject({
+			placementRank: 1,
+			isJointPlacement: true
+		});
+	});
+
+	it('reports multiple species juv records from one session', () => {
+		const highlights = deriveSpeciesJuvs([
+			juvRow(SESSION_DATE, REED_WARBLER, 10),
+			juvRow(SESSION_DATE, ROBIN, 8),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, REED_WARBLER, 5),
+			juvRow(PRIOR_SUMMER_OTHER_YEAR, ROBIN, 3)
+		]);
+		const speciesNames = highlights.map((h) => h.speciesName);
+		expect(speciesNames).toContain(REED_WARBLER);
+		expect(speciesNames).toContain(ROBIN);
+	});
+});
+
+// ---- render — session-total-juv-record ----
+
+function makeTotalJuvHighlight(
+	overrides: Partial<HighlightFields<SessionTotalJuvRecordHighlight>>
+): SessionTotalJuvRecordHighlight {
+	const fields = {
+		scope: 'all-time' as const,
+		value: 20,
+		year: 2024,
+		isCurrentYear: false,
+		...overrides
+	};
+	return {
+		type: 'session-total-juv-record',
+		sortValue: juvSortValue('juv-session-total', fields.scope),
+		...fields
+	};
+}
+
+describe('render — session-total-juv-record', () => {
+	it('renders all-time copy', () => {
+		expect(renderedText(makeTotalJuvHighlight({}))).toBe(
+			'Most juveniles ever — 20 juvs'
+		);
+	});
+
+	it('renders current-year this-year copy', () => {
+		expect(
+			renderedText(
+				makeTotalJuvHighlight({ scope: 'this-year', isCurrentYear: true })
+			)
+		).toBe('Most juveniles this year — 20 juvs');
+	});
+
+	it('renders past-year this-year copy with the year', () => {
+		expect(renderedText(makeTotalJuvHighlight({ scope: 'this-year' }))).toBe(
+			'Most juveniles of 2024 — 20 juvs'
+		);
+	});
+
+	it('renders for-N-years copy for an all-time tie', () => {
+		expect(
+			renderedText(makeTotalJuvHighlight({ recordEqualledYearsAgo: 3 }))
+		).toBe('Most juveniles for 3 years — 20 juvs');
+	});
+});
+
+// ---- render — species-juv-count-record ----
+
+function makeSpeciesJuvHighlight(
+	overrides: Partial<HighlightFields<SpeciesJuvCountRecordHighlight>>
+): SpeciesJuvCountRecordHighlight {
+	const fields = {
+		speciesName: 'Reed Warbler',
+		scope: 'all-time' as const,
+		value: 12,
+		year: 2024,
+		isCurrentYear: false,
+		...overrides
+	};
+	return {
+		type: 'species-juv-count-record',
+		sortValue: juvSortValue('juv-species-count', fields.scope),
+		...fields
+	};
+}
+
+describe('render — species-juv-count-record', () => {
+	it('renders all-time copy', () => {
+		expect(renderedText(makeSpeciesJuvHighlight({}))).toBe(
+			'Most juvenile Reed Warbler — 12 caught, the most ever'
+		);
+	});
+
+	it('renders current-year this-year copy', () => {
+		expect(
+			renderedText(
+				makeSpeciesJuvHighlight({ scope: 'this-year', isCurrentYear: true })
+			)
+		).toBe('Most juvenile Reed Warbler — 12 caught, the most this year');
+	});
+
+	it('renders past-year this-year copy with the year', () => {
+		expect(renderedText(makeSpeciesJuvHighlight({ scope: 'this-year' }))).toBe(
+			'Most juvenile Reed Warbler — 12 caught, the most in 2024'
+		);
+	});
+
+	it('renders record-equalling for-N-years copy', () => {
+		expect(
+			renderedText(makeSpeciesJuvHighlight({ recordEqualledYearsAgo: 2 }))
+		).toBe(
+			'Record-equalling day for juvenile Reed Warbler — 12 caught, most for 2 years'
+		);
+	});
+
+	it('renders second-best placement copy', () => {
+		expect(
+			renderedText(
+				makeSpeciesJuvHighlight({
+					placementRank: 2,
+					isJointPlacement: false,
+					value: 8
+				})
+			)
+		).toBe('Second best day for juvenile Reed Warbler ever — 8 birds');
+	});
+
+	it('renders joint best placement copy', () => {
+		expect(
+			renderedText(
+				makeSpeciesJuvHighlight({ placementRank: 1, isJointPlacement: true })
+			)
+		).toBe('Joint best day for juvenile Reed Warbler ever — 12 birds');
 	});
 });
 

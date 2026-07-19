@@ -3,26 +3,48 @@ import {
 	type SessionHighlight
 } from '@/app/models/session-highlights';
 
+// The per-species record families this rule dedups by scope. Each is keyed
+// independently, so a species holding both an encounter record and a juvenile
+// record keeps the broadest of each — they aren't collapsed into one another.
+const SCOPED_SPECIES_RECORD_TYPES = [
+	'species-count-record',
+	'species-juv-count-record'
+] as const;
+type ScopedSpeciesRecordType = (typeof SCOPED_SPECIES_RECORD_TYPES)[number];
+
+function isScopedSpeciesRecord(
+	highlight: SessionHighlight
+): highlight is Extract<SessionHighlight, { type: ScopedSpeciesRecordType }> {
+	return (SCOPED_SPECIES_RECORD_TYPES as readonly string[]).includes(
+		highlight.type
+	);
+}
+
 // Rem-2: when one species holds records at more than one scope, keep only the
 // broadest — a narrower-scope record is subsumed by the broader one (e.g. drop
 // "the most this year" when the same species holds a 2nd-best-ever placement).
+// Applied per record family (encounter counts, juvenile counts): a species can
+// still hold one of each.
 export function removeNarrowerScopeSpeciesRecords(
 	highlights: SessionHighlight[]
 ): SessionHighlight[] {
-	const broadestScopeRankBySpecies = new Map<string, number>();
+	// Keyed by "<type>|<species>" so each family is deduped independently
+	const broadestScopeRankByKey = new Map<string, number>();
+	const keyFor = (
+		highlight: Extract<SessionHighlight, { type: ScopedSpeciesRecordType }>
+	) => `${highlight.type}|${highlight.speciesName}`;
 	for (const highlight of highlights) {
-		if (highlight.type !== 'species-count-record') continue;
+		if (!isScopedSpeciesRecord(highlight)) continue;
 		const rank = SCOPE_BREADTH_RANK.get(highlight.scope)!;
-		const currentBroadest = broadestScopeRankBySpecies.get(
-			highlight.speciesName
-		);
+		const key = keyFor(highlight);
+		const currentBroadest = broadestScopeRankByKey.get(key);
 		if (currentBroadest === undefined || rank < currentBroadest) {
-			broadestScopeRankBySpecies.set(highlight.speciesName, rank);
+			broadestScopeRankByKey.set(key, rank);
 		}
 	}
 	return highlights.filter((highlight) => {
-		if (highlight.type !== 'species-count-record') return true;
-		const broadestRank = broadestScopeRankBySpecies.get(highlight.speciesName)!;
+		if (!isScopedSpeciesRecord(highlight)) return true;
+		const broadestRank = broadestScopeRankByKey.get(keyFor(highlight))!;
 		return SCOPE_BREADTH_RANK.get(highlight.scope)! === broadestRank;
 	});
 }

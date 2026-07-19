@@ -13,6 +13,7 @@ import {
 import {
 	combinedSortValue,
 	familySortValue,
+	juvSortValue,
 	scopedSortValue,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
@@ -24,6 +25,7 @@ import {
 	type SessionTotalRecordHighlight,
 	type SinceComparisonHighlight,
 	type SpeciesCountRecordHighlight,
+	type SpeciesJuvCountRecordHighlight,
 	type WeightRecordHighlight
 } from '@/app/models/session-highlights';
 
@@ -56,6 +58,23 @@ function speciesCountRecord(
 	return {
 		type: 'species-count-record',
 		sortValue: scopedSortValue(scope, 1),
+		speciesName,
+		scope,
+		value,
+		...periodFields,
+		...extra
+	};
+}
+
+function speciesJuvCountRecord(
+	speciesName: string,
+	scope: RecordScope,
+	value: number,
+	extra: Partial<SpeciesJuvCountRecordHighlight> = {}
+): SpeciesJuvCountRecordHighlight {
+	return {
+		type: 'species-juv-count-record',
+		sortValue: juvSortValue('juv-species-count', scope),
 		speciesName,
 		scope,
 		value,
@@ -218,6 +237,27 @@ describe('removeNarrowerScopeSpeciesRecords (Rem-2)', () => {
 			allTime
 		]);
 		expect(removed).toEqual([allTime]);
+	});
+
+	it('drops a this-year juv record when the species holds an all-time juv record', () => {
+		const allTime = speciesJuvCountRecord('Reed Warbler', 'all-time', 12);
+		const removed = removeNarrowerScopeSpeciesRecords([
+			allTime,
+			speciesJuvCountRecord('Reed Warbler', 'this-year', 12)
+		]);
+		expect(removed).toEqual([allTime]);
+	});
+
+	it('keeps an encounter record and a juv record for the same species', () => {
+		// The two families are deduped independently — a species can hold one of
+		// each, so neither collapses the other
+		const encounterRecord = speciesCountRecord('Reed Warbler', 'all-time', 30);
+		const juvRecord = speciesJuvCountRecord('Reed Warbler', 'all-time', 12);
+		const removed = removeNarrowerScopeSpeciesRecords([
+			encounterRecord,
+			juvRecord
+		]);
+		expect(removed).toEqual([encounterRecord, juvRecord]);
 	});
 
 	it('is a noop on non-species-record highlights', () => {

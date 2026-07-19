@@ -35,13 +35,19 @@ export const SCOPE_BREADTH_RANK = new Map(
 // Families in editorial priority order, highest first. An "only ever" record
 // (the species' sole record in the data) heads the list, then plain first-ever,
 // rare-species and long-absence-retrap — all promoted above scoped records —
-// then the scoped records themselves, then the trailing context families.
+// then the scoped records themselves, then the juvenile-count records, then the
+// trailing context families. Juvenile records sit just below the general
+// scoped records: they're the same kind of "record" line but a more niche
+// measure, so they follow rather than interleave with the encounter/species
+// records.
 export const HIGHLIGHT_FAMILIES = [
 	'only-ever-species',
 	'first-ever-species',
 	'rare-species',
 	'long-absence-retrap',
 	'scoped-record',
+	'juv-session-total',
+	'juv-species-count',
 	'since-comparison',
 	'first-of-year-species',
 	'weight-record'
@@ -93,6 +99,17 @@ export function scopedSortValue(
 	};
 }
 
+// Juvenile-count records live in their own families ('juv-session-total' and
+// 'juv-species-count'), each with two scopes. Within a juv family, order by
+// temporal breadth alone — all-time (2) above this-year (1) — since every
+// member shares the family's single conceptual measure.
+export function juvSortValue(
+	family: 'juv-session-total' | 'juv-species-count',
+	scope: RecordScope
+): SortValue {
+	return { family, orderWithinFamily: temporalPoints(scope) };
+}
+
 // Combining bumps the merged line above the parts it absorbed, by a step that
 // grows with how many highlights were merged — a session with many merged
 // records ranks its combined line higher. Every part of a combine shares a
@@ -136,6 +153,45 @@ export type SessionTotalRecordHighlight = {
 
 export type SpeciesCountRecordHighlight = {
 	type: 'species-count-record';
+	sortValue: SortValue;
+	speciesName: string;
+	scope: RecordScope;
+	value: number;
+	year: number;
+	// 'this year' copy is only correct while the session's year is still current;
+	// otherwise the sentence uses the absolute year
+	isCurrentYear: boolean;
+	// Set only for all-time ties where the equalled record is over a year old
+	recordEqualledYearsAgo?: number;
+	// Set only for all-time placements: 1 for a tie with the current record
+	// under a year old, 2/3 for days ranking behind the record
+	placementRank?: 1 | 2 | 3;
+	// True when a prior day matches the session's count exactly
+	isJointPlacement?: boolean;
+};
+
+// The session's total juvenile count across all species, ranked against every
+// other day in scope — the juvenile counterpart to a session-total record.
+// Strict record or (all-time only) a tie that has stood for a year or more.
+export type SessionTotalJuvRecordHighlight = {
+	type: 'session-total-juv-record';
+	sortValue: SortValue;
+	scope: RecordScope;
+	value: number;
+	year: number;
+	// 'this year' copy is only correct while the session's year is still current;
+	// otherwise the sentence uses the absolute year
+	isCurrentYear: boolean;
+	// Set only for all-time ties where the equalled record is over a year old
+	recordEqualledYearsAgo?: number;
+};
+
+// The most juveniles of one species this session, ranked against every other
+// day in scope — the juvenile counterpart to a species-count record, sharing
+// the same 1st/2nd/3rd placement logic. Only produced when the session's juv
+// count for the species exceeds MIN_NOTABLE_JUV_COUNT.
+export type SpeciesJuvCountRecordHighlight = {
+	type: 'species-juv-count-record';
 	sortValue: SortValue;
 	speciesName: string;
 	scope: RecordScope;
@@ -316,8 +372,10 @@ export type CombinedSpeciesCountRecordHighlight = {
 // side (app/components/session-highlight-renderers.tsx).
 export type SessionHighlight =
 	| SessionTotalRecordHighlight
+	| SessionTotalJuvRecordHighlight
 	| SinceComparisonHighlight
 	| SpeciesCountRecordHighlight
+	| SpeciesJuvCountRecordHighlight
 	| FirstEverSpeciesHighlight
 	| FirstOfYearSpeciesHighlight
 	| RareSpeciesHighlight
@@ -333,6 +391,7 @@ type DayTotals = {
 	date: string;
 	encounters: number;
 	species: number;
+	juvs: number;
 };
 
 // Highlights compare the session against every other session in scope,
@@ -343,16 +402,18 @@ export function buildDayTotals({
 }: SessionStatsData): DayTotals[] {
 	const totalsByDate = new Map<string, DayTotals>();
 	for (const date of sessionDates) {
-		totalsByDate.set(date, { date, encounters: 0, species: 0 });
+		totalsByDate.set(date, { date, encounters: 0, species: 0, juvs: 0 });
 	}
 	for (const row of daySpeciesStats) {
 		const dayTotals = totalsByDate.get(row.visit_date) ?? {
 			date: row.visit_date,
 			encounters: 0,
-			species: 0
+			species: 0,
+			juvs: 0
 		};
 		dayTotals.encounters += row.encounter_count;
 		dayTotals.species += 1;
+		dayTotals.juvs += row.juv_count;
 		totalsByDate.set(row.visit_date, dayTotals);
 	}
 	return [...totalsByDate.values()];
@@ -435,6 +496,74 @@ export function deriveSessionTotalRecords({
 			// beaten or unreportable tie at this scope — a narrower scope may
 			// exclude the offending day and still hold a strict record
 		}
+	}
+	return highlights;
+}
+
+// The session's total juvenile count, ranked against every other day in scope.
+// Mirrors deriveSessionTotalRecords for the single 'juvs' measure: a strict
+// record at the broadest scope it holds, or an all-time tie that has stood a
+// year or more. A session with no juveniles is never a record (a "most juvs
+// ever — 0" line is meaningless), so a zero total is skipped.
+export function deriveSessionTotalJuvRecords({
+	date,
+	stats,
+	today = new Date()
+}: {
+	date: string;
+	stats: SessionStatsData;
+	today?: Date;
+}): SessionTotalJuvRecordHighlight[] {
+	const sessionDate = new Date(date);
+	const dayTotals = buildDayTotals(stats);
+	const currentDay = dayTotals.find((day) => day.date === date);
+	if (!currentDay) return [];
+	const sessionValue = currentDay.juvs;
+	// No juveniles this session — nothing to report
+	if (sessionValue === 0) return [];
+
+	const highlights: SessionTotalJuvRecordHighlight[] = [];
+	for (const scope of RECORD_SCOPES) {
+		const scopeMatcher = getScopeMatcher(scope, sessionDate);
+		const otherDaysInScope = dayTotals.filter(
+			(day) => day.date !== date && scopeMatcher(day.date)
+		);
+		// A record is only meaningful against at least one other session
+		if (otherDaysInScope.length === 0) continue;
+		const bestOtherValue = Math.max(...otherDaysInScope.map((day) => day.juvs));
+		const baseHighlight = {
+			type: 'session-total-juv-record',
+			sortValue: juvSortValue('juv-session-total', scope),
+			scope,
+			value: sessionValue,
+			year: sessionDate.getFullYear(),
+			isCurrentYear: sessionDate.getFullYear() === today.getFullYear()
+		} satisfies SessionTotalJuvRecordHighlight;
+		if (sessionValue > bestOtherValue) {
+			highlights.push(baseHighlight);
+			break;
+		}
+		if (sessionValue === bestOtherValue && scope === 'all-time') {
+			// The for-N-years copy describes how long the record stood, so only
+			// prior tied days count — a later-only tie is unreportable
+			const mostRecentPriorTieDate = otherDaysInScope
+				.filter((day) => day.juvs === bestOtherValue && day.date < date)
+				.map((day) => day.date)
+				.sort()
+				.at(-1);
+			if (mostRecentPriorTieDate !== undefined) {
+				const recordEqualledYearsAgo = differenceInYears(
+					sessionDate,
+					new Date(mostRecentPriorTieDate)
+				);
+				if (recordEqualledYearsAgo >= 1) {
+					highlights.push({ ...baseHighlight, recordEqualledYearsAgo });
+					break;
+				}
+			}
+		}
+		// beaten or unreportable tie at this scope — a narrower scope may still
+		// hold a strict record
 	}
 	return highlights;
 }
@@ -661,6 +790,106 @@ export function deriveSpeciesRecords({
 				const placement = deriveAllTimePlacement(
 					sessionValue,
 					otherRowsInScope.map((row) => row.encounter_count)
+				);
+				if (placement) {
+					highlights.push({ ...baseHighlight, ...placement });
+					// no break — a narrower scope may still hold a strict record,
+					// reported alongside the placement
+				}
+			}
+			// beaten at this scope — a narrower scope may exclude the
+			// offending day and still hold a strict record
+		}
+	}
+	return highlights;
+}
+
+// A per-species juvenile count is only worth a "most juvs" line once it clears
+// this threshold — the session must have caught strictly more than this many
+// juveniles of the species (i.e. 5+) for a highlight to be produced.
+export const MIN_NOTABLE_JUV_COUNT = 4;
+
+// The most juveniles of one species this session, ranked against every other
+// day in scope. Mirrors deriveSpeciesRecords (same strict-record / all-time
+// tie / 1st-2nd-3rd placement logic) over the 'juvs' measure, but gates on
+// MIN_NOTABLE_JUV_COUNT rather than the single-bird rule — a handful of
+// juveniles is common and unremarkable.
+export function deriveSpeciesJuvRecords({
+	date,
+	stats,
+	today = new Date()
+}: {
+	date: string;
+	stats: SessionStatsData;
+	today?: Date;
+}): SpeciesJuvCountRecordHighlight[] {
+	const sessionDate = new Date(date);
+	const sessionRows = stats.daySpeciesStats.filter(
+		(row) => row.visit_date === date
+	);
+	if (sessionRows.length === 0) return [];
+
+	const sharedFields = {
+		year: sessionDate.getFullYear(),
+		isCurrentYear: sessionDate.getFullYear() === today.getFullYear()
+	};
+
+	const highlights: SpeciesJuvCountRecordHighlight[] = [];
+	for (const sessionRow of sessionRows) {
+		const { species_name: speciesName, juv_count: sessionValue } = sessionRow;
+		// Only notable once the session clears the juvenile-count threshold
+		if (sessionValue <= MIN_NOTABLE_JUV_COUNT) continue;
+		for (const scope of RECORD_SCOPES) {
+			const scopeMatcher = getScopeMatcher(scope, sessionDate);
+			const otherRowsInScope = stats.daySpeciesStats.filter(
+				(row) =>
+					row.species_name === speciesName &&
+					row.visit_date !== date &&
+					scopeMatcher(row.visit_date)
+			);
+			// A record requires the species to appear on at least one other day
+			if (otherRowsInScope.length === 0) continue;
+			const bestOtherValue = Math.max(
+				...otherRowsInScope.map((row) => row.juv_count)
+			);
+			const baseHighlight = {
+				type: 'species-juv-count-record',
+				sortValue: juvSortValue('juv-species-count', scope),
+				speciesName,
+				scope,
+				value: sessionValue,
+				...sharedFields
+			} satisfies SpeciesJuvCountRecordHighlight;
+			if (sessionValue > bestOtherValue) {
+				highlights.push(baseHighlight);
+				break;
+			}
+			if (sessionValue === bestOtherValue && scope === 'all-time') {
+				// The for-N-years copy describes how long the record stood, so
+				// only prior tied days count towards it; a tie held only by a
+				// later day still reads as a joint best day
+				const mostRecentPriorTieDate = otherRowsInScope
+					.filter(
+						(row) => row.juv_count === bestOtherValue && row.visit_date < date
+					)
+					.map((row) => row.visit_date)
+					.sort()
+					.at(-1);
+				const recordEqualledYearsAgo =
+					mostRecentPriorTieDate === undefined
+						? 0
+						: differenceInYears(sessionDate, new Date(mostRecentPriorTieDate));
+				highlights.push(
+					recordEqualledYearsAgo >= 1
+						? { ...baseHighlight, recordEqualledYearsAgo }
+						: { ...baseHighlight, placementRank: 1, isJointPlacement: true }
+				);
+				break;
+			}
+			if (scope === 'all-time') {
+				const placement = deriveAllTimePlacement(
+					sessionValue,
+					otherRowsInScope.map((row) => row.juv_count)
 				);
 				if (placement) {
 					highlights.push({ ...baseHighlight, ...placement });
