@@ -15,9 +15,11 @@ import type {
 	SessionHighlight,
 	SessionTotalMetric,
 	SessionTotalRecordHighlight,
+	SessionTotalJuvRecordHighlight,
 	SinceComparisonHighlight,
 	SinceComparisonKind,
 	SpeciesCountRecordHighlight,
+	SpeciesJuvCountRecordHighlight,
 	WeightRecordExtreme,
 	WeightRecordHighlight
 } from '@/app/models/session-highlights';
@@ -75,6 +77,23 @@ function buildSessionTotalRecordSentence(
 	}
 	// Remaining case: all-time (this-year handled above)
 	return `${descriptor} session ever — ${valueCopy}`;
+}
+
+// "Most juveniles ever — N juvs" / "Most juveniles this year — N juvs" /
+// "Most juveniles for N years — N juvs". The session-total juvenile counterpart
+// to buildSessionTotalRecordSentence, phrasing the scope the same way.
+function buildSessionTotalJuvRecordSentence(
+	highlight: SessionTotalJuvRecordHighlight
+): string {
+	const valueCopy = `${highlight.value} juvs`;
+	if (highlight.recordEqualledYearsAgo !== undefined) {
+		return `Most juveniles for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)} — ${valueCopy}`;
+	}
+	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight, 'of');
+	if (currentPeriodPhrase !== null) {
+		return `Most juveniles ${currentPeriodPhrase} — ${valueCopy}`;
+	}
+	return `Most juveniles ever — ${valueCopy}`;
 }
 
 // "Busiest and most varied session <period> — N birds from M species".
@@ -170,6 +189,39 @@ function buildSpeciesCountRecordSentence(
 			? `the most ${currentPeriodPhrase}`
 			: 'the most ever';
 	return `Record day for ${speciesName} — ${valueCopy}, ${mostPhrase}`;
+}
+
+// The per-species juvenile counterpart to buildSpeciesCountRecordSentence,
+// sharing its record / for-N-years tie / 1st-2nd-3rd placement shape but
+// phrased around juveniles: "Most juvenile Robins ever — N caught",
+// "Second best day for juvenile Robins ever — N caught".
+function buildSpeciesJuvCountRecordSentence(
+	highlight: SpeciesJuvCountRecordHighlight
+): string {
+	const { speciesName, value } = highlight;
+	const valueCopy = `${value} caught`;
+	const juvSpeciesPhrase = `juvenile ${speciesName}`;
+	if (highlight.recordEqualledYearsAgo !== undefined) {
+		return `Record-equalling day for ${juvSpeciesPhrase} — ${valueCopy}, most for ${buildYearsAgoCopy(highlight.recordEqualledYearsAgo)}`;
+	}
+	if (highlight.placementRank !== undefined) {
+		const rankCopy = { 1: 'best', 2: 'second best', 3: 'third best' }[
+			highlight.placementRank
+		];
+		const jointPrefix = highlight.isJointPlacement ? 'Joint ' : '';
+		// Non-joint placements open the sentence, so capitalise the ordinal;
+		// with a "Joint " prefix the ordinal stays mid-sentence and lowercase.
+		const placementCopy = jointPrefix
+			? rankCopy
+			: rankCopy.charAt(0).toUpperCase() + rankCopy.slice(1);
+		return `${jointPrefix}${placementCopy} day for ${juvSpeciesPhrase} ever — ${value} birds`;
+	}
+	const currentPeriodPhrase = buildCurrentPeriodScopePhrase(highlight);
+	const mostPhrase =
+		currentPeriodPhrase !== null
+			? `the most ${currentPeriodPhrase}`
+			: 'the most ever';
+	return `Most ${juvSpeciesPhrase} — ${valueCopy}, ${mostPhrase}`;
 }
 
 function buildSpeciesRecordsPhrase(
@@ -286,10 +338,14 @@ const HIGHLIGHT_RENDERERS: {
 } = {
 	'session-total-record': (highlight) =>
 		renderSentence(buildSessionTotalRecordSentence(highlight)),
+	'session-total-juv-record': (highlight) =>
+		renderSentence(buildSessionTotalJuvRecordSentence(highlight)),
 	'since-comparison': (highlight) =>
 		renderSentence(buildSinceComparisonSentence(highlight)),
 	'species-count-record': (highlight) =>
 		renderSentence(buildSpeciesCountRecordSentence(highlight)),
+	'species-juv-count-record': (highlight) =>
+		renderSentence(buildSpeciesJuvCountRecordSentence(highlight)),
 	'first-ever-species': (highlight) =>
 		renderSentence(buildFirstEverSpeciesSentence(highlight)),
 	'first-of-year-species': (highlight) =>

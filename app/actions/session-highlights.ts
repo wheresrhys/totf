@@ -8,8 +8,10 @@ import {
 	deriveLongAbsenceRetraps,
 	deriveRareSpecies,
 	deriveSessionTotalRecords,
+	deriveSessionTotalJuvRecords,
 	deriveSinceHighlights,
 	deriveSpeciesRecords,
+	deriveSpeciesJuvRecords,
 	deriveWeightRecordBreakers,
 	type SessionHighlight,
 	type SessionStatsData
@@ -107,8 +109,10 @@ export async function fetchSessionHighlights({
 	]);
 	const highlightPool = [
 		...deriveSessionTotalRecords({ date, stats }),
+		...deriveSessionTotalJuvRecords({ date, stats }),
 		...deriveSinceHighlights({ date, stats }),
 		...deriveSpeciesRecords({ date, stats }),
+		...deriveSpeciesJuvRecords({ date, stats }),
 		...deriveFirstEverSpecies({ date, stats }),
 		...deriveFirstOfYearSpecies({ date, stats }),
 		...deriveRareSpecies({ date, stats }),
