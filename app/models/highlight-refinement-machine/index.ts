@@ -1,6 +1,7 @@
 import type { SessionHighlight } from '@/app/models/session-highlights';
 import { removeBusiestSinceWhenBusiestRecordHeld } from './remove-busiest-since-when-busiest-record-held';
 import { removeNarrowerScopeSpeciesRecords } from './remove-narrower-scope-species-records';
+import { removeCountAndWeightHighlightsForRareSpecies } from './remove-count-and-weight-highlights-for-rare-species';
 import { combineSessionTotalRecords } from './combine-session-total-records';
 import { combineOnlyOfYearHighlights } from './combine-only-of-year-highlights';
 import { combineFirstEverHighlights } from './combine-first-ever-highlights';
@@ -10,6 +11,7 @@ import { orderBySortValue } from './order-by-sort-value';
 
 export { removeBusiestSinceWhenBusiestRecordHeld } from './remove-busiest-since-when-busiest-record-held';
 export { removeNarrowerScopeSpeciesRecords } from './remove-narrower-scope-species-records';
+export { removeCountAndWeightHighlightsForRareSpecies } from './remove-count-and-weight-highlights-for-rare-species';
 export { combineSessionTotalRecords } from './combine-session-total-records';
 export { combineOnlyOfYearHighlights } from './combine-only-of-year-highlights';
 export { combineFirstEverHighlights } from './combine-first-ever-highlights';
@@ -29,6 +31,7 @@ type HighlightRule = (highlights: SessionHighlight[]) => SessionHighlight[];
 const RULES: HighlightRule[] = [
 	removeBusiestSinceWhenBusiestRecordHeld, // Rem-1
 	removeNarrowerScopeSpeciesRecords, // Rem-2
+	removeCountAndWeightHighlightsForRareSpecies, // Rem-3
 	combineSessionTotalRecords, // Comb-1
 	combineOnlyOfYearHighlights, // Comb-2
 	combineYearSpeciesCounts, // Comb-3
