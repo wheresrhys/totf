@@ -1,39 +1,48 @@
 import type { SessionHighlight } from '@/app/models/session-highlights';
 
-// Count/weight highlight types that a rare-species highlight suppresses. These
-// are the "how many / how heavy" record lines — session totals, per-species
-// counts, their juvenile counterparts, the busiest/quietest comparisons and the
-// weight placements. Editorial rationale: when a genuinely rare bird turns up,
-// that is the story of the session; the routine count and weight records read as
-// noise beside it, so they are dropped. This rule runs before the combine pass,
-// so it only ever sees these base types (their combined variants are produced
-// later).
-const COUNT_AND_WEIGHT_TYPES = [
-	'session-total-record',
-	'session-total-juv-record',
+// Per-species count/weight highlight types that a rare-species highlight
+// suppresses for its own species. These are the "how many / how heavy" record
+// lines scoped to a single species — its count record, the juvenile
+// counterpart and its weight placement. Editorial rationale: when a genuinely
+// rare bird turns up, that it appeared at all is the story; a routine count or
+// weight record for the *same* species reads as noise beside it, so it is
+// dropped. Session-wide records (session totals, busiest/quietest comparisons)
+// are not tied to the rare species and are left untouched. This rule runs
+// before the combine pass, so it only ever sees these base types (their
+// combined variants are produced later).
+const SPECIES_COUNT_AND_WEIGHT_TYPES = [
 	'species-count-record',
 	'species-juv-count-record',
-	'since-comparison',
 	'weight-record'
 ] as const;
-type CountOrWeightType = (typeof COUNT_AND_WEIGHT_TYPES)[number];
+type SpeciesCountOrWeightType = (typeof SPECIES_COUNT_AND_WEIGHT_TYPES)[number];
 
-function isCountOrWeightHighlight(
+function isSpeciesCountOrWeightHighlight(
 	highlight: SessionHighlight
-): highlight is Extract<SessionHighlight, { type: CountOrWeightType }> {
-	return (COUNT_AND_WEIGHT_TYPES as readonly string[]).includes(highlight.type);
+): highlight is Extract<SessionHighlight, { type: SpeciesCountOrWeightType }> {
+	return (SPECIES_COUNT_AND_WEIGHT_TYPES as readonly string[]).includes(
+		highlight.type
+	);
 }
 
-// Rem-3: when the session has a rare-species highlight, drop every count and
-// weight highlight — the rare bird is the headline, and the routine records
-// alongside it only dilute it. No rare-species highlight leaves the pool
-// untouched.
+// Rem-3: for each rare-species highlight, drop that species' own count and
+// weight highlights — the rare appearance is the headline for that bird, and a
+// routine record alongside it only dilutes it. Other species' count/weight
+// highlights, and session-wide records, are untouched.
 export function removeCountAndWeightHighlightsForRareSpecies(
 	highlights: SessionHighlight[]
 ): SessionHighlight[] {
-	const hasRareSpecies = highlights.some(
-		(highlight) => highlight.type === 'rare-species'
+	const rareSpeciesNames = new Set(
+		highlights
+			.filter((highlight) => highlight.type === 'rare-species')
+			.map((highlight) => highlight.speciesName)
 	);
-	if (!hasRareSpecies) return highlights;
-	return highlights.filter((highlight) => !isCountOrWeightHighlight(highlight));
+	if (rareSpeciesNames.size === 0) return highlights;
+	return highlights.filter(
+		(highlight) =>
+			!(
+				isSpeciesCountOrWeightHighlight(highlight) &&
+				rareSpeciesNames.has(highlight.speciesName)
+			)
+	);
 }

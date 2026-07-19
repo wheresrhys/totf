@@ -154,10 +154,13 @@ describe('fetchSessionHighlights', () => {
 		) as [string, { ringing_group_filter: number }];
 		expect(statsArgs.ringing_group_filter).toBe(GROUP_ID);
 		// Robin is a rare species here (seen on only 2 days ever), so the machine's
-		// rare-species suppression (Rem-3) drops every count/weight line, leaving
-		// only the rare-species mention — the rare bird is the story of the session
+		// rare-species suppression (Rem-3) drops Robin's own count/weight lines
+		// (its species record). Session-wide records — busiest session, quietest
+		// since — are not tied to the rare species and survive.
 		expect(sentencesOf(highlights)).toEqual([
-			'Rarely recorded — Robin seen on only 2 days ever'
+			'Rarely recorded — Robin seen on only 2 days ever',
+			'Busiest session ever — 74 birds',
+			'Quietest session since 1 May 2022 — 74 birds'
 		]);
 	});
 

@@ -282,8 +282,29 @@ describe('removeNarrowerScopeSpeciesRecords (Rem-2)', () => {
 });
 
 describe('removeCountAndWeightHighlightsForRareSpecies (Rem-3)', () => {
-	it('drops all count and weight highlights when a rare-species highlight is present', () => {
+	// A weight record for the rare species itself (rareSpecies is 'Wryneck')
+	const wryneckWeight: WeightRecordHighlight = {
+		type: 'weight-record',
+		sortValue: familySortValue('weight-record'),
+		speciesName: 'Wryneck',
+		extreme: 'heaviest',
+		weight: 30.2,
+		placementRank: 1,
+		isJointPlacement: false
+	};
+
+	it("drops the rare species' own count and weight highlights", () => {
 		const removed = removeCountAndWeightHighlightsForRareSpecies([
+			rareSpecies,
+			speciesCountRecord('Wryneck', 'all-time', 2),
+			speciesJuvCountRecord('Wryneck', 'this-year', 1),
+			wryneckWeight
+		]);
+		expect(removed).toEqual([rareSpecies]);
+	});
+
+	it("keeps other species' count and weight highlights, and session-wide records", () => {
+		const pool = [
 			rareSpecies,
 			sessionTotalRecord('encounters', 'this-year', 120),
 			sessionTotalJuvRecord('all-time', 8),
@@ -291,9 +312,9 @@ describe('removeCountAndWeightHighlightsForRareSpecies (Rem-3)', () => {
 			speciesJuvCountRecord('Reed Warbler', 'all-time', 12),
 			busiestSince,
 			quietestSince,
-			weightRecord
-		]);
-		expect(removed).toEqual([rareSpecies]);
+			weightRecord // Blue Tit
+		];
+		expect(removeCountAndWeightHighlightsForRareSpecies(pool)).toEqual(pool);
 	});
 
 	it('leaves the pool untouched when no rare-species highlight is present', () => {
@@ -305,13 +326,13 @@ describe('removeCountAndWeightHighlightsForRareSpecies (Rem-3)', () => {
 		expect(removeCountAndWeightHighlightsForRareSpecies(pool)).toEqual(pool);
 	});
 
-	it('keeps non-count/weight highlights alongside the rare-species one', () => {
+	it("keeps the rare species' non-count/weight highlights alongside it", () => {
 		const removed = removeCountAndWeightHighlightsForRareSpecies([
 			rareSpecies,
 			firstEverSpecies,
 			longAbsenceRetrap,
 			firstOfYear('Chaffinch', true),
-			weightRecord
+			wryneckWeight
 		]);
 		expect(removed).toEqual([
 			rareSpecies,
@@ -321,7 +342,7 @@ describe('removeCountAndWeightHighlightsForRareSpecies (Rem-3)', () => {
 		]);
 	});
 
-	it('drops count and weight highlights but keeps every rare-species highlight when several are present', () => {
+	it("drops each rare species' own records when several rare species are present", () => {
 		const secondRare: RareSpeciesHighlight = {
 			type: 'rare-species',
 			sortValue: familySortValue('rare-species'),
@@ -331,14 +352,21 @@ describe('removeCountAndWeightHighlightsForRareSpecies (Rem-3)', () => {
 		const removed = removeCountAndWeightHighlightsForRareSpecies([
 			rareSpecies,
 			secondRare,
+			wryneckWeight,
+			speciesCountRecord('Hawfinch', 'all-time', 3),
+			weightRecord, // Blue Tit — not rare, kept
+			sessionTotalRecord('encounters', 'this-year', 120)
+		]);
+		expect(removed).toEqual([
+			rareSpecies,
+			secondRare,
 			weightRecord,
 			sessionTotalRecord('encounters', 'this-year', 120)
 		]);
-		expect(removed).toEqual([rareSpecies, secondRare]);
 	});
 
 	it('does not mutate the input list', () => {
-		const pool = [rareSpecies, weightRecord];
+		const pool = [rareSpecies, wryneckWeight];
 		const snapshot = [...pool];
 		removeCountAndWeightHighlightsForRareSpecies(pool);
 		expect(pool).toEqual(snapshot);
@@ -898,21 +926,40 @@ describe('runHighlightMachine', () => {
 		]);
 	});
 
-	it('suppresses count and weight highlights when a rare species turns up', () => {
+	it("suppresses a rare species' own count and weight highlights but keeps other species' and session-wide records", () => {
+		const wryneckWeight: WeightRecordHighlight = {
+			type: 'weight-record',
+			sortValue: familySortValue('weight-record'),
+			speciesName: 'Wryneck',
+			extreme: 'heaviest',
+			weight: 30.2,
+			placementRank: 1,
+			isJointPlacement: false
+		};
 		const pool: SessionHighlight[] = [
-			rareSpecies,
+			rareSpecies, // Wryneck
+			speciesCountRecord('Wryneck', 'all-time', 2), // dropped — rare species' own
+			wryneckWeight, // dropped — rare species' own
 			firstEverSpecies,
-			sessionTotalRecord('encounters', 'this-year', 120),
-			speciesCountRecord('Reed Warbler', 'this-year', 67),
-			busiestSince,
-			weightRecord
+			sessionTotalRecord('encounters', 'this-year', 120), // kept — session-wide
+			speciesCountRecord('Reed Warbler', 'this-year', 67), // kept — other species
+			weightRecord // Blue Tit — kept — other species
 		];
 		const machined = runHighlightMachine(pool);
-		// only the rare bird and the (non-count) first-ever survive; the routine
-		// count/weight lines are dropped, first-ever above rare by sort value
-		expect(machined.map((highlight) => highlight.type)).toEqual([
-			'first-ever-species',
-			'rare-species'
+		// The rare bird's own count/weight lines are dropped; other species' and
+		// session-wide records survive. first-ever above rare by sort value.
+		expect(
+			machined.map((highlight) =>
+				'speciesName' in highlight
+					? [highlight.type, highlight.speciesName]
+					: [highlight.type]
+			)
+		).toEqual([
+			['first-ever-species', 'Firecrest'],
+			['rare-species', 'Wryneck'],
+			['session-total-record'],
+			['species-count-record', 'Reed Warbler'],
+			['weight-record', 'Blue Tit']
 		]);
 	});
 
