@@ -717,7 +717,7 @@ describe('combineSpeciesPlacementRecords (Comb-4)', () => {
 		expect(combineSpeciesPlacementRecords([lone])).toEqual([lone]);
 	});
 
-	it('merges two strict 2nd-best records, keeping a shared count', () => {
+	it('merges two strict 2nd-best records into a countless line', () => {
 		const combined = combineSpeciesPlacementRecords([
 			secondBest('Dunnock', 6),
 			secondBest('Whitethroat', 6)
@@ -733,13 +733,14 @@ describe('combineSpeciesPlacementRecords (Comb-4)', () => {
 				species: [
 					{ name: 'Dunnock', isJoint: false },
 					{ name: 'Whitethroat', isJoint: false }
-				],
-				value: 6
+				]
 			}
 		]);
+		// A combined line never carries a count, even when the parts agree on it
+		expect(combined[0]).not.toHaveProperty('value');
 	});
 
-	it('drops the count when every merged placement is joint', () => {
+	it('carries each species joint flag through the merge', () => {
 		const combined = combineSpeciesPlacementRecords([
 			secondBest('Dunnock', 6, true),
 			secondBest('Whitethroat', 6, true)
@@ -760,7 +761,7 @@ describe('combineSpeciesPlacementRecords (Comb-4)', () => {
 		]);
 	});
 
-	it('flags each joint species and keeps the shared count in a mixed group', () => {
+	it('flags each joint species in a mixed group, still without a count', () => {
 		const combined = combineSpeciesPlacementRecords([
 			secondBest('Dunnock', 6, false),
 			secondBest('Whitethroat', 6, true)
@@ -772,13 +773,13 @@ describe('combineSpeciesPlacementRecords (Comb-4)', () => {
 				species: [
 					{ name: 'Dunnock', isJoint: false },
 					{ name: 'Whitethroat', isJoint: true }
-				],
-				value: 6
+				]
 			})
 		]);
+		expect(combined[0]).not.toHaveProperty('value');
 	});
 
-	it('drops the count when merged placements disagree on it', () => {
+	it('drops the count even when merged placements disagree on it', () => {
 		const combined = combineSpeciesPlacementRecords([
 			secondBest('Dunnock', 6),
 			secondBest('Blue Tit', 15)

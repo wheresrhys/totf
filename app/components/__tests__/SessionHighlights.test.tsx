@@ -308,31 +308,25 @@ describe('SessionHighlights', () => {
 
 	function placementHighlight(
 		placementRank: 2 | 3,
-		species: { name: string; isJoint: boolean }[],
-		value?: number
+		species: { name: string; isJoint: boolean }[]
 	): SessionHighlight {
 		return {
 			type: 'combined-species-placement-record',
 			sortValue: familySortValue('scoped-record'),
 			placementRank,
-			species,
-			...(value === undefined ? {} : { value })
+			species
 		};
 	}
 
-	it('renders a combined strict 2nd-best placement with its shared count', async () => {
+	it('renders a combined strict 2nd-best placement without a count', async () => {
 		const items = await renderSingleHighlight(
-			placementHighlight(
-				2,
-				[
-					{ name: 'Dunnock', isJoint: false },
-					{ name: 'Whitethroat', isJoint: false }
-				],
-				6
-			)
+			placementHighlight(2, [
+				{ name: 'Dunnock', isJoint: false },
+				{ name: 'Whitethroat', isJoint: false }
+			])
 		);
 		expect(items[0].textContent).toBe(
-			'Second best day for Dunnock and Whitethroat ever — 6 birds'
+			'Second best day for Dunnock and Whitethroat ever'
 		);
 	});
 
@@ -350,34 +344,26 @@ describe('SessionHighlights', () => {
 
 	it('renders a mixed 2nd-best placement, flagging the joint species inline', async () => {
 		const items = await renderSingleHighlight(
-			placementHighlight(
-				2,
-				[
-					{ name: 'Dunnock', isJoint: false },
-					{ name: 'Whitethroat', isJoint: true }
-				],
-				6
-			)
+			placementHighlight(2, [
+				{ name: 'Dunnock', isJoint: false },
+				{ name: 'Whitethroat', isJoint: true }
+			])
 		);
 		expect(items[0].textContent).toBe(
-			'Second best day for Dunnock and (tied second) Whitethroat ever — 6 birds'
+			'Second best day for Dunnock and (tied second) Whitethroat ever'
 		);
 	});
 
 	it('comma-joins three merged species and phrases the third-best rank', async () => {
 		const items = await renderSingleHighlight(
-			placementHighlight(
-				3,
-				[
-					{ name: 'Dunnock', isJoint: false },
-					{ name: 'Whitethroat', isJoint: false },
-					{ name: 'Wren', isJoint: false }
-				],
-				4
-			)
+			placementHighlight(3, [
+				{ name: 'Dunnock', isJoint: false },
+				{ name: 'Whitethroat', isJoint: false },
+				{ name: 'Wren', isJoint: false }
+			])
 		);
 		expect(items[0].textContent).toBe(
-			'Third best day for Dunnock, Whitethroat and Wren ever — 4 birds'
+			'Third best day for Dunnock, Whitethroat and Wren ever'
 		);
 	});
 

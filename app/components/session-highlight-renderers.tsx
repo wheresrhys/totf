@@ -173,15 +173,15 @@ const PLACEMENT_TIED_WORD: Record<2 | 3, string> = {
 	3: 'tied third'
 };
 
-// "Second best day for Dunnock and Whitethroat ever — 6 birds" and its variants:
-// several all-time 2nd/3rd-best species records folded into one line. An all-joint
-// group leads with "Joint" and drops the count; a mixed group leads plain and flags
-// each joint species inline ("(tied second) Whitethroat"); the count only shows when
-// every part agreed on it (carried on the highlight, absent otherwise).
+// "Second best day for Dunnock and Whitethroat ever" and its variants: several
+// all-time 2nd/3rd-best species records folded into one line. A combined line
+// never shows a count (only a lone unmerged placement does). An all-joint group
+// leads with "Joint"; a mixed group leads plain and flags each joint species
+// inline ("(tied second) Whitethroat").
 function buildCombinedSpeciesPlacementRecordSentence(
 	highlight: CombinedSpeciesPlacementRecordHighlight
 ): string {
-	const { placementRank, species, value } = highlight;
+	const { placementRank, species } = highlight;
 	const rankWord = PLACEMENT_RANK_WORD[placementRank];
 	const allJoint = species.every((entry) => entry.isJoint);
 	const descriptor = allJoint
@@ -195,8 +195,7 @@ function buildCombinedSpeciesPlacementRecordSentence(
 		: species.map((entry) =>
 				entry.isJoint ? `(${tiedWord}) ${entry.name}` : entry.name
 			);
-	const sentence = `${descriptor} for ${buildSpeciesList(speciesNames)} ever`;
-	return value === undefined ? sentence : `${sentence} — ${value} birds`;
+	return `${descriptor} for ${buildSpeciesList(speciesNames)} ever`;
 }
 
 function buildSpeciesCountRecordSentence(

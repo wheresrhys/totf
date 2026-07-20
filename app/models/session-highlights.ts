@@ -376,12 +376,13 @@ export type CombinedSpeciesCountRecordHighlight = {
 
 // Multiple all-time 2nd- or 3rd-best-day species-count records that share a
 // placement rank, merged by the machine's combine pass into one line listing
-// every species — "Second best day for Dunnock and Whitethroat ever — 6 birds".
-// Only the all-time placements merge (this-year records combine separately); 1st
-// places and record-equalling ties are never included. The count shows only when
-// every part shares the same value and the group isn't all-joint — an all-joint
-// group leads with "Joint" and drops the count, while a mixed group leads plain
-// and flags each joint species inline ("(tied second) Whitethroat").
+// every species — "Second best day for Dunnock and Whitethroat ever". Only the
+// all-time placements merge (this-year records combine separately); 1st places
+// and record-equalling ties are never included. A combined line never carries a
+// count (the merged species may differ on it) — the per-species count survives
+// only on a single, unmerged placement. An all-joint group leads with "Joint",
+// while a mixed group leads plain and flags each joint species inline ("(tied
+// second) Whitethroat").
 export type CombinedSpeciesPlacementRecordHighlight = {
 	type: 'combined-species-placement-record';
 	sortValue: SortValue;
@@ -390,9 +391,6 @@ export type CombinedSpeciesPlacementRecordHighlight = {
 	// Each merged species with its own joint flag, in the order the source
 	// highlights appeared
 	species: { name: string; isJoint: boolean }[];
-	// The shared bird count, present only when every part has the same count and
-	// the group is not all-joint; omitted when the count is discarded
-	value?: number;
 };
 
 // A this-year weight record (always a 1st place) merged with the same species'

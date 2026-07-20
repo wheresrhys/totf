@@ -20,18 +20,12 @@ function isPlacementRecord(
 	);
 }
 
-// Merges one rank's placements into a single line. The count survives only when
-// every part shares it and the group isn't all-joint: an all-joint group drops
-// the count (each part could sit against a different tied value), a mixed or
-// all-strict group keeps a count the whole list agrees on.
+// Merges one rank's placements into a single line. A combined line never carries
+// a count — the merged species can differ on it, so the per-species count is only
+// meaningful on a lone unmerged placement.
 function combinePlacementGroup(
 	group: PlacementRecord[]
 ): CombinedSpeciesPlacementRecordHighlight {
-	const allJoint = group.every((record) => record.isJointPlacement === true);
-	const [firstValue] = group.map((record) => record.value);
-	const sharedValue = group.every((record) => record.value === firstValue)
-		? firstValue
-		: undefined;
 	return {
 		type: 'combined-species-placement-record',
 		sortValue: combinedSortValue(group),
@@ -39,16 +33,16 @@ function combinePlacementGroup(
 		species: group.map((record) => ({
 			name: record.speciesName,
 			isJoint: record.isJointPlacement === true
-		})),
-		...(!allJoint && sharedValue !== undefined ? { value: sharedValue } : {})
+		}))
 	};
 }
 
-// Comb: multiple all-time "Second/Third best day for <species> ever" records
-// merge into one line per rank — "Second best day for A and B ever — N birds".
-// 2nd-best and 3rd-best records merge separately (a rank never mixes with the
-// other), and a rank with only one placement is left unchanged. Each combined
-// line takes the position of the first record of its rank.
+// Comb-4: multiple all-time "Second/Third best day for <species> ever" records
+// merge into one line per rank — "Second best day for A and B ever" (the count
+// is dropped; only a lone unmerged placement keeps its "— N birds"). 2nd-best
+// and 3rd-best records merge separately (a rank never mixes with the other), and
+// a rank with only one placement is left unchanged. Each combined line takes the
+// position of the first record of its rank.
 export function combineSpeciesPlacementRecords(
 	highlights: SessionHighlight[]
 ): SessionHighlight[] {
