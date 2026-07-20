@@ -1012,9 +1012,11 @@ export function deriveFirstEverSpecies({
 
 // Returns a highlight for each species seen for the first time this calendar
 // year on this session. First-ever species are excluded (the broader
-// first-ever highlight covers them), and the group's first session of the
-// year is suppressed entirely (every species would trivially be first of
-// the year).
+// first-ever highlight covers them). The first session of the year is the
+// spring-arrival roll-call — every returning species is genuinely first of the
+// year there, so those highlights are kept, not suppressed; the combine rule
+// collapses the resulting list into a single "First A, B and C of the year"
+// line.
 export function deriveFirstOfYearSpecies({
 	date,
 	stats,
@@ -1029,11 +1031,6 @@ export function deriveFirstOfYearSpecies({
 	);
 	if (sessionRows.length === 0) return [];
 	const yearPrefix = `${date.slice(0, 4)}-`;
-	// Suppress on the group's first session of the year
-	const priorSessionDatesThisYear = stats.sessionDates.filter(
-		(sessionDate) => sessionDate.startsWith(yearPrefix) && sessionDate < date
-	);
-	if (priorSessionDatesThisYear.length === 0) return [];
 	const year = Number(date.slice(0, 4));
 	return sessionRows
 		.filter((sessionRow) => {

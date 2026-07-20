@@ -1519,14 +1519,25 @@ describe('deriveFirstOfYearSpecies', () => {
 		]);
 	});
 
-	it("returns empty for the group's first session of the year", () => {
-		// Prior sessions exist, but none this year — every species would be
-		// first of the year, so suppress all
+	it("reports first-of-year species on the group's first session of the year", () => {
+		// Prior sessions exist, but none this year — the first session of the
+		// year is the spring-arrival roll-call, so returning species are still
+		// reported (the combine rule collapses a long list into one line)
 		const highlights = deriveFirstOfYear([
 			speciesRow(SESSION_DATE, FIRECREST, 1),
 			speciesRow(PRIOR_SUMMER_OTHER_YEAR, FIRECREST, 2)
 		]);
-		expect(highlights).toEqual([]);
+		expect(highlights).toEqual([
+			{
+				type: 'first-of-year-species',
+				sortValue: familySortValue('first-of-year-species'),
+				speciesName: FIRECREST,
+				year: 2024,
+				isCurrentYear: false,
+				multipleIndividualsRecorded: false,
+				isOnlyRecord: true
+			}
+		]);
 	});
 
 	it('returns empty when every species was already seen this year', () => {
