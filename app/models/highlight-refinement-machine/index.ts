@@ -7,6 +7,7 @@ import { combineOnlyOfYearHighlights } from './combine-only-of-year-highlights';
 import { combineFirstEverHighlights } from './combine-first-ever-highlights';
 import { combineFirstOfYearHighlights } from './combine-first-of-year-highlights';
 import { combineYearSpeciesCounts } from './combine-year-species-counts';
+import { combineSpeciesPlacementRecords } from './combine-species-placement-records';
 import { combineWeightRecords } from './combine-weight-records';
 import { orderBySortValue } from './order-by-sort-value';
 
@@ -18,6 +19,7 @@ export { combineOnlyOfYearHighlights } from './combine-only-of-year-highlights';
 export { combineFirstEverHighlights } from './combine-first-ever-highlights';
 export { combineFirstOfYearHighlights } from './combine-first-of-year-highlights';
 export { combineYearSpeciesCounts } from './combine-year-species-counts';
+export { combineSpeciesPlacementRecords } from './combine-species-placement-records';
 export { combineWeightRecords } from './combine-weight-records';
 export { orderBySortValue } from './order-by-sort-value';
 
@@ -37,9 +39,10 @@ const RULES: HighlightRule[] = [
 	combineSessionTotalRecords, // Comb-1
 	combineOnlyOfYearHighlights, // Comb-2
 	combineYearSpeciesCounts, // Comb-3
-	combineFirstEverHighlights, // Comb-4
-	combineFirstOfYearHighlights, // Comb-5
-	combineWeightRecords, // Comb-6
+	combineSpeciesPlacementRecords, // Comb-4
+	combineFirstEverHighlights, // Comb-5
+	combineFirstOfYearHighlights, // Comb-6
+	combineWeightRecords, // Comb-7
 	orderBySortValue // Ord-1
 ];
 

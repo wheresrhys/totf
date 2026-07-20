@@ -295,6 +295,92 @@ describe('SessionHighlights', () => {
 		]);
 	});
 
+	async function renderSingleHighlight(highlight: SessionHighlight) {
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
+		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+		});
+		return screen.getByTestId('session-highlights').querySelectorAll('li');
+	}
+
+	function placementHighlight(
+		placementRank: 2 | 3,
+		species: { name: string; isJoint: boolean }[],
+		value?: number
+	): SessionHighlight {
+		return {
+			type: 'combined-species-placement-record',
+			sortValue: familySortValue('scoped-record'),
+			placementRank,
+			species,
+			...(value === undefined ? {} : { value })
+		};
+	}
+
+	it('renders a combined strict 2nd-best placement with its shared count', async () => {
+		const items = await renderSingleHighlight(
+			placementHighlight(
+				2,
+				[
+					{ name: 'Dunnock', isJoint: false },
+					{ name: 'Whitethroat', isJoint: false }
+				],
+				6
+			)
+		);
+		expect(items[0].textContent).toBe(
+			'Second best day for Dunnock and Whitethroat ever — 6 birds'
+		);
+	});
+
+	it('renders a combined all-joint 2nd-best placement without a count', async () => {
+		const items = await renderSingleHighlight(
+			placementHighlight(2, [
+				{ name: 'Dunnock', isJoint: true },
+				{ name: 'Whitethroat', isJoint: true }
+			])
+		);
+		expect(items[0].textContent).toBe(
+			'Joint second best day for Dunnock and Whitethroat ever'
+		);
+	});
+
+	it('renders a mixed 2nd-best placement, flagging the joint species inline', async () => {
+		const items = await renderSingleHighlight(
+			placementHighlight(
+				2,
+				[
+					{ name: 'Dunnock', isJoint: false },
+					{ name: 'Whitethroat', isJoint: true }
+				],
+				6
+			)
+		);
+		expect(items[0].textContent).toBe(
+			'Second best day for Dunnock and (tied second) Whitethroat ever — 6 birds'
+		);
+	});
+
+	it('comma-joins three merged species and phrases the third-best rank', async () => {
+		const items = await renderSingleHighlight(
+			placementHighlight(
+				3,
+				[
+					{ name: 'Dunnock', isJoint: false },
+					{ name: 'Whitethroat', isJoint: false },
+					{ name: 'Wren', isJoint: false }
+				],
+				4
+			)
+		);
+		expect(items[0].textContent).toBe(
+			'Third best day for Dunnock, Whitethroat and Wren ever — 4 birds'
+		);
+	});
+
 	it('renders weight record sentences', async () => {
 		const weightHighlight: SessionHighlight = {
 			type: 'weight-record',
