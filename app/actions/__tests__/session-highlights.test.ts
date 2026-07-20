@@ -156,11 +156,14 @@ describe('fetchSessionHighlights', () => {
 		// Robin is a rare species here (seen on only 2 days ever), so the machine's
 		// rare-species suppression (Rem-3) drops Robin's own count/weight lines
 		// (its species record). Session-wide records — busiest session, quietest
-		// since — are not tied to the rare species and survive.
+		// since — are not tied to the rare species and survive. This is also the
+		// first session of 2024 (the only prior session is 2022), so Robin — last
+		// seen in 2022 — is first of the year; that trailing line survives too.
 		expect(sentencesOf(highlights)).toEqual([
 			'Rarely recorded — Robin seen on only 2 days ever',
 			'Busiest session ever — 74 birds',
-			'Quietest session since 1 May 2022 — 74 birds'
+			'Quietest session since 1 May 2022 — 74 birds',
+			'Only Robin records of 2024'
 		]);
 	});
 
