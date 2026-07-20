@@ -7,6 +7,7 @@ import type {
 	CombinedOnlyOfYearHighlight,
 	CombinedSessionTotalRecordHighlight,
 	CombinedSpeciesCountRecordHighlight,
+	CombinedWeightRecordHighlight,
 	FirstEverSpeciesHighlight,
 	FirstOfYearSpeciesHighlight,
 	LongAbsenceRetrapHighlight,
@@ -324,6 +325,25 @@ function buildWeightRecordSentence(highlight: WeightRecordHighlight): string {
 	return `${descriptor} ${speciesName} ${periodPhrase} — ${weight}g`;
 }
 
+// "Heaviest Blue Tit weighed in 2024 (2nd heaviest ever) — 13.1g": the this-year
+// claim leads, the all-time placement (always 2nd/3rd) rides in parentheses. Both
+// the headline and the parenthetical can be joint.
+function buildCombinedWeightRecordSentence(
+	highlight: CombinedWeightRecordHighlight
+): string {
+	const extremeWord = WEIGHT_RECORD_EXTREME_WORD[highlight.extreme];
+	const yearPhrase = highlight.isCurrentYear
+		? 'this year'
+		: `in ${highlight.year}`;
+	const headline = highlight.thisYearIsJoint
+		? `Joint ${extremeWord}`
+		: `${extremeWord[0].toUpperCase()}${extremeWord.slice(1)}`;
+	// "2nd heaviest ever" — a space, unlike the hyphenated standalone weight lines
+	const allTimeRankWord = highlight.allTimeRank === 2 ? '2nd' : '3rd';
+	const parenthetical = `(${highlight.allTimeIsJoint ? 'joint ' : ''}${allTimeRankWord} ${extremeWord} ever)`;
+	return `${headline} ${highlight.speciesName} weighed ${yearPhrase} ${parenthetical} — ${highlight.weight}g`;
+}
+
 // ---- renderers ----
 
 type HighlightRenderer<T extends SessionHighlight['type']> = (
@@ -362,6 +382,8 @@ const HIGHLIGHT_RENDERERS: {
 		renderSentence(buildLongAbsenceRetrapSentence(highlight)),
 	'weight-record': (highlight) =>
 		renderSentence(buildWeightRecordSentence(highlight)),
+	'combined-weight-record': (highlight) =>
+		renderSentence(buildCombinedWeightRecordSentence(highlight)),
 	'combined-session-total-record': (highlight) =>
 		renderSentence(buildCombinedSessionTotalRecordSentence(highlight)),
 	'combined-only-of-year': (highlight) =>

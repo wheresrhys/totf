@@ -13,6 +13,7 @@ import {
 	scopedSortValue,
 	juvSortValue,
 	familySortValue,
+	combinedSortValue,
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
 	type LongAbsenceRetrapHighlight,
@@ -24,6 +25,7 @@ import {
 	type SpeciesCountRecordHighlight,
 	type SpeciesJuvCountRecordHighlight,
 	type WeightRecordHighlight,
+	type CombinedWeightRecordHighlight,
 	type SessionStatsData
 } from '../session-highlights';
 import { renderHighlight } from '@/app/components/session-highlight-renderers';
@@ -2305,6 +2307,73 @@ describe('render — weight-record', () => {
 				})
 			)
 		).toBe('Joint heaviest Blue Tit weighed this year — 13.1g');
+	});
+});
+
+// ---- render — combined-weight-record ----
+
+function makeCombinedWeightHighlight(
+	overrides: Partial<HighlightFields<CombinedWeightRecordHighlight>> = {}
+): CombinedWeightRecordHighlight {
+	return {
+		type: 'combined-weight-record',
+		sortValue: combinedSortValue([
+			{ sortValue: familySortValue('weight-record') },
+			{ sortValue: familySortValue('weight-record') }
+		]),
+		speciesName: BLUE_TIT,
+		extreme: 'heaviest',
+		weight: 13.1,
+		year: 2024,
+		isCurrentYear: false,
+		thisYearIsJoint: false,
+		allTimeRank: 2,
+		allTimeIsJoint: false,
+		...overrides
+	};
+}
+
+describe('render — combined-weight-record', () => {
+	it('leads with the year claim and carries the all-time placement in parens', () => {
+		expect(renderedText(makeCombinedWeightHighlight())).toBe(
+			'Heaviest Blue Tit weighed in 2024 (2nd heaviest ever) — 13.1g'
+		);
+	});
+
+	it('uses "this year" while the year is current', () => {
+		expect(
+			renderedText(makeCombinedWeightHighlight({ isCurrentYear: true }))
+		).toBe('Heaviest Blue Tit weighed this year (2nd heaviest ever) — 13.1g');
+	});
+
+	it('renders a 3rd-ever placement', () => {
+		expect(renderedText(makeCombinedWeightHighlight({ allTimeRank: 3 }))).toBe(
+			'Heaviest Blue Tit weighed in 2024 (3rd heaviest ever) — 13.1g'
+		);
+	});
+
+	it('renders the lightest extreme symmetrically', () => {
+		expect(
+			renderedText(
+				makeCombinedWeightHighlight({ extreme: 'lightest', weight: 9.8 })
+			)
+		).toBe('Lightest Blue Tit weighed in 2024 (2nd lightest ever) — 9.8g');
+	});
+
+	it('marks a joint year leader with "Joint"', () => {
+		expect(
+			renderedText(makeCombinedWeightHighlight({ thisYearIsJoint: true }))
+		).toBe(
+			'Joint heaviest Blue Tit weighed in 2024 (2nd heaviest ever) — 13.1g'
+		);
+	});
+
+	it('marks a joint all-time placement inside the parens', () => {
+		expect(
+			renderedText(makeCombinedWeightHighlight({ allTimeIsJoint: true }))
+		).toBe(
+			'Heaviest Blue Tit weighed in 2024 (joint 2nd heaviest ever) — 13.1g'
+		);
 	});
 });
 

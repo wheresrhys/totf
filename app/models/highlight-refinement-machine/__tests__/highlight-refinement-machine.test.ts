@@ -4,6 +4,7 @@ import {
 	combineFirstOfYearHighlights,
 	combineOnlyOfYearHighlights,
 	combineSessionTotalRecords,
+	combineWeightRecords,
 	combineYearSpeciesCounts,
 	orderBySortValue,
 	removeBusiestSinceWhenBusiestRecordHeld,
@@ -279,34 +280,17 @@ describe('removeNarrowerScopeSpeciesRecords (Rem-2)', () => {
 	});
 
 	it('is a noop on non-species-record highlights', () => {
-		const pool = [busiestSince, rareSpecies];
+		// Weight records are reconciled by combineWeightRecords (Comb-6), not here
+		const pool = [busiestSince, weightRecord];
 		expect(removeNarrowerScopeSpeciesRecords(pool)).toEqual(pool);
 	});
 
-	it('drops a this-year weight record when the species holds an all-time one for the same extreme', () => {
-		const allTime = weightRecord; // Blue Tit heaviest, all-time
-		const removed = removeNarrowerScopeSpeciesRecords([
-			allTime,
-			{ ...weightRecord, scope: 'this-year' }
-		]);
-		expect(removed).toEqual([allTime]);
-	});
-
-	it('keeps weight records for different extremes of the same species', () => {
-		// A heaviest all-time and a lightest this-year are keyed separately, so
-		// neither collapses the other
-		const heaviestAllTime = weightRecord;
-		const lightestThisYear: WeightRecordHighlight = {
-			...weightRecord,
-			scope: 'this-year',
-			extreme: 'lightest',
-			weight: 9.8
-		};
-		const removed = removeNarrowerScopeSpeciesRecords([
-			heaviestAllTime,
-			lightestThisYear
-		]);
-		expect(removed).toEqual([heaviestAllTime, lightestThisYear]);
+	it('leaves this-year and all-time weight records untouched (handled by Comb-6)', () => {
+		const pool = [
+			weightRecord,
+			{ ...weightRecord, scope: 'this-year' as const }
+		];
+		expect(removeNarrowerScopeSpeciesRecords(pool)).toEqual(pool);
 	});
 });
 
@@ -903,6 +887,107 @@ describe('combineFirstOfYearHighlights (Comb-5)', () => {
 	});
 });
 
+describe('combineWeightRecords (Comb-6)', () => {
+	// weightRecord is a Blue Tit heaviest all-time 1st; build the pieces from it
+	const heaviestThisYear: WeightRecordHighlight = {
+		...weightRecord,
+		scope: 'this-year'
+	};
+	const heaviestAllTime2nd: WeightRecordHighlight = {
+		...weightRecord,
+		scope: 'all-time',
+		placementRank: 2
+	};
+	const heaviestAllTime3rd: WeightRecordHighlight = {
+		...weightRecord,
+		scope: 'all-time',
+		placementRank: 3
+	};
+
+	it('merges a this-year 1st with an all-time 2nd for the same species+extreme', () => {
+		const combined = combineWeightRecords([
+			heaviestAllTime2nd,
+			heaviestThisYear
+		]);
+		expect(combined).toEqual([
+			{
+				type: 'combined-weight-record',
+				sortValue: combinedSortValue([heaviestThisYear, heaviestAllTime2nd]),
+				speciesName: 'Blue Tit',
+				extreme: 'heaviest',
+				weight: 13.1,
+				year: 2024,
+				isCurrentYear: false,
+				thisYearIsJoint: false,
+				allTimeRank: 2,
+				allTimeIsJoint: false
+			}
+		]);
+	});
+
+	it('merges with an all-time 3rd, carrying the rank through', () => {
+		const combined = combineWeightRecords([
+			heaviestAllTime3rd,
+			heaviestThisYear
+		]);
+		expect(combined).toEqual([
+			expect.objectContaining({
+				type: 'combined-weight-record',
+				allTimeRank: 3
+			})
+		]);
+	});
+
+	it('keeps the all-time line and drops the this-year one when the all-time is a 1st', () => {
+		// Being the heaviest ever subsumes the year claim — no combined line
+		const combined = combineWeightRecords([weightRecord, heaviestThisYear]);
+		expect(combined).toEqual([weightRecord]);
+	});
+
+	it('leaves a this-year 1st untouched when the species has no all-time placement', () => {
+		expect(combineWeightRecords([heaviestThisYear])).toEqual([
+			heaviestThisYear
+		]);
+	});
+
+	it('matches on extreme — a this-year heaviest is not merged with an all-time lightest', () => {
+		const lightestAllTime2nd: WeightRecordHighlight = {
+			...weightRecord,
+			extreme: 'lightest',
+			weight: 9.8,
+			placementRank: 2
+		};
+		const pool = [lightestAllTime2nd, heaviestThisYear];
+		expect(combineWeightRecords(pool)).toEqual(pool);
+	});
+
+	it('carries the joint flags from each part', () => {
+		const combined = combineWeightRecords([
+			{ ...heaviestAllTime2nd, isJointPlacement: true },
+			{ ...heaviestThisYear, isJointPlacement: true }
+		]);
+		expect(combined).toEqual([
+			expect.objectContaining({
+				thisYearIsJoint: true,
+				allTimeIsJoint: true,
+				allTimeRank: 2
+			})
+		]);
+	});
+
+	it('is a noop when there are no this-year weight records', () => {
+		const pool = [weightRecord, rareSpecies];
+		expect(combineWeightRecords(pool)).toEqual(pool);
+	});
+
+	it('does not mutate the input list', () => {
+		const pool = [heaviestAllTime2nd, heaviestThisYear];
+		const snapshot = [...pool];
+		combineWeightRecords(pool);
+		expect(pool).toEqual(snapshot);
+	});
+});
+
 // ---- Full machine ----
 
 describe('runHighlightMachine', () => {
@@ -1019,6 +1104,17 @@ describe('runHighlightMachine', () => {
 			['combined-first-ever', "Blackbird+Blackcap+Cetti's Warbler"],
 			['combined-first-of-year', 'Chiffchaff+Whitethroat'],
 			['weight-record']
+		]);
+	});
+
+	it('merges a this-year weight leader with its all-time placement into one line', () => {
+		const pool: SessionHighlight[] = [
+			{ ...weightRecord, scope: 'all-time', placementRank: 2 },
+			{ ...weightRecord, scope: 'this-year', placementRank: 1 }
+		];
+		const machined = runHighlightMachine(pool);
+		expect(machined.map((highlight) => highlight.type)).toEqual([
+			'combined-weight-record'
 		]);
 	});
 });
