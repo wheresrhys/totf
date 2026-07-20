@@ -11,7 +11,7 @@ function isFirstEver(
 	return highlight.type === 'first-ever-species' && !highlight.isOnlyRecord;
 }
 
-// Comb-4: multiple "First ever <species> record(s)" highlights merge into one
+// Comb-5: multiple "First ever <species> record(s)" highlights merge into one
 // "First ever A, B and C records" line listing every species. One first-ever
 // highlight is left as-is; "Only <species> records ever" (isOnlyRecord)
 // highlights are never merged. The combined line always reads "records" (plural)

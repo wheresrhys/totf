@@ -7,6 +7,7 @@ import type {
 	CombinedOnlyOfYearHighlight,
 	CombinedSessionTotalRecordHighlight,
 	CombinedSpeciesCountRecordHighlight,
+	CombinedSpeciesPlacementRecordHighlight,
 	CombinedWeightRecordHighlight,
 	FirstEverSpeciesHighlight,
 	FirstOfYearSpeciesHighlight,
@@ -161,6 +162,40 @@ function buildCombinedSpeciesCountRecordSentence(
 ): string {
 	const speciesList = buildSpeciesList(highlight.speciesNames);
 	return `Highest ${speciesList} counts ${buildOfYearPhrase(highlight)}`;
+}
+
+const PLACEMENT_RANK_WORD: Record<2 | 3, string> = {
+	2: 'second best',
+	3: 'third best'
+};
+const PLACEMENT_TIED_WORD: Record<2 | 3, string> = {
+	2: 'tied second',
+	3: 'tied third'
+};
+
+// "Second best day for Dunnock and Whitethroat ever" and its variants: several
+// all-time 2nd/3rd-best species records folded into one line. A combined line
+// never shows a count (only a lone unmerged placement does). An all-joint group
+// leads with "Joint"; a mixed group leads plain and flags each joint species
+// inline ("(tied second) Whitethroat").
+function buildCombinedSpeciesPlacementRecordSentence(
+	highlight: CombinedSpeciesPlacementRecordHighlight
+): string {
+	const { placementRank, species } = highlight;
+	const rankWord = PLACEMENT_RANK_WORD[placementRank];
+	const allJoint = species.every((entry) => entry.isJoint);
+	const descriptor = allJoint
+		? `Joint ${rankWord} day`
+		: `${rankWord[0].toUpperCase()}${rankWord.slice(1)} day`;
+	const tiedWord = PLACEMENT_TIED_WORD[placementRank];
+	// An all-joint group's "Joint" prefix covers every species, so no inline flags;
+	// a mixed group flags only the joint species, leaving the strict ones bare.
+	const speciesNames = allJoint
+		? species.map((entry) => entry.name)
+		: species.map((entry) =>
+				entry.isJoint ? `(${tiedWord}) ${entry.name}` : entry.name
+			);
+	return `${descriptor} for ${buildSpeciesList(speciesNames)} ever`;
 }
 
 function buildSpeciesCountRecordSentence(
@@ -393,7 +428,9 @@ const HIGHLIGHT_RENDERERS: {
 	'combined-first-of-year': (highlight) =>
 		renderSentence(buildCombinedFirstOfYearSentence(highlight)),
 	'combined-species-count-record': (highlight) =>
-		renderSentence(buildCombinedSpeciesCountRecordSentence(highlight))
+		renderSentence(buildCombinedSpeciesCountRecordSentence(highlight)),
+	'combined-species-placement-record': (highlight) =>
+		renderSentence(buildCombinedSpeciesPlacementRecordSentence(highlight))
 };
 
 export function renderHighlight(highlight: SessionHighlight): ReactElement {

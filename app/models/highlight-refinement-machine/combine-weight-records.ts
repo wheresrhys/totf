@@ -11,7 +11,7 @@ function isWeightRecord(
 	return highlight.type === 'weight-record';
 }
 
-// Comb-6: reconcile a species' this-year and all-time weight records for the
+// Comb-7: reconcile a species' this-year and all-time weight records for the
 // same extreme. Derivation emits a this-year weight only for an outright leader
 // (a 1st place), so every this-year weight is a "heaviest/lightest of the year".
 // When the same species+extreme also holds an all-time placement:

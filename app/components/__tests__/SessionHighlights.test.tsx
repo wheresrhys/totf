@@ -295,6 +295,78 @@ describe('SessionHighlights', () => {
 		]);
 	});
 
+	async function renderSingleHighlight(highlight: SessionHighlight) {
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
+		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+		});
+		return screen.getByTestId('session-highlights').querySelectorAll('li');
+	}
+
+	function placementHighlight(
+		placementRank: 2 | 3,
+		species: { name: string; isJoint: boolean }[]
+	): SessionHighlight {
+		return {
+			type: 'combined-species-placement-record',
+			sortValue: familySortValue('scoped-record'),
+			placementRank,
+			species
+		};
+	}
+
+	it('renders a combined strict 2nd-best placement without a count', async () => {
+		const items = await renderSingleHighlight(
+			placementHighlight(2, [
+				{ name: 'Dunnock', isJoint: false },
+				{ name: 'Whitethroat', isJoint: false }
+			])
+		);
+		expect(items[0].textContent).toBe(
+			'Second best day for Dunnock and Whitethroat ever'
+		);
+	});
+
+	it('renders a combined all-joint 2nd-best placement without a count', async () => {
+		const items = await renderSingleHighlight(
+			placementHighlight(2, [
+				{ name: 'Dunnock', isJoint: true },
+				{ name: 'Whitethroat', isJoint: true }
+			])
+		);
+		expect(items[0].textContent).toBe(
+			'Joint second best day for Dunnock and Whitethroat ever'
+		);
+	});
+
+	it('renders a mixed 2nd-best placement, flagging the joint species inline', async () => {
+		const items = await renderSingleHighlight(
+			placementHighlight(2, [
+				{ name: 'Dunnock', isJoint: false },
+				{ name: 'Whitethroat', isJoint: true }
+			])
+		);
+		expect(items[0].textContent).toBe(
+			'Second best day for Dunnock and (tied second) Whitethroat ever'
+		);
+	});
+
+	it('comma-joins three merged species and phrases the third-best rank', async () => {
+		const items = await renderSingleHighlight(
+			placementHighlight(3, [
+				{ name: 'Dunnock', isJoint: false },
+				{ name: 'Whitethroat', isJoint: false },
+				{ name: 'Wren', isJoint: false }
+			])
+		);
+		expect(items[0].textContent).toBe(
+			'Third best day for Dunnock, Whitethroat and Wren ever'
+		);
+	});
+
 	it('renders weight record sentences', async () => {
 		const weightHighlight: SessionHighlight = {
 			type: 'weight-record',

@@ -11,7 +11,7 @@ function isFirstOfYear(
 	return highlight.type === 'first-of-year-species' && !highlight.isOnlyRecord;
 }
 
-// Comb-5: multiple "First <species> record(s) of the year" highlights merge into
+// Comb-6: multiple "First <species> record(s) of the year" highlights merge into
 // one "First A, B and C records of the year" line listing every species. One
 // first-of-year highlight is left as-is; "Only ... of the year" (isOnlyRecord)
 // highlights combine separately (Comb-2). The combined line always reads
