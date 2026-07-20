@@ -263,10 +263,13 @@ describe('SessionHighlights', () => {
 				type: 'weight-record',
 				sortValue: familySortValue('scoped-record'),
 				speciesName: 'Blue Tit',
+				scope: 'all-time',
 				extreme: 'heaviest',
 				weight: 13.1,
 				placementRank: 1,
-				isJointPlacement: false
+				isJointPlacement: false,
+				year: 2024,
+				isCurrentYear: false
 			}
 		];
 		const { fetchSessionHighlights } =
@@ -297,10 +300,13 @@ describe('SessionHighlights', () => {
 			type: 'weight-record',
 			sortValue: familySortValue('scoped-record'),
 			speciesName: 'Blue Tit',
+			scope: 'all-time',
 			extreme: 'heaviest',
 			weight: 13.1,
 			placementRank: 1,
-			isJointPlacement: false
+			isJointPlacement: false,
+			year: 2024,
+			isCurrentYear: false
 		};
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');

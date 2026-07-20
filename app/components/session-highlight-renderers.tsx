@@ -7,6 +7,7 @@ import type {
 	CombinedOnlyOfYearHighlight,
 	CombinedSessionTotalRecordHighlight,
 	CombinedSpeciesCountRecordHighlight,
+	CombinedWeightRecordHighlight,
 	FirstEverSpeciesHighlight,
 	FirstOfYearSpeciesHighlight,
 	LongAbsenceRetrapHighlight,
@@ -305,17 +306,42 @@ function buildWeightRecordSentence(highlight: WeightRecordHighlight): string {
 	const extremeWord = WEIGHT_RECORD_EXTREME_WORD[extreme];
 	// "heaviest" / "2nd-heaviest" / "3rd-heaviest"
 	const rankedExtreme = `${WEIGHT_PLACEMENT_PREFIX[placementRank]}${extremeWord}`;
+	// All-time reads "ever weighed"; this-year reads "weighed this year" while the
+	// year is current, otherwise "weighed in <year>".
+	const periodPhrase =
+		highlight.scope === 'all-time'
+			? 'ever weighed'
+			: `weighed ${highlight.isCurrentYear ? 'this year' : `in ${highlight.year}`}`;
 	// A joint placement leads with "Joint"; otherwise the sentence opens with
 	// the extreme word, which is only capitalised when a rank prefix (a digit)
 	// isn't already sitting in front of it
 	if (isJointPlacement) {
-		return `Joint ${rankedExtreme} ${speciesName} ever weighed — ${weight}g`;
+		return `Joint ${rankedExtreme} ${speciesName} ${periodPhrase} — ${weight}g`;
 	}
 	const descriptor =
 		placementRank === 1
 			? `${extremeWord[0].toUpperCase()}${extremeWord.slice(1)}`
 			: rankedExtreme;
-	return `${descriptor} ${speciesName} ever weighed — ${weight}g`;
+	return `${descriptor} ${speciesName} ${periodPhrase} — ${weight}g`;
+}
+
+// "Heaviest Blue Tit weighed in 2024 (2nd heaviest ever) — 13.1g": the this-year
+// claim leads, the all-time placement (always 2nd/3rd) rides in parentheses. Both
+// the headline and the parenthetical can be joint.
+function buildCombinedWeightRecordSentence(
+	highlight: CombinedWeightRecordHighlight
+): string {
+	const extremeWord = WEIGHT_RECORD_EXTREME_WORD[highlight.extreme];
+	const yearPhrase = highlight.isCurrentYear
+		? 'this year'
+		: `in ${highlight.year}`;
+	const headline = highlight.thisYearIsJoint
+		? `Joint ${extremeWord}`
+		: `${extremeWord[0].toUpperCase()}${extremeWord.slice(1)}`;
+	// "2nd heaviest ever" — a space, unlike the hyphenated standalone weight lines
+	const allTimeRankWord = highlight.allTimeRank === 2 ? '2nd' : '3rd';
+	const parenthetical = `(${highlight.allTimeIsJoint ? 'joint ' : ''}${allTimeRankWord} ${extremeWord} ever)`;
+	return `${headline} ${highlight.speciesName} weighed ${yearPhrase} ${parenthetical} — ${highlight.weight}g`;
 }
 
 // ---- renderers ----
@@ -356,6 +382,8 @@ const HIGHLIGHT_RENDERERS: {
 		renderSentence(buildLongAbsenceRetrapSentence(highlight)),
 	'weight-record': (highlight) =>
 		renderSentence(buildWeightRecordSentence(highlight)),
+	'combined-weight-record': (highlight) =>
+		renderSentence(buildCombinedWeightRecordSentence(highlight)),
 	'combined-session-total-record': (highlight) =>
 		renderSentence(buildCombinedSessionTotalRecordSentence(highlight)),
 	'combined-only-of-year': (highlight) =>

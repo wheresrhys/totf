@@ -6,6 +6,9 @@ import {
 // The per-species record families this rule dedups by scope. Each is keyed
 // independently, so a species holding both an encounter record and a juvenile
 // record keeps the broadest of each — they aren't collapsed into one another.
+// Weight records are handled separately (combineWeightRecords): a this-year
+// weight is merged with its all-time placement rather than dropped, so it is
+// deliberately not deduped here.
 const SCOPED_SPECIES_RECORD_TYPES = [
 	'species-count-record',
 	'species-juv-count-record'
