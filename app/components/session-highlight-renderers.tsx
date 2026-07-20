@@ -12,6 +12,7 @@ import type {
 	FirstEverSpeciesHighlight,
 	FirstOfYearSpeciesHighlight,
 	LongAbsenceRetrapHighlight,
+	MegaSpeciesHighlight,
 	RareSpeciesHighlight,
 	RecordScope,
 	SessionHighlight,
@@ -284,7 +285,30 @@ function buildFirstOfYearSpeciesSentence(
 }
 
 function buildRareSpeciesSentence(highlight: RareSpeciesHighlight): string {
-	return `Rarely recorded — ${highlight.speciesName} seen on only ${highlight.totalSessionDays} days ever`;
+	return `MEGA — ${highlight.speciesName} seen on only ${highlight.totalSessionDays} days ever`;
+}
+
+// A MEGA line folds a first/only record together with the same species' rarity.
+// The first/only line is the headline; the rarity rides in a parenthetical,
+// except for an "only ... ever" record, which already implies maximal rarity.
+//   of-year: "MEGA — Only Meadow Pipit records of 2023 (only 3 records ever)"
+//   first ever: "MEGA — First Meadow Pipit ever (only recorded on 2 other occasions)"
+//   only ever: "MEGA — Only Meadow Pipit record ever" (no rarity note)
+function buildMegaSpeciesSentence(highlight: MegaSpeciesHighlight): string {
+	const { base, totalSessionDays } = highlight;
+	if (base.type === 'first-of-year-species') {
+		// The of-year headline stays as-is; the all-time rarity rides alongside it
+		return `MEGA — ${buildFirstOfYearSpeciesSentence(base)} (only ${totalSessionDays} records ever)`;
+	}
+	if (base.isOnlyRecord) {
+		// "Only ... ever" is the species' sole record — already maximally rare
+		return `MEGA — ${buildFirstEverSpeciesSentence(base)}`;
+	}
+	// "First ... ever": this session is the earliest of the few days the species
+	// appears, so the rarity note counts the other occasions
+	const otherOccasions = totalSessionDays - 1;
+	const occasionsWord = otherOccasions === 1 ? 'occasion' : 'occasions';
+	return `MEGA — First ${base.speciesName} ever (only recorded on ${otherOccasions} other ${occasionsWord})`;
 }
 
 function buildLongAbsenceRetrapSentence(
@@ -413,6 +437,8 @@ const HIGHLIGHT_RENDERERS: {
 		renderSentence(buildFirstOfYearSpeciesSentence(highlight)),
 	'rare-species': (highlight) =>
 		renderSentence(buildRareSpeciesSentence(highlight)),
+	'mega-species': (highlight) =>
+		renderSentence(buildMegaSpeciesSentence(highlight)),
 	'long-absence-retrap': (highlight) =>
 		renderSentence(buildLongAbsenceRetrapSentence(highlight)),
 	'weight-record': (highlight) =>

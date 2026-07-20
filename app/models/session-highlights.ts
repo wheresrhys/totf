@@ -32,15 +32,18 @@ export const SCOPE_BREADTH_RANK = new Map(
 // listed after it, whatever `orderWithinFamily` values arise, so there are no
 // numeric bands to keep disjoint.
 
-// Families in editorial priority order, highest first. An "only ever" record
-// (the species' sole record in the data) heads the list, then plain first-ever,
-// rare-species and long-absence-retrap — all promoted above scoped records —
+// Families in editorial priority order, highest first. A "MEGA" record (a
+// first/only record for a species the group has barely ever recorded) heads the
+// list, then an "only ever" record (the species' sole record in the data), then
+// plain first-ever, rare-species and long-absence-retrap — all promoted above
+// scoped records —
 // then the scoped records themselves, then the juvenile-count records, then the
 // trailing context families. Juvenile records sit just below the general
 // scoped records: they're the same kind of "record" line but a more niche
 // measure, so they follow rather than interleave with the encounter/species
 // records.
 export const HIGHLIGHT_FAMILIES = [
+	'mega-species',
 	'only-ever-species',
 	'first-ever-species',
 	'rare-species',
@@ -420,6 +423,27 @@ export type CombinedWeightRecordHighlight = {
 	allTimeIsJoint: boolean;
 };
 
+// A "MEGA" highlight: a first/only record — of the year or ever — for a species
+// the group has only ever recorded on a handful of session days. Produced by the
+// machine's combine pass (combineFirstRareHighlights) when a first/only highlight
+// and a rare-species highlight for the *same* species coincide, folding both into
+// one headline line. The first/only line supplies the headline; the rarity rides
+// in a parenthetical, except for an "only ... ever" record, which already implies
+// maximal rarity and so carries none. Runs before the other combine rules so the
+// specific first/only line is consumed here rather than merged into a multi-species
+// "First/Only A, B and C" line.
+export type MegaSpeciesHighlight = {
+	type: 'mega-species';
+	sortValue: SortValue;
+	// The first/only highlight this MEGA is built on — its species also holds the
+	// rare-species highlight folded in as totalSessionDays. Its type discriminates
+	// the of-year vs ever headline phrasing.
+	base: FirstEverSpeciesHighlight | FirstOfYearSpeciesHighlight;
+	// Distinct session days the species has ever been recorded on, carried over
+	// from the rare-species highlight absorbed into this line (2–3 in practice)
+	totalSessionDays: number;
+};
+
 // The discriminated union the highlight machine's passes and the client
 // renderers both operate over. Highlights are plain serializable data so they
 // can cross the server-action -> client boundary; rendering happens client
@@ -435,6 +459,7 @@ export type SessionHighlight =
 	| RareSpeciesHighlight
 	| LongAbsenceRetrapHighlight
 	| WeightRecordHighlight
+	| MegaSpeciesHighlight
 	| CombinedSessionTotalRecordHighlight
 	| CombinedOnlyOfYearHighlight
 	| CombinedFirstEverHighlight
