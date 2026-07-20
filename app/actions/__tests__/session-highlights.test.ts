@@ -158,12 +158,13 @@ describe('fetchSessionHighlights', () => {
 		// (its species record). Session-wide records — busiest session, quietest
 		// since — are not tied to the rare species and survive. This is also the
 		// first session of 2024 (the only prior session is 2022), so Robin — last
-		// seen in 2022 — is first of the year; that trailing line survives too.
+		// seen in 2022 — is first (in fact only) of the year. That "only of year"
+		// line and Robin's rare-species line fold together (Comb-0) into a single
+		// MEGA headline that leads the list.
 		expect(sentencesOf(highlights)).toEqual([
-			'Rarely recorded — Robin seen on only 2 days ever',
+			'MEGA — Only Robin records of 2024 (only 2 records ever)',
 			'Busiest session ever — 74 birds',
-			'Quietest session since 1 May 2022 — 74 birds',
-			'Only Robin records of 2024'
+			'Quietest session since 1 May 2022 — 74 birds'
 		]);
 	});
 
@@ -277,14 +278,16 @@ describe('fetchSessionHighlights', () => {
 	});
 
 	it('includes rare-species highlights in the fan-out', async () => {
+		// Both Firecrest days fall in the session's year, so it is not first of the
+		// year — the rare-species line stands alone rather than folding into a MEGA
 		rpcPages = [
 			[
 				statsRow('Firecrest', SESSION_DATE, 1),
-				statsRow('Firecrest', '2022-05-01', 1)
+				statsRow('Firecrest', '2024-05-01', 1)
 			]
 		];
 		sessionPages = [
-			[{ visit_date: '2022-05-01' }, { visit_date: SESSION_DATE }]
+			[{ visit_date: '2024-05-01' }, { visit_date: SESSION_DATE }]
 		];
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		const highlights = await fetchSessionHighlights({
@@ -292,7 +295,7 @@ describe('fetchSessionHighlights', () => {
 			viewedGroupId: GROUP_ID
 		});
 		expect(sentencesOf(highlights)).toContain(
-			'Rarely recorded — Firecrest seen on only 2 days ever'
+			'MEGA — Firecrest seen on only 2 days ever'
 		);
 	});
 

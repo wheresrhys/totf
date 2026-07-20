@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	combineFirstEverHighlights,
 	combineFirstOfYearHighlights,
+	combineFirstRareHighlights,
 	combineOnlyOfYearHighlights,
 	combineSessionTotalRecords,
 	combineSpeciesPlacementRecords,
@@ -21,6 +22,7 @@ import {
 	type FirstEverSpeciesHighlight,
 	type FirstOfYearSpeciesHighlight,
 	type LongAbsenceRetrapHighlight,
+	type MegaSpeciesHighlight,
 	type RareSpeciesHighlight,
 	type RecordScope,
 	type SessionHighlight,
@@ -500,6 +502,109 @@ describe('orderBySortValue (Ord-1)', () => {
 });
 
 // ---- Combining rules ----
+
+function rare(speciesName: string, totalSessionDays = 3): RareSpeciesHighlight {
+	return {
+		type: 'rare-species',
+		sortValue: familySortValue('rare-species'),
+		speciesName,
+		totalSessionDays
+	};
+}
+
+function mega(
+	base: MegaSpeciesHighlight['base'],
+	totalSessionDays: number
+): MegaSpeciesHighlight {
+	return {
+		type: 'mega-species',
+		sortValue: familySortValue('mega-species'),
+		base,
+		totalSessionDays
+	};
+}
+
+describe('combineFirstRareHighlights (Comb-0)', () => {
+	it('merges a first-of-year highlight with the same species rare highlight', () => {
+		const firstOfYearMeadowPipit = firstOfYear('Meadow Pipit', false);
+		const combined = combineFirstRareHighlights([
+			firstOfYearMeadowPipit,
+			rare('Meadow Pipit', 3)
+		]);
+		expect(combined).toEqual([mega(firstOfYearMeadowPipit, 3)]);
+	});
+
+	it('merges an only-of-year highlight with the same species rare highlight', () => {
+		const onlyOfYear = firstOfYear('Meadow Pipit', true);
+		const combined = combineFirstRareHighlights([
+			onlyOfYear,
+			rare('Meadow Pipit', 2)
+		]);
+		expect(combined).toEqual([mega(onlyOfYear, 2)]);
+	});
+
+	it('merges a first-ever highlight with the same species rare highlight', () => {
+		const firstEverMeadowPipit = firstEver('Meadow Pipit', false);
+		const combined = combineFirstRareHighlights([
+			firstEverMeadowPipit,
+			rare('Meadow Pipit', 3)
+		]);
+		expect(combined).toEqual([mega(firstEverMeadowPipit, 3)]);
+	});
+
+	it('merges an only-ever highlight with the same species rare highlight', () => {
+		const onlyEver = firstEver('Meadow Pipit', true);
+		const combined = combineFirstRareHighlights([
+			onlyEver,
+			rare('Meadow Pipit', 1)
+		]);
+		expect(combined).toEqual([mega(onlyEver, 1)]);
+	});
+
+	it('takes the list position of the first/only highlight and drops the rare', () => {
+		const firstOfYearMeadowPipit = firstOfYear('Meadow Pipit', false);
+		const combined = combineFirstRareHighlights([
+			weightRecord,
+			firstOfYearMeadowPipit,
+			rare('Meadow Pipit', 3)
+		]);
+		expect(combined).toEqual([weightRecord, mega(firstOfYearMeadowPipit, 3)]);
+	});
+
+	it('leaves a rare highlight untouched when no first/only for its species is present', () => {
+		const pool = [rare('Wryneck', 2), weightRecord];
+		expect(combineFirstRareHighlights(pool)).toEqual(pool);
+	});
+
+	it('leaves a first/only highlight untouched when its species has no rare highlight', () => {
+		const pool = [firstOfYear('Meadow Pipit', false), rare('Wryneck', 2)];
+		expect(combineFirstRareHighlights(pool)).toEqual(pool);
+	});
+
+	it('merges each species independently, leaving unmatched first/only highlights for later rules', () => {
+		const meadowPipit = firstOfYear('Meadow Pipit', true);
+		const chaffinch = firstOfYear('Chaffinch', true);
+		const combined = combineFirstRareHighlights([
+			meadowPipit,
+			chaffinch,
+			rare('Meadow Pipit', 3)
+		]);
+		// Meadow Pipit folds into a MEGA; Chaffinch (no rare) is left for Comb-2
+		expect(combined).toEqual([mega(meadowPipit, 3), chaffinch]);
+	});
+
+	it('is a noop on unrelated highlights', () => {
+		const pool = [weightRecord, quietestSince];
+		expect(combineFirstRareHighlights(pool)).toEqual(pool);
+	});
+
+	it('does not mutate the input list', () => {
+		const pool = [firstOfYear('Meadow Pipit', false), rare('Meadow Pipit', 3)];
+		const snapshot = [...pool];
+		combineFirstRareHighlights(pool);
+		expect(pool).toEqual(snapshot);
+	});
+});
 
 describe('combineSessionTotalRecords (Comb-1)', () => {
 	it('merges same-scope encounters and species records into one combined record', () => {
@@ -1320,6 +1425,32 @@ describe('runHighlightMachine', () => {
 		).toEqual([
 			['combined-species-placement-record', 2, 'Dunnock+Whitethroat'],
 			['combined-species-placement-record', 3, 'Wren+Robin'],
+			['weight-record']
+		]);
+	});
+
+	it('folds a first/only + rare into a MEGA at the top, leaving other onlys to combine', () => {
+		const pool: SessionHighlight[] = [
+			firstOfYear('Meadow Pipit', true),
+			firstOfYear('Chaffinch', true),
+			firstOfYear('Goldfinch', true),
+			rare('Meadow Pipit', 3),
+			weightRecord
+		];
+		const machined = runHighlightMachine(pool);
+		expect(
+			machined.map((highlight) =>
+				highlight.type === 'mega-species'
+					? [highlight.type, highlight.base.speciesName]
+					: 'speciesNames' in highlight
+						? [highlight.type, highlight.speciesNames.join('+')]
+						: [highlight.type]
+			)
+		).toEqual([
+			// the MEGA heads the list; the Meadow Pipit rare-species line is folded in
+			['mega-species', 'Meadow Pipit'],
+			// the two remaining only-of-year lines combine among themselves
+			['combined-only-of-year', 'Chaffinch+Goldfinch'],
 			['weight-record']
 		]);
 	});

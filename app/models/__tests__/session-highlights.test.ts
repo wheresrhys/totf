@@ -1667,14 +1667,14 @@ function makeRareSpeciesHighlight(
 describe('render — rare-species', () => {
 	it('renders the total session-day count', () => {
 		expect(renderedText(makeRareSpeciesHighlight())).toBe(
-			'Rarely recorded — Firecrest seen on only 2 days ever'
+			'MEGA — Firecrest seen on only 2 days ever'
 		);
 	});
 
 	it('renders a three-day count', () => {
 		expect(
 			renderedText(makeRareSpeciesHighlight({ totalSessionDays: 3 }))
-		).toBe('Rarely recorded — Firecrest seen on only 3 days ever');
+		).toBe('MEGA — Firecrest seen on only 3 days ever');
 	});
 });
 

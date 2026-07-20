@@ -188,7 +188,81 @@ describe('SessionHighlights', () => {
 			.querySelectorAll('li');
 		expect(items.length).toBe(1);
 		expect(items[0].textContent).toBe(
-			'Rarely recorded — Firecrest seen on only 2 days ever'
+			'MEGA — Firecrest seen on only 2 days ever'
+		);
+	});
+
+	it('renders a MEGA line for an only-of-year record folded with rarity', async () => {
+		const items = await renderSingleHighlight({
+			type: 'mega-species',
+			sortValue: familySortValue('mega-species'),
+			base: {
+				type: 'first-of-year-species',
+				sortValue: familySortValue('first-of-year-species'),
+				speciesName: 'Meadow Pipit',
+				year: 2023,
+				isCurrentYear: false,
+				multipleIndividualsRecorded: true,
+				isOnlyRecord: true
+			},
+			totalSessionDays: 3
+		});
+		expect(items[0].textContent).toBe(
+			'MEGA — Only Meadow Pipit records of 2023 (only 3 records ever)'
+		);
+	});
+
+	it('renders a MEGA line for a first-of-year record folded with rarity', async () => {
+		const items = await renderSingleHighlight({
+			type: 'mega-species',
+			sortValue: familySortValue('mega-species'),
+			base: {
+				type: 'first-of-year-species',
+				sortValue: familySortValue('first-of-year-species'),
+				speciesName: 'Meadow Pipit',
+				year: 2023,
+				isCurrentYear: false,
+				multipleIndividualsRecorded: true,
+				isOnlyRecord: false
+			},
+			totalSessionDays: 3
+		});
+		expect(items[0].textContent).toBe(
+			'MEGA — First Meadow Pipit records of 2023 (only 3 records ever)'
+		);
+	});
+
+	it('renders a MEGA line for an only-ever record without a rarity note', async () => {
+		const items = await renderSingleHighlight({
+			type: 'mega-species',
+			sortValue: familySortValue('mega-species'),
+			base: {
+				type: 'first-ever-species',
+				sortValue: familySortValue('only-ever-species'),
+				speciesName: 'Meadow Pipit',
+				multipleIndividualsRecorded: false,
+				isOnlyRecord: true
+			},
+			totalSessionDays: 1
+		});
+		expect(items[0].textContent).toBe('MEGA — Only Meadow Pipit record ever');
+	});
+
+	it('renders a MEGA line for a first-ever record, counting the other occasions', async () => {
+		const items = await renderSingleHighlight({
+			type: 'mega-species',
+			sortValue: familySortValue('mega-species'),
+			base: {
+				type: 'first-ever-species',
+				sortValue: familySortValue('first-ever-species'),
+				speciesName: 'Meadow Pipit',
+				multipleIndividualsRecorded: false,
+				isOnlyRecord: false
+			},
+			totalSessionDays: 3
+		});
+		expect(items[0].textContent).toBe(
+			'MEGA — First Meadow Pipit ever (only recorded on 2 other occasions)'
 		);
 	});
 
