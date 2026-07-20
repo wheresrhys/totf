@@ -1875,10 +1875,14 @@ function weightRow(
 	};
 }
 
-function deriveWeights(results: StatsPerDayAndSpeciesResult[]) {
+function deriveWeights(
+	results: StatsPerDayAndSpeciesResult[],
+	today = PAST_PERIOD_TODAY
+) {
 	return deriveWeightRecordBreakers({
 		date: SESSION_DATE,
-		stats: statsFor(results)
+		stats: statsFor(results),
+		today
 	});
 }
 
@@ -1896,10 +1900,13 @@ describe('deriveWeightRecordBreakers', () => {
 			type: 'weight-record',
 			sortValue: familySortValue('weight-record'),
 			speciesName: BLUE_TIT,
+			scope: 'all-time',
 			extreme: 'heaviest',
 			weight: 13.1,
 			placementRank: 1,
-			isJointPlacement: false
+			isJointPlacement: false,
+			year: 2024,
+			isCurrentYear: false
 		});
 	});
 
@@ -1916,10 +1923,13 @@ describe('deriveWeightRecordBreakers', () => {
 			type: 'weight-record',
 			sortValue: familySortValue('weight-record'),
 			speciesName: BLUE_TIT,
+			scope: 'all-time',
 			extreme: 'lightest',
 			weight: 9.8,
 			placementRank: 1,
-			isJointPlacement: false
+			isJointPlacement: false,
+			year: 2024,
+			isCurrentYear: false
 		});
 	});
 
@@ -1937,10 +1947,13 @@ describe('deriveWeightRecordBreakers', () => {
 			type: 'weight-record',
 			sortValue: familySortValue('weight-record'),
 			speciesName: BLUE_TIT,
+			scope: 'all-time',
 			extreme: 'heaviest',
 			weight: 13.1,
 			placementRank: 2,
-			isJointPlacement: false
+			isJointPlacement: false,
+			year: 2024,
+			isCurrentYear: false
 		});
 	});
 
@@ -1992,10 +2005,13 @@ describe('deriveWeightRecordBreakers', () => {
 			type: 'weight-record',
 			sortValue: familySortValue('weight-record'),
 			speciesName: BLUE_TIT,
+			scope: 'all-time',
 			extreme: 'heaviest',
 			weight: 13.1,
 			placementRank: 1,
-			isJointPlacement: true
+			isJointPlacement: true,
+			year: 2024,
+			isCurrentYear: false
 		});
 	});
 
@@ -2060,6 +2076,121 @@ describe('deriveWeightRecordBreakers', () => {
 		]);
 		expect(highlights).toEqual([]);
 	});
+
+	describe('this-year scope', () => {
+		it('reports a this-year heaviest 1st once the year clears the weighed threshold', () => {
+			// Three weighed birds this year (across other days), and the session's
+			// max beats them — heaviest of the year
+			const highlights = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+				weightRow(PRIOR_SUMMER_THIS_YEAR, BLUE_TIT, {
+					weighedBirds: 3,
+					minWeight: 10.5,
+					maxWeight: 12.5
+				})
+			]);
+			expect(highlights).toContainEqual({
+				type: 'weight-record',
+				sortValue: familySortValue('weight-record'),
+				speciesName: BLUE_TIT,
+				scope: 'this-year',
+				extreme: 'heaviest',
+				weight: 13.1,
+				placementRank: 1,
+				isJointPlacement: false,
+				year: 2024,
+				isCurrentYear: false
+			});
+		});
+
+		it('reports a this-year lightest 1st when the session min beats every day this year', () => {
+			const highlights = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 9.8, maxWeight: 12 }),
+				weightRow(PRIOR_SUMMER_THIS_YEAR, BLUE_TIT, {
+					weighedBirds: 3,
+					minWeight: 10.2,
+					maxWeight: 13.0
+				})
+			]);
+			expect(highlights).toContainEqual(
+				expect.objectContaining({
+					scope: 'this-year',
+					extreme: 'lightest',
+					weight: 9.8,
+					placementRank: 1
+				})
+			);
+		});
+
+		it('does not report a this-year 2nd/3rd placement — only a first place', () => {
+			// A prior day this year is heavier, so the session is only 2nd heaviest
+			// of the year; the this-year scope reports only first places
+			const highlights = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+				weightRow(PRIOR_SUMMER_THIS_YEAR, BLUE_TIT, {
+					weighedBirds: 3,
+					minWeight: 10.5,
+					maxWeight: 14.0
+				})
+			]);
+			expect(
+				highlights.filter((highlight) => highlight.scope === 'this-year')
+			).toEqual([]);
+		});
+
+		it('suppresses this-year highlights until the year clears the weighed threshold', () => {
+			// Only two weighed birds this year (across other days) — below the
+			// threshold — so no this-year highlight even though the session leads
+			const highlights = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+				weightRow(PRIOR_SUMMER_THIS_YEAR, BLUE_TIT, {
+					weighedBirds: 2,
+					minWeight: 10.5,
+					maxWeight: 12.5
+				})
+			]);
+			expect(
+				highlights.filter((highlight) => highlight.scope === 'this-year')
+			).toEqual([]);
+		});
+
+		it('flags a joint this-year 1st when another day this year matches the extreme', () => {
+			const highlights = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+				weightRow(PRIOR_SUMMER_THIS_YEAR, BLUE_TIT, {
+					weighedBirds: 3,
+					minWeight: 10.5,
+					maxWeight: 13.1
+				})
+			]);
+			expect(highlights).toContainEqual(
+				expect.objectContaining({
+					scope: 'this-year',
+					extreme: 'heaviest',
+					weight: 13.1,
+					placementRank: 1,
+					isJointPlacement: true
+				})
+			);
+		});
+
+		it('produces both all-time and this-year highlights when the session leads both', () => {
+			// Every comparison day is this year, so the session's heaviest leads
+			// both scopes — derivation yields both (the machine later drops the
+			// narrower one)
+			const scopes = deriveWeights([
+				weightRow(SESSION_DATE, BLUE_TIT, { minWeight: 11, maxWeight: 13.1 }),
+				weightRow(PRIOR_SUMMER_THIS_YEAR, BLUE_TIT, {
+					weighedBirds: 3,
+					minWeight: 10.5,
+					maxWeight: 12.5
+				})
+			])
+				.filter((highlight) => highlight.extreme === 'heaviest')
+				.map((highlight) => highlight.scope);
+			expect(scopes).toEqual(['all-time', 'this-year']);
+		});
+	});
 });
 
 // ---- render — weight-record ----
@@ -2071,10 +2202,13 @@ function makeWeightHighlight(
 		type: 'weight-record',
 		sortValue: familySortValue('weight-record'),
 		speciesName: BLUE_TIT,
+		scope: 'all-time',
 		extreme: 'heaviest',
 		weight: 13.1,
 		placementRank: 1,
 		isJointPlacement: false,
+		year: 2024,
+		isCurrentYear: false,
 		...overrides
 	};
 }
@@ -2126,6 +2260,51 @@ describe('render — weight-record', () => {
 				})
 			)
 		).toBe('Joint 2nd-heaviest Blue Tit ever weighed — 12.9g');
+	});
+
+	it('renders heaviest-of-the-year copy while the year is current', () => {
+		expect(
+			renderedText(
+				makeWeightHighlight({ scope: 'this-year', isCurrentYear: true })
+			)
+		).toBe('Heaviest Blue Tit weighed this year — 13.1g');
+	});
+
+	it('renders heaviest-in-year copy once the year is past', () => {
+		expect(
+			renderedText(
+				makeWeightHighlight({
+					scope: 'this-year',
+					year: 2024,
+					isCurrentYear: false
+				})
+			)
+		).toBe('Heaviest Blue Tit weighed in 2024 — 13.1g');
+	});
+
+	it('renders lightest-of-the-year copy', () => {
+		expect(
+			renderedText(
+				makeWeightHighlight({
+					scope: 'this-year',
+					extreme: 'lightest',
+					weight: 9.8,
+					isCurrentYear: true
+				})
+			)
+		).toBe('Lightest Blue Tit weighed this year — 9.8g');
+	});
+
+	it('renders joint heaviest-of-the-year copy', () => {
+		expect(
+			renderedText(
+				makeWeightHighlight({
+					scope: 'this-year',
+					isJointPlacement: true,
+					isCurrentYear: true
+				})
+			)
+		).toBe('Joint heaviest Blue Tit weighed this year — 13.1g');
 	});
 });
 

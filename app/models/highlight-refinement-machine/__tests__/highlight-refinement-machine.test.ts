@@ -170,10 +170,13 @@ const weightRecord: WeightRecordHighlight = {
 	type: 'weight-record',
 	sortValue: familySortValue('weight-record'),
 	speciesName: 'Blue Tit',
+	scope: 'all-time',
 	extreme: 'heaviest',
 	weight: 13.1,
 	placementRank: 1,
-	isJointPlacement: false
+	isJointPlacement: false,
+	year: 2024,
+	isCurrentYear: false
 };
 
 // ---- Removal rules ----
@@ -276,8 +279,34 @@ describe('removeNarrowerScopeSpeciesRecords (Rem-2)', () => {
 	});
 
 	it('is a noop on non-species-record highlights', () => {
-		const pool = [busiestSince, weightRecord];
+		const pool = [busiestSince, rareSpecies];
 		expect(removeNarrowerScopeSpeciesRecords(pool)).toEqual(pool);
+	});
+
+	it('drops a this-year weight record when the species holds an all-time one for the same extreme', () => {
+		const allTime = weightRecord; // Blue Tit heaviest, all-time
+		const removed = removeNarrowerScopeSpeciesRecords([
+			allTime,
+			{ ...weightRecord, scope: 'this-year' }
+		]);
+		expect(removed).toEqual([allTime]);
+	});
+
+	it('keeps weight records for different extremes of the same species', () => {
+		// A heaviest all-time and a lightest this-year are keyed separately, so
+		// neither collapses the other
+		const heaviestAllTime = weightRecord;
+		const lightestThisYear: WeightRecordHighlight = {
+			...weightRecord,
+			scope: 'this-year',
+			extreme: 'lightest',
+			weight: 9.8
+		};
+		const removed = removeNarrowerScopeSpeciesRecords([
+			heaviestAllTime,
+			lightestThisYear
+		]);
+		expect(removed).toEqual([heaviestAllTime, lightestThisYear]);
 	});
 });
 
@@ -287,10 +316,13 @@ describe('removeCountAndWeightHighlightsForRareSpecies (Rem-3)', () => {
 		type: 'weight-record',
 		sortValue: familySortValue('weight-record'),
 		speciesName: 'Wryneck',
+		scope: 'all-time',
 		extreme: 'heaviest',
 		weight: 30.2,
 		placementRank: 1,
-		isJointPlacement: false
+		isJointPlacement: false,
+		year: 2024,
+		isCurrentYear: false
 	};
 
 	it("drops the rare species' own count and weight highlights", () => {
@@ -931,10 +963,13 @@ describe('runHighlightMachine', () => {
 			type: 'weight-record',
 			sortValue: familySortValue('weight-record'),
 			speciesName: 'Wryneck',
+			scope: 'all-time',
 			extreme: 'heaviest',
 			weight: 30.2,
 			placementRank: 1,
-			isJointPlacement: false
+			isJointPlacement: false,
+			year: 2024,
+			isCurrentYear: false
 		};
 		const pool: SessionHighlight[] = [
 			rareSpecies, // Wryneck

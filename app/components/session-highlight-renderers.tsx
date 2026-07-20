@@ -305,17 +305,23 @@ function buildWeightRecordSentence(highlight: WeightRecordHighlight): string {
 	const extremeWord = WEIGHT_RECORD_EXTREME_WORD[extreme];
 	// "heaviest" / "2nd-heaviest" / "3rd-heaviest"
 	const rankedExtreme = `${WEIGHT_PLACEMENT_PREFIX[placementRank]}${extremeWord}`;
+	// All-time reads "ever weighed"; this-year reads "weighed this year" while the
+	// year is current, otherwise "weighed in <year>".
+	const periodPhrase =
+		highlight.scope === 'all-time'
+			? 'ever weighed'
+			: `weighed ${highlight.isCurrentYear ? 'this year' : `in ${highlight.year}`}`;
 	// A joint placement leads with "Joint"; otherwise the sentence opens with
 	// the extreme word, which is only capitalised when a rank prefix (a digit)
 	// isn't already sitting in front of it
 	if (isJointPlacement) {
-		return `Joint ${rankedExtreme} ${speciesName} ever weighed — ${weight}g`;
+		return `Joint ${rankedExtreme} ${speciesName} ${periodPhrase} — ${weight}g`;
 	}
 	const descriptor =
 		placementRank === 1
 			? `${extremeWord[0].toUpperCase()}${extremeWord.slice(1)}`
 			: rankedExtreme;
-	return `${descriptor} ${speciesName} ever weighed — ${weight}g`;
+	return `${descriptor} ${speciesName} ${periodPhrase} — ${weight}g`;
 }
 
 // ---- renderers ----

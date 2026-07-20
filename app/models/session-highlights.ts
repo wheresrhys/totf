@@ -287,14 +287,22 @@ export type WeightRecordHighlight = {
 	type: 'weight-record';
 	sortValue: SortValue;
 	speciesName: string;
+	// The scope the placement is ranked over. All-time reports the top three
+	// placements; this-year reports only a first place (see deriveWeightRecordBreakers).
+	scope: RecordScope;
 	extreme: WeightRecordExtreme;
 	// The session's weight for this extreme, in grams
 	weight: number;
-	// Where the session's weight ranks across every day the species was weighed
-	// (1 = heaviest/lightest ever, capped at the top 3)
+	// Where the session's weight ranks across every day in scope the species was
+	// weighed (1 = heaviest/lightest, capped at the top 3; always 1 for this-year)
 	placementRank: 1 | 2 | 3;
 	// True when another day's extreme exactly matches the session's weight
 	isJointPlacement: boolean;
+	// The session's calendar year — used by the this-year copy. 'this year' copy
+	// is only correct while the session's year is still current; otherwise the
+	// sentence uses the absolute year. Carried (but unused) for all-time.
+	year: number;
+	isCurrentYear: boolean;
 };
 
 // A combined session-total record: a session that holds both the busiest
@@ -1103,57 +1111,78 @@ function deriveWeightPlacement(
 	return resolvePlacement(betterDays, otherWeights.includes(sessionWeight));
 }
 
-// Weight placements are inherently all-time — a species' heaviest/lightest bird
-// this session is ranked against every other day it was weighed, including
-// later days (which can demote a placement). A placement needs the species to
-// have been weighed at least three times across those other days.
+// A species' heaviest/lightest bird this session is ranked against every other
+// day in scope it was weighed, including later days (which can demote a
+// placement). A placement needs the species to have been weighed at least three
+// times across those other days in scope.
+//
+// All-time reports the full top-three placements. The this-year scope turns on
+// once the species has crossed the same weighed-encounter threshold within the
+// year, but reports only a first place — a heaviest/lightest of the year is
+// worth a line, a lesser within-year placement is not.
 export function deriveWeightRecordBreakers({
 	date,
-	stats
+	stats,
+	today = new Date()
 }: {
 	date: string;
 	stats: SessionStatsData;
+	today?: Date;
 }): WeightRecordHighlight[] {
+	const sessionDate = new Date(date);
 	const sessionRows = stats.daySpeciesStats.filter(
 		(row) => row.visit_date === date && row.weighed_birds_count > 0
 	);
 	if (sessionRows.length === 0) return [];
 
+	const sharedFields = {
+		year: sessionDate.getFullYear(),
+		isCurrentYear: sessionDate.getFullYear() === today.getFullYear()
+	};
+
 	const highlights: WeightRecordHighlight[] = [];
 	for (const sessionRow of sessionRows) {
-		const otherWeighedRows = stats.daySpeciesStats.filter(
-			(row) =>
-				row.species_name === sessionRow.species_name &&
-				row.visit_date !== date &&
-				row.weighed_birds_count > 0
-		);
-		const otherWeighedEncounters = otherWeighedRows.reduce(
-			(total, row) => total + row.weighed_birds_count,
-			0
-		);
-		if (otherWeighedEncounters < MIN_WEIGHED_ENCOUNTERS_FOR_RECORD) continue;
+		for (const scope of RECORD_SCOPES) {
+			const scopeMatcher = getScopeMatcher(scope, sessionDate);
+			const otherWeighedRows = stats.daySpeciesStats.filter(
+				(row) =>
+					row.species_name === sessionRow.species_name &&
+					row.visit_date !== date &&
+					row.weighed_birds_count > 0 &&
+					scopeMatcher(row.visit_date)
+			);
+			const otherWeighedEncounters = otherWeighedRows.reduce(
+				(total, row) => total + row.weighed_birds_count,
+				0
+			);
+			if (otherWeighedEncounters < MIN_WEIGHED_ENCOUNTERS_FOR_RECORD) continue;
 
-		for (const extreme of WEIGHT_RECORD_EXTREMES) {
-			const isHeaviest = extreme === 'heaviest';
-			const sessionWeight = isHeaviest
-				? sessionRow.max_weight
-				: sessionRow.min_weight;
-			const otherWeights = otherWeighedRows.map((row) =>
-				isHeaviest ? row.max_weight : row.min_weight
-			);
-			const placement = deriveWeightPlacement(
-				sessionWeight,
-				otherWeights,
-				isHeaviest
-			);
-			if (placement) {
+			for (const extreme of WEIGHT_RECORD_EXTREMES) {
+				const isHeaviest = extreme === 'heaviest';
+				const sessionWeight = isHeaviest
+					? sessionRow.max_weight
+					: sessionRow.min_weight;
+				const otherWeights = otherWeighedRows.map((row) =>
+					isHeaviest ? row.max_weight : row.min_weight
+				);
+				const placement = deriveWeightPlacement(
+					sessionWeight,
+					otherWeights,
+					isHeaviest
+				);
+				if (!placement) continue;
+				// This-year only headlines an outright leader; lesser within-year
+				// placements aren't worth a line.
+				if (scope === 'this-year' && placement.placementRank !== 1) continue;
 				highlights.push({
 					type: 'weight-record',
 					sortValue: familySortValue('weight-record'),
 					speciesName: sessionRow.species_name,
+					scope,
 					extreme,
 					weight: sessionWeight,
-					...placement
+					...placement,
+					...sharedFields
 				});
 			}
 		}
