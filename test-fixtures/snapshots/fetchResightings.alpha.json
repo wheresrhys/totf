@@ -1,0 +1,67 @@
+[
+  {
+    "id": 1,
+    "record_type": "C",
+    "extra_text": "Seen at feeder",
+    "bird": {
+      "ring_no": "ARESIGHT01",
+      "species": { "species_name": "Blue Tit" }
+    },
+    "session": {
+      "visit_date": "2024-03-01",
+      "location": { "location_name": "Garden Feeder Station" }
+    }
+  },
+  {
+    "id": 2,
+    "record_type": "F",
+    "extra_text": null,
+    "bird": {
+      "ring_no": "ARESIGHT02",
+      "species": { "species_name": "Robin" }
+    },
+    "session": {
+      "visit_date": "2024-06-15",
+      "location": { "location_name": "Garden Feeder Station" }
+    }
+  },
+  {
+    "id": 3,
+    "record_type": "T",
+    "extra_text": "Found dead",
+    "bird": {
+      "ring_no": "ARESIGHT03",
+      "species": { "species_name": "Kingfisher" }
+    },
+    "session": {
+      "visit_date": "2023-11-20",
+      "location": { "location_name": "River Bank" }
+    }
+  },
+  {
+    "id": 4,
+    "record_type": "C",
+    "extra_text": "Photographed",
+    "bird": {
+      "ring_no": "ARESIGHT04",
+      "species": { "species_name": "Blue Tit" }
+    },
+    "session": {
+      "visit_date": "2024-08-02",
+      "location": { "location_name": "Garden Feeder Station" }
+    }
+  },
+  {
+    "id": 5,
+    "record_type": "F",
+    "extra_text": null,
+    "bird": {
+      "ring_no": "ARESIGHT05",
+      "species": { "species_name": "Robin" }
+    },
+    "session": {
+      "visit_date": "2022-01-10",
+      "location": { "location_name": "River Bank" }
+    }
+  }
+]
