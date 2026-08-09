@@ -5,8 +5,9 @@ description: >-
   then pick unblocked `ready` GitHub issues and implement them in parallel. Each unit of work
   runs in its own git worktree via a subagent on the model named by the ticket's label
   (fable/sonnet/opus). Biases toward tickets that unblock the most others, and never runs more
-  than one `db-migration`-labelled ticket at a time (this repo shares one local Supabase
-  instance across worktrees). Each ticket subagent runs the implement-ticket skill (branch,
+  than one exclusive-resource-labelled ticket (`db-migration` or `e2e-exclusive`, combined) at a
+  time (this repo shares one local Supabase instance across worktrees). Each ticket subagent runs
+  the implement-ticket skill (branch,
   commits, tests, PR with "Closes #<n>", mermaid-diff). Runs as a continuously-refilling pool
   of up to 4 worker subagents (the orchestrator doesn't count): each completion triggers a
   re-select + respawn until no eligible work remains; while idle, a "check again" command forces
@@ -64,10 +65,12 @@ Entry shape:
 **Concurrency is capped at 4 worker subagents.** The top-level swarm orchestrator (the parent
 agent running this skill) does not count toward the cap — it only selects, spawns, reports and
 refills; it holds no worktree and does no ticket work. So: 1 orchestrator + up to 4 workers.
-Within that cap, **at most 1 `db-migration`-labelled ticket may be in flight at a time** — this
-repo has a single shared local Supabase instance, so concurrent schema migrations or concurrent
-DB integration tests from different worktrees can collide. Non-`db-migration` tickets are not
-affected by this extra cap.
+Within that cap, **at most 1 ticket carrying an exclusive-resource label may be in flight at a
+time** — the exclusive-resource label set is `db-migration` and `e2e-exclusive`. Both mean the
+ticket will mutate the single shared local Supabase instance (schema migrations, or the
+`@mutates`-tagged E2E specs a ticket's diff will trigger per `e2e/mutating-spec-triggers.json`),
+so they share **one combined counter**, not two independent caps. Tickets carrying neither label
+are not affected by this extra cap.
 
 PR maintenance goes first — merging open PRs unblocks downstream tickets — so allocate free
 slots to PRs needing maintenance first, then fill the remainder with tickets.
@@ -124,10 +127,11 @@ Filter and rank:
   unblocked).
 - **Skip in-flight** — drop issues that already have an open linked PR or an existing branch
   (`gh issue view <n> --json closedByPullRequestsReferences` / `git branch -a`).
-- **Cap `db-migration` at 1 in-flight** — if a ticket carries the `db-migration` label, only
-  select it if no other `db-migration` ticket is currently running **and** none has already been
-  picked earlier in this same selection pass. Extra `db-migration` tickets are skipped this
-  round; they remain eligible on the next refill once the in-flight one completes.
+- **Cap the exclusive-resource label set at 1 in-flight** — if a ticket carries `db-migration` or
+  `e2e-exclusive`, only select it if no other ticket carrying either label is currently running
+  **and** none has already been picked earlier in this same selection pass. Extra
+  exclusive-resource tickets are skipped this round; they remain eligible on the next refill once
+  the in-flight one completes.
 - **Bias to unblockers** — among what's left, rank by the count of *open* issues in `blocking`
   (how many others this ticket unblocks), highest first; tie-break on lowest issue number.
 - Take as many as the **free slots** allow (4 minus workers currently running — both tracks).
@@ -153,7 +157,7 @@ Append a `kind: "ticket"` entry (see State file) for this worker right after spa
 
 The subagent owns branch/commits/tests/PR/mermaid-diff via `implement-ticket`, including the
 test-isolation rule for any DB integration tests it writes. swarm does not duplicate that
-logic — it only pins the branch base to `origin/main` and enforces the `db-migration` cap so
+logic — it only pins the branch base to `origin/main` and enforces the exclusive-resource cap so
 parallel worktrees don't build on a stale checkout or collide on the shared local Supabase
 instance.
 
@@ -171,13 +175,13 @@ time):
      couldn't push so the user can intervene.
 3. **Refill** — unless termination has been requested (see below), immediately re-run selection
    (§1 then §2) for the now-free slot(s) and spawn replacements up to the cap (respecting the
-   `db-migration` cap). A finished ticket often makes its PR eligible for maintenance and unblocks
-   downstream tickets, so a completion usually creates fresh work. If nothing is eligible and no
-   workers remain, report the pool is drained and go idle.
+   exclusive-resource cap). A finished ticket often makes its PR eligible for maintenance and
+   unblocks downstream tickets, so a completion usually creates fresh work. If nothing is
+   eligible and no workers remain, report the pool is drained and go idle.
 
 Track the live worker set (subagent id → what it's doing, including whether it's the in-flight
-`db-migration` ticket) across the whole run so the cap, refill, and termination logic all have an
-accurate count.
+exclusive-resource ticket) across the whole run so the cap, refill, and termination logic all
+have an accurate count.
 
 ## 4.5 Manual re-check (user asks to re-scan)
 
@@ -190,7 +194,7 @@ If the user issues any re-check-like command — e.g. "check again", "re-check",
 again", "any new work?", "refresh", "poll github" — immediately re-run selection from scratch
 against live GitHub state (§1 maintenance first, then §2 tickets) **without** waiting for a
 completion, and spawn workers for every newly-eligible unit up to the free slots (cap still 4;
-`db-migration` cap still 1; count workers already running). Report what the re-scan found:
+exclusive-resource cap still 1; count workers already running). Report what the re-scan found:
 - If new work is eligible, spawn it and report each unit started (as in §4 step 2).
 - If nothing new is eligible, say so plainly (e.g. "re-checked — still N blocked, M in-flight,
   nothing newly available") and stay idle.
@@ -234,9 +238,10 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   shared branch.
 - Never pick a blocked ticket; never exceed **4 concurrent worker subagents** across both tracks.
   The orchestrator itself is not a worker and does not count toward the 4.
-- Never run more than **1 `db-migration`-labelled ticket** at a time — extra ones wait for the
-  next refill. This protects the single shared local Supabase instance from concurrent schema
-  migrations.
+- Never run more than **1 exclusive-resource-labelled ticket** (`db-migration` or
+  `e2e-exclusive`, combined) at a time — extra ones wait for the next refill. This protects the
+  single shared local Supabase instance from concurrent schema migrations and concurrent
+  `@mutates`-tagged E2E runs.
 - Keep the pool full: on every worker completion, refill freed slots (maintenance first, then
   tickets) until no eligible work remains — then go idle, don't exit.
 - On any re-check-like command from the user ("check again", "rescan", "any new work?"), re-run

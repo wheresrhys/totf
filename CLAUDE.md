@@ -45,10 +45,13 @@ subagent implementing it runs on that model:
 - `opus` — fiddly or multi-constraint work (complex SQL, seed-data churn, interacting rules)
 - `fable` — complex or foundational work that sets patterns others build on
 
-If a ticket touches `supabase/schema/`, it also gets the `db-migration` label. This repo has a
-single shared local Supabase instance, so `swarm` never runs more than one `db-migration`-labelled
-ticket at a time — concurrent worktrees running schema migrations or DB integration tests against
-the same instance would otherwise collide.
+This repo has a single shared local Supabase instance, so any ticket that will mutate it gets an
+**exclusive-resource label**, and `swarm` never runs more than one exclusive-resource-labelled
+ticket at a time (combined across the whole set) — concurrent worktrees doing either kind of
+mutation would otherwise collide:
+- `db-migration` — touches `supabase/schema/` (schema migrations or DB integration tests).
+- `e2e-exclusive` — touches a path listed in `e2e/mutating-spec-triggers.json` (an E2E spec
+  tagged `@mutates`; see "E2E tests (Playwright)" below).
 
 ## Authentication model
 
@@ -226,6 +229,9 @@ source it exercises:
   a trigger path it runs the full `npm run test:e2e`, otherwise `npm run test:e2e:safe`
   (`--grep-invert @mutates`) — so most branches never execute the mutating spec at all, and don't
   need any cross-worktree coordination for it.
+- The rare ticket whose scope *does* intersect a trigger path gets the `e2e-exclusive` label
+  (alongside `db-migration`, in the same exclusive-resource set `swarm` caps at 1 in-flight — see
+  "Larger work" above) so two worktrees never run a `@mutates` spec concurrently.
 - Adding a new spec that writes to shared fixture rows: tag its `test.describe`/`test` with
   `@mutates` and add its trigger paths to `e2e/mutating-spec-triggers.json` — the hook and the
   ticket-labelling skills both read that one file, so nothing else needs updating.
