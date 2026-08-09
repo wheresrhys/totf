@@ -96,11 +96,11 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
 
 ## Data fetching conventions
 
-- All data fetching happens in **server actions** (`app/actions/`), never in client components.
-- Every server action calls `getAuthenticatedSupabaseClient()` to get a group-scoped client.
+- Data fetching happens in **server actions** (`app/actions/`) or in server-rendered pages/components — never in client components (anything marked `'use client'`).
+- Every data-fetching function calls `getAuthenticatedSupabaseClient()` to get a group-scoped client.
 - Errors from Supabase calls are handled via `catchSupabaseErrors()`.
 - RPC calls go through `.rpc('function_name', args)` on the Supabase client.
-- TypeScript types for DB rows come from `app/models/db.ts`, which re-exports from the auto-generated types.
+- TypeScript types for DB rows come from `app/models/db.ts`, which re-exports from the auto-generated types. Types for a query's return shape (e.g. an embedded-relation select used by only one page) can live alongside the page/component that fetches and renders it instead, if not reused elsewhere.
 
 ## Code conventions
 
