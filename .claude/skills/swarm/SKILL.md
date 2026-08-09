@@ -11,7 +11,9 @@ description: >-
   of up to 4 worker subagents (the orchestrator doesn't count): each completion triggers a
   re-select + respawn until no eligible work remains; while idle, a "check again" command forces
   a fresh GitHub re-scan for newly-available work. A stop command prompts the user to confirm
-  halt-all vs drain. Orchestration only — PR maintenance, selection, worktree isolation, model
+  halt-all vs drain. Tracks every live worker in a gitignored local state file
+  (`.claude/swarm-state.json`) so the `take-over` skill can find and halt the right agent even
+  from a fresh session. Orchestration only — PR maintenance, selection, worktree isolation, model
   routing, parallelism, refill, termination, teardown. Triggers: "swarm", "/swarm", "pick up
   ready tickets", "work the ready queue".
 ---
@@ -27,6 +29,37 @@ merge conflicts and address outstanding feedback so they can merge — then (b) 
 
 Confirm GitHub Issues are enabled: run `gh issue list` once. If it errors with issues disabled,
 stop and tell the user to enable them (`gh repo edit --enable-issues`) before continuing.
+
+## State file (`.claude/swarm-state.json`)
+
+Every live worker gets one entry here — this is how the `take-over` skill finds and halts the
+right agent from a session that never saw it spawn (there's no tool to list running background
+agents; this file is the only durable record). Gitignored, machine-local, never committed.
+
+Entry shape:
+```json
+{
+  "kind": "ticket",
+  "issue": 412,
+  "pr": null,
+  "branch": "feature/412-add-species-chart",
+  "title": "Add species breakdown chart to session page",
+  "worktreePath": "/abs/path/.claude/worktrees/...",
+  "agentId": "<id returned when spawning>",
+  "model": "sonnet",
+  "startedAt": "<ISO timestamp>"
+}
+```
+(`kind` is `"ticket"` for §3 workers or `"maintenance"` for §1 workers; use `pr` instead of/alongside
+`issue` for maintenance workers, and `title` is the ticket title or PR title, whichever is known.)
+
+- **On every spawn** (§1 and §3): after the Agent tool call returns an id, find the worktree path
+  — if not already given back by the spawn result, diff `git worktree list` from just before the
+  spawn to just after; the new entry is the freshly-created worktree. Then append the entry:
+  create the file with `[]` first if it doesn't exist, then
+  `jq --argjson e '<entry-json>' '. + [$e]' .claude/swarm-state.json > /tmp/swarm-state.tmp && mv /tmp/swarm-state.tmp .claude/swarm-state.json`.
+- **On every completion** (§4) **and on halt/drain** (Termination): remove that worker's entry —
+  `jq --arg id '<agentId>' 'map(select(.agentId != $id))' .claude/swarm-state.json > /tmp/swarm-state.tmp && mv /tmp/swarm-state.tmp .claude/swarm-state.json`.
 
 **Concurrency is capped at 4 worker subagents.** The top-level swarm orchestrator (the parent
 agent running this skill) does not count toward the cap — it only selects, spawns, reports and
@@ -78,6 +111,8 @@ both concerns for that PR:
      and push. If on inspection neither a real conflict nor genuine feedback remains, no-op and
      report that.
 
+Append a `kind: "maintenance"` entry (see State file) for this worker right after spawning it.
+
 If no open PR needs maintenance, skip to ticket selection with the full budget.
 
 ## 2. Select tickets (fill the remaining budget)
@@ -114,6 +149,8 @@ For each selected issue, launch an Agent (default background, so they run in par
   `origin/main` picks up already-merged sibling tickets), then run the `implement-ticket` skill
   for issue `<n>` and return its result (PR number + URL + test status).
 
+Append a `kind: "ticket"` entry (see State file) for this worker right after spawning it.
+
 The subagent owns branch/commits/tests/PR/mermaid-diff via `implement-ticket`, including the
 test-isolation rule for any DB integration tests it writes. swarm does not duplicate that
 logic — it only pins the branch base to `origin/main` and enforces the `db-migration` cap so
@@ -124,7 +161,8 @@ instance.
 
 Every time a worker subagent finishes (completions arrive as notifications, usually one at a
 time):
-1. **Record** its worktree path for teardown and note whether it succeeded or needs the user.
+1. **Record** its worktree path for teardown, remove its entry from the state file (see State
+   file), and note whether it succeeded or needs the user.
 2. **Report** that unit:
    - **Maintained PRs**: PR → conflicts resolved? → feedback addressed (+ reviewer reply URL) →
      commit pushed → now mergeable? (or "no-op, nothing outstanding").
@@ -171,10 +209,12 @@ with these two options:
   normally. No new refills after this.
 
 Then do exactly what they pick:
-- *Halt all now* → `TaskStop` every tracked live worker, confirm each is stopped, report what was
-  abandoned (branch/worktree state may be partial), and exit the loop.
+- *Halt all now* → `TaskStop` every tracked live worker, remove each from the state file, confirm
+  each is stopped, report what was abandoned (branch/worktree state may be partial), and exit the
+  loop.
 - *Drain* → keep the refill suppressed, await the running workers' completions, report each as it
-  lands (§4 steps 1–2 only, no refill), and exit the loop once the pool empties.
+  lands (§4 steps 1–2 only, no refill — completions already remove their own state-file entry),
+  and exit the loop once the pool empties.
 
 Either way, leave worktrees in place for teardown unless the user also asks to clean up.
 
@@ -214,3 +254,6 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
 - Every ticket branch is based on freshly-fetched `origin/main`, never on the local checkout.
 - Per-ticket work goes through `implement-ticket` — don't reinvent it here, including its
   DB-test-isolation rule.
+- Keep `.claude/swarm-state.json` in sync with the live worker set on every spawn, completion,
+  and halt — it's the only durable record of which agent id is working which branch, and
+  `take-over` depends on it being current.
