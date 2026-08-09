@@ -25,7 +25,10 @@ A leaderboard/statistics dashboard for bird ringing data. Bird ringing groups (o
 Tickets are created with the `flesh-out-ticket` skill (single task) or `tasks-to-tickets` skill
 (a whole task list, one issue per task, reusing `flesh-out-ticket` per ticket) and implemented
 with the `implement-ticket` skill. `swarm` picks up open `ready` tickets and open PRs needing
-maintenance and runs them in parallel, one git worktree + subagent per unit of work.
+maintenance and runs them in parallel, one git worktree + subagent per unit of work. If you want
+to grab a branch `swarm` is mid-way through and keep working on it by hand (e.g. in VS Code), use
+the `take-over` skill — it halts the worker and frees the branch's worktree so a normal
+`git checkout` works.
 
 When creating a ticket, add exactly one model label reflecting implementation complexity — the
 subagent implementing it runs on that model:
