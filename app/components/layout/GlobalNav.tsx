@@ -9,6 +9,7 @@ import type { RingingGroupRow } from '@/app/models/db';
 const moreLinks = [
 	{ href: '/mistakes', label: 'Mistakes' },
 	{ href: '/retraps', label: 'Retraps' },
+	{ href: '/resightings', label: 'Resightings' },
 	{ href: '/effort', label: 'Effort' },
 	{ href: '/ring-sequences', label: 'Ring Sequences' },
 	{ href: '/controls', label: 'Controls' }
