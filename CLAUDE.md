@@ -194,7 +194,11 @@ Test RPC functions and RLS policies against the real local database. Require `np
 Tests can run concurrently in separate git worktrees (see `swarm`) against the same shared local
 Supabase instance. Any row a write test creates (ring numbers, group names, session/location
 names, etc.) must use a random or ticket/branch-specific identifier — never a fixed literal —
-so parallel runs never collide on the same row.
+so parallel runs never collide on the same row, and so date-based rows never collide in a
+group-wide aggregate RPC's results (e.g. `stats_per_day_and_species`) even without a unique
+constraint. Use the shared helpers in `supabase/__tests__/test-isolation.ts`
+(`randomTestSuffix`, `randomFutureDate`, `addDays`) rather than inventing a new isolation
+mechanism per file; extend an existing prefix convention (e.g. `TRIG-TEST-`) with the suffix.
 
 ## Environment variables
 

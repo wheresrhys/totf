@@ -15,6 +15,7 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
 import { supabase } from '../../lib/supabase';
+import { randomTestSuffix } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 async function getGroupIdByName(name: string): Promise<number> {
@@ -66,16 +67,20 @@ describe('app_readonly role', () => {
 	});
 
 	it('rejects INSERT with a read-only transaction error', async () => {
+		// The transaction is read-only, so this insert never actually commits — the
+		// random suffix is just for consistency with the isolation convention (see
+		// CLAUDE.md's "DB integration tests" section) in case that guarantee ever changes.
 		const { error } = await readonlyClient
 			.from('Species')
-			.insert({ species_name: 'Readonly Test Species' });
+			.insert({ species_name: `Readonly Test Species ${randomTestSuffix()}` });
 		expect(error?.code).toBe(READ_ONLY_TRANSACTION_ERROR_CODE);
 	});
 
 	it('rejects UPDATE with a read-only transaction error', async () => {
+		// As above: the transaction is read-only, so this update never actually commits.
 		const { error } = await readonlyClient
 			.from('RingingGroups')
-			.update({ group_name: 'Readonly Test Rename' })
+			.update({ group_name: `Readonly Test Rename ${randomTestSuffix()}` })
 			.eq('id', alphaId);
 		expect(error?.code).toBe(READ_ONLY_TRANSACTION_ERROR_CODE);
 	});
