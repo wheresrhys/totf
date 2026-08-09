@@ -20,6 +20,14 @@ A leaderboard/statistics dashboard for bird ringing data. Bird ringing groups (o
 - An **Encounter** is a single capture event: one bird, one session, with measurements.
 - A **Session** is a visit to a ringing location on a given date.
 
+**Standard terminology/enum reference:** imported CSV data follows the DemOn ringing-software
+field spec — [`demon-ringing-data-entry-fields.xls`](https://app.bto.org/static/files/demon/demon-ringing-data-entry-fields.xls),
+published by the BTO. It's the authoritative source for what each `DemonColumnNames` field
+(`lib/demon-import.ts`) means and, for most coded fields (`record_type`, age codes, etc.), the
+full code→meaning table. Consult it before guessing at what a raw code value means. Note:
+`finding_condition`/`finding_circumstances` are **not** covered by this spec — treat their values
+as opaque codes (store/display/filter on them as-is) rather than inventing a decode mapping.
+
 ## Ticket workflow
 
 Tickets are created with the `flesh-out-ticket` skill (single task) or `tasks-to-tickets` skill
