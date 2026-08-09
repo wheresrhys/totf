@@ -17,10 +17,18 @@ import { getTopStats, type UserTopStatsArgs } from '../actions/top-performers';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
+import type { SpeciesRow } from '../models/db';
 import { SessionsByDay } from '../components/SessionHistoryCalendar';
+import { NoPrefetchLink } from '../components/shared/NoPrefetchLink';
+
+type SpeciesWithBirdsCount = Pick<SpeciesRow, 'id' | 'species_name'> & {
+	birds: { count: number }[];
+};
+
 type PageModel = {
 	stats: StatsAccordionModel[];
 	recentSessions: SessionWithEncountersCount[];
+	topSpecies: SpeciesWithBirdsCount[];
 };
 function getStatConfigs(
 	date: Date
@@ -160,6 +168,18 @@ export async function fetchRecentSessions(
 	return sessions.filter((s) => recentDates.includes(s.visit_date));
 }
 
+export async function fetchTopSpecies(): Promise<SpeciesWithBirdsCount[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
+	const species = (await supabase
+		.from('Species')
+		.select('id, species_name, birds:Birds(count)')
+		.then(catchSupabaseErrors)) as SpeciesWithBirdsCount[];
+	return species
+		.filter((s) => (s.birds[0]?.count ?? 0) > 0)
+		.sort((a, b) => (b.birds[0]?.count ?? 0) - (a.birds[0]?.count ?? 0))
+		.slice(0, 10);
+}
+
 export async function fetchHomePageData(
 	_: DefaultPageParams,
 	viewedGroupId: number
@@ -191,7 +211,8 @@ export async function fetchHomePageData(
 				};
 			})
 		),
-		recentSessions: await fetchRecentSessions(viewedGroupId)
+		recentSessions: await fetchRecentSessions(viewedGroupId),
+		topSpecies: await fetchTopSpecies()
 	};
 }
 
@@ -215,6 +236,25 @@ function RecentSessions({
 		</div>
 	);
 }
+function TopSpecies({ data }: { data: SpeciesWithBirdsCount[] }) {
+	return (
+		<div>
+			<SecondaryHeading>Top species</SecondaryHeading>
+			<ul className="flex flex-wrap gap-2">
+				{data.map((species) => (
+					<li key={species.id}>
+						<NoPrefetchLink
+							className="link badge badge-outline"
+							href={`/species/${species.species_name}`}
+						>
+							{species.species_name}
+						</NoPrefetchLink>
+					</li>
+				))}
+			</ul>
+		</div>
+	);
+}
 function HomePageContent({
 	data,
 	viewedGroupId
@@ -228,6 +268,7 @@ function HomePageContent({
 				data={data.recentSessions}
 				viewedGroupId={viewedGroupId}
 			/>
+			<TopSpecies data={data.topSpecies} />
 			<StatsAccordion data={data.stats} viewedGroupId={viewedGroupId} />
 		</PageWrapper>
 	);

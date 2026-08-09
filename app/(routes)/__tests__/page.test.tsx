@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
 import recentSessionsSnapshot from '@/test-fixtures/snapshots/fetchRecentSessions.alpha.json';
+import topSpeciesSnapshot from '@/test-fixtures/snapshots/fetchTopSpecies.alpha.json';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -15,19 +16,30 @@ vi.mock('@/app/actions/top-performers', () => ({
 	getTopStats: vi.fn().mockResolvedValue([])
 }));
 
-function makeChainClient(data: unknown) {
-	const thenable = {
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({ data, error: null }).then(resolve)
+function makeChainClient(
+	overrides: { Sessions?: unknown; Species?: unknown } = {}
+) {
+	const dataByTable: Record<string, unknown> = {
+		Sessions: recentSessionsSnapshot,
+		Species: topSpeciesSnapshot,
+		...overrides
 	};
-	const chain = {
-		select: vi.fn().mockReturnThis(),
-		eq: vi.fn().mockReturnThis(),
-		order: vi.fn().mockReturnThis(),
-		limit: vi.fn().mockReturnThis(),
-		...thenable
+	function chainFor(data: unknown) {
+		const thenable = {
+			then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+				Promise.resolve({ data, error: null }).then(resolve)
+		};
+		return {
+			select: vi.fn().mockReturnThis(),
+			eq: vi.fn().mockReturnThis(),
+			order: vi.fn().mockReturnThis(),
+			limit: vi.fn().mockReturnThis(),
+			...thenable
+		};
+	}
+	return {
+		from: vi.fn((table: string) => chainFor(dataByTable[table] ?? []))
 	};
-	return { from: vi.fn().mockReturnValue(chain) };
 }
 
 describe('home page', () => {
@@ -36,9 +48,7 @@ describe('home page', () => {
 	});
 
 	beforeEach(() => {
-		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-			makeChainClient(recentSessionsSnapshot)
-		);
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeChainClient());
 	});
 
 	it('renders Recent Sessions heading', async () => {
@@ -67,7 +77,9 @@ describe('home page', () => {
 
 	describe('with no recent sessions', () => {
 		it('renders empty session list', async () => {
-			mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeChainClient([]));
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+				makeChainClient({ Sessions: [] })
+			);
 			render(await Page());
 			const heading = await screen.findByRole('heading', {
 				name: 'Recent Sessions'
@@ -115,7 +127,7 @@ describe('home page', () => {
 				}
 			];
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-				makeChainClient(sessionsWithSharedDate)
+				makeChainClient({ Sessions: sessionsWithSharedDate })
 			);
 			render(await Page());
 			const heading = await screen.findByRole('heading', {
@@ -126,6 +138,65 @@ describe('home page', () => {
 			// 2 sessions on same date: 1 day-total link (StatOutput) + 2 site links
 			// + 1 link each for the 2 single-session dates = 5 total
 			expect(sessionLinks.length).toBe(5);
+		});
+	});
+
+	describe('top species section', () => {
+		it('renders Top species heading', async () => {
+			render(await Page());
+			const heading = await screen.findByRole('heading', {
+				name: 'Top species'
+			});
+			expect(heading).toBeDefined();
+		});
+
+		it('renders a badge link per top species, sorted by bird count and excluding zero-count and beyond-10th species', async () => {
+			render(await Page());
+			const heading = await screen.findByRole('heading', {
+				name: 'Top species'
+			});
+			const speciesLinks = Array.from(
+				heading.nextElementSibling?.querySelectorAll('a') ?? []
+			);
+			expect(speciesLinks.map((link) => link.textContent?.trim())).toEqual([
+				'Blackbird',
+				'Blue Tit',
+				'Robin',
+				'Great Tit',
+				'Chaffinch',
+				'Wren',
+				'Dunnock',
+				'Goldfinch',
+				'Song Thrush',
+				'Nuthatch'
+			]);
+			expect(speciesLinks.map((link) => link.getAttribute('href'))).toEqual([
+				'/species/Blackbird',
+				'/species/Blue Tit',
+				'/species/Robin',
+				'/species/Great Tit',
+				'/species/Chaffinch',
+				'/species/Wren',
+				'/species/Dunnock',
+				'/species/Goldfinch',
+				'/species/Song Thrush',
+				'/species/Nuthatch'
+			]);
+		});
+
+		describe('with no species yet caught', () => {
+			it('renders no badge links', async () => {
+				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+					makeChainClient({ Species: [] })
+				);
+				render(await Page());
+				const heading = await screen.findByRole('heading', {
+					name: 'Top species'
+				});
+				const speciesLinks =
+					heading.nextElementSibling?.querySelectorAll('a') ?? [];
+				expect(speciesLinks.length).toBe(0);
+			});
 		});
 	});
 });
