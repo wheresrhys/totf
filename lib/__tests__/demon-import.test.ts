@@ -295,33 +295,7 @@ describe('processEncounterRow', () => {
 			return upsert.mock.calls.find(([table]) => table === 'Sessions');
 		}
 
-		it('buckets an N record_type as is_resighting_only: false', async () => {
-			await processEncounterRow(
-				makeDemonRow({ record_type: 'N' }),
-				upsert,
-				RINGING_GROUP_ID
-			);
-			expect(sessionUpsertArgs()).toEqual([
-				'Sessions',
-				expect.objectContaining({ is_resighting_only: false }),
-				'visit_date,location_id,is_resighting_only'
-			]);
-		});
-
-		it('buckets an S record_type as is_resighting_only: false', async () => {
-			await processEncounterRow(
-				makeDemonRow({ record_type: 'S' }),
-				upsert,
-				RINGING_GROUP_ID
-			);
-			expect(sessionUpsertArgs()).toEqual([
-				'Sessions',
-				expect.objectContaining({ is_resighting_only: false }),
-				'visit_date,location_id,is_resighting_only'
-			]);
-		});
-
-		it.each(['C', 'F', 'T'])(
+		it.each(['U', 'F', 'D'])(
 			'buckets a %s record_type as is_resighting_only: true',
 			async (recordType) => {
 				await processEncounterRow(
@@ -337,7 +311,23 @@ describe('processEncounterRow', () => {
 			}
 		);
 
-		it('treats an unrecognised/future record_type as is_resighting_only: true', async () => {
+		it.each(['N', 'S', 'C', 'T'])(
+			'buckets a %s record_type as is_resighting_only: false',
+			async (recordType) => {
+				await processEncounterRow(
+					makeDemonRow({ record_type: recordType }),
+					upsert,
+					RINGING_GROUP_ID
+				);
+				expect(sessionUpsertArgs()).toEqual([
+					'Sessions',
+					expect.objectContaining({ is_resighting_only: false }),
+					'visit_date,location_id,is_resighting_only'
+				]);
+			}
+		);
+
+		it('treats all other record_type as is_resighting_only: false', async () => {
 			await processEncounterRow(
 				makeDemonRow({ record_type: 'Z' }),
 				upsert,
@@ -345,7 +335,7 @@ describe('processEncounterRow', () => {
 			);
 			expect(sessionUpsertArgs()).toEqual([
 				'Sessions',
-				expect.objectContaining({ is_resighting_only: true }),
+				expect.objectContaining({ is_resighting_only: false }),
 				'visit_date,location_id,is_resighting_only'
 			]);
 		});

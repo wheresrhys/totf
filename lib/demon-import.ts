@@ -209,7 +209,7 @@ export async function processEncounterRow(
 
 	const visitDate = convertDateFormat(row.visit_date as string);
 
-	const isResightingOnly = !['N', 'S'].includes(row.record_type as string);
+	const isResightingOnly = ['U', 'F', 'D'].includes(row.record_type as string);
 
 	const sessionId = await upsert<SessionsInsert>(
 		'Sessions',

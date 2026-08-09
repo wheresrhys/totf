@@ -30,7 +30,9 @@ function psql(sql: string) {
 function psqlScalar(sql: string): string {
 	// psql prints the RETURNING value followed by the command tag (e.g. "INSERT 0 1"),
 	// so take the first non-empty line only.
-	return execSync(`psql "${LOCAL_DB_URL}" -t -A -c "${sql.replace(/"/g, '\\"')}"`)
+	return execSync(
+		`psql "${LOCAL_DB_URL}" -t -A -c "${sql.replace(/"/g, '\\"')}"`
+	)
 		.toString()
 		.split('\n')
 		.map((line) => line.trim())
@@ -98,26 +100,36 @@ describe('Sessions — is_resighting_only identity', () => {
 	it('allows two Sessions with the same visit_date/location when is_resighting_only differs, and rejects a duplicate triple', async () => {
 		const visitDate = '2099-03-01';
 
-		const realCatch = await groupClient
-			.from('Sessions')
-			.insert({ visit_date: visitDate, location_id: locationId, is_resighting_only: false });
+		const realCatch = await groupClient.from('Sessions').insert({
+			visit_date: visitDate,
+			location_id: locationId,
+			is_resighting_only: false
+		});
 		expect(realCatch.error).toBeNull();
 
-		const resighting = await groupClient
-			.from('Sessions')
-			.insert({ visit_date: visitDate, location_id: locationId, is_resighting_only: true });
+		const resighting = await groupClient.from('Sessions').insert({
+			visit_date: visitDate,
+			location_id: locationId,
+			is_resighting_only: true
+		});
 		expect(resighting.error).toBeNull();
 
-		const duplicate = await groupClient
-			.from('Sessions')
-			.insert({ visit_date: visitDate, location_id: locationId, is_resighting_only: false });
+		const duplicate = await groupClient.from('Sessions').insert({
+			visit_date: visitDate,
+			location_id: locationId,
+			is_resighting_only: false
+		});
 		expect(duplicate.error?.code).toBe('23505');
 	});
 
 	it('derives ringing_group_id for a hand-inserted resighting-only Sessions row', async () => {
 		const { data, error } = await groupClient
 			.from('Sessions')
-			.insert({ visit_date: '2099-03-02', location_id: locationId, is_resighting_only: true })
+			.insert({
+				visit_date: '2099-03-02',
+				location_id: locationId,
+				is_resighting_only: true
+			})
 			.select('ringing_group_id')
 			.single();
 		expect(error).toBeNull();
@@ -127,15 +139,16 @@ describe('Sessions — is_resighting_only identity', () => {
 
 describe('is_resighting_only backfill migration', () => {
 	// Mirrors the two DML statements hand-appended to the #428 migration, scoped by
-	// location_id so it only touches this test's isolated fixtures.
+	// location_id so it only touches this test's isolated fixtures. Bucketing rule:
+	// record_type U/F/D = resighting-only, anything else = standard ringing encounter.
 	function runBackfillScopedToLocation(loc: number) {
 		psql(
 			`WITH mixed_sessions AS (
 				SELECT s.id AS old_session_id, s.visit_date, s.location_id
 				FROM "Sessions" s
 				WHERE s.location_id = ${loc}
-					AND EXISTS (SELECT 1 FROM "Encounters" e WHERE e.session_id = s.id AND e.record_type IN ('N','S'))
-					AND EXISTS (SELECT 1 FROM "Encounters" e WHERE e.session_id = s.id AND e.record_type NOT IN ('N','S'))
+					AND EXISTS (SELECT 1 FROM "Encounters" e WHERE e.session_id = s.id AND e.record_type NOT IN ('U','F','D'))
+					AND EXISTS (SELECT 1 FROM "Encounters" e WHERE e.session_id = s.id AND e.record_type IN ('U','F','D'))
 			), inserted_twins AS (
 				INSERT INTO "Sessions" (visit_date, location_id, is_resighting_only)
 				SELECT visit_date, location_id, TRUE FROM mixed_sessions
@@ -145,14 +158,14 @@ describe('is_resighting_only backfill migration', () => {
 			SET session_id = t.new_session_id
 			FROM mixed_sessions m
 			JOIN inserted_twins t ON t.visit_date = m.visit_date AND t.location_id = m.location_id
-			WHERE e.session_id = m.old_session_id AND e.record_type NOT IN ('N','S');`
+			WHERE e.session_id = m.old_session_id AND e.record_type IN ('U','F','D');`
 		);
 		psql(
 			`UPDATE "Sessions" s SET is_resighting_only = TRUE
 			WHERE s.location_id = ${loc}
 				AND s.is_resighting_only = FALSE
 				AND EXISTS (SELECT 1 FROM "Encounters" e WHERE e.session_id = s.id)
-				AND NOT EXISTS (SELECT 1 FROM "Encounters" e WHERE e.session_id = s.id AND e.record_type IN ('N','S'));`
+				AND NOT EXISTS (SELECT 1 FROM "Encounters" e WHERE e.session_id = s.id AND e.record_type NOT IN ('U','F','D'));`
 		);
 	}
 
@@ -212,19 +225,19 @@ describe('is_resighting_only backfill migration', () => {
 		allNSessionId = await insertSession('2099-04-03');
 		emptySessionId = await insertSession('2099-04-04');
 
-		const [birdN, birdC, birdF, birdAllN] = await Promise.all([
+		const [birdN, birdD, birdF, birdAllN] = await Promise.all([
 			insertBird(`RSN-${suffix}`),
-			insertBird(`RSC-${suffix}`),
+			insertBird(`RSD-${suffix}`),
 			insertBird(`RSF-${suffix}`),
 			insertBird(`RSA-${suffix}`)
 		]);
 
-		// mixed: one real (N) + one resighting (C) encounter on the same day/site
+		// mixed: one standard (N) + one resighting (D) encounter on the same day/site
 		await insertEncounter(birdN, mixedSessionId, 'N');
-		await insertEncounter(birdC, mixedSessionId, 'C');
-		// pure resighting: only a non-N/S (F) encounter
+		await insertEncounter(birdD, mixedSessionId, 'D');
+		// pure resighting: only a resighting (F) encounter
 		await insertEncounter(birdF, pureResightSessionId, 'F');
-		// all real: only an N encounter
+		// all standard: only an N encounter
 		await insertEncounter(birdAllN, allNSessionId, 'N');
 		// emptySession deliberately has no encounters
 
@@ -233,7 +246,7 @@ describe('is_resighting_only backfill migration', () => {
 
 	afterAll(() => cleanupGroup(groupId, locationId));
 
-	it('splits a mixed session into two rows, repointing the non-N/S encounters onto a new resighting-only row', async () => {
+	it('splits a mixed session into two rows, repointing the resighting-only (U/F/D) encounters onto a new resighting-only row', async () => {
 		const { data: original } = await groupClient
 			.from('Sessions')
 			.select('is_resighting_only')
@@ -250,7 +263,7 @@ describe('is_resighting_only backfill migration', () => {
 		const twin = rows!.find((r) => r.is_resighting_only);
 		expect(twin).toBeDefined();
 
-		// original keeps the N encounter, twin holds the C encounter
+		// original keeps the N encounter, twin holds the D encounter
 		const { data: originalEncounters } = await groupClient
 			.from('Encounters')
 			.select('record_type')
@@ -261,7 +274,7 @@ describe('is_resighting_only backfill migration', () => {
 			.from('Encounters')
 			.select('record_type')
 			.eq('session_id', twin!.id);
-		expect(twinEncounters?.map((e) => e.record_type)).toEqual(['C']);
+		expect(twinEncounters?.map((e) => e.record_type)).toEqual(['D']);
 	});
 
 	it('flips an already-pure resighting-only session in place without creating a new row', async () => {
