@@ -20,13 +20,24 @@ A leaderboard/statistics dashboard for bird ringing data. Bird ringing groups (o
 - An **Encounter** is a single capture event: one bird, one session, with measurements.
 - A **Session** is a visit to a ringing location on a given date.
 
-## Creating GitHub tickets
+## Ticket workflow
 
-When creating a ticket, add exactly one model label reflecting implementation complexity — the `next-ticket` skill routes implementation to a subagent on that model:
+Tickets are created with the `flesh-out-ticket` skill (single task) or `tasks-to-tickets` skill
+(a whole task list, one issue per task, reusing `flesh-out-ticket` per ticket) and implemented
+with the `implement-ticket` skill. `swarm` picks up open `ready` tickets and open PRs needing
+maintenance and runs them in parallel, one git worktree + subagent per unit of work.
+
+When creating a ticket, add exactly one model label reflecting implementation complexity — the
+subagent implementing it runs on that model:
 
 - `sonnet` — small, precisely specified, low-risk changes
 - `opus` — fiddly or multi-constraint work (complex SQL, seed-data churn, interacting rules)
 - `fable` — complex or foundational work that sets patterns others build on
+
+If a ticket touches `supabase/schema/`, it also gets the `db-migration` label. This repo has a
+single shared local Supabase instance, so `swarm` never runs more than one `db-migration`-labelled
+ticket at a time — concurrent worktrees running schema migrations or DB integration tests against
+the same instance would otherwise collide.
 
 ## Authentication model
 
@@ -168,6 +179,11 @@ Snapshot fixture data lives in `test-fixtures/snapshots/` — use these as mock 
 ### DB integration tests (`supabase/__tests__/`)
 
 Test RPC functions and RLS policies against the real local database. Require `npm run db:seed:e2e` to populate test data before running. Use a separate Vitest node environment (no happy-dom).
+
+Tests can run concurrently in separate git worktrees (see `swarm`) against the same shared local
+Supabase instance. Any row a write test creates (ring numbers, group names, session/location
+names, etc.) must use a random or ticket/branch-specific identifier — never a fixed literal —
+so parallel runs never collide on the same row.
 
 ## Environment variables
 
