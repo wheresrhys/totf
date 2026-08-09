@@ -12,6 +12,7 @@ import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
 import { supabase } from '../../lib/supabase';
+import { randomTestSuffix } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
@@ -54,9 +55,11 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 		if (speciesError || !species) throw new Error('Robin species not found — run npm run db:seed:e2e first');
 		const speciesId = species.id;
 
+		const testSuffix = randomTestSuffix();
+
 		const { data: loc, error: locError } = await groupClient
 			.from('Locations')
-			.insert({ location_name: 'Trigger Test Location', ringing_group_id: deltaId })
+			.insert({ location_name: `Trigger Test Location ${testSuffix}`, ringing_group_id: deltaId })
 			.select('id')
 			.single();
 		if (locError) throw locError;
@@ -71,7 +74,7 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 		sessionId = sess!.id;
 
 		const birds = await Promise.all(
-			['TRIG-TEST-N', 'TRIG-TEST-S', 'TRIG-TEST-FRESH'].map((ringNo) =>
+			[`TRIG-TEST-N-${testSuffix}`, `TRIG-TEST-S-${testSuffix}`, `TRIG-TEST-FRESH-${testSuffix}`].map((ringNo) =>
 				groupClient
 					.from('Birds')
 					.insert({ ring_no: ringNo, species_id: speciesId })
