@@ -281,9 +281,74 @@ describe('processEncounterRow', () => {
 		const locationId = 30; // third call returns 30
 		expect(upsert).toHaveBeenCalledWith(
 			'Sessions',
-			{ visit_date: '2023-03-15', location_id: locationId },
-			'visit_date,location_id'
+			{
+				visit_date: '2023-03-15',
+				location_id: locationId,
+				is_resighting_only: false
+			},
+			'visit_date,location_id,is_resighting_only'
 		);
+	});
+
+	describe('is_resighting_only bucketing', () => {
+		function sessionUpsertArgs() {
+			return upsert.mock.calls.find(([table]) => table === 'Sessions');
+		}
+
+		it('buckets an N record_type as is_resighting_only: false', async () => {
+			await processEncounterRow(
+				makeDemonRow({ record_type: 'N' }),
+				upsert,
+				RINGING_GROUP_ID
+			);
+			expect(sessionUpsertArgs()).toEqual([
+				'Sessions',
+				expect.objectContaining({ is_resighting_only: false }),
+				'visit_date,location_id,is_resighting_only'
+			]);
+		});
+
+		it('buckets an S record_type as is_resighting_only: false', async () => {
+			await processEncounterRow(
+				makeDemonRow({ record_type: 'S' }),
+				upsert,
+				RINGING_GROUP_ID
+			);
+			expect(sessionUpsertArgs()).toEqual([
+				'Sessions',
+				expect.objectContaining({ is_resighting_only: false }),
+				'visit_date,location_id,is_resighting_only'
+			]);
+		});
+
+		it.each(['C', 'F', 'T'])(
+			'buckets a %s record_type as is_resighting_only: true',
+			async (recordType) => {
+				await processEncounterRow(
+					makeDemonRow({ record_type: recordType }),
+					upsert,
+					RINGING_GROUP_ID
+				);
+				expect(sessionUpsertArgs()).toEqual([
+					'Sessions',
+					expect.objectContaining({ is_resighting_only: true }),
+					'visit_date,location_id,is_resighting_only'
+				]);
+			}
+		);
+
+		it('treats an unrecognised/future record_type as is_resighting_only: true', async () => {
+			await processEncounterRow(
+				makeDemonRow({ record_type: 'Z' }),
+				upsert,
+				RINGING_GROUP_ID
+			);
+			expect(sessionUpsertArgs()).toEqual([
+				'Sessions',
+				expect.objectContaining({ is_resighting_only: true }),
+				'visit_date,location_id,is_resighting_only'
+			]);
+		});
 	});
 
 	it('upserts Encounter with bird and session IDs from prior upserts', async () => {
