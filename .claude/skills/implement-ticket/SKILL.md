@@ -85,6 +85,10 @@ For each PR:
 
 Do **not** add `Closes #<number>` to any PR except the last one in a multi-PR sequence. The issue tracks the whole piece of work — it stays open until all increments are merged.
 
+### 7. Add behaviour-change diagrams to each PR
+
+Once a PR is open, invoke the **`mermaid-diff`** skill for it (pass the PR number). Since you have just implemented the change, it draws on this session's context — the code you wrote and the decisions you made — rather than a cold GitHub read, so the diagrams reflect what actually shipped. It posts the Mermaid behaviour-change diagram(s) as a PR comment. Do this per PR in a multi-PR sequence.
+
 ## Constraints
 
 - Never work on `main`
