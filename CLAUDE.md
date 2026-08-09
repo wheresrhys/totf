@@ -225,7 +225,11 @@ source it exercises:
 - `scripts/e2e-select-suite.sh` diffs the branch against `origin/main`; if any changed file matches
   a trigger path it runs the full `npm run test:e2e`, otherwise `npm run test:e2e:safe`
   (`--grep-invert @mutates`) — so most branches never execute the mutating spec at all, and don't
-  need any cross-worktree coordination for it.
+  need any cross-worktree coordination for it. It also treats a change to any direct (one-level,
+  not transitive) local import dependency of a trigger file as touching that trigger — resolved by
+  `scripts/resolve-mutating-import-deps.mjs` via a regex-based import scan, excluding type-only
+  imports — so editing e.g. `lib/group-auth.ts` (imported by `app/api/import/route.ts`) still
+  selects the full suite even though it isn't listed in `mutating-spec-triggers.json` itself.
 - Adding a new spec that writes to shared fixture rows: tag its `test.describe`/`test` with
   `@mutates` and add its trigger paths to `e2e/mutating-spec-triggers.json` — the hook and the
   ticket-labelling skills both read that one file, so nothing else needs updating.
