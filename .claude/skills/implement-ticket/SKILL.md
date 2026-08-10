@@ -117,12 +117,21 @@ For each PR:
    `swarm` read exclusive-resource status directly off `gh pr list --json labels` when deciding
    whether to spawn PR-maintenance work, instead of resolving each PR back to its linked issue.
 6. Include in each PR body:
+   - If the issue carries `db-migration`: a warning block **at the top**, above everything else:
+     > ⚠️ **Database migration — do not merge before pushing.** This PR's schema change must be
+     > deployed to prod (`npm run db:migration:push`, run via the `take-over` skill) before this
+     > PR is merged. Merging first triggers a Vercel prod deploy of code that expects a schema
+     > prod doesn't have yet.
    - What this increment covers
    - Link to the GitHub issue
    - Any assumptions made (subagent mode)
    - `Closes #<number>` **only in the final PR** — and only if this ticket is the last of its
      parent's sequence when the parent tracks the whole feature; otherwise close the child
      ticket, never the parent.
+
+   For a `db-migration` PR, repeat the same warning verbatim in the result handed back to the
+   caller (interactive user or `swarm` orchestrator) — it must surface in `swarm`'s §4 completion
+   report, not just sit in the PR body where it's easy to miss.
 
 ### 6. Keep the issue open until the final PR
 
@@ -143,6 +152,8 @@ multi-PR sequence.
 - No PR on red tests — fix or report back, never push a failing PR.
 - `Closes #<number>` only on the final PR of a sequence; the tracked issue stays open until then.
 - mermaid-diff runs once per PR, right after that PR opens — not from a cold GitHub read later.
+- A `db-migration` PR always carries the top-of-body "do not merge before pushing" warning, and
+  the same warning is always repeated in the result handed back to the caller.
 - Commit trailer names the model actually doing the work; PR body carries the Claude Code
   trailer.
 - DB integration tests must isolate the rows they write (random/ticket-specific identifiers) —

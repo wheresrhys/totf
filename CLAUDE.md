@@ -46,9 +46,9 @@ subagent implementing it runs on that model:
 - `fable` — complex or foundational work that sets patterns others build on
 
 This repo has a single shared local Supabase instance, so any ticket that will mutate it gets an
-**exclusive-resource label**, and `swarm` never runs more than one exclusive-resource-labelled
-ticket at a time (combined across the whole set) — concurrent worktrees doing either kind of
-mutation would otherwise collide:
+**exclusive-resource label**, and `swarm` runs any exclusive-resource-labelled unit of work
+completely solo — no other worker (maintenance or ticket) runs concurrently with it — since
+concurrent worktrees doing either kind of mutation would otherwise collide:
 - `db-migration` — touches `supabase/schema/` (schema migrations or DB integration tests).
 - `e2e-exclusive` — touches a path listed in `e2e/mutating-spec-triggers.json` (an E2E spec
   tagged `@mutates`; see "E2E tests (Playwright)" below).

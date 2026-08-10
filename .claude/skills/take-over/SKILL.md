@@ -6,10 +6,12 @@ description: >-
   that's already checked out in another worktree — this resolves an identifier (branch name,
   issue/PR number, a raw agent id, or a paraphrase of the ticket title) to the worker doing that
   work via swarm's state file, halts that agent, stashes and removes its worktree, then checks
-  the branch out (reapplying the stash) in the current working directory. Works from any session,
-  including a fresh one that never saw the worker spawn. Triggers: "take over ticket <n>", "take
-  over this branch", "let me work on this myself", "/take-over <identifier>", or git complaining
-  a branch is already checked out elsewhere.
+  the branch out (reapplying the stash) in the current working directory, merges in `origin/main`
+  and pushes so the branch/PR is current. If the branch's linked PR/issue carries `db-migration`,
+  automatically runs `npm run db:schema:apply` and warns the user not to merge before pushing the
+  migration themselves. Works from any session, including a fresh one that never saw the worker
+  spawn. Triggers: "take over ticket <n>", "take over this branch", "let me work on this myself",
+  "/take-over <identifier>", or git complaining a branch is already checked out elsewhere.
 ---
 
 # take-over
@@ -96,12 +98,53 @@ If step 4 created a stash, reapply it now: `git stash pop <that stash ref>`. Rep
 applies with no conflicts; if it doesn't, say so and leave the stash in place rather than forcing
 it — the user can resolve and pop it manually.
 
-## 9. Report
+## 9. Sync with `origin/main` and push
+
+The worktree being reclaimed may have gone stale while its worker was halted mid-task (or while
+this took a while to get to), and other work may have merged to `main` since. Bring the branch
+current and make sure GitHub reflects that:
+
+`git fetch origin`, then `git merge origin/main` (merge, not rebase — same convention `swarm`'s
+own PR-maintenance track uses elsewhere in this repo; never force-push a shared branch). If it
+merges cleanly, `git push` (`git push -u origin <branch>` if the branch has no upstream yet) so
+the PR (if one exists) picks up the merge immediately rather than sitting stale until the user's
+next manual push.
+
+If the merge conflicts: stop and hand it to the user rather than resolving it on their behalf —
+they took the branch over specifically to work on it by hand. Report the conflicting files
+plainly and do not push. Step 10's schema-apply is skipped in this case (the working tree is
+mid-conflict, not a clean state to diff from) — go straight to step 11's report and note the
+unresolved merge there.
+
+## 10. Auto-apply the schema if this is a `db-migration` branch
+
+Resolve the branch's linked issue/PR number — from the state-file entry if step 1 found one
+(`issue`/`pr` fields), else `gh pr list --head <branch> --json number --state open` as a
+fallback. Check its labels: `gh pr view <n> --json labels` if a PR exists (it carries the
+exclusive-resource label directly, applied by `implement-ticket` at PR-creation time), otherwise
+`gh issue view <n> --json labels`.
+
+If `db-migration` is present:
+- Run `npm run db:schema:apply` right here, in the just-checked-out working directory (after step
+  8's stash reapply and step 9's merge, so both any uncommitted schema edits and anything just
+  merged in from `origin/main` are included in the diff).
+- On success, report the generated migration file's path plus this warning, verbatim:
+  > ⚠️ **Database migration — do not merge before pushing.** Inspect the generated migration, then
+  > run `npm run db:migration:push` yourself. Do not merge this PR until that succeeds — merging
+  > first triggers a Vercel prod deploy of code that expects a schema prod doesn't have yet.
+- On failure (e.g. the shared local Supabase instance has schema drift from other work), surface
+  the error plainly rather than guessing at a fix. Mention `npm run db:sync:local` as the user's
+  own option to reset to a clean baseline first, but don't run it automatically — it's destructive
+  (wipes the local db) and outside what this step is for.
+
+If no `db-migration` label is found, skip this step silently.
+
+## 11. Report
 
 Summarise: whether the agent was halted (or why not), that the worktree was removed, that the
 branch is now checked out here, any stashes created/reapplied (and any left behind, e.g. the
-current-directory autosave from step 6), and — if the branch has an open PR — its URL, so the
-user knows pushing new commits will update it rather than needing a fresh PR.
+current-directory autosave from step 6), whether step 9's merge+push succeeded or hit conflicts,
+whether step 10 ran (and its result), and — if the branch has an open PR — its URL.
 
 ## Rules
 
@@ -112,3 +155,9 @@ user knows pushing new commits will update it rather than needing a fresh PR.
   only the taken-over branch's own stash (step 4) is.
 - If no agent id can be found for an existing worktree/branch, say so before proceeding — don't
   present a silent, unqualified success.
+- Always merge (never rebase/force-push) `origin/main` into the reclaimed branch and push the
+  result, so a stale worker-abandoned branch and its PR are brought current as part of the
+  handoff. Stop and hand off to the user on conflict instead of resolving it for them.
+- A `db-migration` branch always gets `npm run db:schema:apply` run automatically after the
+  merge, with the "do not merge before pushing" warning in the report — never silently skip this
+  for a labelled branch.

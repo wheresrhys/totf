@@ -4,10 +4,10 @@ description: >-
   Keep open PRs mergeable — resolve merge conflicts and clear outstanding review feedback —
   then pick unblocked `ready` GitHub issues and implement them in parallel. Each unit of work
   runs in its own git worktree via a subagent on the model named by the ticket's label
-  (fable/sonnet/opus). Biases toward tickets that unblock the most others, and never runs more
-  than one exclusive-resource-labelled ticket (`db-migration` or `e2e-exclusive`, combined) at a
-  time (this repo shares one local Supabase instance across worktrees). Each ticket subagent runs
-  the implement-ticket skill (branch,
+  (fable/sonnet/opus). Biases toward tickets that unblock the most others, and runs any
+  exclusive-resource-labelled unit of work (`db-migration` or `e2e-exclusive`) completely solo —
+  no other worker runs concurrently with it (this repo shares one local Supabase instance across
+  worktrees). Each ticket subagent runs the implement-ticket skill (branch,
   commits, tests, PR with "Closes #<n>", mermaid-diff). Runs as a continuously-refilling pool
   of up to 4 worker subagents (the orchestrator doesn't count): each completion triggers a
   re-select + respawn until no eligible work remains; while idle, a "check again" command forces
@@ -65,21 +65,24 @@ Entry shape:
 **Concurrency is capped at 4 worker subagents.** The top-level swarm orchestrator (the parent
 agent running this skill) does not count toward the cap — it only selects, spawns, reports and
 refills; it holds no worktree and does no ticket work. So: 1 orchestrator + up to 4 workers.
-Within that cap, **at most 1 unit of work carrying an exclusive-resource label may be in flight at
-a time** — the exclusive-resource label set is `db-migration` and `e2e-exclusive`. Both mean the
-work will mutate the single shared local Supabase instance (schema migrations, or the
-`@mutates`-tagged E2E specs a diff will trigger per `e2e/mutating-spec-triggers.json`), so they
-share **one combined counter**, not two independent caps.
 
-**The cap spans both tracks — §1 maintenance and §2 tickets — not just one.** A `db-migration` PR
-being maintained (§1) and a `db-migration` ticket being implemented (§2) contend for the same
-shared local Supabase instance just as much as two tickets would. Read the label directly off
-whichever object you already have: `gh pr list`'s `labels` field for a PR (maintenance work —
-`implement-ticket` now applies the issue's exclusive-resource label(s) to its PR at creation, so
-this doesn't require resolving back to the issue) and the issue's `labels` field for a ticket
-(§2). Before spawning *either* kind of exclusive-resource-labelled worker, check the combined
-count of currently-running workers of both kinds carrying either label — spawn only if it's zero.
-Work carrying neither label is not affected by this extra cap.
+**Exclusive-resource work runs solo, not just capped at 1 of its own kind.** The exclusive-resource
+label set is `db-migration` and `e2e-exclusive` — both mean the work will mutate the single shared
+local Supabase instance (schema migrations, or the `@mutates`-tagged E2E specs a diff will trigger
+per `e2e/mutating-spec-triggers.json`). This spans **both tracks**, §1 maintenance and §2 tickets —
+a `db-migration` PR being maintained and a `db-migration` ticket being implemented contend for the
+same shared instance just as much as two tickets would. One rule, no per-track counters:
+- Before spawning **any** worker, check whether an exclusive-resource-labelled worker is currently
+  running (either track). If so, spawn nothing else this round.
+- Before spawning an **exclusive-resource-labelled** worker, additionally require that *no* worker
+  of any kind is currently running — it starts a solo run, it doesn't join one already in
+  progress.
+
+Read the label directly off whichever object you already have: `gh pr list`'s `labels` field for
+a PR (maintenance work — `implement-ticket` applies the issue's exclusive-resource label(s) to its
+PR at creation, so this doesn't require resolving back to the issue) and the issue's `labels`
+field for a ticket (§2). Work carrying neither label is unaffected by this rule, except that it
+must itself wait while an exclusive-resource worker is running.
 
 PR maintenance goes first — merging open PRs unblocks downstream tickets — so allocate free
 slots to PRs needing maintenance first, then fill the remainder with tickets.
@@ -106,11 +109,12 @@ An open PR **needs maintenance** if either holds:
   `CHANGES_REQUESTED` always counts. Ignore the PR's own mermaid-diff/behaviour-change bot
   comments and anything already answered.
 
-- **Exclusive-resource PRs wait their turn** — if a PR needing maintenance carries `db-migration`
-  or `e2e-exclusive` (check the PR's own `labels`, not the linked issue — see the combined-counter
-  note above), only spawn its maintenance worker if the combined exclusive-resource count across
-  *both* tracks is currently zero. If not, skip it this round; it stays eligible on the next
-  refill. Non-exclusive-resource PRs are never held up by this.
+- **Solo-run rule applies here too** — if any worker (either track) is currently running, skip a
+  PR that needs maintenance if either it or the running worker is exclusive-resource-labelled
+  (check the PR's own `labels`, not the linked issue — see the solo-run rule above). It stays
+  eligible on the next refill. A non-exclusive-resource PR is only held up if an
+  exclusive-resource worker is currently running; it's never held up by other non-exclusive-resource
+  workers.
 
 For each PR needing maintenance (up to the budget), launch **one** background Agent that handles
 both concerns for that PR:
@@ -142,12 +146,11 @@ Filter and rank:
   unblocked).
 - **Skip in-flight** — drop issues that already have an open linked PR or an existing branch
   (`gh issue view <n> --json closedByPullRequestsReferences` / `git branch -a`).
-- **Cap the exclusive-resource label set at 1 in-flight, combined across both tracks** — if a
-  ticket carries `db-migration` or `e2e-exclusive`, only select it if the combined exclusive-
-  resource count from §1 (see above) is zero, no other such ticket is currently running, **and**
-  none has already been picked earlier in this same selection pass. Extra exclusive-resource
-  tickets are skipped this round; they remain eligible on the next refill once the in-flight one
-  completes.
+- **Solo-run rule** — if a ticket carries `db-migration` or `e2e-exclusive`, only select it if no
+  worker of any kind (either track) is currently running **and** none has already been picked
+  earlier in this same selection pass. If any exclusive-resource worker is currently running,
+  don't select anything else at all this round, exclusive-resource or not. Skipped tickets remain
+  eligible on the next refill once the in-flight worker completes.
 - **Bias to unblockers** — among what's left, rank by the count of *open* issues in `blocking`
   (how many others this ticket unblocks), highest first; tie-break on lowest issue number.
 - Take as many as the **free slots** allow (4 minus workers currently running — both tracks).
@@ -191,13 +194,13 @@ time):
      couldn't push so the user can intervene.
 3. **Refill** — unless termination has been requested (see below), immediately re-run selection
    (§1 then §2) for the now-free slot(s) and spawn replacements up to the cap (respecting the
-   exclusive-resource cap). A finished ticket often makes its PR eligible for maintenance and
-   unblocks downstream tickets, so a completion usually creates fresh work. If nothing is
-   eligible and no workers remain, report the pool is drained and go idle.
+   solo-run rule). A finished ticket often makes its PR eligible for maintenance and unblocks
+   downstream tickets, so a completion usually creates fresh work. If nothing is eligible and no
+   workers remain, report the pool is drained and go idle.
 
 Track the live worker set (subagent id → what it's doing, including whether it's the in-flight
-exclusive-resource worker) across the whole run — both tracks — so the cap, refill, and
-termination logic all have an accurate combined count.
+exclusive-resource worker) across the whole run — both tracks — so the solo-run rule, refill, and
+termination logic all know accurately whether an exclusive-resource worker is currently running.
 
 ## 4.5 Manual re-check (user asks to re-scan)
 
@@ -210,7 +213,7 @@ If the user issues any re-check-like command — e.g. "check again", "re-check",
 again", "any new work?", "refresh", "poll github" — immediately re-run selection from scratch
 against live GitHub state (§1 maintenance first, then §2 tickets) **without** waiting for a
 completion, and spawn workers for every newly-eligible unit up to the free slots (cap still 4;
-exclusive-resource cap still 1; count workers already running). Report what the re-scan found:
+solo-run rule still applies; count workers already running). Report what the re-scan found:
 - If new work is eligible, spawn it and report each unit started (as in §4 step 2).
 - If nothing new is eligible, say so plainly (e.g. "re-checked — still N blocked, M in-flight,
   nothing newly available") and stay idle.
@@ -254,13 +257,13 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   shared branch.
 - Never pick a blocked ticket; never exceed **4 concurrent worker subagents** across both tracks.
   The orchestrator itself is not a worker and does not count toward the 4.
-- Never run more than **1 exclusive-resource-labelled unit of work** (`db-migration` or
-  `e2e-exclusive`, combined) at a time — **across both tracks**, not just within §2. A
-  `db-migration`/`e2e-exclusive` PR being maintained (§1) counts the same as a ticket of either
-  label being implemented (§2); check the PR's own `labels` for maintenance work (carried over
-  from the issue by `implement-ticket`) and the issue's `labels` for ticket work. Extra ones wait
-  for the next refill. This protects the single shared local Supabase instance from concurrent
-  schema migrations and concurrent `@mutates`-tagged E2E runs.
+- **Exclusive-resource work (`db-migration` or `e2e-exclusive`) runs completely solo** — across
+  both tracks, not just within §2. Don't spawn it alongside any other worker, and don't spawn any
+  other worker while it's running. A `db-migration`/`e2e-exclusive` PR being maintained (§1) is the
+  same hazard as a ticket of either label being implemented (§2); check the PR's own `labels` for
+  maintenance work (carried over from the issue by `implement-ticket`) and the issue's `labels`
+  for ticket work. Blocked units wait for the next refill. This protects the single shared local
+  Supabase instance from concurrent schema migrations and concurrent `@mutates`-tagged E2E runs.
 - Keep the pool full: on every worker completion, refill freed slots (maintenance first, then
   tickets) until no eligible work remains — then go idle, don't exit.
 - On any re-check-like command from the user ("check again", "rescan", "any new work?"), re-run
