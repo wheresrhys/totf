@@ -54,20 +54,18 @@ function makeChainClient(
 			...thenable
 		};
 	}
-	const rpc = vi.fn(
-		(fnName: string, args: { from_date?: string } = {}) => {
-			const data =
-				fnName === 'group_ticks'
-					? lastGroupTick
-					: args?.from_date
-						? [summaryStats.thisYear]
-						: [summaryStats.allTime];
-			return {
-				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-					Promise.resolve({ data, error: null }).then(resolve)
-			};
-		}
-	);
+	const rpc = vi.fn((fnName: string, args: { from_date?: string } = {}) => {
+		const data =
+			fnName === 'group_ticks'
+				? lastGroupTick
+				: args?.from_date
+					? [summaryStats.thisYear]
+					: [summaryStats.allTime];
+		return {
+			then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+				Promise.resolve({ data, error: null }).then(resolve)
+		};
+	});
 	return {
 		from: vi.fn((table: string) => chainFor(dataByTable[table] ?? [])),
 		rpc
