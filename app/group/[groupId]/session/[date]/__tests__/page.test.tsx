@@ -98,8 +98,8 @@ const mockEncounters = [
 const mockPreviousSession = [{ visit_date: '2024-03-01' }];
 const mockNextSession = [{ visit_date: '2024-04-01' }];
 
-function makeSessionClient() {
-	const makeChain = (data: unknown) => ({
+function makeChain(data: unknown) {
+	return {
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
 		in: vi.fn().mockReturnThis(),
@@ -109,7 +109,10 @@ function makeSessionClient() {
 		limit: vi.fn().mockReturnThis(),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({ data, error: null }).then(resolve)
-	});
+	};
+}
+
+function makeSessionClient() {
 	return {
 		from: vi
 			.fn()
@@ -139,6 +142,56 @@ describe('session detail page', () => {
 		render(await renderPage());
 		const heading = await screen.findByRole('heading', { level: 1 });
 		expect(heading.textContent).toContain('15th March 2024');
+	});
+
+	it('excludes resighting-only sessions from the main Sessions query', async () => {
+		const client = makeSessionClient();
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+		render(await renderPage());
+		await screen.findByTestId('session-stats');
+		const mainSessionsChain = client.from.mock.results[0].value;
+		expect(mainSessionsChain.eq).toHaveBeenCalledWith(
+			'is_resighting_only',
+			false
+		);
+	});
+
+	describe('adjacent session date lookups', () => {
+		it('excludes resighting-only sessions from the previous-session lookup', async () => {
+			const client = makeSessionClient();
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+			render(await renderPage());
+			await screen.findByTestId('session-stats');
+			const previousChain = client.from.mock.results[1].value;
+			expect(previousChain.eq).toHaveBeenCalledWith(
+				'is_resighting_only',
+				false
+			);
+		});
+
+		it('excludes resighting-only sessions from the next-session lookup', async () => {
+			const client = makeSessionClient();
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+			render(await renderPage());
+			await screen.findByTestId('session-stats');
+			const nextChain = client.from.mock.results[2].value;
+			expect(nextChain.eq).toHaveBeenCalledWith('is_resighting_only', false);
+		});
+	});
+
+	describe('a date whose only Sessions row is resighting-only', () => {
+		it('renders the "No session found" empty state instead of 404ing', async () => {
+			const client = {
+				from: vi
+					.fn()
+					.mockReturnValueOnce(makeChain([]))
+					.mockReturnValueOnce(makeChain(mockPreviousSession))
+					.mockReturnValueOnce(makeChain(mockNextSession))
+			};
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+			render(await renderPage());
+			await screen.findByText(/No session found/i);
+		});
 	});
 
 	it('renders total bird and species counts', async () => {
