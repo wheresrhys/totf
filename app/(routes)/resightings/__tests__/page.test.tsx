@@ -3,6 +3,7 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import Page, { fetchResightings } from '../page';
 import resightingsSnapshot from '@/test-fixtures/snapshots/fetchResightings.alpha.json';
 import type { ResightingEncounter } from '@/app/models/session';
+import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -16,7 +17,7 @@ function makeEncountersClient(data: unknown) {
 	const chain = {
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
-		not: vi.fn().mockReturnThis(),
+		in: vi.fn().mockReturnThis(),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({ data, error: null }).then(resolve)
 	};
@@ -159,10 +160,12 @@ describe('fetchResightings query building', () => {
 		expect(chain.eq).toHaveBeenCalledWith('ringing_group_id', 42);
 	});
 
-	it('excludes N and S record types from the query', async () => {
+	it('matches only resighting/recovery record types in the query', async () => {
 		const { client, chain } = makeEncountersClient(resightingsSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 		await fetchResightings({}, 42);
-		expect(chain.not).toHaveBeenCalledWith('record_type', 'in', '(N,S)');
+		expect(chain.in).toHaveBeenCalledWith('record_type', [
+			...RESIGHTING_RECORD_TYPES
+		]);
 	});
 });

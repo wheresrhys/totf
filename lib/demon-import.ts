@@ -132,6 +132,12 @@ export type DemonColumnNames =
 
 export type DemonRow = Record<DemonColumnNames, string>;
 
+// `record_type` values that indicate a passive resighting/recovery (no bird
+// in the hand) rather than a capture (see the DemOn field spec referenced in
+// CLAUDE.md for the full record_type code table).
+export const RESIGHTING_RECORD_TYPES = ['U', 'F', 'D'] as const;
+export type ResightingRecordType = (typeof RESIGHTING_RECORD_TYPES)[number];
+
 export class CasualtyEncounterError extends Error {
 	constructor() {
 		super('Casualty encounters are not to be imported');
@@ -209,7 +215,9 @@ export async function processEncounterRow(
 
 	const visitDate = convertDateFormat(row.visit_date as string);
 
-	const isResightingOnly = ['U', 'F', 'D'].includes(row.record_type as string);
+	const isResightingOnly = (
+		RESIGHTING_RECORD_TYPES as readonly string[]
+	).includes(row.record_type as string);
 
 	const sessionId = await upsert<SessionsInsert>(
 		'Sessions',
