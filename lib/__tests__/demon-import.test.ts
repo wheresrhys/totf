@@ -354,7 +354,9 @@ describe('processEncounterRow', () => {
 			old_greater_coverts: '3',
 			moult_code: 'M',
 			breeding_condition: 'B',
-			extra_text: 'some note'
+			extra_text: 'some note',
+			finding_condition: '8',
+			finding_circumstances: '2'
 		});
 		await processEncounterRow(row, upsert, RINGING_GROUP_ID);
 		const birdId = 20; // second call returns 20
@@ -376,7 +378,9 @@ describe('processEncounterRow', () => {
 				old_greater_coverts: 3,
 				moult_code: 'M',
 				breeding_condition: 'B',
-				extra_text: 'some note'
+				extra_text: 'some note',
+				finding_condition: '8',
+				finding_circumstances: '2'
 			}),
 			'bird_id,session_id'
 		);
@@ -390,7 +394,9 @@ describe('processEncounterRow', () => {
 			sexing_method: '',
 			weight: '',
 			wing_length: '',
-			old_greater_coverts: ''
+			old_greater_coverts: '',
+			finding_condition: '',
+			finding_circumstances: ''
 		});
 		await processEncounterRow(row, upsert, RINGING_GROUP_ID);
 		expect(upsert).toHaveBeenCalledWith(
@@ -402,7 +408,9 @@ describe('processEncounterRow', () => {
 				sexing_method: null,
 				weight: null,
 				wing_length: null,
-				old_greater_coverts: null
+				old_greater_coverts: null,
+				finding_condition: null,
+				finding_circumstances: null
 			}),
 			'bird_id,session_id'
 		);
