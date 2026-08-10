@@ -10,6 +10,8 @@ CREATE TABLE public."Encounters" (
 	moult_code text,
 	old_greater_coverts smallint,
 	extra_text text,
+	finding_condition text,
+	finding_circumstances text,
 	is_juv boolean DEFAULT FALSE NOT NULL,
 	id bigint DEFAULT nextval('public."Encounters_id_seq"'::regclass) NOT NULL,
 	bird_id bigint NOT NULL,
