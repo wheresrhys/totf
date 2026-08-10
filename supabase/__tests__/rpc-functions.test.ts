@@ -979,5 +979,166 @@ describe('Postgres RPC integration tests', () => {
 				});
 			});
 		});
+
+		describe('resighting-only sessions', () => {
+			// stats_per_day_and_species is entirely day-level, so a resighting-only
+			// Sessions row (is_resighting_only = TRUE) must contribute no rows at all.
+			// Insert Delta-group fixtures across two dates: one date whose only session
+			// is resighting-only, and one date carrying both a real ringing session and
+			// a same-date/location resighting-only session.
+			let deltaId: number;
+			let deltaClient: SupabaseClient;
+			let locationId: number;
+			let birdIds: number[];
+			let resightingOnlyDate: string;
+			let mixedDate: string;
+
+			async function insertSession(
+				visitDate: string,
+				isResightingOnly: boolean
+			): Promise<number> {
+				const { data, error } = await deltaClient
+					.from('Sessions')
+					.insert({
+						visit_date: visitDate,
+						location_id: locationId,
+						is_resighting_only: isResightingOnly,
+					})
+					.select('id')
+					.single();
+				if (error) throw error;
+				return data!.id;
+			}
+
+			beforeAll(async () => {
+				deltaId = await getGroupIdByName('Delta');
+				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+				const testSuffix = randomTestSuffix();
+				// Randomised, on distinct dates, so concurrent worktree runs against the
+				// shared local Supabase instance never combine their rows into the same
+				// stats_per_day_and_species aggregate row.
+				resightingOnlyDate = randomFutureDate();
+				mixedDate = addDays(resightingOnlyDate, 1);
+
+				const { data: species } = await supabase
+					.from('Species')
+					.select('id')
+					.eq('species_name', 'Robin')
+					.single();
+
+				const { data: location, error: locationError } = await deltaClient
+					.from('Locations')
+					.insert({
+						location_name: `Resighting Stats Test Location ${testSuffix}`,
+						ringing_group_id: deltaId,
+					})
+					.select('id')
+					.single();
+				if (locationError) throw locationError;
+				locationId = location!.id;
+
+				const resightingOnlySessionId = await insertSession(resightingOnlyDate, true);
+				const realSessionId = await insertSession(mixedDate, false);
+				const mixedResightingSessionId = await insertSession(mixedDate, true);
+
+				const birds = await Promise.all(
+					[
+						`RESIGHTSTAT1-${testSuffix}`,
+						`RESIGHTSTAT2-${testSuffix}`,
+						`RESIGHTSTAT3-${testSuffix}`,
+						`RESIGHTSTAT4-${testSuffix}`,
+					].map((ringNo) =>
+						deltaClient
+							.from('Birds')
+							.insert({ ring_no: ringNo, species_id: species!.id })
+							.select('id')
+							.single()
+					)
+				);
+				birds.forEach(({ error }) => {
+					if (error) throw error;
+				});
+				birdIds = birds.map(({ data }) => data!.id);
+
+				const baseEncounter = {
+					capture_time: '10:00:00',
+					scheme: 'BTO',
+					sex: 'M',
+					age_code: 1,
+					weight: 15,
+				};
+				const { error: encountersError } = await deltaClient
+					.from('Encounters')
+					.insert([
+						// resightingOnlyDate: only a passive-resighting encounter on a
+						// resighting-only session.
+						{
+							...baseEncounter,
+							bird_id: birdIds[0],
+							session_id: resightingOnlySessionId,
+							record_type: 'C',
+						},
+						// mixedDate real session: two proper ringing (N) encounters.
+						{
+							...baseEncounter,
+							bird_id: birdIds[1],
+							session_id: realSessionId,
+							record_type: 'N',
+						},
+						{
+							...baseEncounter,
+							bird_id: birdIds[2],
+							session_id: realSessionId,
+							record_type: 'N',
+						},
+						// mixedDate resighting-only session: a passive resighting on the
+						// same date/location that must not merge into the real session's row.
+						{
+							...baseEncounter,
+							bird_id: birdIds[3],
+							session_id: mixedResightingSessionId,
+							record_type: 'D',
+						},
+					]);
+				if (encountersError) throw encountersError;
+			});
+
+			afterAll(() => {
+				execSync(
+					`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+						`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Sessions" WHERE location_id = ${locationId};` +
+						`DELETE FROM "Locations" WHERE id = ${locationId};'`
+				);
+			});
+
+			it('excludes a resighting-only session entirely, returning no rows for a date whose only session is resighting-only', async () => {
+				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
+					ringing_group_filter: deltaId,
+				});
+				expect(error).toBeNull();
+				expect(
+					data!.filter((row) => row.visit_date === resightingOnlyDate)
+				).toHaveLength(0);
+			});
+
+			it('returns rows only for the real session when a real and a resighting-only session share the same date and location', async () => {
+				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
+					ringing_group_filter: deltaId,
+				});
+				expect(error).toBeNull();
+				const mixedRows = data!.filter((row) => row.visit_date === mixedDate);
+				expect(mixedRows).toHaveLength(1);
+				// encounter_count is 2 (the two real N encounters), not 3 — the resighting
+				// on the same date/location is excluded.
+				expect(mixedRows[0]).toMatchObject({
+					species_name: 'Robin',
+					visit_date: mixedDate,
+					encounter_count: 2,
+				});
+			});
+		});
 	});
 });
