@@ -358,8 +358,8 @@ function HomePageContent({
 }) {
 	return (
 		<PageWrapper>
-			<LastGroupTick data={data.lastGroupTick} />
 			<SummaryStats data={data.summaryStats} />
+			<LastGroupTick data={data.lastGroupTick} />
 			<RecentSessions
 				data={data.recentSessions}
 				viewedGroupId={viewedGroupId}
