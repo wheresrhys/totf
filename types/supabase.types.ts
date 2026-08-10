@@ -331,6 +331,17 @@ export type Database = {
           species_name: string
         }[]
       }
+      group_ticks: {
+        Args: {
+          location_filter?: number
+          result_limit?: number
+          ringing_group_filter?: number
+        }
+        Returns: {
+          first_encounter_date: string
+          species_name: string
+        }[]
+      }
       long_absence_retraps: {
         Args: {
           min_gap_days?: number
