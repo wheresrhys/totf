@@ -315,9 +315,7 @@ describe('home page', () => {
 					(p) => p.textContent?.includes('sessions, with')
 				);
 				expect(paragraphs.length).toBe(1);
-				expect(paragraphs[0].textContent?.startsWith('This year:')).toBe(
-					false
-				);
+				expect(paragraphs[0].textContent?.startsWith('This year:')).toBe(false);
 			});
 		});
 
@@ -337,9 +335,7 @@ describe('home page', () => {
 					(p) => p.textContent?.includes('sessions, with')
 				);
 				expect(paragraphs.length).toBe(1);
-				expect(paragraphs[0].textContent?.startsWith('This year:')).toBe(
-					true
-				);
+				expect(paragraphs[0].textContent?.startsWith('This year:')).toBe(true);
 			});
 		});
 	});
