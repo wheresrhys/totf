@@ -17,9 +17,10 @@ import { getTopStats, type UserTopStatsArgs } from '../actions/top-performers';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
-import type { SpeciesRow } from '../models/db';
+import type { SpeciesRow, GroupTicksResult } from '../models/db';
 import { SessionsByDay } from '../components/SessionHistoryCalendar';
 import { NoPrefetchLink } from '../components/shared/NoPrefetchLink';
+import { format as formatDate } from 'date-fns';
 
 type SpeciesWithBirdsCount = Pick<SpeciesRow, 'id' | 'species_name'> & {
 	birds: { count: number }[];
@@ -29,6 +30,7 @@ type PageModel = {
 	stats: StatsAccordionModel[];
 	recentSessions: SessionWithEncountersCount[];
 	topSpecies: SpeciesWithBirdsCount[];
+	lastGroupTick: GroupTicksResult | null;
 };
 function getStatConfigs(
 	date: Date
@@ -168,6 +170,19 @@ export async function fetchRecentSessions(
 	return sessions.filter((s) => recentDates.includes(s.visit_date));
 }
 
+export async function fetchLastGroupTick(
+	viewedGroupId: number
+): Promise<GroupTicksResult | null> {
+	const supabase = await getAuthenticatedSupabaseClient();
+	const ticks = (await supabase
+		.rpc('group_ticks', {
+			ringing_group_filter: viewedGroupId,
+			result_limit: 1
+		})
+		.then(catchSupabaseErrors)) as GroupTicksResult[] | null;
+	return ticks?.[0] ?? null;
+}
+
 export async function fetchTopSpecies(): Promise<SpeciesWithBirdsCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const species = (await supabase
@@ -212,7 +227,8 @@ export async function fetchHomePageData(
 			})
 		),
 		recentSessions: await fetchRecentSessions(viewedGroupId),
-		topSpecies: await fetchTopSpecies()
+		topSpecies: await fetchTopSpecies(),
+		lastGroupTick: await fetchLastGroupTick(viewedGroupId)
 	};
 }
 
@@ -234,6 +250,15 @@ function RecentSessions({
 				/>
 			</BoxyList>
 		</div>
+	);
+}
+function LastGroupTick({ data }: { data: GroupTicksResult | null }) {
+	if (!data) return null;
+	return (
+		<p className="text-lg">
+			Last group tick: {data.species_name} on{' '}
+			{formatDate(new Date(data.first_encounter_date), 'do MMMM yyyy')}
+		</p>
 	);
 }
 function TopSpecies({ data }: { data: SpeciesWithBirdsCount[] }) {
@@ -264,6 +289,7 @@ function HomePageContent({
 }) {
 	return (
 		<PageWrapper>
+			<LastGroupTick data={data.lastGroupTick} />
 			<RecentSessions
 				data={data.recentSessions}
 				viewedGroupId={viewedGroupId}
