@@ -12,6 +12,7 @@ import {
 import { TabNav } from '@/app/components/TabNav';
 
 const ALL_TAB = 'All';
+const ALL_FILTER_VALUE = 'All';
 
 type ResightingsRowModel = {
 	ringNo: string;
@@ -71,6 +72,16 @@ const columnConfigs = {
 } as Record<keyof ResightingsRowModel, ColumnConfig>;
 
 const cellFormatter = getFormattedValue<ResightingsRowModel>(columnConfigs);
+
+export function getDistinctFieldValues(
+	resightings: ResightingEncounter[],
+	field: 'finding_condition' | 'finding_circumstances'
+): string[] {
+	const values = resightings
+		.map((resighting) => resighting[field])
+		.filter((value): value is string => value !== null);
+	return [...new Set(values)].sort();
+}
 
 export function groupResightingsBySpecies(
 	resightings: ResightingEncounter[]
@@ -162,6 +173,41 @@ function ResightingsDataTable({
 	);
 }
 
+function FindingFieldFilter({
+	label,
+	options,
+	value,
+	onChange
+}: {
+	label: string;
+	options: string[];
+	value: string;
+	onChange: (value: string) => void;
+}) {
+	const id = `${label.toLowerCase().replace(/\s+/g, '-')}-select`;
+	return (
+		<div className="flex items-center gap-2">
+			<label htmlFor={id} className="shrink-0">
+				{label}
+			</label>
+			<select
+				id={id}
+				className="select max-w-sm appearance-none"
+				aria-label={label}
+				value={value}
+				onChange={(event) => onChange(event.target.value)}
+			>
+				<option value={ALL_FILTER_VALUE}>All</option>
+				{options.map((option) => (
+					<option key={option} value={option}>
+						{option}
+					</option>
+				))}
+			</select>
+		</div>
+	);
+}
+
 export function ResightingsTable({
 	resightings
 }: {
@@ -170,6 +216,26 @@ export function ResightingsTable({
 	const grouped = groupResightingsBySpecies(resightings);
 	const tabs = Object.keys(grouped);
 	const [activeTab, setActiveTab] = useState(ALL_TAB);
+	const [conditionFilter, setConditionFilter] = useState(ALL_FILTER_VALUE);
+	const [circumstancesFilter, setCircumstancesFilter] =
+		useState(ALL_FILTER_VALUE);
+
+	const conditionOptions = getDistinctFieldValues(
+		resightings,
+		'finding_condition'
+	);
+	const circumstancesOptions = getDistinctFieldValues(
+		resightings,
+		'finding_circumstances'
+	);
+
+	const filteredResightings = grouped[activeTab].filter(
+		(resighting) =>
+			(conditionFilter === ALL_FILTER_VALUE ||
+				resighting.finding_condition === conditionFilter) &&
+			(circumstancesFilter === ALL_FILTER_VALUE ||
+				resighting.finding_circumstances === circumstancesFilter)
+	);
 
 	return (
 		<>
@@ -178,11 +244,21 @@ export function ResightingsTable({
 				activeTab={activeTab}
 				onTabChange={setActiveTab}
 			/>
-			{tabs.map((tab) =>
-				tab === activeTab ? (
-					<ResightingsDataTable key={tab} resightings={grouped[tab]} />
-				) : null
-			)}
+			<div className="flex gap-4 flex-wrap mt-4">
+				<FindingFieldFilter
+					label="Condition"
+					options={conditionOptions}
+					value={conditionFilter}
+					onChange={setConditionFilter}
+				/>
+				<FindingFieldFilter
+					label="Circumstances"
+					options={circumstancesOptions}
+					value={circumstancesFilter}
+					onChange={setCircumstancesFilter}
+				/>
+			</div>
+			<ResightingsDataTable key={activeTab} resightings={filteredResightings} />
 		</>
 	);
 }
