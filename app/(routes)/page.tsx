@@ -17,9 +17,14 @@ import { getTopStats, type UserTopStatsArgs } from '../actions/top-performers';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
-import type { AggregateStatsResult, SpeciesRow } from '../models/db';
+import type {
+	AggregateStatsResult,
+	SpeciesRow,
+	GroupTicksResult
+} from '../models/db';
 import { SessionsByDay } from '../components/SessionHistoryCalendar';
 import { NoPrefetchLink } from '../components/shared/NoPrefetchLink';
+import { format as formatDate } from 'date-fns';
 
 type SpeciesWithBirdsCount = Pick<SpeciesRow, 'id' | 'species_name'> & {
 	birds: { count: number }[];
@@ -35,6 +40,7 @@ type PageModel = {
 	recentSessions: SessionWithEncountersCount[];
 	topSpecies: SpeciesWithBirdsCount[];
 	summaryStats: HomePageSummaryStats | null;
+	lastGroupTick: GroupTicksResult | null;
 };
 function getStatConfigs(
 	date: Date
@@ -196,6 +202,19 @@ export async function fetchHomePageSummaryStats(
 	return { allTime: allTime?.[0] ?? null, thisYear: thisYear?.[0] ?? null };
 }
 
+export async function fetchLastGroupTick(
+	viewedGroupId: number
+): Promise<GroupTicksResult | null> {
+	const supabase = await getAuthenticatedSupabaseClient();
+	const ticks = (await supabase
+		.rpc('group_ticks', {
+			ringing_group_filter: viewedGroupId,
+			result_limit: 1
+		})
+		.then(catchSupabaseErrors)) as GroupTicksResult[] | null;
+	return ticks?.[0] ?? null;
+}
+
 export async function fetchTopSpecies(): Promise<SpeciesWithBirdsCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const species = (await supabase
@@ -241,7 +260,8 @@ export async function fetchHomePageData(
 		),
 		recentSessions: await fetchRecentSessions(viewedGroupId),
 		topSpecies: await fetchTopSpecies(),
-		summaryStats: await fetchHomePageSummaryStats(viewedGroupId)
+		summaryStats: await fetchHomePageSummaryStats(viewedGroupId),
+		lastGroupTick: await fetchLastGroupTick(viewedGroupId)
 	};
 }
 
@@ -296,6 +316,15 @@ function SummaryStats({ data }: { data: HomePageSummaryStats | null }) {
 		</div>
 	);
 }
+function LastGroupTick({ data }: { data: GroupTicksResult | null }) {
+	if (!data) return null;
+	return (
+		<p className="text-lg">
+			Last group tick: {data.species_name} on{' '}
+			{formatDate(new Date(data.first_encounter_date), 'do MMMM yyyy')}
+		</p>
+	);
+}
 function TopSpecies({ data }: { data: SpeciesWithBirdsCount[] }) {
 	return (
 		<div>
@@ -324,6 +353,7 @@ function HomePageContent({
 }) {
 	return (
 		<PageWrapper>
+			<LastGroupTick data={data.lastGroupTick} />
 			<SummaryStats data={data.summaryStats} />
 			<RecentSessions
 				data={data.recentSessions}

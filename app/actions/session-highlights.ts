@@ -73,6 +73,7 @@ async function fetchSessionStats(
 				.from('Sessions')
 				.select('visit_date')
 				.eq('ringing_group_id', viewedGroupId)
+				.eq('is_resighting_only', false)
 				.order('visit_date')
 				.range(fromRow, toRow)
 		)

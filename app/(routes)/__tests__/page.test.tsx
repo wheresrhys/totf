@@ -6,6 +6,7 @@ import topSpeciesSnapshot from '@/test-fixtures/snapshots/fetchTopSpecies.alpha.
 import summaryStatsSnapshot from '@/test-fixtures/snapshots/fetchHomePageSummaryStats.alpha.json';
 import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/fetchHomePageSummaryStats.zero.json';
 import type { HomePageSummaryStats } from '../page';
+import type { GroupTicksResult } from '@/app/models/db';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -19,11 +20,16 @@ vi.mock('@/app/actions/top-performers', () => ({
 	getTopStats: vi.fn().mockResolvedValue([])
 }));
 
+const defaultLastGroupTick: GroupTicksResult[] = [
+	{ species_name: 'Carrion Crow', first_encounter_date: '2026-02-12' }
+];
+
 function makeChainClient(
 	overrides: {
 		Sessions?: unknown;
 		Species?: unknown;
 		summaryStats?: HomePageSummaryStats;
+		lastGroupTick?: unknown;
 	} = {}
 ) {
 	const dataByTable: Record<string, unknown> = {
@@ -34,6 +40,7 @@ function makeChainClient(
 	const summaryStats =
 		overrides.summaryStats ??
 		(summaryStatsSnapshot as unknown as HomePageSummaryStats);
+	const lastGroupTick = overrides.lastGroupTick ?? defaultLastGroupTick;
 	function chainFor(data: unknown) {
 		const thenable = {
 			then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
@@ -47,15 +54,20 @@ function makeChainClient(
 			...thenable
 		};
 	}
-	const rpc = vi.fn((_fnName: string, args: { from_date?: string }) => {
-		const data = args?.from_date
-			? [summaryStats.thisYear]
-			: [summaryStats.allTime];
-		return {
-			then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-				Promise.resolve({ data, error: null }).then(resolve)
-		};
-	});
+	const rpc = vi.fn(
+		(fnName: string, args: { from_date?: string } = {}) => {
+			const data =
+				fnName === 'group_ticks'
+					? lastGroupTick
+					: args?.from_date
+						? [summaryStats.thisYear]
+						: [summaryStats.allTime];
+			return {
+				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+					Promise.resolve({ data, error: null }).then(resolve)
+			};
+		}
+	);
 	return {
 		from: vi.fn((table: string) => chainFor(dataByTable[table] ?? [])),
 		rpc
@@ -158,6 +170,31 @@ describe('home page', () => {
 			// 2 sessions on same date: 1 day-total link (StatOutput) + 2 site links
 			// + 1 link each for the 2 single-session dates = 5 total
 			expect(sessionLinks.length).toBe(5);
+		});
+	});
+
+	describe('last group tick', () => {
+		it('renders "Last group tick: {species} on {date}" paragraph when data is present', async () => {
+			render(await Page());
+			expect(
+				await screen.findByText(
+					'Last group tick: Carrion Crow on 12th February 2026'
+				)
+			).toBeDefined();
+		});
+
+		describe('with no ticks yet', () => {
+			it('omits the paragraph entirely', async () => {
+				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+					makeChainClient({ lastGroupTick: [] })
+				);
+				render(await Page());
+				const heading = await screen.findByRole('heading', {
+					name: 'Recent Sessions'
+				});
+				expect(heading).toBeDefined();
+				expect(screen.queryByText(/Last group tick:/)).toBeNull();
+			});
 		});
 	});
 

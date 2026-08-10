@@ -40,6 +40,15 @@ describe('sessions page', () => {
 		expect(heading.textContent).toBe('Session history');
 	});
 
+	it('excludes resighting-only sessions from the query', async () => {
+		const client = makeChainClient(alphaSessionsSnapshot);
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+		render(await Page());
+		await screen.findByRole('heading', { level: 1 });
+		const chain = client.from.mock.results[0].value;
+		expect(chain.eq).toHaveBeenCalledWith('is_resighting_only', false);
+	});
+
 	describe('with multi-year data (alpha fixture)', () => {
 		beforeEach(() => {
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(

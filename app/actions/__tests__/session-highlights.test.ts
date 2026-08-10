@@ -62,11 +62,14 @@ const mockRpc = vi.fn();
 
 const mockSessionsOrder = vi.fn();
 const mockSessionsRange = vi.fn();
+const mockSessionsEq = vi.fn();
+// eq is also on the builder itself so it self-chains — fetchSessionStats now
+// calls .eq() twice (ringing_group_id, then is_resighting_only) before .order()
 const sessionsQueryBuilder = {
+	eq: mockSessionsEq,
 	order: mockSessionsOrder,
 	range: mockSessionsRange
 };
-const mockSessionsEq = vi.fn();
 const mockSessionsSelect = vi.fn(() => ({ eq: mockSessionsEq }));
 
 let statsVersion = 100;
@@ -177,6 +180,15 @@ describe('fetchSessionHighlights', () => {
 		expect(mockFrom).toHaveBeenCalledWith('Sessions');
 		expect(mockSelect).toHaveBeenCalledWith('visit_date');
 		expect(mockEq).toHaveBeenCalledWith('ringing_group_id', GROUP_ID);
+	});
+
+	it('excludes resighting-only sessions from the session-dates query', async () => {
+		const fetchSessionHighlights = await importFetchSessionHighlights();
+		await fetchSessionHighlights({
+			date: SESSION_DATE,
+			viewedGroupId: GROUP_ID
+		});
+		expect(mockSessionsEq).toHaveBeenCalledWith('is_resighting_only', false);
 	});
 
 	it('requests deterministic ordering for paginated queries', async () => {
@@ -299,6 +311,33 @@ describe('fetchSessionHighlights', () => {
 		);
 	});
 
+	it('derives no highlights for a date whose only session is resighting-only, while other days stay unaffected', async () => {
+		// A resighting-only date is excluded from both stats_per_day_and_species
+		// (filtered at the RPC level by #429) and the sessionDates query (filtered
+		// by this ticket's Sessions .eq('is_resighting_only', false)) — it's
+		// simply absent from both stats blobs fed into every derive* function, so
+		// it's indistinguishable from "no session happened that day".
+		rpcPages = [
+			[statsRow('Wren', '2022-05-01', 5), statsRow('Wren', '2022-06-01', 3)]
+		];
+		sessionPages = [
+			[{ visit_date: '2022-05-01' }, { visit_date: '2022-06-01' }]
+		];
+		const fetchSessionHighlights = await importFetchSessionHighlights();
+		const flaggedDateHighlights = await fetchSessionHighlights({
+			date: SESSION_DATE,
+			viewedGroupId: GROUP_ID
+		});
+		expect(flaggedDateHighlights).toEqual([]);
+		// A real session day untouched by the flagged date still derives its
+		// species-level highlights normally
+		const realDayHighlights = await fetchSessionHighlights({
+			date: '2022-05-01',
+			viewedGroupId: GROUP_ID
+		});
+		expect(sentencesOf(realDayHighlights).length).toBeGreaterThan(0);
+	});
+
 	it('serves cached stats when the data version is unchanged', async () => {
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		await fetchSessionHighlights({
@@ -315,7 +354,9 @@ describe('fetchSessionHighlights', () => {
 			(call) => (call as [string])[0] === 'stats_per_day_and_species'
 		);
 		expect(metricsCalls).toHaveLength(1);
-		expect(mockSessionsEq).toHaveBeenCalledTimes(1);
+		// Two .eq() calls per fetch (ringing_group_id, is_resighting_only), and
+		// the session-dates query only runs once thanks to the stats cache
+		expect(mockSessionsEq).toHaveBeenCalledTimes(2);
 		// version query is run on each call
 		expect(mockEncountersLimit).toHaveBeenCalledTimes(2);
 		// the cached blob still serves other session dates — the 2022 session
