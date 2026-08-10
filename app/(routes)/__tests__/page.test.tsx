@@ -298,5 +298,49 @@ describe('home page', () => {
 				});
 			});
 		});
+
+		describe('with all-time data but no this-year data', () => {
+			it('renders only the all-time paragraph', async () => {
+				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+					makeChainClient({
+						summaryStats: {
+							allTime: summaryStatsSnapshot.allTime,
+							thisYear: null
+						} as unknown as HomePageSummaryStats
+					})
+				);
+				const { container } = render(await Page());
+				await screen.findByRole('heading', { name: 'Recent Sessions' });
+				const paragraphs = Array.from(container.querySelectorAll('p')).filter(
+					(p) => p.textContent?.includes('sessions, with')
+				);
+				expect(paragraphs.length).toBe(1);
+				expect(paragraphs[0].textContent?.startsWith('This year:')).toBe(
+					false
+				);
+			});
+		});
+
+		describe('with this-year data but no all-time data', () => {
+			it('renders only the this-year paragraph', async () => {
+				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+					makeChainClient({
+						summaryStats: {
+							allTime: null,
+							thisYear: summaryStatsSnapshot.thisYear
+						} as unknown as HomePageSummaryStats
+					})
+				);
+				const { container } = render(await Page());
+				await screen.findByRole('heading', { name: 'Recent Sessions' });
+				const paragraphs = Array.from(container.querySelectorAll('p')).filter(
+					(p) => p.textContent?.includes('sessions, with')
+				);
+				expect(paragraphs.length).toBe(1);
+				expect(paragraphs[0].textContent?.startsWith('This year:')).toBe(
+					true
+				);
+			});
+		});
 	});
 });

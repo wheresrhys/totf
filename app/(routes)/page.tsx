@@ -26,8 +26,8 @@ type SpeciesWithBirdsCount = Pick<SpeciesRow, 'id' | 'species_name'> & {
 };
 
 export type HomePageSummaryStats = {
-	allTime: AggregateStatsResult;
-	thisYear: AggregateStatsResult;
+	allTime: AggregateStatsResult | null;
+	thisYear: AggregateStatsResult | null;
 };
 
 type PageModel = {
@@ -190,10 +190,10 @@ export async function fetchHomePageSummaryStats(
 			})
 			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
 	]);
-	if (allTime?.[0] == null || thisYear?.[0] == null) {
+	if (allTime?.[0] == null && thisYear?.[0] == null) {
 		return null;
 	}
-	return { allTime: allTime[0], thisYear: thisYear[0] };
+	return { allTime: allTime?.[0] ?? null, thisYear: thisYear?.[0] ?? null };
 }
 
 export async function fetchTopSpecies(): Promise<SpeciesWithBirdsCount[]> {
@@ -289,8 +289,10 @@ function SummaryStats({ data }: { data: HomePageSummaryStats | null }) {
 	}
 	return (
 		<div>
-			<SummaryParagraph stats={data.allTime} />
-			<SummaryParagraph prefix="This year: " stats={data.thisYear} />
+			{data.allTime && <SummaryParagraph stats={data.allTime} />}
+			{data.thisYear && (
+				<SummaryParagraph prefix="This year: " stats={data.thisYear} />
+			)}
 		</div>
 	);
 }
