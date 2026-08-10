@@ -30,3 +30,5 @@ export type LongAbsenceRetrapsResult =
 	Database['public']['Functions']['long_absence_retraps']['Returns'][number];
 export type StatsPerDayAndSpeciesResult =
 	Database['public']['Functions']['stats_per_day_and_species']['Returns'][number];
+export type GroupTicksResult =
+	Database['public']['Functions']['group_ticks']['Returns'][number];
