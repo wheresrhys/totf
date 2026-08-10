@@ -3,6 +3,9 @@ import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
 import recentSessionsSnapshot from '@/test-fixtures/snapshots/fetchRecentSessions.alpha.json';
 import topSpeciesSnapshot from '@/test-fixtures/snapshots/fetchTopSpecies.alpha.json';
+import summaryStatsSnapshot from '@/test-fixtures/snapshots/fetchHomePageSummaryStats.alpha.json';
+import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/fetchHomePageSummaryStats.zero.json';
+import type { HomePageSummaryStats } from '../page';
 import type { GroupTicksResult } from '@/app/models/db';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
@@ -25,6 +28,7 @@ function makeChainClient(
 	overrides: {
 		Sessions?: unknown;
 		Species?: unknown;
+		summaryStats?: HomePageSummaryStats;
 		lastGroupTick?: unknown;
 	} = {}
 ) {
@@ -33,6 +37,9 @@ function makeChainClient(
 		Species: topSpeciesSnapshot,
 		...overrides
 	};
+	const summaryStats =
+		overrides.summaryStats ??
+		(summaryStatsSnapshot as unknown as HomePageSummaryStats);
 	const lastGroupTick = overrides.lastGroupTick ?? defaultLastGroupTick;
 	function chainFor(data: unknown) {
 		const thenable = {
@@ -47,12 +54,21 @@ function makeChainClient(
 			...thenable
 		};
 	}
+	const rpc = vi.fn((fnName: string, args: { from_date?: string } = {}) => {
+		const data =
+			fnName === 'group_ticks'
+				? lastGroupTick
+				: args?.from_date
+					? [summaryStats.thisYear]
+					: [summaryStats.allTime];
+		return {
+			then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+				Promise.resolve({ data, error: null }).then(resolve)
+		};
+	});
 	return {
 		from: vi.fn((table: string) => chainFor(dataByTable[table] ?? [])),
-		rpc: vi.fn().mockReturnValue({
-			then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-				Promise.resolve({ data: lastGroupTick, error: null }).then(resolve)
-		})
+		rpc
 	};
 }
 
@@ -165,6 +181,12 @@ describe('home page', () => {
 			).toBeDefined();
 		});
 
+		it('renders a "View all" link to /ticks when data is present', async () => {
+			render(await Page());
+			const link = await screen.findByRole('link', { name: 'View all' });
+			expect(link.getAttribute('href')).toBe('/ticks');
+		});
+
 		describe('with no ticks yet', () => {
 			it('omits the paragraph entirely', async () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
@@ -176,6 +198,15 @@ describe('home page', () => {
 				});
 				expect(heading).toBeDefined();
 				expect(screen.queryByText(/Last group tick:/)).toBeNull();
+			});
+
+			it('omits the "View all" link', async () => {
+				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+					makeChainClient({ lastGroupTick: [] })
+				);
+				render(await Page());
+				await screen.findByRole('heading', { name: 'Recent Sessions' });
+				expect(screen.queryByRole('link', { name: 'View all' })).toBeNull();
 			});
 		});
 	});
@@ -235,6 +266,126 @@ describe('home page', () => {
 				const speciesLinks =
 					heading.nextElementSibling?.querySelectorAll('a') ?? [];
 				expect(speciesLinks.length).toBe(0);
+			});
+		});
+	});
+
+	describe('summary stats', () => {
+		it('renders the all-time summary paragraph with bold counts from aggregate_stats', async () => {
+			const { container } = render(await Page());
+			await screen.findByRole('heading', { name: 'Recent Sessions' });
+			const { allTime } = summaryStatsSnapshot;
+			const paragraph = Array.from(container.querySelectorAll('p')).find((p) =>
+				p.textContent?.includes('sessions, with')
+			);
+			expect(paragraph?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+				`${allTime.session_count} sessions, with ${allTime.bird_count} birds of ${allTime.species_count} species encountered ${allTime.encounter_count} times`
+			);
+			const boldValues = Array.from(
+				paragraph?.querySelectorAll('.font-bold') ?? []
+			).map((el) => el.textContent);
+			expect(boldValues).toEqual([
+				String(allTime.session_count),
+				String(allTime.bird_count),
+				String(allTime.species_count),
+				String(allTime.encounter_count)
+			]);
+		});
+
+		it('renders the this-year summary paragraph with bold counts from aggregate_stats', async () => {
+			const { container } = render(await Page());
+			await screen.findByRole('heading', { name: 'Recent Sessions' });
+			const { thisYear } = summaryStatsSnapshot;
+			const paragraph = Array.from(container.querySelectorAll('p')).find((p) =>
+				p.textContent?.startsWith('This year:')
+			);
+			expect(paragraph?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+				`This year: ${thisYear.session_count} sessions, with ${thisYear.bird_count} birds of ${thisYear.species_count} species encountered ${thisYear.encounter_count} times`
+			);
+		});
+
+		it('calls aggregate_stats with from_date set to 1 Jan of the current year for the this-year paragraph, and no date filter for the all-time paragraph', async () => {
+			const client = makeChainClient();
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+			render(await Page());
+			await screen.findByRole('heading', { name: 'Recent Sessions' });
+			const currentYearStart = `${new Date().getFullYear()}-01-01`;
+			const calls = client.rpc.mock.calls.filter(
+				([fnName]) => fnName === 'aggregate_stats'
+			);
+			expect(
+				calls.some(
+					([, args]) => (args as { from_date?: string }).from_date === undefined
+				)
+			).toBe(true);
+			expect(
+				calls.some(
+					([, args]) =>
+						(args as { from_date?: string }).from_date === currentYearStart
+				)
+			).toBe(true);
+		});
+
+		describe('with a brand-new group that has zero sessions', () => {
+			it('renders "0" in each stat slot for both paragraphs', async () => {
+				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+					makeChainClient({
+						summaryStats:
+							summaryStatsZeroSnapshot as unknown as HomePageSummaryStats
+					})
+				);
+				const { container } = render(await Page());
+				await screen.findByRole('heading', { name: 'Recent Sessions' });
+				const paragraphs = Array.from(container.querySelectorAll('p')).filter(
+					(p) => p.textContent?.includes('sessions, with')
+				);
+				expect(paragraphs.length).toBe(2);
+				paragraphs.forEach((paragraph) => {
+					const boldValues = Array.from(
+						paragraph.querySelectorAll('.font-bold')
+					).map((el) => el.textContent);
+					expect(boldValues).toEqual(['0', '0', '0', '0']);
+				});
+			});
+		});
+
+		describe('with all-time data but no this-year data', () => {
+			it('renders only the all-time paragraph', async () => {
+				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+					makeChainClient({
+						summaryStats: {
+							allTime: summaryStatsSnapshot.allTime,
+							thisYear: null
+						} as unknown as HomePageSummaryStats
+					})
+				);
+				const { container } = render(await Page());
+				await screen.findByRole('heading', { name: 'Recent Sessions' });
+				const paragraphs = Array.from(container.querySelectorAll('p')).filter(
+					(p) => p.textContent?.includes('sessions, with')
+				);
+				expect(paragraphs.length).toBe(1);
+				expect(paragraphs[0].textContent?.startsWith('This year:')).toBe(false);
+			});
+		});
+
+		describe('with this-year data but no all-time data', () => {
+			it('renders only the this-year paragraph', async () => {
+				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+					makeChainClient({
+						summaryStats: {
+							allTime: null,
+							thisYear: summaryStatsSnapshot.thisYear
+						} as unknown as HomePageSummaryStats
+					})
+				);
+				const { container } = render(await Page());
+				await screen.findByRole('heading', { name: 'Recent Sessions' });
+				const paragraphs = Array.from(container.querySelectorAll('p')).filter(
+					(p) => p.textContent?.includes('sessions, with')
+				);
+				expect(paragraphs.length).toBe(1);
+				expect(paragraphs[0].textContent?.startsWith('This year:')).toBe(true);
 			});
 		});
 	});
