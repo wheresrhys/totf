@@ -17,7 +17,11 @@ import { getTopStats, type UserTopStatsArgs } from '../actions/top-performers';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
-import type { SpeciesRow, GroupTicksResult } from '../models/db';
+import type {
+	AggregateStatsResult,
+	SpeciesRow,
+	GroupTicksResult
+} from '../models/db';
 import { SessionsByDay } from '../components/SessionHistoryCalendar';
 import { NoPrefetchLink } from '../components/shared/NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
@@ -26,10 +30,16 @@ type SpeciesWithBirdsCount = Pick<SpeciesRow, 'id' | 'species_name'> & {
 	birds: { count: number }[];
 };
 
+export type HomePageSummaryStats = {
+	allTime: AggregateStatsResult | null;
+	thisYear: AggregateStatsResult | null;
+};
+
 type PageModel = {
 	stats: StatsAccordionModel[];
 	recentSessions: SessionWithEncountersCount[];
 	topSpecies: SpeciesWithBirdsCount[];
+	summaryStats: HomePageSummaryStats | null;
 	lastGroupTick: GroupTicksResult | null;
 };
 function getStatConfigs(
@@ -170,6 +180,28 @@ export async function fetchRecentSessions(
 	return sessions.filter((s) => recentDates.includes(s.visit_date));
 }
 
+export async function fetchHomePageSummaryStats(
+	viewedGroupId: number
+): Promise<HomePageSummaryStats | null> {
+	const supabase = await getAuthenticatedSupabaseClient();
+	const startOfCurrentYear = `${new Date().getFullYear()}-01-01`;
+	const [allTime, thisYear] = await Promise.all([
+		supabase
+			.rpc('aggregate_stats', { ringing_group_filter: viewedGroupId })
+			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>,
+		supabase
+			.rpc('aggregate_stats', {
+				ringing_group_filter: viewedGroupId,
+				from_date: startOfCurrentYear
+			})
+			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
+	]);
+	if (allTime?.[0] == null && thisYear?.[0] == null) {
+		return null;
+	}
+	return { allTime: allTime?.[0] ?? null, thisYear: thisYear?.[0] ?? null };
+}
+
 export async function fetchLastGroupTick(
 	viewedGroupId: number
 ): Promise<GroupTicksResult | null> {
@@ -228,6 +260,7 @@ export async function fetchHomePageData(
 		),
 		recentSessions: await fetchRecentSessions(viewedGroupId),
 		topSpecies: await fetchTopSpecies(),
+		summaryStats: await fetchHomePageSummaryStats(viewedGroupId),
 		lastGroupTick: await fetchLastGroupTick(viewedGroupId)
 	};
 }
@@ -249,6 +282,37 @@ function RecentSessions({
 					dateFormat="EEEE do MMMM"
 				/>
 			</BoxyList>
+		</div>
+	);
+}
+function SummaryParagraph({
+	prefix,
+	stats
+}: {
+	prefix?: string;
+	stats: AggregateStatsResult;
+}) {
+	return (
+		<p className="text-lg">
+			{prefix}
+			<span className="font-bold">{stats.session_count}</span> sessions, with{' '}
+			<span className="font-bold">{stats.bird_count}</span> birds of{' '}
+			<span className="font-bold">{stats.species_count}</span> species
+			encountered <span className="font-bold">{stats.encounter_count}</span>{' '}
+			times
+		</p>
+	);
+}
+function SummaryStats({ data }: { data: HomePageSummaryStats | null }) {
+	if (!data) {
+		return null;
+	}
+	return (
+		<div>
+			{data.allTime && <SummaryParagraph stats={data.allTime} />}
+			{data.thisYear && (
+				<SummaryParagraph prefix="This year: " stats={data.thisYear} />
+			)}
 		</div>
 	);
 }
@@ -295,6 +359,7 @@ function HomePageContent({
 	return (
 		<PageWrapper>
 			<LastGroupTick data={data.lastGroupTick} />
+			<SummaryStats data={data.summaryStats} />
 			<RecentSessions
 				data={data.recentSessions}
 				viewedGroupId={viewedGroupId}
