@@ -12,6 +12,15 @@ export type SessionEncounter = EncounterRow & {
 	};
 };
 
+export type ResightingEncounter = EncounterRow & {
+	bird: BirdRow & {
+		species: SpeciesRow;
+	};
+	session: SessionRow & {
+		location: LocationRow;
+	};
+};
+
 export type SessionWithEncountersCount = SessionRow & {
 	encounters: { count: number }[];
 	location: LocationRow;
