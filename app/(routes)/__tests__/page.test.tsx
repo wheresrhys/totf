@@ -165,6 +165,12 @@ describe('home page', () => {
 			).toBeDefined();
 		});
 
+		it('renders a "View all" link to /ticks when data is present', async () => {
+			render(await Page());
+			const link = await screen.findByRole('link', { name: 'View all' });
+			expect(link.getAttribute('href')).toBe('/ticks');
+		});
+
 		describe('with no ticks yet', () => {
 			it('omits the paragraph entirely', async () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
@@ -176,6 +182,15 @@ describe('home page', () => {
 				});
 				expect(heading).toBeDefined();
 				expect(screen.queryByText(/Last group tick:/)).toBeNull();
+			});
+
+			it('omits the "View all" link', async () => {
+				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+					makeChainClient({ lastGroupTick: [] })
+				);
+				render(await Page());
+				await screen.findByRole('heading', { name: 'Recent Sessions' });
+				expect(screen.queryByRole('link', { name: 'View all' })).toBeNull();
 			});
 		});
 	});
