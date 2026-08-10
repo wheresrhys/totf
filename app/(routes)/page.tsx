@@ -255,10 +255,15 @@ function RecentSessions({
 function LastGroupTick({ data }: { data: GroupTicksResult | null }) {
 	if (!data) return null;
 	return (
-		<p className="text-lg">
-			Last group tick: {data.species_name} on{' '}
-			{formatDate(new Date(data.first_encounter_date), 'do MMMM yyyy')}
-		</p>
+		<div>
+			<p className="text-lg">
+				Last group tick: {data.species_name} on{' '}
+				{formatDate(new Date(data.first_encounter_date), 'do MMMM yyyy')}
+			</p>
+			<NoPrefetchLink href="/ticks" className="link link-secondary text-sm">
+				View all
+			</NoPrefetchLink>
+		</div>
 	);
 }
 function TopSpecies({ data }: { data: SpeciesWithBirdsCount[] }) {
