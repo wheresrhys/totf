@@ -228,7 +228,12 @@ source it exercises:
 - `scripts/e2e-select-suite.sh` diffs the branch against `origin/main`; if any changed file matches
   a trigger path it runs the full `npm run test:e2e`, otherwise `npm run test:e2e:safe`
   (`--grep-invert @mutates`) — so most branches never execute the mutating spec at all, and don't
-  need any cross-worktree coordination for it.
+  need any cross-worktree coordination for it. It also treats a change to any direct (one-level,
+  not transitive) local import dependency of a trigger file as touching that trigger — resolved by
+  `scripts/resolve-mutating-import-deps.mjs`, which parses each trigger file with the TypeScript
+  compiler API and walks its import declarations, excluding type-only imports — so editing e.g.
+  `lib/group-auth.ts` (imported by `app/api/import/route.ts`) still
+  selects the full suite even though it isn't listed in `mutating-spec-triggers.json` itself.
 - The rare ticket whose scope *does* intersect a trigger path gets the `e2e-exclusive` label
   (alongside `db-migration`, in the same exclusive-resource set `swarm` caps at 1 in-flight — see
   "Larger work" above) so two worktrees never run a `@mutates` spec concurrently.

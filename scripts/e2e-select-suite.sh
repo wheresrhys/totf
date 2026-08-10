@@ -5,6 +5,12 @@ CHANGED=$(git diff --name-only origin/main...HEAD)
 
 TRIGGER_PATHS=$(node --input-type=commonjs -e "console.log(require('./e2e/mutating-spec-triggers.json')['@mutates'].join('\n'))")
 
+# Also treat direct (one-level) local import dependencies of the trigger
+# files as trigger paths — see scripts/resolve-mutating-import-deps.mjs.
+DEPENDENCY_PATHS=$(node scripts/resolve-mutating-import-deps.mjs)
+TRIGGER_PATHS="$TRIGGER_PATHS
+$DEPENDENCY_PATHS"
+
 MATCHED=false
 while IFS= read -r path; do
 	[ -z "$path" ] && continue
