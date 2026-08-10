@@ -4,7 +4,8 @@ description: >-
   Turn ONE sketched task into a precise, commit-sized, test-enumerated ticket and file it as a
   labelled GitHub issue. Fleshes out scope/acceptance criteria, breaks the work into small
   commits, enumerates describe blocks and test titles (USE algorithm), identifies which stack
-  layers it touches (tagging `db-migration` if it touches `supabase/schema/`), picks the
+  layers it touches (tagging `db-migration` if it touches `supabase/schema/`, or `e2e-exclusive`
+  if it touches a path listed in `e2e/mutating-spec-triggers.json`), picks the
   cheapest Claude model that can do it accurately (fable/sonnet/opus label), ALWAYS asks for
   confirmation, then runs `gh issue create` with the model label plus `ready`. Can optionally
   file the ticket as a GitHub sub-issue of a named tracking issue. Operates on a single task
@@ -83,13 +84,18 @@ Then call **AskUserQuestion** offering: **Confirm & create** / **Edit** / **Chan
 ### 7. Create the GitHub issue
 Only after confirmation:
 1. Ensure labels exist. Run `gh label list`. `ready`/`opus`/`sonnet`/`fable` already exist in
-   this repo. If the ticket touches `supabase/schema/` (step 2) and the `db-migration` label is
-   missing, create it:
-   `gh label create db-migration --color b60205 --description "Touches supabase/schema/ — swarm runs at most one of these at a time"`
+   this repo. These two are the **exclusive-resource label set** — `swarm` caps at most 1
+   ticket carrying *either* in flight at a time, since both mean the ticket will mutate the
+   single shared local Supabase instance. Create whichever is missing and needed:
+   - If the ticket touches `supabase/schema/` (step 2) and `db-migration` is missing:
+     `gh label create db-migration --color b60205 --description "Touches supabase/schema/ — swarm runs at most one exclusive-resource ticket at a time"`
+   - If the ticket touches a path listed in `e2e/mutating-spec-triggers.json` (step 2) and
+     `e2e-exclusive` is missing:
+     `gh label create e2e-exclusive --color b60205 --description "Touches a @mutates E2E spec's trigger path — swarm runs at most one exclusive-resource ticket at a time"`
 2. Write the fleshed markdown (sections 1–4) to a temp file in the scratchpad and create the
    issue from it (avoids shell-escaping problems):
    `gh issue create --title "<title>" --body-file <tmpfile> --label <model> --label ready`
-   — add `--label db-migration` too if step 2 flagged a schema change.
+   — add `--label db-migration` and/or `--label e2e-exclusive` too if step 2 flagged either.
 3. If the task came from a named tracking issue (see Input), link the new issue as its
    sub-issue: `gh api repos/{owner}/{repo}/issues/<parent>/sub_issues -f sub_issue_id=<new-issue-node-id>`
    (resolve the new issue's node id via `gh issue view <new-number> --json id` first).
@@ -98,6 +104,7 @@ Only after confirmation:
 ## Rules
 - Single task per run. Never batch — that's `tasks-to-tickets`.
 - Every issue gets exactly two labels (model + `ready`), plus `db-migration` when it touches
-  `supabase/schema/`.
+  `supabase/schema/` and/or `e2e-exclusive` when it touches a path in
+  `e2e/mutating-spec-triggers.json`.
 - Confirmation gate in step 6 is mandatory — no issue without an explicit yes.
 - Sub-issue linking only happens when the task's source was a named tracking issue.
