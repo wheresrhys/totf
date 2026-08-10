@@ -10,7 +10,7 @@ function psql(sql: string) {
 	if (result.status !== 0) throw new Error(`psql failed: ${result.stderr}`)
 }
 
-test.describe.serial('import flow', { tag: '@delta' }, () => {
+test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 	test.beforeAll(async () => {
 		// Disable trigger to avoid NOT NULL proven_age violation when all encounters for a bird are deleted
 		psql(`ALTER TABLE "Encounters" DISABLE TRIGGER trigger_encounters_refresh_bird_proven_age`)

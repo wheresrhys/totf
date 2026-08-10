@@ -1,0 +1,8 @@
+{
+	"@mutates": [
+		"lib/demon-import.ts",
+		"app/api/import/",
+		"scripts/import-csv.ts",
+		"e2e/authenticated/import.spec.ts"
+	]
+}
