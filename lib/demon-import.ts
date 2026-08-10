@@ -209,10 +209,16 @@ export async function processEncounterRow(
 
 	const visitDate = convertDateFormat(row.visit_date as string);
 
+	const isResightingOnly = ['U', 'F', 'D'].includes(row.record_type as string);
+
 	const sessionId = await upsert<SessionsInsert>(
 		'Sessions',
-		{ visit_date: visitDate, location_id: locationId },
-		'visit_date,location_id' as keyof SessionsInsert
+		{
+			visit_date: visitDate,
+			location_id: locationId,
+			is_resighting_only: isResightingOnly
+		},
+		'visit_date,location_id,is_resighting_only' as keyof SessionsInsert
 	);
 
 	const age_code = Number(String(row.age).replace('J', ''));

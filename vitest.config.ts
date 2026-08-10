@@ -9,6 +9,12 @@ export default defineConfig({
     name: 'app',
     setupFiles: ['./vitest.setup.tsx'],
     environment: 'happy-dom',
-    exclude: ['**/node_modules/**', 'supabase/__tests__/**', 'http-tests/**', 'e2e/**'],
+    exclude: [
+      '**/node_modules/**',
+      'supabase/__tests__/**',
+      'http-tests/**',
+      'e2e/**',
+      '.claude/worktrees/**',
+    ],
   },
 })

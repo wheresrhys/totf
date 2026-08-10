@@ -7,7 +7,9 @@ description: >-
   clarifications/improvements and writing accepted ones back to the source (the tracking issue's
   body, if that's where it came from), before drafting. Enumerates commits and tests, picks a
   model label (fable/sonnet/opus) + `ready`, tags `db-migration` where a task touches
-  `supabase/schema/`, and expresses inter-task dependencies as GitHub native "blocked by" links.
+  `supabase/schema/` and `e2e-exclusive` where it touches a path in
+  `e2e/mutating-spec-triggers.json`, and expresses inter-task dependencies as GitHub native
+  "blocked by" links.
   When run under a named tracking issue, each created ticket is filed as its GitHub sub-issue.
   Drafting is parallelised across subagents, but the flesh-out-ticket confirmation gate still
   fires for every ticket in the main thread. Triggers: "tasks to tickets", "create tickets for
@@ -72,6 +74,8 @@ When there are more than ~3 tasks, fan out to `general-purpose` subagents to dra
   - `body` — the fleshed markdown (context/scope/acceptance/out-of-scope/reuse + stack layers
     touched + commit breakdown + test enumeration).
   - `touchesDbSchema` — whether it touches `supabase/schema/` (drives the `db-migration` label).
+  - `touchesE2eMutatingTrigger` — whether it touches a path listed in
+    `e2e/mutating-spec-triggers.json` (drives the `e2e-exclusive` label).
   - `modelLabel` + one-line justification (`fable`|`sonnet`|`opus`).
   - `dependsOn` — the other tasks (identified by summary) this task is blocked by.
 
@@ -86,9 +90,9 @@ user confirms and can give feedback on each WIP ticket individually.
 
 ### 5. Create issues
 On each confirmation, run `flesh-out-ticket` step 7: ensure the model label, `ready`, and (if
-`touchesDbSchema`) `db-migration` labels exist (create if missing), write the body to a
-scratchpad temp file, then:
-`gh issue create --title "..." --body-file <tmpfile> --label <model> --label ready [--label db-migration]`.
+`touchesDbSchema`) `db-migration` and/or (if `touchesE2eMutatingTrigger`) `e2e-exclusive` labels
+exist (create if missing), write the body to a scratchpad temp file, then:
+`gh issue create --title "..." --body-file <tmpfile> --label <model> --label ready [--label db-migration] [--label e2e-exclusive]`.
 If this run is scoped under a tracking issue, link each created issue as its sub-issue (same
 mechanism as `flesh-out-ticket` step 7.3). Record the mapping `task → issue number`.
 
@@ -110,7 +114,8 @@ links.
 - One issue per task. Reuse `flesh-out-ticket` for the per-ticket work — do not reinvent its
   fleshing, confirmation gate, labelling, or creation logic.
 - Every issue: one model label (`fable`|`sonnet`|`opus`) + `ready`, plus `db-migration` when it
-  touches `supabase/schema/`, plus any blocked-by links and (when scoped under a tracking issue)
-  sub-issue membership.
+  touches `supabase/schema/` and/or `e2e-exclusive` when it touches a path in
+  `e2e/mutating-spec-triggers.json`, plus any blocked-by links and (when scoped under a tracking
+  issue) sub-issue membership.
 - The per-ticket confirmation gate is non-negotiable and runs in the main thread, even when
   drafting was parallelised.
