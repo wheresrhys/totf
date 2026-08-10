@@ -2,7 +2,8 @@ CREATE TABLE public."Sessions" (
 	id bigint DEFAULT nextval('public."Sessions_id_seq"'::regclass) NOT NULL,
 	visit_date date NOT NULL,
 	location_id bigint NOT NULL,
-	ringing_group_id bigint NOT NULL
+	ringing_group_id bigint NOT NULL,
+	is_resighting_only boolean NOT NULL DEFAULT FALSE
 );
 
 CREATE INDEX idx_sessions_location_id ON public."Sessions" (location_id);
@@ -79,7 +80,7 @@ ALTER TABLE public."Sessions"
 ADD CONSTRAINT "Sessions_pkey" PRIMARY KEY (id);
 
 ALTER TABLE public."Sessions"
-ADD CONSTRAINT "Sessions_visit_date_location_id_key" UNIQUE (visit_date, location_id);
+ADD CONSTRAINT "Sessions_visit_date_location_id_key" UNIQUE (visit_date, location_id, is_resighting_only);
 
 ALTER TABLE public."Sessions"
 ADD CONSTRAINT sessions_location_id_fkey FOREIGN KEY (location_id) REFERENCES public."Locations" (id);

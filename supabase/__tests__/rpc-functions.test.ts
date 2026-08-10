@@ -12,6 +12,7 @@ import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
 import { supabase } from '../../lib/supabase';
+import { addDays, randomFutureDate, randomTestSuffix } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 async function getGroupIdByName(name: string): Promise<number> {
@@ -744,10 +745,18 @@ describe('Postgres RPC integration tests', () => {
 			let locationId: number;
 			let sessionIds: number[];
 			let birdIds: number[];
+			let visitDates: string[];
 
 			beforeAll(async () => {
 				deltaId = await getGroupIdByName('Delta');
 				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+				const testSuffix = randomTestSuffix();
+				// Randomised so concurrent test runs (separate worktrees, same shared local
+				// Supabase instance) never combine their rows into the same
+				// stats_per_day_and_species aggregate row.
+				const firstVisitDate = randomFutureDate();
+				visitDates = [firstVisitDate, addDays(firstVisitDate, 1)];
 
 				const { data: species } = await supabase
 					.from('Species')
@@ -758,7 +767,7 @@ describe('Postgres RPC integration tests', () => {
 				const { data: location, error: locationError } = await deltaClient
 					.from('Locations')
 					.insert({
-						location_name: 'Stats Per Day Test Location',
+						location_name: `Stats Per Day Test Location ${testSuffix}`,
 						ringing_group_id: deltaId,
 					})
 					.select('id')
@@ -767,7 +776,7 @@ describe('Postgres RPC integration tests', () => {
 				locationId = location!.id;
 
 				const sessions = await Promise.all(
-					['2098-06-01', '2098-06-02'].map((visitDate) =>
+					visitDates.map((visitDate) =>
 						deltaClient
 							.from('Sessions')
 							.insert({ visit_date: visitDate, location_id: locationId })
@@ -781,7 +790,7 @@ describe('Postgres RPC integration tests', () => {
 				sessionIds = sessions.map(({ data }) => data!.id);
 
 				const birds = await Promise.all(
-					['STATSTEST1', 'STATSTEST2', 'STATSTEST3'].map((ringNo) =>
+					[`STATSTEST1-${testSuffix}`, `STATSTEST2-${testSuffix}`, `STATSTEST3-${testSuffix}`].map((ringNo) =>
 						deltaClient
 							.from('Birds')
 							.insert({ ring_no: ringNo, species_id: species!.id })
@@ -804,10 +813,10 @@ describe('Postgres RPC integration tests', () => {
 				const { error: encountersError } = await deltaClient
 					.from('Encounters')
 					.insert([
-						// 2098-06-01: one weighed + one unweighed encounter
+						// visitDates[0]: one weighed + one unweighed encounter
 						{ ...baseEncounter, bird_id: birdIds[0], session_id: sessionIds[0], weight: 15 },
 						{ ...baseEncounter, bird_id: birdIds[1], session_id: sessionIds[0] },
-						// 2098-06-02: only an unweighed encounter
+						// visitDates[1]: only an unweighed encounter
 						{ ...baseEncounter, bird_id: birdIds[2], session_id: sessionIds[1] },
 					]);
 				if (encountersError) throw encountersError;
@@ -829,10 +838,10 @@ describe('Postgres RPC integration tests', () => {
 				});
 				expect(error).toBeNull();
 				expect(
-					data!.find((row) => row.visit_date === '2098-06-01')
+					data!.find((row) => row.visit_date === visitDates[0])
 				).toEqual({
 					species_name: 'Robin',
-					visit_date: '2098-06-01',
+					visit_date: visitDates[0],
 					encounter_count: 2,
 					juv_count: 0,
 					weighed_birds_count: 1,
@@ -847,10 +856,10 @@ describe('Postgres RPC integration tests', () => {
 				});
 				expect(error).toBeNull();
 				expect(
-					data!.find((row) => row.visit_date === '2098-06-02')
+					data!.find((row) => row.visit_date === visitDates[1])
 				).toEqual({
 					species_name: 'Robin',
-					visit_date: '2098-06-02',
+					visit_date: visitDates[1],
 					encounter_count: 1,
 					juv_count: 0,
 					weighed_birds_count: 0,
@@ -868,10 +877,17 @@ describe('Postgres RPC integration tests', () => {
 			let locationId: number;
 			let sessionId: number;
 			let birdIds: number[];
+			let visitDate: string;
 
 			beforeAll(async () => {
 				deltaId = await getGroupIdByName('Delta');
 				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+				const testSuffix = randomTestSuffix();
+				// Randomised so concurrent test runs (separate worktrees, same shared local
+				// Supabase instance) never combine their rows into the same
+				// stats_per_day_and_species aggregate row.
+				visitDate = randomFutureDate();
 
 				const { data: species } = await supabase
 					.from('Species')
@@ -882,7 +898,7 @@ describe('Postgres RPC integration tests', () => {
 				const { data: location, error: locationError } = await deltaClient
 					.from('Locations')
 					.insert({
-						location_name: 'Juv Stats Test Location',
+						location_name: `Juv Stats Test Location ${testSuffix}`,
 						ringing_group_id: deltaId,
 					})
 					.select('id')
@@ -892,14 +908,20 @@ describe('Postgres RPC integration tests', () => {
 
 				const { data: session, error: sessionError } = await deltaClient
 					.from('Sessions')
-					.insert({ visit_date: '2099-06-01', location_id: locationId })
+					.insert({ visit_date: visitDate, location_id: locationId })
 					.select('id')
 					.single();
 				if (sessionError) throw sessionError;
 				sessionId = session!.id;
 
 				const birds = await Promise.all(
-					['JUVTEST1', 'JUVTEST2', 'JUVTEST3', 'JUVTEST4', 'JUVTEST5'].map(
+					[
+						`JUVTEST1-${testSuffix}`,
+						`JUVTEST2-${testSuffix}`,
+						`JUVTEST3-${testSuffix}`,
+						`JUVTEST4-${testSuffix}`,
+						`JUVTEST5-${testSuffix}`,
+					].map(
 						(ringNo) =>
 							deltaClient
 								.from('Birds')
@@ -948,10 +970,10 @@ describe('Postgres RPC integration tests', () => {
 					ringing_group_filter: deltaId,
 				});
 				expect(error).toBeNull();
-				const row = data!.find((row) => row.visit_date === '2099-06-01');
+				const row = data!.find((row) => row.visit_date === visitDate);
 				expect(row).toMatchObject({
 					species_name: 'Robin',
-					visit_date: '2099-06-01',
+					visit_date: visitDate,
 					encounter_count: 5,
 					juv_count: 3,
 				});

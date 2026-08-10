@@ -45,10 +45,13 @@ subagent implementing it runs on that model:
 - `opus` — fiddly or multi-constraint work (complex SQL, seed-data churn, interacting rules)
 - `fable` — complex or foundational work that sets patterns others build on
 
-If a ticket touches `supabase/schema/`, it also gets the `db-migration` label. This repo has a
-single shared local Supabase instance, so `swarm` never runs more than one `db-migration`-labelled
-ticket at a time — concurrent worktrees running schema migrations or DB integration tests against
-the same instance would otherwise collide.
+This repo has a single shared local Supabase instance, so any ticket that will mutate it gets an
+**exclusive-resource label**, and `swarm` runs any exclusive-resource-labelled unit of work
+completely solo — no other worker (maintenance or ticket) runs concurrently with it — since
+concurrent worktrees doing either kind of mutation would otherwise collide:
+- `db-migration` — touches `supabase/schema/` (schema migrations or DB integration tests).
+- `e2e-exclusive` — touches a path listed in `e2e/mutating-spec-triggers.json` (an E2E spec
+  tagged `@mutates`; see "E2E tests (Playwright)" below).
 
 ## Authentication model
 
@@ -161,18 +164,23 @@ Three separate Vitest configs:
 | Suite | Config | Command | Runs in |
 |---|---|---|---|
 | App tests | `vitest.config.ts` | `npm run test:nowatch` | pre-push hook + CI |
-| DB integration tests | `vitest.integration.config.ts` | `npm run test:integration` | pre-push hook (requires local Supabase) |
+| DB integration tests | `vitest.integration.config.ts` | `npm run test:integration` | manually (requires local Supabase) |
 | HTTP tests | `vitest.http.config.ts` | `npm run test:http` | manually (auto-starts Next.js dev server if not running) |
+| E2E tests | `playwright.config.ts` | `npm run test:e2e` (full) / `test:e2e:safe` / `test:e2e:mutates` | pre-push hook (diff-aware, see below) + CI (full) |
 
 ```sh
 npm test              # watch mode (app tests only)
 npm run test:nowatch  # single run (app tests)
 npm run test:integration  # DB integration tests against local Supabase
 npm run test:http     # HTTP tests — starts dev server automatically if needed
+npm run test:e2e      # full Playwright E2E suite
 npm run qa            # lint + type-check + app tests
 ```
 
-The pre-push hook runs app tests and DB integration tests. Local Supabase must be running (`npm run db:start:local`) and seeded (`npm run db:seed:e2e`) for integration tests to pass.
+The pre-push hook runs app tests, then `scripts/e2e-select-suite.sh` (see "E2E tests" below) —
+never DB integration tests, which are run manually. Local Supabase must be running
+(`npm run db:start:local`) and seeded (`npm run db:seed:e2e`) for the E2E and DB integration
+suites to pass.
 
 HTTP tests (`http-tests/`) use `http-tests/global-setup.ts` to start/stop the Next.js dev server automatically. If a server is already running at `http://localhost:3000` (or `TEST_BASE_URL`), it reuses it and does not kill it after the suite.
 
@@ -194,7 +202,44 @@ Test RPC functions and RLS policies against the real local database. Require `np
 Tests can run concurrently in separate git worktrees (see `swarm`) against the same shared local
 Supabase instance. Any row a write test creates (ring numbers, group names, session/location
 names, etc.) must use a random or ticket/branch-specific identifier — never a fixed literal —
-so parallel runs never collide on the same row.
+so parallel runs never collide on the same row, and so date-based rows never collide in a
+group-wide aggregate RPC's results (e.g. `stats_per_day_and_species`) even without a unique
+constraint. Use the shared helpers in `supabase/__tests__/test-isolation.ts`
+(`randomTestSuffix`, `randomFutureDate`, `addDays`) rather than inventing a new isolation
+mechanism per file; extend an existing prefix convention (e.g. `TRIG-TEST-`) with the suffix.
+
+### E2E tests (Playwright)
+
+Playwright specs live in `e2e/`, run against fixed seed-data groups (`Alpha`/`Beta`/`Gamma`/`Delta`,
+seeded by `npm run db:seed:e2e`) and the same single shared local Supabase instance as everything
+else. Unlike DB integration tests, most E2E specs are read-only assertions against that stable
+seed data — safe under any amount of worktree concurrency, since nothing mutates the rows they
+read.
+
+The exception is any spec tagged `@mutates` (currently only `e2e/authenticated/import.spec.ts`,
+which does raw writes/deletes against the `Delta` group's rows) — concurrent worktrees both
+running a `@mutates` spec at the same time can collide. Rather than isolating each one (there's
+only one, and its writes are inherently global-fixture writes, not isolable per-worktree rows),
+the pre-push hook avoids running it unless the branch's diff actually touches the spec or the
+source it exercises:
+
+- `e2e/mutating-spec-triggers.json` maps the `@mutates` tag to the paths that make it relevant
+  (e.g. `lib/demon-import.ts`, `app/api/import/`).
+- `scripts/e2e-select-suite.sh` diffs the branch against `origin/main`; if any changed file matches
+  a trigger path it runs the full `npm run test:e2e`, otherwise `npm run test:e2e:safe`
+  (`--grep-invert @mutates`) — so most branches never execute the mutating spec at all, and don't
+  need any cross-worktree coordination for it. It also treats a change to any direct (one-level,
+  not transitive) local import dependency of a trigger file as touching that trigger — resolved by
+  `scripts/resolve-mutating-import-deps.mjs`, which parses each trigger file with the TypeScript
+  compiler API and walks its import declarations, excluding type-only imports — so editing e.g.
+  `lib/group-auth.ts` (imported by `app/api/import/route.ts`) still
+  selects the full suite even though it isn't listed in `mutating-spec-triggers.json` itself.
+- The rare ticket whose scope *does* intersect a trigger path gets the `e2e-exclusive` label
+  (alongside `db-migration`, in the same exclusive-resource set `swarm` caps at 1 in-flight — see
+  "Larger work" above) so two worktrees never run a `@mutates` spec concurrently.
+- Adding a new spec that writes to shared fixture rows: tag its `test.describe`/`test` with
+  `@mutates` and add its trigger paths to `e2e/mutating-spec-triggers.json` — the hook and the
+  ticket-labelling skills both read that one file, so nothing else needs updating.
 
 ## Environment variables
 
