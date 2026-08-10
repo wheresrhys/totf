@@ -218,18 +218,21 @@ export type Database = {
       Sessions: {
         Row: {
           id: number
+          is_resighting_only: boolean
           location_id: number
           ringing_group_id: number
           visit_date: string
         }
         Insert: {
           id?: number
+          is_resighting_only?: boolean
           location_id: number
           ringing_group_id: number
           visit_date: string
         }
         Update: {
           id?: number
+          is_resighting_only?: boolean
           location_id?: number
           ringing_group_id?: number
           visit_date?: string
