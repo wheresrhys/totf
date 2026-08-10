@@ -112,6 +112,10 @@ For each PR:
    executing this ticket (e.g. `Sonnet 5`, `Opus 4.8`, `Fable 5`) — not a fixed model name.
 5. Push and open a PR against `main` (or the previous increment's branch if chaining). Include
    the trailer `🤖 Generated with [Claude Code](https://claude.com/claude-code)` in the PR body.
+   If the issue carries `db-migration` and/or `e2e-exclusive` (the exclusive-resource label set —
+   see CLAUDE.md > Ticket workflow), apply the same label(s) to the PR with `--label`. This lets
+   `swarm` read exclusive-resource status directly off `gh pr list --json labels` when deciding
+   whether to spawn PR-maintenance work, instead of resolving each PR back to its linked issue.
 6. Include in each PR body:
    - What this increment covers
    - Link to the GitHub issue
