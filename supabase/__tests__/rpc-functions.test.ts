@@ -149,6 +149,235 @@ describe('Postgres RPC integration tests', () => {
 			);
 			expect(byYear).toEqual({ 2021: 2, 2022: 35, 2023: 15, 2024: 5 });
 		});
+
+		describe('resighting-only sessions', () => {
+			// A resighting-only Sessions row (is_resighting_only = TRUE, from #428) must be
+			// excluded from every day/session-level statistic — session_count, effort, and
+			// the per-session encounter aggregates — but its encounters must still count
+			// toward the per-species/per-bird totals. Fixtures are Delta-group, on random
+			// far-future dates, and every query is bounded by an explicit date range so it
+			// only ever sees this test's rows (never seed or concurrent-run data).
+			let deltaId: number;
+			let deltaClient: SupabaseClient;
+			let robinId: number;
+			let wrenId: number;
+			let mixedLocationId: number;
+			let onlyResightingLocationId: number;
+			let birdIds: number[];
+			// Mixed range: two real sessions plus resighting-only sessions (one sharing a
+			// date/location with a real session, one on its own date).
+			let mixedFrom: string;
+			let mixedTo: string;
+			// Only-resighting range: a single resighting-only session, nothing else.
+			let onlyResightingDate: string;
+
+			async function getSpeciesId(name: string): Promise<number> {
+				const { data, error } = await supabase
+					.from('Species')
+					.select('id')
+					.eq('species_name', name)
+					.single();
+				if (error || !data) throw new Error(`Species "${name}" not found`);
+				return data.id;
+			}
+
+			async function insertSession(
+				locationId: number,
+				visitDate: string,
+				isResightingOnly: boolean
+			): Promise<number> {
+				const { data, error } = await deltaClient
+					.from('Sessions')
+					.insert({
+						visit_date: visitDate,
+						location_id: locationId,
+						is_resighting_only: isResightingOnly,
+					})
+					.select('id')
+					.single();
+				if (error) throw error;
+				return data!.id;
+			}
+
+			async function insertBird(ringNo: string, speciesId: number): Promise<number> {
+				const { data, error } = await deltaClient
+					.from('Birds')
+					.insert({ ring_no: ringNo, species_id: speciesId })
+					.select('id')
+					.single();
+				if (error) throw error;
+				return data!.id;
+			}
+
+			// Query the single whole-period aggregate row for a bounded date range.
+			async function aggregateRow(fromDate: string, toDate: string) {
+				const { data, error } = await deltaClient.rpc('aggregate_stats', {
+					ringing_group_filter: deltaId,
+					from_date: fromDate,
+					to_date: toDate,
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				return data![0];
+			}
+
+			beforeAll(async () => {
+				deltaId = await getGroupIdByName('Delta');
+				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+				robinId = await getSpeciesId('Robin');
+				wrenId = await getSpeciesId('Wren');
+
+				const testSuffix = randomTestSuffix();
+				const base = randomFutureDate();
+				const d1 = base; // real ringing session (+ a same-date/location resighting)
+				const d2 = addDays(base, 1); // second real ringing session
+				const d3 = addDays(base, 2); // standalone resighting-only session
+				mixedFrom = d1;
+				mixedTo = d3;
+				onlyResightingDate = addDays(base, 100); // disjoint from the mixed range
+
+				const [mixedLocation, onlyResightingLocation] = await Promise.all([
+					deltaClient
+						.from('Locations')
+						.insert({
+							location_name: `Resighting Agg Mixed ${testSuffix}`,
+							ringing_group_id: deltaId,
+						})
+						.select('id')
+						.single(),
+					deltaClient
+						.from('Locations')
+						.insert({
+							location_name: `Resighting Agg Only ${testSuffix}`,
+							ringing_group_id: deltaId,
+						})
+						.select('id')
+						.single(),
+				]);
+				if (mixedLocation.error) throw mixedLocation.error;
+				if (onlyResightingLocation.error) throw onlyResightingLocation.error;
+				mixedLocationId = mixedLocation.data!.id;
+				onlyResightingLocationId = onlyResightingLocation.data!.id;
+
+				const realSession1 = await insertSession(mixedLocationId, d1, false);
+				const resightingTwin = await insertSession(mixedLocationId, d1, true); // same date/loc as realSession1
+				const realSession2 = await insertSession(mixedLocationId, d2, false);
+				const standaloneResighting = await insertSession(mixedLocationId, d3, true);
+				const onlyResightingSession = await insertSession(
+					onlyResightingLocationId,
+					onlyResightingDate,
+					true
+				);
+
+				const [b1, b2, b3, b4, b5, b6, b7, b8] = await Promise.all([
+					insertBird(`RAGG-N1-${testSuffix}`, robinId),
+					insertBird(`RAGG-N2-${testSuffix}`, robinId),
+					insertBird(`RAGG-N3-${testSuffix}`, robinId),
+					insertBird(`RAGG-N4-${testSuffix}`, robinId),
+					insertBird(`RAGG-R1-${testSuffix}`, wrenId),
+					insertBird(`RAGG-R2-${testSuffix}`, wrenId),
+					insertBird(`RAGG-R3-${testSuffix}`, wrenId),
+					insertBird(`RAGG-R4-${testSuffix}`, wrenId),
+				]);
+				birdIds = [b1, b2, b3, b4, b5, b6, b7, b8];
+
+				const base_ = { scheme: 'BTO', sex: 'M', age_code: 1, weight: 15 };
+				const { error: encountersError } = await deltaClient
+					.from('Encounters')
+					.insert([
+						// realSession1 (d1): three new (N) Robin encounters spanning 09:00–12:00 → 3h effort.
+						{ ...base_, bird_id: b1, session_id: realSession1, record_type: 'N', capture_time: '09:00:00' },
+						{ ...base_, bird_id: b2, session_id: realSession1, record_type: 'N', capture_time: '10:00:00' },
+						{ ...base_, bird_id: b3, session_id: realSession1, record_type: 'N', capture_time: '12:00:00' },
+						// realSession2 (d2): one new (N) Robin encounter → clamped to 2h minimum effort.
+						{ ...base_, bird_id: b4, session_id: realSession2, record_type: 'N', capture_time: '10:00:00' },
+						// resightingTwin (d1, same location): a passive resighting (C) Wren — an early
+						// capture_time that must NOT stretch realSession1's effort span.
+						{ ...base_, bird_id: b5, session_id: resightingTwin, record_type: 'C', capture_time: '05:00:00' },
+						// standaloneResighting (d3): a passive resighting (D) Wren on its own date.
+						{ ...base_, bird_id: b6, session_id: standaloneResighting, record_type: 'D', capture_time: '20:00:00' },
+						// onlyResighting range: two passive resightings (C) Wrens, nothing else.
+						{ ...base_, bird_id: b7, session_id: onlyResightingSession, record_type: 'C', capture_time: '08:00:00' },
+						{ ...base_, bird_id: b8, session_id: onlyResightingSession, record_type: 'C', capture_time: '09:00:00' },
+					]);
+				if (encountersError) throw encountersError;
+			});
+
+			afterAll(() => {
+				execSync(
+					`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+						`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Sessions" WHERE location_id IN (${mixedLocationId}, ${onlyResightingLocationId});` +
+						`DELETE FROM "Locations" WHERE id IN (${mixedLocationId}, ${onlyResightingLocationId});'`
+				);
+			});
+
+			describe('excluded from day/session-level stats', () => {
+				it('excludes a resighting-only session from session_count', async () => {
+					const row = await aggregateRow(mixedFrom, mixedTo);
+					// Two real session dates (d1, d2); the standalone resighting date (d3) and the
+					// d1 resighting twin contribute nothing.
+					expect(row.session_count).toBe(2);
+				});
+
+				it("excludes a resighting-only session's duration from total_effort and effort_per_session", async () => {
+					const row = await aggregateRow(mixedFrom, mixedTo);
+					// realSession1 span = 3h, realSession2 clamped to 2h → 5h total over 2 sessions.
+					// The resighting twin's 05:00 capture does not stretch any real session's span.
+					expect(row.total_effort).toBe('05:00:00');
+					expect(row.effort_per_session).toBe('02:30:00');
+				});
+
+				it('excludes a resighting-only session from avg_encounters_per_session and max_per_session', async () => {
+					const row = await aggregateRow(mixedFrom, mixedTo);
+					// Real per-session Robin counts: 3 and 1 → avg 2, max 3.
+					expect(row.avg_encounters_per_session).toBe(2);
+					expect(row.max_per_session).toBe(3);
+				});
+
+				it('excludes a resighting-only session from max_new_per_session', async () => {
+					const row = await aggregateRow(mixedFrom, mixedTo);
+					// New (N) encounters per real session: 3 and 1 → max 3.
+					expect(row.max_new_per_session).toBe(3);
+				});
+			});
+
+			describe('unaffected per-species/per-bird totals', () => {
+				it("still counts a resighting-only session's encounters in species_count, bird_count and encounter_count", async () => {
+					const row = await aggregateRow(mixedFrom, mixedTo);
+					// Robin (4 real) + Wren (2 resighting) across 6 birds / 6 encounters.
+					expect(row.species_count).toBe(2);
+					expect(row.bird_count).toBe(6);
+					expect(row.encounter_count).toBe(6);
+				});
+
+				it('leaves new_bird_count unaffected since resighting record_types are never N', async () => {
+					const row = await aggregateRow(mixedFrom, mixedTo);
+					// Only the four N Robins are new; the C/D Wren resightings never are.
+					expect(row.new_bird_count).toBe(4);
+				});
+			});
+
+			describe('edge cases', () => {
+				it('counts a real and a same-date/location resighting-only session as one session, not two', async () => {
+					// Restrict to d1 only, where a real and a resighting-only session share the
+					// date/location. session_count is 1 (the real one), never 2.
+					const row = await aggregateRow(mixedFrom, mixedFrom);
+					expect(row.session_count).toBe(1);
+					// The resighting Wren still shows up in the per-species totals for that day.
+					expect(row.species_count).toBe(2);
+					expect(row.encounter_count).toBe(4);
+				});
+
+				it('returns session_count=0 and zero effort but a nonzero encounter_count for a range of only resighting-only sessions', async () => {
+					const row = await aggregateRow(onlyResightingDate, onlyResightingDate);
+					expect(row.session_count).toBe(0);
+					expect(row.total_effort).toBe('00:00:00');
+					expect(row.encounter_count).toBe(2);
+				});
+			});
+		});
 	});
 
 	describe('top_metrics_by_period', () => {
