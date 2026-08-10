@@ -108,6 +108,18 @@ describe('session site page', () => {
 		expect(heading.textContent).toContain('15th March 2024');
 	});
 
+	it('excludes resighting-only sessions from the Sessions query', async () => {
+		const client = makeSessionClient();
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+		render(await renderPage());
+		await screen.findByTestId('session-stats');
+		const mainSessionsChain = client.from.mock.results[0].value;
+		expect(mainSessionsChain.eq).toHaveBeenCalledWith(
+			'is_resighting_only',
+			false
+		);
+	});
+
 	it('does not render highlights on the location-filtered page', async () => {
 		render(await renderPage());
 		await screen.findByTestId('session-stats');

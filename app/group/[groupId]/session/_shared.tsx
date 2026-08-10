@@ -46,6 +46,7 @@ async function fetchAdjacentSessionDates(
 			.from('Sessions')
 			.select('visit_date')
 			.eq('ringing_group_id', viewedGroupId)
+			.eq('is_resighting_only', false)
 			.lt('visit_date', date)
 			.order('visit_date', { ascending: false })
 			.limit(1)
@@ -54,6 +55,7 @@ async function fetchAdjacentSessionDates(
 			.from('Sessions')
 			.select('visit_date')
 			.eq('ringing_group_id', viewedGroupId)
+			.eq('is_resighting_only', false)
 			.gt('visit_date', date)
 			.order('visit_date', { ascending: true })
 			.limit(1)
@@ -78,6 +80,7 @@ export async function fetchSessionData({
 		)
 		.eq('visit_date', date)
 		.eq('ringing_group_id', viewedGroupId)
+		.eq('is_resighting_only', false)
 		.then(catchSupabaseErrors)) as (SessionRow & { location: LocationRow })[];
 
 	if (!sessions || sessions.length === 0) {
