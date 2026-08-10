@@ -20,6 +20,8 @@ type ResightingsRowModel = {
 	locationName: string;
 	recordType: string;
 	notes: string | null;
+	findingCondition: string | null;
+	findingCircumstances: string | null;
 };
 
 function dateFormatter(value: unknown): string {
@@ -55,6 +57,16 @@ const columnConfigs = {
 		label: 'Notes',
 		invertSort: true,
 		formatter: notesFormatter
+	},
+	findingCondition: {
+		label: 'Finding condition',
+		invertSort: true,
+		formatter: notesFormatter
+	},
+	findingCircumstances: {
+		label: 'Finding circumstances',
+		invertSort: true,
+		formatter: notesFormatter
 	}
 } as Record<keyof ResightingsRowModel, ColumnConfig>;
 
@@ -85,7 +97,9 @@ function rowDataTransform(
 		visitDate: new Date(resighting.session.visit_date),
 		locationName: resighting.session.location.location_name,
 		recordType: resighting.record_type,
-		notes: resighting.extra_text
+		notes: resighting.extra_text,
+		findingCondition: resighting.finding_condition,
+		findingCircumstances: resighting.finding_circumstances
 	};
 }
 
@@ -122,6 +136,10 @@ function ResightingsTableBody({
 						</span>
 					</td>
 					<td>{cellFormatter(row.notes, 'notes')}</td>
+					<td>{cellFormatter(row.findingCondition, 'findingCondition')}</td>
+					<td>
+						{cellFormatter(row.findingCircumstances, 'findingCircumstances')}
+					</td>
 				</tr>
 			))}
 		</tbody>

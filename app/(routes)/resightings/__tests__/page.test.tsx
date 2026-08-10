@@ -109,6 +109,40 @@ describe('resightings page', () => {
 		expect(table.textContent).toContain('Photographed');
 	});
 
+	it('renders finding condition and finding circumstances columns', async () => {
+		render(await Page());
+		const table = await screen.findByRole('table');
+		const headers = [...table.querySelectorAll('thead th')].map(
+			(th) => th.textContent
+		);
+		expect(headers).toContain('Finding condition');
+		expect(headers).toContain('Finding circumstances');
+		const rows = [...table.querySelectorAll('tbody tr')];
+		const rowWithValues = rows.find((row) =>
+			row.textContent?.includes('ARESIGHT01')
+		)!;
+		const cells = rowWithValues.querySelectorAll('td');
+		expect(cells[6].textContent).toBe('8');
+		expect(cells[7].textContent).toBe('2');
+	});
+
+	it('renders empty-value placeholders when finding_condition/finding_circumstances are null', async () => {
+		render(await Page());
+		const tabList = await screen.findByRole('tablist');
+		const robinTab = [...tabList.querySelectorAll('button')].find(
+			(button) => button.textContent === 'Robin'
+		)!;
+		fireEvent.click(robinTab);
+		const table = await screen.findByRole('table');
+		const rows = [...table.querySelectorAll('tbody tr')];
+		const rowWithNoRecoveryDetails = rows.find((row) =>
+			row.textContent?.includes('ARESIGHT02')
+		)!;
+		const cells = rowWithNoRecoveryDetails.querySelectorAll('td');
+		expect(cells[6].textContent).toBe('–');
+		expect(cells[7].textContent).toBe('–');
+	});
+
 	it('re-sorts rows when a column header is clicked', async () => {
 		render(await Page());
 		const table = await screen.findByRole('table');

@@ -24,6 +24,8 @@ export async function fetchResightings(
 			id,
 			record_type,
 			extra_text,
+			finding_condition,
+			finding_circumstances,
 			bird:Birds (
 				ring_no,
 				species:Species (

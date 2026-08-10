@@ -51,6 +51,8 @@ export type Database = {
           breeding_condition: string | null
           capture_time: string
           extra_text: string | null
+          finding_circumstances: string | null
+          finding_condition: string | null
           id: number
           is_juv: boolean
           max_hatch_year: number
@@ -72,6 +74,8 @@ export type Database = {
           breeding_condition?: string | null
           capture_time: string
           extra_text?: string | null
+          finding_circumstances?: string | null
+          finding_condition?: string | null
           id?: number
           is_juv?: boolean
           max_hatch_year: number
@@ -93,6 +97,8 @@ export type Database = {
           breeding_condition?: string | null
           capture_time?: string
           extra_text?: string | null
+          finding_circumstances?: string | null
+          finding_condition?: string | null
           id?: number
           is_juv?: boolean
           max_hatch_year?: number

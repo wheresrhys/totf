@@ -3,6 +3,8 @@
     "id": 1,
     "record_type": "C",
     "extra_text": "Seen at feeder",
+    "finding_condition": "8",
+    "finding_circumstances": "2",
     "bird": {
       "ring_no": "ARESIGHT01",
       "species": { "species_name": "Blue Tit" }
@@ -16,6 +18,8 @@
     "id": 2,
     "record_type": "F",
     "extra_text": null,
+    "finding_condition": null,
+    "finding_circumstances": null,
     "bird": {
       "ring_no": "ARESIGHT02",
       "species": { "species_name": "Robin" }
@@ -29,6 +33,8 @@
     "id": 3,
     "record_type": "T",
     "extra_text": "Found dead",
+    "finding_condition": "5",
+    "finding_circumstances": "1",
     "bird": {
       "ring_no": "ARESIGHT03",
       "species": { "species_name": "Kingfisher" }
@@ -42,6 +48,8 @@
     "id": 4,
     "record_type": "C",
     "extra_text": "Photographed",
+    "finding_condition": "8",
+    "finding_circumstances": "2",
     "bird": {
       "ring_no": "ARESIGHT04",
       "species": { "species_name": "Blue Tit" }
@@ -55,6 +63,8 @@
     "id": 5,
     "record_type": "F",
     "extra_text": null,
+    "finding_condition": null,
+    "finding_circumstances": null,
     "bird": {
       "ring_no": "ARESIGHT05",
       "species": { "species_name": "Robin" }

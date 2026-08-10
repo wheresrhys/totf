@@ -238,6 +238,8 @@ export async function processEncounterRow(
 			breeding_condition: row.breeding_condition as string | null,
 			capture_time: row.capture_time as string,
 			extra_text: row.extra_text as string | null,
+			finding_condition: row.finding_condition as string | null,
+			finding_circumstances: row.finding_circumstances as string | null,
 			is_juv: String(row.age).endsWith('J'),
 			moult_code: row.moult_code as string | null,
 			old_greater_coverts: row.old_greater_coverts
