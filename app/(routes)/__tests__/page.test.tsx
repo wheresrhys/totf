@@ -279,7 +279,7 @@ describe('home page', () => {
 				p.textContent?.includes('sessions, with')
 			);
 			expect(paragraph?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-				`${allTime.session_count} sessions, with ${allTime.bird_count} birds of ${allTime.species_count} species encountered ${allTime.encounter_count} times`
+				`${allTime.session_count} sessions, with ${allTime.bird_count} birds (${allTime.new_bird_count} new) of ${allTime.species_count} species encountered ${allTime.encounter_count} times`
 			);
 			const boldValues = Array.from(
 				paragraph?.querySelectorAll('.font-bold') ?? []
@@ -300,8 +300,23 @@ describe('home page', () => {
 				p.textContent?.startsWith('This year:')
 			);
 			expect(paragraph?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-				`This year: ${thisYear.session_count} sessions, with ${thisYear.bird_count} birds of ${thisYear.species_count} species encountered ${thisYear.encounter_count} times`
+				`This year: ${thisYear.session_count} sessions, with ${thisYear.bird_count} birds (${thisYear.new_bird_count} new) of ${thisYear.species_count} species encountered ${thisYear.encounter_count} times`
 			);
+		});
+
+		it('renders the new-bird count as a de-emphasised (italic) parenthetical, not one of the bold counts', async () => {
+			const { container } = render(await Page());
+			await screen.findByRole('heading', { name: 'Recent Sessions' });
+			const { allTime } = summaryStatsSnapshot;
+			const paragraph = Array.from(container.querySelectorAll('p')).find((p) =>
+				p.textContent?.includes('sessions, with')
+			);
+			const italic = paragraph?.querySelector('.italic');
+			expect(italic?.textContent).toBe(`(${allTime.new_bird_count} new)`);
+			const boldValues = Array.from(
+				paragraph?.querySelectorAll('.font-bold') ?? []
+			).map((el) => el.textContent);
+			expect(boldValues).not.toContain(String(allTime.new_bird_count));
 		});
 
 		it('calls aggregate_stats with from_date set to 1 Jan of the current year for the this-year paragraph, and no date filter for the all-time paragraph', async () => {
