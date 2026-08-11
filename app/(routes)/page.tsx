@@ -296,7 +296,8 @@ function SummaryParagraph({
 		<p className="text-lg">
 			{prefix}
 			<span className="font-bold">{stats.session_count}</span> sessions, with{' '}
-			<span className="font-bold">{stats.bird_count}</span> birds of{' '}
+			<span className="font-bold">{stats.bird_count}</span> birds{' '}
+			<span className="italic">({stats.new_bird_count} new)</span> of{' '}
 			<span className="font-bold">{stats.species_count}</span> species
 			encountered <span className="font-bold">{stats.encounter_count}</span>{' '}
 			times
