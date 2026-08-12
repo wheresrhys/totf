@@ -122,6 +122,21 @@ For each PR:
      > deployed to prod (`npm run db:migration:push`, run via the `take-over` skill) before this
      > PR is merged. Merging first triggers a Vercel prod deploy of code that expects a schema
      > prod doesn't have yet.
+   - If the schema change requires backfilling existing rows to fit the new shape (declarative
+     sync only ever emits DDL, never DML, so this can't be generated): hand-write the backfill,
+     appended to the end of the generated migration file — after all generated DDL, never
+     interleaved with or replacing it — preceded by a literal marker comment line
+     `-- Hand-authored data migration (backfill only — appended after schema-apply)`. Write it
+     against the schema's *final* constrained shape (the generated DDL already has its
+     NOT NULL/CHECK/widened constraints applied in one shot — declarative sync never stages a
+     relaxed intermediate shape), not the old drop/relax/reapply dance. Mirror the same DML
+     verbatim into a DB integration test as a durable second copy — `supabase/migrations/` is
+     gitignored, so a torn-down worktree loses the hand-written file otherwise, and it must be
+     reconstructable from this test. Then paste **only the marker-to-EOF block** (not the whole
+     migration file) into the PR body under a `## Prod-ready migration SQL` heading:
+     `<summary>Data migration — append to the end of the regenerated DDL migration before pushing
+     to prod</summary>` followed by a fenced ```sql``` block — this exact anchor text is what lets
+     `take-over` extract and reattach it deterministically.
    - What this increment covers
    - Link to the GitHub issue
    - Any assumptions made (subagent mode)
@@ -162,7 +177,8 @@ multi-PR sequence.
 - Follow the data-fetching conventions in CLAUDE.md: server actions only,
   `getAuthenticatedSupabaseClient()`, `catchSupabaseErrors()`.
 - DB schema changes go in `supabase/schema/`; generate migrations with `npm run db:schema:apply`;
-  never hand-write migrations.
+  never hand-write DDL. The one exception is backfill DML (declarative sync can't emit it) —
+  hand-write it appended after the generated DDL per the convention in step 5, point 6 above.
 - New DB types: run `npm run db:types` after schema changes; never edit
   `types/supabase.types.ts` by hand.
 - RLS policies must be considered for any new table or query — check issue #149 for current
