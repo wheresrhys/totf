@@ -284,60 +284,126 @@ describe('processEncounterRow', () => {
 			{
 				visit_date: '2023-03-15',
 				location_id: locationId,
+				session_type: 'FULL_GROWN',
 				is_resighting_only: false
 			},
-			'visit_date,location_id,is_resighting_only'
+			'visit_date,location_id,session_type'
 		);
 	});
 
-	describe('is_resighting_only bucketing', () => {
-		function sessionUpsertArgs() {
-			return upsert.mock.calls.find(([table]) => table === 'Sessions');
+	describe('session_type bucketing', () => {
+		function sessionData() {
+			return upsert.mock.calls.find(([table]) => table === 'Sessions')?.[1];
 		}
 
+		it('buckets an N record_type with a non-pulli age as FULL_GROWN', async () => {
+			await processEncounterRow(
+				makeDemonRow({ record_type: 'N', age: '3' }),
+				upsert,
+				RINGING_GROUP_ID
+			);
+			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
+		});
+
+		it('buckets an N record_type with age 1J (recently-fledged juvenile) as FULL_GROWN, not PULLI', async () => {
+			await processEncounterRow(
+				makeDemonRow({ record_type: 'N', age: '1J' }),
+				upsert,
+				RINGING_GROUP_ID
+			);
+			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
+		});
+
+		it('buckets an N record_type with raw age 1 (nestling) as PULLI', async () => {
+			await processEncounterRow(
+				makeDemonRow({ record_type: 'N', age: '1' }),
+				upsert,
+				RINGING_GROUP_ID
+			);
+			expect(sessionData()).toMatchObject({ session_type: 'PULLI' });
+		});
+
 		it.each(['U', 'F', 'D'])(
-			'buckets a %s record_type as is_resighting_only: true',
+			'buckets a %s record_type as FIELD_OBSERVATION regardless of age (record-type precedence over age 1)',
 			async (recordType) => {
 				await processEncounterRow(
-					makeDemonRow({ record_type: recordType }),
+					makeDemonRow({ record_type: recordType, age: '1' }),
 					upsert,
 					RINGING_GROUP_ID
 				);
-				expect(sessionUpsertArgs()).toEqual([
-					'Sessions',
-					expect.objectContaining({ is_resighting_only: true }),
-					'visit_date,location_id,is_resighting_only'
-				]);
+				expect(sessionData()).toMatchObject({
+					session_type: 'FIELD_OBSERVATION'
+				});
 			}
 		);
 
 		it.each(['N', 'S', 'C', 'T'])(
-			'buckets a %s record_type as is_resighting_only: false',
+			'buckets a %s record_type with a non-pulli age as FULL_GROWN',
+			async (recordType) => {
+				await processEncounterRow(
+					makeDemonRow({ record_type: recordType, age: '3' }),
+					upsert,
+					RINGING_GROUP_ID
+				);
+				expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
+			}
+		);
+
+		it('buckets an unrecognised record_type with a non-pulli age as FULL_GROWN', async () => {
+			await processEncounterRow(
+				makeDemonRow({ record_type: 'Z', age: '3' }),
+				upsert,
+				RINGING_GROUP_ID
+			);
+			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
+		});
+
+		it('buckets an unrecognised record_type with raw age 1 as PULLI', async () => {
+			await processEncounterRow(
+				makeDemonRow({ record_type: 'Z', age: '1' }),
+				upsert,
+				RINGING_GROUP_ID
+			);
+			expect(sessionData()).toMatchObject({ session_type: 'PULLI' });
+		});
+
+		it('buckets an empty/unparseable age as FULL_GROWN (NaN must not equal 1)', async () => {
+			await processEncounterRow(
+				makeDemonRow({ record_type: 'N', age: '' }),
+				upsert,
+				RINGING_GROUP_ID
+			);
+			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
+		});
+	});
+
+	describe('is_resighting_only stays in sync with session_type', () => {
+		function sessionData() {
+			return upsert.mock.calls.find(([table]) => table === 'Sessions')?.[1];
+		}
+
+		it.each(['U', 'F', 'D'])(
+			'still upserts is_resighting_only: true for a %s record_type',
 			async (recordType) => {
 				await processEncounterRow(
 					makeDemonRow({ record_type: recordType }),
 					upsert,
 					RINGING_GROUP_ID
 				);
-				expect(sessionUpsertArgs()).toEqual([
-					'Sessions',
-					expect.objectContaining({ is_resighting_only: false }),
-					'visit_date,location_id,is_resighting_only'
-				]);
+				expect(sessionData()).toMatchObject({ is_resighting_only: true });
 			}
 		);
 
-		it('treats all other record_type as is_resighting_only: false', async () => {
+		it('upserts is_resighting_only: false for a PULLI-bucketed row', async () => {
 			await processEncounterRow(
-				makeDemonRow({ record_type: 'Z' }),
+				makeDemonRow({ record_type: 'N', age: '1' }),
 				upsert,
 				RINGING_GROUP_ID
 			);
-			expect(sessionUpsertArgs()).toEqual([
-				'Sessions',
-				expect.objectContaining({ is_resighting_only: false }),
-				'visit_date,location_id,is_resighting_only'
-			]);
+			expect(sessionData()).toMatchObject({
+				session_type: 'PULLI',
+				is_resighting_only: false
+			});
 		});
 	});
 
