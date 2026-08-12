@@ -215,21 +215,36 @@ export async function processEncounterRow(
 
 	const visitDate = convertDateFormat(row.visit_date as string);
 
-	const isResightingOnly = (
-		RESIGHTING_RECORD_TYPES as readonly string[]
-	).includes(row.record_type as string);
+	// Parse the age code once, up front — it feeds both the session-type decision
+	// and the Encounters insert below.
+	const age_code = Number(String(row.age).replace('J', ''));
+	const is_juv = String(row.age).endsWith('J');
+
+	// A row's own record_type/age deterministically picks its session bucket
+	// (no cross-row aggregation, no import-order sensitivity). record_type wins
+	// over age: a resighting/recovery of a pulli-age bird is still a
+	// FIELD_OBSERVATION, not a PULLI capture. A raw age of 1 (but not 1J) is a
+	// pulli; is_juv guards against a recently-fledged juvenile being mistaken
+	// for a nestling.
+	const sessionType = (RESIGHTING_RECORD_TYPES as readonly string[]).includes(
+		row.record_type as string
+	)
+		? 'FIELD_OBSERVATION'
+		: age_code === 1 && !is_juv
+			? 'PULLI'
+			: 'FULL_GROWN';
 
 	const sessionId = await upsert<SessionsInsert>(
 		'Sessions',
 		{
 			visit_date: visitDate,
 			location_id: locationId,
-			is_resighting_only: isResightingOnly
+			session_type: sessionType,
+			// Kept in sync with session_type until #393's tickets 3/5 migrate off it.
+			is_resighting_only: sessionType === 'FIELD_OBSERVATION'
 		},
-		'visit_date,location_id,is_resighting_only' as keyof SessionsInsert
+		'visit_date,location_id,session_type' as keyof SessionsInsert
 	);
-
-	const age_code = Number(String(row.age).replace('J', ''));
 
 	await upsert<EncountersInsert>(
 		'Encounters',
@@ -240,7 +255,7 @@ export async function processEncounterRow(
 			extra_text: row.extra_text as string | null,
 			finding_condition: row.finding_condition as string | null,
 			finding_circumstances: row.finding_circumstances as string | null,
-			is_juv: String(row.age).endsWith('J'),
+			is_juv,
 			moult_code: row.moult_code as string | null,
 			old_greater_coverts: row.old_greater_coverts
 				? Number(row.old_greater_coverts)
