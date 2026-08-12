@@ -74,16 +74,47 @@ acknowledged, but don't silently plough through it.
 
 `git -C <worktreePath> status --porcelain`. If dirty:
 `git -C <worktreePath> stash push -u -m "take-over: <branch> $(date -u +%Y-%m-%dT%H:%M:%SZ)"`.
-Note the stash ref (`git -C <worktreePath> stash list` — it'll be the top entry) so step 8 can
+Note the stash ref (`git -C <worktreePath> stash list` — it'll be the top entry) so step 9 can
 reapply exactly this one, not whatever else happens to be on top of the stash stack by then.
 
-## 5. Free the branch
+## 5. Preserve any hand-authored data-migration DML before the worktree is torn down
+
+Some `db-migration` branches hand-append backfill DML onto their generated migration file — a
+convention documented in `implement-ticket` (step 5, point 6): declarative schema sync only ever
+emits DDL, so a schema change that needs existing rows migrated to fit the new shape gets that
+backfill written by hand and appended after the generated DDL, marked with a literal comment line
+`-- Hand-authored data migration (backfill only — appended after schema-apply)`. That file exists
+only in this worktree's gitignored `supabase/migrations/` — never committed, and step 4's stash
+does **not** capture it (`git stash push -u` skips gitignored files; that needs `-a`, which isn't
+used here). Step 6 below removes the worktree entirely, so this is the last chance to read it.
+
+Cheap, local-only check — no network calls, so it doesn't slow down the common (non-data-migration)
+case:
+
+```sh
+ls <worktreePath>/supabase/migrations/*"$(echo '<branch>' | sed 's/[^a-zA-Z0-9]/_/g')"*.sql \
+  2>/dev/null | xargs grep -l -- '-- Hand-authored data migration' 2>/dev/null
+```
+
+- **No match** — nothing to preserve here. Continue to step 6. (Step 11 still separately checks the
+  PR body for this branch — that doesn't depend on this local file surviving.)
+- **One or more matches** — take the most recently modified match. Read its full contents now and
+  extract everything from the marker line to end-of-file (that's the appendable block — nothing
+  before the marker matters). Hold it for step 11 (don't defer this — the file won't exist after
+  step 6). Also copy it outside the worktree as a same-run backup:
+  `cp <matchedFile> /tmp/take-over-<sanitized-branch>-hand-authored-migration.sql`. State plainly
+  that hand-authored DML was found and preserved from this local copy — step 11 prefers the
+  branch's PR body over it when both exist (the PR body is guaranteed complete and reflects what
+  was actually tested and pushed; this local copy may be stale relative to whatever
+  `db:schema:apply` regenerates after step 10's merge).
+
+## 6. Free the branch
 
 `git worktree remove <worktreePath>`. If git still refuses (leftover files it won't clean up on
 its own), surface the exact error to the user rather than force-removing — don't guess whether
 those leftovers are safe to lose.
 
-## 6. Protect the current directory's own state
+## 7. Protect the current directory's own state
 
 `git status --porcelain` in the current directory. If dirty, stash it too (`-u`, clearly named,
 e.g. `"take-over: pre-checkout autosave $(date -u +%Y-%m-%dT%H:%M:%SZ)"`) before switching
@@ -91,17 +122,17 @@ branches — never discard uncommitted work silently. This stash has nothing to 
 being taken over: report it and leave it stashed for the user to recover later by hand
 (`git stash list` / `git stash pop`); do not touch it again in this run.
 
-## 7. Checkout
+## 8. Checkout
 
 `git fetch origin`, then `git checkout <branch>`.
 
-## 8. Reapply the worktree's stash
+## 9. Reapply the worktree's stash
 
 If step 4 created a stash, reapply it now: `git stash pop <that stash ref>`. Report cleanly if it
 applies with no conflicts; if it doesn't, say so and leave the stash in place rather than forcing
 it — the user can resolve and pop it manually.
 
-## 9. Sync with `origin/main`
+## 10. Sync with `origin/main`
 
 The worktree being reclaimed may have gone stale while its worker was halted mid-task (or while
 this took a while to get to), and other work may have merged to `main` since. Bring the branch
@@ -109,31 +140,35 @@ current before anything else:
 
 `git fetch origin`, then `git merge origin/main` (merge, not rebase — same convention `swarm`'s
 own PR-maintenance track uses elsewhere in this repo; never force-push a shared branch). Don't
-push yet — that happens in step 11, after step 10's schema-apply has had a chance to run. Pushing
+push yet — that happens in step 12, after step 11's schema-apply has had a chance to run. Pushing
 first would trigger the pre-push hook's test suite against a working directory whose schema might
 not match the code yet, on a `db-migration` branch — exactly backwards.
 
 If the merge conflicts: stop and hand it to the user rather than resolving it on their behalf —
 they took the branch over specifically to work on it by hand. Report the conflicting files
-plainly. Steps 10 and 11 are skipped in this case (the working tree is mid-conflict, not a clean
-state to diff from or push) — go straight to step 12's report and note the unresolved merge there.
+plainly. Steps 11 and 12 are skipped in this case (the working tree is mid-conflict, not a clean
+state to diff from or push) — go straight to step 13's report and note the unresolved merge there.
+If step 5 found hand-authored DML, say explicitly in that report that it's sitting unreattached in
+`/tmp/take-over-<branch>-hand-authored-migration.sql`, pending the user resolving the conflict and
+re-running `db:schema:apply` by hand.
 
-## 10. Auto-apply the schema if this is a `db-migration` branch
+## 11. Auto-apply the schema if this is a `db-migration` branch
 
 Resolve the branch's linked issue/PR number — from the state-file entry if step 1 found one
 (`issue`/`pr` fields), else `gh pr list --head <branch> --json number --state open` as a
-fallback. Check its labels: `gh pr view <n> --json labels` if a PR exists (it carries the
-exclusive-resource label directly, applied by `implement-ticket` at PR-creation time), otherwise
-`gh issue view <n> --json labels`.
+fallback. If a PR exists, fetch its labels **and body together in one call** —
+`gh pr view <n> --json labels,body` (it carries the exclusive-resource label directly, applied by
+`implement-ticket` at PR-creation time; the body may carry the "Prod-ready migration SQL" section
+used below). If no PR exists yet, `gh issue view <n> --json labels` for the label only.
 
-If `db-migration` is present, run `npm run db:schema:apply` right here (after step 8's stash
-reapply and step 9's merge, so both any uncommitted schema edits and anything just merged in from
-`origin/main` are included in the diff). Two possible outcomes:
+If `db-migration` is not present, skip this whole step silently.
 
-- **Applies cleanly** — report the generated migration file's path plus this warning, verbatim:
-  > ⚠️ **Database migration — do not merge before pushing.** Inspect the generated migration, then
-  > run `npm run db:migration:push` yourself. Do not merge this PR until that succeeds — merging
-  > first triggers a Vercel prod deploy of code that expects a schema prod doesn't have yet.
+If `db-migration` is present, run `npm run db:schema:apply` right here (after step 9's stash
+reapply and step 10's merge, so both any uncommitted schema edits and anything just merged in from
+`origin/main` are included in the diff). This always regenerates a **DDL-only** file — declarative
+schema sync can never emit data-migration DML. Two possible outcomes:
+
+- **Applies cleanly** — go to "Reattach hand-authored DML" below before reporting.
 - **Fails with a migration-history mismatch** ("remote migration versions not found in local
   migrations directory" or similar) — this means another worktree has, at some point, applied its
   own in-progress migration to the same shared local Postgres instance, and that file only exists
@@ -154,36 +189,73 @@ reapply and step 9's merge, so both any uncommitted schema edits and anything ju
      migrations directory.
   4. Move this branch's migration file back into `supabase/migrations/`, then
      `npx supabase migration up --local` to apply just that one on top of the clean baseline.
-  5. `npm run db:types` (regenerate types; report if this produces a diff — it shouldn't if the
+  5. Go to "Reattach hand-authored DML" below.
+  6. `npm run db:types` (regenerate types; report if this produces a diff — it shouldn't if the
      branch's committed types already match).
-  6. `npm run db:seed:e2e` to restore E2E fixture data, then `git checkout -- test-fixtures/` to
+  7. `npm run db:seed:e2e` to restore E2E fixture data, then `git checkout -- test-fixtures/` to
      discard the snapshot files it regenerates as a side effect (a known quirk of that script —
      restoring them is routine, not optional).
-  7. Report that the reconciliation ran, why, and that local Postgres now reflects prod plus only
-     this branch's change. Then proceed with the same "applies cleanly" warning above.
+  8. Report that the reconciliation ran, why, and that local Postgres now reflects prod plus only
+     this branch's change. Then proceed with the appropriate warning below.
+
+### Reattach hand-authored DML
+
+Skip this sub-step (nothing to do) if step 5 found nothing locally **and** the PR body fetched
+above (if any) has no "Prod-ready migration SQL" section — this is the common case for a
+pure-schema `db-migration` branch.
+
+Otherwise, in priority order:
+
+1. **PR body has a "Prod-ready migration SQL" section** — locate the literal anchor text
+   `<summary>Data migration — append to the end of the regenerated DDL migration before pushing to
+   prod` in the fetched body, then take the ```` ```sql ... ``` ```` fenced block immediately
+   following it, up to the closing `</details>`. This block is the appendable backfill DML only
+   (never the DDL) — **append** it to the end of the freshly-generated migration file (blank line
+   separator), leaving the generated DDL untouched.
+2. **No usable PR-body section** (missing, or the anchor/fence couldn't be found), **but step 5
+   captured a local copy** — append that instead. This is an untested fallback (it wasn't
+   necessarily current as of this run's merge in step 10) — flag it clearly in the report.
+3. **Neither exists** — nothing to reattach. If a PR/issue exists, its body or title may still hint
+   a backfill was intended even though no copy could be found (e.g. the implementer forgot the
+   section, or hasn't gotten that far yet) — say so plainly rather than silently reporting a clean
+   DDL-only warning; don't guess at the SQL yourself.
+
+Report the generated migration file's path plus one of these two warnings, verbatim:
+
+- If DML was appended (cases 1 or 2 above):
+  > ⚠️ **Database migration — do not merge before pushing.** This migration has hand-authored
+  > data-migration DML appended, sourced from <PR #<n>'s "Prod-ready migration SQL" section | this
+  > worktree's own local copy — verify it by hand before trusting it>. Inspect the full file, then
+  > run `npm run db:migration:push` yourself. Do not merge this PR until that succeeds — merging
+  > first triggers a Vercel prod deploy of code that expects a schema prod doesn't have yet.
+- Otherwise (plain DDL, nothing to reattach):
+  > ⚠️ **Database migration — do not merge before pushing.** Inspect the generated migration, then
+  > run `npm run db:migration:push` yourself. Do not merge this PR until that succeeds — merging
+  > first triggers a Vercel prod deploy of code that expects a schema prod doesn't have yet.
 
 If no `db-migration` label is found, skip this step silently.
 
-## 11. Push
+## 12. Push
 
-`git push` (`git push -u origin <branch>` if the branch has no upstream yet) — now that step 10
+`git push` (`git push -u origin <branch>` if the branch has no upstream yet) — now that step 11
 has ensured (for a `db-migration` branch) the local schema matches what the code expects, so the
 pre-push hook's tests run against a consistent environment instead of failing on a stale schema.
 
-## 12. Report
+## 13. Report
 
 Summarise: whether the agent was halted (or why not), that the worktree was removed, that the
 branch is now checked out here, any stashes created/reapplied (and any left behind, e.g. the
-current-directory autosave from step 6), whether step 9's merge succeeded or hit conflicts,
-whether step 10 ran (including whether the reconciliation path fired, and why), whether step 11's
-push succeeded, and — if the branch has an open PR — its URL.
+current-directory autosave from step 7), whether step 10's merge succeeded or hit conflicts,
+whether step 11 ran (including whether the reconciliation path fired, whether hand-authored DML
+was found by step 5 and appended by step 11, and why), whether step 12's push succeeded, and — if
+the branch has an open PR — its URL.
 
 ## Rules
 
 - Never remove a worktree or discard changes without stashing first — uncommitted work always
   survives a take-over.
 - Ambiguous identifier resolution always gets `AskUserQuestion`; never guess between candidates.
-- The current directory's pre-existing uncommitted changes (step 6) are never auto-reapplied —
+- The current directory's pre-existing uncommitted changes (step 7) are never auto-reapplied —
   only the taken-over branch's own stash (step 4) is.
 - If no agent id can be found for an existing worktree/branch, say so before proceeding — don't
   present a silent, unqualified success.
@@ -197,6 +269,12 @@ push succeeded, and — if the branch has an open PR — its URL.
   not merge before pushing" warning in the report — never silently skip this for a labelled
   branch. If it fails on a migration-history mismatch (another worktree's in-progress migration
   already applied to the shared local instance), explain what's happening and get the user's
-  go-ahead before running the reset-and-reapply reconciliation in step 10 — it's local-only,
+  go-ahead before running the reset-and-reapply reconciliation in step 11 — it's local-only,
   throwaway state, but still someone else's in-progress work, so it's not a standing
   auto-authorization to wipe it every time this comes up.
+- **Hand-authored data-migration DML is never silently dropped.** Step 5 captures it from the
+  worktree before teardown (the only local copy, since `supabase/migrations/` is gitignored and
+  `git worktree remove` destroys anything not captured first); step 11 prefers the branch's own PR
+  body ("Prod-ready migration SQL" section) over that local capture when both exist, since the PR
+  body is guaranteed complete and reflects what was actually tested and pushed. It is always
+  **appended** after the freshly-generated DDL, never used to replace or interleave with it.
