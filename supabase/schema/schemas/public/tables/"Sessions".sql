@@ -3,7 +3,10 @@ CREATE TABLE public."Sessions" (
 	visit_date date NOT NULL,
 	location_id bigint NOT NULL,
 	ringing_group_id bigint NOT NULL,
-	is_resighting_only boolean NOT NULL DEFAULT FALSE
+	is_resighting_only boolean NOT NULL DEFAULT FALSE,
+	session_type text NOT NULL DEFAULT 'FULL_GROWN' CHECK (
+		session_type IN ('FULL_GROWN', 'FIELD_OBSERVATION', 'PULLI')
+	)
 );
 
 CREATE INDEX idx_sessions_location_id ON public."Sessions" (location_id);
@@ -80,7 +83,7 @@ ALTER TABLE public."Sessions"
 ADD CONSTRAINT "Sessions_pkey" PRIMARY KEY (id);
 
 ALTER TABLE public."Sessions"
-ADD CONSTRAINT "Sessions_visit_date_location_id_key" UNIQUE (visit_date, location_id, is_resighting_only);
+ADD CONSTRAINT "Sessions_visit_date_location_id_key" UNIQUE (visit_date, location_id, session_type);
 
 ALTER TABLE public."Sessions"
 ADD CONSTRAINT sessions_location_id_fkey FOREIGN KEY (location_id) REFERENCES public."Locations" (id);

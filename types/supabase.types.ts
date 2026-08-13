@@ -227,6 +227,7 @@ export type Database = {
           is_resighting_only: boolean
           location_id: number
           ringing_group_id: number
+          session_type: string
           visit_date: string
         }
         Insert: {
@@ -234,6 +235,7 @@ export type Database = {
           is_resighting_only?: boolean
           location_id: number
           ringing_group_id: number
+          session_type?: string
           visit_date: string
         }
         Update: {
@@ -241,6 +243,7 @@ export type Database = {
           is_resighting_only?: boolean
           location_id?: number
           ringing_group_id?: number
+          session_type?: string
           visit_date?: string
         }
         Relationships: [
