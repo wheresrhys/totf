@@ -290,9 +290,15 @@ function RecentSessions({
 }) {
 	return (
 		<div>
-			<SecondaryHeading>Sessions{' '}<NoPrefetchLink href="/sessions" className="link link-secondary text-sm">
-				View all
-			</NoPrefetchLink></SecondaryHeading>
+			<SecondaryHeading>
+				Sessions{' '}
+				<NoPrefetchLink
+					href="/sessions"
+					className="link link-secondary text-sm"
+				>
+					View all
+				</NoPrefetchLink>
+			</SecondaryHeading>
 			<BoxyList>
 				<SessionsByDay
 					sessions={data}
@@ -386,9 +392,12 @@ function TopSpecies({
 }) {
 	return (
 		<div>
-			<SecondaryHeading>Species{' '}<NoPrefetchLink href="/species" className="link link-secondary text-sm">
-				View all
-			</NoPrefetchLink></SecondaryHeading>
+			<SecondaryHeading>
+				Species{' '}
+				<NoPrefetchLink href="/species" className="link link-secondary text-sm">
+					View all
+				</NoPrefetchLink>
+			</SecondaryHeading>
 
 			<ul className="flex flex-wrap gap-2">
 				{data.map((species) => (

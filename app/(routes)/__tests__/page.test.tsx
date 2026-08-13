@@ -85,12 +85,14 @@ describe('home page', () => {
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeChainClient());
 	});
 
-	it('renders Recent Sessions heading', async () => {
+	it('renders Sessions heading with a "View all" link to /sessions', async () => {
 		render(await Page());
 		const heading = await screen.findByRole('heading', {
-			name: 'Recent Sessions'
+			name: 'Sessions View all'
 		});
 		expect(heading).toBeDefined();
+		const link = within(heading).getByRole('link', { name: 'View all' });
+		expect(link.getAttribute('href')).toBe('/sessions');
 	});
 
 	it('renders stats accordion', async () => {
@@ -102,7 +104,7 @@ describe('home page', () => {
 	it('renders session links from fixture', async () => {
 		render(await Page());
 		const heading = await screen.findByRole('heading', {
-			name: 'Recent Sessions'
+			name: 'Sessions View all'
 		});
 		const sessionLinks =
 			heading.nextElementSibling?.querySelectorAll('a') ?? [];
@@ -116,7 +118,7 @@ describe('home page', () => {
 			);
 			render(await Page());
 			const heading = await screen.findByRole('heading', {
-				name: 'Recent Sessions'
+				name: 'Sessions View all'
 			});
 			const sessionLinks =
 				heading.nextElementSibling?.querySelectorAll('a') ?? [];
@@ -165,7 +167,7 @@ describe('home page', () => {
 			);
 			render(await Page());
 			const heading = await screen.findByRole('heading', {
-				name: 'Recent Sessions'
+				name: 'Sessions View all'
 			});
 			const sessionLinks =
 				heading.nextElementSibling?.querySelectorAll('a') ?? [];
@@ -176,31 +178,43 @@ describe('home page', () => {
 	});
 
 	describe('species section', () => {
-		it('renders Species heading', async () => {
+		it('renders Species heading with a "View all" link to /species', async () => {
 			render(await Page());
 			const heading = await screen.findByRole('heading', {
-				name: 'Species'
+				name: 'Species View all'
 			});
 			expect(heading).toBeDefined();
+			const link = within(heading).getByRole('link', { name: 'View all' });
+			expect(link.getAttribute('href')).toBe('/species');
 		});
 
-		describe('latest addition (last group tick)', () => {
-			it('renders "Latest addition: {species} on {date}" as the first line under the Species heading', async () => {
+		describe('last tick (last group tick)', () => {
+			it('renders "Last tick: {species} on {date}" after the species badge list', async () => {
 				render(await Page());
 				const heading = await screen.findByRole('heading', {
-					name: 'Species'
+					name: 'Species View all'
 				});
-				expect(heading.nextElementSibling?.textContent).toContain(
-					'Latest addition: Carrion Crow on 12th February 2026'
+				const container = heading.parentElement as HTMLElement;
+				const children = Array.from(container.children);
+				const list = container.querySelector('ul');
+				const paragraph = children.find(
+					(el) => el.tagName === 'P' && el.textContent?.includes('Last tick:')
+				);
+				expect(paragraph?.textContent).toContain(
+					'Last tick: Carrion Crow on 12th February 2026'
+				);
+				expect(list).not.toBeNull();
+				expect(children.indexOf(list as Element)).toBeLessThan(
+					children.indexOf(paragraph as Element)
 				);
 			});
 
-			it('renders a "View all" link to /ticks inline within that paragraph', async () => {
+			it('renders a "View all ticks" link to /ticks', async () => {
 				render(await Page());
-				const link = await screen.findByRole('link', { name: 'View all' });
+				const link = await screen.findByRole('link', {
+					name: 'View all ticks'
+				});
 				expect(link.getAttribute('href')).toBe('/ticks');
-				expect(link.tagName).toBe('A');
-				expect(link.closest('p')).not.toBeNull();
 			});
 
 			describe('with no ticks yet', () => {
@@ -210,19 +224,21 @@ describe('home page', () => {
 					);
 					render(await Page());
 					const heading = await screen.findByRole('heading', {
-						name: 'Species'
+						name: 'Species View all'
 					});
 					expect(heading).toBeDefined();
-					expect(screen.queryByText(/Latest addition:/)).toBeNull();
+					expect(screen.queryByText(/Last tick:/)).toBeNull();
 				});
 
-				it('omits the "View all" link', async () => {
+				it('omits the "View all ticks" link', async () => {
 					mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 						makeChainClient({ lastGroupTick: [] })
 					);
 					render(await Page());
-					await screen.findByRole('heading', { name: 'Species' });
-					expect(screen.queryByRole('link', { name: 'View all' })).toBeNull();
+					await screen.findByRole('heading', { name: 'Species View all' });
+					expect(
+						screen.queryByRole('link', { name: 'View all ticks' })
+					).toBeNull();
 				});
 			});
 		});
@@ -230,7 +246,7 @@ describe('home page', () => {
 		it('renders a badge link per top species, sorted by bird count and excluding zero-count and beyond-10th species', async () => {
 			render(await Page());
 			const heading = await screen.findByRole('heading', {
-				name: 'Species'
+				name: 'Species View all'
 			});
 			const speciesList = heading.parentElement?.querySelector('ul');
 			const speciesLinks = Array.from(speciesList?.querySelectorAll('a') ?? []);
@@ -267,7 +283,7 @@ describe('home page', () => {
 				);
 				render(await Page());
 				const heading = await screen.findByRole('heading', {
-					name: 'Species'
+					name: 'Species View all'
 				});
 				const speciesList = heading.parentElement?.querySelector('ul');
 				const speciesLinks = speciesList?.querySelectorAll('a') ?? [];
@@ -296,7 +312,7 @@ describe('home page', () => {
 			return row;
 		}
 
-		it('renders a header column per period, labelled with the actual year and in this-year / last-year / all-time order', async () => {
+		it('renders a "Totals" corner cell and a header column per period, labelled with the actual year and in this-year / last-year / all-time order', async () => {
 			render(await Page());
 			const table = await screen.findByTestId('summary-stats-table');
 			const headers = within(table)
@@ -304,7 +320,7 @@ describe('home page', () => {
 				.map((h) => h.textContent);
 			const currentYear = new Date().getFullYear();
 			expect(headers).toEqual([
-				'',
+				'Totals',
 				String(currentYear),
 				String(currentYear - 1),
 				'All time'
@@ -417,7 +433,7 @@ describe('home page', () => {
 					})
 				);
 				render(await Page());
-				await screen.findByRole('heading', { name: 'Recent Sessions' });
+				await screen.findByRole('heading', { name: 'Sessions View all' });
 				expect(screen.queryByTestId('summary-stats-table')).toBeNull();
 			});
 		});
