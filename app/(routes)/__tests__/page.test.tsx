@@ -16,10 +16,6 @@ vi.mock('@/lib/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
-vi.mock('@/app/actions/top-performers', () => ({
-	getTopStats: vi.fn().mockResolvedValue([])
-}));
-
 const defaultLastGroupTick: GroupTicksResult[] = [
 	{ species_name: 'Carrion Crow', first_encounter_date: '2026-02-12' }
 ];
@@ -93,12 +89,6 @@ describe('home page', () => {
 		expect(heading).toBeDefined();
 		const link = within(heading).getByRole('link', { name: 'View all' });
 		expect(link.getAttribute('href')).toBe('/sessions');
-	});
-
-	it('renders stats accordion', async () => {
-		render(await Page());
-		const accordions = await screen.findAllByTestId('stats-accordion-group');
-		expect(accordions.length).toBeGreaterThan(0);
 	});
 
 	it('renders session links from fixture', async () => {

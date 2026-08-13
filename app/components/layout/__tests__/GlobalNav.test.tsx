@@ -32,6 +32,7 @@ describe('DesktopNavItems', () => {
 		render(
 			<DesktopNavItems classes="" moreExpanded={true} onMoreClick={noOp} />
 		);
+		expect(screen.getByRole('link', { name: 'Highlights' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Mistakes' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Retraps' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Resightings' })).toBeDefined();
@@ -74,10 +75,15 @@ describe('DesktopNavItems', () => {
 describe('MobileNavItems', () => {
 	afterEach(cleanup);
 
-	it('renders all 10 links in a flat list', () => {
+	it('renders all 11 links in a flat list', () => {
 		render(<MobileNavItems classes="" />);
 		const links = screen.getAllByRole('link');
-		expect(links).toHaveLength(10);
+		expect(links).toHaveLength(11);
+	});
+
+	it('includes Highlights link', () => {
+		render(<MobileNavItems classes="" />);
+		expect(screen.getByRole('link', { name: 'Highlights' })).toBeDefined();
 	});
 
 	it('includes Resightings link', () => {
