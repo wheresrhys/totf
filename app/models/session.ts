@@ -21,6 +21,15 @@ export type ResightingEncounter = EncounterRow & {
 	};
 };
 
+export type PulliEncounter = EncounterRow & {
+	bird: BirdRow & {
+		species: SpeciesRow;
+	};
+	session: SessionRow & {
+		location: LocationRow;
+	};
+};
+
 export type SessionWithEncountersCount = SessionRow & {
 	encounters: { count: number }[];
 	location: LocationRow;
