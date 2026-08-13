@@ -22,7 +22,7 @@ export async function fetchAllSessions(
 			'id, visit_date, location: Locations(id, location_name), encounters:Encounters(count)'
 		)
 		.eq('ringing_group_id', viewedGroupId)
-		.eq('is_resighting_only', false)
+		.eq('session_type', 'FULL_GROWN')
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
 }
