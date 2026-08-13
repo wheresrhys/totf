@@ -1,9 +1,9 @@
 [
   {
-    "id": 467,
+    "id": 41,
     "visit_date": "2024-05-10",
-    "location_id": 434,
-    "ringing_group_id": 3,
+    "location_id": 1,
+    "ringing_group_id": 1,
     "location": {
       "location_name": "Alpha Site A (CES)"
     },
@@ -14,10 +14,10 @@
     ]
   },
   {
-    "id": 480,
+    "id": 39,
     "visit_date": "2023-09-14",
-    "location_id": 464,
-    "ringing_group_id": 3,
+    "location_id": 31,
+    "ringing_group_id": 1,
     "location": {
       "location_name": "Alpha Site B"
     },
@@ -28,10 +28,10 @@
     ]
   },
   {
-    "id": 476,
+    "id": 38,
     "visit_date": "2023-07-08",
-    "location_id": 434,
-    "ringing_group_id": 3,
+    "location_id": 1,
+    "ringing_group_id": 1,
     "location": {
       "location_name": "Alpha Site A (CES)"
     },

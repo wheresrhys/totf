@@ -2,12 +2,7 @@ import { test, expect } from '@playwright/test'
 
 test('shows Recent Sessions heading', { tag: '@all' }, async ({ page }) => {
 	await page.goto('/')
-	await expect(page.getByRole('heading', { name: 'Recent Sessions' })).toBeVisible()
-})
-
-test('shows stats accordion', { tag: '@all' }, async ({ page }) => {
-	await page.goto('/')
-	await expect(page.getByText('Busiest sessions:')).toBeVisible()
+	await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible()
 })
 
 test('alpha: shows own recent sessions by date', { tag: '@alpha' }, async ({ page }) => {
