@@ -74,9 +74,11 @@ describe('mistakes page', () => {
 		expect(link).toBeTruthy();
 		const firstActiveType = (mistakesSnapshot as DiscrepenciesResult[])[0]
 			.discrepency_type;
-		const firstOfType = (mistakesSnapshot as DiscrepenciesResult[]).find(
-			(m) => m.discrepency_type === firstActiveType
-		)!;
+		// Rows render sorted by species ascending (see "sorts rows by species
+		// ascending on first render" below), not fixture insertion order.
+		const [firstOfType] = (mistakesSnapshot as DiscrepenciesResult[])
+			.filter((m) => m.discrepency_type === firstActiveType)
+			.sort((a, b) => a.species_name.localeCompare(b.species_name));
 		expect(link?.getAttribute('href')).toBe(`/bird/${firstOfType.ring_no}`);
 	});
 
