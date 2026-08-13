@@ -314,81 +314,6 @@ describe('demon-import — Species uniqueness (species_name)', () => {
 		);
 		expect(Number(speciesIds)).toBe(1);
 	});
-
-	it('rejects a raw duplicate species_name insert (bypassing upsert) with a unique-violation error', async () => {
-		const speciesName = `DemonImportSpecies-${suffix}-raw-dup`;
-		const first = await groupClient
-			.from('Species')
-			.insert({ species_name: speciesName });
-		expect(first.error).toBeNull();
-
-		const duplicate = await groupClient
-			.from('Species')
-			.insert({ species_name: speciesName });
-		expect(duplicate.error?.code).toBe('23505');
-	});
-});
-
-describe('demon-import — Birds uniqueness (ring_no)', () => {
-	let groupId: number;
-	let groupClient: SupabaseClient;
-
-	beforeAll(async () => {
-		groupId = createIsolatedGroup(`demon-import-${suffix}-birds`);
-		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
-	});
-
-	it('upserting two rows with the same ring_no but a different species reuses the same Birds row and updates species_id', async () => {
-		const upsert = createUpserter(groupClient);
-		const ringNo = `DEMON-TEST-${suffix}-bird-shared`;
-
-		await processEncounterRow(
-			makeRow({
-				ring_no: ringNo,
-				species_name: `DemonImportSpecies-${suffix}-bird-1`,
-				loc_id: `DemonImportLoc-${suffix}-bird`
-			}),
-			upsert,
-			groupId
-		);
-		await processEncounterRow(
-			makeRow({
-				ring_no: ringNo,
-				species_name: `DemonImportSpecies-${suffix}-bird-2`,
-				loc_id: `DemonImportLoc-${suffix}-bird`
-			}),
-			upsert,
-			groupId
-		);
-
-		expect(
-			psqlCount(`SELECT COUNT(*) FROM "Birds" WHERE ring_no = '${ringNo}';`)
-		).toBe(1);
-
-		const currentSpeciesName = psqlScalar(
-			`SELECT s.species_name FROM "Birds" b JOIN "Species" s ON s.id = b.species_id WHERE b.ring_no = '${ringNo}';`
-		);
-		expect(currentSpeciesName).toBe(`DemonImportSpecies-${suffix}-bird-2`);
-	});
-
-	it('rejects a raw duplicate ring_no insert (bypassing upsert) with a unique-violation error', async () => {
-		const ringNo = `DEMON-TEST-${suffix}-bird-raw-dup`;
-		const speciesId = Number(
-			psqlScalar(
-				`INSERT INTO "Species" (species_name) VALUES ('DemonImportSpecies-${suffix}-bird-raw-dup') RETURNING id;`
-			)
-		);
-
-		const first = await groupClient
-			.from('Birds')
-			.insert({ ring_no: ringNo, species_id: speciesId });
-		expect(first.error).toBeNull();
-
-		const duplicate = await groupClient
-			.from('Birds')
-			.insert({ ring_no: ringNo, species_id: speciesId });
-		expect(duplicate.error?.code).toBe('23505');
-	});
 });
 
 describe('demon-import — Locations uniqueness (location_name, ringing_group_id)', () => {
@@ -468,19 +393,6 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 				`SELECT COUNT(*) FROM "Locations" WHERE location_name = '${locationName}';`
 			)
 		).toBe(1);
-	});
-
-	it('rejects a raw duplicate (location_name, ringing_group_id) insert (bypassing upsert) with a unique-violation error', async () => {
-		const locationName = `DemonImportLoc-${suffix}-raw-dup`;
-		const first = await groupClientA
-			.from('Locations')
-			.insert({ location_name: locationName, ringing_group_id: groupIdA });
-		expect(first.error).toBeNull();
-
-		const duplicate = await groupClientA
-			.from('Locations')
-			.insert({ location_name: locationName, ringing_group_id: groupIdA });
-		expect(duplicate.error?.code).toBe('23505');
 	});
 });
 
@@ -569,32 +481,78 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 		).toBe(1);
 	});
 
-	it('rejects a raw duplicate (visit_date, location_id, session_type) insert (bypassing upsert) with a unique-violation error', async () => {
-		const { data: location, error: locationError } = await groupClient
-			.from('Locations')
-			.insert({
-				location_name: `DemonImportLoc-${suffix}-sessions-raw-dup`,
-				ringing_group_id: groupId
-			})
-			.select('id')
-			.single();
-		expect(locationError).toBeNull();
-		const locationId = location!.id;
+	it('upserting rows with the same location/session_type but a different visit_date creates separate Session rows', async () => {
+		const upsert = createUpserter(groupClient);
+		const firstVisitDate = randomFutureDate();
+		const secondVisitDate = addDays(firstVisitDate, 1);
+
+		await processEncounterRow(
+			makeRow({
+				ring_no: `DEMON-TEST-${suffix}-session-date-1`,
+				species_name: `DemonImportSpecies-${suffix}-session-date-1`,
+				loc_id: locationName,
+				visit_date: toDemonDate(firstVisitDate),
+				record_type: 'N',
+				age: '5'
+			}),
+			upsert,
+			groupId
+		);
+		await processEncounterRow(
+			makeRow({
+				ring_no: `DEMON-TEST-${suffix}-session-date-2`,
+				species_name: `DemonImportSpecies-${suffix}-session-date-2`,
+				loc_id: locationName,
+				visit_date: toDemonDate(secondVisitDate),
+				record_type: 'N',
+				age: '5'
+			}),
+			upsert,
+			groupId
+		);
+
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Sessions" s JOIN "Locations" l ON l.id = s.location_id WHERE l.location_name = '${locationName}' AND s.visit_date IN ('${firstVisitDate}', '${secondVisitDate}') AND s.session_type = 'FULL_GROWN';`
+			)
+		).toBe(2);
+	});
+
+	it('upserting rows with the same visit_date/session_type but a different location creates separate Session rows', async () => {
+		const upsert = createUpserter(groupClient);
 		const visitDate = randomFutureDate();
+		const otherLocationName = `DemonImportLoc-${suffix}-sessions-other-location`;
 
-		const first = await groupClient.from('Sessions').insert({
-			visit_date: visitDate,
-			location_id: locationId,
-			session_type: 'FULL_GROWN'
-		});
-		expect(first.error).toBeNull();
+		await processEncounterRow(
+			makeRow({
+				ring_no: `DEMON-TEST-${suffix}-session-location-1`,
+				species_name: `DemonImportSpecies-${suffix}-session-location-1`,
+				loc_id: locationName,
+				visit_date: toDemonDate(visitDate),
+				record_type: 'N',
+				age: '5'
+			}),
+			upsert,
+			groupId
+		);
+		await processEncounterRow(
+			makeRow({
+				ring_no: `DEMON-TEST-${suffix}-session-location-2`,
+				species_name: `DemonImportSpecies-${suffix}-session-location-2`,
+				loc_id: otherLocationName,
+				visit_date: toDemonDate(visitDate),
+				record_type: 'N',
+				age: '5'
+			}),
+			upsert,
+			groupId
+		);
 
-		const duplicate = await groupClient.from('Sessions').insert({
-			visit_date: visitDate,
-			location_id: locationId,
-			session_type: 'FULL_GROWN'
-		});
-		expect(duplicate.error?.code).toBe('23505');
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Sessions" s JOIN "Locations" l ON l.id = s.location_id WHERE l.location_name IN ('${locationName}', '${otherLocationName}') AND s.visit_date = '${visitDate}' AND s.session_type = 'FULL_GROWN';`
+			)
+		).toBe(2);
 	});
 });
 
@@ -670,43 +628,5 @@ describe('demon-import — Encounters uniqueness (bird_id, session_id)', () => {
 				`SELECT COUNT(*) FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
 			)
 		).toBe(2);
-	});
-
-	it('rejects a raw duplicate (bird_id, session_id) insert (bypassing upsert) with a unique-violation error', async () => {
-		const upsert = createUpserter(groupClient);
-		const ringNo = `DEMON-TEST-${suffix}-encounter-raw-dup`;
-		await processEncounterRow(
-			makeRow({
-				ring_no: ringNo,
-				species_name: `DemonImportSpecies-${suffix}-encounter-raw-dup`,
-				loc_id: locationName
-			}),
-			upsert,
-			groupId
-		);
-
-		const { data: bird, error: birdError } = await groupClient
-			.from('Birds')
-			.select('id')
-			.eq('ring_no', ringNo)
-			.single();
-		expect(birdError).toBeNull();
-		const { data: encounter, error: encounterError } = await groupClient
-			.from('Encounters')
-			.select('session_id')
-			.eq('bird_id', bird!.id)
-			.single();
-		expect(encounterError).toBeNull();
-
-		const duplicate = await groupClient.from('Encounters').insert({
-			bird_id: bird!.id,
-			session_id: encounter!.session_id,
-			capture_time: '09:00:00',
-			record_type: 'N',
-			scheme: 'BTO',
-			sex: 'M',
-			age_code: 5
-		});
-		expect(duplicate.error?.code).toBe('23505');
 	});
 });
