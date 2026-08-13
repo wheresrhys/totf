@@ -74,9 +74,13 @@ describe('mistakes page', () => {
 		expect(link).toBeTruthy();
 		const firstActiveType = (mistakesSnapshot as DiscrepenciesResult[])[0]
 			.discrepency_type;
-		const firstOfType = (mistakesSnapshot as DiscrepenciesResult[]).find(
-			(m) => m.discrepency_type === firstActiveType
-		)!;
+		// The table's initial sort is by species ascending (see
+		// MistakesDiscrepancyTable's initialSortColumn), so the first rendered row
+		// is the alphabetically-first species within the active tab, not
+		// necessarily the first matching row in the snapshot's raw array order.
+		const firstOfType = (mistakesSnapshot as DiscrepenciesResult[])
+			.filter((m) => m.discrepency_type === firstActiveType)
+			.sort((a, b) => a.species_name.localeCompare(b.species_name))[0];
 		expect(link?.getAttribute('href')).toBe(`/bird/${firstOfType.ring_no}`);
 	});
 
