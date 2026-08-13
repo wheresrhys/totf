@@ -217,10 +217,7 @@ describe('Postgres RPC integration tests', () => {
 					.insert({
 						visit_date: visitDate,
 						location_id: locationId,
-						session_type: sessionType,
-						// is_resighting_only survives until a later ticket; the RPCs no longer
-						// read it, but keep it consistent with the session_type they now filter on.
-						is_resighting_only: sessionType !== 'FULL_GROWN',
+						session_type: sessionType
 					})
 					.select('id')
 					.single();
@@ -1376,10 +1373,7 @@ describe('Postgres RPC integration tests', () => {
 					.insert({
 						visit_date: visitDate,
 						location_id: locationId,
-						session_type: sessionType,
-						// is_resighting_only survives until a later ticket; the RPC no longer
-						// reads it, but keep it consistent with session_type.
-						is_resighting_only: sessionType !== 'FULL_GROWN',
+						session_type: sessionType
 					})
 					.select('id')
 					.single();

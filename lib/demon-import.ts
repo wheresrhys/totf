@@ -239,9 +239,7 @@ export async function processEncounterRow(
 		{
 			visit_date: visitDate,
 			location_id: locationId,
-			session_type: sessionType,
-			// Kept in sync with session_type until #393's tickets 3/5 migrate off it.
-			is_resighting_only: sessionType === 'FIELD_OBSERVATION'
+			session_type: sessionType
 		},
 		'visit_date,location_id,session_type' as keyof SessionsInsert
 	);

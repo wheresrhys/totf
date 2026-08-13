@@ -224,7 +224,6 @@ export type Database = {
       Sessions: {
         Row: {
           id: number
-          is_resighting_only: boolean
           location_id: number
           ringing_group_id: number
           session_type: string
@@ -232,7 +231,6 @@ export type Database = {
         }
         Insert: {
           id?: number
-          is_resighting_only?: boolean
           location_id: number
           ringing_group_id: number
           session_type?: string
@@ -240,7 +238,6 @@ export type Database = {
         }
         Update: {
           id?: number
-          is_resighting_only?: boolean
           location_id?: number
           ringing_group_id?: number
           session_type?: string
