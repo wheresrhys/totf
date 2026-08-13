@@ -178,7 +178,7 @@ describe('createUpserter', () => {
 
 	it('calls supabase upsert on the correct table with provided data', async () => {
 		mockSingle.mockResolvedValue({ data: { id: 1 }, error: null });
-		await upsert('Species', { species_name: 'Robin' }, 'species_name');
+		await upsert('Species', { species_name: 'Robin' }, ['species_name']);
 		expect(mockFrom).toHaveBeenCalledWith('Species');
 		expect(mockUpsertChain).toHaveBeenCalledWith(
 			{ species_name: 'Robin' },
@@ -188,11 +188,9 @@ describe('createUpserter', () => {
 
 	it('returns the id from the upserted record', async () => {
 		mockSingle.mockResolvedValue({ data: { id: 99 }, error: null });
-		const result = await upsert(
-			'Species',
-			{ species_name: 'Robin' },
+		const result = await upsert('Species', { species_name: 'Robin' }, [
 			'species_name'
-		);
+		]);
 		expect(result).toBe(99);
 	});
 
@@ -202,7 +200,7 @@ describe('createUpserter', () => {
 			error: { message: 'conflict error' }
 		});
 		await expect(
-			upsert('Species', { species_name: 'Robin' }, 'species_name')
+			upsert('Species', { species_name: 'Robin' }, ['species_name'])
 		).rejects.toMatchObject({ message: 'conflict error' });
 	});
 });
@@ -250,7 +248,7 @@ describe('processEncounterRow', () => {
 		expect(upsert).toHaveBeenCalledWith(
 			'Species',
 			{ species_name: 'Blue Tit' },
-			'species_name'
+			['species_name']
 		);
 	});
 
@@ -261,7 +259,7 @@ describe('processEncounterRow', () => {
 		expect(upsert).toHaveBeenCalledWith(
 			'Birds',
 			{ ring_no: 'A123456', species_id: speciesId },
-			'ring_no'
+			['ring_no']
 		);
 	});
 
@@ -271,7 +269,7 @@ describe('processEncounterRow', () => {
 		expect(upsert).toHaveBeenCalledWith(
 			'Locations',
 			{ location_name: 'Garden Trap', ringing_group_id: RINGING_GROUP_ID },
-			'location_name'
+			['location_name', 'ringing_group_id']
 		);
 	});
 
@@ -286,26 +284,8 @@ describe('processEncounterRow', () => {
 				location_id: locationId,
 				session_type: 'FULL_GROWN'
 			},
-			'visit_date,location_id,session_type'
+			['visit_date', 'location_id', 'session_type']
 		);
-	});
-
-	describe('Sessions upsert', () => {
-		function sessionUpsertCall() {
-			return upsert.mock.calls.find(([table]) => table === 'Sessions');
-		}
-
-		it('does not include is_resighting_only in the Sessions upsert payload', async () => {
-			await processEncounterRow(makeDemonRow(), upsert, RINGING_GROUP_ID);
-			const payload = sessionUpsertCall()?.[1] as Record<string, unknown>;
-			expect(payload).not.toHaveProperty('is_resighting_only');
-		});
-
-		it('omits is_resighting_only from the upsert conflict-target string', async () => {
-			await processEncounterRow(makeDemonRow(), upsert, RINGING_GROUP_ID);
-			const conflictTarget = sessionUpsertCall()?.[2];
-			expect(conflictTarget).toBe('visit_date,location_id,session_type');
-		});
 	});
 
 	describe('session_type bucketing', () => {
@@ -435,7 +415,7 @@ describe('processEncounterRow', () => {
 				finding_condition: '8',
 				finding_circumstances: '2'
 			}),
-			'bird_id,session_id'
+			['bird_id', 'session_id']
 		);
 	});
 
@@ -465,7 +445,7 @@ describe('processEncounterRow', () => {
 				finding_condition: null,
 				finding_circumstances: null
 			}),
-			'bird_id,session_id'
+			['bird_id', 'session_id']
 		);
 	});
 
@@ -475,7 +455,7 @@ describe('processEncounterRow', () => {
 		expect(upsert).toHaveBeenCalledWith(
 			'Encounters',
 			expect.objectContaining({ age_code: 3, is_juv: true }),
-			'bird_id,session_id'
+			['bird_id', 'session_id']
 		);
 	});
 
@@ -485,7 +465,7 @@ describe('processEncounterRow', () => {
 		expect(upsert).toHaveBeenCalledWith(
 			'Encounters',
 			expect.objectContaining({ age_code: 6, is_juv: false }),
-			'bird_id,session_id'
+			['bird_id', 'session_id']
 		);
 	});
 

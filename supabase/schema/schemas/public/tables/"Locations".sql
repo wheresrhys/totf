@@ -70,7 +70,7 @@ ALTER SEQUENCE public."Locations_id_seq" OWNED BY public."Locations".id;
 ALTER TABLE public."Locations" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public."Locations"
-ADD CONSTRAINT "Locations_location_name_unique" UNIQUE (location_name);
+ADD CONSTRAINT "Locations_location_name_group_id_unique" UNIQUE (location_name, ringing_group_id);
 
 ALTER TABLE public."Locations"
 ADD CONSTRAINT "Locations_pkey" PRIMARY KEY (id);

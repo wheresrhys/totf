@@ -66,7 +66,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 			{
 				group_name: ringingGroupName
 			},
-			'group_name'
+			['group_name']
 		);
 	}
 

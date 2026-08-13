@@ -7,7 +7,7 @@ test.describe('cross-group pages (beta user viewing alpha data)', { tag: '@beta'
 	test.describe('/group/[alphaId] (cross-group home)', () => {
 		test('shows Recent Sessions heading', async ({ page }) => {
 			await page.goto(`/group/${alphaId}`)
-			await expect(page.getByRole('heading', { name: 'Recent Sessions' })).toBeVisible()
+			await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible()
 		})
 
 		test('shows at least one session link', async ({ page }) => {
