@@ -64,7 +64,7 @@ const mockSessionsOrder = vi.fn();
 const mockSessionsRange = vi.fn();
 const mockSessionsEq = vi.fn();
 // eq is also on the builder itself so it self-chains — fetchSessionStats now
-// calls .eq() twice (ringing_group_id, then is_resighting_only) before .order()
+// calls .eq() twice (ringing_group_id, then session_type) before .order()
 const sessionsQueryBuilder = {
 	eq: mockSessionsEq,
 	order: mockSessionsOrder,
@@ -182,13 +182,13 @@ describe('fetchSessionHighlights', () => {
 		expect(mockEq).toHaveBeenCalledWith('ringing_group_id', GROUP_ID);
 	});
 
-	it('excludes resighting-only sessions from the session-dates query', async () => {
+	it('excludes non-FULL_GROWN sessions from the session-dates query', async () => {
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		await fetchSessionHighlights({
 			date: SESSION_DATE,
 			viewedGroupId: GROUP_ID
 		});
-		expect(mockSessionsEq).toHaveBeenCalledWith('is_resighting_only', false);
+		expect(mockSessionsEq).toHaveBeenCalledWith('session_type', 'FULL_GROWN');
 	});
 
 	it('requests deterministic ordering for paginated queries', async () => {
@@ -311,12 +311,13 @@ describe('fetchSessionHighlights', () => {
 		);
 	});
 
-	it('derives no highlights for a date whose only session is resighting-only, while other days stay unaffected', async () => {
-		// A resighting-only date is excluded from both stats_per_day_and_species
-		// (filtered at the RPC level by #429) and the sessionDates query (filtered
-		// by this ticket's Sessions .eq('is_resighting_only', false)) — it's
-		// simply absent from both stats blobs fed into every derive* function, so
-		// it's indistinguishable from "no session happened that day".
+	it('derives no highlights for a date whose only session is PULLI or FIELD_OBSERVATION, while other days stay unaffected', async () => {
+		// A PULLI or FIELD_OBSERVATION date is excluded from both
+		// stats_per_day_and_species (filtered at the RPC level) and the
+		// sessionDates query (filtered by this ticket's Sessions
+		// .eq('session_type', 'FULL_GROWN')) — it's simply absent from both stats
+		// blobs fed into every derive* function, so it's indistinguishable from
+		// "no session happened that day".
 		rpcPages = [
 			[statsRow('Wren', '2022-05-01', 5), statsRow('Wren', '2022-06-01', 3)]
 		];
@@ -354,7 +355,7 @@ describe('fetchSessionHighlights', () => {
 			(call) => (call as [string])[0] === 'stats_per_day_and_species'
 		);
 		expect(metricsCalls).toHaveLength(1);
-		// Two .eq() calls per fetch (ringing_group_id, is_resighting_only), and
+		// Two .eq() calls per fetch (ringing_group_id, session_type), and
 		// the session-dates query only runs once thanks to the stats cache
 		expect(mockSessionsEq).toHaveBeenCalledTimes(2);
 		// version query is run on each call
