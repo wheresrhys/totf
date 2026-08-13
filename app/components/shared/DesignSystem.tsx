@@ -27,14 +27,16 @@ export function BoxyList({
 
 export function Table({
 	children,
-	testId
+	testId,
+	className = 'table'
 }: {
 	children: React.ReactNode;
 	testId?: string;
+	className?: string;
 }) {
 	return (
-		<div className="w-full overflow-x-auto mt-4">
-			<table data-testid={testId} className="table">
+		<div className="w-full overflow-x-auto">
+			<table data-testid={testId} className={className}>
 				{children}
 			</table>
 		</div>
