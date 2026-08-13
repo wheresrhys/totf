@@ -1,10 +1,10 @@
 [
   {
-    "bird_id": 5,
-    "ring_no": "ARRETRAP",
-    "species_name": "Robin",
+    "bird_id": 9,
+    "ring_no": "ABTITMIS",
+    "species_name": "Blue Tit",
     "discrepency_type": "age",
-    "last_encounter_date": "2024-05-10"
+    "last_encounter_date": "2022-06-15"
   },
   {
     "bird_id": 7,
@@ -14,11 +14,11 @@
     "last_encounter_date": "2023-07-08"
   },
   {
-    "bird_id": 9,
-    "ring_no": "ABTITMIS",
-    "species_name": "Blue Tit",
+    "bird_id": 5,
+    "ring_no": "ARRETRAP",
+    "species_name": "Robin",
     "discrepency_type": "age",
-    "last_encounter_date": "2022-06-15"
+    "last_encounter_date": "2024-05-10"
   },
   {
     "bird_id": 9,
