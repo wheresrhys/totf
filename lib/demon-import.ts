@@ -167,12 +167,12 @@ export function createUpserter(supabaseClient: SupabaseClient) {
 	return async <DataInsertModel>(
 		tableName: string,
 		upsertData: DataInsertModel,
-		uniqueColumn: keyof DataInsertModel
+		uniqueColumns: (keyof DataInsertModel)[]
 	): Promise<number> => {
 		const { data: upsertResult, error: upsertError } = await supabaseClient
 			.from(tableName)
 			.upsert(upsertData, {
-				onConflict: uniqueColumn as string,
+				onConflict: uniqueColumns.join(',') as string,
 				ignoreDuplicates: false
 			})
 			.select('id')
@@ -198,19 +198,19 @@ export async function processEncounterRow(
 	const speciesId = await upsert<SpeciesInsert>(
 		'Species',
 		{ species_name: row.species_name as string },
-		'species_name'
+		['species_name']
 	);
 
 	const birdId = await upsert<BirdsInsert>(
 		'Birds',
 		{ ring_no: row.ring_no as string, species_id: speciesId },
-		'ring_no'
+		['ring_no']
 	);
 
 	const locationId = await upsert<LocationsInsert>(
 		'Locations',
 		{ location_name: row.loc_id as string, ringing_group_id: ringingGroupId },
-		'location_name'
+		['location_name', 'ringing_group_id']
 	);
 
 	const visitDate = convertDateFormat(row.visit_date as string);
@@ -241,7 +241,7 @@ export async function processEncounterRow(
 			location_id: locationId,
 			session_type: sessionType
 		},
-		'visit_date,location_id,session_type' as keyof SessionsInsert
+		['visit_date', 'location_id', 'session_type'] as (keyof SessionsInsert)[]
 	);
 
 	await upsert<EncountersInsert>(
@@ -267,7 +267,7 @@ export async function processEncounterRow(
 			weight: row.weight ? Number(row.weight) : null,
 			wing_length: row.wing_length ? Number(row.wing_length) : null
 		},
-		'bird_id,session_id' as keyof EncountersInsert
+		['bird_id', 'session_id'] as (keyof EncountersInsert)[]
 	);
 
 	return { visitDate };
