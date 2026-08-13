@@ -167,26 +167,35 @@ describe('Postgres RPC integration tests', () => {
 			expect(byYear).toEqual({ 2021: 2, 2022: 35, 2023: 15, 2024: 5 });
 		});
 
-		describe('resighting-only sessions', () => {
-			// A resighting-only Sessions row (is_resighting_only = TRUE, from #428) must be
-			// excluded from every day/session-level statistic — session_count, effort, and
-			// the per-session encounter aggregates — but its encounters must still count
-			// toward the per-species/per-bird totals. Fixtures are Delta-group, on random
-			// far-future dates, and every query is bounded by an explicit date range so it
-			// only ever sees this test's rows (never seed or concurrent-run data).
+		describe('non-FULL_GROWN sessions (FIELD_OBSERVATION and PULLI)', () => {
+			// aggregate_stats derives its day/session-level statistics — session_count,
+			// effort, and the per-session encounter aggregates — only from FULL_GROWN
+			// sessions; FIELD_OBSERVATION and PULLI sessions are excluded from those, but
+			// their encounters still count toward the per-species/per-bird totals. PULLI
+			// differs from FIELD_OBSERVATION in that it can carry new-ring (record_type =
+			// 'N') encounters, so excluding it from session stats must NOT remove those
+			// birds from new_bird_count. Fixtures are Delta-group, on random far-future
+			// dates, and every query is bounded by an explicit date range so it only ever
+			// sees this test's rows (never seed or concurrent-run data).
 			let deltaId: number;
 			let deltaClient: SupabaseClient;
 			let robinId: number;
 			let wrenId: number;
-			let mixedLocationId: number;
-			let onlyResightingLocationId: number;
+			let fieldObsLocationId: number;
+			let fieldObsOnlyLocationId: number;
+			let pulliLocationId: number;
 			let birdIds: number[];
-			// Mixed range: two real sessions plus resighting-only sessions (one sharing a
-			// date/location with a real session, one on its own date).
-			let mixedFrom: string;
-			let mixedTo: string;
-			// Only-resighting range: a single resighting-only session, nothing else.
-			let onlyResightingDate: string;
+			// FIELD_OBSERVATION mixed range: two FULL_GROWN sessions plus FIELD_OBSERVATION
+			// sessions (one sharing a date/location with a FULL_GROWN session, one standalone).
+			let fieldObsFrom: string;
+			let fieldObsTo: string;
+			// FIELD_OBSERVATION-only range: a single FIELD_OBSERVATION session, nothing else.
+			let fieldObsOnlyDate: string;
+			// PULLI mixed range: mirrors the FIELD_OBSERVATION range but with PULLI sessions.
+			let pulliFrom: string;
+			let pulliTo: string;
+			// PULLI-only range: a single PULLI session, nothing else.
+			let pulliOnlyDate: string;
 
 			async function getSpeciesId(name: string): Promise<number> {
 				const { data, error } = await supabase
@@ -201,14 +210,17 @@ describe('Postgres RPC integration tests', () => {
 			async function insertSession(
 				locationId: number,
 				visitDate: string,
-				isResightingOnly: boolean
+				sessionType: 'FULL_GROWN' | 'FIELD_OBSERVATION' | 'PULLI'
 			): Promise<number> {
 				const { data, error } = await deltaClient
 					.from('Sessions')
 					.insert({
 						visit_date: visitDate,
 						location_id: locationId,
-						is_resighting_only: isResightingOnly,
+						session_type: sessionType,
+						// is_resighting_only survives until a later ticket; the RPCs no longer
+						// read it, but keep it consistent with the session_type they now filter on.
+						is_resighting_only: sessionType !== 'FULL_GROWN',
 					})
 					.select('id')
 					.single();
@@ -246,18 +258,26 @@ describe('Postgres RPC integration tests', () => {
 
 				const testSuffix = randomTestSuffix();
 				const base = randomFutureDate();
-				const d1 = base; // real ringing session (+ a same-date/location resighting)
-				const d2 = addDays(base, 1); // second real ringing session
-				const d3 = addDays(base, 2); // standalone resighting-only session
-				mixedFrom = d1;
-				mixedTo = d3;
-				onlyResightingDate = addDays(base, 100); // disjoint from the mixed range
+				// FIELD_OBSERVATION scenario dates.
+				const fo1 = base; // FULL_GROWN session (+ a same-date/location FIELD_OBSERVATION)
+				const fo2 = addDays(base, 1); // second FULL_GROWN session
+				const fo3 = addDays(base, 2); // standalone FIELD_OBSERVATION session
+				fieldObsFrom = fo1;
+				fieldObsTo = fo3;
+				fieldObsOnlyDate = addDays(base, 100); // disjoint from the mixed range
+				// PULLI scenario dates (disjoint from the FIELD_OBSERVATION ranges).
+				const pu1 = addDays(base, 200); // FULL_GROWN session (+ a same-date/location PULLI)
+				const pu2 = addDays(base, 201); // second FULL_GROWN session
+				const pu3 = addDays(base, 202); // standalone PULLI session
+				pulliFrom = pu1;
+				pulliTo = pu3;
+				pulliOnlyDate = addDays(base, 300); // disjoint from the PULLI mixed range
 
-				const [mixedLocation, onlyResightingLocation] = await Promise.all([
+				const [fieldObsLocation, fieldObsOnlyLocation, pulliLocation] = await Promise.all([
 					deltaClient
 						.from('Locations')
 						.insert({
-							location_name: `Resighting Agg Mixed ${testSuffix}`,
+							location_name: `NonFG Agg FieldObs ${testSuffix}`,
 							ringing_group_id: deltaId,
 						})
 						.select('id')
@@ -265,57 +285,95 @@ describe('Postgres RPC integration tests', () => {
 					deltaClient
 						.from('Locations')
 						.insert({
-							location_name: `Resighting Agg Only ${testSuffix}`,
+							location_name: `NonFG Agg FieldObsOnly ${testSuffix}`,
+							ringing_group_id: deltaId,
+						})
+						.select('id')
+						.single(),
+					deltaClient
+						.from('Locations')
+						.insert({
+							location_name: `NonFG Agg Pulli ${testSuffix}`,
 							ringing_group_id: deltaId,
 						})
 						.select('id')
 						.single(),
 				]);
-				if (mixedLocation.error) throw mixedLocation.error;
-				if (onlyResightingLocation.error) throw onlyResightingLocation.error;
-				mixedLocationId = mixedLocation.data!.id;
-				onlyResightingLocationId = onlyResightingLocation.data!.id;
+				if (fieldObsLocation.error) throw fieldObsLocation.error;
+				if (fieldObsOnlyLocation.error) throw fieldObsOnlyLocation.error;
+				if (pulliLocation.error) throw pulliLocation.error;
+				fieldObsLocationId = fieldObsLocation.data!.id;
+				fieldObsOnlyLocationId = fieldObsOnlyLocation.data!.id;
+				pulliLocationId = pulliLocation.data!.id;
 
-				const realSession1 = await insertSession(mixedLocationId, d1, false);
-				const resightingTwin = await insertSession(mixedLocationId, d1, true); // same date/loc as realSession1
-				const realSession2 = await insertSession(mixedLocationId, d2, false);
-				const standaloneResighting = await insertSession(mixedLocationId, d3, true);
-				const onlyResightingSession = await insertSession(
-					onlyResightingLocationId,
-					onlyResightingDate,
-					true
-				);
+				// FIELD_OBSERVATION scenario sessions.
+				const foReal1 = await insertSession(fieldObsLocationId, fo1, 'FULL_GROWN');
+				const foTwin = await insertSession(fieldObsLocationId, fo1, 'FIELD_OBSERVATION'); // same date/loc as foReal1
+				const foReal2 = await insertSession(fieldObsLocationId, fo2, 'FULL_GROWN');
+				const foStandalone = await insertSession(fieldObsLocationId, fo3, 'FIELD_OBSERVATION');
+				const foOnly = await insertSession(fieldObsOnlyLocationId, fieldObsOnlyDate, 'FIELD_OBSERVATION');
+				// PULLI scenario sessions.
+				const puReal1 = await insertSession(pulliLocationId, pu1, 'FULL_GROWN');
+				const puTwin = await insertSession(pulliLocationId, pu1, 'PULLI'); // same date/loc as puReal1
+				const puReal2 = await insertSession(pulliLocationId, pu2, 'FULL_GROWN');
+				const puStandalone = await insertSession(pulliLocationId, pu3, 'PULLI');
+				const puOnly = await insertSession(pulliLocationId, pulliOnlyDate, 'PULLI');
 
-				const [b1, b2, b3, b4, b5, b6, b7, b8] = await Promise.all([
-					insertBird(`RAGG-N1-${testSuffix}`, robinId),
-					insertBird(`RAGG-N2-${testSuffix}`, robinId),
-					insertBird(`RAGG-N3-${testSuffix}`, robinId),
-					insertBird(`RAGG-N4-${testSuffix}`, robinId),
-					insertBird(`RAGG-R1-${testSuffix}`, wrenId),
-					insertBird(`RAGG-R2-${testSuffix}`, wrenId),
-					insertBird(`RAGG-R3-${testSuffix}`, wrenId),
-					insertBird(`RAGG-R4-${testSuffix}`, wrenId),
-				]);
-				birdIds = [b1, b2, b3, b4, b5, b6, b7, b8];
+				const [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15, b16] =
+					await Promise.all([
+						insertBird(`RAGG-FO-N1-${testSuffix}`, robinId),
+						insertBird(`RAGG-FO-N2-${testSuffix}`, robinId),
+						insertBird(`RAGG-FO-N3-${testSuffix}`, robinId),
+						insertBird(`RAGG-FO-N4-${testSuffix}`, robinId),
+						insertBird(`RAGG-FO-W1-${testSuffix}`, wrenId),
+						insertBird(`RAGG-FO-W2-${testSuffix}`, wrenId),
+						insertBird(`RAGG-FO-W3-${testSuffix}`, wrenId),
+						insertBird(`RAGG-FO-W4-${testSuffix}`, wrenId),
+						insertBird(`RAGG-PU-N1-${testSuffix}`, robinId),
+						insertBird(`RAGG-PU-N2-${testSuffix}`, robinId),
+						insertBird(`RAGG-PU-N3-${testSuffix}`, robinId),
+						insertBird(`RAGG-PU-N4-${testSuffix}`, robinId),
+						insertBird(`RAGG-PU-W1-${testSuffix}`, wrenId),
+						insertBird(`RAGG-PU-W2-${testSuffix}`, wrenId),
+						insertBird(`RAGG-PU-W3-${testSuffix}`, wrenId),
+						insertBird(`RAGG-PU-W4-${testSuffix}`, wrenId),
+					]);
+				birdIds = [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15, b16];
 
 				const base_ = { scheme: 'BTO', sex: 'M', age_code: 1, weight: 15 };
 				const { error: encountersError } = await deltaClient
 					.from('Encounters')
 					.insert([
-						// realSession1 (d1): three new (N) Robin encounters spanning 09:00–12:00 → 3h effort.
-						{ ...base_, bird_id: b1, session_id: realSession1, record_type: 'N', capture_time: '09:00:00' },
-						{ ...base_, bird_id: b2, session_id: realSession1, record_type: 'N', capture_time: '10:00:00' },
-						{ ...base_, bird_id: b3, session_id: realSession1, record_type: 'N', capture_time: '12:00:00' },
-						// realSession2 (d2): one new (N) Robin encounter → clamped to 2h minimum effort.
-						{ ...base_, bird_id: b4, session_id: realSession2, record_type: 'N', capture_time: '10:00:00' },
-						// resightingTwin (d1, same location): a passive resighting (C) Wren — an early
-						// capture_time that must NOT stretch realSession1's effort span.
-						{ ...base_, bird_id: b5, session_id: resightingTwin, record_type: 'C', capture_time: '05:00:00' },
-						// standaloneResighting (d3): a passive resighting (D) Wren on its own date.
-						{ ...base_, bird_id: b6, session_id: standaloneResighting, record_type: 'D', capture_time: '20:00:00' },
-						// onlyResighting range: two passive resightings (C) Wrens, nothing else.
-						{ ...base_, bird_id: b7, session_id: onlyResightingSession, record_type: 'C', capture_time: '08:00:00' },
-						{ ...base_, bird_id: b8, session_id: onlyResightingSession, record_type: 'C', capture_time: '09:00:00' },
+						// --- FIELD_OBSERVATION scenario ---
+						// foReal1 (fo1): three new (N) Robin encounters spanning 09:00–12:00 → 3h effort.
+						{ ...base_, bird_id: b1, session_id: foReal1, record_type: 'N', capture_time: '09:00:00' },
+						{ ...base_, bird_id: b2, session_id: foReal1, record_type: 'N', capture_time: '10:00:00' },
+						{ ...base_, bird_id: b3, session_id: foReal1, record_type: 'N', capture_time: '12:00:00' },
+						// foReal2 (fo2): one new (N) Robin encounter → clamped to 2h minimum effort.
+						{ ...base_, bird_id: b4, session_id: foReal2, record_type: 'N', capture_time: '10:00:00' },
+						// foTwin (fo1, same location): a passive field observation (C) Wren — an early
+						// capture_time that must NOT stretch foReal1's effort span.
+						{ ...base_, bird_id: b5, session_id: foTwin, record_type: 'C', capture_time: '05:00:00' },
+						// foStandalone (fo3): a passive field observation (D) Wren on its own date.
+						{ ...base_, bird_id: b6, session_id: foStandalone, record_type: 'D', capture_time: '20:00:00' },
+						// foOnly range: two passive field observations (C) Wrens, nothing else.
+						{ ...base_, bird_id: b7, session_id: foOnly, record_type: 'C', capture_time: '08:00:00' },
+						{ ...base_, bird_id: b8, session_id: foOnly, record_type: 'C', capture_time: '09:00:00' },
+						// --- PULLI scenario (mirrors the above, but PULLI encounters are new-ring N) ---
+						// puReal1 (pu1): three new (N) Robin encounters spanning 09:00–12:00 → 3h effort.
+						{ ...base_, bird_id: b9, session_id: puReal1, record_type: 'N', capture_time: '09:00:00' },
+						{ ...base_, bird_id: b10, session_id: puReal1, record_type: 'N', capture_time: '10:00:00' },
+						{ ...base_, bird_id: b11, session_id: puReal1, record_type: 'N', capture_time: '12:00:00' },
+						// puReal2 (pu2): one new (N) Robin encounter → clamped to 2h minimum effort.
+						{ ...base_, bird_id: b12, session_id: puReal2, record_type: 'N', capture_time: '10:00:00' },
+						// puTwin (pu1, same location): a PULLI new-ring (N) Wren — an early capture_time
+						// that must NOT stretch puReal1's effort span, but DOES count in new_bird_count.
+						{ ...base_, bird_id: b13, session_id: puTwin, record_type: 'N', capture_time: '05:00:00' },
+						// puStandalone (pu3): a PULLI new-ring (N) Wren on its own date.
+						{ ...base_, bird_id: b14, session_id: puStandalone, record_type: 'N', capture_time: '20:00:00' },
+						// puOnly range: two PULLI new-ring (N) Wrens, nothing else.
+						{ ...base_, bird_id: b15, session_id: puOnly, record_type: 'N', capture_time: '08:00:00' },
+						{ ...base_, bird_id: b16, session_id: puOnly, record_type: 'N', capture_time: '09:00:00' },
 					]);
 				if (encountersError) throw encountersError;
 			});
@@ -325,70 +383,138 @@ describe('Postgres RPC integration tests', () => {
 					`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
 						`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
 						`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
-						`DELETE FROM "Sessions" WHERE location_id IN (${mixedLocationId}, ${onlyResightingLocationId});` +
-						`DELETE FROM "Locations" WHERE id IN (${mixedLocationId}, ${onlyResightingLocationId});'`
+						`DELETE FROM "Sessions" WHERE location_id IN (${fieldObsLocationId}, ${fieldObsOnlyLocationId}, ${pulliLocationId});` +
+						`DELETE FROM "Locations" WHERE id IN (${fieldObsLocationId}, ${fieldObsOnlyLocationId}, ${pulliLocationId});'`
 				);
 			});
 
-			describe('excluded from day/session-level stats', () => {
-				it('excludes a resighting-only session from session_count', async () => {
-					const row = await aggregateRow(mixedFrom, mixedTo);
-					// Two real session dates (d1, d2); the standalone resighting date (d3) and the
-					// d1 resighting twin contribute nothing.
+			describe('FIELD_OBSERVATION excluded from day/session-level stats', () => {
+				it('excludes a FIELD_OBSERVATION session from session_count', async () => {
+					const row = await aggregateRow(fieldObsFrom, fieldObsTo);
+					// Two FULL_GROWN session dates (fo1, fo2); the standalone FIELD_OBSERVATION
+					// date (fo3) and the fo1 FIELD_OBSERVATION twin contribute nothing.
 					expect(row.session_count).toBe(2);
 				});
 
-				it("excludes a resighting-only session's duration from total_effort and effort_per_session", async () => {
-					const row = await aggregateRow(mixedFrom, mixedTo);
-					// realSession1 span = 3h, realSession2 clamped to 2h → 5h total over 2 sessions.
-					// The resighting twin's 05:00 capture does not stretch any real session's span.
+				it("excludes a FIELD_OBSERVATION session's duration from total_effort and effort_per_session", async () => {
+					const row = await aggregateRow(fieldObsFrom, fieldObsTo);
+					// foReal1 span = 3h, foReal2 clamped to 2h → 5h total over 2 sessions.
+					// The FIELD_OBSERVATION twin's 05:00 capture does not stretch any FULL_GROWN span.
 					expect(row.total_effort).toBe('05:00:00');
 					expect(row.effort_per_session).toBe('02:30:00');
 				});
 
-				it('excludes a resighting-only session from avg_encounters_per_session and max_per_session', async () => {
-					const row = await aggregateRow(mixedFrom, mixedTo);
-					// Real per-session Robin counts: 3 and 1 → avg 2, max 3.
+				it('excludes a FIELD_OBSERVATION session from avg_encounters_per_session and max_per_session', async () => {
+					const row = await aggregateRow(fieldObsFrom, fieldObsTo);
+					// FULL_GROWN per-session Robin counts: 3 and 1 → avg 2, max 3.
 					expect(row.avg_encounters_per_session).toBe(2);
 					expect(row.max_per_session).toBe(3);
 				});
 
-				it('excludes a resighting-only session from max_new_per_session', async () => {
-					const row = await aggregateRow(mixedFrom, mixedTo);
-					// New (N) encounters per real session: 3 and 1 → max 3.
+				it('excludes a FIELD_OBSERVATION session from max_new_per_session', async () => {
+					const row = await aggregateRow(fieldObsFrom, fieldObsTo);
+					// New (N) encounters per FULL_GROWN session: 3 and 1 → max 3.
 					expect(row.max_new_per_session).toBe(3);
 				});
 			});
 
-			describe('unaffected per-species/per-bird totals', () => {
-				it("still counts a resighting-only session's encounters in species_count, bird_count and encounter_count", async () => {
-					const row = await aggregateRow(mixedFrom, mixedTo);
-					// Robin (4 real) + Wren (2 resighting) across 6 birds / 6 encounters.
+			describe('FIELD_OBSERVATION unaffected per-species/per-bird totals', () => {
+				it("still counts a FIELD_OBSERVATION session's encounters in species_count, bird_count and encounter_count", async () => {
+					const row = await aggregateRow(fieldObsFrom, fieldObsTo);
+					// Robin (4 FULL_GROWN) + Wren (2 FIELD_OBSERVATION) across 6 birds / 6 encounters.
 					expect(row.species_count).toBe(2);
 					expect(row.bird_count).toBe(6);
 					expect(row.encounter_count).toBe(6);
 				});
 
-				it('leaves new_bird_count unaffected since resighting record_types are never N', async () => {
-					const row = await aggregateRow(mixedFrom, mixedTo);
-					// Only the four N Robins are new; the C/D Wren resightings never are.
+				it('leaves new_bird_count unaffected since FIELD_OBSERVATION record_types are never N', async () => {
+					const row = await aggregateRow(fieldObsFrom, fieldObsTo);
+					// Only the four N Robins are new; the C/D Wren field observations never are.
 					expect(row.new_bird_count).toBe(4);
 				});
 			});
 
-			describe('edge cases', () => {
-				it('counts a real and a same-date/location resighting-only session as one session, not two', async () => {
-					// Restrict to d1 only, where a real and a resighting-only session share the
-					// date/location. session_count is 1 (the real one), never 2.
-					const row = await aggregateRow(mixedFrom, mixedFrom);
+			describe('FIELD_OBSERVATION edge cases', () => {
+				it('counts a FULL_GROWN and a same-date/location FIELD_OBSERVATION session as one session, not two', async () => {
+					// Restrict to fo1 only, where a FULL_GROWN and a FIELD_OBSERVATION session
+					// share the date/location. session_count is 1 (the FULL_GROWN one), never 2.
+					const row = await aggregateRow(fieldObsFrom, fieldObsFrom);
 					expect(row.session_count).toBe(1);
-					// The resighting Wren still shows up in the per-species totals for that day.
+					// The FIELD_OBSERVATION Wren still shows up in the per-species totals for that day.
 					expect(row.species_count).toBe(2);
 					expect(row.encounter_count).toBe(4);
 				});
 
-				it('returns session_count=0 and zero effort but a nonzero encounter_count for a range of only resighting-only sessions', async () => {
-					const row = await aggregateRow(onlyResightingDate, onlyResightingDate);
+				it('returns session_count=0 and zero effort but a nonzero encounter_count for a range of only FIELD_OBSERVATION sessions', async () => {
+					const row = await aggregateRow(fieldObsOnlyDate, fieldObsOnlyDate);
+					expect(row.session_count).toBe(0);
+					expect(row.total_effort).toBe('00:00:00');
+					expect(row.encounter_count).toBe(2);
+				});
+			});
+
+			describe('PULLI excluded from day/session-level stats', () => {
+				it('excludes a PULLI session from session_count', async () => {
+					const row = await aggregateRow(pulliFrom, pulliTo);
+					// Two FULL_GROWN session dates (pu1, pu2); the standalone PULLI date (pu3)
+					// and the pu1 PULLI twin contribute nothing.
+					expect(row.session_count).toBe(2);
+				});
+
+				it("excludes a PULLI session's duration from total_effort and effort_per_session", async () => {
+					const row = await aggregateRow(pulliFrom, pulliTo);
+					// puReal1 span = 3h, puReal2 clamped to 2h → 5h total over 2 sessions.
+					// The PULLI twin's 05:00 capture does not stretch any FULL_GROWN span.
+					expect(row.total_effort).toBe('05:00:00');
+					expect(row.effort_per_session).toBe('02:30:00');
+				});
+
+				it('excludes a PULLI session from avg_encounters_per_session and max_per_session', async () => {
+					const row = await aggregateRow(pulliFrom, pulliTo);
+					// FULL_GROWN per-session Robin counts: 3 and 1 → avg 2, max 3.
+					expect(row.avg_encounters_per_session).toBe(2);
+					expect(row.max_per_session).toBe(3);
+				});
+
+				it('excludes a PULLI session from max_new_per_session', async () => {
+					const row = await aggregateRow(pulliFrom, pulliTo);
+					// New (N) encounters per FULL_GROWN session: 3 and 1 → max 3. The PULLI
+					// sessions' own N encounters are excluded from the per-session aggregate.
+					expect(row.max_new_per_session).toBe(3);
+				});
+			});
+
+			describe('PULLI unaffected per-species/per-bird totals', () => {
+				it("still counts a PULLI session's encounters in species_count, bird_count and encounter_count", async () => {
+					const row = await aggregateRow(pulliFrom, pulliTo);
+					// Robin (4 FULL_GROWN) + Wren (2 PULLI) across 6 birds / 6 encounters.
+					expect(row.species_count).toBe(2);
+					expect(row.bird_count).toBe(6);
+					expect(row.encounter_count).toBe(6);
+				});
+
+				it("counts a PULLI session's N encounters in new_bird_count, exactly as FULL_GROWN ones", async () => {
+					const row = await aggregateRow(pulliFrom, pulliTo);
+					// All six birds are new-ring (N): the four FULL_GROWN Robins plus the two
+					// PULLI Wrens (puTwin, puStandalone). PULLI's exclusion from session stats
+					// must not drop its N encounters from new_bird_count.
+					expect(row.new_bird_count).toBe(6);
+				});
+			});
+
+			describe('PULLI edge cases', () => {
+				it('counts a FULL_GROWN and a same-date/location PULLI session as one session, not two', async () => {
+					// Restrict to pu1 only, where a FULL_GROWN and a PULLI session share the
+					// date/location. session_count is 1 (the FULL_GROWN one), never 2.
+					const row = await aggregateRow(pulliFrom, pulliFrom);
+					expect(row.session_count).toBe(1);
+					// The PULLI Wren still shows up in the per-species totals for that day.
+					expect(row.species_count).toBe(2);
+					expect(row.encounter_count).toBe(4);
+				});
+
+				it('returns session_count=0 and zero effort but a nonzero encounter_count for a range of only PULLI sessions', async () => {
+					const row = await aggregateRow(pulliOnlyDate, pulliOnlyDate);
 					expect(row.session_count).toBe(0);
 					expect(row.total_effort).toBe('00:00:00');
 					expect(row.encounter_count).toBe(2);
@@ -1226,29 +1352,34 @@ describe('Postgres RPC integration tests', () => {
 			});
 		});
 
-		describe('resighting-only sessions', () => {
-			// stats_per_day_and_species is entirely day-level, so a resighting-only
-			// Sessions row (is_resighting_only = TRUE) must contribute no rows at all.
-			// Insert Delta-group fixtures across two dates: one date whose only session
-			// is resighting-only, and one date carrying both a real ringing session and
-			// a same-date/location resighting-only session.
+		describe('non-FULL_GROWN sessions (FIELD_OBSERVATION and PULLI)', () => {
+			// stats_per_day_and_species is entirely day-level, so any non-FULL_GROWN
+			// Sessions row (FIELD_OBSERVATION or PULLI) must contribute no rows at all.
+			// Insert Delta-group fixtures across four dates: for each of FIELD_OBSERVATION
+			// and PULLI, one date whose only session is that type, and one date carrying
+			// both a FULL_GROWN ringing session and a same-date/location session of that type.
 			let deltaId: number;
 			let deltaClient: SupabaseClient;
 			let locationId: number;
 			let birdIds: number[];
-			let resightingOnlyDate: string;
-			let mixedDate: string;
+			let fieldObsOnlyDate: string;
+			let fieldObsMixedDate: string;
+			let pulliOnlyDate: string;
+			let pulliMixedDate: string;
 
 			async function insertSession(
 				visitDate: string,
-				isResightingOnly: boolean
+				sessionType: 'FULL_GROWN' | 'FIELD_OBSERVATION' | 'PULLI'
 			): Promise<number> {
 				const { data, error } = await deltaClient
 					.from('Sessions')
 					.insert({
 						visit_date: visitDate,
 						location_id: locationId,
-						is_resighting_only: isResightingOnly,
+						session_type: sessionType,
+						// is_resighting_only survives until a later ticket; the RPC no longer
+						// reads it, but keep it consistent with session_type.
+						is_resighting_only: sessionType !== 'FULL_GROWN',
 					})
 					.select('id')
 					.single();
@@ -1264,8 +1395,11 @@ describe('Postgres RPC integration tests', () => {
 				// Randomised, on distinct dates, so concurrent worktree runs against the
 				// shared local Supabase instance never combine their rows into the same
 				// stats_per_day_and_species aggregate row.
-				resightingOnlyDate = randomFutureDate();
-				mixedDate = addDays(resightingOnlyDate, 1);
+				const base = randomFutureDate();
+				fieldObsOnlyDate = base;
+				fieldObsMixedDate = addDays(base, 1);
+				pulliOnlyDate = addDays(base, 2);
+				pulliMixedDate = addDays(base, 3);
 
 				const { data: species } = await supabase
 					.from('Species')
@@ -1276,7 +1410,7 @@ describe('Postgres RPC integration tests', () => {
 				const { data: location, error: locationError } = await deltaClient
 					.from('Locations')
 					.insert({
-						location_name: `Resighting Stats Test Location ${testSuffix}`,
+						location_name: `NonFG Stats Test Location ${testSuffix}`,
 						ringing_group_id: deltaId,
 					})
 					.select('id')
@@ -1284,16 +1418,23 @@ describe('Postgres RPC integration tests', () => {
 				if (locationError) throw locationError;
 				locationId = location!.id;
 
-				const resightingOnlySessionId = await insertSession(resightingOnlyDate, true);
-				const realSessionId = await insertSession(mixedDate, false);
-				const mixedResightingSessionId = await insertSession(mixedDate, true);
+				const fieldObsOnlySessionId = await insertSession(fieldObsOnlyDate, 'FIELD_OBSERVATION');
+				const fieldObsRealSessionId = await insertSession(fieldObsMixedDate, 'FULL_GROWN');
+				const fieldObsMixedTwinId = await insertSession(fieldObsMixedDate, 'FIELD_OBSERVATION');
+				const pulliOnlySessionId = await insertSession(pulliOnlyDate, 'PULLI');
+				const pulliRealSessionId = await insertSession(pulliMixedDate, 'FULL_GROWN');
+				const pulliMixedTwinId = await insertSession(pulliMixedDate, 'PULLI');
 
 				const birds = await Promise.all(
 					[
-						`RESIGHTSTAT1-${testSuffix}`,
-						`RESIGHTSTAT2-${testSuffix}`,
-						`RESIGHTSTAT3-${testSuffix}`,
-						`RESIGHTSTAT4-${testSuffix}`,
+						`NFGSTAT1-${testSuffix}`,
+						`NFGSTAT2-${testSuffix}`,
+						`NFGSTAT3-${testSuffix}`,
+						`NFGSTAT4-${testSuffix}`,
+						`NFGSTAT5-${testSuffix}`,
+						`NFGSTAT6-${testSuffix}`,
+						`NFGSTAT7-${testSuffix}`,
+						`NFGSTAT8-${testSuffix}`,
 					].map((ringNo) =>
 						deltaClient
 							.from('Birds')
@@ -1317,34 +1458,61 @@ describe('Postgres RPC integration tests', () => {
 				const { error: encountersError } = await deltaClient
 					.from('Encounters')
 					.insert([
-						// resightingOnlyDate: only a passive-resighting encounter on a
-						// resighting-only session.
+						// fieldObsOnlyDate: only a passive field-observation (C) encounter.
 						{
 							...baseEncounter,
 							bird_id: birdIds[0],
-							session_id: resightingOnlySessionId,
+							session_id: fieldObsOnlySessionId,
 							record_type: 'C',
 						},
-						// mixedDate real session: two proper ringing (N) encounters.
+						// fieldObsMixedDate FULL_GROWN session: two proper ringing (N) encounters.
 						{
 							...baseEncounter,
 							bird_id: birdIds[1],
-							session_id: realSessionId,
+							session_id: fieldObsRealSessionId,
 							record_type: 'N',
 						},
 						{
 							...baseEncounter,
 							bird_id: birdIds[2],
-							session_id: realSessionId,
+							session_id: fieldObsRealSessionId,
 							record_type: 'N',
 						},
-						// mixedDate resighting-only session: a passive resighting on the
-						// same date/location that must not merge into the real session's row.
+						// fieldObsMixedDate FIELD_OBSERVATION session: a passive observation on the
+						// same date/location that must not merge into the FULL_GROWN session's row.
 						{
 							...baseEncounter,
 							bird_id: birdIds[3],
-							session_id: mixedResightingSessionId,
+							session_id: fieldObsMixedTwinId,
 							record_type: 'D',
+						},
+						// pulliOnlyDate: only a PULLI new-ring (N) encounter.
+						{
+							...baseEncounter,
+							bird_id: birdIds[4],
+							session_id: pulliOnlySessionId,
+							record_type: 'N',
+						},
+						// pulliMixedDate FULL_GROWN session: two proper ringing (N) encounters.
+						{
+							...baseEncounter,
+							bird_id: birdIds[5],
+							session_id: pulliRealSessionId,
+							record_type: 'N',
+						},
+						{
+							...baseEncounter,
+							bird_id: birdIds[6],
+							session_id: pulliRealSessionId,
+							record_type: 'N',
+						},
+						// pulliMixedDate PULLI session: a pulli ringing (N) on the same
+						// date/location that must not merge into the FULL_GROWN session's row.
+						{
+							...baseEncounter,
+							bird_id: birdIds[7],
+							session_id: pulliMixedTwinId,
+							record_type: 'N',
 						},
 					]);
 				if (encountersError) throw encountersError;
@@ -1360,28 +1528,54 @@ describe('Postgres RPC integration tests', () => {
 				);
 			});
 
-			it('excludes a resighting-only session entirely, returning no rows for a date whose only session is resighting-only', async () => {
+			it('excludes a FIELD_OBSERVATION session entirely, returning no rows for a date whose only session is FIELD_OBSERVATION', async () => {
 				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
 					ringing_group_filter: deltaId,
 				});
 				expect(error).toBeNull();
 				expect(
-					data!.filter((row) => row.visit_date === resightingOnlyDate)
+					data!.filter((row) => row.visit_date === fieldObsOnlyDate)
 				).toHaveLength(0);
 			});
 
-			it('returns rows only for the real session when a real and a resighting-only session share the same date and location', async () => {
+			it('excludes a PULLI session entirely, returning no rows for a date whose only session is PULLI', async () => {
 				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
 					ringing_group_filter: deltaId,
 				});
 				expect(error).toBeNull();
-				const mixedRows = data!.filter((row) => row.visit_date === mixedDate);
+				expect(
+					data!.filter((row) => row.visit_date === pulliOnlyDate)
+				).toHaveLength(0);
+			});
+
+			it('returns rows only for the FULL_GROWN session when a FULL_GROWN and a FIELD_OBSERVATION session share the same date and location', async () => {
+				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
+					ringing_group_filter: deltaId,
+				});
+				expect(error).toBeNull();
+				const mixedRows = data!.filter((row) => row.visit_date === fieldObsMixedDate);
 				expect(mixedRows).toHaveLength(1);
-				// encounter_count is 2 (the two real N encounters), not 3 — the resighting
-				// on the same date/location is excluded.
+				// encounter_count is 2 (the two FULL_GROWN N encounters), not 3 — the
+				// FIELD_OBSERVATION on the same date/location is excluded.
 				expect(mixedRows[0]).toMatchObject({
 					species_name: 'Robin',
-					visit_date: mixedDate,
+					visit_date: fieldObsMixedDate,
+					encounter_count: 2,
+				});
+			});
+
+			it('returns rows only for the FULL_GROWN session when a FULL_GROWN and a PULLI session share the same date and location', async () => {
+				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
+					ringing_group_filter: deltaId,
+				});
+				expect(error).toBeNull();
+				const mixedRows = data!.filter((row) => row.visit_date === pulliMixedDate);
+				expect(mixedRows).toHaveLength(1);
+				// encounter_count is 2 (the two FULL_GROWN N encounters), not 3 — the PULLI
+				// ringing on the same date/location is excluded.
+				expect(mixedRows[0]).toMatchObject({
+					species_name: 'Robin',
+					visit_date: pulliMixedDate,
 					encounter_count: 2,
 				});
 			});

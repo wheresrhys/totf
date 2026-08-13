@@ -48,7 +48,7 @@ CREATE FUNCTION public.aggregate_stats (
       e.is_juv,
       sess.id AS session_id,
       sess.visit_date,
-      sess.is_resighting_only,
+      sess.session_type,
       e.max_hatch_year,
       e.capture_time,
       date_trunc('month', sess.visit_date)::DATE AS session_month,
@@ -162,7 +162,7 @@ CREATE FUNCTION public.aggregate_stats (
       COUNT(CASE WHEN re.record_type = 'N' THEN 1 END) AS new_encounter_count
     FROM raw_encounters re
     WHERE re.session_id IS NOT NULL
-      AND re.is_resighting_only = FALSE
+      AND re.session_type = 'FULL_GROWN'
     GROUP BY re.species_id, re.session_id, date_trunc('month', re.visit_date)::DATE, date_trunc('year', re.visit_date)::DATE
   ),
   aggregated_session_counts AS (
@@ -192,7 +192,7 @@ CREATE FUNCTION public.aggregate_stats (
       -- realistically the minimum effort per session is 2 hours
       GREATEST(MAX(re.capture_time) - MIN(re.capture_time), '02:00:00'::interval) AS total_effort
     FROM raw_encounters re
-    WHERE re.is_resighting_only = FALSE
+    WHERE re.session_type = 'FULL_GROWN'
     GROUP BY re.session_id
   ), effort_per_period AS (
     SELECT
@@ -225,7 +225,7 @@ CREATE FUNCTION public.aggregate_stats (
       WHEN group_by_time_period = 'year' THEN spine.time_period
     ELSE NULL::date END AS "time_period",
 
-    COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.is_resighting_only = FALSE THEN raw_enc.visit_date END), 0) AS "session_count",
+    COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.session_type = 'FULL_GROWN' THEN raw_enc.visit_date END), 0) AS "session_count",
     COALESCE(effort.total_effort, '00:00:00'::interval) AS "total_effort",
     COALESCE(effort.effort_per_session, '00:00:00'::interval) AS "effort_per_session",
     COALESCE(effort.total_effort / NULLIF(COUNT(DISTINCT raw_enc.encounter_id), 0), '00:00:00'::interval) AS "effort_per_encounter",
