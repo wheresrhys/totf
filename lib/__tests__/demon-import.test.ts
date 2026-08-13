@@ -284,11 +284,28 @@ describe('processEncounterRow', () => {
 			{
 				visit_date: '2023-03-15',
 				location_id: locationId,
-				session_type: 'FULL_GROWN',
-				is_resighting_only: false
+				session_type: 'FULL_GROWN'
 			},
 			'visit_date,location_id,session_type'
 		);
+	});
+
+	describe('Sessions upsert', () => {
+		function sessionUpsertCall() {
+			return upsert.mock.calls.find(([table]) => table === 'Sessions');
+		}
+
+		it('does not include is_resighting_only in the Sessions upsert payload', async () => {
+			await processEncounterRow(makeDemonRow(), upsert, RINGING_GROUP_ID);
+			const payload = sessionUpsertCall()?.[1] as Record<string, unknown>;
+			expect(payload).not.toHaveProperty('is_resighting_only');
+		});
+
+		it('omits is_resighting_only from the upsert conflict-target string', async () => {
+			await processEncounterRow(makeDemonRow(), upsert, RINGING_GROUP_ID);
+			const conflictTarget = sessionUpsertCall()?.[2];
+			expect(conflictTarget).toBe('visit_date,location_id,session_type');
+		});
 	});
 
 	describe('session_type bucketing', () => {
@@ -374,36 +391,6 @@ describe('processEncounterRow', () => {
 				RINGING_GROUP_ID
 			);
 			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
-		});
-	});
-
-	describe('is_resighting_only stays in sync with session_type', () => {
-		function sessionData() {
-			return upsert.mock.calls.find(([table]) => table === 'Sessions')?.[1];
-		}
-
-		it.each(['U', 'F', 'D'])(
-			'still upserts is_resighting_only: true for a %s record_type',
-			async (recordType) => {
-				await processEncounterRow(
-					makeDemonRow({ record_type: recordType }),
-					upsert,
-					RINGING_GROUP_ID
-				);
-				expect(sessionData()).toMatchObject({ is_resighting_only: true });
-			}
-		);
-
-		it('upserts is_resighting_only: false for a PULLI-bucketed row', async () => {
-			await processEncounterRow(
-				makeDemonRow({ record_type: 'N', age: '1' }),
-				upsert,
-				RINGING_GROUP_ID
-			);
-			expect(sessionData()).toMatchObject({
-				session_type: 'PULLI',
-				is_resighting_only: false
-			});
 		});
 	});
 

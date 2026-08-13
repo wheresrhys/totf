@@ -3,7 +3,6 @@ CREATE TABLE public."Sessions" (
 	visit_date date NOT NULL,
 	location_id bigint NOT NULL,
 	ringing_group_id bigint NOT NULL,
-	is_resighting_only boolean NOT NULL DEFAULT FALSE,
 	session_type text NOT NULL DEFAULT 'FULL_GROWN' CHECK (
 		session_type IN ('FULL_GROWN', 'FIELD_OBSERVATION', 'PULLI')
 	)
