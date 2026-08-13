@@ -188,11 +188,9 @@ describe('createUpserter', () => {
 
 	it('returns the id from the upserted record', async () => {
 		mockSingle.mockResolvedValue({ data: { id: 99 }, error: null });
-		const result = await upsert(
-			'Species',
-			{ species_name: 'Robin' },
-			['species_name']
-		);
+		const result = await upsert('Species', { species_name: 'Robin' }, [
+			'species_name'
+		]);
 		expect(result).toBe(99);
 	});
 
