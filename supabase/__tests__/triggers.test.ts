@@ -1,5 +1,5 @@
 /**
- * Integration tests for custom Postgres triggers on Encounters.
+ * Integration tests for custom Postgres triggers on Encounters and Birds.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -12,6 +12,7 @@ import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
 import { supabase } from '../../lib/supabase';
+import { createUpserter } from '../../lib/demon-import';
 import { randomTestSuffix } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -164,5 +165,144 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 			.single();
 
 		expect(data?.record_type).toBe('S');
+	});
+});
+
+describe('Birds — species_id immutability trigger', () => {
+	let groupClient: SupabaseClient;
+	let speciesIdA: number;
+	let speciesIdB: number;
+	let testSuffix: string;
+
+	// Every ring_no this suite writes shares this prefix + the random suffix, so the
+	// afterAll cleanup can remove exactly this run's rows without colliding with a
+	// concurrent worktree run against the shared local Supabase instance.
+	const ringPrefix = 'SPECIES-IMMUT';
+
+	beforeAll(async () => {
+		const { data: group, error: groupError } = await supabase
+			.from('RingingGroups')
+			.select('id')
+			.eq('group_name', 'Delta')
+			.single();
+		if (groupError || !group)
+			throw new Error('Delta group not found — run npm run db:seed:e2e first');
+
+		groupClient = await getAuthenticatedSupabaseClientForGroup(group.id);
+
+		const { data: species, error: speciesError } = await supabase
+			.from('Species')
+			.select('id')
+			.order('id', { ascending: true })
+			.limit(2);
+		if (speciesError || !species || species.length < 2)
+			throw new Error('Need two Species rows — run npm run db:seed:e2e first');
+		speciesIdA = species[0].id;
+		speciesIdB = species[1].id;
+
+		testSuffix = randomTestSuffix();
+	});
+
+	afterAll(() => {
+		psql(`DELETE FROM "Birds" WHERE ring_no LIKE '${ringPrefix}-%-${testSuffix}';`);
+	});
+
+	it('rejects a direct species_id change on an existing Birds row', async () => {
+		const ringNo = `${ringPrefix}-DIRECT-${testSuffix}`;
+		const { data: bird, error: insertError } = await groupClient
+			.from('Birds')
+			.insert({ ring_no: ringNo, species_id: speciesIdA })
+			.select('id')
+			.single();
+		if (insertError) throw insertError;
+
+		const { error } = await groupClient
+			.from('Birds')
+			.update({ species_id: speciesIdB })
+			.eq('id', bird!.id);
+
+		expect(error).not.toBeNull();
+		expect(error?.code).toBe('23514'); // check_violation
+		expect(error?.message).toContain('immutable');
+
+		// The row must still hold its original species — the change was rejected, not applied.
+		const { data: after } = await groupClient
+			.from('Birds')
+			.select('species_id')
+			.eq('id', bird!.id)
+			.single();
+		expect(after?.species_id).toBe(speciesIdA);
+	});
+
+	it('allows setting species_id to the same value it already has (only a real change is blocked)', async () => {
+		const ringNo = `${ringPrefix}-SAME-${testSuffix}`;
+		const { data: bird, error: insertError } = await groupClient
+			.from('Birds')
+			.insert({ ring_no: ringNo, species_id: speciesIdA })
+			.select('id')
+			.single();
+		if (insertError) throw insertError;
+
+		const { error } = await groupClient
+			.from('Birds')
+			.update({ species_id: speciesIdA })
+			.eq('id', bird!.id);
+
+		expect(error).toBeNull();
+	});
+
+	it('does not block creating a new Bird with a fresh ring_no', async () => {
+		const ringNo = `${ringPrefix}-FRESH-${testSuffix}`;
+		const { data: bird, error } = await groupClient
+			.from('Birds')
+			.insert({ ring_no: ringNo, species_id: speciesIdB })
+			.select('id, species_id')
+			.single();
+
+		expect(error).toBeNull();
+		expect(bird?.species_id).toBe(speciesIdB);
+	});
+
+	describe('import path (createUpserter on ring_no, as processEncounterRow uses)', () => {
+		it('re-importing the same ring_no with the same species is a no-op update, unaffected by the trigger', async () => {
+			const upsert = createUpserter(groupClient);
+			const ringNo = `${ringPrefix}-REIMPORT-SAME-${testSuffix}`;
+
+			const firstId = await upsert(
+				'Birds',
+				{ ring_no: ringNo, species_id: speciesIdA },
+				['ring_no']
+			);
+			const secondId = await upsert(
+				'Birds',
+				{ ring_no: ringNo, species_id: speciesIdA },
+				['ring_no']
+			);
+
+			expect(secondId).toBe(firstId);
+		});
+
+		it('re-importing the same ring_no with a different species no longer silently changes species_id — it errors, and species_id is preserved', async () => {
+			const upsert = createUpserter(groupClient);
+			const ringNo = `${ringPrefix}-REIMPORT-DIFF-${testSuffix}`;
+
+			const birdId = await upsert(
+				'Birds',
+				{ ring_no: ringNo, species_id: speciesIdA },
+				['ring_no']
+			);
+
+			await expect(
+				upsert('Birds', { ring_no: ringNo, species_id: speciesIdB }, ['ring_no'])
+			).rejects.toMatchObject({ code: '23514' });
+
+			// The original species must survive the rejected re-import.
+			const { data: after } = await groupClient
+				.from('Birds')
+				.select('species_id')
+				.eq('id', birdId)
+				.single();
+			expect(after?.species_id).toBe(speciesIdA);
+		});
 	});
 });

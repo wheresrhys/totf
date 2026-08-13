@@ -11,6 +11,13 @@ CREATE INDEX idx_birds_ringing_group_ids ON public."Birds" USING gin (ringing_gr
 
 CREATE INDEX idx_birds_species_id ON public."Birds" (species_id);
 
+-- species_id is immutable once set: a physical ring number belongs to one bird of
+-- one species for life, so a re-import reusing an existing ring_no with a different
+-- species is a source-data error the import must surface rather than silently apply.
+CREATE TRIGGER trigger_trg_prevent_bird_species_id_change BEFORE
+UPDATE ON public."Birds" FOR EACH ROW
+EXECUTE FUNCTION public.trg_prevent_bird_species_id_change ();
+
 -- SELECT: grants access if any of:
 -- 1. The logged-in group is one of the groups that has ringed this bird (its id is in ringing_group_ids)
 -- 2. The bird has no ringing group yet (empty array, e.g. freshly imported) and the user is authenticated
