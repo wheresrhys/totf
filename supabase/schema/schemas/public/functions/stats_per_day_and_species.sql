@@ -29,7 +29,7 @@ BEGIN
     sess.visit_date IS NOT NULL
     AND e.ringing_group_id = ringing_group_filter
     AND sess.ringing_group_id = ringing_group_filter
-    AND sess.is_resighting_only = FALSE
+    AND sess.session_type = 'FULL_GROWN'
   GROUP BY
     sess.visit_date, sp.species_name;
 END;
