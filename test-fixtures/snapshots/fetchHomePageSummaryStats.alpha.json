@@ -50,5 +50,31 @@
     "avg_wing": 66.1,
     "min_wing": 49,
     "median_wing": 65
+  },
+  "lastYear": {
+    "species_name": null,
+    "time_period": null,
+    "session_count": 12,
+    "total_effort": "24:00:00",
+    "effort_per_session": "02:00:00",
+    "effort_per_encounter": "00:15:00",
+    "avg_encounters_per_session": 8,
+    "max_per_session": 18,
+    "species_count": 13,
+    "bird_count": 96,
+    "encounter_count": 110,
+    "new_bird_count": 68,
+    "3j_count": 15,
+    "3_count": 50,
+    "new_3_count": 42,
+    "max_new_per_session": 11,
+    "max_weight": 31,
+    "avg_weight": 15.3,
+    "min_weight": 8.6,
+    "median_weight": 14.8,
+    "max_wing": 78,
+    "avg_wing": 67.2,
+    "min_wing": 47,
+    "median_wing": 67
   }
 }

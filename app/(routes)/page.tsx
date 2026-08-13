@@ -1,19 +1,13 @@
 import {
-	StatsAccordion,
-	StatConfig,
-	type StatsAccordionModel
-} from '../components/StatsAccordion';
-import { getSeasonMonths, getSeasonName } from '../models/seasons';
-import {
 	BootstrapPageData,
 	type DefaultPageParams
 } from '../components/layout/BootstrapPageData';
 import {
 	BoxyList,
 	PageWrapper,
-	SecondaryHeading
+	SecondaryHeading,
+	Table
 } from '../components/shared/DesignSystem';
-import { getTopStats, type UserTopStatsArgs } from '../actions/top-performers';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
@@ -33,132 +27,15 @@ type SpeciesWithBirdsCount = Pick<SpeciesRow, 'id' | 'species_name'> & {
 export type HomePageSummaryStats = {
 	allTime: AggregateStatsResult | null;
 	thisYear: AggregateStatsResult | null;
+	lastYear: AggregateStatsResult | null;
 };
 
 type PageModel = {
-	stats: StatsAccordionModel[];
 	recentSessions: SessionWithEncountersCount[];
 	topSpecies: SpeciesWithBirdsCount[];
 	summaryStats: HomePageSummaryStats | null;
 	lastGroupTick: GroupTicksResult | null;
 };
-function getStatConfigs(
-	date: Date
-): { heading: string; stats: StatConfig[] }[] {
-	return [
-		{
-			heading: 'Busiest sessions:',
-			stats: [
-				{
-					id: 'busiest-session-all-time',
-					category: 'All time',
-					unit: 'Birds',
-					dataArguments: {
-						temporal_unit: 'day',
-						metric_name: 'encounters'
-					} as UserTopStatsArgs
-				},
-				{
-					id: `busiest-session-${getSeasonName(date)}`,
-					category: `Any ${getSeasonName(date)}`,
-					unit: 'Birds',
-					dataArguments: {
-						temporal_unit: 'day',
-						metric_name: 'encounters',
-						filters: {
-							months_filter: getSeasonMonths(date, false) as number[]
-						}
-					} as UserTopStatsArgs
-				},
-				{
-					id: `busiest-session-this-${getSeasonName(date)}`,
-					category: `This ${getSeasonName(date)}`,
-					unit: 'Birds',
-					dataArguments: {
-						temporal_unit: 'day',
-						metric_name: 'encounters',
-						filters: {
-							exact_months_filter: getSeasonMonths(date, true) as string[]
-						}
-					} as UserTopStatsArgs
-				}
-			]
-		},
-		{
-			heading: 'Most varied sessions:',
-			stats: [
-				{
-					id: 'most-varied-session-all-time',
-					category: 'All time',
-					unit: 'Species',
-					dataArguments: {
-						temporal_unit: 'day',
-						metric_name: 'species'
-					} as UserTopStatsArgs
-				},
-				{
-					id: `most-varied-session-${getSeasonName(date)}`,
-					category: `Any ${getSeasonName(date)}`,
-					unit: 'Species',
-					dataArguments: {
-						temporal_unit: 'day',
-						metric_name: 'species',
-						filters: {
-							months_filter: getSeasonMonths(date, false) as number[]
-						}
-					} as UserTopStatsArgs
-				},
-				{
-					id: `most-varied-session-this-${getSeasonName(date)}`,
-					category: `This ${getSeasonName(date)}`,
-					unit: 'Species',
-					dataArguments: {
-						temporal_unit: 'day',
-						metric_name: 'species',
-						filters: {
-							exact_months_filter: getSeasonMonths(date, true) as string[]
-						}
-					} as UserTopStatsArgs
-				}
-			]
-		},
-		{
-			heading: 'Individual species:',
-			stats: [
-				{
-					id: 'highest-species-day-count-ever',
-					category: 'Highest day counts',
-					unit: 'Birds',
-					bySpecies: true,
-					dataArguments: {
-						temporal_unit: 'day',
-						metric_name: 'encounters'
-					} as UserTopStatsArgs
-				},
-				{
-					id: 'highest-species-month-count-ever',
-					category: 'Highest month counts',
-					unit: 'Birds',
-					bySpecies: true,
-					dataArguments: {
-						temporal_unit: 'month',
-						metric_name: 'individuals'
-					} as UserTopStatsArgs
-				},
-				{
-					id: 'highest-species-year-count-ever',
-					category: 'Highest year counts',
-					unit: 'Birds',
-					bySpecies: true,
-					dataArguments: {
-						temporal_unit: 'year',
-						metric_name: 'individuals'
-					} as UserTopStatsArgs
-				}
-			]
-		}
-	];
-}
 
 export async function fetchRecentSessions(
 	viewedGroupId: number
@@ -184,8 +61,11 @@ export async function fetchHomePageSummaryStats(
 	viewedGroupId: number
 ): Promise<HomePageSummaryStats | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	const startOfCurrentYear = `${new Date().getFullYear()}-01-01`;
-	const [allTime, thisYear] = await Promise.all([
+	const currentYear = new Date().getFullYear();
+	const startOfCurrentYear = `${currentYear}-01-01`;
+	const startOfLastYear = `${currentYear - 1}-01-01`;
+	const endOfLastYear = `${currentYear - 1}-12-31`;
+	const [allTime, thisYear, lastYear] = await Promise.all([
 		supabase
 			.rpc('aggregate_stats', { ringing_group_filter: viewedGroupId })
 			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>,
@@ -194,12 +74,23 @@ export async function fetchHomePageSummaryStats(
 				ringing_group_filter: viewedGroupId,
 				from_date: startOfCurrentYear
 			})
+			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>,
+		supabase
+			.rpc('aggregate_stats', {
+				ringing_group_filter: viewedGroupId,
+				from_date: startOfLastYear,
+				to_date: endOfLastYear
+			})
 			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
 	]);
-	if (allTime?.[0] == null && thisYear?.[0] == null) {
+	if (allTime?.[0] == null && thisYear?.[0] == null && lastYear?.[0] == null) {
 		return null;
 	}
-	return { allTime: allTime?.[0] ?? null, thisYear: thisYear?.[0] ?? null };
+	return {
+		allTime: allTime?.[0] ?? null,
+		thisYear: thisYear?.[0] ?? null,
+		lastYear: lastYear?.[0] ?? null
+	};
 }
 
 export async function fetchLastGroupTick(
@@ -231,33 +122,7 @@ export async function fetchHomePageData(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<PageModel> {
-	const statConfigs = getStatConfigs(new Date());
 	return {
-		stats: await Promise.all(
-			statConfigs.map(async (panelGroup) => {
-				const panels = await Promise.all(
-					panelGroup.stats.map(async (panel) => {
-						const data = await getTopStats(Boolean(panel.bySpecies), {
-							...panel.dataArguments,
-							filters: {
-								...(panel.dataArguments.filters ?? {}),
-								ringing_group_filter: viewedGroupId
-							},
-							result_limit: 1
-						});
-
-						return {
-							definition: panel,
-							data: data ?? []
-						};
-					})
-				);
-				return {
-					heading: panelGroup.heading,
-					stats: panels
-				};
-			})
-		),
 		recentSessions: await fetchRecentSessions(viewedGroupId),
 		topSpecies: await fetchTopSpecies(),
 		summaryStats: await fetchHomePageSummaryStats(viewedGroupId),
@@ -274,7 +139,15 @@ function RecentSessions({
 }) {
 	return (
 		<div>
-			<SecondaryHeading>Recent Sessions</SecondaryHeading>
+			<SecondaryHeading>
+				Sessions{' '}
+				<NoPrefetchLink
+					href="/sessions"
+					className="link link-secondary text-sm"
+				>
+					View all
+				</NoPrefetchLink>
+			</SecondaryHeading>
 			<BoxyList>
 				<SessionsByDay
 					sessions={data}
@@ -285,56 +158,96 @@ function RecentSessions({
 		</div>
 	);
 }
-function SummaryParagraph({
-	prefix,
-	stats
-}: {
-	prefix?: string;
-	stats: AggregateStatsResult;
-}) {
-	return (
-		<p className="text-lg">
-			{prefix}
-			<span className="font-bold">{stats.session_count}</span> sessions, with{' '}
-			<span className="font-bold">{stats.bird_count}</span> birds{' '}
-			<span className="italic">({stats.new_bird_count} new)</span> of{' '}
-			<span className="font-bold">{stats.species_count}</span> species
-			encountered <span className="font-bold">{stats.encounter_count}</span>{' '}
-			times
-		</p>
-	);
+const SUMMARY_STATS_ROWS: {
+	label: string;
+	field: keyof AggregateStatsResult;
+}[] = [
+	{ label: 'Sessions', field: 'session_count' },
+	{ label: 'Birds', field: 'bird_count' },
+	{ label: 'New', field: 'new_bird_count' },
+	{ label: 'Encounters', field: 'encounter_count' },
+	{ label: 'Species', field: 'species_count' }
+];
+function getSummaryStatsColumns(): {
+	label: string;
+	period: keyof HomePageSummaryStats;
+}[] {
+	const currentYear = new Date().getFullYear();
+	return [
+		{ label: String(currentYear), period: 'thisYear' },
+		{ label: String(currentYear - 1), period: 'lastYear' },
+		{ label: 'All time', period: 'allTime' }
+	];
 }
-function SummaryStats({ data }: { data: HomePageSummaryStats | null }) {
+function SummaryStatsTable({ data }: { data: HomePageSummaryStats | null }) {
 	if (!data) {
 		return null;
 	}
+	if (!data.allTime && !data.thisYear && !data.lastYear) {
+		return null;
+	}
+	const columns = getSummaryStatsColumns();
 	return (
 		<div>
-			{data.allTime && <SummaryParagraph stats={data.allTime} />}
-			{data.thisYear && (
-				<SummaryParagraph prefix="This year: " stats={data.thisYear} />
-			)}
+			<Table
+				testId="summary-stats-table"
+				className="table table-xs sm:table-md"
+			>
+				<thead>
+					<tr>
+						<th>Totals</th>
+						{columns.map((column) => (
+							<th key={column.period} scope="col">
+								{column.label}
+							</th>
+						))}
+					</tr>
+				</thead>
+				<tbody>
+					{SUMMARY_STATS_ROWS.map((row) => (
+						<tr key={row.field}>
+							<th scope="row">{row.label}</th>
+							{columns.map((column) => {
+								const stats = data[column.period];
+								return (
+									<td key={column.period}>{stats ? stats[row.field] : '–'}</td>
+								);
+							})}
+						</tr>
+					))}
+				</tbody>
+			</Table>
 		</div>
 	);
 }
 function LastGroupTick({ data }: { data: GroupTicksResult | null }) {
 	if (!data) return null;
 	return (
-		<div>
-			<p className="text-lg">
-				Last group tick: {data.species_name} on{' '}
-				{formatDate(new Date(data.first_encounter_date), 'do MMMM yyyy')}
-			</p>
+		<p className="text-lg mt-3">
+			Last tick: {data.species_name} on{' '}
+			{formatDate(new Date(data.first_encounter_date), 'do MMMM yyyy')}{' '}
 			<NoPrefetchLink href="/ticks" className="link link-secondary text-sm">
-				View all
+				View all ticks
 			</NoPrefetchLink>
-		</div>
+		</p>
 	);
 }
-function TopSpecies({ data }: { data: SpeciesWithBirdsCount[] }) {
+function TopSpecies({
+	data,
+	lastGroupTick
+}: {
+	data: SpeciesWithBirdsCount[];
+	lastGroupTick: GroupTicksResult | null;
+}) {
 	return (
 		<div>
-			<SecondaryHeading>Top species</SecondaryHeading>
+			<SecondaryHeading>
+				Species{' '}
+				<NoPrefetchLink href="/species" className="link link-secondary text-sm">
+					View all
+				</NoPrefetchLink>
+			</SecondaryHeading>
+
 			<ul className="flex flex-wrap gap-2">
 				{data.map((species) => (
 					<li key={species.id}>
@@ -347,6 +260,7 @@ function TopSpecies({ data }: { data: SpeciesWithBirdsCount[] }) {
 					</li>
 				))}
 			</ul>
+			<LastGroupTick data={lastGroupTick} />
 		</div>
 	);
 }
@@ -359,14 +273,12 @@ function HomePageContent({
 }) {
 	return (
 		<PageWrapper>
-			<SummaryStats data={data.summaryStats} />
-			<LastGroupTick data={data.lastGroupTick} />
+			<SummaryStatsTable data={data.summaryStats} />
 			<RecentSessions
 				data={data.recentSessions}
 				viewedGroupId={viewedGroupId}
 			/>
-			<TopSpecies data={data.topSpecies} />
-			<StatsAccordion data={data.stats} viewedGroupId={viewedGroupId} />
+			<TopSpecies data={data.topSpecies} lastGroupTick={data.lastGroupTick} />
 		</PageWrapper>
 	);
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, within } from '@testing-library/react';
 import Page from '../page';
 import recentSessionsSnapshot from '@/test-fixtures/snapshots/fetchRecentSessions.alpha.json';
 import topSpeciesSnapshot from '@/test-fixtures/snapshots/fetchTopSpecies.alpha.json';
@@ -14,10 +14,6 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 
 vi.mock('@/lib/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
-}));
-
-vi.mock('@/app/actions/top-performers', () => ({
-	getTopStats: vi.fn().mockResolvedValue([])
 }));
 
 const defaultLastGroupTick: GroupTicksResult[] = [
@@ -54,18 +50,22 @@ function makeChainClient(
 			...thenable
 		};
 	}
-	const rpc = vi.fn((fnName: string, args: { from_date?: string } = {}) => {
-		const data =
-			fnName === 'group_ticks'
-				? lastGroupTick
-				: args?.from_date
-					? [summaryStats.thisYear]
-					: [summaryStats.allTime];
-		return {
-			then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-				Promise.resolve({ data, error: null }).then(resolve)
-		};
-	});
+	const rpc = vi.fn(
+		(fnName: string, args: { from_date?: string; to_date?: string } = {}) => {
+			const data =
+				fnName === 'group_ticks'
+					? lastGroupTick
+					: args?.to_date
+						? [summaryStats.lastYear]
+						: args?.from_date
+							? [summaryStats.thisYear]
+							: [summaryStats.allTime];
+			return {
+				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+					Promise.resolve({ data, error: null }).then(resolve)
+			};
+		}
+	);
 	return {
 		from: vi.fn((table: string) => chainFor(dataByTable[table] ?? [])),
 		rpc
@@ -81,24 +81,20 @@ describe('home page', () => {
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeChainClient());
 	});
 
-	it('renders Recent Sessions heading', async () => {
+	it('renders Sessions heading with a "View all" link to /sessions', async () => {
 		render(await Page());
 		const heading = await screen.findByRole('heading', {
-			name: 'Recent Sessions'
+			name: 'Sessions View all'
 		});
 		expect(heading).toBeDefined();
-	});
-
-	it('renders stats accordion', async () => {
-		render(await Page());
-		const accordions = await screen.findAllByTestId('stats-accordion-group');
-		expect(accordions.length).toBeGreaterThan(0);
+		const link = within(heading).getByRole('link', { name: 'View all' });
+		expect(link.getAttribute('href')).toBe('/sessions');
 	});
 
 	it('renders session links from fixture', async () => {
 		render(await Page());
 		const heading = await screen.findByRole('heading', {
-			name: 'Recent Sessions'
+			name: 'Sessions View all'
 		});
 		const sessionLinks =
 			heading.nextElementSibling?.querySelectorAll('a') ?? [];
@@ -112,7 +108,7 @@ describe('home page', () => {
 			);
 			render(await Page());
 			const heading = await screen.findByRole('heading', {
-				name: 'Recent Sessions'
+				name: 'Sessions View all'
 			});
 			const sessionLinks =
 				heading.nextElementSibling?.querySelectorAll('a') ?? [];
@@ -161,7 +157,7 @@ describe('home page', () => {
 			);
 			render(await Page());
 			const heading = await screen.findByRole('heading', {
-				name: 'Recent Sessions'
+				name: 'Sessions View all'
 			});
 			const sessionLinks =
 				heading.nextElementSibling?.querySelectorAll('a') ?? [];
@@ -171,63 +167,79 @@ describe('home page', () => {
 		});
 	});
 
-	describe('last group tick', () => {
-		it('renders "Last group tick: {species} on {date}" paragraph when data is present', async () => {
-			render(await Page());
-			expect(
-				await screen.findByText(
-					'Last group tick: Carrion Crow on 12th February 2026'
-				)
-			).toBeDefined();
-		});
-
-		it('renders a "View all" link to /ticks when data is present', async () => {
-			render(await Page());
-			const link = await screen.findByRole('link', { name: 'View all' });
-			expect(link.getAttribute('href')).toBe('/ticks');
-		});
-
-		describe('with no ticks yet', () => {
-			it('omits the paragraph entirely', async () => {
-				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-					makeChainClient({ lastGroupTick: [] })
-				);
-				render(await Page());
-				const heading = await screen.findByRole('heading', {
-					name: 'Recent Sessions'
-				});
-				expect(heading).toBeDefined();
-				expect(screen.queryByText(/Last group tick:/)).toBeNull();
-			});
-
-			it('omits the "View all" link', async () => {
-				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-					makeChainClient({ lastGroupTick: [] })
-				);
-				render(await Page());
-				await screen.findByRole('heading', { name: 'Recent Sessions' });
-				expect(screen.queryByRole('link', { name: 'View all' })).toBeNull();
-			});
-		});
-	});
-
-	describe('top species section', () => {
-		it('renders Top species heading', async () => {
+	describe('species section', () => {
+		it('renders Species heading with a "View all" link to /species', async () => {
 			render(await Page());
 			const heading = await screen.findByRole('heading', {
-				name: 'Top species'
+				name: 'Species View all'
 			});
 			expect(heading).toBeDefined();
+			const link = within(heading).getByRole('link', { name: 'View all' });
+			expect(link.getAttribute('href')).toBe('/species');
+		});
+
+		describe('last tick (last group tick)', () => {
+			it('renders "Last tick: {species} on {date}" after the species badge list', async () => {
+				render(await Page());
+				const heading = await screen.findByRole('heading', {
+					name: 'Species View all'
+				});
+				const container = heading.parentElement as HTMLElement;
+				const children = Array.from(container.children);
+				const list = container.querySelector('ul');
+				const paragraph = children.find(
+					(el) => el.tagName === 'P' && el.textContent?.includes('Last tick:')
+				);
+				expect(paragraph?.textContent).toContain(
+					'Last tick: Carrion Crow on 12th February 2026'
+				);
+				expect(list).not.toBeNull();
+				expect(children.indexOf(list as Element)).toBeLessThan(
+					children.indexOf(paragraph as Element)
+				);
+			});
+
+			it('renders a "View all ticks" link to /ticks', async () => {
+				render(await Page());
+				const link = await screen.findByRole('link', {
+					name: 'View all ticks'
+				});
+				expect(link.getAttribute('href')).toBe('/ticks');
+			});
+
+			describe('with no ticks yet', () => {
+				it('omits the paragraph entirely', async () => {
+					mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+						makeChainClient({ lastGroupTick: [] })
+					);
+					render(await Page());
+					const heading = await screen.findByRole('heading', {
+						name: 'Species View all'
+					});
+					expect(heading).toBeDefined();
+					expect(screen.queryByText(/Last tick:/)).toBeNull();
+				});
+
+				it('omits the "View all ticks" link', async () => {
+					mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+						makeChainClient({ lastGroupTick: [] })
+					);
+					render(await Page());
+					await screen.findByRole('heading', { name: 'Species View all' });
+					expect(
+						screen.queryByRole('link', { name: 'View all ticks' })
+					).toBeNull();
+				});
+			});
 		});
 
 		it('renders a badge link per top species, sorted by bird count and excluding zero-count and beyond-10th species', async () => {
 			render(await Page());
 			const heading = await screen.findByRole('heading', {
-				name: 'Top species'
+				name: 'Species View all'
 			});
-			const speciesLinks = Array.from(
-				heading.nextElementSibling?.querySelectorAll('a') ?? []
-			);
+			const speciesList = heading.parentElement?.querySelector('ul');
+			const speciesLinks = Array.from(speciesList?.querySelectorAll('a') ?? []);
 			expect(speciesLinks.map((link) => link.textContent?.trim())).toEqual([
 				'Blackbird',
 				'Blue Tit',
@@ -261,70 +273,73 @@ describe('home page', () => {
 				);
 				render(await Page());
 				const heading = await screen.findByRole('heading', {
-					name: 'Top species'
+					name: 'Species View all'
 				});
-				const speciesLinks =
-					heading.nextElementSibling?.querySelectorAll('a') ?? [];
+				const speciesList = heading.parentElement?.querySelector('ul');
+				const speciesLinks = speciesList?.querySelectorAll('a') ?? [];
 				expect(speciesLinks.length).toBe(0);
 			});
 		});
 	});
 
-	describe('summary stats', () => {
-		it('renders the all-time summary paragraph with bold counts from aggregate_stats', async () => {
-			const { container } = render(await Page());
-			await screen.findByRole('heading', { name: 'Recent Sessions' });
-			const { allTime } = summaryStatsSnapshot;
-			const paragraph = Array.from(container.querySelectorAll('p')).find((p) =>
-				p.textContent?.includes('sessions, with')
-			);
-			expect(paragraph?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-				`${allTime.session_count} sessions, with ${allTime.bird_count} birds (${allTime.new_bird_count} new) of ${allTime.species_count} species encountered ${allTime.encounter_count} times`
-			);
-			const boldValues = Array.from(
-				paragraph?.querySelectorAll('.font-bold') ?? []
-			).map((el) => el.textContent);
-			expect(boldValues).toEqual([
-				String(allTime.session_count),
-				String(allTime.bird_count),
-				String(allTime.species_count),
-				String(allTime.encounter_count)
+	describe('summary stats table', () => {
+		const summaryStatsRows: {
+			label: string;
+			field: keyof typeof summaryStatsSnapshot.allTime;
+		}[] = [
+			{ label: 'Sessions', field: 'session_count' },
+			{ label: 'Birds', field: 'bird_count' },
+			{ label: 'New', field: 'new_bird_count' },
+			{ label: 'Encounters', field: 'encounter_count' },
+			{ label: 'Species', field: 'species_count' }
+		];
+
+		function getRow(table: HTMLElement, label: string) {
+			const row = within(table)
+				.getAllByRole('row')
+				.find((r) => within(r).queryByText(label));
+			if (!row) throw new Error(`No row found for label "${label}"`);
+			return row;
+		}
+
+		it('renders a "Totals" corner cell and a header column per period, labelled with the actual year and in this-year / last-year / all-time order', async () => {
+			render(await Page());
+			const table = await screen.findByTestId('summary-stats-table');
+			const headers = within(table)
+				.getAllByRole('columnheader')
+				.map((h) => h.textContent);
+			const currentYear = new Date().getFullYear();
+			expect(headers).toEqual([
+				'Totals',
+				String(currentYear),
+				String(currentYear - 1),
+				'All time'
 			]);
 		});
 
-		it('renders the this-year summary paragraph with bold counts from aggregate_stats', async () => {
-			const { container } = render(await Page());
-			await screen.findByRole('heading', { name: 'Recent Sessions' });
-			const { thisYear } = summaryStatsSnapshot;
-			const paragraph = Array.from(container.querySelectorAll('p')).find((p) =>
-				p.textContent?.startsWith('This year:')
-			);
-			expect(paragraph?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-				`This year: ${thisYear.session_count} sessions, with ${thisYear.bird_count} birds (${thisYear.new_bird_count} new) of ${thisYear.species_count} species encountered ${thisYear.encounter_count} times`
-			);
+		it('renders a row per metric with values from aggregate_stats for each period', async () => {
+			render(await Page());
+			const table = await screen.findByTestId('summary-stats-table');
+			const { allTime, thisYear, lastYear } = summaryStatsSnapshot;
+			summaryStatsRows.forEach(({ label, field }) => {
+				const row = getRow(table, label);
+				const cells = within(row)
+					.getAllByRole('cell')
+					.map((c) => c.textContent);
+				expect(cells).toEqual([
+					String(thisYear[field]),
+					String(lastYear[field]),
+					String(allTime[field])
+				]);
+			});
 		});
 
-		it('renders the new-bird count as a de-emphasised (italic) parenthetical, not one of the bold counts', async () => {
-			const { container } = render(await Page());
-			await screen.findByRole('heading', { name: 'Recent Sessions' });
-			const { allTime } = summaryStatsSnapshot;
-			const paragraph = Array.from(container.querySelectorAll('p')).find((p) =>
-				p.textContent?.includes('sessions, with')
-			);
-			const italic = paragraph?.querySelector('.italic');
-			expect(italic?.textContent).toBe(`(${allTime.new_bird_count} new)`);
-			const boldValues = Array.from(
-				paragraph?.querySelectorAll('.font-bold') ?? []
-			).map((el) => el.textContent);
-			expect(boldValues).not.toContain(String(allTime.new_bird_count));
-		});
-
-		it('calls aggregate_stats with from_date set to 1 Jan of the current year for the this-year paragraph, and no date filter for the all-time paragraph', async () => {
+		it('calls aggregate_stats for this year, last year, and all time, with the correct date bounds', async () => {
 			const client = makeChainClient();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 			render(await Page());
-			await screen.findByRole('heading', { name: 'Recent Sessions' });
-			const currentYearStart = `${new Date().getFullYear()}-01-01`;
+			await screen.findByTestId('summary-stats-table');
+			const currentYear = new Date().getFullYear();
 			const calls = client.rpc.mock.calls.filter(
 				([fnName]) => fnName === 'aggregate_stats'
 			);
@@ -336,71 +351,80 @@ describe('home page', () => {
 			expect(
 				calls.some(
 					([, args]) =>
-						(args as { from_date?: string }).from_date === currentYearStart
+						(args as { from_date?: string }).from_date ===
+						`${currentYear}-01-01`
+				)
+			).toBe(true);
+			expect(
+				calls.some(
+					([, args]) =>
+						(args as { from_date?: string; to_date?: string }).from_date ===
+							`${currentYear - 1}-01-01` &&
+						(args as { from_date?: string; to_date?: string }).to_date ===
+							`${currentYear - 1}-12-31`
 				)
 			).toBe(true);
 		});
 
 		describe('with a brand-new group that has zero sessions', () => {
-			it('renders "0" in each stat slot for both paragraphs', async () => {
+			it('renders "0" in every cell', async () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 					makeChainClient({
 						summaryStats:
 							summaryStatsZeroSnapshot as unknown as HomePageSummaryStats
 					})
 				);
-				const { container } = render(await Page());
-				await screen.findByRole('heading', { name: 'Recent Sessions' });
-				const paragraphs = Array.from(container.querySelectorAll('p')).filter(
-					(p) => p.textContent?.includes('sessions, with')
-				);
-				expect(paragraphs.length).toBe(2);
-				paragraphs.forEach((paragraph) => {
-					const boldValues = Array.from(
-						paragraph.querySelectorAll('.font-bold')
-					).map((el) => el.textContent);
-					expect(boldValues).toEqual(['0', '0', '0', '0']);
+				render(await Page());
+				const table = await screen.findByTestId('summary-stats-table');
+				summaryStatsRows.forEach(({ label }) => {
+					const row = getRow(table, label);
+					const cells = within(row)
+						.getAllByRole('cell')
+						.map((c) => c.textContent);
+					expect(cells).toEqual(['0', '0', '0']);
 				});
 			});
 		});
 
-		describe('with all-time data but no this-year data', () => {
-			it('renders only the all-time paragraph', async () => {
+		describe('with only all-time data (this-year and last-year missing)', () => {
+			it('renders a dash for the missing periods and values for all time', async () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 					makeChainClient({
 						summaryStats: {
 							allTime: summaryStatsSnapshot.allTime,
-							thisYear: null
+							thisYear: null,
+							lastYear: null
 						} as unknown as HomePageSummaryStats
 					})
 				);
-				const { container } = render(await Page());
-				await screen.findByRole('heading', { name: 'Recent Sessions' });
-				const paragraphs = Array.from(container.querySelectorAll('p')).filter(
-					(p) => p.textContent?.includes('sessions, with')
-				);
-				expect(paragraphs.length).toBe(1);
-				expect(paragraphs[0].textContent?.startsWith('This year:')).toBe(false);
+				render(await Page());
+				const table = await screen.findByTestId('summary-stats-table');
+				const row = getRow(table, 'Sessions');
+				const cells = within(row)
+					.getAllByRole('cell')
+					.map((c) => c.textContent);
+				expect(cells).toEqual([
+					'–',
+					'–',
+					String(summaryStatsSnapshot.allTime.session_count)
+				]);
 			});
 		});
 
-		describe('with this-year data but no all-time data', () => {
-			it('renders only the this-year paragraph', async () => {
+		describe('with every period missing', () => {
+			it('renders no table', async () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 					makeChainClient({
 						summaryStats: {
 							allTime: null,
-							thisYear: summaryStatsSnapshot.thisYear
+							thisYear: null,
+							lastYear: null
 						} as unknown as HomePageSummaryStats
 					})
 				);
-				const { container } = render(await Page());
-				await screen.findByRole('heading', { name: 'Recent Sessions' });
-				const paragraphs = Array.from(container.querySelectorAll('p')).filter(
-					(p) => p.textContent?.includes('sessions, with')
-				);
-				expect(paragraphs.length).toBe(1);
-				expect(paragraphs[0].textContent?.startsWith('This year:')).toBe(true);
+				render(await Page());
+				await screen.findByRole('heading', { name: 'Sessions View all' });
+				expect(screen.queryByTestId('summary-stats-table')).toBeNull();
 			});
 		});
 	});
