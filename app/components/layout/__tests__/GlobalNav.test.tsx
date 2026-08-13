@@ -35,6 +35,7 @@ describe('DesktopNavItems', () => {
 		expect(screen.getByRole('link', { name: 'Mistakes' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Retraps' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Resightings' })).toBeDefined();
+		expect(screen.getByRole('link', { name: 'Pulli' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Ticks' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Effort' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Ring Sequences' })).toBeDefined();
@@ -73,15 +74,20 @@ describe('DesktopNavItems', () => {
 describe('MobileNavItems', () => {
 	afterEach(cleanup);
 
-	it('renders all 9 links in a flat list', () => {
+	it('renders all 10 links in a flat list', () => {
 		render(<MobileNavItems classes="" />);
 		const links = screen.getAllByRole('link');
-		expect(links).toHaveLength(9);
+		expect(links).toHaveLength(10);
 	});
 
 	it('includes Resightings link', () => {
 		render(<MobileNavItems classes="" />);
 		expect(screen.getByRole('link', { name: 'Resightings' })).toBeDefined();
+	});
+
+	it('includes Pulli link', () => {
+		render(<MobileNavItems classes="" />);
+		expect(screen.getByRole('link', { name: 'Pulli' })).toBeDefined();
 	});
 
 	it('includes Ticks link', () => {

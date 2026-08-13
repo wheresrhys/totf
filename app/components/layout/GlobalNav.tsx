@@ -10,6 +10,7 @@ const moreLinks = [
 	{ href: '/mistakes', label: 'Mistakes' },
 	{ href: '/retraps', label: 'Retraps' },
 	{ href: '/resightings', label: 'Resightings' },
+	{ href: '/pulli', label: 'Pulli' },
 	{ href: '/ticks', label: 'Ticks' },
 	{ href: '/effort', label: 'Effort' },
 	{ href: '/ring-sequences', label: 'Ring Sequences' },
