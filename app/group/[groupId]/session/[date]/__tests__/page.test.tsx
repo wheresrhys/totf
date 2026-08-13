@@ -144,42 +144,42 @@ describe('session detail page', () => {
 		expect(heading.textContent).toContain('15th March 2024');
 	});
 
-	it('excludes resighting-only sessions from the main Sessions query', async () => {
+	it('excludes non-FULL_GROWN sessions from the main Sessions query', async () => {
 		const client = makeSessionClient();
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 		render(await renderPage());
 		await screen.findByTestId('session-stats');
 		const mainSessionsChain = client.from.mock.results[0].value;
 		expect(mainSessionsChain.eq).toHaveBeenCalledWith(
-			'is_resighting_only',
-			false
+			'session_type',
+			'FULL_GROWN'
 		);
 	});
 
 	describe('adjacent session date lookups', () => {
-		it('excludes resighting-only sessions from the previous-session lookup', async () => {
+		it('excludes non-FULL_GROWN sessions from the previous-session lookup', async () => {
 			const client = makeSessionClient();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 			render(await renderPage());
 			await screen.findByTestId('session-stats');
 			const previousChain = client.from.mock.results[1].value;
 			expect(previousChain.eq).toHaveBeenCalledWith(
-				'is_resighting_only',
-				false
+				'session_type',
+				'FULL_GROWN'
 			);
 		});
 
-		it('excludes resighting-only sessions from the next-session lookup', async () => {
+		it('excludes non-FULL_GROWN sessions from the next-session lookup', async () => {
 			const client = makeSessionClient();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 			render(await renderPage());
 			await screen.findByTestId('session-stats');
 			const nextChain = client.from.mock.results[2].value;
-			expect(nextChain.eq).toHaveBeenCalledWith('is_resighting_only', false);
+			expect(nextChain.eq).toHaveBeenCalledWith('session_type', 'FULL_GROWN');
 		});
 	});
 
-	describe('a date whose only Sessions row is resighting-only', () => {
+	describe('a date whose only Sessions row is PULLI or FIELD_OBSERVATION', () => {
 		it('renders the "No session found" empty state instead of 404ing', async () => {
 			const client = {
 				from: vi
