@@ -7,8 +7,8 @@ import { getTopStats } from '@/app/actions/top-performers';
 import type { TemporalUnit } from './shared/StatOutput';
 import type { AccordionItemModel } from './StatsAccordion';
 
-type AccordionItemModelWithGroupId = AccordionItemModel & {
-	viewedGroupId: number;
+type AccordionItemModelWithGroup = AccordionItemModel & {
+	viewedGroup: { id: number; slug: string | null };
 };
 
 function hasData(data: TopPeriodsResult[] | null): data is TopPeriodsResult[] {
@@ -19,7 +19,7 @@ function ItemContent({
 	model,
 	expandedId
 }: {
-	model: AccordionItemModelWithGroupId;
+	model: AccordionItemModelWithGroup;
 	expandedId: string | false;
 }) {
 	const [data, setData] = useState<TopPeriodsResult[] | null>(model.data);
@@ -40,7 +40,7 @@ function ItemContent({
 					...model.definition.dataArguments,
 					filters: {
 						...(model.definition.dataArguments.filters ?? {}),
-						ringing_group_filter: model.viewedGroupId
+						ringing_group_filter: model.viewedGroup.id
 					},
 					result_limit: 5
 				})
@@ -64,7 +64,7 @@ function ItemContent({
 		model.definition.id,
 		model.definition.bySpecies,
 		model.definition.dataArguments,
-		model.viewedGroupId
+		model.viewedGroup.id
 	]);
 
 	return hasData(data) ? (
@@ -83,7 +83,7 @@ function ItemContent({
 						temporalUnit={
 							model.definition.dataArguments.temporal_unit as TemporalUnit
 						}
-						viewedGroupId={model.viewedGroupId}
+						viewedGroup={model.viewedGroup}
 					/>
 				</li>
 			))}
@@ -96,7 +96,7 @@ function ItemContent({
 	);
 }
 
-function ItemHeading({ model }: { model: AccordionItemModelWithGroupId }) {
+function ItemHeading({ model }: { model: AccordionItemModelWithGroup }) {
 	return (
 		<span>
 			<span className="font-bold">{model.definition.category}:</span>{' '}
@@ -113,22 +113,22 @@ function ItemHeading({ model }: { model: AccordionItemModelWithGroupId }) {
 
 export function StatsAccordionItem({
 	item,
-	viewedGroupId,
+	viewedGroup,
 	expanded,
 	onToggle
 }: {
 	item: AccordionItemModel;
-	viewedGroupId: number;
+	viewedGroup: { id: number; slug: string | null };
 	expanded: string | false;
 	onToggle: (id: string | false) => void;
 }) {
 	return (
 		<AccordionItem
-			key={`${viewedGroupId}-${item.definition.id}`}
+			key={`${viewedGroup.id}-${item.definition.id}`}
 			id={item.definition.id}
 			HeadingComponent={ItemHeading}
 			ContentComponent={ItemContent}
-			model={{ ...item, viewedGroupId }}
+			model={{ ...item, viewedGroup }}
 			onToggle={onToggle}
 			expandedId={expanded}
 		/>

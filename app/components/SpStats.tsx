@@ -99,8 +99,8 @@ export function SpStats({
 	topSessions,
 	birds,
 	speciesStats,
-	viewedGroupId
-}: FullFatPageData & { viewedGroupId: number }) {
+	viewedGroup
+}: FullFatPageData & { viewedGroup: { id: number; slug: string | null } }) {
 	if (!speciesStats) return null;
 	// const NotableRetrapsBirds =
 	// 	speciesStats.max_encountered_bird && speciesStats.max_encountered_bird > 1
@@ -164,7 +164,7 @@ export function SpStats({
 						temporalUnit="day"
 						classes="badge badge-outline"
 						dateFormat="d MMM yyyy"
-						viewedGroupId={viewedGroupId}
+						viewedGroup={viewedGroup}
 					/>
 				))}
 			</li>

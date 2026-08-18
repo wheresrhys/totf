@@ -38,12 +38,12 @@ const groupByMonth = groupByDateMethod('getMonth');
 export function SessionsByDay({
 	sessions,
 	wrapperClasses = '',
-	viewedGroupId,
+	viewedGroup,
 	dateFormat
 }: {
 	sessions: SessionWithEncountersCount[];
 	wrapperClasses?: string;
-	viewedGroupId: number;
+	viewedGroup: { id: number; slug: string | null };
 	dateFormat: string;
 }) {
 	const sessionsByDate: Record<string, SessionWithEncountersCount[]> = {};
@@ -66,7 +66,7 @@ export function SessionsByDay({
 							showUnit={true}
 							temporalUnit="day"
 							dateFormat={dateFormat}
-							viewedGroupId={viewedGroupId}
+							viewedGroup={viewedGroup}
 						/>
 					) : (
 						<>
@@ -81,7 +81,7 @@ export function SessionsByDay({
 								showUnit={true}
 								temporalUnit="day"
 								dateFormat={dateFormat}
-								viewedGroupId={viewedGroupId}
+								viewedGroup={viewedGroup}
 							/>{' '}
 							at{' '}
 							{daySessions.map((session, index) => (
@@ -89,7 +89,7 @@ export function SessionsByDay({
 									{index > 0 ? ', ' : null}
 									<NoPrefetchLink
 										className="link"
-										href={`/group/${viewedGroupId}/session/${session.visit_date}/site/${session.location.id}`}
+										href={`/group/${viewedGroup.slug}/session/${session.visit_date}/site/${session.location.id}`}
 									>
 										{printLocationName(session.location.location_name)}
 									</NoPrefetchLink>
@@ -109,10 +109,10 @@ function getYearString(year: SessionWithEncountersCount[][]) {
 
 export function SessionHistoryCalendar({
 	sessions,
-	viewedGroupId
+	viewedGroup
 }: {
 	sessions: SessionWithEncountersCount[] | null;
-	viewedGroupId: number;
+	viewedGroup: { id: number; slug: string | null };
 }) {
 	const calendar = groupByYear(sessions || []).map(groupByMonth);
 	const thisYearString = calendar[0] ? getYearString(calendar[0]) : false;
@@ -137,7 +137,7 @@ export function SessionHistoryCalendar({
 						key={yearString}
 						year={year}
 						yearString={yearString}
-						viewedGroupId={viewedGroupId}
+						viewedGroup={viewedGroup}
 						expandedYear={expandedYear}
 						onToggle={setExpandedYear}
 					/>

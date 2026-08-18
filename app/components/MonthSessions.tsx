@@ -23,16 +23,19 @@ export function MonthSessionsHeading({
 }
 
 export function MonthSessionsContent({
-	model: { viewedGroupId, monthData: month }
+	model: { viewedGroup, monthData: month }
 }: {
-	model: { viewedGroupId: number; monthData: SessionWithEncountersCount[] };
+	model: {
+		viewedGroup: { id: number; slug: string | null };
+		monthData: SessionWithEncountersCount[];
+	};
 }) {
 	return (
 		<ol className="list-inside list-none py-3">
 			<SessionsByDay
 				sessions={month}
 				wrapperClasses="mb-2"
-				viewedGroupId={viewedGroupId}
+				viewedGroup={viewedGroup}
 				dateFormat="EEEE do"
 			/>
 		</ol>

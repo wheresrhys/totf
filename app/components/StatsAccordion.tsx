@@ -25,15 +25,15 @@ export type StatsAccordionModel = {
 
 export function StatsAccordion({
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	data: StatsAccordionModel[];
-	viewedGroupId: number;
+	viewedGroup: { id: number; slug: string | null };
 }) {
 	const [expanded, setExpanded] = useState<string | false>(false);
 	useEffect(() => {
 		setExpanded(false);
-	}, [viewedGroupId]);
+	}, [viewedGroup.id]);
 	return (
 		<>
 			{data.map(({ heading, stats }) => (
@@ -42,9 +42,9 @@ export function StatsAccordion({
 					<BoxyList>
 						{stats.map((item) => (
 							<StatsAccordionItem
-								key={`${viewedGroupId}-${item.definition.id}`}
+								key={`${viewedGroup.id}-${item.definition.id}`}
 								item={item}
-								viewedGroupId={viewedGroupId}
+								viewedGroup={viewedGroup}
 								expanded={expanded}
 								onToggle={setExpanded}
 							/>
