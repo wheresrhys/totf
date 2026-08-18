@@ -70,9 +70,8 @@ incrementally; current inventory:
 | `derive_branch_name` | Ticket branch naming (wraps `lib/slugify.ts`) + collision check |
 | `create_ticket` | `gh issue create` with labels + sub-issue linking, no shell-escaping/tempfile dance |
 | `resolve_migration_dml` | Extract hand-authored backfill DML from a PR body or local migration file |
-
-Still to land (tracked in #478): `link_ticket_dependencies` (ticketify's blocked-by wiring),
-`apply_schema_migration` (take-over's schema-apply + mismatch detection).
+| `link_ticket_dependencies` | Apply GitHub blocked-by links to an issue (one comma-joined `gh issue edit --add-blocked-by` call) — ticketify's dependency wiring |
+| `apply_schema_migration` | Run `npm run db:schema:apply` in a worktree, classify the outcome (`applied`/`history-mismatch`/`error`) and name the colliding worktree on a mismatch — take-over's schema-apply + mismatch detection |
 
 Use these tools for anything that touches `.claude/swarm-state.json`, creates a GitHub issue,
 derives a branch name, or extracts backfill DML — never reimplement the `jq`/glob/anchor-text
