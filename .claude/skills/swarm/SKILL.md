@@ -56,11 +56,12 @@ Entry shape:
 
 - **On every spawn** (§1 and §3): after the Agent tool call returns an id, find the worktree path
   — if not already given back by the spawn result, diff `git worktree list` from just before the
-  spawn to just after; the new entry is the freshly-created worktree. Then append the entry:
-  create the file with `[]` first if it doesn't exist, then
-  `jq --argjson e '<entry-json>' '. + [$e]' .claude/swarm-state.json > /tmp/swarm-state.tmp && mv /tmp/swarm-state.tmp .claude/swarm-state.json`.
-- **On every completion** (§4) **and on halt/drain** (Termination): remove that worker's entry —
-  `jq --arg id '<agentId>' 'map(select(.agentId != $id))' .claude/swarm-state.json > /tmp/swarm-state.tmp && mv /tmp/swarm-state.tmp .claude/swarm-state.json`.
+  spawn to just after; the new entry is the freshly-created worktree. Then append the entry via
+  `mcp__swarm-tools__swarm_state_append` (fields as in the shape above). Never hand-write this
+  file with `jq` — the tool holds a filesystem lock so concurrent worktrees never lose an update
+  to each other.
+- **On every completion** (§4) **and on halt/drain** (Termination): remove that worker's entry via
+  `mcp__swarm-tools__swarm_state_remove` with `agentId`.
 
 **Concurrency is capped at 4 worker subagents.** The top-level swarm orchestrator (the parent
 agent running this skill) does not count toward the cap — it only selects, spawns, reports and
@@ -96,32 +97,33 @@ A new completion, a freshly-`ready`/-conflicting PR, or a **manual re-check** co
 user (see §4.5) later re-triggers a refill. The user can stop the loop at any time — see
 **Termination**.
 
+## 0. Plan the batch (one call covers §1 and §2's selection)
+
+`mcp__swarm-tools__swarm_plan_batch` with `freeSlots` = 4 minus currently-running workers takes
+care of the `gh pr list`/`gh api comments`/`gh pr view reviews`/`gh issue list --label
+ready`/`closedByPullRequestsReferences`/`git branch -a` calls and all the eligibility/ranking
+reasoning below in one round trip — including the solo-run rule (an exclusive-resource PR or
+ticket only gets selected if nothing else is running or already picked this pass, and once
+picked, nothing else is). Use its `prsNeedingMaintenance` for §1 and `ticketsToImplement` for §2
+directly — both are already filtered, ranked, and truncated to `freeSlots`. `soloRunActive` /
+`soloRunLabel` tell you whether a solo run is already in progress; `drained` tells you whether
+there was genuinely nothing eligible (regardless of slots) and no workers running.
+
 ## 1. Maintain open PRs — resolve conflicts + address feedback (first call on the budget)
 
-`gh pr list --state open --json number,title,headRefName,labels,reviews,mergeable`
-
-An open PR **needs maintenance** if either holds:
-- **Merge conflicts** — `mergeable` is `CONFLICTING` (it may report `UNKNOWN` briefly while
-  GitHub recomputes; re-query rather than assume).
-- **Outstanding feedback** — inline review comments
-  (`gh api repos/{owner}/{repo}/pulls/<n>/comments`) or review bodies (`gh pr view <n> --json
-  reviews`) authored by a human, **newer than the PR's head commit** or not yet replied to.
-  `CHANGES_REQUESTED` always counts. Ignore the PR's own mermaid-diff/behaviour-change bot
-  comments and anything already answered.
-
-- **Solo-run rule applies here too** — if any worker (either track) is currently running, skip a
-  PR that needs maintenance if either it or the running worker is exclusive-resource-labelled
-  (check the PR's own `labels`, not the linked issue — see the solo-run rule above). It stays
-  eligible on the next refill. A non-exclusive-resource PR is only held up if an
-  exclusive-resource worker is currently running; it's never held up by other non-exclusive-resource
-  workers.
+A PR appears in `prsNeedingMaintenance` because it either has merge conflicts (`mergeable` was
+`CONFLICTING`) or outstanding feedback (a human review/comment, `CHANGES_REQUESTED`, or anything
+newer than the head commit and not yet replied to — the tool ignores the PR's own
+mermaid-diff/behaviour-change comments and bot authors). Its `reason` field says which
+(`conflict` | `feedback` | `conflict+feedback`).
 
 For each PR needing maintenance (up to the budget), launch **one** background Agent that handles
 both concerns for that PR:
 - `subagent_type: general-purpose`; no `isolation` — the prompt tells it to **reuse the PR
   branch's existing worktree if one exists** (`git worktree list`), else `git worktree add` a
   fresh one for that branch. Never edit the main working tree.
-- `model` = the linked ticket's label if resolvable, else `sonnet`.
+- `model` = the candidate's `model` field (already resolved from the linked ticket's label, or
+  `sonnet` if unresolvable).
 - `description`: `"Maintain PR #<pr>"`.
 - Prompt, in order:
   1. **Conflicts first** — if `CONFLICTING`, `git fetch origin` then `git merge origin/main`
@@ -139,25 +141,13 @@ If no open PR needs maintenance, skip to ticket selection with the full budget.
 
 ## 2. Select tickets (fill the remaining budget)
 
-`gh issue list --state open --label ready --json number,title,labels,blockedBy,blocking`
+`swarm_plan_batch`'s `ticketsToImplement` is already unblocked (no open `blockedBy` entry),
+not in-flight (no existing branch or open linked PR), solo-run-filtered, ranked by `blockingCount`
+descending then issue number ascending, and truncated to the free slots left after §1's
+allocation — use it directly.
 
-Filter and rank:
-- **Unblocked only** — drop any issue with an *open* entry in `blockedBy` (all-closed blockers =
-  unblocked).
-- **Skip in-flight** — drop issues that already have an open linked PR or an existing branch
-  (`gh issue view <n> --json closedByPullRequestsReferences` / `git branch -a`).
-- **Solo-run rule** — if a ticket carries `db-migration` or `e2e-exclusive`, only select it if no
-  worker of any kind (either track) is currently running **and** none has already been picked
-  earlier in this same selection pass. If any exclusive-resource worker is currently running,
-  don't select anything else at all this round, exclusive-resource or not. Skipped tickets remain
-  eligible on the next refill once the in-flight worker completes.
-- **Bias to unblockers** — among what's left, rank by the count of *open* issues in `blocking`
-  (how many others this ticket unblocks), highest first; tie-break on lowest issue number.
-- Take as many as the **free slots** allow (4 minus workers currently running — both tracks).
-
-If, on a given selection pass, neither §1 nor §2 yields eligible work **and** no workers are
-running, the pool is drained: report that and go idle (do not exit the loop — a later completion
-or new PR can refill).
+If `drained` is `true`, neither §1 nor §2 found eligible work and no workers are running: report
+that and go idle (do not exit the loop — a later completion or new PR can refill).
 
 ## 3. Spawn one worktree subagent per ticket
 

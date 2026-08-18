@@ -117,12 +117,11 @@ This gate is mandatory for every ticket. Parallel drafting in step 3 must never 
 user confirms and can give feedback on each WIP ticket individually.
 
 ### 5. Create issues
-On each confirmation, run `flesh-out-ticket` step 7: ensure the model label, `ready`, and (if
-`touchesDbSchema`) `db-migration` and/or (if `touchesE2eMutatingTrigger`) `e2e-exclusive` labels
-exist (create if missing), write the body to a scratchpad temp file, then:
-`gh issue create --title "..." --body-file <tmpfile> --label <model> --label ready [--label db-migration] [--label e2e-exclusive]`.
-If this run is scoped under a tracking issue, link each created issue as its sub-issue (same
-mechanism as `flesh-out-ticket` step 7.3). Record the mapping `task → issue number`.
+On each confirmation, run `flesh-out-ticket` step 7: call `mcp__swarm-tools__create_ticket` with
+`title`, `body`, `modelLabel`, `extraLabels` (`db-migration` if `touchesDbSchema`, `e2e-exclusive`
+if `touchesE2eMutatingTrigger`), and `parentIssue` if this run is scoped under a tracking issue
+(the tool links the sub-issue itself). Record the mapping `task → issue number` from the
+returned `issueNumber`.
 
 ### 6. Wire up dependencies (second pass)
 Once every confirmed issue exists (so all issue numbers are known), resolve each ticket's
