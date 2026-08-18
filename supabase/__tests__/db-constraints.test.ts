@@ -327,3 +327,56 @@ describe('DB constraints — Encounters uniqueness (bird_id, session_id)', () =>
 		expect(duplicate.error?.code).toBe('23505');
 	});
 });
+
+describe('DB constraints — RingingGroups uniqueness (slug)', () => {
+	const suffix = randomTestSuffix();
+	let groupId: number;
+	let groupClient: SupabaseClient;
+
+	beforeAll(async () => {
+		groupId = createIsolatedGroup(`db-constraints-${suffix}-slug`);
+		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+	});
+
+	afterAll(() => {
+		psql(
+			`DELETE FROM "RingingGroups" WHERE group_name LIKE 'DbConstraintsGroup-${suffix}-%';` +
+				`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
+		);
+	});
+
+	it('allows inserting a RingingGroups row with a unique slug', async () => {
+		const { error } = await groupClient.from('RingingGroups').insert({
+			group_name: `DbConstraintsGroup-${suffix}-unique`,
+			slug: `db-constraints-${suffix}-unique`
+		});
+		expect(error).toBeNull();
+	});
+
+	it('rejects a raw duplicate slug insert with a unique-violation error', async () => {
+		const slug = `db-constraints-${suffix}-dup`;
+		const first = await groupClient.from('RingingGroups').insert({
+			group_name: `DbConstraintsGroup-${suffix}-dup-1`,
+			slug
+		});
+		expect(first.error).toBeNull();
+
+		const duplicate = await groupClient.from('RingingGroups').insert({
+			group_name: `DbConstraintsGroup-${suffix}-dup-2`,
+			slug
+		});
+		expect(duplicate.error?.code).toBe('23505');
+	});
+
+	it('allows inserting multiple RingingGroups rows with a null slug', async () => {
+		const first = await groupClient.from('RingingGroups').insert({
+			group_name: `DbConstraintsGroup-${suffix}-null-1`
+		});
+		expect(first.error).toBeNull();
+
+		const second = await groupClient.from('RingingGroups').insert({
+			group_name: `DbConstraintsGroup-${suffix}-null-2`
+		});
+		expect(second.error).toBeNull();
+	});
+});
