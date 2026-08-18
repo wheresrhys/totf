@@ -28,7 +28,7 @@ describe('YearSessions', () => {
 			<YearSessions
 				year={yearData}
 				yearString="2022"
-				viewedGroupId={1}
+				viewedGroup={{ id: 1, slug: 'alpha' }}
 				expandedYear={false}
 				onToggle={mockOnToggle}
 			/>
@@ -42,7 +42,7 @@ describe('YearSessions', () => {
 			<YearSessions
 				year={yearData}
 				yearString="2022"
-				viewedGroupId={1}
+				viewedGroup={{ id: 1, slug: 'alpha' }}
 				expandedYear={false}
 				onToggle={mockOnToggle}
 			/>
@@ -57,7 +57,7 @@ describe('YearSessions', () => {
 			<YearSessions
 				year={yearData}
 				yearString="2022"
-				viewedGroupId={1}
+				viewedGroup={{ id: 1, slug: 'alpha' }}
 				expandedYear="2022"
 				onToggle={mockOnToggle}
 			/>

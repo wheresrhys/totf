@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	fireEvent,
+	within
+} from '@testing-library/react';
 import Page from '../page';
 import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
 import type { FullFatPageData } from '../page';
@@ -106,6 +112,18 @@ describe('species detail page', () => {
 			it('renders SpIndividualsTab', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-individuals-tab');
+			});
+		});
+
+		it('renders "Top sessions" links using the group slug, not the numeric id', async () => {
+			render(await renderSpeciesPage());
+			const stats = await screen.findByTestId('headline-stats');
+			const sessionLinks = within(stats)
+				.getAllByRole('link')
+				.filter((link) => link.getAttribute('href')?.includes('/session/'));
+			expect(sessionLinks.length).toBeGreaterThan(0);
+			sessionLinks.forEach((link) => {
+				expect(link.getAttribute('href')).toMatch(/^\/group\/alpha\/session\//);
 			});
 		});
 

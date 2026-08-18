@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import Page from '../page';
 import alphaSessionsSnapshot from '@/test-fixtures/snapshots/fetchAllSessions.alpha.json';
 import betaSessionsSnapshot from '@/test-fixtures/snapshots/fetchAllSessions.beta.json';
@@ -61,6 +61,26 @@ describe('sessions page', () => {
 			const yearHeadings = await screen.findAllByRole('heading', { level: 2 });
 			expect(yearHeadings.length).toBeGreaterThan(1);
 			yearHeadings.forEach((h) => expect(h.textContent).toMatch(/^\d{4}$/));
+		});
+
+		it('renders a session-day link using the group slug, not the numeric id', async () => {
+			render(await Page());
+			await screen.findAllByRole('heading', { level: 2 });
+			const monthButton = screen
+				.getAllByRole('button')
+				.find((btn) => /[a-z]+: \d+ sessions/i.test(btn.textContent ?? ''));
+			expect(monthButton).toBeDefined();
+			fireEvent.click(monthButton as HTMLElement);
+			const sessionLinks = await screen.findAllByRole('link', {
+				name: /\w+ \d+(st|nd|rd|th)/
+			});
+			const dayLinks = sessionLinks.filter((link) =>
+				link.getAttribute('href')?.includes('/session/')
+			);
+			expect(dayLinks.length).toBeGreaterThan(0);
+			dayLinks.forEach((link) => {
+				expect(link.getAttribute('href')).toMatch(/^\/group\/alpha\/session\//);
+			});
 		});
 
 		it('renders sessions grouped by month within year', async () => {

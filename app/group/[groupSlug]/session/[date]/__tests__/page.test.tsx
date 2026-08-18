@@ -256,6 +256,39 @@ describe('session detail page', () => {
 		expect(highlights.textContent).toContain('Busiest session ever — 3 birds');
 	});
 
+	describe('multi-location day', () => {
+		it('renders a Locations badge link to the site-filtered session URL', async () => {
+			const multiLocationSessions = [
+				mockSessions[0],
+				{
+					id: 2,
+					location_id: 11,
+					location: {
+						id: 11,
+						location_name: 'Other Reserve',
+						ringing_group_id: 1
+					}
+				}
+			];
+			const client = {
+				from: vi
+					.fn()
+					.mockReturnValueOnce(makeChain(multiLocationSessions))
+					.mockReturnValueOnce(makeChain(mockPreviousSession))
+					.mockReturnValueOnce(makeChain(mockNextSession))
+					.mockReturnValueOnce(makeChain(mockEncounters))
+			};
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+			render(await renderPage());
+			const locationLink = await screen.findByRole('link', {
+				name: 'Other Reserve'
+			});
+			expect(locationLink.getAttribute('href')).toBe(
+				`/group/${TEST_GROUP_SLUG}/session/${TEST_DATE}/site/11`
+			);
+		});
+	});
+
 	describe('session navigation', () => {
 		it('renders a "Previous" link pointing to the previous session date', async () => {
 			render(await renderPage());
@@ -263,7 +296,7 @@ describe('session detail page', () => {
 				name: /previous session/i
 			});
 			expect(previousLink.getAttribute('href')).toBe(
-				`/group/${TEST_GROUP_ID}/session/${mockPreviousSession[0].visit_date}`
+				`/group/${TEST_GROUP_SLUG}/session/${mockPreviousSession[0].visit_date}`
 			);
 		});
 
@@ -273,7 +306,7 @@ describe('session detail page', () => {
 				name: /next session/i
 			});
 			expect(nextLink.getAttribute('href')).toBe(
-				`/group/${TEST_GROUP_ID}/session/${mockNextSession[0].visit_date}`
+				`/group/${TEST_GROUP_SLUG}/session/${mockNextSession[0].visit_date}`
 			);
 		});
 	});

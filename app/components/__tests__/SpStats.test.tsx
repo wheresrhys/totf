@@ -21,7 +21,7 @@ describe('SpStats', () => {
 					speciesStats={speciesStats}
 					speciesId={1}
 					speciesName="Robin"
-					viewedGroupId={1}
+					viewedGroup={{ id: 1, slug: 'alpha' }}
 				/>
 			);
 			expect(
@@ -39,7 +39,7 @@ describe('SpStats', () => {
 					speciesStats={speciesStats}
 					speciesId={1}
 					speciesName="Robin"
-					viewedGroupId={1}
+					viewedGroup={{ id: 1, slug: 'alpha' }}
 				/>
 			);
 			expect(
