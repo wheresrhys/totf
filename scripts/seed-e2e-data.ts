@@ -13,6 +13,7 @@ import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { supabase } from '../lib/supabase';
+import { slugify } from '../lib/slugify';
 import { generateSnapshots } from './generate-snapshots';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,24 +40,22 @@ async function getGroupId(name: string): Promise<number> {
 }
 
 async function main() {
-	// Step 1: Import Alpha CSV (creates Alpha group + all data)
-	run(`npm run db:import:local -- test-fixtures/csv/alpha.csv "Alpha"`);
-
-	// Step 2: Get Alpha ID
-	const alphaId = await getGroupId('Alpha');
-
-	// Step 3: Pre-create Beta, Gamma, and Delta groups (INSERT is allowed for all; UPDATE is restricted)
-	// Use ignoreDuplicates so re-running doesn't fail when group already exists.
-	for (const name of ['Beta', 'Gamma', 'Delta']) {
+	// Step 1: Pre-create all four groups with slugs, before any CSV import runs.
+	// scripts/import-csv.ts no longer creates a RingingGroups row when the given name
+	// isn't found (#473), so Alpha must exist here too, not just Beta/Gamma/Delta.
+	// INSERT is allowed for all; UPDATE is restricted. Use ignoreDuplicates-via-23505 so
+	// re-running doesn't fail when a group already exists.
+	for (const name of ['Alpha', 'Beta', 'Gamma', 'Delta']) {
 		await supabase
 			.from('RingingGroups')
-			.insert({ group_name: name })
+			.insert({ group_name: name, slug: slugify(name) })
 			.then(({ error }) => {
 				// Ignore unique constraint violation (group already exists)
 				if (error && error.code !== '23505')
 					throw new Error(`Failed to create ${name}: ${error.message}`);
 			});
 	}
+	const alphaId = await getGroupId('Alpha');
 	const betaId = await getGroupId('Beta');
 	const gammaId = await getGroupId('Gamma');
 	const deltaId = await getGroupId('Delta');
@@ -65,7 +64,10 @@ async function main() {
 		`Groups: Alpha(${alphaId}), Beta(${betaId}), Gamma(${gammaId}), Delta(${deltaId})`
 	);
 
-	// Step 4: Insert GroupDataSharing via direct Postgres (bypasses RLS — no INSERT policy exists)
+	// Step 2: Import Alpha CSV (Alpha group already exists from step 1)
+	run(`npm run db:import:local -- test-fixtures/csv/alpha.csv "Alpha"`);
+
+	// Step 3: Insert GroupDataSharing via direct Postgres (bypasses RLS — no INSERT policy exists)
 	// Alpha shares with Beta; Beta shares with Gamma. Not transitive.
 	execSync(
 		`psql "${LOCAL_DB_URL}" -c "INSERT INTO \\"GroupDataSharing\\" (granter_group_id, recipient_group_id) VALUES (${alphaId}, ${betaId}), (${betaId}, ${gammaId}) ON CONFLICT (granter_group_id, recipient_group_id) DO NOTHING;"`,
@@ -73,16 +75,16 @@ async function main() {
 	);
 	console.log(`GroupDataSharing: Alpha→Beta, Beta→Gamma created`);
 
-	// Step 5: Import Beta CSV (GroupDataSharing must exist first so SHARED01 is accessible to Beta)
+	// Step 4: Import Beta CSV (GroupDataSharing must exist first so SHARED01 is accessible to Beta)
 	run(`npm run db:import:local -- test-fixtures/csv/beta.csv "Beta"`);
 
-	// Step 6: Set group passwords
+	// Step 5: Set group passwords
 	run(`npm run set-group-password:local -- "Alpha" "alphapassword"`);
 	run(`npm run set-group-password:local -- "Beta" "betapassword"`);
 	run(`npm run set-group-password:local -- "Gamma" "gammapassword"`);
 	run(`npm run set-group-password:local -- "Delta" "deltapassword"`);
 
-	// Step 7: Generate snapshot JSON fixtures
+	// Step 6: Generate snapshot JSON fixtures
 	await generateSnapshots(alphaId, betaId, gammaId);
 }
 
