@@ -132,10 +132,10 @@ export async function fetchHomePageData(
 
 function RecentSessions({
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	data: SessionWithEncountersCount[];
-	viewedGroupId: number;
+	viewedGroup: { id: number; slug: string | null };
 }) {
 	return (
 		<div>
@@ -151,7 +151,7 @@ function RecentSessions({
 			<BoxyList>
 				<SessionsByDay
 					sessions={data}
-					viewedGroupId={viewedGroupId}
+					viewedGroup={viewedGroup}
 					dateFormat="EEEE do MMMM"
 				/>
 			</BoxyList>
@@ -266,31 +266,34 @@ function TopSpecies({
 }
 function HomePageContent({
 	data,
-	viewedGroupId
+	viewedGroupId,
+	viewedGroupSlug
 }: {
 	data: PageModel;
 	viewedGroupId: number;
+	viewedGroupSlug: string | null;
 }) {
+	const viewedGroup = { id: viewedGroupId, slug: viewedGroupSlug };
 	return (
 		<PageWrapper>
 			<SummaryStatsTable data={data.summaryStats} />
-			<RecentSessions
-				data={data.recentSessions}
-				viewedGroupId={viewedGroupId}
-			/>
+			<RecentSessions data={data.recentSessions} viewedGroup={viewedGroup} />
 			<TopSpecies data={data.topSpecies} lastGroupTick={data.lastGroupTick} />
 		</PageWrapper>
 	);
 }
 
 export default async function Home({
-	viewedGroupId
+	viewedGroupId,
+	viewedGroupSlug
 }: {
 	viewedGroupId?: number;
+	viewedGroupSlug?: string;
 } = {}) {
 	return (
 		<BootstrapPageData<PageModel>
 			viewedGroupId={viewedGroupId}
+			viewedGroupSlug={viewedGroupSlug}
 			getCacheKeys={() => ['home-stats']}
 			dataFetcher={fetchHomePageData}
 			PageComponent={HomePageContent}

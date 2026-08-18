@@ -17,6 +17,7 @@ export default async function CrossGroupSessionPage({ params }: PageProps) {
 	return (
 		<BootstrapPageData<DayData, PageProps, PageParams>
 			viewedGroupId={viewedGroupId}
+			viewedGroupSlug={groupSlug}
 			getParams={async () => ({ viewedGroupId, date, locationId: undefined })}
 			getCacheKeys={() => ['session', date]}
 			dataFetcher={fetchSessionData}

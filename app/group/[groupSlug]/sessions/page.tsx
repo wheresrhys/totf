@@ -10,5 +10,7 @@ export default async function CrossGroupSessionsPage({
 	const { groupSlug } = await params;
 	const viewedGroupId = await resolveGroupIdBySlug(groupSlug);
 	if (viewedGroupId === null) notFound();
-	return <SessionsPage viewedGroupId={viewedGroupId} />;
+	return (
+		<SessionsPage viewedGroupId={viewedGroupId} viewedGroupSlug={groupSlug} />
+	);
 }

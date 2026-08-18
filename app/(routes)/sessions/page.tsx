@@ -29,27 +29,33 @@ export async function fetchAllSessions(
 
 function ListAllSessions({
 	data,
-	viewedGroupId
+	viewedGroupId,
+	viewedGroupSlug
 }: {
 	data: SessionWithEncountersCount[];
 	viewedGroupId: number;
+	viewedGroupSlug: string | null;
 }) {
+	const viewedGroup = { id: viewedGroupId, slug: viewedGroupSlug };
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Session history</PrimaryHeading>
-			<SessionHistoryCalendar sessions={data} viewedGroupId={viewedGroupId} />
+			<SessionHistoryCalendar sessions={data} viewedGroup={viewedGroup} />
 		</PageWrapper>
 	);
 }
 
 export default async function SessionsPage({
-	viewedGroupId
+	viewedGroupId,
+	viewedGroupSlug
 }: {
 	viewedGroupId?: number;
+	viewedGroupSlug?: string;
 } = {}) {
 	return (
 		<BootstrapPageData<SessionWithEncountersCount[]>
 			viewedGroupId={viewedGroupId}
+			viewedGroupSlug={viewedGroupSlug}
 			getCacheKeys={() => ['sessions']}
 			dataFetcher={fetchAllSessions}
 			PageComponent={ListAllSessions}

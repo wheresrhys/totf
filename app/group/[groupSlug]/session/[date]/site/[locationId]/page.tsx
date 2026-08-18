@@ -19,6 +19,7 @@ export default async function CrossGroupSessionSitePage({ params }: PageProps) {
 	return (
 		<BootstrapPageData<DayData, PageProps, PageParams>
 			viewedGroupId={viewedGroupId}
+			viewedGroupSlug={groupSlug}
 			getParams={async () => ({
 				viewedGroupId,
 				date,

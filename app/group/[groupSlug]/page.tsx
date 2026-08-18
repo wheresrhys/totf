@@ -15,5 +15,5 @@ export default async function CrossGroupHome({
 	if (viewedGroupId === loggedInGroupId) {
 		redirect('/');
 	}
-	return <Home viewedGroupId={viewedGroupId} />;
+	return <Home viewedGroupId={viewedGroupId} viewedGroupSlug={groupSlug} />;
 }

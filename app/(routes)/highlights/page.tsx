@@ -169,27 +169,33 @@ export async function fetchHighlightsData(
 
 function HighlightsPageContent({
 	data,
-	viewedGroupId
+	viewedGroupId,
+	viewedGroupSlug
 }: {
 	data: StatsAccordionModel[];
 	viewedGroupId: number;
+	viewedGroupSlug: string | null;
 }) {
+	const viewedGroup = { id: viewedGroupId, slug: viewedGroupSlug };
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Highlights</PrimaryHeading>
-			<StatsAccordion data={data} viewedGroupId={viewedGroupId} />
+			<StatsAccordion data={data} viewedGroup={viewedGroup} />
 		</PageWrapper>
 	);
 }
 
 export default async function HighlightsPage({
-	viewedGroupId
+	viewedGroupId,
+	viewedGroupSlug
 }: {
 	viewedGroupId?: number;
+	viewedGroupSlug?: string;
 } = {}) {
 	return (
 		<BootstrapPageData<StatsAccordionModel[]>
 			viewedGroupId={viewedGroupId}
+			viewedGroupSlug={viewedGroupSlug}
 			getCacheKeys={() => ['highlights']}
 			dataFetcher={fetchHighlightsData}
 			PageComponent={HighlightsPageContent}

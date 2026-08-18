@@ -79,12 +79,13 @@ export async function fetchSpPageData(
 }
 
 export default async function SpeciesPage(
-	props: PageProps & { viewedGroupId?: number }
+	props: PageProps & { viewedGroupId?: number; viewedGroupSlug?: string }
 ) {
 	return (
 		<BootstrapPageData<PageData, PageProps, PageParams>
 			pageProps={props}
 			viewedGroupId={props.viewedGroupId}
+			viewedGroupSlug={props.viewedGroupSlug}
 			getCacheKeys={(params: PageParams) => ['species', params.speciesName]}
 			dataFetcher={fetchSpPageData}
 			PageComponent={SpPage}

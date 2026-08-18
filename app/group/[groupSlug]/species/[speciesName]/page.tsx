@@ -12,6 +12,7 @@ export default async function CrossGroupSingleSpeciesPage(props: {
 		<SpeciesPage
 			params={Promise.resolve({ speciesName })}
 			viewedGroupId={viewedGroupId}
+			viewedGroupSlug={groupSlug}
 		/>
 	);
 }
