@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 import { getGroupCookie } from '@/app/actions/group-cookie';
+import { resolveGroupSlugById } from '@/lib/group-slug';
 
 export type DefaultPageParams = Record<string, string>;
 export type DefaultPageProps = { params: Promise<DefaultPageParams> };
@@ -11,6 +12,7 @@ export type BootstrapPageDataProps<DataType, PagePropsType, ParamsType> = {
 	loading?: React.ReactNode;
 	ttl?: number;
 	viewedGroupId?: number;
+	viewedGroupSlug?: string;
 	getCacheKeys: (params: ParamsType) => string[];
 	getParams?: (pageProps: PagePropsType) => Promise<ParamsType>;
 	dataFetcher: (
@@ -21,6 +23,7 @@ export type BootstrapPageDataProps<DataType, PagePropsType, ParamsType> = {
 		params: ParamsType;
 		data: DataType;
 		viewedGroupId: number;
+		viewedGroupSlug: string | null;
 	}) => React.ReactNode;
 };
 
@@ -71,7 +74,8 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 	getCacheKeys,
 	PageComponent,
 	ttl,
-	viewedGroupId: viewedGroupIdProp
+	viewedGroupId: viewedGroupIdProp,
+	viewedGroupSlug: viewedGroupSlugProp
 }: BootstrapPageDataProps<DataType, PagePropsType, ParamsType>) {
 	let params: ParamsType;
 	if (getParams) {
@@ -94,6 +98,9 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 		// TODO this should trigger a proper authorisation flow
 		return <p>Select a group to view data on this site</p>;
 	}
+	const viewedGroupSlug =
+		viewedGroupSlugProp ??
+		(loggedInGroupId ? await resolveGroupSlugById(loggedInGroupId) : null);
 	const data = await fetchDataWithCache<DataType, ParamsType>({
 		params,
 		dataFetcher,
@@ -105,7 +112,12 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 		notFound();
 	}
 	return (
-		<PageComponent params={params} data={data} viewedGroupId={viewedGroupId} />
+		<PageComponent
+			params={params}
+			data={data}
+			viewedGroupId={viewedGroupId}
+			viewedGroupSlug={viewedGroupSlug}
+		/>
 	);
 }
 

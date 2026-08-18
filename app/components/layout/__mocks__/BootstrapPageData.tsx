@@ -65,6 +65,7 @@ export function BootstrapPageData<
 			params={params}
 			data={data}
 			viewedGroupId={1}
+			viewedGroupSlug={bootstrapProps.viewedGroupSlug ?? 'alpha'}
 		/>
 	);
 }
