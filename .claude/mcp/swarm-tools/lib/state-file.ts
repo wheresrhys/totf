@@ -1,0 +1,109 @@
+import { promises as fs } from 'fs';
+import path from 'path';
+import { execa } from 'execa';
+
+export interface SwarmWorkerEntry {
+	kind: 'ticket' | 'maintenance';
+	issue: number | null;
+	pr: number | null;
+	branch: string;
+	title: string;
+	worktreePath: string;
+	agentId: string;
+	model: string;
+	startedAt: string;
+}
+
+const LOCK_RETRY_MS = 50;
+const LOCK_TIMEOUT_MS = 5000;
+
+/**
+ * Every git worktree of this repo shares one common `.git` dir, so resolving the state file's
+ * path via `git rev-parse --git-common-dir` (rather than `process.cwd()` or this module's own
+ * on-disk location) always lands on the *main* checkout's `.claude/swarm-state.json` — even if
+ * this server process happens to be running with a worktree as its cwd. Cached per (cwd, process)
+ * since it can't change during the server's lifetime.
+ */
+const projectRootCache = new Map<string, Promise<string>>();
+async function resolveProjectRoot(cwd: string): Promise<string> {
+	let cached = projectRootCache.get(cwd);
+	if (!cached) {
+		cached = execa('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd }).then((result) =>
+			path.dirname(result.stdout.trim())
+		);
+		projectRootCache.set(cwd, cached);
+	}
+	return cached;
+}
+
+async function resolveStateFilePath(cwd: string): Promise<string> {
+	const root = await resolveProjectRoot(cwd);
+	return path.join(root, '.claude', 'swarm-state.json');
+}
+
+async function acquireLock(stateFilePath: string): Promise<string> {
+	const lockPath = `${stateFilePath}.lock`;
+	await fs.mkdir(path.dirname(stateFilePath), { recursive: true });
+	const deadline = Date.now() + LOCK_TIMEOUT_MS;
+	for (;;) {
+		try {
+			const handle = await fs.open(lockPath, 'wx');
+			await handle.close();
+			return lockPath;
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+			if (Date.now() > deadline) {
+				throw new Error(`Timed out waiting for lock on ${stateFilePath}`);
+			}
+			await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
+		}
+	}
+}
+
+async function releaseLock(lockPath: string): Promise<void> {
+	await fs.rm(lockPath, { force: true });
+}
+
+async function readState(stateFilePath: string): Promise<SwarmWorkerEntry[]> {
+	try {
+		const raw = await fs.readFile(stateFilePath, 'utf8');
+		return raw.trim() ? (JSON.parse(raw) as SwarmWorkerEntry[]) : [];
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+		throw err;
+	}
+}
+
+async function writeState(stateFilePath: string, entries: SwarmWorkerEntry[]): Promise<void> {
+	await fs.mkdir(path.dirname(stateFilePath), { recursive: true });
+	// Process-unique tmp filename: concurrent writers must never share one tmp path.
+	const tmpPath = `${stateFilePath}.${process.pid}.${Date.now()}.tmp`;
+	await fs.writeFile(tmpPath, JSON.stringify(entries, null, 2) + '\n', 'utf8');
+	await fs.rename(tmpPath, stateFilePath);
+}
+
+/** Read-only, unlocked — safe for callers that only need a snapshot (e.g. filtering/ranking). */
+export async function listState(cwd: string = process.cwd()): Promise<SwarmWorkerEntry[]> {
+	return readState(await resolveStateFilePath(cwd));
+}
+
+/**
+ * Locked read-modify-write. `mutate` receives the current entries and returns the entries to
+ * persist plus a result to hand back to the caller. Holds a filesystem lock for the duration,
+ * so concurrent worktrees appending/removing entries never lose an update to each other.
+ */
+export async function withStateLock<T>(
+	mutate: (entries: SwarmWorkerEntry[]) => { entries: SwarmWorkerEntry[]; result: T },
+	cwd: string = process.cwd()
+): Promise<T> {
+	const stateFilePath = await resolveStateFilePath(cwd);
+	const lockPath = await acquireLock(stateFilePath);
+	try {
+		const current = await readState(stateFilePath);
+		const { entries, result } = mutate(current);
+		await writeState(stateFilePath, entries);
+		return result;
+	} finally {
+		await releaseLock(lockPath);
+	}
+}

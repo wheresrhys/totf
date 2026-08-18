@@ -26,32 +26,22 @@ identifier is the skill argument (e.g. `/take-over 412`, `/take-over feature/412
 
 ## 1. Resolve the identifier
 
-Read `.claude/swarm-state.json` (if missing, treat as `[]` — everything below still works via
-git directly, just without an agent id to halt). Try, in order, until one produces exactly one
-match:
-
-1. **Exact branch match** — identifier equals an entry's `branch`, or an exact ref found in
-   `git branch -a` / `git worktree list`.
-2. **Issue/PR number match** — identifier is numeric or `#<n>`; match against `issue` or `pr`.
-3. **Agent id match** — identifier matches an entry's `agentId` exactly (the user may have this
-   from something swarm printed, or from elsewhere in the harness).
-4. **Title substring match** — case-insensitive substring/keyword match against `title`.
-
-If none of these hit and the identifier reads like a paraphrase (free text, not a number or
-branch-shaped string), resolve it to an issue first: `gh issue list --search "<identifier>"
---state open --json number,title`, then retry steps 2–4 against that issue's number.
-
-**If the state file still has no match** (never tracked, or its entry was already cleared) but
-the identifier clearly names a real ticket: derive the expected branch pattern from
-`implement-ticket`'s convention (`feature/<n>-<slug>`) and look for it directly in `git branch
--a` / `git worktree list`. This covers hand-run `implement-ticket` work and stale state entries.
-There will be no agent id to halt in this case — see step 3.
+Call `mcp__swarm-tools__resolve_work_item` with `{identifier}`. It runs the full resolution
+chain in one call: exact branch match (state file, then `git branch -a`/`git worktree list`
+directly) → issue/PR number match → agent id match → title substring match → (if none hit and
+the identifier reads like a paraphrase) a `gh issue list --search` lookup retried against the
+same strategies → a `feature/<n>-` branch-pattern fallback for a stale/never-tracked entry. Use
+`matches` and `strategyUsed` from the result:
 
 **Multiple matches** (an ambiguous paraphrase, or a number that coincidentally matches more than
 one entry) → `AskUserQuestion` listing each candidate's title, branch, and kind, and stop until
 the user picks one.
 
-**No match anywhere** → report that plainly and stop; don't guess.
+**No match anywhere** (`matches` is empty) → report that plainly and stop; don't guess.
+
+**A match with no `agentId`** (state-file/git/gh-search sources other than an exact state-file
+hit) means there's nothing to halt in step 3 — this covers hand-run `implement-ticket` work and
+stale state entries.
 
 ## 2. Guard: already there?
 
@@ -60,8 +50,8 @@ step 3 (halt) and stop; report that the user is already sitting in that worktree
 
 ## 3. Halt the agent
 
-If an `agentId` was found: `TaskStop <agentId>`, then remove that entry from
-`.claude/swarm-state.json` (same `jq` pattern swarm uses). Report success even if `TaskStop`
+If an `agentId` was found: `TaskStop <agentId>`, then remove that entry via
+`mcp__swarm-tools__swarm_state_remove` with that `agentId`. Report success even if `TaskStop`
 reports "not found" — that just means it had already finished.
 
 If no `agentId` was found for a worktree/branch that clearly exists (untracked or stale entry):
@@ -88,25 +78,17 @@ only in this worktree's gitignored `supabase/migrations/` — never committed, a
 does **not** capture it (`git stash push -u` skips gitignored files; that needs `-a`, which isn't
 used here). Step 6 below removes the worktree entirely, so this is the last chance to read it.
 
-Cheap, local-only check — no network calls, so it doesn't slow down the common (non-data-migration)
-case:
+Call `mcp__swarm-tools__resolve_migration_dml` with `{branch, worktreePath, prNumber}` (pass
+`prNumber` if step 1 already resolved it — the tool checks the PR body's "Prod-ready migration
+SQL" section first, then falls back to the local migration file's marker line) and hold the
+result for step 11 (don't defer this — the local file won't exist after step 6).
 
-```sh
-ls <worktreePath>/supabase/migrations/*"$(echo '<branch>' | sed 's/[^a-zA-Z0-9]/_/g')"*.sql \
-  2>/dev/null | xargs grep -l -- '-- Hand-authored data migration' 2>/dev/null
-```
-
-- **No match** — nothing to preserve here. Continue to step 6. (Step 11 still separately checks the
-  PR body for this branch — that doesn't depend on this local file surviving.)
-- **One or more matches** — take the most recently modified match. Read its full contents now and
-  extract everything from the marker line to end-of-file (that's the appendable block — nothing
-  before the marker matters). Hold it for step 11 (don't defer this — the file won't exist after
-  step 6). Also copy it outside the worktree as a same-run backup:
-  `cp <matchedFile> /tmp/take-over-<sanitized-branch>-hand-authored-migration.sql`. State plainly
-  that hand-authored DML was found and preserved from this local copy — step 11 prefers the
-  branch's PR body over it when both exist (the PR body is guaranteed complete and reflects what
-  was actually tested and pushed; this local copy may be stale relative to whatever
-  `db:schema:apply` regenerates after step 10's merge).
+- **`source: "none"`** — nothing to preserve here. Continue to step 6.
+- **`source: "pr-body"` or `"local-file"`** — state plainly that hand-authored DML was found and
+  which source it came from; step 11 already prioritizes `pr-body` over `local-file` when both
+  exist (the PR body is guaranteed complete and reflects what was actually tested and pushed;
+  the local copy may be stale relative to whatever `db:schema:apply` regenerates after step 10's
+  merge).
 
 ## 6. Free the branch
 
@@ -200,25 +182,20 @@ schema sync can never emit data-migration DML. Two possible outcomes:
 
 ### Reattach hand-authored DML
 
-Skip this sub-step (nothing to do) if step 5 found nothing locally **and** the PR body fetched
-above (if any) has no "Prod-ready migration SQL" section — this is the common case for a
-pure-schema `db-migration` branch.
+Skip this sub-step (nothing to do) if step 5's `resolve_migration_dml` result was `source:
+"none"` — this is the common case for a pure-schema `db-migration` branch.
 
-Otherwise, in priority order:
+Otherwise, **append** the result's `sql` to the end of the freshly-generated migration file
+(blank line separator), leaving the generated DDL untouched. The tool already prioritized
+`pr-body` over `local-file` when both existed, so no further precedence logic is needed here —
+just note in the report which `source` it came from (a `local-file` source is an untested
+fallback, since it wasn't necessarily current as of this run's merge in step 10 — flag that
+clearly).
 
-1. **PR body has a "Prod-ready migration SQL" section** — locate the literal anchor text
-   `<summary>Data migration — append to the end of the regenerated DDL migration before pushing to
-   prod` in the fetched body, then take the ```` ```sql ... ``` ```` fenced block immediately
-   following it, up to the closing `</details>`. This block is the appendable backfill DML only
-   (never the DDL) — **append** it to the end of the freshly-generated migration file (blank line
-   separator), leaving the generated DDL untouched.
-2. **No usable PR-body section** (missing, or the anchor/fence couldn't be found), **but step 5
-   captured a local copy** — append that instead. This is an untested fallback (it wasn't
-   necessarily current as of this run's merge in step 10) — flag it clearly in the report.
-3. **Neither exists** — nothing to reattach. If a PR/issue exists, its body or title may still hint
-   a backfill was intended even though no copy could be found (e.g. the implementer forgot the
-   section, or hasn't gotten that far yet) — say so plainly rather than silently reporting a clean
-   DDL-only warning; don't guess at the SQL yourself.
+If step 5 returned `source: "none"` but a PR/issue exists, its body or title may still hint a
+backfill was intended even though no copy could be found (e.g. the implementer forgot the
+section, or hasn't gotten that far yet) — say so plainly rather than silently reporting a clean
+DDL-only warning; don't guess at the SQL yourself.
 
 Report the generated migration file's path plus one of these two warnings, verbatim:
 

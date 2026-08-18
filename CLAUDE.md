@@ -54,6 +54,32 @@ concurrent worktrees doing either kind of mutation would otherwise collide:
 - `e2e-exclusive` — touches a path listed in `e2e/mutating-spec-triggers.json` (an E2E spec
   tagged `@mutates`; see "E2E tests (Playwright)" below).
 
+### MCP tools for skills
+
+The ticket-workflow skills above call a project-local MCP server (`.claude/mcp/swarm-tools/`,
+registered in `.mcp.json`) instead of hand-rolling `jq`/`gh api`/anchor-text-parsing pipelines,
+wherever a pattern is multi-step, state-mutating, or repeats across skills. Tools land
+incrementally; current inventory:
+
+| Tool | Purpose |
+|---|---|
+| `swarm_tools_ping` | Health check — confirms the server is reachable |
+| `swarm_state_append` / `_remove` / `_list` | Read/mutate `.claude/swarm-state.json` (locked, atomic — never hand-write it) |
+| `swarm_plan_batch` | Pre-filtered, pre-ranked PR-maintenance + ready-ticket lists for `swarm` |
+| `resolve_work_item` | Resolve a branch/issue/PR/agent-id/paraphrase to its worker, for `take-over` |
+| `derive_branch_name` | Ticket branch naming (wraps `lib/slugify.ts`) + collision check |
+| `create_ticket` | `gh issue create` with labels + sub-issue linking, no shell-escaping/tempfile dance |
+| `resolve_migration_dml` | Extract hand-authored backfill DML from a PR body or local migration file |
+
+Still to land (tracked in #478): `link_ticket_dependencies` (ticketify's blocked-by wiring),
+`apply_schema_migration` (take-over's schema-apply + mismatch detection).
+
+Use these tools for anything that touches `.claude/swarm-state.json`, creates a GitHub issue,
+derives a branch name, or extracts backfill DML — never reimplement the `jq`/glob/anchor-text
+equivalent in Bash. Raw `git`/`gh` Bash calls remain fine for simple one-off reads (`gh issue
+view <n> --comments`, `git fetch`, `git merge origin/main`) that aren't multi-step or
+state-mutating.
+
 ## Authentication model
 
 There are no per-person logins. Authentication is group-scoped:

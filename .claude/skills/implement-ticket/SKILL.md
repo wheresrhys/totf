@@ -64,10 +64,10 @@ subagent mode, apply the assumption rules above.
 
 ### 3. Derive branch name and create it
 
-If the ticket specifies a branch name, use it. Otherwise: `feature/<issue-number>-<slug>` where
-slug is the issue title lowercased, spaces → hyphens, punctuation dropped, truncated to ~5 words.
-
-Example: issue #87 "Add species breakdown chart to session page" → `feature/87-species-breakdown-chart`
+If the ticket specifies a branch name, use it. Otherwise call
+`mcp__swarm-tools__derive_branch_name` with `{issueNumber, title}` (add `chainSuffix` — e.g.
+`"1-db"` — for a multi-PR chain per step 4 below) to get `feature/<issue-number>-<slug>`. If it
+reports `collision: true`, don't silently reuse the colliding ref — ask/report instead.
 
 Branch from up-to-date `main` unless the ticket says otherwise. Confirm you are NOT on `main`.
 Never work on `main`.
@@ -135,8 +135,9 @@ For each PR:
      reconstructable from this test. Then paste **only the marker-to-EOF block** (not the whole
      migration file) into the PR body under a `## Prod-ready migration SQL` heading:
      `<summary>Data migration — append to the end of the regenerated DDL migration before pushing
-     to prod</summary>` followed by a fenced ```sql``` block — this exact anchor text is what lets
-     `take-over` extract and reattach it deterministically.
+     to prod</summary>` followed by a fenced ```sql``` block. This exact marker text and anchor
+     format is machine-parsed by `mcp__swarm-tools__resolve_migration_dml` (used by `take-over`)
+     — do not vary it.
    - What this increment covers
    - Link to the GitHub issue
    - Any assumptions made (subagent mode)

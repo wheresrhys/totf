@@ -89,24 +89,17 @@ State the chosen label and a one-line justification.
   confirmed.
 
 ### 7. Create the GitHub issue
-Only after confirmation:
-1. Ensure labels exist. Run `gh label list`. `ready`/`opus`/`sonnet`/`fable` already exist in
-   this repo. These two are the **exclusive-resource label set** — `swarm` caps at most 1
-   ticket carrying *either* in flight at a time, since both mean the ticket will mutate the
-   single shared local Supabase instance. Create whichever is missing and needed:
-   - If the ticket touches `supabase/schema/` (step 2) and `db-migration` is missing:
-     `gh label create db-migration --color b60205 --description "Touches supabase/schema/ — swarm runs at most one exclusive-resource ticket at a time"`
-   - If the ticket touches a path listed in `e2e/mutating-spec-triggers.json` (step 2) and
-     `e2e-exclusive` is missing:
-     `gh label create e2e-exclusive --color b60205 --description "Touches a @mutates E2E spec's trigger path — swarm runs at most one exclusive-resource ticket at a time"`
-2. Write the fleshed markdown (sections 1–4) to a temp file in the scratchpad and create the
-   issue from it (avoids shell-escaping problems):
-   `gh issue create --title "<title>" --body-file <tmpfile> --label <model> --label ready`
-   — add `--label db-migration` and/or `--label e2e-exclusive` too if step 2 flagged either.
-3. If the task came from a named tracking issue (see Input), link the new issue as its
-   sub-issue: `gh api repos/{owner}/{repo}/issues/<parent>/sub_issues -f sub_issue_id=<new-issue-node-id>`
-   (resolve the new issue's node id via `gh issue view <new-number> --json id` first).
-4. Report the created issue URL back to the user.
+Only after confirmation, call `mcp__swarm-tools__create_ticket` with:
+- `title`, `body` (the fleshed markdown, sections 1–4, verbatim)
+- `modelLabel` — the label chosen in step 5
+- `extraLabels` — `["db-migration"]` and/or `["e2e-exclusive"]` per step 2 (the tool ensures
+  these two exclusive-resource labels exist, creating them with the standard description if
+  missing; `ready`/`opus`/`sonnet`/`fable` already exist in this repo)
+- `parentIssue` — the tracking issue's number, if the task came from one (see Input); the tool
+  links the new issue as its sub-issue
+
+The tool pipes the body over the MCP transport (no temp file or shell-escaping needed). Report
+the returned `url` back to the user.
 
 ## Rules
 - Single task per run. Never batch — that's `ticketify`.

@@ -1,0 +1,8 @@
+{
+	"mcpServers": {
+		"swarm-tools": {
+			"command": "npx",
+			"args": ["tsx", ".claude/mcp/swarm-tools/server.ts"]
+		}
+	}
+}
