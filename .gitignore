@@ -60,6 +60,7 @@ e2e/.auth/
 playwright-report/
 test-results/
 e2e/group-ids.json
+e2e/group-slugs.json
 
 # swarm's local worker-tracking state and per-ticket worktrees (machine-local, never committed)
 /.claude/swarm-state.json

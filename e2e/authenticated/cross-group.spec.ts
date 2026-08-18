@@ -1,26 +1,26 @@
 import { test, expect } from '@playwright/test'
-import { alphaId, betaId, gammaId } from '../helpers/group-ids'
+import { alphaSlug, betaSlug, gammaSlug } from '../helpers/group-slugs'
 
-test.describe('/group/[id] home redirect for own group', () => {
+test.describe('/group/[slug] home redirect for own group', () => {
 	test('alpha: own group home redirects to /', { tag: '@alpha' }, async ({ page }) => {
-		await page.goto(`/group/${alphaId}`)
+		await page.goto(`/group/${alphaSlug}`)
 		await expect(page).toHaveURL('/')
 	})
 
 	test('beta: own group home redirects to /', { tag: '@beta' }, async ({ page }) => {
-		await page.goto(`/group/${betaId}`)
+		await page.goto(`/group/${betaSlug}`)
 		await expect(page).toHaveURL('/')
 	})
 
 	test('gamma: own group home redirects to /', { tag: '@gamma' }, async ({ page }) => {
-		await page.goto(`/group/${gammaId}`)
+		await page.goto(`/group/${gammaSlug}`)
 		await expect(page).toHaveURL('/')
 	})
 })
 
-test.describe('/group/[alphaId]/sessions — Alpha shares with Beta', () => {
+test.describe('/group/[alphaSlug]/sessions — Alpha shares with Beta', () => {
 	test('beta: sees Alpha sessions (share exists)', { tag: '@beta' }, async ({ page }) => {
-		await page.goto(`/group/${alphaId}/sessions`)
+		await page.goto(`/group/${alphaSlug}/sessions`)
 		await expect(
 			page.getByRole('heading', { name: 'Session history' })
 		).toBeVisible()
@@ -29,7 +29,7 @@ test.describe('/group/[alphaId]/sessions — Alpha shares with Beta', () => {
 	})
 
 	test('gamma: sees no Alpha sessions (no transitive share)', { tag: '@gamma' }, async ({ page }) => {
-		await page.goto(`/group/${alphaId}/sessions`)
+		await page.goto(`/group/${alphaSlug}/sessions`)
 		await expect(
 			page.getByRole('heading', { name: 'Session history' })
 		).toBeVisible()
@@ -37,7 +37,7 @@ test.describe('/group/[alphaId]/sessions — Alpha shares with Beta', () => {
 	})
 
 	test('alpha: own sessions visible (no redirect on sub-pages)', { tag: '@alpha' }, async ({ page }) => {
-		await page.goto(`/group/${alphaId}/sessions`)
+		await page.goto(`/group/${alphaSlug}/sessions`)
 		await expect(
 			page.getByRole('heading', { name: 'Session history' })
 		).toBeVisible()
@@ -45,9 +45,9 @@ test.describe('/group/[alphaId]/sessions — Alpha shares with Beta', () => {
 	})
 })
 
-test.describe('/group/[betaId]/sessions — Beta shares with Gamma', () => {
+test.describe('/group/[betaSlug]/sessions — Beta shares with Gamma', () => {
 	test('gamma: sees Beta sessions (share exists)', { tag: '@gamma' }, async ({ page }) => {
-		await page.goto(`/group/${betaId}/sessions`)
+		await page.goto(`/group/${betaSlug}/sessions`)
 		await expect(
 			page.getByRole('heading', { name: 'Session history' })
 		).toBeVisible()
@@ -55,7 +55,7 @@ test.describe('/group/[betaId]/sessions — Beta shares with Gamma', () => {
 	})
 
 	test('alpha: sees no Beta sessions (no reverse share)', { tag: '@alpha' }, async ({ page }) => {
-		await page.goto(`/group/${betaId}/sessions`)
+		await page.goto(`/group/${betaSlug}/sessions`)
 		await expect(
 			page.getByRole('heading', { name: 'Session history' })
 		).toBeVisible()
@@ -63,9 +63,9 @@ test.describe('/group/[betaId]/sessions — Beta shares with Gamma', () => {
 	})
 })
 
-test.describe('/group/[alphaId] home — cross-group data visibility', () => {
+test.describe('/group/[alphaSlug] home — cross-group data visibility', () => {
 	test('beta: sees Alpha home data (share exists)', { tag: '@beta' }, async ({ page }) => {
-		await page.goto(`/group/${alphaId}`)
+		await page.goto(`/group/${alphaSlug}`)
 		await expect(page).not.toHaveURL('/')
 		await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible()
 		// Alpha's most recent session is 2024-05-10
@@ -73,15 +73,15 @@ test.describe('/group/[alphaId] home — cross-group data visibility', () => {
 	})
 
 	test('gamma: sees no Alpha data (no share)', { tag: '@gamma' }, async ({ page }) => {
-		await page.goto(`/group/${alphaId}`)
+		await page.goto(`/group/${alphaSlug}`)
 		await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible()
 		await expect(page.getByRole('link', { name: /10th May/ })).not.toBeVisible()
 	})
 })
 
-test.describe('/group/[betaId] home — cross-group data visibility', () => {
+test.describe('/group/[betaSlug] home — cross-group data visibility', () => {
 	test('gamma: sees Beta home data (share exists)', { tag: '@gamma' }, async ({ page }) => {
-		await page.goto(`/group/${betaId}`)
+		await page.goto(`/group/${betaSlug}`)
 		await expect(page).not.toHaveURL('/')
 		await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible()
 		// Beta's session is 2023-06-01
@@ -89,22 +89,22 @@ test.describe('/group/[betaId] home — cross-group data visibility', () => {
 	})
 
 	test('alpha: sees no Beta data (no reverse share)', { tag: '@alpha' }, async ({ page }) => {
-		await page.goto(`/group/${betaId}`)
+		await page.goto(`/group/${betaSlug}`)
 		await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible()
 		await expect(page.getByRole('link', { name: /1st June/ })).not.toBeVisible()
 	})
 })
 
-test.describe('/group/[gammaId] home — Gamma has no data', () => {
+test.describe('/group/[gammaSlug] home — Gamma has no data', () => {
 	test('alpha: sees empty Gamma home (no share)', { tag: '@alpha' }, async ({ page }) => {
-		await page.goto(`/group/${gammaId}`)
+		await page.goto(`/group/${gammaSlug}`)
 		await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible()
 		await expect(page.getByRole('link', { name: /10th May/ })).not.toBeVisible()
 		await expect(page.getByRole('link', { name: /1st June/ })).not.toBeVisible()
 	})
 
 	test('beta: sees empty Gamma home (no share)', { tag: '@beta' }, async ({ page }) => {
-		await page.goto(`/group/${gammaId}`)
+		await page.goto(`/group/${gammaSlug}`)
 		await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible()
 		await expect(page.getByRole('link', { name: /1st June/ })).not.toBeVisible()
 	})
