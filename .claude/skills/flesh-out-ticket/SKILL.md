@@ -9,7 +9,7 @@ description: >-
   cheapest Claude model that can do it accurately (fable/sonnet/opus label), ALWAYS asks for
   confirmation, then runs `gh issue create` with the model label plus `ready`. Can optionally
   file the ticket as a GitHub sub-issue of a named tracking issue. Operates on a single task
-  only — it never walks a whole task list (that's tasks-to-tickets' job). Triggers: "flesh out
+  only — it never walks a whole task list (that's ticketify's job). Triggers: "flesh out
   ticket", "flesh out this task", "/flesh-out-ticket", turning a sketched task into a GitHub
   issue.
 ---
@@ -18,7 +18,7 @@ description: >-
 
 Take a **single** task description and turn it into a precise GitHub issue. Work on one task
 only — never iterate a whole task list or process multiple tasks in one run. If the user hands
-you a whole list, ask which single task to act on (or point them at `tasks-to-tickets`).
+you a whole list, ask which single task to act on (or point them at `ticketify`).
 
 ## Precheck
 
@@ -76,10 +76,17 @@ existing rubric (CLAUDE.md > Creating GitHub tickets):
 State the chosen label and a one-line justification.
 
 ### 6. Confirm (HARD GATE — never skip)
-Present the full drafted ticket (sections 1–4) plus the proposed model label and justification.
-Then call **AskUserQuestion** offering: **Confirm & create** / **Edit** / **Change model label**.
+1. Print the **complete** drafted ticket (title + sections 1–4, verbatim, exactly as it will be
+   filed) as its own normal chat message. Never summarize, paraphrase, or squash it — the user
+   must see the actual ticket text, not a description of it.
+2. Only after that full text is visible, call **AskUserQuestion** with a short decision-only
+   question ("Confirm & create / Edit / Change model label") plus the proposed model label and
+   justification. The AskUserQuestion question text is for the decision prompt only — it must
+   never carry the ticket content itself (that field truncates/compresses long text, which is
+   exactly what must not happen to the ticket).
 - Do NOT create the issue until the user explicitly confirms.
-- On Edit or Change label, revise and re-present, looping until confirmed.
+- On Edit or Change label, revise, re-print the full updated ticket, and re-present, looping until
+  confirmed.
 
 ### 7. Create the GitHub issue
 Only after confirmation:
@@ -102,7 +109,7 @@ Only after confirmation:
 4. Report the created issue URL back to the user.
 
 ## Rules
-- Single task per run. Never batch — that's `tasks-to-tickets`.
+- Single task per run. Never batch — that's `ticketify`.
 - Every issue gets exactly two labels (model + `ready`), plus `db-migration` when it touches
   `supabase/schema/` and/or `e2e-exclusive` when it touches a path in
   `e2e/mutating-spec-triggers.json`.

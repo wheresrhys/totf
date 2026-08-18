@@ -30,8 +30,9 @@ as opaque codes (store/display/filter on them as-is) rather than inventing a dec
 
 ## Ticket workflow
 
-Tickets are created with the `flesh-out-ticket` skill (single task) or `tasks-to-tickets` skill
-(a whole task list, one issue per task, reusing `flesh-out-ticket` per ticket) and implemented
+Tickets are created with the `flesh-out-ticket` skill (single task) or `ticketify` skill (a task
+list, or a single large task it decomposes first, one issue per task, reusing `flesh-out-ticket`
+per ticket) and implemented
 with the `implement-ticket` skill. `swarm` picks up open `ready` tickets and open PRs needing
 maintenance and runs them in parallel, one git worktree + subagent per unit of work. If you want
 to grab a branch `swarm` is mid-way through and keep working on it by hand (e.g. in VS Code), use
