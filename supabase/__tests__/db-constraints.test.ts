@@ -46,7 +46,7 @@ function psqlScalar(sql: string): string {
 function createIsolatedGroup(name: string): number {
 	return Number(
 		psqlScalar(
-			`INSERT INTO "RingingGroups" (group_name) VALUES ('${name}') RETURNING id;`
+			`INSERT INTO "RingingGroups" (group_name, slug) VALUES ('${name}', '${name.toLowerCase().replace(/ /g, '-')}') RETURNING id;`
 		)
 	);
 }
@@ -366,17 +366,5 @@ describe('DB constraints — RingingGroups uniqueness (slug)', () => {
 			slug
 		});
 		expect(duplicate.error?.code).toBe('23505');
-	});
-
-	it('allows inserting multiple RingingGroups rows with a null slug', async () => {
-		const first = await groupClient.from('RingingGroups').insert({
-			group_name: `DbConstraintsGroup-${suffix}-null-1`
-		});
-		expect(first.error).toBeNull();
-
-		const second = await groupClient.from('RingingGroups').insert({
-			group_name: `DbConstraintsGroup-${suffix}-null-2`
-		});
-		expect(second.error).toBeNull();
 	});
 });

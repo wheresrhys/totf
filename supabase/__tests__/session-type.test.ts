@@ -51,7 +51,7 @@ function createIsolatedGroupAndLocation(suffix: string): {
 } {
 	const groupId = Number(
 		psqlScalar(
-			`INSERT INTO "RingingGroups" (group_name) VALUES ('session-type-${suffix}') RETURNING id;`
+			`INSERT INTO "RingingGroups" (group_name, slug) VALUES ('session-type-${suffix}', 'session-type-${suffix}') RETURNING id;`
 		)
 	);
 	const locationId = Number(
