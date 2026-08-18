@@ -12,11 +12,7 @@ import { supabase } from '../lib/supabase';
 import fs from 'fs';
 import path from 'path';
 import csvParser from 'csv-parser';
-import { Database } from '../types/supabase.types';
 import { createUpserter, processEncounterRow } from '../lib/demon-import';
-
-type RingingGroupsInsert =
-	Database['public']['Tables']['RingingGroups']['Insert'];
 
 interface ImportOptions {
 	csvFilePath: string;
@@ -47,9 +43,9 @@ async function importCSV(options: ImportOptions): Promise<void> {
 	let failedRecords = 0;
 	const pendingRows: (Promise<void> | null)[] = [];
 
-	// 0. Upsert Ringing Group (create if doesn't exist) and get ID
-	// client just needs to have a group id - doenst need to be valid
-	let ringingGroupId: number;
+	// 0. Look up the Ringing Group by name and get its ID. This script no longer
+	// creates a missing group on the fly (#473) — groups are created via the seed
+	// script or Supabase Studio, so an unrecognised name is almost always a typo.
 	const { data: ringingGroupData, error: ringingGroupError } = await supabase
 		.from('RingingGroups')
 		.select('id')
@@ -58,17 +54,13 @@ async function importCSV(options: ImportOptions): Promise<void> {
 	if (ringingGroupError) {
 		throw ringingGroupError;
 	}
-	if (ringingGroupData) {
-		ringingGroupId = ringingGroupData.id;
-	} else {
-		ringingGroupId = await createUpserter(supabase)<RingingGroupsInsert>(
-			'RingingGroups',
-			{
-				group_name: ringingGroupName
-			},
-			['group_name']
+	if (!ringingGroupData) {
+		console.error(
+			`Error: Ringing group "${ringingGroupName}" not found. Create it first (e.g. via Supabase Studio) before importing — this script no longer creates groups automatically.`
 		);
+		process.exit(1);
 	}
+	const ringingGroupId: number = ringingGroupData.id;
 
 	const groupSupabaseClient =
 		await getAuthenticatedSupabaseClientForGroup(ringingGroupId);
