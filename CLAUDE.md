@@ -54,6 +54,23 @@ concurrent worktrees doing either kind of mutation would otherwise collide:
 - `e2e-exclusive` — touches a path listed in `e2e/mutating-spec-triggers.json` (an E2E spec
   tagged `@mutates`; see "E2E tests (Playwright)" below).
 
+### MCP tools for skills
+
+The ticket-workflow skills above call a project-local MCP server (`.claude/mcp/swarm-tools/`,
+registered in `.mcp.json`) instead of hand-rolling `jq`/`gh api`/anchor-text-parsing pipelines,
+wherever a pattern is multi-step, state-mutating, or repeats across skills. Tools land
+incrementally; current inventory:
+
+| Tool | Purpose |
+|---|---|
+| `swarm_tools_ping` | Health check — confirms the server is reachable |
+
+Use these tools for anything that touches `.claude/swarm-state.json`, creates a GitHub issue,
+derives a branch name, or extracts backfill DML — never reimplement the `jq`/glob/anchor-text
+equivalent in Bash. Raw `git`/`gh` Bash calls remain fine for simple one-off reads (`gh issue
+view <n> --comments`, `git fetch`, `git merge origin/main`) that aren't multi-step or
+state-mutating.
+
 ## Authentication model
 
 There are no per-person logins. Authentication is group-scoped:
