@@ -144,8 +144,9 @@ returned `issueNumber`.
 
 ### 7. Wire up dependencies (second pass)
 Once every confirmed issue exists (so all issue numbers are known), resolve each ticket's
-`dependsOn` tasks to their issue numbers and apply the GitHub "blocked by" links:
-`gh issue edit <issue#> --add-blocked-by <blockerIssue#>[,<blockerIssue#>...]`
+`dependsOn` tasks to their issue numbers and apply the GitHub "blocked by" links by calling
+`mcp__swarm-tools__link_ticket_dependencies` with `{issueNumber, blockedBy}` (the tool runs the
+single comma-joined `gh issue edit --add-blocked-by` call; an empty `blockedBy` is a no-op).
 (A second pass is used so creation order and missing-number problems don't arise. This is
 orthogonal to sub-issue membership — `blocked-by` sequences siblings, sub-issue links them to
 the parent.)

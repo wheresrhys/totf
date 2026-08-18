@@ -7,6 +7,7 @@ import { registerCreateTicketTool } from './tools/create-ticket';
 import { registerResolveMigrationDmlTool } from './tools/resolve-migration-dml';
 import { registerResolveWorkItemTool } from './tools/resolve-work-item';
 import { registerSwarmPlanBatchTool } from './tools/swarm-plan-batch';
+import { registerLinkTicketDependenciesTool } from './tools/link-ticket-dependencies';
 
 const server = new McpServer({
 	name: 'swarm-tools',
@@ -20,6 +21,7 @@ registerCreateTicketTool(server);
 registerResolveMigrationDmlTool(server);
 registerResolveWorkItemTool(server);
 registerSwarmPlanBatchTool(server);
+registerLinkTicketDependenciesTool(server);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
