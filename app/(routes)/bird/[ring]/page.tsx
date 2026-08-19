@@ -15,6 +15,7 @@ import {
 } from '@/app/models/bird';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { EncountersTimeline } from '@/app/components/EncountersTimeline';
+import type { ViewedGroup } from '@/lib/group-slug';
 
 type PageParams = { ring: string };
 type PageProps = { params: Promise<PageParams> };
@@ -128,7 +129,9 @@ function BirdSummary({
 	);
 }
 
-export default async function BirdPage(props: PageProps) {
+export default async function BirdPage(
+	props: PageProps & { viewedGroup?: ViewedGroup }
+) {
 	return (
 		<BootstrapPageData<StandaloneBird, PageProps, PageParams>
 			pageProps={props}

@@ -1,3 +1,4 @@
+import { resolveGroupSlugById } from '@/lib/group-slug';
 import NotableRetrapsPage from '@/app/(routes)/retraps/page';
 
 export default async function CrossGroupRetrapsPage({
@@ -6,5 +7,15 @@ export default async function CrossGroupRetrapsPage({
 	params: Promise<{ groupId: string }>;
 }) {
 	const { groupId } = await params;
-	return <NotableRetrapsPage viewedGroupId={Number(groupId)} />;
+	const viewedGroupId = Number(groupId);
+	const viewedGroup = {
+		id: viewedGroupId,
+		slug: await resolveGroupSlugById(viewedGroupId)
+	};
+	return (
+		<NotableRetrapsPage
+			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
+		/>
+	);
 }

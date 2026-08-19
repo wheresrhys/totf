@@ -1,3 +1,4 @@
+import { resolveGroupSlugById } from '@/lib/group-slug';
 import PulliPage from '@/app/(routes)/pulli/page';
 
 export default async function CrossGroupPulliPage({
@@ -6,5 +7,10 @@ export default async function CrossGroupPulliPage({
 	params: Promise<{ groupId: string }>;
 }) {
 	const { groupId } = await params;
-	return <PulliPage viewedGroupId={Number(groupId)} />;
+	const viewedGroupId = Number(groupId);
+	const viewedGroup = {
+		id: viewedGroupId,
+		slug: await resolveGroupSlugById(viewedGroupId)
+	};
+	return <PulliPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />;
 }

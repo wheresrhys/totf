@@ -1,3 +1,4 @@
+import { resolveGroupSlugById } from '@/lib/group-slug';
 import PayOffPage from '@/app/(routes)/effort/page';
 
 export default async function CrossGroupEffortPage({
@@ -6,5 +7,10 @@ export default async function CrossGroupEffortPage({
 	params: Promise<{ groupId: string }>;
 }) {
 	const { groupId } = await params;
-	return <PayOffPage viewedGroupId={Number(groupId)} />;
+	const viewedGroupId = Number(groupId);
+	const viewedGroup = {
+		id: viewedGroupId,
+		slug: await resolveGroupSlugById(viewedGroupId)
+	};
+	return <PayOffPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />;
 }

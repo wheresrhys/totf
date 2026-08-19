@@ -5,6 +5,7 @@ import {
 } from '@/app/components/layout/BootstrapPageData';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
+import type { ViewedGroup } from '@/lib/group-slug';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 import {
 	PageWrapper,
@@ -46,6 +47,7 @@ export default async function SessionsPage({
 	viewedGroupId
 }: {
 	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<SessionWithEncountersCount[]>

@@ -2,6 +2,7 @@ import { ResightingEncounter } from '@/app/models/session';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
+import type { ViewedGroup } from '@/lib/group-slug';
 import {
 	BootstrapPageData,
 	DefaultPageParams
@@ -58,6 +59,7 @@ export default async function ResightingsPage({
 	viewedGroupId
 }: {
 	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<ResightingEncounter[]>

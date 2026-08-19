@@ -18,11 +18,15 @@ import { Fragment } from 'react';
 import { calculateSessionChronology } from '@/app/models/session-chronology';
 import { formatMinutesForDisplay } from '@/lib/postgres-interval';
 import { SessionHighlights } from '@/app/components/SessionHighlights';
+import type { ViewedGroup } from '@/lib/group-slug';
 
 export type PageParams = {
 	viewedGroupId: number;
 	date: string;
 	locationId: number | undefined;
+	// Carried alongside viewedGroupId for the /group wrapper pages below —
+	// unused here (and by SessionSummary) until a later ticket consumes it.
+	viewedGroup?: ViewedGroup;
 };
 
 export type AdjacentSessionDates = {

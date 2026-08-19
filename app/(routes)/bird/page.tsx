@@ -6,6 +6,7 @@ import {
 	BirdSearchResults,
 	type SearchResult
 } from '@/app/components/BirdSearchResults';
+import type { ViewedGroup } from '@/lib/group-slug';
 
 type SearchParams = { q: string };
 type PageProps = { searchParams: Promise<SearchParams> };
@@ -28,7 +29,9 @@ async function searchByRing({ q }: SearchParams, _viewedGroupId: number) {
 		.then(catchSupabaseErrors);
 }
 
-export default async function BirdPage(props: PageProps) {
+export default async function BirdPage(
+	props: PageProps & { viewedGroup?: ViewedGroup }
+) {
 	return (
 		<BootstrapPageData<SearchResult[], PageProps, SearchParams>
 			pageProps={props}

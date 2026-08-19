@@ -1,3 +1,4 @@
+import { resolveGroupSlugById } from '@/lib/group-slug';
 import AllSpeciesPage from '@/app/(routes)/species/page';
 
 export default async function CrossGroupSpeciesPage({
@@ -6,5 +7,12 @@ export default async function CrossGroupSpeciesPage({
 	params: Promise<{ groupId: string }>;
 }) {
 	const { groupId } = await params;
-	return <AllSpeciesPage viewedGroupId={Number(groupId)} />;
+	const viewedGroupId = Number(groupId);
+	const viewedGroup = {
+		id: viewedGroupId,
+		slug: await resolveGroupSlugById(viewedGroupId)
+	};
+	return (
+		<AllSpeciesPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />
+	);
 }

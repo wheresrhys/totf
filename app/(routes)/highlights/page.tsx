@@ -16,6 +16,7 @@ import {
 	getTopStats,
 	type UserTopStatsArgs
 } from '@/app/actions/top-performers';
+import type { ViewedGroup } from '@/lib/group-slug';
 
 function getStatConfigs(
 	date: Date
@@ -186,6 +187,7 @@ export default async function HighlightsPage({
 	viewedGroupId
 }: {
 	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<StatsAccordionModel[]>

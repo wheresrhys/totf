@@ -1,3 +1,4 @@
+import { resolveGroupSlugById } from '@/lib/group-slug';
 import ResightingsPage from '@/app/(routes)/resightings/page';
 
 export default async function CrossGroupResightingsPage({
@@ -6,5 +7,12 @@ export default async function CrossGroupResightingsPage({
 	params: Promise<{ groupId: string }>;
 }) {
 	const { groupId } = await params;
-	return <ResightingsPage viewedGroupId={Number(groupId)} />;
+	const viewedGroupId = Number(groupId);
+	const viewedGroup = {
+		id: viewedGroupId,
+		slug: await resolveGroupSlugById(viewedGroupId)
+	};
+	return (
+		<ResightingsPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />
+	);
 }

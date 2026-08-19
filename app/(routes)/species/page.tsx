@@ -6,6 +6,7 @@ import { SppStatsTable } from '@/app/components/SppStatsTable';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
+import type { ViewedGroup } from '@/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
 
 //TODO get year/date range from URL params
@@ -47,6 +48,7 @@ export default async function AllSpeciesPage({
 	viewedGroupId
 }: {
 	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<PageData>

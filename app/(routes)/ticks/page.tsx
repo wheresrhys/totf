@@ -1,6 +1,7 @@
 import { GroupTicksResult } from '@/app/models/db';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
+import type { ViewedGroup } from '@/lib/group-slug';
 import {
 	BootstrapPageData,
 	DefaultPageParams
@@ -46,6 +47,7 @@ export default async function TicksPage({
 	viewedGroupId
 }: {
 	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<GroupTicksResult[]>

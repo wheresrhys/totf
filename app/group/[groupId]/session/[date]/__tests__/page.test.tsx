@@ -107,20 +107,38 @@ function makeChain(data: unknown) {
 		gt: vi.fn().mockReturnThis(),
 		order: vi.fn().mockReturnThis(),
 		limit: vi.fn().mockReturnThis(),
+		maybeSingle: vi.fn().mockReturnThis(),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({ data, error: null }).then(resolve)
 	};
 }
 
-function makeSessionClient() {
-	return {
-		from: vi
-			.fn()
-			.mockReturnValueOnce(makeChain(mockSessions))
-			.mockReturnValueOnce(makeChain(mockPreviousSession))
-			.mockReturnValueOnce(makeChain(mockNextSession))
-			.mockReturnValueOnce(makeChain(mockEncounters))
-	};
+// The wrapper page also resolves the group's slug (RingingGroups) — via a
+// module-scope cache in lib/group-slug.ts, so it's only fetched once per
+// group id for the lifetime of this test file, not once per test. Dispatch
+// on table name so RingingGroups is served on demand regardless of whether
+// a given test hits the cache, without disturbing the ordered queue below
+// that the Sessions/Encounters calls are matched against.
+function makeSessionClient(
+	sessionAndEncounterChains: ReturnType<typeof makeChain>[]
+) {
+	let nextChainIndex = 0;
+	const from = vi.fn((table: string) => {
+		if (table === 'RingingGroups') {
+			return makeChain({ slug: 'test-group-slug' });
+		}
+		return sessionAndEncounterChains[nextChainIndex++];
+	});
+	return { from, sessionAndEncounterChains };
+}
+
+function makeDefaultSessionClient() {
+	return makeSessionClient([
+		makeChain(mockSessions),
+		makeChain(mockPreviousSession),
+		makeChain(mockNextSession),
+		makeChain(mockEncounters)
+	]);
 }
 
 function renderPage() {
@@ -135,7 +153,9 @@ describe('session detail page', () => {
 	});
 
 	beforeEach(() => {
-		mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeSessionClient());
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+			makeDefaultSessionClient()
+		);
 	});
 
 	it('renders date as heading', async () => {
@@ -145,11 +165,11 @@ describe('session detail page', () => {
 	});
 
 	it('excludes non-FULL_GROWN sessions from the main Sessions query', async () => {
-		const client = makeSessionClient();
+		const client = makeDefaultSessionClient();
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 		render(await renderPage());
 		await screen.findByTestId('session-stats');
-		const mainSessionsChain = client.from.mock.results[0].value;
+		const mainSessionsChain = client.sessionAndEncounterChains[0];
 		expect(mainSessionsChain.eq).toHaveBeenCalledWith(
 			'session_type',
 			'FULL_GROWN'
@@ -158,11 +178,11 @@ describe('session detail page', () => {
 
 	describe('adjacent session date lookups', () => {
 		it('excludes non-FULL_GROWN sessions from the previous-session lookup', async () => {
-			const client = makeSessionClient();
+			const client = makeDefaultSessionClient();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 			render(await renderPage());
 			await screen.findByTestId('session-stats');
-			const previousChain = client.from.mock.results[1].value;
+			const previousChain = client.sessionAndEncounterChains[1];
 			expect(previousChain.eq).toHaveBeenCalledWith(
 				'session_type',
 				'FULL_GROWN'
@@ -170,24 +190,22 @@ describe('session detail page', () => {
 		});
 
 		it('excludes non-FULL_GROWN sessions from the next-session lookup', async () => {
-			const client = makeSessionClient();
+			const client = makeDefaultSessionClient();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 			render(await renderPage());
 			await screen.findByTestId('session-stats');
-			const nextChain = client.from.mock.results[2].value;
+			const nextChain = client.sessionAndEncounterChains[2];
 			expect(nextChain.eq).toHaveBeenCalledWith('session_type', 'FULL_GROWN');
 		});
 	});
 
 	describe('a date whose only Sessions row is PULLI or FIELD_OBSERVATION', () => {
 		it('renders the "No session found" empty state instead of 404ing', async () => {
-			const client = {
-				from: vi
-					.fn()
-					.mockReturnValueOnce(makeChain([]))
-					.mockReturnValueOnce(makeChain(mockPreviousSession))
-					.mockReturnValueOnce(makeChain(mockNextSession))
-			};
+			const client = makeSessionClient([
+				makeChain([]),
+				makeChain(mockPreviousSession),
+				makeChain(mockNextSession)
+			]);
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 			render(await renderPage());
 			await screen.findByText(/No session found/i);

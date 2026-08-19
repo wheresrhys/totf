@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getGroupCookie } from '@/app/actions/group-cookie';
+import { resolveGroupSlugById } from '@/lib/group-slug';
 import Home from '@/app/(routes)/page';
 
 export default async function CrossGroupHome({
@@ -13,5 +14,9 @@ export default async function CrossGroupHome({
 	if (viewedGroupId === loggedInGroupId) {
 		redirect('/');
 	}
-	return <Home viewedGroupId={viewedGroupId} />;
+	const viewedGroup = {
+		id: viewedGroupId,
+		slug: await resolveGroupSlugById(viewedGroupId)
+	};
+	return <Home viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />;
 }
