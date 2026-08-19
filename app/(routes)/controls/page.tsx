@@ -17,14 +17,14 @@ async function dataFetcher(
 }
 
 export default async function ControlsRoute({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<RingSequenceControlRow[]>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['controls']}
 			dataFetcher={dataFetcher}
 			PageComponent={ControlsPage}

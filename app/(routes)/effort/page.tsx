@@ -128,14 +128,14 @@ function PayOffPageContent({
 }
 
 export default function PayOffPage({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<PayOffStatsData>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['sessions', 'pay-off']}
 			dataFetcher={fetchPayOffPageData}
 			PageComponent={PayOffPageContent}

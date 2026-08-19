@@ -15,14 +15,14 @@ async function dataFetcher(
 }
 
 export default async function RingSequencesRoute({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<RingSequenceSummary[]>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['ring-sequences']}
 			dataFetcher={dataFetcher}
 			PageComponent={RingSequencesPage}

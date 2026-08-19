@@ -31,14 +31,14 @@ function ListMistakes({ data }: { data: DiscrepenciesResult[] }) {
 	);
 }
 export default async function MistakesPage({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<DiscrepenciesResult[]>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['mistakes']}
 			dataFetcher={fetchMistakes}
 			PageComponent={ListMistakes}

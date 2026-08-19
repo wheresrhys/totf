@@ -44,14 +44,14 @@ function ListAllSessions({
 }
 
 export default async function SessionsPage({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<SessionWithEncountersCount[]>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['sessions']}
 			dataFetcher={fetchAllSessions}
 			PageComponent={ListAllSessions}

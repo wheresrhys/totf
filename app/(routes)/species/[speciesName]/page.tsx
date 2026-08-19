@@ -85,7 +85,7 @@ export default async function SpeciesPage(
 	return (
 		<BootstrapPageData<PageData, PageProps, PageParams>
 			pageProps={props}
-			viewedGroupId={props.viewedGroupId}
+			viewedGroup={props.viewedGroup}
 			getCacheKeys={(params: PageParams) => ['species', params.speciesName]}
 			dataFetcher={fetchSpPageData}
 			PageComponent={SpPage}

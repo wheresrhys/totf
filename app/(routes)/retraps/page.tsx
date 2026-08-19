@@ -36,14 +36,14 @@ function ListNotableRetraps({ data }: { data: NotableRetrapsResult[] }) {
 	);
 }
 export default async function NotableRetrapsPage({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<NotableRetrapsResult[]>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['notable-retraps']}
 			dataFetcher={fetchNotableRetraps}
 			PageComponent={ListNotableRetraps}

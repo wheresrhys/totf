@@ -53,14 +53,14 @@ function ListPulliEncounters({ data }: { data: PulliEncounter[] }) {
 }
 
 export default async function PulliPage({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<PulliEncounter[]>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['pulli']}
 			dataFetcher={fetchPulliEncounters}
 			PageComponent={ListPulliEncounters}

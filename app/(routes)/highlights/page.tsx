@@ -184,14 +184,14 @@ function HighlightsPageContent({
 }
 
 export default async function HighlightsPage({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<StatsAccordionModel[]>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['highlights']}
 			dataFetcher={fetchHighlightsData}
 			PageComponent={HighlightsPageContent}

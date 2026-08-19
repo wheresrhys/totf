@@ -12,17 +12,18 @@ type PageProps = { params: Promise<{ groupId: string; date: string }> };
 export default async function CrossGroupSessionPage({ params }: PageProps) {
 	const { groupId, date } = await params;
 	const viewedGroupId = Number(groupId);
+	const viewedGroup = {
+		id: viewedGroupId,
+		slug: await resolveGroupSlugById(viewedGroupId)
+	};
 	return (
 		<BootstrapPageData<DayData, PageProps, PageParams>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getParams={async () => ({
 				viewedGroupId,
 				date,
 				locationId: undefined,
-				viewedGroup: {
-					id: viewedGroupId,
-					slug: await resolveGroupSlugById(viewedGroupId)
-				}
+				viewedGroup
 			})}
 			getCacheKeys={() => ['session', date]}
 			dataFetcher={fetchSessionData}

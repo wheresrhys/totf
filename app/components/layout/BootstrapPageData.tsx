@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 import { getGroupCookie } from '@/app/actions/group-cookie';
+import { resolveGroupSlugById, type ViewedGroup } from '@/lib/group-slug';
 
 export type DefaultPageParams = Record<string, string>;
 export type DefaultPageProps = { params: Promise<DefaultPageParams> };
@@ -10,7 +11,7 @@ export type BootstrapPageDataProps<DataType, PagePropsType, ParamsType> = {
 	pageProps?: PagePropsType;
 	loading?: React.ReactNode;
 	ttl?: number;
-	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 	getCacheKeys: (params: ParamsType) => string[];
 	getParams?: (pageProps: PagePropsType) => Promise<ParamsType>;
 	dataFetcher: (
@@ -71,7 +72,7 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 	getCacheKeys,
 	PageComponent,
 	ttl,
-	viewedGroupId: viewedGroupIdProp
+	viewedGroup: viewedGroupProp
 }: BootstrapPageDataProps<DataType, PagePropsType, ParamsType>) {
 	let params: ParamsType;
 	if (getParams) {
@@ -84,7 +85,15 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 
 	await connection();
 	const loggedInGroupId = await getGroupCookie();
-	const viewedGroupId = viewedGroupIdProp ?? loggedInGroupId;
+	const viewedGroup: ViewedGroup | null =
+		viewedGroupProp ??
+		(loggedInGroupId
+			? {
+					id: loggedInGroupId,
+					slug: await resolveGroupSlugById(loggedInGroupId)
+				}
+			: null);
+	const viewedGroupId = viewedGroup?.id;
 	const cacheKeys = getCacheKeys(params);
 	const groupScopedCacheKeys = viewedGroupId
 		? [String(viewedGroupId), ...cacheKeys]

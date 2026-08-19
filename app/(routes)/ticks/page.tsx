@@ -44,14 +44,14 @@ function ListTicks({ data }: { data: GroupTicksResult[] }) {
 }
 
 export default async function TicksPage({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<GroupTicksResult[]>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['ticks']}
 			dataFetcher={fetchGroupTicks}
 			PageComponent={ListTicks}

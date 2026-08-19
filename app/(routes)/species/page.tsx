@@ -45,14 +45,14 @@ export async function fetchSppListPageData(
 }
 
 export default async function AllSpeciesPage({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<PageData>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['species']}
 			dataFetcher={fetchSppListPageData}
 			PageComponent={SppStatsTable}
