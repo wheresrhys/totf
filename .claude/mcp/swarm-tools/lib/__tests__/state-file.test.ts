@@ -26,7 +26,13 @@ describe('state-file', () => {
 
 	beforeEach(async () => {
 		repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'swarm-state-test-'));
-		await execa('git', ['init', '--quiet'], { cwd: repoDir });
+		// `git init` honours an inherited GIT_DIR over cwd — git sets GIT_DIR when invoking hooks,
+		// so running this suite from the pre-push hook would otherwise re-target the real repo's
+		// .git instead of creating an isolated one here. Strip it (and disable execa's default
+		// extendEnv, which would otherwise re-merge it back in from process.env) so the temp repo
+		// is genuinely isolated regardless of what invoked the test run.
+		const { GIT_DIR: _GIT_DIR, GIT_WORK_TREE: _GIT_WORK_TREE, GIT_INDEX_FILE: _GIT_INDEX_FILE, ...env } = process.env;
+		await execa('git', ['init', '--quiet'], { cwd: repoDir, env, extendEnv: false });
 	});
 
 	afterEach(async () => {

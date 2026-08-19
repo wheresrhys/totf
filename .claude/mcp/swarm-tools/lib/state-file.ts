@@ -25,12 +25,34 @@ const LOCK_TIMEOUT_MS = 5000;
  * since it can't change during the server's lifetime.
  */
 const projectRootCache = new Map<string, Promise<string>>();
+
+/**
+ * `GIT_DIR`/`GIT_WORK_TREE`/`GIT_INDEX_FILE` in the environment make git skip cwd-based repo
+ * discovery entirely and operate on whatever repo those vars name — git itself sets `GIT_DIR`
+ * when invoking hooks (e.g. this repo's `.husky/pre-push`), so a `git rev-parse` shelled out
+ * during a pre-push run inherits it. Without stripping these, a caller passing an isolated
+ * temp-repo `cwd` (as `state-file.test.ts` does) still resolves to the *real* repo whenever this
+ * runs under a git hook, silently escaping the isolation and hitting the real
+ * `.claude/swarm-state.json`. `extendEnv: false` is required alongside this — execa's default
+ * `extendEnv: true` re-merges the spawned process's env on top of whatever `env` object is
+ * passed, which would otherwise silently reintroduce the very vars just deleted from our copy.
+ */
+function envWithoutGitDiscoveryOverrides(): NodeJS.ProcessEnv {
+	const env = { ...process.env };
+	delete env.GIT_DIR;
+	delete env.GIT_WORK_TREE;
+	delete env.GIT_INDEX_FILE;
+	return env;
+}
+
 async function resolveProjectRoot(cwd: string): Promise<string> {
 	let cached = projectRootCache.get(cwd);
 	if (!cached) {
-		cached = execa('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd }).then((result) =>
-			path.dirname(result.stdout.trim())
-		);
+		cached = execa('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+			cwd,
+			env: envWithoutGitDiscoveryOverrides(),
+			extendEnv: false,
+		}).then((result) => path.dirname(result.stdout.trim()));
 		projectRootCache.set(cwd, cached);
 	}
 	return cached;
