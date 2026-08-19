@@ -35,8 +35,8 @@ describe('BootstrapPageData — viewedGroupSlug resolution', () => {
 		const element = await LoadWithData({
 			getCacheKeys: () => ['test'],
 			dataFetcher: async () => ({ ok: true }),
-			PageComponent: ({ viewedGroupSlug }) => (
-				<div data-testid="page">slug: {String(viewedGroupSlug)}</div>
+			PageComponent: ({ viewedGroup }) => (
+				<div data-testid="page">slug: {String(viewedGroup.slug)}</div>
 			)
 		});
 

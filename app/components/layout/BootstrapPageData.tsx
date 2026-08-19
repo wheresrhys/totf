@@ -23,7 +23,7 @@ export type BootstrapPageDataProps<DataType, PagePropsType, ParamsType> = {
 		params: ParamsType;
 		data: DataType;
 		viewedGroupId: number;
-		viewedGroupSlug: string | null;
+		viewedGroup: { id: number; slug: string | null };
 	}) => React.ReactNode;
 };
 
@@ -101,6 +101,7 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 	const viewedGroupSlug =
 		viewedGroupSlugProp ??
 		(loggedInGroupId ? await resolveGroupSlugById(loggedInGroupId) : null);
+	const viewedGroup = { id: viewedGroupId, slug: viewedGroupSlug };
 	const data = await fetchDataWithCache<DataType, ParamsType>({
 		params,
 		dataFetcher,
@@ -116,7 +117,7 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 			params={params}
 			data={data}
 			viewedGroupId={viewedGroupId}
-			viewedGroupSlug={viewedGroupSlug}
+			viewedGroup={viewedGroup}
 		/>
 	);
 }

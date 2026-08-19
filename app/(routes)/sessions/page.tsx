@@ -29,14 +29,11 @@ export async function fetchAllSessions(
 
 function ListAllSessions({
 	data,
-	viewedGroupId,
-	viewedGroupSlug
+	viewedGroup
 }: {
 	data: SessionWithEncountersCount[];
-	viewedGroupId: number;
-	viewedGroupSlug: string | null;
+	viewedGroup: { id: number; slug: string | null };
 }) {
-	const viewedGroup = { id: viewedGroupId, slug: viewedGroupSlug };
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Session history</PrimaryHeading>

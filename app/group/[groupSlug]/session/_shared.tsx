@@ -258,7 +258,7 @@ function SessionNavigation({
 export function SessionSummary({
 	data: dayData,
 	params: { date, locationId, viewedGroupId },
-	viewedGroupSlug
+	viewedGroup
 }: {
 	data: DayData;
 	params: {
@@ -266,9 +266,8 @@ export function SessionSummary({
 		locationId: number | undefined;
 		viewedGroupId: number;
 	};
-	viewedGroupSlug: string | null;
+	viewedGroup: { id: number; slug: string | null };
 }) {
-	const viewedGroup = { id: viewedGroupId, slug: viewedGroupSlug };
 	const speciesList = groupBySpecies(dayData.encounters);
 	const chronology = calculateSessionChronology(dayData.encounters);
 	const oldestEncounter = findOldestEncounter(dayData.encounters);

@@ -138,14 +138,13 @@ export function SpPage({
 	params: { speciesName },
 	data,
 	viewedGroupId,
-	viewedGroupSlug
+	viewedGroup
 }: {
 	params: PageParams;
 	data: PageData;
 	viewedGroupId: number;
-	viewedGroupSlug: string | null;
+	viewedGroup: { id: number; slug: string | null };
 }) {
-	const viewedGroup = { id: viewedGroupId, slug: viewedGroupSlug };
 	return (
 		<PageWrapper>
 			<PrimaryHeading>{speciesName}</PrimaryHeading>

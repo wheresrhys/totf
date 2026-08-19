@@ -65,7 +65,7 @@ export function BootstrapPageData<
 			params={params}
 			data={data}
 			viewedGroupId={1}
-			viewedGroupSlug={bootstrapProps.viewedGroupSlug ?? 'alpha'}
+			viewedGroup={{ id: 1, slug: bootstrapProps.viewedGroupSlug ?? 'alpha' }}
 		/>
 	);
 }

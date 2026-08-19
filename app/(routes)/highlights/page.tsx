@@ -169,14 +169,11 @@ export async function fetchHighlightsData(
 
 function HighlightsPageContent({
 	data,
-	viewedGroupId,
-	viewedGroupSlug
+	viewedGroup
 }: {
 	data: StatsAccordionModel[];
-	viewedGroupId: number;
-	viewedGroupSlug: string | null;
+	viewedGroup: { id: number; slug: string | null };
 }) {
-	const viewedGroup = { id: viewedGroupId, slug: viewedGroupSlug };
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Highlights</PrimaryHeading>
