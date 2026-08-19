@@ -31,7 +31,10 @@ describe('state-file', () => {
 		// .git instead of creating an isolated one here. Strip it (and disable execa's default
 		// extendEnv, which would otherwise re-merge it back in from process.env) so the temp repo
 		// is genuinely isolated regardless of what invoked the test run.
-		const { GIT_DIR: _GIT_DIR, GIT_WORK_TREE: _GIT_WORK_TREE, GIT_INDEX_FILE: _GIT_INDEX_FILE, ...env } = process.env;
+		const env = { ...process.env };
+		delete env.GIT_DIR;
+		delete env.GIT_WORK_TREE;
+		delete env.GIT_INDEX_FILE;
 		await execa('git', ['init', '--quiet'], { cwd: repoDir, env, extendEnv: false });
 	});
 
