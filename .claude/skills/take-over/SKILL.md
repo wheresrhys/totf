@@ -12,9 +12,14 @@ description: >-
   Supabase instance first if another worktree's in-progress migration collides) before pushing, so
   the push's own tests run against a schema that actually matches the code, and warns the user not
   to merge before pushing the migration to prod themselves. Works from any session, including a
-  fresh one that never saw the worker spawn. Triggers: "take over ticket <n>", "take over this
-  branch", "let me work on this myself", "/take-over <identifier>", or git complaining a branch is
-  already checked out elsewhere.
+  fresh one that never saw the worker spawn. Called with no identifier, instead activates this
+  repo's root checkout — the root is kept permanently on `core.bare=true` so `git worktree add`
+  can hand out ticket branches without "already checked out" conflicts, which also means plain
+  `git status`/`checkout` refuse to run there directly; this switches it to `main` (or another
+  named branch) via an explicit `--work-tree`/`--git-dir` override, stashing any dirty state
+  first. Triggers: "take over ticket <n>", "take over this branch", "let me work on this myself",
+  "/take-over <identifier>", "/take-over" with no argument, "activate the root", "checkout main in
+  root", or git complaining a branch is already checked out elsewhere.
 ---
 
 # take-over
@@ -22,7 +27,39 @@ description: >-
 Free a branch that's locked inside another worktree — usually a `swarm` worker's — and check it
 out here instead, halting whatever was working on it and keeping any uncommitted progress. The
 identifier is the skill argument (e.g. `/take-over 412`, `/take-over feature/412-species-chart`,
-`/take-over "the species chart ticket"`).
+`/take-over "the species chart ticket"`). Called with **no argument**, skip straight to step 0
+below instead — there's no branch to free, just the repo root to switch onto `main`.
+
+## 0. No identifier: activate the root
+
+This repo's root directory (where `.git` itself lives, distinct from anything under
+`.claude/worktrees/`) is deliberately left with `core.bare=true` in its `.git/config` even
+though it has a real branch checked out via `HEAD` — that's what lets `git worktree add` hand
+out every ticket branch elsewhere without git refusing on "already checked out here" for
+whichever branch the root happens to be sitting on. The tradeoff: plain `git status`/`checkout`/
+etc run *in* that directory fail with `fatal: this operation must be run in a work tree`, so they
+need an explicit override.
+
+Confirm this is really that layout before touching anything: `git -C <root> config core.bare`
+reports `true` **and** the directory contains real tracked files (e.g. `package.json`) sitting
+next to `.git` — a genuine bare repo (no working files) is not this pattern; if you see that
+instead, stop and tell the user rather than guessing.
+
+1. Pick the target branch: `main` unless the user named a different one when invoking with no
+   identifier (e.g. "activate root on <branch>").
+2. Check dirty state with the override: `git --work-tree=<root> --git-dir=<root>/.git status
+   --short`. If non-empty, stash it first — same convention as step 7 below: `git
+   --work-tree=<root> --git-dir=<root>/.git stash push -u -m "take-over: root autosave
+   $(date -u +%Y-%m-%dT%H:%M:%SZ)"`. Never discard it silently.
+3. `git --work-tree=<root> --git-dir=<root>/.git checkout <targetBranch>`.
+4. Report the branch switched to, whether it's now ahead/behind `origin/<targetBranch>` (from the
+   checkout output — don't auto-pull unless asked), any stash created and left for the user to
+   pop by hand, and remind them that further plain git commands in that directory still need the
+   same `--work-tree`/`--git-dir` override (or `export GIT_DIR=<root>/.git
+   GIT_WORK_TREE=<root>` for the session, if they want to stop repeating the flags).
+
+Stop here — the rest of this skill (steps 1–13) is for reclaiming a branch out of a worktree,
+which doesn't apply to the root.
 
 ## 1. Resolve the identifier
 
