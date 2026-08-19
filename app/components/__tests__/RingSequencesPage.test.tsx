@@ -53,7 +53,7 @@ describe('RingSequencesPage', () => {
 			<RingSequencesPage
 				params={{}}
 				data={mockSummaries}
-				viewedGroupId={viewedGroupId}
+				viewedGroup={{ id: viewedGroupId, slug: 'alpha' }}
 			/>
 		);
 		expect(screen.getByTestId('ring-size-AA')).toBeDefined();
@@ -66,7 +66,7 @@ describe('RingSequencesPage', () => {
 			<RingSequencesPage
 				params={{}}
 				data={mockSummaries}
-				viewedGroupId={viewedGroupId}
+				viewedGroup={{ id: viewedGroupId, slug: 'alpha' }}
 			/>
 		);
 		const aSection = screen.getByTestId('ring-size-A');
@@ -80,7 +80,7 @@ describe('RingSequencesPage', () => {
 			<RingSequencesPage
 				params={{}}
 				data={mockSummaries}
-				viewedGroupId={viewedGroupId}
+				viewedGroup={{ id: viewedGroupId, slug: 'alpha' }}
 			/>
 		);
 		const aaSection = screen.getByTestId('ring-size-AA');
@@ -102,7 +102,7 @@ describe('RingSequencesPage', () => {
 			<RingSequencesPage
 				params={{}}
 				data={mockSummaries}
-				viewedGroupId={viewedGroupId}
+				viewedGroup={{ id: viewedGroupId, slug: 'alpha' }}
 			/>
 		);
 		expect(screen.queryByTestId('ring-size-B, C, C2')).toBeNull();
@@ -114,7 +114,7 @@ describe('RingSequencesPage', () => {
 			<RingSequencesPage
 				params={{}}
 				data={mockSummaries}
-				viewedGroupId={viewedGroupId}
+				viewedGroup={{ id: viewedGroupId, slug: 'alpha' }}
 			/>
 		);
 		const arwItem = screen.getByTestId('sequence-ARW-7');

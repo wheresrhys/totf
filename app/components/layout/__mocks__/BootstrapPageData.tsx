@@ -64,7 +64,6 @@ export function BootstrapPageData<
 		<bootstrapProps.PageComponent
 			params={params}
 			data={data}
-			viewedGroupId={1}
 			viewedGroup={{ id: 1, slug: bootstrapProps.viewedGroupSlug ?? 'alpha' }}
 		/>
 	);

@@ -11,7 +11,6 @@ export function ControlsPage({
 }: {
 	params: Record<string, string>;
 	data: RingSequenceControlRow[];
-	viewedGroupId: number;
 }) {
 	if (!data || data.length === 0) {
 		return (

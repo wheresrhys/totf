@@ -49,11 +49,12 @@ const sortableColumnConfigs = speciesStatConfigs.reduce(
 
 export function SppStatsTable({
 	data: { speciesStats: initialSpeciesStats, years },
-	viewedGroupId
+	viewedGroup
 }: {
 	data: PageData;
-	viewedGroupId: number;
+	viewedGroup: { id: number; slug: string | null };
 }) {
+	const viewedGroupId = viewedGroup.id;
 	const formRef = useRef<HTMLFormElement>(null);
 	const [year, setYear] = useState<number | null>(null);
 	const [cesOnly, setCesOnly] = useState<boolean>(false);

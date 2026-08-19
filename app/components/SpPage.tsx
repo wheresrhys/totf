@@ -43,13 +43,12 @@ function ConditionalTabPanel({
 
 function SpeciesData({
 	data,
-	viewedGroupId,
 	viewedGroup
 }: {
 	data: FullFatPageData;
-	viewedGroupId: number;
 	viewedGroup: { id: number; slug: string | null };
 }) {
+	const viewedGroupId = viewedGroup.id;
 	const [loadedTabs, setLoadedTabs] = useState<Set<string>>(
 		new Set(['bird-list'])
 	);
@@ -137,23 +136,17 @@ function fullFatTypeGuard(data: PageData): data is FullFatPageData {
 export function SpPage({
 	params: { speciesName },
 	data,
-	viewedGroupId,
 	viewedGroup
 }: {
 	params: PageParams;
 	data: PageData;
-	viewedGroupId: number;
 	viewedGroup: { id: number; slug: string | null };
 }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>{speciesName}</PrimaryHeading>
 			{fullFatTypeGuard(data) ? (
-				<SpeciesData
-					data={data}
-					viewedGroupId={viewedGroupId}
-					viewedGroup={viewedGroup}
-				/>
+				<SpeciesData data={data} viewedGroup={viewedGroup} />
 			) : (
 				<p>Not authorised to view any encounter data for this species</p>
 			)}

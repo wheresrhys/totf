@@ -93,12 +93,13 @@ function RingSizeSection({
 
 export function RingSequencesPage({
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	params: Record<string, string>;
 	data: RingSequenceSummary[];
-	viewedGroupId: number;
+	viewedGroup: { id: number; slug: string | null };
 }) {
+	const viewedGroupId = viewedGroup.id;
 	const [expandedId, setExpandedId] = useState<string | false>(false);
 	const ringSizeGroups = groupSummariesByRingSize(data);
 

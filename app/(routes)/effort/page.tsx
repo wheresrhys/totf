@@ -105,12 +105,7 @@ function PayOffYearlyTable({ yearly }: { yearly: AggregateStatsResult[] }) {
 	);
 }
 
-function PayOffPageContent({
-	data
-}: {
-	data: PayOffStatsData;
-	viewedGroupId: number;
-}) {
+function PayOffPageContent({ data }: { data: PayOffStatsData }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Effort and Pay-off</PrimaryHeading>
