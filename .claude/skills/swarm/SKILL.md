@@ -126,11 +126,15 @@ both concerns for that PR:
   `sonnet` if unresolvable).
 - `description`: `"Maintain PR #<pr>"`.
 - Prompt, in order:
-  1. **Conflicts first** — if `CONFLICTING`, `git fetch origin` then `git merge origin/main`
-     (merge, not rebase — no force-push onto a shared branch), resolve every conflict honouring
-     both sides' intent, run the relevant tests to prove the merge is sound.
-  2. **Then feedback** — summarise outstanding feedback, make the changes, run tests, reply to
-     the reviewer via `gh pr comment <n>`.
+  1. **Sync first, always** — regardless of `mergeable` status, `git fetch origin` then
+     `git merge origin/main` (merge, not rebase — no force-push onto a shared branch) before any
+     other step. GitHub's `mergeable` check only catches textual conflicts, not staleness on
+     unrelated files, so this runs even for `reason: "feedback"` PRs. If the merge produces
+     conflicts — whether GitHub already flagged `CONFLICTING` or the fetch surfaces one GitHub's
+     cache hadn't caught yet — resolve every conflict honouring both sides' intent, and run the
+     relevant tests to prove the merge is sound.
+  2. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
+     the changes, run tests, reply to the reviewer via `gh pr comment <n>`.
   3. Commit (repo conventions, including the model/Claude Code trailers from `implement-ticket`)
      and push. If on inspection neither a real conflict nor genuine feedback remains, no-op and
      report that.
@@ -243,7 +247,10 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
 ## Rules
 - Open-PR maintenance (conflicts + feedback) is handled first; ready tickets fill the remaining
   budget. One subagent per PR does both concerns for that PR.
-- Resolve conflicts by merging `origin/main` into the PR branch — never rebase/force-push a
+- Every maintenance worker unconditionally `git fetch origin` + `git merge origin/main` first,
+  regardless of `mergeable` status — GitHub's check misses staleness on unrelated files, so a
+  feedback-only PR would otherwise never pick up infra fixes since its worktree was cut. Resolve
+  any resulting conflicts by merging `origin/main` into the PR branch — never rebase/force-push a
   shared branch.
 - Never pick a blocked ticket; never exceed **4 concurrent worker subagents** across both tracks.
   The orchestrator itself is not a worker and does not count toward the 4.
