@@ -1,17 +1,40 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { execa } from 'execa';
+import { z } from 'zod';
 
-export interface SwarmWorkerEntry {
-	kind: 'ticket' | 'maintenance';
-	issue: number | null;
-	pr: number | null;
-	branch: string;
-	title: string;
-	worktreePath: string;
-	agentId: string;
-	model: string;
-	startedAt: string;
+/**
+ * Single source of truth for a worker entry's shape — used both to validate
+ * .claude/swarm-state.json on read (see readState below) and, via tools/swarm-state.ts, to type
+ * the swarm_state_* MCP tools' stored-entry output. Keeping one definition means a shape change
+ * can't drift between "what we store" and "what we validate".
+ */
+export const swarmWorkerEntrySchema = z.object({
+	kind: z.enum(['ticket', 'maintenance']),
+	issue: z.number().nullable(),
+	pr: z.number().nullable(),
+	branch: z.string(),
+	title: z.string(),
+	worktreePath: z.string(),
+	agentId: z.string(),
+	model: z.string(),
+	startedAt: z.string(),
+});
+
+export type SwarmWorkerEntry = z.infer<typeof swarmWorkerEntrySchema>;
+
+const swarmStateSchema = z.array(swarmWorkerEntrySchema);
+
+/** Thrown when .claude/swarm-state.json on disk doesn't match SwarmWorkerEntry[] — see #484. */
+export class SwarmStateSchemaError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'SwarmStateSchemaError';
+	}
+}
+
+function formatZodIssues(error: z.ZodError): string {
+	return error.issues.map((issue) => `${issue.path.length ? issue.path.join('.') : '(root)'}: ${issue.message}`).join('; ');
 }
 
 const LOCK_RETRY_MS = 50;
@@ -25,12 +48,34 @@ const LOCK_TIMEOUT_MS = 5000;
  * since it can't change during the server's lifetime.
  */
 const projectRootCache = new Map<string, Promise<string>>();
+
+/**
+ * `GIT_DIR`/`GIT_WORK_TREE`/`GIT_INDEX_FILE` in the environment make git skip cwd-based repo
+ * discovery entirely and operate on whatever repo those vars name — git itself sets `GIT_DIR`
+ * when invoking hooks (e.g. this repo's `.husky/pre-push`), so a `git rev-parse` shelled out
+ * during a pre-push run inherits it. Without stripping these, a caller passing an isolated
+ * temp-repo `cwd` (as `state-file.test.ts` does) still resolves to the *real* repo whenever this
+ * runs under a git hook, silently escaping the isolation and hitting the real
+ * `.claude/swarm-state.json`. `extendEnv: false` is required alongside this — execa's default
+ * `extendEnv: true` re-merges the spawned process's env on top of whatever `env` object is
+ * passed, which would otherwise silently reintroduce the very vars just deleted from our copy.
+ */
+function envWithoutGitDiscoveryOverrides(): NodeJS.ProcessEnv {
+	const env = { ...process.env };
+	delete env.GIT_DIR;
+	delete env.GIT_WORK_TREE;
+	delete env.GIT_INDEX_FILE;
+	return env;
+}
+
 async function resolveProjectRoot(cwd: string): Promise<string> {
 	let cached = projectRootCache.get(cwd);
 	if (!cached) {
-		cached = execa('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd }).then((result) =>
-			path.dirname(result.stdout.trim())
-		);
+		cached = execa('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+			cwd,
+			env: envWithoutGitDiscoveryOverrides(),
+			extendEnv: false,
+		}).then((result) => path.dirname(result.stdout.trim()));
 		projectRootCache.set(cwd, cached);
 	}
 	return cached;
@@ -65,13 +110,23 @@ async function releaseLock(lockPath: string): Promise<void> {
 }
 
 async function readState(stateFilePath: string): Promise<SwarmWorkerEntry[]> {
+	let raw: string;
 	try {
-		const raw = await fs.readFile(stateFilePath, 'utf8');
-		return raw.trim() ? (JSON.parse(raw) as SwarmWorkerEntry[]) : [];
+		raw = await fs.readFile(stateFilePath, 'utf8');
 	} catch (err) {
 		if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
 		throw err;
 	}
+	if (!raw.trim()) return [];
+
+	const parsed: unknown = JSON.parse(raw);
+	const result = swarmStateSchema.safeParse(parsed);
+	if (!result.success) {
+		throw new SwarmStateSchemaError(
+			`${stateFilePath} does not match the expected SwarmWorkerEntry[] shape: ${formatZodIssues(result.error)}`
+		);
+	}
+	return result.data;
 }
 
 async function writeState(stateFilePath: string, entries: SwarmWorkerEntry[]): Promise<void> {

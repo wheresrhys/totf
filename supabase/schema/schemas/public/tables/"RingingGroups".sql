@@ -3,7 +3,7 @@ CREATE TABLE public."RingingGroups" (
 	id bigint DEFAULT nextval('public."RingingGroups_id_seq"'::regclass) NOT NULL,
 	password_hash text,
 	password_salt text,
-	slug text
+	slug text NOT NULL
 );
 
 CREATE POLICY ringing_groups_access ON public."RingingGroups" FOR

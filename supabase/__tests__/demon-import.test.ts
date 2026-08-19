@@ -58,7 +58,7 @@ function toDemonDate(isoDate: string): string {
 function createIsolatedGroup(name: string): number {
 	return Number(
 		psqlScalar(
-			`INSERT INTO "RingingGroups" (group_name) VALUES ('${name}') RETURNING id;`
+			`INSERT INTO "RingingGroups" (group_name, slug) VALUES ('${name}', '${name.toLowerCase().replace(/ /g, '-')}') RETURNING id;`
 		)
 	);
 }

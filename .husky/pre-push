@@ -1,3 +1,4 @@
+./scripts/check-swarm-tools-staleness.sh
 npm run lint
 npx tsc --noEmit
 npm run test:nowatch

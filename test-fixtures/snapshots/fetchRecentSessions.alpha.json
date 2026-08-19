@@ -1,8 +1,8 @@
 [
   {
-    "id": 41,
+    "id": 39,
     "visit_date": "2024-05-10",
-    "location_id": 1,
+    "location_id": 2,
     "ringing_group_id": 1,
     "location": {
       "location_name": "Alpha Site A (CES)"
@@ -14,7 +14,7 @@
     ]
   },
   {
-    "id": 39,
+    "id": 45,
     "visit_date": "2023-09-14",
     "location_id": 31,
     "ringing_group_id": 1,
@@ -28,9 +28,9 @@
     ]
   },
   {
-    "id": 38,
+    "id": 31,
     "visit_date": "2023-07-08",
-    "location_id": 1,
+    "location_id": 2,
     "ringing_group_id": 1,
     "location": {
       "location_name": "Alpha Site A (CES)"

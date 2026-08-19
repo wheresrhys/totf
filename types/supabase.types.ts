@@ -206,21 +206,21 @@ export type Database = {
           id: number
           password_hash: string | null
           password_salt: string | null
-          slug: string | null
+          slug: string
         }
         Insert: {
           group_name: string
           id?: number
           password_hash?: string | null
           password_salt?: string | null
-          slug?: string | null
+          slug: string
         }
         Update: {
           group_name?: string
           id?: number
           password_hash?: string | null
           password_salt?: string | null
-          slug?: string | null
+          slug?: string
         }
         Relationships: []
       }
