@@ -56,14 +56,14 @@ function ListResightings({ data }: { data: ResightingEncounter[] }) {
 }
 
 export default async function ResightingsPage({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<ResightingEncounter[]>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['resightings']}
 			dataFetcher={fetchResightings}
 			PageComponent={ListResightings}

@@ -285,14 +285,14 @@ function HomePageContent({
 }
 
 export default async function Home({
-	viewedGroupId
+	viewedGroup
 }: {
 	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<PageModel>
-			viewedGroupId={viewedGroupId}
+			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['home-stats']}
 			dataFetcher={fetchHomePageData}
 			PageComponent={HomePageContent}

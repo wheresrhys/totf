@@ -135,6 +135,7 @@ export default async function BirdPage(
 	return (
 		<BootstrapPageData<StandaloneBird, PageProps, PageParams>
 			pageProps={props}
+			viewedGroup={props.viewedGroup}
 			getParams={async (pageProps: PageProps) => ({
 				ring: (await pageProps.params).ring.toUpperCase()
 			})}

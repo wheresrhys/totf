@@ -35,6 +35,7 @@ export default async function BirdPage(
 	return (
 		<BootstrapPageData<SearchResult[], PageProps, SearchParams>
 			pageProps={props}
+			viewedGroup={props.viewedGroup}
 			getParams={async (pageProps: PageProps) => ({
 				q: (await pageProps.searchParams).q
 			})}
