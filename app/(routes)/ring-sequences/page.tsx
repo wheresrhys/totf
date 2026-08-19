@@ -5,6 +5,7 @@ import {
 import { fetchRingSequenceSummaries } from '@/app/actions/ring-sequences';
 import type { RingSequenceSummary } from '@/app/actions/ring-sequences';
 import { RingSequencesPage } from '@/app/components/RingSequencesPage';
+import type { ViewedGroup } from '@/lib/group-slug';
 
 async function dataFetcher(
 	_: DefaultPageParams,
@@ -17,6 +18,7 @@ export default async function RingSequencesRoute({
 	viewedGroupId
 }: {
 	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<RingSequenceSummary[]>

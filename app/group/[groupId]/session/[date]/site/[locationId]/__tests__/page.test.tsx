@@ -61,8 +61,8 @@ const mockEncounters = [
 const mockPreviousSession = [{ visit_date: '2024-03-01' }];
 const mockNextSession = [{ visit_date: '2024-04-01' }];
 
-function makeSessionClient() {
-	const makeChain = (data: unknown) => ({
+function makeChain(data: unknown) {
+	return {
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
 		in: vi.fn().mockReturnThis(),
@@ -70,17 +70,33 @@ function makeSessionClient() {
 		gt: vi.fn().mockReturnThis(),
 		order: vi.fn().mockReturnThis(),
 		limit: vi.fn().mockReturnThis(),
+		maybeSingle: vi.fn().mockReturnThis(),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({ data, error: null }).then(resolve)
-	});
-	return {
-		from: vi
-			.fn()
-			.mockReturnValueOnce(makeChain(mockSessions))
-			.mockReturnValueOnce(makeChain(mockPreviousSession))
-			.mockReturnValueOnce(makeChain(mockNextSession))
-			.mockReturnValueOnce(makeChain(mockEncounters))
 	};
+}
+
+// The wrapper page also resolves the group's slug (RingingGroups) — via a
+// module-scope cache in lib/group-slug.ts, so it's only fetched once per
+// group id for the lifetime of this test file, not once per test. Dispatch
+// on table name so RingingGroups is served on demand regardless of whether
+// a given test hits the cache, without disturbing the ordered queue below
+// that the Sessions/Encounters calls are matched against.
+function makeSessionClient() {
+	const sessionAndEncounterChains = [
+		makeChain(mockSessions),
+		makeChain(mockPreviousSession),
+		makeChain(mockNextSession),
+		makeChain(mockEncounters)
+	];
+	let nextChainIndex = 0;
+	const from = vi.fn((table: string) => {
+		if (table === 'RingingGroups') {
+			return makeChain({ slug: 'test-group-slug' });
+		}
+		return sessionAndEncounterChains[nextChainIndex++];
+	});
+	return { from, sessionAndEncounterChains };
 }
 
 function renderPage() {
@@ -113,7 +129,7 @@ describe('session site page', () => {
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 		render(await renderPage());
 		await screen.findByTestId('session-stats');
-		const mainSessionsChain = client.from.mock.results[0].value;
+		const mainSessionsChain = client.sessionAndEncounterChains[0];
 		expect(mainSessionsChain.eq).toHaveBeenCalledWith(
 			'session_type',
 			'FULL_GROWN'

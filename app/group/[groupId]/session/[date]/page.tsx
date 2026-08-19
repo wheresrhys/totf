@@ -1,4 +1,5 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import { resolveGroupSlugById } from '@/lib/group-slug';
 import {
 	fetchSessionData,
 	SessionSummary,
@@ -14,7 +15,15 @@ export default async function CrossGroupSessionPage({ params }: PageProps) {
 	return (
 		<BootstrapPageData<DayData, PageProps, PageParams>
 			viewedGroupId={viewedGroupId}
-			getParams={async () => ({ viewedGroupId, date, locationId: undefined })}
+			getParams={async () => ({
+				viewedGroupId,
+				date,
+				locationId: undefined,
+				viewedGroup: {
+					id: viewedGroupId,
+					slug: await resolveGroupSlugById(viewedGroupId)
+				}
+			})}
 			getCacheKeys={() => ['session', date]}
 			dataFetcher={fetchSessionData}
 			PageComponent={SessionSummary}

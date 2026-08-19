@@ -10,6 +10,7 @@ import {
 } from '../components/shared/DesignSystem';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
+import type { ViewedGroup } from '@/lib/group-slug';
 import type { SessionWithEncountersCount } from '../models/session';
 import type {
 	AggregateStatsResult,
@@ -287,6 +288,7 @@ export default async function Home({
 	viewedGroupId
 }: {
 	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<PageModel>

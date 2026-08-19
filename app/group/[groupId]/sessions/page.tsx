@@ -1,3 +1,4 @@
+import { resolveGroupSlugById } from '@/lib/group-slug';
 import SessionsPage from '@/app/(routes)/sessions/page';
 
 export default async function CrossGroupSessionsPage({
@@ -6,5 +7,12 @@ export default async function CrossGroupSessionsPage({
 	params: Promise<{ groupId: string }>;
 }) {
 	const { groupId } = await params;
-	return <SessionsPage viewedGroupId={Number(groupId)} />;
+	const viewedGroupId = Number(groupId);
+	const viewedGroup = {
+		id: viewedGroupId,
+		slug: await resolveGroupSlugById(viewedGroupId)
+	};
+	return (
+		<SessionsPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />
+	);
 }

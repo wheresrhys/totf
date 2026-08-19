@@ -13,6 +13,7 @@ import {
 	type PayOffStatsData
 } from '@/app/actions/pay-off-stats';
 import type { AggregateStatsResult } from '@/app/models/db';
+import type { ViewedGroup } from '@/lib/group-slug';
 import { formatPostgresIntervalForDisplay } from '@/lib/postgres-interval';
 import { PayOffEffortChart } from '@/app/components/PayOffEffortChart';
 
@@ -130,6 +131,7 @@ export default function PayOffPage({
 	viewedGroupId
 }: {
 	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<PayOffStatsData>

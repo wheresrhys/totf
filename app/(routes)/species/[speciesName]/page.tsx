@@ -11,6 +11,7 @@ import type {
 	TopMetricsFilterParams,
 	TopPeriodsResult
 } from '@/app/models/db';
+import type { ViewedGroup } from '@/lib/group-slug';
 export type PageParams = { speciesName: string };
 type PageProps = { params: Promise<PageParams> };
 
@@ -79,7 +80,7 @@ export async function fetchSpPageData(
 }
 
 export default async function SpeciesPage(
-	props: PageProps & { viewedGroupId?: number }
+	props: PageProps & { viewedGroupId?: number; viewedGroup?: ViewedGroup }
 ) {
 	return (
 		<BootstrapPageData<PageData, PageProps, PageParams>

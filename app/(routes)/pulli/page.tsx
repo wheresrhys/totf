@@ -1,6 +1,7 @@
 import { PulliEncounter } from '@/app/models/session';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
+import type { ViewedGroup } from '@/lib/group-slug';
 import {
 	BootstrapPageData,
 	DefaultPageParams
@@ -55,6 +56,7 @@ export default async function PulliPage({
 	viewedGroupId
 }: {
 	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
 		<BootstrapPageData<PulliEncounter[]>
