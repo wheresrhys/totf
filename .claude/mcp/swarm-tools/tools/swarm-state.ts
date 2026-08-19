@@ -1,18 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { withStateLock, listState, type SwarmWorkerEntry } from '../lib/state-file';
-
-export const swarmWorkerEntrySchema = z.object({
-	kind: z.enum(['ticket', 'maintenance']),
-	issue: z.number().nullable(),
-	pr: z.number().nullable(),
-	branch: z.string(),
-	title: z.string(),
-	worktreePath: z.string(),
-	agentId: z.string(),
-	model: z.string(),
-	startedAt: z.string(),
-});
+import { withStateLock, listState, swarmWorkerEntrySchema, type SwarmWorkerEntry } from '../lib/state-file';
 
 export function registerSwarmStateTools(server: McpServer) {
 	server.registerTool(
