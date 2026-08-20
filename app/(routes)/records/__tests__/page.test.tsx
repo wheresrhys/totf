@@ -10,17 +10,17 @@ vi.mock('@/app/actions/top-performers', () => ({
 	getTopStats: mockGetTopStats
 }));
 
-describe('highlights page', () => {
+describe('records page', () => {
 	afterEach(() => {
 		cleanup();
 		mockGetTopStats.mockReset();
 	});
 
-	it('renders a "Highlights" page heading', async () => {
+	it('renders a "Records" page heading', async () => {
 		mockGetTopStats.mockResolvedValue([]);
 		render(await Page());
 		const heading = await screen.findByRole('heading', { level: 1 });
-		expect(heading.textContent).toBe('Highlights');
+		expect(heading.textContent).toBe('Records');
 	});
 
 	it('renders an accordion group per stat panel heading', async () => {
