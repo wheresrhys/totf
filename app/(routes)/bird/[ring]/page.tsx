@@ -77,12 +77,13 @@ export async function fetchBirdData(
 function BirdSummary({
 	params: { ring },
 	data: bird,
-	viewedGroupId: loggedInGroupId
+	viewedGroup
 }: {
 	params: PageParams;
 	data: StandaloneBird;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
+	const loggedInGroupId = viewedGroup.id;
 	const enrichedBird = bird.encounters.length ? enrichBird(bird) : null;
 	const sharedEncounterCount = enrichedBird
 		? enrichedBird.encounters.filter(

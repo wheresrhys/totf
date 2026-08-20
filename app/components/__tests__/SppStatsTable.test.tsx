@@ -28,7 +28,9 @@ describe('SppStatsTable', () => {
 
 	describe('initial render', () => {
 		it('renders species data rows from initial data', () => {
-			render(<SppStatsTable data={pageData} viewedGroupId={1} />);
+			render(
+				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: 'alpha' }} />
+			);
 			const rows = document.querySelectorAll('tbody tr');
 			expect(rows.length).toBe(speciesDataSnapshot.length);
 		});
@@ -36,7 +38,9 @@ describe('SppStatsTable', () => {
 
 	describe('year filter', () => {
 		it('CES only checkbox is disabled when no year selected', () => {
-			render(<SppStatsTable data={pageData} viewedGroupId={1} />);
+			render(
+				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: 'alpha' }} />
+			);
 			const cesCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
 			expect(cesCheckbox.disabled).toBe(true);
 		});
@@ -46,7 +50,9 @@ describe('SppStatsTable', () => {
 			vi.mocked(fetchSpeciesData).mockResolvedValue(
 				speciesDataSnapshot as unknown as AggregateStatsResult[]
 			);
-			render(<SppStatsTable data={pageData} viewedGroupId={1} />);
+			render(
+				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: 'alpha' }} />
+			);
 			const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;
 			fireEvent.change(yearSelect, { target: { value: '2022' } });
 			const cesCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
@@ -58,7 +64,9 @@ describe('SppStatsTable', () => {
 			vi.mocked(fetchSpeciesData).mockResolvedValue(
 				speciesDataSnapshot as unknown as AggregateStatsResult[]
 			);
-			render(<SppStatsTable data={pageData} viewedGroupId={1} />);
+			render(
+				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: 'alpha' }} />
+			);
 			const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;
 			fireEvent.change(yearSelect, { target: { value: '2022' } });
 			await waitFor(() => {

@@ -11,6 +11,7 @@ import type {
 	PageData,
 	PageParams
 } from '@/app/(routes)/species/[speciesName]/page';
+import type { ViewedGroup } from '@/lib/group-slug';
 import { SpIndividualsTab } from './SpIndividualsTab';
 import { SpNotableRetrapsTab } from './SpNotableRetrapsTab';
 import { SpStatsHistoryTab } from './SpStatsHistoryTab';
@@ -135,17 +136,17 @@ function fullFatTypeGuard(data: PageData): data is FullFatPageData {
 export function SpPage({
 	params: { speciesName },
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	params: PageParams;
 	data: PageData;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>{speciesName}</PrimaryHeading>
 			{fullFatTypeGuard(data) ? (
-				<SpeciesData data={data} viewedGroupId={viewedGroupId} />
+				<SpeciesData data={data} viewedGroupId={viewedGroup.id} />
 			) : (
 				<p>Not authorised to view any encounter data for this species</p>
 			)}

@@ -30,15 +30,15 @@ export async function fetchAllSessions(
 
 function ListAllSessions({
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	data: SessionWithEncountersCount[];
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Session history</PrimaryHeading>
-			<SessionHistoryCalendar sessions={data} viewedGroupId={viewedGroupId} />
+			<SessionHistoryCalendar sessions={data} viewedGroupId={viewedGroup.id} />
 		</PageWrapper>
 	);
 }
@@ -46,7 +46,6 @@ function ListAllSessions({
 export default async function SessionsPage({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
