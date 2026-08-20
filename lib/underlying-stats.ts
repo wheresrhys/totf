@@ -80,14 +80,17 @@ export async function fetchSessionStats(
 	return stats;
 }
 
-// One row per period (group_by_species: false, matching fetchPayOffStats'
-// existing precedent) — aggregate_stats computes bird_count as
-// COUNT(DISTINCT bird_id) per period bucket server-side, so summing across
-// periods client-side never double-counts a retrapped bird. No from_date/
-// to_date is passed, so the RPC's internal period_spine returns one row per
-// period that has data. Unlike fetchSessionStats, this is not cached —
-// matching fetchPayOffStats' precedent (a deliberate choice, not an
-// oversight).
+// One row per period+species (group_by_species: true) — matches
+// fetchSessionStats' species granularity (its stats_per_day_and_species RPC
+// groups by day+species) rather than fetchPayOffStats' summary-only
+// precedent, since these functions are meant to be equivalent to
+// fetchSessionStats except for the aggregate period. aggregate_stats
+// computes bird_count as COUNT(DISTINCT bird_id) per period+species bucket
+// server-side, so summing across periods client-side never double-counts a
+// retrapped bird. No from_date/to_date is passed, so the RPC's internal
+// period_spine returns one row per period that has data. Unlike
+// fetchSessionStats, this is not cached — matching fetchPayOffStats'
+// precedent (a deliberate choice, not an oversight).
 export async function fetchYearStats(
 	viewedGroupId: number
 ): Promise<AggregateStatsResult[] | null> {
@@ -95,7 +98,7 @@ export async function fetchYearStats(
 	return supabase
 		.rpc('aggregate_stats', {
 			ringing_group_filter: viewedGroupId,
-			group_by_species: false,
+			group_by_species: true,
 			group_by_time_period: 'year'
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>;
@@ -108,7 +111,7 @@ export async function fetchMonthStats(
 	return supabase
 		.rpc('aggregate_stats', {
 			ringing_group_filter: viewedGroupId,
-			group_by_species: false,
+			group_by_species: true,
 			group_by_time_period: 'month'
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>;

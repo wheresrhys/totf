@@ -232,7 +232,7 @@ function makeAggregateStatsClient(response: {
 }
 
 describe('fetchYearStats', () => {
-	it('calls aggregate_stats with group_by_time_period "year" and group_by_species false', async () => {
+	it('calls aggregate_stats with group_by_time_period "year" and group_by_species true', async () => {
 		const { client, mockRpc } = makeAggregateStatsClient({
 			data: yearlyRows,
 			error: null
@@ -243,7 +243,7 @@ describe('fetchYearStats', () => {
 
 		expect(mockRpc).toHaveBeenCalledWith('aggregate_stats', {
 			ringing_group_filter: GROUP_ID,
-			group_by_species: false,
+			group_by_species: true,
 			group_by_time_period: 'year'
 		});
 		expect(result).toEqual(yearlyRows);
@@ -297,7 +297,7 @@ describe('fetchYearStats', () => {
 });
 
 describe('fetchMonthStats', () => {
-	it('calls aggregate_stats with group_by_time_period "month" and group_by_species false', async () => {
+	it('calls aggregate_stats with group_by_time_period "month" and group_by_species true', async () => {
 		const { client, mockRpc } = makeAggregateStatsClient({
 			data: monthlyRows,
 			error: null
@@ -308,7 +308,7 @@ describe('fetchMonthStats', () => {
 
 		expect(mockRpc).toHaveBeenCalledWith('aggregate_stats', {
 			ringing_group_filter: GROUP_ID,
-			group_by_species: false,
+			group_by_species: true,
 			group_by_time_period: 'month'
 		});
 		expect(result).toEqual(monthlyRows);
