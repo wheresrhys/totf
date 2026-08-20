@@ -7,15 +7,18 @@ description: >-
   task description with no item boundaries, which is decomposed into commit-sized tasks first.
   First reviews the whole task list conversationally, surfacing clarifications/improvements and
   writing accepted ones back to the source (the tracking issue's body, if that's where it came
-  from), before drafting. Enumerates commits and tests, picks a model label (fable/sonnet/opus) +
-  `ready`, tags `db-migration` where a task touches `supabase/schema/` and `e2e-exclusive` where
-  it touches a path in `e2e/mutating-spec-triggers.json`, and expresses inter-task dependencies as
-  GitHub native "blocked by" links. When run under a named tracking issue, each created ticket is
-  filed as its GitHub sub-issue. Drafting is parallelised across subagents, but the
-  flesh-out-ticket confirmation gate still fires for every ticket in the main thread — the full
-  ticket markdown is always shown before that gate, never a squashed summary. Triggers:
-  "ticketify", "/ticketify", "ticketify this", "break this task down into tickets", "create
-  tickets for all these tasks", "turn this task list into issues".
+  from), before drafting. Before any full drafting, produces a fast coarse per-ticket size
+  estimate (likely files touched, rough LOC, flagged if over this repo's <400 LOC heuristic) so
+  the user can drill into or resize any ticket while it's still cheap to change. Enumerates
+  commits and tests, picks a model label (fable/sonnet/opus) + `ready`, tags `db-migration` where
+  a task touches `supabase/schema/` and `e2e-exclusive` where it touches a path in
+  `e2e/mutating-spec-triggers.json`, and expresses inter-task dependencies as GitHub native
+  "blocked by" links. When run under a named tracking issue, each created ticket is filed as its
+  GitHub sub-issue. Drafting is parallelised across subagents, but the flesh-out-ticket
+  confirmation gate still fires for every ticket in the main thread — the full ticket markdown is
+  always shown before that gate, never a squashed summary. Triggers: "ticketify", "/ticketify",
+  "ticketify this", "break this task down into tickets", "create tickets for all these tasks",
+  "turn this task list into issues".
 ---
 
 # ticketify
@@ -47,7 +50,7 @@ large task with no item boundaries. Handle each differently:
 
 ### 1. Review the whole list (conversational)
 Run this **once, up front**, before any drafting. It is distinct from both the scope-selection
-step (§2) and the per-ticket confirmation gate (§4).
+step (§2) and the per-ticket confirmation gate (§5).
 
 - Read the full task source: the skill argument if pasted (or step 0's proposed decomposition),
   otherwise a named GitHub tracking issue's body. Parse into an ordered list of items — treat each
@@ -77,7 +80,23 @@ step (§2) and the per-ticket confirmation gate (§4).
   confirm which tasks are in scope. This is scope selection — it is NOT the per-ticket
   confirmation gate (that comes later, per ticket).
 
-### 3. Draft each ticket (parallelise)
+### 3. High-level sizing plan (before detailed drafting)
+Before fleshing any ticket in full, give the user a fast, coarse size estimate per in-scope task
+so oversized tickets get caught before the cost of full drafting (§4) is spent on them.
+
+- For each in-scope task, without running `flesh-out-ticket`'s full fleshing, produce a rough
+  estimate: likely files touched (paths/dirs, from a quick grep/read of the areas the task's
+  description implies) and a rough LOC range. Flag any task whose estimate clearly exceeds this
+  repo's <400 LOC heuristic (`CLAUDE.md`).
+- Present the whole set as a single table: task # | one-line summary | est. files touched |
+  est. LOC | flag (over-heuristic?).
+- Discuss conversationally, same as §1: the user can ask to drill into any one task (a short
+  paragraph of what it would touch and why — still short of a full ticket draft) or give feedback
+  (split, merge, trim scope, accept as-is) on any task, especially ones flagged oversized.
+- Loop until the user is satisfied with the plan. Apply any accepted split/merge/trim to the
+  working task list before proceeding to §4.
+
+### 4. Draft each ticket (parallelise)
 For each in-scope task, produce a draft using `flesh-out-ticket` steps 1–5 (flesh out, stack-layer
 identification, small-commit breakdown, USE test enumeration, model-label choice). Do NOT create
 issues yet.
@@ -99,31 +118,31 @@ When there are more than ~3 tasks, fan out to `general-purpose` subagents to dra
   - `modelLabel` + one-line justification (`fable`|`sonnet`|`opus`).
   - `dependsOn` — the other tasks (identified by summary) this task is blocked by.
 
-### 4. Confirm each ticket — HARD GATE, propagated from flesh-out-ticket
+### 5. Confirm each ticket — HARD GATE, propagated from flesh-out-ticket
 Back in the **main thread**, order the drafts in dependency order (blockers before the tickets
 they block). For each draft, run `flesh-out-ticket` step 6's confirmation gate:
 
 1. Print the **complete** ticket markdown (title + every section, verbatim, exactly as it will be
    filed) as its own normal chat message. Never summarize or squash it — the user is reviewing
    the actual ticket text, not a paraphrase of it, regardless of whether it came from a subagent
-   draft (§3) or was drafted inline.
+   draft (§4) or was drafted inline.
 2. Only after that full text is visible, call **AskUserQuestion** with a short decision-only
    question ("Confirm & create / Edit / Change model label") plus the proposed model label and
    justification. The AskUserQuestion question text is for the decision prompt only — it must
    never carry ticket content itself.
 3. Loop on edits until the user confirms.
 
-This gate is mandatory for every ticket. Parallel drafting in step 3 must never bypass it — the
+This gate is mandatory for every ticket. Parallel drafting in step 4 must never bypass it — the
 user confirms and can give feedback on each WIP ticket individually.
 
-### 5. Create issues
+### 6. Create issues
 On each confirmation, run `flesh-out-ticket` step 7: call `mcp__swarm-tools__create_ticket` with
 `title`, `body`, `modelLabel`, `extraLabels` (`db-migration` if `touchesDbSchema`, `e2e-exclusive`
 if `touchesE2eMutatingTrigger`), and `parentIssue` if this run is scoped under a tracking issue
 (the tool links the sub-issue itself). Record the mapping `task → issue number` from the
 returned `issueNumber`.
 
-### 6. Wire up dependencies (second pass)
+### 7. Wire up dependencies (second pass)
 Once every confirmed issue exists (so all issue numbers are known), resolve each ticket's
 `dependsOn` tasks to their issue numbers and apply the GitHub "blocked by" links:
 `gh issue edit <issue#> --add-blocked-by <blockerIssue#>[,<blockerIssue#>...]`
@@ -131,7 +150,7 @@ Once every confirmed issue exists (so all issue numbers are known), resolve each
 orthogonal to sub-issue membership — `blocked-by` sequences siblings, sub-issue links them to
 the parent.)
 
-### 7. Report
+### 8. Report
 Summarise: each created issue URL, its labels, its sub-issue parent (if any), and its blocked-by
 links.
 
@@ -140,6 +159,9 @@ links.
   treat a single large task as if it were already itemized.
 - The whole-list review (§1) runs once at the start, before any drafting. Only user-accepted
   changes are written back; when the source is a tracking issue, its body is edited in place.
+- The sizing plan (§3) runs after scope selection and before any full drafting; it gives a rough
+  per-ticket size estimate and lets the user drill into or resize any ticket before the cost of
+  full fleshing is spent.
 - One issue per task. Reuse `flesh-out-ticket` for the per-ticket work — do not reinvent its
   fleshing, confirmation gate, labelling, or creation logic.
 - Every issue: one model label (`fable`|`sonnet`|`opus`) + `ready`, plus `db-migration` when it
