@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
+import type {
+	AggregateStatsResult,
+	StatsPerDayAndSpeciesResult
+} from '@/app/models/db';
+import payOffStatsFixture from '../../test-fixtures/snapshots/fetchPayOffStats.beta.json';
+import { fetchYearStats, fetchMonthStats } from '../underlying-stats';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -206,6 +211,135 @@ describe('fetchSessionStats', () => {
 		expect(mockEncountersEq).toHaveBeenCalledWith(
 			'ringing_group_id',
 			OTHER_GROUP_ID
+		);
+	});
+});
+
+// fetchYearStats/fetchMonthStats call aggregate_stats directly and
+// `.then(catchSupabaseErrors)` the result — no pagination chain, so these
+// use their own minimal mock client rather than the paginated builder above.
+const yearlyRows =
+	payOffStatsFixture.yearly as unknown as AggregateStatsResult[];
+const monthlyRows =
+	payOffStatsFixture.monthly as unknown as AggregateStatsResult[];
+
+function makeAggregateStatsClient(response: {
+	data: unknown;
+	error: { message: string } | null;
+}) {
+	const mockRpc = vi.fn().mockReturnValue(Promise.resolve(response));
+	return { client: { rpc: mockRpc }, mockRpc };
+}
+
+describe('fetchYearStats', () => {
+	it('calls aggregate_stats with group_by_time_period "year" and group_by_species false', async () => {
+		const { client, mockRpc } = makeAggregateStatsClient({
+			data: yearlyRows,
+			error: null
+		});
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+		const result = await fetchYearStats(GROUP_ID);
+
+		expect(mockRpc).toHaveBeenCalledWith('aggregate_stats', {
+			ringing_group_filter: GROUP_ID,
+			group_by_species: false,
+			group_by_time_period: 'year'
+		});
+		expect(result).toEqual(yearlyRows);
+	});
+
+	it('scopes the call to the given viewedGroupId via ringing_group_filter', async () => {
+		const { client, mockRpc } = makeAggregateStatsClient({
+			data: yearlyRows,
+			error: null
+		});
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+		await fetchYearStats(OTHER_GROUP_ID);
+
+		expect(mockRpc).toHaveBeenCalledWith(
+			'aggregate_stats',
+			expect.objectContaining({ ringing_group_filter: OTHER_GROUP_ID })
+		);
+	});
+
+	it('passes no from_date/to_date, returning one row per year with data', async () => {
+		const { client, mockRpc } = makeAggregateStatsClient({
+			data: yearlyRows,
+			error: null
+		});
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+		const result = await fetchYearStats(GROUP_ID);
+
+		const callArgs = mockRpc.mock.calls[0][1];
+		expect(callArgs).not.toHaveProperty('from_date');
+		expect(callArgs).not.toHaveProperty('to_date');
+		expect(result).toHaveLength(yearlyRows.length);
+	});
+
+	// The ticket's spec describes this as "returns null when the RPC call
+	// errors", but the shared catchSupabaseErrors helper (lib/supabase.ts)
+	// always throws on a Supabase error rather than returning null — this
+	// test asserts that actual (pre-existing, unchanged) behaviour instead.
+	it('throws when the RPC call errors', async () => {
+		const { client } = makeAggregateStatsClient({
+			data: null,
+			error: { message: 'boom' }
+		});
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+		await expect(fetchYearStats(GROUP_ID)).rejects.toThrow(
+			'Failed to fetch data: boom'
+		);
+	});
+});
+
+describe('fetchMonthStats', () => {
+	it('calls aggregate_stats with group_by_time_period "month" and group_by_species false', async () => {
+		const { client, mockRpc } = makeAggregateStatsClient({
+			data: monthlyRows,
+			error: null
+		});
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+		const result = await fetchMonthStats(GROUP_ID);
+
+		expect(mockRpc).toHaveBeenCalledWith('aggregate_stats', {
+			ringing_group_filter: GROUP_ID,
+			group_by_species: false,
+			group_by_time_period: 'month'
+		});
+		expect(result).toEqual(monthlyRows);
+	});
+
+	it('scopes the call to the given viewedGroupId via ringing_group_filter', async () => {
+		const { client, mockRpc } = makeAggregateStatsClient({
+			data: monthlyRows,
+			error: null
+		});
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+		await fetchMonthStats(OTHER_GROUP_ID);
+
+		expect(mockRpc).toHaveBeenCalledWith(
+			'aggregate_stats',
+			expect.objectContaining({ ringing_group_filter: OTHER_GROUP_ID })
+		);
+	});
+
+	// See the equivalent fetchYearStats test above for why this asserts a
+	// throw rather than a null return.
+	it('throws when the RPC call errors', async () => {
+		const { client } = makeAggregateStatsClient({
+			data: null,
+			error: { message: 'boom' }
+		});
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+		await expect(fetchMonthStats(GROUP_ID)).rejects.toThrow(
+			'Failed to fetch data: boom'
 		);
 	});
 });
