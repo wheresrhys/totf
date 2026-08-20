@@ -33,7 +33,6 @@ function ListMistakes({ data }: { data: DiscrepenciesResult[] }) {
 export default async function MistakesPage({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (

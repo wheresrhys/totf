@@ -38,7 +38,6 @@ function ListNotableRetraps({ data }: { data: NotableRetrapsResult[] }) {
 export default async function NotableRetrapsPage({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (

@@ -80,7 +80,7 @@ export async function fetchSpPageData(
 }
 
 export default async function SpeciesPage(
-	props: PageProps & { viewedGroupId?: number; viewedGroup?: ViewedGroup }
+	props: PageProps & { viewedGroup?: ViewedGroup }
 ) {
 	return (
 		<BootstrapPageData<PageData, PageProps, PageParams>

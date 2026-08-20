@@ -37,7 +37,6 @@ describe('cross-group single-species page', () => {
 		expect(mockResolveGroupSlugById).toHaveBeenCalledWith(2);
 		expect(vi.mocked(SpeciesPage).mock.calls[0][0]).toEqual(
 			expect.objectContaining({
-				viewedGroupId: 2,
 				viewedGroup: { id: 2, slug: 'viewed-group-slug' }
 			})
 		);

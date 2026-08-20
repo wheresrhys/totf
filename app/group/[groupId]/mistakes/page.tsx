@@ -12,7 +12,5 @@ export default async function CrossGroupMistakesPage({
 		id: viewedGroupId,
 		slug: await resolveGroupSlugById(viewedGroupId)
 	};
-	return (
-		<MistakesPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />
-	);
+	return <MistakesPage viewedGroup={viewedGroup} />;
 }

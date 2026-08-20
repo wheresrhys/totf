@@ -12,7 +12,5 @@ export default async function CrossGroupSpeciesPage({
 		id: viewedGroupId,
 		slug: await resolveGroupSlugById(viewedGroupId)
 	};
-	return (
-		<AllSpeciesPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />
-	);
+	return <AllSpeciesPage viewedGroup={viewedGroup} />;
 }

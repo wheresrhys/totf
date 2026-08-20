@@ -13,7 +13,6 @@ export default async function CrossGroupSingleSpeciesPage(props: {
 	return (
 		<SpeciesPage
 			params={Promise.resolve({ speciesName })}
-			viewedGroupId={viewedGroupId}
 			viewedGroup={viewedGroup}
 		/>
 	);
