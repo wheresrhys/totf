@@ -73,6 +73,27 @@ export function hasOutstandingInlineFeedback(comments: InlineCommentLike[], head
 	return false;
 }
 
+interface IssueCommentLike {
+	user?: { login?: string };
+	body?: string;
+	created_at?: string;
+}
+
+/**
+ * Flags a top-level PR conversation comment (`GET /issues/{n}/comments` — what both `gh pr
+ * comment` and the `mermaid-diff` skill write to) as outstanding feedback if it's human-authored,
+ * not a mermaid-diff comment, and newer than the PR's head commit. Issue comments are a flat
+ * list, not threaded like review comments, so unlike `hasOutstandingInlineFeedback` there's no
+ * reply-threading step — each comment is evaluated on its own.
+ */
+export function hasOutstandingIssueCommentFeedback(comments: IssueCommentLike[], headCommitDate: string): boolean {
+	return comments.some((comment) => {
+		if (isBotLogin(comment.user?.login)) return false;
+		if (!comment.body || isMermaidDiffComment(comment.body)) return false;
+		return Boolean(comment.created_at && comment.created_at > headCommitDate);
+	});
+}
+
 export interface MaintenanceCandidate {
 	number: number;
 	title: string;
@@ -175,7 +196,7 @@ interface GhIssueListItem {
 	blocking: { nodes: { state: string }[] };
 }
 
-async function findMaintenanceCandidates(): Promise<MaintenanceCandidate[]> {
+export async function findMaintenanceCandidates(): Promise<MaintenanceCandidate[]> {
 	const prs = await ghJson<GhPrListItem[]>([
 		'pr',
 		'list',
@@ -196,6 +217,13 @@ async function findMaintenanceCandidates(): Promise<MaintenanceCandidate[]> {
 				`repos/{owner}/{repo}/pulls/${pr.number}/comments`,
 			]).catch(() => []);
 			hasFeedback = hasOutstandingInlineFeedback(comments, headCommitDate);
+		}
+		if (!hasFeedback) {
+			const issueComments = await ghJson<IssueCommentLike[]>([
+				'api',
+				`repos/{owner}/{repo}/issues/${pr.number}/comments`,
+			]).catch(() => []);
+			hasFeedback = hasOutstandingIssueCommentFeedback(issueComments, headCommitDate);
 		}
 		if (!hasConflict && !hasFeedback) continue;
 		const reason: MaintenanceCandidate['reason'] =
