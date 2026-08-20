@@ -1,6 +1,7 @@
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
 import type { LocationRow } from '@/app/models/db';
+import type { ViewedGroup } from '@/lib/group-slug';
 import { printLocationName } from './DesignSystem';
 export type TemporalUnit = 'day' | 'month' | 'year';
 export type StatOutputModel = {
@@ -13,7 +14,7 @@ export type StatOutputModel = {
 	dateFormat?: string;
 	classes?: string;
 	location?: LocationRow;
-	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 	link?: boolean;
 };
 
@@ -39,12 +40,12 @@ export function StatOutput({
 	temporalUnit,
 	classes,
 	location,
-	viewedGroupId,
+	viewedGroup,
 	link = true
 }: StatOutputModel) {
-	if (temporalUnit === 'day' && !viewedGroupId) {
+	if (temporalUnit === 'day' && !viewedGroup) {
 		throw new Error(
-			'viewedGroupId is required to output stats for day temporal unit'
+			'viewedGroup is required to output stats for day temporal unit'
 		);
 	}
 	return (
@@ -56,7 +57,7 @@ export function StatOutput({
 			{temporalUnit === 'day' && link ? (
 				<NoPrefetchLink
 					className="link"
-					href={`/group/${viewedGroupId}/session/${visitDate}${location ? `/site/${location.id}` : ''}`}
+					href={`/group/${viewedGroup?.id}/session/${visitDate}${location ? `/site/${location.id}` : ''}`}
 				>
 					{formatDate(
 						new Date(visitDate as string),

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { SecondaryHeading, BoxyList } from './shared/DesignSystem';
 import type { TopPeriodsResult, TopSpeciesResult } from '@/app/models/db';
 import type { UserTopStatsArgs } from '@/app/actions/top-performers';
+import type { ViewedGroup } from '@/lib/group-slug';
 import { StatsAccordionItem } from './StatsAccordionItem';
 
 export type StatConfig = {
@@ -25,15 +26,15 @@ export type StatsAccordionModel = {
 
 export function StatsAccordion({
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	data: StatsAccordionModel[];
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	const [expanded, setExpanded] = useState<string | false>(false);
 	useEffect(() => {
 		setExpanded(false);
-	}, [viewedGroupId]);
+	}, [viewedGroup.id]);
 	return (
 		<>
 			{data.map(({ heading, stats }) => (
@@ -42,9 +43,9 @@ export function StatsAccordion({
 					<BoxyList>
 						{stats.map((item) => (
 							<StatsAccordionItem
-								key={`${viewedGroupId}-${item.definition.id}`}
+								key={`${viewedGroup.id}-${item.definition.id}`}
 								item={item}
-								viewedGroupId={viewedGroupId}
+								viewedGroup={viewedGroup}
 								expanded={expanded}
 								onToggle={setExpanded}
 							/>

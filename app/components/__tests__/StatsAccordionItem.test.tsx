@@ -55,7 +55,7 @@ describe('StatsAccordionItem', () => {
 		render(
 			<StatsAccordionItem
 				item={mockItemModel}
-				viewedGroupId={1}
+				viewedGroup={{ id: 1, slug: 'alpha' }}
 				expanded={false}
 				onToggle={mockOnToggle}
 			/>
@@ -69,7 +69,7 @@ describe('StatsAccordionItem', () => {
 			render(
 				<StatsAccordionItem
 					item={mockItemModel}
-					viewedGroupId={1}
+					viewedGroup={{ id: 1, slug: 'alpha' }}
 					expanded={false}
 					onToggle={mockOnToggle}
 				/>
@@ -84,7 +84,7 @@ describe('StatsAccordionItem', () => {
 			render(
 				<StatsAccordionItem
 					item={emptyItem}
-					viewedGroupId={1}
+					viewedGroup={{ id: 1, slug: 'alpha' }}
 					expanded={false}
 					onToggle={mockOnToggle}
 				/>
@@ -105,7 +105,7 @@ describe('StatsAccordionItem', () => {
 			render(
 				<StatsAccordionItem
 					item={itemWithNoData}
-					viewedGroupId={1}
+					viewedGroup={{ id: 1, slug: 'alpha' }}
 					expanded="test-metric"
 					onToggle={mockOnToggle}
 				/>
