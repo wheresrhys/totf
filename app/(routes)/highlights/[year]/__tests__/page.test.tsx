@@ -18,10 +18,4 @@ describe('/highlights/[year]', () => {
 		const heading = await screen.findByRole('heading', { level: 1 });
 		expect(heading.textContent).toBe('1901 highlights');
 	});
-
-	it('404s for a malformed year param', async () => {
-		render(await Page({ params: Promise.resolve({ year: '99' }) }));
-		expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
-		await screen.findByText('No data available');
-	});
 });

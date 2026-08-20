@@ -1,31 +1,30 @@
 import { format } from 'date-fns';
+import {
+	PageWrapper,
+	PrimaryHeading
+} from '@/app/components/shared/DesignSystem';
 
-const YEAR_PATTERN = /^\d{4}$/;
-const MONTH_PATTERN = /^(0[1-9]|1[0-2])$/;
+export function HighlightsHeading({
+	year,
+	month
+}: {
+	year?: number;
+	month?: number;
+}) {
+	return (
+		<PageWrapper>
+			<PrimaryHeading>{buildHeading(year, month)}</PrimaryHeading>
+		</PageWrapper>
+	);
+}
 
-export function parseYearParam(year: string): number | null {
-	if (!YEAR_PATTERN.test(year)) {
-		return null;
+function buildHeading(year?: number, month?: number): string {
+	if (year === undefined) {
+		return 'All time highlights';
 	}
-	return Number(year);
-}
-
-export function parseMonthParam(month: string): number | null {
-	if (!MONTH_PATTERN.test(month)) {
-		return null;
+	if (month === undefined) {
+		return `${year} highlights`;
 	}
-	return Number(month);
-}
-
-export function buildAllTimeHeading(): string {
-	return 'All time highlights';
-}
-
-export function buildYearHeading(year: number): string {
-	return `${year} highlights`;
-}
-
-export function buildYearMonthHeading(year: number, month: number): string {
 	const monthDate = new Date(year, month - 1, 1);
 	return `${format(monthDate, 'LLLL')} ${year} highlights`;
 }
