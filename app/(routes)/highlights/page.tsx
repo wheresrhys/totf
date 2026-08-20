@@ -23,7 +23,7 @@ function AllTimeHighlights({
 	return (
 		<HighlightsPageContent
 			sessionDates={data.sessionDates}
-			viewedGroupId={viewedGroup.id}
+			viewedGroup={viewedGroup}
 		/>
 	);
 }

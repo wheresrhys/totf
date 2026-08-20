@@ -35,7 +35,7 @@ function YearMonthHighlights({
 			year={data.year}
 			month={data.month}
 			sessionDates={data.sessionDates}
-			viewedGroupId={viewedGroup.id}
+			viewedGroup={viewedGroup}
 		/>
 	);
 }
