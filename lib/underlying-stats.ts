@@ -9,10 +9,10 @@ import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
 // The 60-min TTL is retained as a backstop for rare in-place re-imports
 // that edit existing encounters without adding rows.
 //
-// This is a deliberate literal duplicate of the private fetchSessionStats in
-// app/actions/session-highlights.ts (own cache instance, unchanged logic) —
-// that module is slated for eventual deletion, so this shared module must
-// not import from it or share its cache.
+// This is the single implementation of fetchSessionStats — app/actions/
+// session-highlights.ts imports it (and shares this cache instance) rather
+// than keeping its own copy, since importing a plain module from a
+// 'use server' file is fine.
 export const SESSION_STATS_CACHE_TTL_MS = 60 * 60 * 1000;
 export const sessionStatsCache = new Map<
 	number,
