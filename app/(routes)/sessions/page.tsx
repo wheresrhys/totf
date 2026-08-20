@@ -38,7 +38,7 @@ function ListAllSessions({
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Session history</PrimaryHeading>
-			<SessionHistoryCalendar sessions={data} viewedGroupId={viewedGroup.id} />
+			<SessionHistoryCalendar sessions={data} viewedGroup={viewedGroup} />
 		</PageWrapper>
 	);
 }

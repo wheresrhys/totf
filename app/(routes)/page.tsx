@@ -133,10 +133,10 @@ export async function fetchHomePageData(
 
 function RecentSessions({
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	data: SessionWithEncountersCount[];
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	return (
 		<div>
@@ -152,7 +152,7 @@ function RecentSessions({
 			<BoxyList>
 				<SessionsByDay
 					sessions={data}
-					viewedGroupId={viewedGroupId}
+					viewedGroup={viewedGroup}
 					dateFormat="EEEE do MMMM"
 				/>
 			</BoxyList>
@@ -275,10 +275,7 @@ function HomePageContent({
 	return (
 		<PageWrapper>
 			<SummaryStatsTable data={data.summaryStats} />
-			<RecentSessions
-				data={data.recentSessions}
-				viewedGroupId={viewedGroup.id}
-			/>
+			<RecentSessions data={data.recentSessions} viewedGroup={viewedGroup} />
 			<TopSpecies data={data.topSpecies} lastGroupTick={data.lastGroupTick} />
 		</PageWrapper>
 	);

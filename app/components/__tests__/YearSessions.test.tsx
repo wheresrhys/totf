@@ -28,7 +28,7 @@ describe('YearSessions', () => {
 			<YearSessions
 				year={yearData}
 				yearString="2022"
-				viewedGroupId={1}
+				viewedGroup={{ id: 1, slug: 'alpha' }}
 				expandedYear={false}
 				onToggle={mockOnToggle}
 			/>
@@ -42,7 +42,7 @@ describe('YearSessions', () => {
 			<YearSessions
 				year={yearData}
 				yearString="2022"
-				viewedGroupId={1}
+				viewedGroup={{ id: 1, slug: 'alpha' }}
 				expandedYear={false}
 				onToggle={mockOnToggle}
 			/>
@@ -57,7 +57,7 @@ describe('YearSessions', () => {
 			<YearSessions
 				year={yearData}
 				yearString="2022"
-				viewedGroupId={1}
+				viewedGroup={{ id: 1, slug: 'alpha' }}
 				expandedYear="2022"
 				onToggle={mockOnToggle}
 			/>
@@ -65,5 +65,26 @@ describe('YearSessions', () => {
 		const monthsContainer = screen.getByTestId('months-of-year');
 		const monthButtons = monthsContainer.querySelectorAll('button');
 		expect(monthButtons.length).toBe(4);
+	});
+
+	// Regression: viewedGroupId (number) became a viewedGroup object, but the
+	// session hrefs threaded down the calendar tree must still be built from
+	// the numeric id — byte-identical to before, not the slug.
+	it('threads viewedGroup.id into session hrefs (numeric, unchanged)', () => {
+		render(
+			<YearSessions
+				year={yearData}
+				yearString="2022"
+				viewedGroup={{ id: 1, slug: 'alpha' }}
+				expandedYear="2022"
+				onToggle={mockOnToggle}
+			/>
+		);
+		const sessionLink = document.querySelector(
+			'a[href="/group/1/session/2022-10-20"]'
+		);
+		expect(sessionLink).not.toBeNull();
+		// No href in the tree leaks the slug.
+		expect(document.querySelector('a[href*="/group/alpha/"]')).toBeNull();
 	});
 });

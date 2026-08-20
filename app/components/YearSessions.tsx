@@ -8,6 +8,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { format as formatDate } from 'date-fns';
 import { MonthSessionsHeading, MonthSessionsContent } from './MonthSessions';
+import type { ViewedGroup } from '@/lib/group-slug';
 
 function YearHeading({
 	model: { yearString }
@@ -18,13 +19,13 @@ function YearHeading({
 }
 
 function YearContent({
-	model: { yearData, expandedMonth, setExpandedMonth, viewedGroupId }
+	model: { yearData, expandedMonth, setExpandedMonth, viewedGroup }
 }: {
 	model: {
 		yearData: SessionWithEncountersCount[][];
 		expandedMonth: string | false;
 		setExpandedMonth: (month: string | false) => void;
-		viewedGroupId: number;
+		viewedGroup: ViewedGroup;
 	};
 }) {
 	return (
@@ -38,7 +39,7 @@ function YearContent({
 							id={id}
 							HeadingComponent={MonthSessionsHeading}
 							ContentComponent={MonthSessionsContent}
-							model={{ monthData: month, viewedGroupId }}
+							model={{ monthData: month, viewedGroup }}
 							onToggle={setExpandedMonth}
 							expandedId={expandedMonth}
 							icon="calendar-week"
@@ -53,13 +54,13 @@ function YearContent({
 export function YearSessions({
 	year,
 	yearString,
-	viewedGroupId,
+	viewedGroup,
 	expandedYear,
 	onToggle
 }: {
 	year: SessionWithEncountersCount[][];
 	yearString: string;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 	expandedYear: string | false;
 	onToggle: (id: string | false) => void;
 }) {
@@ -82,7 +83,7 @@ export function YearSessions({
 				yearData: year,
 				expandedMonth,
 				setExpandedMonth,
-				viewedGroupId
+				viewedGroup
 			}}
 			onToggle={onToggle}
 			expandedId={expandedYear}
