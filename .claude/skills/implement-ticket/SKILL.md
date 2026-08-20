@@ -105,18 +105,23 @@ For each PR:
    - Server actions → app tests with mocked Supabase client
    - UI → component tests or HTTP tests as appropriate
    - If the ticket enumerates test titles, implement those exactly.
-3. Run `npm run qa` before committing. **Do NOT open a PR while tests fail** — fix the code, or
+3. Run `/compact` to compact context now that the first implementation attempt (code + tests)
+   is written, before running verification (`npm run qa`, step 4 below). Implementation
+   exploration — reading surrounding code, iterating on the approach — tends to accumulate a lot
+   of context that verification doesn't need; compacting here means context lasts through any
+   fix-and-retry cycles that verification triggers, rather than running out partway through.
+4. Run `npm run qa` before committing. **Do NOT open a PR while tests fail** — fix the code, or
    in subagent mode stop and report back to the caller rather than guessing.
-4. Commit using conventional commits (`feat:`, `fix:`, `refactor:`, etc.), with trailer
+5. Commit using conventional commits (`feat:`, `fix:`, `refactor:`, etc.), with trailer
    `Co-Authored-By: Claude <model> <noreply@anthropic.com>` where `<model>` is the model actually
    executing this ticket (e.g. `Sonnet 5`, `Opus 4.8`, `Fable 5`) — not a fixed model name.
-5. Push and open a PR against `main` (or the previous increment's branch if chaining). Include
+6. Push and open a PR against `main` (or the previous increment's branch if chaining). Include
    the trailer `🤖 Generated with [Claude Code](https://claude.com/claude-code)` in the PR body.
    If the issue carries `db-migration` and/or `e2e-exclusive` (the exclusive-resource label set —
    see CLAUDE.md > Ticket workflow), apply the same label(s) to the PR with `--label`. This lets
    `swarm` read exclusive-resource status directly off `gh pr list --json labels` when deciding
    whether to spawn PR-maintenance work, instead of resolving each PR back to its linked issue.
-6. Include in each PR body:
+7. Include in each PR body:
    - If the issue carries `db-migration`: a warning block **at the top**, above everything else:
      > ⚠️ **Database migration — do not merge before pushing.** This PR's schema change must be
      > deployed to prod (`npm run db:migration:push`, run via the `take-over` skill) before this
@@ -165,6 +170,9 @@ multi-PR sequence.
 ## Rules
 
 - One issue per run. Never work on `main`.
+- Compact context after the first implementation attempt (code + tests written) and before
+  running verification — verification's fix-and-retry cycles need the context budget more than
+  implementation's exploration does.
 - No PR on red tests — fix or report back, never push a failing PR.
 - `Closes #<number>` only on the final PR of a sequence; the tracked issue stays open until then.
 - mermaid-diff runs once per PR, right after that PR opens — not from a cold GitHub read later.
@@ -179,7 +187,7 @@ multi-PR sequence.
   `getAuthenticatedSupabaseClient()`, `catchSupabaseErrors()`.
 - DB schema changes go in `supabase/schema/`; generate migrations with `npm run db:schema:apply`;
   never hand-write DDL. The one exception is backfill DML (declarative sync can't emit it) —
-  hand-write it appended after the generated DDL per the convention in step 5, point 6 above.
+  hand-write it appended after the generated DDL per the convention in step 5, point 7 above.
 - New DB types: run `npm run db:types` after schema changes; never edit
   `types/supabase.types.ts` by hand.
 - RLS policies must be considered for any new table or query — check issue #149 for current
