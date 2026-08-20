@@ -3,17 +3,28 @@ import {
 	PageWrapper,
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
+import { SessionLinksList } from '@/app/components/SessionLinksList';
 
 export function HighlightsPage({
 	year,
-	month
+	month,
+	sessionDates = [],
+	viewedGroupId
 }: {
 	year?: number;
 	month?: number;
+	sessionDates?: string[];
+	viewedGroupId?: number;
 }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>{buildHeading(year, month)}</PrimaryHeading>
+			{viewedGroupId !== undefined && (
+				<SessionLinksList
+					sessionDates={sessionDates}
+					viewedGroupId={viewedGroupId}
+				/>
+			)}
 		</PageWrapper>
 	);
 }
