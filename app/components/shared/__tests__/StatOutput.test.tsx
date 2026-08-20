@@ -9,10 +9,9 @@ afterEach(() => {
 
 describe('StatOutput', () => {
 	describe('day temporal unit href', () => {
-		// Regression: this ticket swaps viewedGroupId (a number) for a
-		// viewedGroup object but the session href must still be built from the
-		// numeric id — byte-identical to before.
-		it('builds the session href from viewedGroup.id (numeric, unchanged)', () => {
+		// This ticket (#490) flips the session href from viewedGroup.id to
+		// viewedGroup.slug, now that the /group/[groupSlug] route accepts slugs.
+		it('builds the session href from viewedGroup.slug', () => {
 			render(
 				<StatOutput
 					value={11}
@@ -22,7 +21,7 @@ describe('StatOutput', () => {
 				/>
 			);
 			const link = screen.getByRole('link') as HTMLAnchorElement;
-			expect(link.getAttribute('href')).toBe('/group/1/session/2022-10-20');
+			expect(link.getAttribute('href')).toBe('/group/alpha/session/2022-10-20');
 		});
 
 		it('appends the site segment from location.id when a location is given', () => {
@@ -41,7 +40,7 @@ describe('StatOutput', () => {
 			);
 			const link = screen.getByRole('link') as HTMLAnchorElement;
 			expect(link.getAttribute('href')).toBe(
-				'/group/1/session/2022-10-20/site/31'
+				'/group/alpha/session/2022-10-20/site/31'
 			);
 		});
 
