@@ -242,6 +242,28 @@ async function findTicketCandidates(runningIssueNumbers: Set<number>): Promise<T
 	return candidates;
 }
 
+/**
+ * Resolves a maintenance PR's model label via its linked issue. `gh pr view --json
+ * closingIssuesReferences` does not return `labels` on the linked-issue objects (only
+ * `id`/`number`/`repository`/`url`), so this needs a second `gh issue view --json labels`
+ * call keyed off the issue number — mirroring isSoloRunCurrentlyActive's two-call pattern
+ * below, rather than assuming labels ride along on the first response.
+ */
+export async function resolveMaintenanceCandidateModel(prNumber: number): Promise<ModelLabel | null> {
+	const closing = await ghJson<{ closingIssuesReferences?: { number: number }[] }>([
+		'pr',
+		'view',
+		String(prNumber),
+		'--json',
+		'closingIssuesReferences',
+	]).catch(() => ({ closingIssuesReferences: [] }));
+	const linkedIssueNumber = closing.closingIssuesReferences?.[0]?.number;
+	if (linkedIssueNumber === undefined) return null;
+	return ghJson<{ labels: { name: string }[] }>(['issue', 'view', String(linkedIssueNumber), '--json', 'labels'])
+		.then((result) => getModelLabel(result.labels.map((l) => l.name)))
+		.catch(() => null);
+}
+
 async function isSoloRunCurrentlyActive(): Promise<ExclusiveLabel | null> {
 	const running = await listState();
 	for (const entry of running) {
@@ -314,11 +336,7 @@ export function registerSwarmPlanBatchTool(server: McpServer) {
 
 			const prsNeedingMaintenance = await Promise.all(
 				allocation.maintenance.map(async (pr) => {
-					const closing = await ghJson<{ closingIssuesReferences?: { number: number; labels: { name: string }[] }[] }>(
-						['pr', 'view', String(pr.number), '--json', 'closingIssuesReferences']
-					).catch(() => ({ closingIssuesReferences: [] }));
-					const linkedIssue = closing.closingIssuesReferences?.[0];
-					const model = linkedIssue ? getModelLabel(linkedIssue.labels.map((l) => l.name)) : null;
+					const model = await resolveMaintenanceCandidateModel(pr.number);
 					return { ...pr, model: model ?? 'sonnet', blockedBySoloRun: false };
 				})
 			);

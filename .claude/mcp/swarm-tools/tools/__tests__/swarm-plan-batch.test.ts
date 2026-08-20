@@ -1,4 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+
+vi.mock('../../lib/gh', () => ({ ghJson: vi.fn() }));
+
+import { ghJson } from '../../lib/gh';
 import {
 	getExclusiveLabel,
 	getModelLabel,
@@ -7,6 +11,7 @@ import {
 	rankMaintenanceCandidates,
 	rankTicketCandidates,
 	allocateBudget,
+	resolveMaintenanceCandidateModel,
 	type MaintenanceCandidate,
 	type TicketCandidate,
 } from '../swarm-plan-batch';
@@ -35,6 +40,68 @@ describe('getModelLabel', () => {
 
 	it('returns null when no model label is present', () => {
 		expect(getModelLabel(['ready'])).toBeNull();
+	});
+});
+
+describe('resolveMaintenanceCandidateModel', () => {
+	const mockGhJson = vi.mocked(ghJson);
+
+	afterEach(() => {
+		mockGhJson.mockReset();
+	});
+
+	// Usual — regression test for the real crash on PR #498: `gh pr view --json
+	// closingIssuesReferences` returns linked-issue objects WITHOUT a `labels` field (only
+	// id/number/repository/url), so the model must come from a separate `gh issue view` call.
+	it('resolves the model label via a separate issue lookup, matching gh\'s actual label-less closingIssuesReferences shape', async () => {
+		mockGhJson
+			.mockResolvedValueOnce({ closingIssuesReferences: [{ number: 488 }] })
+			.mockResolvedValueOnce({ labels: [{ name: 'opus' }] });
+
+		const model = await resolveMaintenanceCandidateModel(498);
+
+		expect(model).toBe('opus');
+		expect(mockGhJson).toHaveBeenNthCalledWith(1, ['pr', 'view', '498', '--json', 'closingIssuesReferences']);
+		expect(mockGhJson).toHaveBeenNthCalledWith(2, ['issue', 'view', '488', '--json', 'labels']);
+	});
+
+	// Structure
+	it('returns null without a second call when the PR has no linked issue', async () => {
+		mockGhJson.mockResolvedValueOnce({ closingIssuesReferences: [] });
+
+		const model = await resolveMaintenanceCandidateModel(499);
+
+		expect(model).toBeNull();
+		expect(mockGhJson).toHaveBeenCalledTimes(1);
+	});
+
+	it('returns null when the linked issue has no model label', async () => {
+		mockGhJson
+			.mockResolvedValueOnce({ closingIssuesReferences: [{ number: 1 }] })
+			.mockResolvedValueOnce({ labels: [{ name: 'ready' }] });
+
+		const model = await resolveMaintenanceCandidateModel(1);
+
+		expect(model).toBeNull();
+	});
+
+	// Edge
+	it('returns null when the closingIssuesReferences lookup itself fails', async () => {
+		mockGhJson.mockRejectedValueOnce(new Error('gh error'));
+
+		const model = await resolveMaintenanceCandidateModel(2);
+
+		expect(model).toBeNull();
+	});
+
+	it('returns null when the issue-view lookup fails', async () => {
+		mockGhJson
+			.mockResolvedValueOnce({ closingIssuesReferences: [{ number: 3 }] })
+			.mockRejectedValueOnce(new Error('gh error'));
+
+		const model = await resolveMaintenanceCandidateModel(3);
+
+		expect(model).toBeNull();
 	});
 });
 
