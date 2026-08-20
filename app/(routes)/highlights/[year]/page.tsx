@@ -30,7 +30,7 @@ function YearHighlights({
 		<HighlightsPageContent
 			year={data.year}
 			sessionDates={data.sessionDates}
-			viewedGroupId={viewedGroup.id}
+			viewedGroup={viewedGroup}
 		/>
 	);
 }

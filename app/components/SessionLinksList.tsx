@@ -1,13 +1,13 @@
 import { format as formatDate } from 'date-fns';
 import Link from 'next/link';
 import { BoxyList } from './shared/DesignSystem';
-
+import { type ViewedGroup } from '@/lib/group-slug';
 export function SessionLinksList({
 	sessionDates,
-	viewedGroupId
+	viewedGroup
 }: {
 	sessionDates: string[];
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	if (sessionDates.length === 0) {
 		return null;
@@ -19,7 +19,7 @@ export function SessionLinksList({
 				<li key={date}>
 					<Link
 						className="link"
-						href={`/group/${viewedGroupId}/session-temp/${date}`}
+						href={`/group/${viewedGroup.slug}/session-temp/${date}`}
 					>
 						{formatDate(new Date(date), 'EEE do MMMM yyyy')}
 					</Link>

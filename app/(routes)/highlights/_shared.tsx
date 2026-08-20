@@ -4,25 +4,25 @@ import {
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { SessionLinksList } from '@/app/components/SessionLinksList';
-
+import { type ViewedGroup } from '@/lib/group-slug';
 export function HighlightsPage({
 	year,
 	month,
 	sessionDates = [],
-	viewedGroupId
+	viewedGroup
 }: {
 	year?: number;
 	month?: number;
 	sessionDates?: string[];
-	viewedGroupId?: number;
+	viewedGroup?: ViewedGroup;
 }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>{buildHeading(year, month)}</PrimaryHeading>
-			{viewedGroupId !== undefined && (
+			{viewedGroup !== undefined && (
 				<SessionLinksList
 					sessionDates={sessionDates}
-					viewedGroupId={viewedGroupId}
+					viewedGroup={viewedGroup}
 				/>
 			)}
 		</PageWrapper>

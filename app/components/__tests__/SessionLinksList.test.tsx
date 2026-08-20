@@ -8,21 +8,36 @@ const sessionDates = ['2026-01-05', '2026-03-17'];
 
 describe('SessionLinksList', () => {
 	it('renders one link per session date', () => {
-		render(<SessionLinksList sessionDates={sessionDates} viewedGroupId={1} />);
+		render(
+			<SessionLinksList
+				sessionDates={sessionDates}
+				viewedGroup={{ id: 1, slug: 'group-1' }}
+			/>
+		);
 		expect(screen.getAllByRole('link')).toHaveLength(2);
 	});
 
 	it('links to /group/{viewedGroupId}/session-temp/{date} for each date', () => {
-		render(<SessionLinksList sessionDates={sessionDates} viewedGroupId={7} />);
+		render(
+			<SessionLinksList
+				sessionDates={sessionDates}
+				viewedGroup={{ id: 7, slug: 'group-7' }}
+			/>
+		);
 		const links = screen.getAllByRole('link');
 		expect(links.map((link) => link.getAttribute('href'))).toEqual([
-			'/group/7/session-temp/2026-01-05',
-			'/group/7/session-temp/2026-03-17'
+			'/group/group-7/session-temp/2026-01-05',
+			'/group/group-7/session-temp/2026-03-17'
 		]);
 	});
 
 	it('formats each link text as "EEE do MMMM yyyy"', () => {
-		render(<SessionLinksList sessionDates={sessionDates} viewedGroupId={1} />);
+		render(
+			<SessionLinksList
+				sessionDates={sessionDates}
+				viewedGroup={{ id: 1, slug: 'group-1' }}
+			/>
+		);
 		const links = screen.getAllByRole('link');
 		expect(links.map((link) => link.textContent?.trim())).toEqual([
 			'Mon 5th January 2026',
@@ -34,7 +49,7 @@ describe('SessionLinksList', () => {
 		render(
 			<SessionLinksList
 				sessionDates={['2026-03-17', '2026-01-05']}
-				viewedGroupId={1}
+				viewedGroup={{ id: 1, slug: 'group-1' }}
 			/>
 		);
 		const links = screen.getAllByRole('link');
@@ -46,7 +61,10 @@ describe('SessionLinksList', () => {
 
 	it('renders nothing when sessionDates is empty', () => {
 		const { container } = render(
-			<SessionLinksList sessionDates={[]} viewedGroupId={1} />
+			<SessionLinksList
+				sessionDates={[]}
+				viewedGroup={{ id: 1, slug: 'group-1' }}
+			/>
 		);
 		expect(container.innerHTML).toBe('');
 	});

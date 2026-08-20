@@ -27,12 +27,19 @@ describe('/highlights/[year]', () => {
 	});
 
 	it('renders only links for dates within the given year', async () => {
-		render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+		render(
+			await Page({
+				params: Promise.resolve({
+					year: '2026',
+					viewedGroup: { id: 1, slug: 'alpha' }
+				})
+			})
+		);
 		await screen.findByRole('heading', { level: 1 });
 		const links = screen.getAllByRole('link');
 		expect(links.map((link) => link.getAttribute('href'))).toEqual([
-			'/group/1/session-temp/2026-01-05',
-			'/group/1/session-temp/2026-06-30'
+			'/group/alpha/session-temp/2026-01-05',
+			'/group/alpha/session-temp/2026-06-30'
 		]);
 	});
 });
