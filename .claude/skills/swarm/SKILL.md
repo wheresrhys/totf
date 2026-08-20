@@ -26,6 +26,23 @@ merge conflicts and address outstanding feedback so they can merge — then (b) 
 `ready` tickets**. This skill orchestrates; per-ticket work is delegated to the
 [`implement-ticket`](../implement-ticket/SKILL.md) skill.
 
+## Top-level-only guard
+
+Before doing anything else — before the Precheck, before touching the state file — determine
+whether this session is the top-level interactive Claude Code session the user is directly
+talking to, or a subagent spawned via the Agent tool to do delegated work (e.g. a swarm worker,
+a maintenance worker, or any other subagent). The signal to use: a subagent's framing comes from
+a task/description handed down by a parent agent — an isolated delegated task — not a direct
+interactive message the user typed in an ongoing conversation. If this invocation is a delegated
+subagent task, **stop immediately** — do not run the Precheck, do not read or write
+`.claude/swarm-state.json`, do not plan a batch, do not spawn anything — and output to the user
+exactly one thing: an error stating that `/swarm` can only be run in the top-level Claude Code
+session, not from within a subagent.
+
+This matters because swarm spawns its own worker subagents and manages a shared state file and
+worktree pool; running it recursively from inside a worker (or any other subagent) would corrupt
+that pool and confuse `take-over`.
+
 ## Precheck
 
 Confirm GitHub Issues are enabled: run `gh issue list` once. If it errors with issues disabled,
@@ -257,6 +274,9 @@ Then, per worktree created:
 Confirm each removal; report anything skipped (e.g. a worktree with unpushed changes).
 
 ## Rules
+- Run the Top-level-only guard before anything else — if this session is a subagent spawned via
+  the Agent tool rather than the top-level interactive session, stop immediately and report the
+  error; do not run the Precheck or touch the state file.
 - Open-PR maintenance (conflicts + feedback) is handled first; ready tickets fill the remaining
   budget. One subagent per PR does both concerns for that PR.
 - Every maintenance worker unconditionally `git fetch origin` + `git merge origin/main` first,
