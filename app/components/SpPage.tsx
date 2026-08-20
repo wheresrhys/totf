@@ -44,10 +44,10 @@ function ConditionalTabPanel({
 
 function SpeciesData({
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	data: FullFatPageData;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	const [loadedTabs, setLoadedTabs] = useState<Set<string>>(
 		new Set(['bird-list'])
@@ -61,7 +61,7 @@ function SpeciesData({
 
 	return (
 		<>
-			<SpStats {...data} viewedGroupId={viewedGroupId} />
+			<SpStats {...data} viewedGroup={viewedGroup} />
 			<TabNav
 				tabs={[
 					{ id: 'bird-list', label: 'Bird list' },
@@ -80,7 +80,7 @@ function SpeciesData({
 			>
 				<SpIndividualsTab
 					speciesId={data.speciesId}
-					viewedGroupId={viewedGroupId}
+					viewedGroupId={viewedGroup.id}
 					birds={data.birds}
 					birdCount={data.speciesStats.bird_count ?? 0}
 				/>
@@ -92,7 +92,7 @@ function SpeciesData({
 			>
 				<SpNotableRetrapsTab
 					speciesName={data.speciesName}
-					viewedGroupId={viewedGroupId}
+					viewedGroupId={viewedGroup.id}
 				/>
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
@@ -102,7 +102,7 @@ function SpeciesData({
 			>
 				<SpStatsHistoryTab
 					speciesName={data.speciesName}
-					viewedGroupId={viewedGroupId}
+					viewedGroupId={viewedGroup.id}
 				/>
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
@@ -112,7 +112,7 @@ function SpeciesData({
 			>
 				<SpYearComparisonTab
 					speciesName={data.speciesName}
-					viewedGroupId={viewedGroupId}
+					viewedGroupId={viewedGroup.id}
 				/>
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
@@ -122,7 +122,7 @@ function SpeciesData({
 			>
 				<SpWeightWingTab
 					speciesId={data.speciesId}
-					viewedGroupId={viewedGroupId}
+					viewedGroupId={viewedGroup.id}
 				/>
 			</ConditionalTabPanel>
 		</>
@@ -146,7 +146,7 @@ export function SpPage({
 		<PageWrapper>
 			<PrimaryHeading>{speciesName}</PrimaryHeading>
 			{fullFatTypeGuard(data) ? (
-				<SpeciesData data={data} viewedGroupId={viewedGroup.id} />
+				<SpeciesData data={data} viewedGroup={viewedGroup} />
 			) : (
 				<p>Not authorised to view any encounter data for this species</p>
 			)}
