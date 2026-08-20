@@ -83,11 +83,10 @@ function BirdSummary({
 	data: StandaloneBird;
 	viewedGroup: ViewedGroup;
 }) {
-	const loggedInGroupId = viewedGroup.id;
 	const enrichedBird = bird.encounters.length ? enrichBird(bird) : null;
 	const sharedEncounterCount = enrichedBird
 		? enrichedBird.encounters.filter(
-				(e) => e.ringing_group_id !== loggedInGroupId
+				(e) => e.ringing_group_id !== viewedGroup.id
 			).length
 		: 0;
 	return (
