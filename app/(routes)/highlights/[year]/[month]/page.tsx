@@ -1,6 +1,6 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import type { ViewedGroup } from '@/lib/group-slug';
-import { HighlightsHeading } from '../../_shared';
+import { HighlightsPage as HighlightsPageContent } from '../../_shared';
 
 export type PageParams = { year: string; month: string };
 type PageProps = { params: Promise<PageParams> };
@@ -15,7 +15,7 @@ export async function fetchYearMonthHighlightsData(
 }
 
 function YearMonthHighlights({ data }: { data: PageData }) {
-	return <HighlightsHeading year={data.year} month={data.month} />;
+	return <HighlightsPageContent year={data.year} month={data.month} />;
 }
 
 export default async function YearMonthHighlightsPage(

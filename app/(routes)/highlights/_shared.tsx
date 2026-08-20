@@ -4,7 +4,7 @@ import {
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
 
-export function HighlightsHeading({
+export function HighlightsPage({
 	year,
 	month
 }: {

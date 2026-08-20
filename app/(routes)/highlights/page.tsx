@@ -1,6 +1,6 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import type { ViewedGroup } from '@/lib/group-slug';
-import { HighlightsHeading } from './_shared';
+import { HighlightsPage as HighlightsPageContent } from './_shared';
 
 export type PageData = Record<string, never>;
 
@@ -9,7 +9,7 @@ export async function fetchAllTimeHighlightsData(): Promise<PageData> {
 }
 
 function AllTimeHighlights() {
-	return <HighlightsHeading />;
+	return <HighlightsPageContent />;
 }
 
 export default async function HighlightsPage({
