@@ -182,20 +182,26 @@ used below). If no PR exists yet, `gh issue view <n> --json labels` for the labe
 
 If `db-migration` is not present, skip this whole step silently.
 
-If `db-migration` is present, run `npm run db:schema:apply` right here (after step 9's stash
-reapply and step 10's merge, so both any uncommitted schema edits and anything just merged in from
-`origin/main` are included in the diff). This always regenerates a **DDL-only** file — declarative
-schema sync can never emit data-migration DML. Two possible outcomes:
+If `db-migration` is present, apply the schema right here (after step 9's stash reapply and step
+10's merge, so both any uncommitted schema edits and anything just merged in from `origin/main`
+are included in the diff) by calling `mcp__swarm-tools__apply_schema_migration` with `{cwd}` set
+to the current worktree. It runs `npm run db:schema:apply` (which always regenerates a **DDL-only**
+file — declarative schema sync can never emit data-migration DML) and returns
+`{status, stdout, stderr, conflictingWorktree?}`. Branch on `status`:
 
-- **Applies cleanly** — go to "Reattach hand-authored DML" below before reporting.
-- **Fails with a migration-history mismatch** ("remote migration versions not found in local
-  migrations directory" or similar) — this means another worktree has, at some point, applied its
-  own in-progress migration to the same shared local Postgres instance, and that file only exists
-  in *that* worktree's own gitignored `supabase/migrations/` (never shared between worktrees).
-  **Stop and explain this to the user** — name the other branch/worktree if identifiable (`git
-  worktree list` plus checking each worktree's `supabase/migrations/` for the missing timestamp),
-  and propose the reconciliation below, since it's destructive to local Postgres state (wipes
-  local dev/E2E fixture data and any other worktree's in-progress local schema along with it).
+- **`status: "applied"`** — go to "Reattach hand-authored DML" below before reporting.
+- **`status: "error"`** — the apply failed for an unrelated reason (e.g. a syntax error in a schema
+  file); surface `stderr` to the user and stop. This is not a history mismatch — do **not** run the
+  reconciliation below.
+- **`status: "history-mismatch"`** (the tool matched the "remote migration versions not found in
+  local migrations directory" signature) — this means another worktree has, at some point, applied
+  its own in-progress migration to the same shared local Postgres instance, and that file only
+  exists in *that* worktree's own gitignored `supabase/migrations/` (never shared between
+  worktrees). The tool already did the discovery — `conflictingWorktree` names the colliding
+  worktree's path when one was found (undefined if it was already cleaned up). **Stop and explain
+  this to the user** — name that worktree, and propose the reconciliation below, since it's
+  destructive to local Postgres state (wipes local dev/E2E fixture data and any other worktree's
+  in-progress local schema along with it).
   This is local-only, throwaway state, not prod or anything git-tracked, but it's still someone
   else's in-progress work getting wiped, so get an explicit go-ahead before running it rather than
   assuming it every time. Once confirmed:
