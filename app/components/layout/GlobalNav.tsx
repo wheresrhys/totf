@@ -7,6 +7,7 @@ import { useSetRingingGroup } from './RingingGroupProvider';
 import { logout } from '@/app/actions/logout';
 import type { RingingGroupRow } from '@/app/models/db';
 const moreLinks = [
+	{ href: '/stats', label: 'Stats' },
 	{ href: '/records', label: 'Records' },
 	{ href: '/mistakes', label: 'Mistakes' },
 	{ href: '/retraps', label: 'Retraps' },

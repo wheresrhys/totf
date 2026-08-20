@@ -75,10 +75,15 @@ describe('DesktopNavItems', () => {
 describe('MobileNavItems', () => {
 	afterEach(cleanup);
 
-	it('renders all 11 links in a flat list', () => {
+	it('renders all 12 links in a flat list', () => {
 		render(<MobileNavItems classes="" />);
 		const links = screen.getAllByRole('link');
-		expect(links).toHaveLength(11);
+		expect(links).toHaveLength(12);
+	});
+
+	it('includes Stats link', () => {
+		render(<MobileNavItems classes="" />);
+		expect(screen.getByRole('link', { name: 'Stats' })).toBeDefined();
 	});
 
 	it('includes Records link', () => {
