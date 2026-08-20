@@ -1,6 +1,13 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
+
+vi.mock('@/lib/underlying-stats', () => ({
+	fetchSessionStats: vi.fn().mockResolvedValue({
+		daySpeciesStats: [],
+		sessionDates: ['2025-04-01', '2026-01-05', '2026-06-30']
+	})
+}));
 
 describe('/highlights/[year]', () => {
 	afterEach(() => {
@@ -17,5 +24,15 @@ describe('/highlights/[year]', () => {
 		render(await Page({ params: Promise.resolve({ year: '1901' }) }));
 		const heading = await screen.findByRole('heading', { level: 1 });
 		expect(heading.textContent).toBe('1901 highlights');
+	});
+
+	it('renders only links for dates within the given year', async () => {
+		render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+		await screen.findByRole('heading', { level: 1 });
+		const links = screen.getAllByRole('link');
+		expect(links.map((link) => link.getAttribute('href'))).toEqual([
+			'/group/1/session-temp/2026-01-05',
+			'/group/1/session-temp/2026-06-30'
+		]);
 	});
 });
