@@ -137,25 +137,72 @@ async function writeState(stateFilePath: string, entries: SwarmWorkerEntry[]): P
 	await fs.rename(tmpPath, stateFilePath);
 }
 
-/** Read-only, unlocked — safe for callers that only need a snapshot (e.g. filtering/ranking). */
-export async function listState(cwd: string = process.cwd()): Promise<SwarmWorkerEntry[]> {
-	return readState(await resolveStateFilePath(cwd));
+/** True if `worktreePath` still exists on disk — a plain, local, no-network/no-git liveness check. */
+async function worktreeStillExists(worktreePath: string): Promise<boolean> {
+	try {
+		await fs.access(worktreePath);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /**
- * Locked read-modify-write. `mutate` receives the current entries and returns the entries to
- * persist plus a result to hand back to the caller. Holds a filesystem lock for the duration,
- * so concurrent worktrees appending/removing entries never lose an update to each other.
+ * Splits `entries` into those whose `worktreePath` still exists (live) and those whose worktree
+ * is gone (stale — the worker died or finished without its cleanup step running). Order-preserving.
+ */
+async function partitionStaleEntries(
+	entries: SwarmWorkerEntry[]
+): Promise<{ live: SwarmWorkerEntry[]; stale: SwarmWorkerEntry[] }> {
+	const stillExists = await Promise.all(entries.map((entry) => worktreeStillExists(entry.worktreePath)));
+	const live: SwarmWorkerEntry[] = [];
+	const stale: SwarmWorkerEntry[] = [];
+	entries.forEach((entry, i) => (stillExists[i] ? live.push(entry) : stale.push(entry)));
+	return { live, stale };
+}
+
+/**
+ * Self-healing read: filters out any entry whose `worktreePath` no longer exists on disk (a
+ * worker that died or finished without its `swarm_state_remove` cleanup step running — see
+ * the stale-issue-#490 incident) before returning to the caller, so every consumer
+ * (`swarm_state_list`, `swarm_plan_batch`'s `runningIssueNumbers`/`isSoloRunCurrentlyActive`,
+ * `resolve-work-item`) treats a dead worktree as not-running without needing its own fix.
+ *
+ * Cheap and unlocked in the common case (all worktrees live) — just a snapshot read plus local
+ * `fs.access` checks, no lock taken. Only when a stale entry is actually found does it pay for a
+ * locked read-modify-write to prune the file, re-checking staleness against the freshly-locked
+ * read (rather than trusting the pre-lock snapshot) to avoid clobbering a concurrent
+ * append/remove from another worktree.
+ */
+export async function listState(cwd: string = process.cwd()): Promise<SwarmWorkerEntry[]> {
+	const stateFilePath = await resolveStateFilePath(cwd);
+	const snapshot = await readState(stateFilePath);
+	const { stale } = await partitionStaleEntries(snapshot);
+	if (stale.length === 0) return snapshot;
+
+	return withStateLock(async (current) => {
+		const { live } = await partitionStaleEntries(current);
+		return { entries: live, result: live };
+	}, cwd);
+}
+
+/**
+ * Locked read-modify-write. `mutate` receives the current entries and returns (synchronously or
+ * via a Promise) the entries to persist plus a result to hand back to the caller. Holds a
+ * filesystem lock for the duration, so concurrent worktrees appending/removing/pruning entries
+ * never lose an update to each other.
  */
 export async function withStateLock<T>(
-	mutate: (entries: SwarmWorkerEntry[]) => { entries: SwarmWorkerEntry[]; result: T },
+	mutate: (
+		entries: SwarmWorkerEntry[]
+	) => { entries: SwarmWorkerEntry[]; result: T } | Promise<{ entries: SwarmWorkerEntry[]; result: T }>,
 	cwd: string = process.cwd()
 ): Promise<T> {
 	const stateFilePath = await resolveStateFilePath(cwd);
 	const lockPath = await acquireLock(stateFilePath);
 	try {
 		const current = await readState(stateFilePath);
-		const { entries, result } = mutate(current);
+		const { entries, result } = await mutate(current);
 		await writeState(stateFilePath, entries);
 		return result;
 	} finally {
