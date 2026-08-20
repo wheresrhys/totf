@@ -126,16 +126,23 @@ both concerns for that PR:
   `sonnet` if unresolvable).
 - `description`: `"Maintain PR #<pr>"`.
 - Prompt, in order:
-  1. **Sync first, always** — regardless of `mergeable` status, `git fetch origin` then
+  1. **Copy local env config, if this is a fresh worktree** — if this step's worktree was just
+     created via `git worktree add` (not reused from an existing one), copy `.env.dev` from the
+     main checkout root before running any tests: `.env.dev` is gitignored, so a freshly created
+     worktree never has it, and `npm run qa` / the pre-push hook fail without it
+     (`SUPABASE_JWT_ROLE environment variable is not set`). Find the main checkout root via
+     `git rev-parse --path-format=absolute --git-common-dir` (its parent directory), then
+     `cp -n <that>/.env.dev .env.dev` (no-clobber, since a reused worktree may already have it).
+  2. **Sync first, always** — regardless of `mergeable` status, `git fetch origin` then
      `git merge origin/main` (merge, not rebase — no force-push onto a shared branch) before any
      other step. GitHub's `mergeable` check only catches textual conflicts, not staleness on
      unrelated files, so this runs even for `reason: "feedback"` PRs. If the merge produces
      conflicts — whether GitHub already flagged `CONFLICTING` or the fetch surfaces one GitHub's
      cache hadn't caught yet — resolve every conflict honouring both sides' intent, and run the
      relevant tests to prove the merge is sound.
-  2. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
+  3. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
      the changes, run tests, reply to the reviewer via `gh pr comment <n>`.
-  3. Commit (repo conventions, including the model/Claude Code trailers from `implement-ticket`)
+  4. Commit (repo conventions, including the model/Claude Code trailers from `implement-ticket`)
      and push. If on inspection neither a real conflict nor genuine feedback remains, no-op and
      report that.
 
@@ -161,7 +168,12 @@ For each selected issue, launch an Agent (default background, so they run in par
 - `model` = the ticket's model label — `opus` | `sonnet` | `fable` (exactly the label). Don't
   substitute.
 - `description`: `"Implement #<n>"`.
-- Prompt: **first `git fetch origin` and create the ticket branch off `origin/main`** (the
+- Prompt: **first copy `.env.dev` from the main checkout root into this worktree** — isolation:
+  "worktree" creates a fresh git worktree, and `.env.dev` is gitignored so it's never carried
+  over; without it `npm run qa` / the pre-push hook fail with `SUPABASE_JWT_ROLE environment
+  variable is not set`. Find the main checkout root via `git rev-parse --path-format=absolute
+  --git-common-dir` (its parent directory), then `cp -n <that>/.env.dev .env.dev`. Then
+  **`git fetch origin` and create the ticket branch off `origin/main`** (the
   worktree is cut from local `main`, which may be stale relative to origin — basing on
   `origin/main` picks up already-merged sibling tickets), then run the `implement-ticket` skill
   for issue `<n>` and return its result (PR number + URL + test status).
@@ -281,3 +293,7 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
 - Keep `.claude/swarm-state.json` in sync with the live worker set on every spawn, completion,
   and halt — it's the only durable record of which agent id is working which branch, and
   `take-over` depends on it being current.
+- Every freshly-created worktree (§1's `git worktree add`, or §3's `isolation: "worktree"`) gets
+  `.env.dev` copied in from the main checkout root before any tests run — it's gitignored so
+  worktree creation never carries it over, and without it `npm run qa`/the pre-push hook fail
+  (`SUPABASE_JWT_ROLE environment variable is not set`).
