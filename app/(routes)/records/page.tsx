@@ -136,7 +136,7 @@ function getStatConfigs(
 	];
 }
 
-export async function fetchHighlightsData(
+export async function fetchRecordsData(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<StatsAccordionModel[]> {
@@ -168,7 +168,7 @@ export async function fetchHighlightsData(
 	);
 }
 
-function HighlightsPageContent({
+function RecordsPageContent({
 	data,
 	viewedGroup
 }: {
@@ -177,13 +177,13 @@ function HighlightsPageContent({
 }) {
 	return (
 		<PageWrapper>
-			<PrimaryHeading>Highlights</PrimaryHeading>
+			<PrimaryHeading>Records</PrimaryHeading>
 			<StatsAccordion data={data} viewedGroup={viewedGroup} />
 		</PageWrapper>
 	);
 }
 
-export default async function HighlightsPage({
+export default async function RecordsPage({
 	viewedGroup
 }: {
 	viewedGroup?: ViewedGroup;
@@ -191,9 +191,9 @@ export default async function HighlightsPage({
 	return (
 		<BootstrapPageData<StatsAccordionModel[]>
 			viewedGroup={viewedGroup}
-			getCacheKeys={() => ['highlights']}
-			dataFetcher={fetchHighlightsData}
-			PageComponent={HighlightsPageContent}
+			getCacheKeys={() => ['records']}
+			dataFetcher={fetchRecordsData}
+			PageComponent={RecordsPageContent}
 		/>
 	);
 }
