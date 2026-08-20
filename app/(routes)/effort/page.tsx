@@ -110,7 +110,7 @@ function PayOffPageContent({
 	data
 }: {
 	data: PayOffStatsData;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	return (
 		<PageWrapper>
@@ -130,7 +130,6 @@ function PayOffPageContent({
 export default function PayOffPage({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (

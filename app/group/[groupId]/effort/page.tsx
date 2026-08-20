@@ -12,5 +12,5 @@ export default async function CrossGroupEffortPage({
 		id: viewedGroupId,
 		slug: await resolveGroupSlugById(viewedGroupId)
 	};
-	return <PayOffPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />;
+	return <PayOffPage viewedGroup={viewedGroup} />;
 }

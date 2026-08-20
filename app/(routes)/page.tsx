@@ -267,17 +267,17 @@ function TopSpecies({
 }
 function HomePageContent({
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	data: PageModel;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	return (
 		<PageWrapper>
 			<SummaryStatsTable data={data.summaryStats} />
 			<RecentSessions
 				data={data.recentSessions}
-				viewedGroupId={viewedGroupId}
+				viewedGroupId={viewedGroup.id}
 			/>
 			<TopSpecies data={data.topSpecies} lastGroupTick={data.lastGroupTick} />
 		</PageWrapper>
@@ -287,7 +287,6 @@ function HomePageContent({
 export default async function Home({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (

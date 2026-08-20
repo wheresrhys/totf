@@ -12,5 +12,5 @@ export default async function CrossGroupPulliPage({
 		id: viewedGroupId,
 		slug: await resolveGroupSlugById(viewedGroupId)
 	};
-	return <PulliPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />;
+	return <PulliPage viewedGroup={viewedGroup} />;
 }

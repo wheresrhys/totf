@@ -12,7 +12,5 @@ export default async function CrossGroupSessionsPage({
 		id: viewedGroupId,
 		slug: await resolveGroupSlugById(viewedGroupId)
 	};
-	return (
-		<SessionsPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />
-	);
+	return <SessionsPage viewedGroup={viewedGroup} />;
 }

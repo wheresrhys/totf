@@ -17,7 +17,6 @@ async function dataFetcher(
 export default async function RingSequencesRoute({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (

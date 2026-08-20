@@ -46,7 +46,6 @@ function ListTicks({ data }: { data: GroupTicksResult[] }) {
 export default async function TicksPage({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (

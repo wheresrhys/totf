@@ -170,15 +170,15 @@ export async function fetchHighlightsData(
 
 function HighlightsPageContent({
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	data: StatsAccordionModel[];
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Highlights</PrimaryHeading>
-			<StatsAccordion data={data} viewedGroupId={viewedGroupId} />
+			<StatsAccordion data={data} viewedGroupId={viewedGroup.id} />
 		</PageWrapper>
 	);
 }
@@ -186,7 +186,6 @@ function HighlightsPageContent({
 export default async function HighlightsPage({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (

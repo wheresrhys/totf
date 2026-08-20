@@ -1,4 +1,5 @@
 import type { RingSequenceControlRow } from '@/app/actions/ring-sequences';
+import type { ViewedGroup } from '@/lib/group-slug';
 import {
 	InlineTable,
 	PageWrapper,
@@ -11,7 +12,7 @@ export function ControlsPage({
 }: {
 	params: Record<string, string>;
 	data: RingSequenceControlRow[];
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	if (!data || data.length === 0) {
 		return (

@@ -12,10 +12,5 @@ export default async function CrossGroupRetrapsPage({
 		id: viewedGroupId,
 		slug: await resolveGroupSlugById(viewedGroupId)
 	};
-	return (
-		<NotableRetrapsPage
-			viewedGroupId={viewedGroupId}
-			viewedGroup={viewedGroup}
-		/>
-	);
+	return <NotableRetrapsPage viewedGroup={viewedGroup} />;
 }

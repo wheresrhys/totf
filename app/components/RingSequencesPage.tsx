@@ -13,6 +13,7 @@ import {
 	SecondaryHeading
 } from './shared/DesignSystem';
 import { RingSequenceDetail } from './RingSequenceDetail';
+import type { ViewedGroup } from '@/lib/group-slug';
 
 type SequenceSummaryModel = {
 	summary: RingSequenceSummary;
@@ -93,11 +94,11 @@ function RingSizeSection({
 
 export function RingSequencesPage({
 	data,
-	viewedGroupId
+	viewedGroup
 }: {
 	params: Record<string, string>;
 	data: RingSequenceSummary[];
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	const [expandedId, setExpandedId] = useState<string | false>(false);
 	const ringSizeGroups = groupSummariesByRingSize(data);
@@ -110,7 +111,7 @@ export function RingSequencesPage({
 					<RingSizeSection
 						key={group.name}
 						group={group}
-						viewedGroupId={viewedGroupId}
+						viewedGroupId={viewedGroup.id}
 						expandedId={expandedId}
 						onToggle={setExpandedId}
 					/>

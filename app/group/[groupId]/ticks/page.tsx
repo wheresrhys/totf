@@ -12,5 +12,5 @@ export default async function CrossGroupTicksPage({
 		id: viewedGroupId,
 		slug: await resolveGroupSlugById(viewedGroupId)
 	};
-	return <TicksPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />;
+	return <TicksPage viewedGroup={viewedGroup} />;
 }

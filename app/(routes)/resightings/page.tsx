@@ -58,7 +58,6 @@ function ListResightings({ data }: { data: ResightingEncounter[] }) {
 export default async function ResightingsPage({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (

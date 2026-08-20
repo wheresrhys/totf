@@ -18,5 +18,5 @@ export default async function CrossGroupHome({
 		id: viewedGroupId,
 		slug: await resolveGroupSlugById(viewedGroupId)
 	};
-	return <Home viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />;
+	return <Home viewedGroup={viewedGroup} />;
 }

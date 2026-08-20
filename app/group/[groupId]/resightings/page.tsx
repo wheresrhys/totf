@@ -12,7 +12,5 @@ export default async function CrossGroupResightingsPage({
 		id: viewedGroupId,
 		slug: await resolveGroupSlugById(viewedGroupId)
 	};
-	return (
-		<ResightingsPage viewedGroupId={viewedGroupId} viewedGroup={viewedGroup} />
-	);
+	return <ResightingsPage viewedGroup={viewedGroup} />;
 }

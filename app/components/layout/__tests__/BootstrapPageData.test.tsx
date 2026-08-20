@@ -27,13 +27,13 @@ vi.mock('@/lib/group-slug', () => ({
 type TestData = { ok: boolean };
 
 function TestPageComponent({
-	viewedGroupId
+	viewedGroup
 }: {
 	params: DefaultPageParams;
 	data: TestData;
-	viewedGroupId: number;
+	viewedGroup: { id: number; slug: string | null };
 }) {
-	return <div data-testid="page-content">{viewedGroupId}</div>;
+	return <div data-testid="page-content">{viewedGroup.id}</div>;
 }
 
 describe('LoadWithData', () => {

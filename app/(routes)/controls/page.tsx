@@ -19,7 +19,6 @@ async function dataFetcher(
 export default async function ControlsRoute({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (

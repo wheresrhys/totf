@@ -47,7 +47,6 @@ export async function fetchSppListPageData(
 export default async function AllSpeciesPage({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (

@@ -41,7 +41,6 @@ describe('cross-group home page', () => {
 			expect(mockResolveGroupSlugById).toHaveBeenCalledWith(2);
 			expect(vi.mocked(Home).mock.calls[0][0]).toEqual(
 				expect.objectContaining({
-					viewedGroupId: 2,
 					viewedGroup: { id: 2, slug: 'viewed-group-slug' }
 				})
 			);

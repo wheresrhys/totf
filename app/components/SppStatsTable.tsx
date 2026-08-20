@@ -3,6 +3,7 @@ import { PageWrapper } from '@/app/components/shared/DesignSystem';
 import { speciesStatConfigs } from '@/app/models/species-stats';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { PageData } from '@/app/(routes)/species/page';
+import type { ViewedGroup } from '@/lib/group-slug';
 import { useState, useEffect, useRef } from 'react';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import {
@@ -49,11 +50,12 @@ const sortableColumnConfigs = speciesStatConfigs.reduce(
 
 export function SppStatsTable({
 	data: { speciesStats: initialSpeciesStats, years },
-	viewedGroupId
+	viewedGroup
 }: {
 	data: PageData;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
+	const viewedGroupId = viewedGroup.id;
 	const formRef = useRef<HTMLFormElement>(null);
 	const [year, setYear] = useState<number | null>(null);
 	const [cesOnly, setCesOnly] = useState<boolean>(false);

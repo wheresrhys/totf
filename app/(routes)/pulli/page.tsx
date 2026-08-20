@@ -55,7 +55,6 @@ function ListPulliEncounters({ data }: { data: PulliEncounter[] }) {
 export default async function PulliPage({
 	viewedGroup
 }: {
-	viewedGroupId?: number;
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
