@@ -6,9 +6,10 @@ import type { TopPeriodsResult, TopSpeciesResult } from '@/app/models/db';
 import { getTopStats } from '@/app/actions/top-performers';
 import type { TemporalUnit } from './shared/StatOutput';
 import type { AccordionItemModel } from './StatsAccordion';
+import type { ViewedGroup } from '@/lib/group-slug';
 
 type AccordionItemModelWithGroupId = AccordionItemModel & {
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 };
 
 function hasData(data: TopPeriodsResult[] | null): data is TopPeriodsResult[] {
@@ -40,7 +41,7 @@ function ItemContent({
 					...model.definition.dataArguments,
 					filters: {
 						...(model.definition.dataArguments.filters ?? {}),
-						ringing_group_filter: model.viewedGroupId
+						ringing_group_filter: model.viewedGroup.id
 					},
 					result_limit: 5
 				})
@@ -64,7 +65,7 @@ function ItemContent({
 		model.definition.id,
 		model.definition.bySpecies,
 		model.definition.dataArguments,
-		model.viewedGroupId
+		model.viewedGroup.id
 	]);
 
 	return hasData(data) ? (
@@ -83,7 +84,7 @@ function ItemContent({
 						temporalUnit={
 							model.definition.dataArguments.temporal_unit as TemporalUnit
 						}
-						viewedGroupId={model.viewedGroupId}
+						viewedGroup={model.viewedGroup}
 					/>
 				</li>
 			))}
@@ -113,22 +114,22 @@ function ItemHeading({ model }: { model: AccordionItemModelWithGroupId }) {
 
 export function StatsAccordionItem({
 	item,
-	viewedGroupId,
+	viewedGroup,
 	expanded,
 	onToggle
 }: {
 	item: AccordionItemModel;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 	expanded: string | false;
 	onToggle: (id: string | false) => void;
 }) {
 	return (
 		<AccordionItem
-			key={`${viewedGroupId}-${item.definition.id}`}
+			key={`${viewedGroup.id}-${item.definition.id}`}
 			id={item.definition.id}
 			HeadingComponent={ItemHeading}
 			ContentComponent={ItemContent}
-			model={{ ...item, viewedGroupId }}
+			model={{ ...item, viewedGroup }}
 			onToggle={onToggle}
 			expandedId={expanded}
 		/>

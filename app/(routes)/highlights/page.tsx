@@ -178,7 +178,7 @@ function HighlightsPageContent({
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Highlights</PrimaryHeading>
-			<StatsAccordion data={data} viewedGroupId={viewedGroup.id} />
+			<StatsAccordion data={data} viewedGroup={viewedGroup} />
 		</PageWrapper>
 	);
 }
