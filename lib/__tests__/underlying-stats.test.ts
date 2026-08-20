@@ -4,7 +4,6 @@ import type {
 	StatsPerDayAndSpeciesResult
 } from '@/app/models/db';
 import payOffStatsFixture from '../../test-fixtures/snapshots/fetchPayOffStats.beta.json';
-import { fetchYearStats, fetchMonthStats } from '../underlying-stats';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -78,11 +77,17 @@ const mockFrom = vi.fn((table: string) => {
 	return { select: mockEncountersSelect };
 });
 
-// the module memoises the stats blob at module scope, so each test imports a
-// fresh copy of the module
-async function importFetchSessionStats() {
+// The module memoises each stats blob (session/year/month) at module scope
+// via its own cache Map, so each test imports a fresh copy of the module —
+// shared by fetchSessionStats, fetchYearStats and fetchMonthStats tests
+// alike since they all reuse the same fetchWithVersionCache mechanism.
+async function importUnderlyingStats() {
 	vi.resetModules();
-	const { fetchSessionStats } = await import('../underlying-stats');
+	return import('../underlying-stats');
+}
+
+async function importFetchSessionStats() {
+	const { fetchSessionStats } = await importUnderlyingStats();
 	return fetchSessionStats;
 }
 
@@ -216,8 +221,11 @@ describe('fetchSessionStats', () => {
 });
 
 // fetchYearStats/fetchMonthStats call aggregate_stats directly and
-// `.then(catchSupabaseErrors)` the result — no pagination chain, so these
-// use their own minimal mock client rather than the paginated builder above.
+// `.then(catchSupabaseErrors)` the result — no pagination chain — but they
+// share fetchSessionStats' version-checked/TTL-backed cache (via
+// fetchWithVersionCache), so their mock client still needs a working
+// `from` chain for the Encounters version query: reuse the same mockFrom /
+// statsVersion scaffolding used for fetchSessionStats above.
 const yearlyRows =
 	payOffStatsFixture.yearly as unknown as AggregateStatsResult[];
 const monthlyRows =
@@ -228,11 +236,12 @@ function makeAggregateStatsClient(response: {
 	error: { message: string } | null;
 }) {
 	const mockRpc = vi.fn().mockReturnValue(Promise.resolve(response));
-	return { client: { rpc: mockRpc }, mockRpc };
+	return { client: { rpc: mockRpc, from: mockFrom }, mockRpc };
 }
 
 describe('fetchYearStats', () => {
 	it('calls aggregate_stats with group_by_time_period "year" and group_by_species true', async () => {
+		const { fetchYearStats } = await importUnderlyingStats();
 		const { client, mockRpc } = makeAggregateStatsClient({
 			data: yearlyRows,
 			error: null
@@ -250,6 +259,7 @@ describe('fetchYearStats', () => {
 	});
 
 	it('scopes the call to the given viewedGroupId via ringing_group_filter', async () => {
+		const { fetchYearStats } = await importUnderlyingStats();
 		const { client, mockRpc } = makeAggregateStatsClient({
 			data: yearlyRows,
 			error: null
@@ -265,6 +275,7 @@ describe('fetchYearStats', () => {
 	});
 
 	it('passes no from_date/to_date, returning one row per year with data', async () => {
+		const { fetchYearStats } = await importUnderlyingStats();
 		const { client, mockRpc } = makeAggregateStatsClient({
 			data: yearlyRows,
 			error: null
@@ -284,6 +295,7 @@ describe('fetchYearStats', () => {
 	// always throws on a Supabase error rather than returning null — this
 	// test asserts that actual (pre-existing, unchanged) behaviour instead.
 	it('throws when the RPC call errors', async () => {
+		const { fetchYearStats } = await importUnderlyingStats();
 		const { client } = makeAggregateStatsClient({
 			data: null,
 			error: { message: 'boom' }
@@ -294,10 +306,104 @@ describe('fetchYearStats', () => {
 			'Failed to fetch data: boom'
 		);
 	});
+
+	// Mirrors fetchSessionStats' cache-hit/version-bump/TTL-expiry/per-group
+	// tests above — fetchYearStats reuses the exact same
+	// fetchWithVersionCache mechanism, just keyed off its own
+	// yearStatsCache Map.
+	describe('caching', () => {
+		it('returns the cached result on a second call when the stats version is unchanged', async () => {
+			const { fetchYearStats } = await importUnderlyingStats();
+			const { client, mockRpc } = makeAggregateStatsClient({
+				data: yearlyRows,
+				error: null
+			});
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+			await fetchYearStats(GROUP_ID);
+			await fetchYearStats(GROUP_ID);
+
+			expect(mockRpc).toHaveBeenCalledTimes(1);
+			// version query still runs on each call
+			expect(mockEncountersLimit).toHaveBeenCalledTimes(2);
+		});
+
+		it('re-fetches when the stats version (max Encounters.id) has advanced since the cached entry', async () => {
+			const { fetchYearStats } = await importUnderlyingStats();
+			const { client, mockRpc } = makeAggregateStatsClient({
+				data: yearlyRows,
+				error: null
+			});
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+			await fetchYearStats(GROUP_ID);
+			statsVersion = 101;
+			await fetchYearStats(GROUP_ID);
+
+			expect(mockRpc).toHaveBeenCalledTimes(2);
+		});
+
+		it('re-fetches when the cached entry has passed its TTL even if the version is unchanged', async () => {
+			const { fetchYearStats } = await importUnderlyingStats();
+			const { client, mockRpc } = makeAggregateStatsClient({
+				data: yearlyRows,
+				error: null
+			});
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+			const now = Date.now();
+			const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+			await fetchYearStats(GROUP_ID);
+			dateNowSpy.mockReturnValue(now + TTL_MS + 1);
+			await fetchYearStats(GROUP_ID);
+
+			expect(mockRpc).toHaveBeenCalledTimes(2);
+		});
+
+		it('keeps separate cache entries per viewedGroupId', async () => {
+			const { fetchYearStats } = await importUnderlyingStats();
+			const { client, mockRpc } = makeAggregateStatsClient({
+				data: yearlyRows,
+				error: null
+			});
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+			await fetchYearStats(GROUP_ID);
+			await fetchYearStats(OTHER_GROUP_ID);
+
+			expect(mockRpc).toHaveBeenCalledTimes(2);
+		});
+
+		// The disambiguation the reviewer flagged: a year lookup and a month
+		// lookup for the same group must not collide on the same cache
+		// entry, even though both share a viewedGroupId-keyed cache shape.
+		it('does not share a cache entry with fetchMonthStats for the same group', async () => {
+			const { fetchYearStats, fetchMonthStats } = await importUnderlyingStats();
+			const { client, mockRpc } = makeAggregateStatsClient({
+				data: yearlyRows,
+				error: null
+			});
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+			await fetchYearStats(GROUP_ID);
+			await fetchMonthStats(GROUP_ID);
+
+			expect(mockRpc).toHaveBeenCalledTimes(2);
+			expect(mockRpc).toHaveBeenCalledWith(
+				'aggregate_stats',
+				expect.objectContaining({ group_by_time_period: 'year' })
+			);
+			expect(mockRpc).toHaveBeenCalledWith(
+				'aggregate_stats',
+				expect.objectContaining({ group_by_time_period: 'month' })
+			);
+		});
+	});
 });
 
 describe('fetchMonthStats', () => {
 	it('calls aggregate_stats with group_by_time_period "month" and group_by_species true', async () => {
+		const { fetchMonthStats } = await importUnderlyingStats();
 		const { client, mockRpc } = makeAggregateStatsClient({
 			data: monthlyRows,
 			error: null
@@ -315,6 +421,7 @@ describe('fetchMonthStats', () => {
 	});
 
 	it('scopes the call to the given viewedGroupId via ringing_group_filter', async () => {
+		const { fetchMonthStats } = await importUnderlyingStats();
 		const { client, mockRpc } = makeAggregateStatsClient({
 			data: monthlyRows,
 			error: null
@@ -332,6 +439,7 @@ describe('fetchMonthStats', () => {
 	// See the equivalent fetchYearStats test above for why this asserts a
 	// throw rather than a null return.
 	it('throws when the RPC call errors', async () => {
+		const { fetchMonthStats } = await importUnderlyingStats();
 		const { client } = makeAggregateStatsClient({
 			data: null,
 			error: { message: 'boom' }
@@ -341,5 +449,70 @@ describe('fetchMonthStats', () => {
 		await expect(fetchMonthStats(GROUP_ID)).rejects.toThrow(
 			'Failed to fetch data: boom'
 		);
+	});
+
+	// Mirrors fetchYearStats' caching describe block above — same
+	// fetchWithVersionCache mechanism, keyed off monthStatsCache.
+	describe('caching', () => {
+		it('returns the cached result on a second call when the stats version is unchanged', async () => {
+			const { fetchMonthStats } = await importUnderlyingStats();
+			const { client, mockRpc } = makeAggregateStatsClient({
+				data: monthlyRows,
+				error: null
+			});
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+			await fetchMonthStats(GROUP_ID);
+			await fetchMonthStats(GROUP_ID);
+
+			expect(mockRpc).toHaveBeenCalledTimes(1);
+			expect(mockEncountersLimit).toHaveBeenCalledTimes(2);
+		});
+
+		it('re-fetches when the stats version (max Encounters.id) has advanced since the cached entry', async () => {
+			const { fetchMonthStats } = await importUnderlyingStats();
+			const { client, mockRpc } = makeAggregateStatsClient({
+				data: monthlyRows,
+				error: null
+			});
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+			await fetchMonthStats(GROUP_ID);
+			statsVersion = 101;
+			await fetchMonthStats(GROUP_ID);
+
+			expect(mockRpc).toHaveBeenCalledTimes(2);
+		});
+
+		it('re-fetches when the cached entry has passed its TTL even if the version is unchanged', async () => {
+			const { fetchMonthStats } = await importUnderlyingStats();
+			const { client, mockRpc } = makeAggregateStatsClient({
+				data: monthlyRows,
+				error: null
+			});
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+			const now = Date.now();
+			const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+			await fetchMonthStats(GROUP_ID);
+			dateNowSpy.mockReturnValue(now + TTL_MS + 1);
+			await fetchMonthStats(GROUP_ID);
+
+			expect(mockRpc).toHaveBeenCalledTimes(2);
+		});
+
+		it('keeps separate cache entries per viewedGroupId', async () => {
+			const { fetchMonthStats } = await importUnderlyingStats();
+			const { client, mockRpc } = makeAggregateStatsClient({
+				data: monthlyRows,
+				error: null
+			});
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+
+			await fetchMonthStats(GROUP_ID);
+			await fetchMonthStats(OTHER_GROUP_ID);
+
+			expect(mockRpc).toHaveBeenCalledTimes(2);
+		});
 	});
 });
