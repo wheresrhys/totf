@@ -8,10 +8,12 @@ import {
 	getModelLabel,
 	hasOutstandingReviewFeedback,
 	hasOutstandingInlineFeedback,
+	hasOutstandingIssueCommentFeedback,
 	rankMaintenanceCandidates,
 	rankTicketCandidates,
 	allocateBudget,
 	resolveMaintenanceCandidateModel,
+	findMaintenanceCandidates,
 	type MaintenanceCandidate,
 	type TicketCandidate,
 } from '../swarm-plan-batch';
@@ -179,6 +181,103 @@ describe('hasOutstandingInlineFeedback', () => {
 	// Edge
 	it('returns false for no comments', () => {
 		expect(hasOutstandingInlineFeedback([], headCommitDate)).toBe(false);
+	});
+});
+
+describe('hasOutstandingIssueCommentFeedback', () => {
+	const headCommitDate = '2026-01-05T00:00:00Z';
+
+	// Usual
+	it('flags a human top-level comment newer than the head commit as outstanding feedback', () => {
+		const comments = [{ user: { login: 'reviewer' }, body: 'please also edit this', created_at: '2026-01-06T00:00:00Z' }];
+		expect(hasOutstandingIssueCommentFeedback(comments, headCommitDate)).toBe(true);
+	});
+
+	// Structure
+	it('ignores bot-authored comments', () => {
+		const comments = [{ user: { login: 'github-actions[bot]' }, body: 'automated note', created_at: '2026-01-06T00:00:00Z' }];
+		expect(hasOutstandingIssueCommentFeedback(comments, headCommitDate)).toBe(false);
+	});
+
+	it('ignores mermaid-diff-bodied comments', () => {
+		const comments = [{ user: { login: 'wheresrhys' }, body: '```mermaid\nflowchart TB\n```', created_at: '2026-01-06T00:00:00Z' }];
+		expect(hasOutstandingIssueCommentFeedback(comments, headCommitDate)).toBe(false);
+	});
+
+	it('ignores comments with no body', () => {
+		const comments = [{ user: { login: 'reviewer' }, created_at: '2026-01-06T00:00:00Z' }];
+		expect(hasOutstandingIssueCommentFeedback(comments, headCommitDate)).toBe(false);
+	});
+
+	// Edge
+	it('returns false for a comment older than the head commit', () => {
+		const comments = [{ user: { login: 'reviewer' }, body: 'old note', created_at: '2026-01-01T00:00:00Z' }];
+		expect(hasOutstandingIssueCommentFeedback(comments, headCommitDate)).toBe(false);
+	});
+
+	it('returns false for an empty comments array', () => {
+		expect(hasOutstandingIssueCommentFeedback([], headCommitDate)).toBe(false);
+	});
+});
+
+describe('findMaintenanceCandidates', () => {
+	const mockGhJson = vi.mocked(ghJson);
+
+	afterEach(() => {
+		mockGhJson.mockReset();
+	});
+
+	const pr = {
+		number: 515,
+		title: 'Some PR',
+		headRefName: 'feature/515-x',
+		labels: [],
+		mergeable: 'MERGEABLE',
+		reviews: [],
+		commits: [{ committedDate: '2026-01-05T00:00:00Z' }],
+	};
+
+	// Usual
+	it('surfaces a PR whose only outstanding feedback is a top-level issue comment', async () => {
+		mockGhJson
+			.mockResolvedValueOnce([pr]) // pr list
+			.mockResolvedValueOnce([]) // inline comments
+			.mockResolvedValueOnce([
+				{ user: { login: 'wheresrhys' }, body: 'please also edit this', created_at: '2026-01-06T00:00:00Z' },
+			]); // issue comments
+
+		const candidates = await findMaintenanceCandidates();
+
+		expect(candidates).toEqual([
+			{ number: 515, title: 'Some PR', headRefName: 'feature/515-x', labels: [], reason: 'feedback' },
+		]);
+		expect(mockGhJson).toHaveBeenNthCalledWith(3, ['api', 'repos/{owner}/{repo}/issues/515/comments']);
+	});
+
+	// Structure
+	it('does not re-fetch issue comments when review or inline feedback already found it', async () => {
+		mockGhJson
+			.mockResolvedValueOnce([pr]) // pr list
+			.mockResolvedValueOnce([
+				{ id: 1, user: { login: 'wheresrhys' }, body: 'fix this', created_at: '2026-01-06T00:00:00Z' },
+			]); // inline comments
+
+		const candidates = await findMaintenanceCandidates();
+
+		expect(candidates).toHaveLength(1);
+		expect(mockGhJson).toHaveBeenCalledTimes(2);
+	});
+
+	// Edge
+	it('treats a failed issue-comments fetch as no feedback, matching the inline-comment fallback', async () => {
+		mockGhJson
+			.mockResolvedValueOnce([pr]) // pr list
+			.mockResolvedValueOnce([]) // inline comments
+			.mockRejectedValueOnce(new Error('gh error')); // issue comments
+
+		const candidates = await findMaintenanceCandidates();
+
+		expect(candidates).toEqual([]);
 	});
 });
 
