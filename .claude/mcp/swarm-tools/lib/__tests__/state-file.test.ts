@@ -13,7 +13,10 @@ function makeEntry(overrides: Partial<SwarmWorkerEntry> = {}): SwarmWorkerEntry 
 		pr: null,
 		branch: 'feature/1-example',
 		title: 'Example',
-		worktreePath: '/tmp/example',
+		// listState() now prunes entries whose worktreePath doesn't exist on disk — default to a
+		// path guaranteed to exist (this test process's own cwd) so tests unrelated to staleness
+		// pruning aren't silently pruned; the pruning-specific tests below override this.
+		worktreePath: process.cwd(),
 		agentId: 'agent-1',
 		model: 'sonnet',
 		startedAt: '2026-01-01T00:00:00.000Z',
@@ -127,6 +130,67 @@ describe('state-file', () => {
 			const result = await listState(repoDir);
 			expect(result).toHaveLength(1);
 			expect(result[0].agentId).toBe('agent-1');
+		});
+	});
+
+	describe('listState — stale worktree pruning', () => {
+		async function readRawState(): Promise<SwarmWorkerEntry[]> {
+			const raw = await fs.readFile(path.join(repoDir, '.claude', 'swarm-state.json'), 'utf8');
+			return JSON.parse(raw);
+		}
+
+		// Usual
+		it('omits an entry whose worktreePath no longer exists on disk', async () => {
+			const deadEntry = makeEntry({ agentId: 'agent-dead', worktreePath: path.join(repoDir, 'nonexistent-worktree') });
+			await withStateLock((entries) => ({ entries: [...entries, deadEntry], result: undefined }), repoDir);
+
+			expect(await listState(repoDir)).toEqual([]);
+		});
+
+		it('keeps an entry whose worktreePath still exists on disk', async () => {
+			const liveWorktreePath = path.join(repoDir, 'live-worktree');
+			await fs.mkdir(liveWorktreePath, { recursive: true });
+			const liveEntry = makeEntry({ agentId: 'agent-live', worktreePath: liveWorktreePath });
+			await withStateLock((entries) => ({ entries: [...entries, liveEntry], result: undefined }), repoDir);
+
+			expect(await listState(repoDir)).toEqual([liveEntry]);
+		});
+
+		// Structure
+		it('prunes the stale entry from the on-disk file after listState surfaces it', async () => {
+			const deadEntry = makeEntry({ agentId: 'agent-dead', worktreePath: path.join(repoDir, 'nonexistent-worktree') });
+			await withStateLock((entries) => ({ entries: [...entries, deadEntry], result: undefined }), repoDir);
+
+			await listState(repoDir);
+
+			expect(await readRawState()).toEqual([]);
+		});
+
+		it('prunes only the stale entry when one is stale and one is live, keeping the live one intact', async () => {
+			const liveWorktreePath = path.join(repoDir, 'live-worktree');
+			await fs.mkdir(liveWorktreePath, { recursive: true });
+			const liveEntry = makeEntry({ agentId: 'agent-live', worktreePath: liveWorktreePath });
+			const deadEntry = makeEntry({ agentId: 'agent-dead', worktreePath: path.join(repoDir, 'nonexistent-worktree') });
+			await withStateLock((entries) => ({ entries: [...entries, liveEntry, deadEntry], result: undefined }), repoDir);
+
+			const result = await listState(repoDir);
+
+			expect(result).toEqual([liveEntry]);
+			expect(await readRawState()).toEqual([liveEntry]);
+		});
+
+		// Edge
+		it('does not touch the on-disk file when all entries are live', async () => {
+			const liveWorktreePath = path.join(repoDir, 'live-worktree');
+			await fs.mkdir(liveWorktreePath, { recursive: true });
+			const liveEntry = makeEntry({ agentId: 'agent-live', worktreePath: liveWorktreePath });
+			await withStateLock((entries) => ({ entries: [...entries, liveEntry], result: undefined }), repoDir);
+			const before = await fs.stat(path.join(repoDir, '.claude', 'swarm-state.json'));
+
+			await listState(repoDir);
+
+			const after = await fs.stat(path.join(repoDir, '.claude', 'swarm-state.json'));
+			expect(after.mtimeMs).toBe(before.mtimeMs);
 		});
 	});
 });
