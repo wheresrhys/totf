@@ -212,7 +212,9 @@ time):
 2. **Report** that unit:
    - **Maintained PRs**: PR → conflicts resolved? → feedback addressed (+ reviewer reply URL) →
      commit pushed → now mergeable? (or "no-op, nothing outstanding").
-   - **Tickets**: issue → branch → PR URL → test status → whether mermaid-diff posted.
+   - **Tickets**: issue → branch → PR URL → test status → whether mermaid-diff posted. Posted
+     for `opus`/`fable`-labelled tickets; "skipped (sonnet)" is the expected, normal outcome for
+     `sonnet`-labelled tickets — not a failure to flag.
    - Flag anything that failed tests, still conflicts after the merge, couldn't open a PR, or
      couldn't push so the user can intervene.
 3. **Refill** — unless termination has been requested (see below), immediately re-run selection

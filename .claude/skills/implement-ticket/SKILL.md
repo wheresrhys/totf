@@ -56,6 +56,9 @@ Read the issue body carefully. Identify:
   states)
 - **Dependencies**: does this require a prior ticket to be merged first? If a hard dependency is
   unmerged, stop and report rather than building on top of it.
+- **Model label**: note the ticket's model label (`opus`/`sonnet`/`fable`) from the issue's
+  labels — `gh issue view` already surfaces it. Reuse this value in step 7 rather than
+  re-fetching it later.
 
 In interactive mode, ask the user clarifying questions (via `AskUserQuestion`) for anything that
 would materially affect the implementation approach — exact UI layout or copy, reuse vs build
@@ -159,13 +162,19 @@ For each PR:
 Do **not** add `Closes #<number>` to any PR except the last one in a multi-PR sequence. The issue
 tracks the whole piece of work — it stays open until all increments are merged.
 
-### 7. Add behaviour-change diagrams to each PR
+### 7. Add behaviour-change diagrams to opus/fable PRs only
 
-Once a PR is open, invoke the **`mermaid-diff`** skill for it (pass the PR number). Since you
-have just implemented the change, it draws on this session's context — the code you wrote and
-the decisions you made — rather than a cold GitHub read, so the diagrams reflect what actually
-shipped. It posts the Mermaid behaviour-change diagram(s) as a PR comment. Do this per PR in a
-multi-PR sequence.
+Only invoke the mermaid-diff skill when the ticket's model label (noted in step 2) is `opus` or
+`fable` — the diagrams add real value for fiddly/multi-constraint or foundational work, where a
+reviewer benefits from a behaviour-change visualization, but are noise on routine
+`sonnet`-labelled tickets. For a `sonnet`-labelled ticket, skip this step entirely: no
+invocation, no PR comment.
+
+For an `opus`/`fable`-labelled ticket, once a PR is open, invoke the **`mermaid-diff`** skill for
+it (pass the PR number). Since you have just implemented the change, it draws on this session's
+context — the code you wrote and the decisions you made — rather than a cold GitHub read, so the
+diagrams reflect what actually shipped. It posts the Mermaid behaviour-change diagram(s) as a PR
+comment. Do this per PR in a multi-PR sequence.
 
 ## Rules
 
@@ -175,7 +184,9 @@ multi-PR sequence.
   implementation's exploration does.
 - No PR on red tests — fix or report back, never push a failing PR.
 - `Closes #<number>` only on the final PR of a sequence; the tracked issue stays open until then.
-- mermaid-diff runs once per PR, right after that PR opens — not from a cold GitHub read later.
+- mermaid-diff runs once per PR, right after that PR opens, and only for `opus`/`fable`-labelled
+  tickets — never from a cold GitHub read later, and skipped entirely (no invocation, no PR
+  comment) for `sonnet`-labelled tickets.
 - A `db-migration` PR always carries the top-of-body "do not merge before pushing" warning, and
   the same warning is always repeated in the result handed back to the caller.
 - Commit trailer names the model actually doing the work; PR body carries the Claude Code
