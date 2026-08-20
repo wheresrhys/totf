@@ -57,7 +57,7 @@ export function StatOutput({
 			{temporalUnit === 'day' && link ? (
 				<NoPrefetchLink
 					className="link"
-					href={`/group/${viewedGroup?.id}/session/${visitDate}${location ? `/site/${location.id}` : ''}`}
+					href={`/group/${viewedGroup?.slug}/session/${visitDate}${location ? `/site/${location.id}` : ''}`}
 				>
 					{formatDate(
 						new Date(visitDate as string),

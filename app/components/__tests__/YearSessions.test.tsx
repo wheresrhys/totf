@@ -67,10 +67,10 @@ describe('YearSessions', () => {
 		expect(monthButtons.length).toBe(4);
 	});
 
-	// Regression: viewedGroupId (number) became a viewedGroup object, but the
-	// session hrefs threaded down the calendar tree must still be built from
-	// the numeric id — byte-identical to before, not the slug.
-	it('threads viewedGroup.id into session hrefs (numeric, unchanged)', () => {
+	// This ticket (#490) flips the session hrefs threaded down the calendar
+	// tree from viewedGroup.id to viewedGroup.slug, now that the
+	// /group/[groupSlug] route accepts slugs.
+	it('threads viewedGroup.slug into session hrefs', () => {
 		render(
 			<YearSessions
 				year={yearData}
@@ -81,10 +81,10 @@ describe('YearSessions', () => {
 			/>
 		);
 		const sessionLink = document.querySelector(
-			'a[href="/group/1/session/2022-10-20"]'
+			'a[href="/group/alpha/session/2022-10-20"]'
 		);
 		expect(sessionLink).not.toBeNull();
-		// No href in the tree leaks the slug.
-		expect(document.querySelector('a[href*="/group/alpha/"]')).toBeNull();
+		// No href in the tree leaks the numeric id.
+		expect(document.querySelector('a[href*="/group/1/"]')).toBeNull();
 	});
 });
