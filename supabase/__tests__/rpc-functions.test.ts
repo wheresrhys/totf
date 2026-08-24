@@ -518,6 +518,406 @@ describe('Postgres RPC integration tests', () => {
 				});
 			});
 		});
+
+		describe('age bucketing (juv_count / adult_count / unknown_age_count / new_juv_count)', () => {
+			// Insert Delta-group birds across distinct random future dates so a single-date
+			// (from=to) query sees only this run's rows. Each scenario gets its own date;
+			// multi-encounter birds (conflict / new-juv-split) use two locations on one date.
+			let deltaId: number;
+			let deltaClient: SupabaseClient;
+			let robinId: number;
+			let blueTitId: number;
+			let locationAId: number;
+			let locationBId: number;
+			const birdIds: number[] = [];
+			const sessionIds: number[] = [];
+
+			// Scenario dates.
+			let base: string; // dJuv
+			let dAdult: string;
+			let dNewJuv: string;
+			let dOnly2: string;
+			let dConflict: string;
+			let dJ3: string;
+			let dNewJuvSplit: string;
+			let dSpecies: string;
+			let dMonth2: string;
+			let dEmpty: string;
+
+			async function getSpeciesId(name: string): Promise<number> {
+				const { data, error } = await supabase
+					.from('Species')
+					.select('id')
+					.eq('species_name', name)
+					.single();
+				if (error || !data) throw new Error(`Species "${name}" not found`);
+				return data.id;
+			}
+
+			async function makeSession(locationId: number, visitDate: string): Promise<number> {
+				const { data, error } = await deltaClient
+					.from('Sessions')
+					.insert({ visit_date: visitDate, location_id: locationId })
+					.select('id')
+					.single();
+				if (error) throw error;
+				sessionIds.push(data!.id);
+				return data!.id;
+			}
+
+			async function makeBird(ringNo: string, speciesId: number): Promise<number> {
+				const { data, error } = await deltaClient
+					.from('Birds')
+					.insert({ ring_no: ringNo, species_id: speciesId })
+					.select('id')
+					.single();
+				if (error) throw error;
+				birdIds.push(data!.id);
+				return data!.id;
+			}
+
+			async function makeEncounter(
+				birdId: number,
+				sessionId: number,
+				fields: { age_code: number | null; record_type: string; is_juv?: boolean }
+			): Promise<void> {
+				const { error } = await deltaClient.from('Encounters').insert({
+					bird_id: birdId,
+					session_id: sessionId,
+					scheme: 'BTO',
+					sex: 'M',
+					capture_time: '10:00:00',
+					age_code: fields.age_code,
+					record_type: fields.record_type,
+					is_juv: fields.is_juv ?? false,
+				});
+				if (error) throw error;
+			}
+
+			// The single ungrouped whole-group aggregate row for a bounded date range.
+			async function bucketRow(fromDate: string, toDate: string) {
+				const { data, error } = await deltaClient.rpc('aggregate_stats', {
+					ringing_group_filter: deltaId,
+					from_date: fromDate,
+					to_date: toDate,
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				return data![0];
+			}
+
+			beforeAll(async () => {
+				deltaId = await getGroupIdByName('Delta');
+				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+				robinId = await getSpeciesId('Robin');
+				blueTitId = await getSpeciesId('Blue Tit');
+
+				const testSuffix = randomTestSuffix();
+				base = randomFutureDate();
+				dAdult = addDays(base, 1);
+				dNewJuv = addDays(base, 2);
+				dOnly2 = addDays(base, 3);
+				dConflict = addDays(base, 4);
+				dJ3 = addDays(base, 5);
+				dNewJuvSplit = addDays(base, 6);
+				dSpecies = addDays(base, 7);
+				dMonth2 = addDays(base, 45); // guaranteed a different month from the base cluster
+				dEmpty = addDays(base, 9000); // far outside any session date
+
+				const [locationA, locationB] = await Promise.all([
+					deltaClient
+						.from('Locations')
+						.insert({ location_name: `AgeBucket A ${testSuffix}`, ringing_group_id: deltaId })
+						.select('id')
+						.single(),
+					deltaClient
+						.from('Locations')
+						.insert({ location_name: `AgeBucket B ${testSuffix}`, ringing_group_id: deltaId })
+						.select('id')
+						.single(),
+				]);
+				if (locationA.error) throw locationA.error;
+				if (locationB.error) throw locationB.error;
+				locationAId = locationA.data!.id;
+				locationBId = locationB.data!.id;
+
+				// dJuv (base): juv-only Robin, retrap (R) so it is NOT new.
+				const bJuv = await makeBird(`AB-JUV-${testSuffix}`, robinId);
+				await makeEncounter(bJuv, await makeSession(locationAId, base), {
+					age_code: 1,
+					is_juv: true,
+					record_type: 'R',
+				});
+
+				// dAdult: adult-only Robin (age_code 4).
+				const bAdult = await makeBird(`AB-AD-${testSuffix}`, robinId);
+				await makeEncounter(bAdult, await makeSession(locationAId, dAdult), {
+					age_code: 4,
+					record_type: 'R',
+				});
+
+				// dNewJuv: juv Robin ringed new (N).
+				const bNewJuv = await makeBird(`AB-NJUV-${testSuffix}`, robinId);
+				await makeEncounter(bNewJuv, await makeSession(locationAId, dNewJuv), {
+					age_code: 1,
+					record_type: 'N',
+				});
+
+				// dOnly2: Robin with only an age_code=2 encounter → unknown.
+				const bOnly2 = await makeBird(`AB-TWO-${testSuffix}`, robinId);
+				await makeEncounter(bOnly2, await makeSession(locationAId, dOnly2), {
+					age_code: 2,
+					record_type: 'N',
+				});
+
+				// dConflict: one Robin with a juv (age 1) and an adult (age 4) encounter on the
+				// same date at two locations → conflict → unknown.
+				const bConflict = await makeBird(`AB-CONF-${testSuffix}`, robinId);
+				await makeEncounter(bConflict, await makeSession(locationAId, dConflict), {
+					age_code: 1,
+					is_juv: true,
+					record_type: 'R',
+				});
+				await makeEncounter(bConflict, await makeSession(locationBId, dConflict), {
+					age_code: 4,
+					record_type: 'R',
+				});
+
+				// dJ3: two juv Robins — age_code 1 (is_juv true) and age_code 3 (is_juv false).
+				const bJ3a = await makeBird(`AB-J3A-${testSuffix}`, robinId);
+				const bJ3b = await makeBird(`AB-J3B-${testSuffix}`, robinId);
+				const sJ3 = await makeSession(locationAId, dJ3);
+				await makeEncounter(bJ3a, sJ3, { age_code: 1, is_juv: true, record_type: 'R' });
+				await makeEncounter(bJ3b, sJ3, { age_code: 3, is_juv: false, record_type: 'R' });
+
+				// dNewJuvSplit: one Robin whose juv encounter (age 1, R) and New encounter
+				// (age 2, N) are different rows → still juv bucket AND new_juv.
+				const bSplit = await makeBird(`AB-SPLIT-${testSuffix}`, robinId);
+				await makeEncounter(bSplit, await makeSession(locationAId, dNewJuvSplit), {
+					age_code: 1,
+					is_juv: true,
+					record_type: 'R',
+				});
+				await makeEncounter(bSplit, await makeSession(locationBId, dNewJuvSplit), {
+					age_code: 2,
+					record_type: 'N',
+				});
+
+				// dSpecies: a juv Robin and a juv Blue Tit for the group_by_species test.
+				const sSpecies = await makeSession(locationAId, dSpecies);
+				const bSpRobin = await makeBird(`AB-SPR-${testSuffix}`, robinId);
+				const bSpBlueTit = await makeBird(`AB-SPB-${testSuffix}`, blueTitId);
+				await makeEncounter(bSpRobin, sSpecies, { age_code: 1, is_juv: true, record_type: 'R' });
+				await makeEncounter(bSpBlueTit, sSpecies, { age_code: 1, is_juv: true, record_type: 'R' });
+
+				// dMonth2: a single juv Robin in a later month for the group_by_time_period test.
+				const bMonth2 = await makeBird(`AB-M2-${testSuffix}`, robinId);
+				await makeEncounter(bMonth2, await makeSession(locationAId, dMonth2), {
+					age_code: 1,
+					is_juv: true,
+					record_type: 'R',
+				});
+			});
+
+			afterAll(() => {
+				execSync(
+					`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+						`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
+						`DELETE FROM "Locations" WHERE id IN (${locationAId}, ${locationBId});'`
+				);
+			});
+
+			// Usual
+			it('a bird with only a juv-indicating encounter (age_code 1) counts in juv_count, not adult_count or unknown_age_count', async () => {
+				const row = await bucketRow(base, base);
+				expect(row).toMatchObject({
+					bird_count: 1,
+					juv_count: 1,
+					adult_count: 0,
+					unknown_age_count: 0,
+				});
+			});
+
+			it('a bird with only an adult-indicating encounter (age_code > 3, e.g. 4) counts in adult_count, not juv_count or unknown_age_count', async () => {
+				const row = await bucketRow(dAdult, dAdult);
+				expect(row).toMatchObject({
+					bird_count: 1,
+					adult_count: 1,
+					juv_count: 0,
+					unknown_age_count: 0,
+				});
+			});
+
+			it('a New (record_type=N) juv-bucket bird is counted in new_juv_count', async () => {
+				const row = await bucketRow(dNewJuv, dNewJuv);
+				expect(row).toMatchObject({ juv_count: 1, new_juv_count: 1 });
+			});
+
+			// Structure — one test per bucket-defining branch
+			it('a bird with only age_code=2 encounters counts in unknown_age_count, not juv_count or adult_count', async () => {
+				const row = await bucketRow(dOnly2, dOnly2);
+				expect(row).toMatchObject({
+					bird_count: 1,
+					unknown_age_count: 1,
+					juv_count: 0,
+					adult_count: 0,
+				});
+			});
+
+			it('a bird with both a juv-indicating and an adult-indicating encounter in the same group counts in unknown_age_count, not juv_count or adult_count', async () => {
+				const row = await bucketRow(dConflict, dConflict);
+				expect(row).toMatchObject({
+					bird_count: 1,
+					unknown_age_count: 1,
+					juv_count: 0,
+					adult_count: 0,
+				});
+			});
+
+			it('a retrap (record_type != N) juv-bucket bird is excluded from new_juv_count despite being in juv_count', async () => {
+				const row = await bucketRow(base, base);
+				expect(row).toMatchObject({ juv_count: 1, new_juv_count: 0 });
+			});
+
+			it('a bird whose New encounter and juv-indicating encounter are different rows still counts in new_juv_count (bucket membership and New membership checked independently)', async () => {
+				const row = await bucketRow(dNewJuvSplit, dNewJuvSplit);
+				expect(row).toMatchObject({
+					bird_count: 1,
+					juv_count: 1,
+					new_juv_count: 1,
+					adult_count: 0,
+					unknown_age_count: 0,
+				});
+			});
+
+			it('age_code=1 (J-suffix flag true) and age_code=3 with is_juv=false both count toward juv_count identically, regardless of is_juv', async () => {
+				const row = await bucketRow(dJ3, dJ3);
+				expect(row).toMatchObject({
+					bird_count: 2,
+					juv_count: 2,
+					adult_count: 0,
+					unknown_age_count: 0,
+				});
+			});
+
+			// Edge
+			it('juv_count + adult_count + unknown_age_count equals bird_count for a mixed-bucket group', async () => {
+				const row = await bucketRow(base, dMonth2);
+				expect(row.juv_count + row.adult_count + row.unknown_age_count).toBe(row.bird_count);
+			});
+
+			it('an empty group (no encounters) returns zero for juv_count, adult_count, unknown_age_count and new_juv_count', async () => {
+				const row = await bucketRow(dEmpty, dEmpty);
+				expect(row).toMatchObject({
+					bird_count: 0,
+					juv_count: 0,
+					adult_count: 0,
+					unknown_age_count: 0,
+					new_juv_count: 0,
+				});
+			});
+
+			it("bucket counts respect group_by_species — a juv bird of species A is not counted in species B's row", async () => {
+				const { data, error } = await deltaClient.rpc('aggregate_stats', {
+					ringing_group_filter: deltaId,
+					from_date: dSpecies,
+					to_date: dSpecies,
+					group_by_species: true,
+				});
+				expect(error).toBeNull();
+				const robin = data!.find((r) => r.species_name === 'Robin');
+				const blueTit = data!.find((r) => r.species_name === 'Blue Tit');
+				expect(robin).toMatchObject({ bird_count: 1, juv_count: 1 });
+				expect(blueTit).toMatchObject({ bird_count: 1, juv_count: 1 });
+			});
+
+			it("bucket counts respect group_by_time_period — a juv bird recorded only in month M is not counted in an adjacent month's row", async () => {
+				const { data, error } = await deltaClient.rpc('aggregate_stats', {
+					ringing_group_filter: deltaId,
+					from_date: base,
+					to_date: dMonth2,
+					group_by_time_period: 'month',
+				});
+				expect(error).toBeNull();
+				const month2 = `${dMonth2.slice(0, 7)}-01`;
+				const row = data!.find((r) => r.time_period === month2);
+				expect(row).toMatchObject({
+					bird_count: 1,
+					juv_count: 1,
+					adult_count: 0,
+					unknown_age_count: 0,
+				});
+			});
+		});
+
+		describe('group_by_time_period=day', () => {
+			// Read-only assertions against stable Alpha seed data (safe under concurrency).
+			// Usual
+			it("returns one row per distinct visit date, matching Alpha's known session dates", async () => {
+				const { data, error } = await alphaClient.rpc('aggregate_stats', {
+					ringing_group_filter: alphaId,
+					group_by_time_period: 'day',
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(ARRETRAP_DATES.length);
+				expect(data!.map((r) => r.time_period).sort()).toEqual([...ARRETRAP_DATES].sort());
+			});
+
+			it('day-grouped session_count and encounter_count for a given date match the corresponding month-grouped row filtered to that single day', async () => {
+				// 2021-06-20 is Alpha's only June-2021 session, so its day row equals the month row.
+				const [dayRes, monthRes] = await Promise.all([
+					alphaClient.rpc('aggregate_stats', {
+						ringing_group_filter: alphaId,
+						group_by_time_period: 'day',
+					}),
+					alphaClient.rpc('aggregate_stats', {
+						ringing_group_filter: alphaId,
+						group_by_time_period: 'month',
+					}),
+				]);
+				const dayRow = dayRes.data!.find((r) => r.time_period === '2021-06-20');
+				const monthRow = monthRes.data!.find((r) => r.time_period === '2021-06-01');
+				expect(dayRow!.session_count).toBe(monthRow!.session_count);
+				expect(dayRow!.encounter_count).toBe(monthRow!.encounter_count);
+			});
+
+			// Structure
+			it('a date with no session is absent from the results (spine only covers session dates, not every calendar day)', async () => {
+				const { data, error } = await alphaClient.rpc('aggregate_stats', {
+					ringing_group_filter: alphaId,
+					group_by_time_period: 'day',
+				});
+				expect(error).toBeNull();
+				// 2023-01-01 lies within Alpha's 2021–2024 range but has no session.
+				expect(data!.some((r) => r.time_period === '2023-01-01')).toBe(false);
+			});
+
+			// Edge
+			it('a date range spanning a single day (from_date = to_date) returns exactly one row', async () => {
+				const { data, error } = await alphaClient.rpc('aggregate_stats', {
+					ringing_group_filter: alphaId,
+					group_by_time_period: 'day',
+					from_date: '2022-04-30',
+					to_date: '2022-04-30',
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				expect(data![0].time_period).toBe('2022-04-30');
+			});
+
+			it('an out-of-range group_by_time_period value (anything other than day/month/year) still falls back to the existing ungrouped NULL time_period behaviour', async () => {
+				const { data, error } = await alphaClient.rpc('aggregate_stats', {
+					ringing_group_filter: alphaId,
+					group_by_time_period: 'week',
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				expect(data![0].time_period).toBeNull();
+				expect(data![0].encounter_count).toBe(ALPHA_TOTAL_ENCOUNTERS);
+			});
+		});
 	});
 
 	describe('top_metrics_by_period', () => {
