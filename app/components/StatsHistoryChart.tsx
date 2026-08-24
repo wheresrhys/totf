@@ -20,23 +20,12 @@ function getCounts(statsHistory: AggregateStatsResult[]): LineChartData[] {
 function getYoungsters(statsHistory: AggregateStatsResult[]): LineChartData[] {
 	return [
 		{
-			name: '3j',
-			data: statsHistory.map((row) => [row.time_period, row['3j_count']])
+			name: 'juveniles',
+			data: statsHistory.map((row) => [row.time_period, row.juv_count])
 		},
 		{
-			name: '3',
-			data: statsHistory.map((row) => [row.time_period, row['3_count']])
-		},
-		{
-			name: '(3j + 3)',
-			data: statsHistory.map((row) => [
-				row.time_period,
-				row['3j_count'] + row['3_count']
-			])
-		},
-		{
-			name: "new 3's",
-			data: statsHistory.map((row) => [row.time_period, row.new_3_count])
+			name: 'new juveniles',
+			data: statsHistory.map((row) => [row.time_period, row.new_juv_count])
 		}
 	];
 }
