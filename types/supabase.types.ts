@@ -293,8 +293,7 @@ export type Database = {
           to_date?: string
         }
         Returns: {
-          "3_count": number
-          "3j_count": number
+          adult_count: number
           avg_encounters_per_session: number
           avg_weight: number
           avg_wing: number
@@ -302,6 +301,7 @@ export type Database = {
           effort_per_encounter: string
           effort_per_session: string
           encounter_count: number
+          juv_count: number
           max_new_per_session: number
           max_per_session: number
           max_weight: number
@@ -310,13 +310,14 @@ export type Database = {
           median_wing: number
           min_weight: number
           min_wing: number
-          new_3_count: number
           new_bird_count: number
+          new_juv_count: number
           session_count: number
           species_count: number
           species_name: string
           time_period: string
           total_effort: string
+          unknown_age_count: number
         }[]
       }
       daitch_mokotoff: { Args: { "": string }; Returns: string[] }
