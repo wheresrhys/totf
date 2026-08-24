@@ -5,7 +5,7 @@ export type AvailablePeriod = {
 
 // Buckets an array of ISO date strings (YYYY-MM-DD, as returned for Postgres
 // `date` columns) into a year -> months tree, sorted ascending. Used to drive
-// the /stats page's nested navigation into the /highlights route family.
+// the /summaries page's nested navigation into the /summary route family.
 export function buildAvailablePeriodsTree(
 	sessionDates: string[]
 ): AvailablePeriod[] {

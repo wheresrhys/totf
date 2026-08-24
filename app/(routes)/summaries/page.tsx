@@ -35,13 +35,13 @@ function StatsNav({ data }: { data: PageData }) {
 			<PrimaryHeading>Stats</PrimaryHeading>
 			<ul>
 				<li>
-					<NoPrefetchLink className="link" href="/highlights">
+					<NoPrefetchLink className="link" href="/summary">
 						All time
 					</NoPrefetchLink>
 				</li>
 				{data.periods.map(({ year, months }) => (
 					<li key={year}>
-						<NoPrefetchLink className="link" href={`/highlights/${year}`}>
+						<NoPrefetchLink className="link" href={`/summary/${year}`}>
 							{year}
 						</NoPrefetchLink>
 						<ul>
@@ -49,7 +49,7 @@ function StatsNav({ data }: { data: PageData }) {
 								<li key={month}>
 									<NoPrefetchLink
 										className="link"
-										href={`/highlights/${year}/${month}`}
+										href={`/summary/${year}/${month}`}
 									>
 										{monthLabel(year, month)}
 									</NoPrefetchLink>

@@ -1,14 +1,14 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { fetchSessionStats } from '@/lib/underlying-stats';
 import type { ViewedGroup } from '@/lib/group-slug';
-import { HighlightsPage as HighlightsPageContent } from '../../_shared';
+import { SummaryPage as SummaryPageContent } from '../../_shared';
 
 export type PageParams = { year: string; month: string };
 type PageProps = { params: Promise<PageParams> };
 
 export type PageData = { year: number; month: number; sessionDates: string[] };
 
-export async function fetchYearMonthHighlightsData(
+export async function fetchYearMonthSummaryData(
 	{ year, month }: PageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
@@ -23,7 +23,7 @@ export async function fetchYearMonthHighlightsData(
 	};
 }
 
-function YearMonthHighlights({
+function YearMonthSummary({
 	data,
 	viewedGroup
 }: {
@@ -31,7 +31,7 @@ function YearMonthHighlights({
 	viewedGroup: ViewedGroup;
 }) {
 	return (
-		<HighlightsPageContent
+		<SummaryPageContent
 			year={data.year}
 			month={data.month}
 			sessionDates={data.sessionDates}
@@ -40,7 +40,7 @@ function YearMonthHighlights({
 	);
 }
 
-export default async function YearMonthHighlightsPage(
+export default async function YearMonthSummaryPage(
 	props: PageProps & { viewedGroup?: ViewedGroup }
 ) {
 	return (
@@ -48,12 +48,12 @@ export default async function YearMonthHighlightsPage(
 			pageProps={props}
 			viewedGroup={props.viewedGroup}
 			getCacheKeys={(params: PageParams) => [
-				'highlights',
+				'summary',
 				params.year,
 				params.month
 			]}
-			dataFetcher={fetchYearMonthHighlightsData}
-			PageComponent={YearMonthHighlights}
+			dataFetcher={fetchYearMonthSummaryData}
+			PageComponent={YearMonthSummary}
 		/>
 	);
 }

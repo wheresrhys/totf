@@ -9,15 +9,15 @@ vi.mock('@/lib/underlying-stats', () => ({
 	})
 }));
 
-describe('/highlights (all-time)', () => {
+describe('/summary (all-time)', () => {
 	afterEach(() => {
 		cleanup();
 	});
 
-	it('renders the "All time highlights" heading', async () => {
+	it('renders the "All time summary" heading', async () => {
 		render(await Page());
 		const heading = await screen.findByRole('heading', { level: 1 });
-		expect(heading.textContent).toBe('All time highlights');
+		expect(heading.textContent).toBe('All time summary');
 	});
 
 	it('renders a session link for every date returned by fetchSessionStats', async () => {
