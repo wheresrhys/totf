@@ -5,7 +5,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { SessionLinksList } from '@/app/components/SessionLinksList';
 import { type ViewedGroup } from '@/lib/group-slug';
-export function HighlightsPage({
+export function SummaryPage({
 	year,
 	month,
 	sessionDates = [],
@@ -31,11 +31,11 @@ export function HighlightsPage({
 
 function buildHeading(year?: number, month?: number): string {
 	if (year === undefined) {
-		return 'All time highlights';
+		return 'All time summary';
 	}
 	if (month === undefined) {
-		return `${year} highlights`;
+		return `${year} summary`;
 	}
 	const monthDate = new Date(year, month - 1, 1);
-	return `${format(monthDate, 'LLLL')} ${year} highlights`;
+	return `${format(monthDate, 'LLLL')} ${year} summary`;
 }

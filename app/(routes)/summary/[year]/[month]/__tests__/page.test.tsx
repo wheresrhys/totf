@@ -9,29 +9,29 @@ vi.mock('@/lib/underlying-stats', () => ({
 	})
 }));
 
-describe('/highlights/[year]/[month]', () => {
+describe('/summary/[year]/[month]', () => {
 	afterEach(() => {
 		cleanup();
 	});
 
-	it('renders "{long month} {year} highlights" for a well-formed year/month', async () => {
+	it('renders "{long month} {year} summary" for a well-formed year/month', async () => {
 		render(
 			await Page({
 				params: Promise.resolve({ year: '2026', month: '08' })
 			})
 		);
 		const heading = await screen.findByRole('heading', { level: 1 });
-		expect(heading.textContent).toBe('August 2026 highlights');
+		expect(heading.textContent).toBe('August 2026 summary');
 	});
 
-	it('renders "{long month} {year} highlights" for an unpadded month', async () => {
+	it('renders "{long month} {year} summary" for an unpadded month', async () => {
 		render(
 			await Page({
 				params: Promise.resolve({ year: '2026', month: '8' })
 			})
 		);
 		const heading = await screen.findByRole('heading', { level: 1 });
-		expect(heading.textContent).toBe('August 2026 highlights');
+		expect(heading.textContent).toBe('August 2026 summary');
 	});
 
 	it('renders only links for dates within the given year and month', async () => {
