@@ -73,6 +73,8 @@ function dayRows(
 			visit_date: date,
 			encounter_count,
 			juv_count: 0,
+			postjuv_count: 0,
+			pullus_count: 0,
 			weighed_birds_count: 0,
 			min_weight: 0,
 			max_weight: 0
@@ -530,6 +532,8 @@ function speciesRow(
 		species_name: species,
 		encounter_count: count,
 		juv_count: 0,
+		postjuv_count: 0,
+		pullus_count: 0,
 		weighed_birds_count: 0,
 		min_weight: 0,
 		max_weight: 0
@@ -997,6 +1001,8 @@ function juvRow(
 		species_name: species,
 		encounter_count: encounterCount,
 		juv_count: juvCount,
+		postjuv_count: 0,
+		pullus_count: 0,
 		weighed_birds_count: 0,
 		min_weight: 0,
 		max_weight: 0
@@ -1882,6 +1888,8 @@ function weightRow(
 		species_name: species,
 		encounter_count: weighedBirds,
 		juv_count: 0,
+		postjuv_count: 0,
+		pullus_count: 0,
 		weighed_birds_count: weighedBirds,
 		min_weight: minWeight,
 		max_weight: maxWeight

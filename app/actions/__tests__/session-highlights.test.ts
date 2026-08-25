@@ -39,6 +39,8 @@ function statsRow(
 		visit_date,
 		encounter_count,
 		juv_count: 0,
+		postjuv_count: 0,
+		pullus_count: 0,
 		weighed_birds_count: 0,
 		min_weight: 0,
 		max_weight: 0
@@ -238,6 +240,8 @@ describe('fetchSessionHighlights', () => {
 					visit_date: SESSION_DATE,
 					encounter_count: 5,
 					juv_count: 0,
+					postjuv_count: 0,
+					pullus_count: 0,
 					weighed_birds_count: 5,
 					min_weight: 11,
 					max_weight: 13.1
@@ -247,6 +251,8 @@ describe('fetchSessionHighlights', () => {
 					visit_date: '2022-05-01',
 					encounter_count: 4,
 					juv_count: 0,
+					postjuv_count: 0,
+					pullus_count: 0,
 					weighed_birds_count: 4,
 					min_weight: 10.5,
 					max_weight: 13.0
@@ -256,6 +262,8 @@ describe('fetchSessionHighlights', () => {
 					visit_date: '2022-06-01',
 					encounter_count: 4,
 					juv_count: 0,
+					postjuv_count: 0,
+					pullus_count: 0,
 					weighed_birds_count: 4,
 					min_weight: 10.7,
 					max_weight: 12.8
@@ -265,6 +273,8 @@ describe('fetchSessionHighlights', () => {
 					visit_date: '2022-07-01',
 					encounter_count: 4,
 					juv_count: 0,
+					postjuv_count: 0,
+					pullus_count: 0,
 					weighed_birds_count: 4,
 					min_weight: 10.8,
 					max_weight: 12.9

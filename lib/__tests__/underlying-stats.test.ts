@@ -33,6 +33,8 @@ function statsRow(
 		visit_date,
 		encounter_count,
 		juv_count: 0,
+		postjuv_count: 0,
+		pullus_count: 0,
 		weighed_birds_count: 0,
 		min_weight: 0,
 		max_weight: 0
