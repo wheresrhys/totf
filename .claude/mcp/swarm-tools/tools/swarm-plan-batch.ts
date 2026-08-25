@@ -110,6 +110,27 @@ export interface TicketCandidate {
 	blockingCount: number;
 }
 
+/**
+ * A `ready`, unblocked, not-in-flight issue whose only disqualifier is a pre-existing
+ * `feature/<issue>-*` branch — but that branch's most recent (and only non-open) PR was closed
+ * without merging, so the branch is a stale leftover of an abandoned attempt rather than active
+ * in-flight work. These are surfaced separately (never auto-added to `ticketsToImplement`) so the
+ * orchestrator can prompt the user to reuse/replace the branch instead of silently dropping the
+ * issue forever — the failure mode this ticket (#546) fixes.
+ */
+export interface StaleClosedPrTicket {
+	number: number;
+	title: string;
+	labels: string[];
+	staleBranch: string;
+	closedPrNumber: number;
+}
+
+export interface TicketCandidatesResult {
+	candidates: TicketCandidate[];
+	staleClosedPrTickets: StaleClosedPrTicket[];
+}
+
 export function rankMaintenanceCandidates(candidates: MaintenanceCandidate[]): MaintenanceCandidate[] {
 	return [...candidates].sort((a, b) => a.number - b.number);
 }
@@ -196,6 +217,32 @@ interface GhIssueListItem {
 	blocking: { nodes: { state: string }[] };
 }
 
+/** `gh pr list --head <branch> --state all --json number,state`. `state` is OPEN | CLOSED | MERGED. */
+interface GhPrHeadItem {
+	number: number;
+	state: string;
+}
+
+/**
+ * Classifies a stale-looking `feature/<issue>-*` branch (an issue's only disqualifier) by the
+ * state of its associated PRs, so the caller can tell an actively-worked branch from an abandoned
+ * one. GitHub's `closedByPullRequestsReferences` is empty for a PR closed manually (not merged),
+ * so that path can't distinguish these — a per-branch `gh pr list --head` lookup can.
+ *
+ * - open PR present → `'in-flight'` (genuinely being worked — keep excluded, no change)
+ * - no open PR but ≥1 closed-not-merged PR → `{ closedPrNumber }` (stale leftover — a new
+ *   candidate the orchestrator should prompt about), reporting the most recent (highest-numbered)
+ *   closed PR when several exist (a branch re-attempted more than once)
+ * - only a merged PR, or no PR ever → `'excluded'` (unchanged from prior behaviour)
+ */
+export function classifyStaleBranchPrs(prs: GhPrHeadItem[]): 'in-flight' | 'excluded' | { closedPrNumber: number } {
+	if (prs.some((pr) => pr.state === 'OPEN')) return 'in-flight';
+	const closedUnmerged = prs.filter((pr) => pr.state === 'CLOSED');
+	if (closedUnmerged.length === 0) return 'excluded';
+	const mostRecent = closedUnmerged.reduce((a, b) => (b.number > a.number ? b : a));
+	return { closedPrNumber: mostRecent.number };
+}
+
 export async function findMaintenanceCandidates(): Promise<MaintenanceCandidate[]> {
 	const prs = await ghJson<GhPrListItem[]>([
 		'pr',
@@ -233,7 +280,7 @@ export async function findMaintenanceCandidates(): Promise<MaintenanceCandidate[
 	return candidates;
 }
 
-async function findTicketCandidates(runningIssueNumbers: Set<number>): Promise<TicketCandidate[]> {
+export async function findTicketCandidates(runningIssueNumbers: Set<number>): Promise<TicketCandidatesResult> {
 	const issues = await ghJson<GhIssueListItem[]>([
 		'issue',
 		'list',
@@ -246,12 +293,40 @@ async function findTicketCandidates(runningIssueNumbers: Set<number>): Promise<T
 	]);
 	const branches = await listBranches();
 	const candidates: TicketCandidate[] = [];
+	const staleClosedPrTickets: StaleClosedPrTicket[] = [];
 	for (const issue of issues) {
 		const isBlocked = issue.blockedBy.nodes.some((node) => node.state === 'OPEN');
 		if (isBlocked) continue;
 		if (runningIssueNumbers.has(issue.number)) continue;
-		const hasExistingBranch = branches.some((b) => b.startsWith(`feature/${issue.number}-`));
-		if (hasExistingBranch) continue;
+		const existingBranch = branches.find((b) => b.startsWith(`feature/${issue.number}-`));
+		if (existingBranch) {
+			// The branch alone would exclude this issue. Only now (i.e. solely for issues that
+			// would otherwise be dropped as in-flight) pay for the extra per-branch PR lookup, to
+			// tell an actively-worked branch from a stale leftover of a closed-not-merged PR.
+			const branchPrs = await ghJson<GhPrHeadItem[]>([
+				'pr',
+				'list',
+				'--head',
+				existingBranch,
+				'--state',
+				'all',
+				'--json',
+				'number,state',
+			]).catch(() => []);
+			const classification = classifyStaleBranchPrs(branchPrs);
+			if (typeof classification === 'object') {
+				staleClosedPrTickets.push({
+					number: issue.number,
+					title: issue.title,
+					labels: issue.labels.map((l) => l.name),
+					staleBranch: existingBranch,
+					closedPrNumber: classification.closedPrNumber,
+				});
+			}
+			// 'in-flight', 'excluded', and stale-closed alike stay out of `candidates` — the branch
+			// disqualifies the issue from being auto-implemented either way.
+			continue;
+		}
 		const closedByPrs = await ghJson<{ closedByPullRequestsReferences: unknown[] }>([
 			'issue',
 			'view',
@@ -267,7 +342,7 @@ async function findTicketCandidates(runningIssueNumbers: Set<number>): Promise<T
 		const blockingCount = issue.blocking.nodes.filter((node) => node.state === 'OPEN').length;
 		candidates.push({ number: issue.number, title: issue.title, labels, model, blockingCount });
 	}
-	return candidates;
+	return { candidates, staleClosedPrTickets };
 }
 
 /**
@@ -314,7 +389,7 @@ export function registerSwarmPlanBatchTool(server: McpServer) {
 		'swarm_plan_batch',
 		{
 			description:
-				"Pre-filtered, pre-ranked PR-maintenance and ready-ticket lists for swarm's §1+§2 selection, already applying the unblocked/not-in-flight/solo-run rules and truncated to freeSlots.",
+				"Pre-filtered, pre-ranked PR-maintenance and ready-ticket lists for swarm's §1+§2 selection, already applying the unblocked/not-in-flight/solo-run rules and truncated to freeSlots. Also returns staleClosedPrTickets — ready tickets excluded only because a feature/<issue>-* branch from a closed-not-merged PR still exists — for the orchestrator to prompt on before reusing/replacing.",
 			inputSchema: {
 				freeSlots: z.number(),
 			},
@@ -342,6 +417,15 @@ export function registerSwarmPlanBatchTool(server: McpServer) {
 						blockedBySoloRun: z.boolean(),
 					})
 				),
+				staleClosedPrTickets: z.array(
+					z.object({
+						number: z.number(),
+						title: z.string(),
+						labels: z.array(z.string()),
+						staleBranch: z.string(),
+						closedPrNumber: z.number(),
+					})
+				),
 				drained: z.boolean(),
 			},
 		},
@@ -355,7 +439,8 @@ export function registerSwarmPlanBatchTool(server: McpServer) {
 			);
 
 			const maintenanceCandidates = await findMaintenanceCandidates();
-			const ticketCandidates = await findTicketCandidates(runningIssueNumbers);
+			const { candidates: ticketCandidates, staleClosedPrTickets } =
+				await findTicketCandidates(runningIssueNumbers);
 
 			const rankedMaintenance = rankMaintenanceCandidates(maintenanceCandidates);
 			const rankedTickets = rankTicketCandidates(ticketCandidates);
@@ -370,14 +455,21 @@ export function registerSwarmPlanBatchTool(server: McpServer) {
 			);
 			const ticketsToImplement = allocation.tickets.map((ticket) => ({ ...ticket, blockedBySoloRun: false }));
 
+			// Stale-closed-PR tickets are pending work too (awaiting a user reuse/replace decision),
+			// so the pool isn't genuinely drained while any remain — otherwise the orchestrator would
+			// go idle and never surface them.
 			const drained =
-				maintenanceCandidates.length === 0 && ticketCandidates.length === 0 && runningEntries.length === 0;
+				maintenanceCandidates.length === 0 &&
+				ticketCandidates.length === 0 &&
+				staleClosedPrTickets.length === 0 &&
+				runningEntries.length === 0;
 
 			const structuredContent = {
 				soloRunActive,
 				soloRunLabel: soloRunLabel ?? undefined,
 				prsNeedingMaintenance,
 				ticketsToImplement,
+				staleClosedPrTickets,
 				drained,
 			};
 			return { content: [{ type: 'text', text: JSON.stringify(structuredContent) }], structuredContent };

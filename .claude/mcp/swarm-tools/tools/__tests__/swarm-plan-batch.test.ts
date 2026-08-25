@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 vi.mock('../../lib/gh', () => ({ ghJson: vi.fn() }));
+vi.mock('../../lib/git', () => ({ listBranches: vi.fn() }));
 
 import { ghJson } from '../../lib/gh';
+import { listBranches } from '../../lib/git';
 import {
 	getExclusiveLabel,
 	getModelLabel,
@@ -14,6 +16,8 @@ import {
 	allocateBudget,
 	resolveMaintenanceCandidateModel,
 	findMaintenanceCandidates,
+	findTicketCandidates,
+	classifyStaleBranchPrs,
 	type MaintenanceCandidate,
 	type TicketCandidate,
 } from '../swarm-plan-batch';
@@ -278,6 +282,166 @@ describe('findMaintenanceCandidates', () => {
 		const candidates = await findMaintenanceCandidates();
 
 		expect(candidates).toEqual([]);
+	});
+});
+
+describe('classifyStaleBranchPrs', () => {
+	// Usual — a single closed-not-merged PR marks the branch as a stale leftover.
+	it('reports the closed PR number when the branch has one closed-not-merged PR', () => {
+		expect(classifyStaleBranchPrs([{ number: 610, state: 'CLOSED' }])).toEqual({ closedPrNumber: 610 });
+	});
+
+	// Structure
+	it('returns in-flight when any PR on the branch is open', () => {
+		expect(classifyStaleBranchPrs([{ number: 610, state: 'OPEN' }])).toBe('in-flight');
+	});
+
+	it('prioritises an open PR over a closed one on the same branch', () => {
+		expect(
+			classifyStaleBranchPrs([
+				{ number: 610, state: 'CLOSED' },
+				{ number: 620, state: 'OPEN' },
+			])
+		).toBe('in-flight');
+	});
+
+	it('returns excluded when the only PR is merged', () => {
+		expect(classifyStaleBranchPrs([{ number: 610, state: 'MERGED' }])).toBe('excluded');
+	});
+
+	it('returns excluded when no PR ever existed for the branch', () => {
+		expect(classifyStaleBranchPrs([])).toBe('excluded');
+	});
+
+	// Edge — a branch re-attempted more than once: report the most recent (highest-numbered) closed PR.
+	it('reports the most recent closed PR when several closed PRs exist', () => {
+		expect(
+			classifyStaleBranchPrs([
+				{ number: 610, state: 'CLOSED' },
+				{ number: 625, state: 'CLOSED' },
+			])
+		).toEqual({ closedPrNumber: 625 });
+	});
+});
+
+describe('findTicketCandidates', () => {
+	const mockGhJson = vi.mocked(ghJson);
+	const mockListBranches = vi.mocked(listBranches);
+
+	afterEach(() => {
+		mockGhJson.mockReset();
+		mockListBranches.mockReset();
+	});
+
+	const issue = {
+		number: 600,
+		title: 'Do the thing',
+		labels: [{ name: 'ready' }, { name: 'opus' }],
+		blockedBy: { nodes: [] },
+		blocking: { nodes: [] },
+	};
+
+	/**
+	 * Dispatches ghJson by the command shape so a test can supply issue-list rows, per-branch
+	 * `pr list --head` results, and `issue view` closed-by references independently, regardless of
+	 * call order across issues in the loop.
+	 */
+	function stubGh(opts: { issues?: unknown[]; branchPrs?: unknown[]; closedByPrs?: unknown[] }) {
+		mockGhJson.mockImplementation((args: string[]) => {
+			if (args[0] === 'issue' && args[1] === 'list') return Promise.resolve(opts.issues ?? []);
+			if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve(opts.branchPrs ?? []);
+			if (args[0] === 'issue' && args[1] === 'view')
+				return Promise.resolve({ closedByPullRequestsReferences: opts.closedByPrs ?? [] });
+			return Promise.resolve([]);
+		});
+	}
+
+	// Usual
+	it('surfaces an issue whose existing branch has only a closed-not-merged PR as a staleClosedPrTicket, not a candidate', async () => {
+		stubGh({ issues: [issue], branchPrs: [{ number: 610, state: 'CLOSED' }] });
+		mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+
+		const result = await findTicketCandidates(new Set());
+
+		expect(result.candidates).toEqual([]);
+		expect(result.staleClosedPrTickets).toEqual([
+			{
+				number: 600,
+				title: 'Do the thing',
+				labels: ['ready', 'opus'],
+				staleBranch: 'feature/600-do-the-thing',
+				closedPrNumber: 610,
+			},
+		]);
+	});
+
+	// Structure
+	it('excludes an issue whose existing branch has an open PR from both lists (in-flight, unchanged)', async () => {
+		stubGh({ issues: [issue], branchPrs: [{ number: 610, state: 'OPEN' }] });
+		mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+
+		const result = await findTicketCandidates(new Set());
+
+		expect(result.candidates).toEqual([]);
+		expect(result.staleClosedPrTickets).toEqual([]);
+	});
+
+	it('excludes an issue whose existing branch has a merged PR from both lists (unchanged)', async () => {
+		stubGh({ issues: [issue], branchPrs: [{ number: 610, state: 'MERGED' }] });
+		mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+
+		const result = await findTicketCandidates(new Set());
+
+		expect(result.candidates).toEqual([]);
+		expect(result.staleClosedPrTickets).toEqual([]);
+	});
+
+	it('excludes an issue whose existing branch never had a PR from both lists (unchanged)', async () => {
+		stubGh({ issues: [issue], branchPrs: [] });
+		mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+
+		const result = await findTicketCandidates(new Set());
+
+		expect(result.candidates).toEqual([]);
+		expect(result.staleClosedPrTickets).toEqual([]);
+	});
+
+	it('returns a normal candidate for an issue with no existing branch, without a per-branch PR lookup', async () => {
+		stubGh({ issues: [issue], closedByPrs: [] });
+		mockListBranches.mockResolvedValue(['feature/999-unrelated']);
+
+		const result = await findTicketCandidates(new Set());
+
+		expect(result.candidates).toEqual([
+			{ number: 600, title: 'Do the thing', labels: ['ready', 'opus'], model: 'opus', blockingCount: 0 },
+		]);
+		expect(result.staleClosedPrTickets).toEqual([]);
+		// The extra `pr list --head` lookup must not run for issues excluded by nothing (common case).
+		expect(mockGhJson).not.toHaveBeenCalledWith(expect.arrayContaining(['pr', 'list']));
+	});
+
+	// Edge
+	it('reports the most recent closed PR number when the existing branch has multiple closed PRs', async () => {
+		stubGh({
+			issues: [issue],
+			branchPrs: [
+				{ number: 610, state: 'CLOSED' },
+				{ number: 625, state: 'CLOSED' },
+			],
+		});
+		mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+
+		const result = await findTicketCandidates(new Set());
+
+		expect(result.staleClosedPrTickets).toEqual([
+			{
+				number: 600,
+				title: 'Do the thing',
+				labels: ['ready', 'opus'],
+				staleBranch: 'feature/600-do-the-thing',
+				closedPrNumber: 625,
+			},
+		]);
 	});
 });
 
