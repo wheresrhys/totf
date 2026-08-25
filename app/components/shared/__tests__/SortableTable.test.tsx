@@ -116,7 +116,7 @@ describe('SortableTable', () => {
 		it("applies a column's headerClassName to its header", () => {
 			const styledColumnConfigs: Record<keyof Row, ColumnConfig> = {
 				name: { label: 'Name' },
-				count: { label: 'Count', headerClassName: 'bg-green-100' }
+				count: { label: 'Count', headerClassName: 'bg-green-50' }
 			};
 			render(
 				<SortableTable<Row, Row>
@@ -127,10 +127,10 @@ describe('SortableTable', () => {
 				/>
 			);
 			expect(screen.getByText('Count').closest('th')?.className).toContain(
-				'bg-green-100'
+				'bg-green-50'
 			);
 			expect(screen.getByText('Name').closest('th')?.className).not.toContain(
-				'bg-green-100'
+				'bg-green-50'
 			);
 		});
 
