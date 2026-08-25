@@ -123,60 +123,99 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 	};
 }
 
-const columnConfigs = {
-	species: {
-		label: 'Species',
-		invertSort: true
-	},
-	total: {
-		label: 'Total'
-	},
-	new: {
-		label: 'New'
-	},
-	retraps: {
-		label: 'Retraps'
-	},
-	adults: {
-		label: 'Adults'
-	},
-	pullus: {
-		label: 'Pullus'
-	},
-	juvs: {
-		label: 'Juvs'
-	},
-	postjuv: {
-		label: 'Postjuv'
-	},
-	unknownAge: {
-		label: 'Unknown Age'
-	},
-	maxProvenAge: {
-		label: 'Max Proven Age'
-	}
-} as Record<keyof RowModel, ColumnConfig>;
+// A thicker border marks where the "age class" block of columns
+// (Pulli/Juv/Postjuv/Adult/Unaged) starts and ends, visually separating it
+// from the plain count columns either side.
+const ageBlockStartBorder = 'border-l-4 border-l-base-content/30';
+const ageBlockEndBorder = 'border-r-4 border-r-base-content/30';
 
-const orderedColumnProperties = Object.keys(
-	columnConfigs
-) as (keyof RowModel)[];
+// Shorthand for column configs that tint both the header and every data
+// cell in that column the same colour, so column groupings read clearly
+// top-to-bottom.
+function columnBlock(
+	className: string
+): Pick<ColumnConfig, 'headerClassName' | 'cellClassName'> {
+	return { headerClassName: className, cellClassName: className };
+}
 
-function SpeciesRow({ model }: { model: RowModel }) {
-	return orderedColumnProperties
-		.slice(1)
-		.map((prop) => <td key={prop}>{model[prop]}</td>);
+function buildColumnConfigs(
+	hasPullus: boolean
+): Partial<Record<keyof RowModel, ColumnConfig>> {
+	return {
+		species: {
+			label: 'Species',
+			invertSort: true
+		},
+		total: {
+			label: 'Total',
+			cellClassName: 'font-bold'
+		},
+		new: {
+			label: 'New',
+			...columnBlock('bg-green-50')
+		},
+		retraps: {
+			label: 'Retrap',
+			...columnBlock('bg-amber-50')
+		},
+		// Omitted entirely (rather than rendered empty) when the session
+		// caught no pulli, per issue #545.
+		...(hasPullus
+			? {
+					pullus: {
+						label: 'Pulli',
+						...columnBlock(`bg-cyan-50 ${ageBlockStartBorder}`)
+					}
+				}
+			: {}),
+		juvs: {
+			label: 'Juv',
+			// If pulli is hidden, Juv becomes the first column of the age
+			// block and inherits its thicker left border.
+			...columnBlock(`bg-sky-50 ${hasPullus ? '' : ageBlockStartBorder}`.trim())
+		},
+		postjuv: {
+			label: 'Postjuv',
+			...columnBlock('bg-blue-50')
+		},
+		adults: {
+			label: 'Adult',
+			...columnBlock('bg-purple-50')
+		},
+		unknownAge: {
+			label: 'Unaged',
+			...columnBlock(`bg-taupe-50 ${ageBlockEndBorder}`)
+		},
+		maxProvenAge: {
+			label: 'Max Proven Age'
+		}
+	};
 }
 
 function SessionTableBody({
-	data
+	data,
+	columnConfigs
 }: {
 	data: RowModelWithRawData<SpeciesWithEncounters, RowModel>[];
+	columnConfigs?: Partial<Record<keyof RowModel, ColumnConfig>>;
 }) {
+	const orderedColumnProperties = Object.keys(columnConfigs ?? {}).filter(
+		(property) => property !== 'species'
+	) as (keyof RowModel)[];
+
+	function SpeciesRow({ model }: { model: RowModel }) {
+		return orderedColumnProperties.map((prop) => (
+			<td key={prop} className={columnConfigs?.[prop]?.cellClassName}>
+				{model[prop]}
+			</td>
+		));
+	}
+
 	return (
 		<AccordionTableBody<RowModelWithRawData<SpeciesWithEncounters, RowModel>>
 			data={data}
 			getKey={(speciesWithEncounters) => speciesWithEncounters.species}
-			columnCount={6}
+			columnCount={orderedColumnProperties.length + 1}
 			FirstColumnComponent={SpeciesNameCell}
 			RestColumnsComponent={SpeciesRow}
 			ExpandedContentComponent={SpeciesDetailsTable}
@@ -281,6 +320,13 @@ export function SessionTabs({
 		new Set(['by-species'])
 	);
 	const [activeTab, setActiveTab] = useState('by-species');
+
+	const hasPullus = speciesList.some((speciesWithEncounters) =>
+		speciesWithEncounters.encounters.some(
+			(encounter) => getAgeClass(encounter) === 'pullus'
+		)
+	);
+	const columnConfigs = buildColumnConfigs(hasPullus);
 
 	return (
 		<>

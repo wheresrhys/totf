@@ -110,7 +110,7 @@ describe('SessionTabs', () => {
 	});
 
 	describe('juvs/pullus/postjuv columns', () => {
-		it('counts an age-1, is_juv-true encounter in the juvs column', () => {
+		it('counts an age-1, is_juv-true encounter in the juv column', () => {
 			const encounter = makeEncounter(10, 'Wren', '10:00:00', 0, {
 				age_code: 1,
 				is_juv: true
@@ -121,12 +121,11 @@ describe('SessionTabs', () => {
 					netRounds={[]}
 				/>
 			);
-			expect(columnCellValue('Juvs', 'Wren')).toBe('1');
-			expect(columnCellValue('Pullus', 'Wren')).toBe('0');
+			expect(columnCellValue('Juv', 'Wren')).toBe('1');
 			expect(columnCellValue('Postjuv', 'Wren')).toBe('0');
 		});
 
-		it('counts an age-3, is_juv-true encounter in the juvs column', () => {
+		it('counts an age-3, is_juv-true encounter in the juv column', () => {
 			const encounter = makeEncounter(11, 'Dunnock', '10:00:00', 0, {
 				age_code: 3,
 				is_juv: true
@@ -137,12 +136,11 @@ describe('SessionTabs', () => {
 					netRounds={[]}
 				/>
 			);
-			expect(columnCellValue('Juvs', 'Dunnock')).toBe('1');
-			expect(columnCellValue('Pullus', 'Dunnock')).toBe('0');
+			expect(columnCellValue('Juv', 'Dunnock')).toBe('1');
 			expect(columnCellValue('Postjuv', 'Dunnock')).toBe('0');
 		});
 
-		it('counts an age-1, is_juv-false (pulli) encounter in the new pullus column, not juvs', () => {
+		it('counts an age-1, is_juv-false (pulli) encounter in the pulli column, not juv', () => {
 			const encounter = makeEncounter(12, 'Swallow', '10:00:00', 0, {
 				age_code: 1,
 				is_juv: false
@@ -153,11 +151,11 @@ describe('SessionTabs', () => {
 					netRounds={[]}
 				/>
 			);
-			expect(columnCellValue('Pullus', 'Swallow')).toBe('1');
-			expect(columnCellValue('Juvs', 'Swallow')).toBe('0');
+			expect(columnCellValue('Pulli', 'Swallow')).toBe('1');
+			expect(columnCellValue('Juv', 'Swallow')).toBe('0');
 		});
 
-		it('counts an age-3, is_juv-false (bare 3) encounter in the new postjuv column, not juvs', () => {
+		it('counts an age-3, is_juv-false (bare 3) encounter in the postjuv column, not juv', () => {
 			const encounter = makeEncounter(13, 'Chaffinch', '10:00:00', 0, {
 				age_code: 3,
 				is_juv: false
@@ -169,7 +167,126 @@ describe('SessionTabs', () => {
 				/>
 			);
 			expect(columnCellValue('Postjuv', 'Chaffinch')).toBe('1');
-			expect(columnCellValue('Juvs', 'Chaffinch')).toBe('0');
+			expect(columnCellValue('Juv', 'Chaffinch')).toBe('0');
+		});
+	});
+
+	describe('column headings', () => {
+		it('renders the full heading row in the specified order when the session caught pulli', () => {
+			const pulliEncounter = makeEncounter(20, 'Robin', '10:00:00', 0, {
+				age_code: 1,
+				is_juv: false
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Robin', encounters: [pulliEncounter] }]}
+					netRounds={[]}
+				/>
+			);
+			expect(
+				screen.getAllByRole('columnheader').map((header) => header.textContent)
+			).toEqual([
+				'Species',
+				'Total',
+				'New',
+				'Retrap',
+				'Pulli',
+				'Juv',
+				'Postjuv',
+				'Adult',
+				'Unaged',
+				'Max Proven Age'
+			]);
+		});
+	});
+
+	describe('pulli column visibility', () => {
+		it('hides the Pulli column when the session caught no pulli', () => {
+			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			expect(
+				screen.getAllByRole('columnheader').map((header) => header.textContent)
+			).not.toContain('Pulli');
+		});
+
+		it('shows the Pulli column when at least one species in the session caught pulli', () => {
+			const pulliEncounter = makeEncounter(21, 'Robin', '10:00:00', 0, {
+				age_code: 1,
+				is_juv: false
+			});
+			render(
+				<SessionTabs
+					speciesList={[
+						...speciesList,
+						{ species: 'Wren', encounters: [pulliEncounter] }
+					]}
+					netRounds={netRounds}
+				/>
+			);
+			expect(
+				screen.getAllByRole('columnheader').map((header) => header.textContent)
+			).toContain('Pulli');
+		});
+	});
+
+	describe('column styling', () => {
+		it('renders the Total value in bold', () => {
+			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			const headers = screen.getAllByRole('columnheader');
+			const totalIndex = headers.findIndex(
+				(header) => header.textContent === 'Total'
+			);
+			const robinRow = screen.getByText('Robin').closest('tr') as HTMLElement;
+			const cells = within(robinRow).getAllByRole('cell');
+			expect(cells[totalIndex].className).toContain('font-bold');
+		});
+
+		it('applies a distinct background colour to each of the New/Retrap/Juv/Postjuv/Adult/Unaged columns', () => {
+			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			const headers = screen.getAllByRole('columnheader');
+			const backgroundClassFor = (label: string) =>
+				headers.find((header) => header.textContent === label)?.className;
+			expect(backgroundClassFor('New')).toContain('bg-green-50');
+			expect(backgroundClassFor('Retrap')).toContain('bg-amber-50');
+			expect(backgroundClassFor('Juv')).toContain('bg-sky-50');
+			expect(backgroundClassFor('Postjuv')).toContain('bg-blue-50');
+			expect(backgroundClassFor('Adult')).toContain('bg-purple-50');
+			expect(backgroundClassFor('Unaged')).toContain('bg-taupe-50');
+		});
+
+		it('draws a thicker left border on Juv (as the first age-class column) when Pulli is hidden', () => {
+			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			const headers = screen.getAllByRole('columnheader');
+			const juvHeader = headers.find((header) => header.textContent === 'Juv');
+			expect(juvHeader?.className).toContain('border-l-4');
+		});
+
+		it('draws a thicker left border on Pulli (not Juv) when Pulli is shown', () => {
+			const pulliEncounter = makeEncounter(22, 'Robin', '10:00:00', 0, {
+				age_code: 1,
+				is_juv: false
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Robin', encounters: [pulliEncounter] }]}
+					netRounds={[]}
+				/>
+			);
+			const headers = screen.getAllByRole('columnheader');
+			const pulliHeader = headers.find(
+				(header) => header.textContent === 'Pulli'
+			);
+			const juvHeader = headers.find((header) => header.textContent === 'Juv');
+			expect(pulliHeader?.className).toContain('border-l-4');
+			expect(juvHeader?.className).not.toContain('border-l-4');
+		});
+
+		it('draws a thicker right border on the Unaged column', () => {
+			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			const headers = screen.getAllByRole('columnheader');
+			const unagedHeader = headers.find(
+				(header) => header.textContent === 'Unaged'
+			);
+			expect(unagedHeader?.className).toContain('border-r-4');
 		});
 	});
 });
