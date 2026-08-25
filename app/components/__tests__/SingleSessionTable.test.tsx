@@ -245,12 +245,12 @@ describe('SessionTabs', () => {
 			const headers = screen.getAllByRole('columnheader');
 			const backgroundClassFor = (label: string) =>
 				headers.find((header) => header.textContent === label)?.className;
-			expect(backgroundClassFor('New')).toContain('bg-green-100');
-			expect(backgroundClassFor('Retrap')).toContain('bg-amber-100');
-			expect(backgroundClassFor('Juv')).toContain('bg-sky-100');
-			expect(backgroundClassFor('Postjuv')).toContain('bg-blue-100');
-			expect(backgroundClassFor('Adult')).toContain('bg-purple-100');
-			expect(backgroundClassFor('Unaged')).toContain('bg-taupe-100');
+			expect(backgroundClassFor('New')).toContain('bg-green-50');
+			expect(backgroundClassFor('Retrap')).toContain('bg-amber-50');
+			expect(backgroundClassFor('Juv')).toContain('bg-sky-50');
+			expect(backgroundClassFor('Postjuv')).toContain('bg-blue-50');
+			expect(backgroundClassFor('Adult')).toContain('bg-purple-50');
+			expect(backgroundClassFor('Unaged')).toContain('bg-taupe-50');
 		});
 
 		it('draws a thicker left border on Juv (as the first age-class column) when Pulli is hidden', () => {
