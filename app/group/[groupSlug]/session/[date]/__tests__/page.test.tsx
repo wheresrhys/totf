@@ -227,6 +227,76 @@ describe('session detail page', () => {
 		expect(stats.textContent).toContain('1 retraps');
 	});
 
+	it('counts a pulli-age resighting encounter (age 1, not is_juv) in the new pullus badge, not the juvs badge', async () => {
+		const client = makeSessionClient([
+			makeChain(mockSessions),
+			makeChain(mockPreviousSession),
+			makeChain(mockNextSession),
+			makeChain([
+				{
+					id: 10,
+					session_id: 1,
+					age_code: 1,
+					is_juv: false,
+					breeding_condition: null,
+					capture_time: '09:00:00',
+					moult_code: null,
+					record_type: 'S',
+					ringing_group_id: 1,
+					sex: 'F',
+					sexing_method: null,
+					weight: null,
+					wing_length: null,
+					bird: {
+						ring_no: 'PUL001',
+						proven_age: 1,
+						species: { id: 1, species_name: 'Robin' }
+					}
+				}
+			])
+		]);
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+		render(await renderPage());
+		const stats = await screen.findByTestId('session-stats');
+		expect(stats.textContent).toContain('1 pullus');
+		expect(stats.textContent).toContain('0 juvs');
+	});
+
+	it('counts a bare age-3 encounter in the new postjuv badge, not the juvs badge', async () => {
+		const client = makeSessionClient([
+			makeChain(mockSessions),
+			makeChain(mockPreviousSession),
+			makeChain(mockNextSession),
+			makeChain([
+				{
+					id: 11,
+					session_id: 1,
+					age_code: 3,
+					is_juv: false,
+					breeding_condition: null,
+					capture_time: '09:15:00',
+					moult_code: null,
+					record_type: 'N',
+					ringing_group_id: 1,
+					sex: 'U',
+					sexing_method: null,
+					weight: null,
+					wing_length: null,
+					bird: {
+						ring_no: 'PJV001',
+						proven_age: 1,
+						species: { id: 1, species_name: 'Robin' }
+					}
+				}
+			])
+		]);
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+		render(await renderPage());
+		const stats = await screen.findByTestId('session-stats');
+		expect(stats.textContent).toContain('1 postjuv');
+		expect(stats.textContent).toContain('0 juvs');
+	});
+
 	it('renders session chronology stats', async () => {
 		render(await renderPage());
 		const stats = await screen.findByTestId('session-stats');

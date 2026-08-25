@@ -6,6 +6,7 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionEncounter } from '@/app/models/session';
 import type { LocationRow, SessionRow } from '@/app/models/db';
+import { getAgeClass } from '@/app/models/encounter';
 import {
 	BadgeList,
 	PageWrapper,
@@ -310,7 +311,9 @@ export function SessionSummary({
 						`${dayData.encounters.filter((encounter) => encounter.record_type === 'N').length} new`,
 						`${dayData.encounters.filter((encounter) => encounter.record_type === 'S').length} retraps`,
 						`${dayData.encounters.filter((encounter) => encounter.age_code > 3).length} adults`,
-						`${dayData.encounters.filter((encounter) => [1, 3].includes(encounter.age_code)).length} juvs`,
+						`${dayData.encounters.filter((encounter) => getAgeClass(encounter) === 'pullus').length} pullus`,
+						`${dayData.encounters.filter((encounter) => getAgeClass(encounter) === 'juv').length} juvs`,
+						`${dayData.encounters.filter((encounter) => getAgeClass(encounter) === 'postjuv').length} postjuv`,
 						`${dayData.encounters.filter((encounter) => encounter.age_code === 2).length} unknown age`,
 						`Start: ${chronology.startTime ? chronology.startTime.slice(0, 5) : '–'}`,
 						`End: ${chronology.endTime ? chronology.endTime.slice(0, 5) : '–'}`,

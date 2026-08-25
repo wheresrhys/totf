@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { type SessionEncounter } from '@/app/models/session';
 import { type NetRound } from '@/app/models/session-chronology';
+import { getAgeClass } from '@/app/models/encounter';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { InlineTable } from './shared/DesignSystem';
 import { AccordionTableBody } from './shared/AccordionTableBody';
@@ -87,7 +88,9 @@ type RowModel = {
 	new: number;
 	retraps: number;
 	adults: number;
+	pullus: number;
 	juvs: number;
+	postjuv: number;
 	unknownAge: number;
 	maxProvenAge: number;
 };
@@ -103,8 +106,14 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 		).length,
 		adults: data.encounters.filter((encounter) => encounter.age_code > 3)
 			.length,
-		juvs: data.encounters.filter((encounter) =>
-			[1, 3].includes(encounter.age_code)
+		pullus: data.encounters.filter(
+			(encounter) => getAgeClass(encounter) === 'pullus'
+		).length,
+		juvs: data.encounters.filter(
+			(encounter) => getAgeClass(encounter) === 'juv'
+		).length,
+		postjuv: data.encounters.filter(
+			(encounter) => getAgeClass(encounter) === 'postjuv'
 		).length,
 		unknownAge: data.encounters.filter((encounter) => encounter.age_code === 2)
 			.length,
@@ -131,8 +140,14 @@ const columnConfigs = {
 	adults: {
 		label: 'Adults'
 	},
+	pullus: {
+		label: 'Pullus'
+	},
 	juvs: {
 		label: 'Juvs'
+	},
+	postjuv: {
+		label: 'Postjuv'
 	},
 	unknownAge: {
 		label: 'Unknown Age'
