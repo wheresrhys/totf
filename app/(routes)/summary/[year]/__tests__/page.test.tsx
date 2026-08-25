@@ -1,12 +1,16 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
-import Page from '../page';
+import Page, { fetchYearSummaryData } from '../page';
 
 vi.mock('@/lib/underlying-stats', () => ({
 	fetchSessionStats: vi.fn().mockResolvedValue({
 		daySpeciesStats: [],
 		sessionDates: ['2025-04-01', '2026-01-05', '2026-06-30']
 	})
+}));
+
+vi.mock('@/app/actions/spp-data', () => ({
+	fetchSpeciesData: vi.fn().mockResolvedValue([])
 }));
 
 describe('/summary/[year]', () => {
@@ -41,5 +45,15 @@ describe('/summary/[year]', () => {
 			'/group/alpha/session-temp/2026-01-05',
 			'/group/alpha/session-temp/2026-06-30'
 		]);
+	});
+
+	it('fetchYearSummaryData calls fetchSpeciesData with `${year}-01-01` to `${year}-12-31`', async () => {
+		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+		await fetchYearSummaryData({ year: '2026' }, 1);
+		expect(fetchSpeciesData).toHaveBeenCalledWith(
+			1,
+			'2026-01-01',
+			'2026-12-31'
+		);
 	});
 });

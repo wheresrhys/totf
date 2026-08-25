@@ -1,16 +1,24 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { fetchSessionStats } from '@/lib/underlying-stats';
+import { fetchSpeciesData } from '@/app/actions/spp-data';
 import type { ViewedGroup } from '@/lib/group-slug';
+import type { AggregateStatsResult } from '@/app/models/db';
 import { SummaryPage as SummaryPageContent } from './_shared';
 
-export type PageData = { sessionDates: string[] };
+export type PageData = {
+	sessionDates: string[];
+	speciesStats: AggregateStatsResult[];
+};
 
 export async function fetchAllTimeSummaryData(
 	_params: Record<string, string>,
 	viewedGroupId: number
 ): Promise<PageData> {
-	const { sessionDates } = await fetchSessionStats(viewedGroupId);
-	return { sessionDates };
+	const [{ sessionDates }, speciesStats] = await Promise.all([
+		fetchSessionStats(viewedGroupId),
+		fetchSpeciesData(viewedGroupId)
+	]);
+	return { sessionDates, speciesStats };
 }
 
 function AllTimeSummary({
@@ -23,6 +31,7 @@ function AllTimeSummary({
 	return (
 		<SummaryPageContent
 			sessionDates={data.sessionDates}
+			speciesStats={data.speciesStats}
 			viewedGroup={viewedGroup}
 		/>
 	);

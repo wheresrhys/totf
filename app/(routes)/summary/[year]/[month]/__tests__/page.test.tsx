@@ -1,12 +1,16 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
-import Page from '../page';
+import Page, { fetchYearMonthSummaryData } from '../page';
 
 vi.mock('@/lib/underlying-stats', () => ({
 	fetchSessionStats: vi.fn().mockResolvedValue({
 		daySpeciesStats: [],
 		sessionDates: ['2026-07-30', '2026-08-01', '2026-08-15', '2026-09-01']
 	})
+}));
+
+vi.mock('@/app/actions/spp-data', () => ({
+	fetchSpeciesData: vi.fn().mockResolvedValue([])
 }));
 
 describe('/summary/[year]/[month]', () => {
@@ -68,5 +72,25 @@ describe('/summary/[year]/[month]', () => {
 			'/group/alpha/session-temp/2026-08-01',
 			'/group/alpha/session-temp/2026-08-15'
 		]);
+	});
+
+	it("fetchYearMonthSummaryData calls fetchSpeciesData with the month's first and last calendar day", async () => {
+		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+		await fetchYearMonthSummaryData({ year: '2026', month: '08' }, 1);
+		expect(fetchSpeciesData).toHaveBeenCalledWith(
+			1,
+			'2026-08-01',
+			'2026-08-31'
+		);
+	});
+
+	it('computes correct month bounds for December (year-end month)', async () => {
+		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+		await fetchYearMonthSummaryData({ year: '2026', month: '12' }, 1);
+		expect(fetchSpeciesData).toHaveBeenCalledWith(
+			1,
+			'2026-12-01',
+			'2026-12-31'
+		);
 	});
 });
