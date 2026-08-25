@@ -1,25 +1,40 @@
+import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { fetchSessionStats } from '@/lib/underlying-stats';
+import { fetchSpeciesData } from '@/app/actions/spp-data';
 import type { ViewedGroup } from '@/lib/group-slug';
+import type { AggregateStatsResult } from '@/app/models/db';
 import { SummaryPage as SummaryPageContent } from '../../_shared';
 
 export type PageParams = { year: string; month: string };
 type PageProps = { params: Promise<PageParams> };
 
-export type PageData = { year: number; month: number; sessionDates: string[] };
+export type PageData = {
+	year: number;
+	month: number;
+	sessionDates: string[];
+	speciesStats: AggregateStatsResult[];
+};
 
 export async function fetchYearMonthSummaryData(
 	{ year, month }: PageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
-	const { sessionDates } = await fetchSessionStats(viewedGroupId);
+	const monthDate = new Date(Number(year), Number(month) - 1, 1);
+	const fromDate = format(startOfMonth(monthDate), 'yyyy-MM-dd');
+	const toDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
+	const [{ sessionDates }, speciesStats] = await Promise.all([
+		fetchSessionStats(viewedGroupId),
+		fetchSpeciesData(viewedGroupId, fromDate, toDate)
+	]);
 	const monthPrefix = `${year}-${String(Number(month)).padStart(2, '0')}`;
 	return {
 		year: Number(year),
 		month: Number(month),
 		sessionDates: sessionDates.filter(
 			(date) => date.slice(0, 7) === monthPrefix
-		)
+		),
+		speciesStats
 	};
 }
 
@@ -35,6 +50,7 @@ function YearMonthSummary({
 			year={data.year}
 			month={data.month}
 			sessionDates={data.sessionDates}
+			speciesStats={data.speciesStats}
 			viewedGroup={viewedGroup}
 		/>
 	);

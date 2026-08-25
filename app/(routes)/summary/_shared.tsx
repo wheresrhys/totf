@@ -4,16 +4,20 @@ import {
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { SessionLinksList } from '@/app/components/SessionLinksList';
+import { SpeciesTotalsSection } from '@/app/components/SpeciesTotalsSection';
 import { type ViewedGroup } from '@/lib/group-slug';
+import type { AggregateStatsResult } from '@/app/models/db';
 export function SummaryPage({
 	year,
 	month,
 	sessionDates = [],
+	speciesStats = [],
 	viewedGroup
 }: {
 	year?: number;
 	month?: number;
 	sessionDates?: string[];
+	speciesStats?: AggregateStatsResult[];
 	viewedGroup?: ViewedGroup;
 }) {
 	return (
@@ -25,6 +29,7 @@ export function SummaryPage({
 					viewedGroup={viewedGroup}
 				/>
 			)}
+			<SpeciesTotalsSection speciesStats={speciesStats} />
 		</PageWrapper>
 	);
 }

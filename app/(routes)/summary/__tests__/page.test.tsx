@@ -1,12 +1,16 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
-import Page from '../page';
+import Page, { fetchAllTimeSummaryData } from '../page';
 
 vi.mock('@/lib/underlying-stats', () => ({
 	fetchSessionStats: vi.fn().mockResolvedValue({
 		daySpeciesStats: [],
 		sessionDates: ['2025-04-01', '2026-01-05']
 	})
+}));
+
+vi.mock('@/app/actions/spp-data', () => ({
+	fetchSpeciesData: vi.fn().mockResolvedValue([])
 }));
 
 describe('/summary (all-time)', () => {
@@ -24,5 +28,11 @@ describe('/summary (all-time)', () => {
 		render(await Page());
 		await screen.findByRole('heading', { level: 1 });
 		expect(screen.getAllByRole('link')).toHaveLength(2);
+	});
+
+	it('fetchAllTimeSummaryData calls fetchSpeciesData with no date bounds', async () => {
+		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+		await fetchAllTimeSummaryData({}, 1);
+		expect(fetchSpeciesData).toHaveBeenCalledWith(1);
 	});
 });
