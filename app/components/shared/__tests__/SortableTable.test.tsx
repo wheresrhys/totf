@@ -111,4 +111,65 @@ describe('SortableTable', () => {
 		const rows = document.querySelectorAll('tbody tr');
 		expect(rows[0].textContent).toContain('Robin');
 	});
+
+	describe('per-column styling', () => {
+		it("applies a column's headerClassName to its header", () => {
+			const styledColumnConfigs: Record<keyof Row, ColumnConfig> = {
+				name: { label: 'Name' },
+				count: { label: 'Count', headerClassName: 'bg-green-100' }
+			};
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={styledColumnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			expect(screen.getByText('Count').closest('th')?.className).toContain(
+				'bg-green-100'
+			);
+			expect(screen.getByText('Name').closest('th')?.className).not.toContain(
+				'bg-green-100'
+			);
+		});
+
+		it('omits a RowModel key from columnConfigs to hide its column entirely', () => {
+			const partialColumnConfigs: Partial<Record<keyof Row, ColumnConfig>> = {
+				name: { label: 'Name' }
+			};
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={partialColumnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			expect(screen.queryByText('Count')).toBeNull();
+		});
+
+		it('passes columnConfigs through to TableBodyComponent so it can look up per-column cell styling', () => {
+			let receivedColumnConfigs: unknown;
+			function CapturingBody({
+				data,
+				columnConfigs: bodyColumnConfigs
+			}: {
+				data: RowModelWithRawData<Row, Row>[];
+				columnConfigs?: Partial<Record<keyof Row, ColumnConfig>>;
+			}) {
+				receivedColumnConfigs = bodyColumnConfigs;
+				return <SimpleBody data={data} />;
+			}
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={columnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					TableBodyComponent={CapturingBody}
+				/>
+			);
+			expect(receivedColumnConfigs).toBe(columnConfigs);
+		});
+	});
 });

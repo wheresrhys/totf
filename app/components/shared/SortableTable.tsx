@@ -6,6 +6,13 @@ export type ColumnConfig = {
 	label: string;
 	invertSort?: boolean;
 	formatter?: (value: unknown) => string;
+	// Applied to the column's <th>, letting callers group/emphasise columns
+	// (background colour, thicker borders, etc.) via the same config object
+	// used to describe the column, rather than a parallel styling mechanism.
+	headerClassName?: string;
+	// Applied to each <td> a TableBodyComponent renders for this column (the
+	// component receives columnConfigs alongside data so it can look this up).
+	cellClassName?: string;
 };
 
 export type RowModelWithRawData<RawRowData, RowModel> = RowModel & {
@@ -13,10 +20,10 @@ export type RowModelWithRawData<RawRowData, RowModel> = RowModel & {
 };
 
 export function getFormattedValue<RowModel>(
-	columnConfigs: Record<keyof RowModel, ColumnConfig>
+	columnConfigs: Partial<Record<keyof RowModel, ColumnConfig>>
 ) {
 	return (rawValue: unknown, property: keyof RowModel) => {
-		const formatter = columnConfigs[property].formatter as (
+		const formatter = columnConfigs[property]?.formatter as (
 			value: unknown
 		) => string;
 		return formatter ? formatter(rawValue) : (rawValue as string);
@@ -24,13 +31,16 @@ export function getFormattedValue<RowModel>(
 }
 
 type SortableTableProps<RawRowData, RowModel> = {
-	columnConfigs: Record<keyof RowModel, ColumnConfig>;
+	// Partial: callers may omit a RowModel key entirely to hide that column
+	// (e.g. the Pulli column when a session caught no pulli).
+	columnConfigs: Partial<Record<keyof RowModel, ColumnConfig>>;
 	data: RawRowData[];
 	rowDataTransform: (modelData: RawRowData) => RowModel;
 	testId?: string;
 	initialSortColumn?: keyof RowModel;
 	TableBodyComponent: React.ComponentType<{
 		data: RowModelWithRawData<RawRowData, RowModel>[];
+		columnConfigs?: Partial<Record<keyof RowModel, ColumnConfig>>;
 	}>;
 };
 
@@ -57,7 +67,7 @@ export function SortableTable<RawRowData, RowModel>({
 	);
 	const [sortIsInverted, setSortIsInverted] = useState<boolean>(
 		initialSortColumn
-			? columnConfigs[initialSortColumn].invertSort || false
+			? columnConfigs[initialSortColumn]?.invertSort || false
 			: false
 	);
 
@@ -67,7 +77,7 @@ export function SortableTable<RawRowData, RowModel>({
 		} else {
 			setSortColumn(property);
 			// TODO hideously inefficient
-			setSortIsInverted(columnConfigs[property].invertSort || false);
+			setSortIsInverted(columnConfigs[property]?.invertSort || false);
 			setSortDirection('desc');
 		}
 	}
@@ -107,7 +117,7 @@ export function SortableTable<RawRowData, RowModel>({
 				<tr>
 					{orderedColumns.map((column) => (
 						<th
-							className="text-wrap cursor-pointer"
+							className={`text-wrap cursor-pointer ${column.headerClassName ?? ''}`}
 							key={column.property as string}
 							onClick={() => handleColumnClick(column.property)}
 						>
@@ -123,7 +133,7 @@ export function SortableTable<RawRowData, RowModel>({
 					))}
 				</tr>
 			</thead>
-			<TableBodyComponent data={sortedData} />
+			<TableBodyComponent data={sortedData} columnConfigs={columnConfigs} />
 		</Table>
 	);
 }

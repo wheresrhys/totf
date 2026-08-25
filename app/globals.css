@@ -3,3 +3,9 @@
 @plugin "@iconify/tailwind4";
 @import 'flyonui/variants.css';
 @source "./node_modules/flyonui/flyonui.js";
+
+@theme {
+	/* Not part of Tailwind's default palette - added for the "Unaged" column
+	   background in the per-session species table (issue #545). */
+	--color-taupe-100: #ede3d8;
+}
