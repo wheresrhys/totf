@@ -104,8 +104,9 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 		retraps: data.encounters.filter(
 			(encounter) => encounter.record_type === 'S'
 		).length,
-		adults: data.encounters.filter((encounter) => encounter.age_code > 3)
-			.length,
+		adults: data.encounters.filter(
+			(encounter) => getAgeClass(encounter) === 'adult'
+		).length,
 		pullus: data.encounters.filter(
 			(encounter) => getAgeClass(encounter) === 'pullus'
 		).length,

@@ -140,6 +140,21 @@ describe('SessionTabs', () => {
 			expect(columnCellValue('Postjuv', 'Dunnock')).toBe('0');
 		});
 
+		it('counts an age-code-greater-than-3, is_juv-true encounter in the juv column, not the adult column', () => {
+			const encounter = makeEncounter(14, 'Starling', '10:00:00', 0, {
+				age_code: 5,
+				is_juv: true
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Starling', encounters: [encounter] }]}
+					netRounds={[]}
+				/>
+			);
+			expect(columnCellValue('Juv', 'Starling')).toBe('1');
+			expect(columnCellValue('Adult', 'Starling')).toBe('0');
+		});
+
 		it('counts an age-1, is_juv-false (pulli) encounter in the pulli column, not juv', () => {
 			const encounter = makeEncounter(12, 'Swallow', '10:00:00', 0, {
 				age_code: 1,
