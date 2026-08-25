@@ -1,7 +1,10 @@
 'use server';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import type { EncounterOfBird } from '@/app/models/bird';
+import {
+	orderEncountersByRecency,
+	type EncounterOfBird
+} from '@/app/models/bird';
 
 export async function fetchBirdEncounters(
 	ringNo: string
@@ -18,7 +21,7 @@ export async function fetchBirdEncounters(
 		return [];
 	}
 
-	return supabase
+	const encounters = (await supabase
 		.from('Encounters')
 		.select(
 			`
@@ -43,5 +46,7 @@ export async function fetchBirdEncounters(
 		`
 		)
 		.eq('bird_id', bird.id)
-		.then(catchSupabaseErrors) as Promise<EncounterOfBird[]>;
+		.then(catchSupabaseErrors)) as EncounterOfBird[];
+
+	return orderEncountersByRecency(encounters, 'desc');
 }
