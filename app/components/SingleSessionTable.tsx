@@ -152,11 +152,11 @@ function buildColumnConfigs(
 		},
 		new: {
 			label: 'New',
-			...columnBlock('bg-green-100')
+			...columnBlock('bg-green-50')
 		},
 		retraps: {
 			label: 'Retrap',
-			...columnBlock('bg-amber-100')
+			...columnBlock('bg-amber-50')
 		},
 		// Omitted entirely (rather than rendered empty) when the session
 		// caught no pulli, per issue #545.
@@ -164,7 +164,7 @@ function buildColumnConfigs(
 			? {
 					pullus: {
 						label: 'Pulli',
-						...columnBlock(`bg-cyan-100 ${ageBlockStartBorder}`)
+						...columnBlock(`bg-cyan-50 ${ageBlockStartBorder}`)
 					}
 				}
 			: {}),
@@ -173,20 +173,20 @@ function buildColumnConfigs(
 			// If pulli is hidden, Juv becomes the first column of the age
 			// block and inherits its thicker left border.
 			...columnBlock(
-				`bg-sky-100 ${hasPullus ? '' : ageBlockStartBorder}`.trim()
+				`bg-sky-50 ${hasPullus ? '' : ageBlockStartBorder}`.trim()
 			)
 		},
 		postjuv: {
 			label: 'Postjuv',
-			...columnBlock('bg-blue-100')
+			...columnBlock('bg-blue-50')
 		},
 		adults: {
 			label: 'Adult',
-			...columnBlock('bg-purple-100')
+			...columnBlock('bg-purple-50')
 		},
 		unknownAge: {
 			label: 'Unaged',
-			...columnBlock(`bg-taupe-100 ${ageBlockEndBorder}`)
+			...columnBlock(`bg-taupe-50 ${ageBlockEndBorder}`)
 		},
 		maxProvenAge: {
 			label: 'Max Proven Age'
