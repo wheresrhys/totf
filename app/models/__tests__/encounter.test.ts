@@ -17,8 +17,8 @@ describe('getAgeClass', () => {
 	});
 
 	describe('structure — age_code branches', () => {
-		it('returns 1st-year for age_code 3 with is_juv false (bare 3)', () => {
-			expect(getAgeClass({ age_code: 3, is_juv: false })).toBe('1st-year');
+		it('returns postjuv for age_code 3 with is_juv false (bare 3)', () => {
+			expect(getAgeClass({ age_code: 3, is_juv: false })).toBe('postjuv');
 		});
 
 		it('returns adult for age_code greater than 3 (e.g. 6)', () => {
