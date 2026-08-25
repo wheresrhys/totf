@@ -1034,6 +1034,8 @@ describe('Postgres RPC integration tests', () => {
 				visit_date: '2021-06-20',
 				encounter_count: 1,
 				juv_count: 0,
+				postjuv_count: 1,
+				pullus_count: 0,
 				weighed_birds_count: 1,
 				min_weight: 18.5,
 				max_weight: 18.5,
@@ -1043,6 +1045,8 @@ describe('Postgres RPC integration tests', () => {
 				visit_date: '2021-06-20',
 				encounter_count: 1,
 				juv_count: 0,
+				postjuv_count: 1,
+				pullus_count: 0,
 				weighed_birds_count: 1,
 				min_weight: 9,
 				max_weight: 9,
@@ -1063,6 +1067,8 @@ describe('Postgres RPC integration tests', () => {
 				visit_date: '2022-06-15',
 				encounter_count: 6,
 				juv_count: 0,
+				postjuv_count: 3,
+				pullus_count: 0,
 				weighed_birds_count: 6,
 				min_weight: 16.5,
 				max_weight: 20.5,
@@ -1083,6 +1089,8 @@ describe('Postgres RPC integration tests', () => {
 				visit_date: '2023-06-01',
 				encounter_count: 2,
 				juv_count: 0,
+				postjuv_count: 2,
+				pullus_count: 0,
 				weighed_birds_count: 2,
 				min_weight: 18.5,
 				max_weight: 20,
@@ -1092,6 +1100,8 @@ describe('Postgres RPC integration tests', () => {
 				visit_date: '2023-06-01',
 				encounter_count: 1,
 				juv_count: 0,
+				postjuv_count: 0,
+				pullus_count: 0,
 				weighed_birds_count: 1,
 				min_weight: 18.5,
 				max_weight: 18.5,
@@ -1213,6 +1223,8 @@ describe('Postgres RPC integration tests', () => {
 					visit_date: visitDates[0],
 					encounter_count: 2,
 					juv_count: 0,
+					postjuv_count: 0,
+					pullus_count: 2,
 					weighed_birds_count: 1,
 					min_weight: 15,
 					max_weight: 15,
@@ -1231,6 +1243,8 @@ describe('Postgres RPC integration tests', () => {
 					visit_date: visitDates[1],
 					encounter_count: 1,
 					juv_count: 0,
+					postjuv_count: 0,
+					pullus_count: 1,
 					weighed_birds_count: 0,
 					min_weight: null,
 					max_weight: null,
@@ -1345,6 +1359,219 @@ describe('Postgres RPC integration tests', () => {
 					visit_date: visitDate,
 					encounter_count: 5,
 					juv_count: 3,
+				});
+			});
+		});
+
+		describe('juv_count/postjuv_count/pullus_count age-class split', () => {
+			// Mirrors getAgeClass() in app/models/encounter.ts (#527): juv = age 1 or 3 with
+			// is_juv true (1J/3J), postjuv = bare age 3 (is_juv false), pullus = age 1 with
+			// is_juv false. Insert one Delta-group Robin encounter per bucket, plus an age-5
+			// (adult) encounter with is_juv true to guard against the old "any is_juv truthy"
+			// bug re-appearing, and clean up after.
+			let deltaId: number;
+			let deltaClient: SupabaseClient;
+			let locationId: number;
+			let sessionId: number;
+			let birdIds: number[];
+			let visitDate: string;
+
+			beforeAll(async () => {
+				deltaId = await getGroupIdByName('Delta');
+				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+				const testSuffix = randomTestSuffix();
+				// Randomised so concurrent test runs (separate worktrees, same shared local
+				// Supabase instance) never combine their rows into the same
+				// stats_per_day_and_species aggregate row.
+				visitDate = randomFutureDate();
+
+				const { data: species } = await supabase
+					.from('Species')
+					.select('id')
+					.eq('species_name', 'Robin')
+					.single();
+
+				const { data: location, error: locationError } = await deltaClient
+					.from('Locations')
+					.insert({
+						location_name: `Age Class Stats Test Location ${testSuffix}`,
+						ringing_group_id: deltaId,
+					})
+					.select('id')
+					.single();
+				if (locationError) throw locationError;
+				locationId = location!.id;
+
+				const { data: session, error: sessionError } = await deltaClient
+					.from('Sessions')
+					.insert({ visit_date: visitDate, location_id: locationId })
+					.select('id')
+					.single();
+				if (sessionError) throw sessionError;
+				sessionId = session!.id;
+
+				const birds = await Promise.all(
+					[
+						`AGECLASSTEST1-${testSuffix}`, // age 1, is_juv true (1J) -> juv
+						`AGECLASSTEST2-${testSuffix}`, // age 3, is_juv true (3J) -> juv
+						`AGECLASSTEST3-${testSuffix}`, // age 1, is_juv false (pulli) -> pullus
+						`AGECLASSTEST4-${testSuffix}`, // age 3, is_juv false (bare 3) -> postjuv
+						`AGECLASSTEST5-${testSuffix}`, // age 5, is_juv true -> none of the three
+					].map((ringNo) =>
+						deltaClient
+							.from('Birds')
+							.insert({ ring_no: ringNo, species_id: species!.id })
+							.select('id')
+							.single()
+					)
+				);
+				birds.forEach(({ error }) => {
+					if (error) throw error;
+				});
+				birdIds = birds.map(({ data }) => data!.id);
+
+				const baseEncounter = {
+					capture_time: '10:00:00',
+					scheme: 'BTO',
+					sex: 'M',
+					record_type: 'N',
+					session_id: sessionId,
+				};
+				const { error: encountersError } = await deltaClient
+					.from('Encounters')
+					.insert([
+						{ ...baseEncounter, bird_id: birdIds[0], age_code: 1, is_juv: true },
+						{ ...baseEncounter, bird_id: birdIds[1], age_code: 3, is_juv: true },
+						{ ...baseEncounter, bird_id: birdIds[2], age_code: 1, is_juv: false },
+						{ ...baseEncounter, bird_id: birdIds[3], age_code: 3, is_juv: false },
+						{ ...baseEncounter, bird_id: birdIds[4], age_code: 5, is_juv: true },
+					]);
+				if (encountersError) throw encountersError;
+			});
+
+			afterAll(() => {
+				execSync(
+					`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+						`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Sessions" WHERE id = ${sessionId};` +
+						`DELETE FROM "Locations" WHERE id = ${locationId};'`
+				);
+			});
+
+			async function fetchRow() {
+				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
+					ringing_group_filter: deltaId,
+				});
+				expect(error).toBeNull();
+				const row = data!.find((row) => row.visit_date === visitDate);
+				if (!row) throw new Error(`No row found for visit_date ${visitDate}`);
+				return row;
+			}
+
+			describe('juv_count', () => {
+				it('counts an age-1 encounter with is_juv true (1J)', async () => {
+					const row = await fetchRow();
+					expect(row.juv_count).toBeGreaterThanOrEqual(1);
+				});
+
+				it('counts an age-3 encounter with is_juv true (3J)', async () => {
+					const row = await fetchRow();
+					// Both the 1J and 3J encounters land in juv_count.
+					expect(row.juv_count).toBe(2);
+				});
+
+				it('excludes an age-1 encounter with is_juv false (pulli) — counted in pullus_count instead', async () => {
+					const row = await fetchRow();
+					expect(row.juv_count).toBe(2);
+					expect(row.pullus_count).toBe(1);
+				});
+
+				it('excludes an age-3 encounter with is_juv false (bare 3) — counted in postjuv_count instead', async () => {
+					const row = await fetchRow();
+					expect(row.juv_count).toBe(2);
+					expect(row.postjuv_count).toBe(1);
+				});
+
+				it('excludes non-1/3 age codes even when is_juv is true', async () => {
+					const row = await fetchRow();
+					// AGECLASSTEST5 is age 5 with is_juv true — must not inflate juv_count.
+					expect(row.juv_count).toBe(2);
+				});
+
+				it('aggregates a mix of juv and non-juv encounters on the same day/species into one row', async () => {
+					const row = await fetchRow();
+					expect(row).toMatchObject({
+						species_name: 'Robin',
+						visit_date: visitDate,
+						encounter_count: 5,
+						juv_count: 2,
+						postjuv_count: 1,
+						pullus_count: 1,
+					});
+				});
+			});
+
+			describe('postjuv_count', () => {
+				it('counts a bare age-3 encounter (is_juv false)', async () => {
+					const row = await fetchRow();
+					expect(row.postjuv_count).toBe(1);
+				});
+
+				it('excludes an age-3 encounter with is_juv true (3J) — counted in juv_count instead', async () => {
+					const row = await fetchRow();
+					expect(row.postjuv_count).toBe(1);
+					expect(row.juv_count).toBe(2);
+				});
+
+				it('excludes non-3 age codes', async () => {
+					const row = await fetchRow();
+					// Only AGECLASSTEST4 (age 3, is_juv false) counts — age 1 and age 5
+					// encounters, regardless of is_juv, are excluded.
+					expect(row.postjuv_count).toBe(1);
+				});
+
+				it('aggregates a mix of postjuv and juv encounters on the same day/species into separate columns on one row', async () => {
+					const row = await fetchRow();
+					expect(row).toMatchObject({
+						species_name: 'Robin',
+						visit_date: visitDate,
+						juv_count: 2,
+						postjuv_count: 1,
+					});
+				});
+			});
+
+			describe('pullus_count', () => {
+				it('counts an age-1 encounter with is_juv false (pulli)', async () => {
+					const row = await fetchRow();
+					expect(row.pullus_count).toBe(1);
+				});
+
+				it('excludes an age-1 encounter with is_juv true — counted in juv_count instead', async () => {
+					const row = await fetchRow();
+					expect(row.pullus_count).toBe(1);
+					expect(row.juv_count).toBe(2);
+				});
+
+				it('excludes non-1 age codes', async () => {
+					const row = await fetchRow();
+					// Only AGECLASSTEST3 (age 1, is_juv false) counts — age 3 and age 5
+					// encounters, regardless of is_juv, are excluded.
+					expect(row.pullus_count).toBe(1);
+				});
+
+				it('aggregates alongside juv_count and postjuv_count on the same day/species row', async () => {
+					const row = await fetchRow();
+					expect(row).toMatchObject({
+						species_name: 'Robin',
+						visit_date: visitDate,
+						encounter_count: 5,
+						juv_count: 2,
+						postjuv_count: 1,
+						pullus_count: 1,
+					});
 				});
 			});
 		});

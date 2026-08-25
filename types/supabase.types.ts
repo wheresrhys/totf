@@ -448,6 +448,8 @@ export type Database = {
           juv_count: number
           max_weight: number
           min_weight: number
+          postjuv_count: number
+          pullus_count: number
           species_name: string
           visit_date: string
           weighed_birds_count: number
