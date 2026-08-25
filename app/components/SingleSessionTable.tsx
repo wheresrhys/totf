@@ -172,9 +172,7 @@ function buildColumnConfigs(
 			label: 'Juv',
 			// If pulli is hidden, Juv becomes the first column of the age
 			// block and inherits its thicker left border.
-			...columnBlock(
-				`bg-sky-50 ${hasPullus ? '' : ageBlockStartBorder}`.trim()
-			)
+			...columnBlock(`bg-sky-50 ${hasPullus ? '' : ageBlockStartBorder}`.trim())
 		},
 		postjuv: {
 			label: 'Postjuv',
