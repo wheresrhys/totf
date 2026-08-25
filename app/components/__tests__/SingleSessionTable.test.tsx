@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	fireEvent,
+	within
+} from '@testing-library/react';
 import { SessionTabs } from '../SingleSessionTable';
 import type { SpeciesWithEncounters } from '../SingleSessionTable';
 import type { NetRound } from '@/app/models/session-chronology';
@@ -9,12 +15,14 @@ function makeEncounter(
 	id: number,
 	species: string,
 	capture_time: string,
-	proven_age = 0
+	proven_age = 0,
+	ageOptions: { age_code?: number; is_juv?: boolean } = {}
 ): SessionEncounter {
 	return {
 		id,
 		session_id: 1,
-		age_code: 4,
+		age_code: ageOptions.age_code ?? 4,
+		is_juv: ageOptions.is_juv ?? false,
 		breeding_condition: null,
 		capture_time,
 		moult_code: null,
@@ -30,6 +38,16 @@ function makeEncounter(
 			species: { id: 1, species_name: species }
 		}
 	} as unknown as SessionEncounter;
+}
+
+function columnCellValue(columnLabel: string, rowText: string): string {
+	const headers = screen.getAllByRole('columnheader');
+	const columnIndex = headers.findIndex(
+		(header) => header.textContent === columnLabel
+	);
+	const row = screen.getByText(rowText).closest('tr') as HTMLElement;
+	const cells = within(row).getAllByRole('cell');
+	return cells[columnIndex].textContent ?? '';
 }
 
 const robinEncounter = makeEncounter(1, 'Robin', '09:00:00', 3);
@@ -89,5 +107,69 @@ describe('SessionTabs', () => {
 		expect(screen.getByText('Net round 2: 09:30').textContent).toContain(
 			'Net round 2: 09:30'
 		);
+	});
+
+	describe('juvs/pullus/postjuv columns', () => {
+		it('counts an age-1, is_juv-true encounter in the juvs column', () => {
+			const encounter = makeEncounter(10, 'Wren', '10:00:00', 0, {
+				age_code: 1,
+				is_juv: true
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Wren', encounters: [encounter] }]}
+					netRounds={[]}
+				/>
+			);
+			expect(columnCellValue('Juvs', 'Wren')).toBe('1');
+			expect(columnCellValue('Pullus', 'Wren')).toBe('0');
+			expect(columnCellValue('Postjuv', 'Wren')).toBe('0');
+		});
+
+		it('counts an age-3, is_juv-true encounter in the juvs column', () => {
+			const encounter = makeEncounter(11, 'Dunnock', '10:00:00', 0, {
+				age_code: 3,
+				is_juv: true
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Dunnock', encounters: [encounter] }]}
+					netRounds={[]}
+				/>
+			);
+			expect(columnCellValue('Juvs', 'Dunnock')).toBe('1');
+			expect(columnCellValue('Pullus', 'Dunnock')).toBe('0');
+			expect(columnCellValue('Postjuv', 'Dunnock')).toBe('0');
+		});
+
+		it('counts an age-1, is_juv-false (pulli) encounter in the new pullus column, not juvs', () => {
+			const encounter = makeEncounter(12, 'Swallow', '10:00:00', 0, {
+				age_code: 1,
+				is_juv: false
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Swallow', encounters: [encounter] }]}
+					netRounds={[]}
+				/>
+			);
+			expect(columnCellValue('Pullus', 'Swallow')).toBe('1');
+			expect(columnCellValue('Juvs', 'Swallow')).toBe('0');
+		});
+
+		it('counts an age-3, is_juv-false (bare 3) encounter in the new postjuv column, not juvs', () => {
+			const encounter = makeEncounter(13, 'Chaffinch', '10:00:00', 0, {
+				age_code: 3,
+				is_juv: false
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Chaffinch', encounters: [encounter] }]}
+					netRounds={[]}
+				/>
+			);
+			expect(columnCellValue('Postjuv', 'Chaffinch')).toBe('1');
+			expect(columnCellValue('Juvs', 'Chaffinch')).toBe('0');
+		});
 	});
 });
