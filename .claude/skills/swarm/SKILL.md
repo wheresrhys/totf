@@ -124,7 +124,10 @@ ticket only gets selected if nothing else is running or already picked this pass
 picked, nothing else is). Use its `prsNeedingMaintenance` for §1 and `ticketsToImplement` for §2
 directly — both are already filtered, ranked, and truncated to `freeSlots`. `soloRunActive` /
 `soloRunLabel` tell you whether a solo run is already in progress; `drained` tells you whether
-there was genuinely nothing eligible (regardless of slots) and no workers running.
+there was genuinely nothing eligible (regardless of slots) and no workers running. It also returns
+`staleClosedPrTickets` — ready tickets excluded *only* because a `feature/<issue>-*` branch left
+over from a closed-not-merged PR still exists — which need an explicit user decision before any can
+be spawned; handle these in §1.5 below, never by auto-spawning them alongside normal tickets.
 
 ## 1. Maintain open PRs — resolve conflicts + address feedback (first call on the budget)
 
@@ -166,6 +169,37 @@ both concerns for that PR:
 Append a `kind: "maintenance"` entry (see State file) for this worker right after spawning it.
 
 If no open PR needs maintenance, skip to ticket selection with the full budget.
+
+## 1.5 Stale closed-PR ticket branches (confirm reuse vs replace before spawning)
+
+`swarm_plan_batch`'s `staleClosedPrTickets` holds `ready`, unblocked, not-in-flight issues that
+would otherwise be silently dropped forever, because a `feature/<issue>-*` branch already exists —
+but that branch's only PR was **closed without merging** (an abandoned prior attempt), so the
+branch is a stale leftover, not active in-flight work. GitHub doesn't populate
+`closedByPullRequestsReferences` for a manually-closed PR, so without this the issue just vanishes
+from the queue with nothing signalling why. These entries are **not** in `ticketsToImplement` and
+must **never** be auto-spawned in the same pass as normal tickets.
+
+For each entry (fields: `number`, `title`, `labels`, `staleBranch`, `closedPrNumber`), before
+spawning anything for it, ask the user via `AskUserQuestion` — one question per stale ticket,
+quoting the issue number/title, the stale branch name, and the closed PR number — which of the
+three approaches to take:
+- **Reuse the existing branch** — pick up `staleBranch` where the closed PR left off. Spawn the §3
+  worker pointed at the *existing* `staleBranch` (it already exists, so the worker checks it out and
+  `git merge origin/main` rather than cutting a new branch off `origin/main`), and does not run
+  `mcp__swarm-tools__derive_branch_name`.
+- **Start fresh, referencing the old branch** — derive a new branch name via
+  `mcp__swarm-tools__derive_branch_name` (`{issueNumber, title}`, collision-checked against
+  `staleBranch`) and instruct the worker to inspect the old branch / closed PR #`closedPrNumber`
+  for inspiration but implement cleanly from `origin/main` on the new branch.
+- **Start fresh, clean** — derive a new branch name the same way and instruct the worker to ignore
+  the old branch entirely (the user may delete `staleBranch` separately).
+
+Only once the user has answered do you spawn that ticket's worker via §3 (still respecting the
+free-slot cap and the solo-run rule, and passing the chosen branch strategy into the worker's
+prompt in place of §3's default "create the ticket branch off `origin/main`" instruction). A stale
+ticket the user hasn't answered for is never spawned — it simply resurfaces on the next
+`swarm_plan_batch` call.
 
 ## 2. Select tickets (fill the remaining budget)
 
@@ -288,6 +322,9 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   shared branch.
 - Never pick a blocked ticket; never exceed **4 concurrent worker subagents** across both tracks.
   The orchestrator itself is not a worker and does not count toward the 4.
+- Never auto-spawn a `staleClosedPrTickets` entry (an issue whose only leftover is a stale branch
+  from a closed-not-merged PR). Always ask the user via `AskUserQuestion` (§1.5) to reuse the
+  branch / start fresh referencing it / start fresh clean, and spawn only after they answer.
 - **Exclusive-resource work (`db-migration` or `e2e-exclusive`) runs completely solo** — across
   both tracks, not just within §2. Don't spawn it alongside any other worker, and don't spawn any
   other worker while it's running. A `db-migration`/`e2e-exclusive` PR being maintained (§1) is the
