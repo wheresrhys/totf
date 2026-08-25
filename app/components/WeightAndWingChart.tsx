@@ -1,10 +1,12 @@
 import { type Sex } from '@/app/models/bird';
+import { getAgeClass } from '@/app/models/encounter';
 import { useEffect, useState } from 'react';
 import { ScatterChart, type ScatterChartData } from 'react-chartkick';
 import { fetchGraphableEncounterData } from '../actions/sp-data';
 import { SecondaryHeading } from './shared/DesignSystem';
 type GraphableEncounterData = {
 	age_code: number;
+	is_juv: boolean;
 	sex: string;
 	weight: number;
 	wing_length: number;
@@ -80,7 +82,7 @@ function getWingWeightXYEncounter(
 	return isValidPoint(point) ? point : null;
 }
 
-function getChartData(
+export function getChartData(
 	birds: SexedGraphableBird[],
 	chartGrouping: 'sex' | 'age'
 ): ScatterChartData[] {
@@ -114,21 +116,28 @@ function getChartData(
 		{
 			name: 'Juv',
 			data: allEncounters
-				.filter((encounter) => encounter.age_code === 3)
+				.filter((encounter) => getAgeClass(encounter) === 'juv')
+				.map(getWingWeightXYEncounter)
+				.filter((point) => point !== null)
+		},
+		{
+			name: 'Postjuv',
+			data: allEncounters
+				.filter((encounter) => getAgeClass(encounter) === 'postjuv')
 				.map(getWingWeightXYEncounter)
 				.filter((point) => point !== null)
 		},
 		{
 			name: 'Ad',
 			data: allEncounters
-				.filter((encounter) => encounter.age_code > 3)
+				.filter((encounter) => getAgeClass(encounter) === 'adult')
 				.map(getWingWeightXYEncounter)
 				.filter((point) => point !== null)
 		},
 		{
 			name: 'U',
 			data: allEncounters
-				.filter((encounter) => encounter.age_code < 3)
+				.filter((encounter) => getAgeClass(encounter) === 'unknown')
 				.map(getWingWeightXYEncounter)
 				.filter((point) => point !== null)
 		}

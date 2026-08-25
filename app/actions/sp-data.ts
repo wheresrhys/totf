@@ -80,6 +80,7 @@ export async function fetchGraphableEncounterData(
 		.select(
 			`encounters:Encounters (
 				age_code,
+				is_juv,
 				sex,
 				weight,
 				wing_length
