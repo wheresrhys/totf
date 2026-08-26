@@ -54,6 +54,28 @@ describe('SummaryStatsSection', () => {
 			const { container } = render(<SummaryStatsSection stats={null} />);
 			expect(container.innerHTML).toBe('');
 		});
+
+		it('renders rows in the same order as SpeciesTotalsTable columns', () => {
+			render(<SummaryStatsSection stats={populatedStats} />);
+			const rowHeaders = screen
+				.getAllByRole('rowheader')
+				.map((element) => element.textContent);
+			expect(rowHeaders).toEqual([
+				'Sessions',
+				'Effort',
+				'Species',
+				'Encounters',
+				'Individuals',
+				'New',
+				'Retraps',
+				'Pullus',
+				'Juvs',
+				'Postjuv',
+				'Adults',
+				'Unknown age',
+				'New young'
+			]);
+		});
 	});
 
 	describe('Edge', () => {
