@@ -17,7 +17,7 @@ import {
 	type RowModelWithRawData
 } from './shared/SortableTable';
 import {
-	buildAgeClassColumnConfigs,
+	buildStandardColumnConfigs,
 	columnBlock,
 	createNameLinkCell
 } from './shared/StatsTableColumnConfigs';
@@ -140,7 +140,7 @@ function buildColumnConfigs(
 			label: 'Total',
 			cellClassName: 'font-bold'
 		},
-		...buildAgeClassColumnConfigs<RowModel>(
+		...buildStandardColumnConfigs<RowModel>(
 			hasPullus,
 			{
 				new: 'new',

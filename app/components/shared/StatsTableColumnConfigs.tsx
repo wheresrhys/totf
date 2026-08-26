@@ -38,9 +38,10 @@ export function createNameLinkCell<RawRowData, RowModel>(
 	};
 }
 
-// The logical age-class fields the block builder knows about, independent of
-// any caller's RowModel key names or header wording.
-export type AgeClassField =
+// The logical fields the column-config builder knows about: the capture-type
+// fields (New/Retrap) plus the age-class fields (Pulli/Juv/Postjuv/Adult/
+// Unaged) — independent of any caller's RowModel key names or header wording.
+export type StandardField =
 	| 'new'
 	| 'retraps'
 	| 'pullus'
@@ -49,17 +50,17 @@ export type AgeClassField =
 	| 'adults'
 	| 'unknownAge';
 
-// Builds the colour-blocked age-class column configs (New/Retrap/Pulli/Juv/
+// Builds the colour-blocked standard column configs (New/Retrap/Pulli/Juv/
 // Postjuv/Adult/Unaged) shared across stats tables. `fieldKeys` maps each
 // logical field to the caller's actual RowModel key; `labels` supplies the
 // header text for each (no defaults — callers word these differently, e.g.
 // `Retrap` vs `Retraps`). `hasPullus` omits the Pulli column entirely (rather
 // than rendering it empty) and shifts the age-block's left border onto Juv when
 // false, per issue #545.
-export function buildAgeClassColumnConfigs<RowModel>(
+export function buildStandardColumnConfigs<RowModel>(
 	hasPullus: boolean,
-	fieldKeys: Record<AgeClassField, keyof RowModel>,
-	labels: Record<AgeClassField, string>
+	fieldKeys: Record<StandardField, keyof RowModel>,
+	labels: Record<StandardField, string>
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
 	return {
 		[fieldKeys.new]: {

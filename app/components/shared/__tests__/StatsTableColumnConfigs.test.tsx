@@ -2,9 +2,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import {
 	createNameLinkCell,
-	buildAgeClassColumnConfigs,
+	buildStandardColumnConfigs,
 	buildSessionsColumnConfig,
-	type AgeClassField
+	type StandardField
 } from '../StatsTableColumnConfigs';
 import type { RowModelWithRawData } from '../SortableTable';
 
@@ -72,7 +72,7 @@ describe('createNameLinkCell', () => {
 	});
 });
 
-describe('buildAgeClassColumnConfigs', () => {
+describe('buildStandardColumnConfigs', () => {
 	// The session table's own RowModel shape (identity mapping), used to prove
 	// the builder reproduces today's behaviour.
 	type SessionModel = {
@@ -84,7 +84,7 @@ describe('buildAgeClassColumnConfigs', () => {
 		adults: number;
 		unknownAge: number;
 	};
-	const sessionFieldKeys: Record<AgeClassField, keyof SessionModel> = {
+	const sessionFieldKeys: Record<StandardField, keyof SessionModel> = {
 		new: 'new',
 		retraps: 'retraps',
 		pullus: 'pullus',
@@ -93,7 +93,7 @@ describe('buildAgeClassColumnConfigs', () => {
 		adults: 'adults',
 		unknownAge: 'unknownAge'
 	};
-	const sessionLabels: Record<AgeClassField, string> = {
+	const sessionLabels: Record<StandardField, string> = {
 		new: 'New',
 		retraps: 'Retrap',
 		pullus: 'Pulli',
@@ -114,7 +114,7 @@ describe('buildAgeClassColumnConfigs', () => {
 		grownUps: number;
 		ageUnknown: number;
 	};
-	const totalsFieldKeys: Record<AgeClassField, keyof TotalsModel> = {
+	const totalsFieldKeys: Record<StandardField, keyof TotalsModel> = {
 		new: 'freshRinged',
 		retraps: 'recaptures',
 		pullus: 'chicks',
@@ -123,7 +123,7 @@ describe('buildAgeClassColumnConfigs', () => {
 		adults: 'grownUps',
 		unknownAge: 'ageUnknown'
 	};
-	const totalsLabels: Record<AgeClassField, string> = {
+	const totalsLabels: Record<StandardField, string> = {
 		new: 'New',
 		retraps: 'Retraps',
 		pullus: 'Pulli',
@@ -134,7 +134,7 @@ describe('buildAgeClassColumnConfigs', () => {
 	};
 
 	it('returns new/retraps/juvs/postjuv/adults/unknownAge in order when hasPullus is false', () => {
-		const configs = buildAgeClassColumnConfigs<SessionModel>(
+		const configs = buildStandardColumnConfigs<SessionModel>(
 			false,
 			sessionFieldKeys,
 			sessionLabels
@@ -150,7 +150,7 @@ describe('buildAgeClassColumnConfigs', () => {
 	});
 
 	it('inserts the pullus entry immediately before juvs when hasPullus is true', () => {
-		const configs = buildAgeClassColumnConfigs<SessionModel>(
+		const configs = buildStandardColumnConfigs<SessionModel>(
 			true,
 			sessionFieldKeys,
 			sessionLabels
@@ -167,7 +167,7 @@ describe('buildAgeClassColumnConfigs', () => {
 	});
 
 	it('uses the caller-supplied label for each column', () => {
-		const configs = buildAgeClassColumnConfigs<SessionModel>(
+		const configs = buildStandardColumnConfigs<SessionModel>(
 			true,
 			sessionFieldKeys,
 			sessionLabels
@@ -180,12 +180,12 @@ describe('buildAgeClassColumnConfigs', () => {
 	});
 
 	it('lets two callers word the same logical field differently from the one builder', () => {
-		const sessionConfigs = buildAgeClassColumnConfigs<SessionModel>(
+		const sessionConfigs = buildStandardColumnConfigs<SessionModel>(
 			false,
 			sessionFieldKeys,
 			sessionLabels
 		);
-		const totalsConfigs = buildAgeClassColumnConfigs<TotalsModel>(
+		const totalsConfigs = buildStandardColumnConfigs<TotalsModel>(
 			false,
 			totalsFieldKeys,
 			totalsLabels
@@ -199,7 +199,7 @@ describe('buildAgeClassColumnConfigs', () => {
 	});
 
 	it('keys each config by the caller-supplied RowModel key for each logical field', () => {
-		const configs = buildAgeClassColumnConfigs<TotalsModel>(
+		const configs = buildStandardColumnConfigs<TotalsModel>(
 			true,
 			totalsFieldKeys,
 			totalsLabels
@@ -216,7 +216,7 @@ describe('buildAgeClassColumnConfigs', () => {
 	});
 
 	it('puts the start border on pullus when shown, on juvs when hidden, and the end border always on unknownAge', () => {
-		const withPullus = buildAgeClassColumnConfigs<SessionModel>(
+		const withPullus = buildStandardColumnConfigs<SessionModel>(
 			true,
 			sessionFieldKeys,
 			sessionLabels
@@ -225,7 +225,7 @@ describe('buildAgeClassColumnConfigs', () => {
 		expect(withPullus.juvs?.headerClassName).not.toContain('border-l-4');
 		expect(withPullus.unknownAge?.headerClassName).toContain('border-r-4');
 
-		const withoutPullus = buildAgeClassColumnConfigs<SessionModel>(
+		const withoutPullus = buildStandardColumnConfigs<SessionModel>(
 			false,
 			sessionFieldKeys,
 			sessionLabels
@@ -235,7 +235,7 @@ describe('buildAgeClassColumnConfigs', () => {
 	});
 
 	it('omits the pullus key entirely (not an empty column) when hasPullus is false', () => {
-		const configs = buildAgeClassColumnConfigs<SessionModel>(
+		const configs = buildStandardColumnConfigs<SessionModel>(
 			false,
 			sessionFieldKeys,
 			sessionLabels
