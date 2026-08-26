@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { listState } from '../lib/state-file';
+import { listStateWithPruneReport, prunedEntrySchema, type SwarmWorkerEntry } from '../lib/state-file';
 import { listBranches } from '../lib/git';
 import { ghJson } from '../lib/gh';
 
@@ -367,8 +367,7 @@ export async function resolveMaintenanceCandidateModel(prNumber: number): Promis
 		.catch(() => null);
 }
 
-async function isSoloRunCurrentlyActive(): Promise<ExclusiveLabel | null> {
-	const running = await listState();
+async function isSoloRunCurrentlyActive(running: SwarmWorkerEntry[]): Promise<ExclusiveLabel | null> {
 	for (const entry of running) {
 		const target =
 			entry.kind === 'maintenance' && entry.pr !== null
@@ -384,12 +383,66 @@ async function isSoloRunCurrentlyActive(): Promise<ExclusiveLabel | null> {
 	return null;
 }
 
+/**
+ * Core batch planner behind the `swarm_plan_batch` tool, extracted so it can be exercised directly
+ * in tests. Reads worker state *through the self-healing prune*, so a dead worker (missing worktree
+ * or gone stale-inactive) is dropped before any accounting: it no longer inflates
+ * `runningIssueNumbers` (freeing a phantom cap slot) nor keeps a solo run "active"
+ * (`isSoloRunCurrentlyActive` sees only the surviving live workers) — fixing both raised impacts of
+ * #579 at this single point. The `pruned` report is passed straight through for the orchestrator to
+ * warn on.
+ */
+export async function planBatch(freeSlots: number) {
+	const { workers: runningEntries, pruned } = await listStateWithPruneReport();
+	const soloRunLabel = await isSoloRunCurrentlyActive(runningEntries);
+	const soloRunActive = soloRunLabel !== null;
+
+	const runningIssueNumbers = new Set(
+		runningEntries.filter((e) => e.kind === 'ticket' && e.issue !== null).map((e) => e.issue as number)
+	);
+
+	const maintenanceCandidates = await findMaintenanceCandidates();
+	const { candidates: ticketCandidates, staleClosedPrTickets } = await findTicketCandidates(runningIssueNumbers);
+
+	const rankedMaintenance = rankMaintenanceCandidates(maintenanceCandidates);
+	const rankedTickets = rankTicketCandidates(ticketCandidates);
+
+	const allocation = allocateBudget(freeSlots, soloRunActive, rankedMaintenance, rankedTickets);
+
+	const prsNeedingMaintenance = await Promise.all(
+		allocation.maintenance.map(async (pr) => {
+			const model = await resolveMaintenanceCandidateModel(pr.number);
+			return { ...pr, model: model ?? 'sonnet', blockedBySoloRun: false };
+		})
+	);
+	const ticketsToImplement = allocation.tickets.map((ticket) => ({ ...ticket, blockedBySoloRun: false }));
+
+	// Stale-closed-PR tickets are pending work too (awaiting a user reuse/replace decision),
+	// so the pool isn't genuinely drained while any remain — otherwise the orchestrator would
+	// go idle and never surface them.
+	const drained =
+		maintenanceCandidates.length === 0 &&
+		ticketCandidates.length === 0 &&
+		staleClosedPrTickets.length === 0 &&
+		runningEntries.length === 0;
+
+	return {
+		soloRunActive,
+		soloRunLabel: soloRunLabel ?? undefined,
+		prsNeedingMaintenance,
+		ticketsToImplement,
+		staleClosedPrTickets,
+		drained,
+		pruned,
+	};
+}
+
 export function registerSwarmPlanBatchTool(server: McpServer) {
 	server.registerTool(
 		'swarm_plan_batch',
 		{
 			description:
-				"Pre-filtered, pre-ranked PR-maintenance and ready-ticket lists for swarm's §1+§2 selection, already applying the unblocked/not-in-flight/solo-run rules and truncated to freeSlots. Also returns staleClosedPrTickets — ready tickets excluded only because a feature/<issue>-* branch from a closed-not-merged PR still exists — for the orchestrator to prompt on before reusing/replacing.",
+				"Pre-filtered, pre-ranked PR-maintenance and ready-ticket lists for swarm's §1+§2 selection, already applying the unblocked/not-in-flight/solo-run rules and truncated to freeSlots. Also returns staleClosedPrTickets — ready tickets excluded only because a feature/<issue>-* branch from a closed-not-merged PR still exists — for the orchestrator to prompt on before reusing/replacing. `pruned` lists worker entries auto-removed from state this call as presumed-dead (missing worktree, or no worktree activity past the staleness threshold) — warn the user on any non-empty list before selecting.",
 			inputSchema: {
 				freeSlots: z.number(),
 			},
@@ -427,51 +480,11 @@ export function registerSwarmPlanBatchTool(server: McpServer) {
 					})
 				),
 				drained: z.boolean(),
+				pruned: z.array(prunedEntrySchema),
 			},
 		},
 		async ({ freeSlots }) => {
-			const runningEntries = await listState();
-			const soloRunLabel = await isSoloRunCurrentlyActive();
-			const soloRunActive = soloRunLabel !== null;
-
-			const runningIssueNumbers = new Set(
-				runningEntries.filter((e) => e.kind === 'ticket' && e.issue !== null).map((e) => e.issue as number)
-			);
-
-			const maintenanceCandidates = await findMaintenanceCandidates();
-			const { candidates: ticketCandidates, staleClosedPrTickets } =
-				await findTicketCandidates(runningIssueNumbers);
-
-			const rankedMaintenance = rankMaintenanceCandidates(maintenanceCandidates);
-			const rankedTickets = rankTicketCandidates(ticketCandidates);
-
-			const allocation = allocateBudget(freeSlots, soloRunActive, rankedMaintenance, rankedTickets);
-
-			const prsNeedingMaintenance = await Promise.all(
-				allocation.maintenance.map(async (pr) => {
-					const model = await resolveMaintenanceCandidateModel(pr.number);
-					return { ...pr, model: model ?? 'sonnet', blockedBySoloRun: false };
-				})
-			);
-			const ticketsToImplement = allocation.tickets.map((ticket) => ({ ...ticket, blockedBySoloRun: false }));
-
-			// Stale-closed-PR tickets are pending work too (awaiting a user reuse/replace decision),
-			// so the pool isn't genuinely drained while any remain — otherwise the orchestrator would
-			// go idle and never surface them.
-			const drained =
-				maintenanceCandidates.length === 0 &&
-				ticketCandidates.length === 0 &&
-				staleClosedPrTickets.length === 0 &&
-				runningEntries.length === 0;
-
-			const structuredContent = {
-				soloRunActive,
-				soloRunLabel: soloRunLabel ?? undefined,
-				prsNeedingMaintenance,
-				ticketsToImplement,
-				staleClosedPrTickets,
-				drained,
-			};
+			const structuredContent = await planBatch(freeSlots);
 			return { content: [{ type: 'text', text: JSON.stringify(structuredContent) }], structuredContent };
 		}
 	);
