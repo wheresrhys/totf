@@ -430,8 +430,10 @@ describe('session detail page', () => {
 			const previousLink = await screen.findByRole('link', {
 				name: /previous session/i
 			});
+			// The global BootstrapPageData mock (vitest.setup.tsx) always supplies
+			// viewedGroup as { id: 1, slug: 'alpha' }, not the slug passed via params.
 			expect(previousLink.getAttribute('href')).toBe(
-				`/group/${TEST_GROUP_ID}/session/${mockPreviousSession[0].visit_date}`
+				`/group/alpha/session/${mockPreviousSession[0].visit_date}`
 			);
 		});
 
@@ -441,7 +443,43 @@ describe('session detail page', () => {
 				name: /next session/i
 			});
 			expect(nextLink.getAttribute('href')).toBe(
-				`/group/${TEST_GROUP_ID}/session/${mockNextSession[0].visit_date}`
+				`/group/alpha/session/${mockNextSession[0].visit_date}`
+			);
+		});
+	});
+
+	describe('multiple locations on the same date', () => {
+		const mockMultiLocationSessions = [
+			{
+				id: 1,
+				location_id: 10,
+				location: { id: 10, location_name: 'Test Reserve', ringing_group_id: 1 }
+			},
+			{
+				id: 2,
+				location_id: 20,
+				location: { id: 20, location_name: 'Other Site', ringing_group_id: 1 }
+			}
+		];
+
+		it('links each location badge to the group-slug-based site href', async () => {
+			const client = makeSessionClient([
+				makeChain(mockMultiLocationSessions),
+				makeChain(mockPreviousSession),
+				makeChain(mockNextSession),
+				makeChain(mockEncounters)
+			]);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+			render(await renderPage());
+			const testReserveLink = await screen.findByRole('link', {
+				name: 'Test Reserve'
+			});
+			const otherSiteLink = screen.getByRole('link', { name: 'Other Site' });
+			expect(testReserveLink.getAttribute('href')).toBe(
+				`/group/alpha/session/${TEST_DATE}/site/10`
+			);
+			expect(otherSiteLink.getAttribute('href')).toBe(
+				`/group/alpha/session/${TEST_DATE}/site/20`
 			);
 		});
 	});
