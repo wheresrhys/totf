@@ -293,8 +293,6 @@ export type Database = {
           to_date?: string
         }
         Returns: {
-          "3_count": number
-          "3j_count": number
           adult_count: number
           avg_encounters_per_session: number
           avg_weight: number
@@ -312,7 +310,6 @@ export type Database = {
           median_wing: number
           min_weight: number
           min_wing: number
-          new_3_count: number
           new_bird_count: number
           new_young_count: number
           postjuv_count: number

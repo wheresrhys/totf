@@ -18,9 +18,6 @@ CREATE FUNCTION public.aggregate_stats (
 	bird_count bigint,
 	encounter_count bigint,
 	new_bird_count bigint,
-	"3j_count" bigint,
-	"3_count" bigint,
-	new_3_count bigint,
 	pullus_count bigint,
 	juv_count bigint,
 	postjuv_count bigint,
@@ -342,12 +339,6 @@ CREATE FUNCTION public.aggregate_stats (
     COALESCE(COUNT(DISTINCT raw_enc.encounter_id), 0) AS "encounter_count",
 
     COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' THEN raw_enc.bird_id END), 0) AS "new_bird_count",
-    -- Legacy age fields, kept unchanged for backward compatibility until #539 removes
-    -- them. These are per-encounter-condition bird-distinct counts (NOT the corrected
-    -- bird-level bucketing below), and are known not to partition bird_count.
-    COALESCE(COUNT(DISTINCT CASE WHEN (raw_enc.is_juv OR raw_enc.age_code = 1) THEN raw_enc.bird_id END), 0) AS "3j_count",
-    COALESCE(COUNT(DISTINCT CASE WHEN (raw_enc.age_code = 3 AND NOT raw_enc.is_juv) THEN raw_enc.bird_id END), 0) AS "3_count",
-    COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' AND raw_enc.age_code IN (1, 3) THEN raw_enc.bird_id END), 0) AS "new_3_count",
 
     -- Corrected bird-level age buckets (see bird_age_flags / bird_age_bucket above).
     -- pullus + juv + postjuv + adult + unknown_age = bird_count for every row.
