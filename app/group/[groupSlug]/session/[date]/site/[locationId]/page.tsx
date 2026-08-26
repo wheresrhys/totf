@@ -25,8 +25,7 @@ export default async function CrossGroupSessionSitePage({ params }: PageProps) {
 			getParams={async () => ({
 				viewedGroupId,
 				date,
-				locationId: Number(locationId),
-				viewedGroup
+				locationId: Number(locationId)
 			})}
 			getCacheKeys={() => ['session', date, `loc-${locationId}`]}
 			dataFetcher={fetchSessionData}

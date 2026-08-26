@@ -145,4 +145,45 @@ describe('session site page', () => {
 		expect(screen.queryByTestId('session-highlights')).toBeNull();
 		expect(vi.mocked(fetchSessionHighlights)).not.toHaveBeenCalled();
 	});
+
+	describe('when the date has more than one location', () => {
+		const mockMultiLocationSessions = [
+			{
+				id: 1,
+				location_id: 10,
+				location: { id: 10, location_name: 'Test Reserve', ringing_group_id: 1 }
+			},
+			{
+				id: 2,
+				location_id: 20,
+				location: { id: 20, location_name: 'Other Site', ringing_group_id: 1 }
+			}
+		];
+
+		it('links "View all" to the group-slug-based session href', async () => {
+			const sessionAndEncounterChains = [
+				makeChain(mockMultiLocationSessions),
+				makeChain(mockPreviousSession),
+				makeChain(mockNextSession),
+				makeChain(mockEncounters)
+			];
+			let nextChainIndex = 0;
+			const client = {
+				from: vi.fn((table: string) => {
+					if (table === 'RingingGroups') {
+						return makeChain({ id: Number(TEST_GROUP_ID) });
+					}
+					return sessionAndEncounterChains[nextChainIndex++];
+				})
+			};
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+			render(await renderPage());
+			const viewAllLink = await screen.findByRole('link', {
+				name: 'View all'
+			});
+			expect(viewAllLink.getAttribute('href')).toBe(
+				`/group/alpha/session/${TEST_DATE}`
+			);
+		});
+	});
 });

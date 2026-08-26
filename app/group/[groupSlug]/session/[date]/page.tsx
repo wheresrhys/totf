@@ -23,8 +23,7 @@ export default async function CrossGroupSessionPage({ params }: PageProps) {
 			getParams={async () => ({
 				viewedGroupId,
 				date,
-				locationId: undefined,
-				viewedGroup
+				locationId: undefined
 			})}
 			getCacheKeys={() => ['session', date]}
 			dataFetcher={fetchSessionData}
