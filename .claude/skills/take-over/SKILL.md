@@ -89,7 +89,11 @@ step 3 (halt) and stop; report that the user is already sitting in that worktree
 
 If an `agentId` was found: `TaskStop <agentId>`, then remove that entry via
 `mcp__swarm-tools__swarm_state_remove` with that `agentId`. Report success even if `TaskStop`
-reports "not found" — that just means it had already finished.
+reports "not found" — that just means the agent is no longer running: it either finished cleanly or
+crashed (e.g. a usage-limit/`/clear` kill). Either way the branch is yours to take over; note that
+`swarm`'s self-healing prune may already have removed the state-file entry for a crashed worker
+whose worktree went stale (see swarm's "State file" section), so a missing entry here is expected,
+not an error.
 
 If no `agentId` was found for a worktree/branch that clearly exists (untracked or stale entry):
 tell the user plainly that nothing could be positively stopped — it was either never run through
