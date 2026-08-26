@@ -316,6 +316,13 @@ export function SessionSummary({
 						`${dayData.encounters.filter((encounter) => getAgeClass(encounter) === 'juv').length} juvs`,
 						`${dayData.encounters.filter((encounter) => getAgeClass(encounter) === 'postjuv').length} postjuv`,
 						`${dayData.encounters.filter((encounter) => encounter.age_code === 2).length} unknown age`,
+						`${
+							dayData.encounters.filter(
+								(encounter) =>
+									encounter.record_type === 'N' &&
+									(encounter.age_code === 1 || encounter.age_code === 3)
+							).length
+						} new young`,
 						`Start: ${chronology.startTime ? chronology.startTime.slice(0, 5) : '–'}`,
 						`End: ${chronology.endTime ? chronology.endTime.slice(0, 5) : '–'}`,
 						`Duration: ${chronology.durationMinutes !== null ? formatMinutesForDisplay(chronology.durationMinutes) : '–'}`,
