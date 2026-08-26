@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash } from 'node:crypto';
 
 /**
  * Deterministic per-worktree test-server port.
@@ -26,10 +26,10 @@ import { createHash } from 'node:crypto'
  * 54329, 8083). 10 000 ports keep collisions vanishingly unlikely at swarm's
  * concurrency cap.
  */
-export const PORT_RANGE_START = 20000
-export const PORT_RANGE_END = 29999
+export const PORT_RANGE_START = 20000;
+export const PORT_RANGE_END = 29999;
 
-const PORT_RANGE_SIZE = PORT_RANGE_END - PORT_RANGE_START + 1
+const PORT_RANGE_SIZE = PORT_RANGE_END - PORT_RANGE_START + 1;
 
 /**
  * Derive a stable test-server port from an absolute worktree path.
@@ -38,8 +38,10 @@ const PORT_RANGE_SIZE = PORT_RANGE_END - PORT_RANGE_START + 1
  *   `process.cwd()`, which for any test run is the worktree root.
  * @returns A port in `[PORT_RANGE_START, PORT_RANGE_END]`.
  */
-export function deriveWorktreePort(worktreePath: string = process.cwd()): number {
-	const hash = createHash('sha256').update(worktreePath).digest()
-	const offset = hash.readUInt32BE(0) % PORT_RANGE_SIZE
-	return PORT_RANGE_START + offset
+export function deriveWorktreePort(
+	worktreePath: string = process.cwd()
+): number {
+	const hash = createHash('sha256').update(worktreePath).digest();
+	const offset = hash.readUInt32BE(0) % PORT_RANGE_SIZE;
+	return PORT_RANGE_START + offset;
 }
