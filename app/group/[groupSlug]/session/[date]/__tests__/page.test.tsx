@@ -297,6 +297,41 @@ describe('session detail page', () => {
 		expect(stats.textContent).toContain('0 juvs');
 	});
 
+	it('counts an age-code-greater-than-3, is_juv-true encounter in the juvs badge, not the adults badge', async () => {
+		const client = makeSessionClient([
+			makeChain(mockSessions),
+			makeChain(mockPreviousSession),
+			makeChain(mockNextSession),
+			makeChain([
+				{
+					id: 12,
+					session_id: 1,
+					age_code: 5,
+					is_juv: true,
+					breeding_condition: null,
+					capture_time: '09:30:00',
+					moult_code: null,
+					record_type: 'N',
+					ringing_group_id: 1,
+					sex: 'U',
+					sexing_method: null,
+					weight: null,
+					wing_length: null,
+					bird: {
+						ring_no: 'JUV001',
+						proven_age: 1,
+						species: { id: 1, species_name: 'Robin' }
+					}
+				}
+			])
+		]);
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+		render(await renderPage());
+		const stats = await screen.findByTestId('session-stats');
+		expect(stats.textContent).toContain('1 juvs');
+		expect(stats.textContent).toContain('0 adults');
+	});
+
 	it('renders session chronology stats', async () => {
 		render(await renderPage());
 		const stats = await screen.findByTestId('session-stats');

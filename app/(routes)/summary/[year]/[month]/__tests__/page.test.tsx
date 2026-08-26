@@ -15,6 +15,10 @@ vi.mock('@/app/actions/summary-stats', () => ({
 	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args)
 }));
 
+vi.mock('@/app/actions/spp-data', () => ({
+	fetchSpeciesData: vi.fn().mockResolvedValue([])
+}));
+
 describe('/summary/[year]/[month]', () => {
 	afterEach(() => {
 		cleanup();
@@ -77,6 +81,16 @@ describe('/summary/[year]/[month]', () => {
 		]);
 	});
 
+	it("fetchYearMonthSummaryData calls fetchSpeciesData with the month's first and last calendar day", async () => {
+		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+		await fetchYearMonthSummaryData({ year: '2026', month: '08' }, 1);
+		expect(fetchSpeciesData).toHaveBeenCalledWith(
+			1,
+			'2026-08-01',
+			'2026-08-31'
+		);
+	});
+
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
 		await fetchYearMonthSummaryData({ year: '2026', month: '08' }, 1);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
@@ -115,5 +129,15 @@ describe('/summary/[year]/[month]', () => {
 		);
 		await screen.findByRole('heading', { level: 1 });
 		expect(screen.queryByTestId('summary-stats-section')).toBeNull();
+	});
+
+	it('computes correct month bounds for December (year-end month)', async () => {
+		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+		await fetchYearMonthSummaryData({ year: '2026', month: '12' }, 1);
+		expect(fetchSpeciesData).toHaveBeenCalledWith(
+			1,
+			'2026-12-01',
+			'2026-12-31'
+		);
 	});
 });

@@ -15,6 +15,10 @@ vi.mock('@/app/actions/summary-stats', () => ({
 	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args)
 }));
 
+vi.mock('@/app/actions/spp-data', () => ({
+	fetchSpeciesData: vi.fn().mockResolvedValue([])
+}));
+
 describe('/summary/[year]', () => {
 	afterEach(() => {
 		cleanup();
@@ -53,6 +57,16 @@ describe('/summary/[year]', () => {
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
 		await fetchYearSummaryData({ year: '2026' }, 1);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
+			1,
+			'2026-01-01',
+			'2026-12-31'
+		);
+	});
+
+	it('fetchYearSummaryData calls fetchSpeciesData with `${year}-01-01` to `${year}-12-31`', async () => {
+		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+		await fetchYearSummaryData({ year: '2026' }, 1);
+		expect(fetchSpeciesData).toHaveBeenCalledWith(
 			1,
 			'2026-01-01',
 			'2026-12-31'

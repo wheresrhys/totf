@@ -1,7 +1,8 @@
-import { endOfMonth, format, startOfMonth } from 'date-fns';
+import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { fetchSessionStats } from '@/lib/underlying-stats';
 import { fetchSummaryStats } from '@/app/actions/summary-stats';
+import { fetchSpeciesData } from '@/app/actions/spp-data';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
 import { SummaryPage as SummaryPageContent } from '../../_shared';
@@ -14,27 +15,30 @@ export type PageData = {
 	month: number;
 	sessionDates: string[];
 	summaryStats: AggregateStatsResult | null;
+	speciesStats: AggregateStatsResult[];
 };
 
 export async function fetchYearMonthSummaryData(
 	{ year, month }: PageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
-	const { sessionDates } = await fetchSessionStats(viewedGroupId);
-	const monthPrefix = `${year}-${String(Number(month)).padStart(2, '0')}`;
 	const monthDate = new Date(Number(year), Number(month) - 1, 1);
-	const summaryStats = await fetchSummaryStats(
-		viewedGroupId,
-		format(startOfMonth(monthDate), 'yyyy-MM-dd'),
-		format(endOfMonth(monthDate), 'yyyy-MM-dd')
-	);
+	const fromDate = format(startOfMonth(monthDate), 'yyyy-MM-dd');
+	const toDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
+	const [{ sessionDates }, summaryStats, speciesStats] = await Promise.all([
+		fetchSessionStats(viewedGroupId),
+		fetchSummaryStats(viewedGroupId, fromDate, toDate),
+		fetchSpeciesData(viewedGroupId, fromDate, toDate)
+	]);
+	const monthPrefix = `${year}-${String(Number(month)).padStart(2, '0')}`;
 	return {
 		year: Number(year),
 		month: Number(month),
 		sessionDates: sessionDates.filter(
 			(date) => date.slice(0, 7) === monthPrefix
 		),
-		summaryStats
+		summaryStats,
+		speciesStats
 	};
 }
 
@@ -51,6 +55,7 @@ function YearMonthSummary({
 			month={data.month}
 			sessionDates={data.sessionDates}
 			summaryStats={data.summaryStats}
+			speciesStats={data.speciesStats}
 			viewedGroup={viewedGroup}
 		/>
 	);

@@ -15,6 +15,10 @@ vi.mock('@/app/actions/summary-stats', () => ({
 	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args)
 }));
 
+vi.mock('@/app/actions/spp-data', () => ({
+	fetchSpeciesData: vi.fn().mockResolvedValue([])
+}));
+
 describe('/summary (all-time)', () => {
 	afterEach(() => {
 		cleanup();
@@ -50,5 +54,11 @@ describe('/summary (all-time)', () => {
 		render(await Page());
 		await screen.findByRole('heading', { level: 1 });
 		expect(screen.queryByTestId('summary-stats-section')).toBeNull();
+	});
+
+	it('fetchAllTimeSummaryData calls fetchSpeciesData with no date bounds', async () => {
+		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+		await fetchAllTimeSummaryData({}, 1);
+		expect(fetchSpeciesData).toHaveBeenCalledWith(1);
 	});
 });
