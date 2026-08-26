@@ -260,14 +260,13 @@ function SessionNavigation({
 
 export function SessionSummary({
 	data: dayData,
-	params: { date, locationId, viewedGroupId },
+	params: { date, locationId },
 	viewedGroup
 }: {
 	data: DayData;
 	params: {
 		date: string;
 		locationId: number | undefined;
-		viewedGroupId: number;
 	};
 	viewedGroup: ViewedGroup;
 }) {
@@ -333,7 +332,7 @@ export function SessionSummary({
 				}
 			/>
 			{locationId ? null : (
-				<SessionHighlights date={date} viewedGroupId={viewedGroupId} />
+				<SessionHighlights date={date} viewedGroupId={viewedGroup.id} />
 			)}
 			<SessionTabs speciesList={speciesList} netRounds={chronology.netRounds} />
 		</PageWrapper>
