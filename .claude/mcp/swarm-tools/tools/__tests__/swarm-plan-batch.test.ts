@@ -2,9 +2,16 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 
 vi.mock('../../lib/gh', () => ({ ghJson: vi.fn() }));
 vi.mock('../../lib/git', () => ({ listBranches: vi.fn() }));
+// Preserve the real schemas/types (planBatch and swarm-plan-batch import prunedEntrySchema etc.);
+// only listStateWithPruneReport is stubbed so tests can inject the pruned worker report.
+vi.mock('../../lib/state-file', async (importOriginal) => ({
+	...(await importOriginal<typeof import('../../lib/state-file')>()),
+	listStateWithPruneReport: vi.fn(),
+}));
 
 import { ghJson } from '../../lib/gh';
 import { listBranches } from '../../lib/git';
+import { listStateWithPruneReport, type PrunedEntry, type SwarmWorkerEntry } from '../../lib/state-file';
 import {
 	getExclusiveLabel,
 	getModelLabel,
@@ -18,6 +25,7 @@ import {
 	findMaintenanceCandidates,
 	findTicketCandidates,
 	classifyStaleBranchPrs,
+	planBatch,
 	type MaintenanceCandidate,
 	type TicketCandidate,
 } from '../swarm-plan-batch';
@@ -533,5 +541,125 @@ describe('allocateBudget', () => {
 	it('returns empty results when there are no candidates', () => {
 		const result = allocateBudget(4, false, [], []);
 		expect(result).toEqual({ maintenance: [], tickets: [], soloRunStarted: null });
+	});
+});
+
+describe('planBatch', () => {
+	const mockGhJson = vi.mocked(ghJson);
+	const mockListBranches = vi.mocked(listBranches);
+	const mockListState = vi.mocked(listStateWithPruneReport);
+
+	afterEach(() => {
+		mockGhJson.mockReset();
+		mockListBranches.mockReset();
+		mockListState.mockReset();
+	});
+
+	/** Dispatches ghJson by command shape so each source (pr/issue list, issue/pr view) is stubbed independently. */
+	function stubGh(opts: { prs?: unknown[]; issues?: unknown[]; closedByPrs?: unknown[] } = {}) {
+		mockGhJson.mockImplementation((args: string[]) => {
+			if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve(opts.prs ?? []);
+			if (args[0] === 'issue' && args[1] === 'list') return Promise.resolve(opts.issues ?? []);
+			if (args[0] === 'issue' && args[1] === 'view')
+				return Promise.resolve({ closedByPullRequestsReferences: opts.closedByPrs ?? [] });
+			if (args[0] === 'pr' && args[1] === 'view') return Promise.resolve({ labels: [] });
+			return Promise.resolve([]);
+		});
+	}
+
+	// Usual
+	it('returns an empty prune list when listState pruned nothing', async () => {
+		mockListState.mockResolvedValue({ workers: [], pruned: [] });
+		stubGh();
+		mockListBranches.mockResolvedValue([]);
+
+		const result = await planBatch(4);
+
+		expect(result.pruned).toEqual([]);
+		expect(result.drained).toBe(true);
+	});
+
+	// Structure
+	it('surfaces the prune list populated when listState pruned a dead entry', async () => {
+		const pruned: PrunedEntry = {
+			agentId: 'agent-dead',
+			branch: 'feature/1-x',
+			issue: 1,
+			pr: null,
+			title: 'Some ticket',
+			reason: 'stale-inactivity',
+		};
+		mockListState.mockResolvedValue({ workers: [], pruned: [pruned] });
+		stubGh();
+		mockListBranches.mockResolvedValue([]);
+
+		const result = await planBatch(4);
+
+		expect(result.pruned).toEqual([pruned]);
+	});
+
+	// Edge — the incident's actual impact: a db-migration ticket entry pruned as stale-inactive no
+	// longer keeps a solo run active, so a fresh exclusive-resource candidate becomes selectable in
+	// the same call.
+	it('lets a new exclusive candidate through once a stale-inactive db-migration worker is pruned', async () => {
+		const prunedDbMigration: PrunedEntry = {
+			agentId: 'agent-phantom',
+			branch: 'feature/500-migrate',
+			issue: 500,
+			pr: null,
+			title: 'Old migration',
+			reason: 'stale-inactivity',
+		};
+		// The phantom db-migration worker is already gone from `workers` — only the report remains.
+		mockListState.mockResolvedValue({ workers: [], pruned: [prunedDbMigration] });
+		stubGh({
+			issues: [
+				{
+					number: 600,
+					title: 'New migration',
+					labels: [{ name: 'ready' }, { name: 'db-migration' }, { name: 'opus' }],
+					blockedBy: { nodes: [] },
+					blocking: { nodes: [] },
+				},
+			],
+			closedByPrs: [],
+		});
+		mockListBranches.mockResolvedValue([]);
+
+		const result = await planBatch(4);
+
+		expect(result.soloRunActive).toBe(false);
+		expect(result.ticketsToImplement.map((t) => t.number)).toContain(600);
+		expect(result.pruned).toEqual([prunedDbMigration]);
+	});
+
+	// Guards the accounting side: a still-live db-migration worker keeps the solo run active, so the
+	// pruning path can't be mistaken for the reason the exclusive gate opens above.
+	it('keeps the solo run active when a live db-migration ticket worker survives the prune', async () => {
+		const liveWorker: SwarmWorkerEntry = {
+			kind: 'ticket',
+			issue: 500,
+			pr: null,
+			branch: 'feature/500-migrate',
+			title: 'Live migration',
+			worktreePath: '/tmp/does-not-matter',
+			agentId: 'agent-live',
+			model: 'opus',
+			startedAt: '2026-01-01T00:00:00.000Z',
+		};
+		mockListState.mockResolvedValue({ workers: [liveWorker], pruned: [] });
+		mockGhJson.mockImplementation((args: string[]) => {
+			if (args[0] === 'issue' && args[1] === 'view' && args[2] === '500')
+				return Promise.resolve({ labels: [{ name: 'db-migration' }] });
+			if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve([]);
+			if (args[0] === 'issue' && args[1] === 'list') return Promise.resolve([]);
+			return Promise.resolve([]);
+		});
+		mockListBranches.mockResolvedValue([]);
+
+		const result = await planBatch(4);
+
+		expect(result.soloRunActive).toBe(true);
+		expect(result.soloRunLabel).toBe('db-migration');
 	});
 });

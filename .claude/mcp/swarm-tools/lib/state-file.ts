@@ -25,6 +25,49 @@ export type SwarmWorkerEntry = z.infer<typeof swarmWorkerEntrySchema>;
 
 const swarmStateSchema = z.array(swarmWorkerEntrySchema);
 
+/**
+ * Why an entry was pruned from `.claude/swarm-state.json` during a self-healing read:
+ * - `worktree-missing`: its `worktreePath` no longer exists on disk (the pre-existing #490 signal
+ *   — worker finished/died *and* its worktree was torn down).
+ * - `stale-inactivity`: its worktree still exists but has shown no filesystem/commit activity for
+ *   longer than {@link STALE_INACTIVITY_THRESHOLD_MS} (the #579 signal — the agent process died
+ *   with real work still sitting in the worktree, so `worktree-missing` never fires).
+ */
+export const pruneReasonSchema = z.enum(['worktree-missing', 'stale-inactivity']);
+export type PruneReason = z.infer<typeof pruneReasonSchema>;
+
+/**
+ * A pruned worker, surfaced back to the caller (rather than silently dropped) so `/swarm` can warn
+ * the user which presumed-dead workers it removed and why — an auto-prune that succeeds quietly
+ * would reproduce the original "nobody told me" complaint, just for over-provisioning if the
+ * heuristic is ever wrong. Carries enough identity to name the worker in that warning.
+ */
+export const prunedEntrySchema = z.object({
+	agentId: z.string(),
+	branch: z.string(),
+	issue: z.number().nullable(),
+	pr: z.number().nullable(),
+	title: z.string(),
+	reason: pruneReasonSchema,
+});
+export type PrunedEntry = z.infer<typeof prunedEntrySchema>;
+
+export interface ListStateResult {
+	workers: SwarmWorkerEntry[];
+	pruned: PrunedEntry[];
+}
+
+/**
+ * Idle time past which a worker whose worktree still exists but shows no filesystem/commit
+ * activity is presumed dead and pruned. Set to 45 minutes: comfortably longer than the gap a
+ * genuinely-alive worker leaves between filesystem writes across even its slowest single step (a
+ * full `npm run qa` + Playwright E2E pass is a few minutes at worst), so a busy-but-quiet worker is
+ * never killed, yet short enough to reliably catch a truly dead one (the #579 incident's phantom
+ * workers had been idle ~1h15m). Deliberately a single documented constant, not user-configurable
+ * (YAGNI) — revisit only if false positives turn up in practice.
+ */
+export const STALE_INACTIVITY_THRESHOLD_MS = 45 * 60 * 1000;
+
 /** Thrown when .claude/swarm-state.json on disk doesn't match SwarmWorkerEntry[] — see #484. */
 export class SwarmStateSchemaError extends Error {
 	constructor(message: string) {
@@ -147,43 +190,169 @@ async function worktreeStillExists(worktreePath: string): Promise<boolean> {
 	}
 }
 
-/**
- * Splits `entries` into those whose `worktreePath` still exists (live) and those whose worktree
- * is gone (stale — the worker died or finished without its cleanup step running). Order-preserving.
- */
-async function partitionStaleEntries(
-	entries: SwarmWorkerEntry[]
-): Promise<{ live: SwarmWorkerEntry[]; stale: SwarmWorkerEntry[] }> {
-	const stillExists = await Promise.all(entries.map((entry) => worktreeStillExists(entry.worktreePath)));
-	const live: SwarmWorkerEntry[] = [];
-	const stale: SwarmWorkerEntry[] = [];
-	entries.forEach((entry, i) => (stillExists[i] ? live.push(entry) : stale.push(entry)));
-	return { live, stale };
+/** Runs a git subcommand at `worktreePath`, returning trimmed stdout, or `null` if git errors. */
+async function gitAt(worktreePath: string, args: string[]): Promise<string | null> {
+	try {
+		const { stdout } = await execa('git', args, {
+			cwd: worktreePath,
+			env: envWithoutGitDiscoveryOverrides(),
+			extendEnv: false,
+		});
+		return stdout;
+	} catch {
+		return null;
+	}
 }
 
 /**
- * Self-healing read: filters out any entry whose `worktreePath` no longer exists on disk (a
- * worker that died or finished without its `swarm_state_remove` cleanup step running — see
- * the stale-issue-#490 incident) before returning to the caller, so every consumer
- * (`swarm_state_list`, `swarm_plan_batch`'s `runningIssueNumbers`/`isSoloRunCurrentlyActive`,
- * `resolve-work-item`) treats a dead worktree as not-running without needing its own fix.
- *
- * Cheap and unlocked in the common case (all worktrees live) — just a snapshot read plus local
- * `fs.access` checks, no lock taken. Only when a stale entry is actually found does it pay for a
- * locked read-modify-write to prune the file, re-checking staleness against the freshly-locked
- * read (rather than trusting the pre-lock snapshot) to avoid clobbering a concurrent
- * append/remove from another worktree.
+ * Newest mtime (ms) among the worktree's *uncommitted-changed* files — modified-tracked plus
+ * untracked-non-ignored, via `git ls-files`. This is the true "is the worker still writing?"
+ * signal and, because it drives off git's own change list, it costs a handful of `stat`s (not a
+ * full-tree walk) and never touches `.git` internals or gitignored paths like `node_modules`.
+ * `null` when the worktree is clean (nothing to compare mtimes against) or git can't be run.
  */
-export async function listState(cwd: string = process.cwd()): Promise<SwarmWorkerEntry[]> {
+async function newestChangedFileMtimeMs(worktreePath: string): Promise<number | null> {
+	const stdout = await gitAt(worktreePath, ['ls-files', '-z', '--modified', '--others', '--exclude-standard']);
+	if (stdout === null) return null;
+	const relPaths = stdout.split('\0').filter(Boolean);
+	let newest: number | null = null;
+	for (const rel of relPaths) {
+		try {
+			const stat = await fs.stat(path.join(worktreePath, rel));
+			if (newest === null || stat.mtimeMs > newest) newest = stat.mtimeMs;
+		} catch {
+			// A listed path can be a since-deleted file — skip it rather than failing the check.
+		}
+	}
+	return newest;
+}
+
+/** Committer date (ms) of the worktree's HEAD commit, or `null` if it has no commits / git errors. */
+async function lastCommitMs(worktreePath: string): Promise<number | null> {
+	const stdout = await gitAt(worktreePath, ['log', '-1', '--format=%cI']);
+	if (stdout === null) return null;
+	const iso = stdout.trim();
+	if (!iso) return null;
+	const ms = Date.parse(iso);
+	return Number.isNaN(ms) ? null : ms;
+}
+
+/** Mtime (ms) of the worktree directory itself — the last-ditch fallback for an empty, commit-less worktree. */
+async function directoryMtimeMs(worktreePath: string): Promise<number | null> {
+	try {
+		return (await fs.stat(worktreePath)).mtimeMs;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Newest "activity" timestamp (ms) for a worktree, in priority order:
+ * 1. newest mtime among uncommitted-changed files (a worker mid-edit),
+ * 2. else the HEAD commit's committer date (a worker that just committed and is quietly running,
+ *    e.g. a long test pass with no working-tree writes),
+ * 3. else the worktree directory's own mtime (a freshly-created, commit-less worktree — treated as
+ *    just-born, so a brand-new worker is never pruned before it writes anything).
+ * `null` only if even the directory can't be stat'd (i.e. it's gone — handled by worktree-missing).
+ */
+async function worktreeActivityMs(worktreePath: string): Promise<number | null> {
+	const changedMtime = await newestChangedFileMtimeMs(worktreePath);
+	if (changedMtime !== null) return changedMtime;
+	const commitMs = await lastCommitMs(worktreePath);
+	if (commitMs !== null) return commitMs;
+	return directoryMtimeMs(worktreePath);
+}
+
+/**
+ * True if the worktree shows activity within {@link STALE_INACTIVITY_THRESHOLD_MS} of `nowMs`
+ * (boundary inclusive — an entry idle *exactly* the threshold is still considered alive). When no
+ * activity timestamp can be derived at all it errs alive (returns `true`): staleness must be a
+ * positive signal, never the mere absence of one.
+ */
+async function worktreeHasRecentActivity(worktreePath: string, nowMs: number): Promise<boolean> {
+	const activityMs = await worktreeActivityMs(worktreePath);
+	if (activityMs === null) return true;
+	return nowMs - activityMs <= STALE_INACTIVITY_THRESHOLD_MS;
+}
+
+/** Classifies one entry as live (`null`) or names the single reason it should be pruned. */
+async function classifyStaleness(entry: SwarmWorkerEntry, nowMs: number): Promise<PruneReason | null> {
+	// worktree-missing wins outright: a gone worktree trivially has no activity, but we report one
+	// reason, not two, and skip the git work entirely for the cheap dead-worktree case.
+	if (!(await worktreeStillExists(entry.worktreePath))) return 'worktree-missing';
+	if (!(await worktreeHasRecentActivity(entry.worktreePath, nowMs))) return 'stale-inactivity';
+	return null;
+}
+
+function toPrunedEntry(entry: SwarmWorkerEntry, reason: PruneReason): PrunedEntry {
+	return {
+		agentId: entry.agentId,
+		branch: entry.branch,
+		issue: entry.issue,
+		pr: entry.pr,
+		title: entry.title,
+		reason,
+	};
+}
+
+/**
+ * Splits `entries` into live ones (worktree present *and* recently active) and a prune report of
+ * the rest, each tagged with the single reason it fired (`worktree-missing` or `stale-inactivity`).
+ * Order-preserving.
+ */
+async function partitionStaleEntries(
+	entries: SwarmWorkerEntry[],
+	nowMs: number
+): Promise<{ live: SwarmWorkerEntry[]; pruned: PrunedEntry[] }> {
+	const reasons = await Promise.all(entries.map((entry) => classifyStaleness(entry, nowMs)));
+	const live: SwarmWorkerEntry[] = [];
+	const pruned: PrunedEntry[] = [];
+	entries.forEach((entry, i) => {
+		const reason = reasons[i];
+		if (reason === null) live.push(entry);
+		else pruned.push(toPrunedEntry(entry, reason));
+	});
+	return { live, pruned };
+}
+
+/**
+ * Self-healing read that also reports what it pruned. An entry is pruned when either (a) its
+ * `worktreePath` no longer exists on disk (the #490 signal — a worker that died/finished without
+ * its `swarm_state_remove` cleanup running *and* had its worktree torn down) or (b) its worktree
+ * still exists but has gone quiet past {@link STALE_INACTIVITY_THRESHOLD_MS} (the #579 signal — the
+ * agent process died with real work still sitting in the worktree). Either check alone is
+ * sufficient; both are surfaced through `pruned` so callers can warn the user. Every consumer
+ * (`swarm_state_list`, `swarm_plan_batch`'s `runningIssueNumbers`/`isSoloRunCurrentlyActive`,
+ * `resolve-work-item` via {@link listState}) treats a pruned worker as not-running for free.
+ *
+ * Cheap and unlocked in the common case (all workers live) — a snapshot read plus, per entry, an
+ * `fs.access` and at most a couple of local git calls; no lock taken. Only when something is
+ * actually prunable does it pay for a locked read-modify-write, re-checking staleness against the
+ * freshly-locked read (not the pre-lock snapshot) to avoid clobbering a concurrent append/remove
+ * from another worktree — so the returned `pruned` reflects what was really removed under the lock.
+ */
+export async function listStateWithPruneReport(
+	cwd: string = process.cwd(),
+	nowMs: number = Date.now()
+): Promise<ListStateResult> {
 	const stateFilePath = await resolveStateFilePath(cwd);
 	const snapshot = await readState(stateFilePath);
-	const { stale } = await partitionStaleEntries(snapshot);
-	if (stale.length === 0) return snapshot;
+	const { pruned } = await partitionStaleEntries(snapshot, nowMs);
+	if (pruned.length === 0) return { workers: snapshot, pruned: [] };
 
 	return withStateLock(async (current) => {
-		const { live } = await partitionStaleEntries(current);
-		return { entries: live, result: live };
+		const { live, pruned: prunedUnderLock } = await partitionStaleEntries(current, nowMs);
+		return { entries: live, result: { workers: live, pruned: prunedUnderLock } };
 	}, cwd);
+}
+
+/** {@link listStateWithPruneReport} without the prune report — the live worker list only. */
+export async function listState(
+	cwd: string = process.cwd(),
+	nowMs: number = Date.now()
+): Promise<SwarmWorkerEntry[]> {
+	const { workers } = await listStateWithPruneReport(cwd, nowMs);
+	return workers;
 }
 
 /**
