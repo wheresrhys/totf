@@ -6,7 +6,6 @@ import {
 import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SpeciesTotalsSection } from '@/app/components/SpeciesTotalsSection';
-import { type ViewedGroup } from '@/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
 export function SummaryPage({
 	year,
@@ -16,14 +15,18 @@ export function SummaryPage({
 }: {
 	year?: number;
 	month?: number;
-	sessionDates?: string[];
 	summaryStats?: AggregateStatsResult | null;
 	speciesStats?: AggregateStatsResult[];
-	viewedGroup?: ViewedGroup;
 }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>{buildHeading(year, month)}</PrimaryHeading>
+			{year === undefined && (
+				<p className="text-sm italic text-base-content/70">
+					Note that birds are counted in the youngest age category they were
+					recorded in
+				</p>
+			)}
 			<div className="lg:flex lg:items-start lg:gap-8">
 				<div className="lg:w-[400px] lg:shrink-0">
 					<SummaryStatsSection stats={summaryStats} />

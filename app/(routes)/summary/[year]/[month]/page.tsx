@@ -1,6 +1,5 @@
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
-import { fetchSessionStats } from '@/lib/underlying-stats';
 import { fetchSummaryStats } from '@/app/actions/summary-stats';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import type { ViewedGroup } from '@/lib/group-slug';
@@ -28,7 +27,6 @@ export async function fetchYearMonthSummaryData(
 		fetchSummaryStats(viewedGroupId, fromDate, toDate),
 		fetchSpeciesData(viewedGroupId, fromDate, toDate)
 	]);
-	const monthPrefix = `${year}-${String(Number(month)).padStart(2, '0')}`;
 	return {
 		year: Number(year),
 		month: Number(month),
@@ -38,8 +36,7 @@ export async function fetchYearMonthSummaryData(
 }
 
 function YearMonthSummary({
-	data,
-	viewedGroup
+	data
 }: {
 	data: PageData;
 	viewedGroup: ViewedGroup;
@@ -50,7 +47,6 @@ function YearMonthSummary({
 			month={data.month}
 			summaryStats={data.summaryStats}
 			speciesStats={data.speciesStats}
-			viewedGroup={viewedGroup}
 		/>
 	);
 }
