@@ -118,13 +118,38 @@ For each PR:
 5. Commit using conventional commits (`feat:`, `fix:`, `refactor:`, etc.), with trailer
    `Co-Authored-By: Claude <model> <noreply@anthropic.com>` where `<model>` is the model actually
    executing this ticket (e.g. `Sonnet 5`, `Opus 4.8`, `Fable 5`) — not a fixed model name.
-6. Push and open a PR against `main` (or the previous increment's branch if chaining). Include
+6. **Only for the PR that will carry `Closes #<number>`** (the sole PR of a single-PR ticket, or
+   the last PR in a multi-PR chain per the table in step 4 — non-final PRs in a chain skip this
+   sub-step entirely): immediately before the push/open-PR sub-step below, re-check the issue's
+   current state **freshly** — explicitly not reusing the step-1 read, since staleness during a
+   paused/resumed or long-running task is exactly what this guards against:
+
+   ```sh
+   gh issue view <number> --json state
+   ```
+
+   - If `state` is `OPEN`: proceed to the next sub-step as normal. No behaviour change.
+   - If `state` is `CLOSED`: run `git fetch origin`, then compare this PR's full contribution
+     against `main` with `git diff origin/main...HEAD --stat` (three-dot, merge-base diff; for a
+     multi-PR chain this HEAD already includes every prior increment, so the diff captures the
+     ticket's total contribution vs `origin/main`).
+     - **Diff empty** (a true no-op): do not commit further, do not push, do not open a PR.
+       Report back — interactively, tell the user directly; in subagent/swarm mode, return this
+       in the result handed to the caller — that issue #<number> was independently closed and
+       this branch's changes are already fully present on `main`, so nothing needs opening. Leave
+       the branch/worktree in place for normal teardown.
+     - **Diff non-empty** (real, not-yet-landed content): continue to the push/open-PR sub-step
+       as normal, but omit `Closes #<number>` from the PR body (see point 8 below) even though
+       this is the PR that would normally carry it, and add the closed-issue flag block described
+       there. Surface the same flag in the result handed back to the caller, mirroring the
+       `db-migration` warning rule below.
+7. Push and open a PR against `main` (or the previous increment's branch if chaining). Include
    the trailer `🤖 Generated with [Claude Code](https://claude.com/claude-code)` in the PR body.
    If the issue carries `db-migration` and/or `e2e-exclusive` (the exclusive-resource label set —
    see CLAUDE.md > Ticket workflow), apply the same label(s) to the PR with `--label`. This lets
    `swarm` read exclusive-resource status directly off `gh pr list --json labels` when deciding
    whether to spawn PR-maintenance work, instead of resolving each PR back to its linked issue.
-7. Include in each PR body:
+8. Include in each PR body:
    - If the issue carries `db-migration`: a warning block **at the top**, above everything else:
      > ⚠️ **Database migration — do not merge before pushing.** This PR's schema change must be
      > deployed to prod (`npm run db:migration:push`, run via the `take-over` skill) before this
@@ -146,16 +171,23 @@ For each PR:
      to prod</summary>` followed by a fenced ```sql``` block. This exact marker text and anchor
      format is machine-parsed by `mcp__swarm-tools__resolve_migration_dml` (used by `take-over`)
      — do not vary it.
+   - If step 5, point 6 found the issue already closed with a non-empty diff: a flag block near
+     the top of the PR body — directly after the `db-migration` warning if one is present,
+     otherwise at the very top — stating plainly that issue #<number> was already closed
+     independently before this PR was opened, and that a human reviewer should check for
+     overlap/redundancy with whatever closed it rather than trusting a closing keyword.
    - What this increment covers
    - Link to the GitHub issue
    - Any assumptions made (subagent mode)
    - `Closes #<number>` **only in the final PR** — and only if this ticket is the last of its
      parent's sequence when the parent tracks the whole feature; otherwise close the child
-     ticket, never the parent.
+     ticket, never the parent. Omit it entirely if step 5, point 6 found the issue already closed
+     with a non-empty diff.
 
    For a `db-migration` PR, repeat the same warning verbatim in the result handed back to the
    caller (interactive user or `swarm` orchestrator) — it must surface in `swarm`'s §4 completion
-   report, not just sit in the PR body where it's easy to miss.
+   report, not just sit in the PR body where it's easy to miss. Do the same for the closed-issue
+   flag from step 5, point 6.
 
 ### 6. Keep the issue open until the final PR
 
@@ -189,6 +221,12 @@ comment. Do this per PR in a multi-PR sequence.
   comment) for `sonnet`-labelled tickets.
 - A `db-migration` PR always carries the top-of-body "do not merge before pushing" warning, and
   the same warning is always repeated in the result handed back to the caller.
+- The PR that would carry `Closes #<number>` always re-checks the issue's live state
+  (`gh issue view <number> --json state`, freshly — never the step-1 read) immediately before
+  push/open. If the issue is already closed and this PR's diff against `origin/main` is empty, no
+  PR is opened at all; if closed but real diff remains, the PR opens without `Closes #<number>`
+  and with a top-of-body flag calling out the mismatch, and that same flag is always repeated in
+  the result handed back to the caller.
 - Commit trailer names the model actually doing the work; PR body carries the Claude Code
   trailer.
 - DB integration tests must isolate the rows they write (random/ticket-specific identifiers) —
