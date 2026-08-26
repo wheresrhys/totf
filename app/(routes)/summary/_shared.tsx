@@ -5,6 +5,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { SessionLinksList } from '@/app/components/SessionLinksList';
 import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
+import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SpeciesTotalsSection } from '@/app/components/SpeciesTotalsSection';
 import { type ViewedGroup } from '@/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
@@ -26,14 +27,21 @@ export function SummaryPage({
 	return (
 		<PageWrapper>
 			<PrimaryHeading>{buildHeading(year, month)}</PrimaryHeading>
-			<SummaryStatsSection stats={summaryStats} />
-			{viewedGroup !== undefined && (
-				<SessionLinksList
-					sessionDates={sessionDates}
-					viewedGroup={viewedGroup}
-				/>
-			)}
-			<SpeciesTotalsSection speciesStats={speciesStats} />
+			<div className="lg:flex lg:items-start lg:gap-8">
+				<div className="lg:w-[400px] lg:shrink-0">
+					<SummaryStatsSection stats={summaryStats} />
+					{viewedGroup !== undefined && (
+						<SessionLinksList
+							sessionDates={sessionDates}
+							viewedGroup={viewedGroup}
+						/>
+					)}
+					<HighlightsSection />
+				</div>
+				<div className="lg:flex-1">
+					<SpeciesTotalsSection speciesStats={speciesStats} />
+				</div>
+			</div>
 		</PageWrapper>
 	);
 }
