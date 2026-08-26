@@ -45,42 +45,6 @@ describe('/summary/[year]/[month]', () => {
 		expect(heading.textContent).toBe('August 2026 summary');
 	});
 
-	it('renders only links for dates within the given year and month', async () => {
-		render(
-			await Page({
-				params: Promise.resolve({
-					year: '2026',
-					month: '08',
-					viewedGroup: { id: 1, slug: 'alpha' }
-				})
-			})
-		);
-		await screen.findByRole('heading', { level: 1 });
-		const links = screen.getAllByRole('link');
-		expect(links.map((link) => link.getAttribute('href'))).toEqual([
-			'/group/alpha/session-temp/2026-08-01',
-			'/group/alpha/session-temp/2026-08-15'
-		]);
-	});
-
-	it('renders only links for dates within the given year and unpadded month', async () => {
-		render(
-			await Page({
-				params: Promise.resolve({
-					year: '2026',
-					month: '8',
-					viewedGroup: { id: 1, slug: 'alpha' }
-				})
-			})
-		);
-		await screen.findByRole('heading', { level: 1 });
-		const links = screen.getAllByRole('link');
-		expect(links.map((link) => link.getAttribute('href'))).toEqual([
-			'/group/alpha/session-temp/2026-08-01',
-			'/group/alpha/session-temp/2026-08-15'
-		]);
-	});
-
 	it("fetchYearMonthSummaryData calls fetchSpeciesData with the month's first and last calendar day", async () => {
 		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
 		await fetchYearMonthSummaryData({ year: '2026', month: '08' }, 1);

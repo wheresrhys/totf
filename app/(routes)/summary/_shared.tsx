@@ -3,7 +3,6 @@ import {
 	PageWrapper,
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
-import { SessionLinksList } from '@/app/components/SessionLinksList';
 import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SpeciesTotalsSection } from '@/app/components/SpeciesTotalsSection';
@@ -12,10 +11,8 @@ import type { AggregateStatsResult } from '@/app/models/db';
 export function SummaryPage({
 	year,
 	month,
-	sessionDates = [],
 	summaryStats = null,
-	speciesStats = [],
-	viewedGroup
+	speciesStats = []
 }: {
 	year?: number;
 	month?: number;
@@ -30,12 +27,6 @@ export function SummaryPage({
 			<div className="lg:flex lg:items-start lg:gap-8">
 				<div className="lg:w-[400px] lg:shrink-0">
 					<SummaryStatsSection stats={summaryStats} />
-					{viewedGroup !== undefined && (
-						<SessionLinksList
-							sessionDates={sessionDates}
-							viewedGroup={viewedGroup}
-						/>
-					)}
 					<HighlightsSection />
 				</div>
 				<div className="lg:flex-1">

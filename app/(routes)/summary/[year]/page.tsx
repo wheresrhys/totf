@@ -11,7 +11,6 @@ type PageProps = { params: Promise<PageParams> };
 
 export type PageData = {
 	year: number;
-	sessionDates: string[];
 	summaryStats: AggregateStatsResult | null;
 	speciesStats: AggregateStatsResult[];
 };
@@ -20,14 +19,12 @@ export async function fetchYearSummaryData(
 	{ year }: PageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
-	const [{ sessionDates }, summaryStats, speciesStats] = await Promise.all([
-		fetchSessionStats(viewedGroupId),
+	const [summaryStats, speciesStats] = await Promise.all([
 		fetchSummaryStats(viewedGroupId, `${year}-01-01`, `${year}-12-31`),
 		fetchSpeciesData(viewedGroupId, `${year}-01-01`, `${year}-12-31`)
 	]);
 	return {
 		year: Number(year),
-		sessionDates: sessionDates.filter((date) => date.slice(0, 4) === year),
 		summaryStats,
 		speciesStats
 	};
@@ -43,7 +40,6 @@ function YearSummary({
 	return (
 		<SummaryPageContent
 			year={data.year}
-			sessionDates={data.sessionDates}
 			summaryStats={data.summaryStats}
 			speciesStats={data.speciesStats}
 			viewedGroup={viewedGroup}

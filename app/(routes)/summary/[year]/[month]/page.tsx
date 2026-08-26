@@ -13,7 +13,6 @@ type PageProps = { params: Promise<PageParams> };
 export type PageData = {
 	year: number;
 	month: number;
-	sessionDates: string[];
 	summaryStats: AggregateStatsResult | null;
 	speciesStats: AggregateStatsResult[];
 };
@@ -25,8 +24,7 @@ export async function fetchYearMonthSummaryData(
 	const monthDate = new Date(Number(year), Number(month) - 1, 1);
 	const fromDate = format(startOfMonth(monthDate), 'yyyy-MM-dd');
 	const toDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
-	const [{ sessionDates }, summaryStats, speciesStats] = await Promise.all([
-		fetchSessionStats(viewedGroupId),
+	const [summaryStats, speciesStats] = await Promise.all([
 		fetchSummaryStats(viewedGroupId, fromDate, toDate),
 		fetchSpeciesData(viewedGroupId, fromDate, toDate)
 	]);
@@ -34,9 +32,6 @@ export async function fetchYearMonthSummaryData(
 	return {
 		year: Number(year),
 		month: Number(month),
-		sessionDates: sessionDates.filter(
-			(date) => date.slice(0, 7) === monthPrefix
-		),
 		summaryStats,
 		speciesStats
 	};
@@ -53,7 +48,6 @@ function YearMonthSummary({
 		<SummaryPageContent
 			year={data.year}
 			month={data.month}
-			sessionDates={data.sessionDates}
 			summaryStats={data.summaryStats}
 			speciesStats={data.speciesStats}
 			viewedGroup={viewedGroup}

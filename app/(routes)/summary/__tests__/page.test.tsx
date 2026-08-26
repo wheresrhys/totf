@@ -31,12 +31,6 @@ describe('/summary (all-time)', () => {
 		expect(heading.textContent).toBe('All time summary');
 	});
 
-	it('renders a session link for every date returned by fetchSessionStats', async () => {
-		render(await Page());
-		await screen.findByRole('heading', { level: 1 });
-		expect(screen.getAllByRole('link')).toHaveLength(2);
-	});
-
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
 		await fetchAllTimeSummaryData({}, 1);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(1);

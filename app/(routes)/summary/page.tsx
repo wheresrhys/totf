@@ -7,7 +7,6 @@ import type { AggregateStatsResult } from '@/app/models/db';
 import { SummaryPage as SummaryPageContent } from './_shared';
 
 export type PageData = {
-	sessionDates: string[];
 	summaryStats: AggregateStatsResult | null;
 	speciesStats: AggregateStatsResult[];
 };
@@ -16,12 +15,11 @@ export async function fetchAllTimeSummaryData(
 	_params: Record<string, string>,
 	viewedGroupId: number
 ): Promise<PageData> {
-	const [{ sessionDates }, summaryStats, speciesStats] = await Promise.all([
-		fetchSessionStats(viewedGroupId),
+	const [summaryStats, speciesStats] = await Promise.all([
 		fetchSummaryStats(viewedGroupId),
 		fetchSpeciesData(viewedGroupId)
 	]);
-	return { sessionDates, summaryStats, speciesStats };
+	return { summaryStats, speciesStats };
 }
 
 function AllTimeSummary({
@@ -33,7 +31,6 @@ function AllTimeSummary({
 }) {
 	return (
 		<SummaryPageContent
-			sessionDates={data.sessionDates}
 			summaryStats={data.summaryStats}
 			speciesStats={data.speciesStats}
 			viewedGroup={viewedGroup}

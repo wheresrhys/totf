@@ -30,22 +30,6 @@ describe('SummaryPage', () => {
 	});
 
 	describe('Structure', () => {
-		it('renders the stats section above the session links list when both are present', () => {
-			render(
-				<SummaryPage
-					summaryStats={populatedStats}
-					sessionDates={['2026-01-05']}
-					viewedGroup={{ id: 1, slug: 'alpha' }}
-				/>
-			);
-			const statsSection = screen.getByTestId('summary-stats-section');
-			const sessionLinksList = screen.getByRole('link');
-			expect(
-				statsSection.compareDocumentPosition(sessionLinksList) &
-					Node.DOCUMENT_POSITION_FOLLOWING
-			).toBeTruthy();
-		});
-
 		it('renders nothing extra when summaryStats is undefined/null', () => {
 			render(<SummaryPage summaryStats={null} />);
 			expect(screen.queryByTestId('summary-stats-section')).toBeNull();
