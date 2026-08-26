@@ -80,6 +80,28 @@ Entry shape:
 - **On every completion** (§4) **and on halt/drain** (Termination): remove that worker's entry via
   `mcp__swarm-tools__swarm_state_remove` with `agentId`.
 
+**Self-healing dead-worker prune (with mandatory user warning).** A worker that dies without
+running its own `swarm_state_remove` (usage limit, `/clear`, crash) leaves a phantom entry that
+would silently eat a cap slot and, if exclusive-resource-labelled, wrongly keep a solo run
+"active" forever. So every read through `swarm_state_list` / `swarm_plan_batch` (both go through the
+same self-healing `listState`) auto-prunes any entry that is either:
+- **`worktree-missing`** — its `worktreePath` is gone from disk (worker finished/died *and* its
+  worktree was torn down); or
+- **`stale-inactivity`** — its worktree still exists but has shown no filesystem/commit activity
+  for over 45 minutes (the agent process died with real work still sitting in the worktree). This
+  is a heuristic — a genuinely-alive-but-quiet worker won't be idle that long (a full `npm run qa`
+  + E2E pass is minutes, not tens of minutes), but it *can* false-positive, which is exactly why
+  the prune is never silent.
+
+Both tools return this as a `pruned` array (each item: `agentId`, `branch`, `issue`/`pr`, `title`,
+`reason`). **Whenever `pruned` is non-empty, before doing anything else with that call's result
+(selecting, spawning, reporting drained), tell the user plainly which entries were dropped as
+presumed-dead and why** — e.g. "Dropped presumed-dead worker on `feature/562-x` (issue #562): no
+worktree activity in over 45 minutes" or "…: worktree no longer on disk". This is the "user warned"
+half of the fix: an auto-prune that succeeds quietly reproduces the original "nobody told me"
+complaint (just for over-provisioning instead of under-provisioning) if the heuristic is ever
+wrong, so the user can intervene — e.g. `take-over` the branch — if a prune looks mistaken.
+
 **Concurrency is capped at 4 worker subagents.** The top-level swarm orchestrator (the parent
 agent running this skill) does not count toward the cap — it only selects, spawns, reports and
 refills; it holds no worktree and does no ticket work. So: 1 orchestrator + up to 4 workers.
@@ -128,6 +150,10 @@ there was genuinely nothing eligible (regardless of slots) and no workers runnin
 `staleClosedPrTickets` — ready tickets excluded *only* because a `feature/<issue>-*` branch left
 over from a closed-not-merged PR still exists — which need an explicit user decision before any can
 be spawned; handle these in §1.5 below, never by auto-spawning them alongside normal tickets.
+Finally, `pruned` lists any phantom worker entries this call auto-removed as presumed-dead — **if
+it is non-empty, warn the user about each before selecting/spawning** (see the self-healing
+dead-worker prune under "State file" above); a pruned worker has also already been discounted from
+the cap and solo-run accounting in this same response, so plan against the numbers as returned.
 
 ## 1. Maintain open PRs — resolve conflicts + address feedback (first call on the budget)
 
