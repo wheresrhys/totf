@@ -21,6 +21,12 @@ export function SummaryPage({
 	return (
 		<PageWrapper>
 			<PrimaryHeading>{buildHeading(year, month)}</PrimaryHeading>
+			{year === undefined && (
+				<p className="text-sm italic text-base-content/70">
+					Note that birds are counted in the youngest age category they were
+					recorded in
+				</p>
+			)}
 			<div className="lg:flex lg:items-start lg:gap-8">
 				<div className="lg:w-[400px] lg:shrink-0">
 					<SummaryStatsSection stats={summaryStats} />
