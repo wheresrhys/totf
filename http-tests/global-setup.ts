@@ -1,7 +1,13 @@
 import { spawn } from 'child_process'
 import type { ChildProcess } from 'child_process'
+import { deriveWorktreePort } from '../scripts/worktree-test-port'
 
-const BASE_URL = process.env.TEST_BASE_URL ?? 'http://localhost:3000'
+// Each git worktree gets its own deterministic port (derived from its absolute
+// path) so concurrent swarm worktrees never share a dev server — a reused server
+// can only ever be one this same worktree started. An explicit TEST_BASE_URL
+// still fully overrides this, for pointing at a shared/remote server on purpose.
+const PORT = deriveWorktreePort()
+const BASE_URL = process.env.TEST_BASE_URL ?? `http://localhost:${PORT}`
 
 async function isServerRunning(): Promise<boolean> {
   try {
@@ -28,6 +34,11 @@ export async function setup() {
   serverProcess = spawn('npm', ['run', 'next:dev'], {
     stdio: 'inherit',
     detached: false,
+    // Bind next dev to the worktree's derived port so it matches BASE_URL above.
+    // Skip when TEST_BASE_URL is set — that server is external, not spawned here.
+    env: process.env.TEST_BASE_URL
+      ? process.env
+      : { ...process.env, PORT: String(PORT) },
   })
   await waitForServer()
 }
