@@ -3,13 +3,6 @@ import { render, screen, cleanup } from '@testing-library/react';
 import Page, { fetchYearMonthSummaryData } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
-vi.mock('@/lib/underlying-stats', () => ({
-	fetchSessionStats: vi.fn().mockResolvedValue({
-		daySpeciesStats: [],
-		sessionDates: ['2026-07-30', '2026-08-01', '2026-08-15', '2026-09-01']
-	})
-}));
-
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 vi.mock('@/app/actions/summary-stats', () => ({
 	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args)
