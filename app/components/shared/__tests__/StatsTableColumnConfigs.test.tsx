@@ -73,8 +73,8 @@ describe('createNameLinkCell', () => {
 });
 
 describe('buildStandardColumnConfigs', () => {
-	// The session table's own RowModel shape (identity mapping), used to prove
-	// the builder reproduces today's behaviour.
+	// The session table's own RowModel shape, used to prove the builder
+	// reproduces today's behaviour.
 	type SessionModel = {
 		new: number;
 		retraps: number;
@@ -83,15 +83,6 @@ describe('buildStandardColumnConfigs', () => {
 		postjuv: number;
 		adults: number;
 		unknownAge: number;
-	};
-	const sessionFieldKeys: Record<StandardField, keyof SessionModel> = {
-		new: 'new',
-		retraps: 'retraps',
-		pullus: 'pullus',
-		juvs: 'juvs',
-		postjuv: 'postjuv',
-		adults: 'adults',
-		unknownAge: 'unknownAge'
 	};
 	const sessionLabels: Record<StandardField, string> = {
 		new: 'New',
@@ -103,25 +94,19 @@ describe('buildStandardColumnConfigs', () => {
 		unknownAge: 'Unaged'
 	};
 
-	// A second, differently-shaped caller: different RowModel key names AND
-	// different header wording for the same logical fields.
+	// A second caller whose RowModel carries extra fields of its own (proving
+	// `StandardField & keyof RowModel` doesn't require an exact match) and
+	// words the same logical fields differently in its headers.
 	type TotalsModel = {
-		freshRinged: number;
-		recaptures: number;
-		chicks: number;
-		juveniles: number;
-		moultedJuv: number;
-		grownUps: number;
-		ageUnknown: number;
-	};
-	const totalsFieldKeys: Record<StandardField, keyof TotalsModel> = {
-		new: 'freshRinged',
-		retraps: 'recaptures',
-		pullus: 'chicks',
-		juvs: 'juveniles',
-		postjuv: 'moultedJuv',
-		adults: 'grownUps',
-		unknownAge: 'ageUnknown'
+		species: string;
+		new: number;
+		retraps: number;
+		pullus: number;
+		juvs: number;
+		postjuv: number;
+		adults: number;
+		unknownAge: number;
+		newYoung: number;
 	};
 	const totalsLabels: Record<StandardField, string> = {
 		new: 'New',
@@ -136,7 +121,6 @@ describe('buildStandardColumnConfigs', () => {
 	it('returns new/retraps/juvs/postjuv/adults/unknownAge in order when hasPullus is false', () => {
 		const configs = buildStandardColumnConfigs<SessionModel>(
 			false,
-			sessionFieldKeys,
 			sessionLabels
 		);
 		expect(Object.keys(configs)).toEqual([
@@ -152,7 +136,6 @@ describe('buildStandardColumnConfigs', () => {
 	it('inserts the pullus entry immediately before juvs when hasPullus is true', () => {
 		const configs = buildStandardColumnConfigs<SessionModel>(
 			true,
-			sessionFieldKeys,
 			sessionLabels
 		);
 		expect(Object.keys(configs)).toEqual([
@@ -169,7 +152,6 @@ describe('buildStandardColumnConfigs', () => {
 	it('uses the caller-supplied label for each column', () => {
 		const configs = buildStandardColumnConfigs<SessionModel>(
 			true,
-			sessionFieldKeys,
 			sessionLabels
 		);
 		expect(configs.new?.label).toBe('New');
@@ -182,43 +164,23 @@ describe('buildStandardColumnConfigs', () => {
 	it('lets two callers word the same logical field differently from the one builder', () => {
 		const sessionConfigs = buildStandardColumnConfigs<SessionModel>(
 			false,
-			sessionFieldKeys,
 			sessionLabels
 		);
 		const totalsConfigs = buildStandardColumnConfigs<TotalsModel>(
 			false,
-			totalsFieldKeys,
 			totalsLabels
 		);
 		expect(sessionConfigs.retraps?.label).toBe('Retrap');
-		expect(totalsConfigs.recaptures?.label).toBe('Retraps');
+		expect(totalsConfigs.retraps?.label).toBe('Retraps');
 		expect(sessionConfigs.juvs?.label).toBe('Juv');
-		expect(totalsConfigs.juveniles?.label).toBe('Juvs');
+		expect(totalsConfigs.juvs?.label).toBe('Juvs');
 		expect(sessionConfigs.unknownAge?.label).toBe('Unaged');
-		expect(totalsConfigs.ageUnknown?.label).toBe('Unknown age');
-	});
-
-	it('keys each config by the caller-supplied RowModel key for each logical field', () => {
-		const configs = buildStandardColumnConfigs<TotalsModel>(
-			true,
-			totalsFieldKeys,
-			totalsLabels
-		);
-		expect(Object.keys(configs)).toEqual([
-			'freshRinged',
-			'recaptures',
-			'chicks',
-			'juveniles',
-			'moultedJuv',
-			'grownUps',
-			'ageUnknown'
-		]);
+		expect(totalsConfigs.unknownAge?.label).toBe('Unknown age');
 	});
 
 	it('puts the start border on pullus when shown, on juvs when hidden, and the end border always on unknownAge', () => {
 		const withPullus = buildStandardColumnConfigs<SessionModel>(
 			true,
-			sessionFieldKeys,
 			sessionLabels
 		);
 		expect(withPullus.pullus?.headerClassName).toContain('border-l-4');
@@ -227,7 +189,6 @@ describe('buildStandardColumnConfigs', () => {
 
 		const withoutPullus = buildStandardColumnConfigs<SessionModel>(
 			false,
-			sessionFieldKeys,
 			sessionLabels
 		);
 		expect(withoutPullus.juvs?.headerClassName).toContain('border-l-4');
@@ -237,7 +198,6 @@ describe('buildStandardColumnConfigs', () => {
 	it('omits the pullus key entirely (not an empty column) when hasPullus is false', () => {
 		const configs = buildStandardColumnConfigs<SessionModel>(
 			false,
-			sessionFieldKeys,
 			sessionLabels
 		);
 		expect('pullus' in configs).toBe(false);
