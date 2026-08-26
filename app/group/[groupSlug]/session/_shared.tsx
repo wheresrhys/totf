@@ -25,9 +25,6 @@ export type PageParams = {
 	viewedGroupId: number;
 	date: string;
 	locationId: number | undefined;
-	// Carried alongside viewedGroupId for the /group wrapper pages below —
-	// unused here (and by SessionSummary) until a later ticket consumes it.
-	viewedGroup?: ViewedGroup;
 };
 
 export type AdjacentSessionDates = {
@@ -187,12 +184,12 @@ function Locations({
 	locations,
 	date,
 	selectedLocation,
-	viewedGroupId
+	viewedGroup
 }: {
 	locations: LocationRow[];
 	date: string;
 	selectedLocation: number | undefined;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	return (
 		<small className="text-sm text-gray-500 flex flex-wrap gap-2 mt-2">
@@ -207,7 +204,7 @@ function Locations({
 							) : (
 								<Link
 									className="link badge badge-outline"
-									href={`/group/${viewedGroupId}/session/${date}/site/${location.id}`}
+									href={`/group/${viewedGroup.slug}/session/${date}/site/${location.id}`}
 								>
 									{printLocationName(location.location_name)}
 								</Link>
@@ -218,7 +215,7 @@ function Locations({
 				<>
 					<Link
 						className="link badge badge-outline"
-						href={`/group/${viewedGroupId}/session/${date}`}
+						href={`/group/${viewedGroup.slug}/session/${date}`}
 					>
 						View all
 					</Link>
@@ -230,10 +227,10 @@ function Locations({
 
 function SessionNavigation({
 	adjacentSessionDates,
-	viewedGroupId
+	viewedGroup
 }: {
 	adjacentSessionDates: AdjacentSessionDates;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	const { previousSessionDate, nextSessionDate } = adjacentSessionDates;
 	if (!previousSessionDate && !nextSessionDate) return null;
@@ -241,7 +238,7 @@ function SessionNavigation({
 		<nav aria-label="Session navigation" className="flex gap-2 text-sm mb-2">
 			{previousSessionDate ? (
 				<Link
-					href={`/group/${viewedGroupId}/session/${previousSessionDate}`}
+					href={`/group/${viewedGroup.slug}/session/${previousSessionDate}`}
 					aria-label="Previous session"
 					className="link"
 				>
@@ -250,7 +247,7 @@ function SessionNavigation({
 			) : null}
 			{nextSessionDate ? (
 				<Link
-					href={`/group/${viewedGroupId}/session/${nextSessionDate}`}
+					href={`/group/${viewedGroup.slug}/session/${nextSessionDate}`}
 					aria-label="Next session"
 					className="link"
 				>
@@ -263,7 +260,8 @@ function SessionNavigation({
 
 export function SessionSummary({
 	data: dayData,
-	params: { date, locationId, viewedGroupId }
+	params: { date, locationId, viewedGroupId },
+	viewedGroup
 }: {
 	data: DayData;
 	params: {
@@ -271,6 +269,7 @@ export function SessionSummary({
 		locationId: number | undefined;
 		viewedGroupId: number;
 	};
+	viewedGroup: ViewedGroup;
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
 	const chronology = calculateSessionChronology(dayData.encounters);
@@ -296,12 +295,12 @@ export function SessionSummary({
 					locations={dayData.locations}
 					date={date}
 					selectedLocation={locationId}
-					viewedGroupId={viewedGroupId}
+					viewedGroup={viewedGroup}
 				/>
 			</PrimaryHeading>
 			<SessionNavigation
 				adjacentSessionDates={dayData.adjacentSessionDates}
-				viewedGroupId={viewedGroupId}
+				viewedGroup={viewedGroup}
 			/>
 			<BadgeList
 				testId="session-stats"
