@@ -332,6 +332,69 @@ describe('session detail page', () => {
 		expect(stats.textContent).toContain('0 adults');
 	});
 
+	it('renders the new young count', async () => {
+		render(await renderPage());
+		const stats = await screen.findByTestId('session-stats');
+		// Of mockEncounters: id 1 is record_type N, age_code 4 (excluded); id 2
+		// is record_type S, age_code 1 (excluded — retrap, not new); id 3 is
+		// record_type N, age_code 2 (excluded). None qualify.
+		expect(stats.textContent).toContain('0 new young');
+	});
+
+	it('counts a new (record_type N), age-1-or-3 encounter as new young, excluding retraps with matching age', async () => {
+		const client = makeSessionClient([
+			makeChain(mockSessions),
+			makeChain(mockPreviousSession),
+			makeChain(mockNextSession),
+			makeChain([
+				{
+					id: 20,
+					session_id: 1,
+					age_code: 1,
+					is_juv: false,
+					breeding_condition: null,
+					capture_time: '09:00:00',
+					moult_code: null,
+					record_type: 'N',
+					ringing_group_id: 1,
+					sex: 'F',
+					sexing_method: null,
+					weight: null,
+					wing_length: null,
+					bird: {
+						ring_no: 'NYG001',
+						proven_age: 1,
+						species: { id: 1, species_name: 'Robin' }
+					}
+				},
+				{
+					id: 21,
+					session_id: 1,
+					age_code: 3,
+					is_juv: false,
+					breeding_condition: null,
+					capture_time: '09:15:00',
+					moult_code: null,
+					record_type: 'S',
+					ringing_group_id: 1,
+					sex: 'U',
+					sexing_method: null,
+					weight: null,
+					wing_length: null,
+					bird: {
+						ring_no: 'NYG002',
+						proven_age: 1,
+						species: { id: 1, species_name: 'Robin' }
+					}
+				}
+			])
+		]);
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+		render(await renderPage());
+		const stats = await screen.findByTestId('session-stats');
+		expect(stats.textContent).toContain('1 new young');
+	});
+
 	it('renders session chronology stats', async () => {
 		render(await renderPage());
 		const stats = await screen.findByTestId('session-stats');

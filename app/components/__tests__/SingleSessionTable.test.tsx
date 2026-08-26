@@ -186,6 +186,61 @@ describe('SessionTabs', () => {
 		});
 	});
 
+	describe('New Young column', () => {
+		it('counts a new (record_type N), age-1 encounter', () => {
+			const encounter = makeEncounter(30, 'Wren', '10:00:00', 0, {
+				age_code: 1
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Wren', encounters: [encounter] }]}
+					netRounds={[]}
+				/>
+			);
+			expect(columnCellValue('New Young', 'Wren')).toBe('1');
+		});
+
+		it('counts a new (record_type N), age-3 encounter', () => {
+			const encounter = makeEncounter(31, 'Dunnock', '10:00:00', 0, {
+				age_code: 3
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Dunnock', encounters: [encounter] }]}
+					netRounds={[]}
+				/>
+			);
+			expect(columnCellValue('New Young', 'Dunnock')).toBe('1');
+		});
+
+		it('excludes a new (record_type N) encounter whose age is neither 1 nor 3', () => {
+			const encounter = makeEncounter(32, 'Starling', '10:00:00', 0, {
+				age_code: 4
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Starling', encounters: [encounter] }]}
+					netRounds={[]}
+				/>
+			);
+			expect(columnCellValue('New Young', 'Starling')).toBe('0');
+		});
+
+		it('excludes an age-1 retrap (record_type S), despite matching the age criterion', () => {
+			const encounter = {
+				...makeEncounter(33, 'Swallow', '10:00:00', 0, { age_code: 1 }),
+				record_type: 'S'
+			};
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Swallow', encounters: [encounter] }]}
+					netRounds={[]}
+				/>
+			);
+			expect(columnCellValue('New Young', 'Swallow')).toBe('0');
+		});
+	});
+
 	describe('column headings', () => {
 		it('renders the full heading row in the specified order when the session caught pulli', () => {
 			const pulliEncounter = makeEncounter(20, 'Robin', '10:00:00', 0, {
@@ -210,6 +265,7 @@ describe('SessionTabs', () => {
 				'Postjuv',
 				'Adult',
 				'Unaged',
+				'New Young',
 				'Max Proven Age'
 			]);
 		});
@@ -255,7 +311,7 @@ describe('SessionTabs', () => {
 			expect(cells[totalIndex].className).toContain('font-bold');
 		});
 
-		it('applies a distinct background colour to each of the New/Retrap/Juv/Postjuv/Adult/Unaged columns', () => {
+		it('applies a distinct background colour to each of the New/Retrap/Juv/Postjuv/Adult/Unaged/New Young columns', () => {
 			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
 			const headers = screen.getAllByRole('columnheader');
 			const backgroundClassFor = (label: string) =>
@@ -266,6 +322,17 @@ describe('SessionTabs', () => {
 			expect(backgroundClassFor('Postjuv')).toContain('bg-blue-50');
 			expect(backgroundClassFor('Adult')).toContain('bg-purple-50');
 			expect(backgroundClassFor('Unaged')).toContain('bg-taupe-50');
+			expect(backgroundClassFor('New Young')).toContain('bg-lime-50');
+		});
+
+		it('renders the New Young column before Max Proven Age', () => {
+			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			const headers = screen
+				.getAllByRole('columnheader')
+				.map((header) => header.textContent);
+			expect(headers.indexOf('New Young')).toBeLessThan(
+				headers.indexOf('Max Proven Age')
+			);
 		});
 
 		it('draws a thicker left border on Juv (as the first age-class column) when Pulli is hidden', () => {

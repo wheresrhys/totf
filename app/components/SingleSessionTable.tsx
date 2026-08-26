@@ -92,6 +92,7 @@ type RowModel = {
 	juvs: number;
 	postjuv: number;
 	unknownAge: number;
+	newYoung: number;
 	maxProvenAge: number;
 };
 
@@ -118,6 +119,11 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 		).length,
 		unknownAge: data.encounters.filter((encounter) => encounter.age_code === 2)
 			.length,
+		newYoung: data.encounters.filter(
+			(encounter) =>
+				encounter.record_type === 'N' &&
+				(encounter.age_code === 1 || encounter.age_code === 3)
+		).length,
 		maxProvenAge: Math.max(
 			...data.encounters.map((encounter) => encounter.bird.proven_age)
 		)
@@ -186,6 +192,10 @@ function buildColumnConfigs(
 		unknownAge: {
 			label: 'Unaged',
 			...columnBlock(`bg-taupe-50 ${ageBlockEndBorder}`)
+		},
+		newYoung: {
+			label: 'New Young',
+			...columnBlock('bg-lime-50')
 		},
 		maxProvenAge: {
 			label: 'Max Proven Age'
