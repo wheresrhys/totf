@@ -1,6 +1,38 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { withStateLock, listState, swarmWorkerEntrySchema, type SwarmWorkerEntry } from '../lib/state-file';
+import {
+	withStateLock,
+	listStateWithPruneReport,
+	swarmWorkerEntrySchema,
+	prunedEntrySchema,
+	type SwarmWorkerEntry,
+	type ListStateResult,
+} from '../lib/state-file';
+
+export interface WorkerFilter {
+	kind?: 'ticket' | 'maintenance';
+	issue?: number;
+	pr?: number;
+	branch?: string;
+}
+
+/**
+ * Self-healing worker list: reads through `listStateWithPruneReport` (so any dead entries are
+ * pruned on this call), applies the caller's filter to the surviving `workers`, and passes the
+ * full `pruned` report straight through unfiltered — a prune is about what was dropped from state
+ * regardless of the query's kind/issue/pr/branch narrowing, so the orchestrator always sees it.
+ */
+export async function listWorkersWithPrune(filter: WorkerFilter): Promise<ListStateResult> {
+	const { workers, pruned } = await listStateWithPruneReport();
+	const filtered = workers.filter(
+		(entry) =>
+			(filter.kind === undefined || entry.kind === filter.kind) &&
+			(filter.issue === undefined || entry.issue === filter.issue) &&
+			(filter.pr === undefined || entry.pr === filter.pr) &&
+			(filter.branch === undefined || entry.branch === filter.branch)
+	);
+	return { workers: filtered, pruned };
+}
 
 export function registerSwarmStateTools(server: McpServer) {
 	server.registerTool(
@@ -79,18 +111,11 @@ export function registerSwarmStateTools(server: McpServer) {
 			},
 			outputSchema: {
 				workers: z.array(swarmWorkerEntrySchema),
+				pruned: z.array(prunedEntrySchema),
 			},
 		},
 		async ({ kind, issue, pr, branch }) => {
-			const entries = await listState();
-			const filtered = entries.filter(
-				(entry) =>
-					(kind === undefined || entry.kind === kind) &&
-					(issue === undefined || entry.issue === issue) &&
-					(pr === undefined || entry.pr === pr) &&
-					(branch === undefined || entry.branch === branch)
-			);
-			const structuredContent = { workers: filtered };
+			const structuredContent = await listWorkersWithPrune({ kind, issue, pr, branch });
 			return { content: [{ type: 'text', text: JSON.stringify(structuredContent) }], structuredContent };
 		}
 	);
