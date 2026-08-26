@@ -6,7 +6,6 @@ import {
 import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SpeciesTotalsSection } from '@/app/components/SpeciesTotalsSection';
-import { type ViewedGroup } from '@/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
 export function SummaryPage({
 	year,
@@ -16,10 +15,8 @@ export function SummaryPage({
 }: {
 	year?: number;
 	month?: number;
-	sessionDates?: string[];
 	summaryStats?: AggregateStatsResult | null;
 	speciesStats?: AggregateStatsResult[];
-	viewedGroup?: ViewedGroup;
 }) {
 	return (
 		<PageWrapper>

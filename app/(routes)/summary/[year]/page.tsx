@@ -1,5 +1,4 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
-import { fetchSessionStats } from '@/lib/underlying-stats';
 import { fetchSummaryStats } from '@/app/actions/summary-stats';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import type { ViewedGroup } from '@/lib/group-slug';
@@ -30,19 +29,12 @@ export async function fetchYearSummaryData(
 	};
 }
 
-function YearSummary({
-	data,
-	viewedGroup
-}: {
-	data: PageData;
-	viewedGroup: ViewedGroup;
-}) {
+function YearSummary({ data }: { data: PageData; viewedGroup: ViewedGroup }) {
 	return (
 		<SummaryPageContent
 			year={data.year}
 			summaryStats={data.summaryStats}
 			speciesStats={data.speciesStats}
-			viewedGroup={viewedGroup}
 		/>
 	);
 }

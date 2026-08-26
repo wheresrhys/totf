@@ -2,9 +2,12 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { SummaryPage } from '../_shared';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
+import alphaSpeciesStats from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
 import type { AggregateStatsResult } from '@/app/models/db';
 
 const populatedStats = alphaStats as unknown as AggregateStatsResult;
+const populatedSpeciesStats =
+	alphaSpeciesStats as unknown as AggregateStatsResult[];
 
 describe('SummaryPage', () => {
 	afterEach(() => {
@@ -33,6 +36,18 @@ describe('SummaryPage', () => {
 		it('renders nothing extra when summaryStats is undefined/null', () => {
 			render(<SummaryPage summaryStats={null} />);
 			expect(screen.queryByTestId('summary-stats-section')).toBeNull();
+		});
+	});
+
+	describe('Edge', () => {
+		it('renders no session links list even with populated stats/species', () => {
+			render(
+				<SummaryPage
+					summaryStats={populatedStats}
+					speciesStats={populatedSpeciesStats}
+				/>
+			);
+			expect(screen.queryByRole('link')).toBeNull();
 		});
 	});
 });

@@ -1,5 +1,4 @@
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
-import { fetchSessionStats } from '@/lib/underlying-stats';
 import { fetchSummaryStats } from '@/app/actions/summary-stats';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import type { ViewedGroup } from '@/lib/group-slug';
@@ -23,8 +22,7 @@ export async function fetchAllTimeSummaryData(
 }
 
 function AllTimeSummary({
-	data,
-	viewedGroup
+	data
 }: {
 	data: PageData;
 	viewedGroup: ViewedGroup;
@@ -33,7 +31,6 @@ function AllTimeSummary({
 		<SummaryPageContent
 			summaryStats={data.summaryStats}
 			speciesStats={data.speciesStats}
-			viewedGroup={viewedGroup}
 		/>
 	);
 }
