@@ -27,9 +27,9 @@ export function SummaryStatsSection({
 		{ label: 'New', value: stats.new_bird_count },
 		{ label: 'Retraps', value: calculateRetraps(stats) },
 		{ label: 'Pullus', value: stats.pullus_count },
-		{ label: 'Adults', value: stats.adult_count },
 		{ label: 'Juvs', value: stats.juv_count },
 		{ label: 'Postjuv', value: stats.postjuv_count },
+		{ label: 'Adults', value: stats.adult_count },
 		{ label: 'Unknown age', value: stats.unknown_age_count },
 		{ label: 'New young', value: stats.new_young_count }
 	];
