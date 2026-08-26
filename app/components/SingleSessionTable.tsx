@@ -16,19 +16,17 @@ import {
 	SortableTable,
 	type RowModelWithRawData
 } from './shared/SortableTable';
+import {
+	buildAgeClassColumnConfigs,
+	columnBlock,
+	createNameLinkCell
+} from './shared/StatsTableColumnConfigs';
 import { TabNav } from './TabNav';
 
-function SpeciesNameCell({
-	model: { species }
-}: {
-	model: RowModelWithRawData<SpeciesWithEncounters, RowModel>;
-}) {
-	return (
-		<NoPrefetchLink className="link text-wrap" href={`/species/${species}`}>
-			{species}
-		</NoPrefetchLink>
-	);
-}
+const SpeciesNameCell = createNameLinkCell<SpeciesWithEncounters, RowModel>(
+	(model) => model.species,
+	(model) => `/species/${model.species}`
+);
 
 function SpeciesDetailsTable({
 	model: {
@@ -130,21 +128,6 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 	};
 }
 
-// A thicker border marks where the "age class" block of columns
-// (Pulli/Juv/Postjuv/Adult/Unaged) starts and ends, visually separating it
-// from the plain count columns either side.
-const ageBlockStartBorder = 'border-l-4 border-l-base-content/30';
-const ageBlockEndBorder = 'border-r-4 border-r-base-content/30';
-
-// Shorthand for column configs that tint both the header and every data
-// cell in that column the same colour, so column groupings read clearly
-// top-to-bottom.
-function columnBlock(
-	className: string
-): Pick<ColumnConfig, 'headerClassName' | 'cellClassName'> {
-	return { headerClassName: className, cellClassName: className };
-}
-
 function buildColumnConfigs(
 	hasPullus: boolean
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
@@ -157,42 +140,27 @@ function buildColumnConfigs(
 			label: 'Total',
 			cellClassName: 'font-bold'
 		},
-		new: {
-			label: 'New',
-			...columnBlock('bg-green-50')
-		},
-		retraps: {
-			label: 'Retrap',
-			...columnBlock('bg-amber-50')
-		},
-		// Omitted entirely (rather than rendered empty) when the session
-		// caught no pulli, per issue #545.
-		...(hasPullus
-			? {
-					pullus: {
-						label: 'Pulli',
-						...columnBlock(`bg-cyan-50 ${ageBlockStartBorder}`)
-					}
-				}
-			: {}),
-		juvs: {
-			label: 'Juv',
-			// If pulli is hidden, Juv becomes the first column of the age
-			// block and inherits its thicker left border.
-			...columnBlock(`bg-sky-50 ${hasPullus ? '' : ageBlockStartBorder}`.trim())
-		},
-		postjuv: {
-			label: 'Postjuv',
-			...columnBlock('bg-blue-50')
-		},
-		adults: {
-			label: 'Adult',
-			...columnBlock('bg-purple-50')
-		},
-		unknownAge: {
-			label: 'Unaged',
-			...columnBlock(`bg-taupe-50 ${ageBlockEndBorder}`)
-		},
+		...buildAgeClassColumnConfigs<RowModel>(
+			hasPullus,
+			{
+				new: 'new',
+				retraps: 'retraps',
+				pullus: 'pullus',
+				juvs: 'juvs',
+				postjuv: 'postjuv',
+				adults: 'adults',
+				unknownAge: 'unknownAge'
+			},
+			{
+				new: 'New',
+				retraps: 'Retrap',
+				pullus: 'Pulli',
+				juvs: 'Juv',
+				postjuv: 'Postjuv',
+				adults: 'Adult',
+				unknownAge: 'Unaged'
+			}
+		),
 		newYoung: {
 			label: 'New Young',
 			...columnBlock('bg-lime-50')
