@@ -9,10 +9,19 @@ export const ageBlockEndBorder = 'border-r-4 border-r-base-content/30';
 
 // Shorthand for column configs that tint both the header and every data
 // cell in that column the same colour, so column groupings read clearly
-// top-to-bottom.
+// top-to-bottom. Callers pass just the base Tailwind colour name (e.g.
+// `'green'`) - this applies the light-mode `-50` tint and, per issue #605,
+// the equivalent dark-mode `-950` tint, so callers never hand-wire the
+// per-mode shade themselves. `extraClassName` carries anything unrelated to
+// the tint itself (e.g. the age-block borders below). New base colours must
+// be added to the `@source inline(...)` safelist in `app/globals.css`, since
+// Tailwind's file scanner can't see class names composed at runtime.
 export function columnBlock(
-	className: string
+	baseColor: string,
+	extraClassName?: string
 ): Pick<ColumnConfig, 'headerClassName' | 'cellClassName'> {
+	const className =
+		`bg-${baseColor}-50 dark:bg-${baseColor}-950 ${extraClassName ?? ''}`.trim();
 	return { headerClassName: className, cellClassName: className };
 }
 
@@ -38,70 +47,60 @@ export function createNameLinkCell<RawRowData, RowModel>(
 	};
 }
 
-// The logical fields the column-config builder knows about: the capture-type
-// fields (New/Retrap) plus the age-class fields (Pulli/Juv/Postjuv/Adult/
-// Unaged) — independent of any caller's RowModel key names or header wording.
-export type StandardField =
-	| 'new'
-	| 'retraps'
-	| 'pullus'
-	| 'juvs'
-	| 'postjuv'
-	| 'adults'
-	| 'unknownAge';
-
 // Builds the colour-blocked standard column configs (New/Retrap/Pulli/Juv/
 // Postjuv/Adult/Unaged) shared across stats tables. Keyed directly by
 // `StandardField`, so a caller's RowModel must use those field names for its
 // own new/retraps/pullus/juvs/postjuv/adults/unknownAge counts; `labels`
 // supplies the header text for each (no defaults — callers word these
-// differently, e.g. `Retrap` vs `Retraps`). `hasPullus` omits the Pulli column
+// differently, e.g. `Retrap` vs `Retraps`). `hasPulli` omits the Pulli column
 // entirely (rather than rendering it empty) and shifts the age-block's left
 // border onto Juv when false, per issue #545.
 export function buildStandardColumnConfigs<RowModel>(
-	hasPullus: boolean,
-	labels: Record<StandardField & keyof RowModel, string>
+	hasPulli: boolean
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
 	// `RowModel` is generic here, so TS can't confirm each `StandardField` is
 	// actually a key of it inside the function body (only the caller's
 	// concrete instantiation proves that) — read through a `StandardField`-keyed
 	// view of the same object, matching the cast already needed on the return.
-	const fieldLabels = labels as Record<StandardField, string>;
 	return {
 		new: {
-			label: fieldLabels.new,
-			...columnBlock('bg-green-50')
+			label: 'New',
+			...columnBlock('green')
 		},
 		retraps: {
-			label: fieldLabels.retraps,
-			...columnBlock('bg-amber-50')
+			label: 'Retrap',
+			...columnBlock('amber')
 		},
 		// Omitted entirely (rather than rendered empty) when no pulli were caught.
-		...(hasPullus
+		...(hasPulli
 			? {
 					pullus: {
-						label: fieldLabels.pullus,
-						...columnBlock(`bg-cyan-50 ${ageBlockStartBorder}`)
+						label: 'Pulli',
+						...columnBlock('cyan', ageBlockStartBorder)
 					}
 				}
 			: {}),
 		juvs: {
-			label: fieldLabels.juvs,
+			label: 'Juv',
 			// If pulli is hidden, Juv becomes the first column of the age block
 			// and inherits its thicker left border.
-			...columnBlock(`bg-sky-50 ${hasPullus ? '' : ageBlockStartBorder}`.trim())
+			...columnBlock('sky', hasPulli ? undefined : ageBlockStartBorder)
 		},
 		postjuv: {
-			label: fieldLabels.postjuv,
-			...columnBlock('bg-blue-50')
+			label: 'Postjuv',
+			...columnBlock('blue')
 		},
 		adults: {
-			label: fieldLabels.adults,
-			...columnBlock('bg-purple-50')
+			label: 'Adult',
+			...columnBlock('purple')
 		},
 		unknownAge: {
-			label: fieldLabels.unknownAge,
-			...columnBlock(`bg-taupe-50 ${ageBlockEndBorder}`)
+			label: 'Not aged',
+			...columnBlock('taupe', ageBlockEndBorder)
+		},
+		newYoung: {
+			label: 'New young',
+			...columnBlock('lime')
 		}
 	} as Partial<Record<keyof RowModel, ColumnConfig>>;
 }
@@ -149,16 +148,4 @@ export function buildTotalsRowCells<RowModel>(
 			</td>
 		)
 	);
-}
-
-// A single-entry column config for an opt-in "Sessions" count column. Callers
-// that don't want it (e.g. the session page, where the count is trivially 1)
-// simply never call this.
-export function buildSessionsColumnConfig<RowModel>(
-	fieldKey: keyof RowModel,
-	label: string
-): Partial<Record<keyof RowModel, ColumnConfig>> {
-	return {
-		[fieldKey]: { label }
-	} as Partial<Record<keyof RowModel, ColumnConfig>>;
 }

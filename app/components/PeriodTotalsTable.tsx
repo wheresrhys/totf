@@ -15,22 +15,23 @@ import {
 	type RowModelWithRawData
 } from './shared/SortableTable';
 import {
-	buildSessionsColumnConfig,
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
-	columnBlock,
 	createNameLinkCell
 } from './shared/StatsTableColumnConfigs';
 
 function buildColumnConfigs(
-	firstColumnHeader: string
+	firstColumnHeader: string,
+	hasPulli: boolean
 ): Partial<Record<keyof PeriodTotalsRow, ColumnConfig>> {
 	return {
 		timePeriod: {
 			label: firstColumnHeader,
 			invertSort: true
 		},
-		...buildSessionsColumnConfig<PeriodTotalsRow>('sessionsCount', 'Sessions'),
+		sessionsCount: {
+			label: 'Sessions'
+		},
 		effortSeconds: {
 			label: 'Effort',
 			formatter: (value) => formatSecondsForDisplay(value as number)
@@ -38,19 +39,7 @@ function buildColumnConfigs(
 		speciesCount: { label: 'Species' },
 		encounterCount: { label: 'Encounters' },
 		individualsCount: { label: 'Individuals' },
-		...buildStandardColumnConfigs<PeriodTotalsRow>(true, {
-			new: 'New',
-			retraps: 'Retraps',
-			pullus: 'Pullus',
-			juvs: 'Juvs',
-			postjuv: 'Postjuv',
-			adults: 'Adults',
-			unknownAge: 'Unknown age'
-		}),
-		newYoung: {
-			label: 'New young',
-			...columnBlock('bg-lime-50')
-		}
+		...buildStandardColumnConfigs<PeriodTotalsRow>(hasPulli)
 	};
 }
 
@@ -79,8 +68,8 @@ export function PeriodTotalsTable({
 	const resolveLabel =
 		buildLabel ??
 		((timePeriod: string) => formatPeriodTotalsLabel(grouping, timePeriod));
-
-	const columnConfigs = buildColumnConfigs(firstColumnHeader);
+	const hasPulli = rows.some((stat) => stat.pullus_count > 0);
+	const columnConfigs = buildColumnConfigs(firstColumnHeader, hasPulli);
 
 	const totalsRow = totalsStats
 		? buildTotalsRowCells<PeriodTotalsRow>({

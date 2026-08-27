@@ -320,7 +320,7 @@ export function SessionSummary({
 									encounter.record_type === 'N' &&
 									(encounter.age_code === 1 || encounter.age_code === 3)
 							).length
-						} new young`,
+						} New young`,
 						`Start: ${chronology.startTime ? chronology.startTime.slice(0, 5) : '–'}`,
 						`End: ${chronology.endTime ? chronology.endTime.slice(0, 5) : '–'}`,
 						`Duration: ${chronology.durationMinutes !== null ? formatMinutesForDisplay(chronology.durationMinutes) : '–'}`,

@@ -28,7 +28,7 @@ function getYoungsters(statsHistory: AggregateStatsResult[]): LineChartData[] {
 			data: statsHistory.map((row) => [row.time_period, row.postjuv_count])
 		},
 		{
-			name: "new young's",
+			name: "New young's",
 			data: statsHistory.map((row) => [row.time_period, row.new_young_count])
 		}
 	];

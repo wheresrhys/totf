@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import { SpeciesTotalsSection } from '../SpeciesTotalsSection';
+import { SummaryTotalsSection } from '../SummaryTotalsSection';
 import { buildMonthTotalsRows } from '@/app/models/month-totals';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
 import type { AggregateStatsResult } from '@/app/models/db';
@@ -87,14 +87,14 @@ function buildYearlyStat(
 	} as AggregateStatsResult;
 }
 
-describe('SpeciesTotalsSection', () => {
+describe('SummaryTotalsSection', () => {
 	afterEach(() => {
 		cleanup();
 	});
 
 	describe('without any period-tab data (day summary page)', () => {
 		it('renders a single "Species totals" tab, active by default, with the table content visible beneath it', () => {
-			render(<SpeciesTotalsSection speciesStats={speciesStats} />);
+			render(<SummaryTotalsSection speciesStats={speciesStats} />);
 			const tab = screen.getByRole('button', { name: 'Species totals' });
 			expect(tab.getAttribute('aria-current')).toBe('true');
 			expect(screen.queryByRole('button', { name: 'Month totals' })).toBeNull();
@@ -108,7 +108,7 @@ describe('SpeciesTotalsSection', () => {
 		});
 
 		it("renders the table's empty state when speciesStats is empty, without crashing", () => {
-			render(<SpeciesTotalsSection speciesStats={[]} />);
+			render(<SummaryTotalsSection speciesStats={[]} />);
 			expect(
 				screen.getByRole('button', { name: 'Species totals' })
 			).toBeTruthy();
@@ -117,7 +117,7 @@ describe('SpeciesTotalsSection', () => {
 
 		it('forwards summaryStats to the Species totals table as its totals row', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					summaryStats={summaryStats}
 				/>
@@ -129,7 +129,7 @@ describe('SpeciesTotalsSection', () => {
 	describe('with monthTotals (year page)', () => {
 		it('renders the "Month totals" tab first, active by default', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					monthTotals={monthTotals}
 				/>
@@ -144,7 +144,7 @@ describe('SpeciesTotalsSection', () => {
 
 		it('renders 12 month rows, each linking to /summary/{year}/{month}', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					monthTotals={monthTotals}
 				/>
@@ -158,7 +158,7 @@ describe('SpeciesTotalsSection', () => {
 
 		it('switches to the species totals table when its tab is clicked', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					monthTotals={monthTotals}
 				/>
@@ -172,7 +172,7 @@ describe('SpeciesTotalsSection', () => {
 
 		it('forwards summaryStats to the Month totals table as its totals row', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					monthTotals={monthTotals}
 					summaryStats={summaryStats}
@@ -185,7 +185,7 @@ describe('SpeciesTotalsSection', () => {
 	describe('with session totals (month summary page)', () => {
 		it('renders "Session totals" as the first tab, active by default, with "Species totals" present as a second tab', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					sessionTotals={[buildDayStat()]}
 					viewedGroup={viewedGroup}
@@ -205,7 +205,7 @@ describe('SpeciesTotalsSection', () => {
 
 		it('renders one row per session day, in the order supplied, each linking to the session-temp route with the date formatted "16th August 2026"', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					sessionTotals={[
 						buildDayStat({ time_period: '2026-08-02' }),
@@ -231,7 +231,7 @@ describe('SpeciesTotalsSection', () => {
 
 		it('switches to the "Species totals" table when its tab is clicked', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					sessionTotals={[buildDayStat()]}
 					viewedGroup={viewedGroup}
@@ -248,7 +248,7 @@ describe('SpeciesTotalsSection', () => {
 
 		it('renders a single session day', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					sessionTotals={[buildDayStat({ time_period: '2026-08-16' })]}
 					viewedGroup={viewedGroup}
@@ -264,7 +264,7 @@ describe('SpeciesTotalsSection', () => {
 
 		it('renders the period table empty state when there were no sessions that month', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					sessionTotals={[]}
 					viewedGroup={viewedGroup}
@@ -280,7 +280,7 @@ describe('SpeciesTotalsSection', () => {
 
 		it('forwards summaryStats to the Session totals table as its totals row', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					sessionTotals={[buildDayStat()]}
 					viewedGroup={viewedGroup}
@@ -295,7 +295,7 @@ describe('SpeciesTotalsSection', () => {
 		it('renders "Year totals" as the first tab, active by default, with its content visible beneath it', () => {
 			const yearlyTotals = [buildYearlyStat()];
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					yearlyTotals={yearlyTotals}
 				/>
@@ -312,7 +312,7 @@ describe('SpeciesTotalsSection', () => {
 		it('renders the first column as a plain year number linking to /summary/{year}', () => {
 			const yearlyTotals = [buildYearlyStat({ time_period: '2026-01-01' })];
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					yearlyTotals={yearlyTotals}
 				/>
@@ -324,7 +324,7 @@ describe('SpeciesTotalsSection', () => {
 		it('keeps "Species totals" present and switches to it on click', () => {
 			const yearlyTotals = [buildYearlyStat()];
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					yearlyTotals={yearlyTotals}
 				/>
@@ -342,7 +342,7 @@ describe('SpeciesTotalsSection', () => {
 
 		it("renders the shared table's empty state when yearlyTotals is empty, without crashing", () => {
 			render(
-				<SpeciesTotalsSection speciesStats={speciesStats} yearlyTotals={[]} />
+				<SummaryTotalsSection speciesStats={speciesStats} yearlyTotals={[]} />
 			);
 			expect(screen.getByRole('button', { name: 'Year totals' })).toBeTruthy();
 			expect(screen.queryByTestId('period-totals-table')).toBeNull();
@@ -351,7 +351,7 @@ describe('SpeciesTotalsSection', () => {
 		it('forwards summaryStats to the Year totals table as its totals row', () => {
 			const yearlyTotals = [buildYearlyStat()];
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					yearlyTotals={yearlyTotals}
 					summaryStats={summaryStats}
@@ -364,7 +364,7 @@ describe('SpeciesTotalsSection', () => {
 	describe('when viewedGroup is undefined', () => {
 		it('falls back to "Species totals" as the sole default tab, with no session links, even when sessionTotals are supplied', () => {
 			render(
-				<SpeciesTotalsSection
+				<SummaryTotalsSection
 					speciesStats={speciesStats}
 					sessionTotals={[buildDayStat()]}
 					viewedGroup={undefined}

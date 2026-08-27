@@ -3,10 +3,8 @@ import { render, screen, cleanup } from '@testing-library/react';
 import {
 	createNameLinkCell,
 	buildStandardColumnConfigs,
-	buildSessionsColumnConfig,
 	buildTotalsRowCells,
-	columnBlock,
-	type StandardField
+	columnBlock
 } from '../StatsTableColumnConfigs';
 import type { ColumnConfig, RowModelWithRawData } from '../SortableTable';
 
@@ -74,6 +72,32 @@ describe('createNameLinkCell', () => {
 	});
 });
 
+describe('columnBlock', () => {
+	it('applies the light-mode -50 tint and the dark-mode -950 tint from the same base colour', () => {
+		const block = columnBlock('green');
+		expect(block.headerClassName).toBe('bg-green-50 dark:bg-green-950');
+		expect(block.cellClassName).toBe('bg-green-50 dark:bg-green-950');
+	});
+
+	it('applies the same tinted classes to both the header and every cell in the column', () => {
+		const block = columnBlock('amber');
+		expect(block.headerClassName).toBe(block.cellClassName);
+	});
+
+	it('appends extraClassName after the tint classes when supplied', () => {
+		const block = columnBlock('cyan', 'border-l-4 border-l-base-content/30');
+		expect(block.headerClassName).toBe(
+			'bg-cyan-50 dark:bg-cyan-950 border-l-4 border-l-base-content/30'
+		);
+	});
+
+	it('omits any trailing whitespace when extraClassName is not supplied', () => {
+		const block = columnBlock('purple');
+		expect(block.headerClassName).toBe('bg-purple-50 dark:bg-purple-950');
+		expect(block.headerClassName?.endsWith(' ')).toBe(false);
+	});
+});
+
 describe('buildStandardColumnConfigs', () => {
 	// The session table's own RowModel shape, used to prove the builder
 	// reproduces today's behaviour.
@@ -85,15 +109,6 @@ describe('buildStandardColumnConfigs', () => {
 		postjuv: number;
 		adults: number;
 		unknownAge: number;
-	};
-	const sessionLabels: Record<StandardField, string> = {
-		new: 'New',
-		retraps: 'Retrap',
-		pullus: 'Pulli',
-		juvs: 'Juv',
-		postjuv: 'Postjuv',
-		adults: 'Adult',
-		unknownAge: 'Unaged'
 	};
 
 	// A second caller whose RowModel carries extra fields of its own (proving
@@ -110,36 +125,22 @@ describe('buildStandardColumnConfigs', () => {
 		unknownAge: number;
 		newYoung: number;
 	};
-	const totalsLabels: Record<StandardField, string> = {
-		new: 'New',
-		retraps: 'Retraps',
-		pullus: 'Pulli',
-		juvs: 'Juvs',
-		postjuv: 'Postjuv',
-		adults: 'Adult',
-		unknownAge: 'Unknown age'
-	};
 
-	it('returns new/retraps/juvs/postjuv/adults/unknownAge in order when hasPullus is false', () => {
-		const configs = buildStandardColumnConfigs<SessionModel>(
-			false,
-			sessionLabels
-		);
+	it('returns age counts in logical order when hasPulli is false', () => {
+		const configs = buildStandardColumnConfigs<SessionModel>(false);
 		expect(Object.keys(configs)).toEqual([
 			'new',
 			'retraps',
 			'juvs',
 			'postjuv',
 			'adults',
-			'unknownAge'
+			'unknownAge',
+			'newYoung'
 		]);
 	});
 
-	it('inserts the pullus entry immediately before juvs when hasPullus is true', () => {
-		const configs = buildStandardColumnConfigs<SessionModel>(
-			true,
-			sessionLabels
-		);
+	it('inserts the pullus entry immediately before juvs when hasPulli is true', () => {
+		const configs = buildStandardColumnConfigs<SessionModel>(true);
 		expect(Object.keys(configs)).toEqual([
 			'new',
 			'retraps',
@@ -147,61 +148,33 @@ describe('buildStandardColumnConfigs', () => {
 			'juvs',
 			'postjuv',
 			'adults',
-			'unknownAge'
+			'unknownAge',
+			'newYoung'
 		]);
 	});
 
-	it('uses the caller-supplied label for each column', () => {
-		const configs = buildStandardColumnConfigs<SessionModel>(
-			true,
-			sessionLabels
-		);
+	it('uses the correct label for each column', () => {
+		const configs = buildStandardColumnConfigs<SessionModel>(true);
 		expect(configs.new?.label).toBe('New');
 		expect(configs.retraps?.label).toBe('Retrap');
 		expect(configs.pullus?.label).toBe('Pulli');
 		expect(configs.juvs?.label).toBe('Juv');
-		expect(configs.unknownAge?.label).toBe('Unaged');
-	});
-
-	it('lets two callers word the same logical field differently from the one builder', () => {
-		const sessionConfigs = buildStandardColumnConfigs<SessionModel>(
-			false,
-			sessionLabels
-		);
-		const totalsConfigs = buildStandardColumnConfigs<TotalsModel>(
-			false,
-			totalsLabels
-		);
-		expect(sessionConfigs.retraps?.label).toBe('Retrap');
-		expect(totalsConfigs.retraps?.label).toBe('Retraps');
-		expect(sessionConfigs.juvs?.label).toBe('Juv');
-		expect(totalsConfigs.juvs?.label).toBe('Juvs');
-		expect(sessionConfigs.unknownAge?.label).toBe('Unaged');
-		expect(totalsConfigs.unknownAge?.label).toBe('Unknown age');
+		expect(configs.unknownAge?.label).toBe('Not aged');
 	});
 
 	it('puts the start border on pullus when shown, on juvs when hidden, and the end border always on unknownAge', () => {
-		const withPullus = buildStandardColumnConfigs<SessionModel>(
-			true,
-			sessionLabels
-		);
+		const withPullus = buildStandardColumnConfigs<SessionModel>(true);
 		expect(withPullus.pullus?.headerClassName).toContain('border-l-4');
 		expect(withPullus.juvs?.headerClassName).not.toContain('border-l-4');
 		expect(withPullus.unknownAge?.headerClassName).toContain('border-r-4');
 
-		const withoutPullus = buildStandardColumnConfigs<SessionModel>(
-			false,
-			sessionLabels
-		);
+		const withoutPullus = buildStandardColumnConfigs<SessionModel>(false);
 		expect(withoutPullus.juvs?.headerClassName).toContain('border-l-4');
 		expect(withoutPullus.unknownAge?.headerClassName).toContain('border-r-4');
 	});
 
-	it('omits the pullus key entirely (not an empty column) when hasPullus is false', () => {
-		const configs = buildStandardColumnConfigs<SessionModel>(
-			false,
-			sessionLabels
-		);
+	it('omits the pullus key entirely (not an empty column) when hasPulli is false', () => {
+		const configs = buildStandardColumnConfigs<SessionModel>(false);
 		expect('pullus' in configs).toBe(false);
 	});
 });
@@ -215,7 +188,7 @@ describe('buildTotalsRowCells', () => {
 	const columnConfigs: Partial<Record<keyof TotalsModel, ColumnConfig>> = {
 		speciesName: { label: 'Species' },
 		encounterCount: { label: 'Encounters' },
-		individualsCount: { label: 'Individuals', ...columnBlock('bg-green-50') }
+		individualsCount: { label: 'Individuals', ...columnBlock('green') }
 	};
 	const totalsRowModel: TotalsModel = {
 		speciesName: 'ignored',
@@ -303,24 +276,5 @@ describe('buildTotalsRowCells', () => {
 			totalsRowModel
 		});
 		expect(cells).toHaveLength(0);
-	});
-});
-
-describe('buildSessionsColumnConfig', () => {
-	type Model = { sessions: number };
-
-	it('returns a single-entry config keyed by the supplied field key with the supplied label', () => {
-		const config = buildSessionsColumnConfig<Model>('sessions', 'Sessions');
-		expect(Object.keys(config)).toEqual(['sessions']);
-		expect(config.sessions?.label).toBe('Sessions');
-	});
-
-	it('is absent from a caller column-config object entirely when never called', () => {
-		// A caller that opts in has the key; one that never calls the helper
-		// simply composes its column configs without it.
-		const optedIn = buildSessionsColumnConfig<Model>('sessions', 'Sessions');
-		const optedOut: typeof optedIn = {};
-		expect('sessions' in optedIn).toBe(true);
-		expect('sessions' in optedOut).toBe(false);
 	});
 });

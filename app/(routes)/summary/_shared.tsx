@@ -5,7 +5,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
-import { SpeciesTotalsSection } from '@/app/components/SpeciesTotalsSection';
+import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { MonthTotalsRow } from '@/app/models/month-totals';
@@ -37,22 +37,18 @@ export function SummaryPage({
 					recorded in
 				</p>
 			)}
-			<div className="lg:flex lg:items-start lg:gap-8">
-				<div className="lg:w-[400px] lg:shrink-0">
-					<SummaryStatsSection stats={summaryStats} />
-					<HighlightsSection />
-				</div>
-				<div className="lg:flex-1">
-					<SpeciesTotalsSection
-						speciesStats={speciesStats}
-						summaryStats={summaryStats}
-						monthTotals={monthTotals}
-						yearlyTotals={yearlyTotals}
-						sessionTotals={sessionTotals}
-						viewedGroup={viewedGroup}
-					/>
-				</div>
+			<div className="sm:hidden">
+				<SummaryStatsSection stats={summaryStats} />
+				<HighlightsSection />
 			</div>
+			<SummaryTotalsSection
+				speciesStats={speciesStats}
+				summaryStats={summaryStats}
+				monthTotals={monthTotals}
+				yearlyTotals={yearlyTotals}
+				sessionTotals={sessionTotals}
+				viewedGroup={viewedGroup}
+			/>
 		</PageWrapper>
 	);
 }

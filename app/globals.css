@@ -4,8 +4,22 @@
 @import 'flyonui/variants.css';
 @source "./node_modules/flyonui/flyonui.js";
 
+/* `columnBlock` (app/components/shared/StatsTableColumnConfigs.tsx) composes
+   `bg-<color>-50 dark:bg-<color>-950` from a base colour name at runtime, so
+   the concrete class names never appear as literal text anywhere in the
+   source for Tailwind's file scanner to pick up. `@source inline(...)`
+   (with brace-expansion) tells Tailwind to generate them anyway - see
+   https://tailwindcss.com/docs/detecting-classes-in-source-files#safelisting-classes.
+   Keep this list in sync with the base colours passed to `columnBlock`
+   (issue #605). */
+@source inline('bg-{green,amber,cyan,sky,blue,purple,taupe,lime}-50');
+@source inline('dark:bg-{green,amber,cyan,sky,blue,purple,taupe,lime}-950');
+
 @theme {
 	/* Not part of Tailwind's default palette - added for the "Unaged" column
-	   background in the per-session species table (issue #545). */
+	   background in the per-session species table (issue #545). Both shades
+	   are needed so `columnBlock` can tint dark mode via `dark:bg-taupe-950`
+	   (issue #605). */
 	--color-taupe-50: #ede3d8;
+	--color-taupe-950: #251f18;
 }

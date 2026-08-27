@@ -6,7 +6,6 @@ import {
 	type RowModelWithRawData
 } from './shared/SortableTable';
 import {
-	buildSessionsColumnConfig,
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
 	createNameLinkCell
@@ -51,32 +50,23 @@ function rowDataTransform(stat: AggregateStatsResult): RowModel {
 }
 
 function buildColumnConfigs(
-	hasPullus: boolean
+	hasPulli: boolean
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
 	return {
 		speciesName: {
 			label: 'Species',
 			invertSort: true
 		},
-		...buildSessionsColumnConfig<RowModel>('sessionsCount', 'Sessions'),
+		sessionsCount: {
+			label: 'Sessions'
+		},
 		encounterCount: {
 			label: 'Encounters'
 		},
 		individualsCount: {
 			label: 'Individuals'
 		},
-		...buildStandardColumnConfigs<RowModel>(hasPullus, {
-			new: 'New',
-			retraps: 'Retraps',
-			pullus: 'Pullus',
-			juvs: 'Juvs',
-			postjuv: 'Postjuv',
-			adults: 'Adults',
-			unknownAge: 'Unknown age'
-		}),
-		newYoung: {
-			label: 'New young'
-		}
+		...buildStandardColumnConfigs<RowModel>(hasPulli)
 	};
 }
 
@@ -123,8 +113,8 @@ export function SpeciesTotalsTable({
 		return <p>No species recorded.</p>;
 	}
 
-	const hasPullus = speciesStats.some((stat) => stat.pullus_count > 0);
-	const columnConfigs = buildColumnConfigs(hasPullus);
+	const hasPulli = speciesStats.some((stat) => stat.pullus_count > 0);
+	const columnConfigs = buildColumnConfigs(hasPulli);
 
 	const totalsRow = totalsStats
 		? buildTotalsRowCells<RowModel>({
