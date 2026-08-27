@@ -8,6 +8,7 @@ import {
 import {
 	buildSessionsColumnConfig,
 	buildStandardColumnConfigs,
+	buildTotalsRowCells,
 	createNameLinkCell
 } from './shared/StatsTableColumnConfigs';
 
@@ -112,9 +113,11 @@ function SpeciesTotalsTableBody({
 }
 
 export function SpeciesTotalsTable({
-	speciesStats
+	speciesStats,
+	totalsStats
 }: {
 	speciesStats: AggregateStatsResult[];
+	totalsStats?: AggregateStatsResult;
 }) {
 	if (speciesStats.length === 0) {
 		return <p>No species recorded.</p>;
@@ -123,12 +126,20 @@ export function SpeciesTotalsTable({
 	const hasPullus = speciesStats.some((stat) => stat.pullus_count > 0);
 	const columnConfigs = buildColumnConfigs(hasPullus);
 
+	const totalsRow = totalsStats
+		? buildTotalsRowCells<RowModel>({
+				columnConfigs,
+				totalsRowModel: rowDataTransform(totalsStats)
+			})
+		: undefined;
+
 	return (
 		<SortableTable<AggregateStatsResult, RowModel>
 			columnConfigs={columnConfigs}
 			data={speciesStats}
 			testId="species-totals-table"
 			rowDataTransform={rowDataTransform}
+			totalsRow={totalsRow}
 			TableBodyComponent={SpeciesTotalsTableBody}
 		/>
 	);

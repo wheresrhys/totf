@@ -14,12 +14,16 @@ const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
 
 export function SpeciesTotalsSection({
 	speciesStats,
+	summaryStats,
 	monthTotals,
 	yearlyTotals,
 	sessionTotals,
 	viewedGroup
 }: {
 	speciesStats: AggregateStatsResult[];
+	// The page's aggregate stats for whichever table/tab is active — used to
+	// derive the pinned totals row. `null` (no data yet) renders no totals row.
+	summaryStats?: AggregateStatsResult | null;
 	// Only the year summary page supplies month totals; when present the
 	// "Month totals" tab is prepended and shown first/by default.
 	monthTotals?: MonthTotalsRow[];
@@ -54,6 +58,11 @@ export function SpeciesTotalsSection({
 		(monthTotals ?? []).map((row) => [row.stats.time_period, row])
 	);
 
+	// The totals row always reflects the page's own aggregate stats, regardless
+	// of which tab/table is currently active — `undefined` (not `null`) means
+	// "no totals row" to each table's `totalsStats` prop.
+	const totalsStats = summaryStats ?? undefined;
+
 	return (
 		<>
 			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
@@ -65,6 +74,7 @@ export function SpeciesTotalsSection({
 					buildHref={(timePeriod) =>
 						`/summary/${new Date(timePeriod).getFullYear()}`
 					}
+					totalsStats={totalsStats}
 				/>
 			)}
 			{activeTab === MONTH_TOTALS_TAB.id && monthTotals && (
@@ -78,6 +88,7 @@ export function SpeciesTotalsSection({
 					buildLabel={(timePeriod) =>
 						monthTotalsByTimePeriod.get(timePeriod)?.label ?? ''
 					}
+					totalsStats={totalsStats}
 				/>
 			)}
 			{sessionTotals !== undefined &&
@@ -90,10 +101,14 @@ export function SpeciesTotalsSection({
 						buildHref={(timePeriod) =>
 							`/group/${viewedGroup.slug}/session-temp/${timePeriod}`
 						}
+						totalsStats={totalsStats}
 					/>
 				)}
 			{activeTab === SPECIES_TOTALS_TAB.id && (
-				<SpeciesTotalsTable speciesStats={speciesStats} />
+				<SpeciesTotalsTable
+					speciesStats={speciesStats}
+					totalsStats={totalsStats}
+				/>
 			)}
 		</>
 	);

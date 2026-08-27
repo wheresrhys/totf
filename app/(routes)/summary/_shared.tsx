@@ -45,6 +45,7 @@ export function SummaryPage({
 				<div className="lg:flex-1">
 					<SpeciesTotalsSection
 						speciesStats={speciesStats}
+						summaryStats={summaryStats}
 						monthTotals={monthTotals}
 						yearlyTotals={yearlyTotals}
 						sessionTotals={sessionTotals}
