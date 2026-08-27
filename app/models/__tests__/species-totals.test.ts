@@ -59,6 +59,7 @@ describe('deriveSpeciesTotalsRow', () => {
 		const stat = buildStat();
 		expect(deriveSpeciesTotalsRow(stat)).toEqual({
 			speciesName: 'Blue Tit',
+			sessionsCount: 4,
 			encounterCount: 7,
 			individualsCount: 6,
 			newCount: 4,

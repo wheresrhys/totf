@@ -2,6 +2,7 @@ import type { AggregateStatsResult } from './db';
 
 export type SpeciesTotalsRow = {
 	speciesName: string;
+	sessionsCount: number;
 	encounterCount: number;
 	individualsCount: number;
 	newCount: number;
@@ -24,6 +25,7 @@ export function deriveSpeciesTotalsRow(
 ): SpeciesTotalsRow {
 	return {
 		speciesName: stat.species_name,
+		sessionsCount: stat.session_count,
 		encounterCount: stat.encounter_count,
 		individualsCount: stat.bird_count,
 		newCount: stat.new_bird_count,
