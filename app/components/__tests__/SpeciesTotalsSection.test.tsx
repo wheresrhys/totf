@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import { SpeciesTotalsSection } from '../SpeciesTotalsSection';
+import { SpeciesTotalsSection } from '../SummaryTotalsSection';
 import { buildMonthTotalsRows } from '@/app/models/month-totals';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
 import type { AggregateStatsResult } from '@/app/models/db';

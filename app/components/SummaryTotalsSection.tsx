@@ -12,7 +12,7 @@ const YEAR_TOTALS_TAB = { id: 'year-totals', label: 'Year totals' };
 const SESSION_TOTALS_TAB = { id: 'session-totals', label: 'Session totals' };
 const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
 
-export function SpeciesTotalsSection({
+export function SummaryTotalsSection({
 	speciesStats,
 	summaryStats,
 	monthTotals,

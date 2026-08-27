@@ -339,9 +339,7 @@ describe('SpeciesTotalsTable', () => {
 			const pullusHeader = headers.find(
 				(header) => header.textContent === 'Pulli'
 			);
-			const juvsHeader = headers.find(
-				(header) => header.textContent === 'Juv'
-			);
+			const juvsHeader = headers.find((header) => header.textContent === 'Juv');
 			expect(pullusHeader?.className).toContain('border-l-4');
 			expect(juvsHeader?.className).not.toContain('border-l-4');
 		});
@@ -350,9 +348,7 @@ describe('SpeciesTotalsTable', () => {
 			const stats = [makeStat({ species_name: 'Robin', pullus_count: 0 })];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			const headers = screen.getAllByRole('columnheader');
-			const juvsHeader = headers.find(
-				(header) => header.textContent === 'Juv'
-			);
+			const juvsHeader = headers.find((header) => header.textContent === 'Juv');
 			expect(juvsHeader?.className).toContain('border-l-4');
 		});
 
