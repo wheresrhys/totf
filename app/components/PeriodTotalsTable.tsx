@@ -1,5 +1,6 @@
 'use client';
 
+import { formatSecondsForDisplay } from '@/lib/postgres-interval';
 import type { AggregateStatsResult } from '@/app/models/db';
 import {
 	derivePeriodTotalsRow,
@@ -9,10 +10,12 @@ import {
 } from '@/app/models/period-totals';
 import {
 	SortableTable,
+	getFormattedValue,
 	type ColumnConfig,
 	type RowModelWithRawData
 } from './shared/SortableTable';
 import {
+	buildSessionsColumnConfig,
 	buildStandardColumnConfigs,
 	columnBlock,
 	createNameLinkCell
@@ -25,6 +28,11 @@ function buildColumnConfigs(
 		timePeriod: {
 			label: firstColumnHeader,
 			invertSort: true
+		},
+		...buildSessionsColumnConfig<PeriodTotalsRow>('sessionsCount', 'Sessions'),
+		effortSeconds: {
+			label: 'Effort',
+			formatter: (value) => formatSecondsForDisplay(value as number)
 		},
 		speciesCount: { label: 'Species' },
 		encounterCount: { label: 'Encounters' },
@@ -92,6 +100,9 @@ export function PeriodTotalsTable({
 		const restColumnProperties = Object.keys(columnConfigs ?? {}).filter(
 			(property) => property !== 'timePeriod'
 		) as (keyof PeriodTotalsRow)[];
+		const cellFormatter = getFormattedValue<PeriodTotalsRow>(
+			columnConfigs ?? {}
+		);
 
 		return (
 			<tbody>
@@ -105,7 +116,7 @@ export function PeriodTotalsTable({
 								key={property}
 								className={columnConfigs?.[property]?.cellClassName}
 							>
-								{row[property]}
+								{cellFormatter(row[property], property)}
 							</td>
 						))}
 					</tr>

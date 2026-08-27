@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { PeriodTotalsTable } from '../PeriodTotalsTable';
 import type { AggregateStatsResult } from '@/app/models/db';
 
@@ -61,6 +61,8 @@ describe('PeriodTotalsTable', () => {
 			const headers = screen.getAllByRole('columnheader');
 			expect(headers.map((header) => header.textContent)).toEqual([
 				'Year',
+				'Sessions',
+				'Effort',
 				'Species',
 				'Encounters',
 				'Individuals',
@@ -152,20 +154,70 @@ describe('PeriodTotalsTable', () => {
 			expect(document.querySelectorAll('table').length).toBe(0);
 		});
 
-		it('does not render a Sessions or Effort column', () => {
+		it('renders zero-session/zero-effort rows as "0" for both columns', () => {
 			render(
 				<PeriodTotalsTable
 					grouping="year"
-					rows={[buildStat()]}
+					rows={[
+						buildStat({
+							time_period: '2026-01-01',
+							session_count: 0,
+							total_effort: '00:00:00'
+						})
+					]}
 					firstColumnHeader="Year"
 					buildHref={() => '/summary/2026'}
 				/>
 			);
-			const headers = screen
-				.getAllByRole('columnheader')
-				.map((header) => header.textContent);
-			expect(headers).not.toContain('Sessions');
-			expect(headers).not.toContain('Effort');
+			const row = document.querySelector('tbody tr');
+			expect(row?.textContent).toContain('0');
+			const cells = row?.querySelectorAll('td');
+			expect(cells?.[1].textContent).toBe('0');
+			expect(cells?.[2].textContent).toBe('0');
+		});
+	});
+
+	describe('Sessions and Effort columns', () => {
+		it('renders session_count and formatted total_effort for each grouping', () => {
+			render(
+				<PeriodTotalsTable
+					grouping="month"
+					rows={[
+						buildStat({
+							time_period: '2026-08-01',
+							session_count: 4,
+							total_effort: '18:00:00'
+						})
+					]}
+					firstColumnHeader="Month"
+					buildHref={(timePeriod) => `/summary/2026/${timePeriod}`}
+				/>
+			);
+			const cells = document.querySelectorAll('tbody tr td');
+			expect(cells[1].textContent).toBe('4');
+			expect(cells[2].textContent).toBe('18h');
+		});
+
+		it('sorts the Effort column numerically, not by the formatted string', () => {
+			const rows = [
+				buildStat({ time_period: '2025-01-01', total_effort: '02:30:00' }),
+				buildStat({ time_period: '2026-01-01', total_effort: '09:00:00' })
+			];
+			render(
+				<PeriodTotalsTable
+					grouping="year"
+					rows={rows}
+					firstColumnHeader="Year"
+					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
+				/>
+			);
+			fireEvent.click(screen.getByText('Effort'));
+			const tableRows = document.querySelectorAll('tbody tr');
+			// Descending on first click: the 9h row ranks above the 2h 30m row,
+			// which would sort the wrong way under string comparison ("2h 30m" >
+			// "9h" lexicographically).
+			expect(tableRows[0].textContent).toContain('2026');
+			expect(tableRows[1].textContent).toContain('2025');
 		});
 	});
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, within } from '@testing-library/react';
 import Page, { fetchYearSummaryData } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
@@ -55,8 +55,11 @@ describe('/summary/[year]', () => {
 	it('passes the fetched summary stats through to the rendered section', async () => {
 		render(await Page({ params: Promise.resolve({ year: '2026' }) }));
 		await screen.findByRole('heading', { level: 1 });
-		expect(screen.getByTestId('summary-stats-section')).not.toBeNull();
-		expect(screen.getByText('Sessions').nextSibling?.textContent).toBe('10');
+		const summaryStatsSection = screen.getByTestId('summary-stats-section');
+		expect(summaryStatsSection).not.toBeNull();
+		expect(
+			within(summaryStatsSection).getByText('Sessions').nextSibling?.textContent
+		).toBe('10');
 	});
 
 	it('fetchYearSummaryData calls fetchPeriodStats with month grouping and the year bounds', async () => {
