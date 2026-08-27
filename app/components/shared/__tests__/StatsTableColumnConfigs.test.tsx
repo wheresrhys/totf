@@ -3,7 +3,6 @@ import { render, screen, cleanup } from '@testing-library/react';
 import {
 	createNameLinkCell,
 	buildStandardColumnConfigs,
-	buildSessionsColumnConfig,
 	buildTotalsRowCells,
 	columnBlock
 } from '../StatsTableColumnConfigs';
@@ -277,24 +276,5 @@ describe('buildTotalsRowCells', () => {
 			totalsRowModel
 		});
 		expect(cells).toHaveLength(0);
-	});
-});
-
-describe('buildSessionsColumnConfig', () => {
-	type Model = { sessions: number };
-
-	it('returns a single-entry config keyed by the supplied field key with the supplied label', () => {
-		const config = buildSessionsColumnConfig<Model>('sessions', 'Sessions');
-		expect(Object.keys(config)).toEqual(['sessions']);
-		expect(config.sessions?.label).toBe('Sessions');
-	});
-
-	it('is absent from a caller column-config object entirely when never called', () => {
-		// A caller that opts in has the key; one that never calls the helper
-		// simply composes its column configs without it.
-		const optedIn = buildSessionsColumnConfig<Model>('sessions', 'Sessions');
-		const optedOut: typeof optedIn = {};
-		expect('sessions' in optedIn).toBe(true);
-		expect('sessions' in optedOut).toBe(false);
 	});
 });

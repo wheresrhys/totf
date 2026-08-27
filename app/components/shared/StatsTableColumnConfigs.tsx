@@ -149,15 +149,3 @@ export function buildTotalsRowCells<RowModel>(
 		)
 	);
 }
-
-// A single-entry column config for an opt-in "Sessions" count column. Callers
-// that don't want it (e.g. the session page, where the count is trivially 1)
-// simply never call this.
-export function buildSessionsColumnConfig<RowModel>(
-	fieldKey: keyof RowModel,
-	label: string
-): Partial<Record<keyof RowModel, ColumnConfig>> {
-	return {
-		[fieldKey]: { label }
-	} as Partial<Record<keyof RowModel, ColumnConfig>>;
-}

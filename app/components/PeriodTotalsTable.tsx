@@ -15,10 +15,8 @@ import {
 	type RowModelWithRawData
 } from './shared/SortableTable';
 import {
-	buildSessionsColumnConfig,
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
-	columnBlock,
 	createNameLinkCell
 } from './shared/StatsTableColumnConfigs';
 
@@ -31,7 +29,9 @@ function buildColumnConfigs(
 			label: firstColumnHeader,
 			invertSort: true
 		},
-		...buildSessionsColumnConfig<PeriodTotalsRow>('sessionsCount', 'Sessions'),
+		sessionsCount: {
+			label: 'Sessions'
+		},
 		effortSeconds: {
 			label: 'Effort',
 			formatter: (value) => formatSecondsForDisplay(value as number)

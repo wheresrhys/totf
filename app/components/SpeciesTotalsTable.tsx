@@ -6,7 +6,6 @@ import {
 	type RowModelWithRawData
 } from './shared/SortableTable';
 import {
-	buildSessionsColumnConfig,
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
 	createNameLinkCell
@@ -58,7 +57,9 @@ function buildColumnConfigs(
 			label: 'Species',
 			invertSort: true
 		},
-		...buildSessionsColumnConfig<RowModel>('sessionsCount', 'Sessions'),
+		sessionsCount: {
+			label: 'Sessions'
+		},
 		encounterCount: {
 			label: 'Encounters'
 		},
