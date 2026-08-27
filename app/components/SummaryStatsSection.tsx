@@ -11,6 +11,7 @@ export function SummaryStatsSection({
 	if (!stats) {
 		return null;
 	}
+
 	const rows: { label: string; value: number | string }[] = [
 		{ label: 'Sessions', value: stats.session_count },
 		{
@@ -22,11 +23,11 @@ export function SummaryStatsSection({
 		{ label: 'Individuals', value: stats.bird_count },
 		{ label: 'New', value: stats.new_bird_count },
 		{ label: 'Retraps', value: calculateRetraps(stats) },
-		{ label: 'Pullus', value: stats.pullus_count },
+		{ label: 'Pulli', value: stats.pullus_count },
 		{ label: 'Juvs', value: stats.juv_count },
-		{ label: 'Postjuv', value: stats.postjuv_count },
+		{ label: 'Postjuvs', value: stats.postjuv_count },
 		{ label: 'Adults', value: stats.adult_count },
-		{ label: 'Unknown age', value: stats.unknown_age_count },
+		{ label: 'Not aged', value: stats.unknown_age_count },
 		{ label: 'New young', value: stats.new_young_count }
 	];
 	return (

@@ -27,13 +27,11 @@ describe('SummaryStatsSection', () => {
 			);
 			expect(screen.getByText('New').nextSibling?.textContent).toBe('40');
 			expect(screen.getByText('Retraps').nextSibling?.textContent).toBe('20');
-			expect(screen.getByText('Pullus').nextSibling?.textContent).toBe('10');
+			expect(screen.getByText('Pulli').nextSibling?.textContent).toBe('10');
 			expect(screen.getByText('Adults').nextSibling?.textContent).toBe('22');
 			expect(screen.getByText('Juvs').nextSibling?.textContent).toBe('15');
-			expect(screen.getByText('Postjuv').nextSibling?.textContent).toBe('8');
-			expect(screen.getByText('Unknown age').nextSibling?.textContent).toBe(
-				'5'
-			);
+			expect(screen.getByText('Postjuvs').nextSibling?.textContent).toBe('8');
+			expect(screen.getByText('Not aged').nextSibling?.textContent).toBe('5');
 			expect(screen.getByText('New young').nextSibling?.textContent).toBe('12');
 		});
 
@@ -68,11 +66,11 @@ describe('SummaryStatsSection', () => {
 				'Individuals',
 				'New',
 				'Retraps',
-				'Pullus',
+				'Pulli',
 				'Juvs',
-				'Postjuv',
+				'Postjuvs',
 				'Adults',
-				'Unknown age',
+				'Not aged',
 				'New young'
 			]);
 		});
@@ -90,13 +88,11 @@ describe('SummaryStatsSection', () => {
 			);
 			expect(screen.getByText('New').nextSibling?.textContent).toBe('0');
 			expect(screen.getByText('Retraps').nextSibling?.textContent).toBe('0');
-			expect(screen.getByText('Pullus').nextSibling?.textContent).toBe('0');
+			expect(screen.getByText('Pulli').nextSibling?.textContent).toBe('0');
 			expect(screen.getByText('Adults').nextSibling?.textContent).toBe('0');
 			expect(screen.getByText('Juvs').nextSibling?.textContent).toBe('0');
-			expect(screen.getByText('Postjuv').nextSibling?.textContent).toBe('0');
-			expect(screen.getByText('Unknown age').nextSibling?.textContent).toBe(
-				'0'
-			);
+			expect(screen.getByText('Postjuvs').nextSibling?.textContent).toBe('0');
+			expect(screen.getByText('Not aged').nextSibling?.textContent).toBe('0');
 			expect(screen.getByText('New young').nextSibling?.textContent).toBe('0');
 		});
 
