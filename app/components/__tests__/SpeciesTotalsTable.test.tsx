@@ -39,12 +39,12 @@ describe('SpeciesTotalsTable', () => {
 				'Encounters',
 				'Individuals',
 				'New',
-				'Retraps',
-				'Pullus',
-				'Juvs',
+				'Retrap',
+				'Pulli',
+				'Juv',
 				'Postjuv',
-				'Adults',
-				'Unknown age',
+				'Adult',
+				'Not aged',
 				'New young'
 			]);
 		});
@@ -194,12 +194,12 @@ describe('SpeciesTotalsTable', () => {
 
 			const expectations: [string, string][] = [
 				['New', 'bg-green-50'],
-				['Retraps', 'bg-amber-50'],
-				['Pullus', 'bg-cyan-50'],
-				['Juvs', 'bg-sky-50'],
+				['Retrap', 'bg-amber-50'],
+				['Pulli', 'bg-cyan-50'],
+				['Juv', 'bg-sky-50'],
 				['Postjuv', 'bg-blue-50'],
-				['Adults', 'bg-purple-50'],
-				['Unknown age', 'bg-taupe-50']
+				['Adult', 'bg-purple-50'],
+				['Not aged', 'bg-taupe-50']
 			];
 			expectations.forEach(([label, className]) => {
 				const { header, cell } = columnStyle(label);
@@ -327,7 +327,7 @@ describe('SpeciesTotalsTable', () => {
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			expect(
 				screen.getAllByRole('columnheader').map((header) => header.textContent)
-			).toContain('Pullus');
+			).toContain('Pulli');
 		});
 	});
 
@@ -337,11 +337,9 @@ describe('SpeciesTotalsTable', () => {
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			const headers = screen.getAllByRole('columnheader');
 			const pullusHeader = headers.find(
-				(header) => header.textContent === 'Pullus'
+				(header) => header.textContent === 'Pulli'
 			);
-			const juvsHeader = headers.find(
-				(header) => header.textContent === 'Juvs'
-			);
+			const juvsHeader = headers.find((header) => header.textContent === 'Juv');
 			expect(pullusHeader?.className).toContain('border-l-4');
 			expect(juvsHeader?.className).not.toContain('border-l-4');
 		});
@@ -350,9 +348,7 @@ describe('SpeciesTotalsTable', () => {
 			const stats = [makeStat({ species_name: 'Robin', pullus_count: 0 })];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			const headers = screen.getAllByRole('columnheader');
-			const juvsHeader = headers.find(
-				(header) => header.textContent === 'Juvs'
-			);
+			const juvsHeader = headers.find((header) => header.textContent === 'Juv');
 			expect(juvsHeader?.className).toContain('border-l-4');
 		});
 
@@ -361,7 +357,7 @@ describe('SpeciesTotalsTable', () => {
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			const headers = screen.getAllByRole('columnheader');
 			const unknownAgeHeader = headers.find(
-				(header) => header.textContent === 'Unknown age'
+				(header) => header.textContent === 'Not aged'
 			);
 			expect(unknownAgeHeader?.className).toContain('border-r-4');
 		});

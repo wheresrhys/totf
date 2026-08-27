@@ -5,7 +5,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
-import { SpeciesTotalsSection } from '@/app/components/SpeciesTotalsSection';
+import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { MonthTotalsRow } from '@/app/models/month-totals';
@@ -43,7 +43,7 @@ export function SummaryPage({
 					<HighlightsSection />
 				</div>
 				<div className="lg:flex-1">
-					<SpeciesTotalsSection
+					<SummaryTotalsSection
 						speciesStats={speciesStats}
 						summaryStats={summaryStats}
 						monthTotals={monthTotals}

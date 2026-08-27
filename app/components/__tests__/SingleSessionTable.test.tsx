@@ -186,7 +186,7 @@ describe('SessionTabs', () => {
 		});
 	});
 
-	describe('New Young column', () => {
+	describe('New young column', () => {
 		it('counts a new (record_type N), age-1 encounter', () => {
 			const encounter = makeEncounter(30, 'Wren', '10:00:00', 0, {
 				age_code: 1
@@ -197,7 +197,7 @@ describe('SessionTabs', () => {
 					netRounds={[]}
 				/>
 			);
-			expect(columnCellValue('New Young', 'Wren')).toBe('1');
+			expect(columnCellValue('New young', 'Wren')).toBe('1');
 		});
 
 		it('counts a new (record_type N), age-3 encounter', () => {
@@ -210,7 +210,7 @@ describe('SessionTabs', () => {
 					netRounds={[]}
 				/>
 			);
-			expect(columnCellValue('New Young', 'Dunnock')).toBe('1');
+			expect(columnCellValue('New young', 'Dunnock')).toBe('1');
 		});
 
 		it('excludes a new (record_type N) encounter whose age is neither 1 nor 3', () => {
@@ -223,7 +223,7 @@ describe('SessionTabs', () => {
 					netRounds={[]}
 				/>
 			);
-			expect(columnCellValue('New Young', 'Starling')).toBe('0');
+			expect(columnCellValue('New young', 'Starling')).toBe('0');
 		});
 
 		it('excludes an age-1 retrap (record_type S), despite matching the age criterion', () => {
@@ -237,7 +237,7 @@ describe('SessionTabs', () => {
 					netRounds={[]}
 				/>
 			);
-			expect(columnCellValue('New Young', 'Swallow')).toBe('0');
+			expect(columnCellValue('New young', 'Swallow')).toBe('0');
 		});
 	});
 
@@ -264,8 +264,8 @@ describe('SessionTabs', () => {
 				'Juv',
 				'Postjuv',
 				'Adult',
-				'Unaged',
-				'New Young',
+				'Not aged',
+				'New young',
 				'Max Proven Age'
 			]);
 		});
@@ -311,7 +311,7 @@ describe('SessionTabs', () => {
 			expect(cells[totalIndex].className).toContain('font-bold');
 		});
 
-		it('applies a distinct background colour to each of the New/Retrap/Juv/Postjuv/Adult/Unaged/New Young columns', () => {
+		it('applies a distinct background colour to each of the New/Retrap/Juv/Postjuv/Adult/Unaged/New young columns', () => {
 			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
 			const headers = screen.getAllByRole('columnheader');
 			const backgroundClassFor = (label: string) =>
@@ -321,16 +321,16 @@ describe('SessionTabs', () => {
 			expect(backgroundClassFor('Juv')).toContain('bg-sky-50');
 			expect(backgroundClassFor('Postjuv')).toContain('bg-blue-50');
 			expect(backgroundClassFor('Adult')).toContain('bg-purple-50');
-			expect(backgroundClassFor('Unaged')).toContain('bg-taupe-50');
-			expect(backgroundClassFor('New Young')).toContain('bg-lime-50');
+			expect(backgroundClassFor('Not aged')).toContain('bg-taupe-50');
+			expect(backgroundClassFor('New young')).toContain('bg-lime-50');
 		});
 
-		it('renders the New Young column before Max Proven Age', () => {
+		it('renders the New young column before Max Proven Age', () => {
 			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
 			const headers = screen
 				.getAllByRole('columnheader')
 				.map((header) => header.textContent);
-			expect(headers.indexOf('New Young')).toBeLessThan(
+			expect(headers.indexOf('New young')).toBeLessThan(
 				headers.indexOf('Max Proven Age')
 			);
 		});
@@ -366,7 +366,7 @@ describe('SessionTabs', () => {
 			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
 			const headers = screen.getAllByRole('columnheader');
 			const unagedHeader = headers.find(
-				(header) => header.textContent === 'Unaged'
+				(header) => header.textContent === 'Not aged'
 			);
 			expect(unagedHeader?.className).toContain('border-r-4');
 		});
