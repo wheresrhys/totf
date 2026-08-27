@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { formatSecondsForDisplay } from '@/lib/postgres-interval';
 import type { AggregateStatsResult } from '@/app/models/db';
 import {
 	derivePeriodTotalsRow,
+	derivePeriodTotalsRowByEncounter,
 	formatPeriodTotalsLabel,
 	type PeriodTotalsGrouping,
 	type PeriodTotalsRow
@@ -19,6 +21,10 @@ import {
 	buildTotalsRowCells,
 	createNameLinkCell
 } from './shared/StatsTableColumnConfigs';
+import {
+	AggregateByToggle,
+	type AggregateByValue
+} from './shared/AggregateByToggle';
 
 function buildColumnConfigs(
 	firstColumnHeader: string,
@@ -61,20 +67,30 @@ export function PeriodTotalsTable({
 	buildLabel?: (timePeriod: string) => string;
 	totalsStats?: AggregateStatsResult;
 }) {
+	// Local to this table (not persisted across tab switches) — resets to
+	// 'bird' whenever `SummaryTotalsSection` remounts this table for a
+	// different tab, per #604.
+	const [aggregateBy, setAggregateBy] = useState<AggregateByValue>('bird');
+
 	if (rows.length === 0) {
 		return <p>No data recorded.</p>;
 	}
 
+	const activeDeriveRow =
+		aggregateBy === 'bird'
+			? derivePeriodTotalsRow
+			: derivePeriodTotalsRowByEncounter;
+
 	const resolveLabel =
 		buildLabel ??
 		((timePeriod: string) => formatPeriodTotalsLabel(grouping, timePeriod));
-	const hasPulli = rows.some((stat) => stat.pullus_count > 0);
+	const hasPulli = rows.some((stat) => activeDeriveRow(stat).pullus > 0);
 	const columnConfigs = buildColumnConfigs(firstColumnHeader, hasPulli);
 
 	const totalsRow = totalsStats
 		? buildTotalsRowCells<PeriodTotalsRow>({
 				columnConfigs,
-				totalsRowModel: derivePeriodTotalsRow(totalsStats)
+				totalsRowModel: activeDeriveRow(totalsStats)
 			})
 		: undefined;
 
@@ -129,8 +145,15 @@ export function PeriodTotalsTable({
 			columnConfigs={columnConfigs}
 			data={rows}
 			testId="period-totals-table"
-			rowDataTransform={derivePeriodTotalsRow}
+			rowDataTransform={activeDeriveRow}
 			totalsRow={totalsRow}
+			aboveHeaderRow={{
+				spanFromColumn: 'new',
+				spanToColumn: 'unknownAge',
+				content: (
+					<AggregateByToggle value={aggregateBy} onChange={setAggregateBy} />
+				)
+			}}
 			TableBodyComponent={PeriodTotalsTableBody}
 		/>
 	);

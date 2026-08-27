@@ -3,6 +3,19 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { PeriodTotalsTable } from '../PeriodTotalsTable';
 import type { AggregateStatsResult } from '@/app/models/db';
 
+// The real header <th>s live in the `<thead>` row without a `data-testid` —
+// `above-header-row` (the "Aggregate by" toggle row) and `totals-row` are
+// the other two possible `<thead>` rows, both explicitly testid'd, so this
+// excludes them rather than relying on the header row's fixed position.
+function getColumnHeaders(): HTMLTableCellElement[] {
+	const headerRow = Array.from(document.querySelectorAll('thead tr')).find(
+		(row) => !row.hasAttribute('data-testid')
+	);
+	return Array.from(
+		headerRow?.querySelectorAll('th') ?? []
+	) as HTMLTableCellElement[];
+}
+
 function buildStat(
 	overrides: Partial<AggregateStatsResult> = {}
 ): AggregateStatsResult {
@@ -58,7 +71,7 @@ describe('PeriodTotalsTable', () => {
 				/>
 			);
 
-			const headers = screen.getAllByRole('columnheader');
+			const headers = getColumnHeaders();
 			expect(headers.map((header) => header.textContent)).toEqual([
 				'Year',
 				'Sessions',
@@ -300,6 +313,86 @@ describe('PeriodTotalsTable', () => {
 			// "9h" lexicographically).
 			expect(tableRows[0].textContent).toContain('2026');
 			expect(tableRows[1].textContent).toContain('2025');
+		});
+	});
+
+	describe('Aggregate by toggle', () => {
+		const groupings: {
+			grouping: 'year' | 'month' | 'day';
+			header: string;
+		}[] = [
+			{ grouping: 'year', header: 'Year' },
+			{ grouping: 'month', header: 'Month' },
+			{ grouping: 'day', header: 'Session' }
+		];
+
+		groupings.forEach(({ grouping, header }) => {
+			it(`defaults to bird-based counts and switches to encounter-based counts for the standard-block columns, for the "${grouping}" grouping`, () => {
+				const stat = buildStat({
+					time_period: '2026-01-01',
+					bird_count: 10,
+					encounter_count: 14,
+					new_bird_count: 6,
+					pullus_count: 2,
+					juv_count: 1,
+					postjuv_count: 1,
+					adult_count: 3,
+					unknown_age_count: 0,
+					// `*_enc_count` columns — see #602. `pullus_enc_count` deliberately
+					// differs from `pullus_count` so the toggle's effect is visible.
+					...({
+						pullus_enc_count: 3,
+						juv_enc_count: 2,
+						postjuv_enc_count: 2,
+						adult_enc_count: 4,
+						unknown_age_enc_count: 1
+					} as Partial<AggregateStatsResult>)
+				});
+
+				render(
+					<PeriodTotalsTable
+						grouping={grouping}
+						rows={[stat]}
+						firstColumnHeader={header}
+						buildHref={() => '/summary'}
+					/>
+				);
+
+				const getCells = () =>
+					document
+						.querySelector('tbody tr')
+						?.querySelectorAll('td') as NodeListOf<HTMLTableCellElement>;
+
+				// Indices: 0 label, 1 sessions, 2 effort, 3 species, 4 encounters,
+				// 5 individuals, 6 new, 7 retraps, 8 pullus, 9 juvs, 10 postjuv,
+				// 11 adults, 12 unknownAge.
+				let cells = getCells();
+				expect(cells[3].textContent).toBe(String(stat.species_count));
+				expect(cells[4].textContent).toBe(String(stat.encounter_count));
+				expect(cells[5].textContent).toBe(String(stat.bird_count));
+				expect(cells[6].textContent).toBe('6'); // new (unaffected by toggle)
+				expect(cells[7].textContent).toBe('4'); // retraps: bird_count - new
+				expect(cells[8].textContent).toBe('2'); // pullus_count
+				expect(cells[9].textContent).toBe('1'); // juv_count
+				expect(cells[10].textContent).toBe('1'); // postjuv_count
+				expect(cells[11].textContent).toBe('3'); // adult_count
+				expect(cells[12].textContent).toBe('0'); // unknown_age_count
+
+				fireEvent.click(screen.getByRole('radio', { name: 'Encounter' }));
+
+				cells = getCells();
+				// Unaffected columns stay the same after switching.
+				expect(cells[3].textContent).toBe(String(stat.species_count));
+				expect(cells[4].textContent).toBe(String(stat.encounter_count));
+				expect(cells[5].textContent).toBe(String(stat.bird_count));
+				expect(cells[6].textContent).toBe('6'); // new (still unaffected)
+				expect(cells[7].textContent).toBe('8'); // retraps: encounter_count - new
+				expect(cells[8].textContent).toBe('3'); // pullus_enc_count
+				expect(cells[9].textContent).toBe('2'); // juv_enc_count
+				expect(cells[10].textContent).toBe('2'); // postjuv_enc_count
+				expect(cells[11].textContent).toBe('4'); // adult_enc_count
+				expect(cells[12].textContent).toBe('1'); // unknown_age_enc_count
+			});
 		});
 	});
 });
