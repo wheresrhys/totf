@@ -32,15 +32,19 @@ export function postgresIntervalToMinutes(raw: string): number {
 }
 
 /** Readable duration for tables (hours/minutes; sub-minute uses seconds). */
-export function formatPostgresIntervalForDisplay(raw: string): string {
-	const sec = postgresIntervalToSeconds(raw);
-	if (sec === 0) return '0';
-	if (sec < 60) return `${Math.round(sec)}s`;
-	const h = Math.floor(sec / 3600);
-	const m = Math.floor((sec % 3600) / 60);
+export function formatSecondsForDisplay(seconds: number): string {
+	if (seconds === 0) return '0';
+	if (seconds < 60) return `${Math.round(seconds)}s`;
+	const h = Math.floor(seconds / 3600);
+	const m = Math.floor((seconds % 3600) / 60);
 	if (h === 0) return `${m}m`;
 	if (m === 0) return `${h}h`;
 	return `${h}h ${m}m`;
+}
+
+/** Readable duration for tables (hours/minutes; sub-minute uses seconds). */
+export function formatPostgresIntervalForDisplay(raw: string): string {
+	return formatSecondsForDisplay(postgresIntervalToSeconds(raw));
 }
 
 /** Readable duration from a minute count (e.g. computed from capture_time diff). */
