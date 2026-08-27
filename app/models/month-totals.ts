@@ -45,12 +45,12 @@ function synthesizeZeroStats(timePeriod: string): AggregateStatsResult {
 		avg_wing: 0,
 		min_wing: 0,
 		median_wing: 0,
-		pullus_count: 0,
-		juv_count: 0,
-		postjuv_count: 0,
-		adult_count: 0,
-		unknown_age_count: 0,
-		new_young_count: 0
+		pullus_bird_count: 0,
+		juv_bird_count: 0,
+		postjuv_bird_count: 0,
+		adult_bird_count: 0,
+		unknown_age_bird_count: 0,
+		new_young_bird_count: 0
 		// `species_name` is nullable in the RPC's real output but typed `string`
 		// in the generated types; cast through `unknown` to keep the honest null.
 	} as unknown as AggregateStatsResult;

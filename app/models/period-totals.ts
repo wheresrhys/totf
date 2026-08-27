@@ -40,12 +40,12 @@ export function derivePeriodTotalsRow(
 		individualsCount: stat.bird_count,
 		new: stat.new_bird_count,
 		retraps: calculateRetraps(stat),
-		pullus: stat.pullus_count,
-		juvs: stat.juv_count,
-		postjuv: stat.postjuv_count,
-		adults: stat.adult_count,
-		unknownAge: stat.unknown_age_count,
-		newYoung: stat.new_young_count
+		pullus: stat.pullus_bird_count,
+		juvs: stat.juv_bird_count,
+		postjuv: stat.postjuv_bird_count,
+		adults: stat.adult_bird_count,
+		unknownAge: stat.unknown_age_bird_count,
+		newYoung: stat.new_young_bird_count
 	};
 }
 

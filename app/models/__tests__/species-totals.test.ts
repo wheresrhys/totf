@@ -32,12 +32,6 @@ function buildStat(
 		avg_wing: 66.6,
 		min_wing: 65,
 		median_wing: 67,
-		pullus_count: 1,
-		juv_count: 2,
-		postjuv_count: 1,
-		adult_count: 1,
-		unknown_age_count: 1,
-		new_young_count: 3,
 		pullus_bird_count: 1,
 		juv_bird_count: 2,
 		postjuv_bird_count: 1,
@@ -50,7 +44,7 @@ function buildStat(
 		adult_enc_count: 1,
 		unknown_age_enc_count: 0,
 		...overrides
-	} as AggregateStatsResult;
+	} as unknown as AggregateStatsResult;
 }
 
 describe('calculateRetraps', () => {
@@ -169,8 +163,7 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 	it('sources newCount/newYoungCount from new_bird_count/new_young_bird_count, not any *_enc_count field', () => {
 		const stat = buildStat({
 			new_bird_count: 4,
-			new_young_bird_count: 3,
-			new_young_count: 999
+			new_young_bird_count: 3
 		});
 		const row = deriveSpeciesTotalsRowByEncounter(stat);
 		expect(row.newCount).toBe(4);
