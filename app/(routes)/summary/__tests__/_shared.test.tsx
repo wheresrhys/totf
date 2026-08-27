@@ -82,6 +82,18 @@ describe('SummaryPage', () => {
 		});
 	});
 
+	describe('summaryStats passthrough', () => {
+		it('forwards summaryStats to SpeciesTotalsSection as its totals row', () => {
+			render(
+				<SummaryPage
+					summaryStats={populatedStats}
+					speciesStats={populatedSpeciesStats}
+				/>
+			);
+			expect(screen.getByTestId('totals-row')).toBeTruthy();
+		});
+	});
+
 	describe('yearlyTotals passthrough', () => {
 		it('shows "Year totals" as the default tab when yearlyTotals is passed (all-time page)', () => {
 			render(
