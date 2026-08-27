@@ -305,6 +305,32 @@ solo-run rule still applies; count workers already running). Report what the re-
 
 A manual re-check never stops or disturbs workers already running; it only fills idle slots.
 
+## 4.6 On worker failure/error
+
+§4 covers the normal path: a worker finishes and reports a result, successful or not. This
+section covers the abnormal path — a worker notification that is **not** a completion report at
+all: an error, a crash, an account/session-limit hit, or any other abnormal stop before the
+worker got to report a finished result.
+
+The orchestrator's only allowed actions on such a notification:
+1. **Inspect state read-only, if needed, to decide what to do next** — e.g. `git status` /
+   `git log` in the worker's worktree, or the worker's state-file entry. Reading is fine;
+   mutating is not.
+2. **Re-spawn a fresh Agent worker pointed at the same existing worktree/branch**, instructed to
+   resume from its last commit. This mirrors the stale-worktree-reuse pattern already documented
+   in §1 ("reuse the PR branch's existing worktree if one exists... else `git worktree add` a
+   fresh one") — the new worker picks up where the dead one left off rather than starting over.
+3. **Report the failure and the resumption to the user.**
+
+This boundary applies **regardless of why the previous attempt didn't finish** — whether it
+completed successfully, completed with failing tests, errored outright, or was interrupted
+(e.g. a session-limit hit mid-task). In every one of those cases, the orchestrator itself must
+never edit files, run tests, revert changes, commit, or push inside a worker's worktree, full
+stop — this is the same "orchestrator... holds no worktree and does no ticket work" rule stated
+under "State file" above (see the "Concurrency is capped at 4 worker subagents" paragraph); a
+worker failing mid-task is not license to finish the job inline. If the work needs doing, a
+fresh subagent does it — never the orchestrator itself.
+
 ## Termination (user asks to stop)
 
 If the user issues any stop-like command to the **orchestrator** — e.g. "stop swarming", "stop",
@@ -348,6 +374,13 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   shared branch.
 - Never pick a blocked ticket; never exceed **4 concurrent worker subagents** across both tracks.
   The orchestrator itself is not a worker and does not count toward the 4.
+- **On a worker failure/error notification (not a normal completion — an error, a crash, a
+  session-limit hit, or any other abnormal stop)**, regardless of whether the previous attempt
+  completed successfully, completed with failing tests, errored, or was interrupted: the
+  orchestrator itself must never edit files, run tests, revert changes, commit, or push inside
+  that worker's worktree — same "does no ticket work" boundary as always (see §4.6). It may only
+  read state if needed, re-spawn a fresh Agent worker pointed at the same worktree/branch to
+  resume from the last commit, and report the failure and resumption to the user.
 - Never auto-spawn a `staleClosedPrTickets` entry (an issue whose only leftover is a stale branch
   from a closed-not-merged PR). Always ask the user via `AskUserQuestion` (§1.5) to reuse the
   branch / start fresh referencing it / start fresh clean, and spawn only after they answer.
