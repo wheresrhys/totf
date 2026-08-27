@@ -13,6 +13,7 @@ export function SummaryPage({
 	month,
 	summaryStats = null,
 	speciesStats = [],
+	yearlyTotals,
 	sessionTotals,
 	viewedGroup
 }: {
@@ -20,6 +21,7 @@ export function SummaryPage({
 	month?: number;
 	summaryStats?: AggregateStatsResult | null;
 	speciesStats?: AggregateStatsResult[];
+	yearlyTotals?: AggregateStatsResult[];
 	sessionTotals?: AggregateStatsResult[];
 	viewedGroup?: ViewedGroup;
 }) {
@@ -40,6 +42,7 @@ export function SummaryPage({
 				<div className="lg:flex-1">
 					<SpeciesTotalsSection
 						speciesStats={speciesStats}
+						yearlyTotals={yearlyTotals}
 						sessionTotals={sessionTotals}
 						viewedGroup={viewedGroup}
 					/>

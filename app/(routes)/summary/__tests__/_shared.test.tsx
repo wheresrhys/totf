@@ -81,4 +81,27 @@ describe('SummaryPage', () => {
 			});
 		});
 	});
+
+	describe('yearlyTotals passthrough', () => {
+		it('shows "Year totals" as the default tab when yearlyTotals is passed (all-time page)', () => {
+			render(
+				<SummaryPage
+					speciesStats={populatedSpeciesStats}
+					yearlyTotals={[{ ...populatedStats, time_period: '2026-01-01' }]}
+				/>
+			);
+			const tab = screen.getByRole('button', { name: 'Year totals' });
+			expect(tab.getAttribute('aria-current')).toBe('true');
+			expect(
+				screen.getByRole('button', { name: 'Species totals' })
+			).toBeTruthy();
+		});
+
+		it('keeps "Species totals" as the sole/default tab when yearlyTotals is omitted (year/month pages)', () => {
+			render(<SummaryPage year={2026} speciesStats={populatedSpeciesStats} />);
+			expect(screen.queryByRole('button', { name: 'Year totals' })).toBeNull();
+			const tab = screen.getByRole('button', { name: 'Species totals' });
+			expect(tab.getAttribute('aria-current')).toBe('true');
+		});
+	});
 });
