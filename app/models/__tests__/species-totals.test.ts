@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { calculateRetraps, deriveSpeciesTotalsRow } from '../species-totals';
+import {
+	calculateEncounterRetraps,
+	calculateRetraps,
+	deriveSpeciesTotalsRow,
+	deriveSpeciesTotalsRowByEncounter
+} from '../species-totals';
 import type { AggregateStatsResult } from '../db';
 
 function buildStat(
@@ -33,6 +38,17 @@ function buildStat(
 		adult_count: 1,
 		unknown_age_count: 1,
 		new_young_count: 3,
+		pullus_bird_count: 1,
+		juv_bird_count: 2,
+		postjuv_bird_count: 1,
+		adult_bird_count: 1,
+		unknown_age_bird_count: 1,
+		new_young_bird_count: 3,
+		pullus_enc_count: 2,
+		juv_enc_count: 3,
+		postjuv_enc_count: 1,
+		adult_enc_count: 1,
+		unknown_age_enc_count: 0,
 		...overrides
 	} as AggregateStatsResult;
 }
@@ -86,5 +102,78 @@ describe('deriveSpeciesTotalsRow', () => {
 	it('returns retrapsCount equal to bird_count when new_bird_count is 0', () => {
 		const stat = buildStat({ bird_count: 8, new_bird_count: 0 });
 		expect(deriveSpeciesTotalsRow(stat).retrapsCount).toBe(8);
+	});
+});
+
+describe('calculateEncounterRetraps', () => {
+	it('computes encounter_count minus new_bird_count for a typical row', () => {
+		const stat = buildStat({ encounter_count: 10, new_bird_count: 3 });
+		expect(calculateEncounterRetraps(stat)).toBe(7);
+	});
+
+	it('returns 0 when every encounter is new (encounter_count === new_bird_count)', () => {
+		const stat = buildStat({ encounter_count: 5, new_bird_count: 5 });
+		expect(calculateEncounterRetraps(stat)).toBe(0);
+	});
+
+	it('returns encounter_count when new_bird_count is 0 (all retraps)', () => {
+		const stat = buildStat({ encounter_count: 8, new_bird_count: 0 });
+		expect(calculateEncounterRetraps(stat)).toBe(8);
+	});
+});
+
+describe('deriveSpeciesTotalsRowByEncounter', () => {
+	it('maps each age-bucket *_enc_count field to the correct SpeciesTotalsRow property', () => {
+		const stat = buildStat();
+		expect(deriveSpeciesTotalsRowByEncounter(stat)).toEqual({
+			speciesName: 'Blue Tit',
+			sessionsCount: 4,
+			encounterCount: 7,
+			individualsCount: 6,
+			newCount: 4,
+			retrapsCount: 3,
+			pullusCount: 2,
+			juvsCount: 3,
+			postjuvCount: 1,
+			adultsCount: 1,
+			unknownAgeCount: 0,
+			newYoungCount: 3
+		});
+	});
+
+	it('sources pullusCount from pullus_enc_count', () => {
+		const stat = buildStat({ pullus_enc_count: 9 });
+		expect(deriveSpeciesTotalsRowByEncounter(stat).pullusCount).toBe(9);
+	});
+
+	it('sources juvsCount from juv_enc_count', () => {
+		const stat = buildStat({ juv_enc_count: 9 });
+		expect(deriveSpeciesTotalsRowByEncounter(stat).juvsCount).toBe(9);
+	});
+
+	it('sources postjuvCount from postjuv_enc_count', () => {
+		const stat = buildStat({ postjuv_enc_count: 9 });
+		expect(deriveSpeciesTotalsRowByEncounter(stat).postjuvCount).toBe(9);
+	});
+
+	it('sources adultsCount from adult_enc_count', () => {
+		const stat = buildStat({ adult_enc_count: 9 });
+		expect(deriveSpeciesTotalsRowByEncounter(stat).adultsCount).toBe(9);
+	});
+
+	it('sources unknownAgeCount from unknown_age_enc_count', () => {
+		const stat = buildStat({ unknown_age_enc_count: 9 });
+		expect(deriveSpeciesTotalsRowByEncounter(stat).unknownAgeCount).toBe(9);
+	});
+
+	it('sources newCount/newYoungCount from new_bird_count/new_young_bird_count, not any *_enc_count field', () => {
+		const stat = buildStat({
+			new_bird_count: 4,
+			new_young_bird_count: 3,
+			new_young_count: 999
+		});
+		const row = deriveSpeciesTotalsRowByEncounter(stat);
+		expect(row.newCount).toBe(4);
+		expect(row.newYoungCount).toBe(3);
 	});
 });
