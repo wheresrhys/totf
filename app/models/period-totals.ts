@@ -1,4 +1,5 @@
 import { format as formatDate } from 'date-fns';
+import { postgresIntervalToSeconds } from '@/lib/postgres-interval';
 import type { AggregateStatsResult } from './db';
 import { calculateRetraps } from './species-totals';
 
@@ -12,6 +13,8 @@ export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
 // a remapping step — see `buildStandardColumnConfigs`.
 export type PeriodTotalsRow = {
 	timePeriod: string;
+	sessionsCount: number;
+	effortSeconds: number;
 	speciesCount: number;
 	encounterCount: number;
 	individualsCount: number;
@@ -30,6 +33,8 @@ export function derivePeriodTotalsRow(
 ): PeriodTotalsRow {
 	return {
 		timePeriod: stat.time_period,
+		sessionsCount: stat.session_count,
+		effortSeconds: postgresIntervalToSeconds(stat.total_effort),
 		speciesCount: stat.species_count,
 		encounterCount: stat.encounter_count,
 		individualsCount: stat.bird_count,
