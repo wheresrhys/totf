@@ -24,6 +24,17 @@ CREATE FUNCTION public.aggregate_stats (
 	adult_count bigint,
 	unknown_age_count bigint,
 	new_young_count bigint,
+	pullus_bird_count bigint,
+	juv_bird_count bigint,
+	postjuv_bird_count bigint,
+	adult_bird_count bigint,
+	unknown_age_bird_count bigint,
+	new_young_bird_count bigint,
+	pullus_enc_count bigint,
+	juv_enc_count bigint,
+	postjuv_enc_count bigint,
+	adult_enc_count bigint,
+	unknown_age_enc_count bigint,
 	max_new_per_session bigint,
 	max_weight real,
 	avg_weight numeric,
@@ -146,23 +157,25 @@ CREATE FUNCTION public.aggregate_stats (
     WHERE re.encounter_id IS NOT NULL
     GROUP BY re.species_id, re.bird_id, re.session_day, re.session_month, re.session_year
   ),
-  -- Per-bird, per-grouping age/new signal flags, aggregated across all of a bird's
-  -- encounters in the active group/species/time-period cell. These mirror the
-  -- single-encounter age classes defined in TypeScript by getAgeClass()
-  -- (app/models/encounter.ts, #527) — keep the two in sync by hand — but applied at
-  -- the bird level with two precedence rules that have no single-encounter equivalent:
-  -- pullus always wins (a bird with any pullus reading is pullus, even against a
-  -- conflicting adult reading, which is assumed erroneous), and otherwise juv wins
-  -- over postjuv. Per-encounter indicators:
+  -- Canonical per-encounter age classification. Every raw_encounters row is placed into
+  -- exactly one mutually-exclusive, exhaustive age bucket. This single CTE is the one
+  -- place the bucket definitions live: both the per-encounter counts
+  -- (encounter_age_bucket_counts) and the per-bird flags (bird_age_flags) are derived
+  -- from it. The classes mirror the single-encounter age classes defined in TypeScript by
+  -- getAgeClass() (app/models/encounter.ts, #527) — keep the two in sync by hand:
   --   pullus  = age_code = 1 AND NOT is_juv   (true nestling)
   --   juv     = is_juv AND age_code IN (1, 3) (1J or 3J)
   --   postjuv = age_code = 3 AND NOT is_juv   (bare age 3)
   --   adult   = age_code > 3
-  -- bool_or is COALESCEd to FALSE so a bird whose age_code is always NULL (or only 2)
-  -- lands in unknown_age_count rather than dropping out of every bucket.
-  bird_age_flags AS (
+  --   unknown = anything else (incl. age_code NULL or age_code 2)
+  -- The four conditions are mutually exclusive per encounter, so the ordered CASE assigns
+  -- each encounter its single bucket with no precedence needed. bird_id and record_type
+  -- are carried so bird_age_flags can aggregate over this CTE.
+  encounter_age_classification AS (
     SELECT
+      re.encounter_id,
       re.bird_id,
+      re.record_type,
       CASE WHEN group_by_species THEN re.species_id ELSE NULL::bigint END AS species_id,
       CASE
         WHEN group_by_time_period = 'day' THEN re.session_day
@@ -170,22 +183,39 @@ CREATE FUNCTION public.aggregate_stats (
         WHEN group_by_time_period = 'year' THEN re.session_year
         ELSE NULL::date
       END AS time_period,
-      COALESCE(bool_or(re.age_code = 1 AND NOT re.is_juv), FALSE) AS has_pullus,
-      COALESCE(bool_or(re.is_juv AND re.age_code IN (1, 3)), FALSE) AS has_juv,
-      COALESCE(bool_or(re.age_code = 3 AND NOT re.is_juv), FALSE) AS has_postjuv,
-      COALESCE(bool_or(re.age_code > 3), FALSE) AS has_adult,
-      COALESCE(bool_or(re.record_type = 'N'), FALSE) AS has_new
+      CASE
+        WHEN re.age_code = 1 AND NOT re.is_juv THEN 'pullus'
+        WHEN re.is_juv AND re.age_code IN (1, 3) THEN 'juv'
+        WHEN re.age_code = 3 AND NOT re.is_juv THEN 'postjuv'
+        WHEN re.age_code > 3 THEN 'adult'
+        ELSE 'unknown'
+      END AS age_bucket
     FROM raw_encounters re
     WHERE re.encounter_id IS NOT NULL
-    GROUP BY
-      re.bird_id,
-      CASE WHEN group_by_species THEN re.species_id ELSE NULL::bigint END,
-      CASE
-        WHEN group_by_time_period = 'day' THEN re.session_day
-        WHEN group_by_time_period = 'month' THEN re.session_month
-        WHEN group_by_time_period = 'year' THEN re.session_year
-        ELSE NULL::date
-      END
+  ),
+  -- Per-bird, per-grouping age/new signal flags, aggregated across all of a bird's
+  -- encounters in the active group/species/time-period cell by bool_or-ing the canonical
+  -- per-encounter buckets above. Because those buckets are mutually exclusive per
+  -- encounter, has_pullus = "any encounter bucketed pullus", and likewise for the other
+  -- classes — identical to testing each raw indicator directly, but without restating the
+  -- conditions. Two bird-level precedence rules with no single-encounter equivalent are
+  -- then applied in bird_age_bucket below: pullus always wins (a bird with any pullus
+  -- reading is pullus, even against a conflicting adult reading, which is assumed
+  -- erroneous), and otherwise juv wins over postjuv. bool_or is COALESCEd to FALSE so a
+  -- bird whose encounters are all 'unknown' (age_code always NULL or 2) lands in
+  -- unknown_age_count rather than dropping out of every bucket.
+  bird_age_flags AS (
+    SELECT
+      eac.bird_id,
+      eac.species_id,
+      eac.time_period,
+      COALESCE(bool_or(eac.age_bucket = 'pullus'), FALSE) AS has_pullus,
+      COALESCE(bool_or(eac.age_bucket = 'juv'), FALSE) AS has_juv,
+      COALESCE(bool_or(eac.age_bucket = 'postjuv'), FALSE) AS has_postjuv,
+      COALESCE(bool_or(eac.age_bucket = 'adult'), FALSE) AS has_adult,
+      COALESCE(bool_or(eac.record_type = 'N'), FALSE) AS has_new
+    FROM encounter_age_classification eac
+    GROUP BY eac.bird_id, eac.species_id, eac.time_period
   ),
   -- Resolve each bird's flags into exactly one mutually-exclusive, exhaustive bucket
   -- via the precedence rules above, so the five bucket counts always sum to the number
@@ -221,6 +251,23 @@ CREATE FUNCTION public.aggregate_stats (
       ) AS new_young_count
     FROM bird_age_bucket bab
     GROUP BY bab.species_id, bab.time_period
+  ),
+  -- Per-encounter age-bucket counts — the encounter-level cut, reading the canonical
+  -- encounter_age_classification directly with no bird-level dedup or precedence. A
+  -- retrapped-then-recaught bird whose encounters span different ages is counted once in
+  -- each encounter's bucket here, unlike the bird-level buckets (age_bucket_counts) which
+  -- resolve it to a single bucket.
+  encounter_age_bucket_counts AS (
+    SELECT
+      eac.species_id,
+      eac.time_period,
+      COUNT(*) FILTER (WHERE eac.age_bucket = 'pullus') AS pullus_enc_count,
+      COUNT(*) FILTER (WHERE eac.age_bucket = 'juv') AS juv_enc_count,
+      COUNT(*) FILTER (WHERE eac.age_bucket = 'postjuv') AS postjuv_enc_count,
+      COUNT(*) FILTER (WHERE eac.age_bucket = 'adult') AS adult_enc_count,
+      COUNT(*) FILTER (WHERE eac.age_bucket = 'unknown') AS unknown_age_enc_count
+    FROM encounter_age_classification eac
+    GROUP BY eac.species_id, eac.time_period
   ),
   stats_per_species_period AS (
     -- Aggregate bird-level stats to species level
@@ -349,6 +396,25 @@ CREATE FUNCTION public.aggregate_stats (
     COALESCE(abc.unknown_age_count, 0) AS "unknown_age_count",
     COALESCE(abc.new_young_count, 0) AS "new_young_count",
 
+    -- Disambiguated bird-based siblings of the (deprecated, ambiguous) columns above —
+    -- same source expression, just selected under a second, explicit alias. new_bird_count
+    -- already carries an unambiguous suffix, so it gets no duplicate here.
+    COALESCE(abc.pullus_count, 0) AS "pullus_bird_count",
+    COALESCE(abc.juv_count, 0) AS "juv_bird_count",
+    COALESCE(abc.postjuv_count, 0) AS "postjuv_bird_count",
+    COALESCE(abc.adult_count, 0) AS "adult_bird_count",
+    COALESCE(abc.unknown_age_count, 0) AS "unknown_age_bird_count",
+    COALESCE(abc.new_young_count, 0) AS "new_young_bird_count",
+
+    -- Per-encounter age buckets (see encounter_age_classification above). No new_enc_count /
+    -- new_young_enc_count: record_type 'N' occurs at most once per bird, so the New (and
+    -- New-young) encounter-level and bird-level views coincide by construction.
+    COALESCE(eabc.pullus_enc_count, 0) AS "pullus_enc_count",
+    COALESCE(eabc.juv_enc_count, 0) AS "juv_enc_count",
+    COALESCE(eabc.postjuv_enc_count, 0) AS "postjuv_enc_count",
+    COALESCE(eabc.adult_enc_count, 0) AS "adult_enc_count",
+    COALESCE(eabc.unknown_age_enc_count, 0) AS "unknown_age_enc_count",
+
     COALESCE(agg_sess.max_new_per_session, 0) AS "max_new_per_session",
 
 
@@ -412,6 +478,13 @@ CREATE FUNCTION public.aggregate_stats (
     WHEN group_by_time_period = 'year' THEN spine.time_period = abc.time_period
     ELSE true
   END
+  LEFT JOIN encounter_age_bucket_counts eabc ON CASE WHEN group_by_species THEN spine.species_id = eabc.species_id ELSE true END
+  AND CASE
+    WHEN group_by_time_period = 'day' THEN spine.time_period = eabc.time_period
+    WHEN group_by_time_period = 'month' THEN spine.time_period = eabc.time_period
+    WHEN group_by_time_period = 'year' THEN spine.time_period = eabc.time_period
+    ELSE true
+  END
   GROUP BY CASE
     WHEN group_by_species THEN spine.species_id
     ELSE NULL::bigint
@@ -426,7 +499,8 @@ CREATE FUNCTION public.aggregate_stats (
   END, agg_sta.max_encounter_count, agg_sess.max_per_session,
   -- agg_sta.max_proven_age, agg_sta.max_time_span_days,
   agg_sess.max_new_per_session, effort.total_effort, effort.effort_per_session, agg_sess.avg_encounters_per_session,
-  abc.pullus_count, abc.juv_count, abc.postjuv_count, abc.adult_count, abc.unknown_age_count, abc.new_young_count
+  abc.pullus_count, abc.juv_count, abc.postjuv_count, abc.adult_count, abc.unknown_age_count, abc.new_young_count,
+  eabc.pullus_enc_count, eabc.juv_enc_count, eabc.postjuv_enc_count, eabc.adult_enc_count, eabc.unknown_age_enc_count
   ORDER BY species_name ASC, time_period ASC;
 
 END;

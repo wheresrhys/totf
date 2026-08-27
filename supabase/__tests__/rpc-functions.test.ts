@@ -923,6 +923,84 @@ describe('Postgres RPC integration tests', () => {
 				expect(adultMonth!.juv_count).toBe(0);
 				expect(adultMonth!.adult_count).toBe(1);
 			});
+
+			// *_bird_count / *_enc_count sibling columns (#601). The *_bird_count columns
+			// are true copies of the deprecated ambiguous bird-level columns; the *_enc_count
+			// columns are a purely per-encounter cut, so a bird whose encounters span
+			// different ages contributes to more than one *_enc_count bucket.
+			describe('*_bird_count / *_enc_count sibling columns', () => {
+				// Usual — with nothing multi-encounter to diverge on, the two cuts coincide.
+				it('for a window of only single-encounter birds, every *_bird_count equals its *_enc_count sibling for every age bucket', async () => {
+					// base+0..base+5 holds six single-encounter birds spanning all five
+					// buckets (pullus/juv/juv/postjuv/adult/unknown); none has >1 encounter.
+					const { data, error } = await deltaClient.rpc('aggregate_stats', {
+						ringing_group_filter: deltaId,
+						from_date: dates.pullusOnly,
+						to_date: dates.onlyTwo,
+					});
+					expect(error).toBeNull();
+					const row = data![0];
+					expect(row.pullus_bird_count).toBe(row.pullus_enc_count);
+					expect(row.juv_bird_count).toBe(row.juv_enc_count);
+					expect(row.postjuv_bird_count).toBe(row.postjuv_enc_count);
+					expect(row.adult_bird_count).toBe(row.adult_enc_count);
+					expect(row.unknown_age_bird_count).toBe(row.unknown_age_enc_count);
+					// Sanity: the window genuinely covers multiple buckets.
+					expect(row.bird_count).toBe(6);
+				});
+
+				// Structure — one assertion per age-bucket pair proving the _bird_count
+				// alias is a true copy of the deprecated ambiguous column, plus new_young.
+				it('each *_bird_count equals its deprecated ambiguous column exactly, and new_young_bird_count equals new_young_count', async () => {
+					const { data, error } = await deltaClient.rpc('aggregate_stats', {
+						ringing_group_filter: deltaId,
+						from_date: base,
+						to_date: addDays(base, 13),
+					});
+					expect(error).toBeNull();
+					const row = data![0];
+					expect(row.pullus_bird_count).toBe(row.pullus_count);
+					expect(row.juv_bird_count).toBe(row.juv_count);
+					expect(row.postjuv_bird_count).toBe(row.postjuv_count);
+					expect(row.adult_bird_count).toBe(row.adult_count);
+					expect(row.unknown_age_bird_count).toBe(row.unknown_age_count);
+					expect(row.new_young_bird_count).toBe(row.new_young_count);
+				});
+
+				// Edge — a bird ringed as pullus then retrapped as adult: bird-based resolves
+				// it to a single bucket (pullus wins), encounter-based splits it across both.
+				it('a pullus-then-adult bird counts once in pullus_bird_count (adult_bird_count 0) but increments both pullus_enc_count and adult_enc_count', async () => {
+					const row = await bucketRow(dates.pullusPlusAdult);
+					expect(row.bird_count).toBe(1);
+					expect(row.encounter_count).toBe(2);
+					// Bird-based: single resolved bucket (pullus always wins).
+					expect(row.pullus_bird_count).toBe(1);
+					expect(row.adult_bird_count).toBe(0);
+					// Encounter-based: one encounter in each bucket.
+					expect(row.pullus_enc_count).toBe(1);
+					expect(row.adult_enc_count).toBe(1);
+				});
+
+				// Edge — a juv-then-adult bird: bird-based resolves to unknown (no precedence
+				// between juv and adult), encounter-based still splits across the two buckets.
+				it('a juv-then-adult bird resolves to unknown_age_bird_count but increments both juv_enc_count and adult_enc_count', async () => {
+					const row = await bucketRow(dates.juvPlusAdult);
+					expect(row.bird_count).toBe(1);
+					expect(row.unknown_age_bird_count).toBe(1);
+					expect(row.juv_bird_count).toBe(0);
+					expect(row.adult_bird_count).toBe(0);
+					expect(row.juv_enc_count).toBe(1);
+					expect(row.adult_enc_count).toBe(1);
+				});
+
+				// Edge — negative check: the New family gets no encounter-based sibling at
+				// all, guarding against a future PR accidentally reintroducing them.
+				it('the returned row shape has no new_enc_count or new_young_enc_count column', async () => {
+					const row = await bucketRow(dates.pullusOnly);
+					expect(row).not.toHaveProperty('new_enc_count');
+					expect(row).not.toHaveProperty('new_young_enc_count');
+				});
+			});
 		});
 
 		describe('group_by_time_period=day', () => {
