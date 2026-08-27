@@ -8,11 +8,13 @@ import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SpeciesTotalsSection } from '@/app/components/SpeciesTotalsSection';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
+import type { MonthTotalsRow } from '@/app/models/month-totals';
 export function SummaryPage({
 	year,
 	month,
 	summaryStats = null,
 	speciesStats = [],
+	monthTotals,
 	yearlyTotals,
 	sessionTotals,
 	viewedGroup
@@ -21,6 +23,7 @@ export function SummaryPage({
 	month?: number;
 	summaryStats?: AggregateStatsResult | null;
 	speciesStats?: AggregateStatsResult[];
+	monthTotals?: MonthTotalsRow[];
 	yearlyTotals?: AggregateStatsResult[];
 	sessionTotals?: AggregateStatsResult[];
 	viewedGroup?: ViewedGroup;
@@ -42,6 +45,7 @@ export function SummaryPage({
 				<div className="lg:flex-1">
 					<SpeciesTotalsSection
 						speciesStats={speciesStats}
+						monthTotals={monthTotals}
 						yearlyTotals={yearlyTotals}
 						sessionTotals={sessionTotals}
 						viewedGroup={viewedGroup}

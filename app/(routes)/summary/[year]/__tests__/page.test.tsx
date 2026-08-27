@@ -4,8 +4,10 @@ import Page, { fetchYearSummaryData } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
+const fetchPeriodStatsMock = vi.fn().mockResolvedValue([]);
 vi.mock('@/app/actions/summary-stats', () => ({
-	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args)
+	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args),
+	fetchPeriodStats: (...args: unknown[]) => fetchPeriodStatsMock(...args)
 }));
 
 vi.mock('@/app/actions/spp-data', () => ({
@@ -16,6 +18,7 @@ describe('/summary/[year]', () => {
 	afterEach(() => {
 		cleanup();
 		fetchSummaryStatsMock.mockClear();
+		fetchPeriodStatsMock.mockClear();
 	});
 
 	it('renders "{year} summary" for a well-formed year', async () => {
@@ -54,6 +57,26 @@ describe('/summary/[year]', () => {
 		await screen.findByRole('heading', { level: 1 });
 		expect(screen.getByTestId('summary-stats-section')).not.toBeNull();
 		expect(screen.getByText('Sessions').nextSibling?.textContent).toBe('10');
+	});
+
+	it('fetchYearSummaryData calls fetchPeriodStats with month grouping and the year bounds', async () => {
+		await fetchYearSummaryData({ year: '2026' }, 1);
+		expect(fetchPeriodStatsMock).toHaveBeenCalledWith(
+			1,
+			'month',
+			'2026-01-01',
+			'2026-12-31'
+		);
+	});
+
+	it('zero-fills monthTotals to 12 rows even when the RPC returns a partial response', async () => {
+		fetchPeriodStatsMock.mockResolvedValueOnce([
+			{ ...(alphaStats as object), time_period: '2026-08-01' }
+		]);
+		const data = await fetchYearSummaryData({ year: '2026' }, 1);
+		expect(data.monthTotals).toHaveLength(12);
+		expect(data.monthTotals.map((row) => row.label)[0]).toBe('January 2026');
+		expect(data.monthTotals.map((row) => row.label)[11]).toBe('December 2026');
 	});
 
 	it('renders without the stats section when fetchSummaryStats resolves null', async () => {
