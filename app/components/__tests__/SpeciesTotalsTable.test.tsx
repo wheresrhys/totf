@@ -6,6 +6,19 @@ import type { AggregateStatsResult } from '@/app/models/db';
 
 const speciesStats = speciesDataSnapshot as unknown as AggregateStatsResult[];
 
+// The real header <th>s live in the `<thead>` row without a `data-testid` —
+// `above-header-row` (the "Aggregate by" toggle row) and `totals-row` are
+// the other two possible `<thead>` rows, both explicitly testid'd, so this
+// excludes them rather than relying on the header row's fixed position.
+function getColumnHeaders(): HTMLTableCellElement[] {
+	const headerRow = Array.from(document.querySelectorAll('thead tr')).find(
+		(row) => !row.hasAttribute('data-testid')
+	);
+	return Array.from(
+		headerRow?.querySelectorAll('th') ?? []
+	) as HTMLTableCellElement[];
+}
+
 function makeStat(
 	overrides: Partial<AggregateStatsResult> & { species_name: string }
 ): AggregateStatsResult {
@@ -32,7 +45,7 @@ describe('SpeciesTotalsTable', () => {
 	describe('column headings', () => {
 		it('renders twelve column headers in the expected order', () => {
 			render(<SpeciesTotalsTable speciesStats={speciesStats} />);
-			const headers = screen.getAllByRole('columnheader');
+			const headers = getColumnHeaders();
 			expect(headers.map((header) => header.textContent)).toEqual([
 				'Species',
 				'Sessions',
@@ -182,7 +195,7 @@ describe('SpeciesTotalsTable', () => {
 		it('applies a distinct background colour to each of the New/Retraps/Pullus/Juvs/Postjuv/Adults/Unknown age columns, on header and cells alike', () => {
 			const stats = [makeStat({ species_name: 'Robin', pullus_count: 1 })];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
-			const headers = screen.getAllByRole('columnheader');
+			const headers = getColumnHeaders();
 			const cells = screen.getAllByRole('cell');
 
 			const columnStyle = (label: string) => {
@@ -315,7 +328,7 @@ describe('SpeciesTotalsTable', () => {
 			];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			expect(
-				screen.getAllByRole('columnheader').map((header) => header.textContent)
+				getColumnHeaders().map((header) => header.textContent)
 			).not.toContain('Pullus');
 		});
 
@@ -325,9 +338,9 @@ describe('SpeciesTotalsTable', () => {
 				makeStat({ species_name: 'Wren', pullus_count: 2 })
 			];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
-			expect(
-				screen.getAllByRole('columnheader').map((header) => header.textContent)
-			).toContain('Pulli');
+			expect(getColumnHeaders().map((header) => header.textContent)).toContain(
+				'Pulli'
+			);
 		});
 	});
 
@@ -335,7 +348,7 @@ describe('SpeciesTotalsTable', () => {
 		it('draws a thicker left border on Pullus when it is shown', () => {
 			const stats = [makeStat({ species_name: 'Robin', pullus_count: 1 })];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
-			const headers = screen.getAllByRole('columnheader');
+			const headers = getColumnHeaders();
 			const pullusHeader = headers.find(
 				(header) => header.textContent === 'Pulli'
 			);
@@ -347,7 +360,7 @@ describe('SpeciesTotalsTable', () => {
 		it('shifts the thicker left border onto Juvs when Pullus is hidden', () => {
 			const stats = [makeStat({ species_name: 'Robin', pullus_count: 0 })];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
-			const headers = screen.getAllByRole('columnheader');
+			const headers = getColumnHeaders();
 			const juvsHeader = headers.find((header) => header.textContent === 'Juv');
 			expect(juvsHeader?.className).toContain('border-l-4');
 		});
@@ -355,11 +368,102 @@ describe('SpeciesTotalsTable', () => {
 		it('draws a thicker right border on the Unknown age column', () => {
 			const stats = [makeStat({ species_name: 'Robin' })];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
-			const headers = screen.getAllByRole('columnheader');
+			const headers = getColumnHeaders();
 			const unknownAgeHeader = headers.find(
 				(header) => header.textContent === 'Not aged'
 			);
 			expect(unknownAgeHeader?.className).toContain('border-r-4');
+		});
+	});
+
+	describe('Aggregate by toggle', () => {
+		// One bird, one 'N' (new) encounter and one later retrap: bird mode
+		// counts it once as Pulli (its age at the 'N' encounter); encounter
+		// mode splits its two encounters across Pulli and Adult, so the
+		// standard-block columns differ by aggregation mode while the raw
+		// bird/encounter counts (session/encounter/individuals) don't.
+		const stats = [
+			makeStat({
+				species_name: 'Robin',
+				session_count: 3,
+				encounter_count: 5,
+				bird_count: 4,
+				new_bird_count: 3,
+				pullus_count: 1,
+				juv_count: 0,
+				postjuv_count: 0,
+				adult_count: 0,
+				unknown_age_count: 0,
+				new_young_count: 1,
+				...({
+					pullus_enc_count: 1,
+					juv_enc_count: 0,
+					postjuv_enc_count: 0,
+					adult_enc_count: 1,
+					unknown_age_enc_count: 0
+				} as Partial<AggregateStatsResult>)
+			})
+		];
+
+		function getRowCells(): HTMLTableCellElement[] {
+			return Array.from(
+				document.querySelector('tbody tr')?.querySelectorAll('td') ?? []
+			) as HTMLTableCellElement[];
+		}
+
+		it('defaults to bird-based counts and re-renders the standard-block columns from encounter-based data when "Encounter" is clicked', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+
+			// Column order: Species, Sessions, Encounters, Individuals, New,
+			// Retrap, Pulli, Juv, Postjuv, Adult, Not aged, New young.
+			let cells = getRowCells();
+			expect(cells[4].textContent).toBe('3'); // New
+			expect(cells[5].textContent).toBe('1'); // Retrap: bird_count - new
+			expect(cells[6].textContent).toBe('1'); // Pulli
+			expect(cells[9].textContent).toBe('0'); // Adult
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Encounter' }));
+
+			cells = getRowCells();
+			expect(cells[4].textContent).toBe('3'); // New (unaffected by toggle)
+			expect(cells[5].textContent).toBe('2'); // Retrap: encounter_count - new
+			expect(cells[6].textContent).toBe('1'); // Pulli (from pullus_enc_count)
+			expect(cells[9].textContent).toBe('1'); // Adult (from adult_enc_count)
+		});
+
+		it('leaves the Species/Sessions/Encounters/Individuals columns unaffected by the toggle', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			const cellsBefore = getRowCells();
+			const unaffected = [0, 1, 2, 3].map(
+				(index) => cellsBefore[index].textContent
+			);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Encounter' }));
+
+			const cellsAfter = getRowCells();
+			expect(
+				[0, 1, 2, 3].map((index) => cellsAfter[index].textContent)
+			).toEqual(unaffected);
+		});
+
+		it('recomputes Pullus column visibility when toggling to a variant with a different zero-vs-nonzero pullus count', () => {
+			const zeroInBirdModeStats = [
+				makeStat({
+					species_name: 'Robin',
+					pullus_count: 0,
+					...({ pullus_enc_count: 2 } as Partial<AggregateStatsResult>)
+				})
+			];
+			render(<SpeciesTotalsTable speciesStats={zeroInBirdModeStats} />);
+			expect(
+				getColumnHeaders().map((header) => header.textContent)
+			).not.toContain('Pulli');
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Encounter' }));
+
+			expect(getColumnHeaders().map((header) => header.textContent)).toContain(
+				'Pulli'
+			);
 		});
 	});
 });

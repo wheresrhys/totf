@@ -1,4 +1,11 @@
-import { deriveSpeciesTotalsRow } from '@/app/models/species-totals';
+'use client';
+
+import { useState } from 'react';
+import {
+	deriveSpeciesTotalsRow,
+	deriveSpeciesTotalsRowByEncounter,
+	type SpeciesTotalsRow
+} from '@/app/models/species-totals';
 import type { AggregateStatsResult } from '@/app/models/db';
 import {
 	type ColumnConfig,
@@ -10,6 +17,10 @@ import {
 	buildTotalsRowCells,
 	createNameLinkCell
 } from './shared/StatsTableColumnConfigs';
+import {
+	AggregateByToggle,
+	type AggregateByValue
+} from './shared/AggregateByToggle';
 
 type RowModel = {
 	speciesName: string;
@@ -31,8 +42,7 @@ const SpeciesNameCell = createNameLinkCell<AggregateStatsResult, RowModel>(
 	(model) => `/species/${model.speciesName}`
 );
 
-function rowDataTransform(stat: AggregateStatsResult): RowModel {
-	const row = deriveSpeciesTotalsRow(stat);
+function toRowModel(row: SpeciesTotalsRow): RowModel {
 	return {
 		speciesName: row.speciesName,
 		sessionsCount: row.sessionsCount,
@@ -47,6 +57,18 @@ function rowDataTransform(stat: AggregateStatsResult): RowModel {
 		unknownAge: row.unknownAgeCount,
 		newYoung: row.newYoungCount
 	};
+}
+
+// Picks the bird-based or encounter-based derive function per #604's
+// "Aggregate by" toggle, then reshapes it into `RowModel` via `toRowModel` —
+// same function either way, since both derive functions return the same
+// `SpeciesTotalsRow` shape.
+function deriveRow(
+	aggregateBy: AggregateByValue
+): (stat: AggregateStatsResult) => SpeciesTotalsRow {
+	return aggregateBy === 'bird'
+		? deriveSpeciesTotalsRow
+		: deriveSpeciesTotalsRowByEncounter;
 }
 
 function buildColumnConfigs(
@@ -109,17 +131,27 @@ export function SpeciesTotalsTable({
 	speciesStats: AggregateStatsResult[];
 	totalsStats?: AggregateStatsResult;
 }) {
+	// Local to this table (not persisted across tab switches) — resets to
+	// 'bird' whenever `SpeciesTotalsSection` remounts this table for a
+	// different tab, per #604.
+	const [aggregateBy, setAggregateBy] = useState<AggregateByValue>('bird');
+
 	if (speciesStats.length === 0) {
 		return <p>No species recorded.</p>;
 	}
 
-	const hasPulli = speciesStats.some((stat) => stat.pullus_count > 0);
+	const activeDeriveRow = deriveRow(aggregateBy);
+	const rowDataTransform = (stat: AggregateStatsResult) =>
+		toRowModel(activeDeriveRow(stat));
+	const hasPulli = speciesStats.some(
+		(stat) => activeDeriveRow(stat).pullusCount > 0
+	);
 	const columnConfigs = buildColumnConfigs(hasPulli);
 
 	const totalsRow = totalsStats
 		? buildTotalsRowCells<RowModel>({
 				columnConfigs,
-				totalsRowModel: rowDataTransform(totalsStats)
+				totalsRowModel: toRowModel(activeDeriveRow(totalsStats))
 			})
 		: undefined;
 
@@ -130,6 +162,13 @@ export function SpeciesTotalsTable({
 			testId="species-totals-table"
 			rowDataTransform={rowDataTransform}
 			totalsRow={totalsRow}
+			aboveHeaderRow={{
+				spanFromColumn: 'new',
+				spanToColumn: 'unknownAge',
+				content: (
+					<AggregateByToggle value={aggregateBy} onChange={setAggregateBy} />
+				)
+			}}
 			TableBodyComponent={SpeciesTotalsTableBody}
 		/>
 	);
