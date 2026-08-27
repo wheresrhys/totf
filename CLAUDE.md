@@ -208,7 +208,7 @@ never DB integration tests, which are run manually. Local Supabase must be runni
 (`npm run db:start:local`) and seeded (`npm run db:seed:e2e`) for the E2E and DB integration
 suites to pass.
 
-HTTP tests (`http-tests/`) use `http-tests/global-setup.ts` to start/stop the Next.js dev server automatically. If a server is already running at `http://localhost:3000` (or `TEST_BASE_URL`), it reuses it and does not kill it after the suite.
+HTTP tests (`http-tests/`) use `http-tests/global-setup.ts` to start/stop the Next.js dev server automatically. The default server URL is derived per-worktree from `scripts/worktree-test-port.ts` (`deriveWorktreePort()` hashes the worktree's absolute path into a fixed port range, avoiding `3000` and the local Supabase ports) — so concurrent swarm worktrees each get their own port and a reused server can only ever be one this same worktree started, never a sibling's. Set `TEST_BASE_URL` to override the derivation and point at a specific/remote server. If a server is already running at the resolved URL, it reuses it and does not kill it after the suite. `playwright.config.ts` uses the same helper for the E2E dev server.
 
 ### App tests (Vitest + happy-dom)
 
