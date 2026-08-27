@@ -106,29 +106,46 @@ export function buildStandardColumnConfigs<RowModel>(
 	} as Partial<Record<keyof RowModel, ColumnConfig>>;
 }
 
+// Input for `buildTotalsRowCells`: always the `columnConfigs` that fix the
+// column order/styling, plus exactly one source for the totals values —
+// either a pre-computed `totalsRowModel`, or the table's own `rowModels`,
+// which the function then sums per column itself. The discriminated union
+// makes those two sources mutually exclusive at the type level.
+export type TotalsRowCellsInput<RowModel> = {
+	columnConfigs: Partial<Record<keyof RowModel, ColumnConfig>>;
+} & ({ totalsRowModel: RowModel } | { rowModels: RowModel[] });
+
 // Builds the ordered `<td>` cells for a pinned totals row, mirroring the
 // `orderedColumnProperties` iteration duplicated in `SpeciesTotalsTableBody`/
-// `PeriodTotalsTableBody`: the first column renders `firstColumnLabel` as plain
-// text (not a link, since a totals row has nothing to link to), and every other
-// column renders its value straight from `totalsRowModel`, carrying the same
-// `cellClassName` column-block styling the data rows use so the columns stay
-// visually aligned top-to-bottom. Returns a bare `<td>` array (no wrapping
-// `<tr>`) so `SortableTable` owns the row element and its testid/styling.
+// `PeriodTotalsTableBody`: the first column renders the plain-text label
+// `'Total'` (not a link, since a totals row has nothing to link to), and every
+// other column renders its total value — taken straight from `totalsRowModel`
+// when supplied, or summed across the given `rowModels` otherwise — carrying
+// the same `cellClassName` column-block styling the data rows use so the
+// columns stay visually aligned top-to-bottom. Returns a bare `<td>` array (no
+// wrapping `<tr>`) so `SortableTable` owns the row element and its
+// testid/styling.
 export function buildTotalsRowCells<RowModel>(
-	columnConfigs: Partial<Record<keyof RowModel, ColumnConfig>>,
-	totalsRowModel: RowModel,
-	firstColumnLabel: string
+	input: TotalsRowCellsInput<RowModel>
 ): React.ReactNode[] {
+	const { columnConfigs } = input;
 	const orderedProperties = Object.keys(columnConfigs) as (keyof RowModel)[];
+	const valueFor = (property: keyof RowModel): React.ReactNode =>
+		'totalsRowModel' in input
+			? (input.totalsRowModel[property] as React.ReactNode)
+			: input.rowModels.reduce(
+					(sum, model) => sum + (model[property] as number),
+					0
+				);
 	return orderedProperties.map((property, index) =>
 		index === 0 ? (
-			<td key={property as string}>{firstColumnLabel}</td>
+			<td key={property as string}>Total</td>
 		) : (
 			<td
 				key={property as string}
 				className={columnConfigs[property]?.cellClassName}
 			>
-				{totalsRowModel[property] as React.ReactNode}
+				{valueFor(property)}
 			</td>
 		)
 	);

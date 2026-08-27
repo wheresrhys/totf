@@ -235,11 +235,10 @@ describe('buildTotalsRowCells', () => {
 		);
 
 	it('renders one cell per columnConfigs entry, in the same order as the header', () => {
-		const cells = buildTotalsRowCells<TotalsModel>(
+		const cells = buildTotalsRowCells<TotalsModel>({
 			columnConfigs,
-			totalsRowModel,
-			'Total'
-		);
+			totalsRowModel
+		});
 		renderCells(cells);
 		const renderedCells = document.querySelectorAll('td');
 		expect(renderedCells).toHaveLength(3);
@@ -248,23 +247,21 @@ describe('buildTotalsRowCells', () => {
 		expect(renderedCells[2].textContent).toBe('30');
 	});
 
-	it('renders firstColumnLabel as plain text in the first column, not a link', () => {
-		const cells = buildTotalsRowCells<TotalsModel>(
+	it("renders the hard-coded 'Total' label as plain text in the first column, not a link", () => {
+		const cells = buildTotalsRowCells<TotalsModel>({
 			columnConfigs,
-			totalsRowModel,
-			'Total'
-		);
+			totalsRowModel
+		});
 		renderCells(cells);
 		expect(screen.getByText('Total')).toBeDefined();
 		expect(screen.queryByRole('link')).toBeNull();
 	});
 
 	it('renders each non-first column value straight from totalsRowModel', () => {
-		const cells = buildTotalsRowCells<TotalsModel>(
+		const cells = buildTotalsRowCells<TotalsModel>({
 			columnConfigs,
-			totalsRowModel,
-			'Total'
-		);
+			totalsRowModel
+		});
 		renderCells(cells);
 		const renderedCells = document.querySelectorAll('td');
 		// The first column ignores the model value in favour of the label.
@@ -273,19 +270,38 @@ describe('buildTotalsRowCells', () => {
 		expect(renderedCells[2].textContent).toBe('30');
 	});
 
-	it("carries each non-first column's cellClassName onto its cell", () => {
-		const cells = buildTotalsRowCells<TotalsModel>(
+	it('sums each non-first column across rowModels when no totalsRowModel is given', () => {
+		const rowModels: TotalsModel[] = [
+			{ speciesName: 'Robin', encounterCount: 10, individualsCount: 7 },
+			{ speciesName: 'Wren', encounterCount: 20, individualsCount: 15 },
+			{ speciesName: 'Dunnock', encounterCount: 12, individualsCount: 8 }
+		];
+		const cells = buildTotalsRowCells<TotalsModel>({
 			columnConfigs,
-			totalsRowModel,
-			'Total'
-		);
+			rowModels
+		});
+		renderCells(cells);
+		const renderedCells = document.querySelectorAll('td');
+		expect(renderedCells[0].textContent).toBe('Total');
+		expect(renderedCells[1].textContent).toBe('42');
+		expect(renderedCells[2].textContent).toBe('30');
+	});
+
+	it("carries each non-first column's cellClassName onto its cell", () => {
+		const cells = buildTotalsRowCells<TotalsModel>({
+			columnConfigs,
+			totalsRowModel
+		});
 		renderCells(cells);
 		const renderedCells = document.querySelectorAll('td');
 		expect(renderedCells[2].className).toContain('bg-green-50');
 	});
 
 	it('returns no cells when columnConfigs is empty', () => {
-		const cells = buildTotalsRowCells<TotalsModel>({}, totalsRowModel, 'Total');
+		const cells = buildTotalsRowCells<TotalsModel>({
+			columnConfigs: {},
+			totalsRowModel
+		});
 		expect(cells).toHaveLength(0);
 	});
 });
