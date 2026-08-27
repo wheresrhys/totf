@@ -7,17 +7,20 @@ import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SpeciesTotalsSection } from '@/app/components/SpeciesTotalsSection';
 import type { AggregateStatsResult } from '@/app/models/db';
+import type { MonthTotalsRow } from '@/app/models/month-totals';
 export function SummaryPage({
 	year,
 	month,
 	summaryStats = null,
 	speciesStats = [],
+	monthTotals,
 	yearlyTotals
 }: {
 	year?: number;
 	month?: number;
 	summaryStats?: AggregateStatsResult | null;
 	speciesStats?: AggregateStatsResult[];
+	monthTotals?: MonthTotalsRow[];
 	yearlyTotals?: AggregateStatsResult[];
 }) {
 	return (
@@ -37,6 +40,7 @@ export function SummaryPage({
 				<div className="lg:flex-1">
 					<SpeciesTotalsSection
 						speciesStats={speciesStats}
+						monthTotals={monthTotals}
 						yearlyTotals={yearlyTotals}
 					/>
 				</div>

@@ -106,6 +106,21 @@ describe('PeriodTotalsTable', () => {
 			).toBe('August 2026');
 		});
 
+		it('renders the caller-supplied buildLabel instead of formatPeriodTotalsLabel when provided', () => {
+			render(
+				<PeriodTotalsTable
+					grouping="month"
+					rows={[buildStat({ time_period: '2026-01-01' })]}
+					firstColumnHeader="Month"
+					buildHref={(timePeriod) => `/summary/2026/${timePeriod}`}
+					buildLabel={() => 'Custom Label'}
+				/>
+			);
+			expect(
+				screen.getByRole('link', { name: 'Custom Label' }).textContent?.trim()
+			).toBe('Custom Label');
+		});
+
 		it('renders a "day" grouping label via formatPeriodTotalsLabel', () => {
 			render(
 				<PeriodTotalsTable

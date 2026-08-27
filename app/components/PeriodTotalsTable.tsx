@@ -49,16 +49,25 @@ export function PeriodTotalsTable({
 	grouping,
 	rows,
 	firstColumnHeader,
-	buildHref
+	buildHref,
+	buildLabel
 }: {
 	grouping: PeriodTotalsGrouping;
 	rows: AggregateStatsResult[];
 	firstColumnHeader: string;
 	buildHref: (timePeriod: string) => string;
+	// Overrides the default `formatPeriodTotalsLabel(grouping, ...)` first-column
+	// text — e.g. the month-totals caller supplies a timezone-safe label built
+	// from integer year/month rather than parsing the `time_period` string.
+	buildLabel?: (timePeriod: string) => string;
 }) {
 	if (rows.length === 0) {
 		return <p>No data recorded.</p>;
 	}
+
+	const resolveLabel =
+		buildLabel ??
+		((timePeriod: string) => formatPeriodTotalsLabel(grouping, timePeriod));
 
 	const columnConfigs = buildColumnConfigs(firstColumnHeader);
 
@@ -69,7 +78,7 @@ export function PeriodTotalsTable({
 		AggregateStatsResult,
 		PeriodTotalsRow
 	>(
-		(model) => formatPeriodTotalsLabel(grouping, model.timePeriod),
+		(model) => resolveLabel(model.timePeriod),
 		(model) => buildHref(model.timePeriod)
 	);
 
