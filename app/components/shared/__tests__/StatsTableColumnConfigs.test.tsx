@@ -74,6 +74,32 @@ describe('createNameLinkCell', () => {
 	});
 });
 
+describe('columnBlock', () => {
+	it('applies the light-mode -50 tint and the dark-mode -950 tint from the same base colour', () => {
+		const block = columnBlock('green');
+		expect(block.headerClassName).toBe('bg-green-50 dark:bg-green-950');
+		expect(block.cellClassName).toBe('bg-green-50 dark:bg-green-950');
+	});
+
+	it('applies the same tinted classes to both the header and every cell in the column', () => {
+		const block = columnBlock('amber');
+		expect(block.headerClassName).toBe(block.cellClassName);
+	});
+
+	it('appends extraClassName after the tint classes when supplied', () => {
+		const block = columnBlock('cyan', 'border-l-4 border-l-base-content/30');
+		expect(block.headerClassName).toBe(
+			'bg-cyan-50 dark:bg-cyan-950 border-l-4 border-l-base-content/30'
+		);
+	});
+
+	it('omits any trailing whitespace when extraClassName is not supplied', () => {
+		const block = columnBlock('purple');
+		expect(block.headerClassName).toBe('bg-purple-50 dark:bg-purple-950');
+		expect(block.headerClassName?.endsWith(' ')).toBe(false);
+	});
+});
+
 describe('buildStandardColumnConfigs', () => {
 	// The session table's own RowModel shape, used to prove the builder
 	// reproduces today's behaviour.
@@ -215,7 +241,7 @@ describe('buildTotalsRowCells', () => {
 	const columnConfigs: Partial<Record<keyof TotalsModel, ColumnConfig>> = {
 		speciesName: { label: 'Species' },
 		encounterCount: { label: 'Encounters' },
-		individualsCount: { label: 'Individuals', ...columnBlock('bg-green-50') }
+		individualsCount: { label: 'Individuals', ...columnBlock('green') }
 	};
 	const totalsRowModel: TotalsModel = {
 		speciesName: 'ignored',

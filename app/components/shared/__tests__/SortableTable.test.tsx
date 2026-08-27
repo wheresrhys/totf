@@ -48,6 +48,20 @@ describe('SortableTable', () => {
 		expect(screen.getByText('Count')).toBeDefined();
 	});
 
+	it('renders compact on small screens and full size from sm: up, per issue #605', () => {
+		render(
+			<SortableTable<Row, Row>
+				columnConfigs={columnConfigs}
+				data={data}
+				rowDataTransform={(r) => r}
+				TableBodyComponent={SimpleBody}
+			/>
+		);
+		const table = document.querySelector('table');
+		expect(table?.className).toContain('table-xs');
+		expect(table?.className).toContain('sm:table-md');
+	});
+
 	it('renders all data rows in original order by default', () => {
 		render(
 			<SortableTable<Row, Row>

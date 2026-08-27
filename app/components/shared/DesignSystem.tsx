@@ -25,10 +25,15 @@ export function BoxyList({
 	);
 }
 
+// Default table size: compact (`table-xs`) on small screens, full size
+// (`table-md`, FlyonUI's default) from `sm:` up — see issue #605. Callers
+// that need a different size still pass their own `className`.
+export const defaultTableClassName = 'table table-xs sm:table-md';
+
 export function Table({
 	children,
 	testId,
-	className = 'table'
+	className = defaultTableClassName
 }: {
 	children: React.ReactNode;
 	testId?: string;

@@ -49,7 +49,7 @@ function buildColumnConfigs(
 		}),
 		newYoung: {
 			label: 'New young',
-			...columnBlock('bg-lime-50')
+			...columnBlock('lime')
 		}
 	};
 }

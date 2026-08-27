@@ -151,7 +151,7 @@ function buildColumnConfigs(
 		}),
 		newYoung: {
 			label: 'New Young',
-			...columnBlock('bg-lime-50')
+			...columnBlock('lime')
 		},
 		maxProvenAge: {
 			label: 'Max Proven Age'
