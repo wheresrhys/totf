@@ -4,9 +4,11 @@ import {
 	createNameLinkCell,
 	buildStandardColumnConfigs,
 	buildSessionsColumnConfig,
+	buildTotalsRowCells,
+	columnBlock,
 	type StandardField
 } from '../StatsTableColumnConfigs';
-import type { RowModelWithRawData } from '../SortableTable';
+import type { ColumnConfig, RowModelWithRawData } from '../SortableTable';
 
 afterEach(() => {
 	cleanup();
@@ -201,6 +203,90 @@ describe('buildStandardColumnConfigs', () => {
 			sessionLabels
 		);
 		expect('pullus' in configs).toBe(false);
+	});
+});
+
+describe('buildTotalsRowCells', () => {
+	type TotalsModel = {
+		speciesName: string;
+		encounterCount: number;
+		individualsCount: number;
+	};
+	const columnConfigs: Partial<Record<keyof TotalsModel, ColumnConfig>> = {
+		speciesName: { label: 'Species' },
+		encounterCount: { label: 'Encounters' },
+		individualsCount: { label: 'Individuals', ...columnBlock('bg-green-50') }
+	};
+	const totalsRowModel: TotalsModel = {
+		speciesName: 'ignored',
+		encounterCount: 42,
+		individualsCount: 30
+	};
+
+	// buildTotalsRowCells returns a bare <td> array; render it inside a
+	// table row so the DOM is valid and queryable.
+	const renderCells = (cells: React.ReactNode[]) =>
+		render(
+			<table>
+				<tbody>
+					<tr>{cells}</tr>
+				</tbody>
+			</table>
+		);
+
+	it('renders one cell per columnConfigs entry, in the same order as the header', () => {
+		const cells = buildTotalsRowCells<TotalsModel>(
+			columnConfigs,
+			totalsRowModel,
+			'Total'
+		);
+		renderCells(cells);
+		const renderedCells = document.querySelectorAll('td');
+		expect(renderedCells).toHaveLength(3);
+		expect(renderedCells[0].textContent).toBe('Total');
+		expect(renderedCells[1].textContent).toBe('42');
+		expect(renderedCells[2].textContent).toBe('30');
+	});
+
+	it('renders firstColumnLabel as plain text in the first column, not a link', () => {
+		const cells = buildTotalsRowCells<TotalsModel>(
+			columnConfigs,
+			totalsRowModel,
+			'Total'
+		);
+		renderCells(cells);
+		expect(screen.getByText('Total')).toBeDefined();
+		expect(screen.queryByRole('link')).toBeNull();
+	});
+
+	it('renders each non-first column value straight from totalsRowModel', () => {
+		const cells = buildTotalsRowCells<TotalsModel>(
+			columnConfigs,
+			totalsRowModel,
+			'Total'
+		);
+		renderCells(cells);
+		const renderedCells = document.querySelectorAll('td');
+		// The first column ignores the model value in favour of the label.
+		expect(renderedCells[0].textContent).not.toContain('ignored');
+		expect(renderedCells[1].textContent).toBe('42');
+		expect(renderedCells[2].textContent).toBe('30');
+	});
+
+	it("carries each non-first column's cellClassName onto its cell", () => {
+		const cells = buildTotalsRowCells<TotalsModel>(
+			columnConfigs,
+			totalsRowModel,
+			'Total'
+		);
+		renderCells(cells);
+		const renderedCells = document.querySelectorAll('td');
+		expect(renderedCells[2].className).toContain('bg-green-50');
+	});
+
+	it('returns no cells when columnConfigs is empty', () => {
+		const cells = buildTotalsRowCells<TotalsModel>({}, totalsRowModel, 'Total');
+		expect(cells).toHaveLength(0);
 	});
 });
 

@@ -106,6 +106,34 @@ export function buildStandardColumnConfigs<RowModel>(
 	} as Partial<Record<keyof RowModel, ColumnConfig>>;
 }
 
+// Builds the ordered `<td>` cells for a pinned totals row, mirroring the
+// `orderedColumnProperties` iteration duplicated in `SpeciesTotalsTableBody`/
+// `PeriodTotalsTableBody`: the first column renders `firstColumnLabel` as plain
+// text (not a link, since a totals row has nothing to link to), and every other
+// column renders its value straight from `totalsRowModel`, carrying the same
+// `cellClassName` column-block styling the data rows use so the columns stay
+// visually aligned top-to-bottom. Returns a bare `<td>` array (no wrapping
+// `<tr>`) so `SortableTable` owns the row element and its testid/styling.
+export function buildTotalsRowCells<RowModel>(
+	columnConfigs: Partial<Record<keyof RowModel, ColumnConfig>>,
+	totalsRowModel: RowModel,
+	firstColumnLabel: string
+): React.ReactNode[] {
+	const orderedProperties = Object.keys(columnConfigs) as (keyof RowModel)[];
+	return orderedProperties.map((property, index) =>
+		index === 0 ? (
+			<td key={property as string}>{firstColumnLabel}</td>
+		) : (
+			<td
+				key={property as string}
+				className={columnConfigs[property]?.cellClassName}
+			>
+				{totalsRowModel[property] as React.ReactNode}
+			</td>
+		)
+	);
+}
+
 // A single-entry column config for an opt-in "Sessions" count column. Callers
 // that don't want it (e.g. the session page, where the count is trivially 1)
 // simply never call this.
