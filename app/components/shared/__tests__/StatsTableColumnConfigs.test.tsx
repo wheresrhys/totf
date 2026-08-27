@@ -5,8 +5,7 @@ import {
 	buildStandardColumnConfigs,
 	buildSessionsColumnConfig,
 	buildTotalsRowCells,
-	columnBlock,
-	type StandardField
+	columnBlock
 } from '../StatsTableColumnConfigs';
 import type { ColumnConfig, RowModelWithRawData } from '../SortableTable';
 
@@ -127,17 +126,8 @@ describe('buildStandardColumnConfigs', () => {
 		unknownAge: number;
 		newYoung: number;
 	};
-	const totalsLabels: Record<StandardField, string> = {
-		new: 'New',
-		retraps: 'Retraps',
-		pullus: 'Pulli',
-		juvs: 'Juvs',
-		postjuv: 'Postjuv',
-		adults: 'Adult',
-		unknownAge: 'Unknown age'
-	};
 
-	it('returns new/retraps/juvs/postjuv/adults/unknownAge in order when hasPullus is false', () => {
+	it('returns age counts in logical order when hasPulli is false', () => {
 		const configs = buildStandardColumnConfigs<SessionModel>(false);
 		expect(Object.keys(configs)).toEqual([
 			'new',
@@ -145,11 +135,12 @@ describe('buildStandardColumnConfigs', () => {
 			'juvs',
 			'postjuv',
 			'adults',
-			'unknownAge'
+			'unknownAge',
+			'newYoung'
 		]);
 	});
 
-	it('inserts the pullus entry immediately before juvs when hasPullus is true', () => {
+	it('inserts the pullus entry immediately before juvs when hasPulli is true', () => {
 		const configs = buildStandardColumnConfigs<SessionModel>(true);
 		expect(Object.keys(configs)).toEqual([
 			'new',
@@ -158,7 +149,8 @@ describe('buildStandardColumnConfigs', () => {
 			'juvs',
 			'postjuv',
 			'adults',
-			'unknownAge'
+			'unknownAge',
+			'newYoung'
 		]);
 	});
 
@@ -182,7 +174,7 @@ describe('buildStandardColumnConfigs', () => {
 		expect(withoutPullus.unknownAge?.headerClassName).toContain('border-r-4');
 	});
 
-	it('omits the pullus key entirely (not an empty column) when hasPullus is false', () => {
+	it('omits the pullus key entirely (not an empty column) when hasPulli is false', () => {
 		const configs = buildStandardColumnConfigs<SessionModel>(false);
 		expect('pullus' in configs).toBe(false);
 	});

@@ -47,37 +47,16 @@ export function createNameLinkCell<RawRowData, RowModel>(
 	};
 }
 
-// The logical fields the column-config builder knows about: the capture-type
-// fields (New/Retrap) plus the age-class fields (Pulli/Juv/Postjuv/Adult/
-// Unaged) — independent of any caller's RowModel key names or header wording.
-export type StandardField =
-	| 'new'
-	| 'retraps'
-	| 'pullus'
-	| 'juvs'
-	| 'postjuv'
-	| 'adults'
-	| 'unknownAge';
-
-const standardFieldLabels: Record<StandardField, string> = {
-	new: 'New',
-	retraps: 'Retrap',
-	pullus: 'Pulli',
-	juvs: 'Juv',
-	postjuv: 'Postjuv',
-	adults: 'Adult',
-	unknownAge: 'Not aged'
-};
 // Builds the colour-blocked standard column configs (New/Retrap/Pulli/Juv/
 // Postjuv/Adult/Unaged) shared across stats tables. Keyed directly by
 // `StandardField`, so a caller's RowModel must use those field names for its
 // own new/retraps/pullus/juvs/postjuv/adults/unknownAge counts; `labels`
 // supplies the header text for each (no defaults — callers word these
-// differently, e.g. `Retrap` vs `Retraps`). `hasPullus` omits the Pulli column
+// differently, e.g. `Retrap` vs `Retraps`). `hasPulli` omits the Pulli column
 // entirely (rather than rendering it empty) and shifts the age-block's left
 // border onto Juv when false, per issue #545.
 export function buildStandardColumnConfigs<RowModel>(
-	hasPullus: boolean
+	hasPulli: boolean
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
 	// `RowModel` is generic here, so TS can't confirm each `StandardField` is
 	// actually a key of it inside the function body (only the caller's
@@ -85,39 +64,43 @@ export function buildStandardColumnConfigs<RowModel>(
 	// view of the same object, matching the cast already needed on the return.
 	return {
 		new: {
-			label: standardFieldLabels.new,
+			label: 'New',
 			...columnBlock('green')
 		},
 		retraps: {
-			label: standardFieldLabels.retraps,
+			label: 'Retrap',
 			...columnBlock('amber')
 		},
 		// Omitted entirely (rather than rendered empty) when no pulli were caught.
-		...(hasPullus
+		...(hasPulli
 			? {
 					pullus: {
-						label: standardFieldLabels.pullus,
+						label: 'Pulli',
 						...columnBlock('cyan', ageBlockStartBorder)
 					}
 				}
 			: {}),
 		juvs: {
-			label: standardFieldLabels.juvs,
+			label: 'Juv',
 			// If pulli is hidden, Juv becomes the first column of the age block
 			// and inherits its thicker left border.
-			...columnBlock('sky', hasPullus ? undefined : ageBlockStartBorder)
+			...columnBlock('sky', hasPulli ? undefined : ageBlockStartBorder)
 		},
 		postjuv: {
-			label: standardFieldLabels.postjuv,
+			label: 'Postjuv',
 			...columnBlock('blue')
 		},
 		adults: {
-			label: standardFieldLabels.adults,
+			label: 'Adult',
 			...columnBlock('purple')
 		},
 		unknownAge: {
-			label: standardFieldLabels.unknownAge,
+			label: 'Not aged',
 			...columnBlock('taupe', ageBlockEndBorder)
+		},
+		newYoung: {
+			label: 'New young',
+			...columnBlock('lime')
 		}
 	} as Partial<Record<keyof RowModel, ColumnConfig>>;
 }

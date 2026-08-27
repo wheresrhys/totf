@@ -51,7 +51,7 @@ function rowDataTransform(stat: AggregateStatsResult): RowModel {
 }
 
 function buildColumnConfigs(
-	hasPullus: boolean
+	hasPulli: boolean
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
 	return {
 		speciesName: {
@@ -65,10 +65,7 @@ function buildColumnConfigs(
 		individualsCount: {
 			label: 'Individuals'
 		},
-		...buildStandardColumnConfigs<RowModel>(hasPullus),
-		newYoung: {
-			label: 'New young'
-		}
+		...buildStandardColumnConfigs<RowModel>(hasPulli)
 	};
 }
 
@@ -115,8 +112,8 @@ export function SpeciesTotalsTable({
 		return <p>No species recorded.</p>;
 	}
 
-	const hasPullus = speciesStats.some((stat) => stat.pullus_count > 0);
-	const columnConfigs = buildColumnConfigs(hasPullus);
+	const hasPulli = speciesStats.some((stat) => stat.pullus_count > 0);
+	const columnConfigs = buildColumnConfigs(hasPulli);
 
 	const totalsRow = totalsStats
 		? buildTotalsRowCells<RowModel>({

@@ -129,7 +129,7 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 }
 
 function buildColumnConfigs(
-	hasPullus: boolean
+	hasPulli: boolean
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
 	return {
 		species: {
@@ -140,11 +140,7 @@ function buildColumnConfigs(
 			label: 'Total',
 			cellClassName: 'font-bold'
 		},
-		...buildStandardColumnConfigs<RowModel>(hasPullus),
-		newYoung: {
-			label: 'New Young',
-			...columnBlock('lime')
-		},
+		...buildStandardColumnConfigs<RowModel>(hasPulli),
 		maxProvenAge: {
 			label: 'Max Proven Age'
 		}
@@ -256,12 +252,12 @@ export function SessionTabs({
 	);
 	const [activeTab, setActiveTab] = useState('by-species');
 
-	const hasPullus = speciesList.some((speciesWithEncounters) =>
+	const hasPulli = speciesList.some((speciesWithEncounters) =>
 		speciesWithEncounters.encounters.some(
 			(encounter) => getAgeClass(encounter) === 'pullus'
 		)
 	);
-	const columnConfigs = buildColumnConfigs(hasPullus);
+	const columnConfigs = buildColumnConfigs(hasPulli);
 
 	return (
 		<>
