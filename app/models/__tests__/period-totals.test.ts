@@ -46,6 +46,8 @@ describe('derivePeriodTotalsRow', () => {
 		const stat = buildStat();
 		expect(derivePeriodTotalsRow(stat)).toEqual({
 			timePeriod: '2026-08-16',
+			sessionsCount: 4,
+			effortSeconds: 64800,
 			speciesCount: 5,
 			encounterCount: 7,
 			individualsCount: 6,
@@ -65,8 +67,17 @@ describe('derivePeriodTotalsRow', () => {
 		expect(derivePeriodTotalsRow(stat).speciesCount).toBe(9);
 	});
 
+	it('maps session_count to sessionsCount and total_effort (via postgresIntervalToSeconds) to effortSeconds', () => {
+		const stat = buildStat({ session_count: 11, total_effort: '01:00:00' });
+		const row = derivePeriodTotalsRow(stat);
+		expect(row.sessionsCount).toBe(11);
+		expect(row.effortSeconds).toBe(3600);
+	});
+
 	it('returns all-zero fields for a period with no activity', () => {
 		const stat = buildStat({
+			session_count: 0,
+			total_effort: '00:00:00',
 			species_count: 0,
 			bird_count: 0,
 			encounter_count: 0,
@@ -80,6 +91,8 @@ describe('derivePeriodTotalsRow', () => {
 		});
 		expect(derivePeriodTotalsRow(stat)).toEqual({
 			timePeriod: '2026-08-16',
+			sessionsCount: 0,
+			effortSeconds: 0,
 			speciesCount: 0,
 			encounterCount: 0,
 			individualsCount: 0,

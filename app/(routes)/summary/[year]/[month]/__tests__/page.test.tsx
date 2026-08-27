@@ -21,6 +21,8 @@ function buildDayStat(time_period: string) {
 	return {
 		species_name: null,
 		time_period,
+		session_count: 1,
+		total_effort: '06:00:00',
 		species_count: 5,
 		bird_count: 12,
 		encounter_count: 14,

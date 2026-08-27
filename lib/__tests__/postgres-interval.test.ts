@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
 	formatMinutesForDisplay,
 	formatPostgresIntervalForDisplay,
+	formatSecondsForDisplay,
 	postgresIntervalToHours,
 	postgresIntervalToMinutes,
 	postgresIntervalToSeconds
-} from './postgres-interval';
+} from '../postgres-interval';
 
 describe('postgresIntervalToSeconds', () => {
 	it('parses HH:MM:SS', () => {
@@ -36,6 +37,34 @@ describe('postgresIntervalToMinutes', () => {
 describe('formatPostgresIntervalForDisplay', () => {
 	it('formats hours and minutes', () => {
 		expect(formatPostgresIntervalForDisplay('02:01:00')).toBe('2h 1m');
+	});
+});
+
+describe('formatSecondsForDisplay', () => {
+	describe('Usual', () => {
+		it('formats hours and minutes', () => {
+			expect(formatSecondsForDisplay(9000)).toBe('2h 30m');
+		});
+	});
+
+	describe('Structure', () => {
+		it('formats sub-minute durations in seconds', () => {
+			expect(formatSecondsForDisplay(45)).toBe('45s');
+		});
+
+		it('formats whole hours only', () => {
+			expect(formatSecondsForDisplay(7200)).toBe('2h');
+		});
+
+		it('formats whole minutes only (no hours)', () => {
+			expect(formatSecondsForDisplay(1800)).toBe('30m');
+		});
+	});
+
+	describe('Edge', () => {
+		it('formats 0 as "0"', () => {
+			expect(formatSecondsForDisplay(0)).toBe('0');
+		});
 	});
 });
 
