@@ -46,3 +46,22 @@ export async function fetchPeriodStats(
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
 }
+
+/**
+ * One row per year with data, for the all-time summary page's "Year totals"
+ * tab. `aggregate_stats`'s `period_spine` CTE is already dense across the
+ * group's earliest-to-latest session year and arrives `ORDER BY time_period
+ * ASC` — no client-side zero-fill or re-sorting needed.
+ */
+export async function fetchYearlyTotals(
+	viewedGroupId: number
+): Promise<AggregateStatsResult[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
+	return supabase
+		.rpc('aggregate_stats', {
+			ringing_group_filter: viewedGroupId,
+			group_by_species: false,
+			group_by_time_period: 'year'
+		})
+		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
+}

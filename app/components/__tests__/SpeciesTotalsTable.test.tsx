@@ -10,6 +10,7 @@ function makeStat(
 	overrides: Partial<AggregateStatsResult> & { species_name: string }
 ): AggregateStatsResult {
 	return {
+		session_count: 0,
 		encounter_count: 0,
 		bird_count: 0,
 		new_bird_count: 0,
@@ -29,11 +30,12 @@ describe('SpeciesTotalsTable', () => {
 	});
 
 	describe('column headings', () => {
-		it('renders eleven column headers in the expected order', () => {
+		it('renders twelve column headers in the expected order', () => {
 			render(<SpeciesTotalsTable speciesStats={speciesStats} />);
 			const headers = screen.getAllByRole('columnheader');
 			expect(headers.map((header) => header.textContent)).toEqual([
 				'Species',
+				'Sessions',
 				'Encounters',
 				'Individuals',
 				'New',
@@ -49,7 +51,7 @@ describe('SpeciesTotalsTable', () => {
 	});
 
 	describe('rows', () => {
-		it('renders one row per species with all eleven columns in the correct order', () => {
+		it('renders one row per species with all twelve columns in the correct order', () => {
 			render(<SpeciesTotalsTable speciesStats={speciesStats} />);
 			const rows = document.querySelectorAll('tbody tr');
 			expect(rows.length).toBe(speciesStats.length);
@@ -60,6 +62,7 @@ describe('SpeciesTotalsTable', () => {
 				Array.from(firstRowCells).map((cell) => cell.textContent?.trim())
 			).toEqual([
 				firstStat.species_name,
+				String(firstStat.session_count),
 				String(firstStat.encounter_count),
 				String(firstStat.bird_count),
 				String(firstStat.new_bird_count),
@@ -136,6 +139,42 @@ describe('SpeciesTotalsTable', () => {
 			expect(rows[0].textContent).toContain('Blue Tit');
 			expect(rows[1].textContent).toContain('Robin');
 			expect(rows[2].textContent).toContain('Wren');
+		});
+	});
+
+	describe('Sessions column', () => {
+		it('renders session_count as the Sessions column value for each row', () => {
+			const stats = [
+				makeStat({ species_name: 'Robin', session_count: 3 }),
+				makeStat({ species_name: 'Wren', session_count: 7 })
+			];
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			const rows = document.querySelectorAll('tbody tr');
+			expect(rows[0].textContent).toContain('3');
+			expect(rows[1].textContent).toContain('7');
+		});
+
+		it('sorts descending on the first click of the Sessions header', () => {
+			const stats = [
+				makeStat({ species_name: 'Robin', session_count: 3 }),
+				makeStat({ species_name: 'Wren', session_count: 7 }),
+				makeStat({ species_name: 'Blue Tit', session_count: 1 })
+			];
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			fireEvent.click(screen.getByText('Sessions'));
+			const rows = document.querySelectorAll('tbody tr');
+			expect(rows[0].textContent).toContain('Wren');
+			expect(rows[1].textContent).toContain('Robin');
+			expect(rows[2].textContent).toContain('Blue Tit');
+		});
+
+		it('renders 0 when session_count is 0', () => {
+			const stats = [makeStat({ species_name: 'Robin', session_count: 0 })];
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			const rows = document.querySelectorAll('tbody tr');
+			const cells = rows[0].querySelectorAll('td');
+			// cells[0] is the species-name link cell; Sessions is the next column.
+			expect(cells[1].textContent?.trim()).toBe('0');
 		});
 	});
 

@@ -13,13 +13,15 @@ export function SummaryPage({
 	month,
 	summaryStats = null,
 	speciesStats = [],
-	monthTotals
+	monthTotals,
+	yearlyTotals
 }: {
 	year?: number;
 	month?: number;
 	summaryStats?: AggregateStatsResult | null;
 	speciesStats?: AggregateStatsResult[];
 	monthTotals?: MonthTotalsRow[];
+	yearlyTotals?: AggregateStatsResult[];
 }) {
 	return (
 		<PageWrapper>
@@ -39,6 +41,7 @@ export function SummaryPage({
 					<SpeciesTotalsSection
 						speciesStats={speciesStats}
 						monthTotals={monthTotals}
+						yearlyTotals={yearlyTotals}
 					/>
 				</div>
 			</div>

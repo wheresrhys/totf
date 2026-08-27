@@ -6,12 +6,14 @@ import {
 	type RowModelWithRawData
 } from './shared/SortableTable';
 import {
+	buildSessionsColumnConfig,
 	buildStandardColumnConfigs,
 	createNameLinkCell
 } from './shared/StatsTableColumnConfigs';
 
 type RowModel = {
 	speciesName: string;
+	sessionsCount: number;
 	encounterCount: number;
 	individualsCount: number;
 	new: number;
@@ -33,6 +35,7 @@ function rowDataTransform(stat: AggregateStatsResult): RowModel {
 	const row = deriveSpeciesTotalsRow(stat);
 	return {
 		speciesName: row.speciesName,
+		sessionsCount: row.sessionsCount,
 		encounterCount: row.encounterCount,
 		individualsCount: row.individualsCount,
 		new: row.newCount,
@@ -54,6 +57,7 @@ function buildColumnConfigs(
 			label: 'Species',
 			invertSort: true
 		},
+		...buildSessionsColumnConfig<RowModel>('sessionsCount', 'Sessions'),
 		encounterCount: {
 			label: 'Encounters'
 		},
