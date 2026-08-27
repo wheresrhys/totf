@@ -1,11 +1,7 @@
 import { Table } from '@/app/components/shared/DesignSystem';
 import type { AggregateStatsResult } from '@/app/models/db';
 import { formatPostgresIntervalForDisplay } from '@/lib/postgres-interval';
-
-/** Every bird in the period has ≥1 'N' encounter or none — an exhaustive partition. */
-function calculateRetraps(stats: AggregateStatsResult): number {
-	return stats.bird_count - stats.new_bird_count;
-}
+import { calculateRetraps } from '@/app/models/species-totals';
 
 export function SummaryStatsSection({
 	stats

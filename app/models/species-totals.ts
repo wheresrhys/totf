@@ -14,6 +14,11 @@ export type SpeciesTotalsRow = {
 	newYoungCount: number;
 };
 
+/** Every bird in the period has ≥1 'N' encounter or none — an exhaustive partition. */
+export function calculateRetraps(stat: AggregateStatsResult): number {
+	return stat.bird_count - stat.new_bird_count;
+}
+
 export function deriveSpeciesTotalsRow(
 	stat: AggregateStatsResult
 ): SpeciesTotalsRow {
@@ -22,7 +27,7 @@ export function deriveSpeciesTotalsRow(
 		encounterCount: stat.encounter_count,
 		individualsCount: stat.bird_count,
 		newCount: stat.new_bird_count,
-		retrapsCount: stat.bird_count - stat.new_bird_count,
+		retrapsCount: calculateRetraps(stat),
 		pullusCount: stat.pullus_count,
 		juvsCount: stat.juv_count,
 		postjuvCount: stat.postjuv_count,
