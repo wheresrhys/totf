@@ -17,6 +17,7 @@ import {
 import {
 	buildSessionsColumnConfig,
 	buildStandardColumnConfigs,
+	buildTotalsRowCells,
 	columnBlock,
 	createNameLinkCell
 } from './shared/StatsTableColumnConfigs';
@@ -58,7 +59,8 @@ export function PeriodTotalsTable({
 	rows,
 	firstColumnHeader,
 	buildHref,
-	buildLabel
+	buildLabel,
+	totalsStats
 }: {
 	grouping: PeriodTotalsGrouping;
 	rows: AggregateStatsResult[];
@@ -68,6 +70,7 @@ export function PeriodTotalsTable({
 	// text — e.g. the month-totals caller supplies a timezone-safe label built
 	// from integer year/month rather than parsing the `time_period` string.
 	buildLabel?: (timePeriod: string) => string;
+	totalsStats?: AggregateStatsResult;
 }) {
 	if (rows.length === 0) {
 		return <p>No data recorded.</p>;
@@ -78,6 +81,13 @@ export function PeriodTotalsTable({
 		((timePeriod: string) => formatPeriodTotalsLabel(grouping, timePeriod));
 
 	const columnConfigs = buildColumnConfigs(firstColumnHeader);
+
+	const totalsRow = totalsStats
+		? buildTotalsRowCells<PeriodTotalsRow>({
+				columnConfigs,
+				totalsRowModel: derivePeriodTotalsRow(totalsStats)
+			})
+		: undefined;
 
 	// Recreated each render since `grouping`/`buildHref` are props, not static
 	// — the cell itself is stateless, so this only costs identity, not
@@ -131,6 +141,7 @@ export function PeriodTotalsTable({
 			data={rows}
 			testId="period-totals-table"
 			rowDataTransform={derivePeriodTotalsRow}
+			totalsRow={totalsRow}
 			TableBodyComponent={PeriodTotalsTableBody}
 		/>
 	);

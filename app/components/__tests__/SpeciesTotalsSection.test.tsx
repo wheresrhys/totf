@@ -11,6 +11,12 @@ const monthTotals = buildMonthTotalsRows(2026, []);
 
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 
+const summaryStats = {
+	...speciesStats[0],
+	session_count: 9,
+	encounter_count: 99
+} as AggregateStatsResult;
+
 function buildDayStat(
 	overrides: Partial<AggregateStatsResult> = {}
 ): AggregateStatsResult {
@@ -108,6 +114,16 @@ describe('SpeciesTotalsSection', () => {
 			).toBeTruthy();
 			expect(document.querySelectorAll('tbody tr').length).toBe(0);
 		});
+
+		it('forwards summaryStats to the Species totals table as its totals row', () => {
+			render(
+				<SpeciesTotalsSection
+					speciesStats={speciesStats}
+					summaryStats={summaryStats}
+				/>
+			);
+			expect(screen.getByTestId('totals-row').textContent).toContain('99');
+		});
 	});
 
 	describe('with monthTotals (year page)', () => {
@@ -152,6 +168,17 @@ describe('SpeciesTotalsSection', () => {
 			expect(document.querySelectorAll('tbody tr').length).toBe(
 				speciesStats.length
 			);
+		});
+
+		it('forwards summaryStats to the Month totals table as its totals row', () => {
+			render(
+				<SpeciesTotalsSection
+					speciesStats={speciesStats}
+					monthTotals={monthTotals}
+					summaryStats={summaryStats}
+				/>
+			);
+			expect(screen.getByTestId('totals-row').textContent).toContain('99');
 		});
 	});
 
@@ -250,6 +277,18 @@ describe('SpeciesTotalsSection', () => {
 			).toBe('true');
 			expect(screen.getByText('No data recorded.')).toBeTruthy();
 		});
+
+		it('forwards summaryStats to the Session totals table as its totals row', () => {
+			render(
+				<SpeciesTotalsSection
+					speciesStats={speciesStats}
+					sessionTotals={[buildDayStat()]}
+					viewedGroup={viewedGroup}
+					summaryStats={summaryStats}
+				/>
+			);
+			expect(screen.getByTestId('totals-row').textContent).toContain('99');
+		});
 	});
 
 	describe('with yearlyTotals (all-time summary page)', () => {
@@ -307,6 +346,18 @@ describe('SpeciesTotalsSection', () => {
 			);
 			expect(screen.getByRole('button', { name: 'Year totals' })).toBeTruthy();
 			expect(screen.queryByTestId('period-totals-table')).toBeNull();
+		});
+
+		it('forwards summaryStats to the Year totals table as its totals row', () => {
+			const yearlyTotals = [buildYearlyStat()];
+			render(
+				<SpeciesTotalsSection
+					speciesStats={speciesStats}
+					yearlyTotals={yearlyTotals}
+					summaryStats={summaryStats}
+				/>
+			);
+			expect(screen.getByTestId('totals-row').textContent).toContain('99');
 		});
 	});
 

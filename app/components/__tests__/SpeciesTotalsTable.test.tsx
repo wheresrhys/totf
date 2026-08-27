@@ -217,6 +217,96 @@ describe('SpeciesTotalsTable', () => {
 		});
 	});
 
+	describe('totals row', () => {
+		const stats = [
+			makeStat({
+				species_name: 'Robin',
+				session_count: 3,
+				encounter_count: 5,
+				bird_count: 4,
+				new_bird_count: 3,
+				pullus_count: 1,
+				juv_count: 1,
+				postjuv_count: 0,
+				adult_count: 2,
+				unknown_age_count: 0,
+				new_young_count: 1
+			}),
+			makeStat({
+				species_name: 'Wren',
+				session_count: 2,
+				encounter_count: 7,
+				bird_count: 6,
+				new_bird_count: 4,
+				pullus_count: 0,
+				juv_count: 2,
+				postjuv_count: 1,
+				adult_count: 3,
+				unknown_age_count: 0,
+				new_young_count: 2
+			})
+		];
+		const totalsStats = makeStat({
+			species_name: 'All species',
+			session_count: 4,
+			encounter_count: 12,
+			bird_count: 10,
+			new_bird_count: 7,
+			pullus_count: 1,
+			juv_count: 3,
+			postjuv_count: 1,
+			adult_count: 5,
+			unknown_age_count: 0,
+			new_young_count: 3
+		});
+
+		it('renders a "Total" row with values from totalsStats when supplied', () => {
+			render(
+				<SpeciesTotalsTable speciesStats={stats} totalsStats={totalsStats} />
+			);
+			const totalsRow = screen.getByTestId('totals-row');
+			const cells = totalsRow.querySelectorAll('td');
+			expect(Array.from(cells).map((cell) => cell.textContent?.trim())).toEqual(
+				[
+					'Total',
+					String(totalsStats.session_count),
+					String(totalsStats.encounter_count),
+					String(totalsStats.bird_count),
+					String(totalsStats.new_bird_count),
+					String(totalsStats.bird_count - totalsStats.new_bird_count),
+					String(totalsStats.pullus_count),
+					String(totalsStats.juv_count),
+					String(totalsStats.postjuv_count),
+					String(totalsStats.adult_count),
+					String(totalsStats.unknown_age_count),
+					String(totalsStats.new_young_count)
+				]
+			);
+		});
+
+		it("renders the totals row's species-name cell as plain text, not a species link", () => {
+			render(
+				<SpeciesTotalsTable speciesStats={stats} totalsStats={totalsStats} />
+			);
+			const totalsRow = screen.getByTestId('totals-row');
+			expect(totalsRow.querySelector('a')).toBeNull();
+			expect(totalsRow.querySelector('td')?.textContent).toBe('Total');
+		});
+
+		it('renders no totals row when totalsStats is omitted', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			expect(screen.queryByTestId('totals-row')).toBeNull();
+		});
+
+		it('renders no totals row when speciesStats is empty, even if totalsStats is supplied', () => {
+			render(
+				<SpeciesTotalsTable speciesStats={[]} totalsStats={totalsStats} />
+			);
+			expect(screen.queryByTestId('totals-row')).toBeNull();
+			expect(screen.getByText('No species recorded.')).not.toBeNull();
+		});
+	});
+
 	describe('Pullus column visibility', () => {
 		it('omits the Pullus column when no species in the dataset has a nonzero pullus count', () => {
 			const stats = [

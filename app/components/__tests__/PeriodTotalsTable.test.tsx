@@ -177,6 +177,88 @@ describe('PeriodTotalsTable', () => {
 		});
 	});
 
+	describe('totals row', () => {
+		const rows = [
+			buildStat({ time_period: '2026-01-01', session_count: 4 }),
+			buildStat({ time_period: '2025-01-01', session_count: 3 })
+		];
+		const totalsStats = buildStat({
+			time_period: '2026-01-01',
+			session_count: 7,
+			total_effort: '36:00:00',
+			species_count: 15,
+			bird_count: 80,
+			encounter_count: 110,
+			new_bird_count: 60,
+			pullus_count: 4,
+			juv_count: 10,
+			postjuv_count: 6,
+			adult_count: 30,
+			unknown_age_count: 10,
+			new_young_count: 14
+		});
+
+		it('renders a "Total" row for the "year" grouping when totalsStats is supplied', () => {
+			render(
+				<PeriodTotalsTable
+					grouping="year"
+					rows={rows}
+					firstColumnHeader="Year"
+					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
+					totalsStats={totalsStats}
+				/>
+			);
+			const totalsRow = screen.getByTestId('totals-row');
+			const cells = totalsRow.querySelectorAll('td');
+			expect(cells[0].textContent?.trim()).toBe('Total');
+			expect(cells[1].textContent?.trim()).toBe('7');
+			// buildTotalsRowCells reads the raw totalsRowModel value straight
+			// through — it doesn't apply a column's `formatter` (that's only
+			// wired up for data rows via `getFormattedValue`) — so the Effort
+			// total renders as raw seconds (36h = 129600s), not "36h".
+			expect(cells[2].textContent?.trim()).toBe('129600');
+		});
+
+		it('renders a "Total" row for the "month" grouping when totalsStats is supplied', () => {
+			render(
+				<PeriodTotalsTable
+					grouping="month"
+					rows={[buildStat({ time_period: '2026-08-01' })]}
+					firstColumnHeader="Month"
+					buildHref={(timePeriod) => `/summary/2026/${timePeriod}`}
+					totalsStats={totalsStats}
+				/>
+			);
+			expect(screen.getByTestId('totals-row').textContent).toContain('Total');
+		});
+
+		it('renders no totals row when totalsStats is omitted', () => {
+			render(
+				<PeriodTotalsTable
+					grouping="year"
+					rows={rows}
+					firstColumnHeader="Year"
+					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
+				/>
+			);
+			expect(screen.queryByTestId('totals-row')).toBeNull();
+		});
+
+		it('renders no totals row when rows is empty, even if totalsStats is supplied', () => {
+			render(
+				<PeriodTotalsTable
+					grouping="year"
+					rows={[]}
+					firstColumnHeader="Year"
+					buildHref={() => '/summary'}
+					totalsStats={totalsStats}
+				/>
+			);
+			expect(screen.queryByTestId('totals-row')).toBeNull();
+			expect(document.querySelectorAll('table').length).toBe(0);
+		});
+	});
+
 	describe('Sessions and Effort columns', () => {
 		it('renders session_count and formatted total_effort for each grouping', () => {
 			render(
