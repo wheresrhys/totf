@@ -7,16 +7,21 @@ import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SpeciesTotalsSection } from '@/app/components/SpeciesTotalsSection';
 import type { AggregateStatsResult } from '@/app/models/db';
+import type { ViewedGroup } from '@/lib/group-slug';
 export function SummaryPage({
 	year,
 	month,
 	summaryStats = null,
-	speciesStats = []
+	speciesStats = [],
+	sessionTotals,
+	viewedGroup
 }: {
 	year?: number;
 	month?: number;
 	summaryStats?: AggregateStatsResult | null;
 	speciesStats?: AggregateStatsResult[];
+	sessionTotals?: AggregateStatsResult[];
+	viewedGroup?: ViewedGroup;
 }) {
 	return (
 		<PageWrapper>
@@ -33,7 +38,11 @@ export function SummaryPage({
 					<HighlightsSection />
 				</div>
 				<div className="lg:flex-1">
-					<SpeciesTotalsSection speciesStats={speciesStats} />
+					<SpeciesTotalsSection
+						speciesStats={speciesStats}
+						sessionTotals={sessionTotals}
+						viewedGroup={viewedGroup}
+					/>
 				</div>
 			</div>
 		</PageWrapper>
