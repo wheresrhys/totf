@@ -4,8 +4,10 @@ import Page, { fetchAllTimeSummaryData } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
+const fetchYearlyTotalsMock = vi.fn().mockResolvedValue([]);
 vi.mock('@/app/actions/summary-stats', () => ({
-	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args)
+	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args),
+	fetchYearlyTotals: (...args: unknown[]) => fetchYearlyTotalsMock(...args)
 }));
 
 vi.mock('@/app/actions/spp-data', () => ({
@@ -16,6 +18,7 @@ describe('/summary (all-time)', () => {
 	afterEach(() => {
 		cleanup();
 		fetchSummaryStatsMock.mockClear();
+		fetchYearlyTotalsMock.mockClear();
 	});
 
 	it('renders the "All time summary" heading', async () => {
@@ -47,5 +50,17 @@ describe('/summary (all-time)', () => {
 		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
 		await fetchAllTimeSummaryData({}, 1);
 		expect(fetchSpeciesData).toHaveBeenCalledWith(1);
+	});
+
+	it('fetchAllTimeSummaryData calls fetchYearlyTotals with the viewed group id', async () => {
+		await fetchAllTimeSummaryData({}, 1);
+		expect(fetchYearlyTotalsMock).toHaveBeenCalledWith(1);
+	});
+
+	it('includes yearlyTotals in the returned page data', async () => {
+		const yearlyStats = [{ time_period: '2026-01-01' }];
+		fetchYearlyTotalsMock.mockResolvedValueOnce(yearlyStats);
+		const data = await fetchAllTimeSummaryData({}, 1);
+		expect(data.yearlyTotals).toBe(yearlyStats);
 	});
 });
