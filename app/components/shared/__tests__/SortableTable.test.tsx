@@ -2,18 +2,27 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { SortableTable, type ColumnConfig } from '../SortableTable';
 
-type Row = { name: string; count: number };
+type Row = { name: string; count: number; species: string };
 
 const columnConfigs: Record<keyof Row, ColumnConfig> = {
 	name: { label: 'Name' },
-	count: { label: 'Count' }
+	count: { label: 'Count' },
+	species: { label: 'Species' }
 };
 
 const data: Row[] = [
-	{ name: 'Chiffchaff', count: 5 },
-	{ name: 'Robin', count: 12 },
-	{ name: 'Blue Tit', count: 3 }
+	{ name: 'Chiffchaff', count: 5, species: 'Phylloscopus collybita' },
+	{ name: 'Robin', count: 12, species: 'Erithacus rubecula' },
+	{ name: 'Blue Tit', count: 3, species: 'Cyanistes caeruleus' }
 ];
+
+const totalsCells = (
+	<>
+		<td>Total</td>
+		<td>20</td>
+		<td></td>
+	</>
+);
 
 import type { RowModelWithRawData } from '../SortableTable';
 
@@ -24,6 +33,7 @@ function SimpleBody({ data }: { data: RowModelWithRawData<Row, Row>[] }) {
 				<tr key={row._rawRowData.name}>
 					<td>{row._rawRowData.name}</td>
 					<td>{row._rawRowData.count}</td>
+					<td>{row._rawRowData.species}</td>
 				</tr>
 			))}
 		</tbody>
@@ -127,13 +137,6 @@ describe('SortableTable', () => {
 	});
 
 	describe('totalsRow', () => {
-		const totalsCells = (
-			<>
-				<td>Total</td>
-				<td>20</td>
-			</>
-		);
-
 		it('renders the supplied totalsRow as an extra row inside <thead>', () => {
 			render(
 				<SortableTable<Row, Row>
@@ -210,11 +213,111 @@ describe('SortableTable', () => {
 		});
 	});
 
+	describe('aboveHeaderRow', () => {
+		const aboveHeaderRow = {
+			spanFromColumn: 'count' as const,
+			spanToColumn: 'species' as const,
+			content: <span>Aggregate by: Bird / Encounter</span>
+		};
+
+		it('renders a row above the header row, with the spanning cell covering the requested column range', () => {
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={columnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					aboveHeaderRow={aboveHeaderRow}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			const row = screen.getByTestId('above-header-row');
+			expect(row.closest('thead')).not.toBeNull();
+			const spanningCell = screen
+				.getByText('Aggregate by: Bird / Encounter')
+				.closest('th') as HTMLTableCellElement;
+			// count -> species spans 2 columns
+			expect(spanningCell.colSpan).toBe(2);
+		});
+
+		it('renders columns outside the span as empty <th> cells, leaving the header row and tbody unaffected', () => {
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={columnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					aboveHeaderRow={aboveHeaderRow}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			const row = screen.getByTestId('above-header-row');
+			const cells = row.querySelectorAll('th');
+			// name (outside span) + spanning cell = 2 cells total
+			expect(cells).toHaveLength(2);
+			expect(cells[0].textContent).toBe('');
+			expect(screen.getByText('Name')).toBeDefined();
+			expect(screen.getByText('Count')).toBeDefined();
+			const bodyRows = document.querySelectorAll('tbody tr');
+			expect(bodyRows[0].textContent).toContain('Chiffchaff');
+		});
+
+		it('collapses to colSpan={1} when spanFromColumn equals spanToColumn', () => {
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={columnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					aboveHeaderRow={{
+						spanFromColumn: 'count',
+						spanToColumn: 'count',
+						content: <span>Aggregate by</span>
+					}}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			const spanningCell = screen
+				.getByText('Aggregate by')
+				.closest('th') as HTMLTableCellElement;
+			expect(spanningCell.colSpan).toBe(1);
+		});
+
+		it('renders both aboveHeaderRow and totalsRow together, in the correct relative order', () => {
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={columnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					aboveHeaderRow={aboveHeaderRow}
+					totalsRow={totalsCells}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			const theadRows = document.querySelectorAll('thead tr');
+			expect(theadRows).toHaveLength(3);
+			expect(theadRows[0].getAttribute('data-testid')).toBe('above-header-row');
+			expect(theadRows[1].getAttribute('data-testid')).toBeNull();
+			expect(theadRows[2].getAttribute('data-testid')).toBe('totals-row');
+		});
+
+		it('renders no extra <thead> row when aboveHeaderRow is omitted', () => {
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={columnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			expect(screen.queryByTestId('above-header-row')).toBeNull();
+			expect(document.querySelectorAll('thead tr')).toHaveLength(1);
+		});
+	});
+
 	describe('per-column styling', () => {
 		it("applies a column's headerClassName to its header", () => {
 			const styledColumnConfigs: Record<keyof Row, ColumnConfig> = {
 				name: { label: 'Name' },
-				count: { label: 'Count', headerClassName: 'bg-green-50' }
+				count: { label: 'Count', headerClassName: 'bg-green-50' },
+				species: { label: 'Species' }
 			};
 			render(
 				<SortableTable<Row, Row>
