@@ -42,12 +42,12 @@ function buildDayStat(
 		avg_wing: 66.6,
 		min_wing: 65,
 		median_wing: 67,
-		pullus_count: 1,
-		juv_count: 2,
-		postjuv_count: 1,
-		adult_count: 6,
-		unknown_age_count: 2,
-		new_young_count: 3,
+		pullus_bird_count: 1,
+		juv_bird_count: 2,
+		postjuv_bird_count: 1,
+		adult_bird_count: 6,
+		unknown_age_bird_count: 2,
+		new_young_bird_count: 3,
 		...overrides
 	} as AggregateStatsResult;
 }
@@ -77,12 +77,12 @@ function buildYearlyStat(
 		avg_wing: 66.6,
 		min_wing: 65,
 		median_wing: 67,
-		pullus_count: 2,
-		juv_count: 5,
-		postjuv_count: 3,
-		adult_count: 15,
-		unknown_age_count: 5,
-		new_young_count: 7,
+		pullus_bird_count: 2,
+		juv_bird_count: 5,
+		postjuv_bird_count: 3,
+		adult_bird_count: 15,
+		unknown_age_bird_count: 5,
+		new_young_bird_count: 7,
 		...overrides
 	} as AggregateStatsResult;
 }

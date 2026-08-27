@@ -27,12 +27,12 @@ function buildDayStat(time_period: string) {
 		bird_count: 12,
 		encounter_count: 14,
 		new_bird_count: 9,
-		pullus_count: 1,
-		juv_count: 2,
-		postjuv_count: 1,
-		adult_count: 6,
-		unknown_age_count: 2,
-		new_young_count: 3
+		pullus_bird_count: 1,
+		juv_bird_count: 2,
+		postjuv_bird_count: 1,
+		adult_bird_count: 6,
+		unknown_age_bird_count: 2,
+		new_young_bird_count: 3
 	};
 }
 

@@ -29,7 +29,18 @@
     "postjuv_count": 1,
     "adult_count": 1,
     "unknown_age_count": 1,
-    "new_young_count": 3
+    "new_young_count": 3,
+    "pullus_bird_count": 1,
+    "juv_bird_count": 2,
+    "postjuv_bird_count": 1,
+    "adult_bird_count": 1,
+    "unknown_age_bird_count": 1,
+    "new_young_bird_count": 3,
+    "pullus_enc_count": 1,
+    "juv_enc_count": 2,
+    "postjuv_enc_count": 1,
+    "adult_enc_count": 1,
+    "unknown_age_enc_count": 1
   },
   {
     "species_name": "Kingfisher",
@@ -61,7 +72,18 @@
     "postjuv_count": 0,
     "adult_count": 1,
     "unknown_age_count": 0,
-    "new_young_count": 0
+    "new_young_count": 0,
+    "pullus_bird_count": 0,
+    "juv_bird_count": 0,
+    "postjuv_bird_count": 0,
+    "adult_bird_count": 1,
+    "unknown_age_bird_count": 0,
+    "new_young_bird_count": 0,
+    "pullus_enc_count": 0,
+    "juv_enc_count": 0,
+    "postjuv_enc_count": 0,
+    "adult_enc_count": 1,
+    "unknown_age_enc_count": 0
   },
   {
     "species_name": "Reed Warbler",
@@ -93,7 +115,18 @@
     "postjuv_count": 3,
     "adult_count": 6,
     "unknown_age_count": 1,
-    "new_young_count": 8
+    "new_young_count": 8,
+    "pullus_bird_count": 0,
+    "juv_bird_count": 5,
+    "postjuv_bird_count": 3,
+    "adult_bird_count": 6,
+    "unknown_age_bird_count": 1,
+    "new_young_bird_count": 8,
+    "pullus_enc_count": 0,
+    "juv_enc_count": 5,
+    "postjuv_enc_count": 3,
+    "adult_enc_count": 6,
+    "unknown_age_enc_count": 1
   },
   {
     "species_name": "Robin",
@@ -125,7 +158,18 @@
     "postjuv_count": 4,
     "adult_count": 10,
     "unknown_age_count": 1,
-    "new_young_count": 10
+    "new_young_count": 10,
+    "pullus_bird_count": 2,
+    "juv_bird_count": 6,
+    "postjuv_bird_count": 4,
+    "adult_bird_count": 10,
+    "unknown_age_bird_count": 1,
+    "new_young_bird_count": 10,
+    "pullus_enc_count": 2,
+    "juv_enc_count": 6,
+    "postjuv_enc_count": 4,
+    "adult_enc_count": 10,
+    "unknown_age_enc_count": 1
   },
   {
     "species_name": "Wren",
@@ -157,6 +201,17 @@
     "postjuv_count": 0,
     "adult_count": 1,
     "unknown_age_count": 0,
-    "new_young_count": 0
+    "new_young_count": 0,
+    "pullus_bird_count": 0,
+    "juv_bird_count": 0,
+    "postjuv_bird_count": 0,
+    "adult_bird_count": 1,
+    "unknown_age_bird_count": 0,
+    "new_young_bird_count": 0,
+    "pullus_enc_count": 0,
+    "juv_enc_count": 0,
+    "postjuv_enc_count": 0,
+    "adult_enc_count": 1,
+    "unknown_age_enc_count": 0
   }
 ]

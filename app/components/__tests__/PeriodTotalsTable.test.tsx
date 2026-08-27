@@ -41,14 +41,14 @@ function buildStat(
 		avg_wing: 66.6,
 		min_wing: 65,
 		median_wing: 67,
-		pullus_count: 2,
-		juv_count: 5,
-		postjuv_count: 3,
-		adult_count: 15,
-		unknown_age_count: 5,
-		new_young_count: 7,
+		pullus_bird_count: 2,
+		juv_bird_count: 5,
+		postjuv_bird_count: 3,
+		adult_bird_count: 15,
+		unknown_age_bird_count: 5,
+		new_young_bird_count: 7,
 		...overrides
-	} as AggregateStatsResult;
+	} as unknown as AggregateStatsResult;
 }
 
 describe('PeriodTotalsTable', () => {
@@ -203,12 +203,12 @@ describe('PeriodTotalsTable', () => {
 			bird_count: 80,
 			encounter_count: 110,
 			new_bird_count: 60,
-			pullus_count: 4,
-			juv_count: 10,
-			postjuv_count: 6,
-			adult_count: 30,
-			unknown_age_count: 10,
-			new_young_count: 14
+			pullus_bird_count: 4,
+			juv_bird_count: 10,
+			postjuv_bird_count: 6,
+			adult_bird_count: 30,
+			unknown_age_bird_count: 10,
+			new_young_bird_count: 14
 		});
 
 		it('renders a "Total" row for the "year" grouping when totalsStats is supplied', () => {
@@ -333,13 +333,13 @@ describe('PeriodTotalsTable', () => {
 					bird_count: 10,
 					encounter_count: 14,
 					new_bird_count: 6,
-					pullus_count: 2,
-					juv_count: 1,
-					postjuv_count: 1,
-					adult_count: 3,
-					unknown_age_count: 0,
+					pullus_bird_count: 2,
+					juv_bird_count: 1,
+					postjuv_bird_count: 1,
+					adult_bird_count: 3,
+					unknown_age_bird_count: 0,
 					// `*_enc_count` columns — see #602. `pullus_enc_count` deliberately
-					// differs from `pullus_count` so the toggle's effect is visible.
+					// differs from `pullus_bird_count` so the toggle's effect is visible.
 					...({
 						pullus_enc_count: 3,
 						juv_enc_count: 2,
@@ -372,11 +372,11 @@ describe('PeriodTotalsTable', () => {
 				expect(cells[5].textContent).toBe(String(stat.bird_count));
 				expect(cells[6].textContent).toBe('6'); // new (unaffected by toggle)
 				expect(cells[7].textContent).toBe('4'); // retraps: bird_count - new
-				expect(cells[8].textContent).toBe('2'); // pullus_count
-				expect(cells[9].textContent).toBe('1'); // juv_count
-				expect(cells[10].textContent).toBe('1'); // postjuv_count
-				expect(cells[11].textContent).toBe('3'); // adult_count
-				expect(cells[12].textContent).toBe('0'); // unknown_age_count
+				expect(cells[8].textContent).toBe('2'); // pullus_bird_count
+				expect(cells[9].textContent).toBe('1'); // juv_bird_count
+				expect(cells[10].textContent).toBe('1'); // postjuv_bird_count
+				expect(cells[11].textContent).toBe('3'); // adult_bird_count
+				expect(cells[12].textContent).toBe('0'); // unknown_age_bird_count
 
 				fireEvent.click(screen.getByRole('radio', { name: 'Encounter' }));
 
