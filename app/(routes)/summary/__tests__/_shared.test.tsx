@@ -67,14 +67,18 @@ describe('SummaryPage', () => {
 	});
 
 	describe('Edge', () => {
-		it('renders no session links list even with populated stats/species', () => {
+		it('renders no session links even with populated stats/species (species-name links are expected)', () => {
 			render(
 				<SummaryPage
 					summaryStats={populatedStats}
 					speciesStats={populatedSpeciesStats}
 				/>
 			);
-			expect(screen.queryByRole('link')).toBeNull();
+			const links = screen.getAllByRole('link');
+			expect(links.length).toBeGreaterThan(0);
+			links.forEach((link) => {
+				expect(link.getAttribute('href')).not.toMatch(/^\/group\/.+\/session/);
+			});
 		});
 	});
 });

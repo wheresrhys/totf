@@ -1,19 +1,111 @@
 import { deriveSpeciesTotalsRow } from '@/app/models/species-totals';
 import type { AggregateStatsResult } from '@/app/models/db';
+import {
+	type ColumnConfig,
+	SortableTable,
+	type RowModelWithRawData
+} from './shared/SortableTable';
+import {
+	buildStandardColumnConfigs,
+	createNameLinkCell
+} from './shared/StatsTableColumnConfigs';
 
-const COLUMN_LABELS = [
-	'Species',
-	'Encounters',
-	'Individuals',
-	'New',
-	'Retraps',
-	'Pullus',
-	'Juvs',
-	'Postjuv',
-	'Adults',
-	'Unknown age',
-	'New young'
-];
+type RowModel = {
+	speciesName: string;
+	encounterCount: number;
+	individualsCount: number;
+	new: number;
+	retraps: number;
+	pullus: number;
+	juvs: number;
+	postjuv: number;
+	adults: number;
+	unknownAge: number;
+	newYoung: number;
+};
+
+const SpeciesNameCell = createNameLinkCell<AggregateStatsResult, RowModel>(
+	(model) => model.speciesName,
+	(model) => `/species/${model.speciesName}`
+);
+
+function rowDataTransform(stat: AggregateStatsResult): RowModel {
+	const row = deriveSpeciesTotalsRow(stat);
+	return {
+		speciesName: row.speciesName,
+		encounterCount: row.encounterCount,
+		individualsCount: row.individualsCount,
+		new: row.newCount,
+		retraps: row.retrapsCount,
+		pullus: row.pullusCount,
+		juvs: row.juvsCount,
+		postjuv: row.postjuvCount,
+		adults: row.adultsCount,
+		unknownAge: row.unknownAgeCount,
+		newYoung: row.newYoungCount
+	};
+}
+
+function buildColumnConfigs(
+	hasPullus: boolean
+): Partial<Record<keyof RowModel, ColumnConfig>> {
+	return {
+		speciesName: {
+			label: 'Species',
+			invertSort: true
+		},
+		encounterCount: {
+			label: 'Encounters'
+		},
+		individualsCount: {
+			label: 'Individuals'
+		},
+		...buildStandardColumnConfigs<RowModel>(hasPullus, {
+			new: 'New',
+			retraps: 'Retraps',
+			pullus: 'Pullus',
+			juvs: 'Juvs',
+			postjuv: 'Postjuv',
+			adults: 'Adults',
+			unknownAge: 'Unknown age'
+		}),
+		newYoung: {
+			label: 'New young'
+		}
+	};
+}
+
+function SpeciesTotalsTableBody({
+	data,
+	columnConfigs
+}: {
+	data: RowModelWithRawData<AggregateStatsResult, RowModel>[];
+	columnConfigs?: Partial<Record<keyof RowModel, ColumnConfig>>;
+}) {
+	const orderedColumnProperties = Object.keys(columnConfigs ?? {}).filter(
+		(property) => property !== 'speciesName'
+	) as (keyof RowModel)[];
+
+	return (
+		<tbody>
+			{data.map((row) => (
+				<tr key={row.speciesName}>
+					<td>
+						<SpeciesNameCell model={row} />
+					</td>
+					{orderedColumnProperties.map((property) => (
+						<td
+							key={property}
+							className={columnConfigs?.[property]?.cellClassName}
+						>
+							{row[property]}
+						</td>
+					))}
+				</tr>
+			))}
+		</tbody>
+	);
+}
 
 export function SpeciesTotalsTable({
 	speciesStats
@@ -24,35 +116,16 @@ export function SpeciesTotalsTable({
 		return <p>No species recorded.</p>;
 	}
 
+	const hasPullus = speciesStats.some((stat) => stat.pullus_count > 0);
+	const columnConfigs = buildColumnConfigs(hasPullus);
+
 	return (
-		<table>
-			<thead>
-				<tr>
-					{COLUMN_LABELS.map((label) => (
-						<th key={label}>{label}</th>
-					))}
-				</tr>
-			</thead>
-			<tbody>
-				{speciesStats.map((stat) => {
-					const row = deriveSpeciesTotalsRow(stat);
-					return (
-						<tr key={row.speciesName}>
-							<td>{row.speciesName}</td>
-							<td>{row.encounterCount}</td>
-							<td>{row.individualsCount}</td>
-							<td>{row.newCount}</td>
-							<td>{row.retrapsCount}</td>
-							<td>{row.pullusCount}</td>
-							<td>{row.juvsCount}</td>
-							<td>{row.postjuvCount}</td>
-							<td>{row.adultsCount}</td>
-							<td>{row.unknownAgeCount}</td>
-							<td>{row.newYoungCount}</td>
-						</tr>
-					);
-				})}
-			</tbody>
-		</table>
+		<SortableTable<AggregateStatsResult, RowModel>
+			columnConfigs={columnConfigs}
+			data={speciesStats}
+			testId="species-totals-table"
+			rowDataTransform={rowDataTransform}
+			TableBodyComponent={SpeciesTotalsTableBody}
+		/>
 	);
 }
