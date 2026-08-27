@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	derivePeriodTotalsRow,
+	derivePeriodTotalsRowByEncounter,
 	formatPeriodTotalsLabel,
 	type PeriodTotalsGrouping
 } from '../period-totals';
@@ -37,6 +38,17 @@ function buildStat(
 		adult_count: 1,
 		unknown_age_count: 1,
 		new_young_count: 3,
+		pullus_bird_count: 1,
+		juv_bird_count: 2,
+		postjuv_bird_count: 1,
+		adult_bird_count: 1,
+		unknown_age_bird_count: 1,
+		new_young_bird_count: 3,
+		pullus_enc_count: 2,
+		juv_enc_count: 3,
+		postjuv_enc_count: 1,
+		adult_enc_count: 1,
+		unknown_age_enc_count: 0,
 		...overrides
 	} as AggregateStatsResult;
 }
@@ -110,6 +122,33 @@ describe('derivePeriodTotalsRow', () => {
 	it('computes retraps via the shared calculateRetraps helper', () => {
 		const stat = buildStat({ bird_count: 10, new_bird_count: 3 });
 		expect(derivePeriodTotalsRow(stat).retraps).toBe(7);
+	});
+});
+
+describe('derivePeriodTotalsRowByEncounter', () => {
+	it('maps each field correctly, with age-bucket fields from *_enc_count and New/New young from new_bird_count/new_young_bird_count', () => {
+		const stat = buildStat();
+		expect(derivePeriodTotalsRowByEncounter(stat)).toEqual({
+			timePeriod: '2026-08-16',
+			sessionsCount: 4,
+			effortSeconds: 64800,
+			speciesCount: 5,
+			encounterCount: 7,
+			individualsCount: 6,
+			new: 4,
+			retraps: 3,
+			pullus: 2,
+			juvs: 3,
+			postjuv: 1,
+			adults: 1,
+			unknownAge: 0,
+			newYoung: 3
+		});
+	});
+
+	it('computes retraps via the shared calculateEncounterRetraps helper', () => {
+		const stat = buildStat({ encounter_count: 10, new_bird_count: 3 });
+		expect(derivePeriodTotalsRowByEncounter(stat).retraps).toBe(7);
 	});
 });
 

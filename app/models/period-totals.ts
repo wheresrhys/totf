@@ -1,7 +1,7 @@
 import { format as formatDate } from 'date-fns';
 import { postgresIntervalToSeconds } from '@/lib/postgres-interval';
 import type { AggregateStatsResult } from './db';
-import { calculateRetraps } from './species-totals';
+import { calculateEncounterRetraps, calculateRetraps } from './species-totals';
 
 export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
 
@@ -46,6 +46,35 @@ export function derivePeriodTotalsRow(
 		adults: stat.adult_count,
 		unknownAge: stat.unknown_age_count,
 		newYoung: stat.new_young_count
+	};
+}
+
+/**
+ * Encounter-based sibling of `derivePeriodTotalsRow` — same
+ * `PeriodTotalsRow` shape, but age-bucket fields are sourced from the
+ * `*_enc_count` columns. `new`/`newYoung` still read
+ * `new_bird_count`/`new_young_bird_count` — no `*_enc_count` variant exists
+ * for either, since both are identical to the bird-based count by
+ * construction (see #601).
+ */
+export function derivePeriodTotalsRowByEncounter(
+	stat: AggregateStatsResult
+): PeriodTotalsRow {
+	return {
+		timePeriod: stat.time_period,
+		sessionsCount: stat.session_count,
+		effortSeconds: postgresIntervalToSeconds(stat.total_effort),
+		speciesCount: stat.species_count,
+		encounterCount: stat.encounter_count,
+		individualsCount: stat.bird_count,
+		new: stat.new_bird_count,
+		retraps: calculateEncounterRetraps(stat),
+		pullus: stat.pullus_enc_count,
+		juvs: stat.juv_enc_count,
+		postjuv: stat.postjuv_enc_count,
+		adults: stat.adult_enc_count,
+		unknownAge: stat.unknown_age_enc_count,
+		newYoung: stat.new_young_bird_count
 	};
 }
 
