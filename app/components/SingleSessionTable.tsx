@@ -6,7 +6,6 @@ import { type NetRound } from '@/app/models/session-chronology';
 import { getAgeClass } from '@/app/models/encounter';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { InlineTable } from './shared/DesignSystem';
-import { AccordionTableBody } from './shared/AccordionTableBody';
 export type SpeciesWithEncounters = {
 	species: string;
 	encounters: SessionEncounter[];
@@ -21,6 +20,7 @@ import {
 	columnBlock,
 	createNameLinkCell
 } from './shared/StatsTableColumnConfigs';
+import { createStatsTableBody } from './shared/StatsTableBody';
 import { TabNav } from './TabNav';
 
 const SpeciesNameCell = createNameLinkCell<SpeciesWithEncounters, RowModel>(
@@ -159,36 +159,12 @@ function buildColumnConfigs(
 	};
 }
 
-function SessionTableBody({
-	data,
-	columnConfigs
-}: {
-	data: RowModelWithRawData<SpeciesWithEncounters, RowModel>[];
-	columnConfigs?: Partial<Record<keyof RowModel, ColumnConfig>>;
-}) {
-	const orderedColumnProperties = Object.keys(columnConfigs ?? {}).filter(
-		(property) => property !== 'species'
-	) as (keyof RowModel)[];
-
-	function SpeciesRow({ model }: { model: RowModel }) {
-		return orderedColumnProperties.map((prop) => (
-			<td key={prop} className={columnConfigs?.[prop]?.cellClassName}>
-				{model[prop]}
-			</td>
-		));
-	}
-
-	return (
-		<AccordionTableBody<RowModelWithRawData<SpeciesWithEncounters, RowModel>>
-			data={data}
-			getKey={(speciesWithEncounters) => speciesWithEncounters.species}
-			columnCount={orderedColumnProperties.length + 1}
-			FirstColumnComponent={SpeciesNameCell}
-			RestColumnsComponent={SpeciesRow}
-			ExpandedContentComponent={SpeciesDetailsTable}
-		/>
-	);
-}
+const SessionTableBody = createStatsTableBody<SpeciesWithEncounters, RowModel>({
+	FirstColumnComponent: SpeciesNameCell,
+	firstColumnKey: 'species',
+	getKey: (model) => model.species,
+	ExpandedContentComponent: SpeciesDetailsTable
+});
 
 function EncounterRow({ encounter }: { encounter: SessionEncounter }) {
 	return (
