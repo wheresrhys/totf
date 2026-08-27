@@ -11,12 +11,14 @@ export function SummaryPage({
 	year,
 	month,
 	summaryStats = null,
-	speciesStats = []
+	speciesStats = [],
+	yearlyTotals
 }: {
 	year?: number;
 	month?: number;
 	summaryStats?: AggregateStatsResult | null;
 	speciesStats?: AggregateStatsResult[];
+	yearlyTotals?: AggregateStatsResult[];
 }) {
 	return (
 		<PageWrapper>
@@ -33,7 +35,10 @@ export function SummaryPage({
 					<HighlightsSection />
 				</div>
 				<div className="lg:flex-1">
-					<SpeciesTotalsSection speciesStats={speciesStats} />
+					<SpeciesTotalsSection
+						speciesStats={speciesStats}
+						yearlyTotals={yearlyTotals}
+					/>
 				</div>
 			</div>
 		</PageWrapper>
