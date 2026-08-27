@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveSpeciesTotalsRow } from '../species-totals';
+import { calculateRetraps, deriveSpeciesTotalsRow } from '../species-totals';
 import type { AggregateStatsResult } from '../db';
 
 function buildStat(
@@ -36,6 +36,23 @@ function buildStat(
 		...overrides
 	} as AggregateStatsResult;
 }
+
+describe('calculateRetraps', () => {
+	it('computes bird_count minus new_bird_count for a typical row', () => {
+		const stat = buildStat({ bird_count: 10, new_bird_count: 3 });
+		expect(calculateRetraps(stat)).toBe(7);
+	});
+
+	it('returns 0 when every bird is new (bird_count === new_bird_count)', () => {
+		const stat = buildStat({ bird_count: 5, new_bird_count: 5 });
+		expect(calculateRetraps(stat)).toBe(0);
+	});
+
+	it('returns bird_count when new_bird_count is 0 (no new birds)', () => {
+		const stat = buildStat({ bird_count: 8, new_bird_count: 0 });
+		expect(calculateRetraps(stat)).toBe(8);
+	});
+});
 
 describe('deriveSpeciesTotalsRow', () => {
 	it('maps every AggregateStatsResult bucket field to its SpeciesTotalsRow counterpart', () => {
