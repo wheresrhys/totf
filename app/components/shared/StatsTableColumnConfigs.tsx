@@ -9,10 +9,19 @@ export const ageBlockEndBorder = 'border-r-4 border-r-base-content/30';
 
 // Shorthand for column configs that tint both the header and every data
 // cell in that column the same colour, so column groupings read clearly
-// top-to-bottom.
+// top-to-bottom. Callers pass just the base Tailwind colour name (e.g.
+// `'green'`) - this applies the light-mode `-50` tint and, per issue #605,
+// the equivalent dark-mode `-950` tint, so callers never hand-wire the
+// per-mode shade themselves. `extraClassName` carries anything unrelated to
+// the tint itself (e.g. the age-block borders below). New base colours must
+// be added to the `@source inline(...)` safelist in `app/globals.css`, since
+// Tailwind's file scanner can't see class names composed at runtime.
 export function columnBlock(
-	className: string
+	baseColor: string,
+	extraClassName?: string
 ): Pick<ColumnConfig, 'headerClassName' | 'cellClassName'> {
+	const className =
+		`bg-${baseColor}-50 dark:bg-${baseColor}-950 ${extraClassName ?? ''}`.trim();
 	return { headerClassName: className, cellClassName: className };
 }
 
@@ -70,18 +79,18 @@ export function buildStandardColumnConfigs<RowModel>(
 	return {
 		new: {
 			label: fieldLabels.new,
-			...columnBlock('bg-green-50')
+			...columnBlock('green')
 		},
 		retraps: {
 			label: fieldLabels.retraps,
-			...columnBlock('bg-amber-50')
+			...columnBlock('amber')
 		},
 		// Omitted entirely (rather than rendered empty) when no pulli were caught.
 		...(hasPullus
 			? {
 					pullus: {
 						label: fieldLabels.pullus,
-						...columnBlock(`bg-cyan-50 ${ageBlockStartBorder}`)
+						...columnBlock('cyan', ageBlockStartBorder)
 					}
 				}
 			: {}),
@@ -89,19 +98,19 @@ export function buildStandardColumnConfigs<RowModel>(
 			label: fieldLabels.juvs,
 			// If pulli is hidden, Juv becomes the first column of the age block
 			// and inherits its thicker left border.
-			...columnBlock(`bg-sky-50 ${hasPullus ? '' : ageBlockStartBorder}`.trim())
+			...columnBlock('sky', hasPullus ? undefined : ageBlockStartBorder)
 		},
 		postjuv: {
 			label: fieldLabels.postjuv,
-			...columnBlock('bg-blue-50')
+			...columnBlock('blue')
 		},
 		adults: {
 			label: fieldLabels.adults,
-			...columnBlock('bg-purple-50')
+			...columnBlock('purple')
 		},
 		unknownAge: {
 			label: fieldLabels.unknownAge,
-			...columnBlock(`bg-taupe-50 ${ageBlockEndBorder}`)
+			...columnBlock('taupe', ageBlockEndBorder)
 		}
 	} as Partial<Record<keyof RowModel, ColumnConfig>>;
 }

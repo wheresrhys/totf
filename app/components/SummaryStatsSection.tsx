@@ -30,10 +30,7 @@ export function SummaryStatsSection({
 		{ label: 'New young', value: stats.new_young_count }
 	];
 	return (
-		<Table
-			testId="summary-stats-section"
-			className="table table-xs sm:table-md"
-		>
+		<Table testId="summary-stats-section">
 			<tbody>
 				{rows.map((row) => (
 					<tr key={row.label}>

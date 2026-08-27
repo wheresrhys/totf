@@ -190,10 +190,7 @@ function SummaryStatsTable({ data }: { data: HomePageSummaryStats | null }) {
 	const columns = getSummaryStatsColumns();
 	return (
 		<div>
-			<Table
-				testId="summary-stats-table"
-				className="table table-xs sm:table-md"
-			>
+			<Table testId="summary-stats-table">
 				<thead>
 					<tr>
 						<th>Totals</th>
