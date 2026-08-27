@@ -11,12 +11,12 @@ describe('AggregateByToggle', () => {
 		it('renders the "Aggregate by:" label and Bird/Encounter radios', () => {
 			render(<AggregateByToggle value="bird" onChange={() => {}} />);
 			expect(screen.getByText('Aggregate by:')).not.toBeNull();
-			expect(
-				screen.getByRole('radio', { name: 'Bird' })
-			).toBeInstanceOf(HTMLInputElement);
-			expect(
-				screen.getByRole('radio', { name: 'Encounter' })
-			).toBeInstanceOf(HTMLInputElement);
+			expect(screen.getByRole('radio', { name: 'Bird' })).toBeInstanceOf(
+				HTMLInputElement
+			);
+			expect(screen.getByRole('radio', { name: 'Encounter' })).toBeInstanceOf(
+				HTMLInputElement
+			);
 		});
 
 		it('calls onChange with the corresponding value when a radio is clicked', () => {
