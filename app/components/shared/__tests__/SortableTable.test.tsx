@@ -112,6 +112,90 @@ describe('SortableTable', () => {
 		expect(rows[0].textContent).toContain('Robin');
 	});
 
+	describe('totalsRow', () => {
+		const totalsCells = (
+			<>
+				<td>Total</td>
+				<td>20</td>
+			</>
+		);
+
+		it('renders the supplied totalsRow as an extra row inside <thead>', () => {
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={columnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					totalsRow={totalsCells}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			const totalsRow = screen.getByTestId('totals-row');
+			expect(totalsRow.closest('thead')).not.toBeNull();
+			expect(totalsRow.closest('tbody')).toBeNull();
+			expect(totalsRow.textContent).toContain('Total');
+			expect(totalsRow.textContent).toContain('20');
+		});
+
+		it('renders the totals row immediately after the header row, before any tbody row', () => {
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={columnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					totalsRow={totalsCells}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			const theadRows = document.querySelectorAll('thead tr');
+			// header row first, totals row second
+			expect(theadRows).toHaveLength(2);
+			expect(theadRows[1].getAttribute('data-testid')).toBe('totals-row');
+			// no tbody row precedes it
+			const firstBodyRow = document.querySelector('tbody tr');
+			expect(firstBodyRow?.textContent).toContain('Chiffchaff');
+		});
+
+		it('leaves the totals row position and content unchanged when sorting a data column (asc and desc)', () => {
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={columnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					totalsRow={totalsCells}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			const readTotals = () => {
+				const theadRows = document.querySelectorAll('thead tr');
+				return {
+					index: Array.from(theadRows).findIndex(
+						(row) => row.getAttribute('data-testid') === 'totals-row'
+					),
+					content: screen.getByTestId('totals-row').textContent
+				};
+			};
+			const before = readTotals();
+			fireEvent.click(screen.getByText('Count')); // descending
+			expect(readTotals()).toEqual(before);
+			fireEvent.click(screen.getByText('Count')); // ascending
+			expect(readTotals()).toEqual(before);
+		});
+
+		it('renders no extra <thead> row when totalsRow is omitted', () => {
+			render(
+				<SortableTable<Row, Row>
+					columnConfigs={columnConfigs}
+					data={data}
+					rowDataTransform={(r) => r}
+					TableBodyComponent={SimpleBody}
+				/>
+			);
+			expect(screen.queryByTestId('totals-row')).toBeNull();
+			expect(document.querySelectorAll('thead tr')).toHaveLength(1);
+		});
+	});
+
 	describe('per-column styling', () => {
 		it("applies a column's headerClassName to its header", () => {
 			const styledColumnConfigs: Record<keyof Row, ColumnConfig> = {

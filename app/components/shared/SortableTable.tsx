@@ -38,6 +38,11 @@ type SortableTableProps<RawRowData, RowModel> = {
 	rowDataTransform: (modelData: RawRowData) => RowModel;
 	testId?: string;
 	initialSortColumn?: keyof RowModel;
+	// Optional pinned row (typically built via `buildTotalsRowCells`) rendered
+	// inside <thead>, immediately after the header row. Living in <thead> — not
+	// <tbody> — keeps it structurally outside the sorted data, so no
+	// sortColumn/sortDirection state can ever move or reorder it.
+	totalsRow?: React.ReactNode;
 	TableBodyComponent: React.ComponentType<{
 		data: RowModelWithRawData<RawRowData, RowModel>[];
 		columnConfigs?: Partial<Record<keyof RowModel, ColumnConfig>>;
@@ -49,6 +54,7 @@ export function SortableTable<RawRowData, RowModel>({
 	data,
 	initialSortColumn,
 	testId,
+	totalsRow,
 	rowDataTransform,
 	TableBodyComponent
 }: SortableTableProps<RawRowData, RowModel>) {
@@ -132,6 +138,11 @@ export function SortableTable<RawRowData, RowModel>({
 						</th>
 					))}
 				</tr>
+				{totalsRow ? (
+					<tr data-testid="totals-row" className="font-semibold">
+						{totalsRow}
+					</tr>
+				) : null}
 			</thead>
 			<TableBodyComponent data={sortedData} columnConfigs={columnConfigs} />
 		</Table>
