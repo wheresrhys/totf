@@ -264,7 +264,7 @@ describe('SessionTabs', () => {
 				'Juv',
 				'Postjuv',
 				'Adult',
-				'Unaged',
+				'Not aged',
 				'New Young',
 				'Max Proven Age'
 			]);
@@ -321,7 +321,7 @@ describe('SessionTabs', () => {
 			expect(backgroundClassFor('Juv')).toContain('bg-sky-50');
 			expect(backgroundClassFor('Postjuv')).toContain('bg-blue-50');
 			expect(backgroundClassFor('Adult')).toContain('bg-purple-50');
-			expect(backgroundClassFor('Unaged')).toContain('bg-taupe-50');
+			expect(backgroundClassFor('Not aged')).toContain('bg-taupe-50');
 			expect(backgroundClassFor('New Young')).toContain('bg-lime-50');
 		});
 
@@ -366,7 +366,7 @@ describe('SessionTabs', () => {
 			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
 			const headers = screen.getAllByRole('columnheader');
 			const unagedHeader = headers.find(
-				(header) => header.textContent === 'Unaged'
+				(header) => header.textContent === 'Not aged'
 			);
 			expect(unagedHeader?.className).toContain('border-r-4');
 		});

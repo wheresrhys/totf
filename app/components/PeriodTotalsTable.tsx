@@ -23,7 +23,8 @@ import {
 } from './shared/StatsTableColumnConfigs';
 
 function buildColumnConfigs(
-	firstColumnHeader: string
+	firstColumnHeader: string,
+	hasPullus: boolean
 ): Partial<Record<keyof PeriodTotalsRow, ColumnConfig>> {
 	return {
 		timePeriod: {
@@ -38,15 +39,7 @@ function buildColumnConfigs(
 		speciesCount: { label: 'Species' },
 		encounterCount: { label: 'Encounters' },
 		individualsCount: { label: 'Individuals' },
-		...buildStandardColumnConfigs<PeriodTotalsRow>(true, {
-			new: 'New',
-			retraps: 'Retraps',
-			pullus: 'Pullus',
-			juvs: 'Juvs',
-			postjuv: 'Postjuv',
-			adults: 'Adults',
-			unknownAge: 'Unknown age'
-		}),
+		...buildStandardColumnConfigs<PeriodTotalsRow>(hasPullus),
 		newYoung: {
 			label: 'New young',
 			...columnBlock('lime')
@@ -79,8 +72,8 @@ export function PeriodTotalsTable({
 	const resolveLabel =
 		buildLabel ??
 		((timePeriod: string) => formatPeriodTotalsLabel(grouping, timePeriod));
-
-	const columnConfigs = buildColumnConfigs(firstColumnHeader);
+	const hasPullus = rows.some((stat) => stat.pullus_count > 0);
+	const columnConfigs = buildColumnConfigs(firstColumnHeader, hasPullus);
 
 	const totalsRow = totalsStats
 		? buildTotalsRowCells<PeriodTotalsRow>({

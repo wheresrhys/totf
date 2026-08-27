@@ -67,12 +67,12 @@ describe('PeriodTotalsTable', () => {
 				'Encounters',
 				'Individuals',
 				'New',
-				'Retraps',
-				'Pullus',
-				'Juvs',
+				'Retrap',
+				'Pulli',
+				'Juv',
 				'Postjuv',
-				'Adults',
-				'Unknown age',
+				'Adult',
+				'Not aged',
 				'New young'
 			]);
 

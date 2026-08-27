@@ -140,15 +140,7 @@ function buildColumnConfigs(
 			label: 'Total',
 			cellClassName: 'font-bold'
 		},
-		...buildStandardColumnConfigs<RowModel>(hasPullus, {
-			new: 'New',
-			retraps: 'Retrap',
-			pullus: 'Pulli',
-			juvs: 'Juv',
-			postjuv: 'Postjuv',
-			adults: 'Adult',
-			unknownAge: 'Unaged'
-		}),
+		...buildStandardColumnConfigs<RowModel>(hasPullus),
 		newYoung: {
 			label: 'New Young',
 			...columnBlock('lime')

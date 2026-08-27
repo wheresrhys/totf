@@ -65,15 +65,7 @@ function buildColumnConfigs(
 		individualsCount: {
 			label: 'Individuals'
 		},
-		...buildStandardColumnConfigs<RowModel>(hasPullus, {
-			new: 'New',
-			retraps: 'Retraps',
-			pullus: 'Pullus',
-			juvs: 'Juvs',
-			postjuv: 'Postjuv',
-			adults: 'Adults',
-			unknownAge: 'Unknown age'
-		}),
+		...buildStandardColumnConfigs<RowModel>(hasPullus),
 		newYoung: {
 			label: 'New young'
 		}

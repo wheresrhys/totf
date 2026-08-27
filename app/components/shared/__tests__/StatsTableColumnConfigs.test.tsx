@@ -112,15 +112,6 @@ describe('buildStandardColumnConfigs', () => {
 		adults: number;
 		unknownAge: number;
 	};
-	const sessionLabels: Record<StandardField, string> = {
-		new: 'New',
-		retraps: 'Retrap',
-		pullus: 'Pulli',
-		juvs: 'Juv',
-		postjuv: 'Postjuv',
-		adults: 'Adult',
-		unknownAge: 'Unaged'
-	};
 
 	// A second caller whose RowModel carries extra fields of its own (proving
 	// `StandardField & keyof RowModel` doesn't require an exact match) and
@@ -147,10 +138,7 @@ describe('buildStandardColumnConfigs', () => {
 	};
 
 	it('returns new/retraps/juvs/postjuv/adults/unknownAge in order when hasPullus is false', () => {
-		const configs = buildStandardColumnConfigs<SessionModel>(
-			false,
-			sessionLabels
-		);
+		const configs = buildStandardColumnConfigs<SessionModel>(false);
 		expect(Object.keys(configs)).toEqual([
 			'new',
 			'retraps',
@@ -162,10 +150,7 @@ describe('buildStandardColumnConfigs', () => {
 	});
 
 	it('inserts the pullus entry immediately before juvs when hasPullus is true', () => {
-		const configs = buildStandardColumnConfigs<SessionModel>(
-			true,
-			sessionLabels
-		);
+		const configs = buildStandardColumnConfigs<SessionModel>(true);
 		expect(Object.keys(configs)).toEqual([
 			'new',
 			'retraps',
@@ -177,57 +162,28 @@ describe('buildStandardColumnConfigs', () => {
 		]);
 	});
 
-	it('uses the caller-supplied label for each column', () => {
-		const configs = buildStandardColumnConfigs<SessionModel>(
-			true,
-			sessionLabels
-		);
+	it('uses the correct label for each column', () => {
+		const configs = buildStandardColumnConfigs<SessionModel>(true);
 		expect(configs.new?.label).toBe('New');
 		expect(configs.retraps?.label).toBe('Retrap');
 		expect(configs.pullus?.label).toBe('Pulli');
 		expect(configs.juvs?.label).toBe('Juv');
-		expect(configs.unknownAge?.label).toBe('Unaged');
-	});
-
-	it('lets two callers word the same logical field differently from the one builder', () => {
-		const sessionConfigs = buildStandardColumnConfigs<SessionModel>(
-			false,
-			sessionLabels
-		);
-		const totalsConfigs = buildStandardColumnConfigs<TotalsModel>(
-			false,
-			totalsLabels
-		);
-		expect(sessionConfigs.retraps?.label).toBe('Retrap');
-		expect(totalsConfigs.retraps?.label).toBe('Retraps');
-		expect(sessionConfigs.juvs?.label).toBe('Juv');
-		expect(totalsConfigs.juvs?.label).toBe('Juvs');
-		expect(sessionConfigs.unknownAge?.label).toBe('Unaged');
-		expect(totalsConfigs.unknownAge?.label).toBe('Unknown age');
+		expect(configs.unknownAge?.label).toBe('Not aged');
 	});
 
 	it('puts the start border on pullus when shown, on juvs when hidden, and the end border always on unknownAge', () => {
-		const withPullus = buildStandardColumnConfigs<SessionModel>(
-			true,
-			sessionLabels
-		);
+		const withPullus = buildStandardColumnConfigs<SessionModel>(true);
 		expect(withPullus.pullus?.headerClassName).toContain('border-l-4');
 		expect(withPullus.juvs?.headerClassName).not.toContain('border-l-4');
 		expect(withPullus.unknownAge?.headerClassName).toContain('border-r-4');
 
-		const withoutPullus = buildStandardColumnConfigs<SessionModel>(
-			false,
-			sessionLabels
-		);
+		const withoutPullus = buildStandardColumnConfigs<SessionModel>(false);
 		expect(withoutPullus.juvs?.headerClassName).toContain('border-l-4');
 		expect(withoutPullus.unknownAge?.headerClassName).toContain('border-r-4');
 	});
 
 	it('omits the pullus key entirely (not an empty column) when hasPullus is false', () => {
-		const configs = buildStandardColumnConfigs<SessionModel>(
-			false,
-			sessionLabels
-		);
+		const configs = buildStandardColumnConfigs<SessionModel>(false);
 		expect('pullus' in configs).toBe(false);
 	});
 });
