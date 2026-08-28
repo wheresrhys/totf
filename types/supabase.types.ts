@@ -402,13 +402,14 @@ export type Database = {
       }
       notable_retraps: {
         Args: {
+          from_date?: string
           min_encounter_count?: number
           min_proven_age?: number
           result_limit?: number
           result_limit_per_species?: number
           ringing_group_filter?: number
           species_filter?: string
-          year_filter?: number
+          to_date?: string
         }
         Returns: {
           encounter_count: number
