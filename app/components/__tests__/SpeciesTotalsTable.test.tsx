@@ -99,6 +99,66 @@ describe('SpeciesTotalsTable', () => {
 		});
 	});
 
+	describe('species name link — period scoping (#625)', () => {
+		const stats = [makeStat({ species_name: 'Robin' })];
+
+		it('links to /species/{speciesName} when no period prop is supplied (regression guard)', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			const link = screen.getByRole('link', { name: 'Robin' });
+			expect(link.getAttribute('href')).toBe('/species/Robin');
+		});
+
+		it('links to /species/{speciesName}/{year} when period has a year only', () => {
+			render(
+				<SpeciesTotalsTable speciesStats={stats} period={{ year: 2024 }} />
+			);
+			const link = screen.getByRole('link', { name: 'Robin' });
+			expect(link.getAttribute('href')).toBe('/species/Robin/2024');
+		});
+
+		it('links to /species/{speciesName}/{year}/{month} when period has a year and month', () => {
+			render(
+				<SpeciesTotalsTable
+					speciesStats={stats}
+					period={{ year: 2024, month: 3 }}
+				/>
+			);
+			const link = screen.getByRole('link', { name: 'Robin' });
+			expect(link.getAttribute('href')).toBe('/species/Robin/2024/3');
+		});
+
+		it('produces a valid link at every period depth for a species name requiring URL-encoding', () => {
+			const spacedStats = [makeStat({ species_name: 'Blue Tit' })];
+
+			const { rerender } = render(
+				<SpeciesTotalsTable speciesStats={spacedStats} />
+			);
+			expect(
+				screen.getByRole('link', { name: 'Blue Tit' }).getAttribute('href')
+			).toBe('/species/Blue Tit');
+
+			rerender(
+				<SpeciesTotalsTable
+					speciesStats={spacedStats}
+					period={{ year: 2024 }}
+				/>
+			);
+			expect(
+				screen.getByRole('link', { name: 'Blue Tit' }).getAttribute('href')
+			).toBe('/species/Blue Tit/2024');
+
+			rerender(
+				<SpeciesTotalsTable
+					speciesStats={spacedStats}
+					period={{ year: 2024, month: 3 }}
+				/>
+			);
+			expect(
+				screen.getByRole('link', { name: 'Blue Tit' }).getAttribute('href')
+			).toBe('/species/Blue Tit/2024/3');
+		});
+	});
+
 	describe('sorting', () => {
 		const stats = [
 			makeStat({ species_name: 'Robin', encounter_count: 5 }),
