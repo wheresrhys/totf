@@ -37,10 +37,20 @@ type RowModel = {
 	newYoung: number;
 };
 
-const SpeciesNameCell = createNameLinkCell<AggregateStatsResult, RowModel>(
-	(model) => model.speciesName,
-	(model) => `/species/${model.speciesName}`
-);
+// The period a summary page's species table is scoped to — mirrors the
+// `/species/{name}[/{year}[/{month}]]` route depth. Undefined (the all-time
+// `/summary` page) keeps today's unscoped `/species/{name}` links.
+export type SpeciesPeriod = { year: number; month?: number };
+
+function buildSpeciesHref(speciesName: string, period?: SpeciesPeriod): string {
+	if (!period) {
+		return `/species/${speciesName}`;
+	}
+	if (period.month === undefined) {
+		return `/species/${speciesName}/${period.year}`;
+	}
+	return `/species/${speciesName}/${period.year}/${period.month}`;
+}
 
 function toRowModel(row: SpeciesTotalsRow): RowModel {
 	return {
@@ -92,44 +102,16 @@ function buildColumnConfigs(
 	};
 }
 
-function SpeciesTotalsTableBody({
-	data,
-	columnConfigs
-}: {
-	data: RowModelWithRawData<AggregateStatsResult, RowModel>[];
-	columnConfigs?: Partial<Record<keyof RowModel, ColumnConfig>>;
-}) {
-	const orderedColumnProperties = Object.keys(columnConfigs ?? {}).filter(
-		(property) => property !== 'speciesName'
-	) as (keyof RowModel)[];
-
-	return (
-		<tbody>
-			{data.map((row) => (
-				<tr key={row.speciesName}>
-					<td>
-						<SpeciesNameCell model={row} />
-					</td>
-					{orderedColumnProperties.map((property) => (
-						<td
-							key={property}
-							className={columnConfigs?.[property]?.cellClassName}
-						>
-							{row[property]}
-						</td>
-					))}
-				</tr>
-			))}
-		</tbody>
-	);
-}
-
 export function SpeciesTotalsTable({
 	speciesStats,
-	totalsStats
+	totalsStats,
+	period
 }: {
 	speciesStats: AggregateStatsResult[];
 	totalsStats?: AggregateStatsResult;
+	// The summary page this table is rendered on, if any is period-scoped —
+	// see `buildSpeciesHref` above. Undefined on the all-time page.
+	period?: SpeciesPeriod;
 }) {
 	// Local to this table (not persisted across tab switches) — resets to
 	// 'bird' whenever `SpeciesTotalsSection` remounts this table for a
@@ -138,6 +120,46 @@ export function SpeciesTotalsTable({
 
 	if (speciesStats.length === 0) {
 		return <p>No species recorded.</p>;
+	}
+
+	// Recreated each render since `period` is a prop, not static — the cell
+	// itself is stateless, so this only costs identity, not behaviour (same
+	// approach as `PeriodTotalsTable`'s `PeriodLabelCell`).
+	const SpeciesNameCell = createNameLinkCell<AggregateStatsResult, RowModel>(
+		(model) => model.speciesName,
+		(model) => buildSpeciesHref(model.speciesName, period)
+	);
+
+	function SpeciesTotalsTableBody({
+		data,
+		columnConfigs
+	}: {
+		data: RowModelWithRawData<AggregateStatsResult, RowModel>[];
+		columnConfigs?: Partial<Record<keyof RowModel, ColumnConfig>>;
+	}) {
+		const orderedColumnProperties = Object.keys(columnConfigs ?? {}).filter(
+			(property) => property !== 'speciesName'
+		) as (keyof RowModel)[];
+
+		return (
+			<tbody>
+				{data.map((row) => (
+					<tr key={row.speciesName}>
+						<td>
+							<SpeciesNameCell model={row} />
+						</td>
+						{orderedColumnProperties.map((property) => (
+							<td
+								key={property}
+								className={columnConfigs?.[property]?.cellClassName}
+							>
+								{row[property]}
+							</td>
+						))}
+					</tr>
+				))}
+			</tbody>
+		);
 	}
 
 	const activeDeriveRow = deriveRow(aggregateBy);
