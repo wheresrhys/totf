@@ -38,10 +38,6 @@ vi.mock('@/app/components/SpStatsHistoryTab', () => ({
 	SpStatsHistoryTab: () => <div data-testid="sp-stats-history-tab" />
 }));
 
-vi.mock('@/app/components/SpYearComparisonTab', () => ({
-	SpYearComparisonTab: () => <div data-testid="sp-year-comparison-tab" />
-}));
-
 vi.mock('@/app/components/SpWeightWingTab', () => ({
 	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
@@ -108,6 +104,13 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 			await screen.findByTestId('sp-individuals-tab');
 			expect(screen.getByRole('button', { name: 'Bird list' })).toBeDefined();
 			expect(screen.getByTestId('headline-stats')).toBeDefined();
+		});
+
+		it('shows neither a "Year totals" nor a "Month totals" tab', async () => {
+			render(await renderMonthPage());
+			await screen.findByTestId('sp-individuals-tab');
+			expect(screen.queryByRole('button', { name: 'Year totals' })).toBeNull();
+			expect(screen.queryByRole('button', { name: 'Month totals' })).toBeNull();
 		});
 	});
 

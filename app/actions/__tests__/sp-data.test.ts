@@ -3,7 +3,8 @@ import {
 	fetchPageOfBirds,
 	fetchNotableRetraps,
 	fetchGraphableEncounterData,
-	getSpeciesStatsHistory
+	getSpeciesStatsHistory,
+	fetchSpeciesPeriodTotals
 } from '../sp-data';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
@@ -250,4 +251,57 @@ describe('sp-data actions', () => {
 	// something the action code does — the "inner-joins … forwards both bounds"
 	// tests above assert exactly that construction, which is what makes a bird's
 	// earlier in-range encounter appear while a later out-of-range one is dropped.
+
+	describe('fetchSpeciesPeriodTotals', () => {
+		it('with grouping "year" calls aggregate_stats with species_name_filter and group_by_time_period "year"', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'year');
+
+			expect(rpcCalls[0].name).toBe('aggregate_stats');
+			expect(rpcCalls[0].args).toMatchObject({
+				species_name_filter: SPECIES_NAME,
+				ringing_group_filter: GROUP_ID,
+				group_by_time_period: 'year'
+			});
+		});
+
+		it('with grouping "month" calls aggregate_stats with group_by_time_period "month"', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'month');
+
+			expect(rpcCalls[0].args).toMatchObject({
+				species_name_filter: SPECIES_NAME,
+				ringing_group_filter: GROUP_ID,
+				group_by_time_period: 'month'
+			});
+		});
+
+		it('forwards from_date/to_date when supplied', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await fetchSpeciesPeriodTotals(
+				SPECIES_NAME,
+				GROUP_ID,
+				'month',
+				FROM_DATE,
+				TO_DATE
+			);
+
+			expect(rpcCalls[0].args).toMatchObject({
+				from_date: FROM_DATE,
+				to_date: TO_DATE
+			});
+		});
+
+		it('omits from_date/to_date when no range is supplied', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'month');
+
+			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
+			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
+		});
+	});
 });
