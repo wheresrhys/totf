@@ -115,6 +115,40 @@ describe('SpIndividualsTab', () => {
 		await act(async () => {
 			io.enterNode(loader);
 		});
-		expect(vi.mocked(fetchPageOfBirds)).toHaveBeenCalledWith(1, 1, 1);
+		expect(vi.mocked(fetchPageOfBirds)).toHaveBeenCalledWith(
+			1,
+			1,
+			1,
+			undefined,
+			undefined
+		);
+	});
+
+	it('forwards the from/to date range into paged fetches when scoped', async () => {
+		const { fetchPageOfBirds } = await import('@/app/actions/sp-data');
+		vi.mocked(fetchPageOfBirds).mockResolvedValue(
+			birds as unknown as Awaited<ReturnType<typeof fetchPageOfBirds>>
+		);
+		render(
+			<SpIndividualsTab
+				speciesId={1}
+				viewedGroupId={1}
+				birds={birds}
+				birdCount={birds.length + 10}
+				fromDate="2026-01-01"
+				toDate="2026-12-31"
+			/>
+		);
+		const loader = screen.getByTestId('infinite-scroll-loader');
+		await act(async () => {
+			io.enterNode(loader);
+		});
+		expect(vi.mocked(fetchPageOfBirds)).toHaveBeenCalledWith(
+			1,
+			1,
+			1,
+			'2026-01-01',
+			'2026-12-31'
+		);
 	});
 });
