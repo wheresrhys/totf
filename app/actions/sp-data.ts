@@ -15,10 +15,20 @@ import type { AggregateStatsResult } from '@/app/models/db';
 export async function fetchPageOfBirds(
 	speciesId: number,
 	viewedGroupId: number,
-	page: number = 0
+	page: number = 0,
+	fromDate?: string,
+	toDate?: string
 ) {
 	const supabase = await getAuthenticatedSupabaseClient();
-	const paginatedBirdResults = (await supabase
+	// When a date range is supplied, inner-join the encounter (and its session) so
+	// that only birds with at least one in-range encounter are returned, and only
+	// their in-range encounters appear in the embedded array. The encounter's date
+	// lives on its session (`visit_date`) — `Encounters.capture_time` is a
+	// time-of-day only, so range filtering happens on `session.visit_date`.
+	const hasDateRange = Boolean(fromDate || toDate);
+	const encountersRelation = hasDateRange ? 'Encounters!inner' : 'Encounters';
+	const sessionRelation = hasDateRange ? 'Sessions!inner' : 'Sessions';
+	let query = supabase
 		.from('Birds')
 		.select(
 			`id,
@@ -26,7 +36,7 @@ export async function fetchPageOfBirds(
 			last_encountered_timestamp,
 			ringing_group_ids,
 			proven_age,
-			encounters:Encounters (
+			encounters:${encountersRelation} (
 				id,
 				capture_time,
 				min_hatch_year,
@@ -37,7 +47,7 @@ export async function fetchPageOfBirds(
 				sex,
 				weight,
 				wing_length,
-				session:Sessions (
+				session:${sessionRelation} (
 					id,
 					visit_date
 				)
@@ -49,14 +59,24 @@ export async function fetchPageOfBirds(
 		.range(
 			page * SPECIES_PAGE_BATCH_SIZE,
 			(page + 1) * SPECIES_PAGE_BATCH_SIZE - 1
-		)
-		.then(catchSupabaseErrors)) as BirdOfSpecies[];
+		);
+	if (fromDate) {
+		query = query.filter('encounters.session.visit_date', 'gte', fromDate);
+	}
+	if (toDate) {
+		query = query.filter('encounters.session.visit_date', 'lte', toDate);
+	}
+	const paginatedBirdResults = (await query.then(
+		catchSupabaseErrors
+	)) as BirdOfSpecies[];
 	return paginatedBirdResults.map(enrichBird) as EnrichedBirdOfSpecies[];
 }
 
 export async function fetchNotableRetraps(
 	speciesName: string,
-	viewedGroupId: number
+	viewedGroupId: number,
+	fromDate?: string,
+	toDate?: string
 ): Promise<NotableRetrapsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
@@ -65,30 +85,57 @@ export async function fetchNotableRetraps(
 			species_filter: speciesName,
 			result_limit: 10,
 			min_proven_age: 3,
-			min_encounter_count: 6
+			min_encounter_count: 6,
+			...(fromDate ? { from_date: fromDate } : {}),
+			...(toDate ? { to_date: toDate } : {})
 		})
 		.then(catchSupabaseErrors) as Promise<NotableRetrapsResult[]>;
 }
 
 export async function fetchGraphableEncounterData(
 	speciesId: number,
-	viewedGroupId: number
+	viewedGroupId: number,
+	fromDate?: string,
+	toDate?: string
 ): Promise<SexedGraphableBird[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	const paginatedBirdResults = (await supabase
-		.from('Birds')
-		.select(
-			`encounters:Encounters (
+	// See `fetchPageOfBirds` for the inner-join + `session.visit_date` rationale:
+	// range filtering keeps only birds with an in-range encounter, and prunes the
+	// embedded array to just those encounters.
+	const hasDateRange = Boolean(fromDate || toDate);
+	// The date lives on the session, so when filtering we inner-join it into the
+	// encounters embed purely to constrain on `visit_date` (the field is unused by
+	// the graph itself).
+	const encountersEmbed = hasDateRange
+		? `encounters:Encounters!inner (
+				age_code,
+				is_juv,
+				sex,
+				weight,
+				wing_length,
+				session:Sessions!inner ( visit_date )
+			)`
+		: `encounters:Encounters (
 				age_code,
 				is_juv,
 				sex,
 				weight,
 				wing_length
-			)`
-		)
+			)`;
+	let query = supabase
+		.from('Birds')
+		.select(encountersEmbed)
 		.eq('species_id', speciesId)
-		.contains('ringing_group_ids', [viewedGroupId])
-		.then(catchSupabaseErrors)) as GraphableBird[];
+		.contains('ringing_group_ids', [viewedGroupId]);
+	if (fromDate) {
+		query = query.filter('encounters.session.visit_date', 'gte', fromDate);
+	}
+	if (toDate) {
+		query = query.filter('encounters.session.visit_date', 'lte', toDate);
+	}
+	const paginatedBirdResults = (await query.then(
+		catchSupabaseErrors
+	)) as GraphableBird[];
 	return paginatedBirdResults.map(
 		(bird) =>
 			({
@@ -100,14 +147,18 @@ export async function fetchGraphableEncounterData(
 
 export async function getSpeciesStatsHistory(
 	species: string,
-	viewedGroupId: number
+	viewedGroupId: number,
+	fromDate?: string,
+	toDate?: string
 ) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('aggregate_stats', {
 			species_name_filter: species,
 			ringing_group_filter: viewedGroupId,
-			group_by_time_period: 'month'
+			group_by_time_period: 'month',
+			...(fromDate ? { from_date: fromDate } : {}),
+			...(toDate ? { to_date: toDate } : {})
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
 }

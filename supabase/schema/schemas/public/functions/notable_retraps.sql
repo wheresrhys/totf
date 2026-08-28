@@ -4,7 +4,8 @@ CREATE FUNCTION public.notable_retraps (
 	min_proven_age integer DEFAULT NULL::integer,
 	min_encounter_count integer DEFAULT NULL::integer,
 	species_filter text DEFAULT NULL::text,
-	year_filter integer DEFAULT NULL::integer,
+	from_date date DEFAULT NULL::date,
+	to_date date DEFAULT NULL::date,
 	ringing_group_filter bigint DEFAULT NULL::bigint
 ) RETURNS TABLE (
 	species_name text,
@@ -31,7 +32,8 @@ BEGIN
     LEFT JOIN public."Sessions" sess on sess.id=en.session_id
   WHERE
     (species_filter IS NULL OR sp.species_name ilike species_filter) AND
-    (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
+    (from_date IS NULL OR sess.visit_date >= from_date) AND
+    (to_date IS NULL OR sess.visit_date <= to_date)
 		AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
   GROUP BY
     sp.species_name,
@@ -68,7 +70,8 @@ GRANT ALL ON FUNCTION public.notable_retraps (
 	integer,
 	integer,
 	text,
-	integer,
+	date,
+	date,
 	bigint
 ) TO anon;
 
@@ -78,7 +81,8 @@ GRANT ALL ON FUNCTION public.notable_retraps (
 	integer,
 	integer,
 	text,
-	integer,
+	date,
+	date,
 	bigint
 ) TO authenticated;
 
@@ -88,6 +92,7 @@ GRANT ALL ON FUNCTION public.notable_retraps (
 	integer,
 	integer,
 	text,
-	integer,
+	date,
+	date,
 	bigint
 ) TO service_role;
