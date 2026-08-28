@@ -110,8 +110,8 @@ When there are more than ~3 tasks, fan out to `general-purpose` subagents to dra
   them. The main thread is what shows the ticket to the user; a subagent's commentary is not a
   substitute for that and must not be pasted in its place.
   - `title` — the fleshed title.
-  - `body` — the fleshed markdown (context/scope/acceptance/out-of-scope/reuse + stack layers
-    touched + commit breakdown + test enumeration).
+  - `body` — the fleshed markdown (motivation/scope/acceptance/out-of-scope/reuse + commit
+    breakdown + test enumeration).
   - `touchesDbSchema` — whether it touches `supabase/schema/` (drives the `db-migration` label).
   - `touchesE2eMutatingTrigger` — whether it touches a path listed in
     `e2e/mutating-spec-triggers.json` (drives the `e2e-exclusive` label).

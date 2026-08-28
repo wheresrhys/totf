@@ -41,18 +41,22 @@ new issue is linked as a **sub-issue** of it.
 ### 1. Flesh out the ticket
 Draft a structured ticket in markdown:
 - **Title** — concise, imperative (e.g. "Add species breakdown chart to session page").
-- **Context** — why this is needed; link the originating tracking issue or requirement.
+- **Motivation** — `Part of [<root ticket title>](<root ticket link>)`, followed by one concise,
+  plain-language sentence describing what the ticket does (skip implementation detail — describe
+  the user-visible behaviour change). E.g. not "Currently every species-name link ... points at
+  the unscoped /species/{name} ... Per #614, a link from /summary/2026's species table to
+  'Robin' should go to /species/robin/2026 ..." but "Makes links to species pages from summary
+  pages for a period include that period in the url, e.g. /species/Robin/2026/02."
 - **Scope & acceptance criteria** — bullets, each testable/observable.
 - **Out of scope** — what this ticket deliberately does not do.
-- **Dependencies** — other tickets/work that must land first.
 - **Reuse** — name existing repo files/patterns to build on (grep/read the repo before asserting
   something exists). Follow conventions in `CLAUDE.md` (YAGNI, DRY after 3rd use, descriptive
   names, existing data-fetching/model/action/component conventions).
 
 ### 2. Identify stack layers touched
 Using the same categories `implement-ticket` scopes against: database schema / RPC functions /
-server actions / components / pages / tests. Note this in the ticket body — it drives both the
-PR-splitting decision `implement-ticket` will make later and the label in step 4.
+server actions / components / pages / tests. This is for labelling only (drives step 7's
+`db-migration`/`e2e-exclusive` extra labels) — it is not written into the ticket body.
 
 ### 3. Break into small commits
 Ordered list of shippable subtasks. Each aims for <400 LOC (per `CLAUDE.md`). One line each:
@@ -76,9 +80,10 @@ existing rubric (CLAUDE.md > Creating GitHub tickets):
 State the chosen label and a one-line justification.
 
 ### 6. Confirm (HARD GATE — never skip)
-1. Print the **complete** drafted ticket (title + sections 1–4, verbatim, exactly as it will be
-   filed) as its own normal chat message. Never summarize, paraphrase, or squash it — the user
-   must see the actual ticket text, not a description of it.
+1. Print the **complete** drafted ticket (Title, Motivation, Scope & acceptance criteria, Out of
+   scope, Reuse, Commit breakdown, Tests — verbatim, exactly as it will be filed) as its own
+   normal chat message. Never summarize, paraphrase, or squash it — the user must see the actual
+   ticket text, not a description of it.
 2. Only after that full text is visible, call **AskUserQuestion** with a short decision-only
    question ("Confirm & create / Edit / Change model label") plus the proposed model label and
    justification. The AskUserQuestion question text is for the decision prompt only — it must
@@ -90,7 +95,8 @@ State the chosen label and a one-line justification.
 
 ### 7. Create the GitHub issue
 Only after confirmation, call `mcp__swarm-tools__create_ticket` with:
-- `title`, `body` (the fleshed markdown, sections 1–4, verbatim)
+- `title`, `body` (Motivation, Scope & acceptance criteria, Out of scope, Reuse, Commit
+  breakdown, Tests — verbatim)
 - `modelLabel` — the label chosen in step 5
 - `extraLabels` — `["db-migration"]` and/or `["e2e-exclusive"]` per step 2 (the tool ensures
   these two exclusive-resource labels exist, creating them with the standard description if
