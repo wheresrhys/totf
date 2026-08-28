@@ -9,12 +9,16 @@ export function SpIndividualsTab({
 	speciesId,
 	viewedGroupId,
 	birds: initialBirds,
-	birdCount
+	birdCount,
+	fromDate,
+	toDate
 }: {
 	speciesId: number;
 	viewedGroupId: number;
 	birds: EnrichedBirdOfSpecies[];
 	birdCount: number;
+	fromDate?: string;
+	toDate?: string;
 }) {
 	const [loadedBirds, setLoadedBirds] = useState(initialBirds);
 	const [page, setPage] = useState(0);
@@ -22,7 +26,13 @@ export function SpIndividualsTab({
 	async function loadMoreBirds() {
 		const nextPage = page + 1;
 		setPage(nextPage);
-		const newBirds = await fetchPageOfBirds(speciesId, viewedGroupId, nextPage);
+		const newBirds = await fetchPageOfBirds(
+			speciesId,
+			viewedGroupId,
+			nextPage,
+			fromDate,
+			toDate
+		);
 		const loadedIds = loadedBirds.map((bird) => bird.id);
 		setLoadedBirds([
 			...loadedBirds,

@@ -7,10 +7,14 @@ import type { NotableRetrapsResult } from '@/app/models/db';
 
 export function SpNotableRetrapsTab({
 	speciesName,
-	viewedGroupId
+	viewedGroupId,
+	fromDate,
+	toDate
 }: {
 	speciesName: string;
 	viewedGroupId: number;
+	fromDate?: string;
+	toDate?: string;
 }) {
 	const [notableRetraps, setNotableRetraps] = useState<NotableRetrapsResult[]>(
 		[]
@@ -18,11 +22,13 @@ export function SpNotableRetrapsTab({
 	const [isLoaded, setIsLoaded] = useState(false);
 	useEffect(() => {
 		if (notableRetraps.length > 0) return;
-		fetchNotableRetraps(speciesName, viewedGroupId).then((data) => {
-			setNotableRetraps(data);
-			setIsLoaded(true);
-		});
-	}, [speciesName, viewedGroupId, notableRetraps.length]);
+		fetchNotableRetraps(speciesName, viewedGroupId, fromDate, toDate).then(
+			(data) => {
+				setNotableRetraps(data);
+				setIsLoaded(true);
+			}
+		);
+	}, [speciesName, viewedGroupId, fromDate, toDate, notableRetraps.length]);
 	return (
 		<>
 			<SecondaryHeading>Notable Retraps</SecondaryHeading>

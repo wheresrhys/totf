@@ -1,10 +1,8 @@
 'use client';
 import { useState } from 'react';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
+import { PageWrapper } from '@/app/components/shared/DesignSystem';
 import { SpStats } from '@/app/components/SpStats';
+import { SpeciesHeading } from '@/app/(routes)/species/_shared';
 import 'chartkick/chart.js';
 import type {
 	FullFatPageData,
@@ -83,6 +81,8 @@ function SpeciesData({
 					viewedGroupId={viewedGroup.id}
 					birds={data.birds}
 					birdCount={data.speciesStats.bird_count ?? 0}
+					fromDate={data.fromDate}
+					toDate={data.toDate}
 				/>
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
@@ -93,6 +93,8 @@ function SpeciesData({
 				<SpNotableRetrapsTab
 					speciesName={data.speciesName}
 					viewedGroupId={viewedGroup.id}
+					fromDate={data.fromDate}
+					toDate={data.toDate}
 				/>
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
@@ -103,6 +105,8 @@ function SpeciesData({
 				<SpStatsHistoryTab
 					speciesName={data.speciesName}
 					viewedGroupId={viewedGroup.id}
+					fromDate={data.fromDate}
+					toDate={data.toDate}
 				/>
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
@@ -123,6 +127,8 @@ function SpeciesData({
 				<SpWeightWingTab
 					speciesId={data.speciesId}
 					viewedGroupId={viewedGroup.id}
+					fromDate={data.fromDate}
+					toDate={data.toDate}
 				/>
 			</ConditionalTabPanel>
 		</>
@@ -134,7 +140,7 @@ function fullFatTypeGuard(data: PageData): data is FullFatPageData {
 }
 
 export function SpPage({
-	params: { speciesName },
+	params: { speciesName, year, month },
 	data,
 	viewedGroup
 }: {
@@ -144,7 +150,11 @@ export function SpPage({
 }) {
 	return (
 		<PageWrapper>
-			<PrimaryHeading>{speciesName}</PrimaryHeading>
+			<SpeciesHeading
+				speciesName={speciesName}
+				year={year === undefined ? undefined : Number(year)}
+				month={month === undefined ? undefined : Number(month)}
+			/>
 			{fullFatTypeGuard(data) ? (
 				<SpeciesData data={data} viewedGroup={viewedGroup} />
 			) : (
