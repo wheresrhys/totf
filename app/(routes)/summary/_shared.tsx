@@ -48,6 +48,8 @@ export function SummaryPage({
 				yearlyTotals={yearlyTotals}
 				sessionTotals={sessionTotals}
 				viewedGroup={viewedGroup}
+				year={year}
+				month={month}
 			/>
 		</PageWrapper>
 	);

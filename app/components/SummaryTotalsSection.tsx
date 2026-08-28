@@ -18,7 +18,9 @@ export function SummaryTotalsSection({
 	monthTotals,
 	yearlyTotals,
 	sessionTotals,
-	viewedGroup
+	viewedGroup,
+	year,
+	month
 }: {
 	speciesStats: AggregateStatsResult[];
 	// The page's aggregate stats for whichever table/tab is active — used to
@@ -36,6 +38,12 @@ export function SummaryTotalsSection({
 	// means "this page has no Session totals tab".
 	sessionTotals?: AggregateStatsResult[];
 	viewedGroup?: ViewedGroup;
+	// The page's own period, mirroring `SummaryPage`'s `year`/`month` props —
+	// threaded into `SpeciesTotalsTable` so its species links carry the same
+	// period into the target `/species/{name}[/{year}[/{month}]]` URL (#625).
+	// Undefined on the all-time page, matching its unscoped species links.
+	year?: number;
+	month?: number;
 }) {
 	// Each summary page supplies at most one period tab's data: year totals on
 	// the all-time page, month totals on the year page, session totals on the
@@ -108,6 +116,7 @@ export function SummaryTotalsSection({
 				<SpeciesTotalsTable
 					speciesStats={speciesStats}
 					totalsStats={totalsStats}
+					period={year === undefined ? undefined : { year, month }}
 				/>
 			)}
 		</>

@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, within } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	within,
+	fireEvent
+} from '@testing-library/react';
 import Page, { fetchYearSummaryData } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
@@ -87,5 +93,17 @@ describe('/summary/[year]', () => {
 		render(await Page({ params: Promise.resolve({ year: '2026' }) }));
 		await screen.findByRole('heading', { level: 1 });
 		expect(screen.queryByTestId('summary-stats-section')).toBeNull();
+	});
+
+	it('renders species table rows linking to the year-scoped species URL (#625)', async () => {
+		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+		vi.mocked(fetchSpeciesData).mockResolvedValueOnce([
+			{ ...(alphaStats as object), species_name: 'Robin' }
+		] as never);
+		render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+		await screen.findByRole('heading', { level: 1 });
+		fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
+		const link = screen.getByRole('link', { name: 'Robin' });
+		expect(link.getAttribute('href')).toBe('/species/Robin/2026');
 	});
 });
