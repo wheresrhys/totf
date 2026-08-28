@@ -21,15 +21,18 @@ function getYoungsters(statsHistory: AggregateStatsResult[]): LineChartData[] {
 	return [
 		{
 			name: 'juv',
-			data: statsHistory.map((row) => [row.time_period, row.juv_count])
+			data: statsHistory.map((row) => [row.time_period, row.juv_bird_count])
 		},
 		{
 			name: 'postjuv',
-			data: statsHistory.map((row) => [row.time_period, row.postjuv_count])
+			data: statsHistory.map((row) => [row.time_period, row.postjuv_bird_count])
 		},
 		{
 			name: "New young's",
-			data: statsHistory.map((row) => [row.time_period, row.new_young_count])
+			data: statsHistory.map((row) => [
+				row.time_period,
+				row.new_young_bird_count
+			])
 		}
 	];
 }

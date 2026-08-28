@@ -28,14 +28,14 @@ function buildStat(
 		avg_wing: 66.6,
 		min_wing: 65,
 		median_wing: 67,
-		pullus_count: 2,
-		juv_count: 5,
-		postjuv_count: 3,
-		adult_count: 15,
-		unknown_age_count: 5,
-		new_young_count: 7,
+		pullus_bird_count: 2,
+		juv_bird_count: 5,
+		postjuv_bird_count: 3,
+		adult_bird_count: 15,
+		unknown_age_bird_count: 5,
+		new_young_bird_count: 7,
 		...overrides
-	} as AggregateStatsResult;
+	} as unknown as AggregateStatsResult;
 }
 
 // A monthly stat row as `aggregate_stats` returns it: `time_period` is the first

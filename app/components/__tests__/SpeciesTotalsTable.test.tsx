@@ -27,12 +27,12 @@ function makeStat(
 		encounter_count: 0,
 		bird_count: 0,
 		new_bird_count: 0,
-		pullus_count: 0,
-		juv_count: 0,
-		postjuv_count: 0,
-		adult_count: 0,
-		unknown_age_count: 0,
-		new_young_count: 0,
+		pullus_bird_count: 0,
+		juv_bird_count: 0,
+		postjuv_bird_count: 0,
+		adult_bird_count: 0,
+		unknown_age_bird_count: 0,
+		new_young_bird_count: 0,
 		...overrides
 	} as unknown as AggregateStatsResult;
 }
@@ -80,12 +80,12 @@ describe('SpeciesTotalsTable', () => {
 				String(firstStat.bird_count),
 				String(firstStat.new_bird_count),
 				String(firstStat.bird_count - firstStat.new_bird_count),
-				String(firstStat.pullus_count),
-				String(firstStat.juv_count),
-				String(firstStat.postjuv_count),
-				String(firstStat.adult_count),
-				String(firstStat.unknown_age_count),
-				String(firstStat.new_young_count)
+				String(firstStat.pullus_bird_count),
+				String(firstStat.juv_bird_count),
+				String(firstStat.postjuv_bird_count),
+				String(firstStat.adult_bird_count),
+				String(firstStat.unknown_age_bird_count),
+				String(firstStat.new_young_bird_count)
 			]);
 		});
 
@@ -193,7 +193,7 @@ describe('SpeciesTotalsTable', () => {
 
 	describe('column styling', () => {
 		it('applies a distinct background colour to each of the New/Retraps/Pullus/Juvs/Postjuv/Adults/Unknown age columns, on header and cells alike', () => {
-			const stats = [makeStat({ species_name: 'Robin', pullus_count: 1 })];
+			const stats = [makeStat({ species_name: 'Robin', pullus_bird_count: 1 })];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			const headers = getColumnHeaders();
 			const cells = screen.getAllByRole('cell');
@@ -238,12 +238,12 @@ describe('SpeciesTotalsTable', () => {
 				encounter_count: 5,
 				bird_count: 4,
 				new_bird_count: 3,
-				pullus_count: 1,
-				juv_count: 1,
-				postjuv_count: 0,
-				adult_count: 2,
-				unknown_age_count: 0,
-				new_young_count: 1
+				pullus_bird_count: 1,
+				juv_bird_count: 1,
+				postjuv_bird_count: 0,
+				adult_bird_count: 2,
+				unknown_age_bird_count: 0,
+				new_young_bird_count: 1
 			}),
 			makeStat({
 				species_name: 'Wren',
@@ -251,12 +251,12 @@ describe('SpeciesTotalsTable', () => {
 				encounter_count: 7,
 				bird_count: 6,
 				new_bird_count: 4,
-				pullus_count: 0,
-				juv_count: 2,
-				postjuv_count: 1,
-				adult_count: 3,
-				unknown_age_count: 0,
-				new_young_count: 2
+				pullus_bird_count: 0,
+				juv_bird_count: 2,
+				postjuv_bird_count: 1,
+				adult_bird_count: 3,
+				unknown_age_bird_count: 0,
+				new_young_bird_count: 2
 			})
 		];
 		const totalsStats = makeStat({
@@ -265,12 +265,12 @@ describe('SpeciesTotalsTable', () => {
 			encounter_count: 12,
 			bird_count: 10,
 			new_bird_count: 7,
-			pullus_count: 1,
-			juv_count: 3,
-			postjuv_count: 1,
-			adult_count: 5,
-			unknown_age_count: 0,
-			new_young_count: 3
+			pullus_bird_count: 1,
+			juv_bird_count: 3,
+			postjuv_bird_count: 1,
+			adult_bird_count: 5,
+			unknown_age_bird_count: 0,
+			new_young_bird_count: 3
 		});
 
 		it('renders a "Total" row with values from totalsStats when supplied', () => {
@@ -287,12 +287,12 @@ describe('SpeciesTotalsTable', () => {
 					String(totalsStats.bird_count),
 					String(totalsStats.new_bird_count),
 					String(totalsStats.bird_count - totalsStats.new_bird_count),
-					String(totalsStats.pullus_count),
-					String(totalsStats.juv_count),
-					String(totalsStats.postjuv_count),
-					String(totalsStats.adult_count),
-					String(totalsStats.unknown_age_count),
-					String(totalsStats.new_young_count)
+					String(totalsStats.pullus_bird_count),
+					String(totalsStats.juv_bird_count),
+					String(totalsStats.postjuv_bird_count),
+					String(totalsStats.adult_bird_count),
+					String(totalsStats.unknown_age_bird_count),
+					String(totalsStats.new_young_bird_count)
 				]
 			);
 		});
@@ -323,8 +323,8 @@ describe('SpeciesTotalsTable', () => {
 	describe('Pullus column visibility', () => {
 		it('omits the Pullus column when no species in the dataset has a nonzero pullus count', () => {
 			const stats = [
-				makeStat({ species_name: 'Robin', pullus_count: 0 }),
-				makeStat({ species_name: 'Wren', pullus_count: 0 })
+				makeStat({ species_name: 'Robin', pullus_bird_count: 0 }),
+				makeStat({ species_name: 'Wren', pullus_bird_count: 0 })
 			];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			expect(
@@ -334,8 +334,8 @@ describe('SpeciesTotalsTable', () => {
 
 		it('shows the Pullus column when at least one species has a nonzero pullus count, even when another species has none', () => {
 			const stats = [
-				makeStat({ species_name: 'Robin', pullus_count: 0 }),
-				makeStat({ species_name: 'Wren', pullus_count: 2 })
+				makeStat({ species_name: 'Robin', pullus_bird_count: 0 }),
+				makeStat({ species_name: 'Wren', pullus_bird_count: 2 })
 			];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			expect(getColumnHeaders().map((header) => header.textContent)).toContain(
@@ -346,7 +346,7 @@ describe('SpeciesTotalsTable', () => {
 
 	describe('age-block borders', () => {
 		it('draws a thicker left border on Pullus when it is shown', () => {
-			const stats = [makeStat({ species_name: 'Robin', pullus_count: 1 })];
+			const stats = [makeStat({ species_name: 'Robin', pullus_bird_count: 1 })];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			const headers = getColumnHeaders();
 			const pullusHeader = headers.find(
@@ -358,7 +358,7 @@ describe('SpeciesTotalsTable', () => {
 		});
 
 		it('shifts the thicker left border onto Juvs when Pullus is hidden', () => {
-			const stats = [makeStat({ species_name: 'Robin', pullus_count: 0 })];
+			const stats = [makeStat({ species_name: 'Robin', pullus_bird_count: 0 })];
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			const headers = getColumnHeaders();
 			const juvsHeader = headers.find((header) => header.textContent === 'Juv');
@@ -389,12 +389,12 @@ describe('SpeciesTotalsTable', () => {
 				encounter_count: 5,
 				bird_count: 4,
 				new_bird_count: 3,
-				pullus_count: 1,
-				juv_count: 0,
-				postjuv_count: 0,
-				adult_count: 0,
-				unknown_age_count: 0,
-				new_young_count: 1,
+				pullus_bird_count: 1,
+				juv_bird_count: 0,
+				postjuv_bird_count: 0,
+				adult_bird_count: 0,
+				unknown_age_bird_count: 0,
+				new_young_bird_count: 1,
 				...({
 					pullus_enc_count: 1,
 					juv_enc_count: 0,
@@ -450,7 +450,7 @@ describe('SpeciesTotalsTable', () => {
 			const zeroInBirdModeStats = [
 				makeStat({
 					species_name: 'Robin',
-					pullus_count: 0,
+					pullus_bird_count: 0,
 					...({ pullus_enc_count: 2 } as Partial<AggregateStatsResult>)
 				})
 			];

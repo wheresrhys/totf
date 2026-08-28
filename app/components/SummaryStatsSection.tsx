@@ -23,12 +23,12 @@ export function SummaryStatsSection({
 		{ label: 'Individuals', value: stats.bird_count },
 		{ label: 'New', value: stats.new_bird_count },
 		{ label: 'Retraps', value: calculateRetraps(stats) },
-		{ label: 'Pulli', value: stats.pullus_count },
-		{ label: 'Juvs', value: stats.juv_count },
-		{ label: 'Postjuvs', value: stats.postjuv_count },
-		{ label: 'Adults', value: stats.adult_count },
-		{ label: 'Not aged', value: stats.unknown_age_count },
-		{ label: 'New young', value: stats.new_young_count }
+		{ label: 'Pulli', value: stats.pullus_bird_count },
+		{ label: 'Juvs', value: stats.juv_bird_count },
+		{ label: 'Postjuvs', value: stats.postjuv_bird_count },
+		{ label: 'Adults', value: stats.adult_bird_count },
+		{ label: 'Not aged', value: stats.unknown_age_bird_count },
+		{ label: 'New young', value: stats.new_young_bird_count }
 	];
 	return (
 		<Table testId="summary-stats-section">

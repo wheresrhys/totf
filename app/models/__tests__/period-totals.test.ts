@@ -32,12 +32,6 @@ function buildStat(
 		avg_wing: 66.6,
 		min_wing: 65,
 		median_wing: 67,
-		pullus_count: 1,
-		juv_count: 2,
-		postjuv_count: 1,
-		adult_count: 1,
-		unknown_age_count: 1,
-		new_young_count: 3,
 		pullus_bird_count: 1,
 		juv_bird_count: 2,
 		postjuv_bird_count: 1,
@@ -50,7 +44,7 @@ function buildStat(
 		adult_enc_count: 1,
 		unknown_age_enc_count: 0,
 		...overrides
-	} as AggregateStatsResult;
+	} as unknown as AggregateStatsResult;
 }
 
 describe('derivePeriodTotalsRow', () => {
@@ -94,12 +88,12 @@ describe('derivePeriodTotalsRow', () => {
 			bird_count: 0,
 			encounter_count: 0,
 			new_bird_count: 0,
-			pullus_count: 0,
-			juv_count: 0,
-			postjuv_count: 0,
-			adult_count: 0,
-			unknown_age_count: 0,
-			new_young_count: 0
+			pullus_bird_count: 0,
+			juv_bird_count: 0,
+			postjuv_bird_count: 0,
+			adult_bird_count: 0,
+			unknown_age_bird_count: 0,
+			new_young_bird_count: 0
 		});
 		expect(derivePeriodTotalsRow(stat)).toEqual({
 			timePeriod: '2026-08-16',
