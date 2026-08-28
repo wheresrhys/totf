@@ -18,12 +18,6 @@ CREATE FUNCTION public.aggregate_stats (
 	bird_count bigint,
 	encounter_count bigint,
 	new_bird_count bigint,
-	pullus_count bigint,
-	juv_count bigint,
-	postjuv_count bigint,
-	adult_count bigint,
-	unknown_age_count bigint,
-	new_young_count bigint,
 	pullus_bird_count bigint,
 	juv_bird_count bigint,
 	postjuv_bird_count bigint,
@@ -388,17 +382,8 @@ CREATE FUNCTION public.aggregate_stats (
     COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.record_type = 'N' THEN raw_enc.bird_id END), 0) AS "new_bird_count",
 
     -- Corrected bird-level age buckets (see bird_age_flags / bird_age_bucket above).
-    -- pullus + juv + postjuv + adult + unknown_age = bird_count for every row.
-    COALESCE(abc.pullus_count, 0) AS "pullus_count",
-    COALESCE(abc.juv_count, 0) AS "juv_count",
-    COALESCE(abc.postjuv_count, 0) AS "postjuv_count",
-    COALESCE(abc.adult_count, 0) AS "adult_count",
-    COALESCE(abc.unknown_age_count, 0) AS "unknown_age_count",
-    COALESCE(abc.new_young_count, 0) AS "new_young_count",
-
-    -- Disambiguated bird-based siblings of the (deprecated, ambiguous) columns above —
-    -- same source expression, just selected under a second, explicit alias. new_bird_count
-    -- already carries an unambiguous suffix, so it gets no duplicate here.
+    -- pullus + juv + postjuv + adult + unknown_age = bird_count for every row. new_bird_count
+    -- already carries an unambiguous suffix, so it gets no *_bird_count duplicate here.
     COALESCE(abc.pullus_count, 0) AS "pullus_bird_count",
     COALESCE(abc.juv_count, 0) AS "juv_bird_count",
     COALESCE(abc.postjuv_count, 0) AS "postjuv_bird_count",
