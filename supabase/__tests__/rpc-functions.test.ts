@@ -519,7 +519,7 @@ describe('Postgres RPC integration tests', () => {
 			});
 		});
 
-		describe('age bucketing (pullus_count / juv_count / postjuv_count / adult_count / unknown_age_count / new_young_count)', () => {
+		describe('age bucketing (pullus_bird_count / juv_bird_count / postjuv_bird_count / adult_bird_count / unknown_age_bird_count / new_young_bird_count)', () => {
 			// getAgeClass() in app/models/encounter.ts (#527) defines the single-encounter
 			// age classes this bird-level bucketing aggregates. The two bird-level
 			// precedence rules have no single-encounter equivalent: pullus always wins (a
@@ -675,7 +675,7 @@ describe('Postgres RPC integration tests', () => {
 					{ ...AGE1J, record_type: 'R' },
 				]);
 
-				// new_young_count edge birds.
+				// new_young_bird_count edge birds.
 				dates.retrapYoung = addDays(base, 11);
 				await addBird(dates.retrapYoung, robin!.id, [{ ...AGE1J, record_type: 'R' }]);
 				dates.splitNew = addDays(base, 12);
@@ -720,146 +720,146 @@ describe('Postgres RPC integration tests', () => {
 			const monthOf = (date: string) => `${date.slice(0, 7)}-01`;
 
 			// Usual
-			it('a bird with only a pullus-indicating encounter (age_code 1, is_juv false) counts in pullus_count, not juv_count, postjuv_count, adult_count or unknown_age_count', async () => {
+			it('a bird with only a pullus-indicating encounter (age_code 1, is_juv false) counts in pullus_bird_count, not juv_bird_count, postjuv_bird_count, adult_bird_count or unknown_age_bird_count', async () => {
 				const row = await bucketRow(dates.pullusOnly);
 				expect(row).toMatchObject({
 					bird_count: 1,
-					pullus_count: 1,
-					juv_count: 0,
-					postjuv_count: 0,
-					adult_count: 0,
-					unknown_age_count: 0,
+					pullus_bird_count: 1,
+					juv_bird_count: 0,
+					postjuv_bird_count: 0,
+					adult_bird_count: 0,
+					unknown_age_bird_count: 0,
 				});
 			});
 
-			it('a bird with only a juv-indicating encounter (age_code 1, is_juv true) counts in juv_count, not pullus_count, postjuv_count, adult_count or unknown_age_count', async () => {
+			it('a bird with only a juv-indicating encounter (age_code 1, is_juv true) counts in juv_bird_count, not pullus_bird_count, postjuv_bird_count, adult_bird_count or unknown_age_bird_count', async () => {
 				const row = await bucketRow(dates.juv1J);
 				expect(row).toMatchObject({
 					bird_count: 1,
-					pullus_count: 0,
-					juv_count: 1,
-					postjuv_count: 0,
-					adult_count: 0,
-					unknown_age_count: 0,
+					pullus_bird_count: 0,
+					juv_bird_count: 1,
+					postjuv_bird_count: 0,
+					adult_bird_count: 0,
+					unknown_age_bird_count: 0,
 				});
 			});
 
-			it('a bird with only a postjuv-indicating encounter (bare age_code 3, is_juv false) counts in postjuv_count, not pullus_count, juv_count, adult_count or unknown_age_count', async () => {
+			it('a bird with only a postjuv-indicating encounter (bare age_code 3, is_juv false) counts in postjuv_bird_count, not pullus_bird_count, juv_bird_count, adult_bird_count or unknown_age_bird_count', async () => {
 				const row = await bucketRow(dates.postjuvOnly);
 				expect(row).toMatchObject({
 					bird_count: 1,
-					pullus_count: 0,
-					juv_count: 0,
-					postjuv_count: 1,
-					adult_count: 0,
-					unknown_age_count: 0,
+					pullus_bird_count: 0,
+					juv_bird_count: 0,
+					postjuv_bird_count: 1,
+					adult_bird_count: 0,
+					unknown_age_bird_count: 0,
 				});
 			});
 
-			it('a bird with only an adult-indicating encounter (age_code > 3, e.g. 4) counts in adult_count, not pullus_count, juv_count, postjuv_count or unknown_age_count', async () => {
+			it('a bird with only an adult-indicating encounter (age_code > 3, e.g. 4) counts in adult_bird_count, not pullus_bird_count, juv_bird_count, postjuv_bird_count or unknown_age_bird_count', async () => {
 				const row = await bucketRow(dates.adultOnly);
 				expect(row).toMatchObject({
 					bird_count: 1,
-					pullus_count: 0,
-					juv_count: 0,
-					postjuv_count: 0,
-					adult_count: 1,
-					unknown_age_count: 0,
+					pullus_bird_count: 0,
+					juv_bird_count: 0,
+					postjuv_bird_count: 0,
+					adult_bird_count: 1,
+					unknown_age_bird_count: 0,
 				});
 			});
 
-			it('a New (record_type=N) pullus-bucket bird is counted in new_young_count', async () => {
+			it('a New (record_type=N) pullus-bucket bird is counted in new_young_bird_count', async () => {
 				const row = await bucketRow(dates.pullusOnly);
-				expect(row.new_young_count).toBe(1);
+				expect(row.new_young_bird_count).toBe(1);
 			});
 
-			it('a New (record_type=N) juv-bucket bird is counted in new_young_count', async () => {
+			it('a New (record_type=N) juv-bucket bird is counted in new_young_bird_count', async () => {
 				const row = await bucketRow(dates.juv1J);
-				expect(row.new_young_count).toBe(1);
+				expect(row.new_young_bird_count).toBe(1);
 			});
 
-			it('a New (record_type=N) postjuv-bucket bird is counted in new_young_count', async () => {
+			it('a New (record_type=N) postjuv-bucket bird is counted in new_young_bird_count', async () => {
 				const row = await bucketRow(dates.postjuvOnly);
-				expect(row.new_young_count).toBe(1);
+				expect(row.new_young_bird_count).toBe(1);
 			});
 
 			// Structure — one test per bucket-defining branch
-			it('a bird with only age_code=2 encounters counts in unknown_age_count, not any other bucket', async () => {
+			it('a bird with only age_code=2 encounters counts in unknown_age_bird_count, not any other bucket', async () => {
 				const row = await bucketRow(dates.onlyTwo);
 				expect(row).toMatchObject({
 					bird_count: 1,
-					pullus_count: 0,
-					juv_count: 0,
-					postjuv_count: 0,
-					adult_count: 0,
-					unknown_age_count: 1,
+					pullus_bird_count: 0,
+					juv_bird_count: 0,
+					postjuv_bird_count: 0,
+					adult_bird_count: 0,
+					unknown_age_bird_count: 1,
 				});
 			});
 
-			it('a bird recorded as both bare age-3 and 3J in the same group counts in juv_count, not postjuv_count — juv wins over postjuv', async () => {
+			it('a bird recorded as both bare age-3 and 3J in the same group counts in juv_bird_count, not postjuv_bird_count — juv wins over postjuv', async () => {
 				const row = await bucketRow(dates.juvWinsPostjuv);
-				expect(row).toMatchObject({ bird_count: 1, juv_count: 1, postjuv_count: 0 });
+				expect(row).toMatchObject({ bird_count: 1, juv_bird_count: 1, postjuv_bird_count: 0 });
 			});
 
-			it('a bird with both a juv-indicating and an adult-indicating encounter in the same group counts in unknown_age_count', async () => {
+			it('a bird with both a juv-indicating and an adult-indicating encounter in the same group counts in unknown_age_bird_count', async () => {
 				const row = await bucketRow(dates.juvPlusAdult);
 				expect(row).toMatchObject({
 					bird_count: 1,
-					juv_count: 0,
-					adult_count: 0,
-					unknown_age_count: 1,
+					juv_bird_count: 0,
+					adult_bird_count: 0,
+					unknown_age_bird_count: 1,
 				});
 			});
 
-			it('a bird with both a postjuv-indicating and an adult-indicating encounter in the same group counts in unknown_age_count', async () => {
+			it('a bird with both a postjuv-indicating and an adult-indicating encounter in the same group counts in unknown_age_bird_count', async () => {
 				const row = await bucketRow(dates.postjuvPlusAdult);
 				expect(row).toMatchObject({
 					bird_count: 1,
-					postjuv_count: 0,
-					adult_count: 0,
-					unknown_age_count: 1,
+					postjuv_bird_count: 0,
+					adult_bird_count: 0,
+					unknown_age_bird_count: 1,
 				});
 			});
 
-			it('a bird with both a pullus-indicating and an adult-indicating encounter in the same group counts in pullus_count, not unknown_age_count — pullus always wins', async () => {
+			it('a bird with both a pullus-indicating and an adult-indicating encounter in the same group counts in pullus_bird_count, not unknown_age_bird_count — pullus always wins', async () => {
 				const row = await bucketRow(dates.pullusPlusAdult);
 				expect(row).toMatchObject({
 					bird_count: 1,
-					pullus_count: 1,
-					adult_count: 0,
-					unknown_age_count: 0,
+					pullus_bird_count: 1,
+					adult_bird_count: 0,
+					unknown_age_bird_count: 0,
 				});
 			});
 
-			it('a bird with both a pullus-indicating and a juv-indicating encounter in the same group counts in pullus_count, not juv_count — pullus always wins', async () => {
+			it('a bird with both a pullus-indicating and a juv-indicating encounter in the same group counts in pullus_bird_count, not juv_bird_count — pullus always wins', async () => {
 				const row = await bucketRow(dates.pullusPlusJuv);
-				expect(row).toMatchObject({ bird_count: 1, pullus_count: 1, juv_count: 0 });
+				expect(row).toMatchObject({ bird_count: 1, pullus_bird_count: 1, juv_bird_count: 0 });
 			});
 
-			it('a retrap (record_type != N) young-bucket bird is excluded from new_young_count despite being in pullus_count/juv_count/postjuv_count', async () => {
+			it('a retrap (record_type != N) young-bucket bird is excluded from new_young_bird_count despite being in pullus_bird_count/juv_bird_count/postjuv_bird_count', async () => {
 				const row = await bucketRow(dates.retrapYoung);
-				expect(row.juv_count).toBe(1);
-				expect(row.new_young_count).toBe(0);
+				expect(row.juv_bird_count).toBe(1);
+				expect(row.new_young_bird_count).toBe(0);
 			});
 
-			it('a bird whose New encounter and young-bucket-indicating encounter are different rows still counts in new_young_count (bucket membership and New membership checked independently)', async () => {
+			it('a bird whose New encounter and young-bucket-indicating encounter are different rows still counts in new_young_bird_count (bucket membership and New membership checked independently)', async () => {
 				const row = await bucketRow(dates.splitNew);
-				expect(row.juv_count).toBe(1);
-				expect(row.new_young_count).toBe(1);
+				expect(row.juv_bird_count).toBe(1);
+				expect(row.new_young_bird_count).toBe(1);
 				expect(row.encounter_count).toBe(2);
 			});
 
-			it('age_code=1 (is_juv true) and age_code=3+is_juv=true both count toward juv_count identically', async () => {
+			it('age_code=1 (is_juv true) and age_code=3+is_juv=true both count toward juv_bird_count identically', async () => {
 				const oneJ = await bucketRow(dates.juv1J);
 				const threeJ = await bucketRow(dates.juv3J);
-				expect(oneJ.juv_count).toBe(1);
-				expect(threeJ.juv_count).toBe(1);
+				expect(oneJ.juv_bird_count).toBe(1);
+				expect(threeJ.juv_bird_count).toBe(1);
 				expect(oneJ.bird_count).toBe(1);
 				expect(threeJ.bird_count).toBe(1);
 			});
 
 			// Edge
-			it('pullus_count + juv_count + postjuv_count + adult_count + unknown_age_count equals bird_count for a mixed-bucket group', async () => {
+			it('pullus_bird_count + juv_bird_count + postjuv_bird_count + adult_bird_count + unknown_age_bird_count equals bird_count for a mixed-bucket group', async () => {
 				const { data, error } = await deltaClient.rpc('aggregate_stats', {
 					ringing_group_filter: deltaId,
 					from_date: base,
@@ -868,30 +868,30 @@ describe('Postgres RPC integration tests', () => {
 				expect(error).toBeNull();
 				const row = data![0];
 				// The window holds all five buckets, so this is genuinely mixed.
-				expect(row.pullus_count).toBeGreaterThan(0);
-				expect(row.juv_count).toBeGreaterThan(0);
-				expect(row.postjuv_count).toBeGreaterThan(0);
-				expect(row.adult_count).toBeGreaterThan(0);
-				expect(row.unknown_age_count).toBeGreaterThan(0);
+				expect(row.pullus_bird_count).toBeGreaterThan(0);
+				expect(row.juv_bird_count).toBeGreaterThan(0);
+				expect(row.postjuv_bird_count).toBeGreaterThan(0);
+				expect(row.adult_bird_count).toBeGreaterThan(0);
+				expect(row.unknown_age_bird_count).toBeGreaterThan(0);
 				expect(
-					row.pullus_count +
-						row.juv_count +
-						row.postjuv_count +
-						row.adult_count +
-						row.unknown_age_count
+					row.pullus_bird_count +
+						row.juv_bird_count +
+						row.postjuv_bird_count +
+						row.adult_bird_count +
+						row.unknown_age_bird_count
 				).toBe(row.bird_count);
 			});
 
-			it('an empty group (no encounters) returns zero for pullus_count, juv_count, postjuv_count, adult_count, unknown_age_count and new_young_count', async () => {
+			it('an empty group (no encounters) returns zero for pullus_bird_count, juv_bird_count, postjuv_bird_count, adult_bird_count, unknown_age_bird_count and new_young_bird_count', async () => {
 				const row = await bucketRow(emptyDate);
 				expect(row).toMatchObject({
 					bird_count: 0,
-					pullus_count: 0,
-					juv_count: 0,
-					postjuv_count: 0,
-					adult_count: 0,
-					unknown_age_count: 0,
-					new_young_count: 0,
+					pullus_bird_count: 0,
+					juv_bird_count: 0,
+					postjuv_bird_count: 0,
+					adult_bird_count: 0,
+					unknown_age_bird_count: 0,
+					new_young_bird_count: 0,
 				});
 			});
 
@@ -905,8 +905,8 @@ describe('Postgres RPC integration tests', () => {
 				expect(error).toBeNull();
 				const robinRow = data!.find((r) => r.species_name === 'Robin');
 				const wrenRow = data!.find((r) => r.species_name === 'Wren');
-				expect(robinRow!.juv_count).toBe(1);
-				expect(wrenRow!.juv_count).toBe(1);
+				expect(robinRow!.juv_bird_count).toBe(1);
+				expect(wrenRow!.juv_bird_count).toBe(1);
 			});
 
 			it("bucket counts respect group_by_time_period — a juv bird recorded only in month M is not counted in an adjacent month's row", async () => {
@@ -919,9 +919,9 @@ describe('Postgres RPC integration tests', () => {
 				expect(error).toBeNull();
 				const juvMonth = data!.find((r) => r.time_period === monthOf(tpJuvDate));
 				const adultMonth = data!.find((r) => r.time_period === monthOf(tpAdultDate));
-				expect(juvMonth!.juv_count).toBe(1);
-				expect(adultMonth!.juv_count).toBe(0);
-				expect(adultMonth!.adult_count).toBe(1);
+				expect(juvMonth!.juv_bird_count).toBe(1);
+				expect(adultMonth!.juv_bird_count).toBe(0);
+				expect(adultMonth!.adult_bird_count).toBe(1);
 			});
 
 			// *_bird_count / *_enc_count sibling columns (#601). The *_bird_count columns
@@ -947,24 +947,6 @@ describe('Postgres RPC integration tests', () => {
 					expect(row.unknown_age_bird_count).toBe(row.unknown_age_enc_count);
 					// Sanity: the window genuinely covers multiple buckets.
 					expect(row.bird_count).toBe(6);
-				});
-
-				// Structure — one assertion per age-bucket pair proving the _bird_count
-				// alias is a true copy of the deprecated ambiguous column, plus new_young.
-				it('each *_bird_count equals its deprecated ambiguous column exactly, and new_young_bird_count equals new_young_count', async () => {
-					const { data, error } = await deltaClient.rpc('aggregate_stats', {
-						ringing_group_filter: deltaId,
-						from_date: base,
-						to_date: addDays(base, 13),
-					});
-					expect(error).toBeNull();
-					const row = data![0];
-					expect(row.pullus_bird_count).toBe(row.pullus_count);
-					expect(row.juv_bird_count).toBe(row.juv_count);
-					expect(row.postjuv_bird_count).toBe(row.postjuv_count);
-					expect(row.adult_bird_count).toBe(row.adult_count);
-					expect(row.unknown_age_bird_count).toBe(row.unknown_age_count);
-					expect(row.new_young_bird_count).toBe(row.new_young_count);
 				});
 
 				// Edge — a bird ringed as pullus then retrapped as adult: bird-based resolves
@@ -999,6 +981,18 @@ describe('Postgres RPC integration tests', () => {
 					const row = await bucketRow(dates.pullusOnly);
 					expect(row).not.toHaveProperty('new_enc_count');
 					expect(row).not.toHaveProperty('new_young_enc_count');
+				});
+
+				// Edge — negative check: the deprecated ambiguous columns dropped in #607 must
+				// not reappear, catching a forgotten SELECT entry.
+				it('the returned row shape has none of the deprecated ambiguous age-bucket columns', async () => {
+					const row = await bucketRow(dates.pullusOnly);
+					expect(row).not.toHaveProperty('pullus_count');
+					expect(row).not.toHaveProperty('juv_count');
+					expect(row).not.toHaveProperty('postjuv_count');
+					expect(row).not.toHaveProperty('adult_count');
+					expect(row).not.toHaveProperty('unknown_age_count');
+					expect(row).not.toHaveProperty('new_young_count');
 				});
 			});
 		});

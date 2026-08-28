@@ -294,7 +294,6 @@ export type Database = {
         }
         Returns: {
           adult_bird_count: number
-          adult_count: number
           adult_enc_count: number
           avg_encounters_per_session: number
           avg_weight: number
@@ -304,7 +303,6 @@ export type Database = {
           effort_per_session: string
           encounter_count: number
           juv_bird_count: number
-          juv_count: number
           juv_enc_count: number
           max_new_per_session: number
           max_per_session: number
@@ -316,12 +314,9 @@ export type Database = {
           min_wing: number
           new_bird_count: number
           new_young_bird_count: number
-          new_young_count: number
           postjuv_bird_count: number
-          postjuv_count: number
           postjuv_enc_count: number
           pullus_bird_count: number
-          pullus_count: number
           pullus_enc_count: number
           session_count: number
           species_count: number
@@ -329,7 +324,6 @@ export type Database = {
           time_period: string
           total_effort: string
           unknown_age_bird_count: number
-          unknown_age_count: number
           unknown_age_enc_count: number
         }[]
       }
