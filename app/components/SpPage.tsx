@@ -14,7 +14,8 @@ import { SpIndividualsTab } from './SpIndividualsTab';
 import { SpNotableRetrapsTab } from './SpNotableRetrapsTab';
 import { SpStatsHistoryTab } from './SpStatsHistoryTab';
 import { SpWeightWingTab } from './SpWeightWingTab';
-import { SpYearComparisonTab } from './SpYearComparisonTab';
+import { SpYearTotalsTab } from './SpYearTotalsTab';
+import { SpMonthTotalsTab } from './SpMonthTotalsTab';
 import { TabNav } from './TabNav';
 
 function ConditionalTabPanel({
@@ -57,6 +58,13 @@ function SpeciesData({
 		setActiveTab(tab);
 	}
 
+	// Cascading period tab, same convention `SummaryTotalsSection` uses: the
+	// all-time page gets "Year totals" (drilling into a year), the year-scoped
+	// page gets "Month totals" instead (drilling into a month); the month-scoped
+	// page gets neither.
+	const isAllTime = data.year === undefined;
+	const isYearScoped = data.year !== undefined && data.month === undefined;
+
 	return (
 		<>
 			<SpStats {...data} viewedGroup={viewedGroup} />
@@ -65,7 +73,10 @@ function SpeciesData({
 					{ id: 'bird-list', label: 'Bird list' },
 					{ id: 'retraps', label: 'Retraps' },
 					{ id: 'trend-charts', label: 'Trend charts' },
-					{ id: 'year-comparison', label: 'Year comparison' },
+					...(isAllTime ? [{ id: 'year-totals', label: 'Year totals' }] : []),
+					...(isYearScoped
+						? [{ id: 'month-totals', label: 'Month totals' }]
+						: []),
 					{ id: 'size-plot', label: 'Size plot' }
 				]}
 				activeTab={activeTab}
@@ -109,16 +120,33 @@ function SpeciesData({
 					toDate={data.toDate}
 				/>
 			</ConditionalTabPanel>
-			<ConditionalTabPanel
-				loadedTabs={loadedTabs}
-				tabId="year-comparison"
-				activeTabId={activeTab}
-			>
-				<SpYearComparisonTab
-					speciesName={data.speciesName}
-					viewedGroupId={viewedGroup.id}
-				/>
-			</ConditionalTabPanel>
+			{isAllTime && (
+				<ConditionalTabPanel
+					loadedTabs={loadedTabs}
+					tabId="year-totals"
+					activeTabId={activeTab}
+				>
+					<SpYearTotalsTab
+						speciesName={data.speciesName}
+						viewedGroupId={viewedGroup.id}
+					/>
+				</ConditionalTabPanel>
+			)}
+			{isYearScoped && data.year !== undefined && (
+				<ConditionalTabPanel
+					loadedTabs={loadedTabs}
+					tabId="month-totals"
+					activeTabId={activeTab}
+				>
+					<SpMonthTotalsTab
+						speciesName={data.speciesName}
+						viewedGroupId={viewedGroup.id}
+						year={data.year}
+						fromDate={data.fromDate}
+						toDate={data.toDate}
+					/>
+				</ConditionalTabPanel>
+			)}
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
 				tabId="size-plot"

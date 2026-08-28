@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, within } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	within,
+	fireEvent
+} from '@testing-library/react';
 import Page, { fetchSpYearPageData } from '../page';
 import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/page';
@@ -38,8 +44,8 @@ vi.mock('@/app/components/SpStatsHistoryTab', () => ({
 	SpStatsHistoryTab: () => <div data-testid="sp-stats-history-tab" />
 }));
 
-vi.mock('@/app/components/SpYearComparisonTab', () => ({
-	SpYearComparisonTab: () => <div data-testid="sp-year-comparison-tab" />
+vi.mock('@/app/components/SpMonthTotalsTab', () => ({
+	SpMonthTotalsTab: () => <div data-testid="sp-month-totals-tab" />
 }));
 
 vi.mock('@/app/components/SpWeightWingTab', () => ({
@@ -108,6 +114,22 @@ describe('/species/[speciesName]/[year]', () => {
 			await screen.findByTestId('sp-individuals-tab');
 			expect(screen.getByRole('button', { name: 'Bird list' })).toBeDefined();
 			expect(screen.getByTestId('headline-stats')).toBeDefined();
+		});
+
+		it('shows a "Month totals" tab and not a "Year totals" tab', async () => {
+			render(await renderYearPage());
+			await screen.findByTestId('sp-individuals-tab');
+			expect(
+				screen.getByRole('button', { name: 'Month totals' })
+			).toBeDefined();
+			expect(screen.queryByRole('button', { name: 'Year totals' })).toBeNull();
+		});
+
+		it('renders SpMonthTotalsTab after clicking the Month totals button', async () => {
+			render(await renderYearPage());
+			await screen.findByTestId('sp-individuals-tab');
+			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+			await screen.findByTestId('sp-month-totals-tab');
 		});
 	});
 

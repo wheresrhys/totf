@@ -163,16 +163,29 @@ export async function getSpeciesStatsHistory(
 		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
 }
 
-export async function getSpeciesYearComparison(
-	species: string,
-	viewedGroupId: number
-) {
+/**
+ * Per-time-period totals for a single species — the species-scoped sibling of
+ * `fetchPeriodTotals` (`app/actions/period-totals.ts`): same `aggregate_stats`
+ * call shape, but filtered to one species (`species_name_filter`) instead of
+ * grouped across all of them (`group_by_species: false`). Feeds the species
+ * page's "Year totals" (all-time page) and "Month totals" (year-scoped page)
+ * tabs via the shared `PeriodTotalsTable`.
+ */
+export async function fetchSpeciesPeriodTotals(
+	speciesName: string,
+	viewedGroupId: number,
+	grouping: 'year' | 'month',
+	fromDate?: string,
+	toDate?: string
+): Promise<AggregateStatsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('aggregate_stats', {
-			species_name_filter: species,
+			...(fromDate ? { from_date: fromDate } : {}),
+			...(toDate ? { to_date: toDate } : {}),
 			ringing_group_filter: viewedGroupId,
-			group_by_time_period: 'year'
+			species_name_filter: speciesName,
+			group_by_time_period: grouping
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
 }
