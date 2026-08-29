@@ -1,7 +1,6 @@
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
 import { fetchSummaryStats } from '@/app/actions/summary-stats';
-import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
@@ -14,8 +13,9 @@ export type PageData = {
 	year: number;
 	month: number;
 	summaryStats: AggregateStatsResult | null;
-	speciesStats: AggregateStatsResult[];
 	sessionTotals: AggregateStatsResult[];
+	fromDate: string;
+	toDate: string;
 };
 
 export async function fetchYearMonthSummaryData(
@@ -25,17 +25,17 @@ export async function fetchYearMonthSummaryData(
 	const monthDate = new Date(Number(year), Number(month) - 1, 1);
 	const fromDate = format(startOfMonth(monthDate), 'yyyy-MM-dd');
 	const toDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
-	const [summaryStats, speciesStats, sessionTotals] = await Promise.all([
+	const [summaryStats, sessionTotals] = await Promise.all([
 		fetchSummaryStats(viewedGroupId, fromDate, toDate),
-		fetchSpeciesData(viewedGroupId, fromDate, toDate),
 		fetchPeriodTotals(viewedGroupId, 'day', fromDate, toDate)
 	]);
 	return {
 		year: Number(year),
 		month: Number(month),
 		summaryStats,
-		speciesStats,
-		sessionTotals
+		sessionTotals,
+		fromDate,
+		toDate
 	};
 }
 
@@ -51,9 +51,10 @@ function YearMonthSummary({
 			year={data.year}
 			month={data.month}
 			summaryStats={data.summaryStats}
-			speciesStats={data.speciesStats}
 			sessionTotals={data.sessionTotals}
 			viewedGroup={viewedGroup}
+			fromDate={data.fromDate}
+			toDate={data.toDate}
 		/>
 	);
 }
