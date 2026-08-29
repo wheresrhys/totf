@@ -22,6 +22,11 @@ vi.mock('@/app/actions/summary-stats', () => ({
 	fetchPeriodStats: (...args: unknown[]) => fetchPeriodStatsMock(...args)
 }));
 
+const fetchPeriodTotalsMock = vi.fn();
+vi.mock('@/app/actions/period-totals', () => ({
+	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
+}));
+
 const speciesStats = speciesDataSnapshot as unknown as AggregateStatsResult[];
 const monthTotals = buildMonthTotalsRows(2026, []);
 
@@ -130,11 +135,13 @@ describe('SummaryTotalsSection', () => {
 	beforeEach(() => {
 		fetchSpeciesDataMock.mockResolvedValue(speciesStats);
 		fetchPeriodStatsMock.mockResolvedValue(monthlyPeriodStats);
+		fetchPeriodTotalsMock.mockResolvedValue([]);
 	});
 	afterEach(() => {
 		cleanup();
 		fetchSpeciesDataMock.mockReset();
 		fetchPeriodStatsMock.mockReset();
+		fetchPeriodTotalsMock.mockReset();
 	});
 
 	describe('without any period-tab data (day summary page)', () => {
@@ -481,7 +488,9 @@ describe('SummaryTotalsSection', () => {
 
 		describe('Edge', () => {
 			it("shows '-' in the Individuals column for every row on this tab", async () => {
-				render(<SummaryTotalsSection {...allTimeProps} summaryStats={summaryStats} />);
+				render(
+					<SummaryTotalsSection {...allTimeProps} summaryStats={summaryStats} />
+				);
 				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 				await waitFor(() =>
 					expect(document.querySelectorAll('tbody tr').length).toBe(12)
@@ -497,18 +506,23 @@ describe('SummaryTotalsSection', () => {
 				expect(totalsCells[5].textContent).toBe('-');
 			});
 
-			it("hides the Aggregate-by toggle only on this tab — the Year totals tab's toggle is unaffected", async () => {
+			it("disables the Aggregate-by toggle (locked to Encounter) only on this tab — the Year totals tab's toggle stays interactive", async () => {
 				render(<SummaryTotalsSection {...allTimeProps} />);
 				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 				await waitFor(() =>
 					expect(document.querySelectorAll('tbody tr').length).toBe(12)
 				);
-				expect(screen.queryByRole('radio', { name: 'Encounter' })).toBeNull();
+				const fixedEncounter = screen.getByRole('radio', {
+					name: 'Encounter'
+				}) as HTMLInputElement;
+				expect(fixedEncounter.checked).toBe(true);
+				expect(fixedEncounter.disabled).toBe(true);
 
 				fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
-				expect(
-					screen.getByRole('radio', { name: 'Encounter' })
-				).toBeTruthy();
+				const freeEncounter = screen.getByRole('radio', {
+					name: 'Encounter'
+				}) as HTMLInputElement;
+				expect(freeEncounter.disabled).toBe(false);
 			});
 		});
 	});
@@ -632,6 +646,113 @@ describe('SummaryTotalsSection', () => {
 			);
 			expect(consoleError).toHaveBeenCalledWith(
 				'Failed to fetch species totals',
+				expect.objectContaining({ viewedGroupId: 1 })
+			);
+			consoleError.mockRestore();
+		});
+	});
+
+	describe('lazySessionTotals (all-time/year summary pages)', () => {
+		it('renders "Session totals" as a tab but does not fetch it until selected', () => {
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildYearlyStat()]}
+					lazySessionTotals
+					viewedGroup={viewedGroup}
+				/>
+			);
+			expect(
+				screen.getByRole('button', { name: 'Session totals' })
+			).toBeTruthy();
+			expect(fetchPeriodTotalsMock).not.toHaveBeenCalled();
+		});
+
+		it('fetches day-grouped totals scoped by fromDate/toDate once the tab is selected', async () => {
+			fetchPeriodTotalsMock.mockResolvedValue([
+				buildDayStat({ time_period: '2026-08-16' })
+			]);
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildYearlyStat()]}
+					lazySessionTotals
+					fromDate="2026-01-01"
+					toDate="2026-12-31"
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await waitFor(() =>
+				expect(
+					screen.getByRole('link', { name: '16th August 2026' })
+				).toBeTruthy()
+			);
+			expect(fetchPeriodTotalsMock).toHaveBeenCalledWith(
+				1,
+				'day',
+				'2026-01-01',
+				'2026-12-31'
+			);
+		});
+
+		it('does not refetch when switching away from Session totals and back again', async () => {
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildYearlyStat()]}
+					lazySessionTotals
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await waitFor(() =>
+				expect(fetchPeriodTotalsMock).toHaveBeenCalledTimes(1)
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			expect(fetchPeriodTotalsMock).toHaveBeenCalledTimes(1);
+		});
+
+		it('shows a loading indicator while the fetch is in flight', async () => {
+			let resolveFetch: (value: AggregateStatsResult[]) => void = () => {};
+			fetchPeriodTotalsMock.mockReturnValue(
+				new Promise<AggregateStatsResult[]>((resolve) => {
+					resolveFetch = resolve;
+				})
+			);
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildYearlyStat()]}
+					lazySessionTotals
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await waitFor(() =>
+				expect(document.querySelector('.loading-spinner')).toBeTruthy()
+			);
+			resolveFetch([]);
+			await waitFor(() =>
+				expect(document.querySelector('.loading-spinner')).toBeNull()
+			);
+		});
+
+		it('renders the empty state rather than throwing when the fetch rejects', async () => {
+			const consoleError = vi
+				.spyOn(console, 'error')
+				.mockImplementation(() => {});
+			fetchPeriodTotalsMock.mockRejectedValue(new Error('boom'));
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildYearlyStat()]}
+					lazySessionTotals
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await waitFor(() =>
+				expect(screen.getByText('No data recorded.')).toBeTruthy()
+			);
+			expect(consoleError).toHaveBeenCalledWith(
+				'Failed to fetch session totals',
 				expect.objectContaining({ viewedGroupId: 1 })
 			);
 			consoleError.mockRestore();

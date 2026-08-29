@@ -35,6 +35,7 @@ function AllTimeSummary({
 			summaryStats={data.summaryStats}
 			yearlyTotals={data.yearlyTotals}
 			showAllTimeMonthTotals
+			lazySessionTotals
 			viewedGroup={viewedGroup}
 		/>
 	);

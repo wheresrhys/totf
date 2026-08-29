@@ -53,6 +53,7 @@ function YearSummary({
 			year={data.year}
 			summaryStats={data.summaryStats}
 			monthTotals={data.monthTotals}
+			lazySessionTotals
 			viewedGroup={viewedGroup}
 			fromDate={data.fromDate}
 			toDate={data.toDate}

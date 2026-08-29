@@ -6,6 +6,7 @@ import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { fetchPeriodStats } from '@/app/actions/summary-stats';
+import { fetchPeriodTotals } from '@/app/actions/period-totals';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
 import {
@@ -31,6 +32,7 @@ export function SummaryTotalsSection({
 	yearlyTotals,
 	sessionTotals,
 	showAllTimeMonthTotals,
+	lazySessionTotals,
 	viewedGroup,
 	fromDate,
 	toDate,
@@ -49,16 +51,26 @@ export function SummaryTotalsSection({
 	yearlyTotals?: AggregateStatsResult[];
 	// The month summary page passes these — a leading "Session totals" tab needs
 	// both the per-day rows and a group to build session links for. undefined
-	// means "this page has no Session totals tab".
+	// means "this page has no Session totals tab" (unless `lazySessionTotals` is
+	// set, see below).
 	sessionTotals?: AggregateStatsResult[];
 	// Only the all-time page sets this — it enables the combine-years "Month
 	// totals" tab, whose data (unlike the year page's `monthTotals` prop) is
 	// fetched lazily on first selection rather than passed in, so this is just a
 	// boolean gate, not the data itself.
 	showAllTimeMonthTotals?: boolean;
+	// The all-time and year summary pages set this instead of supplying
+	// `sessionTotals` up front — it shows the Session totals tab but defers the
+	// `fetchPeriodTotals('day', fromDate, toDate)` call (scoped by the same
+	// `fromDate`/`toDate` used for Species totals) until the tab is first
+	// selected, via the same `useLazyTabData` mechanism as Species totals. The
+	// month summary page keeps fetching eagerly server-side and passing
+	// `sessionTotals` directly — untouched by this.
+	lazySessionTotals?: boolean;
 	// The viewed group whose id scopes the lazy Species-totals fetch. All three
 	// summary pages supply it; the Session totals tab additionally needs it to
-	// build session links.
+	// build session links (and to scope its own lazy fetch when
+	// `lazySessionTotals` is set).
 	viewedGroup?: ViewedGroup;
 	// The date range the Species-totals fetch is scoped to — matches the bounds
 	// the page used for its other stats. Both undefined on the all-time page
@@ -74,10 +86,12 @@ export function SummaryTotalsSection({
 }) {
 	// Each summary page supplies at most one period tab's data: year totals on
 	// the all-time page, month totals on the year page, session totals on the
-	// month page. Whichever is present is prepended and shown first/by default;
-	// the day page passes none and keeps Species totals as its sole/default tab.
+	// month page (eager) or all-time/year pages (lazy, see below). Whichever is
+	// present is prepended and shown first/by default; the day page passes none
+	// and keeps Species totals as its sole/default tab.
 	const showSessionTotals =
-		sessionTotals !== undefined && viewedGroup !== undefined;
+		(sessionTotals !== undefined || lazySessionTotals === true) &&
+		viewedGroup !== undefined;
 	const tabs = [
 		...(yearlyTotals !== undefined ? [YEAR_TOTALS_TAB] : []),
 		...(monthTotals ? [MONTH_TOTALS_TAB] : []),
@@ -127,6 +141,34 @@ export function SummaryTotalsSection({
 				onError: (error) =>
 					console.error('Failed to fetch all-time month totals', {
 						viewedGroupId: viewedGroup?.id,
+						error
+					})
+			}
+		);
+
+	// Session totals follow the same fetch-on-select shape as Species totals,
+	// but only when the page opted in via `lazySessionTotals` — when
+	// `sessionTotals` is already supplied (the month page's eager fetch) this
+	// never fires, since `isActive` below is gated on `sessionTotals` being
+	// undefined.
+	const isSessionActive = activeTab === SESSION_TOTALS_TAB.id;
+	const fetchSessionStats = useCallback(
+		() => fetchPeriodTotals(viewedGroup!.id, 'day', fromDate, toDate),
+		[viewedGroup, fromDate, toDate]
+	);
+	const { data: lazySessionStats, isLoading: isSessionLoading } =
+		useLazyTabData(
+			isSessionActive &&
+				lazySessionTotals === true &&
+				sessionTotals === undefined &&
+				viewedGroup !== undefined,
+			fetchSessionStats,
+			{
+				onError: (error) =>
+					console.error('Failed to fetch session totals', {
+						viewedGroupId: viewedGroup?.id,
+						fromDate,
+						toDate,
 						error
 					})
 			}
@@ -197,13 +239,14 @@ export function SummaryTotalsSection({
 							combinedMonthLabelByTimePeriod.get(timePeriod) ?? ''
 						}
 						totalsStats={totalsStats}
-						fixedAggregateBy="encounter"
+						aggregationFixedTo="encounter"
 						dashIndividuals
 					/>
 				))}
-			{sessionTotals !== undefined &&
+			{showSessionTotals &&
 				viewedGroup !== undefined &&
-				activeTab === SESSION_TOTALS_TAB.id && (
+				isSessionActive &&
+				(sessionTotals !== undefined ? (
 					<PeriodTotalsTable
 						grouping="day"
 						rows={sessionTotals}
@@ -213,7 +256,21 @@ export function SummaryTotalsSection({
 						}
 						totalsStats={totalsStats}
 					/>
-				)}
+				) : isSessionLoading ? (
+					<div className="flex items-center justify-center">
+						<div className="loading loading-spinner loading-xl"></div>
+					</div>
+				) : (
+					<PeriodTotalsTable
+						grouping="day"
+						rows={lazySessionStats ?? []}
+						firstColumnHeader="Session"
+						buildHref={(timePeriod) =>
+							`/group/${viewedGroup.slug}/session-temp/${timePeriod}`
+						}
+						totalsStats={totalsStats}
+					/>
+				))}
 			{isSpeciesActive &&
 				(isSpeciesLoading ? (
 					<div className="flex items-center justify-center">

@@ -62,7 +62,7 @@ export function PeriodTotalsTable({
 	buildHref,
 	buildLabel,
 	totalsStats,
-	fixedAggregateBy,
+	aggregationFixedTo,
 	dashIndividuals = false
 }: {
 	grouping: PeriodTotalsGrouping;
@@ -74,18 +74,18 @@ export function PeriodTotalsTable({
 	// from integer year/month rather than parsing the `time_period` string.
 	buildLabel?: (timePeriod: string) => string;
 	totalsStats?: AggregateStatsResult;
-	// When set, the Bird/Encounter toggle is hidden and aggregation is locked to
-	// this value — the all-time "Month totals" tab hardcodes `'encounter'`, since
-	// combine-years bird counts aren't meaningful.
-	fixedAggregateBy?: AggregateByValue;
+	// When set, aggregation is locked to this value and the Bird/Encounter toggle
+	// still renders but is disabled — the all-time "Month totals" tab fixes it to
+	// `'encounter'`, since combine-years bird counts aren't meaningful.
+	aggregationFixedTo?: AggregateByValue;
 	// Renders every Individuals cell (data rows and the totals row) as `'-'`.
 	dashIndividuals?: boolean;
 }) {
 	// Local to this table (not persisted across tab switches) — resets to
 	// 'bird' whenever `SummaryTotalsSection` remounts this table for a
-	// different tab, per #604. Ignored when `fixedAggregateBy` locks the mode.
+	// different tab, per #604. Ignored when `aggregationFixedTo` locks the mode.
 	const [aggregateByState, setAggregateBy] = useState<AggregateByValue>('bird');
-	const aggregateBy = fixedAggregateBy ?? aggregateByState;
+	const aggregateBy = aggregationFixedTo ?? aggregateByState;
 
 	if (rows.length === 0) {
 		return <p>No data recorded.</p>;
@@ -167,20 +167,17 @@ export function PeriodTotalsTable({
 			testId="period-totals-table"
 			rowDataTransform={activeDeriveRow}
 			totalsRow={totalsRow}
-			aboveHeaderRow={
-				fixedAggregateBy
-					? undefined
-					: {
-							spanFromColumn: 'new',
-							spanToColumn: 'unknownAge',
-							content: (
-								<AggregateByToggle
-									value={aggregateBy}
-									onChange={setAggregateBy}
-								/>
-							)
-						}
-			}
+			aboveHeaderRow={{
+				spanFromColumn: 'new',
+				spanToColumn: 'unknownAge',
+				content: (
+					<AggregateByToggle
+						value={aggregateBy}
+						onChange={setAggregateBy}
+						disabled={aggregationFixedTo !== undefined}
+					/>
+				)
+			}}
 			TableBodyComponent={PeriodTotalsTableBody}
 		/>
 	);

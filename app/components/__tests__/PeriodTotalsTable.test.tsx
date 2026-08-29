@@ -340,7 +340,7 @@ describe('PeriodTotalsTable', () => {
 		}
 
 		describe('Usual', () => {
-			it('hides the AggregateByToggle when a fixed aggregation is supplied', () => {
+			it('still shows the AggregateByToggle, disabled and pre-set to Encounter, when a fixed aggregation is supplied', () => {
 				render(
 					<PeriodTotalsTable
 						grouping="month"
@@ -348,14 +348,20 @@ describe('PeriodTotalsTable', () => {
 						firstColumnHeader="Month"
 						buildHref={() => ''}
 						buildLabel={() => 'January'}
-						fixedAggregateBy="encounter"
+						aggregationFixedTo="encounter"
 					/>
 				);
-				expect(screen.queryByTestId('above-header-row')).toBeNull();
-				expect(
-					screen.queryByRole('radio', { name: 'Encounter' })
-				).toBeNull();
-				expect(screen.queryByRole('radio', { name: 'Bird' })).toBeNull();
+				expect(screen.getByTestId('above-header-row')).toBeTruthy();
+				const encounter = screen.getByRole('radio', {
+					name: 'Encounter'
+				}) as HTMLInputElement;
+				const bird = screen.getByRole('radio', {
+					name: 'Bird'
+				}) as HTMLInputElement;
+				expect(encounter.checked).toBe(true);
+				expect(encounter.disabled).toBe(true);
+				expect(bird.checked).toBe(false);
+				expect(bird.disabled).toBe(true);
 			});
 
 			it("renders encounter-derived age-bucket values when fixed aggregation is 'encounter'", () => {
@@ -366,7 +372,7 @@ describe('PeriodTotalsTable', () => {
 						firstColumnHeader="Month"
 						buildHref={() => ''}
 						buildLabel={() => 'January'}
-						fixedAggregateBy="encounter"
+						aggregationFixedTo="encounter"
 					/>
 				);
 				const cells = document
@@ -395,7 +401,7 @@ describe('PeriodTotalsTable', () => {
 						firstColumnHeader="Month"
 						buildHref={() => ''}
 						buildLabel={(tp) => tp}
-						fixedAggregateBy="encounter"
+						aggregationFixedTo="encounter"
 						dashIndividuals
 					/>
 				);
@@ -414,7 +420,7 @@ describe('PeriodTotalsTable', () => {
 						firstColumnHeader="Month"
 						buildHref={() => ''}
 						buildLabel={() => 'January'}
-						fixedAggregateBy="encounter"
+						aggregationFixedTo="encounter"
 						dashIndividuals
 						totalsStats={encStat({ bird_count: 123 })}
 					/>
@@ -433,7 +439,7 @@ describe('PeriodTotalsTable', () => {
 						firstColumnHeader="Month"
 						buildHref={() => ''}
 						buildLabel={() => 'January'}
-						fixedAggregateBy="encounter"
+						aggregationFixedTo="encounter"
 						dashIndividuals
 					/>
 				);
