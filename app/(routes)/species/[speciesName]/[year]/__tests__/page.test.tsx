@@ -48,6 +48,12 @@ vi.mock('@/app/components/SpMonthTotalsTab', () => ({
 	SpMonthTotalsTab: () => <div data-testid="sp-month-totals-tab" />
 }));
 
+vi.mock('@/app/components/SpCombinedMonthTotalsTab', () => ({
+	SpCombinedMonthTotalsTab: () => (
+		<div data-testid="sp-combined-month-totals-tab" />
+	)
+}));
+
 vi.mock('@/app/components/SpSessionTotalsTab', () => ({
 	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
 }));
@@ -134,6 +140,17 @@ describe('/species/[speciesName]/[year]', () => {
 			await screen.findByTestId('sp-individuals-tab');
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 			await screen.findByTestId('sp-month-totals-tab');
+		});
+
+		it("does not show the all-time 'Month totals' tab on the year-scoped species page", async () => {
+			render(await renderYearPage());
+			await screen.findByTestId('sp-individuals-tab');
+			expect(
+				screen.getAllByRole('button', { name: 'Month totals' })
+			).toHaveLength(1);
+			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+			await screen.findByTestId('sp-month-totals-tab');
+			expect(screen.queryByTestId('sp-combined-month-totals-tab')).toBeNull();
 		});
 
 		it('shows a "Session totals" tab on the year-scoped species page', async () => {

@@ -113,6 +113,13 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 			expect(screen.queryByRole('button', { name: 'Month totals' })).toBeNull();
 		});
 
+		it("does not show the all-time 'Month totals' tab on the month-scoped species page", async () => {
+			render(await renderMonthPage());
+			await screen.findByTestId('sp-individuals-tab');
+			expect(screen.queryByRole('button', { name: 'Month totals' })).toBeNull();
+			expect(screen.queryByTestId('sp-combined-month-totals-tab')).toBeNull();
+		});
+
 		it('does not show a "Session totals" tab on the month-scoped species page', async () => {
 			render(await renderMonthPage());
 			await screen.findByTestId('sp-individuals-tab');

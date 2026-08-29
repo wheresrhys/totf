@@ -16,6 +16,7 @@ import { SpStatsHistoryTab } from './SpStatsHistoryTab';
 import { SpWeightWingTab } from './SpWeightWingTab';
 import { SpYearTotalsTab } from './SpYearTotalsTab';
 import { SpMonthTotalsTab } from './SpMonthTotalsTab';
+import { SpCombinedMonthTotalsTab } from './SpCombinedMonthTotalsTab';
 import { SpSessionTotalsTab } from './SpSessionTotalsTab';
 import { TabNav } from './TabNav';
 
@@ -75,6 +76,9 @@ function SpeciesData({
 					{ id: 'retraps', label: 'Retraps' },
 					{ id: 'trend-charts', label: 'Trend charts' },
 					...(isAllTime ? [{ id: 'year-totals', label: 'Year totals' }] : []),
+					...(isAllTime
+						? [{ id: 'all-time-month-totals', label: 'Month totals' }]
+						: []),
 					...(isYearScoped
 						? [{ id: 'month-totals', label: 'Month totals' }]
 						: []),
@@ -133,6 +137,19 @@ function SpeciesData({
 					<SpYearTotalsTab
 						speciesName={data.speciesName}
 						viewedGroupId={viewedGroup.id}
+					/>
+				</ConditionalTabPanel>
+			)}
+			{isAllTime && (
+				<ConditionalTabPanel
+					loadedTabs={loadedTabs}
+					tabId="all-time-month-totals"
+					activeTabId={activeTab}
+				>
+					<SpCombinedMonthTotalsTab
+						speciesName={data.speciesName}
+						viewedGroupId={viewedGroup.id}
+						isActive={activeTab === 'all-time-month-totals'}
 					/>
 				</ConditionalTabPanel>
 			)}
