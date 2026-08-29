@@ -42,6 +42,12 @@ vi.mock('@/app/components/SpYearTotalsTab', () => ({
 	SpYearTotalsTab: () => <div data-testid="sp-year-totals-tab" />
 }));
 
+vi.mock('@/app/components/SpCombinedMonthTotalsTab', () => ({
+	SpCombinedMonthTotalsTab: () => (
+		<div data-testid="sp-combined-month-totals-tab" />
+	)
+}));
+
 vi.mock('@/app/components/SpSessionTotalsTab', () => ({
 	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
 }));
@@ -92,7 +98,7 @@ describe('species detail page', () => {
 			mockFetchPageOfBirds.mockResolvedValue(birds);
 		});
 
-		it('renders all 6 tab buttons: Bird list, Retraps, Trend charts, Year totals, Session totals, Size plot', async () => {
+		it('renders all 7 tab buttons: Bird list, Retraps, Trend charts, Year totals, Month totals, Session totals, Size plot', async () => {
 			render(await renderSpeciesPage());
 			await screen.findByTestId('sp-individuals-tab');
 			expect(screen.getByRole('button', { name: 'Bird list' })).toBeDefined();
@@ -101,6 +107,9 @@ describe('species detail page', () => {
 				screen.getByRole('button', { name: 'Trend charts' })
 			).toBeDefined();
 			expect(screen.getByRole('button', { name: 'Year totals' })).toBeDefined();
+			expect(
+				screen.getByRole('button', { name: 'Month totals' })
+			).toBeDefined();
 			expect(
 				screen.getByRole('button', { name: 'Session totals' })
 			).toBeDefined();
@@ -115,10 +124,13 @@ describe('species detail page', () => {
 			).toBeDefined();
 		});
 
-		it('does not render a "Month totals" tab button', async () => {
+		it("shows both 'Year totals' and 'Month totals' tabs on the all-time species page", async () => {
 			render(await renderSpeciesPage());
 			await screen.findByTestId('sp-individuals-tab');
-			expect(screen.queryByRole('button', { name: 'Month totals' })).toBeNull();
+			expect(screen.getByRole('button', { name: 'Year totals' })).toBeDefined();
+			expect(
+				screen.getByRole('button', { name: 'Month totals' })
+			).toBeDefined();
 		});
 
 		describe('bird-list tab (default active)', () => {
@@ -152,6 +164,15 @@ describe('species detail page', () => {
 				await screen.findByTestId('sp-individuals-tab');
 				fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
 				await screen.findByTestId('sp-year-totals-tab');
+			});
+		});
+
+		describe('month-totals tab (click to activate)', () => {
+			it('renders SpCombinedMonthTotalsTab after clicking Month totals button', async () => {
+				render(await renderSpeciesPage());
+				await screen.findByTestId('sp-individuals-tab');
+				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+				await screen.findByTestId('sp-combined-month-totals-tab');
 			});
 		});
 
