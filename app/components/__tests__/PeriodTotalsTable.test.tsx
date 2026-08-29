@@ -316,6 +316,137 @@ describe('PeriodTotalsTable', () => {
 		});
 	});
 
+	describe('fixed aggregation / encounters-only placeholder', () => {
+		function encStat(overrides: Partial<AggregateStatsResult> = {}) {
+			return buildStat({
+				time_period: '2000-01-01',
+				bird_count: 40,
+				encounter_count: 55,
+				new_bird_count: 30,
+				pullus_bird_count: 2,
+				juv_bird_count: 5,
+				postjuv_bird_count: 3,
+				adult_bird_count: 15,
+				unknown_age_bird_count: 5,
+				...({
+					pullus_enc_count: 9,
+					juv_enc_count: 8,
+					postjuv_enc_count: 7,
+					adult_enc_count: 6,
+					unknown_age_enc_count: 4
+				} as Partial<AggregateStatsResult>),
+				...overrides
+			});
+		}
+
+		describe('Usual', () => {
+			it('hides the AggregateByToggle when a fixed aggregation is supplied', () => {
+				render(
+					<PeriodTotalsTable
+						grouping="month"
+						rows={[encStat()]}
+						firstColumnHeader="Month"
+						buildHref={() => ''}
+						buildLabel={() => 'January'}
+						fixedAggregateBy="encounter"
+					/>
+				);
+				expect(screen.queryByTestId('above-header-row')).toBeNull();
+				expect(
+					screen.queryByRole('radio', { name: 'Encounter' })
+				).toBeNull();
+				expect(screen.queryByRole('radio', { name: 'Bird' })).toBeNull();
+			});
+
+			it("renders encounter-derived age-bucket values when fixed aggregation is 'encounter'", () => {
+				render(
+					<PeriodTotalsTable
+						grouping="month"
+						rows={[encStat()]}
+						firstColumnHeader="Month"
+						buildHref={() => ''}
+						buildLabel={() => 'January'}
+						fixedAggregateBy="encounter"
+					/>
+				);
+				const cells = document
+					.querySelector('tbody tr')
+					?.querySelectorAll('td') as NodeListOf<HTMLTableCellElement>;
+				// 6 new, 7 retraps (enc 55 - new 30 = 25), 8 pullus_enc, 9 juv_enc,
+				// 10 postjuv_enc, 11 adult_enc, 12 unknown_age_enc.
+				expect(cells[7].textContent).toBe('25');
+				expect(cells[8].textContent).toBe('9');
+				expect(cells[9].textContent).toBe('8');
+				expect(cells[10].textContent).toBe('7');
+				expect(cells[11].textContent).toBe('6');
+				expect(cells[12].textContent).toBe('4');
+			});
+		});
+
+		describe('Edge', () => {
+			it("renders '-' in every row's Individuals column when the placeholder option is set, regardless of underlying bird_count", () => {
+				render(
+					<PeriodTotalsTable
+						grouping="month"
+						rows={[
+							encStat({ time_period: '2000-01-01', bird_count: 40 }),
+							encStat({ time_period: '2000-02-01', bird_count: 7 })
+						]}
+						firstColumnHeader="Month"
+						buildHref={() => ''}
+						buildLabel={(tp) => tp}
+						fixedAggregateBy="encounter"
+						dashIndividuals
+					/>
+				);
+				const dataRows = document.querySelectorAll('tbody tr');
+				dataRows.forEach((row) => {
+					const cells = row.querySelectorAll('td');
+					expect(cells[5].textContent).toBe('-');
+				});
+			});
+
+			it("renders the totals row's Individuals cell as '-' too", () => {
+				render(
+					<PeriodTotalsTable
+						grouping="month"
+						rows={[encStat()]}
+						firstColumnHeader="Month"
+						buildHref={() => ''}
+						buildLabel={() => 'January'}
+						fixedAggregateBy="encounter"
+						dashIndividuals
+						totalsStats={encStat({ bird_count: 123 })}
+					/>
+				);
+				const totalsCells = screen
+					.getByTestId('totals-row')
+					.querySelectorAll('td');
+				expect(totalsCells[5].textContent).toBe('-');
+			});
+
+			it('renders the first column as plain text, not a link, when no href is available for a row', () => {
+				render(
+					<PeriodTotalsTable
+						grouping="month"
+						rows={[encStat()]}
+						firstColumnHeader="Month"
+						buildHref={() => ''}
+						buildLabel={() => 'January'}
+						fixedAggregateBy="encounter"
+						dashIndividuals
+					/>
+				);
+				expect(screen.queryByRole('link', { name: 'January' })).toBeNull();
+				const firstCell = document
+					.querySelector('tbody tr')
+					?.querySelector('td');
+				expect(firstCell?.textContent).toBe('January');
+				expect(firstCell?.querySelector('a')).toBeNull();
+			});
+		});
+	});
+
 	describe('Aggregate by toggle', () => {
 		const groupings: {
 			grouping: 'year' | 'month' | 'day';

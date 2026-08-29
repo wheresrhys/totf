@@ -29,7 +29,10 @@ export function columnBlock(
 // display name and the href are derived per row from caller-supplied getters,
 // so the same primitive serves a species table (`/species/{name}`), a
 // period-totals table (`/summary/{year}`), etc. The returned component matches
-// the `AccordionTableBody`/`SortableTable` `FirstColumnComponent` shape.
+// the `AccordionTableBody`/`SortableTable` `FirstColumnComponent` shape. When
+// `buildHref` yields a falsy value (empty string), the name renders as plain
+// text instead of a link — for rows with no single drill-down target, e.g. the
+// all-time "Month totals" tab whose combine-years rows span every year at once.
 export function createNameLinkCell<RawRowData, RowModel>(
 	getName: (model: RowModelWithRawData<RawRowData, RowModel>) => string,
 	buildHref: (model: RowModelWithRawData<RawRowData, RowModel>) => string
@@ -39,8 +42,12 @@ export function createNameLinkCell<RawRowData, RowModel>(
 	}: {
 		model: RowModelWithRawData<RawRowData, RowModel>;
 	}) {
+		const href = buildHref(model);
+		if (!href) {
+			return <span className="text-wrap">{getName(model)}</span>;
+		}
 		return (
-			<NoPrefetchLink className="link text-wrap" href={buildHref(model)}>
+			<NoPrefetchLink className="link text-wrap" href={href}>
 				{getName(model)}
 			</NoPrefetchLink>
 		);
@@ -112,6 +119,10 @@ export function buildStandardColumnConfigs<RowModel>(
 // makes those two sources mutually exclusive at the type level.
 export type TotalsRowCellsInput<RowModel> = {
 	columnConfigs: Partial<Record<keyof RowModel, ColumnConfig>>;
+	// Optional per-column overrides rendered verbatim in place of the summed/
+	// passed-through value — e.g. a `'-'` placeholder for the Individuals column
+	// on an encounters-only tab, where a bird count is meaningless.
+	cellOverrides?: Partial<Record<keyof RowModel, React.ReactNode>>;
 } & ({ totalsRowModel: RowModel } | { rowModels: RowModel[] });
 
 // Builds the ordered `<td>` cells for a pinned totals row, mirroring the
@@ -127,15 +138,19 @@ export type TotalsRowCellsInput<RowModel> = {
 export function buildTotalsRowCells<RowModel>(
 	input: TotalsRowCellsInput<RowModel>
 ): React.ReactNode[] {
-	const { columnConfigs } = input;
+	const { columnConfigs, cellOverrides } = input;
 	const orderedProperties = Object.keys(columnConfigs) as (keyof RowModel)[];
-	const valueFor = (property: keyof RowModel): React.ReactNode =>
-		'totalsRowModel' in input
+	const valueFor = (property: keyof RowModel): React.ReactNode => {
+		if (cellOverrides && cellOverrides[property] !== undefined) {
+			return cellOverrides[property];
+		}
+		return 'totalsRowModel' in input
 			? (input.totalsRowModel[property] as React.ReactNode)
 			: input.rowModels.reduce(
 					(sum, model) => sum + (model[property] as number),
 					0
 				);
+	};
 	return orderedProperties.map((property, index) =>
 		index === 0 ? (
 			<td key={property as string}>Total</td>
