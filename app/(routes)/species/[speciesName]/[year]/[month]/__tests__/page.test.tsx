@@ -112,6 +112,14 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 			expect(screen.queryByRole('button', { name: 'Year totals' })).toBeNull();
 			expect(screen.queryByRole('button', { name: 'Month totals' })).toBeNull();
 		});
+
+		it('does not show a "Session totals" tab on the month-scoped species page', async () => {
+			render(await renderMonthPage());
+			await screen.findByTestId('sp-individuals-tab');
+			expect(
+				screen.queryByRole('button', { name: 'Session totals' })
+			).toBeNull();
+		});
 	});
 
 	describe('date-range plumbing', () => {
