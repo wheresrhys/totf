@@ -11,8 +11,10 @@ import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
 import {
 	buildCombinedMonthTotalsRows,
+	buildPerYearMonthTotalsRows,
 	type MonthTotalsRow
 } from '@/app/models/month-totals';
+import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
 // The all-time page's combine-years month tab — distinct from `MONTH_TOTALS_TAB`
@@ -25,6 +27,78 @@ const ALL_TIME_MONTH_TOTALS_TAB = {
 const YEAR_TOTALS_TAB = { id: 'year-totals', label: 'Year totals' };
 const SESSION_TOTALS_TAB = { id: 'session-totals', label: 'Session totals' };
 const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
+
+// The all-time page's combine-years "Month totals" tab content. Owns the
+// "Combine years" toggle's local state so it resets to the default (ON) each
+// time the tab remounts — mirroring how `PeriodTotalsTable`'s own
+// `aggregateByState` resets per #604 — since `SummaryTotalsSection` itself
+// never unmounts across tab switches, so the state has to live down here
+// instead. Both row shapes are derived from the same already-fetched
+// `periodStats` array (the raw per-`(year, month)` rows `aggregate_stats`
+// returns) — toggling re-renders in place, no new fetch either way.
+function AllTimeMonthTotalsTab({
+	periodStats,
+	totalsStats
+}: {
+	periodStats: AggregateStatsResult[];
+	totalsStats?: AggregateStatsResult;
+}) {
+	const [combineYears, setCombineYears] = useState(true);
+
+	// ON: 12 calendar-month buckets summed across every year. The month name
+	// is precomputed per bucket in the model; look it back up by the row's
+	// sentinel `time_period` (there's no year to link to, so no href).
+	const combinedRows = buildCombinedMonthTotalsRows(periodStats);
+	const combinedLabelByTimePeriod = new Map(
+		combinedRows.map((row) => [row.stats.time_period, row.label])
+	);
+
+	// OFF: one row per real `(year, month)` combination, unsummed. Label/href
+	// are precomputed per row in the model; look them back up by `time_period`
+	// so the shared table renders those rather than re-deriving from the date
+	// string.
+	const perYearRows = buildPerYearMonthTotalsRows(periodStats);
+	const perYearRowByTimePeriod = new Map(
+		perYearRows.map((row) => [row.stats.time_period, row])
+	);
+
+	return (
+		<>
+			<div className="mb-2">
+				<CombineYearsToggle value={combineYears} onChange={setCombineYears} />
+			</div>
+			{combineYears ? (
+				<PeriodTotalsTable
+					grouping="month"
+					rows={combinedRows.map((row) => row.stats)}
+					firstColumnHeader="Month"
+					// No single year to drill into — an empty href renders the
+					// month label as plain text rather than a link.
+					buildHref={() => ''}
+					buildLabel={(timePeriod) =>
+						combinedLabelByTimePeriod.get(timePeriod) ?? ''
+					}
+					totalsStats={totalsStats}
+					aggregationFixedTo="encounter"
+					dashIndividuals
+				/>
+			) : (
+				<PeriodTotalsTable
+					grouping="month"
+					rows={perYearRows.map((row) => row.stats)}
+					firstColumnHeader="Month"
+					buildHref={(timePeriod) =>
+						perYearRowByTimePeriod.get(timePeriod)?.href ?? ''
+					}
+					buildLabel={(timePeriod) =>
+						perYearRowByTimePeriod.get(timePeriod)?.label ?? ''
+					}
+					totalsStats={totalsStats}
+				/>
+			)}
+		</>
+	);
+}
 
 export function SummaryTotalsSection({
 	summaryStats,
@@ -173,15 +247,6 @@ export function SummaryTotalsSection({
 					})
 			}
 		);
-	const combinedMonthRows = combinedMonthStats
-		? buildCombinedMonthTotalsRows(combinedMonthStats)
-		: [];
-	// The month name is precomputed per bucket in the model; look it back up by
-	// the row's sentinel `time_period` (there's no year to link to, so no href).
-	const combinedMonthLabelByTimePeriod = new Map(
-		combinedMonthRows.map((row) => [row.stats.time_period, row.label])
-	);
-
 	// Label/href are precomputed per month in the model (timezone-safe); look
 	// them back up by `time_period` so the shared table renders those rather
 	// than re-deriving from the date string.
@@ -228,19 +293,9 @@ export function SummaryTotalsSection({
 						<div className="loading loading-spinner loading-xl"></div>
 					</div>
 				) : (
-					<PeriodTotalsTable
-						grouping="month"
-						rows={combinedMonthRows.map((row) => row.stats)}
-						firstColumnHeader="Month"
-						// No single year to drill into — an empty href renders the
-						// month label as plain text rather than a link.
-						buildHref={() => ''}
-						buildLabel={(timePeriod) =>
-							combinedMonthLabelByTimePeriod.get(timePeriod) ?? ''
-						}
+					<AllTimeMonthTotalsTab
+						periodStats={combinedMonthStats ?? []}
 						totalsStats={totalsStats}
-						aggregationFixedTo="encounter"
-						dashIndividuals
 					/>
 				))}
 			{showSessionTotals &&

@@ -2,7 +2,9 @@ import { format as formatDate } from 'date-fns';
 import { postgresIntervalToSeconds } from '@/lib/postgres-interval';
 import type { AggregateStatsResult } from './db';
 
-// A single month's row for the year summary page's "Month totals" tab. `label`
+// A single month's row for the year summary page's "Month totals" tab, and
+// (reused as-is) for the all-time page's "Combine years" OFF state — same
+// shape either way: one row per real `(year, month)` combination. `label`
 // and `href` are precomputed here (not derived downstream from `stats`) so the
 // month name is built from integer year/month via a *local* `Date` — sidestepping
 // the UTC-parse off-by-one that `new Date("2026-01-01")` risks at the Jan/Dec
@@ -162,4 +164,26 @@ export function buildCombinedMonthTotalsRows(
 			stats
 		};
 	});
+}
+
+// The "Combine years" toggle's OFF state for the all-time "Month totals" tab:
+// one row per real `(year, month)` combination in the group's history, with no
+// combining/summing — the raw `aggregate_stats` month array (the same array
+// `buildCombinedMonthTotalsRows` folds into 12 buckets), reshaped with a
+// precomputed label/href per row and sorted chronologically regardless of
+// input order.
+export function buildPerYearMonthTotalsRows(
+	periodStats: AggregateStatsResult[]
+): MonthTotalsRow[] {
+	return periodStats
+		.map((stat) => {
+			const year = Number(stat.time_period.slice(0, 4));
+			const month = Number(stat.time_period.slice(5, 7));
+			return {
+				label: formatDate(new Date(year, month - 1, 1), 'LLLL yyyy'),
+				href: `/summary/${year}/${month}`,
+				stats: stat
+			};
+		})
+		.sort((a, b) => a.stats.time_period.localeCompare(b.stats.time_period));
 }
