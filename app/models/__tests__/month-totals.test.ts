@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
 	buildMonthTotalsRows,
-	buildCombinedMonthTotalsRows
+	buildCombinedMonthTotalsRows,
+	buildPerYearMonthTotalsRows
 } from '../month-totals';
 import {
 	formatPostgresIntervalForDisplay,
@@ -300,6 +301,76 @@ describe('buildCombinedMonthTotalsRows', () => {
 				expect(row.stats.bird_count).toBe(0);
 				expect(row.stats.total_effort).toBe('00:00:00');
 			});
+		});
+	});
+});
+
+describe('buildPerYearMonthTotalsRows', () => {
+	describe('Usual', () => {
+		it('returns one row per (year, month) combination present in the input, unsummed', () => {
+			const rows = buildPerYearMonthTotalsRows([
+				monthStat(2020, 1, { session_count: 4, encounter_count: 30 }),
+				monthStat(2021, 1, { session_count: 6, encounter_count: 45 }),
+				monthStat(2020, 8, { session_count: 2, encounter_count: 11 })
+			]);
+			expect(rows).toHaveLength(3);
+			expect(rows.map((row) => row.stats.session_count)).toEqual([4, 2, 6]);
+			expect(rows.map((row) => row.stats.encounter_count)).toEqual([
+				30, 11, 45
+			]);
+		});
+
+		it("formats each row's label as 'MMMM yyyy' and links to /summary/{year}/{month}", () => {
+			const rows = buildPerYearMonthTotalsRows([monthStat(2020, 1)]);
+			expect(rows[0].label).toBe('January 2020');
+			expect(rows[0].href).toBe('/summary/2020/1');
+		});
+	});
+
+	describe('Structure', () => {
+		it('keeps rows for the same calendar month in different years separate (e.g. January 2020 and January 2021 both present, uncombined)', () => {
+			const rows = buildPerYearMonthTotalsRows([
+				monthStat(2020, 1, { session_count: 4 }),
+				monthStat(2021, 1, { session_count: 6 })
+			]);
+			expect(rows).toHaveLength(2);
+			expect(rows.map((row) => row.label)).toEqual([
+				'January 2020',
+				'January 2021'
+			]);
+			expect(rows.map((row) => row.stats.session_count)).toEqual([4, 6]);
+		});
+
+		it('orders rows chronologically regardless of input order', () => {
+			const rows = buildPerYearMonthTotalsRows([
+				monthStat(2021, 12),
+				monthStat(2020, 3),
+				monthStat(2022, 1),
+				monthStat(2020, 1)
+			]);
+			expect(rows.map((row) => row.stats.time_period)).toEqual([
+				'2020-01-01',
+				'2020-03-01',
+				'2021-12-01',
+				'2022-01-01'
+			]);
+		});
+	});
+
+	describe('Edge', () => {
+		it('returns an empty array when given no rows', () => {
+			expect(buildPerYearMonthTotalsRows([])).toEqual([]);
+		});
+
+		it('handles a single (year, month) row correctly', () => {
+			const rows = buildPerYearMonthTotalsRows([
+				monthStat(2026, 6, { session_count: 3, encounter_count: 20 })
+			]);
+			expect(rows).toHaveLength(1);
+			expect(rows[0].label).toBe('June 2026');
+			expect(rows[0].href).toBe('/summary/2026/6');
+			expect(rows[0].stats.session_count).toBe(3);
+			expect(rows[0].stats.encounter_count).toBe(20);
 		});
 	});
 });

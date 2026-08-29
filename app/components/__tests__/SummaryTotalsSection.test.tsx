@@ -525,6 +525,146 @@ describe('SummaryTotalsSection', () => {
 				expect(freeEncounter.disabled).toBe(false);
 			});
 		});
+
+		describe('Combine years toggle', () => {
+			describe('Usual', () => {
+				it('defaults to ON ("Combined"), showing the 12 summed rows with AggregateByToggle disabled', async () => {
+					render(<SummaryTotalsSection {...allTimeProps} />);
+					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+					await waitFor(() =>
+						expect(document.querySelectorAll('tbody tr').length).toBe(12)
+					);
+					expect(
+						(
+							screen.getByRole('radio', {
+								name: 'Combined'
+							}) as HTMLInputElement
+						).checked
+					).toBe(true);
+					expect(
+						(
+							screen.getByRole('radio', {
+								name: 'Encounter'
+							}) as HTMLInputElement
+						).disabled
+					).toBe(true);
+				});
+
+				it('switching to "By year" shows one row per (year, month) combination with AggregateByToggle enabled', async () => {
+					render(<SummaryTotalsSection {...allTimeProps} />);
+					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+					await waitFor(() =>
+						expect(document.querySelectorAll('tbody tr').length).toBe(12)
+					);
+
+					fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+
+					expect(document.querySelectorAll('tbody tr').length).toBe(3);
+					expect(
+						screen
+							.getByRole('link', { name: 'January 2020' })
+							.getAttribute('href')
+					).toBe('/summary/2020/1');
+					expect(
+						screen
+							.getByRole('link', { name: 'January 2021' })
+							.getAttribute('href')
+					).toBe('/summary/2021/1');
+					expect(
+						screen
+							.getByRole('link', { name: 'August 2020' })
+							.getAttribute('href')
+					).toBe('/summary/2020/8');
+					expect(
+						(
+							screen.getByRole('radio', {
+								name: 'Encounter'
+							}) as HTMLInputElement
+						).disabled
+					).toBe(false);
+				});
+
+				it('switching back to "Combined" restores the 12 summed rows and disables AggregateByToggle again', async () => {
+					render(<SummaryTotalsSection {...allTimeProps} />);
+					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+					await waitFor(() =>
+						expect(document.querySelectorAll('tbody tr').length).toBe(12)
+					);
+
+					fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+					expect(document.querySelectorAll('tbody tr').length).toBe(3);
+
+					fireEvent.click(screen.getByRole('radio', { name: 'Combined' }));
+					expect(document.querySelectorAll('tbody tr').length).toBe(12);
+					expect(
+						(
+							screen.getByRole('radio', {
+								name: 'Encounter'
+							}) as HTMLInputElement
+						).disabled
+					).toBe(true);
+				});
+			});
+
+			describe('Structure', () => {
+				it('in the "By year" state, toggling AggregateByToggle between Bird and Encounter changes the rendered counts', async () => {
+					fetchPeriodStatsMock.mockResolvedValue([
+						buildYearlyStat({
+							time_period: '2020-01-01',
+							pullus_bird_count: 2,
+							...({ pullus_enc_count: 5 } as Partial<AggregateStatsResult>)
+						})
+					]);
+					render(<SummaryTotalsSection {...allTimeProps} />);
+					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+					await waitFor(() =>
+						expect(document.querySelectorAll('tbody tr').length).toBe(12)
+					);
+					fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+					expect(document.querySelectorAll('tbody tr').length).toBe(1);
+
+					const getPullusCell = () =>
+						document.querySelector('tbody tr')?.querySelectorAll('td')[8];
+					expect(getPullusCell()?.textContent).toBe('2');
+
+					fireEvent.click(screen.getByRole('radio', { name: 'Encounter' }));
+					expect(getPullusCell()?.textContent).toBe('5');
+				});
+			});
+
+			describe('Edge', () => {
+				it('does not trigger any additional data fetch when toggling Combine years', async () => {
+					render(<SummaryTotalsSection {...allTimeProps} />);
+					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+					await waitFor(() =>
+						expect(document.querySelectorAll('tbody tr').length).toBe(12)
+					);
+					expect(fetchPeriodStatsMock).toHaveBeenCalledTimes(1);
+
+					fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+					fireEvent.click(screen.getByRole('radio', { name: 'Combined' }));
+					fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+
+					expect(fetchPeriodStatsMock).toHaveBeenCalledTimes(1);
+				});
+
+				it('renders a single row per month (not zero-filled to 12) in the "By year" state when history spans only one year', async () => {
+					fetchPeriodStatsMock.mockResolvedValue([
+						buildYearlyStat({ time_period: '2020-01-01' }),
+						buildYearlyStat({ time_period: '2020-08-01' })
+					]);
+					render(<SummaryTotalsSection {...allTimeProps} />);
+					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+					await waitFor(() =>
+						expect(document.querySelectorAll('tbody tr').length).toBe(12)
+					);
+
+					fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+
+					expect(document.querySelectorAll('tbody tr').length).toBe(2);
+				});
+			});
+		});
 	});
 
 	describe('when viewedGroup is undefined', () => {
