@@ -16,6 +16,7 @@ export function SummaryPage({
 	monthTotals,
 	yearlyTotals,
 	sessionTotals,
+	showAllTimeMonthTotals,
 	viewedGroup,
 	fromDate,
 	toDate
@@ -26,6 +27,9 @@ export function SummaryPage({
 	monthTotals?: MonthTotalsRow[];
 	yearlyTotals?: AggregateStatsResult[];
 	sessionTotals?: AggregateStatsResult[];
+	// Only the all-time page sets this — enables the combine-years "Month totals"
+	// tab (data fetched lazily on select, not passed in).
+	showAllTimeMonthTotals?: boolean;
 	viewedGroup?: ViewedGroup;
 	// Date bounds for the lazily-fetched Species totals tab — undefined on the
 	// all-time page (unscoped species totals).
@@ -50,6 +54,7 @@ export function SummaryPage({
 				monthTotals={monthTotals}
 				yearlyTotals={yearlyTotals}
 				sessionTotals={sessionTotals}
+				showAllTimeMonthTotals={showAllTimeMonthTotals}
 				viewedGroup={viewedGroup}
 				fromDate={fromDate}
 				toDate={toDate}

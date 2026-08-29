@@ -5,9 +5,11 @@ import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 const fetchYearlyTotalsMock = vi.fn().mockResolvedValue([]);
+const fetchPeriodStatsMock = vi.fn().mockResolvedValue([]);
 vi.mock('@/app/actions/summary-stats', () => ({
 	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args),
-	fetchYearlyTotals: (...args: unknown[]) => fetchYearlyTotalsMock(...args)
+	fetchYearlyTotals: (...args: unknown[]) => fetchYearlyTotalsMock(...args),
+	fetchPeriodStats: (...args: unknown[]) => fetchPeriodStatsMock(...args)
 }));
 
 const fetchSpeciesDataMock = vi.fn().mockResolvedValue([]);
@@ -20,6 +22,7 @@ describe('/summary (all-time)', () => {
 		cleanup();
 		fetchSummaryStatsMock.mockClear();
 		fetchYearlyTotalsMock.mockClear();
+		fetchPeriodStatsMock.mockClear();
 		fetchSpeciesDataMock.mockClear();
 	});
 
@@ -71,5 +74,13 @@ describe('/summary (all-time)', () => {
 		fetchYearlyTotalsMock.mockResolvedValueOnce(yearlyStats);
 		const data = await fetchAllTimeSummaryData({}, 1);
 		expect(data.yearlyTotals).toBe(yearlyStats);
+	});
+
+	it('renders the all-time "Month totals" tab, without eagerly fetching its period stats', async () => {
+		render(await Page());
+		await screen.findByRole('heading', { level: 1 });
+		expect(screen.getByRole('button', { name: 'Month totals' })).toBeTruthy();
+		// Lazy: the tab exists but its data isn't fetched until first selected.
+		expect(fetchPeriodStatsMock).not.toHaveBeenCalled();
 	});
 });
