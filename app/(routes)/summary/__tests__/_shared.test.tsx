@@ -1,17 +1,29 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SummaryPage } from '../_shared';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 import alphaSpeciesStats from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
 import type { AggregateStatsResult } from '@/app/models/db';
+import type { ViewedGroup } from '@/lib/group-slug';
 
 const populatedStats = alphaStats as unknown as AggregateStatsResult;
 const populatedSpeciesStats =
 	alphaSpeciesStats as unknown as AggregateStatsResult[];
 
+const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
+
+const fetchSpeciesDataMock = vi.fn();
+vi.mock('@/app/actions/spp-data', () => ({
+	fetchSpeciesData: (...args: unknown[]) => fetchSpeciesDataMock(...args)
+}));
+
 describe('SummaryPage', () => {
+	beforeEach(() => {
+		fetchSpeciesDataMock.mockResolvedValue(populatedSpeciesStats);
+	});
 	afterEach(() => {
 		cleanup();
+		fetchSpeciesDataMock.mockReset();
 	});
 
 	it('renders "All time summary" when neither year nor month is given', async () => {
@@ -67,12 +79,13 @@ describe('SummaryPage', () => {
 	});
 
 	describe('Edge', () => {
-		it('renders no session links even with populated stats/species (species-name links are expected)', () => {
+		it('renders no session links even with populated stats/species (species-name links are expected)', async () => {
 			render(
-				<SummaryPage
-					summaryStats={populatedStats}
-					speciesStats={populatedSpeciesStats}
-				/>
+				<SummaryPage summaryStats={populatedStats} viewedGroup={viewedGroup} />
+			);
+			// Species is the sole/default tab here; wait for the lazy fetch to render
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBeGreaterThan(0)
 			);
 			const links = screen.getAllByRole('link');
 			expect(links.length).toBeGreaterThan(0);
@@ -83,14 +96,13 @@ describe('SummaryPage', () => {
 	});
 
 	describe('summaryStats passthrough', () => {
-		it('forwards summaryStats to SpeciesTotalsSection as its totals row', () => {
+		it('forwards summaryStats to the lazily-loaded Species totals table as its totals row', async () => {
 			render(
-				<SummaryPage
-					summaryStats={populatedStats}
-					speciesStats={populatedSpeciesStats}
-				/>
+				<SummaryPage summaryStats={populatedStats} viewedGroup={viewedGroup} />
 			);
-			expect(screen.getByTestId('totals-row')).toBeTruthy();
+			await waitFor(() =>
+				expect(screen.getByTestId('totals-row')).toBeTruthy()
+			);
 		});
 	});
 
@@ -98,7 +110,7 @@ describe('SummaryPage', () => {
 		it('shows "Year totals" as the default tab when yearlyTotals is passed (all-time page)', () => {
 			render(
 				<SummaryPage
-					speciesStats={populatedSpeciesStats}
+					viewedGroup={viewedGroup}
 					yearlyTotals={[{ ...populatedStats, time_period: '2026-01-01' }]}
 				/>
 			);
@@ -110,7 +122,9 @@ describe('SummaryPage', () => {
 		});
 
 		it('keeps "Species totals" as the sole/default tab when yearlyTotals is omitted (year/month pages)', () => {
-			render(<SummaryPage year={2026} speciesStats={populatedSpeciesStats} />);
+			// No viewedGroup: asserts tab structure only, so the lazy species fetch
+			// stays inert (no async state update to wrap in act).
+			render(<SummaryPage year={2026} />);
 			expect(screen.queryByRole('button', { name: 'Year totals' })).toBeNull();
 			const tab = screen.getByRole('button', { name: 'Species totals' });
 			expect(tab.getAttribute('aria-current')).toBe('true');

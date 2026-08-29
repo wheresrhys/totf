@@ -8,8 +8,9 @@ vi.mock('@/app/actions/summary-stats', () => ({
 	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args)
 }));
 
+const fetchSpeciesDataMock = vi.fn().mockResolvedValue([]);
 vi.mock('@/app/actions/spp-data', () => ({
-	fetchSpeciesData: vi.fn().mockResolvedValue([])
+	fetchSpeciesData: (...args: unknown[]) => fetchSpeciesDataMock(...args)
 }));
 
 const fetchPeriodTotalsMock = vi.fn().mockResolvedValue([]);
@@ -41,6 +42,8 @@ describe('/summary/[year]/[month]', () => {
 		cleanup();
 		fetchSummaryStatsMock.mockClear();
 		fetchPeriodTotalsMock.mockClear();
+		fetchSpeciesDataMock.mockReset();
+		fetchSpeciesDataMock.mockResolvedValue([]);
 	});
 
 	it('renders "{long month} {year} summary" for a well-formed year/month', async () => {
@@ -63,14 +66,18 @@ describe('/summary/[year]/[month]', () => {
 		expect(heading.textContent).toBe('August 2026 summary');
 	});
 
-	it("fetchYearMonthSummaryData calls fetchSpeciesData with the month's first and last calendar day", async () => {
-		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
 		await fetchYearMonthSummaryData({ year: '2026', month: '08' }, 1);
-		expect(fetchSpeciesData).toHaveBeenCalledWith(
-			1,
-			'2026-08-01',
-			'2026-08-31'
+		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
+	});
+
+	it("returns the month's first and last calendar day as the lazy species-fetch bounds", async () => {
+		const data = await fetchYearMonthSummaryData(
+			{ year: '2026', month: '08' },
+			1
 		);
+		expect(data.fromDate).toBe('2026-08-01');
+		expect(data.toDate).toBe('2026-08-31');
 	});
 
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
@@ -114,13 +121,12 @@ describe('/summary/[year]/[month]', () => {
 	});
 
 	it('computes correct month bounds for December (year-end month)', async () => {
-		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
-		await fetchYearMonthSummaryData({ year: '2026', month: '12' }, 1);
-		expect(fetchSpeciesData).toHaveBeenCalledWith(
-			1,
-			'2026-12-01',
-			'2026-12-31'
+		const data = await fetchYearMonthSummaryData(
+			{ year: '2026', month: '12' },
+			1
 		);
+		expect(data.fromDate).toBe('2026-12-01');
+		expect(data.toDate).toBe('2026-12-31');
 	});
 
 	it("fetchYearMonthSummaryData requests per-day period totals scoped to the month's bounds", async () => {
@@ -161,11 +167,10 @@ describe('/summary/[year]/[month]', () => {
 		).toBe('/group/alpha/session-temp/2026-08-16');
 	});
 
-	it('renders species table rows linking to the year-and-month-scoped species URL (#625)', async () => {
-		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
-		vi.mocked(fetchSpeciesData).mockResolvedValueOnce([
+	it('lazily renders species table rows linking to the year-and-month-scoped species URL (#625)', async () => {
+		fetchSpeciesDataMock.mockResolvedValueOnce([
 			{ ...(alphaStats as object), species_name: 'Robin' }
-		] as never);
+		]);
 		render(
 			await Page({
 				params: Promise.resolve({ year: '2026', month: '08' })
@@ -173,7 +178,12 @@ describe('/summary/[year]/[month]', () => {
 		);
 		await screen.findByRole('heading', { level: 1 });
 		fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
-		const link = screen.getByRole('link', { name: 'Robin' });
+		const link = await screen.findByRole('link', { name: 'Robin' });
 		expect(link.getAttribute('href')).toBe('/species/Robin/2026/8');
+		expect(fetchSpeciesDataMock).toHaveBeenCalledWith(
+			1,
+			'2026-08-01',
+			'2026-08-31'
+		);
 	});
 });

@@ -10,8 +10,9 @@ vi.mock('@/app/actions/summary-stats', () => ({
 	fetchYearlyTotals: (...args: unknown[]) => fetchYearlyTotalsMock(...args)
 }));
 
+const fetchSpeciesDataMock = vi.fn().mockResolvedValue([]);
 vi.mock('@/app/actions/spp-data', () => ({
-	fetchSpeciesData: vi.fn().mockResolvedValue([])
+	fetchSpeciesData: (...args: unknown[]) => fetchSpeciesDataMock(...args)
 }));
 
 describe('/summary (all-time)', () => {
@@ -19,6 +20,7 @@ describe('/summary (all-time)', () => {
 		cleanup();
 		fetchSummaryStatsMock.mockClear();
 		fetchYearlyTotalsMock.mockClear();
+		fetchSpeciesDataMock.mockClear();
 	});
 
 	it('renders the "All time summary" heading', async () => {
@@ -46,10 +48,17 @@ describe('/summary (all-time)', () => {
 		expect(screen.queryByTestId('summary-stats-section')).toBeNull();
 	});
 
-	it('fetchAllTimeSummaryData calls fetchSpeciesData with no date bounds', async () => {
-		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
 		await fetchAllTimeSummaryData({}, 1);
-		expect(fetchSpeciesData).toHaveBeenCalledWith(1);
+		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
+	});
+
+	it('renders the default Year totals tab but no species table on first paint', async () => {
+		render(await Page());
+		await screen.findByRole('heading', { level: 1 });
+		expect(screen.getByRole('button', { name: 'Year totals' })).toBeTruthy();
+		expect(screen.queryByTestId('species-totals-table')).toBeNull();
+		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
 
 	it('fetchAllTimeSummaryData calls fetchYearlyTotals with the viewed group id', async () => {
