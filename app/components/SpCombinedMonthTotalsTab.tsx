@@ -1,9 +1,13 @@
 'use client';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { fetchSpeciesPeriodTotals } from '../actions/sp-data';
 import { PeriodTotalsTable } from './PeriodTotalsTable';
 import { useLazyTabData } from './shared/useLazyTabData';
-import { buildCombinedMonthTotalsRows } from '@/app/models/month-totals';
+import {
+	buildCombinedMonthTotalsRows,
+	buildPerYearMonthTotalsRows
+} from '@/app/models/month-totals';
+import { CombineYearsToggle } from './shared/CombineYearsToggle';
 
 // The all-time species page's combine-years "Month totals" tab — the
 // species-scoped counterpart to `SummaryTotalsSection`'s
@@ -41,6 +45,11 @@ export function SpCombinedMonthTotalsTab({
 				})
 		}
 	);
+	// Defaults to ON (combined) — resets each time this tab remounts, mirroring
+	// `SummaryTotalsSection`'s `AllTimeMonthTotalsTab`, since this component
+	// itself never unmounts across tab switches (`SpPage`'s tab nav keeps it
+	// mounted via `isActive`).
+	const [combineYears, setCombineYears] = useState(true);
 
 	if (isLoading || monthlyStats === undefined) {
 		return (
@@ -50,24 +59,56 @@ export function SpCombinedMonthTotalsTab({
 		);
 	}
 
+	// ON: 12 calendar-month buckets summed across every year, encounters-only —
+	// unchanged from #637. The month name is precomputed per bucket in the
+	// model; look it back up by the row's sentinel `time_period` (there's no
+	// year to link to, so no href).
 	const combinedMonthRows = buildCombinedMonthTotalsRows(monthlyStats);
-	// The month name is precomputed per bucket in the model; look it back up by
-	// the row's sentinel `time_period` (there's no year to link to, so no href).
 	const combinedMonthLabelByTimePeriod = new Map(
 		combinedMonthRows.map((row) => [row.stats.time_period, row.label])
 	);
 
+	// OFF: one row per real `(year, month)` combination the species actually has
+	// data for — no zero-filling, no summing across years — linking into the
+	// species' year/month drill-down route, same shape `SpMonthTotalsTab` uses.
+	const perYearRows = buildPerYearMonthTotalsRows(
+		monthlyStats,
+		(year, month) => `/species/${speciesName}/${year}/${month}`
+	);
+	const perYearRowByTimePeriod = new Map(
+		perYearRows.map((row) => [row.stats.time_period, row])
+	);
+
 	return (
-		<PeriodTotalsTable
-			grouping="month"
-			rows={combinedMonthRows.map((row) => row.stats)}
-			firstColumnHeader="Month"
-			buildHref={() => ''}
-			buildLabel={(timePeriod) =>
-				combinedMonthLabelByTimePeriod.get(timePeriod) ?? ''
-			}
-			aggregationFixedTo="encounter"
-			dashIndividuals
-		/>
+		<>
+			<div className="mb-2">
+				<CombineYearsToggle value={combineYears} onChange={setCombineYears} />
+			</div>
+			{combineYears ? (
+				<PeriodTotalsTable
+					grouping="month"
+					rows={combinedMonthRows.map((row) => row.stats)}
+					firstColumnHeader="Month"
+					buildHref={() => ''}
+					buildLabel={(timePeriod) =>
+						combinedMonthLabelByTimePeriod.get(timePeriod) ?? ''
+					}
+					aggregationFixedTo="encounter"
+					dashIndividuals
+				/>
+			) : (
+				<PeriodTotalsTable
+					grouping="month"
+					rows={perYearRows.map((row) => row.stats)}
+					firstColumnHeader="Month"
+					buildHref={(timePeriod) =>
+						perYearRowByTimePeriod.get(timePeriod)?.href ?? ''
+					}
+					buildLabel={(timePeriod) =>
+						perYearRowByTimePeriod.get(timePeriod)?.label ?? ''
+					}
+				/>
+			)}
+		</>
 	);
 }

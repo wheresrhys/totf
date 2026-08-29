@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	waitFor,
+	fireEvent
+} from '@testing-library/react';
 import { SpCombinedMonthTotalsTab } from '../SpCombinedMonthTotalsTab';
 import type { AggregateStatsResult } from '@/app/models/db';
 
@@ -211,6 +217,254 @@ describe('SpCombinedMonthTotalsTab', () => {
 				const cells = row.querySelectorAll('td');
 				expect(cells[5]?.textContent).toBe('-');
 			});
+		});
+	});
+});
+
+describe('species all-time Month totals tab — Combine years toggle', () => {
+	afterEach(() => {
+		cleanup();
+	});
+
+	beforeEach(async () => {
+		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
+		vi.mocked(fetchSpeciesPeriodTotals).mockReset();
+		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
+			buildMonthlyStat({ time_period: '2020-01-01' }),
+			buildMonthlyStat({ time_period: '2021-01-01' }),
+			buildMonthlyStat({ time_period: '2020-08-01' })
+		]);
+	});
+
+	describe('Usual', () => {
+		it('defaults to combined calendar-month rows, encounters-only, with the bird/encounter toggle disabled', async () => {
+			render(
+				<SpCombinedMonthTotalsTab
+					speciesName="Robin"
+					viewedGroupId={1}
+					isActive={true}
+				/>
+			);
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(12)
+			);
+			expect(
+				(screen.getByRole('radio', { name: 'Combined' }) as HTMLInputElement)
+					.checked
+			).toBe(true);
+			expect(
+				(screen.getByRole('radio', { name: 'Encounter' }) as HTMLInputElement)
+					.disabled
+			).toBe(true);
+		});
+
+		it('switching the toggle off renders one row per (month, year) combination returned for the species, without summing', async () => {
+			render(
+				<SpCombinedMonthTotalsTab
+					speciesName="Robin"
+					viewedGroupId={1}
+					isActive={true}
+				/>
+			);
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(12)
+			);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+
+			expect(document.querySelectorAll('tbody tr').length).toBe(3);
+			expect(
+				screen.getByRole('link', { name: 'January 2020' }).getAttribute('href')
+			).toBe('/species/Robin/2020/1');
+			expect(
+				screen.getByRole('link', { name: 'January 2021' }).getAttribute('href')
+			).toBe('/species/Robin/2021/1');
+			expect(
+				screen.getByRole('link', { name: 'August 2020' }).getAttribute('href')
+			).toBe('/species/Robin/2020/8');
+		});
+
+		it("switching the toggle off enables the bird/encounter toggle, and selecting 'Bird' re-derives the rendered rows as bird-based", async () => {
+			const { fetchSpeciesPeriodTotals } =
+				await import('@/app/actions/sp-data');
+			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
+				buildMonthlyStat({
+					time_period: '2020-01-01',
+					pullus_bird_count: 2,
+					...({ pullus_enc_count: 5 } as Partial<AggregateStatsResult>)
+				})
+			]);
+			render(
+				<SpCombinedMonthTotalsTab
+					speciesName="Robin"
+					viewedGroupId={1}
+					isActive={true}
+				/>
+			);
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(12)
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
+
+			const getPullusCell = () =>
+				document.querySelector('tbody tr')?.querySelectorAll('td')[8];
+			// Unlocked, the toggle defaults to 'Bird' (matching every other
+			// unlocked `PeriodTotalsTable` usage), so the bird-based count is
+			// already showing without needing to click anything.
+			expect(
+				(screen.getByRole('radio', { name: 'Bird' }) as HTMLInputElement)
+					.checked
+			).toBe(true);
+			expect(getPullusCell()?.textContent).toBe('2');
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Encounter' }));
+			expect(getPullusCell()?.textContent).toBe('5');
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Bird' }));
+			expect(getPullusCell()?.textContent).toBe('2');
+		});
+
+		it('switching the toggle back on restores the combined, encounters-only view and disables the bird/encounter toggle again', async () => {
+			render(
+				<SpCombinedMonthTotalsTab
+					speciesName="Robin"
+					viewedGroupId={1}
+					isActive={true}
+				/>
+			);
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(12)
+			);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+			expect(document.querySelectorAll('tbody tr').length).toBe(3);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Combined' }));
+			expect(document.querySelectorAll('tbody tr').length).toBe(12);
+			expect(
+				(screen.getByRole('radio', { name: 'Encounter' }) as HTMLInputElement)
+					.disabled
+			).toBe(true);
+		});
+	});
+
+	describe('Structure', () => {
+		it('the combine-years control is the same shared component/pattern used by the group-wide all-time Month totals tab (#635), not a bespoke implementation', async () => {
+			render(
+				<SpCombinedMonthTotalsTab
+					speciesName="Robin"
+					viewedGroupId={1}
+					isActive={true}
+				/>
+			);
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(12)
+			);
+			// `CombineYearsToggle`'s exact copy/markup (shared with
+			// `SummaryTotalsSection`'s `AllTimeMonthTotalsTab`) rather than a
+			// bespoke species-only control.
+			expect(screen.getByText('Combine years:')).toBeTruthy();
+			expect(screen.getByRole('radio', { name: 'Combined' })).toBeTruthy();
+			expect(screen.getByRole('radio', { name: 'By year' })).toBeTruthy();
+		});
+
+		it('per-row (toggle-off) rows link to /species/{speciesName}/{year}/{month} for each row', async () => {
+			render(
+				<SpCombinedMonthTotalsTab
+					speciesName="Blackbird"
+					viewedGroupId={1}
+					isActive={true}
+				/>
+			);
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(12)
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+
+			[
+				['January 2020', '/species/Blackbird/2020/1'],
+				['January 2021', '/species/Blackbird/2021/1'],
+				['August 2020', '/species/Blackbird/2020/8']
+			].forEach(([label, href]) => {
+				expect(
+					screen.getByRole('link', { name: label }).getAttribute('href')
+				).toBe(href);
+			});
+		});
+	});
+
+	describe('Edge', () => {
+		it('a species with data in only one year renders matching values for that month whether combine-years is on or off', async () => {
+			const { fetchSpeciesPeriodTotals } =
+				await import('@/app/actions/sp-data');
+			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
+				buildMonthlyStat({ time_period: '2020-01-01', encounter_count: 30 })
+			]);
+			render(
+				<SpCombinedMonthTotalsTab
+					speciesName="Robin"
+					viewedGroupId={1}
+					isActive={true}
+				/>
+			);
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(12)
+			);
+			// Combined: with only one contributing year, the January bucket's
+			// summed value equals that single year's own value.
+			const combinedJanuaryRow = screen.getByText('January').closest('tr');
+			const combinedCells = combinedJanuaryRow?.querySelectorAll('td') ?? [];
+			expect(combinedCells[4]?.textContent).toBe('30');
+
+			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
+			const perYearRow = document.querySelector('tbody tr');
+			const perYearCells = perYearRow?.querySelectorAll('td') ?? [];
+			expect(perYearCells[4]?.textContent).toBe('30');
+		});
+
+		it("a species with no recorded data shows 12 zero-filled rows when combined, and 'No data recorded.' when combine-years is off, without erroring", async () => {
+			const { fetchSpeciesPeriodTotals } =
+				await import('@/app/actions/sp-data');
+			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([]);
+			render(
+				<SpCombinedMonthTotalsTab
+					speciesName="Robin"
+					viewedGroupId={1}
+					isActive={true}
+				/>
+			);
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(12)
+			);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+
+			expect(screen.getByText('No data recorded.')).toBeTruthy();
+			expect(document.querySelectorAll('tbody tr').length).toBe(0);
+		});
+
+		it('toggling combine-years on and off repeatedly does not trigger any additional fetch of species period totals', async () => {
+			const { fetchSpeciesPeriodTotals } =
+				await import('@/app/actions/sp-data');
+			render(
+				<SpCombinedMonthTotalsTab
+					speciesName="Robin"
+					viewedGroupId={1}
+					isActive={true}
+				/>
+			);
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(12)
+			);
+			expect(fetchSpeciesPeriodTotals).toHaveBeenCalledTimes(1);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+			fireEvent.click(screen.getByRole('radio', { name: 'Combined' }));
+			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
+
+			expect(fetchSpeciesPeriodTotals).toHaveBeenCalledTimes(1);
 		});
 	});
 });
