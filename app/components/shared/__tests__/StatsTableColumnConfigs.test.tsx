@@ -70,6 +70,16 @@ describe('createNameLinkCell', () => {
 			'/species/Reed%20%26%20Sedge'
 		);
 	});
+
+	it('renders the name as plain text (no link) when buildHref returns an empty string', () => {
+		const Cell = createNameLinkCell<Raw, Model>(
+			(model) => model.name,
+			() => ''
+		);
+		render(<Cell model={makeRow('January')} />);
+		expect(screen.queryByRole('link')).toBeNull();
+		expect(screen.getByText('January').tagName).toBe('SPAN');
+	});
 });
 
 describe('columnBlock', () => {

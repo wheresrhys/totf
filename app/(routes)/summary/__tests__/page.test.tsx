@@ -11,9 +11,11 @@ import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 const fetchYearlyTotalsMock = vi.fn().mockResolvedValue([]);
+const fetchPeriodStatsMock = vi.fn().mockResolvedValue([]);
 vi.mock('@/app/actions/summary-stats', () => ({
 	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args),
-	fetchYearlyTotals: (...args: unknown[]) => fetchYearlyTotalsMock(...args)
+	fetchYearlyTotals: (...args: unknown[]) => fetchYearlyTotalsMock(...args),
+	fetchPeriodStats: (...args: unknown[]) => fetchPeriodStatsMock(...args)
 }));
 
 const fetchSpeciesDataMock = vi.fn().mockResolvedValue([]);
@@ -50,6 +52,7 @@ describe('/summary (all-time)', () => {
 		cleanup();
 		fetchSummaryStatsMock.mockClear();
 		fetchYearlyTotalsMock.mockClear();
+		fetchPeriodStatsMock.mockClear();
 		fetchSpeciesDataMock.mockClear();
 		fetchPeriodTotalsMock.mockClear();
 		fetchPeriodTotalsMock.mockResolvedValue([]);
@@ -105,6 +108,14 @@ describe('/summary (all-time)', () => {
 		expect(data.yearlyTotals).toBe(yearlyStats);
 	});
 
+	it('renders the all-time "Month totals" tab, without eagerly fetching its period stats', async () => {
+		render(await Page());
+		await screen.findByRole('heading', { level: 1 });
+		expect(screen.getByRole('button', { name: 'Month totals' })).toBeTruthy();
+		// Lazy: the tab exists but its data isn't fetched until first selected.
+		expect(fetchPeriodStatsMock).not.toHaveBeenCalled();
+	});
+
 	describe('Session totals tab', () => {
 		it("selecting the Session totals tab fetches day-grouped totals for the group's entire history, with no date bounds", async () => {
 			fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
@@ -134,12 +145,13 @@ describe('/summary (all-time)', () => {
 			);
 		});
 
-		it('Session totals tab appears immediately after Year totals, which remains the default tab', async () => {
+		it('Session totals tab appears after Month totals, with Year totals remaining the default tab', async () => {
 			render(await Page());
 			await screen.findByRole('heading', { level: 1 });
 			const tabs = screen.getAllByRole('button');
 			expect(tabs.map((tab) => tab.textContent)).toEqual([
 				'Year totals',
+				'Month totals',
 				'Session totals',
 				'Species totals'
 			]);

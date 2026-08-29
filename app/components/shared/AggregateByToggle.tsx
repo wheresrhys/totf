@@ -14,10 +14,14 @@ const OPTIONS: { value: AggregateByValue; label: string }[] = [
 // `WeightAndWingChart`.
 export function AggregateByToggle({
 	value,
-	onChange
+	onChange,
+	disabled = false
 }: {
 	value: AggregateByValue;
 	onChange: (value: AggregateByValue) => void;
+	// When set, the toggle still renders (so its locked state stays visible) but
+	// the options can't be changed — used by tabs whose aggregation is fixed.
+	disabled?: boolean;
 }) {
 	return (
 		<div className="flex items-center justify-center gap-2">
@@ -27,7 +31,9 @@ export function AggregateByToggle({
 					<label
 						key={option.value}
 						htmlFor={`aggregate-by-toggle-${option.value}`}
-						className="btn btn-sm btn-text has-checked:btn-active"
+						className={`btn btn-sm btn-text has-checked:btn-active${
+							disabled ? ' btn-disabled pointer-events-none' : ''
+						}`}
 					>
 						<span>{option.label}</span>
 						<input
@@ -36,6 +42,7 @@ export function AggregateByToggle({
 							type="radio"
 							className="hidden"
 							checked={value === option.value}
+							disabled={disabled}
 							onChange={() => onChange(option.value)}
 						/>
 					</label>

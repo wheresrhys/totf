@@ -34,6 +34,7 @@ function AllTimeSummary({
 		<SummaryPageContent
 			summaryStats={data.summaryStats}
 			yearlyTotals={data.yearlyTotals}
+			showAllTimeMonthTotals
 			lazySessionTotals
 			viewedGroup={viewedGroup}
 		/>

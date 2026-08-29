@@ -28,7 +28,8 @@ import {
 
 function buildColumnConfigs(
 	firstColumnHeader: string,
-	hasPulli: boolean
+	hasPulli: boolean,
+	dashIndividuals: boolean
 ): Partial<Record<keyof PeriodTotalsRow, ColumnConfig>> {
 	return {
 		timePeriod: {
@@ -44,7 +45,12 @@ function buildColumnConfigs(
 		},
 		speciesCount: { label: 'Species' },
 		encounterCount: { label: 'Encounters' },
-		individualsCount: { label: 'Individuals' },
+		// On an encounters-only tab a per-period bird count is meaningless, so
+		// the whole column renders a `'-'` placeholder rather than a number.
+		individualsCount: {
+			label: 'Individuals',
+			...(dashIndividuals ? { formatter: () => '-' } : {})
+		},
 		...buildStandardColumnConfigs<PeriodTotalsRow>(hasPulli)
 	};
 }
@@ -55,7 +61,9 @@ export function PeriodTotalsTable({
 	firstColumnHeader,
 	buildHref,
 	buildLabel,
-	totalsStats
+	totalsStats,
+	aggregationFixedTo,
+	dashIndividuals = false
 }: {
 	grouping: PeriodTotalsGrouping;
 	rows: AggregateStatsResult[];
@@ -66,11 +74,18 @@ export function PeriodTotalsTable({
 	// from integer year/month rather than parsing the `time_period` string.
 	buildLabel?: (timePeriod: string) => string;
 	totalsStats?: AggregateStatsResult;
+	// When set, aggregation is locked to this value and the Bird/Encounter toggle
+	// still renders but is disabled — the all-time "Month totals" tab fixes it to
+	// `'encounter'`, since combine-years bird counts aren't meaningful.
+	aggregationFixedTo?: AggregateByValue;
+	// Renders every Individuals cell (data rows and the totals row) as `'-'`.
+	dashIndividuals?: boolean;
 }) {
 	// Local to this table (not persisted across tab switches) — resets to
 	// 'bird' whenever `SummaryTotalsSection` remounts this table for a
-	// different tab, per #604.
-	const [aggregateBy, setAggregateBy] = useState<AggregateByValue>('bird');
+	// different tab, per #604. Ignored when `aggregationFixedTo` locks the mode.
+	const [aggregateByState, setAggregateBy] = useState<AggregateByValue>('bird');
+	const aggregateBy = aggregationFixedTo ?? aggregateByState;
 
 	if (rows.length === 0) {
 		return <p>No data recorded.</p>;
@@ -85,12 +100,17 @@ export function PeriodTotalsTable({
 		buildLabel ??
 		((timePeriod: string) => formatPeriodTotalsLabel(grouping, timePeriod));
 	const hasPulli = rows.some((stat) => activeDeriveRow(stat).pullus > 0);
-	const columnConfigs = buildColumnConfigs(firstColumnHeader, hasPulli);
+	const columnConfigs = buildColumnConfigs(
+		firstColumnHeader,
+		hasPulli,
+		dashIndividuals
+	);
 
 	const totalsRow = totalsStats
 		? buildTotalsRowCells<PeriodTotalsRow>({
 				columnConfigs,
-				totalsRowModel: activeDeriveRow(totalsStats)
+				totalsRowModel: activeDeriveRow(totalsStats),
+				...(dashIndividuals ? { cellOverrides: { individualsCount: '-' } } : {})
 			})
 		: undefined;
 
@@ -151,7 +171,11 @@ export function PeriodTotalsTable({
 				spanFromColumn: 'new',
 				spanToColumn: 'unknownAge',
 				content: (
-					<AggregateByToggle value={aggregateBy} onChange={setAggregateBy} />
+					<AggregateByToggle
+						value={aggregateBy}
+						onChange={setAggregateBy}
+						disabled={aggregationFixedTo !== undefined}
+					/>
 				)
 			}}
 			TableBodyComponent={PeriodTotalsTableBody}

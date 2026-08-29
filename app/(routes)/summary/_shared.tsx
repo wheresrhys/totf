@@ -16,6 +16,7 @@ export function SummaryPage({
 	monthTotals,
 	yearlyTotals,
 	sessionTotals,
+	showAllTimeMonthTotals,
 	lazySessionTotals,
 	viewedGroup,
 	fromDate,
@@ -27,6 +28,9 @@ export function SummaryPage({
 	monthTotals?: MonthTotalsRow[];
 	yearlyTotals?: AggregateStatsResult[];
 	sessionTotals?: AggregateStatsResult[];
+	// Only the all-time page sets this — enables the combine-years "Month totals"
+	// tab (data fetched lazily on select, not passed in).
+	showAllTimeMonthTotals?: boolean;
 	// The all-time and year summary pages set this to show a Session totals tab
 	// whose data is fetched lazily on first select (see
 	// `SummaryTotalsSection`'s `lazySessionTotals` prop) rather than supplied
@@ -56,6 +60,7 @@ export function SummaryPage({
 				monthTotals={monthTotals}
 				yearlyTotals={yearlyTotals}
 				sessionTotals={sessionTotals}
+				showAllTimeMonthTotals={showAllTimeMonthTotals}
 				lazySessionTotals={lazySessionTotals}
 				viewedGroup={viewedGroup}
 				fromDate={fromDate}

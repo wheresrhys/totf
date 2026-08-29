@@ -17,6 +17,11 @@ vi.mock('@/app/actions/spp-data', () => ({
 	fetchSpeciesData: (...args: unknown[]) => fetchSpeciesDataMock(...args)
 }));
 
+const fetchPeriodStatsMock = vi.fn();
+vi.mock('@/app/actions/summary-stats', () => ({
+	fetchPeriodStats: (...args: unknown[]) => fetchPeriodStatsMock(...args)
+}));
+
 const fetchPeriodTotalsMock = vi.fn();
 vi.mock('@/app/actions/period-totals', () => ({
 	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
@@ -103,14 +108,39 @@ function buildYearlyStat(
 	} as AggregateStatsResult;
 }
 
+// Monthly (year, month) stats as `fetchPeriodStats(_, 'month')` returns them —
+// two Januaries and one August, to exercise the combine-years fold.
+const monthlyPeriodStats: AggregateStatsResult[] = [
+	buildYearlyStat({
+		time_period: '2020-01-01',
+		session_count: 4,
+		encounter_count: 30,
+		bird_count: 25
+	}),
+	buildYearlyStat({
+		time_period: '2021-01-01',
+		session_count: 6,
+		encounter_count: 45,
+		bird_count: 33
+	}),
+	buildYearlyStat({
+		time_period: '2020-08-01',
+		session_count: 2,
+		encounter_count: 11,
+		bird_count: 9
+	})
+];
+
 describe('SummaryTotalsSection', () => {
 	beforeEach(() => {
 		fetchSpeciesDataMock.mockResolvedValue(speciesStats);
+		fetchPeriodStatsMock.mockResolvedValue(monthlyPeriodStats);
 		fetchPeriodTotalsMock.mockResolvedValue([]);
 	});
 	afterEach(() => {
 		cleanup();
 		fetchSpeciesDataMock.mockReset();
+		fetchPeriodStatsMock.mockReset();
 		fetchPeriodTotalsMock.mockReset();
 	});
 
@@ -390,6 +420,110 @@ describe('SummaryTotalsSection', () => {
 				/>
 			);
 			expect(screen.getByTestId('totals-row').textContent).toContain('99');
+		});
+	});
+
+	describe('all-time "Month totals" tab', () => {
+		// The all-time page shape: yearlyTotals present (Year totals tab) plus the
+		// combine-years month tab enabled.
+		const allTimeProps = {
+			yearlyTotals: [buildYearlyStat()],
+			showAllTimeMonthTotals: true,
+			viewedGroup
+		};
+
+		describe('Usual', () => {
+			it('renders the Month totals tab when showAllTimeMonthTotals is set, alongside Year totals and Species totals', () => {
+				render(<SummaryTotalsSection {...allTimeProps} />);
+				const tabs = screen.getAllByRole('button');
+				expect(tabs.map((tab) => tab.textContent)).toEqual([
+					'Year totals',
+					'Month totals',
+					'Species totals'
+				]);
+			});
+
+			it('renders 12 rows labelled Jan–Dec when the tab is active', async () => {
+				render(<SummaryTotalsSection {...allTimeProps} />);
+				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+				await waitFor(() =>
+					expect(document.querySelectorAll('tbody tr').length).toBe(12)
+				);
+				['January', 'June', 'December'].forEach((monthName) => {
+					expect(screen.getByText(monthName)).toBeTruthy();
+				});
+				// Combine-years labels are month name only — no year, no link.
+				expect(screen.queryByText('January 2020')).toBeNull();
+				expect(screen.queryByRole('link', { name: 'January' })).toBeNull();
+			});
+		});
+
+		describe('Structure', () => {
+			it('does not render the Month totals tab when showAllTimeMonthTotals is undefined', () => {
+				render(
+					<SummaryTotalsSection
+						yearlyTotals={[buildYearlyStat()]}
+						viewedGroup={viewedGroup}
+					/>
+				);
+				expect(
+					screen.queryByRole('button', { name: 'Month totals' })
+				).toBeNull();
+			});
+
+			it('keeps Year totals as the default/active tab even when Month totals is present', () => {
+				render(<SummaryTotalsSection {...allTimeProps} />);
+				expect(
+					screen
+						.getByRole('button', { name: 'Year totals' })
+						.getAttribute('aria-current')
+				).toBe('true');
+				expect(
+					screen
+						.getByRole('button', { name: 'Month totals' })
+						.getAttribute('aria-current')
+				).toBeNull();
+			});
+		});
+
+		describe('Edge', () => {
+			it("shows '-' in the Individuals column for every row on this tab", async () => {
+				render(
+					<SummaryTotalsSection {...allTimeProps} summaryStats={summaryStats} />
+				);
+				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+				await waitFor(() =>
+					expect(document.querySelectorAll('tbody tr').length).toBe(12)
+				);
+				document.querySelectorAll('tbody tr').forEach((row) => {
+					const cells = row.querySelectorAll('td');
+					expect(cells[5].textContent).toBe('-');
+				});
+				// The pinned totals row is encounters-only here too.
+				const totalsCells = screen
+					.getByTestId('totals-row')
+					.querySelectorAll('td');
+				expect(totalsCells[5].textContent).toBe('-');
+			});
+
+			it("disables the Aggregate-by toggle (locked to Encounter) only on this tab — the Year totals tab's toggle stays interactive", async () => {
+				render(<SummaryTotalsSection {...allTimeProps} />);
+				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+				await waitFor(() =>
+					expect(document.querySelectorAll('tbody tr').length).toBe(12)
+				);
+				const fixedEncounter = screen.getByRole('radio', {
+					name: 'Encounter'
+				}) as HTMLInputElement;
+				expect(fixedEncounter.checked).toBe(true);
+				expect(fixedEncounter.disabled).toBe(true);
+
+				fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
+				const freeEncounter = screen.getByRole('radio', {
+					name: 'Encounter'
+				}) as HTMLInputElement;
+				expect(freeEncounter.disabled).toBe(false);
+			});
 		});
 	});
 

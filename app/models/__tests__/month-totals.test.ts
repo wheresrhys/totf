@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { buildMonthTotalsRows } from '../month-totals';
-import { formatPostgresIntervalForDisplay } from '@/lib/postgres-interval';
+import {
+	buildMonthTotalsRows,
+	buildCombinedMonthTotalsRows
+} from '../month-totals';
+import {
+	formatPostgresIntervalForDisplay,
+	postgresIntervalToSeconds
+} from '@/lib/postgres-interval';
 import type { AggregateStatsResult } from '@/app/models/db';
 
 function buildStat(
@@ -179,6 +185,121 @@ describe('buildMonthTotalsRows', () => {
 			expect(formatPostgresIntervalForDisplay(rows[0].stats.total_effort)).toBe(
 				'0'
 			);
+		});
+	});
+});
+
+describe('buildCombinedMonthTotalsRows', () => {
+	describe('Usual', () => {
+		it('returns exactly 12 rows in Jan→Dec order, each labelled by month name only (no year)', () => {
+			const rows = buildCombinedMonthTotalsRows([]);
+			expect(rows).toHaveLength(12);
+			expect(rows.map((row) => row.label)).toEqual([
+				'January',
+				'February',
+				'March',
+				'April',
+				'May',
+				'June',
+				'July',
+				'August',
+				'September',
+				'October',
+				'November',
+				'December'
+			]);
+		});
+	});
+
+	describe('Structure', () => {
+		it('sums session_count/encounter_count across every year sharing the same calendar month', () => {
+			const rows = buildCombinedMonthTotalsRows([
+				monthStat(2020, 1, { session_count: 4, encounter_count: 30 }),
+				monthStat(2021, 1, { session_count: 6, encounter_count: 45 }),
+				monthStat(2022, 1, { session_count: 1, encounter_count: 5 })
+			]);
+			const january = rows[0];
+			expect(january.stats.session_count).toBe(11);
+			expect(january.stats.encounter_count).toBe(80);
+		});
+
+		it('sums total_effort correctly across years rather than taking the last year value', () => {
+			const rows = buildCombinedMonthTotalsRows([
+				monthStat(2020, 1, { total_effort: '10:00:00' }),
+				monthStat(2021, 1, { total_effort: '05:30:00' })
+			]);
+			// 10h + 5h30m = 15h30m = 55800s — a sum, not the last year's 5h30m.
+			expect(postgresIntervalToSeconds(rows[0].stats.total_effort)).toBe(55800);
+		});
+
+		it('sums species_count across years as a documented approximation (does not attempt cross-year de-duplication)', () => {
+			const rows = buildCombinedMonthTotalsRows([
+				monthStat(2020, 1, { species_count: 12 }),
+				monthStat(2021, 1, { species_count: 9 })
+			]);
+			// Deliberate over-count: the same species in Jan 2020 and Jan 2021
+			// contributes twice — an exact distinct count is out of scope.
+			expect(rows[0].stats.species_count).toBe(21);
+		});
+	});
+
+	describe('Edge', () => {
+		it('zero-fills a calendar month with no sessions in any year', () => {
+			const rows = buildCombinedMonthTotalsRows([
+				monthStat(2020, 1, { session_count: 4, encounter_count: 30 })
+			]);
+			const february = rows[1];
+			expect(february.stats.session_count).toBe(0);
+			expect(february.stats.encounter_count).toBe(0);
+			expect(february.stats.total_effort).toBe('00:00:00');
+		});
+
+		it('degenerates to the same per-month totals as a single year of history', () => {
+			const singleYear = [
+				monthStat(2026, 3, { session_count: 5, encounter_count: 40 }),
+				monthStat(2026, 7, { session_count: 2, encounter_count: 11 })
+			];
+			const rows = buildCombinedMonthTotalsRows(singleYear);
+			expect(rows[2].stats.session_count).toBe(5);
+			expect(rows[2].stats.encounter_count).toBe(40);
+			expect(rows[6].stats.session_count).toBe(2);
+			expect(rows[6].stats.encounter_count).toBe(11);
+		});
+
+		it('produces Jan→Dec order regardless of input row order', () => {
+			const rows = buildCombinedMonthTotalsRows([
+				monthStat(2021, 12, { session_count: 1 }),
+				monthStat(2020, 3, { session_count: 2 }),
+				monthStat(2022, 1, { session_count: 3 })
+			]);
+			expect(rows.map((row) => row.label)).toEqual([
+				'January',
+				'February',
+				'March',
+				'April',
+				'May',
+				'June',
+				'July',
+				'August',
+				'September',
+				'October',
+				'November',
+				'December'
+			]);
+			expect(rows[0].stats.session_count).toBe(3);
+			expect(rows[2].stats.session_count).toBe(2);
+			expect(rows[11].stats.session_count).toBe(1);
+		});
+
+		it('returns all-zero rows for 12 months when periodStats is empty', () => {
+			const rows = buildCombinedMonthTotalsRows([]);
+			expect(rows).toHaveLength(12);
+			rows.forEach((row) => {
+				expect(row.stats.session_count).toBe(0);
+				expect(row.stats.encounter_count).toBe(0);
+				expect(row.stats.bird_count).toBe(0);
+				expect(row.stats.total_effort).toBe('00:00:00');
+			});
 		});
 	});
 });
