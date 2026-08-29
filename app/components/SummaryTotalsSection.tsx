@@ -5,11 +5,22 @@ import { SpeciesTotalsTable } from '@/app/components/SpeciesTotalsTable';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
+import { fetchPeriodStats } from '@/app/actions/summary-stats';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
-import type { MonthTotalsRow } from '@/app/models/month-totals';
+import {
+	buildCombinedMonthTotalsRows,
+	type MonthTotalsRow
+} from '@/app/models/month-totals';
 
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
+// The all-time page's combine-years month tab — distinct from `MONTH_TOTALS_TAB`
+// (the year page's per-year, linked, toggle-enabled month rows). Same label,
+// different semantics: 12 rows summed across every year, encounters-only.
+const ALL_TIME_MONTH_TOTALS_TAB = {
+	id: 'all-time-month-totals',
+	label: 'Month totals'
+};
 const YEAR_TOTALS_TAB = { id: 'year-totals', label: 'Year totals' };
 const SESSION_TOTALS_TAB = { id: 'session-totals', label: 'Session totals' };
 const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
@@ -19,6 +30,7 @@ export function SummaryTotalsSection({
 	monthTotals,
 	yearlyTotals,
 	sessionTotals,
+	showAllTimeMonthTotals,
 	viewedGroup,
 	fromDate,
 	toDate,
@@ -39,6 +51,11 @@ export function SummaryTotalsSection({
 	// both the per-day rows and a group to build session links for. undefined
 	// means "this page has no Session totals tab".
 	sessionTotals?: AggregateStatsResult[];
+	// Only the all-time page sets this — it enables the combine-years "Month
+	// totals" tab, whose data (unlike the year page's `monthTotals` prop) is
+	// fetched lazily on first selection rather than passed in, so this is just a
+	// boolean gate, not the data itself.
+	showAllTimeMonthTotals?: boolean;
 	// The viewed group whose id scopes the lazy Species-totals fetch. All three
 	// summary pages supply it; the Session totals tab additionally needs it to
 	// build session links.
@@ -64,6 +81,7 @@ export function SummaryTotalsSection({
 	const tabs = [
 		...(yearlyTotals !== undefined ? [YEAR_TOTALS_TAB] : []),
 		...(monthTotals ? [MONTH_TOTALS_TAB] : []),
+		...(showAllTimeMonthTotals ? [ALL_TIME_MONTH_TOTALS_TAB] : []),
 		...(showSessionTotals ? [SESSION_TOTALS_TAB] : []),
 		SPECIES_TOTALS_TAB
 	];
@@ -90,6 +108,36 @@ export function SummaryTotalsSection({
 					error
 				})
 		}
+	);
+
+	// The all-time combine-years month tab fetches lazily too, on first select —
+	// one row per (year, month) across the group's full history, folded into 12
+	// calendar-month buckets client-side. Encounters-only, so it needs no date
+	// range (all-time) and no per-year drill-down link.
+	const isAllTimeMonthActive = activeTab === ALL_TIME_MONTH_TOTALS_TAB.id;
+	const fetchCombinedMonthStats = useCallback(
+		() => fetchPeriodStats(viewedGroup!.id, 'month'),
+		[viewedGroup]
+	);
+	const { data: combinedMonthStats, isLoading: isCombinedMonthLoading } =
+		useLazyTabData(
+			isAllTimeMonthActive && viewedGroup !== undefined,
+			fetchCombinedMonthStats,
+			{
+				onError: (error) =>
+					console.error('Failed to fetch all-time month totals', {
+						viewedGroupId: viewedGroup?.id,
+						error
+					})
+			}
+		);
+	const combinedMonthRows = combinedMonthStats
+		? buildCombinedMonthTotalsRows(combinedMonthStats)
+		: [];
+	// The month name is precomputed per bucket in the model; look it back up by
+	// the row's sentinel `time_period` (there's no year to link to, so no href).
+	const combinedMonthLabelByTimePeriod = new Map(
+		combinedMonthRows.map((row) => [row.stats.time_period, row.label])
 	);
 
 	// Label/href are precomputed per month in the model (timezone-safe); look
@@ -132,6 +180,27 @@ export function SummaryTotalsSection({
 					totalsStats={totalsStats}
 				/>
 			)}
+			{isAllTimeMonthActive &&
+				(isCombinedMonthLoading ? (
+					<div className="flex items-center justify-center">
+						<div className="loading loading-spinner loading-xl"></div>
+					</div>
+				) : (
+					<PeriodTotalsTable
+						grouping="month"
+						rows={combinedMonthRows.map((row) => row.stats)}
+						firstColumnHeader="Month"
+						// No single year to drill into — an empty href renders the
+						// month label as plain text rather than a link.
+						buildHref={() => ''}
+						buildLabel={(timePeriod) =>
+							combinedMonthLabelByTimePeriod.get(timePeriod) ?? ''
+						}
+						totalsStats={totalsStats}
+						fixedAggregateBy="encounter"
+						dashIndividuals
+					/>
+				))}
 			{sessionTotals !== undefined &&
 				viewedGroup !== undefined &&
 				activeTab === SESSION_TOTALS_TAB.id && (
