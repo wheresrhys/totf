@@ -1,8 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { TabNav } from '@/app/components/TabNav';
 import { SpeciesTotalsTable } from '@/app/components/SpeciesTotalsTable';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
+import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
+import { fetchSpeciesData } from '@/app/actions/spp-data';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { MonthTotalsRow } from '@/app/models/month-totals';
@@ -13,16 +15,16 @@ const SESSION_TOTALS_TAB = { id: 'session-totals', label: 'Session totals' };
 const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
 
 export function SummaryTotalsSection({
-	speciesStats,
 	summaryStats,
 	monthTotals,
 	yearlyTotals,
 	sessionTotals,
 	viewedGroup,
+	fromDate,
+	toDate,
 	year,
 	month
 }: {
-	speciesStats: AggregateStatsResult[];
 	// The page's aggregate stats for whichever table/tab is active — used to
 	// derive the pinned totals row. `null` (no data yet) renders no totals row.
 	summaryStats?: AggregateStatsResult | null;
@@ -37,7 +39,15 @@ export function SummaryTotalsSection({
 	// both the per-day rows and a group to build session links for. undefined
 	// means "this page has no Session totals tab".
 	sessionTotals?: AggregateStatsResult[];
+	// The viewed group whose id scopes the lazy Species-totals fetch. All three
+	// summary pages supply it; the Session totals tab additionally needs it to
+	// build session links.
 	viewedGroup?: ViewedGroup;
+	// The date range the Species-totals fetch is scoped to — matches the bounds
+	// the page used for its other stats. Both undefined on the all-time page
+	// (unscoped, all-time species totals).
+	fromDate?: string;
+	toDate?: string;
 	// The page's own period, mirroring `SummaryPage`'s `year`/`month` props —
 	// threaded into `SpeciesTotalsTable` so its species links carry the same
 	// period into the target `/species/{name}[/{year}[/{month}]]` URL (#625).
@@ -58,6 +68,29 @@ export function SummaryTotalsSection({
 		SPECIES_TOTALS_TAB
 	];
 	const [activeTab, setActiveTab] = useState(tabs[0].id);
+
+	// Species totals are fetched lazily: only once the Species tab is first
+	// selected (or on first paint when it is the sole/default tab), and never
+	// again for the component's mounted lifetime — the page no longer eagerly
+	// fetches this data server-side.
+	const isSpeciesActive = activeTab === SPECIES_TOTALS_TAB.id;
+	const fetchSpeciesStats = useCallback(
+		() => fetchSpeciesData(viewedGroup!.id, fromDate, toDate),
+		[viewedGroup, fromDate, toDate]
+	);
+	const { data: speciesStats, isLoading: isSpeciesLoading } = useLazyTabData(
+		isSpeciesActive && viewedGroup !== undefined,
+		fetchSpeciesStats,
+		{
+			onError: (error) =>
+				console.error('Failed to fetch species totals', {
+					viewedGroupId: viewedGroup?.id,
+					fromDate,
+					toDate,
+					error
+				})
+		}
+	);
 
 	// Label/href are precomputed per month in the model (timezone-safe); look
 	// them back up by `time_period` so the shared table renders those rather
@@ -112,13 +145,18 @@ export function SummaryTotalsSection({
 						totalsStats={totalsStats}
 					/>
 				)}
-			{activeTab === SPECIES_TOTALS_TAB.id && (
-				<SpeciesTotalsTable
-					speciesStats={speciesStats}
-					totalsStats={totalsStats}
-					period={year === undefined ? undefined : { year, month }}
-				/>
-			)}
+			{isSpeciesActive &&
+				(isSpeciesLoading ? (
+					<div className="flex items-center justify-center">
+						<div className="loading loading-spinner loading-xl"></div>
+					</div>
+				) : (
+					<SpeciesTotalsTable
+						speciesStats={speciesStats ?? []}
+						totalsStats={totalsStats}
+						period={year === undefined ? undefined : { year, month }}
+					/>
+				))}
 		</>
 	);
 }
