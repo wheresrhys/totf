@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	fireEvent,
+	waitFor
+} from '@testing-library/react';
 import Page, { fetchAllTimeSummaryData } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
@@ -15,12 +21,38 @@ vi.mock('@/app/actions/spp-data', () => ({
 	fetchSpeciesData: (...args: unknown[]) => fetchSpeciesDataMock(...args)
 }));
 
+const fetchPeriodTotalsMock = vi.fn().mockResolvedValue([]);
+vi.mock('@/app/actions/period-totals', () => ({
+	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
+}));
+
+function buildDayStat(time_period: string) {
+	return {
+		species_name: null,
+		time_period,
+		session_count: 1,
+		total_effort: '06:00:00',
+		species_count: 5,
+		bird_count: 12,
+		encounter_count: 14,
+		new_bird_count: 9,
+		pullus_bird_count: 1,
+		juv_bird_count: 2,
+		postjuv_bird_count: 1,
+		adult_bird_count: 6,
+		unknown_age_bird_count: 2,
+		new_young_bird_count: 3
+	};
+}
+
 describe('/summary (all-time)', () => {
 	afterEach(() => {
 		cleanup();
 		fetchSummaryStatsMock.mockClear();
 		fetchYearlyTotalsMock.mockClear();
 		fetchSpeciesDataMock.mockClear();
+		fetchPeriodTotalsMock.mockClear();
+		fetchPeriodTotalsMock.mockResolvedValue([]);
 	});
 
 	it('renders the "All time summary" heading', async () => {
@@ -71,5 +103,73 @@ describe('/summary (all-time)', () => {
 		fetchYearlyTotalsMock.mockResolvedValueOnce(yearlyStats);
 		const data = await fetchAllTimeSummaryData({}, 1);
 		expect(data.yearlyTotals).toBe(yearlyStats);
+	});
+
+	describe('Session totals tab', () => {
+		it("selecting the Session totals tab fetches day-grouped totals for the group's entire history, with no date bounds", async () => {
+			fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
+			render(await Page());
+			await screen.findByRole('heading', { level: 1 });
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await screen.findByRole('link', { name: '16th August 2026' });
+			expect(fetchPeriodTotalsMock).toHaveBeenCalledWith(
+				1,
+				'day',
+				undefined,
+				undefined
+			);
+		});
+
+		it('selecting the Session totals tab a second time does not trigger a second fetch', async () => {
+			render(await Page());
+			await screen.findByRole('heading', { level: 1 });
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await waitFor(() =>
+				expect(fetchPeriodTotalsMock).toHaveBeenCalledTimes(1)
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await waitFor(() =>
+				expect(fetchPeriodTotalsMock).toHaveBeenCalledTimes(1)
+			);
+		});
+
+		it('Session totals tab appears immediately after Year totals, which remains the default tab', async () => {
+			render(await Page());
+			await screen.findByRole('heading', { level: 1 });
+			const tabs = screen.getAllByRole('button');
+			expect(tabs.map((tab) => tab.textContent)).toEqual([
+				'Year totals',
+				'Session totals',
+				'Species totals'
+			]);
+			expect(tabs[0].getAttribute('aria-current')).toBe('true');
+		});
+
+		it("each returned day links to the group-scoped session-temp route via the group's resolved slug", async () => {
+			fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
+			render(await Page());
+			await screen.findByRole('heading', { level: 1 });
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			const link = await screen.findByRole('link', {
+				name: '16th August 2026'
+			});
+			expect(link.getAttribute('href')).toBe(
+				'/group/alpha/session-temp/2026-08-16'
+			);
+		});
+
+		it("the page's initial render (Year totals active) triggers no day-grouped fetch", async () => {
+			render(await Page());
+			await screen.findByRole('heading', { level: 1 });
+			expect(fetchPeriodTotalsMock).not.toHaveBeenCalled();
+		});
+
+		it('renders the shared empty state when the group has no sessions at all', async () => {
+			render(await Page());
+			await screen.findByRole('heading', { level: 1 });
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await screen.findByText('No data recorded.');
+		});
 	});
 });
