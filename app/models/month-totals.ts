@@ -171,9 +171,14 @@ export function buildCombinedMonthTotalsRows(
 // combining/summing — the raw `aggregate_stats` month array (the same array
 // `buildCombinedMonthTotalsRows` folds into 12 buckets), reshaped with a
 // precomputed label/href per row and sorted chronologically regardless of
-// input order.
+// input order. Dataset-agnostic: `buildHref` defaults to the group-wide
+// `/summary/{year}/{month}` shape, but the species-scoped combine-years tab
+// (`SpCombinedMonthTotalsTab`) passes its own `/species/{name}/{year}/{month}`
+// builder to reuse this same sort/label logic.
 export function buildPerYearMonthTotalsRows(
-	periodStats: AggregateStatsResult[]
+	periodStats: AggregateStatsResult[],
+	buildHref: (year: number, month: number) => string = (year, month) =>
+		`/summary/${year}/${month}`
 ): MonthTotalsRow[] {
 	return periodStats
 		.map((stat) => {
@@ -181,7 +186,7 @@ export function buildPerYearMonthTotalsRows(
 			const month = Number(stat.time_period.slice(5, 7));
 			return {
 				label: formatDate(new Date(year, month - 1, 1), 'LLLL yyyy'),
-				href: `/summary/${year}/${month}`,
+				href: buildHref(year, month),
 				stats: stat
 			};
 		})
