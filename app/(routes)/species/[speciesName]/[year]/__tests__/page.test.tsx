@@ -48,6 +48,10 @@ vi.mock('@/app/components/SpMonthTotalsTab', () => ({
 	SpMonthTotalsTab: () => <div data-testid="sp-month-totals-tab" />
 }));
 
+vi.mock('@/app/components/SpSessionTotalsTab', () => ({
+	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
+}));
+
 vi.mock('@/app/components/SpWeightWingTab', () => ({
 	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
@@ -130,6 +134,22 @@ describe('/species/[speciesName]/[year]', () => {
 			await screen.findByTestId('sp-individuals-tab');
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 			await screen.findByTestId('sp-month-totals-tab');
+		});
+
+		it('shows a "Session totals" tab on the year-scoped species page', async () => {
+			render(await renderYearPage());
+			await screen.findByTestId('sp-individuals-tab');
+			expect(
+				screen.getByRole('button', { name: 'Session totals' })
+			).toBeDefined();
+		});
+
+		it('lazily loads SpSessionTotalsTab only once "Session totals" is selected, consistent with the other tabs', async () => {
+			render(await renderYearPage());
+			await screen.findByTestId('sp-individuals-tab');
+			expect(screen.queryByTestId('sp-session-totals-tab')).toBeNull();
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await screen.findByTestId('sp-session-totals-tab');
 		});
 	});
 

@@ -42,6 +42,10 @@ vi.mock('@/app/components/SpYearTotalsTab', () => ({
 	SpYearTotalsTab: () => <div data-testid="sp-year-totals-tab" />
 }));
 
+vi.mock('@/app/components/SpSessionTotalsTab', () => ({
+	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
+}));
+
 vi.mock('@/app/components/SpWeightWingTab', () => ({
 	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
@@ -88,7 +92,7 @@ describe('species detail page', () => {
 			mockFetchPageOfBirds.mockResolvedValue(birds);
 		});
 
-		it('renders all 5 tab buttons: Bird list, Retraps, Trend charts, Year totals, Size plot', async () => {
+		it('renders all 6 tab buttons: Bird list, Retraps, Trend charts, Year totals, Session totals, Size plot', async () => {
 			render(await renderSpeciesPage());
 			await screen.findByTestId('sp-individuals-tab');
 			expect(screen.getByRole('button', { name: 'Bird list' })).toBeDefined();
@@ -97,7 +101,18 @@ describe('species detail page', () => {
 				screen.getByRole('button', { name: 'Trend charts' })
 			).toBeDefined();
 			expect(screen.getByRole('button', { name: 'Year totals' })).toBeDefined();
+			expect(
+				screen.getByRole('button', { name: 'Session totals' })
+			).toBeDefined();
 			expect(screen.getByRole('button', { name: 'Size plot' })).toBeDefined();
+		});
+
+		it('shows a "Session totals" tab on the all-time species page', async () => {
+			render(await renderSpeciesPage());
+			await screen.findByTestId('sp-individuals-tab');
+			expect(
+				screen.getByRole('button', { name: 'Session totals' })
+			).toBeDefined();
 		});
 
 		it('does not render a "Month totals" tab button', async () => {
@@ -137,6 +152,23 @@ describe('species detail page', () => {
 				await screen.findByTestId('sp-individuals-tab');
 				fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
 				await screen.findByTestId('sp-year-totals-tab');
+			});
+		});
+
+		describe('session-totals tab (click to activate)', () => {
+			it('renders SpSessionTotalsTab after clicking Session totals button', async () => {
+				render(await renderSpeciesPage());
+				await screen.findByTestId('sp-individuals-tab');
+				fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+				await screen.findByTestId('sp-session-totals-tab');
+			});
+
+			it('lazily loads SpSessionTotalsTab only once "Session totals" is selected, consistent with the other tabs', async () => {
+				render(await renderSpeciesPage());
+				await screen.findByTestId('sp-individuals-tab');
+				expect(screen.queryByTestId('sp-session-totals-tab')).toBeNull();
+				fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+				await screen.findByTestId('sp-session-totals-tab');
 			});
 		});
 

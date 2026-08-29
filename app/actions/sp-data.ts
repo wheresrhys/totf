@@ -12,6 +12,7 @@ import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/WeightAndWingChart';
 import type { SexedGraphableBird } from '@/app/components/WeightAndWingChart';
 import type { AggregateStatsResult } from '@/app/models/db';
+import type { PeriodTotalsGrouping } from '@/app/models/period-totals';
 export async function fetchPageOfBirds(
 	speciesId: number,
 	viewedGroupId: number,
@@ -168,13 +169,14 @@ export async function getSpeciesStatsHistory(
  * `fetchPeriodTotals` (`app/actions/period-totals.ts`): same `aggregate_stats`
  * call shape, but filtered to one species (`species_name_filter`) instead of
  * grouped across all of them (`group_by_species: false`). Feeds the species
- * page's "Year totals" (all-time page) and "Month totals" (year-scoped page)
- * tabs via the shared `PeriodTotalsTable`.
+ * page's "Year totals" (all-time page), "Month totals" (year-scoped page), and
+ * "Session totals" (all-time/year-scoped pages, day-grouped) tabs via the
+ * shared `PeriodTotalsTable`.
  */
 export async function fetchSpeciesPeriodTotals(
 	speciesName: string,
 	viewedGroupId: number,
-	grouping: 'year' | 'month',
+	grouping: PeriodTotalsGrouping,
 	fromDate?: string,
 	toDate?: string
 ): Promise<AggregateStatsResult[]> {
