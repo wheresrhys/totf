@@ -16,8 +16,9 @@ vi.mock('@/app/actions/summary-stats', () => ({
 	fetchPeriodStats: (...args: unknown[]) => fetchPeriodStatsMock(...args)
 }));
 
+const fetchSpeciesDataMock = vi.fn().mockResolvedValue([]);
 vi.mock('@/app/actions/spp-data', () => ({
-	fetchSpeciesData: vi.fn().mockResolvedValue([])
+	fetchSpeciesData: (...args: unknown[]) => fetchSpeciesDataMock(...args)
 }));
 
 describe('/summary/[year]', () => {
@@ -25,6 +26,8 @@ describe('/summary/[year]', () => {
 		cleanup();
 		fetchSummaryStatsMock.mockClear();
 		fetchPeriodStatsMock.mockClear();
+		fetchSpeciesDataMock.mockReset();
+		fetchSpeciesDataMock.mockResolvedValue([]);
 	});
 
 	it('renders "{year} summary" for a well-formed year', async () => {
@@ -48,14 +51,15 @@ describe('/summary/[year]', () => {
 		);
 	});
 
-	it('fetchYearSummaryData calls fetchSpeciesData with `${year}-01-01` to `${year}-12-31`', async () => {
-		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
+	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
 		await fetchYearSummaryData({ year: '2026' }, 1);
-		expect(fetchSpeciesData).toHaveBeenCalledWith(
-			1,
-			'2026-01-01',
-			'2026-12-31'
-		);
+		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
+	});
+
+	it('returns the year date bounds for the lazy species fetch', async () => {
+		const data = await fetchYearSummaryData({ year: '2026' }, 1);
+		expect(data.fromDate).toBe('2026-01-01');
+		expect(data.toDate).toBe('2026-12-31');
 	});
 
 	it('passes the fetched summary stats through to the rendered section', async () => {
@@ -95,15 +99,19 @@ describe('/summary/[year]', () => {
 		expect(screen.queryByTestId('summary-stats-section')).toBeNull();
 	});
 
-	it('renders species table rows linking to the year-scoped species URL (#625)', async () => {
-		const { fetchSpeciesData } = await import('@/app/actions/spp-data');
-		vi.mocked(fetchSpeciesData).mockResolvedValueOnce([
+	it('lazily renders species table rows linking to the year-scoped species URL (#625)', async () => {
+		fetchSpeciesDataMock.mockResolvedValueOnce([
 			{ ...(alphaStats as object), species_name: 'Robin' }
-		] as never);
+		]);
 		render(await Page({ params: Promise.resolve({ year: '2026' }) }));
 		await screen.findByRole('heading', { level: 1 });
 		fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
-		const link = screen.getByRole('link', { name: 'Robin' });
+		const link = await screen.findByRole('link', { name: 'Robin' });
 		expect(link.getAttribute('href')).toBe('/species/Robin/2026');
+		expect(fetchSpeciesDataMock).toHaveBeenCalledWith(
+			1,
+			'2026-01-01',
+			'2026-12-31'
+		);
 	});
 });

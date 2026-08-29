@@ -1,10 +1,21 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import {
+	render,
+	screen,
+	cleanup,
+	fireEvent,
+	waitFor
+} from '@testing-library/react';
 import { SummaryTotalsSection } from '../SummaryTotalsSection';
 import { buildMonthTotalsRows } from '@/app/models/month-totals';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
+
+const fetchSpeciesDataMock = vi.fn();
+vi.mock('@/app/actions/spp-data', () => ({
+	fetchSpeciesData: (...args: unknown[]) => fetchSpeciesDataMock(...args)
+}));
 
 const speciesStats = speciesDataSnapshot as unknown as AggregateStatsResult[];
 const monthTotals = buildMonthTotalsRows(2026, []);
@@ -88,13 +99,23 @@ function buildYearlyStat(
 }
 
 describe('SummaryTotalsSection', () => {
+	beforeEach(() => {
+		fetchSpeciesDataMock.mockResolvedValue(speciesStats);
+	});
 	afterEach(() => {
 		cleanup();
+		fetchSpeciesDataMock.mockReset();
 	});
 
 	describe('without any period-tab data (day summary page)', () => {
-		it('renders a single "Species totals" tab, active by default, with the table content visible beneath it', () => {
-			render(<SummaryTotalsSection speciesStats={speciesStats} />);
+		it('renders a single "Species totals" tab, active by default, and lazily loads its table content', async () => {
+			render(
+				<SummaryTotalsSection
+					viewedGroup={viewedGroup}
+					fromDate="2026-08-01"
+					toDate="2026-08-31"
+				/>
+			);
 			const tab = screen.getByRole('button', { name: 'Species totals' });
 			expect(tab.getAttribute('aria-current')).toBe('true');
 			expect(screen.queryByRole('button', { name: 'Month totals' })).toBeNull();
@@ -102,27 +123,34 @@ describe('SummaryTotalsSection', () => {
 			expect(
 				screen.queryByRole('button', { name: 'Session totals' })
 			).toBeNull();
-			expect(document.querySelectorAll('tbody tr').length).toBe(
-				speciesStats.length
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(
+					speciesStats.length
+				)
 			);
 		});
 
-		it("renders the table's empty state when speciesStats is empty, without crashing", () => {
-			render(<SummaryTotalsSection speciesStats={[]} />);
+		it("renders the table's empty state when the fetch returns no species, without crashing", async () => {
+			fetchSpeciesDataMock.mockResolvedValue([]);
+			render(<SummaryTotalsSection viewedGroup={viewedGroup} />);
 			expect(
 				screen.getByRole('button', { name: 'Species totals' })
 			).toBeTruthy();
-			expect(document.querySelectorAll('tbody tr').length).toBe(0);
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(0)
+			);
 		});
 
-		it('forwards summaryStats to the Species totals table as its totals row', () => {
+		it('forwards summaryStats to the Species totals table as its totals row', async () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
+					viewedGroup={viewedGroup}
 					summaryStats={summaryStats}
 				/>
 			);
-			expect(screen.getByTestId('totals-row').textContent).toContain('99');
+			await waitFor(() =>
+				expect(screen.getByTestId('totals-row').textContent).toContain('99')
+			);
 		});
 	});
 
@@ -130,8 +158,8 @@ describe('SummaryTotalsSection', () => {
 		it('renders the "Month totals" tab first, active by default', () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					monthTotals={monthTotals}
+					viewedGroup={viewedGroup}
 				/>
 			);
 			const tabs = screen.getAllByRole('button');
@@ -145,8 +173,8 @@ describe('SummaryTotalsSection', () => {
 		it('renders 12 month rows, each linking to /summary/{year}/{month}', () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					monthTotals={monthTotals}
+					viewedGroup={viewedGroup}
 				/>
 			);
 			expect(document.querySelectorAll('tbody tr').length).toBe(12);
@@ -156,25 +184,27 @@ describe('SummaryTotalsSection', () => {
 			expect(decemberLink.getAttribute('href')).toBe('/summary/2026/12');
 		});
 
-		it('switches to the species totals table when its tab is clicked', () => {
+		it('lazily switches to the species totals table when its tab is clicked', async () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					monthTotals={monthTotals}
+					viewedGroup={viewedGroup}
 				/>
 			);
 			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
-			expect(screen.queryByRole('link', { name: 'January 2026' })).toBeNull();
-			expect(document.querySelectorAll('tbody tr').length).toBe(
-				speciesStats.length
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(
+					speciesStats.length
+				)
 			);
+			expect(screen.queryByRole('link', { name: 'January 2026' })).toBeNull();
 		});
 
 		it('forwards summaryStats to the Month totals table as its totals row', () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					monthTotals={monthTotals}
+					viewedGroup={viewedGroup}
 					summaryStats={summaryStats}
 				/>
 			);
@@ -186,7 +216,6 @@ describe('SummaryTotalsSection', () => {
 		it('renders "Session totals" as the first tab, active by default, with "Species totals" present as a second tab', () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					sessionTotals={[buildDayStat()]}
 					viewedGroup={viewedGroup}
 				/>
@@ -206,7 +235,6 @@ describe('SummaryTotalsSection', () => {
 		it('renders one row per session day, in the order supplied, each linking to the session-temp route with the date formatted "16th August 2026"', () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					sessionTotals={[
 						buildDayStat({ time_period: '2026-08-02' }),
 						buildDayStat({ time_period: '2026-08-16' })
@@ -229,17 +257,18 @@ describe('SummaryTotalsSection', () => {
 			]);
 		});
 
-		it('switches to the "Species totals" table when its tab is clicked', () => {
+		it('lazily switches to the "Species totals" table when its tab is clicked', async () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					sessionTotals={[buildDayStat()]}
 					viewedGroup={viewedGroup}
 				/>
 			);
 			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(
-				speciesStats.length
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(
+					speciesStats.length
+				)
 			);
 			expect(
 				screen.queryByRole('link', { name: '16th August 2026' })
@@ -249,7 +278,6 @@ describe('SummaryTotalsSection', () => {
 		it('renders a single session day', () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					sessionTotals={[buildDayStat({ time_period: '2026-08-16' })]}
 					viewedGroup={viewedGroup}
 				/>
@@ -264,11 +292,7 @@ describe('SummaryTotalsSection', () => {
 
 		it('renders the period table empty state when there were no sessions that month', () => {
 			render(
-				<SummaryTotalsSection
-					speciesStats={speciesStats}
-					sessionTotals={[]}
-					viewedGroup={viewedGroup}
-				/>
+				<SummaryTotalsSection sessionTotals={[]} viewedGroup={viewedGroup} />
 			);
 			expect(
 				screen
@@ -281,7 +305,6 @@ describe('SummaryTotalsSection', () => {
 		it('forwards summaryStats to the Session totals table as its totals row', () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					sessionTotals={[buildDayStat()]}
 					viewedGroup={viewedGroup}
 					summaryStats={summaryStats}
@@ -296,8 +319,8 @@ describe('SummaryTotalsSection', () => {
 			const yearlyTotals = [buildYearlyStat()];
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					yearlyTotals={yearlyTotals}
+					viewedGroup={viewedGroup}
 				/>
 			);
 			const tabs = screen.getAllByRole('button');
@@ -313,20 +336,20 @@ describe('SummaryTotalsSection', () => {
 			const yearlyTotals = [buildYearlyStat({ time_period: '2026-01-01' })];
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					yearlyTotals={yearlyTotals}
+					viewedGroup={viewedGroup}
 				/>
 			);
 			const link = screen.getByRole('link', { name: '2026' });
 			expect(link.getAttribute('href')).toBe('/summary/2026');
 		});
 
-		it('keeps "Species totals" present and switches to it on click', () => {
+		it('keeps "Species totals" present and lazily switches to it on click', async () => {
 			const yearlyTotals = [buildYearlyStat()];
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					yearlyTotals={yearlyTotals}
+					viewedGroup={viewedGroup}
 				/>
 			);
 			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
@@ -335,14 +358,16 @@ describe('SummaryTotalsSection', () => {
 					.getByRole('button', { name: 'Species totals' })
 					.getAttribute('aria-current')
 			).toBe('true');
-			expect(document.querySelectorAll('tbody tr').length).toBe(
-				speciesStats.length
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(
+					speciesStats.length
+				)
 			);
 		});
 
 		it("renders the shared table's empty state when yearlyTotals is empty, without crashing", () => {
 			render(
-				<SummaryTotalsSection speciesStats={speciesStats} yearlyTotals={[]} />
+				<SummaryTotalsSection yearlyTotals={[]} viewedGroup={viewedGroup} />
 			);
 			expect(screen.getByRole('button', { name: 'Year totals' })).toBeTruthy();
 			expect(screen.queryByTestId('period-totals-table')).toBeNull();
@@ -352,8 +377,8 @@ describe('SummaryTotalsSection', () => {
 			const yearlyTotals = [buildYearlyStat()];
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					yearlyTotals={yearlyTotals}
+					viewedGroup={viewedGroup}
 					summaryStats={summaryStats}
 				/>
 			);
@@ -362,10 +387,9 @@ describe('SummaryTotalsSection', () => {
 	});
 
 	describe('when viewedGroup is undefined', () => {
-		it('falls back to "Species totals" as the sole default tab, with no session links, even when sessionTotals are supplied', () => {
+		it('falls back to "Species totals" as the sole default tab, suppressing the session tab and not attempting a fetch', async () => {
 			render(
 				<SummaryTotalsSection
-					speciesStats={speciesStats}
 					sessionTotals={[buildDayStat()]}
 					viewedGroup={undefined}
 				/>
@@ -378,9 +402,112 @@ describe('SummaryTotalsSection', () => {
 			expect(
 				screen.queryByRole('link', { name: '16th August 2026' })
 			).toBeNull();
-			expect(document.querySelectorAll('tbody tr').length).toBe(
-				speciesStats.length
+			// no group id to scope the fetch to, so the tab shows its empty state
+			await waitFor(() => expect(screen.getByText('No species recorded.')));
+			expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('lazy Species totals fetch', () => {
+		it('shows a loading indicator immediately after the Species tab is selected, before the fetch resolves', async () => {
+			let resolveFetch: (value: AggregateStatsResult[]) => void = () => {};
+			fetchSpeciesDataMock.mockReturnValue(
+				new Promise<AggregateStatsResult[]>((resolve) => {
+					resolveFetch = resolve;
+				})
 			);
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildYearlyStat()]}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
+			await waitFor(() =>
+				expect(document.querySelector('.loading-spinner')).toBeTruthy()
+			);
+			expect(screen.queryByTestId('species-totals-table')).toBeNull();
+
+			resolveFetch(speciesStats);
+			await waitFor(() =>
+				expect(document.querySelector('.loading-spinner')).toBeNull()
+			);
+		});
+
+		it('renders the fetched rows once the promise resolves', async () => {
+			fetchSpeciesDataMock.mockResolvedValue([
+				{ ...speciesStats[0], species_name: 'Robin' }
+			]);
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildYearlyStat()]}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
+			await waitFor(() =>
+				expect(screen.getByRole('link', { name: 'Robin' })).toBeTruthy()
+			);
+		});
+
+		it.each([
+			['yearlyTotals', { yearlyTotals: [buildYearlyStat()] }],
+			['monthTotals', { monthTotals }],
+			['sessionTotals', { sessionTotals: [buildDayStat()] }]
+		])(
+			'fetches species data exactly once when selected on the %s page shape',
+			async (_label, pageProps) => {
+				render(
+					<SummaryTotalsSection {...pageProps} viewedGroup={viewedGroup} />
+				);
+				fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
+				await waitFor(() =>
+					expect(fetchSpeciesDataMock).toHaveBeenCalledTimes(1)
+				);
+			}
+		);
+
+		it('does not refetch when switching to Species, away, and back again', async () => {
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildYearlyStat()]}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
+			await waitFor(() =>
+				expect(fetchSpeciesDataMock).toHaveBeenCalledTimes(1)
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
+			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
+			await waitFor(() =>
+				expect(document.querySelectorAll('tbody tr').length).toBe(
+					speciesStats.length
+				)
+			);
+			expect(fetchSpeciesDataMock).toHaveBeenCalledTimes(1);
+		});
+
+		it('renders the table empty state rather than throwing when the fetch rejects', async () => {
+			const consoleError = vi
+				.spyOn(console, 'error')
+				.mockImplementation(() => {});
+			fetchSpeciesDataMock.mockRejectedValue(new Error('boom'));
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildYearlyStat()]}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
+			await waitFor(() =>
+				expect(screen.getByText('No species recorded.')).toBeTruthy()
+			);
+			expect(consoleError).toHaveBeenCalledWith(
+				'Failed to fetch species totals',
+				expect.objectContaining({ viewedGroupId: 1 })
+			);
+			consoleError.mockRestore();
 		});
 	});
 });

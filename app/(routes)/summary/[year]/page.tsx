@@ -3,7 +3,6 @@ import {
 	fetchSummaryStats,
 	fetchPeriodStats
 } from '@/app/actions/summary-stats';
-import { fetchSpeciesData } from '@/app/actions/spp-data';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
 import {
@@ -18,34 +17,45 @@ type PageProps = { params: Promise<PageParams> };
 export type PageData = {
 	year: number;
 	summaryStats: AggregateStatsResult | null;
-	speciesStats: AggregateStatsResult[];
 	monthTotals: MonthTotalsRow[];
+	fromDate: string;
+	toDate: string;
 };
 
 export async function fetchYearSummaryData(
 	{ year }: PageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
-	const [summaryStats, speciesStats, monthlyStats] = await Promise.all([
-		fetchSummaryStats(viewedGroupId, `${year}-01-01`, `${year}-12-31`),
-		fetchSpeciesData(viewedGroupId, `${year}-01-01`, `${year}-12-31`),
-		fetchPeriodStats(viewedGroupId, 'month', `${year}-01-01`, `${year}-12-31`)
+	const fromDate = `${year}-01-01`;
+	const toDate = `${year}-12-31`;
+	const [summaryStats, monthlyStats] = await Promise.all([
+		fetchSummaryStats(viewedGroupId, fromDate, toDate),
+		fetchPeriodStats(viewedGroupId, 'month', fromDate, toDate)
 	]);
 	return {
 		year: Number(year),
 		summaryStats,
-		speciesStats,
-		monthTotals: buildMonthTotalsRows(Number(year), monthlyStats)
+		monthTotals: buildMonthTotalsRows(Number(year), monthlyStats),
+		fromDate,
+		toDate
 	};
 }
 
-function YearSummary({ data }: { data: PageData; viewedGroup: ViewedGroup }) {
+function YearSummary({
+	data,
+	viewedGroup
+}: {
+	data: PageData;
+	viewedGroup: ViewedGroup;
+}) {
 	return (
 		<SummaryPageContent
 			year={data.year}
 			summaryStats={data.summaryStats}
-			speciesStats={data.speciesStats}
 			monthTotals={data.monthTotals}
+			viewedGroup={viewedGroup}
+			fromDate={data.fromDate}
+			toDate={data.toDate}
 		/>
 	);
 }

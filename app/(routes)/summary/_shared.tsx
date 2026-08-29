@@ -13,20 +13,24 @@ export function SummaryPage({
 	year,
 	month,
 	summaryStats = null,
-	speciesStats = [],
 	monthTotals,
 	yearlyTotals,
 	sessionTotals,
-	viewedGroup
+	viewedGroup,
+	fromDate,
+	toDate
 }: {
 	year?: number;
 	month?: number;
 	summaryStats?: AggregateStatsResult | null;
-	speciesStats?: AggregateStatsResult[];
 	monthTotals?: MonthTotalsRow[];
 	yearlyTotals?: AggregateStatsResult[];
 	sessionTotals?: AggregateStatsResult[];
 	viewedGroup?: ViewedGroup;
+	// Date bounds for the lazily-fetched Species totals tab — undefined on the
+	// all-time page (unscoped species totals).
+	fromDate?: string;
+	toDate?: string;
 }) {
 	return (
 		<PageWrapper>
@@ -42,12 +46,13 @@ export function SummaryPage({
 				<HighlightsSection />
 			</div>
 			<SummaryTotalsSection
-				speciesStats={speciesStats}
 				summaryStats={summaryStats}
 				monthTotals={monthTotals}
 				yearlyTotals={yearlyTotals}
 				sessionTotals={sessionTotals}
 				viewedGroup={viewedGroup}
+				fromDate={fromDate}
+				toDate={toDate}
 				year={year}
 				month={month}
 			/>
