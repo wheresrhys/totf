@@ -372,5 +372,14 @@ describe('buildPerYearMonthTotalsRows', () => {
 			expect(rows[0].stats.session_count).toBe(3);
 			expect(rows[0].stats.encounter_count).toBe(20);
 		});
+
+		it('uses a supplied buildHref callback in place of the default /summary/{year}/{month} shape', () => {
+			const rows = buildPerYearMonthTotalsRows(
+				[monthStat(2020, 1)],
+				(year, month) => `/species/Robin/${year}/${month}`
+			);
+			expect(rows[0].href).toBe('/species/Robin/2020/1');
+			expect(rows[0].label).toBe('January 2020');
+		});
 	});
 });
