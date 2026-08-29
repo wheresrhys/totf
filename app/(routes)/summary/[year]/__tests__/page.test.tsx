@@ -4,7 +4,8 @@ import {
 	screen,
 	cleanup,
 	within,
-	fireEvent
+	fireEvent,
+	waitFor
 } from '@testing-library/react';
 import Page, { fetchYearSummaryData } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
@@ -21,6 +22,30 @@ vi.mock('@/app/actions/spp-data', () => ({
 	fetchSpeciesData: (...args: unknown[]) => fetchSpeciesDataMock(...args)
 }));
 
+const fetchPeriodTotalsMock = vi.fn().mockResolvedValue([]);
+vi.mock('@/app/actions/period-totals', () => ({
+	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
+}));
+
+function buildDayStat(time_period: string) {
+	return {
+		species_name: null,
+		time_period,
+		session_count: 1,
+		total_effort: '06:00:00',
+		species_count: 5,
+		bird_count: 12,
+		encounter_count: 14,
+		new_bird_count: 9,
+		pullus_bird_count: 1,
+		juv_bird_count: 2,
+		postjuv_bird_count: 1,
+		adult_bird_count: 6,
+		unknown_age_bird_count: 2,
+		new_young_bird_count: 3
+	};
+}
+
 describe('/summary/[year]', () => {
 	afterEach(() => {
 		cleanup();
@@ -28,6 +53,8 @@ describe('/summary/[year]', () => {
 		fetchPeriodStatsMock.mockClear();
 		fetchSpeciesDataMock.mockReset();
 		fetchSpeciesDataMock.mockResolvedValue([]);
+		fetchPeriodTotalsMock.mockClear();
+		fetchPeriodTotalsMock.mockResolvedValue([]);
 	});
 
 	it('renders "{year} summary" for a well-formed year', async () => {
@@ -113,5 +140,60 @@ describe('/summary/[year]', () => {
 			'2026-01-01',
 			'2026-12-31'
 		);
+	});
+
+	describe('Session totals tab', () => {
+		it('selecting the Session totals tab fetches day-grouped totals bounded to {year}-01-01 / {year}-12-31', async () => {
+			fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
+			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+			await screen.findByRole('heading', { level: 1 });
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await screen.findByRole('link', { name: '16th August 2026' });
+			expect(fetchPeriodTotalsMock).toHaveBeenCalledWith(
+				1,
+				'day',
+				'2026-01-01',
+				'2026-12-31'
+			);
+		});
+
+		it('Session totals tab appears immediately after Month totals, which remains the default tab', async () => {
+			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+			await screen.findByRole('heading', { level: 1 });
+			const tabs = screen.getAllByRole('button');
+			expect(tabs.map((tab) => tab.textContent)).toEqual([
+				'Month totals',
+				'Session totals',
+				'Species totals'
+			]);
+			expect(tabs[0].getAttribute('aria-current')).toBe('true');
+		});
+
+		it("the page's initial render (Month totals active) triggers no day-grouped fetch", async () => {
+			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+			await screen.findByRole('heading', { level: 1 });
+			expect(fetchPeriodTotalsMock).not.toHaveBeenCalled();
+		});
+
+		it('renders the shared empty state when that year has no sessions', async () => {
+			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+			await screen.findByRole('heading', { level: 1 });
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await screen.findByText('No data recorded.');
+		});
+
+		it('selecting the Session totals tab a second time does not trigger a second fetch', async () => {
+			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+			await screen.findByRole('heading', { level: 1 });
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await waitFor(() =>
+				expect(fetchPeriodTotalsMock).toHaveBeenCalledTimes(1)
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await waitFor(() =>
+				expect(fetchPeriodTotalsMock).toHaveBeenCalledTimes(1)
+			);
+		});
 	});
 });
