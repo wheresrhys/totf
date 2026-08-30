@@ -389,7 +389,9 @@ describe('processEncounterRow', () => {
 			breeding_condition: 'B',
 			extra_text: 'some note',
 			finding_condition: '8',
-			finding_circumstances: '2'
+			finding_circumstances: '2',
+			primary_moult: '5(6)5(6)5(6)5(6)5(6)5(6)5(6)5(6)5(6)5(6)',
+			capture_method: 'MN'
 		});
 		await processEncounterRow(row, upsert, RINGING_GROUP_ID);
 		const birdId = 20; // second call returns 20
@@ -413,7 +415,9 @@ describe('processEncounterRow', () => {
 				breeding_condition: 'B',
 				extra_text: 'some note',
 				finding_condition: '8',
-				finding_circumstances: '2'
+				finding_circumstances: '2',
+				primary_moult: '5(6)5(6)5(6)5(6)5(6)5(6)5(6)5(6)5(6)5(6)',
+				capture_method: 'MN'
 			}),
 			['bird_id', 'session_id']
 		);
@@ -429,7 +433,9 @@ describe('processEncounterRow', () => {
 			wing_length: '',
 			old_greater_coverts: '',
 			finding_condition: '',
-			finding_circumstances: ''
+			finding_circumstances: '',
+			primary_moult: '',
+			capture_method: ''
 		});
 		await processEncounterRow(row, upsert, RINGING_GROUP_ID);
 		expect(upsert).toHaveBeenCalledWith(
@@ -443,7 +449,9 @@ describe('processEncounterRow', () => {
 				wing_length: null,
 				old_greater_coverts: null,
 				finding_condition: null,
-				finding_circumstances: null
+				finding_circumstances: null,
+				primary_moult: null,
+				capture_method: null
 			}),
 			['bird_id', 'session_id']
 		);
