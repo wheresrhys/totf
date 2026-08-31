@@ -15,6 +15,7 @@ export type Database = {
           last_encountered_timestamp: string
           proven_age: number
           ring_no: string
+          ring_sequence_id: number | null
           ringing_group_ids: number[]
           species_id: number
         }
@@ -23,6 +24,7 @@ export type Database = {
           last_encountered_timestamp?: string
           proven_age?: number
           ring_no: string
+          ring_sequence_id?: number | null
           ringing_group_ids?: number[]
           species_id: number
         }
@@ -31,10 +33,18 @@ export type Database = {
           last_encountered_timestamp?: string
           proven_age?: number
           ring_no?: string
+          ring_sequence_id?: number | null
           ringing_group_ids?: number[]
           species_id?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "birds_ring_sequence_id_fkey"
+            columns: ["ring_sequence_id"]
+            isOneToOne: false
+            referencedRelation: "RingSequences"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "birds_species_id_fkey"
             columns: ["species_id"]

@@ -4,12 +4,15 @@ CREATE TABLE public."Birds" (
 	species_id bigint NOT NULL,
 	last_encountered_timestamp timestamp without time zone DEFAULT '0001-01-01 00:00:00'::timestamp WITHOUT time zone NOT NULL,
 	ringing_group_ids BIGINT[] DEFAULT '{}'::BIGINT[] NOT NULL,
-	proven_age smallint DEFAULT 0 NOT NULL
+	proven_age smallint DEFAULT 0 NOT NULL,
+	ring_sequence_id bigint
 );
 
 CREATE INDEX idx_birds_ringing_group_ids ON public."Birds" USING gin (ringing_group_ids);
 
 CREATE INDEX idx_birds_species_id ON public."Birds" (species_id);
+
+CREATE INDEX idx_birds_ring_sequence_id ON public."Birds" (ring_sequence_id);
 
 -- species_id is immutable once set: a physical ring number belongs to one bird of
 -- one species for life, so a re-import reusing an existing ring_no with a different
@@ -17,6 +20,14 @@ CREATE INDEX idx_birds_species_id ON public."Birds" (species_id);
 CREATE TRIGGER trigger_trg_prevent_bird_species_id_change BEFORE
 UPDATE ON public."Birds" FOR EACH ROW
 EXECUTE FUNCTION public.trg_prevent_bird_species_id_change ();
+
+-- When a bird is assigned to a ring sequence (on insert, or when the assignment
+-- changes on update), widen that sequence's first_ring/last_ring window to cover it.
+CREATE TRIGGER trigger_trg_refresh_ring_sequence_bounds
+AFTER INSERT
+OR
+UPDATE OF ring_sequence_id ON public."Birds" FOR EACH ROW
+EXECUTE FUNCTION public.trg_refresh_ring_sequence_bounds ();
 
 -- SELECT: grants access if any of:
 -- 1. The logged-in group is one of the groups that has ringed this bird (its id is in ringing_group_ids)
@@ -101,6 +112,9 @@ ADD CONSTRAINT birds_ring_no_unique UNIQUE (ring_no);
 
 ALTER TABLE public."Birds"
 ADD CONSTRAINT birds_species_id_fkey FOREIGN KEY (species_id) REFERENCES public."Species" (id);
+
+ALTER TABLE public."Birds"
+ADD CONSTRAINT birds_ring_sequence_id_fkey FOREIGN KEY (ring_sequence_id) REFERENCES public."RingSequences" (id);
 
 GRANT ALL ON public."Birds" TO anon;
 
