@@ -12,6 +12,8 @@ CREATE TABLE public."Encounters" (
 	extra_text text,
 	primary_moult text,
 	capture_method text,
+	lure_code_1 text,
+	lure_code_2 text,
 	finding_condition text,
 	finding_circumstances text,
 	is_juv boolean DEFAULT FALSE NOT NULL,

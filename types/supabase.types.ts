@@ -56,6 +56,8 @@ export type Database = {
           finding_condition: string | null
           id: number
           is_juv: boolean
+          lure_code_1: string | null
+          lure_code_2: string | null
           max_hatch_year: number
           min_hatch_year: number
           moult_code: string | null
@@ -81,6 +83,8 @@ export type Database = {
           finding_condition?: string | null
           id?: number
           is_juv?: boolean
+          lure_code_1?: string | null
+          lure_code_2?: string | null
           max_hatch_year: number
           min_hatch_year: number
           moult_code?: string | null
@@ -106,6 +110,8 @@ export type Database = {
           finding_condition?: string | null
           id?: number
           is_juv?: boolean
+          lure_code_1?: string | null
+          lure_code_2?: string | null
           max_hatch_year?: number
           min_hatch_year?: number
           moult_code?: string | null
