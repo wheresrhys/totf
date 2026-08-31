@@ -177,3 +177,123 @@ export async function updateRingSequence(
 		return { success: false, error: (error as Error).message };
 	}
 }
+
+// Result shape for `promoteControlToSequence`. Mirrors `UpdateRingSequenceState`
+// / `LoginState`: a discriminated union rather than a thrown error, so the
+// client modal can react without crossing the server-action boundary with an
+// exception.
+export type PromoteControlState =
+	| { success: true }
+	| { success: false; error: string }
+	| null;
+
+// Postgres unique-constraint violation SQLSTATE (raised on the
+// `(prefix, ringing_group_id)` unique index if two promotes for the same prefix
+// race). `catchSupabaseErrors` collapses the error to a message and loses the
+// code, so the insert below inspects the raw PostgREST error itself.
+const UNIQUE_VIOLATION = '23505';
+
+type PromoteSupabaseClient = Awaited<
+	ReturnType<typeof getAuthenticatedSupabaseClient>
+>;
+
+// Returns the id of the group's RingSequences row for `prefix`, creating a
+// promoted (`owned_by_group = false`, `size = NULL`) row if none exists yet.
+// Reuses an existing row untouched — never overwriting its `owned_by_group` or
+// `size`, which the importer or a prior manual edit may have set. RLS scopes
+// every query to the caller's group; the explicit `ringing_group_id` filter is
+// defence-in-depth.
+async function findOrCreateRingSequence(
+	supabase: PromoteSupabaseClient,
+	prefix: string,
+	groupId: number
+): Promise<number> {
+	const existing = (await supabase
+		.from('RingSequences')
+		.select('id')
+		.eq('prefix', prefix)
+		.eq('ringing_group_id', groupId)
+		.maybeSingle()
+		.then(catchSupabaseErrors)) as { id: number } | null;
+	if (existing?.id) return existing.id;
+
+	const { data: inserted, error } = await supabase
+		.from('RingSequences')
+		.insert({
+			prefix,
+			ringing_group_id: groupId,
+			owned_by_group: false,
+			size: null
+		})
+		.select('id')
+		.single();
+
+	if (error) {
+		// A concurrent promote for the same prefix won the race and inserted the
+		// row first — re-select and reuse it rather than surfacing a hard error.
+		if (error.code === UNIQUE_VIOLATION) {
+			const raced = (await supabase
+				.from('RingSequences')
+				.select('id')
+				.eq('prefix', prefix)
+				.eq('ringing_group_id', groupId)
+				.single()
+				.then(catchSupabaseErrors)) as { id: number } | null;
+			if (raced?.id) return raced.id;
+		}
+		throw new Error(`Failed to create ring sequence: ${error.message}`);
+	}
+
+	return inserted!.id;
+}
+
+// Promotes a control ring to a tracked ring sequence: derives the ring's
+// leading-alpha prefix, finds or creates an `owned_by_group = false`
+// RingSequences row for it, and links the bird via `Birds.ring_sequence_id`
+// (firing the bounds trigger). The updated RPC (issue #661) then drops the ring
+// from `/controls` on the next load. Reads `ring_no` / `viewed_group_id` from
+// the submitted form, matching `updateRingSequence`'s `useActionState` shape.
+export async function promoteControlToSequence(
+	_prevState: PromoteControlState,
+	formData: FormData
+): Promise<PromoteControlState> {
+	const ringNo = (formData.get('ring_no') as string)?.trim();
+	const viewedGroupId = Number(formData.get('viewed_group_id'));
+
+	if (!ringNo) {
+		return { success: false, error: 'Missing ring number' };
+	}
+	if (!viewedGroupId) {
+		return { success: false, error: 'Missing group' };
+	}
+
+	const prefix = (ringNo.match(/^[A-Za-z]+/) || [''])[0];
+	if (!prefix) {
+		return {
+			success: false,
+			error: `Could not derive a prefix from ring "${ringNo}"`
+		};
+	}
+
+	try {
+		const supabase = await getAuthenticatedSupabaseClient();
+		const sequenceId = await findOrCreateRingSequence(
+			supabase,
+			prefix,
+			viewedGroupId
+		);
+
+		// Link the bird to the sequence. RLS scopes the update to birds visible to
+		// the caller's group; the write fires the bounds trigger, which populates
+		// first_ring/last_ring from this bird.
+		await supabase
+			.from('Birds')
+			.update({ ring_sequence_id: sequenceId })
+			.eq('ring_no', ringNo)
+			.then(catchSupabaseErrors);
+
+		return { success: true };
+	} catch (error) {
+		return { success: false, error: (error as Error).message };
+	}
+}

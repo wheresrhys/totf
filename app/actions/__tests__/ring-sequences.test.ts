@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchRingSequences, updateRingSequence } from '../ring-sequences';
+import {
+	fetchRingSequences,
+	updateRingSequence,
+	promoteControlToSequence
+} from '../ring-sequences';
 
 const {
 	mockEq,
@@ -134,6 +138,137 @@ describe('updateRingSequence', () => {
 		expect(result).toMatchObject({ success: false });
 		if (result && !result.success) {
 			expect(result.error).toContain('unique constraint');
+		}
+	});
+});
+
+type QueryResult = {
+	data: unknown;
+	error: { code?: string; message: string } | null;
+};
+
+// A chainable + thenable query-builder mock resolving to `result` on await and
+// on the terminal `maybeSingle()` / `single()` calls. Records every call so
+// tests can assert on `insert` / `update` / `eq` payloads.
+function makeBuilder(result: QueryResult) {
+	const builder = {
+		select: vi.fn(() => builder),
+		insert: vi.fn(() => builder),
+		update: vi.fn(() => builder),
+		eq: vi.fn(() => builder),
+		maybeSingle: vi.fn(() => Promise.resolve(result)),
+		single: vi.fn(() => Promise.resolve(result)),
+		then: (resolve: (value: QueryResult) => unknown) =>
+			Promise.resolve(result).then(resolve)
+	};
+	return builder;
+}
+
+describe('promoteControlToSequence', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('creates a promoted (owned_by_group=false, size=null) sequence and links the bird when no matching prefix exists', async () => {
+		const find = makeBuilder({ data: null, error: null }); // no existing row
+		const insert = makeBuilder({ data: { id: 99 }, error: null });
+		const birds = makeBuilder({ data: null, error: null });
+		const from = vi
+			.fn()
+			.mockReturnValueOnce(find)
+			.mockReturnValueOnce(insert)
+			.mockReturnValueOnce(birds);
+		mockGetClient.mockResolvedValue({ from });
+
+		const result = await promoteControlToSequence(
+			null,
+			makeFormData({ ring_no: 'ABC1234', viewed_group_id: '42' })
+		);
+
+		expect(insert.insert).toHaveBeenCalledWith({
+			prefix: 'ABC',
+			ringing_group_id: 42,
+			owned_by_group: false,
+			size: null
+		});
+		expect(birds.update).toHaveBeenCalledWith({ ring_sequence_id: 99 });
+		expect(birds.eq).toHaveBeenCalledWith('ring_no', 'ABC1234');
+		expect(result).toEqual({ success: true });
+	});
+
+	it('reuses an existing matching-prefix sequence without inserting or modifying it', async () => {
+		const find = makeBuilder({ data: { id: 55 }, error: null }); // existing row
+		const birds = makeBuilder({ data: null, error: null });
+		const from = vi.fn().mockReturnValueOnce(find).mockReturnValueOnce(birds);
+		mockGetClient.mockResolvedValue({ from });
+
+		const result = await promoteControlToSequence(
+			null,
+			makeFormData({ ring_no: 'ABC1234', viewed_group_id: '42' })
+		);
+
+		// No second RingSequences write: only the find + the Birds update ran, and
+		// the Birds builder's `insert`/`update`-of-RingSequences is never touched.
+		expect(from).toHaveBeenCalledTimes(2);
+		expect(from).toHaveBeenNthCalledWith(1, 'RingSequences');
+		expect(from).toHaveBeenNthCalledWith(2, 'Birds');
+		expect(birds.insert).not.toHaveBeenCalled();
+		expect(birds.update).toHaveBeenCalledWith({ ring_sequence_id: 55 });
+		expect(result).toEqual({ success: true });
+	});
+
+	it('re-selects and reuses the row on a unique-violation race rather than erroring', async () => {
+		const find = makeBuilder({ data: null, error: null });
+		const insert = makeBuilder({
+			data: null,
+			error: { code: '23505', message: 'duplicate key value' }
+		});
+		const raced = makeBuilder({ data: { id: 77 }, error: null });
+		const birds = makeBuilder({ data: null, error: null });
+		const from = vi
+			.fn()
+			.mockReturnValueOnce(find)
+			.mockReturnValueOnce(insert)
+			.mockReturnValueOnce(raced)
+			.mockReturnValueOnce(birds);
+		mockGetClient.mockResolvedValue({ from });
+
+		const result = await promoteControlToSequence(
+			null,
+			makeFormData({ ring_no: 'ABC1234', viewed_group_id: '42' })
+		);
+
+		expect(birds.update).toHaveBeenCalledWith({ ring_sequence_id: 77 });
+		expect(result).toEqual({ success: true });
+	});
+
+	it('returns a validation error and does not touch supabase when ring_no is missing', async () => {
+		const result = await promoteControlToSequence(
+			null,
+			makeFormData({ ring_no: '', viewed_group_id: '42' })
+		);
+
+		expect(mockGetClient).not.toHaveBeenCalled();
+		expect(result).toMatchObject({ success: false });
+	});
+
+	it('surfaces a caught DB error from the bird-link update', async () => {
+		const find = makeBuilder({ data: { id: 55 }, error: null });
+		const birds = makeBuilder({
+			data: null,
+			error: { message: 'connection reset' }
+		});
+		const from = vi.fn().mockReturnValueOnce(find).mockReturnValueOnce(birds);
+		mockGetClient.mockResolvedValue({ from });
+
+		const result = await promoteControlToSequence(
+			null,
+			makeFormData({ ring_no: 'ABC1234', viewed_group_id: '42' })
+		);
+
+		expect(result).toMatchObject({ success: false });
+		if (result && !result.success) {
+			expect(result.error).toContain('connection reset');
 		}
 	});
 });
