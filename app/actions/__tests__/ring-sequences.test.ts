@@ -1,12 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { updateRingSequence } from '../ring-sequences';
+import { fetchRingSequences, updateRingSequence } from '../ring-sequences';
 
-const { mockEq, mockUpdate, mockFrom, mockGetClient } = vi.hoisted(() => {
+const {
+	mockEq,
+	mockUpdate,
+	mockFrom,
+	mockGetClient,
+	mockSelect,
+	mockSelectEq,
+	mockOrder
+} = vi.hoisted(() => {
 	const mockEq = vi.fn();
 	const mockUpdate = vi.fn(() => ({ eq: mockEq }));
-	const mockFrom = vi.fn(() => ({ update: mockUpdate }));
+	// Read path: from(...).select(...).eq(...).order(...) => thenable result.
+	const mockOrder = vi.fn();
+	const mockSelectEq = vi.fn(() => ({ order: mockOrder }));
+	const mockSelect = vi.fn(() => ({ eq: mockSelectEq }));
+	const mockFrom = vi.fn(() => ({ update: mockUpdate, select: mockSelect }));
 	const mockGetClient = vi.fn(async () => ({ from: mockFrom }));
-	return { mockEq, mockUpdate, mockFrom, mockGetClient };
+	return {
+		mockEq,
+		mockUpdate,
+		mockFrom,
+		mockGetClient,
+		mockSelect,
+		mockSelectEq,
+		mockOrder
+	};
 });
 
 vi.mock('@/lib/group-auth', () => ({
@@ -35,6 +55,25 @@ function makeFormData(fields: Record<string, string>): FormData {
 	for (const [key, value] of Object.entries(fields)) fd.append(key, value);
 	return fd;
 }
+
+describe('fetchRingSequences', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('filters explicitly on the viewed group id and orders by prefix', async () => {
+		const rows = [{ id: 1, prefix: 'ARW' }];
+		mockOrder.mockResolvedValue({ data: rows, error: null });
+
+		const result = await fetchRingSequences(42);
+
+		expect(mockFrom).toHaveBeenCalledWith('RingSequences');
+		expect(mockSelect).toHaveBeenCalledWith('*');
+		expect(mockSelectEq).toHaveBeenCalledWith('ringing_group_id', 42);
+		expect(mockOrder).toHaveBeenCalledWith('prefix');
+		expect(result).toEqual(rows);
+	});
+});
 
 describe('updateRingSequence', () => {
 	beforeEach(() => {

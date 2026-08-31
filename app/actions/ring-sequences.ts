@@ -59,8 +59,9 @@ export async function fetchRingSequenceControls(
 // --- New read/write path off the `RingSequences` table (issue #660) ---
 //
 // These read directly from the `RingSequences` table rather than the RPCs
-// above. RLS scopes every query to the caller's group, so — unlike the RPC
-// functions — no manual `ringing_group_id`/`ringing_group_filter` is passed.
+// above. RLS scopes every query to the caller's group; where a query already
+// has the viewed group id to hand it also filters on `ringing_group_id`
+// explicitly (defence-in-depth), rather than leaning on RLS alone.
 
 // A single bird belonging to a ring sequence, flattened from the embedded
 // `Birds`→`Species`/`Encounters`→`Sessions` select for rendering.
@@ -77,11 +78,17 @@ export type UpdateRingSequenceState =
 
 // Lists this group's ring sequences, ordered by prefix. Returns an empty array
 // (not null) when the group has none yet, so the page renders an empty state.
-export async function fetchRingSequences(): Promise<RingSequenceRow[] | null> {
+// RLS already scopes the result to the caller's group, but the query still
+// filters on `ringing_group_id` explicitly so it asks only for the data it
+// needs (defence-in-depth, not relying on RLS alone).
+export async function fetchRingSequences(
+	viewedGroupId: number
+): Promise<RingSequenceRow[] | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('RingSequences')
 		.select('*')
+		.eq('ringing_group_id', viewedGroupId)
 		.order('prefix')
 		.then(catchSupabaseErrors) as Promise<RingSequenceRow[] | null>;
 }

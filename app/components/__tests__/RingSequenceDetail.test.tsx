@@ -66,7 +66,11 @@ describe('RingSequenceDetail', () => {
 		const { fetchRingSequenceBirds } =
 			await import('@/app/actions/ring-sequences');
 		const contiguousRows: RingSequenceBirdRow[] = [
-			{ ring_no: 'ARW000001', species_name: 'Robin', ringed_date: '2022-06-15' },
+			{
+				ring_no: 'ARW000001',
+				species_name: 'Robin',
+				ringed_date: '2022-06-15'
+			},
 			{ ring_no: 'ARW000002', species_name: 'Robin', ringed_date: '2022-06-16' }
 		];
 		vi.mocked(fetchRingSequenceBirds).mockResolvedValue(contiguousRows);
