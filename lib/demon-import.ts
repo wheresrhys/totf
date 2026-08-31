@@ -260,6 +260,8 @@ export async function processEncounterRow(
 				: null,
 			primary_moult: row.primary_moult as string | null,
 			capture_method: row.capture_method as string | null,
+			lure_code_1: row.lure_code_1 as string | null,
+			lure_code_2: row.lure_code_2 as string | null,
 			record_type: row.record_type as string,
 			bird_id: birdId,
 			session_id: sessionId,
