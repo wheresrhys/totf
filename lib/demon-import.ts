@@ -163,6 +163,39 @@ export function convertDateFormat(dateString: string): string {
 	return dateString.split('/').reverse().join('-');
 }
 
+// The leading alphabetic run of a ring number is its sequence prefix
+// (e.g. "AEL1699" -> "AEL"). A ring number with no leading letters yields "".
+export function deriveRingSequencePrefix(ringNo: string): string {
+	return (ringNo.match(/^[A-Za-z]+/) || [''])[0];
+}
+
+// Deduce a ring's `size` enum from its prefix length and total ring-number
+// length. This is deliberately NOT the same mapping as `classifyRingSize` in
+// app/models/ring-sequences.ts — that heuristic returns coarse display buckets
+// ('B, C, C2'/'Large') and has no 'G' branch; this returns real `ring_size`
+// enum values and only for the unambiguous cases, `null` otherwise (so the
+// importer never guesses a size it isn't sure of). See issue #659.
+export function deduceRingSequenceSize(
+	prefix: string,
+	ringNoLength: number
+): Database['public']['Enums']['ring_size'] | null {
+	const alphaCount = prefix.length;
+
+	if (alphaCount === 3 && ringNoLength === 6) return 'AA';
+	if (alphaCount === 3 && ringNoLength === 7) return 'A';
+
+	if (alphaCount === 2 && ringNoLength === 7) {
+		const firstLetter = prefix[0].toUpperCase();
+		if (firstLetter === 'D') return 'D2';
+		if (firstLetter === 'F') return 'Fv';
+		if (firstLetter === 'S') return 'SO';
+		if (firstLetter === 'G') return 'G';
+		if (firstLetter === 'E') return 'E';
+	}
+
+	return null;
+}
+
 export function createUpserter(supabaseClient: SupabaseClient) {
 	return async <DataInsertModel>(
 		tableName: string,
@@ -185,9 +218,47 @@ export function createUpserter(supabaseClient: SupabaseClient) {
 	};
 }
 
+// Resolves (find-or-create) the `RingSequences` row for a `(prefix,
+// ringing_group_id)` pair and returns its id. Deliberately NOT built on
+// `createUpserter`: that always upserts with `ignoreDuplicates: false`, i.e. a
+// full-column overwrite on conflict, which would clobber a `size` a user has
+// manually corrected via the ring-sequences UI. Here the insert uses
+// `ignoreDuplicates: true` (ON CONFLICT DO NOTHING) so an existing row's `size`
+// is never touched; the follow-up select then returns the id for both the
+// just-inserted and the pre-existing-conflict case. See issue #659.
+export function createRingSequenceResolver(supabaseClient: SupabaseClient) {
+	return async (
+		prefix: string,
+		ringingGroupId: number,
+		size: Database['public']['Enums']['ring_size'] | null
+	): Promise<number> => {
+		const { error: insertError } = await supabaseClient
+			.from('RingSequences')
+			.upsert(
+				{ prefix, ringing_group_id: ringingGroupId, size },
+				{ onConflict: 'prefix,ringing_group_id', ignoreDuplicates: true }
+			);
+		if (insertError) throw insertError;
+
+		const { data, error: selectError } = await supabaseClient
+			.from('RingSequences')
+			.select('id')
+			.eq('prefix', prefix)
+			.eq('ringing_group_id', ringingGroupId)
+			.single();
+		if (selectError) throw selectError;
+		if (!data)
+			throw new Error(
+				`RingSequences row for prefix "${prefix}" (group ${ringingGroupId}) not found after upsert`
+			);
+		return data.id;
+	};
+}
+
 export async function processEncounterRow(
 	rawRow: DemonRow,
 	upsert: ReturnType<typeof createUpserter>,
+	resolveRingSequence: ReturnType<typeof createRingSequenceResolver>,
 	ringingGroupId: number
 ): Promise<{ visitDate: string }> {
 	const row = transformEmptyStringsToNull(rawRow) as DemonRow;
@@ -201,9 +272,28 @@ export async function processEncounterRow(
 		['species_name']
 	);
 
+	// Only a 'N' (new ring) record assigns a ring to this group for the first
+	// time, so it's the only record_type that resolves/creates a RingSequences
+	// row and stamps `ring_sequence_id` onto the Bird. Any other record_type
+	// leaves both RingSequences and Birds.ring_sequence_id untouched (the Birds
+	// upsert only writes columns present in its payload).
+	let ringSequenceId: number | undefined;
+	if (row.record_type === 'N') {
+		const ringNo = row.ring_no as string;
+		const prefix = deriveRingSequencePrefix(ringNo);
+		const size = deduceRingSequenceSize(prefix, ringNo.length);
+		ringSequenceId = await resolveRingSequence(prefix, ringingGroupId, size);
+	}
+
 	const birdId = await upsert<BirdsInsert>(
 		'Birds',
-		{ ring_no: row.ring_no as string, species_id: speciesId },
+		{
+			ring_no: row.ring_no as string,
+			species_id: speciesId,
+			...(ringSequenceId !== undefined
+				? { ring_sequence_id: ringSequenceId }
+				: {})
+		},
 		['ring_no']
 	);
 
