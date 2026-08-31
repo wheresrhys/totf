@@ -1,7 +1,7 @@
 import {
-	BootstrapPageData,
+	BootstrapPage,
 	DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
+} from '@/app/components/layout/BootstrapPage';
 import { SppStatsTable } from '@/app/components/SppStatsTable';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
@@ -50,7 +50,7 @@ export default async function AllSpeciesPage({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<PageData>
+		<BootstrapPage<PageData>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['species']}
 			dataFetcher={fetchSppListPageData}

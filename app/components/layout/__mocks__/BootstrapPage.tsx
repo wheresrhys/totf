@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import {
 	defaultGetParams,
-	type BootstrapPageDataProps,
+	type BootstrapPageProps,
 	type DefaultPageParams,
 	type DefaultPageProps
-} from '../BootstrapPageData';
+} from '../BootstrapPage';
 
-export function BootstrapPageData<
+export function BootstrapPage<
 	DataType,
 	PagePropsType = DefaultPageProps,
 	ParamsType = DefaultPageParams
->(bootstrapProps: BootstrapPageDataProps<DataType, PagePropsType, ParamsType>) {
+>(bootstrapProps: BootstrapPageProps<DataType, PagePropsType, ParamsType>) {
 	const [data, setData] = useState<DataType | null>(null);
 	const [params, setParams] = useState<ParamsType | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
@@ -39,7 +39,7 @@ export function BootstrapPageData<
 				if (!mounted) return;
 				setData(fetchedData);
 			} catch (error) {
-				console.error('Error loading data in BootstrapPageData mock:', error);
+				console.error('Error loading data in BootstrapPage mock:', error);
 				if (mounted) setData(null);
 			} finally {
 				if (mounted) setIsLoading(false);

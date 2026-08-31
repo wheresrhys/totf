@@ -12,7 +12,7 @@ configMocks({ act, afterAll });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (global as any).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock('./app/components/layout/BootstrapPageData');
+vi.mock('./app/components/layout/BootstrapPage');
 
 // Mock Next.js Link component
 vi.mock('next/link', () => ({

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
-import { LoadWithData, type DefaultPageParams } from '../BootstrapPageData';
+import { LoadWithData, type DefaultPageParams } from '../BootstrapPage';
 
-vi.unmock('@/app/components/layout/BootstrapPageData');
+vi.unmock('@/app/components/layout/BootstrapPage');
 
 vi.mock('next/server', () => ({
 	connection: vi.fn().mockResolvedValue(undefined)
