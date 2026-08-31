@@ -22,6 +22,7 @@ import {
 } from './shared/StatsTableColumnConfigs';
 import { createStatsTableBody } from './shared/StatsTableBody';
 import { TabNav } from './TabNav';
+import { SessionHighlights } from './SessionHighlights';
 
 const SpeciesNameCell = createNameLinkCell<SpeciesWithEncounters, RowModel>(
 	(model) => model.species,
@@ -242,15 +243,21 @@ function ConditionalTabPanel({
 
 export function SessionTabs({
 	speciesList,
-	netRounds
+	netRounds,
+	locationId,
+	date,
+	viewedGroupId
 }: {
 	speciesList: SpeciesWithEncounters[];
 	netRounds: NetRound[];
+	locationId?: number;
+	date: string;
+	viewedGroupId: number;
 }) {
 	const [loadedTabs, setLoadedTabs] = useState<Set<string>>(
-		new Set(['by-species'])
+		new Set(['species'])
 	);
-	const [activeTab, setActiveTab] = useState('by-species');
+	const [activeTab, setActiveTab] = useState('species');
 
 	const hasPulli = speciesList.some((speciesWithEncounters) =>
 		speciesWithEncounters.encounters.some(
@@ -259,13 +266,18 @@ export function SessionTabs({
 	);
 	const columnConfigs = buildColumnConfigs(hasPulli);
 
+	const tabNavConfig = [
+		{ id: 'species', label: 'Species totals' },
+		{ id: 'net-rounds', label: 'Net rounds' }
+	];
+
+	if (!locationId) {
+		tabNavConfig.push({ id: 'highlights', label: 'Highlights' });
+	}
 	return (
 		<>
 			<TabNav
-				tabs={[
-					{ id: 'by-species', label: 'By species' },
-					{ id: 'by-time', label: 'By time' }
-				]}
+				tabs={tabNavConfig}
 				activeTab={activeTab}
 				onTabChange={(tab) => {
 					setLoadedTabs((prev) => new Set([...prev, tab]));
@@ -274,7 +286,7 @@ export function SessionTabs({
 			/>
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
-				tabId="by-species"
+				tabId="species"
 				activeTabId={activeTab}
 			>
 				<SortableTable<SpeciesWithEncounters, RowModel>
@@ -288,11 +300,20 @@ export function SessionTabs({
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
-				tabId="by-time"
+				tabId="net-rounds"
 				activeTabId={activeTab}
 			>
 				<ChronologicalView netRounds={netRounds} />
 			</ConditionalTabPanel>
+			{locationId ? null : (
+				<ConditionalTabPanel
+					loadedTabs={loadedTabs}
+					tabId="highlights"
+					activeTabId={activeTab}
+				>
+					<SessionHighlights date={date} viewedGroupId={viewedGroupId} />
+				</ConditionalTabPanel>
+			)}
 		</>
 	);
 }
