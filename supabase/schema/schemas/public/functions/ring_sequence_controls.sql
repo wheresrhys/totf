@@ -13,6 +13,16 @@ BEGIN
   JOIN "Sessions"   s  ON s.id = e.session_id
   JOIN "Species"    sp ON sp.id = b.species_id
   WHERE (ringing_group_filter IS NULL OR s.ringing_group_id = ringing_group_filter)
+    -- Exclude any ring whose leading-alpha prefix already has a RingSequences
+    -- row for this group — regardless of owned_by_group. A prefix the group
+    -- already tracks (including one promoted from a control, owned_by_group =
+    -- false) is not a "foreign" control, so it must not resurface here.
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "RingSequences" rs
+      WHERE rs.ringing_group_id = ringing_group_filter
+        AND rs.prefix = substring(b.ring_no FROM '^[A-Za-z]+')
+    )
   GROUP BY b.ring_no, sp.species_name
   HAVING COUNT(*) = COUNT(*) FILTER (WHERE e.record_type = 'S')
   ORDER BY b.ring_no;
