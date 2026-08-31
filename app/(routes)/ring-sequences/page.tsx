@@ -1,17 +1,14 @@
-import {
-	BootstrapPageData,
-	type DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
-import { fetchRingSequenceSummaries } from '@/app/actions/ring-sequences';
-import type { RingSequenceSummary } from '@/app/actions/ring-sequences';
+import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import { fetchRingSequences } from '@/app/actions/ring-sequences';
+import type { RingSequenceRow } from '@/app/models/db';
 import { RingSequencesPage } from '@/app/components/RingSequencesPage';
 import type { ViewedGroup } from '@/lib/group-slug';
 
 async function dataFetcher(
-	_: DefaultPageParams,
+	_params: Record<string, string>,
 	viewedGroupId: number
-): Promise<RingSequenceSummary[] | null> {
-	return fetchRingSequenceSummaries(viewedGroupId);
+): Promise<RingSequenceRow[] | null> {
+	return fetchRingSequences(viewedGroupId);
 }
 
 export default async function RingSequencesRoute({
@@ -20,7 +17,7 @@ export default async function RingSequencesRoute({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<RingSequenceSummary[]>
+		<BootstrapPageData<RingSequenceRow[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['ring-sequences']}
 			dataFetcher={dataFetcher}

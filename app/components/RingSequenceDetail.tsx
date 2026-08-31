@@ -1,8 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import {
-	fetchRingSequenceDetail,
-	type RingSequenceDetailRow
+	fetchRingSequenceBirds,
+	type RingSequenceBirdRow
 } from '@/app/actions/ring-sequences';
 import { findUnusedRings } from '@/app/models/ring-sequences';
 import { AccordionItem } from './shared/Accordion';
@@ -10,18 +10,17 @@ import { BoxyList, InlineTable } from './shared/DesignSystem';
 import { NoPrefetchLink } from './shared/NoPrefetchLink';
 
 type SequenceDetailModel = {
-	sequencePrefix: string;
-	ringLength: number;
-	viewedGroupId: number;
+	id: number;
+	prefix: string;
 };
 
 type SpeciesGroup = {
 	speciesName: string;
-	rings: RingSequenceDetailRow[];
+	rings: RingSequenceBirdRow[];
 };
 
-function groupBySpecies(rows: RingSequenceDetailRow[]): SpeciesGroup[] {
-	const map = new Map<string, RingSequenceDetailRow[]>();
+function groupBySpecies(rows: RingSequenceBirdRow[]): SpeciesGroup[] {
+	const map = new Map<string, RingSequenceBirdRow[]>();
 	for (const row of rows) {
 		const existing = map.get(row.species_name) ?? [];
 		existing.push(row);
@@ -82,10 +81,10 @@ export function RingSequenceDetail({
 	model: SequenceDetailModel;
 	expandedId: string | false;
 }) {
-	const accordionId = `${model.sequencePrefix}-${model.ringLength}`;
+	const accordionId = String(model.id);
 	const isExpanded = expandedId === accordionId;
 
-	const [data, setData] = useState<RingSequenceDetailRow[] | null>(null);
+	const [data, setData] = useState<RingSequenceBirdRow[] | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isLoaded, setIsLoaded] = useState(false);
 	const [expandedSpecies, setExpandedSpecies] = useState<string | false>(false);
@@ -96,11 +95,7 @@ export function RingSequenceDetail({
 		setTimeout(() => {
 			if (!cancelled) setIsLoading(true);
 		}, 100);
-		fetchRingSequenceDetail(
-			model.sequencePrefix,
-			model.ringLength,
-			model.viewedGroupId
-		)
+		fetchRingSequenceBirds(model.id)
 			.then((result) => {
 				if (!cancelled) setData(result);
 			})
@@ -113,13 +108,7 @@ export function RingSequenceDetail({
 		return () => {
 			cancelled = true;
 		};
-	}, [
-		isExpanded,
-		isLoaded,
-		model.sequencePrefix,
-		model.ringLength,
-		model.viewedGroupId
-	]);
+	}, [isExpanded, isLoaded, model.id]);
 
 	if (!isExpanded) return null;
 
@@ -131,7 +120,7 @@ export function RingSequenceDetail({
 
 	const unusedRings = findUnusedRings(
 		data.map((r) => r.ring_no),
-		model.sequencePrefix.length
+		model.prefix.length
 	);
 	const speciesGroups = groupBySpecies(data);
 

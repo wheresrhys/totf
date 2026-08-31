@@ -1,126 +1,126 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	waitFor,
+	within,
+	fireEvent
+} from '@testing-library/react';
 import { RingSequencesPage } from '../RingSequencesPage';
-import type { RingSequenceSummary } from '@/app/actions/ring-sequences';
+import type { RingSequenceRow } from '@/app/models/db';
+import type { RingSequenceBirdRow } from '@/app/actions/ring-sequences';
 
 vi.mock('@/app/actions/ring-sequences', () => ({
-	fetchRingSequenceSummaries: vi.fn(),
-	fetchRingSequenceDetail: vi.fn()
+	fetchRingSequences: vi.fn(),
+	fetchRingSequenceBirds: vi.fn(),
+	updateRingSequence: vi.fn()
 }));
 
-// AA (3-alpha, length 6), A (3-alpha, length 7), Large (3-alpha, length 9)
-const mockSummaries: RingSequenceSummary[] = [
-	{
-		sequence_prefix: 'ARW',
-		ring_length: 6,
-		ring_count: 10,
-		earliest_date: '2022-06-15',
-		latest_date: '2024-05-10'
-	},
-	{
-		sequence_prefix: 'ARW',
-		ring_length: 7,
-		ring_count: 15,
-		earliest_date: '2022-06-15',
-		latest_date: '2024-05-10'
-	},
-	{
-		sequence_prefix: 'ABT',
-		ring_length: 7,
-		ring_count: 6,
-		earliest_date: '2022-04-30',
-		latest_date: '2023-05-12'
-	},
-	{
-		sequence_prefix: 'ARW',
-		ring_length: 9,
-		ring_count: 8,
-		earliest_date: '2021-03-01',
-		latest_date: '2023-07-20'
-	}
+function makeSequence(
+	overrides: Partial<RingSequenceRow> & Pick<RingSequenceRow, 'id' | 'prefix'>
+): RingSequenceRow {
+	return {
+		size: null,
+		owned_by_group: true,
+		ringing_group_id: 1,
+		first_ring: `${overrides.prefix}00001`,
+		last_ring: `${overrides.prefix}00099`,
+		...overrides
+	};
+}
+
+const mockSequences: RingSequenceRow[] = [
+	makeSequence({ id: 1, prefix: 'ARW', size: 'A' }),
+	makeSequence({ id: 2, prefix: 'ABT', size: 'A' }),
+	makeSequence({ id: 3, prefix: 'CJ', size: 'C' }),
+	makeSequence({ id: 4, prefix: 'ZZZ', size: null })
 ];
 
-const viewedGroupId = 1;
-
-describe('RingSequencesPage', () => {
+describe('RingSequencesPage (RingSequences table data path)', () => {
 	afterEach(() => {
 		cleanup();
 		vi.clearAllMocks();
 	});
 
-	it('renders a section heading per populated ring size', () => {
-		render(
-			<RingSequencesPage
-				params={{}}
-				data={mockSummaries}
-				viewedGroup={{ id: viewedGroupId, slug: 'alpha' }}
-			/>
-		);
-		expect(screen.getByTestId('ring-size-AA')).toBeDefined();
-		expect(screen.getByTestId('ring-size-A')).toBeDefined();
-		expect(screen.getByTestId('ring-size-Large')).toBeDefined();
+	it('renders one row per RingSequences entry grouped by size', () => {
+		render(<RingSequencesPage data={mockSequences} />);
+		expect(screen.getByTestId('sequence-1')).toBeDefined();
+		expect(screen.getByTestId('sequence-2')).toBeDefined();
+		expect(screen.getByTestId('sequence-3')).toBeDefined();
+		expect(screen.getByTestId('sequence-4')).toBeDefined();
 	});
 
-	it('heading shows ring size name and total ring count', () => {
-		render(
-			<RingSequencesPage
-				params={{}}
-				data={mockSummaries}
-				viewedGroup={{ id: viewedGroupId, slug: 'alpha' }}
-			/>
-		);
+	it('groups sizes in RING_SIZE_ENUM_ORDER with the missing-size group first', () => {
+		render(<RingSequencesPage data={mockSequences} />);
+		const sections = screen
+			.getAllByTestId(/^ring-size-/)
+			.map((el) => el.getAttribute('data-testid'));
+		expect(sections).toEqual([
+			'ring-size-missing',
+			'ring-size-A',
+			'ring-size-C'
+		]);
+	});
+
+	it('places a sized row in its size group with no highlight badge', () => {
+		render(<RingSequencesPage data={mockSequences} />);
 		const aSection = screen.getByTestId('ring-size-A');
-		// ARW (15) + ABT (6) = 21
-		expect(aSection.textContent).toContain('A');
-		expect(aSection.textContent).toContain('21 rings');
+		expect(within(aSection).getByTestId('sequence-1')).toBeDefined();
+		expect(within(aSection).getByTestId('sequence-2')).toBeDefined();
+		expect(within(aSection).queryByTestId('missing-size-badge')).toBeNull();
 	});
 
-	it('renders sequence accordions within correct ring size section', () => {
-		render(
-			<RingSequencesPage
-				params={{}}
-				data={mockSummaries}
-				viewedGroup={{ id: viewedGroupId, slug: 'alpha' }}
-			/>
-		);
-		const aaSection = screen.getByTestId('ring-size-AA');
+	it('renders null-size rows in the missing-size group with a warning badge', () => {
+		render(<RingSequencesPage data={mockSequences} />);
+		const missingSection = screen.getByTestId('ring-size-missing');
 		expect(
-			aaSection.querySelector('[data-testid="sequence-ARW-6"]')
-		).toBeTruthy();
-
-		const aSection = screen.getByTestId('ring-size-A');
-		expect(
-			aSection.querySelector('[data-testid="sequence-ARW-7"]')
-		).toBeTruthy();
-		expect(
-			aSection.querySelector('[data-testid="sequence-ABT-7"]')
-		).toBeTruthy();
+			within(missingSection).getByTestId('missing-size-badge')
+		).toBeDefined();
+		expect(within(missingSection).getByTestId('sequence-4')).toBeDefined();
 	});
 
-	it('omits ring size sections with no sequences', () => {
-		render(
-			<RingSequencesPage
-				params={{}}
-				data={mockSummaries}
-				viewedGroup={{ id: viewedGroupId, slug: 'alpha' }}
-			/>
-		);
-		expect(screen.queryByTestId('ring-size-B, C, C2')).toBeNull();
-		expect(screen.queryByTestId('ring-size-D')).toBeNull();
+	it('shows prefix and first_ring–last_ring range in the row heading', () => {
+		render(<RingSequencesPage data={mockSequences} />);
+		const row = screen.getByTestId('sequence-1');
+		expect(row.textContent).toContain('ARW');
+		expect(row.textContent).toContain('ARW00001');
+		expect(row.textContent).toContain('ARW00099');
 	});
 
-	it('shows sequence prefix, ring count, and date range in heading', () => {
-		render(
-			<RingSequencesPage
-				params={{}}
-				data={mockSummaries}
-				viewedGroup={{ id: viewedGroupId, slug: 'alpha' }}
-			/>
-		);
-		const arwItem = screen.getByTestId('sequence-ARW-7');
-		expect(arwItem.textContent).toContain('ARW');
-		expect(arwItem.textContent).toContain('15 rings');
-		expect(arwItem.textContent).toContain('2022-06-15');
-		expect(arwItem.textContent).toContain('2024-05-10');
+	it('renders an empty state without throwing when there are no sequences', () => {
+		render(<RingSequencesPage data={[]} />);
+		expect(screen.getByTestId('ring-sequences-empty')).toBeDefined();
+		expect(screen.queryByTestId(/^ring-size-/)).toBeNull();
+	});
+
+	it('opens the edit modal for a row without toggling its detail', () => {
+		render(<RingSequencesPage data={mockSequences} />);
+		expect(screen.queryByTestId('ring-sequence-edit-modal')).toBeNull();
+
+		fireEvent.click(screen.getByTestId('edit-sequence-1'));
+
+		expect(screen.getByTestId('ring-sequence-edit-modal')).toBeDefined();
+		// The accordion detail should not have expanded (no fetch triggered).
+		expect(screen.getByDisplayValue('ARW')).toBeDefined();
+	});
+
+	it('fetches and renders a row detail when expanded', async () => {
+		const { fetchRingSequenceBirds } =
+			await import('@/app/actions/ring-sequences');
+		const detailRows: RingSequenceBirdRow[] = [
+			{ ring_no: 'ARW00001', species_name: 'Robin', ringed_date: '2022-06-15' }
+		];
+		vi.mocked(fetchRingSequenceBirds).mockResolvedValue(detailRows);
+
+		render(<RingSequencesPage data={mockSequences} />);
+		const row = screen.getByTestId('sequence-1');
+		const toggle = within(row).getAllByRole('button')[0];
+		fireEvent.click(toggle);
+
+		await waitFor(() => {
+			expect(vi.mocked(fetchRingSequenceBirds)).toHaveBeenCalledWith(1);
+			expect(screen.getByText(/Robin/)).toBeDefined();
+		});
 	});
 });
