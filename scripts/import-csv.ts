@@ -12,7 +12,11 @@ import { supabase } from '../lib/supabase';
 import fs from 'fs';
 import path from 'path';
 import csvParser from 'csv-parser';
-import { createUpserter, processEncounterRow } from '../lib/demon-import';
+import {
+	createUpserter,
+	createRingSequenceResolver,
+	processEncounterRow
+} from '../lib/demon-import';
 
 interface ImportOptions {
 	csvFilePath: string;
@@ -66,6 +70,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 		await getAuthenticatedSupabaseClientForGroup(ringingGroupId);
 
 	const upsert = createUpserter(groupSupabaseClient);
+	const resolveRingSequence = createRingSequenceResolver(groupSupabaseClient);
 	return new Promise((resolve, reject) => {
 		fs.createReadStream(csvFilePath)
 			.pipe(csvParser())
@@ -73,7 +78,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 				const rowIndex = totalRecords;
 				totalRecords++;
 				const promise = limit(() =>
-					processEncounterRow(row, upsert, ringingGroupId)
+					processEncounterRow(row, upsert, resolveRingSequence, ringingGroupId)
 						.then(
 							() => successfulRecords++,
 							(err) => {
