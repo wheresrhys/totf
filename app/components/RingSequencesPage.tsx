@@ -1,9 +1,9 @@
 'use client';
 import { useState } from 'react';
-import type { RingSequenceSummary } from '@/app/actions/ring-sequences';
+import type { RingSequenceRow } from '@/app/models/db';
 import {
-	groupSummariesByRingSize,
-	type RingSizeGroup
+	groupRingSequencesBySize,
+	type RingSequenceSizeGroup
 } from '@/app/models/ring-sequences';
 import { AccordionItem } from './shared/Accordion';
 import {
@@ -13,24 +13,30 @@ import {
 	SecondaryHeading
 } from './shared/DesignSystem';
 import { RingSequenceDetail } from './RingSequenceDetail';
-import type { ViewedGroup } from '@/lib/group-slug';
 
-type SequenceSummaryModel = {
-	summary: RingSequenceSummary;
-	viewedGroupId: number;
+type SequenceRowModel = {
+	sequence: RingSequenceRow;
 };
 
-function SequenceHeading({ model }: { model: SequenceSummaryModel }) {
-	const { summary } = model;
+function formatRingRange(sequence: RingSequenceRow): string | null {
+	const { first_ring, last_ring } = sequence;
+	if (!first_ring && !last_ring) return null;
+	if (first_ring && last_ring) return `${first_ring} – ${last_ring}`;
+	return first_ring ?? last_ring;
+}
+
+function SequenceHeading({ model }: { model: SequenceRowModel }) {
+	const { sequence } = model;
+	const range = formatRingRange(sequence);
 	return (
 		<span>
-			<span className="font-bold">{summary.sequence_prefix}</span>
-			{' — '}
-			<span>{summary.ring_count} rings</span>
-			{', '}
-			<span>
-				{summary.earliest_date} – {summary.latest_date}
-			</span>
+			<span className="font-bold">{sequence.prefix}</span>
+			{range && (
+				<>
+					{' — '}
+					<span>{range}</span>
+				</>
+			)}
 		</span>
 	);
 }
@@ -39,16 +45,12 @@ function SequenceContent({
 	model,
 	expandedId
 }: {
-	model: SequenceSummaryModel;
+	model: SequenceRowModel;
 	expandedId: string | false;
 }) {
 	return (
 		<RingSequenceDetail
-			model={{
-				sequencePrefix: model.summary.sequence_prefix,
-				ringLength: model.summary.ring_length,
-				viewedGroupId: model.viewedGroupId
-			}}
+			model={{ id: model.sequence.id, prefix: model.sequence.prefix }}
 			expandedId={expandedId}
 		/>
 	);
@@ -56,29 +58,36 @@ function SequenceContent({
 
 function RingSizeSection({
 	group,
-	viewedGroupId,
 	expandedId,
 	onToggle
 }: {
-	group: RingSizeGroup;
-	viewedGroupId: number;
+	group: RingSequenceSizeGroup;
 	expandedId: string | false;
 	onToggle: (id: string | false) => void;
 }) {
+	const isMissingSize = group.size === null;
 	return (
-		<li data-testid={`ring-size-${group.name}`}>
+		<li data-testid={`ring-size-${group.size ?? 'missing'}`}>
 			<SecondaryHeading>
-				{group.name} — {group.totalRingCount} rings
+				{isMissingSize ? (
+					<span className="badge badge-warning" data-testid="missing-size-badge">
+						Missing size
+					</span>
+				) : (
+					group.size
+				)}{' '}
+				<span className="text-base-content/60 text-base">
+					({group.sequences.length})
+				</span>
 			</SecondaryHeading>
 			<ul className="divide-base-content/25 divide-y">
-				{group.summaries.map((summary) => {
-					const id = `${summary.sequence_prefix}-${summary.ring_length}`;
-					const summaryModel: SequenceSummaryModel = { summary, viewedGroupId };
+				{group.sequences.map((sequence) => {
+					const id = String(sequence.id);
 					return (
 						<AccordionItem
 							key={id}
 							id={id}
-							model={summaryModel}
+							model={{ sequence }}
 							onToggle={onToggle}
 							expandedId={expandedId}
 							HeadingComponent={SequenceHeading}
@@ -92,31 +101,29 @@ function RingSizeSection({
 	);
 }
 
-export function RingSequencesPage({
-	data,
-	viewedGroup
-}: {
-	params: Record<string, string>;
-	data: RingSequenceSummary[];
-	viewedGroup: ViewedGroup;
-}) {
+export function RingSequencesPage({ data }: { data: RingSequenceRow[] }) {
 	const [expandedId, setExpandedId] = useState<string | false>(false);
-	const ringSizeGroups = groupSummariesByRingSize(data);
+	const ringSizeGroups = groupRingSequencesBySize(data);
 
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Ring Sequences</PrimaryHeading>
-			<BoxyList>
-				{ringSizeGroups.map((group) => (
-					<RingSizeSection
-						key={group.name}
-						group={group}
-						viewedGroupId={viewedGroup.id}
-						expandedId={expandedId}
-						onToggle={setExpandedId}
-					/>
-				))}
-			</BoxyList>
+			{data.length === 0 ? (
+				<p data-testid="ring-sequences-empty">
+					No ring sequences yet. Re-import your data to populate them.
+				</p>
+			) : (
+				<BoxyList>
+					{ringSizeGroups.map((group) => (
+						<RingSizeSection
+							key={group.size ?? 'missing'}
+							group={group}
+							expandedId={expandedId}
+							onToggle={setExpandedId}
+						/>
+					))}
+				</BoxyList>
+			)}
 		</PageWrapper>
 	);
 }
