@@ -13,9 +13,11 @@ import {
 	SecondaryHeading
 } from './shared/DesignSystem';
 import { RingSequenceDetail } from './RingSequenceDetail';
+import { RingSequenceEditModal } from './RingSequenceEditModal';
 
 type SequenceRowModel = {
 	sequence: RingSequenceRow;
+	onEdit: (sequence: RingSequenceRow) => void;
 };
 
 function formatRingRange(sequence: RingSequenceRow): string | null {
@@ -26,10 +28,10 @@ function formatRingRange(sequence: RingSequenceRow): string | null {
 }
 
 function SequenceHeading({ model }: { model: SequenceRowModel }) {
-	const { sequence } = model;
+	const { sequence, onEdit } = model;
 	const range = formatRingRange(sequence);
 	return (
-		<span>
+		<span className="flex items-center gap-2">
 			<span className="font-bold">{sequence.prefix}</span>
 			{range && (
 				<>
@@ -37,6 +39,27 @@ function SequenceHeading({ model }: { model: SequenceRowModel }) {
 					<span>{range}</span>
 				</>
 			)}
+			{/* A span (not a nested <button>) so it is valid inside the
+			    AccordionItem's header <button>; stopPropagation keeps a click
+			    from also toggling the accordion. */}
+			<span
+				role="button"
+				tabIndex={0}
+				className="btn btn-xs btn-outline"
+				data-testid={`edit-sequence-${sequence.id}`}
+				onClick={(event) => {
+					event.stopPropagation();
+					onEdit(sequence);
+				}}
+				onKeyDown={(event) => {
+					if (event.key === 'Enter' || event.key === ' ') {
+						event.stopPropagation();
+						onEdit(sequence);
+					}
+				}}
+			>
+				Edit
+			</span>
 		</span>
 	);
 }
@@ -59,18 +82,23 @@ function SequenceContent({
 function RingSizeSection({
 	group,
 	expandedId,
-	onToggle
+	onToggle,
+	onEdit
 }: {
 	group: RingSequenceSizeGroup;
 	expandedId: string | false;
 	onToggle: (id: string | false) => void;
+	onEdit: (sequence: RingSequenceRow) => void;
 }) {
 	const isMissingSize = group.size === null;
 	return (
 		<li data-testid={`ring-size-${group.size ?? 'missing'}`}>
 			<SecondaryHeading>
 				{isMissingSize ? (
-					<span className="badge badge-warning" data-testid="missing-size-badge">
+					<span
+						className="badge badge-warning"
+						data-testid="missing-size-badge"
+					>
 						Missing size
 					</span>
 				) : (
@@ -87,7 +115,7 @@ function RingSizeSection({
 						<AccordionItem
 							key={id}
 							id={id}
-							model={{ sequence }}
+							model={{ sequence, onEdit }}
 							onToggle={onToggle}
 							expandedId={expandedId}
 							HeadingComponent={SequenceHeading}
@@ -103,6 +131,8 @@ function RingSizeSection({
 
 export function RingSequencesPage({ data }: { data: RingSequenceRow[] }) {
 	const [expandedId, setExpandedId] = useState<string | false>(false);
+	const [editingSequence, setEditingSequence] =
+		useState<RingSequenceRow | null>(null);
 	const ringSizeGroups = groupRingSequencesBySize(data);
 
 	return (
@@ -120,9 +150,16 @@ export function RingSequencesPage({ data }: { data: RingSequenceRow[] }) {
 							group={group}
 							expandedId={expandedId}
 							onToggle={setExpandedId}
+							onEdit={setEditingSequence}
 						/>
 					))}
 				</BoxyList>
+			)}
+			{editingSequence && (
+				<RingSequenceEditModal
+					sequence={editingSequence}
+					onClose={() => setEditingSequence(null)}
+				/>
 			)}
 		</PageWrapper>
 	);

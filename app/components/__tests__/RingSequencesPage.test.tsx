@@ -74,7 +74,9 @@ describe('RingSequencesPage (RingSequences table data path)', () => {
 	it('renders null-size rows in the missing-size group with a warning badge', () => {
 		render(<RingSequencesPage data={mockSequences} />);
 		const missingSection = screen.getByTestId('ring-size-missing');
-		expect(within(missingSection).getByTestId('missing-size-badge')).toBeDefined();
+		expect(
+			within(missingSection).getByTestId('missing-size-badge')
+		).toBeDefined();
 		expect(within(missingSection).getByTestId('sequence-4')).toBeDefined();
 	});
 
@@ -90,6 +92,17 @@ describe('RingSequencesPage (RingSequences table data path)', () => {
 		render(<RingSequencesPage data={[]} />);
 		expect(screen.getByTestId('ring-sequences-empty')).toBeDefined();
 		expect(screen.queryByTestId(/^ring-size-/)).toBeNull();
+	});
+
+	it('opens the edit modal for a row without toggling its detail', () => {
+		render(<RingSequencesPage data={mockSequences} />);
+		expect(screen.queryByTestId('ring-sequence-edit-modal')).toBeNull();
+
+		fireEvent.click(screen.getByTestId('edit-sequence-1'));
+
+		expect(screen.getByTestId('ring-sequence-edit-modal')).toBeDefined();
+		// The accordion detail should not have expanded (no fetch triggered).
+		expect(screen.getByDisplayValue('ARW')).toBeDefined();
 	});
 
 	it('fetches and renders a row detail when expanded', async () => {
