@@ -229,7 +229,7 @@ describe('deduceRingSequenceSize', () => {
 
 describe('createRingSequenceResolver', () => {
 	let mockUpsert: ReturnType<typeof vi.fn>;
-	let mockSingle: ReturnType<typeof vi.fn>;
+	let mockMaybeSingle: ReturnType<typeof vi.fn>;
 	let mockEqGroup: ReturnType<typeof vi.fn>;
 	let mockEqPrefix: ReturnType<typeof vi.fn>;
 	let mockSelect: ReturnType<typeof vi.fn>;
@@ -238,8 +238,8 @@ describe('createRingSequenceResolver', () => {
 
 	beforeEach(() => {
 		mockUpsert = vi.fn().mockResolvedValue({ error: null });
-		mockSingle = vi.fn();
-		mockEqGroup = vi.fn(() => ({ single: mockSingle }));
+		mockMaybeSingle = vi.fn();
+		mockEqGroup = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
 		mockEqPrefix = vi.fn(() => ({ eq: mockEqGroup }));
 		mockSelect = vi.fn(() => ({ eq: mockEqPrefix }));
 		mockFrom = vi.fn(() => ({ upsert: mockUpsert, select: mockSelect }));
@@ -247,8 +247,11 @@ describe('createRingSequenceResolver', () => {
 		resolve = createRingSequenceResolver(mockClient);
 	});
 
-	it('inserts a new RingSequences row (ignoreDuplicates) and returns its id', async () => {
-		mockSingle.mockResolvedValue({ data: { id: 42 }, error: null });
+	it('inserts a new RingSequences row (ignoreDuplicates) and returns its id when no row exists yet', async () => {
+		// select-first misses, then the post-insert select returns the new id
+		mockMaybeSingle
+			.mockResolvedValueOnce({ data: null, error: null })
+			.mockResolvedValueOnce({ data: { id: 42 }, error: null });
 		const id = await resolve('AEL', 7, 'A');
 		expect(mockFrom).toHaveBeenCalledWith('RingSequences');
 		expect(mockUpsert).toHaveBeenCalledWith(
@@ -258,20 +261,17 @@ describe('createRingSequenceResolver', () => {
 		expect(id).toBe(42);
 	});
 
-	it('returns the existing row id and never carries an update to size when a row already exists', async () => {
-		mockSingle.mockResolvedValue({ data: { id: 99 }, error: null });
+	it('returns the existing row id without ever inserting (so a pre-existing size is never touched) when a row already exists', async () => {
+		mockMaybeSingle.mockResolvedValue({ data: { id: 99 }, error: null });
 		const id = await resolve('AEL', 7, 'A');
-		// ignoreDuplicates: true => ON CONFLICT DO NOTHING, so a pre-existing
-		// row's `size` is never overwritten by the insert step.
-		expect(mockUpsert).toHaveBeenCalledWith(
-			expect.anything(),
-			expect.objectContaining({ ignoreDuplicates: true })
-		);
+		// select-first hits, so the insert step is skipped entirely — the
+		// strongest possible "never overwrite size" guarantee.
+		expect(mockUpsert).not.toHaveBeenCalled();
 		expect(id).toBe(99);
 	});
 
 	it('throws when the id-resolving select returns an error', async () => {
-		mockSingle.mockResolvedValue({
+		mockMaybeSingle.mockResolvedValue({
 			data: null,
 			error: { message: 'select failed' }
 		});

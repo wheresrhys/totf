@@ -218,20 +218,80 @@ export function createUpserter(supabaseClient: SupabaseClient) {
 	};
 }
 
+// Postgres transient failures worth retrying: serialization failure (40001)
+// and deadlock detected (40P01). Both import paths process rows concurrently,
+// and rows sharing a ring prefix contend on the same RingSequences row — both
+// when first creating it and, via the Task B `trg_refresh_ring_sequence_bounds`
+// trigger (which SELECT ... FOR UPDATEs the sequence row on every
+// Birds.ring_sequence_id write), when two same-prefix Bird upserts each hold the
+// FK's KEY SHARE lock and try to upgrade to FOR UPDATE. Retrying the aborted
+// statement lets the deadlock victim succeed once the winner has committed.
+const RETRYABLE_PG_CODES = new Set(['40001', '40P01']);
+const PG_RETRY_MAX_ATTEMPTS = 5;
+
+function isRetryablePgError(error: unknown): boolean {
+	return (
+		typeof error === 'object' &&
+		error !== null &&
+		'code' in error &&
+		RETRYABLE_PG_CODES.has((error as { code: string }).code)
+	);
+}
+
+// Retry an operation on transient serialization/deadlock failures, with a small
+// randomised backoff so contending rows don't immediately re-collide.
+export async function withPgRetry<T>(operation: () => Promise<T>): Promise<T> {
+	let lastError: unknown;
+	for (let attempt = 0; attempt < PG_RETRY_MAX_ATTEMPTS; attempt++) {
+		try {
+			return await operation();
+		} catch (error) {
+			if (!isRetryablePgError(error)) throw error;
+			lastError = error;
+			await new Promise((resolve) =>
+				setTimeout(resolve, Math.random() * 25 * (attempt + 1))
+			);
+		}
+	}
+	throw lastError;
+}
+
 // Resolves (find-or-create) the `RingSequences` row for a `(prefix,
 // ringing_group_id)` pair and returns its id. Deliberately NOT built on
 // `createUpserter`: that always upserts with `ignoreDuplicates: false`, i.e. a
 // full-column overwrite on conflict, which would clobber a `size` a user has
-// manually corrected via the ring-sequences UI. Here the insert uses
-// `ignoreDuplicates: true` (ON CONFLICT DO NOTHING) so an existing row's `size`
-// is never touched; the follow-up select then returns the id for both the
-// just-inserted and the pre-existing-conflict case. See issue #659.
+// manually corrected via the ring-sequences UI. This never updates an existing
+// row's `size`: it selects first and only inserts (with `ignoreDuplicates:
+// true` / ON CONFLICT DO NOTHING) when the row is genuinely missing.
+//
+// Both import paths run rows concurrently, and every row of a given prefix hits
+// the same key, so the select-first ordering means only the first row of a
+// prefix ever attempts an insert once the row is committed — and any residual
+// races between simultaneous first-inserts are retried on deadlock/serialization
+// failure (see `isRetryablePgError`). See issue #659.
 export function createRingSequenceResolver(supabaseClient: SupabaseClient) {
-	return async (
+	async function selectId(
+		prefix: string,
+		ringingGroupId: number
+	): Promise<number | null> {
+		const { data, error } = await supabaseClient
+			.from('RingSequences')
+			.select('id')
+			.eq('prefix', prefix)
+			.eq('ringing_group_id', ringingGroupId)
+			.maybeSingle();
+		if (error) throw error;
+		return data?.id ?? null;
+	}
+
+	async function resolveOnce(
 		prefix: string,
 		ringingGroupId: number,
 		size: Database['public']['Enums']['ring_size'] | null
-	): Promise<number> => {
+	): Promise<number> {
+		const existingId = await selectId(prefix, ringingGroupId);
+		if (existingId !== null) return existingId;
+
 		const { error: insertError } = await supabaseClient
 			.from('RingSequences')
 			.upsert(
@@ -240,19 +300,20 @@ export function createRingSequenceResolver(supabaseClient: SupabaseClient) {
 			);
 		if (insertError) throw insertError;
 
-		const { data, error: selectError } = await supabaseClient
-			.from('RingSequences')
-			.select('id')
-			.eq('prefix', prefix)
-			.eq('ringing_group_id', ringingGroupId)
-			.single();
-		if (selectError) throw selectError;
-		if (!data)
+		const id = await selectId(prefix, ringingGroupId);
+		if (id === null)
 			throw new Error(
 				`RingSequences row for prefix "${prefix}" (group ${ringingGroupId}) not found after upsert`
 			);
-		return data.id;
-	};
+		return id;
+	}
+
+	return (
+		prefix: string,
+		ringingGroupId: number,
+		size: Database['public']['Enums']['ring_size'] | null
+	): Promise<number> =>
+		withPgRetry(() => resolveOnce(prefix, ringingGroupId, size));
 }
 
 export async function processEncounterRow(
@@ -285,16 +346,21 @@ export async function processEncounterRow(
 		ringSequenceId = await resolveRingSequence(prefix, ringingGroupId, size);
 	}
 
-	const birdId = await upsert<BirdsInsert>(
-		'Birds',
-		{
-			ring_no: row.ring_no as string,
-			species_id: speciesId,
-			...(ringSequenceId !== undefined
-				? { ring_sequence_id: ringSequenceId }
-				: {})
-		},
-		['ring_no']
+	// Wrapped in withPgRetry because writing ring_sequence_id fires the Task B
+	// bounds trigger, which FOR UPDATEs the shared RingSequences row — so two
+	// concurrent same-prefix Bird upserts can deadlock (see withPgRetry).
+	const birdId = await withPgRetry(() =>
+		upsert<BirdsInsert>(
+			'Birds',
+			{
+				ring_no: row.ring_no as string,
+				species_id: speciesId,
+				...(ringSequenceId !== undefined
+					? { ring_sequence_id: ringSequenceId }
+					: {})
+			},
+			['ring_no']
+		)
 	);
 
 	const locationId = await upsert<LocationsInsert>(
