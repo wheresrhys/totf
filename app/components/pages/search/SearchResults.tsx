@@ -1,8 +1,12 @@
 'use client';
 import { useState } from 'react';
-import { BoxyList, PageWrapper, PrimaryHeading } from './shared/DesignSystem';
-import { NoPrefetchLink } from './shared/NoPrefetchLink';
-import { RingSearchForm } from './shared/RingSearchForm';
+import {
+	BoxyList,
+	PageWrapper,
+	PrimaryHeading
+} from '@/app/components/shared/DesignSystem';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
 
 export type SearchResult = {
 	ring_no: string;
@@ -10,7 +14,7 @@ export type SearchResult = {
 	closeness_score: number;
 };
 
-export function BirdSearchResults({
+export function SearchResults({
 	params: { q },
 	data
 }: {

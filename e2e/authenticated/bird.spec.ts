@@ -2,19 +2,19 @@ import { test, expect } from '@playwright/test'
 
 test.describe('bird search', () => {
 	test('alpha: exact ring match redirects to bird page', { tag: '@alpha' }, async ({ page }) => {
-		await page.goto('/bird?q=ARRETRAP')
+		await page.goto('/search?q=ARRETRAP')
 		await expect(page).toHaveURL(/\/bird\/ARRETRAP/i)
 	})
 
 	test('beta: partial match shows search results', { tag: '@beta' }, async ({ page }) => {
-		await page.goto('/bird?q=BCHAF')
+		await page.goto('/search?q=BCHAF')
 		await expect(
 			page.getByRole('heading', { name: 'Search results' })
 		).toBeVisible()
 	})
 
 	test('gamma: no own birds — search yields no results', { tag: '@gamma' }, async ({ page }) => {
-		await page.goto('/bird?q=ARRETRAP')
+		await page.goto('/search?q=ARRETRAP')
 		// Gamma cannot see Alpha's birds; fuzzy search returns empty
 		await expect(
 			page.getByRole('heading', { name: 'Search results' })
