@@ -1,4 +1,4 @@
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import {
 	fetchSummaryStats,
 	fetchYearlyTotals
@@ -47,7 +47,7 @@ export default async function SummaryPage({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<PageData>
+		<BootstrapPage<PageData>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['summary']}
 			dataFetcher={fetchAllTimeSummaryData}

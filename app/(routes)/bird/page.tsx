@@ -1,4 +1,4 @@
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
@@ -33,7 +33,7 @@ export default async function BirdPage(
 	props: PageProps & { viewedGroup?: ViewedGroup }
 ) {
 	return (
-		<BootstrapPageData<SearchResult[], PageProps, SearchParams>
+		<BootstrapPage<SearchResult[], PageProps, SearchParams>
 			pageProps={props}
 			viewedGroup={props.viewedGroup}
 			getParams={async (pageProps: PageProps) => ({

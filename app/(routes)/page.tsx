@@ -1,7 +1,7 @@
 import {
-	BootstrapPageData,
+	BootstrapPage,
 	type DefaultPageParams
-} from '../components/layout/BootstrapPageData';
+} from '../components/layout/BootstrapPage';
 import {
 	BoxyList,
 	PageWrapper,
@@ -284,7 +284,7 @@ export default async function Home({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<PageModel>
+		<BootstrapPage<PageModel>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['home-stats']}
 			dataFetcher={fetchHomePageData}

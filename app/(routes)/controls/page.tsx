@@ -1,7 +1,7 @@
 import {
-	BootstrapPageData,
+	BootstrapPage,
 	type DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
+} from '@/app/components/layout/BootstrapPage';
 import {
 	fetchRingSequenceControls,
 	type RingSequenceControlRow
@@ -22,7 +22,7 @@ export default async function ControlsRoute({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<RingSequenceControlRow[]>
+		<BootstrapPage<RingSequenceControlRow[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['controls']}
 			dataFetcher={dataFetcher}

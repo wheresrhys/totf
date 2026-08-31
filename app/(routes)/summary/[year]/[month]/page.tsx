@@ -1,5 +1,5 @@
 import { startOfMonth, endOfMonth, format } from 'date-fns';
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { fetchSummaryStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
 import type { ViewedGroup } from '@/lib/group-slug';
@@ -63,7 +63,7 @@ export default async function YearMonthSummaryPage(
 	props: PageProps & { viewedGroup?: ViewedGroup }
 ) {
 	return (
-		<BootstrapPageData<PageData, PageProps, PageParams>
+		<BootstrapPage<PageData, PageProps, PageParams>
 			pageProps={props}
 			viewedGroup={props.viewedGroup}
 			getCacheKeys={(params: PageParams) => [

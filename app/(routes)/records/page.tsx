@@ -5,9 +5,9 @@ import {
 } from '@/app/components/StatsAccordion';
 import { getSeasonMonths, getSeasonName } from '@/app/models/seasons';
 import {
-	BootstrapPageData,
+	BootstrapPage,
 	type DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
+} from '@/app/components/layout/BootstrapPage';
 import {
 	PageWrapper,
 	PrimaryHeading
@@ -189,7 +189,7 @@ export default async function RecordsPage({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<StatsAccordionModel[]>
+		<BootstrapPage<StatsAccordionModel[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['records']}
 			dataFetcher={fetchRecordsData}

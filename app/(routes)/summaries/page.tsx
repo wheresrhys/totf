@@ -1,8 +1,8 @@
 import { format } from 'date-fns';
 import {
-	BootstrapPageData,
+	BootstrapPage,
 	type DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
+} from '@/app/components/layout/BootstrapPage';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import {
 	PageWrapper,
@@ -69,7 +69,7 @@ export default async function StatsPage({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<PageData>
+		<BootstrapPage<PageData>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['stats']}
 			dataFetcher={fetchAvailablePeriods}

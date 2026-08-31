@@ -4,9 +4,9 @@ import { catchSupabaseErrors } from '@/lib/supabase';
 import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
 import type { ViewedGroup } from '@/lib/group-slug';
 import {
-	BootstrapPageData,
+	BootstrapPage,
 	DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
+} from '@/app/components/layout/BootstrapPage';
 import {
 	PageWrapper,
 	PrimaryHeading
@@ -61,7 +61,7 @@ export default async function ResightingsPage({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<ResightingEncounter[]>
+		<BootstrapPage<ResightingEncounter[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['resightings']}
 			dataFetcher={fetchResightings}
