@@ -6,8 +6,8 @@ import {
 	fireEvent,
 	within
 } from '@testing-library/react';
-import { SessionTabs } from '../SingleSessionTable';
-import type { SpeciesWithEncounters } from '../SingleSessionTable';
+import { SessionTabs } from '../SingleSessionData';
+import type { SpeciesWithEncounters } from '../SingleSessionData';
 import type { NetRound } from '@/app/models/session-chronology';
 import type { SessionEncounter } from '@/app/models/session';
 
@@ -70,37 +70,77 @@ describe('SessionTabs', () => {
 	});
 
 	it('renders both tab buttons', () => {
-		render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+		render(
+			<SessionTabs
+				speciesList={speciesList}
+				netRounds={netRounds}
+				locationId={undefined}
+				viewedGroupId={1}
+				date="2024-09-15"
+			/>
+		);
 		expect(
-			screen.getByRole('button', { name: 'By species' }).textContent
-		).toContain('By species');
+			screen.getByRole('button', { name: 'Species totals' }).textContent
+		).toContain('Species totals');
 		expect(
-			screen.getByRole('button', { name: 'By time' }).textContent
-		).toContain('By time');
+			screen.getByRole('button', { name: 'Net rounds' }).textContent
+		).toContain('Net rounds');
 	});
 
 	it('shows species table by default', () => {
-		render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+		render(
+			<SessionTabs
+				speciesList={speciesList}
+				netRounds={netRounds}
+				locationId={undefined}
+				viewedGroupId={1}
+				date="2024-09-15"
+			/>
+		);
 		expect(screen.getByTestId('session-table')).not.toBeNull();
 	});
 
 	it('shows the max proven age per species row', () => {
-		render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+		render(
+			<SessionTabs
+				speciesList={speciesList}
+				netRounds={netRounds}
+				locationId={undefined}
+				viewedGroupId={1}
+				date="2024-09-15"
+			/>
+		);
 		const robinRow = screen.getByText('Robin').closest('tr') as HTMLElement;
 		expect(robinRow.textContent).toContain('7');
 	});
 
-	it('shows proven age per encounter in the by-time view', () => {
-		render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
-		fireEvent.click(screen.getByRole('button', { name: 'By time' }));
+	it('shows proven age per encounter in the net rounds view', () => {
+		render(
+			<SessionTabs
+				speciesList={speciesList}
+				netRounds={netRounds}
+				locationId={undefined}
+				viewedGroupId={1}
+				date="2024-09-15"
+			/>
+		);
+		fireEvent.click(screen.getByRole('button', { name: 'Net rounds' }));
 		expect(
 			screen.getAllByRole('columnheader').map((c) => c.textContent)
 		).toContain('Proven Age');
 	});
 
-	it('shows chronological view when By time tab clicked', () => {
-		render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
-		fireEvent.click(screen.getByRole('button', { name: 'By time' }));
+	it('shows chronological view when Net rounds tab clicked', () => {
+		render(
+			<SessionTabs
+				speciesList={speciesList}
+				netRounds={netRounds}
+				locationId={undefined}
+				viewedGroupId={1}
+				date="2024-09-15"
+			/>
+		);
+		fireEvent.click(screen.getByRole('button', { name: 'Net rounds' }));
 		expect(screen.getByText('Net round 1: 09:00').textContent).toContain(
 			'Net round 1: 09:00'
 		);
@@ -119,6 +159,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Wren', encounters: [encounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(columnCellValue('Juv', 'Wren')).toBe('1');
@@ -134,6 +177,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Dunnock', encounters: [encounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(columnCellValue('Juv', 'Dunnock')).toBe('1');
@@ -149,6 +195,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Starling', encounters: [encounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(columnCellValue('Juv', 'Starling')).toBe('1');
@@ -164,6 +213,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Swallow', encounters: [encounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(columnCellValue('Pulli', 'Swallow')).toBe('1');
@@ -179,6 +231,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Chaffinch', encounters: [encounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(columnCellValue('Postjuv', 'Chaffinch')).toBe('1');
@@ -195,6 +250,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Wren', encounters: [encounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(columnCellValue('New young', 'Wren')).toBe('1');
@@ -208,6 +266,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Dunnock', encounters: [encounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(columnCellValue('New young', 'Dunnock')).toBe('1');
@@ -221,6 +282,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Starling', encounters: [encounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(columnCellValue('New young', 'Starling')).toBe('0');
@@ -235,6 +299,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Swallow', encounters: [encounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(columnCellValue('New young', 'Swallow')).toBe('0');
@@ -251,6 +318,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Robin', encounters: [pulliEncounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(
@@ -273,7 +343,15 @@ describe('SessionTabs', () => {
 
 	describe('pulli column visibility', () => {
 		it('hides the Pulli column when the session caught no pulli', () => {
-			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
 			expect(
 				screen.getAllByRole('columnheader').map((header) => header.textContent)
 			).not.toContain('Pulli');
@@ -291,6 +369,9 @@ describe('SessionTabs', () => {
 						{ species: 'Wren', encounters: [pulliEncounter] }
 					]}
 					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			expect(
@@ -301,7 +382,15 @@ describe('SessionTabs', () => {
 
 	describe('column styling', () => {
 		it('renders the Total value in bold', () => {
-			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
 			const headers = screen.getAllByRole('columnheader');
 			const totalIndex = headers.findIndex(
 				(header) => header.textContent === 'Total'
@@ -312,7 +401,15 @@ describe('SessionTabs', () => {
 		});
 
 		it('applies a distinct background colour to each of the New/Retrap/Juv/Postjuv/Adult/Unaged/New young columns', () => {
-			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
 			const headers = screen.getAllByRole('columnheader');
 			const backgroundClassFor = (label: string) =>
 				headers.find((header) => header.textContent === label)?.className;
@@ -326,7 +423,15 @@ describe('SessionTabs', () => {
 		});
 
 		it('renders the New young column before Max Proven Age', () => {
-			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
 			const headers = screen
 				.getAllByRole('columnheader')
 				.map((header) => header.textContent);
@@ -336,7 +441,15 @@ describe('SessionTabs', () => {
 		});
 
 		it('draws a thicker left border on Juv (as the first age-class column) when Pulli is hidden', () => {
-			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
 			const headers = screen.getAllByRole('columnheader');
 			const juvHeader = headers.find((header) => header.textContent === 'Juv');
 			expect(juvHeader?.className).toContain('border-l-4');
@@ -351,6 +464,9 @@ describe('SessionTabs', () => {
 				<SessionTabs
 					speciesList={[{ species: 'Robin', encounters: [pulliEncounter] }]}
 					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
 				/>
 			);
 			const headers = screen.getAllByRole('columnheader');
@@ -363,12 +479,37 @@ describe('SessionTabs', () => {
 		});
 
 		it('draws a thicker right border on the Unaged column', () => {
-			render(<SessionTabs speciesList={speciesList} netRounds={netRounds} />);
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
 			const headers = screen.getAllByRole('columnheader');
 			const unagedHeader = headers.find(
 				(header) => header.textContent === 'Not aged'
 			);
 			expect(unagedHeader?.className).toContain('border-r-4');
 		});
+	});
+
+	it.skip('renders session highlights in a tab', async () => {
+		render(
+			<SessionTabs
+				speciesList={speciesList}
+				netRounds={netRounds}
+				locationId={undefined}
+				viewedGroupId={1}
+				date="2024-09-15"
+			/>
+		);
+		expect(screen.getByRole('button', { name: 'Highlights' })).not.toBeNull();
+		fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
+		const highlights = await screen.findByTestId('session-highlights');
+		expect(highlights.textContent).toContain('Highlights');
+		expect(highlights.textContent).toContain('Busiest session ever — 3 birds');
 	});
 });

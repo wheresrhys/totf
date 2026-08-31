@@ -1,7 +1,7 @@
 import {
 	SessionTabs,
 	type SpeciesWithEncounters
-} from '@/app/components/SingleSessionTable';
+} from '@/app/components/SingleSessionData';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionEncounter } from '@/app/models/session';
@@ -18,7 +18,6 @@ import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
 import { calculateSessionChronology } from '@/app/models/session-chronology';
 import { formatMinutesForDisplay } from '@/lib/postgres-interval';
-import { SessionHighlights } from '@/app/components/SessionHighlights';
 import type { ViewedGroup } from '@/lib/group-slug';
 
 export type PageParams = {
@@ -331,10 +330,14 @@ export function SessionSummary({
 					].filter(Boolean) as string[]
 				}
 			/>
-			{locationId ? null : (
-				<SessionHighlights date={date} viewedGroupId={viewedGroup.id} />
-			)}
-			<SessionTabs speciesList={speciesList} netRounds={chronology.netRounds} />
+
+			<SessionTabs
+				speciesList={speciesList}
+				netRounds={chronology.netRounds}
+				locationId={locationId}
+				date={date}
+				viewedGroupId={viewedGroup.id}
+			/>
 		</PageWrapper>
 	);
 }
