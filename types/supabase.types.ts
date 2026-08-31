@@ -49,16 +49,20 @@ export type Database = {
           age_code: number
           bird_id: number
           breeding_condition: string | null
+          capture_method: string | null
           capture_time: string
           extra_text: string | null
           finding_circumstances: string | null
           finding_condition: string | null
           id: number
           is_juv: boolean
+          lure_code_1: string | null
+          lure_code_2: string | null
           max_hatch_year: number
           min_hatch_year: number
           moult_code: string | null
           old_greater_coverts: number | null
+          primary_moult: string | null
           record_type: string
           ringing_group_id: number
           scheme: string
@@ -72,16 +76,20 @@ export type Database = {
           age_code: number
           bird_id: number
           breeding_condition?: string | null
+          capture_method?: string | null
           capture_time: string
           extra_text?: string | null
           finding_circumstances?: string | null
           finding_condition?: string | null
           id?: number
           is_juv?: boolean
+          lure_code_1?: string | null
+          lure_code_2?: string | null
           max_hatch_year: number
           min_hatch_year: number
           moult_code?: string | null
           old_greater_coverts?: number | null
+          primary_moult?: string | null
           record_type: string
           ringing_group_id: number
           scheme: string
@@ -95,16 +103,20 @@ export type Database = {
           age_code?: number
           bird_id?: number
           breeding_condition?: string | null
+          capture_method?: string | null
           capture_time?: string
           extra_text?: string | null
           finding_circumstances?: string | null
           finding_condition?: string | null
           id?: number
           is_juv?: boolean
+          lure_code_1?: string | null
+          lure_code_2?: string | null
           max_hatch_year?: number
           min_hatch_year?: number
           moult_code?: string | null
           old_greater_coverts?: number | null
+          primary_moult?: string | null
           record_type?: string
           ringing_group_id?: number
           scheme?: string
