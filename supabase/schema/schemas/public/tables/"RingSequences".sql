@@ -2,7 +2,7 @@ CREATE TABLE public."RingSequences" (
 	id bigint DEFAULT nextval('public."RingSequences_id_seq"'::regclass) NOT NULL,
 	size public.ring_size,
 	prefix text NOT NULL,
-	owned_by_group boolean DEFAULT true NOT NULL,
+	owned_by_group boolean DEFAULT TRUE NOT NULL,
 	ringing_group_id bigint NOT NULL,
 	first_ring text,
 	last_ring text

@@ -236,6 +236,44 @@ export type Database = {
         }
         Relationships: []
       }
+      RingSequences: {
+        Row: {
+          first_ring: string | null
+          id: number
+          last_ring: string | null
+          owned_by_group: boolean
+          prefix: string
+          ringing_group_id: number
+          size: Database["public"]["Enums"]["ring_size"] | null
+        }
+        Insert: {
+          first_ring?: string | null
+          id?: number
+          last_ring?: string | null
+          owned_by_group?: boolean
+          prefix: string
+          ringing_group_id: number
+          size?: Database["public"]["Enums"]["ring_size"] | null
+        }
+        Update: {
+          first_ring?: string | null
+          id?: number
+          last_ring?: string | null
+          owned_by_group?: boolean
+          prefix?: string
+          ringing_group_id?: number
+          size?: Database["public"]["Enums"]["ring_size"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ring_sequences_ringing_group_id_fkey"
+            columns: ["ringing_group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       Sessions: {
         Row: {
           id: number
@@ -504,7 +542,29 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      ring_size:
+        | "AA"
+        | "A"
+        | "A2"
+        | "B"
+        | "B+"
+        | "B2"
+        | "SO"
+        | "C"
+        | "C2"
+        | "CC"
+        | "D2"
+        | "E"
+        | "Fc"
+        | "Fv"
+        | "G"
+        | "H"
+        | "J"
+        | "K"
+        | "L"
+        | "L+"
+        | "MI"
+        | "MS"
     }
     CompositeTypes: {
       top_metrics_filter_params: {
@@ -638,7 +698,32 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      ring_size: [
+        "AA",
+        "A",
+        "A2",
+        "B",
+        "B+",
+        "B2",
+        "SO",
+        "C",
+        "C2",
+        "CC",
+        "D2",
+        "E",
+        "Fc",
+        "Fv",
+        "G",
+        "H",
+        "J",
+        "K",
+        "L",
+        "L+",
+        "MI",
+        "MS",
+      ],
+    },
   },
 } as const
 
