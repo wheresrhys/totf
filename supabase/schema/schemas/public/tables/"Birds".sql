@@ -21,6 +21,14 @@ CREATE TRIGGER trigger_trg_prevent_bird_species_id_change BEFORE
 UPDATE ON public."Birds" FOR EACH ROW
 EXECUTE FUNCTION public.trg_prevent_bird_species_id_change ();
 
+-- When a bird is assigned to a ring sequence (on insert, or when the assignment
+-- changes on update), widen that sequence's first_ring/last_ring window to cover it.
+CREATE TRIGGER trigger_trg_refresh_ring_sequence_bounds
+AFTER INSERT
+OR
+UPDATE OF ring_sequence_id ON public."Birds" FOR EACH ROW
+EXECUTE FUNCTION public.trg_refresh_ring_sequence_bounds ();
+
 -- SELECT: grants access if any of:
 -- 1. The logged-in group is one of the groups that has ringed this bird (its id is in ringing_group_ids)
 -- 2. The bird has no ringing group yet (empty array, e.g. freshly imported) and the user is authenticated
