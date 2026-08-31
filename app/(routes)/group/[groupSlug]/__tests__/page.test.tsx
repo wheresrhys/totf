@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { redirect, notFound } from 'next/navigation';
 import { getGroupCookie } from '@/app/actions/group-cookie';
-import CrossGroupHome from '../page';
+import GroupHomePage from '../page';
 
 const { mockResolveGroupIdBySlug } = vi.hoisted(() => ({
 	mockResolveGroupIdBySlug: vi.fn()
@@ -24,10 +24,10 @@ vi.mock('@/app/(routes)/page', () => ({
 	default: vi.fn(() => <div data-testid="mock-home" />)
 }));
 
-import Home from '@/app/(routes)/page';
+import HomePage from '@/app/(routes)/page';
 
 function renderPage(groupSlug: string) {
-	return CrossGroupHome({ params: Promise.resolve({ groupSlug }) });
+	return GroupHomePage({ params: Promise.resolve({ groupSlug }) });
 }
 
 describe('cross-group home page', () => {
@@ -49,7 +49,7 @@ describe('cross-group home page', () => {
 			expect(mockResolveGroupIdBySlug).toHaveBeenCalledWith(
 				'viewed-group-slug'
 			);
-			expect(vi.mocked(Home).mock.calls[0][0]).toEqual(
+			expect(vi.mocked(HomePage).mock.calls[0][0]).toEqual(
 				expect.objectContaining({
 					viewedGroup: { id: 2, slug: 'viewed-group-slug' }
 				})
@@ -72,7 +72,7 @@ describe('cross-group home page', () => {
 			);
 
 			expect(vi.mocked(notFound)).toHaveBeenCalled();
-			expect(vi.mocked(Home)).not.toHaveBeenCalled();
+			expect(vi.mocked(HomePage)).not.toHaveBeenCalled();
 		});
 	});
 
@@ -91,7 +91,7 @@ describe('cross-group home page', () => {
 			);
 
 			expect(vi.mocked(redirect)).toHaveBeenCalledWith('/');
-			expect(vi.mocked(Home)).not.toHaveBeenCalled();
+			expect(vi.mocked(HomePage)).not.toHaveBeenCalled();
 		});
 	});
 });

@@ -1,9 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
-import Home from '@/app/(routes)/page';
+import HomePage from '@/app/(routes)/page';
 
-export default async function CrossGroupHome({
+export default async function GroupHomePage({
 	params
 }: {
 	params: Promise<{ groupSlug: string }>;
@@ -18,5 +18,5 @@ export default async function CrossGroupHome({
 		redirect('/');
 	}
 	const viewedGroup = { id: viewedGroupId, slug: groupSlug };
-	return <Home viewedGroup={viewedGroup} />;
+	return <HomePage viewedGroup={viewedGroup} />;
 }
