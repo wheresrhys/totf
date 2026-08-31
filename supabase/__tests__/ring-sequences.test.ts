@@ -8,9 +8,11 @@
  * Run with: npm run test:integration
  */
 
-import { describe, it, beforeAll, expect } from 'vitest';
+import { describe, it, beforeAll, afterAll, expect } from 'vitest';
+import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
 import { supabase } from '../../lib/supabase';
+import { randomTestSuffix, randomFutureDate } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 async function getGroupIdByName(name: string): Promise<number> {
@@ -256,5 +258,177 @@ describe('ring sequence RPC functions', () => {
 			expect(row).toHaveProperty('species_name');
 			expect(row).toHaveProperty('first_date');
 		});
+	});
+});
+
+/**
+ * Controls exclusion for group-tracked prefixes (issue #661).
+ *
+ * A ring whose leading-alpha prefix already has a `RingSequences` row for the
+ * current group is no longer a "foreign" control and must not appear in
+ * `ring_sequence_controls` — regardless of that row's `owned_by_group`. This
+ * covers promoted-but-not-owned sequences (`owned_by_group = false`) as well as
+ * fully-owned ones.
+ *
+ * Uses freshly-created, isolated fixtures under the Delta/Gamma seed groups with
+ * random alpha prefixes (never fixed literals) so concurrent worktree runs
+ * against the shared local Supabase instance never collide on `ring_no` or on
+ * the `(prefix, ringing_group_id)` unique constraint.
+ */
+describe('ring_sequence_controls with tracked sequences', () => {
+	const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+	function psql(sql: string) {
+		execSync(`psql "${LOCAL_DB_URL}" -c "${sql.replace(/"/g, '\\"')}"`);
+	}
+
+	// A purely-alphabetic prefix — the RPC extracts `substring(ring_no from
+	// '^[A-Za-z]+')`, so the prefix segment must contain no digits. Six random
+	// letters keep concurrent runs (and the ring_no unique constraint) apart.
+	function randomAlphaPrefix(): string {
+		const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+		return Array.from({ length: 6 }, () => letters[Math.floor(Math.random() * 26)]).join('');
+	}
+
+	let deltaId: number;
+	let gammaId: number;
+	let deltaClient: SupabaseClient;
+	let gammaClient: SupabaseClient;
+	let robinId: number;
+	let deltaLocationId: number;
+	let deltaSessionId: number;
+
+	const createdBirdIds: number[] = [];
+	const createdSeqIds: number[] = [];
+
+	// Create a control bird under Delta: a single `record_type = 'S'` encounter,
+	// so `ring_sequence_controls` counts it as a control (every encounter is S).
+	// Returns its ring number and leading-alpha prefix.
+	async function createDeltaControl(): Promise<{ ringNo: string; prefix: string }> {
+		const prefix = randomAlphaPrefix();
+		const ringNo = `${prefix}0001`;
+		const { data: bird, error: birdError } = await deltaClient
+			.from('Birds')
+			.insert({ ring_no: ringNo, species_id: robinId })
+			.select('id')
+			.single();
+		if (birdError) throw birdError;
+		createdBirdIds.push(bird!.id);
+
+		const { error: encounterError } = await deltaClient.from('Encounters').insert({
+			capture_time: '10:00:00',
+			record_type: 'S',
+			scheme: 'BTO',
+			sex: 'M',
+			age_code: 4,
+			session_id: deltaSessionId,
+			bird_id: bird!.id,
+		});
+		if (encounterError) throw encounterError;
+
+		return { ringNo, prefix };
+	}
+
+	// Insert a RingSequences row for the given group/prefix, tracking it for cleanup.
+	async function insertRingSequence(
+		client: SupabaseClient,
+		groupId: number,
+		prefix: string,
+		ownedByGroup: boolean
+	): Promise<void> {
+		const { data, error } = await client
+			.from('RingSequences')
+			.insert({ prefix, ringing_group_id: groupId, owned_by_group: ownedByGroup })
+			.select('id')
+			.single();
+		if (error) throw error;
+		createdSeqIds.push(data!.id);
+	}
+
+	async function deltaControls() {
+		const { data, error } = await deltaClient.rpc('ring_sequence_controls', {
+			ringing_group_filter: deltaId,
+		});
+		expect(error).toBeNull();
+		return data!;
+	}
+
+	beforeAll(async () => {
+		deltaId = await getGroupIdByName('Delta');
+		gammaId = await getGroupIdByName('Gamma');
+		[deltaClient, gammaClient] = await Promise.all([
+			getAuthenticatedSupabaseClientForGroup(deltaId),
+			getAuthenticatedSupabaseClientForGroup(gammaId),
+		]);
+
+		const { data: robin, error: robinError } = await supabase
+			.from('Species')
+			.select('id')
+			.eq('species_name', 'Robin')
+			.single();
+		if (robinError || !robin) throw new Error('Robin species not found — run npm run db:seed:e2e first');
+		robinId = robin.id;
+
+		const suffix = randomTestSuffix();
+		const { data: location, error: locationError } = await deltaClient
+			.from('Locations')
+			.insert({ location_name: `Controls Test Location ${suffix}`, ringing_group_id: deltaId })
+			.select('id')
+			.single();
+		if (locationError) throw locationError;
+		deltaLocationId = location!.id;
+
+		const { data: session, error: sessionError } = await deltaClient
+			.from('Sessions')
+			.insert({ visit_date: randomFutureDate(), location_id: deltaLocationId })
+			.select('id')
+			.single();
+		if (sessionError) throw sessionError;
+		deltaSessionId = session!.id;
+	});
+
+	afterAll(() => {
+		const birdIds = createdBirdIds.length ? createdBirdIds.join(', ') : '-1';
+		const seqIds = createdSeqIds.length ? createdSeqIds.join(', ') : '-1';
+		psql(
+			`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds});` +
+				`DELETE FROM "Birds" WHERE id IN (${birdIds});` +
+				`DELETE FROM "RingSequences" WHERE id IN (${seqIds});` +
+				`DELETE FROM "Sessions" WHERE id = ${deltaSessionId};` +
+				`DELETE FROM "Locations" WHERE id = ${deltaLocationId};`
+		);
+	});
+
+	// Usual
+	it('a genuine control with no matching RingSequences row still appears', async () => {
+		const { ringNo } = await createDeltaControl();
+		const controls = await deltaControls();
+		expect(controls.find((r) => r.ring_no === ringNo)).toBeDefined();
+	});
+
+	// Structure — owned_by_group = true excludes
+	it('excludes a control whose prefix has an owned_by_group = true RingSequences row for the group', async () => {
+		const { ringNo, prefix } = await createDeltaControl();
+		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
+
+		await insertRingSequence(deltaClient, deltaId, prefix, true);
+		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeUndefined();
+	});
+
+	// Structure — owned_by_group = false also excludes (promoted-but-not-owned)
+	it('excludes a control whose prefix has an owned_by_group = false RingSequences row for the group', async () => {
+		const { ringNo, prefix } = await createDeltaControl();
+		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
+
+		await insertRingSequence(deltaClient, deltaId, prefix, false);
+		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeUndefined();
+	});
+
+	// Edge — cross-group isolation
+	it('a RingSequences row for a different group with the same prefix does not exclude this group\'s control', async () => {
+		const { ringNo, prefix } = await createDeltaControl();
+
+		// Gamma tracks the same prefix text — must not affect Delta's controls.
+		await insertRingSequence(gammaClient, gammaId, prefix, true);
+		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
 	});
 });
