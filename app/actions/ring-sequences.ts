@@ -202,11 +202,14 @@ type PromoteSupabaseClient = Awaited<
 // existing row untouched, never overwriting its `owned_by_group` or `size`,
 // which the importer or a prior manual edit may have set), then links every
 // currently-untracked bird sharing that prefix to it via
-// `Birds.ring_sequence_id` (firing the bounds trigger on each write). Every
-// control sharing the prefix was promoted together — not just the ring that
-// triggered the promote — since they're indistinguishable once tracked. RLS
-// scopes every query to the caller's group; the explicit `ringing_group_id`
-// filter is defence-in-depth.
+// `Birds.ring_sequence_id`. Every control sharing the prefix was promoted
+// together — not just the ring that triggered the promote — since they're
+// indistinguishable once tracked. `first_ring`/`last_ring` are deliberately
+// left untouched here (there is no more bounds-widening trigger — see #701 —
+// and authoring them is the ring-sequences UI's job, not this action's), so a
+// freshly-created row's numeric range stays null until set there. RLS scopes
+// every query to the caller's group; the explicit `ringing_group_id` filter is
+// defence-in-depth.
 async function findOrCreateRingSequenceAndLinkBirds(
 	supabase: PromoteSupabaseClient,
 	prefix: string,
