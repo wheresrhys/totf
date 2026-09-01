@@ -1,17 +1,16 @@
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
+import type { ViewedGroup } from '@/lib/group-slug';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
-import {
-	BirdSearchResults,
-	type SearchResult
-} from '@/app/components/BirdSearchResults';
-import type { ViewedGroup } from '@/lib/group-slug';
+import { SearchPageContent, type SearchResult } from './PageContent';
 
-type SearchParams = { q: string };
-type PageProps = { searchParams: Promise<SearchParams> };
+export type SearchParams = { q: string };
 
-async function searchByRing({ q }: SearchParams, _viewedGroupId: number) {
+export async function fetchSearchPageContent(
+	{ q }: SearchParams,
+	_viewedGroupId: number
+): Promise<SearchResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const uppercaseQuery = q.toUpperCase();
 	const exactMatch = await supabase
@@ -29,7 +28,9 @@ async function searchByRing({ q }: SearchParams, _viewedGroupId: number) {
 		.then(catchSupabaseErrors);
 }
 
-export default async function BirdPage(
+type PageProps = { searchParams: Promise<SearchParams> };
+
+export default async function SearchPage(
 	props: PageProps & { viewedGroup?: ViewedGroup }
 ) {
 	return (
@@ -40,8 +41,8 @@ export default async function BirdPage(
 				q: (await pageProps.searchParams).q
 			})}
 			getCacheKeys={(params: SearchParams) => ['search', params.q]}
-			dataFetcher={searchByRing}
-			PageComponent={BirdSearchResults}
+			dataFetcher={fetchSearchPageContent}
+			PageComponent={SearchPageContent}
 		/>
 	);
 }

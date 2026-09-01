@@ -15,7 +15,7 @@ export function RingSearchForm({
 		e.preventDefault();
 		const formData = new FormData(e.target as HTMLFormElement);
 		const ring = formData.get('ring') as string;
-		router.push(`/bird?q=${ring}`);
+		router.push(`/search?q=${ring}`);
 	};
 	return (
 		<form
