@@ -262,28 +262,31 @@ describe('ring sequence RPC functions', () => {
 });
 
 /**
- * Controls exclusion for group-tracked prefixes (issue #661).
+ * Controls exclusion for birds already linked to a sequence (issue #661,
+ * simplified per PR #690 review — comment 3903576698).
  *
- * A ring whose leading-alpha prefix already has a `RingSequences` row for the
- * current group is no longer a "foreign" control and must not appear in
- * `ring_sequence_controls` — regardless of that row's `owned_by_group`. This
- * covers promoted-but-not-owned sequences (`owned_by_group = false`) as well as
- * fully-owned ones.
+ * A bird whose `ring_sequence_id` is non-null is already attached to a
+ * `RingSequences` row, so it is no longer a "foreign" control and must not appear
+ * in `ring_sequence_controls`. This check is deliberately group-agnostic: the
+ * single FK slot on `Birds` is shared across groups, so linking a bird to *any*
+ * group's sequence excludes it from *every* group's controls. That is the
+ * "shadow sequence" multi-tenancy flaw tracked in issue #703 — the cross-group
+ * test below documents the accepted "no worse" behaviour.
  *
  * Uses freshly-created, isolated fixtures under the Delta/Gamma seed groups with
  * random alpha prefixes (never fixed literals) so concurrent worktree runs
  * against the shared local Supabase instance never collide on `ring_no` or on
  * the `(prefix, ringing_group_id)` unique constraint.
  */
-describe('ring_sequence_controls with tracked sequences', () => {
+describe('ring_sequence_controls with linked sequences', () => {
 	const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 	function psql(sql: string) {
 		execSync(`psql "${LOCAL_DB_URL}" -c "${sql.replace(/"/g, '\\"')}"`);
 	}
 
-	// A purely-alphabetic prefix — the RPC extracts `substring(ring_no from
-	// '^[A-Za-z]+')`, so the prefix segment must contain no digits. Six random
-	// letters keep concurrent runs (and the ring_no unique constraint) apart.
+	// A purely-alphabetic prefix keeps the RingSequences `(prefix,
+	// ringing_group_id)` unique constraint and the ring_no unique constraint apart
+	// across concurrent worktree runs. Six random letters.
 	function randomAlphaPrefix(): string {
 		const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 		return Array.from({ length: 6 }, () => letters[Math.floor(Math.random() * 26)]).join('');
@@ -302,8 +305,8 @@ describe('ring_sequence_controls with tracked sequences', () => {
 
 	// Create a control bird under Delta: a single `record_type = 'S'` encounter,
 	// so `ring_sequence_controls` counts it as a control (every encounter is S).
-	// Returns its ring number and leading-alpha prefix.
-	async function createDeltaControl(): Promise<{ ringNo: string; prefix: string }> {
+	// Returns its ring number, id and leading-alpha prefix.
+	async function createDeltaControl(): Promise<{ ringNo: string; birdId: number; prefix: string }> {
 		const prefix = randomAlphaPrefix();
 		const ringNo = `${prefix}0001`;
 		const { data: bird, error: birdError } = await deltaClient
@@ -325,23 +328,33 @@ describe('ring_sequence_controls with tracked sequences', () => {
 		});
 		if (encounterError) throw encounterError;
 
-		return { ringNo, prefix };
+		return { ringNo, birdId: bird!.id, prefix };
 	}
 
-	// Insert a RingSequences row for the given group/prefix, tracking it for cleanup.
+	// Insert a RingSequences row for the given group/prefix and return its id,
+	// tracking it for cleanup.
 	async function insertRingSequence(
 		client: SupabaseClient,
 		groupId: number,
-		prefix: string,
-		ownedByGroup: boolean
-	): Promise<void> {
+		prefix: string
+	): Promise<number> {
 		const { data, error } = await client
 			.from('RingSequences')
-			.insert({ prefix, ringing_group_id: groupId, owned_by_group: ownedByGroup })
+			.insert({ prefix, ringing_group_id: groupId, owned_by_group: true })
 			.select('id')
 			.single();
 		if (error) throw error;
 		createdSeqIds.push(data!.id);
+		return data!.id;
+	}
+
+	// Link a Delta bird to a sequence by setting Birds.ring_sequence_id.
+	async function linkBirdToSequence(birdId: number, sequenceId: number): Promise<void> {
+		const { error } = await deltaClient
+			.from('Birds')
+			.update({ ring_sequence_id: sequenceId })
+			.eq('id', birdId);
+		if (error) throw error;
 	}
 
 	async function deltaControls() {
@@ -389,8 +402,11 @@ describe('ring_sequence_controls with tracked sequences', () => {
 	afterAll(() => {
 		const birdIds = createdBirdIds.length ? createdBirdIds.join(', ') : '-1';
 		const seqIds = createdSeqIds.length ? createdSeqIds.join(', ') : '-1';
+		// Null out the FK before deleting sequences so the sequence deletes don't
+		// trip the birds_ring_sequence_id_fkey constraint.
 		psql(
-			`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds});` +
+			`UPDATE "Birds" SET ring_sequence_id = NULL WHERE id IN (${birdIds});` +
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds});` +
 				`DELETE FROM "Birds" WHERE id IN (${birdIds});` +
 				`DELETE FROM "RingSequences" WHERE id IN (${seqIds});` +
 				`DELETE FROM "Sessions" WHERE id = ${deltaSessionId};` +
@@ -398,37 +414,33 @@ describe('ring_sequence_controls with tracked sequences', () => {
 		);
 	});
 
-	// Usual
-	it('a genuine control with no matching RingSequences row still appears', async () => {
+	// Usual — an unlinked control appears
+	it('a control whose bird has a null ring_sequence_id still appears', async () => {
 		const { ringNo } = await createDeltaControl();
 		const controls = await deltaControls();
 		expect(controls.find((r) => r.ring_no === ringNo)).toBeDefined();
 	});
 
-	// Structure — owned_by_group = true excludes
-	it('excludes a control whose prefix has an owned_by_group = true RingSequences row for the group', async () => {
-		const { ringNo, prefix } = await createDeltaControl();
+	// Structure — a bird linked to this group's own sequence is excluded
+	it("excludes a control whose bird is linked to the group's own sequence", async () => {
+		const { ringNo, birdId, prefix } = await createDeltaControl();
 		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
 
-		await insertRingSequence(deltaClient, deltaId, prefix, true);
+		const seqId = await insertRingSequence(deltaClient, deltaId, prefix);
+		await linkBirdToSequence(birdId, seqId);
 		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeUndefined();
 	});
 
-	// Structure — owned_by_group = false also excludes (promoted-but-not-owned)
-	it('excludes a control whose prefix has an owned_by_group = false RingSequences row for the group', async () => {
-		const { ringNo, prefix } = await createDeltaControl();
+	// Edge / cross-group — the accepted "shadow sequence" behaviour (#703):
+	// linking a bird to a *different* group's sequence still excludes it here.
+	it("excludes a control whose bird is linked to another group's sequence (documents the #703 shadow-sequence flaw)", async () => {
+		const { ringNo, birdId, prefix } = await createDeltaControl();
 		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
 
-		await insertRingSequence(deltaClient, deltaId, prefix, false);
+		// Gamma owns the sequence, but the single group-agnostic FK on the bird
+		// means Delta's control disappears anyway — no worse than prefix matching.
+		const gammaSeqId = await insertRingSequence(gammaClient, gammaId, prefix);
+		await linkBirdToSequence(birdId, gammaSeqId);
 		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeUndefined();
-	});
-
-	// Edge — cross-group isolation
-	it('a RingSequences row for a different group with the same prefix does not exclude this group\'s control', async () => {
-		const { ringNo, prefix } = await createDeltaControl();
-
-		// Gamma tracks the same prefix text — must not affect Delta's controls.
-		await insertRingSequence(gammaClient, gammaId, prefix, true);
-		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
 	});
 });
