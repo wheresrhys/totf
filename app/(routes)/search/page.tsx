@@ -1,10 +1,9 @@
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import type { ViewedGroup } from '@/lib/group-slug';
-import type { SearchResult } from '@/app/components/SearchResults';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
-import { SearchPageContent } from './PageContent';
+import { SearchPageContent, type SearchResult } from './PageContent';
 
 export type SearchParams = { q: string };
 
