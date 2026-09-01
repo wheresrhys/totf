@@ -4,9 +4,7 @@ import {
 	transformEmptyStringsToNull,
 	convertDateFormat,
 	createUpserter,
-	createRingSequenceResolver,
-	deriveRingSequencePrefix,
-	deduceRingSequenceSize,
+	createRingSequenceLookup,
 	CasualtyEncounterError,
 	processEncounterRow,
 	type DemonRow
@@ -163,119 +161,71 @@ describe('convertDateFormat', () => {
 	});
 });
 
-describe('deriveRingSequencePrefix', () => {
-	it('extracts the alphabetic prefix from a typical ring number', () => {
-		expect(deriveRingSequencePrefix('AEL1699')).toBe('AEL');
-	});
-
-	it('returns an empty string for a ring number with no alphabetic prefix', () => {
-		expect(deriveRingSequencePrefix('1234567')).toBe('');
-	});
-
-	it('does not error on a ring number that is entirely alphabetic', () => {
-		expect(deriveRingSequencePrefix('ABCDEF')).toBe('ABCDEF');
-	});
-});
-
-describe('deduceRingSequenceSize', () => {
-	it("returns 'AA' for a 3-letter prefix + 6-char ring number", () => {
-		expect(deduceRingSequenceSize('AAB', 6)).toBe('AA');
-	});
-
-	it("returns 'A' for a 3-letter prefix + 7-char ring number", () => {
-		expect(deduceRingSequenceSize('AEL', 7)).toBe('A');
-	});
-
-	it("returns 'D2' for a 2-letter prefix + 7-char ring number starting with D", () => {
-		expect(deduceRingSequenceSize('DA', 7)).toBe('D2');
-	});
-
-	it("returns 'Fv' for a 2-letter prefix + 7-char ring number starting with F", () => {
-		expect(deduceRingSequenceSize('FA', 7)).toBe('Fv');
-	});
-
-	it("returns 'SO' for a 2-letter prefix + 7-char ring number starting with S", () => {
-		expect(deduceRingSequenceSize('SA', 7)).toBe('SO');
-	});
-
-	it("returns 'G' for a 2-letter prefix + 7-char ring number starting with G", () => {
-		expect(deduceRingSequenceSize('GA', 7)).toBe('G');
-	});
-
-	it("returns 'E' for a 2-letter prefix + 7-char ring number starting with E", () => {
-		expect(deduceRingSequenceSize('EA', 7)).toBe('E');
-	});
-
-	it('returns null for a 2-letter prefix + 7-char ring number with an unrecognised first letter', () => {
-		expect(deduceRingSequenceSize('ZA', 7)).toBeNull();
-	});
-
-	it('returns null for a 1-letter prefix', () => {
-		expect(deduceRingSequenceSize('A', 7)).toBeNull();
-	});
-
-	it('returns null for a 4-letter prefix', () => {
-		expect(deduceRingSequenceSize('ABCD', 7)).toBeNull();
-	});
-
-	it('returns null for a 3-letter prefix with a ring-number length other than 6 or 7', () => {
-		expect(deduceRingSequenceSize('ABC', 8)).toBeNull();
-	});
-
-	it('resolves case-insensitively (lowercase prefix still matches the first-letter rule)', () => {
-		expect(deduceRingSequenceSize('da', 7)).toBe('D2');
-	});
-});
-
-describe('createRingSequenceResolver', () => {
-	let mockUpsert: ReturnType<typeof vi.fn>;
-	let mockMaybeSingle: ReturnType<typeof vi.fn>;
-	let mockEqGroup: ReturnType<typeof vi.fn>;
+describe('createRingSequenceLookup', () => {
+	let mockGte: ReturnType<typeof vi.fn>;
+	let mockLte: ReturnType<typeof vi.fn>;
 	let mockEqPrefix: ReturnType<typeof vi.fn>;
+	let mockEqGroup: ReturnType<typeof vi.fn>;
 	let mockSelect: ReturnType<typeof vi.fn>;
 	let mockFrom: ReturnType<typeof vi.fn>;
-	let resolve: ReturnType<typeof createRingSequenceResolver>;
+	let lookup: ReturnType<typeof createRingSequenceLookup>;
 
 	beforeEach(() => {
-		mockUpsert = vi.fn().mockResolvedValue({ error: null });
-		mockMaybeSingle = vi.fn();
-		mockEqGroup = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
-		mockEqPrefix = vi.fn(() => ({ eq: mockEqGroup }));
-		mockSelect = vi.fn(() => ({ eq: mockEqPrefix }));
-		mockFrom = vi.fn(() => ({ upsert: mockUpsert, select: mockSelect }));
+		// Chain: from -> select -> eq(group) -> eq(prefix) -> lte(first_index) ->
+		// gte(last_index) -> resolves to { data, error }.
+		mockGte = vi.fn();
+		mockLte = vi.fn(() => ({ gte: mockGte }));
+		mockEqPrefix = vi.fn(() => ({ lte: mockLte }));
+		mockEqGroup = vi.fn(() => ({ eq: mockEqPrefix }));
+		mockSelect = vi.fn(() => ({ eq: mockEqGroup }));
+		mockFrom = vi.fn(() => ({ select: mockSelect }));
 		const mockClient = { from: mockFrom } as unknown as SupabaseClient;
-		resolve = createRingSequenceResolver(mockClient);
+		lookup = createRingSequenceLookup(mockClient);
 	});
 
-	it('inserts a new RingSequences row (ignoreDuplicates) and returns its id when no row exists yet', async () => {
-		// select-first misses, then the post-insert select returns the new id
-		mockMaybeSingle
-			.mockResolvedValueOnce({ data: null, error: null })
-			.mockResolvedValueOnce({ data: { id: 42 }, error: null });
-		const id = await resolve('AEL', 7, 'A');
+	it('queries RingSequences filtering by group, the first-3-char prefix, and numeric bounds', async () => {
+		mockGte.mockResolvedValue({ data: [{ id: 5 }], error: null });
+		await lookup('AEL1699', 7);
 		expect(mockFrom).toHaveBeenCalledWith('RingSequences');
-		expect(mockUpsert).toHaveBeenCalledWith(
-			{ prefix: 'AEL', ringing_group_id: 7, size: 'A' },
-			{ onConflict: 'prefix,ringing_group_id', ignoreDuplicates: true }
-		);
-		expect(id).toBe(42);
+		expect(mockSelect).toHaveBeenCalledWith('id');
+		expect(mockEqGroup).toHaveBeenCalledWith('ringing_group_id', 7);
+		expect(mockEqPrefix).toHaveBeenCalledWith('prefix', 'AEL');
+		expect(mockLte).toHaveBeenCalledWith('first_index', 1699);
+		expect(mockGte).toHaveBeenCalledWith('last_index', 1699);
 	});
 
-	it('returns the existing row id without ever inserting (so a pre-existing size is never touched) when a row already exists', async () => {
-		mockMaybeSingle.mockResolvedValue({ data: { id: 99 }, error: null });
-		const id = await resolve('AEL', 7, 'A');
-		// select-first hits, so the insert step is skipped entirely — the
-		// strongest possible "never overwrite size" guarantee.
-		expect(mockUpsert).not.toHaveBeenCalled();
-		expect(id).toBe(99);
+	it('takes exactly the first three characters as the prefix comparator', async () => {
+		mockGte.mockResolvedValue({ data: [{ id: 5 }], error: null });
+		await lookup('ABC123456', 7);
+		expect(mockEqPrefix).toHaveBeenCalledWith('prefix', 'ABC');
 	});
 
-	it('throws when the id-resolving select returns an error', async () => {
-		mockMaybeSingle.mockResolvedValue({
+	it('returns the id of the single matching sequence', async () => {
+		mockGte.mockResolvedValue({ data: [{ id: 5 }], error: null });
+		expect(await lookup('AEL1699', 7)).toBe(5);
+	});
+
+	it('returns null when no sequence matches the prefix and bounds (import leaves the ring unassigned)', async () => {
+		mockGte.mockResolvedValue({ data: [], error: null });
+		expect(await lookup('AEL1699', 7)).toBeNull();
+	});
+
+	it('returns null for an empty ring number without querying', async () => {
+		expect(await lookup('', 7)).toBeNull();
+		expect(mockFrom).not.toHaveBeenCalled();
+	});
+
+	it('returns null for a ring number with no trailing digits without querying', async () => {
+		expect(await lookup('ABCDEF', 7)).toBeNull();
+		expect(mockFrom).not.toHaveBeenCalled();
+	});
+
+	it('throws when the select returns an error', async () => {
+		mockGte.mockResolvedValue({
 			data: null,
 			error: { message: 'select failed' }
 		});
-		await expect(resolve('AEL', 7, 'A')).rejects.toMatchObject({
+		await expect(lookup('AEL1699', 7)).rejects.toMatchObject({
 			message: 'select failed'
 		});
 	});
@@ -330,7 +280,7 @@ describe('processEncounterRow', () => {
 	const RINGING_GROUP_ID = 7;
 	const RESOLVED_RING_SEQUENCE_ID = 555;
 	let upsert: ReturnType<typeof vi.fn>;
-	let resolveRingSequence: ReturnType<typeof vi.fn>;
+	let lookupRingSequence: ReturnType<typeof vi.fn>;
 
 	beforeEach(() => {
 		let callCount = 0;
@@ -338,21 +288,21 @@ describe('processEncounterRow', () => {
 			callCount++;
 			return Promise.resolve(callCount * 10);
 		});
-		resolveRingSequence = vi.fn().mockResolvedValue(RESOLVED_RING_SEQUENCE_ID);
+		lookupRingSequence = vi.fn().mockResolvedValue(RESOLVED_RING_SEQUENCE_ID);
 	});
 
 	describe('casualty encounters', () => {
 		it('throws CasualtyEncounterError when ring_no is empty', async () => {
 			const row = makeDemonRow({ ring_no: '' });
 			await expect(
-				processEncounterRow(row, upsert, resolveRingSequence, RINGING_GROUP_ID)
+				processEncounterRow(row, upsert, lookupRingSequence, RINGING_GROUP_ID)
 			).rejects.toBeInstanceOf(CasualtyEncounterError);
 		});
 
 		it('does not call upsert when ring_no is empty', async () => {
 			const row = makeDemonRow({ ring_no: '' });
 			await expect(
-				processEncounterRow(row, upsert, resolveRingSequence, RINGING_GROUP_ID)
+				processEncounterRow(row, upsert, lookupRingSequence, RINGING_GROUP_ID)
 			).rejects.toBeInstanceOf(CasualtyEncounterError);
 			expect(upsert).not.toHaveBeenCalled();
 		});
@@ -360,7 +310,7 @@ describe('processEncounterRow', () => {
 		it('processes normally when ring_no is present (already-ringed bird)', async () => {
 			const row = makeDemonRow({ ring_no: 'A123456' });
 			await expect(
-				processEncounterRow(row, upsert, resolveRingSequence, RINGING_GROUP_ID)
+				processEncounterRow(row, upsert, lookupRingSequence, RINGING_GROUP_ID)
 			).resolves.toBeDefined();
 			expect(upsert).toHaveBeenCalled();
 		});
@@ -371,7 +321,7 @@ describe('processEncounterRow', () => {
 		await processEncounterRow(
 			row,
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			RINGING_GROUP_ID
 		);
 		expect(upsert).toHaveBeenCalledWith(
@@ -390,7 +340,7 @@ describe('processEncounterRow', () => {
 		await processEncounterRow(
 			row,
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			RINGING_GROUP_ID
 		);
 		const speciesId = 10; // first call returns 10
@@ -410,7 +360,7 @@ describe('processEncounterRow', () => {
 		await processEncounterRow(
 			row,
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			RINGING_GROUP_ID
 		);
 		expect(upsert).toHaveBeenCalledWith(
@@ -425,7 +375,7 @@ describe('processEncounterRow', () => {
 		await processEncounterRow(
 			row,
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			RINGING_GROUP_ID
 		);
 		const locationId = 30; // third call returns 30
@@ -449,7 +399,7 @@ describe('processEncounterRow', () => {
 			await processEncounterRow(
 				makeDemonRow({ record_type: 'N', age: '3' }),
 				upsert,
-				resolveRingSequence,
+				lookupRingSequence,
 				RINGING_GROUP_ID
 			);
 			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
@@ -459,7 +409,7 @@ describe('processEncounterRow', () => {
 			await processEncounterRow(
 				makeDemonRow({ record_type: 'N', age: '1J' }),
 				upsert,
-				resolveRingSequence,
+				lookupRingSequence,
 				RINGING_GROUP_ID
 			);
 			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
@@ -469,7 +419,7 @@ describe('processEncounterRow', () => {
 			await processEncounterRow(
 				makeDemonRow({ record_type: 'N', age: '1' }),
 				upsert,
-				resolveRingSequence,
+				lookupRingSequence,
 				RINGING_GROUP_ID
 			);
 			expect(sessionData()).toMatchObject({ session_type: 'PULLI' });
@@ -481,7 +431,7 @@ describe('processEncounterRow', () => {
 				await processEncounterRow(
 					makeDemonRow({ record_type: recordType, age: '1' }),
 					upsert,
-					resolveRingSequence,
+					lookupRingSequence,
 					RINGING_GROUP_ID
 				);
 				expect(sessionData()).toMatchObject({
@@ -496,7 +446,7 @@ describe('processEncounterRow', () => {
 				await processEncounterRow(
 					makeDemonRow({ record_type: recordType, age: '3' }),
 					upsert,
-					resolveRingSequence,
+					lookupRingSequence,
 					RINGING_GROUP_ID
 				);
 				expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
@@ -507,7 +457,7 @@ describe('processEncounterRow', () => {
 			await processEncounterRow(
 				makeDemonRow({ record_type: 'Z', age: '3' }),
 				upsert,
-				resolveRingSequence,
+				lookupRingSequence,
 				RINGING_GROUP_ID
 			);
 			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
@@ -517,7 +467,7 @@ describe('processEncounterRow', () => {
 			await processEncounterRow(
 				makeDemonRow({ record_type: 'Z', age: '1' }),
 				upsert,
-				resolveRingSequence,
+				lookupRingSequence,
 				RINGING_GROUP_ID
 			);
 			expect(sessionData()).toMatchObject({ session_type: 'PULLI' });
@@ -527,7 +477,7 @@ describe('processEncounterRow', () => {
 			await processEncounterRow(
 				makeDemonRow({ record_type: 'N', age: '' }),
 				upsert,
-				resolveRingSequence,
+				lookupRingSequence,
 				RINGING_GROUP_ID
 			);
 			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
@@ -554,7 +504,7 @@ describe('processEncounterRow', () => {
 		await processEncounterRow(
 			row,
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			RINGING_GROUP_ID
 		);
 		const birdId = 20; // second call returns 20
@@ -599,7 +549,7 @@ describe('processEncounterRow', () => {
 		await processEncounterRow(
 			row,
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			RINGING_GROUP_ID
 		);
 		expect(upsert).toHaveBeenCalledWith(
@@ -624,7 +574,7 @@ describe('processEncounterRow', () => {
 		await processEncounterRow(
 			row,
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			RINGING_GROUP_ID
 		);
 		expect(upsert).toHaveBeenCalledWith(
@@ -639,7 +589,7 @@ describe('processEncounterRow', () => {
 		await processEncounterRow(
 			row,
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			RINGING_GROUP_ID
 		);
 		expect(upsert).toHaveBeenCalledWith(
@@ -654,18 +604,18 @@ describe('processEncounterRow', () => {
 		const result = await processEncounterRow(
 			row,
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			RINGING_GROUP_ID
 		);
 		expect(result.visitDate).toBe('2022-11-22');
 	});
 
-	it('calls upsert exactly 5 times (Species, Birds, Locations, Sessions, Encounters) — the resolver is a separate injected function, not routed through upsert', async () => {
+	it('calls upsert exactly 5 times (Species, Birds, Locations, Sessions, Encounters) — the lookup is a separate injected function, not routed through upsert', async () => {
 		const row = makeDemonRow();
 		await processEncounterRow(
 			row,
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			RINGING_GROUP_ID
 		);
 		expect(upsert).toHaveBeenCalledTimes(5);
@@ -676,18 +626,17 @@ describe('processEncounterRow', () => {
 			return upsert.mock.calls.find(([table]) => table === 'Birds')?.[1];
 		}
 
-		it('resolves/creates a RingSequences row and sets Birds.ring_sequence_id to the resolved id', async () => {
+		it('looks up the matching RingSequences row by full ring number and sets Birds.ring_sequence_id to its id', async () => {
 			const row = makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' });
 			await processEncounterRow(
 				row,
 				upsert,
-				resolveRingSequence,
+				lookupRingSequence,
 				RINGING_GROUP_ID
 			);
-			expect(resolveRingSequence).toHaveBeenCalledWith(
-				'AEL',
-				RINGING_GROUP_ID,
-				'A'
+			expect(lookupRingSequence).toHaveBeenCalledWith(
+				'AEL1699',
+				RINGING_GROUP_ID
 			);
 			expect(birdsData()).toMatchObject({
 				ring_sequence_id: RESOLVED_RING_SEQUENCE_ID
@@ -695,7 +644,7 @@ describe('processEncounterRow', () => {
 		});
 
 		it.each(['S', 'C', 'U', 'F', 'D'])(
-			'does not resolve a RingSequences row or set ring_sequence_id for a non-N record_type (%s)',
+			'does not look up a RingSequences row or set ring_sequence_id for a non-N record_type (%s)',
 			async (recordType) => {
 				const row = makeDemonRow({
 					ring_no: 'AEL1699',
@@ -704,42 +653,39 @@ describe('processEncounterRow', () => {
 				await processEncounterRow(
 					row,
 					upsert,
-					resolveRingSequence,
+					lookupRingSequence,
 					RINGING_GROUP_ID
 				);
-				expect(resolveRingSequence).not.toHaveBeenCalled();
+				expect(lookupRingSequence).not.toHaveBeenCalled();
 				expect(birdsData()).not.toHaveProperty('ring_sequence_id');
 			}
 		);
 
-		it('still resolves a RingSequences row with size null for an ambiguous ring_no rather than erroring', async () => {
-			// 5-char prefix / unusual length -> deduceRingSequenceSize returns null
-			const row = makeDemonRow({ ring_no: 'ABCDE12', record_type: 'N' });
-			await processEncounterRow(
-				row,
-				upsert,
-				resolveRingSequence,
-				RINGING_GROUP_ID
-			);
-			expect(resolveRingSequence).toHaveBeenCalledWith(
-				'ABCDE',
-				RINGING_GROUP_ID,
-				null
-			);
-			expect(birdsData()).toMatchObject({
-				ring_sequence_id: RESOLVED_RING_SEQUENCE_ID
-			});
-		});
-
-		it('calls resolveRingSequence exactly once per N row', async () => {
+		it('leaves ring_sequence_id unset when no sequence matches (lookup returns null)', async () => {
+			lookupRingSequence.mockResolvedValueOnce(null);
 			const row = makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' });
 			await processEncounterRow(
 				row,
 				upsert,
-				resolveRingSequence,
+				lookupRingSequence,
 				RINGING_GROUP_ID
 			);
-			expect(resolveRingSequence).toHaveBeenCalledTimes(1);
+			expect(lookupRingSequence).toHaveBeenCalledWith(
+				'AEL1699',
+				RINGING_GROUP_ID
+			);
+			expect(birdsData()).not.toHaveProperty('ring_sequence_id');
+		});
+
+		it('calls lookupRingSequence exactly once per N row', async () => {
+			const row = makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' });
+			await processEncounterRow(
+				row,
+				upsert,
+				lookupRingSequence,
+				RINGING_GROUP_ID
+			);
+			expect(lookupRingSequence).toHaveBeenCalledTimes(1);
 		});
 	});
 });

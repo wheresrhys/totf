@@ -20,6 +20,7 @@ import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { randomTestSuffix } from './test-isolation';
+import { createRingSequenceLookup } from '../../lib/demon-import';
 
 const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 
@@ -91,7 +92,7 @@ describe('RingSequences table', () => {
 			expect(data?.size).toBe('B+');
 		});
 
-		it('accepts null first_ring and last_ring (populated later by a Task B trigger, not here)', async () => {
+		it('accepts null first_ring and last_ring (set via the ring-sequences UI, not on insert)', async () => {
 			const { data, error } = await groupClient
 				.from('RingSequences')
 				.insert({ prefix: `RS-${suffix}-RINGS`, ringing_group_id: groupId })
@@ -100,6 +101,145 @@ describe('RingSequences table', () => {
 			expect(error).toBeNull();
 			expect(data?.first_ring).toBeNull();
 			expect(data?.last_ring).toBeNull();
+		});
+	});
+
+	describe('generated numeric bounds (first_index / last_index)', () => {
+		const suffix = randomTestSuffix();
+		let groupId: number;
+		let groupClient: SupabaseClient;
+
+		beforeAll(async () => {
+			groupId = createIsolatedGroup(`ring-sequences-bounds-${suffix}`);
+			groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+		});
+
+		afterAll(() => {
+			psql(
+				`DELETE FROM "RingSequences" WHERE ringing_group_id = ${groupId};` +
+					`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
+			);
+		});
+
+		it('derives first_index/last_index by stripping the leading alpha prefix and casting the trailing digits to a number', async () => {
+			const { data, error } = await groupClient
+				.from('RingSequences')
+				.insert({
+					prefix: 'ABC',
+					ringing_group_id: groupId,
+					first_ring: 'ABC1000',
+					last_ring: 'ABC2000'
+				})
+				.select('first_index, last_index')
+				.single();
+			expect(error).toBeNull();
+			expect(data?.first_index).toBe(1000);
+			expect(data?.last_index).toBe(2000);
+		});
+
+		it('ignores leading zeros in the trailing digits (e.g. "ABC0100" -> 100)', async () => {
+			const { data, error } = await groupClient
+				.from('RingSequences')
+				.insert({
+					prefix: 'DEF',
+					ringing_group_id: groupId,
+					first_ring: 'DEF0100',
+					last_ring: 'DEF0200'
+				})
+				.select('first_index, last_index')
+				.single();
+			expect(error).toBeNull();
+			expect(data?.first_index).toBe(100);
+			expect(data?.last_index).toBe(200);
+		});
+
+		it('leaves first_index/last_index null when first_ring/last_ring are null', async () => {
+			const { data, error } = await groupClient
+				.from('RingSequences')
+				.insert({ prefix: 'GHI', ringing_group_id: groupId })
+				.select('first_index, last_index')
+				.single();
+			expect(error).toBeNull();
+			expect(data?.first_index).toBeNull();
+			expect(data?.last_index).toBeNull();
+		});
+
+		it('rejects a direct write to the generated first_index column', async () => {
+			const { error } = await groupClient
+				.from('RingSequences')
+				.insert({
+					prefix: 'JKL',
+					ringing_group_id: groupId,
+					first_index: 5 // GENERATED ALWAYS — rejected at the DB, not the type layer
+				});
+			expect(error).not.toBeNull();
+			expect(error?.code).toBe('428C9'); // cannot insert into generated column
+		});
+	});
+
+	describe('createRingSequenceLookup bounds matching', () => {
+		const suffix = randomTestSuffix();
+		let groupId: number;
+		let groupClient: SupabaseClient;
+		let boundedRowId: number;
+		let lookup: ReturnType<typeof createRingSequenceLookup>;
+
+		beforeAll(async () => {
+			groupId = createIsolatedGroup(`ring-sequences-lookup-${suffix}`);
+			groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+			lookup = createRingSequenceLookup(groupClient);
+
+			// A bounded sequence: prefix ABC covering ABC1000..ABC2000.
+			const bounded = await groupClient
+				.from('RingSequences')
+				.insert({
+					prefix: 'ABC',
+					ringing_group_id: groupId,
+					first_ring: 'ABC1000',
+					last_ring: 'ABC2000'
+				})
+				.select('id')
+				.single();
+			if (bounded.error || !bounded.data)
+				throw bounded.error ?? new Error('Failed to seed bounded RingSequences row');
+			boundedRowId = bounded.data.id;
+
+			// An unbounded sequence (null first/last): prefix DEF, no numeric window.
+			await groupClient
+				.from('RingSequences')
+				.insert({ prefix: 'DEF', ringing_group_id: groupId });
+		});
+
+		afterAll(() => {
+			psql(
+				`DELETE FROM "RingSequences" WHERE ringing_group_id = ${groupId};` +
+					`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
+			);
+		});
+
+		it('matches a ring whose first 3 chars equal the prefix and whose number is within [first_index, last_index]', async () => {
+			expect(await lookup('ABC1500', groupId)).toBe(boundedRowId);
+		});
+
+		it('matches a ring on the lower and upper bounds inclusively', async () => {
+			expect(await lookup('ABC1000', groupId)).toBe(boundedRowId);
+			expect(await lookup('ABC2000', groupId)).toBe(boundedRowId);
+		});
+
+		it('does not match a ring numerically below first_index', async () => {
+			expect(await lookup('ABC0999', groupId)).toBeNull();
+		});
+
+		it('does not match a ring numerically above last_index', async () => {
+			expect(await lookup('ABC2001', groupId)).toBeNull();
+		});
+
+		it('does not match a ring whose first 3 chars differ from the prefix', async () => {
+			expect(await lookup('XYZ1500', groupId)).toBeNull();
+		});
+
+		it('does not match a sequence with null bounds (unverifiable numeric window)', async () => {
+			expect(await lookup('DEF1500', groupId)).toBeNull();
 		});
 	});
 

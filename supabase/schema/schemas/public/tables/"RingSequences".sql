@@ -5,7 +5,26 @@ CREATE TABLE public."RingSequences" (
 	owned_by_group boolean DEFAULT TRUE NOT NULL,
 	ringing_group_id bigint NOT NULL,
 	first_ring text,
-	last_ring text
+	last_ring text,
+	-- Numeric bounds derived from first_ring/last_ring by stripping the leading
+	-- alphabetic prefix and taking the trailing digits (same parse as the
+	-- first_ring/last_ring bounds trigger). Used by the import ring-sequence
+	-- lookup to test whether a ring's numeric part falls within the sequence's
+	-- range (first_index <= ring number <= last_index).
+	first_index bigint GENERATED ALWAYS AS (
+		substring(
+			first_ring
+			FROM
+				'[0-9]+$'
+		)::bigint
+	) STORED,
+	last_index bigint GENERATED ALWAYS AS (
+		substring(
+			last_ring
+			FROM
+				'[0-9]+$'
+		)::bigint
+	) STORED
 );
 
 CREATE INDEX idx_ring_sequences_ringing_group_id ON public."RingSequences" (ringing_group_id);

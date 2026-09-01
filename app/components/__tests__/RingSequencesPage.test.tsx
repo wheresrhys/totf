@@ -26,6 +26,8 @@ function makeSequence(
 		ringing_group_id: 1,
 		first_ring: `${overrides.prefix}00001`,
 		last_ring: `${overrides.prefix}00099`,
+		first_index: 1,
+		last_index: 99,
 		...overrides
 	};
 }

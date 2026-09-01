@@ -5,7 +5,7 @@ import { getGroupCookie } from '@/app/actions/group-cookie';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import {
 	createUpserter,
-	createRingSequenceResolver,
+	createRingSequenceLookup,
 	processEncounterRow,
 	CasualtyEncounterError,
 	type DemonRow
@@ -50,7 +50,7 @@ export async function POST(request: Request): Promise<Response> {
 	const buffer = Buffer.from(await file.arrayBuffer());
 	const supabaseClient = await getAuthenticatedSupabaseClient();
 	const upsert = createUpserter(supabaseClient);
-	const resolveRingSequence = createRingSequenceResolver(supabaseClient);
+	const lookupRingSequence = createRingSequenceLookup(supabaseClient);
 	const deadline = Date.now() + TIMEOUT_MS;
 	const encoder = new TextEncoder();
 
@@ -94,7 +94,7 @@ export async function POST(request: Request): Promise<Response> {
 								const { visitDate } = await processEncounterRow(
 									row,
 									upsert,
-									resolveRingSequence,
+									lookupRingSequence,
 									ringingGroupId
 								);
 								successful++;
