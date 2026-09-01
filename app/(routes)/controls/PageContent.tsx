@@ -1,13 +1,24 @@
-import type { RingSequenceControlRow } from '@/app/actions/ring-sequences';
+import type { DefaultPageParams } from '@/app/components/layout/BootstrapPage';
+import {
+	fetchRingSequenceControls,
+	type RingSequenceControlRow
+} from '@/app/actions/ring-sequences';
 import type { ViewedGroup } from '@/lib/group-slug';
 import {
 	InlineTable,
 	PageWrapper,
 	PrimaryHeading
-} from './shared/DesignSystem';
-import { NoPrefetchLink } from './shared/NoPrefetchLink';
+} from '@/app/components/shared/DesignSystem';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 
-export function ControlsPage({
+export async function fetchControlsPageContent(
+	_: DefaultPageParams,
+	viewedGroupId: number
+): Promise<RingSequenceControlRow[] | null> {
+	return fetchRingSequenceControls(viewedGroupId);
+}
+
+export function ControlsPageContent({
 	data
 }: {
 	params: Record<string, string>;
