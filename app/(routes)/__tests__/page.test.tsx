@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, within } from '@testing-library/react';
-import Page from '../page';
+import HomePage from '../page';
 import recentSessionsSnapshot from '@/test-fixtures/snapshots/fetchRecentSessions.alpha.json';
 import topSpeciesSnapshot from '@/test-fixtures/snapshots/fetchTopSpecies.alpha.json';
 import summaryStatsSnapshot from '@/test-fixtures/snapshots/fetchHomePageSummaryStats.alpha.json';
 import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/fetchHomePageSummaryStats.zero.json';
-import type { HomePageSummaryStats } from '../page';
+import type { HomePageSummaryStats } from '../PageContent';
 import type { GroupTicksResult } from '@/app/models/db';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
@@ -82,7 +82,7 @@ describe('home page', () => {
 	});
 
 	it('renders Sessions heading with a "View all" link to /sessions', async () => {
-		render(await Page());
+		render(await HomePage());
 		const heading = await screen.findByRole('heading', {
 			name: 'Sessions View all'
 		});
@@ -92,7 +92,7 @@ describe('home page', () => {
 	});
 
 	it('renders session links from fixture', async () => {
-		render(await Page());
+		render(await HomePage());
 		const heading = await screen.findByRole('heading', {
 			name: 'Sessions View all'
 		});
@@ -106,7 +106,7 @@ describe('home page', () => {
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 				makeChainClient({ Sessions: [] })
 			);
-			render(await Page());
+			render(await HomePage());
 			const heading = await screen.findByRole('heading', {
 				name: 'Sessions View all'
 			});
@@ -155,7 +155,7 @@ describe('home page', () => {
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 				makeChainClient({ Sessions: sessionsWithSharedDate })
 			);
-			render(await Page());
+			render(await HomePage());
 			const heading = await screen.findByRole('heading', {
 				name: 'Sessions View all'
 			});
@@ -169,7 +169,7 @@ describe('home page', () => {
 
 	describe('species section', () => {
 		it('renders Species heading with a "View all" link to /species', async () => {
-			render(await Page());
+			render(await HomePage());
 			const heading = await screen.findByRole('heading', {
 				name: 'Species View all'
 			});
@@ -180,7 +180,7 @@ describe('home page', () => {
 
 		describe('last tick (last group tick)', () => {
 			it('renders "Last tick: {species} on {date}" after the species badge list', async () => {
-				render(await Page());
+				render(await HomePage());
 				const heading = await screen.findByRole('heading', {
 					name: 'Species View all'
 				});
@@ -200,7 +200,7 @@ describe('home page', () => {
 			});
 
 			it('renders a "View all ticks" link to /ticks', async () => {
-				render(await Page());
+				render(await HomePage());
 				const link = await screen.findByRole('link', {
 					name: 'View all ticks'
 				});
@@ -212,7 +212,7 @@ describe('home page', () => {
 					mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 						makeChainClient({ lastGroupTick: [] })
 					);
-					render(await Page());
+					render(await HomePage());
 					const heading = await screen.findByRole('heading', {
 						name: 'Species View all'
 					});
@@ -224,7 +224,7 @@ describe('home page', () => {
 					mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 						makeChainClient({ lastGroupTick: [] })
 					);
-					render(await Page());
+					render(await HomePage());
 					await screen.findByRole('heading', { name: 'Species View all' });
 					expect(
 						screen.queryByRole('link', { name: 'View all ticks' })
@@ -234,7 +234,7 @@ describe('home page', () => {
 		});
 
 		it('renders a badge link per top species, sorted by bird count and excluding zero-count and beyond-10th species', async () => {
-			render(await Page());
+			render(await HomePage());
 			const heading = await screen.findByRole('heading', {
 				name: 'Species View all'
 			});
@@ -271,7 +271,7 @@ describe('home page', () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 					makeChainClient({ Species: [] })
 				);
-				render(await Page());
+				render(await HomePage());
 				const heading = await screen.findByRole('heading', {
 					name: 'Species View all'
 				});
@@ -303,7 +303,7 @@ describe('home page', () => {
 		}
 
 		it('renders a "Totals" corner cell and a header column per period, labelled with the actual year and in this-year / last-year / all-time order', async () => {
-			render(await Page());
+			render(await HomePage());
 			const table = await screen.findByTestId('summary-stats-table');
 			const headers = within(table)
 				.getAllByRole('columnheader')
@@ -318,7 +318,7 @@ describe('home page', () => {
 		});
 
 		it('renders a row per metric with values from aggregate_stats for each period', async () => {
-			render(await Page());
+			render(await HomePage());
 			const table = await screen.findByTestId('summary-stats-table');
 			const { allTime, thisYear, lastYear } = summaryStatsSnapshot;
 			summaryStatsRows.forEach(({ label, field }) => {
@@ -337,7 +337,7 @@ describe('home page', () => {
 		it('calls aggregate_stats for this year, last year, and all time, with the correct date bounds', async () => {
 			const client = makeChainClient();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-			render(await Page());
+			render(await HomePage());
 			await screen.findByTestId('summary-stats-table');
 			const currentYear = new Date().getFullYear();
 			const calls = client.rpc.mock.calls.filter(
@@ -374,7 +374,7 @@ describe('home page', () => {
 							summaryStatsZeroSnapshot as unknown as HomePageSummaryStats
 					})
 				);
-				render(await Page());
+				render(await HomePage());
 				const table = await screen.findByTestId('summary-stats-table');
 				summaryStatsRows.forEach(({ label }) => {
 					const row = getRow(table, label);
@@ -397,7 +397,7 @@ describe('home page', () => {
 						} as unknown as HomePageSummaryStats
 					})
 				);
-				render(await Page());
+				render(await HomePage());
 				const table = await screen.findByTestId('summary-stats-table');
 				const row = getRow(table, 'Sessions');
 				const cells = within(row)
@@ -422,7 +422,7 @@ describe('home page', () => {
 						} as unknown as HomePageSummaryStats
 					})
 				);
-				render(await Page());
+				render(await HomePage());
 				await screen.findByRole('heading', { name: 'Sessions View all' });
 				expect(screen.queryByTestId('summary-stats-table')).toBeNull();
 			});
