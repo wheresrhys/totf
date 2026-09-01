@@ -8,9 +8,11 @@
  * Run with: npm run test:integration
  */
 
-import { describe, it, beforeAll, expect } from 'vitest';
+import { describe, it, beforeAll, afterAll, expect } from 'vitest';
+import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
 import { supabase } from '../../lib/supabase';
+import { randomTestSuffix, randomFutureDate } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 async function getGroupIdByName(name: string): Promise<number> {
@@ -256,5 +258,189 @@ describe('ring sequence RPC functions', () => {
 			expect(row).toHaveProperty('species_name');
 			expect(row).toHaveProperty('first_date');
 		});
+	});
+});
+
+/**
+ * Controls exclusion for birds already linked to a sequence (issue #661,
+ * simplified per PR #690 review — comment 3903576698).
+ *
+ * A bird whose `ring_sequence_id` is non-null is already attached to a
+ * `RingSequences` row, so it is no longer a "foreign" control and must not appear
+ * in `ring_sequence_controls`. This check is deliberately group-agnostic: the
+ * single FK slot on `Birds` is shared across groups, so linking a bird to *any*
+ * group's sequence excludes it from *every* group's controls. That is the
+ * "shadow sequence" multi-tenancy flaw tracked in issue #703 — the cross-group
+ * test below documents the accepted "no worse" behaviour.
+ *
+ * Uses freshly-created, isolated fixtures under the Delta/Gamma seed groups with
+ * random alpha prefixes (never fixed literals) so concurrent worktree runs
+ * against the shared local Supabase instance never collide on `ring_no` or on
+ * the `(prefix, ringing_group_id)` unique constraint.
+ */
+describe('ring_sequence_controls with linked sequences', () => {
+	const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+	function psql(sql: string) {
+		execSync(`psql "${LOCAL_DB_URL}" -c "${sql.replace(/"/g, '\\"')}"`);
+	}
+
+	// A purely-alphabetic prefix keeps the RingSequences `(prefix,
+	// ringing_group_id)` unique constraint and the ring_no unique constraint apart
+	// across concurrent worktree runs. Six random letters.
+	function randomAlphaPrefix(): string {
+		const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+		return Array.from({ length: 6 }, () => letters[Math.floor(Math.random() * 26)]).join('');
+	}
+
+	let deltaId: number;
+	let gammaId: number;
+	let deltaClient: SupabaseClient;
+	let gammaClient: SupabaseClient;
+	let robinId: number;
+	let deltaLocationId: number;
+	let deltaSessionId: number;
+
+	const createdBirdIds: number[] = [];
+	const createdSeqIds: number[] = [];
+
+	// Create a control bird under Delta: a single `record_type = 'S'` encounter,
+	// so `ring_sequence_controls` counts it as a control (every encounter is S).
+	// Returns its ring number, id and leading-alpha prefix.
+	async function createDeltaControl(): Promise<{ ringNo: string; birdId: number; prefix: string }> {
+		const prefix = randomAlphaPrefix();
+		const ringNo = `${prefix}0001`;
+		const { data: bird, error: birdError } = await deltaClient
+			.from('Birds')
+			.insert({ ring_no: ringNo, species_id: robinId })
+			.select('id')
+			.single();
+		if (birdError) throw birdError;
+		createdBirdIds.push(bird!.id);
+
+		const { error: encounterError } = await deltaClient.from('Encounters').insert({
+			capture_time: '10:00:00',
+			record_type: 'S',
+			scheme: 'BTO',
+			sex: 'M',
+			age_code: 4,
+			session_id: deltaSessionId,
+			bird_id: bird!.id,
+		});
+		if (encounterError) throw encounterError;
+
+		return { ringNo, birdId: bird!.id, prefix };
+	}
+
+	// Insert a RingSequences row for the given group/prefix and return its id,
+	// tracking it for cleanup.
+	async function insertRingSequence(
+		client: SupabaseClient,
+		groupId: number,
+		prefix: string
+	): Promise<number> {
+		const { data, error } = await client
+			.from('RingSequences')
+			.insert({ prefix, ringing_group_id: groupId, owned_by_group: true })
+			.select('id')
+			.single();
+		if (error) throw error;
+		createdSeqIds.push(data!.id);
+		return data!.id;
+	}
+
+	// Link a Delta bird to a sequence by setting Birds.ring_sequence_id.
+	async function linkBirdToSequence(birdId: number, sequenceId: number): Promise<void> {
+		const { error } = await deltaClient
+			.from('Birds')
+			.update({ ring_sequence_id: sequenceId })
+			.eq('id', birdId);
+		if (error) throw error;
+	}
+
+	async function deltaControls() {
+		const { data, error } = await deltaClient.rpc('ring_sequence_controls', {
+			ringing_group_filter: deltaId,
+		});
+		expect(error).toBeNull();
+		return data!;
+	}
+
+	beforeAll(async () => {
+		deltaId = await getGroupIdByName('Delta');
+		gammaId = await getGroupIdByName('Gamma');
+		[deltaClient, gammaClient] = await Promise.all([
+			getAuthenticatedSupabaseClientForGroup(deltaId),
+			getAuthenticatedSupabaseClientForGroup(gammaId),
+		]);
+
+		const { data: robin, error: robinError } = await supabase
+			.from('Species')
+			.select('id')
+			.eq('species_name', 'Robin')
+			.single();
+		if (robinError || !robin) throw new Error('Robin species not found — run npm run db:seed:e2e first');
+		robinId = robin.id;
+
+		const suffix = randomTestSuffix();
+		const { data: location, error: locationError } = await deltaClient
+			.from('Locations')
+			.insert({ location_name: `Controls Test Location ${suffix}`, ringing_group_id: deltaId })
+			.select('id')
+			.single();
+		if (locationError) throw locationError;
+		deltaLocationId = location!.id;
+
+		const { data: session, error: sessionError } = await deltaClient
+			.from('Sessions')
+			.insert({ visit_date: randomFutureDate(), location_id: deltaLocationId })
+			.select('id')
+			.single();
+		if (sessionError) throw sessionError;
+		deltaSessionId = session!.id;
+	});
+
+	afterAll(() => {
+		const birdIds = createdBirdIds.length ? createdBirdIds.join(', ') : '-1';
+		const seqIds = createdSeqIds.length ? createdSeqIds.join(', ') : '-1';
+		// Null out the FK before deleting sequences so the sequence deletes don't
+		// trip the birds_ring_sequence_id_fkey constraint.
+		psql(
+			`UPDATE "Birds" SET ring_sequence_id = NULL WHERE id IN (${birdIds});` +
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds});` +
+				`DELETE FROM "Birds" WHERE id IN (${birdIds});` +
+				`DELETE FROM "RingSequences" WHERE id IN (${seqIds});` +
+				`DELETE FROM "Sessions" WHERE id = ${deltaSessionId};` +
+				`DELETE FROM "Locations" WHERE id = ${deltaLocationId};`
+		);
+	});
+
+	// Usual — an unlinked control appears
+	it('a control whose bird has a null ring_sequence_id still appears', async () => {
+		const { ringNo } = await createDeltaControl();
+		const controls = await deltaControls();
+		expect(controls.find((r) => r.ring_no === ringNo)).toBeDefined();
+	});
+
+	// Structure — a bird linked to this group's own sequence is excluded
+	it("excludes a control whose bird is linked to the group's own sequence", async () => {
+		const { ringNo, birdId, prefix } = await createDeltaControl();
+		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
+
+		const seqId = await insertRingSequence(deltaClient, deltaId, prefix);
+		await linkBirdToSequence(birdId, seqId);
+		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeUndefined();
+	});
+
+	// Edge / cross-group — the accepted "shadow sequence" behaviour (#703):
+	// linking a bird to a *different* group's sequence still excludes it here.
+	it("excludes a control whose bird is linked to another group's sequence (documents the #703 shadow-sequence flaw)", async () => {
+		const { ringNo, birdId, prefix } = await createDeltaControl();
+		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
+
+		// Gamma owns the sequence, but the single group-agnostic FK on the bird
+		// means Delta's control disappears anyway — no worse than prefix matching.
+		const gammaSeqId = await insertRingSequence(gammaClient, gammaId, prefix);
+		await linkBirdToSequence(birdId, gammaSeqId);
+		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeUndefined();
 	});
 });

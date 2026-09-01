@@ -13,6 +13,13 @@ BEGIN
   JOIN "Sessions"   s  ON s.id = e.session_id
   JOIN "Species"    sp ON sp.id = b.species_id
   WHERE (ringing_group_filter IS NULL OR s.ringing_group_id = ringing_group_filter)
+    -- Exclude any ring already linked to a RingSequences row. A bird attached to
+    -- a sequence is being tracked, so it is no longer a "foreign" control and must
+    -- not resurface here. This deliberately ignores which group owns that sequence:
+    -- the deeper multi-tenancy flaw (a group can attach a "shadow sequence" to a
+    -- bird it does not truly own, blocking the real owner) is tracked separately —
+    -- see PR #690's review thread and issue #703.
+    AND b.ring_sequence_id IS NULL
   GROUP BY b.ring_no, sp.species_name
   HAVING COUNT(*) = COUNT(*) FILTER (WHERE e.record_type = 'S')
   ORDER BY b.ring_no;
