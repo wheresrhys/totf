@@ -163,37 +163,15 @@ export function convertDateFormat(dateString: string): string {
 	return dateString.split('/').reverse().join('-');
 }
 
-// The leading alphabetic run of a ring number is its sequence prefix
-// (e.g. "AEL1699" -> "AEL"). A ring number with no leading letters yields "".
-export function deriveRingSequencePrefix(ringNo: string): string {
-	return (ringNo.match(/^[A-Za-z]+/) || [''])[0];
-}
-
-// Deduce a ring's `size` enum from its prefix length and total ring-number
-// length. This is deliberately NOT the same mapping as `classifyRingSize` in
-// app/models/ring-sequences.ts — that heuristic returns coarse display buckets
-// ('B, C, C2'/'Large') and has no 'G' branch; this returns real `ring_size`
-// enum values and only for the unambiguous cases, `null` otherwise (so the
-// importer never guesses a size it isn't sure of). See issue #659.
-export function deduceRingSequenceSize(
-	prefix: string,
-	ringNoLength: number
-): Database['public']['Enums']['ring_size'] | null {
-	const alphaCount = prefix.length;
-
-	if (alphaCount === 3 && ringNoLength === 6) return 'AA';
-	if (alphaCount === 3 && ringNoLength === 7) return 'A';
-
-	if (alphaCount === 2 && ringNoLength === 7) {
-		const firstLetter = prefix[0].toUpperCase();
-		if (firstLetter === 'D') return 'D2';
-		if (firstLetter === 'F') return 'Fv';
-		if (firstLetter === 'S') return 'SO';
-		if (firstLetter === 'G') return 'G';
-		if (firstLetter === 'E') return 'E';
+// Every non-empty leading substring of a ring number, longest last
+// (e.g. "AE1" -> ["A", "AE", "AE1"]). A RingSequences row matches a ring when
+// its `prefix` is one of these — i.e. the ring number LIKE prefix || '%'.
+export function leadingSubstrings(value: string): string[] {
+	const substrings: string[] = [];
+	for (let length = 1; length <= value.length; length++) {
+		substrings.push(value.slice(0, length));
 	}
-
-	return null;
+	return substrings;
 }
 
 export function createUpserter(supabaseClient: SupabaseClient) {
@@ -218,108 +196,41 @@ export function createUpserter(supabaseClient: SupabaseClient) {
 	};
 }
 
-// Postgres transient failures worth retrying: serialization failure (40001)
-// and deadlock detected (40P01). Both import paths process rows concurrently,
-// and rows sharing a ring prefix contend on the same RingSequences row — both
-// when first creating it and, via the Task B `trg_refresh_ring_sequence_bounds`
-// trigger (which SELECT ... FOR UPDATEs the sequence row on every
-// Birds.ring_sequence_id write), when two same-prefix Bird upserts each hold the
-// FK's KEY SHARE lock and try to upgrade to FOR UPDATE. Retrying the aborted
-// statement lets the deadlock victim succeed once the winner has committed.
-const RETRYABLE_PG_CODES = new Set(['40001', '40P01']);
-const PG_RETRY_MAX_ATTEMPTS = 5;
-
-function isRetryablePgError(error: unknown): boolean {
-	return (
-		typeof error === 'object' &&
-		error !== null &&
-		'code' in error &&
-		RETRYABLE_PG_CODES.has((error as { code: string }).code)
-	);
-}
-
-// Retry an operation on transient serialization/deadlock failures, with a small
-// randomised backoff so contending rows don't immediately re-collide.
-export async function withPgRetry<T>(operation: () => Promise<T>): Promise<T> {
-	let lastError: unknown;
-	for (let attempt = 0; attempt < PG_RETRY_MAX_ATTEMPTS; attempt++) {
-		try {
-			return await operation();
-		} catch (error) {
-			if (!isRetryablePgError(error)) throw error;
-			lastError = error;
-			await new Promise((resolve) =>
-				setTimeout(resolve, Math.random() * 25 * (attempt + 1))
-			);
-		}
-	}
-	throw lastError;
-}
-
-// Resolves (find-or-create) the `RingSequences` row for a `(prefix,
-// ringing_group_id)` pair and returns its id. Deliberately NOT built on
-// `createUpserter`: that always upserts with `ignoreDuplicates: false`, i.e. a
-// full-column overwrite on conflict, which would clobber a `size` a user has
-// manually corrected via the ring-sequences UI. This never updates an existing
-// row's `size`: it selects first and only inserts (with `ignoreDuplicates:
-// true` / ON CONFLICT DO NOTHING) when the row is genuinely missing.
-//
-// Both import paths run rows concurrently, and every row of a given prefix hits
-// the same key, so the select-first ordering means only the first row of a
-// prefix ever attempts an insert once the row is committed — and any residual
-// races between simultaneous first-inserts are retried on deadlock/serialization
-// failure (see `isRetryablePgError`). See issue #659.
-export function createRingSequenceResolver(supabaseClient: SupabaseClient) {
-	async function selectId(
-		prefix: string,
+// Looks up the existing `RingSequences` row a ring number belongs to and returns
+// its id, or `null` if the group has no sequence covering it. A sequence matches
+// when its `prefix` is a leading substring of the full ring number (i.e. the ring
+// number LIKE prefix || '%'); when several match, the most specific (longest
+// prefix) wins. The import deliberately never *creates* a sequence here (that was
+// removed in #695 — it slowed imports catastrophically): sequences are authored
+// in the ring-sequences UI, and a ring with no matching sequence is simply left
+// unassigned.
+export function createRingSequenceLookup(supabaseClient: SupabaseClient) {
+	return async (
+		ringNo: string,
 		ringingGroupId: number
-	): Promise<number | null> {
+	): Promise<number | null> => {
+		const candidatePrefixes = leadingSubstrings(ringNo);
+		if (candidatePrefixes.length === 0) return null;
+
 		const { data, error } = await supabaseClient
 			.from('RingSequences')
-			.select('id')
-			.eq('prefix', prefix)
+			.select('id, prefix')
 			.eq('ringing_group_id', ringingGroupId)
-			.maybeSingle();
+			.in('prefix', candidatePrefixes);
 		if (error) throw error;
-		return data?.id ?? null;
-	}
+		if (!data || data.length === 0) return null;
 
-	async function resolveOnce(
-		prefix: string,
-		ringingGroupId: number,
-		size: Database['public']['Enums']['ring_size'] | null
-	): Promise<number> {
-		const existingId = await selectId(prefix, ringingGroupId);
-		if (existingId !== null) return existingId;
-
-		const { error: insertError } = await supabaseClient
-			.from('RingSequences')
-			.upsert(
-				{ prefix, ringing_group_id: ringingGroupId, size },
-				{ onConflict: 'prefix,ringing_group_id', ignoreDuplicates: true }
-			);
-		if (insertError) throw insertError;
-
-		const id = await selectId(prefix, ringingGroupId);
-		if (id === null)
-			throw new Error(
-				`RingSequences row for prefix "${prefix}" (group ${ringingGroupId}) not found after upsert`
-			);
-		return id;
-	}
-
-	return (
-		prefix: string,
-		ringingGroupId: number,
-		size: Database['public']['Enums']['ring_size'] | null
-	): Promise<number> =>
-		withPgRetry(() => resolveOnce(prefix, ringingGroupId, size));
+		const mostSpecific = data.reduce((best, row) =>
+			row.prefix.length > best.prefix.length ? row : best
+		);
+		return mostSpecific.id;
+	};
 }
 
 export async function processEncounterRow(
 	rawRow: DemonRow,
 	upsert: ReturnType<typeof createUpserter>,
-	resolveRingSequence: ReturnType<typeof createRingSequenceResolver>,
+	lookupRingSequence: ReturnType<typeof createRingSequenceLookup>,
 	ringingGroupId: number
 ): Promise<{ visitDate: string }> {
 	const row = transformEmptyStringsToNull(rawRow) as DemonRow;
@@ -334,33 +245,27 @@ export async function processEncounterRow(
 	);
 
 	// Only a 'N' (new ring) record assigns a ring to this group for the first
-	// time, so it's the only record_type that resolves/creates a RingSequences
-	// row and stamps `ring_sequence_id` onto the Bird. Any other record_type
-	// leaves both RingSequences and Birds.ring_sequence_id untouched (the Birds
-	// upsert only writes columns present in its payload).
-	let ringSequenceId: number | undefined;
+	// time, so it's the only record_type that looks up a matching RingSequences
+	// row and stamps `ring_sequence_id` onto the Bird. Any other record_type —
+	// and any 'N' ring with no matching sequence (lookup returns null) — leaves
+	// Birds.ring_sequence_id untouched (the Birds upsert only writes columns
+	// present in its payload).
+	let ringSequenceId: number | null = null;
 	if (row.record_type === 'N') {
-		const ringNo = row.ring_no as string;
-		const prefix = deriveRingSequencePrefix(ringNo);
-		const size = deduceRingSequenceSize(prefix, ringNo.length);
-		ringSequenceId = await resolveRingSequence(prefix, ringingGroupId, size);
+		ringSequenceId = await lookupRingSequence(
+			row.ring_no as string,
+			ringingGroupId
+		);
 	}
 
-	// Wrapped in withPgRetry because writing ring_sequence_id fires the Task B
-	// bounds trigger, which FOR UPDATEs the shared RingSequences row — so two
-	// concurrent same-prefix Bird upserts can deadlock (see withPgRetry).
-	const birdId = await withPgRetry(() =>
-		upsert<BirdsInsert>(
-			'Birds',
-			{
-				ring_no: row.ring_no as string,
-				species_id: speciesId,
-				...(ringSequenceId !== undefined
-					? { ring_sequence_id: ringSequenceId }
-					: {})
-			},
-			['ring_no']
-		)
+	const birdId = await upsert<BirdsInsert>(
+		'Birds',
+		{
+			ring_no: row.ring_no as string,
+			species_id: speciesId,
+			...(ringSequenceId !== null ? { ring_sequence_id: ringSequenceId } : {})
+		},
+		['ring_no']
 	);
 
 	const locationId = await upsert<LocationsInsert>(

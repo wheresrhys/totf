@@ -91,7 +91,7 @@ describe('RingSequences table', () => {
 			expect(data?.size).toBe('B+');
 		});
 
-		it('accepts null first_ring and last_ring (populated later by a Task B trigger, not here)', async () => {
+		it('accepts null first_ring and last_ring (set via the ring-sequences UI, not on insert)', async () => {
 			const { data, error } = await groupClient
 				.from('RingSequences')
 				.insert({ prefix: `RS-${suffix}-RINGS`, ringing_group_id: groupId })

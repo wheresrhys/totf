@@ -201,12 +201,12 @@ afterAll(() => cleanupAll());
 describe('demon-import — multi-record import (usual case)', () => {
 	let groupId: number;
 	let groupClient: SupabaseClient;
-	let resolveRingSequence: ReturnType<typeof vi.fn>;
+	let lookupRingSequence: ReturnType<typeof vi.fn>;
 
 	beforeAll(async () => {
 		groupId = createIsolatedGroup(`demon-import-${suffix}-multi`);
 		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
-		resolveRingSequence = vi.fn().mockResolvedValue(1)
+		lookupRingSequence = vi.fn().mockResolvedValue(1)
 	});
 
 
@@ -222,7 +222,7 @@ describe('demon-import — multi-record import (usual case)', () => {
 		);
 
 		for (const row of rows) {
-			await processEncounterRow(row, upsert, resolveRingSequence, groupId);
+			await processEncounterRow(row, upsert, lookupRingSequence, groupId);
 		}
 
 		const encounterCount = psqlCount(
@@ -250,8 +250,8 @@ describe('demon-import — multi-record import (usual case)', () => {
 			visit_date: toDemonDate(randomFutureDate())
 		});
 
-		await processEncounterRow(row, upsert, resolveRingSequence, groupId);
-		await processEncounterRow(row, upsert, resolveRingSequence, groupId);
+		await processEncounterRow(row, upsert, lookupRingSequence, groupId);
+		await processEncounterRow(row, upsert, lookupRingSequence, groupId);
 
 		expect(
 			psqlCount(
@@ -279,12 +279,12 @@ describe('demon-import — multi-record import (usual case)', () => {
 describe('demon-import — Species uniqueness (species_name)', () => {
 	let groupId: number;
 	let groupClient: SupabaseClient;
-	let resolveRingSequence: ReturnType<typeof vi.fn>;
+	let lookupRingSequence: ReturnType<typeof vi.fn>;
 
 	beforeAll(async () => {
 		groupId = createIsolatedGroup(`demon-import-${suffix}-species`);
 		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
-		resolveRingSequence = vi.fn().mockResolvedValue(1)
+		lookupRingSequence = vi.fn().mockResolvedValue(1)
 	});
 
 	it('upserting two rows with the same species_name resolves to the same Species row', async () => {
@@ -298,7 +298,7 @@ describe('demon-import — Species uniqueness (species_name)', () => {
 				loc_id: `DemonImportLoc-${suffix}-species`
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 		await processEncounterRow(
@@ -308,7 +308,7 @@ describe('demon-import — Species uniqueness (species_name)', () => {
 				loc_id: `DemonImportLoc-${suffix}-species`
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 
@@ -328,14 +328,14 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 	let groupIdB: number;
 	let groupClientA: SupabaseClient;
 	let groupClientB: SupabaseClient;
-	let resolveRingSequence: ReturnType<typeof vi.fn>;
+	let lookupRingSequence: ReturnType<typeof vi.fn>;
 
 	beforeAll(async () => {
 		groupIdA = createIsolatedGroup(`demon-import-${suffix}-loc-a`);
 		groupIdB = createIsolatedGroup(`demon-import-${suffix}-loc-b`);
 		groupClientA = await getAuthenticatedSupabaseClientForGroup(groupIdA);
 		groupClientB = await getAuthenticatedSupabaseClientForGroup(groupIdB);
-		resolveRingSequence = vi.fn().mockResolvedValue(1);
+		lookupRingSequence = vi.fn().mockResolvedValue(1);
 	});
 
 	it('upserting the same location_name under two different ringing groups creates two separate Location rows', async () => {
@@ -350,7 +350,7 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 				loc_id: locationName
 			}),
 			upsertA,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupIdA
 		);
 		await processEncounterRow(
@@ -360,7 +360,7 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 				loc_id: locationName
 			}),
 			upsertB,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupIdB
 		);
 
@@ -387,7 +387,7 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 				loc_id: locationName
 			}),
 			upsertA,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupIdA
 		);
 		await processEncounterRow(
@@ -397,7 +397,7 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 				loc_id: locationName
 			}),
 			upsertA,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupIdA
 		);
 
@@ -413,13 +413,13 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 	let groupId: number;
 	let groupClient: SupabaseClient;
 	let locationName: string;
-	let resolveRingSequence: ReturnType<typeof vi.fn>;
+	let lookupRingSequence: ReturnType<typeof vi.fn>;
 
 	beforeAll(async () => {
 		groupId = createIsolatedGroup(`demon-import-${suffix}-sessions`);
 		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
 		locationName = `DemonImportLoc-${suffix}-sessions`;
-		resolveRingSequence = vi.fn().mockResolvedValue(1);
+		lookupRingSequence = vi.fn().mockResolvedValue(1);
 	});
 
 	it('upserting rows with the same visit_date/location but different session_type creates separate Session rows', async () => {
@@ -438,7 +438,7 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 				age: '5'
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 		await processEncounterRow(
@@ -451,7 +451,7 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 				age: '5'
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 
@@ -476,7 +476,7 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 				age: '5'
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 		await processEncounterRow(
@@ -489,7 +489,7 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 				age: '6'
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 
@@ -515,7 +515,7 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 				age: '5'
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 		await processEncounterRow(
@@ -528,7 +528,7 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 				age: '5'
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 
@@ -554,7 +554,7 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 				age: '5'
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 		await processEncounterRow(
@@ -567,7 +567,7 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 				age: '5'
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 
@@ -583,13 +583,13 @@ describe('demon-import — Encounters uniqueness (bird_id, session_id)', () => {
 	let groupId: number;
 	let groupClient: SupabaseClient;
 	let locationName: string;
-	let resolveRingSequence: ReturnType<typeof vi.fn>;
+	let lookupRingSequence: ReturnType<typeof vi.fn>;
 
 	beforeAll(async () => {
 		groupId = createIsolatedGroup(`demon-import-${suffix}-encounters`);
 		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
 		locationName = `DemonImportLoc-${suffix}-encounters`;
-		resolveRingSequence = vi.fn().mockResolvedValue(1);
+		lookupRingSequence = vi.fn().mockResolvedValue(1);
 	});
 
 	it('reprocessing the exact same row (same bird + session) updates the existing Encounters row instead of creating a duplicate', async () => {
@@ -602,11 +602,11 @@ describe('demon-import — Encounters uniqueness (bird_id, session_id)', () => {
 			weight: '10.5'
 		});
 
-		await processEncounterRow(row, upsert, resolveRingSequence, groupId);
+		await processEncounterRow(row, upsert, lookupRingSequence, groupId);
 		await processEncounterRow(
 			{ ...row, weight: '12.3' }, // near-identical row: same key, different measurement
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 
@@ -636,7 +636,7 @@ describe('demon-import — Encounters uniqueness (bird_id, session_id)', () => {
 				visit_date: toDemonDate(firstVisitDate)
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 		await processEncounterRow(
@@ -647,7 +647,7 @@ describe('demon-import — Encounters uniqueness (bird_id, session_id)', () => {
 				visit_date: toDemonDate(addDays(firstVisitDate, 1))
 			}),
 			upsert,
-			resolveRingSequence,
+			lookupRingSequence,
 			groupId
 		);
 

@@ -14,7 +14,7 @@ import path from 'path';
 import csvParser from 'csv-parser';
 import {
 	createUpserter,
-	createRingSequenceResolver,
+	createRingSequenceLookup,
 	processEncounterRow
 } from '../lib/demon-import';
 
@@ -70,7 +70,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 		await getAuthenticatedSupabaseClientForGroup(ringingGroupId);
 
 	const upsert = createUpserter(groupSupabaseClient);
-	const resolveRingSequence = createRingSequenceResolver(groupSupabaseClient);
+	const lookupRingSequence = createRingSequenceLookup(groupSupabaseClient);
 	return new Promise((resolve, reject) => {
 		fs.createReadStream(csvFilePath)
 			.pipe(csvParser())
@@ -78,7 +78,7 @@ async function importCSV(options: ImportOptions): Promise<void> {
 				const rowIndex = totalRecords;
 				totalRecords++;
 				const promise = limit(() =>
-					processEncounterRow(row, upsert, resolveRingSequence, ringingGroupId)
+					processEncounterRow(row, upsert, lookupRingSequence, ringingGroupId)
 						.then(
 							() => successfulRecords++,
 							(err) => {
