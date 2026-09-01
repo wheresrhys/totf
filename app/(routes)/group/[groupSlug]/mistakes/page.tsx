@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
 import MistakesPage from '@/app/(routes)/mistakes/page';
 
-export default async function CrossGroupMistakesPage({
+export default async function GroupMistakesPage({
 	params
 }: {
 	params: Promise<{ groupSlug: string }>;

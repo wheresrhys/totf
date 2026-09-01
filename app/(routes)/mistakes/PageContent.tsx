@@ -1,12 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { format as formatDate } from 'date-fns';
+import {
+	PageWrapper,
+	PrimaryHeading
+} from '@/app/components/shared/DesignSystem';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { AccordionTableBody } from '@/app/components/shared/AccordionTableBody';
 import { SingleBirdTable } from '@/app/components/SingleBirdTable';
 import { fetchBirdEncounters } from '@/app/actions/bird-encounters';
-import type { DiscrepenciesResult } from '@/app/models/db';
 import type { EncounterOfBird } from '@/app/models/bird';
+import type { DiscrepenciesResult } from '@/app/models/db';
 import {
 	SortableTable,
 	type ColumnConfig,
@@ -176,17 +180,18 @@ function MistakesDiscrepancyTable({
 	);
 }
 
-export function MistakesTable({
-	mistakes
+export function MistakesPageContent({
+	data: mistakes
 }: {
-	mistakes: DiscrepenciesResult[];
+	data: DiscrepenciesResult[];
 }) {
 	const grouped = groupByDiscrepancyType(mistakes);
 	const discrepancyTypes = Object.keys(grouped);
 	const [activeTab, setActiveTab] = useState(discrepancyTypes[0] ?? '');
 
 	return (
-		<>
+		<PageWrapper>
+			<PrimaryHeading>Mistakes</PrimaryHeading>
 			<TabNav
 				tabs={discrepancyTypes.map((type) => ({
 					id: type,
@@ -200,6 +205,6 @@ export function MistakesTable({
 					<MistakesDiscrepancyTable key={type} mistakes={grouped[type]} />
 				) : null
 			)}
-		</>
+		</PageWrapper>
 	);
 }
