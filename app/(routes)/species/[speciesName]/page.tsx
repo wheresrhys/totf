@@ -1,4 +1,4 @@
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
@@ -133,7 +133,7 @@ export default async function SpeciesPage(
 	props: PageProps & { viewedGroup?: ViewedGroup }
 ) {
 	return (
-		<BootstrapPageData<PageData, PageProps, PageParams>
+		<BootstrapPage<PageData, PageProps, PageParams>
 			pageProps={props}
 			viewedGroup={props.viewedGroup}
 			getCacheKeys={(params: PageParams) => ['species', params.speciesName]}

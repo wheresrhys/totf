@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
 import {
 	fetchSessionData,
@@ -20,7 +20,7 @@ export default async function CrossGroupSessionSitePage({ params }: PageProps) {
 	}
 	const viewedGroup = { id: viewedGroupId, slug: groupSlug };
 	return (
-		<BootstrapPageData<DayData, PageProps, PageParams>
+		<BootstrapPage<DayData, PageProps, PageParams>
 			viewedGroup={viewedGroup}
 			getParams={async () => ({
 				viewedGroupId,

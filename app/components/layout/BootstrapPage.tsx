@@ -7,7 +7,7 @@ import { resolveGroupSlugById, type ViewedGroup } from '@/lib/group-slug';
 export type DefaultPageParams = Record<string, string>;
 export type DefaultPageProps = { params: Promise<DefaultPageParams> };
 
-export type BootstrapPageDataProps<DataType, PagePropsType, ParamsType> = {
+export type BootstrapPageProps<DataType, PagePropsType, ParamsType> = {
 	pageProps?: PagePropsType;
 	loading?: React.ReactNode;
 	ttl?: number;
@@ -73,7 +73,7 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 	PageComponent,
 	ttl,
 	viewedGroup: viewedGroupProp
-}: BootstrapPageDataProps<DataType, PagePropsType, ParamsType>) {
+}: BootstrapPageProps<DataType, PagePropsType, ParamsType>) {
 	let params: ParamsType;
 	if (getParams) {
 		params = await getParams(pageProps as PagePropsType);
@@ -114,11 +114,11 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 	);
 }
 
-export function BootstrapPageData<
+export function BootstrapPage<
 	DataType,
 	PagePropsType = DefaultPageProps,
 	ParamsType = DefaultPageParams
->(bootstrapProps: BootstrapPageDataProps<DataType, PagePropsType, ParamsType>) {
+>(bootstrapProps: BootstrapPageProps<DataType, PagePropsType, ParamsType>) {
 	return (
 		<Suspense
 			fallback={

@@ -439,7 +439,7 @@ describe('session detail page', () => {
 			const previousLink = await screen.findByRole('link', {
 				name: /previous session/i
 			});
-			// The global BootstrapPageData mock (vitest.setup.tsx) always supplies
+			// The global BootstrapPage mock (vitest.setup.tsx) always supplies
 			// viewedGroup as { id: 1, slug: 'alpha' }, not the slug passed via params.
 			expect(previousLink.getAttribute('href')).toBe(
 				`/group/alpha/session/${mockPreviousSession[0].visit_date}`

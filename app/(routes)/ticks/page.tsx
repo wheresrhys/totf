@@ -3,9 +3,9 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { ViewedGroup } from '@/lib/group-slug';
 import {
-	BootstrapPageData,
+	BootstrapPage,
 	DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
+} from '@/app/components/layout/BootstrapPage';
 import {
 	BoxyList,
 	PageWrapper,
@@ -49,7 +49,7 @@ export default async function TicksPage({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<GroupTicksResult[]>
+		<BootstrapPage<GroupTicksResult[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['ticks']}
 			dataFetcher={fetchGroupTicks}

@@ -1,4 +1,4 @@
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { SpPage } from '@/app/components/SpPage';
 import {
 	fetchSpPageDataForPeriod,
@@ -25,7 +25,7 @@ export default async function SpeciesYearPage(
 	props: PageProps & { viewedGroup?: ViewedGroup }
 ) {
 	return (
-		<BootstrapPageData<PageData, PageProps, PageParams>
+		<BootstrapPage<PageData, PageProps, PageParams>
 			pageProps={props}
 			viewedGroup={props.viewedGroup}
 			getCacheKeys={(params: PageParams) => [

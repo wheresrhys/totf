@@ -1,32 +1,19 @@
-import {
-	BootstrapPageData,
-	type DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
-import {
-	fetchRingSequenceControls,
-	type RingSequenceControlRow
-} from '@/app/actions/ring-sequences';
-import { ControlsPage } from '@/app/components/ControlsPage';
+import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
+import { fetchControlsPageContent, ControlsPageContent } from './PageContent';
+import type { RingSequenceControlRow } from '@/app/actions/ring-sequences';
 import type { ViewedGroup } from '@/lib/group-slug';
 
-async function dataFetcher(
-	_: DefaultPageParams,
-	viewedGroupId: number
-): Promise<RingSequenceControlRow[] | null> {
-	return fetchRingSequenceControls(viewedGroupId);
-}
-
-export default async function ControlsRoute({
+export default async function ControlsPage({
 	viewedGroup
 }: {
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<RingSequenceControlRow[]>
+		<BootstrapPage<RingSequenceControlRow[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['controls']}
-			dataFetcher={dataFetcher}
-			PageComponent={ControlsPage}
+			dataFetcher={fetchControlsPageContent}
+			PageComponent={ControlsPageContent}
 		/>
 	);
 }
