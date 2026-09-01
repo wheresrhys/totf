@@ -51,9 +51,8 @@ export function CreateSequenceForRing({
 				<p className="mb-4">
 					Promote ring <span className="font-bold">{ringNo}</span> to a tracked
 					ring sequence for prefix{' '}
-					<span className="font-bold">{ringPrefix(ringNo)}</span>? Every
-					control with this prefix will move to the sequence and no longer
-					appear here.
+					<span className="font-bold">{ringPrefix(ringNo)}</span>? Every control
+					with this prefix will move to the sequence and no longer appear here.
 				</p>
 				<form action={action} className="flex flex-col gap-4">
 					<input type="hidden" name="ring_no" value={ringNo} />

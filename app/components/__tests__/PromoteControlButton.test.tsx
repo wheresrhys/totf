@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	fireEvent,
+	within
+} from '@testing-library/react';
 import { PromoteControlButton } from '../PromoteControlButton';
 
 // PromoteControlButton renders CreateSequenceForRing, which imports the
