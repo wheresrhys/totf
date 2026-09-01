@@ -1,25 +1,14 @@
-import type { DefaultPageParams } from '@/app/components/layout/BootstrapPage';
 import {
 	PageWrapper,
 	PrimaryHeading,
 	Table
 } from '@/app/components/shared/DesignSystem';
 import { format as formatDate } from 'date-fns';
-import {
-	fetchPayOffStats,
-	type PayOffStatsData
-} from '@/app/actions/pay-off-stats';
+import type { PayOffStatsData } from '@/app/actions/pay-off-stats';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
 import { formatPostgresIntervalForDisplay } from '@/lib/postgres-interval';
 import { PayOffEffortChart } from '@/app/components/pages/effort/PayOffEffortChart';
-
-export async function fetchEffortPageContent(
-	_params: DefaultPageParams,
-	viewedGroupId: number
-): Promise<PayOffStatsData | null> {
-	return fetchPayOffStats(viewedGroupId);
-}
 
 function formatAvgEncounters(n: number | null | undefined): string {
 	if (n == null || Number.isNaN(n)) return '—';
