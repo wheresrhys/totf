@@ -15,7 +15,6 @@ export type Database = {
           last_encountered_timestamp: string
           proven_age: number
           ring_no: string
-          ring_sequence_id: number | null
           ringing_group_ids: number[]
           species_id: number
         }
@@ -24,7 +23,6 @@ export type Database = {
           last_encountered_timestamp?: string
           proven_age?: number
           ring_no: string
-          ring_sequence_id?: number | null
           ringing_group_ids?: number[]
           species_id: number
         }
@@ -33,18 +31,10 @@ export type Database = {
           last_encountered_timestamp?: string
           proven_age?: number
           ring_no?: string
-          ring_sequence_id?: number | null
           ringing_group_ids?: number[]
           species_id?: number
         }
         Relationships: [
-          {
-            foreignKeyName: "birds_ring_sequence_id_fkey"
-            columns: ["ring_sequence_id"]
-            isOneToOne: false
-            referencedRelation: "RingSequences"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "birds_species_id_fkey"
             columns: ["species_id"]
@@ -283,6 +273,49 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "ring_sequences_ringing_group_id_fkey"
+            columns: ["ringing_group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      RingSequences_Birds: {
+        Row: {
+          bird_id: number
+          id: number
+          ring_sequence_id: number
+          ringing_group_id: number
+        }
+        Insert: {
+          bird_id: number
+          id?: number
+          ring_sequence_id: number
+          ringing_group_id: number
+        }
+        Update: {
+          bird_id?: number
+          id?: number
+          ring_sequence_id?: number
+          ringing_group_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ring_sequences_birds_bird_id_fkey"
+            columns: ["bird_id"]
+            isOneToOne: false
+            referencedRelation: "Birds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ring_sequences_birds_ring_sequence_id_fkey"
+            columns: ["ring_sequence_id"]
+            isOneToOne: false
+            referencedRelation: "RingSequences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ring_sequences_birds_ringing_group_id_fkey"
             columns: ["ringing_group_id"]
             isOneToOne: false
             referencedRelation: "RingingGroups"
