@@ -5,7 +5,6 @@ import {
 	convertDateFormat,
 	createUpserter,
 	createRingSequenceLookup,
-	leadingSubstrings,
 	CasualtyEncounterError,
 	processEncounterRow,
 	type DemonRow
@@ -162,72 +161,52 @@ describe('convertDateFormat', () => {
 	});
 });
 
-describe('leadingSubstrings', () => {
-	it('returns every non-empty leading substring, shortest first', () => {
-		expect(leadingSubstrings('AE1')).toEqual(['A', 'AE', 'AE1']);
-	});
-
-	it('returns a single-element array for a one-character string', () => {
-		expect(leadingSubstrings('A')).toEqual(['A']);
-	});
-
-	it('returns an empty array for an empty string', () => {
-		expect(leadingSubstrings('')).toEqual([]);
-	});
-});
-
 describe('createRingSequenceLookup', () => {
-	let mockIn: ReturnType<typeof vi.fn>;
-	let mockEq: ReturnType<typeof vi.fn>;
+	let mockGte: ReturnType<typeof vi.fn>;
+	let mockLte: ReturnType<typeof vi.fn>;
+	let mockEqPrefix: ReturnType<typeof vi.fn>;
+	let mockEqGroup: ReturnType<typeof vi.fn>;
 	let mockSelect: ReturnType<typeof vi.fn>;
 	let mockFrom: ReturnType<typeof vi.fn>;
 	let lookup: ReturnType<typeof createRingSequenceLookup>;
 
 	beforeEach(() => {
-		mockIn = vi.fn();
-		mockEq = vi.fn(() => ({ in: mockIn }));
-		mockSelect = vi.fn(() => ({ eq: mockEq }));
+		// Chain: from -> select -> eq(group) -> eq(prefix) -> lte(first_index) ->
+		// gte(last_index) -> resolves to { data, error }.
+		mockGte = vi.fn();
+		mockLte = vi.fn(() => ({ gte: mockGte }));
+		mockEqPrefix = vi.fn(() => ({ lte: mockLte }));
+		mockEqGroup = vi.fn(() => ({ eq: mockEqPrefix }));
+		mockSelect = vi.fn(() => ({ eq: mockEqGroup }));
 		mockFrom = vi.fn(() => ({ select: mockSelect }));
 		const mockClient = { from: mockFrom } as unknown as SupabaseClient;
 		lookup = createRingSequenceLookup(mockClient);
 	});
 
-	it('queries RingSequences for the group by every leading substring of the ring number', async () => {
-		mockIn.mockResolvedValue({ data: [{ id: 5, prefix: 'AEL' }], error: null });
+	it('queries RingSequences filtering by group, the first-3-char prefix, and numeric bounds', async () => {
+		mockGte.mockResolvedValue({ data: [{ id: 5 }], error: null });
 		await lookup('AEL1699', 7);
 		expect(mockFrom).toHaveBeenCalledWith('RingSequences');
-		expect(mockSelect).toHaveBeenCalledWith('id, prefix');
-		expect(mockEq).toHaveBeenCalledWith('ringing_group_id', 7);
-		expect(mockIn).toHaveBeenCalledWith('prefix', [
-			'A',
-			'AE',
-			'AEL',
-			'AEL1',
-			'AEL16',
-			'AEL169',
-			'AEL1699'
-		]);
+		expect(mockSelect).toHaveBeenCalledWith('id');
+		expect(mockEqGroup).toHaveBeenCalledWith('ringing_group_id', 7);
+		expect(mockEqPrefix).toHaveBeenCalledWith('prefix', 'AEL');
+		expect(mockLte).toHaveBeenCalledWith('first_index', 1699);
+		expect(mockGte).toHaveBeenCalledWith('last_index', 1699);
+	});
+
+	it('takes exactly the first three characters as the prefix comparator', async () => {
+		mockGte.mockResolvedValue({ data: [{ id: 5 }], error: null });
+		await lookup('ABC123456', 7);
+		expect(mockEqPrefix).toHaveBeenCalledWith('prefix', 'ABC');
 	});
 
 	it('returns the id of the single matching sequence', async () => {
-		mockIn.mockResolvedValue({ data: [{ id: 5, prefix: 'AEL' }], error: null });
+		mockGte.mockResolvedValue({ data: [{ id: 5 }], error: null });
 		expect(await lookup('AEL1699', 7)).toBe(5);
 	});
 
-	it('returns the id of the most specific (longest prefix) sequence when several match', async () => {
-		mockIn.mockResolvedValue({
-			data: [
-				{ id: 1, prefix: 'A' },
-				{ id: 2, prefix: 'AEL' },
-				{ id: 3, prefix: 'AE' }
-			],
-			error: null
-		});
-		expect(await lookup('AEL1699', 7)).toBe(2);
-	});
-
-	it('returns null when no sequence matches (import leaves the ring unassigned)', async () => {
-		mockIn.mockResolvedValue({ data: [], error: null });
+	it('returns null when no sequence matches the prefix and bounds (import leaves the ring unassigned)', async () => {
+		mockGte.mockResolvedValue({ data: [], error: null });
 		expect(await lookup('AEL1699', 7)).toBeNull();
 	});
 
@@ -236,8 +215,13 @@ describe('createRingSequenceLookup', () => {
 		expect(mockFrom).not.toHaveBeenCalled();
 	});
 
+	it('returns null for a ring number with no trailing digits without querying', async () => {
+		expect(await lookup('ABCDEF', 7)).toBeNull();
+		expect(mockFrom).not.toHaveBeenCalled();
+	});
+
 	it('throws when the select returns an error', async () => {
-		mockIn.mockResolvedValue({
+		mockGte.mockResolvedValue({
 			data: null,
 			error: { message: 'select failed' }
 		});

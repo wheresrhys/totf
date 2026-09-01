@@ -21,7 +21,9 @@ function makeSequence(
 		owned_by_group: true,
 		ringing_group_id: 1,
 		first_ring: `${prefix}00001`,
-		last_ring: `${prefix}00009`
+		last_ring: `${prefix}00009`,
+		first_index: 1,
+		last_index: 9
 	};
 }
 

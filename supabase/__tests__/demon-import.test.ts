@@ -206,7 +206,7 @@ describe('demon-import — multi-record import (usual case)', () => {
 	beforeAll(async () => {
 		groupId = createIsolatedGroup(`demon-import-${suffix}-multi`);
 		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
-		lookupRingSequence = vi.fn().mockResolvedValue(1)
+		lookupRingSequence = vi.fn().mockResolvedValue(null)
 	});
 
 
@@ -284,7 +284,7 @@ describe('demon-import — Species uniqueness (species_name)', () => {
 	beforeAll(async () => {
 		groupId = createIsolatedGroup(`demon-import-${suffix}-species`);
 		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
-		lookupRingSequence = vi.fn().mockResolvedValue(1)
+		lookupRingSequence = vi.fn().mockResolvedValue(null)
 	});
 
 	it('upserting two rows with the same species_name resolves to the same Species row', async () => {
@@ -335,7 +335,7 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 		groupIdB = createIsolatedGroup(`demon-import-${suffix}-loc-b`);
 		groupClientA = await getAuthenticatedSupabaseClientForGroup(groupIdA);
 		groupClientB = await getAuthenticatedSupabaseClientForGroup(groupIdB);
-		lookupRingSequence = vi.fn().mockResolvedValue(1);
+		lookupRingSequence = vi.fn().mockResolvedValue(null);
 	});
 
 	it('upserting the same location_name under two different ringing groups creates two separate Location rows', async () => {
@@ -419,7 +419,7 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 		groupId = createIsolatedGroup(`demon-import-${suffix}-sessions`);
 		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
 		locationName = `DemonImportLoc-${suffix}-sessions`;
-		lookupRingSequence = vi.fn().mockResolvedValue(1);
+		lookupRingSequence = vi.fn().mockResolvedValue(null);
 	});
 
 	it('upserting rows with the same visit_date/location but different session_type creates separate Session rows', async () => {
@@ -589,7 +589,7 @@ describe('demon-import — Encounters uniqueness (bird_id, session_id)', () => {
 		groupId = createIsolatedGroup(`demon-import-${suffix}-encounters`);
 		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
 		locationName = `DemonImportLoc-${suffix}-encounters`;
-		lookupRingSequence = vi.fn().mockResolvedValue(1);
+		lookupRingSequence = vi.fn().mockResolvedValue(null);
 	});
 
 	it('reprocessing the exact same row (same bird + session) updates the existing Encounters row instead of creating a duplicate', async () => {

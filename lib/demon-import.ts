@@ -163,17 +163,6 @@ export function convertDateFormat(dateString: string): string {
 	return dateString.split('/').reverse().join('-');
 }
 
-// Every non-empty leading substring of a ring number, longest last
-// (e.g. "AE1" -> ["A", "AE", "AE1"]). A RingSequences row matches a ring when
-// its `prefix` is one of these — i.e. the ring number LIKE prefix || '%'.
-export function leadingSubstrings(value: string): string[] {
-	const substrings: string[] = [];
-	for (let length = 1; length <= value.length; length++) {
-		substrings.push(value.slice(0, length));
-	}
-	return substrings;
-}
-
 export function createUpserter(supabaseClient: SupabaseClient) {
 	return async <DataInsertModel>(
 		tableName: string,
@@ -198,32 +187,43 @@ export function createUpserter(supabaseClient: SupabaseClient) {
 
 // Looks up the existing `RingSequences` row a ring number belongs to and returns
 // its id, or `null` if the group has no sequence covering it. A sequence matches
-// when its `prefix` is a leading substring of the full ring number (i.e. the ring
-// number LIKE prefix || '%'); when several match, the most specific (longest
-// prefix) wins. The import deliberately never *creates* a sequence here (that was
-// removed in #695 — it slowed imports catastrophically): sequences are authored
-// in the ring-sequences UI, and a ring with no matching sequence is simply left
-// unassigned.
+// when two criteria hold:
+//   1. its `prefix` equals the first three characters of the ring number (a ring
+//      prefix is always exactly three letters), and
+//   2. the ring's numeric part (the trailing digits, after stripping the leading
+//      alpha prefix) falls within the sequence's numeric window,
+//      `first_index <= ring number <= last_index` — powered by the
+//      `first_index`/`last_index` generated columns on RingSequences.
+// `(prefix, ringing_group_id)` is unique, so at most one row can match. The import
+// deliberately never *creates* a sequence here (that was removed in #695 — it
+// slowed imports catastrophically): sequences are authored in the ring-sequences
+// UI, and a ring with no matching sequence is simply left unassigned.
 export function createRingSequenceLookup(supabaseClient: SupabaseClient) {
 	return async (
 		ringNo: string,
 		ringingGroupId: number
 	): Promise<number | null> => {
-		const candidatePrefixes = leadingSubstrings(ringNo);
-		if (candidatePrefixes.length === 0) return null;
+		const prefix = ringNo.slice(0, 3);
+		if (prefix.length === 0) return null;
+
+		// The ring's numeric part: trailing digits after the leading alpha prefix.
+		// Must match the `first_index`/`last_index` generated-column parse
+		// (`substring(... FROM '[0-9]+$')`). A ring with no trailing digits can't be
+		// range-checked, so it matches no sequence.
+		const numericPart = ringNo.match(/[0-9]+$/);
+		if (!numericPart) return null;
+		const ringNumber = Number(numericPart[0]);
 
 		const { data, error } = await supabaseClient
 			.from('RingSequences')
-			.select('id, prefix')
+			.select('id')
 			.eq('ringing_group_id', ringingGroupId)
-			.in('prefix', candidatePrefixes);
+			.eq('prefix', prefix)
+			.lte('first_index', ringNumber)
+			.gte('last_index', ringNumber);
 		if (error) throw error;
 		if (!data || data.length === 0) return null;
-
-		const mostSpecific = data.reduce((best, row) =>
-			row.prefix.length > best.prefix.length ? row : best
-		);
-		return mostSpecific.id;
+		return data[0].id;
 	};
 }
 
