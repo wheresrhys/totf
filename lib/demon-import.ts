@@ -15,6 +15,8 @@ type SessionsInsert = Omit<
 	'ringing_group_id'
 >;
 type LocationsInsert = Database['public']['Tables']['Locations']['Insert'];
+type RingSequencesBirdsInsert =
+	Database['public']['Tables']['RingSequences_Birds']['Insert'];
 
 export type DemonColumnNames =
 	| 'entered_by'
@@ -227,11 +229,42 @@ export function createRingSequenceLookup(supabaseClient: SupabaseClient) {
 	};
 }
 
+// Records that `ringingGroupId` links `birdId` to `ringSequenceId`, via the
+// `RingSequences_Birds` join table (issue #703). Tracking is per-group rather than
+// a single group-agnostic FK on `Birds`: each group's link is its own row, so one
+// group's import can never consume another group's tracking slot for a shared
+// bird. Upserts on the table's `(bird_id, ring_sequence_id, ringing_group_id)`
+// unique constraint and ignores a duplicate (re-importing the same 'N' row is a
+// no-op here, not an error).
+export function createRingSequenceLinker(supabaseClient: SupabaseClient) {
+	return async (
+		birdId: number,
+		ringSequenceId: number,
+		ringingGroupId: number
+	): Promise<void> => {
+		const { error } = await supabaseClient
+			.from('RingSequences_Birds')
+			.upsert<RingSequencesBirdsInsert>(
+				{
+					bird_id: birdId,
+					ring_sequence_id: ringSequenceId,
+					ringing_group_id: ringingGroupId
+				},
+				{
+					onConflict: 'bird_id,ring_sequence_id,ringing_group_id',
+					ignoreDuplicates: true
+				}
+			);
+		if (error) throw error;
+	};
+}
+
 export async function processEncounterRow(
 	rawRow: DemonRow,
 	upsert: ReturnType<typeof createUpserter>,
 	lookupRingSequence: ReturnType<typeof createRingSequenceLookup>,
-	ringingGroupId: number
+	ringingGroupId: number,
+	linkRingSequence: ReturnType<typeof createRingSequenceLinker>
 ): Promise<{ visitDate: string }> {
 	const row = transformEmptyStringsToNull(rawRow) as DemonRow;
 	if (!row.ring_no) {
@@ -246,10 +279,8 @@ export async function processEncounterRow(
 
 	// Only a 'N' (new ring) record assigns a ring to this group for the first
 	// time, so it's the only record_type that looks up a matching RingSequences
-	// row and stamps `ring_sequence_id` onto the Bird. Any other record_type —
-	// and any 'N' ring with no matching sequence (lookup returns null) — leaves
-	// Birds.ring_sequence_id untouched (the Birds upsert only writes columns
-	// present in its payload).
+	// row. Any other record_type — and any 'N' ring with no matching sequence
+	// (lookup returns null) — leaves the bird unlinked for this group.
 	let ringSequenceId: number | null = null;
 	if (row.record_type === 'N') {
 		ringSequenceId = await lookupRingSequence(
@@ -262,11 +293,16 @@ export async function processEncounterRow(
 		'Birds',
 		{
 			ring_no: row.ring_no as string,
-			species_id: speciesId,
-			...(ringSequenceId !== null ? { ring_sequence_id: ringSequenceId } : {})
+			species_id: speciesId
 		},
 		['ring_no']
 	);
+
+	// Record this group's link to the matched sequence via the per-group join
+	// table (issue #703) rather than a group-agnostic FK on the Bird.
+	if (ringSequenceId !== null) {
+		await linkRingSequence(birdId, ringSequenceId, ringingGroupId);
+	}
 
 	const locationId = await upsert<LocationsInsert>(
 		'Locations',

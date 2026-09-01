@@ -24,7 +24,7 @@ async function getGroupIdByName(name: string): Promise<number> {
 	return data.id;
 }
 
-const ALPHA_SESSION_COUNT = 9;
+const ALPHA_SESSION_COUNT = 10;
 
 describe('Row Level Security — cross-group data sharing', () => {
 	let alphaId: number;
