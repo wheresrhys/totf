@@ -1,7 +1,7 @@
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
-import type { SearchResult } from '@/app/components/pages/search/SearchResults';
+import type { SearchResult } from '@/app/components/SearchResults';
 
 export type SearchParams = { q: string };
 
@@ -29,4 +29,4 @@ export async function fetchSearchPageContent(
 export {
 	SearchResults as SearchPageContent,
 	type SearchResult
-} from '@/app/components/pages/search/SearchResults';
+} from '@/app/components/SearchResults';

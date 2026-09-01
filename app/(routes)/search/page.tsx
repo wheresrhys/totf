@@ -1,6 +1,6 @@
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import type { ViewedGroup } from '@/lib/group-slug';
-import type { SearchResult } from '@/app/components/pages/search/SearchResults';
+import type { SearchResult } from '@/app/components/SearchResults';
 import {
 	fetchSearchPageContent,
 	SearchPageContent,
