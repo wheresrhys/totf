@@ -232,7 +232,7 @@ export async function generateSnapshots(
 	} as Parameters<typeof alpha.rpc<'top_metrics_by_period'>>[1]);
 	await writeSnapshot(`getTopPeriodsByMetric.alpha.json`, topDays ?? []);
 
-	// fetchBirdData (bird/[ring]/page.tsx) — ARRETRAP bird
+	// fetchBirdPageContent (bird/[ring]/PageContent.tsx) — ARRETRAP bird
 	const { data: arretrapBird } = await alpha
 		.from('Birds')
 		.select(`id, ring_no, proven_age, species:Species(species_name)`)
