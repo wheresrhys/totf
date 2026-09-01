@@ -248,8 +248,10 @@ export type Database = {
       }
       RingSequences: {
         Row: {
+          first_index: number | null
           first_ring: string | null
           id: number
+          last_index: number | null
           last_ring: string | null
           owned_by_group: boolean
           prefix: string
@@ -257,8 +259,10 @@ export type Database = {
           size: Database["public"]["Enums"]["ring_size"] | null
         }
         Insert: {
+          first_index?: number | null
           first_ring?: string | null
           id?: number
+          last_index?: number | null
           last_ring?: string | null
           owned_by_group?: boolean
           prefix: string
@@ -266,8 +270,10 @@ export type Database = {
           size?: Database["public"]["Enums"]["ring_size"] | null
         }
         Update: {
+          first_index?: number | null
           first_ring?: string | null
           id?: number
+          last_index?: number | null
           last_ring?: string | null
           owned_by_group?: boolean
           prefix?: string

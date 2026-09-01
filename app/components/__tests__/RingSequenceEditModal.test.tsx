@@ -26,7 +26,9 @@ const sequence: RingSequenceRow = {
 	owned_by_group: true,
 	ringing_group_id: 1,
 	first_ring: 'ARW00001',
-	last_ring: 'ARW00099'
+	last_ring: 'ARW00099',
+	first_index: 1,
+	last_index: 99
 };
 
 describe('RingSequenceEditModal', () => {
