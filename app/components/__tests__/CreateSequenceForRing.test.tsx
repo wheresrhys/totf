@@ -6,7 +6,7 @@ import {
 	fireEvent,
 	waitFor
 } from '@testing-library/react';
-import { PromoteControlModal } from '../PromoteControlModal';
+import { CreateSequenceForRing } from '../CreateSequenceForRing';
 import type { PromoteControlState } from '@/app/actions/ring-sequences';
 import { mockRefresh } from '@/vitest.setup';
 
@@ -18,7 +18,7 @@ vi.mock('@/app/actions/ring-sequences', () => ({
 	promoteControlToSequence: mockPromoteControlToSequence
 }));
 
-describe('PromoteControlModal', () => {
+describe('CreateSequenceForRing', () => {
 	afterEach(() => {
 		cleanup();
 		vi.clearAllMocks();
@@ -26,13 +26,13 @@ describe('PromoteControlModal', () => {
 
 	it('names the ring and its derived prefix in the confirmation copy', () => {
 		render(
-			<PromoteControlModal
+			<CreateSequenceForRing
 				ringNo="ABC1234"
 				viewedGroupId={1}
 				onClose={vi.fn()}
 			/>
 		);
-		// Ring number and the leading-alpha prefix are both surfaced.
+		// Ring number and its first-3-characters prefix are both surfaced.
 		expect(screen.getByText('ABC1234')).toBeDefined();
 		expect(screen.getByText('ABC')).toBeDefined();
 	});
@@ -43,7 +43,7 @@ describe('PromoteControlModal', () => {
 			async (): Promise<PromoteControlState> => ({ success: true })
 		);
 		render(
-			<PromoteControlModal
+			<CreateSequenceForRing
 				ringNo="ABC1234"
 				viewedGroupId={42}
 				onClose={onClose}
@@ -70,7 +70,7 @@ describe('PromoteControlModal', () => {
 			})
 		);
 		render(
-			<PromoteControlModal
+			<CreateSequenceForRing
 				ringNo="ABC1234"
 				viewedGroupId={1}
 				onClose={onClose}
@@ -91,7 +91,7 @@ describe('PromoteControlModal', () => {
 	it('closes without calling the action when Cancel is clicked', () => {
 		const onClose = vi.fn();
 		render(
-			<PromoteControlModal
+			<CreateSequenceForRing
 				ringNo="ABC1234"
 				viewedGroupId={1}
 				onClose={onClose}

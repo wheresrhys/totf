@@ -1,8 +1,8 @@
 import { SessionHistoryCalendar } from '@/app/components/SessionHistoryCalendar';
 import {
-	BootstrapPageData,
+	BootstrapPage,
 	type DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
+} from '@/app/components/layout/BootstrapPage';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { ViewedGroup } from '@/lib/group-slug';
@@ -49,7 +49,7 @@ export default async function SessionsPage({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<SessionWithEncountersCount[]>
+		<BootstrapPage<SessionWithEncountersCount[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['sessions']}
 			dataFetcher={fetchAllSessions}

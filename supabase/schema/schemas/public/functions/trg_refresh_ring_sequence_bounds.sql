@@ -36,8 +36,8 @@ BEGIN
   numeric_width := length(numeric_str);
   ring_index := numeric_str::integer;
 
-  -- Step 1: this ring's decade start — greatest number ending in 1 that is < ring_index.
-  start_index := 10 * floor((ring_index - 2)::numeric / 10)::int + 1;
+  -- Step 1: this ring's decade start — greatest number ending in 1 that is <= ring_index.
+  start_index := 10 * floor((ring_index - 1)::numeric / 10)::int + 1;
   start_ring := alpha_prefix || lpad(start_index::text, numeric_width, '0');
 
   -- Lock the referenced sequence row so concurrent assignments serialise on it.

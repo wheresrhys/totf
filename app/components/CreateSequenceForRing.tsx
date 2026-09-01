@@ -6,19 +6,20 @@ import {
 	type PromoteControlState
 } from '@/app/actions/ring-sequences';
 
-// Leading-alpha prefix of a ring number, matching the server action's
-// `/^[A-Za-z]+/` derivation, so the modal names the same prefix the promote
-// will actually track.
+// First 3 characters of a ring number, matching the server action's prefix
+// derivation, so the modal names the same prefix the promote will actually
+// track.
 function ringPrefix(ringNo: string): string {
-	return (ringNo.match(/^[A-Za-z]+/) || [''])[0];
+	return ringNo.slice(0, 3);
 }
 
 // Confirmation modal for promoting a control ring to a tracked ring sequence.
 // Mirrors `RingSequenceEditModal` / `LoginModal`: a `useActionState`-driven
 // form with hidden inputs, a spinner while pending, and an inline error that
-// keeps the modal open on failure. On success it refreshes the route (so the
-// now-tracked ring drops off the controls list) and closes.
-export function PromoteControlModal({
+// keeps the modal open on failure. On success it refreshes the route (so
+// every control sharing this prefix — not just the clicked ring — drops off
+// the controls list) and closes.
+export function CreateSequenceForRing({
 	ringNo,
 	viewedGroupId,
 	onClose
@@ -50,8 +51,9 @@ export function PromoteControlModal({
 				<p className="mb-4">
 					Promote ring <span className="font-bold">{ringNo}</span> to a tracked
 					ring sequence for prefix{' '}
-					<span className="font-bold">{ringPrefix(ringNo)}</span>? It will no
-					longer appear as a control.
+					<span className="font-bold">{ringPrefix(ringNo)}</span>? Every
+					control with this prefix will move to the sequence and no longer
+					appear here.
 				</p>
 				<form action={action} className="flex flex-col gap-4">
 					<input type="hidden" name="ring_no" value={ringNo} />

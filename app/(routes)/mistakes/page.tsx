@@ -3,9 +3,9 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { ViewedGroup } from '@/lib/group-slug';
 import {
-	BootstrapPageData,
+	BootstrapPage,
 	DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
+} from '@/app/components/layout/BootstrapPage';
 import {
 	PageWrapper,
 	PrimaryHeading
@@ -36,7 +36,7 @@ export default async function MistakesPage({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<DiscrepenciesResult[]>
+		<BootstrapPage<DiscrepenciesResult[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['mistakes']}
 			dataFetcher={fetchMistakes}

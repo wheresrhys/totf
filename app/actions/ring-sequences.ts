@@ -197,13 +197,17 @@ type PromoteSupabaseClient = Awaited<
 	ReturnType<typeof getAuthenticatedSupabaseClient>
 >;
 
-// Returns the id of the group's RingSequences row for `prefix`, creating a
-// promoted (`owned_by_group = false`, `size = NULL`) row if none exists yet.
-// Reuses an existing row untouched — never overwriting its `owned_by_group` or
-// `size`, which the importer or a prior manual edit may have set. RLS scopes
-// every query to the caller's group; the explicit `ringing_group_id` filter is
-// defence-in-depth.
-async function findOrCreateRingSequence(
+// Finds or creates the group's RingSequences row for `prefix` (a promoted row
+// is `owned_by_group = false`, `size = NULL` if newly created — reusing an
+// existing row untouched, never overwriting its `owned_by_group` or `size`,
+// which the importer or a prior manual edit may have set), then links every
+// currently-untracked bird sharing that prefix to it via
+// `Birds.ring_sequence_id` (firing the bounds trigger on each write). Every
+// control sharing the prefix was promoted together — not just the ring that
+// triggered the promote — since they're indistinguishable once tracked. RLS
+// scopes every query to the caller's group; the explicit `ringing_group_id`
+// filter is defence-in-depth.
+async function findOrCreateRingSequenceAndLinkBirds(
 	supabase: PromoteSupabaseClient,
 	prefix: string,
 	groupId: number
@@ -215,44 +219,64 @@ async function findOrCreateRingSequence(
 		.eq('ringing_group_id', groupId)
 		.maybeSingle()
 		.then(catchSupabaseErrors)) as { id: number } | null;
-	if (existing?.id) return existing.id;
 
-	const { data: inserted, error } = await supabase
-		.from('RingSequences')
-		.insert({
-			prefix,
-			ringing_group_id: groupId,
-			owned_by_group: false,
-			size: null
-		})
-		.select('id')
-		.single();
+	let sequenceId: number;
+	if (existing?.id) {
+		sequenceId = existing.id;
+	} else {
+		const { data: inserted, error } = await supabase
+			.from('RingSequences')
+			.insert({
+				prefix,
+				ringing_group_id: groupId,
+				owned_by_group: false,
+				size: null
+			})
+			.select('id')
+			.single();
 
-	if (error) {
-		// A concurrent promote for the same prefix won the race and inserted the
-		// row first — re-select and reuse it rather than surfacing a hard error.
-		if (error.code === UNIQUE_VIOLATION) {
-			const raced = (await supabase
-				.from('RingSequences')
-				.select('id')
-				.eq('prefix', prefix)
-				.eq('ringing_group_id', groupId)
-				.single()
-				.then(catchSupabaseErrors)) as { id: number } | null;
-			if (raced?.id) return raced.id;
+		if (error) {
+			// A concurrent promote for the same prefix won the race and inserted
+			// the row first — re-select and reuse it rather than surfacing a hard
+			// error.
+			if (error.code === UNIQUE_VIOLATION) {
+				const raced = (await supabase
+					.from('RingSequences')
+					.select('id')
+					.eq('prefix', prefix)
+					.eq('ringing_group_id', groupId)
+					.single()
+					.then(catchSupabaseErrors)) as { id: number } | null;
+				if (!raced?.id) {
+					throw new Error(`Failed to create ring sequence: ${error.message}`);
+				}
+				sequenceId = raced.id;
+			} else {
+				throw new Error(`Failed to create ring sequence: ${error.message}`);
+			}
+		} else {
+			sequenceId = inserted!.id;
 		}
-		throw new Error(`Failed to create ring sequence: ${error.message}`);
 	}
 
-	return inserted!.id;
+	// Link every bird sharing this prefix that isn't tracked by a sequence yet.
+	// RLS scopes the update to birds visible to the caller's group.
+	await supabase
+		.from('Birds')
+		.update({ ring_sequence_id: sequenceId })
+		.ilike('ring_no', `${prefix}%`)
+		.is('ring_sequence_id', null)
+		.then(catchSupabaseErrors);
+
+	return sequenceId;
 }
 
 // Promotes a control ring to a tracked ring sequence: derives the ring's
-// leading-alpha prefix, finds or creates an `owned_by_group = false`
-// RingSequences row for it, and links the bird via `Birds.ring_sequence_id`
-// (firing the bounds trigger). The updated RPC (issue #661) then drops the ring
-// from `/controls` on the next load. Reads `ring_no` / `viewed_group_id` from
-// the submitted form, matching `updateRingSequence`'s `useActionState` shape.
+// 3-character prefix and finds-or-creates the RingSequences row for it,
+// linking every control sharing that prefix. The updated RPC (issue #661)
+// then drops them all from `/controls` on the next load. Reads `ring_no` /
+// `viewed_group_id` from the submitted form, matching `updateRingSequence`'s
+// `useActionState` shape.
 export async function promoteControlToSequence(
 	_prevState: PromoteControlState,
 	formData: FormData
@@ -267,30 +291,11 @@ export async function promoteControlToSequence(
 		return { success: false, error: 'Missing group' };
 	}
 
-	const prefix = (ringNo.match(/^[A-Za-z]+/) || [''])[0];
-	if (!prefix) {
-		return {
-			success: false,
-			error: `Could not derive a prefix from ring "${ringNo}"`
-		};
-	}
+	const prefix = ringNo.slice(0, 3);
 
 	try {
 		const supabase = await getAuthenticatedSupabaseClient();
-		const sequenceId = await findOrCreateRingSequence(
-			supabase,
-			prefix,
-			viewedGroupId
-		);
-
-		// Link the bird to the sequence. RLS scopes the update to birds visible to
-		// the caller's group; the write fires the bounds trigger, which populates
-		// first_ring/last_ring from this bird.
-		await supabase
-			.from('Birds')
-			.update({ ring_sequence_id: sequenceId })
-			.eq('ring_no', ringNo)
-			.then(catchSupabaseErrors);
+		await findOrCreateRingSequenceAndLinkBirds(supabase, prefix, viewedGroupId);
 
 		return { success: true };
 	} catch (error) {

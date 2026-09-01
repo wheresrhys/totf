@@ -9,8 +9,15 @@ export type ExclusiveLabel = (typeof EXCLUSIVE_LABELS)[number];
 export const MODEL_LABELS = ['opus', 'sonnet', 'fable'] as const;
 export type ModelLabel = (typeof MODEL_LABELS)[number];
 
+/** Priority-override label: a `next`-labelled ready ticket ranks above every ticket without it. */
+export const NEXT_LABEL = 'next';
+
 export function getExclusiveLabel(labels: string[]): ExclusiveLabel | undefined {
 	return labels.find((label): label is ExclusiveLabel => (EXCLUSIVE_LABELS as readonly string[]).includes(label));
+}
+
+export function hasNextLabel(labels: string[]): boolean {
+	return labels.includes(NEXT_LABEL);
 }
 
 export function getModelLabel(labels: string[]): ModelLabel | null {
@@ -136,7 +143,15 @@ export function rankMaintenanceCandidates(candidates: MaintenanceCandidate[]): M
 }
 
 export function rankTicketCandidates(candidates: TicketCandidate[]): TicketCandidate[] {
-	return [...candidates].sort((a, b) => b.blockingCount - a.blockingCount || a.number - b.number);
+	// `next` is a priority override: any ticket carrying it ranks above every ticket without it,
+	// regardless of blockingCount. Within each group the existing tiebreak holds — blockingCount
+	// descending, then issue number ascending.
+	return [...candidates].sort(
+		(a, b) =>
+			Number(hasNextLabel(b.labels)) - Number(hasNextLabel(a.labels)) ||
+			b.blockingCount - a.blockingCount ||
+			a.number - b.number
+	);
 }
 
 export interface AllocationResult {

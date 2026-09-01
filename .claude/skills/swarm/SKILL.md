@@ -230,9 +230,11 @@ ticket the user hasn't answered for is never spawned — it simply resurfaces on
 ## 2. Select tickets (fill the remaining budget)
 
 `swarm_plan_batch`'s `ticketsToImplement` is already unblocked (no open `blockedBy` entry),
-not in-flight (no existing branch or open linked PR), solo-run-filtered, ranked by `blockingCount`
-descending then issue number ascending, and truncated to the free slots left after §1's
-allocation — use it directly.
+not in-flight (no existing branch or open linked PR), solo-run-filtered, ranked, and truncated to
+the free slots left after §1's allocation — use it directly. Ranking is a priority override:
+any ticket also carrying the `next` label ranks above every ticket without it, regardless of
+`blockingCount` (a manual "do this one first" flag); within each group the tiebreak is
+`blockingCount` descending then issue number ascending.
 
 If `drained` is `true`, neither §1 nor §2 found eligible work and no workers are running: report
 that and go idle (do not exit the loop — a later completion or new PR can refill).

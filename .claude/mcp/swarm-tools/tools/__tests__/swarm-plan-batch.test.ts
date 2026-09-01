@@ -473,6 +473,24 @@ describe('rankTicketCandidates', () => {
 		expect(rankTicketCandidates(candidates).map((c) => c.number)).toEqual([2, 1]);
 	});
 
+	// Structure — the `next` priority override beats blockingCount.
+	it('ranks a next-labelled ticket above a non-next ticket with higher blockingCount', () => {
+		const candidates: TicketCandidate[] = [
+			{ number: 1, title: 'high-blocking', labels: ['ready'], model: 'sonnet', blockingCount: 5 },
+			{ number: 2, title: 'next', labels: ['ready', 'next'], model: 'sonnet', blockingCount: 0 },
+		];
+		expect(rankTicketCandidates(candidates).map((c) => c.number)).toEqual([2, 1]);
+	});
+
+	it('keeps blockingCount-then-number tiebreak within the next group', () => {
+		const candidates: TicketCandidate[] = [
+			{ number: 30, title: 'next-low', labels: ['next'], model: 'sonnet', blockingCount: 1 },
+			{ number: 10, title: 'next-high', labels: ['next'], model: 'sonnet', blockingCount: 3 },
+			{ number: 20, title: 'next-low-b', labels: ['next'], model: 'sonnet', blockingCount: 1 },
+		];
+		expect(rankTicketCandidates(candidates).map((c) => c.number)).toEqual([10, 20, 30]);
+	});
+
 	// Edge
 	it('tie-breaks on lowest issue number', () => {
 		const candidates: TicketCandidate[] = [

@@ -1,16 +1,25 @@
-'use client';
-import { useState } from 'react';
-import type { RingSequenceControlRow } from '@/app/actions/ring-sequences';
+import type { DefaultPageParams } from '@/app/components/layout/BootstrapPage';
+import {
+	fetchRingSequenceControls,
+	type RingSequenceControlRow
+} from '@/app/actions/ring-sequences';
 import type { ViewedGroup } from '@/lib/group-slug';
 import {
 	InlineTable,
 	PageWrapper,
 	PrimaryHeading
-} from './shared/DesignSystem';
-import { NoPrefetchLink } from './shared/NoPrefetchLink';
-import { PromoteControlModal } from './PromoteControlModal';
+} from '@/app/components/shared/DesignSystem';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+import { PromoteControlButton } from '@/app/components/PromoteControlButton';
 
-export function ControlsPage({
+export async function fetchControlsPageContent(
+	_: DefaultPageParams,
+	viewedGroupId: number
+): Promise<RingSequenceControlRow[] | null> {
+	return fetchRingSequenceControls(viewedGroupId);
+}
+
+export function ControlsPageContent({
 	data,
 	viewedGroup
 }: {
@@ -18,9 +27,6 @@ export function ControlsPage({
 	data: RingSequenceControlRow[];
 	viewedGroup: ViewedGroup;
 }) {
-	// The control ring currently pending promotion (drives the modal), or null.
-	const [promotingRingNo, setPromotingRingNo] = useState<string | null>(null);
-
 	if (!data || data.length === 0) {
 		return (
 			<PageWrapper>
@@ -53,26 +59,15 @@ export function ControlsPage({
 							<td>{row.species_name}</td>
 							<td>{row.first_date}</td>
 							<td>
-								<button
-									type="button"
-									className="btn btn-xs btn-outline"
-									data-testid={`promote-control-${row.ring_no}`}
-									onClick={() => setPromotingRingNo(row.ring_no)}
-								>
-									Promote to sequence
-								</button>
+								<PromoteControlButton
+									ringNo={row.ring_no}
+									viewedGroupId={viewedGroup.id}
+								/>
 							</td>
 						</tr>
 					))}
 				</tbody>
 			</InlineTable>
-			{promotingRingNo && (
-				<PromoteControlModal
-					ringNo={promotingRingNo}
-					viewedGroupId={viewedGroup.id}
-					onClose={() => setPromotingRingNo(null)}
-				/>
-			)}
 		</PageWrapper>
 	);
 }

@@ -156,6 +156,8 @@ function makeBuilder(result: QueryResult) {
 		insert: vi.fn(() => builder),
 		update: vi.fn(() => builder),
 		eq: vi.fn(() => builder),
+		ilike: vi.fn(() => builder),
+		is: vi.fn(() => builder),
 		maybeSingle: vi.fn(() => Promise.resolve(result)),
 		single: vi.fn(() => Promise.resolve(result)),
 		then: (resolve: (value: QueryResult) => unknown) =>
@@ -192,7 +194,8 @@ describe('promoteControlToSequence', () => {
 			size: null
 		});
 		expect(birds.update).toHaveBeenCalledWith({ ring_sequence_id: 99 });
-		expect(birds.eq).toHaveBeenCalledWith('ring_no', 'ABC1234');
+		expect(birds.ilike).toHaveBeenCalledWith('ring_no', 'ABC%');
+		expect(birds.is).toHaveBeenCalledWith('ring_sequence_id', null);
 		expect(result).toEqual({ success: true });
 	});
 
@@ -214,6 +217,8 @@ describe('promoteControlToSequence', () => {
 		expect(from).toHaveBeenNthCalledWith(2, 'Birds');
 		expect(birds.insert).not.toHaveBeenCalled();
 		expect(birds.update).toHaveBeenCalledWith({ ring_sequence_id: 55 });
+		expect(birds.ilike).toHaveBeenCalledWith('ring_no', 'ABC%');
+		expect(birds.is).toHaveBeenCalledWith('ring_sequence_id', null);
 		expect(result).toEqual({ success: true });
 	});
 

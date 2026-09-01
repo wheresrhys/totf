@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
 import {
 	PageWrapper,
@@ -10,7 +10,7 @@ import { format as formatDate } from 'date-fns';
 type PageParams = { date: string };
 
 // No session data exists to fetch yet — this page derives its heading
-// entirely from the date route param. BootstrapPageData's LoadWithData
+// entirely from the date route param. BootstrapPage's LoadWithData
 // calls notFound() when data is falsy, so this stub must stay truthy.
 async function fetchSessionTempData(): Promise<{ loaded: true }> {
 	return { loaded: true };
@@ -36,7 +36,7 @@ export default async function SessionTempPage({ params }: PageProps) {
 	}
 	const viewedGroup = { id: viewedGroupId, slug: groupSlug };
 	return (
-		<BootstrapPageData<{ loaded: true }, PageProps, PageParams>
+		<BootstrapPage<{ loaded: true }, PageProps, PageParams>
 			viewedGroup={viewedGroup}
 			getParams={async () => ({ date })}
 			getCacheKeys={() => ['session-temp', date]}

@@ -1,7 +1,7 @@
 import {
-	BootstrapPageData,
+	BootstrapPage,
 	type DefaultPageParams
-} from '@/app/components/layout/BootstrapPageData';
+} from '@/app/components/layout/BootstrapPage';
 import {
 	PageWrapper,
 	PrimaryHeading,
@@ -133,7 +133,7 @@ export default function PayOffPage({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<PayOffStatsData>
+		<BootstrapPage<PayOffStatsData>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['sessions', 'pay-off']}
 			dataFetcher={fetchPayOffPageData}

@@ -1,4 +1,4 @@
-import { BootstrapPageData } from '@/app/components/layout/BootstrapPageData';
+import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { fetchRingSequences } from '@/app/actions/ring-sequences';
 import type { RingSequenceRow } from '@/app/models/db';
 import { RingSequencesPage } from '@/app/components/RingSequencesPage';
@@ -17,7 +17,7 @@ export default async function RingSequencesRoute({
 	viewedGroup?: ViewedGroup;
 } = {}) {
 	return (
-		<BootstrapPageData<RingSequenceRow[]>
+		<BootstrapPage<RingSequenceRow[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['ring-sequences']}
 			dataFetcher={dataFetcher}
