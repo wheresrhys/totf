@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeHighlighter } from '@/app/components/MistakesTable';
+import { makeHighlighter } from '@/app/components/pages/mistakes/MistakesTable';
 import type { EncounterOfBird } from '@/app/models/bird';
 
 function makeEncounters(wingLengths: (number | null)[]): EncounterOfBird[] {

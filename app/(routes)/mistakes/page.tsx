@@ -6,13 +6,9 @@ import {
 	BootstrapPage,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
-import { MistakesTable } from '@/app/components/MistakesTable';
+import { MistakesPageContent } from './PageContent';
 
-export async function fetchMistakes(
+export async function fetchMistakesPageContent(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<DiscrepenciesResult[]> {
@@ -22,14 +18,6 @@ export async function fetchMistakes(
 		.then(catchSupabaseErrors) as Promise<DiscrepenciesResult[]>;
 }
 
-function ListMistakes({ data }: { data: DiscrepenciesResult[] }) {
-	return (
-		<PageWrapper>
-			<PrimaryHeading>Mistakes</PrimaryHeading>
-			<MistakesTable mistakes={data} />
-		</PageWrapper>
-	);
-}
 export default async function MistakesPage({
 	viewedGroup
 }: {
@@ -39,8 +27,8 @@ export default async function MistakesPage({
 		<BootstrapPage<DiscrepenciesResult[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['mistakes']}
-			dataFetcher={fetchMistakes}
-			PageComponent={ListMistakes}
+			dataFetcher={fetchMistakesPageContent}
+			PageComponent={MistakesPageContent}
 		/>
 	);
 }
