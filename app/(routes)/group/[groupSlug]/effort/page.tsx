@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
-import PayOffPage from '@/app/(routes)/effort/page';
+import EffortPage from '@/app/(routes)/effort/page';
 
-export default async function CrossGroupEffortPage({
+export default async function GroupEffortPage({
 	params
 }: {
 	params: Promise<{ groupSlug: string }>;
@@ -13,5 +13,5 @@ export default async function CrossGroupEffortPage({
 		notFound();
 	}
 	const viewedGroup = { id: viewedGroupId, slug: groupSlug };
-	return <PayOffPage viewedGroup={viewedGroup} />;
+	return <EffortPage viewedGroup={viewedGroup} />;
 }
