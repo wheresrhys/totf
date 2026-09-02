@@ -1,12 +1,40 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { AccordionItem } from './shared/Accordion';
-import { StatOutput } from './shared/StatOutput';
+import {
+	PageWrapper,
+	PrimaryHeading,
+	SecondaryHeading,
+	BoxyList
+} from '@/app/components/shared/DesignSystem';
+import { AccordionItem } from '@/app/components/shared/Accordion';
+import {
+	StatOutput,
+	type TemporalUnit
+} from '@/app/components/shared/StatOutput';
 import type { TopPeriodsResult, TopSpeciesResult } from '@/app/models/db';
-import { getTopStats } from '@/app/actions/top-performers';
-import type { TemporalUnit } from './shared/StatOutput';
-import type { AccordionItemModel } from './StatsAccordion';
+import {
+	getTopStats,
+	type UserTopStatsArgs
+} from '@/app/actions/top-performers';
 import type { ViewedGroup } from '@/lib/group-slug';
+
+export type StatConfig = {
+	id: string;
+	category: string;
+	unit: string;
+	bySpecies?: boolean;
+	dataArguments: UserTopStatsArgs;
+};
+
+export type AccordionItemModel = {
+	definition: StatConfig;
+	data: TopPeriodsResult[] | TopSpeciesResult[];
+};
+
+export type StatsAccordionModel = {
+	heading: string;
+	stats: AccordionItemModel[];
+};
 
 type AccordionItemModelWithGroupId = AccordionItemModel & {
 	viewedGroup: ViewedGroup;
@@ -133,5 +161,53 @@ export function StatsAccordionItem({
 			onToggle={onToggle}
 			expandedId={expanded}
 		/>
+	);
+}
+
+function StatsAccordion({
+	data,
+	viewedGroup
+}: {
+	data: StatsAccordionModel[];
+	viewedGroup: ViewedGroup;
+}) {
+	const [expanded, setExpanded] = useState<string | false>(false);
+	useEffect(() => {
+		setExpanded(false);
+	}, [viewedGroup.id]);
+	return (
+		<>
+			{data.map(({ heading, stats }) => (
+				<div data-testid="stats-accordion-group" key={heading}>
+					<SecondaryHeading>{heading}</SecondaryHeading>
+					<BoxyList>
+						{stats.map((item) => (
+							<StatsAccordionItem
+								key={`${viewedGroup.id}-${item.definition.id}`}
+								item={item}
+								viewedGroup={viewedGroup}
+								expanded={expanded}
+								onToggle={setExpanded}
+							/>
+						))}
+					</BoxyList>
+				</div>
+			))}
+		</>
+	);
+}
+
+export function RecordsPageContent({
+	data,
+	viewedGroup
+}: {
+	data: StatsAccordionModel[];
+	viewedGroup: ViewedGroup;
+}) {
+	return (
+		<PageWrapper>
+			<PrimaryHeading>Records</PrimaryHeading>
+			<StatsAccordion data={data} viewedGroup={viewedGroup} />
+		</PageWrapper>
 	);
 }
