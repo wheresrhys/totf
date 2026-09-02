@@ -167,6 +167,7 @@ async function findOrCreateRingSequenceAndLinkBirds(
 		.from('RingSequences')
 		.select('id')
 		.eq('prefix', prefix)
+		// TODO this shoudl also probably check against first and last values
 		.eq('ringing_group_id', groupId)
 		.maybeSingle()
 		.then(catchSupabaseErrors)) as { id: number } | null;
