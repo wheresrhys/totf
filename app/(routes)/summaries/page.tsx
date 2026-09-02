@@ -17,7 +17,7 @@ import type { ViewedGroup } from '@/lib/group-slug';
 
 export type PageData = { periods: AvailablePeriod[] };
 
-export async function fetchAvailablePeriods(
+export async function fetchSummariesPageContent(
 	_params: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
@@ -29,7 +29,7 @@ function monthLabel(year: string, month: string): string {
 	return format(new Date(Number(year), Number(month) - 1, 1), 'LLLL');
 }
 
-function StatsNav({ data }: { data: PageData }) {
+function SummariesPageContent({ data }: { data: PageData }) {
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Stats</PrimaryHeading>
@@ -63,7 +63,7 @@ function StatsNav({ data }: { data: PageData }) {
 	);
 }
 
-export default async function StatsPage({
+export default async function SummariesPage({
 	viewedGroup
 }: {
 	viewedGroup?: ViewedGroup;
@@ -72,8 +72,8 @@ export default async function StatsPage({
 		<BootstrapPage<PageData>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['stats']}
-			dataFetcher={fetchAvailablePeriods}
-			PageComponent={StatsNav}
+			dataFetcher={fetchSummariesPageContent}
+			PageComponent={SummariesPageContent}
 		/>
 	);
 }

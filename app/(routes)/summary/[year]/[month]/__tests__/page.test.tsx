@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import Page, { fetchYearMonthSummaryData } from '../page';
+import Page, { fetchSummaryYearMonthPageContent } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
@@ -67,12 +67,12 @@ describe('/summary/[year]/[month]', () => {
 	});
 
 	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
-		await fetchYearMonthSummaryData({ year: '2026', month: '08' }, 1);
+		await fetchSummaryYearMonthPageContent({ year: '2026', month: '08' }, 1);
 		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
 
 	it("returns the month's first and last calendar day as the lazy species-fetch bounds", async () => {
-		const data = await fetchYearMonthSummaryData(
+		const data = await fetchSummaryYearMonthPageContent(
 			{ year: '2026', month: '08' },
 			1
 		);
@@ -81,7 +81,7 @@ describe('/summary/[year]/[month]', () => {
 	});
 
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
-		await fetchYearMonthSummaryData({ year: '2026', month: '08' }, 1);
+		await fetchSummaryYearMonthPageContent({ year: '2026', month: '08' }, 1);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
 			1,
 			'2026-08-01',
@@ -90,7 +90,7 @@ describe('/summary/[year]/[month]', () => {
 	});
 
 	it('calls fetchSummaryStats with the correct bounds for a shorter month (April)', async () => {
-		await fetchYearMonthSummaryData({ year: '2026', month: '04' }, 1);
+		await fetchSummaryYearMonthPageContent({ year: '2026', month: '04' }, 1);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
 			1,
 			'2026-04-01',
@@ -121,7 +121,7 @@ describe('/summary/[year]/[month]', () => {
 	});
 
 	it('computes correct month bounds for December (year-end month)', async () => {
-		const data = await fetchYearMonthSummaryData(
+		const data = await fetchSummaryYearMonthPageContent(
 			{ year: '2026', month: '12' },
 			1
 		);
@@ -129,8 +129,8 @@ describe('/summary/[year]/[month]', () => {
 		expect(data.toDate).toBe('2026-12-31');
 	});
 
-	it("fetchYearMonthSummaryData requests per-day period totals scoped to the month's bounds", async () => {
-		await fetchYearMonthSummaryData({ year: '2026', month: '08' }, 1);
+	it("fetchSummaryYearMonthPageContent requests per-day period totals scoped to the month's bounds", async () => {
+		await fetchSummaryYearMonthPageContent({ year: '2026', month: '08' }, 1);
 		expect(fetchPeriodTotalsMock).toHaveBeenCalledWith(
 			1,
 			'day',

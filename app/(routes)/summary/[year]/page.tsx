@@ -9,7 +9,7 @@ import {
 	buildMonthTotalsRows,
 	type MonthTotalsRow
 } from '@/app/models/month-totals';
-import { SummaryPage as SummaryPageContent } from '../_shared';
+import { SummaryPageContent } from '../PageContent';
 
 export type PageParams = { year: string };
 type PageProps = { params: Promise<PageParams> };
@@ -22,7 +22,7 @@ export type PageData = {
 	toDate: string;
 };
 
-export async function fetchYearSummaryData(
+export async function fetchSummaryYearPageContent(
 	{ year }: PageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
@@ -69,7 +69,7 @@ export default async function YearSummaryPage(
 			pageProps={props}
 			viewedGroup={props.viewedGroup}
 			getCacheKeys={(params: PageParams) => ['summary', params.year]}
-			dataFetcher={fetchYearSummaryData}
+			dataFetcher={fetchSummaryYearPageContent}
 			PageComponent={YearSummary}
 		/>
 	);
