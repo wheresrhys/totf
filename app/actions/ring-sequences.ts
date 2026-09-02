@@ -1,6 +1,10 @@
 'use server';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
+import {
+	groupRingNosByPrefix,
+	type UnassignedImportPrefix
+} from '@/app/models/ring-sequences';
 import type { RingSequenceRow, RingSize } from '@/app/models/db';
 
 export type RingSequenceControlRow = {
@@ -53,6 +57,50 @@ export async function fetchRingSequences(
 		.eq('ringing_group_id', viewedGroupId)
 		.order('prefix')
 		.then(catchSupabaseErrors) as Promise<RingSequenceRow[] | null>;
+}
+
+// Lists the group's first-3-character ring prefixes whose birds are newly ringed
+// (`record_type = 'N'`) but not yet assigned to any ring sequence — the raw
+// material the Ring Sequences page offers for sequence creation (issue #697).
+// An `!inner` join to `Encounters` restricts the result to birds with at least
+// one `N` encounter, and `contains('ringing_group_ids', [groupId])` scopes to
+// this group's birds (RLS on Birds is only partially implemented — see issue
+// #149 — and a bird can be shared across groups, so the group id must appear in
+// the array). A separate read of the group's `RingSequences_Birds` links then
+// drops any bird already assigned to a sequence (assignment lives in that
+// per-group link table now, not a `Birds.ring_sequence_id` column — see #703).
+// Grouping the survivors into prefixes is the pure `groupRingNosByPrefix` model
+// function.
+export async function fetchUnassignedImportPrefixes(
+	viewedGroupId: number
+): Promise<UnassignedImportPrefix[] | null> {
+	const supabase = await getAuthenticatedSupabaseClient();
+
+	const birds = (await supabase
+		.from('Birds')
+		.select('id, ring_no, encounters:Encounters!inner(record_type)')
+		.eq('encounters.record_type', 'N')
+		.contains('ringing_group_ids', [viewedGroupId])
+		.then(catchSupabaseErrors)) as { id: number; ring_no: string }[] | null;
+
+	if (birds === null) return null;
+	if (birds.length === 0) return [];
+
+	const assigned = (await supabase
+		.from('RingSequences_Birds')
+		.select('bird_id')
+		.eq('ringing_group_id', viewedGroupId)
+		.in(
+			'bird_id',
+			birds.map(({ id }) => id)
+		)
+		.then(catchSupabaseErrors)) as { bird_id: number }[] | null;
+
+	if (assigned === null) return null;
+	const assignedBirdIds = new Set(assigned.map(({ bird_id }) => bird_id));
+
+	const unassigned = birds.filter(({ id }) => !assignedBirdIds.has(id));
+	return groupRingNosByPrefix(unassigned);
 }
 
 // Birds belonging to one ring sequence: newly-ringed birds (`record_type = 'N'`)
@@ -145,24 +193,37 @@ type PromoteSupabaseClient = Awaited<
 	ReturnType<typeof getAuthenticatedSupabaseClient>
 >;
 
-// Finds or creates the group's RingSequences row for `prefix` (a promoted row
-// is `owned_by_group = false`, `size = NULL` if newly created — reusing an
-// existing row untouched, never overwriting its `owned_by_group` or `size`,
-// which the importer or a prior manual edit may have set), then links every
-// currently-untracked bird sharing that prefix to it via
-// `Birds.ring_sequence_id`. Every control sharing the prefix was promoted
-// together — not just the ring that triggered the promote — since they're
-// indistinguishable once tracked. `first_ring`/`last_ring` are deliberately
-// left untouched here (there is no more bounds-widening trigger — see #701 —
-// and authoring them is the ring-sequences UI's job, not this action's), so a
-// freshly-created row's numeric range stays null until set there. RLS scopes
-// every query to the caller's group; the explicit `ringing_group_id` filter is
-// defence-in-depth.
+// Options controlling how a newly-created RingSequences row is shaped. Both call
+// sites reuse an existing row untouched (never overwriting its `owned_by_group`,
+// `size`, or bounds — the importer or a prior manual edit may have set them);
+// these only apply when a row is inserted:
+//   - promote-control (issue #661): a foreign sequence being tracked, so
+//     `owned_by_group = false` and no bounds (defaults below).
+//   - create-from-import-prefix (issue #697): the group's own newly-ringed
+//     birds, so `owned_by_group = true` with UI-suggested `first_ring`/
+//     `last_ring` bounds.
+type CreateSequenceOptions = {
+	ownedByGroup?: boolean;
+	firstRing?: string | null;
+	lastRing?: string | null;
+};
+
+// Finds or creates the group's RingSequences row for `prefix`, then links every
+// currently-untracked bird sharing that prefix to it via the per-group
+// `RingSequences_Birds` link table. Every bird sharing the prefix is linked
+// together — not just the one that triggered the action — since they're
+// indistinguishable once tracked. Reusing an existing row never overwrites its
+// `owned_by_group`, `size`, or bounds. There is no more bounds-widening trigger
+// (see #701), so a newly-created row's bounds are whatever `options` supplies
+// (null unless the caller passes them). RLS scopes every query to the caller's
+// group; the explicit `ringing_group_id` filter is defence-in-depth.
 async function findOrCreateRingSequenceAndLinkBirds(
 	supabase: PromoteSupabaseClient,
 	prefix: string,
-	groupId: number
+	groupId: number,
+	options: CreateSequenceOptions = {}
 ): Promise<number> {
+	const { ownedByGroup = false, firstRing = null, lastRing = null } = options;
 	const existing = (await supabase
 		.from('RingSequences')
 		.select('id')
@@ -181,8 +242,12 @@ async function findOrCreateRingSequenceAndLinkBirds(
 			.insert({
 				prefix,
 				ringing_group_id: groupId,
-				owned_by_group: false,
-				size: null
+				owned_by_group: ownedByGroup,
+				size: null,
+				// Only include the bounds columns when the caller supplied them, so
+				// the promote path's insert payload stays exactly as it was.
+				...(firstRing !== null ? { first_ring: firstRing } : {}),
+				...(lastRing !== null ? { last_ring: lastRing } : {})
 			})
 			.select('id')
 			.single();
@@ -273,6 +338,57 @@ export async function promoteControlToSequence(
 	try {
 		const supabase = await getAuthenticatedSupabaseClient();
 		await findOrCreateRingSequenceAndLinkBirds(supabase, prefix, viewedGroupId);
+
+		return { success: true };
+	} catch (error) {
+		return { success: false, error: (error as Error).message };
+	}
+}
+
+// Result shape for `createSequenceFromImportPrefix`, mirroring the discriminated
+// unions above so the modal reacts without an exception crossing the boundary.
+export type CreateSequenceFromPrefixState =
+	| { success: true }
+	| { success: false; error: string }
+	| null;
+
+// Creates a group-owned ring sequence for an unassigned import prefix (issue
+// #697) and links every currently-untracked bird sharing it. Unlike
+// `promoteControlToSequence`, the sequence is `owned_by_group = true` (these are
+// the group's own newly-ringed birds, not a foreign control) and carries the
+// `first_ring`/`last_ring` bounds the ring-sequences UI suggested (and the user
+// may have adjusted). `fetchUnassignedImportPrefixes` drops the prefix on the
+// next load once its birds are linked. Reads `prefix` / `first_ring` /
+// `last_ring` / `viewed_group_id` from the submitted form, matching the
+// `useActionState` shape of the other write actions.
+export async function createSequenceFromImportPrefix(
+	_prevState: CreateSequenceFromPrefixState,
+	formData: FormData
+): Promise<CreateSequenceFromPrefixState> {
+	const prefix = (formData.get('prefix') as string)?.trim();
+	const firstRing = (formData.get('first_ring') as string)?.trim() || null;
+	const lastRing = (formData.get('last_ring') as string)?.trim() || null;
+	const viewedGroupId = Number(formData.get('viewed_group_id'));
+
+	if (!prefix) {
+		return { success: false, error: 'Missing prefix' };
+	}
+	if (!viewedGroupId) {
+		return { success: false, error: 'Missing group' };
+	}
+
+	try {
+		const supabase = await getAuthenticatedSupabaseClient();
+		await findOrCreateRingSequenceAndLinkBirds(
+			supabase,
+			prefix,
+			viewedGroupId,
+			{
+				ownedByGroup: true,
+				firstRing,
+				lastRing
+			}
+		);
 
 		return { success: true };
 	} catch (error) {

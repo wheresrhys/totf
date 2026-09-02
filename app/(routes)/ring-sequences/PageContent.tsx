@@ -3,8 +3,10 @@ import { useState } from 'react';
 import type { RingSequenceRow } from '@/app/models/db';
 import {
 	groupRingSequencesBySize,
-	type RingSequenceSizeGroup
+	type RingSequenceSizeGroup,
+	type UnassignedImportPrefix
 } from '@/app/models/ring-sequences';
+import type { ViewedGroup } from '@/lib/group-slug';
 import { AccordionItem } from '@/app/components/shared/Accordion';
 import {
 	BoxyList,
@@ -14,6 +16,14 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { RingSequenceDetail } from '@/app/components/pages/ring-sequences/RingSequenceDetail';
 import { RingSequenceEditModal } from '@/app/components/RingSequenceEditModal';
+import { CreateSequenceFromPrefix } from '@/app/components/pages/ring-sequences/CreateSequenceFromPrefix';
+
+// Composite payload the Ring Sequences page renders: the group's existing
+// sequences plus the unassigned import prefixes offered for creation (#697).
+export type RingSequencesPageData = {
+	sequences: RingSequenceRow[];
+	unassignedPrefixes: UnassignedImportPrefix[];
+};
 
 type SequenceRowModel = {
 	sequence: RingSequenceRow;
@@ -129,22 +139,70 @@ function RingSizeSection({
 	);
 }
 
-export function RingSequencesPageContent({
-	data
+// Top-of-page list of first-3-character prefixes belonging to newly-ringed
+// birds not yet assigned to a sequence. Each is a button that opens the
+// create-sequence modal for that prefix.
+function UnassignedPrefixes({
+	prefixes,
+	onSelect
 }: {
-	data: RingSequenceRow[];
+	prefixes: UnassignedImportPrefix[];
+	onSelect: (prefix: UnassignedImportPrefix) => void;
+}) {
+	return (
+		<section data-testid="unassigned-prefixes" className="mb-6">
+			<SecondaryHeading>Unassigned import prefixes</SecondaryHeading>
+			<p className="text-base-content/60 mb-2 text-sm">
+				Newly-ringed birds not yet assigned to a sequence. Pick a prefix to
+				create a sequence for it.
+			</p>
+			<ul className="flex flex-wrap gap-2">
+				{prefixes.map((prefix) => (
+					<li key={prefix.prefix}>
+						<button
+							type="button"
+							className="btn btn-sm btn-outline"
+							data-testid={`unassigned-prefix-${prefix.prefix}`}
+							onClick={() => onSelect(prefix)}
+						>
+							<span className="font-bold">{prefix.prefix}</span>
+							<span className="opacity-60">({prefix.ring_nos.length})</span>
+						</button>
+					</li>
+				))}
+			</ul>
+		</section>
+	);
+}
+
+export function RingSequencesPageContent({
+	data,
+	viewedGroup
+}: {
+	data: RingSequencesPageData;
+	viewedGroup: ViewedGroup;
 }) {
 	const [expandedId, setExpandedId] = useState<string | false>(false);
 	const [editingSequence, setEditingSequence] =
 		useState<RingSequenceRow | null>(null);
-	const ringSizeGroups = groupRingSequencesBySize(data);
+	const [creatingPrefix, setCreatingPrefix] =
+		useState<UnassignedImportPrefix | null>(null);
+	const { sequences, unassignedPrefixes } = data;
+	const ringSizeGroups = groupRingSequencesBySize(sequences);
 
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Ring Sequences</PrimaryHeading>
-			{data.length === 0 ? (
+			{unassignedPrefixes.length > 0 && (
+				<UnassignedPrefixes
+					prefixes={unassignedPrefixes}
+					onSelect={setCreatingPrefix}
+				/>
+			)}
+			{sequences.length === 0 ? (
 				<p data-testid="ring-sequences-empty">
-					No ring sequences yet. Re-import your data to populate them.
+					No ring sequences yet. Create one from an unassigned import prefix
+					above, or re-import your data.
 				</p>
 			) : (
 				<BoxyList>
@@ -163,6 +221,14 @@ export function RingSequencesPageContent({
 				<RingSequenceEditModal
 					sequence={editingSequence}
 					onClose={() => setEditingSequence(null)}
+				/>
+			)}
+			{creatingPrefix && (
+				<CreateSequenceFromPrefix
+					prefix={creatingPrefix.prefix}
+					ringNos={creatingPrefix.ring_nos}
+					viewedGroupId={viewedGroup.id}
+					onClose={() => setCreatingPrefix(null)}
 				/>
 			)}
 		</PageWrapper>

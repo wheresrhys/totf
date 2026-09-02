@@ -59,6 +59,124 @@ export function groupRingSequencesBySize(
 	return groups;
 }
 
+// --- Unassigned import prefixes (issue #697) ---
+//
+// The Ring Sequences page lists every first-3-character prefix used by the
+// group's newly-ringed (`record_type = 'N'`) birds that aren't yet assigned to
+// a `RingSequences` row, so the user can create sequences for them. Prefix
+// derivation matches `promoteControlToSequence`'s `ringNo.slice(0, 3)` — the
+// exact text stored in `RingSequences.prefix`.
+
+const IMPORT_PREFIX_LENGTH = 3;
+
+// One first-3-character prefix used by the group's unassigned newly-ringed
+// birds, plus the distinct ring numbers sharing it. Produced by
+// `groupRingNosByPrefix` and rendered at the top of the Ring Sequences page.
+export type UnassignedImportPrefix = {
+	prefix: string;
+	ring_nos: string[];
+};
+
+// Groups a flat list of unassigned birds' ring numbers into one entry per
+// first-3-character prefix, each carrying the distinct ring numbers sharing it
+// (sorted), with the prefixes themselves sorted. Pure so the fetch action and
+// its tests share one grouping definition.
+export function groupRingNosByPrefix(
+	rows: { ring_no: string }[]
+): UnassignedImportPrefix[] {
+	const byPrefix = new Map<string, Set<string>>();
+	for (const { ring_no } of rows) {
+		const prefix = ring_no.slice(0, IMPORT_PREFIX_LENGTH);
+		if (!byPrefix.has(prefix)) byPrefix.set(prefix, new Set());
+		byPrefix.get(prefix)!.add(ring_no);
+	}
+
+	return [...byPrefix.entries()]
+		.map(([prefix, ringNos]) => ({
+			prefix,
+			ring_nos: [...ringNos].sort()
+		}))
+		.sort((a, b) => a.prefix.localeCompare(b.prefix));
+}
+
+// Splits a ring number into its leading alphabetic prefix and trailing numeric
+// portion, e.g. "AEL1699" -> { alpha: "AEL", width: 4, index: 1699 }. Mirrors
+// the SQL `substring(... from '^[A-Za-z]+')` / `'[0-9]+$'` parse the removed
+// bounds trigger used (#659/#695). Returns null for a ring with no leading
+// letters or no trailing digits.
+function parseRing(
+	ringNo: string
+): { alpha: string; width: number; index: number } | null {
+	const alpha = ringNo.match(/^[A-Za-z]+/)?.[0];
+	const numericStr = ringNo.match(/[0-9]+$/)?.[0];
+	if (!alpha || !numericStr) return null;
+	return { alpha, width: numericStr.length, index: parseInt(numericStr, 10) };
+}
+
+function numericSuffix(ringNo: string): number {
+	return parseInt(ringNo.match(/[0-9]+$/)![0], 10);
+}
+
+// Suggests `first_ring`/`last_ring` bounds for a new ring sequence created from
+// a set of ring numbers, by folding the removed bounds trigger's per-bird
+// algorithm (#659/#695) over the rings in ascending numeric order. That trigger
+// widened a sequence's bounds one assignment at a time; replaying it over the
+// whole set in a stable order reproduces the same suggestion it would have
+// arrived at, so the ring-sequences UI can offer it before the user confirms.
+// Returns null when no ring parses into an alpha-prefix + numeric-suffix shape.
+export function deriveRingBounds(
+	ringNos: string[]
+): { first_ring: string; last_ring: string } | null {
+	const parsed = ringNos
+		.map(parseRing)
+		.filter((ring): ring is NonNullable<typeof ring> => ring !== null)
+		.sort((a, b) => a.index - b.index);
+	if (parsed.length === 0) return null;
+
+	let firstRing: string | null = null;
+	let lastRing: string | null = null;
+
+	for (const { alpha, width, index: ringIndex } of parsed) {
+		// This ring's decade start — greatest number ending in 1 that is <= it.
+		// Matches the trigger's `10 * floor((ring_index - 1) / 10) + 1`.
+		const startIndex = 10 * Math.floor((ringIndex - 1) / 10) + 1;
+		const startRing = alpha + String(startIndex).padStart(width, '0');
+
+		// Maybe move first_ring backward to cover this ring's decade start.
+		const newFirstRing: string =
+			firstRing === null || startIndex < numericSuffix(firstRing)
+				? startRing
+				: firstRing;
+
+		// Current last index, defaulting to one full decade when empty.
+		let lastIndex: number =
+			lastRing !== null ? numericSuffix(lastRing) : startIndex + 9;
+
+		// Widen to cover this ring if needed, rounding up to the nearest ten.
+		if (ringIndex > lastIndex) {
+			lastIndex =
+				ringIndex % 10 === 0 ? ringIndex : ringIndex + (10 - (ringIndex % 10));
+		}
+
+		// Escalate the batch width in tiers relative to the (possibly just-moved)
+		// first_ring, largest-tier-first so a span over 100 reaches the 500 tier.
+		const firstIndex = numericSuffix(newFirstRing);
+		if (lastIndex - firstIndex > 100) {
+			lastIndex = firstIndex + 500;
+		} else if (lastIndex - firstIndex > 50) {
+			lastIndex = firstIndex + 100;
+		}
+
+		// Pad to the ring's numeric width, growing the digit count rather than
+		// truncating if escalation pushed last_index past what that width holds.
+		const lastWidth = Math.max(width, String(lastIndex).length);
+		firstRing = newFirstRing;
+		lastRing = alpha + String(lastIndex).padStart(lastWidth, '0');
+	}
+
+	return { first_ring: firstRing!, last_ring: lastRing! };
+}
+
 export function findUnusedRings(
 	rings: string[],
 	prefixLength: number

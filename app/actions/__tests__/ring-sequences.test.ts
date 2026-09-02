@@ -26,7 +26,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
 	fetchRingSequences,
 	updateRingSequence,
-	promoteControlToSequence
+	promoteControlToSequence,
+	fetchUnassignedImportPrefixes,
+	createSequenceFromImportPrefix
 } from '../ring-sequences';
 import { getAuthenticatedSupabaseClientForGroup } from '@/lib/group-auth';
 import { supabase } from '@/lib/supabase';
@@ -544,5 +546,395 @@ describe('promoteControlToSequence', () => {
 			`SELECT COUNT(*) FROM "RingSequences" WHERE prefix = '${prefix}' AND ringing_group_id = ${otherGroupId};`
 		);
 		expect(count).toBe('0');
+	});
+});
+
+describe('fetchUnassignedImportPrefixes', () => {
+	const suffix = randomTestSuffix();
+	let groupId: number;
+	let otherGroupId: number;
+	let robinId: number;
+	let sessionId: number;
+	let otherSessionId: number;
+	let groupClient: SupabaseClient;
+	let otherGroupClient: SupabaseClient;
+
+	const createdBirdIds: number[] = [];
+	const createdSeqIds: number[] = [];
+
+	// Creates a Bird for `client` with a single Encounter of `recordType`, which
+	// also populates `Birds.ringing_group_ids` via the DB trigger (a raw Birds
+	// insert alone leaves it the empty-array default).
+	async function createBird(
+		client: SupabaseClient,
+		ringNo: string,
+		onSessionId: number,
+		recordType: string
+	): Promise<number> {
+		const { data: bird, error: birdError } = await client
+			.from('Birds')
+			.insert({ ring_no: ringNo, species_id: robinId })
+			.select('id')
+			.single();
+		if (birdError || !bird)
+			throw birdError ?? new Error('Failed to create bird');
+		createdBirdIds.push(bird.id);
+
+		const { error: encounterError } = await client.from('Encounters').insert({
+			capture_time: '09:00:00',
+			record_type: recordType,
+			scheme: 'BTO',
+			sex: 'U',
+			age_code: 4,
+			session_id: onSessionId,
+			bird_id: bird.id
+		});
+		if (encounterError) throw encounterError;
+
+		return bird.id;
+	}
+
+	beforeAll(async () => {
+		groupId = createIsolatedGroup(`fetch-unassigned-${suffix}`);
+		otherGroupId = createIsolatedGroup(`fetch-unassigned-other-${suffix}`);
+		[groupClient, otherGroupClient] = await Promise.all([
+			getAuthenticatedSupabaseClientForGroup(groupId),
+			getAuthenticatedSupabaseClientForGroup(otherGroupId)
+		]);
+
+		const { data: robin, error: robinError } = await supabase
+			.from('Species')
+			.select('id')
+			.eq('species_name', 'Robin')
+			.single();
+		if (robinError || !robin)
+			throw new Error(
+				'Robin species not found — run npm run db:seed:e2e first'
+			);
+		robinId = robin.id;
+
+		const { data: location, error: locationError } = await groupClient
+			.from('Locations')
+			.insert({
+				location_name: `Unassigned Location ${suffix}`,
+				ringing_group_id: groupId
+			})
+			.select('id')
+			.single();
+		if (locationError || !location)
+			throw locationError ?? new Error('Failed to create location');
+		const { data: session, error: sessionError } = await groupClient
+			.from('Sessions')
+			.insert({ visit_date: '2090-01-01', location_id: location.id })
+			.select('id')
+			.single();
+		if (sessionError || !session)
+			throw sessionError ?? new Error('Failed to create session');
+		sessionId = session.id;
+
+		const { data: otherLocation, error: otherLocationError } =
+			await otherGroupClient
+				.from('Locations')
+				.insert({
+					location_name: `Unassigned Other Location ${suffix}`,
+					ringing_group_id: otherGroupId
+				})
+				.select('id')
+				.single();
+		if (otherLocationError || !otherLocation)
+			throw otherLocationError ?? new Error('Failed to create other location');
+		const { data: otherSession, error: otherSessionError } =
+			await otherGroupClient
+				.from('Sessions')
+				.insert({ visit_date: '2090-01-01', location_id: otherLocation.id })
+				.select('id')
+				.single();
+		if (otherSessionError || !otherSession)
+			throw otherSessionError ?? new Error('Failed to create other session');
+		otherSessionId = otherSession.id;
+	});
+
+	afterAll(() => {
+		const birdIds = createdBirdIds.length ? createdBirdIds.join(', ') : '-1';
+		const seqIds = createdSeqIds.length ? createdSeqIds.join(', ') : '-1';
+		psql(
+			`DELETE FROM "RingSequences_Birds" WHERE bird_id IN (${birdIds});` +
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds});` +
+				`DELETE FROM "Birds" WHERE id IN (${birdIds});` +
+				`DELETE FROM "RingSequences" WHERE id IN (${seqIds});` +
+				`DELETE FROM "Sessions" WHERE id IN (${sessionId}, ${otherSessionId});` +
+				`DELETE FROM "Locations" WHERE ringing_group_id IN (${groupId}, ${otherGroupId});` +
+				`DELETE FROM "RingingGroups" WHERE id IN (${groupId}, ${otherGroupId});`
+		);
+	});
+
+	it("groups the prefixes of the group's newly-ringed, unassigned birds", async () => {
+		const prefixA = randomPrefix();
+		const prefixB = randomPrefix();
+		await createBird(groupClient, `${prefixA}1699`, sessionId, 'N');
+		await createBird(groupClient, `${prefixA}1700`, sessionId, 'N');
+		await createBird(groupClient, `${prefixB}0001`, sessionId, 'N');
+
+		authenticateAs(groupId);
+		const result = await fetchUnassignedImportPrefixes(groupId);
+		const relevant = (result ?? []).filter((entry) =>
+			[prefixA, prefixB].includes(entry.prefix)
+		);
+		expect(relevant).toEqual(
+			[
+				{ prefix: prefixA, ring_nos: [`${prefixA}1699`, `${prefixA}1700`] },
+				{ prefix: prefixB, ring_nos: [`${prefixB}0001`] }
+			].sort((a, b) => a.prefix.localeCompare(b.prefix))
+		);
+	});
+
+	it('excludes birds already assigned to a ring sequence', async () => {
+		const prefix = randomPrefix();
+		const birdId = await createBird(
+			groupClient,
+			`${prefix}0001`,
+			sessionId,
+			'N'
+		);
+
+		// Assign it to a sequence via the existing create action.
+		authenticateAs(groupId);
+		const created = await createSequenceFromImportPrefix(
+			null,
+			makeFormData({ prefix, viewed_group_id: String(groupId) })
+		);
+		expect(created).toEqual({ success: true });
+		const { data: seq } = await groupClient
+			.from('RingSequences')
+			.select('id')
+			.eq('prefix', prefix)
+			.eq('ringing_group_id', groupId)
+			.single();
+		createdSeqIds.push(seq!.id);
+
+		const result = await fetchUnassignedImportPrefixes(groupId);
+		expect((result ?? []).some((entry) => entry.prefix === prefix)).toBe(false);
+		// The bird itself still exists — it was excluded, not deleted.
+		expect(createdBirdIds).toContain(birdId);
+	});
+
+	it('excludes birds that have no newly-ringed (N) encounter', async () => {
+		const prefix = randomPrefix();
+		await createBird(groupClient, `${prefix}0001`, sessionId, 'R');
+
+		authenticateAs(groupId);
+		const result = await fetchUnassignedImportPrefixes(groupId);
+		expect((result ?? []).some((entry) => entry.prefix === prefix)).toBe(false);
+	});
+
+	it("excludes another group's birds", async () => {
+		const prefix = randomPrefix();
+		await createBird(otherGroupClient, `${prefix}0001`, otherSessionId, 'N');
+
+		authenticateAs(groupId);
+		const result = await fetchUnassignedImportPrefixes(groupId);
+		expect((result ?? []).some((entry) => entry.prefix === prefix)).toBe(false);
+	});
+});
+
+describe('createSequenceFromImportPrefix', () => {
+	const suffix = randomTestSuffix();
+	let groupId: number;
+	let robinId: number;
+	let sessionId: number;
+	let groupClient: SupabaseClient;
+
+	const createdBirdIds: number[] = [];
+	const createdSeqIds: number[] = [];
+
+	async function createNewRingBird(ringNo: string): Promise<number> {
+		const { data: bird, error: birdError } = await groupClient
+			.from('Birds')
+			.insert({ ring_no: ringNo, species_id: robinId })
+			.select('id')
+			.single();
+		if (birdError || !bird)
+			throw birdError ?? new Error('Failed to create bird');
+		createdBirdIds.push(bird.id);
+		const { error: encounterError } = await groupClient
+			.from('Encounters')
+			.insert({
+				capture_time: '09:00:00',
+				record_type: 'N',
+				scheme: 'BTO',
+				sex: 'U',
+				age_code: 4,
+				session_id: sessionId,
+				bird_id: bird.id
+			});
+		if (encounterError) throw encounterError;
+		return bird.id;
+	}
+
+	async function sequenceFor(prefix: string) {
+		const { data } = await groupClient
+			.from('RingSequences')
+			.select('*')
+			.eq('prefix', prefix)
+			.eq('ringing_group_id', groupId)
+			.maybeSingle();
+		return data;
+	}
+
+	async function linkedBirdIds(ringSequenceId: number): Promise<number[]> {
+		const { data } = await groupClient
+			.from('RingSequences_Birds')
+			.select('bird_id')
+			.eq('ring_sequence_id', ringSequenceId);
+		return (data ?? []).map((row) => row.bird_id);
+	}
+
+	beforeAll(async () => {
+		groupId = createIsolatedGroup(`create-from-prefix-${suffix}`);
+		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+
+		const { data: robin, error: robinError } = await supabase
+			.from('Species')
+			.select('id')
+			.eq('species_name', 'Robin')
+			.single();
+		if (robinError || !robin)
+			throw new Error(
+				'Robin species not found — run npm run db:seed:e2e first'
+			);
+		robinId = robin.id;
+
+		const { data: location, error: locationError } = await groupClient
+			.from('Locations')
+			.insert({
+				location_name: `Create From Prefix Location ${suffix}`,
+				ringing_group_id: groupId
+			})
+			.select('id')
+			.single();
+		if (locationError || !location)
+			throw locationError ?? new Error('Failed to create location');
+		const { data: session, error: sessionError } = await groupClient
+			.from('Sessions')
+			.insert({ visit_date: '2090-01-01', location_id: location.id })
+			.select('id')
+			.single();
+		if (sessionError || !session)
+			throw sessionError ?? new Error('Failed to create session');
+		sessionId = session.id;
+	});
+
+	afterAll(() => {
+		const birdIds = createdBirdIds.length ? createdBirdIds.join(', ') : '-1';
+		const seqIds = createdSeqIds.length ? createdSeqIds.join(', ') : '-1';
+		psql(
+			`DELETE FROM "RingSequences_Birds" WHERE bird_id IN (${birdIds});` +
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds});` +
+				`DELETE FROM "Birds" WHERE id IN (${birdIds});` +
+				`DELETE FROM "RingSequences" WHERE id IN (${seqIds});` +
+				`DELETE FROM "Sessions" WHERE id = ${sessionId};` +
+				`DELETE FROM "Locations" WHERE ringing_group_id = ${groupId};` +
+				`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
+		);
+	});
+
+	it('creates a group-owned sequence with the supplied bounds and links every matching bird', async () => {
+		const prefix = randomPrefix();
+		const birdA = await createNewRingBird(`${prefix}1699`);
+		const birdB = await createNewRingBird(`${prefix}1700`);
+
+		authenticateAs(groupId);
+		const result = await createSequenceFromImportPrefix(
+			null,
+			makeFormData({
+				prefix,
+				first_ring: `${prefix}1691`,
+				last_ring: `${prefix}1710`,
+				viewed_group_id: String(groupId)
+			})
+		);
+		expect(result).toEqual({ success: true });
+
+		const sequence = await sequenceFor(prefix);
+		createdSeqIds.push(sequence!.id);
+		expect(sequence).toMatchObject({
+			owned_by_group: true,
+			first_ring: `${prefix}1691`,
+			last_ring: `${prefix}1710`
+		});
+		expect(await linkedBirdIds(sequence!.id)).toEqual(
+			expect.arrayContaining([birdA, birdB])
+		);
+
+		// The prefix is no longer offered as unassigned.
+		const unassigned = await fetchUnassignedImportPrefixes(groupId);
+		expect((unassigned ?? []).some((entry) => entry.prefix === prefix)).toBe(
+			false
+		);
+	});
+
+	it('reuses an existing matching-prefix sequence without overwriting its owned_by_group/size/bounds', async () => {
+		const prefix = randomPrefix();
+		const { data: existing, error: existingError } = await groupClient
+			.from('RingSequences')
+			.insert({
+				prefix,
+				ringing_group_id: groupId,
+				owned_by_group: false,
+				size: 'C',
+				first_ring: `${prefix}0001`,
+				last_ring: `${prefix}0099`
+			})
+			.select('id')
+			.single();
+		if (existingError || !existing)
+			throw existingError ?? new Error('Failed to seed existing sequence');
+		createdSeqIds.push(existing.id);
+		const birdId = await createNewRingBird(`${prefix}0005`);
+
+		authenticateAs(groupId);
+		const result = await createSequenceFromImportPrefix(
+			null,
+			makeFormData({
+				prefix,
+				first_ring: `${prefix}9000`,
+				last_ring: `${prefix}9999`,
+				viewed_group_id: String(groupId)
+			})
+		);
+		expect(result).toEqual({ success: true });
+
+		const { data: matches } = await groupClient
+			.from('RingSequences')
+			.select('id, owned_by_group, size, first_ring, last_ring')
+			.eq('prefix', prefix)
+			.eq('ringing_group_id', groupId);
+		expect(matches).toHaveLength(1);
+		expect(matches![0]).toMatchObject({
+			id: existing.id,
+			owned_by_group: false,
+			size: 'C',
+			first_ring: `${prefix}0001`,
+			last_ring: `${prefix}0099`
+		});
+		expect(await linkedBirdIds(existing.id)).toEqual([birdId]);
+	});
+
+	it('returns a validation error and does not touch supabase when prefix is missing', async () => {
+		authenticateAs(groupId);
+		const result = await createSequenceFromImportPrefix(
+			null,
+			makeFormData({ prefix: '   ', viewed_group_id: String(groupId) })
+		);
+		expect(result).toEqual({ success: false, error: 'Missing prefix' });
+	});
+
+	it('returns a validation error when viewed_group_id is missing', async () => {
+		authenticateAs(groupId);
+		const result = await createSequenceFromImportPrefix(
+			null,
+			makeFormData({ prefix: randomPrefix(), viewed_group_id: '' })
+		);
+		expect(result).toEqual({ success: false, error: 'Missing group' });
 	});
 });

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+	deriveRingBounds,
 	findUnusedRings,
+	groupRingNosByPrefix,
 	groupRingSequencesBySize,
 	RING_SIZE_ENUM_ORDER
 } from '../ring-sequences';
@@ -97,5 +99,97 @@ describe('groupRingSequencesBySize', () => {
 		expect(RING_SIZE_ENUM_ORDER).toHaveLength(22);
 		expect(RING_SIZE_ENUM_ORDER[0]).toBe('AA');
 		expect(RING_SIZE_ENUM_ORDER.at(-1)).toBe('MS');
+	});
+});
+
+describe('groupRingNosByPrefix', () => {
+	it('groups ring numbers by their first 3 characters, sorted and deduped', () => {
+		const result = groupRingNosByPrefix([
+			{ ring_no: 'AEL1700' },
+			{ ring_no: 'AEL1699' },
+			{ ring_no: 'DB12345' },
+			{ ring_no: 'AEL1699' }
+		]);
+		expect(result).toEqual([
+			{ prefix: 'AEL', ring_nos: ['AEL1699', 'AEL1700'] },
+			{ prefix: 'DB1', ring_nos: ['DB12345'] }
+		]);
+	});
+
+	it('returns a single entry when all rings share a prefix', () => {
+		const result = groupRingNosByPrefix([
+			{ ring_no: 'XYZ001' },
+			{ ring_no: 'XYZ002' }
+		]);
+		expect(result).toEqual([{ prefix: 'XYZ', ring_nos: ['XYZ001', 'XYZ002'] }]);
+	});
+
+	it('returns an empty array for no rows', () => {
+		expect(groupRingNosByPrefix([])).toEqual([]);
+	});
+});
+
+describe('deriveRingBounds', () => {
+	it('suggests decade-aligned bounds for a batch of rings (matches the removed trigger)', () => {
+		// AEL1699 decade start 1691; AEL1701 widens last to 1710 (rounded up).
+		expect(deriveRingBounds(['AEL1699', 'AEL1700', 'AEL1701'])).toEqual({
+			first_ring: 'AEL1691',
+			last_ring: 'AEL1710'
+		});
+	});
+
+	it('uses a ring ending in 1 as its own decade start (not the decade below)', () => {
+		// Guards the trigger's `floor((ring_index - 1) / 10)`: 1701 -> start 1701,
+		// not 1691. A one-decade default window then gives last 1710.
+		expect(deriveRingBounds(['AEL1701'])).toEqual({
+			first_ring: 'AEL1701',
+			last_ring: 'AEL1710'
+		});
+	});
+
+	it('rounds the last ring up to the nearest ten when widening past the window', () => {
+		expect(deriveRingBounds(['AEL1705', 'AEL1727'])).toEqual({
+			first_ring: 'AEL1701',
+			last_ring: 'AEL1730'
+		});
+	});
+
+	it('escalates the window to +100 once the span exceeds 50', () => {
+		expect(deriveRingBounds(['AEL1705', 'AEL1760'])).toEqual({
+			first_ring: 'AEL1701',
+			last_ring: 'AEL1801'
+		});
+	});
+
+	it('escalates the window to +500 once the span exceeds 100', () => {
+		expect(deriveRingBounds(['AEL1705', 'AEL1860'])).toEqual({
+			first_ring: 'AEL1701',
+			last_ring: 'AEL2201'
+		});
+	});
+
+	it('grows the digit width rather than truncating when the last ring overflows it', () => {
+		expect(deriveRingBounds(['XY995'])).toEqual({
+			first_ring: 'XY991',
+			last_ring: 'XY1000'
+		});
+	});
+
+	it('is independent of input order', () => {
+		expect(deriveRingBounds(['AEL1701', 'AEL1699', 'AEL1700'])).toEqual(
+			deriveRingBounds(['AEL1699', 'AEL1700', 'AEL1701'])
+		);
+	});
+
+	it('ignores ring numbers that do not parse into prefix + numeric suffix', () => {
+		expect(deriveRingBounds(['AEL1699', 'GARBAGE'])).toEqual({
+			first_ring: 'AEL1691',
+			last_ring: 'AEL1700'
+		});
+	});
+
+	it('returns null when no ring number parses', () => {
+		expect(deriveRingBounds([])).toBeNull();
+		expect(deriveRingBounds(['ABCDEF', ''])).toBeNull();
 	});
 });
