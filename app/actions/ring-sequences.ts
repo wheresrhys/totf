@@ -177,3 +177,136 @@ export async function updateRingSequence(
 		return { success: false, error: (error as Error).message };
 	}
 }
+
+// Result shape for `promoteControlToSequence`. Mirrors `UpdateRingSequenceState`
+// / `LoginState`: a discriminated union rather than a thrown error, so the
+// client modal can react without crossing the server-action boundary with an
+// exception.
+export type PromoteControlState =
+	| { success: true }
+	| { success: false; error: string }
+	| null;
+
+// Postgres unique-constraint violation SQLSTATE (raised on the
+// `(prefix, ringing_group_id)` unique index if two promotes for the same prefix
+// race). `catchSupabaseErrors` collapses the error to a message and loses the
+// code, so the insert below inspects the raw PostgREST error itself.
+const UNIQUE_VIOLATION = '23505';
+
+type PromoteSupabaseClient = Awaited<
+	ReturnType<typeof getAuthenticatedSupabaseClient>
+>;
+
+// Finds or creates the group's RingSequences row for `prefix` (a promoted row
+// is `owned_by_group = false`, `size = NULL` if newly created — reusing an
+// existing row untouched, never overwriting its `owned_by_group` or `size`,
+// which the importer or a prior manual edit may have set), then links every
+// currently-untracked bird sharing that prefix to it via
+// `Birds.ring_sequence_id`. Every control sharing the prefix was promoted
+// together — not just the ring that triggered the promote — since they're
+// indistinguishable once tracked. `first_ring`/`last_ring` are deliberately
+// left untouched here (there is no more bounds-widening trigger — see #701 —
+// and authoring them is the ring-sequences UI's job, not this action's), so a
+// freshly-created row's numeric range stays null until set there. RLS scopes
+// every query to the caller's group; the explicit `ringing_group_id` filter is
+// defence-in-depth.
+async function findOrCreateRingSequenceAndLinkBirds(
+	supabase: PromoteSupabaseClient,
+	prefix: string,
+	groupId: number
+): Promise<number> {
+	const existing = (await supabase
+		.from('RingSequences')
+		.select('id')
+		.eq('prefix', prefix)
+		.eq('ringing_group_id', groupId)
+		.maybeSingle()
+		.then(catchSupabaseErrors)) as { id: number } | null;
+
+	let sequenceId: number;
+	if (existing?.id) {
+		sequenceId = existing.id;
+	} else {
+		const { data: inserted, error } = await supabase
+			.from('RingSequences')
+			.insert({
+				prefix,
+				ringing_group_id: groupId,
+				owned_by_group: false,
+				size: null
+			})
+			.select('id')
+			.single();
+
+		if (error) {
+			// A concurrent promote for the same prefix won the race and inserted
+			// the row first — re-select and reuse it rather than surfacing a hard
+			// error.
+			if (error.code === UNIQUE_VIOLATION) {
+				const raced = (await supabase
+					.from('RingSequences')
+					.select('id')
+					.eq('prefix', prefix)
+					.eq('ringing_group_id', groupId)
+					.single()
+					.then(catchSupabaseErrors)) as { id: number } | null;
+				if (!raced?.id) {
+					throw new Error(`Failed to create ring sequence: ${error.message}`);
+				}
+				sequenceId = raced.id;
+			} else {
+				throw new Error(`Failed to create ring sequence: ${error.message}`);
+			}
+		} else {
+			sequenceId = inserted!.id;
+		}
+	}
+
+	// Link every bird sharing this prefix that isn't tracked by a sequence yet.
+	// Multi-tenancy via RLS is only partially implemented (see issue #149), so
+	// this doesn't rely on RLS alone — it also filters explicitly on
+	// `ringing_group_ids` (a bird can be shared across groups, so `groupId`
+	// must appear in the array, not just match a single owner column),
+	// matching the pattern in `app/actions/sp-data.ts`.
+	await supabase
+		.from('Birds')
+		.update({ ring_sequence_id: sequenceId })
+		.ilike('ring_no', `${prefix}%`)
+		.is('ring_sequence_id', null)
+		.contains('ringing_group_ids', [groupId])
+		.then(catchSupabaseErrors);
+
+	return sequenceId;
+}
+
+// Promotes a control ring to a tracked ring sequence: derives the ring's
+// 3-character prefix and finds-or-creates the RingSequences row for it,
+// linking every control sharing that prefix. The updated RPC (issue #661)
+// then drops them all from `/controls` on the next load. Reads `ring_no` /
+// `viewed_group_id` from the submitted form, matching `updateRingSequence`'s
+// `useActionState` shape.
+export async function promoteControlToSequence(
+	_prevState: PromoteControlState,
+	formData: FormData
+): Promise<PromoteControlState> {
+	const ringNo = (formData.get('ring_no') as string)?.trim();
+	const viewedGroupId = Number(formData.get('viewed_group_id'));
+
+	if (!ringNo) {
+		return { success: false, error: 'Missing ring number' };
+	}
+	if (!viewedGroupId) {
+		return { success: false, error: 'Missing group' };
+	}
+
+	const prefix = ringNo.slice(0, 3);
+
+	try {
+		const supabase = await getAuthenticatedSupabaseClient();
+		await findOrCreateRingSequenceAndLinkBirds(supabase, prefix, viewedGroupId);
+
+		return { success: true };
+	} catch (error) {
+		return { success: false, error: (error as Error).message };
+	}
+}
