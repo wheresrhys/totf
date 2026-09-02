@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
 import TicksPage from '@/app/(routes)/ticks/page';
 
-export default async function CrossGroupTicksPage({
+export default async function GroupTicksPage({
 	params
 }: {
 	params: Promise<{ groupSlug: string }>;
