@@ -66,42 +66,28 @@ export async function fetchRingSequenceBirds(
 ): Promise<RingSequenceBirdRow[] | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 
-	const sequence = await supabase
-		.from('RingSequences')
-		.select('prefix, first_ring')
-		.eq('id', ringSequenceId)
-		.maybeSingle()
-		.then(catchSupabaseErrors);
-
-	if (!sequence?.first_ring) return [];
-
-	const wildcardCount = sequence.first_ring.length - sequence.prefix.length;
-	if (wildcardCount < 0) return [];
-	const ringNoPattern = sequence.prefix + '_'.repeat(wildcardCount);
-
 	type BirdQueryRow = {
 		ring_no: string;
 		species: { species_name: string } | null;
 		encounters: { session: { visit_date: string } | null }[];
 	};
-
-	const birds = (await supabase
-		.from('Birds')
+	const birdsInSequence = (await supabase
+		.from('RingSequences_Birds')
 		.select(
 			`
-			ring_no,
-			species:Species(species_name),
-			encounters:Encounters!inner(
-				session:Sessions(visit_date)
+			bird:Birds!inner(
+				ring_no,
+				species:Species(species_name),
+				encounters:Encounters!inner(
+					session:Sessions(visit_date)
+				)
 			)
 		`
 		)
-		.eq('encounters.record_type', 'N')
-		.ilike('ring_no', ringNoPattern)
-		.order('ring_no')
-		.then(catchSupabaseErrors)) as BirdQueryRow[] | null;
+		.eq('ring_sequence_id', ringSequenceId)
+		.then(catchSupabaseErrors)) as { bird: BirdQueryRow }[] | null;
 
-	return (birds ?? []).map((bird) => ({
+	return (birdsInSequence || []).map(({ bird }) => ({
 		ring_no: bird.ring_no,
 		species_name: bird.species?.species_name ?? '',
 		ringed_date: bird.encounters[0]?.session?.visit_date ?? ''
@@ -181,6 +167,7 @@ async function findOrCreateRingSequenceAndLinkBirds(
 		.from('RingSequences')
 		.select('id')
 		.eq('prefix', prefix)
+		// TODO this shoudl also probably check against first and last values
 		.eq('ringing_group_id', groupId)
 		.maybeSingle()
 		.then(catchSupabaseErrors)) as { id: number } | null;
@@ -230,12 +217,32 @@ async function findOrCreateRingSequenceAndLinkBirds(
 	// `ringing_group_ids` (a bird can be shared across groups, so `groupId`
 	// must appear in the array, not just match a single owner column),
 	// matching the pattern in `app/actions/sp-data.ts`.
-	await supabase
+	const birds = await supabase
 		.from('Birds')
-		.update({ ring_sequence_id: sequenceId })
+		.select('id')
 		.ilike('ring_no', `${prefix}%`)
-		.is('ring_sequence_id', null)
 		.contains('ringing_group_ids', [groupId])
+		.then(catchSupabaseErrors);
+
+	const allreadyInSequenceBirds = await supabase
+		.from('RingSequences_Birds')
+		.select('bird_id')
+		.in('bird_id', birds?.map(({ id }) => id) ?? [])
+		.then(catchSupabaseErrors);
+
+	const birdsToLink = (birds ?? []).filter(
+		(bird) => !allreadyInSequenceBirds?.some((s) => s.bird_id === bird.id)
+	);
+
+	await supabase
+		.from('RingSequences_Birds')
+		.insert(
+			birdsToLink?.map(({ id }) => ({
+				ringing_group_id: groupId,
+				ring_sequence_id: sequenceId,
+				bird_id: id
+			})) ?? []
+		)
 		.then(catchSupabaseErrors);
 
 	return sequenceId;
