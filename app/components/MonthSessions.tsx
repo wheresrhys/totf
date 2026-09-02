@@ -1,7 +1,7 @@
 'use client';
 import { type SessionWithEncountersCount } from '@/app/models/session';
 import { format as formatDate } from 'date-fns';
-import { SessionsByDay } from './SessionHistoryCalendar';
+import { SessionsByDay } from './SessionsByDay';
 import type { ViewedGroup } from '@/lib/group-slug';
 
 export function MonthSessionsHeading({
