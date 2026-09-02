@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
 import PulliPage from '@/app/(routes)/pulli/page';
 
-export default async function CrossGroupPulliPage({
+export default async function GroupPulliPage({
 	params
 }: {
 	params: Promise<{ groupSlug: string }>;
