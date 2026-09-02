@@ -1,8 +1,4 @@
-import type { DefaultPageParams } from '@/app/components/layout/BootstrapPage';
-import {
-	fetchRingSequenceControls,
-	type RingSequenceControlRow
-} from '@/app/actions/ring-sequences';
+import type { RingSequenceControlRow } from '@/app/actions/ring-sequences';
 import type { ViewedGroup } from '@/lib/group-slug';
 import {
 	InlineTable,
@@ -11,13 +7,6 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { PromoteControlButton } from '@/app/components/PromoteControlButton';
-
-export async function fetchControlsPageContent(
-	_: DefaultPageParams,
-	viewedGroupId: number
-): Promise<RingSequenceControlRow[] | null> {
-	return fetchRingSequenceControls(viewedGroupId);
-}
 
 export function ControlsPageContent({
 	data,
