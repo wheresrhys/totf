@@ -37,16 +37,10 @@ export function RingSequenceEditModal({
 				<h2 className="font-bold text-lg mb-4">Edit ring sequence</h2>
 				<form action={action} className="flex flex-col gap-4">
 					<input type="hidden" name="id" value={sequence.id} />
-					<label className="flex flex-col gap-1">
+					<div className="flex flex-col gap-1">
 						<span className="text-sm">Prefix</span>
-						<input
-							type="text"
-							name="prefix"
-							defaultValue={sequence.prefix}
-							className="input input-bordered w-full"
-							placeholder="Prefix"
-						/>
-					</label>
+						<span className="font-mono">{sequence.prefix}</span>
+					</div>
 					<label className="flex flex-col gap-1">
 						<span className="text-sm">Ring size</span>
 						<select

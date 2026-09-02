@@ -43,7 +43,7 @@ describe('RingSequences table', () => {
 		it('defaults owned_by_group to true when omitted on insert', async () => {
 			const { data, error } = await groupClient
 				.from('RingSequences')
-				.insert({ prefix: `RS-${suffix}-DEFAULT`, ringing_group_id: groupId })
+				.insert({ prefix: 'DFT', ringing_group_id: groupId })
 				.select('owned_by_group')
 				.single();
 			expect(error).toBeNull();
@@ -53,7 +53,7 @@ describe('RingSequences table', () => {
 		it('accepts a null size (unset ring-size metadata)', async () => {
 			const { data, error } = await groupClient
 				.from('RingSequences')
-				.insert({ prefix: `RS-${suffix}-NULLSIZE`, ringing_group_id: groupId, size: null })
+				.insert({ prefix: 'NSZ', ringing_group_id: groupId, size: null })
 				.select('size')
 				.single();
 			expect(error).toBeNull();
@@ -63,7 +63,7 @@ describe('RingSequences table', () => {
 		it('accepts an explicit ring_size value, including one containing a "+" (e.g. "B+")', async () => {
 			const { data, error } = await groupClient
 				.from('RingSequences')
-				.insert({ prefix: `RS-${suffix}-PLUS`, ringing_group_id: groupId, size: 'B+' })
+				.insert({ prefix: 'PLS', ringing_group_id: groupId, size: 'B+' })
 				.select('size')
 				.single();
 			expect(error).toBeNull();
@@ -73,7 +73,7 @@ describe('RingSequences table', () => {
 		it('accepts null first_ring and last_ring (set via the ring-sequences UI, not on insert)', async () => {
 			const { data, error } = await groupClient
 				.from('RingSequences')
-				.insert({ prefix: `RS-${suffix}-RINGS`, ringing_group_id: groupId })
+				.insert({ prefix: 'RNG', ringing_group_id: groupId })
 				.select('first_ring, last_ring')
 				.single();
 			expect(error).toBeNull();
@@ -230,8 +230,8 @@ describe('RingSequences table', () => {
 			groupId = createIsolatedGroup(`ring-sequences-order-${suffix}`);
 			groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
 			await groupClient.from('RingSequences').insert([
-				{ prefix: `RS-${suffix}-SO`, ringing_group_id: groupId, size: 'SO' },
-				{ prefix: `RS-${suffix}-C`, ringing_group_id: groupId, size: 'C' },
+				{ prefix: 'SOR', ringing_group_id: groupId, size: 'SO' },
+				{ prefix: 'CXR', ringing_group_id: groupId, size: 'C' },
 			]);
 		});
 
@@ -254,7 +254,7 @@ describe('RingSequences table', () => {
 
 		it('rejects an insert with a size value outside the enum (e.g. "Z")', async () => {
 			const { error } = await groupClient.from('RingSequences').insert({
-				prefix: `RS-${suffix}-INVALID`,
+				prefix: 'BAD',
 				ringing_group_id: groupId,
 				// @ts-expect-error 'Z' is deliberately not a member of the ring_size enum
 				size: 'Z',
@@ -290,12 +290,12 @@ describe('RingSequences table', () => {
 		it('allows inserting a RingSequences row with a prefix unique to that group', async () => {
 			const { error } = await groupAClient
 				.from('RingSequences')
-				.insert({ prefix: `RS-${suffix}-UNIQUE`, ringing_group_id: groupAId });
+				.insert({ prefix: 'UNQ', ringing_group_id: groupAId });
 			expect(error).toBeNull();
 		});
 
 		it('rejects a duplicate (prefix, ringing_group_id) insert with a 23505 unique-violation error', async () => {
-			const prefix = `RS-${suffix}-DUP`;
+			const prefix = 'DUP';
 			const first = await groupAClient
 				.from('RingSequences')
 				.insert({ prefix, ringing_group_id: groupAId });
@@ -308,7 +308,7 @@ describe('RingSequences table', () => {
 		});
 
 		it('allows a different group to reuse the same prefix as another group (constraint is per-group, not global)', async () => {
-			const prefix = `RS-${suffix}-SHARED`;
+			const prefix = 'SHR';
 			const forGroupA = await groupAClient
 				.from('RingSequences')
 				.insert({ prefix, ringing_group_id: groupAId });
@@ -351,9 +351,142 @@ describe('RingSequences table', () => {
 			const nonExistentGroupId = 999999999;
 			expect(() =>
 				psql(
-					`INSERT INTO "RingSequences" (prefix, ringing_group_id) VALUES ('RS-${suffix}-FK', ${nonExistentGroupId});`
+					`INSERT INTO "RingSequences" (prefix, ringing_group_id) VALUES ('FKX', ${nonExistentGroupId});`
 				)
 			).toThrow();
+		});
+	});
+
+	describe('prefix length constraint', () => {
+		const suffix = randomTestSuffix();
+		let groupId: number;
+		let groupClient: SupabaseClient;
+
+		beforeAll(async () => {
+			groupId = createIsolatedGroup(`ring-sequences-prefix-length-${suffix}`);
+			groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+		});
+
+		afterAll(() => {
+			psql(
+				`DELETE FROM "RingSequences" WHERE ringing_group_id = ${groupId};` +
+					`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
+			);
+		});
+
+		it('accepts a 3-character prefix', async () => {
+			const { error } = await groupClient
+				.from('RingSequences')
+				.insert({ prefix: 'ABC', ringing_group_id: groupId });
+			expect(error).toBeNull();
+		});
+
+		it('rejects a 2-character prefix with a check-violation error', async () => {
+			const { error } = await groupClient
+				.from('RingSequences')
+				.insert({ prefix: 'AB', ringing_group_id: groupId });
+			expect(error).not.toBeNull();
+			expect(error?.code).toBe('23514'); // check_violation
+		});
+
+		it('rejects a 4-character prefix with a check-violation error', async () => {
+			const { error } = await groupClient
+				.from('RingSequences')
+				.insert({ prefix: 'ABCD', ringing_group_id: groupId });
+			expect(error).not.toBeNull();
+			expect(error?.code).toBe('23514');
+		});
+
+		it('rejects an empty-string prefix with a check-violation error', async () => {
+			const { error } = await groupClient
+				.from('RingSequences')
+				.insert({ prefix: '', ringing_group_id: groupId });
+			expect(error).not.toBeNull();
+			expect(error?.code).toBe('23514');
+		});
+	});
+
+	describe('first_ring/last_ring prefix constraint', () => {
+		const suffix = randomTestSuffix();
+		let groupId: number;
+		let groupClient: SupabaseClient;
+
+		beforeAll(async () => {
+			groupId = createIsolatedGroup(`ring-sequences-bounds-prefix-${suffix}`);
+			groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+		});
+
+		afterAll(() => {
+			psql(
+				`DELETE FROM "RingSequences" WHERE ringing_group_id = ${groupId};` +
+					`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
+			);
+		});
+
+		it('accepts first_ring and last_ring that both start with the prefix', async () => {
+			const { error } = await groupClient.from('RingSequences').insert({
+				prefix: 'ABC',
+				ringing_group_id: groupId,
+				first_ring: 'ABC1000',
+				last_ring: 'ABC2000',
+			});
+			expect(error).toBeNull();
+		});
+
+		it('accepts only first_ring set, starting with the prefix', async () => {
+			const { error } = await groupClient.from('RingSequences').insert({
+				prefix: 'DEF',
+				ringing_group_id: groupId,
+				first_ring: 'DEF1000',
+			});
+			expect(error).toBeNull();
+		});
+
+		it('accepts only last_ring set, starting with the prefix', async () => {
+			const { error } = await groupClient.from('RingSequences').insert({
+				prefix: 'GHI',
+				ringing_group_id: groupId,
+				last_ring: 'GHI2000',
+			});
+			expect(error).toBeNull();
+		});
+
+		it('accepts both first_ring and last_ring left null (existing default case)', async () => {
+			const { error } = await groupClient.from('RingSequences').insert({
+				prefix: 'JKL',
+				ringing_group_id: groupId,
+			});
+			expect(error).toBeNull();
+		});
+
+		it('rejects a first_ring that does not start with the prefix, with a check-violation error', async () => {
+			const { error } = await groupClient.from('RingSequences').insert({
+				prefix: 'MNO',
+				ringing_group_id: groupId,
+				first_ring: 'XYZ1000',
+			});
+			expect(error).not.toBeNull();
+			expect(error?.code).toBe('23514');
+		});
+
+		it('rejects a last_ring that does not start with the prefix, with a check-violation error', async () => {
+			const { error } = await groupClient.from('RingSequences').insert({
+				prefix: 'PQR',
+				ringing_group_id: groupId,
+				last_ring: 'XYZ2000',
+			});
+			expect(error).not.toBeNull();
+			expect(error?.code).toBe('23514');
+		});
+
+		it('rejects a first_ring shorter than the prefix, with a check-violation error', async () => {
+			const { error } = await groupClient.from('RingSequences').insert({
+				prefix: 'STU',
+				ringing_group_id: groupId,
+				first_ring: 'ST',
+			});
+			expect(error).not.toBeNull();
+			expect(error?.code).toBe('23514');
 		});
 	});
 
@@ -373,7 +506,7 @@ describe('RingSequences table', () => {
 			]);
 			await ownerClient
 				.from('RingSequences')
-				.insert({ prefix: `RS-${suffix}-SELECT`, ringing_group_id: ownerGroupId });
+				.insert({ prefix: 'SEL', ringing_group_id: ownerGroupId });
 			// Grant otherGroup read access to ownerGroup's data generally, to prove
 			// RingSequences ignores GroupDataSharing entirely — unlike Locations/Sessions,
 			// which allow a granted recipient group to also SELECT (see the table's schema
@@ -432,14 +565,14 @@ describe('RingSequences table', () => {
 		it('a group can insert a RingSequences row for itself', async () => {
 			const { error } = await ownClient
 				.from('RingSequences')
-				.insert({ prefix: `RS-${suffix}-SELF`, ringing_group_id: ownGroupId });
+				.insert({ prefix: 'SLF', ringing_group_id: ownGroupId });
 			expect(error).toBeNull();
 		});
 
 		it('a group cannot insert a RingSequences row for another group (ringing_group_id mismatch rejected by policy)', async () => {
 			const { error } = await ownClient
 				.from('RingSequences')
-				.insert({ prefix: `RS-${suffix}-OTHER`, ringing_group_id: otherGroupId });
+				.insert({ prefix: 'OTH', ringing_group_id: otherGroupId });
 			expect(error).not.toBeNull();
 		});
 	});
@@ -461,7 +594,7 @@ describe('RingSequences table', () => {
 			]);
 			const { data, error } = await ownerClient
 				.from('RingSequences')
-				.insert({ prefix: `RS-${suffix}-UPDATE`, ringing_group_id: ownerGroupId })
+				.insert({ prefix: 'UPD', ringing_group_id: ownerGroupId })
 				.select('id')
 				.single();
 			if (error || !data) throw error ?? new Error('Failed to seed RingSequences row');
