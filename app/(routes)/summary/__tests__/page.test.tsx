@@ -6,7 +6,7 @@ import {
 	fireEvent,
 	waitFor
 } from '@testing-library/react';
-import Page, { fetchAllTimeSummaryData } from '../page';
+import Page, { fetchSummaryPageContent } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
@@ -65,7 +65,7 @@ describe('/summary (all-time)', () => {
 	});
 
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
-		await fetchAllTimeSummaryData({}, 1);
+		await fetchSummaryPageContent({}, 1);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(1);
 	});
 
@@ -84,7 +84,7 @@ describe('/summary (all-time)', () => {
 	});
 
 	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
-		await fetchAllTimeSummaryData({}, 1);
+		await fetchSummaryPageContent({}, 1);
 		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
 
@@ -96,15 +96,15 @@ describe('/summary (all-time)', () => {
 		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
 
-	it('fetchAllTimeSummaryData calls fetchYearlyTotals with the viewed group id', async () => {
-		await fetchAllTimeSummaryData({}, 1);
+	it('fetchSummaryPageContent calls fetchYearlyTotals with the viewed group id', async () => {
+		await fetchSummaryPageContent({}, 1);
 		expect(fetchYearlyTotalsMock).toHaveBeenCalledWith(1);
 	});
 
 	it('includes yearlyTotals in the returned page data', async () => {
 		const yearlyStats = [{ time_period: '2026-01-01' }];
 		fetchYearlyTotalsMock.mockResolvedValueOnce(yearlyStats);
-		const data = await fetchAllTimeSummaryData({}, 1);
+		const data = await fetchSummaryPageContent({}, 1);
 		expect(data.yearlyTotals).toBe(yearlyStats);
 	});
 

@@ -4,7 +4,7 @@ import { fetchSummaryStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
-import { SummaryPage as SummaryPageContent } from '../../_shared';
+import { SummaryPageContent } from '../../PageContent';
 
 export type PageParams = { year: string; month: string };
 type PageProps = { params: Promise<PageParams> };
@@ -18,7 +18,7 @@ export type PageData = {
 	toDate: string;
 };
 
-export async function fetchYearMonthSummaryData(
+export async function fetchSummaryYearMonthPageContent(
 	{ year, month }: PageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
@@ -71,7 +71,7 @@ export default async function YearMonthSummaryPage(
 				params.year,
 				params.month
 			]}
-			dataFetcher={fetchYearMonthSummaryData}
+			dataFetcher={fetchSummaryYearMonthPageContent}
 			PageComponent={YearMonthSummary}
 		/>
 	);

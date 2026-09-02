@@ -7,7 +7,7 @@ import {
 	fireEvent,
 	waitFor
 } from '@testing-library/react';
-import Page, { fetchYearSummaryData } from '../page';
+import Page, { fetchSummaryYearPageContent } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
@@ -70,7 +70,7 @@ describe('/summary/[year]', () => {
 	});
 
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
-		await fetchYearSummaryData({ year: '2026' }, 1);
+		await fetchSummaryYearPageContent({ year: '2026' }, 1);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
 			1,
 			'2026-01-01',
@@ -79,12 +79,12 @@ describe('/summary/[year]', () => {
 	});
 
 	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
-		await fetchYearSummaryData({ year: '2026' }, 1);
+		await fetchSummaryYearPageContent({ year: '2026' }, 1);
 		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
 
 	it('returns the year date bounds for the lazy species fetch', async () => {
-		const data = await fetchYearSummaryData({ year: '2026' }, 1);
+		const data = await fetchSummaryYearPageContent({ year: '2026' }, 1);
 		expect(data.fromDate).toBe('2026-01-01');
 		expect(data.toDate).toBe('2026-12-31');
 	});
@@ -99,8 +99,8 @@ describe('/summary/[year]', () => {
 		).toBe('10');
 	});
 
-	it('fetchYearSummaryData calls fetchPeriodStats with month grouping and the year bounds', async () => {
-		await fetchYearSummaryData({ year: '2026' }, 1);
+	it('fetchSummaryYearPageContent calls fetchPeriodStats with month grouping and the year bounds', async () => {
+		await fetchSummaryYearPageContent({ year: '2026' }, 1);
 		expect(fetchPeriodStatsMock).toHaveBeenCalledWith(
 			1,
 			'month',
@@ -113,7 +113,7 @@ describe('/summary/[year]', () => {
 		fetchPeriodStatsMock.mockResolvedValueOnce([
 			{ ...(alphaStats as object), time_period: '2026-08-01' }
 		]);
-		const data = await fetchYearSummaryData({ year: '2026' }, 1);
+		const data = await fetchSummaryYearPageContent({ year: '2026' }, 1);
 		expect(data.monthTotals).toHaveLength(12);
 		expect(data.monthTotals.map((row) => row.label)[0]).toBe('January 2026');
 		expect(data.monthTotals.map((row) => row.label)[11]).toBe('December 2026');

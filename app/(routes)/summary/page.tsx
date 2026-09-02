@@ -5,14 +5,14 @@ import {
 } from '@/app/actions/summary-stats';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
-import { SummaryPage as SummaryPageContent } from './_shared';
+import { SummaryPageContent } from './PageContent';
 
 export type PageData = {
 	summaryStats: AggregateStatsResult | null;
 	yearlyTotals: AggregateStatsResult[];
 };
 
-export async function fetchAllTimeSummaryData(
+export async function fetchSummaryPageContent(
 	_params: Record<string, string>,
 	viewedGroupId: number
 ): Promise<PageData> {
@@ -50,7 +50,7 @@ export default async function SummaryPage({
 		<BootstrapPage<PageData>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['summary']}
-			dataFetcher={fetchAllTimeSummaryData}
+			dataFetcher={fetchSummaryPageContent}
 			PageComponent={AllTimeSummary}
 		/>
 	);

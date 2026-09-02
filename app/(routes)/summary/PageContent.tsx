@@ -9,7 +9,7 @@ import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { MonthTotalsRow } from '@/app/models/month-totals';
-export function SummaryPage({
+export function SummaryPageContent({
 	year,
 	month,
 	summaryStats = null,
