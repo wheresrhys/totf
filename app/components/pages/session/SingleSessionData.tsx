@@ -5,7 +5,7 @@ import { type SessionEncounter } from '@/app/models/session';
 import { type NetRound } from '@/app/models/session-chronology';
 import { getAgeClass } from '@/app/models/encounter';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { InlineTable } from './shared/DesignSystem';
+import { InlineTable } from '../../shared/DesignSystem';
 export type SpeciesWithEncounters = {
 	species: string;
 	encounters: SessionEncounter[];
@@ -14,14 +14,14 @@ import {
 	type ColumnConfig,
 	SortableTable,
 	type RowModelWithRawData
-} from './shared/SortableTable';
+} from '../../shared/SortableTable';
 import {
 	buildStandardColumnConfigs,
 	columnBlock,
 	createNameLinkCell
-} from './shared/StatsTableColumnConfigs';
-import { createStatsTableBody } from './shared/StatsTableBody';
-import { TabNav } from './TabNav';
+} from '../../shared/StatsTableColumnConfigs';
+import { createStatsTableBody } from '../../shared/StatsTableBody';
+import { TabNav } from '../../TabNav';
 import { SessionHighlights } from './SessionHighlights';
 
 const SpeciesNameCell = createNameLinkCell<SpeciesWithEncounters, RowModel>(
