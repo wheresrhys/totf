@@ -140,6 +140,48 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
 - Route pages are in `app/(routes)/` — the `(routes)` group is just for organisation, it doesn't affect URLs.
 - Tests live in `__tests__/` directories alongside the code they test.
 
+## Route/page/content/dataFetcher conventions
+
+Every page lives under `app/(routes)/` and follows a consistent split between the route
+entrypoint, its content, and its data fetcher:
+
+- **`page.tsx`** is always server-side. It exports a default `___Page` component named after the
+  route (e.g. `BirdPage`, `SpeciesPage`, `RecordsPage`), which calls `BootstrapPage`
+  (`app/components/layout/BootstrapPage.tsx`) with a `PageComponent` and a `dataFetcher`.
+  `page.tsx` also hosts the `fetch___PageContent` function itself, even though
+  `PageContent.tsx` sits right next to it — the fetcher is inherently server-side (it's passed
+  into `BootstrapPage`), while `PageContent.tsx` may need `'use client'` for its content
+  component, so colocating the fetcher there risks a server/client boundary conflict.
+- **`PageContent.tsx`**, colocated alongside `page.tsx`, holds only the content component
+  (`___PageContent`) and any types/helpers it needs — never the data fetcher.
+- **Group-scoped variant** (`app/(routes)/group/[groupSlug]/...`) resolves `{id, slug}` via
+  `resolveGroupIdBySlug` and delegates to the top-level `___Page` component, passing it
+  `viewedGroup`. Its own export is named `Group___Page` (e.g. `GroupHomePage`,
+  `GroupMistakesPage`; disambiguated where a route has more than one group-scoped variant, e.g.
+  `GroupSpeciesPage` for the list vs. `GroupSpeciesDetailPage` for `species/[speciesName]`).
+  Group variants don't need their own `PageContent.tsx`. A route that only exists in
+  group-scoped form (no bare top-level URL — e.g. the by-date session page,
+  `group/[groupSlug]/session/[date]/`) still follows the `Group___Page` / `___PageContent` /
+  `fetch___PageContent` naming even though there's no separate top-level page to delegate to.
+- **Multiple route-depth variants of the same page** (e.g. `summary/`, `summary/[year]/`,
+  `summary/[year]/[month]/`, and the equivalent `species/[speciesName]/...` drill-downs) share
+  one `PageContent.tsx` colocated with the base route; the deeper variants import it via relative
+  path (`../PageContent`, `../../PageContent`). This replaces the old `_shared.tsx` convention,
+  which has been removed everywhere.
+- **Page-specific components** — used by only one page's content — live under
+  `app/components/pages/{route-name}/` (e.g. `components/pages/session/`,
+  `components/pages/species/`). Components used by more than one page family stay in top-level
+  `app/components/`.
+
+Naming reference (see #667 for the original design discussion):
+
+| Route | PageComponent (`page.tsx`) | ContentComponent (`PageContent.tsx`) | dataFetcher (`page.tsx`) | Child-component directory |
+|---|---|---|---|---|
+| `app/(routes)/group/[groupSlug]/session/[date]/page.tsx` | `GroupSessionPage` | `SessionPageContent` | `fetchSessionPageContent` | `components/pages/session` |
+| `app/(routes)/bird/[ring]/page.tsx` | `BirdPage` | `BirdPageContent` | `fetchBirdPageContent` | — |
+| `app/(routes)/species/[speciesName]/page.tsx` | `SpeciesPage` | `SpeciesPageContent` | `fetchSpeciesPageContent` | `components/pages/species` |
+
+
 ## Development environment
 
 ```sh
@@ -215,7 +257,7 @@ HTTP tests (`http-tests/`) use `http-tests/global-setup.ts` to start/stop the Ne
 Tests live in `__tests__/` directories alongside the code they test. Global mocks in `vitest.setup.tsx`:
 - `next/link`, `next/navigation`
 - `app/actions/group-cookie` (returns group ID `1`)
-- `BootstrapPageData` component
+- `BootstrapPage` component
 
 Page-level tests render async server components directly with `await Page({ params: Promise.resolve(...) })`.
 
