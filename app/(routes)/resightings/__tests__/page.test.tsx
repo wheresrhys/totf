@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import Page, { fetchResightings } from '../page';
+import Page, { fetchResightingsPageContent } from '../page';
 import resightingsSnapshot from '@/test-fixtures/snapshots/fetchResightings.alpha.json';
 import type { ResightingEncounter } from '@/app/models/session';
 import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
@@ -182,7 +182,7 @@ describe('resightings page', () => {
 	});
 });
 
-describe('fetchResightings query building', () => {
+describe('fetchResightingsPageContent query building', () => {
 	afterEach(() => {
 		cleanup();
 	});
@@ -190,14 +190,14 @@ describe('fetchResightings query building', () => {
 	it('filters encounters to the viewed group', async () => {
 		const { client, chain } = makeEncountersClient(resightingsSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchResightings({}, 42);
+		await fetchResightingsPageContent({}, 42);
 		expect(chain.eq).toHaveBeenCalledWith('ringing_group_id', 42);
 	});
 
 	it('matches only resighting/recovery record types in the query', async () => {
 		const { client, chain } = makeEncountersClient(resightingsSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchResightings({}, 42);
+		await fetchResightingsPageContent({}, 42);
 		expect(chain.in).toHaveBeenCalledWith('record_type', [
 			...RESIGHTING_RECORD_TYPES
 		]);
