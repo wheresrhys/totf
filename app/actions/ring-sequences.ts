@@ -66,42 +66,28 @@ export async function fetchRingSequenceBirds(
 ): Promise<RingSequenceBirdRow[] | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 
-	const sequence = await supabase
-		.from('RingSequences')
-		.select('prefix, first_ring')
-		.eq('id', ringSequenceId)
-		.maybeSingle()
-		.then(catchSupabaseErrors);
-
-	if (!sequence?.first_ring) return [];
-
-	const wildcardCount = sequence.first_ring.length - sequence.prefix.length;
-	if (wildcardCount < 0) return [];
-	const ringNoPattern = sequence.prefix + '_'.repeat(wildcardCount);
-
 	type BirdQueryRow = {
 		ring_no: string;
 		species: { species_name: string } | null;
 		encounters: { session: { visit_date: string } | null }[];
 	};
-
-	const birds = (await supabase
-		.from('Birds')
+	const birdsInSequence = (await supabase
+		.from('RingSequences_Birds')
 		.select(
 			`
-			ring_no,
-			species:Species(species_name),
-			encounters:Encounters!inner(
-				session:Sessions(visit_date)
+			bird:Birds!inner(
+				ring_no,
+				species:Species(species_name),
+				encounters:Encounters!inner(
+					session:Sessions(visit_date)
+				)
 			)
 		`
 		)
-		.eq('encounters.record_type', 'N')
-		.ilike('ring_no', ringNoPattern)
-		.order('ring_no')
-		.then(catchSupabaseErrors)) as BirdQueryRow[] | null;
+		.eq('ring_sequence_id', ringSequenceId)
+		.then(catchSupabaseErrors)) as { bird: BirdQueryRow }[] | null;
 
-	return (birds ?? []).map((bird) => ({
+	return (birdsInSequence || []).map(({ bird }) => ({
 		ring_no: bird.ring_no,
 		species_name: bird.species?.species_name ?? '',
 		ringed_date: bird.encounters[0]?.session?.visit_date ?? ''
