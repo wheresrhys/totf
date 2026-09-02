@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { SpStats } from '../SpStats';
 import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
-import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/page';
+import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 
 const { topSessions, birds, speciesStats } =
 	spPageSnapshot as unknown as FullFatPageData;

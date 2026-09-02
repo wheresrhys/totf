@@ -1,7 +1,9 @@
-import { BoxyList } from '@/app/components/shared/DesignSystem';
-import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/page';
-import { StatOutput } from './shared/StatOutput';
-import { UnwrappedBadgeList } from './shared/DesignSystem';
+import {
+	BoxyList,
+	UnwrappedBadgeList
+} from '@/app/components/shared/DesignSystem';
+import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
+import { StatOutput } from '@/app/components/shared/StatOutput';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { SpeciesStatConfig } from '@/app/models/species-stats';
 import { speciesStatConfigs } from '@/app/models/species-stats';

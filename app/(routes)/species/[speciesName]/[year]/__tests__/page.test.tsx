@@ -6,9 +6,9 @@ import {
 	within,
 	fireEvent
 } from '@testing-library/react';
-import Page, { fetchSpYearPageData } from '../page';
+import Page, { fetchSpeciesYearPageContent } from '../page';
 import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
-import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/page';
+import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 
 const {
 	mockGetAuthenticatedSupabaseClient,
@@ -32,33 +32,33 @@ vi.mock('@/app/actions/sp-data', () => ({
 	fetchPageOfBirds: mockFetchPageOfBirds
 }));
 
-vi.mock('@/app/components/SpIndividualsTab', () => ({
+vi.mock('@/app/components/pages/species/SpIndividualsTab', () => ({
 	SpIndividualsTab: () => <div data-testid="sp-individuals-tab" />
 }));
 
-vi.mock('@/app/components/SpNotableRetrapsTab', () => ({
+vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
 	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
 }));
 
-vi.mock('@/app/components/SpStatsHistoryTab', () => ({
+vi.mock('@/app/components/pages/species/SpStatsHistoryTab', () => ({
 	SpStatsHistoryTab: () => <div data-testid="sp-stats-history-tab" />
 }));
 
-vi.mock('@/app/components/SpMonthTotalsTab', () => ({
+vi.mock('@/app/components/pages/species/SpMonthTotalsTab', () => ({
 	SpMonthTotalsTab: () => <div data-testid="sp-month-totals-tab" />
 }));
 
-vi.mock('@/app/components/SpCombinedMonthTotalsTab', () => ({
+vi.mock('@/app/components/pages/species/SpCombinedMonthTotalsTab', () => ({
 	SpCombinedMonthTotalsTab: () => (
 		<div data-testid="sp-combined-month-totals-tab" />
 	)
 }));
 
-vi.mock('@/app/components/SpSessionTotalsTab', () => ({
+vi.mock('@/app/components/pages/species/SpSessionTotalsTab', () => ({
 	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
 }));
 
-vi.mock('@/app/components/SpWeightWingTab', () => ({
+vi.mock('@/app/components/pages/species/SpWeightWingTab', () => ({
 	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
 
@@ -178,7 +178,10 @@ describe('/species/[speciesName]/[year]', () => {
 		});
 
 		it('threads the whole-year from/to bounds into fetchPageOfBirds', async () => {
-			await fetchSpYearPageData({ speciesName: 'Robin', year: '2026' }, 1);
+			await fetchSpeciesYearPageContent(
+				{ speciesName: 'Robin', year: '2026' },
+				1
+			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
 				spPageSnapshot.speciesId,
 				1,
@@ -191,7 +194,10 @@ describe('/species/[speciesName]/[year]', () => {
 		it('threads year_filter into the top-sessions filter and the range into aggregate stats', async () => {
 			const client = makeSpeciesClient();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-			await fetchSpYearPageData({ speciesName: 'Robin', year: '2026' }, 1);
+			await fetchSpeciesYearPageContent(
+				{ speciesName: 'Robin', year: '2026' },
+				1
+			);
 			expect(mockGetTopPeriodsByMetric).toHaveBeenCalledWith(
 				expect.objectContaining({
 					filters: expect.objectContaining({ year_filter: 2026 })
@@ -239,7 +245,10 @@ describe('/species/[speciesName]/[year]', () => {
 
 		it('rejects when the species lookup finds no row (surfacing the not-found path)', async () => {
 			await expect(
-				fetchSpYearPageData({ speciesName: 'Nonexistent', year: '2026' }, 1)
+				fetchSpeciesYearPageContent(
+					{ speciesName: 'Nonexistent', year: '2026' },
+					1
+				)
 			).rejects.toThrow();
 		});
 	});

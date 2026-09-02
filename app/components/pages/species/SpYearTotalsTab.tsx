@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { fetchSpeciesPeriodTotals } from '../actions/sp-data';
-import { PeriodTotalsTable } from './PeriodTotalsTable';
+import { fetchSpeciesPeriodTotals } from '@/app/actions/sp-data';
+import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import type { AggregateStatsResult } from '@/app/models/db';
 
 export function SpYearTotalsTab({

@@ -1,20 +1,20 @@
 'use client';
-import { WeightVsWingLengthChart } from '@/app/components/WeightAndWingChart';
+import { StatsHistoryChart } from '@/app/components/pages/species/StatsHistoryChart';
 
-export function SpWeightWingTab({
-	speciesId,
+export function SpStatsHistoryTab({
+	speciesName,
 	viewedGroupId,
 	fromDate,
 	toDate
 }: {
-	speciesId: number;
+	speciesName: string;
 	viewedGroupId: number;
 	fromDate?: string;
 	toDate?: string;
 }) {
 	return (
-		<WeightVsWingLengthChart
-			speciesId={speciesId}
+		<StatsHistoryChart
+			speciesName={speciesName}
 			viewedGroupId={viewedGroupId}
 			fromDate={fromDate}
 			toDate={toDate}

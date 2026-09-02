@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { notFound } from 'next/navigation';
-import CrossGroupSingleSpeciesPage from '../page';
+import GroupSpeciesDetailPage from '../page';
 
 const { mockResolveGroupIdBySlug } = vi.hoisted(() => ({
 	mockResolveGroupIdBySlug: vi.fn()
@@ -23,7 +23,7 @@ vi.mock('@/app/(routes)/species/[speciesName]/page', () => ({
 
 import SpeciesPage from '@/app/(routes)/species/[speciesName]/page';
 
-describe('cross-group single-species page', () => {
+describe('group species detail page', () => {
 	afterEach(() => {
 		cleanup();
 		vi.clearAllMocks();
@@ -36,7 +36,7 @@ describe('cross-group single-species page', () => {
 
 		it('passes viewedGroup matching { id, slug } resolved from resolveGroupIdBySlug to the underlying route page', async () => {
 			render(
-				await CrossGroupSingleSpeciesPage({
+				await GroupSpeciesDetailPage({
 					params: Promise.resolve({
 						groupSlug: 'viewed-group-slug',
 						speciesName: 'Robin'
@@ -66,7 +66,7 @@ describe('cross-group single-species page', () => {
 
 		it('calls notFound() instead of rendering the route page', async () => {
 			await expect(
-				CrossGroupSingleSpeciesPage({
+				GroupSpeciesDetailPage({
 					params: Promise.resolve({
 						groupSlug: 'no-such-group',
 						speciesName: 'Robin'

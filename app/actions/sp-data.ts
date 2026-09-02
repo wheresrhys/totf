@@ -9,8 +9,8 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
-import type { GraphableBird } from '@/app/components/WeightAndWingChart';
-import type { SexedGraphableBird } from '@/app/components/WeightAndWingChart';
+import type { GraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
+import type { SexedGraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/models/period-totals';
 export async function fetchPageOfBirds(

@@ -1,24 +1,96 @@
 'use client';
 import { useState } from 'react';
-import { PageWrapper } from '@/app/components/shared/DesignSystem';
-import { SpStats } from '@/app/components/SpStats';
-import { SpeciesHeading } from '@/app/(routes)/species/_shared';
+import { format } from 'date-fns';
+import {
+	PageWrapper,
+	PrimaryHeading
+} from '@/app/components/shared/DesignSystem';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+import { SpStats } from '@/app/components/pages/species/SpStats';
 import 'chartkick/chart.js';
-import type {
-	FullFatPageData,
-	PageData,
-	PageParams
-} from '@/app/(routes)/species/[speciesName]/page';
+import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
+import type { AggregateStatsResult, TopPeriodsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
-import { SpIndividualsTab } from './SpIndividualsTab';
-import { SpNotableRetrapsTab } from './SpNotableRetrapsTab';
-import { SpStatsHistoryTab } from './SpStatsHistoryTab';
-import { SpWeightWingTab } from './SpWeightWingTab';
-import { SpYearTotalsTab } from './SpYearTotalsTab';
-import { SpMonthTotalsTab } from './SpMonthTotalsTab';
-import { SpCombinedMonthTotalsTab } from './SpCombinedMonthTotalsTab';
-import { SpSessionTotalsTab } from './SpSessionTotalsTab';
-import { TabNav } from './TabNav';
+import { SpIndividualsTab } from '@/app/components/pages/species/SpIndividualsTab';
+import { SpNotableRetrapsTab } from '@/app/components/pages/species/SpNotableRetrapsTab';
+import { SpStatsHistoryTab } from '@/app/components/pages/species/SpStatsHistoryTab';
+import { SpWeightWingTab } from '@/app/components/pages/species/SpWeightWingTab';
+import { SpYearTotalsTab } from '@/app/components/pages/species/SpYearTotalsTab';
+import { SpMonthTotalsTab } from '@/app/components/pages/species/SpMonthTotalsTab';
+import { SpCombinedMonthTotalsTab } from '@/app/components/pages/species/SpCombinedMonthTotalsTab';
+import { SpSessionTotalsTab } from '@/app/components/pages/species/SpSessionTotalsTab';
+import { TabNav } from '@/app/components/TabNav';
+
+// `year`/`month` are only present on the period-scoped child routes
+// (`[year]`, `[year]/[month]`); the unscoped route supplies just `speciesName`.
+export type PageParams = { speciesName: string; year?: string; month?: string };
+
+// A resolved period passed to `fetchSpeciesPageContentForPeriod`. `year`/`month`
+// drive the heading and top-session filtering; `fromDate`/`toDate` (a
+// `yyyy-MM-dd` range) scope the encounter-level fetchers. All optional — an
+// all-time page passes none.
+export type PeriodScope = {
+	year?: number;
+	month?: number;
+	fromDate?: string;
+	toDate?: string;
+};
+
+export type FullFatPageData = {
+	topSessions: TopPeriodsResult[];
+	birds: EnrichedBirdOfSpecies[];
+	speciesStats: AggregateStatsResult;
+	speciesId: number;
+	speciesName: string;
+} & PeriodScope;
+export type ThinPageData = { speciesId: number } & PeriodScope;
+export type PageData = FullFatPageData | ThinPageData;
+
+export function buildSpeciesHeadingText(
+	speciesName: string,
+	year?: number,
+	month?: number
+): string {
+	if (year === undefined) {
+		return speciesName;
+	}
+	if (month === undefined) {
+		return `${speciesName} ${year}`;
+	}
+	const monthDate = new Date(year, month - 1, 1);
+	return `${speciesName} ${format(monthDate, 'LLLL')} ${year}`;
+}
+
+// Period-aware heading shared by the all-time, year and year+month species routes.
+// When a period is in play it appends an "All time" link back to the unscoped
+// `/species/{name}` page (mirroring #614's `{species} {period} [All time]` spec);
+// with no period it renders the bare species name, matching today's behaviour.
+export function SpeciesHeading({
+	speciesName,
+	year,
+	month
+}: {
+	speciesName: string;
+	year?: number;
+	month?: number;
+}) {
+	return (
+		<PrimaryHeading>
+			{buildSpeciesHeadingText(speciesName, year, month)}
+			{year !== undefined && (
+				<>
+					{' '}
+					<NoPrefetchLink
+						className="link text-lg align-middle"
+						href={`/species/${speciesName}`}
+					>
+						All time
+					</NoPrefetchLink>
+				</>
+			)}
+		</PrimaryHeading>
+	);
+}
 
 function ConditionalTabPanel({
 	loadedTabs,
@@ -202,7 +274,7 @@ function fullFatTypeGuard(data: PageData): data is FullFatPageData {
 	return 'birds' in data;
 }
 
-export function SpPage({
+export function SpeciesPageContent({
 	params: { speciesName, year, month },
 	data,
 	viewedGroup

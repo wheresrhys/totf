@@ -1,20 +1,17 @@
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
-import { SpPage } from '@/app/components/SpPage';
-import {
-	fetchSpPageDataForPeriod,
-	type PageData
-} from '@/app/(routes)/species/[speciesName]/page';
+import { SpeciesPageContent, type PageData } from '../PageContent';
+import { fetchSpeciesPageContentForPeriod } from '@/app/(routes)/species/[speciesName]/page';
 import type { ViewedGroup } from '@/lib/group-slug';
 
 export type PageParams = { speciesName: string; year: string };
 type PageProps = { params: Promise<PageParams> };
 
-export async function fetchSpYearPageData(
+export async function fetchSpeciesYearPageContent(
 	params: PageParams,
 	viewedGroupId: number
 ): Promise<PageData | null> {
 	// Whole-calendar-year range, mirroring `summary/[year]/page.tsx`.
-	return fetchSpPageDataForPeriod(params, viewedGroupId, {
+	return fetchSpeciesPageContentForPeriod(params, viewedGroupId, {
 		year: Number(params.year),
 		fromDate: `${params.year}-01-01`,
 		toDate: `${params.year}-12-31`
@@ -33,8 +30,8 @@ export default async function SpeciesYearPage(
 				params.speciesName,
 				params.year
 			]}
-			dataFetcher={fetchSpYearPageData}
-			PageComponent={SpPage}
+			dataFetcher={fetchSpeciesYearPageContent}
+			PageComponent={SpeciesPageContent}
 		/>
 	);
 }

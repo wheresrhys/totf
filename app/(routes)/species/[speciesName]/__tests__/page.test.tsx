@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import Page from '../page';
 import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
-import type { FullFatPageData } from '../page';
+import type { FullFatPageData } from '../PageContent';
 
 const {
 	mockGetAuthenticatedSupabaseClient,
@@ -26,33 +26,33 @@ vi.mock('@/app/actions/sp-data', () => ({
 	fetchPageOfBirds: mockFetchPageOfBirds
 }));
 
-vi.mock('@/app/components/SpIndividualsTab', () => ({
+vi.mock('@/app/components/pages/species/SpIndividualsTab', () => ({
 	SpIndividualsTab: () => <div data-testid="sp-individuals-tab" />
 }));
 
-vi.mock('@/app/components/SpNotableRetrapsTab', () => ({
+vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
 	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
 }));
 
-vi.mock('@/app/components/SpStatsHistoryTab', () => ({
+vi.mock('@/app/components/pages/species/SpStatsHistoryTab', () => ({
 	SpStatsHistoryTab: () => <div data-testid="sp-stats-history-tab" />
 }));
 
-vi.mock('@/app/components/SpYearTotalsTab', () => ({
+vi.mock('@/app/components/pages/species/SpYearTotalsTab', () => ({
 	SpYearTotalsTab: () => <div data-testid="sp-year-totals-tab" />
 }));
 
-vi.mock('@/app/components/SpCombinedMonthTotalsTab', () => ({
+vi.mock('@/app/components/pages/species/SpCombinedMonthTotalsTab', () => ({
 	SpCombinedMonthTotalsTab: () => (
 		<div data-testid="sp-combined-month-totals-tab" />
 	)
 }));
 
-vi.mock('@/app/components/SpSessionTotalsTab', () => ({
+vi.mock('@/app/components/pages/species/SpSessionTotalsTab', () => ({
 	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
 }));
 
-vi.mock('@/app/components/SpWeightWingTab', () => ({
+vi.mock('@/app/components/pages/species/SpWeightWingTab', () => ({
 	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
 

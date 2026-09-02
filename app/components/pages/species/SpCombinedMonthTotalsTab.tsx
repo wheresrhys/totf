@@ -1,13 +1,13 @@
 'use client';
 import { useCallback, useState } from 'react';
-import { fetchSpeciesPeriodTotals } from '../actions/sp-data';
-import { PeriodTotalsTable } from './PeriodTotalsTable';
-import { useLazyTabData } from './shared/useLazyTabData';
+import { fetchSpeciesPeriodTotals } from '@/app/actions/sp-data';
+import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
+import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import {
 	buildCombinedMonthTotalsRows,
 	buildPerYearMonthTotalsRows
 } from '@/app/models/month-totals';
-import { CombineYearsToggle } from './shared/CombineYearsToggle';
+import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 
 // The all-time species page's combine-years "Month totals" tab — the
 // species-scoped counterpart to `SummaryTotalsSection`'s
@@ -24,8 +24,9 @@ export function SpCombinedMonthTotalsTab({
 	speciesName: string;
 	viewedGroupId: number;
 	// Gates the lazy fetch — true once this tab is the selected tab. Unlike
-	// `SpYearTotalsTab`/`SpMonthTotalsTab` (which rely solely on `SpPage`'s
-	// `ConditionalTabPanel` deferring their mount), this tab uses #633's
+	// `SpYearTotalsTab`/`SpMonthTotalsTab` (which rely solely on
+	// `SpeciesPageContent`'s `ConditionalTabPanel` deferring their mount), this
+	// tab uses #633's
 	// `useLazyTabData` explicitly, per this ticket's reuse requirement.
 	isActive: boolean;
 }) {
@@ -47,8 +48,8 @@ export function SpCombinedMonthTotalsTab({
 	);
 	// Defaults to ON (combined) — resets each time this tab remounts, mirroring
 	// `SummaryTotalsSection`'s `AllTimeMonthTotalsTab`, since this component
-	// itself never unmounts across tab switches (`SpPage`'s tab nav keeps it
-	// mounted via `isActive`).
+	// itself never unmounts across tab switches (`SpeciesPageContent`'s tab nav
+	// keeps it mounted via `isActive`).
 	const [combineYears, setCombineYears] = useState(true);
 
 	if (isLoading || monthlyStats === undefined) {
