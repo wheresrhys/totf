@@ -2,9 +2,13 @@ import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
-import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
-import { SpPage } from '@/app/components/SpPage';
 import { fetchPageOfBirds } from '@/app/actions/sp-data';
+import {
+	SpeciesPageContent,
+	type PageParams,
+	type PeriodScope,
+	type PageData
+} from './PageContent';
 
 import type {
 	AggregateStatsResult,
@@ -12,30 +16,8 @@ import type {
 	TopPeriodsResult
 } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
-// `year`/`month` are only present on the period-scoped child routes
-// (`[year]`, `[year]/[month]`); the unscoped route supplies just `speciesName`.
-export type PageParams = { speciesName: string; year?: string; month?: string };
+
 type PageProps = { params: Promise<PageParams> };
-
-// A resolved period passed to `fetchSpPageDataForPeriod`. `year`/`month` drive the
-// heading and top-session filtering; `fromDate`/`toDate` (a `yyyy-MM-dd` range)
-// scope the encounter-level fetchers. All optional — an all-time page passes none.
-export type PeriodScope = {
-	year?: number;
-	month?: number;
-	fromDate?: string;
-	toDate?: string;
-};
-
-export type FullFatPageData = {
-	topSessions: TopPeriodsResult[];
-	birds: EnrichedBirdOfSpecies[];
-	speciesStats: AggregateStatsResult;
-	speciesId: number;
-	speciesName: string;
-} & PeriodScope;
-export type ThinPageData = { speciesId: number } & PeriodScope;
-export type PageData = FullFatPageData | ThinPageData;
 
 function getTopSessions(
 	species: string,
@@ -79,7 +61,7 @@ async function getSpeciesStats(
 // echoes the period back on the returned data so the client can build the
 // heading and scope its own tab fetches. The unscoped route passes an empty
 // period, reproducing today's all-time behaviour exactly.
-export async function fetchSpPageDataForPeriod(
+export async function fetchSpeciesPageContentForPeriod(
 	params: PageParams,
 	viewedGroupId: number,
 	period: PeriodScope = {}
@@ -122,11 +104,11 @@ export async function fetchSpPageDataForPeriod(
 	};
 }
 
-export async function fetchSpPageData(
+export async function fetchSpeciesPageContent(
 	params: PageParams,
 	viewedGroupId: number
 ): Promise<PageData | null> {
-	return fetchSpPageDataForPeriod(params, viewedGroupId);
+	return fetchSpeciesPageContentForPeriod(params, viewedGroupId);
 }
 
 export default async function SpeciesPage(
@@ -137,8 +119,8 @@ export default async function SpeciesPage(
 			pageProps={props}
 			viewedGroup={props.viewedGroup}
 			getCacheKeys={(params: PageParams) => ['species', params.speciesName]}
-			dataFetcher={fetchSpPageData}
-			PageComponent={SpPage}
+			dataFetcher={fetchSpeciesPageContent}
+			PageComponent={SpeciesPageContent}
 		/>
 	);
 }

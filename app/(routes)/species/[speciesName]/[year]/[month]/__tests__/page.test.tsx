@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, within } from '@testing-library/react';
-import Page, { fetchSpYearMonthPageData } from '../page';
+import Page, { fetchSpeciesYearMonthPageContent } from '../page';
 import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
-import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/page';
+import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 
 const {
 	mockGetAuthenticatedSupabaseClient,
@@ -26,19 +26,19 @@ vi.mock('@/app/actions/sp-data', () => ({
 	fetchPageOfBirds: mockFetchPageOfBirds
 }));
 
-vi.mock('@/app/components/SpIndividualsTab', () => ({
+vi.mock('@/app/components/pages/species/SpIndividualsTab', () => ({
 	SpIndividualsTab: () => <div data-testid="sp-individuals-tab" />
 }));
 
-vi.mock('@/app/components/SpNotableRetrapsTab', () => ({
+vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
 	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
 }));
 
-vi.mock('@/app/components/SpStatsHistoryTab', () => ({
+vi.mock('@/app/components/pages/species/SpStatsHistoryTab', () => ({
 	SpStatsHistoryTab: () => <div data-testid="sp-stats-history-tab" />
 }));
 
-vi.mock('@/app/components/SpWeightWingTab', () => ({
+vi.mock('@/app/components/pages/species/SpWeightWingTab', () => ({
 	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
 
@@ -137,7 +137,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 		});
 
 		it("threads the month's first/last calendar day into fetchPageOfBirds", async () => {
-			await fetchSpYearMonthPageData(
+			await fetchSpeciesYearMonthPageContent(
 				{ speciesName: 'Robin', year: '2026', month: '08' },
 				1
 			);
@@ -151,7 +151,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 		});
 
 		it('computes the correct bounds for a shorter month (April)', async () => {
-			await fetchSpYearMonthPageData(
+			await fetchSpeciesYearMonthPageContent(
 				{ speciesName: 'Robin', year: '2026', month: '04' },
 				1
 			);
@@ -165,7 +165,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 		});
 
 		it('threads year_filter and month_filter into the top-sessions filter', async () => {
-			await fetchSpYearMonthPageData(
+			await fetchSpeciesYearMonthPageContent(
 				{ speciesName: 'Robin', year: '2026', month: '08' },
 				1
 			);
@@ -211,7 +211,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 
 		it('rejects when the species lookup finds no row (surfacing the not-found path)', async () => {
 			await expect(
-				fetchSpYearMonthPageData(
+				fetchSpeciesYearMonthPageContent(
 					{ speciesName: 'Nonexistent', year: '2026', month: '08' },
 					1
 				)
