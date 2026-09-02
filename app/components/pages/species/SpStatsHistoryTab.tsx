@@ -1,5 +1,5 @@
 'use client';
-import { StatsHistoryChart } from '@/app/components/StatsHistoryChart';
+import { StatsHistoryChart } from '@/app/components/pages/species/StatsHistoryChart';
 
 export function SpStatsHistoryTab({
 	speciesName,

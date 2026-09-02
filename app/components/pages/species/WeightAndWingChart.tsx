@@ -2,8 +2,8 @@ import { type Sex } from '@/app/models/bird';
 import { getAgeClass } from '@/app/models/encounter';
 import { useEffect, useState } from 'react';
 import { ScatterChart, type ScatterChartData } from 'react-chartkick';
-import { fetchGraphableEncounterData } from '../actions/sp-data';
-import { SecondaryHeading } from './shared/DesignSystem';
+import { fetchGraphableEncounterData } from '@/app/actions/sp-data';
+import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
 type GraphableEncounterData = {
 	age_code: number;
 	is_juv: boolean;

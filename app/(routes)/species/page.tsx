@@ -2,7 +2,7 @@ import {
 	BootstrapPage,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import { SppStatsTable } from '@/app/components/SppStatsTable';
+import { SppStatsTable } from '@/app/components/pages/species/SppStatsTable';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
@@ -30,7 +30,7 @@ export async function fetchYears(viewedGroupId: number): Promise<number[]> {
 	] as number[];
 }
 
-export async function fetchSppListPageData(
+export async function fetchSpeciesListPageContent(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
@@ -53,7 +53,7 @@ export default async function AllSpeciesPage({
 		<BootstrapPage<PageData>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['species']}
-			dataFetcher={fetchSppListPageData}
+			dataFetcher={fetchSpeciesListPageContent}
 			PageComponent={SppStatsTable}
 		/>
 	);

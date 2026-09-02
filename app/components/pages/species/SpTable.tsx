@@ -6,15 +6,15 @@ import {
 	type MeasurementRange
 } from '@/app/models/measurement-range';
 import { SingleBirdTable } from '@/app/components/SingleBirdTable';
-import { MeasurementRangeCell } from '@/app/components/MeasurementRangeCell';
+import { MeasurementRangeCell } from '@/app/components/pages/species/MeasurementRangeCell';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { AccordionTableBody } from './shared/AccordionTableBody';
+import { AccordionTableBody } from '@/app/components/shared/AccordionTableBody';
 import {
 	SortableTable,
 	type ColumnConfig,
 	type RowModelWithRawData,
 	getFormattedValue
-} from './shared/SortableTable';
+} from '@/app/components/shared/SortableTable';
 
 type RowModel = {
 	ringNo: string;

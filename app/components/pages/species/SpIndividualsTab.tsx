@@ -1,7 +1,7 @@
 'use client';
-import { SpTable } from '@/app/components/SpTable';
+import { SpTable } from '@/app/components/pages/species/SpTable';
 import { useState } from 'react';
-import { fetchPageOfBirds } from '../actions/sp-data';
+import { fetchPageOfBirds } from '@/app/actions/sp-data';
 import { useOnInView } from 'react-intersection-observer';
 import type { EnrichedBirdOfSpecies } from '@/app/models/bird';
 

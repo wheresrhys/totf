@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	getChartData,
 	type SexedGraphableBird
-} from '@/app/components/WeightAndWingChart';
+} from '@/app/components/pages/species/WeightAndWingChart';
 
 function makeBird(encounter: {
 	age_code: number;

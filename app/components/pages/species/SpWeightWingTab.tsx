@@ -1,5 +1,5 @@
 'use client';
-import { WeightVsWingLengthChart } from '@/app/components/WeightAndWingChart';
+import { WeightVsWingLengthChart } from '@/app/components/pages/species/WeightAndWingChart';
 
 export function SpWeightWingTab({
 	speciesId,

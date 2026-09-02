@@ -1,8 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
-import { fetchNotableRetraps } from '../actions/sp-data';
-import { NotableRetrapsTable } from './NotableRetrapsTable';
+import { fetchNotableRetraps } from '@/app/actions/sp-data';
+import { NotableRetrapsTable } from '@/app/components/NotableRetrapsTable';
 import type { NotableRetrapsResult } from '@/app/models/db';
 
 export function SpNotableRetrapsTab({
