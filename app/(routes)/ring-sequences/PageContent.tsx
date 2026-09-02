@@ -5,15 +5,15 @@ import {
 	groupRingSequencesBySize,
 	type RingSequenceSizeGroup
 } from '@/app/models/ring-sequences';
-import { AccordionItem } from './shared/Accordion';
+import { AccordionItem } from '@/app/components/shared/Accordion';
 import {
 	BoxyList,
 	PageWrapper,
 	PrimaryHeading,
 	SecondaryHeading
-} from './shared/DesignSystem';
-import { RingSequenceDetail } from './RingSequenceDetail';
-import { RingSequenceEditModal } from './RingSequenceEditModal';
+} from '@/app/components/shared/DesignSystem';
+import { RingSequenceDetail } from '@/app/components/pages/ring-sequences/RingSequenceDetail';
+import { RingSequenceEditModal } from '@/app/components/RingSequenceEditModal';
 
 type SequenceRowModel = {
 	sequence: RingSequenceRow;
@@ -129,7 +129,11 @@ function RingSizeSection({
 	);
 }
 
-export function RingSequencesPage({ data }: { data: RingSequenceRow[] }) {
+export function RingSequencesPageContent({
+	data
+}: {
+	data: RingSequenceRow[];
+}) {
 	const [expandedId, setExpandedId] = useState<string | false>(false);
 	const [editingSequence, setEditingSequence] =
 		useState<RingSequenceRow | null>(null);
