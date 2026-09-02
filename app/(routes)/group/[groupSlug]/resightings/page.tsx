@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
 import ResightingsPage from '@/app/(routes)/resightings/page';
 
-export default async function CrossGroupResightingsPage({
+export default async function GroupResightingsPage({
 	params
 }: {
 	params: Promise<{ groupSlug: string }>;

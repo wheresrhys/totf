@@ -6,13 +6,9 @@ import {
 	BootstrapPage,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
-import { NotableRetrapsTable } from '@/app/components/NotableRetrapsTable';
+import { RetrapsPageContent } from './PageContent';
 
-export async function fetchNotableRetraps(
+export async function fetchRetrapsPageContent(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<NotableRetrapsResult[]> {
@@ -27,15 +23,7 @@ export async function fetchNotableRetraps(
 		.then(catchSupabaseErrors) as Promise<NotableRetrapsResult[]>;
 }
 
-function ListNotableRetraps({ data }: { data: NotableRetrapsResult[] }) {
-	return (
-		<PageWrapper>
-			<PrimaryHeading>Notable Birds</PrimaryHeading>
-			<NotableRetrapsTable data={data} />
-		</PageWrapper>
-	);
-}
-export default async function NotableRetrapsPage({
+export default async function RetrapsPage({
 	viewedGroup
 }: {
 	viewedGroup?: ViewedGroup;
@@ -44,8 +32,8 @@ export default async function NotableRetrapsPage({
 		<BootstrapPage<NotableRetrapsResult[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['notable-retraps']}
-			dataFetcher={fetchNotableRetraps}
-			PageComponent={ListNotableRetraps}
+			dataFetcher={fetchRetrapsPageContent}
+			PageComponent={RetrapsPageContent}
 		/>
 	);
 }

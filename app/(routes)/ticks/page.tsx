@@ -6,14 +6,9 @@ import {
 	BootstrapPage,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import {
-	BoxyList,
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
-import { format as formatDate } from 'date-fns';
+import { TicksPageContent } from './PageContent';
 
-export async function fetchGroupTicks(
+export async function fetchTicksPageContent(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<GroupTicksResult[]> {
@@ -21,26 +16,6 @@ export async function fetchGroupTicks(
 	return supabase
 		.rpc('group_ticks', { ringing_group_filter: viewedGroupId })
 		.then(catchSupabaseErrors) as Promise<GroupTicksResult[]>;
-}
-
-function ListTicks({ data }: { data: GroupTicksResult[] }) {
-	return (
-		<PageWrapper>
-			<PrimaryHeading>Ticks</PrimaryHeading>
-			{data.length === 0 ? (
-				<p>No ticks yet.</p>
-			) : (
-				<BoxyList>
-					{data.map((tick) => (
-						<li key={`${tick.species_name}-${tick.first_encounter_date}`}>
-							{tick.species_name} on{' '}
-							{formatDate(new Date(tick.first_encounter_date), 'do MMMM yyyy')}
-						</li>
-					))}
-				</BoxyList>
-			)}
-		</PageWrapper>
-	);
 }
 
 export default async function TicksPage({
@@ -52,8 +27,8 @@ export default async function TicksPage({
 		<BootstrapPage<GroupTicksResult[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['ticks']}
-			dataFetcher={fetchGroupTicks}
-			PageComponent={ListTicks}
+			dataFetcher={fetchTicksPageContent}
+			PageComponent={TicksPageContent}
 		/>
 	);
 }

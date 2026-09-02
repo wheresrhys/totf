@@ -6,10 +6,10 @@ import {
 	waitFor,
 	fireEvent
 } from '@testing-library/react';
-import { StatsAccordionItem } from '../StatsAccordionItem';
+import { StatsAccordionItem } from '../PageContent';
 import topPeriodsSnapshot from '@/test-fixtures/snapshots/getTopPeriodsByMetric.alpha.json';
 import type { TopPeriodsResult } from '@/app/models/db';
-import type { AccordionItemModel } from '../StatsAccordion';
+import type { AccordionItemModel } from '../PageContent';
 import type { UserTopStatsArgs } from '@/app/actions/top-performers';
 
 vi.mock('@/app/actions/top-performers', () => ({

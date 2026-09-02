@@ -7,13 +7,9 @@ import {
 	BootstrapPage,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
-import { ResightingsTable } from '@/app/components/ResightingsTable';
+import { ResightingsPageContent } from './PageContent';
 
-export async function fetchResightings(
+export async function fetchResightingsPageContent(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<ResightingEncounter[]> {
@@ -46,15 +42,6 @@ export async function fetchResightings(
 		.then(catchSupabaseErrors) as Promise<ResightingEncounter[]>;
 }
 
-function ListResightings({ data }: { data: ResightingEncounter[] }) {
-	return (
-		<PageWrapper>
-			<PrimaryHeading>Resightings</PrimaryHeading>
-			<ResightingsTable resightings={data} />
-		</PageWrapper>
-	);
-}
-
 export default async function ResightingsPage({
 	viewedGroup
 }: {
@@ -64,8 +51,8 @@ export default async function ResightingsPage({
 		<BootstrapPage<ResightingEncounter[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['resightings']}
-			dataFetcher={fetchResightings}
-			PageComponent={ListResightings}
+			dataFetcher={fetchResightingsPageContent}
+			PageComponent={ResightingsPageContent}
 		/>
 	);
 }
