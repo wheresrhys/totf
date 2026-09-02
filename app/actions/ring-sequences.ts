@@ -3,6 +3,8 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import {
 	groupRingNosByPrefix,
+	trailingRingNumber,
+	validateRingSequenceBounds,
 	type UnassignedImportPrefix
 } from '@/app/models/ring-sequences';
 import type { RingSequenceRow, RingSize } from '@/app/models/db';
@@ -142,30 +144,195 @@ export async function fetchRingSequenceBirds(
 	}));
 }
 
-// Updates a ring sequence's `size`. `prefix` is a fixed identity for a
-// sequence (enforced via a DB CHECK constraint — see #729) and is never read
-// from the submitted form, even if a `prefix` field is present. RLS enforces
-// the group boundary, so no manual `ringing_group_id` check is needed. Mirrors
-// the `LoginState` result-shape convention: any thrown `catchSupabaseErrors`
-// error is surfaced via `.message`.
+type RingSequenceSupabaseClient = Awaited<
+	ReturnType<typeof getAuthenticatedSupabaseClient>
+>;
+
+// Finds group-owned Birds whose ring number matches `prefix` at the exact length
+// of the sequence's bounds and whose numeric part falls within
+// [first_index, last_index]. Mirrors the import lookup's numeric-window match
+// (`lib/demon-import.ts` `createRingSequenceLookup`) and `fetchRingSequenceBirds`'s
+// exact-length `ilike` convention (prefix + one `_` wildcard per remaining
+// character). PostgREST can't compute the trailing-digits substring in a filter,
+// so the numeric-window test is applied in JS with the same `trailingRingNumber`
+// parse the `first_index`/`last_index` generated columns use. The
+// `ringing_group_ids` containment filter is defence-in-depth on top of RLS — a
+// bird can be shared across groups, so `groupId` must appear in the array (see
+// issue #149).
+async function findBirdsMatchingSequenceBounds(
+	supabase: RingSequenceSupabaseClient,
+	prefix: string,
+	firstRing: string,
+	lastRing: string,
+	groupId: number
+): Promise<number[]> {
+	const firstIndex = trailingRingNumber(firstRing);
+	const lastIndex = trailingRingNumber(lastRing);
+	if (firstIndex === null || lastIndex === null) return [];
+
+	const exactLengthPattern =
+		prefix + '_'.repeat(Math.max(0, firstRing.length - prefix.length));
+	const birds = (await supabase
+		.from('Birds')
+		.select('id, ring_no')
+		.ilike('ring_no', exactLengthPattern)
+		.contains('ringing_group_ids', [groupId])
+		.then(catchSupabaseErrors)) as { id: number; ring_no: string }[] | null;
+
+	return (birds ?? [])
+		.filter((bird) => {
+			const ringNumber = trailingRingNumber(bird.ring_no);
+			return (
+				ringNumber !== null &&
+				ringNumber >= firstIndex &&
+				ringNumber <= lastIndex
+			);
+		})
+		.map((bird) => bird.id);
+}
+
+// Reconciles the `RingSequences_Birds` links for one sequence against a new
+// `first_ring`/`last_ring` window: links every in-bounds group-owned bird that
+// isn't linked yet, and unlinks every currently-linked bird now outside the
+// window. Diffs current vs. desired so an unchanged in-range bird is left
+// untouched (no spurious delete+reinsert) and an empty candidate set is a no-op.
+async function reconcileRingSequenceBounds(
+	supabase: RingSequenceSupabaseClient,
+	ringSequenceId: number,
+	prefix: string,
+	firstRing: string,
+	lastRing: string,
+	groupId: number
+): Promise<void> {
+	const desiredBirdIds = new Set(
+		await findBirdsMatchingSequenceBounds(
+			supabase,
+			prefix,
+			firstRing,
+			lastRing,
+			groupId
+		)
+	);
+
+	const currentlyLinked = (await supabase
+		.from('RingSequences_Birds')
+		.select('bird_id')
+		.eq('ring_sequence_id', ringSequenceId)
+		.then(catchSupabaseErrors)) as { bird_id: number }[] | null;
+	const currentBirdIds = new Set((currentlyLinked ?? []).map((r) => r.bird_id));
+
+	const birdIdsToLink = [...desiredBirdIds].filter(
+		(id) => !currentBirdIds.has(id)
+	);
+	const birdIdsToUnlink = [...currentBirdIds].filter(
+		(id) => !desiredBirdIds.has(id)
+	);
+
+	if (birdIdsToLink.length > 0) {
+		await supabase
+			.from('RingSequences_Birds')
+			.insert(
+				birdIdsToLink.map((bird_id) => ({
+					ringing_group_id: groupId,
+					ring_sequence_id: ringSequenceId,
+					bird_id
+				}))
+			)
+			.then(catchSupabaseErrors);
+	}
+
+	if (birdIdsToUnlink.length > 0) {
+		await supabase
+			.from('RingSequences_Birds')
+			.delete()
+			.eq('ring_sequence_id', ringSequenceId)
+			.in('bird_id', birdIdsToUnlink)
+			.then(catchSupabaseErrors);
+	}
+}
+
+// Updates a ring sequence's `size` and, optionally, its `first_ring`/`last_ring`
+// bounds. `prefix` is a fixed identity for a sequence (enforced via a DB CHECK
+// constraint — see #729) and is never read from the submitted form, even if a
+// `prefix` field is present. Bounds are set as a pair: submit both to update
+// them (validated by `validateRingSequenceBounds` before the write, mirroring
+// #729's DB CHECK), submit neither to leave the existing bounds untouched
+// (clearing isn't in scope). When bounds change, `RingSequences_Birds`
+// membership is reconciled against the new window (birds now in range are
+// linked, birds now out of range unlinked). RLS enforces the group boundary, so
+// no manual `ringing_group_id` check is needed. Mirrors the `LoginState`
+// result-shape convention: any thrown `catchSupabaseErrors` error is surfaced
+// via `.message`.
 export async function updateRingSequence(
 	_prevState: UpdateRingSequenceState,
 	formData: FormData
 ): Promise<UpdateRingSequenceState> {
 	const id = Number(formData.get('id'));
 	const size = formData.get('size') as string;
+	const firstRing = (formData.get('first_ring') as string)?.trim() || null;
+	const lastRing = (formData.get('last_ring') as string)?.trim() || null;
 
 	if (!size) {
 		return { success: false, error: 'Please select a ring size' };
 	}
 
+	const boundsSubmitted = firstRing !== null || lastRing !== null;
+	const bothBoundsSet = firstRing !== null && lastRing !== null;
+
 	try {
 		const supabase = await getAuthenticatedSupabaseClient();
+
+		// Only when at least one bound is submitted do we need the row's immutable
+		// prefix (to validate against and match candidate birds) and its group.
+		// RLS scopes this read to the caller's group, so a row belonging to another
+		// group reads back as null.
+		let prefix: string | null = null;
+		let ringingGroupId: number | null = null;
+		if (boundsSubmitted) {
+			const row = (await supabase
+				.from('RingSequences')
+				.select('prefix, ringing_group_id')
+				.eq('id', id)
+				.maybeSingle()
+				.then(catchSupabaseErrors)) as {
+				prefix: string;
+				ringing_group_id: number;
+			} | null;
+
+			if (row) {
+				prefix = row.prefix;
+				ringingGroupId = row.ringing_group_id;
+				const validationError = validateRingSequenceBounds(
+					prefix,
+					firstRing,
+					lastRing
+				);
+				if (validationError) {
+					return { success: false, error: validationError };
+				}
+			}
+		}
+
 		await supabase
 			.from('RingSequences')
-			.update({ size: size as RingSize })
+			.update({
+				size: size as RingSize,
+				...(bothBoundsSet ? { first_ring: firstRing, last_ring: lastRing } : {})
+			})
 			.eq('id', id)
 			.then(catchSupabaseErrors);
+
+		if (bothBoundsSet && prefix !== null && ringingGroupId !== null) {
+			await reconcileRingSequenceBounds(
+				supabase,
+				id,
+				prefix,
+				firstRing,
+				lastRing,
+				ringingGroupId
+			);
+		}
+
 		return { success: true };
 	} catch (error) {
 		return { success: false, error: (error as Error).message };
@@ -187,9 +354,7 @@ export type PromoteControlState =
 // code, so the insert below inspects the raw PostgREST error itself.
 const UNIQUE_VIOLATION = '23505';
 
-type PromoteSupabaseClient = Awaited<
-	ReturnType<typeof getAuthenticatedSupabaseClient>
->;
+type PromoteSupabaseClient = RingSequenceSupabaseClient;
 
 // Options controlling how a newly-created RingSequences row is shaped. Both call
 // sites reuse an existing row untouched (never overwriting its `owned_by_group`,
@@ -206,15 +371,28 @@ type CreateSequenceOptions = {
 	lastRing?: string | null;
 };
 
+type ExistingSequenceRow = {
+	id: number;
+	first_ring: string | null;
+	last_ring: string | null;
+};
+
 // Finds or creates the group's RingSequences row for `prefix`, then links every
-// currently-untracked bird sharing that prefix to it via the per-group
-// `RingSequences_Birds` link table. Every bird sharing the prefix is linked
-// together — not just the one that triggered the action — since they're
-// indistinguishable once tracked. Reusing an existing row never overwrites its
-// `owned_by_group`, `size`, or bounds. There is no more bounds-widening trigger
-// (see #701), so a newly-created row's bounds are whatever `options` supplies
-// (null unless the caller passes them). RLS scopes every query to the caller's
-// group; the explicit `ringing_group_id` filter is defence-in-depth.
+// currently-untracked matching bird to it via the per-group
+// `RingSequences_Birds` link table. Matching is bounds-aware: when the sequence
+// (whether reused or freshly created) has `first_ring`/`last_ring` set, only
+// birds whose ring falls inside that numeric window at the bounds' exact length
+// are candidates (`findBirdsMatchingSequenceBounds`, shared with
+// `updateRingSequence`'s reconciliation); when bounds are still `NULL`, every
+// bird sharing the prefix is a candidate (unchanged pre-#731 behaviour, since
+// there's no range yet). Every matching bird is linked together — not just the
+// one that triggered the action — since they're indistinguishable once tracked.
+// This path only links; it never unlinks (that's reconciliation's job). Reusing
+// an existing row never overwrites its `owned_by_group`, `size`, or bounds.
+// There is no more bounds-widening trigger (see #701), so a newly-created row's
+// bounds are whatever `options` supplies (null unless the caller passes them).
+// RLS scopes every query to the caller's group; the explicit `ringing_group_id`
+// filter is defence-in-depth.
 async function findOrCreateRingSequenceAndLinkBirds(
 	supabase: PromoteSupabaseClient,
 	prefix: string,
@@ -224,17 +402,25 @@ async function findOrCreateRingSequenceAndLinkBirds(
 	const { ownedByGroup = false, firstRing = null, lastRing = null } = options;
 	const existing = (await supabase
 		.from('RingSequences')
-		.select('id')
+		.select('id, first_ring, last_ring')
 		.eq('prefix', prefix)
-		// TODO this shoudl also probably check against first and last values
 		.eq('ringing_group_id', groupId)
 		.maybeSingle()
-		.then(catchSupabaseErrors)) as { id: number } | null;
+		.then(catchSupabaseErrors)) as ExistingSequenceRow | null;
 
 	let sequenceId: number;
+	// The bounds the sequence actually carries after this call — a reused row's
+	// own bounds, or the ones we insert for a fresh row. Drives whether candidate
+	// birds are matched by numeric window or by prefix alone.
+	let sequenceFirstRing: string | null;
+	let sequenceLastRing: string | null;
 	if (existing?.id) {
 		sequenceId = existing.id;
+		sequenceFirstRing = existing.first_ring;
+		sequenceLastRing = existing.last_ring;
 	} else {
+		sequenceFirstRing = firstRing;
+		sequenceLastRing = lastRing;
 		const { data: inserted, error } = await supabase
 			.from('RingSequences')
 			.insert({
@@ -257,15 +443,17 @@ async function findOrCreateRingSequenceAndLinkBirds(
 			if (error.code === UNIQUE_VIOLATION) {
 				const raced = (await supabase
 					.from('RingSequences')
-					.select('id')
+					.select('id, first_ring, last_ring')
 					.eq('prefix', prefix)
 					.eq('ringing_group_id', groupId)
 					.single()
-					.then(catchSupabaseErrors)) as { id: number } | null;
+					.then(catchSupabaseErrors)) as ExistingSequenceRow | null;
 				if (!raced?.id) {
 					throw new Error(`Failed to create ring sequence: ${error.message}`);
 				}
 				sequenceId = raced.id;
+				sequenceFirstRing = raced.first_ring;
+				sequenceLastRing = raced.last_ring;
 			} else {
 				throw new Error(`Failed to create ring sequence: ${error.message}`);
 			}
@@ -274,28 +462,42 @@ async function findOrCreateRingSequenceAndLinkBirds(
 		}
 	}
 
-	// Link every bird sharing this prefix that isn't tracked by a sequence yet.
-	// Multi-tenancy via RLS is only partially implemented (see issue #149), so
-	// this doesn't rely on RLS alone — it also filters explicitly on
-	// `ringing_group_ids` (a bird can be shared across groups, so `groupId`
-	// must appear in the array, not just match a single owner column),
-	// matching the pattern in `app/actions/sp-data.ts`.
-	const birds = await supabase
-		.from('Birds')
-		.select('id')
-		.ilike('ring_no', `${prefix}%`)
-		.contains('ringing_group_ids', [groupId])
-		.then(catchSupabaseErrors);
+	// Candidate birds: bounds-aware when the sequence has a numeric window set,
+	// prefix-only otherwise. Multi-tenancy via RLS is only partially implemented
+	// (see issue #149), so neither path relies on RLS alone — both filter
+	// explicitly on `ringing_group_ids` (a bird can be shared across groups, so
+	// `groupId` must appear in the array), matching the pattern in
+	// `app/actions/sp-data.ts`.
+	let candidateBirdIds: number[];
+	if (sequenceFirstRing !== null && sequenceLastRing !== null) {
+		candidateBirdIds = await findBirdsMatchingSequenceBounds(
+			supabase,
+			prefix,
+			sequenceFirstRing,
+			sequenceLastRing,
+			groupId
+		);
+	} else {
+		const birds = (await supabase
+			.from('Birds')
+			.select('id')
+			.ilike('ring_no', `${prefix}%`)
+			.contains('ringing_group_ids', [groupId])
+			.then(catchSupabaseErrors)) as { id: number }[] | null;
+		candidateBirdIds = (birds ?? []).map(({ id }) => id);
+	}
 
 	const allreadyInSequenceBirds = await supabase
 		.from('RingSequences_Birds')
 		.select('bird_id')
-		.in('bird_id', birds?.map(({ id }) => id) ?? [])
+		.in('bird_id', candidateBirdIds)
 		.then(catchSupabaseErrors);
 
-	const birdsToLink = (birds ?? []).filter(
-		(bird) => !allreadyInSequenceBirds?.some((s) => s.bird_id === bird.id)
-	);
+	const birdsToLink = candidateBirdIds
+		.filter(
+			(birdId) => !allreadyInSequenceBirds?.some((s) => s.bird_id === birdId)
+		)
+		.map((id) => ({ id }));
 
 	await supabase
 		.from('RingSequences_Birds')
