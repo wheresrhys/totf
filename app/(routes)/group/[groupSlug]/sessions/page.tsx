@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
 import SessionsPage from '@/app/(routes)/sessions/page';
 
-export default async function CrossGroupSessionsPage({
+export default async function GroupSessionsPage({
 	params
 }: {
 	params: Promise<{ groupSlug: string }>;
