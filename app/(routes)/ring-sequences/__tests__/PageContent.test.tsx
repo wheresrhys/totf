@@ -121,7 +121,9 @@ describe('RingSequencesPageContent (RingSequences table data path)', () => {
 
 		expect(screen.getByTestId('ring-sequence-edit-modal')).toBeDefined();
 		// The accordion detail should not have expanded (no fetch triggered).
-		expect(screen.getByDisplayValue('ARW')).toBeDefined();
+		expect(
+			within(screen.getByTestId('ring-sequence-edit-modal')).getByText('ARW')
+		).toBeDefined();
 	});
 
 	it('fetches and renders a row detail when expanded', async () => {

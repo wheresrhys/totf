@@ -132,12 +132,15 @@ describe('ring sequence RPC functions', () => {
  * the `(prefix, ringing_group_id)` unique constraint.
  */
 describe('ring_sequence_controls with linked sequences', () => {
-	// A purely-alphabetic prefix keeps the RingSequences `(prefix,
-	// ringing_group_id)` unique constraint and the ring_no unique constraint apart
-	// across concurrent worktree runs. Six random letters.
+	// A purely-alphabetic, random (never fixed-literal) 3-character prefix, so
+	// concurrent worktree runs are unlikely to collide on the RingSequences
+	// `(prefix, ringing_group_id)` unique constraint or on ring_no. Exactly 3
+	// characters — RingSequences.prefix now has a CHECK(length(prefix) = 3)
+	// constraint (#729) — so entropy is bounded to 26^3 combinations, unlike
+	// the wider space a longer random prefix would offer.
 	function randomAlphaPrefix(): string {
 		const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-		return Array.from({ length: 6 }, () => letters[Math.floor(Math.random() * 26)]).join('');
+		return Array.from({ length: 3 }, () => letters[Math.floor(Math.random() * 26)]).join('');
 	}
 
 	let deltaId: number;

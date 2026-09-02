@@ -142,30 +142,28 @@ export async function fetchRingSequenceBirds(
 	}));
 }
 
-// Updates a ring sequence's `size` and `prefix`. RLS enforces the group
-// boundary, so no manual `ringing_group_id` check is needed. Mirrors the
-// `LoginState` result-shape convention: any thrown `catchSupabaseErrors` error
-// (e.g. a unique-constraint violation on `prefix`) is surfaced via `.message`.
+// Updates a ring sequence's `size`. `prefix` is a fixed identity for a
+// sequence (enforced via a DB CHECK constraint — see #729) and is never read
+// from the submitted form, even if a `prefix` field is present. RLS enforces
+// the group boundary, so no manual `ringing_group_id` check is needed. Mirrors
+// the `LoginState` result-shape convention: any thrown `catchSupabaseErrors`
+// error is surfaced via `.message`.
 export async function updateRingSequence(
 	_prevState: UpdateRingSequenceState,
 	formData: FormData
 ): Promise<UpdateRingSequenceState> {
 	const id = Number(formData.get('id'));
 	const size = formData.get('size') as string;
-	const prefix = (formData.get('prefix') as string)?.trim();
 
 	if (!size) {
 		return { success: false, error: 'Please select a ring size' };
-	}
-	if (!prefix) {
-		return { success: false, error: 'Prefix cannot be empty' };
 	}
 
 	try {
 		const supabase = await getAuthenticatedSupabaseClient();
 		await supabase
 			.from('RingSequences')
-			.update({ size: size as RingSize, prefix })
+			.update({ size: size as RingSize })
 			.eq('id', id)
 			.then(catchSupabaseErrors);
 		return { success: true };

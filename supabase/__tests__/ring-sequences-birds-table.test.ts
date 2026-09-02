@@ -64,7 +64,7 @@ describe('RingSequences_Birds table', () => {
 
 		const { data: sequence, error: sequenceError } = await groupClient
 			.from('RingSequences')
-			.insert({ prefix: `RSB-${suffix}`, ringing_group_id: groupId })
+			.insert({ prefix: 'RSB', ringing_group_id: groupId })
 			.select('id')
 			.single();
 		if (sequenceError || !sequence) throw sequenceError ?? new Error('Failed to seed RingSequences row');
@@ -207,7 +207,7 @@ describe('RingSequences_Birds table', () => {
 
 			const { data: sequence, error: sequenceError } = await groupClient
 				.from('RingSequences')
-				.insert({ prefix: `RSB2-${suffix}`, ringing_group_id: groupId })
+				.insert({ prefix: 'RS2', ringing_group_id: groupId })
 				.select('id')
 				.single();
 			if (sequenceError || !sequence) throw sequenceError ?? new Error('Failed to seed second RingSequences row');

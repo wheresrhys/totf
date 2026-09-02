@@ -86,8 +86,8 @@ describe('fetchRingSequences', () => {
 		otherGroupId = createIsolatedGroup(`fetch-ring-sequences-other-${suffix}`);
 		const groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
 		const { error } = await groupClient.from('RingSequences').insert([
-			{ prefix: `Z-${suffix}`, ringing_group_id: groupId },
-			{ prefix: `A-${suffix}`, ringing_group_id: groupId }
+			{ prefix: 'ZZZ', ringing_group_id: groupId },
+			{ prefix: 'AAA', ringing_group_id: groupId }
 		]);
 		if (error) throw error;
 	});
@@ -102,10 +102,7 @@ describe('fetchRingSequences', () => {
 	it("returns the group's ring sequences ordered by prefix", async () => {
 		authenticateAs(groupId);
 		const result = await fetchRingSequences(groupId);
-		expect(result?.map((row) => row.prefix)).toEqual([
-			`A-${suffix}`,
-			`Z-${suffix}`
-		]);
+		expect(result?.map((row) => row.prefix)).toEqual(['AAA', 'ZZZ']);
 	});
 
 	it("does not return another group's ring sequences, even when asked for by id (RLS + explicit filter)", async () => {
@@ -126,7 +123,6 @@ describe('updateRingSequence', () => {
 	let groupId: number;
 	let otherGroupId: number;
 	let rowId: number;
-	let secondRowId: number;
 	let otherGroupRowId: number;
 	let groupClient: SupabaseClient;
 	let otherGroupClient: SupabaseClient;
@@ -140,24 +136,15 @@ describe('updateRingSequence', () => {
 
 		const { data: row, error: rowError } = await groupClient
 			.from('RingSequences')
-			.insert({ prefix: `URS-${suffix}-1`, ringing_group_id: groupId })
+			.insert({ prefix: 'URS', ringing_group_id: groupId })
 			.select('id')
 			.single();
 		if (rowError || !row) throw rowError ?? new Error('Failed to seed row');
 		rowId = row.id;
 
-		const { data: secondRow, error: secondRowError } = await groupClient
-			.from('RingSequences')
-			.insert({ prefix: `URS-${suffix}-2`, ringing_group_id: groupId })
-			.select('id')
-			.single();
-		if (secondRowError || !secondRow)
-			throw secondRowError ?? new Error('Failed to seed second row');
-		secondRowId = secondRow.id;
-
 		const { data: otherRow, error: otherRowError } = await otherGroupClient
 			.from('RingSequences')
-			.insert({ prefix: `URS-${suffix}-OTHER`, ringing_group_id: otherGroupId })
+			.insert({ prefix: 'OTH', ringing_group_id: otherGroupId })
 			.select('id')
 			.single();
 		if (otherRowError || !otherRow)
@@ -172,11 +159,15 @@ describe('updateRingSequence', () => {
 		);
 	});
 
-	it('updates size and prefix and persists the change', async () => {
+	it('updates size and persists the change; prefix is unchanged even when a prefix field is included in the submitted FormData (prefix is immutable — #729)', async () => {
 		authenticateAs(groupId);
 		const result = await updateRingSequence(
 			null,
-			makeFormData({ id: String(rowId), size: 'C', prefix: `URS-${suffix}-1B` })
+			makeFormData({
+				id: String(rowId),
+				size: 'C',
+				prefix: 'HIJ'
+			})
 		);
 		expect(result).toEqual({ success: true });
 
@@ -185,44 +176,19 @@ describe('updateRingSequence', () => {
 			.select('size, prefix')
 			.eq('id', rowId)
 			.single();
-		expect(data).toMatchObject({ size: 'C', prefix: `URS-${suffix}-1B` });
+		expect(data).toMatchObject({ size: 'C', prefix: 'URS' });
 	});
 
 	it('returns a validation error and does not call supabase when size is empty', async () => {
 		authenticateAs(groupId);
 		const result = await updateRingSequence(
 			null,
-			makeFormData({ id: String(rowId), size: '', prefix: `URS-${suffix}-1B` })
+			makeFormData({ id: String(rowId), size: '' })
 		);
 		expect(result).toEqual({
 			success: false,
 			error: 'Please select a ring size'
 		});
-	});
-
-	it('returns a validation error when prefix is blank', async () => {
-		authenticateAs(groupId);
-		const result = await updateRingSequence(
-			null,
-			makeFormData({ id: String(rowId), size: 'C', prefix: '   ' })
-		);
-		expect(result).toEqual({ success: false, error: 'Prefix cannot be empty' });
-	});
-
-	it('surfaces a unique-constraint violation when updating to a prefix already used by the same group', async () => {
-		authenticateAs(groupId);
-		const result = await updateRingSequence(
-			null,
-			makeFormData({
-				id: String(secondRowId),
-				size: 'C',
-				prefix: `URS-${suffix}-1B`
-			})
-		);
-		expect(result).toMatchObject({ success: false });
-		if (result && !result.success) {
-			expect(result.error).toContain('unique constraint');
-		}
 	});
 
 	it("does not modify another group's row — RLS silently matches zero rows rather than erroring, so the action still reports success", async () => {
@@ -231,8 +197,7 @@ describe('updateRingSequence', () => {
 			null,
 			makeFormData({
 				id: String(otherGroupRowId),
-				size: 'D2',
-				prefix: `URS-${suffix}-HIJACKED`
+				size: 'D2'
 			})
 		);
 		expect(result).toEqual({ success: true });
@@ -242,7 +207,7 @@ describe('updateRingSequence', () => {
 			.select('size, prefix')
 			.eq('id', otherGroupRowId)
 			.single();
-		expect(data).toMatchObject({ size: null, prefix: `URS-${suffix}-OTHER` });
+		expect(data).toMatchObject({ size: null, prefix: 'OTH' });
 	});
 });
 

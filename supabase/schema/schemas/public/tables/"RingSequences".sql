@@ -84,6 +84,25 @@ ADD UNIQUE (prefix, ringing_group_id);
 ALTER TABLE public."RingSequences"
 ADD CONSTRAINT "RingSequences_pkey" PRIMARY KEY (id);
 
+-- Prefix is a fixed identity for a sequence: always exactly 3 characters.
+ALTER TABLE public."RingSequences"
+ADD CONSTRAINT ring_sequences_prefix_length_check CHECK (length(prefix) = 3);
+
+-- first_ring/last_ring, when set, must start with the sequence's prefix.
+-- left() rather than a volatile regex/LIKE-escaping function: cheap, immutable,
+-- and correctly fails when the ring value is shorter than the prefix.
+ALTER TABLE public."RingSequences"
+ADD CONSTRAINT ring_sequences_first_last_ring_prefix_check CHECK (
+	(
+		first_ring IS NULL
+		OR left(first_ring, length(prefix)) = prefix
+	)
+	AND (
+		last_ring IS NULL
+		OR left(last_ring, length(prefix)) = prefix
+	)
+);
+
 ALTER TABLE public."RingSequences"
 ADD CONSTRAINT ring_sequences_ringing_group_id_fkey FOREIGN KEY (ringing_group_id) REFERENCES public."RingingGroups" (id);
 

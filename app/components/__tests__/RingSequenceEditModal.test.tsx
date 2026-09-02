@@ -37,12 +37,13 @@ describe('RingSequenceEditModal', () => {
 		vi.clearAllMocks();
 	});
 
-	it('renders a size dropdown of every ring_size value and a prefill prefix input', () => {
+	it('renders a size dropdown of every ring_size value and the prefix as read-only static text (prefix is immutable — #729)', () => {
 		render(<RingSequenceEditModal sequence={sequence} onClose={vi.fn()} />);
 		const select = screen.getByRole('combobox') as HTMLSelectElement;
 		// 22 enum values + the "select size" placeholder option
 		expect(select.querySelectorAll('option')).toHaveLength(23);
-		expect(screen.getByDisplayValue('ARW')).toBeDefined();
+		expect(screen.getByText('ARW')).toBeDefined();
+		expect(screen.queryByRole('textbox', { name: 'Prefix' })).toBeNull();
 	});
 
 	it('surfaces the action error message (e.g. a unique-constraint violation)', async () => {
