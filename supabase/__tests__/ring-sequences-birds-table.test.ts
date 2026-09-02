@@ -20,33 +20,11 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
 import { supabase } from '../../lib/supabase';
 import { randomTestSuffix } from './test-isolation';
+import { psql, createIsolatedGroup } from './db-test-helpers';
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
-
-function psql(sql: string) {
-	execSync(`psql "${LOCAL_DB_URL}" -c "${sql.replace(/"/g, '\\"')}"`);
-}
-
-function psqlScalar(sql: string): string {
-	return execSync(`psql "${LOCAL_DB_URL}" -t -A -c "${sql.replace(/"/g, '\\"')}"`)
-		.toString()
-		.split('\n')
-		.map((line) => line.trim())
-		.filter(Boolean)[0];
-}
-
-function createIsolatedGroup(name: string): number {
-	return Number(
-		psqlScalar(
-			`INSERT INTO "RingingGroups" (group_name, slug) VALUES ('${name}', '${name.toLowerCase().replace(/ /g, '-')}') RETURNING id;`
-		)
-	);
-}
 
 describe('RingSequences_Birds table', () => {
 	// Shared fixtures reused across the describe blocks below: an isolated group

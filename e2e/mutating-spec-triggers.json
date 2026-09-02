@@ -2,6 +2,7 @@
 	"@mutates": [
 		"lib/demon-import.ts",
 		"app/api/import/",
+		"app/actions/ring-sequences.ts",
 		"scripts/import-csv.ts",
 		"e2e/authenticated/import.spec.ts"
 	]
