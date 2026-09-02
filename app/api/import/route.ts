@@ -6,6 +6,7 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import {
 	createUpserter,
 	createRingSequenceLookup,
+	createRingSequenceLinker,
 	processEncounterRow,
 	CasualtyEncounterError,
 	type DemonRow
@@ -51,6 +52,7 @@ export async function POST(request: Request): Promise<Response> {
 	const supabaseClient = await getAuthenticatedSupabaseClient();
 	const upsert = createUpserter(supabaseClient);
 	const lookupRingSequence = createRingSequenceLookup(supabaseClient);
+	const linkRingSequence = createRingSequenceLinker(supabaseClient);
 	const deadline = Date.now() + TIMEOUT_MS;
 	const encoder = new TextEncoder();
 
@@ -95,7 +97,8 @@ export async function POST(request: Request): Promise<Response> {
 									row,
 									upsert,
 									lookupRingSequence,
-									ringingGroupId
+									ringingGroupId,
+									linkRingSequence
 								);
 								successful++;
 								if (startDate === null || visitDate < startDate)

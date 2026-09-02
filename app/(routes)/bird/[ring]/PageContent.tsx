@@ -1,5 +1,3 @@
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
-import { catchSupabaseErrors } from '@/lib/supabase';
 import { SingleBirdTable } from '@/app/components/SingleBirdTable';
 import { format as formatDate } from 'date-fns';
 import {
@@ -7,67 +5,12 @@ import {
 	PageWrapper,
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
-import {
-	enrichBird,
-	type StandaloneBird,
-	type EncounterOfBird
-} from '@/app/models/bird';
+import { enrichBird, type StandaloneBird } from '@/app/models/bird';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { EncountersTimeline } from '@/app/components/EncountersTimeline';
 import type { ViewedGroup } from '@/lib/group-slug';
 
 export type PageParams = { ring: string };
-
-export async function fetchBirdPageContent({ ring }: PageParams) {
-	const supabase = await getAuthenticatedSupabaseClient();
-	const bird = (await supabase
-		.from('Birds')
-		.select(
-			`id,
-			ring_no,
-			proven_age,
-			species:Species (
-				species_name
-			)
-		`
-		)
-		.eq('ring_no', ring)
-		.maybeSingle()
-		.then(catchSupabaseErrors)) as StandaloneBird;
-
-	if (!bird) {
-		return null;
-	}
-
-	const encounters = (await supabase
-		.from('Encounters')
-		.select(
-			`
-				bird_id,
-				id,
-				age_code,
-				breeding_condition,
-				is_juv,
-				capture_time,
-				max_hatch_year,
-				min_hatch_year,
-				moult_code,
-				record_type,
-				sex,
-				sexing_method,
-				ringing_group_id,
-				weight,
-				wing_length,
-				session:Sessions(
-					visit_date
-				)
-	`
-		)
-		.eq('bird_id', bird.id)
-		.then(catchSupabaseErrors)) as EncounterOfBird[];
-
-	return { ...bird, encounters } as StandaloneBird;
-}
 
 export function BirdPageContent({
 	params: { ring },

@@ -55,11 +55,11 @@ function makeBirdSearchClient({
 	};
 }
 
-function renderBirdPage(q: string) {
+function renderSearchPage(q: string) {
 	return Page({ searchParams: Promise.resolve({ q }) });
 }
 
-describe('bird search page', () => {
+describe('search page', () => {
 	afterEach(() => {
 		cleanup();
 		mockRedirect.mockReset();
@@ -73,12 +73,12 @@ describe('bird search page', () => {
 		});
 
 		it('renders "No exact match found" message', async () => {
-			render(await renderBirdPage('UNKNOWN'));
+			render(await renderSearchPage('UNKNOWN'));
 			await screen.findByText(/No exact match found/);
 		});
 
 		it('renders empty results list', async () => {
-			render(await renderBirdPage('UNKNOWN'));
+			render(await renderSearchPage('UNKNOWN'));
 			await screen.findByText(/No exact match found/);
 			const list = screen.getByRole('list');
 			expect(list.querySelectorAll('li').length).toBe(0);
@@ -98,7 +98,7 @@ describe('bird search page', () => {
 		});
 
 		it('renders list of fuzzy match results with ring numbers', async () => {
-			render(await renderBirdPage('ABC'));
+			render(await renderSearchPage('ABC'));
 			const list = await screen.findByRole('list');
 			const items = list.querySelectorAll('li');
 			expect(items.length).toBe(fuzzyResults.length);
@@ -118,7 +118,7 @@ describe('bird search page', () => {
 		});
 
 		it('calls redirect to /bird/[ring]', async () => {
-			render(await renderBirdPage('RING123'));
+			render(await renderSearchPage('RING123'));
 			await waitFor(() => {
 				expect(mockRedirect).toHaveBeenCalledWith('/bird/RING123');
 			});

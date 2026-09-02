@@ -262,16 +262,16 @@ describe('ring sequence RPC functions', () => {
 });
 
 /**
- * Controls exclusion for birds already linked to a sequence (issue #661,
- * simplified per PR #690 review — comment 3903576698).
+ * Controls exclusion for birds linked to a sequence via the per-group
+ * `RingSequences_Birds` join table (issue #703).
  *
- * A bird whose `ring_sequence_id` is non-null is already attached to a
- * `RingSequences` row, so it is no longer a "foreign" control and must not appear
- * in `ring_sequence_controls`. This check is deliberately group-agnostic: the
- * single FK slot on `Birds` is shared across groups, so linking a bird to *any*
- * group's sequence excludes it from *every* group's controls. That is the
- * "shadow sequence" multi-tenancy flaw tracked in issue #703 — the cross-group
- * test below documents the accepted "no worse" behaviour.
+ * `RingSequences_Birds` replaces the old group-agnostic `Birds.ring_sequence_id`
+ * FK: a bird has one link row per group that has claimed it, not one shared slot,
+ * so linking a bird to one group's sequence can no longer block every other
+ * group from tracking the same shared bird as its own control. RLS scopes
+ * `RingSequences_Birds` strictly to the owning group (no `GroupDataSharing`
+ * cross-group reads), mirroring `RingSequences` itself — the cross-group test
+ * below proves the previously-documented "shadow sequence" flaw no longer holds.
  *
  * Uses freshly-created, isolated fixtures under the Delta/Gamma seed groups with
  * random alpha prefixes (never fixed literals) so concurrent worktree runs
@@ -348,12 +348,20 @@ describe('ring_sequence_controls with linked sequences', () => {
 		return data!.id;
 	}
 
-	// Link a Delta bird to a sequence by setting Birds.ring_sequence_id.
-	async function linkBirdToSequence(birdId: number, sequenceId: number): Promise<void> {
-		const { error } = await deltaClient
-			.from('Birds')
-			.update({ ring_sequence_id: sequenceId })
-			.eq('id', birdId);
+	// Link a bird to a sequence for `groupId` via the `RingSequences_Birds` join
+	// table. `client` must be authenticated as `groupId` — RLS restricts inserts
+	// to the caller's own group (no cross-group writes).
+	async function linkBirdToSequence(
+		client: SupabaseClient,
+		groupId: number,
+		birdId: number,
+		sequenceId: number
+	): Promise<void> {
+		const { error } = await client.from('RingSequences_Birds').insert({
+			bird_id: birdId,
+			ring_sequence_id: sequenceId,
+			ringing_group_id: groupId,
+		});
 		if (error) throw error;
 	}
 
@@ -402,10 +410,8 @@ describe('ring_sequence_controls with linked sequences', () => {
 	afterAll(() => {
 		const birdIds = createdBirdIds.length ? createdBirdIds.join(', ') : '-1';
 		const seqIds = createdSeqIds.length ? createdSeqIds.join(', ') : '-1';
-		// Null out the FK before deleting sequences so the sequence deletes don't
-		// trip the birds_ring_sequence_id_fkey constraint.
 		psql(
-			`UPDATE "Birds" SET ring_sequence_id = NULL WHERE id IN (${birdIds});` +
+			`DELETE FROM "RingSequences_Birds" WHERE bird_id IN (${birdIds});` +
 				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds});` +
 				`DELETE FROM "Birds" WHERE id IN (${birdIds});` +
 				`DELETE FROM "RingSequences" WHERE id IN (${seqIds});` +
@@ -414,8 +420,8 @@ describe('ring_sequence_controls with linked sequences', () => {
 		);
 	});
 
-	// Usual — an unlinked control appears
-	it('a control whose bird has a null ring_sequence_id still appears', async () => {
+	// Usual — a control with no RingSequences_Birds link still appears
+	it('a control with no RingSequences_Birds link still appears', async () => {
 		const { ringNo } = await createDeltaControl();
 		const controls = await deltaControls();
 		expect(controls.find((r) => r.ring_no === ringNo)).toBeDefined();
@@ -427,20 +433,18 @@ describe('ring_sequence_controls with linked sequences', () => {
 		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
 
 		const seqId = await insertRingSequence(deltaClient, deltaId, prefix);
-		await linkBirdToSequence(birdId, seqId);
+		await linkBirdToSequence(deltaClient, deltaId, birdId, seqId);
 		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeUndefined();
 	});
 
-	// Edge / cross-group — the accepted "shadow sequence" behaviour (#703):
-	// linking a bird to a *different* group's sequence still excludes it here.
-	it("excludes a control whose bird is linked to another group's sequence (documents the #703 shadow-sequence flaw)", async () => {
+	// Edge / cross-group — the #703 fix: another group's link no longer shadows
+	// this group's tracking of the same shared bird.
+	it("does NOT exclude a control whose bird is linked to another group's sequence (issue #703 fix: per-group links replace the old shared FK slot)", async () => {
 		const { ringNo, birdId, prefix } = await createDeltaControl();
 		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
 
-		// Gamma owns the sequence, but the single group-agnostic FK on the bird
-		// means Delta's control disappears anyway — no worse than prefix matching.
 		const gammaSeqId = await insertRingSequence(gammaClient, gammaId, prefix);
-		await linkBirdToSequence(birdId, gammaSeqId);
-		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeUndefined();
+		await linkBirdToSequence(gammaClient, gammaId, birdId, gammaSeqId);
+		expect((await deltaControls()).find((r) => r.ring_no === ringNo)).toBeDefined();
 	});
 });

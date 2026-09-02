@@ -4,15 +4,12 @@ CREATE TABLE public."Birds" (
 	species_id bigint NOT NULL,
 	last_encountered_timestamp timestamp without time zone DEFAULT '0001-01-01 00:00:00'::timestamp WITHOUT time zone NOT NULL,
 	ringing_group_ids BIGINT[] DEFAULT '{}'::BIGINT[] NOT NULL,
-	proven_age smallint DEFAULT 0 NOT NULL,
-	ring_sequence_id bigint
+	proven_age smallint DEFAULT 0 NOT NULL
 );
 
 CREATE INDEX idx_birds_ringing_group_ids ON public."Birds" USING gin (ringing_group_ids);
 
 CREATE INDEX idx_birds_species_id ON public."Birds" (species_id);
-
-CREATE INDEX idx_birds_ring_sequence_id ON public."Birds" (ring_sequence_id);
 
 -- species_id is immutable once set: a physical ring number belongs to one bird of
 -- one species for life, so a re-import reusing an existing ring_no with a different
@@ -104,9 +101,6 @@ ADD CONSTRAINT birds_ring_no_unique UNIQUE (ring_no);
 
 ALTER TABLE public."Birds"
 ADD CONSTRAINT birds_species_id_fkey FOREIGN KEY (species_id) REFERENCES public."Species" (id);
-
-ALTER TABLE public."Birds"
-ADD CONSTRAINT birds_ring_sequence_id_fkey FOREIGN KEY (ring_sequence_id) REFERENCES public."RingSequences" (id);
 
 GRANT ALL ON public."Birds" TO anon;
 
