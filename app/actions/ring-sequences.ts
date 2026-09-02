@@ -230,12 +230,32 @@ async function findOrCreateRingSequenceAndLinkBirds(
 	// `ringing_group_ids` (a bird can be shared across groups, so `groupId`
 	// must appear in the array, not just match a single owner column),
 	// matching the pattern in `app/actions/sp-data.ts`.
-	await supabase
+	const birds = await supabase
 		.from('Birds')
-		.update({ ring_sequence_id: sequenceId })
+		.select('id')
 		.ilike('ring_no', `${prefix}%`)
-		.is('ring_sequence_id', null)
 		.contains('ringing_group_ids', [groupId])
+		.then(catchSupabaseErrors);
+
+	const allreadyInSequenceBirds = await supabase
+		.from('RingSequences_Birds')
+		.select('bird_id')
+		.in('bird_id', birds?.map(({ id }) => id) ?? [])
+		.then(catchSupabaseErrors);
+
+	const birdsToLink = (birds ?? []).filter(
+		(bird) => !allreadyInSequenceBirds?.some((s) => s.bird_id === bird.id)
+	);
+
+	await supabase
+		.from('RingSequences_Birds')
+		.insert(
+			birdsToLink?.map(({ id }) => ({
+				ringing_group_id: groupId,
+				ring_sequence_id: sequenceId,
+				bird_id: id
+			})) ?? []
+		)
 		.then(catchSupabaseErrors);
 
 	return sequenceId;
