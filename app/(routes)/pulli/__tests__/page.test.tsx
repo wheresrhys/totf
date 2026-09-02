@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import Page, { fetchPulliEncounters } from '../page';
+import Page, { fetchPulliPageContent } from '../page';
 import pulliEncountersSnapshot from '@/test-fixtures/snapshots/fetchPulliEncounters.alpha.json';
 import type { PulliEncounter } from '@/app/models/session';
 
@@ -112,7 +112,7 @@ describe('pulli page', () => {
 	});
 });
 
-describe('fetchPulliEncounters query building', () => {
+describe('fetchPulliPageContent query building', () => {
 	afterEach(() => {
 		cleanup();
 	});
@@ -120,14 +120,14 @@ describe('fetchPulliEncounters query building', () => {
 	it('filters encounters to the viewed group', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchPulliEncounters({}, 42);
+		await fetchPulliPageContent({}, 42);
 		expect(chain.eq).toHaveBeenCalledWith('ringing_group_id', 42);
 	});
 
 	it('filters to session.session_type = PULLI via the embedded-join filter', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchPulliEncounters({}, 42);
+		await fetchPulliPageContent({}, 42);
 		expect(chain.eq).toHaveBeenCalledWith('session.session_type', 'PULLI');
 	});
 });

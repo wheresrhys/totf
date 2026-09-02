@@ -1,7 +1,11 @@
 'use client';
+import { PulliEncounter } from '@/app/models/session';
+import {
+	PageWrapper,
+	PrimaryHeading
+} from '@/app/components/shared/DesignSystem';
 import { format as formatDate } from 'date-fns';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import type { PulliEncounter } from '@/app/models/session';
 import {
 	SortableTable,
 	type ColumnConfig,
@@ -104,5 +108,14 @@ export function PulliEncountersTable({ data }: { data: PulliEncounter[] }) {
 			rowDataTransform={rowDataTransform}
 			TableBodyComponent={PulliEncountersTableBody}
 		/>
+	);
+}
+
+export function PulliPageContent({ data }: { data: PulliEncounter[] }) {
+	return (
+		<PageWrapper>
+			<PrimaryHeading>Pulli</PrimaryHeading>
+			<PulliEncountersTable data={data} />
+		</PageWrapper>
 	);
 }

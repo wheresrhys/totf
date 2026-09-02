@@ -6,13 +6,9 @@ import {
 	BootstrapPage,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
-import { PulliEncountersTable } from '@/app/components/PulliEncountersTable';
+import { PulliPageContent } from './PageContent';
 
-export async function fetchPulliEncounters(
+export async function fetchPulliPageContent(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<PulliEncounter[]> {
@@ -43,15 +39,6 @@ export async function fetchPulliEncounters(
 		.then(catchSupabaseErrors) as Promise<PulliEncounter[]>;
 }
 
-function ListPulliEncounters({ data }: { data: PulliEncounter[] }) {
-	return (
-		<PageWrapper>
-			<PrimaryHeading>Pulli</PrimaryHeading>
-			<PulliEncountersTable data={data} />
-		</PageWrapper>
-	);
-}
-
 export default async function PulliPage({
 	viewedGroup
 }: {
@@ -61,8 +48,8 @@ export default async function PulliPage({
 		<BootstrapPage<PulliEncounter[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['pulli']}
-			dataFetcher={fetchPulliEncounters}
-			PageComponent={ListPulliEncounters}
+			dataFetcher={fetchPulliPageContent}
+			PageComponent={PulliPageContent}
 		/>
 	);
 }
