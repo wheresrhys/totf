@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
 import SpeciesPage from '@/app/(routes)/species/[speciesName]/page';
 
-export default async function CrossGroupSingleSpeciesPage(props: {
+export default async function GroupSpeciesDetailPage(props: {
 	params: Promise<{ groupSlug: string; speciesName: string }>;
 }) {
 	const { groupSlug, speciesName } = await props.params;

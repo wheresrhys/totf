@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
 import AllSpeciesPage from '@/app/(routes)/species/page';
 
-export default async function CrossGroupSpeciesPage({
+export default async function GroupSpeciesPage({
 	params
 }: {
 	params: Promise<{ groupSlug: string }>;
