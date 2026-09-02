@@ -181,9 +181,6 @@ Naming reference (see #667 for the original design discussion):
 | `app/(routes)/bird/[ring]/page.tsx` | `BirdPage` | `BirdPageContent` | `fetchBirdPageContent` | — |
 | `app/(routes)/species/[speciesName]/page.tsx` | `SpeciesPage` | `SpeciesPageContent` | `fetchSpeciesPageContent` | `components/pages/species` |
 
-Note: as of this writing, `controls/PageContent.tsx` still defines its own `fetchControlsPageContent`
-instead of `page.tsx` doing so — tracked by #673, not yet merged. Don't treat it as a second
-valid pattern; it's a known gap against the convention above.
 
 ## Development environment
 
