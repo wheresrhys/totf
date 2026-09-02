@@ -10,6 +10,7 @@ import {
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+import { PromoteControlButton } from '@/app/components/PromoteControlButton';
 
 export async function fetchControlsPageContent(
 	_: DefaultPageParams,
@@ -19,7 +20,8 @@ export async function fetchControlsPageContent(
 }
 
 export function ControlsPageContent({
-	data
+	data,
+	viewedGroup
 }: {
 	params: Record<string, string>;
 	data: RingSequenceControlRow[];
@@ -43,6 +45,7 @@ export function ControlsPageContent({
 						<th>Ring</th>
 						<th>Species</th>
 						<th>First date</th>
+						<th />
 					</tr>
 				</thead>
 				<tbody>
@@ -55,6 +58,12 @@ export function ControlsPageContent({
 							</td>
 							<td>{row.species_name}</td>
 							<td>{row.first_date}</td>
+							<td>
+								<PromoteControlButton
+									ringNo={row.ring_no}
+									viewedGroupId={viewedGroup.id}
+								/>
+							</td>
 						</tr>
 					))}
 				</tbody>

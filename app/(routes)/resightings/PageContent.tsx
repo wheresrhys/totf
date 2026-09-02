@@ -4,6 +4,10 @@ import { format as formatDate } from 'date-fns';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import type { ResightingEncounter } from '@/app/models/session';
 import {
+	PageWrapper,
+	PrimaryHeading
+} from '@/app/components/shared/DesignSystem';
+import {
 	SortableTable,
 	type ColumnConfig,
 	type RowModelWithRawData,
@@ -162,7 +166,7 @@ function ResightingsDataTable({
 	);
 }
 
-export function ResightingsTable({
+function ResightingsTable({
 	resightings
 }: {
 	resightings: ResightingEncounter[];
@@ -184,5 +188,18 @@ export function ResightingsTable({
 				) : null
 			)}
 		</>
+	);
+}
+
+export function ResightingsPageContent({
+	data
+}: {
+	data: ResightingEncounter[];
+}) {
+	return (
+		<PageWrapper>
+			<PrimaryHeading>Resightings</PrimaryHeading>
+			<ResightingsTable resightings={data} />
+		</PageWrapper>
 	);
 }

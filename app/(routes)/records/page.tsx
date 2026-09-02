@@ -1,22 +1,18 @@
 import {
-	StatsAccordion,
-	StatConfig,
-	type StatsAccordionModel
-} from '@/app/components/StatsAccordion';
-import { getSeasonMonths, getSeasonName } from '@/app/models/seasons';
-import {
 	BootstrapPage,
 	type DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
+import { getSeasonMonths, getSeasonName } from '@/app/models/seasons';
 import {
 	getTopStats,
 	type UserTopStatsArgs
 } from '@/app/actions/top-performers';
 import type { ViewedGroup } from '@/lib/group-slug';
+import {
+	RecordsPageContent,
+	type StatConfig,
+	type StatsAccordionModel
+} from './PageContent';
 
 function getStatConfigs(
 	date: Date
@@ -136,7 +132,7 @@ function getStatConfigs(
 	];
 }
 
-export async function fetchRecordsData(
+export async function fetchRecordsPageContent(
 	_: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<StatsAccordionModel[]> {
@@ -168,21 +164,6 @@ export async function fetchRecordsData(
 	);
 }
 
-function RecordsPageContent({
-	data,
-	viewedGroup
-}: {
-	data: StatsAccordionModel[];
-	viewedGroup: ViewedGroup;
-}) {
-	return (
-		<PageWrapper>
-			<PrimaryHeading>Records</PrimaryHeading>
-			<StatsAccordion data={data} viewedGroup={viewedGroup} />
-		</PageWrapper>
-	);
-}
-
 export default async function RecordsPage({
 	viewedGroup
 }: {
@@ -192,7 +173,7 @@ export default async function RecordsPage({
 		<BootstrapPage<StatsAccordionModel[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['records']}
-			dataFetcher={fetchRecordsData}
+			dataFetcher={fetchRecordsPageContent}
 			PageComponent={RecordsPageContent}
 		/>
 	);
