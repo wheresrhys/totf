@@ -263,12 +263,17 @@ async function findOrCreateRingSequenceAndLinkBirds(
 	}
 
 	// Link every bird sharing this prefix that isn't tracked by a sequence yet.
-	// RLS scopes the update to birds visible to the caller's group.
+	// Multi-tenancy via RLS is only partially implemented (see issue #149), so
+	// this doesn't rely on RLS alone — it also filters explicitly on
+	// `ringing_group_ids` (a bird can be shared across groups, so `groupId`
+	// must appear in the array, not just match a single owner column),
+	// matching the pattern in `app/actions/sp-data.ts`.
 	await supabase
 		.from('Birds')
 		.update({ ring_sequence_id: sequenceId })
 		.ilike('ring_no', `${prefix}%`)
 		.is('ring_sequence_id', null)
+		.contains('ringing_group_ids', [groupId])
 		.then(catchSupabaseErrors);
 
 	return sequenceId;
