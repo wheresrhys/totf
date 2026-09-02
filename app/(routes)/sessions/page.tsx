@@ -1,4 +1,3 @@
-import { SessionHistoryCalendar } from '@/app/components/SessionHistoryCalendar';
 import {
 	BootstrapPage,
 	type DefaultPageParams
@@ -7,12 +6,9 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { SessionWithEncountersCount } from '@/app/models/session';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
+import { SessionsPageContent } from './PageContent';
 
-export async function fetchAllSessions(
+export async function fetchSessionsPageContent(
 	params: DefaultPageParams,
 	viewedGroupId: number
 ): Promise<SessionWithEncountersCount[]> {
@@ -28,21 +24,6 @@ export async function fetchAllSessions(
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
 }
 
-function ListAllSessions({
-	data,
-	viewedGroup
-}: {
-	data: SessionWithEncountersCount[];
-	viewedGroup: ViewedGroup;
-}) {
-	return (
-		<PageWrapper>
-			<PrimaryHeading>Session history</PrimaryHeading>
-			<SessionHistoryCalendar sessions={data} viewedGroup={viewedGroup} />
-		</PageWrapper>
-	);
-}
-
 export default async function SessionsPage({
 	viewedGroup
 }: {
@@ -52,8 +33,8 @@ export default async function SessionsPage({
 		<BootstrapPage<SessionWithEncountersCount[]>
 			viewedGroup={viewedGroup}
 			getCacheKeys={() => ['sessions']}
-			dataFetcher={fetchAllSessions}
-			PageComponent={ListAllSessions}
+			dataFetcher={fetchSessionsPageContent}
+			PageComponent={SessionsPageContent}
 		/>
 	);
 }

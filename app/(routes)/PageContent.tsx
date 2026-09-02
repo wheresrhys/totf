@@ -11,7 +11,7 @@ import type {
 	SpeciesRow,
 	GroupTicksResult
 } from '../models/db';
-import { SessionsByDay } from '../components/SessionHistoryCalendar';
+import { SessionsByDay } from '../components/SessionsByDay';
 import { NoPrefetchLink } from '../components/shared/NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
 
