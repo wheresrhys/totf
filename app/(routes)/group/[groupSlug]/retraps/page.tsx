@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug } from '@/lib/group-slug';
-import NotableRetrapsPage from '@/app/(routes)/retraps/page';
+import RetrapsPage from '@/app/(routes)/retraps/page';
 
-export default async function CrossGroupRetrapsPage({
+export default async function GroupRetrapsPage({
 	params
 }: {
 	params: Promise<{ groupSlug: string }>;
@@ -13,5 +13,5 @@ export default async function CrossGroupRetrapsPage({
 		notFound();
 	}
 	const viewedGroup = { id: viewedGroupId, slug: groupSlug };
-	return <NotableRetrapsPage viewedGroup={viewedGroup} />;
+	return <RetrapsPage viewedGroup={viewedGroup} />;
 }
