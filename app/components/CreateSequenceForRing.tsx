@@ -43,7 +43,7 @@ export function CreateSequenceForRing({
 
 	return (
 		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 text-wrap"
 			data-testid="promote-control-modal"
 		>
 			<div className="bg-base-100 rounded-box shadow-xl p-6 w-full max-w-sm">
