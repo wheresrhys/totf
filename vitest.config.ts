@@ -15,6 +15,9 @@ export default defineConfig({
       'http-tests/**',
       'e2e/**',
       '.claude/worktrees/**',
+      // DB integration test (issue #725) — real Supabase calls, run via
+      // vitest.integration.config.ts instead.
+      'app/actions/__tests__/ring-sequences.test.ts',
     ],
   },
 })

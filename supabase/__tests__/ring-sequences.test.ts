@@ -9,10 +9,10 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
 import { supabase } from '../../lib/supabase';
 import { randomTestSuffix, randomFutureDate } from './test-isolation';
+import { psql } from './db-test-helpers';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 async function getGroupIdByName(name: string): Promise<number> {
@@ -132,11 +132,6 @@ describe('ring sequence RPC functions', () => {
  * the `(prefix, ringing_group_id)` unique constraint.
  */
 describe('ring_sequence_controls with linked sequences', () => {
-	const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
-	function psql(sql: string) {
-		execSync(`psql "${LOCAL_DB_URL}" -c "${sql.replace(/"/g, '\\"')}"`);
-	}
-
 	// A purely-alphabetic prefix keeps the RingSequences `(prefix,
 	// ringing_group_id)` unique constraint and the ring_no unique constraint apart
 	// across concurrent worktree runs. Six random letters.
