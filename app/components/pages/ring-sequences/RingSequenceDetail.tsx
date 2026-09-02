@@ -5,9 +5,9 @@ import {
 	type RingSequenceBirdRow
 } from '@/app/actions/ring-sequences';
 import { findUnusedRings } from '@/app/models/ring-sequences';
-import { AccordionItem } from './shared/Accordion';
-import { BoxyList, InlineTable } from './shared/DesignSystem';
-import { NoPrefetchLink } from './shared/NoPrefetchLink';
+import { AccordionItem } from '@/app/components/shared/Accordion';
+import { BoxyList, InlineTable } from '@/app/components/shared/DesignSystem';
+import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 
 type SequenceDetailModel = {
 	id: number;

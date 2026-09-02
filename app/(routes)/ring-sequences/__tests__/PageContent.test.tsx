@@ -7,7 +7,7 @@ import {
 	within,
 	fireEvent
 } from '@testing-library/react';
-import { RingSequencesPage } from '../RingSequencesPage';
+import { RingSequencesPageContent } from '../PageContent';
 import type { RingSequenceRow } from '@/app/models/db';
 import type { RingSequenceBirdRow } from '@/app/actions/ring-sequences';
 
@@ -39,14 +39,14 @@ const mockSequences: RingSequenceRow[] = [
 	makeSequence({ id: 4, prefix: 'ZZZ', size: null })
 ];
 
-describe('RingSequencesPage (RingSequences table data path)', () => {
+describe('RingSequencesPageContent (RingSequences table data path)', () => {
 	afterEach(() => {
 		cleanup();
 		vi.clearAllMocks();
 	});
 
 	it('renders one row per RingSequences entry grouped by size', () => {
-		render(<RingSequencesPage data={mockSequences} />);
+		render(<RingSequencesPageContent data={mockSequences} />);
 		expect(screen.getByTestId('sequence-1')).toBeDefined();
 		expect(screen.getByTestId('sequence-2')).toBeDefined();
 		expect(screen.getByTestId('sequence-3')).toBeDefined();
@@ -54,7 +54,7 @@ describe('RingSequencesPage (RingSequences table data path)', () => {
 	});
 
 	it('groups sizes in RING_SIZE_ENUM_ORDER with the missing-size group first', () => {
-		render(<RingSequencesPage data={mockSequences} />);
+		render(<RingSequencesPageContent data={mockSequences} />);
 		const sections = screen
 			.getAllByTestId(/^ring-size-/)
 			.map((el) => el.getAttribute('data-testid'));
@@ -66,7 +66,7 @@ describe('RingSequencesPage (RingSequences table data path)', () => {
 	});
 
 	it('places a sized row in its size group with no highlight badge', () => {
-		render(<RingSequencesPage data={mockSequences} />);
+		render(<RingSequencesPageContent data={mockSequences} />);
 		const aSection = screen.getByTestId('ring-size-A');
 		expect(within(aSection).getByTestId('sequence-1')).toBeDefined();
 		expect(within(aSection).getByTestId('sequence-2')).toBeDefined();
@@ -74,7 +74,7 @@ describe('RingSequencesPage (RingSequences table data path)', () => {
 	});
 
 	it('renders null-size rows in the missing-size group with a warning badge', () => {
-		render(<RingSequencesPage data={mockSequences} />);
+		render(<RingSequencesPageContent data={mockSequences} />);
 		const missingSection = screen.getByTestId('ring-size-missing');
 		expect(
 			within(missingSection).getByTestId('missing-size-badge')
@@ -83,7 +83,7 @@ describe('RingSequencesPage (RingSequences table data path)', () => {
 	});
 
 	it('shows prefix and first_ring–last_ring range in the row heading', () => {
-		render(<RingSequencesPage data={mockSequences} />);
+		render(<RingSequencesPageContent data={mockSequences} />);
 		const row = screen.getByTestId('sequence-1');
 		expect(row.textContent).toContain('ARW');
 		expect(row.textContent).toContain('ARW00001');
@@ -91,13 +91,13 @@ describe('RingSequencesPage (RingSequences table data path)', () => {
 	});
 
 	it('renders an empty state without throwing when there are no sequences', () => {
-		render(<RingSequencesPage data={[]} />);
+		render(<RingSequencesPageContent data={[]} />);
 		expect(screen.getByTestId('ring-sequences-empty')).toBeDefined();
 		expect(screen.queryByTestId(/^ring-size-/)).toBeNull();
 	});
 
 	it('opens the edit modal for a row without toggling its detail', () => {
-		render(<RingSequencesPage data={mockSequences} />);
+		render(<RingSequencesPageContent data={mockSequences} />);
 		expect(screen.queryByTestId('ring-sequence-edit-modal')).toBeNull();
 
 		fireEvent.click(screen.getByTestId('edit-sequence-1'));
@@ -115,7 +115,7 @@ describe('RingSequencesPage (RingSequences table data path)', () => {
 		];
 		vi.mocked(fetchRingSequenceBirds).mockResolvedValue(detailRows);
 
-		render(<RingSequencesPage data={mockSequences} />);
+		render(<RingSequencesPageContent data={mockSequences} />);
 		const row = screen.getByTestId('sequence-1');
 		const toggle = within(row).getAllByRole('button')[0];
 		fireEvent.click(toggle);
