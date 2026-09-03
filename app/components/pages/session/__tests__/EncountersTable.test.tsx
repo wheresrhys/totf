@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	fireEvent,
+	within
+} from '@testing-library/react';
 import { EncountersTable } from '../EncountersTable';
 import type { SessionEncounter } from '@/app/models/session';
 
@@ -10,6 +16,10 @@ function makeEncounter(
 		species?: string;
 		capture_time?: string;
 		wing_length?: number | null;
+		fat?: string | null;
+		pectoral_muscle?: number | null;
+		primary_moult?: string | null;
+		old_greater_coverts?: number | null;
 	} = {}
 ): SessionEncounter {
 	return {
@@ -19,7 +29,11 @@ function makeEncounter(
 		is_juv: false,
 		breeding_condition: null,
 		capture_time: overrides.capture_time ?? '09:00:00',
+		fat: overrides.fat ?? null,
 		moult_code: null,
+		old_greater_coverts: overrides.old_greater_coverts ?? null,
+		pectoral_muscle: overrides.pectoral_muscle ?? null,
+		primary_moult: overrides.primary_moult ?? null,
 		record_type: 'N',
 		ringing_group_id: 1,
 		sex: 'M',
@@ -45,7 +59,11 @@ const STANDARD_COLUMNS = [
 	'Breeding Condition',
 	'Wing',
 	'Weight',
-	'Moult Code'
+	'Moult Code',
+	'Fat',
+	'Pectoral muscle',
+	'Primary moult',
+	'OGC'
 ];
 
 const encounters: SessionEncounter[] = [
@@ -58,6 +76,16 @@ const headerLabels = () =>
 	screen.getAllByRole('columnheader').map((header) => header.textContent);
 
 const bodyRows = () => document.querySelectorAll('tbody tr');
+
+function columnCellValue(columnLabel: string, rowText: string): string {
+	const headers = screen.getAllByRole('columnheader');
+	const columnIndex = headers.findIndex(
+		(header) => header.textContent === columnLabel
+	);
+	const row = screen.getByText(rowText).closest('tr') as HTMLElement;
+	const cells = within(row).getAllByRole('cell');
+	return cells[columnIndex].textContent ?? '';
+}
 
 describe('EncountersTable', () => {
 	afterEach(() => {
@@ -155,6 +183,76 @@ describe('EncountersTable', () => {
 				expect(headerLabels()).not.toContain('Species');
 			});
 		});
+
+		describe('fat, pectoral muscle, primary moult, and OGC columns', () => {
+			it('renders the encounter fat score value in the Fat column', () => {
+				render(
+					<EncountersTable encounters={[makeEncounter(1, { fat: '2' })]} />
+				);
+				expect(columnCellValue('Fat', 'RING1')).toBe('2');
+			});
+
+			it('renders an empty cell when fat is null', () => {
+				render(
+					<EncountersTable encounters={[makeEncounter(1, { fat: null })]} />
+				);
+				expect(columnCellValue('Fat', 'RING1')).toBe('');
+			});
+
+			it('renders the encounter pectoral muscle score value in the Pectoral muscle column', () => {
+				render(
+					<EncountersTable
+						encounters={[makeEncounter(1, { pectoral_muscle: 3 })]}
+					/>
+				);
+				expect(columnCellValue('Pectoral muscle', 'RING1')).toBe('3');
+			});
+
+			it('renders an empty cell when pectoral_muscle is null', () => {
+				render(
+					<EncountersTable
+						encounters={[makeEncounter(1, { pectoral_muscle: null })]}
+					/>
+				);
+				expect(columnCellValue('Pectoral muscle', 'RING1')).toBe('');
+			});
+
+			it('renders the encounter primary_moult raw value in the Primary moult column', () => {
+				render(
+					<EncountersTable
+						encounters={[makeEncounter(1, { primary_moult: '5' })]}
+					/>
+				);
+				expect(columnCellValue('Primary moult', 'RING1')).toBe('5');
+			});
+
+			it('renders an empty cell when primary_moult is null', () => {
+				render(
+					<EncountersTable
+						encounters={[makeEncounter(1, { primary_moult: null })]}
+					/>
+				);
+				expect(columnCellValue('Primary moult', 'RING1')).toBe('');
+			});
+
+			it('renders the encounter old_greater_coverts numeric value in the OGC column', () => {
+				render(
+					<EncountersTable
+						encounters={[makeEncounter(1, { old_greater_coverts: 1 })]}
+					/>
+				);
+				expect(columnCellValue('OGC', 'RING1')).toBe('1');
+			});
+
+			it('renders an empty cell when old_greater_coverts is null', () => {
+				render(
+					<EncountersTable
+						encounters={[makeEncounter(1, { old_greater_coverts: null })]}
+					/>
+				);
+				expect(columnCellValue('OGC', 'RING1')).toBe('');
+			});
+		});
 	});
 
 	describe('Edge', () => {
@@ -189,12 +287,55 @@ describe('EncountersTable', () => {
 				'Breeding Condition',
 				'Wing',
 				'Weight',
-				'Moult Code'
+				'Moult Code',
+				'Fat',
+				'Pectoral muscle',
+				'Primary moult',
+				'OGC'
 			]);
 			expect(bodyRows()).toHaveLength(encounters.length);
 			// sorting still works with the full column set
 			fireEvent.click(screen.getByText('Wing'));
 			expect(bodyRows()[0].textContent).toContain('RING2');
+		});
+
+		it('renders identical Fat/Pectoral muscle/Primary moult/OGC values for the same encounter in both the net-rounds view and the expanded species-row view', () => {
+			const encounter = makeEncounter(1, {
+				fat: '2',
+				pectoral_muscle: 3,
+				primary_moult: '5',
+				old_greater_coverts: 1
+			});
+			const scoreColumnValues = () =>
+				['Fat', 'Pectoral muscle', 'Primary moult', 'OGC'].map((label) =>
+					columnCellValue(label, 'RING1')
+				);
+
+			// Net-rounds view: size="responsive", no Time column, Species shown.
+			const { unmount } = render(
+				<EncountersTable
+					encounters={[encounter]}
+					size="responsive"
+					showTimeColumn={false}
+					showSpeciesColumn={true}
+				/>
+			);
+			const netRoundsValues = scoreColumnValues();
+			unmount();
+
+			// Expanded species-row view: size="xs", Time shown, no Species column.
+			render(
+				<EncountersTable
+					encounters={[encounter]}
+					size="xs"
+					showTimeColumn={true}
+					showSpeciesColumn={false}
+				/>
+			);
+			const speciesRowValues = scoreColumnValues();
+
+			expect(speciesRowValues).toEqual(netRoundsValues);
+			expect(speciesRowValues).toEqual(['2', '3', '5', '1']);
 		});
 	});
 });

@@ -9,7 +9,7 @@ import {
 } from '../../shared/SortableTable';
 
 // Renders the per-bird encounter rows shared by the session page's expanded
-// species rows and its net-rounds tab. Both tables render the same 11 core
+// species rows and its net-rounds tab. Both tables render the same 15 core
 // columns cell-for-cell; the net-rounds table adds a Species column. This
 // component consolidates that shared rendering behind a single, click-to-sort
 // implementation.
@@ -40,7 +40,11 @@ type EncounterColumnKey =
 	| 'breeding_condition'
 	| 'wing_length'
 	| 'weight'
-	| 'moult_code';
+	| 'moult_code'
+	| 'fat'
+	| 'pectoral_muscle'
+	| 'primary_moult'
+	| 'old_greater_coverts';
 
 type EncounterColumn = {
 	key: EncounterColumnKey;
@@ -129,6 +133,30 @@ const ALL_COLUMNS: EncounterColumn[] = [
 		label: 'Moult Code',
 		sortValue: (encounter) => encounter.moult_code,
 		renderCell: (encounter) => encounter.moult_code
+	},
+	{
+		key: 'fat',
+		label: 'Fat',
+		sortValue: (encounter) => encounter.fat,
+		renderCell: (encounter) => encounter.fat
+	},
+	{
+		key: 'pectoral_muscle',
+		label: 'Pectoral muscle',
+		sortValue: (encounter) => encounter.pectoral_muscle,
+		renderCell: (encounter) => encounter.pectoral_muscle
+	},
+	{
+		key: 'primary_moult',
+		label: 'Primary moult',
+		sortValue: (encounter) => encounter.primary_moult,
+		renderCell: (encounter) => encounter.primary_moult
+	},
+	{
+		key: 'old_greater_coverts',
+		label: 'OGC',
+		sortValue: (encounter) => encounter.old_greater_coverts,
+		renderCell: (encounter) => encounter.old_greater_coverts
 	}
 ];
 
