@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { type SessionEncounter } from '@/app/models/session';
 import { type NetRound } from '@/app/models/session-chronology';
 import { getAgeClass } from '@/app/models/encounter';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { InlineTable } from '../../shared/DesignSystem';
 export type SpeciesWithEncounters = {
 	species: string;
 	encounters: SessionEncounter[];
@@ -22,6 +20,7 @@ import {
 } from '../../shared/StatsTableColumnConfigs';
 import { createStatsTableBody } from '../../shared/StatsTableBody';
 import { TabNav } from '../../TabNav';
+import { EncountersTable } from './EncountersTable';
 import { SessionHighlights } from './SessionHighlights';
 
 const SpeciesNameCell = createNameLinkCell<SpeciesWithEncounters, RowModel>(
@@ -29,7 +28,9 @@ const SpeciesNameCell = createNameLinkCell<SpeciesWithEncounters, RowModel>(
 	(model) => `/species/${model.species}`
 );
 
-function SpeciesDetailsTable({
+// Drill-down content for an expanded species row: the species' encounters, as a
+// compact, static (non-sortable) table without the redundant Species column.
+function ExpandedSpeciesEncounters({
 	model: {
 		_rawRowData: { encounters }
 	}
@@ -37,47 +38,14 @@ function SpeciesDetailsTable({
 	model: RowModelWithRawData<SpeciesWithEncounters, RowModel>;
 }) {
 	return (
-		<InlineTable testId="species-details-table">
-			<thead>
-				<tr>
-					<th>Time</th>
-					<th>Ring No</th>
-					<th>Type</th>
-					<th>Age</th>
-					<th>Proven Age</th>
-					<th>Sex</th>
-					<th>Sexing Method</th>
-					<th>Breeding Condition</th>
-					<th>Wing</th>
-					<th>Weight</th>
-					<th>Moult Code</th>
-				</tr>
-			</thead>
-			<tbody>
-				{encounters.map((encounter) => (
-					<tr key={encounter.id}>
-						<td>{encounter.capture_time}</td>
-						<td>
-							<NoPrefetchLink
-								className="link"
-								href={`/bird/${encounter.bird.ring_no}`}
-							>
-								{encounter.bird.ring_no}
-							</NoPrefetchLink>
-						</td>
-						<td>{encounter.record_type}</td>
-						<td>{encounter.age_code}</td>
-						<td>{encounter.bird.proven_age}</td>
-						<td>{encounter.sex}</td>
-						<td>{encounter.sexing_method}</td>
-						<td>{encounter.breeding_condition}</td>
-						<td>{encounter.wing_length}</td>
-						<td>{encounter.weight}</td>
-						<td>{encounter.moult_code}</td>
-					</tr>
-				))}
-			</tbody>
-		</InlineTable>
+		<EncountersTable
+			encounters={encounters}
+			size="xs"
+			sortable={false}
+			showTimeColumn={true}
+			showSpeciesColumn={false}
+			testId="species-details-table"
+		/>
 	);
 }
 
@@ -152,71 +120,8 @@ const SessionTableBody = createStatsTableBody<SpeciesWithEncounters, RowModel>({
 	FirstColumnComponent: SpeciesNameCell,
 	firstColumnKey: 'species',
 	getKey: (model) => model.species,
-	ExpandedContentComponent: SpeciesDetailsTable
+	ExpandedContentComponent: ExpandedSpeciesEncounters
 });
-
-function EncounterRow({ encounter }: { encounter: SessionEncounter }) {
-	return (
-		<tr>
-			<td>{encounter.capture_time}</td>
-			<td>
-				<NoPrefetchLink
-					className="link"
-					href={`/bird/${encounter.bird.ring_no}`}
-				>
-					{encounter.bird.ring_no}
-				</NoPrefetchLink>
-			</td>
-			<td>{encounter.bird.species.species_name}</td>
-			<td>{encounter.record_type}</td>
-			<td>{encounter.age_code}</td>
-			<td>{encounter.bird.proven_age}</td>
-			<td>{encounter.sex}</td>
-			<td>{encounter.sexing_method}</td>
-			<td>{encounter.breeding_condition}</td>
-			<td>{encounter.wing_length}</td>
-			<td>{encounter.weight}</td>
-			<td>{encounter.moult_code}</td>
-		</tr>
-	);
-}
-
-function ChronologicalView({ netRounds }: { netRounds: NetRound[] }) {
-	return (
-		<div>
-			{netRounds.map((round, index) => (
-				<div key={round.startTime}>
-					<h3 className="mt-4 mb-2 font-semibold">
-						Net round {index + 1}: {round.startTime.slice(0, 5)}
-					</h3>
-					<InlineTable testId="net-round-table">
-						<thead>
-							<tr>
-								<th>Time</th>
-								<th>Ring No</th>
-								<th>Species</th>
-								<th>Type</th>
-								<th>Age</th>
-								<th>Proven Age</th>
-								<th>Sex</th>
-								<th>Sexing Method</th>
-								<th>Breeding Condition</th>
-								<th>Wing</th>
-								<th>Weight</th>
-								<th>Moult Code</th>
-							</tr>
-						</thead>
-						<tbody>
-							{round.encounters.map((encounter) => (
-								<EncounterRow key={encounter.id} encounter={encounter} />
-							))}
-						</tbody>
-					</InlineTable>
-				</div>
-			))}
-		</div>
-	);
-}
 
 function ConditionalTabPanel({
 	loadedTabs,
@@ -314,7 +219,22 @@ export function SessionTabs({
 				tabId="net-rounds"
 				activeTabId={activeTab}
 			>
-				<ChronologicalView netRounds={netRounds} />
+				<div>
+					{netRounds.map((round, index) => (
+						<div key={round.startTime}>
+							<h3 className="mt-4 mb-2 font-semibold">
+								Net round {index + 1}: {round.startTime.slice(0, 5)}
+							</h3>
+							<EncountersTable
+								encounters={round.encounters}
+								size="responsive"
+								showTimeColumn={false}
+								showSpeciesColumn={true}
+								testId="net-round-table"
+							/>
+						</div>
+					))}
+				</div>
 			</ConditionalTabPanel>
 			{locationId ? null : (
 				<ConditionalTabPanel

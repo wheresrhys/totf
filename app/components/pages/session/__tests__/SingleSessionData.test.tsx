@@ -159,6 +159,130 @@ describe('SessionTabs', () => {
 		);
 	});
 
+	describe('Net rounds — EncountersTable adoption', () => {
+		function renderAndOpenNetRounds(rounds: NetRound[]) {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={rounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Net rounds' }));
+		}
+
+		function netRoundHeaders(table: HTMLElement): (string | null)[] {
+			return within(table)
+				.getAllByRole('columnheader')
+				.map((header) => header.textContent);
+		}
+
+		it('does not render a Time column header; still renders a Species column header', () => {
+			renderAndOpenNetRounds(netRounds);
+			const [firstTable] = screen.getAllByTestId('net-round-table');
+			const headers = netRoundHeaders(firstTable);
+			expect(headers).not.toContain('Time');
+			expect(headers).toContain('Species');
+		});
+
+		it("sorts a net round's rows on header click, reversing on second click", () => {
+			const roundEncounters = [
+				makeEncounter(2, 'Robin', '09:00:00'),
+				makeEncounter(1, 'Robin', '09:05:00'),
+				makeEncounter(3, 'Robin', '09:10:00')
+			];
+			renderAndOpenNetRounds([
+				{ startTime: '09:00:00', encounters: roundEncounters }
+			]);
+			const [table] = screen.getAllByTestId('net-round-table');
+			const ringOrder = () =>
+				Array.from(table.querySelectorAll('tbody tr')).map(
+					(row) => row.textContent?.match(/RING\d+/)?.[0]
+				);
+			// Insertion order before any sort.
+			expect(ringOrder()).toEqual(['RING2', 'RING1', 'RING3']);
+			fireEvent.click(within(table).getByText('Ring No'));
+			// First click sorts descending.
+			expect(ringOrder()).toEqual(['RING3', 'RING2', 'RING1']);
+			fireEvent.click(within(table).getByText('Ring No'));
+			// Second click reverses to ascending.
+			expect(ringOrder()).toEqual(['RING1', 'RING2', 'RING3']);
+		});
+
+		it('renders each net round table using the responsive size pattern, not fixed xs', () => {
+			renderAndOpenNetRounds(netRounds);
+			screen.getAllByTestId('net-round-table').forEach((table) => {
+				expect(table.className).toContain('sm:table-md');
+			});
+		});
+
+		it('renders a net round with a single encounter without erroring', () => {
+			renderAndOpenNetRounds([
+				{ startTime: '09:00:00', encounters: [robinEncounter] }
+			]);
+			const [table] = screen.getAllByTestId('net-round-table');
+			expect(table.querySelectorAll('tbody tr')).toHaveLength(1);
+		});
+
+		it('renders a net round with no encounters as an empty table with headers but no rows', () => {
+			renderAndOpenNetRounds([{ startTime: '09:00:00', encounters: [] }]);
+			const [table] = screen.getAllByTestId('net-round-table');
+			expect(within(table).getAllByRole('columnheader').length).toBeGreaterThan(
+				0
+			);
+			expect(table.querySelectorAll('tbody tr')).toHaveLength(0);
+		});
+	});
+
+	describe('Expanded species row — EncountersTable adoption', () => {
+		function renderAndExpandFirstSpecies(list: SpeciesWithEncounters[]) {
+			render(
+				<SessionTabs
+					speciesList={list}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			const sessionTable = screen.getByTestId('session-table');
+			const expandButton = sessionTable.querySelector(
+				'tbody button'
+			) as HTMLElement;
+			fireEvent.click(expandButton);
+		}
+
+		it('does not render a Species column; renders a Time column', () => {
+			renderAndExpandFirstSpecies(speciesList);
+			const detailsTable = screen.getByTestId('species-details-table');
+			const headers = within(detailsTable)
+				.getAllByRole('columnheader')
+				.map((header) => header.textContent);
+			expect(headers).not.toContain('Species');
+			expect(headers).toContain('Time');
+		});
+
+		it('renders column headers that are not clickable/sortable', () => {
+			renderAndExpandFirstSpecies(speciesList);
+			const detailsTable = screen.getByTestId('species-details-table');
+			within(detailsTable)
+				.getAllByRole('columnheader')
+				.forEach((header) => {
+					expect(header.className).not.toContain('cursor-pointer');
+				});
+		});
+
+		it('expands a species row with a single encounter without erroring', () => {
+			renderAndExpandFirstSpecies([
+				{ species: 'Blue Tit', encounters: [titmouseEncounter] }
+			]);
+			const detailsTable = screen.getByTestId('species-details-table');
+			expect(detailsTable.querySelectorAll('tbody tr')).toHaveLength(1);
+		});
+	});
+
 	describe('juvs/pullus/postjuv columns', () => {
 		it('counts an age-1, is_juv-true encounter in the juv column', () => {
 			const encounter = makeEncounter(10, 'Wren', '10:00:00', 0, {
