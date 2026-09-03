@@ -4,9 +4,7 @@ import {
 } from '@/app/components/pages/session/SingleSessionData';
 import type { SessionEncounter } from '@/app/models/session';
 import type { LocationRow } from '@/app/models/db';
-import { getAgeClass } from '@/app/models/encounter';
 import {
-	BadgeList,
 	PageWrapper,
 	PrimaryHeading,
 	printLocationName
@@ -14,7 +12,10 @@ import {
 import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
-import { calculateSessionChronology } from '@/app/models/session-chronology';
+import {
+	calculateSessionChronology,
+	type SessionChronology
+} from '@/app/models/session-chronology';
 import { formatMinutesForDisplay } from '@/lib/postgres-interval';
 import type { ViewedGroup } from '@/lib/group-slug';
 
@@ -63,6 +64,33 @@ function findOldestEncounter(
 		}
 		return oldest;
 	}, null);
+}
+
+export function buildSessionSummarySentence(
+	encounters: SessionEncounter[],
+	speciesCount: number,
+	chronology: SessionChronology
+): string {
+	const birdCount = encounters.length;
+	const newCount = encounters.filter(
+		(encounter) => encounter.record_type === 'N'
+	).length;
+	const retrapCount = encounters.filter(
+		(encounter) => encounter.record_type === 'S'
+	).length;
+
+	const birdWord = birdCount === 1 ? 'bird' : 'birds';
+	const retrapWord = retrapCount === 1 ? 'retrap' : 'retraps';
+
+	const durationClause =
+		chronology.durationMinutes !== null
+			? ` in ~${formatMinutesForDisplay(chronology.durationMinutes)}`
+			: '';
+
+	return (
+		`${birdCount} ${birdWord} (${newCount} new, ${retrapCount} ${retrapWord}) ` +
+		`from ${speciesCount} species${durationClause}`
+	);
 }
 
 function Locations({
@@ -186,36 +214,13 @@ export function SessionPageContent({
 				adjacentSessionDates={dayData.adjacentSessionDates}
 				viewedGroup={viewedGroup}
 			/>
-			<BadgeList
-				testId="session-stats"
-				items={
-					[
-						`${dayData.encounters.length} birds`,
-						`${speciesList.length} species`,
-						`${dayData.encounters.filter((encounter) => encounter.record_type === 'N').length} new`,
-						`${dayData.encounters.filter((encounter) => encounter.record_type === 'S').length} retraps`,
-						`${dayData.encounters.filter((encounter) => getAgeClass(encounter) === 'adult').length} adults`,
-						`${dayData.encounters.filter((encounter) => getAgeClass(encounter) === 'pullus').length} pullus`,
-						`${dayData.encounters.filter((encounter) => getAgeClass(encounter) === 'juv').length} juvs`,
-						`${dayData.encounters.filter((encounter) => getAgeClass(encounter) === 'postjuv').length} postjuv`,
-						`${dayData.encounters.filter((encounter) => encounter.age_code === 2).length} unknown age`,
-						`${
-							dayData.encounters.filter(
-								(encounter) =>
-									encounter.record_type === 'N' &&
-									(encounter.age_code === 1 || encounter.age_code === 3)
-							).length
-						} New young`,
-						`Start: ${chronology.startTime ? chronology.startTime.slice(0, 5) : '–'}`,
-						`End: ${chronology.endTime ? chronology.endTime.slice(0, 5) : '–'}`,
-						`Duration: ${chronology.durationMinutes !== null ? formatMinutesForDisplay(chronology.durationMinutes) : '–'}`,
-						`Net rounds: ${chronology.netRounds.length}`,
-						oldestEncounter && oldestEncounter.bird.proven_age > 0
-							? `Oldest: ${oldestEncounter.bird.proven_age} years — ${oldestEncounter.bird.species.species_name} (${oldestEncounter.bird.ring_no})`
-							: null
-					].filter(Boolean) as string[]
-				}
-			/>
+			<p className="text-sm text-gray-500" data-testid="session-stats">
+				{buildSessionSummarySentence(
+					dayData.encounters,
+					speciesList.length,
+					chronology
+				)}
+			</p>
 
 			<SessionTabs
 				speciesList={speciesList}

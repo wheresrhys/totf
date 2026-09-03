@@ -137,6 +137,14 @@ describe('session site page', () => {
 		);
 	});
 
+	it('renders the summary sentence for the filtered location', async () => {
+		render(await renderPage());
+		const stats = await screen.findByTestId('session-stats');
+		expect(stats.textContent).toContain(
+			'1 bird (1 new, 0 retraps) from 1 species in ~0m'
+		);
+	});
+
 	it('does not render highlights on the location-filtered page', async () => {
 		render(await renderPage());
 		await screen.findByTestId('session-stats');
