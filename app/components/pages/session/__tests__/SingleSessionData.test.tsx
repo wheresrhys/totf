@@ -50,6 +50,16 @@ function columnCellValue(columnLabel: string, rowText: string): string {
 	return cells[columnIndex].textContent ?? '';
 }
 
+function totalsRowCellValue(columnLabel: string): string {
+	const headers = screen.getAllByRole('columnheader');
+	const columnIndex = headers.findIndex(
+		(header) => header.textContent === columnLabel
+	);
+	const totalsRow = screen.getByTestId('totals-row');
+	const cells = totalsRow.querySelectorAll('td');
+	return cells[columnIndex]?.textContent ?? '';
+}
+
 const robinEncounter = makeEncounter(1, 'Robin', '09:00:00', 3);
 const olderRobinEncounter = makeEncounter(3, 'Robin', '09:15:00', 7);
 const titmouseEncounter = makeEncounter(2, 'Blue Tit', '09:30:00');
@@ -493,6 +503,171 @@ describe('SessionTabs', () => {
 				(header) => header.textContent === 'Not aged'
 			);
 			expect(unagedHeader?.className).toContain('border-r-4');
+		});
+	});
+
+	describe('species totals row', () => {
+		it('renders a totals row labelled "Total" in the species column', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			const totalsRow = screen.getByTestId('totals-row');
+			expect(totalsRow.querySelector('td')?.textContent).toBe('Total');
+		});
+
+		it('sums the Total column across all species', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			// Robin: 2 encounters, Blue Tit: 1 encounter.
+			expect(totalsRowCellValue('Total')).toBe('3');
+		});
+
+		it('sums the New/Retrap/Juv/Postjuv/Adult/Not aged/New young columns across all species', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			// All three fixture encounters are record_type 'N', age_code 4,
+			// is_juv false — i.e. "New" and "Adult", nothing else.
+			expect(totalsRowCellValue('New')).toBe('3');
+			expect(totalsRowCellValue('Retrap')).toBe('0');
+			expect(totalsRowCellValue('Juv')).toBe('0');
+			expect(totalsRowCellValue('Postjuv')).toBe('0');
+			expect(totalsRowCellValue('Adult')).toBe('3');
+			expect(totalsRowCellValue('Not aged')).toBe('0');
+			expect(totalsRowCellValue('New young')).toBe('0');
+		});
+
+		it('shows the maximum, not the sum, of maxProvenAge in the Max Proven Age totals cell', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			// Robin's proven ages are 3 and 7 (max 7); Blue Tit's is 0 — the
+			// totals cell should show 7, not 7 + 0 or 3 + 7.
+			expect(totalsRowCellValue('Max Proven Age')).toBe('7');
+		});
+
+		it('includes a Pulli totals cell, correctly summed, when the session caught pulli', () => {
+			const pulliEncounter = makeEncounter(40, 'Wren', '10:00:00', 0, {
+				age_code: 1,
+				is_juv: false
+			});
+			const anotherPulliEncounter = makeEncounter(41, 'Wren', '10:05:00', 0, {
+				age_code: 1,
+				is_juv: false
+			});
+			render(
+				<SessionTabs
+					speciesList={[
+						{
+							species: 'Wren',
+							encounters: [pulliEncounter, anotherPulliEncounter]
+						}
+					]}
+					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			expect(totalsRowCellValue('Pulli')).toBe('2');
+		});
+
+		it('omits the Pulli totals cell when the session caught no pulli', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			const totalsRow = screen.getByTestId('totals-row');
+			const headers = screen
+				.getAllByRole('columnheader')
+				.map((header) => header.textContent);
+			expect(headers).not.toContain('Pulli');
+			expect(totalsRow.querySelectorAll('td').length).toBe(headers.length);
+		});
+
+		it('keeps totals row values unchanged after sorting the table by a different column', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			const beforeSort = totalsRowCellValue('Total');
+			fireEvent.click(screen.getByRole('columnheader', { name: /Species/ }));
+			expect(totalsRowCellValue('Total')).toBe(beforeSort);
+			expect(totalsRowCellValue('Max Proven Age')).toBe('7');
+		});
+
+		it('shows a totals row matching the single row exactly when only one species was caught', () => {
+			const encounter = makeEncounter(50, 'Wren', '10:00:00', 5, {
+				age_code: 1,
+				is_juv: false
+			});
+			render(
+				<SessionTabs
+					speciesList={[{ species: 'Wren', encounters: [encounter] }]}
+					netRounds={[]}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			expect(totalsRowCellValue('Total')).toBe(
+				columnCellValue('Total', 'Wren')
+			);
+			expect(totalsRowCellValue('New')).toBe(columnCellValue('New', 'Wren'));
+			expect(totalsRowCellValue('Pulli')).toBe(
+				columnCellValue('Pulli', 'Wren')
+			);
+			expect(totalsRowCellValue('Max Proven Age')).toBe(
+				columnCellValue('Max Proven Age', 'Wren')
+			);
+		});
+
+		it('renders 0 for a count column where no species had a non-zero value', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			expect(totalsRowCellValue('Retrap')).toBe('0');
 		});
 	});
 
