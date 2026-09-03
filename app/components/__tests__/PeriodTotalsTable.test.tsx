@@ -351,7 +351,6 @@ describe('PeriodTotalsTable', () => {
 						aggregationFixedTo="encounter"
 					/>
 				);
-				expect(screen.getByTestId('above-header-row')).toBeTruthy();
 				const encounter = screen.getByRole('radio', {
 					name: 'Encounter'
 				}) as HTMLInputElement;

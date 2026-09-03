@@ -63,7 +63,8 @@ export function PeriodTotalsTable({
 	buildLabel,
 	totalsStats,
 	aggregationFixedTo,
-	dashIndividuals = false
+	dashIndividuals = false,
+	extraControls
 }: {
 	grouping: PeriodTotalsGrouping;
 	rows: AggregateStatsResult[];
@@ -80,6 +81,9 @@ export function PeriodTotalsTable({
 	aggregationFixedTo?: AggregateByValue;
 	// Renders every Individuals cell (data rows and the totals row) as `'-'`.
 	dashIndividuals?: boolean;
+	// Optional extra controls rendered above the table, e.g. a toggle to switch
+	// between combined-months and per-year-months views.
+	extraControls?: React.ReactNode;
 }) {
 	// Local to this table (not persisted across tab switches) — resets to
 	// 'bird' whenever `SummaryTotalsSection` remounts this table for a
@@ -161,24 +165,23 @@ export function PeriodTotalsTable({
 	}
 
 	return (
-		<SortableTable<AggregateStatsResult, PeriodTotalsRow>
-			columnConfigs={columnConfigs}
-			data={rows}
-			testId="period-totals-table"
-			rowDataTransform={activeDeriveRow}
-			totalsRow={totalsRow}
-			aboveHeaderRow={{
-				spanFromColumn: 'new',
-				spanToColumn: 'unknownAge',
-				content: (
-					<AggregateByToggle
-						value={aggregateBy}
-						onChange={setAggregateBy}
-						disabled={aggregationFixedTo !== undefined}
-					/>
-				)
-			}}
-			TableBodyComponent={PeriodTotalsTableBody}
-		/>
+		<>
+			<div data-test-id="above-header-row" className="m-2 flex gap-4">
+				<AggregateByToggle
+					value={aggregateBy}
+					onChange={setAggregateBy}
+					disabled={aggregationFixedTo !== undefined}
+				/>
+				{extraControls ?? null}
+			</div>
+			<SortableTable<AggregateStatsResult, PeriodTotalsRow>
+				columnConfigs={columnConfigs}
+				data={rows}
+				testId="period-totals-table"
+				rowDataTransform={activeDeriveRow}
+				totalsRow={totalsRow}
+				TableBodyComponent={PeriodTotalsTableBody}
+			/>
+		</>
 	);
 }

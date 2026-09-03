@@ -82,9 +82,6 @@ export function SpCombinedMonthTotalsTab({
 
 	return (
 		<>
-			<div className="mb-2">
-				<CombineYearsToggle value={combineYears} onChange={setCombineYears} />
-			</div>
 			{combineYears ? (
 				<PeriodTotalsTable
 					grouping="month"
@@ -96,6 +93,12 @@ export function SpCombinedMonthTotalsTab({
 					}
 					aggregationFixedTo="encounter"
 					dashIndividuals
+					extraControls={
+						<CombineYearsToggle
+							value={combineYears}
+							onChange={setCombineYears}
+						/>
+					}
 				/>
 			) : (
 				<PeriodTotalsTable
@@ -107,6 +110,12 @@ export function SpCombinedMonthTotalsTab({
 					}
 					buildLabel={(timePeriod) =>
 						perYearRowByTimePeriod.get(timePeriod)?.label ?? ''
+					}
+					extraControls={
+						<CombineYearsToggle
+							value={combineYears}
+							onChange={setCombineYears}
+						/>
 					}
 				/>
 			)}
