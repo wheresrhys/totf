@@ -178,20 +178,18 @@ export function SpeciesTotalsTable({
 		: undefined;
 
 	return (
-		<SortableTable<AggregateStatsResult, RowModel>
-			columnConfigs={columnConfigs}
-			data={speciesStats}
-			testId="species-totals-table"
-			rowDataTransform={rowDataTransform}
-			totalsRow={totalsRow}
-			aboveHeaderRow={{
-				spanFromColumn: 'new',
-				spanToColumn: 'unknownAge',
-				content: (
-					<AggregateByToggle value={aggregateBy} onChange={setAggregateBy} />
-				)
-			}}
-			TableBodyComponent={SpeciesTotalsTableBody}
-		/>
+		<>
+			<div data-test-id="above-header-row" className="m-2 flex gap-4">
+				<AggregateByToggle value={aggregateBy} onChange={setAggregateBy} />
+			</div>
+			<SortableTable<AggregateStatsResult, RowModel>
+				columnConfigs={columnConfigs}
+				data={speciesStats}
+				testId="species-totals-table"
+				rowDataTransform={rowDataTransform}
+				totalsRow={totalsRow}
+				TableBodyComponent={SpeciesTotalsTableBody}
+			/>
+		</>
 	);
 }

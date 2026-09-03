@@ -47,17 +47,6 @@ type SortableTableProps<RawRowData, RowModel> = {
 	// <tbody> — keeps it structurally outside the sorted data, so no
 	// sortColumn/sortDirection state can ever move or reorder it.
 	totalsRow?: React.ReactNode;
-	// Optional row rendered inside <thead>, immediately before the header row.
-	// Every column outside the [spanFromColumn, spanToColumn] range (inclusive,
-	// by position in orderedColumns) renders as an empty <th>; that whole range
-	// collapses into a single <th colSpan={n}>{content}</th> at the position of
-	// spanFromColumn. Knows nothing about what `content` is — a follow-up
-	// consumer supplies the actual control and owns its state.
-	aboveHeaderRow?: {
-		spanFromColumn: keyof RowModel;
-		spanToColumn: keyof RowModel;
-		content: React.ReactNode;
-	};
 	TableBodyComponent: React.ComponentType<{
 		data: RowModelWithRawData<RawRowData, RowModel>[];
 		columnConfigs?: Partial<Record<keyof RowModel, ColumnConfig>>;
@@ -71,7 +60,6 @@ export function SortableTable<RawRowData, RowModel>({
 	testId,
 	className,
 	totalsRow,
-	aboveHeaderRow,
 	rowDataTransform,
 	TableBodyComponent
 }: SortableTableProps<RawRowData, RowModel>) {
@@ -81,16 +69,6 @@ export function SortableTable<RawRowData, RowModel>({
 				property: keyof RowModel;
 			} & ColumnConfig
 	);
-	const spanFromIndex = aboveHeaderRow
-		? orderedColumns.findIndex(
-				(column) => column.property === aboveHeaderRow.spanFromColumn
-			)
-		: -1;
-	const spanToIndex = aboveHeaderRow
-		? orderedColumns.findIndex(
-				(column) => column.property === aboveHeaderRow.spanToColumn
-			)
-		: -1;
 
 	const [sortColumn, setSortColumn] = useState<keyof RowModel | null>(
 		initialSortColumn || null
@@ -147,26 +125,6 @@ export function SortableTable<RawRowData, RowModel>({
 	return (
 		<Table testId={testId} className={className}>
 			<thead>
-				{aboveHeaderRow ? (
-					<tr data-testid="above-header-row">
-						{orderedColumns.map((column, index) => {
-							if (index === spanFromIndex) {
-								return (
-									<th
-										key={column.property as string}
-										colSpan={spanToIndex - spanFromIndex + 1}
-									>
-										{aboveHeaderRow.content}
-									</th>
-								);
-							}
-							if (index > spanFromIndex && index <= spanToIndex) {
-								return null;
-							}
-							return <th key={column.property as string}></th>;
-						})}
-					</tr>
-				) : null}
 				<tr>
 					{orderedColumns.map((column) => (
 						<th
