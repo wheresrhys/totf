@@ -11,6 +11,8 @@ CREATE TABLE public."Encounters" (
 	old_greater_coverts smallint,
 	extra_text text,
 	primary_moult text,
+	fat text,
+	pectoral_muscle smallint,
 	capture_method text,
 	lure_code_1 text,
 	lure_code_2 text,
