@@ -417,20 +417,37 @@ describe('session detail page', () => {
 		expect(rows.length).toBe(2);
 	});
 
-	it.skip('does not render the highlights section on the date-level page', async () => {
+	it('does not render the highlights section on the date-level page', async () => {
 		render(await renderPage());
-		const highlights = await screen.findByTestId('session-highlights');
-		expect(highlights).toBeNull();
+		// The species table is always mounted; wait for it so the render has
+		// settled before asserting the highlights section is absent.
+		await screen.findByTestId('session-table');
+		// The "highlights" ConditionalTabPanel only mounts once its tab is loaded,
+		// and loadedTabs starts as Set(['species']) — so before the Highlights tab
+		// is ever clicked, the section is not in the DOM at all.
+		expect(screen.queryByTestId('session-highlights')).toBeNull();
 	});
 
-	it.skip('renders the highlights section after clicking the tab', async () => {
-		await render(await renderPage());
+	it('renders the highlights section after clicking the tab', async () => {
+		render(await renderPage());
 
-		fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
+		// The page content mounts asynchronously — wait for the tab nav to appear
+		// before clicking the Highlights tab.
+		const highlightsTab = await screen.findByRole('button', {
+			name: 'Highlights'
+		});
+		fireEvent.click(highlightsTab);
 
 		const highlights = await screen.findByTestId('session-highlights');
-		expect(highlights.textContent).toContain('Highlights');
+		// The section no longer carries a literal "Highlights" heading — that text
+		// now lives only on the tab button. The Standouts subsection holds the
+		// highlight-machine output; the Best-of-the-session subsection holds the
+		// oldest-bird fact (ABC001, proven_age 5, from this file's mockEncounters).
+		expect(highlights.textContent).toContain('Standouts');
 		expect(highlights.textContent).toContain('Busiest session ever — 3 birds');
+		expect(highlights.textContent).toContain(
+			'Oldest: 5 years — Robin (ABC001)'
+		);
 	});
 
 	describe('session navigation', () => {
