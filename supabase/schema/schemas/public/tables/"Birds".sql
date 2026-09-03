@@ -4,7 +4,20 @@ CREATE TABLE public."Birds" (
 	species_id bigint NOT NULL,
 	last_encountered_timestamp timestamp without time zone DEFAULT '0001-01-01 00:00:00'::timestamp WITHOUT time zone NOT NULL,
 	ringing_group_ids BIGINT[] DEFAULT '{}'::BIGINT[] NOT NULL,
-	proven_age smallint DEFAULT 0 NOT NULL
+	proven_age smallint DEFAULT 0 NOT NULL,
+	-- Numeric part of ring_no, same parse as RingSequences.first_index/last_index
+	-- (strip leading alphabetic prefix, take trailing digits). Lets a bird be
+	-- matched against a RingSequence's [first_index, last_index] range.
+	ring_index bigint GENERATED ALWAYS AS (
+		substring(
+			ring_no
+			FROM
+				'[0-9]+$'
+		)::bigint
+	) STORED,
+	-- First 3 characters of ring_no, matching RingSequences.prefix's fixed
+	-- length. Lets a bird be matched against a RingSequence by prefix.
+	ring_prefix text GENERATED ALWAYS AS (left(ring_no, 3)) STORED
 );
 
 CREATE INDEX idx_birds_ringing_group_ids ON public."Birds" USING gin (ringing_group_ids);
