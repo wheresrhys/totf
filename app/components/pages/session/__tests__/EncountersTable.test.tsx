@@ -114,39 +114,6 @@ describe('EncountersTable', () => {
 			});
 		});
 
-		describe('sortable prop', () => {
-			it('renders clickable, sortable headers when sortable (default)', () => {
-				render(<EncountersTable encounters={encounters} />);
-				screen.getAllByRole('columnheader').forEach((header) => {
-					expect(header.className).toContain('cursor-pointer');
-				});
-				// default order: RING1 (50), RING2 (90), RING3 (30)
-				fireEvent.click(screen.getByText('Wing'));
-				expect(bodyRows()[0].textContent).toContain('RING2');
-			});
-
-			it('renders static, non-clickable headers when sortable is false', () => {
-				render(<EncountersTable encounters={encounters} sortable={false} />);
-				screen.getAllByRole('columnheader').forEach((header) => {
-					expect(header.className).not.toContain('cursor-pointer');
-				});
-			});
-
-			it('does not reorder rows on header click when sortable is false', () => {
-				render(<EncountersTable encounters={encounters} sortable={false} />);
-				const before = Array.from(bodyRows()).map((row) => row.textContent);
-				fireEvent.click(screen.getByText('Wing'));
-				const after = Array.from(bodyRows()).map((row) => row.textContent);
-				expect(after).toEqual(before);
-			});
-
-			it('still renders one row per encounter with all columns when not sortable', () => {
-				render(<EncountersTable encounters={encounters} sortable={false} />);
-				expect(headerLabels()).toEqual(STANDARD_COLUMNS);
-				expect(bodyRows()).toHaveLength(encounters.length);
-			});
-		});
-
 		describe('showTimeColumn prop', () => {
 			it('renders Time column when true', () => {
 				render(

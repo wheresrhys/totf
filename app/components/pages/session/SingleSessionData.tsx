@@ -29,7 +29,7 @@ const SpeciesNameCell = createNameLinkCell<SpeciesWithEncounters, RowModel>(
 );
 
 // Drill-down content for an expanded species row: the species' encounters, as a
-// compact, static (non-sortable) table without the redundant Species column.
+// compact table without the redundant Species column.
 function ExpandedSpeciesEncounters({
 	model: {
 		_rawRowData: { encounters }
@@ -41,7 +41,6 @@ function ExpandedSpeciesEncounters({
 		<EncountersTable
 			encounters={encounters}
 			size="xs"
-			sortable={false}
 			showTimeColumn={true}
 			showSpeciesColumn={false}
 			testId="species-details-table"

@@ -264,13 +264,13 @@ describe('SessionTabs', () => {
 			expect(headers).toContain('Time');
 		});
 
-		it('renders column headers that are not clickable/sortable', () => {
+		it('renders clickable, sortable column headers (EncountersTable is always sortable)', () => {
 			renderAndExpandFirstSpecies(speciesList);
 			const detailsTable = screen.getByTestId('species-details-table');
 			within(detailsTable)
 				.getAllByRole('columnheader')
 				.forEach((header) => {
-					expect(header.className).not.toContain('cursor-pointer');
+					expect(header.className).toContain('cursor-pointer');
 				});
 		});
 

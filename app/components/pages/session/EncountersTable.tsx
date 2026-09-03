@@ -2,7 +2,6 @@
 
 import { type SessionEncounter } from '@/app/models/session';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { Table } from '../../shared/DesignSystem';
 import {
 	SortableTable,
 	type ColumnConfig,
@@ -22,10 +21,6 @@ type EncountersTableProps = {
 	// 'xs' → always-compact `table table-xs` (matches both current call sites).
 	// 'responsive' → `table table-xs sm:table-md` (the app-wide responsive size).
 	size?: EncountersTableSize;
-	// true (default) → click-to-sort headers via SortableTable (net rounds).
-	// false → a plain, static-header table (expanded species rows, which read as
-	// a drill-down list rather than a re-orderable table).
-	sortable?: boolean;
 	showTimeColumn?: boolean;
 	showSpeciesColumn?: boolean;
 	testId?: string;
@@ -172,39 +167,11 @@ type EncounterRowModel = Record<EncounterColumnKey, string | number | null>;
 export function EncountersTable({
 	encounters,
 	size = 'xs',
-	sortable = true,
 	showTimeColumn = true,
 	showSpeciesColumn = false,
 	testId
 }: EncountersTableProps) {
 	const columns = getShownColumns(showTimeColumn, showSpeciesColumn);
-
-	// 'xs' pins the compact size; 'responsive' lets <Table> fall back to its
-	// default `table table-xs sm:table-md`.
-	const className = size === 'xs' ? 'table table-xs' : undefined;
-
-	// Static-header variant: no SortableTable, so headers carry no click-to-sort
-	// affordance. Cells still render through the shared EncounterCells.
-	if (!sortable) {
-		return (
-			<Table testId={testId} className={className}>
-				<thead>
-					<tr>
-						{columns.map((column) => (
-							<th key={column.key}>{column.label}</th>
-						))}
-					</tr>
-				</thead>
-				<tbody>
-					{encounters.map((encounter) => (
-						<tr key={encounter.id}>
-							<EncounterCells encounter={encounter} columns={columns} />
-						</tr>
-					))}
-				</tbody>
-			</Table>
-		);
-	}
 
 	// Only the shown columns get a config, so only they render as headers.
 	const columnConfigs = Object.fromEntries(
@@ -238,7 +205,7 @@ export function EncountersTable({
 			data={encounters}
 			rowDataTransform={rowDataTransform}
 			testId={testId}
-			className={className}
+			className={size === 'xs' ? 'table table-xs' : undefined}
 			TableBodyComponent={EncountersTableBody}
 		/>
 	);
