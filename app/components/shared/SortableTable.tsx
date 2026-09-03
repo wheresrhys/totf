@@ -37,6 +37,10 @@ type SortableTableProps<RawRowData, RowModel> = {
 	data: RawRowData[];
 	rowDataTransform: (modelData: RawRowData) => RowModel;
 	testId?: string;
+	// Forwarded to the underlying <Table> so callers can override the default
+	// responsive sizing (e.g. an always-compact `table table-xs`). Omitted →
+	// Table falls back to `defaultTableClassName`.
+	className?: string;
 	initialSortColumn?: keyof RowModel;
 	// Optional pinned row (typically built via `buildTotalsRowCells`) rendered
 	// inside <thead>, immediately after the header row. Living in <thead> — not
@@ -65,6 +69,7 @@ export function SortableTable<RawRowData, RowModel>({
 	data,
 	initialSortColumn,
 	testId,
+	className,
 	totalsRow,
 	aboveHeaderRow,
 	rowDataTransform,
@@ -140,7 +145,7 @@ export function SortableTable<RawRowData, RowModel>({
 	}
 
 	return (
-		<Table testId={testId}>
+		<Table testId={testId} className={className}>
 			<thead>
 				{aboveHeaderRow ? (
 					<tr data-testid="above-header-row">
