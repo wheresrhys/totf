@@ -69,11 +69,33 @@ test.describe('nested table-xs sizing (issue #742)', () => {
 		}
 	)
 
+	// The net rounds table is a top-level (non-nested) table that, since #743,
+	// uses the responsive size pattern (`table table-xs sm:table-md`) rather than
+	// a fixed `table-xs` — so at a >=640px viewport it renders at the larger
+	// `table-md` size, and only drops to compact `table-xs` on narrow screens.
 	test(
-		'alpha: a top-level (non-nested) table-xs table still renders compact at a >=640px viewport',
+		'alpha: the net rounds table renders at the responsive (table-md) size at a >=640px viewport',
 		{ tag: '@alpha' },
 		async ({ page }) => {
 			await page.setViewportSize({ width: 1024, height: 800 })
+			await page.goto(`/group/${alphaSlug}/session/${knownDate}`)
+			await page.getByRole('button', { name: 'Net rounds' }).click()
+			const netRoundCell = page.getByTestId('net-round-table').locator('td').first()
+			await expect(netRoundCell).toBeVisible()
+			const { paddingTop, fontSize } = await netRoundCell.evaluate((el) => {
+				const style = getComputedStyle(el)
+				return { paddingTop: style.paddingTop, fontSize: style.fontSize }
+			})
+			expect(paddingTop).toBe('12px')
+			expect(fontSize).toBe('14px')
+		}
+	)
+
+	test(
+		'alpha: the net rounds table renders compact (table-xs) at a narrow (<640px) viewport',
+		{ tag: '@alpha' },
+		async ({ page }) => {
+			await page.setViewportSize({ width: 375, height: 800 })
 			await page.goto(`/group/${alphaSlug}/session/${knownDate}`)
 			await page.getByRole('button', { name: 'Net rounds' }).click()
 			const netRoundCell = page.getByTestId('net-round-table').locator('td').first()
