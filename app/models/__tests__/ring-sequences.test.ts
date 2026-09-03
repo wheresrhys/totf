@@ -196,13 +196,15 @@ describe('deriveRingBounds', () => {
 });
 
 describe('validateRingSequenceBounds', () => {
-	// Usual — a valid pair (both start with the prefix, first ≤ last) is accepted.
-	it('returns null for a valid matching-prefix pair with first ≤ last', () => {
+	// Usual — a valid pair (both start with the prefix, first < last) is accepted.
+	it('returns null for a valid matching-prefix pair with first < last', () => {
 		expect(validateRingSequenceBounds('AEL', 'AEL1691', 'AEL1710')).toBeNull();
 	});
 
-	it('returns null when first equals last (a single-ring window)', () => {
-		expect(validateRingSequenceBounds('AEL', 'AEL1691', 'AEL1691')).toBeNull();
+	it('rejects first equal to last (a window must span at least two rings)', () => {
+		expect(validateRingSequenceBounds('AEL', 'AEL1691', 'AEL1691')).toBe(
+			'Last index must be strictly greater than first index'
+		);
 	});
 
 	// Structure — bounds are set as a pair; one-without-the-other is rejected,
@@ -245,7 +247,7 @@ describe('validateRingSequenceBounds', () => {
 
 	it('rejects first_ring numerically greater than last_ring', () => {
 		expect(validateRingSequenceBounds('AEL', 'AEL1710', 'AEL1691')).toBe(
-			'First ring must not be greater than last ring'
+			'Last index must be strictly greater than first index'
 		);
 	});
 });

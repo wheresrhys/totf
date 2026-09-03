@@ -193,9 +193,9 @@ export function trailingRingNumber(ringNo: string): number | null {
 // valid. Bounds are set as a pair: either both present or both absent (clearing
 // isn't in scope — "neither set" is valid and leaves existing bounds untouched).
 // When present, both must start with the sequence's immutable `prefix` (mirroring
-// #729's DB CHECK, surfaced before the write) and `first_ring` must not be
-// numerically greater than `last_ring`. Pure so the edit action and its unit
-// tests share one definition.
+// #729's DB CHECK, surfaced before the write) and `last_ring` must be numerically
+// strictly greater than `first_ring` (a window spans at least two rings). Pure so
+// the edit action and its unit tests share one definition.
 export function validateRingSequenceBounds(
 	prefix: string,
 	firstRing: string | null,
@@ -220,8 +220,8 @@ export function validateRingSequenceBounds(
 	if (firstIndex === null || lastIndex === null) {
 		return 'First and last ring must end in a number';
 	}
-	if (firstIndex > lastIndex) {
-		return 'First ring must not be greater than last ring';
+	if (firstIndex >= lastIndex) {
+		return 'Last index must be strictly greater than first index';
 	}
 
 	return null;

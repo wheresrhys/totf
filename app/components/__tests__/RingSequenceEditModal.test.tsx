@@ -62,7 +62,7 @@ describe('RingSequenceEditModal', () => {
 		mockUpdateRingSequence.mockImplementation(
 			async (): Promise<UpdateRingSequenceState> => ({
 				success: false,
-				error: 'First ring must not be greater than last ring'
+				error: 'Last index must be strictly greater than first index'
 			})
 		);
 		render(<RingSequenceEditModal sequence={sequence} onClose={vi.fn()} />);
@@ -71,7 +71,7 @@ describe('RingSequenceEditModal', () => {
 		);
 		await waitFor(() => {
 			expect(
-				screen.getByText('First ring must not be greater than last ring')
+				screen.getByText('Last index must be strictly greater than first index')
 			).toBeDefined();
 		});
 	});

@@ -3,7 +3,6 @@ import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import {
 	groupRingNosByPrefix,
-	trailingRingNumber,
 	validateRingSequenceBounds,
 	type UnassignedImportPrefix
 } from '@/app/models/ring-sequences';
@@ -148,47 +147,32 @@ type RingSequenceSupabaseClient = Awaited<
 	ReturnType<typeof getAuthenticatedSupabaseClient>
 >;
 
-// Finds group-owned Birds whose ring number matches `prefix` at the exact length
-// of the sequence's bounds and whose numeric part falls within
-// [first_index, last_index]. Mirrors the import lookup's numeric-window match
-// (`lib/demon-import.ts` `createRingSequenceLookup`) and `fetchRingSequenceBirds`'s
-// exact-length `ilike` convention (prefix + one `_` wildcard per remaining
-// character). PostgREST can't compute the trailing-digits substring in a filter,
-// so the numeric-window test is applied in JS with the same `trailingRingNumber`
-// parse the `first_index`/`last_index` generated columns use. The
+// Finds group-owned Birds that fall inside a sequence's numeric window, matched
+// entirely by the DB-side generated columns on `Birds` (added in #736): a single
+// query on `ring_prefix` (`left(ring_no, 3)`, equal to the sequence's fixed
+// 3-character prefix) and `ring_index` (the trailing digits, `first_index <=
+// ring_index <= last_index`). Both bounds are the sequence's own `first_index`/
+// `last_index` generated columns, so nothing is re-parsed in JS. The
 // `ringing_group_ids` containment filter is defence-in-depth on top of RLS — a
 // bird can be shared across groups, so `groupId` must appear in the array (see
 // issue #149).
 async function findBirdsMatchingSequenceBounds(
 	supabase: RingSequenceSupabaseClient,
 	prefix: string,
-	firstRing: string,
-	lastRing: string,
+	firstIndex: number,
+	lastIndex: number,
 	groupId: number
 ): Promise<number[]> {
-	const firstIndex = trailingRingNumber(firstRing);
-	const lastIndex = trailingRingNumber(lastRing);
-	if (firstIndex === null || lastIndex === null) return [];
-
-	const exactLengthPattern =
-		prefix + '_'.repeat(Math.max(0, firstRing.length - prefix.length));
 	const birds = (await supabase
 		.from('Birds')
-		.select('id, ring_no')
-		.ilike('ring_no', exactLengthPattern)
+		.select('id')
+		.eq('ring_prefix', prefix)
+		.gte('ring_index', firstIndex)
+		.lte('ring_index', lastIndex)
 		.contains('ringing_group_ids', [groupId])
-		.then(catchSupabaseErrors)) as { id: number; ring_no: string }[] | null;
+		.then(catchSupabaseErrors)) as { id: number }[] | null;
 
-	return (birds ?? [])
-		.filter((bird) => {
-			const ringNumber = trailingRingNumber(bird.ring_no);
-			return (
-				ringNumber !== null &&
-				ringNumber >= firstIndex &&
-				ringNumber <= lastIndex
-			);
-		})
-		.map((bird) => bird.id);
+	return (birds ?? []).map((bird) => bird.id);
 }
 
 // Reconciles the `RingSequences_Birds` links for one sequence against a new
@@ -200,16 +184,16 @@ async function reconcileRingSequenceBounds(
 	supabase: RingSequenceSupabaseClient,
 	ringSequenceId: number,
 	prefix: string,
-	firstRing: string,
-	lastRing: string,
+	firstIndex: number,
+	lastIndex: number,
 	groupId: number
 ): Promise<void> {
 	const desiredBirdIds = new Set(
 		await findBirdsMatchingSequenceBounds(
 			supabase,
 			prefix,
-			firstRing,
-			lastRing,
+			firstIndex,
+			lastIndex,
 			groupId
 		)
 	);
@@ -313,22 +297,38 @@ export async function updateRingSequence(
 			}
 		}
 
-		await supabase
+		// Return the updated row's `first_index`/`last_index` generated columns so
+		// reconciliation matches candidate birds against the DB-computed numeric
+		// window rather than re-parsing the bound strings in JS. On a cross-group
+		// row RLS matches zero rows, so the update returns null and reconciliation
+		// is skipped below (prefix is also null in that case).
+		const updated = (await supabase
 			.from('RingSequences')
 			.update({
 				size: size as RingSize,
 				...(bothBoundsSet ? { first_ring: firstRing, last_ring: lastRing } : {})
 			})
 			.eq('id', id)
-			.then(catchSupabaseErrors);
+			.select('first_index, last_index')
+			.maybeSingle()
+			.then(catchSupabaseErrors)) as {
+			first_index: number | null;
+			last_index: number | null;
+		} | null;
 
-		if (bothBoundsSet && prefix !== null && ringingGroupId !== null) {
+		if (
+			bothBoundsSet &&
+			prefix !== null &&
+			ringingGroupId !== null &&
+			updated?.first_index != null &&
+			updated?.last_index != null
+		) {
 			await reconcileRingSequenceBounds(
 				supabase,
 				id,
 				prefix,
-				firstRing,
-				lastRing,
+				updated.first_index,
+				updated.last_index,
 				ringingGroupId
 			);
 		}
@@ -373,8 +373,8 @@ type CreateSequenceOptions = {
 
 type ExistingSequenceRow = {
 	id: number;
-	first_ring: string | null;
-	last_ring: string | null;
+	first_index: number | null;
+	last_index: number | null;
 };
 
 // Finds or creates the group's RingSequences row for `prefix`, then links every
@@ -402,25 +402,24 @@ async function findOrCreateRingSequenceAndLinkBirds(
 	const { ownedByGroup = false, firstRing = null, lastRing = null } = options;
 	const existing = (await supabase
 		.from('RingSequences')
-		.select('id, first_ring, last_ring')
+		.select('id, first_index, last_index')
 		.eq('prefix', prefix)
 		.eq('ringing_group_id', groupId)
 		.maybeSingle()
 		.then(catchSupabaseErrors)) as ExistingSequenceRow | null;
 
 	let sequenceId: number;
-	// The bounds the sequence actually carries after this call — a reused row's
-	// own bounds, or the ones we insert for a fresh row. Drives whether candidate
+	// The numeric window the sequence actually carries after this call — a reused
+	// row's own `first_index`/`last_index` generated columns, or the ones the DB
+	// computes from the bounds we insert for a fresh row. Drives whether candidate
 	// birds are matched by numeric window or by prefix alone.
-	let sequenceFirstRing: string | null;
-	let sequenceLastRing: string | null;
+	let sequenceFirstIndex: number | null;
+	let sequenceLastIndex: number | null;
 	if (existing?.id) {
 		sequenceId = existing.id;
-		sequenceFirstRing = existing.first_ring;
-		sequenceLastRing = existing.last_ring;
+		sequenceFirstIndex = existing.first_index;
+		sequenceLastIndex = existing.last_index;
 	} else {
-		sequenceFirstRing = firstRing;
-		sequenceLastRing = lastRing;
 		const { data: inserted, error } = await supabase
 			.from('RingSequences')
 			.insert({
@@ -433,7 +432,8 @@ async function findOrCreateRingSequenceAndLinkBirds(
 				...(firstRing !== null ? { first_ring: firstRing } : {}),
 				...(lastRing !== null ? { last_ring: lastRing } : {})
 			})
-			.select('id')
+			// Read back the DB-computed numeric window from the generated columns.
+			.select('id, first_index, last_index')
 			.single();
 
 		if (error) {
@@ -443,7 +443,7 @@ async function findOrCreateRingSequenceAndLinkBirds(
 			if (error.code === UNIQUE_VIOLATION) {
 				const raced = (await supabase
 					.from('RingSequences')
-					.select('id, first_ring, last_ring')
+					.select('id, first_index, last_index')
 					.eq('prefix', prefix)
 					.eq('ringing_group_id', groupId)
 					.single()
@@ -452,13 +452,15 @@ async function findOrCreateRingSequenceAndLinkBirds(
 					throw new Error(`Failed to create ring sequence: ${error.message}`);
 				}
 				sequenceId = raced.id;
-				sequenceFirstRing = raced.first_ring;
-				sequenceLastRing = raced.last_ring;
+				sequenceFirstIndex = raced.first_index;
+				sequenceLastIndex = raced.last_index;
 			} else {
 				throw new Error(`Failed to create ring sequence: ${error.message}`);
 			}
 		} else {
 			sequenceId = inserted!.id;
+			sequenceFirstIndex = inserted!.first_index;
+			sequenceLastIndex = inserted!.last_index;
 		}
 	}
 
@@ -469,12 +471,12 @@ async function findOrCreateRingSequenceAndLinkBirds(
 	// `groupId` must appear in the array), matching the pattern in
 	// `app/actions/sp-data.ts`.
 	let candidateBirdIds: number[];
-	if (sequenceFirstRing !== null && sequenceLastRing !== null) {
+	if (sequenceFirstIndex !== null && sequenceLastIndex !== null) {
 		candidateBirdIds = await findBirdsMatchingSequenceBounds(
 			supabase,
 			prefix,
-			sequenceFirstRing,
-			sequenceLastRing,
+			sequenceFirstIndex,
+			sequenceLastIndex,
 			groupId
 		);
 	} else {
