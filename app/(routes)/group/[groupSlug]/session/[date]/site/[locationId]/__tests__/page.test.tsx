@@ -141,7 +141,7 @@ describe('session site page', () => {
 		render(await renderPage());
 		const stats = await screen.findByTestId('session-stats');
 		expect(stats.textContent).toContain(
-			'1 bird (1 new, 0 retraps) from 1 species in ~0m'
+			'1 bird of 1 species, 1 new and 0 retraps'
 		);
 	});
 

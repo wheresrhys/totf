@@ -19,7 +19,7 @@ export function TabNav({
 	ariaLabel = 'Tabs'
 }: TabNavProps) {
 	return (
-		<div className="overflow-x-auto mt-4">
+		<div className="overflow-x-auto mt-2 sm:mt-4">
 			<nav
 				className="flex border-b border-base-300 min-w-max"
 				role="tablist"
