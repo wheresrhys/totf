@@ -152,7 +152,7 @@ describe('/summary/[year]/[month]', () => {
 		expect(screen.getByRole('button', { name: 'Species totals' })).toBeTruthy();
 	});
 
-	it('links each session day to the group-scoped session-temp route', async () => {
+	it('links each session day to the group-scoped session route', async () => {
 		fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
 		render(
 			await Page({
@@ -164,7 +164,7 @@ describe('/summary/[year]/[month]', () => {
 			screen
 				.getByRole('link', { name: '16th August 2026' })
 				.getAttribute('href')
-		).toBe('/group/alpha/session-temp/2026-08-16');
+		).toBe('/group/alpha/session/2026-08-16');
 	});
 
 	it('lazily renders species table rows linking to the year-and-month-scoped species URL (#625)', async () => {

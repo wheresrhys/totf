@@ -101,18 +101,18 @@ describe('SpMonthTotalsTab', () => {
 		});
 	});
 
-	it('renders a row per month, each linking to /species/{name}/{year}/{month}', async () => {
+	it('renders a row per month, each one that has sessions linking to /species/{name}/{year}/{month}', async () => {
 		render(
 			<SpMonthTotalsTab speciesName="Robin" viewedGroupId={1} year={2026} />
 		);
 		await waitFor(() => {
 			expect(document.querySelectorAll('tbody tr').length).toBe(12);
 		});
-		const januaryLink = screen.getByRole('link', { name: 'January 2026' });
-		expect(januaryLink.getAttribute('href')).toBe('/species/Robin/2026/1');
+		expect(screen.getByText('January 2026')).not.toBeNull();
+		expect(screen.queryByRole('link', { name: 'January 2026' })).toBeNull();
 		const marchLink = screen.getByRole('link', { name: 'March 2026' });
 		expect(marchLink.getAttribute('href')).toBe('/species/Robin/2026/3');
-		const decemberLink = screen.getByRole('link', { name: 'December 2026' });
-		expect(decemberLink.getAttribute('href')).toBe('/species/Robin/2026/12');
+		expect(screen.getByText('December 2026')).not.toBeNull();
+		expect(screen.queryByRole('link', { name: 'December 2026' })).toBeNull();
 	});
 });

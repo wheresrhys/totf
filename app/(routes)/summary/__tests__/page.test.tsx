@@ -158,7 +158,7 @@ describe('/summary (all-time)', () => {
 			expect(tabs[0].getAttribute('aria-current')).toBe('true');
 		});
 
-		it("each returned day links to the group-scoped session-temp route via the group's resolved slug", async () => {
+		it("each returned day links to the group-scoped session route via the group's resolved slug", async () => {
 			fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
 			render(await Page());
 			await screen.findByRole('heading', { level: 1 });
@@ -166,9 +166,7 @@ describe('/summary (all-time)', () => {
 			const link = await screen.findByRole('link', {
 				name: '16th August 2026'
 			});
-			expect(link.getAttribute('href')).toBe(
-				'/group/alpha/session-temp/2026-08-16'
-			);
+			expect(link.getAttribute('href')).toBe('/group/alpha/session/2026-08-16');
 		});
 
 		it("the page's initial render (Year totals active) triggers no day-grouped fetch", async () => {

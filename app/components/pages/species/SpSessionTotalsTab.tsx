@@ -49,7 +49,7 @@ export function SpSessionTotalsTab({
 			rows={sessionTotals}
 			firstColumnHeader="Session"
 			buildHref={(timePeriod) =>
-				`/group/${viewedGroup.slug}/session-temp/${timePeriod}`
+				`/group/${viewedGroup.slug}/session/${timePeriod}`
 			}
 		/>
 	);

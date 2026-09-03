@@ -116,6 +116,9 @@ function SummaryStatsTable({ data }: { data: HomePageSummaryStats | null }) {
 					))}
 				</tbody>
 			</Table>
+			<NoPrefetchLink href="/summary" className="link link-secondary text-sm">
+				View more stats
+			</NoPrefetchLink>
 		</div>
 	);
 }

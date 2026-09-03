@@ -111,7 +111,7 @@ describe('SpSessionTotalsTab', () => {
 		);
 	});
 
-	it('renders a row per day returned by the RPC, each linking to /group/{slug}/session-temp/{date}', async () => {
+	it('renders a row per day returned by the RPC, each linking to /group/{slug}/session/{date}', async () => {
 		render(
 			<SpSessionTotalsTab speciesName="Robin" viewedGroup={viewedGroup} />
 		);
@@ -121,10 +121,10 @@ describe('SpSessionTotalsTab', () => {
 		const march14Link = screen.getByRole('link', { name: '14th March 2026' });
 		const march21Link = screen.getByRole('link', { name: '21st March 2026' });
 		expect(march14Link.getAttribute('href')).toBe(
-			'/group/alpha/session-temp/2026-03-14'
+			'/group/alpha/session/2026-03-14'
 		);
 		expect(march21Link.getAttribute('href')).toBe(
-			'/group/alpha/session-temp/2026-03-21'
+			'/group/alpha/session/2026-03-21'
 		);
 	});
 
