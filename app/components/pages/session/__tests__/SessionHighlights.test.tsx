@@ -5,6 +5,7 @@ import {
 	familySortValue,
 	type SessionHighlight
 } from '@/app/models/session-highlights';
+import type { SessionEncounter } from '@/app/models/session';
 
 vi.mock('@/app/actions/session-highlights', () => ({
 	fetchSessionHighlights: vi.fn()
@@ -54,6 +55,19 @@ const mockHighlightsWithSpeciesRecord: SessionHighlight[] = [
 	}
 ];
 
+// The "Best of the session" subsection only reads bird.proven_age,
+// bird.species.species_name and bird.ring_no off the oldest encounter — the
+// rest of the SessionEncounter shape is irrelevant here, so build a minimal one.
+function makeOldestEncounter(provenAge: number): SessionEncounter {
+	return {
+		bird: {
+			ring_no: 'ABC001',
+			proven_age: provenAge,
+			species: { species_name: 'Robin' }
+		}
+	} as unknown as SessionEncounter;
+}
+
 describe('SessionHighlights', () => {
 	afterEach(() => {
 		cleanup();
@@ -75,19 +89,29 @@ describe('SessionHighlights', () => {
 				resolveData = resolve;
 			})
 		);
-		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
+		);
 		expect(document.querySelector('.loading')).not.toBeNull();
 		resolveData(mockHighlights);
 	});
 
-	it('renders a Highlights heading and one item per highlight', async () => {
-		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+	it('renders a Standouts heading and one item per highlight', async () => {
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
+		);
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'Standouts' })).toBeDefined();
 		});
-		const items = screen
-			.getByTestId('session-highlights')
-			.querySelectorAll('li');
+		const items = screen.getByTestId('standouts').querySelectorAll('li');
 		expect(items.length).toBe(2);
 		expect(items[0].textContent).toBe('Busiest session ever — 74 birds');
 		expect(items[1].textContent).toBe(
@@ -95,12 +119,114 @@ describe('SessionHighlights', () => {
 		);
 	});
 
-	it('renders nothing when there are no highlights', async () => {
+	it('renders a "Best of the session" heading with the oldest-bird sentence when an oldest encounter is provided', async () => {
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={makeOldestEncounter(5)}
+			/>
+		);
+		await waitFor(() => {
+			expect(
+				screen.getByRole('heading', { name: 'Best of the session' })
+			).toBeDefined();
+		});
+		const items = screen.getByTestId('best-of-session').querySelectorAll('li');
+		expect(items.length).toBe(1);
+		expect(items[0].textContent).toBe('Oldest: 5 years — Robin (ABC001)');
+	});
+
+	it('renders both subsections together when both highlights and an oldest encounter are present', async () => {
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={makeOldestEncounter(5)}
+			/>
+		);
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'Standouts' })).toBeDefined();
+		});
+		expect(
+			screen.getByRole('heading', { name: 'Best of the session' })
+		).toBeDefined();
+		expect(screen.getByTestId('standouts').querySelectorAll('li').length).toBe(
+			2
+		);
+		expect(
+			screen.getByTestId('best-of-session').querySelectorAll('li').length
+		).toBe(1);
+	});
+
+	it('renders only the Best-of-the-session subsection when there are no highlights but an oldest encounter is provided', async () => {
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([]);
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={makeOldestEncounter(5)}
+			/>
+		);
+		await waitFor(() => {
+			expect(
+				screen.getByRole('heading', { name: 'Best of the session' })
+			).toBeDefined();
+		});
+		expect(screen.queryByRole('heading', { name: 'Standouts' })).toBeNull();
+		expect(screen.queryByTestId('standouts')).toBeNull();
+	});
+
+	it('renders only the Standouts subsection when there is no oldest encounter but highlights exist', async () => {
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
+		);
+		await waitFor(() => {
+			expect(screen.getByRole('heading', { name: 'Standouts' })).toBeDefined();
+		});
+		expect(
+			screen.queryByRole('heading', { name: 'Best of the session' })
+		).toBeNull();
+		expect(screen.queryByTestId('best-of-session')).toBeNull();
+	});
+
+	it('renders the oldest-bird sentence in the existing "Oldest: N years — Species (RING)" format', async () => {
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([]);
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={makeOldestEncounter(5)}
+			/>
+		);
+		await waitFor(() => {
+			expect(
+				screen.getByRole('heading', { name: 'Best of the session' })
+			).toBeDefined();
+		});
+		expect(screen.getByTestId('best-of-session').textContent).toBe(
+			'Oldest: 5 years — Robin (ABC001)'
+		);
+	});
+
+	it('renders nothing when there are no highlights and no oldest encounter', async () => {
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
 		vi.mocked(fetchSessionHighlights).mockResolvedValue([]);
 		const { container } = render(
-			<SessionHighlights date="2024-09-15" viewedGroupId={1} />
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
 		);
 		await waitFor(() => {
 			expect(document.querySelector('.loading')).toBeNull();
@@ -108,7 +234,24 @@ describe('SessionHighlights', () => {
 		expect(container.innerHTML).toBe('');
 	});
 
-	it('renders nothing when the action rejects', async () => {
+	it('renders nothing for an oldest encounter with proven_age 0', async () => {
+		const { fetchSessionHighlights } =
+			await import('@/app/actions/session-highlights');
+		vi.mocked(fetchSessionHighlights).mockResolvedValue([]);
+		const { container } = render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={makeOldestEncounter(0)}
+			/>
+		);
+		await waitFor(() => {
+			expect(document.querySelector('.loading')).toBeNull();
+		});
+		expect(container.innerHTML).toBe('');
+	});
+
+	it('renders nothing when the action rejects, even with an oldest encounter provided', async () => {
 		const consoleErrorSpy = vi
 			.spyOn(console, 'error')
 			.mockImplementation(() => {});
@@ -118,12 +261,17 @@ describe('SessionHighlights', () => {
 			new Error('action failed')
 		);
 		const { container } = render(
-			<SessionHighlights date="2024-09-15" viewedGroupId={1} />
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={makeOldestEncounter(5)}
+			/>
 		);
 		await waitFor(() => {
 			expect(document.querySelector('.loading')).toBeNull();
 		});
 		expect(container.innerHTML).toBe('');
+		expect(screen.queryByTestId('standouts')).toBeNull();
 		expect(consoleErrorSpy).toHaveBeenCalled();
 	});
 
@@ -133,13 +281,17 @@ describe('SessionHighlights', () => {
 		vi.mocked(fetchSessionHighlights).mockResolvedValue(
 			mockHighlightsWithSpeciesRecord
 		);
-		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
+		);
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'Standouts' })).toBeDefined();
 		});
-		const items = screen
-			.getByTestId('session-highlights')
-			.querySelectorAll('li');
+		const items = screen.getByTestId('standouts').querySelectorAll('li');
 		expect(items.length).toBe(2);
 		expect(items[0].textContent).toBe('Busiest session ever — 74 birds');
 		expect(items[1].textContent).toBe(
@@ -158,13 +310,17 @@ describe('SessionHighlights', () => {
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
 		vi.mocked(fetchSessionHighlights).mockResolvedValue([firstEverHighlight]);
-		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
+		);
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'Standouts' })).toBeDefined();
 		});
-		const items = screen
-			.getByTestId('session-highlights')
-			.querySelectorAll('li');
+		const items = screen.getByTestId('standouts').querySelectorAll('li');
 		expect(items.length).toBe(1);
 		expect(items[0].textContent).toBe('First ever Firecrest record');
 	});
@@ -179,13 +335,17 @@ describe('SessionHighlights', () => {
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
 		vi.mocked(fetchSessionHighlights).mockResolvedValue([rareSpeciesHighlight]);
-		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
+		);
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'Standouts' })).toBeDefined();
 		});
-		const items = screen
-			.getByTestId('session-highlights')
-			.querySelectorAll('li');
+		const items = screen.getByTestId('standouts').querySelectorAll('li');
 		expect(items.length).toBe(1);
 		expect(items[0].textContent).toBe(
 			'MEGA — Firecrest seen on only 2 days ever'
@@ -279,13 +439,17 @@ describe('SessionHighlights', () => {
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
 		vi.mocked(fetchSessionHighlights).mockResolvedValue([longAbsenceHighlight]);
-		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
+		);
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'Standouts' })).toBeDefined();
 		});
-		const items = screen
-			.getByTestId('session-highlights')
-			.querySelectorAll('li');
+		const items = screen.getByTestId('standouts').querySelectorAll('li');
 		expect(items.length).toBe(1);
 		expect(items[0].textContent).toBe(
 			'Robin ARRETRAP recaught after 2 years, 10 months away (last seen 20 Jun 2021)'
@@ -349,13 +513,17 @@ describe('SessionHighlights', () => {
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
 		vi.mocked(fetchSessionHighlights).mockResolvedValue(mixedHighlights);
-		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
+		);
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'Standouts' })).toBeDefined();
 		});
-		const items = screen
-			.getByTestId('session-highlights')
-			.querySelectorAll('li');
+		const items = screen.getByTestId('standouts').querySelectorAll('li');
 		// The machine sorts the scoped record block first (busiest all-time,
 		// then Reed Warbler all-time), then the quietest-since comparison, then
 		// the first/absence block, with weights last.
@@ -373,11 +541,17 @@ describe('SessionHighlights', () => {
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
 		vi.mocked(fetchSessionHighlights).mockResolvedValue([highlight]);
-		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
+		);
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'Standouts' })).toBeDefined();
 		});
-		return screen.getByTestId('session-highlights').querySelectorAll('li');
+		return screen.getByTestId('standouts').querySelectorAll('li');
 	}
 
 	function placementHighlight(
@@ -457,13 +631,17 @@ describe('SessionHighlights', () => {
 		const { fetchSessionHighlights } =
 			await import('@/app/actions/session-highlights');
 		vi.mocked(fetchSessionHighlights).mockResolvedValue([weightHighlight]);
-		render(<SessionHighlights date="2024-09-15" viewedGroupId={1} />);
+		render(
+			<SessionHighlights
+				date="2024-09-15"
+				viewedGroupId={1}
+				oldestEncounter={null}
+			/>
+		);
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Highlights' })).toBeDefined();
+			expect(screen.getByRole('heading', { name: 'Standouts' })).toBeDefined();
 		});
-		const items = screen
-			.getByTestId('session-highlights')
-			.querySelectorAll('li');
+		const items = screen.getByTestId('standouts').querySelectorAll('li');
 		expect(items.length).toBe(1);
 		expect(items[0].textContent).toBe('Heaviest Blue Tit ever weighed — 13.1g');
 	});
