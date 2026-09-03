@@ -4,6 +4,7 @@ import {
 	findUnusedRings,
 	groupRingNosByPrefix,
 	groupRingSequencesBySize,
+	validateRingSequenceBounds,
 	RING_SIZE_ENUM_ORDER
 } from '../ring-sequences';
 import type { RingSequenceRow, RingSize } from '@/app/models/db';
@@ -191,5 +192,62 @@ describe('deriveRingBounds', () => {
 	it('returns null when no ring number parses', () => {
 		expect(deriveRingBounds([])).toBeNull();
 		expect(deriveRingBounds(['ABCDEF', ''])).toBeNull();
+	});
+});
+
+describe('validateRingSequenceBounds', () => {
+	// Usual — a valid pair (both start with the prefix, first < last) is accepted.
+	it('returns null for a valid matching-prefix pair with first < last', () => {
+		expect(validateRingSequenceBounds('AEL', 'AEL1691', 'AEL1710')).toBeNull();
+	});
+
+	it('rejects first equal to last (a window must span at least two rings)', () => {
+		expect(validateRingSequenceBounds('AEL', 'AEL1691', 'AEL1691')).toBe(
+			'Last index must be strictly greater than first index'
+		);
+	});
+
+	// Structure — bounds are set as a pair; one-without-the-other is rejected,
+	// and neither-set is valid (leaves existing bounds untouched).
+	it('rejects only first_ring being set', () => {
+		expect(validateRingSequenceBounds('AEL', 'AEL1691', null)).toBe(
+			'Set both a first and last ring, or neither'
+		);
+	});
+
+	it('rejects only last_ring being set', () => {
+		expect(validateRingSequenceBounds('AEL', null, 'AEL1710')).toBe(
+			'Set both a first and last ring, or neither'
+		);
+	});
+
+	it('treats an empty string the same as unset (only one effectively set is rejected)', () => {
+		expect(validateRingSequenceBounds('AEL', 'AEL1691', '')).toBe(
+			'Set both a first and last ring, or neither'
+		);
+	});
+
+	it('returns null when neither bound is set', () => {
+		expect(validateRingSequenceBounds('AEL', null, null)).toBeNull();
+		expect(validateRingSequenceBounds('AEL', '', '')).toBeNull();
+	});
+
+	// Edge — prefix mismatch on either bound, and first numerically > last.
+	it("rejects a first_ring that doesn't start with the prefix", () => {
+		expect(validateRingSequenceBounds('AEL', 'XYZ1691', 'AEL1710')).toBe(
+			'First and last ring must start with the prefix "AEL"'
+		);
+	});
+
+	it("rejects a last_ring that doesn't start with the prefix", () => {
+		expect(validateRingSequenceBounds('AEL', 'AEL1691', 'XYZ1710')).toBe(
+			'First and last ring must start with the prefix "AEL"'
+		);
+	});
+
+	it('rejects first_ring numerically greater than last_ring', () => {
+		expect(validateRingSequenceBounds('AEL', 'AEL1710', 'AEL1691')).toBe(
+			'Last index must be strictly greater than first index'
+		);
 	});
 });

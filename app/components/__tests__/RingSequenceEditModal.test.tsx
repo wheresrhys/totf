@@ -46,6 +46,36 @@ describe('RingSequenceEditModal', () => {
 		expect(screen.queryByRole('textbox', { name: 'Prefix' })).toBeNull();
 	});
 
+	it('renders first_ring/last_ring inputs pre-filled from the sequence bounds', () => {
+		render(<RingSequenceEditModal sequence={sequence} onClose={vi.fn()} />);
+		const firstRing = screen.getByRole('textbox', {
+			name: 'First ring'
+		}) as HTMLInputElement;
+		const lastRing = screen.getByRole('textbox', {
+			name: 'Last ring'
+		}) as HTMLInputElement;
+		expect(firstRing.value).toBe('ARW00001');
+		expect(lastRing.value).toBe('ARW00099');
+	});
+
+	it('surfaces a bounds validation error returned by the action', async () => {
+		mockUpdateRingSequence.mockImplementation(
+			async (): Promise<UpdateRingSequenceState> => ({
+				success: false,
+				error: 'Last index must be strictly greater than first index'
+			})
+		);
+		render(<RingSequenceEditModal sequence={sequence} onClose={vi.fn()} />);
+		fireEvent.submit(
+			screen.getByRole('button', { name: 'Save' }).closest('form')!
+		);
+		await waitFor(() => {
+			expect(
+				screen.getByText('Last index must be strictly greater than first index')
+			).toBeDefined();
+		});
+	});
+
 	it('surfaces the action error message (e.g. a unique-constraint violation)', async () => {
 		mockUpdateRingSequence.mockImplementation(
 			async (): Promise<UpdateRingSequenceState> => ({

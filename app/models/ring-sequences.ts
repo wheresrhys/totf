@@ -177,6 +177,56 @@ export function deriveRingBounds(
 	return { first_ring: firstRing!, last_ring: lastRing! };
 }
 
+// The trailing digits of a ring number as an integer, or null when it has no
+// trailing digits (so it can't be range-compared). Mirrors the
+// `substring(... FROM '[0-9]+$')` parse the `first_index`/`last_index` generated
+// columns use, and `createRingSequenceLookup`'s `ringNo.match(/[0-9]+$/)`.
+// Exported so the reconciliation helper in `app/actions/ring-sequences.ts` can
+// match candidate birds against a sequence's numeric window with the same parse.
+export function trailingRingNumber(ringNo: string): number | null {
+	const match = ringNo.match(/[0-9]+$/);
+	return match ? parseInt(match[0], 10) : null;
+}
+
+// Validates a proposed `first_ring`/`last_ring` pair for a ring sequence before
+// it hits the DB. Returns a friendly error message, or null when the pair is
+// valid. Bounds are set as a pair: either both present or both absent (clearing
+// isn't in scope — "neither set" is valid and leaves existing bounds untouched).
+// When present, both must start with the sequence's immutable `prefix` (mirroring
+// #729's DB CHECK, surfaced before the write) and `last_ring` must be numerically
+// strictly greater than `first_ring` (a window spans at least two rings). Pure so
+// the edit action and its unit tests share one definition.
+export function validateRingSequenceBounds(
+	prefix: string,
+	firstRing: string | null,
+	lastRing: string | null
+): string | null {
+	const hasFirst = firstRing != null && firstRing !== '';
+	const hasLast = lastRing != null && lastRing !== '';
+
+	if (hasFirst !== hasLast) {
+		return 'Set both a first and last ring, or neither';
+	}
+	if (!hasFirst && !hasLast) {
+		return null;
+	}
+
+	if (!firstRing!.startsWith(prefix) || !lastRing!.startsWith(prefix)) {
+		return `First and last ring must start with the prefix "${prefix}"`;
+	}
+
+	const firstIndex = trailingRingNumber(firstRing!);
+	const lastIndex = trailingRingNumber(lastRing!);
+	if (firstIndex === null || lastIndex === null) {
+		return 'First and last ring must end in a number';
+	}
+	if (firstIndex >= lastIndex) {
+		return 'Last index must be strictly greater than first index';
+	}
+
+	return null;
+}
+
 export function findUnusedRings(
 	rings: string[],
 	prefixLength: number

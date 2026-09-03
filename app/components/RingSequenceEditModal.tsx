@@ -56,6 +56,26 @@ export function RingSequenceEditModal({
 							))}
 						</select>
 					</label>
+					<label className="flex flex-col gap-1">
+						<span className="text-sm">First ring</span>
+						<input
+							type="text"
+							name="first_ring"
+							defaultValue={sequence.first_ring ?? ''}
+							placeholder={sequence.prefix}
+							className="input input-bordered w-full font-mono"
+						/>
+					</label>
+					<label className="flex flex-col gap-1">
+						<span className="text-sm">Last ring</span>
+						<input
+							type="text"
+							name="last_ring"
+							defaultValue={sequence.last_ring ?? ''}
+							placeholder={sequence.prefix}
+							className="input input-bordered w-full font-mono"
+						/>
+					</label>
 					{state && !state.success && (
 						<p className="text-error text-sm">{state.error}</p>
 					)}

@@ -28,7 +28,8 @@ import {
 	updateRingSequence,
 	promoteControlToSequence,
 	fetchUnassignedImportPrefixes,
-	createSequenceFromImportPrefix
+	createSequenceFromImportPrefix,
+	type UpdateRingSequenceState
 } from '../ring-sequences';
 import { getAuthenticatedSupabaseClientForGroup } from '@/lib/group-auth';
 import { supabase } from '@/lib/supabase';
@@ -208,6 +209,311 @@ describe('updateRingSequence', () => {
 			.eq('id', otherGroupRowId)
 			.single();
 		expect(data).toMatchObject({ size: null, prefix: 'OTH' });
+	});
+});
+
+describe('updateRingSequence — bounds reconciliation (#731)', () => {
+	const suffix = randomTestSuffix();
+	let groupId: number;
+	let otherGroupId: number;
+	let robinId: number;
+	let sessionId: number;
+	let otherSessionId: number;
+	let groupClient: SupabaseClient;
+	let otherGroupClient: SupabaseClient;
+
+	const createdBirdIds: number[] = [];
+	const createdSeqIds: number[] = [];
+
+	async function createBird(
+		client: SupabaseClient,
+		ringNo: string,
+		onSessionId: number
+	): Promise<number> {
+		const { data: bird, error: birdError } = await client
+			.from('Birds')
+			.insert({ ring_no: ringNo, species_id: robinId })
+			.select('id')
+			.single();
+		if (birdError || !bird)
+			throw birdError ?? new Error('Failed to create bird');
+		createdBirdIds.push(bird.id);
+
+		const { error: encounterError } = await client.from('Encounters').insert({
+			capture_time: '09:00:00',
+			record_type: 'N',
+			scheme: 'BTO',
+			sex: 'U',
+			age_code: 4,
+			session_id: onSessionId,
+			bird_id: bird.id
+		});
+		if (encounterError) throw encounterError;
+		return bird.id;
+	}
+
+	// Seeds a group-owned sequence with the given bounds and returns its id.
+	async function seedSequence(
+		prefix: string,
+		firstRing: string,
+		lastRing: string
+	): Promise<number> {
+		const { data, error } = await groupClient
+			.from('RingSequences')
+			.insert({
+				prefix,
+				ringing_group_id: groupId,
+				first_ring: firstRing,
+				last_ring: lastRing
+			})
+			.select('id')
+			.single();
+		if (error || !data) throw error ?? new Error('Failed to seed sequence');
+		createdSeqIds.push(data.id);
+		return data.id;
+	}
+
+	async function linkBird(seqId: number, birdId: number): Promise<void> {
+		const { error } = await groupClient.from('RingSequences_Birds').insert({
+			ringing_group_id: groupId,
+			ring_sequence_id: seqId,
+			bird_id: birdId
+		});
+		if (error) throw error;
+	}
+
+	async function linkedBirdIds(seqId: number): Promise<number[]> {
+		const { data } = await groupClient
+			.from('RingSequences_Birds')
+			.select('bird_id')
+			.eq('ring_sequence_id', seqId);
+		return (data ?? []).map((row) => row.bird_id).sort((a, b) => a - b);
+	}
+
+	function updateBounds(
+		id: number,
+		firstRing: string,
+		lastRing: string
+	): Promise<UpdateRingSequenceState> {
+		authenticateAs(groupId);
+		return updateRingSequence(
+			null,
+			makeFormData({
+				id: String(id),
+				size: 'C',
+				first_ring: firstRing,
+				last_ring: lastRing
+			})
+		);
+	}
+
+	beforeAll(async () => {
+		groupId = createIsolatedGroup(`update-reconcile-${suffix}`);
+		otherGroupId = createIsolatedGroup(`update-reconcile-other-${suffix}`);
+		[groupClient, otherGroupClient] = await Promise.all([
+			getAuthenticatedSupabaseClientForGroup(groupId),
+			getAuthenticatedSupabaseClientForGroup(otherGroupId)
+		]);
+
+		const { data: robin, error: robinError } = await supabase
+			.from('Species')
+			.select('id')
+			.eq('species_name', 'Robin')
+			.single();
+		if (robinError || !robin)
+			throw new Error(
+				'Robin species not found — run npm run db:seed:e2e first'
+			);
+		robinId = robin.id;
+
+		const { data: location, error: locationError } = await groupClient
+			.from('Locations')
+			.insert({
+				location_name: `Reconcile Location ${suffix}`,
+				ringing_group_id: groupId
+			})
+			.select('id')
+			.single();
+		if (locationError || !location)
+			throw locationError ?? new Error('Failed to create location');
+		const { data: session, error: sessionError } = await groupClient
+			.from('Sessions')
+			.insert({ visit_date: '2090-01-01', location_id: location.id })
+			.select('id')
+			.single();
+		if (sessionError || !session)
+			throw sessionError ?? new Error('Failed to create session');
+		sessionId = session.id;
+
+		const { data: otherLocation, error: otherLocationError } =
+			await otherGroupClient
+				.from('Locations')
+				.insert({
+					location_name: `Reconcile Other Location ${suffix}`,
+					ringing_group_id: otherGroupId
+				})
+				.select('id')
+				.single();
+		if (otherLocationError || !otherLocation)
+			throw otherLocationError ?? new Error('Failed to create other location');
+		const { data: otherSession, error: otherSessionError } =
+			await otherGroupClient
+				.from('Sessions')
+				.insert({ visit_date: '2090-01-01', location_id: otherLocation.id })
+				.select('id')
+				.single();
+		if (otherSessionError || !otherSession)
+			throw otherSessionError ?? new Error('Failed to create other session');
+		otherSessionId = otherSession.id;
+	});
+
+	afterAll(() => {
+		const birdIds = createdBirdIds.length ? createdBirdIds.join(', ') : '-1';
+		const seqIds = createdSeqIds.length ? createdSeqIds.join(', ') : '-1';
+		psql(
+			`DELETE FROM "RingSequences_Birds" WHERE bird_id IN (${birdIds});` +
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds});` +
+				`DELETE FROM "Birds" WHERE id IN (${birdIds});` +
+				`DELETE FROM "RingSequences" WHERE id IN (${seqIds});` +
+				`DELETE FROM "Sessions" WHERE id IN (${sessionId}, ${otherSessionId});` +
+				`DELETE FROM "Locations" WHERE ringing_group_id IN (${groupId}, ${otherGroupId});` +
+				`DELETE FROM "RingingGroups" WHERE id IN (${groupId}, ${otherGroupId});`
+		);
+	});
+
+	// Usual — broadening links a previously-unlinked matching bird.
+	it('links a previously-unlinked matching bird when the range is broadened', async () => {
+		const prefix = randomPrefix();
+		const seqId = await seedSequence(prefix, `${prefix}0010`, `${prefix}0020`);
+		const inRange = await createBird(groupClient, `${prefix}0015`, sessionId);
+		const newlyInRange = await createBird(
+			groupClient,
+			`${prefix}0025`,
+			sessionId
+		);
+		await linkBird(seqId, inRange);
+
+		const result = await updateBounds(seqId, `${prefix}0010`, `${prefix}0030`);
+		expect(result).toEqual({ success: true });
+		expect(await linkedBirdIds(seqId)).toEqual(
+			[inRange, newlyInRange].sort((a, b) => a - b)
+		);
+	});
+
+	// Usual — tightening unlinks a bird now outside the range.
+	it('unlinks a bird that falls outside the range when it is tightened', async () => {
+		const prefix = randomPrefix();
+		const seqId = await seedSequence(prefix, `${prefix}0010`, `${prefix}0030`);
+		const stillInRange = await createBird(
+			groupClient,
+			`${prefix}0015`,
+			sessionId
+		);
+		const nowOutOfRange = await createBird(
+			groupClient,
+			`${prefix}0025`,
+			sessionId
+		);
+		await linkBird(seqId, stillInRange);
+		await linkBird(seqId, nowOutOfRange);
+
+		const result = await updateBounds(seqId, `${prefix}0010`, `${prefix}0020`);
+		expect(result).toEqual({ success: true });
+		expect(await linkedBirdIds(seqId)).toEqual([stillInRange]);
+	});
+
+	// Structure — broadening both ends at once.
+	it('links birds newly in range at both ends when both bounds are broadened', async () => {
+		const prefix = randomPrefix();
+		const seqId = await seedSequence(prefix, `${prefix}0020`, `${prefix}0030`);
+		const low = await createBird(groupClient, `${prefix}0015`, sessionId);
+		const mid = await createBird(groupClient, `${prefix}0025`, sessionId);
+		const high = await createBird(groupClient, `${prefix}0035`, sessionId);
+		await linkBird(seqId, mid);
+
+		const result = await updateBounds(seqId, `${prefix}0010`, `${prefix}0040`);
+		expect(result).toEqual({ success: true });
+		expect(await linkedBirdIds(seqId)).toEqual(
+			[low, mid, high].sort((a, b) => a - b)
+		);
+	});
+
+	// Structure — tightening both ends at once.
+	it('unlinks birds now outside both ends when both bounds are tightened', async () => {
+		const prefix = randomPrefix();
+		const seqId = await seedSequence(prefix, `${prefix}0010`, `${prefix}0040`);
+		const low = await createBird(groupClient, `${prefix}0015`, sessionId);
+		const mid = await createBird(groupClient, `${prefix}0025`, sessionId);
+		const high = await createBird(groupClient, `${prefix}0035`, sessionId);
+		await linkBird(seqId, low);
+		await linkBird(seqId, mid);
+		await linkBird(seqId, high);
+
+		const result = await updateBounds(seqId, `${prefix}0020`, `${prefix}0030`);
+		expect(result).toEqual({ success: true });
+		expect(await linkedBirdIds(seqId)).toEqual([mid]);
+	});
+
+	// Structure — moving the window (tighten one end, broaden the other).
+	it('links and unlinks simultaneously when the window is shifted', async () => {
+		const prefix = randomPrefix();
+		const seqId = await seedSequence(prefix, `${prefix}0010`, `${prefix}0020`);
+		const dropsOut = await createBird(groupClient, `${prefix}0015`, sessionId);
+		const comesIn = await createBird(groupClient, `${prefix}0025`, sessionId);
+		await linkBird(seqId, dropsOut);
+
+		const result = await updateBounds(seqId, `${prefix}0020`, `${prefix}0030`);
+		expect(result).toEqual({ success: true });
+		expect(await linkedBirdIds(seqId)).toEqual([comesIn]);
+	});
+
+	// Edge — a different group's bird with a matching ring number is never linked.
+	it("never links another group's bird even when its ring number is in range", async () => {
+		const prefix = randomPrefix();
+		const seqId = await seedSequence(prefix, `${prefix}0010`, `${prefix}0020`);
+		const ownBird = await createBird(groupClient, `${prefix}0015`, sessionId);
+		await createBird(otherGroupClient, `${prefix}0016`, otherSessionId);
+
+		const result = await updateBounds(seqId, `${prefix}0010`, `${prefix}0020`);
+		expect(result).toEqual({ success: true });
+		expect(await linkedBirdIds(seqId)).toEqual([ownBird]);
+	});
+
+	// Edge — an already-linked, still-in-range bird is left untouched (no
+	// spurious delete + reinsert), so its RingSequences_Birds row id is stable.
+	it('leaves an already-linked, still-in-range bird untouched (no delete + reinsert)', async () => {
+		const prefix = randomPrefix();
+		const seqId = await seedSequence(prefix, `${prefix}0010`, `${prefix}0020`);
+		const bird = await createBird(groupClient, `${prefix}0015`, sessionId);
+		await linkBird(seqId, bird);
+
+		const { data: before } = await groupClient
+			.from('RingSequences_Birds')
+			.select('id')
+			.eq('ring_sequence_id', seqId)
+			.eq('bird_id', bird)
+			.single();
+
+		const result = await updateBounds(seqId, `${prefix}0010`, `${prefix}0025`);
+		expect(result).toEqual({ success: true });
+
+		const { data: after } = await groupClient
+			.from('RingSequences_Birds')
+			.select('id')
+			.eq('ring_sequence_id', seqId)
+			.eq('bird_id', bird)
+			.single();
+		expect(after!.id).toBe(before!.id);
+	});
+
+	// Edge — reconciling against an empty candidate set is a no-op, not an error.
+	it('is a no-op when no birds fall in the new range', async () => {
+		const prefix = randomPrefix();
+		const seqId = await seedSequence(prefix, `${prefix}0900`, `${prefix}0999`);
+
+		const result = await updateBounds(seqId, `${prefix}0800`, `${prefix}0899`);
+		expect(result).toEqual({ success: true });
+		expect(await linkedBirdIds(seqId)).toEqual([]);
 	});
 });
 
@@ -448,6 +754,73 @@ describe('promoteControlToSequence', () => {
 		expect(second).toEqual({ success: true });
 
 		expect(await linkedBirdIds(sequence!.id)).toEqual([birdId]);
+	});
+
+	it('only links in-bounds birds when reusing an existing sequence that already has first_ring/last_ring set (#731)', async () => {
+		const prefix = randomPrefix();
+		const { data: existing, error: existingError } = await groupClient
+			.from('RingSequences')
+			.insert({
+				prefix,
+				ringing_group_id: groupId,
+				first_ring: `${prefix}0010`,
+				last_ring: `${prefix}0020`
+			})
+			.select('id')
+			.single();
+		if (existingError || !existing)
+			throw existingError ?? new Error('Failed to seed bounded sequence');
+		createdSeqIds.push(existing.id);
+
+		const inRangeBird = await createBird(
+			groupClient,
+			`${prefix}0015`,
+			sessionId
+		);
+		await createBird(groupClient, `${prefix}0099`, sessionId);
+
+		authenticateAs(groupId);
+		const result = await promoteControlToSequence(
+			null,
+			makeFormData({
+				ring_no: `${prefix}0015`,
+				viewed_group_id: String(groupId)
+			})
+		);
+		expect(result).toEqual({ success: true });
+
+		// The out-of-range bird sharing the prefix is left unlinked.
+		expect(await linkedBirdIds(existing.id)).toEqual([inRangeBird]);
+	});
+
+	it('still links every prefix-matching bird when reusing a sequence with NULL bounds (unchanged behaviour)', async () => {
+		const prefix = randomPrefix();
+		const { data: existing, error: existingError } = await groupClient
+			.from('RingSequences')
+			.insert({ prefix, ringing_group_id: groupId })
+			.select('id')
+			.single();
+		if (existingError || !existing)
+			throw existingError ?? new Error('Failed to seed unbounded sequence');
+		createdSeqIds.push(existing.id);
+
+		const birdA = await createBird(groupClient, `${prefix}0015`, sessionId);
+		const birdB = await createBird(groupClient, `${prefix}0099`, sessionId);
+
+		authenticateAs(groupId);
+		const result = await promoteControlToSequence(
+			null,
+			makeFormData({
+				ring_no: `${prefix}0015`,
+				viewed_group_id: String(groupId)
+			})
+		);
+		expect(result).toEqual({ success: true });
+
+		expect(await linkedBirdIds(existing.id)).toEqual(
+			expect.arrayContaining([birdA, birdB])
+		);
+		expect(await linkedBirdIds(existing.id)).toHaveLength(2);
 	});
 
 	it('does not link a bird belonging only to a different group, even when its ring number shares the prefix', async () => {
