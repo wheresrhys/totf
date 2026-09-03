@@ -17,6 +17,7 @@ import {
 } from '../../shared/SortableTable';
 import {
 	buildStandardColumnConfigs,
+	buildTotalsRowCells,
 	columnBlock,
 	createNameLinkCell
 } from '../../shared/StatsTableColumnConfigs';
@@ -265,6 +266,14 @@ export function SessionTabs({
 		)
 	);
 	const columnConfigs = buildColumnConfigs(hasPulli);
+	const rowModels = speciesList.map(rowDataTransform);
+	const totalsRow = buildTotalsRowCells<RowModel>({
+		columnConfigs,
+		rowModels,
+		cellOverrides: {
+			maxProvenAge: Math.max(...rowModels.map((model) => model.maxProvenAge))
+		}
+	});
 
 	const tabNavConfig = [
 		{ id: 'species', label: 'Species totals' },
@@ -295,6 +304,7 @@ export function SessionTabs({
 					testId="session-table"
 					initialSortColumn="total"
 					rowDataTransform={rowDataTransform}
+					totalsRow={totalsRow}
 					TableBodyComponent={SessionTableBody}
 				/>
 			</ConditionalTabPanel>
