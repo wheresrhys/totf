@@ -18,7 +18,6 @@ import {
 import {
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
-	columnBlock,
 	createNameLinkCell
 } from '../../shared/StatsTableColumnConfigs';
 import { createStatsTableBody } from '../../shared/StatsTableBody';

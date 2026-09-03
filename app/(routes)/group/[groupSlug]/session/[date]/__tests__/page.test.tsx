@@ -217,14 +217,8 @@ describe('session detail page', () => {
 		render(await renderPage());
 		const stats = await screen.findByTestId('session-stats');
 		expect(stats.textContent).toContain(
-			'3 birds (2 new, 1 retrap) from 2 species'
+			'3 birds of 2 species, 2 new and 1 retrap'
 		);
-	});
-
-	it('renders the approximate session duration in the summary sentence', async () => {
-		render(await renderPage());
-		const stats = await screen.findByTestId('session-stats');
-		expect(stats.textContent).toContain('in ~30m');
 	});
 
 	it('renders one table row per species', async () => {

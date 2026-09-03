@@ -3,10 +3,18 @@ export function PageWrapper({ children }: { children: React.ReactNode }) {
 	return <div className="m-3">{children}</div>;
 }
 export function PrimaryHeading({ children }: { children: React.ReactNode }) {
-	return <h1 className="text-base-content text-3xl mt-4 mb-4">{children}</h1>;
+	return (
+		<h1 className="text-base-content text-2xl sm:text-3xl mt-2 mb-2 sm:mt-4 sm:mb-4">
+			{children}
+		</h1>
+	);
 }
 export function SecondaryHeading({ children }: { children: React.ReactNode }) {
-	return <h2 className="text-base-content text-2xl mt-3 mb-3">{children}</h2>;
+	return (
+		<h2 className="text-base-content text-xl sm:text-2xl mt-2 mb-2sm:mt-3 sm:mb-3">
+			{children}
+		</h2>
+	);
 }
 export function BoxyList({
 	children,

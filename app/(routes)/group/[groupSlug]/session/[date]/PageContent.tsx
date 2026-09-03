@@ -12,11 +12,7 @@ import {
 import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
-import {
-	calculateSessionChronology,
-	type SessionChronology
-} from '@/app/models/session-chronology';
-import { formatMinutesForDisplay } from '@/lib/postgres-interval';
+import { calculateSessionChronology } from '@/app/models/session-chronology';
 import type { ViewedGroup } from '@/lib/group-slug';
 
 export type PageParams = {
@@ -68,8 +64,7 @@ function findOldestEncounter(
 
 export function buildSessionSummarySentence(
 	encounters: SessionEncounter[],
-	speciesCount: number,
-	chronology: SessionChronology
+	speciesCount: number
 ): string {
 	const birdCount = encounters.length;
 	const newCount = encounters.filter(
@@ -82,15 +77,7 @@ export function buildSessionSummarySentence(
 	const birdWord = birdCount === 1 ? 'bird' : 'birds';
 	const retrapWord = retrapCount === 1 ? 'retrap' : 'retraps';
 
-	const durationClause =
-		chronology.durationMinutes !== null
-			? ` in ~${formatMinutesForDisplay(chronology.durationMinutes)}`
-			: '';
-
-	return (
-		`${birdCount} ${birdWord} (${newCount} new, ${retrapCount} ${retrapWord}) ` +
-		`from ${speciesCount} species${durationClause}`
-	);
+	return `${birdCount} ${birdWord} of ${speciesCount} species, ${newCount} new and ${retrapCount} ${retrapWord}`;
 }
 
 function Locations({
@@ -104,7 +91,7 @@ function Locations({
 	selectedLocation: number | undefined;
 	viewedGroup: ViewedGroup;
 }) {
-	return (
+	return locations.length > 1 ? (
 		<small className="text-sm text-gray-500 flex flex-wrap gap-2 mt-2">
 			{locations.length === 1
 				? printLocationName(locations[0].location_name)
@@ -135,7 +122,7 @@ function Locations({
 				</>
 			) : null}
 		</small>
-	);
+	) : null;
 }
 
 function SessionNavigation({
@@ -148,12 +135,11 @@ function SessionNavigation({
 	const { previousSessionDate, nextSessionDate } = adjacentSessionDates;
 	if (!previousSessionDate && !nextSessionDate) return null;
 	return (
-		<nav aria-label="Session navigation" className="flex gap-2 text-sm mb-2">
+		<nav aria-label="Session navigation" className="flex gap-2 text-sm -mb-1">
 			{previousSessionDate ? (
 				<Link
 					href={`/group/${viewedGroup.slug}/session/${previousSessionDate}`}
 					aria-label="Previous session"
-					className="link"
 				>
 					← Previous
 				</Link>
@@ -162,7 +148,6 @@ function SessionNavigation({
 				<Link
 					href={`/group/${viewedGroup.slug}/session/${nextSessionDate}`}
 					aria-label="Next session"
-					className="link"
 				>
 					Next →
 				</Link>
@@ -200,27 +185,23 @@ export function SessionPageContent({
 	}
 	return (
 		<PageWrapper>
-			<PrimaryHeading>
-				{formatDate(new Date(date), 'EEE do MMMM yyyy')}
-				<br />
-				<Locations
-					locations={dayData.locations}
-					date={date}
-					selectedLocation={locationId}
-					viewedGroup={viewedGroup}
-				/>
-			</PrimaryHeading>
 			<SessionNavigation
 				adjacentSessionDates={dayData.adjacentSessionDates}
 				viewedGroup={viewedGroup}
 			/>
-			<p className="text-sm text-gray-500" data-testid="session-stats">
-				{buildSessionSummarySentence(
-					dayData.encounters,
-					speciesList.length,
-					chronology
-				)}
+			<PrimaryHeading>
+				{formatDate(new Date(date), 'EEE do MMMM yyyy')}
+			</PrimaryHeading>
+
+			<p className="text-lg" data-testid="session-stats">
+				{buildSessionSummarySentence(dayData.encounters, speciesList.length)}
 			</p>
+			<Locations
+				locations={dayData.locations}
+				date={date}
+				selectedLocation={locationId}
+				viewedGroup={viewedGroup}
+			/>
 
 			<SessionTabs
 				speciesList={speciesList}
