@@ -122,7 +122,7 @@ export function PeriodTotalsTable({
 		PeriodTotalsRow
 	>(
 		(model) => resolveLabel(model.timePeriod),
-		(model) => buildHref(model.timePeriod)
+		(model) => (model.sessionsCount ? buildHref(model.timePeriod) : undefined)
 	);
 
 	function PeriodTotalsTableBody({

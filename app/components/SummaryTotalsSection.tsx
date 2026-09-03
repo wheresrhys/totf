@@ -307,7 +307,7 @@ export function SummaryTotalsSection({
 						rows={sessionTotals}
 						firstColumnHeader="Session"
 						buildHref={(timePeriod) =>
-							`/group/${viewedGroup.slug}/session-temp/${timePeriod}`
+							`/group/${viewedGroup.slug}/session/${timePeriod}`
 						}
 						totalsStats={totalsStats}
 					/>
@@ -321,7 +321,7 @@ export function SummaryTotalsSection({
 						rows={lazySessionStats ?? []}
 						firstColumnHeader="Session"
 						buildHref={(timePeriod) =>
-							`/group/${viewedGroup.slug}/session-temp/${timePeriod}`
+							`/group/${viewedGroup.slug}/session/${timePeriod}`
 						}
 						totalsStats={totalsStats}
 					/>

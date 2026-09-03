@@ -35,7 +35,9 @@ export function columnBlock(
 // all-time "Month totals" tab whose combine-years rows span every year at once.
 export function createNameLinkCell<RawRowData, RowModel>(
 	getName: (model: RowModelWithRawData<RawRowData, RowModel>) => string,
-	buildHref: (model: RowModelWithRawData<RawRowData, RowModel>) => string
+	buildHref: (
+		model: RowModelWithRawData<RawRowData, RowModel>
+	) => string | undefined
 ) {
 	return function NameLinkCell({
 		model
