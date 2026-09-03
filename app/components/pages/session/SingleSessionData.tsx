@@ -17,6 +17,7 @@ import {
 } from '../../shared/SortableTable';
 import {
 	buildStandardColumnConfigs,
+	buildTotalsRowCells,
 	columnBlock,
 	createNameLinkCell
 } from '../../shared/StatsTableColumnConfigs';
@@ -246,13 +247,15 @@ export function SessionTabs({
 	netRounds,
 	locationId,
 	date,
-	viewedGroupId
+	viewedGroupId,
+	oldestEncounter = null
 }: {
 	speciesList: SpeciesWithEncounters[];
 	netRounds: NetRound[];
 	locationId?: number;
 	date: string;
 	viewedGroupId: number;
+	oldestEncounter?: SessionEncounter | null;
 }) {
 	const [loadedTabs, setLoadedTabs] = useState<Set<string>>(
 		new Set(['species'])
@@ -265,6 +268,14 @@ export function SessionTabs({
 		)
 	);
 	const columnConfigs = buildColumnConfigs(hasPulli);
+	const rowModels = speciesList.map(rowDataTransform);
+	const totalsRow = buildTotalsRowCells<RowModel>({
+		columnConfigs,
+		rowModels,
+		cellOverrides: {
+			maxProvenAge: Math.max(...rowModels.map((model) => model.maxProvenAge))
+		}
+	});
 
 	const tabNavConfig = [
 		{ id: 'species', label: 'Species totals' },
@@ -295,6 +306,7 @@ export function SessionTabs({
 					testId="session-table"
 					initialSortColumn="total"
 					rowDataTransform={rowDataTransform}
+					totalsRow={totalsRow}
 					TableBodyComponent={SessionTableBody}
 				/>
 			</ConditionalTabPanel>
@@ -311,7 +323,11 @@ export function SessionTabs({
 					tabId="highlights"
 					activeTabId={activeTab}
 				>
-					<SessionHighlights date={date} viewedGroupId={viewedGroupId} />
+					<SessionHighlights
+						date={date}
+						viewedGroupId={viewedGroupId}
+						oldestEncounter={oldestEncounter}
+					/>
 				</ConditionalTabPanel>
 			)}
 		</>

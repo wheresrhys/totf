@@ -223,6 +223,7 @@ export function SessionPageContent({
 				locationId={locationId}
 				date={date}
 				viewedGroupId={viewedGroup.id}
+				oldestEncounter={oldestEncounter}
 			/>
 		</PageWrapper>
 	);
