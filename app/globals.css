@@ -23,3 +23,29 @@
 	--color-taupe-50: #ede3d8;
 	--color-taupe-950: #251f18;
 }
+
+/* FlyonUI's `.table-xs`/`.sm:table-md` (etc.) utilities style cells via
+   unscoped descendant selectors (`:where(th,td)`, `:not(thead,tfoot) tr`)
+   that don't stop at a nested <table> boundary. A `table-xs` table (e.g.
+   `InlineTable`) nested inside an ancestor table carrying `sm:table-md`
+   (e.g. the default `Table`/`SortableTable` sizing, see issue #605) has both
+   rules match its own cells at >=640px; both have equal specificity (one
+   class each - `:where()` contributes zero), so the ancestor's `sm:table-md`
+   rule wins purely by appearing later in FlyonUI's compiled stylesheet,
+   silently overriding the nested table's own `table-xs` sizing (issue #742).
+   These rules target a `table-xs` table that is itself a descendant of
+   another <table> with a higher-specificity type+class selector, so the
+   nested table always wins on specificity - not on stylesheet/cascade order
+   - and stays compact at every viewport width. Selecting via an ancestor
+   <table> (not a specific ancestor class) means this protects any future
+   nested table under any responsively-sized ancestor, not just today's
+   call sites. */
+table table.table-xs :where(th, td) {
+	padding-block: 0.25rem;
+	padding-inline: 0.5rem;
+}
+table table.table-xs :where(thead, tfoot),
+table table.table-xs :not(thead, tfoot) tr {
+	font-size: var(--text-xs);
+	line-height: var(--tw-leading, var(--text-xs--line-height));
+}

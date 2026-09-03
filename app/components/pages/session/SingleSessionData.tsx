@@ -37,7 +37,7 @@ function SpeciesDetailsTable({
 	model: RowModelWithRawData<SpeciesWithEncounters, RowModel>;
 }) {
 	return (
-		<InlineTable>
+		<InlineTable testId="species-details-table">
 			<thead>
 				<tr>
 					<th>Time</th>
@@ -189,7 +189,7 @@ function ChronologicalView({ netRounds }: { netRounds: NetRound[] }) {
 					<h3 className="mt-4 mb-2 font-semibold">
 						Net round {index + 1}: {round.startTime.slice(0, 5)}
 					</h3>
-					<InlineTable>
+					<InlineTable testId="net-round-table">
 						<thead>
 							<tr>
 								<th>Time</th>
