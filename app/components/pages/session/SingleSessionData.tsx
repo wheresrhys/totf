@@ -246,13 +246,15 @@ export function SessionTabs({
 	netRounds,
 	locationId,
 	date,
-	viewedGroupId
+	viewedGroupId,
+	oldestEncounter = null
 }: {
 	speciesList: SpeciesWithEncounters[];
 	netRounds: NetRound[];
 	locationId?: number;
 	date: string;
 	viewedGroupId: number;
+	oldestEncounter?: SessionEncounter | null;
 }) {
 	const [loadedTabs, setLoadedTabs] = useState<Set<string>>(
 		new Set(['species'])
@@ -311,7 +313,11 @@ export function SessionTabs({
 					tabId="highlights"
 					activeTabId={activeTab}
 				>
-					<SessionHighlights date={date} viewedGroupId={viewedGroupId} />
+					<SessionHighlights
+						date={date}
+						viewedGroupId={viewedGroupId}
+						oldestEncounter={oldestEncounter}
+					/>
 				</ConditionalTabPanel>
 			)}
 		</>
