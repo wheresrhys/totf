@@ -1,6 +1,6 @@
 'use server';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
-import { catchSupabaseErrors } from '@/lib/supabase';
+import { catchSupabaseErrors, fetchAllPaginatedRows } from '@/lib/supabase';
 import {
 	groupRingNosByPrefix,
 	validateRingSequenceBounds,
@@ -77,29 +77,32 @@ export async function fetchUnassignedImportPrefixes(
 ): Promise<UnassignedImportPrefix[] | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 
-	const birds = (await supabase
-		.from('Birds')
-		.select('id, ring_no, encounters:Encounters!inner(record_type)')
-		.eq('encounters.record_type', 'N')
-		.contains('ringing_group_ids', [viewedGroupId])
-		.then(catchSupabaseErrors)) as { id: number; ring_no: string }[] | null;
+	const birds = (await fetchAllPaginatedRows<{ id: number; ring_no: string }>(
+		(fromRow, toRow) =>
+			supabase
+				.from('Birds')
+				.select('id, ring_no, encounters:Encounters!inner(record_type)')
+				.eq('encounters.record_type', 'N')
+				.contains('ringing_group_ids', [viewedGroupId])
+				.order('ring_no')
+				.range(fromRow, toRow)
+	)) as { id: number; ring_no: string }[] | null;
 
 	if (birds === null) return null;
 	if (birds.length === 0) return [];
 
-	const assigned = (await supabase
-		.from('RingSequences_Birds')
-		.select('bird_id')
-		.eq('ringing_group_id', viewedGroupId)
-		.in(
-			'bird_id',
-			birds.map(({ id }) => id)
-		)
-		.then(catchSupabaseErrors)) as { bird_id: number }[] | null;
+	const assigned = (await fetchAllPaginatedRows<{ bird_id: number }>(
+		(fromRow, toRow) =>
+			supabase
+				.from('RingSequences_Birds')
+				.select('bird_id')
+				.eq('ringing_group_id', viewedGroupId)
+				.order('id')
+				.range(fromRow, toRow)
+	)) as { bird_id: number }[] | null;
 
 	if (assigned === null) return null;
 	const assignedBirdIds = new Set(assigned.map(({ bird_id }) => bird_id));
-
 	const unassigned = birds.filter(({ id }) => !assignedBirdIds.has(id));
 	return groupRingNosByPrefix(unassigned);
 }
