@@ -348,6 +348,7 @@ export async function processEncounterRow(
 			breeding_condition: row.breeding_condition as string | null,
 			capture_time: row.capture_time as string,
 			extra_text: row.extra_text as string | null,
+			fat: row.fat as string | null,
 			finding_condition: row.finding_condition as string | null,
 			finding_circumstances: row.finding_circumstances as string | null,
 			is_juv,
@@ -355,6 +356,8 @@ export async function processEncounterRow(
 			old_greater_coverts: row.old_greater_coverts
 				? Number(row.old_greater_coverts)
 				: null,
+			pectoral_muscle: row.pectoral_muscle ? Number(row.pectoral_muscle) : null,
+			primary_moult: row.primary_moult as string | null,
 			record_type: row.record_type as string,
 			bird_id: birdId,
 			session_id: sessionId,

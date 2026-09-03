@@ -563,7 +563,10 @@ describe('processEncounterRow', () => {
 			breeding_condition: 'B',
 			extra_text: 'some note',
 			finding_condition: '8',
-			finding_circumstances: '2'
+			finding_circumstances: '2',
+			primary_moult: 'FF',
+			fat: 'B4',
+			pectoral_muscle: '2'
 		});
 		await processEncounterRow(
 			row,
@@ -593,7 +596,10 @@ describe('processEncounterRow', () => {
 				breeding_condition: 'B',
 				extra_text: 'some note',
 				finding_condition: '8',
-				finding_circumstances: '2'
+				finding_circumstances: '2',
+				primary_moult: 'FF',
+				fat: 'B4',
+				pectoral_muscle: 2
 			}),
 			['bird_id', 'session_id']
 		);
@@ -609,7 +615,10 @@ describe('processEncounterRow', () => {
 			wing_length: '',
 			old_greater_coverts: '',
 			finding_condition: '',
-			finding_circumstances: ''
+			finding_circumstances: '',
+			primary_moult: '',
+			fat: '',
+			pectoral_muscle: ''
 		});
 		await processEncounterRow(
 			row,
@@ -629,7 +638,10 @@ describe('processEncounterRow', () => {
 				wing_length: null,
 				old_greater_coverts: null,
 				finding_condition: null,
-				finding_circumstances: null
+				finding_circumstances: null,
+				primary_moult: null,
+				fat: null,
+				pectoral_muscle: null
 			}),
 			['bird_id', 'session_id']
 		);
