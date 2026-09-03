@@ -64,9 +64,6 @@ function AllTimeMonthTotalsTab({
 
 	return (
 		<>
-			<div className="mb-2">
-				<CombineYearsToggle value={combineYears} onChange={setCombineYears} />
-			</div>
 			{combineYears ? (
 				<PeriodTotalsTable
 					grouping="month"
@@ -81,6 +78,12 @@ function AllTimeMonthTotalsTab({
 					totalsStats={totalsStats}
 					aggregationFixedTo="encounter"
 					dashIndividuals
+					extraControls={
+						<CombineYearsToggle
+							value={combineYears}
+							onChange={setCombineYears}
+						/>
+					}
 				/>
 			) : (
 				<PeriodTotalsTable
@@ -94,6 +97,12 @@ function AllTimeMonthTotalsTab({
 						perYearRowByTimePeriod.get(timePeriod)?.label ?? ''
 					}
 					totalsStats={totalsStats}
+					extraControls={
+						<CombineYearsToggle
+							value={combineYears}
+							onChange={setCombineYears}
+						/>
+					}
 				/>
 			)}
 		</>
