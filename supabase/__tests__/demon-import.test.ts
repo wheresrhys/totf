@@ -658,3 +658,68 @@ describe('demon-import — Encounters uniqueness (bird_id, session_id)', () => {
 		).toBe(2);
 	});
 });
+
+describe('demon-import — fat/pectoral_muscle/primary_moult persistence', () => {
+	let groupId: number;
+	let groupClient: SupabaseClient;
+	let locationName: string;
+	let lookupRingSequence: ReturnType<typeof vi.fn>;
+
+	beforeAll(async () => {
+		groupId = createIsolatedGroup(`demon-import-${suffix}-biometrics`);
+		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+		locationName = `DemonImportLoc-${suffix}-biometrics`;
+		lookupRingSequence = vi.fn().mockResolvedValue(null);
+	});
+
+	// Regression test for the historical bug where primary_moult (despite having a column)
+	// was never written by any import, and fat/pectoral_muscle had no column at all.
+	it('persists fat, pectoral_muscle and primary_moult values from a CSV row onto the Encounters row', async () => {
+		const upsert = createUpserter(groupClient);
+		const ringNo = `DEMON-TEST-${suffix}-biometrics-set`;
+
+		await processEncounterRow(
+			makeRow({
+				ring_no: ringNo,
+				species_name: `DemonImportSpecies-${suffix}-biometrics-set`,
+				loc_id: locationName,
+				primary_moult: 'FFFFF3210',
+				fat: 'B4',
+				pectoral_muscle: '2'
+			}),
+			upsert,
+			lookupRingSequence,
+			groupId
+		);
+
+		const row = psqlScalar(
+			`SELECT e.primary_moult || '|' || e.fat || '|' || e.pectoral_muscle FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
+		);
+		expect(row).toBe('FFFFF3210|B4|2');
+	});
+
+	it('persists null for fat, pectoral_muscle and primary_moult when the CSV row leaves them blank', async () => {
+		const upsert = createUpserter(groupClient);
+		const ringNo = `DEMON-TEST-${suffix}-biometrics-blank`;
+
+		await processEncounterRow(
+			makeRow({
+				ring_no: ringNo,
+				species_name: `DemonImportSpecies-${suffix}-biometrics-blank`,
+				loc_id: locationName,
+				primary_moult: '',
+				fat: '',
+				pectoral_muscle: ''
+			}),
+			upsert,
+			lookupRingSequence,
+			groupId
+		);
+
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}' AND e.primary_moult IS NULL AND e.fat IS NULL AND e.pectoral_muscle IS NULL;`
+			)
+		).toBe(1);
+	});
+});

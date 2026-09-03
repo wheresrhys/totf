@@ -58,6 +58,7 @@ export type Database = {
           capture_method: string | null
           capture_time: string
           extra_text: string | null
+          fat: string | null
           finding_circumstances: string | null
           finding_condition: string | null
           id: number
@@ -68,6 +69,7 @@ export type Database = {
           min_hatch_year: number
           moult_code: string | null
           old_greater_coverts: number | null
+          pectoral_muscle: number | null
           primary_moult: string | null
           record_type: string
           ringing_group_id: number
@@ -85,6 +87,7 @@ export type Database = {
           capture_method?: string | null
           capture_time: string
           extra_text?: string | null
+          fat?: string | null
           finding_circumstances?: string | null
           finding_condition?: string | null
           id?: number
@@ -95,6 +98,7 @@ export type Database = {
           min_hatch_year: number
           moult_code?: string | null
           old_greater_coverts?: number | null
+          pectoral_muscle?: number | null
           primary_moult?: string | null
           record_type: string
           ringing_group_id: number
@@ -112,6 +116,7 @@ export type Database = {
           capture_method?: string | null
           capture_time?: string
           extra_text?: string | null
+          fat?: string | null
           finding_circumstances?: string | null
           finding_condition?: string | null
           id?: number
@@ -122,6 +127,7 @@ export type Database = {
           min_hatch_year?: number
           moult_code?: string | null
           old_greater_coverts?: number | null
+          pectoral_muscle?: number | null
           primary_moult?: string | null
           record_type?: string
           ringing_group_id?: number
