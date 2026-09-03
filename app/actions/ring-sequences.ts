@@ -102,7 +102,6 @@ export async function fetchUnassignedImportPrefixes(
 
 	if (assigned === null) return null;
 	const assignedBirdIds = new Set(assigned.map(({ bird_id }) => bird_id));
-	console.log(assignedBirdIds)
 	const unassigned = birds.filter(({ id }) => !assignedBirdIds.has(id));
 	return groupRingNosByPrefix(unassigned);
 }
