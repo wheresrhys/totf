@@ -2,7 +2,6 @@
 
 import { type SessionEncounter } from '@/app/models/session';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { InlineTable, Table } from '../../shared/DesignSystem';
 import {
 	SortableTable,
 	type ColumnConfig,
@@ -12,7 +11,7 @@ import {
 // Renders the per-bird encounter rows shared by the session page's expanded
 // species rows and its net-rounds tab. Both tables render the same 11 core
 // columns cell-for-cell; the net-rounds table adds a Species column. This
-// component consolidates that shared rendering behind a single, configurable
+// component consolidates that shared rendering behind a single, click-to-sort
 // implementation.
 
 export type EncountersTableSize = 'xs' | 'responsive';
@@ -22,8 +21,6 @@ type EncountersTableProps = {
 	// 'xs' → always-compact `table table-xs` (matches both current call sites).
 	// 'responsive' → `table table-xs sm:table-md` (the app-wide responsive size).
 	size?: EncountersTableSize;
-	// When true, renders click-to-sort headers via the generic SortableTable.
-	sortable?: boolean;
 	showTimeColumn?: boolean;
 	showSpeciesColumn?: boolean;
 	testId?: string;
@@ -48,10 +45,9 @@ type EncounterColumnKey =
 type EncounterColumn = {
 	key: EncounterColumnKey;
 	label: string;
-	// Primitive used for sorting in the sortable code path.
+	// Primitive used for sorting.
 	sortValue: (encounter: SessionEncounter) => string | number | null;
-	// Cell content — the single source of truth for how each column renders,
-	// shared by the sortable and non-sortable paths (DRY: defined once here).
+	// Cell content — the single source of truth for how each column renders.
 	renderCell: (encounter: SessionEncounter) => React.ReactNode;
 };
 
@@ -147,7 +143,7 @@ function getShownColumns(
 	});
 }
 
-// The shared per-encounter cell renderer used by both code paths.
+// The shared per-encounter cell renderer.
 function EncounterCells({
 	encounter,
 	columns
@@ -164,67 +160,19 @@ function EncounterCells({
 	);
 }
 
-function PlainEncountersTable({
-	encounters,
-	columns,
-	size,
-	testId
-}: {
-	encounters: SessionEncounter[];
-	columns: EncounterColumn[];
-	size: EncountersTableSize;
-	testId?: string;
-}) {
-	const head = (
-		<thead>
-			<tr>
-				{columns.map((column) => (
-					<th key={column.key}>{column.label}</th>
-				))}
-			</tr>
-		</thead>
-	);
-	const body = (
-		<tbody>
-			{encounters.map((encounter) => (
-				<tr key={encounter.id}>
-					<EncounterCells encounter={encounter} columns={columns} />
-				</tr>
-			))}
-		</tbody>
-	);
-
-	if (size === 'xs') {
-		return (
-			<InlineTable testId={testId}>
-				{head}
-				{body}
-			</InlineTable>
-		);
-	}
-	return (
-		<Table testId={testId}>
-			{head}
-			{body}
-		</Table>
-	);
-}
-
-// RowModel for the sortable path: one sort value per column key. Only used to
-// drive SortableTable's sorting — cells still render from the raw encounter.
+// RowModel driving SortableTable's sorting — one sort value per column key.
+// Cells still render from the raw encounter.
 type EncounterRowModel = Record<EncounterColumnKey, string | number | null>;
 
-function SortableEncountersTable({
+export function EncountersTable({
 	encounters,
-	columns,
-	size,
+	size = 'xs',
+	showTimeColumn = true,
+	showSpeciesColumn = false,
 	testId
-}: {
-	encounters: SessionEncounter[];
-	columns: EncounterColumn[];
-	size: EncountersTableSize;
-	testId?: string;
-}) {
+}: EncountersTableProps) {
+	const columns = getShownColumns(showTimeColumn, showSpeciesColumn);
+
 	// Only the shown columns get a config, so only they render as headers.
 	const columnConfigs = Object.fromEntries(
 		columns.map((column) => [column.key, { label: column.label }])
@@ -259,36 +207,6 @@ function SortableEncountersTable({
 			testId={testId}
 			className={size === 'xs' ? 'table table-xs' : undefined}
 			TableBodyComponent={EncountersTableBody}
-		/>
-	);
-}
-
-export function EncountersTable({
-	encounters,
-	size = 'xs',
-	sortable = false,
-	showTimeColumn = true,
-	showSpeciesColumn = false,
-	testId
-}: EncountersTableProps) {
-	const columns = getShownColumns(showTimeColumn, showSpeciesColumn);
-
-	if (sortable) {
-		return (
-			<SortableEncountersTable
-				encounters={encounters}
-				columns={columns}
-				size={size}
-				testId={testId}
-			/>
-		);
-	}
-	return (
-		<PlainEncountersTable
-			encounters={encounters}
-			columns={columns}
-			size={size}
-			testId={testId}
 		/>
 	);
 }

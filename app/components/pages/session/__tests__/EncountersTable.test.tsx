@@ -76,6 +76,25 @@ describe('EncountersTable', () => {
 			const link = screen.getByRole('link', { name: 'RING1' });
 			expect(link.getAttribute('href')).toBe('/bird/RING1');
 		});
+
+		it('renders clickable sortable headers', () => {
+			render(<EncountersTable encounters={encounters} />);
+			screen.getAllByRole('columnheader').forEach((header) => {
+				expect(header.className).toContain('cursor-pointer');
+			});
+		});
+
+		it('reorders rows on header click', () => {
+			render(<EncountersTable encounters={encounters} />);
+			// default order: RING1 (50), RING2 (90), RING3 (30)
+			expect(bodyRows()[0].textContent).toContain('RING1');
+			fireEvent.click(screen.getByText('Wing'));
+			// descending by wing: RING2 (90), RING1 (50), RING3 (30)
+			const rows = bodyRows();
+			expect(rows[0].textContent).toContain('RING2');
+			expect(rows[1].textContent).toContain('RING1');
+			expect(rows[2].textContent).toContain('RING3');
+		});
 	});
 
 	describe('Structure', () => {
@@ -92,43 +111,6 @@ describe('EncountersTable', () => {
 				const table = document.querySelector('table');
 				expect(table?.className).toContain('table-xs');
 				expect(table?.className).toContain('sm:table-md');
-			});
-		});
-
-		describe('sortable prop', () => {
-			it('renders a plain table with no clickable headers when false', () => {
-				render(<EncountersTable encounters={encounters} sortable={false} />);
-				screen.getAllByRole('columnheader').forEach((header) => {
-					expect(header.className).not.toContain('cursor-pointer');
-				});
-			});
-
-			it('renders clickable sortable headers when true', () => {
-				render(<EncountersTable encounters={encounters} sortable={true} />);
-				screen.getAllByRole('columnheader').forEach((header) => {
-					expect(header.className).toContain('cursor-pointer');
-				});
-			});
-
-			it('reorders rows on header click', () => {
-				render(<EncountersTable encounters={encounters} sortable={true} />);
-				// default order: RING1 (50), RING2 (90), RING3 (30)
-				expect(bodyRows()[0].textContent).toContain('RING1');
-				fireEvent.click(screen.getByText('Wing'));
-				// descending by wing: RING2 (90), RING1 (50), RING3 (30)
-				const rows = bodyRows();
-				expect(rows[0].textContent).toContain('RING2');
-				expect(rows[1].textContent).toContain('RING1');
-				expect(rows[2].textContent).toContain('RING3');
-			});
-
-			it('respects the size prop when sortable is true', () => {
-				render(
-					<EncountersTable encounters={encounters} sortable={true} size="xs" />
-				);
-				const table = document.querySelector('table');
-				expect(table?.className).toContain('table-xs');
-				expect(table?.className).not.toContain('sm:table-md');
 			});
 		});
 
@@ -187,11 +169,10 @@ describe('EncountersTable', () => {
 			expect(bodyRows()).toHaveLength(1);
 		});
 
-		it('renders correctly with every column shown and sortable enabled together', () => {
+		it('renders correctly with every column shown together', () => {
 			render(
 				<EncountersTable
 					encounters={encounters}
-					sortable={true}
 					showTimeColumn={true}
 					showSpeciesColumn={true}
 				/>
