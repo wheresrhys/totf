@@ -14,7 +14,9 @@ export type Database = {
           id: number
           last_encountered_timestamp: string
           proven_age: number
+          ring_index: number | null
           ring_no: string
+          ring_prefix: string | null
           ringing_group_ids: number[]
           species_id: number
         }
@@ -22,7 +24,9 @@ export type Database = {
           id?: number
           last_encountered_timestamp?: string
           proven_age?: number
+          ring_index?: number | null
           ring_no: string
+          ring_prefix?: string | null
           ringing_group_ids?: number[]
           species_id: number
         }
@@ -30,7 +34,9 @@ export type Database = {
           id?: number
           last_encountered_timestamp?: string
           proven_age?: number
+          ring_index?: number | null
           ring_no?: string
+          ring_prefix?: string | null
           ringing_group_ids?: number[]
           species_id?: number
         }
