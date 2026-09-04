@@ -7,11 +7,11 @@ import {
 } from '@/app/actions/sp-data';
 import type { AggregateStatsResult } from '@/app/models/db';
 import {
-	TrendLineChart,
 	getCounts,
 	getYoungsters,
 	getSizes
 } from '@/app/components/pages/species/StatsHistoryChart';
+import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
 import {
 	WingWeightScatterChart,
 	type SexedGraphableBird
@@ -88,7 +88,7 @@ export function SpGraphsTab({
 			load: loadStatsHistory,
 			renderChart: () =>
 				statsHistory ? (
-					<TrendLineChart series={getCounts(statsHistory)} />
+					<YearComparisonTrendChart series={getCounts(statsHistory)} />
 				) : (
 					<Spinner />
 				)
@@ -100,7 +100,7 @@ export function SpGraphsTab({
 			load: loadStatsHistory,
 			renderChart: () =>
 				statsHistory ? (
-					<TrendLineChart series={getYoungsters(statsHistory)} />
+					<YearComparisonTrendChart series={getYoungsters(statsHistory)} />
 				) : (
 					<Spinner />
 				)
@@ -112,7 +112,7 @@ export function SpGraphsTab({
 			load: loadStatsHistory,
 			renderChart: () =>
 				statsHistory ? (
-					<TrendLineChart series={getSizes(statsHistory)} />
+					<YearComparisonTrendChart series={getSizes(statsHistory)} />
 				) : (
 					<Spinner />
 				)

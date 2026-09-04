@@ -20,12 +20,15 @@ vi.mock('@/app/actions/sp-data', () => ({
 }));
 
 vi.mock('../StatsHistoryChart', () => ({
-	TrendLineChart: ({ series }: { series: unknown[] }) => (
-		<div data-testid="trend-chart" data-series-count={series.length} />
-	),
 	getCounts: () => [{ name: 'counts', data: [] }],
 	getYoungsters: () => [{ name: 'young', data: [] }],
 	getSizes: () => [{ name: 'sizes', data: [] }]
+}));
+
+vi.mock('@/app/components/YearComparisonTrendChart', () => ({
+	YearComparisonTrendChart: ({ series }: { series: unknown[] }) => (
+		<div data-testid="trend-chart" data-series-count={series.length} />
+	)
 }));
 
 vi.mock('../WeightAndWingChart', () => ({

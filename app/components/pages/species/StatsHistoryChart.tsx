@@ -1,5 +1,5 @@
 'use client';
-import { LineChart, type LineChartData } from 'react-chartkick';
+import { type LineChartData } from 'react-chartkick';
 import type { AggregateStatsResult } from '@/app/models/db';
 
 export function getCounts(
@@ -69,26 +69,4 @@ export function getSizes(
 			data: statsHistory.map((row) => [row.time_period, row.min_wing])
 		}
 	];
-}
-
-// Presentational trend line chart. Receives its series already selected (via
-// `getCounts`/`getYoungsters`/`getSizes`) so one component + one shared chartkick
-// config renders every trend tile on the species Graphs tab. Fetching is owned
-// by `SpGraphsTab`, which memoises the single stats-history query the three
-// trend tiles share.
-export function TrendLineChart({ series }: { series: LineChartData[] }) {
-	return (
-		<LineChart
-			min={0}
-			data={series}
-			xtitle="Year"
-			ytitle="Value"
-			library={{
-				elements: {
-					point: { radius: 1 },
-					line: { cubicInterpolationMode: 'monotone' }
-				}
-			}}
-		/>
-	);
 }

@@ -49,7 +49,9 @@ declare module 'react-chartkick' {
   };
   export type LineChartData = {
     name: string;
-    data: [string, number][];
+    // `null` marks an absent point (rendered as a gap) — e.g. a month with no
+    // data in a year-on-year series.
+    data: [string, number | null][];
     dataset?: Record<string, unknown>;
   };
 }
