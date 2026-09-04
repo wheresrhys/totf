@@ -34,8 +34,8 @@ vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
 	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
 }));
 
-vi.mock('@/app/components/pages/species/SpStatsHistoryTab', () => ({
-	SpStatsHistoryTab: () => <div data-testid="sp-stats-history-tab" />
+vi.mock('@/app/components/pages/species/SpGraphsTab', () => ({
+	SpGraphsTab: () => <div data-testid="sp-graphs-tab" />
 }));
 
 vi.mock('@/app/components/pages/species/SpYearTotalsTab', () => ({
@@ -50,10 +50,6 @@ vi.mock('@/app/components/pages/species/SpCombinedMonthTotalsTab', () => ({
 
 vi.mock('@/app/components/pages/species/SpSessionTotalsTab', () => ({
 	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
-}));
-
-vi.mock('@/app/components/pages/species/SpWeightWingTab', () => ({
-	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
 
 const { topSessions, birds, speciesStats } =
@@ -98,14 +94,11 @@ describe('species detail page', () => {
 			mockFetchPageOfBirds.mockResolvedValue(birds);
 		});
 
-		it('renders all 7 tab buttons: Bird list, Retraps, Trend charts, Year totals, Month totals, Session totals, Size plot', async () => {
+		it('renders all 6 tab buttons: Bird list, Retraps, Year totals, Month totals, Session totals, Graphs', async () => {
 			render(await renderSpeciesPage());
 			await screen.findByTestId('sp-individuals-tab');
 			expect(screen.getByRole('button', { name: 'Bird list' })).toBeDefined();
 			expect(screen.getByRole('button', { name: 'Retraps' })).toBeDefined();
-			expect(
-				screen.getByRole('button', { name: 'Trend charts' })
-			).toBeDefined();
 			expect(screen.getByRole('button', { name: 'Year totals' })).toBeDefined();
 			expect(
 				screen.getByRole('button', { name: 'Month totals' })
@@ -113,7 +106,9 @@ describe('species detail page', () => {
 			expect(
 				screen.getByRole('button', { name: 'Session totals' })
 			).toBeDefined();
-			expect(screen.getByRole('button', { name: 'Size plot' })).toBeDefined();
+			expect(screen.getByRole('button', { name: 'Graphs' })).toBeDefined();
+			expect(screen.queryByRole('button', { name: 'Trend charts' })).toBeNull();
+			expect(screen.queryByRole('button', { name: 'Size plot' })).toBeNull();
 		});
 
 		it('shows a "Session totals" tab on the all-time species page', async () => {
@@ -146,15 +141,6 @@ describe('species detail page', () => {
 				await screen.findByTestId('sp-individuals-tab');
 				fireEvent.click(screen.getByRole('button', { name: 'Retraps' }));
 				await screen.findByTestId('sp-notable-retraps-tab');
-			});
-		});
-
-		describe('trend-charts tab (click to activate)', () => {
-			it('renders SpStatsHistoryTab after clicking Trend charts button', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-individuals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Trend charts' }));
-				await screen.findByTestId('sp-stats-history-tab');
 			});
 		});
 
@@ -193,12 +179,20 @@ describe('species detail page', () => {
 			});
 		});
 
-		describe('size-plot tab (click to activate)', () => {
-			it('renders SpWeightWingTab after clicking Size plot button', async () => {
+		describe('graphs tab (click to activate)', () => {
+			it('renders SpGraphsTab after clicking Graphs button', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-individuals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Size plot' }));
-				await screen.findByTestId('sp-weight-wing-tab');
+				fireEvent.click(screen.getByRole('button', { name: 'Graphs' }));
+				await screen.findByTestId('sp-graphs-tab');
+			});
+
+			it('lazily loads SpGraphsTab only once "Graphs" is selected', async () => {
+				render(await renderSpeciesPage());
+				await screen.findByTestId('sp-individuals-tab');
+				expect(screen.queryByTestId('sp-graphs-tab')).toBeNull();
+				fireEvent.click(screen.getByRole('button', { name: 'Graphs' }));
+				await screen.findByTestId('sp-graphs-tab');
 			});
 		});
 	});

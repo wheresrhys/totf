@@ -1,10 +1,10 @@
+'use client';
 import { LineChart, type LineChartData } from 'react-chartkick';
 import type { AggregateStatsResult } from '@/app/models/db';
-import { useEffect, useState } from 'react';
-import { getSpeciesStatsHistory } from '@/app/actions/sp-data';
-import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
 
-function getCounts(statsHistory: AggregateStatsResult[]): LineChartData[] {
+export function getCounts(
+	statsHistory: AggregateStatsResult[]
+): LineChartData[] {
 	return [
 		{
 			name: 'encounters',
@@ -17,7 +17,9 @@ function getCounts(statsHistory: AggregateStatsResult[]): LineChartData[] {
 	];
 }
 
-function getYoungsters(statsHistory: AggregateStatsResult[]): LineChartData[] {
+export function getYoungsters(
+	statsHistory: AggregateStatsResult[]
+): LineChartData[] {
 	return [
 		{
 			name: 'juv',
@@ -37,7 +39,9 @@ function getYoungsters(statsHistory: AggregateStatsResult[]): LineChartData[] {
 	];
 }
 
-function getSizes(statsHistory: AggregateStatsResult[]): LineChartData[] {
+export function getSizes(
+	statsHistory: AggregateStatsResult[]
+): LineChartData[] {
 	return [
 		{
 			name: 'max weight',
@@ -67,65 +71,24 @@ function getSizes(statsHistory: AggregateStatsResult[]): LineChartData[] {
 	];
 }
 
-export function StatsHistoryChart({
-	speciesName,
-	viewedGroupId,
-	fromDate,
-	toDate
-}: {
-	speciesName: string;
-	viewedGroupId: number;
-	fromDate?: string;
-	toDate?: string;
-}) {
-	const [statsHistory, setStatsHistory] = useState<AggregateStatsResult[]>([]);
-	useEffect(() => {
-		if (statsHistory.length > 0) return;
-		getSpeciesStatsHistory(speciesName, viewedGroupId, fromDate, toDate).then(
-			(data) => {
-				setStatsHistory(data);
-			}
-		);
-	}, [speciesName, viewedGroupId, fromDate, toDate, statsHistory.length]);
+// Presentational trend line chart. Receives its series already selected (via
+// `getCounts`/`getYoungsters`/`getSizes`) so one component + one shared chartkick
+// config renders every trend tile on the species Graphs tab. Fetching is owned
+// by `SpGraphsTab`, which memoises the single stats-history query the three
+// trend tiles share.
+export function TrendLineChart({ series }: { series: LineChartData[] }) {
 	return (
-		<>
-			<SecondaryHeading>Stats History</SecondaryHeading>
-			<LineChart
-				min={0}
-				data={getCounts(statsHistory)}
-				xtitle="Year"
-				ytitle="Value"
-				library={{
-					elements: {
-						point: { radius: 1 },
-						line: { cubicInterpolationMode: 'monotone' }
-					}
-				}}
-			/>
-			<LineChart
-				min={0}
-				data={getYoungsters(statsHistory)}
-				xtitle="Year"
-				ytitle="Value"
-				library={{
-					elements: {
-						point: { radius: 1 },
-						line: { cubicInterpolationMode: 'monotone' }
-					}
-				}}
-			/>
-			<LineChart
-				min={0}
-				data={getSizes(statsHistory)}
-				xtitle="Year"
-				ytitle="Value"
-				library={{
-					elements: {
-						point: { radius: 1 },
-						line: { cubicInterpolationMode: 'monotone' }
-					}
-				}}
-			/>
-		</>
+		<LineChart
+			min={0}
+			data={series}
+			xtitle="Year"
+			ytitle="Value"
+			library={{
+				elements: {
+					point: { radius: 1 },
+					line: { cubicInterpolationMode: 'monotone' }
+				}
+			}}
+		/>
 	);
 }
