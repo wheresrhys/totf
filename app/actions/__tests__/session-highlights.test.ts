@@ -1,7 +1,44 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
-import type { SessionHighlight } from '@/app/models/highlights';
-import { renderHighlight } from '@/app/components/session-highlight-renderers';
+import type {
+	CountHighlight,
+	LongAbsenceRetrapHighlight,
+	RarityHighlight,
+	SessionHighlight,
+	VitalStatHighlight
+} from '@/app/models/highlights';
+import {
+	renderRarityHighlight,
+	RARITY_HIGHLIGHT_RENDERERS,
+	renderCountHighlight,
+	COUNT_HIGHLIGHT_RENDERERS,
+	renderVitalStatHighlight,
+	VITAL_STAT_HIGHLIGHT_RENDERERS
+} from '@/app/components/highlights';
+import { renderLongAbsenceRetrapHighlight } from '@/app/components/highlights/long-absence-retrap-renderer';
+
+// The action fans out across all four groups (three componentized renderers
+// plus the long-absence-retrap sibling, per #760); this dispatches a flat
+// SessionHighlight[] to whichever group's renderer matches, the same way
+// SessionHighlights.tsx partitions the list into its sections.
+const RARITY_TYPES = new Set(Object.keys(RARITY_HIGHLIGHT_RENDERERS));
+const COUNT_TYPES = new Set(Object.keys(COUNT_HIGHLIGHT_RENDERERS));
+const VITAL_STAT_TYPES = new Set(Object.keys(VITAL_STAT_HIGHLIGHT_RENDERERS));
+
+function renderHighlight(highlight: SessionHighlight) {
+	if (RARITY_TYPES.has(highlight.type)) {
+		return renderRarityHighlight(highlight as RarityHighlight);
+	}
+	if (COUNT_TYPES.has(highlight.type)) {
+		return renderCountHighlight(highlight as CountHighlight);
+	}
+	if (VITAL_STAT_TYPES.has(highlight.type)) {
+		return renderVitalStatHighlight(highlight as VitalStatHighlight);
+	}
+	return renderLongAbsenceRetrapHighlight(
+		highlight as LongAbsenceRetrapHighlight
+	);
+}
 
 // The action returns plain highlight data; rendering each gives the
 // <li key={sentence}>{sentence}</li> whose sentence we assert on

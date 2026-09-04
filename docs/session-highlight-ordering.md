@@ -1,12 +1,12 @@
 # Session highlight ordering
 
-Session highlights (the "Standouts" list on a session page) are produced by
-`app/models/highlights/`. This doc covers the directory layout, how each
-group composes its own order, the fixed section order, and why
+Session highlights (the Rarities/Counts/Vital stats sections on a session page) are produced by
+`app/models/highlights/` and rendered by `app/components/highlights/`. This doc covers the
+directory layout of both, how each group composes its own order, the fixed section order, and why
 `long-absence-retrap` sits outside the three groups. See [#758](https://github.com/wheresrhys/totf/issues/758)
-for the design discussion this restructure implements, and
-[#409](https://github.com/wheresrhys/totf/issues/409) for the restructure
-itself.
+for the design discussion this restructure implements, [#409](https://github.com/wheresrhys/totf/issues/409)
+for the model-layer restructure, and [#760](https://github.com/wheresrhys/totf/issues/760) for the
+componentized render layer + 3-section page UI.
 
 ## Directory layout
 
@@ -40,11 +40,26 @@ app/models/highlights/
     index.ts                 # runVitalStatsGroup — derive -> rules -> compose
   long-absence-retrap.ts     # sibling of the three groups — see below
   index.ts                   # top-level: SessionHighlight union, { rarities, counts, vitalStats }
+
+app/components/highlights/
+  shared/
+    render-sentence.tsx       # renderSentence (<li> wrapper) + formatting helpers reused
+                               # across at least two groups (capitalize, buildSpeciesList,
+                               # buildOfYearPhrase, formatShortDate)
+  rarities/renderers.tsx      # HIGHLIGHT_RENDERERS keyed to RarityHighlight['type'] only
+  counts/renderers.tsx        # HIGHLIGHT_RENDERERS keyed to CountHighlight['type'] only
+  vital-stats/renderers.tsx   # HIGHLIGHT_RENDERERS keyed to VitalStatHighlight['type'] only
+  long-absence-retrap-renderer.tsx  # sibling — not in any group, not re-exported below
+  index.ts                    # barrel: render{Rarity,Count,VitalStat}Highlight + each map
 ```
 
-`app/components/session-highlight-renderers.tsx` (untouched by #409, componentized per group by
-a later ticket, #760) renders each highlight via its `type`; `app/actions/session-highlights.ts`
-calls the four groups and concatenates them into the flat list the client renders today.
+`app/actions/session-highlights.ts` calls the four model groups and concatenates them into one
+flat `SessionHighlight[]`, unchanged since #409. `app/components/pages/session/SessionHighlights.tsx`
+(per #760) partitions that flat list into three arrays — using each group's own renderer map's
+keys as the membership check, so partitioning can never drift out of sync with what each group's
+renderer actually handles — and renders three independently-shown/hidden `BoxyList` sections
+(Rarities → Counts → Vital stats). `long-absence-retrap` highlights match none of the three groups'
+renderer maps, so they currently render nowhere on the page — see the exclusion note below.
 
 ## Each group composes its own order — no shared priority list
 
@@ -90,23 +105,28 @@ already yields all-time-before-this-year per species, since `deriveWeightRecordB
 scopes all-time-first). A true cross-species "all-time weight → this-year weight" global sort is
 #414's call to make, not #409's — that ticket owns Vital-stats' full editorial composition.
 
-## Fixed section order (for the future sectioned UI)
+## Fixed section order
 
-Rarities → Counts → Vital stats. Today's single flat "Standouts" list concatenates them in this
-order (`app/actions/session-highlights.ts`); a future ticket (#760) turns this into three
-distinct page sections.
+Rarities → Counts → Vital stats. `app/actions/session-highlights.ts` still concatenates the four
+model groups' output into one flat list in this order (`rarities + counts + vitalStats +
+longAbsenceRetraps`); `SessionHighlights.tsx` (per #760) re-derives the three page sections from
+that flat list by group membership and renders them as three independently-shown/hidden `BoxyList`
+sections in this fixed order, each headed `Rarities`/`Counts`/`Vital stats`.
 
-## `long-absence-retrap` — excluded from the three groups
+## `long-absence-retrap` — excluded from the three groups and from the page
 
 `long-absence-retrap` (a bird retrapped after a long gap) is sourced from a per-bird RPC
 (`long_absence_retraps`), not the aggregate `stats_per_day_and_species` matrix the three groups
 are built from — it's recoveries-shaped, not rarity-shaped. It lives at
 `app/models/highlights/long-absence-retrap.ts`, a sibling of the three group directories, and is
 exposed from the top-level `index.ts` as its own fourth, independent function
-(`deriveLongAbsenceRetraps`). In the flat "Standouts" list it sorts **last** —
-`rarities + counts + vitalStats + longAbsenceRetraps` — unlike its old position (between the
-leading rarity families and the record block). It's the natural seed for a future "Notable
-retraps" section (see #758's comment thread), out of scope until that section is designed.
+(`deriveLongAbsenceRetraps`). Its renderer (`app/components/highlights/long-absence-retrap-renderer.tsx`)
+mirrors that sibling status: it's not part of any group's `HIGHLIGHT_RENDERERS` map and isn't
+re-exported from `app/components/highlights/index.ts`, so `SessionHighlights.tsx`'s
+group-membership partitioning matches it to none of the three sections — it's fetched (the action
+is unchanged) but currently renders nowhere on the session page. It's the natural seed for a
+future "Notable retraps" section (see #758's comment thread), out of scope until that section is
+designed and wired up.
 
 ## Cross-group rare-species suppression — extension point only
 
