@@ -6,7 +6,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { fetchSessionHighlights } from '@/app/actions/session-highlights';
 import { renderHighlight } from '@/app/components/session-highlight-renderers';
-import type { SessionHighlight } from '@/app/models/session-highlights';
+import type { SessionHighlight } from '@/app/models/highlights';
 import type { SessionEncounter } from '@/app/models/session';
 
 export function SessionHighlights({

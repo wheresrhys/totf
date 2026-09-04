@@ -1,20 +1,16 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SessionHighlights } from '../SessionHighlights';
-import {
-	familySortValue,
-	type SessionHighlight
-} from '@/app/models/session-highlights';
+import type { SessionHighlight } from '@/app/models/highlights';
 import type { SessionEncounter } from '@/app/models/session';
 
 vi.mock('@/app/actions/session-highlights', () => ({
 	fetchSessionHighlights: vi.fn()
 }));
 
-// These mocks stand in for the machine's already-ordered output; the component
-// renders them in the given order, so the exact sortValue is immaterial here.
+// These mocks stand in for each group's already-ordered output; the component
+// renders them in the given order.
 const periodFields = {
-	sortValue: familySortValue('scoped-record'),
 	year: 2024,
 	isCurrentYear: false
 } as const;
@@ -302,7 +298,6 @@ describe('SessionHighlights', () => {
 	it('renders first-ever sentences', async () => {
 		const firstEverHighlight: SessionHighlight = {
 			type: 'first-ever-species',
-			sortValue: familySortValue('scoped-record'),
 			speciesName: 'Firecrest',
 			multipleIndividualsRecorded: false,
 			isOnlyRecord: false
@@ -328,7 +323,6 @@ describe('SessionHighlights', () => {
 	it('renders rare-species sentences', async () => {
 		const rareSpeciesHighlight: SessionHighlight = {
 			type: 'rare-species',
-			sortValue: familySortValue('scoped-record'),
 			speciesName: 'Firecrest',
 			totalSessionDays: 2
 		};
@@ -355,10 +349,8 @@ describe('SessionHighlights', () => {
 	it('renders a MEGA line for an only-of-year record folded with rarity', async () => {
 		const items = await renderSingleHighlight({
 			type: 'mega-species',
-			sortValue: familySortValue('mega-species'),
 			base: {
 				type: 'first-of-year-species',
-				sortValue: familySortValue('first-of-year-species'),
 				speciesName: 'Meadow Pipit',
 				year: 2023,
 				isCurrentYear: false,
@@ -375,10 +367,8 @@ describe('SessionHighlights', () => {
 	it('renders a MEGA line for a first-of-year record folded with rarity', async () => {
 		const items = await renderSingleHighlight({
 			type: 'mega-species',
-			sortValue: familySortValue('mega-species'),
 			base: {
 				type: 'first-of-year-species',
-				sortValue: familySortValue('first-of-year-species'),
 				speciesName: 'Meadow Pipit',
 				year: 2023,
 				isCurrentYear: false,
@@ -395,10 +385,8 @@ describe('SessionHighlights', () => {
 	it('renders a MEGA line for an only-ever record without a rarity note', async () => {
 		const items = await renderSingleHighlight({
 			type: 'mega-species',
-			sortValue: familySortValue('mega-species'),
 			base: {
 				type: 'first-ever-species',
-				sortValue: familySortValue('only-ever-species'),
 				speciesName: 'Meadow Pipit',
 				multipleIndividualsRecorded: false,
 				isOnlyRecord: true
@@ -411,10 +399,8 @@ describe('SessionHighlights', () => {
 	it('renders a MEGA line for a first-ever record, counting the other occasions', async () => {
 		const items = await renderSingleHighlight({
 			type: 'mega-species',
-			sortValue: familySortValue('mega-species'),
 			base: {
 				type: 'first-ever-species',
-				sortValue: familySortValue('first-ever-species'),
 				speciesName: 'Meadow Pipit',
 				multipleIndividualsRecorded: false,
 				isOnlyRecord: false
@@ -429,7 +415,6 @@ describe('SessionHighlights', () => {
 	it('renders long-absence sentences', async () => {
 		const longAbsenceHighlight: SessionHighlight = {
 			type: 'long-absence-retrap',
-			sortValue: familySortValue('scoped-record'),
 			ringNo: 'ARRETRAP',
 			speciesName: 'Robin',
 			previousDate: '2021-06-20',
@@ -476,21 +461,18 @@ describe('SessionHighlights', () => {
 			},
 			{
 				type: 'since-comparison',
-				sortValue: familySortValue('scoped-record'),
 				kind: 'quietest',
 				value: 3,
 				sinceDate: '2023-09-14'
 			},
 			{
 				type: 'first-ever-species',
-				sortValue: familySortValue('scoped-record'),
 				speciesName: 'Firecrest',
 				multipleIndividualsRecorded: false,
 				isOnlyRecord: false
 			},
 			{
 				type: 'long-absence-retrap',
-				sortValue: familySortValue('scoped-record'),
 				ringNo: 'ARRETRAP',
 				speciesName: 'Robin',
 				previousDate: '2021-06-20',
@@ -499,7 +481,6 @@ describe('SessionHighlights', () => {
 			},
 			{
 				type: 'weight-record',
-				sortValue: familySortValue('scoped-record'),
 				speciesName: 'Blue Tit',
 				scope: 'all-time',
 				extreme: 'heaviest',
@@ -560,7 +541,6 @@ describe('SessionHighlights', () => {
 	): SessionHighlight {
 		return {
 			type: 'combined-species-placement-record',
-			sortValue: familySortValue('scoped-record'),
 			placementRank,
 			species
 		};
@@ -618,7 +598,6 @@ describe('SessionHighlights', () => {
 	it('renders weight record sentences', async () => {
 		const weightHighlight: SessionHighlight = {
 			type: 'weight-record',
-			sortValue: familySortValue('scoped-record'),
 			speciesName: 'Blue Tit',
 			scope: 'all-time',
 			extreme: 'heaviest',

@@ -2,20 +2,13 @@
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { fetchSessionStats } from '@/lib/underlying-stats';
-import { runHighlightMachine } from '@/app/models/highlight-refinement-machine';
 import {
-	deriveFirstEverSpecies,
-	deriveFirstOfYearSpecies,
+	rarities,
+	counts,
+	vitalStats,
 	deriveLongAbsenceRetraps,
-	deriveRareSpecies,
-	deriveSessionTotalRecords,
-	deriveSessionTotalJuvRecords,
-	deriveSinceHighlights,
-	deriveSpeciesRecords,
-	deriveSpeciesJuvRecords,
-	deriveWeightRecordBreakers,
 	type SessionHighlight
-} from '@/app/models/session-highlights';
+} from '@/app/models/highlights';
 import type { LongAbsenceRetrapsResult } from '@/app/models/db';
 
 export async function fetchSessionHighlights({
@@ -36,19 +29,16 @@ export async function fetchSessionHighlights({
 			.then(catchSupabaseErrors)
 			.then((results) => (results ?? []) as LongAbsenceRetrapsResult[])
 	]);
-	const highlightPool = [
-		...deriveSessionTotalRecords({ date, stats }),
-		...deriveSessionTotalJuvRecords({ date, stats }),
-		...deriveSinceHighlights({ date, stats }),
-		...deriveSpeciesRecords({ date, stats }),
-		...deriveSpeciesJuvRecords({ date, stats }),
-		...deriveFirstEverSpecies({ date, stats }),
-		...deriveFirstOfYearSpecies({ date, stats }),
-		...deriveRareSpecies({ date, stats }),
-		...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date),
-		...deriveWeightRecordBreakers({ date, stats })
+	// Each group composes its own already-ordered block list — see
+	// docs/session-highlight-ordering.md. The flat "Standouts" list is a
+	// literal concatenation, long-absence-retrap last (it's a sibling of the
+	// three groups, not one of them). Highlights are plain data, so this
+	// serialises across the RSC boundary as-is; the client renders each via
+	// renderHighlight.
+	return [
+		...rarities({ date, stats }),
+		...counts({ date, stats }),
+		...vitalStats({ date, stats }),
+		...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date)
 	];
-	// Highlights are plain data, so the machine's output serialises across the
-	// RSC boundary as-is; the client component renders each via renderHighlight.
-	return runHighlightMachine(highlightPool);
 }
