@@ -251,10 +251,11 @@ describe('session detail page', () => {
 
 		const highlights = await screen.findByTestId('session-highlights');
 		// The section no longer carries a literal "Highlights" heading — that text
-		// now lives only on the tab button. The Standouts subsection holds the
-		// highlight-machine output; the Best-of-the-session subsection holds the
-		// oldest-bird fact (ABC001, proven_age 5, from this file's mockEncounters).
-		expect(highlights.textContent).toContain('Standouts');
+		// now lives only on the tab button. The mocked highlight is a Counts-group
+		// type (session-total-record), so it renders under the "Counts" section;
+		// the Best-of-the-session subsection holds the oldest-bird fact (ABC001,
+		// proven_age 5, from this file's mockEncounters).
+		expect(highlights.textContent).toContain('Counts');
 		expect(highlights.textContent).toContain('Busiest session ever — 3 birds');
 		expect(highlights.textContent).toContain(
 			'Oldest: 5 years — Robin (ABC001)'
