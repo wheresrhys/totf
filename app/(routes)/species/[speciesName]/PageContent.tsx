@@ -7,14 +7,12 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { SpStats } from '@/app/components/pages/species/SpStats';
-import 'chartkick/chart.js';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import type { AggregateStatsResult, TopPeriodsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
 import { SpIndividualsTab } from '@/app/components/pages/species/SpIndividualsTab';
 import { SpNotableRetrapsTab } from '@/app/components/pages/species/SpNotableRetrapsTab';
-import { SpStatsHistoryTab } from '@/app/components/pages/species/SpStatsHistoryTab';
-import { SpWeightWingTab } from '@/app/components/pages/species/SpWeightWingTab';
+import { SpGraphsTab } from '@/app/components/pages/species/SpGraphsTab';
 import { SpYearTotalsTab } from '@/app/components/pages/species/SpYearTotalsTab';
 import { SpMonthTotalsTab } from '@/app/components/pages/species/SpMonthTotalsTab';
 import { SpCombinedMonthTotalsTab } from '@/app/components/pages/species/SpCombinedMonthTotalsTab';
@@ -146,7 +144,6 @@ function SpeciesData({
 				tabs={[
 					{ id: 'bird-list', label: 'Bird list' },
 					{ id: 'retraps', label: 'Retraps' },
-					{ id: 'trend-charts', label: 'Trend charts' },
 					...(isAllTime ? [{ id: 'year-totals', label: 'Year totals' }] : []),
 					...(isAllTime
 						? [{ id: 'all-time-month-totals', label: 'Month totals' }]
@@ -157,7 +154,7 @@ function SpeciesData({
 					...(isAllTime || isYearScoped
 						? [{ id: 'session-totals', label: 'Session totals' }]
 						: []),
-					{ id: 'size-plot', label: 'Size plot' }
+					{ id: 'graphs', label: 'Graphs' }
 				]}
 				activeTab={activeTab}
 				onTabChange={handleTabChange}
@@ -182,18 +179,6 @@ function SpeciesData({
 				activeTabId={activeTab}
 			>
 				<SpNotableRetrapsTab
-					speciesName={data.speciesName}
-					viewedGroupId={viewedGroup.id}
-					fromDate={data.fromDate}
-					toDate={data.toDate}
-				/>
-			</ConditionalTabPanel>
-			<ConditionalTabPanel
-				loadedTabs={loadedTabs}
-				tabId="trend-charts"
-				activeTabId={activeTab}
-			>
-				<SpStatsHistoryTab
 					speciesName={data.speciesName}
 					viewedGroupId={viewedGroup.id}
 					fromDate={data.fromDate}
@@ -256,10 +241,11 @@ function SpeciesData({
 			)}
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
-				tabId="size-plot"
+				tabId="graphs"
 				activeTabId={activeTab}
 			>
-				<SpWeightWingTab
+				<SpGraphsTab
+					speciesName={data.speciesName}
 					speciesId={data.speciesId}
 					viewedGroupId={viewedGroup.id}
 					fromDate={data.fromDate}

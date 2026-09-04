@@ -1,9 +1,8 @@
+'use client';
 import { type Sex } from '@/app/models/bird';
 import { getAgeClass } from '@/app/models/encounter';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ScatterChart, type ScatterChartData } from 'react-chartkick';
-import { fetchGraphableEncounterData } from '@/app/actions/sp-data';
-import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
 type GraphableEncounterData = {
 	age_code: number;
 	is_juv: boolean;
@@ -144,42 +143,18 @@ export function getChartData(
 	];
 }
 
-export function WeightVsWingLengthChart({
-	speciesId,
-	viewedGroupId,
-	fromDate,
-	toDate
+// Presentational wing-vs-weight scatter. Receives its birds via prop (fetching
+// is owned by `SpGraphsTab`) and keeps only the by-sex/by-age grouping toggle as
+// local state.
+export function WingWeightScatterChart({
+	birds
 }: {
-	speciesId: number;
-	viewedGroupId: number;
-	fromDate?: string;
-	toDate?: string;
+	birds: SexedGraphableBird[];
 }) {
 	const [chartGrouping, setChartGrouping] = useState<'sex' | 'age'>('sex');
-	const [graphableEncounterData, setGraphableEncounterData] = useState<
-		SexedGraphableBird[]
-	>([]);
-	useEffect(() => {
-		if (graphableEncounterData.length > 0) return;
-		fetchGraphableEncounterData(
-			speciesId,
-			viewedGroupId,
-			fromDate,
-			toDate
-		).then((data) => {
-			setGraphableEncounterData(data);
-		});
-	}, [
-		speciesId,
-		viewedGroupId,
-		fromDate,
-		toDate,
-		graphableEncounterData.length
-	]);
-	const chartData = getChartData(graphableEncounterData, chartGrouping);
+	const chartData = getChartData(birds, chartGrouping);
 	return (
 		<>
-			<SecondaryHeading>Wing vs Weight</SecondaryHeading>
 			<div className="mt-3 mb-3 flex justify-end">
 				<div
 					id="toggle-count"
