@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
-import type { SessionHighlight } from '@/app/models/session-highlights';
+import type { SessionHighlight } from '@/app/models/highlights';
 import { renderHighlight } from '@/app/components/session-highlight-renderers';
 
 // The action returns plain highlight data; rendering each gives the
@@ -158,17 +158,20 @@ describe('fetchSessionHighlights', () => {
 			(call) => (call as [string, unknown])[0] === 'stats_per_day_and_species'
 		) as [string, { ringing_group_filter: number }];
 		expect(statsArgs.ringing_group_filter).toBe(GROUP_ID);
-		// Robin is a rare species here (seen on only 2 days ever), so the machine's
-		// rare-species suppression (Rem-3) drops Robin's own count/weight lines
-		// (its species record). Session-wide records — busiest session, quietest
-		// since — are not tied to the rare species and survive. This is also the
-		// first session of 2024 (the only prior session is 2022), so Robin — last
-		// seen in 2022 — is first (in fact only) of the year. That "only of year"
-		// line and Robin's rare-species line fold together (Comb-0) into a single
-		// MEGA headline that leads the list.
+		// Robin is a rare species here (seen on only 2 days ever). This is also
+		// the first session of 2024 (the only prior session is 2022), so Robin —
+		// last seen in 2022 — is first (in fact only) of the year. That "only of
+		// year" line and Robin's rare-species line fold together (rarities'
+		// Comb-0) into a single MEGA headline that leads the list.
+		// Per #409: the cross-group rare-species suppression that used to drop a
+		// rare species' own count/weight lines (old Rem-3) is intentionally left
+		// unwired in this restructure — #418 designs and wires it properly — so
+		// Robin's own species-count-record (74 beats its prior day's 30, all-time)
+		// now survives into the Counts block instead of being suppressed.
 		expect(sentencesOf(highlights)).toEqual([
 			'MEGA — Only Robin records of 2024 (only 2 records ever)',
 			'Busiest session ever — 74 birds',
+			'Record day for Robin — 74 caught, the most ever',
 			'Quietest session since 1 May 2022 — 74 birds'
 		]);
 	});
@@ -231,8 +234,7 @@ describe('fetchSessionHighlights', () => {
 
 	it('includes weight record highlights in the fan-out', async () => {
 		// Blue Tit appears on enough session days to be a common (non-rare)
-		// species, so the rare-species suppression (Rem-3) doesn't drop its
-		// weight record — this test is about the weight fan-out, not suppression
+		// species — this test is about the Vital-stats weight fan-out
 		rpcPages = [
 			[
 				{

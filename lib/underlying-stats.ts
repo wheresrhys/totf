@@ -1,6 +1,6 @@
 import { getAuthenticatedSupabaseClient } from './group-auth';
 import { catchSupabaseErrors, fetchAllPaginatedRows } from './supabase';
-import type { SessionStatsData } from '@/app/models/session-highlights';
+import type { SessionStatsData } from '@/app/models/highlights';
 import type {
 	AggregateStatsResult,
 	StatsPerDayAndSpeciesResult

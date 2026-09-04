@@ -25,7 +25,7 @@ import type {
 	SpeciesJuvCountRecordHighlight,
 	WeightRecordExtreme,
 	WeightRecordHighlight
-} from '@/app/models/session-highlights';
+} from '@/app/models/highlights';
 
 // ---- copy builders ----
 // Each family's sentence lives here, next to the markup that renders it — the
