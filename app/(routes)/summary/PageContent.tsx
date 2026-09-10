@@ -19,7 +19,8 @@ export function SummaryPageContent({
 	showAllTimeMonthTotals,
 	viewedGroup,
 	fromDate,
-	toDate
+	toDate,
+	initialTabId
 }: {
 	year?: number;
 	month?: number;
@@ -35,6 +36,10 @@ export function SummaryPageContent({
 	// all-time page (unscoped species totals).
 	fromDate?: string;
 	toDate?: string;
+	// The resolved `?tabId=` search param (#804, reusing #803's mechanism) —
+	// passed straight through to `SummaryTotalsSection`, which resolves it
+	// against its own per-render `tabs` array.
+	initialTabId?: string;
 }) {
 	return (
 		<PageWrapper>
@@ -54,6 +59,7 @@ export function SummaryPageContent({
 				toDate={toDate}
 				year={year}
 				month={month}
+				initialTabId={initialTabId}
 			/>
 		</PageWrapper>
 	);

@@ -89,4 +89,41 @@ describe('SummaryPageContent', () => {
 			expect(tab.getAttribute('aria-current')).toBe('true');
 		});
 	});
+
+	describe('initialTabId passthrough (#804)', () => {
+		it('a matching initialTabId is active on mount and its lazy fetch fires without a click', async () => {
+			render(
+				<SummaryPageContent
+					viewedGroup={viewedGroup}
+					initialTabId="species-totals"
+				/>
+			);
+			const tab = screen.getByRole('button', { name: 'Species totals' });
+			expect(tab.getAttribute('aria-current')).toBe('true');
+			await waitFor(() => expect(fetchSpeciesDataMock).toHaveBeenCalled());
+		});
+
+		it('undefined initialTabId leaves tabs[0].id as the default, unchanged from current behaviour', () => {
+			render(
+				<SummaryPageContent
+					viewedGroup={viewedGroup}
+					yearlyTotals={[{ ...populatedStats, time_period: '2026-01-01' }]}
+				/>
+			);
+			const tab = screen.getByRole('button', { name: 'Year totals' });
+			expect(tab.getAttribute('aria-current')).toBe('true');
+		});
+
+		it("an initialTabId not present in this render's tabs falls back to tabs[0].id", () => {
+			render(
+				<SummaryPageContent
+					viewedGroup={viewedGroup}
+					yearlyTotals={[{ ...populatedStats, time_period: '2026-01-01' }]}
+					initialTabId="month-totals"
+				/>
+			);
+			const tab = screen.getByRole('button', { name: 'Year totals' });
+			expect(tab.getAttribute('aria-current')).toBe('true');
+		});
+	});
 });

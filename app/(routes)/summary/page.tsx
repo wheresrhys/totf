@@ -3,17 +3,29 @@ import {
 	fetchSummaryStats,
 	fetchYearlyTotals
 } from '@/app/actions/summary-stats';
+import { readTabIdSearchParam } from '@/lib/tab-query-param';
 import type { ViewedGroup } from '@/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
 import { SummaryPageContent } from './PageContent';
+
+// `tabId` (#804, reusing #803's mechanism) is the optional `?tabId=` search
+// param — it never affects `getCacheKeys`, only which tab
+// `SummaryTotalsSection` focuses/loads first.
+export type PageParams = { tabId?: string };
+type PageProps = { searchParams?: Promise<{ tabId?: string }> };
 
 export type PageData = {
 	summaryStats: AggregateStatsResult | null;
 	yearlyTotals: AggregateStatsResult[];
 };
 
+async function getSummaryPageParams(pageProps: PageProps): Promise<PageParams> {
+	const tabId = await readTabIdSearchParam(pageProps.searchParams);
+	return tabId ? { tabId } : {};
+}
+
 export async function fetchSummaryPageContent(
-	_params: Record<string, string>,
+	_params: PageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
 	const [summaryStats, yearlyTotals] = await Promise.all([
@@ -24,9 +36,11 @@ export async function fetchSummaryPageContent(
 }
 
 function AllTimeSummary({
+	params,
 	data,
 	viewedGroup
 }: {
+	params: PageParams;
 	data: PageData;
 	viewedGroup: ViewedGroup;
 }) {
@@ -36,18 +50,19 @@ function AllTimeSummary({
 			yearlyTotals={data.yearlyTotals}
 			showAllTimeMonthTotals
 			viewedGroup={viewedGroup}
+			initialTabId={params.tabId}
 		/>
 	);
 }
 
-export default async function SummaryPage({
-	viewedGroup
-}: {
-	viewedGroup?: ViewedGroup;
-} = {}) {
+export default async function SummaryPage(
+	props: PageProps & { viewedGroup?: ViewedGroup } = {}
+) {
 	return (
-		<BootstrapPage<PageData>
-			viewedGroup={viewedGroup}
+		<BootstrapPage<PageData, PageProps, PageParams>
+			pageProps={props}
+			viewedGroup={props.viewedGroup}
+			getParams={getSummaryPageParams}
 			getCacheKeys={() => ['summary']}
 			dataFetcher={fetchSummaryPageContent}
 			PageComponent={AllTimeSummary}
