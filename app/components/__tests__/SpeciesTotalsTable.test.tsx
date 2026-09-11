@@ -47,7 +47,7 @@ describe('SpeciesTotalsTable', () => {
 	});
 
 	describe('column headings', () => {
-		it('renders twelve column headers in the expected order', () => {
+		it('renders eleven column headers in the expected order', () => {
 			render(<SpeciesTotalsTable speciesStats={speciesStats} />);
 			const headers = getColumnHeaders();
 			expect(headers.map((header) => header.textContent)).toEqual([
@@ -61,14 +61,13 @@ describe('SpeciesTotalsTable', () => {
 				'Juv',
 				'Postjuv',
 				'Adult',
-				'Not aged',
-				'New young'
+				'Not aged'
 			]);
 		});
 	});
 
 	describe('rows', () => {
-		it('renders one row per species with all twelve columns in the correct order', () => {
+		it('renders one row per species with all eleven columns in the correct order', () => {
 			render(<SpeciesTotalsTable speciesStats={speciesStats} />);
 			const rows = document.querySelectorAll('tbody tr');
 			expect(rows.length).toBe(speciesStats.length);
@@ -88,8 +87,7 @@ describe('SpeciesTotalsTable', () => {
 				String(firstStat.juv_bird_count),
 				String(firstStat.postjuv_bird_count),
 				String(firstStat.adult_bird_count),
-				String(firstStat.unknown_age_bird_count),
-				String(firstStat.new_young_bird_count)
+				String(firstStat.unknown_age_bird_count)
 			]);
 		});
 
@@ -349,8 +347,7 @@ describe('SpeciesTotalsTable', () => {
 					String(totalsStats.juv_bird_count),
 					String(totalsStats.postjuv_bird_count),
 					String(totalsStats.adult_bird_count),
-					String(totalsStats.unknown_age_bird_count),
-					String(totalsStats.new_young_bird_count)
+					String(totalsStats.unknown_age_bird_count)
 				]
 			);
 		});

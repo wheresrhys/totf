@@ -142,12 +142,6 @@ export function buildStandardColumnConfigs<RowModel>(
 					? 'Includes birds recorded with inconsistent ages'
 					: ENCOUNTERS_AGE_TOOLTIP
 				: null
-		},
-		newYoung: {
-			label: 'New young',
-			...columnBlock('lime'),
-			tooltip:
-				'Count of all pulli, juv or postjuv recorded for the first time in this period'
 		}
 	} as Partial<Record<keyof RowModel, ColumnConfig>>;
 }

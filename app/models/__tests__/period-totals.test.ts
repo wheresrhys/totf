@@ -62,8 +62,7 @@ describe('derivePeriodTotalsRowByBird', () => {
 			juvs: 2,
 			postjuv: 1,
 			adults: 1,
-			unknownAge: 1,
-			newYoung: 3
+			unknownAge: 1
 		});
 	});
 
@@ -105,8 +104,7 @@ describe('derivePeriodTotalsRowByBird', () => {
 			juvs: 0,
 			postjuv: 0,
 			adults: 0,
-			unknownAge: 0,
-			newYoung: 0
+			unknownAge: 0
 		});
 	});
 
@@ -117,7 +115,7 @@ describe('derivePeriodTotalsRowByBird', () => {
 });
 
 describe('derivePeriodTotalsRowByEncounter', () => {
-	it('maps each field correctly, with age-bucket fields from *_enc_count and New/New young from new_bird_count/new_young_bird_count', () => {
+	it('maps each field correctly, with age-bucket fields from *_enc_count and New from new_bird_count', () => {
 		const stat = buildStat();
 		expect(derivePeriodTotalsRowByEncounter(stat)).toEqual({
 			timePeriod: '2026-08-16',
@@ -131,8 +129,7 @@ describe('derivePeriodTotalsRowByEncounter', () => {
 			juvs: 3,
 			postjuv: 1,
 			adults: 1,
-			unknownAge: 0,
-			newYoung: 3
+			unknownAge: 0
 		});
 	});
 

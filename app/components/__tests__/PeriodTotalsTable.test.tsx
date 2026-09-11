@@ -88,8 +88,7 @@ describe('PeriodTotalsTable', () => {
 				'Juv',
 				'Postjuv',
 				'Adult',
-				'Not aged',
-				'New young'
+				'Not aged'
 			]);
 
 			expect(document.querySelectorAll('tbody tr').length).toBe(rows.length);
