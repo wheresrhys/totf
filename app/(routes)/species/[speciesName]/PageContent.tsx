@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 import { format } from 'date-fns';
 import {
 	PageWrapper,
@@ -20,7 +19,7 @@ import { SpMonthTotalsTab } from '@/app/components/pages/species/SpMonthTotalsTa
 import { SpCombinedMonthTotalsTab } from '@/app/components/pages/species/SpCombinedMonthTotalsTab';
 import { SpSessionTotalsTab } from '@/app/components/pages/species/SpSessionTotalsTab';
 import { TabNav } from '@/app/components/TabNav';
-import { resolveInitialTabId } from '@/lib/tab-query-param';
+import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
 
 // `year`/`month` are only present on the period-scoped child routes
 // (`[year]`, `[year]/[month]`); the unscoped route supplies just `speciesName`.
@@ -208,26 +207,17 @@ function SpeciesData({
 
 	// The `?tabId=` param (#803) wins over the route-depth default when it
 	// names one of this route depth's actual tabs; an unknown/garbage value or
-	// no param at all falls back to `defaultTabId` unchanged.
-	const initialTab = resolveInitialTabId(
-		initialTabId,
-		tabs.map((tab) => tab.id),
-		defaultTabId
-	);
-
-	const [loadedTabs, setLoadedTabs] = useState<Set<string>>(
-		new Set([initialTab])
-	);
-	const [activeTab, setActiveTab] = useState<string>(initialTab);
-
-	function handleTabChange(tab: string) {
-		setLoadedTabs((prev) => new Set([...prev, tab]));
-		setActiveTab(tab);
-	}
+	// no param at all falls back to `defaultTabId` unchanged. Shared with the
+	// summary and session pages via `useLinkableTabs` (#818).
+	const { activeTab, loadedTabs, selectTab } = useLinkableTabs({
+		tabIds: tabs.map((tab) => tab.id),
+		defaultTabId,
+		initialTabId
+	});
 
 	return (
 		<>
-			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
+			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={selectTab} />
 			{isAllTime && (
 				<ConditionalTabPanel
 					loadedTabs={loadedTabs}
