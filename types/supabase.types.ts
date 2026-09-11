@@ -506,6 +506,23 @@ export type Database = {
           species_name: string
         }[]
       }
+      population_stats: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["population_stats_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "population_stats_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       public_aggregate_stats: {
         Args: {
           from_date?: string
@@ -532,6 +549,44 @@ export type Database = {
         }[]
       }
       soundex: { Args: { "": string }; Returns: string }
+      stats_bird_age_bucket: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: {
+          age_bucket: string
+          bird_id: number
+          has_new: boolean
+          species_id: number
+          time_period: string
+        }[]
+      }
+      stats_encounter_age_classification: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: {
+          age_bucket: string
+          age_code: number
+          bird_id: number
+          encounter_id: number
+          is_juv: boolean
+          record_type: string
+          species_id: number
+          time_period: string
+          visit_date: string
+        }[]
+      }
       stats_per_day_and_species: {
         Args: { ringing_group_filter: number }
         Returns: {
@@ -544,6 +599,49 @@ export type Database = {
           species_name: string
           visit_date: string
           weighed_birds_count: number
+        }[]
+      }
+      stats_raw_encounters: {
+        Args: {
+          from_date?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: {
+          age_code: number
+          bird_id: number
+          capture_time: string
+          encounter_id: number
+          is_juv: boolean
+          max_hatch_year: number
+          record_type: string
+          ring_no: string
+          session_day: string
+          session_id: number
+          session_month: string
+          session_type: string
+          session_year: string
+          species_id: number
+          species_name: string
+          visit_date: string
+          weight: number
+          wing_length: number
+        }[]
+      }
+      stats_spine: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: {
+          species_id: number
+          species_name: string
+          time_period: string
         }[]
       }
       text_soundex: { Args: { "": string }; Returns: string }
@@ -632,6 +730,21 @@ export type Database = {
         avg_wing: number | null
         min_wing: number | null
         median_wing: number | null
+      }
+      population_stats_result: {
+        species_name: string | null
+        time_period: string | null
+        adult_bird_count: number | null
+        juv_bird_count: number | null
+        juv_enc_count: number | null
+        postjuv_enc_count: number | null
+        new_young_bird_count: number | null
+        new_adult_bird_count: number | null
+        first_summer_bird_count: number | null
+        postjuv_juv_enc_count: number | null
+        new_postjuv_juv_enc_count: number | null
+        new_postjuv_enc_count: number | null
+        old_timers_bird_count: number | null
       }
       top_metrics_filter_params: {
         month_filter: number | null

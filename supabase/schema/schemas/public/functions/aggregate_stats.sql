@@ -8,98 +8,15 @@ CREATE FUNCTION public.aggregate_stats (
 ) RETURNS SETOF public.aggregate_stats_result LANGUAGE plpgsql AS $function$
   BEGIN
   RETURN QUERY
+  -- Base windowed row source and grouping-cell spine, delegated to the shared
+  -- stats_raw_encounters / stats_spine utility RPCs (#800) so this logic isn't
+  -- duplicated between aggregate_stats and population_stats. Each utility RPC is
+  -- called exactly once here and materialized into a local CTE (reused by every
+  -- downstream reference below), so the base tables aren't rescanned per use.
   WITH raw_encounters AS (
-    -- Pre-aggregate all encounter data per species
-    SELECT
-      sp.id AS species_id,
-      sp.species_name,
-      b.id AS bird_id,
-      b.ring_no,
-      e.id AS encounter_id,
-      e.weight,
-      e.wing_length,
-      e.record_type,
-      e.age_code,
-      e.is_juv,
-      sess.id AS session_id,
-      sess.visit_date,
-      sess.session_type,
-      e.max_hatch_year,
-      e.capture_time,
-      date_trunc('day', sess.visit_date)::DATE AS session_day,
-      date_trunc('month', sess.visit_date)::DATE AS session_month,
-      date_trunc('year', sess.visit_date)::DATE AS session_year
-    FROM public."Species" sp
-    JOIN public."Birds" b ON sp.id = b.species_id
-    LEFT JOIN public."Encounters" e ON b.id = e.bird_id
-    LEFT JOIN public."Sessions" sess ON e.session_id = sess.id
-    WHERE (from_date IS NULL OR sess.visit_date >=from_date)
-     AND (to_date IS NULL OR sess.visit_date<=to_date)
-     AND (species_name_filter IS NULL OR sp.species_name = species_name_filter)
-     AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
-  ), species_spine AS (
-    SELECT
-      DISTINCT re.species_id, re.species_name
-    FROM raw_encounters as re
-    WHERE (species_name_filter IS NULL OR re.species_name = species_name_filter)
-    AND group_by_species
-
-    UNION ALL
-
-    SELECT NULL::bigint, NULL::text
-    WHERE NOT group_by_species
-  ), session_date_range AS (
-    SELECT
-      MIN(sess.visit_date) AS min_date,
-      MAX(sess.visit_date) AS max_date
-    FROM public."Sessions" as sess
-    WHERE (from_date IS NULL OR sess.visit_date >= from_date)
-      AND (to_date IS NULL OR sess.visit_date <= to_date)
-  ), period_spine AS (
-    SELECT date_trunc('month', d)::date AS time_period
-    FROM session_date_range sdr,
-    LATERAL generate_series(
-      date_trunc('month', COALESCE(sdr.min_date, from_date, CURRENT_DATE))::timestamp,
-      date_trunc('month', COALESCE(sdr.max_date, to_date, CURRENT_DATE))::timestamp,
-      '1 month'::interval
-    ) d
-    WHERE group_by_time_period = 'month'
-      AND sdr.min_date IS NOT NULL
-      AND sdr.max_date IS NOT NULL
-
-    UNION ALL
-
-    SELECT date_trunc('year', d)::date AS time_period
-    FROM session_date_range sdr,
-    LATERAL generate_series(
-      date_trunc('year', COALESCE(sdr.min_date, from_date, CURRENT_DATE))::timestamp,
-      date_trunc('year', COALESCE(sdr.max_date, to_date, CURRENT_DATE))::timestamp,
-      '1 year'::interval
-    ) d
-    WHERE group_by_time_period = 'year'
-      AND sdr.min_date IS NOT NULL
-      AND sdr.max_date IS NOT NULL
-
-    UNION ALL
-
-    -- The 'day' spine is sparse: one row per distinct session date actually present
-    -- in the filtered data, unlike the dense month/year spines (which span every
-    -- period in the min..max range, including empty ones). A dense day spine would
-    -- emit a row for every calendar day in range — thousands of mostly-empty rows —
-    -- so we key off the encounter data instead, and days with no session never appear.
-    SELECT DISTINCT re.session_day AS time_period
-    FROM raw_encounters re
-    WHERE group_by_time_period = 'day'
-      AND re.session_day IS NOT NULL
-
-    UNION ALL
-
-    SELECT NULL::date
-    WHERE group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day')
+    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter)
   ), spine AS (
-    SELECT s.species_id, s.species_name, p.time_period
-    FROM species_spine s
-    CROSS JOIN period_spine p
+    SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
   ),
   stats_per_bird_month AS (
     -- Calculate per-bird statistics once
@@ -118,82 +35,18 @@ CREATE FUNCTION public.aggregate_stats (
     WHERE re.encounter_id IS NOT NULL
     GROUP BY re.species_id, re.bird_id, re.session_day, re.session_month, re.session_year
   ),
-  -- Canonical per-encounter age classification. Every raw_encounters row is placed into
-  -- exactly one mutually-exclusive, exhaustive age bucket. This single CTE is the one
-  -- place the bucket definitions live: both the per-encounter counts
-  -- (encounter_age_bucket_counts) and the per-bird flags (bird_age_flags) are derived
-  -- from it. The classes mirror the single-encounter age classes defined in TypeScript by
-  -- getAgeClass() (app/models/encounter.ts, #527) — keep the two in sync by hand:
-  --   pullus  = age_code = 1 AND NOT is_juv   (true nestling)
-  --   juv     = is_juv AND age_code IN (1, 3) (1J or 3J)
-  --   postjuv = age_code = 3 AND NOT is_juv   (bare age 3)
-  --   adult   = age_code > 3
-  --   unknown = anything else (incl. age_code NULL or age_code 2)
-  -- The four conditions are mutually exclusive per encounter, so the ordered CASE assigns
-  -- each encounter its single bucket with no precedence needed. bird_id and record_type
-  -- are carried so bird_age_flags can aggregate over this CTE.
+  -- Canonical per-encounter age classification and its bird-level bucket
+  -- resolution, delegated to the shared stats_encounter_age_classification /
+  -- stats_bird_age_bucket utility RPCs (#800) — see those files for the bucket
+  -- definitions and bird-level precedence rules (pullus always wins; otherwise
+  -- juv wins over postjuv), which mirror the single-encounter age classes
+  -- defined in TypeScript by getAgeClass() (app/models/encounter.ts, #527) — keep
+  -- the two in sync by hand.
   encounter_age_classification AS (
-    SELECT
-      re.encounter_id,
-      re.bird_id,
-      re.record_type,
-      CASE WHEN group_by_species THEN re.species_id ELSE NULL::bigint END AS species_id,
-      CASE
-        WHEN group_by_time_period = 'day' THEN re.session_day
-        WHEN group_by_time_period = 'month' THEN re.session_month
-        WHEN group_by_time_period = 'year' THEN re.session_year
-        ELSE NULL::date
-      END AS time_period,
-      CASE
-        WHEN re.age_code = 1 AND NOT re.is_juv THEN 'pullus'
-        WHEN re.is_juv AND re.age_code IN (1, 3) THEN 'juv'
-        WHEN re.age_code = 3 AND NOT re.is_juv THEN 'postjuv'
-        WHEN re.age_code > 3 THEN 'adult'
-        ELSE 'unknown'
-      END AS age_bucket
-    FROM raw_encounters re
-    WHERE re.encounter_id IS NOT NULL
+    SELECT * FROM public.stats_encounter_age_classification(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
   ),
-  -- Per-bird, per-grouping age/new signal flags, aggregated across all of a bird's
-  -- encounters in the active group/species/time-period cell by bool_or-ing the canonical
-  -- per-encounter buckets above. Because those buckets are mutually exclusive per
-  -- encounter, has_pullus = "any encounter bucketed pullus", and likewise for the other
-  -- classes — identical to testing each raw indicator directly, but without restating the
-  -- conditions. Two bird-level precedence rules with no single-encounter equivalent are
-  -- then applied in bird_age_bucket below: pullus always wins (a bird with any pullus
-  -- reading is pullus, even against a conflicting adult reading, which is assumed
-  -- erroneous), and otherwise juv wins over postjuv. bool_or is COALESCEd to FALSE so a
-  -- bird whose encounters are all 'unknown' (age_code always NULL or 2) lands in
-  -- unknown_age_count rather than dropping out of every bucket.
-  bird_age_flags AS (
-    SELECT
-      eac.bird_id,
-      eac.species_id,
-      eac.time_period,
-      COALESCE(bool_or(eac.age_bucket = 'pullus'), FALSE) AS has_pullus,
-      COALESCE(bool_or(eac.age_bucket = 'juv'), FALSE) AS has_juv,
-      COALESCE(bool_or(eac.age_bucket = 'postjuv'), FALSE) AS has_postjuv,
-      COALESCE(bool_or(eac.age_bucket = 'adult'), FALSE) AS has_adult,
-      COALESCE(bool_or(eac.record_type = 'N'), FALSE) AS has_new
-    FROM encounter_age_classification eac
-    GROUP BY eac.bird_id, eac.species_id, eac.time_period
-  ),
-  -- Resolve each bird's flags into exactly one mutually-exclusive, exhaustive bucket
-  -- via the precedence rules above, so the five bucket counts always sum to the number
-  -- of distinct birds (i.e. bird_count) in the cell.
   bird_age_bucket AS (
-    SELECT
-      baf.species_id,
-      baf.time_period,
-      baf.has_new,
-      CASE
-        WHEN baf.has_pullus THEN 'pullus'
-        WHEN baf.has_juv AND NOT baf.has_adult THEN 'juv'
-        WHEN baf.has_postjuv AND NOT baf.has_juv AND NOT baf.has_adult THEN 'postjuv'
-        WHEN baf.has_adult AND NOT baf.has_juv AND NOT baf.has_postjuv THEN 'adult'
-        ELSE 'unknown'
-      END AS age_bucket
-    FROM bird_age_flags baf
+    SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
   ),
   age_bucket_counts AS (
     SELECT
