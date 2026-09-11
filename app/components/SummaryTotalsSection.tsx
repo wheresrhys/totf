@@ -89,7 +89,7 @@ function AllTimeMonthTotalsTab({
 		<>
 			{combineYears ? (
 				<PeriodTotalsTable
-					grouping="month"
+					timeInterval="month"
 					rows={filterEmptyMonthTotalsRows(combinedRows, hideEmptyMonths).map(
 						(row) => row.stats
 					)}
@@ -107,7 +107,7 @@ function AllTimeMonthTotalsTab({
 				/>
 			) : (
 				<PeriodTotalsTable
-					grouping="month"
+					timeInterval="month"
 					rows={filterEmptyMonthTotalsRows(perYearRows, hideEmptyMonths).map(
 						(row) => row.stats
 					)}
@@ -155,7 +155,7 @@ function YearMonthTotalsTab({
 
 	return (
 		<PeriodTotalsTable
-			grouping="month"
+			timeInterval="month"
 			rows={visibleRows.map((row) => row.stats)}
 			firstColumnHeader="Month"
 			buildHref={(timePeriod) => {
@@ -341,7 +341,7 @@ export function SummaryTotalsSection({
 			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={selectTab} />
 			{yearlyTotals !== undefined && activeTab === YEAR_TOTALS_TAB.id && (
 				<PeriodTotalsTable
-					grouping="year"
+					timeInterval="year"
 					rows={yearlyTotals}
 					firstColumnHeader="Year"
 					buildHref={(timePeriod) =>
@@ -384,7 +384,7 @@ export function SummaryTotalsSection({
 				isSessionActive &&
 				(sessionTotals !== undefined ? (
 					<PeriodTotalsTable
-						grouping="day"
+						timeInterval="day"
 						rows={sessionTotals}
 						firstColumnHeader="Session"
 						buildHref={(timePeriod) =>
@@ -400,7 +400,7 @@ export function SummaryTotalsSection({
 					</div>
 				) : (
 					<PeriodTotalsTable
-						grouping="day"
+						timeInterval="day"
 						rows={lazySessionStats ?? []}
 						firstColumnHeader="Session"
 						buildHref={(timePeriod) =>

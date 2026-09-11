@@ -45,7 +45,7 @@ export function SpSessionTotalsTab({
 
 	return (
 		<PeriodTotalsTable
-			grouping="day"
+			timeInterval="day"
 			rows={sessionTotals}
 			firstColumnHeader="Session"
 			buildHref={(timePeriod) =>

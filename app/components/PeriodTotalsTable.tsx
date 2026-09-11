@@ -27,12 +27,14 @@ import {
 } from './shared/AggregateByToggle';
 
 function buildColumnConfigs({
+	timeInterval,
 	firstColumnHeader,
 	hasPulli,
 	dashIndividuals,
 	aggregateBy,
 	showSpeciesColumn
 }: {
+	timeInterval: PeriodTotalsGrouping;
 	firstColumnHeader: string;
 	hasPulli: boolean;
 	dashIndividuals: boolean;
@@ -44,13 +46,15 @@ function buildColumnConfigs({
 			label: firstColumnHeader,
 			preferSortAscending: firstColumnHeader !== 'Year'
 		},
-		sessionsCount: {
-			label: 'Sessions'
-		},
+		...(timeInterval !== 'day' ? { sessionsCount: { label: 'Sessions' } } : {}),
 		...(showSpeciesColumn ? { speciesCount: { label: 'Species' } } : {}),
-		encounterCount: {
-			label: 'Encounters'
-		},
+		...(timeInterval !== 'day'
+			? {
+					encounterCount: {
+						label: 'Encounters'
+					}
+				}
+			: {}),
 		// On an encounters-only tab a per-period bird count is meaningless, so
 		// the whole column renders a `'-'` placeholder rather than a number.
 		individualsCount: {
@@ -62,7 +66,7 @@ function buildColumnConfigs({
 }
 
 export function PeriodTotalsTable({
-	grouping,
+	timeInterval,
 	rows,
 	firstColumnHeader,
 	buildHref,
@@ -73,11 +77,11 @@ export function PeriodTotalsTable({
 	extraControls,
 	showSpeciesColumn = true
 }: {
-	grouping: PeriodTotalsGrouping;
+	timeInterval: PeriodTotalsGrouping;
 	rows: AggregateStatsResult[];
 	firstColumnHeader: string;
 	buildHref: (timePeriod: string) => string;
-	// Overrides the default `formatPeriodTotalsLabel(grouping, ...)` first-column
+	// Overrides the default `formatPeriodTotalsLabel(timeInterval, ...)` first-column
 	// text — e.g. the month-totals caller supplies a timezone-safe label built
 	// from integer year/month rather than parsing the `time_period` string.
 	buildLabel?: (timePeriod: string) => string;
@@ -110,7 +114,7 @@ export function PeriodTotalsTable({
 
 	const resolveLabel =
 		buildLabel ??
-		((timePeriod: string) => formatPeriodTotalsLabel(grouping, timePeriod));
+		((timePeriod: string) => formatPeriodTotalsLabel(timeInterval, timePeriod));
 
 	const hasPulli = rows.some((stat) => activeDeriveRow(stat).pullus > 0);
 	const columnConfigs = buildColumnConfigs({
@@ -118,7 +122,8 @@ export function PeriodTotalsTable({
 		hasPulli,
 		dashIndividuals,
 		aggregateBy,
-		showSpeciesColumn
+		showSpeciesColumn,
+		timeInterval
 	});
 
 	const totalsRow = totalsStats
@@ -129,7 +134,7 @@ export function PeriodTotalsTable({
 			})
 		: undefined;
 
-	// Recreated each render since `grouping`/`buildHref` are props, not static
+	// Recreated each render since `timeInterval`/`buildHref` are props, not static
 	// — the cell itself is stateless, so this only costs identity, not
 	// behaviour.
 	const PeriodLabelCell = createNameLinkCell<
@@ -177,11 +182,13 @@ export function PeriodTotalsTable({
 	return (
 		<>
 			<div data-test-id="above-header-row" className="m-2 flex gap-4">
-				<AggregateByToggle
-					value={aggregateBy}
-					onChange={setAggregateBy}
-					disabled={aggregationFixedTo !== undefined}
-				/>
+				{timeInterval !== 'day' && (
+					<AggregateByToggle
+						value={aggregateBy}
+						onChange={setAggregateBy}
+						disabled={aggregationFixedTo !== undefined}
+					/>
+				)}
 				{extraControls ?? null}
 			</div>
 			<SortableTable<AggregateStatsResult, PeriodTotalsRow>

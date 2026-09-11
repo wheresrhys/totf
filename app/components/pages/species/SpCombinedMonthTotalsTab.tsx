@@ -103,7 +103,7 @@ export function SpCombinedMonthTotalsTab({
 		<>
 			{combineYears ? (
 				<PeriodTotalsTable
-					grouping="month"
+					timeInterval="month"
 					rows={filterEmptyMonthTotalsRows(
 						combinedMonthRows,
 						hideEmptyMonths
@@ -120,7 +120,7 @@ export function SpCombinedMonthTotalsTab({
 				/>
 			) : (
 				<PeriodTotalsTable
-					grouping="month"
+					timeInterval="month"
 					showSpeciesColumn={false}
 					rows={filterEmptyMonthTotalsRows(perYearRows, hideEmptyMonths).map(
 						(row) => row.stats

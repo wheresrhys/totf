@@ -48,7 +48,7 @@ describe('summary-stats actions — route through the group-summary access helpe
 	});
 
 	describe('fetchPeriodStats', () => {
-		it('passes the grouping and date range through to the access helper', async () => {
+		it('passes the timeInterval and date range through to the access helper', async () => {
 			vi.mocked(fetchAuthorisedAggregateStats).mockResolvedValue({
 				accessLevel: 'own',
 				rows: [ROW]

@@ -128,7 +128,7 @@ describe('SpSessionTotalsTab', () => {
 		);
 	});
 
-	it("renders through PeriodTotalsTable with grouping='day'", async () => {
+	it("renders through PeriodTotalsTable with timeInterval='day'", async () => {
 		render(
 			<SpSessionTotalsTab speciesName="Robin" viewedGroup={viewedGroup} />
 		);
@@ -136,8 +136,8 @@ describe('SpSessionTotalsTab', () => {
 			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
 		});
 		// Day-grouped rows format their label as "do MMMM yyyy" (e.g. "14th March
-		// 2026"), distinct from year/month grouping's formatting — confirms
-		// `grouping="day"` was actually threaded through to `PeriodTotalsTable`.
+		// 2026"), distinct from year/month timeInterval's formatting — confirms
+		// `timeInterval="day"` was actually threaded through to `PeriodTotalsTable`.
 		expect(screen.getByRole('link', { name: '14th March 2026' })).toBeTruthy();
 	});
 

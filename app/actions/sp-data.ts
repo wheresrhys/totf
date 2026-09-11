@@ -260,7 +260,7 @@ export async function getGroupEffortHistory(
 export async function fetchSpeciesPeriodTotals(
 	speciesName: string,
 	viewedGroupId: number,
-	grouping: PeriodTotalsGrouping,
+	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
 	toDate?: string
 ): Promise<AggregateStatsResult[]> {
@@ -271,7 +271,7 @@ export async function fetchSpeciesPeriodTotals(
 			...(toDate ? { to_date: toDate } : {}),
 			ringing_group_filter: viewedGroupId,
 			species_name_filter: speciesName,
-			group_by_time_period: grouping
+			group_by_time_period: timeInterval
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
 }

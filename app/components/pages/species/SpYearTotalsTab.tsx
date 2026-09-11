@@ -34,7 +34,7 @@ export function SpYearTotalsTab({
 
 	return (
 		<PeriodTotalsTable
-			grouping="year"
+			timeInterval="year"
 			rows={yearTotals}
 			firstColumnHeader="Year"
 			showSpeciesColumn={false}

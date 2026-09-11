@@ -20,19 +20,19 @@ export async function fetchSummaryStats(
 
 /**
  * Per-period (ungrouped by species) totals for a summary range — one row per
- * `grouping` bucket the RPC found within `fromDate`..`toDate`. The RPC's spine
+ * `timeInterval` bucket the RPC found within `fromDate`..`toDate`. The RPC's spine
  * only spans actual session dates, so callers that need every calendar bucket
  * present (e.g. all 12 months) zero-fill the gaps themselves.
  */
 export async function fetchPeriodStats(
 	viewedGroupId: number,
-	grouping: 'year' | 'month' | 'day',
+	timeInterval: 'year' | 'month' | 'day',
 	fromDate?: string,
 	toDate?: string
 ): Promise<AggregateStatsResult[]> {
 	const { rows } = await fetchAuthorisedAggregateStats(viewedGroupId, {
 		group_by_species: false,
-		group_by_time_period: grouping,
+		group_by_time_period: timeInterval,
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {})
 	});

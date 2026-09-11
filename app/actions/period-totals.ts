@@ -12,7 +12,7 @@ import type { PeriodTotalsGrouping } from '@/app/models/period-totals';
  */
 export async function fetchPeriodTotals(
 	viewedGroupId: number,
-	grouping: PeriodTotalsGrouping,
+	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
 	toDate?: string
 ): Promise<AggregateStatsResult[]> {
@@ -20,7 +20,7 @@ export async function fetchPeriodTotals(
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {}),
 		group_by_species: false,
-		group_by_time_period: grouping
+		group_by_time_period: timeInterval
 	});
 	return rows;
 }
