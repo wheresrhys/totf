@@ -133,7 +133,6 @@ describe('buildStandardColumnConfigs', () => {
 		postjuv: number;
 		adults: number;
 		unknownAge: number;
-		newYoung: number;
 	};
 
 	it('returns age counts in logical order when hasPulli is false', () => {
@@ -144,8 +143,7 @@ describe('buildStandardColumnConfigs', () => {
 			'juvs',
 			'postjuv',
 			'adults',
-			'unknownAge',
-			'newYoung'
+			'unknownAge'
 		]);
 	});
 
@@ -158,8 +156,7 @@ describe('buildStandardColumnConfigs', () => {
 			'juvs',
 			'postjuv',
 			'adults',
-			'unknownAge',
-			'newYoung'
+			'unknownAge'
 		]);
 	});
 
