@@ -116,9 +116,12 @@ export function SpPopulationTab({
 	function loadPopulationStats() {
 		if (populationRequested) return;
 		setPopulationRequested(true);
-		getSpeciesPopulationStats(speciesName, viewedGroupId, fromDate, toDate).then(
-			setPopulationStats
-		);
+		getSpeciesPopulationStats(
+			speciesName,
+			viewedGroupId,
+			fromDate,
+			toDate
+		).then(setPopulationStats);
 	}
 
 	const [effortHistory, setEffortHistory] = useState<LineChartData | null>(
@@ -160,6 +163,7 @@ export function SpPopulationTab({
 				statsHistory ? (
 					<YearComparisonTrendChart
 						series={getCounts(statsHistory)}
+						yearlyAggregators={{ encounters: 'sum', birds: 'sum' }}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 					/>
@@ -180,6 +184,12 @@ export function SpPopulationTab({
 					<YearComparisonTrendChart
 						series={getAgeSplit(populationStats)}
 						colors={AGE_SPLIT_COLORS}
+						yearlyAggregators={{
+							'New adults': 'sum',
+							'First summer': 'sum',
+							Oldies: 'sum',
+							'New young': 'sum'
+						}}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 					/>
@@ -200,6 +210,14 @@ export function SpPopulationTab({
 					<YearComparisonTrendChart
 						series={getYoungTrends(populationStats)}
 						colors={YOUNG_TRENDS_COLORS}
+						yearlyAggregators={{
+							Juv: 'sum',
+							'New juv': 'sum',
+							Postjuv: 'sum',
+							'New postjuv': 'sum',
+							Young: 'sum',
+							'New young': 'sum'
+						}}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 					/>

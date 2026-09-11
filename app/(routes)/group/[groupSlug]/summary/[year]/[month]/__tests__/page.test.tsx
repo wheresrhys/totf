@@ -56,6 +56,25 @@ describe('GroupSummaryYearMonthPage', () => {
 				vi.mocked(YearMonthSummaryPage).mock.calls[0][0].params
 			).resolves.toEqual({ year: '2025', month: '3' });
 		});
+
+		// #804: the year/month summary page's new `searchParams` prop is
+		// optional precisely so this call site (which `withGroupScope` never
+		// threads it through) keeps rendering/type-checking unaffected.
+		it('delegates without a searchParams prop, since withGroupScope does not thread one through', async () => {
+			render(
+				await GroupSummaryYearMonthPage({
+					params: Promise.resolve({
+						groupSlug: 'viewed-group-slug',
+						year: '2025',
+						month: '3'
+					})
+				})
+			);
+			screen.getByTestId('mock-year-month-summary-page');
+			expect(
+				vi.mocked(YearMonthSummaryPage).mock.calls[0][0]
+			).not.toHaveProperty('searchParams');
+		});
 	});
 
 	describe('an unknown groupSlug', () => {

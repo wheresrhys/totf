@@ -319,9 +319,9 @@ describe('SpPopulationTab', () => {
 			expect(returningFamily).toContain(AGE_SPLIT_COLORS[1]); // First summer
 			expect(returningFamily).toContain(AGE_SPLIT_COLORS[2]); // Oldies
 			// The two families share no colour.
-			expect(
-				newFamily.some((colour) => returningFamily.includes(colour))
-			).toBe(false);
+			expect(newFamily.some((colour) => returningFamily.includes(colour))).toBe(
+				false
+			);
 		});
 
 		it('pairs Young trends colours into three disjoint hue families', () => {

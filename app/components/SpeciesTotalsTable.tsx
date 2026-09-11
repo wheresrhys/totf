@@ -34,7 +34,6 @@ type RowModel = {
 	postjuv: number;
 	adults: number;
 	unknownAge: number;
-	newYoung: number;
 };
 
 // The period a summary page's species table is scoped to — mirrors the
@@ -64,8 +63,7 @@ function toRowModel(row: SpeciesTotalsRow): RowModel {
 		juvs: row.juvsCount,
 		postjuv: row.postjuvCount,
 		adults: row.adultsCount,
-		unknownAge: row.unknownAgeCount,
-		newYoung: row.newYoungCount
+		unknownAge: row.unknownAgeCount
 	};
 }
 

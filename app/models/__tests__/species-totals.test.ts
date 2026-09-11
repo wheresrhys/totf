@@ -78,8 +78,7 @@ describe('deriveSpeciesTotalsRow', () => {
 			juvsCount: 2,
 			postjuvCount: 1,
 			adultsCount: 1,
-			unknownAgeCount: 1,
-			newYoungCount: 3
+			unknownAgeCount: 1
 		});
 	});
 
@@ -130,8 +129,7 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 			juvsCount: 3,
 			postjuvCount: 1,
 			adultsCount: 1,
-			unknownAgeCount: 0,
-			newYoungCount: 3
+			unknownAgeCount: 0
 		});
 	});
 
@@ -160,13 +158,11 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 		expect(deriveSpeciesTotalsRowByEncounter(stat).unknownAgeCount).toBe(9);
 	});
 
-	it('sources newCount/newYoungCount from new_bird_count/new_young_bird_count, not any *_enc_count field', () => {
+	it('sources newCount from new_bird_count, not any *_enc_count field', () => {
 		const stat = buildStat({
-			new_bird_count: 4,
-			new_young_bird_count: 3
+			new_bird_count: 4
 		});
 		const row = deriveSpeciesTotalsRowByEncounter(stat);
 		expect(row.newCount).toBe(4);
-		expect(row.newYoungCount).toBe(3);
 	});
 });

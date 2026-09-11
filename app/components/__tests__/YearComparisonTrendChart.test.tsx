@@ -7,6 +7,7 @@ import {
 	yearColors,
 	thisYearColors,
 	normalizeSeriesByEffort,
+	aggregateSeriesByYear,
 	YearComparisonTrendChart
 } from '../YearComparisonTrendChart';
 
@@ -370,6 +371,114 @@ describe('normalizeSeriesByEffort', () => {
 	});
 });
 
+describe('aggregateSeriesByYear', () => {
+	describe('Usual: summing a metric into one point per year', () => {
+		it('sums each year’s monthly values into a single yearly point', () => {
+			const metric: LineChartData = {
+				name: 'encounters',
+				data: [
+					['2023-03-01', 5],
+					['2023-06-01', 9],
+					['2024-03-01', 7]
+				]
+			};
+			expect(aggregateSeriesByYear(metric, 'sum').data).toEqual([
+				['2023', 14],
+				['2024', 7]
+			]);
+		});
+
+		it('preserves the metric name', () => {
+			const metric: LineChartData = {
+				name: 'encounters',
+				data: [['2023-03-01', 5]]
+			};
+			expect(aggregateSeriesByYear(metric, 'sum').name).toBe('encounters');
+		});
+	});
+
+	describe('Structure: one test per aggregator', () => {
+		const metric: LineChartData = {
+			name: 'weight',
+			data: [
+				['2024-03-01', 10],
+				['2024-06-01', 20],
+				['2024-09-01', 30]
+			]
+		};
+
+		it('sums with the sum aggregator', () => {
+			expect(aggregateSeriesByYear(metric, 'sum').data).toEqual([['2024', 60]]);
+		});
+
+		it('averages with the mean aggregator', () => {
+			expect(aggregateSeriesByYear(metric, 'mean').data).toEqual([
+				['2024', 20]
+			]);
+		});
+
+		it('takes the maximum with the max aggregator', () => {
+			expect(aggregateSeriesByYear(metric, 'max').data).toEqual([['2024', 30]]);
+		});
+
+		it('takes the minimum with the min aggregator', () => {
+			expect(aggregateSeriesByYear(metric, 'min').data).toEqual([['2024', 10]]);
+		});
+	});
+
+	describe('Structure: ordering and labelling', () => {
+		it('returns points oldest-first, labelled by year', () => {
+			const metric: LineChartData = {
+				name: 'encounters',
+				data: [
+					['2024-01-01', 1],
+					['2022-01-01', 1],
+					['2023-01-01', 1]
+				]
+			};
+			expect(
+				aggregateSeriesByYear(metric, 'sum').data.map(([year]) => year)
+			).toEqual(['2022', '2023', '2024']);
+		});
+	});
+
+	describe('Edge: gaps, empty years and empty input', () => {
+		it('excludes a zero-count month from its year’s aggregate', () => {
+			const metric: LineChartData = {
+				name: 'encounters',
+				data: [
+					['2024-01-01', 0],
+					['2024-03-01', 30],
+					['2024-06-01', 10]
+				]
+			};
+			// The 0 is a dense-spine gap, so the sum is 30 + 10, not 40 with a real 0.
+			expect(aggregateSeriesByYear(metric, 'sum').data).toEqual([['2024', 40]]);
+		});
+
+		it('aggregates a year with no reportable months to null (a gap)', () => {
+			const metric: LineChartData = {
+				name: 'encounters',
+				data: [
+					['2022-05-01', 0],
+					['2022-06-01', 0],
+					['2023-05-01', 4]
+				]
+			};
+			expect(aggregateSeriesByYear(metric, 'sum').data).toEqual([
+				['2022', null],
+				['2023', 4]
+			]);
+		});
+
+		it('returns an empty array for a metric with no points', () => {
+			expect(
+				aggregateSeriesByYear({ name: 'encounters', data: [] }, 'sum').data
+			).toEqual([]);
+		});
+	});
+});
+
 describe('YearComparisonTrendChart', () => {
 	afterEach(cleanup);
 
@@ -475,6 +584,109 @@ describe('YearComparisonTrendChart', () => {
 			const [chart] = screen.getAllByTestId('line-chart');
 			// index 0 overridden, index 1 falls back to METRIC_BASE_COLORS[1].
 			expect(JSON.parse(chart.dataset.colors!)).toEqual(['#111111', '#DC3912']);
+		});
+	});
+
+	describe('Structure: all-time Interval toggle', () => {
+		// One metric spanning two months in a single year, so a year-aggregate
+		// differs from either monthly value and the aggregator is observable.
+		const multiMonth: LineChartData[] = [
+			{
+				name: 'max weight',
+				data: [
+					['2024-03-01', 10],
+					['2024-06-01', 30]
+				]
+			},
+			{
+				name: 'encounters',
+				data: [
+					['2024-03-01', 4],
+					['2024-06-01', 6]
+				]
+			}
+		];
+
+		it('defaults to Month — shows the per-month series, Month selected', () => {
+			render(<YearComparisonTrendChart series={series} />);
+			const month = screen.getByRole('radio', {
+				name: 'Month'
+			}) as HTMLInputElement;
+			const year = screen.getByRole('radio', {
+				name: 'Year'
+			}) as HTMLInputElement;
+			expect(month.checked).toBe(true);
+			expect(year.checked).toBe(false);
+			const [chart] = screen.getAllByTestId('line-chart');
+			expect(JSON.parse(chart.dataset.values!)).toEqual([
+				series[0].data,
+				series[1].data
+			]);
+		});
+
+		it('switching to Year re-renders one point per year, per-metric aggregator from yearlyAggregators', () => {
+			render(
+				<YearComparisonTrendChart
+					series={multiMonth}
+					yearlyAggregators={{ 'max weight': 'max' }}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			const [chart] = screen.getAllByTestId('line-chart');
+			const [maxWeight, encounters] = JSON.parse(chart.dataset.values!);
+			// 'max weight' aggregates via max → 30; 'encounters' has no mapping so
+			// defaults to sum → 4 + 6 = 10.
+			expect(maxWeight).toEqual([['2024', 30]]);
+			expect(encounters).toEqual([['2024', 10]]);
+		});
+
+		it('defaults a metric absent from yearlyAggregators to sum', () => {
+			render(
+				<YearComparisonTrendChart series={multiMonth} yearlyAggregators={{}} />
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			const [chart] = screen.getAllByTestId('line-chart');
+			const [maxWeight] = JSON.parse(chart.dataset.values!);
+			expect(maxWeight).toEqual([['2024', 40]]);
+		});
+
+		it('restores the exact per-month series when toggled Year → Month', () => {
+			render(<YearComparisonTrendChart series={multiMonth} />);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			fireEvent.click(screen.getByRole('radio', { name: 'Month' }));
+			const [chart] = screen.getAllByTestId('line-chart');
+			expect(JSON.parse(chart.dataset.values!)).toEqual([
+				multiMonth[0].data,
+				multiMonth[1].data
+			]);
+		});
+
+		it('is not shown in Compare years or This year modes', () => {
+			render(<YearComparisonTrendChart series={series} />);
+			fireEvent.click(screen.getByRole('radio', { name: 'Compare years' }));
+			expect(screen.queryByRole('radio', { name: 'Year' })).toBeNull();
+			expect(screen.queryByRole('radio', { name: 'Month' })).toBeNull();
+			fireEvent.click(screen.getByRole('radio', { name: 'This year' }));
+			expect(screen.queryByRole('radio', { name: 'Year' })).toBeNull();
+			expect(screen.queryByRole('radio', { name: 'Month' })).toBeNull();
+		});
+
+		it('toggles independently across multiple chart instances on one page', () => {
+			render(
+				<>
+					<YearComparisonTrendChart
+						series={multiMonth}
+						yearlyAggregators={{ 'max weight': 'max' }}
+					/>
+					<YearComparisonTrendChart series={multiMonth} />
+				</>
+			);
+			// Switch only the first instance to Year.
+			fireEvent.click(screen.getAllByRole('radio', { name: 'Year' })[0]);
+			const [first, second] = screen.getAllByTestId('line-chart');
+			// First is now yearly (one point per year), second stays per-month.
+			expect(JSON.parse(first.dataset.values!)[0]).toEqual([['2024', 30]]);
+			expect(JSON.parse(second.dataset.values!)[0]).toEqual(multiMonth[0].data);
 		});
 	});
 

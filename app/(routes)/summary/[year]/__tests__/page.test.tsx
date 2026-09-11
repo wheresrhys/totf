@@ -28,6 +28,13 @@ vi.mock('@/app/actions/period-totals', () => ({
 	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
 }));
 
+function renderSummaryYearPage(year = '2026', tabId?: string) {
+	return Page({
+		params: Promise.resolve({ year }),
+		...(tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) })
+	});
+}
+
 function buildDayStat(time_period: string) {
 	return {
 		species_name: null,
@@ -201,6 +208,53 @@ describe('/summary/[year]', () => {
 			await waitFor(() =>
 				expect(fetchPeriodTotalsMock).toHaveBeenCalledTimes(1)
 			);
+		});
+	});
+
+	describe('?tabId= query param (#804)', () => {
+		it('with no tabId, the existing default (Month totals) renders unchanged', async () => {
+			render(await renderSummaryYearPage());
+			await screen.findByRole('heading', { level: 1 });
+			expect(
+				screen
+					.getByRole('button', { name: 'Month totals' })
+					.getAttribute('aria-current')
+			).toBe('true');
+		});
+
+		it('?tabId=species-totals focuses the Species totals tab and loads its data without a click', async () => {
+			render(await renderSummaryYearPage('2026', 'species-totals'));
+			await screen.findByRole('heading', { level: 1 });
+			await waitFor(() => expect(fetchSpeciesDataMock).toHaveBeenCalled());
+			expect(
+				screen
+					.getByRole('button', { name: 'Species totals' })
+					.getAttribute('aria-current')
+			).toBe('true');
+		});
+
+		it.each([
+			['month-totals', 'Month totals'],
+			['session-totals', 'Session totals'],
+			['species-totals', 'Species totals']
+		])('?tabId=%s selects the %s tab', async (tabId, buttonName) => {
+			render(await renderSummaryYearPage('2026', tabId));
+			await screen.findByRole('heading', { level: 1 });
+			expect(
+				screen
+					.getByRole('button', { name: buttonName })
+					.getAttribute('aria-current')
+			).toBe('true');
+		});
+
+		it('?tabId=year-totals (real elsewhere, absent on this route) falls back to this route default', async () => {
+			render(await renderSummaryYearPage('2026', 'year-totals'));
+			await screen.findByRole('heading', { level: 1 });
+			expect(
+				screen
+					.getByRole('button', { name: 'Month totals' })
+					.getAttribute('aria-current')
+			).toBe('true');
 		});
 	});
 });

@@ -24,7 +24,6 @@ export type PeriodTotalsRow = {
 	postjuv: number;
 	adults: number;
 	unknownAge: number;
-	newYoung: number;
 };
 
 export function derivePeriodTotalsRowByBird(
@@ -42,18 +41,16 @@ export function derivePeriodTotalsRowByBird(
 		juvs: stat.juv_bird_count,
 		postjuv: stat.postjuv_bird_count,
 		adults: stat.adult_bird_count,
-		unknownAge: stat.unknown_age_bird_count,
-		newYoung: stat.new_young_bird_count
+		unknownAge: stat.unknown_age_bird_count
 	};
 }
 
 /**
  * Encounter-based sibling of `derivePeriodTotalsRowByBird` — same
  * `PeriodTotalsRow` shape, but age-bucket fields are sourced from the
- * `*_enc_count` columns. `new`/`newYoung` still read
- * `new_bird_count`/`new_young_bird_count` — no `*_enc_count` variant exists
- * for either, since both are identical to the bird-based count by
- * construction (see #601).
+ * `*_enc_count` columns. `new` still reads `new_bird_count` — no
+ * `*_enc_count` variant exists for it, since it's identical to the
+ * bird-based count by construction (see #601).
  */
 export function derivePeriodTotalsRowByEncounter(
 	stat: AggregateStatsResult
@@ -70,8 +67,7 @@ export function derivePeriodTotalsRowByEncounter(
 		juvs: stat.juv_enc_count,
 		postjuv: stat.postjuv_enc_count,
 		adults: stat.adult_enc_count,
-		unknownAge: stat.unknown_age_enc_count,
-		newYoung: stat.new_young_bird_count
+		unknownAge: stat.unknown_age_enc_count
 	};
 }
 

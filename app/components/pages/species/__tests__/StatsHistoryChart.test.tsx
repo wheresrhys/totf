@@ -3,11 +3,7 @@ import type {
 	AggregateStatsResult,
 	PopulationStatsResult
 } from '@/app/models/db';
-import {
-	getCounts,
-	getAgeSplit,
-	getYoungTrends
-} from '../StatsHistoryChart';
+import { getCounts, getAgeSplit, getYoungTrends } from '../StatsHistoryChart';
 
 // Minimal fixture builders — only the columns each mapper reads matter; the rest
 // are filled with 0 so a full composite-type row satisfies the (null-stripped)
@@ -167,7 +163,9 @@ describe('getYoungTrends', () => {
 
 	describe('Edge: all-zero period', () => {
 		it('still emits a 0 row for every series, including the client-side sums', () => {
-			const result = getYoungTrends([populationRow({ time_period: '2024-01-01' })]);
+			const result = getYoungTrends([
+				populationRow({ time_period: '2024-01-01' })
+			]);
 			for (const series of result) {
 				expect(series.data).toEqual([['2024-01-01', 0]]);
 			}

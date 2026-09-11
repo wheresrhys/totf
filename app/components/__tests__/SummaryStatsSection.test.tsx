@@ -14,7 +14,7 @@ afterEach(() => {
 
 describe('SummaryStatsSection', () => {
 	describe('Usual', () => {
-		it('renders all thirteen stat labels with their values from a populated row', () => {
+		it('renders all twelve stat labels with their values from a populated row', () => {
 			render(<SummaryStatsSection stats={populatedStats} />);
 			expect(screen.getByText('Sessions').nextSibling?.textContent).toBe('10');
 			expect(screen.getByText('Species').nextSibling?.textContent).toBe('8');
@@ -31,7 +31,6 @@ describe('SummaryStatsSection', () => {
 			expect(screen.getByText('Juvs').nextSibling?.textContent).toBe('15');
 			expect(screen.getByText('Postjuvs').nextSibling?.textContent).toBe('8');
 			expect(screen.getByText('Not aged').nextSibling?.textContent).toBe('5');
-			expect(screen.getByText('New young').nextSibling?.textContent).toBe('12');
 		});
 
 		it('computes Retraps as bird_count - new_bird_count', () => {
@@ -62,8 +61,7 @@ describe('SummaryStatsSection', () => {
 				'Juvs',
 				'Postjuvs',
 				'Adults',
-				'Not aged',
-				'New young'
+				'Not aged'
 			]);
 		});
 	});
@@ -84,7 +82,6 @@ describe('SummaryStatsSection', () => {
 			expect(screen.getByText('Juvs').nextSibling?.textContent).toBe('0');
 			expect(screen.getByText('Postjuvs').nextSibling?.textContent).toBe('0');
 			expect(screen.getByText('Not aged').nextSibling?.textContent).toBe('0');
-			expect(screen.getByText('New young').nextSibling?.textContent).toBe('0');
 		});
 
 		it('renders Retraps as 0 when every bird in the period is new (new_bird_count === bird_count)', () => {

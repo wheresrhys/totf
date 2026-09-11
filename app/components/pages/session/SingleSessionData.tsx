@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { type SessionEncounter } from '@/app/models/session';
 import { type NetRound } from '@/app/models/session-chronology';
 import { getAgeClass } from '@/app/models/encounter';
+import { resolveInitialTabId } from '@/lib/tab-query-param';
 export type SpeciesWithEncounters = {
 	species: string;
 	encounters: SessionEncounter[];
@@ -58,7 +59,6 @@ type RowModel = {
 	juvs: number;
 	postjuv: number;
 	unknownAge: number;
-	newYoung: number;
 	maxProvenAge: number;
 };
 
@@ -85,11 +85,6 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 		).length,
 		unknownAge: data.encounters.filter((encounter) => encounter.age_code === 2)
 			.length,
-		newYoung: data.encounters.filter(
-			(encounter) =>
-				encounter.record_type === 'N' &&
-				(encounter.age_code === 1 || encounter.age_code === 3)
-		).length,
 		maxProvenAge: Math.max(
 			...data.encounters.map((encounter) => encounter.bird.proven_age)
 		)
@@ -151,7 +146,8 @@ export function SessionTabs({
 	locationId,
 	date,
 	viewedGroupId,
-	oldestEncounter = null
+	oldestEncounter = null,
+	initialTabId
 }: {
 	speciesList: SpeciesWithEncounters[];
 	netRounds: NetRound[];
@@ -159,12 +155,8 @@ export function SessionTabs({
 	date: string;
 	viewedGroupId: number;
 	oldestEncounter?: SessionEncounter | null;
+	initialTabId?: string;
 }) {
-	const [loadedTabs, setLoadedTabs] = useState<Set<string>>(
-		new Set(['species'])
-	);
-	const [activeTab, setActiveTab] = useState('species');
-
 	const hasPulli = speciesList.some((speciesWithEncounters) =>
 		speciesWithEncounters.encounters.some(
 			(encounter) => getAgeClass(encounter) === 'pullus'
@@ -188,6 +180,23 @@ export function SessionTabs({
 	if (!locationId) {
 		tabNavConfig.push({ id: 'highlights', label: 'Highlights' });
 	}
+
+	// The `?tabId=` param (#803, applied here by #805) wins over the hardcoded
+	// 'species' default when it names one of this render's actual tabs (the
+	// `highlights` tab only exists when `!locationId` — see `tabNavConfig`
+	// above); an unknown/garbage value or no param at all falls back to
+	// 'species' unchanged.
+	const initialTab = resolveInitialTabId(
+		initialTabId,
+		tabNavConfig.map((tab) => tab.id),
+		'species'
+	);
+
+	const [loadedTabs, setLoadedTabs] = useState<Set<string>>(
+		new Set([initialTab])
+	);
+	const [activeTab, setActiveTab] = useState(initialTab);
+
 	return (
 		<>
 			<TabNav
