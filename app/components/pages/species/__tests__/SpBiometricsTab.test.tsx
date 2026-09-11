@@ -18,7 +18,8 @@ vi.mock('chartkick/chart.js', () => ({}));
 
 vi.mock('@/app/actions/sp-data', () => ({
 	getSpeciesStatsHistory: vi.fn(),
-	fetchGraphableEncounterData: vi.fn()
+	fetchGraphableEncounterData: vi.fn(),
+	getGroupEffortHistory: vi.fn()
 }));
 
 vi.mock('../StatsHistoryChart', () => ({
@@ -26,8 +27,21 @@ vi.mock('../StatsHistoryChart', () => ({
 }));
 
 vi.mock('@/app/components/YearComparisonTrendChart', () => ({
-	YearComparisonTrendChart: ({ series }: { series: unknown[] }) => (
-		<div data-testid="trend-chart" data-series-count={series.length} />
+	YearComparisonTrendChart: ({
+		series,
+		effortHistory,
+		compareYearsUrl
+	}: {
+		series: unknown[];
+		effortHistory?: { name: string; data: unknown[] } | null;
+		compareYearsUrl?: string;
+	}) => (
+		<div
+			data-testid="trend-chart"
+			data-series-count={series.length}
+			data-effort-history={effortHistory ? JSON.stringify(effortHistory) : ''}
+			data-compare-years-url={compareYearsUrl ?? ''}
+		/>
 	)
 }));
 
@@ -55,14 +69,18 @@ describe('SpBiometricsTab', () => {
 	});
 
 	beforeEach(async () => {
-		const { getSpeciesStatsHistory, fetchGraphableEncounterData } =
-			await loadActions();
+		const {
+			getSpeciesStatsHistory,
+			fetchGraphableEncounterData,
+			getGroupEffortHistory
+		} = await loadActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
 			[] as AggregateStatsResult[]
 		);
 		vi.mocked(fetchGraphableEncounterData).mockResolvedValue(
 			[] as SexedGraphableBird[]
 		);
+		vi.mocked(getGroupEffortHistory).mockResolvedValue([]);
 	});
 
 	describe('Usual: sentences render from speciesStats', () => {
@@ -83,8 +101,11 @@ describe('SpBiometricsTab', () => {
 
 	describe('Usual: initial collapsed grid', () => {
 		it('renders a text tile per chart and fetches nothing until a tile is expanded', async () => {
-			const { getSpeciesStatsHistory, fetchGraphableEncounterData } =
-				await loadActions();
+			const {
+				getSpeciesStatsHistory,
+				fetchGraphableEncounterData,
+				getGroupEffortHistory
+			} = await loadActions();
 			render(<SpBiometricsTab {...props} />);
 			expect(
 				screen.getByRole('button', { name: /Biometrics trends/ })
@@ -96,6 +117,7 @@ describe('SpBiometricsTab', () => {
 			expect(screen.queryByTestId('scatter-chart')).toBeNull();
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
 			expect(fetchGraphableEncounterData).not.toHaveBeenCalled();
+			expect(getGroupEffortHistory).not.toHaveBeenCalled();
 		});
 	});
 
@@ -118,12 +140,104 @@ describe('SpBiometricsTab', () => {
 				screen.getByRole('button', { name: 'Close Biometrics trends' })
 			).toBeDefined();
 		});
+
+		it('fetches effort history alongside stats history and passes it through to the trend chart', async () => {
+			const { getGroupEffortHistory } = await loadActions();
+			vi.mocked(getGroupEffortHistory).mockResolvedValue([['2024-01-01', 3.5]]);
+			render(<SpBiometricsTab {...props} />);
+			fireEvent.click(
+				screen.getByRole('button', { name: /Biometrics trends/ })
+			);
+			const chart = await screen.findByTestId('trend-chart');
+			expect(getGroupEffortHistory).toHaveBeenCalledTimes(1);
+			expect(getGroupEffortHistory).toHaveBeenCalledWith(1);
+			await waitFor(() =>
+				expect(chart.dataset.effortHistory).toEqual(
+					JSON.stringify({ name: 'effort', data: [['2024-01-01', 3.5]] })
+				)
+			);
+		});
+
+		it('does not re-call the effort-history fetcher on a collapse/re-expand cycle', async () => {
+			const { getGroupEffortHistory } = await loadActions();
+			render(<SpBiometricsTab {...props} />);
+			fireEvent.click(
+				screen.getByRole('button', { name: /Biometrics trends/ })
+			);
+			await screen.findByTestId('trend-chart');
+			fireEvent.click(
+				screen.getByRole('button', { name: 'Close Biometrics trends' })
+			);
+			await waitFor(() =>
+				expect(screen.queryByTestId('trend-chart')).toBeNull()
+			);
+			fireEvent.click(
+				screen.getByRole('button', { name: /Biometrics trends/ })
+			);
+			await screen.findByTestId('trend-chart');
+			expect(getGroupEffortHistory).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe('Structure: compareYearsUrl', () => {
+		it('is set to the Population tab (tabId=graphs) when the page is period-scoped', async () => {
+			render(
+				<SpBiometricsTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
+			);
+			fireEvent.click(
+				screen.getByRole('button', { name: /Biometrics trends/ })
+			);
+			const chart = await screen.findByTestId('trend-chart');
+			expect(chart.dataset.compareYearsUrl).toBe('/species/Robin?tabId=graphs');
+		});
+
+		it('is undefined on the all-time render (no fromDate/toDate)', async () => {
+			render(<SpBiometricsTab {...props} />);
+			fireEvent.click(
+				screen.getByRole('button', { name: /Biometrics trends/ })
+			);
+			const chart = await screen.findByTestId('trend-chart');
+			expect(chart.dataset.compareYearsUrl).toBe('');
+		});
+	});
+
+	describe('Edge: effort-history fetch failure/empty', () => {
+		it('still renders the trend chart once statsHistory resolves when the effort-history fetch rejects', async () => {
+			const { getGroupEffortHistory } = await loadActions();
+			vi.mocked(getGroupEffortHistory).mockRejectedValue(
+				new Error('effort history fetch failed')
+			);
+			render(<SpBiometricsTab {...props} />);
+			fireEvent.click(
+				screen.getByRole('button', { name: /Biometrics trends/ })
+			);
+			const chart = await screen.findByTestId('trend-chart');
+			expect(chart.dataset.effortHistory).toBe('');
+		});
+
+		it('passes an empty effort-history series through unchanged', async () => {
+			const { getGroupEffortHistory } = await loadActions();
+			vi.mocked(getGroupEffortHistory).mockResolvedValue([]);
+			render(<SpBiometricsTab {...props} />);
+			fireEvent.click(
+				screen.getByRole('button', { name: /Biometrics trends/ })
+			);
+			const chart = await screen.findByTestId('trend-chart');
+			await waitFor(() =>
+				expect(chart.dataset.effortHistory).toEqual(
+					JSON.stringify({ name: 'effort', data: [] })
+				)
+			);
+		});
 	});
 
 	describe('Structure: expanding the scatter tile', () => {
 		it('fetches graphable encounter data (not stats history) and renders the scatter chart', async () => {
-			const { getSpeciesStatsHistory, fetchGraphableEncounterData } =
-				await loadActions();
+			const {
+				getSpeciesStatsHistory,
+				fetchGraphableEncounterData,
+				getGroupEffortHistory
+			} = await loadActions();
 			render(<SpBiometricsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Wing vs weight/ }));
 			await screen.findByTestId('scatter-chart');
@@ -135,6 +249,7 @@ describe('SpBiometricsTab', () => {
 				undefined
 			);
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
+			expect(getGroupEffortHistory).not.toHaveBeenCalled();
 		});
 	});
 

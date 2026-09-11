@@ -21,7 +21,10 @@ async function getGroupIdByName(name: string): Promise<number> {
 		.select('id')
 		.eq('group_name', name)
 		.single();
-	if (error || !data) throw new Error(`Group "${name}" not found — run npm run db:seed:e2e first`);
+	if (error || !data)
+		throw new Error(
+			`Group "${name}" not found — run npm run db:seed:e2e first`
+		);
 	return data.id;
 }
 
@@ -38,7 +41,10 @@ async function getLocationIdByName(
 		.eq('location_name', name)
 		.eq('ringing_group_id', ringingGroupId)
 		.single();
-	if (error || !data) throw new Error(`Location "${name}" not found — run npm run db:seed:e2e first`);
+	if (error || !data)
+		throw new Error(
+			`Location "${name}" not found — run npm run db:seed:e2e first`
+		);
 	return data.id;
 }
 
@@ -52,17 +58,24 @@ const CES_2022_ENCOUNTERS = 30; // Apr–Aug 2022 only
 
 // Per-species aggregates for Alpha — reused across multiple tests
 const PER_SPECIES_AGGREGATES = {
-	'Blue Tit':     { encounter_count: 7,  bird_count: 6  },
-	'Kingfisher':   { encounter_count: 2,  bird_count: 1  },
+	'Blue Tit': { encounter_count: 7, bird_count: 6 },
+	Kingfisher: { encounter_count: 2, bird_count: 1 },
 	'Reed Warbler': { encounter_count: 15, bird_count: 15 },
-	'Robin':        { encounter_count: 31, bird_count: 23 },
-	'Wren':         { encounter_count: 2,  bird_count: 1  },
+	Robin: { encounter_count: 31, bird_count: 23 },
+	Wren: { encounter_count: 2, bird_count: 1 }
 } as const;
 
 const ARRETRAP_ENCOUNTERS = 9;
 const ARRETRAP_DATES = [
-	'2021-06-20', '2022-04-30', '2022-06-15', '2022-08-10',
-	'2022-10-20', '2023-05-12', '2023-07-08', '2023-09-14', '2024-05-10',
+	'2021-06-20',
+	'2022-04-30',
+	'2022-06-15',
+	'2022-08-10',
+	'2022-10-20',
+	'2023-05-12',
+	'2023-07-08',
+	'2023-09-14',
+	'2024-05-10'
 ];
 const ARRETRAP_PROVEN_AGE = 3;
 
@@ -82,14 +95,14 @@ describe('Postgres RPC integration tests', () => {
 		[alphaClient, betaClient, gammaClient] = await Promise.all([
 			getAuthenticatedSupabaseClientForGroup(alphaId),
 			getAuthenticatedSupabaseClientForGroup(betaId),
-			getAuthenticatedSupabaseClientForGroup(gammaId),
+			getAuthenticatedSupabaseClientForGroup(gammaId)
 		]);
 	});
 
 	describe('aggregate_stats', () => {
 		it('no filters returns total aggregate across all alpha data', async () => {
 			const { data, error } = await alphaClient.rpc('aggregate_stats', {
-				ringing_group_filter: alphaId,
+				ringing_group_filter: alphaId
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(1);
@@ -105,12 +118,14 @@ describe('Postgres RPC integration tests', () => {
 		it('species_name_filter=Robin returns single Robin aggregate', async () => {
 			const { data, error } = await alphaClient.rpc('aggregate_stats', {
 				ringing_group_filter: alphaId,
-				species_name_filter: 'Robin',
+				species_name_filter: 'Robin'
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(1);
 			const row = data![0];
-			expect(row.encounter_count).toBe(PER_SPECIES_AGGREGATES['Robin'].encounter_count);
+			expect(row.encounter_count).toBe(
+				PER_SPECIES_AGGREGATES['Robin'].encounter_count
+			);
 			expect(row.bird_count).toBe(PER_SPECIES_AGGREGATES['Robin'].bird_count);
 			expect(row.species_count).toBe(1);
 		});
@@ -119,7 +134,7 @@ describe('Postgres RPC integration tests', () => {
 			const { data, error } = await alphaClient.rpc('aggregate_stats', {
 				ringing_group_filter: alphaId,
 				from_date: '2022-04-01',
-				to_date: '2022-08-31',
+				to_date: '2022-08-31'
 			});
 			expect(error).toBeNull();
 			expect(data![0].encounter_count).toBe(CES_2022_ENCOUNTERS);
@@ -128,24 +143,34 @@ describe('Postgres RPC integration tests', () => {
 		it('group_by_species returns one row per species with correct counts', async () => {
 			const { data, error } = await alphaClient.rpc('aggregate_stats', {
 				ringing_group_filter: alphaId,
-				group_by_species: true,
+				group_by_species: true
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(ALPHA_SPECIES_COUNT);
-			const sorted = data!.slice().sort((a, b) => a.species_name.localeCompare(b.species_name));
+			const sorted = data!
+				.slice()
+				.sort((a, b) => a.species_name.localeCompare(b.species_name));
 			expect(
-				sorted.map((r) => ({ sp: r.species_name, enc: r.encounter_count, birds: r.bird_count }))
+				sorted.map((r) => ({
+					sp: r.species_name,
+					enc: r.encounter_count,
+					birds: r.bird_count
+				}))
 			).toEqual(
 				Object.entries(PER_SPECIES_AGGREGATES)
 					.sort(([a], [b]) => a.localeCompare(b))
-					.map(([sp, { encounter_count, bird_count }]) => ({ sp, enc: encounter_count, birds: bird_count }))
+					.map(([sp, { encounter_count, bird_count }]) => ({
+						sp,
+						enc: encounter_count,
+						birds: bird_count
+					}))
 			);
 		});
 
 		it('group_by_time_period=month returns one row per month (36 months Jun 2021–May 2024)', async () => {
 			const { data, error } = await alphaClient.rpc('aggregate_stats', {
 				ringing_group_filter: alphaId,
-				group_by_time_period: 'month',
+				group_by_time_period: 'month'
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(36);
@@ -157,12 +182,15 @@ describe('Postgres RPC integration tests', () => {
 		it('group_by_time_period=year returns one row per year with correct totals', async () => {
 			const { data, error } = await alphaClient.rpc('aggregate_stats', {
 				ringing_group_filter: alphaId,
-				group_by_time_period: 'year',
+				group_by_time_period: 'year'
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(4);
 			const byYear = Object.fromEntries(
-				data!.map((r) => [new Date(r.time_period).getFullYear(), r.encounter_count])
+				data!.map((r) => [
+					new Date(r.time_period).getFullYear(),
+					r.encounter_count
+				])
 			);
 			expect(byYear).toEqual({ 2021: 2, 2022: 35, 2023: 15, 2024: 5 });
 		});
@@ -225,7 +253,10 @@ describe('Postgres RPC integration tests', () => {
 				return data!.id;
 			}
 
-			async function insertBird(ringNo: string, speciesId: number): Promise<number> {
+			async function insertBird(
+				ringNo: string,
+				speciesId: number
+			): Promise<number> {
 				const { data, error } = await deltaClient
 					.from('Birds')
 					.insert({ ring_no: ringNo, species_id: speciesId })
@@ -240,7 +271,7 @@ describe('Postgres RPC integration tests', () => {
 				const { data, error } = await deltaClient.rpc('aggregate_stats', {
 					ringing_group_filter: deltaId,
 					from_date: fromDate,
-					to_date: toDate,
+					to_date: toDate
 				});
 				expect(error).toBeNull();
 				expect(data).toHaveLength(1);
@@ -270,32 +301,33 @@ describe('Postgres RPC integration tests', () => {
 				pulliTo = pu3;
 				pulliOnlyDate = addDays(base, 300); // disjoint from the PULLI mixed range
 
-				const [fieldObsLocation, fieldObsOnlyLocation, pulliLocation] = await Promise.all([
-					deltaClient
-						.from('Locations')
-						.insert({
-							location_name: `NonFG Agg FieldObs ${testSuffix}`,
-							ringing_group_id: deltaId,
-						})
-						.select('id')
-						.single(),
-					deltaClient
-						.from('Locations')
-						.insert({
-							location_name: `NonFG Agg FieldObsOnly ${testSuffix}`,
-							ringing_group_id: deltaId,
-						})
-						.select('id')
-						.single(),
-					deltaClient
-						.from('Locations')
-						.insert({
-							location_name: `NonFG Agg Pulli ${testSuffix}`,
-							ringing_group_id: deltaId,
-						})
-						.select('id')
-						.single(),
-				]);
+				const [fieldObsLocation, fieldObsOnlyLocation, pulliLocation] =
+					await Promise.all([
+						deltaClient
+							.from('Locations')
+							.insert({
+								location_name: `NonFG Agg FieldObs ${testSuffix}`,
+								ringing_group_id: deltaId
+							})
+							.select('id')
+							.single(),
+						deltaClient
+							.from('Locations')
+							.insert({
+								location_name: `NonFG Agg FieldObsOnly ${testSuffix}`,
+								ringing_group_id: deltaId
+							})
+							.select('id')
+							.single(),
+						deltaClient
+							.from('Locations')
+							.insert({
+								location_name: `NonFG Agg Pulli ${testSuffix}`,
+								ringing_group_id: deltaId
+							})
+							.select('id')
+							.single()
+					]);
 				if (fieldObsLocation.error) throw fieldObsLocation.error;
 				if (fieldObsOnlyLocation.error) throw fieldObsOnlyLocation.error;
 				if (pulliLocation.error) throw pulliLocation.error;
@@ -304,38 +336,95 @@ describe('Postgres RPC integration tests', () => {
 				pulliLocationId = pulliLocation.data!.id;
 
 				// FIELD_OBSERVATION scenario sessions.
-				const foReal1 = await insertSession(fieldObsLocationId, fo1, 'FULL_GROWN');
-				const foTwin = await insertSession(fieldObsLocationId, fo1, 'FIELD_OBSERVATION'); // same date/loc as foReal1
-				const foReal2 = await insertSession(fieldObsLocationId, fo2, 'FULL_GROWN');
-				const foStandalone = await insertSession(fieldObsLocationId, fo3, 'FIELD_OBSERVATION');
-				const foOnly = await insertSession(fieldObsOnlyLocationId, fieldObsOnlyDate, 'FIELD_OBSERVATION');
+				const foReal1 = await insertSession(
+					fieldObsLocationId,
+					fo1,
+					'FULL_GROWN'
+				);
+				const foTwin = await insertSession(
+					fieldObsLocationId,
+					fo1,
+					'FIELD_OBSERVATION'
+				); // same date/loc as foReal1
+				const foReal2 = await insertSession(
+					fieldObsLocationId,
+					fo2,
+					'FULL_GROWN'
+				);
+				const foStandalone = await insertSession(
+					fieldObsLocationId,
+					fo3,
+					'FIELD_OBSERVATION'
+				);
+				const foOnly = await insertSession(
+					fieldObsOnlyLocationId,
+					fieldObsOnlyDate,
+					'FIELD_OBSERVATION'
+				);
 				// PULLI scenario sessions.
 				const puReal1 = await insertSession(pulliLocationId, pu1, 'FULL_GROWN');
 				const puTwin = await insertSession(pulliLocationId, pu1, 'PULLI'); // same date/loc as puReal1
 				const puReal2 = await insertSession(pulliLocationId, pu2, 'FULL_GROWN');
 				const puStandalone = await insertSession(pulliLocationId, pu3, 'PULLI');
-				const puOnly = await insertSession(pulliLocationId, pulliOnlyDate, 'PULLI');
+				const puOnly = await insertSession(
+					pulliLocationId,
+					pulliOnlyDate,
+					'PULLI'
+				);
 
-				const [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15, b16] =
-					await Promise.all([
-						insertBird(`RAGG-FO-N1-${testSuffix}`, robinId),
-						insertBird(`RAGG-FO-N2-${testSuffix}`, robinId),
-						insertBird(`RAGG-FO-N3-${testSuffix}`, robinId),
-						insertBird(`RAGG-FO-N4-${testSuffix}`, robinId),
-						insertBird(`RAGG-FO-W1-${testSuffix}`, wrenId),
-						insertBird(`RAGG-FO-W2-${testSuffix}`, wrenId),
-						insertBird(`RAGG-FO-W3-${testSuffix}`, wrenId),
-						insertBird(`RAGG-FO-W4-${testSuffix}`, wrenId),
-						insertBird(`RAGG-PU-N1-${testSuffix}`, robinId),
-						insertBird(`RAGG-PU-N2-${testSuffix}`, robinId),
-						insertBird(`RAGG-PU-N3-${testSuffix}`, robinId),
-						insertBird(`RAGG-PU-N4-${testSuffix}`, robinId),
-						insertBird(`RAGG-PU-W1-${testSuffix}`, wrenId),
-						insertBird(`RAGG-PU-W2-${testSuffix}`, wrenId),
-						insertBird(`RAGG-PU-W3-${testSuffix}`, wrenId),
-						insertBird(`RAGG-PU-W4-${testSuffix}`, wrenId),
-					]);
-				birdIds = [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15, b16];
+				const [
+					b1,
+					b2,
+					b3,
+					b4,
+					b5,
+					b6,
+					b7,
+					b8,
+					b9,
+					b10,
+					b11,
+					b12,
+					b13,
+					b14,
+					b15,
+					b16
+				] = await Promise.all([
+					insertBird(`RAGG-FO-N1-${testSuffix}`, robinId),
+					insertBird(`RAGG-FO-N2-${testSuffix}`, robinId),
+					insertBird(`RAGG-FO-N3-${testSuffix}`, robinId),
+					insertBird(`RAGG-FO-N4-${testSuffix}`, robinId),
+					insertBird(`RAGG-FO-W1-${testSuffix}`, wrenId),
+					insertBird(`RAGG-FO-W2-${testSuffix}`, wrenId),
+					insertBird(`RAGG-FO-W3-${testSuffix}`, wrenId),
+					insertBird(`RAGG-FO-W4-${testSuffix}`, wrenId),
+					insertBird(`RAGG-PU-N1-${testSuffix}`, robinId),
+					insertBird(`RAGG-PU-N2-${testSuffix}`, robinId),
+					insertBird(`RAGG-PU-N3-${testSuffix}`, robinId),
+					insertBird(`RAGG-PU-N4-${testSuffix}`, robinId),
+					insertBird(`RAGG-PU-W1-${testSuffix}`, wrenId),
+					insertBird(`RAGG-PU-W2-${testSuffix}`, wrenId),
+					insertBird(`RAGG-PU-W3-${testSuffix}`, wrenId),
+					insertBird(`RAGG-PU-W4-${testSuffix}`, wrenId)
+				]);
+				birdIds = [
+					b1,
+					b2,
+					b3,
+					b4,
+					b5,
+					b6,
+					b7,
+					b8,
+					b9,
+					b10,
+					b11,
+					b12,
+					b13,
+					b14,
+					b15,
+					b16
+				];
 
 				const base_ = { scheme: 'BTO', sex: 'M', age_code: 1, weight: 15 };
 				const { error: encountersError } = await deltaClient
@@ -343,34 +432,130 @@ describe('Postgres RPC integration tests', () => {
 					.insert([
 						// --- FIELD_OBSERVATION scenario ---
 						// foReal1 (fo1): three new (N) Robin encounters spanning 09:00–12:00 → 3h effort.
-						{ ...base_, bird_id: b1, session_id: foReal1, record_type: 'N', capture_time: '09:00:00' },
-						{ ...base_, bird_id: b2, session_id: foReal1, record_type: 'N', capture_time: '10:00:00' },
-						{ ...base_, bird_id: b3, session_id: foReal1, record_type: 'N', capture_time: '12:00:00' },
+						{
+							...base_,
+							bird_id: b1,
+							session_id: foReal1,
+							record_type: 'N',
+							capture_time: '09:00:00'
+						},
+						{
+							...base_,
+							bird_id: b2,
+							session_id: foReal1,
+							record_type: 'N',
+							capture_time: '10:00:00'
+						},
+						{
+							...base_,
+							bird_id: b3,
+							session_id: foReal1,
+							record_type: 'N',
+							capture_time: '12:00:00'
+						},
 						// foReal2 (fo2): one new (N) Robin encounter → clamped to 2h minimum effort.
-						{ ...base_, bird_id: b4, session_id: foReal2, record_type: 'N', capture_time: '10:00:00' },
+						{
+							...base_,
+							bird_id: b4,
+							session_id: foReal2,
+							record_type: 'N',
+							capture_time: '10:00:00'
+						},
 						// foTwin (fo1, same location): a passive field observation (C) Wren — an early
 						// capture_time that must NOT stretch foReal1's effort span.
-						{ ...base_, bird_id: b5, session_id: foTwin, record_type: 'C', capture_time: '05:00:00' },
+						{
+							...base_,
+							bird_id: b5,
+							session_id: foTwin,
+							record_type: 'C',
+							capture_time: '05:00:00'
+						},
 						// foStandalone (fo3): a passive field observation (D) Wren on its own date.
-						{ ...base_, bird_id: b6, session_id: foStandalone, record_type: 'D', capture_time: '20:00:00' },
+						{
+							...base_,
+							bird_id: b6,
+							session_id: foStandalone,
+							record_type: 'D',
+							capture_time: '20:00:00'
+						},
 						// foOnly range: two passive field observations (C) Wrens, nothing else.
-						{ ...base_, bird_id: b7, session_id: foOnly, record_type: 'C', capture_time: '08:00:00' },
-						{ ...base_, bird_id: b8, session_id: foOnly, record_type: 'C', capture_time: '09:00:00' },
+						{
+							...base_,
+							bird_id: b7,
+							session_id: foOnly,
+							record_type: 'C',
+							capture_time: '08:00:00'
+						},
+						{
+							...base_,
+							bird_id: b8,
+							session_id: foOnly,
+							record_type: 'C',
+							capture_time: '09:00:00'
+						},
 						// --- PULLI scenario (mirrors the above, but PULLI encounters are new-ring N) ---
 						// puReal1 (pu1): three new (N) Robin encounters spanning 09:00–12:00 → 3h effort.
-						{ ...base_, bird_id: b9, session_id: puReal1, record_type: 'N', capture_time: '09:00:00' },
-						{ ...base_, bird_id: b10, session_id: puReal1, record_type: 'N', capture_time: '10:00:00' },
-						{ ...base_, bird_id: b11, session_id: puReal1, record_type: 'N', capture_time: '12:00:00' },
+						{
+							...base_,
+							bird_id: b9,
+							session_id: puReal1,
+							record_type: 'N',
+							capture_time: '09:00:00'
+						},
+						{
+							...base_,
+							bird_id: b10,
+							session_id: puReal1,
+							record_type: 'N',
+							capture_time: '10:00:00'
+						},
+						{
+							...base_,
+							bird_id: b11,
+							session_id: puReal1,
+							record_type: 'N',
+							capture_time: '12:00:00'
+						},
 						// puReal2 (pu2): one new (N) Robin encounter → clamped to 2h minimum effort.
-						{ ...base_, bird_id: b12, session_id: puReal2, record_type: 'N', capture_time: '10:00:00' },
+						{
+							...base_,
+							bird_id: b12,
+							session_id: puReal2,
+							record_type: 'N',
+							capture_time: '10:00:00'
+						},
 						// puTwin (pu1, same location): a PULLI new-ring (N) Wren — an early capture_time
 						// that must NOT stretch puReal1's effort span, but DOES count in new_bird_count.
-						{ ...base_, bird_id: b13, session_id: puTwin, record_type: 'N', capture_time: '05:00:00' },
+						{
+							...base_,
+							bird_id: b13,
+							session_id: puTwin,
+							record_type: 'N',
+							capture_time: '05:00:00'
+						},
 						// puStandalone (pu3): a PULLI new-ring (N) Wren on its own date.
-						{ ...base_, bird_id: b14, session_id: puStandalone, record_type: 'N', capture_time: '20:00:00' },
+						{
+							...base_,
+							bird_id: b14,
+							session_id: puStandalone,
+							record_type: 'N',
+							capture_time: '20:00:00'
+						},
 						// puOnly range: two PULLI new-ring (N) Wrens, nothing else.
-						{ ...base_, bird_id: b15, session_id: puOnly, record_type: 'N', capture_time: '08:00:00' },
-						{ ...base_, bird_id: b16, session_id: puOnly, record_type: 'N', capture_time: '09:00:00' },
+						{
+							...base_,
+							bird_id: b15,
+							session_id: puOnly,
+							record_type: 'N',
+							capture_time: '08:00:00'
+						},
+						{
+							...base_,
+							bird_id: b16,
+							session_id: puOnly,
+							record_type: 'N',
+							capture_time: '09:00:00'
+						}
 					]);
 				if (encountersError) throw encountersError;
 			});
@@ -579,7 +764,7 @@ describe('Postgres RPC integration tests', () => {
 						.from('Locations')
 						.insert({
 							location_name: `Age Bucket Test Location ${testSuffix}-${i}`,
-							ringing_group_id: deltaId,
+							ringing_group_id: deltaId
 						})
 						.select('id')
 						.single();
@@ -608,11 +793,18 @@ describe('Postgres RPC integration tests', () => {
 				async function addBird(
 					date: string,
 					speciesId: number,
-					encounters: Array<{ age_code: number; is_juv: boolean; record_type: string }>
+					encounters: Array<{
+						age_code: number;
+						is_juv: boolean;
+						record_type: string;
+					}>
 				) {
 					const { data: bird, error: birdError } = await deltaClient
 						.from('Birds')
-						.insert({ ring_no: `BKT-${testSuffix}-${ringCounter++}`, species_id: speciesId })
+						.insert({
+							ring_no: `BKT-${testSuffix}-${ringCounter++}`,
+							species_id: speciesId
+						})
 						.select('id')
 						.single();
 					if (birdError) throw birdError;
@@ -627,62 +819,74 @@ describe('Postgres RPC integration tests', () => {
 							sex: 'M',
 							session_id: sessionId,
 							bird_id: bird!.id,
-							...encounters[i],
+							...encounters[i]
 						});
 					}
-					const { error: encountersError } = await deltaClient.from('Encounters').insert(rows);
+					const { error: encountersError } = await deltaClient
+						.from('Encounters')
+						.insert(rows);
 					if (encountersError) throw encountersError;
 				}
 
 				// Single-bucket birds, each on its own date.
 				dates.pullusOnly = addDays(base, 0);
-				await addBird(dates.pullusOnly, robin!.id, [{ ...PULLUS, record_type: 'N' }]);
+				await addBird(dates.pullusOnly, robin!.id, [
+					{ ...PULLUS, record_type: 'N' }
+				]);
 				dates.juv1J = addDays(base, 1);
 				await addBird(dates.juv1J, robin!.id, [{ ...AGE1J, record_type: 'N' }]);
 				dates.juv3J = addDays(base, 2);
 				await addBird(dates.juv3J, robin!.id, [{ ...AGE3J, record_type: 'N' }]);
 				dates.postjuvOnly = addDays(base, 3);
-				await addBird(dates.postjuvOnly, robin!.id, [{ ...POSTJUV, record_type: 'N' }]);
+				await addBird(dates.postjuvOnly, robin!.id, [
+					{ ...POSTJUV, record_type: 'N' }
+				]);
 				dates.adultOnly = addDays(base, 4);
-				await addBird(dates.adultOnly, robin!.id, [{ ...ADULT, record_type: 'R' }]);
+				await addBird(dates.adultOnly, robin!.id, [
+					{ ...ADULT, record_type: 'R' }
+				]);
 				dates.onlyTwo = addDays(base, 5);
-				await addBird(dates.onlyTwo, robin!.id, [{ ...AGE2, record_type: 'R' }]);
+				await addBird(dates.onlyTwo, robin!.id, [
+					{ ...AGE2, record_type: 'R' }
+				]);
 
 				// Conflict birds resolving via the precedence rules.
 				dates.juvWinsPostjuv = addDays(base, 6);
 				await addBird(dates.juvWinsPostjuv, robin!.id, [
 					{ ...POSTJUV, record_type: 'R' },
-					{ ...AGE3J, record_type: 'R' },
+					{ ...AGE3J, record_type: 'R' }
 				]);
 				dates.juvPlusAdult = addDays(base, 7);
 				await addBird(dates.juvPlusAdult, robin!.id, [
 					{ ...AGE1J, record_type: 'R' },
-					{ ...ADULT, record_type: 'R' },
+					{ ...ADULT, record_type: 'R' }
 				]);
 				dates.postjuvPlusAdult = addDays(base, 8);
 				await addBird(dates.postjuvPlusAdult, robin!.id, [
 					{ ...POSTJUV, record_type: 'R' },
-					{ ...ADULT, record_type: 'R' },
+					{ ...ADULT, record_type: 'R' }
 				]);
 				dates.pullusPlusAdult = addDays(base, 9);
 				await addBird(dates.pullusPlusAdult, robin!.id, [
 					{ ...PULLUS, record_type: 'R' },
-					{ ...ADULT, record_type: 'R' },
+					{ ...ADULT, record_type: 'R' }
 				]);
 				dates.pullusPlusJuv = addDays(base, 10);
 				await addBird(dates.pullusPlusJuv, robin!.id, [
 					{ ...PULLUS, record_type: 'R' },
-					{ ...AGE1J, record_type: 'R' },
+					{ ...AGE1J, record_type: 'R' }
 				]);
 
 				// new_young_bird_count edge birds.
 				dates.retrapYoung = addDays(base, 11);
-				await addBird(dates.retrapYoung, robin!.id, [{ ...AGE1J, record_type: 'R' }]);
+				await addBird(dates.retrapYoung, robin!.id, [
+					{ ...AGE1J, record_type: 'R' }
+				]);
 				dates.splitNew = addDays(base, 12);
 				// Young via a retrap 1J row; New via a separate age-2 row — different rows.
 				await addBird(dates.splitNew, robin!.id, [
 					{ ...AGE1J, record_type: 'R' },
-					{ ...AGE2, record_type: 'N' },
+					{ ...AGE2, record_type: 'N' }
 				]);
 
 				// group_by_species isolation: a Robin juv and a Wren juv on the same date.
@@ -710,7 +914,7 @@ describe('Postgres RPC integration tests', () => {
 				const { data, error } = await deltaClient.rpc('aggregate_stats', {
 					ringing_group_filter: deltaId,
 					from_date: date,
-					to_date: date,
+					to_date: date
 				});
 				expect(error).toBeNull();
 				expect(data).toHaveLength(1);
@@ -728,7 +932,7 @@ describe('Postgres RPC integration tests', () => {
 					juv_bird_count: 0,
 					postjuv_bird_count: 0,
 					adult_bird_count: 0,
-					unknown_age_bird_count: 0,
+					unknown_age_bird_count: 0
 				});
 			});
 
@@ -740,7 +944,7 @@ describe('Postgres RPC integration tests', () => {
 					juv_bird_count: 1,
 					postjuv_bird_count: 0,
 					adult_bird_count: 0,
-					unknown_age_bird_count: 0,
+					unknown_age_bird_count: 0
 				});
 			});
 
@@ -752,7 +956,7 @@ describe('Postgres RPC integration tests', () => {
 					juv_bird_count: 0,
 					postjuv_bird_count: 1,
 					adult_bird_count: 0,
-					unknown_age_bird_count: 0,
+					unknown_age_bird_count: 0
 				});
 			});
 
@@ -764,7 +968,7 @@ describe('Postgres RPC integration tests', () => {
 					juv_bird_count: 0,
 					postjuv_bird_count: 0,
 					adult_bird_count: 1,
-					unknown_age_bird_count: 0,
+					unknown_age_bird_count: 0
 				});
 			});
 
@@ -792,13 +996,17 @@ describe('Postgres RPC integration tests', () => {
 					juv_bird_count: 0,
 					postjuv_bird_count: 0,
 					adult_bird_count: 0,
-					unknown_age_bird_count: 1,
+					unknown_age_bird_count: 1
 				});
 			});
 
 			it('a bird recorded as both bare age-3 and 3J in the same group counts in juv_bird_count, not postjuv_bird_count — juv wins over postjuv', async () => {
 				const row = await bucketRow(dates.juvWinsPostjuv);
-				expect(row).toMatchObject({ bird_count: 1, juv_bird_count: 1, postjuv_bird_count: 0 });
+				expect(row).toMatchObject({
+					bird_count: 1,
+					juv_bird_count: 1,
+					postjuv_bird_count: 0
+				});
 			});
 
 			it('a bird with both a juv-indicating and an adult-indicating encounter in the same group counts in unknown_age_bird_count', async () => {
@@ -807,7 +1015,7 @@ describe('Postgres RPC integration tests', () => {
 					bird_count: 1,
 					juv_bird_count: 0,
 					adult_bird_count: 0,
-					unknown_age_bird_count: 1,
+					unknown_age_bird_count: 1
 				});
 			});
 
@@ -817,7 +1025,7 @@ describe('Postgres RPC integration tests', () => {
 					bird_count: 1,
 					postjuv_bird_count: 0,
 					adult_bird_count: 0,
-					unknown_age_bird_count: 1,
+					unknown_age_bird_count: 1
 				});
 			});
 
@@ -827,13 +1035,17 @@ describe('Postgres RPC integration tests', () => {
 					bird_count: 1,
 					pullus_bird_count: 1,
 					adult_bird_count: 0,
-					unknown_age_bird_count: 0,
+					unknown_age_bird_count: 0
 				});
 			});
 
 			it('a bird with both a pullus-indicating and a juv-indicating encounter in the same group counts in pullus_bird_count, not juv_bird_count — pullus always wins', async () => {
 				const row = await bucketRow(dates.pullusPlusJuv);
-				expect(row).toMatchObject({ bird_count: 1, pullus_bird_count: 1, juv_bird_count: 0 });
+				expect(row).toMatchObject({
+					bird_count: 1,
+					pullus_bird_count: 1,
+					juv_bird_count: 0
+				});
 			});
 
 			it('a retrap (record_type != N) young-bucket bird is excluded from new_young_bird_count despite being in pullus_bird_count/juv_bird_count/postjuv_bird_count', async () => {
@@ -863,7 +1075,7 @@ describe('Postgres RPC integration tests', () => {
 				const { data, error } = await deltaClient.rpc('aggregate_stats', {
 					ringing_group_filter: deltaId,
 					from_date: base,
-					to_date: addDays(base, 13),
+					to_date: addDays(base, 13)
 				});
 				expect(error).toBeNull();
 				const row = data![0];
@@ -891,7 +1103,7 @@ describe('Postgres RPC integration tests', () => {
 					postjuv_bird_count: 0,
 					adult_bird_count: 0,
 					unknown_age_bird_count: 0,
-					new_young_bird_count: 0,
+					new_young_bird_count: 0
 				});
 			});
 
@@ -900,7 +1112,7 @@ describe('Postgres RPC integration tests', () => {
 					ringing_group_filter: deltaId,
 					group_by_species: true,
 					from_date: speciesDate,
-					to_date: speciesDate,
+					to_date: speciesDate
 				});
 				expect(error).toBeNull();
 				const robinRow = data!.find((r) => r.species_name === 'Robin');
@@ -914,11 +1126,15 @@ describe('Postgres RPC integration tests', () => {
 					ringing_group_filter: deltaId,
 					group_by_time_period: 'month',
 					from_date: tpJuvDate,
-					to_date: tpAdultDate,
+					to_date: tpAdultDate
 				});
 				expect(error).toBeNull();
-				const juvMonth = data!.find((r) => r.time_period === monthOf(tpJuvDate));
-				const adultMonth = data!.find((r) => r.time_period === monthOf(tpAdultDate));
+				const juvMonth = data!.find(
+					(r) => r.time_period === monthOf(tpJuvDate)
+				);
+				const adultMonth = data!.find(
+					(r) => r.time_period === monthOf(tpAdultDate)
+				);
 				expect(juvMonth!.juv_bird_count).toBe(1);
 				expect(adultMonth!.juv_bird_count).toBe(0);
 				expect(adultMonth!.adult_bird_count).toBe(1);
@@ -936,7 +1152,7 @@ describe('Postgres RPC integration tests', () => {
 					const { data, error } = await deltaClient.rpc('aggregate_stats', {
 						ringing_group_filter: deltaId,
 						from_date: dates.pullusOnly,
-						to_date: dates.onlyTwo,
+						to_date: dates.onlyTwo
 					});
 					expect(error).toBeNull();
 					const row = data![0];
@@ -1004,11 +1220,13 @@ describe('Postgres RPC integration tests', () => {
 			it("returns one row per distinct visit date, matching Alpha's known session dates", async () => {
 				const { data, error } = await alphaClient.rpc('aggregate_stats', {
 					ringing_group_filter: alphaId,
-					group_by_time_period: 'day',
+					group_by_time_period: 'day'
 				});
 				expect(error).toBeNull();
 				expect(data).toHaveLength(ARRETRAP_DATES.length);
-				expect(data!.map((r) => r.time_period).sort()).toEqual([...ARRETRAP_DATES].sort());
+				expect(data!.map((r) => r.time_period).sort()).toEqual(
+					[...ARRETRAP_DATES].sort()
+				);
 			});
 
 			it('day-grouped session_count and encounter_count for a given date match the corresponding month-grouped row filtered to that single day', async () => {
@@ -1017,17 +1235,19 @@ describe('Postgres RPC integration tests', () => {
 				const [dayRes, monthRes] = await Promise.all([
 					alphaClient.rpc('aggregate_stats', {
 						ringing_group_filter: alphaId,
-						group_by_time_period: 'day',
+						group_by_time_period: 'day'
 					}),
 					alphaClient.rpc('aggregate_stats', {
 						ringing_group_filter: alphaId,
-						group_by_time_period: 'month',
-					}),
+						group_by_time_period: 'month'
+					})
 				]);
 				expect(dayRes.error).toBeNull();
 				expect(monthRes.error).toBeNull();
 				const dayRow = dayRes.data!.find((r) => r.time_period === '2022-04-30');
-				const monthRow = monthRes.data!.find((r) => r.time_period === '2022-04-01');
+				const monthRow = monthRes.data!.find(
+					(r) => r.time_period === '2022-04-01'
+				);
 				expect(dayRow!.session_count).toBe(monthRow!.session_count);
 				expect(dayRow!.encounter_count).toBe(monthRow!.encounter_count);
 			});
@@ -1036,11 +1256,13 @@ describe('Postgres RPC integration tests', () => {
 			it('a date with no session is absent from the results (spine only covers min..max date range, not every calendar day)', async () => {
 				const { data, error } = await alphaClient.rpc('aggregate_stats', {
 					ringing_group_filter: alphaId,
-					group_by_time_period: 'day',
+					group_by_time_period: 'day'
 				});
 				expect(error).toBeNull();
 				// 2022-04-15 falls inside Alpha's date range but has no session.
-				expect(data!.find((r) => r.time_period === '2022-04-15')).toBeUndefined();
+				expect(
+					data!.find((r) => r.time_period === '2022-04-15')
+				).toBeUndefined();
 			});
 
 			// Edge
@@ -1049,7 +1271,7 @@ describe('Postgres RPC integration tests', () => {
 					ringing_group_filter: alphaId,
 					group_by_time_period: 'day',
 					from_date: '2022-04-30',
-					to_date: '2022-04-30',
+					to_date: '2022-04-30'
 				});
 				expect(error).toBeNull();
 				expect(data).toHaveLength(1);
@@ -1059,12 +1281,705 @@ describe('Postgres RPC integration tests', () => {
 			it('an out-of-range group_by_time_period value (anything other than day/month/year) still falls back to the existing ungrouped NULL time_period behaviour', async () => {
 				const { data, error } = await alphaClient.rpc('aggregate_stats', {
 					ringing_group_filter: alphaId,
-					group_by_time_period: 'week',
+					group_by_time_period: 'week'
 				});
 				expect(error).toBeNull();
 				expect(data).toHaveLength(1);
 				expect(data![0].time_period).toBeNull();
 				expect(data![0].encounter_count).toBe(ALPHA_TOTAL_ENCOUNTERS);
+			});
+		});
+	});
+	describe('population_stats', () => {
+		// Age-split subsets of adult_bird_count (#800): new_adult_bird_count /
+		// first_summer_bird_count / old_timers_bird_count. These partition the adult bucket
+		// by each bird's LIFETIME history with the ringing group (unwindowed), so every
+		// bird carries encounters in earlier calendar years that sit OUTSIDE the query
+		// window but still drive its classification. Each bird's "this period" adult
+		// encounter is on its own random far-future date; an ungrouped from=to=date query
+		// then returns exactly that one bird, and period_year resolves (via the
+		// time_period-IS-NULL fallback rule) to that date's calendar year. Prior-year
+		// encounters hang off the same bird on dates in (year-1)/(year-2) and never appear
+		// in any query window, so they never pollute a cell — they only set
+		// bird_first_year and the (period_year-1) majority vote. All rows randomised per
+		// run so concurrent worktrees (shared local Supabase) never combine.
+		describe('age split (new_adult_bird_count / first_summer_bird_count / old_timers_bird_count)', () => {
+			let deltaId: number;
+			let deltaClient: SupabaseClient;
+			const locationIds: number[] = [];
+			const sessionIds: number[] = [];
+			const birdIds: number[] = [];
+			// Alpha-owned rows for the multi-group isolation case (cleaned up too).
+			const alphaLocationIds: number[] = [];
+			const alphaSessionIds: number[] = [];
+
+			const ADULT = { age_code: 4, is_juv: false };
+			const AGE1J = { age_code: 1, is_juv: true };
+			const AGE3J = { age_code: 3, is_juv: true };
+
+			type EncInput = {
+				date: string;
+				age_code: number;
+				is_juv: boolean;
+				record_type: string;
+			};
+
+			// Scenario "this period" query dates (each bird gets its own).
+			let naDate: string; // new_adult
+			let fsDate: string; // first_summer
+			let oldTimersDate: string; // old timers (adult returner)
+			let tieDate: string; // old timers via a prior-year tie
+			let gapDate: string; // old timers via no prior-year encounters
+			let juvDate: string; // adult-split-excluded (juv bucket this period)
+			let mgDate: string; // multi-group isolation
+
+			const yearOf = (d: string) => parseInt(d.slice(0, 4), 10);
+
+			beforeAll(async () => {
+				deltaId = await getGroupIdByName('Delta');
+				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+				const testSuffix = randomTestSuffix();
+				const base = randomFutureDate();
+
+				const { data: robin } = await supabase
+					.from('Species')
+					.select('id')
+					.eq('species_name', 'Robin')
+					.single();
+				const robinId = robin!.id;
+
+				// One Delta location; one Alpha location for the cross-group bird.
+				const { data: deltaLoc, error: dLocErr } = await deltaClient
+					.from('Locations')
+					.insert({
+						location_name: `Age Split Delta Loc ${testSuffix}`,
+						ringing_group_id: deltaId
+					})
+					.select('id')
+					.single();
+				if (dLocErr) throw dLocErr;
+				locationIds.push(deltaLoc!.id);
+				const deltaLocId = deltaLoc!.id;
+
+				const { data: alphaLoc, error: aLocErr } = await alphaClient
+					.from('Locations')
+					.insert({
+						location_name: `Age Split Alpha Loc ${testSuffix}`,
+						ringing_group_id: alphaId
+					})
+					.select('id')
+					.single();
+				if (aLocErr) throw aLocErr;
+				alphaLocationIds.push(alphaLoc!.id);
+				const alphaLocId = alphaLoc!.id;
+
+				// One shared session per (client, date, location).
+				const sessionCache = new Map<string, number>();
+				async function getSession(
+					client: SupabaseClient,
+					date: string,
+					locationId: number,
+					track: number[]
+				) {
+					const key = `${date}|${locationId}`;
+					const cached = sessionCache.get(key);
+					if (cached !== undefined) return cached;
+					const { data: session, error } = await client
+						.from('Sessions')
+						.insert({ visit_date: date, location_id: locationId })
+						.select('id')
+						.single();
+					if (error) throw error;
+					sessionCache.set(key, session!.id);
+					track.push(session!.id);
+					return session!.id;
+				}
+
+				let ringCounter = 0;
+				async function insertEncounter(
+					client: SupabaseClient,
+					bird_id: number,
+					sessionId: number,
+					enc: { age_code: number; is_juv: boolean; record_type: string }
+				) {
+					const { error } = await client.from('Encounters').insert({
+						capture_time: '10:00:00',
+						scheme: 'BTO',
+						sex: 'M',
+						session_id: sessionId,
+						bird_id,
+						age_code: enc.age_code,
+						is_juv: enc.is_juv,
+						record_type: enc.record_type
+					});
+					if (error) throw error;
+				}
+
+				// Insert a Delta-owned bird with the given Delta encounters.
+				async function addBird(encounters: EncInput[]): Promise<number> {
+					const { data: bird, error } = await deltaClient
+						.from('Birds')
+						.insert({
+							ring_no: `SPLIT-${testSuffix}-${ringCounter++}`,
+							species_id: robinId
+						})
+						.select('id')
+						.single();
+					if (error) throw error;
+					birdIds.push(bird!.id);
+					for (const e of encounters) {
+						const sessionId = await getSession(
+							deltaClient,
+							e.date,
+							deltaLocId,
+							sessionIds
+						);
+						await insertEncounter(deltaClient, bird!.id, sessionId, e);
+					}
+					return bird!.id;
+				}
+
+				// new_adult: first-ever (and only) encounter is this period year, as adult.
+				naDate = addDays(base, 0);
+				await addBird([{ date: naDate, ...ADULT, record_type: 'N' }]);
+
+				// first_summer: first-ever year earlier; a strict majority of the bird's
+				// (period_year - 1) encounters were at age_code IN (1,3); adult this period.
+				fsDate = addDays(base, 1);
+				const fsPy = yearOf(fsDate) - 1;
+				await addBird([
+					{ date: `${fsPy}-05-10`, ...AGE1J, record_type: 'N' },
+					{ date: `${fsPy}-05-11`, ...AGE3J, record_type: 'R' },
+					{ date: fsDate, ...ADULT, record_type: 'R' }
+				]);
+
+				// old timers: first-ever year earlier; (period_year - 1) majority NOT age_code
+				// IN (1,3) (adult retraps); adult this period.
+				oldTimersDate = addDays(base, 2);
+				const oldPy = yearOf(oldTimersDate) - 1;
+				await addBird([
+					{ date: `${oldPy}-05-10`, ...ADULT, record_type: 'R' },
+					{ date: `${oldPy}-05-11`, ...ADULT, record_type: 'R' },
+					{ date: oldTimersDate, ...ADULT, record_type: 'R' }
+				]);
+
+				// old timers via a tie: (period_year - 1) exactly one age_code IN (1,3) and one
+				// not — a tie falls to old timers, not first_summer.
+				tieDate = addDays(base, 100);
+				const tiePy = yearOf(tieDate) - 1;
+				await addBird([
+					{ date: `${tiePy}-05-10`, ...AGE1J, record_type: 'R' },
+					{ date: `${tiePy}-05-11`, ...ADULT, record_type: 'R' },
+					{ date: tieDate, ...ADULT, record_type: 'R' }
+				]);
+
+				// old timers via a gap year: first-ever year is two years back, and there are
+				// zero encounters in (period_year - 1) — no prior-year data falls to old timers.
+				gapDate = addDays(base, 130);
+				const gapPy2 = yearOf(gapDate) - 2;
+				await addBird([
+					{ date: `${gapPy2}-05-10`, ...ADULT, record_type: 'N' },
+					{ date: gapDate, ...ADULT, record_type: 'R' }
+				]);
+
+				// juv this period: first-ever this year but bucket is juv (age_code 1J), so
+				// it must not appear in any of the three adult-split columns.
+				juvDate = addDays(base, 160);
+				await addBird([{ date: juvDate, ...AGE1J, record_type: 'N' }]);
+
+				// Multi-group isolation: an earlier-year encounter under Alpha and a first
+				// Delta encounter this period, as adult. The Alpha history must NOT count as
+				// "first-ever with this group", so under ringing_group_filter=Delta this
+				// reads as new_adult.
+				mgDate = addDays(base, 190);
+				const mgAlphaYear = yearOf(mgDate) - 2;
+				const { data: mgBird, error: mgErr } = await deltaClient
+					.from('Birds')
+					.insert({ ring_no: `SPLIT-${testSuffix}-MG`, species_id: robinId })
+					.select('id')
+					.single();
+				if (mgErr) throw mgErr;
+				birdIds.push(mgBird!.id);
+				const alphaSess = await getSession(
+					alphaClient,
+					`${mgAlphaYear}-05-10`,
+					alphaLocId,
+					alphaSessionIds
+				);
+				await insertEncounter(alphaClient, mgBird!.id, alphaSess, {
+					...ADULT,
+					record_type: 'N'
+				});
+				const mgDeltaSess = await getSession(
+					deltaClient,
+					mgDate,
+					deltaLocId,
+					sessionIds
+				);
+				await insertEncounter(deltaClient, mgBird!.id, mgDeltaSess, {
+					...ADULT,
+					record_type: 'N'
+				});
+			});
+
+			afterAll(() => {
+				const allSessions = [...sessionIds, ...alphaSessionIds];
+				const allLocations = [...locationIds, ...alphaLocationIds];
+				execSync(
+					`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+						`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Sessions" WHERE id IN (${allSessions.join(', ')});` +
+						`DELETE FROM "Locations" WHERE id IN (${allLocations.join(', ')});'`
+				);
+			});
+
+			// An ungrouped single-date aggregate row (covers exactly the one bird on `date`).
+			async function splitRow(date: string) {
+				const { data, error } = await deltaClient.rpc('population_stats', {
+					ringing_group_filter: deltaId,
+					from_date: date,
+					to_date: date
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				return data![0];
+			}
+
+			// Usual
+			it('a bird first ringed as an adult this period year counts in new_adult_bird_count only', async () => {
+				const row = await splitRow(naDate);
+				expect(row).toMatchObject({
+					adult_bird_count: 1,
+					new_adult_bird_count: 1,
+					first_summer_bird_count: 0,
+					old_timers_bird_count: 0
+				});
+			});
+
+			it('an adult this period whose (period_year - 1) encounters are a majority age_code IN (1,3) counts in first_summer_bird_count only', async () => {
+				const row = await splitRow(fsDate);
+				expect(row).toMatchObject({
+					adult_bird_count: 1,
+					new_adult_bird_count: 0,
+					first_summer_bird_count: 1,
+					old_timers_bird_count: 0
+				});
+			});
+
+			it('an adult returner whose (period_year - 1) encounters are a majority NOT age_code IN (1,3) counts in old_timers_bird_count only', async () => {
+				const row = await splitRow(oldTimersDate);
+				expect(row).toMatchObject({
+					adult_bird_count: 1,
+					new_adult_bird_count: 0,
+					first_summer_bird_count: 0,
+					old_timers_bird_count: 1
+				});
+			});
+
+			// Structure
+			it('for a cell holding one bird of each adult sub-kind, new_adult + first_summer + old_timers = adult_bird_count', async () => {
+				const { data, error } = await deltaClient.rpc('population_stats', {
+					ringing_group_filter: deltaId,
+					from_date: naDate,
+					to_date: oldTimersDate
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				const row = data![0];
+				expect(row.adult_bird_count).toBe(3);
+				expect(row.new_adult_bird_count).toBe(1);
+				expect(row.first_summer_bird_count).toBe(1);
+				expect(row.old_timers_bird_count).toBe(1);
+				expect(
+					row.new_adult_bird_count +
+						row.first_summer_bird_count +
+						row.old_timers_bird_count
+				).toBe(row.adult_bird_count);
+			});
+
+			it('a bird first-ever-with-group this year but bucketed juv (not adult) this period appears in none of the three age-split columns', async () => {
+				const row = await splitRow(juvDate);
+				expect(row).toMatchObject({
+					adult_bird_count: 0,
+					juv_bird_count: 1,
+					new_adult_bird_count: 0,
+					first_summer_bird_count: 0,
+					old_timers_bird_count: 0
+				});
+			});
+
+			it('year, month, day and ungrouped grouping modes all return valid rows for the age-split columns (period_year resolution rule)', async () => {
+				for (const mode of ['year', 'month', 'day', undefined] as const) {
+					const { data, error } = await deltaClient.rpc('population_stats', {
+						ringing_group_filter: deltaId,
+						from_date: naDate,
+						to_date: oldTimersDate,
+						group_by_time_period: mode
+					});
+					expect(error).toBeNull();
+					expect(data!.length).toBeGreaterThan(0);
+					const totals = data!.reduce(
+						(acc, r) => ({
+							na: acc.na + r.new_adult_bird_count,
+							fs: acc.fs + r.first_summer_bird_count,
+							ol: acc.ol + r.old_timers_bird_count,
+							ad: acc.ad + r.adult_bird_count
+						}),
+						{ na: 0, fs: 0, ol: 0, ad: 0 }
+					);
+					expect(totals.na).toBe(1);
+					expect(totals.fs).toBe(1);
+					expect(totals.ol).toBe(1);
+					expect(totals.ad).toBe(3);
+				}
+			});
+
+			// Edge
+			it('a (period_year - 1) tie between age_code IN (1,3) and not falls to old_timers_bird_count, not first_summer_bird_count', async () => {
+				const row = await splitRow(tieDate);
+				expect(row).toMatchObject({
+					adult_bird_count: 1,
+					first_summer_bird_count: 0,
+					old_timers_bird_count: 1
+				});
+			});
+
+			it('a bird with zero encounters in (period_year - 1) (a gap year) falls to old_timers_bird_count', async () => {
+				const row = await splitRow(gapDate);
+				expect(row).toMatchObject({
+					adult_bird_count: 1,
+					new_adult_bird_count: 0,
+					first_summer_bird_count: 0,
+					old_timers_bird_count: 1
+				});
+			});
+
+			it("a bird whose only earlier history is under a DIFFERENT group still counts as new_adult with this group (other group's history is not first-ever-with-this-group)", async () => {
+				const row = await splitRow(mgDate);
+				expect(row).toMatchObject({
+					adult_bird_count: 1,
+					new_adult_bird_count: 1,
+					first_summer_bird_count: 0,
+					old_timers_bird_count: 0
+				});
+			});
+		});
+
+		// Young-trends encounter-level counts (#800): postjuv_juv_enc_count /
+		// new_postjuv_juv_enc_count / new_postjuv_enc_count. The existing juv_enc_count
+		// bucket combines 1J and 3J; these break out the 3J-only slice (age_code = 3 AND
+		// is_juv) plus New-record variants, without altering juv_enc_count. Purely
+		// per-encounter (no lifetime/year logic), so each bird sits on its own random date
+		// and an ungrouped from=to=date query returns exactly that one encounter.
+		describe('young trends (postjuv_juv_enc_count / new_postjuv_juv_enc_count / new_postjuv_enc_count)', () => {
+			let deltaId: number;
+			let deltaClient: SupabaseClient;
+			const locationIds: number[] = [];
+			const sessionIds: number[] = [];
+			const birdIds: number[] = [];
+
+			const AGE1J = { age_code: 1, is_juv: true };
+			const AGE3J = { age_code: 3, is_juv: true };
+			const POSTJUV = { age_code: 3, is_juv: false };
+
+			let d3jR: string; // 3J retrap
+			let d3jN: string; // 3J new
+			let dpjN: string; // bare age-3 (postjuv) new
+			let d1jN: string; // 1J new
+
+			beforeAll(async () => {
+				deltaId = await getGroupIdByName('Delta');
+				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+				const testSuffix = randomTestSuffix();
+				const base = randomFutureDate();
+
+				const { data: robin } = await supabase
+					.from('Species')
+					.select('id')
+					.eq('species_name', 'Robin')
+					.single();
+				const robinId = robin!.id;
+
+				const { data: location, error: locErr } = await deltaClient
+					.from('Locations')
+					.insert({
+						location_name: `Young Trends Loc ${testSuffix}`,
+						ringing_group_id: deltaId
+					})
+					.select('id')
+					.single();
+				if (locErr) throw locErr;
+				locationIds.push(location!.id);
+				const locationId = location!.id;
+
+				const sessionCache = new Map<string, number>();
+				async function getSession(date: string) {
+					const cached = sessionCache.get(date);
+					if (cached !== undefined) return cached;
+					const { data: session, error } = await deltaClient
+						.from('Sessions')
+						.insert({ visit_date: date, location_id: locationId })
+						.select('id')
+						.single();
+					if (error) throw error;
+					sessionCache.set(date, session!.id);
+					sessionIds.push(session!.id);
+					return session!.id;
+				}
+
+				let ringCounter = 0;
+				async function addBird(
+					date: string,
+					enc: { age_code: number; is_juv: boolean; record_type: string }
+				) {
+					const { data: bird, error } = await deltaClient
+						.from('Birds')
+						.insert({
+							ring_no: `YT-${testSuffix}-${ringCounter++}`,
+							species_id: robinId
+						})
+						.select('id')
+						.single();
+					if (error) throw error;
+					birdIds.push(bird!.id);
+					const sessionId = await getSession(date);
+					const { error: encErr } = await deltaClient
+						.from('Encounters')
+						.insert({
+							capture_time: '10:00:00',
+							scheme: 'BTO',
+							sex: 'M',
+							session_id: sessionId,
+							bird_id: bird!.id,
+							age_code: enc.age_code,
+							is_juv: enc.is_juv,
+							record_type: enc.record_type
+						});
+					if (encErr) throw encErr;
+				}
+
+				d3jR = addDays(base, 0);
+				await addBird(d3jR, { ...AGE3J, record_type: 'R' });
+				d3jN = addDays(base, 1);
+				await addBird(d3jN, { ...AGE3J, record_type: 'N' });
+				dpjN = addDays(base, 2);
+				await addBird(dpjN, { ...POSTJUV, record_type: 'N' });
+				d1jN = addDays(base, 3);
+				await addBird(d1jN, { ...AGE1J, record_type: 'N' });
+			});
+
+			afterAll(() => {
+				execSync(
+					`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+						`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
+						`DELETE FROM "Locations" WHERE id IN (${locationIds.join(', ')});'`
+				);
+			});
+
+			async function ytRow(date: string) {
+				const { data, error } = await deltaClient.rpc('population_stats', {
+					ringing_group_filter: deltaId,
+					from_date: date,
+					to_date: date
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				return data![0];
+			}
+
+			// Usual
+			it('a 3J encounter (age_code = 3, is_juv) is counted in postjuv_juv_enc_count', async () => {
+				const row = await ytRow(d3jR);
+				expect(row.postjuv_juv_enc_count).toBe(1);
+				expect(row.juv_enc_count).toBe(1);
+			});
+
+			it("a 3J New (record_type = 'N') encounter is counted in new_postjuv_juv_enc_count", async () => {
+				const row = await ytRow(d3jN);
+				expect(row.postjuv_juv_enc_count).toBe(1);
+				expect(row.new_postjuv_juv_enc_count).toBe(1);
+			});
+
+			it("a bare age-3 postjuv New (age_code = 3, is_juv false, 'N') encounter is counted in new_postjuv_enc_count", async () => {
+				const row = await ytRow(dpjN);
+				expect(row.new_postjuv_enc_count).toBe(1);
+				expect(row.postjuv_enc_count).toBe(1);
+				expect(row.postjuv_juv_enc_count).toBe(0);
+			});
+
+			// Structure
+			it("a 3J retrap (record_type = 'R') counts in postjuv_juv_enc_count but not new_postjuv_juv_enc_count", async () => {
+				const row = await ytRow(d3jR);
+				expect(row.postjuv_juv_enc_count).toBe(1);
+				expect(row.new_postjuv_juv_enc_count).toBe(0);
+			});
+
+			it('a 1J New encounter is excluded from the 3-only young-trends columns, but still counts in juv_enc_count', async () => {
+				const row = await ytRow(d1jN);
+				expect(row.juv_enc_count).toBe(1);
+				expect(row.postjuv_juv_enc_count).toBe(0);
+				expect(row.new_postjuv_juv_enc_count).toBe(0);
+				expect(row.new_postjuv_enc_count).toBe(0);
+			});
+
+			// Edge
+			it('across a mixed 1J/3J/postjuv window, postjuv_juv_enc_count is the 3J-only slice of juv_enc_count', async () => {
+				const { data, error } = await deltaClient.rpc('population_stats', {
+					ringing_group_filter: deltaId,
+					from_date: d3jR,
+					to_date: d1jN
+				});
+				expect(error).toBeNull();
+				expect(data).toHaveLength(1);
+				const row = data![0];
+				// juv_enc_count = two 3J + one 1J = 3; postjuv_juv_enc_count = the two 3J.
+				expect(row.juv_enc_count).toBe(3);
+				expect(row.postjuv_juv_enc_count).toBe(2);
+				expect(row.new_postjuv_juv_enc_count).toBe(1); // the single 3J New
+				expect(row.new_postjuv_enc_count).toBe(1); // the single bare-age-3 New
+				expect(row.postjuv_enc_count).toBe(1); // bucket postjuv = the bare age-3
+			});
+		});
+
+		// new_young_bird_count (#800 follow-up): a straight copy of
+		// aggregate_stats.new_young_bird_count, identically derived. aggregate_stats'
+		// copy is untouched/authoritative — these tests exist to prove population_stats'
+		// copy doesn't drift from it, not to re-litigate the derivation itself (already
+		// covered by the "age bucketing" describe block above, against aggregate_stats).
+		describe('new_young_bird_count (copy of aggregate_stats.new_young_bird_count)', () => {
+			let deltaId: number;
+			let deltaClient: SupabaseClient;
+			const locationIds: number[] = [];
+			const sessionIds: number[] = [];
+			const birdIds: number[] = [];
+
+			let newJuvDate: string;
+			let retrapJuvDate: string;
+
+			beforeAll(async () => {
+				deltaId = await getGroupIdByName('Delta');
+				deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+				const testSuffix = randomTestSuffix();
+				const base = randomFutureDate();
+
+				const { data: robin } = await supabase
+					.from('Species')
+					.select('id')
+					.eq('species_name', 'Robin')
+					.single();
+				const robinId = robin!.id;
+
+				const { data: location, error: locErr } = await deltaClient
+					.from('Locations')
+					.insert({
+						location_name: `New Young Loc ${testSuffix}`,
+						ringing_group_id: deltaId
+					})
+					.select('id')
+					.single();
+				if (locErr) throw locErr;
+				locationIds.push(location!.id);
+				const locationId = location!.id;
+
+				async function addBird(date: string, record_type: string) {
+					const { data: session, error: sessionError } = await deltaClient
+						.from('Sessions')
+						.insert({ visit_date: date, location_id: locationId })
+						.select('id')
+						.single();
+					if (sessionError) throw sessionError;
+					sessionIds.push(session!.id);
+
+					const { data: bird, error: birdError } = await deltaClient
+						.from('Birds')
+						.insert({
+							ring_no: `NY-${testSuffix}-${date}`,
+							species_id: robinId
+						})
+						.select('id')
+						.single();
+					if (birdError) throw birdError;
+					birdIds.push(bird!.id);
+
+					const { error: encError } = await deltaClient
+						.from('Encounters')
+						.insert({
+							capture_time: '10:00:00',
+							scheme: 'BTO',
+							sex: 'M',
+							session_id: session!.id,
+							bird_id: bird!.id,
+							age_code: 1,
+							is_juv: true,
+							record_type
+						});
+					if (encError) throw encError;
+				}
+
+				newJuvDate = addDays(base, 0);
+				await addBird(newJuvDate, 'N');
+				retrapJuvDate = addDays(base, 1);
+				await addBird(retrapJuvDate, 'R');
+			});
+
+			afterAll(() => {
+				execSync(
+					`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+						`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+						`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
+						`DELETE FROM "Locations" WHERE id IN (${locationIds.join(', ')});'`
+				);
+			});
+
+			// Usual
+			it('a New (record_type=N) juv-bucket bird is counted in new_young_bird_count', async () => {
+				const { data, error } = await deltaClient.rpc('population_stats', {
+					ringing_group_filter: deltaId,
+					from_date: newJuvDate,
+					to_date: newJuvDate
+				});
+				expect(error).toBeNull();
+				expect(data![0].new_young_bird_count).toBe(1);
+			});
+
+			// Edge
+			it('a retrap (record_type != N) juv-bucket bird is excluded from new_young_bird_count', async () => {
+				const { data, error } = await deltaClient.rpc('population_stats', {
+					ringing_group_filter: deltaId,
+					from_date: retrapJuvDate,
+					to_date: retrapJuvDate
+				});
+				expect(error).toBeNull();
+				expect(data![0].new_young_bird_count).toBe(0);
+			});
+
+			// Parity — population_stats' copy must never drift from aggregate_stats' own,
+			// authoritative derivation for the same query.
+			it("matches aggregate_stats' new_young_bird_count for the same query window", async () => {
+				const [popRes, aggRes] = await Promise.all([
+					deltaClient.rpc('population_stats', {
+						ringing_group_filter: deltaId,
+						from_date: newJuvDate,
+						to_date: retrapJuvDate
+					}),
+					deltaClient.rpc('aggregate_stats', {
+						ringing_group_filter: deltaId,
+						from_date: newJuvDate,
+						to_date: retrapJuvDate
+					})
+				]);
+				expect(popRes.error).toBeNull();
+				expect(aggRes.error).toBeNull();
+				expect(popRes.data![0].new_young_bird_count).toBe(
+					aggRes.data![0].new_young_bird_count
+				);
 			});
 		});
 	});
@@ -1079,14 +1994,23 @@ describe('Postgres RPC integration tests', () => {
 					temporal_unit: 'day',
 					metric_name: 'encounters',
 					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
+					filters: { ringing_group_filter: alphaId }
 				} as never);
 				expect(error).toBeNull();
 				expect(data).toHaveLength(3);
 				// Top 2 days tie at 11 encounters (secondary sort: visit_date DESC → 2022-06-15 wins)
-				expect(data![0]).toEqual({ visit_date: '2022-06-15', metric_value: 11 });
-				expect(data![1]).toEqual({ visit_date: '2022-04-30', metric_value: 11 });
-				expect(data![2]).toEqual({ visit_date: '2023-05-12', metric_value: 10 });
+				expect(data![0]).toEqual({
+					visit_date: '2022-06-15',
+					metric_value: 11
+				});
+				expect(data![1]).toEqual({
+					visit_date: '2022-04-30',
+					metric_value: 11
+				});
+				expect(data![2]).toEqual({
+					visit_date: '2023-05-12',
+					metric_value: 10
+				});
 			});
 
 			it('month aggregates results into calendar months', async () => {
@@ -1094,13 +2018,22 @@ describe('Postgres RPC integration tests', () => {
 					temporal_unit: 'month',
 					metric_name: 'encounters',
 					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
+					filters: { ringing_group_filter: alphaId }
 				} as never);
 				expect(error).toBeNull();
 				expect(data).toHaveLength(3);
-				expect(data![0]).toEqual({ visit_date: '2022-06-01', metric_value: 11 });
-				expect(data![1]).toEqual({ visit_date: '2022-04-01', metric_value: 11 });
-				expect(data![2]).toEqual({ visit_date: '2023-05-01', metric_value: 10 });
+				expect(data![0]).toEqual({
+					visit_date: '2022-06-01',
+					metric_value: 11
+				});
+				expect(data![1]).toEqual({
+					visit_date: '2022-04-01',
+					metric_value: 11
+				});
+				expect(data![2]).toEqual({
+					visit_date: '2023-05-01',
+					metric_value: 10
+				});
 			});
 
 			it('year aggregates results into calendar years', async () => {
@@ -1108,12 +2041,18 @@ describe('Postgres RPC integration tests', () => {
 					temporal_unit: 'year',
 					metric_name: 'encounters',
 					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
+					filters: { ringing_group_filter: alphaId }
 				} as never);
 				expect(error).toBeNull();
 				expect(data).toHaveLength(3);
-				expect(data![0]).toEqual({ visit_date: '2022-01-01', metric_value: 35 });
-				expect(data![1]).toEqual({ visit_date: '2023-01-01', metric_value: 15 });
+				expect(data![0]).toEqual({
+					visit_date: '2022-01-01',
+					metric_value: 35
+				});
+				expect(data![1]).toEqual({
+					visit_date: '2023-01-01',
+					metric_value: 15
+				});
 				expect(data![2]).toEqual({ visit_date: '2024-01-01', metric_value: 5 });
 			});
 		});
@@ -1124,10 +2063,13 @@ describe('Postgres RPC integration tests', () => {
 					temporal_unit: 'day',
 					metric_name: 'encounters',
 					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
+					filters: { ringing_group_filter: alphaId }
 				} as never);
 				expect(error).toBeNull();
-				expect(data![0]).toEqual({ visit_date: '2022-06-15', metric_value: 11 });
+				expect(data![0]).toEqual({
+					visit_date: '2022-06-15',
+					metric_value: 11
+				});
 			});
 
 			it('individuals counts distinct rings per day', async () => {
@@ -1135,11 +2077,14 @@ describe('Postgres RPC integration tests', () => {
 					temporal_unit: 'day',
 					metric_name: 'individuals',
 					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
+					filters: { ringing_group_filter: alphaId }
 				} as never);
 				expect(error).toBeNull();
 				// Each bird is caught once per session in seed data → same as encounters
-				expect(data![0]).toEqual({ visit_date: '2022-06-15', metric_value: 11 });
+				expect(data![0]).toEqual({
+					visit_date: '2022-06-15',
+					metric_value: 11
+				});
 			});
 
 			it('species counts distinct species present per day', async () => {
@@ -1147,7 +2092,7 @@ describe('Postgres RPC integration tests', () => {
 					temporal_unit: 'day',
 					metric_name: 'species',
 					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
+					filters: { ringing_group_filter: alphaId }
 				} as never);
 				expect(error).toBeNull();
 				// Several days had 3 species; tie broken by visit_date DESC
@@ -1162,11 +2107,14 @@ describe('Postgres RPC integration tests', () => {
 					temporal_unit: 'day',
 					metric_name: 'encounters',
 					result_limit: 1,
-					filters: { ringing_group_filter: alphaId },
+					filters: { ringing_group_filter: alphaId }
 				} as never);
 				expect(error).toBeNull();
 				expect(data).toHaveLength(1);
-				expect(data![0]).toEqual({ visit_date: '2022-06-15', metric_value: 11 });
+				expect(data![0]).toEqual({
+					visit_date: '2022-06-15',
+					metric_value: 11
+				});
 			});
 
 			it('result_limit=3 returns top 3 results', async () => {
@@ -1174,7 +2122,7 @@ describe('Postgres RPC integration tests', () => {
 					temporal_unit: 'day',
 					metric_name: 'encounters',
 					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
+					filters: { ringing_group_filter: alphaId }
 				} as never);
 				expect(error).toBeNull();
 				expect(data).toHaveLength(3);
@@ -1187,93 +2135,162 @@ describe('Postgres RPC integration tests', () => {
 
 		describe('temporal_unit parameter', () => {
 			it('day groups results by individual session date', async () => {
-				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
-					temporal_unit: 'day',
-					metric_name: 'encounters',
-					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
-				} as never);
+				const { data, error } = await alphaClient.rpc(
+					'top_metrics_by_species_and_period',
+					{
+						temporal_unit: 'day',
+						metric_name: 'encounters',
+						result_limit: 3,
+						filters: { ringing_group_filter: alphaId }
+					} as never
+				);
 				expect(error).toBeNull();
 				expect(data).toHaveLength(3);
-				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2023-05-12', metric_value: 7 });
-				expect(data![1]).toEqual({ species_name: 'Robin', visit_date: '2022-04-30', metric_value: 7 });
-				expect(data![2]).toEqual({ species_name: 'Robin', visit_date: '2022-06-15', metric_value: 6 });
+				expect(data![0]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2023-05-12',
+					metric_value: 7
+				});
+				expect(data![1]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2022-04-30',
+					metric_value: 7
+				});
+				expect(data![2]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2022-06-15',
+					metric_value: 6
+				});
 			});
 
 			it('month aggregates results into calendar months', async () => {
-				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
-					temporal_unit: 'month',
-					metric_name: 'encounters',
-					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
-				} as never);
+				const { data, error } = await alphaClient.rpc(
+					'top_metrics_by_species_and_period',
+					{
+						temporal_unit: 'month',
+						metric_name: 'encounters',
+						result_limit: 3,
+						filters: { ringing_group_filter: alphaId }
+					} as never
+				);
 				expect(error).toBeNull();
 				expect(data).toHaveLength(3);
-				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2023-05-01', metric_value: 7 });
-				expect(data![1]).toEqual({ species_name: 'Robin', visit_date: '2022-04-01', metric_value: 7 });
-				expect(data![2]).toEqual({ species_name: 'Robin', visit_date: '2022-06-01', metric_value: 6 });
+				expect(data![0]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2023-05-01',
+					metric_value: 7
+				});
+				expect(data![1]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2022-04-01',
+					metric_value: 7
+				});
+				expect(data![2]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2022-06-01',
+					metric_value: 6
+				});
 			});
 
 			it('year aggregates results into calendar years', async () => {
-				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
-					temporal_unit: 'year',
-					metric_name: 'encounters',
-					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
-				} as never);
+				const { data, error } = await alphaClient.rpc(
+					'top_metrics_by_species_and_period',
+					{
+						temporal_unit: 'year',
+						metric_name: 'encounters',
+						result_limit: 3,
+						filters: { ringing_group_filter: alphaId }
+					} as never
+				);
 				expect(error).toBeNull();
 				expect(data).toHaveLength(3);
-				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2022-01-01', metric_value: 20 });
-				expect(data![1]).toEqual({ species_name: 'Robin', visit_date: '2023-01-01', metric_value: 9 });
-				expect(data![2]).toEqual({ species_name: 'Reed Warbler', visit_date: '2022-01-01', metric_value: 8 });
+				expect(data![0]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2022-01-01',
+					metric_value: 20
+				});
+				expect(data![1]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2023-01-01',
+					metric_value: 9
+				});
+				expect(data![2]).toEqual({
+					species_name: 'Reed Warbler',
+					visit_date: '2022-01-01',
+					metric_value: 8
+				});
 			});
 		});
 
 		describe('metric_name parameter', () => {
 			it('encounters counts all encounter records per species per day', async () => {
-				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
-					temporal_unit: 'day',
-					metric_name: 'encounters',
-					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
-				} as never);
+				const { data, error } = await alphaClient.rpc(
+					'top_metrics_by_species_and_period',
+					{
+						temporal_unit: 'day',
+						metric_name: 'encounters',
+						result_limit: 3,
+						filters: { ringing_group_filter: alphaId }
+					} as never
+				);
 				expect(error).toBeNull();
-				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2023-05-12', metric_value: 7 });
+				expect(data![0]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2023-05-12',
+					metric_value: 7
+				});
 			});
 
 			it('individuals counts distinct rings per species per day', async () => {
-				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
-					temporal_unit: 'day',
-					metric_name: 'individuals',
-					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
-				} as never);
+				const { data, error } = await alphaClient.rpc(
+					'top_metrics_by_species_and_period',
+					{
+						temporal_unit: 'day',
+						metric_name: 'individuals',
+						result_limit: 3,
+						filters: { ringing_group_filter: alphaId }
+					} as never
+				);
 				expect(error).toBeNull();
 				// Each bird is caught once per session in seed data → same as encounters
-				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2023-05-12', metric_value: 7 });
+				expect(data![0]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2023-05-12',
+					metric_value: 7
+				});
 			});
 		});
 
 		describe('result_limit parameter', () => {
 			it('result_limit=1 returns only the top result', async () => {
-				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
-					temporal_unit: 'day',
-					metric_name: 'encounters',
-					result_limit: 1,
-					filters: { ringing_group_filter: alphaId },
-				} as never);
+				const { data, error } = await alphaClient.rpc(
+					'top_metrics_by_species_and_period',
+					{
+						temporal_unit: 'day',
+						metric_name: 'encounters',
+						result_limit: 1,
+						filters: { ringing_group_filter: alphaId }
+					} as never
+				);
 				expect(error).toBeNull();
 				expect(data).toHaveLength(1);
-				expect(data![0]).toEqual({ species_name: 'Robin', visit_date: '2023-05-12', metric_value: 7 });
+				expect(data![0]).toEqual({
+					species_name: 'Robin',
+					visit_date: '2023-05-12',
+					metric_value: 7
+				});
 			});
 
 			it('result_limit=3 returns top 3 results', async () => {
-				const { data, error } = await alphaClient.rpc('top_metrics_by_species_and_period', {
-					temporal_unit: 'day',
-					metric_name: 'encounters',
-					result_limit: 3,
-					filters: { ringing_group_filter: alphaId },
-				} as never);
+				const { data, error } = await alphaClient.rpc(
+					'top_metrics_by_species_and_period',
+					{
+						temporal_unit: 'day',
+						metric_name: 'encounters',
+						result_limit: 3,
+						filters: { ringing_group_filter: alphaId }
+					} as never
+				);
 				expect(error).toBeNull();
 				expect(data).toHaveLength(3);
 			});
@@ -1282,11 +2299,14 @@ describe('Postgres RPC integration tests', () => {
 
 	describe('metrics_by_period_and_species', () => {
 		it('temporal_unit=month returns 23 species-month rows', async () => {
-			const { data, error } = await alphaClient.rpc('metrics_by_period_and_species', {
-				temporal_unit: 'month',
-				metric_name: 'encounters',
-				filters: { ringing_group_filter: alphaId },
-			} as never);
+			const { data, error } = await alphaClient.rpc(
+				'metrics_by_period_and_species',
+				{
+					temporal_unit: 'month',
+					metric_name: 'encounters',
+					filters: { ringing_group_filter: alphaId }
+				} as never
+			);
 			expect(error).toBeNull();
 			expect(data).toHaveLength(23);
 			const robin2021 = data!.find(
@@ -1300,17 +2320,24 @@ describe('Postgres RPC integration tests', () => {
 		});
 
 		it('temporal_unit=year returns 13 species-year rows spanning 2021–2024', async () => {
-			const { data, error } = await alphaClient.rpc('metrics_by_period_and_species', {
-				temporal_unit: 'year',
-				metric_name: 'encounters',
-				filters: { ringing_group_filter: alphaId },
-			} as never);
+			const { data, error } = await alphaClient.rpc(
+				'metrics_by_period_and_species',
+				{
+					temporal_unit: 'year',
+					metric_name: 'encounters',
+					filters: { ringing_group_filter: alphaId }
+				} as never
+			);
 			expect(error).toBeNull();
 			expect(data).toHaveLength(13);
-			const years = [...new Set(data!.map((r) => new Date(r.visit_date).getFullYear()))].sort();
+			const years = [
+				...new Set(data!.map((r) => new Date(r.visit_date).getFullYear()))
+			].sort();
 			expect(years).toEqual([2021, 2022, 2023, 2024]);
 			const robin2022 = data!.find(
-				(r) => r.species_name === 'Robin' && new Date(r.visit_date).getFullYear() === 2022
+				(r) =>
+					r.species_name === 'Robin' &&
+					new Date(r.visit_date).getFullYear() === 2022
 			);
 			expect(robin2022!.metric_value).toBe(20);
 		});
@@ -1318,13 +2345,19 @@ describe('Postgres RPC integration tests', () => {
 
 	describe('fuzzy_search_rings', () => {
 		it('exact match returns ring with closeness_score 0 and correct species', async () => {
-			const { data, error } = await alphaClient.rpc('fuzzy_search_rings', { q: 'ARRETRAP' });
+			const { data, error } = await alphaClient.rpc('fuzzy_search_rings', {
+				q: 'ARRETRAP'
+			});
 			expect(error).toBeNull();
-			expect(data).toEqual([{ ring_no: 'ARRETRAP', closeness_score: 0, species_name: 'Robin' }]);
+			expect(data).toEqual([
+				{ ring_no: 'ARRETRAP', closeness_score: 0, species_name: 'Robin' }
+			]);
 		});
 
 		it('off-by-one match returns ARRETRAP with closeness_score 1', async () => {
-			const { data, error } = await alphaClient.rpc('fuzzy_search_rings', { q: 'ARRETR' });
+			const { data, error } = await alphaClient.rpc('fuzzy_search_rings', {
+				q: 'ARRETR'
+			});
 			expect(error).toBeNull();
 			// ARRETR is 2 chars shorter → levenshtein=2, score = 2 - 0.5*(8-6) = 1
 			const match = data!.find((r) => r.ring_no === 'ARRETRAP');
@@ -1333,7 +2366,9 @@ describe('Postgres RPC integration tests', () => {
 		});
 
 		it('no match returns empty array', async () => {
-			const { data, error } = await alphaClient.rpc('fuzzy_search_rings', { q: 'ZZZZZZZZZ' });
+			const { data, error } = await alphaClient.rpc('fuzzy_search_rings', {
+				q: 'ZZZZZZZZZ'
+			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(0);
 		});
@@ -1343,7 +2378,7 @@ describe('Postgres RPC integration tests', () => {
 		describe('significance_threshold parameter', () => {
 			it('default threshold=3 returns only ARRETRAP (only bird with ≥3 encounters)', async () => {
 				const { data, error } = await alphaClient.rpc('most_caught_birds', {
-					ringing_group_filter: alphaId,
+					ringing_group_filter: alphaId
 				});
 				expect(error).toBeNull();
 				expect(data).toHaveLength(1);
@@ -1351,14 +2386,14 @@ describe('Postgres RPC integration tests', () => {
 					species_name: 'Robin',
 					ring_no: 'ARRETRAP',
 					encounter_count: ARRETRAP_ENCOUNTERS,
-					encounter_dates: ARRETRAP_DATES,
+					encounter_dates: ARRETRAP_DATES
 				});
 			});
 
 			it('threshold=1 returns all 46 birds with at least 1 encounter', async () => {
 				const { data, error } = await alphaClient.rpc('most_caught_birds', {
 					ringing_group_filter: alphaId,
-					significance_threshold: 1,
+					significance_threshold: 1
 				});
 				expect(error).toBeNull();
 				expect(data).toHaveLength(ALPHA_TOTAL_BIRDS);
@@ -1368,7 +2403,7 @@ describe('Postgres RPC integration tests', () => {
 			it('threshold=10 returns no birds (max encounters is 9 for ARRETRAP)', async () => {
 				const { data, error } = await alphaClient.rpc('most_caught_birds', {
 					ringing_group_filter: alphaId,
-					significance_threshold: 10,
+					significance_threshold: 10
 				});
 				expect(error).toBeNull();
 				expect(data).toHaveLength(0);
@@ -1378,7 +2413,7 @@ describe('Postgres RPC integration tests', () => {
 		it('species_filter=Robin returns only ARRETRAP (only Robin with ≥3 encounters)', async () => {
 			const { data, error } = await alphaClient.rpc('most_caught_birds', {
 				ringing_group_filter: alphaId,
-				species_filter: 'Robin',
+				species_filter: 'Robin'
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(1);
@@ -1388,21 +2423,26 @@ describe('Postgres RPC integration tests', () => {
 		it('year_filter=2022 returns ARRETRAP with exactly 4 encounters in 2022', async () => {
 			const { data, error } = await alphaClient.rpc('most_caught_birds', {
 				ringing_group_filter: alphaId,
-				year_filter: 2022,
+				year_filter: 2022
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(1);
 			expect(data![0]).toMatchObject({
 				ring_no: 'ARRETRAP',
 				encounter_count: 4,
-				encounter_dates: ['2022-04-30', '2022-06-15', '2022-08-10', '2022-10-20'],
+				encounter_dates: [
+					'2022-04-30',
+					'2022-06-15',
+					'2022-08-10',
+					'2022-10-20'
+				]
 			});
 		});
 
 		it('max_per_species=1 returns at most 1 row per species (ARRETRAP is only result)', async () => {
 			const { data, error } = await alphaClient.rpc('most_caught_birds', {
 				ringing_group_filter: alphaId,
-				max_per_species: 1,
+				max_per_species: 1
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(1);
@@ -1414,7 +2454,7 @@ describe('Postgres RPC integration tests', () => {
 		it('min_encounter_count=6 returns only ARRETRAP (9 encounters)', async () => {
 			const { data, error } = await alphaClient.rpc('notable_retraps', {
 				ringing_group_filter: alphaId,
-				min_encounter_count: 6,
+				min_encounter_count: 6
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(1);
@@ -1423,7 +2463,7 @@ describe('Postgres RPC integration tests', () => {
 				ring_no: 'ARRETRAP',
 				encounter_count: ARRETRAP_ENCOUNTERS,
 				encounter_dates: ARRETRAP_DATES,
-				proven_age: ARRETRAP_PROVEN_AGE,
+				proven_age: ARRETRAP_PROVEN_AGE
 			});
 		});
 
@@ -1432,20 +2472,20 @@ describe('Postgres RPC integration tests', () => {
 			// also a proven-age-3 bird. Ordered by encounter_count DESC → ARRETRAP first.
 			const { data, error } = await alphaClient.rpc('notable_retraps', {
 				ringing_group_filter: alphaId,
-				min_proven_age: 3,
+				min_proven_age: 3
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(2);
 			expect(data![0]).toMatchObject({
 				ring_no: 'ARRETRAP',
 				encounter_count: ARRETRAP_ENCOUNTERS,
-				proven_age: ARRETRAP_PROVEN_AGE,
+				proven_age: ARRETRAP_PROVEN_AGE
 			});
 			expect(data![1]).toMatchObject({
 				ring_no: 'AWREN001',
 				species_name: 'Wren',
 				encounter_count: 2,
-				proven_age: 3,
+				proven_age: 3
 			});
 		});
 
@@ -1453,7 +2493,7 @@ describe('Postgres RPC integration tests', () => {
 			const { data, error } = await alphaClient.rpc('notable_retraps', {
 				ringing_group_filter: alphaId,
 				species_filter: 'Robin',
-				min_encounter_count: 1,
+				min_encounter_count: 1
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(PER_SPECIES_AGGREGATES['Robin'].bird_count);
@@ -1464,7 +2504,7 @@ describe('Postgres RPC integration tests', () => {
 		it('min_encounter_count=100 returns no birds', async () => {
 			const { data, error } = await alphaClient.rpc('notable_retraps', {
 				ringing_group_filter: alphaId,
-				min_encounter_count: 100,
+				min_encounter_count: 100
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(0);
@@ -1477,7 +2517,11 @@ describe('Postgres RPC integration tests', () => {
 		// (`min_encounter_count: 1`) and checks its date-scoped shape.
 		describe('date-range filtering', () => {
 			const findArretrap = (
-				rows: { ring_no: string; encounter_count: number; encounter_dates: string[] }[]
+				rows: {
+					ring_no: string;
+					encounter_count: number;
+					encounter_dates: string[];
+				}[]
 			) => rows.find((r) => r.ring_no === 'ARRETRAP');
 
 			it('both from_date and to_date returns only encounters within the range', async () => {
@@ -1486,18 +2530,20 @@ describe('Postgres RPC integration tests', () => {
 					species_filter: 'Robin',
 					min_encounter_count: 1,
 					from_date: '2023-01-01',
-					to_date: '2023-12-31',
+					to_date: '2023-12-31'
 				});
 				expect(error).toBeNull();
 				// Every returned bird's encounter dates fall within the range.
 				expect(
 					data!.every((r) =>
-						r.encounter_dates.every((d) => d >= '2023-01-01' && d <= '2023-12-31')
+						r.encounter_dates.every(
+							(d) => d >= '2023-01-01' && d <= '2023-12-31'
+						)
 					)
 				).toBe(true);
 				expect(findArretrap(data!)).toMatchObject({
 					encounter_count: 3,
-					encounter_dates: ['2023-05-12', '2023-07-08', '2023-09-14'],
+					encounter_dates: ['2023-05-12', '2023-07-08', '2023-09-14']
 				});
 			});
 
@@ -1506,12 +2552,17 @@ describe('Postgres RPC integration tests', () => {
 					ringing_group_filter: alphaId,
 					species_filter: 'Robin',
 					min_encounter_count: 1,
-					from_date: '2023-01-01',
+					from_date: '2023-01-01'
 				});
 				expect(error).toBeNull();
 				expect(findArretrap(data!)).toMatchObject({
 					encounter_count: 4,
-					encounter_dates: ['2023-05-12', '2023-07-08', '2023-09-14', '2024-05-10'],
+					encounter_dates: [
+						'2023-05-12',
+						'2023-07-08',
+						'2023-09-14',
+						'2024-05-10'
+					]
 				});
 			});
 
@@ -1520,14 +2571,18 @@ describe('Postgres RPC integration tests', () => {
 					ringing_group_filter: alphaId,
 					species_filter: 'Robin',
 					min_encounter_count: 1,
-					to_date: '2022-12-31',
+					to_date: '2022-12-31'
 				});
 				expect(error).toBeNull();
 				expect(findArretrap(data!)).toMatchObject({
 					encounter_count: 5,
 					encounter_dates: [
-						'2021-06-20', '2022-04-30', '2022-06-15', '2022-08-10', '2022-10-20',
-					],
+						'2021-06-20',
+						'2022-04-30',
+						'2022-06-15',
+						'2022-08-10',
+						'2022-10-20'
+					]
 				});
 			});
 
@@ -1535,12 +2590,12 @@ describe('Postgres RPC integration tests', () => {
 				const { data, error } = await alphaClient.rpc('notable_retraps', {
 					ringing_group_filter: alphaId,
 					species_filter: 'Robin',
-					min_encounter_count: 1,
+					min_encounter_count: 1
 				});
 				expect(error).toBeNull();
 				expect(findArretrap(data!)).toMatchObject({
 					encounter_count: ARRETRAP_ENCOUNTERS,
-					encounter_dates: ARRETRAP_DATES,
+					encounter_dates: ARRETRAP_DATES
 				});
 			});
 
@@ -1549,12 +2604,12 @@ describe('Postgres RPC integration tests', () => {
 					ringing_group_filter: alphaId,
 					species_filter: 'Robin',
 					min_encounter_count: 1,
-					from_date: '2024-05-10', // ARRETRAP's last encounter date
+					from_date: '2024-05-10' // ARRETRAP's last encounter date
 				});
 				expect(error).toBeNull();
 				expect(findArretrap(data!)).toMatchObject({
 					encounter_count: 1,
-					encounter_dates: ['2024-05-10'],
+					encounter_dates: ['2024-05-10']
 				});
 			});
 
@@ -1563,12 +2618,12 @@ describe('Postgres RPC integration tests', () => {
 					ringing_group_filter: alphaId,
 					species_filter: 'Robin',
 					min_encounter_count: 1,
-					to_date: '2021-06-20', // ARRETRAP's first encounter date
+					to_date: '2021-06-20' // ARRETRAP's first encounter date
 				});
 				expect(error).toBeNull();
 				expect(findArretrap(data!)).toMatchObject({
 					encounter_count: 1,
-					encounter_dates: ['2021-06-20'],
+					encounter_dates: ['2021-06-20']
 				});
 			});
 
@@ -1578,7 +2633,7 @@ describe('Postgres RPC integration tests', () => {
 					species_filter: 'Robin',
 					min_encounter_count: 1,
 					from_date: '2025-01-01',
-					to_date: '2025-12-31',
+					to_date: '2025-12-31'
 				});
 				expect(error).toBeNull();
 				expect(data).toHaveLength(0);
@@ -1589,28 +2644,39 @@ describe('Postgres RPC integration tests', () => {
 	describe('find_discrepencies', () => {
 		it('alpha group returns 5 discrepancy rows across 3 birds', async () => {
 			const { data, error } = await alphaClient.rpc('find_discrepencies', {
-				ringing_group_filter: alphaId,
+				ringing_group_filter: alphaId
 			});
 			expect(error).toBeNull();
 			const rows = data!
 				.map((r) => ({
 					ring_no: r.ring_no,
 					type: r.discrepency_type,
-					last_encounter_date: r.last_encounter_date,
+					last_encounter_date: r.last_encounter_date
 				}))
-				.sort((a, b) => a.ring_no.localeCompare(b.ring_no) || a.type.localeCompare(b.type));
+				.sort(
+					(a, b) =>
+						a.ring_no.localeCompare(b.ring_no) || a.type.localeCompare(b.type)
+				);
 			expect(rows).toEqual([
-				{ ring_no: 'ABTITMIS',  type: 'age',         last_encounter_date: '2022-06-15' },
-				{ ring_no: 'ABTITMIS',  type: 'sex',         last_encounter_date: '2022-06-15' },
-				{ ring_no: 'AKINGF001', type: 'age',         last_encounter_date: '2023-07-08' },
-				{ ring_no: 'ARRETRAP',  type: 'age',         last_encounter_date: '2024-05-10' },
-				{ ring_no: 'ARRETRAP',  type: 'wing_length', last_encounter_date: '2024-05-10' },
+				{ ring_no: 'ABTITMIS', type: 'age', last_encounter_date: '2022-06-15' },
+				{ ring_no: 'ABTITMIS', type: 'sex', last_encounter_date: '2022-06-15' },
+				{
+					ring_no: 'AKINGF001',
+					type: 'age',
+					last_encounter_date: '2023-07-08'
+				},
+				{ ring_no: 'ARRETRAP', type: 'age', last_encounter_date: '2024-05-10' },
+				{
+					ring_no: 'ARRETRAP',
+					type: 'wing_length',
+					last_encounter_date: '2024-05-10'
+				}
 			]);
 		});
 
 		it('beta group returns empty (clean data, no discrepancies)', async () => {
 			const { data, error } = await betaClient.rpc('find_discrepencies', {
-				ringing_group_filter: betaId,
+				ringing_group_filter: betaId
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(0);
@@ -1623,7 +2689,7 @@ describe('Postgres RPC integration tests', () => {
 		it('returns the long-absence bird with correct previous_date and gap_days', async () => {
 			const { data, error } = await alphaClient.rpc('long_absence_retraps', {
 				session_date: '2024-05-10',
-				ringing_group_filter: alphaId,
+				ringing_group_filter: alphaId
 			});
 			expect(error).toBeNull();
 			expect(data).toEqual([
@@ -1631,8 +2697,8 @@ describe('Postgres RPC integration tests', () => {
 					ring_no: 'AWREN001',
 					species_name: 'Wren',
 					previous_date: '2021-06-20',
-					gap_days: 1055,
-				},
+					gap_days: 1055
+				}
 			]);
 		});
 
@@ -1641,7 +2707,7 @@ describe('Postgres RPC integration tests', () => {
 			// 730-day default, so only the Wren (1055 days) qualifies.
 			const { data, error } = await alphaClient.rpc('long_absence_retraps', {
 				session_date: '2024-05-10',
-				ringing_group_filter: alphaId,
+				ringing_group_filter: alphaId
 			});
 			expect(error).toBeNull();
 			expect(data!.map((r) => r.ring_no)).toEqual(['AWREN001']);
@@ -1653,7 +2719,7 @@ describe('Postgres RPC integration tests', () => {
 			const { data, error } = await alphaClient.rpc('long_absence_retraps', {
 				session_date: '2021-06-20',
 				ringing_group_filter: alphaId,
-				min_gap_days: 1,
+				min_gap_days: 1
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(0);
@@ -1665,19 +2731,21 @@ describe('Postgres RPC integration tests', () => {
 			const { data, error } = await alphaClient.rpc('long_absence_retraps', {
 				session_date: '2024-05-10',
 				ringing_group_filter: alphaId,
-				min_gap_days: 200,
+				min_gap_days: 200
 			});
 			expect(error).toBeNull();
-			expect(data!.map((r) => ({ ring_no: r.ring_no, gap_days: r.gap_days }))).toEqual([
+			expect(
+				data!.map((r) => ({ ring_no: r.ring_no, gap_days: r.gap_days }))
+			).toEqual([
 				{ ring_no: 'AWREN001', gap_days: 1055 },
-				{ ring_no: 'ARRETRAP', gap_days: 239 },
+				{ ring_no: 'ARRETRAP', gap_days: 239 }
 			]);
 		});
 
 		it('returns empty for a date with no session', async () => {
 			const { data, error } = await alphaClient.rpc('long_absence_retraps', {
 				session_date: '2099-01-01',
-				ringing_group_filter: alphaId,
+				ringing_group_filter: alphaId
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(0);
@@ -1687,9 +2755,12 @@ describe('Postgres RPC integration tests', () => {
 	describe('stats_per_day_and_species', () => {
 		it('returns encounter count, weighed birds count and weight extremes per day and species', async () => {
 			// Seed 2021-06-20: ARRETRAP (Robin, 18.5) and AWREN001 (Wren, 9.0).
-			const { data, error } = await alphaClient.rpc('stats_per_day_and_species', {
-				ringing_group_filter: alphaId,
-			});
+			const { data, error } = await alphaClient.rpc(
+				'stats_per_day_and_species',
+				{
+					ringing_group_filter: alphaId
+				}
+			);
 			expect(error).toBeNull();
 			const dayRows = data!.filter((row) => row.visit_date === '2021-06-20');
 			expect(dayRows).toHaveLength(2);
@@ -1702,7 +2773,7 @@ describe('Postgres RPC integration tests', () => {
 				pullus_count: 0,
 				weighed_birds_count: 1,
 				min_weight: 18.5,
-				max_weight: 18.5,
+				max_weight: 18.5
 			});
 			expect(dayRows).toContainEqual({
 				species_name: 'Wren',
@@ -1713,15 +2784,18 @@ describe('Postgres RPC integration tests', () => {
 				pullus_count: 0,
 				weighed_birds_count: 1,
 				min_weight: 9,
-				max_weight: 9,
+				max_weight: 9
 			});
 		});
 
 		it('aggregates multiple weighed encounters on one day into a single row', async () => {
 			// Seed 2022-06-15 Robins: 19.0, 17.2, 16.5, 20.5, 19.5, 17.0 — six encounters.
-			const { data, error } = await alphaClient.rpc('stats_per_day_and_species', {
-				ringing_group_filter: alphaId,
-			});
+			const { data, error } = await alphaClient.rpc(
+				'stats_per_day_and_species',
+				{
+					ringing_group_filter: alphaId
+				}
+			);
 			expect(error).toBeNull();
 			const robinRow = data!.find(
 				(row) => row.visit_date === '2022-06-15' && row.species_name === 'Robin'
@@ -1735,7 +2809,7 @@ describe('Postgres RPC integration tests', () => {
 				pullus_count: 0,
 				weighed_birds_count: 6,
 				min_weight: 16.5,
-				max_weight: 20.5,
+				max_weight: 20.5
 			});
 		});
 
@@ -1743,9 +2817,12 @@ describe('Postgres RPC integration tests', () => {
 			// Beta's only session is 2023-06-01 (two Chaffinches + its own SHARED01
 			// Robin encounter). None of Alpha's sessions appear despite Alpha→Beta
 			// sharing, because both Encounters and Sessions are group-filtered.
-			const { data, error } = await betaClient.rpc('stats_per_day_and_species', {
-				ringing_group_filter: betaId,
-			});
+			const { data, error } = await betaClient.rpc(
+				'stats_per_day_and_species',
+				{
+					ringing_group_filter: betaId
+				}
+			);
 			expect(error).toBeNull();
 			expect(data).toHaveLength(2);
 			expect(data).toContainEqual({
@@ -1757,7 +2834,7 @@ describe('Postgres RPC integration tests', () => {
 				pullus_count: 0,
 				weighed_birds_count: 2,
 				min_weight: 18.5,
-				max_weight: 20,
+				max_weight: 20
 			});
 			expect(data).toContainEqual({
 				species_name: 'Robin',
@@ -1768,14 +2845,17 @@ describe('Postgres RPC integration tests', () => {
 				pullus_count: 0,
 				weighed_birds_count: 1,
 				min_weight: 18.5,
-				max_weight: 18.5,
+				max_weight: 18.5
 			});
 		});
 
 		it('returns no rows for a group with no encounters', async () => {
-			const { data, error } = await gammaClient.rpc('stats_per_day_and_species', {
-				ringing_group_filter: gammaId,
-			});
+			const { data, error } = await gammaClient.rpc(
+				'stats_per_day_and_species',
+				{
+					ringing_group_filter: gammaId
+				}
+			);
 			expect(error).toBeNull();
 			expect(data).toHaveLength(0);
 		});
@@ -1811,7 +2891,7 @@ describe('Postgres RPC integration tests', () => {
 					.from('Locations')
 					.insert({
 						location_name: `Stats Per Day Test Location ${testSuffix}`,
-						ringing_group_id: deltaId,
+						ringing_group_id: deltaId
 					})
 					.select('id')
 					.single();
@@ -1833,7 +2913,11 @@ describe('Postgres RPC integration tests', () => {
 				sessionIds = sessions.map(({ data }) => data!.id);
 
 				const birds = await Promise.all(
-					[`STATSTEST1-${testSuffix}`, `STATSTEST2-${testSuffix}`, `STATSTEST3-${testSuffix}`].map((ringNo) =>
+					[
+						`STATSTEST1-${testSuffix}`,
+						`STATSTEST2-${testSuffix}`,
+						`STATSTEST3-${testSuffix}`
+					].map((ringNo) =>
 						deltaClient
 							.from('Birds')
 							.insert({ ring_no: ringNo, species_id: species!.id })
@@ -1851,16 +2935,25 @@ describe('Postgres RPC integration tests', () => {
 					scheme: 'BTO',
 					sex: 'M',
 					age_code: 1,
-					record_type: 'N',
+					record_type: 'N'
 				};
 				const { error: encountersError } = await deltaClient
 					.from('Encounters')
 					.insert([
 						// visitDates[0]: one weighed + one unweighed encounter
-						{ ...baseEncounter, bird_id: birdIds[0], session_id: sessionIds[0], weight: 15 },
-						{ ...baseEncounter, bird_id: birdIds[1], session_id: sessionIds[0] },
+						{
+							...baseEncounter,
+							bird_id: birdIds[0],
+							session_id: sessionIds[0],
+							weight: 15
+						},
+						{
+							...baseEncounter,
+							bird_id: birdIds[1],
+							session_id: sessionIds[0]
+						},
 						// visitDates[1]: only an unweighed encounter
-						{ ...baseEncounter, bird_id: birdIds[2], session_id: sessionIds[1] },
+						{ ...baseEncounter, bird_id: birdIds[2], session_id: sessionIds[1] }
 					]);
 				if (encountersError) throw encountersError;
 			});
@@ -1876,13 +2969,14 @@ describe('Postgres RPC integration tests', () => {
 			});
 
 			it('counts unweighed encounters in encounter_count but not weighed_birds_count', async () => {
-				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
-					ringing_group_filter: deltaId,
-				});
+				const { data, error } = await deltaClient.rpc(
+					'stats_per_day_and_species',
+					{
+						ringing_group_filter: deltaId
+					}
+				);
 				expect(error).toBeNull();
-				expect(
-					data!.find((row) => row.visit_date === visitDates[0])
-				).toEqual({
+				expect(data!.find((row) => row.visit_date === visitDates[0])).toEqual({
 					species_name: 'Robin',
 					visit_date: visitDates[0],
 					encounter_count: 2,
@@ -1891,18 +2985,19 @@ describe('Postgres RPC integration tests', () => {
 					pullus_count: 2,
 					weighed_birds_count: 1,
 					min_weight: 15,
-					max_weight: 15,
+					max_weight: 15
 				});
 			});
 
 			it('returns null weight extremes and zero weighed_birds_count for a day with only unweighed encounters', async () => {
-				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
-					ringing_group_filter: deltaId,
-				});
+				const { data, error } = await deltaClient.rpc(
+					'stats_per_day_and_species',
+					{
+						ringing_group_filter: deltaId
+					}
+				);
 				expect(error).toBeNull();
-				expect(
-					data!.find((row) => row.visit_date === visitDates[1])
-				).toEqual({
+				expect(data!.find((row) => row.visit_date === visitDates[1])).toEqual({
 					species_name: 'Robin',
 					visit_date: visitDates[1],
 					encounter_count: 1,
@@ -1911,7 +3006,7 @@ describe('Postgres RPC integration tests', () => {
 					pullus_count: 1,
 					weighed_birds_count: 0,
 					min_weight: null,
-					max_weight: null,
+					max_weight: null
 				});
 			});
 		});
@@ -1946,7 +3041,7 @@ describe('Postgres RPC integration tests', () => {
 					.from('Locations')
 					.insert({
 						location_name: `Juv Stats Test Location ${testSuffix}`,
-						ringing_group_id: deltaId,
+						ringing_group_id: deltaId
 					})
 					.select('id')
 					.single();
@@ -1967,14 +3062,13 @@ describe('Postgres RPC integration tests', () => {
 						`JUVTEST2-${testSuffix}`,
 						`JUVTEST3-${testSuffix}`,
 						`JUVTEST4-${testSuffix}`,
-						`JUVTEST5-${testSuffix}`,
-					].map(
-						(ringNo) =>
-							deltaClient
-								.from('Birds')
-								.insert({ ring_no: ringNo, species_id: species!.id })
-								.select('id')
-								.single()
+						`JUVTEST5-${testSuffix}`
+					].map((ringNo) =>
+						deltaClient
+							.from('Birds')
+							.insert({ ring_no: ringNo, species_id: species!.id })
+							.select('id')
+							.single()
 					)
 				);
 				birds.forEach(({ error }) => {
@@ -1988,7 +3082,7 @@ describe('Postgres RPC integration tests', () => {
 					sex: 'M',
 					age_code: 1,
 					record_type: 'N',
-					session_id: sessionId,
+					session_id: sessionId
 				};
 				const { error: encountersError } = await deltaClient
 					.from('Encounters')
@@ -1997,7 +3091,7 @@ describe('Postgres RPC integration tests', () => {
 						{ ...baseEncounter, bird_id: birdIds[1], is_juv: true },
 						{ ...baseEncounter, bird_id: birdIds[2], is_juv: true },
 						{ ...baseEncounter, bird_id: birdIds[3], is_juv: false },
-						{ ...baseEncounter, bird_id: birdIds[4], is_juv: false },
+						{ ...baseEncounter, bird_id: birdIds[4], is_juv: false }
 					]);
 				if (encountersError) throw encountersError;
 			});
@@ -2013,16 +3107,19 @@ describe('Postgres RPC integration tests', () => {
 			});
 
 			it('counts only juvenile encounters in juv_count, all encounters in encounter_count', async () => {
-				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
-					ringing_group_filter: deltaId,
-				});
+				const { data, error } = await deltaClient.rpc(
+					'stats_per_day_and_species',
+					{
+						ringing_group_filter: deltaId
+					}
+				);
 				expect(error).toBeNull();
 				const row = data!.find((row) => row.visit_date === visitDate);
 				expect(row).toMatchObject({
 					species_name: 'Robin',
 					visit_date: visitDate,
 					encounter_count: 5,
-					juv_count: 3,
+					juv_count: 3
 				});
 			});
 		});
@@ -2060,7 +3157,7 @@ describe('Postgres RPC integration tests', () => {
 					.from('Locations')
 					.insert({
 						location_name: `Age Class Stats Test Location ${testSuffix}`,
-						ringing_group_id: deltaId,
+						ringing_group_id: deltaId
 					})
 					.select('id')
 					.single();
@@ -2081,7 +3178,7 @@ describe('Postgres RPC integration tests', () => {
 						`AGECLASSTEST2-${testSuffix}`, // age 3, is_juv true (3J) -> juv
 						`AGECLASSTEST3-${testSuffix}`, // age 1, is_juv false (pulli) -> pullus
 						`AGECLASSTEST4-${testSuffix}`, // age 3, is_juv false (bare 3) -> postjuv
-						`AGECLASSTEST5-${testSuffix}`, // age 5, is_juv true -> none of the three
+						`AGECLASSTEST5-${testSuffix}` // age 5, is_juv true -> none of the three
 					].map((ringNo) =>
 						deltaClient
 							.from('Birds')
@@ -2100,16 +3197,36 @@ describe('Postgres RPC integration tests', () => {
 					scheme: 'BTO',
 					sex: 'M',
 					record_type: 'N',
-					session_id: sessionId,
+					session_id: sessionId
 				};
 				const { error: encountersError } = await deltaClient
 					.from('Encounters')
 					.insert([
-						{ ...baseEncounter, bird_id: birdIds[0], age_code: 1, is_juv: true },
-						{ ...baseEncounter, bird_id: birdIds[1], age_code: 3, is_juv: true },
-						{ ...baseEncounter, bird_id: birdIds[2], age_code: 1, is_juv: false },
-						{ ...baseEncounter, bird_id: birdIds[3], age_code: 3, is_juv: false },
-						{ ...baseEncounter, bird_id: birdIds[4], age_code: 5, is_juv: true },
+						{
+							...baseEncounter,
+							bird_id: birdIds[0],
+							age_code: 1,
+							is_juv: true
+						},
+						{
+							...baseEncounter,
+							bird_id: birdIds[1],
+							age_code: 3,
+							is_juv: true
+						},
+						{
+							...baseEncounter,
+							bird_id: birdIds[2],
+							age_code: 1,
+							is_juv: false
+						},
+						{
+							...baseEncounter,
+							bird_id: birdIds[3],
+							age_code: 3,
+							is_juv: false
+						},
+						{ ...baseEncounter, bird_id: birdIds[4], age_code: 5, is_juv: true }
 					]);
 				if (encountersError) throw encountersError;
 			});
@@ -2125,9 +3242,12 @@ describe('Postgres RPC integration tests', () => {
 			});
 
 			async function fetchRow() {
-				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
-					ringing_group_filter: deltaId,
-				});
+				const { data, error } = await deltaClient.rpc(
+					'stats_per_day_and_species',
+					{
+						ringing_group_filter: deltaId
+					}
+				);
 				expect(error).toBeNull();
 				const row = data!.find((row) => row.visit_date === visitDate);
 				if (!row) throw new Error(`No row found for visit_date ${visitDate}`);
@@ -2172,7 +3292,7 @@ describe('Postgres RPC integration tests', () => {
 						encounter_count: 5,
 						juv_count: 2,
 						postjuv_count: 1,
-						pullus_count: 1,
+						pullus_count: 1
 					});
 				});
 			});
@@ -2202,7 +3322,7 @@ describe('Postgres RPC integration tests', () => {
 						species_name: 'Robin',
 						visit_date: visitDate,
 						juv_count: 2,
-						postjuv_count: 1,
+						postjuv_count: 1
 					});
 				});
 			});
@@ -2234,7 +3354,7 @@ describe('Postgres RPC integration tests', () => {
 						encounter_count: 5,
 						juv_count: 2,
 						postjuv_count: 1,
-						pullus_count: 1,
+						pullus_count: 1
 					});
 				});
 			});
@@ -2296,18 +3416,30 @@ describe('Postgres RPC integration tests', () => {
 					.from('Locations')
 					.insert({
 						location_name: `NonFG Stats Test Location ${testSuffix}`,
-						ringing_group_id: deltaId,
+						ringing_group_id: deltaId
 					})
 					.select('id')
 					.single();
 				if (locationError) throw locationError;
 				locationId = location!.id;
 
-				const fieldObsOnlySessionId = await insertSession(fieldObsOnlyDate, 'FIELD_OBSERVATION');
-				const fieldObsRealSessionId = await insertSession(fieldObsMixedDate, 'FULL_GROWN');
-				const fieldObsMixedTwinId = await insertSession(fieldObsMixedDate, 'FIELD_OBSERVATION');
+				const fieldObsOnlySessionId = await insertSession(
+					fieldObsOnlyDate,
+					'FIELD_OBSERVATION'
+				);
+				const fieldObsRealSessionId = await insertSession(
+					fieldObsMixedDate,
+					'FULL_GROWN'
+				);
+				const fieldObsMixedTwinId = await insertSession(
+					fieldObsMixedDate,
+					'FIELD_OBSERVATION'
+				);
 				const pulliOnlySessionId = await insertSession(pulliOnlyDate, 'PULLI');
-				const pulliRealSessionId = await insertSession(pulliMixedDate, 'FULL_GROWN');
+				const pulliRealSessionId = await insertSession(
+					pulliMixedDate,
+					'FULL_GROWN'
+				);
 				const pulliMixedTwinId = await insertSession(pulliMixedDate, 'PULLI');
 
 				const birds = await Promise.all(
@@ -2319,7 +3451,7 @@ describe('Postgres RPC integration tests', () => {
 						`NFGSTAT5-${testSuffix}`,
 						`NFGSTAT6-${testSuffix}`,
 						`NFGSTAT7-${testSuffix}`,
-						`NFGSTAT8-${testSuffix}`,
+						`NFGSTAT8-${testSuffix}`
 					].map((ringNo) =>
 						deltaClient
 							.from('Birds')
@@ -2338,7 +3470,7 @@ describe('Postgres RPC integration tests', () => {
 					scheme: 'BTO',
 					sex: 'M',
 					age_code: 1,
-					weight: 15,
+					weight: 15
 				};
 				const { error: encountersError } = await deltaClient
 					.from('Encounters')
@@ -2348,20 +3480,20 @@ describe('Postgres RPC integration tests', () => {
 							...baseEncounter,
 							bird_id: birdIds[0],
 							session_id: fieldObsOnlySessionId,
-							record_type: 'C',
+							record_type: 'C'
 						},
 						// fieldObsMixedDate FULL_GROWN session: two proper ringing (N) encounters.
 						{
 							...baseEncounter,
 							bird_id: birdIds[1],
 							session_id: fieldObsRealSessionId,
-							record_type: 'N',
+							record_type: 'N'
 						},
 						{
 							...baseEncounter,
 							bird_id: birdIds[2],
 							session_id: fieldObsRealSessionId,
-							record_type: 'N',
+							record_type: 'N'
 						},
 						// fieldObsMixedDate FIELD_OBSERVATION session: a passive observation on the
 						// same date/location that must not merge into the FULL_GROWN session's row.
@@ -2369,27 +3501,27 @@ describe('Postgres RPC integration tests', () => {
 							...baseEncounter,
 							bird_id: birdIds[3],
 							session_id: fieldObsMixedTwinId,
-							record_type: 'D',
+							record_type: 'D'
 						},
 						// pulliOnlyDate: only a PULLI new-ring (N) encounter.
 						{
 							...baseEncounter,
 							bird_id: birdIds[4],
 							session_id: pulliOnlySessionId,
-							record_type: 'N',
+							record_type: 'N'
 						},
 						// pulliMixedDate FULL_GROWN session: two proper ringing (N) encounters.
 						{
 							...baseEncounter,
 							bird_id: birdIds[5],
 							session_id: pulliRealSessionId,
-							record_type: 'N',
+							record_type: 'N'
 						},
 						{
 							...baseEncounter,
 							bird_id: birdIds[6],
 							session_id: pulliRealSessionId,
-							record_type: 'N',
+							record_type: 'N'
 						},
 						// pulliMixedDate PULLI session: a pulli ringing (N) on the same
 						// date/location that must not merge into the FULL_GROWN session's row.
@@ -2397,8 +3529,8 @@ describe('Postgres RPC integration tests', () => {
 							...baseEncounter,
 							bird_id: birdIds[7],
 							session_id: pulliMixedTwinId,
-							record_type: 'N',
-						},
+							record_type: 'N'
+						}
 					]);
 				if (encountersError) throw encountersError;
 			});
@@ -2414,9 +3546,12 @@ describe('Postgres RPC integration tests', () => {
 			});
 
 			it('excludes a FIELD_OBSERVATION session entirely, returning no rows for a date whose only session is FIELD_OBSERVATION', async () => {
-				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
-					ringing_group_filter: deltaId,
-				});
+				const { data, error } = await deltaClient.rpc(
+					'stats_per_day_and_species',
+					{
+						ringing_group_filter: deltaId
+					}
+				);
 				expect(error).toBeNull();
 				expect(
 					data!.filter((row) => row.visit_date === fieldObsOnlyDate)
@@ -2424,9 +3559,12 @@ describe('Postgres RPC integration tests', () => {
 			});
 
 			it('excludes a PULLI session entirely, returning no rows for a date whose only session is PULLI', async () => {
-				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
-					ringing_group_filter: deltaId,
-				});
+				const { data, error } = await deltaClient.rpc(
+					'stats_per_day_and_species',
+					{
+						ringing_group_filter: deltaId
+					}
+				);
 				expect(error).toBeNull();
 				expect(
 					data!.filter((row) => row.visit_date === pulliOnlyDate)
@@ -2434,34 +3572,44 @@ describe('Postgres RPC integration tests', () => {
 			});
 
 			it('returns rows only for the FULL_GROWN session when a FULL_GROWN and a FIELD_OBSERVATION session share the same date and location', async () => {
-				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
-					ringing_group_filter: deltaId,
-				});
+				const { data, error } = await deltaClient.rpc(
+					'stats_per_day_and_species',
+					{
+						ringing_group_filter: deltaId
+					}
+				);
 				expect(error).toBeNull();
-				const mixedRows = data!.filter((row) => row.visit_date === fieldObsMixedDate);
+				const mixedRows = data!.filter(
+					(row) => row.visit_date === fieldObsMixedDate
+				);
 				expect(mixedRows).toHaveLength(1);
 				// encounter_count is 2 (the two FULL_GROWN N encounters), not 3 — the
 				// FIELD_OBSERVATION on the same date/location is excluded.
 				expect(mixedRows[0]).toMatchObject({
 					species_name: 'Robin',
 					visit_date: fieldObsMixedDate,
-					encounter_count: 2,
+					encounter_count: 2
 				});
 			});
 
 			it('returns rows only for the FULL_GROWN session when a FULL_GROWN and a PULLI session share the same date and location', async () => {
-				const { data, error } = await deltaClient.rpc('stats_per_day_and_species', {
-					ringing_group_filter: deltaId,
-				});
+				const { data, error } = await deltaClient.rpc(
+					'stats_per_day_and_species',
+					{
+						ringing_group_filter: deltaId
+					}
+				);
 				expect(error).toBeNull();
-				const mixedRows = data!.filter((row) => row.visit_date === pulliMixedDate);
+				const mixedRows = data!.filter(
+					(row) => row.visit_date === pulliMixedDate
+				);
 				expect(mixedRows).toHaveLength(1);
 				// encounter_count is 2 (the two FULL_GROWN N encounters), not 3 — the PULLI
 				// ringing on the same date/location is excluded.
 				expect(mixedRows[0]).toMatchObject({
 					species_name: 'Robin',
 					visit_date: pulliMixedDate,
-					encounter_count: 2,
+					encounter_count: 2
 				});
 			});
 		});
@@ -2474,12 +3622,16 @@ describe('Postgres RPC integration tests', () => {
 		let alphaSiteBLocationId: number;
 
 		beforeAll(async () => {
-			alphaSiteBLocationId = await getLocationIdByName(alphaClient, 'Alpha Site B', alphaId);
+			alphaSiteBLocationId = await getLocationIdByName(
+				alphaClient,
+				'Alpha Site B',
+				alphaId
+			);
 		});
 
 		it('a group with multiple species returns them ordered by most recent first_encounter_date first', async () => {
 			const { data, error } = await alphaClient.rpc('group_ticks', {
-				ringing_group_filter: alphaId,
+				ringing_group_filter: alphaId
 			});
 			expect(error).toBeNull();
 			expect(data).toEqual([
@@ -2487,19 +3639,19 @@ describe('Postgres RPC integration tests', () => {
 				{ species_name: 'Blue Tit', first_encounter_date: '2022-04-30' },
 				{ species_name: 'Kingfisher', first_encounter_date: '2022-04-30' },
 				{ species_name: 'Robin', first_encounter_date: '2021-06-20' },
-				{ species_name: 'Wren', first_encounter_date: '2021-06-20' },
+				{ species_name: 'Wren', first_encounter_date: '2021-06-20' }
 			]);
 		});
 
 		describe('ringing_group_filter parameter', () => {
 			it('scopes to that group only — a species encountered by a different group is excluded', async () => {
 				const { data, error } = await betaClient.rpc('group_ticks', {
-					ringing_group_filter: betaId,
+					ringing_group_filter: betaId
 				});
 				expect(error).toBeNull();
 				expect(data).toEqual([
 					{ species_name: 'Chaffinch', first_encounter_date: '2023-06-01' },
-					{ species_name: 'Robin', first_encounter_date: '2023-06-01' },
+					{ species_name: 'Robin', first_encounter_date: '2023-06-01' }
 				]);
 				// Alpha-only species (e.g. Kingfisher) never appear when filtered to Beta
 				expect(data!.some((r) => r.species_name === 'Kingfisher')).toBe(false);
@@ -2510,13 +3662,13 @@ describe('Postgres RPC integration tests', () => {
 			it('scopes to that location only — a species first encountered at a different location is excluded', async () => {
 				const { data, error } = await alphaClient.rpc('group_ticks', {
 					ringing_group_filter: alphaId,
-					location_filter: alphaSiteBLocationId,
+					location_filter: alphaSiteBLocationId
 				});
 				expect(error).toBeNull();
 				expect(data).toEqual([
 					{ species_name: 'Reed Warbler', first_encounter_date: '2023-09-14' },
 					{ species_name: 'Blue Tit', first_encounter_date: '2022-10-20' },
-					{ species_name: 'Robin', first_encounter_date: '2022-10-20' },
+					{ species_name: 'Robin', first_encounter_date: '2022-10-20' }
 				]);
 				// Kingfisher and Wren were only ever encountered at Alpha Site A (CES)
 				expect(data!.some((r) => r.species_name === 'Kingfisher')).toBe(false);
@@ -2528,19 +3680,19 @@ describe('Postgres RPC integration tests', () => {
 			it('truncates the returned rows to N', async () => {
 				const { data, error } = await alphaClient.rpc('group_ticks', {
 					ringing_group_filter: alphaId,
-					result_limit: 2,
+					result_limit: 2
 				});
 				expect(error).toBeNull();
 				expect(data).toEqual([
 					{ species_name: 'Reed Warbler', first_encounter_date: '2022-06-15' },
-					{ species_name: 'Blue Tit', first_encounter_date: '2022-04-30' },
+					{ species_name: 'Blue Tit', first_encounter_date: '2022-04-30' }
 				]);
 			});
 		});
 
 		it('a group with zero encounters returns an empty array', async () => {
 			const { data, error } = await gammaClient.rpc('group_ticks', {
-				ringing_group_filter: gammaId,
+				ringing_group_filter: gammaId
 			});
 			expect(error).toBeNull();
 			expect(data).toEqual([]);
@@ -2548,13 +3700,23 @@ describe('Postgres RPC integration tests', () => {
 
 		it('two species sharing the same first_encounter_date are tie-broken by species_name ASC', async () => {
 			const { data, error } = await alphaClient.rpc('group_ticks', {
-				ringing_group_filter: alphaId,
+				ringing_group_filter: alphaId
 			});
 			expect(error).toBeNull();
-			const tiedAtJune2021 = data!.filter((r) => r.first_encounter_date === '2021-06-20');
-			expect(tiedAtJune2021.map((r) => r.species_name)).toEqual(['Robin', 'Wren']);
-			const tiedAtApril2022 = data!.filter((r) => r.first_encounter_date === '2022-04-30');
-			expect(tiedAtApril2022.map((r) => r.species_name)).toEqual(['Blue Tit', 'Kingfisher']);
+			const tiedAtJune2021 = data!.filter(
+				(r) => r.first_encounter_date === '2021-06-20'
+			);
+			expect(tiedAtJune2021.map((r) => r.species_name)).toEqual([
+				'Robin',
+				'Wren'
+			]);
+			const tiedAtApril2022 = data!.filter(
+				(r) => r.first_encounter_date === '2022-04-30'
+			);
+			expect(tiedAtApril2022.map((r) => r.species_name)).toEqual([
+				'Blue Tit',
+				'Kingfisher'
+			]);
 		});
 
 		it("a species' first-ever encounter logged with a non-'N' record_type still sets first_encounter_date", async () => {
@@ -2562,11 +3724,14 @@ describe('Postgres RPC integration tests', () => {
 			// record — the bird was originally ringed by Alpha). group_ticks must not filter to
 			// record_type = 'N' only, or Robin would be missing from Beta's results entirely.
 			const { data, error } = await betaClient.rpc('group_ticks', {
-				ringing_group_filter: betaId,
+				ringing_group_filter: betaId
 			});
 			expect(error).toBeNull();
 			const robinRow = data!.find((r) => r.species_name === 'Robin');
-			expect(robinRow).toEqual({ species_name: 'Robin', first_encounter_date: '2023-06-01' });
+			expect(robinRow).toEqual({
+				species_name: 'Robin',
+				first_encounter_date: '2023-06-01'
+			});
 		});
 	});
 });
@@ -2580,7 +3745,8 @@ describe('Postgres RPC integration tests', () => {
 // worktree runs against the shared local Supabase instance never collide (see CLAUDE.md's
 // "DB integration tests" section). `supabase` is the anon client (anon key, no JWT).
 describe('public_aggregate_stats', () => {
-	const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+	const LOCAL_DB_URL =
+		'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 	const suffix = randomTestSuffix();
 
 	// Two isolated groups: one that publishes 'summary', one that publishes nothing. Each
@@ -2602,7 +3768,9 @@ describe('public_aggregate_stats', () => {
 	let month2Date: string;
 
 	function psqlScalar(sql: string): string {
-		return execSync(`psql "${LOCAL_DB_URL}" -t -A -c "${sql.replace(/"/g, '\\"')}"`)
+		return execSync(
+			`psql "${LOCAL_DB_URL}" -t -A -c "${sql.replace(/"/g, '\\"')}"`
+		)
 			.toString()
 			.split('\n')
 			.map((line) => line.trim())
@@ -2611,7 +3779,9 @@ describe('public_aggregate_stats', () => {
 
 	function createGroup(name: string, publicAreas: 'summary'[] = []): number {
 		const areasLiteral =
-			publicAreas.length === 0 ? "'{}'" : `ARRAY[${publicAreas.map((a) => `'${a}'`).join(', ')}]`;
+			publicAreas.length === 0
+				? "'{}'"
+				: `ARRAY[${publicAreas.map((a) => `'${a}'`).join(', ')}]`;
 		return Number(
 			psqlScalar(
 				`INSERT INTO "RingingGroups" (group_name, slug, public_areas) ` +
@@ -2626,7 +3796,10 @@ describe('public_aggregate_stats', () => {
 			.select('id')
 			.eq('species_name', name)
 			.single();
-		if (error || !data) throw new Error(`Species "${name}" not found — run npm run db:seed:e2e first`);
+		if (error || !data)
+			throw new Error(
+				`Species "${name}" not found — run npm run db:seed:e2e first`
+			);
 		return data.id;
 	}
 
@@ -2637,11 +3810,19 @@ describe('public_aggregate_stats', () => {
 		groupId: number,
 		locationId: number,
 		visitDate: string,
-		encounters: Array<{ speciesId: number; recordType: string; captureTime: string }>
+		encounters: Array<{
+			speciesId: number;
+			recordType: string;
+			captureTime: string;
+		}>
 	): Promise<void> {
 		const { data: session, error: sessionError } = await client
 			.from('Sessions')
-			.insert({ visit_date: visitDate, location_id: locationId, session_type: 'FULL_GROWN' })
+			.insert({
+				visit_date: visitDate,
+				location_id: locationId,
+				session_type: 'FULL_GROWN'
+			})
 			.select('id')
 			.single();
 		if (sessionError) throw sessionError;
@@ -2651,7 +3832,10 @@ describe('public_aggregate_stats', () => {
 			const { speciesId, recordType, captureTime } = encounters[i];
 			const { data: bird, error: birdError } = await client
 				.from('Birds')
-				.insert({ ring_no: `PAS-${suffix}-${groupId}-${createdBirdIds.length}`, species_id: speciesId })
+				.insert({
+					ring_no: `PAS-${suffix}-${groupId}-${createdBirdIds.length}`,
+					species_id: speciesId
+				})
 				.select('id')
 				.single();
 			if (birdError) throw birdError;
@@ -2665,16 +3849,23 @@ describe('public_aggregate_stats', () => {
 				age_code: 4,
 				weight: 15,
 				record_type: recordType,
-				capture_time: captureTime,
+				capture_time: captureTime
 			});
 			if (encounterError) throw encounterError;
 		}
 	}
 
-	async function createLocation(client: SupabaseClient, groupId: number, label: string): Promise<number> {
+	async function createLocation(
+		client: SupabaseClient,
+		groupId: number,
+		label: string
+	): Promise<number> {
 		const { data, error } = await client
 			.from('Locations')
-			.insert({ location_name: `Public Agg ${label} ${suffix}`, ringing_group_id: groupId })
+			.insert({
+				location_name: `Public Agg ${label} ${suffix}`,
+				ringing_group_id: groupId
+			})
 			.select('id')
 			.single();
 		if (error) throw error;
@@ -2685,8 +3876,10 @@ describe('public_aggregate_stats', () => {
 	beforeAll(async () => {
 		publicGroupId = createGroup(`PublicAggPublic-${suffix}`, ['summary']);
 		privateGroupId = createGroup(`PublicAggPrivate-${suffix}`, []);
-		publicGroupClient = await getAuthenticatedSupabaseClientForGroup(publicGroupId);
-		const privateGroupClient = await getAuthenticatedSupabaseClientForGroup(privateGroupId);
+		publicGroupClient =
+			await getAuthenticatedSupabaseClientForGroup(publicGroupId);
+		const privateGroupClient =
+			await getAuthenticatedSupabaseClientForGroup(privateGroupId);
 
 		const robinId = await getSpeciesId('Robin');
 		const wrenId = await getSpeciesId('Wren');
@@ -2695,18 +3888,36 @@ describe('public_aggregate_stats', () => {
 		month2Date = addDays(month1Date, 40);
 
 		// Public group: month 1 = 2 Robins + 1 Wren (all New); month 2 = 1 Robin.
-		const publicLocationId = await createLocation(publicGroupClient, publicGroupId, 'Public');
-		await insertSessionWithEncounters(publicGroupClient, publicGroupId, publicLocationId, month1Date, [
-			{ speciesId: robinId, recordType: 'N', captureTime: '09:00:00' },
-			{ speciesId: robinId, recordType: 'N', captureTime: '10:00:00' },
-			{ speciesId: wrenId, recordType: 'N', captureTime: '11:00:00' },
-		]);
-		await insertSessionWithEncounters(publicGroupClient, publicGroupId, publicLocationId, month2Date, [
-			{ speciesId: robinId, recordType: 'N', captureTime: '09:00:00' },
-		]);
+		const publicLocationId = await createLocation(
+			publicGroupClient,
+			publicGroupId,
+			'Public'
+		);
+		await insertSessionWithEncounters(
+			publicGroupClient,
+			publicGroupId,
+			publicLocationId,
+			month1Date,
+			[
+				{ speciesId: robinId, recordType: 'N', captureTime: '09:00:00' },
+				{ speciesId: robinId, recordType: 'N', captureTime: '10:00:00' },
+				{ speciesId: wrenId, recordType: 'N', captureTime: '11:00:00' }
+			]
+		);
+		await insertSessionWithEncounters(
+			publicGroupClient,
+			publicGroupId,
+			publicLocationId,
+			month2Date,
+			[{ speciesId: robinId, recordType: 'N', captureTime: '09:00:00' }]
+		);
 
 		// Private group: has data too, so "returns nothing" reflects the flag, not empty data.
-		const privateLocationId = await createLocation(privateGroupClient, privateGroupId, 'Private');
+		const privateLocationId = await createLocation(
+			privateGroupClient,
+			privateGroupId,
+			'Private'
+		);
 		await insertSessionWithEncounters(
 			privateGroupClient,
 			privateGroupId,
@@ -2729,16 +3940,24 @@ describe('public_aggregate_stats', () => {
 
 	// Usual
 	it("returns the same rows as aggregate_stats for a group with 'summary' in public_areas", async () => {
-		const params = { ringing_group_filter: publicGroupId, from_date: month1Date, to_date: month1Date };
+		const params = {
+			ringing_group_filter: publicGroupId,
+			from_date: month1Date,
+			to_date: month1Date
+		};
 		const [publicRes, authRes] = await Promise.all([
 			anonClient.rpc('public_aggregate_stats', params),
-			publicGroupClient.rpc('aggregate_stats', params),
+			publicGroupClient.rpc('aggregate_stats', params)
 		]);
 		expect(publicRes.error).toBeNull();
 		expect(authRes.error).toBeNull();
 		expect(authRes.data).toHaveLength(1);
 		// month 1 = 3 encounters / 3 birds / 2 species, and the public wrapper mirrors it exactly.
-		expect(authRes.data![0]).toMatchObject({ encounter_count: 3, bird_count: 3, species_count: 2 });
+		expect(authRes.data![0]).toMatchObject({
+			encounter_count: 3,
+			bird_count: 3,
+			species_count: 2
+		});
 		expect(publicRes.data).toEqual(authRes.data);
 	});
 
@@ -2747,7 +3966,7 @@ describe('public_aggregate_stats', () => {
 		const { data, error } = await anonClient.rpc('public_aggregate_stats', {
 			ringing_group_filter: privateGroupId,
 			from_date: month1Date,
-			to_date: month1Date,
+			to_date: month1Date
 		});
 		expect(error).toBeNull();
 		// The private group has a real encounter on this date; the empty flag, not empty data,
@@ -2760,15 +3979,18 @@ describe('public_aggregate_stats', () => {
 			ringing_group_filter: publicGroupId,
 			from_date: month1Date,
 			to_date: month1Date,
-			group_by_species: true,
+			group_by_species: true
 		};
 		const [publicRes, authRes] = await Promise.all([
 			anonClient.rpc('public_aggregate_stats', params),
-			publicGroupClient.rpc('aggregate_stats', params),
+			publicGroupClient.rpc('aggregate_stats', params)
 		]);
 		expect(publicRes.error).toBeNull();
 		expect(authRes.error).toBeNull();
-		expect(authRes.data!.map((r) => r.species_name).sort()).toEqual(['Robin', 'Wren']);
+		expect(authRes.data!.map((r) => r.species_name).sort()).toEqual([
+			'Robin',
+			'Wren'
+		]);
 		expect(publicRes.data).toEqual(authRes.data);
 	});
 
@@ -2777,11 +3999,11 @@ describe('public_aggregate_stats', () => {
 			ringing_group_filter: publicGroupId,
 			from_date: month1Date,
 			to_date: month2Date,
-			group_by_time_period: 'month',
+			group_by_time_period: 'month'
 		};
 		const [publicRes, authRes] = await Promise.all([
 			anonClient.rpc('public_aggregate_stats', params),
-			publicGroupClient.rpc('aggregate_stats', params),
+			publicGroupClient.rpc('aggregate_stats', params)
 		]);
 		expect(publicRes.error).toBeNull();
 		expect(authRes.error).toBeNull();
@@ -2793,7 +4015,7 @@ describe('public_aggregate_stats', () => {
 	// Edge
 	it('returns nothing for a non-existent ringing_group_filter id', async () => {
 		const { data, error } = await anonClient.rpc('public_aggregate_stats', {
-			ringing_group_filter: 2_000_000_000,
+			ringing_group_filter: 2_000_000_000
 		});
 		expect(error).toBeNull();
 		expect(data).toEqual([]);
@@ -2811,7 +4033,7 @@ describe('public_aggregate_stats', () => {
 		const { data, error } = await anonClient.rpc('public_aggregate_stats', {
 			ringing_group_filter: publicGroupId,
 			from_date: month1Date,
-			to_date: month1Date,
+			to_date: month1Date
 		});
 		expect(error).toBeNull();
 		expect(data).toHaveLength(1);
@@ -2823,9 +4045,18 @@ describe('public_aggregate_stats', () => {
 		// on Sessions/Encounters/Birds still returns nothing to a client with no group JWT,
 		// even for the very group that published its summary.
 		const [sessions, encounters, birds] = await Promise.all([
-			anonClient.from('Sessions').select('id').eq('ringing_group_id', publicGroupId),
-			anonClient.from('Encounters').select('id').eq('ringing_group_id', publicGroupId),
-			anonClient.from('Birds').select('id').contains('ringing_group_ids', [publicGroupId]),
+			anonClient
+				.from('Sessions')
+				.select('id')
+				.eq('ringing_group_id', publicGroupId),
+			anonClient
+				.from('Encounters')
+				.select('id')
+				.eq('ringing_group_id', publicGroupId),
+			anonClient
+				.from('Birds')
+				.select('id')
+				.contains('ringing_group_ids', [publicGroupId])
 		]);
 		expect(sessions.error).toBeNull();
 		expect(encounters.error).toBeNull();
