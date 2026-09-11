@@ -694,6 +694,129 @@ describe('SessionTabs', () => {
 		});
 	});
 
+	describe('initialTabId (#805)', () => {
+		it('defaults activeTab to species when initialTabId is undefined (existing behaviour)', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+				/>
+			);
+			expect(screen.getByTestId('session-table')).not.toBeNull();
+			expect(screen.queryByText('Net round 1: 09:00')).toBeNull();
+		});
+
+		it('initialTabId="net-rounds" loads and shows the Net rounds panel on first render, no click', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+					initialTabId="net-rounds"
+				/>
+			);
+			expect(screen.getByText('Net round 1: 09:00')).not.toBeNull();
+			expect(screen.queryByTestId('session-table')).toBeNull();
+		});
+
+		describe('when locationId is unset — one test per known tab id', () => {
+			it.each(['species', 'net-rounds', 'highlights'])(
+				'initialTabId=%s focuses that tab',
+				(tabId) => {
+					render(
+						<SessionTabs
+							speciesList={speciesList}
+							netRounds={netRounds}
+							locationId={undefined}
+							viewedGroupId={1}
+							date="2024-09-15"
+							initialTabId={tabId}
+						/>
+					);
+					const button = screen.getByRole('button', {
+						name:
+							tabId === 'species'
+								? 'Species totals'
+								: tabId === 'net-rounds'
+									? 'Net rounds'
+									: 'Highlights'
+					});
+					expect(button.getAttribute('aria-current')).toBe('true');
+				}
+			);
+		});
+
+		describe('when locationId is set — one test per known tab id (highlights excluded)', () => {
+			it.each(['species', 'net-rounds'])(
+				'initialTabId=%s focuses that tab',
+				(tabId) => {
+					render(
+						<SessionTabs
+							speciesList={speciesList}
+							netRounds={netRounds}
+							locationId={10}
+							viewedGroupId={1}
+							date="2024-09-15"
+							initialTabId={tabId}
+						/>
+					);
+					const button = screen.getByRole('button', {
+						name: tabId === 'species' ? 'Species totals' : 'Net rounds'
+					});
+					expect(button.getAttribute('aria-current')).toBe('true');
+				}
+			);
+
+			it('does not offer a Highlights tab at all', () => {
+				render(
+					<SessionTabs
+						speciesList={speciesList}
+						netRounds={netRounds}
+						locationId={10}
+						viewedGroupId={1}
+						date="2024-09-15"
+						initialTabId="species"
+					/>
+				);
+				expect(screen.queryByRole('button', { name: 'Highlights' })).toBeNull();
+			});
+		});
+
+		it('initialTabId="highlights" while locationId is set falls back to species (not a known tab for this render)', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={10}
+					viewedGroupId={1}
+					date="2024-09-15"
+					initialTabId="highlights"
+				/>
+			);
+			expect(screen.getByTestId('session-table')).not.toBeNull();
+			expect(screen.queryByText('Net round 1: 09:00')).toBeNull();
+		});
+
+		it('initialTabId="not-a-real-tab" falls back to species, with no crash and no blank pane', () => {
+			render(
+				<SessionTabs
+					speciesList={speciesList}
+					netRounds={netRounds}
+					locationId={undefined}
+					viewedGroupId={1}
+					date="2024-09-15"
+					initialTabId="not-a-real-tab"
+				/>
+			);
+			expect(screen.getByTestId('session-table')).not.toBeNull();
+		});
+	});
+
 	it.skip('renders session highlights in a tab', async () => {
 		render(
 			<SessionTabs

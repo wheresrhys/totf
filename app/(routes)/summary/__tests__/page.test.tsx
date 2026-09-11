@@ -29,6 +29,12 @@ vi.mock('@/app/actions/period-totals', () => ({
 	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
 }));
 
+function renderSummaryPage(tabId?: string) {
+	return Page(
+		tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) }
+	);
+}
+
 function buildDayStat(time_period: string) {
 	return {
 		species_name: null,
@@ -182,6 +188,64 @@ describe('/summary (all-time)', () => {
 			await screen.findByRole('heading', { level: 1 });
 			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
 			await screen.findByText('No data recorded.');
+		});
+	});
+
+	describe('?tabId= query param (#804)', () => {
+		it('with no tabId search param, the existing default tab (Year totals) renders and loads, unchanged', async () => {
+			render(await renderSummaryPage());
+			await screen.findByRole('heading', { level: 1 });
+			expect(
+				screen
+					.getByRole('button', { name: 'Year totals' })
+					.getAttribute('aria-current')
+			).toBe('true');
+		});
+
+		it('?tabId=species-totals focuses the Species totals tab and loads its data without a click', async () => {
+			render(await renderSummaryPage('species-totals'));
+			await screen.findByRole('heading', { level: 1 });
+			await waitFor(() => expect(fetchSpeciesDataMock).toHaveBeenCalled());
+			expect(
+				screen
+					.getByRole('button', { name: 'Species totals' })
+					.getAttribute('aria-current')
+			).toBe('true');
+		});
+
+		it.each([
+			['year-totals', 'Year totals'],
+			['all-time-month-totals', 'Month totals'],
+			['session-totals', 'Session totals'],
+			['species-totals', 'Species totals']
+		])('?tabId=%s selects the %s tab', async (tabId, buttonName) => {
+			render(await renderSummaryPage(tabId));
+			await screen.findByRole('heading', { level: 1 });
+			expect(
+				screen
+					.getByRole('button', { name: buttonName })
+					.getAttribute('aria-current')
+			).toBe('true');
+		});
+
+		it('?tabId=not-a-real-tab falls back to the route default, with no crash and no blank pane', async () => {
+			render(await renderSummaryPage('not-a-real-tab'));
+			await screen.findByRole('heading', { level: 1 });
+			expect(
+				screen
+					.getByRole('button', { name: 'Year totals' })
+					.getAttribute('aria-current')
+			).toBe('true');
+		});
+
+		it('?tabId=month-totals (a real tab id, but only built on the [year] route) falls back to this route default', async () => {
+			render(await renderSummaryPage('month-totals'));
+			await screen.findByRole('heading', { level: 1 });
+			expect(
+				screen
+					.getByRole('button', { name: 'Year totals' })
+					.getAttribute('aria-current')
+			).toBe('true');
 		});
 	});
 });

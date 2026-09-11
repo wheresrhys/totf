@@ -26,6 +26,7 @@ type GroupScopedParams<ExtraParams> = { groupSlug: string } & ExtraParams;
 export type GroupScopeContext<ExtraParams> = {
 	viewedGroup: ViewedGroup;
 	params: ExtraParams;
+	searchParams?: Promise<{ tabId?: string }>;
 };
 
 /**
@@ -37,6 +38,13 @@ export type GroupScopeContext<ExtraParams> = {
  * `renderPage` may be sync or async — an async callback lets a page do extra
  * work after resolution (e.g. the cross-group home page's redirect-to-own-group
  * check) before returning its element.
+ *
+ * `searchParams` (#805) is optional and passed through unmodified — Next.js
+ * supplies it to every page component regardless of whether the component's
+ * declared type mentions it, but most `withGroupScope` callers don't care
+ * about it, so it's not defaulted or unwrapped here. A `renderPage` that wants
+ * a `?tabId=` deep link (e.g. the session page) reads it via
+ * `readTabIdSearchParam` in its own `getParams`.
  */
 export function withGroupScope<ExtraParams = Record<never, never>>(
 	renderPage: (
@@ -44,9 +52,11 @@ export function withGroupScope<ExtraParams = Record<never, never>>(
 	) => React.ReactNode | Promise<React.ReactNode>
 ) {
 	return async function GroupScopedPage({
-		params
+		params,
+		searchParams
 	}: {
 		params: Promise<GroupScopedParams<ExtraParams>>;
+		searchParams?: Promise<{ tabId?: string }>;
 	}) {
 		const { groupSlug, ...extraParams } = await params;
 		const viewedGroupId = await resolveGroupIdBySlug(groupSlug);
@@ -56,7 +66,8 @@ export function withGroupScope<ExtraParams = Record<never, never>>(
 		const viewedGroup: ViewedGroup = { id: viewedGroupId, slug: groupSlug };
 		return renderPage({
 			viewedGroup,
-			params: extraParams as ExtraParams
+			params: extraParams as ExtraParams,
+			searchParams
 		});
 	};
 }

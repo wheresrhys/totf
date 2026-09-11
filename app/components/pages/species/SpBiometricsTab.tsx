@@ -140,6 +140,14 @@ export function SpBiometricsTab({
 								? `/species/${speciesName}?tabId=graphs`
 								: undefined
 						}
+						yearlyAggregators={{
+							'max weight': 'max',
+							'median weight': 'mean',
+							'min weight': 'min',
+							'max wing': 'max',
+							'median wing': 'mean',
+							'min wing': 'min'
+						}}
 					/>
 				) : (
 					<Spinner />

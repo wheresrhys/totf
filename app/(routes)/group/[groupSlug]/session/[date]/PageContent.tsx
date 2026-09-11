@@ -20,6 +20,9 @@ export type PageParams = {
 	viewedGroupId: number;
 	date: string;
 	locationId: number | undefined;
+	// The optional `?tabId=` search param (#803, applied here by #805) — never
+	// affects `getCacheKeys`, only which tab `SessionTabs` focuses/loads first.
+	tabId?: string;
 };
 
 export type AdjacentSessionDates = {
@@ -159,13 +162,14 @@ function SessionNavigation({
 
 export function SessionPageContent({
 	data: dayData,
-	params: { date, locationId },
+	params: { date, locationId, tabId },
 	viewedGroup
 }: {
 	data: DayData;
 	params: {
 		date: string;
 		locationId: number | undefined;
+		tabId?: string;
 	};
 	viewedGroup: ViewedGroup;
 }) {
@@ -211,6 +215,7 @@ export function SessionPageContent({
 				date={date}
 				viewedGroupId={viewedGroup.id}
 				oldestEncounter={oldestEncounter}
+				initialTabId={tabId}
 			/>
 		</PageWrapper>
 	);

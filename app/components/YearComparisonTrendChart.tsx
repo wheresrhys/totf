@@ -113,6 +113,16 @@ const NORMALIZE_OPTIONS: { value: boolean; label: string }[] = [
 	{ value: true, label: 'Yes' }
 ];
 
+// Granularity of the "All time" view: 'month' is the conventional per-month
+// trend line; 'year' collapses each metric to one point per calendar year via
+// `aggregateSeriesByYear`. Only ever shown in the all-time view.
+type Interval = 'year' | 'month';
+
+const INTERVAL_OPTIONS: { value: Interval; label: string }[] = [
+	{ value: 'year', label: 'Year' },
+	{ value: 'month', label: 'Month' }
+];
+
 // Divides each metric's `[date, value]` point by that date's ringing-effort
 // hours from `effortHistory` (a single, species-agnostic series keyed by the
 // same date convention as `series`), turning a raw count/measurement into an
@@ -167,6 +177,69 @@ export function toYearOnYearSeries(metric: LineChartData): LineChartData[] {
 					]
 			)
 		}));
+}
+
+type YearlyAggregator = 'sum' | 'mean' | 'max' | 'min';
+
+function reduceByAggregator(
+	values: number[],
+	aggregator: YearlyAggregator
+): number {
+	switch (aggregator) {
+		case 'sum':
+			return values.reduce((total, value) => total + value, 0);
+		case 'mean':
+			return values.reduce((total, value) => total + value, 0) / values.length;
+		case 'max':
+			return Math.max(...values);
+		case 'min':
+			return Math.min(...values);
+	}
+}
+
+// Collapses one metric's monthly `[date, value]` points down to a single point
+// per calendar year, reducing each year's reportable months with `aggregator`.
+// Every year present in the input span is emitted (oldest-first, labelled by
+// year) so a quiet year in the middle renders as an explicit gap rather than
+// the line bridging across it. A month with no reportable value is skipped from
+// its year's aggregate (same `hasReportableValue` gap convention as
+// `toYearOnYearSeries`/`toThisYearSeries` — a dense-spine zero-count month is
+// "no data", not a real `0`); a year with no reportable months at all
+// aggregates to `null` (a gap), never `0`/`NaN`. Dates are read in UTC to avoid
+// the behind-UTC month-slip the sibling transforms already guard against.
+//
+// `'mean'` on a median-weight/median-wing series is an average-of-monthly-
+// medians approximation — the true yearly median can't be recovered from
+// monthly medians alone — and is accepted as-is (see #810).
+export function aggregateSeriesByYear(
+	metric: LineChartData,
+	aggregator: YearlyAggregator
+): LineChartData {
+	const reportableByYear = new Map<number, number[]>();
+	const yearsInSpan = new Set<number>();
+	for (const [rawDate, value] of metric.data) {
+		const year = new Date(rawDate).getUTCFullYear();
+		yearsInSpan.add(year);
+		if (!hasReportableValue(value)) continue;
+		if (!reportableByYear.has(year)) {
+			reportableByYear.set(year, []);
+		}
+		reportableByYear.get(year)!.push(value);
+	}
+	return {
+		...metric,
+		data: [...yearsInSpan]
+			.sort((a, b) => a - b)
+			.map((year) => {
+				const values = reportableByYear.get(year);
+				return [
+					String(year),
+					values && values.length
+						? reduceByAggregator(values, aggregator)
+						: null
+				] as [string, number | null];
+			})
+	};
 }
 
 // One colour per year (in the oldest-first order `toYearOnYearSeries` returns),
@@ -333,7 +406,8 @@ export function YearComparisonTrendChart({
 	ytitle = 'Value',
 	min = 0,
 	effortHistory,
-	compareYearsUrl
+	compareYearsUrl,
+	yearlyAggregators
 }: {
 	series: LineChartData[];
 	xtitle?: string;
@@ -348,9 +422,16 @@ export function YearComparisonTrendChart({
 	// chart renders in a fixed `'all-time'` mode (there's no switcher left to
 	// pick another mode).
 	compareYearsUrl?: string;
+	// How each metric's monthly points collapse into a single yearly point when
+	// the all-time "Interval" toggle is set to Year, keyed by the metric's
+	// `name`. A metric absent from the map defaults to `'sum'`. Counts sum; a
+	// biometrics "max"/"min" series aggregates via `max`/`min`, and a "median"
+	// series via `mean` (an average-of-monthly-medians approximation — see #810).
+	yearlyAggregators?: Record<string, YearlyAggregator>;
 }) {
 	const [mode, setMode] = useState<ChartMode>('all-time');
 	const [normalize, setNormalize] = useState(false);
+	const [interval, setInterval] = useState<Interval>('month');
 	// Unique per instance so several of these charts on one page (e.g. multiple
 	// expanded species-graph tiles) don't share a radio group.
 	const toggleName = useId();
@@ -364,6 +445,17 @@ export function YearComparisonTrendChart({
 	const allTimeColors = effectiveSeries.map((_, metricIndex) =>
 		metricBaseColor(metricIndex)
 	);
+	// Year aggregation is layered on top of the (possibly effort-normalized)
+	// series, matching the order-of-operations the normalize toggle establishes.
+	const allTimeSeries =
+		interval === 'year'
+			? effectiveSeries.map((metric) =>
+					aggregateSeriesByYear(
+						metric,
+						yearlyAggregators?.[metric.name] ?? 'sum'
+					)
+				)
+			: effectiveSeries;
 	return (
 		<div className="flex flex-col">
 			<div className="mb-2 flex justify-end gap-2">
@@ -392,6 +484,30 @@ export function YearComparisonTrendChart({
 						))}
 					</div>
 				)}
+				{mode === 'all-time' ? (
+					<div className="flex items-center gap-1">
+						<span className="text-sm">Interval</span>
+						<div className="border-base-content/20 flex gap-0.5 rounded-field border p-0.5">
+							{INTERVAL_OPTIONS.map((option) => (
+								<label
+									key={option.value}
+									htmlFor={`${toggleName}-interval-${option.value}`}
+									className="btn btn-sm btn-text has-checked:btn-active"
+								>
+									<span>{option.label}</span>
+									<input
+										id={`${toggleName}-interval-${option.value}`}
+										name={`${toggleName}-interval`}
+										type="radio"
+										className="hidden"
+										checked={interval === option.value}
+										onChange={() => setInterval(option.value)}
+									/>
+								</label>
+							))}
+						</div>
+					</div>
+				) : null}
 				{effortHistory ? (
 					<div className="flex items-center gap-1">
 						<span className="text-sm">Normalize</span>
@@ -421,7 +537,7 @@ export function YearComparisonTrendChart({
 				{mode === 'all-time' && (
 					<LineChart
 						min={min}
-						data={effectiveSeries}
+						data={allTimeSeries}
 						colors={allTimeColors}
 						xtitle={xtitle}
 						ytitle={effectiveYtitle}

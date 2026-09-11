@@ -23,6 +23,7 @@ import {
 } from '@/app/models/month-totals';
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
+import { resolveInitialTabId } from '@/lib/tab-query-param';
 
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
 // The all-time page's combine-years month tab — distinct from `MONTH_TOTALS_TAB`
@@ -188,7 +189,8 @@ export function SummaryTotalsSection({
 	fromDate,
 	toDate,
 	year,
-	month
+	month,
+	initialTabId
 }: {
 	// The page's aggregate stats for whichever table/tab is active — used to
 	// derive the pinned totals row. `null` (no data yet) renders no totals row.
@@ -224,6 +226,11 @@ export function SummaryTotalsSection({
 	// Undefined on the all-time page, matching its unscoped species links.
 	year?: number;
 	month?: number;
+	// The resolved `?tabId=` search param (#804, reusing #803's mechanism) —
+	// wins over `tabs[0].id` as the initial active tab when it names one of
+	// this render's own `tabs`; an unknown/garbage value or no param at all
+	// falls back to `tabs[0].id` unchanged.
+	initialTabId?: string;
 }) {
 	// Each summary page supplies at most one period tab's data: year totals on
 	// the all-time page, month totals on the year page, session totals on the
@@ -245,7 +252,13 @@ export function SummaryTotalsSection({
 		[ALL_TIME_MONTH_TOTALS_TAB.id]: !yearlyTotals,
 		[SESSION_TOTALS_TAB.id]: !monthTotals && !yearlyTotals
 	};
-	const [activeTab, setActiveTab] = useState(tabs[0].id);
+	const [activeTab, setActiveTab] = useState(
+		resolveInitialTabId(
+			initialTabId,
+			tabs.map((tab) => tab.id),
+			tabs[0].id
+		)
+	);
 
 	// Species totals are fetched lazily: only once the Species tab is first
 	// selected (or on first paint when it is the sole/default tab), and never
