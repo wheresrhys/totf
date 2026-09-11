@@ -407,6 +407,7 @@ export function YearComparisonTrendChart({
 	min = 0,
 	effortHistory,
 	compareYearsUrl,
+	colors,
 	yearlyAggregators
 }: {
 	series: LineChartData[];
@@ -422,6 +423,16 @@ export function YearComparisonTrendChart({
 	// chart renders in a fixed `'all-time'` mode (there's no switcher left to
 	// pick another mode).
 	compareYearsUrl?: string;
+	// Explicit per-metric base colours, indexed the same as `series`. When
+	// supplied, `colors[metricIndex]` replaces the internally-computed
+	// `metricBaseColor(metricIndex)` as that metric's base colour in *every*
+	// mode (all-time series colour, and the base each per-metric
+	// compare-years/this-year sub-chart derives its shades from). A caller uses
+	// this to impose colour relationships the default per-index palette can't
+	// express (e.g. light/dark hue pairs). Leaving it `undefined` reproduces the
+	// default palette exactly, so callers that don't pass it are unaffected. An
+	// index without a colour (shorter array) falls back to the default palette.
+	colors?: string[];
 	// How each metric's monthly points collapse into a single yearly point when
 	// the all-time "Interval" toggle is set to Year, keyed by the metric's
 	// `name`. A metric absent from the map defaults to `'sum'`. Counts sum; a
@@ -442,8 +453,13 @@ export function YearComparisonTrendChart({
 			: series;
 	const effectiveYtitle =
 		normalize && effortHistory ? `${ytitle} per hour` : ytitle;
+	// A metric's base colour: the caller's explicit override at that index if
+	// supplied, else the default per-index palette. Used identically by all three
+	// modes so an override recolours every view consistently.
+	const baseColorFor = (metricIndex: number): string =>
+		colors?.[metricIndex] ?? metricBaseColor(metricIndex);
 	const allTimeColors = effectiveSeries.map((_, metricIndex) =>
-		metricBaseColor(metricIndex)
+		baseColorFor(metricIndex)
 	);
 	// Year aggregation is layered on top of the (possibly effort-normalized)
 	// series, matching the order-of-operations the normalize toggle establishes.
@@ -556,7 +572,7 @@ export function YearComparisonTrendChart({
 								data: yearSeries,
 								colors: yearColors(
 									years,
-									metricBaseColor(metricIndex),
+									baseColorFor(metricIndex),
 									currentYear
 								)
 							};
@@ -570,7 +586,7 @@ export function YearComparisonTrendChart({
 						min={min}
 						buildChart={(metric, metricIndex) => ({
 							data: toThisYearSeries(metric, currentYear),
-							colors: thisYearColors(metricBaseColor(metricIndex))
+							colors: thisYearColors(baseColorFor(metricIndex))
 						})}
 					/>
 				)}
