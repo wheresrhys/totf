@@ -7,7 +7,22 @@ CREATE FUNCTION public.aggregate_stats (
 	group_by_time_period text DEFAULT NULL::text
 ) RETURNS SETOF public.aggregate_stats_result LANGUAGE plpgsql AS $function$
   BEGIN
+  -- The final projection below is wrapped in jsonb_populate_record rather than
+  -- returned as a bare positional SELECT. A bare `RETURN QUERY SELECT ...` binds
+  -- to aggregate_stats_result's columns by ORDINAL POSITION, not by the "AS" alias
+  -- names below — and that position is only as stable as whatever DDL a given
+  -- environment's schema-diff run happened to emit for the composite type's
+  -- attributes (e.g. `ALTER TYPE ... ADD ATTRIBUTE` order is not guaranteed to
+  -- match this file's declared column order — see #800 postmortem: two schema:apply
+  -- runs on the same source files produced two different physical attribute orders
+  -- for the columns added in this PR, silently scrambling values into the wrong
+  -- named columns with no error). Routing through to_jsonb(...)/jsonb_populate_record
+  -- binds every column by NAME instead, so the result is correct regardless of the
+  -- composite type's physical attribute order in any given environment. Keep this
+  -- wrapper for any future column additions too.
   RETURN QUERY
+  SELECT (jsonb_populate_record(NULL::public.aggregate_stats_result, to_jsonb(agg))).*
+  FROM (
   WITH raw_encounters AS (
     -- Pre-aggregate all encounter data per species
     SELECT
@@ -573,7 +588,8 @@ CREATE FUNCTION public.aggregate_stats (
   eabc.pullus_enc_count, eabc.juv_enc_count, eabc.postjuv_enc_count, eabc.adult_enc_count, eabc.unknown_age_enc_count,
   asc2.new_adult_bird_count, asc2.first_summer_bird_count, asc2.oldies_bird_count,
   eabc.postjuv_juv_enc_count, eabc.new_postjuv_juv_enc_count, eabc.new_postjuv_enc_count
-  ORDER BY species_name ASC, time_period ASC;
+  ) AS agg
+  ORDER BY agg.species_name ASC, agg.time_period ASC;
 
 END;
 $function$;
