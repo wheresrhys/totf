@@ -160,6 +160,36 @@ Key design notes:
 - Complex queries are exposed as Postgres RPC functions (e.g. `top_metrics_by_period`, `aggregate_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
 
+### Companion stats RPCs and shared plumbing (`aggregate_stats` / `population_stats`, #800)
+
+`aggregate_stats` and `population_stats` (age-split + young-trends derivations, split into its own
+RPC rather than folded into `aggregate_stats`' already-large single query — for query-plan
+simplicity and to leave `aggregate_stats`' existing columns/performance untouched) share the same
+input signature (`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
+group_by_time_period`) and reuse the same underlying logic via `stats_raw_encounters` /
+`stats_spine` / `stats_encounter_age_classification` / `stats_bird_age_bucket` — internal utility
+RPCs, each called once per top-level RPC invocation and materialized into a local CTE, not
+re-invoked per use (avoids re-scanning the base tables once per downstream CTE). `aggregate_stats`
+itself still carries its own historical inline copies of the same logic rather than calling these
+utility RPCs — refactoring it to delegate was judged unnecessary regression risk to a
+heavily-exercised, already-tested function; keep the utility RPCs' bucket/precedence definitions in
+sync **by hand** with `aggregate_stats.sql`'s inline copies if either changes.
+`population_stats.new_young_bird_count` is a duplicate of `aggregate_stats.new_young_bird_count`
+(same derivation, kept in both places) — `aggregate_stats`' copy is the untouched/authoritative one.
+
+**Composite-type RETURN QUERY binds by position, not name — this bit us.** A `RETURNS SETOF
+<composite type>` function's `RETURN QUERY SELECT ...` binds the SELECT list to the composite
+type's columns by ordinal attribute position, never by the `AS "..."` alias text. That position is
+only as stable as whatever DDL a given environment's `db:schema:apply` run happens to emit for the
+type — confirmed empirically while building `population_stats`: two schema-diff runs against the
+identical schema files produced two *different* physical attribute orders for a composite type's
+columns (one matching the file's declared order, one alphabetical), silently scrambling values into
+the wrong named output columns with no error either way. Both `aggregate_stats` and
+`population_stats` guard against this by wrapping their final projection —
+`SELECT (jsonb_populate_record(NULL::the_result_type, to_jsonb(agg))).* FROM (...) AS agg` — which
+binds every column by **name** instead, independent of the type's physical attribute order. Use this
+wrapper for any new/future `RETURNS SETOF <composite type>` RPC in this codebase.
+
 ## Schema files
 
 The authoritative schema lives in `supabase/schema/` as declarative SQL files, organised by type (tables, functions, RLS policies, etc.). Migrations in `supabase/migrations/` are generated from diffs — do not hand-write DDL. The one exception is backfill data migrations: declarative sync only ever emits DDL, never DML, so a schema change that needs existing rows migrated to fit the new shape gets its backfill hand-written and appended after the generated DDL (never interleaved with or replacing it) — see `implement-ticket`'s schema-change guidance for the exact convention (marker comment, PR body section, test mirror).

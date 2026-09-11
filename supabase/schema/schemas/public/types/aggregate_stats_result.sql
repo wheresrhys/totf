@@ -1,6 +1,6 @@
 -- Shared return shape for aggregate_stats and its public, group-gated wrapper
 -- public_aggregate_stats (#768). Both functions RETURN SETOF this type so the
--- 36-column result shape is defined in exactly one place; the wrapper is
+-- 30-column result shape is defined in exactly one place; the wrapper is
 -- guaranteed to stay row-for-row identical to what it forwards. Matches the SELECT
 -- list order in aggregate_stats.sql positionally (SETOF composite is matched by
 -- position, not name) — keep the two in the same column order.
@@ -36,17 +36,5 @@ CREATE TYPE public.aggregate_stats_result AS (
 	max_wing smallint,
 	avg_wing numeric,
 	min_wing smallint,
-	median_wing numeric,
-	-- Age-split subsets of adult_bird_count (#800). Mutually exclusive and exhaustive
-	-- over adult-bucketed birds, so new_adult + first_summer + oldies = adult_bird_count
-	-- for every row. Partition adults by lifetime history with the ringing group.
-	new_adult_bird_count bigint,
-	first_summer_bird_count bigint,
-	oldies_bird_count bigint,
-	-- Young-trends encounter-level counts (#800). The 3J-only slice of juv_enc_count
-	-- (which combines 1J and 3J), plus New-record variants. Additive — juv_enc_count
-	-- is unchanged.
-	postjuv_juv_enc_count bigint,
-	new_postjuv_juv_enc_count bigint,
-	new_postjuv_enc_count bigint
+	median_wing numeric
 );
