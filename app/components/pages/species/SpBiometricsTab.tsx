@@ -1,9 +1,11 @@
 'use client';
 import { useState } from 'react';
 import 'chartkick/chart.js';
+import { type LineChartData } from 'react-chartkick';
 import {
 	getSpeciesStatsHistory,
-	fetchGraphableEncounterData
+	fetchGraphableEncounterData,
+	getGroupEffortHistory
 } from '@/app/actions/sp-data';
 import type { AggregateStatsResult } from '@/app/models/db';
 import { BoxyList } from '@/app/components/shared/DesignSystem';
@@ -86,6 +88,18 @@ export function SpBiometricsTab({
 		);
 	}
 
+	const [effortHistory, setEffortHistory] = useState<LineChartData | null>(
+		null
+	);
+	const [effortHistoryRequested, setEffortHistoryRequested] = useState(false);
+	function loadEffortHistory() {
+		if (effortHistoryRequested) return;
+		setEffortHistoryRequested(true);
+		getGroupEffortHistory(viewedGroupId)
+			.then((data) => setEffortHistory({ name: 'effort', data }))
+			.catch(() => setEffortHistory(null));
+	}
+
 	const [scatterData, setScatterData] = useState<SexedGraphableBird[] | null>(
 		null
 	);
@@ -112,11 +126,20 @@ export function SpBiometricsTab({
 			id: 'biometrics',
 			heading: 'Biometrics trends',
 			description: 'Wing and weight plotted over time',
-			load: loadStatsHistory,
+			load: () => {
+				loadStatsHistory();
+				loadEffortHistory();
+			},
 			renderChart: () =>
 				statsHistory ? (
 					<YearComparisonTrendChart
 						series={getSizes(statsHistory)}
+						effortHistory={effortHistory ?? undefined}
+						compareYearsUrl={
+							fromDate !== undefined
+								? `/species/${speciesName}?tabId=graphs`
+								: undefined
+						}
 						yearlyAggregators={{
 							'max weight': 'max',
 							'median weight': 'mean',

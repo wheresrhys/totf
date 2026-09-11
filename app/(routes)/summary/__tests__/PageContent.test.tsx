@@ -17,13 +17,20 @@ vi.mock('@/app/actions/spp-data', () => ({
 	fetchSpeciesData: (...args: unknown[]) => fetchSpeciesDataMock(...args)
 }));
 
+const fetchPeriodTotalsMock = vi.fn();
+vi.mock('@/app/actions/period-totals', () => ({
+	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
+}));
+
 describe('SummaryPageContent', () => {
 	beforeEach(() => {
 		fetchSpeciesDataMock.mockResolvedValue(populatedSpeciesStats);
+		fetchPeriodTotalsMock.mockResolvedValue([populatedStats]);
 	});
 	afterEach(() => {
 		cleanup();
 		fetchSpeciesDataMock.mockReset();
+		fetchPeriodTotalsMock.mockReset();
 	});
 
 	it('renders "All time summary" when neither year nor month is given', async () => {
