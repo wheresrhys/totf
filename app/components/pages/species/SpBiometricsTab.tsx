@@ -115,7 +115,17 @@ export function SpBiometricsTab({
 			load: loadStatsHistory,
 			renderChart: () =>
 				statsHistory ? (
-					<YearComparisonTrendChart series={getSizes(statsHistory)} />
+					<YearComparisonTrendChart
+						series={getSizes(statsHistory)}
+						yearlyAggregators={{
+							'max weight': 'max',
+							'median weight': 'mean',
+							'min weight': 'min',
+							'max wing': 'max',
+							'median wing': 'mean',
+							'min wing': 'min'
+						}}
+					/>
 				) : (
 					<Spinner />
 				)

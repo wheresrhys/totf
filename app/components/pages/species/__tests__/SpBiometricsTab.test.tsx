@@ -26,8 +26,18 @@ vi.mock('../StatsHistoryChart', () => ({
 }));
 
 vi.mock('@/app/components/YearComparisonTrendChart', () => ({
-	YearComparisonTrendChart: ({ series }: { series: unknown[] }) => (
-		<div data-testid="trend-chart" data-series-count={series.length} />
+	YearComparisonTrendChart: ({
+		series,
+		yearlyAggregators
+	}: {
+		series: unknown[];
+		yearlyAggregators?: Record<string, string>;
+	}) => (
+		<div
+			data-testid="trend-chart"
+			data-series-count={series.length}
+			data-aggregators={JSON.stringify(yearlyAggregators)}
+		/>
 	)
 }));
 
@@ -117,6 +127,24 @@ describe('SpBiometricsTab', () => {
 			expect(
 				screen.getByRole('button', { name: 'Close Biometrics trends' })
 			).toBeDefined();
+		});
+	});
+
+	describe('Structure: yearly aggregators for the biometrics tile', () => {
+		it('passes max/mean/min aggregators per weight and wing metric', async () => {
+			render(<SpBiometricsTab {...props} />);
+			fireEvent.click(
+				screen.getByRole('button', { name: /Biometrics trends/ })
+			);
+			const chart = await screen.findByTestId('trend-chart');
+			expect(JSON.parse(chart.dataset.aggregators!)).toEqual({
+				'max weight': 'max',
+				'median weight': 'mean',
+				'min weight': 'min',
+				'max wing': 'max',
+				'median wing': 'mean',
+				'min wing': 'min'
+			});
 		});
 	});
 

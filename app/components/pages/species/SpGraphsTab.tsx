@@ -66,7 +66,10 @@ export function SpGraphsTab({
 			load: loadStatsHistory,
 			renderChart: () =>
 				statsHistory ? (
-					<YearComparisonTrendChart series={getCounts(statsHistory)} />
+					<YearComparisonTrendChart
+						series={getCounts(statsHistory)}
+						yearlyAggregators={{ encounters: 'sum', birds: 'sum' }}
+					/>
 				) : (
 					<Spinner />
 				)
@@ -78,7 +81,14 @@ export function SpGraphsTab({
 			load: loadStatsHistory,
 			renderChart: () =>
 				statsHistory ? (
-					<YearComparisonTrendChart series={getYoungsters(statsHistory)} />
+					<YearComparisonTrendChart
+						series={getYoungsters(statsHistory)}
+						yearlyAggregators={{
+							juv: 'sum',
+							postjuv: 'sum',
+							"New young's": 'sum'
+						}}
+					/>
 				) : (
 					<Spinner />
 				)
