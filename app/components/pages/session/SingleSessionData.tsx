@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { type SessionEncounter } from '@/app/models/session';
 import { type NetRound } from '@/app/models/session-chronology';
 import { getAgeClass } from '@/app/models/encounter';
-import { resolveInitialTabId } from '@/lib/tab-query-param';
+import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
 export type SpeciesWithEncounters = {
 	species: string;
 	encounters: SessionEncounter[];
@@ -185,27 +184,20 @@ export function SessionTabs({
 	// 'species' default when it names one of this render's actual tabs (the
 	// `highlights` tab only exists when `!locationId` — see `tabNavConfig`
 	// above); an unknown/garbage value or no param at all falls back to
-	// 'species' unchanged.
-	const initialTab = resolveInitialTabId(
-		initialTabId,
-		tabNavConfig.map((tab) => tab.id),
-		'species'
-	);
-
-	const [loadedTabs, setLoadedTabs] = useState<Set<string>>(
-		new Set([initialTab])
-	);
-	const [activeTab, setActiveTab] = useState(initialTab);
+	// 'species' unchanged. Shared with the species and summary pages via
+	// `useLinkableTabs` (#818).
+	const { activeTab, loadedTabs, selectTab } = useLinkableTabs({
+		tabIds: tabNavConfig.map((tab) => tab.id),
+		defaultTabId: 'species',
+		initialTabId
+	});
 
 	return (
 		<>
 			<TabNav
 				tabs={tabNavConfig}
 				activeTab={activeTab}
-				onTabChange={(tab) => {
-					setLoadedTabs((prev) => new Set([...prev, tab]));
-					setActiveTab(tab);
-				}}
+				onTabChange={selectTab}
 			/>
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
