@@ -180,7 +180,7 @@ describe('SpBiometricsTab', () => {
 	});
 
 	describe('Structure: compareYearsUrl', () => {
-		it('is set to the Population tab (tabId=graphs) when the page is period-scoped', async () => {
+		it('is set to the Population tab (tabId=population) when the page is period-scoped', async () => {
 			render(
 				<SpBiometricsTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
 			);
@@ -188,7 +188,9 @@ describe('SpBiometricsTab', () => {
 				screen.getByRole('button', { name: /Biometrics trends/ })
 			);
 			const chart = await screen.findByTestId('trend-chart');
-			expect(chart.dataset.compareYearsUrl).toBe('/species/Robin?tabId=graphs');
+			expect(chart.dataset.compareYearsUrl).toBe(
+				'/species/Robin?tabId=population'
+			);
 		});
 
 		it('is undefined on the all-time render (no fromDate/toDate)', async () => {
@@ -272,7 +274,7 @@ describe('SpBiometricsTab', () => {
 		});
 	});
 
-	describe('Edge: independent fetch state from SpGraphsTab', () => {
+	describe('Edge: independent fetch state from SpPopulationTab', () => {
 		it('does not refetch when a tile is collapsed and re-expanded', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
 			render(<SpBiometricsTab {...props} />);

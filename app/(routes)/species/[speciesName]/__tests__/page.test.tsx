@@ -37,8 +37,8 @@ vi.mock('@/app/components/pages/species/SpBusiestSessionsTab', () => ({
 	SpBusiestSessionsTab: () => <div data-testid="sp-busiest-sessions-tab" />
 }));
 
-vi.mock('@/app/components/pages/species/SpGraphsTab', () => ({
-	SpGraphsTab: () => <div data-testid="sp-graphs-tab" />
+vi.mock('@/app/components/pages/species/SpPopulationTab', () => ({
+	SpPopulationTab: () => <div data-testid="sp-population-tab" />
 }));
 
 vi.mock('@/app/components/pages/species/SpBiometricsTab', () => ({
@@ -202,28 +202,28 @@ describe('species detail page', () => {
 			});
 		});
 
-		describe('graphs tab (click to activate, labelled "Population")', () => {
-			it('renders SpGraphsTab after clicking the Population button', async () => {
+		describe('population tab (click to activate, labelled "Population")', () => {
+			it('renders SpPopulationTab after clicking the Population button', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
 				fireEvent.click(screen.getByRole('button', { name: 'Population' }));
-				await screen.findByTestId('sp-graphs-tab');
+				await screen.findByTestId('sp-population-tab');
 			});
 
-			it('lazily loads SpGraphsTab only once "Population" is selected', async () => {
+			it('lazily loads SpPopulationTab only once "Population" is selected', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
-				expect(screen.queryByTestId('sp-graphs-tab')).toBeNull();
+				expect(screen.queryByTestId('sp-population-tab')).toBeNull();
 				fireEvent.click(screen.getByRole('button', { name: 'Population' }));
-				await screen.findByTestId('sp-graphs-tab');
+				await screen.findByTestId('sp-population-tab');
 			});
 
-			it("renders a 'Population' button that activates the same panel the 'graphs' tab id always did", async () => {
+			it("renders a 'Population' button that activates the 'population' tab panel", async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
 				expect(screen.queryByRole('button', { name: 'Graphs' })).toBeNull();
 				fireEvent.click(screen.getByRole('button', { name: 'Population' }));
-				await screen.findByTestId('sp-graphs-tab');
+				await screen.findByTestId('sp-population-tab');
 			});
 		});
 
@@ -258,7 +258,7 @@ describe('species detail page', () => {
 				['session-totals', 'Session totals', 'sp-session-totals-tab'],
 				['highlights', 'Highlights', 'sp-busiest-sessions-tab'],
 				['biometrics', 'Biometrics', 'sp-biometrics-tab'],
-				['graphs', 'Population', 'sp-graphs-tab'],
+				['population', 'Population', 'sp-population-tab'],
 				['bird-list', 'Bird list', 'sp-individuals-tab']
 			])(
 				'?tabId=%s selects the %s tab and loads its data without a click',

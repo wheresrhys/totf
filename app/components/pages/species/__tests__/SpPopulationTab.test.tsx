@@ -6,7 +6,7 @@ import {
 	fireEvent,
 	waitFor
 } from '@testing-library/react';
-import { SpGraphsTab } from '../SpGraphsTab';
+import { SpPopulationTab } from '../SpPopulationTab';
 import type { AggregateStatsResult } from '@/app/models/db';
 
 // chartkick registers Chart.js as a side effect; nothing renders a real canvas
@@ -37,7 +37,7 @@ async function loadActions() {
 	return import('@/app/actions/sp-data');
 }
 
-describe('SpGraphsTab', () => {
+describe('SpPopulationTab', () => {
 	afterEach(() => {
 		cleanup();
 		vi.clearAllMocks();
@@ -52,7 +52,7 @@ describe('SpGraphsTab', () => {
 
 	describe('Structure: remaining tiles only', () => {
 		it('renders only the Totals and Young tiles — no Biometrics trends or Wing vs weight tiles', () => {
-			render(<SpGraphsTab {...props} />);
+			render(<SpPopulationTab {...props} />);
 			expect(screen.getByRole('button', { name: /Totals/ })).toBeDefined();
 			expect(screen.getByRole('button', { name: /Young/ })).toBeDefined();
 			expect(
@@ -67,7 +67,7 @@ describe('SpGraphsTab', () => {
 	describe('Usual: initial collapsed grid', () => {
 		it('renders a text tile per chart and fetches nothing until a tile is expanded', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
-			render(<SpGraphsTab {...props} />);
+			render(<SpPopulationTab {...props} />);
 			expect(
 				screen.getByText('Bird and encounter counts over time')
 			).toBeDefined();
@@ -79,7 +79,7 @@ describe('SpGraphsTab', () => {
 	describe('Structure: expanding a trend tile', () => {
 		it('fetches stats history once and renders the trend chart with a close button', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
-			render(<SpGraphsTab {...props} />);
+			render(<SpPopulationTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Totals/ }));
 			await screen.findByTestId('trend-chart');
 			expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(1);
@@ -97,7 +97,7 @@ describe('SpGraphsTab', () => {
 
 	describe('Structure: collapsing a tile', () => {
 		it('hides the chart again when the close button is clicked', async () => {
-			render(<SpGraphsTab {...props} />);
+			render(<SpPopulationTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Totals/ }));
 			await screen.findByTestId('trend-chart');
 			fireEvent.click(screen.getByRole('button', { name: 'Close Totals' }));
@@ -111,7 +111,7 @@ describe('SpGraphsTab', () => {
 	describe('Edge: memoised stats-history fetch shared across trend tiles', () => {
 		it('fetches stats history only once when two trend tiles are expanded', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
-			render(<SpGraphsTab {...props} />);
+			render(<SpPopulationTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Totals/ }));
 			await screen.findByTestId('trend-chart');
 			fireEvent.click(screen.getByRole('button', { name: /Young/ }));
@@ -123,7 +123,7 @@ describe('SpGraphsTab', () => {
 
 		it('does not refetch when a tile is collapsed and re-expanded', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
-			render(<SpGraphsTab {...props} />);
+			render(<SpPopulationTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Totals/ }));
 			await screen.findByTestId('trend-chart');
 			fireEvent.click(screen.getByRole('button', { name: 'Close Totals' }));
@@ -140,7 +140,7 @@ describe('SpGraphsTab', () => {
 		it('passes fromDate/toDate through to the stats-history query', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
 			render(
-				<SpGraphsTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
+				<SpPopulationTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
 			);
 			fireEvent.click(screen.getByRole('button', { name: /Young/ }));
 			await screen.findByTestId('trend-chart');

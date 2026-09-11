@@ -18,16 +18,18 @@ function Spinner() {
 	);
 }
 
-// The "Population" tab on the species page (label only — id stays `graphs`,
-// #783): a reflowing grid of population-count chart tiles. Each tile is
-// text-only until clicked, at which point it expands to render its chart and
-// the click triggers the underlying data fetch. Data is memoised at this
-// level — the two trend tiles share one `getSpeciesStatsHistory` query,
+// The "Population" tab on the species page (tab id `population` — renamed from
+// `graphs` in #801, which also renamed this component `SpGraphsTab` ->
+// `SpPopulationTab`; #783 had relabelled the tab but kept the old id/name to
+// minimise blast radius): a reflowing grid of population-count chart tiles.
+// Each tile is text-only until clicked, at which point it expands to render its
+// chart and the click triggers the underlying data fetch. Data is memoised at
+// this level — the two trend tiles share one `getSpeciesStatsHistory` query,
 // fired at most once regardless of how often its tiles are expanded/collapsed.
 // The biometrics-related tiles (wing/weight trend, wing-vs-weight scatter)
 // moved to the "Biometrics" tab (SpBiometricsTab.tsx) with their own,
 // independent fetch state.
-export function SpGraphsTab({
+export function SpPopulationTab({
 	speciesName,
 	viewedGroupId,
 	fromDate,

@@ -54,8 +54,8 @@ function MeasurementCategory({
 
 // The "Biometrics" tab on the species page: the Weight/Wing summary sentences
 // (moved out of the intro block, #783) plus the two biometrics-related chart
-// tiles (moved out of the "Population" tab, formerly "Graphs" — see
-// SpGraphsTab.tsx). Fetch state here is independent of SpGraphsTab's: each
+// tiles (moved out of the "Population" tab — see
+// SpPopulationTab.tsx). Fetch state here is independent of SpPopulationTab's: each
 // tab fires its own `getSpeciesStatsHistory` call the first time one of its
 // own tiles is expanded, even though both tabs' trend charts derive from the
 // same underlying query — deduping that is out of scope for #783.
@@ -137,7 +137,7 @@ export function SpBiometricsTab({
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={
 							fromDate !== undefined
-								? `/species/${speciesName}?tabId=graphs`
+								? `/species/${speciesName}?tabId=population`
 								: undefined
 						}
 					/>
