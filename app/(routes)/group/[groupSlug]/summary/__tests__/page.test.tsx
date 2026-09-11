@@ -51,6 +51,21 @@ describe('GroupSummaryPage', () => {
 				})
 			);
 		});
+
+		// #804: the top-level summary page's new `searchParams` prop is
+		// optional precisely so this call site (which `withGroupScope` never
+		// threads it through) keeps rendering/type-checking unaffected.
+		it('delegates without a searchParams prop, since withGroupScope does not thread one through', async () => {
+			render(
+				await GroupSummaryPage({
+					params: Promise.resolve({ groupSlug: 'viewed-group-slug' })
+				})
+			);
+			screen.getByTestId('mock-summary-page');
+			expect(vi.mocked(AllTimeSummaryPage).mock.calls[0][0]).not.toHaveProperty(
+				'searchParams'
+			);
+		});
 	});
 
 	describe('an unknown groupSlug', () => {
