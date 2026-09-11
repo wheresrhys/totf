@@ -35,6 +35,17 @@ export type AggregateStatsResult = {
 	>;
 };
 
+// population_stats is aggregate_stats' companion RPC (#800), carrying the
+// age-split + young-trends derivations in its own population_stats_result
+// composite type. Same null-stripping rationale as AggregateStatsResult above:
+// composite-type attributes are always nullable in the generated types, but the
+// RPC COALESCEs its counts and only ever emits whole rows.
+export type PopulationStatsResult = {
+	[K in keyof Database['public']['CompositeTypes']['population_stats_result']]-?: NonNullable<
+		Database['public']['CompositeTypes']['population_stats_result'][K]
+	>;
+};
+
 export type DiscrepenciesResult =
 	Database['public']['Functions']['find_discrepencies']['Returns'][number];
 export type NotableRetrapsResult =
