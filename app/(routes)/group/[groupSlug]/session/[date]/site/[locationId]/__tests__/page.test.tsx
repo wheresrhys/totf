@@ -100,13 +100,14 @@ function makeSessionClient() {
 	return { from, sessionAndEncounterChains };
 }
 
-function renderPage() {
+function renderPage(tabId?: string) {
 	return Page({
 		params: Promise.resolve({
 			groupSlug: TEST_GROUP_SLUG,
 			date: TEST_DATE,
 			locationId: TEST_LOCATION_ID
-		})
+		}),
+		...(tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) })
 	});
 }
 
@@ -193,6 +194,26 @@ describe('session site page', () => {
 			expect(viewAllLink.getAttribute('href')).toBe(
 				`/group/alpha/session/${TEST_DATE}`
 			);
+		});
+	});
+
+	describe('?tabId= query param (#805)', () => {
+		it('with no tabId search param, the Species totals tab renders unchanged', async () => {
+			render(await renderPage());
+			await screen.findByTestId('session-table');
+			expect(screen.queryByText(/Net round 1/)).toBeNull();
+		});
+
+		it('?tabId=net-rounds focuses the Net rounds tab and renders its content without a click', async () => {
+			render(await renderPage('net-rounds'));
+			await screen.findByText('Net round 1: 08:00');
+		});
+
+		it('?tabId=highlights falls back to the Species totals tab (highlights is not a known tab on this location-scoped route), with no crash and no blank pane', async () => {
+			render(await renderPage('highlights'));
+			await screen.findByTestId('session-table');
+			expect(screen.queryByTestId('session-highlights')).toBeNull();
+			expect(screen.queryByText(/Net round 1/)).toBeNull();
 		});
 	});
 });

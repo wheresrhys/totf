@@ -2,6 +2,7 @@ import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { withGroupScope } from '@/app/components/layout/withGroupScope';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
+import { readTabIdSearchParam } from '@/lib/tab-query-param';
 import type { SessionEncounter } from '@/app/models/session';
 import type { LocationRow, SessionRow } from '@/app/models/db';
 import {
@@ -129,17 +130,20 @@ export async function fetchSessionPageContent({
 
 type PageProps = { params: Promise<{ groupSlug: string; date: string }> };
 
-export default withGroupScope<{ date: string }>(({ viewedGroup, params }) => (
-	<BootstrapPage<DayData, PageProps, PageParams>
-		viewedGroup={viewedGroup}
-		getParams={async () => ({
-			viewedGroupId: viewedGroup.id,
-			date: params.date,
-			locationId: undefined
-		})}
-		getCacheKeys={() => ['session', params.date]}
-		dataFetcher={fetchSessionPageContent}
-		PageComponent={SessionPageContent}
-		ttl={3600 * 24 * 7}
-	/>
-));
+export default withGroupScope<{ date: string }>(
+	({ viewedGroup, params, searchParams }) => (
+		<BootstrapPage<DayData, PageProps, PageParams>
+			viewedGroup={viewedGroup}
+			getParams={async () => ({
+				viewedGroupId: viewedGroup.id,
+				date: params.date,
+				locationId: undefined,
+				tabId: await readTabIdSearchParam(searchParams)
+			})}
+			getCacheKeys={() => ['session', params.date]}
+			dataFetcher={fetchSessionPageContent}
+			PageComponent={SessionPageContent}
+			ttl={3600 * 24 * 7}
+		/>
+	)
+);
