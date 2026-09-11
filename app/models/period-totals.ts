@@ -16,6 +16,7 @@ export type PeriodTotalsRow = {
 	sessionsCount: number;
 	speciesCount: number;
 	encounterCount: number;
+	maxPerSession: number;
 	individualsCount: number;
 	new: number;
 	retraps: number;
@@ -34,6 +35,7 @@ export function derivePeriodTotalsRowByBird(
 		sessionsCount: stat.session_count,
 		speciesCount: stat.species_count,
 		encounterCount: stat.encounter_count,
+		maxPerSession: stat.max_per_session,
 		individualsCount: stat.bird_count,
 		new: stat.new_bird_count,
 		retraps: calculateRetraps(stat),
@@ -60,6 +62,7 @@ export function derivePeriodTotalsRowByEncounter(
 		sessionsCount: stat.session_count,
 		speciesCount: stat.species_count,
 		encounterCount: stat.encounter_count,
+		maxPerSession: stat.max_per_session,
 		individualsCount: stat.bird_count,
 		new: stat.new_bird_count,
 		retraps: calculateEncounterRetraps(stat),

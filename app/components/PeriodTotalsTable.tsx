@@ -31,13 +31,15 @@ function buildColumnConfigs({
 	hasPulli,
 	dashIndividuals,
 	aggregateBy,
-	showSpeciesColumn
+	showSpeciesColumn,
+	showBusiestSession
 }: {
 	firstColumnHeader: string;
 	hasPulli: boolean;
 	dashIndividuals: boolean;
 	aggregateBy: string;
 	showSpeciesColumn: boolean;
+	showBusiestSession: boolean;
 }): Partial<Record<keyof PeriodTotalsRow, ColumnConfig>> {
 	return {
 		timePeriod: {
@@ -51,6 +53,9 @@ function buildColumnConfigs({
 		encounterCount: {
 			label: 'Encounters'
 		},
+		...(showBusiestSession
+			? { maxPerSession: { label: 'Busiest session' } }
+			: {}),
 		// On an encounters-only tab a per-period bird count is meaningless, so
 		// the whole column renders a `'-'` placeholder rather than a number.
 		individualsCount: {
@@ -71,7 +76,8 @@ export function PeriodTotalsTable({
 	aggregationFixedTo,
 	dashIndividuals = false,
 	extraControls,
-	showSpeciesColumn = true
+	showSpeciesColumn = true,
+	showBusiestSession = true
 }: {
 	grouping: PeriodTotalsGrouping;
 	rows: AggregateStatsResult[];
@@ -92,6 +98,7 @@ export function PeriodTotalsTable({
 	// between combined-months and per-year-months views.
 	extraControls?: React.ReactNode;
 	showSpeciesColumn?: boolean;
+	showBusiestSession?: boolean;
 }) {
 	// Local to this table (not persisted across tab switches) — resets to
 	// 'bird' whenever `SummaryTotalsSection` remounts this table for a
@@ -118,7 +125,8 @@ export function PeriodTotalsTable({
 		hasPulli,
 		dashIndividuals,
 		aggregateBy,
-		showSpeciesColumn
+		showSpeciesColumn,
+		showBusiestSession
 	});
 
 	const totalsRow = totalsStats

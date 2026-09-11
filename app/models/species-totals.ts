@@ -4,6 +4,7 @@ export type SpeciesTotalsRow = {
 	speciesName: string;
 	sessionsCount: number;
 	encounterCount: number;
+	maxPerSession: number;
 	individualsCount: number;
 	newCount: number;
 	retrapsCount: number;
@@ -36,6 +37,7 @@ export function deriveSpeciesTotalsRow(
 		speciesName: stat.species_name,
 		sessionsCount: stat.session_count,
 		encounterCount: stat.encounter_count,
+		maxPerSession: stat.max_per_session,
 		individualsCount: stat.bird_count,
 		newCount: stat.new_bird_count,
 		retrapsCount: calculateRetraps(stat),
@@ -61,6 +63,7 @@ export function deriveSpeciesTotalsRowByEncounter(
 		speciesName: stat.species_name,
 		sessionsCount: stat.session_count,
 		encounterCount: stat.encounter_count,
+		maxPerSession: stat.max_per_session,
 		individualsCount: stat.bird_count,
 		newCount: stat.new_bird_count,
 		retrapsCount: calculateEncounterRetraps(stat),

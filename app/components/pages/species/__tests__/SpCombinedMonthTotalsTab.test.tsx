@@ -8,7 +8,10 @@ import {
 } from '@testing-library/react';
 import { SpCombinedMonthTotalsTab } from '../SpCombinedMonthTotalsTab';
 import type { AggregateStatsResult } from '@/app/models/db';
-import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
+import {
+	getCellTextByHeading,
+	getColumnIndex
+} from '@/app/__tests__/helpers/table';
 
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchSpeciesPeriodTotals: vi.fn()
@@ -99,6 +102,24 @@ describe('SpCombinedMonthTotalsTab', () => {
 			expect(screen.getByText('January')).toBeTruthy();
 			expect(screen.queryByText('January 2020')).toBeNull();
 			expect(screen.queryByRole('link', { name: 'January' })).toBeNull();
+		});
+
+		it('renders a "Busiest session" column between Encounters and Birds', async () => {
+			render(
+				<SpCombinedMonthTotalsTab
+					speciesName="Robin"
+					viewedGroupId={1}
+					isActive={true}
+				/>
+			);
+			await waitFor(() => {
+				expect(document.querySelectorAll('tbody tr').length).toBe(1);
+			});
+			const encountersIndex = getColumnIndex('Encounters');
+			const busiestSessionIndex = getColumnIndex('Busiest session');
+			const birdsIndex = getColumnIndex('Birds');
+			expect(busiestSessionIndex).toBe(encountersIndex + 1);
+			expect(busiestSessionIndex).toBe(birdsIndex - 1);
 		});
 	});
 
