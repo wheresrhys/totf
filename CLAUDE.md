@@ -164,18 +164,24 @@ Key design notes:
 
 `aggregate_stats` and `population_stats` (age-split + young-trends derivations, split into its own
 RPC rather than folded into `aggregate_stats`' already-large single query — for query-plan
-simplicity and to leave `aggregate_stats`' existing columns/performance untouched) share the same
-input signature (`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
-group_by_time_period`) and reuse the same underlying logic via `stats_raw_encounters` /
+simplicity and to leave `aggregate_stats`' existing columns untouched) share the same input
+signature (`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
+group_by_time_period`) and both build on the same underlying logic via `stats_raw_encounters` /
 `stats_spine` / `stats_encounter_age_classification` / `stats_bird_age_bucket` — internal utility
-RPCs, each called once per top-level RPC invocation and materialized into a local CTE, not
-re-invoked per use (avoids re-scanning the base tables once per downstream CTE). `aggregate_stats`
-itself still carries its own historical inline copies of the same logic rather than calling these
-utility RPCs — refactoring it to delegate was judged unnecessary regression risk to a
-heavily-exercised, already-tested function; keep the utility RPCs' bucket/precedence definitions in
-sync **by hand** with `aggregate_stats.sql`'s inline copies if either changes.
-`population_stats.new_young_bird_count` is a duplicate of `aggregate_stats.new_young_bird_count`
-(same derivation, kept in both places) — `aggregate_stats`' copy is the untouched/authoritative one.
+RPCs holding the windowed-row-source / grouping-spine / per-encounter-classification /
+per-bird-bucket-resolution logic previously duplicated inline in `aggregate_stats`. Each top-level
+RPC calls every utility it needs exactly once and materializes the result into a local CTE (reused
+by every downstream reference in that RPC), so the base tables aren't rescanned once per downstream
+CTE — but a utility RPC that itself depends on another (e.g. `stats_bird_age_bucket` →
+`stats_encounter_age_classification` → `stats_raw_encounters`) does re-derive that dependency
+independently per call site, so a top-level RPC needing several layers (e.g. `population_stats`
+needing `stats_spine` + `stats_encounter_age_classification` + `stats_bird_age_bucket`) re-scans the
+base tables a small constant number of times rather than once — accepted as a reasonable tradeoff at
+this app's data scale; keep an eye on it if a future RPC stacks many more utility layers. Keep the
+utility RPCs' bucket/precedence definitions in sync **by hand** with `app/models/encounter.ts`'s
+`getAgeClass()` if either changes. `population_stats.new_young_bird_count` is a duplicate of
+`aggregate_stats.new_young_bird_count` (same derivation, kept in both places) —
+`aggregate_stats`' copy is the untouched/authoritative one.
 
 **Composite-type RETURN QUERY binds by position, not name — this bit us.** A `RETURNS SETOF
 <composite type>` function's `RETURN QUERY SELECT ...` binds the SELECT list to the composite
@@ -184,11 +190,13 @@ only as stable as whatever DDL a given environment's `db:schema:apply` run happe
 type — confirmed empirically while building `population_stats`: two schema-diff runs against the
 identical schema files produced two *different* physical attribute orders for a composite type's
 columns (one matching the file's declared order, one alphabetical), silently scrambling values into
-the wrong named output columns with no error either way. Both `aggregate_stats` and
-`population_stats` guard against this by wrapping their final projection —
-`SELECT (jsonb_populate_record(NULL::the_result_type, to_jsonb(agg))).* FROM (...) AS agg` — which
-binds every column by **name** instead, independent of the type's physical attribute order. Use this
-wrapper for any new/future `RETURNS SETOF <composite type>` RPC in this codebase.
+the wrong named output columns with no error either way. `population_stats` (and any RPC whose
+composite return type gains new columns going forward — `aggregate_stats_result` itself is currently
+stable/unchanged, so `aggregate_stats` doesn't currently need this) guards against this by wrapping
+its final projection — `SELECT (jsonb_populate_record(NULL::the_result_type, to_jsonb(agg))).* FROM
+(...) AS agg` — which binds every column by **name** instead, independent of the type's physical
+attribute order. Use this wrapper for any new/future `RETURNS SETOF <composite type>` RPC in this
+codebase, and add it to `aggregate_stats` too if `aggregate_stats_result` ever grows a new column.
 
 ## Schema files
 
