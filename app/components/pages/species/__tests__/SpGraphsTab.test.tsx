@@ -23,8 +23,18 @@ vi.mock('../StatsHistoryChart', () => ({
 }));
 
 vi.mock('@/app/components/YearComparisonTrendChart', () => ({
-	YearComparisonTrendChart: ({ series }: { series: unknown[] }) => (
-		<div data-testid="trend-chart" data-series-count={series.length} />
+	YearComparisonTrendChart: ({
+		series,
+		yearlyAggregators
+	}: {
+		series: unknown[];
+		yearlyAggregators?: Record<string, string>;
+	}) => (
+		<div
+			data-testid="trend-chart"
+			data-series-count={series.length}
+			data-aggregators={JSON.stringify(yearlyAggregators)}
+		/>
 	)
 }));
 
@@ -133,6 +143,29 @@ describe('SpGraphsTab', () => {
 			fireEvent.click(screen.getByRole('button', { name: /Totals/ }));
 			await screen.findByTestId('trend-chart');
 			expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe('Structure: yearly aggregators per tile', () => {
+		it('passes all-sum aggregators for the Totals tile’s count metrics', async () => {
+			render(<SpGraphsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Totals/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(JSON.parse(chart.dataset.aggregators!)).toEqual({
+				encounters: 'sum',
+				birds: 'sum'
+			});
+		});
+
+		it('passes all-sum aggregators for the Young tile’s count metrics', async () => {
+			render(<SpGraphsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Young/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(JSON.parse(chart.dataset.aggregators!)).toEqual({
+				juv: 'sum',
+				postjuv: 'sum',
+				"New young's": 'sum'
+			});
 		});
 	});
 
