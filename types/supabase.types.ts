@@ -414,6 +414,23 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      biometrics_stats: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["biometrics_stats_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "biometrics_stats_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       daitch_mokotoff: { Args: { "": string }; Returns: string[] }
       dmetaphone: { Args: { "": string }; Returns: string }
       dmetaphone_alt: { Args: { "": string }; Returns: string }
@@ -721,6 +738,18 @@ export type Database = {
         adult_enc_count: number | null
         unknown_age_enc_count: number | null
         max_new_per_session: number | null
+        max_weight: number | null
+        avg_weight: number | null
+        min_weight: number | null
+        median_weight: number | null
+        max_wing: number | null
+        avg_wing: number | null
+        min_wing: number | null
+        median_wing: number | null
+      }
+      biometrics_stats_result: {
+        species_name: string | null
+        time_period: string | null
         max_weight: number | null
         avg_weight: number | null
         min_weight: number | null
