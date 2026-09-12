@@ -66,12 +66,9 @@ incrementally; current inventory:
 | `swarm_tools_ping` | Health check — confirms the server is reachable |
 | `swarm_state_append` / `_remove` / `_list` | Read/mutate `.claude/swarm-state.json` (locked, atomic — never hand-write it) |
 | `swarm_plan_batch` | Pre-filtered, pre-ranked PR-maintenance + ready-ticket lists for `swarm` |
-| `resolve_work_item` | Resolve a branch/issue/PR/agent-id/paraphrase to its worker, for `take-over` |
 | `derive_branch_name` | Ticket branch naming (wraps `lib/slugify.ts`) + collision check |
 | `create_ticket` | `gh issue create` with labels + sub-issue linking, no shell-escaping/tempfile dance |
-| `resolve_migration_dml` | Extract hand-authored backfill DML from a PR body or local migration file |
 | `link_ticket_dependencies` | Apply GitHub blocked-by links to an issue (one comma-joined `gh issue edit --add-blocked-by` call) — ticketify's dependency wiring |
-| `apply_schema_migration` | Run `npm run db:schema:apply` in a worktree, classify the outcome (`applied`/`history-mismatch`/`error`) and name the colliding worktree on a mismatch — take-over's schema-apply + mismatch detection |
 
 Use these tools for anything that touches `.claude/swarm-state.json`, creates a GitHub issue,
 derives a branch name, or extracts backfill DML — never reimplement the `jq`/glob/anchor-text
@@ -210,7 +207,13 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
 4. Run `npm run db:schema:apply` to generate a migration named after the current branch and apply it to the local db
 5. You may want to use `npm run db:seed:local` to repopulate the db with test data
 6. Inspect the generated migration file before pushing.
-7. Deploy schema changes with `npm run db:migration:push`.
+7. Commit the generated file(s) under `supabase/migrations/` (no longer gitignored, #862) along
+   with your PR. Once the PR merges to `main`, `.github/workflows/deploy-migrations.yml` deploys
+   any new migrations to production automatically — it's path-filtered to only run when a push to
+   `main` touches `supabase/migrations/**`, and fails the workflow run visibly (no silent success)
+   if the deploy fails. `npm run db:migration:push` still exists as a manual break-glass fallback
+   (e.g. CI is down, or a migration needs deploying outside the normal PR-merge flow) but is no
+   longer the primary path.
 
 ## Data fetching conventions
 
@@ -313,8 +316,10 @@ read-only against any server.
 `load-prod-write-env.sh`, which sets `SUPABASE_JWT_ROLE=authenticated` — writes
 allowed but still RLS-scoped to the target group. Break-glass
 web-import test against prod: `./scripts/load-prod-write-env.sh next dev --turbopack`
-(deliberately not an npm script). Migrations are deployed by the human
-(`npm run db:migration:push`).
+(deliberately not an npm script). Migrations deploy automatically via
+`.github/workflows/deploy-migrations.yml` when a PR touching `supabase/migrations/**` merges to
+`main` (#862); `npm run db:migration:push` remains as a human-only manual break-glass fallback for
+deploying a migration outside that flow.
 
 Note: the deployed Vercel app gets its env directly, with
 `SUPABASE_JWT_ROLE=authenticated` set in the Vercel project settings, so production

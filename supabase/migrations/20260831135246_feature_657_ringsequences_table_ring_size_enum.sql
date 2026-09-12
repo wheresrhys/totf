@@ -1,0 +1,18 @@
+CREATE TYPE public.ring_size AS ENUM ('AA', 'A', 'A2', 'B', 'B+', 'B2', 'SO', 'C', 'C2', 'CC', 'D2', 'E', 'Fc', 'Fv', 'G', 'H', 'J', 'K', 'L', 'L+', 'MI', 'MS');
+CREATE SEQUENCE public."RingSequences_id_seq";
+CREATE TABLE public."RingSequences" (id bigint DEFAULT nextval('public."RingSequences_id_seq"'::regclass) NOT NULL, size public.ring_size, prefix text NOT NULL, owned_by_group boolean DEFAULT true NOT NULL, ringing_group_id bigint NOT NULL, first_ring text, last_ring text);
+ALTER SEQUENCE public."RingSequences_id_seq" OWNED BY public."RingSequences".id;
+GRANT ALL ON SEQUENCE public."RingSequences_id_seq" TO anon;
+GRANT ALL ON SEQUENCE public."RingSequences_id_seq" TO authenticated;
+GRANT ALL ON SEQUENCE public."RingSequences_id_seq" TO service_role;
+ALTER TABLE public."RingSequences" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."RingSequences" ADD CONSTRAINT "RingSequences_pkey" PRIMARY KEY (id);
+ALTER TABLE public."RingSequences" ADD CONSTRAINT "RingSequences_prefix_ringing_group_id_key" UNIQUE (prefix, ringing_group_id);
+ALTER TABLE public."RingSequences" ADD CONSTRAINT ring_sequences_ringing_group_id_fkey FOREIGN KEY (ringing_group_id) REFERENCES public."RingingGroups"(id);
+GRANT ALL ON public."RingSequences" TO anon;
+GRANT ALL ON public."RingSequences" TO authenticated;
+GRANT ALL ON public."RingSequences" TO service_role;
+CREATE INDEX idx_ring_sequences_ringing_group_id ON public."RingSequences" (ringing_group_id);
+CREATE POLICY group_ring_sequences_access ON public."RingSequences" FOR SELECT USING ((ringing_group_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'ringing_group_id'::text))::bigint));
+CREATE POLICY group_ring_sequences_insert ON public."RingSequences" FOR INSERT WITH CHECK ((ringing_group_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'ringing_group_id'::text))::bigint));
+CREATE POLICY group_ring_sequences_update ON public."RingSequences" FOR UPDATE USING ((ringing_group_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'ringing_group_id'::text))::bigint)) WITH CHECK ((ringing_group_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'ringing_group_id'::text))::bigint));
