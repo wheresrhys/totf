@@ -61,14 +61,17 @@ export function getAgeSplit(
 	];
 }
 
-// Young trends — encounter-level 3J/postjuv breakdown of the "Population" tab's
-// Young trends tile, consuming `population_stats`' young-trends columns
-// (#800/#801). "Juv" is all 3J encounters (`postjuv_juv_enc_count`), "New juv"
-// its N-record slice; "Postjuv"/"New postjuv" the age-3-non-juv pair. "Young"
-// and "New young" have no dedicated column — they are summed client-side from
-// their two component series per period (Juv+Postjuv, New juv+New postjuv). The
-// counts are COALESCEd non-null by the RPC, so the sums never hit a null.
-export function getYoungTrends(
+// Young counts / New young counts — encounter-level 3J/postjuv breakdown of the
+// "Population" tab's Young counts and New young counts tiles, consuming
+// `population_stats`' young-trends columns (#800/#801). Originally a single
+// "Young trends" tile with six series including two client-side sums (Young,
+// New young); #839 split it into two tiles — raw counts and first-encounter
+// ("new") counts — dropping the summed series entirely since nothing combines
+// juv+postjuv any more.
+//
+// "Juv" is all 3J encounters (`postjuv_juv_enc_count`); "Postjuv" the
+// age-3-non-juv count (`postjuv_enc_count`).
+export function getYoungCounts(
 	populationStats: PopulationStatsResult[]
 ): LineChartData[] {
 	return [
@@ -80,6 +83,22 @@ export function getYoungTrends(
 			])
 		},
 		{
+			name: 'Postjuv',
+			data: populationStats.map((row) => [
+				row.time_period,
+				row.postjuv_enc_count
+			])
+		}
+	];
+}
+
+// "New juv"/"New postjuv" are the same two columns' N-record (first-encounter)
+// slices.
+export function getNewYoungCounts(
+	populationStats: PopulationStatsResult[]
+): LineChartData[] {
+	return [
+		{
 			name: 'New juv',
 			data: populationStats.map((row) => [
 				row.time_period,
@@ -87,31 +106,10 @@ export function getYoungTrends(
 			])
 		},
 		{
-			name: 'Postjuv',
-			data: populationStats.map((row) => [
-				row.time_period,
-				row.postjuv_enc_count
-			])
-		},
-		{
 			name: 'New postjuv',
 			data: populationStats.map((row) => [
 				row.time_period,
 				row.new_postjuv_enc_count
-			])
-		},
-		{
-			name: 'Young',
-			data: populationStats.map((row) => [
-				row.time_period,
-				row.postjuv_juv_enc_count + row.postjuv_enc_count
-			])
-		},
-		{
-			name: 'New young',
-			data: populationStats.map((row) => [
-				row.time_period,
-				row.new_postjuv_juv_enc_count + row.new_postjuv_enc_count
 			])
 		}
 	];
