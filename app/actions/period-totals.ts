@@ -1,7 +1,7 @@
 'use server';
-import { fetchAuthorisedAggregateStats } from '@/lib/group-summary-access';
+import { fetchAuthorisedAggregateStats } from '@/app/lib/auth/group-summary-access';
 import type { AggregateStatsResult } from '@/app/models/db';
-import type { PeriodTotalsGrouping } from '@/app/models/period-totals';
+import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
 
 /**
  * Per-time-period totals for a summary period — `aggregate_stats` grouped by

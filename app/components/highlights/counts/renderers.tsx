@@ -12,7 +12,7 @@ import type {
 	SinceComparisonKind,
 	SpeciesCountRecordHighlight,
 	SpeciesJuvCountRecordHighlight
-} from '@/app/models/highlights';
+} from '@/app/lib/highlights';
 import {
 	buildOfYearPhrase,
 	buildSpeciesList,

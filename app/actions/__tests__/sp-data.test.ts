@@ -16,7 +16,7 @@ const { mockGetAuthenticatedSupabaseClient, mockFetchGroupEffortHistory } =
 		mockFetchGroupEffortHistory: vi.fn()
 	}));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
@@ -25,7 +25,7 @@ vi.mock('@/lib/group-auth', () => ({
 // RPC-args/caching behaviour is covered by lib/__tests__/underlying-stats.test.ts,
 // so here it's mocked directly and these tests only assert the
 // interval->hours conversion + [time_period, hours] pair shaping.
-vi.mock('@/lib/underlying-stats', () => ({
+vi.mock('@/app/lib/underlying-stats', () => ({
 	fetchGroupEffortHistory: mockFetchGroupEffortHistory
 }));
 

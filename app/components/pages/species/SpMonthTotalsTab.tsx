@@ -6,7 +6,7 @@ import {
 	buildMonthTotalsRows,
 	filterEmptyMonthTotalsRows,
 	formatMonthYearLabel
-} from '@/app/models/month-totals';
+} from '@/app/lib/month-totals';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import type { AggregateStatsResult } from '@/app/models/db';
 

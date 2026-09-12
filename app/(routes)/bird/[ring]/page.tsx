@@ -1,6 +1,6 @@
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
-import type { ViewedGroup } from '@/lib/group-slug';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { StandaloneBird, EncounterOfBird } from '@/app/models/bird';
 import { BirdPageContent, type PageParams } from './PageContent';

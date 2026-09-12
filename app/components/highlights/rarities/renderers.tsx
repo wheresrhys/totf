@@ -8,7 +8,7 @@ import type {
 	MegaSpeciesHighlight,
 	RareSpeciesHighlight,
 	RarityHighlight
-} from '@/app/models/highlights';
+} from '@/app/lib/highlights';
 import {
 	buildOfYearPhrase,
 	buildSpeciesList,

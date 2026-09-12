@@ -1,4 +1,4 @@
-import type { MeasurementRange } from '@/app/models/measurement-range';
+import type { MeasurementRange } from '@/app/lib/measurement-range';
 
 /**
  * Renders a summarised measurement range (see issue #377):

@@ -3,7 +3,7 @@ import { printLocationName } from '@/app/components/shared/DesignSystem';
 import { StatOutput } from './shared/StatOutput';
 import { NoPrefetchLink } from './shared/NoPrefetchLink';
 
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export function SessionsByDay({
 	sessions,

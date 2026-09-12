@@ -53,7 +53,7 @@ describe('group-cookie', () => {
 			await setGroupCookie(5);
 
 			const [, token] = mockCookieStore.set.mock.calls[0];
-			const { verifyGroupJwt } = await import('@/lib/jwt');
+			const { verifyGroupJwt } = await import('@/app/lib/auth/jwt');
 			const groupId = await verifyGroupJwt(token);
 			expect(groupId).toBe(5);
 		});
@@ -69,7 +69,7 @@ describe('group-cookie', () => {
 		});
 
 		it('round-trips: returns correct groupId from a valid cookie', async () => {
-			const { generateGroupJwt } = await import('@/lib/jwt');
+			const { generateGroupJwt } = await import('@/app/lib/auth/jwt');
 			const token = await generateGroupJwt(99);
 			mockCookieStore.get.mockReturnValue({ value: token });
 

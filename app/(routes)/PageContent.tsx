@@ -4,7 +4,7 @@ import {
 	SecondaryHeading,
 	Table
 } from '../components/shared/DesignSystem';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '../models/session';
 import type {
 	AggregateStatsResult,

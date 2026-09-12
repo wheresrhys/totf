@@ -23,7 +23,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('./app/actions/group-cookie', async () => {
-  const { generateGroupJwt } = await import('./lib/jwt');
+  const { generateGroupJwt } = await import('./app/lib/auth/jwt');
   return {
     getGroupCookie: vi.fn().mockResolvedValue(1),
     setGroupCookie: vi.fn().mockResolvedValue(undefined),

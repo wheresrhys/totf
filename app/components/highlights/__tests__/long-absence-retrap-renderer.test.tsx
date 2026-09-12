@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderLongAbsenceRetrapHighlight } from '../long-absence-retrap-renderer';
-import type { LongAbsenceRetrapHighlight } from '@/app/models/highlights';
+import type { LongAbsenceRetrapHighlight } from '@/app/lib/highlights';
 
 // Moved from the old flat app/components/session-highlight-renderers.tsx
 // coverage as part of #760's componentized-per-group renderers split —

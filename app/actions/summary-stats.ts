@@ -1,5 +1,5 @@
 'use server';
-import { fetchAuthorisedAggregateStats } from '@/lib/group-summary-access';
+import { fetchAuthorisedAggregateStats } from '@/app/lib/auth/group-summary-access';
 import type { AggregateStatsResult } from '@/app/models/db';
 
 /**

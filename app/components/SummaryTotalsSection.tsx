@@ -8,11 +8,11 @@ import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { fetchPeriodStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
 import type { AggregateStatsResult } from '@/app/models/db';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	buildGroupSummaryHref,
 	buildGroupSessionHref
-} from '@/lib/group-links';
+} from '@/app/lib/group-links';
 import {
 	buildCombinedMonthTotalsRows,
 	buildPerYearMonthTotalsRows,
@@ -20,7 +20,7 @@ import {
 	formatMonthYearLabel,
 	formatMonthLabel,
 	type MonthTotalsRow
-} from '@/app/models/month-totals';
+} from '@/app/lib/month-totals';
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';

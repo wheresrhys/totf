@@ -9,7 +9,7 @@ import {
 import { SppStatsTable } from '../SppStatsTable';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
-import type { SpeciesStatsRow } from '@/app/models/species-stats';
+import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 import type { PageData } from '@/app/(routes)/species/page';
 
 vi.mock('@/app/actions/spp-data', () => ({
