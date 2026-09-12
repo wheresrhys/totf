@@ -6,7 +6,7 @@ import { registerDeriveBranchNameTool } from './tools/derive-branch-name';
 import { registerCreateTicketTool } from './tools/create-ticket';
 import { registerSwarmPlanBatchTool } from './tools/swarm-plan-batch';
 import { registerLinkTicketDependenciesTool } from './tools/link-ticket-dependencies';
-import { registerApplySchemaMigrationTool } from './tools/apply-schema-migration';
+import { registerEnsureLocalMigrationsAppliedTool } from './tools/ensure-local-migrations-applied';
 
 const server = new McpServer({
 	name: 'swarm-tools',
@@ -19,7 +19,7 @@ registerDeriveBranchNameTool(server);
 registerCreateTicketTool(server);
 registerSwarmPlanBatchTool(server);
 registerLinkTicketDependenciesTool(server);
-registerApplySchemaMigrationTool(server);
+registerEnsureLocalMigrationsAppliedTool(server);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

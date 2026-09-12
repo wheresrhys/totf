@@ -64,4 +64,5 @@ e2e/group-slugs.json
 
 # swarm's local worker-tracking state and per-ticket worktrees (machine-local, never committed)
 /.claude/swarm-state.json
+/.claude/swarm-migration-state.json
 /.claude/worktrees/

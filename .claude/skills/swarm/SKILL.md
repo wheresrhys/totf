@@ -194,9 +194,17 @@ both concerns for that PR:
      conflicts — whether GitHub already flagged `CONFLICTING` or the fetch surfaces one GitHub's
      cache hadn't caught yet — resolve every conflict honouring both sides' intent, and run the
      relevant tests to prove the merge is sound.
-  3. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
+  3. **Catch up local migrations** — before running any tests, call
+     `mcp__swarm-tools__ensure_local_migrations_applied` with `{ worktreePath: <this worktree's
+     absolute path> }`. The sync above may have pulled in migration files (committed to the repo
+     since #862) that the shared local Postgres hasn't had applied yet, which would make DB-backed
+     tests (E2E) run against a stale schema. The tool fast-paths (no Supabase CLI, no Postgres)
+     when a shared marker shows the DB is already caught up, so it's cheap on every PR; only when
+     behind does it run `npx supabase migration up --local`, and that apply case is safe because a
+     `db-migration` unit already runs solo (the exclusive-resource rule).
+  4. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
      the changes, run tests, reply to the reviewer via `gh pr comment <n>`.
-  4. Commit (repo conventions, including the model/Claude Code trailers from `implement-ticket`)
+  5. Commit (repo conventions, including the model/Claude Code trailers from `implement-ticket`)
      and push. If on inspection neither a real conflict nor genuine feedback remains, no-op and
      report that.
 
@@ -303,8 +311,16 @@ For each selected issue, launch an Agent (default background, so they run in par
   --git-common-dir` (its parent directory), then `cp -n <that>/.env.dev .env.dev`. Then
   **`git fetch origin` and create the ticket branch off `origin/main`** (the
   worktree is cut from local `main`, which may be stale relative to origin — basing on
-  `origin/main` picks up already-merged sibling tickets), then run the `implement-ticket` skill
-  for issue `<n>` and return its result (PR number + URL + test status).
+  `origin/main` picks up already-merged sibling tickets). Then, before starting any
+  DB-dependent work, **catch the shared local Postgres up to the committed migrations** by calling
+  `mcp__swarm-tools__ensure_local_migrations_applied` with `{ worktreePath: <this worktree's
+  absolute path> }` — since #862 committed `supabase/migrations/` to the repo, a worktree based on
+  `origin/main` can hold migration files the shared local DB hasn't had applied yet. The tool
+  fast-paths (no Supabase CLI, no Postgres) when a shared marker shows the DB is already caught up,
+  so it's cheap to call for *every* ticket regardless of label; only when behind does it run
+  `npx supabase migration up --local`, and that apply case is safe because a `db-migration` unit
+  already runs solo (the exclusive-resource rule) — no new coordination primitive. Finally, run the
+  `implement-ticket` skill for issue `<n>` and return its result (PR number + URL + test status).
 
 Append a `kind: "ticket"` entry (see State file) for this worker right after spawning it.
 
