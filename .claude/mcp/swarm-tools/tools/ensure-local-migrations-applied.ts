@@ -95,7 +95,7 @@ export async function ensureLocalMigrationsApplied(
 		};
 	}
 
-	return withMigrationMarkerLock(async (marker) => {
+	return withMigrationMarkerLock<EnsureResult>(async (marker) => {
 		if (markerIsCaughtUp(marker, highestOnDisk)) {
 			return {
 				marker,
@@ -158,7 +158,13 @@ export function registerEnsureLocalMigrationsAppliedTool(server: McpServer) {
 		},
 		async ({ worktreePath }) => {
 			const structuredContent = await ensureLocalMigrationsApplied(worktreePath);
-			return { content: [{ type: 'text', text: JSON.stringify(structuredContent) }], structuredContent };
+			// Spread into a fresh object literal: the SDK types `structuredContent` as an
+			// index-signatured `{ [x: string]: unknown }`, which a named interface (`EnsureResult`)
+			// is not assignable to, but an object-literal type is.
+			return {
+				content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
+				structuredContent: { ...structuredContent },
+			};
 		}
 	);
 }

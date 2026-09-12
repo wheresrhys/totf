@@ -116,7 +116,13 @@ export function registerSwarmStateTools(server: McpServer) {
 		},
 		async ({ kind, issue, pr, branch }) => {
 			const structuredContent = await listWorkersWithPrune({ kind, issue, pr, branch });
-			return { content: [{ type: 'text', text: JSON.stringify(structuredContent) }], structuredContent };
+			// Spread into a fresh object literal: the SDK types `structuredContent` as an
+			// index-signatured `{ [x: string]: unknown }`, which a named interface
+			// (`ListStateResult`) is not assignable to, but an object-literal type is.
+			return {
+				content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
+				structuredContent: { ...structuredContent },
+			};
 		}
 	);
 }

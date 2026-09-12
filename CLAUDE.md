@@ -209,12 +209,10 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
 5. You may want to use `npm run db:seed:local` to repopulate the db with test data
 6. Inspect the generated migration file before pushing.
 7. Commit the generated file(s) under `supabase/migrations/` (no longer gitignored, #862) along
-   with your PR. Once the PR merges to `main`, `.github/workflows/deploy-migrations.yml` deploys
-   any new migrations to production automatically — it's path-filtered to only run when a push to
-   `main` touches `supabase/migrations/**`, and fails the workflow run visibly (no silent success)
-   if the deploy fails. `npm run db:migration:push` still exists as a manual break-glass fallback
-   (e.g. CI is down, or a migration needs deploying outside the normal PR-merge flow) but is no
-   longer the primary path.
+   with your PR, then deploy the schema change to production with `npm run db:migration:push`
+   (human-only). There is **no** automated CI deploy of migrations: the
+   `.github/workflows/deploy-migrations.yml` job added in #862 was exercised and then deliberately
+   removed, so `npm run db:migration:push` is once again the sole deploy path.
 
 ## Data fetching conventions
 
@@ -317,10 +315,9 @@ read-only against any server.
 `load-prod-write-env.sh`, which sets `SUPABASE_JWT_ROLE=authenticated` — writes
 allowed but still RLS-scoped to the target group. Break-glass
 web-import test against prod: `./scripts/load-prod-write-env.sh next dev --turbopack`
-(deliberately not an npm script). Migrations deploy automatically via
-`.github/workflows/deploy-migrations.yml` when a PR touching `supabase/migrations/**` merges to
-`main` (#862); `npm run db:migration:push` remains as a human-only manual break-glass fallback for
-deploying a migration outside that flow.
+(deliberately not an npm script). Migrations are deployed by the human with
+`npm run db:migration:push` — there is no automated CI deploy (the `deploy-migrations.yml` workflow
+added in #862 was removed after being exercised).
 
 Note: the deployed Vercel app gets its env directly, with
 `SUPABASE_JWT_ROLE=authenticated` set in the Vercel project settings, so production
