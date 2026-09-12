@@ -126,7 +126,6 @@ describe('public_aggregate_stats', () => {
 				scheme: 'BTO',
 				sex: 'M',
 				age_code: 4,
-				weight: 15,
 				record_type: recordType,
 				capture_time: captureTime
 			});
@@ -238,6 +237,31 @@ describe('public_aggregate_stats', () => {
 			species_count: 2
 		});
 		expect(publicRes.data).toEqual(authRes.data);
+	});
+
+	// Edge — #827 removed the 8 wing/weight columns from the shared
+	// aggregate_stats_result type; confirm the change propagates through the
+	// SECURITY DEFINER wrapper too (it RETURN QUERY SELECTs from aggregate_stats).
+	it('returns rows without the 8 wing/weight columns (removed in #827)', async () => {
+		const { data, error } = await anonClient.rpc('public_aggregate_stats', {
+			ringing_group_filter: publicGroupId,
+			from_date: month1Date,
+			to_date: month1Date
+		});
+		expect(error).toBeNull();
+		expect(data).toHaveLength(1);
+		for (const column of [
+			'max_weight',
+			'avg_weight',
+			'min_weight',
+			'median_weight',
+			'max_wing',
+			'avg_wing',
+			'min_wing',
+			'median_wing'
+		]) {
+			expect(data![0]).not.toHaveProperty(column);
+		}
 	});
 
 	// Structure

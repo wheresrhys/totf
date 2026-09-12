@@ -345,18 +345,30 @@ describe('sp-data actions', () => {
 			expect(result).toEqual([]);
 		});
 
-		it('passes an aggregate_stats row through unmerged when its time_period has no matching biometrics_stats row', async () => {
+		it('fills all 8 biometric fields with null when a time_period has no matching biometrics_stats row', async () => {
 			makeStatsHistoryClient({
-				aggregateRows: [
-					{ time_period: '2023-03', bird_count: 2, min_weight: 7 }
-				],
+				aggregateRows: [{ time_period: '2023-03', bird_count: 2 }],
 				biometricsRows: []
 			});
 
 			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
 
+			// aggregate_stats no longer carries its own wing/weight columns (#827),
+			// so a period with no matching biometrics_stats row gets all 8 fields
+			// coalesced to null rather than being passed through unmerged.
 			expect(result).toEqual([
-				{ time_period: '2023-03', bird_count: 2, min_weight: 7 }
+				{
+					time_period: '2023-03',
+					bird_count: 2,
+					min_weight: null,
+					max_weight: null,
+					avg_weight: null,
+					median_weight: null,
+					min_wing: null,
+					max_wing: null,
+					avg_wing: null,
+					median_wing: null
+				}
 			]);
 		});
 	});

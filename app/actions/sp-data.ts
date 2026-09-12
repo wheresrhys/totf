@@ -16,6 +16,7 @@ import type { SexedGraphableBird } from '@/app/components/pages/species/WeightAn
 import {
 	mergeBiometricsFields,
 	type AggregateStatsResult,
+	type AggregateStatsWithBiometrics,
 	type BiometricsStatsResult,
 	type PopulationStatsResult
 } from '@/app/models/db';
@@ -187,16 +188,17 @@ export async function fetchGraphableEncounterData(
 // params, so their rows are grouped identically and joined here on
 // `time_period` (rather than assumed to line up positionally) — a period
 // present on one side but not the other is handled by the merge below: an
-// aggregate_stats row with no matching biometrics_stats row is passed through
-// unmerged (keeping whatever wing/weight values it already carries, if any),
-// and a biometrics_stats row with no matching aggregate_stats row is simply
-// not included in the output (the output shape is driven by aggregate_stats).
+// aggregate_stats row with no matching biometrics_stats row still gets all 8
+// biometric fields, coalesced to null by mergeBiometricsFields (matching the
+// null columns aggregate_stats returned before #827 removed them), and a
+// biometrics_stats row with no matching aggregate_stats row is simply not
+// included in the output (the output shape is driven by aggregate_stats).
 export async function getSpeciesStatsHistory(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsResult[]> {
+): Promise<AggregateStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
 		species_name_filter: species,
@@ -216,12 +218,12 @@ export async function getSpeciesStatsHistory(
 	const biometricsRowsByPeriod = new Map(
 		biometricsRows.map((row) => [row.time_period, row])
 	);
-	return aggregateRows.map((aggregateRow) => {
-		const biometricsRow = biometricsRowsByPeriod.get(aggregateRow.time_period);
-		return biometricsRow
-			? mergeBiometricsFields(aggregateRow, biometricsRow)
-			: aggregateRow;
-	});
+	return aggregateRows.map((aggregateRow) =>
+		mergeBiometricsFields(
+			aggregateRow,
+			biometricsRowsByPeriod.get(aggregateRow.time_period)
+		)
+	);
 }
 
 /**
