@@ -50,7 +50,6 @@ function buildStat(
 		postjuv_bird_count: 3,
 		adult_bird_count: 15,
 		unknown_age_bird_count: 5,
-		new_young_bird_count: 7,
 		...overrides
 	} as unknown as AggregateStatsResult;
 }
@@ -205,8 +204,7 @@ describe('PeriodTotalsTable', () => {
 			juv_bird_count: 10,
 			postjuv_bird_count: 6,
 			adult_bird_count: 30,
-			unknown_age_bird_count: 10,
-			new_young_bird_count: 14
+			unknown_age_bird_count: 10
 		});
 
 		it('renders a "Total" row for the "year" timeInterval when totalsStats is supplied', () => {

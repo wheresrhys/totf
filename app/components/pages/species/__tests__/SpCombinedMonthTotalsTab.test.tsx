@@ -44,7 +44,6 @@ function buildMonthlyStat(
 		postjuv_bird_count: 3,
 		adult_bird_count: 15,
 		unknown_age_bird_count: 5,
-		new_young_bird_count: 7,
 		...overrides
 	} as AggregateStatsResult;
 }

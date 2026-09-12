@@ -39,7 +39,6 @@ function buildDailyStat(
 		postjuv_bird_count: 1,
 		adult_bird_count: 5,
 		unknown_age_bird_count: 1,
-		new_young_bird_count: 3,
 		...overrides
 	} as AggregateStatsResult;
 }

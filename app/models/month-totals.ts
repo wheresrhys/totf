@@ -68,7 +68,6 @@ function synthesizeZeroStats(timePeriod: string): AggregateStatsResult {
 		postjuv_bird_count: 0,
 		adult_bird_count: 0,
 		unknown_age_bird_count: 0,
-		new_young_bird_count: 0,
 		// Encounter-based age buckets (read by `derivePeriodTotalsRowByEncounter`)
 		// are zero for a month with no sessions too — included so a zero-filled
 		// row toggled to encounter mode reads `0`, not `undefined`.
@@ -136,7 +135,6 @@ const SUMMABLE_STAT_FIELDS = [
 	'species_count',
 	'bird_count',
 	'new_bird_count',
-	'new_young_bird_count',
 	'pullus_enc_count',
 	'juv_enc_count',
 	'postjuv_enc_count',
