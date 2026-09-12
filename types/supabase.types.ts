@@ -394,12 +394,15 @@ export type Database = {
       }
       Test: {
         Row: {
+          haha: string | null
           id: string
         }
         Insert: {
+          haha?: string | null
           id: string
         }
         Update: {
+          haha?: string | null
           id?: string
         }
         Relationships: []
