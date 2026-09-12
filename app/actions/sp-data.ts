@@ -13,9 +13,11 @@ import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
 import type { SexedGraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
-import type {
-	AggregateStatsResult,
-	PopulationStatsResult
+import {
+	mergeBiometricsFields,
+	type AggregateStatsResult,
+	type BiometricsStatsResult,
+	type PopulationStatsResult
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/models/period-totals';
 import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
@@ -179,22 +181,47 @@ export async function fetchGraphableEncounterData(
 	);
 }
 
+// Monthly wing/weight + count history for a single species, merging
+// biometrics_stats' wing/weight fields onto each aggregate_stats row (#821).
+// The two RPCs share the same species/group/date-range/group_by_time_period
+// params, so their rows are grouped identically and joined here on
+// `time_period` (rather than assumed to line up positionally) — a period
+// present on one side but not the other is handled by the merge below: an
+// aggregate_stats row with no matching biometrics_stats row is passed through
+// unmerged (keeping whatever wing/weight values it already carries, if any),
+// and a biometrics_stats row with no matching aggregate_stats row is simply
+// not included in the output (the output shape is driven by aggregate_stats).
 export async function getSpeciesStatsHistory(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
-) {
+): Promise<AggregateStatsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	return supabase
-		.rpc('aggregate_stats', {
-			species_name_filter: species,
-			ringing_group_filter: viewedGroupId,
-			group_by_time_period: 'month',
-			...(fromDate ? { from_date: fromDate } : {}),
-			...(toDate ? { to_date: toDate } : {})
-		})
-		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
+	const rpcArgs = {
+		species_name_filter: species,
+		ringing_group_filter: viewedGroupId,
+		group_by_time_period: 'month',
+		...(fromDate ? { from_date: fromDate } : {}),
+		...(toDate ? { to_date: toDate } : {})
+	};
+	const [aggregateRows, biometricsRows] = await Promise.all([
+		supabase
+			.rpc('aggregate_stats', rpcArgs)
+			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>,
+		supabase
+			.rpc('biometrics_stats', rpcArgs)
+			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>
+	]);
+	const biometricsRowsByPeriod = new Map(
+		biometricsRows.map((row) => [row.time_period, row])
+	);
+	return aggregateRows.map((aggregateRow) => {
+		const biometricsRow = biometricsRowsByPeriod.get(aggregateRow.time_period);
+		return biometricsRow
+			? mergeBiometricsFields(aggregateRow, biometricsRow)
+			: aggregateRow;
+	});
 }
 
 /**

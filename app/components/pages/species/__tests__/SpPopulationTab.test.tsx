@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import {
 	SpPopulationTab,
+	RETURNING_VS_NEW_COLORS,
 	AGE_SPLIT_COLORS,
 	AGE_SPLIT_HUES,
 	YOUNG_COUNTS_COLORS,
@@ -31,6 +32,11 @@ vi.mock('@/app/actions/sp-data', () => ({
 
 vi.mock('../StatsHistoryChart', () => ({
 	getCounts: () => [{ name: 'birds', data: [] }],
+	getReturningVsNew: () => [
+		{ name: 'New adults', data: [] },
+		{ name: 'Returning adults', data: [] },
+		{ name: 'Young', data: [] }
+	],
 	getAgeSplit: () => [
 		{ name: 'New adults', data: [] },
 		{ name: 'First summer', data: [] },
@@ -144,10 +150,13 @@ describe('SpPopulationTab', () => {
 		vi.mocked(getGroupEffortHistory).mockResolvedValue([['2024-01-01', 10]]);
 	});
 
-	describe('Structure: the four population tiles', () => {
-		it('renders Counts, Age split, Young counts and New young counts tiles — no Biometrics/Wing-vs-weight tiles', () => {
+	describe('Structure: the five population tiles', () => {
+		it('renders Counts, Returning vs new, Age split, Young counts and New young counts tiles — no Biometrics/Wing-vs-weight tiles', () => {
 			render(<SpPopulationTab {...props} />);
 			expect(screen.getByRole('button', { name: /Counts/ })).toBeDefined();
+			expect(
+				screen.getByRole('button', { name: /Returning vs new/ })
+			).toBeDefined();
 			expect(screen.getByRole('button', { name: /Age split/ })).toBeDefined();
 			expect(
 				screen.getByRole('button', { name: /Young counts/ })
@@ -197,6 +206,51 @@ describe('SpPopulationTab', () => {
 			expect(
 				screen.getByRole('button', { name: 'Close Counts' })
 			).toBeDefined();
+		});
+	});
+
+	describe('Structure: expanding the Returning vs new tile (aggregate_stats + population_stats)', () => {
+		it('renders the "Returning vs new" tile heading and description', () => {
+			render(<SpPopulationTab {...props} />);
+			expect(
+				screen.getByRole('button', { name: /Returning vs new/ })
+			).toBeDefined();
+			expect(
+				screen.getByText('New adults, returning adults and young over time')
+			).toBeDefined();
+		});
+
+		it('expanding the tile triggers both the stats-history and population-stats fetches', async () => {
+			const { getSpeciesStatsHistory, getSpeciesPopulationStats } =
+				await loadActions();
+			render(<SpPopulationTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Returning vs new/ }));
+			await screen.findByTestId('trend-chart');
+			expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(1);
+			expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1);
+		});
+
+		it('shows a spinner until both fetches have resolved, not just one', async () => {
+			const { getSpeciesStatsHistory, getSpeciesPopulationStats } =
+				await loadActions();
+			let resolveStatsHistory!: (value: AggregateStatsResult[]) => void;
+			vi.mocked(getSpeciesStatsHistory).mockReturnValue(
+				new Promise((resolve) => {
+					resolveStatsHistory = resolve;
+				})
+			);
+			const { container } = render(<SpPopulationTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Returning vs new/ }));
+			// population_stats resolves immediately (default mock); stats_history is
+			// still pending — the tile must still show its spinner, not the chart,
+			// even though one of the two fetches it needs has already resolved.
+			await waitFor(() =>
+				expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1)
+			);
+			expect(screen.queryByTestId('trend-chart')).toBeNull();
+			expect(container.querySelector('.loading-spinner')).not.toBeNull();
+			resolveStatsHistory([]);
+			await screen.findByTestId('trend-chart');
 		});
 	});
 
@@ -332,6 +386,16 @@ describe('SpPopulationTab', () => {
 			fireEvent.click(screen.getByRole('button', { name: /Counts/ }));
 			const chart = await screen.findByTestId('trend-chart');
 			expect(chart.dataset.colors).toBe('null');
+		});
+
+		it('passes the Returning vs new colours on the Returning vs new tile', async () => {
+			render(<SpPopulationTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Returning vs new/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(JSON.parse(chart.dataset.colors!)).toEqual(
+				RETURNING_VS_NEW_COLORS
+			);
+			expect(chart.dataset.seriesCount).toBe('3');
 		});
 
 		it('passes the paired Age split colours on the Age split tile', async () => {
