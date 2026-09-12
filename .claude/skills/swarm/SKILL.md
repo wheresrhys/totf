@@ -235,6 +235,46 @@ prompt in place of §3's default "create the ticket branch off `origin/main`" in
 ticket the user hasn't answered for is never spawned — it simply resurfaces on the next
 `swarm_plan_batch` call.
 
+## 1.6 Ready tickets missing a model label (auto-ticketify)
+
+A `ready` issue is expected to already carry exactly one model label (`sonnet`/`opus`/`fable`) —
+`flesh-out-ticket`/`ticketify` always add one at creation. In practice this is sometimes violated
+(e.g. an issue filed directly by a human, not through the ticket-workflow skills). Such an issue
+must never be selected for direct implementation and its model must never be guessed. This applies
+whether the gap surfaces via `swarm_plan_batch`'s `ticketsToImplement` (once it excludes these —
+a known `swarm_plan_batch` gap, see #835) or via the manual `gh issue list --label ready`
+cross-check the orchestrator currently has to do as a workaround for that same bug.
+
+For each `ready` issue found with none of `sonnet`/`opus`/`fable`, spawn one background Agent that
+runs the `ticketify` skill against that single issue, treating its existing title+body as the
+input task description:
+- `subagent_type: general-purpose`; no `isolation` — `ticketify` only creates/edits GitHub issues,
+  no repo checkout needed.
+- `model`: fixed `sonnet`, regardless of what model label the eventual replacement ticket(s) get —
+  this subagent's own job (drafting/labeling) is lightweight, not implementation.
+- `description`: `"Auto-ticketify #<n>"`.
+- Prompt: run `ticketify` against issue `<n>`'s current title+body. Let it do its normal job —
+  including splitting the issue into more than one commit-sized ticket if the body actually
+  bundles multiple distinct changes. It drafts properly-labeled replacement ticket(s) (model label
+  + `ready`, plus `db-migration`/`e2e-exclusive` if applicable) and closes the original issue in
+  favor of the new one(s), linking back with a comment (e.g. "Superseded by #NNN") — or, if
+  `ticketify` determines the issue is already atomic and just needs a label, it may instead simply
+  add the correct label to the original issue in place. Use whichever of `ticketify`'s own normal
+  outcomes fits.
+
+**No direct user interaction from this subagent.** `ticketify`'s process is normally interactive
+(reviewing the task list conversationally, surfacing clarifications, and — per
+`flesh-out-ticket`'s confirm-before-create gate, reused per-ticket — an `AskUserQuestion` step). A
+background subagent must not block on `AskUserQuestion` waiting for the real human: whenever
+`ticketify` would normally ask the user something, this subagent instead posts the question up to
+the parent orchestrator agent rather than prompting the user directly, so the top-level `/swarm`
+session relays it to the user and can pipe the answer back down — then waits for the answer before
+proceeding.
+
+This subagent counts toward the normal 4-worker cap (same pool as ticket/maintenance workers).
+Append a `kind: "ticket"` entry (see State file) right after spawning it, with `issue` set to the
+original unlabeled issue's number, so `take-over`/self-healing prune still work on it.
+
 ## 2. Select tickets (fill the remaining budget)
 
 `swarm_plan_batch`'s `ticketsToImplement` is already unblocked (no open `blockedBy` entry),
@@ -242,7 +282,8 @@ not in-flight (no existing branch or open linked PR), solo-run-filtered, ranked,
 the free slots left after §1's allocation — use it directly. Ranking is a priority override:
 any ticket also carrying the `next` label ranks above every ticket without it, regardless of
 `blockingCount` (a manual "do this one first" flag); within each group the tiebreak is
-`blockingCount` descending then issue number ascending.
+`blockingCount` descending then issue number ascending. An issue lacking a model label is never
+selected here — see §1.6.
 
 If `drained` is `true`, neither §1 nor §2 found eligible work and no workers are running: report
 that and go idle (do not exit the loop — a later completion or new PR can refill).
@@ -394,6 +435,11 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
 - Never auto-spawn a `staleClosedPrTickets` entry (an issue whose only leftover is a stale branch
   from a closed-not-merged PR). Always ask the user via `AskUserQuestion` (§1.5) to reuse the
   branch / start fresh referencing it / start fresh clean, and spawn only after they answer.
+- Never implement or guess a model label for a `ready` issue missing `sonnet`/`opus`/`fable`.
+  Instead spawn a dedicated `sonnet`-model subagent to run `ticketify` against it (§1.6), which
+  drafts properly-labeled replacement ticket(s) and closes the original (or relabels it in place
+  if already atomic). That subagent must never block on `AskUserQuestion` directly — it posts
+  questions up to the parent orchestrator and waits for the answer to come back down.
 - **Exclusive-resource work (`db-migration` or `e2e-exclusive`) runs completely solo** — across
   both tracks, not just within §2. Don't spawn it alongside any other worker, and don't spawn any
   other worker while it's running. A `db-migration`/`e2e-exclusive` PR being maintained (§1) is the
