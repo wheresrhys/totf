@@ -24,8 +24,8 @@ export function getCounts(
 // consuming `population_stats`' age-split columns (#800/#801). "New adults" and
 // "New young" are birds new to the group this year; "First summer" and "Oldies"
 // are returning birds. The four counts partition the adults + new-young cohorts;
-// `new_young_bird_count` is the same column `aggregate_stats` also carries (kept
-// duplicated in both RPCs — see CLAUDE.md's companion-stats-RPC note).
+// `new_young_bird_count` used to be duplicated on `aggregate_stats` too, but #824
+// removed that unused copy — `population_stats` now holds the only one.
 export function getAgeSplit(
 	populationStats: PopulationStatsResult[]
 ): LineChartData[] {
