@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type {
 	AggregateStatsResult,
+	AggregateStatsWithBiometrics,
 	PopulationStatsResult
 } from '@/app/models/db';
 import {
@@ -285,10 +286,10 @@ describe('getYoungCounts', () => {
 
 describe('getSizes', () => {
 	// #821 merges biometrics_stats' wing/weight fields onto each aggregate_stats
-	// row before getSizes ever sees it — getSizes itself is unaware of the merge
-	// and just reads the same AggregateStatsResult-shaped columns it always has.
-	// This regression-checks that a merged-in row still produces the same
-	// shape/values as a plain aggregate_stats row would have.
+	// row before getSizes ever sees it — the merged AggregateStatsWithBiometrics
+	// shape (#827) is what getSizes reads its wing/weight columns from now that
+	// aggregate_stats itself no longer carries them. This checks getSizes maps
+	// those merged columns onto the expected six series.
 	describe('Structure: six size series from the max/median/min weight and wing columns', () => {
 		it('maps max/median/min weight and wing against time_period', () => {
 			const rows = [
@@ -302,7 +303,7 @@ describe('getSizes', () => {
 					median_wing: 74,
 					min_wing: 72
 				}
-			] as AggregateStatsResult[];
+			] as AggregateStatsWithBiometrics[];
 
 			const result = getSizes(rows);
 

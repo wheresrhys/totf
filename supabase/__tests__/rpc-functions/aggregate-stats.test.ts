@@ -1179,4 +1179,62 @@ describe('aggregate_stats', () => {
 			expect(data![0].encounter_count).toBe(ALPHA_TOTAL_ENCOUNTERS);
 		});
 	});
+
+	// #827 removed the 8 wing/weight summary columns from aggregate_stats_result
+	// now that biometrics_stats is the sole source for them. These guard that the
+	// removal holds across every grouping shape aggregate_stats can return.
+	describe('wing/weight columns removed (#827)', () => {
+		const REMOVED_BIOMETRIC_COLUMNS = [
+			'max_weight',
+			'avg_weight',
+			'min_weight',
+			'median_weight',
+			'max_wing',
+			'avg_wing',
+			'min_wing',
+			'median_wing'
+		];
+
+		// Usual
+		it('the no-filters whole-aggregate row carries none of the 8 wing/weight columns', async () => {
+			const { data, error } = await alphaClient.rpc('aggregate_stats', {
+				ringing_group_filter: alphaId
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(1);
+			for (const column of REMOVED_BIOMETRIC_COLUMNS) {
+				expect(data![0]).not.toHaveProperty(column);
+			}
+		});
+
+		// Structure
+		it('a group_by_species row carries none of the 8 wing/weight columns', async () => {
+			const { data, error } = await alphaClient.rpc('aggregate_stats', {
+				ringing_group_filter: alphaId,
+				group_by_species: true
+			});
+			expect(error).toBeNull();
+			expect(data!.length).toBeGreaterThan(0);
+			for (const row of data!) {
+				for (const column of REMOVED_BIOMETRIC_COLUMNS) {
+					expect(row).not.toHaveProperty(column);
+				}
+			}
+		});
+
+		// Structure
+		it('a group_by_time_period=month row carries none of the 8 wing/weight columns', async () => {
+			const { data, error } = await alphaClient.rpc('aggregate_stats', {
+				ringing_group_filter: alphaId,
+				group_by_time_period: 'month'
+			});
+			expect(error).toBeNull();
+			expect(data!.length).toBeGreaterThan(0);
+			for (const row of data!) {
+				for (const column of REMOVED_BIOMETRIC_COLUMNS) {
+					expect(row).not.toHaveProperty(column);
+				}
+			}
+		});
+	});
 });

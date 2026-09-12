@@ -2,6 +2,7 @@
 import { type LineChartData } from 'react-chartkick';
 import type {
 	AggregateStatsResult,
+	AggregateStatsWithBiometrics,
 	PopulationStatsResult
 } from '@/app/models/db';
 
@@ -170,7 +171,7 @@ export function getNewYoungCounts(
 }
 
 export function getSizes(
-	statsHistory: AggregateStatsResult[]
+	statsHistory: AggregateStatsWithBiometrics[]
 ): LineChartData[] {
 	return [
 		{

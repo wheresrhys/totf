@@ -221,20 +221,6 @@ describe('fetchSpeciesData — merges aggregate_stats and biometrics_stats by sp
 			expect(row.median_wing).toBeUndefined();
 		});
 
-		it('ignores a same-named biometric field still returned by aggregate_stats when biometrics_stats also returns a row for that species', async () => {
-			vi.mocked(fetchAuthorisedAggregateStats).mockResolvedValue({
-				accessLevel: 'own',
-				rows: [buildAggregateRow({ species_name: 'Robin', max_weight: 999 })]
-			});
-			makeRpcClient([
-				buildBiometricsRow({ species_name: 'Robin', max_weight: 20 })
-			]);
-
-			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
-
-			expect(row.max_weight).toBe(20);
-		});
-
 		it('returns an empty array when aggregate_stats returns no rows', async () => {
 			vi.mocked(fetchAuthorisedAggregateStats).mockResolvedValue({
 				accessLevel: 'own',

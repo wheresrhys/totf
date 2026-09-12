@@ -7,7 +7,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { AggregateStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
 import { SpIndividualsTab } from '@/app/components/pages/species/SpIndividualsTab';
 import { SpNotableRetrapsTab } from '@/app/components/pages/species/SpNotableRetrapsTab';
@@ -46,7 +46,7 @@ export type PeriodScope = {
 
 export type FullFatPageData = {
 	birds: EnrichedBirdOfSpecies[];
-	speciesStats: AggregateStatsResult;
+	speciesStats: AggregateStatsWithBiometrics;
 	speciesId: number;
 	speciesName: string;
 } & PeriodScope;

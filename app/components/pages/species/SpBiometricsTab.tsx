@@ -5,7 +5,7 @@ import {
 	getSpeciesStatsHistory,
 	fetchGraphableEncounterData
 } from '@/app/actions/sp-data';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { AggregateStatsWithBiometrics } from '@/app/models/db';
 import { BoxyList } from '@/app/components/shared/DesignSystem';
 import { getSizes } from '@/app/components/pages/species/StatsHistoryChart';
 import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
@@ -65,7 +65,7 @@ export function SpBiometricsTab({
 	fromDate,
 	toDate
 }: {
-	speciesStats: AggregateStatsResult;
+	speciesStats: AggregateStatsWithBiometrics;
 	speciesName: string;
 	speciesId: number;
 	viewedGroupId: number;
@@ -75,7 +75,7 @@ export function SpBiometricsTab({
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
 	const [statsHistory, setStatsHistory] = useState<
-		AggregateStatsResult[] | null
+		AggregateStatsWithBiometrics[] | null
 	>(null);
 	const [statsRequested, setStatsRequested] = useState(false);
 	function loadStatsHistory() {

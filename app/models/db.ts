@@ -64,28 +64,57 @@ export type BiometricsStatsResult = Omit<
 	>;
 };
 
+// The 8 wing/weight columns that biometrics_stats owns. aggregate_stats no
+// longer carries its own copies (#827 removed them from aggregate_stats_result
+// now that biometrics_stats is the sole source), so callers that want the
+// biometric stats alongside an aggregate_stats row merge them in explicitly
+// (see mergeBiometricsFields below and mergeSpeciesBiometrics in
+// species-stats.ts, which reuses this same field list).
+export type BiometricFieldName =
+	| 'max_weight'
+	| 'avg_weight'
+	| 'min_weight'
+	| 'median_weight'
+	| 'max_wing'
+	| 'avg_wing'
+	| 'min_wing'
+	| 'median_wing';
+
+// An aggregate_stats row with the 8 biometrics_stats wing/weight fields merged
+// back on (the species detail + monthly-history read path, #821). Since
+// aggregate_stats_result no longer declares these columns (#827), the merged
+// shape has to add them explicitly — this is the detail/history counterpart of
+// species-stats.ts's SpeciesStatsRow (the /species list read path, #823). The
+// fields are always present here (mergeBiometricsFields coalesces a missing
+// biometrics row to null, matching the old null-valued aggregate_stats columns),
+// so consumers can read them without an undefined check.
+export type AggregateStatsWithBiometrics = AggregateStatsResult &
+	Pick<BiometricsStatsResult, BiometricFieldName>;
+
 // Wing/weight fields merged from a biometrics_stats row onto an
-// aggregate_stats row, preferring biometrics_stats' value for each of the
-// eight metric fields and leaving every other field on the aggregate_stats
-// row untouched (#821 — species page migration to biometrics_stats). The
+// aggregate_stats row (#821 — species page migration to biometrics_stats). The
 // grouping/identity columns (species_name, time_period) are intentionally
 // excluded from the merge: they belong to the aggregate_stats row's own
 // shape, and biometrics_stats' copies are only used by callers to find the
 // matching row (e.g. joining a time series on time_period) before merging.
+// A missing biometrics row (no biometric-eligible encounters for this
+// species/period) coalesces every metric to null, so the merged row always
+// carries all 8 fields — matching the null-valued columns aggregate_stats used
+// to return before #827 removed them.
 export function mergeBiometricsFields<T extends AggregateStatsResult>(
 	aggregateRow: T,
-	biometricsRow: BiometricsStatsResult
-): T {
+	biometricsRow: BiometricsStatsResult | undefined
+): T & Pick<BiometricsStatsResult, BiometricFieldName> {
 	return {
 		...aggregateRow,
-		min_weight: biometricsRow.min_weight,
-		max_weight: biometricsRow.max_weight,
-		avg_weight: biometricsRow.avg_weight,
-		median_weight: biometricsRow.median_weight,
-		min_wing: biometricsRow.min_wing,
-		max_wing: biometricsRow.max_wing,
-		avg_wing: biometricsRow.avg_wing,
-		median_wing: biometricsRow.median_wing
+		min_weight: biometricsRow?.min_weight ?? null,
+		max_weight: biometricsRow?.max_weight ?? null,
+		avg_weight: biometricsRow?.avg_weight ?? null,
+		median_weight: biometricsRow?.median_weight ?? null,
+		min_wing: biometricsRow?.min_wing ?? null,
+		max_wing: biometricsRow?.max_wing ?? null,
+		avg_wing: biometricsRow?.avg_wing ?? null,
+		median_wing: biometricsRow?.median_wing ?? null
 	};
 }
 
