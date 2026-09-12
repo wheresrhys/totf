@@ -85,6 +85,28 @@ function makeClient({
 	return { client, queryRecord: query.record, rpcCalls };
 }
 
+function makeStatsHistoryClient({
+	aggregateRows,
+	biometricsRows
+}: {
+	aggregateRows: unknown[];
+	biometricsRows: unknown[];
+}) {
+	const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
+	const client = {
+		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
+			rpcCalls.push({ name, args });
+			const data = name === 'aggregate_stats' ? aggregateRows : biometricsRows;
+			return {
+				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+					Promise.resolve({ data, error: null }).then(resolve)
+			};
+		})
+	};
+	mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+	return { rpcCalls };
+}
+
 function birdRow(encounterDates: string[]) {
 	return {
 		id: 1,
@@ -257,6 +279,85 @@ describe('sp-data actions', () => {
 
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
+		});
+
+		it('calls biometrics_stats with group_by_time_period: "month", matching the existing aggregate_stats call', async () => {
+			const { rpcCalls } = makeStatsHistoryClient({
+				aggregateRows: [],
+				biometricsRows: []
+			});
+
+			await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+
+			const biometricsCall = rpcCalls.find(
+				(call) => call.name === 'biometrics_stats'
+			);
+			expect(biometricsCall?.args).toMatchObject({
+				group_by_time_period: 'month'
+			});
+		});
+
+		it('merges biometrics_stats wing/weight fields onto each aggregate_stats row, keyed by time_period', async () => {
+			makeStatsHistoryClient({
+				aggregateRows: [
+					{
+						time_period: '2023-01',
+						bird_count: 5,
+						min_weight: 1,
+						max_weight: 2
+					},
+					{
+						time_period: '2023-02',
+						bird_count: 3,
+						min_weight: 1,
+						max_weight: 2
+					}
+				],
+				biometricsRows: [
+					{ time_period: '2023-01', min_weight: 99, max_weight: 100 },
+					{ time_period: '2023-02', min_weight: 88, max_weight: 90 }
+				]
+			});
+
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+
+			expect(result).toEqual([
+				expect.objectContaining({
+					time_period: '2023-01',
+					bird_count: 5,
+					min_weight: 99,
+					max_weight: 100
+				}),
+				expect.objectContaining({
+					time_period: '2023-02',
+					bird_count: 3,
+					min_weight: 88,
+					max_weight: 90
+				})
+			]);
+		});
+
+		it('returns an empty array without erroring when neither RPC returns rows', async () => {
+			makeStatsHistoryClient({ aggregateRows: [], biometricsRows: [] });
+
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+
+			expect(result).toEqual([]);
+		});
+
+		it('passes an aggregate_stats row through unmerged when its time_period has no matching biometrics_stats row', async () => {
+			makeStatsHistoryClient({
+				aggregateRows: [
+					{ time_period: '2023-03', bird_count: 2, min_weight: 7 }
+				],
+				biometricsRows: []
+			});
+
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+
+			expect(result).toEqual([
+				{ time_period: '2023-03', bird_count: 2, min_weight: 7 }
+			]);
 		});
 	});
 

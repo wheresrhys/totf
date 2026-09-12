@@ -7,7 +7,8 @@ import {
 	getCounts,
 	getAgeSplit,
 	getYoungCounts,
-	getNewYoungCounts
+	getNewYoungCounts,
+	getSizes
 } from '../StatsHistoryChart';
 
 // Minimal fixture builders — only the columns each mapper reads matter; the rest
@@ -138,6 +139,55 @@ describe('getYoungCounts', () => {
 		it('returns both series with empty data arrays', () => {
 			const result = getYoungCounts([]);
 			expect(result).toHaveLength(2);
+			expect(result.every((series) => series.data.length === 0)).toBe(true);
+		});
+	});
+});
+
+describe('getSizes', () => {
+	// #821 merges biometrics_stats' wing/weight fields onto each aggregate_stats
+	// row before getSizes ever sees it — getSizes itself is unaware of the merge
+	// and just reads the same AggregateStatsResult-shaped columns it always has.
+	// This regression-checks that a merged-in row still produces the same
+	// shape/values as a plain aggregate_stats row would have.
+	describe('Structure: six size series from the max/median/min weight and wing columns', () => {
+		it('maps max/median/min weight and wing against time_period', () => {
+			const rows = [
+				{
+					...aggregateRow({}),
+					time_period: '2024-01-01',
+					max_weight: 21,
+					median_weight: 18,
+					min_weight: 16.5,
+					max_wing: 80,
+					median_wing: 74,
+					min_wing: 72
+				}
+			] as AggregateStatsResult[];
+
+			const result = getSizes(rows);
+
+			expect(result.map((series) => series.name)).toEqual([
+				'max weight',
+				'median weight',
+				'min weight',
+				'max wing',
+				'median wing',
+				'min wing'
+			]);
+			expect(result[0].data).toEqual([['2024-01-01', 21]]);
+			expect(result[1].data).toEqual([['2024-01-01', 18]]);
+			expect(result[2].data).toEqual([['2024-01-01', 16.5]]);
+			expect(result[3].data).toEqual([['2024-01-01', 80]]);
+			expect(result[4].data).toEqual([['2024-01-01', 74]]);
+			expect(result[5].data).toEqual([['2024-01-01', 72]]);
+		});
+	});
+
+	describe('Edge: empty history', () => {
+		it('returns all six series with empty data arrays', () => {
+			const result = getSizes([]);
+			expect(result).toHaveLength(6);
 			expect(result.every((series) => series.data.length === 0)).toBe(true);
 		});
 	});

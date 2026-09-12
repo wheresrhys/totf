@@ -46,6 +46,41 @@ export type PopulationStatsResult = {
 	>;
 };
 
+// biometrics_stats is aggregate_stats' companion RPC (#822) carrying the
+// wing/weight summary statistics (max/avg/min/median for both) in its own
+// biometrics_stats_result composite type. Same null-stripping rationale as
+// AggregateStatsResult/PopulationStatsResult above.
+export type BiometricsStatsResult = {
+	[K in keyof Database['public']['CompositeTypes']['biometrics_stats_result']]-?: NonNullable<
+		Database['public']['CompositeTypes']['biometrics_stats_result'][K]
+	>;
+};
+
+// Wing/weight fields merged from a biometrics_stats row onto an
+// aggregate_stats row, preferring biometrics_stats' value for each of the
+// eight metric fields and leaving every other field on the aggregate_stats
+// row untouched (#821 — species page migration to biometrics_stats). The
+// grouping/identity columns (species_name, time_period) are intentionally
+// excluded from the merge: they belong to the aggregate_stats row's own
+// shape, and biometrics_stats' copies are only used by callers to find the
+// matching row (e.g. joining a time series on time_period) before merging.
+export function mergeBiometricsFields<T extends AggregateStatsResult>(
+	aggregateRow: T,
+	biometricsRow: BiometricsStatsResult
+): T {
+	return {
+		...aggregateRow,
+		min_weight: biometricsRow.min_weight,
+		max_weight: biometricsRow.max_weight,
+		avg_weight: biometricsRow.avg_weight,
+		median_weight: biometricsRow.median_weight,
+		min_wing: biometricsRow.min_wing,
+		max_wing: biometricsRow.max_wing,
+		avg_wing: biometricsRow.avg_wing,
+		median_wing: biometricsRow.median_wing
+	};
+}
+
 export type DiscrepenciesResult =
 	Database['public']['Functions']['find_discrepencies']['Returns'][number];
 export type NotableRetrapsResult =
