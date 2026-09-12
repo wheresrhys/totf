@@ -1,7 +1,9 @@
 'use client';
 import { PageWrapper } from '@/app/components/shared/DesignSystem';
-import { speciesStatConfigs } from '@/app/models/species-stats';
-import type { AggregateStatsResult } from '@/app/models/db';
+import {
+	speciesStatConfigs,
+	type SpeciesStatsRow
+} from '@/app/models/species-stats';
 import type { PageData } from '@/app/(routes)/species/page';
 import type { ViewedGroup } from '@/lib/group-slug';
 import { useState, useEffect, useRef } from 'react';
@@ -12,7 +14,7 @@ import {
 } from '@/app/components/shared/SortableTable';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 
-function MultiSpeciesTableBody({ data }: { data: AggregateStatsResult[] }) {
+function MultiSpeciesTableBody({ data }: { data: SpeciesStatsRow[] }) {
 	return (
 		<tbody>
 			{data.map((species) => (
@@ -45,7 +47,7 @@ const sortableColumnConfigs = speciesStatConfigs.reduce(
 			preferSortAscending: column.preferSortAscending
 		}
 	}),
-	{} as Record<keyof AggregateStatsResult, ColumnConfig>
+	{} as Record<keyof SpeciesStatsRow, ColumnConfig>
 );
 
 export function SppStatsTable({
@@ -62,7 +64,7 @@ export function SppStatsTable({
 	const [fromDate, setFromDate] = useState<string | null>(null);
 	const [toDate, setToDate] = useState<string | null>(null);
 	const [speciesStats, setSpeciesStats] =
-		useState<AggregateStatsResult[]>(initialSpeciesStats);
+		useState<SpeciesStatsRow[]>(initialSpeciesStats);
 	const isFirstRender = useRef(true);
 	useEffect(() => {
 		if (isFirstRender.current) {
@@ -193,7 +195,7 @@ export function SppStatsTable({
 					</div>
 				</form>
 			</PageWrapper>
-			<SortableTable<AggregateStatsResult, AggregateStatsResult>
+			<SortableTable<SpeciesStatsRow, SpeciesStatsRow>
 				columnConfigs={sortableColumnConfigs}
 				data={speciesStats}
 				rowDataTransform={(data) => data}

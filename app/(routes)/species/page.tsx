@@ -7,12 +7,12 @@ import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { ViewedGroup } from '@/lib/group-slug';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { SpeciesStatsRow } from '@/app/models/species-stats';
 
 //TODO get year/date range from URL params
 
 export type PageData = {
-	speciesStats: AggregateStatsResult[];
+	speciesStats: SpeciesStatsRow[];
 	years: number[];
 };
 
