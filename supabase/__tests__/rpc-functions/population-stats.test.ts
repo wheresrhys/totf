@@ -578,12 +578,12 @@ describe('population_stats', () => {
 		});
 	});
 
-	// new_young_bird_count (#800 follow-up): a straight copy of
-	// aggregate_stats.new_young_bird_count, identically derived. aggregate_stats'
-	// copy is untouched/authoritative — these tests exist to prove population_stats'
-	// copy doesn't drift from it, not to re-litigate the derivation itself (already
-	// covered by the "age bucketing" describe block above, against aggregate_stats).
-	describe('new_young_bird_count (copy of aggregate_stats.new_young_bird_count)', () => {
+	// new_young_bird_count (#800 follow-up): originally a straight copy of a
+	// same-named column on aggregate_stats. #824 removed aggregate_stats' copy (and
+	// the corresponding UI series, #817) as unused, so this is now the only
+	// new_young_bird_count column in the schema — these tests cover its derivation
+	// directly rather than parity against aggregate_stats.
+	describe('new_young_bird_count', () => {
 		let deltaId: number;
 		let deltaClient: SupabaseClient;
 		const locationIds: number[] = [];
@@ -690,28 +690,6 @@ describe('population_stats', () => {
 			});
 			expect(error).toBeNull();
 			expect(data![0].new_young_bird_count).toBe(0);
-		});
-
-		// Parity — population_stats' copy must never drift from aggregate_stats' own,
-		// authoritative derivation for the same query.
-		it("matches aggregate_stats' new_young_bird_count for the same query window", async () => {
-			const [popRes, aggRes] = await Promise.all([
-				deltaClient.rpc('population_stats', {
-					ringing_group_filter: deltaId,
-					from_date: newJuvDate,
-					to_date: retrapJuvDate
-				}),
-				deltaClient.rpc('aggregate_stats', {
-					ringing_group_filter: deltaId,
-					from_date: newJuvDate,
-					to_date: retrapJuvDate
-				})
-			]);
-			expect(popRes.error).toBeNull();
-			expect(aggRes.error).toBeNull();
-			expect(popRes.data![0].new_young_bird_count).toBe(
-				aggRes.data![0].new_young_bird_count
-			);
 		});
 	});
 });
