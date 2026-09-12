@@ -3,7 +3,12 @@ import type {
 	AggregateStatsResult,
 	PopulationStatsResult
 } from '@/app/models/db';
-import { getCounts, getAgeSplit, getYoungTrends } from '../StatsHistoryChart';
+import {
+	getCounts,
+	getAgeSplit,
+	getYoungCounts,
+	getNewYoungCounts
+} from '../StatsHistoryChart';
 
 // Minimal fixture builders — only the columns each mapper reads matter; the rest
 // are filled with 0 so a full composite-type row satisfies the (null-stripped)
@@ -101,69 +106,26 @@ describe('getAgeSplit', () => {
 	});
 });
 
-describe('getYoungTrends', () => {
-	describe('Structure: six series including client-side sums', () => {
-		it('maps the four column-backed series and sums Young / New young client-side', () => {
+describe('getYoungCounts', () => {
+	describe('Structure: two series from Juv/Postjuv columns', () => {
+		it('maps postjuv_juv_enc_count and postjuv_enc_count against time_period as Juv and Postjuv', () => {
 			const rows = [
 				populationRow({
 					time_period: '2024-01-01',
 					postjuv_juv_enc_count: 4, // Juv
-					new_postjuv_juv_enc_count: 1, // New juv
-					postjuv_enc_count: 6, // Postjuv
-					new_postjuv_enc_count: 2 // New postjuv
+					postjuv_enc_count: 6 // Postjuv
 				})
 			];
-			const result = getYoungTrends(rows);
-			expect(result.map((series) => series.name)).toEqual([
-				'Juv',
-				'New juv',
-				'Postjuv',
-				'New postjuv',
-				'Young',
-				'New young'
-			]);
+			const result = getYoungCounts(rows);
+			expect(result.map((series) => series.name)).toEqual(['Juv', 'Postjuv']);
 			expect(result[0].data).toEqual([['2024-01-01', 4]]);
-			expect(result[1].data).toEqual([['2024-01-01', 1]]);
-			expect(result[2].data).toEqual([['2024-01-01', 6]]);
-			expect(result[3].data).toEqual([['2024-01-01', 2]]);
-			// Young = Juv (4) + Postjuv (6)
-			expect(result[4].data).toEqual([['2024-01-01', 10]]);
-			// New young = New juv (1) + New postjuv (2)
-			expect(result[5].data).toEqual([['2024-01-01', 3]]);
-		});
-
-		it('sums Young / New young per period across multiple rows', () => {
-			const rows = [
-				populationRow({
-					time_period: '2024-01-01',
-					postjuv_juv_enc_count: 1,
-					postjuv_enc_count: 2,
-					new_postjuv_juv_enc_count: 3,
-					new_postjuv_enc_count: 4
-				}),
-				populationRow({
-					time_period: '2024-02-01',
-					postjuv_juv_enc_count: 10,
-					postjuv_enc_count: 20,
-					new_postjuv_juv_enc_count: 30,
-					new_postjuv_enc_count: 40
-				})
-			];
-			const [, , , , young, newYoung] = getYoungTrends(rows);
-			expect(young.data).toEqual([
-				['2024-01-01', 3],
-				['2024-02-01', 30]
-			]);
-			expect(newYoung.data).toEqual([
-				['2024-01-01', 7],
-				['2024-02-01', 70]
-			]);
+			expect(result[1].data).toEqual([['2024-01-01', 6]]);
 		});
 	});
 
 	describe('Edge: all-zero period', () => {
-		it('still emits a 0 row for every series, including the client-side sums', () => {
-			const result = getYoungTrends([
+		it('still emits a 0 row for every series', () => {
+			const result = getYoungCounts([
 				populationRow({ time_period: '2024-01-01' })
 			]);
 			for (const series of result) {
@@ -173,9 +135,49 @@ describe('getYoungTrends', () => {
 	});
 
 	describe('Edge: empty history', () => {
-		it('returns all six series with empty data arrays', () => {
-			const result = getYoungTrends([]);
-			expect(result).toHaveLength(6);
+		it('returns both series with empty data arrays', () => {
+			const result = getYoungCounts([]);
+			expect(result).toHaveLength(2);
+			expect(result.every((series) => series.data.length === 0)).toBe(true);
+		});
+	});
+});
+
+describe('getNewYoungCounts', () => {
+	describe('Structure: two series from New juv/New postjuv columns', () => {
+		it('maps new_postjuv_juv_enc_count and new_postjuv_enc_count against time_period as New juv and New postjuv', () => {
+			const rows = [
+				populationRow({
+					time_period: '2024-01-01',
+					new_postjuv_juv_enc_count: 1, // New juv
+					new_postjuv_enc_count: 2 // New postjuv
+				})
+			];
+			const result = getNewYoungCounts(rows);
+			expect(result.map((series) => series.name)).toEqual([
+				'New juv',
+				'New postjuv'
+			]);
+			expect(result[0].data).toEqual([['2024-01-01', 1]]);
+			expect(result[1].data).toEqual([['2024-01-01', 2]]);
+		});
+	});
+
+	describe('Edge: all-zero period', () => {
+		it('still emits a 0 row for every series', () => {
+			const result = getNewYoungCounts([
+				populationRow({ time_period: '2024-01-01' })
+			]);
+			for (const series of result) {
+				expect(series.data).toEqual([['2024-01-01', 0]]);
+			}
+		});
+	});
+
+	describe('Edge: empty history', () => {
+		it('returns both series with empty data arrays', () => {
+			const result = getNewYoungCounts([]);
+			expect(result).toHaveLength(2);
 			expect(result.every((series) => series.data.length === 0)).toBe(true);
 		});
 	});

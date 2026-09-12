@@ -10,8 +10,9 @@ import {
 	SpPopulationTab,
 	AGE_SPLIT_COLORS,
 	AGE_SPLIT_HUES,
-	YOUNG_TRENDS_COLORS,
-	YOUNG_TRENDS_HUES
+	YOUNG_COUNTS_COLORS,
+	YOUNG_COUNTS_HUES,
+	NEW_YOUNG_COUNTS_COLORS
 } from '../SpPopulationTab';
 import type {
 	AggregateStatsResult,
@@ -36,13 +37,13 @@ vi.mock('../StatsHistoryChart', () => ({
 		{ name: 'Oldies', data: [] },
 		{ name: 'New young', data: [] }
 	],
-	getYoungTrends: () => [
+	getYoungCounts: () => [
 		{ name: 'Juv', data: [] },
+		{ name: 'Postjuv', data: [] }
+	],
+	getNewYoungCounts: () => [
 		{ name: 'New juv', data: [] },
-		{ name: 'Postjuv', data: [] },
-		{ name: 'New postjuv', data: [] },
-		{ name: 'Young', data: [] },
-		{ name: 'New young', data: [] }
+		{ name: 'New postjuv', data: [] }
 	]
 }));
 
@@ -98,13 +99,16 @@ describe('SpPopulationTab', () => {
 		vi.mocked(getGroupEffortHistory).mockResolvedValue([['2024-01-01', 10]]);
 	});
 
-	describe('Structure: the three population tiles', () => {
-		it('renders Counts, Age split and Young trends tiles — no Biometrics/Wing-vs-weight tiles', () => {
+	describe('Structure: the four population tiles', () => {
+		it('renders Counts, Age split, Young counts and New young counts tiles — no Biometrics/Wing-vs-weight tiles', () => {
 			render(<SpPopulationTab {...props} />);
 			expect(screen.getByRole('button', { name: /Counts/ })).toBeDefined();
 			expect(screen.getByRole('button', { name: /Age split/ })).toBeDefined();
 			expect(
-				screen.getByRole('button', { name: /Young trends/ })
+				screen.getByRole('button', { name: /Young counts/ })
+			).toBeDefined();
+			expect(
+				screen.getByRole('button', { name: /New young counts/ })
 			).toBeDefined();
 			expect(
 				screen.queryByRole('button', { name: /Biometrics trends/ })
@@ -168,6 +172,40 @@ describe('SpPopulationTab', () => {
 			// The population tiles do not touch aggregate_stats.
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
 		});
+
+		it('fetches population stats once when the Young counts tile is expanded', async () => {
+			const { getSpeciesPopulationStats, getSpeciesStatsHistory } =
+				await loadActions();
+			render(<SpPopulationTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Young counts/ }));
+			await screen.findByTestId('trend-chart');
+			expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1);
+			expect(getSpeciesPopulationStats).toHaveBeenCalledWith(
+				'Robin',
+				1,
+				undefined,
+				undefined
+			);
+			// The population tiles do not touch aggregate_stats.
+			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
+		});
+
+		it('fetches population stats once when the New young counts tile is expanded', async () => {
+			const { getSpeciesPopulationStats, getSpeciesStatsHistory } =
+				await loadActions();
+			render(<SpPopulationTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /New young counts/ }));
+			await screen.findByTestId('trend-chart');
+			expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1);
+			expect(getSpeciesPopulationStats).toHaveBeenCalledWith(
+				'Robin',
+				1,
+				undefined,
+				undefined
+			);
+			// The population tiles do not touch aggregate_stats.
+			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('Structure: collapsing a tile', () => {
@@ -184,14 +222,18 @@ describe('SpPopulationTab', () => {
 	});
 
 	describe('Edge: memoised population_stats fetch shared across tiles', () => {
-		it('fetches population stats only once when both Age split and Young trends are expanded', async () => {
+		it('fetches population stats only once when Age split, Young counts and New young counts are all expanded', async () => {
 			const { getSpeciesPopulationStats } = await loadActions();
 			render(<SpPopulationTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Age split/ }));
 			await screen.findByTestId('trend-chart');
-			fireEvent.click(screen.getByRole('button', { name: /Young trends/ }));
+			fireEvent.click(screen.getByRole('button', { name: /Young counts/ }));
 			await waitFor(() =>
 				expect(screen.getAllByTestId('trend-chart').length).toBe(2)
+			);
+			fireEvent.click(screen.getByRole('button', { name: /New young counts/ }));
+			await waitFor(() =>
+				expect(screen.getAllByTestId('trend-chart').length).toBe(3)
 			);
 			expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1);
 		});
@@ -220,7 +262,7 @@ describe('SpPopulationTab', () => {
 			);
 			fireEvent.click(screen.getByRole('button', { name: /Counts/ }));
 			await screen.findByTestId('trend-chart');
-			fireEvent.click(screen.getByRole('button', { name: /Young trends/ }));
+			fireEvent.click(screen.getByRole('button', { name: /Young counts/ }));
 			await waitFor(() =>
 				expect(screen.getAllByTestId('trend-chart').length).toBe(2)
 			);
@@ -255,12 +297,22 @@ describe('SpPopulationTab', () => {
 			expect(chart.dataset.seriesCount).toBe('4');
 		});
 
-		it('passes the paired Young trends colours on the Young trends tile', async () => {
+		it('passes the Young counts colours on the Young counts tile', async () => {
 			render(<SpPopulationTab {...props} />);
-			fireEvent.click(screen.getByRole('button', { name: /Young trends/ }));
+			fireEvent.click(screen.getByRole('button', { name: /Young counts/ }));
 			const chart = await screen.findByTestId('trend-chart');
-			expect(JSON.parse(chart.dataset.colors!)).toEqual(YOUNG_TRENDS_COLORS);
-			expect(chart.dataset.seriesCount).toBe('6');
+			expect(JSON.parse(chart.dataset.colors!)).toEqual(YOUNG_COUNTS_COLORS);
+			expect(chart.dataset.seriesCount).toBe('2');
+		});
+
+		it('passes the New young counts colours on the New young counts tile', async () => {
+			render(<SpPopulationTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /New young counts/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(JSON.parse(chart.dataset.colors!)).toEqual(
+				NEW_YOUNG_COUNTS_COLORS
+			);
+			expect(chart.dataset.seriesCount).toBe('2');
 		});
 	});
 
@@ -269,11 +321,16 @@ describe('SpPopulationTab', () => {
 			render(
 				<SpPopulationTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
 			);
-			for (const name of [/Counts/, /Age split/, /Young trends/]) {
+			for (const name of [
+				/Counts/,
+				/Age split/,
+				/Young counts/,
+				/New young counts/
+			]) {
 				fireEvent.click(screen.getByRole('button', { name }));
 			}
 			await waitFor(() =>
-				expect(screen.getAllByTestId('trend-chart').length).toBe(3)
+				expect(screen.getAllByTestId('trend-chart').length).toBe(4)
 			);
 			for (const chart of screen.getAllByTestId('trend-chart')) {
 				expect(chart.dataset.compareYearsUrl).toBe(
@@ -291,14 +348,19 @@ describe('SpPopulationTab', () => {
 	});
 
 	describe('Structure: effort history fetched once and passed to every tile', () => {
-		it('fetches group effort history once regardless of how many tiles expand, passing it to all three charts', async () => {
+		it('fetches group effort history once regardless of how many tiles expand, passing it to all four charts', async () => {
 			const { getGroupEffortHistory } = await loadActions();
 			render(<SpPopulationTab {...props} />);
-			for (const name of [/Counts/, /Age split/, /Young trends/]) {
+			for (const name of [
+				/Counts/,
+				/Age split/,
+				/Young counts/,
+				/New young counts/
+			]) {
 				fireEvent.click(screen.getByRole('button', { name }));
 			}
 			await waitFor(() =>
-				expect(screen.getAllByTestId('trend-chart').length).toBe(3)
+				expect(screen.getAllByTestId('trend-chart').length).toBe(4)
 			);
 			await waitFor(() => {
 				for (const chart of screen.getAllByTestId('trend-chart')) {
@@ -324,19 +386,25 @@ describe('SpPopulationTab', () => {
 			);
 		});
 
-		it('pairs Young trends colours into three disjoint hue families', () => {
-			const families = [
-				Object.values(YOUNG_TRENDS_HUES.juv),
-				Object.values(YOUNG_TRENDS_HUES.postjuv),
-				Object.values(YOUNG_TRENDS_HUES.young)
-			];
-			// Each adjacent (raw, new) pair shares one family: (0,1),(2,3),(4,5).
-			for (const [familyIndex, family] of families.entries()) {
-				expect(family).toContain(YOUNG_TRENDS_COLORS[familyIndex * 2]);
-				expect(family).toContain(YOUNG_TRENDS_COLORS[familyIndex * 2 + 1]);
-			}
-			// All six colours are distinct (no family overlap).
-			expect(new Set(YOUNG_TRENDS_COLORS).size).toBe(6);
+		it('pairs Young counts / New young counts colours as disjoint dark/light draws from the same two hue families', () => {
+			const juvFamily = Object.values(YOUNG_COUNTS_HUES.juv);
+			const postjuvFamily = Object.values(YOUNG_COUNTS_HUES.postjuv);
+			// Young counts: Juv, Postjuv (dark shades).
+			expect(juvFamily).toContain(YOUNG_COUNTS_COLORS[0]); // Juv
+			expect(postjuvFamily).toContain(YOUNG_COUNTS_COLORS[1]); // Postjuv
+			// New young counts: New juv, New postjuv (light shades of the same families).
+			expect(juvFamily).toContain(NEW_YOUNG_COUNTS_COLORS[0]); // New juv
+			expect(postjuvFamily).toContain(NEW_YOUNG_COUNTS_COLORS[1]); // New postjuv
+			// The two tiles' colour sets are entirely disjoint from each other.
+			expect(
+				YOUNG_COUNTS_COLORS.some((colour) =>
+					NEW_YOUNG_COUNTS_COLORS.includes(colour)
+				)
+			).toBe(false);
+			// The juv and postjuv families themselves share no colour.
+			expect(juvFamily.some((colour) => postjuvFamily.includes(colour))).toBe(
+				false
+			);
 		});
 	});
 });
