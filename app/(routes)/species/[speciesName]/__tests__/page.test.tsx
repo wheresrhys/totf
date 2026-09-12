@@ -6,9 +6,13 @@ import {
 	fireEvent,
 	within
 } from '@testing-library/react';
-import Page from '../page';
+import Page, { getSpeciesStats } from '../page';
 import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
 import type { FullFatPageData } from '../PageContent';
+import type {
+	AggregateStatsResult,
+	BiometricsStatsResult
+} from '@/app/models/db';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
 	() => ({
@@ -316,5 +320,174 @@ describe('species detail page', () => {
 			);
 			expect(screen.queryByRole('button', { name: 'Bird list' })).toBeNull();
 		});
+	});
+});
+
+const BIOMETRICS_FIELD_KEYS = [
+	'min_weight',
+	'max_weight',
+	'avg_weight',
+	'median_weight',
+	'min_wing',
+	'max_wing',
+	'avg_wing',
+	'median_wing'
+] as const;
+
+function omitBiometricsFields(row: AggregateStatsResult): AggregateStatsResult {
+	const copy: Record<string, unknown> = { ...row };
+	for (const key of BIOMETRICS_FIELD_KEYS) delete copy[key];
+	return copy as unknown as AggregateStatsResult;
+}
+
+function makeAggregateRow(
+	overrides: Partial<AggregateStatsResult> = {}
+): AggregateStatsResult {
+	return {
+		...(speciesStats as AggregateStatsResult),
+		...overrides
+	};
+}
+
+function makeBiometricsRow(
+	overrides: Partial<BiometricsStatsResult> = {}
+): BiometricsStatsResult {
+	return {
+		species_name: null,
+		time_period: null,
+		min_weight: 10,
+		max_weight: 20,
+		avg_weight: 15,
+		median_weight: 15,
+		min_wing: 60,
+		max_wing: 70,
+		avg_wing: 65,
+		median_wing: 65,
+		...overrides
+	} as unknown as BiometricsStatsResult;
+}
+
+function makeStatsClient({
+	aggregateRows,
+	biometricsRows
+}: {
+	aggregateRows: unknown[];
+	biometricsRows: unknown[];
+}) {
+	const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
+	const client = {
+		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
+			rpcCalls.push({ name, args });
+			const data = name === 'aggregate_stats' ? aggregateRows : biometricsRows;
+			return {
+				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+					Promise.resolve({ data, error: null }).then(resolve)
+			};
+		})
+	};
+	mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+	return { rpcCalls };
+}
+
+const STATS_SPECIES_NAME = 'Robin';
+const STATS_GROUP_ID = 7;
+const STATS_FROM_DATE = '2023-01-01';
+const STATS_TO_DATE = '2023-12-31';
+
+describe('getSpeciesStats', () => {
+	afterEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it('merges biometrics_stats wing/weight fields onto the aggregate_stats row when both calls succeed', async () => {
+		makeStatsClient({
+			aggregateRows: [makeAggregateRow()],
+			biometricsRows: [makeBiometricsRow({ min_weight: 99 })]
+		});
+
+		const result = await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
+
+		expect(result[0].min_weight).toBe(99);
+		expect(result[0].bird_count).toBe(
+			(speciesStats as AggregateStatsResult).bird_count
+		);
+	});
+
+	it('calls biometrics_stats with the same species_name_filter/ringing_group_filter it passes to aggregate_stats', async () => {
+		const { rpcCalls } = makeStatsClient({
+			aggregateRows: [makeAggregateRow()],
+			biometricsRows: [makeBiometricsRow()]
+		});
+
+		await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
+
+		const aggregateCall = rpcCalls.find(
+			(call) => call.name === 'aggregate_stats'
+		);
+		const biometricsCall = rpcCalls.find(
+			(call) => call.name === 'biometrics_stats'
+		);
+		expect(biometricsCall?.args).toMatchObject({
+			species_name_filter: STATS_SPECIES_NAME,
+			ringing_group_filter: STATS_GROUP_ID
+		});
+		expect(biometricsCall?.args.species_name_filter).toBe(
+			aggregateCall?.args.species_name_filter
+		);
+		expect(biometricsCall?.args.ringing_group_filter).toBe(
+			aggregateCall?.args.ringing_group_filter
+		);
+	});
+
+	it('omits from_date/to_date from both calls when the page is unscoped (no date range)', async () => {
+		const { rpcCalls } = makeStatsClient({
+			aggregateRows: [makeAggregateRow()],
+			biometricsRows: [makeBiometricsRow()]
+		});
+
+		await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
+
+		expect(rpcCalls).toHaveLength(2);
+		for (const call of rpcCalls) {
+			expect(call.args).not.toHaveProperty('from_date');
+			expect(call.args).not.toHaveProperty('to_date');
+		}
+	});
+
+	it('includes from_date/to_date in both calls when the page is date-scoped', async () => {
+		const { rpcCalls } = makeStatsClient({
+			aggregateRows: [makeAggregateRow()],
+			biometricsRows: [makeBiometricsRow()]
+		});
+
+		await getSpeciesStats(
+			STATS_SPECIES_NAME,
+			STATS_GROUP_ID,
+			STATS_FROM_DATE,
+			STATS_TO_DATE
+		);
+
+		expect(rpcCalls).toHaveLength(2);
+		for (const call of rpcCalls) {
+			expect(call.args).toMatchObject({
+				from_date: STATS_FROM_DATE,
+				to_date: STATS_TO_DATE
+			});
+		}
+	});
+
+	it('still returns a valid speciesStats row when aggregate_stats happens to already omit the wing/weight columns', async () => {
+		makeStatsClient({
+			aggregateRows: [omitBiometricsFields(makeAggregateRow())],
+			biometricsRows: [makeBiometricsRow({ min_weight: 12, max_wing: 88 })]
+		});
+
+		const result = await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
+
+		expect(result[0].min_weight).toBe(12);
+		expect(result[0].max_wing).toBe(88);
+		expect(result[0].bird_count).toBe(
+			(speciesStats as AggregateStatsResult).bird_count
+		);
 	});
 });
