@@ -280,6 +280,42 @@ export function aggregateSeriesByYear(
 	};
 }
 
+// Builds a `Total` series summing every other series' value at each matching
+// period, for the `includeTotalSeries` option. Mirrors
+// `normalizeSeriesByEffort`'s "Map keyed by date" join pattern: the dates seen
+// across every input series are unioned (in first-seen order), and each
+// date's total sums whichever series have a reportable (non-null) value
+// there — a date stays `null` (a gap) only when every contributing series is
+// `null` there. Not a running/cumulative total: each period's total only
+// ever reflects that period's own values.
+export function buildTotalSeries(series: LineChartData[]): LineChartData {
+	const datesInOrder: string[] = [];
+	const valuesByDate = new Map<string, (number | null)[]>();
+	for (const metric of series) {
+		for (const [date, value] of metric.data) {
+			if (!valuesByDate.has(date)) {
+				valuesByDate.set(date, []);
+				datesInOrder.push(date);
+			}
+			valuesByDate.get(date)!.push(value);
+		}
+	}
+	return {
+		name: 'Total',
+		data: datesInOrder.map((date) => {
+			const reportableValues = valuesByDate
+				.get(date)!
+				.filter((value): value is number => value != null);
+			return [
+				date,
+				reportableValues.length
+					? reportableValues.reduce((total, value) => total + value, 0)
+					: null
+			] as [string, number | null];
+		})
+	};
+}
+
 // One colour per year (in the oldest-first order `toYearOnYearSeries` returns),
 // for the compare-years view. The current year is black; every previous year is
 // a shade of the metric's base colour — the most recent previous year at full
@@ -446,7 +482,8 @@ export function YearComparisonTrendChart({
 	effortHistory,
 	compareYearsUrl,
 	colors,
-	yearlyAggregators
+	yearlyAggregators,
+	includeTotalSeries
 }: {
 	series: LineChartData[];
 	xtitle?: string;
@@ -477,6 +514,12 @@ export function YearComparisonTrendChart({
 	// biometrics "max"/"min" series aggregates via `max`/`min`, and a "median"
 	// series via `mean` (an average-of-monthly-medians approximation — see #810).
 	yearlyAggregators?: Record<string, YearlyAggregator>;
+	// When `true`, appends one extra `Total` series — the per-period sum of
+	// every other currently-plotted series (computed downstream of the
+	// Normalize toggle, so it stays a valid per-hour rate when normalized) —
+	// to every mode/interval. Omitting it (or passing `false`) leaves
+	// rendering byte-for-byte identical to not having the prop at all.
+	includeTotalSeries?: boolean;
 }) {
 	const [mode, setMode] = useState<ChartMode>('all-time');
 	const [normalize, setNormalize] = useState(false);
@@ -491,25 +534,37 @@ export function YearComparisonTrendChart({
 			: series;
 	const effectiveYtitle =
 		normalize && effortHistory ? `${ytitle} per hour` : ytitle;
+	// The total series (when requested) is appended right after
+	// `effectiveSeries` is computed — post-normalize, pre-interval-aggregation
+	// — so it's summed from already effort-normalized values when Normalize is
+	// on, and then flows through every mode/interval below for free (the total
+	// is simply the next metric index, so it gets its own base colour, its own
+	// compare-years/this-year sub-chart, and its own Year-interval aggregation
+	// via the same `yearlyAggregators` default-to-'sum' mechanism as any other
+	// metric).
+	const plottedSeries = includeTotalSeries
+		? [...effectiveSeries, buildTotalSeries(effectiveSeries)]
+		: effectiveSeries;
 	// A metric's base colour: the caller's explicit override at that index if
 	// supplied, else the default per-index palette. Used identically by all three
 	// modes so an override recolours every view consistently.
 	const baseColorFor = (metricIndex: number): string =>
 		colors?.[metricIndex] ?? metricBaseColor(metricIndex);
-	const allTimeColors = effectiveSeries.map((_, metricIndex) =>
+	const allTimeColors = plottedSeries.map((_, metricIndex) =>
 		baseColorFor(metricIndex)
 	);
-	// Year aggregation is layered on top of the (possibly effort-normalized)
-	// series, matching the order-of-operations the normalize toggle establishes.
+	// Year aggregation is layered on top of the (possibly effort-normalized,
+	// possibly total-appended) series, matching the order-of-operations the
+	// normalize toggle establishes.
 	const allTimeSeries =
 		interval === 'year'
-			? effectiveSeries.map((metric) =>
+			? plottedSeries.map((metric) =>
 					aggregateSeriesByYear(
 						metric,
 						yearlyAggregators?.[metric.name] ?? 'sum'
 					)
 				)
-			: effectiveSeries;
+			: plottedSeries;
 	const showIntervalToggle = mode === 'all-time' && spansMultipleYears(series);
 	return (
 		<div className="flex flex-col">
@@ -601,7 +656,7 @@ export function YearComparisonTrendChart({
 				)}
 				{mode === 'compare-years' && (
 					<PerMetricChartGrid
-						metrics={effectiveSeries}
+						metrics={plottedSeries}
 						ytitle={effectiveYtitle}
 						min={min}
 						buildChart={(metric, metricIndex) => {
@@ -620,7 +675,7 @@ export function YearComparisonTrendChart({
 				)}
 				{mode === 'this-year' && (
 					<PerMetricChartGrid
-						metrics={effectiveSeries}
+						metrics={plottedSeries}
 						ytitle={effectiveYtitle}
 						min={min}
 						buildChart={(metric, metricIndex) => ({
