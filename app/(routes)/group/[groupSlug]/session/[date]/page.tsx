@@ -119,6 +119,8 @@ export async function fetchSessionPageContent({
 			sessions.map((session) => session.id)
 		)
 		.eq('ringing_group_id', viewedGroupId)
+		.order('capture_time', { ascending: true })
+		.order('bird(ring_no)', { ascending: true })
 		.then(catchSupabaseErrors)) as SessionEncounter[];
 
 	return {
