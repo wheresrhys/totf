@@ -1,12 +1,12 @@
 'use server';
-import { fetchAuthorisedAggregateStats } from '@/lib/group-summary-access';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { fetchAuthorisedAggregateStats } from '@/app/lib/auth/group-summary-access';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { BiometricsStatsResult } from '@/app/models/db';
 import {
 	mergeSpeciesBiometrics,
 	type SpeciesStatsRow
-} from '@/app/models/species-stats';
+} from '@/app/lib/species-stats';
 
 // biometrics_stats needs an authenticated session to be meaningful (it has no
 // public-gated wrapper analogous to public_aggregate_stats — /species sits

@@ -7,7 +7,7 @@ const { mockGetAuthenticatedSupabaseClient, mockRedirect } = vi.hoisted(() => ({
 	mockRedirect: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 

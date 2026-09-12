@@ -1,14 +1,14 @@
 'use server';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { fetchSessionStats } from '@/lib/underlying-stats';
+import { fetchSessionStats } from '@/app/lib/underlying-stats';
 import {
 	rarities,
 	counts,
 	vitalStats,
 	deriveLongAbsenceRetraps,
 	type SessionHighlight
-} from '@/app/models/highlights';
+} from '@/app/lib/highlights';
 import type { LongAbsenceRetrapsResult } from '@/app/models/db';
 
 export async function fetchSessionHighlights({

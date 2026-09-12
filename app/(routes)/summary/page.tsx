@@ -3,8 +3,8 @@ import {
 	fetchSummaryStats,
 	fetchYearlyTotals
 } from '@/app/actions/summary-stats';
-import { readTabIdSearchParam } from '@/lib/tab-query-param';
-import type { ViewedGroup } from '@/lib/group-slug';
+import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
 import { SummaryPageContent } from './PageContent';
 

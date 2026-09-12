@@ -1,7 +1,7 @@
 import { Table } from '@/app/components/shared/DesignSystem';
 import type { AggregateStatsResult } from '@/app/models/db';
-import { formatPostgresIntervalForDisplay } from '@/lib/postgres-interval';
-import { calculateRetraps } from '@/app/models/species-totals';
+import { formatPostgresIntervalForDisplay } from '@/app/lib/postgres-interval';
+import { calculateRetraps } from '@/app/lib/species-totals';
 
 export function SummaryStatsSection({
 	stats

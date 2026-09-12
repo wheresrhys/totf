@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { formatSecondsForDisplay } from '@/lib/postgres-interval';
+import { formatSecondsForDisplay } from '@/app/lib/postgres-interval';
 import type { AggregateStatsResult } from '@/app/models/db';
 import {
 	derivePeriodTotalsRowByBird,
@@ -9,7 +9,7 @@ import {
 	formatPeriodTotalsLabel,
 	type PeriodTotalsGrouping,
 	type PeriodTotalsRow
-} from '@/app/models/period-totals';
+} from '@/app/lib/period-totals';
 import {
 	SortableTable,
 	getFormattedValue,

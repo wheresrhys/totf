@@ -6,13 +6,13 @@ import {
 	fetchSummaryStats,
 	fetchPeriodStats
 } from '@/app/actions/summary-stats';
-import { readTabIdSearchParam } from '@/lib/tab-query-param';
-import type { ViewedGroup } from '@/lib/group-slug';
+import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { AggregateStatsResult } from '@/app/models/db';
 import {
 	buildMonthTotalsRows,
 	type MonthTotalsRow
-} from '@/app/models/month-totals';
+} from '@/app/lib/month-totals';
 import { SummaryPageContent } from '../PageContent';
 
 // `tabId` (#804, reusing #803's mechanism) is the optional `?tabId=` search

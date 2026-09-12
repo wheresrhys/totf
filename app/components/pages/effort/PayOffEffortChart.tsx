@@ -7,7 +7,7 @@ import type { AggregateStatsResult } from '@/app/models/db';
 import {
 	postgresIntervalToHours,
 	postgresIntervalToMinutes
-} from '@/lib/postgres-interval';
+} from '@/app/lib/postgres-interval';
 
 type SeriesPoint = [string, number];
 

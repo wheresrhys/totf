@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { fetchSpeciesPeriodTotals } from '@/app/actions/sp-data';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import type { AggregateStatsResult } from '@/app/models/db';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export function SpSessionTotalsTab({
 	speciesName,

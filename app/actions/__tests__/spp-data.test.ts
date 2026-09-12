@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchAuthorisedAggregateStats } from '@/lib/group-summary-access';
+import { fetchAuthorisedAggregateStats } from '@/app/lib/auth/group-summary-access';
 import type {
 	AggregateStatsResult,
 	BiometricsStatsResult
@@ -10,11 +10,11 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-summary-access', () => ({
+vi.mock('@/app/lib/auth/group-summary-access', () => ({
 	fetchAuthorisedAggregateStats: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 

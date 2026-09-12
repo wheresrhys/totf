@@ -7,8 +7,8 @@ import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';
 import type { AggregateStatsResult } from '@/app/models/db';
-import type { ViewedGroup } from '@/lib/group-slug';
-import type { MonthTotalsRow } from '@/app/models/month-totals';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { MonthTotalsRow } from '@/app/lib/month-totals';
 export function SummaryPageContent({
 	year,
 	month,

@@ -2,10 +2,10 @@ import {
 	BootstrapPage,
 	defaultGetParams
 } from '@/app/components/layout/BootstrapPage';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { fetchPageOfBirds } from '@/app/actions/sp-data';
-import { readTabIdSearchParam } from '@/lib/tab-query-param';
+import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
 import {
 	SpeciesPageContent,
 	type PageParams,
@@ -19,7 +19,7 @@ import {
 	type AggregateStatsWithBiometrics,
 	type BiometricsStatsResult
 } from '@/app/models/db';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 type PageProps = {
 	params: Promise<{ speciesName: string }>;

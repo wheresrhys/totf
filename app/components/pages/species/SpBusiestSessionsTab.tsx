@@ -4,7 +4,7 @@ import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
 import { fetchTopSessions } from '@/app/actions/sp-data';
 import { StatOutput } from '@/app/components/shared/StatOutput';
 import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // The Highlights tab's second section (#782) — the species' top 5 sessions by
 // encounter count for the page's current scope, matching what the headline

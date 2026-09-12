@@ -315,7 +315,7 @@ read-only against any server.
 `load-prod-write-env.sh`, which sets `SUPABASE_JWT_ROLE=authenticated` — writes
 allowed but still RLS-scoped to the target group. Break-glass
 web-import test against prod: `./scripts/load-prod-write-env.sh next dev --turbopack`
-(deliberately not an npm script). Migrations are committed and deployed on merge to main by the 
+(deliberately not an npm script). Migrations are committed and deployed on merge to main by the
 supabase github integration.
 
 Note: the deployed Vercel app gets its env directly, with
@@ -469,3 +469,12 @@ npm run set-group-password:prod "Group Name" "password"
 ```
 
 Passwords are bcrypt-hashed with a per-group random salt stored in the `password_salt` column of `RingingGroups`.
+
+
+## Project structure
+
+This split is far from perfect and suggestions to improve the comprehensiveness and quality are welcome.
+
+- ./lib is for any library files used by both scripts and the core next.js app
+- ./app/lib is for any libarry files used only by the next.js app. Where appropriate they should be grouped into subdirectories
+- ./app/models should be mainly for data structures, with only very minimal functionlaity for transforming/massaging data into related data structures. Anything more complex should live in ./app/lib.

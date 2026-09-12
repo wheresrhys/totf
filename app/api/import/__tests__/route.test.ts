@@ -4,7 +4,7 @@ import type { ImportMessage } from '../route';
 
 // group-cookie is mocked globally to return group ID 1 (see vitest.setup.tsx)
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: vi.fn()
 }));
 
@@ -80,7 +80,8 @@ describe('POST /api/import', () => {
 		vi.resetModules();
 		({ POST } = await import('../route'));
 
-		const { getAuthenticatedSupabaseClient } = await import('@/lib/group-auth');
+		const { getAuthenticatedSupabaseClient } =
+			await import('@/app/lib/auth/group-auth');
 		const { createUpserter } = await import('@/lib/demon-import');
 		mockUpsert = vi.fn().mockResolvedValue(1);
 		vi.mocked(createUpserter).mockReturnValue(mockUpsert as never);

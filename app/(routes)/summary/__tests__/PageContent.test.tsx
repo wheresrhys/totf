@@ -4,7 +4,7 @@ import { SummaryPageContent } from '../PageContent';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 import alphaSpeciesStats from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
 import type { AggregateStatsResult } from '@/app/models/db';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const populatedStats = alphaStats as unknown as AggregateStatsResult;
 const populatedSpeciesStats =

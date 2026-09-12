@@ -6,8 +6,8 @@ import {
 import { format as formatDate } from 'date-fns';
 import type { PayOffStatsData } from '@/app/actions/pay-off-stats';
 import type { AggregateStatsResult } from '@/app/models/db';
-import type { ViewedGroup } from '@/lib/group-slug';
-import { formatPostgresIntervalForDisplay } from '@/lib/postgres-interval';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+import { formatPostgresIntervalForDisplay } from '@/app/lib/postgres-interval';
 import { PayOffEffortChart } from '@/app/components/pages/effort/PayOffEffortChart';
 
 function formatAvgEncounters(n: number | null | undefined): string {

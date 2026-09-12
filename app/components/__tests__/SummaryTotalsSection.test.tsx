@@ -8,10 +8,10 @@ import {
 	getAllByRole
 } from '@testing-library/react';
 import { SummaryTotalsSection } from '../SummaryTotalsSection';
-import { buildMonthTotalsRows } from '@/app/models/month-totals';
+import { buildMonthTotalsRows } from '@/app/lib/month-totals';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
 import type { AggregateStatsResult } from '@/app/models/db';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	getCellTextByHeading,
 	getColumnIndex

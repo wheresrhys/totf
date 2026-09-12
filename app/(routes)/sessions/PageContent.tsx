@@ -1,5 +1,5 @@
 'use client';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 import {
 	PageWrapper,

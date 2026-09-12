@@ -8,11 +8,11 @@ const { mockGetAuthenticatedSupabaseClient, mockResolveGroupIdBySlug } =
 		mockResolveGroupIdBySlug: vi.fn()
 	}));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
-vi.mock('@/lib/group-slug', () => ({
+vi.mock('@/app/lib/group-slug', () => ({
 	resolveGroupIdBySlug: mockResolveGroupIdBySlug
 }));
 

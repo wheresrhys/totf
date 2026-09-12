@@ -3,9 +3,9 @@ import { PageWrapper } from '@/app/components/shared/DesignSystem';
 import {
 	speciesStatConfigs,
 	type SpeciesStatsRow
-} from '@/app/models/species-stats';
+} from '@/app/lib/species-stats';
 import type { PageData } from '@/app/(routes)/species/page';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import { useState, useEffect, useRef } from 'react';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import {

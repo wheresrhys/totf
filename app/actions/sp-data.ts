@@ -5,10 +5,10 @@ import {
 	type BirdOfSpecies,
 	type EnrichedBirdOfSpecies
 } from '@/app/models/bird';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { fetchGroupEffortHistory } from '@/lib/underlying-stats';
-import { postgresIntervalToHours } from '@/lib/postgres-interval';
+import { fetchGroupEffortHistory } from '@/app/lib/underlying-stats';
+import { postgresIntervalToHours } from '@/app/lib/postgres-interval';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
@@ -20,7 +20,7 @@ import {
 	type BiometricsStatsResult,
 	type PopulationStatsResult
 } from '@/app/models/db';
-import type { PeriodTotalsGrouping } from '@/app/models/period-totals';
+import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
 import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
 import type { TopMetricsFilterParams, TopPeriodsResult } from '@/app/models/db';
 export async function fetchPageOfBirds(

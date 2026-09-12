@@ -1,7 +1,7 @@
 'use client';
 
 import { type SessionEncounter } from '@/app/models/session';
-import { type NetRound } from '@/app/models/session-chronology';
+import { type NetRound } from '@/app/lib/session-chronology';
 import { getAgeClass } from '@/app/models/encounter';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
 export type SpeciesWithEncounters = {

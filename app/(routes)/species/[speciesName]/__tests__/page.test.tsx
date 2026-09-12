@@ -21,7 +21,7 @@ const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
 	})
 );
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 

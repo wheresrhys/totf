@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 import { getGroupCookie } from '@/app/actions/group-cookie';
-import { resolveGroupSlugById, type ViewedGroup } from '@/lib/group-slug';
+import { resolveGroupSlugById, type ViewedGroup } from '@/app/lib/group-slug';
 
 export type DefaultPageParams = Record<string, string>;
 export type DefaultPageProps = { params: Promise<DefaultPageParams> };

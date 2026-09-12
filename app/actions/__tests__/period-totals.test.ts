@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchAuthorisedAggregateStats } from '@/lib/group-summary-access';
+import { fetchAuthorisedAggregateStats } from '@/app/lib/auth/group-summary-access';
 import type { AggregateStatsResult } from '@/app/models/db';
 import { fetchPeriodTotals } from '../period-totals';
 
-vi.mock('@/lib/group-summary-access', () => ({
+vi.mock('@/app/lib/auth/group-summary-access', () => ({
 	fetchAuthorisedAggregateStats: vi.fn()
 }));
 
