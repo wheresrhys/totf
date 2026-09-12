@@ -392,21 +392,6 @@ export type Database = {
         }
         Relationships: []
       }
-      Test: {
-        Row: {
-          haha: string | null
-          id: string
-        }
-        Insert: {
-          haha?: string | null
-          id: string
-        }
-        Update: {
-          haha?: string | null
-          id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
