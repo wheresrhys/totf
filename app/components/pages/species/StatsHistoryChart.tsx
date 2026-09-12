@@ -20,6 +20,60 @@ export function getCounts(
 	];
 }
 
+// Returning vs new — #854, one of two replacements for the "Age split" tile
+// (the other is #843's "Returning ages"): a simpler top-level new/returning/
+// young split than Age split's four-way New adults/First summer/Oldies/New
+// young breakdown. "Returning adults" merges what Age split shows as two
+// separate series (First summer + Oldies) into one, computed client-side
+// (`adult_bird_count - new_adult_bird_count`) since no RPC column holds that
+// sum directly. "Young" sums three `aggregate_stats` bucket columns
+// (pullus/juv/postjuv) rather than reusing `population_stats`' own
+// `juv_bird_count`, since the ticket's three columns are guaranteed
+// consistent with `population_stats` (same `stats_bird_age_bucket` utility
+// RPC) while matching this tile's "Young" label more precisely (includes
+// pullus). Joins the two RPC results by `time_period` via a `Map` — mirrors
+// `normalizeSeriesByEffort`'s join-by-date pattern in
+// `YearComparisonTrendChart.tsx` — rather than assuming positional parity,
+// even though both RPCs share `stats_spine` and so their rows correspond 1:1
+// for identical filter args. `populationStats`' row order drives the output
+// order for all three series.
+export function getReturningVsNew(
+	statsHistory: AggregateStatsResult[],
+	populationStats: PopulationStatsResult[]
+): LineChartData[] {
+	const statsHistoryByPeriod = new Map(
+		statsHistory.map((row) => [row.time_period, row])
+	);
+	return [
+		{
+			name: 'New adults',
+			data: populationStats.map((row) => [
+				row.time_period,
+				row.new_adult_bird_count
+			])
+		},
+		{
+			name: 'Returning adults',
+			data: populationStats.map((row) => [
+				row.time_period,
+				row.adult_bird_count - row.new_adult_bird_count
+			])
+		},
+		{
+			name: 'Young',
+			data: populationStats.map((row) => {
+				const statsRow = statsHistoryByPeriod.get(row.time_period);
+				const young = statsRow
+					? statsRow.pullus_bird_count +
+						statsRow.juv_bird_count +
+						statsRow.postjuv_bird_count
+					: 0;
+				return [row.time_period, young];
+			})
+		}
+	];
+}
+
 // Age split — bird-level breakdown of the "Population" tab's Age split tile,
 // consuming `population_stats`' age-split columns (#800/#801). "New adults" and
 // "New young" are birds new to the group this year; "First summer" and "Oldies"

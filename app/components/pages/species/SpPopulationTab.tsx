@@ -13,12 +13,19 @@ import type {
 } from '@/app/models/db';
 import {
 	getCounts,
+	getReturningVsNew,
 	getAgeSplit,
 	getYoungCounts,
 	getNewYoungCounts
 } from '@/app/components/pages/species/StatsHistoryChart';
 import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
 import { ChartTile } from '@/app/components/pages/species/ChartTile';
+
+// Returning vs new (#854): three plain categorical colours — unlike Age
+// split/Young counts below, these three series ("New adults", "Returning
+// adults", "Young") aren't paired concepts (no combining dark/light shades of
+// a shared hue), so a flat array is enough.
+export const RETURNING_VS_NEW_COLORS = ['#1f4fb0', '#b83a10', '#0f7a14'];
 
 // Explicit paired colours for the Age split, Young counts and New young counts
 // tiles, passed via
@@ -91,7 +98,11 @@ function Spinner() {
 // fetch (`getSpeciesPopulationStats`) — #800 split the age-split/young-trends
 // derivations into that separate RPC rather than folding them into
 // `aggregate_stats`; #839 split the original single Young trends tile into
-// Young counts / New young counts. A third fetch loads the group-wide effort
+// Young counts / New young counts. The Returning vs new tile (#854) is the
+// first to need *both* fetches at once — it remerges `aggregate_stats`' young
+// bucket columns with `population_stats`' adult columns into a single
+// new/returning/young split — so its `renderChart` gates on both being loaded
+// rather than just one. A third fetch loads the group-wide effort
 // history once (same pattern as SpBiometricsTab) so every tile's chart can offer the
 // Normalize toggle. The biometrics-related tiles (wing/weight trend,
 // wing-vs-weight scatter) live on the "Biometrics" tab (SpBiometricsTab.tsx).
@@ -175,6 +186,32 @@ export function SpPopulationTab({
 					<YearComparisonTrendChart
 						series={getCounts(statsHistory)}
 						yearlyAggregators={{ encounters: 'sum', birds: 'sum' }}
+						effortHistory={effortHistory ?? undefined}
+						compareYearsUrl={compareYearsUrl}
+					/>
+				) : (
+					<Spinner />
+				)
+		},
+		{
+			id: 'returning-vs-new',
+			heading: 'Returning vs new',
+			description: 'New adults, returning adults and young over time',
+			load: () => {
+				loadStatsHistory();
+				loadPopulationStats();
+				loadEffortHistory();
+			},
+			renderChart: () =>
+				statsHistory && populationStats ? (
+					<YearComparisonTrendChart
+						series={getReturningVsNew(statsHistory, populationStats)}
+						colors={RETURNING_VS_NEW_COLORS}
+						yearlyAggregators={{
+							'New adults': 'sum',
+							'Returning adults': 'sum',
+							Young: 'sum'
+						}}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 					/>
