@@ -40,7 +40,7 @@ const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 const summaryStats = {
 	...speciesStats[0],
 	session_count: 9,
-	encounter_count: 99
+	bird_count: 99
 } as AggregateStatsResult;
 
 function buildDayStat(

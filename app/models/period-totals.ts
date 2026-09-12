@@ -81,11 +81,11 @@ export function derivePeriodTotalsRowByEncounter(
 // negative-UTC-offset runtime this can render a period's first day as the
 // previous day — pre-existing behaviour, not introduced here.
 export function formatPeriodTotalsLabel(
-	grouping: PeriodTotalsGrouping,
+	timeInterval: PeriodTotalsGrouping,
 	timePeriod: string
 ): string {
 	const date = new Date(timePeriod);
-	switch (grouping) {
+	switch (timeInterval) {
 		case 'year':
 			return formatDate(date, 'yyyy');
 		case 'month':

@@ -4,6 +4,7 @@ import {
 	fetchNotableRetraps,
 	fetchGraphableEncounterData,
 	getSpeciesStatsHistory,
+	getSpeciesPopulationStats,
 	fetchSpeciesPeriodTotals,
 	getGroupEffortHistory
 } from '../sp-data';
@@ -234,7 +235,7 @@ describe('sp-data actions', () => {
 	});
 
 	describe('getSpeciesStatsHistory', () => {
-		it('forwards from_date/to_date to aggregate_stats alongside the monthly grouping', async () => {
+		it('forwards from_date/to_date to aggregate_stats alongside the monthly timeInterval', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID, FROM_DATE, TO_DATE);
@@ -253,6 +254,37 @@ describe('sp-data actions', () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+
+			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
+			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
+		});
+	});
+
+	describe('getSpeciesPopulationStats', () => {
+		it('forwards from_date/to_date to population_stats alongside the monthly timeInterval', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await getSpeciesPopulationStats(
+				SPECIES_NAME,
+				GROUP_ID,
+				FROM_DATE,
+				TO_DATE
+			);
+
+			expect(rpcCalls[0].name).toBe('population_stats');
+			expect(rpcCalls[0].args).toMatchObject({
+				species_name_filter: SPECIES_NAME,
+				ringing_group_filter: GROUP_ID,
+				group_by_time_period: 'month',
+				from_date: FROM_DATE,
+				to_date: TO_DATE
+			});
+		});
+
+		it('omits from_date/to_date when no range is supplied', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await getSpeciesPopulationStats(SPECIES_NAME, GROUP_ID);
 
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
@@ -331,7 +363,7 @@ describe('sp-data actions', () => {
 	// earlier in-range encounter appear while a later out-of-range one is dropped.
 
 	describe('fetchSpeciesPeriodTotals', () => {
-		it('with grouping "year" calls aggregate_stats with species_name_filter and group_by_time_period "year"', async () => {
+		it('with timeInterval "year" calls aggregate_stats with species_name_filter and group_by_time_period "year"', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'year');
@@ -344,7 +376,7 @@ describe('sp-data actions', () => {
 			});
 		});
 
-		it('with grouping "month" calls aggregate_stats with group_by_time_period "month"', async () => {
+		it('with timeInterval "month" calls aggregate_stats with group_by_time_period "month"', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'month');

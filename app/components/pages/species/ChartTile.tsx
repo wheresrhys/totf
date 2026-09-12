@@ -1,13 +1,13 @@
 'use client';
 import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
 
-// One chart on the species "Graphs" tab. Collapsed it is a fixed-height text
+// One chart on the species "Population" tab. Collapsed it is a fixed-height text
 // tile (heading + description) that sits ~300px wide in the reflowing grid;
 // clicking it expands the tile to hold the rendered chart. Expanded it spans the
 // full grid width at every breakpoint (the other tiles reflow around it) and
 // grows to whatever height its chart needs — no fixed height or inner scroll —
-// and carries a small close button. The parent (`SpGraphsTab`) owns which tiles
-// are expanded and lazily fetches each chart's data when it first expands.
+// and carries a small close button. The parent (`SpPopulationTab`) owns which
+// tiles are expanded and lazily fetches each chart's data when it first expands.
 export function ChartTile({
 	heading,
 	description,

@@ -67,7 +67,7 @@ export function SpMonthTotalsTab({
 
 	return (
 		<PeriodTotalsTable
-			grouping="month"
+			timeInterval="month"
 			rows={visibleRows.map((row) => row.stats)}
 			firstColumnHeader="Month"
 			showSpeciesColumn={false}

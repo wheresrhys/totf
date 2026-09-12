@@ -23,7 +23,7 @@ import {
 } from '@/app/models/month-totals';
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
-import { resolveInitialTabId } from '@/lib/tab-query-param';
+import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
 
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
 // The all-time page's combine-years month tab — distinct from `MONTH_TOTALS_TAB`
@@ -89,7 +89,7 @@ function AllTimeMonthTotalsTab({
 		<>
 			{combineYears ? (
 				<PeriodTotalsTable
-					grouping="month"
+					timeInterval="month"
 					rows={filterEmptyMonthTotalsRows(combinedRows, hideEmptyMonths).map(
 						(row) => row.stats
 					)}
@@ -107,7 +107,7 @@ function AllTimeMonthTotalsTab({
 				/>
 			) : (
 				<PeriodTotalsTable
-					grouping="month"
+					timeInterval="month"
 					rows={filterEmptyMonthTotalsRows(perYearRows, hideEmptyMonths).map(
 						(row) => row.stats
 					)}
@@ -155,7 +155,7 @@ function YearMonthTotalsTab({
 
 	return (
 		<PeriodTotalsTable
-			grouping="month"
+			timeInterval="month"
 			rows={visibleRows.map((row) => row.stats)}
 			firstColumnHeader="Month"
 			buildHref={(timePeriod) => {
@@ -252,13 +252,14 @@ export function SummaryTotalsSection({
 		[ALL_TIME_MONTH_TOTALS_TAB.id]: !yearlyTotals,
 		[SESSION_TOTALS_TAB.id]: !monthTotals && !yearlyTotals
 	};
-	const [activeTab, setActiveTab] = useState(
-		resolveInitialTabId(
-			initialTabId,
-			tabs.map((tab) => tab.id),
-			tabs[0].id
-		)
-	);
+	// Shared with the species and session pages via `useLinkableTabs` (#818).
+	// Summary renders every tab eagerly, so it ignores the hook's `loadedTabs`
+	// and just uses `activeTab` + `selectTab`.
+	const { activeTab, selectTab } = useLinkableTabs({
+		tabIds: tabs.map((tab) => tab.id),
+		defaultTabId: tabs[0].id,
+		initialTabId
+	});
 
 	// Species totals are fetched lazily: only once the Species tab is first
 	// selected (or on first paint when it is the sole/default tab), and never
@@ -337,10 +338,10 @@ export function SummaryTotalsSection({
 
 	return (
 		<>
-			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={selectTab} />
 			{yearlyTotals !== undefined && activeTab === YEAR_TOTALS_TAB.id && (
 				<PeriodTotalsTable
-					grouping="year"
+					timeInterval="year"
 					rows={yearlyTotals}
 					firstColumnHeader="Year"
 					buildHref={(timePeriod) =>
@@ -383,7 +384,7 @@ export function SummaryTotalsSection({
 				isSessionActive &&
 				(sessionTotals !== undefined ? (
 					<PeriodTotalsTable
-						grouping="day"
+						timeInterval="day"
 						rows={sessionTotals}
 						firstColumnHeader="Session"
 						buildHref={(timePeriod) =>
@@ -400,7 +401,7 @@ export function SummaryTotalsSection({
 					</div>
 				) : (
 					<PeriodTotalsTable
-						grouping="day"
+						timeInterval="day"
 						rows={lazySessionStats ?? []}
 						firstColumnHeader="Session"
 						buildHref={(timePeriod) =>

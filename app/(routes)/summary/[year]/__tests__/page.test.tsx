@@ -107,7 +107,7 @@ describe('/summary/[year]', () => {
 		).toBe('10');
 	});
 
-	it('fetchSummaryYearPageContent calls fetchPeriodStats with month grouping and the year bounds', async () => {
+	it('fetchSummaryYearPageContent calls fetchPeriodStats with month timeInterval and the year bounds', async () => {
 		await fetchSummaryYearPageContent({ year: '2026' }, 1);
 		expect(fetchPeriodStatsMock).toHaveBeenCalledWith(
 			1,

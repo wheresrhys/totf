@@ -13,7 +13,10 @@ import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
 import type { SexedGraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type {
+	AggregateStatsResult,
+	PopulationStatsResult
+} from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/models/period-totals';
 import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
 import type { TopMetricsFilterParams, TopPeriodsResult } from '@/app/models/db';
@@ -195,6 +198,33 @@ export async function getSpeciesStatsHistory(
 }
 
 /**
+ * Monthly age-split + young-trends history for a single species — the
+ * `population_stats` sibling of `getSpeciesStatsHistory`. #800 split these
+ * derivations (new-adult/first-summer/old-timer age split, and the 3J/postjuv
+ * young-trends counts) into their own RPC rather than folding them into
+ * `aggregate_stats`, so the "Population" tab's Age split and Young trends tiles
+ * fetch here while its Counts tile keeps using `getSpeciesStatsHistory`. Same
+ * call shape (species-filtered, month-grouped) as `getSpeciesStatsHistory`.
+ */
+export async function getSpeciesPopulationStats(
+	species: string,
+	viewedGroupId: number,
+	fromDate?: string,
+	toDate?: string
+) {
+	const supabase = await getAuthenticatedSupabaseClient();
+	return supabase
+		.rpc('population_stats', {
+			species_name_filter: species,
+			ringing_group_filter: viewedGroupId,
+			group_by_time_period: 'month',
+			...(fromDate ? { from_date: fromDate } : {}),
+			...(toDate ? { to_date: toDate } : {})
+		})
+		.then(catchSupabaseErrors) as Promise<PopulationStatsResult[]>;
+}
+
+/**
  * Group-wide (not species-filtered) monthly ringing-effort history for the
  * species page's Population/Biometrics tabs — effort is a property of a
  * session, not of the species caught in it, so this wraps
@@ -230,7 +260,7 @@ export async function getGroupEffortHistory(
 export async function fetchSpeciesPeriodTotals(
 	speciesName: string,
 	viewedGroupId: number,
-	grouping: PeriodTotalsGrouping,
+	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
 	toDate?: string
 ): Promise<AggregateStatsResult[]> {
@@ -241,7 +271,7 @@ export async function fetchSpeciesPeriodTotals(
 			...(toDate ? { to_date: toDate } : {}),
 			ringing_group_filter: viewedGroupId,
 			species_name_filter: speciesName,
-			group_by_time_period: grouping
+			group_by_time_period: timeInterval
 		})
 		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
 }

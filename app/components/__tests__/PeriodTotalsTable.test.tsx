@@ -68,7 +68,7 @@ describe('PeriodTotalsTable', () => {
 			];
 			render(
 				<PeriodTotalsTable
-					grouping="year"
+					timeInterval="year"
 					rows={rows}
 					firstColumnHeader="Year"
 					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
@@ -98,7 +98,7 @@ describe('PeriodTotalsTable', () => {
 		it('renders the first column via formatPeriodTotalsLabel and the caller-supplied buildHref', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="year"
+					timeInterval="year"
 					rows={[buildStat({ time_period: '2026-01-01' })]}
 					firstColumnHeader="Year"
 					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
@@ -110,10 +110,10 @@ describe('PeriodTotalsTable', () => {
 	});
 
 	describe('Structure', () => {
-		it('renders a "month" grouping label via formatPeriodTotalsLabel', () => {
+		it('renders a "month" timeInterval label via formatPeriodTotalsLabel', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="month"
+					timeInterval="month"
 					rows={[buildStat({ time_period: '2026-08-01' })]}
 					firstColumnHeader="Month"
 					buildHref={(timePeriod) => `/summary/2026/${timePeriod}`}
@@ -127,7 +127,7 @@ describe('PeriodTotalsTable', () => {
 		it('renders the caller-supplied buildLabel instead of formatPeriodTotalsLabel when provided', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="month"
+					timeInterval="month"
 					rows={[buildStat({ time_period: '2026-01-01' })]}
 					firstColumnHeader="Month"
 					buildHref={(timePeriod) => `/summary/2026/${timePeriod}`}
@@ -139,10 +139,10 @@ describe('PeriodTotalsTable', () => {
 			).toBe('Custom Label');
 		});
 
-		it('renders a "day" grouping label via formatPeriodTotalsLabel', () => {
+		it('renders a "day" timeInterval label via formatPeriodTotalsLabel', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="day"
+					timeInterval="day"
 					rows={[buildStat({ time_period: '2026-08-16' })]}
 					firstColumnHeader="Session"
 					buildHref={(timePeriod) => `/session/${timePeriod}`}
@@ -160,7 +160,7 @@ describe('PeriodTotalsTable', () => {
 		it('renders without crashing and shows no data rows when rows is empty', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="year"
+					timeInterval="year"
 					rows={[]}
 					firstColumnHeader="Year"
 					buildHref={() => '/summary'}
@@ -173,7 +173,7 @@ describe('PeriodTotalsTable', () => {
 		it('renders zero-session/zero-effort rows as "0" for both columns', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="year"
+					timeInterval="year"
 					rows={[
 						buildStat({
 							time_period: '2026-01-01',
@@ -210,10 +210,10 @@ describe('PeriodTotalsTable', () => {
 			new_young_bird_count: 14
 		});
 
-		it('renders a "Total" row for the "year" grouping when totalsStats is supplied', () => {
+		it('renders a "Total" row for the "year" timeInterval when totalsStats is supplied', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="year"
+					timeInterval="year"
 					rows={rows}
 					firstColumnHeader="Year"
 					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
@@ -225,10 +225,10 @@ describe('PeriodTotalsTable', () => {
 			expect(getCellTextByHeading('Sessions', totalsRow)).toBe('7');
 		});
 
-		it('renders a "Total" row for the "month" grouping when totalsStats is supplied', () => {
+		it('renders a "Total" row for the "month" timeInterval when totalsStats is supplied', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="month"
+					timeInterval="month"
 					rows={[buildStat({ time_period: '2026-08-01' })]}
 					firstColumnHeader="Month"
 					buildHref={(timePeriod) => `/summary/2026/${timePeriod}`}
@@ -241,7 +241,7 @@ describe('PeriodTotalsTable', () => {
 		it('renders no totals row when totalsStats is omitted', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="year"
+					timeInterval="year"
 					rows={rows}
 					firstColumnHeader="Year"
 					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
@@ -253,7 +253,7 @@ describe('PeriodTotalsTable', () => {
 		it('renders no totals row when rows is empty, even if totalsStats is supplied', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="year"
+					timeInterval="year"
 					rows={[]}
 					firstColumnHeader="Year"
 					buildHref={() => '/summary'}
@@ -266,10 +266,10 @@ describe('PeriodTotalsTable', () => {
 	});
 
 	describe('Sessions column', () => {
-		it('renders session_count and formatted total_effort for each grouping', () => {
+		it('renders session_count and formatted total_effort for each timeInterval', () => {
 			render(
 				<PeriodTotalsTable
-					grouping="month"
+					timeInterval="month"
 					rows={[
 						buildStat({
 							time_period: '2026-08-01',
@@ -290,7 +290,7 @@ describe('PeriodTotalsTable', () => {
 			it('renders a "Busiest session" column header, positioned between "Encounters" and "Birds", when showBusiestSession is omitted/true', () => {
 				render(
 					<PeriodTotalsTable
-						grouping="year"
+						timeInterval="year"
 						rows={[buildStat()]}
 						firstColumnHeader="Year"
 						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
@@ -307,7 +307,7 @@ describe('PeriodTotalsTable', () => {
 			it('renders the correct max_per_session value in each data row\'s "Busiest session" cell', () => {
 				render(
 					<PeriodTotalsTable
-						grouping="year"
+						timeInterval="year"
 						rows={[
 							buildStat({ time_period: '2026-01-01', max_per_session: 17 })
 						]}
@@ -321,7 +321,7 @@ describe('PeriodTotalsTable', () => {
 			it('renders the correct value in the pinned totals row\'s "Busiest session" cell, when a totals row is present', () => {
 				render(
 					<PeriodTotalsTable
-						grouping="year"
+						timeInterval="year"
 						rows={[buildStat()]}
 						firstColumnHeader="Year"
 						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
@@ -337,7 +337,7 @@ describe('PeriodTotalsTable', () => {
 			it('omits the "Busiest session" column entirely when showBusiestSession={false}', () => {
 				render(
 					<PeriodTotalsTable
-						grouping="year"
+						timeInterval="year"
 						rows={[buildStat()]}
 						firstColumnHeader="Year"
 						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
@@ -379,7 +379,7 @@ describe('PeriodTotalsTable', () => {
 			it('still shows the AggregateByToggle, disabled and pre-set to Encounter, when a fixed aggregation is supplied', () => {
 				render(
 					<PeriodTotalsTable
-						grouping="month"
+						timeInterval="month"
 						rows={[encStat()]}
 						firstColumnHeader="Month"
 						buildHref={() => ''}
@@ -402,7 +402,7 @@ describe('PeriodTotalsTable', () => {
 			it("renders encounter-derived age-bucket values when fixed aggregation is 'encounter'", () => {
 				render(
 					<PeriodTotalsTable
-						grouping="month"
+						timeInterval="month"
 						rows={[encStat()]}
 						firstColumnHeader="Month"
 						buildHref={() => ''}
@@ -425,7 +425,7 @@ describe('PeriodTotalsTable', () => {
 			it("renders '-' in every row's Individuals column when the placeholder option is set, regardless of underlying bird_count", () => {
 				render(
 					<PeriodTotalsTable
-						grouping="month"
+						timeInterval="month"
 						rows={[
 							encStat({ time_period: '2000-01-01', bird_count: 40 }),
 							encStat({ time_period: '2000-02-01', bird_count: 7 })
@@ -446,7 +446,7 @@ describe('PeriodTotalsTable', () => {
 			it("renders the totals row's Individuals cell as '-' too", () => {
 				render(
 					<PeriodTotalsTable
-						grouping="month"
+						timeInterval="month"
 						rows={[encStat()]}
 						firstColumnHeader="Month"
 						buildHref={() => ''}
@@ -463,7 +463,7 @@ describe('PeriodTotalsTable', () => {
 			it('renders the first column as plain text, not a link, when no href is available for a row', () => {
 				render(
 					<PeriodTotalsTable
-						grouping="month"
+						timeInterval="month"
 						rows={[encStat()]}
 						firstColumnHeader="Month"
 						buildHref={() => ''}
@@ -482,16 +482,28 @@ describe('PeriodTotalsTable', () => {
 
 	describe('Aggregate by toggle', () => {
 		const groupings: {
-			grouping: 'year' | 'month' | 'day';
+			timeInterval: 'year' | 'month';
 			header: string;
 		}[] = [
-			{ grouping: 'year', header: 'Year' },
-			{ grouping: 'month', header: 'Month' },
-			{ grouping: 'day', header: 'Session' }
+			{ timeInterval: 'year', header: 'Year' },
+			{ timeInterval: 'month', header: 'Month' }
 		];
 
-		groupings.forEach(({ grouping, header }) => {
-			it(`defaults to bird-based counts and switches to encounter-based counts for the standard-block columns, for the "${grouping}" grouping`, () => {
+		it('has no toggle for "day" timeInterval', () => {
+			render(
+				<PeriodTotalsTable
+					timeInterval="day"
+					rows={[buildStat()]}
+					firstColumnHeader="Session"
+					buildHref={() => ''}
+				/>
+			);
+			expect(screen.queryByRole('radio', { name: 'Bird' })).toBeNull();
+			expect(screen.queryByRole('radio', { name: 'Encounter' })).toBeNull();
+		});
+
+		groupings.forEach(({ timeInterval, header }) => {
+			it(`defaults to bird-based counts and switches to encounter-based counts for the standard-block columns, for the "${timeInterval}" timeInterval`, () => {
 				const stat = buildStat({
 					time_period: '2026-01-01',
 					bird_count: 10,
@@ -515,7 +527,7 @@ describe('PeriodTotalsTable', () => {
 
 				render(
 					<PeriodTotalsTable
-						grouping={grouping}
+						timeInterval={timeInterval}
 						rows={[stat]}
 						firstColumnHeader={header}
 						buildHref={() => '/summary'}

@@ -144,7 +144,7 @@ export function getChartData(
 }
 
 // Presentational wing-vs-weight scatter. Receives its birds via prop (fetching
-// is owned by `SpGraphsTab`) and keeps only the by-sex/by-age grouping toggle as
+// is owned by `SpPopulationTab`) and keeps only the by-sex/by-age timeInterval toggle as
 // local state.
 export function WingWeightScatterChart({
 	birds

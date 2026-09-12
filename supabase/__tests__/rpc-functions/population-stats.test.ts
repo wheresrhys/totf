@@ -344,7 +344,7 @@ describe('population_stats', () => {
 			});
 		});
 
-		it('year, month, day and ungrouped grouping modes all return valid rows for the age-split columns (period_year resolution rule)', async () => {
+		it('year, month, day and ungrouped timeInterval modes all return valid rows for the age-split columns (period_year resolution rule)', async () => {
 			for (const mode of ['year', 'month', 'day', undefined] as const) {
 				const { data, error } = await deltaClient.rpc('population_stats', {
 					ringing_group_filter: deltaId,

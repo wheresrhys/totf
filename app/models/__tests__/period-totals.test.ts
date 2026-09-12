@@ -157,7 +157,10 @@ describe('formatPeriodTotalsLabel', () => {
 		['year', '2026-01-01', '2026'],
 		['month', '2026-08-01', 'August 2026'],
 		['day', '2026-08-16', '16th August 2026']
-	])('formats a %s grouping as "%s"', (grouping, timePeriod, expected) => {
-		expect(formatPeriodTotalsLabel(grouping, timePeriod)).toBe(expected);
-	});
+	])(
+		'formats a %s timeInterval as "%s"',
+		(timeInterval, timePeriod, expected) => {
+			expect(formatPeriodTotalsLabel(timeInterval, timePeriod)).toBe(expected);
+		}
+	);
 });

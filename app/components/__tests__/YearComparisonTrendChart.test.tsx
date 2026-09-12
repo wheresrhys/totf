@@ -534,6 +534,57 @@ describe('YearComparisonTrendChart', () => {
 			const [chart] = screen.getAllByTestId('line-chart');
 			expect(JSON.parse(chart.dataset.colors!)).toHaveLength(series.length);
 		});
+
+		it('uses the default palette (chartkick base colours) when no colors prop is passed', () => {
+			// Regression guard for the `colors` prop's default fallback: with no
+			// override, the all-time chart must still be handed the exact
+			// METRIC_BASE_COLORS in series order, unchanged from before the prop.
+			render(<YearComparisonTrendChart series={series} />);
+			const [chart] = screen.getAllByTestId('line-chart');
+			expect(JSON.parse(chart.dataset.colors!)).toEqual(['#3366CC', '#DC3912']);
+		});
+	});
+
+	describe('Structure: colors override prop', () => {
+		const override = ['#111111', '#222222'];
+
+		it('all-time: uses the supplied colours in series order in place of the palette', () => {
+			render(<YearComparisonTrendChart series={series} colors={override} />);
+			const [chart] = screen.getAllByTestId('line-chart');
+			expect(JSON.parse(chart.dataset.colors!)).toEqual(override);
+		});
+
+		it('compare-years: each per-metric chart derives its shades from the supplied base colour, not the default palette', () => {
+			render(<YearComparisonTrendChart series={series} colors={override} />);
+			fireEvent.click(screen.getByRole('radio', { name: 'Compare years' }));
+			const charts = screen.getAllByTestId('line-chart');
+			// series has only previous years (2023, 2024); the most-recent previous
+			// year renders at the metric's full-strength base colour — which must be
+			// the override, not METRIC_BASE_COLORS.
+			const metric0Colors = JSON.parse(charts[0].dataset.colors!) as string[];
+			const metric1Colors = JSON.parse(charts[1].dataset.colors!) as string[];
+			expect(metric0Colors).toContain('#111111');
+			expect(metric1Colors).toContain('#222222');
+			expect(metric0Colors).not.toContain('#3366cc');
+		});
+
+		it('this-year: the current-year line uses the supplied base colour, not the default palette', () => {
+			render(<YearComparisonTrendChart series={series} colors={override} />);
+			fireEvent.click(screen.getByRole('radio', { name: 'This year' }));
+			const charts = screen.getAllByTestId('line-chart');
+			// thisYearColors puts the full-strength base colour last (current-year line).
+			const metric0Colors = JSON.parse(charts[0].dataset.colors!) as string[];
+			const metric1Colors = JSON.parse(charts[1].dataset.colors!) as string[];
+			expect(metric0Colors[metric0Colors.length - 1]).toBe('#111111');
+			expect(metric1Colors[metric1Colors.length - 1]).toBe('#222222');
+		});
+
+		it('falls back to the default palette for a metric index the colors array does not cover', () => {
+			render(<YearComparisonTrendChart series={series} colors={['#111111']} />);
+			const [chart] = screen.getAllByTestId('line-chart');
+			// index 0 overridden, index 1 falls back to METRIC_BASE_COLORS[1].
+			expect(JSON.parse(chart.dataset.colors!)).toEqual(['#111111', '#DC3912']);
+		});
 	});
 
 	describe('Structure: all-time Interval toggle', () => {
