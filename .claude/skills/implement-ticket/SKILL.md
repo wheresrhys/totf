@@ -153,27 +153,6 @@ For each PR:
    `swarm` read exclusive-resource status directly off `gh pr list --json labels` when deciding
    whether to spawn PR-maintenance work, instead of resolving each PR back to its linked issue.
 8. Include in each PR body:
-   - If the issue carries `db-migration`: a warning block **at the top**, above everything else:
-     > ⚠️ **Database migration — do not merge before pushing.** This PR's schema change must be
-     > deployed to prod (`npm run db:migration:push`, run via the `take-over` skill) before this
-     > PR is merged. Merging first triggers a Vercel prod deploy of code that expects a schema
-     > prod doesn't have yet.
-   - If the schema change requires backfilling existing rows to fit the new shape (declarative
-     sync only ever emits DDL, never DML, so this can't be generated): hand-write the backfill,
-     appended to the end of the generated migration file — after all generated DDL, never
-     interleaved with or replacing it — preceded by a literal marker comment line
-     `-- Hand-authored data migration (backfill only — appended after schema-apply)`. Write it
-     against the schema's *final* constrained shape (the generated DDL already has its
-     NOT NULL/CHECK/widened constraints applied in one shot — declarative sync never stages a
-     relaxed intermediate shape), not the old drop/relax/reapply dance. Mirror the same DML
-     verbatim into a DB integration test as a durable second copy — `supabase/migrations/` is
-     gitignored, so a torn-down worktree loses the hand-written file otherwise, and it must be
-     reconstructable from this test. Then paste **only the marker-to-EOF block** (not the whole
-     migration file) into the PR body under a `## Prod-ready migration SQL` heading:
-     `<summary>Data migration — append to the end of the regenerated DDL migration before pushing
-     to prod</summary>` followed by a fenced ```sql``` block. This exact marker text and anchor
-     format is machine-parsed by `mcp__swarm-tools__resolve_migration_dml` (used by `take-over`)
-     — do not vary it.
    - If step 5, point 6 found the issue already closed with a non-empty diff: a flag block near
      the top of the PR body — directly after the `db-migration` warning if one is present,
      otherwise at the very top — stating plainly that issue #<number> was already closed
