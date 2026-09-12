@@ -53,12 +53,17 @@ export const YOUNG_COUNTS_HUES = {
 	juv: { dark: '#0f7a14', light: '#8fd08f' },
 	postjuv: { dark: '#7a077a', light: '#d08fd0' }
 };
-// Series order (matches getYoungCounts): Juv, Postjuv.
+// Series order (matches getYoungCounts): Juv, Postjuv. Both young-trends
+// tiles also plot a Total series (#841, `includeTotalSeries`) appended after
+// these two — it intentionally isn't given an explicit colour here, so it
+// falls back to the default palette via YearComparisonTrendChart's own
+// `colors?.[metricIndex] ?? metricBaseColor(metricIndex)` fallback.
 export const YOUNG_COUNTS_COLORS = [
 	YOUNG_COUNTS_HUES.juv.dark, // Juv
 	YOUNG_COUNTS_HUES.postjuv.dark // Postjuv
 ];
-// Series order (matches getNewYoungCounts): New juv, New postjuv.
+// Series order (matches getNewYoungCounts): New juv, New postjuv. Same Total
+// fallback note as YOUNG_COUNTS_COLORS above.
 export const NEW_YOUNG_COUNTS_COLORS = [
 	YOUNG_COUNTS_HUES.juv.light, // New juv
 	YOUNG_COUNTS_HUES.postjuv.light // New postjuv
@@ -222,6 +227,7 @@ export function SpPopulationTab({
 						}}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
+						includeTotalSeries
 					/>
 				) : (
 					<Spinner />
@@ -247,6 +253,7 @@ export function SpPopulationTab({
 						}}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
+						includeTotalSeries
 					/>
 				) : (
 					<Spinner />

@@ -38,12 +38,36 @@ vi.mock('../StatsHistoryChart', () => ({
 		{ name: 'New young', data: [] }
 	],
 	getYoungCounts: () => [
-		{ name: 'Juv', data: [] },
-		{ name: 'Postjuv', data: [] }
+		{
+			name: 'Juv',
+			data: [
+				['2024-01-01', 5],
+				['2024-02-01', 3]
+			]
+		},
+		{
+			name: 'Postjuv',
+			data: [
+				['2024-01-01', 2],
+				['2024-02-01', 4]
+			]
+		}
 	],
 	getNewYoungCounts: () => [
-		{ name: 'New juv', data: [] },
-		{ name: 'New postjuv', data: [] }
+		{
+			name: 'New juv',
+			data: [
+				['2024-01-01', 1],
+				['2024-02-01', 2]
+			]
+		},
+		{
+			name: 'New postjuv',
+			data: [
+				['2024-01-01', 3],
+				['2024-02-01', 1]
+			]
+		}
 	]
 }));
 
@@ -52,21 +76,42 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 		series,
 		colors,
 		effortHistory,
-		compareYearsUrl
+		compareYearsUrl,
+		includeTotalSeries
 	}: {
-		series: unknown[];
+		series: { name: string; data: [string, number | null][] }[];
 		colors?: string[];
 		effortHistory?: unknown;
 		compareYearsUrl?: string;
-	}) => (
-		<div
-			data-testid="trend-chart"
-			data-series-count={series.length}
-			data-colors={JSON.stringify(colors ?? null)}
-			data-has-effort={effortHistory ? 'yes' : 'no'}
-			data-compare-years-url={compareYearsUrl ?? ''}
-		/>
-	)
+		includeTotalSeries?: boolean;
+	}) => {
+		// Mirrors YearComparisonTrendChart's own includeTotalSeries summing
+		// (unit-tested against buildTotalSeries directly in
+		// YearComparisonTrendChart.test.tsx) just enough for this tab-level test
+		// to assert real per-tile series data sums correctly end to end, without
+		// re-rendering the real chart/toggle machinery.
+		const total = includeTotalSeries
+			? series[0].data.map(([date], index) => {
+					const sum = series.reduce(
+						(runningTotal, metric) =>
+							runningTotal + (metric.data[index][1] ?? 0),
+						0
+					);
+					return [date, sum] as [string, number];
+				})
+			: null;
+		return (
+			<div
+				data-testid="trend-chart"
+				data-series-count={series.length}
+				data-colors={JSON.stringify(colors ?? null)}
+				data-has-effort={effortHistory ? 'yes' : 'no'}
+				data-compare-years-url={compareYearsUrl ?? ''}
+				data-include-total-series={includeTotalSeries ? 'yes' : 'no'}
+				data-total={JSON.stringify(total)}
+			/>
+		);
+	}
 }));
 
 const props = {
@@ -305,6 +350,16 @@ describe('SpPopulationTab', () => {
 			expect(chart.dataset.seriesCount).toBe('2');
 		});
 
+		it('renders a Total series summing Juv and Postjuv', async () => {
+			render(<SpPopulationTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Young counts/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(JSON.parse(chart.dataset.total!)).toEqual([
+				['2024-01-01', 7],
+				['2024-02-01', 7]
+			]);
+		});
+
 		it('passes the New young counts colours on the New young counts tile', async () => {
 			render(<SpPopulationTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /New young counts/ }));
@@ -313,6 +368,37 @@ describe('SpPopulationTab', () => {
 				NEW_YOUNG_COUNTS_COLORS
 			);
 			expect(chart.dataset.seriesCount).toBe('2');
+		});
+
+		it('renders a Total series summing New juv and New postjuv', async () => {
+			render(<SpPopulationTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /New young counts/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(JSON.parse(chart.dataset.total!)).toEqual([
+				['2024-01-01', 4],
+				['2024-02-01', 3]
+			]);
+		});
+
+		it('passes includeTotalSeries to the Young counts and New young counts tiles only, not Counts or Age split', async () => {
+			render(<SpPopulationTab {...props} />);
+			for (const name of [
+				/Counts/,
+				/Age split/,
+				/Young counts/,
+				/New young counts/
+			]) {
+				fireEvent.click(screen.getByRole('button', { name }));
+			}
+			await waitFor(() =>
+				expect(screen.getAllByTestId('trend-chart').length).toBe(4)
+			);
+			const [counts, ageSplit, youngCounts, newYoungCounts] =
+				screen.getAllByTestId('trend-chart');
+			expect(counts.dataset.includeTotalSeries).toBe('no');
+			expect(ageSplit.dataset.includeTotalSeries).toBe('no');
+			expect(youngCounts.dataset.includeTotalSeries).toBe('yes');
+			expect(newYoungCounts.dataset.includeTotalSeries).toBe('yes');
 		});
 	});
 

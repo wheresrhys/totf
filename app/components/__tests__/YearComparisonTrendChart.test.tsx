@@ -8,6 +8,7 @@ import {
 	thisYearColors,
 	normalizeSeriesByEffort,
 	aggregateSeriesByYear,
+	buildTotalSeries,
 	spansMultipleYears,
 	isHiddenFromLegend,
 	YearComparisonTrendChart
@@ -500,6 +501,92 @@ describe('aggregateSeriesByYear', () => {
 	});
 });
 
+describe('buildTotalSeries', () => {
+	describe('Usual: summing multiple series per period', () => {
+		it('sums the values of every input series at each matching period', () => {
+			const series: LineChartData[] = [
+				{
+					name: 'Juv',
+					data: [
+						['2024-01-01', 5],
+						['2024-02-01', 3]
+					]
+				},
+				{
+					name: 'Postjuv',
+					data: [
+						['2024-01-01', 2],
+						['2024-02-01', 4]
+					]
+				}
+			];
+			expect(buildTotalSeries(series).data).toEqual([
+				['2024-01-01', 7],
+				['2024-02-01', 7]
+			]);
+		});
+
+		it("names the result 'Total'", () => {
+			const series: LineChartData[] = [
+				{ name: 'Juv', data: [['2024-01-01', 5]] }
+			];
+			expect(buildTotalSeries(series).name).toBe('Total');
+		});
+	});
+
+	describe('Structure: per-period, not cumulative', () => {
+		it("does not accumulate across periods — each period's total only reflects that period's values", () => {
+			const series: LineChartData[] = [
+				{
+					name: 'Juv',
+					data: [
+						['2024-01-01', 5],
+						['2024-02-01', 3]
+					]
+				},
+				{
+					name: 'Postjuv',
+					data: [
+						['2024-01-01', 2],
+						['2024-02-01', 1]
+					]
+				}
+			];
+			expect(buildTotalSeries(series).data).toEqual([
+				['2024-01-01', 7],
+				['2024-02-01', 4]
+			]);
+		});
+	});
+
+	describe('Edge: gaps and single-series input', () => {
+		it('produces a null (gap) total for a period where every input series is null', () => {
+			const series: LineChartData[] = [
+				{ name: 'Juv', data: [['2024-01-01', null]] },
+				{ name: 'Postjuv', data: [['2024-01-01', null]] }
+			];
+			expect(buildTotalSeries(series).data).toEqual([['2024-01-01', null]]);
+		});
+
+		it('returns the single series unchanged (as the total) when only one series is supplied', () => {
+			const series: LineChartData[] = [
+				{
+					name: 'Juv',
+					data: [
+						['2024-01-01', 5],
+						['2024-02-01', null]
+					]
+				}
+			];
+			expect(buildTotalSeries(series).data).toEqual(series[0].data);
+		});
+
+		it('returns an empty series when given no input series', () => {
+			expect(buildTotalSeries([]).data).toEqual([]);
+		});
+	});
+});
+
 describe('spansMultipleYears', () => {
 	describe('Usual: dates crossing a calendar-year boundary', () => {
 		it('returns true when one metric has dates in two different years', () => {
@@ -694,6 +781,140 @@ describe('YearComparisonTrendChart', () => {
 			const [chart] = screen.getAllByTestId('line-chart');
 			// index 0 overridden, index 1 falls back to METRIC_BASE_COLORS[1].
 			expect(JSON.parse(chart.dataset.colors!)).toEqual(['#111111', '#DC3912']);
+		});
+	});
+
+	describe('Structure: includeTotalSeries prop', () => {
+		it('adds no extra series when includeTotalSeries is omitted', () => {
+			render(<YearComparisonTrendChart series={series} />);
+			const [chart] = screen.getAllByTestId('line-chart');
+			expect(JSON.parse(chart.dataset.series!)).toEqual([
+				'encounters',
+				'birds'
+			]);
+		});
+
+		it('adds no extra series when includeTotalSeries is false', () => {
+			render(
+				<YearComparisonTrendChart series={series} includeTotalSeries={false} />
+			);
+			const [chart] = screen.getAllByTestId('line-chart');
+			expect(JSON.parse(chart.dataset.series!)).toEqual([
+				'encounters',
+				'birds'
+			]);
+		});
+
+		it('adds one Total series summing all plotted series when includeTotalSeries is true', () => {
+			render(
+				<YearComparisonTrendChart series={series} includeTotalSeries={true} />
+			);
+			const [chart] = screen.getAllByTestId('line-chart');
+			expect(JSON.parse(chart.dataset.series!)).toEqual([
+				'encounters',
+				'birds',
+				'Total'
+			]);
+			const [, , total] = JSON.parse(chart.dataset.values!);
+			expect(total).toEqual([
+				['2023-01-01', 8],
+				['2024-01-01', 14]
+			]);
+		});
+
+		it('computes the total from effort-normalized values when Normalize is toggled on', () => {
+			render(
+				<YearComparisonTrendChart
+					series={series}
+					effortHistory={normEffort}
+					includeTotalSeries={true}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
+			const [chart] = screen.getAllByTestId('line-chart');
+			const [, , total] = JSON.parse(chart.dataset.values!);
+			// encounters/effort: 5/2=2.5, 8/4=2; birds/effort: 3/2=1.5, 6/4=1.5;
+			// total: 2.5+1.5=4, 2+1.5=3.5 — reflects the normalized values, not
+			// the raw 5+3=8/8+6=14 the unnormalized test above asserts.
+			expect(total).toEqual([
+				['2023-01-01', 4],
+				['2024-01-01', 3.5]
+			]);
+		});
+
+		it('aggregates the total series with sum when the Interval is switched to Year', () => {
+			const multiMonthSeries: LineChartData[] = [
+				{
+					name: 'encounters',
+					data: [
+						['2023-04-01', 2],
+						['2024-03-01', 4],
+						['2024-06-01', 6]
+					]
+				},
+				{
+					name: 'birds',
+					data: [
+						['2023-04-01', 1],
+						['2024-03-01', 2],
+						['2024-06-01', 3]
+					]
+				}
+			];
+			render(
+				<YearComparisonTrendChart
+					series={multiMonthSeries}
+					includeTotalSeries={true}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			const [chart] = screen.getAllByTestId('line-chart');
+			const [, , total] = JSON.parse(chart.dataset.values!);
+			// Per-month totals: 2023-04 → 3, 2024-03 → 6, 2024-06 → 9; Total is
+			// absent from yearlyAggregators, so it defaults to 'sum': 2023 → 3,
+			// 2024 → 6 + 9 = 15.
+			expect(total).toEqual([
+				['2023', 3],
+				['2024', 15]
+			]);
+		});
+
+		it('includes the Total series as its own per-metric sub-chart in Compare-years mode', () => {
+			render(
+				<YearComparisonTrendChart series={series} includeTotalSeries={true} />
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Compare years' }));
+			const charts = screen.getAllByTestId('line-chart');
+			expect(charts).toHaveLength(3);
+			expect(screen.getByText('Total')).toBeTruthy();
+		});
+
+		it('includes the Total series as its own per-metric sub-chart in This-year mode', () => {
+			render(
+				<YearComparisonTrendChart series={series} includeTotalSeries={true} />
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'This year' }));
+			const charts = screen.getAllByTestId('line-chart');
+			expect(charts).toHaveLength(3);
+			expect(screen.getByText('Total')).toBeTruthy();
+		});
+
+		it('colours the Total series via the default metricBaseColor fallback when the supplied colors array does not cover its index', () => {
+			render(
+				<YearComparisonTrendChart
+					series={series}
+					colors={['#111111', '#222222']}
+					includeTotalSeries={true}
+				/>
+			);
+			const [chart] = screen.getAllByTestId('line-chart');
+			// index 0 and 1 overridden; index 2 (Total) falls back to
+			// METRIC_BASE_COLORS[2].
+			expect(JSON.parse(chart.dataset.colors!)).toEqual([
+				'#111111',
+				'#222222',
+				'#FF9900'
+			]);
 		});
 	});
 
