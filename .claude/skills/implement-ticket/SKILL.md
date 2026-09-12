@@ -57,15 +57,21 @@ Read the issue body carefully. Identify:
 - **Dependencies**: does this require a prior ticket to be merged first? If a hard dependency is
   unmerged, stop and report rather than building on top of it.
 
-In interactive mode, ask the user clarifying questions (via `AskUserQuestion`) for anything that
-would materially affect the implementation approach — exact UI layout or copy, reuse vs build
+If there are ambiguities, and the ticket has a parent issue, read the parent too (including comments) — parents of tracking sequences carry shared design decisions, sentence copy, and plan links that the child bodies
+assume:
+
+```sh
+gh issue view <parent-number> --comments
+```
+
+If there are still ambiguities, in interactive mode, ask the user clarifying questions (via `AskUserQuestion`)
+for anything that would materially affect the implementation approach — exact UI layout or copy, reuse vs build
 new, edge-case behaviour, whether a DB schema change is needed, priority of sub-features. In
 subagent mode, apply the assumption rules above.
 
 ### 3. Derive branch name and create it
 
-If the ticket specifies a branch name, use it. Otherwise call
-`mcp__swarm-tools__derive_branch_name` with `{issueNumber, title}` (add `chainSuffix` — e.g.
+Call `mcp__swarm-tools__derive_branch_name` with `{issueNumber, title}` (add `chainSuffix` — e.g.
 `"1-db"` — for a multi-PR chain per step 4 below) to get `feature/<issue-number>-<slug>`. If it
 reports `collision: true`, don't silently reuse the colliding ref — ask/report instead.
 
