@@ -393,6 +393,7 @@ export function SummaryTotalsSection({
 						totalsStats={
 							tabsWithTotalsRow[SESSION_TOTALS_TAB.id] ? totalsStats : undefined
 						}
+						showBusiestSession={false}
 					/>
 				) : isSessionLoading ? (
 					<div className="flex items-center justify-center">
@@ -409,6 +410,7 @@ export function SummaryTotalsSection({
 						totalsStats={
 							tabsWithTotalsRow[SESSION_TOTALS_TAB.id] ? totalsStats : undefined
 						}
+						showBusiestSession={false}
 					/>
 				))}
 			{isSpeciesActive &&

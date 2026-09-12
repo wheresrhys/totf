@@ -54,6 +54,7 @@ describe('derivePeriodTotalsRowByBird', () => {
 			sessionsCount: 4,
 			speciesCount: 5,
 			encounterCount: 7,
+			maxPerSession: 3,
 			individualsCount: 6,
 			new: 4,
 			retraps: 2,
@@ -76,6 +77,11 @@ describe('derivePeriodTotalsRowByBird', () => {
 		expect(row.sessionsCount).toBe(11);
 	});
 
+	it('maps max_per_session to maxPerSession', () => {
+		const stat = buildStat({ max_per_session: 9 });
+		expect(derivePeriodTotalsRowByBird(stat).maxPerSession).toBe(9);
+	});
+
 	it('returns all-zero fields for a period with no activity', () => {
 		const stat = buildStat({
 			session_count: 0,
@@ -95,6 +101,7 @@ describe('derivePeriodTotalsRowByBird', () => {
 			sessionsCount: 0,
 			speciesCount: 0,
 			encounterCount: 0,
+			maxPerSession: 3,
 			individualsCount: 0,
 			new: 0,
 			retraps: 0,
@@ -120,6 +127,7 @@ describe('derivePeriodTotalsRowByEncounter', () => {
 			sessionsCount: 4,
 			speciesCount: 5,
 			encounterCount: 7,
+			maxPerSession: 3,
 			individualsCount: 6,
 			new: 4,
 			retraps: 3,
@@ -134,6 +142,11 @@ describe('derivePeriodTotalsRowByEncounter', () => {
 	it('computes retraps via the shared calculateEncounterRetraps helper', () => {
 		const stat = buildStat({ encounter_count: 10, new_bird_count: 3 });
 		expect(derivePeriodTotalsRowByEncounter(stat).retraps).toBe(7);
+	});
+
+	it('maps max_per_session to maxPerSession', () => {
+		const stat = buildStat({ max_per_session: 9 });
+		expect(derivePeriodTotalsRowByEncounter(stat).maxPerSession).toBe(9);
 	});
 });
 

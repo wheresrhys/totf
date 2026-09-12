@@ -635,7 +635,7 @@ describe('allocateBudget', () => {
 
 	// Usual
 	it('fills maintenance first, then tickets, within free slots', () => {
-		const result = allocateBudget(2, false, nonExclusiveMaintenance, nonExclusiveTickets);
+		const result = allocateBudget(2, false, false, nonExclusiveMaintenance, nonExclusiveTickets);
 		expect(result.maintenance.map((m) => m.number)).toEqual([1]);
 		expect(result.tickets.map((t) => t.number)).toEqual([10]);
 		expect(result.soloRunStarted).toBeNull();
@@ -643,39 +643,113 @@ describe('allocateBudget', () => {
 
 	// Structure
 	it('selects nothing when a solo run is already active', () => {
-		const result = allocateBudget(4, true, nonExclusiveMaintenance, nonExclusiveTickets);
+		const result = allocateBudget(4, true, true, nonExclusiveMaintenance, nonExclusiveTickets);
 		expect(result.maintenance).toEqual([]);
 		expect(result.tickets).toEqual([]);
 	});
 
 	it('picks an exclusive maintenance PR alone and stops the pass', () => {
-		const result = allocateBudget(4, false, [...exclusiveMaintenance, ...nonExclusiveMaintenance], nonExclusiveTickets);
+		const result = allocateBudget(
+			4,
+			false,
+			false,
+			[...exclusiveMaintenance, ...nonExclusiveMaintenance],
+			nonExclusiveTickets
+		);
 		expect(result.maintenance.map((m) => m.number)).toEqual([2]);
 		expect(result.tickets).toEqual([]);
 		expect(result.soloRunStarted).toBe('db-migration');
 	});
 
 	it('skips an exclusive ticket that would join an already non-empty batch, leaving it for next round', () => {
-		const result = allocateBudget(4, false, nonExclusiveMaintenance, [...exclusiveTickets, ...nonExclusiveTickets]);
+		const result = allocateBudget(4, false, false, nonExclusiveMaintenance, [...exclusiveTickets, ...nonExclusiveTickets]);
 		expect(result.maintenance.map((m) => m.number)).toEqual([1]);
 		expect(result.tickets.map((t) => t.number)).toEqual([10]);
 	});
 
 	it('picks a lone exclusive ticket when nothing else is eligible', () => {
-		const result = allocateBudget(4, false, [], exclusiveTickets);
+		const result = allocateBudget(4, false, false, [], exclusiveTickets);
 		expect(result.tickets.map((t) => t.number)).toEqual([11]);
 		expect(result.soloRunStarted).toBe('e2e-exclusive');
 	});
 
+	// #835: an exclusive candidate ranked first must not hide the ordinary candidates behind it, and
+	// must only be picked when nothing else is running at all.
+	describe('exclusive-first visibility and any-worker-running gate (#835)', () => {
+		// Usual — regression guard: with no workers running, an exclusive ticket ranked first is
+		// still picked alone and stops the pass (existing solo-run behaviour must not change).
+		it('picks an exclusive ticket ranked first alone when no worker is running', () => {
+			const result = allocateBudget(4, false, false, [], [...exclusiveTickets, ...nonExclusiveTickets]);
+			expect(result.tickets.map((t) => t.number)).toEqual([11]);
+			expect(result.soloRunStarted).toBe('e2e-exclusive');
+		});
+
+		// Structure — a non-exclusive worker is running: the exclusive ticket ranked first is skipped
+		// entirely (it needs to run solo) and the ordinary tickets behind it still fill the free slots.
+		it('skips an exclusive ticket ranked first while a worker is running, still picking ordinary tickets behind it', () => {
+			const moreTickets: TicketCandidate[] = [
+				...exclusiveTickets,
+				{ number: 10, title: 't1', labels: ['ready'], model: 'sonnet', blockingCount: 0 },
+				{ number: 12, title: 't3', labels: ['ready'], model: 'sonnet', blockingCount: 0 },
+			];
+			const result = allocateBudget(4, false, true, [], moreTickets);
+			expect(result.tickets.map((t) => t.number)).toEqual([10, 12]);
+			expect(result.soloRunStarted).toBeNull();
+		});
+
+		it('caps the ordinary tickets picked around a skipped exclusive at freeSlots', () => {
+			const moreTickets: TicketCandidate[] = [
+				...exclusiveTickets,
+				{ number: 10, title: 't1', labels: ['ready'], model: 'sonnet', blockingCount: 0 },
+				{ number: 12, title: 't3', labels: ['ready'], model: 'sonnet', blockingCount: 0 },
+			];
+			const result = allocateBudget(1, false, true, [], moreTickets);
+			expect(result.tickets.map((t) => t.number)).toEqual([10]);
+		});
+
+		// Structure — the same fix on the maintenance-track loop.
+		it('skips an exclusive maintenance PR ranked first while a worker is running, still picking ordinary PRs behind it', () => {
+			const result = allocateBudget(
+				4,
+				false,
+				true,
+				[...exclusiveMaintenance, ...nonExclusiveMaintenance],
+				[]
+			);
+			expect(result.maintenance.map((m) => m.number)).toEqual([1]);
+			expect(result.soloRunStarted).toBeNull();
+		});
+
+		// Edge — two exclusive tickets, no worker running: only the first is picked, and once it's
+		// picked nothing else is (solo run started this pass).
+		it('picks only the first of two exclusive tickets when no worker is running', () => {
+			const twoExclusive: TicketCandidate[] = [
+				{ number: 11, title: 't2', labels: ['e2e-exclusive'], model: 'sonnet', blockingCount: 0 },
+				{ number: 12, title: 't3', labels: ['db-migration'], model: 'sonnet', blockingCount: 0 },
+			];
+			const result = allocateBudget(4, false, false, [], twoExclusive);
+			expect(result.tickets.map((t) => t.number)).toEqual([11]);
+			expect(result.soloRunStarted).toBe('e2e-exclusive');
+		});
+
+		// Edge — free slots exhausted by ordinary tickets before reaching a trailing exclusive one:
+		// the exclusive ticket is correctly omitted (the existing slots<=0 check still holds).
+		it('omits a trailing exclusive ticket once free slots are exhausted by ordinary tickets', () => {
+			const result = allocateBudget(1, false, false, [], [...nonExclusiveTickets, ...exclusiveTickets]);
+			expect(result.tickets.map((t) => t.number)).toEqual([10]);
+			expect(result.soloRunStarted).toBeNull();
+		});
+	});
+
 	// Edge
 	it('respects freeSlots of 0', () => {
-		const result = allocateBudget(0, false, nonExclusiveMaintenance, nonExclusiveTickets);
+		const result = allocateBudget(0, false, false, nonExclusiveMaintenance, nonExclusiveTickets);
 		expect(result.maintenance).toEqual([]);
 		expect(result.tickets).toEqual([]);
 	});
 
 	it('returns empty results when there are no candidates', () => {
-		const result = allocateBudget(4, false, [], []);
+		const result = allocateBudget(4, false, false, [], []);
 		expect(result).toEqual({ maintenance: [], tickets: [], soloRunStarted: null });
 	});
 });
@@ -798,6 +872,70 @@ describe('planBatch', () => {
 
 		expect(result.soloRunActive).toBe(true);
 		expect(result.soloRunLabel).toBe('db-migration');
+	});
+
+	// #835 end-to-end: a live non-exclusive worker leaves `soloRunActive` false but `anyWorkerRunning`
+	// true, so an exclusive ready ticket ranked first is omitted while the ordinary tickets behind it
+	// are still returned up to freeSlots — rather than the exclusive ticket hiding them all.
+	it('omits an exclusive ready ticket but still returns ordinary tickets while a non-exclusive worker runs', async () => {
+		const liveNonExclusiveWorker: SwarmWorkerEntry = {
+			kind: 'ticket',
+			issue: 500,
+			pr: null,
+			branch: 'feature/500-ordinary',
+			title: 'Ordinary in-flight work',
+			worktreePath: '/tmp/does-not-matter',
+			agentId: 'agent-ordinary',
+			model: 'sonnet',
+			startedAt: '2026-01-01T00:00:00.000Z',
+		};
+		mockListState.mockResolvedValue({ workers: [liveNonExclusiveWorker], pruned: [] });
+		mockListBranches.mockResolvedValue([]);
+		mockGhJson.mockImplementation((args: string[]) => {
+			// The running worker's issue #500 is non-exclusive — keeps soloRunActive false.
+			if (args[0] === 'issue' && args[1] === 'view' && args[2] === '500')
+				return Promise.resolve({ labels: [{ name: 'sonnet' }] });
+			// closedByPullRequestsReferences lookups for the ready candidates.
+			if (args[0] === 'issue' && args[1] === 'view')
+				return Promise.resolve({ closedByPullRequestsReferences: [] });
+			if (args[0] === 'issue' && args[1] === 'list')
+				return Promise.resolve([
+					{
+						number: 600,
+						title: 'Exclusive ranked first',
+						labels: [{ name: 'ready' }, { name: 'db-migration' }, { name: 'opus' }],
+						blockedBy: { nodes: [] },
+						// Highest blockingCount → ranked first.
+						blocking: { nodes: [{ state: 'OPEN' }, { state: 'OPEN' }] },
+						updatedAt: '2026-01-06T00:00:00Z',
+					},
+					{
+						number: 601,
+						title: 'Ordinary A',
+						labels: [{ name: 'ready' }, { name: 'sonnet' }],
+						blockedBy: { nodes: [] },
+						blocking: { nodes: [{ state: 'OPEN' }] },
+						updatedAt: '2026-01-06T00:00:00Z',
+					},
+					{
+						number: 602,
+						title: 'Ordinary B',
+						labels: [{ name: 'ready' }, { name: 'sonnet' }],
+						blockedBy: { nodes: [] },
+						blocking: { nodes: [] },
+						updatedAt: '2026-01-06T00:00:00Z',
+					},
+				]);
+			if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve([]);
+			return Promise.resolve([]);
+		});
+
+		const result = await planBatch(4);
+
+		expect(result.soloRunActive).toBe(false);
+		const numbers = result.ticketsToImplement.map((t) => t.number);
+		expect(numbers).not.toContain(600);
+		expect(numbers).toEqual([601, 602]);
 	});
 
 	// forceRescan clears the per-item caches before planning, so a manual re-check always hits

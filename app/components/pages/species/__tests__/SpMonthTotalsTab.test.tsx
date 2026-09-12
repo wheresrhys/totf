@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import { SpMonthTotalsTab } from '../SpMonthTotalsTab';
 import type { AggregateStatsResult } from '@/app/models/db';
+import { getColumnIndex } from '@/app/__tests__/helpers/table';
 
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchSpeciesPeriodTotals: vi.fn()
@@ -108,6 +109,20 @@ describe('SpMonthTotalsTab', () => {
 		});
 		const marchLink = screen.getByRole('link', { name: 'March 2026' });
 		expect(marchLink.getAttribute('href')).toBe('/species/Robin/2026/3');
+	});
+
+	it('renders a "Busiest session" column between Encounters and Birds', async () => {
+		render(
+			<SpMonthTotalsTab speciesName="Robin" viewedGroupId={1} year={2026} />
+		);
+		await waitFor(() => {
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
+		});
+		const encountersIndex = getColumnIndex('Encounters');
+		const busiestSessionIndex = getColumnIndex('Busiest session');
+		const birdsIndex = getColumnIndex('Birds');
+		expect(busiestSessionIndex).toBe(encountersIndex + 1);
+		expect(busiestSessionIndex).toBe(birdsIndex - 1);
 	});
 
 	describe('empty months toggle', () => {

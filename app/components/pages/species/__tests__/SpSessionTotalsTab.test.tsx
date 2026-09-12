@@ -140,6 +140,18 @@ describe('SpSessionTotalsTab', () => {
 		expect(screen.getByRole('link', { name: '14th March 2026' })).toBeTruthy();
 	});
 
+	it('does not render a "Busiest session" column', async () => {
+		render(
+			<SpSessionTotalsTab speciesName="Robin" viewedGroup={viewedGroup} />
+		);
+		await waitFor(() => {
+			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+		});
+		expect(
+			screen.queryByRole('columnheader', { name: 'Busiest session' })
+		).toBeNull();
+	});
+
 	it("renders the table's empty state when the species has no sessions in range, without crashing", async () => {
 		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
 		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([]);

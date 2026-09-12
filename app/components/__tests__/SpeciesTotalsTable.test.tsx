@@ -46,13 +46,14 @@ describe('SpeciesTotalsTable', () => {
 	});
 
 	describe('column headings', () => {
-		it('renders eleven column headers in the expected order', () => {
+		it('renders twelve column headers in the expected order', () => {
 			render(<SpeciesTotalsTable speciesStats={speciesStats} />);
 			const headers = getColumnHeaders();
 			expect(headers.map((header) => header.textContent)).toEqual([
 				'Species',
 				'Sessions',
 				'Encounters',
+				'Busiest session',
 				'Individuals',
 				'New',
 				'Retrap',
@@ -66,7 +67,7 @@ describe('SpeciesTotalsTable', () => {
 	});
 
 	describe('rows', () => {
-		it('renders one row per species with all eleven columns in the correct order', () => {
+		it('renders one row per species with all twelve columns in the correct order', () => {
 			render(<SpeciesTotalsTable speciesStats={speciesStats} />);
 			const rows = document.querySelectorAll('tbody tr');
 			expect(rows.length).toBe(speciesStats.length);
@@ -79,6 +80,7 @@ describe('SpeciesTotalsTable', () => {
 				firstStat.species_name,
 				String(firstStat.session_count),
 				String(firstStat.encounter_count),
+				String(firstStat.max_per_session),
 				String(firstStat.bird_count),
 				String(firstStat.new_bird_count),
 				String(firstStat.bird_count - firstStat.new_bird_count),
@@ -291,6 +293,7 @@ describe('SpeciesTotalsTable', () => {
 				species_name: 'Robin',
 				session_count: 3,
 				encounter_count: 5,
+				max_per_session: 3,
 				bird_count: 4,
 				new_bird_count: 3,
 				pullus_bird_count: 1,
@@ -303,6 +306,7 @@ describe('SpeciesTotalsTable', () => {
 				species_name: 'Wren',
 				session_count: 2,
 				encounter_count: 7,
+				max_per_session: 4,
 				bird_count: 6,
 				new_bird_count: 4,
 				pullus_bird_count: 0,
@@ -316,6 +320,7 @@ describe('SpeciesTotalsTable', () => {
 			species_name: 'All species',
 			session_count: 4,
 			encounter_count: 12,
+			max_per_session: 4,
 			bird_count: 10,
 			new_bird_count: 7,
 			pullus_bird_count: 1,
@@ -336,6 +341,7 @@ describe('SpeciesTotalsTable', () => {
 					'Total',
 					String(totalsStats.session_count),
 					String(totalsStats.encounter_count),
+					String(totalsStats.max_per_session),
 					String(totalsStats.bird_count),
 					String(totalsStats.new_bird_count),
 					String(totalsStats.bird_count - totalsStats.new_bird_count),

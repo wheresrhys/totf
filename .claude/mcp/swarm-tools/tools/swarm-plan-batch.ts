@@ -162,13 +162,21 @@ export interface AllocationResult {
 
 /**
  * Sequential allocator implementing swarm's solo-run rule: an exclusive-resource-labelled item
- * can only be picked if nothing else has been picked yet this pass, and once picked, nothing
- * else is picked this pass either. Maintenance is allocated before tickets. Assumes candidates
- * are pre-ranked and pre-filtered for eligibility (unblocked, not in-flight, etc).
+ * can only be picked if nothing else has been picked yet this pass AND no worker of any kind is
+ * currently running (an exclusive item must run completely solo — see `/swarm`), and once picked,
+ * nothing else is picked this pass either. Maintenance is allocated before tickets. Assumes
+ * candidates are pre-ranked and pre-filtered for eligibility (unblocked, not in-flight, etc).
+ *
+ * `soloRunAlreadyActive` (an *exclusive* worker is already running) blocks the whole pass — nothing
+ * can be picked until it finishes alone. `anyWorkerRunning` (a worker of *any* kind is running)
+ * only blocks *exclusive* candidates: an exclusive item ranked first must be skipped past — via
+ * `continue`, so every remaining non-exclusive candidate still gets evaluated and can fill the rest
+ * of `freeSlots` — rather than picked (which would break the pass and hide those candidates, #835).
  */
 export function allocateBudget(
 	freeSlots: number,
 	soloRunAlreadyActive: boolean,
+	anyWorkerRunning: boolean,
 	rankedMaintenance: MaintenanceCandidate[],
 	rankedTickets: TicketCandidate[]
 ): AllocationResult {
@@ -183,7 +191,7 @@ export function allocateBudget(
 		for (const pr of rankedMaintenance) {
 			if (slots <= 0) break;
 			const exclusiveLabel = getExclusiveLabel(pr.labels);
-			if (exclusiveLabel && anyPickedThisPass) continue;
+			if (exclusiveLabel && (anyPickedThisPass || anyWorkerRunning)) continue;
 			maintenance.push(pr);
 			slots--;
 			anyPickedThisPass = true;
@@ -199,7 +207,7 @@ export function allocateBudget(
 		for (const ticket of rankedTickets) {
 			if (slots <= 0) break;
 			const exclusiveLabel = getExclusiveLabel(ticket.labels);
-			if (exclusiveLabel && anyPickedThisPass) continue;
+			if (exclusiveLabel && (anyPickedThisPass || anyWorkerRunning)) continue;
 			tickets.push(ticket);
 			slots--;
 			anyPickedThisPass = true;
@@ -474,7 +482,14 @@ export async function planBatch(freeSlots: number, forceRescan = false) {
 	const rankedMaintenance = rankMaintenanceCandidates(maintenanceCandidates);
 	const rankedTickets = rankTicketCandidates(ticketCandidates);
 
-	const allocation = allocateBudget(freeSlots, soloRunActive, rankedMaintenance, rankedTickets);
+	// An exclusive-resource candidate can only be picked when *nothing else is running at all* —
+	// not merely when no exclusive worker is running (#835). `soloRunActive` still blocks the whole
+	// pass (an exclusive worker must finish solo); `anyWorkerRunning` additionally keeps a new
+	// exclusive candidate from being picked while ordinary workers are live, without hiding the
+	// ordinary candidates that should still fill the free slots.
+	const anyWorkerRunning = runningEntries.length > 0;
+
+	const allocation = allocateBudget(freeSlots, soloRunActive, anyWorkerRunning, rankedMaintenance, rankedTickets);
 
 	const prsNeedingMaintenance = await Promise.all(
 		allocation.maintenance.map(async (pr) => {

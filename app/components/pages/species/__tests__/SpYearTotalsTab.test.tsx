@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SpYearTotalsTab } from '../SpYearTotalsTab';
 import type { AggregateStatsResult } from '@/app/models/db';
+import { getColumnIndex } from '@/app/__tests__/helpers/table';
 
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchSpeciesPeriodTotals: vi.fn()
@@ -85,6 +86,18 @@ describe('SpYearTotalsTab', () => {
 		const link2026 = screen.getByRole('link', { name: '2026' });
 		expect(link2025.getAttribute('href')).toBe('/species/Robin/2025');
 		expect(link2026.getAttribute('href')).toBe('/species/Robin/2026');
+	});
+
+	it('renders a "Busiest session" column between Encounters and Birds', async () => {
+		render(<SpYearTotalsTab speciesName="Robin" viewedGroupId={1} />);
+		await waitFor(() => {
+			expect(document.querySelectorAll('tbody tr').length).toBe(2);
+		});
+		const encountersIndex = getColumnIndex('Encounters');
+		const busiestSessionIndex = getColumnIndex('Busiest session');
+		const birdsIndex = getColumnIndex('Birds');
+		expect(busiestSessionIndex).toBe(encountersIndex + 1);
+		expect(busiestSessionIndex).toBe(birdsIndex - 1);
 	});
 
 	it('shows the period table empty state when no years are returned', async () => {

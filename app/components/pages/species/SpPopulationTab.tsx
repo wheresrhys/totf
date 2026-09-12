@@ -14,12 +14,14 @@ import type {
 import {
 	getCounts,
 	getAgeSplit,
-	getYoungTrends
+	getYoungCounts,
+	getNewYoungCounts
 } from '@/app/components/pages/species/StatsHistoryChart';
 import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
 import { ChartTile } from '@/app/components/pages/species/ChartTile';
 
-// Explicit paired colours for the Age split and Young trends tiles, passed via
+// Explicit paired colours for the Age split, Young counts and New young counts
+// tiles, passed via
 // YearComparisonTrendChart's `colors` override prop. The chart's default
 // per-metric palette cycles one arbitrary colour per series index with no
 // concept of pairing, so a related pair (e.g. "New adults"/"New young", both new
@@ -41,22 +43,25 @@ export const AGE_SPLIT_COLORS = [
 	AGE_SPLIT_HUES.new.light // New young
 ];
 
-// Young trends: three hues, one per (raw, "new") pair — (Juv, New juv),
-// (Postjuv, New postjuv), (Young, New young) — each a dark + light shade.
-export const YOUNG_TRENDS_HUES = {
+// Young counts / New young counts: two hues (juv, postjuv), split across the
+// two tiles by shade instead of by pair within one tile — #839 split the old
+// single "Young trends" tile (six series, including two client-side sums) into
+// "Young counts" (raw, dark shades) and "New young counts" (first-encounter
+// only, light shades), dropping the "young" combined hue since nothing sums
+// the two series any more.
+export const YOUNG_COUNTS_HUES = {
 	juv: { dark: '#0f7a14', light: '#8fd08f' },
-	postjuv: { dark: '#7a077a', light: '#d08fd0' },
-	young: { dark: '#c77a00', light: '#f0c88f' }
+	postjuv: { dark: '#7a077a', light: '#d08fd0' }
 };
-// Series order (matches getYoungTrends): Juv, New juv, Postjuv, New postjuv,
-// Young, New young.
-export const YOUNG_TRENDS_COLORS = [
-	YOUNG_TRENDS_HUES.juv.dark, // Juv
-	YOUNG_TRENDS_HUES.juv.light, // New juv
-	YOUNG_TRENDS_HUES.postjuv.dark, // Postjuv
-	YOUNG_TRENDS_HUES.postjuv.light, // New postjuv
-	YOUNG_TRENDS_HUES.young.dark, // Young
-	YOUNG_TRENDS_HUES.young.light // New young
+// Series order (matches getYoungCounts): Juv, Postjuv.
+export const YOUNG_COUNTS_COLORS = [
+	YOUNG_COUNTS_HUES.juv.dark, // Juv
+	YOUNG_COUNTS_HUES.postjuv.dark // Postjuv
+];
+// Series order (matches getNewYoungCounts): New juv, New postjuv.
+export const NEW_YOUNG_COUNTS_COLORS = [
+	YOUNG_COUNTS_HUES.juv.light, // New juv
+	YOUNG_COUNTS_HUES.postjuv.light // New postjuv
 ];
 
 function Spinner() {
@@ -76,12 +81,13 @@ function Spinner() {
 //
 // Two memoised species-scoped fetches back the tiles, each fired at most once
 // regardless of how often tiles expand/collapse: the Counts tile reads
-// `aggregate_stats` (`getSpeciesStatsHistory`), while the Age split and Young
-// trends tiles share the companion `population_stats` fetch
-// (`getSpeciesPopulationStats`) — #800 split the age-split/young-trends
+// `aggregate_stats` (`getSpeciesStatsHistory`), while the Age split, Young
+// counts and New young counts tiles share the companion `population_stats`
+// fetch (`getSpeciesPopulationStats`) — #800 split the age-split/young-trends
 // derivations into that separate RPC rather than folding them into
-// `aggregate_stats`. A third fetch loads the group-wide effort history once
-// (same pattern as SpBiometricsTab) so every tile's chart can offer the
+// `aggregate_stats`; #839 split the original single Young trends tile into
+// Young counts / New young counts. A third fetch loads the group-wide effort
+// history once (same pattern as SpBiometricsTab) so every tile's chart can offer the
 // Normalize toggle. The biometrics-related tiles (wing/weight trend,
 // wing-vs-weight scatter) live on the "Biometrics" tab (SpBiometricsTab.tsx).
 export function SpPopulationTab({
@@ -198,8 +204,8 @@ export function SpPopulationTab({
 				)
 		},
 		{
-			id: 'young-trends',
-			heading: 'Young trends',
+			id: 'young-counts',
+			heading: 'Young counts',
 			description: 'Juv and postjuv encounter counts over time',
 			load: () => {
 				loadPopulationStats();
@@ -208,15 +214,36 @@ export function SpPopulationTab({
 			renderChart: () =>
 				populationStats ? (
 					<YearComparisonTrendChart
-						series={getYoungTrends(populationStats)}
-						colors={YOUNG_TRENDS_COLORS}
+						series={getYoungCounts(populationStats)}
+						colors={YOUNG_COUNTS_COLORS}
 						yearlyAggregators={{
 							Juv: 'sum',
+							Postjuv: 'sum'
+						}}
+						effortHistory={effortHistory ?? undefined}
+						compareYearsUrl={compareYearsUrl}
+					/>
+				) : (
+					<Spinner />
+				)
+		},
+		{
+			id: 'new-young-counts',
+			heading: 'New young counts',
+			description:
+				'New juv and new postjuv encounter counts over time (first encounters only)',
+			load: () => {
+				loadPopulationStats();
+				loadEffortHistory();
+			},
+			renderChart: () =>
+				populationStats ? (
+					<YearComparisonTrendChart
+						series={getNewYoungCounts(populationStats)}
+						colors={NEW_YOUNG_COUNTS_COLORS}
+						yearlyAggregators={{
 							'New juv': 'sum',
-							Postjuv: 'sum',
-							'New postjuv': 'sum',
-							Young: 'sum',
-							'New young': 'sum'
+							'New postjuv': 'sum'
 						}}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}

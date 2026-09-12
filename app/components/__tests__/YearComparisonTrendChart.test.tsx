@@ -8,6 +8,8 @@ import {
 	thisYearColors,
 	normalizeSeriesByEffort,
 	aggregateSeriesByYear,
+	spansMultipleYears,
+	isHiddenFromLegend,
 	YearComparisonTrendChart
 } from '../YearComparisonTrendChart';
 
@@ -15,27 +17,46 @@ import {
 // no real canvas renders. The mock surfaces its `data`/`xtitle`/`ytitle`/`colors`
 // props so tests can assert what each chart was handed.
 vi.mock('chartkick/chart.js', () => ({}));
+type LegendLabelsFilter = (legendItem: { text: string }) => boolean;
+
 vi.mock('react-chartkick', () => ({
 	LineChart: ({
 		data,
 		xtitle,
 		ytitle,
-		colors
+		colors,
+		library
 	}: {
 		data: LineChartData[];
 		xtitle: string;
 		ytitle: string;
 		colors?: string[];
-	}) => (
-		<div
-			data-testid="line-chart"
-			data-xtitle={xtitle}
-			data-ytitle={ytitle}
-			data-colors={JSON.stringify(colors)}
-			data-series={JSON.stringify(data.map((series) => series.name))}
-			data-values={JSON.stringify(data.map((series) => series.data))}
-		/>
-	)
+		library?: {
+			plugins?: { legend?: { labels?: { filter?: LegendLabelsFilter } } };
+		};
+	}) => {
+		// The legend filter function isn't JSON-serializable, so surface its
+		// verdict on each series' own name instead — lets a test assert the
+		// wiring end-to-end (component -> library option -> filter result)
+		// without reaching into react-chartkick/Chart.js internals.
+		const legendFilter = library?.plugins?.legend?.labels?.filter;
+		const visibleInLegend = legendFilter
+			? data
+					.map((series) => series.name)
+					.filter((name) => legendFilter({ text: name }))
+			: null;
+		return (
+			<div
+				data-testid="line-chart"
+				data-xtitle={xtitle}
+				data-ytitle={ytitle}
+				data-colors={JSON.stringify(colors)}
+				data-series={JSON.stringify(data.map((series) => series.name))}
+				data-values={JSON.stringify(data.map((series) => series.data))}
+				data-visible-in-legend={JSON.stringify(visibleInLegend)}
+			/>
+		);
+	}
 }));
 
 const MONTHS = [
@@ -479,6 +500,95 @@ describe('aggregateSeriesByYear', () => {
 	});
 });
 
+describe('spansMultipleYears', () => {
+	describe('Usual: dates crossing a calendar-year boundary', () => {
+		it('returns true when one metric has dates in two different years', () => {
+			const series: LineChartData[] = [
+				{
+					name: 'encounters',
+					data: [
+						['2023-03-01', 5],
+						['2024-03-01', 7]
+					]
+				}
+			];
+			expect(spansMultipleYears(series)).toBe(true);
+		});
+	});
+
+	describe('Structure: single-year data', () => {
+		it('returns false when every metric only has dates in one calendar year', () => {
+			const series: LineChartData[] = [
+				{
+					name: 'encounters',
+					data: [
+						['2024-01-01', 5],
+						['2024-06-01', 7]
+					]
+				},
+				{
+					name: 'birds',
+					data: [['2024-03-01', 2]]
+				}
+			];
+			expect(spansMultipleYears(series)).toBe(false);
+		});
+
+		it('returns true when the year boundary only shows up across different metrics', () => {
+			const series: LineChartData[] = [
+				{ name: 'encounters', data: [['2023-06-01', 5]] },
+				{ name: 'birds', data: [['2024-06-01', 2]] }
+			];
+			expect(spansMultipleYears(series)).toBe(true);
+		});
+	});
+
+	describe('Edge: empty input', () => {
+		it('returns false for no metrics', () => {
+			expect(spansMultipleYears([])).toBe(false);
+		});
+
+		it('returns false for a metric with no data points', () => {
+			expect(spansMultipleYears([{ name: 'encounters', data: [] }])).toBe(
+				false
+			);
+		});
+
+		it('returns false for a single date, regardless of its value', () => {
+			const series: LineChartData[] = [
+				{ name: 'encounters', data: [['2024-06-01', 0]] }
+			];
+			expect(spansMultipleYears(series)).toBe(false);
+		});
+	});
+});
+
+describe('isHiddenFromLegend', () => {
+	describe('Structure: one check per hidden series name', () => {
+		it('hides "Previous max"', () => {
+			expect(isHiddenFromLegend('Previous max')).toBe(true);
+		});
+
+		it('hides "Previous min"', () => {
+			expect(isHiddenFromLegend('Previous min')).toBe(true);
+		});
+	});
+
+	describe('Usual: every other series name stays visible', () => {
+		it('keeps "Previous median" visible', () => {
+			expect(isHiddenFromLegend('Previous median')).toBe(false);
+		});
+
+		it('keeps a current-year series (named by year) visible', () => {
+			expect(isHiddenFromLegend('2025')).toBe(false);
+		});
+
+		it('keeps an all-time metric name visible', () => {
+			expect(isHiddenFromLegend('encounters')).toBe(false);
+		});
+	});
+});
+
 describe('YearComparisonTrendChart', () => {
 	afterEach(cleanup);
 
@@ -588,12 +698,15 @@ describe('YearComparisonTrendChart', () => {
 	});
 
 	describe('Structure: all-time Interval toggle', () => {
-		// One metric spanning two months in a single year, so a year-aggregate
-		// differs from either monthly value and the aggregator is observable.
+		// Two calendar years (so the Interval toggle is actually shown — see the
+		// "single calendar year" edge case below), with one metric spanning two
+		// months in the later year, so a year-aggregate differs from either
+		// monthly value and the aggregator is observable.
 		const multiMonth: LineChartData[] = [
 			{
 				name: 'max weight',
 				data: [
+					['2023-04-01', 5],
 					['2024-03-01', 10],
 					['2024-06-01', 30]
 				]
@@ -601,6 +714,7 @@ describe('YearComparisonTrendChart', () => {
 			{
 				name: 'encounters',
 				data: [
+					['2023-04-01', 2],
 					['2024-03-01', 4],
 					['2024-06-01', 6]
 				]
@@ -634,10 +748,17 @@ describe('YearComparisonTrendChart', () => {
 			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
 			const [chart] = screen.getAllByTestId('line-chart');
 			const [maxWeight, encounters] = JSON.parse(chart.dataset.values!);
-			// 'max weight' aggregates via max → 30; 'encounters' has no mapping so
-			// defaults to sum → 4 + 6 = 10.
-			expect(maxWeight).toEqual([['2024', 30]]);
-			expect(encounters).toEqual([['2024', 10]]);
+			// 'max weight' aggregates via max → 5 for 2023, 30 for 2024;
+			// 'encounters' has no mapping so defaults to sum → 2 for 2023, 4 + 6 =
+			// 10 for 2024.
+			expect(maxWeight).toEqual([
+				['2023', 5],
+				['2024', 30]
+			]);
+			expect(encounters).toEqual([
+				['2023', 2],
+				['2024', 10]
+			]);
 		});
 
 		it('defaults a metric absent from yearlyAggregators to sum', () => {
@@ -647,7 +768,10 @@ describe('YearComparisonTrendChart', () => {
 			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
 			const [chart] = screen.getAllByTestId('line-chart');
 			const [maxWeight] = JSON.parse(chart.dataset.values!);
-			expect(maxWeight).toEqual([['2024', 40]]);
+			expect(maxWeight).toEqual([
+				['2023', 5],
+				['2024', 40]
+			]);
 		});
 
 		it('restores the exact per-month series when toggled Year → Month', () => {
@@ -685,8 +809,37 @@ describe('YearComparisonTrendChart', () => {
 			fireEvent.click(screen.getAllByRole('radio', { name: 'Year' })[0]);
 			const [first, second] = screen.getAllByTestId('line-chart');
 			// First is now yearly (one point per year), second stays per-month.
-			expect(JSON.parse(first.dataset.values!)[0]).toEqual([['2024', 30]]);
+			expect(JSON.parse(first.dataset.values!)[0]).toEqual([
+				['2023', 5],
+				['2024', 30]
+			]);
 			expect(JSON.parse(second.dataset.values!)[0]).toEqual(multiMonth[0].data);
+		});
+
+		describe('Edge: data confined to a single calendar year', () => {
+			const singleYear: LineChartData[] = [
+				{
+					name: 'encounters',
+					data: [
+						['2024-03-01', 4],
+						['2024-06-01', 6]
+					]
+				}
+			];
+
+			it('never renders the Interval toggle in all-time mode', () => {
+				render(<YearComparisonTrendChart series={singleYear} />);
+				expect(screen.queryByText('Interval')).toBeNull();
+				expect(screen.queryByRole('radio', { name: 'Year' })).toBeNull();
+				expect(screen.queryByRole('radio', { name: 'Month' })).toBeNull();
+			});
+
+			it('still renders the mode switcher and the all-time chart as usual', () => {
+				render(<YearComparisonTrendChart series={singleYear} />);
+				expect(screen.getByRole('radio', { name: 'All time' })).toBeTruthy();
+				const [chart] = screen.getAllByTestId('line-chart');
+				expect(chart.dataset.xtitle).toBe('Year');
+			});
 		});
 	});
 
@@ -711,6 +864,27 @@ describe('YearComparisonTrendChart', () => {
 			for (const chart of charts) {
 				expect(JSON.parse(chart.dataset.series!)).toContain('Previous median');
 			}
+		});
+
+		it('keeps the Previous max/min band series in the data but hides them from the legend', () => {
+			render(<YearComparisonTrendChart series={series} />);
+			fireEvent.click(screen.getByRole('radio', { name: 'This year' }));
+			const [chart] = screen.getAllByTestId('line-chart');
+			const currentYearLabel = String(new Date().getFullYear());
+			// The band data itself is still drawn (Previous max/min are present in
+			// `series`)...
+			expect(JSON.parse(chart.dataset.series!)).toEqual([
+				'Previous max',
+				'Previous min',
+				'Previous median',
+				currentYearLabel
+			]);
+			// ...but the chart's legend filter drops them, leaving only the median
+			// and current-year lines as legend entries.
+			expect(JSON.parse(chart.dataset.visibleInLegend!)).toEqual([
+				'Previous median',
+				currentYearLabel
+			]);
 		});
 	});
 
@@ -769,6 +943,33 @@ describe('YearComparisonTrendChart', () => {
 			const charts = screen.getAllByTestId('line-chart');
 			expect(charts).toHaveLength(1);
 			expect(charts[0].dataset.xtitle).toBe('Year');
+		});
+
+		it('styles the Compare years link as a small text link, not a button', () => {
+			render(
+				<YearComparisonTrendChart series={series} compareYearsUrl="/compare" />
+			);
+			const link = screen.getByRole('link', { name: 'Compare years' });
+			expect(link.className).toContain('link');
+			expect(link.className).not.toContain('btn');
+		});
+	});
+
+	describe('Structure: toggle row responsive layout', () => {
+		it('wraps every toggle in one flexbox row that can wrap and vertically centers its items', () => {
+			render(
+				<YearComparisonTrendChart series={series} effortHistory={normEffort} />
+			);
+			const toggleRow = screen.getByText('Normalize').closest('.flex-wrap');
+			expect(toggleRow).not.toBeNull();
+			expect(toggleRow!.className).toContain('items-center');
+			// The mode switcher and the Interval toggle both live in the same
+			// wrapping row as Normalize, so all three toggle groups wrap together
+			// rather than one overflowing past the others on a narrow screen.
+			const allTimeRadio = screen.getByRole('radio', { name: 'All time' });
+			const yearRadio = screen.getByRole('radio', { name: 'Year' });
+			expect(toggleRow!.contains(allTimeRadio)).toBe(true);
+			expect(toggleRow!.contains(yearRadio)).toBe(true);
 		});
 	});
 
