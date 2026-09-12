@@ -126,7 +126,6 @@ describe('public_aggregate_stats', () => {
 				scheme: 'BTO',
 				sex: 'M',
 				age_code: 4,
-				weight: 15,
 				record_type: recordType,
 				capture_time: captureTime
 			});
