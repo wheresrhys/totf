@@ -388,6 +388,16 @@ describe('SpPopulationTab', () => {
 			expect(chart.dataset.colors).toBe('null');
 		});
 
+		it('passes the Returning vs new colours on the Returning vs new tile', async () => {
+			render(<SpPopulationTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Returning vs new/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(JSON.parse(chart.dataset.colors!)).toEqual(
+				RETURNING_VS_NEW_COLORS
+			);
+			expect(chart.dataset.seriesCount).toBe('3');
+		});
+
 		it('passes the paired Age split colours on the Age split tile', async () => {
 			render(<SpPopulationTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Age split/ }));
