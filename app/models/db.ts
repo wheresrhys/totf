@@ -46,13 +46,21 @@ export type PopulationStatsResult = {
 	>;
 };
 
-// biometrics_stats is aggregate_stats' companion RPC (#822) carrying the
+// biometrics_stats is aggregate_stats' companion RPC (#822/#823), carrying the 8
 // wing/weight summary statistics (max/avg/min/median for both) in its own
-// biometrics_stats_result composite type. Same null-stripping rationale as
-// AggregateStatsResult/PopulationStatsResult above.
-export type BiometricsStatsResult = {
-	[K in keyof Database['public']['CompositeTypes']['biometrics_stats_result']]-?: NonNullable<
-		Database['public']['CompositeTypes']['biometrics_stats_result'][K]
+// biometrics_stats_result composite type. Unlike AggregateStatsResult above, the
+// metric columns here are deliberately NOT stripped of null — MAX/AVG/MIN/
+// PERCENTILE_CONT over an empty set genuinely returns NULL (the RPC applies no
+// COALESCE, see biometrics_stats.sql), so a real "no biometric-eligible
+// encounters for this species/period" cell must stay nullable. Only species_name
+// is stripped non-null, since every caller today calls the RPC with
+// group_by_species: true.
+export type BiometricsStatsResult = Omit<
+	Database['public']['CompositeTypes']['biometrics_stats_result'],
+	'species_name'
+> & {
+	species_name: NonNullable<
+		Database['public']['CompositeTypes']['biometrics_stats_result']['species_name']
 	>;
 };
 

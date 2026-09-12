@@ -6,7 +6,7 @@ import {
 	deriveSpeciesTotalsRowByEncounter,
 	type SpeciesTotalsRow
 } from '@/app/models/species-totals';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { SpeciesStatsRow } from '@/app/models/species-stats';
 import {
 	type ColumnConfig,
 	SortableTable,
@@ -75,7 +75,7 @@ function toRowModel(row: SpeciesTotalsRow): RowModel {
 // `SpeciesTotalsRow` shape.
 function deriveRow(
 	aggregateBy: AggregateByValue
-): (stat: AggregateStatsResult) => SpeciesTotalsRow {
+): (stat: SpeciesStatsRow) => SpeciesTotalsRow {
 	return aggregateBy === 'bird'
 		? deriveSpeciesTotalsRow
 		: deriveSpeciesTotalsRowByEncounter;
@@ -111,8 +111,8 @@ export function SpeciesTotalsTable({
 	totalsStats,
 	period
 }: {
-	speciesStats: AggregateStatsResult[];
-	totalsStats?: AggregateStatsResult;
+	speciesStats: SpeciesStatsRow[];
+	totalsStats?: SpeciesStatsRow;
 	// The summary page this table is rendered on, if any is period-scoped —
 	// see `buildSpeciesHref` above. Undefined on the all-time page.
 	period?: SpeciesPeriod;
@@ -129,7 +129,7 @@ export function SpeciesTotalsTable({
 	// Recreated each render since `period` is a prop, not static — the cell
 	// itself is stateless, so this only costs identity, not behaviour (same
 	// approach as `PeriodTotalsTable`'s `PeriodLabelCell`).
-	const SpeciesNameCell = createNameLinkCell<AggregateStatsResult, RowModel>(
+	const SpeciesNameCell = createNameLinkCell<SpeciesStatsRow, RowModel>(
 		(model) => model.speciesName,
 		(model) => buildSpeciesHref(model.speciesName, period)
 	);
@@ -138,7 +138,7 @@ export function SpeciesTotalsTable({
 		data,
 		columnConfigs
 	}: {
-		data: RowModelWithRawData<AggregateStatsResult, RowModel>[];
+		data: RowModelWithRawData<SpeciesStatsRow, RowModel>[];
 		columnConfigs?: Partial<Record<keyof RowModel, ColumnConfig>>;
 	}) {
 		const orderedColumnProperties = Object.keys(columnConfigs ?? {}).filter(
@@ -167,7 +167,7 @@ export function SpeciesTotalsTable({
 	}
 
 	const activeDeriveRow = deriveRow(aggregateBy);
-	const rowDataTransform = (stat: AggregateStatsResult) =>
+	const rowDataTransform = (stat: SpeciesStatsRow) =>
 		toRowModel(activeDeriveRow(stat));
 	const hasPulli = speciesStats.some(
 		(stat) => activeDeriveRow(stat).pullusCount > 0
@@ -186,7 +186,7 @@ export function SpeciesTotalsTable({
 			<div data-test-id="above-header-row" className="m-2 flex gap-4">
 				<AggregateByToggle value={aggregateBy} onChange={setAggregateBy} />
 			</div>
-			<SortableTable<AggregateStatsResult, RowModel>
+			<SortableTable<SpeciesStatsRow, RowModel>
 				columnConfigs={columnConfigs}
 				data={speciesStats}
 				testId="species-totals-table"

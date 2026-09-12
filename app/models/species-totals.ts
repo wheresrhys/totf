@@ -1,4 +1,4 @@
-import type { AggregateStatsResult } from './db';
+import type { SpeciesStatsRow } from './species-stats';
 
 export type SpeciesTotalsRow = {
 	speciesName: string;
@@ -16,7 +16,7 @@ export type SpeciesTotalsRow = {
 };
 
 /** Every bird in the period has ≥1 'N' encounter or none — an exhaustive partition. */
-export function calculateRetraps(stat: AggregateStatsResult): number {
+export function calculateRetraps(stat: SpeciesStatsRow): number {
 	return stat.bird_count - stat.new_bird_count;
 }
 
@@ -26,12 +26,12 @@ export function calculateRetraps(stat: AggregateStatsResult): number {
  * identical by construction — there's no separate `new_enc_count` to
  * subtract, so this reuses `new_bird_count` directly.
  */
-export function calculateEncounterRetraps(stat: AggregateStatsResult): number {
+export function calculateEncounterRetraps(stat: SpeciesStatsRow): number {
 	return stat.encounter_count - stat.new_bird_count;
 }
 
 export function deriveSpeciesTotalsRow(
-	stat: AggregateStatsResult
+	stat: SpeciesStatsRow
 ): SpeciesTotalsRow {
 	return {
 		speciesName: stat.species_name,
@@ -57,7 +57,7 @@ export function deriveSpeciesTotalsRow(
  * bird-based count by construction (see #601).
  */
 export function deriveSpeciesTotalsRowByEncounter(
-	stat: AggregateStatsResult
+	stat: SpeciesStatsRow
 ): SpeciesTotalsRow {
 	return {
 		speciesName: stat.species_name,
