@@ -8,6 +8,15 @@ CREATE FUNCTION public.aggregate_stats (
 ) RETURNS SETOF public.aggregate_stats_result LANGUAGE plpgsql AS $function$
   BEGIN
   RETURN QUERY
+  -- The final projection below is wrapped in jsonb_populate_record rather than
+  -- returned as a bare positional SELECT, so it binds to aggregate_stats_result's
+  -- columns by NAME instead of ordinal attribute position — see CLAUDE.md's
+  -- "Composite-type RETURN QUERY binds by position, not name" section for why
+  -- (confirmed empirically while building population_stats: two db:schema:apply
+  -- runs on identical schema files produced two different physical attribute
+  -- orders for the same composite type).
+  SELECT (jsonb_populate_record(NULL::public.aggregate_stats_result, to_jsonb(agg))).*
+  FROM (
   -- Base windowed row source and grouping-cell spine, delegated to the shared
   -- stats_raw_encounters / stats_spine utility RPCs (#800) so this logic isn't
   -- duplicated between aggregate_stats and population_stats. Each utility RPC is
@@ -56,13 +65,7 @@ CREATE FUNCTION public.aggregate_stats (
       COUNT(*) FILTER (WHERE bab.age_bucket = 'juv') AS juv_count,
       COUNT(*) FILTER (WHERE bab.age_bucket = 'postjuv') AS postjuv_count,
       COUNT(*) FILTER (WHERE bab.age_bucket = 'adult') AS adult_count,
-      COUNT(*) FILTER (WHERE bab.age_bucket = 'unknown') AS unknown_age_count,
-      -- New young bird: in a young bucket (pullus/juv/postjuv) AND has any New ('N')
-      -- encounter in the cell. Bucket membership and New membership are checked
-      -- independently — not required to be the same encounter row.
-      COUNT(*) FILTER (
-        WHERE bab.age_bucket IN ('pullus', 'juv', 'postjuv') AND bab.has_new
-      ) AS new_young_count
+      COUNT(*) FILTER (WHERE bab.age_bucket = 'unknown') AS unknown_age_count
     FROM bird_age_bucket bab
     GROUP BY bab.species_id, bab.time_period
   ),
@@ -209,7 +212,6 @@ CREATE FUNCTION public.aggregate_stats (
     COALESCE(abc.postjuv_count, 0) AS "postjuv_bird_count",
     COALESCE(abc.adult_count, 0) AS "adult_bird_count",
     COALESCE(abc.unknown_age_count, 0) AS "unknown_age_bird_count",
-    COALESCE(abc.new_young_count, 0) AS "new_young_bird_count",
 
     -- Per-encounter age buckets (see encounter_age_classification above). No new_enc_count /
     -- new_young_enc_count: record_type 'N' occurs at most once per bird, so the New (and
@@ -304,9 +306,10 @@ CREATE FUNCTION public.aggregate_stats (
   END, agg_sta.max_encounter_count, agg_sess.max_per_session,
   -- agg_sta.max_proven_age, agg_sta.max_time_span_days,
   agg_sess.max_new_per_session, effort.total_effort, effort.effort_per_session, agg_sess.avg_encounters_per_session,
-  abc.pullus_count, abc.juv_count, abc.postjuv_count, abc.adult_count, abc.unknown_age_count, abc.new_young_count,
+  abc.pullus_count, abc.juv_count, abc.postjuv_count, abc.adult_count, abc.unknown_age_count,
   eabc.pullus_enc_count, eabc.juv_enc_count, eabc.postjuv_enc_count, eabc.adult_enc_count, eabc.unknown_age_enc_count
-  ORDER BY species_name ASC, time_period ASC;
+  ) AS agg
+  ORDER BY agg.species_name ASC, agg.time_period ASC;
 
 END;
 $function$;

@@ -179,9 +179,10 @@ needing `stats_spine` + `stats_encounter_age_classification` + `stats_bird_age_b
 base tables a small constant number of times rather than once — accepted as a reasonable tradeoff at
 this app's data scale; keep an eye on it if a future RPC stacks many more utility layers. Keep the
 utility RPCs' bucket/precedence definitions in sync **by hand** with `app/models/encounter.ts`'s
-`getAgeClass()` if either changes. `population_stats.new_young_bird_count` is a duplicate of
-`aggregate_stats.new_young_bird_count` (same derivation, kept in both places) —
-`aggregate_stats`' copy is the untouched/authoritative one.
+`getAgeClass()` if either changes. `population_stats.new_young_bird_count` was originally a
+duplicate of a same-named column on `aggregate_stats` (#800); #824 removed `aggregate_stats`'s
+copy (and the corresponding UI series, #817) as unused, so `population_stats` now holds the only
+`new_young_bird_count` column in the schema.
 
 **Composite-type RETURN QUERY binds by position, not name — this bit us.** A `RETURNS SETOF
 <composite type>` function's `RETURN QUERY SELECT ...` binds the SELECT list to the composite
@@ -190,13 +191,12 @@ only as stable as whatever DDL a given environment's `db:schema:apply` run happe
 type — confirmed empirically while building `population_stats`: two schema-diff runs against the
 identical schema files produced two *different* physical attribute orders for a composite type's
 columns (one matching the file's declared order, one alphabetical), silently scrambling values into
-the wrong named output columns with no error either way. `population_stats` (and any RPC whose
-composite return type gains new columns going forward — `aggregate_stats_result` itself is currently
-stable/unchanged, so `aggregate_stats` doesn't currently need this) guards against this by wrapping
-its final projection — `SELECT (jsonb_populate_record(NULL::the_result_type, to_jsonb(agg))).* FROM
-(...) AS agg` — which binds every column by **name** instead, independent of the type's physical
-attribute order. Use this wrapper for any new/future `RETURNS SETOF <composite type>` RPC in this
-codebase, and add it to `aggregate_stats` too if `aggregate_stats_result` ever grows a new column.
+the wrong named output columns with no error either way. `population_stats` and `aggregate_stats`
+(the latter retrofitted in #824, the first time `aggregate_stats_result` changed shape since this
+note was written) guard against this by wrapping their final projection — `SELECT
+(jsonb_populate_record(NULL::the_result_type, to_jsonb(agg))).* FROM (...) AS agg` — which binds
+every column by **name** instead, independent of the type's physical attribute order. Use this
+wrapper for any new/future `RETURNS SETOF <composite type>` RPC in this codebase.
 
 ## Schema files
 

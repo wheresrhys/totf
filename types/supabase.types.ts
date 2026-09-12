@@ -715,7 +715,6 @@ export type Database = {
         postjuv_bird_count: number | null
         adult_bird_count: number | null
         unknown_age_bird_count: number | null
-        new_young_bird_count: number | null
         pullus_enc_count: number | null
         juv_enc_count: number | null
         postjuv_enc_count: number | null
