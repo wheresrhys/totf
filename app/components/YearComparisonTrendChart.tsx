@@ -82,12 +82,42 @@ function hasReportableValue(value: number | null): value is number {
 	return value != null && value !== 0;
 }
 
+// Whether `series`' underlying dates cross more than one calendar year — used
+// to decide whether the all-time "Interval" toggle (Month vs Year) is even
+// meaningful. A single-year chart has nothing to collapse a Year view down
+// from, so the toggle would just be a confusing no-op. Reads raw dates (not
+// gated by `hasReportableValue`) since this is about the span of the
+// underlying data, not which months have reportable values within it.
+export function spansMultipleYears(series: LineChartData[]): boolean {
+	const years = new Set<number>();
+	for (const metric of series) {
+		for (const [rawDate] of metric.data) {
+			years.add(new Date(rawDate).getUTCFullYear());
+			if (years.size > 1) return true;
+		}
+	}
+	return false;
+}
+
 function median(values: number[]): number {
 	const sorted = [...values].sort((a, b) => a - b);
 	const middle = Math.floor(sorted.length / 2);
 	return sorted.length % 2 === 0
 		? (sorted[middle - 1] + sorted[middle]) / 2
 		: sorted[middle];
+}
+
+// The "this-year" view's min/max band (see `toThisYearSeries`) is drawn from
+// two series named 'Previous max'/'Previous min' purely to shade the band
+// between them — they aren't meaningful legend entries on their own (the band
+// they draw is already implied by the shaded area, and the median/current-year
+// lines are the series worth labelling). These names never occur in the
+// all-time or compare-years series, so filtering them out of the legend here
+// is safe across every mode without needing a per-mode library override.
+const HIDDEN_LEGEND_SERIES_NAMES = new Set(['Previous max', 'Previous min']);
+
+export function isHiddenFromLegend(seriesName: string): boolean {
+	return HIDDEN_LEGEND_SERIES_NAMES.has(seriesName);
 }
 
 // Shared chartkick config for every trend line — small points, smoothed lines.
@@ -97,6 +127,14 @@ const TREND_CHART_LIBRARY = {
 	elements: {
 		point: { radius: 1 },
 		line: { cubicInterpolationMode: 'monotone' }
+	},
+	plugins: {
+		legend: {
+			labels: {
+				filter: (legendItem: { text: string }) =>
+					!isHiddenFromLegend(legendItem.text)
+			}
+		}
 	}
 };
 
@@ -472,11 +510,12 @@ export function YearComparisonTrendChart({
 					)
 				)
 			: effectiveSeries;
+	const showIntervalToggle = mode === 'all-time' && spansMultipleYears(series);
 	return (
 		<div className="flex flex-col">
-			<div className="mb-2 flex justify-end gap-2">
+			<div className="mb-2 flex flex-wrap items-center justify-end gap-2">
 				{compareYearsUrl ? (
-					<Link href={compareYearsUrl} className="btn btn-sm btn-text">
+					<Link href={compareYearsUrl} className="link link-secondary text-sm">
 						Compare years
 					</Link>
 				) : (
@@ -500,7 +539,7 @@ export function YearComparisonTrendChart({
 						))}
 					</div>
 				)}
-				{mode === 'all-time' ? (
+				{showIntervalToggle ? (
 					<div className="flex items-center gap-1">
 						<span className="text-sm">Interval</span>
 						<div className="border-base-content/20 flex gap-0.5 rounded-field border p-0.5">
