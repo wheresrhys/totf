@@ -37,7 +37,6 @@ function buildStat(
 		postjuv_bird_count: 1,
 		adult_bird_count: 1,
 		unknown_age_bird_count: 1,
-		new_young_bird_count: 3,
 		pullus_enc_count: 2,
 		juv_enc_count: 3,
 		postjuv_enc_count: 1,

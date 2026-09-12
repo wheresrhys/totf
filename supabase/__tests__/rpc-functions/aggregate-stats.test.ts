@@ -641,7 +641,7 @@ describe('aggregate_stats', () => {
 		});
 	});
 
-	describe('age bucketing (pullus_bird_count / juv_bird_count / postjuv_bird_count / adult_bird_count / unknown_age_bird_count / new_young_bird_count)', () => {
+	describe('age bucketing (pullus_bird_count / juv_bird_count / postjuv_bird_count / adult_bird_count / unknown_age_bird_count)', () => {
 		// getAgeClass() in app/models/encounter.ts (#527) defines the single-encounter
 		// age classes this bird-level bucketing aggregates. The two bird-level
 		// precedence rules have no single-encounter equivalent: pullus always wins (a
@@ -812,18 +812,6 @@ describe('aggregate_stats', () => {
 				{ ...AGE1J, record_type: 'R' }
 			]);
 
-			// new_young_bird_count edge birds.
-			dates.retrapYoung = addDays(base, 11);
-			await addBird(dates.retrapYoung, robin!.id, [
-				{ ...AGE1J, record_type: 'R' }
-			]);
-			dates.splitNew = addDays(base, 12);
-			// Young via a retrap 1J row; New via a separate age-2 row — different rows.
-			await addBird(dates.splitNew, robin!.id, [
-				{ ...AGE1J, record_type: 'R' },
-				{ ...AGE2, record_type: 'N' }
-			]);
-
 			// group_by_species isolation: a Robin juv and a Wren juv on the same date.
 			await addBird(speciesDate, robin!.id, [{ ...AGE1J, record_type: 'N' }]);
 			await addBird(speciesDate, wren!.id, [{ ...AGE1J, record_type: 'N' }]);
@@ -907,21 +895,6 @@ describe('aggregate_stats', () => {
 			});
 		});
 
-		it('a New (record_type=N) pullus-bucket bird is counted in new_young_bird_count', async () => {
-			const row = await bucketRow(dates.pullusOnly);
-			expect(row.new_young_bird_count).toBe(1);
-		});
-
-		it('a New (record_type=N) juv-bucket bird is counted in new_young_bird_count', async () => {
-			const row = await bucketRow(dates.juv1J);
-			expect(row.new_young_bird_count).toBe(1);
-		});
-
-		it('a New (record_type=N) postjuv-bucket bird is counted in new_young_bird_count', async () => {
-			const row = await bucketRow(dates.postjuvOnly);
-			expect(row.new_young_bird_count).toBe(1);
-		});
-
 		// Structure — one test per bucket-defining branch
 		it('a bird with only age_code=2 encounters counts in unknown_age_bird_count, not any other bucket', async () => {
 			const row = await bucketRow(dates.onlyTwo);
@@ -983,19 +956,6 @@ describe('aggregate_stats', () => {
 			});
 		});
 
-		it('a retrap (record_type != N) young-bucket bird is excluded from new_young_bird_count despite being in pullus_bird_count/juv_bird_count/postjuv_bird_count', async () => {
-			const row = await bucketRow(dates.retrapYoung);
-			expect(row.juv_bird_count).toBe(1);
-			expect(row.new_young_bird_count).toBe(0);
-		});
-
-		it('a bird whose New encounter and young-bucket-indicating encounter are different rows still counts in new_young_bird_count (bucket membership and New membership checked independently)', async () => {
-			const row = await bucketRow(dates.splitNew);
-			expect(row.juv_bird_count).toBe(1);
-			expect(row.new_young_bird_count).toBe(1);
-			expect(row.encounter_count).toBe(2);
-		});
-
 		it('age_code=1 (is_juv true) and age_code=3+is_juv=true both count toward juv_bird_count identically', async () => {
 			const oneJ = await bucketRow(dates.juv1J);
 			const threeJ = await bucketRow(dates.juv3J);
@@ -1029,7 +989,7 @@ describe('aggregate_stats', () => {
 			).toBe(row.bird_count);
 		});
 
-		it('an empty group (no encounters) returns zero for pullus_bird_count, juv_bird_count, postjuv_bird_count, adult_bird_count, unknown_age_bird_count and new_young_bird_count', async () => {
+		it('an empty group (no encounters) returns zero for pullus_bird_count, juv_bird_count, postjuv_bird_count, adult_bird_count and unknown_age_bird_count', async () => {
 			const row = await bucketRow(emptyDate);
 			expect(row).toMatchObject({
 				bird_count: 0,
@@ -1037,8 +997,7 @@ describe('aggregate_stats', () => {
 				juv_bird_count: 0,
 				postjuv_bird_count: 0,
 				adult_bird_count: 0,
-				unknown_age_bird_count: 0,
-				new_young_bird_count: 0
+				unknown_age_bird_count: 0
 			});
 		});
 

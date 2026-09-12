@@ -37,7 +37,6 @@ function buildStat(
 		postjuv_bird_count: 1,
 		adult_bird_count: 1,
 		unknown_age_bird_count: 1,
-		new_young_bird_count: 3,
 		pullus_enc_count: 2,
 		juv_enc_count: 3,
 		postjuv_enc_count: 1,
@@ -95,8 +94,7 @@ describe('derivePeriodTotalsRowByBird', () => {
 			juv_bird_count: 0,
 			postjuv_bird_count: 0,
 			adult_bird_count: 0,
-			unknown_age_bird_count: 0,
-			new_young_bird_count: 0
+			unknown_age_bird_count: 0
 		});
 		expect(derivePeriodTotalsRowByBird(stat)).toEqual({
 			timePeriod: '2026-08-16',

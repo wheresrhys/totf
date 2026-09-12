@@ -53,7 +53,6 @@ function buildStatsRow(
 		postjuv_bird_count: 0,
 		adult_bird_count: 0,
 		unknown_age_bird_count: 0,
-		new_young_bird_count: 0,
 		pullus_enc_count: 0,
 		juv_enc_count: 0,
 		postjuv_enc_count: 0,

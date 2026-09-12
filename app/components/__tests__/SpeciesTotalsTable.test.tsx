@@ -36,7 +36,6 @@ function makeStat(
 		postjuv_bird_count: 0,
 		adult_bird_count: 0,
 		unknown_age_bird_count: 0,
-		new_young_bird_count: 0,
 		...overrides
 	} as unknown as AggregateStatsResult;
 }
@@ -301,8 +300,7 @@ describe('SpeciesTotalsTable', () => {
 				juv_bird_count: 1,
 				postjuv_bird_count: 0,
 				adult_bird_count: 2,
-				unknown_age_bird_count: 0,
-				new_young_bird_count: 1
+				unknown_age_bird_count: 0
 			}),
 			makeStat({
 				species_name: 'Wren',
@@ -315,8 +313,7 @@ describe('SpeciesTotalsTable', () => {
 				juv_bird_count: 2,
 				postjuv_bird_count: 1,
 				adult_bird_count: 3,
-				unknown_age_bird_count: 0,
-				new_young_bird_count: 2
+				unknown_age_bird_count: 0
 			})
 		];
 		const totalsStats = makeStat({
@@ -330,8 +327,7 @@ describe('SpeciesTotalsTable', () => {
 			juv_bird_count: 3,
 			postjuv_bird_count: 1,
 			adult_bird_count: 5,
-			unknown_age_bird_count: 0,
-			new_young_bird_count: 3
+			unknown_age_bird_count: 0
 		});
 
 		it('renders a "Total" row with values from totalsStats when supplied', () => {
@@ -455,7 +451,6 @@ describe('SpeciesTotalsTable', () => {
 				postjuv_bird_count: 0,
 				adult_bird_count: 0,
 				unknown_age_bird_count: 0,
-				new_young_bird_count: 1,
 				...({
 					pullus_enc_count: 1,
 					juv_enc_count: 0,

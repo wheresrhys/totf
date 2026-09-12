@@ -235,7 +235,7 @@ export async function getSpeciesPopulationStats(
  * `total_effort` interval into fractional hours and pairs it with
  * `time_period`, matching the `[time_period, value]` tuple shape
  * `YearComparisonTrendChart`'s existing series already use (see
- * `getCounts`/`getYoungsters` in
+ * `getCounts`/`getAgeSplit` in
  * `app/components/pages/species/StatsHistoryChart.tsx`), so it can be zipped
  * against a species-filtered series by `time_period`.
  */
