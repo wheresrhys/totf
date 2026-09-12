@@ -29,13 +29,5 @@ CREATE TYPE public.aggregate_stats_result AS (
 	postjuv_enc_count bigint,
 	adult_enc_count bigint,
 	unknown_age_enc_count bigint,
-	max_new_per_session bigint,
-	max_weight real,
-	avg_weight numeric,
-	min_weight real,
-	median_weight numeric,
-	max_wing smallint,
-	avg_wing numeric,
-	min_wing smallint,
-	median_wing numeric
+	max_new_per_session bigint
 );

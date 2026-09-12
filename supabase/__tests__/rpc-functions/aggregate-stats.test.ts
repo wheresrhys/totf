@@ -363,7 +363,7 @@ describe('aggregate_stats', () => {
 				b16
 			];
 
-			const base_ = { scheme: 'BTO', sex: 'M', age_code: 1, weight: 15 };
+			const base_ = { scheme: 'BTO', sex: 'M', age_code: 1 };
 			const { error: encountersError } = await deltaClient
 				.from('Encounters')
 				.insert([

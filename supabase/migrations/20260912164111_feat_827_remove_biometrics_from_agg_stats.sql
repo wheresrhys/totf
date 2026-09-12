@@ -1,11 +1,16 @@
-CREATE FUNCTION public.aggregate_stats (
-	species_name_filter text DEFAULT NULL::text,
-	from_date date DEFAULT NULL::date,
-	to_date date DEFAULT NULL::date,
-	ringing_group_filter bigint DEFAULT NULL::bigint,
-	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
-) RETURNS SETOF public.aggregate_stats_result LANGUAGE plpgsql AS $function$
+SET check_function_bodies = false;
+ALTER TYPE public.aggregate_stats_result DROP ATTRIBUTE avg_weight;
+ALTER TYPE public.aggregate_stats_result DROP ATTRIBUTE avg_wing;
+ALTER TYPE public.aggregate_stats_result DROP ATTRIBUTE max_weight;
+ALTER TYPE public.aggregate_stats_result DROP ATTRIBUTE max_wing;
+ALTER TYPE public.aggregate_stats_result DROP ATTRIBUTE median_weight;
+ALTER TYPE public.aggregate_stats_result DROP ATTRIBUTE median_wing;
+ALTER TYPE public.aggregate_stats_result DROP ATTRIBUTE min_weight;
+ALTER TYPE public.aggregate_stats_result DROP ATTRIBUTE min_wing;
+CREATE OR REPLACE FUNCTION public.aggregate_stats(species_name_filter text DEFAULT NULL::text, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, ringing_group_filter bigint DEFAULT NULL::bigint, group_by_species boolean DEFAULT false, group_by_time_period text DEFAULT NULL::text)
+ RETURNS SETOF public.aggregate_stats_result
+ LANGUAGE plpgsql
+AS $function$
   BEGIN
   RETURN QUERY
   -- The final projection below is wrapped in jsonb_populate_record rather than
@@ -302,9 +307,3 @@ CREATE FUNCTION public.aggregate_stats (
 
 END;
 $function$;
-
-GRANT ALL ON FUNCTION public.aggregate_stats (text, date, date, bigint, boolean, text) TO anon;
-
-GRANT ALL ON FUNCTION public.aggregate_stats (text, date, date, bigint, boolean, text) TO authenticated;
-
-GRANT ALL ON FUNCTION public.aggregate_stats (text, date, date, bigint, boolean, text) TO service_role;

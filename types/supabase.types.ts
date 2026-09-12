@@ -738,14 +738,6 @@ export type Database = {
         adult_enc_count: number | null
         unknown_age_enc_count: number | null
         max_new_per_session: number | null
-        max_weight: number | null
-        avg_weight: number | null
-        min_weight: number | null
-        median_weight: number | null
-        max_wing: number | null
-        avg_wing: number | null
-        min_wing: number | null
-        median_wing: number | null
       }
       biometrics_stats_result: {
         species_name: string | null
