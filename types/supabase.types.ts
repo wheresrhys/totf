@@ -689,6 +689,7 @@ export type Database = {
       }
     }
     Enums: {
+      resighting_record_type: "U" | "F" | "D"
       ring_size:
         | "AA"
         | "A"
@@ -898,6 +899,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      resighting_record_type: ["U", "F", "D"],
       ring_size: [
         "AA",
         "A",

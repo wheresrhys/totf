@@ -10,6 +10,8 @@ export type RingingGroupRow =
 export type RingSequenceRow =
 	Database['public']['Tables']['RingSequences']['Row'];
 export type RingSize = Database['public']['Enums']['ring_size'];
+export type ResightingRecordType =
+	Database['public']['Enums']['resighting_record_type'];
 
 export type TopPeriodsResult =
 	Database['public']['Functions']['top_metrics_by_period']['Returns'][number];
