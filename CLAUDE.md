@@ -315,9 +315,8 @@ read-only against any server.
 `load-prod-write-env.sh`, which sets `SUPABASE_JWT_ROLE=authenticated` — writes
 allowed but still RLS-scoped to the target group. Break-glass
 web-import test against prod: `./scripts/load-prod-write-env.sh next dev --turbopack`
-(deliberately not an npm script). Migrations are deployed by the human with
-`npm run db:migration:push` — there is no automated CI deploy (the `deploy-migrations.yml` workflow
-added in #862 was removed after being exercised).
+(deliberately not an npm script). Migrations are committed and deployed on merge to main by the 
+supabase github integration.
 
 Note: the deployed Vercel app gets its env directly, with
 `SUPABASE_JWT_ROLE=authenticated` set in the Vercel project settings, so production
