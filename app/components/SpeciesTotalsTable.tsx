@@ -26,6 +26,7 @@ type RowModel = {
 	speciesName: string;
 	sessionsCount: number;
 	encounterCount: number;
+	maxPerSession: number;
 	individualsCount: number;
 	new: number;
 	retraps: number;
@@ -56,6 +57,7 @@ function toRowModel(row: SpeciesTotalsRow): RowModel {
 		speciesName: row.speciesName,
 		sessionsCount: row.sessionsCount,
 		encounterCount: row.encounterCount,
+		maxPerSession: row.maxPerSession,
 		individualsCount: row.individualsCount,
 		new: row.newCount,
 		retraps: row.retrapsCount,
@@ -93,6 +95,9 @@ function buildColumnConfigs(
 		},
 		encounterCount: {
 			label: 'Encounters'
+		},
+		maxPerSession: {
+			label: 'Busiest session'
 		},
 		individualsCount: {
 			label: 'Individuals'

@@ -71,6 +71,7 @@ describe('deriveSpeciesTotalsRow', () => {
 			speciesName: 'Blue Tit',
 			sessionsCount: 4,
 			encounterCount: 7,
+			maxPerSession: 3,
 			individualsCount: 6,
 			newCount: 4,
 			retrapsCount: 2,
@@ -95,6 +96,11 @@ describe('deriveSpeciesTotalsRow', () => {
 	it('returns retrapsCount equal to bird_count when new_bird_count is 0', () => {
 		const stat = buildStat({ bird_count: 8, new_bird_count: 0 });
 		expect(deriveSpeciesTotalsRow(stat).retrapsCount).toBe(8);
+	});
+
+	it('maps max_per_session to maxPerSession', () => {
+		const stat = buildStat({ max_per_session: 9 });
+		expect(deriveSpeciesTotalsRow(stat).maxPerSession).toBe(9);
 	});
 });
 
@@ -122,6 +128,7 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 			speciesName: 'Blue Tit',
 			sessionsCount: 4,
 			encounterCount: 7,
+			maxPerSession: 3,
 			individualsCount: 6,
 			newCount: 4,
 			retrapsCount: 3,
@@ -164,5 +171,10 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 		});
 		const row = deriveSpeciesTotalsRowByEncounter(stat);
 		expect(row.newCount).toBe(4);
+	});
+
+	it('maps max_per_session to maxPerSession', () => {
+		const stat = buildStat({ max_per_session: 9 });
+		expect(deriveSpeciesTotalsRowByEncounter(stat).maxPerSession).toBe(9);
 	});
 });

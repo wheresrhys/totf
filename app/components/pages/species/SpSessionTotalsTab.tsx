@@ -51,6 +51,7 @@ export function SpSessionTotalsTab({
 			buildHref={(timePeriod) =>
 				`/group/${viewedGroup.slug}/session/${timePeriod}`
 			}
+			showBusiestSession={false}
 		/>
 	);
 }

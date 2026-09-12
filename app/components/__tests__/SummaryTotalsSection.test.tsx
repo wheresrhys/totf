@@ -12,7 +12,10 @@ import { buildMonthTotalsRows } from '@/app/models/month-totals';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
 import type { AggregateStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/lib/group-slug';
-import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
+import {
+	getCellTextByHeading,
+	getColumnIndex
+} from '@/app/__tests__/helpers/table';
 
 const fetchSpeciesDataMock = vi.fn();
 vi.mock('@/app/actions/spp-data', () => ({
@@ -213,6 +216,25 @@ describe('SummaryTotalsSection', () => {
 			);
 			expect(screen.getByTestId('totals-row').textContent).toContain('99');
 		});
+
+		it('renders a "Busiest session" column between Encounters and Birds', () => {
+			// At least one populated month, since Hide default filters an
+			// all-empty monthTotals down to zero rows (and no header row).
+			const populatedMonthTotals = buildMonthTotalsRows(2026, [
+				buildYearlyStat({ time_period: '2026-03-01', session_count: 5 })
+			]);
+			render(
+				<SummaryTotalsSection
+					monthTotals={populatedMonthTotals}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			const encountersIndex = getColumnIndex('Encounters');
+			const busiestSessionIndex = getColumnIndex('Busiest session');
+			const birdsIndex = getColumnIndex('Birds');
+			expect(busiestSessionIndex).toBe(encountersIndex + 1);
+			expect(busiestSessionIndex).toBe(birdsIndex - 1);
+		});
 	});
 
 	describe('with session totals (month summary page)', () => {
@@ -313,6 +335,35 @@ describe('SummaryTotalsSection', () => {
 			);
 			expect(screen.getByTestId('totals-row').textContent).toContain('99');
 		});
+
+		it('does not render a "Busiest session" column (eager sessionTotals path)', () => {
+			render(
+				<SummaryTotalsSection
+					sessionTotals={[buildDayStat()]}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			expect(
+				screen.queryByRole('columnheader', { name: 'Busiest session' })
+			).toBeNull();
+		});
+
+		it('does not render a "Busiest session" column (lazy-fetch path)', async () => {
+			fetchPeriodTotalsMock.mockResolvedValue([buildDayStat()]);
+			render(
+				<SummaryTotalsSection
+					monthTotals={monthTotals}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
+			await waitFor(() =>
+				expect(screen.getByTestId('period-totals-table')).toBeTruthy()
+			);
+			expect(
+				screen.queryByRole('columnheader', { name: 'Busiest session' })
+			).toBeNull();
+		});
 	});
 
 	describe('with yearlyTotals (all-time summary page)', () => {
@@ -386,6 +437,21 @@ describe('SummaryTotalsSection', () => {
 			);
 			expect(screen.getByTestId('totals-row').textContent).toContain('99');
 		});
+
+		it('renders a "Busiest session" column between Encounters and Birds', () => {
+			const yearlyTotals = [buildYearlyStat()];
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={yearlyTotals}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			const encountersIndex = getColumnIndex('Encounters');
+			const busiestSessionIndex = getColumnIndex('Busiest session');
+			const birdsIndex = getColumnIndex('Birds');
+			expect(busiestSessionIndex).toBe(encountersIndex + 1);
+			expect(busiestSessionIndex).toBe(birdsIndex - 1);
+		});
 	});
 
 	describe('all-time "Month totals" tab', () => {
@@ -423,6 +489,19 @@ describe('SummaryTotalsSection', () => {
 				// Combine-years labels are month name only — no year, no link.
 				expect(screen.queryByText('January 2020')).toBeNull();
 				expect(screen.queryByRole('link', { name: 'January' })).toBeNull();
+			});
+
+			it('renders a "Busiest session" column between Encounters and Birds', async () => {
+				render(<SummaryTotalsSection {...allTimeProps} />);
+				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+				await waitFor(() =>
+					expect(document.querySelectorAll('tbody tr').length).toBe(2)
+				);
+				const encountersIndex = getColumnIndex('Encounters');
+				const busiestSessionIndex = getColumnIndex('Busiest session');
+				const birdsIndex = getColumnIndex('Birds');
+				expect(busiestSessionIndex).toBe(encountersIndex + 1);
+				expect(busiestSessionIndex).toBe(birdsIndex - 1);
 			});
 		});
 

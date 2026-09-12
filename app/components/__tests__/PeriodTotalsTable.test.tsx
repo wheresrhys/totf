@@ -81,6 +81,7 @@ describe('PeriodTotalsTable', () => {
 				'Sessions',
 				'Species',
 				'Encounters',
+				'Busiest session',
 				'Birds',
 				'New',
 				'Retrap',
@@ -281,6 +282,73 @@ describe('PeriodTotalsTable', () => {
 				/>
 			);
 			expect(getCellTextByHeading('Sessions', 0)).toBe('4');
+		});
+	});
+
+	describe('Busiest session column', () => {
+		describe('Structure', () => {
+			it('renders a "Busiest session" column header, positioned between "Encounters" and "Birds", when showBusiestSession is omitted/true', () => {
+				render(
+					<PeriodTotalsTable
+						timeInterval="year"
+						rows={[buildStat()]}
+						firstColumnHeader="Year"
+						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
+					/>
+				);
+				const headers = getColumnHeaders().map((header) => header.textContent);
+				const encountersIndex = headers.indexOf('Encounters');
+				const birdsIndex = headers.indexOf('Birds');
+				expect(headers).toContain('Busiest session');
+				expect(headers.indexOf('Busiest session')).toBe(encountersIndex + 1);
+				expect(headers.indexOf('Busiest session')).toBe(birdsIndex - 1);
+			});
+
+			it('renders the correct max_per_session value in each data row\'s "Busiest session" cell', () => {
+				render(
+					<PeriodTotalsTable
+						timeInterval="year"
+						rows={[
+							buildStat({ time_period: '2026-01-01', max_per_session: 17 })
+						]}
+						firstColumnHeader="Year"
+						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
+					/>
+				);
+				expect(getCellTextByHeading('Busiest session', 0)).toBe('17');
+			});
+
+			it('renders the correct value in the pinned totals row\'s "Busiest session" cell, when a totals row is present', () => {
+				render(
+					<PeriodTotalsTable
+						timeInterval="year"
+						rows={[buildStat()]}
+						firstColumnHeader="Year"
+						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
+						totalsStats={buildStat({ max_per_session: 23 })}
+					/>
+				);
+				const totalsRow = screen.getByTestId('totals-row');
+				expect(getCellTextByHeading('Busiest session', totalsRow)).toBe('23');
+			});
+		});
+
+		describe('Edge', () => {
+			it('omits the "Busiest session" column entirely when showBusiestSession={false}', () => {
+				render(
+					<PeriodTotalsTable
+						timeInterval="year"
+						rows={[buildStat()]}
+						firstColumnHeader="Year"
+						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
+						showBusiestSession={false}
+					/>
+				);
+				expect(
+					getColumnHeaders().map((header) => header.textContent)
+				).not.toContain('Busiest session');
+				expect(screen.queryByText('Busiest session')).toBeNull();
+			});
 		});
 	});
 
