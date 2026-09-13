@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import 'chartkick/chart.js';
 import { type LineChartData } from 'react-chartkick';
 import {
@@ -104,7 +104,12 @@ function Spinner() {
 // new/returning/young split — so its `renderChart` gates on both being loaded
 // rather than just one. A third fetch loads the group-wide effort
 // history once (same pattern as SpBiometricsTab) so every tile's chart can offer the
-// Normalize toggle. The biometrics-related tiles (wing/weight trend,
+// Normalize toggle.
+//
+// Every tile also passes `fetchYearSeries` (#852), so its chart's "Interval:
+// Year" toggle re-fetches the same two RPCs grouped by year instead of summing
+// the monthly points client-side — see the year-fetch refs below for why that
+// distinction matters. The biometrics-related tiles (wing/weight trend,
 // wing-vs-weight scatter) live on the "Biometrics" tab (SpBiometricsTab.tsx).
 export function SpPopulationTab({
 	speciesName,
@@ -144,6 +149,43 @@ export function SpPopulationTab({
 			fromDate,
 			toDate
 		).then(setPopulationStats);
+	}
+
+	// Year-grouped counterparts of the two fetches above, for the charts'
+	// "Interval: Year" toggle (#852). These are *not* derivable from the monthly
+	// rows: `aggregate_stats`' bird_count and `population_stats`' age-bucket
+	// counts are per-bird-distinct within each month's cell, so summing months
+	// double-counts any bird retrapped in more than one month of a year. Held
+	// as lazily-created promises in refs rather than as state, since several
+	// tiles ask for the same year data and each `YearComparisonTrendChart`
+	// keeps its own copy once resolved — the ref only needs to guarantee one
+	// RPC round-trip per interval per tab, not to drive a re-render.
+	const yearStatsHistoryPromise = useRef<Promise<
+		AggregateStatsResult[]
+	> | null>(null);
+	function fetchYearStatsHistory() {
+		yearStatsHistoryPromise.current ??= getSpeciesStatsHistory(
+			speciesName,
+			viewedGroupId,
+			fromDate,
+			toDate,
+			'year'
+		);
+		return yearStatsHistoryPromise.current;
+	}
+
+	const yearPopulationStatsPromise = useRef<Promise<
+		PopulationStatsResult[]
+	> | null>(null);
+	function fetchYearPopulationStats() {
+		yearPopulationStatsPromise.current ??= getSpeciesPopulationStats(
+			speciesName,
+			viewedGroupId,
+			fromDate,
+			toDate,
+			'year'
+		);
+		return yearPopulationStatsPromise.current;
 	}
 
 	const [effortHistory, setEffortHistory] = useState<LineChartData | null>(
@@ -186,6 +228,7 @@ export function SpPopulationTab({
 					<YearComparisonTrendChart
 						series={getCounts(statsHistory)}
 						yearlyAggregators={{ encounters: 'sum', birds: 'sum' }}
+						fetchYearSeries={() => fetchYearStatsHistory().then(getCounts)}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 					/>
@@ -212,6 +255,16 @@ export function SpPopulationTab({
 							'Returning adults': 'sum',
 							Young: 'sum'
 						}}
+						// The only tile needing both year fetches, mirroring its
+						// two-fetch monthly `load` above.
+						fetchYearSeries={() =>
+							Promise.all([
+								fetchYearStatsHistory(),
+								fetchYearPopulationStats()
+							]).then(([yearStats, yearPopulation]) =>
+								getReturningVsNew(yearStats, yearPopulation)
+							)
+						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 					/>
@@ -238,6 +291,7 @@ export function SpPopulationTab({
 							Oldies: 'sum',
 							'New young': 'sum'
 						}}
+						fetchYearSeries={() => fetchYearPopulationStats().then(getAgeSplit)}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 					/>
@@ -262,6 +316,9 @@ export function SpPopulationTab({
 							Juv: 'sum',
 							Postjuv: 'sum'
 						}}
+						fetchYearSeries={() =>
+							fetchYearPopulationStats().then(getYoungCounts)
+						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 						includeTotalSeries
@@ -288,6 +345,9 @@ export function SpPopulationTab({
 							'New juv': 'sum',
 							'New postjuv': 'sum'
 						}}
+						fetchYearSeries={() =>
+							fetchYearPopulationStats().then(getNewYoungCounts)
+						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 						includeTotalSeries
