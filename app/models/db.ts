@@ -46,6 +46,18 @@ export type PopulationStatsResult = {
 	>;
 };
 
+// arrivals_stats is aggregate_stats' companion RPC (#858), counting each bird once
+// per calendar year (at its first classifiable encounter of that year) rather than
+// once per (species, time_period) cell, split across the five arrival buckets in
+// its own arrivals_stats_result composite type. Same null-stripping rationale as
+// AggregateStatsResult above: composite-type attributes are always nullable in the
+// generated types, but the RPC COALESCEs its counts and only ever emits whole rows.
+export type ArrivalsStatsResult = {
+	[K in keyof Database['public']['CompositeTypes']['arrivals_stats_result']]-?: NonNullable<
+		Database['public']['CompositeTypes']['arrivals_stats_result'][K]
+	>;
+};
+
 // biometrics_stats is aggregate_stats' companion RPC (#822/#823), carrying the 8
 // wing/weight summary statistics (max/avg/min/median for both) in its own
 // biometrics_stats_result composite type. Unlike AggregateStatsResult above, the
