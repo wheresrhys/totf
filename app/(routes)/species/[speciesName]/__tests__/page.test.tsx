@@ -7,7 +7,7 @@ import {
 	within
 } from '@testing-library/react';
 import Page, { getSpeciesStats } from '../page';
-import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
+import spPageSnapshot from '@/test-fixtures/snapshots/core_stats/robin-alpha.species-page-composite.json';
 import type { FullFatPageData } from '../PageContent';
 import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 

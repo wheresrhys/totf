@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import retrapsSnapshot from '@/test-fixtures/snapshots/fetchNotableRetraps.alpha.json';
+import retrapsSnapshot from '@/test-fixtures/snapshots/notable_retraps/alpha.retraps.json';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 

@@ -7,7 +7,7 @@ import {
 	getAllByRole
 } from '@testing-library/react';
 import Page, { fetchSummaryYearMonthPageContent } from '../page';
-import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
+import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 vi.mock('@/app/actions/summary-stats', () => ({

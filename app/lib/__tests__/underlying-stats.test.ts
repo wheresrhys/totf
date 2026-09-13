@@ -3,7 +3,7 @@ import type {
 	CoreStatsResult,
 	StatsPerDayAndSpeciesResult
 } from '@/app/models/db';
-import payOffStatsFixture from '../../../test-fixtures/snapshots/fetchPayOffStats.beta.json';
+import payOffStatsFixture from '../../../test-fixtures/snapshots/core_stats/beta.yearly-and-monthly-totals.json';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()

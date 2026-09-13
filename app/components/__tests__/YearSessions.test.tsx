@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { YearSessions } from '../YearSessions';
-import sessionsSnapshot from '@/test-fixtures/snapshots/fetchAllSessions.alpha.json';
+import sessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.all-sessions.json';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 
 const allSessions = sessionsSnapshot as unknown as SessionWithEncountersCount[];
