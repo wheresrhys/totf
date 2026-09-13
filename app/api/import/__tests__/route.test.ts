@@ -232,7 +232,7 @@ describe('POST /api/import', () => {
 			vi.resetModules();
 
 			// Re-apply mocks cleared by resetModules
-			vi.doMock('@/lib/group-auth', () => ({
+			vi.doMock('@/app/lib/auth/group-auth', () => ({
 				getAuthenticatedSupabaseClient: vi.fn().mockResolvedValue({})
 			}));
 			vi.doMock('@/lib/demon-import', async (importOriginal) => {
