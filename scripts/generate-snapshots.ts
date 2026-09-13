@@ -13,7 +13,7 @@ import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import fs from 'fs/promises';
 import { supabase } from '../lib/supabase';
-import { getAuthenticatedSupabaseClientForGroup } from '../lib/group-auth';
+import { getAuthenticatedSupabaseClientForGroup } from '../app/lib/auth/group-auth';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

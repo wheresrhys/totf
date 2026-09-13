@@ -2,7 +2,7 @@
 import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { supabase } from '../lib/supabase';
-import { getAuthenticatedSupabaseClientForGroup } from '../lib/group-auth';
+import { getAuthenticatedSupabaseClientForGroup } from '../app/lib/auth/group-auth';
 
 const [groupName, password] = process.argv.slice(2);
 
