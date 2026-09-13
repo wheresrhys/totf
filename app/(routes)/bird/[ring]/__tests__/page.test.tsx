@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import birdFixture from '@/test-fixtures/snapshots/fetchBirdData.ARRETRAP.json';
+import birdFixture from '@/test-fixtures/snapshots/tables/Birds/arretrap.bird-detail.json';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()

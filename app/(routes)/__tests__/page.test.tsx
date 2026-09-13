@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, within } from '@testing-library/react';
 import HomePage from '../page';
-import recentSessionsSnapshot from '@/test-fixtures/snapshots/fetchRecentSessions.alpha.json';
-import topSpeciesSnapshot from '@/test-fixtures/snapshots/fetchTopSpecies.alpha.json';
-import summaryStatsSnapshot from '@/test-fixtures/snapshots/fetchHomePageSummaryStats.alpha.json';
-import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/fetchHomePageSummaryStats.zero.json';
+import recentSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.recent-sessions.json';
+import topSpeciesSnapshot from '@/test-fixtures/snapshots/tables/Species/alpha.top-species.json';
+import summaryStatsSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.home-page-summary.json';
+import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/core_stats/zero.home-page-summary.json';
 import type { HomePageSummaryStats } from '../PageContent';
 import type { GroupTicksResult } from '@/app/models/db';
 

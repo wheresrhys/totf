@@ -2,8 +2,22 @@
 /**
  * Generate snapshot JSON fixtures from the local e2e seed data.
  *
- * Reads Alpha/Beta/Gamma group data and writes 19 JSON files to
- * test-fixtures/snapshots/ used as mock return values in unit tests.
+ * Reads Alpha/Beta/Gamma group data and writes 19 JSON files under
+ * test-fixtures/snapshots/, organised into one subdirectory per data source —
+ * the RPC name for RPC-backed fixtures (`core_stats/`, `find_discrepencies/`,
+ * `notable_retraps/`, `top_metrics_by_period/`) and `tables/<TableName>/` for
+ * fixtures produced by a direct PostgREST table query. The comment above each
+ * block below names both the RPC/table and the consuming action(s) — keep this
+ * in sync when a call site's underlying RPC/table changes, so a fixture's
+ * location never silently drifts from what it actually tests (see #870, #882).
+ *
+ * Not every fixture under test-fixtures/snapshots/ is written by this script —
+ * `ring_sequence_controls/`, `tables/Encounters/`, `tables/Species/`, and a few
+ * files alongside generated ones under `core_stats/` (the
+ * `*.summary-totals.json` / `*.home-page-summary.json` pairs) are still
+ * hand-maintained (see CLAUDE.md's "App tests" section). They were moved to
+ * their correct source directory by #882 but not wired up for generation here
+ * — that's a separate follow-up.
  *
  * Run via: npm run db:generate-snapshots
  * Or called programmatically: generateSnapshots(alphaId, betaId, gammaId)
@@ -31,12 +45,13 @@ async function getGroupId(name: string): Promise<number> {
 	return data.id;
 }
 
-async function writeSnapshot(filename: string, data: unknown) {
-	await fs.writeFile(
-		path.join(SNAPSHOTS_DIR, filename),
-		JSON.stringify(data, null, 2)
-	);
-	console.log(`  → ${filename}`);
+// `relativePath` is a source-directory-relative path, e.g.
+// `core_stats/alpha.by-species.json` or `tables/Birds/arretrap.bird-detail.json`.
+async function writeSnapshot(relativePath: string, data: unknown) {
+	const target = path.join(SNAPSHOTS_DIR, relativePath);
+	await fs.mkdir(path.dirname(target), { recursive: true });
+	await fs.writeFile(target, JSON.stringify(data, null, 2));
+	console.log(`  → ${relativePath}`);
 }
 
 export async function generateSnapshots(
@@ -45,13 +60,13 @@ export async function generateSnapshots(
 	gammaId: number
 ) {
 	console.log('\nGenerating snapshots...');
-	await fs.mkdir(SNAPSHOTS_DIR, { recursive: true });
 
 	const alpha = await getAuthenticatedSupabaseClientForGroup(alphaId);
 	const beta = await getAuthenticatedSupabaseClientForGroup(betaId);
 	const gamma = await getAuthenticatedSupabaseClientForGroup(gammaId);
 
-	// fetchSpeciesData (spp-data.ts) — aggregate_stats group_by_species
+	// RPC: core_stats (group_by_species) — powers fetchSpeciesData
+	// (app/actions/spp-data.ts)
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId],
@@ -61,10 +76,11 @@ export async function generateSnapshots(
 			ringing_group_filter: gId,
 			group_by_species: true
 		});
-		await writeSnapshot(`fetchSpeciesData.${name}.json`, data ?? []);
+		await writeSnapshot(`core_stats/${name}.by-species.json`, data ?? []);
 	}
 
-	// fetchPayOffStats (pay-off-stats.ts) — yearly + monthly aggregate_stats
+	// RPC: core_stats (yearly + monthly, ungrouped by species) — powers
+	// fetchPayOffStats (app/actions/pay-off-stats.ts)
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId]
@@ -81,13 +97,14 @@ export async function generateSnapshots(
 				group_by_time_period: 'month'
 			})
 		]);
-		await writeSnapshot(`fetchPayOffStats.${name}.json`, {
+		await writeSnapshot(`core_stats/${name}.yearly-and-monthly-totals.json`, {
 			yearly: yearly ?? [],
 			monthly: monthly ?? []
 		});
 	}
 
-	// fetchAllSessions (sessions page)
+	// Table: Sessions (embedded Locations + Encounters count) — powers
+	// fetchAllSessions (app/(routes)/sessions/page.tsx)
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId]
@@ -99,10 +116,14 @@ export async function generateSnapshots(
 			)
 			.eq('ringing_group_id', gId)
 			.order('visit_date', { ascending: false });
-		await writeSnapshot(`fetchAllSessions.${name}.json`, data ?? []);
+		await writeSnapshot(
+			`tables/Sessions/${name}.all-sessions.json`,
+			data ?? []
+		);
 	}
 
-	// fetchMistakes (mistakes page)
+	// RPC: find_discrepencies — powers fetchMistakesPageContent
+	// (app/(routes)/mistakes/page.tsx)
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId]
@@ -110,10 +131,14 @@ export async function generateSnapshots(
 		const { data } = await client.rpc('find_discrepencies', {
 			ringing_group_filter: gId
 		});
-		await writeSnapshot(`fetchMistakes.${name}.json`, data ?? []);
+		await writeSnapshot(
+			`find_discrepencies/${name}.discrepancies.json`,
+			data ?? []
+		);
 	}
 
-	// fetchNotableRetraps (retraps page)
+	// RPC: notable_retraps (group-wide) — powers fetchNotableRetrapsPageContent
+	// (app/(routes)/retraps/page.tsx)
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId]
@@ -124,10 +149,11 @@ export async function generateSnapshots(
 			min_proven_age: 3,
 			min_encounter_count: 6
 		});
-		await writeSnapshot(`fetchNotableRetraps.${name}.json`, data ?? []);
+		await writeSnapshot(`notable_retraps/${name}.retraps.json`, data ?? []);
 	}
 
-	// fetchRecentSessions (home page helper)
+	// Table: Sessions (Alpha only, most-recent visit date) — powers
+	// fetchRecentSessions (app/(routes)/page.tsx)
 	const { data: recentSessions } = await alpha
 		.from('Sessions')
 		.select(
@@ -136,7 +162,10 @@ export async function generateSnapshots(
 		.eq('ringing_group_id', alphaId)
 		.order('visit_date', { ascending: false })
 		.limit(3);
-	await writeSnapshot(`fetchRecentSessions.alpha.json`, recentSessions ?? []);
+	await writeSnapshot(
+		`tables/Sessions/alpha.recent-sessions.json`,
+		recentSessions ?? []
+	);
 
 	// Robin species ID (needed for species-specific snapshots)
 	const { data: robinSpecies } = await alpha
@@ -148,7 +177,8 @@ export async function generateSnapshots(
 	if (robinSpecies) {
 		const BATCH_SIZE = 20;
 
-		// fetchPageOfBirds (sp-data.ts) — Robin page 0 for Alpha
+		// Table: Birds (embedded Encounters/Sessions, page 0) — powers
+		// fetchPageOfBirds (app/actions/sp-data.ts)
 		const { data: birdsPage0 } = await alpha
 			.from('Birds')
 			.select(
@@ -159,20 +189,25 @@ export async function generateSnapshots(
 			.contains('ringing_group_ids', [alphaId])
 			.order('last_encountered_timestamp', { ascending: false })
 			.range(0, BATCH_SIZE - 1);
-		await writeSnapshot(`fetchPageOfBirds.alpha.robin.json`, birdsPage0 ?? []);
+		await writeSnapshot(
+			`tables/Birds/robin-alpha.page-of-birds.json`,
+			birdsPage0 ?? []
+		);
 
-		// getSpeciesStatsHistory (sp-data.ts) — Robin monthly for Alpha
+		// RPC: core_stats (species-filtered, group_by_time_period: month) —
+		// powers getSpeciesStatsHistory (app/actions/sp-data.ts)
 		const { data: robinHistory } = await alpha.rpc('core_stats', {
 			species_name_filter: 'Robin',
 			ringing_group_filter: alphaId,
 			group_by_time_period: 'month'
 		});
 		await writeSnapshot(
-			`getSpeciesStatsHistory.alpha.robin.json`,
+			`core_stats/robin-alpha.monthly-history.json`,
 			robinHistory ?? []
 		);
 
-		// fetchSpNotableRetraps (sp-data.ts fetchNotableRetraps) — Robin for Alpha
+		// RPC: notable_retraps (species-filtered) — powers fetchNotableRetraps
+		// (app/actions/sp-data.ts)
 		const { data: robinRetraps } = await alpha.rpc('notable_retraps', {
 			ringing_group_filter: alphaId,
 			species_filter: 'Robin',
@@ -181,22 +216,29 @@ export async function generateSnapshots(
 			min_encounter_count: 6
 		});
 		await writeSnapshot(
-			`fetchSpNotableRetraps.alpha.robin.json`,
+			`notable_retraps/robin-alpha.retraps.json`,
 			robinRetraps ?? []
 		);
 
-		// fetchGraphableEncounterData (sp-data.ts) — Robin for Alpha
+		// Table: Birds (embedded Encounters only, for charting) — powers
+		// fetchGraphableEncounterData (app/actions/sp-data.ts)
 		const { data: graphableData } = await alpha
 			.from('Birds')
 			.select(`encounters:Encounters(age_code,sex,weight,wing_length)`)
 			.eq('species_id', robinSpecies.id)
 			.contains('ringing_group_ids', [alphaId]);
 		await writeSnapshot(
-			`fetchGraphableEncounterData.alpha.robin.json`,
+			`tables/Birds/robin-alpha.graphable-encounters.json`,
 			graphableData ?? []
 		);
 
-		// fetchSpPageData (species/[speciesName]/page.tsx) — Robin for Alpha
+		// Composite: RPC top_metrics_by_period + RPC core_stats + the Birds
+		// page fetched above — powers the species/[speciesName] page's headline
+		// stats, busiest-sessions and individuals data. Filed under
+		// core_stats/ since `speciesStats` (a core_stats row) is the
+		// field most exposed to silent RPC-shape drift — the same risk class
+		// that caused #870; `topSessions` and `birds` piggy-back on this fixture
+		// for convenience rather than getting a fixture each.
 		const [{ data: topSessions }, { data: robinStats }] = await Promise.all([
 			alpha.rpc('top_metrics_by_period', {
 				temporal_unit: 'day',
@@ -213,26 +255,36 @@ export async function generateSnapshots(
 			})
 		]);
 		if (birdsPage0 && birdsPage0.length > 0) {
-			await writeSnapshot(`fetchSpPageData.alpha.robin.json`, {
-				topSessions: topSessions ?? [],
-				birds: birdsPage0,
-				speciesStats: robinStats?.[0] ?? null,
-				speciesId: robinSpecies.id,
-				speciesName: 'Robin'
-			});
+			await writeSnapshot(
+				`core_stats/robin-alpha.species-page-composite.json`,
+				{
+					topSessions: topSessions ?? [],
+					birds: birdsPage0,
+					speciesStats: robinStats?.[0] ?? null,
+					speciesId: robinSpecies.id,
+					speciesName: 'Robin'
+				}
+			);
 		}
 	}
 
-	// getTopPeriodsByMetric (top-performers.ts) — busiest sessions for Alpha
+	// RPC: top_metrics_by_period (busiest single day, group-wide) — powers
+	// getTopPeriodsByMetric (app/actions/top-performers.ts)
 	const { data: topDays } = await alpha.rpc('top_metrics_by_period', {
 		temporal_unit: 'day',
 		metric_name: 'encounters',
 		result_limit: 1,
 		filters: { ringing_group_filter: alphaId }
 	} as Parameters<typeof alpha.rpc<'top_metrics_by_period'>>[1]);
-	await writeSnapshot(`getTopPeriodsByMetric.alpha.json`, topDays ?? []);
+	await writeSnapshot(
+		`top_metrics_by_period/alpha.busiest-days.json`,
+		topDays ?? []
+	);
 
-	// fetchBirdPageContent (bird/[ring]/PageContent.tsx) — ARRETRAP bird
+	// Table: Birds + Table: Encounters (bird detail merged with its own
+	// encounters) — powers fetchBirdPageContent (app/(routes)/bird/[ring]/page.tsx).
+	// Filed under tables/Birds/ since Birds (by ring_no) is the entity the page
+	// is keyed on; Encounters is a secondary query merged into the same object.
 	const { data: arretrapBird } = await alpha
 		.from('Birds')
 		.select(`id, ring_no, proven_age, species:Species(species_name)`)
@@ -245,7 +297,7 @@ export async function generateSnapshots(
 				`bird_id, id, age_code, is_juv, capture_time, max_hatch_year, min_hatch_year, record_type, sex, ringing_group_id, weight, wing_length, session:Sessions(visit_date)`
 			)
 			.eq('bird_id', arretrapBird.id);
-		await writeSnapshot(`fetchBirdData.ARRETRAP.json`, {
+		await writeSnapshot(`tables/Birds/arretrap.bird-detail.json`, {
 			...arretrapBird,
 			encounters: encounters ?? []
 		});

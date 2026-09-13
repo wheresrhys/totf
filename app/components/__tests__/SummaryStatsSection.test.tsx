@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { SummaryStatsSection } from '../SummaryStatsSection';
-import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
-import zeroStats from '@/test-fixtures/snapshots/fetchSummaryStats.zero.json';
+import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
+import zeroStats from '@/test-fixtures/snapshots/core_stats/zero.summary-totals.json';
 import type { CoreStatsResult } from '@/app/models/db';
 
 const populatedStats = alphaStats as unknown as CoreStatsResult;

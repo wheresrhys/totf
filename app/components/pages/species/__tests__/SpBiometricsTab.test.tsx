@@ -7,7 +7,7 @@ import {
 	waitFor
 } from '@testing-library/react';
 import { SpBiometricsTab } from '../SpBiometricsTab';
-import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
+import spPageSnapshot from '@/test-fixtures/snapshots/core_stats/robin-alpha.species-page-composite.json';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 import type { SexedGraphableBird } from '../WeightAndWingChart';

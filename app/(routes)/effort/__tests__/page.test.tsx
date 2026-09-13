@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import payOffSnapshot from '@/test-fixtures/snapshots/fetchPayOffStats.alpha.json';
+import payOffSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.yearly-and-monthly-totals.json';
 import type { PayOffStatsData } from '@/app/actions/pay-off-stats';
 
 vi.mock('@/app/actions/pay-off-stats', () => ({

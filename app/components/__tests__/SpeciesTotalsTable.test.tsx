@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { SpeciesTotalsTable } from '../SpeciesTotalsTable';
-import speciesDataSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
+import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
 import type { CoreStatsResult } from '@/app/models/db';
 import {
 	getCellByHeading,

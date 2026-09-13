@@ -8,7 +8,7 @@ import {
 	waitFor
 } from '@testing-library/react';
 import Page, { fetchSummaryPageContent } from '../page';
-import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
+import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 const fetchYearlyTotalsMock = vi.fn().mockResolvedValue([]);
