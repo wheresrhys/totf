@@ -23,7 +23,7 @@
 
 import { describe, it, beforeAll, afterAll, expect, vi } from 'vitest';
 import { execSync } from 'child_process';
-import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
+import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import {
 	createUpserter,
 	processEncounterRow,
