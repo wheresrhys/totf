@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
-import type {
-	AggregateStatsResult,
-	BiometricsStatsResult
-} from '@/app/models/db';
+import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 import { fetchSpeciesData } from '../spp-data';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
@@ -23,8 +20,8 @@ const FROM_DATE = '2026-01-01';
 const TO_DATE = '2026-12-31';
 
 function buildAggregateRow(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	return {
 		species_name: 'Blue Tit',
 		time_period: null,
@@ -58,7 +55,7 @@ function buildAggregateRow(
 		min_wing: 65,
 		median_wing: 67,
 		...overrides
-	} as unknown as AggregateStatsResult;
+	} as unknown as CoreStatsResult;
 }
 
 function buildBiometricsRow(

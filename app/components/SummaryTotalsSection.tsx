@@ -7,7 +7,7 @@ import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { fetchPeriodStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	buildGroupSummaryHref,
@@ -50,8 +50,8 @@ function AllTimeMonthTotalsTab({
 	totalsStats,
 	viewedGroup
 }: {
-	periodStats: AggregateStatsResult[];
-	totalsStats?: AggregateStatsResult;
+	periodStats: CoreStatsResult[];
+	totalsStats?: CoreStatsResult;
 	viewedGroup?: ViewedGroup;
 }) {
 	const [combineYears, setCombineYears] = useState(true);
@@ -143,7 +143,7 @@ function YearMonthTotalsTab({
 	viewedGroup
 }: {
 	monthTotals: MonthTotalsRow[];
-	totalsStats?: AggregateStatsResult;
+	totalsStats?: CoreStatsResult;
 	viewedGroup?: ViewedGroup;
 }) {
 	const [hideEmptyMonths, setHideEmptyMonths] = useState(true);
@@ -194,18 +194,18 @@ export function SummaryTotalsSection({
 }: {
 	// The page's aggregate stats for whichever table/tab is active — used to
 	// derive the pinned totals row. `null` (no data yet) renders no totals row.
-	summaryStats?: AggregateStatsResult | null;
+	summaryStats?: CoreStatsResult | null;
 	// Only the year summary page supplies month totals; when present the
 	// "Month totals" tab is prepended and shown first/by default.
 	monthTotals?: MonthTotalsRow[];
 	// Only the all-time summary page fetches this — undefined (not just an
 	// empty array) means "this page doesn't have a Year totals tab at all",
 	// so pages that don't pass it keep Species totals as their sole/default tab.
-	yearlyTotals?: AggregateStatsResult[];
+	yearlyTotals?: CoreStatsResult[];
 	// The month summary page passes these — a leading "Session totals" tab needs
 	// both the per-day rows and a group to build session links for. undefined
 	// means "this page has no Session totals tab"
-	sessionTotals?: AggregateStatsResult[];
+	sessionTotals?: CoreStatsResult[];
 	// Only the all-time page sets this — it enables the combine-years "Month
 	// totals" tab, whose data (unlike the year page's `monthTotals` prop) is
 	// fetched lazily on first selection rather than passed in, so this is just a

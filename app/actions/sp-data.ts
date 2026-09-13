@@ -15,8 +15,8 @@ import type { GraphableBird } from '@/app/components/pages/species/WeightAndWing
 import type { SexedGraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
 import {
 	mergeBiometricsFields,
-	type AggregateStatsResult,
-	type AggregateStatsWithBiometrics,
+	type CoreStatsResult,
+	type CoreStatsWithBiometrics,
 	type BiometricsStatsResult,
 	type PopulationStatsResult
 } from '@/app/models/db';
@@ -198,7 +198,7 @@ export async function getSpeciesStatsHistory(
 	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsWithBiometrics[]> {
+): Promise<CoreStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
 		species_name_filter: species,
@@ -209,7 +209,7 @@ export async function getSpeciesStatsHistory(
 	};
 	const [aggregateRows, biometricsRows] = await Promise.all([
 		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
-			AggregateStatsResult[]
+			CoreStatsResult[]
 		>,
 		supabase
 			.rpc('biometrics_stats', rpcArgs)
@@ -294,7 +294,7 @@ export async function fetchSpeciesPeriodTotals(
 	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsResult[]> {
+): Promise<CoreStatsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('core_stats', {
@@ -304,5 +304,5 @@ export async function fetchSpeciesPeriodTotals(
 			species_name_filter: speciesName,
 			group_by_time_period: timeInterval
 		})
-		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
+		.then(catchSupabaseErrors) as Promise<CoreStatsResult[]>;
 }

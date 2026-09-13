@@ -7,7 +7,7 @@ import {
 	fireEvent
 } from '@testing-library/react';
 import { SpMonthTotalsTab } from '../SpMonthTotalsTab';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import { getColumnIndex } from '@/app/__tests__/helpers/table';
 
 vi.mock('@/app/actions/sp-data', () => ({
@@ -15,8 +15,8 @@ vi.mock('@/app/actions/sp-data', () => ({
 }));
 
 function buildMonthlyStat(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	return {
 		species_name: null,
 		time_period: '2026-03-01',
@@ -45,7 +45,7 @@ function buildMonthlyStat(
 		adult_bird_count: 6,
 		unknown_age_bird_count: 2,
 		...overrides
-	} as AggregateStatsResult;
+	} as CoreStatsResult;
 }
 
 describe('SpMonthTotalsTab', () => {
@@ -62,7 +62,7 @@ describe('SpMonthTotalsTab', () => {
 
 	it('shows a loading spinner while data is fetching', async () => {
 		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		let resolveData!: (v: AggregateStatsResult[]) => void;
+		let resolveData!: (v: CoreStatsResult[]) => void;
 		vi.mocked(fetchSpeciesPeriodTotals).mockReturnValue(
 			new Promise((resolve) => {
 				resolveData = resolve;

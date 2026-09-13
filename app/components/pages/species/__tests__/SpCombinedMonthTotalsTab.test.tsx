@@ -7,7 +7,7 @@ import {
 	fireEvent
 } from '@testing-library/react';
 import { SpCombinedMonthTotalsTab } from '../SpCombinedMonthTotalsTab';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import {
 	getCellTextByHeading,
 	getColumnIndex
@@ -18,8 +18,8 @@ vi.mock('@/app/actions/sp-data', () => ({
 }));
 
 function buildMonthlyStat(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	return {
 		species_name: null,
 		time_period: '2020-01-01',
@@ -48,7 +48,7 @@ function buildMonthlyStat(
 		adult_bird_count: 15,
 		unknown_age_bird_count: 5,
 		...overrides
-	} as AggregateStatsResult;
+	} as CoreStatsResult;
 }
 
 describe('SpCombinedMonthTotalsTab', () => {
@@ -147,7 +147,7 @@ describe('SpCombinedMonthTotalsTab', () => {
 		it('shows a loading state before the fetch resolves', async () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
-			let resolveData!: (v: AggregateStatsResult[]) => void;
+			let resolveData!: (v: CoreStatsResult[]) => void;
 			vi.mocked(fetchSpeciesPeriodTotals).mockReturnValue(
 				new Promise((resolve) => {
 					resolveData = resolve;
@@ -295,7 +295,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 				buildMonthlyStat({
 					time_period: '2020-01-01',
 					pullus_bird_count: 2,
-					...({ pullus_enc_count: 5 } as Partial<AggregateStatsResult>)
+					...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
 				})
 			]);
 			render(

@@ -8,7 +8,7 @@ import {
 	formatMonthYearLabel
 } from '@/app/lib/month-totals';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 
 export function SpMonthTotalsTab({
 	speciesName,
@@ -23,7 +23,7 @@ export function SpMonthTotalsTab({
 	fromDate?: string;
 	toDate?: string;
 }) {
-	const [monthlyStats, setMonthlyStats] = useState<AggregateStatsResult[]>([]);
+	const [monthlyStats, setMonthlyStats] = useState<CoreStatsResult[]>([]);
 	const [isLoaded, setIsLoaded] = useState(false);
 	// Plain local state — `SpeciesPageContent`'s `ConditionalTabPanel` unmounts
 	// this tab on every tab switch, so the toggle naturally resets to Hide

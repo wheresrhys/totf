@@ -32,8 +32,9 @@ export type TopMetricsFilterParams =
 // Post-#815-item-4 (the aggregate_stats -> core_stats rename), the app's own call
 // sites all call core_stats/public_core_stats instead (#830), so this type now
 // sources from the byte-identical core_stats_result composite type rather than
-// aggregate_stats_result — same name, same shape, no consumer changes needed.
-export type AggregateStatsResult = {
+// aggregate_stats_result, and is itself renamed CoreStatsResult (from
+// AggregateStatsResult) to match — same shape, just following the RPC rename.
+export type CoreStatsResult = {
 	[K in keyof Database['public']['CompositeTypes']['core_stats_result']]-?: NonNullable<
 		Database['public']['CompositeTypes']['core_stats_result'][K]
 	>;
@@ -41,7 +42,7 @@ export type AggregateStatsResult = {
 
 // population_stats is aggregate_stats' companion RPC (#800), carrying the
 // age-split + young-trends derivations in its own population_stats_result
-// composite type. Same null-stripping rationale as AggregateStatsResult above:
+// composite type. Same null-stripping rationale as CoreStatsResult above:
 // composite-type attributes are always nullable in the generated types, but the
 // RPC COALESCEs its counts and only ever emits whole rows.
 export type PopulationStatsResult = {
@@ -54,7 +55,7 @@ export type PopulationStatsResult = {
 // per calendar year (at its first classifiable encounter of that year) rather than
 // once per (species, time_period) cell, split across the five arrival buckets in
 // its own arrivals_stats_result composite type. Same null-stripping rationale as
-// AggregateStatsResult above: composite-type attributes are always nullable in the
+// CoreStatsResult above: composite-type attributes are always nullable in the
 // generated types, but the RPC COALESCEs its counts and only ever emits whole rows.
 export type ArrivalsStatsResult = {
 	[K in keyof Database['public']['CompositeTypes']['arrivals_stats_result']]-?: NonNullable<
@@ -64,7 +65,7 @@ export type ArrivalsStatsResult = {
 
 // biometrics_stats is aggregate_stats' companion RPC (#822/#823), carrying the 8
 // wing/weight summary statistics (max/avg/min/median for both) in its own
-// biometrics_stats_result composite type. Unlike AggregateStatsResult above, the
+// biometrics_stats_result composite type. Unlike CoreStatsResult above, the
 // metric columns here are deliberately NOT stripped of null — MAX/AVG/MIN/
 // PERCENTILE_CONT over an empty set genuinely returns NULL (the RPC applies no
 // COALESCE, see biometrics_stats.sql), so a real "no biometric-eligible
@@ -104,7 +105,7 @@ export type BiometricFieldName =
 // fields are always present here (mergeBiometricsFields coalesces a missing
 // biometrics row to null, matching the old null-valued aggregate_stats columns),
 // so consumers can read them without an undefined check.
-export type AggregateStatsWithBiometrics = AggregateStatsResult &
+export type CoreStatsWithBiometrics = CoreStatsResult &
 	Pick<BiometricsStatsResult, BiometricFieldName>;
 
 // Wing/weight fields merged from a biometrics_stats row onto an
@@ -117,7 +118,7 @@ export type AggregateStatsWithBiometrics = AggregateStatsResult &
 // species/period) coalesces every metric to null, so the merged row always
 // carries all 8 fields — matching the null-valued columns aggregate_stats used
 // to return before #827 removed them.
-export function mergeBiometricsFields<T extends AggregateStatsResult>(
+export function mergeBiometricsFields<T extends CoreStatsResult>(
 	aggregateRow: T,
 	biometricsRow: BiometricsStatsResult | undefined
 ): T & Pick<BiometricsStatsResult, BiometricFieldName> {

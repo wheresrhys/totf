@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getGroupCookie } from '../../../actions/group-cookie';
 import { getAuthenticatedSupabaseClient } from '../group-auth';
 import { resolveGroupPublicAreasForRequest } from '../../group-slug';
-import type { AggregateStatsWithBiometrics } from '@/app/models/db';
+import type { CoreStatsWithBiometrics } from '@/app/models/db';
 
 const { mockPublicSupabaseFrom, mockPublicSupabaseRpc } = vi.hoisted(() => ({
 	mockPublicSupabaseFrom: vi.fn(),
@@ -29,12 +29,12 @@ import { fetchAuthorisedCoreStats } from '../group-summary-access';
 
 // Only `encounter_count` matters to the access-resolution logic under test
 // (it's the "is there anything real here" signal); every other field is
-// filled with an inert default so the fixture satisfies `AggregateStatsWithBiometrics`
+// filled with an inert default so the fixture satisfies `CoreStatsWithBiometrics`
 // (a Postgres composite type — every column comes back non-null, see
 // app/models/db.ts).
 function buildStatsRow(
-	overrides: Partial<AggregateStatsWithBiometrics> = {}
-): AggregateStatsWithBiometrics {
+	overrides: Partial<CoreStatsWithBiometrics> = {}
+): CoreStatsWithBiometrics {
 	return {
 		species_name: 'Robin',
 		time_period: '2026-01-01',
@@ -71,7 +71,7 @@ function buildStatsRow(
 	};
 }
 
-function makeAuthenticatedClient(rows: AggregateStatsWithBiometrics[] | null) {
+function makeAuthenticatedClient(rows: CoreStatsWithBiometrics[] | null) {
 	return {
 		rpc: vi.fn().mockReturnValue({
 			then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
@@ -80,7 +80,7 @@ function makeAuthenticatedClient(rows: AggregateStatsWithBiometrics[] | null) {
 	};
 }
 
-function mockPublicRpcReturning(rows: AggregateStatsWithBiometrics[] | null) {
+function mockPublicRpcReturning(rows: CoreStatsWithBiometrics[] | null) {
 	mockPublicSupabaseRpc.mockReturnValue({
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({ data: rows, error: null }).then(resolve)

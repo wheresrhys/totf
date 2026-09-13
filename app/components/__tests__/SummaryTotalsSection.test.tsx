@@ -10,7 +10,7 @@ import {
 import { SummaryTotalsSection } from '../SummaryTotalsSection';
 import { buildMonthTotalsRows } from '@/app/lib/month-totals';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	getCellTextByHeading,
@@ -32,7 +32,7 @@ vi.mock('@/app/actions/period-totals', () => ({
 	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
 }));
 
-const speciesStats = speciesDataSnapshot as unknown as AggregateStatsResult[];
+const speciesStats = speciesDataSnapshot as unknown as CoreStatsResult[];
 const monthTotals = buildMonthTotalsRows(2026, []);
 
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
@@ -41,11 +41,11 @@ const summaryStats = {
 	...speciesStats[0],
 	session_count: 9,
 	bird_count: 99
-} as AggregateStatsResult;
+} as CoreStatsResult;
 
 function buildDayStat(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	return {
 		species_name: null,
 		time_period: '2026-08-16',
@@ -74,12 +74,12 @@ function buildDayStat(
 		adult_bird_count: 6,
 		unknown_age_bird_count: 2,
 		...overrides
-	} as AggregateStatsResult;
+	} as CoreStatsResult;
 }
 
 function buildYearlyStat(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	return {
 		species_name: null,
 		time_period: '2026-01-01',
@@ -108,12 +108,12 @@ function buildYearlyStat(
 		adult_bird_count: 15,
 		unknown_age_bird_count: 5,
 		...overrides
-	} as AggregateStatsResult;
+	} as CoreStatsResult;
 }
 
 // Monthly (year, month) stats as `fetchPeriodStats(_, 'month')` returns them —
 // two Januaries and one August, to exercise the combine-years fold.
-const monthlyPeriodStats: AggregateStatsResult[] = [
+const monthlyPeriodStats: CoreStatsResult[] = [
 	buildYearlyStat({
 		time_period: '2020-01-01',
 		session_count: 4,
@@ -656,7 +656,7 @@ describe('SummaryTotalsSection', () => {
 						buildYearlyStat({
 							time_period: '2020-01-01',
 							pullus_bird_count: 2,
-							...({ pullus_enc_count: 5 } as Partial<AggregateStatsResult>)
+							...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
 						})
 					]);
 					render(<SummaryTotalsSection {...allTimeProps} />);
@@ -733,9 +733,9 @@ describe('SummaryTotalsSection', () => {
 
 	describe('lazy Species totals fetch', () => {
 		it('shows a loading indicator immediately after the Species tab is selected, before the fetch resolves', async () => {
-			let resolveFetch: (value: AggregateStatsResult[]) => void = () => {};
+			let resolveFetch: (value: CoreStatsResult[]) => void = () => {};
 			fetchSpeciesDataMock.mockReturnValue(
-				new Promise<AggregateStatsResult[]>((resolve) => {
+				new Promise<CoreStatsResult[]>((resolve) => {
 					resolveFetch = resolve;
 				})
 			);

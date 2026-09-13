@@ -8,7 +8,7 @@ import {
 } from '@/app/actions/summary-stats';
 import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import {
 	buildMonthTotalsRows,
 	type MonthTotalsRow
@@ -35,7 +35,7 @@ async function getSummaryYearPageParams(
 
 export type PageData = {
 	year: number;
-	summaryStats: AggregateStatsResult | null;
+	summaryStats: CoreStatsResult | null;
 	monthTotals: MonthTotalsRow[];
 	fromDate: string;
 	toDate: string;

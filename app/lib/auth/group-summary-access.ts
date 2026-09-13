@@ -3,7 +3,7 @@ import { getAuthenticatedSupabaseClient } from './group-auth';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import { resolveGroupPublicAreasForRequest } from '../group-slug';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 
 // Shared param shape for both `core_stats` and `public_core_stats`
 // (the two functions share an identical Args signature — see #772/#768).
@@ -21,7 +21,7 @@ export type GroupSummaryAccessLevel = 'own' | 'shared' | 'public' | 'blocked';
 
 export type AuthorisedSummaryResult = {
 	accessLevel: GroupSummaryAccessLevel;
-	rows: AggregateStatsResult[];
+	rows: CoreStatsResult[];
 };
 
 async function runCoreStats(
@@ -29,10 +29,10 @@ async function runCoreStats(
 	client: SupabaseClient,
 	viewedGroupId: number,
 	rpcParams: CoreStatsRpcParams
-): Promise<AggregateStatsResult[]> {
+): Promise<CoreStatsResult[]> {
 	const rows = (await client
 		.rpc(rpcName, { ringing_group_filter: viewedGroupId, ...rpcParams })
-		.then(catchSupabaseErrors)) as AggregateStatsResult[] | null;
+		.then(catchSupabaseErrors)) as CoreStatsResult[] | null;
 	return rows ?? [];
 }
 
@@ -42,7 +42,7 @@ async function runCoreStats(
 // it comes back as a single row of COALESCEd zeros. This checks for that
 // case too, so "blocked by RLS" and "no rows at all" (the grouped-query
 // case) are both treated as "nothing visible here".
-function hasVisibleData(rows: AggregateStatsResult[]): boolean {
+function hasVisibleData(rows: CoreStatsResult[]): boolean {
 	return rows.length > 0 && rows.some((row) => row.encounter_count > 0);
 }
 

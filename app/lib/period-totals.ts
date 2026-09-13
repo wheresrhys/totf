@@ -1,6 +1,6 @@
 import { format as formatDate } from 'date-fns';
 import { postgresIntervalToSeconds } from '@/app/lib/postgres-interval';
-import type { AggregateStatsResult } from '../models/db';
+import type { CoreStatsResult } from '../models/db';
 import { calculateEncounterRetraps, calculateRetraps } from './species-totals';
 
 export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
@@ -28,7 +28,7 @@ export type PeriodTotalsRow = {
 };
 
 export function derivePeriodTotalsRowByBird(
-	stat: AggregateStatsResult
+	stat: CoreStatsResult
 ): PeriodTotalsRow {
 	return {
 		timePeriod: stat.time_period,
@@ -55,7 +55,7 @@ export function derivePeriodTotalsRowByBird(
  * bird-based count by construction (see #601).
  */
 export function derivePeriodTotalsRowByEncounter(
-	stat: AggregateStatsResult
+	stat: CoreStatsResult
 ): PeriodTotalsRow {
 	return {
 		timePeriod: stat.time_period,

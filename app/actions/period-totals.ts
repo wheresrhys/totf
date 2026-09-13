@@ -1,6 +1,6 @@
 'use server';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
 
 /**
@@ -15,7 +15,7 @@ export async function fetchPeriodTotals(
 	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsResult[]> {
+): Promise<CoreStatsResult[]> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {}),

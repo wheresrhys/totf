@@ -9,10 +9,7 @@ import {
 import Page, { getSpeciesStats } from '../page';
 import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
 import type { FullFatPageData } from '../PageContent';
-import type {
-	AggregateStatsResult,
-	BiometricsStatsResult
-} from '@/app/models/db';
+import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
 	() => ({
@@ -334,17 +331,17 @@ const BIOMETRICS_FIELD_KEYS = [
 	'median_wing'
 ] as const;
 
-function omitBiometricsFields(row: AggregateStatsResult): AggregateStatsResult {
+function omitBiometricsFields(row: CoreStatsResult): CoreStatsResult {
 	const copy: Record<string, unknown> = { ...row };
 	for (const key of BIOMETRICS_FIELD_KEYS) delete copy[key];
-	return copy as unknown as AggregateStatsResult;
+	return copy as unknown as CoreStatsResult;
 }
 
 function makeAggregateRow(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	return {
-		...(speciesStats as AggregateStatsResult),
+		...(speciesStats as CoreStatsResult),
 		...overrides
 	};
 }
@@ -409,7 +406,7 @@ describe('getSpeciesStats', () => {
 
 		expect(result[0].min_weight).toBe(99);
 		expect(result[0].bird_count).toBe(
-			(speciesStats as AggregateStatsResult).bird_count
+			(speciesStats as CoreStatsResult).bird_count
 		);
 	});
 
@@ -485,7 +482,7 @@ describe('getSpeciesStats', () => {
 		expect(result[0].min_weight).toBe(12);
 		expect(result[0].max_wing).toBe(88);
 		expect(result[0].bird_count).toBe(
-			(speciesStats as AggregateStatsResult).bird_count
+			(speciesStats as CoreStatsResult).bird_count
 		);
 	});
 });

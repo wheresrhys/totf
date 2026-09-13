@@ -5,7 +5,7 @@ import {
 } from '@/app/actions/summary-stats';
 import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import { SummaryPageContent } from './PageContent';
 
 // `tabId` (#804, reusing #803's mechanism) is the optional `?tabId=` search
@@ -15,8 +15,8 @@ export type PageParams = { tabId?: string };
 type PageProps = { searchParams?: Promise<{ tabId?: string }> };
 
 export type PageData = {
-	summaryStats: AggregateStatsResult | null;
-	yearlyTotals: AggregateStatsResult[];
+	summaryStats: CoreStatsResult | null;
+	yearlyTotals: CoreStatsResult[];
 };
 
 async function getSummaryPageParams(pageProps: PageProps): Promise<PageParams> {

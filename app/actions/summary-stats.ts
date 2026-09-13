@@ -1,6 +1,6 @@
 'use server';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 
 /**
  * Page-wide (ungrouped) totals for a summary period — no `group_by_species`/
@@ -10,7 +10,7 @@ export async function fetchSummaryStats(
 	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsResult | null> {
+): Promise<CoreStatsResult | null> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {})
@@ -29,7 +29,7 @@ export async function fetchPeriodStats(
 	timeInterval: 'year' | 'month' | 'day',
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsResult[]> {
+): Promise<CoreStatsResult[]> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		group_by_species: false,
 		group_by_time_period: timeInterval,
@@ -47,7 +47,7 @@ export async function fetchPeriodStats(
  */
 export async function fetchYearlyTotals(
 	viewedGroupId: number
-): Promise<AggregateStatsResult[]> {
+): Promise<CoreStatsResult[]> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		group_by_species: false,
 		group_by_time_period: 'year'

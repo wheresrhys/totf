@@ -16,7 +16,7 @@ import {
 	NEW_YOUNG_COUNTS_COLORS
 } from '../SpPopulationTab';
 import type {
-	AggregateStatsWithBiometrics,
+	CoreStatsWithBiometrics,
 	PopulationStatsResult
 } from '@/app/models/db';
 
@@ -142,7 +142,7 @@ describe('SpPopulationTab', () => {
 			getGroupEffortHistory
 		} = await loadActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
-			[] as AggregateStatsWithBiometrics[]
+			[] as CoreStatsWithBiometrics[]
 		);
 		vi.mocked(getSpeciesPopulationStats).mockResolvedValue(
 			[] as PopulationStatsResult[]
@@ -233,7 +233,7 @@ describe('SpPopulationTab', () => {
 		it('shows a spinner until both fetches have resolved, not just one', async () => {
 			const { getSpeciesStatsHistory, getSpeciesPopulationStats } =
 				await loadActions();
-			let resolveStatsHistory!: (value: AggregateStatsWithBiometrics[]) => void;
+			let resolveStatsHistory!: (value: CoreStatsWithBiometrics[]) => void;
 			vi.mocked(getSpeciesStatsHistory).mockReturnValue(
 				new Promise((resolve) => {
 					resolveStatsHistory = resolve;

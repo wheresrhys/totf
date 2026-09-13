@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
-	AggregateStatsResult,
+	CoreStatsResult,
 	StatsPerDayAndSpeciesResult
 } from '@/app/models/db';
 import payOffStatsFixture from '../../../test-fixtures/snapshots/fetchPayOffStats.beta.json';
@@ -228,10 +228,8 @@ describe('fetchSessionStats', () => {
 // fetchWithVersionCache), so their mock client still needs a working
 // `from` chain for the Encounters version query: reuse the same mockFrom /
 // statsVersion scaffolding used for fetchSessionStats above.
-const yearlyRows =
-	payOffStatsFixture.yearly as unknown as AggregateStatsResult[];
-const monthlyRows =
-	payOffStatsFixture.monthly as unknown as AggregateStatsResult[];
+const yearlyRows = payOffStatsFixture.yearly as unknown as CoreStatsResult[];
+const monthlyRows = payOffStatsFixture.monthly as unknown as CoreStatsResult[];
 
 function makeAggregateStatsClient(response: {
 	data: unknown;

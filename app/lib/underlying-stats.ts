@@ -2,7 +2,7 @@ import { getAuthenticatedSupabaseClient } from './auth/group-auth';
 import { catchSupabaseErrors, fetchAllPaginatedRows } from '@/lib/supabase';
 import type { SessionStatsData } from '@/app/lib/highlights';
 import type {
-	AggregateStatsResult,
+	CoreStatsResult,
 	StatsPerDayAndSpeciesResult
 } from '@/app/models/db';
 
@@ -33,15 +33,15 @@ export const sessionStatsCache = new Map<
 >();
 export const yearStatsCache = new Map<
 	number,
-	StatsCacheEntry<AggregateStatsResult[] | null>
+	StatsCacheEntry<CoreStatsResult[] | null>
 >();
 export const monthStatsCache = new Map<
 	number,
-	StatsCacheEntry<AggregateStatsResult[] | null>
+	StatsCacheEntry<CoreStatsResult[] | null>
 >();
 export const effortHistoryCache = new Map<
 	number,
-	StatsCacheEntry<AggregateStatsResult[] | null>
+	StatsCacheEntry<CoreStatsResult[] | null>
 >();
 
 export async function fetchStatsVersion(
@@ -132,7 +132,7 @@ export async function fetchSessionStats(
 // remains deliberately uncached.
 export async function fetchYearStats(
 	viewedGroupId: number
-): Promise<AggregateStatsResult[] | null> {
+): Promise<CoreStatsResult[] | null> {
 	return fetchWithVersionCache(
 		yearStatsCache,
 		viewedGroupId,
@@ -143,13 +143,13 @@ export async function fetchYearStats(
 					group_by_species: true,
 					group_by_time_period: 'year'
 				})
-				.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
+				.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>
 	);
 }
 
 export async function fetchMonthStats(
 	viewedGroupId: number
-): Promise<AggregateStatsResult[] | null> {
+): Promise<CoreStatsResult[] | null> {
 	return fetchWithVersionCache(
 		monthStatsCache,
 		viewedGroupId,
@@ -160,7 +160,7 @@ export async function fetchMonthStats(
 					group_by_species: true,
 					group_by_time_period: 'month'
 				})
-				.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
+				.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>
 	);
 }
 
@@ -175,7 +175,7 @@ export async function fetchMonthStats(
 // comment above it) via its own dedicated effortHistoryCache Map.
 export async function fetchGroupEffortHistory(
 	viewedGroupId: number
-): Promise<AggregateStatsResult[] | null> {
+): Promise<CoreStatsResult[] | null> {
 	return fetchWithVersionCache(
 		effortHistoryCache,
 		viewedGroupId,
@@ -186,6 +186,6 @@ export async function fetchGroupEffortHistory(
 					group_by_species: false,
 					group_by_time_period: 'month'
 				})
-				.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
+				.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>
 	);
 }

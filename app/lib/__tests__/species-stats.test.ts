@@ -1,13 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { mergeSpeciesBiometrics } from '../species-stats';
-import type {
-	AggregateStatsResult,
-	BiometricsStatsResult
-} from '../../models/db';
+import type { CoreStatsResult, BiometricsStatsResult } from '../../models/db';
 
 function buildAggregateRow(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	return {
 		species_name: 'Blue Tit',
 		time_period: null,
@@ -41,7 +38,7 @@ function buildAggregateRow(
 		min_wing: 65,
 		median_wing: 67,
 		...overrides
-	} as unknown as AggregateStatsResult;
+	} as unknown as CoreStatsResult;
 }
 
 function buildBiometricsRow(

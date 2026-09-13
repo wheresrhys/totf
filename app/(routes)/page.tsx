@@ -9,7 +9,7 @@ import {
 	type HomePageSummaryStats,
 	type SpeciesWithBirdsCount
 } from './PageContent';
-import type { AggregateStatsResult, GroupTicksResult } from '../models/db';
+import type { CoreStatsResult, GroupTicksResult } from '../models/db';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
@@ -45,20 +45,20 @@ export async function fetchHomePageSummaryStats(
 	const [allTime, thisYear, lastYear] = await Promise.all([
 		supabase
 			.rpc('core_stats', { ringing_group_filter: viewedGroupId })
-			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>,
+			.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>,
 		supabase
 			.rpc('core_stats', {
 				ringing_group_filter: viewedGroupId,
 				from_date: startOfCurrentYear
 			})
-			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>,
+			.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>,
 		supabase
 			.rpc('core_stats', {
 				ringing_group_filter: viewedGroupId,
 				from_date: startOfLastYear,
 				to_date: endOfLastYear
 			})
-			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
+			.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>
 	]);
 	if (allTime?.[0] == null && thisYear?.[0] == null && lastYear?.[0] == null) {
 		return null;

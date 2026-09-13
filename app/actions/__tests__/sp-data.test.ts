@@ -8,7 +8,7 @@ import {
 	fetchSpeciesPeriodTotals,
 	getGroupEffortHistory
 } from '../sp-data';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchGroupEffortHistory } =
 	vi.hoisted(() => ({
@@ -408,11 +408,11 @@ describe('sp-data actions', () => {
 		function effortRow(
 			time_period: string,
 			total_effort: string
-		): AggregateStatsResult {
+		): CoreStatsResult {
 			return {
 				time_period,
 				total_effort
-			} as AggregateStatsResult;
+			} as CoreStatsResult;
 		}
 
 		it('converts aggregate_stats rows into [time_period, hours] pairs in the same order', async () => {

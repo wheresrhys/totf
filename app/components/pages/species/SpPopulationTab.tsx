@@ -7,10 +7,7 @@ import {
 	getSpeciesPopulationStats,
 	getGroupEffortHistory
 } from '@/app/actions/sp-data';
-import type {
-	AggregateStatsResult,
-	PopulationStatsResult
-} from '@/app/models/db';
+import type { CoreStatsResult, PopulationStatsResult } from '@/app/models/db';
 import {
 	getCounts,
 	getReturningVsNew,
@@ -119,9 +116,9 @@ export function SpPopulationTab({
 }) {
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-	const [statsHistory, setStatsHistory] = useState<
-		AggregateStatsResult[] | null
-	>(null);
+	const [statsHistory, setStatsHistory] = useState<CoreStatsResult[] | null>(
+		null
+	);
 	const [statsRequested, setStatsRequested] = useState(false);
 	function loadStatsHistory() {
 		if (statsRequested) return;

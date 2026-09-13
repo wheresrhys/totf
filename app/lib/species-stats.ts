@@ -1,5 +1,5 @@
 import type {
-	AggregateStatsResult,
+	CoreStatsResult,
 	BiometricFieldName,
 	BiometricsStatsResult
 } from '../models/db';
@@ -16,7 +16,7 @@ export type { BiometricFieldName };
 // biometrics_stats row leaves the 8 fields undefined, which
 // MultiSpeciesTableBody's generic `<td>{species[column.property]}</td>` already
 // renders as a blank cell — no special-casing needed.
-export type SpeciesStatsRow = Omit<AggregateStatsResult, BiometricFieldName> &
+export type SpeciesStatsRow = Omit<CoreStatsResult, BiometricFieldName> &
 	Partial<Pick<BiometricsStatsResult, BiometricFieldName>>;
 
 // Joins aggregate_stats rows (species_name, bird_count, encounter_count, etc.)
@@ -25,7 +25,7 @@ export type SpeciesStatsRow = Omit<AggregateStatsResult, BiometricFieldName> &
 // sole source for the 8 biometric fields (#827 removed aggregate_stats' own
 // copies).
 export function mergeSpeciesBiometrics(
-	aggregateRows: AggregateStatsResult[],
+	aggregateRows: CoreStatsResult[],
 	biometricsRows: BiometricsStatsResult[]
 ): SpeciesStatsRow[] {
 	const aggregateByName = new Map(
@@ -42,7 +42,7 @@ export function mergeSpeciesBiometrics(
 		const aggregateRow = aggregateByName.get(speciesName);
 		const biometricsRow = biometricsByName.get(speciesName);
 		return {
-			...(aggregateRow ?? ({} as AggregateStatsResult)),
+			...(aggregateRow ?? ({} as CoreStatsResult)),
 			species_name: speciesName,
 			max_weight: biometricsRow?.max_weight,
 			avg_weight: biometricsRow?.avg_weight,

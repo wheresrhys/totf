@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import {
 	fetchSummaryStats,
 	fetchPeriodStats,
@@ -11,7 +11,7 @@ vi.mock('@/app/lib/auth/group-summary-access', () => ({
 	fetchAuthorisedCoreStats: vi.fn()
 }));
 
-const ROW = { encounter_count: 5 } as unknown as AggregateStatsResult;
+const ROW = { encounter_count: 5 } as unknown as CoreStatsResult;
 
 describe('summary-stats actions — route through the group-summary access helper', () => {
 	beforeEach(() => {
