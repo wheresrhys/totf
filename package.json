@@ -8,6 +8,7 @@
 		"db:schema:apply": "MIGRATION_NAME=$(git rev-parse --abbrev-ref HEAD | sed 's/[^a-zA-Z0-9]/_/g') && npx supabase db schema declarative sync --name \"$MIGRATION_NAME\" && npx supabase migration up --local && echo 'local schema applied to local db' && npm run db:types",
 		"db:diff": "npm run db:schema:pull && supabase db diff --local",
 		"db:migration:push": "supabase migration up --linked --debug --include-all",
+		"db:migration:squash": "supabase migration new squash_migration_history && supabase migration squash squash_migration_history",
 		"db:sync:local": "npm run db:schema:pull && supabase db reset && npm run db:seed:local",
 		"db:seed:local": "npm run db:import:local ./data/test-data.csv \"Walthamstow Wetlands\" && npm run db:import:local ./data/group2.csv \"Second Group\" && npm run set-group-password:local \"Walthamstow Wetlands\" password",
 		"db:seed:e2e": "dotenvx run -f .env.dev -- tsx scripts/seed-e2e-data.ts",
