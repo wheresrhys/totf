@@ -65,6 +65,7 @@ incrementally; current inventory:
 |---|---|
 | `swarm_tools_ping` | Health check — confirms the server is reachable |
 | `swarm_state_append` / `_remove` / `_list` | Read/mutate `.claude/swarm-state.json` (locked, atomic — never hand-write it) |
+| `swarm_state_release_db_lock` | Let an exclusive-resource worker release the shared-local-Postgres lock early (by `agentId`), once its migration/`@mutates` work is applied and verified and only push/PR steps remain — other non-exclusive tickets can then start, while a *new* exclusive-resource worker still waits for it to finish. One-way |
 | `swarm_plan_batch` | Pre-filtered, pre-ranked PR-maintenance + ready-ticket lists for `swarm` |
 | `derive_branch_name` | Ticket branch naming (wraps `lib/slugify.ts`) + collision check |
 | `create_ticket` | `gh issue create` with labels + sub-issue linking, no shell-escaping/tempfile dance |

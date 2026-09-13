@@ -397,23 +397,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      core_stats: {
-        Args: {
-          from_date?: string
-          group_by_species?: boolean
-          group_by_time_period?: string
-          ringing_group_filter?: number
-          species_name_filter?: string
-          to_date?: string
-        }
-        Returns: Database["public"]["CompositeTypes"]["core_stats_result"][]
-        SetofOptions: {
-          from: "*"
-          to: "core_stats_result"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
       aggregate_stats: {
         Args: {
           from_date?: string
@@ -465,7 +448,41 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      core_stats: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["core_stats_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "core_stats_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       daitch_mokotoff: { Args: { "": string }; Returns: string[] }
+      demographics_stats: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["demographics_stats_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "demographics_stats_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       dmetaphone: { Args: { "": string }; Returns: string }
       dmetaphone_alt: { Args: { "": string }; Returns: string }
       find_discrepencies: {
@@ -574,23 +591,6 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      public_core_stats: {
-        Args: {
-          from_date?: string
-          group_by_species?: boolean
-          group_by_time_period?: string
-          ringing_group_filter?: number
-          species_name_filter?: string
-          to_date?: string
-        }
-        Returns: Database["public"]["CompositeTypes"]["core_stats_result"][]
-        SetofOptions: {
-          from: "*"
-          to: "core_stats_result"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
       public_aggregate_stats: {
         Args: {
           from_date?: string
@@ -604,6 +604,23 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "aggregate_stats_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      public_core_stats: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["core_stats_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "core_stats_result"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -781,31 +798,6 @@ export type Database = {
         | "MS"
     }
     CompositeTypes: {
-      core_stats_result: {
-        species_name: string | null
-        time_period: string | null
-        session_count: number | null
-        total_effort: string | null
-        effort_per_session: string | null
-        effort_per_encounter: string | null
-        avg_encounters_per_session: number | null
-        max_per_session: number | null
-        species_count: number | null
-        bird_count: number | null
-        encounter_count: number | null
-        new_bird_count: number | null
-        pullus_bird_count: number | null
-        juv_bird_count: number | null
-        postjuv_bird_count: number | null
-        adult_bird_count: number | null
-        unknown_age_bird_count: number | null
-        pullus_enc_count: number | null
-        juv_enc_count: number | null
-        postjuv_enc_count: number | null
-        adult_enc_count: number | null
-        unknown_age_enc_count: number | null
-        max_new_per_session: number | null
-      }
       aggregate_stats_result: {
         species_name: string | null
         time_period: string | null
@@ -851,6 +843,46 @@ export type Database = {
         avg_wing: number | null
         min_wing: number | null
         median_wing: number | null
+      }
+      core_stats_result: {
+        species_name: string | null
+        time_period: string | null
+        session_count: number | null
+        total_effort: string | null
+        effort_per_session: string | null
+        effort_per_encounter: string | null
+        avg_encounters_per_session: number | null
+        max_per_session: number | null
+        species_count: number | null
+        bird_count: number | null
+        encounter_count: number | null
+        new_bird_count: number | null
+        pullus_bird_count: number | null
+        juv_bird_count: number | null
+        postjuv_bird_count: number | null
+        adult_bird_count: number | null
+        unknown_age_bird_count: number | null
+        pullus_enc_count: number | null
+        juv_enc_count: number | null
+        postjuv_enc_count: number | null
+        adult_enc_count: number | null
+        unknown_age_enc_count: number | null
+        max_new_per_session: number | null
+      }
+      demographics_stats_result: {
+        species_name: string | null
+        time_period: string | null
+        adult_bird_count: number | null
+        juv_bird_count: number | null
+        juv_enc_count: number | null
+        postjuv_enc_count: number | null
+        new_young_bird_count: number | null
+        new_adult_bird_count: number | null
+        first_summer_bird_count: number | null
+        old_timers_bird_count: number | null
+        postjuv_juv_enc_count: number | null
+        new_postjuv_juv_enc_count: number | null
+        new_postjuv_enc_count: number | null
       }
       population_stats_result: {
         species_name: string | null

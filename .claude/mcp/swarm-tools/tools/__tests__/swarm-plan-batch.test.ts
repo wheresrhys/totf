@@ -874,6 +874,132 @@ describe('planBatch', () => {
 		expect(result.soloRunLabel).toBe('db-migration');
 	});
 
+	describe('early db-lock release (dbLockReleased)', () => {
+		/** A live db-migration ticket worker on issue #500, optionally having released its lock early. */
+		function dbMigrationWorker(overrides: Partial<SwarmWorkerEntry> = {}): SwarmWorkerEntry {
+			return {
+				kind: 'ticket',
+				issue: 500,
+				pr: null,
+				branch: 'feature/500-migrate',
+				title: 'Live migration',
+				worktreePath: '/tmp/does-not-matter',
+				agentId: 'agent-live',
+				model: 'opus',
+				startedAt: '2026-01-01T00:00:00.000Z',
+				...overrides,
+			};
+		}
+
+		/** Labels issue #500 db-migration, so any entry that *does* get looked up contributes an exclusive label. */
+		function stubGhWithExclusiveIssue500(issues: unknown[] = []) {
+			mockGhJson.mockImplementation((args: string[]) => {
+				if (args[0] === 'issue' && args[1] === 'view' && args[2] === '500')
+					return Promise.resolve({ labels: [{ name: 'db-migration' }] });
+				if (args[0] === 'pr' && args[1] === 'view' && args[2] === '900')
+					return Promise.resolve({ labels: [{ name: 'db-migration' }] });
+				if (args[0] === 'issue' && args[1] === 'view') return Promise.resolve({ closedByPullRequestsReferences: [] });
+				if (args[0] === 'issue' && args[1] === 'list') return Promise.resolve(issues);
+				if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve([]);
+				return Promise.resolve([]);
+			});
+		}
+
+		// Usual — the released worker no longer holds the lock, and the label lookup is short-circuited
+		// entirely (issue #500 is still labelled db-migration in the gh stub, so a lookup would have
+		// reported it active).
+		it('reports no solo run, without looking the entry up, once its lock is released', async () => {
+			mockListState.mockResolvedValue({ workers: [dbMigrationWorker({ dbLockReleased: true })], pruned: [] });
+			stubGhWithExclusiveIssue500();
+			mockListBranches.mockResolvedValue([]);
+
+			const result = await planBatch(4);
+
+			expect(result.soloRunActive).toBe(false);
+			expect(result.soloRunLabel).toBeUndefined();
+			expect(mockGhJson.mock.calls.some((call) => call[0][1] === 'view' && call[0][2] === '500')).toBe(false);
+		});
+
+		// Structure — an explicit `false` is treated exactly like the absent flag: still holding the lock.
+		it('keeps the solo run active when dbLockReleased is explicitly false', async () => {
+			mockListState.mockResolvedValue({ workers: [dbMigrationWorker({ dbLockReleased: false })], pruned: [] });
+			stubGhWithExclusiveIssue500();
+			mockListBranches.mockResolvedValue([]);
+
+			const result = await planBatch(4);
+
+			expect(result.soloRunActive).toBe(true);
+			expect(result.soloRunLabel).toBe('db-migration');
+		});
+
+		// Structure — the release is a state-file flag, nothing to do with what the worker is doing now:
+		// a maintenance worker on an already-open exclusive PR is excluded on the flag alone. (Release
+		// happens before push/PR-open, so an open exclusive PR has necessarily already released.)
+		it('reports no solo run for a released maintenance worker whose exclusive PR is already open', async () => {
+			mockListState.mockResolvedValue({
+				workers: [
+					dbMigrationWorker({ kind: 'maintenance', issue: null, pr: 900, agentId: 'agent-maint', dbLockReleased: true }),
+				],
+				pruned: [],
+			});
+			stubGhWithExclusiveIssue500();
+			mockListBranches.mockResolvedValue([]);
+
+			const result = await planBatch(4);
+
+			expect(result.soloRunActive).toBe(false);
+			expect(mockGhJson.mock.calls.some((call) => call[0][1] === 'view' && call[0][2] === '900')).toBe(false);
+		});
+
+		// Structure — releasing the lock frees non-exclusive work only: the released worker still counts
+		// as running, so `anyWorkerRunning` keeps a *new* exclusive candidate out.
+		it('lets ordinary tickets start but still withholds a new exclusive candidate', async () => {
+			mockListState.mockResolvedValue({ workers: [dbMigrationWorker({ dbLockReleased: true })], pruned: [] });
+			stubGhWithExclusiveIssue500([
+				{
+					number: 600,
+					title: 'Another migration',
+					labels: [{ name: 'ready' }, { name: 'db-migration' }, { name: 'opus' }],
+					blockedBy: { nodes: [] },
+					blocking: { nodes: [{ state: 'OPEN' }, { state: 'OPEN' }] },
+					updatedAt: '2026-01-06T00:00:00Z',
+				},
+				{
+					number: 601,
+					title: 'Ordinary',
+					labels: [{ name: 'ready' }, { name: 'sonnet' }],
+					blockedBy: { nodes: [] },
+					blocking: { nodes: [] },
+					updatedAt: '2026-01-06T00:00:00Z',
+				},
+			]);
+			mockListBranches.mockResolvedValue([]);
+
+			const result = await planBatch(4);
+
+			expect(result.soloRunActive).toBe(false);
+			expect(result.ticketsToImplement.map((t) => t.number)).toEqual([601]);
+		});
+
+		// Edge — one released and one still-holding worker: the unreleased one still names the solo run.
+		it('still reports the solo run when another worker has not released its lock', async () => {
+			mockListState.mockResolvedValue({
+				workers: [
+					dbMigrationWorker({ agentId: 'agent-released', dbLockReleased: true }),
+					dbMigrationWorker({ agentId: 'agent-holding' }),
+				],
+				pruned: [],
+			});
+			stubGhWithExclusiveIssue500();
+			mockListBranches.mockResolvedValue([]);
+
+			const result = await planBatch(4);
+
+			expect(result.soloRunActive).toBe(true);
+			expect(result.soloRunLabel).toBe('db-migration');
+		});
+	});
+
 	// #835 end-to-end: a live non-exclusive worker leaves `soloRunActive` false but `anyWorkerRunning`
 	// true, so an exclusive ready ticket ranked first is omitted while the ordinary tickets behind it
 	// are still returned up to freeSlots — rather than the exclusive ticket hiding them all.

@@ -437,8 +437,18 @@ export async function resolveMaintenanceCandidateModel(prNumber: number): Promis
 		.catch(() => null);
 }
 
+/**
+ * The exclusive label of the first running worker still holding the shared-local-Postgres lock, or
+ * `null` when none is. An entry that has explicitly released its lock early (`dbLockReleased`, set
+ * via `swarm_state_release_db_lock` once its migration/`@mutates` work is applied and verified) is
+ * skipped *before* its `gh` label lookup — cheaper, and correct: a released entry must never
+ * contribute an exclusive label even though its issue/PR still carries one. The flag is the sole
+ * signal; liveness/idleness is deliberately not consulted here (the release is one-way and persists
+ * however the worker behaves afterwards, including going idle or opening its PR).
+ */
 async function isSoloRunCurrentlyActive(running: SwarmWorkerEntry[]): Promise<ExclusiveLabel | null> {
 	for (const entry of running) {
+		if (entry.dbLockReleased === true) continue;
 		const target =
 			entry.kind === 'maintenance' && entry.pr !== null
 				? (['pr', 'view', String(entry.pr), '--json', 'labels'] as const)
