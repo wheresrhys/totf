@@ -12,7 +12,7 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 import { SpIndividualsTab } from '@/app/components/pages/species/SpIndividualsTab';
 import { SpNotableRetrapsTab } from '@/app/components/pages/species/SpNotableRetrapsTab';
 import { SpBusiestSessionsTab } from '@/app/components/pages/species/SpBusiestSessionsTab';
-import { SpPopulationTab } from '@/app/components/pages/species/SpPopulationTab';
+import { SpDemographicsTab } from '@/app/components/pages/species/SpDemographicsTab';
 import { SpBiometricsTab } from '@/app/components/pages/species/SpBiometricsTab';
 import { SpYearTotalsTab } from '@/app/components/pages/species/SpYearTotalsTab';
 import { SpMonthTotalsTab } from '@/app/components/pages/species/SpMonthTotalsTab';
@@ -201,7 +201,7 @@ function SpeciesData({
 		{ id: 'session-totals', label: 'Session totals' },
 		{ id: 'highlights', label: 'Highlights' },
 		{ id: 'biometrics', label: 'Biometrics' },
-		{ id: 'population', label: 'Population' },
+		{ id: 'demographics', label: 'Demographics' },
 		{ id: 'bird-list', label: 'Bird list' }
 	];
 
@@ -306,10 +306,10 @@ function SpeciesData({
 			</ConditionalTabPanel>
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
-				tabId="population"
+				tabId="demographics"
 				activeTabId={activeTab}
 			>
-				<SpPopulationTab
+				<SpDemographicsTab
 					speciesName={data.speciesName}
 					viewedGroupId={viewedGroup.id}
 					fromDate={data.fromDate}

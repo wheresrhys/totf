@@ -38,8 +38,8 @@ vi.mock('@/app/components/pages/species/SpBusiestSessionsTab', () => ({
 	SpBusiestSessionsTab: () => <div data-testid="sp-busiest-sessions-tab" />
 }));
 
-vi.mock('@/app/components/pages/species/SpPopulationTab', () => ({
-	SpPopulationTab: () => <div data-testid="sp-population-tab" />
+vi.mock('@/app/components/pages/species/SpDemographicsTab', () => ({
+	SpDemographicsTab: () => <div data-testid="sp-demographics-tab" />
 }));
 
 vi.mock('@/app/components/pages/species/SpBiometricsTab', () => ({
@@ -102,7 +102,7 @@ describe('species detail page', () => {
 		});
 
 		describe('tab order and defaults (all-time page)', () => {
-			it('renders tab buttons in the order Year totals, Month totals, Session totals, Highlights, Biometrics, Population, Bird list', async () => {
+			it('renders tab buttons in the order Year totals, Month totals, Session totals, Highlights, Biometrics, Demographics, Bird list', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
 				const labels = within(screen.getByRole('tablist'))
@@ -114,7 +114,7 @@ describe('species detail page', () => {
 					'Session totals',
 					'Highlights',
 					'Biometrics',
-					'Population',
+					'Demographics',
 					'Bird list'
 				]);
 				expect(screen.queryByRole('button', { name: 'Graphs' })).toBeNull();
@@ -203,28 +203,28 @@ describe('species detail page', () => {
 			});
 		});
 
-		describe('population tab (click to activate, labelled "Population")', () => {
-			it('renders SpPopulationTab after clicking the Population button', async () => {
+		describe('demographics tab (click to activate, labelled "Demographics")', () => {
+			it('renders SpDemographicsTab after clicking the Demographics button', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Population' }));
-				await screen.findByTestId('sp-population-tab');
+				fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
+				await screen.findByTestId('sp-demographics-tab');
 			});
 
-			it('lazily loads SpPopulationTab only once "Population" is selected', async () => {
+			it('lazily loads SpDemographicsTab only once "Demographics" is selected', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
-				expect(screen.queryByTestId('sp-population-tab')).toBeNull();
-				fireEvent.click(screen.getByRole('button', { name: 'Population' }));
-				await screen.findByTestId('sp-population-tab');
+				expect(screen.queryByTestId('sp-demographics-tab')).toBeNull();
+				fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
+				await screen.findByTestId('sp-demographics-tab');
 			});
 
-			it("renders a 'Population' button that activates the 'population' tab panel", async () => {
+			it("renders a 'Demographics' button that activates the 'demographics' tab panel", async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
 				expect(screen.queryByRole('button', { name: 'Graphs' })).toBeNull();
-				fireEvent.click(screen.getByRole('button', { name: 'Population' }));
-				await screen.findByTestId('sp-population-tab');
+				fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
+				await screen.findByTestId('sp-demographics-tab');
 			});
 		});
 
@@ -259,7 +259,7 @@ describe('species detail page', () => {
 				['session-totals', 'Session totals', 'sp-session-totals-tab'],
 				['highlights', 'Highlights', 'sp-busiest-sessions-tab'],
 				['biometrics', 'Biometrics', 'sp-biometrics-tab'],
-				['population', 'Population', 'sp-population-tab'],
+				['demographics', 'Demographics', 'sp-demographics-tab'],
 				['bird-list', 'Bird list', 'sp-individuals-tab']
 			])(
 				'?tabId=%s selects the %s tab and loads its data without a click',
