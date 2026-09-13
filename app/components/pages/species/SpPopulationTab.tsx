@@ -157,9 +157,9 @@ export function SpPopulationTab({
 	// tiles ask for the same year data and each `YearComparisonTrendChart`
 	// keeps its own copy once resolved — the ref only needs to guarantee one
 	// RPC round-trip per interval per tab, not to drive a re-render.
-	const yearStatsHistoryPromise = useRef<Promise<
-		AggregateStatsResult[]
-	> | null>(null);
+	const yearStatsHistoryPromise = useRef<Promise<CoreStatsResult[]> | null>(
+		null
+	);
 	function fetchYearStatsHistory() {
 		yearStatsHistoryPromise.current ??= getSpeciesStatsHistory(
 			speciesName,
