@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { REQUEST_PATHNAME_HEADER } from '@/lib/request-pathname';
+import { REQUEST_PATHNAME_HEADER } from '@/app/lib/request-pathname';
 
 // Server Components can't read the current request's full pathname on their
 // own (a layout only ever receives `params` for its own position in the
