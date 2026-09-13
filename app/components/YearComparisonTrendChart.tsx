@@ -483,7 +483,8 @@ export function YearComparisonTrendChart({
 	compareYearsUrl,
 	colors,
 	yearlyAggregators,
-	includeTotalSeries
+	includeTotalSeries,
+	fetchYearSeries
 }: {
 	series: LineChartData[];
 	xtitle?: string;
@@ -520,31 +521,70 @@ export function YearComparisonTrendChart({
 	// to every mode/interval. Omitting it (or passing `false`) leaves
 	// rendering byte-for-byte identical to not having the prop at all.
 	includeTotalSeries?: boolean;
+	// Fetches the same metrics already aggregated by calendar year at source,
+	// for the all-time Year interval. When supplied, switching Interval to Year
+	// fetches once (cached for the component's lifetime — toggling back to
+	// Month and out to Year again never refetches) and plots the fetched series
+	// instead of running `aggregateSeriesByYear` over the monthly points.
+	//
+	// This matters for any bird-distinct metric (#852): `aggregate_stats`'
+	// `bird_count` and `population_stats`' age-bucket counts are
+	// `COUNT(DISTINCT bird_id)` *within each month's cell*, so a bird retrapped
+	// in three months of one year contributes 3 to a client-side yearly sum but
+	// 1 to a year-grouped fetch. Only the fetch can answer that correctly.
+	//
+	// Omitting the prop keeps today's client-side `aggregateSeriesByYear`
+	// behaviour exactly — which is why Biometrics (whose max/min/mean
+	// aggregators are exact over monthly points, with no double-counting
+	// mechanism) passes nothing and is untouched. The client-side path is also
+	// the fallback if the fetch rejects.
+	fetchYearSeries?: () => Promise<LineChartData[]>;
 }) {
 	const [mode, setMode] = useState<ChartMode>('all-time');
 	const [normalize, setNormalize] = useState(false);
 	const [interval, setInterval] = useState<Interval>('month');
+	// Request-once cache for `fetchYearSeries` (same boolean-guard pattern as
+	// SpPopulationTab/SpBiometricsTab's own fetches). `yearSeriesFailed` is
+	// distinct from "not yet arrived" so a rejected fetch falls back to the
+	// client-side aggregation rather than spinning forever.
+	const [fetchedYearSeries, setFetchedYearSeries] = useState<
+		LineChartData[] | null
+	>(null);
+	const [yearSeriesRequested, setYearSeriesRequested] = useState(false);
+	const [yearSeriesFailed, setYearSeriesFailed] = useState(false);
+	function loadYearSeries() {
+		if (!fetchYearSeries || yearSeriesRequested) return;
+		setYearSeriesRequested(true);
+		fetchYearSeries()
+			.then(setFetchedYearSeries)
+			.catch(() => setYearSeriesFailed(true));
+	}
 	// Unique per instance so several of these charts on one page (e.g. multiple
 	// expanded species-graph tiles) don't share a radio group.
 	const toggleName = useId();
 	const currentYear = new Date().getFullYear();
-	const effectiveSeries =
-		normalize && effortHistory
-			? normalizeSeriesByEffort(series, effortHistory)
-			: series;
 	const effectiveYtitle =
 		normalize && effortHistory ? `${ytitle} per hour` : ytitle;
-	// The total series (when requested) is appended right after
-	// `effectiveSeries` is computed — post-normalize, pre-interval-aggregation
-	// — so it's summed from already effort-normalized values when Normalize is
-	// on, and then flows through every mode/interval below for free (the total
-	// is simply the next metric index, so it gets its own base colour, its own
-	// compare-years/this-year sub-chart, and its own Year-interval aggregation
-	// via the same `yearlyAggregators` default-to-'sum' mechanism as any other
-	// metric).
-	const plottedSeries = includeTotalSeries
-		? [...effectiveSeries, buildTotalSeries(effectiveSeries)]
-		: effectiveSeries;
+	// Applies the Normalize toggle and then the optional `Total` series to one
+	// set of metric series, against whichever effort series matches that set's
+	// granularity. The total is appended post-normalize (so it's summed from
+	// already effort-normalized values and stays a valid per-hour rate) and —
+	// on the monthly path — pre-interval-aggregation, so it flows through every
+	// mode/interval for free: the total is simply the next metric index, so it
+	// gets its own base colour, its own compare-years/this-year sub-chart, and
+	// its own Year-interval aggregation via the same `yearlyAggregators`
+	// default-to-'sum' mechanism as any other metric.
+	function applyNormalizeAndTotal(
+		metrics: LineChartData[],
+		effort: LineChartData | undefined
+	): LineChartData[] {
+		const normalized =
+			normalize && effort ? normalizeSeriesByEffort(metrics, effort) : metrics;
+		return includeTotalSeries
+			? [...normalized, buildTotalSeries(normalized)]
+			: normalized;
+	}
+	const plottedSeries = applyNormalizeAndTotal(series, effortHistory);
 	// A metric's base colour: the caller's explicit override at that index if
 	// supplied, else the default per-index palette. Used identically by all three
 	// modes so an override recolours every view consistently.
@@ -553,17 +593,39 @@ export function YearComparisonTrendChart({
 	const allTimeColors = plottedSeries.map((_, metricIndex) =>
 		baseColorFor(metricIndex)
 	);
-	// Year aggregation is layered on top of the (possibly effort-normalized,
-	// possibly total-appended) series, matching the order-of-operations the
-	// normalize toggle establishes.
+	// The Year interval is served from `fetchYearSeries` when the caller
+	// supplied one and the fetch has landed — the fetched series are already
+	// year-granular, so they only need Normalize + Total applied (against the
+	// monthly effort series collapsed to yearly totals: summing hours across a
+	// year is exact, effort being additive, unlike the bird-distinct counts
+	// this fetch exists to fix). Otherwise — no fetcher, or the fetch rejected
+	// — the Year view falls back to aggregating the monthly points client-side,
+	// layered on top of the (possibly effort-normalized, possibly
+	// total-appended) series, matching the order-of-operations the normalize
+	// toggle establishes.
+	//
+	// Note the fetched series carry `aggregate_stats`' dense spine verbatim, so
+	// a year with no encounters plots an explicit `0` here rather than the gap
+	// the client-side path's `hasReportableValue` convention produces. That
+	// matches what the all-time *month* view already does with its own zero
+	// months, so the two intervals stay consistent with each other.
+	const yearSeriesPending =
+		Boolean(fetchYearSeries) && !fetchedYearSeries && !yearSeriesFailed;
 	const allTimeSeries =
 		interval === 'year'
-			? plottedSeries.map((metric) =>
-					aggregateSeriesByYear(
-						metric,
-						yearlyAggregators?.[metric.name] ?? 'sum'
+			? fetchedYearSeries
+				? applyNormalizeAndTotal(
+						fetchedYearSeries,
+						effortHistory
+							? aggregateSeriesByYear(effortHistory, 'sum')
+							: undefined
 					)
-				)
+				: plottedSeries.map((metric) =>
+						aggregateSeriesByYear(
+							metric,
+							yearlyAggregators?.[metric.name] ?? 'sum'
+						)
+					)
 			: plottedSeries;
 	const showIntervalToggle = mode === 'all-time' && spansMultipleYears(series);
 	return (
@@ -611,7 +673,10 @@ export function YearComparisonTrendChart({
 										type="radio"
 										className="hidden"
 										checked={interval === option.value}
-										onChange={() => setInterval(option.value)}
+										onChange={() => {
+											setInterval(option.value);
+											if (option.value === 'year') loadYearSeries();
+										}}
 									/>
 								</label>
 							))}
@@ -644,16 +709,25 @@ export function YearComparisonTrendChart({
 				) : null}
 			</div>
 			<div>
-				{mode === 'all-time' && (
-					<LineChart
-						min={min}
-						data={allTimeSeries}
-						colors={allTimeColors}
-						xtitle={xtitle}
-						ytitle={effectiveYtitle}
-						library={TREND_CHART_LIBRARY}
-					/>
-				)}
+				{mode === 'all-time' &&
+					(interval === 'year' && yearSeriesPending ? (
+						// Deliberately a spinner rather than the client-side-summed
+						// series: showing the month-summed numbers while the correct
+						// year-grouped ones are in flight would flash known-wrong
+						// (double-counted) values at the reader.
+						<div className="flex h-full items-center justify-center">
+							<div className="loading loading-spinner loading-xl"></div>
+						</div>
+					) : (
+						<LineChart
+							min={min}
+							data={allTimeSeries}
+							colors={allTimeColors}
+							xtitle={xtitle}
+							ytitle={effectiveYtitle}
+							library={TREND_CHART_LIBRARY}
+						/>
+					))}
 				{mode === 'compare-years' && (
 					<PerMetricChartGrid
 						metrics={plottedSeries}

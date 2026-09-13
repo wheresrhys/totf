@@ -1,5 +1,12 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	fireEvent,
+	waitFor,
+	act
+} from '@testing-library/react';
 import type { LineChartData } from 'react-chartkick';
 import {
 	toYearOnYearSeries,
@@ -1060,6 +1067,201 @@ describe('YearComparisonTrendChart', () => {
 				expect(screen.getByRole('radio', { name: 'All time' })).toBeTruthy();
 				const [chart] = screen.getAllByTestId('line-chart');
 				expect(chart.dataset.xtitle).toBe('Year');
+			});
+		});
+	});
+
+	describe('Structure: fetchYearSeries (year-grouped fetch for the Year interval)', () => {
+		// Two months in each of two years, so a client-side yearly sum (11 / 19)
+		// is plainly distinguishable from what a year-grouped fetch returns
+		// (7 / 12 — fewer, because the RPC counts each bird once per year rather
+		// than once per month; see #852).
+		const monthly: LineChartData[] = [
+			{
+				name: 'birds',
+				data: [
+					['2023-03-01', 5],
+					['2023-09-01', 6],
+					['2024-03-01', 9],
+					['2024-09-01', 10]
+				]
+			}
+		];
+		const fetchedYearly: LineChartData[] = [
+			{
+				name: 'birds',
+				data: [
+					['2023', 7],
+					['2024', 12]
+				]
+			}
+		];
+
+		function chartValues() {
+			const [chart] = screen.getAllByTestId('line-chart');
+			return JSON.parse(chart.dataset.values!);
+		}
+
+		it('fetches once when the Interval is switched to Year and plots the resolved series, not the client-side sum', async () => {
+			const fetchYearSeries = vi.fn().mockResolvedValue(fetchedYearly);
+			render(
+				<YearComparisonTrendChart
+					series={monthly}
+					fetchYearSeries={fetchYearSeries}
+				/>
+			);
+			expect(fetchYearSeries).not.toHaveBeenCalled();
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			await waitFor(() =>
+				expect(screen.queryByTestId('line-chart')).toBeTruthy()
+			);
+
+			expect(fetchYearSeries).toHaveBeenCalledTimes(1);
+			expect(chartValues()).toEqual([fetchedYearly[0].data]);
+		});
+
+		it('does not refetch when toggled Year → Month → Year, and re-plots the cached series', async () => {
+			const fetchYearSeries = vi.fn().mockResolvedValue(fetchedYearly);
+			render(
+				<YearComparisonTrendChart
+					series={monthly}
+					fetchYearSeries={fetchYearSeries}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			await waitFor(() =>
+				expect(chartValues()).toEqual([fetchedYearly[0].data])
+			);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Month' }));
+			expect(chartValues()).toEqual([monthly[0].data]);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			expect(chartValues()).toEqual([fetchedYearly[0].data]);
+			expect(fetchYearSeries).toHaveBeenCalledTimes(1);
+		});
+
+		it('shows a loading spinner instead of the stale month-summed data while the fetch is pending', async () => {
+			let resolveFetch: (value: LineChartData[]) => void = () => {};
+			const fetchYearSeries = vi.fn(
+				() =>
+					new Promise<LineChartData[]>((resolve) => {
+						resolveFetch = resolve;
+					})
+			);
+			render(
+				<YearComparisonTrendChart
+					series={monthly}
+					fetchYearSeries={fetchYearSeries}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+
+			expect(screen.queryByTestId('line-chart')).toBeNull();
+			expect(document.querySelector('.loading-spinner')).toBeTruthy();
+
+			await act(async () => {
+				resolveFetch(fetchedYearly);
+			});
+
+			expect(document.querySelector('.loading-spinner')).toBeNull();
+			expect(chartValues()).toEqual([fetchedYearly[0].data]);
+		});
+
+		it('normalizes a fetched year series against yearly-summed effort hours, not the raw monthly effort', async () => {
+			// 2023 effort: 2 + 3 = 5 hours; 2024: 4 hours. So the fetched yearly
+			// counts normalize to 7/5 = 1.4 and 12/4 = 3.
+			const monthlyEffort: LineChartData = {
+				name: 'effort',
+				data: [
+					['2023-03-01', 2],
+					['2023-09-01', 3],
+					['2024-03-01', 4],
+					['2024-09-01', 0]
+				]
+			};
+			const fetchYearSeries = vi.fn().mockResolvedValue(fetchedYearly);
+			render(
+				<YearComparisonTrendChart
+					series={monthly}
+					ytitle="Count"
+					effortHistory={monthlyEffort}
+					fetchYearSeries={fetchYearSeries}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			await waitFor(() =>
+				expect(chartValues()).toEqual([fetchedYearly[0].data])
+			);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
+			expect(chartValues()).toEqual([
+				[
+					['2023', 1.4],
+					['2024', 3]
+				]
+			]);
+			const [chart] = screen.getAllByTestId('line-chart');
+			expect(chart.dataset.ytitle).toBe('Count per hour');
+		});
+
+		it('appends the Total series to a fetched year series when includeTotalSeries is set', async () => {
+			const twoMetrics: LineChartData[] = [
+				{ name: 'juv', data: [['2023', 4]] },
+				{ name: 'postjuv', data: [['2023', 6]] }
+			];
+			const fetchYearSeries = vi.fn().mockResolvedValue(twoMetrics);
+			render(
+				<YearComparisonTrendChart
+					series={monthly}
+					includeTotalSeries
+					fetchYearSeries={fetchYearSeries}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			await waitFor(() =>
+				expect(screen.getAllByTestId('line-chart')[0].dataset.series).toBe(
+					JSON.stringify(['juv', 'postjuv', 'Total'])
+				)
+			);
+			expect(chartValues()[2]).toEqual([['2023', 10]]);
+		});
+
+		it('keeps the client-side aggregateSeriesByYear behaviour when no fetchYearSeries is supplied', () => {
+			// Regression guard for the Biometrics path, which passes no fetcher.
+			render(<YearComparisonTrendChart series={monthly} />);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			expect(chartValues()).toEqual([
+				[
+					['2023', 11],
+					['2024', 19]
+				]
+			]);
+		});
+
+		describe('Edge: the fetch rejects', () => {
+			it('falls back to the client-side yearly aggregation rather than spinning or crashing', async () => {
+				const fetchYearSeries = vi
+					.fn()
+					.mockRejectedValue(new Error('network down'));
+				render(
+					<YearComparisonTrendChart
+						series={monthly}
+						fetchYearSeries={fetchYearSeries}
+					/>
+				);
+				fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+
+				await waitFor(() =>
+					expect(document.querySelector('.loading-spinner')).toBeNull()
+				);
+				expect(chartValues()).toEqual([
+					[
+						['2023', 11],
+						['2024', 19]
+					]
+				]);
 			});
 		});
 	});
