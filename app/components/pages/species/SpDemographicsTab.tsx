@@ -4,10 +4,10 @@ import 'chartkick/chart.js';
 import { type LineChartData } from 'react-chartkick';
 import {
 	getSpeciesStatsHistory,
-	getSpeciesPopulationStats,
+	getSpeciesDemographicsStats,
 	getGroupEffortHistory
 } from '@/app/actions/sp-data';
-import type { CoreStatsResult, PopulationStatsResult } from '@/app/models/db';
+import type { CoreStatsResult, DemographicsStatsResult } from '@/app/models/db';
 import {
 	getCounts,
 	getReturningVsNew,
@@ -81,23 +81,26 @@ function Spinner() {
 	);
 }
 
-// The "Population" tab on the species page (tab id `population` — renamed from
-// `graphs` in #801, which also renamed this component `SpGraphsTab` ->
-// `SpPopulationTab`; #783 had relabelled the tab but kept the old id/name to
-// minimise blast radius): a reflowing grid of population chart tiles. Each tile
-// is text-only until clicked, at which point it expands to render its chart and
-// the click triggers the underlying data fetch.
+// The "Demographics" tab on the species page (tab id `demographics` — renamed
+// from `population` in #878, which also renamed this component
+// `SpPopulationTab` -> `SpDemographicsTab`; before that, #801 had renamed the
+// tab from `graphs` to `population`, renaming the component `SpGraphsTab` ->
+// `SpPopulationTab`, and #783 had relabelled the tab but kept the old id/name
+// to minimise blast radius): a reflowing grid of demographics chart tiles.
+// Each tile is text-only until clicked, at which point it expands to render
+// its chart and the click triggers the underlying data fetch.
 //
 // Two memoised species-scoped fetches back the tiles, each fired at most once
 // regardless of how often tiles expand/collapse: the Counts tile reads
 // `aggregate_stats` (`getSpeciesStatsHistory`), while the Age split, Young
-// counts and New young counts tiles share the companion `population_stats`
-// fetch (`getSpeciesPopulationStats`) — #800 split the age-split/young-trends
-// derivations into that separate RPC rather than folding them into
+// counts and New young counts tiles share the companion `demographics_stats`
+// fetch (`getSpeciesDemographicsStats`) — #800 split the age-split/young-trends
+// derivations into that separate RPC (originally named `population_stats`,
+// renamed `demographics_stats` in #878) rather than folding them into
 // `aggregate_stats`; #839 split the original single Young trends tile into
 // Young counts / New young counts. The Returning vs new tile (#854) is the
 // first to need *both* fetches at once — it remerges `aggregate_stats`' young
-// bucket columns with `population_stats`' adult columns into a single
+// bucket columns with `demographics_stats`' adult columns into a single
 // new/returning/young split — so its `renderChart` gates on both being loaded
 // rather than just one. A third fetch loads the group-wide effort
 // history once (same pattern as SpBiometricsTab) so every tile's chart can offer the
@@ -108,7 +111,7 @@ function Spinner() {
 // the monthly points client-side — see the year-fetch refs below for why that
 // distinction matters. The biometrics-related tiles (wing/weight trend,
 // wing-vs-weight scatter) live on the "Biometrics" tab (SpBiometricsTab.tsx).
-export function SpPopulationTab({
+export function SpDemographicsTab({
 	speciesName,
 	viewedGroupId,
 	fromDate,
@@ -133,24 +136,24 @@ export function SpPopulationTab({
 		);
 	}
 
-	const [populationStats, setPopulationStats] = useState<
-		PopulationStatsResult[] | null
+	const [demographicsStats, setDemographicsStats] = useState<
+		DemographicsStatsResult[] | null
 	>(null);
-	const [populationRequested, setPopulationRequested] = useState(false);
-	function loadPopulationStats() {
-		if (populationRequested) return;
-		setPopulationRequested(true);
-		getSpeciesPopulationStats(
+	const [demographicsRequested, setDemographicsRequested] = useState(false);
+	function loadDemographicsStats() {
+		if (demographicsRequested) return;
+		setDemographicsRequested(true);
+		getSpeciesDemographicsStats(
 			speciesName,
 			viewedGroupId,
 			fromDate,
 			toDate
-		).then(setPopulationStats);
+		).then(setDemographicsStats);
 	}
 
 	// Year-grouped counterparts of the two fetches above, for the charts'
 	// "Interval: Year" toggle (#852). These are *not* derivable from the monthly
-	// rows: `aggregate_stats`' bird_count and `population_stats`' age-bucket
+	// rows: `aggregate_stats`' bird_count and `demographics_stats`' age-bucket
 	// counts are per-bird-distinct within each month's cell, so summing months
 	// double-counts any bird retrapped in more than one month of a year. Held
 	// as lazily-created promises in refs rather than as state, since several
@@ -171,18 +174,18 @@ export function SpPopulationTab({
 		return yearStatsHistoryPromise.current;
 	}
 
-	const yearPopulationStatsPromise = useRef<Promise<
-		PopulationStatsResult[]
+	const yearDemographicsStatsPromise = useRef<Promise<
+		DemographicsStatsResult[]
 	> | null>(null);
-	function fetchYearPopulationStats() {
-		yearPopulationStatsPromise.current ??= getSpeciesPopulationStats(
+	function fetchYearDemographicsStats() {
+		yearDemographicsStatsPromise.current ??= getSpeciesDemographicsStats(
 			speciesName,
 			viewedGroupId,
 			fromDate,
 			toDate,
 			'year'
 		);
-		return yearPopulationStatsPromise.current;
+		return yearDemographicsStatsPromise.current;
 	}
 
 	const [effortHistory, setEffortHistory] = useState<LineChartData | null>(
@@ -202,7 +205,7 @@ export function SpPopulationTab({
 	// keeps its inline mode switcher instead. Mirrors SpBiometricsTab.
 	const compareYearsUrl =
 		fromDate !== undefined
-			? `/species/${speciesName}?tabId=population`
+			? `/species/${speciesName}?tabId=demographics`
 			: undefined;
 
 	const charts: {
@@ -239,13 +242,13 @@ export function SpPopulationTab({
 			description: 'New adults, returning adults and young over time',
 			load: () => {
 				loadStatsHistory();
-				loadPopulationStats();
+				loadDemographicsStats();
 				loadEffortHistory();
 			},
 			renderChart: () =>
-				statsHistory && populationStats ? (
+				statsHistory && demographicsStats ? (
 					<YearComparisonTrendChart
-						series={getReturningVsNew(statsHistory, populationStats)}
+						series={getReturningVsNew(statsHistory, demographicsStats)}
 						colors={RETURNING_VS_NEW_COLORS}
 						yearlyAggregators={{
 							'New adults': 'sum',
@@ -257,9 +260,9 @@ export function SpPopulationTab({
 						fetchYearSeries={() =>
 							Promise.all([
 								fetchYearStatsHistory(),
-								fetchYearPopulationStats()
-							]).then(([yearStats, yearPopulation]) =>
-								getReturningVsNew(yearStats, yearPopulation)
+								fetchYearDemographicsStats()
+							]).then(([yearStats, yearDemographics]) =>
+								getReturningVsNew(yearStats, yearDemographics)
 							)
 						}
 						effortHistory={effortHistory ?? undefined}
@@ -274,13 +277,13 @@ export function SpPopulationTab({
 			heading: 'Age split',
 			description: 'New adults, first summers, oldies and new young over time',
 			load: () => {
-				loadPopulationStats();
+				loadDemographicsStats();
 				loadEffortHistory();
 			},
 			renderChart: () =>
-				populationStats ? (
+				demographicsStats ? (
 					<YearComparisonTrendChart
-						series={getAgeSplit(populationStats)}
+						series={getAgeSplit(demographicsStats)}
 						colors={AGE_SPLIT_COLORS}
 						yearlyAggregators={{
 							'New adults': 'sum',
@@ -288,7 +291,9 @@ export function SpPopulationTab({
 							Oldies: 'sum',
 							'New young': 'sum'
 						}}
-						fetchYearSeries={() => fetchYearPopulationStats().then(getAgeSplit)}
+						fetchYearSeries={() =>
+							fetchYearDemographicsStats().then(getAgeSplit)
+						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 					/>
@@ -301,20 +306,20 @@ export function SpPopulationTab({
 			heading: 'Young counts',
 			description: 'Juv and postjuv encounter counts over time',
 			load: () => {
-				loadPopulationStats();
+				loadDemographicsStats();
 				loadEffortHistory();
 			},
 			renderChart: () =>
-				populationStats ? (
+				demographicsStats ? (
 					<YearComparisonTrendChart
-						series={getYoungCounts(populationStats)}
+						series={getYoungCounts(demographicsStats)}
 						colors={YOUNG_COUNTS_COLORS}
 						yearlyAggregators={{
 							Juv: 'sum',
 							Postjuv: 'sum'
 						}}
 						fetchYearSeries={() =>
-							fetchYearPopulationStats().then(getYoungCounts)
+							fetchYearDemographicsStats().then(getYoungCounts)
 						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
@@ -330,20 +335,20 @@ export function SpPopulationTab({
 			description:
 				'New juv and new postjuv encounter counts over time (first encounters only)',
 			load: () => {
-				loadPopulationStats();
+				loadDemographicsStats();
 				loadEffortHistory();
 			},
 			renderChart: () =>
-				populationStats ? (
+				demographicsStats ? (
 					<YearComparisonTrendChart
-						series={getNewYoungCounts(populationStats)}
+						series={getNewYoungCounts(demographicsStats)}
 						colors={NEW_YOUNG_COUNTS_COLORS}
 						yearlyAggregators={{
 							'New juv': 'sum',
 							'New postjuv': 'sum'
 						}}
 						fetchYearSeries={() =>
-							fetchYearPopulationStats().then(getNewYoungCounts)
+							fetchYearDemographicsStats().then(getNewYoungCounts)
 						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}

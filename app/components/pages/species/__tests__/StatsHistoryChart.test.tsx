@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type {
 	CoreStatsResult,
 	CoreStatsWithBiometrics,
-	PopulationStatsResult
+	DemographicsStatsResult
 } from '@/app/models/db';
 import {
 	getCounts,
@@ -24,9 +24,9 @@ function aggregateRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
 	} as unknown as CoreStatsResult & typeof overrides;
 }
 
-function populationRow(
-	overrides: Partial<PopulationStatsResult>
-): PopulationStatsResult {
+function demographicsRow(
+	overrides: Partial<DemographicsStatsResult>
+): DemographicsStatsResult {
 	return {
 		species_name: 'Robin',
 		time_period: '2024-01-01',
@@ -42,7 +42,7 @@ function populationRow(
 		new_postjuv_enc_count: 0,
 		old_timers_bird_count: 0,
 		...overrides
-	} as PopulationStatsResult;
+	} as DemographicsStatsResult;
 }
 
 describe('getCounts', () => {
@@ -91,19 +91,19 @@ describe('getReturningVsNew', () => {
 					postjuv_bird_count: 1
 				}
 			] as CoreStatsResult[];
-			const populationStats = [
-				populationRow({
+			const demographicsStats = [
+				demographicsRow({
 					time_period: '2024-01-01',
 					adult_bird_count: 10,
 					new_adult_bird_count: 4
 				}),
-				populationRow({
+				demographicsRow({
 					time_period: '2024-02-01',
 					adult_bird_count: 8,
 					new_adult_bird_count: 3
 				})
 			];
-			const result = getReturningVsNew(statsHistory, populationStats);
+			const result = getReturningVsNew(statsHistory, demographicsStats);
 			expect(result.map((series) => series.name)).toEqual([
 				'New adults',
 				'Returning adults',
@@ -126,14 +126,14 @@ describe('getReturningVsNew', () => {
 
 	describe('Structure: Returning adults derivation', () => {
 		it('computes Returning adults as adult_bird_count minus new_adult_bird_count', () => {
-			const populationStats = [
-				populationRow({
+			const demographicsStats = [
+				demographicsRow({
 					time_period: '2024-01-01',
 					adult_bird_count: 20,
 					new_adult_bird_count: 7
 				})
 			];
-			const result = getReturningVsNew([], populationStats);
+			const result = getReturningVsNew([], demographicsStats);
 			expect(result[1].data).toEqual([['2024-01-01', 13]]);
 		});
 	});
@@ -149,8 +149,10 @@ describe('getReturningVsNew', () => {
 					postjuv_bird_count: 3
 				}
 			] as CoreStatsResult[];
-			const populationStats = [populationRow({ time_period: '2024-01-01' })];
-			const result = getReturningVsNew(statsHistory, populationStats);
+			const demographicsStats = [
+				demographicsRow({ time_period: '2024-01-01' })
+			];
+			const result = getReturningVsNew(statsHistory, demographicsStats);
 			expect(result[2].data).toEqual([['2024-01-01', 10]]);
 		});
 	});
@@ -185,20 +187,20 @@ describe('getReturningVsNew', () => {
 					postjuv_bird_count: 1
 				}
 			] as CoreStatsResult[];
-			const populationStats = [
-				populationRow({
+			const demographicsStats = [
+				demographicsRow({
 					time_period: '2024-01-01',
 					adult_bird_count: 5,
 					new_adult_bird_count: 2
 				}),
-				populationRow({
+				demographicsRow({
 					time_period: '2024-02-01',
 					adult_bird_count: 6,
 					new_adult_bird_count: 1
 				})
 			];
-			const result = getReturningVsNew(statsHistory, populationStats);
-			// populationStats' order drives the output order (2024-01-01, then
+			const result = getReturningVsNew(statsHistory, demographicsStats);
+			// demographicsStats' order drives the output order (2024-01-01, then
 			// 2024-02-01) even though statsHistory lists them in the reverse order —
 			// the Young value for each date is picked up correctly via the
 			// time_period join rather than by matching array index.
@@ -214,7 +216,7 @@ describe('getAgeSplit', () => {
 	describe('Structure: four age-split series from the right columns', () => {
 		it('maps New adults / First summer / Oldies / New young from their columns', () => {
 			const rows = [
-				populationRow({
+				demographicsRow({
 					time_period: '2024-01-01',
 					new_adult_bird_count: 5,
 					first_summer_bird_count: 3,
@@ -249,7 +251,7 @@ describe('getYoungCounts', () => {
 	describe('Structure: two series from Juv/Postjuv columns', () => {
 		it('maps postjuv_juv_enc_count and postjuv_enc_count against time_period as Juv and Postjuv', () => {
 			const rows = [
-				populationRow({
+				demographicsRow({
 					time_period: '2024-01-01',
 					postjuv_juv_enc_count: 4, // Juv
 					postjuv_enc_count: 6 // Postjuv
@@ -265,7 +267,7 @@ describe('getYoungCounts', () => {
 	describe('Edge: all-zero period', () => {
 		it('still emits a 0 row for every series', () => {
 			const result = getYoungCounts([
-				populationRow({ time_period: '2024-01-01' })
+				demographicsRow({ time_period: '2024-01-01' })
 			]);
 			for (const series of result) {
 				expect(series.data).toEqual([['2024-01-01', 0]]);
@@ -335,7 +337,7 @@ describe('getNewYoungCounts', () => {
 	describe('Structure: two series from New juv/New postjuv columns', () => {
 		it('maps new_postjuv_juv_enc_count and new_postjuv_enc_count against time_period as New juv and New postjuv', () => {
 			const rows = [
-				populationRow({
+				demographicsRow({
 					time_period: '2024-01-01',
 					new_postjuv_juv_enc_count: 1, // New juv
 					new_postjuv_enc_count: 2 // New postjuv
@@ -354,7 +356,7 @@ describe('getNewYoungCounts', () => {
 	describe('Edge: all-zero period', () => {
 		it('still emits a 0 row for every series', () => {
 			const result = getNewYoungCounts([
-				populationRow({ time_period: '2024-01-01' })
+				demographicsRow({ time_period: '2024-01-01' })
 			]);
 			for (const series of result) {
 				expect(series.data).toEqual([['2024-01-01', 0]]);

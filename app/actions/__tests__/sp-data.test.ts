@@ -4,7 +4,7 @@ import {
 	fetchNotableRetraps,
 	fetchGraphableEncounterData,
 	getSpeciesStatsHistory,
-	getSpeciesPopulationStats,
+	getSpeciesDemographicsStats,
 	fetchSpeciesPeriodTotals,
 	getGroupEffortHistory
 } from '../sp-data';
@@ -412,18 +412,18 @@ describe('sp-data actions', () => {
 		});
 	});
 
-	describe('getSpeciesPopulationStats', () => {
-		it('forwards from_date/to_date to population_stats alongside the monthly timeInterval', async () => {
+	describe('getSpeciesDemographicsStats', () => {
+		it('forwards from_date/to_date to demographics_stats alongside the monthly timeInterval', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesPopulationStats(
+			await getSpeciesDemographicsStats(
 				SPECIES_NAME,
 				GROUP_ID,
 				FROM_DATE,
 				TO_DATE
 			);
 
-			expect(rpcCalls[0].name).toBe('population_stats');
+			expect(rpcCalls[0].name).toBe('demographics_stats');
 			expect(rpcCalls[0].args).toMatchObject({
 				species_name_filter: SPECIES_NAME,
 				ringing_group_filter: GROUP_ID,
@@ -436,16 +436,16 @@ describe('sp-data actions', () => {
 		it('omits from_date/to_date when no range is supplied', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesPopulationStats(SPECIES_NAME, GROUP_ID);
+			await getSpeciesDemographicsStats(SPECIES_NAME, GROUP_ID);
 
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
 		});
 
-		it('with interval "year" calls population_stats with group_by_time_period: "year"', async () => {
+		it('with interval "year" calls demographics_stats with group_by_time_period: "year"', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesPopulationStats(
+			await getSpeciesDemographicsStats(
 				SPECIES_NAME,
 				GROUP_ID,
 				undefined,
@@ -461,7 +461,7 @@ describe('sp-data actions', () => {
 		it('with interval "month" passed explicitly matches the default', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesPopulationStats(
+			await getSpeciesDemographicsStats(
 				SPECIES_NAME,
 				GROUP_ID,
 				undefined,

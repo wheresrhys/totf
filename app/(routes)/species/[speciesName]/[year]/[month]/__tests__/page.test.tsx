@@ -132,7 +132,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 		});
 
 		describe('tab order and defaults (month-scoped page)', () => {
-			it('renders tab buttons in the order Session totals, Highlights, Biometrics, Population, Bird list (no Year/Month totals)', async () => {
+			it('renders tab buttons in the order Session totals, Highlights, Biometrics, Demographics, Bird list (no Year/Month totals)', async () => {
 				render(await renderMonthPage());
 				await screen.findByTestId('sp-session-totals-tab');
 				const labels = within(screen.getByRole('tablist'))
@@ -142,7 +142,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 					'Session totals',
 					'Highlights',
 					'Biometrics',
-					'Population',
+					'Demographics',
 					'Bird list'
 				]);
 			});

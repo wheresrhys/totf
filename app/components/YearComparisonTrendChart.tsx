@@ -528,7 +528,7 @@ export function YearComparisonTrendChart({
 	// instead of running `aggregateSeriesByYear` over the monthly points.
 	//
 	// This matters for any bird-distinct metric (#852): `aggregate_stats`'
-	// `bird_count` and `population_stats`' age-bucket counts are
+	// `bird_count` and `demographics_stats`' age-bucket counts are
 	// `COUNT(DISTINCT bird_id)` *within each month's cell*, so a bird retrapped
 	// in three months of one year contributes 3 to a client-side yearly sum but
 	// 1 to a year-grouped fetch. Only the fetch can answer that correctly.
@@ -544,7 +544,7 @@ export function YearComparisonTrendChart({
 	const [normalize, setNormalize] = useState(false);
 	const [interval, setInterval] = useState<Interval>('month');
 	// Request-once cache for `fetchYearSeries` (same boolean-guard pattern as
-	// SpPopulationTab/SpBiometricsTab's own fetches). `yearSeriesFailed` is
+	// SpDemographicsTab/SpBiometricsTab's own fetches). `yearSeriesFailed` is
 	// distinct from "not yet arrived" so a rejected fetch falls back to the
 	// client-side aggregation rather than spinning forever.
 	const [fetchedYearSeries, setFetchedYearSeries] = useState<

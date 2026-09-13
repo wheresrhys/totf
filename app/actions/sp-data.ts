@@ -18,7 +18,7 @@ import {
 	type CoreStatsResult,
 	type CoreStatsWithBiometrics,
 	type BiometricsStatsResult,
-	type PopulationStatsResult
+	type DemographicsStatsResult
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
 import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
@@ -187,7 +187,7 @@ export async function fetchGraphableEncounterData(
  * conventional per-month history every caller started with; `'year'` re-fetches
  * the same stats already grouped by calendar year at the RPC, which is *not*
  * the same as summing the monthly rows client-side: `aggregate_stats`'
- * `bird_count` and `population_stats`' per-bird bucket counts are
+ * `bird_count` and `demographics_stats`' per-bird bucket counts are
  * `COUNT(DISTINCT bird_id)` within their cell, so a bird retrapped in several
  * months of one year would be counted once per month by a client-side sum but
  * exactly once by a year-grouped fetch (#852).
@@ -242,17 +242,18 @@ export async function getSpeciesStatsHistory(
 
 /**
  * Monthly age-split + young-trends history for a single species — the
- * `population_stats` sibling of `getSpeciesStatsHistory`. #800 split these
+ * `demographics_stats` sibling of `getSpeciesStatsHistory`. #800 split these
  * derivations (new-adult/first-summer/old-timer age split, and the 3J/postjuv
- * young-trends counts) into their own RPC rather than folding them into
- * `aggregate_stats`, so the "Population" tab's Age split, Young counts and New
- * young counts tiles (#839 split the original single Young trends tile into
- * the latter two) fetch here while its Counts tile keeps using
+ * young-trends counts) into their own RPC (`population_stats`, renamed
+ * `demographics_stats` in #878) rather than folding them into
+ * `aggregate_stats`, so the "Demographics" tab's Age split, Young counts and
+ * New young counts tiles (#839 split the original single Young trends tile
+ * into the latter two) fetch here while its Counts tile keeps using
  * `getSpeciesStatsHistory`. Same
  * call shape (species-filtered, `interval`-grouped, monthly by default) as
  * `getSpeciesStatsHistory`.
  */
-export async function getSpeciesPopulationStats(
+export async function getSpeciesDemographicsStats(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
@@ -261,19 +262,19 @@ export async function getSpeciesPopulationStats(
 ) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('population_stats', {
+		.rpc('demographics_stats', {
 			species_name_filter: species,
 			ringing_group_filter: viewedGroupId,
 			group_by_time_period: interval,
 			...(fromDate ? { from_date: fromDate } : {}),
 			...(toDate ? { to_date: toDate } : {})
 		})
-		.then(catchSupabaseErrors) as Promise<PopulationStatsResult[]>;
+		.then(catchSupabaseErrors) as Promise<DemographicsStatsResult[]>;
 }
 
 /**
  * Group-wide (not species-filtered) monthly ringing-effort history for the
- * species page's Population/Biometrics tabs — effort is a property of a
+ * species page's Demographics/Biometrics tabs — effort is a property of a
  * session, not of the species caught in it, so this wraps
  * `fetchGroupEffortHistory` (`lib/underlying-stats.ts`, cached across both
  * tabs within a session) rather than filtering by species. Shapes the raw
