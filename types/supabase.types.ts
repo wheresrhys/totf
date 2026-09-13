@@ -397,7 +397,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      abundance_stats: {
+      core_stats: {
         Args: {
           from_date?: string
           group_by_species?: boolean
@@ -406,10 +406,10 @@ export type Database = {
           species_name_filter?: string
           to_date?: string
         }
-        Returns: Database["public"]["CompositeTypes"]["abundance_stats_result"][]
+        Returns: Database["public"]["CompositeTypes"]["core_stats_result"][]
         SetofOptions: {
           from: "*"
-          to: "abundance_stats_result"
+          to: "core_stats_result"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -557,7 +557,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      public_abundance_stats: {
+      public_core_stats: {
         Args: {
           from_date?: string
           group_by_species?: boolean
@@ -566,10 +566,10 @@ export type Database = {
           species_name_filter?: string
           to_date?: string
         }
-        Returns: Database["public"]["CompositeTypes"]["abundance_stats_result"][]
+        Returns: Database["public"]["CompositeTypes"]["core_stats_result"][]
         SetofOptions: {
           from: "*"
-          to: "abundance_stats_result"
+          to: "core_stats_result"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -748,7 +748,7 @@ export type Database = {
         | "MS"
     }
     CompositeTypes: {
-      abundance_stats_result: {
+      core_stats_result: {
         species_name: string | null
         time_period: string | null
         session_count: number | null

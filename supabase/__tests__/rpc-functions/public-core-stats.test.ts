@@ -1,5 +1,5 @@
 /**
- * Integration tests for the `public_abundance_stats` Postgres RPC function.
+ * Integration tests for the `public_core_stats` Postgres RPC function.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -15,15 +15,15 @@ import { supabase } from '../../../lib/supabase';
 import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-// public_abundance_stats (#768) — a SECURITY DEFINER wrapper around abundance_stats that
+// public_core_stats (#768) — a SECURITY DEFINER wrapper around core_stats that
 // only returns data for a group that has published its summary area ('summary' = ANY
 // public_areas), and is executable by PUBLIC (anonymous, no-JWT clients). We prove three
-// things: it mirrors abundance_stats exactly for a published group, it returns nothing
+// things: it mirrors core_stats exactly for a published group, it returns nothing
 // otherwise, and it exposes no raw base-table rows to the anon role. Every row created here
 // is on a random far-future date under two run-unique isolated groups, so concurrent
 // worktree runs against the shared local Supabase instance never collide (see CLAUDE.md's
 // "DB integration tests" section). `supabase` is the anon client (anon key, no JWT).
-describe('public_abundance_stats', () => {
+describe('public_core_stats', () => {
 	const LOCAL_DB_URL =
 		'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 	const suffix = randomTestSuffix();
@@ -217,15 +217,15 @@ describe('public_abundance_stats', () => {
 	});
 
 	// Usual
-	it("returns the same rows as abundance_stats for a group with 'summary' in public_areas", async () => {
+	it("returns the same rows as core_stats for a group with 'summary' in public_areas", async () => {
 		const params = {
 			ringing_group_filter: publicGroupId,
 			from_date: month1Date,
 			to_date: month1Date
 		};
 		const [publicRes, authRes] = await Promise.all([
-			anonClient.rpc('public_abundance_stats', params),
-			publicGroupClient.rpc('abundance_stats', params)
+			anonClient.rpc('public_core_stats', params),
+			publicGroupClient.rpc('core_stats', params)
 		]);
 		expect(publicRes.error).toBeNull();
 		expect(authRes.error).toBeNull();
@@ -241,9 +241,9 @@ describe('public_abundance_stats', () => {
 
 	// Edge — #827 removed the 8 wing/weight columns from the shared
 	// abundance_stats_result type; confirm the change propagates through the
-	// SECURITY DEFINER wrapper too (it RETURN QUERY SELECTs from abundance_stats).
+	// SECURITY DEFINER wrapper too (it RETURN QUERY SELECTs from core_stats).
 	it('returns rows without the 8 wing/weight columns (removed in #827)', async () => {
-		const { data, error } = await anonClient.rpc('public_abundance_stats', {
+		const { data, error } = await anonClient.rpc('public_core_stats', {
 			ringing_group_filter: publicGroupId,
 			from_date: month1Date,
 			to_date: month1Date
@@ -266,7 +266,7 @@ describe('public_abundance_stats', () => {
 
 	// Structure
 	it('returns nothing for a group whose public_areas is empty', async () => {
-		const { data, error } = await anonClient.rpc('public_abundance_stats', {
+		const { data, error } = await anonClient.rpc('public_core_stats', {
 			ringing_group_filter: privateGroupId,
 			from_date: month1Date,
 			to_date: month1Date
@@ -277,7 +277,7 @@ describe('public_abundance_stats', () => {
 		expect(data).toEqual([]);
 	});
 
-	it('respects group_by_species identically to abundance_stats when public', async () => {
+	it('respects group_by_species identically to core_stats when public', async () => {
 		const params = {
 			ringing_group_filter: publicGroupId,
 			from_date: month1Date,
@@ -285,8 +285,8 @@ describe('public_abundance_stats', () => {
 			group_by_species: true
 		};
 		const [publicRes, authRes] = await Promise.all([
-			anonClient.rpc('public_abundance_stats', params),
-			publicGroupClient.rpc('abundance_stats', params)
+			anonClient.rpc('public_core_stats', params),
+			publicGroupClient.rpc('core_stats', params)
 		]);
 		expect(publicRes.error).toBeNull();
 		expect(authRes.error).toBeNull();
@@ -297,7 +297,7 @@ describe('public_abundance_stats', () => {
 		expect(publicRes.data).toEqual(authRes.data);
 	});
 
-	it('respects group_by_time_period identically to abundance_stats when public', async () => {
+	it('respects group_by_time_period identically to core_stats when public', async () => {
 		const params = {
 			ringing_group_filter: publicGroupId,
 			from_date: month1Date,
@@ -305,8 +305,8 @@ describe('public_abundance_stats', () => {
 			group_by_time_period: 'month'
 		};
 		const [publicRes, authRes] = await Promise.all([
-			anonClient.rpc('public_abundance_stats', params),
-			publicGroupClient.rpc('abundance_stats', params)
+			anonClient.rpc('public_core_stats', params),
+			publicGroupClient.rpc('core_stats', params)
 		]);
 		expect(publicRes.error).toBeNull();
 		expect(authRes.error).toBeNull();
@@ -317,7 +317,7 @@ describe('public_abundance_stats', () => {
 
 	// Edge
 	it('returns nothing for a non-existent ringing_group_filter id', async () => {
-		const { data, error } = await anonClient.rpc('public_abundance_stats', {
+		const { data, error } = await anonClient.rpc('public_core_stats', {
 			ringing_group_filter: 2_000_000_000
 		});
 		expect(error).toBeNull();
@@ -325,15 +325,15 @@ describe('public_abundance_stats', () => {
 	});
 
 	it('returns nothing when no ringing_group_filter is given', async () => {
-		const { data, error } = await anonClient.rpc('public_abundance_stats', {});
+		const { data, error } = await anonClient.rpc('public_core_stats', {});
 		expect(error).toBeNull();
 		expect(data).toEqual([]);
 	});
 
-	it('an anon-role client can call public_abundance_stats directly (no JWT/app_metadata needed)', async () => {
+	it('an anon-role client can call public_core_stats directly (no JWT/app_metadata needed)', async () => {
 		// anonClient carries only the anon key — no signed group JWT — yet still receives the
 		// published group's aggregate rows, proving the PUBLIC execute grant is in effect.
-		const { data, error } = await anonClient.rpc('public_abundance_stats', {
+		const { data, error } = await anonClient.rpc('public_core_stats', {
 			ringing_group_filter: publicGroupId,
 			from_date: month1Date,
 			to_date: month1Date

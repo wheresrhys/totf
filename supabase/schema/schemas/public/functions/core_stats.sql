@@ -1,28 +1,28 @@
 -- Mechanical duplication of aggregate_stats under a new name (#828, step 1 of the
--- aggregate_stats -> abundance_stats rename: create new, migrate app, delete
+-- aggregate_stats -> core_stats rename: create new, migrate app, delete
 -- old). No logic change, no new columns, no redesign — identical signature and
 -- body to aggregate_stats, with every reference to aggregate_stats_result
--- swapped to abundance_stats_result. aggregate_stats/aggregate_stats_result are
+-- swapped to core_stats_result. aggregate_stats/aggregate_stats_result are
 -- left untouched and keep serving all existing app call sites unchanged until
 -- the migration ticket lands.
-CREATE FUNCTION public.abundance_stats (
+CREATE FUNCTION public.core_stats (
 	species_name_filter text DEFAULT NULL::text,
 	from_date date DEFAULT NULL::date,
 	to_date date DEFAULT NULL::date,
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
 	group_by_time_period text DEFAULT NULL::text
-) RETURNS SETOF public.abundance_stats_result LANGUAGE plpgsql AS $function$
+) RETURNS SETOF public.core_stats_result LANGUAGE plpgsql AS $function$
   BEGIN
   RETURN QUERY
   -- The final projection below is wrapped in jsonb_populate_record rather than
-  -- returned as a bare positional SELECT, so it binds to abundance_stats_result's
+  -- returned as a bare positional SELECT, so it binds to core_stats_result's
   -- columns by NAME instead of ordinal attribute position — see CLAUDE.md's
   -- "Composite-type RETURN QUERY binds by position, not name" section for why
   -- (confirmed empirically while building population_stats: two db:schema:apply
   -- runs on identical schema files produced two different physical attribute
   -- orders for the same composite type).
-  SELECT (jsonb_populate_record(NULL::public.abundance_stats_result, to_jsonb(agg))).*
+  SELECT (jsonb_populate_record(NULL::public.core_stats_result, to_jsonb(agg))).*
   FROM (
   -- Base windowed row source and grouping-cell spine, delegated to the shared
   -- stats_raw_encounters / stats_spine utility RPCs (#800) so this logic isn't
@@ -310,8 +310,8 @@ CREATE FUNCTION public.abundance_stats (
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.abundance_stats (text, date, date, bigint, boolean, text) TO anon;
+GRANT ALL ON FUNCTION public.core_stats (text, date, date, bigint, boolean, text) TO anon;
 
-GRANT ALL ON FUNCTION public.abundance_stats (text, date, date, bigint, boolean, text) TO authenticated;
+GRANT ALL ON FUNCTION public.core_stats (text, date, date, bigint, boolean, text) TO authenticated;
 
-GRANT ALL ON FUNCTION public.abundance_stats (text, date, date, bigint, boolean, text) TO service_role;
+GRANT ALL ON FUNCTION public.core_stats (text, date, date, bigint, boolean, text) TO service_role;

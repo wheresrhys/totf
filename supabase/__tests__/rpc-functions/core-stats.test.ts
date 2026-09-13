@@ -1,5 +1,5 @@
 /**
- * Integration tests for the `abundance_stats` Postgres RPC function.
+ * Integration tests for the `core_stats` Postgres RPC function.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -29,7 +29,7 @@ const ALPHA_TOTAL_ENCOUNTERS = 57;
 const ALPHA_SPECIES_COUNT = 5; // Blue Tit, Kingfisher, Reed Warbler, Robin, Wren
 const CES_2022_ENCOUNTERS = 30; // Apr–Aug 2022 only
 
-describe('abundance_stats', () => {
+describe('core_stats', () => {
 	let alphaId: number;
 	let alphaClient: SupabaseClient;
 
@@ -38,7 +38,7 @@ describe('abundance_stats', () => {
 	});
 
 	it('no filters returns total aggregate across all alpha data', async () => {
-		const { data, error } = await alphaClient.rpc('abundance_stats', {
+		const { data, error } = await alphaClient.rpc('core_stats', {
 			ringing_group_filter: alphaId
 		});
 		expect(error).toBeNull();
@@ -53,7 +53,7 @@ describe('abundance_stats', () => {
 	});
 
 	it('species_name_filter=Robin returns single Robin aggregate', async () => {
-		const { data, error } = await alphaClient.rpc('abundance_stats', {
+		const { data, error } = await alphaClient.rpc('core_stats', {
 			ringing_group_filter: alphaId,
 			species_name_filter: 'Robin'
 		});
@@ -68,7 +68,7 @@ describe('abundance_stats', () => {
 	});
 
 	it('date range Apr–Aug 2022 (CES months) returns 30 encounters', async () => {
-		const { data, error } = await alphaClient.rpc('abundance_stats', {
+		const { data, error } = await alphaClient.rpc('core_stats', {
 			ringing_group_filter: alphaId,
 			from_date: '2022-04-01',
 			to_date: '2022-08-31'
@@ -78,7 +78,7 @@ describe('abundance_stats', () => {
 	});
 
 	it('group_by_species returns one row per species with correct counts', async () => {
-		const { data, error } = await alphaClient.rpc('abundance_stats', {
+		const { data, error } = await alphaClient.rpc('core_stats', {
 			ringing_group_filter: alphaId,
 			group_by_species: true
 		});
@@ -105,7 +105,7 @@ describe('abundance_stats', () => {
 	});
 
 	it('group_by_time_period=month returns one row per month (36 months Jun 2021–May 2024)', async () => {
-		const { data, error } = await alphaClient.rpc('abundance_stats', {
+		const { data, error } = await alphaClient.rpc('core_stats', {
 			ringing_group_filter: alphaId,
 			group_by_time_period: 'month'
 		});
@@ -117,7 +117,7 @@ describe('abundance_stats', () => {
 	});
 
 	it('group_by_time_period=year returns one row per year with correct totals', async () => {
-		const { data, error } = await alphaClient.rpc('abundance_stats', {
+		const { data, error } = await alphaClient.rpc('core_stats', {
 			ringing_group_filter: alphaId,
 			group_by_time_period: 'year'
 		});
@@ -133,7 +133,7 @@ describe('abundance_stats', () => {
 	});
 
 	describe('non-FULL_GROWN sessions (FIELD_OBSERVATION and PULLI)', () => {
-		// abundance_stats derives its day/session-level statistics — session_count,
+		// core_stats derives its day/session-level statistics — session_count,
 		// effort, and the per-session encounter aggregates — only from FULL_GROWN
 		// sessions; FIELD_OBSERVATION and PULLI sessions are excluded from those, but
 		// their encounters still count toward the per-species/per-bird totals. PULLI
@@ -205,7 +205,7 @@ describe('abundance_stats', () => {
 
 		// Query the single whole-period aggregate row for a bounded date range.
 		async function aggregateRow(fromDate: string, toDate: string) {
-			const { data, error } = await deltaClient.rpc('abundance_stats', {
+			const { data, error } = await deltaClient.rpc('core_stats', {
 				ringing_group_filter: deltaId,
 				from_date: fromDate,
 				to_date: toDate
@@ -834,7 +834,7 @@ describe('abundance_stats', () => {
 
 		// An ungrouped single-date aggregate row (covers exactly the one bird on `date`).
 		async function bucketRow(date: string) {
-			const { data, error } = await deltaClient.rpc('abundance_stats', {
+			const { data, error } = await deltaClient.rpc('core_stats', {
 				ringing_group_filter: deltaId,
 				from_date: date,
 				to_date: date
@@ -967,7 +967,7 @@ describe('abundance_stats', () => {
 
 		// Edge
 		it('pullus_bird_count + juv_bird_count + postjuv_bird_count + adult_bird_count + unknown_age_bird_count equals bird_count for a mixed-bucket group', async () => {
-			const { data, error } = await deltaClient.rpc('abundance_stats', {
+			const { data, error } = await deltaClient.rpc('core_stats', {
 				ringing_group_filter: deltaId,
 				from_date: base,
 				to_date: addDays(base, 13)
@@ -1002,7 +1002,7 @@ describe('abundance_stats', () => {
 		});
 
 		it("bucket counts respect group_by_species — a juv bird of species A is not counted in species B's row", async () => {
-			const { data, error } = await deltaClient.rpc('abundance_stats', {
+			const { data, error } = await deltaClient.rpc('core_stats', {
 				ringing_group_filter: deltaId,
 				group_by_species: true,
 				from_date: speciesDate,
@@ -1016,7 +1016,7 @@ describe('abundance_stats', () => {
 		});
 
 		it("bucket counts respect group_by_time_period — a juv bird recorded only in month M is not counted in an adjacent month's row", async () => {
-			const { data, error } = await deltaClient.rpc('abundance_stats', {
+			const { data, error } = await deltaClient.rpc('core_stats', {
 				ringing_group_filter: deltaId,
 				group_by_time_period: 'month',
 				from_date: tpJuvDate,
@@ -1041,7 +1041,7 @@ describe('abundance_stats', () => {
 			it('for a window of only single-encounter birds, every *_bird_count equals its *_enc_count sibling for every age bucket', async () => {
 				// base+0..base+5 holds six single-encounter birds spanning all five
 				// buckets (pullus/juv/juv/postjuv/adult/unknown); none has >1 encounter.
-				const { data, error } = await deltaClient.rpc('abundance_stats', {
+				const { data, error } = await deltaClient.rpc('core_stats', {
 					ringing_group_filter: deltaId,
 					from_date: dates.pullusOnly,
 					to_date: dates.onlyTwo
@@ -1110,7 +1110,7 @@ describe('abundance_stats', () => {
 		// 2022-08-10, 2022-10-20, 2023-05-12, 2023-07-08, 2023-09-14, 2024-05-10.
 		// Usual
 		it("returns one row per distinct visit date, matching Alpha's known session dates", async () => {
-			const { data, error } = await alphaClient.rpc('abundance_stats', {
+			const { data, error } = await alphaClient.rpc('core_stats', {
 				ringing_group_filter: alphaId,
 				group_by_time_period: 'day'
 			});
@@ -1125,11 +1125,11 @@ describe('abundance_stats', () => {
 			// 2022-04-30 is the only session in April 2022, so its day row and the
 			// April 2022 month row must carry identical session/encounter counts.
 			const [dayRes, monthRes] = await Promise.all([
-				alphaClient.rpc('abundance_stats', {
+				alphaClient.rpc('core_stats', {
 					ringing_group_filter: alphaId,
 					group_by_time_period: 'day'
 				}),
-				alphaClient.rpc('abundance_stats', {
+				alphaClient.rpc('core_stats', {
 					ringing_group_filter: alphaId,
 					group_by_time_period: 'month'
 				})
@@ -1146,7 +1146,7 @@ describe('abundance_stats', () => {
 
 		// Structure
 		it('a date with no session is absent from the results (spine only covers min..max date range, not every calendar day)', async () => {
-			const { data, error } = await alphaClient.rpc('abundance_stats', {
+			const { data, error } = await alphaClient.rpc('core_stats', {
 				ringing_group_filter: alphaId,
 				group_by_time_period: 'day'
 			});
@@ -1157,7 +1157,7 @@ describe('abundance_stats', () => {
 
 		// Edge
 		it('a date range spanning a single day (from_date = to_date) returns exactly one row', async () => {
-			const { data, error } = await alphaClient.rpc('abundance_stats', {
+			const { data, error } = await alphaClient.rpc('core_stats', {
 				ringing_group_filter: alphaId,
 				group_by_time_period: 'day',
 				from_date: '2022-04-30',
@@ -1169,7 +1169,7 @@ describe('abundance_stats', () => {
 		});
 
 		it('an out-of-range group_by_time_period value (anything other than day/month/year) still falls back to the existing ungrouped NULL time_period behaviour', async () => {
-			const { data, error } = await alphaClient.rpc('abundance_stats', {
+			const { data, error } = await alphaClient.rpc('core_stats', {
 				ringing_group_filter: alphaId,
 				group_by_time_period: 'week'
 			});
@@ -1180,9 +1180,9 @@ describe('abundance_stats', () => {
 		});
 	});
 
-	// #827 removed the 8 wing/weight summary columns from abundance_stats_result
+	// #827 removed the 8 wing/weight summary columns from core_stats_result
 	// now that biometrics_stats is the sole source for them. These guard that the
-	// removal holds across every grouping shape abundance_stats can return.
+	// removal holds across every grouping shape core_stats can return.
 	describe('wing/weight columns removed (#827)', () => {
 		const REMOVED_BIOMETRIC_COLUMNS = [
 			'max_weight',
@@ -1197,7 +1197,7 @@ describe('abundance_stats', () => {
 
 		// Usual
 		it('the no-filters whole-aggregate row carries none of the 8 wing/weight columns', async () => {
-			const { data, error } = await alphaClient.rpc('abundance_stats', {
+			const { data, error } = await alphaClient.rpc('core_stats', {
 				ringing_group_filter: alphaId
 			});
 			expect(error).toBeNull();
@@ -1209,7 +1209,7 @@ describe('abundance_stats', () => {
 
 		// Structure
 		it('a group_by_species row carries none of the 8 wing/weight columns', async () => {
-			const { data, error } = await alphaClient.rpc('abundance_stats', {
+			const { data, error } = await alphaClient.rpc('core_stats', {
 				ringing_group_filter: alphaId,
 				group_by_species: true
 			});
@@ -1224,7 +1224,7 @@ describe('abundance_stats', () => {
 
 		// Structure
 		it('a group_by_time_period=month row carries none of the 8 wing/weight columns', async () => {
-			const { data, error } = await alphaClient.rpc('abundance_stats', {
+			const { data, error } = await alphaClient.rpc('core_stats', {
 				ringing_group_filter: alphaId,
 				group_by_time_period: 'month'
 			});
