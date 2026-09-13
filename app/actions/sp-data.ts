@@ -210,7 +210,7 @@ export async function getSpeciesStatsHistory(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
 	interval: StatsHistoryInterval = 'month'
 ): Promise<CoreStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
