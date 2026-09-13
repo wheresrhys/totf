@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { PeriodTotalsTable } from '../PeriodTotalsTable';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import {
 	getCellByHeading,
 	getCellTextByHeading
@@ -20,9 +20,7 @@ function getColumnHeaders(): HTMLTableCellElement[] {
 	) as HTMLTableCellElement[];
 }
 
-function buildStat(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+function buildStat(overrides: Partial<CoreStatsResult> = {}): CoreStatsResult {
 	return {
 		species_name: null,
 		time_period: '2026-01-01',
@@ -51,7 +49,7 @@ function buildStat(
 		adult_bird_count: 15,
 		unknown_age_bird_count: 5,
 		...overrides
-	} as unknown as AggregateStatsResult;
+	} as unknown as CoreStatsResult;
 }
 
 describe('PeriodTotalsTable', () => {
@@ -351,7 +349,7 @@ describe('PeriodTotalsTable', () => {
 	});
 
 	describe('fixed aggregation / encounters-only placeholder', () => {
-		function encStat(overrides: Partial<AggregateStatsResult> = {}) {
+		function encStat(overrides: Partial<CoreStatsResult> = {}) {
 			return buildStat({
 				time_period: '2000-01-01',
 				bird_count: 40,
@@ -368,7 +366,7 @@ describe('PeriodTotalsTable', () => {
 					postjuv_enc_count: 7,
 					adult_enc_count: 6,
 					unknown_age_enc_count: 4
-				} as Partial<AggregateStatsResult>),
+				} as Partial<CoreStatsResult>),
 				...overrides
 			});
 		}
@@ -520,7 +518,7 @@ describe('PeriodTotalsTable', () => {
 						postjuv_enc_count: 2,
 						adult_enc_count: 4,
 						unknown_age_enc_count: 1
-					} as Partial<AggregateStatsResult>)
+					} as Partial<CoreStatsResult>)
 				});
 
 				render(

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getGroupCookie } from '../../../actions/group-cookie';
 import { getAuthenticatedSupabaseClient } from '../group-auth';
 import { resolveGroupPublicAreasForRequest } from '../../group-slug';
-import type { AggregateStatsWithBiometrics } from '@/app/models/db';
+import type { CoreStatsWithBiometrics } from '@/app/models/db';
 
 const { mockPublicSupabaseFrom, mockPublicSupabaseRpc } = vi.hoisted(() => ({
 	mockPublicSupabaseFrom: vi.fn(),
@@ -25,16 +25,16 @@ vi.mock('@/lib/supabase', async (importOriginal) => {
 	};
 });
 
-import { fetchAuthorisedAggregateStats } from '../group-summary-access';
+import { fetchAuthorisedCoreStats } from '../group-summary-access';
 
 // Only `encounter_count` matters to the access-resolution logic under test
 // (it's the "is there anything real here" signal); every other field is
-// filled with an inert default so the fixture satisfies `AggregateStatsWithBiometrics`
+// filled with an inert default so the fixture satisfies `CoreStatsWithBiometrics`
 // (a Postgres composite type — every column comes back non-null, see
 // app/models/db.ts).
 function buildStatsRow(
-	overrides: Partial<AggregateStatsWithBiometrics> = {}
-): AggregateStatsWithBiometrics {
+	overrides: Partial<CoreStatsWithBiometrics> = {}
+): CoreStatsWithBiometrics {
 	return {
 		species_name: 'Robin',
 		time_period: '2026-01-01',
@@ -71,7 +71,7 @@ function buildStatsRow(
 	};
 }
 
-function makeAuthenticatedClient(rows: AggregateStatsWithBiometrics[] | null) {
+function makeAuthenticatedClient(rows: CoreStatsWithBiometrics[] | null) {
 	return {
 		rpc: vi.fn().mockReturnValue({
 			then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
@@ -80,7 +80,7 @@ function makeAuthenticatedClient(rows: AggregateStatsWithBiometrics[] | null) {
 	};
 }
 
-function mockPublicRpcReturning(rows: AggregateStatsWithBiometrics[] | null) {
+function mockPublicRpcReturning(rows: CoreStatsWithBiometrics[] | null) {
 	mockPublicSupabaseRpc.mockReturnValue({
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({ data: rows, error: null }).then(resolve)
@@ -103,7 +103,7 @@ describe('summary read-path access model', () => {
 				client as never
 			);
 
-			const result = await fetchAuthorisedAggregateStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
 
 			expect(result).toEqual({ accessLevel: 'own', rows: ownRows });
 			expect(resolveGroupPublicAreasForRequest).not.toHaveBeenCalled();
@@ -117,7 +117,7 @@ describe('summary read-path access model', () => {
 				client as never
 			);
 
-			const result = await fetchAuthorisedAggregateStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
 
 			expect(result.accessLevel).toBe('own');
 			expect(resolveGroupPublicAreasForRequest).not.toHaveBeenCalled();
@@ -137,23 +137,23 @@ describe('summary read-path access model', () => {
 		it('target not public: blocked (gated), not a 500', async () => {
 			vi.mocked(resolveGroupPublicAreasForRequest).mockResolvedValue([]);
 
-			const result = await fetchAuthorisedAggregateStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
 
 			expect(result).toEqual({ accessLevel: 'blocked', rows: [] });
 		});
 
-		it('target public: sees target public summary data via public_aggregate_stats', async () => {
+		it('target public: sees target public summary data via public_core_stats', async () => {
 			vi.mocked(resolveGroupPublicAreasForRequest).mockResolvedValue([
 				'summary'
 			]);
 			const publicRows = [buildStatsRow({ encounter_count: 42 })];
 			mockPublicRpcReturning(publicRows);
 
-			const result = await fetchAuthorisedAggregateStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
 
 			expect(result).toEqual({ accessLevel: 'public', rows: publicRows });
 			expect(mockPublicSupabaseRpc).toHaveBeenCalledWith(
-				'public_aggregate_stats',
+				'public_core_stats',
 				expect.objectContaining({ ringing_group_filter: VIEWED_GROUP_ID })
 			);
 		});
@@ -169,7 +169,7 @@ describe('summary read-path access model', () => {
 			);
 			vi.mocked(resolveGroupPublicAreasForRequest).mockResolvedValue([]);
 
-			const result = await fetchAuthorisedAggregateStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
 
 			expect(result).toEqual({ accessLevel: 'shared', rows: sharedRows });
 			expect(mockPublicSupabaseRpc).not.toHaveBeenCalled();
@@ -183,11 +183,11 @@ describe('summary read-path access model', () => {
 			const publicRows = [buildStatsRow({ encounter_count: 17 })];
 			mockPublicRpcReturning(publicRows);
 
-			const result = await fetchAuthorisedAggregateStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
 
 			// accessLevel is 'public' rather than 'shared' here — a deliberate
-			// labelling tradeoff (see fetchAuthorisedAggregateStats's own
-			// comment): public_aggregate_stats returns byte-identical rows to
+			// labelling tradeoff (see fetchAuthorisedCoreStats's own
+			// comment): public_core_stats returns byte-identical rows to
 			// the authenticated path for an opted-in target, so the sharing
 			// grant is never exercised (and never needs to be) once the
 			// target is public.
@@ -213,7 +213,7 @@ describe('summary read-path access model', () => {
 			const publicRows = [buildStatsRow({ encounter_count: 3 })];
 			mockPublicRpcReturning(publicRows);
 
-			const result = await fetchAuthorisedAggregateStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
 
 			expect(result).toEqual({ accessLevel: 'public', rows: publicRows });
 			expect(getAuthenticatedSupabaseClient).not.toHaveBeenCalled();
@@ -222,15 +222,16 @@ describe('summary read-path access model', () => {
 		it('target not public: gated gracefully without ever attempting the authenticated client, not a 500', async () => {
 			vi.mocked(resolveGroupPublicAreasForRequest).mockResolvedValue([]);
 
-			await expect(
-				fetchAuthorisedAggregateStats(VIEWED_GROUP_ID)
-			).resolves.toEqual({ accessLevel: 'blocked', rows: [] });
+			await expect(fetchAuthorisedCoreStats(VIEWED_GROUP_ID)).resolves.toEqual({
+				accessLevel: 'blocked',
+				rows: []
+			});
 			expect(getAuthenticatedSupabaseClient).not.toHaveBeenCalled();
 		});
 	});
 
 	describe('edge cases', () => {
-		it('target group has zero sessions and is public: renders empty state via public_aggregate_stats, not mistaken for blocked', async () => {
+		it('target group has zero sessions and is public: renders empty state via public_core_stats, not mistaken for blocked', async () => {
 			vi.mocked(getGroupCookie).mockResolvedValue(null);
 			vi.mocked(getAuthenticatedSupabaseClient).mockRejectedValue(
 				new Error('No group selected')
@@ -241,7 +242,7 @@ describe('summary read-path access model', () => {
 			const genuinelyEmptyRows = [buildStatsRow({ encounter_count: 0 })];
 			mockPublicRpcReturning(genuinelyEmptyRows);
 
-			const result = await fetchAuthorisedAggregateStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
 
 			expect(result.accessLevel).toBe('public');
 			expect(result.rows).toEqual(genuinelyEmptyRows);

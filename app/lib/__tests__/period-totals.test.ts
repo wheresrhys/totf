@@ -5,11 +5,9 @@ import {
 	formatPeriodTotalsLabel,
 	type PeriodTotalsGrouping
 } from '../period-totals';
-import type { AggregateStatsResult } from '../../models/db';
+import type { CoreStatsResult } from '../../models/db';
 
-function buildStat(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+function buildStat(overrides: Partial<CoreStatsResult> = {}): CoreStatsResult {
 	return {
 		species_name: null,
 		time_period: '2026-08-16',
@@ -43,11 +41,11 @@ function buildStat(
 		adult_enc_count: 1,
 		unknown_age_enc_count: 0,
 		...overrides
-	} as unknown as AggregateStatsResult;
+	} as unknown as CoreStatsResult;
 }
 
 describe('derivePeriodTotalsRowByBird', () => {
-	it('maps every AggregateStatsResult bucket field to its PeriodTotalsRow counterpart', () => {
+	it('maps every CoreStatsResult bucket field to its PeriodTotalsRow counterpart', () => {
 		const stat = buildStat();
 		expect(derivePeriodTotalsRowByBird(stat)).toEqual({
 			timePeriod: '2026-08-16',

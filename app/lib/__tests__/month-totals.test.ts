@@ -11,11 +11,9 @@ import {
 	formatPostgresIntervalForDisplay,
 	postgresIntervalToSeconds
 } from '@/app/lib/postgres-interval';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 
-function buildStat(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+function buildStat(overrides: Partial<CoreStatsResult> = {}): CoreStatsResult {
 	return {
 		species_name: null,
 		time_period: '2026-01-01',
@@ -44,16 +42,16 @@ function buildStat(
 		adult_bird_count: 15,
 		unknown_age_bird_count: 5,
 		...overrides
-	} as unknown as AggregateStatsResult;
+	} as unknown as CoreStatsResult;
 }
 
-// A monthly stat row as `aggregate_stats` returns it: `time_period` is the first
+// A monthly stat row as `core_stats` returns it: `time_period` is the first
 // of the month.
 function monthStat(
 	year: number,
 	month: number,
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	const timePeriod = `${year}-${String(month).padStart(2, '0')}-01`;
 	return buildStat({ time_period: timePeriod, ...overrides });
 }

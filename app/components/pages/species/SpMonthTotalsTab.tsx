@@ -8,7 +8,7 @@ import {
 	formatMonthYearLabel
 } from '@/app/lib/month-totals';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 
 export function SpMonthTotalsTab({
 	speciesName,
@@ -23,7 +23,7 @@ export function SpMonthTotalsTab({
 	fromDate?: string;
 	toDate?: string;
 }) {
-	const [monthlyStats, setMonthlyStats] = useState<AggregateStatsResult[]>([]);
+	const [monthlyStats, setMonthlyStats] = useState<CoreStatsResult[]>([]);
 	const [isLoaded, setIsLoaded] = useState(false);
 	// Plain local state — `SpeciesPageContent`'s `ConditionalTabPanel` unmounts
 	// this tab on every tab switch, so the toggle naturally resets to Hide
@@ -53,7 +53,7 @@ export function SpMonthTotalsTab({
 	}
 
 	// Zero-fill across all 12 calendar months, same as the year summary page's
-	// "Month totals" tab (`summary/[year]/page.tsx`) — `aggregate_stats`'s spine
+	// "Month totals" tab (`summary/[year]/page.tsx`) — `core_stats`'s spine
 	// only spans actual session months. The model returns pure data only, so
 	// both href and label are derived here for the species route.
 	const monthTotalsRows = buildMonthTotalsRows(year, monthlyStats);

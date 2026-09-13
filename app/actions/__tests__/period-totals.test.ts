@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchAuthorisedAggregateStats } from '@/app/lib/auth/group-summary-access';
-import type { AggregateStatsResult } from '@/app/models/db';
+import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
+import type { CoreStatsResult } from '@/app/models/db';
 import { fetchPeriodTotals } from '../period-totals';
 
 vi.mock('@/app/lib/auth/group-summary-access', () => ({
-	fetchAuthorisedAggregateStats: vi.fn()
+	fetchAuthorisedCoreStats: vi.fn()
 }));
 
-const ROW = { encounter_count: 5 } as unknown as AggregateStatsResult;
+const ROW = { encounter_count: 5 } as unknown as CoreStatsResult;
 
 describe('fetchPeriodTotals — routes through the group-summary access helper', () => {
 	beforeEach(() => {
@@ -15,7 +15,7 @@ describe('fetchPeriodTotals — routes through the group-summary access helper',
 	});
 
 	it('passes the timeInterval and date range through to the access helper', async () => {
-		vi.mocked(fetchAuthorisedAggregateStats).mockResolvedValue({
+		vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 			accessLevel: 'own',
 			rows: [ROW]
 		});
@@ -28,7 +28,7 @@ describe('fetchPeriodTotals — routes through the group-summary access helper',
 		);
 
 		expect(result).toEqual([ROW]);
-		expect(fetchAuthorisedAggregateStats).toHaveBeenCalledWith(1, {
+		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
 			from_date: '2026-03-01',
 			to_date: '2026-03-31',
 			group_by_species: false,
@@ -37,14 +37,14 @@ describe('fetchPeriodTotals — routes through the group-summary access helper',
 	});
 
 	it('omits from/to date keys entirely when not supplied', async () => {
-		vi.mocked(fetchAuthorisedAggregateStats).mockResolvedValue({
+		vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 			accessLevel: 'blocked',
 			rows: []
 		});
 
 		await fetchPeriodTotals(1, 'year');
 
-		expect(fetchAuthorisedAggregateStats).toHaveBeenCalledWith(1, {
+		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
 			group_by_species: false,
 			group_by_time_period: 'year'
 		});

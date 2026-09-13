@@ -1,12 +1,12 @@
 import { Table } from '@/app/components/shared/DesignSystem';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import { formatPostgresIntervalForDisplay } from '@/app/lib/postgres-interval';
 import { calculateRetraps } from '@/app/lib/species-totals';
 
 export function SummaryStatsSection({
 	stats
 }: {
-	stats: AggregateStatsResult | null;
+	stats: CoreStatsResult | null;
 }) {
 	if (!stats) {
 		return null;

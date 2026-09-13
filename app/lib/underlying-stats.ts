@@ -2,7 +2,7 @@ import { getAuthenticatedSupabaseClient } from './auth/group-auth';
 import { catchSupabaseErrors, fetchAllPaginatedRows } from '@/lib/supabase';
 import type { SessionStatsData } from '@/app/lib/highlights';
 import type {
-	AggregateStatsResult,
+	CoreStatsResult,
 	StatsPerDayAndSpeciesResult
 } from '@/app/models/db';
 
@@ -33,15 +33,15 @@ export const sessionStatsCache = new Map<
 >();
 export const yearStatsCache = new Map<
 	number,
-	StatsCacheEntry<AggregateStatsResult[] | null>
+	StatsCacheEntry<CoreStatsResult[] | null>
 >();
 export const monthStatsCache = new Map<
 	number,
-	StatsCacheEntry<AggregateStatsResult[] | null>
+	StatsCacheEntry<CoreStatsResult[] | null>
 >();
 export const effortHistoryCache = new Map<
 	number,
-	StatsCacheEntry<AggregateStatsResult[] | null>
+	StatsCacheEntry<CoreStatsResult[] | null>
 >();
 
 export async function fetchStatsVersion(
@@ -122,7 +122,7 @@ export async function fetchSessionStats(
 // fetchSessionStats' species granularity (its stats_per_day_and_species RPC
 // groups by day+species) rather than fetchPayOffStats' summary-only
 // precedent, since these functions are meant to be equivalent to
-// fetchSessionStats except for the aggregate period. aggregate_stats
+// fetchSessionStats except for the aggregate period. core_stats
 // computes bird_count as COUNT(DISTINCT bird_id) per period+species bucket
 // server-side, so summing across periods client-side never double-counts a
 // retrapped bird. No from_date/to_date is passed, so the RPC's internal
@@ -132,35 +132,35 @@ export async function fetchSessionStats(
 // remains deliberately uncached.
 export async function fetchYearStats(
 	viewedGroupId: number
-): Promise<AggregateStatsResult[] | null> {
+): Promise<CoreStatsResult[] | null> {
 	return fetchWithVersionCache(
 		yearStatsCache,
 		viewedGroupId,
 		(supabase) =>
 			supabase
-				.rpc('aggregate_stats', {
+				.rpc('core_stats', {
 					ringing_group_filter: viewedGroupId,
 					group_by_species: true,
 					group_by_time_period: 'year'
 				})
-				.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
+				.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>
 	);
 }
 
 export async function fetchMonthStats(
 	viewedGroupId: number
-): Promise<AggregateStatsResult[] | null> {
+): Promise<CoreStatsResult[] | null> {
 	return fetchWithVersionCache(
 		monthStatsCache,
 		viewedGroupId,
 		(supabase) =>
 			supabase
-				.rpc('aggregate_stats', {
+				.rpc('core_stats', {
 					ringing_group_filter: viewedGroupId,
 					group_by_species: true,
 					group_by_time_period: 'month'
 				})
-				.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
+				.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>
 	);
 }
 
@@ -175,17 +175,17 @@ export async function fetchMonthStats(
 // comment above it) via its own dedicated effortHistoryCache Map.
 export async function fetchGroupEffortHistory(
 	viewedGroupId: number
-): Promise<AggregateStatsResult[] | null> {
+): Promise<CoreStatsResult[] | null> {
 	return fetchWithVersionCache(
 		effortHistoryCache,
 		viewedGroupId,
 		(supabase) =>
 			supabase
-				.rpc('aggregate_stats', {
+				.rpc('core_stats', {
 					ringing_group_filter: viewedGroupId,
 					group_by_species: false,
 					group_by_time_period: 'month'
 				})
-				.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>
+				.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>
 	);
 }

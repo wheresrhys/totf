@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { SpBiometricsTab } from '../SpBiometricsTab';
 import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
-import type { AggregateStatsWithBiometrics } from '@/app/models/db';
+import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 import type { SexedGraphableBird } from '../WeightAndWingChart';
 
@@ -74,7 +74,7 @@ describe('SpBiometricsTab', () => {
 		const { getSpeciesStatsHistory, fetchGraphableEncounterData } =
 			await loadActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
-			[] as AggregateStatsWithBiometrics[]
+			[] as CoreStatsWithBiometrics[]
 		);
 		vi.mocked(fetchGraphableEncounterData).mockResolvedValue(
 			[] as SexedGraphableBird[]

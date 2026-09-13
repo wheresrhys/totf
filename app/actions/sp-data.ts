@@ -15,8 +15,8 @@ import type { GraphableBird } from '@/app/components/pages/species/WeightAndWing
 import type { SexedGraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
 import {
 	mergeBiometricsFields,
-	type AggregateStatsResult,
-	type AggregateStatsWithBiometrics,
+	type CoreStatsResult,
+	type CoreStatsWithBiometrics,
 	type BiometricsStatsResult,
 	type PopulationStatsResult
 } from '@/app/models/db';
@@ -210,9 +210,9 @@ export async function getSpeciesStatsHistory(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
-	toDate?: string,
+	toDate?: string
 	interval: StatsHistoryInterval = 'month'
-): Promise<AggregateStatsWithBiometrics[]> {
+): Promise<CoreStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
 		species_name_filter: species,
@@ -222,9 +222,9 @@ export async function getSpeciesStatsHistory(
 		...(toDate ? { to_date: toDate } : {})
 	};
 	const [aggregateRows, biometricsRows] = await Promise.all([
-		supabase
-			.rpc('aggregate_stats', rpcArgs)
-			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>,
+		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
+			CoreStatsResult[]
+		>,
 		supabase
 			.rpc('biometrics_stats', rpcArgs)
 			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>
@@ -310,15 +310,15 @@ export async function fetchSpeciesPeriodTotals(
 	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsResult[]> {
+): Promise<CoreStatsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('aggregate_stats', {
+		.rpc('core_stats', {
 			...(fromDate ? { from_date: fromDate } : {}),
 			...(toDate ? { to_date: toDate } : {}),
 			ringing_group_filter: viewedGroupId,
 			species_name_filter: speciesName,
 			group_by_time_period: timeInterval
 		})
-		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
+		.then(catchSupabaseErrors) as Promise<CoreStatsResult[]>;
 }
