@@ -7,17 +7,17 @@ import {
 	waitFor
 } from '@testing-library/react';
 import {
-	SpPopulationTab,
+	SpDemographicsTab,
 	RETURNING_VS_NEW_COLORS,
 	AGE_SPLIT_COLORS,
 	AGE_SPLIT_HUES,
 	YOUNG_COUNTS_COLORS,
 	YOUNG_COUNTS_HUES,
 	NEW_YOUNG_COUNTS_COLORS
-} from '../SpPopulationTab';
+} from '../SpDemographicsTab';
 import type {
 	CoreStatsWithBiometrics,
-	PopulationStatsResult
+	DemographicsStatsResult
 } from '@/app/models/db';
 
 // chartkick registers Chart.js as a side effect; nothing renders a real canvas
@@ -26,7 +26,7 @@ vi.mock('chartkick/chart.js', () => ({}));
 
 vi.mock('@/app/actions/sp-data', () => ({
 	getSpeciesStatsHistory: vi.fn(),
-	getSpeciesPopulationStats: vi.fn(),
+	getSpeciesDemographicsStats: vi.fn(),
 	getGroupEffortHistory: vi.fn()
 }));
 
@@ -156,7 +156,7 @@ async function loadActions() {
 	return import('@/app/actions/sp-data');
 }
 
-describe('SpPopulationTab', () => {
+describe('SpDemographicsTab', () => {
 	afterEach(() => {
 		cleanup();
 		vi.clearAllMocks();
@@ -165,21 +165,21 @@ describe('SpPopulationTab', () => {
 	beforeEach(async () => {
 		const {
 			getSpeciesStatsHistory,
-			getSpeciesPopulationStats,
+			getSpeciesDemographicsStats,
 			getGroupEffortHistory
 		} = await loadActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
 			[] as CoreStatsWithBiometrics[]
 		);
-		vi.mocked(getSpeciesPopulationStats).mockResolvedValue(
-			[] as PopulationStatsResult[]
+		vi.mocked(getSpeciesDemographicsStats).mockResolvedValue(
+			[] as DemographicsStatsResult[]
 		);
 		vi.mocked(getGroupEffortHistory).mockResolvedValue([['2024-01-01', 10]]);
 	});
 
-	describe('Structure: the five population tiles', () => {
+	describe('Structure: the five demographics tiles', () => {
 		it('renders Counts, Returning vs new, Age split, Young counts and New young counts tiles — no Biometrics/Wing-vs-weight tiles', () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			expect(screen.getByRole('button', { name: /Counts/ })).toBeDefined();
 			expect(
 				screen.getByRole('button', { name: /Returning vs new/ })
@@ -202,23 +202,23 @@ describe('SpPopulationTab', () => {
 
 	describe('Usual: initial collapsed grid', () => {
 		it('renders a text tile per chart and fetches nothing until a tile is expanded', async () => {
-			const { getSpeciesStatsHistory, getSpeciesPopulationStats } =
+			const { getSpeciesStatsHistory, getSpeciesDemographicsStats } =
 				await loadActions();
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			expect(
 				screen.getByText('Bird and encounter counts over time')
 			).toBeDefined();
 			expect(screen.queryByTestId('trend-chart')).toBeNull();
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
-			expect(getSpeciesPopulationStats).not.toHaveBeenCalled();
+			expect(getSpeciesDemographicsStats).not.toHaveBeenCalled();
 		});
 	});
 
 	describe('Structure: expanding the Counts tile (aggregate_stats)', () => {
 		it('fetches aggregate stats once and renders the chart with a close button', async () => {
-			const { getSpeciesStatsHistory, getSpeciesPopulationStats } =
+			const { getSpeciesStatsHistory, getSpeciesDemographicsStats } =
 				await loadActions();
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Counts/ }));
 			await screen.findByTestId('trend-chart');
 			expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(1);
@@ -228,17 +228,17 @@ describe('SpPopulationTab', () => {
 				undefined,
 				undefined
 			);
-			// The Counts tile does not touch population_stats.
-			expect(getSpeciesPopulationStats).not.toHaveBeenCalled();
+			// The Counts tile does not touch demographics_stats.
+			expect(getSpeciesDemographicsStats).not.toHaveBeenCalled();
 			expect(
 				screen.getByRole('button', { name: 'Close Counts' })
 			).toBeDefined();
 		});
 	});
 
-	describe('Structure: expanding the Returning vs new tile (aggregate_stats + population_stats)', () => {
+	describe('Structure: expanding the Returning vs new tile (aggregate_stats + demographics_stats)', () => {
 		it('renders the "Returning vs new" tile heading and description', () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			expect(
 				screen.getByRole('button', { name: /Returning vs new/ })
 			).toBeDefined();
@@ -247,18 +247,18 @@ describe('SpPopulationTab', () => {
 			).toBeDefined();
 		});
 
-		it('expanding the tile triggers both the stats-history and population-stats fetches', async () => {
-			const { getSpeciesStatsHistory, getSpeciesPopulationStats } =
+		it('expanding the tile triggers both the stats-history and demographics-stats fetches', async () => {
+			const { getSpeciesStatsHistory, getSpeciesDemographicsStats } =
 				await loadActions();
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Returning vs new/ }));
 			await screen.findByTestId('trend-chart');
 			expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(1);
-			expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1);
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1);
 		});
 
 		it('shows a spinner until both fetches have resolved, not just one', async () => {
-			const { getSpeciesStatsHistory, getSpeciesPopulationStats } =
+			const { getSpeciesStatsHistory, getSpeciesDemographicsStats } =
 				await loadActions();
 			let resolveStatsHistory!: (value: CoreStatsWithBiometrics[]) => void;
 			vi.mocked(getSpeciesStatsHistory).mockReturnValue(
@@ -266,13 +266,13 @@ describe('SpPopulationTab', () => {
 					resolveStatsHistory = resolve;
 				})
 			);
-			const { container } = render(<SpPopulationTab {...props} />);
+			const { container } = render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Returning vs new/ }));
-			// population_stats resolves immediately (default mock); stats_history is
+			// demographics_stats resolves immediately (default mock); stats_history is
 			// still pending — the tile must still show its spinner, not the chart,
 			// even though one of the two fetches it needs has already resolved.
 			await waitFor(() =>
-				expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1)
+				expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1)
 			);
 			expect(screen.queryByTestId('trend-chart')).toBeNull();
 			expect(container.querySelector('.loading-spinner')).not.toBeNull();
@@ -281,55 +281,55 @@ describe('SpPopulationTab', () => {
 		});
 	});
 
-	describe('Structure: expanding an age/young tile (population_stats)', () => {
-		it('fetches population stats once when the Age split tile is expanded', async () => {
-			const { getSpeciesPopulationStats, getSpeciesStatsHistory } =
+	describe('Structure: expanding an age/young tile (demographics_stats)', () => {
+		it('fetches demographics stats once when the Age split tile is expanded', async () => {
+			const { getSpeciesDemographicsStats, getSpeciesStatsHistory } =
 				await loadActions();
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Age split/ }));
 			await screen.findByTestId('trend-chart');
-			expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1);
-			expect(getSpeciesPopulationStats).toHaveBeenCalledWith(
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1);
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledWith(
 				'Robin',
 				1,
 				undefined,
 				undefined
 			);
-			// The population tiles do not touch aggregate_stats.
+			// The demographics tiles do not touch aggregate_stats.
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
 		});
 
-		it('fetches population stats once when the Young counts tile is expanded', async () => {
-			const { getSpeciesPopulationStats, getSpeciesStatsHistory } =
+		it('fetches demographics stats once when the Young counts tile is expanded', async () => {
+			const { getSpeciesDemographicsStats, getSpeciesStatsHistory } =
 				await loadActions();
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Young counts/ }));
 			await screen.findByTestId('trend-chart');
-			expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1);
-			expect(getSpeciesPopulationStats).toHaveBeenCalledWith(
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1);
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledWith(
 				'Robin',
 				1,
 				undefined,
 				undefined
 			);
-			// The population tiles do not touch aggregate_stats.
+			// The demographics tiles do not touch aggregate_stats.
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
 		});
 
-		it('fetches population stats once when the New young counts tile is expanded', async () => {
-			const { getSpeciesPopulationStats, getSpeciesStatsHistory } =
+		it('fetches demographics stats once when the New young counts tile is expanded', async () => {
+			const { getSpeciesDemographicsStats, getSpeciesStatsHistory } =
 				await loadActions();
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /New young counts/ }));
 			await screen.findByTestId('trend-chart');
-			expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1);
-			expect(getSpeciesPopulationStats).toHaveBeenCalledWith(
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1);
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledWith(
 				'Robin',
 				1,
 				undefined,
 				undefined
 			);
-			// The population tiles do not touch aggregate_stats.
+			// The demographics tiles do not touch aggregate_stats.
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
 		});
 	});
@@ -348,7 +348,7 @@ describe('SpPopulationTab', () => {
 
 		it('Counts: refetches aggregate stats with interval "year" rather than summing the monthly rows', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			await expandAndSwitchToYear(/Counts/);
 
 			await waitFor(() =>
@@ -374,15 +374,15 @@ describe('SpPopulationTab', () => {
 			).toBe(JSON.stringify(['birds']));
 		});
 
-		it('Age split: refetches population stats with interval "year"', async () => {
-			const { getSpeciesPopulationStats } = await loadActions();
-			render(<SpPopulationTab {...props} />);
+		it('Age split: refetches demographics stats with interval "year"', async () => {
+			const { getSpeciesDemographicsStats } = await loadActions();
+			render(<SpDemographicsTab {...props} />);
 			await expandAndSwitchToYear(/Age split/);
 
 			await waitFor(() =>
-				expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(2)
+				expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(2)
 			);
-			expect(getSpeciesPopulationStats).toHaveBeenLastCalledWith(
+			expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
 				'Robin',
 				1,
 				undefined,
@@ -391,15 +391,15 @@ describe('SpPopulationTab', () => {
 			);
 		});
 
-		it('Young counts: refetches population stats with interval "year"', async () => {
-			const { getSpeciesPopulationStats } = await loadActions();
-			render(<SpPopulationTab {...props} />);
+		it('Young counts: refetches demographics stats with interval "year"', async () => {
+			const { getSpeciesDemographicsStats } = await loadActions();
+			render(<SpDemographicsTab {...props} />);
 			await expandAndSwitchToYear(/^Young counts/);
 
 			await waitFor(() =>
-				expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(2)
+				expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(2)
 			);
-			expect(getSpeciesPopulationStats).toHaveBeenLastCalledWith(
+			expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
 				'Robin',
 				1,
 				undefined,
@@ -408,15 +408,15 @@ describe('SpPopulationTab', () => {
 			);
 		});
 
-		it('New young counts: refetches population stats with interval "year"', async () => {
-			const { getSpeciesPopulationStats } = await loadActions();
-			render(<SpPopulationTab {...props} />);
+		it('New young counts: refetches demographics stats with interval "year"', async () => {
+			const { getSpeciesDemographicsStats } = await loadActions();
+			render(<SpDemographicsTab {...props} />);
 			await expandAndSwitchToYear(/New young counts/);
 
 			await waitFor(() =>
-				expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(2)
+				expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(2)
 			);
-			expect(getSpeciesPopulationStats).toHaveBeenLastCalledWith(
+			expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
 				'Robin',
 				1,
 				undefined,
@@ -426,13 +426,13 @@ describe('SpPopulationTab', () => {
 		});
 
 		it('Returning vs new: refetches both RPCs with interval "year"', async () => {
-			const { getSpeciesStatsHistory, getSpeciesPopulationStats } =
+			const { getSpeciesStatsHistory, getSpeciesDemographicsStats } =
 				await loadActions();
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			await expandAndSwitchToYear(/Returning vs new/);
 
 			await waitFor(() =>
-				expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(2)
+				expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(2)
 			);
 			expect(getSpeciesStatsHistory).toHaveBeenLastCalledWith(
 				'Robin',
@@ -441,7 +441,7 @@ describe('SpPopulationTab', () => {
 				undefined,
 				'year'
 			);
-			expect(getSpeciesPopulationStats).toHaveBeenLastCalledWith(
+			expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
 				'Robin',
 				1,
 				undefined,
@@ -451,14 +451,18 @@ describe('SpPopulationTab', () => {
 		});
 
 		it('forwards the page date range to the year-grouped fetch', async () => {
-			const { getSpeciesPopulationStats } = await loadActions();
+			const { getSpeciesDemographicsStats } = await loadActions();
 			render(
-				<SpPopulationTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
+				<SpDemographicsTab
+					{...props}
+					fromDate="2024-01-01"
+					toDate="2024-12-31"
+				/>
 			);
 			await expandAndSwitchToYear(/Age split/);
 
 			await waitFor(() =>
-				expect(getSpeciesPopulationStats).toHaveBeenLastCalledWith(
+				expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
 					'Robin',
 					1,
 					'2024-01-01',
@@ -469,9 +473,9 @@ describe('SpPopulationTab', () => {
 		});
 
 		describe('Edge: the year fetch is shared across tiles', () => {
-			it('issues one year-grouped population_stats call however many tiles switch to Year', async () => {
-				const { getSpeciesPopulationStats } = await loadActions();
-				render(<SpPopulationTab {...props} />);
+			it('issues one year-grouped demographics_stats call however many tiles switch to Year', async () => {
+				const { getSpeciesDemographicsStats } = await loadActions();
+				render(<SpDemographicsTab {...props} />);
 				await expandAndSwitchToYear(/Age split/);
 				await expandAndSwitchToYear(/^Young counts/);
 				await expandAndSwitchToYear(/New young counts/);
@@ -480,10 +484,10 @@ describe('SpPopulationTab', () => {
 					expect(screen.getAllByTestId('trend-chart').length).toBe(3)
 				);
 				// Three monthly fetches would have been deduped by the existing
-				// `populationRequested` guard; the year fetches must dedupe too — one
+				// `demographicsRequested` guard; the year fetches must dedupe too — one
 				// monthly call plus exactly one year call.
 				const yearCalls = vi
-					.mocked(getSpeciesPopulationStats)
+					.mocked(getSpeciesDemographicsStats)
 					.mock.calls.filter((call) => call[4] === 'year');
 				expect(yearCalls).toHaveLength(1);
 			});
@@ -492,7 +496,7 @@ describe('SpPopulationTab', () => {
 
 	describe('Structure: collapsing a tile', () => {
 		it('hides the chart again when the close button is clicked', async () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Counts/ }));
 			await screen.findByTestId('trend-chart');
 			fireEvent.click(screen.getByRole('button', { name: 'Close Counts' }));
@@ -503,10 +507,10 @@ describe('SpPopulationTab', () => {
 		});
 	});
 
-	describe('Edge: memoised population_stats fetch shared across tiles', () => {
-		it('fetches population stats only once when Age split, Young counts and New young counts are all expanded', async () => {
-			const { getSpeciesPopulationStats } = await loadActions();
-			render(<SpPopulationTab {...props} />);
+	describe('Edge: memoised demographics_stats fetch shared across tiles', () => {
+		it('fetches demographics stats only once when Age split, Young counts and New young counts are all expanded', async () => {
+			const { getSpeciesDemographicsStats } = await loadActions();
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Age split/ }));
 			await screen.findByTestId('trend-chart');
 			fireEvent.click(screen.getByRole('button', { name: /Young counts/ }));
@@ -517,12 +521,12 @@ describe('SpPopulationTab', () => {
 			await waitFor(() =>
 				expect(screen.getAllByTestId('trend-chart').length).toBe(3)
 			);
-			expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1);
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1);
 		});
 
 		it('does not refetch when a tile is collapsed and re-expanded', async () => {
-			const { getSpeciesPopulationStats } = await loadActions();
-			render(<SpPopulationTab {...props} />);
+			const { getSpeciesDemographicsStats } = await loadActions();
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Age split/ }));
 			await screen.findByTestId('trend-chart');
 			fireEvent.click(screen.getByRole('button', { name: 'Close Age split' }));
@@ -531,16 +535,20 @@ describe('SpPopulationTab', () => {
 			);
 			fireEvent.click(screen.getByRole('button', { name: /Age split/ }));
 			await screen.findByTestId('trend-chart');
-			expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(1);
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1);
 		});
 	});
 
 	describe('Edge: date-range scope forwarded to both fetchers', () => {
-		it('passes fromDate/toDate through to the aggregate- and population-stats queries', async () => {
-			const { getSpeciesStatsHistory, getSpeciesPopulationStats } =
+		it('passes fromDate/toDate through to the aggregate- and demographics-stats queries', async () => {
+			const { getSpeciesStatsHistory, getSpeciesDemographicsStats } =
 				await loadActions();
 			render(
-				<SpPopulationTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
+				<SpDemographicsTab
+					{...props}
+					fromDate="2024-01-01"
+					toDate="2024-12-31"
+				/>
 			);
 			fireEvent.click(screen.getByRole('button', { name: /Counts/ }));
 			await screen.findByTestId('trend-chart');
@@ -554,7 +562,7 @@ describe('SpPopulationTab', () => {
 				'2024-01-01',
 				'2024-12-31'
 			);
-			expect(getSpeciesPopulationStats).toHaveBeenCalledWith(
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledWith(
 				'Robin',
 				1,
 				'2024-01-01',
@@ -565,14 +573,14 @@ describe('SpPopulationTab', () => {
 
 	describe('Structure: series/colours per tile', () => {
 		it('passes no colors override on the Counts tile (default palette)', async () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Counts/ }));
 			const chart = await screen.findByTestId('trend-chart');
 			expect(chart.dataset.colors).toBe('null');
 		});
 
 		it('passes the Returning vs new colours on the Returning vs new tile', async () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Returning vs new/ }));
 			const chart = await screen.findByTestId('trend-chart');
 			expect(JSON.parse(chart.dataset.colors!)).toEqual(
@@ -582,7 +590,7 @@ describe('SpPopulationTab', () => {
 		});
 
 		it('passes the paired Age split colours on the Age split tile', async () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Age split/ }));
 			const chart = await screen.findByTestId('trend-chart');
 			expect(JSON.parse(chart.dataset.colors!)).toEqual(AGE_SPLIT_COLORS);
@@ -590,7 +598,7 @@ describe('SpPopulationTab', () => {
 		});
 
 		it('passes the Young counts colours on the Young counts tile', async () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Young counts/ }));
 			const chart = await screen.findByTestId('trend-chart');
 			expect(JSON.parse(chart.dataset.colors!)).toEqual(YOUNG_COUNTS_COLORS);
@@ -598,7 +606,7 @@ describe('SpPopulationTab', () => {
 		});
 
 		it('renders a Total series summing Juv and Postjuv', async () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Young counts/ }));
 			const chart = await screen.findByTestId('trend-chart');
 			expect(JSON.parse(chart.dataset.total!)).toEqual([
@@ -608,7 +616,7 @@ describe('SpPopulationTab', () => {
 		});
 
 		it('passes the New young counts colours on the New young counts tile', async () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /New young counts/ }));
 			const chart = await screen.findByTestId('trend-chart');
 			expect(JSON.parse(chart.dataset.colors!)).toEqual(
@@ -618,7 +626,7 @@ describe('SpPopulationTab', () => {
 		});
 
 		it('renders a Total series summing New juv and New postjuv', async () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /New young counts/ }));
 			const chart = await screen.findByTestId('trend-chart');
 			expect(JSON.parse(chart.dataset.total!)).toEqual([
@@ -628,7 +636,7 @@ describe('SpPopulationTab', () => {
 		});
 
 		it('passes includeTotalSeries to the Young counts and New young counts tiles only, not Counts or Age split', async () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			for (const name of [
 				/Counts/,
 				/Age split/,
@@ -650,9 +658,13 @@ describe('SpPopulationTab', () => {
 	});
 
 	describe('Structure: compareYearsUrl per tile', () => {
-		it('passes /species/{name}?tabId=population to every tile when the page is period-scoped', async () => {
+		it('passes /species/{name}?tabId=demographics to every tile when the page is period-scoped', async () => {
 			render(
-				<SpPopulationTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
+				<SpDemographicsTab
+					{...props}
+					fromDate="2024-01-01"
+					toDate="2024-12-31"
+				/>
 			);
 			for (const name of [
 				/Counts/,
@@ -667,13 +679,13 @@ describe('SpPopulationTab', () => {
 			);
 			for (const chart of screen.getAllByTestId('trend-chart')) {
 				expect(chart.dataset.compareYearsUrl).toBe(
-					'/species/Robin?tabId=population'
+					'/species/Robin?tabId=demographics'
 				);
 			}
 		});
 
 		it('omits compareYearsUrl on the all-time render (no fromDate/toDate)', async () => {
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			fireEvent.click(screen.getByRole('button', { name: /Counts/ }));
 			const chart = await screen.findByTestId('trend-chart');
 			expect(chart.dataset.compareYearsUrl).toBe('');
@@ -683,7 +695,7 @@ describe('SpPopulationTab', () => {
 	describe('Structure: effort history fetched once and passed to every tile', () => {
 		it('fetches group effort history once regardless of how many tiles expand, passing it to all four charts', async () => {
 			const { getGroupEffortHistory } = await loadActions();
-			render(<SpPopulationTab {...props} />);
+			render(<SpDemographicsTab {...props} />);
 			for (const name of [
 				/Counts/,
 				/Age split/,
