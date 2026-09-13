@@ -182,6 +182,24 @@ duplicate of a same-named column on `aggregate_stats` (#800); #824 removed `aggr
 copy (and the corresponding UI series, #817) as unused, so `population_stats` now holds the only
 `new_young_bird_count` column in the schema.
 
+`arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
+two structurally can't: **arrivals**. `aggregate_stats`/`population_stats` compute their bucket
+counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
+one year is counted again in each monthly cell. `arrivals_stats` instead counts each bird exactly
+once per calendar year, at whichever cell holds its **first classifiable encounter of that year**,
+bucketed by what the bird was at that encounter — `new_adult` / `returning_adult` / `pullus` / `juv`
+/ `postjuv` (mutually exclusive and exhaustive, so the five counts sum to the cell's distinct
+arriving-bird-year count). The per-bird-year resolution lives in the `stats_bird_first_encounter_of_year`
+utility RPC: it drops `'unknown'`-bucket encounters *before* the first-of-year pick (so an
+unclassifiable early encounter is skipped in favour of the next classifiable one that year, rather
+than losing the bird for that year), takes `DISTINCT ON (bird_id, enc_year)` ordered by
+`visit_date, encounter_id` for same-day determinism, and splits `adult` into `new_adult` vs
+`returning_adult` off the same unwindowed, `ringing_group_filter`-scoped lifetime-history CTEs
+`population_stats` uses (`new_adult` iff the arrival year is the bird's first-ever year with the
+group — no majority-vote heuristic needed, unlike `population_stats`' first_summer/old_timers split).
+Note the granularity: an "arrival" is a **bird-year**, not a bird, so under an ungrouped query a bird
+that arrived in two years contributes two counts.
+
 **Composite-type RETURN QUERY binds by position, not name — this bit us.** A `RETURNS SETOF
 <composite type>` function's `RETURN QUERY SELECT ...` binds the SELECT list to the composite
 type's columns by ordinal attribute position, never by the `AS "..."` alias text. That position is

@@ -414,6 +414,23 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      arrivals_stats: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["arrivals_stats_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "arrivals_stats_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       biometrics_stats: {
         Args: {
           from_date?: string
@@ -583,6 +600,22 @@ export type Database = {
           time_period: string
         }[]
       }
+      stats_bird_first_encounter_of_year: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: {
+          arrival_bucket: string
+          bird_id: number
+          species_id: number
+          time_period: string
+        }[]
+      }
       stats_encounter_age_classification: {
         Args: {
           from_date?: string
@@ -738,6 +771,15 @@ export type Database = {
         adult_enc_count: number | null
         unknown_age_enc_count: number | null
         max_new_per_session: number | null
+      }
+      arrivals_stats_result: {
+        species_name: string | null
+        time_period: string | null
+        new_adult_bird_count: number | null
+        returning_adult_bird_count: number | null
+        pullus_bird_count: number | null
+        juv_bird_count: number | null
+        postjuv_bird_count: number | null
       }
       biometrics_stats_result: {
         species_name: string | null
