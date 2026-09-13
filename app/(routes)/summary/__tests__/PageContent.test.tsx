@@ -3,12 +3,11 @@ import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SummaryPageContent } from '../PageContent';
 import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
 import alphaSpeciesStats from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
-const populatedStats = alphaStats as unknown as AggregateStatsResult;
-const populatedSpeciesStats =
-	alphaSpeciesStats as unknown as AggregateStatsResult[];
+const populatedStats = alphaStats as unknown as CoreStatsResult;
+const populatedSpeciesStats = alphaSpeciesStats as unknown as CoreStatsResult[];
 
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 

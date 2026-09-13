@@ -7,7 +7,7 @@ import {
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '../models/session';
 import type {
-	AggregateStatsResult,
+	CoreStatsResult,
 	SpeciesRow,
 	GroupTicksResult
 } from '../models/db';
@@ -20,9 +20,9 @@ export type SpeciesWithBirdsCount = Pick<SpeciesRow, 'id' | 'species_name'> & {
 };
 
 export type HomePageSummaryStats = {
-	allTime: AggregateStatsResult | null;
-	thisYear: AggregateStatsResult | null;
-	lastYear: AggregateStatsResult | null;
+	allTime: CoreStatsResult | null;
+	thisYear: CoreStatsResult | null;
+	lastYear: CoreStatsResult | null;
 };
 
 export type PageModel = {
@@ -62,7 +62,7 @@ function RecentSessions({
 }
 const SUMMARY_STATS_ROWS: {
 	label: string;
-	field: keyof AggregateStatsResult;
+	field: keyof CoreStatsResult;
 }[] = [
 	{ label: 'Sessions', field: 'session_count' },
 	{ label: 'Birds', field: 'bird_count' },

@@ -254,7 +254,7 @@ describe('/species/[speciesName]/[year]', () => {
 				1
 			);
 			expect(client.rpc).toHaveBeenCalledWith(
-				'aggregate_stats',
+				'core_stats',
 				expect.objectContaining({
 					from_date: '2026-01-01',
 					to_date: '2026-12-31'

@@ -1,6 +1,6 @@
 import type { SessionEncounter } from '../models/session';
 
-// Matches SQL: GREATEST(MAX(capture_time) - MIN(capture_time), '02:00:00') in aggregate_stats RPC.
+// Matches SQL: GREATEST(MAX(capture_time) - MIN(capture_time), '02:00:00') in core_stats RPC.
 // That 2h floor applies to effort calculations only — display uses actual duration.
 export const SESSION_MINIMUM_EFFORT_MINUTES = 120;
 

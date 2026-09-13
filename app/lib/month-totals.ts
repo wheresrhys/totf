@@ -1,6 +1,6 @@
 import { format as formatDate } from 'date-fns';
 import { postgresIntervalToSeconds } from '@/app/lib/postgres-interval';
-import type { AggregateStatsResult } from '../models/db';
+import type { CoreStatsResult } from '../models/db';
 
 // A single month's row for the year summary page's "Month totals" tab, and
 // (reused as-is) for the all-time page's "Combine years" OFF state — same
@@ -11,7 +11,7 @@ import type { AggregateStatsResult } from '../models/db';
 export type MonthTotalsRow = {
 	year: number;
 	zeroIndexedMonth: number;
-	stats: AggregateStatsResult;
+	stats: CoreStatsResult;
 };
 
 // The month name is built from integer year/zeroIndexedMonth via a *local*
@@ -30,17 +30,17 @@ export function formatMonthYearLabel(
 	return formatDate(new Date(row.year, row.zeroIndexedMonth, 1), 'LLLL yyyy');
 }
 
-// `aggregate_stats` returns `'00:00:00'` for an interval with no recorded
+// `core_stats` returns `'00:00:00'` for an interval with no recorded
 // effort; mirror that convention for synthesized (zero-session) months so the
 // shared table's interval formatting renders them identically to a real empty
 // period.
 const ZERO_INTERVAL = '00:00:00';
 
-// A zero-valued `aggregate_stats` row for a month the RPC omitted (no sessions).
+// A zero-valued `core_stats` row for a month the RPC omitted (no sessions).
 // The RPC's `period_spine` only spans min→max actual session dates, so a year
 // with e.g. only Mar–Oct sessions comes back missing the other months entirely;
 // these are filled in client-side rather than by touching the RPC.
-function synthesizeZeroStats(timePeriod: string): AggregateStatsResult {
+function synthesizeZeroStats(timePeriod: string): CoreStatsResult {
 	return {
 		species_name: null,
 		time_period: timePeriod,
@@ -78,7 +78,7 @@ function synthesizeZeroStats(timePeriod: string): AggregateStatsResult {
 		unknown_age_enc_count: 0
 		// `species_name` is nullable in the RPC's real output but typed `string`
 		// in the generated types; cast through `unknown` to keep the honest null.
-	} as unknown as AggregateStatsResult;
+	} as unknown as CoreStatsResult;
 }
 
 // Build all 12 calendar months for `year`, in Jan→Dec order regardless of the
@@ -87,7 +87,7 @@ function synthesizeZeroStats(timePeriod: string): AggregateStatsResult {
 // timezone pitfalls).
 export function buildMonthTotalsRows(
 	year: number,
-	periodStats: AggregateStatsResult[]
+	periodStats: CoreStatsResult[]
 ): MonthTotalsRow[] {
 	return Array.from({ length: 12 }, (_unused, zeroIndexedMonth) => {
 		const month = zeroIndexedMonth + 1;
@@ -109,7 +109,7 @@ export function buildMonthTotalsRows(
 // and no year field — pure raw data, same as `MonthTotalsRow`.
 export type CombinedMonthTotalsRow = {
 	zeroIndexedMonth: number;
-	stats: AggregateStatsResult;
+	stats: CoreStatsResult;
 };
 
 // Month name only (no year) — these rows span every year at once. `row` is
@@ -140,11 +140,11 @@ const SUMMABLE_STAT_FIELDS = [
 	'postjuv_enc_count',
 	'adult_enc_count',
 	'unknown_age_enc_count'
-] as const satisfies readonly (keyof AggregateStatsResult)[];
+] as const satisfies readonly (keyof CoreStatsResult)[];
 
 // Re-format a second count back into a Postgres-interval string that
 // `postgresIntervalToSeconds` round-trips. Hours are unbounded (e.g. `36:00:00`)
-// — exactly the shape `aggregate_stats` returns for a multi-day `total_effort` —
+// — exactly the shape `core_stats` returns for a multi-day `total_effort` —
 // so summing then re-parsing is lossless.
 function secondsToPostgresInterval(totalSeconds: number): string {
 	const whole = Math.round(totalSeconds);
@@ -162,7 +162,7 @@ function secondsToPostgresInterval(totalSeconds: number): string {
 // to the same shape `buildMonthTotalsRows` uses. Matching is by the `MM` slice of
 // `time_period` (string comparison — avoids `Date` timezone pitfalls).
 export function buildCombinedMonthTotalsRows(
-	periodStats: AggregateStatsResult[]
+	periodStats: CoreStatsResult[]
 ): CombinedMonthTotalsRow[] {
 	return Array.from({ length: 12 }, (_unused, index) => {
 		const month = index + 1;
@@ -199,7 +199,7 @@ export function buildCombinedMonthTotalsRows(
 // `stats.session_count`. Pure — never mutates the input array. Callers apply it
 // after building rows; the builders themselves stay unaware of the toggle.
 export function filterEmptyMonthTotalsRows<
-	T extends { stats: Pick<AggregateStatsResult, 'session_count'> }
+	T extends { stats: Pick<CoreStatsResult, 'session_count'> }
 >(rows: T[], hideEmptyMonths: boolean): T[] {
 	if (!hideEmptyMonths) return rows;
 	return rows.filter((row) => row.stats.session_count !== 0);
@@ -207,11 +207,11 @@ export function filterEmptyMonthTotalsRows<
 
 // The "Combine years" toggle's OFF state for the all-time "Month totals" tab:
 // one row per real `(year, month)` combination in the group's history, with no
-// combining/summing — the raw `aggregate_stats` month array (the same array
+// combining/summing — the raw `core_stats` month array (the same array
 // `buildCombinedMonthTotalsRows` folds into 12 buckets), reshaped into pure
 // `MonthTotalsRow`s and sorted chronologically regardless of input order.
 export function buildPerYearMonthTotalsRows(
-	periodStats: AggregateStatsResult[]
+	periodStats: CoreStatsResult[]
 ): MonthTotalsRow[] {
 	return periodStats
 		.map((stat) => ({

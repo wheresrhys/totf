@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { formatSecondsForDisplay } from '@/app/lib/postgres-interval';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import {
 	derivePeriodTotalsRowByBird,
 	derivePeriodTotalsRowByEncounter,
@@ -84,14 +84,14 @@ export function PeriodTotalsTable({
 	showBusiestSession = true
 }: {
 	timeInterval: PeriodTotalsGrouping;
-	rows: AggregateStatsResult[];
+	rows: CoreStatsResult[];
 	firstColumnHeader: string;
 	buildHref: (timePeriod: string) => string;
 	// Overrides the default `formatPeriodTotalsLabel(timeInterval, ...)` first-column
 	// text — e.g. the month-totals caller supplies a timezone-safe label built
 	// from integer year/month rather than parsing the `time_period` string.
 	buildLabel?: (timePeriod: string) => string;
-	totalsStats?: AggregateStatsResult;
+	totalsStats?: CoreStatsResult;
 	// When set, aggregation is locked to this value and the Bird/Encounter toggle
 	// still renders but is disabled — the all-time "Month totals" tab fixes it to
 	// `'encounter'`, since combine-years bird counts aren't meaningful.
@@ -145,10 +145,7 @@ export function PeriodTotalsTable({
 	// Recreated each render since `timeInterval`/`buildHref` are props, not static
 	// — the cell itself is stateless, so this only costs identity, not
 	// behaviour.
-	const PeriodLabelCell = createNameLinkCell<
-		AggregateStatsResult,
-		PeriodTotalsRow
-	>(
+	const PeriodLabelCell = createNameLinkCell<CoreStatsResult, PeriodTotalsRow>(
 		(model) => resolveLabel(model.timePeriod),
 		(model) => (model.sessionsCount ? buildHref(model.timePeriod) : undefined)
 	);
@@ -157,7 +154,7 @@ export function PeriodTotalsTable({
 		data,
 		columnConfigs
 	}: {
-		data: RowModelWithRawData<AggregateStatsResult, PeriodTotalsRow>[];
+		data: RowModelWithRawData<CoreStatsResult, PeriodTotalsRow>[];
 		columnConfigs?: Partial<Record<keyof PeriodTotalsRow, ColumnConfig>>;
 	}) {
 		const restColumnProperties = Object.keys(columnConfigs ?? {}).filter(
@@ -199,7 +196,7 @@ export function PeriodTotalsTable({
 				)}
 				{extraControls ?? null}
 			</div>
-			<SortableTable<AggregateStatsResult, PeriodTotalsRow>
+			<SortableTable<CoreStatsResult, PeriodTotalsRow>
 				columnConfigs={columnConfigs}
 				data={rows}
 				testId="period-totals-table"

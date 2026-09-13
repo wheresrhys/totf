@@ -15,8 +15,8 @@ import {
 
 import {
 	mergeBiometricsFields,
-	type AggregateStatsResult,
-	type AggregateStatsWithBiometrics,
+	type CoreStatsResult,
+	type CoreStatsWithBiometrics,
 	type BiometricsStatsResult
 } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
@@ -49,7 +49,7 @@ export async function getSpeciesStats(
 	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsWithBiometrics[]> {
+): Promise<CoreStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
 		species_name_filter: species,
@@ -58,9 +58,9 @@ export async function getSpeciesStats(
 		...(toDate ? { to_date: toDate } : {})
 	};
 	const [aggregateRows, biometricsRows] = await Promise.all([
-		supabase
-			.rpc('aggregate_stats', rpcArgs)
-			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>,
+		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
+			CoreStatsResult[]
+		>,
 		supabase
 			.rpc('biometrics_stats', rpcArgs)
 			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>

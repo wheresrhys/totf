@@ -6,7 +6,7 @@ import {
 import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { MonthTotalsRow } from '@/app/lib/month-totals';
 export function SummaryPageContent({
@@ -24,10 +24,10 @@ export function SummaryPageContent({
 }: {
 	year?: number;
 	month?: number;
-	summaryStats?: AggregateStatsResult | null;
+	summaryStats?: CoreStatsResult | null;
 	monthTotals?: MonthTotalsRow[];
-	yearlyTotals?: AggregateStatsResult[];
-	sessionTotals?: AggregateStatsResult[];
+	yearlyTotals?: CoreStatsResult[];
+	sessionTotals?: CoreStatsResult[];
 	// Only the all-time page sets this — enables the combine-years "Month totals"
 	// tab (data fetched lazily on select, not passed in).
 	showAllTimeMonthTotals?: boolean;

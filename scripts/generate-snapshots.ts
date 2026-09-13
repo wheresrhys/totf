@@ -57,7 +57,7 @@ export async function generateSnapshots(
 		['beta', beta, betaId],
 		['gamma', gamma, gammaId]
 	] as const) {
-		const { data } = await client.rpc('aggregate_stats', {
+		const { data } = await client.rpc('core_stats', {
 			ringing_group_filter: gId,
 			group_by_species: true
 		});
@@ -70,12 +70,12 @@ export async function generateSnapshots(
 		['beta', beta, betaId]
 	] as const) {
 		const [{ data: yearly }, { data: monthly }] = await Promise.all([
-			client.rpc('aggregate_stats', {
+			client.rpc('core_stats', {
 				ringing_group_filter: gId,
 				group_by_species: false,
 				group_by_time_period: 'year'
 			}),
-			client.rpc('aggregate_stats', {
+			client.rpc('core_stats', {
 				ringing_group_filter: gId,
 				group_by_species: false,
 				group_by_time_period: 'month'
@@ -162,7 +162,7 @@ export async function generateSnapshots(
 		await writeSnapshot(`fetchPageOfBirds.alpha.robin.json`, birdsPage0 ?? []);
 
 		// getSpeciesStatsHistory (sp-data.ts) — Robin monthly for Alpha
-		const { data: robinHistory } = await alpha.rpc('aggregate_stats', {
+		const { data: robinHistory } = await alpha.rpc('core_stats', {
 			species_name_filter: 'Robin',
 			ringing_group_filter: alphaId,
 			group_by_time_period: 'month'
@@ -207,7 +207,7 @@ export async function generateSnapshots(
 					ringing_group_filter: alphaId
 				}
 			} as Parameters<typeof alpha.rpc<'top_metrics_by_period'>>[1]),
-			alpha.rpc('aggregate_stats', {
+			alpha.rpc('core_stats', {
 				species_name_filter: 'Robin',
 				ringing_group_filter: alphaId
 			})

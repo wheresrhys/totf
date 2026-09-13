@@ -7,10 +7,7 @@ import {
 	getSpeciesPopulationStats,
 	getGroupEffortHistory
 } from '@/app/actions/sp-data';
-import type {
-	AggregateStatsResult,
-	PopulationStatsResult
-} from '@/app/models/db';
+import type { CoreStatsResult, PopulationStatsResult } from '@/app/models/db';
 import {
 	getCounts,
 	getReturningVsNew,
@@ -124,9 +121,9 @@ export function SpPopulationTab({
 }) {
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-	const [statsHistory, setStatsHistory] = useState<
-		AggregateStatsResult[] | null
-	>(null);
+	const [statsHistory, setStatsHistory] = useState<CoreStatsResult[] | null>(
+		null
+	);
 	const [statsRequested, setStatsRequested] = useState(false);
 	function loadStatsHistory() {
 		if (statsRequested) return;
@@ -160,9 +157,9 @@ export function SpPopulationTab({
 	// tiles ask for the same year data and each `YearComparisonTrendChart`
 	// keeps its own copy once resolved — the ref only needs to guarantee one
 	// RPC round-trip per interval per tab, not to drive a re-render.
-	const yearStatsHistoryPromise = useRef<Promise<
-		AggregateStatsResult[]
-	> | null>(null);
+	const yearStatsHistoryPromise = useRef<Promise<CoreStatsResult[]> | null>(
+		null
+	);
 	function fetchYearStatsHistory() {
 		yearStatsHistoryPromise.current ??= getSpeciesStatsHistory(
 			speciesName,

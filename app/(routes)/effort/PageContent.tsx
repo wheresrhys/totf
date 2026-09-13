@@ -5,7 +5,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { format as formatDate } from 'date-fns';
 import type { PayOffStatsData } from '@/app/actions/pay-off-stats';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { formatPostgresIntervalForDisplay } from '@/app/lib/postgres-interval';
 import { PayOffEffortChart } from '@/app/components/pages/effort/PayOffEffortChart';
@@ -15,11 +15,11 @@ function formatAvgEncounters(n: number | null | undefined): string {
 	return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
-/** Expects `yearly` from aggregate_stats with group_by_time_period 'year' (ascending by time_period). */
-function PayOffYearlyTable({ yearly }: { yearly: AggregateStatsResult[] }) {
+/** Expects `yearly` from core_stats with group_by_time_period 'year' (ascending by time_period). */
+function PayOffYearlyTable({ yearly }: { yearly: CoreStatsResult[] }) {
 	const metricRows: {
 		label: string;
-		cell: (row: AggregateStatsResult) => string;
+		cell: (row: CoreStatsResult) => string;
 	}[] = [
 		{
 			label: 'Total ringing effort',

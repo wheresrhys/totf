@@ -7,7 +7,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
-import type { AggregateStatsWithBiometrics } from '@/app/models/db';
+import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { SpIndividualsTab } from '@/app/components/pages/species/SpIndividualsTab';
 import { SpNotableRetrapsTab } from '@/app/components/pages/species/SpNotableRetrapsTab';
@@ -46,7 +46,7 @@ export type PeriodScope = {
 
 export type FullFatPageData = {
 	birds: EnrichedBirdOfSpecies[];
-	speciesStats: AggregateStatsWithBiometrics;
+	speciesStats: CoreStatsWithBiometrics;
 	speciesId: number;
 	speciesName: string;
 } & PeriodScope;
@@ -87,7 +87,7 @@ export function buildSpeciesHeadingText(
 }
 
 // Counts sentence rendered under the heading when species stats are available
-// (#784). `null` counts (a possible shape for `AggregateStatsResult`'s count
+// (#784). `null` counts (a possible shape for `CoreStatsResult`'s count
 // columns) are treated as 0 for both the number shown and the singular/plural
 // check, following the `${n} ${n === 1 ? 'singular' : 'plural'}` idiom used by
 // `buildYearsAgoCopy` (app/components/highlights/counts/renderers.tsx).

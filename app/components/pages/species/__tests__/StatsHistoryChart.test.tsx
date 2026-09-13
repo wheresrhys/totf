@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type {
-	AggregateStatsResult,
-	AggregateStatsWithBiometrics,
+	CoreStatsResult,
+	CoreStatsWithBiometrics,
 	PopulationStatsResult
 } from '@/app/models/db';
 import {
@@ -16,14 +16,12 @@ import {
 // Minimal fixture builders — only the columns each mapper reads matter; the rest
 // are filled with 0 so a full composite-type row satisfies the (null-stripped)
 // result types without inventing meaningless values inline per test.
-function aggregateRow(
-	overrides: Partial<AggregateStatsResult>
-): AggregateStatsResult {
+function aggregateRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
 	return {
 		time_period: '2024-01-01',
 		bird_count: 0,
 		encounter_count: 0
-	} as unknown as AggregateStatsResult & typeof overrides;
+	} as unknown as CoreStatsResult & typeof overrides;
 }
 
 function populationRow(
@@ -52,7 +50,7 @@ describe('getCounts', () => {
 		it('maps encounter_count and bird_count against time_period', () => {
 			const result = getCounts([
 				{ ...aggregateRow({}), encounter_count: 12, bird_count: 9 }
-			] as AggregateStatsResult[]);
+			] as CoreStatsResult[]);
 			expect(result.map((series) => series.name)).toEqual([
 				'encounters',
 				'birds'
@@ -92,7 +90,7 @@ describe('getReturningVsNew', () => {
 					juv_bird_count: 0,
 					postjuv_bird_count: 1
 				}
-			] as AggregateStatsResult[];
+			] as CoreStatsResult[];
 			const populationStats = [
 				populationRow({
 					time_period: '2024-01-01',
@@ -150,7 +148,7 @@ describe('getReturningVsNew', () => {
 					juv_bird_count: 5,
 					postjuv_bird_count: 3
 				}
-			] as AggregateStatsResult[];
+			] as CoreStatsResult[];
 			const populationStats = [populationRow({ time_period: '2024-01-01' })];
 			const result = getReturningVsNew(statsHistory, populationStats);
 			expect(result[2].data).toEqual([['2024-01-01', 10]]);
@@ -186,7 +184,7 @@ describe('getReturningVsNew', () => {
 					juv_bird_count: 1,
 					postjuv_bird_count: 1
 				}
-			] as AggregateStatsResult[];
+			] as CoreStatsResult[];
 			const populationStats = [
 				populationRow({
 					time_period: '2024-01-01',
@@ -286,7 +284,7 @@ describe('getYoungCounts', () => {
 
 describe('getSizes', () => {
 	// #821 merges biometrics_stats' wing/weight fields onto each aggregate_stats
-	// row before getSizes ever sees it — the merged AggregateStatsWithBiometrics
+	// row before getSizes ever sees it — the merged CoreStatsWithBiometrics
 	// shape (#827) is what getSizes reads its wing/weight columns from now that
 	// aggregate_stats itself no longer carries them. This checks getSizes maps
 	// those merged columns onto the expected six series.
@@ -303,7 +301,7 @@ describe('getSizes', () => {
 					median_wing: 74,
 					min_wing: 72
 				}
-			] as AggregateStatsWithBiometrics[];
+			] as CoreStatsWithBiometrics[];
 
 			const result = getSizes(rows);
 

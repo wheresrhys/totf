@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { fetchSpeciesPeriodTotals } from '@/app/actions/sp-data';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 
 export function SpYearTotalsTab({
 	speciesName,
@@ -11,7 +11,7 @@ export function SpYearTotalsTab({
 	speciesName: string;
 	viewedGroupId: number;
 }) {
-	const [yearTotals, setYearTotals] = useState<AggregateStatsResult[]>([]);
+	const [yearTotals, setYearTotals] = useState<CoreStatsResult[]>([]);
 	const [isLoaded, setIsLoaded] = useState(false);
 
 	useEffect(() => {

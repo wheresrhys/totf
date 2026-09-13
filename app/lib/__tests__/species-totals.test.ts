@@ -5,11 +5,9 @@ import {
 	deriveSpeciesTotalsRow,
 	deriveSpeciesTotalsRowByEncounter
 } from '../species-totals';
-import type { AggregateStatsResult } from '../../models/db';
+import type { CoreStatsResult } from '../../models/db';
 
-function buildStat(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+function buildStat(overrides: Partial<CoreStatsResult> = {}): CoreStatsResult {
 	return {
 		species_name: 'Blue Tit',
 		time_period: null,
@@ -43,7 +41,7 @@ function buildStat(
 		adult_enc_count: 1,
 		unknown_age_enc_count: 0,
 		...overrides
-	} as unknown as AggregateStatsResult;
+	} as unknown as CoreStatsResult;
 }
 
 describe('calculateRetraps', () => {
@@ -64,7 +62,7 @@ describe('calculateRetraps', () => {
 });
 
 describe('deriveSpeciesTotalsRow', () => {
-	it('maps every AggregateStatsResult bucket field to its SpeciesTotalsRow counterpart', () => {
+	it('maps every CoreStatsResult bucket field to its SpeciesTotalsRow counterpart', () => {
 		const stat = buildStat();
 		expect(deriveSpeciesTotalsRow(stat)).toEqual({
 			speciesName: 'Blue Tit',

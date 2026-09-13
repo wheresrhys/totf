@@ -68,7 +68,7 @@ function lighten(hex: string, fraction: number): string {
 	return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
 }
 
-// `aggregate_stats` returns a *dense* monthly spine: every month between the
+// `core_stats` returns a *dense* monthly spine: every month between the
 // first and last session emits a row, and a month with no encounters of this
 // species comes back as an explicit `0` (not an absent row). Plotting those
 // zeros verbatim makes a partial/quiet year's line dive to a flat zero baseline

@@ -1,17 +1,17 @@
 'use server';
-import { fetchAuthorisedAggregateStats } from '@/app/lib/auth/group-summary-access';
-import type { AggregateStatsResult } from '@/app/models/db';
+import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
+import type { CoreStatsResult } from '@/app/models/db';
 
 /**
  * Page-wide (ungrouped) totals for a summary period — no `group_by_species`/
- * `group_by_time_period`, so `aggregate_stats` returns at most one row.
+ * `group_by_time_period`, so `core_stats` returns at most one row.
  */
 export async function fetchSummaryStats(
 	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsResult | null> {
-	const { rows } = await fetchAuthorisedAggregateStats(viewedGroupId, {
+): Promise<CoreStatsResult | null> {
+	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {})
 	});
@@ -29,8 +29,8 @@ export async function fetchPeriodStats(
 	timeInterval: 'year' | 'month' | 'day',
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsResult[]> {
-	const { rows } = await fetchAuthorisedAggregateStats(viewedGroupId, {
+): Promise<CoreStatsResult[]> {
+	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		group_by_species: false,
 		group_by_time_period: timeInterval,
 		...(fromDate ? { from_date: fromDate } : {}),
@@ -41,14 +41,14 @@ export async function fetchPeriodStats(
 
 /**
  * One row per year with data, for the all-time summary page's "Year totals"
- * tab. `aggregate_stats`'s `period_spine` CTE is already dense across the
+ * tab. `core_stats`'s `period_spine` CTE is already dense across the
  * group's earliest-to-latest session year and arrives `ORDER BY time_period
  * ASC` — no client-side zero-fill or re-sorting needed.
  */
 export async function fetchYearlyTotals(
 	viewedGroupId: number
-): Promise<AggregateStatsResult[]> {
-	const { rows } = await fetchAuthorisedAggregateStats(viewedGroupId, {
+): Promise<CoreStatsResult[]> {
+	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		group_by_species: false,
 		group_by_time_period: 'year'
 	});
