@@ -182,7 +182,20 @@ export async function fetchGraphableEncounterData(
 	);
 }
 
-// Monthly wing/weight + count history for a single species, merging
+/**
+ * Granularity of a species stats-history fetch. `'month'` (the default) is the
+ * conventional per-month history every caller started with; `'year'` re-fetches
+ * the same stats already grouped by calendar year at the RPC, which is *not*
+ * the same as summing the monthly rows client-side: `aggregate_stats`'
+ * `bird_count` and `population_stats`' per-bird bucket counts are
+ * `COUNT(DISTINCT bird_id)` within their cell, so a bird retrapped in several
+ * months of one year would be counted once per month by a client-side sum but
+ * exactly once by a year-grouped fetch (#852).
+ */
+export type StatsHistoryInterval = 'month' | 'year';
+
+// Wing/weight + count history for a single species at `interval` granularity
+// (monthly by default), merging
 // biometrics_stats' wing/weight fields onto each aggregate_stats row (#821).
 // The two RPCs share the same species/group/date-range/group_by_time_period
 // params, so their rows are grouped identically and joined here on
@@ -198,12 +211,13 @@ export async function getSpeciesStatsHistory(
 	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
+	interval: StatsHistoryInterval = 'month'
 ): Promise<CoreStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
 		species_name_filter: species,
 		ringing_group_filter: viewedGroupId,
-		group_by_time_period: 'month',
+		group_by_time_period: interval,
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {})
 	};
@@ -235,20 +249,22 @@ export async function getSpeciesStatsHistory(
  * young counts tiles (#839 split the original single Young trends tile into
  * the latter two) fetch here while its Counts tile keeps using
  * `getSpeciesStatsHistory`. Same
- * call shape (species-filtered, month-grouped) as `getSpeciesStatsHistory`.
+ * call shape (species-filtered, `interval`-grouped, monthly by default) as
+ * `getSpeciesStatsHistory`.
  */
 export async function getSpeciesPopulationStats(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
+	interval: StatsHistoryInterval = 'month'
 ) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('population_stats', {
 			species_name_filter: species,
 			ringing_group_filter: viewedGroupId,
-			group_by_time_period: 'month',
+			group_by_time_period: interval,
 			...(fromDate ? { from_date: fromDate } : {}),
 			...(toDate ? { to_date: toDate } : {})
 		})

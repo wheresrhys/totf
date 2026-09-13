@@ -13,8 +13,7 @@ description: >-
   re-select + respawn until no eligible work remains; while idle, a "check again" command forces
   a fresh GitHub re-scan for newly-available work. A stop command prompts the user to confirm
   halt-all vs drain. Tracks every live worker in a gitignored local state file
-  (`.claude/swarm-state.json`) so the `take-over` skill can find and halt the right agent even
-  from a fresh session. Orchestration only — PR maintenance, selection, worktree isolation, model
+  (`.claude/swarm-state.json`). Orchestration only — PR maintenance, selection, worktree isolation, model
   routing, parallelism, refill, termination, teardown. Triggers: "swarm", "/swarm", "pick up
   ready tickets", "work the ready queue".
 ---
@@ -41,7 +40,7 @@ session, not from within a subagent.
 
 This matters because swarm spawns its own worker subagents and manages a shared state file and
 worktree pool; running it recursively from inside a worker (or any other subagent) would corrupt
-that pool and confuse `take-over`.
+that pool.
 
 ## Precheck
 
@@ -50,9 +49,7 @@ stop and tell the user to enable them (`gh repo edit --enable-issues`) before co
 
 ## State file (`.claude/swarm-state.json`)
 
-Every live worker gets one entry here — this is how the `take-over` skill finds and halts the
-right agent from a session that never saw it spawn (there's no tool to list running background
-agents; this file is the only durable record). Gitignored, machine-local, never committed.
+Every live worker gets one entry here. Gitignored, machine-local, never committed.
 
 Entry shape:
 ```json
@@ -102,7 +99,7 @@ presumed-dead and why** — e.g. "Dropped presumed-dead worker on `feature/562-x
 worktree activity in over 45 minutes" or "…: worktree no longer on disk". This is the "user warned"
 half of the fix: an auto-prune that succeeds quietly reproduces the original "nobody told me"
 complaint (just for over-provisioning instead of under-provisioning) if the heuristic is ever
-wrong, so the user can intervene — e.g. `take-over` the branch — if a prune looks mistaken.
+wrong, so the user can intervene if a prune looks mistaken.
 
 **Concurrency is capped at 4 worker subagents.** The top-level swarm orchestrator (the parent
 agent running this skill) does not count toward the cap — it only selects, spawns, reports and
@@ -313,7 +310,7 @@ proceeding.
 
 This subagent counts toward the normal 4-worker cap (same pool as ticket/maintenance workers).
 Append a `kind: "ticket"` entry (see State file) right after spawning it, with `issue` set to the
-original unlabeled issue's number, so `take-over`/self-healing prune still work on it.
+original unlabeled issue's number, so self-healing prune still work on it.
 
 ## 2. Select tickets (fill the remaining budget)
 
@@ -555,8 +552,7 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
 - Per-ticket work goes through `implement-ticket` — don't reinvent it here, including its
   DB-test-isolation rule.
 - Keep `.claude/swarm-state.json` in sync with the live worker set on every spawn, completion,
-  and halt — it's the only durable record of which agent id is working which branch, and
-  `take-over` depends on it being current.
+  and halt — it's the only durable record of which agent id is working which branch.
 - Every freshly-created worktree (§1's `git worktree add`, or §3's `isolation: "worktree"`) gets
   `.env.dev` copied in from the main checkout root before any tests run — it's gitignored so
   worktree creation never carries it over, and without it `npm run qa`/the pre-push hook fail

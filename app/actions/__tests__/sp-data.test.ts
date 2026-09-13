@@ -345,6 +345,45 @@ describe('sp-data actions', () => {
 			expect(result).toEqual([]);
 		});
 
+		it('with interval "year" calls both RPCs with group_by_time_period: "year"', async () => {
+			const { rpcCalls } = makeStatsHistoryClient({
+				aggregateRows: [],
+				biometricsRows: []
+			});
+
+			await getSpeciesStatsHistory(
+				SPECIES_NAME,
+				GROUP_ID,
+				undefined,
+				undefined,
+				'year'
+			);
+
+			expect(rpcCalls).toHaveLength(2);
+			for (const call of rpcCalls) {
+				expect(call.args).toMatchObject({ group_by_time_period: 'year' });
+			}
+		});
+
+		it('with interval "month" passed explicitly matches the default', async () => {
+			const { rpcCalls } = makeStatsHistoryClient({
+				aggregateRows: [],
+				biometricsRows: []
+			});
+
+			await getSpeciesStatsHistory(
+				SPECIES_NAME,
+				GROUP_ID,
+				undefined,
+				undefined,
+				'month'
+			);
+
+			for (const call of rpcCalls) {
+				expect(call.args).toMatchObject({ group_by_time_period: 'month' });
+			}
+		});
+
 		it('fills all 8 biometric fields with null when a time_period has no matching biometrics_stats row', async () => {
 			makeStatsHistoryClient({
 				aggregateRows: [{ time_period: '2023-03', bird_count: 2 }],
@@ -401,6 +440,38 @@ describe('sp-data actions', () => {
 
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
+		});
+
+		it('with interval "year" calls population_stats with group_by_time_period: "year"', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await getSpeciesPopulationStats(
+				SPECIES_NAME,
+				GROUP_ID,
+				undefined,
+				undefined,
+				'year'
+			);
+
+			expect(rpcCalls[0].args).toMatchObject({
+				group_by_time_period: 'year'
+			});
+		});
+
+		it('with interval "month" passed explicitly matches the default', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await getSpeciesPopulationStats(
+				SPECIES_NAME,
+				GROUP_ID,
+				undefined,
+				undefined,
+				'month'
+			);
+
+			expect(rpcCalls[0].args).toMatchObject({
+				group_by_time_period: 'month'
+			});
 		});
 	});
 

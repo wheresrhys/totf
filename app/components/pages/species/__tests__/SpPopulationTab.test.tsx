@@ -83,13 +83,17 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 		colors,
 		effortHistory,
 		compareYearsUrl,
-		includeTotalSeries
+		includeTotalSeries,
+		fetchYearSeries
 	}: {
 		series: { name: string; data: [string, number | null][] }[];
 		colors?: string[];
 		effortHistory?: unknown;
 		compareYearsUrl?: string;
 		includeTotalSeries?: boolean;
+		fetchYearSeries?: () => Promise<
+			{ name: string; data: [string, number | null][] }[]
+		>;
 	}) => {
 		// Mirrors YearComparisonTrendChart's own includeTotalSeries summing
 		// (unit-tested against buildTotalSeries directly in
@@ -115,7 +119,30 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 				data-compare-years-url={compareYearsUrl ?? ''}
 				data-include-total-series={includeTotalSeries ? 'yes' : 'no'}
 				data-total={JSON.stringify(total)}
-			/>
+			>
+				{/* Stands in for the real chart's "Interval: Year" radio: clicking it
+				    invokes whatever fetcher the tab wired in, so a tab-level test can
+				    assert the RPC call the Year interval triggers without rendering the
+				    real toggle machinery (covered in YearComparisonTrendChart.test.tsx).
+				    Records the resolved series names on the element so the test can also
+				    check the right transform was applied to the year-grouped rows. */}
+				{fetchYearSeries ? (
+					<button
+						data-testid="fetch-year-series"
+						onClick={(event) => {
+							const button = event.currentTarget;
+							void fetchYearSeries().then((yearSeries) => {
+								button.setAttribute(
+									'data-year-series',
+									JSON.stringify(yearSeries.map((metric) => metric.name))
+								);
+							});
+						}}
+					>
+						Year interval
+					</button>
+				) : null}
+			</div>
 		);
 	}
 }));
@@ -304,6 +331,162 @@ describe('SpPopulationTab', () => {
 			);
 			// The population tiles do not touch aggregate_stats.
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('Structure: the Year interval refetches year-grouped data (#852)', () => {
+		// Expands `tileName`, waits for its chart, then fires the mock chart's
+		// stand-in for the "Interval: Year" radio — which calls whatever
+		// `fetchYearSeries` the tab wired into that tile.
+		async function expandAndSwitchToYear(tileName: RegExp) {
+			fireEvent.click(screen.getByRole('button', { name: tileName }));
+			// findAll, not find: earlier tiles may already be expanded when several
+			// are switched to Year in one test.
+			await screen.findAllByTestId('trend-chart');
+			fireEvent.click(screen.getAllByTestId('fetch-year-series').at(-1)!);
+		}
+
+		it('Counts: refetches aggregate stats with interval "year" rather than summing the monthly rows', async () => {
+			const { getSpeciesStatsHistory } = await loadActions();
+			render(<SpPopulationTab {...props} />);
+			await expandAndSwitchToYear(/Counts/);
+
+			await waitFor(() =>
+				expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(2)
+			);
+			expect(getSpeciesStatsHistory).toHaveBeenNthCalledWith(
+				1,
+				'Robin',
+				1,
+				undefined,
+				undefined
+			);
+			expect(getSpeciesStatsHistory).toHaveBeenNthCalledWith(
+				2,
+				'Robin',
+				1,
+				undefined,
+				undefined,
+				'year'
+			);
+			expect(
+				screen.getAllByTestId('fetch-year-series').at(-1)!.dataset.yearSeries
+			).toBe(JSON.stringify(['birds']));
+		});
+
+		it('Age split: refetches population stats with interval "year"', async () => {
+			const { getSpeciesPopulationStats } = await loadActions();
+			render(<SpPopulationTab {...props} />);
+			await expandAndSwitchToYear(/Age split/);
+
+			await waitFor(() =>
+				expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(2)
+			);
+			expect(getSpeciesPopulationStats).toHaveBeenLastCalledWith(
+				'Robin',
+				1,
+				undefined,
+				undefined,
+				'year'
+			);
+		});
+
+		it('Young counts: refetches population stats with interval "year"', async () => {
+			const { getSpeciesPopulationStats } = await loadActions();
+			render(<SpPopulationTab {...props} />);
+			await expandAndSwitchToYear(/^Young counts/);
+
+			await waitFor(() =>
+				expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(2)
+			);
+			expect(getSpeciesPopulationStats).toHaveBeenLastCalledWith(
+				'Robin',
+				1,
+				undefined,
+				undefined,
+				'year'
+			);
+		});
+
+		it('New young counts: refetches population stats with interval "year"', async () => {
+			const { getSpeciesPopulationStats } = await loadActions();
+			render(<SpPopulationTab {...props} />);
+			await expandAndSwitchToYear(/New young counts/);
+
+			await waitFor(() =>
+				expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(2)
+			);
+			expect(getSpeciesPopulationStats).toHaveBeenLastCalledWith(
+				'Robin',
+				1,
+				undefined,
+				undefined,
+				'year'
+			);
+		});
+
+		it('Returning vs new: refetches both RPCs with interval "year"', async () => {
+			const { getSpeciesStatsHistory, getSpeciesPopulationStats } =
+				await loadActions();
+			render(<SpPopulationTab {...props} />);
+			await expandAndSwitchToYear(/Returning vs new/);
+
+			await waitFor(() =>
+				expect(getSpeciesPopulationStats).toHaveBeenCalledTimes(2)
+			);
+			expect(getSpeciesStatsHistory).toHaveBeenLastCalledWith(
+				'Robin',
+				1,
+				undefined,
+				undefined,
+				'year'
+			);
+			expect(getSpeciesPopulationStats).toHaveBeenLastCalledWith(
+				'Robin',
+				1,
+				undefined,
+				undefined,
+				'year'
+			);
+		});
+
+		it('forwards the page date range to the year-grouped fetch', async () => {
+			const { getSpeciesPopulationStats } = await loadActions();
+			render(
+				<SpPopulationTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
+			);
+			await expandAndSwitchToYear(/Age split/);
+
+			await waitFor(() =>
+				expect(getSpeciesPopulationStats).toHaveBeenLastCalledWith(
+					'Robin',
+					1,
+					'2024-01-01',
+					'2024-12-31',
+					'year'
+				)
+			);
+		});
+
+		describe('Edge: the year fetch is shared across tiles', () => {
+			it('issues one year-grouped population_stats call however many tiles switch to Year', async () => {
+				const { getSpeciesPopulationStats } = await loadActions();
+				render(<SpPopulationTab {...props} />);
+				await expandAndSwitchToYear(/Age split/);
+				await expandAndSwitchToYear(/^Young counts/);
+				await expandAndSwitchToYear(/New young counts/);
+
+				await waitFor(() =>
+					expect(screen.getAllByTestId('trend-chart').length).toBe(3)
+				);
+				// Three monthly fetches would have been deduped by the existing
+				// `populationRequested` guard; the year fetches must dedupe too — one
+				// monthly call plus exactly one year call.
+				const yearCalls = vi
+					.mocked(getSpeciesPopulationStats)
+					.mock.calls.filter((call) => call[4] === 'year');
+				expect(yearCalls).toHaveLength(1);
+			});
 		});
 	});
 
