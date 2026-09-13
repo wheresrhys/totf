@@ -13,14 +13,14 @@ export async function fetchPayOffStats(
 	const supabase = await getAuthenticatedSupabaseClient();
 	const [yearly, monthly] = await Promise.all([
 		supabase
-			.rpc('aggregate_stats', {
+			.rpc('core_stats', {
 				ringing_group_filter: viewedGroupId,
 				group_by_species: false,
 				group_by_time_period: 'year'
 			})
 			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>,
 		supabase
-			.rpc('aggregate_stats', {
+			.rpc('core_stats', {
 				ringing_group_filter: viewedGroupId,
 				group_by_species: false,
 				group_by_time_period: 'month'

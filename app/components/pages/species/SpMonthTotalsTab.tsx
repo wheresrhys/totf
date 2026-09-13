@@ -53,7 +53,7 @@ export function SpMonthTotalsTab({
 	}
 
 	// Zero-fill across all 12 calendar months, same as the year summary page's
-	// "Month totals" tab (`summary/[year]/page.tsx`) — `aggregate_stats`'s spine
+	// "Month totals" tab (`summary/[year]/page.tsx`) — `core_stats`'s spine
 	// only spans actual session months. The model returns pure data only, so
 	// both href and label are derived here for the species route.
 	const monthTotalsRows = buildMonthTotalsRows(year, monthlyStats);

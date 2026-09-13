@@ -44,16 +44,16 @@ export async function fetchHomePageSummaryStats(
 	const endOfLastYear = `${currentYear - 1}-12-31`;
 	const [allTime, thisYear, lastYear] = await Promise.all([
 		supabase
-			.rpc('aggregate_stats', { ringing_group_filter: viewedGroupId })
+			.rpc('core_stats', { ringing_group_filter: viewedGroupId })
 			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>,
 		supabase
-			.rpc('aggregate_stats', {
+			.rpc('core_stats', {
 				ringing_group_filter: viewedGroupId,
 				from_date: startOfCurrentYear
 			})
 			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[] | null>,
 		supabase
-			.rpc('aggregate_stats', {
+			.rpc('core_stats', {
 				ringing_group_filter: viewedGroupId,
 				from_date: startOfLastYear,
 				to_date: endOfLastYear

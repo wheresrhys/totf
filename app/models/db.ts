@@ -29,9 +29,13 @@ export type TopMetricsFilterParams =
 // rows, and the app relied on the all-non-null contract the previous RETURNS TABLE
 // signature generated. Strip the null back off here, in the one place the row type
 // is defined, so every consumer keeps the same shape it had before the refactor.
+// Post-#815-item-4 (the aggregate_stats -> core_stats rename), the app's own call
+// sites all call core_stats/public_core_stats instead (#830), so this type now
+// sources from the byte-identical core_stats_result composite type rather than
+// aggregate_stats_result — same name, same shape, no consumer changes needed.
 export type AggregateStatsResult = {
-	[K in keyof Database['public']['CompositeTypes']['aggregate_stats_result']]-?: NonNullable<
-		Database['public']['CompositeTypes']['aggregate_stats_result'][K]
+	[K in keyof Database['public']['CompositeTypes']['core_stats_result']]-?: NonNullable<
+		Database['public']['CompositeTypes']['core_stats_result'][K]
 	>;
 };
 

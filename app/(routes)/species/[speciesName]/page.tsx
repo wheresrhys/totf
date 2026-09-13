@@ -58,9 +58,9 @@ export async function getSpeciesStats(
 		...(toDate ? { to_date: toDate } : {})
 	};
 	const [aggregateRows, biometricsRows] = await Promise.all([
-		supabase
-			.rpc('aggregate_stats', rpcArgs)
-			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>,
+		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
+			AggregateStatsResult[]
+		>,
 		supabase
 			.rpc('biometrics_stats', rpcArgs)
 			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>

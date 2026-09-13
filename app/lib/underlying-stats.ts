@@ -122,7 +122,7 @@ export async function fetchSessionStats(
 // fetchSessionStats' species granularity (its stats_per_day_and_species RPC
 // groups by day+species) rather than fetchPayOffStats' summary-only
 // precedent, since these functions are meant to be equivalent to
-// fetchSessionStats except for the aggregate period. aggregate_stats
+// fetchSessionStats except for the aggregate period. core_stats
 // computes bird_count as COUNT(DISTINCT bird_id) per period+species bucket
 // server-side, so summing across periods client-side never double-counts a
 // retrapped bird. No from_date/to_date is passed, so the RPC's internal
@@ -138,7 +138,7 @@ export async function fetchYearStats(
 		viewedGroupId,
 		(supabase) =>
 			supabase
-				.rpc('aggregate_stats', {
+				.rpc('core_stats', {
 					ringing_group_filter: viewedGroupId,
 					group_by_species: true,
 					group_by_time_period: 'year'
@@ -155,7 +155,7 @@ export async function fetchMonthStats(
 		viewedGroupId,
 		(supabase) =>
 			supabase
-				.rpc('aggregate_stats', {
+				.rpc('core_stats', {
 					ringing_group_filter: viewedGroupId,
 					group_by_species: true,
 					group_by_time_period: 'month'
@@ -181,7 +181,7 @@ export async function fetchGroupEffortHistory(
 		viewedGroupId,
 		(supabase) =>
 			supabase
-				.rpc('aggregate_stats', {
+				.rpc('core_stats', {
 					ringing_group_filter: viewedGroupId,
 					group_by_species: false,
 					group_by_time_period: 'month'

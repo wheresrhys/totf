@@ -47,7 +47,7 @@ function buildStat(
 	} as unknown as AggregateStatsResult;
 }
 
-// A monthly stat row as `aggregate_stats` returns it: `time_period` is the first
+// A monthly stat row as `core_stats` returns it: `time_period` is the first
 // of the month.
 function monthStat(
 	year: number,

@@ -208,9 +208,9 @@ export async function getSpeciesStatsHistory(
 		...(toDate ? { to_date: toDate } : {})
 	};
 	const [aggregateRows, biometricsRows] = await Promise.all([
-		supabase
-			.rpc('aggregate_stats', rpcArgs)
-			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>,
+		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
+			AggregateStatsResult[]
+		>,
 		supabase
 			.rpc('biometrics_stats', rpcArgs)
 			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>
@@ -297,7 +297,7 @@ export async function fetchSpeciesPeriodTotals(
 ): Promise<AggregateStatsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('aggregate_stats', {
+		.rpc('core_stats', {
 			...(fromDate ? { from_date: fromDate } : {}),
 			...(toDate ? { to_date: toDate } : {}),
 			ringing_group_filter: viewedGroupId,

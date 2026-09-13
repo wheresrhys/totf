@@ -15,7 +15,7 @@ function formatAvgEncounters(n: number | null | undefined): string {
 	return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
-/** Expects `yearly` from aggregate_stats with group_by_time_period 'year' (ascending by time_period). */
+/** Expects `yearly` from core_stats with group_by_time_period 'year' (ascending by time_period). */
 function PayOffYearlyTable({ yearly }: { yearly: AggregateStatsResult[] }) {
 	const metricRows: {
 		label: string;

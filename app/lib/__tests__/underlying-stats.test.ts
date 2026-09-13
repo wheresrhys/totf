@@ -222,7 +222,7 @@ describe('fetchSessionStats', () => {
 	});
 });
 
-// fetchYearStats/fetchMonthStats call aggregate_stats directly and
+// fetchYearStats/fetchMonthStats call core_stats directly and
 // `.then(catchSupabaseErrors)` the result — no pagination chain — but they
 // share fetchSessionStats' version-checked/TTL-backed cache (via
 // fetchWithVersionCache), so their mock client still needs a working
@@ -242,7 +242,7 @@ function makeAggregateStatsClient(response: {
 }
 
 describe('fetchYearStats', () => {
-	it('calls aggregate_stats with group_by_time_period "year" and group_by_species true', async () => {
+	it('calls core_stats with group_by_time_period "year" and group_by_species true', async () => {
 		const { fetchYearStats } = await importUnderlyingStats();
 		const { client, mockRpc } = makeAggregateStatsClient({
 			data: yearlyRows,
@@ -252,7 +252,7 @@ describe('fetchYearStats', () => {
 
 		const result = await fetchYearStats(GROUP_ID);
 
-		expect(mockRpc).toHaveBeenCalledWith('aggregate_stats', {
+		expect(mockRpc).toHaveBeenCalledWith('core_stats', {
 			ringing_group_filter: GROUP_ID,
 			group_by_species: true,
 			group_by_time_period: 'year'
@@ -271,7 +271,7 @@ describe('fetchYearStats', () => {
 		await fetchYearStats(OTHER_GROUP_ID);
 
 		expect(mockRpc).toHaveBeenCalledWith(
-			'aggregate_stats',
+			'core_stats',
 			expect.objectContaining({ ringing_group_filter: OTHER_GROUP_ID })
 		);
 	});
@@ -392,11 +392,11 @@ describe('fetchYearStats', () => {
 
 			expect(mockRpc).toHaveBeenCalledTimes(2);
 			expect(mockRpc).toHaveBeenCalledWith(
-				'aggregate_stats',
+				'core_stats',
 				expect.objectContaining({ group_by_time_period: 'year' })
 			);
 			expect(mockRpc).toHaveBeenCalledWith(
-				'aggregate_stats',
+				'core_stats',
 				expect.objectContaining({ group_by_time_period: 'month' })
 			);
 		});
@@ -404,7 +404,7 @@ describe('fetchYearStats', () => {
 });
 
 describe('fetchMonthStats', () => {
-	it('calls aggregate_stats with group_by_time_period "month" and group_by_species true', async () => {
+	it('calls core_stats with group_by_time_period "month" and group_by_species true', async () => {
 		const { fetchMonthStats } = await importUnderlyingStats();
 		const { client, mockRpc } = makeAggregateStatsClient({
 			data: monthlyRows,
@@ -414,7 +414,7 @@ describe('fetchMonthStats', () => {
 
 		const result = await fetchMonthStats(GROUP_ID);
 
-		expect(mockRpc).toHaveBeenCalledWith('aggregate_stats', {
+		expect(mockRpc).toHaveBeenCalledWith('core_stats', {
 			ringing_group_filter: GROUP_ID,
 			group_by_species: true,
 			group_by_time_period: 'month'
@@ -433,7 +433,7 @@ describe('fetchMonthStats', () => {
 		await fetchMonthStats(OTHER_GROUP_ID);
 
 		expect(mockRpc).toHaveBeenCalledWith(
-			'aggregate_stats',
+			'core_stats',
 			expect.objectContaining({ ringing_group_filter: OTHER_GROUP_ID })
 		);
 	});
@@ -519,11 +519,11 @@ describe('fetchMonthStats', () => {
 	});
 });
 
-// fetchGroupEffortHistory shares fetchMonthStats' exact aggregate_stats /
+// fetchGroupEffortHistory shares fetchMonthStats' exact core_stats /
 // caching shape, just group_by_species: false (unfiltered by species) rather
 // than true — reuse the same monthlyRows fixture and mock scaffolding.
 describe('fetchGroupEffortHistory', () => {
-	it('calls aggregate_stats with group_by_time_period "month" and group_by_species false, with no species_name_filter', async () => {
+	it('calls core_stats with group_by_time_period "month" and group_by_species false, with no species_name_filter', async () => {
 		const { fetchGroupEffortHistory } = await importUnderlyingStats();
 		const { client, mockRpc } = makeAggregateStatsClient({
 			data: monthlyRows,
@@ -533,7 +533,7 @@ describe('fetchGroupEffortHistory', () => {
 
 		const result = await fetchGroupEffortHistory(GROUP_ID);
 
-		expect(mockRpc).toHaveBeenCalledWith('aggregate_stats', {
+		expect(mockRpc).toHaveBeenCalledWith('core_stats', {
 			ringing_group_filter: GROUP_ID,
 			group_by_species: false,
 			group_by_time_period: 'month'
@@ -554,7 +554,7 @@ describe('fetchGroupEffortHistory', () => {
 		await fetchGroupEffortHistory(OTHER_GROUP_ID);
 
 		expect(mockRpc).toHaveBeenCalledWith(
-			'aggregate_stats',
+			'core_stats',
 			expect.objectContaining({ ringing_group_filter: OTHER_GROUP_ID })
 		);
 	});
@@ -662,11 +662,11 @@ describe('fetchGroupEffortHistory', () => {
 
 			expect(mockRpc).toHaveBeenCalledTimes(2);
 			expect(mockRpc).toHaveBeenCalledWith(
-				'aggregate_stats',
+				'core_stats',
 				expect.objectContaining({ group_by_species: false })
 			);
 			expect(mockRpc).toHaveBeenCalledWith(
-				'aggregate_stats',
+				'core_stats',
 				expect.objectContaining({ group_by_species: true })
 			);
 		});

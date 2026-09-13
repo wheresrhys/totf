@@ -378,7 +378,7 @@ function makeStatsClient({
 	const client = {
 		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
 			rpcCalls.push({ name, args });
-			const data = name === 'aggregate_stats' ? aggregateRows : biometricsRows;
+			const data = name === 'core_stats' ? aggregateRows : biometricsRows;
 			return {
 				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 					Promise.resolve({ data, error: null }).then(resolve)
@@ -421,9 +421,7 @@ describe('getSpeciesStats', () => {
 
 		await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
 
-		const aggregateCall = rpcCalls.find(
-			(call) => call.name === 'aggregate_stats'
-		);
+		const aggregateCall = rpcCalls.find((call) => call.name === 'core_stats');
 		const biometricsCall = rpcCalls.find(
 			(call) => call.name === 'biometrics_stats'
 		);

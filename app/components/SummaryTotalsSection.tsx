@@ -43,7 +43,7 @@ const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
 // `aggregateByState` resets per #604 — since `SummaryTotalsSection` itself
 // never unmounts across tab switches, so the state has to live down here
 // instead. Both row shapes are derived from the same already-fetched
-// `periodStats` array (the raw per-`(year, month)` rows `aggregate_stats`
+// `periodStats` array (the raw per-`(year, month)` rows `core_stats`
 // returns) — toggling re-renders in place, no new fetch either way.
 function AllTimeMonthTotalsTab({
 	periodStats,

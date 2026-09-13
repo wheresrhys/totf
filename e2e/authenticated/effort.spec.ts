@@ -22,7 +22,7 @@ test('beta: shows yearly data with non-zero encounter counts', { tag: '@beta' },
 
 test('gamma: shows table with all-zero encounter counts (no own data)', { tag: '@gamma' }, async ({ page }) => {
 	await page.goto('/effort')
-	// aggregate_stats returns zero-count rows for all years; no Alpha/Beta data leaks
+	// core_stats returns zero-count rows for all years; no Alpha/Beta data leaks
 	// via ringing_group_filter — only encounters where ringing_group_id = gammaId are counted
 	await expect(page.getByRole('rowheader', { name: 'Encounter count' })).toBeVisible()
 	const encounterRow = page.getByRole('row', { name: /^Encounter count/ })

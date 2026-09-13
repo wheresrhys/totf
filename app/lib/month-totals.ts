@@ -30,13 +30,13 @@ export function formatMonthYearLabel(
 	return formatDate(new Date(row.year, row.zeroIndexedMonth, 1), 'LLLL yyyy');
 }
 
-// `aggregate_stats` returns `'00:00:00'` for an interval with no recorded
+// `core_stats` returns `'00:00:00'` for an interval with no recorded
 // effort; mirror that convention for synthesized (zero-session) months so the
 // shared table's interval formatting renders them identically to a real empty
 // period.
 const ZERO_INTERVAL = '00:00:00';
 
-// A zero-valued `aggregate_stats` row for a month the RPC omitted (no sessions).
+// A zero-valued `core_stats` row for a month the RPC omitted (no sessions).
 // The RPC's `period_spine` only spans min→max actual session dates, so a year
 // with e.g. only Mar–Oct sessions comes back missing the other months entirely;
 // these are filled in client-side rather than by touching the RPC.
@@ -144,7 +144,7 @@ const SUMMABLE_STAT_FIELDS = [
 
 // Re-format a second count back into a Postgres-interval string that
 // `postgresIntervalToSeconds` round-trips. Hours are unbounded (e.g. `36:00:00`)
-// — exactly the shape `aggregate_stats` returns for a multi-day `total_effort` —
+// — exactly the shape `core_stats` returns for a multi-day `total_effort` —
 // so summing then re-parsing is lossless.
 function secondsToPostgresInterval(totalSeconds: number): string {
 	const whole = Math.round(totalSeconds);
@@ -207,7 +207,7 @@ export function filterEmptyMonthTotalsRows<
 
 // The "Combine years" toggle's OFF state for the all-time "Month totals" tab:
 // one row per real `(year, month)` combination in the group's history, with no
-// combining/summing — the raw `aggregate_stats` month array (the same array
+// combining/summing — the raw `core_stats` month array (the same array
 // `buildCombinedMonthTotalsRows` folds into 12 buckets), reshaped into pure
 // `MonthTotalsRow`s and sorted chronologically regardless of input order.
 export function buildPerYearMonthTotalsRows(

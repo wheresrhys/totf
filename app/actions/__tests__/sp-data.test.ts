@@ -96,7 +96,7 @@ function makeStatsHistoryClient({
 	const client = {
 		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
 			rpcCalls.push({ name, args });
-			const data = name === 'aggregate_stats' ? aggregateRows : biometricsRows;
+			const data = name === 'core_stats' ? aggregateRows : biometricsRows;
 			return {
 				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 					Promise.resolve({ data, error: null }).then(resolve)
@@ -262,7 +262,7 @@ describe('sp-data actions', () => {
 
 			await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID, FROM_DATE, TO_DATE);
 
-			expect(rpcCalls[0].name).toBe('aggregate_stats');
+			expect(rpcCalls[0].name).toBe('core_stats');
 			expect(rpcCalls[0].args).toMatchObject({
 				species_name_filter: SPECIES_NAME,
 				ringing_group_filter: GROUP_ID,
@@ -481,7 +481,7 @@ describe('sp-data actions', () => {
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'year');
 
-			expect(rpcCalls[0].name).toBe('aggregate_stats');
+			expect(rpcCalls[0].name).toBe('core_stats');
 			expect(rpcCalls[0].args).toMatchObject({
 				species_name_filter: SPECIES_NAME,
 				ringing_group_filter: GROUP_ID,
