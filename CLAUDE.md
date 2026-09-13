@@ -394,10 +394,10 @@ assignability checking off, and an imported JSON module is not a fresh object li
 without the cast a fixture carrying columns the type no longer declares stays assignable. A removed
 RPC column therefore leaves stale keys in every fixture, silently. If you change an RPC's return
 shape, run `npm run db:seed:e2e` and commit the regenerated fixtures as part of the same PR — and
-check the eight fixtures that no generator produces (they can only be edited by hand). See
-[`docs/fixture-drift-and-test-orchestration.md`](docs/fixture-drift-and-test-orchestration.md) for
-the full investigation ([#884](https://github.com/wheresrhys/totf/issues/884)), the current inventory
-of drifted fixtures, and the proposed fixes.
+check the eight fixtures that no generator produces (they can only be edited by hand).
+[#890](https://github.com/wheresrhys/totf/issues/890) carries the full investigation
+([#884](https://github.com/wheresrhys/totf/issues/884)), the current inventory of drifted fixtures,
+and the planned fixes.
 
 **Asserting on table cells:** never index into cells by raw position (`cells[6]`,
 `querySelectorAll('td')[8]`) — a reordered or added column silently breaks an unrelated
