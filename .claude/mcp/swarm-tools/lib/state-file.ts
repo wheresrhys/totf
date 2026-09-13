@@ -16,6 +16,16 @@ import {
  * .claude/swarm-state.json on read (see readState below) and, via tools/swarm-state.ts, to type
  * the swarm_state_* MCP tools' stored-entry output. Keeping one definition means a shape change
  * can't drift between "what we store" and "what we validate".
+ *
+ * `dbLockReleased` is the one optional field: an exclusive-resource worker (`db-migration` /
+ * `e2e-exclusive`) holds the shared-local-Postgres lock for its whole lifetime by default, but once
+ * its schema/`@mutates` work is applied and verified and only non-DB steps remain (lint fixes,
+ * retests, commit, push, PR) it can flip this to `true` via `swarm_state_release_db_lock`. Absent or
+ * `false` means "still holding the lock"; `true` means `swarm_plan_batch`'s solo-run check ignores
+ * this entry, so other unblocked *non-exclusive* work can start while it finishes up. It is
+ * deliberately a one-way signal, and deliberately does NOT make the entry stop counting as a running
+ * worker — it still occupies a cap slot and still blocks a *new* exclusive-resource candidate from
+ * starting until the entry is removed from state altogether.
  */
 export const swarmWorkerEntrySchema = z.object({
 	kind: z.enum(['ticket', 'maintenance']),
@@ -27,6 +37,7 @@ export const swarmWorkerEntrySchema = z.object({
 	agentId: z.string(),
 	model: z.string(),
 	startedAt: z.string(),
+	dbLockReleased: z.boolean().optional(),
 });
 
 export type SwarmWorkerEntry = z.infer<typeof swarmWorkerEntrySchema>;
