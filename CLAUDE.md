@@ -349,7 +349,12 @@ Three separate Vitest configs:
 | App tests | `vitest.config.ts` | `npm run test:nowatch` | pre-push hook + CI |
 | DB integration tests | `vitest.integration.config.ts` | `npm run test:integration` | manually (requires local Supabase) |
 | HTTP tests | `vitest.http.config.ts` | `npm run test:http` | manually (auto-starts Next.js dev server if not running) |
-| E2E tests | `playwright.config.ts` | `npm run test:e2e` (full) / `test:e2e:safe` / `test:e2e:mutates` | pre-push hook (diff-aware, see below) + CI (full) |
+| E2E tests | `playwright.config.ts` | `npm run test:e2e` (full) / `test:e2e:safe` / `test:e2e:mutates` | pre-push hook only (diff-aware, see below) |
+
+CI (`.github/workflows/ci.yml`) has exactly three jobs — `lint`, `type-check`, `unit-tests` — and no
+Supabase service, so **no** suite that needs a database runs in CI. The `unit-tests` job fabricates a
+`.env.dev` pointing at a `localhost:54321` that nothing is listening on; app tests are fully mocked
+by construction. E2E and DB integration tests are local-only (pre-push hook and manual respectively).
 
 ```sh
 npm test              # watch mode (app tests only)
@@ -377,6 +382,19 @@ Tests live in `__tests__/` directories alongside the code they test. Global mock
 Page-level tests render async server components directly with `await Page({ params: Promise.resolve(...) })`.
 
 Snapshot fixture data lives in `test-fixtures/snapshots/` — use these as mock return values rather than inventing data inline.
+
+**Fixtures are not validated by anything — regenerate them by hand when an RPC's shape changes.**
+`npm run db:generate-snapshots` (and `db:seed:e2e`, which calls it last) runs in no hook and no CI
+job, so every automated check only replays whatever is checked in. Nor does the type checker help:
+fixtures are consumed via `fixture as unknown as SomeType`, a double assertion that switches
+assignability checking off, and an imported JSON module is not a fresh object literal, so even
+without the cast a fixture carrying columns the type no longer declares stays assignable. A removed
+RPC column therefore leaves stale keys in every fixture, silently. If you change an RPC's return
+shape, run `npm run db:seed:e2e` and commit the regenerated fixtures as part of the same PR — and
+check the eight fixtures that no generator produces (they can only be edited by hand). See
+[`docs/fixture-drift-and-test-orchestration.md`](docs/fixture-drift-and-test-orchestration.md) for
+the full investigation ([#884](https://github.com/wheresrhys/totf/issues/884)), the current inventory
+of drifted fixtures, and the proposed fixes.
 
 **Asserting on table cells:** never index into cells by raw position (`cells[6]`,
 `querySelectorAll('td')[8]`) — a reordered or added column silently breaks an unrelated
