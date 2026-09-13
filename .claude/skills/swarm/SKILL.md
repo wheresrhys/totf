@@ -69,7 +69,9 @@ Entry shape:
 }
 ```
 (`kind` is `"ticket"` for §3 workers or `"maintenance"` for §1 workers; use `pr` instead of/alongside
-`issue` for maintenance workers, and `title` is the ticket title or PR title, whichever is known.)
+`issue` for maintenance workers, and `title` is the ticket title or PR title, whichever is known.
+One further optional field, `dbLockReleased`, is never set at append time — only later, by the
+worker itself, via `swarm_state_release_db_lock`; see the exclusive-resource paragraph below.)
 
 - **On every spawn** (§1 and §3): after the Agent tool call returns an id, find the worktree path
   — if not already given back by the spawn result, diff `git worktree list` from just before the
@@ -123,6 +125,25 @@ a PR (maintenance work — `implement-ticket` applies the issue's exclusive-reso
 PR at creation, so this doesn't require resolving back to the issue) and the issue's `labels`
 field for a ticket (§2). Work carrying neither label is unaffected by this rule, except that it
 must itself wait while an exclusive-resource worker is running.
+
+**The solo lock can be released early, before the worker finishes.** The tail of an
+exclusive-resource unit — lint fixes, retests, commit, push, opening the PR — touches the shared
+local Postgres not at all, yet used to block every other ticket for its whole duration. So an
+exclusive-resource worker calls `mcp__swarm-tools__swarm_state_release_db_lock` with its own
+`agentId` once its migration is applied and verified (or its `@mutates` E2E run has completed) and
+only those non-shared-resource steps remain. That sets `dbLockReleased: true` on its state entry,
+which `swarm_plan_batch` skips when deciding whether a solo run is active — so other unblocked,
+**non-exclusive** work can start straight away. It changes nothing else: the entry still counts
+toward the 4-worker cap and still blocks a *new* exclusive-resource worker from starting (via the
+"no worker of any kind running" requirement above) until it actually completes and its entry is
+removed. Release is one-way — there is no re-lock tool. The flag on the state entry is the *only*
+signal; never infer a release from a worker looking idle, and never re-derive it from GitHub.
+Because release happens *before* the worker pushes and opens its PR, an exclusive-resource
+ticket/PR whose PR is already open has necessarily already released the lock — so there is never
+any need to special-case "the PR is open" or "the worker isn't actively doing anything right now"
+separately from checking `dbLockReleased`. A worker also pings the orchestrator the moment it
+releases, so the freed capacity gets used immediately rather than at the next completion — see
+§4.7.
 
 PR maintenance goes first — merging open PRs unblocks downstream tickets — so allocate free
 slots to PRs needing maintenance first, then fill the remainder with tickets.
@@ -204,7 +225,18 @@ both concerns for that PR:
      `db-migration` unit already runs solo (the exclusive-resource rule).
   4. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
      the changes, run tests, reply to the reviewer via `gh pr comment <n>`.
-  5. Commit (repo conventions, including the model/Claude Code trailers from `implement-ticket`)
+  5. **Release the shared-DB lock early, if this PR is `db-migration`/`e2e-exclusive`** — once the
+     migration is applied and verified against the shared local Postgres (or the `@mutates` E2E run
+     has completed) and every remaining step is non-shared-resource (lint fixes, retests needing no
+     further schema change, commit, push, replying to the reviewer), call
+     `mcp__swarm-tools__swarm_state_release_db_lock` with this worker's own `agentId`, then carry
+     on. This frees other unblocked, non-exclusive tickets to start while this worker finishes up.
+     It is a **one-way** signal: never call it while there is any chance further schema/migration
+     work is still to come, and if genuinely unsure, just don't release early. Immediately after a
+     successful release, notify the orchestrator so it can refill without waiting for this worker:
+     `SendMessage({ to: "main", summary: "<short>", message: "Released db-migration/e2e-exclusive
+     lock for #<issue-or-pr> — safe to pick up other non-exclusive work now." })`.
+  6. Commit (repo conventions, including the model/Claude Code trailers from `implement-ticket`)
      and push. If on inspection neither a real conflict nor genuine feedback remains, no-op and
      report that.
 
@@ -322,6 +354,20 @@ For each selected issue, launch an Agent (default background, so they run in par
   already runs solo (the exclusive-resource rule) — no new coordination primitive. Finally, run the
   `implement-ticket` skill for issue `<n>` and return its result (PR number + URL + test status).
 
+  **If (and only if) this ticket is labelled `db-migration` or `e2e-exclusive`**, add one further
+  instruction to the prompt: partway through `implement-ticket` — once the migration is applied and
+  verified against the shared local Postgres (or the `@mutates` E2E run has completed) and every
+  remaining step is non-shared-resource (lint fixes, retests needing no further schema change,
+  commit, push, opening the PR) — call `mcp__swarm-tools__swarm_state_release_db_lock` with this
+  worker's own `agentId`, then continue as normal. That releases the solo lock so other unblocked,
+  non-exclusive tickets can start while this worker finishes up; the worker keeps its cap slot and a
+  new exclusive-resource unit still can't start until it's fully done. It is a **one-way** signal:
+  never call it if there is any chance schema/migration work isn't actually finished, and if
+  genuinely unsure, don't release early. Immediately after a successful release, notify the
+  orchestrator so it can refill without waiting for this worker to finish:
+  `SendMessage({ to: "main", summary: "<short>", message: "Released db-migration/e2e-exclusive lock
+  for #<issue-or-pr> — safe to pick up other non-exclusive work now." })`.
+
 Append a `kind: "ticket"` entry (see State file) for this worker right after spawning it.
 
 The subagent owns branch/commits/tests/PR via `implement-ticket`, including the
@@ -398,6 +444,25 @@ under "State file" above (see the "Concurrency is capped at 4 worker subagents" 
 worker failing mid-task is not license to finish the job inline. If the work needs doing, a
 fresh subagent does it — never the orchestrator itself.
 
+## 4.7 Lock-release notification (worker signals early)
+
+An exclusive-resource worker sends the orchestrator a `SendMessage` when it releases the shared-DB
+lock early (see the exclusive-resource paragraph under "State file", and the worker prompts in §1
+and §3). This arrives as a **message from a running worker**, not a completion notification — the
+worker is still going, finishing its lint fixes, commit, push and PR.
+
+Treat it exactly like a manual re-check (§4.5): immediately re-run selection for the currently free
+slots and spawn any newly-eligible work up to the cap. The one difference is the call itself — a
+plain `swarm_plan_batch` is right here, **without** `forceRescan`: nothing about GitHub state has
+changed and needs bypassing, only the local state file's `dbLockReleased` flag, which every call
+reads fresh anyway. What opens up is non-exclusive work only; a new `db-migration`/`e2e-exclusive`
+candidate is still withheld, because the releasing worker is still running.
+
+Like a manual re-check, this never stops or disturbs the worker that sent it — it keeps running to
+finish its push and PR, and will send its normal completion notification (§4) later. Waiting for
+that completion instead of acting on the release would waste exactly the window the early release
+exists to open.
+
 ## Termination (user asks to stop)
 
 If the user issues any stop-like command to the **orchestrator** — e.g. "stop swarming", "stop",
@@ -463,6 +528,11 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   maintenance work (carried over from the issue by `implement-ticket`) and the issue's `labels`
   for ticket work. Blocked units wait for the next refill. This protects the single shared local
   Supabase instance from concurrent schema migrations and concurrent `@mutates`-tagged E2E runs.
+  The solo lock is released **early**, though: such a worker calls
+  `mcp__swarm-tools__swarm_state_release_db_lock` once its shared-DB work is applied and verified
+  and only push/PR steps remain, then messages the orchestrator — which refills idle slots with
+  non-exclusive work right then (§4.7), while the worker keeps its cap slot and a new
+  exclusive-resource unit still waits for it to finish.
 - Keep the pool full: on every worker completion, refill freed slots (maintenance first, then
   tickets) until no eligible work remains — then go idle, don't exit.
 - On any re-check-like command from the user ("check again", "rescan", "any new work?"), re-run
