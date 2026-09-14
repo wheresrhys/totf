@@ -70,7 +70,7 @@ describe('findSnapshotDrift', () => {
 			]);
 		});
 
-		it('flags a newly added column the fixture is missing', () => {
+		it('flags a key the database returns but the fixture does not have', () => {
 			const drifts = findSnapshotDrift(
 				[{ bird_count: 3 }],
 				[{ bird_count: 3, new_adult_count: 7 }]
@@ -151,8 +151,8 @@ describe('formatSnapshotDrift', () => {
 });
 
 describe('fixture coverage lists', () => {
-	it('covers the 19 generator-produced fixtures', () => {
-		expect(GENERATED_SNAPSHOT_FIXTURES).toHaveLength(19);
+	it('covers the 25 generator-produced fixtures', () => {
+		expect(GENERATED_SNAPSHOT_FIXTURES).toHaveLength(25);
 	});
 
 	it('leaves the 8 hand-maintained fixtures uncovered (issue #894)', () => {

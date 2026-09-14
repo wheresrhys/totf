@@ -7,9 +7,8 @@ import {
 	waitFor
 } from '@testing-library/react';
 import { SpBiometricsTab } from '../SpBiometricsTab';
-import spPageSnapshot from '@/test-fixtures/snapshots/core_stats/robin-alpha.species-page-composite.json';
+import { robinSpeciesStats as speciesStats } from '@/app/__tests__/helpers/species-stats-fixtures';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
-import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 import type { SexedGraphableBird } from '../WeightAndWingChart';
 
 // chartkick registers Chart.js as a side effect; nothing renders a real canvas
@@ -50,8 +49,6 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 vi.mock('../WeightAndWingChart', () => ({
 	WingWeightScatterChart: () => <div data-testid="scatter-chart" />
 }));
-
-const { speciesStats } = spPageSnapshot as unknown as FullFatPageData;
 
 const props = {
 	speciesStats,

@@ -7,7 +7,7 @@ import {
 	waitFor
 } from '@testing-library/react';
 import { SppStatsTable } from '../SppStatsTable';
-import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
+import { alphaSpeciesStats as speciesDataSnapshot } from '@/app/__tests__/helpers/species-stats-fixtures';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 import type { PageData } from '@/app/(routes)/species/page';

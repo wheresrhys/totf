@@ -9,7 +9,7 @@ import {
 } from '@testing-library/react';
 import { SummaryTotalsSection } from '../SummaryTotalsSection';
 import { buildMonthTotalsRows } from '@/app/lib/month-totals';
-import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
+import { alphaSpeciesStats as speciesDataSnapshot } from '@/app/__tests__/helpers/species-stats-fixtures';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {

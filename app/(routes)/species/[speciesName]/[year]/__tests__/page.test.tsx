@@ -7,7 +7,11 @@ import {
 	fireEvent
 } from '@testing-library/react';
 import Page, { fetchSpeciesYearPageContent } from '../page';
-import spPageSnapshot from '@/test-fixtures/snapshots/core_stats/robin-alpha.species-page-composite.json';
+import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
+import {
+	ROBIN_SPECIES_ID,
+	robinSpeciesStats as speciesStats
+} from '@/app/__tests__/helpers/species-stats-fixtures';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
@@ -59,11 +63,9 @@ vi.mock('@/app/components/pages/species/SpWeightWingTab', () => ({
 	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
 
-const { birds, speciesStats } = spPageSnapshot as unknown as FullFatPageData;
+const birds = birdsSnapshot as unknown as FullFatPageData['birds'];
 
-function makeSpeciesClient(
-	speciesId: number | null = spPageSnapshot.speciesId
-) {
+function makeSpeciesClient(speciesId: number | null = ROBIN_SPECIES_ID) {
 	const fromChain = {
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
@@ -238,7 +240,7 @@ describe('/species/[speciesName]/[year]', () => {
 				1
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
-				spPageSnapshot.speciesId,
+				ROBIN_SPECIES_ID,
 				1,
 				0,
 				'2026-01-01',

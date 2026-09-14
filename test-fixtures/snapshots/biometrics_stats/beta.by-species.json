@@ -1,0 +1,26 @@
+[
+  {
+    "species_name": "Chaffinch",
+    "time_period": null,
+    "max_weight": 20,
+    "avg_weight": 19.3,
+    "min_weight": 18.5,
+    "median_weight": 19.3,
+    "max_wing": 90,
+    "avg_wing": 88.5,
+    "min_wing": 87,
+    "median_wing": 89
+  },
+  {
+    "species_name": "Robin",
+    "time_period": null,
+    "max_weight": 18.5,
+    "avg_weight": 18.5,
+    "min_weight": 18.5,
+    "median_weight": 18.5,
+    "max_wing": 74,
+    "avg_wing": 74,
+    "min_wing": 74,
+    "median_wing": 74
+  }
+]

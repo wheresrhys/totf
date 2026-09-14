@@ -2,14 +2,28 @@
 /**
  * Generate snapshot JSON fixtures from the local e2e seed data.
  *
- * Reads Alpha/Beta/Gamma group data and writes 19 JSON files under
+ * Reads Alpha/Beta/Gamma group data and writes 25 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
- * the RPC name for RPC-backed fixtures (`core_stats/`, `find_discrepencies/`,
- * `notable_retraps/`, `top_metrics_by_period/`) and `tables/<TableName>/` for
- * fixtures produced by a direct PostgREST table query. The comment above each
- * block below names both the RPC/table and the consuming action(s) — keep this
- * in sync when a call site's underlying RPC/table changes, so a fixture's
- * location never silently drifts from what it actually tests (see #870, #882).
+ * the RPC name for RPC-backed fixtures (`core_stats/`, `biometrics_stats/`,
+ * `find_discrepencies/`, `notable_retraps/`, `top_metrics_by_period/`) and
+ * `tables/<TableName>/` for fixtures produced by a direct PostgREST table
+ * query. The comment above each block below names both the RPC/table and the
+ * consuming action(s) — keep this in sync when a call site's underlying
+ * RPC/table changes, so a fixture's location never silently drifts from what it
+ * actually tests (see #870, #882).
+ *
+ * **Every fixture is the raw, unmodified return of exactly one RPC call or one
+ * table query.** Never merge two sources into one file, and never post-process a
+ * result before writing it: a fixture that isn't a verbatim source response can't
+ * be checked against any source, and quietly starts asserting the shape of the
+ * merge instead of the shape of the database. Where an action joins two sources
+ * (e.g. core_stats + biometrics_stats), write one fixture per source and let the
+ * consuming test perform the same join the action does, with the same helper —
+ * see app/__tests__/helpers/species-stats-fixtures.ts. Two fixtures below still
+ * break this rule and are grandfathered pending #901: the
+ * `*.yearly-and-monthly-totals.json` pair (two core_stats calls in one file) and
+ * `tables/Birds/arretrap.bird-detail.json` (a Birds row with an Encounters query
+ * spliced on). Don't add a third.
  *
  * Not every fixture under test-fixtures/snapshots/ is written by this script —
  * `ring_sequence_controls/`, `tables/Encounters/`, `tables/Species/`, and a few
@@ -28,12 +42,6 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import fs from 'fs/promises';
 import { supabase } from '../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../app/lib/auth/group-auth';
-import { mergeSpeciesBiometrics } from '../app/lib/species-stats';
-import {
-	mergeBiometricsFields,
-	type BiometricsStatsResult,
-	type CoreStatsResult
-} from '../app/models/db';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,13 +84,13 @@ export async function generateSnapshots(
 	const beta = await getAuthenticatedSupabaseClientForGroup(betaId);
 	const gamma = await getAuthenticatedSupabaseClientForGroup(gammaId);
 
-	// RPC: core_stats (group_by_species) + RPC biometrics_stats — powers
-	// fetchSpeciesData (app/actions/spp-data.ts). #821/#823 moved the 8
-	// wing/weight columns out of core_stats into biometrics_stats, and the
-	// action merges them back on with mergeSpeciesBiometrics, so a bare
-	// core_stats row is no longer the shape the page receives. Filed under
-	// core_stats/ since that's the row identity; biometrics_stats only
-	// contributes columns.
+	// RPC: core_stats (group_by_species) and RPC: biometrics_stats
+	// (group_by_species) — the two halves fetchSpeciesData
+	// (app/actions/spp-data.ts) joins with mergeSpeciesBiometrics after #821/#823
+	// moved the 8 wing/weight columns out of core_stats. Each is written as its
+	// own raw fixture; the tests that need the merged row do the merge
+	// themselves, exactly as the action does (see
+	// app/__tests__/helpers/species-stats-fixtures.ts).
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId],
@@ -98,12 +106,10 @@ export async function generateSnapshots(
 				group_by_species: true
 			})
 		]);
+		await writeSnapshot(`core_stats/${name}.by-species.json`, coreRows ?? []);
 		await writeSnapshot(
-			`core_stats/${name}.by-species.json`,
-			mergeSpeciesBiometrics(
-				(coreRows ?? []) as CoreStatsResult[],
-				(biometricsRows ?? []) as BiometricsStatsResult[]
-			)
+			`biometrics_stats/${name}.by-species.json`,
+			biometricsRows ?? []
 		);
 	}
 
@@ -222,10 +228,10 @@ export async function generateSnapshots(
 			birdsPage0 ?? []
 		);
 
-		// RPC: core_stats (species-filtered, group_by_time_period: month) + RPC
-		// biometrics_stats — powers getSpeciesStatsHistory
-		// (app/actions/sp-data.ts), which joins the two on time_period with
-		// mergeBiometricsFields (#821).
+		// RPC: core_stats (species-filtered, group_by_time_period: month) and RPC:
+		// biometrics_stats (same params) — the two halves getSpeciesStatsHistory
+		// (app/actions/sp-data.ts) joins on time_period with mergeBiometricsFields
+		// (#821). One raw fixture each; the join belongs to whoever consumes them.
 		const [{ data: robinHistory }, { data: robinHistoryBiometrics }] =
 			await Promise.all([
 				alpha.rpc('core_stats', {
@@ -239,20 +245,13 @@ export async function generateSnapshots(
 					group_by_time_period: 'month'
 				})
 			]);
-		const robinBiometricsByPeriod = new Map(
-			((robinHistoryBiometrics ?? []) as BiometricsStatsResult[]).map((row) => [
-				row.time_period,
-				row
-			])
-		);
 		await writeSnapshot(
 			`core_stats/robin-alpha.monthly-history.json`,
-			((robinHistory ?? []) as CoreStatsResult[]).map((coreRow) =>
-				mergeBiometricsFields(
-					coreRow,
-					robinBiometricsByPeriod.get(coreRow.time_period)
-				)
-			)
+			robinHistory ?? []
+		);
+		await writeSnapshot(
+			`biometrics_stats/robin-alpha.monthly-history.json`,
+			robinHistoryBiometrics ?? []
 		);
 
 		// RPC: notable_retraps (species-filtered) — powers fetchNotableRetraps
@@ -281,14 +280,13 @@ export async function generateSnapshots(
 			graphableData ?? []
 		);
 
-		// Composite: RPC top_metrics_by_period + RPC core_stats + RPC
-		// biometrics_stats + the Birds page fetched above — powers the
-		// species/[speciesName] page's headline
-		// stats, busiest-sessions and individuals data. Filed under
-		// core_stats/ since `speciesStats` (a core_stats row) is the
-		// field most exposed to silent RPC-shape drift — the same risk class
-		// that caused #870; `topSessions` and `birds` piggy-back on this fixture
-		// for convenience rather than getting a fixture each.
+		// The three raw sources behind the species/[speciesName] page
+		// (app/(routes)/species/[speciesName]/page.tsx): its busiest-sessions list
+		// (top_metrics_by_period), and the core_stats + biometrics_stats halves of
+		// its headline `speciesStats` row, which the page joins with
+		// mergeBiometricsFields. One fixture per RPC — the page's fourth input,
+		// its page of Birds, is already covered by
+		// tables/Birds/robin-alpha.page-of-birds.json above.
 		const [{ data: topSessions }, { data: robinStats }, { data: robinBio }] =
 			await Promise.all([
 				alpha.rpc('top_metrics_by_period', {
@@ -309,26 +307,18 @@ export async function generateSnapshots(
 					ringing_group_filter: alphaId
 				})
 			]);
-		// `speciesStats` is the page's merged core_stats + biometrics_stats row
-		// (app/(routes)/species/[speciesName]/page.tsx), not a bare core_stats row.
-		const robinStatsRow = (robinStats as CoreStatsResult[] | null)?.[0];
-		if (birdsPage0 && birdsPage0.length > 0) {
-			await writeSnapshot(
-				`core_stats/robin-alpha.species-page-composite.json`,
-				{
-					topSessions: topSessions ?? [],
-					birds: birdsPage0,
-					speciesStats: robinStatsRow
-						? mergeBiometricsFields(
-								robinStatsRow,
-								(robinBio as BiometricsStatsResult[] | null)?.[0]
-							)
-						: null,
-					speciesId: robinSpecies.id,
-					speciesName: 'Robin'
-				}
-			);
-		}
+		await writeSnapshot(
+			`top_metrics_by_period/robin-alpha.top-sessions.json`,
+			topSessions ?? []
+		);
+		await writeSnapshot(
+			`core_stats/robin-alpha.species-stats.json`,
+			robinStats ?? []
+		);
+		await writeSnapshot(
+			`biometrics_stats/robin-alpha.species-stats.json`,
+			robinBio ?? []
+		);
 	}
 
 	// RPC: top_metrics_by_period (busiest single day, group-wide) — powers

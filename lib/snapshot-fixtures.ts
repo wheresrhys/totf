@@ -25,7 +25,7 @@
  */
 
 /**
- * The 19 fixtures `scripts/generate-snapshots.ts` produces, and therefore the
+ * The 25 fixtures `scripts/generate-snapshots.ts` produces, and therefore the
  * exact set the freshness check covers. Paths are relative to
  * `test-fixtures/snapshots/` and follow #882's source-directory layout (one
  * subdirectory per RPC, `tables/<TableName>/` for direct PostgREST reads).
@@ -36,13 +36,18 @@
  * failing.
  */
 export const GENERATED_SNAPSHOT_FIXTURES = [
+	'biometrics_stats/alpha.by-species.json',
+	'biometrics_stats/beta.by-species.json',
+	'biometrics_stats/gamma.by-species.json',
+	'biometrics_stats/robin-alpha.monthly-history.json',
+	'biometrics_stats/robin-alpha.species-stats.json',
 	'core_stats/alpha.by-species.json',
 	'core_stats/alpha.yearly-and-monthly-totals.json',
 	'core_stats/beta.by-species.json',
 	'core_stats/beta.yearly-and-monthly-totals.json',
 	'core_stats/gamma.by-species.json',
 	'core_stats/robin-alpha.monthly-history.json',
-	'core_stats/robin-alpha.species-page-composite.json',
+	'core_stats/robin-alpha.species-stats.json',
 	'find_discrepencies/alpha.discrepancies.json',
 	'find_discrepencies/beta.discrepancies.json',
 	'notable_retraps/alpha.retraps.json',
@@ -54,7 +59,8 @@ export const GENERATED_SNAPSHOT_FIXTURES = [
 	'tables/Sessions/alpha.all-sessions.json',
 	'tables/Sessions/alpha.recent-sessions.json',
 	'tables/Sessions/beta.all-sessions.json',
-	'top_metrics_by_period/alpha.busiest-days.json'
+	'top_metrics_by_period/alpha.busiest-days.json',
+	'top_metrics_by_period/robin-alpha.top-sessions.json'
 ] as const;
 
 /**
