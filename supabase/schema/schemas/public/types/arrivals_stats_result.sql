@@ -1,5 +1,5 @@
 -- Return shape for arrivals_stats (#858) — the "arrivals" companion to
--- aggregate_stats/population_stats. Shares their input signature
+-- core_stats/population_stats. Shares their input signature
 -- (species_name_filter, from_date, to_date, ringing_group_filter,
 -- group_by_species, group_by_time_period) and their stats_* utility-RPC plumbing,
 -- but counts each bird exactly ONCE per calendar year (at its first classifiable

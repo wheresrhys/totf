@@ -527,7 +527,7 @@ export function YearComparisonTrendChart({
 	// Month and out to Year again never refetches) and plots the fetched series
 	// instead of running `aggregateSeriesByYear` over the monthly points.
 	//
-	// This matters for any bird-distinct metric (#852): `aggregate_stats`'
+	// This matters for any bird-distinct metric (#852): `core_stats`'
 	// `bird_count` and `demographics_stats`' age-bucket counts are
 	// `COUNT(DISTINCT bird_id)` *within each month's cell*, so a bird retrapped
 	// in three months of one year contributes 3 to a client-side yearly sum but
@@ -604,7 +604,7 @@ export function YearComparisonTrendChart({
 	// total-appended) series, matching the order-of-operations the normalize
 	// toggle establishes.
 	//
-	// Note the fetched series carry `aggregate_stats`' dense spine verbatim, so
+	// Note the fetched series carry `core_stats`' dense spine verbatim, so
 	// a year with no encounters plots an explicit `0` here rather than the gap
 	// the client-side path's `hasReportableValue` convention produces. That
 	// matches what the all-time *month* view already does with its own zero

@@ -372,8 +372,8 @@ describe('DB constraints — RingingGroups uniqueness (slug)', () => {
 // RingingGroups.public_areas (#768) is constrained to a known allowlist of area tags
 // (currently just 'summary') so a group can never publish an area the app doesn't
 // understand. Since the allowlist forbids any other tag, this constraint is where the
-// "no unrelated tag" guarantee that public_aggregate_stats relies on is enforced —
-// a row with a non-'summary' tag is unreachable, so public_aggregate_stats never has
+// "no unrelated tag" guarantee that public_core_stats relies on is enforced —
+// a row with a non-'summary' tag is unreachable, so public_core_stats never has
 // to reason about one.
 describe('DB constraints — RingingGroups public_areas allowlist (CHECK)', () => {
 	const suffix = randomTestSuffix();

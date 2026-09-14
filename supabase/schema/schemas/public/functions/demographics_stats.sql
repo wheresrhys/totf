@@ -1,13 +1,13 @@
 -- Age-split (new_adult/first_summer/old_timers) and young-trends
 -- (postjuv_juv/new_postjuv_juv/new_postjuv) derivations for the planned Age-split
--- and Young-trends species-page charts (#800). Split out of aggregate_stats into
+-- and Young-trends species-page charts (#800). Split out of core_stats into
 -- its own RPC rather than folded into that already-large single query, both to
--- keep each query's plan simpler and to leave aggregate_stats' existing
--- columns/performance untouched. Shares aggregate_stats' input signature and
+-- keep each query's plan simpler and to leave core_stats' existing
+-- columns/performance untouched. Shares core_stats' input signature and
 -- reuses its underlying plumbing via the stats_raw_encounters / stats_spine /
 -- stats_encounter_age_classification / stats_bird_age_bucket utility RPCs (each
 -- mirrors, and must be kept in sync by hand with, the equivalent inline CTE still
--- living in aggregate_stats.sql).
+-- living in core_stats.sql).
 --
 -- The final projection below is wrapped in jsonb_populate_record rather than
 -- returned as a bare positional SELECT. A bare `RETURN QUERY SELECT ...` binds to
@@ -41,7 +41,7 @@ CREATE FUNCTION public.demographics_stats (
     SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
   ),
   -- Bird-level bucket counts (context columns + the new_young_bird_count copy).
-  -- Mirrors aggregate_stats' age_bucket_counts, restricted to the columns this RPC
+  -- Mirrors core_stats' age_bucket_counts, restricted to the columns this RPC
   -- exposes.
   age_bucket_counts AS (
     SELECT
@@ -52,7 +52,7 @@ CREATE FUNCTION public.demographics_stats (
       -- New young bird: in a young bucket (pullus/juv/postjuv) AND has any New ('N')
       -- encounter in the cell. Bucket membership and New membership are checked
       -- independently — not required to be the same encounter row. Identical
-      -- derivation to aggregate_stats.new_young_bird_count.
+      -- derivation to core_stats.new_young_bird_count.
       COUNT(*) FILTER (
         WHERE bab.age_bucket IN ('pullus', 'juv', 'postjuv') AND bab.has_new
       ) AS new_young_count

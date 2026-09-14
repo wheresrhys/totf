@@ -1,10 +1,3 @@
--- Mechanical duplication of aggregate_stats under a new name (#828, step 1 of the
--- aggregate_stats -> core_stats rename: create new, migrate app, delete
--- old). No logic change, no new columns, no redesign — identical signature and
--- body to aggregate_stats, with every reference to aggregate_stats_result
--- swapped to core_stats_result. aggregate_stats/aggregate_stats_result are
--- left untouched and keep serving all existing app call sites unchanged until
--- the migration ticket lands.
 CREATE FUNCTION public.core_stats (
 	species_name_filter text DEFAULT NULL::text,
 	from_date date DEFAULT NULL::date,
@@ -26,7 +19,7 @@ CREATE FUNCTION public.core_stats (
   FROM (
   -- Base windowed row source and grouping-cell spine, delegated to the shared
   -- stats_raw_encounters / stats_spine utility RPCs (#800) so this logic isn't
-  -- duplicated between aggregate_stats and population_stats. Each utility RPC is
+  -- duplicated between core_stats and population_stats. Each utility RPC is
   -- called exactly once here and materialized into a local CTE (reused by every
   -- downstream reference below), so the base tables aren't rescanned per use.
   WITH raw_encounters AS (
