@@ -2,10 +2,11 @@
 /**
  * Generate snapshot JSON fixtures from the local e2e seed data.
  *
- * Reads Alpha/Beta/Gamma group data and writes 19 JSON files under
+ * Reads Alpha/Beta/Gamma group data and writes 23 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
- * the RPC name for RPC-backed fixtures (`core_stats/`, `find_discrepencies/`,
- * `notable_retraps/`, `top_metrics_by_period/`) and `tables/<TableName>/` for
+ * the RPC name for RPC-backed fixtures (`core_stats/`, `biometrics_stats/`,
+ * `find_discrepencies/`, `notable_retraps/`, `top_metrics_by_period/`) and
+ * `tables/<TableName>/` for
  * fixtures produced by a direct PostgREST table query. The comment above each
  * block below names both the RPC/table and the consuming action(s) — keep this
  * in sync when a call site's underlying RPC/table changes, so a fixture's
@@ -77,6 +78,20 @@ export async function generateSnapshots(
 			group_by_species: true
 		});
 		await writeSnapshot(`core_stats/${name}.by-species.json`, data ?? []);
+	}
+
+	// RPC: biometrics_stats (group_by_species) — powers fetchSpeciesData's
+	// biometrics half (app/actions/spp-data.ts), merged onto the core_stats
+	// by-species rows above by mergeSpeciesBiometrics (app/lib/species-stats.ts)
+	for (const [name, client, gId] of [
+		['alpha', alpha, alphaId],
+		['gamma', gamma, gammaId]
+	] as const) {
+		const { data } = await client.rpc('biometrics_stats', {
+			ringing_group_filter: gId,
+			group_by_species: true
+		});
+		await writeSnapshot(`biometrics_stats/${name}.by-species.json`, data ?? []);
 	}
 
 	// RPC: core_stats (yearly + monthly, ungrouped by species) — powers
@@ -204,6 +219,34 @@ export async function generateSnapshots(
 		await writeSnapshot(
 			`core_stats/robin-alpha.monthly-history.json`,
 			robinHistory ?? []
+		);
+
+		// RPC: biometrics_stats (species-filtered, group_by_time_period: month) —
+		// the sibling half of getSpeciesStatsHistory (app/actions/sp-data.ts),
+		// merged onto the core_stats rows above by time_period
+		const { data: robinBiometricsHistory } = await alpha.rpc(
+			'biometrics_stats',
+			{
+				species_name_filter: 'Robin',
+				ringing_group_filter: alphaId,
+				group_by_time_period: 'month'
+			}
+		);
+		await writeSnapshot(
+			`biometrics_stats/robin-alpha.monthly-history.json`,
+			robinBiometricsHistory ?? []
+		);
+
+		// RPC: biometrics_stats (species-filtered, ungrouped — a single headline
+		// row) — powers getSpeciesStats (app/(routes)/species/[speciesName]/page.tsx),
+		// merged onto that page's single core_stats row
+		const { data: robinBiometrics } = await alpha.rpc('biometrics_stats', {
+			species_name_filter: 'Robin',
+			ringing_group_filter: alphaId
+		});
+		await writeSnapshot(
+			`biometrics_stats/robin-alpha.headline.json`,
+			robinBiometrics ?? []
 		);
 
 		// RPC: notable_retraps (species-filtered) — powers fetchNotableRetraps
