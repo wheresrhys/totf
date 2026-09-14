@@ -138,6 +138,20 @@ const TREND_CHART_LIBRARY = {
 	}
 };
 
+// Layered on top of `TREND_CHART_LIBRARY` (not replacing it) for the accumulate
+// view: `elements.line.fill: true` fills each dataset's area — chart.js applies
+// the line-element default to every line dataset, so it's equivalent to setting
+// `fill` per dataset — and `scales.y.stacked: true` stacks those areas so the
+// metrics read as a stacked area chart rather than overlapping filled lines.
+const STACKED_AREA_CHART_LIBRARY = {
+	...TREND_CHART_LIBRARY,
+	elements: {
+		...TREND_CHART_LIBRARY.elements,
+		line: { ...TREND_CHART_LIBRARY.elements.line, fill: true }
+	},
+	scales: { y: { stacked: true } }
+};
+
 type ChartMode = 'all-time' | 'compare-years' | 'this-year';
 
 const MODE_OPTIONS: { value: ChartMode; label: string }[] = [
@@ -146,7 +160,8 @@ const MODE_OPTIONS: { value: ChartMode; label: string }[] = [
 	{ value: 'this-year', label: 'This year' }
 ];
 
-const NORMALIZE_OPTIONS: { value: boolean; label: string }[] = [
+// Shared Yes/No option list for the boolean toggles (Normalize, Accumulate).
+const YES_NO_OPTIONS: { value: boolean; label: string }[] = [
 	{ value: false, label: 'No' },
 	{ value: true, label: 'Yes' }
 ];
@@ -277,6 +292,74 @@ export function aggregateSeriesByYear(
 						: null
 				] as [string, number | null];
 			})
+	};
+}
+
+// Turns one metric's monthly `[date, value]` points into a *within-year
+// cumulative* running total: each month becomes itself plus every preceding
+// month in the same calendar year (Jan→Dec running sum), resetting at each new
+// calendar year. Points keep their original `[date, value]` shape (and are
+// returned oldest-first) so the result drops straight into the all-time
+// timeline chart — this is only ever used in all-time / month-interval mode.
+//
+// The same `hasReportableValue` gap convention as the sibling transforms
+// applies, but with a cumulative twist: a zero-count month contributes nothing
+// to the sum and does *not* reset or break the running total — the accumulated
+// value carries forward flat through it, because a cumulative count can't
+// "un-happen". Only months *before* a year's first reportable value stay `null`
+// (a leading gap), so the area doesn't start at zero before there's any data.
+//
+// When `effortHistory` is supplied (the Normalize composition), summing
+// already-normalized per-month rates would be meaningless, so instead the raw
+// counts and the effort-hours denominator are each accumulated separately
+// across the year-to-date and divided once per month:
+// `cumulative_raw_count[month] / cumulative_effort_hours[month]`. A month whose
+// cumulative effort is `0`/missing divides to an explicit `0` (never
+// `NaN`/`Infinity`), matching `normalizeSeriesByEffort`.
+export function accumulateSeriesByYear(
+	metric: LineChartData,
+	effortHistory?: LineChartData
+): LineChartData {
+	const effortHoursByDate = effortHistory ? new Map(effortHistory.data) : null;
+	// The running sum is order-dependent; the dense spine already arrives
+	// oldest-first, but sort defensively (a lexical compare is exact for the
+	// ISO dates these series are keyed by).
+	const orderedByDate = [...metric.data].sort(([dateA], [dateB]) =>
+		dateA < dateB ? -1 : dateA > dateB ? 1 : 0
+	);
+	let currentYear: number | null = null;
+	let cumulativeCount = 0;
+	let cumulativeEffortHours = 0;
+	let seenReportableThisYear = false;
+	return {
+		...metric,
+		data: orderedByDate.map(([date, value]) => {
+			const year = new Date(date).getUTCFullYear();
+			if (year !== currentYear) {
+				currentYear = year;
+				cumulativeCount = 0;
+				cumulativeEffortHours = 0;
+				seenReportableThisYear = false;
+			}
+			if (hasReportableValue(value)) {
+				cumulativeCount += value;
+				seenReportableThisYear = true;
+			}
+			if (effortHoursByDate) {
+				const effortHours = effortHoursByDate.get(date);
+				if (effortHours) cumulativeEffortHours += effortHours;
+			}
+			if (!seenReportableThisYear) {
+				return [date, null] as [string, number | null];
+			}
+			if (effortHoursByDate) {
+				return [
+					date,
+					cumulativeEffortHours ? cumulativeCount / cumulativeEffortHours : 0
+				] as [string, number | null];
+			}
+			return [date, cumulativeCount] as [string, number | null];
+		})
 	};
 }
 
@@ -484,7 +567,8 @@ export function YearComparisonTrendChart({
 	colors,
 	yearlyAggregators,
 	includeTotalSeries,
-	fetchYearSeries
+	fetchYearSeries,
+	allowYearAccumulation
 }: {
 	series: LineChartData[];
 	xtitle?: string;
@@ -539,10 +623,17 @@ export function YearComparisonTrendChart({
 	// mechanism) passes nothing and is untouched. The client-side path is also
 	// the fallback if the fetch rejects.
 	fetchYearSeries?: () => Promise<LineChartData[]>;
+	// When `true`, offers an "Accumulate" toggle (all-time mode only). While
+	// on, each series becomes a within-year cumulative running sum (see
+	// `accumulateSeriesByYear`) rendered as a stacked area, the Interval is
+	// forced to `'month'` and its toggle is hidden. Omitting it (the default)
+	// leaves the component behaving exactly as before.
+	allowYearAccumulation?: boolean;
 }) {
 	const [mode, setMode] = useState<ChartMode>('all-time');
 	const [normalize, setNormalize] = useState(false);
 	const [interval, setInterval] = useState<Interval>('month');
+	const [accumulate, setAccumulate] = useState(false);
 	// Request-once cache for `fetchYearSeries` (same boolean-guard pattern as
 	// SpDemographicsTab/SpBiometricsTab's own fetches). `yearSeriesFailed` is
 	// distinct from "not yet arrived" so a rejected fetch falls back to the
@@ -563,6 +654,12 @@ export function YearComparisonTrendChart({
 	// expanded species-graph tiles) don't share a radio group.
 	const toggleName = useId();
 	const currentYear = new Date().getFullYear();
+	// Accumulate is only meaningful in all-time mode; the toggle is hidden and
+	// the mode switcher resets the state elsewhere, but gate on `mode` here too
+	// so the compare-years/this-year sub-charts — which reshape each metric per
+	// year — can never be handed accumulated data, even for a single render.
+	const accumulating =
+		!!allowYearAccumulation && accumulate && mode === 'all-time';
 	const effectiveYtitle =
 		normalize && effortHistory ? `${ytitle} per hour` : ytitle;
 	// Applies the Normalize toggle and then the optional `Total` series to one
@@ -574,17 +671,41 @@ export function YearComparisonTrendChart({
 	// gets its own base colour, its own compare-years/this-year sub-chart, and
 	// its own Year-interval aggregation via the same `yearlyAggregators`
 	// default-to-'sum' mechanism as any other metric.
+	function appendTotalSeries(metrics: LineChartData[]): LineChartData[] {
+		return includeTotalSeries
+			? [...metrics, buildTotalSeries(metrics)]
+			: metrics;
+	}
 	function applyNormalizeAndTotal(
 		metrics: LineChartData[],
 		effort: LineChartData | undefined
 	): LineChartData[] {
-		const normalized =
-			normalize && effort ? normalizeSeriesByEffort(metrics, effort) : metrics;
-		return includeTotalSeries
-			? [...normalized, buildTotalSeries(normalized)]
-			: normalized;
+		return appendTotalSeries(
+			normalize && effort ? normalizeSeriesByEffort(metrics, effort) : metrics
+		);
 	}
-	const plottedSeries = applyNormalizeAndTotal(series, effortHistory);
+	// The accumulate path *replaces* the Normalize step rather than composing on
+	// top of it: summing already-normalized per-month rates is meaningless, so
+	// when Normalize is also on the raw counts and the effort hours are
+	// accumulated separately and divided once per month (inside
+	// `accumulateSeriesByYear`). The Total is still appended last, so it sums
+	// the already-accumulated metrics into a cumulative total.
+	//
+	// Only ever applied to the monthly all-time path: accumulate forces the
+	// Interval to `'month'`, so the year-granular branch below can't reach it.
+	function applyAccumulateAndTotal(
+		metrics: LineChartData[],
+		effort: LineChartData | undefined
+	): LineChartData[] {
+		return appendTotalSeries(
+			metrics.map((metric) =>
+				accumulateSeriesByYear(metric, normalize && effort ? effort : undefined)
+			)
+		);
+	}
+	const plottedSeries = accumulating
+		? applyAccumulateAndTotal(series, effortHistory)
+		: applyNormalizeAndTotal(series, effortHistory);
 	// A metric's base colour: the caller's explicit override at that index if
 	// supplied, else the default per-index palette. Used identically by all three
 	// modes so an override recolours every view consistently.
@@ -627,7 +748,11 @@ export function YearComparisonTrendChart({
 						)
 					)
 			: plottedSeries;
-	const showIntervalToggle = mode === 'all-time' && spansMultipleYears(series);
+	// While accumulating the Interval is forced to Month (a within-year running
+	// sum only makes sense per month), so the Interval toggle is hidden.
+	const showIntervalToggle =
+		mode === 'all-time' && spansMultipleYears(series) && !accumulate;
+	const showAccumulateToggle = !!allowYearAccumulation && mode === 'all-time';
 	return (
 		<div className="flex flex-col">
 			<div className="mb-2 flex flex-wrap items-center justify-end gap-2">
@@ -650,7 +775,12 @@ export function YearComparisonTrendChart({
 									type="radio"
 									className="hidden"
 									checked={mode === option.value}
-									onChange={() => setMode(option.value)}
+									onChange={() => {
+										setMode(option.value);
+										// Accumulate only exists in all-time mode; drop it on the
+										// way out so it never persists "on but hidden and inert".
+										if (option.value !== 'all-time') setAccumulate(false);
+									}}
 								/>
 							</label>
 						))}
@@ -687,7 +817,7 @@ export function YearComparisonTrendChart({
 					<div className="flex items-center gap-1">
 						<span className="text-sm">Normalize</span>
 						<div className="border-base-content/20 flex gap-0.5 rounded-field border p-0.5">
-							{NORMALIZE_OPTIONS.map((option) => (
+							{YES_NO_OPTIONS.map((option) => (
 								<label
 									key={String(option.value)}
 									htmlFor={`${toggleName}-normalize-${option.value}`}
@@ -701,6 +831,36 @@ export function YearComparisonTrendChart({
 										className="hidden"
 										checked={normalize === option.value}
 										onChange={() => setNormalize(option.value)}
+									/>
+								</label>
+							))}
+						</div>
+					</div>
+				) : null}
+				{showAccumulateToggle ? (
+					<div className="flex items-center gap-1">
+						<span className="text-sm">Accumulate</span>
+						<div className="border-base-content/20 flex gap-0.5 rounded-field border p-0.5">
+							{YES_NO_OPTIONS.map((option) => (
+								<label
+									key={String(option.value)}
+									htmlFor={`${toggleName}-accumulate-${option.value}`}
+									className="btn btn-sm btn-text has-checked:btn-active"
+								>
+									<span>{option.label}</span>
+									<input
+										id={`${toggleName}-accumulate-${option.value}`}
+										name={`${toggleName}-accumulate`}
+										type="radio"
+										className="hidden"
+										checked={accumulate === option.value}
+										onChange={() => {
+											setAccumulate(option.value);
+											// A within-year running sum is a per-month view, so
+											// turning it on drops any existing Year selection back
+											// to Month (the Interval toggle itself then hides).
+											if (option.value) setInterval('month');
+										}}
 									/>
 								</label>
 							))}
@@ -725,7 +885,9 @@ export function YearComparisonTrendChart({
 							colors={allTimeColors}
 							xtitle={xtitle}
 							ytitle={effectiveYtitle}
-							library={TREND_CHART_LIBRARY}
+							library={
+								accumulating ? STACKED_AREA_CHART_LIBRARY : TREND_CHART_LIBRARY
+							}
 						/>
 					))}
 				{mode === 'compare-years' && (
