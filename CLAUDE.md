@@ -369,8 +369,8 @@ npm run qa            # lint + type-check + app tests
 
 The pre-push hook runs app tests, then `scripts/e2e-select-suite.sh` (see "E2E tests" below) —
 never DB integration tests, which are run manually. Local Supabase must be running
-(`npm run db:start:local`) and seeded (`npm run db:seed:e2e`) for the E2E and DB integration
-suites to pass.
+(`npm run db:start:local`) and seeded (`npm run db:seed:e2e`, or `npm run db:sync:e2e` for a
+guaranteed-clean baseline — see "Fixtures" below) for the E2E and DB integration suites to pass.
 
 HTTP tests (`http-tests/`) use `http-tests/global-setup.ts` to start/stop the Next.js dev server automatically. The default server URL is derived per-worktree from `scripts/worktree-test-port.ts` (`deriveWorktreePort()` hashes the worktree's absolute path into a fixed port range, avoiding `3000` and the local Supabase ports) — so concurrent swarm worktrees each get their own port and a reused server can only ever be one this same worktree started, never a sibling's. Set `TEST_BASE_URL` to override the derivation and point at a specific/remote server. If a server is already running at the resolved URL, it reuses it and does not kill it after the suite. `playwright.config.ts` uses the same helper for the E2E dev server.
 
@@ -426,11 +426,33 @@ fixtures are consumed via `fixture as unknown as SomeType`, a double assertion t
 assignability checking off, and an imported JSON module is not a fresh object literal, so even
 without the cast a fixture carrying columns the type no longer declares stays assignable. A removed
 RPC column therefore leaves stale keys in every fixture, silently. If you change an RPC's return
-shape, run `npm run db:seed:e2e` and commit the regenerated fixtures as part of the same PR — and
-check the eight fixtures that no generator produces (they can only be edited by hand).
-[#890](https://github.com/wheresrhys/totf/issues/890) carries the full investigation
+shape, run `npm run db:sync:e2e` (see below) and commit the regenerated fixtures as part of the
+same PR — and check the eight fixtures that no generator produces (they can only be edited by
+hand). [#890](https://github.com/wheresrhys/totf/issues/890) carries the full investigation
 ([#884](https://github.com/wheresrhys/totf/issues/884)), the current inventory of drifted fixtures,
 and the planned fixes.
+
+**Regenerating fixtures reproducibly — `db:seed:e2e` vs `db:sync:e2e` (#903).** Both end by
+regenerating every generated fixture, but they start from different baselines:
+
+- `npm run db:seed:e2e` is **upsert-only** — it never truncates, so it tops up whatever is already
+  in the local database. Fine for routine dev, but *not* a clean baseline: DB integration tests
+  write real, undeleted rows into the shared seed groups (e.g. `supabase/__tests__/ring-sequences.test.ts`
+  and `triggers.test.ts` write into Gamma/Delta with no teardown), and those rows survive into
+  whatever you regenerate next.
+- `npm run db:sync:e2e` is `supabase db reset && npm run db:seed:e2e` (the same shape as
+  `db:sync:local`) — a destructive reset first, so seeding always starts from an empty database.
+  **Use this whenever byte-identical fixture output matters**, i.e. any time you're committing
+  regenerated fixtures.
+
+Determinism also depends on the seed importing serially: every table's `id` is `DEFAULT
+nextval(...)` rather than `GENERATED ALWAYS AS IDENTITY`, so under concurrent row processing the id
+a row gets depends on I/O timing, and the fixtures embed literal ids (e.g.
+`tables/Birds/robin-alpha.page-of-birds.json`). `scripts/seed-e2e-data.ts` therefore calls
+`importCSV` from `scripts/import-csv.ts` in-process at `concurrency: 1`, rather than shelling out
+to `npm run db:import:local` at the default 30. That's seeding-only: the CLI (`db:import:{local,prod}`)
+and the web import route keep the default concurrency. Two consecutive `db:sync:e2e` +
+`db:generate-snapshots` runs now produce byte-identical fixtures.
 
 **Asserting on table cells:** never index into cells by raw position (`cells[6]`,
 `querySelectorAll('td')[8]`) — a reordered or added column silently breaks an unrelated
