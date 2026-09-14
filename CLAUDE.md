@@ -102,7 +102,7 @@ the target isn't public and the viewer actually has a session; or blocked), retu
 `{ accessLevel, rows }` — every summary-stats action function (`app/actions/summary-stats.ts`,
 `period-totals.ts`, `spp-data.ts`) routes through it (currently destructuring only `rows`) instead of
 calling `getAuthenticatedSupabaseClient()` + `core_stats` directly. (`core_stats`/`public_core_stats`
-are byte-identical siblings of the still-schema-resident `aggregate_stats`/`public_aggregate_stats`
+are byte-identical siblings of the still-schema-resident `core_stats`/`public_aggregate_stats`
 RPCs — #830 moved every app-code call site onto the new names; a later ticket deletes the old ones.)
 
 `lib/group-slug.ts`'s group-lookup functions (`resolveGroupIdBySlug`, `resolveGroupSlugById`,
@@ -155,19 +155,19 @@ Tables (PascalCase in Postgres, matching generated TypeScript types in `types/su
 Key design notes:
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
 - Several fields are populated by triggers (e.g. `proven_age` on Birds, timestamps on Sessions/Encounters).
-- Complex queries are exposed as Postgres RPC functions (e.g. `top_metrics_by_period`, `aggregate_stats`, `notable_retraps`, `find_discrepencies`).
+- Complex queries are exposed as Postgres RPC functions (e.g. `top_metrics_by_period`, `core_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
 
-### Companion stats RPCs and shared plumbing (`aggregate_stats` / `population_stats`, #800)
+### Companion stats RPCs and shared plumbing (`core_stats` / `population_stats`, #800)
 
-`aggregate_stats` and `population_stats` (age-split + young-trends derivations, split into its own
-RPC rather than folded into `aggregate_stats`' already-large single query — for query-plan
-simplicity and to leave `aggregate_stats`' existing columns untouched) share the same input
+`core_stats` and `population_stats` (age-split + young-trends derivations, split into its own
+RPC rather than folded into `core_stats`' already-large single query — for query-plan
+simplicity and to leave `core_stats`' existing columns untouched) share the same input
 signature (`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
 group_by_time_period`) and both build on the same underlying logic via `stats_raw_encounters` /
 `stats_spine` / `stats_encounter_age_classification` / `stats_bird_age_bucket` — internal utility
 RPCs holding the windowed-row-source / grouping-spine / per-encounter-classification /
-per-bird-bucket-resolution logic previously duplicated inline in `aggregate_stats`. Each top-level
+per-bird-bucket-resolution logic previously duplicated inline in `core_stats`. Each top-level
 RPC calls every utility it needs exactly once and materializes the result into a local CTE (reused
 by every downstream reference in that RPC), so the base tables aren't rescanned once per downstream
 CTE — but a utility RPC that itself depends on another (e.g. `stats_bird_age_bucket` →
@@ -178,12 +178,12 @@ base tables a small constant number of times rather than once — accepted as a 
 this app's data scale; keep an eye on it if a future RPC stacks many more utility layers. Keep the
 utility RPCs' bucket/precedence definitions in sync **by hand** with `app/models/encounter.ts`'s
 `getAgeClass()` if either changes. `population_stats.new_young_bird_count` was originally a
-duplicate of a same-named column on `aggregate_stats` (#800); #824 removed `aggregate_stats`'s
+duplicate of a same-named column on `core_stats` (#800); #824 removed `core_stats`'s
 copy (and the corresponding UI series, #817) as unused, so `population_stats` now holds the only
 `new_young_bird_count` column in the schema.
 
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
-two structurally can't: **arrivals**. `aggregate_stats`/`population_stats` compute their bucket
+two structurally can't: **arrivals**. `core_stats`/`population_stats` compute their bucket
 counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
 one year is counted again in each monthly cell. `arrivals_stats` instead counts each bird exactly
 once per calendar year, at whichever cell holds its **first classifiable encounter of that year**,
@@ -207,7 +207,7 @@ only as stable as whatever DDL a given environment's `db:schema:apply` run happe
 type — confirmed empirically while building `population_stats`: two schema-diff runs against the
 identical schema files produced two *different* physical attribute orders for a composite type's
 columns (one matching the file's declared order, one alphabetical), silently scrambling values into
-the wrong named output columns with no error either way. `population_stats` and `aggregate_stats`
+the wrong named output columns with no error either way. `population_stats` and `core_stats`
 (the latter retrofitted in #824, the first time `aggregate_stats_result` changed shape since this
 note was written) guard against this by wrapping their final projection — `SELECT
 (jsonb_populate_record(NULL::the_result_type, to_jsonb(agg))).* FROM (...) AS agg` — which binds
@@ -395,7 +395,7 @@ that consumes them** (#882): one subdirectory per Postgres RPC (`core_stats/`,
 `tables/<TableName>/` for a fixture produced by a direct PostgREST table query rather than an RPC
 call. This matters because an action can drift from the RPC/table it actually calls (#870:
 `getSpeciesStatsHistory.alpha.robin.json` was named after the `getSpeciesStatsHistory` action but
-generated from a raw `aggregate_stats`/`core_stats` call) — naming by source instead of by consumer
+generated from a raw `core_stats` call) — naming by source instead of by consumer
 means a fixture's location can never overstate what it verifies. Within each directory, filenames
 follow `<callingGroupOrParams>.<intent>.json` (e.g. `core_stats/alpha.by-species.json`,
 `core_stats/robin-alpha.monthly-history.json`). Not every fixture here is generated by
@@ -404,7 +404,7 @@ follow `<callingGroupOrParams>.<intent>.json` (e.g. `core_stats/alpha.by-species
 `core_stats/*.summary-totals.json` / `*.home-page-summary.json` pairs) are still hand-maintained;
 regenerate the rest with `npm run db:generate-snapshots`.
 
-`aggregate_stats`/`core_stats`' two companion stats RPCs — `biometrics_stats` and
+`core_stats`' two companion stats RPCs — `biometrics_stats` and
 `demographics_stats` (see "Companion stats RPCs and shared plumbing" above) — went uncovered until
 #883, so every test of their row shapes hand-rolled its own literal. Both now have fixtures for
 each call shape their real call sites use (`biometrics_stats`: group-wide `by-species`, plus
