@@ -12,6 +12,7 @@ import {
 	getNewYoungCounts,
 	getSizes
 } from '../StatsHistoryChart';
+import robinDemographicsHistory from '@/test-fixtures/snapshots/demographics_stats/robin-alpha.monthly-history.json';
 
 // Minimal fixture builders — only the columns each mapper reads matter; the rest
 // are filled with 0 so a full composite-type row satisfies the (null-stripped)
@@ -24,23 +25,28 @@ function aggregateRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
 	} as unknown as CoreStatsResult & typeof overrides;
 }
 
+// The demographics builder's *column set* comes from a real captured
+// demographics_stats row (Robin/Alpha, species-filtered and month-grouped —
+// the exact call getSpeciesDemographicsStats makes) rather than a
+// hand-maintained literal, so a column added or removed at the RPC shows up
+// here instead of silently drifting (#883). Every count is zeroed so each test
+// still only sees the columns it explicitly sets.
+const [capturedDemographicsRow] =
+	robinDemographicsHistory as unknown as DemographicsStatsResult[];
+const zeroedDemographicsRow = Object.fromEntries(
+	Object.entries(capturedDemographicsRow).map(([column, value]) => [
+		column,
+		typeof value === 'number' ? 0 : value
+	])
+) as DemographicsStatsResult;
+
 function demographicsRow(
 	overrides: Partial<DemographicsStatsResult>
 ): DemographicsStatsResult {
 	return {
+		...zeroedDemographicsRow,
 		species_name: 'Robin',
 		time_period: '2024-01-01',
-		adult_bird_count: 0,
-		juv_bird_count: 0,
-		juv_enc_count: 0,
-		postjuv_enc_count: 0,
-		new_young_bird_count: 0,
-		new_adult_bird_count: 0,
-		first_summer_bird_count: 0,
-		postjuv_juv_enc_count: 0,
-		new_postjuv_juv_enc_count: 0,
-		new_postjuv_enc_count: 0,
-		old_timers_bird_count: 0,
 		...overrides
 	} as DemographicsStatsResult;
 }
