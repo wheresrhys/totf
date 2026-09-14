@@ -17,21 +17,12 @@
     "postjuv_bird_count": 2,
     "adult_bird_count": 0,
     "unknown_age_bird_count": 0,
-    "new_young_bird_count": 2,
     "pullus_enc_count": 0,
     "juv_enc_count": 0,
     "postjuv_enc_count": 2,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 2,
-    "max_weight": 20,
-    "avg_weight": 19.3,
-    "min_weight": 18.5,
-    "median_weight": 19.3,
-    "max_wing": 90,
-    "avg_wing": 88.5,
-    "min_wing": 87,
-    "median_wing": 89
+    "max_new_per_session": 2
   },
   {
     "species_name": "Robin",
@@ -51,20 +42,11 @@
     "postjuv_bird_count": 0,
     "adult_bird_count": 1,
     "unknown_age_bird_count": 0,
-    "new_young_bird_count": 0,
     "pullus_enc_count": 0,
     "juv_enc_count": 0,
     "postjuv_enc_count": 0,
     "adult_enc_count": 1,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0,
-    "max_weight": 18.5,
-    "avg_weight": 18.5,
-    "min_weight": 18.5,
-    "median_weight": 18.5,
-    "max_wing": 74,
-    "avg_wing": 74,
-    "min_wing": 74,
-    "median_wing": 74
+    "max_new_per_session": 0
   }
 ]

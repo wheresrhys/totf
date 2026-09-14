@@ -2,7 +2,19 @@
 /**
  * Generate snapshot JSON fixtures from the local e2e seed data.
  *
- * Reads Alpha/Beta/Gamma group data and writes 24 JSON files under
+ * **Every fixture is the raw, unmodified return of exactly one RPC call or one
+ * table query.** Never merge two sources into one file, and never post-process a
+ * result before writing it: a fixture that isn't a verbatim source response can't
+ * be checked against any source, and quietly starts asserting the shape of the
+ * merge instead of the shape of the database. Where an action joins two sources
+ * (e.g. core_stats + biometrics_stats), write one fixture per source and let the
+ * consuming test perform the same join the action does, with the same helper.
+ * Two fixtures below still break this rule and are grandfathered pending #901:
+ * the `*.yearly-and-monthly-totals.json` pair (two core_stats calls in one file)
+ * and `tables/Birds/arretrap.bird-detail.json` (a Birds row with an Encounters
+ * query spliced on). Don't add a third.
+ *
+ * Reads Alpha/Beta/Gamma group data and writes 25 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
  * the RPC name for RPC-backed fixtures (`core_stats/`, `biometrics_stats/`,
  * `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
@@ -33,7 +45,7 @@ import { getAuthenticatedSupabaseClientForGroup } from '../app/lib/auth/group-au
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
-const SNAPSHOTS_DIR = path.join(ROOT, 'test-fixtures', 'snapshots');
+export const SNAPSHOTS_DIR = path.join(ROOT, 'test-fixtures', 'snapshots');
 
 async function getGroupId(name: string): Promise<number> {
 	const { data, error } = await supabase
@@ -46,20 +58,25 @@ async function getGroupId(name: string): Promise<number> {
 	return data.id;
 }
 
-// `relativePath` is a source-directory-relative path, e.g.
-// `core_stats/alpha.by-species.json` or `tables/Birds/arretrap.bird-detail.json`.
-async function writeSnapshot(relativePath: string, data: unknown) {
-	const target = path.join(SNAPSHOTS_DIR, relativePath);
-	await fs.mkdir(path.dirname(target), { recursive: true });
-	await fs.writeFile(target, JSON.stringify(data, null, 2));
-	console.log(`  → ${relativePath}`);
-}
-
 export async function generateSnapshots(
 	alphaId: number,
 	betaId: number,
-	gammaId: number
+	gammaId: number,
+	// Defaults to the committed fixture directory; the fixture-freshness DB
+	// integration test (supabase/__tests__/snapshot-fixture-freshness.test.ts)
+	// passes a temp directory so it can diff without touching the repo.
+	outputDir: string = SNAPSHOTS_DIR
 ) {
+	// `relativePath` is a source-directory-relative path, e.g.
+	// `core_stats/alpha.by-species.json` or
+	// `tables/Birds/arretrap.bird-detail.json`.
+	const writeSnapshot = async (relativePath: string, data: unknown) => {
+		const target = path.join(outputDir, relativePath);
+		await fs.mkdir(path.dirname(target), { recursive: true });
+		await fs.writeFile(target, JSON.stringify(data, null, 2));
+		console.log(`  → ${relativePath}`);
+	};
+
 	console.log('\nGenerating snapshots...');
 
 	const alpha = await getAuthenticatedSupabaseClientForGroup(alphaId);
@@ -289,13 +306,14 @@ export async function generateSnapshots(
 			graphableData ?? []
 		);
 
-		// Composite: RPC top_metrics_by_period + RPC core_stats + the Birds
-		// page fetched above — powers the species/[speciesName] page's headline
-		// stats, busiest-sessions and individuals data. Filed under
-		// core_stats/ since `speciesStats` (a core_stats row) is the
-		// field most exposed to silent RPC-shape drift — the same risk class
-		// that caused #870; `topSessions` and `birds` piggy-back on this fixture
-		// for convenience rather than getting a fixture each.
+		// The remaining two raw sources behind the species/[speciesName] page: its
+		// busiest-sessions list (top_metrics_by_period) and the core_stats half of
+		// its headline row, whose biometrics_stats sibling is
+		// `biometrics_stats/robin-alpha.headline.json` above — getSpeciesStats
+		// joins the two with mergeBiometricsFields. The page's other inputs need
+		// no fixture here: its page of Birds is already
+		// tables/Birds/robin-alpha.page-of-birds.json, and speciesId/speciesName
+		// are route-resolved props, not RPC output.
 		const [{ data: topSessions }, { data: robinStats }] = await Promise.all([
 			alpha.rpc('top_metrics_by_period', {
 				temporal_unit: 'day',
@@ -311,18 +329,14 @@ export async function generateSnapshots(
 				ringing_group_filter: alphaId
 			})
 		]);
-		if (birdsPage0 && birdsPage0.length > 0) {
-			await writeSnapshot(
-				`core_stats/robin-alpha.species-page-composite.json`,
-				{
-					topSessions: topSessions ?? [],
-					birds: birdsPage0,
-					speciesStats: robinStats?.[0] ?? null,
-					speciesId: robinSpecies.id,
-					speciesName: 'Robin'
-				}
-			);
-		}
+		await writeSnapshot(
+			`top_metrics_by_period/robin-alpha.top-sessions.json`,
+			topSessions ?? []
+		);
+		await writeSnapshot(
+			`core_stats/robin-alpha.headline.json`,
+			robinStats ?? []
+		);
 	}
 
 	// RPC: top_metrics_by_period (busiest single day, group-wide) — powers

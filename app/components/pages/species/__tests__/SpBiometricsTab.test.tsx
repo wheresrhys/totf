@@ -7,14 +7,8 @@ import {
 	waitFor
 } from '@testing-library/react';
 import { SpBiometricsTab } from '../SpBiometricsTab';
-import spPageSnapshot from '@/test-fixtures/snapshots/core_stats/robin-alpha.species-page-composite.json';
-import robinBiometricsHeadline from '@/test-fixtures/snapshots/biometrics_stats/robin-alpha.headline.json';
-import {
-	mergeBiometricsFields,
-	type BiometricsStatsResult,
-	type CoreStatsWithBiometrics
-} from '@/app/models/db';
-import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
+import { robinSpeciesStats as speciesStatsWithBiometrics } from '@/app/__tests__/helpers/robin-species-page-fixtures';
+import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { SexedGraphableBird } from '../WeightAndWingChart';
 
 // chartkick registers Chart.js as a side effect; nothing renders a real canvas
@@ -55,20 +49,6 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 vi.mock('../WeightAndWingChart', () => ({
 	WingWeightScatterChart: () => <div data-testid="scatter-chart" />
 }));
-
-const { speciesStats } = spPageSnapshot as unknown as FullFatPageData;
-const [robinBiometricsRow] =
-	robinBiometricsHeadline as unknown as BiometricsStatsResult[];
-
-// getSpeciesStats merges the biometrics_stats headline row onto the core_stats
-// row before this tab ever sees it, so do the same here rather than reading
-// the wing/weight columns off the core_stats fixture — core_stats stopped
-// carrying its own copies at #827, and biometrics_stats is now the only source
-// for the numbers the Weight/Wing sentences render (#883).
-const speciesStatsWithBiometrics = mergeBiometricsFields(
-	speciesStats,
-	robinBiometricsRow
-);
 
 const props = {
 	speciesStats: speciesStatsWithBiometrics,
