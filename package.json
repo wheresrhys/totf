@@ -38,6 +38,7 @@
 		"test:nowatch": "dotenvx run -f .env.dev -- vitest run",
 		"test:ci": "dotenvx run -f .env.dev -- vitest run --config vitest.config.ts",
 		"test:integration": "dotenvx run -f .env.dev -- vitest run --config vitest.integration.config.ts",
+		"test:fixture-freshness": "dotenvx run -f .env.dev -- vitest run --config vitest.integration.config.ts supabase/__tests__/snapshot-fixture-freshness.test.ts",
 		"test:http": "vitest run --config vitest.http.config.ts",
 		"test:e2e": "playwright test",
 		"test:e2e:safe": "playwright test --grep-invert @mutates",

@@ -2,4 +2,5 @@
 npm run lint
 npx tsc --noEmit
 npm run test:nowatch
+./scripts/fixture-freshness-select.sh
 ./scripts/e2e-select-suite.sh

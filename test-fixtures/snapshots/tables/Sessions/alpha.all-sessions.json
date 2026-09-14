@@ -1,6 +1,6 @@
 [
   {
-    "id": 40,
+    "id": 35,
     "visit_date": "2024-05-10",
     "location": {
       "id": 1,
@@ -13,7 +13,7 @@
     ]
   },
   {
-    "id": 34,
+    "id": 43,
     "visit_date": "2023-09-14",
     "location": {
       "id": 31,
@@ -39,7 +39,7 @@
     ]
   },
   {
-    "id": 36,
+    "id": 33,
     "visit_date": "2023-05-12",
     "location": {
       "id": 1,
@@ -65,7 +65,7 @@
     ]
   },
   {
-    "id": 8,
+    "id": 7,
     "visit_date": "2022-08-10",
     "location": {
       "id": 1,
@@ -78,7 +78,7 @@
     ]
   },
   {
-    "id": 4,
+    "id": 5,
     "visit_date": "2022-06-15",
     "location": {
       "id": 1,
@@ -87,6 +87,19 @@
     "encounters": [
       {
         "count": 11
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "visit_date": "2022-04-30",
+    "location": {
+      "id": 1,
+      "location_name": "Alpha Site A (CES)"
+    },
+    "encounters": [
+      {
+        "count": 1
       }
     ]
   },
@@ -104,20 +117,7 @@
     ]
   },
   {
-    "id": 17,
-    "visit_date": "2022-04-30",
-    "location": {
-      "id": 1,
-      "location_name": "Alpha Site A (CES)"
-    },
-    "encounters": [
-      {
-        "count": 1
-      }
-    ]
-  },
-  {
-    "id": 21,
+    "id": 14,
     "visit_date": "2021-06-20",
     "location": {
       "id": 1,

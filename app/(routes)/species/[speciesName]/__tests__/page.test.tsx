@@ -7,8 +7,12 @@ import {
 	within
 } from '@testing-library/react';
 import Page, { getSpeciesStats } from '../page';
-import spPageSnapshot from '@/test-fixtures/snapshots/core_stats/robin-alpha.species-page-composite.json';
+import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
 import robinBiometricsHeadline from '@/test-fixtures/snapshots/biometrics_stats/robin-alpha.headline.json';
+import {
+	ROBIN_SPECIES_ID,
+	robinSpeciesStats as speciesStats
+} from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '../PageContent';
 import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 
@@ -61,7 +65,7 @@ vi.mock('@/app/components/pages/species/SpSessionTotalsTab', () => ({
 	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
 }));
 
-const { birds, speciesStats } = spPageSnapshot as unknown as FullFatPageData;
+const birds = birdsSnapshot as unknown as FullFatPageData['birds'];
 
 function makeSpeciesClient() {
 	const fromChain = {
@@ -70,7 +74,7 @@ function makeSpeciesClient() {
 		single: vi.fn().mockReturnThis(),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({
-				data: { id: spPageSnapshot.speciesId },
+				data: { id: ROBIN_SPECIES_ID },
 				error: null
 			}).then(resolve)
 	};
