@@ -22,7 +22,15 @@
     "postjuv_enc_count": 1,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 1
+    "max_new_per_session": 1,
+    "min_weight": 18.5,
+    "max_weight": 18.5,
+    "avg_weight": 18.5,
+    "median_weight": 18.5,
+    "min_wing": 74,
+    "max_wing": 74,
+    "avg_wing": 74,
+    "median_wing": 74
   },
   {
     "species_name": null,
@@ -47,7 +55,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -72,7 +88,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -97,7 +121,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -122,7 +154,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -147,7 +187,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -172,7 +220,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -197,7 +253,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -222,7 +286,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -247,7 +319,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -272,7 +352,15 @@
     "postjuv_enc_count": 2,
     "adult_enc_count": 4,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 5
+    "max_new_per_session": 5,
+    "min_weight": 16.8,
+    "max_weight": 20,
+    "avg_weight": 18,
+    "median_weight": 18,
+    "min_wing": 72,
+    "max_wing": 75,
+    "avg_wing": 73.6,
+    "median_wing": 74
   },
   {
     "species_name": null,
@@ -297,7 +385,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -322,7 +418,15 @@
     "postjuv_enc_count": 3,
     "adult_enc_count": 3,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 5
+    "max_new_per_session": 5,
+    "min_weight": 16.5,
+    "max_weight": 20.5,
+    "avg_weight": 18.3,
+    "median_weight": 18.1,
+    "min_wing": 72,
+    "max_wing": 75,
+    "avg_wing": 73.5,
+    "median_wing": 74
   },
   {
     "species_name": null,
@@ -347,7 +451,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -372,7 +484,15 @@
     "postjuv_enc_count": 3,
     "adult_enc_count": 1,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 3
+    "max_new_per_session": 3,
+    "min_weight": 16.8,
+    "max_weight": 18.8,
+    "avg_weight": 17.8,
+    "median_weight": 17.8,
+    "min_wing": 72,
+    "max_wing": 75,
+    "avg_wing": 73.5,
+    "median_wing": 74
   },
   {
     "species_name": null,
@@ -397,7 +517,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -422,7 +550,15 @@
     "postjuv_enc_count": 2,
     "adult_enc_count": 1,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 2
+    "max_new_per_session": 2,
+    "min_weight": 17.2,
+    "max_weight": 19.2,
+    "avg_weight": 18.3,
+    "median_weight": 18.5,
+    "min_wing": 72,
+    "max_wing": 75,
+    "avg_wing": 73.7,
+    "median_wing": 74
   },
   {
     "species_name": null,
@@ -447,7 +583,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -472,7 +616,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -497,7 +649,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -522,7 +682,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -547,7 +715,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -572,7 +748,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -597,7 +781,15 @@
     "postjuv_enc_count": 3,
     "adult_enc_count": 4,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 6
+    "max_new_per_session": 6,
+    "min_weight": 16.9,
+    "max_weight": 21,
+    "avg_weight": 18.5,
+    "median_weight": 18,
+    "min_wing": 72,
+    "max_wing": 76,
+    "avg_wing": 73.7,
+    "median_wing": 73
   },
   {
     "species_name": null,
@@ -622,7 +814,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -647,7 +847,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 1,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": 19.2,
+    "max_weight": 19.2,
+    "avg_weight": 19.2,
+    "median_weight": 19.2,
+    "min_wing": 80,
+    "max_wing": 80,
+    "avg_wing": 80,
+    "median_wing": 80
   },
   {
     "species_name": null,
@@ -672,7 +880,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -697,7 +913,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 1,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": 19.1,
+    "max_weight": 19.1,
+    "avg_weight": 19.1,
+    "median_weight": 19.1,
+    "min_wing": 80,
+    "max_wing": 80,
+    "avg_wing": 80,
+    "median_wing": 80
   },
   {
     "species_name": null,
@@ -722,7 +946,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -747,7 +979,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -772,7 +1012,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -797,7 +1045,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -822,7 +1078,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -847,7 +1111,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -872,7 +1144,15 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 0,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": null,
+    "max_weight": null,
+    "avg_weight": null,
+    "median_weight": null,
+    "min_wing": null,
+    "max_wing": null,
+    "avg_wing": null,
+    "median_wing": null
   },
   {
     "species_name": null,
@@ -897,6 +1177,14 @@
     "postjuv_enc_count": 0,
     "adult_enc_count": 1,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 0
+    "max_new_per_session": 0,
+    "min_weight": 19.3,
+    "max_weight": 19.3,
+    "avg_weight": 19.3,
+    "median_weight": 19.3,
+    "min_wing": 80,
+    "max_wing": 80,
+    "avg_wing": 80,
+    "median_wing": 80
   }
 ]

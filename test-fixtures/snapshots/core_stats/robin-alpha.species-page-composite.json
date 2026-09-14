@@ -32,7 +32,7 @@
       "proven_age": 3,
       "encounters": [
         {
-          "id": 5,
+          "id": 1,
           "sex": "M",
           "is_juv": false,
           "weight": 19,
@@ -48,12 +48,12 @@
           "min_hatch_year": 2021
         },
         {
-          "id": 6,
+          "id": 5,
           "sex": "M",
           "is_juv": false,
           "weight": 19,
           "session": {
-            "id": 4,
+            "id": 5,
             "visit_date": "2022-06-15"
           },
           "age_code": 5,
@@ -64,12 +64,12 @@
           "min_hatch_year": 2021
         },
         {
-          "id": 16,
+          "id": 7,
           "sex": "M",
           "is_juv": false,
           "weight": 18.8,
           "session": {
-            "id": 8,
+            "id": 7,
             "visit_date": "2022-08-10"
           },
           "age_code": 5,
@@ -80,12 +80,12 @@
           "min_hatch_year": 2021
         },
         {
-          "id": 20,
+          "id": 14,
           "sex": "M",
           "is_juv": false,
           "weight": 18.5,
           "session": {
-            "id": 21,
+            "id": 14,
             "visit_date": "2021-06-20"
           },
           "age_code": 3,
@@ -96,39 +96,7 @@
           "min_hatch_year": 2021
         },
         {
-          "id": 31,
-          "sex": "M",
-          "is_juv": false,
-          "weight": 19.1,
-          "session": {
-            "id": 34,
-            "visit_date": "2023-09-14"
-          },
-          "age_code": 5,
-          "record_type": "S",
-          "wing_length": 80,
-          "capture_time": "07:00:00",
-          "max_hatch_year": 2022,
-          "min_hatch_year": 2022
-        },
-        {
-          "id": 34,
-          "sex": "M",
-          "is_juv": false,
-          "weight": 19.2,
-          "session": {
-            "id": 31,
-            "visit_date": "2022-10-20"
-          },
-          "age_code": 5,
-          "record_type": "S",
-          "wing_length": 75,
-          "capture_time": "07:00:00",
-          "max_hatch_year": 2021,
-          "min_hatch_year": 2021
-        },
-        {
-          "id": 38,
+          "id": 32,
           "sex": "M",
           "is_juv": false,
           "weight": 19.2,
@@ -144,12 +112,44 @@
           "min_hatch_year": 2022
         },
         {
-          "id": 44,
+          "id": 33,
+          "sex": "M",
+          "is_juv": false,
+          "weight": 19,
+          "session": {
+            "id": 33,
+            "visit_date": "2023-05-12"
+          },
+          "age_code": 5,
+          "record_type": "S",
+          "wing_length": 75,
+          "capture_time": "05:45:00",
+          "max_hatch_year": 2022,
+          "min_hatch_year": 2022
+        },
+        {
+          "id": 35,
+          "sex": "M",
+          "is_juv": false,
+          "weight": 19.2,
+          "session": {
+            "id": 31,
+            "visit_date": "2022-10-20"
+          },
+          "age_code": 5,
+          "record_type": "S",
+          "wing_length": 75,
+          "capture_time": "07:00:00",
+          "max_hatch_year": 2021,
+          "min_hatch_year": 2021
+        },
+        {
+          "id": 34,
           "sex": "M",
           "is_juv": false,
           "weight": 19.3,
           "session": {
-            "id": 40,
+            "id": 35,
             "visit_date": "2024-05-10"
           },
           "age_code": 5,
@@ -160,25 +160,25 @@
           "min_hatch_year": 2023
         },
         {
-          "id": 51,
+          "id": 41,
           "sex": "M",
           "is_juv": false,
-          "weight": 19,
+          "weight": 19.1,
           "session": {
-            "id": 36,
-            "visit_date": "2023-05-12"
+            "id": 43,
+            "visit_date": "2023-09-14"
           },
           "age_code": 5,
           "record_type": "S",
-          "wing_length": 75,
-          "capture_time": "05:45:00",
+          "wing_length": 80,
+          "capture_time": "07:00:00",
           "max_hatch_year": 2022,
           "min_hatch_year": 2022
         }
       ]
     },
     {
-      "id": 4,
+      "id": 3,
       "ring_no": "SHARED01",
       "last_encountered_timestamp": "2023-06-01T06:10:00",
       "ringing_group_ids": [
@@ -188,7 +188,7 @@
       "proven_age": 1,
       "encounters": [
         {
-          "id": 1,
+          "id": 3,
           "sex": "M",
           "is_juv": false,
           "weight": 18,
@@ -206,7 +206,7 @@
       ]
     },
     {
-      "id": 57,
+      "id": 50,
       "ring_no": "AR0021",
       "last_encountered_timestamp": "2023-05-12T06:15:00",
       "ringing_group_ids": [
@@ -215,12 +215,12 @@
       "proven_age": 1,
       "encounters": [
         {
-          "id": 55,
+          "id": 37,
           "sex": "M",
           "is_juv": false,
           "weight": 19.5,
           "session": {
-            "id": 36,
+            "id": 33,
             "visit_date": "2023-05-12"
           },
           "age_code": 5,
@@ -233,7 +233,7 @@
       ]
     },
     {
-      "id": 46,
+      "id": 52,
       "ring_no": "AR0020",
       "last_encountered_timestamp": "2023-05-12T06:10:00",
       "ringing_group_ids": [
@@ -242,12 +242,12 @@
       "proven_age": 0,
       "encounters": [
         {
-          "id": 48,
+          "id": 54,
           "sex": "U",
           "is_juv": false,
           "weight": 18,
           "session": {
-            "id": 36,
+            "id": 33,
             "visit_date": "2023-05-12"
           },
           "age_code": 3,
@@ -260,7 +260,7 @@
       ]
     },
     {
-      "id": 50,
+      "id": 41,
       "ring_no": "AR0019",
       "last_encountered_timestamp": "2023-05-12T06:05:00",
       "ringing_group_ids": [
@@ -269,12 +269,12 @@
       "proven_age": 1,
       "encounters": [
         {
-          "id": 50,
+          "id": 53,
           "sex": "F",
           "is_juv": false,
           "weight": 17,
           "session": {
-            "id": 36,
+            "id": 33,
             "visit_date": "2023-05-12"
           },
           "age_code": 4,
@@ -287,7 +287,7 @@
       ]
     },
     {
-      "id": 39,
+      "id": 40,
       "ring_no": "AR0018",
       "last_encountered_timestamp": "2023-05-12T06:00:00",
       "ringing_group_ids": [
@@ -296,12 +296,12 @@
       "proven_age": 1,
       "encounters": [
         {
-          "id": 33,
+          "id": 43,
           "sex": "M",
           "is_juv": false,
           "weight": 21,
           "session": {
-            "id": 36,
+            "id": 33,
             "visit_date": "2023-05-12"
           },
           "age_code": 5,
@@ -314,7 +314,7 @@
       ]
     },
     {
-      "id": 44,
+      "id": 46,
       "ring_no": "AR0017",
       "last_encountered_timestamp": "2023-05-12T05:55:00",
       "ringing_group_ids": [
@@ -323,12 +323,12 @@
       "proven_age": 0,
       "encounters": [
         {
-          "id": 37,
+          "id": 47,
           "sex": "F",
           "is_juv": false,
           "weight": 16.9,
           "session": {
-            "id": 36,
+            "id": 33,
             "visit_date": "2023-05-12"
           },
           "age_code": 3,
@@ -341,7 +341,7 @@
       ]
     },
     {
-      "id": 38,
+      "id": 49,
       "ring_no": "AR0016",
       "last_encountered_timestamp": "2023-05-12T05:50:00",
       "ringing_group_ids": [
@@ -350,12 +350,12 @@
       "proven_age": 0,
       "encounters": [
         {
-          "id": 36,
+          "id": 45,
           "sex": "M",
           "is_juv": false,
           "weight": 17.8,
           "session": {
-            "id": 36,
+            "id": 33,
             "visit_date": "2023-05-12"
           },
           "age_code": 3,
@@ -368,7 +368,7 @@
       ]
     },
     {
-      "id": 54,
+      "id": 47,
       "ring_no": "AR0015",
       "last_encountered_timestamp": "2022-10-20T07:10:00",
       "ringing_group_ids": [
@@ -377,7 +377,7 @@
       "proven_age": 0,
       "encounters": [
         {
-          "id": 45,
+          "id": 44,
           "sex": "F",
           "is_juv": false,
           "weight": 17.2,
@@ -395,7 +395,7 @@
       ]
     },
     {
-      "id": 34,
+      "id": 43,
       "ring_no": "AR0014",
       "last_encountered_timestamp": "2022-10-20T07:05:00",
       "ringing_group_ids": [
@@ -404,7 +404,7 @@
       "proven_age": 0,
       "encounters": [
         {
-          "id": 32,
+          "id": 38,
           "sex": "M",
           "is_juv": false,
           "weight": 18.5,
@@ -422,7 +422,7 @@
       ]
     },
     {
-      "id": 9,
+      "id": 10,
       "ring_no": "AR0013",
       "last_encountered_timestamp": "2022-08-10T05:45:00",
       "ringing_group_ids": [
@@ -431,12 +431,12 @@
       "proven_age": 0,
       "encounters": [
         {
-          "id": 19,
+          "id": 11,
           "sex": "M",
           "is_juv": false,
           "weight": 18,
           "session": {
-            "id": 8,
+            "id": 7,
             "visit_date": "2022-08-10"
           },
           "age_code": 3,
@@ -449,7 +449,7 @@
       ]
     },
     {
-      "id": 28,
+      "id": 24,
       "ring_no": "AR0012",
       "last_encountered_timestamp": "2022-08-10T05:40:00",
       "ringing_group_ids": [
@@ -463,7 +463,7 @@
           "is_juv": false,
           "weight": 16.8,
           "session": {
-            "id": 8,
+            "id": 7,
             "visit_date": "2022-08-10"
           },
           "age_code": 3,
@@ -476,7 +476,7 @@
       ]
     },
     {
-      "id": 19,
+      "id": 28,
       "ring_no": "AR0011",
       "last_encountered_timestamp": "2022-08-10T05:35:00",
       "ringing_group_ids": [
@@ -485,12 +485,12 @@
       "proven_age": 0,
       "encounters": [
         {
-          "id": 18,
+          "id": 27,
           "sex": "F",
           "is_juv": false,
           "weight": 17.5,
           "session": {
-            "id": 8,
+            "id": 7,
             "visit_date": "2022-08-10"
           },
           "age_code": 3,
@@ -503,7 +503,7 @@
       ]
     },
     {
-      "id": 12,
+      "id": 29,
       "ring_no": "AR0010",
       "last_encountered_timestamp": "2022-06-15T06:10:00",
       "ringing_group_ids": [
@@ -512,12 +512,12 @@
       "proven_age": 0,
       "encounters": [
         {
-          "id": 8,
+          "id": 29,
           "sex": "F",
           "is_juv": false,
           "weight": 17,
           "session": {
-            "id": 4,
+            "id": 5,
             "visit_date": "2022-06-15"
           },
           "age_code": 3,
@@ -530,7 +530,7 @@
       ]
     },
     {
-      "id": 25,
+      "id": 21,
       "ring_no": "AR0009",
       "last_encountered_timestamp": "2022-06-15T06:05:00",
       "ringing_group_ids": [
@@ -539,12 +539,12 @@
       "proven_age": 1,
       "encounters": [
         {
-          "id": 25,
+          "id": 21,
           "sex": "M",
           "is_juv": false,
           "weight": 19.5,
           "session": {
-            "id": 4,
+            "id": 5,
             "visit_date": "2022-06-15"
           },
           "age_code": 5,
@@ -557,7 +557,7 @@
       ]
     },
     {
-      "id": 16,
+      "id": 20,
       "ring_no": "AR0008",
       "last_encountered_timestamp": "2022-06-15T06:00:00",
       "ringing_group_ids": [
@@ -566,12 +566,12 @@
       "proven_age": 1,
       "encounters": [
         {
-          "id": 26,
+          "id": 20,
           "sex": "M",
           "is_juv": false,
           "weight": 20.5,
           "session": {
-            "id": 4,
+            "id": 5,
             "visit_date": "2022-06-15"
           },
           "age_code": 5,
@@ -584,7 +584,7 @@
       ]
     },
     {
-      "id": 15,
+      "id": 9,
       "ring_no": "AR0007",
       "last_encountered_timestamp": "2022-06-15T05:55:00",
       "ringing_group_ids": [
@@ -593,12 +593,12 @@
       "proven_age": 0,
       "encounters": [
         {
-          "id": 15,
+          "id": 8,
           "sex": "F",
           "is_juv": false,
           "weight": 16.5,
           "session": {
-            "id": 4,
+            "id": 5,
             "visit_date": "2022-06-15"
           },
           "age_code": 3,
@@ -611,7 +611,7 @@
       ]
     },
     {
-      "id": 24,
+      "id": 25,
       "ring_no": "AR0006",
       "last_encountered_timestamp": "2022-06-15T05:50:00",
       "ringing_group_ids": [
@@ -620,12 +620,12 @@
       "proven_age": 0,
       "encounters": [
         {
-          "id": 22,
+          "id": 25,
           "sex": "M",
           "is_juv": false,
           "weight": 17.2,
           "session": {
-            "id": 4,
+            "id": 5,
             "visit_date": "2022-06-15"
           },
           "age_code": 3,
@@ -638,7 +638,7 @@
       ]
     },
     {
-      "id": 22,
+      "id": 11,
       "ring_no": "AR0005",
       "last_encountered_timestamp": "2022-04-30T06:30:00",
       "ringing_group_ids": [
@@ -647,7 +647,7 @@
       "proven_age": 1,
       "encounters": [
         {
-          "id": 27,
+          "id": 10,
           "sex": "U",
           "is_juv": false,
           "weight": 18,
@@ -665,7 +665,7 @@
       ]
     },
     {
-      "id": 10,
+      "id": 18,
       "ring_no": "AR0004",
       "last_encountered_timestamp": "2022-04-30T06:25:00",
       "ringing_group_ids": [
@@ -674,7 +674,7 @@
       "proven_age": 1,
       "encounters": [
         {
-          "id": 11,
+          "id": 18,
           "sex": "F",
           "is_juv": false,
           "weight": 17,
@@ -710,20 +710,19 @@
     "postjuv_bird_count": 13,
     "adult_bird_count": 8,
     "unknown_age_bird_count": 1,
-    "new_young_bird_count": 14,
     "pullus_enc_count": 1,
     "juv_enc_count": 0,
     "postjuv_enc_count": 14,
     "adult_enc_count": 16,
     "unknown_age_enc_count": 0,
     "max_new_per_session": 6,
+    "min_weight": 16.5,
     "max_weight": 21,
     "avg_weight": 18.3,
-    "min_weight": 16.5,
     "median_weight": 18,
+    "min_wing": 72,
     "max_wing": 80,
     "avg_wing": 74.2,
-    "min_wing": 72,
     "median_wing": 74
   },
   "speciesId": 1,

@@ -28,11 +28,17 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import fs from 'fs/promises';
 import { supabase } from '../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../app/lib/auth/group-auth';
+import { mergeSpeciesBiometrics } from '../app/lib/species-stats';
+import {
+	mergeBiometricsFields,
+	type BiometricsStatsResult,
+	type CoreStatsResult
+} from '../app/models/db';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
-const SNAPSHOTS_DIR = path.join(ROOT, 'test-fixtures', 'snapshots');
+export const SNAPSHOTS_DIR = path.join(ROOT, 'test-fixtures', 'snapshots');
 
 async function getGroupId(name: string): Promise<number> {
 	const { data, error } = await supabase
@@ -45,38 +51,60 @@ async function getGroupId(name: string): Promise<number> {
 	return data.id;
 }
 
-// `relativePath` is a source-directory-relative path, e.g.
-// `core_stats/alpha.by-species.json` or `tables/Birds/arretrap.bird-detail.json`.
-async function writeSnapshot(relativePath: string, data: unknown) {
-	const target = path.join(SNAPSHOTS_DIR, relativePath);
-	await fs.mkdir(path.dirname(target), { recursive: true });
-	await fs.writeFile(target, JSON.stringify(data, null, 2));
-	console.log(`  → ${relativePath}`);
-}
-
 export async function generateSnapshots(
 	alphaId: number,
 	betaId: number,
-	gammaId: number
+	gammaId: number,
+	// Defaults to the committed fixture directory; the fixture-freshness DB
+	// integration test (supabase/__tests__/snapshot-fixture-freshness.test.ts)
+	// passes a temp directory so it can diff without touching the repo.
+	outputDir: string = SNAPSHOTS_DIR
 ) {
+	// `relativePath` is a source-directory-relative path, e.g.
+	// `core_stats/alpha.by-species.json` or
+	// `tables/Birds/arretrap.bird-detail.json`.
+	const writeSnapshot = async (relativePath: string, data: unknown) => {
+		const target = path.join(outputDir, relativePath);
+		await fs.mkdir(path.dirname(target), { recursive: true });
+		await fs.writeFile(target, JSON.stringify(data, null, 2));
+		console.log(`  → ${relativePath}`);
+	};
+
 	console.log('\nGenerating snapshots...');
 
 	const alpha = await getAuthenticatedSupabaseClientForGroup(alphaId);
 	const beta = await getAuthenticatedSupabaseClientForGroup(betaId);
 	const gamma = await getAuthenticatedSupabaseClientForGroup(gammaId);
 
-	// RPC: core_stats (group_by_species) — powers fetchSpeciesData
-	// (app/actions/spp-data.ts)
+	// RPC: core_stats (group_by_species) + RPC biometrics_stats — powers
+	// fetchSpeciesData (app/actions/spp-data.ts). #821/#823 moved the 8
+	// wing/weight columns out of core_stats into biometrics_stats, and the
+	// action merges them back on with mergeSpeciesBiometrics, so a bare
+	// core_stats row is no longer the shape the page receives. Filed under
+	// core_stats/ since that's the row identity; biometrics_stats only
+	// contributes columns.
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId],
 		['gamma', gamma, gammaId]
 	] as const) {
-		const { data } = await client.rpc('core_stats', {
-			ringing_group_filter: gId,
-			group_by_species: true
-		});
-		await writeSnapshot(`core_stats/${name}.by-species.json`, data ?? []);
+		const [{ data: coreRows }, { data: biometricsRows }] = await Promise.all([
+			client.rpc('core_stats', {
+				ringing_group_filter: gId,
+				group_by_species: true
+			}),
+			client.rpc('biometrics_stats', {
+				ringing_group_filter: gId,
+				group_by_species: true
+			})
+		]);
+		await writeSnapshot(
+			`core_stats/${name}.by-species.json`,
+			mergeSpeciesBiometrics(
+				(coreRows ?? []) as CoreStatsResult[],
+				(biometricsRows ?? []) as BiometricsStatsResult[]
+			)
+		);
 	}
 
 	// RPC: core_stats (yearly + monthly, ungrouped by species) — powers
@@ -194,16 +222,37 @@ export async function generateSnapshots(
 			birdsPage0 ?? []
 		);
 
-		// RPC: core_stats (species-filtered, group_by_time_period: month) —
-		// powers getSpeciesStatsHistory (app/actions/sp-data.ts)
-		const { data: robinHistory } = await alpha.rpc('core_stats', {
-			species_name_filter: 'Robin',
-			ringing_group_filter: alphaId,
-			group_by_time_period: 'month'
-		});
+		// RPC: core_stats (species-filtered, group_by_time_period: month) + RPC
+		// biometrics_stats — powers getSpeciesStatsHistory
+		// (app/actions/sp-data.ts), which joins the two on time_period with
+		// mergeBiometricsFields (#821).
+		const [{ data: robinHistory }, { data: robinHistoryBiometrics }] =
+			await Promise.all([
+				alpha.rpc('core_stats', {
+					species_name_filter: 'Robin',
+					ringing_group_filter: alphaId,
+					group_by_time_period: 'month'
+				}),
+				alpha.rpc('biometrics_stats', {
+					species_name_filter: 'Robin',
+					ringing_group_filter: alphaId,
+					group_by_time_period: 'month'
+				})
+			]);
+		const robinBiometricsByPeriod = new Map(
+			((robinHistoryBiometrics ?? []) as BiometricsStatsResult[]).map((row) => [
+				row.time_period,
+				row
+			])
+		);
 		await writeSnapshot(
 			`core_stats/robin-alpha.monthly-history.json`,
-			robinHistory ?? []
+			((robinHistory ?? []) as CoreStatsResult[]).map((coreRow) =>
+				mergeBiometricsFields(
+					coreRow,
+					robinBiometricsByPeriod.get(coreRow.time_period)
+				)
+			)
 		);
 
 		// RPC: notable_retraps (species-filtered) — powers fetchNotableRetraps
@@ -232,35 +281,49 @@ export async function generateSnapshots(
 			graphableData ?? []
 		);
 
-		// Composite: RPC top_metrics_by_period + RPC core_stats + the Birds
-		// page fetched above — powers the species/[speciesName] page's headline
+		// Composite: RPC top_metrics_by_period + RPC core_stats + RPC
+		// biometrics_stats + the Birds page fetched above — powers the
+		// species/[speciesName] page's headline
 		// stats, busiest-sessions and individuals data. Filed under
 		// core_stats/ since `speciesStats` (a core_stats row) is the
 		// field most exposed to silent RPC-shape drift — the same risk class
 		// that caused #870; `topSessions` and `birds` piggy-back on this fixture
 		// for convenience rather than getting a fixture each.
-		const [{ data: topSessions }, { data: robinStats }] = await Promise.all([
-			alpha.rpc('top_metrics_by_period', {
-				temporal_unit: 'day',
-				metric_name: 'encounters',
-				result_limit: 5,
-				filters: {
-					species_filter: 'Robin',
+		const [{ data: topSessions }, { data: robinStats }, { data: robinBio }] =
+			await Promise.all([
+				alpha.rpc('top_metrics_by_period', {
+					temporal_unit: 'day',
+					metric_name: 'encounters',
+					result_limit: 5,
+					filters: {
+						species_filter: 'Robin',
+						ringing_group_filter: alphaId
+					}
+				} as Parameters<typeof alpha.rpc<'top_metrics_by_period'>>[1]),
+				alpha.rpc('core_stats', {
+					species_name_filter: 'Robin',
 					ringing_group_filter: alphaId
-				}
-			} as Parameters<typeof alpha.rpc<'top_metrics_by_period'>>[1]),
-			alpha.rpc('core_stats', {
-				species_name_filter: 'Robin',
-				ringing_group_filter: alphaId
-			})
-		]);
+				}),
+				alpha.rpc('biometrics_stats', {
+					species_name_filter: 'Robin',
+					ringing_group_filter: alphaId
+				})
+			]);
+		// `speciesStats` is the page's merged core_stats + biometrics_stats row
+		// (app/(routes)/species/[speciesName]/page.tsx), not a bare core_stats row.
+		const robinStatsRow = (robinStats as CoreStatsResult[] | null)?.[0];
 		if (birdsPage0 && birdsPage0.length > 0) {
 			await writeSnapshot(
 				`core_stats/robin-alpha.species-page-composite.json`,
 				{
 					topSessions: topSessions ?? [],
 					birds: birdsPage0,
-					speciesStats: robinStats?.[0] ?? null,
+					speciesStats: robinStatsRow
+						? mergeBiometricsFields(
+								robinStatsRow,
+								(robinBio as BiometricsStatsResult[] | null)?.[0]
+							)
+						: null,
 					speciesId: robinSpecies.id,
 					speciesName: 'Robin'
 				}
