@@ -186,7 +186,9 @@ unchanged — that's the whole point of a user-requested re-check.
 A PR appears in `prsNeedingMaintenance` because it either has merge conflicts (`mergeable` was
 `CONFLICTING`) or outstanding feedback (a human review/comment, `CHANGES_REQUESTED`, or anything
 newer than the head commit and not yet replied to — the tool ignores the PR's own
-mermaid-diff/behaviour-change comments and bot authors). Its `reason` field says which
+mermaid-diff/behaviour-change comments, bot authors, and any comment carrying the
+`<!-- swarm-worker-reply -->` marker a maintenance worker appends to its own replies, step 4
+below). Its `reason` field says which
 (`conflict` | `feedback` | `conflict+feedback`).
 
 For each PR needing maintenance (up to the budget), launch **one** background Agent that handles
@@ -221,7 +223,17 @@ both concerns for that PR:
      behind does it run `npx supabase migration up --local`, and that apply case is safe because a
      `db-migration` unit already runs solo (the exclusive-resource rule).
   4. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
-     the changes, run tests, reply to the reviewer via `gh pr comment <n>`.
+     the changes, run tests, reply to the reviewer via `gh pr comment <n>` (or `gh api
+     repos/{owner}/{repo}/pulls/<n>/comments` for an inline-thread reply). **Every reply a
+     maintenance worker posts must end with the marker line `<!-- swarm-worker-reply -->`**, on its
+     own line after the reply text. There is no bot identity for swarm workers — `gh` authenticates
+     as the same human account a real reviewer uses — so without the marker `swarm_plan_batch`
+     cannot tell a worker's own reply from genuine unaddressed feedback, and re-flags the PR as
+     `reason: "feedback"` on the very next call, looping it through maintenance spawns indefinitely
+     (#904). The marker is an HTML comment, so it's invisible in GitHub's rendered view;
+     `swarm_plan_batch`'s feedback checks skip any comment/thread-head carrying it, exactly as they
+     already skip mermaid-diff comments. Never add the marker to a comment that is genuine new
+     feedback rather than a worker's reply.
   5. **Release the shared-DB lock early, if this PR is `db-migration`/`e2e-exclusive`** — once the
      migration is applied and verified against the shared local Postgres (or the `@mutates` E2E run
      has completed) and every remaining step is non-shared-resource (lint fixes, retests needing no
