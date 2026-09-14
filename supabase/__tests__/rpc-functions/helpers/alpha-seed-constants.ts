@@ -1,5 +1,5 @@
 // Alpha/ARRETRAP seed-data constants shared by more than one RPC's integration tests.
-// Constants used by only one RPC's tests (e.g. aggregate_stats' ALPHA_SESSION_COUNT,
+// Constants used by only one RPC's tests (e.g. core_stats' ALPHA_SESSION_COUNT,
 // ALPHA_TOTAL_ENCOUNTERS, ALPHA_SPECIES_COUNT, CES_2022_ENCOUNTERS; notable_retraps'
 // ARRETRAP_PROVEN_AGE) live alongside their own test file instead.
 

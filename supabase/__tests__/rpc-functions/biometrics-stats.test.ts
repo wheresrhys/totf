@@ -1,10 +1,10 @@
 /**
  * Integration tests for the `biometrics_stats` Postgres RPC function (#822).
  *
- * A companion RPC to `aggregate_stats` carrying only the wing/weight summary
- * statistics (max/avg/min/median for both), sharing `aggregate_stats`' input
+ * A companion RPC to `core_stats` carrying only the wing/weight summary
+ * statistics (max/avg/min/median for both), sharing `core_stats`' input
  * signature and reusing the `stats_raw_encounters` / `stats_spine` utility RPCs.
- * The eight metric columns and their rounding mirror `aggregate_stats.sql`'s
+ * The eight metric columns and their rounding mirror `core_stats.sql`'s
  * final SELECT exactly (ROUND(..., 1) for avg/median weight, ROUND(..., 0) for
  * median wing); MAX/AVG/MIN/PERCENTILE_CONT over an empty set is NULL (not 0), so
  * an empty cell yields NULLs for all eight columns.

@@ -1,13 +1,13 @@
--- Shared plumbing for aggregate_stats and population_stats (#800). Pre-aggregates
+-- Shared plumbing for core_stats and population_stats (#800). Pre-aggregates
 -- all Encounters/Sessions/Birds/Species rows in scope for a given
 -- (species_name_filter, from_date, to_date, ringing_group_filter) query window,
 -- with the day/month/year grouping columns precomputed for the caller to pick
 -- from. This is the base windowed row source both RPCs build their own
 -- grouping/classification logic on top of via the other agg_* utility RPCs — keep
 -- this the single place that defines "which raw rows are in scope for a query".
--- Mirrors aggregate_stats' own (untouched, historical) inline raw_encounters CTE —
+-- Mirrors core_stats' own (untouched, historical) inline raw_encounters CTE —
 -- the two are logically equivalent but no longer share this exact SQL text, since
--- aggregate_stats predates this extraction and changing it carries needless
+-- core_stats predates this extraction and changing it carries needless
 -- regression risk to its existing, heavily-exercised query plan.
 CREATE FUNCTION public.stats_raw_encounters (
 	species_name_filter text DEFAULT NULL::text,

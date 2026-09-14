@@ -579,10 +579,10 @@ describe('population_stats', () => {
 	});
 
 	// new_young_bird_count (#800 follow-up): originally a straight copy of a
-	// same-named column on aggregate_stats. #824 removed aggregate_stats' copy (and
+	// same-named column on core_stats. #824 removed core_stats' copy (and
 	// the corresponding UI series, #817) as unused, so this is now the only
 	// new_young_bird_count column in the schema — these tests cover its derivation
-	// directly rather than parity against aggregate_stats.
+	// directly rather than parity against core_stats.
 	describe('new_young_bird_count', () => {
 		let deltaId: number;
 		let deltaClient: SupabaseClient;

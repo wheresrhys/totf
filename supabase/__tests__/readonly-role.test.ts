@@ -59,7 +59,7 @@ describe('app_readonly role', () => {
 	});
 
 	it('allows read-only RPC calls', async () => {
-		const { data, error } = await readonlyClient.rpc('aggregate_stats', {
+		const { data, error } = await readonlyClient.rpc('core_stats', {
 			ringing_group_filter: alphaId,
 		});
 		expect(error).toBeNull();
