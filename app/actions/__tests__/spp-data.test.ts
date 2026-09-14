@@ -2,6 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
 import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 import { fetchSpeciesData } from '../spp-data';
+import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
+import gammaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/gamma.by-species.json';
+
+// Real captured biometrics_stats output for the exact call fetchSpeciesData
+// makes (group-wide, group_by_species). Alpha's first row is the Blue Tit that
+// buildAggregateRow below also defaults to, so the two builders line up on
+// species_name; Gamma's is genuinely empty — that group has no
+// biometric-eligible encounters at all — which is the fixture-backed
+// no-biometrics-anywhere edge case (#883).
+const capturedBiometricsRows =
+	alphaBiometricsBySpecies as unknown as BiometricsStatsResult[];
+const emptyBiometricsRows =
+	gammaBiometricsBySpecies as unknown as BiometricsStatsResult[];
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -62,16 +75,7 @@ function buildBiometricsRow(
 	overrides: Partial<BiometricsStatsResult> = {}
 ): BiometricsStatsResult {
 	return {
-		species_name: 'Blue Tit',
-		time_period: null,
-		max_weight: 20,
-		avg_weight: 18,
-		min_weight: 16,
-		median_weight: 17,
-		max_wing: 70,
-		avg_wing: 69,
-		min_wing: 68,
-		median_wing: 68.5,
+		...capturedBiometricsRows[0],
 		...overrides
 	};
 }
@@ -208,6 +212,26 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 
 			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
 
+			expect(row.max_weight).toBeUndefined();
+			expect(row.avg_weight).toBeUndefined();
+			expect(row.min_weight).toBeUndefined();
+			expect(row.median_weight).toBeUndefined();
+			expect(row.max_wing).toBeUndefined();
+			expect(row.avg_wing).toBeUndefined();
+			expect(row.min_wing).toBeUndefined();
+			expect(row.median_wing).toBeUndefined();
+		});
+
+		it('leaves the 8 biometric fields undefined when biometrics_stats returns no rows at all for the group', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [buildAggregateRow()]
+			});
+			makeRpcClient(emptyBiometricsRows);
+
+			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(row.species_name).toBe('Blue Tit');
 			expect(row.max_weight).toBeUndefined();
 			expect(row.avg_weight).toBeUndefined();
 			expect(row.min_weight).toBeUndefined();
