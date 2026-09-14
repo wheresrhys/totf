@@ -3,7 +3,8 @@ import type {
 	CoreStatsResult,
 	StatsPerDayAndSpeciesResult
 } from '@/app/models/db';
-import payOffStatsFixture from '../../../test-fixtures/snapshots/core_stats/beta.yearly-and-monthly-totals.json';
+import yearlyStatsFixture from '../../../test-fixtures/snapshots/core_stats/beta.yearly-totals.json';
+import monthlyStatsFixture from '../../../test-fixtures/snapshots/core_stats/beta.monthly-totals.json';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -228,8 +229,8 @@ describe('fetchSessionStats', () => {
 // fetchWithVersionCache), so their mock client still needs a working
 // `from` chain for the Encounters version query: reuse the same mockFrom /
 // statsVersion scaffolding used for fetchSessionStats above.
-const yearlyRows = payOffStatsFixture.yearly as unknown as CoreStatsResult[];
-const monthlyRows = payOffStatsFixture.monthly as unknown as CoreStatsResult[];
+const yearlyRows = yearlyStatsFixture as unknown as CoreStatsResult[];
+const monthlyRows = monthlyStatsFixture as unknown as CoreStatsResult[];
 
 function makeAggregateStatsClient(response: {
 	data: unknown;

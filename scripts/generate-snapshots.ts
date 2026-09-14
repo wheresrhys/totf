@@ -9,12 +9,8 @@
  * merge instead of the shape of the database. Where an action joins two sources
  * (e.g. core_stats + biometrics_stats), write one fixture per source and let the
  * consuming test perform the same join the action does, with the same helper.
- * Two fixtures below still break this rule and are grandfathered pending #901:
- * the `*.yearly-and-monthly-totals.json` pair (two core_stats calls in one file)
- * and `tables/Birds/arretrap.bird-detail.json` (a Birds row with an Encounters
- * query spliced on). Don't add a third.
  *
- * Reads Alpha/Beta/Gamma group data and writes 25 JSON files under
+ * Reads Alpha/Beta/Gamma group data and writes 28 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
  * the RPC name for RPC-backed fixtures (`core_stats/`, `biometrics_stats/`,
  * `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
@@ -25,12 +21,13 @@
  * location never silently drifts from what it actually tests (see #870, #882).
  *
  * Not every fixture under test-fixtures/snapshots/ is written by this script —
- * `ring_sequence_controls/`, `tables/Encounters/`, `tables/Species/`, and a few
- * files alongside generated ones under `core_stats/` (the
- * `*.summary-totals.json` / `*.home-page-summary.json` pairs) are still
- * hand-maintained (see CLAUDE.md's "App tests" section). They were moved to
- * their correct source directory by #882 but not wired up for generation here
- * — that's a separate follow-up.
+ * `ring_sequence_controls/`, `tables/Species/`, and a few files alongside
+ * generated ones under `core_stats/` (the `*.summary-totals.json` /
+ * `*.home-page-summary.json` pairs) and `tables/Encounters/` (`alpha.pulli-
+ * encounters.json`, `alpha.resightings.json`) are still hand-maintained (see
+ * CLAUDE.md's "App tests" section). They were moved to their correct source
+ * directory by #882 but not wired up for generation here — that's a separate
+ * follow-up.
  *
  * Run via: npm run db:generate-snapshots
  * Or called programmatically: generateSnapshots(alphaId, betaId, gammaId)
@@ -111,28 +108,35 @@ export async function generateSnapshots(
 		await writeSnapshot(`biometrics_stats/${name}.by-species.json`, data ?? []);
 	}
 
-	// RPC: core_stats (yearly + monthly, ungrouped by species) — powers
-	// fetchPayOffStats (app/actions/pay-off-stats.ts)
+	// RPC: core_stats (yearly, ungrouped by species) — powers fetchPayOffStats
+	// (app/actions/pay-off-stats.ts)
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId]
 	] as const) {
-		const [{ data: yearly }, { data: monthly }] = await Promise.all([
-			client.rpc('core_stats', {
-				ringing_group_filter: gId,
-				group_by_species: false,
-				group_by_time_period: 'year'
-			}),
-			client.rpc('core_stats', {
-				ringing_group_filter: gId,
-				group_by_species: false,
-				group_by_time_period: 'month'
-			})
-		]);
-		await writeSnapshot(`core_stats/${name}.yearly-and-monthly-totals.json`, {
-			yearly: yearly ?? [],
-			monthly: monthly ?? []
+		const { data: yearly } = await client.rpc('core_stats', {
+			ringing_group_filter: gId,
+			group_by_species: false,
+			group_by_time_period: 'year'
 		});
+		await writeSnapshot(`core_stats/${name}.yearly-totals.json`, yearly ?? []);
+	}
+
+	// RPC: core_stats (monthly, ungrouped by species) — powers fetchPayOffStats
+	// (app/actions/pay-off-stats.ts)
+	for (const [name, client, gId] of [
+		['alpha', alpha, alphaId],
+		['beta', beta, betaId]
+	] as const) {
+		const { data: monthly } = await client.rpc('core_stats', {
+			ringing_group_filter: gId,
+			group_by_species: false,
+			group_by_time_period: 'month'
+		});
+		await writeSnapshot(
+			`core_stats/${name}.monthly-totals.json`,
+			monthly ?? []
+		);
 	}
 
 	// Table: Sessions (embedded Locations + Encounters count) — powers
@@ -352,15 +356,19 @@ export async function generateSnapshots(
 		topDays ?? []
 	);
 
-	// Table: Birds + Table: Encounters (bird detail merged with its own
-	// encounters) — powers fetchBirdPageContent (app/(routes)/bird/[ring]/page.tsx).
-	// Filed under tables/Birds/ since Birds (by ring_no) is the entity the page
-	// is keyed on; Encounters is a secondary query merged into the same object.
+	// Table: Birds — powers fetchBirdPageContent
+	// (app/(routes)/bird/[ring]/page.tsx)
 	const { data: arretrapBird } = await alpha
 		.from('Birds')
 		.select(`id, ring_no, proven_age, species:Species(species_name)`)
 		.eq('ring_no', 'ARRETRAP')
 		.maybeSingle();
+	await writeSnapshot(`tables/Birds/arretrap.bird.json`, arretrapBird ?? null);
+
+	// Table: Encounters — the same page's encounters-of-bird query, merged
+	// onto the Birds row above by fetchBirdPageContent itself. Filed under
+	// tables/Encounters/ (its own source table) even though it's keyed off
+	// the Birds row fetched above.
 	if (arretrapBird) {
 		const { data: encounters } = await alpha
 			.from('Encounters')
@@ -368,10 +376,10 @@ export async function generateSnapshots(
 				`bird_id, id, age_code, is_juv, capture_time, max_hatch_year, min_hatch_year, record_type, sex, ringing_group_id, weight, wing_length, session:Sessions(visit_date)`
 			)
 			.eq('bird_id', arretrapBird.id);
-		await writeSnapshot(`tables/Birds/arretrap.bird-detail.json`, {
-			...arretrapBird,
-			encounters: encounters ?? []
-		});
+		await writeSnapshot(
+			`tables/Encounters/arretrap.encounters.json`,
+			encounters ?? []
+		);
 	}
 
 	console.log('\nSnapshots generated successfully!');

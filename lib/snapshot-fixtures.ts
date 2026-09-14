@@ -38,7 +38,7 @@
  */
 
 /**
- * The 25 fixtures `scripts/generate-snapshots.ts` produces, and therefore the
+ * The 28 fixtures `scripts/generate-snapshots.ts` produces, and therefore the
  * exact set the freshness check covers. Paths are relative to
  * `test-fixtures/snapshots/` and follow #882's source-directory layout (one
  * subdirectory per RPC, `tables/<TableName>/` for direct PostgREST reads).
@@ -54,9 +54,11 @@ export const GENERATED_SNAPSHOT_FIXTURES = [
 	'biometrics_stats/robin-alpha.headline.json',
 	'biometrics_stats/robin-alpha.monthly-history.json',
 	'core_stats/alpha.by-species.json',
-	'core_stats/alpha.yearly-and-monthly-totals.json',
+	'core_stats/alpha.monthly-totals.json',
+	'core_stats/alpha.yearly-totals.json',
 	'core_stats/beta.by-species.json',
-	'core_stats/beta.yearly-and-monthly-totals.json',
+	'core_stats/beta.monthly-totals.json',
+	'core_stats/beta.yearly-totals.json',
 	'core_stats/gamma.by-species.json',
 	'core_stats/robin-alpha.headline.json',
 	'core_stats/robin-alpha.monthly-history.json',
@@ -66,9 +68,10 @@ export const GENERATED_SNAPSHOT_FIXTURES = [
 	'notable_retraps/alpha.retraps.json',
 	'notable_retraps/beta.retraps.json',
 	'notable_retraps/robin-alpha.retraps.json',
-	'tables/Birds/arretrap.bird-detail.json',
+	'tables/Birds/arretrap.bird.json',
 	'tables/Birds/robin-alpha.graphable-encounters.json',
 	'tables/Birds/robin-alpha.page-of-birds.json',
+	'tables/Encounters/arretrap.encounters.json',
 	'tables/Sessions/alpha.all-sessions.json',
 	'tables/Sessions/alpha.recent-sessions.json',
 	'tables/Sessions/beta.all-sessions.json',
