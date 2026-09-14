@@ -11,10 +11,11 @@
  * current database and diffs them against the committed copies, failing with the
  * specific per-file differences when they've drifted.
  *
- * The diff is structural (which key paths exist), not value-by-value — see
- * `lib/snapshot-fixtures.ts` for why: fixture row order and surrogate ids reflect the
- * local database's physical row order and sequence state, so comparing values would
- * fail on every reseed for reasons unrelated to staleness.
+ * The diff is structural — which columns exist, and how many rows each array holds —
+ * never value-by-value. See `lib/snapshot-fixtures.ts` for why: fixture row order and
+ * surrogate ids reflect the local database's physical row order and sequence state, so
+ * comparing values would fail on every reseed for reasons unrelated to staleness, while
+ * a column set and a row count are properties of the query and survive a reseed.
  *
  * Preconditions: local Supabase running and seeded exactly as `npm run db:seed:e2e`
  * leaves it — the same precondition as the rest of this suite.

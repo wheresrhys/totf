@@ -443,12 +443,16 @@ how #870's column removal reached `main` with every check green (full investigat
 `supabase/__tests__/snapshot-fixture-freshness.test.ts` (#893) closes the gap:
 
 - **What it does.** Runs `generateSnapshots()` into an `fs.mkdtemp` directory and diffs each result
-  against the committed copy, failing with the specific per-file key paths that differ. The diff is
-  **structural** (which key paths exist, array indices collapsed to `[]`), never value-by-value —
-  fixture row order and surrogate ids reflect whatever physical order and sequence state the local
-  database is in, so value equality would fail on every reseed for reasons unrelated to staleness.
-  The comparison helpers and the two fixture inventories live in `lib/snapshot-fixtures.ts`
-  (pure, no I/O, unit-tested in the app suite).
+  against the committed copy, failing with the specific per-file differences. Two kinds are
+  reported — **column drift** (a column path present on one side only, array indices collapsed to
+  `[]`) and **row-count drift** (same columns, different number of rows: a fixture committed at 3
+  rows against a database now returning 5 is just as stale). Values are never compared — fixture
+  row order and surrogate ids reflect whatever physical order and sequence state the local database
+  is in, so value equality would fail on every reseed for reasons unrelated to staleness, whereas a
+  column set and a row count are properties of the query and survive a reseed. Stick to that
+  column/row vocabulary when touching this code: it's uniform across the module, its tests and its
+  failure messages. The comparison helpers and the two fixture inventories live in
+  `lib/snapshot-fixtures.ts` (pure, no I/O, unit-tested in the app suite).
 - **What it covers.** Exactly the 25 fixtures `scripts/generate-snapshots.ts` writes
   (`GENERATED_SNAPSHOT_FIXTURES`). It asserts the generator still produces precisely that set, so a
   fixture silently dropping out of the generator fails rather than quietly stopping being checked.
