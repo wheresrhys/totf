@@ -7,7 +7,7 @@ import {
 	waitFor
 } from '@testing-library/react';
 import { SpBiometricsTab } from '../SpBiometricsTab';
-import { robinSpeciesStats as speciesStats } from '@/app/__tests__/helpers/species-stats-fixtures';
+import { robinSpeciesStats as speciesStatsWithBiometrics } from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { SexedGraphableBird } from '../WeightAndWingChart';
 
@@ -51,7 +51,7 @@ vi.mock('../WeightAndWingChart', () => ({
 }));
 
 const props = {
-	speciesStats,
+	speciesStats: speciesStatsWithBiometrics,
 	speciesName: 'Robin',
 	speciesId: 42,
 	viewedGroupId: 1

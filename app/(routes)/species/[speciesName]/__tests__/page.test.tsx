@@ -8,10 +8,11 @@ import {
 } from '@testing-library/react';
 import Page, { getSpeciesStats } from '../page';
 import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
+import robinBiometricsHeadline from '@/test-fixtures/snapshots/biometrics_stats/robin-alpha.headline.json';
 import {
 	ROBIN_SPECIES_ID,
 	robinSpeciesStats as speciesStats
-} from '@/app/__tests__/helpers/species-stats-fixtures';
+} from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '../PageContent';
 import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 
@@ -350,22 +351,19 @@ function makeAggregateRow(
 	};
 }
 
+// The real captured biometrics_stats row for the exact call getSpeciesStats
+// makes (Robin, Alpha, ungrouped — one headline row), rather than a
+// hand-written literal that can silently drift from the RPC's shape (#883).
+const [capturedBiometricsRow] =
+	robinBiometricsHeadline as unknown as BiometricsStatsResult[];
+
 function makeBiometricsRow(
 	overrides: Partial<BiometricsStatsResult> = {}
 ): BiometricsStatsResult {
 	return {
-		species_name: null,
-		time_period: null,
-		min_weight: 10,
-		max_weight: 20,
-		avg_weight: 15,
-		median_weight: 15,
-		min_wing: 60,
-		max_wing: 70,
-		avg_wing: 65,
-		median_wing: 65,
+		...capturedBiometricsRow,
 		...overrides
-	} as unknown as BiometricsStatsResult;
+	};
 }
 
 function makeStatsClient({

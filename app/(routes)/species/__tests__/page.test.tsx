@@ -1,11 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import {
-	alphaSpeciesStats as alphaSpeciesSnapshot,
-	betaSpeciesStats as betaSpeciesSnapshot,
-	gammaSpeciesStats as gammaSpeciesSnapshot
-} from '@/app/__tests__/helpers/species-stats-fixtures';
+import alphaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
+import betaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/beta.by-species.json';
+import gammaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/gamma.by-species.json';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchSpeciesData } = vi.hoisted(
 	() => ({

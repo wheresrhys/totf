@@ -389,8 +389,8 @@ Page-level tests render async server components directly with `await Page({ para
 Snapshot fixture data lives in `test-fixtures/snapshots/` — use these as mock return values rather
 than inventing data inline. Fixtures are organised **by data source, not by the action function
 that consumes them** (#882): one subdirectory per Postgres RPC (`core_stats/`,
-`biometrics_stats/`, `find_discrepencies/`, `notable_retraps/`, `top_metrics_by_period/`,
-`ring_sequence_controls/`), or
+`biometrics_stats/`, `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
+`top_metrics_by_period/`, `ring_sequence_controls/`), or
 `tables/<TableName>/` for a fixture produced by a direct PostgREST table query rather than an RPC
 call. This matters because an action can drift from the RPC/table it actually calls (#870:
 `getSpeciesStatsHistory.alpha.robin.json` was named after the `getSpeciesStatsHistory` action but
@@ -403,18 +403,31 @@ follow `<callingGroupOrParams>.<intent>.json` (e.g. `core_stats/alpha.by-species
 `core_stats/*.summary-totals.json` / `*.home-page-summary.json` pairs) are still hand-maintained;
 regenerate the rest with `npm run db:generate-snapshots`.
 
+`aggregate_stats`/`core_stats`' two companion stats RPCs — `biometrics_stats` and
+`demographics_stats` (see "Companion stats RPCs and shared plumbing" above) — went uncovered until
+#883, so every test of their row shapes hand-rolled its own literal. Both now have fixtures for
+each call shape their real call sites use (`biometrics_stats`: group-wide `by-species`, plus
+Robin/Alpha `headline` and `monthly-history`; `demographics_stats`: Robin/Alpha `monthly-history`,
+its only call shape), and `biometrics_stats/gamma.by-species.json` is deliberately an empty array —
+Gamma has no biometric-eligible encounters — for the no-rows edge case. **Don't reintroduce a
+hand-written literal for either RPC's row shape:** base a test's row builder on a fixture row
+(spread it, override only the columns the test asserts on) so a column added or removed at the RPC
+surfaces in the fixture rather than drifting silently.
+
 **No compound fixtures: one fixture is the raw, unmodified return of exactly one RPC call or one
 table query.** Never merge two sources into one file, and never post-process a result before
 writing it. A fixture that isn't a verbatim source response can't be checked against any source —
 it quietly starts asserting the shape of the merge instead of the shape of the database, which is
 the same class of silent drift #870/#890 were about. Where an action joins two sources, write one
-fixture per source and let the **consuming test** do the same join the action does, using the same
-helper: e.g. `fetchSpeciesData`, `getSpeciesStatsHistory` and the species page's `speciesStats`
-each join a `core_stats` row with a `biometrics_stats` row (`mergeSpeciesBiometrics` /
-`mergeBiometricsFields`, #821/#823), so the generator writes
-`core_stats/alpha.by-species.json` and `biometrics_stats/alpha.by-species.json` separately and
-`app/__tests__/helpers/species-stats-fixtures.ts` merges them for the tests that need the merged
-row. Two generated fixtures still break this rule and are grandfathered pending
+fixture per source and let the **consuming test** do the same join the action does, with the same
+helper the production read path uses: build a `CoreStatsWithBiometrics` row with
+`mergeBiometricsFields` and a `SpeciesStatsRow` with `mergeSpeciesBiometrics` over the two source
+fixtures (#821/#823), rather than reading wing/weight columns off a `core_stats` fixture —
+`core_stats` stopped carrying its own copies at #827. So `core_stats/alpha.by-species.json` and
+`biometrics_stats/alpha.by-species.json` are separate files, and `SppStatsTable`'s test merges
+them itself.
+
+Two generated fixtures still break this rule and are grandfathered pending
 [#901](https://github.com/wheresrhys/totf/issues/901) — the
 `core_stats/*.yearly-and-monthly-totals.json` pair (two `core_stats` calls in one file) and
 `tables/Birds/arretrap.bird-detail.json` (a `Birds` row with an `Encounters` query spliced on).

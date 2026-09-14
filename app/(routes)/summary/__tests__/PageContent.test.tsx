@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SummaryPageContent } from '../PageContent';
 import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
-import { alphaSpeciesStats } from '@/app/__tests__/helpers/species-stats-fixtures';
+import alphaSpeciesStats from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 

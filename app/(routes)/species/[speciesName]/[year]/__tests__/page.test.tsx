@@ -11,7 +11,7 @@ import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.pa
 import {
 	ROBIN_SPECIES_ID,
 	robinSpeciesStats as speciesStats
-} from '@/app/__tests__/helpers/species-stats-fixtures';
+} from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
