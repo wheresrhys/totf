@@ -10,8 +10,8 @@ import type {
 export type { BiometricFieldName };
 
 // The /species list page's row shape (#823): every non-biometric column from
-// aggregate_stats, plus the 8 biometric columns sourced from biometrics_stats.
-// aggregate_stats no longer carries its own copies (#827 removed them), so
+// core_stats, plus the 8 biometric columns sourced from biometrics_stats.
+// core_stats no longer carries its own copies (#827 removed them), so
 // biometrics_stats is the sole source. A species with no matching
 // biometrics_stats row leaves the 8 fields undefined, which
 // MultiSpeciesTableBody's generic `<td>{species[column.property]}</td>` already
@@ -19,10 +19,10 @@ export type { BiometricFieldName };
 export type SpeciesStatsRow = Omit<CoreStatsResult, BiometricFieldName> &
 	Partial<Pick<BiometricsStatsResult, BiometricFieldName>>;
 
-// Joins aggregate_stats rows (species_name, bird_count, encounter_count, etc.)
+// Joins core_stats rows (species_name, bird_count, encounter_count, etc.)
 // with biometrics_stats rows (the 8 wing/weight metrics) by species_name, keyed
 // off the union of species present in either result set. biometrics_stats is the
-// sole source for the 8 biometric fields (#827 removed aggregate_stats' own
+// sole source for the 8 biometric fields (#827 removed core_stats' own
 // copies).
 export function mergeSpeciesBiometrics(
 	aggregateRows: CoreStatsResult[],

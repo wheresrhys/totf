@@ -92,14 +92,14 @@ function Spinner() {
 //
 // Two memoised species-scoped fetches back the tiles, each fired at most once
 // regardless of how often tiles expand/collapse: the Counts tile reads
-// `aggregate_stats` (`getSpeciesStatsHistory`), while the Age split, Young
+// `core_stats` (`getSpeciesStatsHistory`), while the Age split, Young
 // counts and New young counts tiles share the companion `demographics_stats`
 // fetch (`getSpeciesDemographicsStats`) — #800 split the age-split/young-trends
 // derivations into that separate RPC (originally named `population_stats`,
 // renamed `demographics_stats` in #878) rather than folding them into
-// `aggregate_stats`; #839 split the original single Young trends tile into
+// `core_stats`; #839 split the original single Young trends tile into
 // Young counts / New young counts. The Returning vs new tile (#854) is the
-// first to need *both* fetches at once — it remerges `aggregate_stats`' young
+// first to need *both* fetches at once — it remerges `core_stats`' young
 // bucket columns with `demographics_stats`' adult columns into a single
 // new/returning/young split — so its `renderChart` gates on both being loaded
 // rather than just one. A third fetch loads the group-wide effort
@@ -153,7 +153,7 @@ export function SpDemographicsTab({
 
 	// Year-grouped counterparts of the two fetches above, for the charts'
 	// "Interval: Year" toggle (#852). These are *not* derivable from the monthly
-	// rows: `aggregate_stats`' bird_count and `demographics_stats`' age-bucket
+	// rows: `core_stats`' bird_count and `demographics_stats`' age-bucket
 	// counts are per-bird-distinct within each month's cell, so summing months
 	// double-counts any bird retrapped in more than one month of a year. Held
 	// as lazily-created promises in refs rather than as state, since several
