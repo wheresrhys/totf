@@ -19,7 +19,18 @@ describe('parseBranchList', () => {
 		expect(parseBranchList(stdout)).toEqual(['main']);
 	});
 
+	// Structure
+	it('strips the "+" worktree-checkout marker from a branch checked out in another worktree', () => {
+		const stdout = ['  main', '+ feature/859-x'].join('\n');
+		expect(parseBranchList(stdout)).toEqual(['main', 'feature/859-x']);
+	});
+
 	// Edge
+	it('dedupes a "+"-marked branch against its remotes/origin/ counterpart', () => {
+		const stdout = ['+ feature/859-x', '  remotes/origin/feature/859-x'].join('\n');
+		expect(parseBranchList(stdout)).toEqual(['feature/859-x']);
+	});
+
 	it('returns an empty array for empty output', () => {
 		expect(parseBranchList('')).toEqual([]);
 	});

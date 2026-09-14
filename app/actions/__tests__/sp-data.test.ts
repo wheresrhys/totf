@@ -257,7 +257,7 @@ describe('sp-data actions', () => {
 	});
 
 	describe('getSpeciesStatsHistory', () => {
-		it('forwards from_date/to_date to aggregate_stats alongside the monthly timeInterval', async () => {
+		it('forwards from_date/to_date to core_stats alongside the monthly timeInterval', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID, FROM_DATE, TO_DATE);
@@ -281,7 +281,7 @@ describe('sp-data actions', () => {
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
 		});
 
-		it('calls biometrics_stats with group_by_time_period: "month", matching the existing aggregate_stats call', async () => {
+		it('calls biometrics_stats with group_by_time_period: "month", matching the existing core_stats call', async () => {
 			const { rpcCalls } = makeStatsHistoryClient({
 				aggregateRows: [],
 				biometricsRows: []
@@ -297,7 +297,7 @@ describe('sp-data actions', () => {
 			});
 		});
 
-		it('merges biometrics_stats wing/weight fields onto each aggregate_stats row, keyed by time_period', async () => {
+		it('merges biometrics_stats wing/weight fields onto each core_stats row, keyed by time_period', async () => {
 			makeStatsHistoryClient({
 				aggregateRows: [
 					{
@@ -392,7 +392,7 @@ describe('sp-data actions', () => {
 
 			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
 
-			// aggregate_stats no longer carries its own wing/weight columns (#827),
+			// core_stats no longer carries its own wing/weight columns (#827),
 			// so a period with no matching biometrics_stats row gets all 8 fields
 			// coalesced to null rather than being passed through unmerged.
 			expect(result).toEqual([
@@ -486,7 +486,7 @@ describe('sp-data actions', () => {
 			} as CoreStatsResult;
 		}
 
-		it('converts aggregate_stats rows into [time_period, hours] pairs in the same order', async () => {
+		it('converts core_stats rows into [time_period, hours] pairs in the same order', async () => {
 			mockFetchGroupEffortHistory.mockResolvedValue([
 				effortRow('2023-01', '05:30:00'),
 				effortRow('2023-02', '02:00:00')
@@ -547,7 +547,7 @@ describe('sp-data actions', () => {
 	// earlier in-range encounter appear while a later out-of-range one is dropped.
 
 	describe('fetchSpeciesPeriodTotals', () => {
-		it('with timeInterval "year" calls aggregate_stats with species_name_filter and group_by_time_period "year"', async () => {
+		it('with timeInterval "year" calls core_stats with species_name_filter and group_by_time_period "year"', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'year');
@@ -560,7 +560,7 @@ describe('sp-data actions', () => {
 			});
 		});
 
-		it('with timeInterval "month" calls aggregate_stats with group_by_time_period "month"', async () => {
+		it('with timeInterval "month" calls core_stats with group_by_time_period "month"', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'month');

@@ -1,4 +1,4 @@
--- "Arrivals" companion RPC to aggregate_stats/population_stats (#858). Those two
+-- "Arrivals" companion RPC to core_stats/population_stats (#858). Those two
 -- count birds per (species, time_period) cell INDEPENDENTLY, so a bird seen in
 -- Jan, Mar and Jun of one year lands in all three monthly cells. This RPC counts
 -- each bird exactly once per calendar year, in whichever cell holds its first
@@ -6,7 +6,7 @@
 -- encounter — see stats_bird_first_encounter_of_year.sql for the per-bird-year
 -- resolution and the new_adult/returning_adult split.
 --
--- Shares aggregate_stats' input signature and builds on the same stats_spine /
+-- Shares core_stats' input signature and builds on the same stats_spine /
 -- stats_encounter_age_classification plumbing (via
 -- stats_bird_first_encounter_of_year). Each utility RPC is called exactly once and
 -- materialized into a local CTE, so downstream references don't rescan the base

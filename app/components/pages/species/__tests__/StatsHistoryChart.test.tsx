@@ -291,10 +291,10 @@ describe('getYoungCounts', () => {
 });
 
 describe('getSizes', () => {
-	// #821 merges biometrics_stats' wing/weight fields onto each aggregate_stats
+	// #821 merges biometrics_stats' wing/weight fields onto each core_stats
 	// row before getSizes ever sees it — the merged CoreStatsWithBiometrics
 	// shape (#827) is what getSizes reads its wing/weight columns from now that
-	// aggregate_stats itself no longer carries them. This checks getSizes maps
+	// core_stats itself no longer carries them. This checks getSizes maps
 	// those merged columns onto the expected six series.
 	describe('Structure: six size series from the max/median/min weight and wing columns', () => {
 		it('maps max/median/min weight and wing against time_period', () => {

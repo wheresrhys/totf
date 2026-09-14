@@ -6,12 +6,6 @@
 -- jsonb_populate_record — see CLAUDE.md's "Composite-type RETURN QUERY binds by
 -- position, not name" section), not by physical attribute order, so this file's
 -- declared column order need not match core_stats.sql's SELECT list order.
---
--- Byte-for-byte the same column list as aggregate_stats_result (#828, step 1 of
--- the aggregate_stats -> core_stats rename: create new, migrate app, delete
--- old). aggregate_stats/aggregate_stats_result/public_aggregate_stats are left
--- untouched and keep serving all existing app call sites until the migration
--- ticket lands.
 CREATE TYPE public.core_stats_result AS (
 	species_name text,
 	time_period date,

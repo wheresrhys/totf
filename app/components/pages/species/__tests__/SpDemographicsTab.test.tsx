@@ -214,7 +214,7 @@ describe('SpDemographicsTab', () => {
 		});
 	});
 
-	describe('Structure: expanding the Counts tile (aggregate_stats)', () => {
+	describe('Structure: expanding the Counts tile (core_stats)', () => {
 		it('fetches aggregate stats once and renders the chart with a close button', async () => {
 			const { getSpeciesStatsHistory, getSpeciesDemographicsStats } =
 				await loadActions();
@@ -236,7 +236,7 @@ describe('SpDemographicsTab', () => {
 		});
 	});
 
-	describe('Structure: expanding the Returning vs new tile (aggregate_stats + demographics_stats)', () => {
+	describe('Structure: expanding the Returning vs new tile (core_stats + demographics_stats)', () => {
 		it('renders the "Returning vs new" tile heading and description', () => {
 			render(<SpDemographicsTab {...props} />);
 			expect(
@@ -295,7 +295,7 @@ describe('SpDemographicsTab', () => {
 				undefined,
 				undefined
 			);
-			// The demographics tiles do not touch aggregate_stats.
+			// The demographics tiles do not touch core_stats.
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
 		});
 
@@ -312,7 +312,7 @@ describe('SpDemographicsTab', () => {
 				undefined,
 				undefined
 			);
-			// The demographics tiles do not touch aggregate_stats.
+			// The demographics tiles do not touch core_stats.
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
 		});
 
@@ -329,7 +329,7 @@ describe('SpDemographicsTab', () => {
 				undefined,
 				undefined
 			);
-			// The demographics tiles do not touch aggregate_stats.
+			// The demographics tiles do not touch core_stats.
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
 		});
 	});

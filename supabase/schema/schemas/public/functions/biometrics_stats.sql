@@ -1,19 +1,19 @@
 -- Wing/weight summary statistics (max/avg/min/median for both) for the planned
--- biometrics species-page charts/tables (#822). Split out of aggregate_stats into
+-- biometrics species-page charts/tables (#822). Split out of core_stats into
 -- its own RPC rather than left folded into that already-large single query, both to
--- keep each query's plan simpler and to leave aggregate_stats' existing
+-- keep each query's plan simpler and to leave core_stats' existing
 -- columns/performance untouched (those wing/weight columns are removed from
--- aggregate_stats in a later ticket, once consumers migrate). Shares aggregate_stats'
+-- core_stats in a later ticket, once consumers migrate). Shares core_stats'
 -- input signature and reuses its underlying plumbing via the stats_raw_encounters /
 -- stats_spine utility RPCs — biometrics has no age dimension, so
 -- stats_encounter_age_classification / stats_bird_age_bucket are not needed here.
 -- Each utility RPC is called exactly once and materialized into a local CTE.
 --
--- The eight metric columns and their rounding mirror aggregate_stats.sql's final
+-- The eight metric columns and their rounding mirror core_stats.sql's final
 -- SELECT exactly (ROUND(..., 1) for avg/median weight, ROUND(..., 0) for median
 -- wing). MAX/AVG/MIN/PERCENTILE_CONT over an empty set is NULL (not 0), so a
 -- spine-only cell with no matching encounters yields NULLs for all eight columns —
--- deliberately no COALESCE, matching aggregate_stats' behaviour for these columns.
+-- deliberately no COALESCE, matching core_stats' behaviour for these columns.
 --
 -- The final projection below is wrapped in jsonb_populate_record rather than
 -- returned as a bare positional SELECT. A bare `RETURN QUERY SELECT ...` binds to

@@ -186,7 +186,9 @@ unchanged — that's the whole point of a user-requested re-check.
 A PR appears in `prsNeedingMaintenance` because it either has merge conflicts (`mergeable` was
 `CONFLICTING`) or outstanding feedback (a human review/comment, `CHANGES_REQUESTED`, or anything
 newer than the head commit and not yet replied to — the tool ignores the PR's own
-mermaid-diff/behaviour-change comments and bot authors). Its `reason` field says which
+mermaid-diff/behaviour-change comments, bot authors, and any comment carrying the
+`<!-- swarm-worker-reply -->` marker a maintenance worker appends to its own replies, step 4
+below). Its `reason` field says which
 (`conflict` | `feedback` | `conflict+feedback`).
 
 For each PR needing maintenance (up to the budget), launch **one** background Agent that handles
@@ -198,6 +200,11 @@ both concerns for that PR:
   `sonnet` if unresolvable).
 - `description`: `"Maintain PR #<pr>"`.
 - Prompt, in order:
+  0. **Prefix self-reported status with the PR number, throughout** — prefix any self-reported
+     progress/status text this worker produces during its run, including its final result
+     summary, with `#<pr-number>: ` (e.g. `#902: resolving merge conflict in
+     generate-snapshots.ts`). The harness's live-status line renders this as an evolving one-line
+     task summary; without the prefix the PR number that summary is *about* isn't visible in it.
   1. **Copy local env config, if this is a fresh worktree** — if this step's worktree was just
      created via `git worktree add` (not reused from an existing one), copy `.env.dev` from the
      main checkout root before running any tests: `.env.dev` is gitignored, so a freshly created
@@ -221,7 +228,17 @@ both concerns for that PR:
      behind does it run `npx supabase migration up --local`, and that apply case is safe because a
      `db-migration` unit already runs solo (the exclusive-resource rule).
   4. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
-     the changes, run tests, reply to the reviewer via `gh pr comment <n>`.
+     the changes, run tests, reply to the reviewer via `gh pr comment <n>` (or `gh api
+     repos/{owner}/{repo}/pulls/<n>/comments` for an inline-thread reply). **Every reply a
+     maintenance worker posts must end with the marker line `<!-- swarm-worker-reply -->`**, on its
+     own line after the reply text. There is no bot identity for swarm workers — `gh` authenticates
+     as the same human account a real reviewer uses — so without the marker `swarm_plan_batch`
+     cannot tell a worker's own reply from genuine unaddressed feedback, and re-flags the PR as
+     `reason: "feedback"` on the very next call, looping it through maintenance spawns indefinitely
+     (#904). The marker is an HTML comment, so it's invisible in GitHub's rendered view;
+     `swarm_plan_batch`'s feedback checks skip any comment/thread-head carrying it, exactly as they
+     already skip mermaid-diff comments. Never add the marker to a comment that is genuine new
+     feedback rather than a worker's reply.
   5. **Release the shared-DB lock early, if this PR is `db-migration`/`e2e-exclusive`** — once the
      migration is applied and verified against the shared local Postgres (or the `@mutates` E2E run
      has completed) and every remaining step is non-shared-resource (lint fixes, retests needing no
@@ -290,7 +307,10 @@ input task description:
 - `model`: fixed `sonnet`, regardless of what model label the eventual replacement ticket(s) get —
   this subagent's own job (drafting/labeling) is lightweight, not implementation.
 - `description`: `"Auto-ticketify #<n>"`.
-- Prompt: run `ticketify` against issue `<n>`'s current title+body. Let it do its normal job —
+- Prompt: **throughout this task, prefix self-reported status with the issue number** — prefix any
+  self-reported progress/status text (including the final result summary) with `#<n>: `, so the
+  harness's live-status line keeps the issue number visible alongside whatever it's currently
+  doing. Then run `ticketify` against issue `<n>`'s current title+body. Let it do its normal job —
   including splitting the issue into more than one commit-sized ticket if the body actually
   bundles multiple distinct changes. It drafts properly-labeled replacement ticket(s) (model label
   + `ready`, plus `db-migration`/`e2e-exclusive` if applicable) and closes the original issue in
@@ -333,7 +353,11 @@ For each selected issue, launch an Agent (default background, so they run in par
 - `model` = the ticket's model label — `opus` | `sonnet` | `fable` (exactly the label). Don't
   substitute.
 - `description`: `"Implement #<n>"`.
-- Prompt: **first copy `.env.dev` from the main checkout root into this worktree** — isolation:
+- Prompt: **throughout this task, prefix self-reported status with the issue number** — prefix any
+  self-reported progress/status text this worker produces during its run, including its final
+  result summary, with `#<n>: ` (e.g. `#904: running affected summary/controls test files`), so
+  the harness's live-status line keeps the ticket number visible alongside whatever it's currently
+  doing. Then, **first copy `.env.dev` from the main checkout root into this worktree** — isolation:
   "worktree" creates a fresh git worktree, and `.env.dev` is gitignored so it's never carried
   over; without it `npm run qa` / the pre-push hook fail with `SUPABASE_JWT_ROLE environment
   variable is not set`. Find the main checkout root via `git rev-parse --path-format=absolute
@@ -545,6 +569,10 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   running workers finish), and do exactly that. Never assume which.
 - Each subagent runs the model the ticket label dictates (feedback PRs: the linked ticket's
   label, else `sonnet`).
+- Every worker prefixes its own self-reported progress/status text — including its final result
+  summary — with its ticket/PR number (`#<n>: `) throughout the run, so the harness's live-status
+  line keeps the number visible alongside the evolving task summary (§1 step 0, §3, §1.6). This is
+  separate from the `description` param set once at spawn time, which is already number-first.
 - One worktree per unit of work; parallel branches must never share a working tree. Ticket work
   cuts a fresh isolated worktree; feedback work reuses the PR branch's existing worktree or adds
   one for that branch.

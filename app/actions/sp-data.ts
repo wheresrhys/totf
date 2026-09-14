@@ -186,7 +186,7 @@ export async function fetchGraphableEncounterData(
  * Granularity of a species stats-history fetch. `'month'` (the default) is the
  * conventional per-month history every caller started with; `'year'` re-fetches
  * the same stats already grouped by calendar year at the RPC, which is *not*
- * the same as summing the monthly rows client-side: `aggregate_stats`'
+ * the same as summing the monthly rows client-side: `core_stats`'
  * `bird_count` and `demographics_stats`' per-bird bucket counts are
  * `COUNT(DISTINCT bird_id)` within their cell, so a bird retrapped in several
  * months of one year would be counted once per month by a client-side sum but
@@ -196,16 +196,16 @@ export type StatsHistoryInterval = 'month' | 'year';
 
 // Wing/weight + count history for a single species at `interval` granularity
 // (monthly by default), merging
-// biometrics_stats' wing/weight fields onto each aggregate_stats row (#821).
+// biometrics_stats' wing/weight fields onto each core_stats row (#821).
 // The two RPCs share the same species/group/date-range/group_by_time_period
 // params, so their rows are grouped identically and joined here on
 // `time_period` (rather than assumed to line up positionally) — a period
 // present on one side but not the other is handled by the merge below: an
-// aggregate_stats row with no matching biometrics_stats row still gets all 8
+// core_stats row with no matching biometrics_stats row still gets all 8
 // biometric fields, coalesced to null by mergeBiometricsFields (matching the
-// null columns aggregate_stats returned before #827 removed them), and a
-// biometrics_stats row with no matching aggregate_stats row is simply not
-// included in the output (the output shape is driven by aggregate_stats).
+// null columns core_stats returned before #827 removed them), and a
+// biometrics_stats row with no matching core_stats row is simply not
+// included in the output (the output shape is driven by core_stats).
 export async function getSpeciesStatsHistory(
 	species: string,
 	viewedGroupId: number,
@@ -246,7 +246,7 @@ export async function getSpeciesStatsHistory(
  * derivations (new-adult/first-summer/old-timer age split, and the 3J/postjuv
  * young-trends counts) into their own RPC (`population_stats`, renamed
  * `demographics_stats` in #878) rather than folding them into
- * `aggregate_stats`, so the "Demographics" tab's Age split, Young counts and
+ * `core_stats`, so the "Demographics" tab's Age split, Young counts and
  * New young counts tiles (#839 split the original single Young trends tile
  * into the latter two) fetch here while its Counts tile keeps using
  * `getSpeciesStatsHistory`. Same
@@ -298,7 +298,7 @@ export async function getGroupEffortHistory(
 
 /**
  * Per-time-period totals for a single species — the species-scoped sibling of
- * `fetchPeriodTotals` (`app/actions/period-totals.ts`): same `aggregate_stats`
+ * `fetchPeriodTotals` (`app/actions/period-totals.ts`): same `core_stats`
  * call shape, but filtered to one species (`species_name_filter`) instead of
  * grouped across all of them (`group_by_species: false`). Feeds the species
  * page's "Year totals" (all-time page), "Month totals" (year-scoped page), and

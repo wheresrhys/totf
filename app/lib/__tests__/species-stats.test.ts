@@ -83,7 +83,7 @@ describe('mergeSpeciesBiometrics', () => {
 	});
 
 	describe('Structure', () => {
-		it('keeps every non-biometric field from the aggregate_stats row', () => {
+		it('keeps every non-biometric field from the core_stats row', () => {
 			const [row] = mergeSpeciesBiometrics(
 				[
 					buildAggregateRow({
@@ -115,7 +115,7 @@ describe('mergeSpeciesBiometrics', () => {
 			expect(merged[0].max_weight).toBe(12);
 		});
 
-		it('returns aggregate_stats rows with biometric fields undefined when the biometrics array is empty', () => {
+		it('returns core_stats rows with biometric fields undefined when the biometrics array is empty', () => {
 			const [row] = mergeSpeciesBiometrics(
 				[buildAggregateRow({ species_name: 'Blue Tit' })],
 				[]

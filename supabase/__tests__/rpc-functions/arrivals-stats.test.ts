@@ -19,7 +19,7 @@ import { resolveAlphaBetaGammaClients } from './helpers/group-clients';
 
 // arrivals_stats counts each bird exactly ONCE per calendar year, at whichever
 // (species, time_period) cell holds its first classifiable encounter of that year
-// — unlike aggregate_stats/population_stats, whose per-cell bucket counts re-count
+// — unlike core_stats/population_stats, whose per-cell bucket counts re-count
 // the same bird in every cell it appears in. The fixtures below therefore care
 // about (a) which encounter of a year is picked, and (b) which cell that encounter
 // lands in, not just the totals.

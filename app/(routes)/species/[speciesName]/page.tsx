@@ -40,7 +40,7 @@ async function getSpeciesPageParams(pageProps: PageProps): Promise<PageParams> {
 }
 
 // Fetches the species page's headline stats row, merging biometrics_stats'
-// wing/weight fields onto the aggregate_stats row (#821). Both RPCs share the
+// wing/weight fields onto the core_stats row (#821). Both RPCs share the
 // same param shape and, called without group_by_species/group_by_time_period,
 // each return exactly one (ungrouped) row for this species/date-range/group,
 // so the two rows line up 1:1 without needing a join key.

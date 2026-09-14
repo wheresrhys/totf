@@ -27,6 +27,7 @@ import {
 	classifyStaleBranchPrs,
 	planBatch,
 	resetSwarmPlanBatchCaches,
+	SWARM_WORKER_REPLY_MARKER,
 	type MaintenanceCandidate,
 	type TicketCandidate,
 } from '../swarm-plan-batch';
@@ -191,6 +192,35 @@ describe('hasOutstandingInlineFeedback', () => {
 		expect(hasOutstandingInlineFeedback(comments, headCommitDate)).toBe(false);
 	});
 
+	// A swarm worker's reply is posted by the same human account a reviewer uses, so only the
+	// marker distinguishes it — without this the PR loops through maintenance forever (#904).
+	it('ignores a swarm-worker-marked reply as the latest comment in a thread', () => {
+		const comments = [
+			{ id: 1, user: { login: 'wheresrhys' }, body: 'fix this', created_at: '2026-01-06T00:00:00Z' },
+			{
+				id: 2,
+				in_reply_to_id: 1,
+				user: { login: 'wheresrhys' },
+				body: `Fixed in abc1234.\n\n${SWARM_WORKER_REPLY_MARKER}`,
+				created_at: '2026-01-07T00:00:00Z',
+			},
+		];
+		expect(hasOutstandingInlineFeedback(comments, headCommitDate)).toBe(false);
+	});
+
+	it('still flags a thread whose latest comment is an unmarked human reply', () => {
+		const comments = [
+			{
+				id: 1,
+				user: { login: 'wheresrhys' },
+				body: `Fixed in abc1234.\n\n${SWARM_WORKER_REPLY_MARKER}`,
+				created_at: '2026-01-06T00:00:00Z',
+			},
+			{ id: 2, in_reply_to_id: 1, user: { login: 'wheresrhys' }, body: 'still wrong', created_at: '2026-01-07T00:00:00Z' },
+		];
+		expect(hasOutstandingInlineFeedback(comments, headCommitDate)).toBe(true);
+	});
+
 	// Edge
 	it('returns false for no comments', () => {
 		expect(hasOutstandingInlineFeedback([], headCommitDate)).toBe(false);
@@ -215,6 +245,31 @@ describe('hasOutstandingIssueCommentFeedback', () => {
 	it('ignores mermaid-diff-bodied comments', () => {
 		const comments = [{ user: { login: 'wheresrhys' }, body: '```mermaid\nflowchart TB\n```', created_at: '2026-01-06T00:00:00Z' }];
 		expect(hasOutstandingIssueCommentFeedback(comments, headCommitDate)).toBe(false);
+	});
+
+	// #904 — a worker's own `gh pr comment` reply is authored by the same human account as a real
+	// reviewer's, so only the marker keeps it from being read back as fresh unaddressed feedback.
+	it('ignores a swarm-worker-marked reply newer than the head commit', () => {
+		const comments = [
+			{
+				user: { login: 'wheresrhys' },
+				body: `Addressed all three points, pushed def5678.\n\n${SWARM_WORKER_REPLY_MARKER}`,
+				created_at: '2026-01-06T00:00:00Z',
+			},
+		];
+		expect(hasOutstandingIssueCommentFeedback(comments, headCommitDate)).toBe(false);
+	});
+
+	it('still flags a genuine unmarked human comment alongside a swarm-worker-marked reply', () => {
+		const comments = [
+			{
+				user: { login: 'wheresrhys' },
+				body: `Addressed all three points.\n\n${SWARM_WORKER_REPLY_MARKER}`,
+				created_at: '2026-01-06T00:00:00Z',
+			},
+			{ user: { login: 'reviewer' }, body: 'one more thing', created_at: '2026-01-07T00:00:00Z' },
+		];
+		expect(hasOutstandingIssueCommentFeedback(comments, headCommitDate)).toBe(true);
 	});
 
 	it('ignores comments with no body', () => {

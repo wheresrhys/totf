@@ -3,7 +3,7 @@
 -- — and buckets it into exactly one of new_adult / returning_adult / pullus /
 -- juv / postjuv.
 --
--- Why this exists at all: aggregate_stats'/population_stats' bucket counts are
+-- Why this exists at all: core_stats'/population_stats' bucket counts are
 -- computed per (species, time_period) cell INDEPENDENTLY, so a bird encountered
 -- in Jan, Mar and Jun of the same year is counted again in each of those three
 -- monthly cells. This function instead emits at most one row per

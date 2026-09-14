@@ -1,11 +1,5 @@
--- Public, group-gated wrapper around core_stats (#828, step 1 of the
--- aggregate_stats -> core_stats rename: create new, migrate app, delete
--- old). Mechanical duplication of public_aggregate_stats under a new name,
--- with every reference to aggregate_stats/aggregate_stats_result swapped to
--- core_stats/core_stats_result. public_aggregate_stats is left
--- untouched and keeps serving all existing app call sites unchanged until the
--- migration ticket lands.
--- Runs SECURITY DEFINER so the (owner-privileged) definer bypasses RLS to
+-- Public, group-gated wrapper around core_stats (#828). Mirrors core_stats' input signature and return shape, but runs
+-- SECURITY DEFINER so the (owner-privileged) definer bypasses RLS to
 -- compute the aggregate, but only ever after confirming the target group has
 -- opted its summary data into public view via 'summary' = ANY(public_areas).
 -- It returns exactly what core_stats returns for the same params, or

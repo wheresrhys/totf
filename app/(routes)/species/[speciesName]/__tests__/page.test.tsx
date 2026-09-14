@@ -398,7 +398,7 @@ describe('getSpeciesStats', () => {
 		vi.clearAllMocks();
 	});
 
-	it('merges biometrics_stats wing/weight fields onto the aggregate_stats row when both calls succeed', async () => {
+	it('merges biometrics_stats wing/weight fields onto the core_stats row when both calls succeed', async () => {
 		makeStatsClient({
 			aggregateRows: [makeAggregateRow()],
 			biometricsRows: [makeBiometricsRow({ min_weight: 99 })]
@@ -412,7 +412,7 @@ describe('getSpeciesStats', () => {
 		);
 	});
 
-	it('calls biometrics_stats with the same species_name_filter/ringing_group_filter it passes to aggregate_stats', async () => {
+	it('calls biometrics_stats with the same species_name_filter/ringing_group_filter it passes to core_stats', async () => {
 		const { rpcCalls } = makeStatsClient({
 			aggregateRows: [makeAggregateRow()],
 			biometricsRows: [makeBiometricsRow()]
@@ -473,7 +473,7 @@ describe('getSpeciesStats', () => {
 		}
 	});
 
-	it('still returns a valid speciesStats row when aggregate_stats happens to already omit the wing/weight columns', async () => {
+	it('still returns a valid speciesStats row when core_stats happens to already omit the wing/weight columns', async () => {
 		makeStatsClient({
 			aggregateRows: [omitBiometricsFields(makeAggregateRow())],
 			biometricsRows: [makeBiometricsRow({ min_weight: 12, max_wing: 88 })]

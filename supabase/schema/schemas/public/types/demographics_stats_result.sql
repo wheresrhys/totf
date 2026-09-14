@@ -1,9 +1,9 @@
 -- Shared return shape for population_stats (#800). A companion RPC to
--- aggregate_stats carrying the age-split (new_adult/first_summer/old_timers) and
+-- core_stats carrying the age-split (new_adult/first_summer/old_timers) and
 -- young-trends (postjuv_juv/new_postjuv_juv/new_postjuv) derivations, split into
--- their own RPC rather than folded into aggregate_stats' already-large single
--- query — both for query-plan simplicity and to leave aggregate_stats' existing
--- columns/performance untouched. Shares its input signature with aggregate_stats
+-- their own RPC rather than folded into core_stats' already-large single
+-- query — both for query-plan simplicity and to leave core_stats' existing
+-- columns/performance untouched. Shares its input signature with core_stats
 -- (species_name_filter, from_date, to_date, ringing_group_filter,
 -- group_by_species, group_by_time_period) and much of its underlying plumbing via
 -- the agg_raw_encounters / agg_spine / agg_encounter_age_classification /
@@ -18,15 +18,15 @@
 CREATE TYPE public.demographics_stats_result AS (
 	species_name text,
 	time_period date,
-	-- Context/denominator columns, duplicated from aggregate_stats' own bucket
+	-- Context/denominator columns, duplicated from core_stats' own bucket
 	-- counts so this RPC's rows are self-contained (e.g. to check the age-split
 	-- sanity invariant below without a second RPC call).
 	adult_bird_count bigint,
 	juv_bird_count bigint,
 	juv_enc_count bigint,
 	postjuv_enc_count bigint,
-	-- Copied from aggregate_stats.new_young_bird_count (#800 follow-up). Kept in
-	-- both places for now — aggregate_stats' copy is untouched/authoritative,
+	-- Copied from core_stats.new_young_bird_count (#800 follow-up). Kept in
+	-- both places for now — core_stats' copy is untouched/authoritative,
 	-- this is where young/new-focused derivations belong going forward.
 	new_young_bird_count bigint,
 	-- Age-split subsets of adult_bird_count. Mutually exclusive and exhaustive over
