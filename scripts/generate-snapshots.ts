@@ -2,11 +2,11 @@
 /**
  * Generate snapshot JSON fixtures from the local e2e seed data.
  *
- * Reads Alpha/Beta/Gamma group data and writes 23 JSON files under
+ * Reads Alpha/Beta/Gamma group data and writes 24 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
  * the RPC name for RPC-backed fixtures (`core_stats/`, `biometrics_stats/`,
- * `find_discrepencies/`, `notable_retraps/`, `top_metrics_by_period/`) and
- * `tables/<TableName>/` for
+ * `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
+ * `top_metrics_by_period/`) and `tables/<TableName>/` for
  * fixtures produced by a direct PostgREST table query. The comment above each
  * block below names both the RPC/table and the consuming action(s) — keep this
  * in sync when a call site's underlying RPC/table changes, so a fixture's
@@ -247,6 +247,20 @@ export async function generateSnapshots(
 		await writeSnapshot(
 			`biometrics_stats/robin-alpha.headline.json`,
 			robinBiometrics ?? []
+		);
+
+		// RPC: demographics_stats (species-filtered, group_by_time_period: month) —
+		// powers getSpeciesDemographicsStats (app/actions/sp-data.ts), which backs
+		// the species page's Demographics tab. Renamed from population_stats in
+		// #878; only ever called species-filtered and time-grouped.
+		const { data: robinDemographics } = await alpha.rpc('demographics_stats', {
+			species_name_filter: 'Robin',
+			ringing_group_filter: alphaId,
+			group_by_time_period: 'month'
+		});
+		await writeSnapshot(
+			`demographics_stats/robin-alpha.monthly-history.json`,
+			robinDemographics ?? []
 		);
 
 		// RPC: notable_retraps (species-filtered) — powers fetchNotableRetraps
