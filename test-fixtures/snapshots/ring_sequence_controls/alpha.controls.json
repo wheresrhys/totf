@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "ring_no": "XFIELDF01",
+    "species_name": "Fieldfare",
+    "first_date": "2023-03-15"
+  },
+  {
+    "ring_no": "XREDWNG01",
+    "species_name": "Redwing",
+    "first_date": "2023-03-20"
+  }
+]

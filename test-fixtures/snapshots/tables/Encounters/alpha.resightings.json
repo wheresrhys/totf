@@ -1,1 +1,40 @@
-[]
+[
+  {
+    "id": 1055,
+    "record_type": "F",
+    "extra_text": null,
+    "finding_condition": "8",
+    "finding_circumstances": "2",
+    "bird": {
+      "ring_no": "AKINGF9001",
+      "species": {
+        "species_name": "Kingfisher"
+      }
+    },
+    "session": {
+      "location": {
+        "location_name": "Alpha Site A (CES)"
+      },
+      "visit_date": "2023-05-10"
+    }
+  },
+  {
+    "id": 1063,
+    "record_type": "U",
+    "extra_text": null,
+    "finding_condition": "3",
+    "finding_circumstances": "5",
+    "bird": {
+      "ring_no": "ZWREN9001",
+      "species": {
+        "species_name": "Wren"
+      }
+    },
+    "session": {
+      "location": {
+        "location_name": "Alpha Site A (CES)"
+      },
+      "visit_date": "2023-05-12"
+    }
+  }
+]

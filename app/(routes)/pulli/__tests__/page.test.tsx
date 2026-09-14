@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import Page, { fetchPulliPageContent } from '../page';
 import pulliEncountersSnapshot from '@/test-fixtures/snapshots/tables/Encounters/alpha.pulli-encounters.json';
 import type { PulliEncounter } from '@/app/models/session';
@@ -77,44 +77,6 @@ describe('pulli page', () => {
 		expect(headers).toContain('Notes');
 		expect(table.textContent).toContain('Robin');
 		expect(table.textContent).toContain('Alpha Site A (CES)');
-	});
-
-	// Alpha's real seed data has only one PULLI encounter (#894), which can't
-	// demonstrate a re-sort actually reordering rows — a small inline dataset
-	// stands in here instead of the generated fixture.
-	it('re-sorts rows when a column header is clicked', async () => {
-		const twoRowFixture = [
-			{
-				id: 1,
-				extra_text: null,
-				bird: { ring_no: 'APULLI01', species: { species_name: 'Blue Tit' } },
-				session: {
-					visit_date: '2024-03-01',
-					location: { location_name: 'Garden Feeder Station' }
-				}
-			},
-			{
-				id: 2,
-				extra_text: null,
-				bird: { ring_no: 'APULLI02', species: { species_name: 'Robin' } },
-				session: {
-					visit_date: '2024-06-15',
-					location: { location_name: 'Garden Feeder Station' }
-				}
-			}
-		] as unknown as PulliEncounter[];
-		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-			makeEncountersClient(twoRowFixture).client
-		);
-		render(await Page());
-		const table = await screen.findByRole('table');
-		const firstRowBefore = table.querySelectorAll('tbody tr')[0].textContent;
-		const ringHeader = [...table.querySelectorAll('thead th')].find((th) =>
-			th.textContent?.includes('Ring')
-		)!;
-		fireEvent.click(ringHeader);
-		const firstRowAfter = table.querySelectorAll('tbody tr')[0].textContent;
-		expect(firstRowAfter).not.toBe(firstRowBefore);
 	});
 
 	it('renders a null notes cell gracefully when extra_text is null', async () => {

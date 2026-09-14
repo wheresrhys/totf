@@ -21,21 +21,12 @@ function makeRpcClient(data: unknown) {
 	return { rpc: vi.fn().mockReturnValue(thenable) };
 }
 
-// Alpha's real seed data has no untracked control birds at all (the real
-// captured `alpha.controls.json` fixture, imported above, is `[]` — #894), so
-// it can only stand in for the page's real empty-state rendering (already
-// covered below). Rendering a populated table needs an inline dataset
-// instead.
-const sampleControls = [
-	{ ring_no: 'A123456', species_name: 'Robin', first_date: '2023-03-15' },
-	{ ring_no: 'B789012', species_name: 'Blue Tit', first_date: '2023-05-22' },
-	{ ring_no: 'C345678', species_name: 'Blackbird', first_date: '2024-01-10' }
-] as RingSequenceControlRow[];
+const controls = controlsSnapshot as unknown as RingSequenceControlRow[];
 
 describe('controls page', () => {
 	beforeEach(() => {
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-			makeRpcClient(sampleControls)
+			makeRpcClient(controls)
 		);
 	});
 
@@ -53,24 +44,18 @@ describe('controls page', () => {
 		render(await Page());
 		const table = await screen.findByRole('table');
 		const rows = table.querySelectorAll('tbody tr');
-		expect(rows.length).toBe(sampleControls.length);
-		expect(getCellTextByHeading(table, 'Ring', 0)).toBe(
-			sampleControls[0].ring_no
-		);
+		expect(rows.length).toBe(controls.length);
+		expect(getCellTextByHeading(table, 'Ring', 0)).toBe(controls[0].ring_no);
 		expect(getCellTextByHeading(table, 'Species', 0)).toBe(
-			sampleControls[0].species_name
+			controls[0].species_name
 		);
 		expect(getCellTextByHeading(table, 'First date', 0)).toBe(
-			sampleControls[0].first_date
+			controls[0].first_date
 		);
 	});
 
-	// The real captured `alpha.controls.json` fixture (#894) exercises this
-	// case for real: Alpha's seed data has no untracked control birds.
 	it('renders empty state when no data', async () => {
-		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-			makeRpcClient(controlsSnapshot)
-		);
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeRpcClient([]));
 		render(await Page());
 		expect(await screen.findByText('No control birds found.')).toBeTruthy();
 		expect(screen.queryByRole('table')).toBeNull();

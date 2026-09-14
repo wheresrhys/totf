@@ -105,22 +105,6 @@
         "min_hatch_year": 2022
       },
       {
-        "id": 47,
-        "sex": "M",
-        "is_juv": false,
-        "weight": 19.2,
-        "session": {
-          "id": 47,
-          "visit_date": "2023-07-08"
-        },
-        "age_code": 5,
-        "record_type": "S",
-        "wing_length": 80,
-        "capture_time": "05:45:00",
-        "max_hatch_year": 2022,
-        "min_hatch_year": 2022
-      },
-      {
         "id": 50,
         "sex": "M",
         "is_juv": false,
@@ -151,6 +135,22 @@
         "capture_time": "05:45:00",
         "max_hatch_year": 2023,
         "min_hatch_year": 2023
+      },
+      {
+        "id": 47,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 19.2,
+        "session": {
+          "id": 47,
+          "visit_date": "2023-07-08"
+        },
+        "age_code": 5,
+        "record_type": "S",
+        "wing_length": 80,
+        "capture_time": "05:45:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
       }
     ]
   },
