@@ -3,7 +3,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import { act } from 'react';
 import { mockIntersectionObserver } from 'jsdom-testing-mocks';
 import { SpIndividualsTab } from '../SpIndividualsTab';
-import birdsSnapshot from '@/test-fixtures/snapshots/fetchPageOfBirds.alpha.robin.json';
+import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
 import { enrichBird } from '@/app/models/bird';
 import type { EnrichedBirdOfSpecies, BirdOfSpecies } from '@/app/models/bird';
 

@@ -9,7 +9,7 @@ import {
 	filterEmptyMonthTotalsRows,
 	formatMonthYearLabel,
 	formatMonthLabel
-} from '@/app/models/month-totals';
+} from '@/app/lib/month-totals';
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 

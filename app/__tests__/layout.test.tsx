@@ -34,11 +34,11 @@ vi.mock('@/lib/supabase', () => ({
 	}
 }));
 
-vi.mock('@/lib/request-pathname', () => ({
+vi.mock('@/app/lib/request-pathname', () => ({
 	getRequestPathname: mockGetRequestPathname
 }));
 
-vi.mock('@/lib/public-group-access', () => ({
+vi.mock('@/app/lib/auth/public-group-access', () => ({
 	resolvePublicPageViewedGroupId: mockResolvePublicPageViewedGroupId
 }));
 

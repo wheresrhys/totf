@@ -397,7 +397,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      aggregate_stats: {
+      arrivals_stats: {
         Args: {
           from_date?: string
           group_by_species?: boolean
@@ -406,10 +406,10 @@ export type Database = {
           species_name_filter?: string
           to_date?: string
         }
-        Returns: Database["public"]["CompositeTypes"]["aggregate_stats_result"][]
+        Returns: Database["public"]["CompositeTypes"]["arrivals_stats_result"][]
         SetofOptions: {
           from: "*"
-          to: "aggregate_stats_result"
+          to: "arrivals_stats_result"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -431,7 +431,41 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      core_stats: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["core_stats_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "core_stats_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       daitch_mokotoff: { Args: { "": string }; Returns: string[] }
+      demographics_stats: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: Database["public"]["CompositeTypes"]["demographics_stats_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "demographics_stats_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       dmetaphone: { Args: { "": string }; Returns: string }
       dmetaphone_alt: { Args: { "": string }; Returns: string }
       find_discrepencies: {
@@ -540,7 +574,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      public_aggregate_stats: {
+      public_core_stats: {
         Args: {
           from_date?: string
           group_by_species?: boolean
@@ -549,10 +583,10 @@ export type Database = {
           species_name_filter?: string
           to_date?: string
         }
-        Returns: Database["public"]["CompositeTypes"]["aggregate_stats_result"][]
+        Returns: Database["public"]["CompositeTypes"]["core_stats_result"][]
         SetofOptions: {
           from: "*"
-          to: "aggregate_stats_result"
+          to: "core_stats_result"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -579,6 +613,22 @@ export type Database = {
           age_bucket: string
           bird_id: number
           has_new: boolean
+          species_id: number
+          time_period: string
+        }[]
+      }
+      stats_bird_first_encounter_of_year: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: {
+          arrival_bucket: string
+          bird_id: number
           species_id: number
           time_period: string
         }[]
@@ -714,7 +764,28 @@ export type Database = {
         | "MS"
     }
     CompositeTypes: {
-      aggregate_stats_result: {
+      arrivals_stats_result: {
+        species_name: string | null
+        time_period: string | null
+        new_adult_bird_count: number | null
+        returning_adult_bird_count: number | null
+        pullus_bird_count: number | null
+        juv_bird_count: number | null
+        postjuv_bird_count: number | null
+      }
+      biometrics_stats_result: {
+        species_name: string | null
+        time_period: string | null
+        max_weight: number | null
+        avg_weight: number | null
+        min_weight: number | null
+        median_weight: number | null
+        max_wing: number | null
+        avg_wing: number | null
+        min_wing: number | null
+        median_wing: number | null
+      }
+      core_stats_result: {
         species_name: string | null
         time_period: string | null
         session_count: number | null
@@ -738,26 +809,21 @@ export type Database = {
         adult_enc_count: number | null
         unknown_age_enc_count: number | null
         max_new_per_session: number | null
-        max_weight: number | null
-        avg_weight: number | null
-        min_weight: number | null
-        median_weight: number | null
-        max_wing: number | null
-        avg_wing: number | null
-        min_wing: number | null
-        median_wing: number | null
       }
-      biometrics_stats_result: {
+      demographics_stats_result: {
         species_name: string | null
         time_period: string | null
-        max_weight: number | null
-        avg_weight: number | null
-        min_weight: number | null
-        median_weight: number | null
-        max_wing: number | null
-        avg_wing: number | null
-        min_wing: number | null
-        median_wing: number | null
+        adult_bird_count: number | null
+        juv_bird_count: number | null
+        juv_enc_count: number | null
+        postjuv_enc_count: number | null
+        new_young_bird_count: number | null
+        new_adult_bird_count: number | null
+        first_summer_bird_count: number | null
+        old_timers_bird_count: number | null
+        postjuv_juv_enc_count: number | null
+        new_postjuv_juv_enc_count: number | null
+        new_postjuv_enc_count: number | null
       }
       population_stats_result: {
         species_name: string | null

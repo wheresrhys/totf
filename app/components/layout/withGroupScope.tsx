@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { resolveGroupIdBySlug, type ViewedGroup } from '@/lib/group-slug';
+import { resolveGroupIdBySlug, type ViewedGroup } from '@/app/lib/group-slug';
 
 // Shared group-scoping wrapper for `/group/[groupSlug]/**` route pages.
 //

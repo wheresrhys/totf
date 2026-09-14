@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import alphaSpeciesSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
-import betaSpeciesSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.beta.json';
-import gammaSpeciesSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.gamma.json';
+import alphaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
+import betaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/beta.by-species.json';
+import gammaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/gamma.by-species.json';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchSpeciesData } = vi.hoisted(
 	() => ({
@@ -12,7 +12,7 @@ const { mockGetAuthenticatedSupabaseClient, mockFetchSpeciesData } = vi.hoisted(
 	})
 );
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 

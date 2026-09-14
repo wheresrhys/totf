@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import Page, { fetchPulliPageContent } from '../page';
-import pulliEncountersSnapshot from '@/test-fixtures/snapshots/fetchPulliEncounters.alpha.json';
+import pulliEncountersSnapshot from '@/test-fixtures/snapshots/tables/Encounters/alpha.pulli-encounters.json';
 import type { PulliEncounter } from '@/app/models/session';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 
@@ -9,7 +9,7 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 

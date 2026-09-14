@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import Page, { fetchResightingsPageContent } from '../page';
-import resightingsSnapshot from '@/test-fixtures/snapshots/fetchResightings.alpha.json';
+import resightingsSnapshot from '@/test-fixtures/snapshots/tables/Encounters/alpha.resightings.json';
 import type { ResightingEncounter } from '@/app/models/session';
 import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
@@ -10,7 +10,7 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 

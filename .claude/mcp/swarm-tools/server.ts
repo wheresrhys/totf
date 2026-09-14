@@ -4,11 +4,9 @@ import { registerPingTool } from './tools/ping';
 import { registerSwarmStateTools } from './tools/swarm-state';
 import { registerDeriveBranchNameTool } from './tools/derive-branch-name';
 import { registerCreateTicketTool } from './tools/create-ticket';
-import { registerResolveMigrationDmlTool } from './tools/resolve-migration-dml';
-import { registerResolveWorkItemTool } from './tools/resolve-work-item';
 import { registerSwarmPlanBatchTool } from './tools/swarm-plan-batch';
 import { registerLinkTicketDependenciesTool } from './tools/link-ticket-dependencies';
-import { registerApplySchemaMigrationTool } from './tools/apply-schema-migration';
+import { registerEnsureLocalMigrationsAppliedTool } from './tools/ensure-local-migrations-applied';
 
 const server = new McpServer({
 	name: 'swarm-tools',
@@ -19,11 +17,9 @@ registerPingTool(server);
 registerSwarmStateTools(server);
 registerDeriveBranchNameTool(server);
 registerCreateTicketTool(server);
-registerResolveMigrationDmlTool(server);
-registerResolveWorkItemTool(server);
 registerSwarmPlanBatchTool(server);
 registerLinkTicketDependenciesTool(server);
-registerApplySchemaMigrationTool(server);
+registerEnsureLocalMigrationsAppliedTool(server);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

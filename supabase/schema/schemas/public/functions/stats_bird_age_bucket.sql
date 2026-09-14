@@ -1,14 +1,14 @@
--- Shared plumbing for aggregate_stats and population_stats (#800). Resolves each
+-- Shared plumbing for core_stats and population_stats (#800). Resolves each
 -- bird's per-(species, time_period)-cell encounters into exactly one
 -- mutually-exclusive, exhaustive bird-level age bucket, applying the two
 -- precedence rules with no single-encounter equivalent: pullus always wins (a
 -- bird with any pullus reading is pullus, even against a conflicting adult
 -- reading, which is assumed erroneous), and otherwise juv wins over postjuv.
--- Mirrors aggregate_stats' own (untouched, historical) inline
+-- Mirrors core_stats' own (untouched, historical) inline
 -- bird_age_flags/bird_age_bucket CTEs — see stats_raw_encounters.sql's header for
--- why the two functions don't literally share SQL text with aggregate_stats
--- itself; keep the precedence rules below in sync BY HAND with aggregate_stats.sql's
--- copy. bird_id is carried (beyond what aggregate_stats' copy exposes) because
+-- why the two functions don't literally share SQL text with core_stats
+-- itself; keep the precedence rules below in sync BY HAND with core_stats.sql's
+-- copy. bird_id is carried (beyond what core_stats' copy exposes) because
 -- population_stats' age-split columns need per-bird (not just per-cell-count)
 -- bucket membership to drive its own lifetime-history lookups.
 CREATE FUNCTION public.stats_bird_age_bucket (

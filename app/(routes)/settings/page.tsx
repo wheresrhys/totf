@@ -2,7 +2,7 @@ import {
 	BootstrapPage,
 	type DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import { fetchOwnGroupPublicAreas } from '@/app/actions/settings';
 import { SettingsPageContent, type SettingsPageData } from './PageContent';
 

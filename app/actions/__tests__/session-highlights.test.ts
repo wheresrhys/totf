@@ -6,7 +6,7 @@ import type {
 	RarityHighlight,
 	SessionHighlight,
 	VitalStatHighlight
-} from '@/app/models/highlights';
+} from '@/app/lib/highlights';
 import {
 	renderRarityHighlight,
 	RARITY_HIGHLIGHT_RENDERERS,
@@ -53,7 +53,7 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 

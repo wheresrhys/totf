@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import alphaSessionsSnapshot from '@/test-fixtures/snapshots/fetchAllSessions.alpha.json';
-import betaSessionsSnapshot from '@/test-fixtures/snapshots/fetchAllSessions.beta.json';
+import alphaSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.all-sessions.json';
+import betaSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/beta.all-sessions.json';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 

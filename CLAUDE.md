@@ -34,10 +34,7 @@ Tickets are created with the `flesh-out-ticket` skill (single task) or `ticketif
 list, or a single large task it decomposes first, one issue per task, reusing `flesh-out-ticket`
 per ticket) and implemented
 with the `implement-ticket` skill. `swarm` picks up open `ready` tickets and open PRs needing
-maintenance and runs them in parallel, one git worktree + subagent per unit of work. If you want
-to grab a branch `swarm` is mid-way through and keep working on it by hand (e.g. in VS Code), use
-the `take-over` skill — it halts the worker and frees the branch's worktree so a normal
-`git checkout` works.
+maintenance and runs them in parallel, one git worktree + subagent per unit of work.
 
 When creating a ticket, add exactly one model label reflecting implementation complexity — the
 subagent implementing it runs on that model:
@@ -65,13 +62,12 @@ incrementally; current inventory:
 |---|---|
 | `swarm_tools_ping` | Health check — confirms the server is reachable |
 | `swarm_state_append` / `_remove` / `_list` | Read/mutate `.claude/swarm-state.json` (locked, atomic — never hand-write it) |
+| `swarm_state_release_db_lock` | Let an exclusive-resource worker release the shared-local-Postgres lock early (by `agentId`), once its migration/`@mutates` work is applied and verified and only push/PR steps remain — other non-exclusive tickets can then start, while a *new* exclusive-resource worker still waits for it to finish. One-way |
 | `swarm_plan_batch` | Pre-filtered, pre-ranked PR-maintenance + ready-ticket lists for `swarm` |
-| `resolve_work_item` | Resolve a branch/issue/PR/agent-id/paraphrase to its worker, for `take-over` |
 | `derive_branch_name` | Ticket branch naming (wraps `lib/slugify.ts`) + collision check |
 | `create_ticket` | `gh issue create` with labels + sub-issue linking, no shell-escaping/tempfile dance |
-| `resolve_migration_dml` | Extract hand-authored backfill DML from a PR body or local migration file |
 | `link_ticket_dependencies` | Apply GitHub blocked-by links to an issue (one comma-joined `gh issue edit --add-blocked-by` call) — ticketify's dependency wiring |
-| `apply_schema_migration` | Run `npm run db:schema:apply` in a worktree, classify the outcome (`applied`/`history-mismatch`/`error`) and name the colliding worktree on a mismatch — take-over's schema-apply + mismatch detection |
+| `ensure_local_migrations_applied` | Catch a worktree's shared local Postgres up to the committed `supabase/migrations/` before DB-dependent work — fast-paths off a locked `.claude/swarm-migration-state.json` marker, only running `npx supabase migration up --local` when the marker is behind (#863). Called by `swarm` on every worktree spawn. |
 
 Use these tools for anything that touches `.claude/swarm-state.json`, creates a GitHub issue,
 derives a branch name, or extracts backfill DML — never reimplement the `jq`/glob/anchor-text
@@ -93,19 +89,21 @@ There are no per-person logins. Authentication is group-scoped:
 ### Public pages and the group summary read-path (#770)
 
 A group can opt an area of its data into public, unauthenticated view via `RingingGroups.public_areas`
-(currently only `'summary'` is allowlisted, #768) and the SECURITY DEFINER `public_aggregate_stats` RPC,
+(currently only `'summary'` is allowlisted, #768) and the SECURITY DEFINER `public_core_stats` RPC,
 which returns real data only when the target group has opted in — otherwise nothing, with no JWT
-required. `lib/group-summary-access.ts`'s `fetchAuthorisedAggregateStats` implements the resulting
+required. `app/lib/auth/group-summary-access.ts`'s `fetchAuthorisedCoreStats` implements the resulting
 4-case access model for a `(viewedGroupId, viewerGroupId)` pair (own group, always via the normal
-authenticated client; a public grant via `public_aggregate_stats`, checked *before* any
-authenticated/RLS attempt — since `public_aggregate_stats` is a pure gated pass-through to
-`aggregate_stats` for the same params, this never shows an already-authorised cross-group viewer a
+authenticated client; a public grant via `public_core_stats`, checked *before* any
+authenticated/RLS attempt — since `public_core_stats` is a pure gated pass-through to
+`core_stats` for the same params, this never shows an already-authorised cross-group viewer a
 degraded view, and it spares an anonymous visitor a wasted authenticated attempt; an existing
 `GroupDataSharing`-granted cross-group view via the normal authenticated client, only attempted once
 the target isn't public and the viewer actually has a session; or blocked), returning
 `{ accessLevel, rows }` — every summary-stats action function (`app/actions/summary-stats.ts`,
 `period-totals.ts`, `spp-data.ts`) routes through it (currently destructuring only `rows`) instead of
-calling `getAuthenticatedSupabaseClient()` + `aggregate_stats` directly.
+calling `getAuthenticatedSupabaseClient()` + `core_stats` directly. (`core_stats`/`public_core_stats`
+are byte-identical siblings of the still-schema-resident `core_stats`/`public_aggregate_stats`
+RPCs — #830 moved every app-code call site onto the new names; a later ticket deletes the old ones.)
 
 `lib/group-slug.ts`'s group-lookup functions (`resolveGroupIdBySlug`, `resolveGroupSlugById`,
 `resolveGroupPublicAreas`) deliberately use the plain unauthenticated `supabase` client (`lib/supabase.ts`)
@@ -113,7 +111,7 @@ rather than `getAuthenticatedSupabaseClient()`, since `RingingGroups` is publicl
 what lets an anonymous visitor's request resolve a group at all without a 500. `resolveGroupPublicAreas`
 itself never caches (a group can toggle its public-summary setting at any time), but the same group's
 public_areas gets resolved from two places in one request when an anonymous visitor is served a public
-summary — the root layout's public-page access gate below, and `fetchAuthorisedAggregateStats`'s own public
+summary — the root layout's public-page access gate below, and `fetchAuthorisedCoreStats`'s own public
 fallback — so both route through `resolveGroupPublicAreasForRequest`, a `React.cache()`-memoised wrapper
 around it that dedupes within a single request/render pass without weakening the "always live" guarantee
 across requests.
@@ -157,19 +155,19 @@ Tables (PascalCase in Postgres, matching generated TypeScript types in `types/su
 Key design notes:
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
 - Several fields are populated by triggers (e.g. `proven_age` on Birds, timestamps on Sessions/Encounters).
-- Complex queries are exposed as Postgres RPC functions (e.g. `top_metrics_by_period`, `aggregate_stats`, `notable_retraps`, `find_discrepencies`).
+- Complex queries are exposed as Postgres RPC functions (e.g. `top_metrics_by_period`, `core_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
 
-### Companion stats RPCs and shared plumbing (`aggregate_stats` / `population_stats`, #800)
+### Companion stats RPCs and shared plumbing (`core_stats` / `population_stats`, #800)
 
-`aggregate_stats` and `population_stats` (age-split + young-trends derivations, split into its own
-RPC rather than folded into `aggregate_stats`' already-large single query — for query-plan
-simplicity and to leave `aggregate_stats`' existing columns untouched) share the same input
+`core_stats` and `population_stats` (age-split + young-trends derivations, split into its own
+RPC rather than folded into `core_stats`' already-large single query — for query-plan
+simplicity and to leave `core_stats`' existing columns untouched) share the same input
 signature (`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
 group_by_time_period`) and both build on the same underlying logic via `stats_raw_encounters` /
 `stats_spine` / `stats_encounter_age_classification` / `stats_bird_age_bucket` — internal utility
 RPCs holding the windowed-row-source / grouping-spine / per-encounter-classification /
-per-bird-bucket-resolution logic previously duplicated inline in `aggregate_stats`. Each top-level
+per-bird-bucket-resolution logic previously duplicated inline in `core_stats`. Each top-level
 RPC calls every utility it needs exactly once and materializes the result into a local CTE (reused
 by every downstream reference in that RPC), so the base tables aren't rescanned once per downstream
 CTE — but a utility RPC that itself depends on another (e.g. `stats_bird_age_bucket` →
@@ -180,9 +178,27 @@ base tables a small constant number of times rather than once — accepted as a 
 this app's data scale; keep an eye on it if a future RPC stacks many more utility layers. Keep the
 utility RPCs' bucket/precedence definitions in sync **by hand** with `app/models/encounter.ts`'s
 `getAgeClass()` if either changes. `population_stats.new_young_bird_count` was originally a
-duplicate of a same-named column on `aggregate_stats` (#800); #824 removed `aggregate_stats`'s
+duplicate of a same-named column on `core_stats` (#800); #824 removed `core_stats`'s
 copy (and the corresponding UI series, #817) as unused, so `population_stats` now holds the only
 `new_young_bird_count` column in the schema.
+
+`arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
+two structurally can't: **arrivals**. `core_stats`/`population_stats` compute their bucket
+counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
+one year is counted again in each monthly cell. `arrivals_stats` instead counts each bird exactly
+once per calendar year, at whichever cell holds its **first classifiable encounter of that year**,
+bucketed by what the bird was at that encounter — `new_adult` / `returning_adult` / `pullus` / `juv`
+/ `postjuv` (mutually exclusive and exhaustive, so the five counts sum to the cell's distinct
+arriving-bird-year count). The per-bird-year resolution lives in the `stats_bird_first_encounter_of_year`
+utility RPC: it drops `'unknown'`-bucket encounters *before* the first-of-year pick (so an
+unclassifiable early encounter is skipped in favour of the next classifiable one that year, rather
+than losing the bird for that year), takes `DISTINCT ON (bird_id, enc_year)` ordered by
+`visit_date, encounter_id` for same-day determinism, and splits `adult` into `new_adult` vs
+`returning_adult` off the same unwindowed, `ringing_group_filter`-scoped lifetime-history CTEs
+`population_stats` uses (`new_adult` iff the arrival year is the bird's first-ever year with the
+group — no majority-vote heuristic needed, unlike `population_stats`' first_summer/old_timers split).
+Note the granularity: an "arrival" is a **bird-year**, not a bird, so under an ungrouped query a bird
+that arrived in two years contributes two counts.
 
 **Composite-type RETURN QUERY binds by position, not name — this bit us.** A `RETURNS SETOF
 <composite type>` function's `RETURN QUERY SELECT ...` binds the SELECT list to the composite
@@ -191,7 +207,7 @@ only as stable as whatever DDL a given environment's `db:schema:apply` run happe
 type — confirmed empirically while building `population_stats`: two schema-diff runs against the
 identical schema files produced two *different* physical attribute orders for a composite type's
 columns (one matching the file's declared order, one alphabetical), silently scrambling values into
-the wrong named output columns with no error either way. `population_stats` and `aggregate_stats`
+the wrong named output columns with no error either way. `population_stats` and `core_stats`
 (the latter retrofitted in #824, the first time `aggregate_stats_result` changed shape since this
 note was written) guard against this by wrapping their final projection — `SELECT
 (jsonb_populate_record(NULL::the_result_type, to_jsonb(agg))).* FROM (...) AS agg` — which binds
@@ -210,7 +226,11 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
 4. Run `npm run db:schema:apply` to generate a migration named after the current branch and apply it to the local db
 5. You may want to use `npm run db:seed:local` to repopulate the db with test data
 6. Inspect the generated migration file before pushing.
-7. Deploy schema changes with `npm run db:migration:push`.
+7. Commit the generated file(s) under `supabase/migrations/` (no longer gitignored, #862) along
+   with your PR, then deploy the schema change to production with `npm run db:migration:push`
+   (human-only). There is **no** automated CI deploy of migrations: the
+   `.github/workflows/deploy-migrations.yml` job added in #862 was exercised and then deliberately
+   removed, so `npm run db:migration:push` is once again the sole deploy path.
 
 ## Data fetching conventions
 
@@ -313,8 +333,8 @@ read-only against any server.
 `load-prod-write-env.sh`, which sets `SUPABASE_JWT_ROLE=authenticated` — writes
 allowed but still RLS-scoped to the target group. Break-glass
 web-import test against prod: `./scripts/load-prod-write-env.sh next dev --turbopack`
-(deliberately not an npm script). Migrations are deployed by the human
-(`npm run db:migration:push`).
+(deliberately not an npm script). Migrations are committed and deployed on merge to main by the
+supabase github integration.
 
 Note: the deployed Vercel app gets its env directly, with
 `SUPABASE_JWT_ROLE=authenticated` set in the Vercel project settings, so production
@@ -329,23 +349,32 @@ Three separate Vitest configs:
 | Suite | Config | Command | Runs in |
 |---|---|---|---|
 | App tests | `vitest.config.ts` | `npm run test:nowatch` | pre-push hook + CI |
-| DB integration tests | `vitest.integration.config.ts` | `npm run test:integration` | manually (requires local Supabase) |
+| DB integration tests | `vitest.integration.config.ts` | `npm run test:integration` | manually (requires local Supabase); the fixture-freshness test alone also runs pre-push, diff-aware (`npm run test:fixture-freshness`) |
 | HTTP tests | `vitest.http.config.ts` | `npm run test:http` | manually (auto-starts Next.js dev server if not running) |
-| E2E tests | `playwright.config.ts` | `npm run test:e2e` (full) / `test:e2e:safe` / `test:e2e:mutates` | pre-push hook (diff-aware, see below) + CI (full) |
+| E2E tests | `playwright.config.ts` | `npm run test:e2e` (full) / `test:e2e:safe` / `test:e2e:mutates` | pre-push hook only (diff-aware, see below) |
+
+CI (`.github/workflows/ci.yml`) has exactly three jobs — `lint`, `type-check`, `unit-tests` — and no
+Supabase service, so **no** suite that needs a database runs in CI. The `unit-tests` job fabricates a
+`.env.dev` pointing at a `localhost:54321` that nothing is listening on; app tests are fully mocked
+by construction. E2E and DB integration tests are local-only (pre-push hook and manual respectively).
 
 ```sh
 npm test              # watch mode (app tests only)
 npm run test:nowatch  # single run (app tests)
 npm run test:integration  # DB integration tests against local Supabase
+npm run test:fixture-freshness  # just the snapshot-fixture-drift check (a DB integration test)
 npm run test:http     # HTTP tests — starts dev server automatically if needed
 npm run test:e2e      # full Playwright E2E suite
 npm run qa            # lint + type-check + app tests
 ```
 
-The pre-push hook runs app tests, then `scripts/e2e-select-suite.sh` (see "E2E tests" below) —
-never DB integration tests, which are run manually. Local Supabase must be running
-(`npm run db:start:local`) and seeded (`npm run db:seed:e2e`) for the E2E and DB integration
-suites to pass.
+The pre-push hook runs app tests, then two diff-aware selection scripts —
+`scripts/fixture-freshness-select.sh` (see "App tests" below) and `scripts/e2e-select-suite.sh`
+(see "E2E tests" below). It never runs the DB integration suite as a whole; that stays manual,
+and the fixture-freshness check is the one integration test it can reach, gated on the branch
+diff. Local Supabase must be running (`npm run db:start:local`) and seeded
+(`npm run db:seed:e2e`, or `npm run db:sync:e2e` for a guaranteed-clean baseline — see
+"Regenerating fixtures reproducibly" below) for the E2E and DB integration suites to pass.
 
 HTTP tests (`http-tests/`) use `http-tests/global-setup.ts` to start/stop the Next.js dev server automatically. The default server URL is derived per-worktree from `scripts/worktree-test-port.ts` (`deriveWorktreePort()` hashes the worktree's absolute path into a fixed port range, avoiding `3000` and the local Supabase ports) — so concurrent swarm worktrees each get their own port and a reused server can only ever be one this same worktree started, never a sibling's. Set `TEST_BASE_URL` to override the derivation and point at a specific/remote server. If a server is already running at the resolved URL, it reuses it and does not kill it after the suite. `playwright.config.ts` uses the same helper for the E2E dev server.
 
@@ -358,7 +387,114 @@ Tests live in `__tests__/` directories alongside the code they test. Global mock
 
 Page-level tests render async server components directly with `await Page({ params: Promise.resolve(...) })`.
 
-Snapshot fixture data lives in `test-fixtures/snapshots/` — use these as mock return values rather than inventing data inline.
+Snapshot fixture data lives in `test-fixtures/snapshots/` — use these as mock return values rather
+than inventing data inline. Fixtures are organised **by data source, not by the action function
+that consumes them** (#882): one subdirectory per Postgres RPC (`core_stats/`,
+`biometrics_stats/`, `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
+`top_metrics_by_period/`, `ring_sequence_controls/`), or
+`tables/<TableName>/` for a fixture produced by a direct PostgREST table query rather than an RPC
+call. This matters because an action can drift from the RPC/table it actually calls (#870:
+`getSpeciesStatsHistory.alpha.robin.json` was named after the `getSpeciesStatsHistory` action but
+generated from a raw `core_stats` call) — naming by source instead of by consumer
+means a fixture's location can never overstate what it verifies. Within each directory, filenames
+follow `<callingGroupOrParams>.<intent>.json` (e.g. `core_stats/alpha.by-species.json`,
+`core_stats/robin-alpha.monthly-history.json`). Not every fixture here is generated by
+`scripts/generate-snapshots.ts` — a handful
+(`ring_sequence_controls/`, `tables/Encounters/`, `tables/Species/`, and the
+`core_stats/*.summary-totals.json` / `*.home-page-summary.json` pairs) are still hand-maintained;
+regenerate the rest with `npm run db:generate-snapshots`.
+
+`core_stats`' two companion stats RPCs — `biometrics_stats` and
+`demographics_stats` (see "Companion stats RPCs and shared plumbing" above) — went uncovered until
+#883, so every test of their row shapes hand-rolled its own literal. Both now have fixtures for
+each call shape their real call sites use (`biometrics_stats`: group-wide `by-species`, plus
+Robin/Alpha `headline` and `monthly-history`; `demographics_stats`: Robin/Alpha `monthly-history`,
+its only call shape), and `biometrics_stats/gamma.by-species.json` is deliberately an empty array —
+Gamma has no biometric-eligible encounters — for the no-rows edge case. **Don't reintroduce a
+hand-written literal for either RPC's row shape:** base a test's row builder on a fixture row
+(spread it, override only the columns the test asserts on) so a column added or removed at the RPC
+surfaces in the fixture rather than drifting silently.
+
+**No compound fixtures: one fixture is the raw, unmodified return of exactly one RPC call or one
+table query.** Never merge two sources into one file, and never post-process a result before
+writing it. A fixture that isn't a verbatim source response can't be checked against any source —
+it quietly starts asserting the shape of the merge instead of the shape of the database, which is
+the same class of silent drift #870/#890 were about. Where an action joins two sources, write one
+fixture per source and let the **consuming test** do the same join the action does, with the same
+helper the production read path uses: build a `CoreStatsWithBiometrics` row with
+`mergeBiometricsFields` and a `SpeciesStatsRow` with `mergeSpeciesBiometrics` over the two source
+fixtures (#821/#823), rather than reading wing/weight columns off a `core_stats` fixture —
+`core_stats` stopped carrying its own copies at #827. So `core_stats/alpha.by-species.json` and
+`biometrics_stats/alpha.by-species.json` are separate files, and `SppStatsTable`'s test merges
+them itself.
+
+Two generated fixtures still break this rule and are grandfathered pending
+[#901](https://github.com/wheresrhys/totf/issues/901) — the
+`core_stats/*.yearly-and-monthly-totals.json` pair (two `core_stats` calls in one file) and
+`tables/Birds/arretrap.bird-detail.json` (a `Birds` row with an `Encounters` query spliced on).
+Don't add a third.
+
+**Fixture drift is caught by a pre-push, diff-gated check — but only for the 25 generated
+fixtures.** Nothing in the type system notices when an RPC's return shape changes underneath a
+fixture: they're consumed via `fixture as unknown as SomeType`, a double assertion that switches
+assignability checking off, and an imported JSON module is not a fresh object literal, so even
+without the cast a fixture carrying columns the type no longer declares stays assignable. That's
+how #870's column removal reached `main` with every check green (full investigation in
+[#890](https://github.com/wheresrhys/totf/issues/890) / [#884](https://github.com/wheresrhys/totf/issues/884)).
+`supabase/__tests__/snapshot-fixture-freshness.test.ts` (#893) closes the gap:
+
+- **What it does.** Runs `generateSnapshots()` into an `fs.mkdtemp` directory and diffs each result
+  against the committed copy, failing with the specific per-file differences. Two kinds are
+  reported — **column drift** (a column path present on one side only, array indices collapsed to
+  `[]`) and **row-count drift** (same columns, different number of rows: a fixture committed at 3
+  rows against a database now returning 5 is just as stale). Values are never compared — fixture
+  row order and surrogate ids reflect whatever physical order and sequence state the local database
+  is in, so value equality would fail on every reseed for reasons unrelated to staleness, whereas a
+  column set and a row count are properties of the query and survive a reseed. Stick to that
+  column/row vocabulary when touching this code: it's uniform across the module, its tests and its
+  failure messages. The comparison helpers and the two fixture inventories live in
+  `lib/snapshot-fixtures.ts` (pure, no I/O, unit-tested in the app suite).
+- **What it covers.** Exactly the 25 fixtures `scripts/generate-snapshots.ts` writes
+  (`GENERATED_SNAPSHOT_FIXTURES`). It asserts the generator still produces precisely that set, so a
+  fixture silently dropping out of the generator fails rather than quietly stopping being checked.
+- **What it doesn't.** The 8 hand-maintained fixtures (`UNGENERATED_SNAPSHOT_FIXTURES` — the
+  `core_stats/*.summary-totals.json` / `*.home-page-summary.json` pairs, `ring_sequence_controls/`,
+  `tables/Encounters/`, `tables/Species/`). A second coverage test pins the on-disk file list to
+  generated + ungenerated, so the gap stays visible rather than implied-fixed. Bringing them under
+  the generator is [#894](https://github.com/wheresrhys/totf/issues/894).
+- **When it runs.** Pre-push only — CI has no Supabase service. `scripts/fixture-freshness-select.sh`
+  mirrors `scripts/e2e-select-suite.sh`: it diffs the branch against `origin/main` and runs
+  `npm run test:fixture-freshness` only when the diff touches `supabase/schema/`,
+  `types/supabase.types.ts`, `scripts/generate-snapshots.ts`, `lib/snapshot-fixtures.ts`,
+  `test-fixtures/snapshots/`, or the test itself. Any branch changing an RPC's shape touches at
+  least the first two; most branches pay nothing. It's read-only and writes solely to a temp
+  directory, so it stays safe alongside sibling swarm worktrees.
+
+So: if you change an RPC's return shape, run `npm run db:sync:e2e` (not `db:seed:e2e` — see
+"Regenerating fixtures reproducibly" immediately below) and commit the regenerated fixtures in the
+same PR, and hand-edit the eight ungenerated ones.
+
+**Regenerating fixtures reproducibly — `db:seed:e2e` vs `db:sync:e2e` (#903).** Both end by
+regenerating every generated fixture, but they start from different baselines:
+
+- `npm run db:seed:e2e` is **upsert-only** — it never truncates, so it tops up whatever is already
+  in the local database. Fine for routine dev, but *not* a clean baseline: DB integration tests
+  write real, undeleted rows into the shared seed groups (e.g. `supabase/__tests__/ring-sequences.test.ts`
+  and `triggers.test.ts` write into Gamma/Delta with no teardown), and those rows survive into
+  whatever you regenerate next.
+- `npm run db:sync:e2e` is `supabase db reset && npm run db:seed:e2e` (the same shape as
+  `db:sync:local`) — a destructive reset first, so seeding always starts from an empty database.
+  **Use this whenever byte-identical fixture output matters**, i.e. any time you're committing
+  regenerated fixtures.
+
+Determinism also depends on the seed importing serially: every table's `id` is `DEFAULT
+nextval(...)` rather than `GENERATED ALWAYS AS IDENTITY`, so under concurrent row processing the id
+a row gets depends on I/O timing, and the fixtures embed literal ids (e.g.
+`tables/Birds/robin-alpha.page-of-birds.json`). `scripts/seed-e2e-data.ts` therefore calls
+`importCSV` from `scripts/import-csv.ts` in-process at `concurrency: 1`, rather than shelling out
+to `npm run db:import:local` at the default 30. That's seeding-only: the CLI (`db:import:{local,prod}`)
+and the web import route keep the default concurrency. Two consecutive `db:sync:e2e` +
+`db:generate-snapshots` runs now produce byte-identical fixtures.
 
 **Asserting on table cells:** never index into cells by raw position (`cells[6]`,
 `querySelectorAll('td')[8]`) — a reordered or added column silently breaks an unrelated
@@ -467,3 +603,17 @@ npm run set-group-password:prod "Group Name" "password"
 ```
 
 Passwords are bcrypt-hashed with a per-group random salt stored in the `password_salt` column of `RingingGroups`.
+
+
+## Project structure
+
+This split is far from perfect and suggestions to improve the comprehensiveness and quality are welcome.
+
+- ./lib is for any library files used by both scripts and the core next.js app
+- ./app/lib is for any libarry files used only by the next.js app. Where appropriate they should be grouped into subdirectories
+- ./app/models should be mainly for data structures, with only very minimal functionlaity for transforming/massaging data into related data structures. Anything more complex should live in ./app/lib.
+
+## Caveman
+Use the caveman skill judiciously:
+- extensively while implementing
+- less so when communicating with me

@@ -8,7 +8,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { format as formatDate } from 'date-fns';
 import { MonthSessionsHeading, MonthSessionsContent } from './MonthSessions';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 function YearHeading({
 	model: { yearString }

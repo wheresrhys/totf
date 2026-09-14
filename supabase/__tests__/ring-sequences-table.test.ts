@@ -16,7 +16,7 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
+import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { randomTestSuffix } from './test-isolation';
 import { psql, createIsolatedGroup } from './db-test-helpers';

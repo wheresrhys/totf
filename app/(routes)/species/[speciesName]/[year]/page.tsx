@@ -4,8 +4,8 @@ import {
 } from '@/app/components/layout/BootstrapPage';
 import { SpeciesPageContent, type PageData } from '../PageContent';
 import { fetchSpeciesPageContentForPeriod } from '@/app/(routes)/species/[speciesName]/page';
-import { readTabIdSearchParam } from '@/lib/tab-query-param';
-import type { ViewedGroup } from '@/lib/group-slug';
+import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type PageParams = { speciesName: string; year: string; tabId?: string };
 type PageProps = {

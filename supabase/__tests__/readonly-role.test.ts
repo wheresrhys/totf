@@ -13,7 +13,7 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
+import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import { supabase } from '../../lib/supabase';
 import { randomTestSuffix } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -59,7 +59,7 @@ describe('app_readonly role', () => {
 	});
 
 	it('allows read-only RPC calls', async () => {
-		const { data, error } = await readonlyClient.rpc('aggregate_stats', {
+		const { data, error } = await readonlyClient.rpc('core_stats', {
 			ringing_group_filter: alphaId,
 		});
 		expect(error).toBeNull();

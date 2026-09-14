@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SpNotableRetrapsTab } from '../SpNotableRetrapsTab';
-import notableRetrapsSnapshot from '@/test-fixtures/snapshots/fetchSpNotableRetraps.alpha.robin.json';
+import notableRetrapsSnapshot from '@/test-fixtures/snapshots/notable_retraps/robin-alpha.retraps.json';
 import type { NotableRetrapsResult } from '@/app/models/db';
 
 vi.mock('@/app/actions/sp-data', () => ({

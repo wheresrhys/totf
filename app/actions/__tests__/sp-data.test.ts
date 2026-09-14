@@ -4,11 +4,11 @@ import {
 	fetchNotableRetraps,
 	fetchGraphableEncounterData,
 	getSpeciesStatsHistory,
-	getSpeciesPopulationStats,
+	getSpeciesDemographicsStats,
 	fetchSpeciesPeriodTotals,
 	getGroupEffortHistory
 } from '../sp-data';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchGroupEffortHistory } =
 	vi.hoisted(() => ({
@@ -16,7 +16,7 @@ const { mockGetAuthenticatedSupabaseClient, mockFetchGroupEffortHistory } =
 		mockFetchGroupEffortHistory: vi.fn()
 	}));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
@@ -25,7 +25,7 @@ vi.mock('@/lib/group-auth', () => ({
 // RPC-args/caching behaviour is covered by lib/__tests__/underlying-stats.test.ts,
 // so here it's mocked directly and these tests only assert the
 // interval->hours conversion + [time_period, hours] pair shaping.
-vi.mock('@/lib/underlying-stats', () => ({
+vi.mock('@/app/lib/underlying-stats', () => ({
 	fetchGroupEffortHistory: mockFetchGroupEffortHistory
 }));
 
@@ -83,6 +83,28 @@ function makeClient({
 	};
 	mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 	return { client, queryRecord: query.record, rpcCalls };
+}
+
+function makeStatsHistoryClient({
+	aggregateRows,
+	biometricsRows
+}: {
+	aggregateRows: unknown[];
+	biometricsRows: unknown[];
+}) {
+	const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
+	const client = {
+		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
+			rpcCalls.push({ name, args });
+			const data = name === 'core_stats' ? aggregateRows : biometricsRows;
+			return {
+				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+					Promise.resolve({ data, error: null }).then(resolve)
+			};
+		})
+	};
+	mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+	return { rpcCalls };
 }
 
 function birdRow(encounterDates: string[]) {
@@ -235,12 +257,12 @@ describe('sp-data actions', () => {
 	});
 
 	describe('getSpeciesStatsHistory', () => {
-		it('forwards from_date/to_date to aggregate_stats alongside the monthly timeInterval', async () => {
+		it('forwards from_date/to_date to core_stats alongside the monthly timeInterval', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID, FROM_DATE, TO_DATE);
 
-			expect(rpcCalls[0].name).toBe('aggregate_stats');
+			expect(rpcCalls[0].name).toBe('core_stats');
 			expect(rpcCalls[0].args).toMatchObject({
 				species_name_filter: SPECIES_NAME,
 				ringing_group_filter: GROUP_ID,
@@ -258,20 +280,150 @@ describe('sp-data actions', () => {
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
 		});
+
+		it('calls biometrics_stats with group_by_time_period: "month", matching the existing core_stats call', async () => {
+			const { rpcCalls } = makeStatsHistoryClient({
+				aggregateRows: [],
+				biometricsRows: []
+			});
+
+			await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+
+			const biometricsCall = rpcCalls.find(
+				(call) => call.name === 'biometrics_stats'
+			);
+			expect(biometricsCall?.args).toMatchObject({
+				group_by_time_period: 'month'
+			});
+		});
+
+		it('merges biometrics_stats wing/weight fields onto each core_stats row, keyed by time_period', async () => {
+			makeStatsHistoryClient({
+				aggregateRows: [
+					{
+						time_period: '2023-01',
+						bird_count: 5,
+						min_weight: 1,
+						max_weight: 2
+					},
+					{
+						time_period: '2023-02',
+						bird_count: 3,
+						min_weight: 1,
+						max_weight: 2
+					}
+				],
+				biometricsRows: [
+					{ time_period: '2023-01', min_weight: 99, max_weight: 100 },
+					{ time_period: '2023-02', min_weight: 88, max_weight: 90 }
+				]
+			});
+
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+
+			expect(result).toEqual([
+				expect.objectContaining({
+					time_period: '2023-01',
+					bird_count: 5,
+					min_weight: 99,
+					max_weight: 100
+				}),
+				expect.objectContaining({
+					time_period: '2023-02',
+					bird_count: 3,
+					min_weight: 88,
+					max_weight: 90
+				})
+			]);
+		});
+
+		it('returns an empty array without erroring when neither RPC returns rows', async () => {
+			makeStatsHistoryClient({ aggregateRows: [], biometricsRows: [] });
+
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+
+			expect(result).toEqual([]);
+		});
+
+		it('with interval "year" calls both RPCs with group_by_time_period: "year"', async () => {
+			const { rpcCalls } = makeStatsHistoryClient({
+				aggregateRows: [],
+				biometricsRows: []
+			});
+
+			await getSpeciesStatsHistory(
+				SPECIES_NAME,
+				GROUP_ID,
+				undefined,
+				undefined,
+				'year'
+			);
+
+			expect(rpcCalls).toHaveLength(2);
+			for (const call of rpcCalls) {
+				expect(call.args).toMatchObject({ group_by_time_period: 'year' });
+			}
+		});
+
+		it('with interval "month" passed explicitly matches the default', async () => {
+			const { rpcCalls } = makeStatsHistoryClient({
+				aggregateRows: [],
+				biometricsRows: []
+			});
+
+			await getSpeciesStatsHistory(
+				SPECIES_NAME,
+				GROUP_ID,
+				undefined,
+				undefined,
+				'month'
+			);
+
+			for (const call of rpcCalls) {
+				expect(call.args).toMatchObject({ group_by_time_period: 'month' });
+			}
+		});
+
+		it('fills all 8 biometric fields with null when a time_period has no matching biometrics_stats row', async () => {
+			makeStatsHistoryClient({
+				aggregateRows: [{ time_period: '2023-03', bird_count: 2 }],
+				biometricsRows: []
+			});
+
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+
+			// core_stats no longer carries its own wing/weight columns (#827),
+			// so a period with no matching biometrics_stats row gets all 8 fields
+			// coalesced to null rather than being passed through unmerged.
+			expect(result).toEqual([
+				{
+					time_period: '2023-03',
+					bird_count: 2,
+					min_weight: null,
+					max_weight: null,
+					avg_weight: null,
+					median_weight: null,
+					min_wing: null,
+					max_wing: null,
+					avg_wing: null,
+					median_wing: null
+				}
+			]);
+		});
 	});
 
-	describe('getSpeciesPopulationStats', () => {
-		it('forwards from_date/to_date to population_stats alongside the monthly timeInterval', async () => {
+	describe('getSpeciesDemographicsStats', () => {
+		it('forwards from_date/to_date to demographics_stats alongside the monthly timeInterval', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesPopulationStats(
+			await getSpeciesDemographicsStats(
 				SPECIES_NAME,
 				GROUP_ID,
 				FROM_DATE,
 				TO_DATE
 			);
 
-			expect(rpcCalls[0].name).toBe('population_stats');
+			expect(rpcCalls[0].name).toBe('demographics_stats');
 			expect(rpcCalls[0].args).toMatchObject({
 				species_name_filter: SPECIES_NAME,
 				ringing_group_filter: GROUP_ID,
@@ -284,10 +436,42 @@ describe('sp-data actions', () => {
 		it('omits from_date/to_date when no range is supplied', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesPopulationStats(SPECIES_NAME, GROUP_ID);
+			await getSpeciesDemographicsStats(SPECIES_NAME, GROUP_ID);
 
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
+		});
+
+		it('with interval "year" calls demographics_stats with group_by_time_period: "year"', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await getSpeciesDemographicsStats(
+				SPECIES_NAME,
+				GROUP_ID,
+				undefined,
+				undefined,
+				'year'
+			);
+
+			expect(rpcCalls[0].args).toMatchObject({
+				group_by_time_period: 'year'
+			});
+		});
+
+		it('with interval "month" passed explicitly matches the default', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await getSpeciesDemographicsStats(
+				SPECIES_NAME,
+				GROUP_ID,
+				undefined,
+				undefined,
+				'month'
+			);
+
+			expect(rpcCalls[0].args).toMatchObject({
+				group_by_time_period: 'month'
+			});
 		});
 	});
 
@@ -295,14 +479,14 @@ describe('sp-data actions', () => {
 		function effortRow(
 			time_period: string,
 			total_effort: string
-		): AggregateStatsResult {
+		): CoreStatsResult {
 			return {
 				time_period,
 				total_effort
-			} as AggregateStatsResult;
+			} as CoreStatsResult;
 		}
 
-		it('converts aggregate_stats rows into [time_period, hours] pairs in the same order', async () => {
+		it('converts core_stats rows into [time_period, hours] pairs in the same order', async () => {
 			mockFetchGroupEffortHistory.mockResolvedValue([
 				effortRow('2023-01', '05:30:00'),
 				effortRow('2023-02', '02:00:00')
@@ -363,12 +547,12 @@ describe('sp-data actions', () => {
 	// earlier in-range encounter appear while a later out-of-range one is dropped.
 
 	describe('fetchSpeciesPeriodTotals', () => {
-		it('with timeInterval "year" calls aggregate_stats with species_name_filter and group_by_time_period "year"', async () => {
+		it('with timeInterval "year" calls core_stats with species_name_filter and group_by_time_period "year"', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'year');
 
-			expect(rpcCalls[0].name).toBe('aggregate_stats');
+			expect(rpcCalls[0].name).toBe('core_stats');
 			expect(rpcCalls[0].args).toMatchObject({
 				species_name_filter: SPECIES_NAME,
 				ringing_group_filter: GROUP_ID,
@@ -376,7 +560,7 @@ describe('sp-data actions', () => {
 			});
 		});
 
-		it('with timeInterval "month" calls aggregate_stats with group_by_time_period "month"', async () => {
+		it('with timeInterval "month" calls core_stats with group_by_time_period "month"', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'month');

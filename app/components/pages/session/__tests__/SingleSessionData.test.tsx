@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { SessionTabs } from '../SingleSessionData';
 import type { SpeciesWithEncounters } from '../SingleSessionData';
-import type { NetRound } from '@/app/models/session-chronology';
+import type { NetRound } from '@/app/lib/session-chronology';
 import type { SessionEncounter } from '@/app/models/session';
 import {
 	getCellByHeading,

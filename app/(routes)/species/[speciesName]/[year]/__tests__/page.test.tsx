@@ -7,7 +7,11 @@ import {
 	fireEvent
 } from '@testing-library/react';
 import Page, { fetchSpeciesYearPageContent } from '../page';
-import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
+import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
+import {
+	ROBIN_SPECIES_ID,
+	robinSpeciesStats as speciesStats
+} from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
@@ -17,7 +21,7 @@ const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
 	})
 );
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
@@ -59,11 +63,9 @@ vi.mock('@/app/components/pages/species/SpWeightWingTab', () => ({
 	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
 
-const { birds, speciesStats } = spPageSnapshot as unknown as FullFatPageData;
+const birds = birdsSnapshot as unknown as FullFatPageData['birds'];
 
-function makeSpeciesClient(
-	speciesId: number | null = spPageSnapshot.speciesId
-) {
+function makeSpeciesClient(speciesId: number | null = ROBIN_SPECIES_ID) {
 	const fromChain = {
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
@@ -123,7 +125,7 @@ describe('/species/[speciesName]/[year]', () => {
 		});
 
 		describe('tab order and defaults (year-scoped page)', () => {
-			it('renders tab buttons in the order Month totals, Session totals, Highlights, Biometrics, Population, Bird list (no Year totals)', async () => {
+			it('renders tab buttons in the order Month totals, Session totals, Highlights, Biometrics, Demographics, Bird list (no Year totals)', async () => {
 				render(await renderYearPage());
 				await screen.findByTestId('sp-month-totals-tab');
 				const labels = within(screen.getByRole('tablist'))
@@ -134,7 +136,7 @@ describe('/species/[speciesName]/[year]', () => {
 					'Session totals',
 					'Highlights',
 					'Biometrics',
-					'Population',
+					'Demographics',
 					'Bird list'
 				]);
 				expect(
@@ -238,7 +240,7 @@ describe('/species/[speciesName]/[year]', () => {
 				1
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
-				spPageSnapshot.speciesId,
+				ROBIN_SPECIES_ID,
 				1,
 				0,
 				'2026-01-01',
@@ -254,7 +256,7 @@ describe('/species/[speciesName]/[year]', () => {
 				1
 			);
 			expect(client.rpc).toHaveBeenCalledWith(
-				'aggregate_stats',
+				'core_stats',
 				expect.objectContaining({
 					from_date: '2026-01-01',
 					to_date: '2026-12-31'

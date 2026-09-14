@@ -32,6 +32,20 @@ function isMermaidDiffComment(body: string | undefined): boolean {
 	return Boolean(body?.includes('```mermaid'));
 }
 
+/**
+ * Trailing marker a swarm maintenance worker appends to every reply it posts on a PR it's
+ * addressing (see `/swarm` §1 step 4). An HTML comment, so it's invisible in GitHub's rendered
+ * view. There is no bot identity for swarm workers — `gh pr comment` authenticates as the same
+ * human account a real reviewer uses — so `isBotLogin` cannot tell a worker's own reply from
+ * genuine unaddressed feedback, and without this marker a replied-to PR loops through maintenance
+ * spawns forever (#904).
+ */
+export const SWARM_WORKER_REPLY_MARKER = '<!-- swarm-worker-reply -->';
+
+function isSwarmWorkerReply(body: string | undefined): boolean {
+	return Boolean(body?.includes(SWARM_WORKER_REPLY_MARKER));
+}
+
 interface ReviewLike {
 	author?: { login?: string };
 	state?: string;
@@ -60,8 +74,8 @@ interface InlineCommentLike {
 /**
  * Groups inline review comments into threads (by in_reply_to_id, falling back to the comment's
  * own id for a thread root) and flags a thread as outstanding if its most recent comment is
- * human-authored, not a mermaid-diff comment, and newer than the PR's head commit — i.e. nobody
- * has posted anything since, human or otherwise.
+ * human-authored, not a mermaid-diff comment, not a swarm worker's own marked reply, and newer
+ * than the PR's head commit — i.e. nobody has posted anything since, human or otherwise.
  */
 export function hasOutstandingInlineFeedback(comments: InlineCommentLike[], headCommitDate: string): boolean {
 	const threads = new Map<number, InlineCommentLike[]>();
@@ -75,6 +89,7 @@ export function hasOutstandingInlineFeedback(comments: InlineCommentLike[], head
 		const latest = thread.reduce((a, b) => ((a.created_at ?? '') > (b.created_at ?? '') ? a : b));
 		if (isBotLogin(latest.user?.login)) continue;
 		if (isMermaidDiffComment(latest.body)) continue;
+		if (isSwarmWorkerReply(latest.body)) continue;
 		if (latest.created_at && latest.created_at > headCommitDate) return true;
 	}
 	return false;
@@ -89,14 +104,16 @@ interface IssueCommentLike {
 /**
  * Flags a top-level PR conversation comment (`GET /issues/{n}/comments` — what both `gh pr
  * comment` and the `mermaid-diff` skill write to) as outstanding feedback if it's human-authored,
- * not a mermaid-diff comment, and newer than the PR's head commit. Issue comments are a flat
- * list, not threaded like review comments, so unlike `hasOutstandingInlineFeedback` there's no
- * reply-threading step — each comment is evaluated on its own.
+ * not a mermaid-diff comment, not a swarm worker's own marked reply, and newer than the PR's head
+ * commit. Issue comments are a flat list, not threaded like review comments, so unlike
+ * `hasOutstandingInlineFeedback` there's no reply-threading step — each comment is evaluated on
+ * its own.
  */
 export function hasOutstandingIssueCommentFeedback(comments: IssueCommentLike[], headCommitDate: string): boolean {
 	return comments.some((comment) => {
 		if (isBotLogin(comment.user?.login)) return false;
 		if (!comment.body || isMermaidDiffComment(comment.body)) return false;
+		if (isSwarmWorkerReply(comment.body)) return false;
 		return Boolean(comment.created_at && comment.created_at > headCommitDate);
 	});
 }
@@ -437,8 +454,18 @@ export async function resolveMaintenanceCandidateModel(prNumber: number): Promis
 		.catch(() => null);
 }
 
+/**
+ * The exclusive label of the first running worker still holding the shared-local-Postgres lock, or
+ * `null` when none is. An entry that has explicitly released its lock early (`dbLockReleased`, set
+ * via `swarm_state_release_db_lock` once its migration/`@mutates` work is applied and verified) is
+ * skipped *before* its `gh` label lookup — cheaper, and correct: a released entry must never
+ * contribute an exclusive label even though its issue/PR still carries one. The flag is the sole
+ * signal; liveness/idleness is deliberately not consulted here (the release is one-way and persists
+ * however the worker behaves afterwards, including going idle or opening its PR).
+ */
 async function isSoloRunCurrentlyActive(running: SwarmWorkerEntry[]): Promise<ExclusiveLabel | null> {
 	for (const entry of running) {
+		if (entry.dbLockReleased === true) continue;
 		const target =
 			entry.kind === 'maintenance' && entry.pr !== null
 				? (['pr', 'view', String(entry.pr), '--json', 'labels'] as const)

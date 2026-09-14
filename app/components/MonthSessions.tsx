@@ -2,7 +2,7 @@
 import { type SessionWithEncountersCount } from '@/app/models/session';
 import { format as formatDate } from 'date-fns';
 import { SessionsByDay } from './SessionsByDay';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export function MonthSessionsHeading({
 	model: { monthData: month }

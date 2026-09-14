@@ -7,7 +7,11 @@ import {
 	fireEvent
 } from '@testing-library/react';
 import Page, { fetchSpeciesYearMonthPageContent } from '../page';
-import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
+import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
+import {
+	ROBIN_SPECIES_ID,
+	robinSpeciesStats as speciesStats
+} from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
@@ -17,7 +21,7 @@ const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
 	})
 );
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
@@ -49,11 +53,9 @@ vi.mock('@/app/components/pages/species/SpSessionTotalsTab', () => ({
 	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
 }));
 
-const { birds, speciesStats } = spPageSnapshot as unknown as FullFatPageData;
+const birds = birdsSnapshot as unknown as FullFatPageData['birds'];
 
-function makeSpeciesClient(
-	speciesId: number | null = spPageSnapshot.speciesId
-) {
+function makeSpeciesClient(speciesId: number | null = ROBIN_SPECIES_ID) {
 	const fromChain = {
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
@@ -132,7 +134,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 		});
 
 		describe('tab order and defaults (month-scoped page)', () => {
-			it('renders tab buttons in the order Session totals, Highlights, Biometrics, Population, Bird list (no Year/Month totals)', async () => {
+			it('renders tab buttons in the order Session totals, Highlights, Biometrics, Demographics, Bird list (no Year/Month totals)', async () => {
 				render(await renderMonthPage());
 				await screen.findByTestId('sp-session-totals-tab');
 				const labels = within(screen.getByRole('tablist'))
@@ -142,7 +144,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 					'Session totals',
 					'Highlights',
 					'Biometrics',
-					'Population',
+					'Demographics',
 					'Bird list'
 				]);
 			});
@@ -227,7 +229,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 				1
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
-				spPageSnapshot.speciesId,
+				ROBIN_SPECIES_ID,
 				1,
 				0,
 				'2026-08-01',
@@ -241,7 +243,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 				1
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
-				spPageSnapshot.speciesId,
+				ROBIN_SPECIES_ID,
 				1,
 				0,
 				'2026-04-01',

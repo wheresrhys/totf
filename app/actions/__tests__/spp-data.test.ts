@@ -1,32 +1,257 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchAuthorisedAggregateStats } from '@/lib/group-summary-access';
-import type { AggregateStatsResult } from '@/app/models/db';
+import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
+import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 import { fetchSpeciesData } from '../spp-data';
+import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
+import gammaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/gamma.by-species.json';
 
-vi.mock('@/lib/group-summary-access', () => ({
-	fetchAuthorisedAggregateStats: vi.fn()
+// Real captured biometrics_stats output for the exact call fetchSpeciesData
+// makes (group-wide, group_by_species). Alpha's first row is the Blue Tit that
+// buildAggregateRow below also defaults to, so the two builders line up on
+// species_name; Gamma's is genuinely empty — that group has no
+// biometric-eligible encounters at all — which is the fixture-backed
+// no-biometrics-anywhere edge case (#883).
+const capturedBiometricsRows =
+	alphaBiometricsBySpecies as unknown as BiometricsStatsResult[];
+const emptyBiometricsRows =
+	gammaBiometricsBySpecies as unknown as BiometricsStatsResult[];
+
+const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
+	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-const ROW = { encounter_count: 5 } as unknown as AggregateStatsResult;
+vi.mock('@/app/lib/auth/group-summary-access', () => ({
+	fetchAuthorisedCoreStats: vi.fn()
+}));
 
-describe('fetchSpeciesData — routes through the group-summary access helper', () => {
+vi.mock('@/app/lib/auth/group-auth', () => ({
+	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
+}));
+
+const GROUP_ID = 1;
+const FROM_DATE = '2026-01-01';
+const TO_DATE = '2026-12-31';
+
+function buildAggregateRow(
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
+	return {
+		species_name: 'Blue Tit',
+		time_period: null,
+		session_count: 4,
+		total_effort: '18:00:00',
+		effort_per_session: '02:00:00',
+		effort_per_encounter: '02:34:17',
+		avg_encounters_per_session: 1.75,
+		max_per_session: 3,
+		species_count: 1,
+		bird_count: 6,
+		encounter_count: 7,
+		new_bird_count: 4,
+		pullus_bird_count: 0,
+		juv_bird_count: 0,
+		postjuv_bird_count: 5,
+		adult_bird_count: 0,
+		unknown_age_bird_count: 1,
+		pullus_enc_count: 0,
+		juv_enc_count: 0,
+		postjuv_enc_count: 6,
+		adult_enc_count: 1,
+		unknown_age_enc_count: 0,
+		max_new_per_session: 3,
+		max_weight: 13.1,
+		avg_weight: 11.2,
+		min_weight: 9.8,
+		median_weight: 10.8,
+		max_wing: 68,
+		avg_wing: 66.6,
+		min_wing: 65,
+		median_wing: 67,
+		...overrides
+	} as unknown as CoreStatsResult;
+}
+
+function buildBiometricsRow(
+	overrides: Partial<BiometricsStatsResult> = {}
+): BiometricsStatsResult {
+	return {
+		...capturedBiometricsRows[0],
+		...overrides
+	};
+}
+
+// Mirrors the rpc() mock pattern used by app/actions/__tests__/sp-data.test.ts —
+// records every rpc() call and resolves it to the given rows.
+function makeRpcClient(rpcRows: unknown) {
+	const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
+	const client = {
+		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
+			rpcCalls.push({ name, args });
+			return {
+				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+					Promise.resolve({ data: rpcRows, error: null }).then(resolve)
+			};
+		})
+	};
+	mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+	return rpcCalls;
+}
+
+describe('fetchSpeciesData — merges core_stats and biometrics_stats by species_name', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
-	it('requests species-grouped stats scoped to the given date range', async () => {
-		vi.mocked(fetchAuthorisedAggregateStats).mockResolvedValue({
-			accessLevel: 'own',
-			rows: [ROW]
+	describe('Usual', () => {
+		it('merges biometrics_stats fields onto matching core_stats rows by species_name', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [buildAggregateRow()]
+			});
+			makeRpcClient([buildBiometricsRow({ max_weight: 20, max_wing: 70 })]);
+
+			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(row.max_weight).toBe(20);
+			expect(row.max_wing).toBe(70);
 		});
 
-		const result = await fetchSpeciesData(1, '2026-01-01', '2026-12-31');
+		it('passes through non-biometric core_stats fields unchanged', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [
+					buildAggregateRow({
+						bird_count: 12,
+						encounter_count: 15,
+						session_count: 3,
+						max_per_session: 4
+					})
+				]
+			});
+			makeRpcClient([buildBiometricsRow()]);
 
-		expect(result).toEqual([ROW]);
-		expect(fetchAuthorisedAggregateStats).toHaveBeenCalledWith(1, {
-			from_date: '2026-01-01',
-			to_date: '2026-12-31',
-			group_by_species: true
+			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(row.bird_count).toBe(12);
+			expect(row.encounter_count).toBe(15);
+			expect(row.session_count).toBe(3);
+			expect(row.max_per_session).toBe(4);
+		});
+	});
+
+	describe('Structure', () => {
+		it('calls biometrics_stats with the same viewedGroupId/from_date/to_date/group_by_species params as core_stats', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [buildAggregateRow()]
+			});
+			const rpcCalls = makeRpcClient([]);
+
+			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(GROUP_ID, {
+				from_date: FROM_DATE,
+				to_date: TO_DATE,
+				group_by_species: true
+			});
+			expect(rpcCalls).toEqual([
+				{
+					name: 'biometrics_stats',
+					args: {
+						ringing_group_filter: GROUP_ID,
+						from_date: FROM_DATE,
+						to_date: TO_DATE,
+						group_by_species: true
+					}
+				}
+			]);
+		});
+
+		it('does not call biometrics_stats when fetchAuthorisedCoreStats resolves accessLevel "blocked"', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'blocked',
+				rows: []
+			});
+
+			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(mockGetAuthenticatedSupabaseClient).not.toHaveBeenCalled();
+		});
+
+		it('does not call biometrics_stats when fetchAuthorisedCoreStats resolves accessLevel "public"', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'public',
+				rows: [buildAggregateRow()]
+			});
+
+			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(mockGetAuthenticatedSupabaseClient).not.toHaveBeenCalled();
+		});
+
+		it('calls biometrics_stats when accessLevel is "shared"', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'shared',
+				rows: [buildAggregateRow()]
+			});
+			makeRpcClient([]);
+
+			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(mockGetAuthenticatedSupabaseClient).toHaveBeenCalled();
+		});
+	});
+
+	describe('Edge', () => {
+		it('leaves the 8 biometric fields undefined for a species present in core_stats but absent from biometrics_stats', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [buildAggregateRow({ species_name: 'Robin' })]
+			});
+			makeRpcClient([buildBiometricsRow({ species_name: 'Wren' })]);
+
+			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(row.max_weight).toBeUndefined();
+			expect(row.avg_weight).toBeUndefined();
+			expect(row.min_weight).toBeUndefined();
+			expect(row.median_weight).toBeUndefined();
+			expect(row.max_wing).toBeUndefined();
+			expect(row.avg_wing).toBeUndefined();
+			expect(row.min_wing).toBeUndefined();
+			expect(row.median_wing).toBeUndefined();
+		});
+
+		it('leaves the 8 biometric fields undefined when biometrics_stats returns no rows at all for the group', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [buildAggregateRow()]
+			});
+			makeRpcClient(emptyBiometricsRows);
+
+			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(row.species_name).toBe('Blue Tit');
+			expect(row.max_weight).toBeUndefined();
+			expect(row.avg_weight).toBeUndefined();
+			expect(row.min_weight).toBeUndefined();
+			expect(row.median_weight).toBeUndefined();
+			expect(row.max_wing).toBeUndefined();
+			expect(row.avg_wing).toBeUndefined();
+			expect(row.min_wing).toBeUndefined();
+			expect(row.median_wing).toBeUndefined();
+		});
+
+		it('returns an empty array when core_stats returns no rows', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: []
+			});
+			makeRpcClient([]);
+
+			const result = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(result).toEqual([]);
 		});
 	});
 });

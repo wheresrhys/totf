@@ -1,7 +1,7 @@
 'use server';
 
 import { cookies } from 'next/headers';
-import { generateGroupJwt, verifyGroupJwt } from '@/lib/jwt';
+import { generateGroupJwt, verifyGroupJwt } from '@/app/lib/auth/jwt';
 
 const COOKIE_NAME = 'TOTFSession';
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;

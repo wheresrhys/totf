@@ -1,0 +1,22 @@
+[
+  {
+    "visit_date": "2023-05-12",
+    "metric_value": 7
+  },
+  {
+    "visit_date": "2022-04-30",
+    "metric_value": 7
+  },
+  {
+    "visit_date": "2022-06-15",
+    "metric_value": 6
+  },
+  {
+    "visit_date": "2022-08-10",
+    "metric_value": 4
+  },
+  {
+    "visit_date": "2022-10-20",
+    "metric_value": 3
+  }
+]

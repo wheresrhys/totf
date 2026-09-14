@@ -2,10 +2,10 @@ import {
 	BootstrapPage,
 	defaultGetParams
 } from '@/app/components/layout/BootstrapPage';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { fetchPageOfBirds } from '@/app/actions/sp-data';
-import { readTabIdSearchParam } from '@/lib/tab-query-param';
+import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
 import {
 	SpeciesPageContent,
 	type PageParams,
@@ -13,8 +13,13 @@ import {
 	type PageData
 } from './PageContent';
 
-import type { AggregateStatsResult } from '@/app/models/db';
-import type { ViewedGroup } from '@/lib/group-slug';
+import {
+	mergeBiometricsFields,
+	type CoreStatsResult,
+	type CoreStatsWithBiometrics,
+	type BiometricsStatsResult
+} from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 type PageProps = {
 	params: Promise<{ speciesName: string }>;
@@ -34,21 +39,36 @@ async function getSpeciesPageParams(pageProps: PageProps): Promise<PageParams> {
 	return { speciesName, ...(tabId ? { tabId } : {}) };
 }
 
-async function getSpeciesStats(
+// Fetches the species page's headline stats row, merging biometrics_stats'
+// wing/weight fields onto the core_stats row (#821). Both RPCs share the
+// same param shape and, called without group_by_species/group_by_time_period,
+// each return exactly one (ungrouped) row for this species/date-range/group,
+// so the two rows line up 1:1 without needing a join key.
+export async function getSpeciesStats(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
-) {
+): Promise<CoreStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	return supabase
-		.rpc('aggregate_stats', {
-			species_name_filter: species,
-			ringing_group_filter: viewedGroupId,
-			...(fromDate ? { from_date: fromDate } : {}),
-			...(toDate ? { to_date: toDate } : {})
-		})
-		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
+	const rpcArgs = {
+		species_name_filter: species,
+		ringing_group_filter: viewedGroupId,
+		...(fromDate ? { from_date: fromDate } : {}),
+		...(toDate ? { to_date: toDate } : {})
+	};
+	const [aggregateRows, biometricsRows] = await Promise.all([
+		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
+			CoreStatsResult[]
+		>,
+		supabase
+			.rpc('biometrics_stats', rpcArgs)
+			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>
+	]);
+	const biometricsRow = biometricsRows[0];
+	return aggregateRows.map((aggregateRow) =>
+		mergeBiometricsFields(aggregateRow, biometricsRow)
+	);
 }
 
 // Shared core fetcher for all three species route levels. Given a resolved

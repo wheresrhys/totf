@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getAuthenticatedSupabaseClientForGroup } from '../../../../lib/group-auth';
+import { getAuthenticatedSupabaseClientForGroup } from '../../../../app/lib/auth/group-auth';
 import { getGroupIdByName } from './seed-lookups';
 
 export interface AlphaBetaGammaClients {

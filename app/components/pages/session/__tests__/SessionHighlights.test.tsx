@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SessionHighlights } from '../SessionHighlights';
-import type { SessionHighlight } from '@/app/models/highlights';
+import type { SessionHighlight } from '@/app/lib/highlights';
 import type { SessionEncounter } from '@/app/models/session';
 
 vi.mock('@/app/actions/session-highlights', () => ({

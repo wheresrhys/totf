@@ -7,8 +7,8 @@ import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import { RingingGroupProvider } from './components/layout/RingingGroupProvider';
 import { getGroupCookie } from './actions/group-cookie';
 import { LoginModal } from './components/layout/LoginModal';
-import { getRequestPathname } from '@/lib/request-pathname';
-import { resolvePublicPageViewedGroupId } from '@/lib/public-group-access';
+import { getRequestPathname } from '@/app/lib/request-pathname';
+import { resolvePublicPageViewedGroupId } from '@/app/lib/auth/public-group-access';
 export const metadata: Metadata = {
 	title: 'Top of the Flocks',
 	description: 'Leaderboard for bird ringing data'

@@ -7,7 +7,7 @@ import {
 	fireEvent
 } from '@testing-library/react';
 import { StatsAccordionItem } from '../PageContent';
-import topPeriodsSnapshot from '@/test-fixtures/snapshots/getTopPeriodsByMetric.alpha.json';
+import topPeriodsSnapshot from '@/test-fixtures/snapshots/top_metrics_by_period/alpha.busiest-days.json';
 import type { TopPeriodsResult } from '@/app/models/db';
 import type { AccordionItemModel } from '../PageContent';
 import type { UserTopStatsArgs } from '@/app/actions/top-performers';

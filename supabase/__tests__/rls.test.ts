@@ -10,7 +10,7 @@
  */
 
 import { describe, it, beforeAll, expect } from 'vitest';
-import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
+import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import { supabase } from '../../lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 

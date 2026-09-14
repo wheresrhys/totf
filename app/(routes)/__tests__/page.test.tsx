@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, within } from '@testing-library/react';
 import HomePage from '../page';
-import recentSessionsSnapshot from '@/test-fixtures/snapshots/fetchRecentSessions.alpha.json';
-import topSpeciesSnapshot from '@/test-fixtures/snapshots/fetchTopSpecies.alpha.json';
-import summaryStatsSnapshot from '@/test-fixtures/snapshots/fetchHomePageSummaryStats.alpha.json';
-import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/fetchHomePageSummaryStats.zero.json';
+import recentSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.recent-sessions.json';
+import topSpeciesSnapshot from '@/test-fixtures/snapshots/tables/Species/alpha.top-species.json';
+import summaryStatsSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.home-page-summary.json';
+import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/core_stats/zero.home-page-summary.json';
 import type { HomePageSummaryStats } from '../PageContent';
 import type { GroupTicksResult } from '@/app/models/db';
 
@@ -12,7 +12,7 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
@@ -317,7 +317,7 @@ describe('home page', () => {
 			]);
 		});
 
-		it('renders a row per metric with values from aggregate_stats for each period', async () => {
+		it('renders a row per metric with values from core_stats for each period', async () => {
 			render(await HomePage());
 			const table = await screen.findByTestId('summary-stats-table');
 			const { allTime, thisYear, lastYear } = summaryStatsSnapshot;
@@ -334,14 +334,14 @@ describe('home page', () => {
 			});
 		});
 
-		it('calls aggregate_stats for this year, last year, and all time, with the correct date bounds', async () => {
+		it('calls core_stats for this year, last year, and all time, with the correct date bounds', async () => {
 			const client = makeChainClient();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 			render(await HomePage());
 			await screen.findByTestId('summary-stats-table');
 			const currentYear = new Date().getFullYear();
 			const calls = client.rpc.mock.calls.filter(
-				([fnName]) => fnName === 'aggregate_stats'
+				([fnName]) => fnName === 'core_stats'
 			);
 			expect(
 				calls.some(

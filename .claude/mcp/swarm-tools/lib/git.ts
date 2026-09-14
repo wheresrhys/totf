@@ -15,11 +15,14 @@ export async function runGit(args: string[], cwd?: string): Promise<GitResult> {
 	};
 }
 
-/** Parses `git branch -a` output into branch names, with `remotes/origin/` stripped and deduped. */
+/**
+ * Parses `git branch -a` output into branch names, with `remotes/origin/` stripped and deduped.
+ * Strips both the `*` (current branch) and `+` (checked out in another worktree) leading markers.
+ */
 export function parseBranchList(stdout: string): string[] {
 	const names = stdout
 		.split('\n')
-		.map((line) => line.replace(/^\*?\s+/, '').trim())
+		.map((line) => line.replace(/^[*+]?\s+/, '').trim())
 		.filter(Boolean)
 		.filter((line) => !line.startsWith('remotes/origin/HEAD'))
 		.map((line) => line.replace(/^remotes\/origin\//, ''));

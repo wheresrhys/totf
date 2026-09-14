@@ -5,19 +5,22 @@ import {
 	type BirdOfSpecies,
 	type EnrichedBirdOfSpecies
 } from '@/app/models/bird';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { fetchGroupEffortHistory } from '@/lib/underlying-stats';
-import { postgresIntervalToHours } from '@/lib/postgres-interval';
+import { fetchGroupEffortHistory } from '@/app/lib/underlying-stats';
+import { postgresIntervalToHours } from '@/app/lib/postgres-interval';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
 import type { SexedGraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
-import type {
-	AggregateStatsResult,
-	PopulationStatsResult
+import {
+	mergeBiometricsFields,
+	type CoreStatsResult,
+	type CoreStatsWithBiometrics,
+	type BiometricsStatsResult,
+	type DemographicsStatsResult
 } from '@/app/models/db';
-import type { PeriodTotalsGrouping } from '@/app/models/period-totals';
+import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
 import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
 import type { TopMetricsFilterParams, TopPeriodsResult } from '@/app/models/db';
 export async function fetchPageOfBirds(
@@ -179,56 +182,99 @@ export async function fetchGraphableEncounterData(
 	);
 }
 
+/**
+ * Granularity of a species stats-history fetch. `'month'` (the default) is the
+ * conventional per-month history every caller started with; `'year'` re-fetches
+ * the same stats already grouped by calendar year at the RPC, which is *not*
+ * the same as summing the monthly rows client-side: `core_stats`'
+ * `bird_count` and `demographics_stats`' per-bird bucket counts are
+ * `COUNT(DISTINCT bird_id)` within their cell, so a bird retrapped in several
+ * months of one year would be counted once per month by a client-side sum but
+ * exactly once by a year-grouped fetch (#852).
+ */
+export type StatsHistoryInterval = 'month' | 'year';
+
+// Wing/weight + count history for a single species at `interval` granularity
+// (monthly by default), merging
+// biometrics_stats' wing/weight fields onto each core_stats row (#821).
+// The two RPCs share the same species/group/date-range/group_by_time_period
+// params, so their rows are grouped identically and joined here on
+// `time_period` (rather than assumed to line up positionally) — a period
+// present on one side but not the other is handled by the merge below: an
+// core_stats row with no matching biometrics_stats row still gets all 8
+// biometric fields, coalesced to null by mergeBiometricsFields (matching the
+// null columns core_stats returned before #827 removed them), and a
+// biometrics_stats row with no matching core_stats row is simply not
+// included in the output (the output shape is driven by core_stats).
 export async function getSpeciesStatsHistory(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
-	toDate?: string
-) {
+	toDate?: string,
+	interval: StatsHistoryInterval = 'month'
+): Promise<CoreStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	return supabase
-		.rpc('aggregate_stats', {
-			species_name_filter: species,
-			ringing_group_filter: viewedGroupId,
-			group_by_time_period: 'month',
-			...(fromDate ? { from_date: fromDate } : {}),
-			...(toDate ? { to_date: toDate } : {})
-		})
-		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
+	const rpcArgs = {
+		species_name_filter: species,
+		ringing_group_filter: viewedGroupId,
+		group_by_time_period: interval,
+		...(fromDate ? { from_date: fromDate } : {}),
+		...(toDate ? { to_date: toDate } : {})
+	};
+	const [aggregateRows, biometricsRows] = await Promise.all([
+		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
+			CoreStatsResult[]
+		>,
+		supabase
+			.rpc('biometrics_stats', rpcArgs)
+			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>
+	]);
+	const biometricsRowsByPeriod = new Map(
+		biometricsRows.map((row) => [row.time_period, row])
+	);
+	return aggregateRows.map((aggregateRow) =>
+		mergeBiometricsFields(
+			aggregateRow,
+			biometricsRowsByPeriod.get(aggregateRow.time_period)
+		)
+	);
 }
 
 /**
  * Monthly age-split + young-trends history for a single species — the
- * `population_stats` sibling of `getSpeciesStatsHistory`. #800 split these
+ * `demographics_stats` sibling of `getSpeciesStatsHistory`. #800 split these
  * derivations (new-adult/first-summer/old-timer age split, and the 3J/postjuv
- * young-trends counts) into their own RPC rather than folding them into
- * `aggregate_stats`, so the "Population" tab's Age split, Young counts and New
- * young counts tiles (#839 split the original single Young trends tile into
- * the latter two) fetch here while its Counts tile keeps using
+ * young-trends counts) into their own RPC (`population_stats`, renamed
+ * `demographics_stats` in #878) rather than folding them into
+ * `core_stats`, so the "Demographics" tab's Age split, Young counts and
+ * New young counts tiles (#839 split the original single Young trends tile
+ * into the latter two) fetch here while its Counts tile keeps using
  * `getSpeciesStatsHistory`. Same
- * call shape (species-filtered, month-grouped) as `getSpeciesStatsHistory`.
+ * call shape (species-filtered, `interval`-grouped, monthly by default) as
+ * `getSpeciesStatsHistory`.
  */
-export async function getSpeciesPopulationStats(
+export async function getSpeciesDemographicsStats(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
+	interval: StatsHistoryInterval = 'month'
 ) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('population_stats', {
+		.rpc('demographics_stats', {
 			species_name_filter: species,
 			ringing_group_filter: viewedGroupId,
-			group_by_time_period: 'month',
+			group_by_time_period: interval,
 			...(fromDate ? { from_date: fromDate } : {}),
 			...(toDate ? { to_date: toDate } : {})
 		})
-		.then(catchSupabaseErrors) as Promise<PopulationStatsResult[]>;
+		.then(catchSupabaseErrors) as Promise<DemographicsStatsResult[]>;
 }
 
 /**
  * Group-wide (not species-filtered) monthly ringing-effort history for the
- * species page's Population/Biometrics tabs — effort is a property of a
+ * species page's Demographics/Biometrics tabs — effort is a property of a
  * session, not of the species caught in it, so this wraps
  * `fetchGroupEffortHistory` (`lib/underlying-stats.ts`, cached across both
  * tabs within a session) rather than filtering by species. Shapes the raw
@@ -252,7 +298,7 @@ export async function getGroupEffortHistory(
 
 /**
  * Per-time-period totals for a single species — the species-scoped sibling of
- * `fetchPeriodTotals` (`app/actions/period-totals.ts`): same `aggregate_stats`
+ * `fetchPeriodTotals` (`app/actions/period-totals.ts`): same `core_stats`
  * call shape, but filtered to one species (`species_name_filter`) instead of
  * grouped across all of them (`group_by_species: false`). Feeds the species
  * page's "Year totals" (all-time page), "Month totals" (year-scoped page), and
@@ -265,15 +311,15 @@ export async function fetchSpeciesPeriodTotals(
 	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsResult[]> {
+): Promise<CoreStatsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('aggregate_stats', {
+		.rpc('core_stats', {
 			...(fromDate ? { from_date: fromDate } : {}),
 			...(toDate ? { to_date: toDate } : {}),
 			ringing_group_filter: viewedGroupId,
 			species_name_filter: speciesName,
 			group_by_time_period: timeInterval
 		})
-		.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>;
+		.then(catchSupabaseErrors) as Promise<CoreStatsResult[]>;
 }

@@ -1,12 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { SummaryStatsSection } from '../SummaryStatsSection';
-import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
-import zeroStats from '@/test-fixtures/snapshots/fetchSummaryStats.zero.json';
-import type { AggregateStatsResult } from '@/app/models/db';
+import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
+import zeroStats from '@/test-fixtures/snapshots/core_stats/zero.summary-totals.json';
+import type { CoreStatsResult } from '@/app/models/db';
 
-const populatedStats = alphaStats as unknown as AggregateStatsResult;
-const zeroActivityStats = zeroStats as unknown as AggregateStatsResult;
+const populatedStats = alphaStats as unknown as CoreStatsResult;
+const zeroActivityStats = zeroStats as unknown as CoreStatsResult;
 
 afterEach(() => {
 	cleanup();
@@ -85,7 +85,7 @@ describe('SummaryStatsSection', () => {
 		});
 
 		it('renders Retraps as 0 when every bird in the period is new (new_bird_count === bird_count)', () => {
-			const allNewStats: AggregateStatsResult = {
+			const allNewStats: CoreStatsResult = {
 				...populatedStats,
 				bird_count: 40,
 				new_bird_count: 40
@@ -95,7 +95,7 @@ describe('SummaryStatsSection', () => {
 		});
 
 		it('renders Retraps equal to bird_count when new_bird_count is 0 (no new birds)', () => {
-			const noNewStats: AggregateStatsResult = {
+			const noNewStats: CoreStatsResult = {
 				...populatedStats,
 				bird_count: 60,
 				new_bird_count: 0

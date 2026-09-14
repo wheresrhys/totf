@@ -13,8 +13,7 @@ description: >-
   re-select + respawn until no eligible work remains; while idle, a "check again" command forces
   a fresh GitHub re-scan for newly-available work. A stop command prompts the user to confirm
   halt-all vs drain. Tracks every live worker in a gitignored local state file
-  (`.claude/swarm-state.json`) so the `take-over` skill can find and halt the right agent even
-  from a fresh session. Orchestration only — PR maintenance, selection, worktree isolation, model
+  (`.claude/swarm-state.json`). Orchestration only — PR maintenance, selection, worktree isolation, model
   routing, parallelism, refill, termination, teardown. Triggers: "swarm", "/swarm", "pick up
   ready tickets", "work the ready queue".
 ---
@@ -41,7 +40,7 @@ session, not from within a subagent.
 
 This matters because swarm spawns its own worker subagents and manages a shared state file and
 worktree pool; running it recursively from inside a worker (or any other subagent) would corrupt
-that pool and confuse `take-over`.
+that pool.
 
 ## Precheck
 
@@ -50,9 +49,7 @@ stop and tell the user to enable them (`gh repo edit --enable-issues`) before co
 
 ## State file (`.claude/swarm-state.json`)
 
-Every live worker gets one entry here — this is how the `take-over` skill finds and halts the
-right agent from a session that never saw it spawn (there's no tool to list running background
-agents; this file is the only durable record). Gitignored, machine-local, never committed.
+Every live worker gets one entry here. Gitignored, machine-local, never committed.
 
 Entry shape:
 ```json
@@ -69,7 +66,9 @@ Entry shape:
 }
 ```
 (`kind` is `"ticket"` for §3 workers or `"maintenance"` for §1 workers; use `pr` instead of/alongside
-`issue` for maintenance workers, and `title` is the ticket title or PR title, whichever is known.)
+`issue` for maintenance workers, and `title` is the ticket title or PR title, whichever is known.
+One further optional field, `dbLockReleased`, is never set at append time — only later, by the
+worker itself, via `swarm_state_release_db_lock`; see the exclusive-resource paragraph below.)
 
 - **On every spawn** (§1 and §3): after the Agent tool call returns an id, find the worktree path
   — if not already given back by the spawn result, diff `git worktree list` from just before the
@@ -100,7 +99,7 @@ presumed-dead and why** — e.g. "Dropped presumed-dead worker on `feature/562-x
 worktree activity in over 45 minutes" or "…: worktree no longer on disk". This is the "user warned"
 half of the fix: an auto-prune that succeeds quietly reproduces the original "nobody told me"
 complaint (just for over-provisioning instead of under-provisioning) if the heuristic is ever
-wrong, so the user can intervene — e.g. `take-over` the branch — if a prune looks mistaken.
+wrong, so the user can intervene if a prune looks mistaken.
 
 **Concurrency is capped at 4 worker subagents.** The top-level swarm orchestrator (the parent
 agent running this skill) does not count toward the cap — it only selects, spawns, reports and
@@ -123,6 +122,25 @@ a PR (maintenance work — `implement-ticket` applies the issue's exclusive-reso
 PR at creation, so this doesn't require resolving back to the issue) and the issue's `labels`
 field for a ticket (§2). Work carrying neither label is unaffected by this rule, except that it
 must itself wait while an exclusive-resource worker is running.
+
+**The solo lock can be released early, before the worker finishes.** The tail of an
+exclusive-resource unit — lint fixes, retests, commit, push, opening the PR — touches the shared
+local Postgres not at all, yet used to block every other ticket for its whole duration. So an
+exclusive-resource worker calls `mcp__swarm-tools__swarm_state_release_db_lock` with its own
+`agentId` once its migration is applied and verified (or its `@mutates` E2E run has completed) and
+only those non-shared-resource steps remain. That sets `dbLockReleased: true` on its state entry,
+which `swarm_plan_batch` skips when deciding whether a solo run is active — so other unblocked,
+**non-exclusive** work can start straight away. It changes nothing else: the entry still counts
+toward the 4-worker cap and still blocks a *new* exclusive-resource worker from starting (via the
+"no worker of any kind running" requirement above) until it actually completes and its entry is
+removed. Release is one-way — there is no re-lock tool. The flag on the state entry is the *only*
+signal; never infer a release from a worker looking idle, and never re-derive it from GitHub.
+Because release happens *before* the worker pushes and opens its PR, an exclusive-resource
+ticket/PR whose PR is already open has necessarily already released the lock — so there is never
+any need to special-case "the PR is open" or "the worker isn't actively doing anything right now"
+separately from checking `dbLockReleased`. A worker also pings the orchestrator the moment it
+releases, so the freed capacity gets used immediately rather than at the next completion — see
+§4.7.
 
 PR maintenance goes first — merging open PRs unblocks downstream tickets — so allocate free
 slots to PRs needing maintenance first, then fill the remainder with tickets.
@@ -168,7 +186,9 @@ unchanged — that's the whole point of a user-requested re-check.
 A PR appears in `prsNeedingMaintenance` because it either has merge conflicts (`mergeable` was
 `CONFLICTING`) or outstanding feedback (a human review/comment, `CHANGES_REQUESTED`, or anything
 newer than the head commit and not yet replied to — the tool ignores the PR's own
-mermaid-diff/behaviour-change comments and bot authors). Its `reason` field says which
+mermaid-diff/behaviour-change comments, bot authors, and any comment carrying the
+`<!-- swarm-worker-reply -->` marker a maintenance worker appends to its own replies, step 4
+below). Its `reason` field says which
 (`conflict` | `feedback` | `conflict+feedback`).
 
 For each PR needing maintenance (up to the budget), launch **one** background Agent that handles
@@ -180,6 +200,11 @@ both concerns for that PR:
   `sonnet` if unresolvable).
 - `description`: `"Maintain PR #<pr>"`.
 - Prompt, in order:
+  0. **Prefix self-reported status with the PR number, throughout** — prefix any self-reported
+     progress/status text this worker produces during its run, including its final result
+     summary, with `#<pr-number>: ` (e.g. `#902: resolving merge conflict in
+     generate-snapshots.ts`). The harness's live-status line renders this as an evolving one-line
+     task summary; without the prefix the PR number that summary is *about* isn't visible in it.
   1. **Copy local env config, if this is a fresh worktree** — if this step's worktree was just
      created via `git worktree add` (not reused from an existing one), copy `.env.dev` from the
      main checkout root before running any tests: `.env.dev` is gitignored, so a freshly created
@@ -194,9 +219,38 @@ both concerns for that PR:
      conflicts — whether GitHub already flagged `CONFLICTING` or the fetch surfaces one GitHub's
      cache hadn't caught yet — resolve every conflict honouring both sides' intent, and run the
      relevant tests to prove the merge is sound.
-  3. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
-     the changes, run tests, reply to the reviewer via `gh pr comment <n>`.
-  4. Commit (repo conventions, including the model/Claude Code trailers from `implement-ticket`)
+  3. **Catch up local migrations** — before running any tests, call
+     `mcp__swarm-tools__ensure_local_migrations_applied` with `{ worktreePath: <this worktree's
+     absolute path> }`. The sync above may have pulled in migration files (committed to the repo
+     since #862) that the shared local Postgres hasn't had applied yet, which would make DB-backed
+     tests (E2E) run against a stale schema. The tool fast-paths (no Supabase CLI, no Postgres)
+     when a shared marker shows the DB is already caught up, so it's cheap on every PR; only when
+     behind does it run `npx supabase migration up --local`, and that apply case is safe because a
+     `db-migration` unit already runs solo (the exclusive-resource rule).
+  4. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
+     the changes, run tests, reply to the reviewer via `gh pr comment <n>` (or `gh api
+     repos/{owner}/{repo}/pulls/<n>/comments` for an inline-thread reply). **Every reply a
+     maintenance worker posts must end with the marker line `<!-- swarm-worker-reply -->`**, on its
+     own line after the reply text. There is no bot identity for swarm workers — `gh` authenticates
+     as the same human account a real reviewer uses — so without the marker `swarm_plan_batch`
+     cannot tell a worker's own reply from genuine unaddressed feedback, and re-flags the PR as
+     `reason: "feedback"` on the very next call, looping it through maintenance spawns indefinitely
+     (#904). The marker is an HTML comment, so it's invisible in GitHub's rendered view;
+     `swarm_plan_batch`'s feedback checks skip any comment/thread-head carrying it, exactly as they
+     already skip mermaid-diff comments. Never add the marker to a comment that is genuine new
+     feedback rather than a worker's reply.
+  5. **Release the shared-DB lock early, if this PR is `db-migration`/`e2e-exclusive`** — once the
+     migration is applied and verified against the shared local Postgres (or the `@mutates` E2E run
+     has completed) and every remaining step is non-shared-resource (lint fixes, retests needing no
+     further schema change, commit, push, replying to the reviewer), call
+     `mcp__swarm-tools__swarm_state_release_db_lock` with this worker's own `agentId`, then carry
+     on. This frees other unblocked, non-exclusive tickets to start while this worker finishes up.
+     It is a **one-way** signal: never call it while there is any chance further schema/migration
+     work is still to come, and if genuinely unsure, just don't release early. Immediately after a
+     successful release, notify the orchestrator so it can refill without waiting for this worker:
+     `SendMessage({ to: "main", summary: "<short>", message: "Released db-migration/e2e-exclusive
+     lock for #<issue-or-pr> — safe to pick up other non-exclusive work now." })`.
+  6. Commit (repo conventions, including the model/Claude Code trailers from `implement-ticket`)
      and push. If on inspection neither a real conflict nor genuine feedback remains, no-op and
      report that.
 
@@ -253,7 +307,10 @@ input task description:
 - `model`: fixed `sonnet`, regardless of what model label the eventual replacement ticket(s) get —
   this subagent's own job (drafting/labeling) is lightweight, not implementation.
 - `description`: `"Auto-ticketify #<n>"`.
-- Prompt: run `ticketify` against issue `<n>`'s current title+body. Let it do its normal job —
+- Prompt: **throughout this task, prefix self-reported status with the issue number** — prefix any
+  self-reported progress/status text (including the final result summary) with `#<n>: `, so the
+  harness's live-status line keeps the issue number visible alongside whatever it's currently
+  doing. Then run `ticketify` against issue `<n>`'s current title+body. Let it do its normal job —
   including splitting the issue into more than one commit-sized ticket if the body actually
   bundles multiple distinct changes. It drafts properly-labeled replacement ticket(s) (model label
   + `ready`, plus `db-migration`/`e2e-exclusive` if applicable) and closes the original issue in
@@ -273,7 +330,7 @@ proceeding.
 
 This subagent counts toward the normal 4-worker cap (same pool as ticket/maintenance workers).
 Append a `kind: "ticket"` entry (see State file) right after spawning it, with `issue` set to the
-original unlabeled issue's number, so `take-over`/self-healing prune still work on it.
+original unlabeled issue's number, so self-healing prune still work on it.
 
 ## 2. Select tickets (fill the remaining budget)
 
@@ -296,15 +353,41 @@ For each selected issue, launch an Agent (default background, so they run in par
 - `model` = the ticket's model label — `opus` | `sonnet` | `fable` (exactly the label). Don't
   substitute.
 - `description`: `"Implement #<n>"`.
-- Prompt: **first copy `.env.dev` from the main checkout root into this worktree** — isolation:
+- Prompt: **throughout this task, prefix self-reported status with the issue number** — prefix any
+  self-reported progress/status text this worker produces during its run, including its final
+  result summary, with `#<n>: ` (e.g. `#904: running affected summary/controls test files`), so
+  the harness's live-status line keeps the ticket number visible alongside whatever it's currently
+  doing. Then, **first copy `.env.dev` from the main checkout root into this worktree** — isolation:
   "worktree" creates a fresh git worktree, and `.env.dev` is gitignored so it's never carried
   over; without it `npm run qa` / the pre-push hook fail with `SUPABASE_JWT_ROLE environment
   variable is not set`. Find the main checkout root via `git rev-parse --path-format=absolute
   --git-common-dir` (its parent directory), then `cp -n <that>/.env.dev .env.dev`. Then
   **`git fetch origin` and create the ticket branch off `origin/main`** (the
   worktree is cut from local `main`, which may be stale relative to origin — basing on
-  `origin/main` picks up already-merged sibling tickets), then run the `implement-ticket` skill
-  for issue `<n>` and return its result (PR number + URL + test status).
+  `origin/main` picks up already-merged sibling tickets). Then, before starting any
+  DB-dependent work, **catch the shared local Postgres up to the committed migrations** by calling
+  `mcp__swarm-tools__ensure_local_migrations_applied` with `{ worktreePath: <this worktree's
+  absolute path> }` — since #862 committed `supabase/migrations/` to the repo, a worktree based on
+  `origin/main` can hold migration files the shared local DB hasn't had applied yet. The tool
+  fast-paths (no Supabase CLI, no Postgres) when a shared marker shows the DB is already caught up,
+  so it's cheap to call for *every* ticket regardless of label; only when behind does it run
+  `npx supabase migration up --local`, and that apply case is safe because a `db-migration` unit
+  already runs solo (the exclusive-resource rule) — no new coordination primitive. Finally, run the
+  `implement-ticket` skill for issue `<n>` and return its result (PR number + URL + test status).
+
+  **If (and only if) this ticket is labelled `db-migration` or `e2e-exclusive`**, add one further
+  instruction to the prompt: partway through `implement-ticket` — once the migration is applied and
+  verified against the shared local Postgres (or the `@mutates` E2E run has completed) and every
+  remaining step is non-shared-resource (lint fixes, retests needing no further schema change,
+  commit, push, opening the PR) — call `mcp__swarm-tools__swarm_state_release_db_lock` with this
+  worker's own `agentId`, then continue as normal. That releases the solo lock so other unblocked,
+  non-exclusive tickets can start while this worker finishes up; the worker keeps its cap slot and a
+  new exclusive-resource unit still can't start until it's fully done. It is a **one-way** signal:
+  never call it if there is any chance schema/migration work isn't actually finished, and if
+  genuinely unsure, don't release early. Immediately after a successful release, notify the
+  orchestrator so it can refill without waiting for this worker to finish:
+  `SendMessage({ to: "main", summary: "<short>", message: "Released db-migration/e2e-exclusive lock
+  for #<issue-or-pr> — safe to pick up other non-exclusive work now." })`.
 
 Append a `kind: "ticket"` entry (see State file) for this worker right after spawning it.
 
@@ -382,6 +465,25 @@ under "State file" above (see the "Concurrency is capped at 4 worker subagents" 
 worker failing mid-task is not license to finish the job inline. If the work needs doing, a
 fresh subagent does it — never the orchestrator itself.
 
+## 4.7 Lock-release notification (worker signals early)
+
+An exclusive-resource worker sends the orchestrator a `SendMessage` when it releases the shared-DB
+lock early (see the exclusive-resource paragraph under "State file", and the worker prompts in §1
+and §3). This arrives as a **message from a running worker**, not a completion notification — the
+worker is still going, finishing its lint fixes, commit, push and PR.
+
+Treat it exactly like a manual re-check (§4.5): immediately re-run selection for the currently free
+slots and spawn any newly-eligible work up to the cap. The one difference is the call itself — a
+plain `swarm_plan_batch` is right here, **without** `forceRescan`: nothing about GitHub state has
+changed and needs bypassing, only the local state file's `dbLockReleased` flag, which every call
+reads fresh anyway. What opens up is non-exclusive work only; a new `db-migration`/`e2e-exclusive`
+candidate is still withheld, because the releasing worker is still running.
+
+Like a manual re-check, this never stops or disturbs the worker that sent it — it keeps running to
+finish its push and PR, and will send its normal completion notification (§4) later. Waiting for
+that completion instead of acting on the release would waste exactly the window the early release
+exists to open.
+
 ## Termination (user asks to stop)
 
 If the user issues any stop-like command to the **orchestrator** — e.g. "stop swarming", "stop",
@@ -447,6 +549,11 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   maintenance work (carried over from the issue by `implement-ticket`) and the issue's `labels`
   for ticket work. Blocked units wait for the next refill. This protects the single shared local
   Supabase instance from concurrent schema migrations and concurrent `@mutates`-tagged E2E runs.
+  The solo lock is released **early**, though: such a worker calls
+  `mcp__swarm-tools__swarm_state_release_db_lock` once its shared-DB work is applied and verified
+  and only push/PR steps remain, then messages the orchestrator — which refills idle slots with
+  non-exclusive work right then (§4.7), while the worker keeps its cap slot and a new
+  exclusive-resource unit still waits for it to finish.
 - Keep the pool full: on every worker completion, refill freed slots (maintenance first, then
   tickets) until no eligible work remains — then go idle, don't exit.
 - On any re-check-like command from the user ("check again", "rescan", "any new work?"), re-run
@@ -462,6 +569,10 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   running workers finish), and do exactly that. Never assume which.
 - Each subagent runs the model the ticket label dictates (feedback PRs: the linked ticket's
   label, else `sonnet`).
+- Every worker prefixes its own self-reported progress/status text — including its final result
+  summary — with its ticket/PR number (`#<n>: `) throughout the run, so the harness's live-status
+  line keeps the number visible alongside the evolving task summary (§1 step 0, §3, §1.6). This is
+  separate from the `description` param set once at spawn time, which is already number-first.
 - One worktree per unit of work; parallel branches must never share a working tree. Ticket work
   cuts a fresh isolated worktree; feedback work reuses the PR branch's existing worktree or adds
   one for that branch.
@@ -469,8 +580,7 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
 - Per-ticket work goes through `implement-ticket` — don't reinvent it here, including its
   DB-test-isolation rule.
 - Keep `.claude/swarm-state.json` in sync with the live worker set on every spawn, completion,
-  and halt — it's the only durable record of which agent id is working which branch, and
-  `take-over` depends on it being current.
+  and halt — it's the only durable record of which agent id is working which branch.
 - Every freshly-created worktree (§1's `git worktree add`, or §3's `isolation: "worktree"`) gets
   `.env.dev` copied in from the main checkout root before any tests run — it's gitignored so
   worktree creation never carries it over, and without it `npm run qa`/the pre-push hook fail

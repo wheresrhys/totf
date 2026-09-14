@@ -7,7 +7,7 @@ import {
 	getTopStats,
 	type UserTopStatsArgs
 } from '@/app/actions/top-performers';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	RecordsPageContent,
 	type StatConfig,

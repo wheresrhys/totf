@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import controlsSnapshot from '@/test-fixtures/snapshots/fetchRingSequenceControls.alpha.json';
+import controlsSnapshot from '@/test-fixtures/snapshots/ring_sequence_controls/alpha.controls.json';
 import type { RingSequenceControlRow } from '@/app/actions/ring-sequences';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 
@@ -9,7 +9,7 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 

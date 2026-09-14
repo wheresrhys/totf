@@ -1,6 +1,6 @@
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { withGroupScope } from '@/app/components/layout/withGroupScope';
-import { readTabIdSearchParam } from '@/lib/tab-query-param';
+import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
 import { fetchSessionPageContent } from '../../page';
 import {
 	SessionPageContent,

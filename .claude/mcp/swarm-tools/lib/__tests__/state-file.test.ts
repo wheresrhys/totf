@@ -122,6 +122,16 @@ describe('state-file', () => {
 		expect(await listState(repoDir)).toEqual([]);
 	});
 
+	it('round-trips a dbLockReleased flag set via withStateLock', async () => {
+		const entry = makeEntry();
+		await withStateLock((entries) => ({ entries: [...entries, entry], result: undefined }), repoDir);
+		await withStateLock(
+			(entries) => ({ entries: entries.map((e) => ({ ...e, dbLockReleased: true })), result: undefined }),
+			repoDir
+		);
+		expect(await listState(repoDir)).toEqual([{ ...entry, dbLockReleased: true }]);
+	});
+
 	it('writes the file under .claude/swarm-state.json at the repo root', async () => {
 		await withStateLock((entries) => ({ entries: [...entries, makeEntry()], result: undefined }), repoDir);
 		const raw = await fs.readFile(path.join(repoDir, '.claude', 'swarm-state.json'), 'utf8');
@@ -178,6 +188,27 @@ describe('state-file', () => {
 		it('accepts an empty array', async () => {
 			await writeRawState('[]');
 			expect(await listState(repoDir)).toEqual([]);
+		});
+
+		// Structure — dbLockReleased is optional, so all three states parse.
+		it('accepts an entry with dbLockReleased: true', async () => {
+			await writeRawState(JSON.stringify([makeEntry({ dbLockReleased: true })]));
+			expect((await listState(repoDir))[0].dbLockReleased).toBe(true);
+		});
+
+		it('accepts an entry with dbLockReleased: false', async () => {
+			await writeRawState(JSON.stringify([makeEntry({ dbLockReleased: false })]));
+			expect((await listState(repoDir))[0].dbLockReleased).toBe(false);
+		});
+
+		it('accepts an entry with dbLockReleased absent', async () => {
+			await writeRawState(JSON.stringify([makeEntry()]));
+			expect((await listState(repoDir))[0].dbLockReleased).toBeUndefined();
+		});
+
+		it('rejects a non-boolean dbLockReleased', async () => {
+			await writeRawState(JSON.stringify([{ ...makeEntry(), dbLockReleased: 'yes' }]));
+			await expect(listState(repoDir)).rejects.toThrow(SwarmStateSchemaError);
 		});
 
 		it('tolerates unknown extra keys on an otherwise-valid entry', async () => {

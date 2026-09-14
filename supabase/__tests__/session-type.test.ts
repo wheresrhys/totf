@@ -18,7 +18,7 @@
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { execSync } from 'child_process';
-import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
+import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { randomTestSuffix, randomFutureDate, addDays } from './test-isolation';
 

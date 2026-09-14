@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SpSessionTotalsTab } from '../SpSessionTotalsTab';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchSpeciesPeriodTotals: vi.fn()
@@ -10,8 +10,8 @@ vi.mock('@/app/actions/sp-data', () => ({
 const viewedGroup = { id: 1, slug: 'alpha' };
 
 function buildDailyStat(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	return {
 		species_name: null,
 		time_period: '2026-03-14',
@@ -40,7 +40,7 @@ function buildDailyStat(
 		adult_bird_count: 5,
 		unknown_age_bird_count: 1,
 		...overrides
-	} as AggregateStatsResult;
+	} as CoreStatsResult;
 }
 
 describe('SpSessionTotalsTab', () => {
@@ -58,7 +58,7 @@ describe('SpSessionTotalsTab', () => {
 
 	it('shows a loading spinner while data is fetching', async () => {
 		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		let resolveData!: (v: AggregateStatsResult[]) => void;
+		let resolveData!: (v: CoreStatsResult[]) => void;
 		vi.mocked(fetchSpeciesPeriodTotals).mockReturnValue(
 			new Promise((resolve) => {
 				resolveData = resolve;

@@ -3,19 +3,15 @@
 import { LineChart } from 'react-chartkick';
 import 'chartkick/chart.js';
 import { format } from 'date-fns';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import {
 	postgresIntervalToHours,
 	postgresIntervalToMinutes
-} from '@/lib/postgres-interval';
+} from '@/app/lib/postgres-interval';
 
 type SeriesPoint = [string, number];
 
-export function PayOffEffortChart({
-	monthly
-}: {
-	monthly: AggregateStatsResult[];
-}) {
+export function PayOffEffortChart({ monthly }: { monthly: CoreStatsResult[] }) {
 	const sorted = [...monthly].sort(
 		(a, b) =>
 			new Date(a.time_period).getTime() - new Date(b.time_period).getTime()

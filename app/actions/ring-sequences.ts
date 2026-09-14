@@ -1,5 +1,5 @@
 'use server';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors, fetchAllPaginatedRows } from '@/lib/supabase';
 import {
 	groupRingNosByPrefix,
