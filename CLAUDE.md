@@ -373,7 +373,8 @@ The pre-push hook runs app tests, then two diff-aware selection scripts —
 (see "E2E tests" below). It never runs the DB integration suite as a whole; that stays manual,
 and the fixture-freshness check is the one integration test it can reach, gated on the branch
 diff. Local Supabase must be running (`npm run db:start:local`) and seeded
-(`npm run db:seed:e2e`) for the E2E and DB integration suites to pass.
+(`npm run db:seed:e2e`, or `npm run db:sync:e2e` for a guaranteed-clean baseline — see
+"Regenerating fixtures reproducibly" below) for the E2E and DB integration suites to pass.
 
 HTTP tests (`http-tests/`) use `http-tests/global-setup.ts` to start/stop the Next.js dev server automatically. The default server URL is derived per-worktree from `scripts/worktree-test-port.ts` (`deriveWorktreePort()` hashes the worktree's absolute path into a fixed port range, avoiding `3000` and the local Supabase ports) — so concurrent swarm worktrees each get their own port and a reused server can only ever be one this same worktree started, never a sibling's. Set `TEST_BASE_URL` to override the derivation and point at a specific/remote server. If a server is already running at the resolved URL, it reuses it and does not kill it after the suite. `playwright.config.ts` uses the same helper for the E2E dev server.
 
@@ -469,8 +470,31 @@ how #870's column removal reached `main` with every check green (full investigat
   least the first two; most branches pay nothing. It's read-only and writes solely to a temp
   directory, so it stays safe alongside sibling swarm worktrees.
 
-So: if you change an RPC's return shape, run `npm run db:seed:e2e` and commit the regenerated
-fixtures in the same PR, and hand-edit the eight ungenerated ones.
+So: if you change an RPC's return shape, run `npm run db:sync:e2e` (not `db:seed:e2e` — see
+"Regenerating fixtures reproducibly" immediately below) and commit the regenerated fixtures in the
+same PR, and hand-edit the eight ungenerated ones.
+
+**Regenerating fixtures reproducibly — `db:seed:e2e` vs `db:sync:e2e` (#903).** Both end by
+regenerating every generated fixture, but they start from different baselines:
+
+- `npm run db:seed:e2e` is **upsert-only** — it never truncates, so it tops up whatever is already
+  in the local database. Fine for routine dev, but *not* a clean baseline: DB integration tests
+  write real, undeleted rows into the shared seed groups (e.g. `supabase/__tests__/ring-sequences.test.ts`
+  and `triggers.test.ts` write into Gamma/Delta with no teardown), and those rows survive into
+  whatever you regenerate next.
+- `npm run db:sync:e2e` is `supabase db reset && npm run db:seed:e2e` (the same shape as
+  `db:sync:local`) — a destructive reset first, so seeding always starts from an empty database.
+  **Use this whenever byte-identical fixture output matters**, i.e. any time you're committing
+  regenerated fixtures.
+
+Determinism also depends on the seed importing serially: every table's `id` is `DEFAULT
+nextval(...)` rather than `GENERATED ALWAYS AS IDENTITY`, so under concurrent row processing the id
+a row gets depends on I/O timing, and the fixtures embed literal ids (e.g.
+`tables/Birds/robin-alpha.page-of-birds.json`). `scripts/seed-e2e-data.ts` therefore calls
+`importCSV` from `scripts/import-csv.ts` in-process at `concurrency: 1`, rather than shelling out
+to `npm run db:import:local` at the default 30. That's seeding-only: the CLI (`db:import:{local,prod}`)
+and the web import route keep the default concurrency. Two consecutive `db:sync:e2e` +
+`db:generate-snapshots` runs now produce byte-identical fixtures.
 
 **Asserting on table cells:** never index into cells by raw position (`cells[6]`,
 `querySelectorAll('td')[8]`) — a reordered or added column silently breaks an unrelated

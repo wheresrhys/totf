@@ -11,6 +11,7 @@
 		"db:migration:squash": "supabase migration new squash_migration_history && supabase migration squash squash_migration_history",
 		"db:sync:local": "npm run db:schema:pull && supabase db reset && npm run db:seed:local",
 		"db:seed:local": "npm run db:import:local ./data/test-data.csv \"Walthamstow Wetlands\" && npm run db:import:local ./data/group2.csv \"Second Group\" && npm run set-group-password:local \"Walthamstow Wetlands\" password",
+		"db:sync:e2e": "supabase db reset && npm run db:seed:e2e",
 		"db:seed:e2e": "dotenvx run -f .env.dev -- tsx scripts/seed-e2e-data.ts",
 		"db:generate-snapshots": "dotenvx run -f .env.dev -- tsx scripts/generate-snapshots.ts",
 		"db:start:local": "supabase start",
