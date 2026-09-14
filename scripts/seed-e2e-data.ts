@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 import { supabase } from '../lib/supabase';
 import { slugify } from '../lib/slugify';
 import { generateSnapshots } from './generate-snapshots';
+import { importCSV } from './import-csv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,6 +27,24 @@ const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 function run(cmd: string) {
 	console.log(`\n$ ${cmd}`);
 	execSync(cmd, { stdio: 'inherit', cwd: ROOT });
+}
+
+/**
+ * Import one seed CSV in-process at `concurrency: 1`.
+ *
+ * Deliberately not `npm run db:import:local` (a child process at the default
+ * concurrency of 30): every table's `id` is `DEFAULT nextval(...)`, so under
+ * concurrency the numeric id a given row ends up with depends on I/O timing,
+ * and the fixtures under test-fixtures/snapshots/ embed literal ids. Serial
+ * processing makes a reseed reproduce the same ids every time (#903).
+ */
+async function seedImport(relativeCsvPath: string, ringingGroupName: string) {
+	console.log(`\nImporting ${relativeCsvPath} as "${ringingGroupName}"...`);
+	await importCSV({
+		csvFilePath: path.join(ROOT, relativeCsvPath),
+		ringingGroupName,
+		concurrency: 1
+	});
 }
 
 async function getGroupId(name: string): Promise<number> {
@@ -65,7 +84,7 @@ async function main() {
 	);
 
 	// Step 2: Import Alpha CSV (Alpha group already exists from step 1)
-	run(`npm run db:import:local -- test-fixtures/csv/alpha.csv "Alpha"`);
+	await seedImport('test-fixtures/csv/alpha.csv', 'Alpha');
 
 	// Step 3: Insert GroupDataSharing via direct Postgres (bypasses RLS — no INSERT policy exists)
 	// Alpha shares with Beta; Beta shares with Gamma. Not transitive.
@@ -76,7 +95,7 @@ async function main() {
 	console.log(`GroupDataSharing: Alpha→Beta, Beta→Gamma created`);
 
 	// Step 4: Import Beta CSV (GroupDataSharing must exist first so SHARED01 is accessible to Beta)
-	run(`npm run db:import:local -- test-fixtures/csv/beta.csv "Beta"`);
+	await seedImport('test-fixtures/csv/beta.csv', 'Beta');
 
 	// Step 5: Set group passwords
 	run(`npm run set-group-password:local -- "Alpha" "alphapassword"`);
