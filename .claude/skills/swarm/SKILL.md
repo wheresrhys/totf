@@ -200,6 +200,11 @@ both concerns for that PR:
   `sonnet` if unresolvable).
 - `description`: `"Maintain PR #<pr>"`.
 - Prompt, in order:
+  0. **Prefix self-reported status with the PR number, throughout** — prefix any self-reported
+     progress/status text this worker produces during its run, including its final result
+     summary, with `#<pr-number>: ` (e.g. `#902: resolving merge conflict in
+     generate-snapshots.ts`). The harness's live-status line renders this as an evolving one-line
+     task summary; without the prefix the PR number that summary is *about* isn't visible in it.
   1. **Copy local env config, if this is a fresh worktree** — if this step's worktree was just
      created via `git worktree add` (not reused from an existing one), copy `.env.dev` from the
      main checkout root before running any tests: `.env.dev` is gitignored, so a freshly created
@@ -302,7 +307,10 @@ input task description:
 - `model`: fixed `sonnet`, regardless of what model label the eventual replacement ticket(s) get —
   this subagent's own job (drafting/labeling) is lightweight, not implementation.
 - `description`: `"Auto-ticketify #<n>"`.
-- Prompt: run `ticketify` against issue `<n>`'s current title+body. Let it do its normal job —
+- Prompt: **throughout this task, prefix self-reported status with the issue number** — prefix any
+  self-reported progress/status text (including the final result summary) with `#<n>: `, so the
+  harness's live-status line keeps the issue number visible alongside whatever it's currently
+  doing. Then run `ticketify` against issue `<n>`'s current title+body. Let it do its normal job —
   including splitting the issue into more than one commit-sized ticket if the body actually
   bundles multiple distinct changes. It drafts properly-labeled replacement ticket(s) (model label
   + `ready`, plus `db-migration`/`e2e-exclusive` if applicable) and closes the original issue in
@@ -345,7 +353,11 @@ For each selected issue, launch an Agent (default background, so they run in par
 - `model` = the ticket's model label — `opus` | `sonnet` | `fable` (exactly the label). Don't
   substitute.
 - `description`: `"Implement #<n>"`.
-- Prompt: **first copy `.env.dev` from the main checkout root into this worktree** — isolation:
+- Prompt: **throughout this task, prefix self-reported status with the issue number** — prefix any
+  self-reported progress/status text this worker produces during its run, including its final
+  result summary, with `#<n>: ` (e.g. `#904: running affected summary/controls test files`), so
+  the harness's live-status line keeps the ticket number visible alongside whatever it's currently
+  doing. Then, **first copy `.env.dev` from the main checkout root into this worktree** — isolation:
   "worktree" creates a fresh git worktree, and `.env.dev` is gitignored so it's never carried
   over; without it `npm run qa` / the pre-push hook fail with `SUPABASE_JWT_ROLE environment
   variable is not set`. Find the main checkout root via `git rev-parse --path-format=absolute
@@ -557,6 +569,10 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   running workers finish), and do exactly that. Never assume which.
 - Each subagent runs the model the ticket label dictates (feedback PRs: the linked ticket's
   label, else `sonnet`).
+- Every worker prefixes its own self-reported progress/status text — including its final result
+  summary — with its ticket/PR number (`#<n>: `) throughout the run, so the harness's live-status
+  line keeps the number visible alongside the evolving task summary (§1 step 0, §3, §1.6). This is
+  separate from the `description` param set once at spawn time, which is already number-first.
 - One worktree per unit of work; parallel branches must never share a working tree. Ticket work
   cuts a fresh isolated worktree; feedback work reuses the PR branch's existing worktree or adds
   one for that branch.
