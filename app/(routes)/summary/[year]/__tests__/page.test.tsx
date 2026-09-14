@@ -103,7 +103,7 @@ describe('/summary/[year]', () => {
 		expect(summaryStatsSection).not.toBeNull();
 		expect(
 			within(summaryStatsSection).getByText('Sessions').nextSibling?.textContent
-		).toBe('10');
+		).toBe(String(alphaStats.session_count));
 	});
 
 	it('fetchSummaryYearPageContent calls fetchPeriodStats with month timeInterval and the year bounds', async () => {

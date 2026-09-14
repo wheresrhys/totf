@@ -4,7 +4,7 @@ import HomePage from '../page';
 import recentSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.recent-sessions.json';
 import topSpeciesSnapshot from '@/test-fixtures/snapshots/tables/Species/alpha.top-species.json';
 import summaryStatsSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.home-page-summary.json';
-import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/core_stats/zero.home-page-summary.json';
+import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/synthetic/zero.home-page-summary.json';
 import type { HomePageSummaryStats } from '../PageContent';
 import type { GroupTicksResult } from '@/app/models/db';
 
@@ -233,7 +233,30 @@ describe('home page', () => {
 			});
 		});
 
+		// Alpha's real seed data only has 6 species (the real captured
+		// `alpha.top-species.json` fixture, imported above, #894), too few to
+		// exercise both the zero-count exclusion and the beyond-10th truncation
+		// in one scenario — an inline 13-species dataset stands in here instead.
 		it('renders a badge link per top species, sorted by bird count and excluding zero-count and beyond-10th species', async () => {
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+				makeChainClient({
+					Species: [
+						{ id: 1, species_name: 'Blackbird', birds: [{ count: 42 }] },
+						{ id: 2, species_name: 'Blue Tit', birds: [{ count: 37 }] },
+						{ id: 3, species_name: 'Robin', birds: [{ count: 29 }] },
+						{ id: 4, species_name: 'Great Tit', birds: [{ count: 21 }] },
+						{ id: 5, species_name: 'Chaffinch', birds: [{ count: 18 }] },
+						{ id: 6, species_name: 'Wren', birds: [{ count: 14 }] },
+						{ id: 7, species_name: 'Dunnock', birds: [{ count: 11 }] },
+						{ id: 8, species_name: 'Goldfinch', birds: [{ count: 9 }] },
+						{ id: 9, species_name: 'Song Thrush', birds: [{ count: 6 }] },
+						{ id: 10, species_name: 'Nuthatch', birds: [{ count: 4 }] },
+						{ id: 11, species_name: 'Greenfinch', birds: [{ count: 2 }] },
+						{ id: 12, species_name: 'Coal Tit', birds: [{ count: 1 }] },
+						{ id: 13, species_name: 'Jay', birds: [{ count: 0 }] }
+					]
+				})
+			);
 			render(await HomePage());
 			const heading = await screen.findByRole('heading', {
 				name: 'Species View all'
