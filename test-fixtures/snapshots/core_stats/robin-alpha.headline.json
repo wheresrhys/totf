@@ -1,0 +1,27 @@
+[
+  {
+    "species_name": null,
+    "time_period": null,
+    "session_count": 9,
+    "total_effort": "18:00:00",
+    "effort_per_session": "02:00:00",
+    "effort_per_encounter": "00:34:50.322581",
+    "avg_encounters_per_session": 3.3333333333333335,
+    "max_per_session": 7,
+    "species_count": 1,
+    "bird_count": 23,
+    "encounter_count": 31,
+    "new_bird_count": 23,
+    "pullus_bird_count": 1,
+    "juv_bird_count": 0,
+    "postjuv_bird_count": 13,
+    "adult_bird_count": 8,
+    "unknown_age_bird_count": 1,
+    "pullus_enc_count": 1,
+    "juv_enc_count": 0,
+    "postjuv_enc_count": 14,
+    "adult_enc_count": 16,
+    "unknown_age_enc_count": 0,
+    "max_new_per_session": 6
+  }
+]
