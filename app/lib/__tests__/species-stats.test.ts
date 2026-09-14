@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { mergeSpeciesBiometrics } from '../species-stats';
 import type { CoreStatsResult, BiometricsStatsResult } from '../../models/db';
+import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
+
+// A real captured biometrics_stats row (Alpha, group_by_species — the exact
+// call fetchSpeciesData makes) rather than a hand-written literal, so the
+// column set every test builds on comes from actual RPC output and can't
+// silently drift from the RPC's shape (#883).
+const [capturedBiometricsRow] =
+	alphaBiometricsBySpecies as unknown as BiometricsStatsResult[];
 
 function buildAggregateRow(
 	overrides: Partial<CoreStatsResult> = {}
@@ -45,16 +53,7 @@ function buildBiometricsRow(
 	overrides: Partial<BiometricsStatsResult> = {}
 ): BiometricsStatsResult {
 	return {
-		species_name: 'Blue Tit',
-		time_period: null,
-		max_weight: 20,
-		avg_weight: 18,
-		min_weight: 16,
-		median_weight: 17,
-		max_wing: 70,
-		avg_wing: 69,
-		min_wing: 68,
-		median_wing: 68.5,
+		...capturedBiometricsRow,
 		...overrides
 	};
 }

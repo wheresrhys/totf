@@ -2,15 +2,15 @@
 /**
  * Generate snapshot JSON fixtures from the local e2e seed data.
  *
- * Reads Alpha/Beta/Gamma group data and writes 21 JSON files under
+ * Reads Alpha/Beta/Gamma group data and writes 26 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
- * the RPC name for RPC-backed fixtures (`core_stats/`, `find_discrepencies/`,
- * `notable_retraps/`, `top_metrics_by_period/`, `ring_sequence_controls/`) and
- * `tables/<TableName>/` for fixtures produced by a direct PostgREST table
- * query. The comment above each block below names both the RPC/table and the
- * consuming action(s) — keep this in sync when a call site's underlying
- * RPC/table changes, so a fixture's location never silently drifts from what
- * it actually tests (see #870, #882).
+ * the RPC name for RPC-backed fixtures (`core_stats/`, `biometrics_stats/`,
+ * `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
+ * `top_metrics_by_period/`, `ring_sequence_controls/`) and `tables/<TableName>/`
+ * for fixtures produced by a direct PostgREST table query. The comment above
+ * each block below names both the RPC/table and the consuming action(s) — keep
+ * this in sync when a call site's underlying RPC/table changes, so a fixture's
+ * location never silently drifts from what it actually tests (see #870, #882).
  *
  * The only fixtures under test-fixtures/snapshots/ this script does not write
  * are the two under `synthetic/` — hand-authored zero-activity edge cases, not
@@ -88,6 +88,20 @@ export async function generateSnapshots(
 			`core_stats/alpha.summary-totals.json`,
 			data?.[0] ?? null
 		);
+	}
+
+	// RPC: biometrics_stats (group_by_species) — powers fetchSpeciesData's
+	// biometrics half (app/actions/spp-data.ts), merged onto the core_stats
+	// by-species rows above by mergeSpeciesBiometrics (app/lib/species-stats.ts)
+	for (const [name, client, gId] of [
+		['alpha', alpha, alphaId],
+		['gamma', gamma, gammaId]
+	] as const) {
+		const { data } = await client.rpc('biometrics_stats', {
+			ringing_group_filter: gId,
+			group_by_species: true
+		});
+		await writeSnapshot(`biometrics_stats/${name}.by-species.json`, data ?? []);
 	}
 
 	// RPC: core_stats (yearly + monthly, ungrouped by species) — powers
@@ -318,6 +332,51 @@ export async function generateSnapshots(
 		await writeSnapshot(
 			`tables/Birds/robin-alpha.page-of-birds.json`,
 			birdsPage0 ?? []
+		);
+
+		// RPC: biometrics_stats (species-filtered, group_by_time_period: month) —
+		// the sibling half of getSpeciesStatsHistory (app/actions/sp-data.ts),
+		// merged with its live core_stats call by time_period (that half isn't
+		// separately fixtured — see the core_stats/robin-alpha.monthly-history.json
+		// removal note in #894, still unconsumed by any test after this fixture
+		// was added)
+		const { data: robinBiometricsHistory } = await alpha.rpc(
+			'biometrics_stats',
+			{
+				species_name_filter: 'Robin',
+				ringing_group_filter: alphaId,
+				group_by_time_period: 'month'
+			}
+		);
+		await writeSnapshot(
+			`biometrics_stats/robin-alpha.monthly-history.json`,
+			robinBiometricsHistory ?? []
+		);
+
+		// RPC: biometrics_stats (species-filtered, ungrouped — a single headline
+		// row) — powers getSpeciesStats (app/(routes)/species/[speciesName]/page.tsx),
+		// merged onto that page's single core_stats row
+		const { data: robinBiometrics } = await alpha.rpc('biometrics_stats', {
+			species_name_filter: 'Robin',
+			ringing_group_filter: alphaId
+		});
+		await writeSnapshot(
+			`biometrics_stats/robin-alpha.headline.json`,
+			robinBiometrics ?? []
+		);
+
+		// RPC: demographics_stats (species-filtered, group_by_time_period: month) —
+		// powers getSpeciesDemographicsStats (app/actions/sp-data.ts), which backs
+		// the species page's Demographics tab. Renamed from population_stats in
+		// #878; only ever called species-filtered and time-grouped.
+		const { data: robinDemographics } = await alpha.rpc('demographics_stats', {
+			species_name_filter: 'Robin',
+			ringing_group_filter: alphaId,
+			group_by_time_period: 'month'
+		});
+		await writeSnapshot(
+			`demographics_stats/robin-alpha.monthly-history.json`,
+			robinDemographics ?? []
 		);
 
 		// RPC: notable_retraps (species-filtered) — powers fetchNotableRetraps
