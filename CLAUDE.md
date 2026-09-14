@@ -416,6 +416,33 @@ check the eight fixtures that no generator produces (they can only be edited by 
 ([#884](https://github.com/wheresrhys/totf/issues/884)), the current inventory of drifted fixtures,
 and the planned fixes.
 
+**Deterministic seeding — feasibility plan ([#885](https://github.com/wheresrhys/totf/issues/885)).**
+#873 proposed that a `db-migration` ticket should automatically regenerate every fixture, on the
+premise that a destructive reset-and-reseed is deterministic enough to produce a byte-identical
+result whenever nothing relevant changed. #885's investigation (full write-up in that ticket's PR
+body) found the concurrency-limited (`concurrency: 30`) row upserts in `scripts/import-csv.ts` are
+a real but fixable source of nondeterminism — every table's `id` column is a plain
+`DEFAULT nextval(...)` (not `GENERATED ALWAYS AS IDENTITY`), and Postgres consumes a sequence value
+for every upsert attempt before checking `ON CONFLICT`, so concurrent row processing lets real-world
+I/O timing decide which row gets which id, varying between reseeds; the fix is cheap because the
+concurrency knob already lives entirely in `import-csv.ts`'s `pRateLimit(...)` construction, not in
+`lib/demon-import.ts` — `processEncounterRow` itself is already a self-contained per-row unit safe
+to run at `concurrency: 1`. Two of the schema's other order-sensitive-looking fields turned out not
+to be a problem: `Birds.proven_age` and `last_encountered_timestamp` are recomputed from the full
+row set (or a monotonic max) on every trigger firing, so their final value doesn't depend on
+insertion order. Separately — and this bites regardless of the concurrency fix — DB integration
+tests write real, undeleted rows into the same seed groups fixtures are generated from (e.g.
+`ring-sequences.test.ts` and `triggers.test.ts` write into Gamma/Delta), so an unbounded
+aggregate-fixture RPC call (no `from_date`/`to_date`, e.g. `core_stats/alpha.by-species.json`) can
+pick up that noise; `npm run db:seed:e2e` alone (upsert-only, no truncation) can never guarantee a
+byte-identical fixture regardless of import determinism — only a preceding full `supabase db reset
+--local` closes that gap. Recommendation: implement the `concurrency`-parameterised import as a
+small standalone follow-up now (no risk to the production import path, which keeps its default of
+30); defer wiring an automatic full-reset-and-regenerate step into `implement-ticket`'s
+`db-migration` handling, since it would nuke the one shared local Postgres instance's state for
+every concurrent worker and human on every such ticket — worth doing once the series-mode import
+exists and has been dogfooded manually a few times, not before.
+
 **Asserting on table cells:** never index into cells by raw position (`cells[6]`,
 `querySelectorAll('td')[8]`) — a reordered or added column silently breaks an unrelated
 assertion. Use the shared helpers in `app/__tests__/helpers/table.ts` instead:
@@ -507,7 +534,12 @@ npm run db:import:prod ./path/to/data.csv "Group Name"
 
 The import script (`scripts/import-csv.ts`) upserts Species, RingingGroups, Birds, Locations, Sessions, and Encounters in dependency order, rate-limited to 30 req/s.
 
-Core import logic (types, transforms, `createUpserter`, `processEncounterRow`) lives in `lib/demon-import.ts` and is shared by both the CLI script and the web import route.
+Core import logic (types, transforms, `createUpserter`, `processEncounterRow`) lives in `lib/demon-import.ts` and is shared by both the CLI script and the web import route. The `concurrency: 30`
+rate-limiter that governs row-processing parallelism lives entirely in `import-csv.ts`'s own
+`pRateLimit(...)` construction — `processEncounterRow` itself has no concurrency awareness, which is
+exactly why a future seeding-only "run at `concurrency: 1` for deterministic ids" mode (see
+[#885](https://github.com/wheresrhys/totf/issues/885)'s fixture-drift section above) is a small,
+caller-side change rather than a `demon-import.ts` rework.
 
 ### Web import
 
