@@ -9,6 +9,7 @@ import {
 	listState,
 	listStateWithPruneReport,
 	STALE_INACTIVITY_THRESHOLD_MS,
+	STARTUP_GRACE_PERIOD_MS,
 	SwarmStateSchemaError,
 	type SwarmWorkerEntry,
 } from '../state-file';
@@ -418,6 +419,87 @@ describe('state-file', () => {
 			expect(pruned).toEqual([
 				{ agentId: 'agent-both', branch: missingEntry.branch, issue: 1, pr: null, title: 'Example', reason: 'worktree-missing' },
 			]);
+		});
+	});
+
+	describe('listState — startup grace period (#912)', () => {
+		// A round, divisible-by-1000 fixed instant so `now - threshold` lands on an exact integer
+		// second — fs.utimes stores seconds, so boundary comparisons are then exact.
+		const NOW = 1_800_000_000_000;
+		const RECENTLY_STARTED = 30 * 1000; // well within STARTUP_GRACE_PERIOD_MS
+		const GRACE_EXPIRED_BUT_UNDER_STALE_THRESHOLD = STARTUP_GRACE_PERIOD_MS + 5 * 60 * 1000;
+		const OLD_ACTIVITY = STALE_INACTIVITY_THRESHOLD_MS + 5 * 60 * 1000;
+		const RECENT_ACTIVITY = 5 * 60 * 1000;
+
+		// Usual
+		it('keeps a freshly-started entry live even when its worktree activity is old (resumed worktree case)', async () => {
+			const wt = path.join(repoDir, 'wt-resumed');
+			await initWorktreeRepo(wt);
+			await fs.writeFile(path.join(wt, 'file.txt'), 'x', 'utf8');
+			await commitAllAt(wt, 'previous dead worker commit', new Date(NOW - OLD_ACTIVITY).toISOString());
+			const entry = makeEntry({
+				agentId: 'agent-resumed',
+				worktreePath: wt,
+				startedAt: new Date(NOW - RECENTLY_STARTED).toISOString(),
+			});
+			await withStateLock((entries) => ({ entries: [...entries, entry], result: undefined }), repoDir);
+
+			expect(await listState(repoDir, NOW)).toEqual([entry]);
+		});
+
+		// Structure
+		it('keeps a freshly-started entry live when its worktree activity is also recent', async () => {
+			const wt = path.join(repoDir, 'wt-resumed-and-active');
+			await initWorktreeRepo(wt);
+			await writeFileWithMtime(path.join(wt, 'work.txt'), NOW - RECENT_ACTIVITY);
+			const entry = makeEntry({
+				agentId: 'agent-resumed-active',
+				worktreePath: wt,
+				startedAt: new Date(NOW - RECENTLY_STARTED).toISOString(),
+			});
+			await withStateLock((entries) => ({ entries: [...entries, entry], result: undefined }), repoDir);
+
+			expect(await listState(repoDir, NOW)).toEqual([entry]);
+		});
+
+		// Edge — grace period actually expires
+		it('prunes as stale-inactivity once startedAt is older than the grace period but still under the stale-inactivity threshold', async () => {
+			const wt = path.join(repoDir, 'wt-grace-expired');
+			await initWorktreeRepo(wt);
+			await fs.writeFile(path.join(wt, 'file.txt'), 'x', 'utf8');
+			await commitAllAt(wt, 'previous dead worker commit', new Date(NOW - OLD_ACTIVITY).toISOString());
+			const entry = makeEntry({
+				agentId: 'agent-grace-expired',
+				worktreePath: wt,
+				startedAt: new Date(NOW - GRACE_EXPIRED_BUT_UNDER_STALE_THRESHOLD).toISOString(),
+			});
+			await withStateLock((entries) => ({ entries: [...entries, entry], result: undefined }), repoDir);
+
+			const { workers, pruned } = await listStateWithPruneReport(repoDir, NOW);
+
+			expect(workers).toEqual([]);
+			expect(pruned).toEqual([
+				{ agentId: 'agent-grace-expired', branch: entry.branch, issue: 1, pr: null, title: 'Example', reason: 'stale-inactivity' },
+			]);
+		});
+
+		// Edge — malformed startedAt
+		it('does not crash on an unparseable startedAt, falling back to the filesystem/git-derived check', async () => {
+			const wt = path.join(repoDir, 'wt-malformed-started-at');
+			await initWorktreeRepo(wt);
+			await fs.writeFile(path.join(wt, 'file.txt'), 'x', 'utf8');
+			await commitAllAt(wt, 'previous dead worker commit', new Date(NOW - OLD_ACTIVITY).toISOString());
+			const entry = makeEntry({
+				agentId: 'agent-malformed-started-at',
+				worktreePath: wt,
+				startedAt: 'not-a-real-date',
+			});
+			await withStateLock((entries) => ({ entries: [...entries, entry], result: undefined }), repoDir);
+
+			// A malformed startedAt must not grant a grace period ("no grace available" != "always
+			// live") — it falls straight through to the ordinary filesystem/git-derived check, which
+			// correctly prunes this old-activity worktree.
+			await expect(listState(repoDir, NOW)).resolves.toEqual([]);
 		});
 	});
 });
