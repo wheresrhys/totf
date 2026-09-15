@@ -5,7 +5,8 @@ import {
 	cleanup,
 	fireEvent,
 	waitFor,
-	act
+	act,
+	within
 } from '@testing-library/react';
 import type { LineChartData } from 'react-chartkick';
 import {
@@ -15,6 +16,7 @@ import {
 	thisYearColors,
 	normalizeSeriesByEffort,
 	aggregateSeriesByYear,
+	accumulateSeriesByYear,
 	buildTotalSeries,
 	spansMultipleYears,
 	isHiddenFromLegend,
@@ -41,6 +43,8 @@ vi.mock('react-chartkick', () => ({
 		colors?: string[];
 		library?: {
 			plugins?: { legend?: { labels?: { filter?: LegendLabelsFilter } } };
+			elements?: { line?: { fill?: boolean } };
+			scales?: { y?: { stacked?: boolean } };
 		};
 	}) => {
 		// The legend filter function isn't JSON-serializable, so surface its
@@ -62,6 +66,10 @@ vi.mock('react-chartkick', () => ({
 				data-series={JSON.stringify(data.map((series) => series.name))}
 				data-values={JSON.stringify(data.map((series) => series.data))}
 				data-visible-in-legend={JSON.stringify(visibleInLegend)}
+				// Surfaces the stacked-area config so a test can tell the accumulate
+				// view's chart apart from the plain trend one.
+				data-stacked={JSON.stringify(library?.scales?.y?.stacked)}
+				data-fill={JSON.stringify(library?.elements?.line?.fill)}
 			/>
 		);
 	}
@@ -504,6 +512,170 @@ describe('aggregateSeriesByYear', () => {
 			expect(
 				aggregateSeriesByYear({ name: 'encounters', data: [] }, 'sum').data
 			).toEqual([]);
+		});
+	});
+});
+
+describe('accumulateSeriesByYear', () => {
+	describe('Usual: a within-year running sum', () => {
+		it('accumulates Jan..Dec as a running sum within a year, e.g. feb = feb + jan', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2024-01-01', 5],
+					['2024-02-01', 3],
+					['2024-03-01', 2]
+				]
+			};
+			expect(accumulateSeriesByYear(metric).data).toEqual([
+				['2024-01-01', 5],
+				['2024-02-01', 8],
+				['2024-03-01', 10]
+			]);
+		});
+
+		it('preserves the metric name', () => {
+			expect(
+				accumulateSeriesByYear({
+					name: 'arrivals',
+					data: [['2024-01-01', 1]]
+				}).name
+			).toBe('arrivals');
+		});
+	});
+
+	describe('Structure: year boundaries and the normalize composition', () => {
+		it('resets the running sum at the start of each new calendar year', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2023-11-01', 5],
+					['2023-12-01', 3],
+					['2024-01-01', 7],
+					['2024-02-01', 1]
+				]
+			};
+			expect(accumulateSeriesByYear(metric).data).toEqual([
+				['2023-11-01', 5],
+				['2023-12-01', 8],
+				['2024-01-01', 7],
+				['2024-02-01', 8]
+			]);
+		});
+
+		it('accumulates numerator and denominator separately then divides once, when combined with normalize', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2024-01-01', 2],
+					['2024-02-01', 4]
+				]
+			};
+			const effortHistory: LineChartData = {
+				name: 'effort',
+				data: [
+					['2024-01-01', 4],
+					['2024-02-01', 4]
+				]
+			};
+			// Cumulative counts 2 then 6, over cumulative effort 4 then 8 → 0.5,
+			// 0.75. Summing the per-month rates instead would give 0.5 then 1.5.
+			expect(accumulateSeriesByYear(metric, effortHistory).data).toEqual([
+				['2024-01-01', 0.5],
+				['2024-02-01', 0.75]
+			]);
+		});
+
+		it('resets the effort denominator at each new calendar year too', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2023-12-01', 6],
+					['2024-01-01', 2]
+				]
+			};
+			const effortHistory: LineChartData = {
+				name: 'effort',
+				data: [
+					['2023-12-01', 2],
+					['2024-01-01', 4]
+				]
+			};
+			expect(accumulateSeriesByYear(metric, effortHistory).data).toEqual([
+				['2023-12-01', 3],
+				['2024-01-01', 0.5]
+			]);
+		});
+	});
+
+	describe('Edge: gaps, zero effort and empty input', () => {
+		it('accumulates a series with no data some months without treating a gap as breaking the running sum', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2024-01-01', 5],
+					// A dense-spine zero-count month is "no data", but a cumulative
+					// count can't un-happen, so it carries the running total forward.
+					['2024-02-01', 0],
+					['2024-03-01', null],
+					['2024-04-01', 3]
+				]
+			};
+			expect(accumulateSeriesByYear(metric).data).toEqual([
+				['2024-01-01', 5],
+				['2024-02-01', 5],
+				['2024-03-01', 5],
+				['2024-04-01', 8]
+			]);
+		});
+
+		it('leaves the months before a year’s first reportable value as a gap', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2024-01-01', 0],
+					['2024-02-01', 4]
+				]
+			};
+			expect(accumulateSeriesByYear(metric).data).toEqual([
+				['2024-01-01', null],
+				['2024-02-01', 4]
+			]);
+		});
+
+		it('maps a month with 0 cumulative effort hours to 0, not NaN/Infinity', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [['2024-01-01', 3]]
+			};
+			const effortHistory: LineChartData = {
+				name: 'effort',
+				data: [['2024-01-01', 0]]
+			};
+			expect(accumulateSeriesByYear(metric, effortHistory).data).toEqual([
+				['2024-01-01', 0]
+			]);
+		});
+
+		it('accumulates oldest-first regardless of input order', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2024-02-01', 3],
+					['2024-01-01', 5]
+				]
+			};
+			expect(accumulateSeriesByYear(metric).data).toEqual([
+				['2024-01-01', 5],
+				['2024-02-01', 8]
+			]);
+		});
+
+		it('returns an empty series unchanged', () => {
+			expect(accumulateSeriesByYear({ name: 'arrivals', data: [] })).toEqual({
+				name: 'arrivals',
+				data: []
+			});
 		});
 	});
 });
@@ -1263,6 +1435,196 @@ describe('YearComparisonTrendChart', () => {
 					]
 				]);
 			});
+		});
+	});
+
+	describe('Structure: allowYearAccumulation / Accumulate toggle', () => {
+		// Two months of one calendar year, with effort hours chosen so the
+		// accumulate × normalize composition is distinguishable from a sum of
+		// per-month rates by hand (see the combination test below).
+		const accumulable: LineChartData[] = [
+			{
+				name: 'arrivals',
+				data: [
+					['2024-01-01', 2],
+					['2024-02-01', 4]
+				]
+			}
+		];
+		const accumulableEffort: LineChartData = {
+			name: 'effort',
+			data: [
+				['2024-01-01', 4],
+				['2024-02-01', 4]
+			]
+		};
+		// Spans two calendar years, so the Interval toggle is actually offered.
+		const multiYear: LineChartData[] = [
+			{
+				name: 'arrivals',
+				data: [
+					['2023-04-01', 2],
+					['2024-03-01', 4],
+					['2024-06-01', 6]
+				]
+			}
+		];
+		// Both Normalize and Accumulate render Yes/No radios, so every query has
+		// to be scoped to its own toggle group (the label span's parent holds
+		// that group's radios).
+		const toggle = (label: string) =>
+			within(screen.getByText(label).parentElement!);
+
+		it('does not render an Accumulate toggle when allowYearAccumulation is unset', () => {
+			render(
+				<YearComparisonTrendChart
+					series={accumulable}
+					effortHistory={accumulableEffort}
+				/>
+			);
+			expect(screen.queryByText('Accumulate')).toBeNull();
+		});
+
+		it('renders an Accumulate toggle only in all-time mode when allowYearAccumulation is true', () => {
+			render(
+				<YearComparisonTrendChart series={accumulable} allowYearAccumulation />
+			);
+			expect(screen.getByText('Accumulate')).toBeTruthy();
+			const no = toggle('Accumulate').getByRole('radio', {
+				name: 'No'
+			}) as HTMLInputElement;
+			expect(no.checked).toBe(true);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Compare years' }));
+			expect(screen.queryByText('Accumulate')).toBeNull();
+
+			fireEvent.click(screen.getByRole('radio', { name: 'This year' }));
+			expect(screen.queryByText('Accumulate')).toBeNull();
+		});
+
+		it('turning Accumulate on forces interval to month and hides the Interval toggle', () => {
+			render(
+				<YearComparisonTrendChart series={multiYear} allowYearAccumulation />
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			expect(
+				(screen.getByRole('radio', { name: 'Year' }) as HTMLInputElement)
+					.checked
+			).toBe(true);
+
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
+			expect(screen.queryByRole('radio', { name: 'Year' })).toBeNull();
+			expect(screen.queryByRole('radio', { name: 'Month' })).toBeNull();
+			// The monthly (accumulated) points are plotted, not one point per year.
+			const [chart] = screen.getAllByTestId('line-chart');
+			expect(JSON.parse(chart.dataset.values!)).toEqual([
+				[
+					['2023-04-01', 2],
+					['2024-03-01', 4],
+					['2024-06-01', 10]
+				]
+			]);
+
+			// Turning it back off restores the Interval toggle, reset to Month.
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'No' }));
+			expect(
+				(screen.getByRole('radio', { name: 'Month' }) as HTMLInputElement)
+					.checked
+			).toBe(true);
+		});
+
+		it('turning Accumulate on renders the chart as a stacked area', () => {
+			render(
+				<YearComparisonTrendChart series={accumulable} allowYearAccumulation />
+			);
+			const chartBefore = screen.getByTestId('line-chart');
+			expect(chartBefore.dataset.stacked).toBeUndefined();
+			expect(chartBefore.dataset.fill).toBeUndefined();
+
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
+			const chartAfter = screen.getByTestId('line-chart');
+			expect(chartAfter.dataset.stacked).toBe('true');
+			expect(chartAfter.dataset.fill).toBe('true');
+			// The stacked-area config is layered on top of the trend config, not a
+			// replacement — the legend filter still runs.
+			expect(JSON.parse(chartAfter.dataset.visibleInLegend!)).toEqual([
+				'arrivals'
+			]);
+		});
+
+		it('switching to compare-years mode while accumulate is on turns accumulate back off', () => {
+			render(
+				<YearComparisonTrendChart series={accumulable} allowYearAccumulation />
+			);
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
+			fireEvent.click(screen.getByRole('radio', { name: 'Compare years' }));
+			fireEvent.click(screen.getByRole('radio', { name: 'All time' }));
+
+			expect(
+				(
+					toggle('Accumulate').getByRole('radio', {
+						name: 'No'
+					}) as HTMLInputElement
+				).checked
+			).toBe(true);
+			const chart = screen.getByTestId('line-chart');
+			expect(chart.dataset.stacked).toBeUndefined();
+			expect(JSON.parse(chart.dataset.values!)).toEqual([accumulable[0].data]);
+		});
+
+		it('turning on both Accumulate and Normalize divides cumulative counts by cumulative effort, not the sum of per-month rates', () => {
+			render(
+				<YearComparisonTrendChart
+					series={accumulable}
+					effortHistory={accumulableEffort}
+					allowYearAccumulation
+				/>
+			);
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
+			fireEvent.click(toggle('Normalize').getByRole('radio', { name: 'Yes' }));
+
+			const chart = screen.getByTestId('line-chart');
+			// Cumulative 2/4 = 0.5, then 6/8 = 0.75 — summing the per-month rates
+			// (0.5, then 0.5 + 1 = 1.5) would be wrong.
+			expect(JSON.parse(chart.dataset.values!)).toEqual([
+				[
+					['2024-01-01', 0.5],
+					['2024-02-01', 0.75]
+				]
+			]);
+			expect(chart.dataset.ytitle).toBe('Value per hour');
+		});
+
+		it('sums the Total series from the already-accumulated metrics when includeTotalSeries is set', () => {
+			render(
+				<YearComparisonTrendChart
+					series={[
+						accumulable[0],
+						{
+							name: 'departures',
+							data: [
+								['2024-01-01', 1],
+								['2024-02-01', 3]
+							]
+						}
+					]}
+					allowYearAccumulation
+					includeTotalSeries
+				/>
+			);
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
+			const chart = screen.getByTestId('line-chart');
+			expect(JSON.parse(chart.dataset.series!)).toEqual([
+				'arrivals',
+				'departures',
+				'Total'
+			]);
+			const [, , total] = JSON.parse(chart.dataset.values!);
+			// Cumulative arrivals 2/6 plus cumulative departures 1/4.
+			expect(total).toEqual([
+				['2024-01-01', 3],
+				['2024-02-01', 10]
+			]);
 		});
 	});
 
