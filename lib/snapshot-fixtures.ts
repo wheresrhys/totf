@@ -38,7 +38,7 @@
  */
 
 /**
- * The 25 fixtures `scripts/generate-snapshots.ts` produces, and therefore the
+ * The 26 fixtures `scripts/generate-snapshots.ts` produces, and therefore the
  * exact set the freshness check covers. Paths are relative to
  * `test-fixtures/snapshots/` and follow #882's source-directory layout (one
  * subdirectory per RPC, `tables/<TableName>/` for direct PostgREST reads).
@@ -47,52 +47,61 @@
  * the generator still produces precisely this set: a fixture silently dropping
  * out of the generator would otherwise stop being checked without anything
  * failing.
+ *
+ * #894 wired the previously hand-maintained `core_stats/alpha.home-page-summary.json`
+ * / `alpha.summary-totals.json` / `ring_sequence_controls/alpha.controls.json` /
+ * `tables/Encounters/alpha.{pulli-encounters,resightings}.json` /
+ * `tables/Species/alpha.top-species.json` fixtures into this list, and deleted
+ * four generated-but-unconsumed fixtures that had no test reading them
+ * (`core_stats/robin-alpha.monthly-history.json`,
+ * `biometrics_stats/robin-alpha.monthly-history.json`,
+ * `tables/Birds/robin-alpha.graphable-encounters.json`,
+ * `find_discrepencies`/`notable_retraps` `beta.*` counterparts to the alpha-only
+ * fixtures below) — see `scripts/generate-snapshots.ts`'s per-block comments for
+ * why each one is safe to skip.
  */
 export const GENERATED_SNAPSHOT_FIXTURES = [
 	'biometrics_stats/alpha.by-species.json',
 	'biometrics_stats/gamma.by-species.json',
 	'biometrics_stats/robin-alpha.headline.json',
-	'biometrics_stats/robin-alpha.monthly-history.json',
 	'core_stats/alpha.by-species.json',
+	'core_stats/alpha.home-page-summary.json',
+	'core_stats/alpha.summary-totals.json',
 	'core_stats/alpha.yearly-and-monthly-totals.json',
 	'core_stats/beta.by-species.json',
 	'core_stats/beta.yearly-and-monthly-totals.json',
 	'core_stats/gamma.by-species.json',
 	'core_stats/robin-alpha.headline.json',
-	'core_stats/robin-alpha.monthly-history.json',
 	'demographics_stats/robin-alpha.monthly-history.json',
 	'find_discrepencies/alpha.discrepancies.json',
-	'find_discrepencies/beta.discrepancies.json',
 	'notable_retraps/alpha.retraps.json',
-	'notable_retraps/beta.retraps.json',
 	'notable_retraps/robin-alpha.retraps.json',
+	'ring_sequence_controls/alpha.controls.json',
 	'tables/Birds/arretrap.bird-detail.json',
-	'tables/Birds/robin-alpha.graphable-encounters.json',
 	'tables/Birds/robin-alpha.page-of-birds.json',
+	'tables/Encounters/alpha.pulli-encounters.json',
+	'tables/Encounters/alpha.resightings.json',
 	'tables/Sessions/alpha.all-sessions.json',
 	'tables/Sessions/alpha.recent-sessions.json',
 	'tables/Sessions/beta.all-sessions.json',
+	'tables/Species/alpha.top-species.json',
 	'top_metrics_by_period/alpha.busiest-days.json',
 	'top_metrics_by_period/robin-alpha.top-sessions.json'
 ] as const;
 
 /**
- * The 8 committed fixtures no generator produces — they can only be edited by
- * hand, so the freshness check cannot cover them. #882 moved them into their
- * correct source directory but did not wire them up for generation. Bringing
- * them under the generator (or deleting the ones with no consumers) is tracked
- * by issue #894; until then this list keeps the gap explicit rather than
- * implied-fixed.
+ * The 2 committed fixtures no generator produces or ever will —
+ * `synthetic/zero.home-page-summary.json` and `synthetic/zero.summary-totals.json`
+ * are hand-authored all-zero/null edge cases that no real query against seed
+ * data can produce (see `test-fixtures/snapshots/synthetic/README.md`). Every
+ * other previously-hand-maintained fixture was brought under the generator by
+ * #894, closing that gap; this pair is a deliberate, permanent exception rather
+ * than a remaining gap, so the freshness check's coverage test can still assert
+ * the on-disk fixture set is exactly `GENERATED_SNAPSHOT_FIXTURES` plus these.
  */
 export const UNGENERATED_SNAPSHOT_FIXTURES = [
-	'core_stats/alpha.home-page-summary.json',
-	'core_stats/alpha.summary-totals.json',
-	'core_stats/zero.home-page-summary.json',
-	'core_stats/zero.summary-totals.json',
-	'ring_sequence_controls/alpha.controls.json',
-	'tables/Encounters/alpha.pulli-encounters.json',
-	'tables/Encounters/alpha.resightings.json',
-	'tables/Species/alpha.top-species.json'
+	'synthetic/zero.home-page-summary.json',
+	'synthetic/zero.summary-totals.json'
 ] as const;
 
 export type SnapshotDriftKind =

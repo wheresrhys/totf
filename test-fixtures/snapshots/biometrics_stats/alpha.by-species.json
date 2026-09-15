@@ -12,6 +12,18 @@
     "median_wing": 67
   },
   {
+    "species_name": "Fieldfare",
+    "time_period": null,
+    "max_weight": 95,
+    "avg_weight": 95,
+    "min_weight": 95,
+    "median_weight": 95,
+    "max_wing": 145,
+    "avg_wing": 145,
+    "min_wing": 145,
+    "median_wing": 145
+  },
+  {
     "species_name": "Kingfisher",
     "time_period": null,
     "max_weight": 34,
@@ -22,6 +34,18 @@
     "avg_wing": 76.5,
     "min_wing": 76,
     "median_wing": 77
+  },
+  {
+    "species_name": "Redwing",
+    "time_period": null,
+    "max_weight": 65,
+    "avg_weight": 65,
+    "min_weight": 65,
+    "median_weight": 65,
+    "max_wing": 118,
+    "avg_wing": 118,
+    "min_wing": 118,
+    "median_wing": 118
   },
   {
     "species_name": "Reed Warbler",
