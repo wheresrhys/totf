@@ -257,7 +257,6 @@ describe('species detail page', () => {
 					'sp-combined-month-totals-tab'
 				],
 				['session-totals', 'Session totals', 'sp-session-totals-tab'],
-				['highlights', 'Highlights', 'sp-busiest-sessions-tab'],
 				['biometrics', 'Biometrics', 'sp-biometrics-tab'],
 				['demographics', 'Demographics', 'sp-demographics-tab'],
 				['bird-list', 'Bird list', 'sp-individuals-tab']

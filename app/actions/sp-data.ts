@@ -21,8 +21,6 @@ import {
 	type DemographicsStatsResult
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
-import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
-import type { TopMetricsFilterParams, TopPeriodsResult } from '@/app/models/db';
 export async function fetchPageOfBirds(
 	speciesId: number,
 	viewedGroupId: number,
@@ -81,32 +79,6 @@ export async function fetchPageOfBirds(
 		catchSupabaseErrors
 	)) as BirdOfSpecies[];
 	return paginatedBirdResults.map(enrichBird) as EnrichedBirdOfSpecies[];
-}
-
-/**
- * The species page's "Busiest sessions" section (Highlights tab) — the top 5
- * sessions by encounter count for this species, optionally scoped to a
- * year/month. Reuses `getTopPeriodsByMetric` with the same
- * day/encounters/limit-5 shape the headline stats' "Top sessions" line used
- * before #782 moved it into the Highlights tab.
- */
-export async function fetchTopSessions(
-	speciesName: string,
-	viewedGroupId: number,
-	year?: number,
-	month?: number
-): Promise<TopPeriodsResult[]> {
-	return getTopPeriodsByMetric({
-		temporal_unit: 'day',
-		metric_name: 'encounters',
-		filters: {
-			species_filter: speciesName,
-			ringing_group_filter: viewedGroupId,
-			...(year !== undefined ? { year_filter: year } : {}),
-			...(month !== undefined ? { month_filter: month } : {})
-		} as TopMetricsFilterParams,
-		result_limit: 5
-	}) as Promise<TopPeriodsResult[]>;
 }
 
 export async function fetchNotableRetraps(

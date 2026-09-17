@@ -77,10 +77,10 @@ describe('DesktopNavItems', () => {
 describe('MobileNavItems', () => {
 	afterEach(cleanup);
 
-	it('renders all 11 links in a flat list', () => {
+	it('renders all 10 links in a flat list', () => {
 		render(<MobileNavItems classes="" />);
 		const links = screen.getAllByRole('link');
-		expect(links).toHaveLength(11);
+		expect(links).toHaveLength(10);
 	});
 
 	it('includes Resightings link', () => {
