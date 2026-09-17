@@ -84,9 +84,7 @@ export const GENERATED_SNAPSHOT_FIXTURES = [
 	'tables/Sessions/alpha.all-sessions.json',
 	'tables/Sessions/alpha.recent-sessions.json',
 	'tables/Sessions/beta.all-sessions.json',
-	'tables/Species/alpha.top-species.json',
-	'top_metrics_by_period/alpha.busiest-days.json',
-	'top_metrics_by_period/robin-alpha.top-sessions.json'
+	'tables/Species/alpha.top-species.json'
 ] as const;
 
 /**

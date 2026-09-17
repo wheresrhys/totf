@@ -510,18 +510,6 @@ export type Database = {
           species_name: string
         }[]
       }
-      metrics_by_period_and_species: {
-        Args: {
-          filters?: Database["public"]["CompositeTypes"]["top_metrics_filter_params"]
-          metric_name: string
-          temporal_unit: string
-        }
-        Returns: {
-          metric_value: number
-          species_name: string
-          visit_date: string
-        }[]
-      }
       most_caught_birds: {
         Args: {
           max_per_species?: number
@@ -712,31 +700,6 @@ export type Database = {
         }[]
       }
       text_soundex: { Args: { "": string }; Returns: string }
-      top_metrics_by_period: {
-        Args: {
-          filters?: Database["public"]["CompositeTypes"]["top_metrics_filter_params"]
-          metric_name: string
-          result_limit: number
-          temporal_unit: string
-        }
-        Returns: {
-          metric_value: number
-          visit_date: string
-        }[]
-      }
-      top_metrics_by_species_and_period: {
-        Args: {
-          filters?: Database["public"]["CompositeTypes"]["top_metrics_filter_params"]
-          metric_name: string
-          result_limit: number
-          temporal_unit: string
-        }
-        Returns: {
-          metric_value: number
-          species_name: string
-          visit_date: string
-        }[]
-      }
     }
     Enums: {
       ring_size:
@@ -839,14 +802,6 @@ export type Database = {
         new_postjuv_juv_enc_count: number | null
         new_postjuv_enc_count: number | null
         old_timers_bird_count: number | null
-      }
-      top_metrics_filter_params: {
-        month_filter: number | null
-        year_filter: number | null
-        exact_months_filter: string[] | null
-        months_filter: number[] | null
-        species_filter: string | null
-        ringing_group_filter: number | null
       }
     }
   }
