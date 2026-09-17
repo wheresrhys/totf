@@ -255,7 +255,7 @@ Every page lives under `app/(routes)/` and follows a consistent split between th
 entrypoint, its content, and its data fetcher:
 
 - **`page.tsx`** is always server-side. It exports a default `___Page` component named after the
-  route (e.g. `BirdPage`, `SpeciesPage`, `RecordsPage`), which calls `BootstrapPage`
+  route (e.g. `BirdPage`, `SpeciesPage`), which calls `BootstrapPage`
   (`app/components/layout/BootstrapPage.tsx`) with a `PageComponent` and a `dataFetcher`.
   `page.tsx` also hosts the `fetch___PageContent` function itself, even though
   `PageContent.tsx` sits right next to it — the fetcher is inherently server-side (it's passed
