@@ -39,10 +39,6 @@ vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
 	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
 }));
 
-vi.mock('@/app/components/pages/species/SpBusiestSessionsTab', () => ({
-	SpBusiestSessionsTab: () => <div data-testid="sp-busiest-sessions-tab" />
-}));
-
 vi.mock('@/app/components/pages/species/SpDemographicsTab', () => ({
 	SpDemographicsTab: () => <div data-testid="sp-demographics-tab" />
 }));
@@ -164,12 +160,11 @@ describe('species detail page', () => {
 		});
 
 		describe('highlights tab (click to activate)', () => {
-			it('renders both SpNotableRetrapsTab and SpBusiestSessionsTab after clicking Highlights button', async () => {
+			it('renders SpNotableRetrapsTab after clicking Highlights button', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
 				fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
 				await screen.findByTestId('sp-notable-retraps-tab');
-				await screen.findByTestId('sp-busiest-sessions-tab');
 			});
 		});
 
