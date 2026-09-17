@@ -11,7 +11,6 @@ import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { SpIndividualsTab } from '@/app/components/pages/species/SpIndividualsTab';
 import { SpNotableRetrapsTab } from '@/app/components/pages/species/SpNotableRetrapsTab';
-import { SpBusiestSessionsTab } from '@/app/components/pages/species/SpBusiestSessionsTab';
 import { SpDemographicsTab } from '@/app/components/pages/species/SpDemographicsTab';
 import { SpBiometricsTab } from '@/app/components/pages/species/SpBiometricsTab';
 import { SpYearTotalsTab } from '@/app/components/pages/species/SpYearTotalsTab';
@@ -275,14 +274,6 @@ function SpeciesData({
 				tabId="highlights"
 				activeTabId={activeTab}
 			>
-				<SpBusiestSessionsTab
-					speciesName={data.speciesName}
-					viewedGroupId={viewedGroup.id}
-					viewedGroup={viewedGroup}
-					year={data.year}
-					month={data.month}
-					isActive={activeTab === 'highlights'}
-				/>
 				<SpNotableRetrapsTab
 					speciesName={data.speciesName}
 					viewedGroupId={viewedGroup.id}

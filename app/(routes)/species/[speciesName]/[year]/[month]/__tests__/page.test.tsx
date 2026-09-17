@@ -37,10 +37,6 @@ vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
 	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
 }));
 
-vi.mock('@/app/components/pages/species/SpBusiestSessionsTab', () => ({
-	SpBusiestSessionsTab: () => <div data-testid="sp-busiest-sessions-tab" />
-}));
-
 vi.mock('@/app/components/pages/species/SpStatsHistoryTab', () => ({
 	SpStatsHistoryTab: () => <div data-testid="sp-stats-history-tab" />
 }));
