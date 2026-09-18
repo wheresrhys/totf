@@ -69,7 +69,7 @@ describe('Cached supabase fetch', () => {
 		const { cachedSupabaseFetch } = await importCachedFetch();
 		mockDataFetcher.mockResolvedValue('test ok');
 		await cachedSupabaseFetch('test-cache-1', GROUP_ID, mockDataFetcher);
-		expect(mockDataFetcher).toHaveBeenCalledWith(mockSupabaseClient);
+		expect(mockDataFetcher).toHaveBeenCalledWith(mockSupabaseClient, GROUP_ID);
 	});
 	it('returns a cached response if a cached item for the group exists', async () => {
 		const { cachedSupabaseFetch } = await importCachedFetch();
@@ -103,6 +103,10 @@ describe('Cached supabase fetch', () => {
 			mockDataFetcher
 		);
 		expect(mockDataFetcher).toHaveBeenCalledTimes(2);
+		expect(mockDataFetcher).toHaveBeenCalledWith(
+			mockSupabaseClient,
+			OTHER_GROUP_ID
+		);
 		expect(result).toBe('other test ok');
 	});
 	it('different cache namespaces do not pollute each other', async () => {

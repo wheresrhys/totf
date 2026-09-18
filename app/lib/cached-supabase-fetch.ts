@@ -40,7 +40,8 @@ export async function cachedSupabaseFetch<T>(
 	namespace: string,
 	viewedGroupId: number,
 	dataFetcher: (
-		supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>
+		supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>,
+		viewedGroupId: number
 	) => Promise<T>
 ): Promise<T> {
 	const cache = getCache<T>(namespace);
@@ -54,7 +55,7 @@ export async function cachedSupabaseFetch<T>(
 	) {
 		return cachedResult.data;
 	}
-	const data = await dataFetcher(supabase);
+	const data = await dataFetcher(supabase, viewedGroupId);
 	cache.set(viewedGroupId, {
 		version: currentVersion,
 		expiresAt: Date.now() + CACHE_TTL_MS,
