@@ -391,6 +391,19 @@ npm run test:e2e      # full Playwright E2E suite
 npm run qa            # lint + type-check + app tests
 ```
 
+**Output is concise by default (#927).** Every one-shot ("run", not "watch") Vitest command —
+`test:nowatch`, `test:ci`, `test:integration`, `test:fixture-freshness`, `test:http` — passes
+`--reporter=dot`: a single character per test instead of a verbose per-test PASS line, with full
+detail still printed for any failure plus the final summary. `npm test` (interactive watch mode)
+is deliberately left on Vitest's default reporter — that's for a human watching it run, not an
+automated one-shot pass. Playwright (`playwright.config.ts`) uses `[['dot'], ['html', { open:
+'never' }]]` for the same reason, and to stop the HTML reporter auto-opening a browser tab when a
+test fails in a subagent's headless environment. `npm run lint`'s Prettier step passes
+`--log-level warn` so it stays silent when a file needs no reformatting, rather than printing a
+line per file scanned. This matters most when tests/lint run inside a subagent (`implement-ticket`'s
+`npm run qa`, `swarm` workers, the pre-push hook firing on a subagent's `git push`) — verbose
+per-test/per-file output there burns tokens for no signal.
+
 The pre-push hook runs app tests, then two diff-aware selection scripts —
 `scripts/fixture-freshness-select.sh` (see "App tests" below) and `scripts/e2e-select-suite.sh`
 (see "E2E tests" below). It never runs the DB integration suite as a whole; that stays manual,
