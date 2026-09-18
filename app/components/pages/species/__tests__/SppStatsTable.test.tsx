@@ -27,8 +27,12 @@ vi.mock('@/app/actions/spp-data', () => ({
 // core_stats stopped carrying its own copies at #827 and biometrics_stats is
 // now their only source (#883).
 const speciesStats = mergeSpeciesBiometrics(
+	// Kept as `as unknown as`: this fixture is grouped by species only, so
+	// time_period is genuinely null — CoreStatsResult's NonNullable mapped
+	// type (app/models/db.ts) assumes every column is always present, so a
+	// direct assertion doesn't compile (#895).
 	speciesDataSnapshot as unknown as CoreStatsResult[],
-	biometricsSnapshot as unknown as BiometricsStatsResult[]
+	biometricsSnapshot as BiometricsStatsResult[]
 );
 
 const pageData: PageData = {

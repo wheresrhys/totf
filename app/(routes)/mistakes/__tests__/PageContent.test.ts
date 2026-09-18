@@ -20,6 +20,9 @@ function makeEncounters(wingLengths: (number | null)[]): EncounterOfBird[] {
 		ringing_group_id: 1,
 		weight: null,
 		session: { visit_date: '2024-01-01' }
+		// Kept as `as unknown as`: this is a hand-built partial object carrying
+		// only the fields makeHighlighter's rules use, not a real fixture — it
+		// deliberately omits several EncounterOfBird columns (#895).
 	})) as unknown as EncounterOfBird[];
 }
 
@@ -32,7 +35,7 @@ describe('makeHighlighter', () => {
 				{ ...encs[0], id: 2, sex: 'F' },
 				{ ...encs[0], id: 3, sex: 'u' },
 				{ ...encs[0], id: 4, sex: 'U' }
-			] as unknown as EncounterOfBird[];
+			] as EncounterOfBird[];
 			const highlight = makeHighlighter('sex', encounters);
 			expect(highlight(encounters[0])).toBe(true);
 			expect(highlight(encounters[1])).toBe(true);
@@ -49,7 +52,7 @@ describe('makeHighlighter', () => {
 				{ ...encs[0], id: 2, age_code: 2 },
 				{ ...encs[0], id: 3, age_code: 5 },
 				{ ...encs[0], id: 4, age_code: null }
-			] as unknown as EncounterOfBird[];
+			] as EncounterOfBird[];
 			const highlight = makeHighlighter('age', encounters);
 			expect(highlight(encounters[0])).toBe(false);
 			expect(highlight(encounters[1])).toBe(true);

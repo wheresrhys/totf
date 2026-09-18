@@ -12,9 +12,8 @@ import gammaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats
 // biometric-eligible encounters at all — which is the fixture-backed
 // no-biometrics-anywhere edge case (#883).
 const capturedBiometricsRows =
-	alphaBiometricsBySpecies as unknown as BiometricsStatsResult[];
-const emptyBiometricsRows =
-	gammaBiometricsBySpecies as unknown as BiometricsStatsResult[];
+	alphaBiometricsBySpecies as BiometricsStatsResult[];
+const emptyBiometricsRows = gammaBiometricsBySpecies as BiometricsStatsResult[];
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -68,7 +67,7 @@ function buildAggregateRow(
 		min_wing: 65,
 		median_wing: 67,
 		...overrides
-	} as unknown as CoreStatsResult;
+	} as CoreStatsResult;
 }
 
 function buildBiometricsRow(

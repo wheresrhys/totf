@@ -29,7 +29,7 @@ function makeEncountersClient(data: unknown) {
 // Alpha's real seed data now has two resighting/recovery records (#902 review
 // on #894): a Kingfisher found dead (record_type F) and a Wren controlled by
 // another ringer (record_type U), both at the same site on consecutive days.
-const resightings = resightingsSnapshot as unknown as ResightingEncounter[];
+const resightings = resightingsSnapshot as ResightingEncounter[];
 
 describe('resightings page', () => {
 	beforeEach(() => {

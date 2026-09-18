@@ -26,7 +26,7 @@ function makeEncounter(
 			ring_no: `RING${id}`,
 			species: { id: 1, species_name: 'Robin' }
 		}
-	} as unknown as SessionEncounter;
+	} as SessionEncounter;
 }
 
 describe('calculateSessionChronology', () => {

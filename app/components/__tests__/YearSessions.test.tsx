@@ -4,7 +4,7 @@ import { YearSessions } from '../YearSessions';
 import sessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.all-sessions.json';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 
-const allSessions = sessionsSnapshot as unknown as SessionWithEncountersCount[];
+const allSessions = sessionsSnapshot as SessionWithEncountersCount[];
 
 // Group 2022 sessions by month (4 months)
 const sessions2022 = allSessions.filter((s) => s.visit_date.startsWith('2022'));

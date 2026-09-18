@@ -228,6 +228,10 @@ describe('fetchSessionStats', () => {
 // fetchWithVersionCache), so their mock client still needs a working
 // `from` chain for the Encounters version query: reuse the same mockFrom /
 // statsVersion scaffolding used for fetchSessionStats above.
+// Both kept as `as unknown as`: this fixture is not grouped by species, so
+// species_name is genuinely null — CoreStatsResult's NonNullable mapped type
+// (app/models/db.ts) assumes every column is always present, so a direct
+// assertion doesn't compile (#895).
 const yearlyRows = payOffStatsFixture.yearly as unknown as CoreStatsResult[];
 const monthlyRows = payOffStatsFixture.monthly as unknown as CoreStatsResult[];
 

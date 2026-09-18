@@ -59,7 +59,7 @@ vi.mock('@/app/components/pages/species/SpWeightWingTab', () => ({
 	SpWeightWingTab: () => <div data-testid="sp-weight-wing-tab" />
 }));
 
-const birds = birdsSnapshot as unknown as FullFatPageData['birds'];
+const birds = birdsSnapshot as FullFatPageData['birds'];
 
 function makeSpeciesClient(speciesId: number | null = ROBIN_SPECIES_ID) {
 	const fromChain = {

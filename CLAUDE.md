@@ -435,11 +435,26 @@ Two generated fixtures still break this rule and are grandfathered pending
 `tables/Birds/arretrap.bird-detail.json` (a `Birds` row with an `Encounters` query spliced on).
 Don't add a third.
 
+**Never write `fixture as unknown as SomeType` for a new fixture cast — try `fixture as SomeType`
+first (#895).** The double assertion through `unknown` switches assignability checking off
+completely, so a fixture's shape is never compared against the type at all — a fixture missing a
+column the type has since gained goes uncaught. A direct single assertion still doesn't catch
+every drift (an imported JSON module isn't a fresh object literal, so TypeScript's
+excess-property check never applies to it — a fixture carrying a column the type has since
+*removed* stays assignable either way; that direction is `snapshot-fixture-freshness.test.ts`'s
+job, described below), but it does catch a newly-*added* required column, which the double
+assertion can't. Only fall back to `as unknown as SomeType` when the fixture is a genuine
+structural mismatch — e.g. an ungrouped/species-filtered `core_stats`-family fixture with a
+literal `null` in a column the row type (`CoreStatsResult`, `DemographicsStatsResult`,
+`BiometricsStatsResult` in `app/models/db.ts`) strips non-null via `NonNullable`, or a hand-built
+object that only fills in the columns a test actually reads — and leave a short comment on why,
+so a future reader doesn't assume it was simply missed.
+
 **Fixture drift is caught by a pre-push, diff-gated check — but only for the 26 generated
 fixtures.** Nothing in the type system notices when an RPC's return shape changes underneath a
-fixture: they're consumed via `fixture as unknown as SomeType`, a double assertion that switches
-assignability checking off, and an imported JSON module is not a fresh object literal, so even
-without the cast a fixture carrying columns the type no longer declares stays assignable. That's
+fixture consumed via a double assertion (see above) or via a JSON import generally, since an
+imported JSON module is not a fresh object literal so even a direct assertion still leaves a
+fixture carrying columns the type no longer declares assignable. That's
 how #870's column removal reached `main` with every check green (full investigation in
 [#890](https://github.com/wheresrhys/totf/issues/890) / [#884](https://github.com/wheresrhys/totf/issues/884)).
 `supabase/__tests__/snapshot-fixture-freshness.test.ts` (#893) closes the gap:

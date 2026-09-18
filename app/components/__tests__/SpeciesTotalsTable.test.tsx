@@ -8,6 +8,10 @@ import {
 	getCellTextByHeading
 } from '@/app/__tests__/helpers/table';
 
+// Kept as `as unknown as`: this fixture is grouped by species only, so
+// time_period is genuinely null — CoreStatsResult's NonNullable mapped type
+// (app/models/db.ts) assumes every column is always present, so a direct
+// assertion doesn't compile (#895).
 const speciesStats = speciesDataSnapshot as unknown as CoreStatsResult[];
 
 // The real header <th>s live in the `<thead>` row without a `data-testid` —
@@ -37,7 +41,7 @@ function makeStat(
 		adult_bird_count: 0,
 		unknown_age_bird_count: 0,
 		...overrides
-	} as unknown as CoreStatsResult;
+	} as CoreStatsResult;
 }
 
 describe('SpeciesTotalsTable', () => {

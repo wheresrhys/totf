@@ -35,6 +35,10 @@ function makeChainClient(
 	};
 	const summaryStats =
 		overrides.summaryStats ??
+		// Kept as `as unknown as`: this is an ungrouped core_stats fixture, so
+		// species_name/time_period are genuinely null — CoreStatsResult's
+		// NonNullable mapped type (app/models/db.ts) assumes every column is
+		// always present, so a direct assertion doesn't compile (#895).
 		(summaryStatsSnapshot as unknown as HomePageSummaryStats);
 	const lastGroupTick = overrides.lastGroupTick ?? defaultLastGroupTick;
 	function chainFor(data: unknown) {
@@ -353,6 +357,7 @@ describe('home page', () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 					makeChainClient({
 						summaryStats:
+							// Kept as `as unknown as` — see comment above summaryStats (#895).
 							summaryStatsZeroSnapshot as unknown as HomePageSummaryStats
 					})
 				);
@@ -372,6 +377,7 @@ describe('home page', () => {
 			it('renders a dash for the missing periods and values for all time', async () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 					makeChainClient({
+						// Kept as `as unknown as` — see comment above summaryStats (#895).
 						summaryStats: {
 							allTime: summaryStatsSnapshot.allTime,
 							thisYear: null,
@@ -401,7 +407,7 @@ describe('home page', () => {
 							allTime: null,
 							thisYear: null,
 							lastYear: null
-						} as unknown as HomePageSummaryStats
+						} as HomePageSummaryStats
 					})
 				);
 				render(await HomePage());

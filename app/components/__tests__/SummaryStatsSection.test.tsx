@@ -5,6 +5,10 @@ import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-total
 import zeroStats from '@/test-fixtures/snapshots/synthetic/zero.summary-totals.json';
 import type { CoreStatsResult } from '@/app/models/db';
 
+// Both kept as `as unknown as`: these are ungrouped core_stats fixtures, so
+// species_name/time_period are genuinely null — CoreStatsResult's
+// NonNullable mapped type (app/models/db.ts) assumes every column is always
+// present, so a direct assertion doesn't compile (#895).
 const populatedStats = alphaStats as unknown as CoreStatsResult;
 const zeroActivityStats = zeroStats as unknown as CoreStatsResult;
 

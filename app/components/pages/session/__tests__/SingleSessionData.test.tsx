@@ -41,7 +41,7 @@ function makeEncounter(
 			proven_age,
 			species: { id: 1, species_name: species }
 		}
-	} as unknown as SessionEncounter;
+	} as SessionEncounter;
 }
 
 function totalsRowCellValue(columnLabel: string): string {

@@ -22,7 +22,7 @@ function aggregateRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
 		time_period: '2024-01-01',
 		bird_count: 0,
 		encounter_count: 0
-	} as unknown as CoreStatsResult & typeof overrides;
+	} as CoreStatsResult & typeof overrides;
 }
 
 // The demographics builder's *column set* comes from a real captured
@@ -31,6 +31,11 @@ function aggregateRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
 // hand-maintained literal, so a column added or removed at the RPC shows up
 // here instead of silently drifting (#883). Every count is zeroed so each test
 // still only sees the columns it explicitly sets.
+// Kept as `as unknown as`: this fixture is species-filtered rather than
+// species-grouped, so species_name is genuinely null —
+// DemographicsStatsResult's NonNullable mapped type (app/models/db.ts)
+// assumes every column is always present, so a direct assertion doesn't
+// compile (#895).
 const [capturedDemographicsRow] =
 	robinDemographicsHistory as unknown as DemographicsStatsResult[];
 const zeroedDemographicsRow = Object.fromEntries(
