@@ -692,4 +692,403 @@ describe('demographics_stats', () => {
 			expect(data![0].new_young_bird_count).toBe(0);
 		});
 	});
+
+	// Returning-age subsets of adult_bird_count (#843), resolved per bird by the
+	// stats_bird_returning_age_bucket utility RPC. Same fixture shape as the
+	// age-split block above: every bird's "this period" adult encounter is on its
+	// own random far-future date, so an ungrouped from=to=date query returns
+	// exactly that one bird and period_year resolves to that date's calendar year;
+	// prior-year encounters sit outside every query window and only ever feed the
+	// lifetime history.
+	//
+	// The buckets key off a PERIOD-RELATIVE proven age — period_year minus the
+	// smallest max_hatch_year across the bird's encounters up to and including
+	// period_year — never the live, all-time Birds.proven_age column. The age
+	// codes below are chosen for what trg_set_encounter_generated_fields derives
+	// from them at a visit in year V:
+	//   age_code 2 -> max_hatch_year V,     min_hatch_year 0 (even = imprecise)
+	//   age_code 3 -> max_hatch_year V,     min_hatch_year V
+	//   age_code 4 -> max_hatch_year V - 1, min_hatch_year 0
+	//   age_code 5 -> max_hatch_year V - 1, min_hatch_year V - 1
+	//   age_code 6 -> max_hatch_year V - 2, min_hatch_year 0
+	// and only age_code > 3 buckets as 'adult', which is the cohort these columns
+	// partition.
+	describe('returning age buckets (returning_age_1/2/3_plus/new_unknown_age_bird_count)', () => {
+		let deltaId: number;
+		let deltaClient: SupabaseClient;
+		const locationIds: number[] = [];
+		const sessionIds: number[] = [];
+		const birdIds: number[] = [];
+		const alphaLocationIds: number[] = [];
+		const alphaSessionIds: number[] = [];
+
+		type EncInput = { date: string; age_code: number; is_juv: boolean };
+
+		// Scenario "this period" query dates (each bird gets its own).
+		let age1Date: string; // precisely-aged returner, age 1
+		let age6Date: string; // long-lived returner, age 6
+		let age2Date: string; // exactly 2
+		let age3Date: string; // exactly 3
+		let imprecisePairDate: string; // 2 encounters, never precisely aged, age 1
+		let newImpreciseDate: string; // first-ever imprecise encounter, age 1
+		let newImprecise2Date: string; // first-ever imprecise encounter, age 2
+		let periodRelativeEarlyDate: string; // same bird, earlier cell
+		let periodRelativeLateDate: string; // same bird, later cell
+		let periodRelativeBirdId: number;
+		let multiGroupDate: string; // Alpha history must not count under Delta
+
+		const yearOf = (d: string) => parseInt(d.slice(0, 4), 10);
+
+		beforeAll(async () => {
+			deltaId = await getGroupIdByName('Delta');
+			deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+			const testSuffix = randomTestSuffix();
+			const base = randomFutureDate();
+
+			const { data: robin } = await supabase
+				.from('Species')
+				.select('id')
+				.eq('species_name', 'Robin')
+				.single();
+			const robinId = robin!.id;
+
+			const { data: deltaLoc, error: dLocErr } = await deltaClient
+				.from('Locations')
+				.insert({
+					location_name: `Returning Age Delta Loc ${testSuffix}`,
+					ringing_group_id: deltaId
+				})
+				.select('id')
+				.single();
+			if (dLocErr) throw dLocErr;
+			locationIds.push(deltaLoc!.id);
+			const deltaLocId = deltaLoc!.id;
+
+			const { data: alphaLoc, error: aLocErr } = await alphaClient
+				.from('Locations')
+				.insert({
+					location_name: `Returning Age Alpha Loc ${testSuffix}`,
+					ringing_group_id: alphaId
+				})
+				.select('id')
+				.single();
+			if (aLocErr) throw aLocErr;
+			alphaLocationIds.push(alphaLoc!.id);
+			const alphaLocId = alphaLoc!.id;
+
+			const sessionCache = new Map<string, number>();
+			async function getSession(
+				client: SupabaseClient,
+				date: string,
+				locationId: number,
+				track: number[]
+			) {
+				const key = `${date}|${locationId}`;
+				const cached = sessionCache.get(key);
+				if (cached !== undefined) return cached;
+				const { data: session, error } = await client
+					.from('Sessions')
+					.insert({ visit_date: date, location_id: locationId })
+					.select('id')
+					.single();
+				if (error) throw error;
+				sessionCache.set(key, session!.id);
+				track.push(session!.id);
+				return session!.id;
+			}
+
+			async function insertEncounter(
+				client: SupabaseClient,
+				bird_id: number,
+				sessionId: number,
+				enc: { age_code: number; is_juv: boolean }
+			) {
+				const { error } = await client.from('Encounters').insert({
+					capture_time: '10:00:00',
+					scheme: 'BTO',
+					sex: 'M',
+					session_id: sessionId,
+					bird_id,
+					age_code: enc.age_code,
+					is_juv: enc.is_juv,
+					record_type: 'R'
+				});
+				if (error) throw error;
+			}
+
+			let ringCounter = 0;
+			async function addBird(encounters: EncInput[]): Promise<number> {
+				const { data: bird, error } = await deltaClient
+					.from('Birds')
+					.insert({
+						ring_no: `RETAGE-${testSuffix}-${ringCounter++}`,
+						species_id: robinId
+					})
+					.select('id')
+					.single();
+				if (error) throw error;
+				birdIds.push(bird!.id);
+				for (const e of encounters) {
+					const sessionId = await getSession(
+						deltaClient,
+						e.date,
+						deltaLocId,
+						sessionIds
+					);
+					await insertEncounter(deltaClient, bird!.id, sessionId, e);
+				}
+				return bird!.id;
+			}
+
+			// Age 1, precisely aged and genuinely returning: ringed as a bare age-3
+			// bird in (period_year - 1) (max_hatch_year = that year, precisely aged),
+			// retrapped as an adult this period.
+			age1Date = addDays(base, 0);
+			await addBird([
+				{ date: `${yearOf(age1Date) - 1}-05-10`, age_code: 3, is_juv: false },
+				{ date: age1Date, age_code: 4, is_juv: false }
+			]);
+
+			// Age 6: first encounter six years before this period year.
+			age6Date = addDays(base, 20);
+			await addBird([
+				{ date: `${yearOf(age6Date) - 6}-05-10`, age_code: 3, is_juv: false },
+				{ date: age6Date, age_code: 4, is_juv: false }
+			]);
+
+			// Exactly 2.
+			age2Date = addDays(base, 40);
+			await addBird([
+				{ date: `${yearOf(age2Date) - 2}-05-10`, age_code: 3, is_juv: false },
+				{ date: age2Date, age_code: 4, is_juv: false }
+			]);
+
+			// Exactly 3.
+			age3Date = addDays(base, 60);
+			await addBird([
+				{ date: `${yearOf(age3Date) - 3}-05-10`, age_code: 3, is_juv: false },
+				{ date: age3Date, age_code: 4, is_juv: false }
+			]);
+
+			// Genuinely returning but never precisely aged: both encounters carry an
+			// even age_code (min_hatch_year 0), and the pair still computes an age of
+			// 1 — so the carve-out COULD fire on the age, but must not, because the
+			// bird has two encounters to date.
+			imprecisePairDate = addDays(base, 80);
+			await addBird([
+				{
+					date: `${yearOf(imprecisePairDate) - 1}-05-10`,
+					age_code: 2,
+					is_juv: false
+				},
+				{ date: imprecisePairDate, age_code: 4, is_juv: false }
+			]);
+
+			// First-ever encounter, imprecise (age_code 4), computing an age of 1 —
+			// the carve-out case.
+			newImpreciseDate = addDays(base, 100);
+			await addBird([{ date: newImpreciseDate, age_code: 4, is_juv: false }]);
+
+			// First-ever encounter, imprecise (age_code 6), computing an age of 2 —
+			// deliberately NOT carved out.
+			newImprecise2Date = addDays(base, 120);
+			await addBird([{ date: newImprecise2Date, age_code: 6, is_juv: false }]);
+
+			// One bird read in two different cells: first ringed (precisely, age_code
+			// 3) four years before the later cell, adult in both cells. The earlier
+			// cell must read 2, the later 4 — while the live Birds.proven_age column
+			// holds only the all-time 4.
+			periodRelativeLateDate = addDays(base, 140);
+			periodRelativeEarlyDate = `${yearOf(periodRelativeLateDate) - 2}-05-11`;
+			periodRelativeBirdId = await addBird([
+				{
+					date: `${yearOf(periodRelativeLateDate) - 4}-05-10`,
+					age_code: 3,
+					is_juv: false
+				},
+				{ date: periodRelativeEarlyDate, age_code: 4, is_juv: false },
+				{ date: periodRelativeLateDate, age_code: 4, is_juv: false }
+			]);
+
+			// Multi-group isolation: a precisely-aged Alpha encounter five years back
+			// plus a first Delta encounter this period. Under ringing_group_filter =
+			// Delta the Alpha history is invisible, so this reads as a first-ever
+			// imprecise encounter ('new_unknown_age'), not a 5-year returner.
+			multiGroupDate = addDays(base, 160);
+			const { data: mgBird, error: mgErr } = await deltaClient
+				.from('Birds')
+				.insert({ ring_no: `RETAGE-${testSuffix}-MG`, species_id: robinId })
+				.select('id')
+				.single();
+			if (mgErr) throw mgErr;
+			birdIds.push(mgBird!.id);
+			const alphaSess = await getSession(
+				alphaClient,
+				`${yearOf(multiGroupDate) - 5}-05-10`,
+				alphaLocId,
+				alphaSessionIds
+			);
+			await insertEncounter(alphaClient, mgBird!.id, alphaSess, {
+				age_code: 3,
+				is_juv: false
+			});
+			const mgDeltaSess = await getSession(
+				deltaClient,
+				multiGroupDate,
+				deltaLocId,
+				sessionIds
+			);
+			await insertEncounter(deltaClient, mgBird!.id, mgDeltaSess, {
+				age_code: 4,
+				is_juv: false
+			});
+		});
+
+		afterAll(() => {
+			const allSessions = [...sessionIds, ...alphaSessionIds];
+			const allLocations = [...locationIds, ...alphaLocationIds];
+			execSync(
+				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+					`DELETE FROM "Sessions" WHERE id IN (${allSessions.join(', ')});` +
+					`DELETE FROM "Locations" WHERE id IN (${allLocations.join(', ')});'`
+			);
+		});
+
+		// An ungrouped single-date aggregate row (covers exactly the one bird on `date`).
+		async function returningAgeRow(date: string) {
+			const { data, error } = await deltaClient.rpc('demographics_stats', {
+				ringing_group_filter: deltaId,
+				from_date: date,
+				to_date: date
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(1);
+			return data![0];
+		}
+
+		// Usual
+		it('a bird recaptured this period, precisely aged 1 year returning, counts in returning_age_1_bird_count only', async () => {
+			const row = await returningAgeRow(age1Date);
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_1_bird_count: 1,
+				returning_age_2_bird_count: 0,
+				returning_age_3_plus_bird_count: 0,
+				returning_new_unknown_age_bird_count: 0
+			});
+		});
+
+		it('a bird recaptured well past the 3-year boundary (6 years) counts in returning_age_3_plus_bird_count only', async () => {
+			const row = await returningAgeRow(age6Date);
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_1_bird_count: 0,
+				returning_age_2_bird_count: 0,
+				returning_age_3_plus_bird_count: 1,
+				returning_new_unknown_age_bird_count: 0
+			});
+		});
+
+		// Structure
+		it('a bird exactly at period-relative proven age 2 counts in returning_age_2_bird_count, not 1 or 3_plus', async () => {
+			const row = await returningAgeRow(age2Date);
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_1_bird_count: 0,
+				returning_age_2_bird_count: 1,
+				returning_age_3_plus_bird_count: 0,
+				returning_new_unknown_age_bird_count: 0
+			});
+		});
+
+		it('a bird exactly at period-relative proven age 3 counts in returning_age_3_plus_bird_count, not 2', async () => {
+			const row = await returningAgeRow(age3Date);
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_2_bird_count: 0,
+				returning_age_3_plus_bird_count: 1
+			});
+		});
+
+		it('a genuinely-returning bird that has never been precisely aged counts in its numeric bucket, not returning_new_unknown_age_bird_count', async () => {
+			const row = await returningAgeRow(imprecisePairDate);
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_1_bird_count: 1,
+				returning_new_unknown_age_bird_count: 0
+			});
+		});
+
+		it('the four returning-age columns partition the adult cohort for a cell holding one bird of each kind', async () => {
+			const { data, error } = await deltaClient.rpc('demographics_stats', {
+				ringing_group_filter: deltaId,
+				from_date: age1Date,
+				to_date: newImprecise2Date
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(1);
+			const row = data![0];
+			expect(
+				row.returning_age_1_bird_count +
+					row.returning_age_2_bird_count +
+					row.returning_age_3_plus_bird_count +
+					row.returning_new_unknown_age_bird_count
+			).toBe(row.adult_bird_count);
+		});
+
+		// Edge
+		it("a bird's very first-ever encounter, coded imprecisely and computing an age of 1, counts in returning_new_unknown_age_bird_count", async () => {
+			const row = await returningAgeRow(newImpreciseDate);
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_1_bird_count: 0,
+				returning_new_unknown_age_bird_count: 1
+			});
+		});
+
+		it('a first-ever imprecisely-coded encounter computing an age of 2 is NOT carved out — it lands in returning_age_2_bird_count', async () => {
+			const row = await returningAgeRow(newImprecise2Date);
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_2_bird_count: 1,
+				returning_new_unknown_age_bird_count: 0
+			});
+		});
+
+		it("the bucket is computed relative to the cell's own period_year, not the bird's live Birds.proven_age", async () => {
+			const earlier = await returningAgeRow(periodRelativeEarlyDate);
+			expect(earlier).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_2_bird_count: 1,
+				returning_age_3_plus_bird_count: 0
+			});
+			const later = await returningAgeRow(periodRelativeLateDate);
+			expect(later).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_2_bird_count: 0,
+				returning_age_3_plus_bird_count: 1
+			});
+			// The live column holds only the all-time value the later cell happens to
+			// agree with — the earlier cell's 2 is unobtainable from it.
+			const { data: bird, error: birdError } = await deltaClient
+				.from('Birds')
+				.select('proven_age')
+				.eq('id', periodRelativeBirdId)
+				.single();
+			expect(birdError).toBeNull();
+			expect(bird!.proven_age).toBe(4);
+		});
+
+		it("another ringing group's history is excluded when ringing_group_filter is set", async () => {
+			const row = await returningAgeRow(multiGroupDate);
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_3_plus_bird_count: 0,
+				returning_new_unknown_age_bird_count: 1
+			});
+		});
+	});
 });
