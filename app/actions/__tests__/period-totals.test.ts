@@ -7,7 +7,7 @@ vi.mock('@/app/lib/auth/group-summary-access', () => ({
 	fetchAuthorisedCoreStats: vi.fn()
 }));
 
-const ROW = { encounter_count: 5 } as unknown as CoreStatsResult;
+const ROW = { encounter_count: 5 } as CoreStatsResult;
 
 describe('fetchPeriodTotals — routes through the group-summary access helper', () => {
 	beforeEach(() => {

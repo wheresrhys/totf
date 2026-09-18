@@ -15,7 +15,7 @@ function makeResighting(id: number, speciesName: string): ResightingEncounter {
 			visit_date: '2024-01-01',
 			location: { location_name: 'Test Site' }
 		}
-	} as unknown as ResightingEncounter;
+	} as ResightingEncounter;
 }
 
 describe('groupResightingsBySpecies', () => {

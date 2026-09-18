@@ -21,7 +21,7 @@ function makeRpcClient(data: unknown) {
 	return { rpc: vi.fn().mockReturnValue(thenable) };
 }
 
-const controls = controlsSnapshot as unknown as RingSequenceControlRow[];
+const controls = controlsSnapshot as RingSequenceControlRow[];
 
 describe('controls page', () => {
 	beforeEach(() => {

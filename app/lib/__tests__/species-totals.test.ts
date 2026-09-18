@@ -41,7 +41,7 @@ function buildStat(overrides: Partial<CoreStatsResult> = {}): CoreStatsResult {
 		adult_enc_count: 1,
 		unknown_age_enc_count: 0,
 		...overrides
-	} as unknown as CoreStatsResult;
+	} as CoreStatsResult;
 }
 
 describe('calculateRetraps', () => {

@@ -40,7 +40,7 @@ function makeEncounter(
 			proven_age: 0,
 			species: { id: 1, species_name: overrides.species ?? 'Robin' }
 		}
-	} as unknown as SessionEncounter;
+	} as SessionEncounter;
 }
 
 const STANDARD_COLUMNS = [
