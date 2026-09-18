@@ -158,9 +158,9 @@ Key design notes:
 - Complex queries are exposed as Postgres RPC functions (e.g. `top_metrics_by_period`, `core_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
 
-### Companion stats RPCs and shared plumbing (`core_stats` / `population_stats`, #800)
+### Companion stats RPCs and shared plumbing (`core_stats` / `demographics_stats`, #800/#877)
 
-`core_stats` and `population_stats` (age-split + young-trends derivations, split into its own
+`core_stats` and `demographics_stats` (age-split + young-trends derivations, split into its own
 RPC rather than folded into `core_stats`' already-large single query — for query-plan
 simplicity and to leave `core_stats`' existing columns untouched) share the same input
 signature (`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
@@ -172,18 +172,23 @@ RPC calls every utility it needs exactly once and materializes the result into a
 by every downstream reference in that RPC), so the base tables aren't rescanned once per downstream
 CTE — but a utility RPC that itself depends on another (e.g. `stats_bird_age_bucket` →
 `stats_encounter_age_classification` → `stats_raw_encounters`) does re-derive that dependency
-independently per call site, so a top-level RPC needing several layers (e.g. `population_stats`
+independently per call site, so a top-level RPC needing several layers (e.g. `demographics_stats`
 needing `stats_spine` + `stats_encounter_age_classification` + `stats_bird_age_bucket`) re-scans the
 base tables a small constant number of times rather than once — accepted as a reasonable tradeoff at
 this app's data scale; keep an eye on it if a future RPC stacks many more utility layers. Keep the
 utility RPCs' bucket/precedence definitions in sync **by hand** with `app/models/encounter.ts`'s
-`getAgeClass()` if either changes. `population_stats.new_young_bird_count` was originally a
+`getAgeClass()` if either changes. `demographics_stats` was originally named `population_stats`
+(#800); #877 created the renamed `demographics_stats`/`demographics_stats_result` pair as
+byte-identical siblings, #878 migrated every app-code call site onto the new names, and #879
+dropped the old `population_stats` function and `population_stats_result` type entirely — the
+same three-step pattern used for `core_stats`/`public_core_stats` (#830, see "Public pages and
+the group summary read-path" above). `demographics_stats.new_young_bird_count` was originally a
 duplicate of a same-named column on `core_stats` (#800); #824 removed `core_stats`'s
-copy (and the corresponding UI series, #817) as unused, so `population_stats` now holds the only
+copy (and the corresponding UI series, #817) as unused, so `demographics_stats` now holds the only
 `new_young_bird_count` column in the schema.
 
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
-two structurally can't: **arrivals**. `core_stats`/`population_stats` compute their bucket
+two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
 counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
 one year is counted again in each monthly cell. `arrivals_stats` instead counts each bird exactly
 once per calendar year, at whichever cell holds its **first classifiable encounter of that year**,
@@ -195,8 +200,8 @@ unclassifiable early encounter is skipped in favour of the next classifiable one
 than losing the bird for that year), takes `DISTINCT ON (bird_id, enc_year)` ordered by
 `visit_date, encounter_id` for same-day determinism, and splits `adult` into `new_adult` vs
 `returning_adult` off the same unwindowed, `ringing_group_filter`-scoped lifetime-history CTEs
-`population_stats` uses (`new_adult` iff the arrival year is the bird's first-ever year with the
-group — no majority-vote heuristic needed, unlike `population_stats`' first_summer/old_timers split).
+`demographics_stats` uses (`new_adult` iff the arrival year is the bird's first-ever year with the
+group — no majority-vote heuristic needed, unlike `demographics_stats`' first_summer/old_timers split).
 Note the granularity: an "arrival" is a **bird-year**, not a bird, so under an ungrouped query a bird
 that arrived in two years contributes two counts.
 
@@ -204,10 +209,11 @@ that arrived in two years contributes two counts.
 <composite type>` function's `RETURN QUERY SELECT ...` binds the SELECT list to the composite
 type's columns by ordinal attribute position, never by the `AS "..."` alias text. That position is
 only as stable as whatever DDL a given environment's `db:schema:apply` run happens to emit for the
-type — confirmed empirically while building `population_stats`: two schema-diff runs against the
-identical schema files produced two *different* physical attribute orders for a composite type's
-columns (one matching the file's declared order, one alphabetical), silently scrambling values into
-the wrong named output columns with no error either way. `population_stats` and `core_stats`
+type — confirmed empirically while building `demographics_stats` (as `population_stats`): two
+schema-diff runs against the identical schema files produced two *different* physical attribute
+orders for a composite type's columns (one matching the file's declared order, one alphabetical),
+silently scrambling values into the wrong named output columns with no error either way.
+`demographics_stats` and `core_stats`
 (the latter retrofitted in #824, the first time `aggregate_stats_result` changed shape since this
 note was written) guard against this by wrapping their final projection — `SELECT
 (jsonb_populate_record(NULL::the_result_type, to_jsonb(agg))).* FROM (...) AS agg` — which binds
