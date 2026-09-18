@@ -180,6 +180,7 @@ describe('createRingSequenceLookup', () => {
 		mockEqGroup = vi.fn(() => ({ eq: mockEqPrefix }));
 		mockSelect = vi.fn(() => ({ eq: mockEqGroup }));
 		mockFrom = vi.fn(() => ({ select: mockSelect }));
+		// eslint-disable-next-line no-restricted-syntax -- mock only implements the `from` chain this test needs, not the full SupabaseClient interface
 		const mockClient = { from: mockFrom } as unknown as SupabaseClient;
 		lookup = createRingSequenceLookup(mockClient);
 	});
@@ -240,6 +241,7 @@ describe('createRingSequenceLinker', () => {
 	beforeEach(() => {
 		mockUpsert = vi.fn().mockResolvedValue({ error: null });
 		mockFrom = vi.fn(() => ({ upsert: mockUpsert }));
+		// eslint-disable-next-line no-restricted-syntax -- mock only implements the `from` chain this test needs, not the full SupabaseClient interface
 		const mockClient = { from: mockFrom } as unknown as SupabaseClient;
 		link = createRingSequenceLinker(mockClient);
 	});
@@ -276,6 +278,7 @@ describe('createUpserter', () => {
 		mockSelect = vi.fn(() => ({ single: mockSingle }));
 		mockUpsertChain = vi.fn(() => ({ select: mockSelect }));
 		mockFrom = vi.fn(() => ({ upsert: mockUpsertChain }));
+		// eslint-disable-next-line no-restricted-syntax -- mock only implements the `from` chain this test needs, not the full SupabaseClient interface
 		const mockClient = { from: mockFrom } as unknown as SupabaseClient;
 		upsert = createUpserter(mockClient);
 	});

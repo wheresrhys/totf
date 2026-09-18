@@ -348,10 +348,11 @@ function makeAggregateRow(
 // The real captured biometrics_stats row for the exact call getSpeciesStats
 // makes (Robin, Alpha, ungrouped — one headline row), rather than a
 // hand-written literal that can silently drift from the RPC's shape (#883).
-// Kept as `as unknown as`: this fixture's row has species_name/time_period
-// null, but BiometricsStatsResult declares species_name non-null
-// (app/models/db.ts), so a direct assertion doesn't compile (#895).
+// This fixture's row has species_name/time_period null, but
+// BiometricsStatsResult declares species_name non-null (app/models/db.ts),
+// so a direct assertion doesn't compile (#895).
 const [capturedBiometricsRow] =
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	robinBiometricsHeadline as unknown as BiometricsStatsResult[];
 
 function makeBiometricsRow(

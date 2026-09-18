@@ -31,12 +31,12 @@ function aggregateRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
 // hand-maintained literal, so a column added or removed at the RPC shows up
 // here instead of silently drifting (#883). Every count is zeroed so each test
 // still only sees the columns it explicitly sets.
-// Kept as `as unknown as`: this fixture is species-filtered rather than
-// species-grouped, so species_name is genuinely null —
-// DemographicsStatsResult's NonNullable mapped type (app/models/db.ts)
-// assumes every column is always present, so a direct assertion doesn't
-// compile (#895).
+// This fixture is species-filtered rather than species-grouped, so
+// species_name is genuinely null — DemographicsStatsResult's NonNullable
+// mapped type (app/models/db.ts) assumes every column is always present, so
+// a direct assertion doesn't compile (#895).
 const [capturedDemographicsRow] =
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	robinDemographicsHistory as unknown as DemographicsStatsResult[];
 const zeroedDemographicsRow = Object.fromEntries(
 	Object.entries(capturedDemographicsRow).map(([column, value]) => [

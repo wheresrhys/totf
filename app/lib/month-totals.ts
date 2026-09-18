@@ -41,6 +41,9 @@ const ZERO_INTERVAL = '00:00:00';
 // with e.g. only Mar–Oct sessions comes back missing the other months entirely;
 // these are filled in client-side rather than by touching the RPC.
 function synthesizeZeroStats(timePeriod: string): CoreStatsResult {
+	// `species_name` is nullable in the RPC's real output but typed `string`
+	// in the generated types; cast through `unknown` to keep the honest null.
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	return {
 		species_name: null,
 		time_period: timePeriod,
@@ -76,8 +79,6 @@ function synthesizeZeroStats(timePeriod: string): CoreStatsResult {
 		postjuv_enc_count: 0,
 		adult_enc_count: 0,
 		unknown_age_enc_count: 0
-		// `species_name` is nullable in the RPC's real output but typed `string`
-		// in the generated types; cast through `unknown` to keep the honest null.
 	} as unknown as CoreStatsResult;
 }
 

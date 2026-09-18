@@ -20,9 +20,18 @@ import {
 import robinCoreStatsHeadline from '@/test-fixtures/snapshots/core_stats/robin-alpha.headline.json';
 import robinBiometricsHeadline from '@/test-fixtures/snapshots/biometrics_stats/robin-alpha.headline.json';
 
-/** The species page's headline `speciesStats` row, merged as the page merges it. */
+/**
+ * The species page's headline `speciesStats` row, merged as the page merges it.
+ *
+ * Both fixtures are ungrouped headline rows, so species_name/time_period are
+ * genuinely null — CoreStatsResult/BiometricsStatsResult's NonNullable mapped
+ * types (app/models/db.ts) assume every column is always present, so a direct
+ * assertion doesn't compile (#895).
+ */
 export const robinSpeciesStats = mergeBiometricsFields(
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	(robinCoreStatsHeadline as unknown as CoreStatsResult[])[0],
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	(robinBiometricsHeadline as unknown as BiometricsStatsResult[])[0]
 );
 

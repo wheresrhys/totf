@@ -447,8 +447,17 @@ assertion can't. Only fall back to `as unknown as SomeType` when the fixture is 
 structural mismatch — e.g. an ungrouped/species-filtered `core_stats`-family fixture with a
 literal `null` in a column the row type (`CoreStatsResult`, `DemographicsStatsResult`,
 `BiometricsStatsResult` in `app/models/db.ts`) strips non-null via `NonNullable`, or a hand-built
-object that only fills in the columns a test actually reads — and leave a short comment on why,
-so a future reader doesn't assume it was simply missed.
+object that only fills in the columns a test actually reads.
+
+**This is enforced, not just documented (#921).** `eslint.config.js` forbids the `x as unknown as
+T` pattern outright via a `no-restricted-syntax` selector — `npm run lint` fails on any new one. A
+genuine exception still needs a one-line `// eslint-disable-next-line no-restricted-syntax --
+<reason>` comment directly above the line the cast is on (a longer explanation can precede it as
+ordinary comment lines, as long as the disable directive itself is the line immediately above the
+cast — `eslint-disable-next-line` only ever suppresses the line right after it). Don't fall back to
+a freeform "kept as `as unknown as`: ..." comment with no enforcing directive — that's exactly the
+drift this rule exists to catch, since nothing then stops another cast being added the same way
+without anyone noticing.
 
 **Fixture drift is caught by a pre-push, diff-gated check — but only for the 26 generated
 fixtures.** Nothing in the type system notices when an RPC's return shape changes underneath a

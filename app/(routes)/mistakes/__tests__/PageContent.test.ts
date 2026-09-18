@@ -3,6 +3,10 @@ import { makeHighlighter } from '../PageContent';
 import type { EncounterOfBird } from '@/app/models/bird';
 
 function makeEncounters(wingLengths: (number | null)[]): EncounterOfBird[] {
+	// This is a hand-built partial object carrying only the fields
+	// makeHighlighter's rules use, not a real fixture — it deliberately omits
+	// several EncounterOfBird columns (#895).
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	return wingLengths.map((wing_length, i) => ({
 		id: i,
 		bird_id: 1,
@@ -20,9 +24,6 @@ function makeEncounters(wingLengths: (number | null)[]): EncounterOfBird[] {
 		ringing_group_id: 1,
 		weight: null,
 		session: { visit_date: '2024-01-01' }
-		// Kept as `as unknown as`: this is a hand-built partial object carrying
-		// only the fields makeHighlighter's rules use, not a real fixture — it
-		// deliberately omits several EncounterOfBird columns (#895).
 	})) as unknown as EncounterOfBird[];
 }
 
