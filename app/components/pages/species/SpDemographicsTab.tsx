@@ -17,6 +17,7 @@ import {
 	getCounts,
 	getReturningVsNew,
 	getAgeSplit,
+	getReturningAges,
 	getYoungCounts,
 	getNewYoungCounts,
 	getArrivals
@@ -51,6 +52,26 @@ export const AGE_SPLIT_COLORS = [
 	AGE_SPLIT_HUES.returning.dark, // First summer
 	AGE_SPLIT_HUES.returning.light, // Oldies
 	AGE_SPLIT_HUES.new.light // New young
+];
+
+// Returning ages (#843): '1 year' -> '2 years' -> '3+ years' is an ordered
+// progression through a returning bird's proven age, so it gets a dark-to-light
+// single-hue ramp (same convention as ARRIVALS_HUES.young below). 'Unknown age
+// (new)' is NOT a fourth step of that ramp — those birds aren't actually known to
+// be returning at all, just imprecisely coded on a single first encounter — so it
+// takes a visually distinct hue instead, signalling "different kind of thing"
+// rather than "older still". Fresh constants rather than an extension of
+// AGE_SPLIT_* above, which #855 removes along with the Age split tile.
+export const RETURNING_AGES_HUES = {
+	returning: { dark: '#7a0f3d', mid: '#c4487e', light: '#eda3c1' },
+	unknown: '#8a7a12'
+};
+// Series order (matches getReturningAges): 1 year, 2 years, 3+ years, Unknown age (new).
+export const RETURNING_AGES_COLORS = [
+	RETURNING_AGES_HUES.returning.dark, // 1 year
+	RETURNING_AGES_HUES.returning.mid, // 2 years
+	RETURNING_AGES_HUES.returning.light, // 3+ years
+	RETURNING_AGES_HUES.unknown // Unknown age (new)
 ];
 
 // Young counts / New young counts: two hues (juv, postjuv), split across the
@@ -307,6 +328,36 @@ export function SpDemographicsTab({
 							]).then(([yearStats, yearDemographics]) =>
 								getReturningVsNew(yearStats, yearDemographics)
 							)
+						}
+						effortHistory={effortHistory ?? undefined}
+						compareYearsUrl={compareYearsUrl}
+					/>
+				) : (
+					<Spinner />
+				)
+		},
+		{
+			id: 'returning-ages',
+			heading: 'Returning ages',
+			description:
+				'Returning adults over time, split by how old they were proven to be',
+			load: () => {
+				loadDemographicsStats();
+				loadEffortHistory();
+			},
+			renderChart: () =>
+				demographicsStats ? (
+					<YearComparisonTrendChart
+						series={getReturningAges(demographicsStats)}
+						colors={RETURNING_AGES_COLORS}
+						yearlyAggregators={{
+							'1 year': 'sum',
+							'2 years': 'sum',
+							'3+ years': 'sum',
+							'Unknown age (new)': 'sum'
+						}}
+						fetchYearSeries={() =>
+							fetchYearDemographicsStats().then(getReturningAges)
 						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}

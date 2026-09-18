@@ -115,6 +115,55 @@ export function getAgeSplit(
 	];
 }
 
+// Returning ages — #843, the other replacement for the "Age split" tile
+// (alongside #854's "Returning vs new"): a bird-level breakdown of the
+// returning-adult cohort ONLY, split by how old each bird was proven to be as of
+// the cell's own period_year. The four columns come straight off
+// `demographics_stats` (#843), which derives them per bird in the
+// `stats_bird_returning_age_bucket` utility RPC — see that function for why the
+// age is recomputed per period rather than read off the live `Birds.proven_age`.
+//
+// "Unknown age (new)" is categorically different from the other three: it holds
+// birds whose apparent proven age of 1 is an artefact of a single, imprecisely
+// coded first-ever encounter rather than any actual return history. It is
+// deliberately not an ordered continuation of 1 -> 2 -> 3+, which is why
+// RETURNING_AGES_COLORS gives it its own hue rather than a fourth step of the
+// ramp.
+export function getReturningAges(
+	demographicsStats: DemographicsStatsResult[]
+): LineChartData[] {
+	return [
+		{
+			name: '1 year',
+			data: demographicsStats.map((row) => [
+				row.time_period,
+				row.returning_age_1_bird_count
+			])
+		},
+		{
+			name: '2 years',
+			data: demographicsStats.map((row) => [
+				row.time_period,
+				row.returning_age_2_bird_count
+			])
+		},
+		{
+			name: '3+ years',
+			data: demographicsStats.map((row) => [
+				row.time_period,
+				row.returning_age_3_plus_bird_count
+			])
+		},
+		{
+			name: 'Unknown age (new)',
+			data: demographicsStats.map((row) => [
+				row.time_period,
+				row.returning_new_unknown_age_bird_count
+			])
+		}
+	];
+}
+
 // Young counts / New young counts — encounter-level 3J/postjuv breakdown of the
 // "Demographics" tab's Young counts and New young counts tiles, consuming
 // `demographics_stats`' young-trends columns (#800/#801). Originally a single

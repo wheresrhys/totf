@@ -9,6 +9,8 @@ import {
 import {
 	SpDemographicsTab,
 	RETURNING_VS_NEW_COLORS,
+	RETURNING_AGES_COLORS,
+	RETURNING_AGES_HUES,
 	AGE_SPLIT_COLORS,
 	AGE_SPLIT_HUES,
 	YOUNG_COUNTS_COLORS,
@@ -45,6 +47,12 @@ vi.mock('../StatsHistoryChart', () => ({
 		{ name: 'First summer', data: [] },
 		{ name: 'Oldies', data: [] },
 		{ name: 'New young', data: [] }
+	],
+	getReturningAges: () => [
+		{ name: '1 year', data: [] },
+		{ name: '2 years', data: [] },
+		{ name: '3+ years', data: [] },
+		{ name: 'Unknown age (new)', data: [] }
 	],
 	getYoungCounts: () => [
 		{
@@ -351,6 +359,57 @@ describe('SpDemographicsTab', () => {
 		});
 	});
 
+	describe('Usual: the Returning ages tile', () => {
+		it('renders the "Returning ages" tile heading and description', () => {
+			render(<SpDemographicsTab {...props} />);
+			expect(
+				screen.getByRole('button', { name: /Returning ages/ })
+			).toBeDefined();
+			expect(
+				screen.getByText(
+					'Returning adults over time, split by how old they were proven to be'
+				)
+			).toBeDefined();
+		});
+	});
+
+	describe('Structure: expanding the Returning ages tile (demographics_stats)', () => {
+		it('expanding the tile triggers the demographics-stats fetch and renders the chart with 4 series', async () => {
+			const { getSpeciesDemographicsStats, getSpeciesStatsHistory } =
+				await loadActions();
+			render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Returning ages/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1);
+			expect(getSpeciesDemographicsStats).toHaveBeenCalledWith(
+				'Robin',
+				1,
+				undefined,
+				undefined
+			);
+			// Reuses the existing demographics_stats fetch — no new RPC of its own.
+			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
+			expect(chart.dataset.seriesCount).toBe('4');
+			expect(JSON.parse(chart.dataset.colors!)).toEqual(RETURNING_AGES_COLORS);
+		});
+	});
+
+	describe('Edge: the Returning ages tile before load', () => {
+		it('shows a spinner before demographics stats have loaded', async () => {
+			const { getSpeciesDemographicsStats } = await loadActions();
+			vi.mocked(getSpeciesDemographicsStats).mockReturnValue(
+				new Promise(() => {})
+			);
+			const { container } = render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Returning ages/ }));
+			await waitFor(() =>
+				expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1)
+			);
+			expect(screen.queryByTestId('trend-chart')).toBeNull();
+			expect(container.querySelector('.loading-spinner')).not.toBeNull();
+		});
+	});
+
 	describe('Usual: the Arrivals tile', () => {
 		it('renders the "Arrivals" tile heading and description, using "pulli" (not "pullus") in the description text', () => {
 			render(<SpDemographicsTab {...props} />);
@@ -512,6 +571,23 @@ describe('SpDemographicsTab', () => {
 			const { getSpeciesDemographicsStats } = await loadActions();
 			render(<SpDemographicsTab {...props} />);
 			await expandAndSwitchToYear(/New young counts/);
+
+			await waitFor(() =>
+				expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(2)
+			);
+			expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
+				'Robin',
+				1,
+				undefined,
+				undefined,
+				'year'
+			);
+		});
+
+		it('Returning ages: refetches demographics stats with interval "year"', async () => {
+			const { getSpeciesDemographicsStats } = await loadActions();
+			render(<SpDemographicsTab {...props} />);
+			await expandAndSwitchToYear(/Returning ages/);
 
 			await waitFor(() =>
 				expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(2)
@@ -829,6 +905,18 @@ describe('SpDemographicsTab', () => {
 			expect(newFamily.some((colour) => returningFamily.includes(colour))).toBe(
 				false
 			);
+		});
+
+		it('ramps the three Returning ages age steps through one hue and gives Unknown age (new) a hue outside it', () => {
+			const returningFamily = Object.values(RETURNING_AGES_HUES.returning);
+			// series order: 1 year, 2 years, 3+ years, Unknown age (new)
+			expect(returningFamily).toEqual(RETURNING_AGES_COLORS.slice(0, 3));
+			// The ordered ramp is three distinct steps, not a repeated colour.
+			expect(new Set(returningFamily).size).toBe(3);
+			// "Unknown age (new)" is categorically different, so it must sit outside
+			// the ramp rather than reading as a fourth, older step.
+			expect(returningFamily).not.toContain(RETURNING_AGES_HUES.unknown);
+			expect(RETURNING_AGES_COLORS[3]).toBe(RETURNING_AGES_HUES.unknown);
 		});
 
 		it('pairs Young counts / New young counts colours as disjoint dark/light draws from the same two hue families', () => {
