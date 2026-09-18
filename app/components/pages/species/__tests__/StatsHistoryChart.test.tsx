@@ -9,6 +9,7 @@ import {
 	getCounts,
 	getReturningVsNew,
 	getAgeSplit,
+	getReturningAges,
 	getYoungCounts,
 	getNewYoungCounts,
 	getArrivals,
@@ -256,6 +257,81 @@ describe('getAgeSplit', () => {
 			const result = getAgeSplit([]);
 			expect(result).toHaveLength(4);
 			expect(result.every((series) => series.data.length === 0)).toBe(true);
+		});
+	});
+});
+
+describe('getReturningAges', () => {
+	describe('Usual: four returning-age series from the right columns', () => {
+		it('maps 1 year / 2 years / 3+ years / Unknown age (new) from their columns', () => {
+			const rows = [
+				demographicsRow({
+					time_period: '2024-01-01',
+					returning_age_1_bird_count: 6,
+					returning_age_2_bird_count: 4,
+					returning_age_3_plus_bird_count: 3,
+					returning_new_unknown_age_bird_count: 9
+				})
+			];
+			const result = getReturningAges(rows);
+			expect(result.map((series) => series.name)).toEqual([
+				'1 year',
+				'2 years',
+				'3+ years',
+				'Unknown age (new)'
+			]);
+			expect(result[0].data).toEqual([['2024-01-01', 6]]);
+			expect(result[1].data).toEqual([['2024-01-01', 4]]);
+			expect(result[2].data).toEqual([['2024-01-01', 3]]);
+			expect(result[3].data).toEqual([['2024-01-01', 9]]);
+		});
+	});
+
+	describe('Structure: time_period ordering', () => {
+		it("preserves the input rows' time_period order across every series", () => {
+			const rows = [
+				demographicsRow({
+					time_period: '2024-03-01',
+					returning_age_1_bird_count: 1
+				}),
+				demographicsRow({
+					time_period: '2024-01-01',
+					returning_age_1_bird_count: 2
+				}),
+				demographicsRow({
+					time_period: '2024-02-01',
+					returning_age_1_bird_count: 3
+				})
+			];
+			const result = getReturningAges(rows);
+			for (const series of result) {
+				expect(series.data.map(([period]) => period)).toEqual([
+					'2024-03-01',
+					'2024-01-01',
+					'2024-02-01'
+				]);
+			}
+			expect(result[0].data).toEqual([
+				['2024-03-01', 1],
+				['2024-01-01', 2],
+				['2024-02-01', 3]
+			]);
+		});
+	});
+
+	describe('Edge: a bucket with no birds', () => {
+		it('emits zero-valued points rather than dropping the series', () => {
+			const rows = [
+				demographicsRow({
+					time_period: '2024-01-01',
+					returning_age_1_bird_count: 5
+				})
+			];
+			const result = getReturningAges(rows);
+			expect(result).toHaveLength(4);
+			expect(result[1].data).toEqual([['2024-01-01', 0]]);
+			expect(result[2].data).toEqual([['2024-01-01', 0]]);
+			expect(result[3].data).toEqual([['2024-01-01', 0]]);
 		});
 	});
 });
