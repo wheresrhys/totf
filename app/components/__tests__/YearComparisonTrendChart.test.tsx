@@ -29,8 +29,15 @@ import {
 vi.mock('chartkick/chart.js', () => ({}));
 type LegendLabelsFilter = (legendItem: { text: string }) => boolean;
 
-vi.mock('react-chartkick', () => ({
-	LineChart: ({
+// LineChart and AreaChart are mocked with the same renderer (parametrized only
+// by testid): the accumulate view tells them apart by rendering via AreaChart
+// instead of LineChart (see YearComparisonTrendChart.tsx's `AllTimeChart`) —
+// there's no `library` fill flag to surface any more (chartkick always
+// derives a dataset's own `fill` from which component built it, not from a
+// `library.elements.line.fill` default), so which testid a test finds *is*
+// the fill signal.
+function makeChartMock(testId: string) {
+	function ChartMock({
 		data,
 		xtitle,
 		ytitle,
@@ -43,10 +50,9 @@ vi.mock('react-chartkick', () => ({
 		colors?: string[];
 		library?: {
 			plugins?: { legend?: { labels?: { filter?: LegendLabelsFilter } } };
-			elements?: { line?: { fill?: boolean } };
 			scales?: { y?: { stacked?: boolean } };
 		};
-	}) => {
+	}) {
 		// The legend filter function isn't JSON-serializable, so surface its
 		// verdict on each series' own name instead — lets a test assert the
 		// wiring end-to-end (component -> library option -> filter result)
@@ -59,7 +65,7 @@ vi.mock('react-chartkick', () => ({
 			: null;
 		return (
 			<div
-				data-testid="line-chart"
+				data-testid={testId}
 				data-xtitle={xtitle}
 				data-ytitle={ytitle}
 				data-colors={JSON.stringify(colors)}
@@ -69,10 +75,16 @@ vi.mock('react-chartkick', () => ({
 				// Surfaces the stacked-area config so a test can tell the accumulate
 				// view's chart apart from the plain trend one.
 				data-stacked={JSON.stringify(library?.scales?.y?.stacked)}
-				data-fill={JSON.stringify(library?.elements?.line?.fill)}
 			/>
 		);
 	}
+	ChartMock.displayName = testId;
+	return ChartMock;
+}
+
+vi.mock('react-chartkick', () => ({
+	LineChart: makeChartMock('line-chart'),
+	AreaChart: makeChartMock('area-chart')
 }));
 
 const MONTHS = [
@@ -1516,7 +1528,7 @@ describe('YearComparisonTrendChart', () => {
 			expect(screen.queryByRole('radio', { name: 'Year' })).toBeNull();
 			expect(screen.queryByRole('radio', { name: 'Month' })).toBeNull();
 			// The monthly (accumulated) points are plotted, not one point per year.
-			const [chart] = screen.getAllByTestId('line-chart');
+			const [chart] = screen.getAllByTestId('area-chart');
 			expect(JSON.parse(chart.dataset.values!)).toEqual([
 				[
 					['2023-04-01', 2],
@@ -1539,12 +1551,15 @@ describe('YearComparisonTrendChart', () => {
 			);
 			const chartBefore = screen.getByTestId('line-chart');
 			expect(chartBefore.dataset.stacked).toBeUndefined();
-			expect(chartBefore.dataset.fill).toBeUndefined();
 
 			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
-			const chartAfter = screen.getByTestId('line-chart');
+			// Rendered via chartkick's AreaChart (filled, translucent datasets) —
+			// not LineChart — since a `library` option alone can't put a filled
+			// dataset onto a LineChart-rendered chart (see
+			// STACKED_AREA_CHART_LIBRARY's comment in the component).
+			expect(screen.queryByTestId('line-chart')).toBeNull();
+			const chartAfter = screen.getByTestId('area-chart');
 			expect(chartAfter.dataset.stacked).toBe('true');
-			expect(chartAfter.dataset.fill).toBe('true');
 			// The stacked-area config is layered on top of the trend config, not a
 			// replacement — the legend filter still runs.
 			expect(JSON.parse(chartAfter.dataset.visibleInLegend!)).toEqual([
@@ -1583,7 +1598,7 @@ describe('YearComparisonTrendChart', () => {
 			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
 			fireEvent.click(toggle('Normalize').getByRole('radio', { name: 'Yes' }));
 
-			const chart = screen.getByTestId('line-chart');
+			const chart = screen.getByTestId('area-chart');
 			// Cumulative 2/4 = 0.5, then 6/8 = 0.75 — summing the per-month rates
 			// (0.5, then 0.5 + 1 = 1.5) would be wrong.
 			expect(JSON.parse(chart.dataset.values!)).toEqual([
@@ -1613,7 +1628,7 @@ describe('YearComparisonTrendChart', () => {
 				/>
 			);
 			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
-			const chart = screen.getByTestId('line-chart');
+			const chart = screen.getByTestId('area-chart');
 			expect(JSON.parse(chart.dataset.series!)).toEqual([
 				'arrivals',
 				'departures',
