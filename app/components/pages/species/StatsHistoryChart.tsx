@@ -177,9 +177,22 @@ export function getNewYoungCounts(
 // that makes simply summing this tile's monthly points across a year exact
 // (no Year-interval `fetchYearSeries` correction needed, unlike its two
 // siblings).
+//
+// The `pullus_bird_count` bucket is displayed as "Pulli" (the correct plural
+// of "pullus") — display text only, the RPC column/model bucket name itself
+// stays `pullus`. The series is omitted entirely, rather than plotted as a
+// flat zero line, whenever nothing in the fetched range ever had a nonzero
+// pullus count — mirrors the `hasPulli` convention
+// `SpeciesTotalsTable`/`PeriodTotalsTable` already use to hide their own
+// all-zero Pulli column (`app/components/shared/StatsTableColumnConfigs.tsx`).
 export function getArrivals(
 	arrivalsStats: ArrivalsStatsResult[]
 ): LineChartData[] {
+	const hasPulli = arrivalsStats.some((row) => row.pullus_bird_count > 0);
+	const pulliSeries: LineChartData = {
+		name: 'Pulli',
+		data: arrivalsStats.map((row) => [row.time_period, row.pullus_bird_count])
+	};
 	return [
 		{
 			name: 'New adults',
@@ -195,10 +208,7 @@ export function getArrivals(
 				row.returning_adult_bird_count
 			])
 		},
-		{
-			name: 'Pullus',
-			data: arrivalsStats.map((row) => [row.time_period, row.pullus_bird_count])
-		},
+		...(hasPulli ? [pulliSeries] : []),
 		{
 			name: 'Juv',
 			data: arrivalsStats.map((row) => [row.time_period, row.juv_bird_count])

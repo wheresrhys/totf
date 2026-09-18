@@ -13,7 +13,8 @@ import {
 	AGE_SPLIT_HUES,
 	YOUNG_COUNTS_COLORS,
 	YOUNG_COUNTS_HUES,
-	NEW_YOUNG_COUNTS_COLORS
+	NEW_YOUNG_COUNTS_COLORS,
+	ARRIVALS_COLORS_BY_NAME
 } from '../SpDemographicsTab';
 import type {
 	CoreStatsWithBiometrics,
@@ -77,13 +78,13 @@ vi.mock('../StatsHistoryChart', () => ({
 			]
 		}
 	],
-	getArrivals: () => [
+	getArrivals: vi.fn(() => [
 		{ name: 'New adults', data: [] },
 		{ name: 'Returning adults', data: [] },
-		{ name: 'Pullus', data: [] },
+		{ name: 'Pulli', data: [] },
 		{ name: 'Juv', data: [] },
 		{ name: 'Postjuv', data: [] }
-	]
+	])
 }));
 
 vi.mock('@/app/components/YearComparisonTrendChart', () => ({
@@ -351,12 +352,12 @@ describe('SpDemographicsTab', () => {
 	});
 
 	describe('Usual: the Arrivals tile', () => {
-		it('renders the "Arrivals" tile heading and description', () => {
+		it('renders the "Arrivals" tile heading and description, using "pulli" (not "pullus") in the description text', () => {
 			render(<SpDemographicsTab {...props} />);
 			expect(screen.getByRole('button', { name: /Arrivals/ })).toBeDefined();
 			expect(
 				screen.getByText(
-					'New adults, returning adults, pullus, juv and postjuv arriving each year'
+					'New adults, returning adults, pulli, juv and postjuv arriving each year'
 				)
 			).toBeDefined();
 		});
@@ -383,6 +384,39 @@ describe('SpDemographicsTab', () => {
 			fireEvent.click(screen.getByRole('button', { name: /Arrivals/ }));
 			const chart = await screen.findByTestId('trend-chart');
 			expect(chart.dataset.allowYearAccumulation).toBe('yes');
+		});
+
+		it('passes a colour per series, looked up by name, matching the 5-series default mock', async () => {
+			render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Arrivals/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(JSON.parse(chart.dataset.colors!)).toEqual([
+				ARRIVALS_COLORS_BY_NAME['New adults'],
+				ARRIVALS_COLORS_BY_NAME['Returning adults'],
+				ARRIVALS_COLORS_BY_NAME.Pulli,
+				ARRIVALS_COLORS_BY_NAME.Juv,
+				ARRIVALS_COLORS_BY_NAME.Postjuv
+			]);
+		});
+
+		it('drops the Pulli colour (rather than misaligning the rest) when getArrivals omits the Pulli series', async () => {
+			const { getArrivals } = await import('../StatsHistoryChart');
+			vi.mocked(getArrivals).mockReturnValueOnce([
+				{ name: 'New adults', data: [] },
+				{ name: 'Returning adults', data: [] },
+				{ name: 'Juv', data: [] },
+				{ name: 'Postjuv', data: [] }
+			]);
+			render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Arrivals/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(chart.dataset.seriesCount).toBe('4');
+			expect(JSON.parse(chart.dataset.colors!)).toEqual([
+				ARRIVALS_COLORS_BY_NAME['New adults'],
+				ARRIVALS_COLORS_BY_NAME['Returning adults'],
+				ARRIVALS_COLORS_BY_NAME.Juv,
+				ARRIVALS_COLORS_BY_NAME.Postjuv
+			]);
 		});
 	});
 

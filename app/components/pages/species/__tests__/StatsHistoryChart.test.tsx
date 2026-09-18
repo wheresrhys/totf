@@ -312,7 +312,7 @@ function arrivalsRow(
 
 describe('getArrivals', () => {
 	describe('Usual: maps each arrival bucket column to its own series', () => {
-		it('maps New adults/Returning adults/Pullus/Juv/Postjuv from their columns', () => {
+		it('maps New adults/Returning adults/Pulli/Juv/Postjuv from their columns', () => {
 			const rows = [
 				arrivalsRow({
 					time_period: '2024-01-01',
@@ -327,7 +327,7 @@ describe('getArrivals', () => {
 			expect(result.map((series) => series.name)).toEqual([
 				'New adults',
 				'Returning adults',
-				'Pullus',
+				'Pulli',
 				'Juv',
 				'Postjuv'
 			]);
@@ -339,13 +339,47 @@ describe('getArrivals', () => {
 		});
 	});
 
+	describe('Structure: Pulli series visibility (#920 follow-up)', () => {
+		it('omits the Pulli series when every row has a zero pullus count', () => {
+			const rows = [
+				arrivalsRow({ time_period: '2024-01-01', pullus_bird_count: 0 }),
+				arrivalsRow({ time_period: '2024-02-01', pullus_bird_count: 0 })
+			];
+			const result = getArrivals(rows);
+			expect(result.map((series) => series.name)).toEqual([
+				'New adults',
+				'Returning adults',
+				'Juv',
+				'Postjuv'
+			]);
+		});
+
+		it('includes the Pulli series when at least one row has a nonzero pullus count', () => {
+			const rows = [
+				arrivalsRow({ time_period: '2024-01-01', pullus_bird_count: 0 }),
+				arrivalsRow({ time_period: '2024-02-01', pullus_bird_count: 3 })
+			];
+			const result = getArrivals(rows);
+			expect(result.map((series) => series.name)).toEqual([
+				'New adults',
+				'Returning adults',
+				'Pulli',
+				'Juv',
+				'Postjuv'
+			]);
+			expect(result[2].data).toEqual([
+				['2024-01-01', 0],
+				['2024-02-01', 3]
+			]);
+		});
+	});
+
 	describe('Edge: empty input', () => {
-		it('returns an empty series for empty input', () => {
+		it('returns an empty, Pulli-less series for empty input (vacuously zero pullus records)', () => {
 			const result = getArrivals([]);
 			expect(result.map((series) => series.name)).toEqual([
 				'New adults',
 				'Returning adults',
-				'Pullus',
 				'Juv',
 				'Postjuv'
 			]);
