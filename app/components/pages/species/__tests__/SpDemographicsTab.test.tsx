@@ -17,7 +17,8 @@ import {
 } from '../SpDemographicsTab';
 import type {
 	CoreStatsWithBiometrics,
-	DemographicsStatsResult
+	DemographicsStatsResult,
+	ArrivalsStatsResult
 } from '@/app/models/db';
 
 // chartkick registers Chart.js as a side effect; nothing renders a real canvas
@@ -27,6 +28,7 @@ vi.mock('chartkick/chart.js', () => ({}));
 vi.mock('@/app/actions/sp-data', () => ({
 	getSpeciesStatsHistory: vi.fn(),
 	getSpeciesDemographicsStats: vi.fn(),
+	getSpeciesArrivalsStats: vi.fn(),
 	getGroupEffortHistory: vi.fn()
 }));
 
@@ -74,6 +76,13 @@ vi.mock('../StatsHistoryChart', () => ({
 				['2024-02-01', 1]
 			]
 		}
+	],
+	getArrivals: () => [
+		{ name: 'New adults', data: [] },
+		{ name: 'Returning adults', data: [] },
+		{ name: 'Pullus', data: [] },
+		{ name: 'Juv', data: [] },
+		{ name: 'Postjuv', data: [] }
 	]
 }));
 
@@ -84,7 +93,8 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 		effortHistory,
 		compareYearsUrl,
 		includeTotalSeries,
-		fetchYearSeries
+		fetchYearSeries,
+		allowYearAccumulation
 	}: {
 		series: { name: string; data: [string, number | null][] }[];
 		colors?: string[];
@@ -94,6 +104,7 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 		fetchYearSeries?: () => Promise<
 			{ name: string; data: [string, number | null][] }[]
 		>;
+		allowYearAccumulation?: boolean;
 	}) => {
 		// Mirrors YearComparisonTrendChart's own includeTotalSeries summing
 		// (unit-tested against buildTotalSeries directly in
@@ -119,6 +130,7 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 				data-compare-years-url={compareYearsUrl ?? ''}
 				data-include-total-series={includeTotalSeries ? 'yes' : 'no'}
 				data-total={JSON.stringify(total)}
+				data-allow-year-accumulation={allowYearAccumulation ? 'yes' : 'no'}
 			>
 				{/* Stands in for the real chart's "Interval: Year" radio: clicking it
 				    invokes whatever fetcher the tab wired in, so a tab-level test can
@@ -166,6 +178,7 @@ describe('SpDemographicsTab', () => {
 		const {
 			getSpeciesStatsHistory,
 			getSpeciesDemographicsStats,
+			getSpeciesArrivalsStats,
 			getGroupEffortHistory
 		} = await loadActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
@@ -173,6 +186,9 @@ describe('SpDemographicsTab', () => {
 		);
 		vi.mocked(getSpeciesDemographicsStats).mockResolvedValue(
 			[] as DemographicsStatsResult[]
+		);
+		vi.mocked(getSpeciesArrivalsStats).mockResolvedValue(
+			[] as ArrivalsStatsResult[]
 		);
 		vi.mocked(getGroupEffortHistory).mockResolvedValue([['2024-01-01', 10]]);
 	});
@@ -331,6 +347,56 @@ describe('SpDemographicsTab', () => {
 			);
 			// The demographics tiles do not touch core_stats.
 			expect(getSpeciesStatsHistory).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('Usual: the Arrivals tile', () => {
+		it('renders the "Arrivals" tile heading and description', () => {
+			render(<SpDemographicsTab {...props} />);
+			expect(screen.getByRole('button', { name: /Arrivals/ })).toBeDefined();
+			expect(
+				screen.getByText(
+					'New adults, returning adults, pullus, juv and postjuv arriving each year'
+				)
+			).toBeDefined();
+		});
+	});
+
+	describe('Structure: expanding the Arrivals tile (arrivals_stats)', () => {
+		it('expanding the tile triggers the arrivals-stats fetch and renders the chart with 5 series', async () => {
+			const { getSpeciesArrivalsStats } = await loadActions();
+			render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Arrivals/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(getSpeciesArrivalsStats).toHaveBeenCalledTimes(1);
+			expect(getSpeciesArrivalsStats).toHaveBeenCalledWith(
+				'Robin',
+				1,
+				undefined,
+				undefined
+			);
+			expect(chart.dataset.seriesCount).toBe('5');
+		});
+
+		it('passes allowYearAccumulation to YearComparisonTrendChart', async () => {
+			render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Arrivals/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(chart.dataset.allowYearAccumulation).toBe('yes');
+		});
+	});
+
+	describe('Edge: the Arrivals tile before load', () => {
+		it('shows a spinner before arrivals stats have loaded', async () => {
+			const { getSpeciesArrivalsStats } = await loadActions();
+			vi.mocked(getSpeciesArrivalsStats).mockReturnValue(new Promise(() => {}));
+			const { container } = render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Arrivals/ }));
+			await waitFor(() =>
+				expect(getSpeciesArrivalsStats).toHaveBeenCalledTimes(1)
+			);
+			expect(screen.queryByTestId('trend-chart')).toBeNull();
+			expect(container.querySelector('.loading-spinner')).not.toBeNull();
 		});
 	});
 

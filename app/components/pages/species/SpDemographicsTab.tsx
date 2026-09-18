@@ -5,15 +5,21 @@ import { type LineChartData } from 'react-chartkick';
 import {
 	getSpeciesStatsHistory,
 	getSpeciesDemographicsStats,
+	getSpeciesArrivalsStats,
 	getGroupEffortHistory
 } from '@/app/actions/sp-data';
-import type { CoreStatsResult, DemographicsStatsResult } from '@/app/models/db';
+import type {
+	CoreStatsResult,
+	DemographicsStatsResult,
+	ArrivalsStatsResult
+} from '@/app/models/db';
 import {
 	getCounts,
 	getReturningVsNew,
 	getAgeSplit,
 	getYoungCounts,
-	getNewYoungCounts
+	getNewYoungCounts,
+	getArrivals
 } from '@/app/components/pages/species/StatsHistoryChart';
 import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
 import { ChartTile } from '@/app/components/pages/species/ChartTile';
@@ -71,6 +77,27 @@ export const YOUNG_COUNTS_COLORS = [
 export const NEW_YOUNG_COUNTS_COLORS = [
 	YOUNG_COUNTS_HUES.juv.light, // New juv
 	YOUNG_COUNTS_HUES.postjuv.light // New postjuv
+];
+
+// Arrivals tile (#860): two colour concepts share one hue map. "New adults"/
+// "Returning adults" are a paired dark/light draw off a single hue (mirroring
+// AGE_SPLIT_HUES' own dark-for-new/light-for-returning convention, but here as
+// one pair within a single tile rather than split across two hues). "Pullus"
+// -> "Juv" -> "Postjuv" is instead an ordered progression through a bird's
+// first calendar year, so it gets a 3-tone single-hue ramp (dark to light)
+// rather than a two-value pair — the same convention #843's proven-age-bucket
+// tile uses for its own ordered '1 year'/'2 years'/'3+ years' series.
+export const ARRIVALS_HUES = {
+	adult: { dark: '#1f4fb0', light: '#8fb0e8' },
+	young: { dark: '#0f7a14', mid: '#4fa854', light: '#8fd08f' }
+};
+// Series order (matches getArrivals): New adults, Returning adults, Pullus, Juv, Postjuv.
+export const ARRIVALS_COLORS = [
+	ARRIVALS_HUES.adult.dark, // New adults
+	ARRIVALS_HUES.adult.light, // Returning adults
+	ARRIVALS_HUES.young.dark, // Pullus
+	ARRIVALS_HUES.young.mid, // Juv
+	ARRIVALS_HUES.young.light // Postjuv
 ];
 
 function Spinner() {
@@ -186,6 +213,18 @@ export function SpDemographicsTab({
 			'year'
 		);
 		return yearDemographicsStatsPromise.current;
+	}
+
+	const [arrivalsStats, setArrivalsStats] = useState<
+		ArrivalsStatsResult[] | null
+	>(null);
+	const [arrivalsRequested, setArrivalsRequested] = useState(false);
+	function loadArrivalsStats() {
+		if (arrivalsRequested) return;
+		setArrivalsRequested(true);
+		getSpeciesArrivalsStats(speciesName, viewedGroupId, fromDate, toDate).then(
+			setArrivalsStats
+		);
 	}
 
 	const [effortHistory, setEffortHistory] = useState<LineChartData | null>(
@@ -353,6 +392,35 @@ export function SpDemographicsTab({
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 						includeTotalSeries
+					/>
+				) : (
+					<Spinner />
+				)
+		},
+		{
+			id: 'arrivals',
+			heading: 'Arrivals',
+			description:
+				'New adults, returning adults, pullus, juv and postjuv arriving each year',
+			load: () => {
+				loadArrivalsStats();
+				loadEffortHistory();
+			},
+			renderChart: () =>
+				arrivalsStats ? (
+					<YearComparisonTrendChart
+						series={getArrivals(arrivalsStats)}
+						colors={ARRIVALS_COLORS}
+						allowYearAccumulation={true}
+						yearlyAggregators={{
+							'New adults': 'sum',
+							'Returning adults': 'sum',
+							Pullus: 'sum',
+							Juv: 'sum',
+							Postjuv: 'sum'
+						}}
+						effortHistory={effortHistory ?? undefined}
+						compareYearsUrl={compareYearsUrl}
 					/>
 				) : (
 					<Spinner />
