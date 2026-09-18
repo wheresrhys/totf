@@ -1,5 +1,4 @@
 import { Database } from '@/types/supabase.types';
-
 export type SpeciesRow = Database['public']['Tables']['Species']['Row'];
 export type SessionRow = Database['public']['Tables']['Sessions']['Row'];
 export type EncounterRow = Database['public']['Tables']['Encounters']['Row'];
