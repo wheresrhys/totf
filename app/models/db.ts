@@ -22,6 +22,42 @@ export type RingSize = Database['public']['Enums']['ring_size'];
 // sources from the byte-identical core_stats_result composite type rather than
 // core_stats_result, and is itself renamed CoreStatsResult (from
 // AggregateStatsResult) to match — same shape, just following the RPC rename.
+//
+// #924 explored replacing this blanket-NonNullable mapped type (and the same
+// pattern on DemographicsStatsResult/BiometricsStatsResult below) with a 4-way
+// discriminated union keyed to the RPC's (group_by_species, group_by_time_period)
+// call shape — CoreStatsUnscopedResult/CoreStatsPeriodResult/CoreStatsSpeciesResult/
+// CoreStatsSpeciesPeriodResult — so a fixture/row's real species_name/time_period
+// nullability would be checked directly instead of needing an
+// `eslint-disable-next-line no-restricted-syntax` escape hatch at each of the
+// ~8 genuine mismatch sites. Concluded not worth it at the current call-site count:
+// - The RPC layer has no literal foothold to discriminate on: `group_by_time_period`
+//   is generated as bare `string` (Postgres `text`), not a literal union, so an
+//   overloaded fetch signature would first need its own hand-written literal
+//   parameter type layered on top of every RPC wrapper — a separate, unscoped
+//   precursor change, not a consequence of the union itself.
+// - Two funnels between the RPC and the ~50 non-test read sites — the shared
+//   `fetchAuthorisedCoreStats`/`runCoreStats` (app/lib/auth/group-summary-access.ts)
+//   and ~8 ad hoc direct `.rpc('core_stats', ...)` calls duplicated across
+//   underlying-stats.ts/pay-off-stats.ts/sp-data.ts/page.tsx — would each need a
+//   4-way overload set (or a manually-chosen cast per call site, which is close to
+//   what already exists today via `as Promise<CoreStatsResult[] | null>`).
+// - Individual leaf consumers (month-totals.ts, period-totals.ts, species-stats.ts,
+//   StatsHistoryChart.tsx, SpDemographicsTab.tsx, ...) each consistently use exactly
+//   one of the four shapes, so a swap-in-place would be mechanical for them — but
+//   a few shared components (e.g. PeriodTotalsTable, SummaryTotalsSection) genuinely
+//   take more than one shape across distinctly-named props, and cross-family merge
+//   helpers (mergeBiometricsFields, mergeSpeciesBiometrics, CoreStatsWithBiometrics,
+//   SpeciesStatsRow) combine two of the three families along a dimension (biometric
+//   nullability) that's orthogonal to the species/period discriminant this ticket
+//   targets — a 4-way split would ripple through those without a matching benefit.
+// - Repeating the same 4-way split across all three RPC families (core/demographics/
+//   biometrics stats) would roughly triple the boilerplate for a benefit concentrated
+//   in a handful of real sites — most concretely `month-totals.ts`'s
+//   `synthesizeZeroStats`, whose existing `as unknown as CoreStatsResult` is a
+//   narrower, cheaper fix on its own than rearchitecting the shared type family.
+// If this needs revisiting, start from a narrower slice (e.g. just the period-shaped
+// callers) rather than the full 4-way cross product across all three RPCs.
 export type CoreStatsResult = {
 	[K in keyof Database['public']['CompositeTypes']['core_stats_result']]-?: NonNullable<
 		Database['public']['CompositeTypes']['core_stats_result'][K]
