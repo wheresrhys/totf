@@ -18,7 +18,7 @@
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
  * the RPC name for RPC-backed fixtures (`core_stats/`, `biometrics_stats/`,
  * `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
- * `top_metrics_by_period/`, `ring_sequence_controls/`) and `tables/<TableName>/`
+ * `ring_sequence_controls/`) and `tables/<TableName>/`
  * for fixtures produced by a direct PostgREST table query. The comment above
  * each block below names both the RPC/table and the consuming action(s) — keep
  * this in sync when a call site's underlying RPC/table changes, so a fixture's
@@ -391,9 +391,8 @@ export async function generateSnapshots(
 			robinRetraps ?? []
 		);
 
-		// The two raw sources behind the species/[speciesName] page's headline
-		// stats and busiest-sessions list: top_metrics_by_period and the
-		// core_stats half of its headline row, whose biometrics_stats sibling is
+		// The raw source behind the species/[speciesName] page's headline
+		// stats, whose biometrics_stats sibling is
 		// `biometrics_stats/robin-alpha.headline.json` above — getSpeciesStats
 		// joins the two with mergeBiometricsFields. The page's other inputs need
 		// no fixture here: its page of Birds is already
@@ -403,43 +402,15 @@ export async function generateSnapshots(
 		// it from a fixture — the one test exercising it mocks the action
 		// directly with a small inline array, so a generated fixture here would
 		// just be dead weight (#894).
-		const [{ data: topSessions }, { data: robinStats }] = await Promise.all([
-			alpha.rpc('top_metrics_by_period', {
-				temporal_unit: 'day',
-				metric_name: 'encounters',
-				result_limit: 5,
-				filters: {
-					species_filter: 'Robin',
-					ringing_group_filter: alphaId
-				}
-			} as Parameters<typeof alpha.rpc<'top_metrics_by_period'>>[1]),
-			alpha.rpc('core_stats', {
-				species_name_filter: 'Robin',
-				ringing_group_filter: alphaId
-			})
-		]);
-		await writeSnapshot(
-			`top_metrics_by_period/robin-alpha.top-sessions.json`,
-			topSessions ?? []
-		);
+		const { data: robinStats } = await alpha.rpc('core_stats', {
+			species_name_filter: 'Robin',
+			ringing_group_filter: alphaId
+		});
 		await writeSnapshot(
 			`core_stats/robin-alpha.headline.json`,
 			robinStats ?? []
 		);
 	}
-
-	// RPC: top_metrics_by_period (busiest single day, group-wide) — powers
-	// getTopPeriodsByMetric (app/actions/top-performers.ts)
-	const { data: topDays } = await alpha.rpc('top_metrics_by_period', {
-		temporal_unit: 'day',
-		metric_name: 'encounters',
-		result_limit: 1,
-		filters: { ringing_group_filter: alphaId }
-	} as Parameters<typeof alpha.rpc<'top_metrics_by_period'>>[1]);
-	await writeSnapshot(
-		`top_metrics_by_period/alpha.busiest-days.json`,
-		topDays ?? []
-	);
 
 	// Table: Birds + Table: Encounters (bird detail merged with its own
 	// encounters) — powers fetchBirdPageContent (app/(routes)/bird/[ring]/page.tsx).

@@ -155,7 +155,7 @@ Tables (PascalCase in Postgres, matching generated TypeScript types in `types/su
 Key design notes:
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
 - Several fields are populated by triggers (e.g. `proven_age` on Birds, timestamps on Sessions/Encounters).
-- Complex queries are exposed as Postgres RPC functions (e.g. `top_metrics_by_period`, `core_stats`, `notable_retraps`, `find_discrepencies`).
+- Complex queries are exposed as Postgres RPC functions (e.g. `core_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
 
 ### Companion stats RPCs and shared plumbing (`core_stats` / `population_stats`, #800)
@@ -391,7 +391,7 @@ Snapshot fixture data lives in `test-fixtures/snapshots/` — use these as mock 
 than inventing data inline. Fixtures are organised **by data source, not by the action function
 that consumes them** (#882): one subdirectory per Postgres RPC (`core_stats/`,
 `biometrics_stats/`, `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
-`top_metrics_by_period/`, `ring_sequence_controls/`), or
+`ring_sequence_controls/`), or
 `tables/<TableName>/` for a fixture produced by a direct PostgREST table query rather than an RPC
 call. This matters because an action can drift from the RPC/table it actually calls (#870:
 `getSpeciesStatsHistory.alpha.robin.json` was named after the `getSpeciesStatsHistory` action but
