@@ -35,6 +35,11 @@ function makeChainClient(
 	};
 	const summaryStats =
 		overrides.summaryStats ??
+		// This is an ungrouped core_stats fixture, so species_name/time_period
+		// are genuinely null; HomePageSummaryStats' NonNullable mapped type
+		// (app/models/db.ts) assumes every column is always present, so a
+		// direct assertion doesn't compile (#895).
+		// eslint-disable-next-line no-restricted-syntax -- see comment above
 		(summaryStatsSnapshot as unknown as HomePageSummaryStats);
 	const lastGroupTick = overrides.lastGroupTick ?? defaultLastGroupTick;
 	function chainFor(data: unknown) {
@@ -353,6 +358,7 @@ describe('home page', () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 					makeChainClient({
 						summaryStats:
+							// eslint-disable-next-line no-restricted-syntax -- see comment above summaryStats in makeChainClient (#895)
 							summaryStatsZeroSnapshot as unknown as HomePageSummaryStats
 					})
 				);
@@ -372,6 +378,7 @@ describe('home page', () => {
 			it('renders a dash for the missing periods and values for all time', async () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 					makeChainClient({
+						// eslint-disable-next-line no-restricted-syntax -- see comment above summaryStats in makeChainClient (#895)
 						summaryStats: {
 							allTime: summaryStatsSnapshot.allTime,
 							thisYear: null,
@@ -401,7 +408,7 @@ describe('home page', () => {
 							allTime: null,
 							thisYear: null,
 							lastYear: null
-						} as unknown as HomePageSummaryStats
+						} as HomePageSummaryStats
 					})
 				);
 				render(await HomePage());

@@ -3,6 +3,10 @@ import { makeHighlighter } from '../PageContent';
 import type { EncounterOfBird } from '@/app/models/bird';
 
 function makeEncounters(wingLengths: (number | null)[]): EncounterOfBird[] {
+	// This is a hand-built partial object carrying only the fields
+	// makeHighlighter's rules use, not a real fixture — it deliberately omits
+	// several EncounterOfBird columns (#895).
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	return wingLengths.map((wing_length, i) => ({
 		id: i,
 		bird_id: 1,
@@ -32,7 +36,7 @@ describe('makeHighlighter', () => {
 				{ ...encs[0], id: 2, sex: 'F' },
 				{ ...encs[0], id: 3, sex: 'u' },
 				{ ...encs[0], id: 4, sex: 'U' }
-			] as unknown as EncounterOfBird[];
+			] as EncounterOfBird[];
 			const highlight = makeHighlighter('sex', encounters);
 			expect(highlight(encounters[0])).toBe(true);
 			expect(highlight(encounters[1])).toBe(true);
@@ -49,7 +53,7 @@ describe('makeHighlighter', () => {
 				{ ...encs[0], id: 2, age_code: 2 },
 				{ ...encs[0], id: 3, age_code: 5 },
 				{ ...encs[0], id: 4, age_code: null }
-			] as unknown as EncounterOfBird[];
+			] as EncounterOfBird[];
 			const highlight = makeHighlighter('age', encounters);
 			expect(highlight(encounters[0])).toBe(false);
 			expect(highlight(encounters[1])).toBe(true);

@@ -62,7 +62,7 @@ function makeOldestEncounter(provenAge: number): SessionEncounter {
 			proven_age: provenAge,
 			species: { species_name: 'Robin' }
 		}
-	} as unknown as SessionEncounter;
+	} as SessionEncounter;
 }
 
 async function mockHighlights(highlights: SessionHighlight[]) {

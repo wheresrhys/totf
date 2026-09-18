@@ -8,7 +8,7 @@ import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats
 // column set every test builds on comes from actual RPC output and can't
 // silently drift from the RPC's shape (#883).
 const [capturedBiometricsRow] =
-	alphaBiometricsBySpecies as unknown as BiometricsStatsResult[];
+	alphaBiometricsBySpecies as BiometricsStatsResult[];
 
 function buildAggregateRow(
 	overrides: Partial<CoreStatsResult> = {}
@@ -46,7 +46,7 @@ function buildAggregateRow(
 		min_wing: 65,
 		median_wing: 67,
 		...overrides
-	} as unknown as CoreStatsResult;
+	} as CoreStatsResult;
 }
 
 function buildBiometricsRow(

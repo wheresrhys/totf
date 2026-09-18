@@ -13,7 +13,7 @@ vi.mock('@/app/actions/sp-data', () => ({
 
 const io = mockIntersectionObserver();
 
-const birds = (birdsSnapshot as unknown as BirdOfSpecies[]).map(
+const birds = (birdsSnapshot as BirdOfSpecies[]).map(
 	(b) => enrichBird(b) as EnrichedBirdOfSpecies
 );
 
@@ -101,7 +101,7 @@ describe('SpIndividualsTab', () => {
 	it('loads more birds when scroll loader enters view', async () => {
 		const { fetchPageOfBirds } = await import('@/app/actions/sp-data');
 		vi.mocked(fetchPageOfBirds).mockResolvedValue(
-			birds as unknown as Awaited<ReturnType<typeof fetchPageOfBirds>>
+			birds as Awaited<ReturnType<typeof fetchPageOfBirds>>
 		);
 		render(
 			<SpIndividualsTab
@@ -127,7 +127,7 @@ describe('SpIndividualsTab', () => {
 	it('forwards the from/to date range into paged fetches when scoped', async () => {
 		const { fetchPageOfBirds } = await import('@/app/actions/sp-data');
 		vi.mocked(fetchPageOfBirds).mockResolvedValue(
-			birds as unknown as Awaited<ReturnType<typeof fetchPageOfBirds>>
+			birds as Awaited<ReturnType<typeof fetchPageOfBirds>>
 		);
 		render(
 			<SpIndividualsTab

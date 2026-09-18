@@ -42,7 +42,7 @@ function buildStat(overrides: Partial<CoreStatsResult> = {}): CoreStatsResult {
 		adult_bird_count: 15,
 		unknown_age_bird_count: 5,
 		...overrides
-	} as unknown as CoreStatsResult;
+	} as CoreStatsResult;
 }
 
 // A monthly stat row as `core_stats` returns it: `time_period` is the first

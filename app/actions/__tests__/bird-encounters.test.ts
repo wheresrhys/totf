@@ -30,7 +30,7 @@ function encounter(id: number, visit_date: string): EncounterOfBird {
 		weight: null,
 		wing_length: null,
 		session: { visit_date }
-	} as unknown as EncounterOfBird;
+	} as EncounterOfBird;
 }
 
 function makeClient(encounters: EncounterOfBird[]) {
