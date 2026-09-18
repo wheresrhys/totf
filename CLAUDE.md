@@ -187,6 +187,23 @@ duplicate of a same-named column on `core_stats` (#800); #824 removed `core_stat
 copy (and the corresponding UI series, #817) as unused, so `demographics_stats` now holds the only
 `new_young_bird_count` column in the schema.
 
+`demographics_stats`' four `returning_age_*_bird_count` columns (#843, driving the species page's
+"Returning ages" chart) are resolved per bird by a fifth utility RPC,
+`stats_bird_returning_age_bucket`. It takes the adult cohort straight from `stats_bird_age_bucket`
+(`age_bucket = 'adult'`, the same filter `adult_age_split` applies) and splits it by a
+**period-relative** proven age — `period_year − MIN(max_hatch_year)` over the bird's group-scoped
+lifetime encounters with `enc_year <= period_year`, the same formula
+`trg_encounters_refresh_bird_proven_age` uses but windowed rather than all-time. It deliberately
+never reads `Birds.proven_age` itself: that column is live, global and all-time, so joining it onto
+a historical cell would stamp today's age onto a ten-year-old row. One narrow carve-out sends a
+bird to `'new_unknown_age'` instead of `'1'` — a single first-ever encounter, never precisely aged
+(`min_hatch_year = 0`, `trg_set_encounter_generated_fields`' sentinel for an even/imprecise
+`age_code`), computing an age of exactly 1, where that 1 is a coding artefact rather than evidence
+of return. Don't widen it: a first-ever imprecise encounter computing 2 lands in `'2'` as an
+accepted quirk. Note also that an adult-bucketed bird can never compute a period-relative age of 0
+(any `age_code > 3` encounter in year V implies `max_hatch_year <= V - 1`), so the four columns in
+practice sum to `adult_bird_count`; the RPC's zero/NULL guard is defensive only.
+
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
 two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
 counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
