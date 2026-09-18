@@ -5,6 +5,7 @@ import {
 	fetchGraphableEncounterData,
 	getSpeciesStatsHistory,
 	getSpeciesDemographicsStats,
+	getSpeciesArrivalsStats,
 	fetchSpeciesPeriodTotals,
 	getGroupEffortHistory
 } from '../sp-data';
@@ -462,6 +463,64 @@ describe('sp-data actions', () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
 			await getSpeciesDemographicsStats(
+				SPECIES_NAME,
+				GROUP_ID,
+				undefined,
+				undefined,
+				'month'
+			);
+
+			expect(rpcCalls[0].args).toMatchObject({
+				group_by_time_period: 'month'
+			});
+		});
+	});
+
+	describe('getSpeciesArrivalsStats', () => {
+		it('forwards from_date/to_date to arrivals_stats alongside the monthly timeInterval', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await getSpeciesArrivalsStats(SPECIES_NAME, GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(rpcCalls[0].name).toBe('arrivals_stats');
+			expect(rpcCalls[0].args).toMatchObject({
+				species_name_filter: SPECIES_NAME,
+				ringing_group_filter: GROUP_ID,
+				group_by_time_period: 'month',
+				from_date: FROM_DATE,
+				to_date: TO_DATE
+			});
+		});
+
+		it('omits from_date/to_date when no range is supplied', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await getSpeciesArrivalsStats(SPECIES_NAME, GROUP_ID);
+
+			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
+			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
+		});
+
+		it('with interval "year" calls arrivals_stats with group_by_time_period: "year"', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await getSpeciesArrivalsStats(
+				SPECIES_NAME,
+				GROUP_ID,
+				undefined,
+				undefined,
+				'year'
+			);
+
+			expect(rpcCalls[0].args).toMatchObject({
+				group_by_time_period: 'year'
+			});
+		});
+
+		it('with interval "month" passed explicitly matches the default', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await getSpeciesArrivalsStats(
 				SPECIES_NAME,
 				GROUP_ID,
 				undefined,

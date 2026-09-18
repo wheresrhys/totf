@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import type {
 	CoreStatsResult,
 	CoreStatsWithBiometrics,
-	DemographicsStatsResult
+	DemographicsStatsResult,
+	ArrivalsStatsResult
 } from '@/app/models/db';
 import {
 	getCounts,
@@ -10,6 +11,7 @@ import {
 	getAgeSplit,
 	getYoungCounts,
 	getNewYoungCounts,
+	getArrivals,
 	getSizes
 } from '../StatsHistoryChart';
 import robinDemographicsHistory from '@/test-fixtures/snapshots/demographics_stats/robin-alpha.monthly-history.json';
@@ -285,6 +287,68 @@ describe('getYoungCounts', () => {
 		it('returns both series with empty data arrays', () => {
 			const result = getYoungCounts([]);
 			expect(result).toHaveLength(2);
+			expect(result.every((series) => series.data.length === 0)).toBe(true);
+		});
+	});
+});
+
+// No captured arrivals_stats fixture exists yet (unlike demographicsRow
+// above) — mirrors aggregateRow's plain-literal approach: only the columns
+// this mapper reads matter, so a minimal literal is enough.
+function arrivalsRow(
+	overrides: Partial<ArrivalsStatsResult>
+): ArrivalsStatsResult {
+	return {
+		species_name: 'Robin',
+		time_period: '2024-01-01',
+		new_adult_bird_count: 0,
+		returning_adult_bird_count: 0,
+		pullus_bird_count: 0,
+		juv_bird_count: 0,
+		postjuv_bird_count: 0,
+		...overrides
+	} as ArrivalsStatsResult;
+}
+
+describe('getArrivals', () => {
+	describe('Usual: maps each arrival bucket column to its own series', () => {
+		it('maps New adults/Returning adults/Pullus/Juv/Postjuv from their columns', () => {
+			const rows = [
+				arrivalsRow({
+					time_period: '2024-01-01',
+					new_adult_bird_count: 5,
+					returning_adult_bird_count: 8,
+					pullus_bird_count: 2,
+					juv_bird_count: 3,
+					postjuv_bird_count: 1
+				})
+			];
+			const result = getArrivals(rows);
+			expect(result.map((series) => series.name)).toEqual([
+				'New adults',
+				'Returning adults',
+				'Pullus',
+				'Juv',
+				'Postjuv'
+			]);
+			expect(result[0].data).toEqual([['2024-01-01', 5]]);
+			expect(result[1].data).toEqual([['2024-01-01', 8]]);
+			expect(result[2].data).toEqual([['2024-01-01', 2]]);
+			expect(result[3].data).toEqual([['2024-01-01', 3]]);
+			expect(result[4].data).toEqual([['2024-01-01', 1]]);
+		});
+	});
+
+	describe('Edge: empty input', () => {
+		it('returns an empty series for empty input', () => {
+			const result = getArrivals([]);
+			expect(result.map((series) => series.name)).toEqual([
+				'New adults',
+				'Returning adults',
+				'Pullus',
+				'Juv',
+				'Postjuv'
+			]);
 			expect(result.every((series) => series.data.length === 0)).toBe(true);
 		});
 	});

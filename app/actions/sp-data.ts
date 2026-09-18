@@ -18,7 +18,8 @@ import {
 	type CoreStatsResult,
 	type CoreStatsWithBiometrics,
 	type BiometricsStatsResult,
-	type DemographicsStatsResult
+	type DemographicsStatsResult,
+	type ArrivalsStatsResult
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
 export async function fetchPageOfBirds(
@@ -242,6 +243,34 @@ export async function getSpeciesDemographicsStats(
 			...(toDate ? { to_date: toDate } : {})
 		})
 		.then(catchSupabaseErrors) as Promise<DemographicsStatsResult[]>;
+}
+
+/**
+ * Monthly arrivals history for a single species — the `arrivals_stats`
+ * sibling of `getSpeciesStatsHistory`/`getSpeciesDemographicsStats` (#858).
+ * Counts each bird once per calendar year, at its first classifiable
+ * encounter of that year, bucketed into `new_adult`/`returning_adult`/
+ * `pullus`/`juv`/`postjuv` — feeds the "Demographics" tab's Arrivals tile
+ * (#860). Same call shape (species-filtered, `interval`-grouped, monthly by
+ * default) as its two siblings.
+ */
+export async function getSpeciesArrivalsStats(
+	species: string,
+	viewedGroupId: number,
+	fromDate?: string,
+	toDate?: string,
+	interval: StatsHistoryInterval = 'month'
+): Promise<ArrivalsStatsResult[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
+	return supabase
+		.rpc('arrivals_stats', {
+			species_name_filter: species,
+			ringing_group_filter: viewedGroupId,
+			group_by_time_period: interval,
+			...(fromDate ? { from_date: fromDate } : {}),
+			...(toDate ? { to_date: toDate } : {})
+		})
+		.then(catchSupabaseErrors) as Promise<ArrivalsStatsResult[]>;
 }
 
 /**

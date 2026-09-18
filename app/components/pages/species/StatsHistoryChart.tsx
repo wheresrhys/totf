@@ -3,7 +3,8 @@ import { type LineChartData } from 'react-chartkick';
 import type {
 	CoreStatsResult,
 	CoreStatsWithBiometrics,
-	DemographicsStatsResult
+	DemographicsStatsResult,
+	ArrivalsStatsResult
 } from '@/app/models/db';
 
 export function getCounts(statsHistory: CoreStatsResult[]): LineChartData[] {
@@ -163,6 +164,50 @@ export function getNewYoungCounts(
 			data: demographicsStats.map((row) => [
 				row.time_period,
 				row.new_postjuv_enc_count
+			])
+		}
+	];
+}
+
+// Arrivals — the "Demographics" tab's Arrivals tile (#860), consuming
+// `arrivals_stats`' five mutually-exclusive arrival-bucket columns (#858).
+// Unlike Counts/Age split/Young counts, an "arrival" here is a bird-year (one
+// bird's first classifiable encounter of a calendar year), not a per-cell
+// encounter or bird-distinct count — see the RPC's own doc comment for why
+// that makes simply summing this tile's monthly points across a year exact
+// (no Year-interval `fetchYearSeries` correction needed, unlike its two
+// siblings).
+export function getArrivals(
+	arrivalsStats: ArrivalsStatsResult[]
+): LineChartData[] {
+	return [
+		{
+			name: 'New adults',
+			data: arrivalsStats.map((row) => [
+				row.time_period,
+				row.new_adult_bird_count
+			])
+		},
+		{
+			name: 'Returning adults',
+			data: arrivalsStats.map((row) => [
+				row.time_period,
+				row.returning_adult_bird_count
+			])
+		},
+		{
+			name: 'Pullus',
+			data: arrivalsStats.map((row) => [row.time_period, row.pullus_bird_count])
+		},
+		{
+			name: 'Juv',
+			data: arrivalsStats.map((row) => [row.time_period, row.juv_bird_count])
+		},
+		{
+			name: 'Postjuv',
+			data: arrivalsStats.map((row) => [
+				row.time_period,
+				row.postjuv_bird_count
 			])
 		}
 	];
