@@ -82,7 +82,7 @@ export const NEW_YOUNG_COUNTS_COLORS = [
 // Arrivals tile (#860): two colour concepts share one hue map. "New adults"/
 // "Returning adults" are a paired dark/light draw off a single hue (mirroring
 // AGE_SPLIT_HUES' own dark-for-new/light-for-returning convention, but here as
-// one pair within a single tile rather than split across two hues). "Pullus"
+// one pair within a single tile rather than split across two hues). "Pulli"
 // -> "Juv" -> "Postjuv" is instead an ordered progression through a bird's
 // first calendar year, so it gets a 3-tone single-hue ramp (dark to light)
 // rather than a two-value pair — the same convention #843's proven-age-bucket
@@ -91,14 +91,18 @@ export const ARRIVALS_HUES = {
 	adult: { dark: '#1f4fb0', light: '#8fb0e8' },
 	young: { dark: '#0f7a14', mid: '#4fa854', light: '#8fd08f' }
 };
-// Series order (matches getArrivals): New adults, Returning adults, Pullus, Juv, Postjuv.
-export const ARRIVALS_COLORS = [
-	ARRIVALS_HUES.adult.dark, // New adults
-	ARRIVALS_HUES.adult.light, // Returning adults
-	ARRIVALS_HUES.young.dark, // Pullus
-	ARRIVALS_HUES.young.mid, // Juv
-	ARRIVALS_HUES.young.light // Postjuv
-];
+// Keyed by series name (matching getArrivals' `name` fields) rather than a
+// positional array: getArrivals omits the "Pulli" series entirely when the
+// fetched range has no nonzero pullus count, so a fixed-index array would
+// silently misassign every colour after the gap. Looked up per-series in the
+// Arrivals tile below instead.
+export const ARRIVALS_COLORS_BY_NAME: Record<string, string> = {
+	'New adults': ARRIVALS_HUES.adult.dark,
+	'Returning adults': ARRIVALS_HUES.adult.light,
+	Pulli: ARRIVALS_HUES.young.dark,
+	Juv: ARRIVALS_HUES.young.mid,
+	Postjuv: ARRIVALS_HUES.young.light
+};
 
 function Spinner() {
 	return (
@@ -401,30 +405,33 @@ export function SpDemographicsTab({
 			id: 'arrivals',
 			heading: 'Arrivals',
 			description:
-				'New adults, returning adults, pullus, juv and postjuv arriving each year',
+				'New adults, returning adults, pulli, juv and postjuv arriving each year',
 			load: () => {
 				loadArrivalsStats();
 				loadEffortHistory();
 			},
-			renderChart: () =>
-				arrivalsStats ? (
+			renderChart: () => {
+				if (!arrivalsStats) return <Spinner />;
+				const arrivalsSeries = getArrivals(arrivalsStats);
+				return (
 					<YearComparisonTrendChart
-						series={getArrivals(arrivalsStats)}
-						colors={ARRIVALS_COLORS}
+						series={arrivalsSeries}
+						colors={arrivalsSeries.map(
+							(metric) => ARRIVALS_COLORS_BY_NAME[metric.name]
+						)}
 						allowYearAccumulation={true}
 						yearlyAggregators={{
 							'New adults': 'sum',
 							'Returning adults': 'sum',
-							Pullus: 'sum',
+							Pulli: 'sum',
 							Juv: 'sum',
 							Postjuv: 'sum'
 						}}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
 					/>
-				) : (
-					<Spinner />
-				)
+				);
+			}
 		}
 	];
 

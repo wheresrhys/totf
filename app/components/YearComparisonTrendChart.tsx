@@ -1,7 +1,7 @@
 'use client';
 import { useId, useState } from 'react';
 import Link from 'next/link';
-import { LineChart, type LineChartData } from 'react-chartkick';
+import { AreaChart, LineChart, type LineChartData } from 'react-chartkick';
 import 'chartkick/chart.js';
 import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
 
@@ -139,16 +139,21 @@ const TREND_CHART_LIBRARY = {
 };
 
 // Layered on top of `TREND_CHART_LIBRARY` (not replacing it) for the accumulate
-// view: `elements.line.fill: true` fills each dataset's area — chart.js applies
-// the line-element default to every line dataset, so it's equivalent to setting
-// `fill` per dataset — and `scales.y.stacked: true` stacks those areas so the
-// metrics read as a stacked area chart rather than overlapping filled lines.
+// view: `scales.y.stacked: true` stacks each dataset's filled area so the
+// metrics read as a stacked area chart rather than overlapping lines.
+//
+// The fill itself does NOT come from a `library` option — a `library.elements.
+// line.fill` default has no effect here. Chartkick's `createDataTable` always
+// sets an explicit `fill` (and matching `backgroundColor`) on every dataset it
+// builds, keyed off which chart *type* it's building for ("area" -> filled with
+// a translucent version of the series colour; "line" -> not filled), and a
+// per-dataset Chart.js option always overrides the same option's `elements`
+// default. So the only way to get a filled dataset out of chartkick is to
+// render via its `AreaChart` component rather than `LineChart` — see the
+// `accumulating` branch below, which switches components instead of trying to
+// force `fill` on through `library`.
 const STACKED_AREA_CHART_LIBRARY = {
 	...TREND_CHART_LIBRARY,
-	elements: {
-		...TREND_CHART_LIBRARY.elements,
-		line: { ...TREND_CHART_LIBRARY.elements.line, fill: true }
-	},
 	scales: { y: { stacked: true } }
 };
 
@@ -753,6 +758,11 @@ export function YearComparisonTrendChart({
 	const showIntervalToggle =
 		mode === 'all-time' && spansMultipleYears(series) && !accumulate;
 	const showAccumulateToggle = !!allowYearAccumulation && mode === 'all-time';
+	// `accumulating` swaps the rendered component (not just the `library`
+	// config) between chartkick's LineChart and AreaChart — see
+	// STACKED_AREA_CHART_LIBRARY's comment for why a `library` option alone
+	// can't produce a filled dataset here.
+	const AllTimeChart = accumulating ? AreaChart : LineChart;
 	return (
 		<div className="flex flex-col">
 			<div className="mb-2 flex flex-wrap items-center justify-end gap-2">
@@ -879,7 +889,7 @@ export function YearComparisonTrendChart({
 							<div className="loading loading-spinner loading-xl"></div>
 						</div>
 					) : (
-						<LineChart
+						<AllTimeChart
 							min={min}
 							data={allTimeSeries}
 							colors={allTimeColors}
