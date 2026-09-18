@@ -545,23 +545,6 @@ export type Database = {
           species_name: string
         }[]
       }
-      population_stats: {
-        Args: {
-          from_date?: string
-          group_by_species?: boolean
-          group_by_time_period?: string
-          ringing_group_filter?: number
-          species_name_filter?: string
-          to_date?: string
-        }
-        Returns: Database["public"]["CompositeTypes"]["population_stats_result"][]
-        SetofOptions: {
-          from: "*"
-          to: "population_stats_result"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
       public_core_stats: {
         Args: {
           from_date?: string
@@ -787,21 +770,6 @@ export type Database = {
         postjuv_juv_enc_count: number | null
         new_postjuv_juv_enc_count: number | null
         new_postjuv_enc_count: number | null
-      }
-      population_stats_result: {
-        species_name: string | null
-        time_period: string | null
-        adult_bird_count: number | null
-        juv_bird_count: number | null
-        juv_enc_count: number | null
-        postjuv_enc_count: number | null
-        new_young_bird_count: number | null
-        new_adult_bird_count: number | null
-        first_summer_bird_count: number | null
-        postjuv_juv_enc_count: number | null
-        new_postjuv_juv_enc_count: number | null
-        new_postjuv_enc_count: number | null
-        old_timers_bird_count: number | null
       }
     }
   }
