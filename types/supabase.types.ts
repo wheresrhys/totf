@@ -604,6 +604,22 @@ export type Database = {
           time_period: string
         }[]
       }
+      stats_bird_returning_age_bucket: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: {
+          bird_id: number
+          returning_age_bucket: string
+          species_id: number
+          time_period: string
+        }[]
+      }
       stats_encounter_age_classification: {
         Args: {
           from_date?: string
@@ -770,6 +786,10 @@ export type Database = {
         postjuv_juv_enc_count: number | null
         new_postjuv_juv_enc_count: number | null
         new_postjuv_enc_count: number | null
+        returning_age_1_bird_count: number | null
+        returning_age_2_bird_count: number | null
+        returning_age_3_plus_bird_count: number | null
+        returning_new_unknown_age_bird_count: number | null
       }
     }
   }
