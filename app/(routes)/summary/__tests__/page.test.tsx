@@ -8,7 +8,7 @@ import {
 	waitFor
 } from '@testing-library/react';
 import Page, { fetchSummaryPageContent } from '../page';
-import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
+import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 const fetchYearlyTotalsMock = vi.fn().mockResolvedValue([]);
@@ -79,7 +79,9 @@ describe('/summary (all-time)', () => {
 		render(await Page());
 		await screen.findByRole('heading', { level: 1 });
 		expect(screen.getByTestId('summary-stats-section')).not.toBeNull();
-		expect(screen.getByText('Sessions').nextSibling?.textContent).toBe('10');
+		expect(screen.getByText('Sessions').nextSibling?.textContent).toBe(
+			String(alphaStats.session_count)
+		);
 	});
 
 	it('renders without the stats section when fetchSummaryStats resolves null', async () => {

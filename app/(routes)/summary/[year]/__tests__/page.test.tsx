@@ -9,7 +9,7 @@ import {
 	waitFor
 } from '@testing-library/react';
 import Page, { fetchSummaryYearPageContent } from '../page';
-import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
+import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 const fetchPeriodStatsMock = vi.fn().mockResolvedValue([]);
@@ -103,7 +103,7 @@ describe('/summary/[year]', () => {
 		expect(summaryStatsSection).not.toBeNull();
 		expect(
 			within(summaryStatsSection).getByText('Sessions').nextSibling?.textContent
-		).toBe('10');
+		).toBe(String(alphaStats.session_count));
 	});
 
 	it('fetchSummaryYearPageContent calls fetchPeriodStats with month timeInterval and the year bounds', async () => {

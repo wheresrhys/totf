@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import type { LongAbsenceRetrapHighlight } from '@/app/models/highlights';
+import type { LongAbsenceRetrapHighlight } from '@/app/lib/highlights';
 import {
 	formatShortDate,
 	renderSentence

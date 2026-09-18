@@ -13,8 +13,8 @@ import {
 import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { Fragment } from 'react';
-import { calculateSessionChronology } from '@/app/models/session-chronology';
-import type { ViewedGroup } from '@/lib/group-slug';
+import { calculateSessionChronology } from '@/app/lib/session-chronology';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type PageParams = {
 	viewedGroupId: number;

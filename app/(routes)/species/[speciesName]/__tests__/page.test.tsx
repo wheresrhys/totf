@@ -7,12 +7,14 @@ import {
 	within
 } from '@testing-library/react';
 import Page, { getSpeciesStats } from '../page';
-import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
+import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
+import robinBiometricsHeadline from '@/test-fixtures/snapshots/biometrics_stats/robin-alpha.headline.json';
+import {
+	ROBIN_SPECIES_ID,
+	robinSpeciesStats as speciesStats
+} from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '../PageContent';
-import type {
-	AggregateStatsResult,
-	BiometricsStatsResult
-} from '@/app/models/db';
+import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
 	() => ({
@@ -21,7 +23,7 @@ const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
 	})
 );
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
@@ -37,12 +39,8 @@ vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
 	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
 }));
 
-vi.mock('@/app/components/pages/species/SpBusiestSessionsTab', () => ({
-	SpBusiestSessionsTab: () => <div data-testid="sp-busiest-sessions-tab" />
-}));
-
-vi.mock('@/app/components/pages/species/SpPopulationTab', () => ({
-	SpPopulationTab: () => <div data-testid="sp-population-tab" />
+vi.mock('@/app/components/pages/species/SpDemographicsTab', () => ({
+	SpDemographicsTab: () => <div data-testid="sp-demographics-tab" />
 }));
 
 vi.mock('@/app/components/pages/species/SpBiometricsTab', () => ({
@@ -63,7 +61,7 @@ vi.mock('@/app/components/pages/species/SpSessionTotalsTab', () => ({
 	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
 }));
 
-const { birds, speciesStats } = spPageSnapshot as unknown as FullFatPageData;
+const birds = birdsSnapshot as FullFatPageData['birds'];
 
 function makeSpeciesClient() {
 	const fromChain = {
@@ -72,7 +70,7 @@ function makeSpeciesClient() {
 		single: vi.fn().mockReturnThis(),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({
-				data: { id: spPageSnapshot.speciesId },
+				data: { id: ROBIN_SPECIES_ID },
 				error: null
 			}).then(resolve)
 	};
@@ -105,7 +103,7 @@ describe('species detail page', () => {
 		});
 
 		describe('tab order and defaults (all-time page)', () => {
-			it('renders tab buttons in the order Year totals, Month totals, Session totals, Highlights, Biometrics, Population, Bird list', async () => {
+			it('renders tab buttons in the order Year totals, Month totals, Session totals, Highlights, Biometrics, Demographics, Bird list', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
 				const labels = within(screen.getByRole('tablist'))
@@ -117,7 +115,7 @@ describe('species detail page', () => {
 					'Session totals',
 					'Highlights',
 					'Biometrics',
-					'Population',
+					'Demographics',
 					'Bird list'
 				]);
 				expect(screen.queryByRole('button', { name: 'Graphs' })).toBeNull();
@@ -162,12 +160,11 @@ describe('species detail page', () => {
 		});
 
 		describe('highlights tab (click to activate)', () => {
-			it('renders both SpNotableRetrapsTab and SpBusiestSessionsTab after clicking Highlights button', async () => {
+			it('renders SpNotableRetrapsTab after clicking Highlights button', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
 				fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
 				await screen.findByTestId('sp-notable-retraps-tab');
-				await screen.findByTestId('sp-busiest-sessions-tab');
 			});
 		});
 
@@ -206,28 +203,28 @@ describe('species detail page', () => {
 			});
 		});
 
-		describe('population tab (click to activate, labelled "Population")', () => {
-			it('renders SpPopulationTab after clicking the Population button', async () => {
+		describe('demographics tab (click to activate, labelled "Demographics")', () => {
+			it('renders SpDemographicsTab after clicking the Demographics button', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Population' }));
-				await screen.findByTestId('sp-population-tab');
+				fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
+				await screen.findByTestId('sp-demographics-tab');
 			});
 
-			it('lazily loads SpPopulationTab only once "Population" is selected', async () => {
+			it('lazily loads SpDemographicsTab only once "Demographics" is selected', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
-				expect(screen.queryByTestId('sp-population-tab')).toBeNull();
-				fireEvent.click(screen.getByRole('button', { name: 'Population' }));
-				await screen.findByTestId('sp-population-tab');
+				expect(screen.queryByTestId('sp-demographics-tab')).toBeNull();
+				fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
+				await screen.findByTestId('sp-demographics-tab');
 			});
 
-			it("renders a 'Population' button that activates the 'population' tab panel", async () => {
+			it("renders a 'Demographics' button that activates the 'demographics' tab panel", async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
 				expect(screen.queryByRole('button', { name: 'Graphs' })).toBeNull();
-				fireEvent.click(screen.getByRole('button', { name: 'Population' }));
-				await screen.findByTestId('sp-population-tab');
+				fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
+				await screen.findByTestId('sp-demographics-tab');
 			});
 		});
 
@@ -260,9 +257,8 @@ describe('species detail page', () => {
 					'sp-combined-month-totals-tab'
 				],
 				['session-totals', 'Session totals', 'sp-session-totals-tab'],
-				['highlights', 'Highlights', 'sp-busiest-sessions-tab'],
 				['biometrics', 'Biometrics', 'sp-biometrics-tab'],
-				['population', 'Population', 'sp-population-tab'],
+				['demographics', 'Demographics', 'sp-demographics-tab'],
 				['bird-list', 'Bird list', 'sp-individuals-tab']
 			])(
 				'?tabId=%s selects the %s tab and loads its data without a click',
@@ -334,37 +330,38 @@ const BIOMETRICS_FIELD_KEYS = [
 	'median_wing'
 ] as const;
 
-function omitBiometricsFields(row: AggregateStatsResult): AggregateStatsResult {
+function omitBiometricsFields(row: CoreStatsResult): CoreStatsResult {
 	const copy: Record<string, unknown> = { ...row };
 	for (const key of BIOMETRICS_FIELD_KEYS) delete copy[key];
-	return copy as unknown as AggregateStatsResult;
+	return copy as CoreStatsResult;
 }
 
 function makeAggregateRow(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	return {
-		...(speciesStats as AggregateStatsResult),
+		...(speciesStats as CoreStatsResult),
 		...overrides
 	};
 }
+
+// The real captured biometrics_stats row for the exact call getSpeciesStats
+// makes (Robin, Alpha, ungrouped — one headline row), rather than a
+// hand-written literal that can silently drift from the RPC's shape (#883).
+// This fixture's row has species_name/time_period null, but
+// BiometricsStatsResult declares species_name non-null (app/models/db.ts),
+// so a direct assertion doesn't compile (#895).
+const [capturedBiometricsRow] =
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
+	robinBiometricsHeadline as unknown as BiometricsStatsResult[];
 
 function makeBiometricsRow(
 	overrides: Partial<BiometricsStatsResult> = {}
 ): BiometricsStatsResult {
 	return {
-		species_name: null,
-		time_period: null,
-		min_weight: 10,
-		max_weight: 20,
-		avg_weight: 15,
-		median_weight: 15,
-		min_wing: 60,
-		max_wing: 70,
-		avg_wing: 65,
-		median_wing: 65,
+		...capturedBiometricsRow,
 		...overrides
-	} as unknown as BiometricsStatsResult;
+	};
 }
 
 function makeStatsClient({
@@ -378,7 +375,7 @@ function makeStatsClient({
 	const client = {
 		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
 			rpcCalls.push({ name, args });
-			const data = name === 'aggregate_stats' ? aggregateRows : biometricsRows;
+			const data = name === 'core_stats' ? aggregateRows : biometricsRows;
 			return {
 				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 					Promise.resolve({ data, error: null }).then(resolve)
@@ -399,7 +396,7 @@ describe('getSpeciesStats', () => {
 		vi.clearAllMocks();
 	});
 
-	it('merges biometrics_stats wing/weight fields onto the aggregate_stats row when both calls succeed', async () => {
+	it('merges biometrics_stats wing/weight fields onto the core_stats row when both calls succeed', async () => {
 		makeStatsClient({
 			aggregateRows: [makeAggregateRow()],
 			biometricsRows: [makeBiometricsRow({ min_weight: 99 })]
@@ -409,11 +406,11 @@ describe('getSpeciesStats', () => {
 
 		expect(result[0].min_weight).toBe(99);
 		expect(result[0].bird_count).toBe(
-			(speciesStats as AggregateStatsResult).bird_count
+			(speciesStats as CoreStatsResult).bird_count
 		);
 	});
 
-	it('calls biometrics_stats with the same species_name_filter/ringing_group_filter it passes to aggregate_stats', async () => {
+	it('calls biometrics_stats with the same species_name_filter/ringing_group_filter it passes to core_stats', async () => {
 		const { rpcCalls } = makeStatsClient({
 			aggregateRows: [makeAggregateRow()],
 			biometricsRows: [makeBiometricsRow()]
@@ -421,9 +418,7 @@ describe('getSpeciesStats', () => {
 
 		await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
 
-		const aggregateCall = rpcCalls.find(
-			(call) => call.name === 'aggregate_stats'
-		);
+		const aggregateCall = rpcCalls.find((call) => call.name === 'core_stats');
 		const biometricsCall = rpcCalls.find(
 			(call) => call.name === 'biometrics_stats'
 		);
@@ -476,7 +471,7 @@ describe('getSpeciesStats', () => {
 		}
 	});
 
-	it('still returns a valid speciesStats row when aggregate_stats happens to already omit the wing/weight columns', async () => {
+	it('still returns a valid speciesStats row when core_stats happens to already omit the wing/weight columns', async () => {
 		makeStatsClient({
 			aggregateRows: [omitBiometricsFields(makeAggregateRow())],
 			biometricsRows: [makeBiometricsRow({ min_weight: 12, max_wing: 88 })]
@@ -487,7 +482,7 @@ describe('getSpeciesStats', () => {
 		expect(result[0].min_weight).toBe(12);
 		expect(result[0].max_wing).toBe(88);
 		expect(result[0].bird_count).toBe(
-			(speciesStats as AggregateStatsResult).bird_count
+			(speciesStats as CoreStatsResult).bird_count
 		);
 	});
 });

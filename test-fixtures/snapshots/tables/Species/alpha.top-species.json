@@ -1,0 +1,74 @@
+[
+  {
+    "id": 8,
+    "species_name": "Blue Tit",
+    "birds": [
+      {
+        "count": 6
+      }
+    ]
+  },
+  {
+    "id": 58,
+    "species_name": "Chaffinch",
+    "birds": [
+      {
+        "count": 0
+      }
+    ]
+  },
+  {
+    "id": 239,
+    "species_name": "Redwing",
+    "birds": [
+      {
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "species_name": "Kingfisher",
+    "birds": [
+      {
+        "count": 2
+      }
+    ]
+  },
+  {
+    "id": 19,
+    "species_name": "Reed Warbler",
+    "birds": [
+      {
+        "count": 15
+      }
+    ]
+  },
+  {
+    "id": 231,
+    "species_name": "Fieldfare",
+    "birds": [
+      {
+        "count": 1
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "species_name": "Robin",
+    "birds": [
+      {
+        "count": 23
+      }
+    ]
+  },
+  {
+    "id": 56,
+    "species_name": "Wren",
+    "birds": [
+      {
+        "count": 2
+      }
+    ]
+  }
+]

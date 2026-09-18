@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { SessionTabs } from '../SingleSessionData';
 import type { SpeciesWithEncounters } from '../SingleSessionData';
-import type { NetRound } from '@/app/models/session-chronology';
+import type { NetRound } from '@/app/lib/session-chronology';
 import type { SessionEncounter } from '@/app/models/session';
 import {
 	getCellByHeading,
@@ -41,7 +41,7 @@ function makeEncounter(
 			proven_age,
 			species: { id: 1, species_name: species }
 		}
-	} as unknown as SessionEncounter;
+	} as SessionEncounter;
 }
 
 function totalsRowCellValue(columnLabel: string): string {

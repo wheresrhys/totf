@@ -4,7 +4,7 @@ import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import {
 	deriveMeasurementRange,
 	type MeasurementRange
-} from '@/app/models/measurement-range';
+} from '@/app/lib/measurement-range';
 import { SingleBirdTable } from '@/app/components/SingleBirdTable';
 import { MeasurementRangeCell } from '@/app/components/pages/species/MeasurementRangeCell';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';

@@ -7,7 +7,7 @@ import {
 	getAllByRole
 } from '@testing-library/react';
 import Page, { fetchSummaryYearMonthPageContent } from '../page';
-import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
+import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 vi.mock('@/app/actions/summary-stats', () => ({
@@ -122,7 +122,9 @@ describe('/summary/[year]/[month]', () => {
 		);
 		await screen.findByRole('heading', { level: 1 });
 		expect(screen.getByTestId('summary-stats-section')).not.toBeNull();
-		expect(screen.getByText('Sessions').nextSibling?.textContent).toBe('10');
+		expect(screen.getByText('Sessions').nextSibling?.textContent).toBe(
+			String(alphaStats.session_count)
+		);
 	});
 
 	it('renders without the stats section when fetchSummaryStats resolves null', async () => {

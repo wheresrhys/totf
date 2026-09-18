@@ -4,10 +4,10 @@ import {
 } from '@/app/components/layout/BootstrapPage';
 import { SppStatsTable } from '@/app/components/pages/species/SppStatsTable';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import type { ViewedGroup } from '@/lib/group-slug';
-import type { SpeciesStatsRow } from '@/app/models/species-stats';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 
 //TODO get year/date range from URL params
 

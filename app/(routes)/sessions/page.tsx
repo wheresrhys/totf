@@ -2,9 +2,9 @@ import {
 	BootstrapPage,
 	type DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 import { SessionsPageContent } from './PageContent';
 

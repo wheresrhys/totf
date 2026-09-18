@@ -31,7 +31,7 @@ import {
 	createSequenceFromImportPrefix,
 	type UpdateRingSequenceState
 } from '../ring-sequences';
-import { getAuthenticatedSupabaseClientForGroup } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClientForGroup } from '@/app/lib/auth/group-auth';
 import { supabase } from '@/lib/supabase';
 import { randomTestSuffix } from '@/supabase/__tests__/test-isolation';
 import {
@@ -50,7 +50,7 @@ const activeGroupId = vi.hoisted(() => ({ current: null as number | null }));
 vi.mock('@/app/actions/group-cookie', () => ({
 	getGroupJwt: async () => {
 		if (activeGroupId.current === null) return null;
-		const { generateGroupJwt } = await import('@/lib/jwt');
+		const { generateGroupJwt } = await import('@/app/lib/auth/jwt');
 		return generateGroupJwt(activeGroupId.current);
 	}
 }));

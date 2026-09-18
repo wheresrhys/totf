@@ -1,0 +1,19 @@
+[
+  {
+    "id": 4,
+    "extra_text": null,
+    "session": {
+      "location": {
+        "location_name": "Alpha Site A (CES)"
+      },
+      "visit_date": "2022-04-30",
+      "session_type": "PULLI"
+    },
+    "bird": {
+      "ring_no": "AR0002",
+      "species": {
+        "species_name": "Robin"
+      }
+    }
+  }
+]

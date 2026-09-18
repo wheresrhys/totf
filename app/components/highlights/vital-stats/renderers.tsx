@@ -4,7 +4,7 @@ import type {
 	VitalStatHighlight,
 	WeightRecordExtreme,
 	WeightRecordHighlight
-} from '@/app/models/highlights';
+} from '@/app/lib/highlights';
 import {
 	capitalize,
 	renderSentence

@@ -1,0 +1,44 @@
+[
+  {
+    "id": 52,
+    "visit_date": "2024-05-10",
+    "location_id": 1,
+    "ringing_group_id": 1,
+    "location": {
+      "location_name": "Alpha Site A (CES)"
+    },
+    "encounters": [
+      {
+        "count": 5
+      }
+    ]
+  },
+  {
+    "id": 50,
+    "visit_date": "2023-09-14",
+    "location_id": 32,
+    "ringing_group_id": 1,
+    "location": {
+      "location_name": "Alpha Site B"
+    },
+    "encounters": [
+      {
+        "count": 2
+      }
+    ]
+  },
+  {
+    "id": 47,
+    "visit_date": "2023-07-08",
+    "location_id": 1,
+    "ringing_group_id": 1,
+    "location": {
+      "location_name": "Alpha Site A (CES)"
+    },
+    "encounters": [
+      {
+        "count": 3
+      }
+    ]
+  }
+]

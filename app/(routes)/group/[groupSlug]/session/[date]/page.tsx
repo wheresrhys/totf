@@ -1,8 +1,8 @@
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { withGroupScope } from '@/app/components/layout/withGroupScope';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { readTabIdSearchParam } from '@/lib/tab-query-param';
+import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
 import type { SessionEncounter } from '@/app/models/session';
 import type { LocationRow, SessionRow } from '@/app/models/db';
 import {

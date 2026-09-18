@@ -2,10 +2,10 @@ import {
 	BootstrapPage,
 	defaultGetParams
 } from '@/app/components/layout/BootstrapPage';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { fetchPageOfBirds } from '@/app/actions/sp-data';
-import { readTabIdSearchParam } from '@/lib/tab-query-param';
+import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
 import {
 	SpeciesPageContent,
 	type PageParams,
@@ -15,11 +15,11 @@ import {
 
 import {
 	mergeBiometricsFields,
-	type AggregateStatsResult,
-	type AggregateStatsWithBiometrics,
+	type CoreStatsResult,
+	type CoreStatsWithBiometrics,
 	type BiometricsStatsResult
 } from '@/app/models/db';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 type PageProps = {
 	params: Promise<{ speciesName: string }>;
@@ -40,7 +40,7 @@ async function getSpeciesPageParams(pageProps: PageProps): Promise<PageParams> {
 }
 
 // Fetches the species page's headline stats row, merging biometrics_stats'
-// wing/weight fields onto the aggregate_stats row (#821). Both RPCs share the
+// wing/weight fields onto the core_stats row (#821). Both RPCs share the
 // same param shape and, called without group_by_species/group_by_time_period,
 // each return exactly one (ungrouped) row for this species/date-range/group,
 // so the two rows line up 1:1 without needing a join key.
@@ -49,7 +49,7 @@ export async function getSpeciesStats(
 	viewedGroupId: number,
 	fromDate?: string,
 	toDate?: string
-): Promise<AggregateStatsWithBiometrics[]> {
+): Promise<CoreStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
 		species_name_filter: species,
@@ -58,9 +58,9 @@ export async function getSpeciesStats(
 		...(toDate ? { to_date: toDate } : {})
 	};
 	const [aggregateRows, biometricsRows] = await Promise.all([
-		supabase
-			.rpc('aggregate_stats', rpcArgs)
-			.then(catchSupabaseErrors) as Promise<AggregateStatsResult[]>,
+		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
+			CoreStatsResult[]
+		>,
 		supabase
 			.rpc('biometrics_stats', rpcArgs)
 			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>

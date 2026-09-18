@@ -2,7 +2,7 @@ import { Readable } from 'stream';
 import csvParser from 'csv-parser';
 import { pRateLimit } from 'p-ratelimit';
 import { getGroupCookie } from '@/app/actions/group-cookie';
-import { getAuthenticatedSupabaseClient } from '@/lib/group-auth';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import {
 	createUpserter,
 	createRingSequenceLookup,

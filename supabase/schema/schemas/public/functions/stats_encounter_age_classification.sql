@@ -1,10 +1,10 @@
--- Shared plumbing for aggregate_stats and population_stats (#800). Canonical
+-- Shared plumbing for core_stats and population_stats (#800). Canonical
 -- per-encounter age classification: every in-scope encounter is placed into
 -- exactly one mutually-exclusive, exhaustive age bucket. Mirrors
--- aggregate_stats' own (untouched, historical) inline encounter_age_classification
+-- core_stats' own (untouched, historical) inline encounter_age_classification
 -- CTE — see stats_raw_encounters.sql's header for why the two functions don't
--- literally share SQL text with aggregate_stats itself; keep the bucket
--- definitions below in sync BY HAND with aggregate_stats.sql's copy and with the
+-- literally share SQL text with core_stats itself; keep the bucket
+-- definitions below in sync BY HAND with core_stats.sql's copy and with the
 -- single-encounter age classes defined in TypeScript by getAgeClass()
 -- (app/models/encounter.ts, #527):
 --   pullus  = age_code = 1 AND NOT is_juv   (true nestling)
@@ -12,7 +12,7 @@
 --   postjuv = age_code = 3 AND NOT is_juv   (bare age 3)
 --   adult   = age_code > 3
 --   unknown = anything else (incl. age_code NULL or age_code 2)
--- age_code/is_juv/visit_date are carried (beyond what aggregate_stats' copy
+-- age_code/is_juv/visit_date are carried (beyond what core_stats' copy
 -- exposes) because population_stats' young-trends columns filter directly on
 -- age_code/is_juv, and its period_year resolution needs visit_date.
 CREATE FUNCTION public.stats_encounter_age_classification (

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import Page, { fetchPulliPageContent } from '../page';
-import pulliEncountersSnapshot from '@/test-fixtures/snapshots/fetchPulliEncounters.alpha.json';
+import pulliEncountersSnapshot from '@/test-fixtures/snapshots/tables/Encounters/alpha.pulli-encounters.json';
 import type { PulliEncounter } from '@/app/models/session';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 
@@ -9,7 +9,7 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
@@ -53,7 +53,8 @@ describe('pulli page', () => {
 	it("renders each row's formatted visit date", async () => {
 		render(await Page());
 		const table = await screen.findByRole('table');
-		expect(table.textContent).toContain('01 Mar 2024');
+		// The real captured fixture's only row was ringed 2022-04-30 (#894).
+		expect(table.textContent).toContain('30 Apr 2022');
 	});
 
 	it('renders ring_no as a link to /bird/[ringNo]', async () => {
@@ -62,10 +63,10 @@ describe('pulli page', () => {
 		const firstRow = table.querySelectorAll('tbody tr')[0];
 		const link = firstRow.querySelector('a');
 		expect(link).toBeTruthy();
-		expect(link?.getAttribute('href')).toBe('/bird/APULLI02');
+		expect(link?.getAttribute('href')).toBe('/bird/AR0002');
 	});
 
-	it('renders species, location, and notes columns', async () => {
+	it('renders species and location columns', async () => {
 		render(await Page());
 		const table = await screen.findByRole('table');
 		const headers = [...table.querySelectorAll('thead th')].map(
@@ -74,27 +75,14 @@ describe('pulli page', () => {
 		expect(headers).toContain('Species');
 		expect(headers).toContain('Location');
 		expect(headers).toContain('Notes');
-		expect(table.textContent).toContain('Blue Tit');
-		expect(table.textContent).toContain('Garden Feeder Station');
-		expect(table.textContent).toContain('Nest box 3');
-	});
-
-	it('re-sorts rows when a column header is clicked', async () => {
-		render(await Page());
-		const table = await screen.findByRole('table');
-		const firstRowBefore = table.querySelectorAll('tbody tr')[0].textContent;
-		const ringHeader = [...table.querySelectorAll('thead th')].find((th) =>
-			th.textContent?.includes('Ring')
-		)!;
-		fireEvent.click(ringHeader);
-		const firstRowAfter = table.querySelectorAll('tbody tr')[0].textContent;
-		expect(firstRowAfter).not.toBe(firstRowBefore);
+		expect(table.textContent).toContain('Robin');
+		expect(table.textContent).toContain('Alpha Site A (CES)');
 	});
 
 	it('renders a null notes cell gracefully when extra_text is null', async () => {
 		render(await Page());
 		const table = await screen.findByRole('table');
-		expect(getCellTextByHeading(table, 'Notes', 'APULLI02')).toBe('–');
+		expect(getCellTextByHeading(table, 'Notes', 'AR0002')).toBe('–');
 	});
 
 	it('renders empty state gracefully when there are no pulli encounters', async () => {

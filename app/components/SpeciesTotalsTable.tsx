@@ -5,8 +5,8 @@ import {
 	deriveSpeciesTotalsRow,
 	deriveSpeciesTotalsRowByEncounter,
 	type SpeciesTotalsRow
-} from '@/app/models/species-totals';
-import type { SpeciesStatsRow } from '@/app/models/species-stats';
+} from '@/app/lib/species-totals';
+import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 import {
 	type ColumnConfig,
 	SortableTable,

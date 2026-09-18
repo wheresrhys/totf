@@ -16,6 +16,16 @@ import {
  * .claude/swarm-state.json on read (see readState below) and, via tools/swarm-state.ts, to type
  * the swarm_state_* MCP tools' stored-entry output. Keeping one definition means a shape change
  * can't drift between "what we store" and "what we validate".
+ *
+ * `dbLockReleased` is the one optional field: an exclusive-resource worker (`db-migration` /
+ * `e2e-exclusive`) holds the shared-local-Postgres lock for its whole lifetime by default, but once
+ * its schema/`@mutates` work is applied and verified and only non-DB steps remain (lint fixes,
+ * retests, commit, push, PR) it can flip this to `true` via `swarm_state_release_db_lock`. Absent or
+ * `false` means "still holding the lock"; `true` means `swarm_plan_batch`'s solo-run check ignores
+ * this entry, so other unblocked *non-exclusive* work can start while it finishes up. It is
+ * deliberately a one-way signal, and deliberately does NOT make the entry stop counting as a running
+ * worker — it still occupies a cap slot and still blocks a *new* exclusive-resource candidate from
+ * starting until the entry is removed from state altogether.
  */
 export const swarmWorkerEntrySchema = z.object({
 	kind: z.enum(['ticket', 'maintenance']),
@@ -27,6 +37,7 @@ export const swarmWorkerEntrySchema = z.object({
 	agentId: z.string(),
 	model: z.string(),
 	startedAt: z.string(),
+	dbLockReleased: z.boolean().optional(),
 });
 
 export type SwarmWorkerEntry = z.infer<typeof swarmWorkerEntrySchema>;
@@ -75,6 +86,20 @@ export interface ListStateResult {
  * (YAGNI) — revisit only if false positives turn up in practice.
  */
 export const STALE_INACTIVITY_THRESHOLD_MS = 45 * 60 * 1000;
+
+/**
+ * Grace period after an entry's own `startedAt` during which the filesystem/git-derived activity
+ * check ({@link worktreeActivityMs}) is not trusted at all — see #912. A freshly (re)spawned
+ * worker — especially one resuming a pre-existing worktree per the `swarm` skill's §4.6 recovery
+ * convention — typically spends its first few minutes on read-only investigation (reading the
+ * issue, exploring code) before its first write or commit. Until then, every signal
+ * `worktreeActivityMs` can see (changed-file mtimes, HEAD commit date, directory mtime) still
+ * reflects whatever the *previous* occupant of that worktree last did, which can easily predate
+ * {@link STALE_INACTIVITY_THRESHOLD_MS} even though the new worker is very much alive. Five
+ * minutes comfortably covers a worker's realistic first read-only steps while staying far short
+ * of the 45-minute stale-inactivity threshold, so it can't mask a genuinely dead worker for long.
+ */
+export const STARTUP_GRACE_PERIOD_MS = 5 * 60 * 1000;
 
 /** Thrown when .claude/swarm-state.json on disk doesn't match SwarmWorkerEntry[] — see #484. */
 export class SwarmStateSchemaError extends Error {
@@ -210,11 +235,27 @@ async function worktreeHasRecentActivity(worktreePath: string, nowMs: number): P
 	return nowMs - activityMs <= STALE_INACTIVITY_THRESHOLD_MS;
 }
 
+/**
+ * True if `startedAt` parses to a valid instant and `nowMs` still falls within
+ * {@link STARTUP_GRACE_PERIOD_MS} of it. A malformed/unparseable `startedAt` (`Date.parse` ->
+ * `NaN`) returns `false` rather than `true` — "no grace period available" is not the same as
+ * "always live"; such an entry simply falls through to the ordinary filesystem/git-derived check.
+ */
+function isWithinStartupGracePeriod(startedAt: string, nowMs: number): boolean {
+	const startedAtMs = Date.parse(startedAt);
+	if (Number.isNaN(startedAtMs)) return false;
+	return nowMs - startedAtMs <= STARTUP_GRACE_PERIOD_MS;
+}
+
 /** Classifies one entry as live (`null`) or names the single reason it should be pruned. */
 async function classifyStaleness(entry: SwarmWorkerEntry, nowMs: number): Promise<PruneReason | null> {
 	// worktree-missing wins outright: a gone worktree trivially has no activity, but we report one
 	// reason, not two, and skip the git work entirely for the cheap dead-worktree case.
 	if (!(await worktreeStillExists(entry.worktreePath))) return 'worktree-missing';
+	// A freshly (re)spawned entry is trusted outright for a short grace window — see
+	// STARTUP_GRACE_PERIOD_MS above — before the filesystem/git-derived activity check (which can
+	// still be reflecting a previous, dead occupant of a reused worktree) is consulted at all.
+	if (isWithinStartupGracePeriod(entry.startedAt, nowMs)) return null;
 	if (!(await worktreeHasRecentActivity(entry.worktreePath, nowMs))) return 'stale-inactivity';
 	return null;
 }

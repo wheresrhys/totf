@@ -6,7 +6,7 @@ import {
 	type RingSequenceSizeGroup,
 	type UnassignedImportPrefix
 } from '@/app/models/ring-sequences';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import { AccordionItem } from '@/app/components/shared/Accordion';
 import {
 	BoxyList,

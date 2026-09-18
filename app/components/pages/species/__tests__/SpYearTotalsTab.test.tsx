@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SpYearTotalsTab } from '../SpYearTotalsTab';
-import type { AggregateStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import { getColumnIndex } from '@/app/__tests__/helpers/table';
 
 vi.mock('@/app/actions/sp-data', () => ({
@@ -9,8 +9,8 @@ vi.mock('@/app/actions/sp-data', () => ({
 }));
 
 function buildYearlyStat(
-	overrides: Partial<AggregateStatsResult> = {}
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
 	return {
 		species_name: null,
 		time_period: '2026-01-01',
@@ -39,7 +39,7 @@ function buildYearlyStat(
 		adult_bird_count: 15,
 		unknown_age_bird_count: 5,
 		...overrides
-	} as AggregateStatsResult;
+	} as CoreStatsResult;
 }
 
 describe('SpYearTotalsTab', () => {
@@ -57,7 +57,7 @@ describe('SpYearTotalsTab', () => {
 
 	it('shows a loading spinner while data is fetching', async () => {
 		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		let resolveData!: (v: AggregateStatsResult[]) => void;
+		let resolveData!: (v: CoreStatsResult[]) => void;
 		vi.mocked(fetchSpeciesPeriodTotals).mockReturnValue(
 			new Promise((resolve) => {
 				resolveData = resolve;

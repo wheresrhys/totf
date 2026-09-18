@@ -32,7 +32,10 @@ describe('getAgeClass', () => {
 
 	describe('edge cases', () => {
 		it('returns unknown for a null age_code', () => {
+			// age_code is typed `number` but the RPC can genuinely return null;
+			// cast through `unknown` to exercise that real-world case.
 			expect(
+				// eslint-disable-next-line no-restricted-syntax -- see comment above
 				getAgeClass({ age_code: null as unknown as number, is_juv: false })
 			).toBe('unknown');
 		});

@@ -6,7 +6,7 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
@@ -30,7 +30,7 @@ function encounter(id: number, visit_date: string): EncounterOfBird {
 		weight: null,
 		wing_length: null,
 		session: { visit_date }
-	} as unknown as EncounterOfBird;
+	} as EncounterOfBird;
 }
 
 function makeClient(encounters: EncounterOfBird[]) {

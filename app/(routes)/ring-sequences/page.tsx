@@ -7,7 +7,7 @@ import {
 	RingSequencesPageContent,
 	type RingSequencesPageData
 } from './PageContent';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export async function fetchRingSequencesPageContent(
 	_params: Record<string, string>,

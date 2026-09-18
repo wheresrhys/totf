@@ -9,7 +9,7 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { getAuthenticatedSupabaseClientForGroup } from '../../lib/group-auth';
+import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import { supabase } from '../../lib/supabase';
 import { randomTestSuffix, randomFutureDate } from './test-isolation';
 import { psql } from './db-test-helpers';

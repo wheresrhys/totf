@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import controlsSnapshot from '@/test-fixtures/snapshots/fetchRingSequenceControls.alpha.json';
+import controlsSnapshot from '@/test-fixtures/snapshots/ring_sequence_controls/alpha.controls.json';
 import type { RingSequenceControlRow } from '@/app/actions/ring-sequences';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 
@@ -9,7 +9,7 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
@@ -21,10 +21,12 @@ function makeRpcClient(data: unknown) {
 	return { rpc: vi.fn().mockReturnValue(thenable) };
 }
 
+const controls = controlsSnapshot as RingSequenceControlRow[];
+
 describe('controls page', () => {
 	beforeEach(() => {
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-			makeRpcClient(controlsSnapshot)
+			makeRpcClient(controls)
 		);
 	});
 
@@ -42,17 +44,13 @@ describe('controls page', () => {
 		render(await Page());
 		const table = await screen.findByRole('table');
 		const rows = table.querySelectorAll('tbody tr');
-		expect(rows.length).toBe(
-			(controlsSnapshot as RingSequenceControlRow[]).length
-		);
-		expect(getCellTextByHeading(table, 'Ring', 0)).toBe(
-			controlsSnapshot[0].ring_no
-		);
+		expect(rows.length).toBe(controls.length);
+		expect(getCellTextByHeading(table, 'Ring', 0)).toBe(controls[0].ring_no);
 		expect(getCellTextByHeading(table, 'Species', 0)).toBe(
-			controlsSnapshot[0].species_name
+			controls[0].species_name
 		);
 		expect(getCellTextByHeading(table, 'First date', 0)).toBe(
-			controlsSnapshot[0].first_date
+			controls[0].first_date
 		);
 	});
 

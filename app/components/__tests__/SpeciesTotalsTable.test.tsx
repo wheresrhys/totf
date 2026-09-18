@@ -1,14 +1,18 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { SpeciesTotalsTable } from '../SpeciesTotalsTable';
-import speciesDataSnapshot from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
-import type { AggregateStatsResult } from '@/app/models/db';
+import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
+import type { CoreStatsResult } from '@/app/models/db';
 import {
 	getCellByHeading,
 	getCellTextByHeading
 } from '@/app/__tests__/helpers/table';
 
-const speciesStats = speciesDataSnapshot as unknown as AggregateStatsResult[];
+// This fixture is grouped by species only, so time_period is genuinely null —
+// CoreStatsResult's NonNullable mapped type (app/models/db.ts) assumes every
+// column is always present, so a direct assertion doesn't compile (#895).
+// eslint-disable-next-line no-restricted-syntax -- see comment above
+const speciesStats = speciesDataSnapshot as unknown as CoreStatsResult[];
 
 // The real header <th>s live in the `<thead>` row without a `data-testid` —
 // `above-header-row` (the "Aggregate by" toggle row) and `totals-row` are
@@ -24,8 +28,8 @@ function getColumnHeaders(): HTMLTableCellElement[] {
 }
 
 function makeStat(
-	overrides: Partial<AggregateStatsResult> & { species_name: string }
-): AggregateStatsResult {
+	overrides: Partial<CoreStatsResult> & { species_name: string }
+): CoreStatsResult {
 	return {
 		session_count: 0,
 		encounter_count: 0,
@@ -37,7 +41,7 @@ function makeStat(
 		adult_bird_count: 0,
 		unknown_age_bird_count: 0,
 		...overrides
-	} as unknown as AggregateStatsResult;
+	} as CoreStatsResult;
 }
 
 describe('SpeciesTotalsTable', () => {
@@ -457,7 +461,7 @@ describe('SpeciesTotalsTable', () => {
 					postjuv_enc_count: 0,
 					adult_enc_count: 1,
 					unknown_age_enc_count: 0
-				} as Partial<AggregateStatsResult>)
+				} as Partial<CoreStatsResult>)
 			})
 		];
 
@@ -502,7 +506,7 @@ describe('SpeciesTotalsTable', () => {
 				makeStat({
 					species_name: 'Robin',
 					pullus_bird_count: 0,
-					...({ pullus_enc_count: 2 } as Partial<AggregateStatsResult>)
+					...({ pullus_enc_count: 2 } as Partial<CoreStatsResult>)
 				})
 			];
 			render(<SpeciesTotalsTable speciesStats={zeroInBirdModeStats} />);

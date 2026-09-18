@@ -34,6 +34,24 @@ export async function listWorkersWithPrune(filter: WorkerFilter): Promise<ListSt
 	return { workers: filtered, pruned };
 }
 
+/**
+ * Flips `dbLockReleased` to `true` on the entry with this `agentId`, returning the updated entry (or
+ * `undefined` when no entry matches). Extracted from the tool handler so the mutation is directly
+ * testable, mirroring {@link listWorkersWithPrune}. One-way by design: there is no re-lock helper —
+ * a worker that isn't certain its shared-DB work is finished simply doesn't call this.
+ */
+export async function releaseDbLockForAgent(agentId: string): Promise<SwarmWorkerEntry | undefined> {
+	return withStateLock((entries) => {
+		const match = entries.find((entry) => entry.agentId === agentId);
+		if (!match) return { entries, result: undefined };
+		const updated: SwarmWorkerEntry = { ...match, dbLockReleased: true };
+		return {
+			entries: entries.map((entry) => (entry.agentId === agentId ? updated : entry)),
+			result: updated,
+		};
+	});
+}
+
 export function registerSwarmStateTools(server: McpServer) {
 	server.registerTool(
 		'swarm_state_append',
@@ -95,6 +113,27 @@ export function registerSwarmStateTools(server: McpServer) {
 				return { entries: remaining, result: match };
 			});
 			const structuredContent = { ok: true as const, removed: Boolean(removedEntry), entry: removedEntry };
+			return { content: [{ type: 'text', text: JSON.stringify(structuredContent) }], structuredContent };
+		}
+	);
+
+	server.registerTool(
+		'swarm_state_release_db_lock',
+		{
+			description:
+				"Release the shared-local-Postgres lock held by an exclusive-resource worker (a db-migration or e2e-exclusive ticket/PR) early, by agentId. Call this once ALL shared-local-Postgres-mutating work is done and verified — the migration is applied and checked, or the @mutates E2E run has completed — and only non-shared-resource steps remain (lint fixes, retests that need no further schema change, commit, push, opening the PR). It lets swarm start other unblocked, NON-exclusive tickets while this worker finishes up; the worker still counts toward the overall worker cap and still blocks a *new* exclusive-resource worker from starting until its entry is removed from state. One-way signal — there is no re-lock: if there's any chance schema/migration work isn't actually finished, don't call it.",
+			inputSchema: {
+				agentId: z.string(),
+			},
+			outputSchema: {
+				ok: z.literal(true),
+				released: z.boolean(),
+				entry: swarmWorkerEntrySchema.optional(),
+			},
+		},
+		async ({ agentId }) => {
+			const updatedEntry = await releaseDbLockForAgent(agentId);
+			const structuredContent = { ok: true as const, released: Boolean(updatedEntry), entry: updatedEntry };
 			return { content: [{ type: 'text', text: JSON.stringify(structuredContent) }], structuredContent };
 		}
 	);

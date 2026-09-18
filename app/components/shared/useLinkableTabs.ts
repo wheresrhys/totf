@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { resolveInitialTabId } from '@/lib/tab-query-param';
+import { resolveInitialTabId } from '@/app/lib/tab-query-param';
 
 /**
  * Shared tab-state hook for the app's `?tabId=`-linkable tab pages — species,

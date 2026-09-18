@@ -1,11 +1,11 @@
--- Shared plumbing for aggregate_stats and population_stats (#800). Builds the
+-- Shared plumbing for core_stats and demographics_stats (#800). Builds the
 -- (species, time_period) grouping-cell spine both RPCs LEFT JOIN their own
 -- per-cell aggregates onto, so every cell in range appears in the result even
 -- when it has no matching encounters (the caller COALESCEs to 0/empty). Mirrors
--- aggregate_stats' own (untouched, historical) inline
+-- core_stats' own (untouched, historical) inline
 -- species_spine/session_date_range/period_spine/spine CTEs — see
 -- stats_raw_encounters.sql's header for why the two functions don't literally share
--- SQL text with aggregate_stats itself.
+-- SQL text with core_stats itself.
 CREATE FUNCTION public.stats_spine (
 	species_name_filter text DEFAULT NULL::text,
 	from_date date DEFAULT NULL::date,

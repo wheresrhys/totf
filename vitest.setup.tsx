@@ -5,6 +5,10 @@ import { configMocks } from 'jsdom-testing-mocks';
 // avoids happy-dom's fetch teardown which leads to all sorts of
 // abort errors in tests
 import { fetch as nodeFetch } from 'undici';
+// undici's fetch type isn't structurally identical to the DOM lib's `fetch`
+// (different Headers/Request/Response definitions) — a direct assertion
+// doesn't compile.
+// eslint-disable-next-line no-restricted-syntax -- see comment above
 globalThis.fetch = nodeFetch as unknown as typeof fetch;
 
 configMocks({ act, afterAll });
@@ -23,7 +27,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('./app/actions/group-cookie', async () => {
-  const { generateGroupJwt } = await import('./lib/jwt');
+  const { generateGroupJwt } = await import('./app/lib/auth/jwt');
   return {
     getGroupCookie: vi.fn().mockResolvedValue(1),
     setGroupCookie: vi.fn().mockResolvedValue(undefined),

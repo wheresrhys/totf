@@ -8,7 +8,7 @@ import {
 import { enrichBird, type StandaloneBird } from '@/app/models/bird';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { EncountersTimeline } from '@/app/components/EncountersTimeline';
-import type { ViewedGroup } from '@/lib/group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type PageParams = { ring: string };
 

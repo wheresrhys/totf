@@ -4,7 +4,7 @@ import type {
 	CombinedWeightRecordHighlight,
 	VitalStatHighlight,
 	WeightRecordHighlight
-} from '@/app/models/highlights';
+} from '@/app/lib/highlights';
 
 // Moved from the old flat app/components/session-highlight-renderers.tsx
 // coverage as part of #760's componentized-per-group renderers split.

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import Page from '../page';
-import mistakesSnapshot from '@/test-fixtures/snapshots/fetchMistakes.alpha.json';
+import mistakesSnapshot from '@/test-fixtures/snapshots/find_discrepencies/alpha.discrepancies.json';
 import type { DiscrepenciesResult } from '@/app/models/db';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 
@@ -9,7 +9,7 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/group-auth', () => ({
+vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 

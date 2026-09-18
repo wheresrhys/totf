@@ -8,7 +8,7 @@ const { mockResolveGroupIdBySlug } = vi.hoisted(() => ({
 	mockResolveGroupIdBySlug: vi.fn()
 }));
 
-vi.mock('@/lib/group-slug', () => ({
+vi.mock('@/app/lib/group-slug', () => ({
 	resolveGroupIdBySlug: mockResolveGroupIdBySlug
 }));
 

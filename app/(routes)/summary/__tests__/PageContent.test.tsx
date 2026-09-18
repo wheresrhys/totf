@@ -1,14 +1,19 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SummaryPageContent } from '../PageContent';
-import alphaStats from '@/test-fixtures/snapshots/fetchSummaryStats.alpha.json';
-import alphaSpeciesStats from '@/test-fixtures/snapshots/fetchSpeciesData.alpha.json';
-import type { AggregateStatsResult } from '@/app/models/db';
-import type { ViewedGroup } from '@/lib/group-slug';
+import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
+import alphaSpeciesStats from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
+import type { CoreStatsResult } from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
-const populatedStats = alphaStats as unknown as AggregateStatsResult;
-const populatedSpeciesStats =
-	alphaSpeciesStats as unknown as AggregateStatsResult[];
+// Both are ungrouped/species-grouped-only core_stats fixtures, so
+// species_name/time_period are genuinely null in places — CoreStatsResult's
+// NonNullable mapped type (app/models/db.ts) assumes every column is always
+// present, so a direct assertion doesn't compile (#895).
+// eslint-disable-next-line no-restricted-syntax -- see comment above
+const populatedStats = alphaStats as unknown as CoreStatsResult;
+// eslint-disable-next-line no-restricted-syntax -- see comment above
+const populatedSpeciesStats = alphaSpeciesStats as unknown as CoreStatsResult[];
 
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 

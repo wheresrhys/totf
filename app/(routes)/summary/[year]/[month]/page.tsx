@@ -5,9 +5,9 @@ import {
 } from '@/app/components/layout/BootstrapPage';
 import { fetchSummaryStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
-import { readTabIdSearchParam } from '@/lib/tab-query-param';
-import type { ViewedGroup } from '@/lib/group-slug';
-import type { AggregateStatsResult } from '@/app/models/db';
+import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { CoreStatsResult } from '@/app/models/db';
 import { SummaryPageContent } from '../../PageContent';
 
 // `tabId` (#804, reusing #803's mechanism) is the optional `?tabId=` search
@@ -34,8 +34,8 @@ async function getSummaryYearMonthPageParams(
 export type PageData = {
 	year: number;
 	month: number;
-	summaryStats: AggregateStatsResult | null;
-	sessionTotals: AggregateStatsResult[];
+	summaryStats: CoreStatsResult | null;
+	sessionTotals: CoreStatsResult[];
 	fromDate: string;
 	toDate: string;
 };

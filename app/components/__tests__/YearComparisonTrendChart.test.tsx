@@ -1,5 +1,13 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	fireEvent,
+	waitFor,
+	act,
+	within
+} from '@testing-library/react';
 import type { LineChartData } from 'react-chartkick';
 import {
 	toYearOnYearSeries,
@@ -8,6 +16,7 @@ import {
 	thisYearColors,
 	normalizeSeriesByEffort,
 	aggregateSeriesByYear,
+	accumulateSeriesByYear,
 	buildTotalSeries,
 	spansMultipleYears,
 	isHiddenFromLegend,
@@ -20,8 +29,15 @@ import {
 vi.mock('chartkick/chart.js', () => ({}));
 type LegendLabelsFilter = (legendItem: { text: string }) => boolean;
 
-vi.mock('react-chartkick', () => ({
-	LineChart: ({
+// LineChart and AreaChart are mocked with the same renderer (parametrized only
+// by testid): the accumulate view tells them apart by rendering via AreaChart
+// instead of LineChart (see YearComparisonTrendChart.tsx's `AllTimeChart`) —
+// there's no `library` fill flag to surface any more (chartkick always
+// derives a dataset's own `fill` from which component built it, not from a
+// `library.elements.line.fill` default), so which testid a test finds *is*
+// the fill signal.
+function makeChartMock(testId: string) {
+	function ChartMock({
 		data,
 		xtitle,
 		ytitle,
@@ -34,8 +50,9 @@ vi.mock('react-chartkick', () => ({
 		colors?: string[];
 		library?: {
 			plugins?: { legend?: { labels?: { filter?: LegendLabelsFilter } } };
+			scales?: { y?: { stacked?: boolean } };
 		};
-	}) => {
+	}) {
 		// The legend filter function isn't JSON-serializable, so surface its
 		// verdict on each series' own name instead — lets a test assert the
 		// wiring end-to-end (component -> library option -> filter result)
@@ -48,16 +65,26 @@ vi.mock('react-chartkick', () => ({
 			: null;
 		return (
 			<div
-				data-testid="line-chart"
+				data-testid={testId}
 				data-xtitle={xtitle}
 				data-ytitle={ytitle}
 				data-colors={JSON.stringify(colors)}
 				data-series={JSON.stringify(data.map((series) => series.name))}
 				data-values={JSON.stringify(data.map((series) => series.data))}
 				data-visible-in-legend={JSON.stringify(visibleInLegend)}
+				// Surfaces the stacked-area config so a test can tell the accumulate
+				// view's chart apart from the plain trend one.
+				data-stacked={JSON.stringify(library?.scales?.y?.stacked)}
 			/>
 		);
 	}
+	ChartMock.displayName = testId;
+	return ChartMock;
+}
+
+vi.mock('react-chartkick', () => ({
+	LineChart: makeChartMock('line-chart'),
+	AreaChart: makeChartMock('area-chart')
 }));
 
 const MONTHS = [
@@ -497,6 +524,170 @@ describe('aggregateSeriesByYear', () => {
 			expect(
 				aggregateSeriesByYear({ name: 'encounters', data: [] }, 'sum').data
 			).toEqual([]);
+		});
+	});
+});
+
+describe('accumulateSeriesByYear', () => {
+	describe('Usual: a within-year running sum', () => {
+		it('accumulates Jan..Dec as a running sum within a year, e.g. feb = feb + jan', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2024-01-01', 5],
+					['2024-02-01', 3],
+					['2024-03-01', 2]
+				]
+			};
+			expect(accumulateSeriesByYear(metric).data).toEqual([
+				['2024-01-01', 5],
+				['2024-02-01', 8],
+				['2024-03-01', 10]
+			]);
+		});
+
+		it('preserves the metric name', () => {
+			expect(
+				accumulateSeriesByYear({
+					name: 'arrivals',
+					data: [['2024-01-01', 1]]
+				}).name
+			).toBe('arrivals');
+		});
+	});
+
+	describe('Structure: year boundaries and the normalize composition', () => {
+		it('resets the running sum at the start of each new calendar year', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2023-11-01', 5],
+					['2023-12-01', 3],
+					['2024-01-01', 7],
+					['2024-02-01', 1]
+				]
+			};
+			expect(accumulateSeriesByYear(metric).data).toEqual([
+				['2023-11-01', 5],
+				['2023-12-01', 8],
+				['2024-01-01', 7],
+				['2024-02-01', 8]
+			]);
+		});
+
+		it('accumulates numerator and denominator separately then divides once, when combined with normalize', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2024-01-01', 2],
+					['2024-02-01', 4]
+				]
+			};
+			const effortHistory: LineChartData = {
+				name: 'effort',
+				data: [
+					['2024-01-01', 4],
+					['2024-02-01', 4]
+				]
+			};
+			// Cumulative counts 2 then 6, over cumulative effort 4 then 8 → 0.5,
+			// 0.75. Summing the per-month rates instead would give 0.5 then 1.5.
+			expect(accumulateSeriesByYear(metric, effortHistory).data).toEqual([
+				['2024-01-01', 0.5],
+				['2024-02-01', 0.75]
+			]);
+		});
+
+		it('resets the effort denominator at each new calendar year too', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2023-12-01', 6],
+					['2024-01-01', 2]
+				]
+			};
+			const effortHistory: LineChartData = {
+				name: 'effort',
+				data: [
+					['2023-12-01', 2],
+					['2024-01-01', 4]
+				]
+			};
+			expect(accumulateSeriesByYear(metric, effortHistory).data).toEqual([
+				['2023-12-01', 3],
+				['2024-01-01', 0.5]
+			]);
+		});
+	});
+
+	describe('Edge: gaps, zero effort and empty input', () => {
+		it('accumulates a series with no data some months without treating a gap as breaking the running sum', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2024-01-01', 5],
+					// A dense-spine zero-count month is "no data", but a cumulative
+					// count can't un-happen, so it carries the running total forward.
+					['2024-02-01', 0],
+					['2024-03-01', null],
+					['2024-04-01', 3]
+				]
+			};
+			expect(accumulateSeriesByYear(metric).data).toEqual([
+				['2024-01-01', 5],
+				['2024-02-01', 5],
+				['2024-03-01', 5],
+				['2024-04-01', 8]
+			]);
+		});
+
+		it('leaves the months before a year’s first reportable value as a gap', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2024-01-01', 0],
+					['2024-02-01', 4]
+				]
+			};
+			expect(accumulateSeriesByYear(metric).data).toEqual([
+				['2024-01-01', null],
+				['2024-02-01', 4]
+			]);
+		});
+
+		it('maps a month with 0 cumulative effort hours to 0, not NaN/Infinity', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [['2024-01-01', 3]]
+			};
+			const effortHistory: LineChartData = {
+				name: 'effort',
+				data: [['2024-01-01', 0]]
+			};
+			expect(accumulateSeriesByYear(metric, effortHistory).data).toEqual([
+				['2024-01-01', 0]
+			]);
+		});
+
+		it('accumulates oldest-first regardless of input order', () => {
+			const metric: LineChartData = {
+				name: 'arrivals',
+				data: [
+					['2024-02-01', 3],
+					['2024-01-01', 5]
+				]
+			};
+			expect(accumulateSeriesByYear(metric).data).toEqual([
+				['2024-01-01', 5],
+				['2024-02-01', 8]
+			]);
+		});
+
+		it('returns an empty series unchanged', () => {
+			expect(accumulateSeriesByYear({ name: 'arrivals', data: [] })).toEqual({
+				name: 'arrivals',
+				data: []
+			});
 		});
 	});
 });
@@ -1061,6 +1252,394 @@ describe('YearComparisonTrendChart', () => {
 				const [chart] = screen.getAllByTestId('line-chart');
 				expect(chart.dataset.xtitle).toBe('Year');
 			});
+		});
+	});
+
+	describe('Structure: fetchYearSeries (year-grouped fetch for the Year interval)', () => {
+		// Two months in each of two years, so a client-side yearly sum (11 / 19)
+		// is plainly distinguishable from what a year-grouped fetch returns
+		// (7 / 12 — fewer, because the RPC counts each bird once per year rather
+		// than once per month; see #852).
+		const monthly: LineChartData[] = [
+			{
+				name: 'birds',
+				data: [
+					['2023-03-01', 5],
+					['2023-09-01', 6],
+					['2024-03-01', 9],
+					['2024-09-01', 10]
+				]
+			}
+		];
+		const fetchedYearly: LineChartData[] = [
+			{
+				name: 'birds',
+				data: [
+					['2023', 7],
+					['2024', 12]
+				]
+			}
+		];
+
+		function chartValues() {
+			const [chart] = screen.getAllByTestId('line-chart');
+			return JSON.parse(chart.dataset.values!);
+		}
+
+		it('fetches once when the Interval is switched to Year and plots the resolved series, not the client-side sum', async () => {
+			const fetchYearSeries = vi.fn().mockResolvedValue(fetchedYearly);
+			render(
+				<YearComparisonTrendChart
+					series={monthly}
+					fetchYearSeries={fetchYearSeries}
+				/>
+			);
+			expect(fetchYearSeries).not.toHaveBeenCalled();
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			await waitFor(() =>
+				expect(screen.queryByTestId('line-chart')).toBeTruthy()
+			);
+
+			expect(fetchYearSeries).toHaveBeenCalledTimes(1);
+			expect(chartValues()).toEqual([fetchedYearly[0].data]);
+		});
+
+		it('does not refetch when toggled Year → Month → Year, and re-plots the cached series', async () => {
+			const fetchYearSeries = vi.fn().mockResolvedValue(fetchedYearly);
+			render(
+				<YearComparisonTrendChart
+					series={monthly}
+					fetchYearSeries={fetchYearSeries}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			await waitFor(() =>
+				expect(chartValues()).toEqual([fetchedYearly[0].data])
+			);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Month' }));
+			expect(chartValues()).toEqual([monthly[0].data]);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			expect(chartValues()).toEqual([fetchedYearly[0].data]);
+			expect(fetchYearSeries).toHaveBeenCalledTimes(1);
+		});
+
+		it('shows a loading spinner instead of the stale month-summed data while the fetch is pending', async () => {
+			let resolveFetch: (value: LineChartData[]) => void = () => {};
+			const fetchYearSeries = vi.fn(
+				() =>
+					new Promise<LineChartData[]>((resolve) => {
+						resolveFetch = resolve;
+					})
+			);
+			render(
+				<YearComparisonTrendChart
+					series={monthly}
+					fetchYearSeries={fetchYearSeries}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+
+			expect(screen.queryByTestId('line-chart')).toBeNull();
+			expect(document.querySelector('.loading-spinner')).toBeTruthy();
+
+			await act(async () => {
+				resolveFetch(fetchedYearly);
+			});
+
+			expect(document.querySelector('.loading-spinner')).toBeNull();
+			expect(chartValues()).toEqual([fetchedYearly[0].data]);
+		});
+
+		it('normalizes a fetched year series against yearly-summed effort hours, not the raw monthly effort', async () => {
+			// 2023 effort: 2 + 3 = 5 hours; 2024: 4 hours. So the fetched yearly
+			// counts normalize to 7/5 = 1.4 and 12/4 = 3.
+			const monthlyEffort: LineChartData = {
+				name: 'effort',
+				data: [
+					['2023-03-01', 2],
+					['2023-09-01', 3],
+					['2024-03-01', 4],
+					['2024-09-01', 0]
+				]
+			};
+			const fetchYearSeries = vi.fn().mockResolvedValue(fetchedYearly);
+			render(
+				<YearComparisonTrendChart
+					series={monthly}
+					ytitle="Count"
+					effortHistory={monthlyEffort}
+					fetchYearSeries={fetchYearSeries}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			await waitFor(() =>
+				expect(chartValues()).toEqual([fetchedYearly[0].data])
+			);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
+			expect(chartValues()).toEqual([
+				[
+					['2023', 1.4],
+					['2024', 3]
+				]
+			]);
+			const [chart] = screen.getAllByTestId('line-chart');
+			expect(chart.dataset.ytitle).toBe('Count per hour');
+		});
+
+		it('appends the Total series to a fetched year series when includeTotalSeries is set', async () => {
+			const twoMetrics: LineChartData[] = [
+				{ name: 'juv', data: [['2023', 4]] },
+				{ name: 'postjuv', data: [['2023', 6]] }
+			];
+			const fetchYearSeries = vi.fn().mockResolvedValue(twoMetrics);
+			render(
+				<YearComparisonTrendChart
+					series={monthly}
+					includeTotalSeries
+					fetchYearSeries={fetchYearSeries}
+				/>
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			await waitFor(() =>
+				expect(screen.getAllByTestId('line-chart')[0].dataset.series).toBe(
+					JSON.stringify(['juv', 'postjuv', 'Total'])
+				)
+			);
+			expect(chartValues()[2]).toEqual([['2023', 10]]);
+		});
+
+		it('keeps the client-side aggregateSeriesByYear behaviour when no fetchYearSeries is supplied', () => {
+			// Regression guard for the Biometrics path, which passes no fetcher.
+			render(<YearComparisonTrendChart series={monthly} />);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			expect(chartValues()).toEqual([
+				[
+					['2023', 11],
+					['2024', 19]
+				]
+			]);
+		});
+
+		describe('Edge: the fetch rejects', () => {
+			it('falls back to the client-side yearly aggregation rather than spinning or crashing', async () => {
+				const fetchYearSeries = vi
+					.fn()
+					.mockRejectedValue(new Error('network down'));
+				render(
+					<YearComparisonTrendChart
+						series={monthly}
+						fetchYearSeries={fetchYearSeries}
+					/>
+				);
+				fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+
+				await waitFor(() =>
+					expect(document.querySelector('.loading-spinner')).toBeNull()
+				);
+				expect(chartValues()).toEqual([
+					[
+						['2023', 11],
+						['2024', 19]
+					]
+				]);
+			});
+		});
+	});
+
+	describe('Structure: allowYearAccumulation / Accumulate toggle', () => {
+		// Two months of one calendar year, with effort hours chosen so the
+		// accumulate × normalize composition is distinguishable from a sum of
+		// per-month rates by hand (see the combination test below).
+		const accumulable: LineChartData[] = [
+			{
+				name: 'arrivals',
+				data: [
+					['2024-01-01', 2],
+					['2024-02-01', 4]
+				]
+			}
+		];
+		const accumulableEffort: LineChartData = {
+			name: 'effort',
+			data: [
+				['2024-01-01', 4],
+				['2024-02-01', 4]
+			]
+		};
+		// Spans two calendar years, so the Interval toggle is actually offered.
+		const multiYear: LineChartData[] = [
+			{
+				name: 'arrivals',
+				data: [
+					['2023-04-01', 2],
+					['2024-03-01', 4],
+					['2024-06-01', 6]
+				]
+			}
+		];
+		// Both Normalize and Accumulate render Yes/No radios, so every query has
+		// to be scoped to its own toggle group (the label span's parent holds
+		// that group's radios).
+		const toggle = (label: string) =>
+			within(screen.getByText(label).parentElement!);
+
+		it('does not render an Accumulate toggle when allowYearAccumulation is unset', () => {
+			render(
+				<YearComparisonTrendChart
+					series={accumulable}
+					effortHistory={accumulableEffort}
+				/>
+			);
+			expect(screen.queryByText('Accumulate')).toBeNull();
+		});
+
+		it('renders an Accumulate toggle only in all-time mode when allowYearAccumulation is true', () => {
+			render(
+				<YearComparisonTrendChart series={accumulable} allowYearAccumulation />
+			);
+			expect(screen.getByText('Accumulate')).toBeTruthy();
+			const no = toggle('Accumulate').getByRole('radio', {
+				name: 'No'
+			}) as HTMLInputElement;
+			expect(no.checked).toBe(true);
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Compare years' }));
+			expect(screen.queryByText('Accumulate')).toBeNull();
+
+			fireEvent.click(screen.getByRole('radio', { name: 'This year' }));
+			expect(screen.queryByText('Accumulate')).toBeNull();
+		});
+
+		it('turning Accumulate on forces interval to month and hides the Interval toggle', () => {
+			render(
+				<YearComparisonTrendChart series={multiYear} allowYearAccumulation />
+			);
+			fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+			expect(
+				(screen.getByRole('radio', { name: 'Year' }) as HTMLInputElement)
+					.checked
+			).toBe(true);
+
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
+			expect(screen.queryByRole('radio', { name: 'Year' })).toBeNull();
+			expect(screen.queryByRole('radio', { name: 'Month' })).toBeNull();
+			// The monthly (accumulated) points are plotted, not one point per year.
+			const [chart] = screen.getAllByTestId('area-chart');
+			expect(JSON.parse(chart.dataset.values!)).toEqual([
+				[
+					['2023-04-01', 2],
+					['2024-03-01', 4],
+					['2024-06-01', 10]
+				]
+			]);
+
+			// Turning it back off restores the Interval toggle, reset to Month.
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'No' }));
+			expect(
+				(screen.getByRole('radio', { name: 'Month' }) as HTMLInputElement)
+					.checked
+			).toBe(true);
+		});
+
+		it('turning Accumulate on renders the chart as a stacked area', () => {
+			render(
+				<YearComparisonTrendChart series={accumulable} allowYearAccumulation />
+			);
+			const chartBefore = screen.getByTestId('line-chart');
+			expect(chartBefore.dataset.stacked).toBeUndefined();
+
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
+			// Rendered via chartkick's AreaChart (filled, translucent datasets) —
+			// not LineChart — since a `library` option alone can't put a filled
+			// dataset onto a LineChart-rendered chart (see
+			// STACKED_AREA_CHART_LIBRARY's comment in the component).
+			expect(screen.queryByTestId('line-chart')).toBeNull();
+			const chartAfter = screen.getByTestId('area-chart');
+			expect(chartAfter.dataset.stacked).toBe('true');
+			// The stacked-area config is layered on top of the trend config, not a
+			// replacement — the legend filter still runs.
+			expect(JSON.parse(chartAfter.dataset.visibleInLegend!)).toEqual([
+				'arrivals'
+			]);
+		});
+
+		it('switching to compare-years mode while accumulate is on turns accumulate back off', () => {
+			render(
+				<YearComparisonTrendChart series={accumulable} allowYearAccumulation />
+			);
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
+			fireEvent.click(screen.getByRole('radio', { name: 'Compare years' }));
+			fireEvent.click(screen.getByRole('radio', { name: 'All time' }));
+
+			expect(
+				(
+					toggle('Accumulate').getByRole('radio', {
+						name: 'No'
+					}) as HTMLInputElement
+				).checked
+			).toBe(true);
+			const chart = screen.getByTestId('line-chart');
+			expect(chart.dataset.stacked).toBeUndefined();
+			expect(JSON.parse(chart.dataset.values!)).toEqual([accumulable[0].data]);
+		});
+
+		it('turning on both Accumulate and Normalize divides cumulative counts by cumulative effort, not the sum of per-month rates', () => {
+			render(
+				<YearComparisonTrendChart
+					series={accumulable}
+					effortHistory={accumulableEffort}
+					allowYearAccumulation
+				/>
+			);
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
+			fireEvent.click(toggle('Normalize').getByRole('radio', { name: 'Yes' }));
+
+			const chart = screen.getByTestId('area-chart');
+			// Cumulative 2/4 = 0.5, then 6/8 = 0.75 — summing the per-month rates
+			// (0.5, then 0.5 + 1 = 1.5) would be wrong.
+			expect(JSON.parse(chart.dataset.values!)).toEqual([
+				[
+					['2024-01-01', 0.5],
+					['2024-02-01', 0.75]
+				]
+			]);
+			expect(chart.dataset.ytitle).toBe('Value per hour');
+		});
+
+		it('sums the Total series from the already-accumulated metrics when includeTotalSeries is set', () => {
+			render(
+				<YearComparisonTrendChart
+					series={[
+						accumulable[0],
+						{
+							name: 'departures',
+							data: [
+								['2024-01-01', 1],
+								['2024-02-01', 3]
+							]
+						}
+					]}
+					allowYearAccumulation
+					includeTotalSeries
+				/>
+			);
+			fireEvent.click(toggle('Accumulate').getByRole('radio', { name: 'Yes' }));
+			const chart = screen.getByTestId('area-chart');
+			expect(JSON.parse(chart.dataset.series!)).toEqual([
+				'arrivals',
+				'departures',
+				'Total'
+			]);
+			const [, , total] = JSON.parse(chart.dataset.values!);
+			// Cumulative arrivals 2/6 plus cumulative departures 1/4.
+			expect(total).toEqual([
+				['2024-01-01', 3],
+				['2024-02-01', 10]
+			]);
 		});
 	});
 

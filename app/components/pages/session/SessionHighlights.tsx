@@ -18,7 +18,7 @@ import type {
 	RarityHighlight,
 	SessionHighlight,
 	VitalStatHighlight
-} from '@/app/models/highlights';
+} from '@/app/lib/highlights';
 import type { SessionEncounter } from '@/app/models/session';
 
 // Each group's own renderer map (from the barrel) is the single source of

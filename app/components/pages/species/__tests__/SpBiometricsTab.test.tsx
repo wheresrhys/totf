@@ -7,9 +7,8 @@ import {
 	waitFor
 } from '@testing-library/react';
 import { SpBiometricsTab } from '../SpBiometricsTab';
-import spPageSnapshot from '@/test-fixtures/snapshots/fetchSpPageData.alpha.robin.json';
-import type { AggregateStatsWithBiometrics } from '@/app/models/db';
-import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
+import { robinSpeciesStats as speciesStatsWithBiometrics } from '@/app/__tests__/helpers/robin-species-page-fixtures';
+import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { SexedGraphableBird } from '../WeightAndWingChart';
 
 // chartkick registers Chart.js as a side effect; nothing renders a real canvas
@@ -51,10 +50,8 @@ vi.mock('../WeightAndWingChart', () => ({
 	WingWeightScatterChart: () => <div data-testid="scatter-chart" />
 }));
 
-const { speciesStats } = spPageSnapshot as unknown as FullFatPageData;
-
 const props = {
-	speciesStats,
+	speciesStats: speciesStatsWithBiometrics,
 	speciesName: 'Robin',
 	speciesId: 42,
 	viewedGroupId: 1
@@ -74,7 +71,7 @@ describe('SpBiometricsTab', () => {
 		const { getSpeciesStatsHistory, fetchGraphableEncounterData } =
 			await loadActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
-			[] as AggregateStatsWithBiometrics[]
+			[] as CoreStatsWithBiometrics[]
 		);
 		vi.mocked(fetchGraphableEncounterData).mockResolvedValue(
 			[] as SexedGraphableBird[]
@@ -150,7 +147,7 @@ describe('SpBiometricsTab', () => {
 	});
 
 	describe('Structure: compareYearsUrl', () => {
-		it('is set to the Population tab (tabId=population) when the page is period-scoped', async () => {
+		it('is set to the Demographics tab (tabId=demographics) when the page is period-scoped', async () => {
 			render(
 				<SpBiometricsTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
 			);
@@ -159,7 +156,7 @@ describe('SpBiometricsTab', () => {
 			);
 			const chart = await screen.findByTestId('trend-chart');
 			expect(chart.dataset.compareYearsUrl).toBe(
-				'/species/Robin?tabId=population'
+				'/species/Robin?tabId=demographics'
 			);
 		});
 
@@ -228,7 +225,7 @@ describe('SpBiometricsTab', () => {
 		});
 	});
 
-	describe('Edge: independent fetch state from SpPopulationTab', () => {
+	describe('Edge: independent fetch state from SpDemographicsTab', () => {
 		it('does not refetch when a tile is collapsed and re-expanded', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
 			render(<SpBiometricsTab {...props} />);
