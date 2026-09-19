@@ -9,12 +9,8 @@
  * merge instead of the shape of the database. Where an action joins two sources
  * (e.g. core_stats + biometrics_stats), write one fixture per source and let the
  * consuming test perform the same join the action does, with the same helper.
- * Two fixtures below still break this rule and are grandfathered pending #901:
- * the `*.yearly-and-monthly-totals.json` pair (two core_stats calls in one file)
- * and `tables/Birds/arretrap.bird-detail.json` (a Birds row with an Encounters
- * query spliced on). Don't add a third.
  *
- * Reads Alpha/Beta/Gamma group data and writes 26 JSON files under
+ * Reads Alpha/Beta/Gamma group data and writes 27 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
  * the RPC name for RPC-backed fixtures (`core_stats/`, `biometrics_stats/`,
  * `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
@@ -78,7 +74,7 @@ export async function generateSnapshots(
 ) {
 	// `relativePath` is a source-directory-relative path, e.g.
 	// `core_stats/alpha.by-species.json` or
-	// `tables/Birds/arretrap.bird-detail.json`.
+	// `tables/Birds/arretrap.bird.json`.
 	const writeSnapshot = async (relativePath: string, data: unknown) => {
 		const target = path.join(outputDir, relativePath);
 		await fs.mkdir(path.dirname(target), { recursive: true });
@@ -133,28 +129,35 @@ export async function generateSnapshots(
 		await writeSnapshot(`biometrics_stats/${name}.by-species.json`, data ?? []);
 	}
 
-	// RPC: core_stats (yearly + monthly, ungrouped by species) — powers
-	// fetchPayOffStats (app/actions/pay-off-stats.ts)
+	// RPC: core_stats (yearly, ungrouped by species) — powers fetchPayOffStats
+	// (app/actions/pay-off-stats.ts)
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId]
 	] as const) {
-		const [{ data: yearly }, { data: monthly }] = await Promise.all([
-			client.rpc('core_stats', {
-				ringing_group_filter: gId,
-				group_by_species: false,
-				group_by_time_period: 'year'
-			}),
-			client.rpc('core_stats', {
-				ringing_group_filter: gId,
-				group_by_species: false,
-				group_by_time_period: 'month'
-			})
-		]);
-		await writeSnapshot(`core_stats/${name}.yearly-and-monthly-totals.json`, {
-			yearly: yearly ?? [],
-			monthly: monthly ?? []
+		const { data: yearly } = await client.rpc('core_stats', {
+			ringing_group_filter: gId,
+			group_by_species: false,
+			group_by_time_period: 'year'
 		});
+		await writeSnapshot(`core_stats/${name}.yearly-totals.json`, yearly ?? []);
+	}
+
+	// RPC: core_stats (monthly, ungrouped by species) — powers fetchPayOffStats
+	// (app/actions/pay-off-stats.ts)
+	for (const [name, client, gId] of [
+		['alpha', alpha, alphaId],
+		['beta', beta, betaId]
+	] as const) {
+		const { data: monthly } = await client.rpc('core_stats', {
+			ringing_group_filter: gId,
+			group_by_species: false,
+			group_by_time_period: 'month'
+		});
+		await writeSnapshot(
+			`core_stats/${name}.monthly-totals.json`,
+			monthly ?? []
+		);
 	}
 
 	// Table: Sessions (embedded Locations + Encounters count) — powers
@@ -384,8 +387,9 @@ export async function generateSnapshots(
 		);
 	}
 
-	// Table: Birds + Table: Encounters (bird detail merged with its own
-	// encounters) — powers fetchBirdPageContent (app/(routes)/bird/[ring]/page.tsx).
+	// Table: Birds — the fetchBirdPageContent (app/(routes)/bird/[ring]/page.tsx)
+	// bird-detail query, split by #901 from the compound
+	// tables/Birds/arretrap.bird-detail.json fixture into its two raw sources.
 	// Filed under tables/Birds/ since Birds (by ring_no) is the entity the page
 	// is keyed on; Encounters is a secondary query merged into the same object.
 	// The Birds portion's query is queries/Birds/bird-detail.ts; the Encounters
@@ -397,6 +401,12 @@ export async function generateSnapshots(
 		.select(birdDetailQuery.select)
 		.eq('ring_no', 'ARRETRAP')
 		.maybeSingle();
+	await writeSnapshot(`tables/Birds/arretrap.bird.json`, arretrapBird ?? null);
+
+	// Table: Encounters — the same page's encounters-of-bird query, merged
+	// onto the Birds row above by fetchBirdPageContent itself. Filed under
+	// tables/Encounters/ (its own source table) even though it's keyed off
+	// the Birds row fetched above.
 	if (arretrapBird) {
 		const { data: encounters } = await alpha
 			.from('Encounters')
@@ -404,10 +414,10 @@ export async function generateSnapshots(
 				`bird_id, id, age_code, is_juv, capture_time, max_hatch_year, min_hatch_year, record_type, sex, ringing_group_id, weight, wing_length, session:Sessions(visit_date)`
 			)
 			.eq('bird_id', arretrapBird.id);
-		await writeSnapshot(`tables/Birds/arretrap.bird-detail.json`, {
-			...arretrapBird,
-			encounters: encounters ?? []
-		});
+		await writeSnapshot(
+			`tables/Encounters/arretrap.encounters.json`,
+			encounters ?? []
+		);
 	}
 
 	console.log('\nSnapshots generated successfully!');

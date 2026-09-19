@@ -38,7 +38,7 @@
  */
 
 /**
- * The 26 fixtures `scripts/generate-snapshots.ts` produces, and therefore the
+ * The 27 fixtures `scripts/generate-snapshots.ts` produces, and therefore the
  * exact set the freshness check covers. Paths are relative to
  * `test-fixtures/snapshots/` and follow #882's source-directory layout (one
  * subdirectory per RPC, `tables/<TableName>/` for direct PostgREST reads).
@@ -59,6 +59,13 @@
  * `find_discrepencies`/`notable_retraps` `beta.*` counterparts to the alpha-only
  * fixtures below) — see `scripts/generate-snapshots.ts`'s per-block comments for
  * why each one is safe to skip.
+ *
+ * #901 split the last two compound fixtures (each merging two RPC/table results
+ * into one file) into their raw sources: `core_stats/{alpha,beta}.yearly-and-monthly-totals.json`
+ * became `{alpha,beta}.monthly-totals.json` / `{alpha,beta}.yearly-totals.json`, and
+ * `tables/Birds/arretrap.bird-detail.json` became `tables/Birds/arretrap.bird.json` /
+ * `tables/Encounters/arretrap.encounters.json` — see CLAUDE.md's "App tests" section
+ * for why every fixture is now a verbatim single-source response.
  */
 export const GENERATED_SNAPSHOT_FIXTURES = [
 	'biometrics_stats/alpha.by-species.json',
@@ -66,10 +73,12 @@ export const GENERATED_SNAPSHOT_FIXTURES = [
 	'biometrics_stats/robin-alpha.headline.json',
 	'core_stats/alpha.by-species.json',
 	'core_stats/alpha.home-page-summary.json',
+	'core_stats/alpha.monthly-totals.json',
 	'core_stats/alpha.summary-totals.json',
-	'core_stats/alpha.yearly-and-monthly-totals.json',
+	'core_stats/alpha.yearly-totals.json',
 	'core_stats/beta.by-species.json',
-	'core_stats/beta.yearly-and-monthly-totals.json',
+	'core_stats/beta.monthly-totals.json',
+	'core_stats/beta.yearly-totals.json',
 	'core_stats/gamma.by-species.json',
 	'core_stats/robin-alpha.headline.json',
 	'demographics_stats/robin-alpha.monthly-history.json',
@@ -77,10 +86,11 @@ export const GENERATED_SNAPSHOT_FIXTURES = [
 	'notable_retraps/alpha.retraps.json',
 	'notable_retraps/robin-alpha.retraps.json',
 	'ring_sequence_controls/alpha.controls.json',
-	'tables/Birds/arretrap.bird-detail.json',
+	'tables/Birds/arretrap.bird.json',
 	'tables/Birds/robin-alpha.page-of-birds.json',
 	'tables/Encounters/alpha.pulli-encounters.json',
 	'tables/Encounters/alpha.resightings.json',
+	'tables/Encounters/arretrap.encounters.json',
 	'tables/Sessions/alpha.all-sessions.json',
 	'tables/Sessions/alpha.recent-sessions.json',
 	'tables/Sessions/beta.all-sessions.json',

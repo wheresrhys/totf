@@ -3,7 +3,8 @@ import type {
 	CoreStatsResult,
 	StatsPerDayAndSpeciesResult
 } from '@/app/models/db';
-import payOffStatsFixture from '../../../test-fixtures/snapshots/core_stats/beta.yearly-and-monthly-totals.json';
+import yearlyStatsFixture from '../../../test-fixtures/snapshots/core_stats/beta.yearly-totals.json';
+import monthlyStatsFixture from '../../../test-fixtures/snapshots/core_stats/beta.monthly-totals.json';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -233,9 +234,9 @@ describe('fetchSessionStats', () => {
 // assumes every column is always present, so a direct assertion doesn't
 // compile (#895).
 // eslint-disable-next-line no-restricted-syntax -- see comment above
-const yearlyRows = payOffStatsFixture.yearly as unknown as CoreStatsResult[];
+const yearlyRows = yearlyStatsFixture as unknown as CoreStatsResult[];
 // eslint-disable-next-line no-restricted-syntax -- see comment above
-const monthlyRows = payOffStatsFixture.monthly as unknown as CoreStatsResult[];
+const monthlyRows = monthlyStatsFixture as unknown as CoreStatsResult[];
 
 function makeAggregateStatsClient(response: {
 	data: unknown;

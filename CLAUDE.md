@@ -495,12 +495,6 @@ fixtures (#821/#823), rather than reading wing/weight columns off a `core_stats`
 `biometrics_stats/alpha.by-species.json` are separate files, and `SppStatsTable`'s test merges
 them itself.
 
-Two generated fixtures still break this rule and are grandfathered pending
-[#901](https://github.com/wheresrhys/totf/issues/901) — the
-`core_stats/*.yearly-and-monthly-totals.json` pair (two `core_stats` calls in one file) and
-`tables/Birds/arretrap.bird-detail.json` (a `Birds` row with an `Encounters` query spliced on).
-Don't add a third.
-
 **Never write `fixture as unknown as SomeType` for a new fixture cast — try `fixture as SomeType`
 first (#895).** The double assertion through `unknown` switches assignability checking off
 completely, so a fixture's shape is never compared against the type at all — a fixture missing a
@@ -525,7 +519,7 @@ a freeform "kept as `as unknown as`: ..." comment with no enforcing directive �
 drift this rule exists to catch, since nothing then stops another cast being added the same way
 without anyone noticing.
 
-**Fixture drift is caught by a pre-push, diff-gated check — but only for the 26 generated
+**Fixture drift is caught by a pre-push, diff-gated check — but only for the 27 generated
 fixtures.** Nothing in the type system notices when an RPC's return shape changes underneath a
 fixture consumed via a double assertion (see above) or via a JSON import generally, since an
 imported JSON module is not a fresh object literal so even a direct assertion still leaves a
@@ -545,7 +539,7 @@ how #870's column removal reached `main` with every check green (full investigat
   column/row vocabulary when touching this code: it's uniform across the module, its tests and its
   failure messages. The comparison helpers and the two fixture inventories live in
   `lib/snapshot-fixtures.ts` (pure, no I/O, unit-tested in the app suite).
-- **What it covers.** Exactly the 26 fixtures `scripts/generate-snapshots.ts` writes
+- **What it covers.** Exactly the 27 fixtures `scripts/generate-snapshots.ts` writes
   (`GENERATED_SNAPSHOT_FIXTURES`). It asserts the generator still produces precisely that set, so a
   fixture silently dropping out of the generator fails rather than quietly stopping being checked.
 - **What it doesn't.** The 2 permanently hand-authored `synthetic/` fixtures
@@ -553,7 +547,9 @@ how #870's column removal reached `main` with every check green (full investigat
   above. #894 brought every other previously-hand-maintained fixture
   (`core_stats/*.summary-totals.json` / `*.home-page-summary.json`, `ring_sequence_controls/`,
   `tables/Encounters/`, `tables/Species/`) under the generator and deleted four generated-but-
-  unconsumed orphans, so this list is now just the two `synthetic/` fixtures rather than an
+  unconsumed orphans, and #901 split the last two compound fixtures
+  (`core_stats/*.yearly-and-monthly-totals.json`, `tables/Birds/arretrap.bird-detail.json`) into
+  their raw sources, so this list is now just the two `synthetic/` fixtures rather than an
   open-ended gap. A second coverage test pins the on-disk file list to generated + ungenerated, so
   any future hand-added fixture stays visible rather than implied-covered.
 - **When it runs.** Pre-push only — CI has no Supabase service. `scripts/fixture-freshness-select.sh`

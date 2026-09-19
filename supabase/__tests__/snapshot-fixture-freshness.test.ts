@@ -65,7 +65,7 @@ async function readJson(filePath: string): Promise<unknown> {
  * forward-slash-separated paths relative to it — the same spelling
  * `GENERATED_SNAPSHOT_FIXTURES` uses. Fixtures live one or two directories deep
  * since #882 (`core_stats/alpha.by-species.json`,
- * `tables/Birds/arretrap.bird-detail.json`), so a flat readdir won't do.
+ * `tables/Birds/arretrap.bird.json`), so a flat readdir won't do.
  */
 async function listFixturePaths(directory: string): Promise<string[]> {
 	const entries = await fs.readdir(directory, {

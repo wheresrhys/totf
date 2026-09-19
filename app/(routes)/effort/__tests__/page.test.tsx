@@ -1,12 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import payOffSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.yearly-and-monthly-totals.json';
+import yearlySnapshot from '@/test-fixtures/snapshots/core_stats/alpha.yearly-totals.json';
+import monthlySnapshot from '@/test-fixtures/snapshots/core_stats/alpha.monthly-totals.json';
 import type { PayOffStatsData } from '@/app/actions/pay-off-stats';
 
 vi.mock('@/app/actions/pay-off-stats', () => ({
 	fetchPayOffStats: vi.fn()
 }));
+
+// These fixtures are not grouped by species, so species_name is genuinely
+// null — PayOffStatsData's underlying CoreStatsResult NonNullable mapped type
+// (app/models/db.ts) assumes every column is always present, so a direct
+// assertion doesn't compile (#895).
+const payOffSnapshot: PayOffStatsData = {
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
+	yearly: yearlySnapshot as unknown as PayOffStatsData['yearly'],
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
+	monthly: monthlySnapshot as unknown as PayOffStatsData['monthly']
+};
 
 describe('effort page', () => {
 	afterEach(() => {
@@ -15,14 +27,7 @@ describe('effort page', () => {
 
 	beforeEach(async () => {
 		const { fetchPayOffStats } = await import('@/app/actions/pay-off-stats');
-		vi.mocked(fetchPayOffStats).mockResolvedValue(
-			// This fixture is not grouped by species, so species_name is genuinely
-			// null — PayOffStatsData's underlying CoreStatsResult NonNullable
-			// mapped type (app/models/db.ts) assumes every column is always
-			// present, so a direct assertion doesn't compile (#895).
-			// eslint-disable-next-line no-restricted-syntax -- see comment above
-			payOffSnapshot as unknown as PayOffStatsData
-		);
+		vi.mocked(fetchPayOffStats).mockResolvedValue(payOffSnapshot);
 	});
 
 	it('renders heading', async () => {

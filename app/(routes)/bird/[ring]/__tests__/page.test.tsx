@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import birdFixture from '@/test-fixtures/snapshots/tables/Birds/arretrap.bird-detail.json';
+import birdFixture from '@/test-fixtures/snapshots/tables/Birds/arretrap.bird.json';
+import encountersFixture from '@/test-fixtures/snapshots/tables/Encounters/arretrap.encounters.json';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -11,6 +12,8 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
+// Mirrors how app/(routes)/bird/[ring]/page.tsx's fetchBirdPageContent merges
+// the two source queries: `{ ...bird, encounters }`.
 const birdData = {
 	id: birdFixture.id,
 	ring_no: birdFixture.ring_no,
@@ -18,7 +21,7 @@ const birdData = {
 	species: birdFixture.species
 };
 
-const encountersData = birdFixture.encounters;
+const encountersData = encountersFixture;
 
 function makeBirdDetailClient() {
 	const makeBirdChain = () => ({
