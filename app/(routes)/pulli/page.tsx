@@ -6,6 +6,7 @@ import {
 	BootstrapPage,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
+import { pulliEncountersQuery } from '@/queries';
 import { PulliPageContent } from './PageContent';
 
 export async function fetchPulliPageContent(
@@ -15,25 +16,7 @@ export async function fetchPulliPageContent(
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Encounters')
-		.select(
-			`
-			id,
-			extra_text,
-			bird:Birds (
-				ring_no,
-				species:Species (
-					species_name
-				)
-			),
-			session:Sessions!inner (
-				visit_date,
-				session_type,
-				location:Locations (
-					location_name
-				)
-			)
-		`
-		)
+		.select(pulliEncountersQuery.select)
 		.eq('ringing_group_id', viewedGroupId)
 		.eq('session.session_type', 'PULLI')
 		.then(catchSupabaseErrors) as Promise<PulliEncounter[]>;

@@ -13,6 +13,7 @@ import type { CoreStatsResult, GroupTicksResult } from '../models/db';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
+import { recentSessionsQuery, topSpeciesQuery } from '@/queries';
 
 export async function fetchRecentSessions(
 	viewedGroupId: number
@@ -20,9 +21,7 @@ export async function fetchRecentSessions(
 	const supabase = await getAuthenticatedSupabaseClient();
 	const sessions = (await supabase
 		.from('Sessions')
-		.select(
-			'id, visit_date, location_id, ringing_group_id, location:Locations(location_name), encounters:Encounters(count)'
-		)
+		.select(recentSessionsQuery.select)
 		.eq('ringing_group_id', viewedGroupId)
 		.order('visit_date', { ascending: false })
 		.limit(30)
@@ -87,7 +86,7 @@ export async function fetchTopSpecies(): Promise<SpeciesWithBirdsCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const species = (await supabase
 		.from('Species')
-		.select('id, species_name, birds:Birds(count)')
+		.select(topSpeciesQuery.select)
 		.then(catchSupabaseErrors)) as SpeciesWithBirdsCount[];
 	return species
 		.filter((s) => (s.birds[0]?.count ?? 0) > 0)
