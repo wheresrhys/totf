@@ -21,6 +21,7 @@ import {
 	renderSentence
 } from '@/app/components/highlights/shared/render-sentence';
 
+import type { HighlightsOfType } from '@/app/lib/highlights/v2/index';
 // ---- copy builders ----
 
 type PeriodFields = {
@@ -260,4 +261,14 @@ export function renderCountHighlight(highlight: CountHighlight): ReactElement {
 		matched: CountHighlight
 	) => ReactElement;
 	return render(highlight);
+}
+
+export function renderV2Highlight(highlight: HighlightsOfType): ReactElement {
+	return (
+		<li key={`v2-${highlight.type}`}>
+			{' '}
+			v2 - {highlight.name}, {highlight.highlights[0].time_period},{' '}
+			{highlight.highlights[0].value}{' '}
+		</li>
+	);
 }

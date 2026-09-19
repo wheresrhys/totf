@@ -289,9 +289,12 @@ export function SummaryTotalsSection({
 	const isHighlightsActive = activeTab === HIGHLIGHTS_TAB.id;
 	const fetchHighlightsData = useCallback(
 		async () =>
-			dailyHighlights(viewedGroup!.id, {
-				year,
-				month: month as OneBasedMonth
+			dailyHighlights({
+				groupId: viewedGroup!.id,
+				periodFilter: {
+					year,
+					month: month as OneBasedMonth
+				}
 			}),
 		[viewedGroup]
 	);

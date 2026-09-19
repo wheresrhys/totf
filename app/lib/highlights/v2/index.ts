@@ -29,7 +29,7 @@ type HighlightFinderOptions = {
 	threshold?: number;
 };
 
-type HighlightsOfType = {
+export type HighlightsOfType = {
 	name: string;
 	type: HighlightType;
 	category: HighlightCategory;
@@ -168,10 +168,15 @@ function generateHighlights({
 	);
 }
 
-export async function dailyHighlights(
-	groupId: number,
-	periodFilter?: YearMonthRestriction
-) {
+export async function dailyHighlights({
+	groupId,
+	limit,
+	periodFilter
+}: {
+	groupId: number;
+	limit?: number;
+	periodFilter?: YearMonthRestriction;
+}) {
 	let dailyStats = await fetchDailyStats(groupId);
 	let cacheKey = `${groupId}-daily`;
 	if (periodFilter) {
@@ -200,10 +205,12 @@ export async function dailyHighlights(
 			)
 		};
 	}
-	const limit = Math.min(
-		DEFAULT_OPTIONS.limit,
-		Math.ceil(dailyStats.overall.length / 4)
-	);
+	if (!limit) {
+		limit = Math.min(
+			DEFAULT_OPTIONS.limit,
+			Math.ceil(dailyStats.overall.length / 4)
+		);
+	}
 	return generateHighlights({
 		cacheKey,
 		stats: dailyStats,
@@ -221,10 +228,29 @@ export async function dailyHighlights(
 	});
 }
 
-// export async function cherryPickDailyHighlights(
-// 	groupId: number,
-// 	timePeriod: string,
-// 	periodFilter?: YearMonthRestriction,
-// ) {
-// 	const allTimeHighlights = await dailyHighlights(groupId, periodFilter);
-// }
+export async function fetchDayHighlights(
+	groupId: number,
+	timePeriod: string,
+	periodFilter?: YearMonthRestriction
+) {
+	const allTimeDailyHighlights = await dailyHighlights({
+		groupId,
+		periodFilter,
+		limit: 3
+	});
+	const relevantHighlights: HighlightsOfType[] = [];
+
+	allTimeDailyHighlights.forEach((highlightWrapper) => {
+		const relevantHighlight = highlightWrapper.highlights.find(
+			({ time_period }) => timePeriod === time_period
+		);
+
+		if (relevantHighlight) {
+			relevantHighlights.push({
+				...highlightWrapper,
+				highlights: [relevantHighlight]
+			});
+		}
+	});
+	return relevantHighlights;
+}

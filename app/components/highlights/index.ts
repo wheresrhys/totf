@@ -14,6 +14,7 @@ export {
 } from './rarities/renderers';
 export {
 	renderCountHighlight,
+	renderV2Highlight,
 	HIGHLIGHT_RENDERERS as COUNT_HIGHLIGHT_RENDERERS
 } from './counts/renderers';
 export {

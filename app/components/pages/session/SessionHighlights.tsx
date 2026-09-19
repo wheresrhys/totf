@@ -4,11 +4,15 @@ import {
 	BoxyList,
 	SecondaryHeading
 } from '@/app/components/shared/DesignSystem';
-import { fetchSessionHighlights } from '@/app/actions/session-highlights';
+import {
+	fetchSessionHighlights,
+	type HighlightsData
+} from '@/app/actions/session-highlights';
 import {
 	renderRarityHighlight,
 	RARITY_HIGHLIGHT_RENDERERS,
 	renderCountHighlight,
+	renderV2Highlight,
 	COUNT_HIGHLIGHT_RENDERERS,
 	renderVitalStatHighlight,
 	VITAL_STAT_HIGHLIGHT_RENDERERS
@@ -62,7 +66,10 @@ export function SessionHighlights({
 	// pool, fetched async; the action returns plain highlight data and the
 	// client partitions + renders each group here. The "Best of the session"
 	// subsection is plain prop data, available synchronously.
-	const [highlights, setHighlights] = useState<SessionHighlight[]>([]);
+	const [highlights, setHighlights] = useState<HighlightsData>({
+		v1: [],
+		v2: []
+	});
 	const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>(
 		'loading'
 	);
@@ -79,7 +86,7 @@ export function SessionHighlights({
 					viewedGroupId,
 					error
 				});
-				setHighlights([]);
+				setHighlights({ v1: [], v2: [] });
 				setStatus('error');
 			});
 	}, [date, viewedGroupId]);
@@ -95,9 +102,9 @@ export function SessionHighlights({
 	// top of an errored fetch.
 	if (status === 'error') return null;
 
-	const rarityHighlights = highlights.filter(isRarityHighlight);
-	const countHighlights = highlights.filter(isCountHighlight);
-	const vitalStatHighlights = highlights.filter(isVitalStatHighlight);
+	const rarityHighlights = highlights.v1.filter(isRarityHighlight);
+	const countHighlights = highlights.v1.filter(isCountHighlight);
+	const vitalStatHighlights = highlights.v1.filter(isVitalStatHighlight);
 
 	const showRarities = rarityHighlights.length > 0;
 	const showCounts = countHighlights.length > 0;
@@ -123,6 +130,7 @@ export function SessionHighlights({
 					<SecondaryHeading>Counts</SecondaryHeading>
 					<BoxyList testId="counts">
 						{countHighlights.map(renderCountHighlight)}
+						{highlights.v2.map(renderV2Highlight)}
 					</BoxyList>
 				</>
 			) : null}
