@@ -23,8 +23,9 @@ function aggregateRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
 	return {
 		time_period: '2024-01-01',
 		bird_count: 0,
-		encounter_count: 0
-	} as CoreStatsResult & typeof overrides;
+		encounter_count: 0,
+		...overrides
+	} as CoreStatsResult;
 }
 
 // The demographics builder's *column set* comes from a real captured

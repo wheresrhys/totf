@@ -1,4 +1,3 @@
-import { getAuthenticatedSupabaseClient } from './auth/group-auth';
 import { catchSupabaseErrors, fetchAllPaginatedRows } from '@/lib/supabase';
 import type { SessionStatsData } from '@/app/lib/highlights';
 import type {

@@ -1,5 +1,4 @@
 import { format as formatDate } from 'date-fns';
-import { postgresIntervalToSeconds } from '@/app/lib/postgres-interval';
 import type { CoreStatsResult } from '../models/db';
 import { calculateEncounterRetraps, calculateRetraps } from './species-totals';
 
