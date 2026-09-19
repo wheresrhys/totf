@@ -23,7 +23,7 @@ import { supabase } from '../../../lib/supabase';
 import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
-import { resolveAlphaBetaGammaClients } from './helpers/group-clients';
+import { createIsolatedGroup, psql } from '../db-test-helpers';
 
 // numeric-typed columns can come back as a JS number or a stringified numeric
 // depending on the driver; coerce before comparing.
@@ -42,20 +42,26 @@ async function getSpeciesId(speciesName: string): Promise<number> {
 
 describe('biometrics_stats', () => {
 	// A single ungrouped dataset covering the metric maths, all three filters, and
-	// the null/single/empty edges. Every row is Delta-owned (bar one Alpha row for
-	// the ringing_group_filter case) and randomised per run so concurrent worktrees
-	// against the shared local Supabase never collide.
+	// the null/single/empty edges. Every row is Delta-owned (bar one row under a
+	// dedicated isolated group for the ringing_group_filter case) and randomised
+	// per run so concurrent worktrees against the shared local Supabase never
+	// collide.
 	describe('ungrouped statistics and filtering', () => {
-		let alphaId: number;
-		let alphaClient: SupabaseClient;
+		// A dedicated throwaway group for the ringing_group_filter case, rather than
+		// the shared `Alpha` seed group — see #935: a temporary Alpha location/session,
+		// even cleaned up in afterAll, is visible to any concurrently-running test
+		// asserting on Alpha's full row set (e.g. core-stats.test.ts's
+		// ALPHA_ALL_VISIT_DATES) for the window between insert and teardown.
+		let otherGroupId: number;
+		let otherGroupClient: SupabaseClient;
 		let deltaId: number;
 		let deltaClient: SupabaseClient;
 
 		const locationIds: number[] = [];
 		const sessionIds: number[] = [];
 		const birdIds: number[] = [];
-		const alphaLocationIds: number[] = [];
-		const alphaSessionIds: number[] = [];
+		const otherGroupLocationIds: number[] = [];
+		const otherGroupSessionIds: number[] = [];
 
 		let base: string;
 		// Named dates for readability in the assertions below.
@@ -64,11 +70,12 @@ describe('biometrics_stats', () => {
 		let dEmpty: string;
 
 		beforeAll(async () => {
-			({ alphaId, alphaClient } = await resolveAlphaBetaGammaClients());
 			deltaId = await getGroupIdByName('Delta');
 			deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
 
 			const testSuffix = randomTestSuffix();
+			otherGroupId = createIsolatedGroup(`Biometrics Other ${testSuffix}`);
+			otherGroupClient = await getAuthenticatedSupabaseClientForGroup(otherGroupId);
 			base = randomFutureDate();
 			d0 = addDays(base, 0);
 			d1 = addDays(base, 1);
@@ -90,14 +97,17 @@ describe('biometrics_stats', () => {
 			locationIds.push(deltaLoc!.id);
 			const deltaLocId = deltaLoc!.id;
 
-			const { data: alphaLoc, error: aLocErr } = await alphaClient
+			const { data: otherGroupLoc, error: aLocErr } = await otherGroupClient
 				.from('Locations')
-				.insert({ location_name: `Biometrics Alpha Loc ${testSuffix}`, ringing_group_id: alphaId })
+				.insert({
+					location_name: `Biometrics Other Loc ${testSuffix}`,
+					ringing_group_id: otherGroupId
+				})
 				.select('id')
 				.single();
 			if (aLocErr) throw aLocErr;
-			alphaLocationIds.push(alphaLoc!.id);
-			const alphaLocId = alphaLoc!.id;
+			otherGroupLocationIds.push(otherGroupLoc!.id);
+			const otherGroupLocId = otherGroupLoc!.id;
 
 			const sessionCache = new Map<string, number>();
 			async function getSession(
@@ -162,13 +172,21 @@ describe('biometrics_stats', () => {
 			await addBird(deltaClient, robinId, dNullWing, deltaLocId, sessionIds, 15, null);
 			// A Delta Wren on d0 for the species_name_filter case.
 			await addBird(deltaClient, wrenId, d0, deltaLocId, sessionIds, 8, 44);
-			// An Alpha Robin on d0 with an extreme weight for the ringing_group_filter case.
-			await addBird(alphaClient, robinId, d0, alphaLocId, alphaSessionIds, 1000, 300);
+			// An other-group Robin on d0 with an extreme weight for the ringing_group_filter case.
+			await addBird(
+				otherGroupClient,
+				robinId,
+				d0,
+				otherGroupLocId,
+				otherGroupSessionIds,
+				1000,
+				300
+			);
 		});
 
 		afterAll(() => {
-			const allSessions = [...sessionIds, ...alphaSessionIds];
-			const allLocations = [...locationIds, ...alphaLocationIds];
+			const allSessions = [...sessionIds, ...otherGroupSessionIds];
+			const allLocations = [...locationIds, ...otherGroupLocationIds];
 			execSync(
 				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
 					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
@@ -176,6 +194,7 @@ describe('biometrics_stats', () => {
 					`DELETE FROM "Sessions" WHERE id IN (${allSessions.join(', ')});` +
 					`DELETE FROM "Locations" WHERE id IN (${allLocations.join(', ')});'`
 			);
+			psql(`DELETE FROM "RingingGroups" WHERE id = ${otherGroupId};`);
 		});
 
 		async function statsRow(args: Record<string, unknown>) {
@@ -210,19 +229,20 @@ describe('biometrics_stats', () => {
 				from_date: d0,
 				to_date: d3
 			});
-			// The Alpha Robin's weight of 1000 on d0 must not leak into Delta's stats.
+			// The other group's Robin weight of 1000 on d0 must not leak into Delta's stats.
 			expect(num(deltaRow.max_weight)).toBe(40);
 			expect(num(deltaRow.max_wing)).toBe(80);
 
-			// Sanity: the Alpha row does exist and carries the extreme value.
-			const { data: alphaData, error: alphaErr } = await alphaClient.rpc('biometrics_stats', {
-				ringing_group_filter: alphaId,
-				species_name_filter: 'Robin',
-				from_date: d0,
-				to_date: d0
-			});
-			expect(alphaErr).toBeNull();
-			expect(num(alphaData![0].max_weight)).toBe(1000);
+			// Sanity: the other-group row does exist and carries the extreme value.
+			const { data: otherGroupData, error: otherGroupErr } =
+				await otherGroupClient.rpc('biometrics_stats', {
+					ringing_group_filter: otherGroupId,
+					species_name_filter: 'Robin',
+					from_date: d0,
+					to_date: d0
+				});
+			expect(otherGroupErr).toBeNull();
+			expect(num(otherGroupData![0].max_weight)).toBe(1000);
 		});
 
 		it('filters by from_date/to_date so out-of-window encounters are excluded', async () => {
@@ -241,8 +261,8 @@ describe('biometrics_stats', () => {
 		});
 
 		it('filters by species_name_filter so only the named species\' encounters are included', async () => {
-			// d0 holds a Delta Robin (10/50), a Delta Wren (8/44) and an Alpha Robin
-			// (1000/300); filtering to Wren must isolate the single Wren encounter.
+			// d0 holds a Delta Robin (10/50), a Delta Wren (8/44) and an other-group
+			// Robin (1000/300); filtering to Wren must isolate the single Wren encounter.
 			const row = await statsRow({
 				ringing_group_filter: deltaId,
 				species_name_filter: 'Wren',
