@@ -191,15 +191,15 @@ export async function getSpeciesStatsHistory(
 }
 
 /**
- * Monthly age-split + young-trends history for a single species — the
+ * Monthly demographics history for a single species — the
  * `demographics_stats` sibling of `getSpeciesStatsHistory`. #800 split these
- * derivations (new-adult/first-summer/old-timer age split, and the 3J/postjuv
- * young-trends counts) into their own RPC (`population_stats`, renamed
- * `demographics_stats` in #878) rather than folding them into
- * `core_stats`, so the "Demographics" tab's Age split, Young counts and
- * New young counts tiles (#839 split the original single Young trends tile
- * into the latter two) fetch here while its Counts tile keeps using
- * `getSpeciesStatsHistory`. Same
+ * derivations (the new-adult count and the 3J/postjuv young-trends counts;
+ * #843 added the returning-age buckets) into their own RPC
+ * (`population_stats`, renamed `demographics_stats` in #878) rather than
+ * folding them into `core_stats`, so the "Demographics" tab's Returning ages,
+ * Returning vs new, Young counts and New young counts tiles (#839 split the
+ * original single Young trends tile into the latter two) fetch here while its
+ * Counts tile keeps using `getSpeciesStatsHistory`. Same
  * call shape (species-filtered, `interval`-grouped, monthly by default) as
  * `getSpeciesStatsHistory`.
  */
