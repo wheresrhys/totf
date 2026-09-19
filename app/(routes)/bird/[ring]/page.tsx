@@ -3,21 +3,14 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { StandaloneBird, EncounterOfBird } from '@/app/models/bird';
+import { birdDetailQuery } from '@/queries';
 import { BirdPageContent, type PageParams } from './PageContent';
 
 export async function fetchBirdPageContent({ ring }: PageParams) {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const bird = (await supabase
 		.from('Birds')
-		.select(
-			`id,
-			ring_no,
-			proven_age,
-			species:Species (
-				species_name
-			)
-		`
-		)
+		.select(birdDetailQuery.select)
 		.eq('ring_no', ring)
 		.maybeSingle()
 		.then(catchSupabaseErrors)) as StandaloneBird;

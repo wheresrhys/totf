@@ -6,6 +6,7 @@ import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '@/app/models/session';
+import { allSessionsQuery } from '@/queries';
 import { SessionsPageContent } from './PageContent';
 
 export async function fetchSessionsPageContent(
@@ -15,9 +16,7 @@ export async function fetchSessionsPageContent(
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Sessions')
-		.select(
-			'id, visit_date, location: Locations(id, location_name), encounters:Encounters(count)'
-		)
+		.select(allSessionsQuery.select)
 		.eq('ringing_group_id', viewedGroupId)
 		.eq('session_type', 'FULL_GROWN')
 		.order('visit_date', { ascending: false })

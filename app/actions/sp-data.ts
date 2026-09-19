@@ -22,6 +22,7 @@ import {
 	type ArrivalsStatsResult
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
+import { buildPageOfBirdsSelect } from '@/queries';
 export async function fetchPageOfBirds(
 	speciesId: number,
 	viewedGroupId: number,
@@ -36,33 +37,9 @@ export async function fetchPageOfBirds(
 	// lives on its session (`visit_date`) — `Encounters.capture_time` is a
 	// time-of-day only, so range filtering happens on `session.visit_date`.
 	const hasDateRange = Boolean(fromDate || toDate);
-	const encountersRelation = hasDateRange ? 'Encounters!inner' : 'Encounters';
-	const sessionRelation = hasDateRange ? 'Sessions!inner' : 'Sessions';
 	let query = supabase
 		.from('Birds')
-		.select(
-			`id,
-			ring_no,
-			last_encountered_timestamp,
-			ringing_group_ids,
-			proven_age,
-			encounters:${encountersRelation} (
-				id,
-				capture_time,
-				min_hatch_year,
-				max_hatch_year,
-				age_code,
-				is_juv,
-				record_type,
-				sex,
-				weight,
-				wing_length,
-				session:${sessionRelation} (
-					id,
-					visit_date
-				)
-			)`
-		)
+		.select(buildPageOfBirdsSelect(hasDateRange))
 		.eq('species_id', speciesId)
 		.contains('ringing_group_ids', [viewedGroupId])
 		.order('last_encountered_timestamp', { ascending: false })

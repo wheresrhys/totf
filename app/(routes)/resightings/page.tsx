@@ -7,6 +7,7 @@ import {
 	BootstrapPage,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
+import { resightingsQuery } from '@/queries';
 import { ResightingsPageContent } from './PageContent';
 
 export async function fetchResightingsPageContent(
@@ -16,27 +17,7 @@ export async function fetchResightingsPageContent(
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Encounters')
-		.select(
-			`
-			id,
-			record_type,
-			extra_text,
-			finding_condition,
-			finding_circumstances,
-			bird:Birds (
-				ring_no,
-				species:Species (
-					species_name
-				)
-			),
-			session:Sessions (
-				visit_date,
-				location:Locations (
-					location_name
-				)
-			)
-		`
-		)
+		.select(resightingsQuery.select)
 		.eq('ringing_group_id', viewedGroupId)
 		.in('record_type', [...RESIGHTING_RECORD_TYPES])
 		.then(catchSupabaseErrors) as Promise<ResightingEncounter[]>;

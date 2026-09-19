@@ -23,6 +23,9 @@
  * each block below names both the RPC/table and the consuming action(s) — keep
  * this in sync when a call site's underlying RPC/table changes, so a fixture's
  * location never silently drifts from what it actually tests (see #870, #882).
+ * Every `tables/<TableName>/` block's `.select()` string comes from a named
+ * query definition in `queries/<TableName>/`, the same one the real app call
+ * site imports — see `queries/types.ts` (#913).
  *
  * The only fixtures under test-fixtures/snapshots/ this script does not write
  * are the two under `synthetic/` — hand-authored zero-activity edge cases, not
@@ -38,6 +41,15 @@ import fs from 'fs/promises';
 import { supabase } from '../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../app/lib/auth/group-auth';
 import { RESIGHTING_RECORD_TYPES } from '../lib/demon-import';
+import {
+	allSessionsQuery,
+	recentSessionsQuery,
+	pulliEncountersQuery,
+	resightingsQuery,
+	topSpeciesQuery,
+	pageOfBirdsQuery,
+	birdDetailQuery
+} from '../queries';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -146,16 +158,15 @@ export async function generateSnapshots(
 	}
 
 	// Table: Sessions (embedded Locations + Encounters count) — powers
-	// fetchAllSessions (app/(routes)/sessions/page.tsx)
+	// fetchSessionsPageContent (app/(routes)/sessions/page.tsx). Query:
+	// queries/Sessions/all-sessions.ts
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId]
 	] as const) {
 		const { data } = await client
 			.from('Sessions')
-			.select(
-				'id, visit_date, location: Locations(id, location_name), encounters:Encounters(count)'
-			)
+			.select(allSessionsQuery.select)
 			.eq('ringing_group_id', gId)
 			.order('visit_date', { ascending: false });
 		await writeSnapshot(
@@ -193,29 +204,11 @@ export async function generateSnapshots(
 	}
 
 	// Table: Encounters (PULLI session type) — powers fetchPulliPageContent
-	// (app/(routes)/pulli/page.tsx)
+	// (app/(routes)/pulli/page.tsx). Query: queries/Encounters/pulli-encounters.ts
 	{
 		const { data } = await alpha
 			.from('Encounters')
-			.select(
-				`
-				id,
-				extra_text,
-				bird:Birds (
-					ring_no,
-					species:Species (
-						species_name
-					)
-				),
-				session:Sessions!inner (
-					visit_date,
-					session_type,
-					location:Locations (
-						location_name
-					)
-				)
-			`
-			)
+			.select(pulliEncountersQuery.select)
 			.eq('ringing_group_id', alphaId)
 			.eq('session.session_type', 'PULLI');
 		await writeSnapshot(
@@ -225,31 +218,12 @@ export async function generateSnapshots(
 	}
 
 	// Table: Encounters (resighting record types) — powers
-	// fetchResightingsPageContent (app/(routes)/resightings/page.tsx)
+	// fetchResightingsPageContent (app/(routes)/resightings/page.tsx). Query:
+	// queries/Encounters/resightings.ts
 	{
 		const { data } = await alpha
 			.from('Encounters')
-			.select(
-				`
-				id,
-				record_type,
-				extra_text,
-				finding_condition,
-				finding_circumstances,
-				bird:Birds (
-					ring_no,
-					species:Species (
-						species_name
-					)
-				),
-				session:Sessions (
-					visit_date,
-					location:Locations (
-						location_name
-					)
-				)
-			`
-			)
+			.select(resightingsQuery.select)
 			.eq('ringing_group_id', alphaId)
 			.in('record_type', [...RESIGHTING_RECORD_TYPES]);
 		await writeSnapshot(`tables/Encounters/alpha.resightings.json`, data ?? []);
@@ -268,12 +242,11 @@ export async function generateSnapshots(
 	}
 
 	// Table: Sessions (Alpha only, most-recent visit date) — powers
-	// fetchRecentSessions (app/(routes)/page.tsx)
+	// fetchRecentSessions (app/(routes)/page.tsx). Query:
+	// queries/Sessions/recent-sessions.ts
 	const { data: recentSessions } = await alpha
 		.from('Sessions')
-		.select(
-			'id, visit_date, location_id, ringing_group_id, location:Locations(location_name), encounters:Encounters(count)'
-		)
+		.select(recentSessionsQuery.select)
 		.eq('ringing_group_id', alphaId)
 		.order('visit_date', { ascending: false })
 		.limit(3);
@@ -286,11 +259,12 @@ export async function generateSnapshots(
 	// fetchTopSpecies (app/(routes)/page.tsx); the action itself filters to
 	// birds count > 0, sorts descending and slices to the top 10 client-side —
 	// this fixture is the raw query result before that in-memory processing,
-	// since the raw DB read is what a shape drift would actually break.
+	// since the raw DB read is what a shape drift would actually break. Query:
+	// queries/Species/top-species.ts
 	{
 		const { data: topSpecies } = await alpha
 			.from('Species')
-			.select('id, species_name, birds:Birds(count)');
+			.select(topSpeciesQuery.select);
 		await writeSnapshot(
 			`tables/Species/alpha.top-species.json`,
 			topSpecies ?? []
@@ -335,13 +309,11 @@ export async function generateSnapshots(
 		const BATCH_SIZE = 20;
 
 		// Table: Birds (embedded Encounters/Sessions, page 0) — powers
-		// fetchPageOfBirds (app/actions/sp-data.ts)
+		// fetchPageOfBirds (app/actions/sp-data.ts). Query:
+		// queries/Birds/page-of-birds.ts
 		const { data: birdsPage0 } = await alpha
 			.from('Birds')
-			.select(
-				`id, ring_no, last_encountered_timestamp, ringing_group_ids, proven_age,
-				encounters:Encounters(id,capture_time,min_hatch_year,max_hatch_year,age_code,is_juv,record_type,sex,weight,wing_length,session:Sessions(id,visit_date))`
-			)
+			.select(pageOfBirdsQuery.select)
 			.eq('species_id', robinSpecies.id)
 			.contains('ringing_group_ids', [alphaId])
 			.order('last_encountered_timestamp', { ascending: false })
@@ -416,9 +388,13 @@ export async function generateSnapshots(
 	// encounters) — powers fetchBirdPageContent (app/(routes)/bird/[ring]/page.tsx).
 	// Filed under tables/Birds/ since Birds (by ring_no) is the entity the page
 	// is keyed on; Encounters is a secondary query merged into the same object.
+	// The Birds portion's query is queries/Birds/bird-detail.ts; the Encounters
+	// portion stays inline here rather than being extracted, since it's
+	// deliberately narrower than the real page's own Encounters select — see
+	// that query file's comment for why.
 	const { data: arretrapBird } = await alpha
 		.from('Birds')
-		.select(`id, ring_no, proven_age, species:Species(species_name)`)
+		.select(birdDetailQuery.select)
 		.eq('ring_no', 'ARRETRAP')
 		.maybeSingle();
 	if (arretrapBird) {
