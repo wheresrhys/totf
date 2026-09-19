@@ -160,9 +160,10 @@ Key design notes:
 
 ### Companion stats RPCs and shared plumbing (`core_stats` / `demographics_stats`, #800/#877)
 
-`core_stats` and `demographics_stats` (age-split + young-trends derivations, split into its own
-RPC rather than folded into `core_stats`' already-large single query — for query-plan
-simplicity and to leave `core_stats`' existing columns untouched) share the same input
+`core_stats` and `demographics_stats` (a new-adult count, young-trends derivations and #843's
+returning-age buckets, split into its own RPC rather than folded into `core_stats`' already-large
+single query — for query-plan simplicity and to leave `core_stats`' existing columns untouched)
+share the same input
 signature (`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
 group_by_time_period`) and both build on the same underlying logic via `stats_raw_encounters` /
 `stats_spine` / `stats_encounter_age_classification` / `stats_bird_age_bucket` — internal utility
@@ -186,6 +187,17 @@ the group summary read-path" above). `demographics_stats.new_young_bird_count` w
 duplicate of a same-named column on `core_stats` (#800); #824 removed `core_stats`'s
 copy (and the corresponding UI series, #817) as unused, so `demographics_stats` now holds the only
 `new_young_bird_count` column in the schema.
+
+**"Old timers" no longer exists at any layer (#837).** `demographics_stats` originally carried a
+three-way split of the adult cohort — `new_adult_bird_count` / `first_summer_bird_count` /
+`old_timers_bird_count`, the latter two resolved by a majority vote over the bird's `(period_year
+− 1)` encounters. #855 removed the client-side "Age split" tile that read them and #856 removed the
+two columns from `demographics_stats_result`, the `adult_age_split`/`adult_split_counts` CTEs and
+the now-unconsumed `bird_year_age_stats` CTE. What survives is `new_adult_bird_count` alone — an
+unchanged, non-exhaustive *subset* of `adult_bird_count` (adults whose first-ever year with the
+group is the cell's own `period_year`), read by the "Returning vs new" chart (#854). Don't
+reintroduce either column or the majority-vote heuristic; `arrivals_stats`' `new_adult` /
+`returning_adult` split is the supported way to name the rest of the adult cohort.
 
 `stats_raw_encounters` and `stats_spine` also exclude passive, no-bird-in-hand data so it never
 leaks into any stats RPC built on them (#874). `stats_raw_encounters` filters out any `Encounters`
@@ -248,7 +260,8 @@ than losing the bird for that year), takes `DISTINCT ON (bird_id, enc_year)` ord
 `visit_date, encounter_id` for same-day determinism, and splits `adult` into `new_adult` vs
 `returning_adult` off the same unwindowed, `ringing_group_filter`-scoped lifetime-history CTEs
 `demographics_stats` uses (`new_adult` iff the arrival year is the bird's first-ever year with the
-group — no majority-vote heuristic needed, unlike `demographics_stats`' first_summer/old_timers split).
+group — the same first-ever-year rule `demographics_stats.new_adult_bird_count` applies, resolved
+per bird-year rather than per cell).
 Note the granularity: an "arrival" is a **bird-year**, not a bird, so under an ungrouped query a bird
 that arrived in two years contributes two counts.
 

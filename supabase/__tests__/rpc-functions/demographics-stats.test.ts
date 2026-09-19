@@ -18,19 +18,31 @@ import { getGroupIdByName } from './helpers/seed-lookups';
 import { createIsolatedGroup, psql } from '../db-test-helpers';
 
 describe('demographics_stats', () => {
-	// Age-split subsets of adult_bird_count (#800): new_adult_bird_count /
-	// first_summer_bird_count / old_timers_bird_count. These partition the adult bucket
-	// by each bird's LIFETIME history with the ringing group (unwindowed), so every
-	// bird carries encounters in earlier calendar years that sit OUTSIDE the query
-	// window but still drive its classification. Each bird's "this period" adult
-	// encounter is on its own random far-future date; an ungrouped from=to=date query
-	// then returns exactly that one bird, and period_year resolves (via the
-	// time_period-IS-NULL fallback rule) to that date's calendar year. Prior-year
-	// encounters hang off the same bird on dates in (year-1)/(year-2) and never appear
-	// in any query window, so they never pollute a cell — they only set
-	// bird_first_year and the (period_year-1) majority vote. All rows randomised per
-	// run so concurrent worktrees (shared local Supabase) never combine.
-	describe('age split (new_adult_bird_count / first_summer_bird_count / old_timers_bird_count)', () => {
+	let alphaId: number;
+	let alphaClient: SupabaseClient;
+
+	beforeAll(async () => {
+		({ alphaId, alphaClient } = await resolveAlphaBetaGammaClients());
+	});
+
+	// new_adult_bird_count (#800): the subset of adult_bird_count whose first-ever
+	// year with the ringing group is the cell's own period_year. Resolved from each
+	// bird's LIFETIME history with the group (unwindowed), so every bird carries
+	// encounters in earlier calendar years that sit OUTSIDE the query window but
+	// still drive its classification. Each bird's "this period" adult encounter is
+	// on its own random far-future date; an ungrouped from=to=date query then returns
+	// exactly that one bird, and period_year resolves (via the time_period-IS-NULL
+	// fallback rule) to that date's calendar year. Prior-year encounters hang off the
+	// same bird on dates in (year-1)/(year-2) and never appear in any query window,
+	// so they never pollute a cell — they only set bird_first_year. All rows
+	// randomised per run so concurrent worktrees (shared local Supabase) never
+	// combine.
+	//
+	// #856 removed the first_summer_bird_count / old_timers_bird_count columns that
+	// once completed a three-way split of the adult cohort alongside this one, along
+	// with every case exercising their (period_year - 1) majority-vote heuristic. The
+	// returners below therefore only assert that they are NOT new adults.
+	describe('new adult count (new_adult_bird_count)', () => {
 		let deltaId: number;
 		let deltaClient: SupabaseClient;
 		// A dedicated throwaway group for the multi-group isolation case, rather than the
@@ -49,7 +61,6 @@ describe('demographics_stats', () => {
 
 		const ADULT = { age_code: 4, is_juv: false };
 		const AGE1J = { age_code: 1, is_juv: true };
-		const AGE3J = { age_code: 3, is_juv: true };
 
 		type EncInput = {
 			date: string;
@@ -60,11 +71,8 @@ describe('demographics_stats', () => {
 
 		// Scenario "this period" query dates (each bird gets its own).
 		let naDate: string; // new_adult
-		let fsDate: string; // first_summer
-		let oldTimersDate: string; // old timers (adult returner)
-		let tieDate: string; // old timers via a prior-year tie
-		let gapDate: string; // old timers via no prior-year encounters
-		let juvDate: string; // adult-split-excluded (juv bucket this period)
+		let returnerDate: string; // adult returner (not a new adult)
+		let juvDate: string; // new-adult-excluded (juv bucket this period)
 		let mgDate: string; // multi-group isolation
 
 		const yearOf = (d: string) => parseInt(d.slice(0, 4), 10);
@@ -180,47 +188,18 @@ describe('demographics_stats', () => {
 			naDate = addDays(base, 0);
 			await addBird([{ date: naDate, ...ADULT, record_type: 'N' }]);
 
-			// first_summer: first-ever year earlier; a strict majority of the bird's
-			// (period_year - 1) encounters were at age_code IN (1,3); adult this period.
-			fsDate = addDays(base, 1);
-			const fsPy = yearOf(fsDate) - 1;
+			// adult returner: first-ever year earlier, adult again this period — so this
+			// cell's period_year is not its first-ever year with the group.
+			returnerDate = addDays(base, 2);
+			const returnerPy = yearOf(returnerDate) - 1;
 			await addBird([
-				{ date: `${fsPy}-05-10`, ...AGE1J, record_type: 'N' },
-				{ date: `${fsPy}-05-11`, ...AGE3J, record_type: 'R' },
-				{ date: fsDate, ...ADULT, record_type: 'R' }
-			]);
-
-			// old timers: first-ever year earlier; (period_year - 1) majority NOT age_code
-			// IN (1,3) (adult retraps); adult this period.
-			oldTimersDate = addDays(base, 2);
-			const oldPy = yearOf(oldTimersDate) - 1;
-			await addBird([
-				{ date: `${oldPy}-05-10`, ...ADULT, record_type: 'R' },
-				{ date: `${oldPy}-05-11`, ...ADULT, record_type: 'R' },
-				{ date: oldTimersDate, ...ADULT, record_type: 'R' }
-			]);
-
-			// old timers via a tie: (period_year - 1) exactly one age_code IN (1,3) and one
-			// not — a tie falls to old timers, not first_summer.
-			tieDate = addDays(base, 100);
-			const tiePy = yearOf(tieDate) - 1;
-			await addBird([
-				{ date: `${tiePy}-05-10`, ...AGE1J, record_type: 'R' },
-				{ date: `${tiePy}-05-11`, ...ADULT, record_type: 'R' },
-				{ date: tieDate, ...ADULT, record_type: 'R' }
-			]);
-
-			// old timers via a gap year: first-ever year is two years back, and there are
-			// zero encounters in (period_year - 1) — no prior-year data falls to old timers.
-			gapDate = addDays(base, 130);
-			const gapPy2 = yearOf(gapDate) - 2;
-			await addBird([
-				{ date: `${gapPy2}-05-10`, ...ADULT, record_type: 'N' },
-				{ date: gapDate, ...ADULT, record_type: 'R' }
+				{ date: `${returnerPy}-05-10`, ...ADULT, record_type: 'R' },
+				{ date: `${returnerPy}-05-11`, ...ADULT, record_type: 'R' },
+				{ date: returnerDate, ...ADULT, record_type: 'R' }
 			]);
 
 			// juv this period: first-ever this year but bucket is juv (age_code 1J), so
-			// it must not appear in any of the three adult-split columns.
+			// it must not count as a new adult.
 			juvDate = addDays(base, 160);
 			await addBird([{ date: juvDate, ...AGE1J, record_type: 'N' }]);
 
@@ -285,74 +264,51 @@ describe('demographics_stats', () => {
 		}
 
 		// Usual
-		it('a bird first ringed as an adult this period year counts in new_adult_bird_count only', async () => {
+		it('a bird first ringed as an adult this period year counts in new_adult_bird_count', async () => {
 			const row = await splitRow(naDate);
 			expect(row).toMatchObject({
 				adult_bird_count: 1,
-				new_adult_bird_count: 1,
-				first_summer_bird_count: 0,
-				old_timers_bird_count: 0
+				new_adult_bird_count: 1
 			});
 		});
 
-		it('an adult this period whose (period_year - 1) encounters are a majority age_code IN (1,3) counts in first_summer_bird_count only', async () => {
-			const row = await splitRow(fsDate);
+		it('an adult returner whose first-ever year with the group is earlier is excluded from new_adult_bird_count', async () => {
+			const row = await splitRow(returnerDate);
 			expect(row).toMatchObject({
 				adult_bird_count: 1,
-				new_adult_bird_count: 0,
-				first_summer_bird_count: 1,
-				old_timers_bird_count: 0
-			});
-		});
-
-		it('an adult returner whose (period_year - 1) encounters are a majority NOT age_code IN (1,3) counts in old_timers_bird_count only', async () => {
-			const row = await splitRow(oldTimersDate);
-			expect(row).toMatchObject({
-				adult_bird_count: 1,
-				new_adult_bird_count: 0,
-				first_summer_bird_count: 0,
-				old_timers_bird_count: 1
+				new_adult_bird_count: 0
 			});
 		});
 
 		// Structure
-		it('for a cell holding one bird of each adult sub-kind, new_adult + first_summer + old_timers = adult_bird_count', async () => {
+		it('for a cell holding one new adult and one returner, new_adult_bird_count is the new-adult subset of adult_bird_count', async () => {
 			const { data, error } = await deltaClient.rpc('demographics_stats', {
 				ringing_group_filter: deltaId,
 				from_date: naDate,
-				to_date: oldTimersDate
+				to_date: returnerDate
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(1);
 			const row = data![0];
-			expect(row.adult_bird_count).toBe(3);
+			expect(row.adult_bird_count).toBe(2);
 			expect(row.new_adult_bird_count).toBe(1);
-			expect(row.first_summer_bird_count).toBe(1);
-			expect(row.old_timers_bird_count).toBe(1);
-			expect(
-				row.new_adult_bird_count +
-					row.first_summer_bird_count +
-					row.old_timers_bird_count
-			).toBe(row.adult_bird_count);
 		});
 
-		it('a bird first-ever-with-group this year but bucketed juv (not adult) this period appears in none of the three age-split columns', async () => {
+		it('a bird first-ever-with-group this year but bucketed juv (not adult) this period is excluded from new_adult_bird_count', async () => {
 			const row = await splitRow(juvDate);
 			expect(row).toMatchObject({
 				adult_bird_count: 0,
 				juv_bird_count: 1,
-				new_adult_bird_count: 0,
-				first_summer_bird_count: 0,
-				old_timers_bird_count: 0
+				new_adult_bird_count: 0
 			});
 		});
 
-		it('year, month, day and ungrouped timeInterval modes all return valid rows for the age-split columns (period_year resolution rule)', async () => {
+		it('year, month, day and ungrouped timeInterval modes all return valid rows for new_adult_bird_count (period_year resolution rule)', async () => {
 			for (const mode of ['year', 'month', 'day', undefined] as const) {
 				const { data, error } = await deltaClient.rpc('demographics_stats', {
 					ringing_group_filter: deltaId,
 					from_date: naDate,
-					to_date: oldTimersDate,
+					to_date: returnerDate,
 					group_by_time_period: mode
 				});
 				expect(error).toBeNull();
@@ -360,47 +316,28 @@ describe('demographics_stats', () => {
 				const totals = data!.reduce(
 					(acc, r) => ({
 						na: acc.na + r.new_adult_bird_count,
-						fs: acc.fs + r.first_summer_bird_count,
-						ol: acc.ol + r.old_timers_bird_count,
 						ad: acc.ad + r.adult_bird_count
 					}),
-					{ na: 0, fs: 0, ol: 0, ad: 0 }
+					{ na: 0, ad: 0 }
 				);
 				expect(totals.na).toBe(1);
-				expect(totals.fs).toBe(1);
-				expect(totals.ol).toBe(1);
-				expect(totals.ad).toBe(3);
+				expect(totals.ad).toBe(2);
 			}
 		});
 
 		// Edge
-		it('a (period_year - 1) tie between age_code IN (1,3) and not falls to old_timers_bird_count, not first_summer_bird_count', async () => {
-			const row = await splitRow(tieDate);
-			expect(row).toMatchObject({
-				adult_bird_count: 1,
-				first_summer_bird_count: 0,
-				old_timers_bird_count: 1
-			});
-		});
-
-		it('a bird with zero encounters in (period_year - 1) (a gap year) falls to old_timers_bird_count', async () => {
-			const row = await splitRow(gapDate);
-			expect(row).toMatchObject({
-				adult_bird_count: 1,
-				new_adult_bird_count: 0,
-				first_summer_bird_count: 0,
-				old_timers_bird_count: 1
-			});
-		});
-
 		it("a bird whose only earlier history is under a DIFFERENT group still counts as new_adult with this group (other group's history is not first-ever-with-this-group)", async () => {
 			const row = await splitRow(mgDate);
 			expect(row).toMatchObject({
 				adult_bird_count: 1,
-				new_adult_bird_count: 1,
-				first_summer_bird_count: 0,
-				old_timers_bird_count: 0
+				new_adult_bird_count: 1
 			});
+		});
+
+		it('the RPC result carries no old_timers_bird_count or first_summer_bird_count key (#856)', async () => {
+			const row = await splitRow(naDate);
+			expect(Object.keys(row)).not.toContain('old_timers_bird_count');
+			expect(Object.keys(row)).not.toContain('first_summer_bird_count');
 		});
 	});
 

@@ -782,8 +782,6 @@ export type Database = {
         postjuv_enc_count: number | null
         new_young_bird_count: number | null
         new_adult_bird_count: number | null
-        first_summer_bird_count: number | null
-        old_timers_bird_count: number | null
         postjuv_juv_enc_count: number | null
         new_postjuv_juv_enc_count: number | null
         new_postjuv_enc_count: number | null

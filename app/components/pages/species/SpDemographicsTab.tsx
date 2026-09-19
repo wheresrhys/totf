@@ -121,7 +121,7 @@ function Spinner() {
 // regardless of how often tiles expand/collapse: the Counts tile reads
 // `core_stats` (`getSpeciesStatsHistory`), while the Returning ages, Young
 // counts and New young counts tiles share the companion `demographics_stats`
-// fetch (`getSpeciesDemographicsStats`) — #800 split the age-split/young-trends
+// fetch (`getSpeciesDemographicsStats`) — #800 split the new-adult/young-trends
 // derivations into that separate RPC (originally named `population_stats`,
 // renamed `demographics_stats` in #878) rather than folding them into
 // `core_stats`; #839 split the original single Young trends tile into

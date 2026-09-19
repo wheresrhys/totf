@@ -32,8 +32,9 @@ export type CoreStatsResult = {
 };
 
 // demographics_stats is core_stats' companion RPC (#800, renamed from
-// population_stats in #878), carrying the age-split + young-trends derivations
-// in its own demographics_stats_result composite type. Same null-stripping
+// population_stats in #878), carrying the new-adult count, young-trends and
+// returning-age (#843) derivations in its own demographics_stats_result
+// composite type. Same null-stripping
 // rationale as CoreStatsResult above: composite-type attributes are
 // always nullable in the generated types, but the RPC COALESCEs its counts and
 // only ever emits whole rows.
