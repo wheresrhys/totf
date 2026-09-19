@@ -456,19 +456,17 @@ export function SummaryTotalsSection({
 				) : (
 					<div>
 						{highlightsData &&
-							Object.entries(highlightsData.overall).map(
-								([highlightName, records]) => (
-									<p key={highlightName}>
-										{highlightName}:{' '}
-										{records.map(({ time_period, value }, i) => (
-											<span key={time_period}>
-												{i > 0 && ', '}
-												{value} on {time_period}
-											</span>
-										))}
-									</p>
-								)
-							)}
+							Object.values(highlightsData.overall).map((highlight) => (
+								<p key={highlight.type}>
+									{highlight.name}:{' '}
+									{highlight.highlights.map(({ time_period, value }, i) => (
+										<span key={time_period}>
+											{i > 0 && ', '}
+											{value} on {time_period}
+										</span>
+									))}
+								</p>
+							))}
 					</div>
 				))}
 		</>
