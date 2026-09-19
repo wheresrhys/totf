@@ -45,7 +45,7 @@ import {
 	topSpeciesQuery,
 	pageOfBirdsQuery,
 	birdDetailQuery,
-	birdDetailEncountersQuery
+	arretrapEncountersQuery
 } from '../queries';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -394,9 +394,9 @@ export async function generateSnapshots(
 	// Filed under tables/Birds/ since Birds (by ring_no) is the entity the page
 	// is keyed on; Encounters is a secondary query merged into the same object.
 	// The Birds portion's query is queries/Birds/bird-detail.ts; the Encounters
-	// portion is queries/Encounters/bird-detail-encounters.ts — deliberately
-	// narrower than the real page's own Encounters select, see that query
-	// file's comment for why.
+	// portion is queries/Encounters/arretrap-encounters.ts, kept as a separate
+	// query definition rather than reusing the page's own Encounters select,
+	// since it's deliberately narrower — see that query file's comment for why.
 	const { data: arretrapBird } = await alpha
 		.from('Birds')
 		.select(birdDetailQuery.select)
@@ -411,7 +411,7 @@ export async function generateSnapshots(
 	if (arretrapBird) {
 		const { data: encounters } = await alpha
 			.from('Encounters')
-			.select(birdDetailEncountersQuery.select)
+			.select(arretrapEncountersQuery.select)
 			.eq('bird_id', arretrapBird.id);
 		await writeSnapshot(
 			`tables/Encounters/arretrap.encounters.json`,
