@@ -25,7 +25,7 @@ import {
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
-
+import type { OneBasedMonth } from '@/app/lib/highlights/v2/index';
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
 // The all-time page's combine-years month tab — distinct from `MONTH_TOTALS_TAB`
 // (the year page's per-year, linked, toggle-enabled month rows). Same label,
@@ -288,7 +288,11 @@ export function SummaryTotalsSection({
 	);
 	const isHighlightsActive = activeTab === HIGHLIGHTS_TAB.id;
 	const fetchHighlightsData = useCallback(
-		async () => dailyHighlights(viewedGroup!.id),
+		async () =>
+			dailyHighlights(viewedGroup!.id, {
+				year,
+				month: month as OneBasedMonth
+			}),
 		[viewedGroup]
 	);
 	const { data: highlightsData, isLoading: isHighlightsLoading } =
@@ -357,7 +361,6 @@ export function SummaryTotalsSection({
 	// of which tab/table is currently active — `undefined` (not `null`) means
 	// "no totals row" to each table's `totalsStats` prop.
 	const totalsStats = summaryStats ?? undefined;
-	console.log(highlightsData);
 
 	return (
 		<>
