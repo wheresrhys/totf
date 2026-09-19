@@ -7,6 +7,7 @@ export { resightingsQuery } from './Encounters/resightings';
 export { topSpeciesQuery } from './Species/top-species';
 export { pageOfBirdsQuery, buildPageOfBirdsSelect } from './Birds/page-of-birds';
 export { birdDetailQuery } from './Birds/bird-detail';
+export { birdDetailEncountersQuery } from './Encounters/bird-detail-encounters';
 
 import { allSessionsQuery } from './Sessions/all-sessions';
 import { recentSessionsQuery } from './Sessions/recent-sessions';
@@ -15,6 +16,7 @@ import { resightingsQuery } from './Encounters/resightings';
 import { topSpeciesQuery } from './Species/top-species';
 import { pageOfBirdsQuery } from './Birds/page-of-birds';
 import { birdDetailQuery } from './Birds/bird-detail';
+import { birdDetailEncountersQuery } from './Encounters/bird-detail-encounters';
 import type { TableQueryDefinition } from './types';
 
 /**
@@ -30,5 +32,6 @@ export const TABLE_QUERIES: readonly TableQueryDefinition[] = [
 	resightingsQuery,
 	topSpeciesQuery,
 	pageOfBirdsQuery,
-	birdDetailQuery
+	birdDetailQuery,
+	birdDetailEncountersQuery
 ];
