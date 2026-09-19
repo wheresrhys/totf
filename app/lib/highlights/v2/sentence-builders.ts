@@ -1,6 +1,10 @@
-import type { Highlight } from './';
-export type HighlightUnit = 'bird' | 'species' | 'encounter';
-type HighlightTemporalUnit = 'session' | 'month';
+import type {
+	Highlight,
+	HighlightUnit,
+	HighlightTemporalUnit,
+	HighlightInContext,
+	YearMonthRestriction
+} from './';
 
 const plurals: Partial<Record<HighlightUnit | HighlightTemporalUnit, string>> =
 	{
@@ -20,7 +24,7 @@ export function printDescriptor({
 	temporalUnit
 }: {
 	verb: string;
-	usePlural: boolean;
+	usePlural?: boolean;
 	temporalUnit: HighlightTemporalUnit;
 }) {
 	return `${verb} ${usePlural ? getPlural(temporalUnit) : temporalUnit}`;
@@ -40,29 +44,25 @@ function prettyPrintPosition(position: number) {
 }
 
 export function printProminenceQualifier({
-	highlights,
-	index
+	siblingHighlights,
+	highlightIndex
 }: {
-	highlights: Highlight[];
-	index: number;
+	siblingHighlights: Highlight[];
+	highlightIndex: number;
 }) {
-	const activeHighlight = highlights[index];
+	const activeHighlight = siblingHighlights[highlightIndex];
 	const activeValue = activeHighlight.value;
-	const allValues = [...new Set(highlights.map(({ value }) => value))].sort();
+	const allValues = [
+		...new Set(siblingHighlights.map(({ value }) => value))
+	].sort((a, b) => b - a);
 	const position = allValues.indexOf(activeValue) + 1;
 	const isJoint =
-		highlights.filter(({ value }) => value === activeValue).length > 1;
+		siblingHighlights.filter(({ value }) => value === activeValue).length > 1;
 
 	return `${isJoint ? 'Joint ' : ''}${prettyPrintPosition(position)}`;
 }
 
-export function printTimeQualifier({
-	year,
-	month
-}: {
-	year?: number;
-	month?: number;
-}) {
+export function printTimeQualifier({ year, month }: YearMonthRestriction) {
 	if (year && month) {
 		// todo pretty print month
 		return year === new Date().getFullYear()
@@ -75,4 +75,16 @@ export function printTimeQualifier({
 	} else {
 		return `ever`;
 	}
+}
+
+export function printSingleHighlightSentence({
+	parentTimeWindow,
+	siblingHighlights,
+	highlightIndex,
+	verb,
+	temporalUnit,
+	value,
+	unit
+}: HighlightInContext) {
+	return `${printProminenceQualifier({ highlightIndex, siblingHighlights })} ${printDescriptor({ verb, temporalUnit })} ${printTimeQualifier(parentTimeWindow || {})}: ${printValue(value, unit)}`.trim();
 }

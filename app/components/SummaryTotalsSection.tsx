@@ -464,7 +464,7 @@ export function SummaryTotalsSection({
 						{highlightsData &&
 							highlightsData.map((highlight) => (
 								<p key={highlight.type}>
-									{highlight.name}:{' '}
+									{highlight.verb} {highlight.type}:{' '}
 									{highlight.highlights.map(({ time_period, value }, i) => (
 										<span key={time_period}>
 											{i > 0 && ', '}

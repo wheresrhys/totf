@@ -3,11 +3,12 @@ import type { CoreStatsResult } from '@/app/models/db';
 const DEFAULT_OPTIONS = { limit: 3, threshold: 0 };
 export type OneBasedMonth = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
-type YearMonthRestriction = {
-	year: number | undefined;
-	month: OneBasedMonth | undefined;
+export type YearMonthRestriction = {
+	year?: number;
+	month?: OneBasedMonth;
 };
-
+export type HighlightUnit = 'bird' | 'species' | 'encounter';
+export type HighlightTemporalUnit = 'session' | 'month';
 type HighlightCategory = 'count' | 'rarity' | 'biometrics';
 type HighlightType =
 	| 'birds'
@@ -30,10 +31,25 @@ type HighlightFinderOptions = {
 };
 
 export type HighlightsOfType = {
-	name: string;
 	type: HighlightType;
+	verb: string;
+	temporalUnit: HighlightTemporalUnit;
+	unit: HighlightUnit;
 	category: HighlightCategory;
 	highlights: Highlight[];
+};
+
+export type HighlightInContext = {
+	type: HighlightType;
+	parentTimeWindow?: YearMonthRestriction;
+	verb: string;
+	temporalUnit: HighlightTemporalUnit;
+	unit: HighlightUnit;
+	category: HighlightCategory;
+	highlightIndex: number;
+	siblingHighlights: Highlight[];
+	value: number;
+	timePeriod: string;
 };
 
 function sumProperties<T>(item: T, properties: (keyof T)[]) {
@@ -96,12 +112,12 @@ const cache: Map<string, HighlightsOfType[]> = new Map();
 
 function generateHighlights({
 	stats,
-	highlightNameMapping,
 	limit,
+	temporalUnit,
 	cacheKey
 }: {
 	stats: RawStats;
-	highlightNameMapping: Record<HighlightType, string>;
+	temporalUnit: HighlightTemporalUnit;
 	limit?: number;
 	cacheKey: string;
 }): HighlightsOfType[] {
@@ -111,8 +127,10 @@ function generateHighlights({
 	} else {
 		unboundedHighlights = [
 			{
-				name: highlightNameMapping.birds,
 				type: 'birds',
+				unit: 'bird',
+				verb: 'Busiest',
+				temporalUnit,
 				category: 'count',
 				highlights: getTopByProperty<CoreStatsResult>(
 					'bird_count',
@@ -129,8 +147,10 @@ function generateHighlights({
 			// 	)
 			// },
 			{
-				name: highlightNameMapping.species,
 				type: 'species',
+				unit: 'species',
+				verb: 'Most varied',
+				temporalUnit,
 				category: 'count',
 				highlights: getTopByProperty<CoreStatsResult>(
 					'species_count',
@@ -138,18 +158,22 @@ function generateHighlights({
 				)
 			},
 			{
-				name: highlightNameMapping.newBirds,
 				type: 'newBirds',
 				category: 'count',
+				unit: 'bird',
+				verb: 'Most new birds in a',
+				temporalUnit,
 				highlights: getTopByProperty<CoreStatsResult>(
 					'new_bird_count',
 					stats.overall
 				)
 			},
 			{
-				name: highlightNameMapping.juvs,
 				type: 'juvs',
 				category: 'count',
+				unit: 'bird',
+				verb: 'Most juveniles in a',
+				temporalUnit,
 				highlights: getTopByPropertiesSum<CoreStatsResult>(
 					['pullus_bird_count', 'juv_bird_count', 'postjuv_bird_count'],
 					stats.overall
@@ -213,17 +237,8 @@ export async function dailyHighlights({
 	}
 	return generateHighlights({
 		cacheKey,
+		temporalUnit: 'session',
 		stats: dailyStats,
-		highlightNameMapping: {
-			birds: limit > 1 ? 'Busiest sessions' : 'Busiest session',
-			// encounters: limit > 1 ? 'Busiest sessions' : 'Busiest session',
-			species: limit > 1 ? 'Most varied sessions' : 'Most varied session',
-			newBirds:
-				limit > 1
-					? 'Sessions with most new birds'
-					: 'Session with most new birds',
-			juvs: limit > 1 ? 'Sessions with most juvs' : 'Session with most juvs'
-		},
 		limit
 	});
 }
@@ -232,23 +247,28 @@ export async function fetchDayHighlights(
 	groupId: number,
 	timePeriod: string,
 	periodFilter?: YearMonthRestriction
-) {
+): Promise<HighlightInContext[]> {
 	const allTimeDailyHighlights = await dailyHighlights({
 		groupId,
 		periodFilter,
 		limit: 3
 	});
-	const relevantHighlights: HighlightsOfType[] = [];
+	const relevantHighlights: HighlightInContext[] = [];
 
 	allTimeDailyHighlights.forEach((highlightWrapper) => {
-		const relevantHighlight = highlightWrapper.highlights.find(
+		const relevantHighlightIndex = highlightWrapper.highlights.findIndex(
 			({ time_period }) => timePeriod === time_period
 		);
+		const relevantHighlight =
+			highlightWrapper.highlights[relevantHighlightIndex];
 
-		if (relevantHighlight) {
+		if (relevantHighlightIndex > -1) {
 			relevantHighlights.push({
 				...highlightWrapper,
-				highlights: [relevantHighlight]
+				siblingHighlights: highlightWrapper.highlights,
+				highlightIndex: relevantHighlightIndex,
+				value: relevantHighlight.value,
+				timePeriod: relevantHighlight.time_period
 			});
 		}
 	});

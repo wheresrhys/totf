@@ -12,10 +12,13 @@ import {
 import type { LongAbsenceRetrapsResult } from '@/app/models/db';
 import {
 	fetchDayHighlights,
-	type HighlightsOfType
+	type HighlightInContext
 } from '@/app/lib/highlights/v2/index';
 
-export type HighlightsData = { v1: SessionHighlight[]; v2: HighlightsOfType[] };
+export type HighlightsData = {
+	v1: SessionHighlight[];
+	v2: HighlightInContext[];
+};
 export async function fetchSessionHighlights({
 	date,
 	viewedGroupId
