@@ -1092,6 +1092,300 @@ describe('demographics_stats', () => {
 		});
 	});
 
+	// Regression guards for #932, which restructured stats_bird_returning_age_bucket
+	// from a per-cell re-aggregation of each bird's whole per-encounter lifetime
+	// history into a single window pass over a merged stream: the history collapsed
+	// to one row per (bird, calendar year), UNIONed with the cells, accumulated once
+	// per bird. Output is meant to be byte-for-byte unchanged, so the block above
+	// (which asserts the classification rules themselves) is the primary guard. These
+	// tests pin the two things the restructuring specifically could break and the old
+	// shape structurally could not:
+	//
+	//   * the per-year GROUP BY that collapses several encounters in ONE calendar year
+	//     into a single stream row — if it lost the row count or the
+	//     precisely-aged flag, a multi-encounter bird would be misread as a
+	//     single-encounter one and wrongly carved out to 'new_unknown_age';
+	//   * the running window frame, which must cover every history year <= a cell's
+	//     own period_year and no more — checked across many cells of one bird, and at
+	//     the 1 / 2 / 3_plus boundary years of a bird with a 17-year history.
+	//
+	// Isolation: these queries are the only ones in the suite that read several cells
+	// at once (rather than a single from=to=date row), so besides the usual random
+	// far-future dates they also filter on 'Kingfisher' — a species no other test in
+	// this file touches — so a concurrent worktree's rows can never land in the same
+	// cells.
+	//
+	// Not covered, deliberately: a cell whose bird has NO lifetime encounter at or
+	// before its period_year. The refactor keeps the old LEFT JOIN's NULL-bucket
+	// behaviour for it, but it is unreachable through the RPC's public surface —
+	// stats_raw_encounters scopes the windowed source by the same
+	// sess.ringing_group_id the lifetime CTE uses, so a bird's windowed encounters
+	// are always a subset of its lifetime ones. See the note in
+	// stats_bird_returning_age_bucket.sql.
+	describe('returning age buckets — cumulative per-year history (#932)', () => {
+		let deltaId: number;
+		let deltaClient: SupabaseClient;
+		const locationIds: number[] = [];
+		const sessionIds: number[] = [];
+		const birdIds: number[] = [];
+
+		// Disjoint year bands, so no two of these birds ever share a cell except
+		// where a test deliberately puts them there.
+		let baseYear: number;
+		let longHistoryFirstYear: number; // ringed here, then adult for 16 more years
+		let multiCellRingYear: number; // ringed here, adult in the two years after next
+		let sameYearYear: number; // one bird's only calendar year, 3 encounters
+		let singlePreciseYear: number; // one bird's only calendar year, 1 encounter
+
+		const LONG_HISTORY_YEARS = 16;
+		// Month/day each bird uses within a year, so a date is derivable from a year.
+		const visitDateIn = (year: number, month = 5) =>
+			`${year}-${String(month).padStart(2, '0')}-15`;
+
+		beforeAll(async () => {
+			deltaId = await getGroupIdByName('Delta');
+			deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+			const testSuffix = randomTestSuffix();
+			baseYear = parseInt(randomFutureDate().slice(0, 4), 10);
+			longHistoryFirstYear = baseYear - 20;
+			multiCellRingYear = baseYear - 3;
+			sameYearYear = baseYear + 2;
+			singlePreciseYear = baseYear + 3;
+
+			const { data: kingfisher, error: speciesError } = await supabase
+				.from('Species')
+				.select('id')
+				.eq('species_name', 'Kingfisher')
+				.single();
+			if (speciesError) throw speciesError;
+			const kingfisherId = kingfisher!.id;
+
+			const { data: location, error: locationError } = await deltaClient
+				.from('Locations')
+				.insert({
+					location_name: `Cumulative History Loc ${testSuffix}`,
+					ringing_group_id: deltaId
+				})
+				.select('id')
+				.single();
+			if (locationError) throw locationError;
+			locationIds.push(location!.id);
+			const locationId = location!.id;
+
+			const sessionCache = new Map<string, number>();
+			async function getSession(date: string) {
+				const cached = sessionCache.get(date);
+				if (cached !== undefined) return cached;
+				const { data: session, error } = await deltaClient
+					.from('Sessions')
+					.insert({ visit_date: date, location_id: locationId })
+					.select('id')
+					.single();
+				if (error) throw error;
+				sessionCache.set(date, session!.id);
+				sessionIds.push(session!.id);
+				return session!.id;
+			}
+
+			let ringCounter = 0;
+			async function addBird(
+				encounters: { date: string; age_code: number }[]
+			): Promise<number> {
+				const { data: bird, error } = await deltaClient
+					.from('Birds')
+					.insert({
+						ring_no: `CUMHIST-${testSuffix}-${ringCounter++}`,
+						species_id: kingfisherId
+					})
+					.select('id')
+					.single();
+				if (error) throw error;
+				birdIds.push(bird!.id);
+				for (const encounter of encounters) {
+					const sessionId = await getSession(encounter.date);
+					const { error: encounterError } = await deltaClient
+						.from('Encounters')
+						.insert({
+							capture_time: '10:00:00',
+							scheme: 'BTO',
+							sex: 'M',
+							session_id: sessionId,
+							bird_id: bird!.id,
+							age_code: encounter.age_code,
+							is_juv: false,
+							record_type: 'R'
+						});
+					if (encounterError) throw encounterError;
+				}
+				return bird!.id;
+			}
+
+			// (a) One bird read across many monthly cells spanning two calendar years.
+			// Precisely ringed (age_code 3, max_hatch_year = multiCellRingYear) two
+			// years before the first adult year, so every cell in multiCellRingYear + 2
+			// must read 2 and every cell in multiCellRingYear + 3 must read 3_plus.
+			await addBird([
+				{ date: visitDateIn(multiCellRingYear, 5), age_code: 3 },
+				{ date: visitDateIn(multiCellRingYear + 2, 3), age_code: 4 },
+				{ date: visitDateIn(multiCellRingYear + 2, 9), age_code: 4 },
+				{ date: visitDateIn(multiCellRingYear + 3, 2), age_code: 4 },
+				{ date: visitDateIn(multiCellRingYear + 3, 6), age_code: 4 },
+				{ date: visitDateIn(multiCellRingYear + 3, 11), age_code: 4 }
+			]);
+
+			// (b) Three encounters, all in ONE calendar year, all imprecise (age_code 4
+			// -> max_hatch_year year - 1, min_hatch_year 0). Age computes to 1 and the
+			// bird was never precisely aged, so ONLY the encounter count keeps it out of
+			// the 'new_unknown_age' carve-out — exactly what the per-year collapse must
+			// preserve.
+			await addBird([
+				{ date: visitDateIn(sameYearYear, 4), age_code: 4 },
+				{ date: visitDateIn(sameYearYear, 7), age_code: 4 },
+				{ date: visitDateIn(sameYearYear, 10), age_code: 4 }
+			]);
+
+			// (c) A single first-ever encounter in the SAME month as one of bird (b)'s,
+			// imprecise and computing an age of 1 — the carve-out case. Shares a cell
+			// with (b), so one query sees both classifications side by side.
+			await addBird([{ date: visitDateIn(sameYearYear, 7), age_code: 4 }]);
+
+			// (d) A single first-ever encounter, precisely aged (age_code 5 ->
+			// max_hatch_year year - 1, min_hatch_year year - 1), computing an age of 1.
+			// The precisely-aged flag must survive the per-year collapse, or this bird
+			// would be wrongly carved out to 'new_unknown_age'.
+			await addBird([{ date: visitDateIn(singlePreciseYear, 5), age_code: 5 }]);
+
+			// (e) A 17-distinct-year history: precisely ringed, then one adult encounter
+			// per year for the next 16 years.
+			await addBird([
+				{ date: visitDateIn(longHistoryFirstYear, 5), age_code: 3 },
+				...Array.from({ length: LONG_HISTORY_YEARS }, (_, offset) => ({
+					date: visitDateIn(longHistoryFirstYear + offset + 1, 5),
+					age_code: 4
+				}))
+			]);
+		});
+
+		afterAll(() => {
+			execSync(
+				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+					`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
+					`DELETE FROM "Locations" WHERE id IN (${locationIds.join(', ')});'`
+			);
+		});
+
+		// A single ungrouped Kingfisher row covering exactly one date.
+		async function kingfisherRowOn(date: string) {
+			const { data, error } = await deltaClient.rpc('demographics_stats', {
+				species_name_filter: 'Kingfisher',
+				ringing_group_filter: deltaId,
+				from_date: date,
+				to_date: date
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(1);
+			return data![0];
+		}
+
+		// Usual
+		it('a bird with a 3-calendar-year history reads the same bucket in every monthly cell of a given year, and shifts one bucket in the next', async () => {
+			const { data, error } = await deltaClient.rpc('demographics_stats', {
+				species_name_filter: 'Kingfisher',
+				ringing_group_filter: deltaId,
+				from_date: `${multiCellRingYear + 2}-01-01`,
+				to_date: `${multiCellRingYear + 3}-12-31`,
+				group_by_time_period: 'month'
+			});
+			expect(error).toBeNull();
+
+			const cellFor = (date: string) =>
+				data!.find((row) => row.time_period === date.slice(0, 8) + '01');
+
+			// Two cells in the earlier year: period_year - max_hatch_year = 2.
+			for (const month of [3, 9]) {
+				expect(cellFor(visitDateIn(multiCellRingYear + 2, month))).toMatchObject({
+					adult_bird_count: 1,
+					returning_age_1_bird_count: 0,
+					returning_age_2_bird_count: 1,
+					returning_age_3_plus_bird_count: 0,
+					returning_new_unknown_age_bird_count: 0
+				});
+			}
+
+			// Three cells in the later year: the same bird, now reading 3.
+			for (const month of [2, 6, 11]) {
+				expect(cellFor(visitDateIn(multiCellRingYear + 3, month))).toMatchObject({
+					adult_bird_count: 1,
+					returning_age_1_bird_count: 0,
+					returning_age_2_bird_count: 0,
+					returning_age_3_plus_bird_count: 1,
+					returning_new_unknown_age_bird_count: 0
+				});
+			}
+		});
+
+		// Structure
+		it('a bird with three encounters in one calendar year is not carved out as new_unknown_age — the per-year collapse keeps its encounter count', async () => {
+			const row = await kingfisherRowOn(visitDateIn(sameYearYear, 4));
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_1_bird_count: 1,
+				returning_new_unknown_age_bird_count: 0
+			});
+		});
+
+		it('a single precisely-aged first encounter is not carved out — the per-year collapse keeps its precisely-aged flag', async () => {
+			const row = await kingfisherRowOn(visitDateIn(singlePreciseYear, 5));
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_1_bird_count: 1,
+				returning_new_unknown_age_bird_count: 0
+			});
+		});
+
+		it('a multi-encounter and a single-encounter bird sharing one cell land in different buckets', async () => {
+			const row = await kingfisherRowOn(visitDateIn(sameYearYear, 7));
+			expect(row).toMatchObject({
+				adult_bird_count: 2,
+				returning_age_1_bird_count: 1,
+				returning_age_2_bird_count: 0,
+				returning_age_3_plus_bird_count: 0,
+				returning_new_unknown_age_bird_count: 1
+			});
+		});
+
+		// Edge
+		it('a bird with 17 distinct encounter years reads the exact bucket boundaries 1 / 2 / 3_plus in its first three returning years', async () => {
+			const expectations: [number, Record<string, number>][] = [
+				[1, { returning_age_1_bird_count: 1, returning_age_2_bird_count: 0 }],
+				[2, { returning_age_2_bird_count: 1, returning_age_3_plus_bird_count: 0 }],
+				[3, { returning_age_2_bird_count: 0, returning_age_3_plus_bird_count: 1 }]
+			];
+			for (const [yearOffset, expected] of expectations) {
+				const row = await kingfisherRowOn(
+					visitDateIn(longHistoryFirstYear + yearOffset, 5)
+				);
+				expect(row).toMatchObject({ adult_bird_count: 1, ...expected });
+			}
+		});
+
+		it('the same bird still reads 3_plus at the far end of its 17-year history', async () => {
+			const row = await kingfisherRowOn(
+				visitDateIn(longHistoryFirstYear + LONG_HISTORY_YEARS, 5)
+			);
+			expect(row).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_1_bird_count: 0,
+				returning_age_2_bird_count: 0,
+				returning_age_3_plus_bird_count: 1,
+				returning_new_unknown_age_bird_count: 0
+			});
+		});
+	});
+
 	// Thin confirming assertion — the actual exclusion logic is covered in depth by
 	// stats-raw-encounters-and-spine.test.ts, since demographics_stats inherits it from
 	// the shared stats_raw_encounters/stats_spine utility RPCs (#874).
