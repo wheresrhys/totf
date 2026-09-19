@@ -187,6 +187,18 @@ duplicate of a same-named column on `core_stats` (#800); #824 removed `core_stat
 copy (and the corresponding UI series, #817) as unused, so `demographics_stats` now holds the only
 `new_young_bird_count` column in the schema.
 
+`stats_raw_encounters` and `stats_spine` also exclude passive, no-bird-in-hand data so it never
+leaks into any stats RPC built on them (#874). `stats_raw_encounters` filters out any `Encounters`
+row whose `record_type` is a resighting/recovery type — `public.resighting_record_type` (`U`/`F`/`D`
+— see the DemOn field spec) — by adding the condition to its `LEFT JOIN ... ON` clause rather than a
+`WHERE`, so a bird whose only encounters are resightings still surfaces as a NULL-`encounter_id` row
+instead of disappearing from the result entirely. `stats_spine`'s `session_date_range` separately
+excludes `FIELD_OBSERVATION` sessions, so a field-observation-only date can't stretch the month/year
+spine past the range of real (`FULL_GROWN`/`PULLI`) sessions. `app/models/db.ts` exports
+`ResightingRecordType` from the generated enum, and `lib/demon-import.ts`'s
+`RESIGHTING_RECORD_TYPES` constant is typed against it — keep that constant in sync **by hand** if
+the enum ever changes, the same convention as the age-bucket definitions above.
+
 `demographics_stats`' four `returning_age_*_bird_count` columns (#843, driving the species page's
 "Returning ages" chart) are resolved per bird by a fifth utility RPC,
 `stats_bird_returning_age_bucket`. It takes the adult cohort straight from `stats_bird_age_bucket`

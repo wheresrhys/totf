@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase.types';
+import type { ResightingRecordType } from '@/app/models/db';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Omit<
@@ -137,8 +138,11 @@ export type DemonRow = Record<DemonColumnNames, string>;
 // `record_type` values that indicate a passive resighting/recovery (no bird
 // in the hand) rather than a capture (see the DemOn field spec referenced in
 // CLAUDE.md for the full record_type code table).
-export const RESIGHTING_RECORD_TYPES = ['U', 'F', 'D'] as const;
-export type ResightingRecordType = (typeof RESIGHTING_RECORD_TYPES)[number];
+// Typed against the generated `resighting_record_type` enum so a DB-side
+// rename/removal fails to compile here instead of silently drifting (mirrors
+// RING_SIZE_ENUM_ORDER's pinning against the ring_size enum). Keep in sync with
+// the enum by hand — the exhaustiveness test in demon-import.test.ts guards it.
+export const RESIGHTING_RECORD_TYPES: ResightingRecordType[] = ['U', 'F', 'D'];
 
 export class CasualtyEncounterError extends Error {
 	constructor() {

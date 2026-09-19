@@ -71,12 +71,23 @@ describe('ring sequence RPC functions', () => {
 		});
 
 		it('excludes rings that have any N encounter for the group', async () => {
-			// Alpha: all birds have at least 1 N encounter → no controls
+			// A "control" is a ring whose encounters are ALL record_type 'S' (see
+			// ring_sequence_controls.sql's HAVING clause) — every pre-existing Alpha
+			// bird has at least one non-'S' encounter, so none qualified here
+			// originally. #902 added two single-encounter, all-'S' birds (Fieldfare
+			// XFIELDF01, Redwing XREDWNG01) to exercise a "resightings" table fixture,
+			// so those two now surface as controls. The same fixture change also added
+			// a resighting-only Kingfisher ('F') and Wren ('U') — neither qualifies as
+			// a control since their sole encounter isn't record_type 'S'.
 			const { data, error } = await alphaClient.rpc('ring_sequence_controls', {
 				ringing_group_filter: alphaId,
 			});
 			expect(error).toBeNull();
-			expect(data).toHaveLength(0);
+			expect(data).toHaveLength(2);
+			expect(data!.map((r) => r.ring_no).sort()).toEqual([
+				'XFIELDF01',
+				'XREDWNG01',
+			]);
 		});
 
 		it('excludes ARRETRAP because it has an N record despite also having S records', async () => {

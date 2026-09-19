@@ -39,6 +39,19 @@
     ]
   },
   {
+    "id": 61,
+    "visit_date": "2023-05-12",
+    "location": {
+      "id": 1,
+      "location_name": "Alpha Site A (CES)"
+    },
+    "encounters": [
+      {
+        "count": 1
+      }
+    ]
+  },
+  {
     "id": 37,
     "visit_date": "2023-05-12",
     "location": {
@@ -52,20 +65,7 @@
     ]
   },
   {
-    "id": 727,
-    "visit_date": "2023-05-12",
-    "location": {
-      "id": 1,
-      "location_name": "Alpha Site A (CES)"
-    },
-    "encounters": [
-      {
-        "count": 1
-      }
-    ]
-  },
-  {
-    "id": 702,
+    "id": 60,
     "visit_date": "2023-05-10",
     "location": {
       "id": 1,
@@ -78,7 +78,7 @@
     ]
   },
   {
-    "id": 699,
+    "id": 59,
     "visit_date": "2023-03-20",
     "location": {
       "id": 1,
@@ -91,7 +91,7 @@
     ]
   },
   {
-    "id": 723,
+    "id": 58,
     "visit_date": "2023-03-15",
     "location": {
       "id": 1,

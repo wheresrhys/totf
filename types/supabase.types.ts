@@ -701,6 +701,7 @@ export type Database = {
       text_soundex: { Args: { "": string }; Returns: string }
     }
     Enums: {
+      resighting_record_type: "U" | "F" | "D"
       ring_size:
         | "AA"
         | "A"
@@ -915,6 +916,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      resighting_record_type: ["U", "F", "D"],
       ring_size: [
         "AA",
         "A",
