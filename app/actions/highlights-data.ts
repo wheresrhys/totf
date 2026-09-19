@@ -3,6 +3,11 @@ import type { CoreStatsResult } from '@/app/models/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
 
+export type RawStats = {
+	bySpecies: CoreStatsResult[];
+	overall: CoreStatsResult[];
+};
+
 export async function uncachedDailyCoreStats(
 	supabase: SupabaseClient,
 	viewedGroupId: number
