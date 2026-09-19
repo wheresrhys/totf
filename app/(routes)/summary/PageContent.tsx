@@ -9,6 +9,18 @@ import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { MonthTotalsRow } from '@/app/lib/month-totals';
+
+function buildHeading(year?: number, month?: number): string {
+	if (year === undefined) {
+		return 'All time summary';
+	}
+	if (month === undefined) {
+		return `${year} summary`;
+	}
+	const monthDate = new Date(year, month - 1, 1);
+	return `${format(monthDate, 'LLLL')} ${year} summary`;
+}
+
 export function SummaryPageContent({
 	year,
 	month,
@@ -63,15 +75,4 @@ export function SummaryPageContent({
 			/>
 		</PageWrapper>
 	);
-}
-
-function buildHeading(year?: number, month?: number): string {
-	if (year === undefined) {
-		return 'All time summary';
-	}
-	if (month === undefined) {
-		return `${year} summary`;
-	}
-	const monthDate = new Date(year, month - 1, 1);
-	return `${format(monthDate, 'LLLL')} ${year} summary`;
 }
