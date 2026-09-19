@@ -155,12 +155,12 @@ Tables (PascalCase in Postgres, matching generated TypeScript types in `types/su
 Key design notes:
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
 - Several fields are populated by triggers (e.g. `proven_age` on Birds, timestamps on Sessions/Encounters).
-- Complex queries are exposed as Postgres RPC functions (e.g. `top_metrics_by_period`, `core_stats`, `notable_retraps`, `find_discrepencies`).
+- Complex queries are exposed as Postgres RPC functions (e.g. `core_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
 
-### Companion stats RPCs and shared plumbing (`core_stats` / `population_stats`, #800)
+### Companion stats RPCs and shared plumbing (`core_stats` / `demographics_stats`, #800/#877)
 
-`core_stats` and `population_stats` (age-split + young-trends derivations, split into its own
+`core_stats` and `demographics_stats` (age-split + young-trends derivations, split into its own
 RPC rather than folded into `core_stats`' already-large single query — for query-plan
 simplicity and to leave `core_stats`' existing columns untouched) share the same input
 signature (`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
@@ -172,18 +172,52 @@ RPC calls every utility it needs exactly once and materializes the result into a
 by every downstream reference in that RPC), so the base tables aren't rescanned once per downstream
 CTE — but a utility RPC that itself depends on another (e.g. `stats_bird_age_bucket` →
 `stats_encounter_age_classification` → `stats_raw_encounters`) does re-derive that dependency
-independently per call site, so a top-level RPC needing several layers (e.g. `population_stats`
+independently per call site, so a top-level RPC needing several layers (e.g. `demographics_stats`
 needing `stats_spine` + `stats_encounter_age_classification` + `stats_bird_age_bucket`) re-scans the
 base tables a small constant number of times rather than once — accepted as a reasonable tradeoff at
 this app's data scale; keep an eye on it if a future RPC stacks many more utility layers. Keep the
 utility RPCs' bucket/precedence definitions in sync **by hand** with `app/models/encounter.ts`'s
-`getAgeClass()` if either changes. `population_stats.new_young_bird_count` was originally a
+`getAgeClass()` if either changes. `demographics_stats` was originally named `population_stats`
+(#800); #877 created the renamed `demographics_stats`/`demographics_stats_result` pair as
+byte-identical siblings, #878 migrated every app-code call site onto the new names, and #879
+dropped the old `population_stats` function and `population_stats_result` type entirely — the
+same three-step pattern used for `core_stats`/`public_core_stats` (#830, see "Public pages and
+the group summary read-path" above). `demographics_stats.new_young_bird_count` was originally a
 duplicate of a same-named column on `core_stats` (#800); #824 removed `core_stats`'s
-copy (and the corresponding UI series, #817) as unused, so `population_stats` now holds the only
+copy (and the corresponding UI series, #817) as unused, so `demographics_stats` now holds the only
 `new_young_bird_count` column in the schema.
 
+`stats_raw_encounters` and `stats_spine` also exclude passive, no-bird-in-hand data so it never
+leaks into any stats RPC built on them (#874). `stats_raw_encounters` filters out any `Encounters`
+row whose `record_type` is a resighting/recovery type — `public.resighting_record_type` (`U`/`F`/`D`
+— see the DemOn field spec) — by adding the condition to its `LEFT JOIN ... ON` clause rather than a
+`WHERE`, so a bird whose only encounters are resightings still surfaces as a NULL-`encounter_id` row
+instead of disappearing from the result entirely. `stats_spine`'s `session_date_range` separately
+excludes `FIELD_OBSERVATION` sessions, so a field-observation-only date can't stretch the month/year
+spine past the range of real (`FULL_GROWN`/`PULLI`) sessions. `app/models/db.ts` exports
+`ResightingRecordType` from the generated enum, and `lib/demon-import.ts`'s
+`RESIGHTING_RECORD_TYPES` constant is typed against it — keep that constant in sync **by hand** if
+the enum ever changes, the same convention as the age-bucket definitions above.
+
+`demographics_stats`' four `returning_age_*_bird_count` columns (#843, driving the species page's
+"Returning ages" chart) are resolved per bird by a fifth utility RPC,
+`stats_bird_returning_age_bucket`. It takes the adult cohort straight from `stats_bird_age_bucket`
+(`age_bucket = 'adult'`, the same filter `adult_age_split` applies) and splits it by a
+**period-relative** proven age — `period_year − MIN(max_hatch_year)` over the bird's group-scoped
+lifetime encounters with `enc_year <= period_year`, the same formula
+`trg_encounters_refresh_bird_proven_age` uses but windowed rather than all-time. It deliberately
+never reads `Birds.proven_age` itself: that column is live, global and all-time, so joining it onto
+a historical cell would stamp today's age onto a ten-year-old row. One narrow carve-out sends a
+bird to `'new_unknown_age'` instead of `'1'` — a single first-ever encounter, never precisely aged
+(`min_hatch_year = 0`, `trg_set_encounter_generated_fields`' sentinel for an even/imprecise
+`age_code`), computing an age of exactly 1, where that 1 is a coding artefact rather than evidence
+of return. Don't widen it: a first-ever imprecise encounter computing 2 lands in `'2'` as an
+accepted quirk. Note also that an adult-bucketed bird can never compute a period-relative age of 0
+(any `age_code > 3` encounter in year V implies `max_hatch_year <= V - 1`), so the four columns in
+practice sum to `adult_bird_count`; the RPC's zero/NULL guard is defensive only.
+
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
-two structurally can't: **arrivals**. `core_stats`/`population_stats` compute their bucket
+two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
 counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
 one year is counted again in each monthly cell. `arrivals_stats` instead counts each bird exactly
 once per calendar year, at whichever cell holds its **first classifiable encounter of that year**,
@@ -195,8 +229,8 @@ unclassifiable early encounter is skipped in favour of the next classifiable one
 than losing the bird for that year), takes `DISTINCT ON (bird_id, enc_year)` ordered by
 `visit_date, encounter_id` for same-day determinism, and splits `adult` into `new_adult` vs
 `returning_adult` off the same unwindowed, `ringing_group_filter`-scoped lifetime-history CTEs
-`population_stats` uses (`new_adult` iff the arrival year is the bird's first-ever year with the
-group — no majority-vote heuristic needed, unlike `population_stats`' first_summer/old_timers split).
+`demographics_stats` uses (`new_adult` iff the arrival year is the bird's first-ever year with the
+group — no majority-vote heuristic needed, unlike `demographics_stats`' first_summer/old_timers split).
 Note the granularity: an "arrival" is a **bird-year**, not a bird, so under an ungrouped query a bird
 that arrived in two years contributes two counts.
 
@@ -204,10 +238,11 @@ that arrived in two years contributes two counts.
 <composite type>` function's `RETURN QUERY SELECT ...` binds the SELECT list to the composite
 type's columns by ordinal attribute position, never by the `AS "..."` alias text. That position is
 only as stable as whatever DDL a given environment's `db:schema:apply` run happens to emit for the
-type — confirmed empirically while building `population_stats`: two schema-diff runs against the
-identical schema files produced two *different* physical attribute orders for a composite type's
-columns (one matching the file's declared order, one alphabetical), silently scrambling values into
-the wrong named output columns with no error either way. `population_stats` and `core_stats`
+type — confirmed empirically while building `demographics_stats` (as `population_stats`): two
+schema-diff runs against the identical schema files produced two *different* physical attribute
+orders for a composite type's columns (one matching the file's declared order, one alphabetical),
+silently scrambling values into the wrong named output columns with no error either way.
+`demographics_stats` and `core_stats`
 (the latter retrofitted in #824, the first time `aggregate_stats_result` changed shape since this
 note was written) guard against this by wrapping their final projection — `SELECT
 (jsonb_populate_record(NULL::the_result_type, to_jsonb(agg))).* FROM (...) AS agg` — which binds
@@ -255,7 +290,7 @@ Every page lives under `app/(routes)/` and follows a consistent split between th
 entrypoint, its content, and its data fetcher:
 
 - **`page.tsx`** is always server-side. It exports a default `___Page` component named after the
-  route (e.g. `BirdPage`, `SpeciesPage`, `RecordsPage`), which calls `BootstrapPage`
+  route (e.g. `BirdPage`, `SpeciesPage`), which calls `BootstrapPage`
   (`app/components/layout/BootstrapPage.tsx`) with a `PageComponent` and a `dataFetcher`.
   `page.tsx` also hosts the `fetch___PageContent` function itself, even though
   `PageContent.tsx` sits right next to it — the fetcher is inherently server-side (it's passed
@@ -368,6 +403,19 @@ npm run test:e2e      # full Playwright E2E suite
 npm run qa            # lint + type-check + app tests
 ```
 
+**Output is concise by default (#927).** Every one-shot ("run", not "watch") Vitest command —
+`test:nowatch`, `test:ci`, `test:integration`, `test:fixture-freshness`, `test:http` — passes
+`--reporter=dot`: a single character per test instead of a verbose per-test PASS line, with full
+detail still printed for any failure plus the final summary. `npm test` (interactive watch mode)
+is deliberately left on Vitest's default reporter — that's for a human watching it run, not an
+automated one-shot pass. Playwright (`playwright.config.ts`) uses `[['dot'], ['html', { open:
+'never' }]]` for the same reason, and to stop the HTML reporter auto-opening a browser tab when a
+test fails in a subagent's headless environment. `npm run lint`'s Prettier step passes
+`--log-level warn` so it stays silent when a file needs no reformatting, rather than printing a
+line per file scanned. This matters most when tests/lint run inside a subagent (`implement-ticket`'s
+`npm run qa`, `swarm` workers, the pre-push hook firing on a subagent's `git push`) — verbose
+per-test/per-file output there burns tokens for no signal.
+
 The pre-push hook runs app tests, then two diff-aware selection scripts —
 `scripts/fixture-freshness-select.sh` (see "App tests" below) and `scripts/e2e-select-suite.sh`
 (see "E2E tests" below). It never runs the DB integration suite as a whole; that stays manual,
@@ -391,18 +439,19 @@ Snapshot fixture data lives in `test-fixtures/snapshots/` — use these as mock 
 than inventing data inline. Fixtures are organised **by data source, not by the action function
 that consumes them** (#882): one subdirectory per Postgres RPC (`core_stats/`,
 `biometrics_stats/`, `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
-`top_metrics_by_period/`, `ring_sequence_controls/`), or
+`ring_sequence_controls/`), or
 `tables/<TableName>/` for a fixture produced by a direct PostgREST table query rather than an RPC
 call. This matters because an action can drift from the RPC/table it actually calls (#870:
 `getSpeciesStatsHistory.alpha.robin.json` was named after the `getSpeciesStatsHistory` action but
 generated from a raw `core_stats` call) — naming by source instead of by consumer
 means a fixture's location can never overstate what it verifies. Within each directory, filenames
 follow `<callingGroupOrParams>.<intent>.json` (e.g. `core_stats/alpha.by-species.json`,
-`core_stats/robin-alpha.monthly-history.json`). Not every fixture here is generated by
-`scripts/generate-snapshots.ts` — a handful (`ring_sequence_controls/`, `tables/Species/`, two
-files under `tables/Encounters/`, and the `core_stats/*.summary-totals.json` /
-`*.home-page-summary.json` pairs) are still hand-maintained; regenerate the rest with
-`npm run db:generate-snapshots`.
+`core_stats/alpha.home-page-summary.json`). See the comment above the relevant block in
+`scripts/generate-snapshots.ts`, which documents every fixture's actual RPC/table and consuming
+action(s), keeping a fixture's location from silently drifting from what it actually tests.
+Regenerate every fixture here with `npm run db:generate-snapshots` — the sole exception is
+`synthetic/` (#894), two hand-authored all-zero/null edge-case fixtures that no real query can ever
+produce (see that directory's own `README.md`), which the generator deliberately never touches.
 
 `core_stats`' two companion stats RPCs — `biometrics_stats` and
 `demographics_stats` (see "Companion stats RPCs and shared plumbing" above) — went uncovered until
@@ -428,11 +477,35 @@ fixtures (#821/#823), rather than reading wing/weight columns off a `core_stats`
 `biometrics_stats/alpha.by-species.json` are separate files, and `SppStatsTable`'s test merges
 them itself.
 
-**Fixture drift is caught by a pre-push, diff-gated check — but only for the 28 generated
+**Never write `fixture as unknown as SomeType` for a new fixture cast — try `fixture as SomeType`
+first (#895).** The double assertion through `unknown` switches assignability checking off
+completely, so a fixture's shape is never compared against the type at all — a fixture missing a
+column the type has since gained goes uncaught. A direct single assertion still doesn't catch
+every drift (an imported JSON module isn't a fresh object literal, so TypeScript's
+excess-property check never applies to it — a fixture carrying a column the type has since
+*removed* stays assignable either way; that direction is `snapshot-fixture-freshness.test.ts`'s
+job, described below), but it does catch a newly-*added* required column, which the double
+assertion can't. Only fall back to `as unknown as SomeType` when the fixture is a genuine
+structural mismatch — e.g. an ungrouped/species-filtered `core_stats`-family fixture with a
+literal `null` in a column the row type (`CoreStatsResult`, `DemographicsStatsResult`,
+`BiometricsStatsResult` in `app/models/db.ts`) strips non-null via `NonNullable`, or a hand-built
+object that only fills in the columns a test actually reads.
+
+**This is enforced, not just documented (#921).** `eslint.config.js` forbids the `x as unknown as
+T` pattern outright via a `no-restricted-syntax` selector — `npm run lint` fails on any new one. A
+genuine exception still needs a one-line `// eslint-disable-next-line no-restricted-syntax --
+<reason>` comment directly above the line the cast is on (a longer explanation can precede it as
+ordinary comment lines, as long as the disable directive itself is the line immediately above the
+cast — `eslint-disable-next-line` only ever suppresses the line right after it). Don't fall back to
+a freeform "kept as `as unknown as`: ..." comment with no enforcing directive — that's exactly the
+drift this rule exists to catch, since nothing then stops another cast being added the same way
+without anyone noticing.
+
+**Fixture drift is caught by a pre-push, diff-gated check — but only for the 27 generated
 fixtures.** Nothing in the type system notices when an RPC's return shape changes underneath a
-fixture: they're consumed via `fixture as unknown as SomeType`, a double assertion that switches
-assignability checking off, and an imported JSON module is not a fresh object literal, so even
-without the cast a fixture carrying columns the type no longer declares stays assignable. That's
+fixture consumed via a double assertion (see above) or via a JSON import generally, since an
+imported JSON module is not a fresh object literal so even a direct assertion still leaves a
+fixture carrying columns the type no longer declares assignable. That's
 how #870's column removal reached `main` with every check green (full investigation in
 [#890](https://github.com/wheresrhys/totf/issues/890) / [#884](https://github.com/wheresrhys/totf/issues/884)).
 `supabase/__tests__/snapshot-fixture-freshness.test.ts` (#893) closes the gap:
@@ -448,14 +521,19 @@ how #870's column removal reached `main` with every check green (full investigat
   column/row vocabulary when touching this code: it's uniform across the module, its tests and its
   failure messages. The comparison helpers and the two fixture inventories live in
   `lib/snapshot-fixtures.ts` (pure, no I/O, unit-tested in the app suite).
-- **What it covers.** Exactly the 28 fixtures `scripts/generate-snapshots.ts` writes
+- **What it covers.** Exactly the 27 fixtures `scripts/generate-snapshots.ts` writes
   (`GENERATED_SNAPSHOT_FIXTURES`). It asserts the generator still produces precisely that set, so a
   fixture silently dropping out of the generator fails rather than quietly stopping being checked.
-- **What it doesn't.** The 8 hand-maintained fixtures (`UNGENERATED_SNAPSHOT_FIXTURES` — the
-  `core_stats/*.summary-totals.json` / `*.home-page-summary.json` pairs, `ring_sequence_controls/`,
-  two files under `tables/Encounters/`, `tables/Species/`). A second coverage test pins the on-disk
-  file list to generated + ungenerated, so the gap stays visible rather than implied-fixed. Bringing
-  them under the generator is [#894](https://github.com/wheresrhys/totf/issues/894).
+- **What it doesn't.** The 2 permanently hand-authored `synthetic/` fixtures
+  (`UNGENERATED_SNAPSHOT_FIXTURES`) — all-zero/null edge cases no real query can ever produce, see
+  above. #894 brought every other previously-hand-maintained fixture
+  (`core_stats/*.summary-totals.json` / `*.home-page-summary.json`, `ring_sequence_controls/`,
+  `tables/Encounters/`, `tables/Species/`) under the generator and deleted four generated-but-
+  unconsumed orphans, and #901 split the last two compound fixtures
+  (`core_stats/*.yearly-and-monthly-totals.json`, `tables/Birds/arretrap.bird-detail.json`) into
+  their raw sources, so this list is now just the two `synthetic/` fixtures rather than an
+  open-ended gap. A second coverage test pins the on-disk file list to generated + ungenerated, so
+  any future hand-added fixture stays visible rather than implied-covered.
 - **When it runs.** Pre-push only — CI has no Supabase service. `scripts/fixture-freshness-select.sh`
   mirrors `scripts/e2e-select-suite.sh`: it diffs the branch against `origin/main` and runs
   `npm run test:fixture-freshness` only when the diff touches `supabase/schema/`,
@@ -466,7 +544,7 @@ how #870's column removal reached `main` with every check green (full investigat
 
 So: if you change an RPC's return shape, run `npm run db:sync:e2e` (not `db:seed:e2e` — see
 "Regenerating fixtures reproducibly" immediately below) and commit the regenerated fixtures in the
-same PR, and hand-edit the eight ungenerated ones.
+same PR, and hand-edit the two `synthetic/` ones only if their edge case itself needs to change.
 
 **Regenerating fixtures reproducibly — `db:seed:e2e` vs `db:sync:e2e` (#903).** Both end by
 regenerating every generated fixture, but they start from different baselines:

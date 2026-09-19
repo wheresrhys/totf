@@ -1,37 +1,15 @@
--- Age-split (new_adult/first_summer/old_timers) and young-trends
--- (postjuv_juv/new_postjuv_juv/new_postjuv) derivations for the planned Age-split
--- and Young-trends species-page charts (#800). Split out of core_stats into
--- its own RPC rather than folded into that already-large single query, both to
--- keep each query's plan simpler and to leave core_stats' existing
--- columns/performance untouched. Shares core_stats' input signature and
--- reuses its underlying plumbing via the stats_raw_encounters / stats_spine /
--- stats_encounter_age_classification / stats_bird_age_bucket utility RPCs (each
--- mirrors, and must be kept in sync by hand with, the equivalent inline CTE still
--- living in core_stats.sql).
---
--- The final projection below is wrapped in jsonb_populate_record rather than
--- returned as a bare positional SELECT. A bare `RETURN QUERY SELECT ...` binds to
--- population_stats_result's columns by ORDINAL POSITION, not by the "AS" alias
--- names below — and that position is only as stable as whatever DDL a given
--- environment's schema-diff run happens to emit for the composite type's
--- attributes (`ALTER TYPE ... ADD ATTRIBUTE` order is not guaranteed to match this
--- file's declared column order — confirmed while building this RPC: two
--- `db:schema:apply` runs on the same source files produced two different physical
--- attribute orders, silently scrambling values into the wrong named columns with
--- no error). Routing through to_jsonb(...)/jsonb_populate_record binds every
--- column by NAME instead, so the result is correct regardless of the composite
--- type's physical attribute order in any given environment.
-CREATE FUNCTION public.population_stats (
-	species_name_filter text DEFAULT NULL::text,
-	from_date date DEFAULT NULL::date,
-	to_date date DEFAULT NULL::date,
-	ringing_group_filter bigint DEFAULT NULL::bigint,
-	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
-) RETURNS SETOF public.population_stats_result LANGUAGE plpgsql AS $function$
+SET check_function_bodies = false;
+ALTER TYPE public.demographics_stats_result ADD ATTRIBUTE returning_age_1_bird_count bigint;
+ALTER TYPE public.demographics_stats_result ADD ATTRIBUTE returning_age_2_bird_count bigint;
+ALTER TYPE public.demographics_stats_result ADD ATTRIBUTE returning_age_3_plus_bird_count bigint;
+ALTER TYPE public.demographics_stats_result ADD ATTRIBUTE returning_new_unknown_age_bird_count bigint;
+CREATE OR REPLACE FUNCTION public.demographics_stats(species_name_filter text DEFAULT NULL::text, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, ringing_group_filter bigint DEFAULT NULL::bigint, group_by_species boolean DEFAULT false, group_by_time_period text DEFAULT NULL::text)
+ RETURNS SETOF public.demographics_stats_result
+ LANGUAGE plpgsql
+AS $function$
   BEGIN
   RETURN QUERY
-  SELECT (jsonb_populate_record(NULL::public.population_stats_result, to_jsonb(agg))).*
+  SELECT (jsonb_populate_record(NULL::public.demographics_stats_result, to_jsonb(agg))).*
   FROM (
   WITH spine AS (
     SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
@@ -39,6 +17,8 @@ CREATE FUNCTION public.population_stats (
     SELECT * FROM public.stats_encounter_age_classification(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
   ), bird_age_bucket AS (
     SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+  ), bird_returning_age_bucket AS (
+    SELECT * FROM public.stats_bird_returning_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
   ),
   -- Bird-level bucket counts (context columns + the new_young_bird_count copy).
   -- Mirrors core_stats' age_bucket_counts, restricted to the columns this RPC
@@ -166,6 +146,23 @@ CREATE FUNCTION public.population_stats (
       COUNT(*) FILTER (WHERE aas.split = 'old_timers') AS old_timers_bird_count
     FROM adult_age_split aas
     GROUP BY aas.species_id, aas.time_period
+  ),
+  -- Returning-age subsets of adult_bird_count (#843). Each adult-bucketed bird in
+  -- a cell carries exactly one bucket from stats_bird_returning_age_bucket, or
+  -- NULL when its period-relative proven age is 0 (not yet proven to have
+  -- returned). So these four counts are mutually exclusive but NOT exhaustive over
+  -- the adult cohort: they sum to adult_bird_count MINUS this cell's
+  -- proven_age-0 adults, not to adult_bird_count itself.
+  returning_age_counts AS (
+    SELECT
+      brab.species_id,
+      brab.time_period,
+      COUNT(*) FILTER (WHERE brab.returning_age_bucket = '1') AS returning_age_1_bird_count,
+      COUNT(*) FILTER (WHERE brab.returning_age_bucket = '2') AS returning_age_2_bird_count,
+      COUNT(*) FILTER (WHERE brab.returning_age_bucket = '3_plus') AS returning_age_3_plus_bird_count,
+      COUNT(*) FILTER (WHERE brab.returning_age_bucket = 'new_unknown_age') AS returning_new_unknown_age_bird_count
+    FROM bird_returning_age_bucket brab
+    GROUP BY brab.species_id, brab.time_period
   )
   SELECT
     CASE WHEN group_by_species THEN spine.species_name ELSE NULL::text END AS "species_name",
@@ -191,7 +188,15 @@ CREATE FUNCTION public.population_stats (
     -- Young-trends encounter-level counts; 3J-only slice of juv_enc_count + New variants.
     COALESCE(eabc.postjuv_juv_enc_count, 0) AS "postjuv_juv_enc_count",
     COALESCE(eabc.new_postjuv_juv_enc_count, 0) AS "new_postjuv_juv_enc_count",
-    COALESCE(eabc.new_postjuv_enc_count, 0) AS "new_postjuv_enc_count"
+    COALESCE(eabc.new_postjuv_enc_count, 0) AS "new_postjuv_enc_count",
+
+    -- Returning-age subsets of adult_bird_count; these four sum to
+    -- adult_bird_count MINUS this cell's proven_age-0 adults, NOT to
+    -- adult_bird_count (see returning_age_counts above).
+    COALESCE(rac.returning_age_1_bird_count, 0) AS "returning_age_1_bird_count",
+    COALESCE(rac.returning_age_2_bird_count, 0) AS "returning_age_2_bird_count",
+    COALESCE(rac.returning_age_3_plus_bird_count, 0) AS "returning_age_3_plus_bird_count",
+    COALESCE(rac.returning_new_unknown_age_bird_count, 0) AS "returning_new_unknown_age_bird_count"
 
   FROM spine
   LEFT JOIN age_bucket_counts abc ON CASE WHEN group_by_species THEN spine.species_id = abc.species_id ELSE true END
@@ -215,14 +220,103 @@ CREATE FUNCTION public.population_stats (
     WHEN group_by_time_period = 'year' THEN spine.time_period = asc2.time_period
     ELSE true
   END
+  LEFT JOIN returning_age_counts rac ON CASE WHEN group_by_species THEN spine.species_id = rac.species_id ELSE true END
+  AND CASE
+    WHEN group_by_time_period = 'day' THEN spine.time_period = rac.time_period
+    WHEN group_by_time_period = 'month' THEN spine.time_period = rac.time_period
+    WHEN group_by_time_period = 'year' THEN spine.time_period = rac.time_period
+    ELSE true
+  END
   ) AS agg
   ORDER BY agg.species_name ASC, agg.time_period ASC;
 
 END;
 $function$;
-
-GRANT ALL ON FUNCTION public.population_stats (text, date, date, bigint, boolean, text) TO anon;
-
-GRANT ALL ON FUNCTION public.population_stats (text, date, date, bigint, boolean, text) TO authenticated;
-
-GRANT ALL ON FUNCTION public.population_stats (text, date, date, bigint, boolean, text) TO service_role;
+CREATE FUNCTION public.stats_bird_returning_age_bucket(species_name_filter text DEFAULT NULL::text, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, ringing_group_filter bigint DEFAULT NULL::bigint, group_by_species boolean DEFAULT false, group_by_time_period text DEFAULT NULL::text)
+ RETURNS TABLE(bird_id bigint, species_id bigint, time_period date, returning_age_bucket text)
+ LANGUAGE sql
+ STABLE
+AS $function$
+  WITH encounter_age_classification AS (
+    SELECT * FROM public.stats_encounter_age_classification(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+  ), bird_age_bucket AS (
+    SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+  ),
+  -- Resolve the calendar year each (species, time_period) cell represents.
+  -- Identical rule to demographics_stats' own cell_period_year CTE (keep the two
+  -- in sync by hand): use the cell's own time_period when grouped by day/month/
+  -- year, else fall back to the latest visit date present in the cell.
+  cell_period_year AS (
+    SELECT
+      eac.species_id,
+      eac.time_period,
+      EXTRACT(YEAR FROM COALESCE(eac.time_period, MAX(eac.visit_date)))::int AS period_year
+    FROM encounter_age_classification eac
+    GROUP BY eac.species_id, eac.time_period
+  ),
+  -- Every adult-bucketed bird in every cell, carrying that cell's period_year.
+  -- IS NOT DISTINCT FROM makes the join NULL-safe for the ungrouped case
+  -- (species_id / time_period are NULL).
+  adult_birds AS (
+    SELECT
+      bab.bird_id,
+      bab.species_id,
+      bab.time_period,
+      py.period_year
+    FROM bird_age_bucket bab
+    JOIN cell_period_year py
+      ON py.species_id IS NOT DISTINCT FROM bab.species_id
+     AND py.time_period IS NOT DISTINCT FROM bab.time_period
+    WHERE bab.age_bucket = 'adult'
+      AND bab.bird_id IS NOT NULL
+  ),
+  -- Unwindowed lifetime history for every adult bird above, scoped to
+  -- ringing_group_filter but IGNORING from_date/to_date — a period-relative age
+  -- can't be answered from a windowed source. Mirrors (and extends, with
+  -- max_hatch_year/min_hatch_year) demographics_stats' own lifetime_encounters CTE.
+  lifetime_encounters AS (
+    SELECT
+      e.bird_id,
+      e.max_hatch_year,
+      e.min_hatch_year,
+      EXTRACT(YEAR FROM sess.visit_date)::int AS enc_year
+    FROM public."Encounters" e
+    JOIN public."Sessions" sess ON e.session_id = sess.id
+    WHERE (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
+      AND e.bird_id IN (SELECT DISTINCT ab.bird_id FROM adult_birds ab)
+  ),
+  -- Per (bird, cell): that bird's history as it stood at the end of the cell's
+  -- period_year. LEFT JOIN so a (data-impossible) bird with no lifetime rows still
+  -- emits a row — with a NULL age, which the CASE below sends to the NULL bucket.
+  bird_history_to_date AS (
+    SELECT
+      ab.bird_id,
+      ab.species_id,
+      ab.time_period,
+      COUNT(le.bird_id) AS encounters_to_date,
+      ab.period_year - MIN(le.max_hatch_year) AS period_relative_proven_age,
+      COALESCE(bool_or(le.min_hatch_year <> 0), FALSE) AS was_ever_precisely_aged_to_date
+    FROM adult_birds ab
+    LEFT JOIN lifetime_encounters le
+      ON le.bird_id = ab.bird_id
+     AND le.enc_year <= ab.period_year
+    GROUP BY ab.bird_id, ab.species_id, ab.time_period, ab.period_year
+  )
+  SELECT
+    h.bird_id,
+    h.species_id,
+    h.time_period,
+    CASE
+      WHEN h.period_relative_proven_age IS NULL OR h.period_relative_proven_age <= 0 THEN NULL
+      WHEN h.encounters_to_date = 1
+        AND NOT h.was_ever_precisely_aged_to_date
+        AND h.period_relative_proven_age = 1 THEN 'new_unknown_age'
+      WHEN h.period_relative_proven_age = 1 THEN '1'
+      WHEN h.period_relative_proven_age = 2 THEN '2'
+      ELSE '3_plus'
+    END AS returning_age_bucket
+  FROM bird_history_to_date h;
+$function$;
+GRANT ALL ON FUNCTION public.stats_bird_returning_age_bucket(text, date, date, bigint, boolean, text) TO anon;
+GRANT ALL ON FUNCTION public.stats_bird_returning_age_bucket(text, date, date, bigint, boolean, text) TO authenticated;
+GRANT ALL ON FUNCTION public.stats_bird_returning_age_bucket(text, date, date, bigint, boolean, text) TO service_role;

@@ -5,15 +5,22 @@ import { type LineChartData } from 'react-chartkick';
 import {
 	getSpeciesStatsHistory,
 	getSpeciesDemographicsStats,
+	getSpeciesArrivalsStats,
 	getGroupEffortHistory
 } from '@/app/actions/sp-data';
-import type { CoreStatsResult, DemographicsStatsResult } from '@/app/models/db';
+import type {
+	CoreStatsResult,
+	DemographicsStatsResult,
+	ArrivalsStatsResult
+} from '@/app/models/db';
 import {
 	getCounts,
 	getReturningVsNew,
 	getAgeSplit,
+	getReturningAges,
 	getYoungCounts,
-	getNewYoungCounts
+	getNewYoungCounts,
+	getArrivals
 } from '@/app/components/pages/species/StatsHistoryChart';
 import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
 import { ChartTile } from '@/app/components/pages/species/ChartTile';
@@ -47,6 +54,26 @@ export const AGE_SPLIT_COLORS = [
 	AGE_SPLIT_HUES.new.light // New young
 ];
 
+// Returning ages (#843): '1 year' -> '2 years' -> '3+ years' is an ordered
+// progression through a returning bird's proven age, so it gets a dark-to-light
+// single-hue ramp (same convention as ARRIVALS_HUES.young below). 'Unknown age
+// (new)' is NOT a fourth step of that ramp — those birds aren't actually known to
+// be returning at all, just imprecisely coded on a single first encounter — so it
+// takes a visually distinct hue instead, signalling "different kind of thing"
+// rather than "older still". Fresh constants rather than an extension of
+// AGE_SPLIT_* above, which #855 removes along with the Age split tile.
+export const RETURNING_AGES_HUES = {
+	returning: { dark: '#7a0f3d', mid: '#c4487e', light: '#eda3c1' },
+	unknown: '#8a7a12'
+};
+// Series order (matches getReturningAges): 1 year, 2 years, 3+ years, Unknown age (new).
+export const RETURNING_AGES_COLORS = [
+	RETURNING_AGES_HUES.returning.dark, // 1 year
+	RETURNING_AGES_HUES.returning.mid, // 2 years
+	RETURNING_AGES_HUES.returning.light, // 3+ years
+	RETURNING_AGES_HUES.unknown // Unknown age (new)
+];
+
 // Young counts / New young counts: two hues (juv, postjuv), split across the
 // two tiles by shade instead of by pair within one tile — #839 split the old
 // single "Young trends" tile (six series, including two client-side sums) into
@@ -72,6 +99,31 @@ export const NEW_YOUNG_COUNTS_COLORS = [
 	YOUNG_COUNTS_HUES.juv.light, // New juv
 	YOUNG_COUNTS_HUES.postjuv.light // New postjuv
 ];
+
+// Arrivals tile (#860): two colour concepts share one hue map. "New adults"/
+// "Returning adults" are a paired dark/light draw off a single hue (mirroring
+// AGE_SPLIT_HUES' own dark-for-new/light-for-returning convention, but here as
+// one pair within a single tile rather than split across two hues). "Pulli"
+// -> "Juv" -> "Postjuv" is instead an ordered progression through a bird's
+// first calendar year, so it gets a 3-tone single-hue ramp (dark to light)
+// rather than a two-value pair — the same convention #843's proven-age-bucket
+// tile uses for its own ordered '1 year'/'2 years'/'3+ years' series.
+export const ARRIVALS_HUES = {
+	adult: { dark: '#1f4fb0', light: '#8fb0e8' },
+	young: { dark: '#0f7a14', mid: '#4fa854', light: '#8fd08f' }
+};
+// Keyed by series name (matching getArrivals' `name` fields) rather than a
+// positional array: getArrivals omits the "Pulli" series entirely when the
+// fetched range has no nonzero pullus count, so a fixed-index array would
+// silently misassign every colour after the gap. Looked up per-series in the
+// Arrivals tile below instead.
+export const ARRIVALS_COLORS_BY_NAME: Record<string, string> = {
+	'New adults': ARRIVALS_HUES.adult.dark,
+	'Returning adults': ARRIVALS_HUES.adult.light,
+	Pulli: ARRIVALS_HUES.young.dark,
+	Juv: ARRIVALS_HUES.young.mid,
+	Postjuv: ARRIVALS_HUES.young.light
+};
 
 function Spinner() {
 	return (
@@ -188,6 +240,18 @@ export function SpDemographicsTab({
 		return yearDemographicsStatsPromise.current;
 	}
 
+	const [arrivalsStats, setArrivalsStats] = useState<
+		ArrivalsStatsResult[] | null
+	>(null);
+	const [arrivalsRequested, setArrivalsRequested] = useState(false);
+	function loadArrivalsStats() {
+		if (arrivalsRequested) return;
+		setArrivalsRequested(true);
+		getSpeciesArrivalsStats(speciesName, viewedGroupId, fromDate, toDate).then(
+			setArrivalsStats
+		);
+	}
+
 	const [effortHistory, setEffortHistory] = useState<LineChartData | null>(
 		null
 	);
@@ -264,6 +328,36 @@ export function SpDemographicsTab({
 							]).then(([yearStats, yearDemographics]) =>
 								getReturningVsNew(yearStats, yearDemographics)
 							)
+						}
+						effortHistory={effortHistory ?? undefined}
+						compareYearsUrl={compareYearsUrl}
+					/>
+				) : (
+					<Spinner />
+				)
+		},
+		{
+			id: 'returning-ages',
+			heading: 'Returning ages',
+			description:
+				'Returning adults over time, split by how old they were proven to be',
+			load: () => {
+				loadDemographicsStats();
+				loadEffortHistory();
+			},
+			renderChart: () =>
+				demographicsStats ? (
+					<YearComparisonTrendChart
+						series={getReturningAges(demographicsStats)}
+						colors={RETURNING_AGES_COLORS}
+						yearlyAggregators={{
+							'1 year': 'sum',
+							'2 years': 'sum',
+							'3+ years': 'sum',
+							'Unknown age (new)': 'sum'
+						}}
+						fetchYearSeries={() =>
+							fetchYearDemographicsStats().then(getReturningAges)
 						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
@@ -357,6 +451,38 @@ export function SpDemographicsTab({
 				) : (
 					<Spinner />
 				)
+		},
+		{
+			id: 'arrivals',
+			heading: 'Arrivals',
+			description:
+				'New adults, returning adults, pulli, juv and postjuv arriving each year',
+			load: () => {
+				loadArrivalsStats();
+				loadEffortHistory();
+			},
+			renderChart: () => {
+				if (!arrivalsStats) return <Spinner />;
+				const arrivalsSeries = getArrivals(arrivalsStats);
+				return (
+					<YearComparisonTrendChart
+						series={arrivalsSeries}
+						colors={arrivalsSeries.map(
+							(metric) => ARRIVALS_COLORS_BY_NAME[metric.name]
+						)}
+						allowYearAccumulation={true}
+						yearlyAggregators={{
+							'New adults': 'sum',
+							'Returning adults': 'sum',
+							Pulli: 'sum',
+							Juv: 'sum',
+							Postjuv: 'sum'
+						}}
+						effortHistory={effortHistory ?? undefined}
+						compareYearsUrl={compareYearsUrl}
+					/>
+				);
+			}
 		}
 	];
 

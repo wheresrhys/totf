@@ -37,10 +37,6 @@ vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
 	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
 }));
 
-vi.mock('@/app/components/pages/species/SpBusiestSessionsTab', () => ({
-	SpBusiestSessionsTab: () => <div data-testid="sp-busiest-sessions-tab" />
-}));
-
 vi.mock('@/app/components/pages/species/SpStatsHistoryTab', () => ({
 	SpStatsHistoryTab: () => <div data-testid="sp-stats-history-tab" />
 }));
@@ -53,7 +49,7 @@ vi.mock('@/app/components/pages/species/SpSessionTotalsTab', () => ({
 	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
 }));
 
-const birds = birdsSnapshot as unknown as FullFatPageData['birds'];
+const birds = birdsSnapshot as FullFatPageData['birds'];
 
 function makeSpeciesClient(speciesId: number | null = ROBIN_SPECIES_ID) {
 	const fromChain = {

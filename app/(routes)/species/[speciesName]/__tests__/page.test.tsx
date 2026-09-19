@@ -39,10 +39,6 @@ vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
 	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
 }));
 
-vi.mock('@/app/components/pages/species/SpBusiestSessionsTab', () => ({
-	SpBusiestSessionsTab: () => <div data-testid="sp-busiest-sessions-tab" />
-}));
-
 vi.mock('@/app/components/pages/species/SpDemographicsTab', () => ({
 	SpDemographicsTab: () => <div data-testid="sp-demographics-tab" />
 }));
@@ -65,7 +61,7 @@ vi.mock('@/app/components/pages/species/SpSessionTotalsTab', () => ({
 	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
 }));
 
-const birds = birdsSnapshot as unknown as FullFatPageData['birds'];
+const birds = birdsSnapshot as FullFatPageData['birds'];
 
 function makeSpeciesClient() {
 	const fromChain = {
@@ -164,12 +160,11 @@ describe('species detail page', () => {
 		});
 
 		describe('highlights tab (click to activate)', () => {
-			it('renders both SpNotableRetrapsTab and SpBusiestSessionsTab after clicking Highlights button', async () => {
+			it('renders SpNotableRetrapsTab after clicking Highlights button', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
 				fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
 				await screen.findByTestId('sp-notable-retraps-tab');
-				await screen.findByTestId('sp-busiest-sessions-tab');
 			});
 		});
 
@@ -262,7 +257,6 @@ describe('species detail page', () => {
 					'sp-combined-month-totals-tab'
 				],
 				['session-totals', 'Session totals', 'sp-session-totals-tab'],
-				['highlights', 'Highlights', 'sp-busiest-sessions-tab'],
 				['biometrics', 'Biometrics', 'sp-biometrics-tab'],
 				['demographics', 'Demographics', 'sp-demographics-tab'],
 				['bird-list', 'Bird list', 'sp-individuals-tab']
@@ -339,7 +333,7 @@ const BIOMETRICS_FIELD_KEYS = [
 function omitBiometricsFields(row: CoreStatsResult): CoreStatsResult {
 	const copy: Record<string, unknown> = { ...row };
 	for (const key of BIOMETRICS_FIELD_KEYS) delete copy[key];
-	return copy as unknown as CoreStatsResult;
+	return copy as CoreStatsResult;
 }
 
 function makeAggregateRow(
@@ -354,7 +348,11 @@ function makeAggregateRow(
 // The real captured biometrics_stats row for the exact call getSpeciesStats
 // makes (Robin, Alpha, ungrouped — one headline row), rather than a
 // hand-written literal that can silently drift from the RPC's shape (#883).
+// This fixture's row has species_name/time_period null, but
+// BiometricsStatsResult declares species_name non-null (app/models/db.ts),
+// so a direct assertion doesn't compile (#895).
 const [capturedBiometricsRow] =
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	robinBiometricsHeadline as unknown as BiometricsStatsResult[];
 
 function makeBiometricsRow(

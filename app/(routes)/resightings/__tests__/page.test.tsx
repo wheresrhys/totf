@@ -26,10 +26,15 @@ function makeEncountersClient(data: unknown) {
 	return { client, chain };
 }
 
+// Alpha's real seed data now has two resighting/recovery records (#902 review
+// on #894): a Kingfisher found dead (record_type F) and a Wren controlled by
+// another ringer (record_type U), both at the same site on consecutive days.
+const resightings = resightingsSnapshot as ResightingEncounter[];
+
 describe('resightings page', () => {
 	beforeEach(() => {
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-			makeEncountersClient(resightingsSnapshot).client
+			makeEncountersClient(resightings).client
 		);
 	});
 
@@ -47,15 +52,14 @@ describe('resightings page', () => {
 		render(await Page());
 		const table = await screen.findByRole('table');
 		const rows = table.querySelectorAll('tbody tr');
-		expect(rows.length).toBe(
-			(resightingsSnapshot as ResightingEncounter[]).length
-		);
+		expect(rows.length).toBe(resightings.length);
 	});
 
 	it("renders each row's formatted visit date", async () => {
 		render(await Page());
 		const table = await screen.findByRole('table');
-		expect(table.textContent).toContain('01 Mar 2024');
+		expect(table.textContent).toContain('10 May 2023');
+		expect(table.textContent).toContain('12 May 2023');
 	});
 
 	it('renders an "All" tab plus one tab per distinct species', async () => {
@@ -64,21 +68,21 @@ describe('resightings page', () => {
 		const tabs = [...tabList.querySelectorAll('button')].map(
 			(button) => button.textContent
 		);
-		expect(tabs).toEqual(['All', 'Blue Tit', 'Robin', 'Kingfisher']);
+		expect(tabs).toEqual(['All', 'Kingfisher', 'Wren']);
 	});
 
 	it('shows only rows for the active species tab when a tab is clicked', async () => {
 		render(await Page());
 		const tabList = await screen.findByRole('tablist');
-		const blueTitTab = [...tabList.querySelectorAll('button')].find(
-			(button) => button.textContent === 'Blue Tit'
+		const kingfisherTab = [...tabList.querySelectorAll('button')].find(
+			(button) => button.textContent === 'Kingfisher'
 		)!;
-		fireEvent.click(blueTitTab);
+		fireEvent.click(kingfisherTab);
 		const table = await screen.findByRole('table');
 		const rows = table.querySelectorAll('tbody tr');
-		expect(rows.length).toBe(2);
-		expect(table.textContent).toContain('Blue Tit');
-		expect(table.textContent).not.toContain('Robin');
+		expect(rows.length).toBe(1);
+		expect(table.textContent).toContain('Kingfisher');
+		expect(table.textContent).not.toContain('Wren');
 	});
 
 	it('renders ring_no as a link to /bird/[ringNo]', async () => {
@@ -87,15 +91,21 @@ describe('resightings page', () => {
 		const firstRow = table.querySelectorAll('tbody tr')[0];
 		const link = firstRow.querySelector('a');
 		expect(link).toBeTruthy();
-		expect(link?.getAttribute('href')).toBe('/bird/ARESIGHT04');
+		// Sorted by visit date descending by default, so the Wren (12 May) leads.
+		expect(link?.getAttribute('href')).toBe('/bird/ZWREN9001');
 	});
 
 	it('renders a record-type badge', async () => {
 		render(await Page());
 		const table = await screen.findByRole('table');
-		const badge = table.querySelector('.badge');
-		expect(badge).toBeTruthy();
-		expect(['C', 'F', 'T']).toContain(badge?.textContent?.trim());
+		const badges = [...table.querySelectorAll('.badge')].map((badge) =>
+			badge.textContent?.trim()
+		);
+		expect(badges).toEqual(
+			expect.arrayContaining([
+				...new Set(resightings.map((r) => r.record_type))
+			])
+		);
 	});
 
 	it('renders location and notes columns', async () => {
@@ -106,8 +116,7 @@ describe('resightings page', () => {
 		);
 		expect(headers).toContain('Location');
 		expect(headers).toContain('Notes');
-		expect(table.textContent).toContain('Garden Feeder Station');
-		expect(table.textContent).toContain('Photographed');
+		expect(table.textContent).toContain('Alpha Site A (CES)');
 	});
 
 	it('renders finding condition and finding circumstances columns', async () => {
@@ -119,39 +128,15 @@ describe('resightings page', () => {
 		expect(headers).toContain('Finding condition');
 		expect(headers).toContain('Finding circumstances');
 		const rows = [...table.querySelectorAll('tbody tr')];
-		const rowWithValues = rows.find((row) =>
-			row.textContent?.includes('ARESIGHT01')
+		const kingfisherRow = rows.find((row) =>
+			row.textContent?.includes('AKINGF9001')
 		)!;
 		expect(
-			getCellTextByHeading(table, 'Finding condition', rowWithValues)
+			getCellTextByHeading(table, 'Finding condition', kingfisherRow)
 		).toBe('8');
 		expect(
-			getCellTextByHeading(table, 'Finding circumstances', rowWithValues)
+			getCellTextByHeading(table, 'Finding circumstances', kingfisherRow)
 		).toBe('2');
-	});
-
-	it('renders empty-value placeholders when finding_condition/finding_circumstances are null', async () => {
-		render(await Page());
-		const tabList = await screen.findByRole('tablist');
-		const robinTab = [...tabList.querySelectorAll('button')].find(
-			(button) => button.textContent === 'Robin'
-		)!;
-		fireEvent.click(robinTab);
-		const table = await screen.findByRole('table');
-		const rows = [...table.querySelectorAll('tbody tr')];
-		const rowWithNoRecoveryDetails = rows.find((row) =>
-			row.textContent?.includes('ARESIGHT02')
-		)!;
-		expect(
-			getCellTextByHeading(table, 'Finding condition', rowWithNoRecoveryDetails)
-		).toBe('–');
-		expect(
-			getCellTextByHeading(
-				table,
-				'Finding circumstances',
-				rowWithNoRecoveryDetails
-			)
-		).toBe('–');
 	});
 
 	it('re-sorts rows when a column header is clicked', async () => {
@@ -168,15 +153,10 @@ describe('resightings page', () => {
 
 	it('renders a null notes cell gracefully when extra_text is null', async () => {
 		render(await Page());
-		const tabList = await screen.findByRole('tablist');
-		const robinTab = [...tabList.querySelectorAll('button')].find(
-			(button) => button.textContent === 'Robin'
-		)!;
-		fireEvent.click(robinTab);
 		const table = await screen.findByRole('table');
 		const rows = [...table.querySelectorAll('tbody tr')];
 		const rowWithNoNotes = rows.find((row) =>
-			row.textContent?.includes('ARESIGHT02')
+			row.textContent?.includes('ZWREN9001')
 		)!;
 		expect(getCellTextByHeading(table, 'Notes', rowWithNoNotes)).toBe('–');
 	});
@@ -198,14 +178,14 @@ describe('fetchResightingsPageContent query building', () => {
 	});
 
 	it('filters encounters to the viewed group', async () => {
-		const { client, chain } = makeEncountersClient(resightingsSnapshot);
+		const { client, chain } = makeEncountersClient(resightings);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 		await fetchResightingsPageContent({}, 42);
 		expect(chain.eq).toHaveBeenCalledWith('ringing_group_id', 42);
 	});
 
 	it('matches only resighting/recovery record types in the query', async () => {
-		const { client, chain } = makeEncountersClient(resightingsSnapshot);
+		const { client, chain } = makeEncountersClient(resightings);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 		await fetchResightingsPageContent({}, 42);
 		expect(chain.in).toHaveBeenCalledWith('record_type', [

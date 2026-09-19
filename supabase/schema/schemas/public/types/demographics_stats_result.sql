@@ -39,5 +39,16 @@ CREATE TYPE public.demographics_stats_result AS (
 	-- (which combines 1J and 3J), plus New-record variants.
 	postjuv_juv_enc_count bigint,
 	new_postjuv_juv_enc_count bigint,
-	new_postjuv_enc_count bigint
+	new_postjuv_enc_count bigint,
+	-- Returning-age subsets of adult_bird_count (#843), driving the "Returning
+	-- ages" chart. Mutually exclusive over adult-bucketed birds, but NOT
+	-- exhaustive: the four sum to adult_bird_count MINUS this cell's adults whose
+	-- period-relative proven age is 0 (birds not yet proven to have returned —
+	-- they belong to the "New adults" series instead). The age is computed as of
+	-- each cell's own period_year, never from the live Birds.proven_age column —
+	-- see stats_bird_returning_age_bucket.sql for the full derivation.
+	returning_age_1_bird_count bigint,
+	returning_age_2_bird_count bigint,
+	returning_age_3_plus_bird_count bigint,
+	returning_new_unknown_age_bird_count bigint
 );

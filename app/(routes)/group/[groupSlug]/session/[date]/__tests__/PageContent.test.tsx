@@ -4,7 +4,7 @@ import type { SessionEncounter } from '@/app/models/session';
 
 function makeEncounters(recordTypes: Array<'N' | 'S'>): SessionEncounter[] {
 	return recordTypes.map(
-		(record_type) => ({ record_type }) as unknown as SessionEncounter
+		(record_type) => ({ record_type }) as SessionEncounter
 	);
 }
 

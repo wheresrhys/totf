@@ -7,7 +7,8 @@
 -- reuses its underlying plumbing via the stats_raw_encounters / stats_spine /
 -- stats_encounter_age_classification / stats_bird_age_bucket utility RPCs (each
 -- mirrors, and must be kept in sync by hand with, the equivalent inline CTE still
--- living in core_stats.sql).
+-- living in core_stats.sql). #843 added the returning-age columns, whose
+-- per-bird resolution lives in the stats_bird_returning_age_bucket utility RPC.
 --
 -- The final projection below is wrapped in jsonb_populate_record rather than
 -- returned as a bare positional SELECT. A bare `RETURN QUERY SELECT ...` binds to
@@ -39,6 +40,8 @@ CREATE FUNCTION public.demographics_stats (
     SELECT * FROM public.stats_encounter_age_classification(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
   ), bird_age_bucket AS (
     SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+  ), bird_returning_age_bucket AS (
+    SELECT * FROM public.stats_bird_returning_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
   ),
   -- Bird-level bucket counts (context columns + the new_young_bird_count copy).
   -- Mirrors core_stats' age_bucket_counts, restricted to the columns this RPC
@@ -166,6 +169,23 @@ CREATE FUNCTION public.demographics_stats (
       COUNT(*) FILTER (WHERE aas.split = 'old_timers') AS old_timers_bird_count
     FROM adult_age_split aas
     GROUP BY aas.species_id, aas.time_period
+  ),
+  -- Returning-age subsets of adult_bird_count (#843). Each adult-bucketed bird in
+  -- a cell carries exactly one bucket from stats_bird_returning_age_bucket, or
+  -- NULL when its period-relative proven age is 0 (not yet proven to have
+  -- returned). So these four counts are mutually exclusive but NOT exhaustive over
+  -- the adult cohort: they sum to adult_bird_count MINUS this cell's
+  -- proven_age-0 adults, not to adult_bird_count itself.
+  returning_age_counts AS (
+    SELECT
+      brab.species_id,
+      brab.time_period,
+      COUNT(*) FILTER (WHERE brab.returning_age_bucket = '1') AS returning_age_1_bird_count,
+      COUNT(*) FILTER (WHERE brab.returning_age_bucket = '2') AS returning_age_2_bird_count,
+      COUNT(*) FILTER (WHERE brab.returning_age_bucket = '3_plus') AS returning_age_3_plus_bird_count,
+      COUNT(*) FILTER (WHERE brab.returning_age_bucket = 'new_unknown_age') AS returning_new_unknown_age_bird_count
+    FROM bird_returning_age_bucket brab
+    GROUP BY brab.species_id, brab.time_period
   )
   SELECT
     CASE WHEN group_by_species THEN spine.species_name ELSE NULL::text END AS "species_name",
@@ -191,7 +211,15 @@ CREATE FUNCTION public.demographics_stats (
     -- Young-trends encounter-level counts; 3J-only slice of juv_enc_count + New variants.
     COALESCE(eabc.postjuv_juv_enc_count, 0) AS "postjuv_juv_enc_count",
     COALESCE(eabc.new_postjuv_juv_enc_count, 0) AS "new_postjuv_juv_enc_count",
-    COALESCE(eabc.new_postjuv_enc_count, 0) AS "new_postjuv_enc_count"
+    COALESCE(eabc.new_postjuv_enc_count, 0) AS "new_postjuv_enc_count",
+
+    -- Returning-age subsets of adult_bird_count; these four sum to
+    -- adult_bird_count MINUS this cell's proven_age-0 adults, NOT to
+    -- adult_bird_count (see returning_age_counts above).
+    COALESCE(rac.returning_age_1_bird_count, 0) AS "returning_age_1_bird_count",
+    COALESCE(rac.returning_age_2_bird_count, 0) AS "returning_age_2_bird_count",
+    COALESCE(rac.returning_age_3_plus_bird_count, 0) AS "returning_age_3_plus_bird_count",
+    COALESCE(rac.returning_new_unknown_age_bird_count, 0) AS "returning_new_unknown_age_bird_count"
 
   FROM spine
   LEFT JOIN age_bucket_counts abc ON CASE WHEN group_by_species THEN spine.species_id = abc.species_id ELSE true END
@@ -213,6 +241,13 @@ CREATE FUNCTION public.demographics_stats (
     WHEN group_by_time_period = 'day' THEN spine.time_period = asc2.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = asc2.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = asc2.time_period
+    ELSE true
+  END
+  LEFT JOIN returning_age_counts rac ON CASE WHEN group_by_species THEN spine.species_id = rac.species_id ELSE true END
+  AND CASE
+    WHEN group_by_time_period = 'day' THEN spine.time_period = rac.time_period
+    WHEN group_by_time_period = 'month' THEN spine.time_period = rac.time_period
+    WHEN group_by_time_period = 'year' THEN spine.time_period = rac.time_period
     ELSE true
   END
   ) AS agg

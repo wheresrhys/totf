@@ -246,12 +246,12 @@ describe('formatSnapshotDrift', () => {
 });
 
 describe('fixture coverage lists', () => {
-	it('covers the 28 generator-produced fixtures', () => {
-		expect(GENERATED_SNAPSHOT_FIXTURES).toHaveLength(28);
+	it('covers the 29 generator-produced fixtures', () => {
+		expect(GENERATED_SNAPSHOT_FIXTURES).toHaveLength(27);
 	});
 
-	it('leaves the 8 hand-maintained fixtures uncovered (issue #894)', () => {
-		expect(UNGENERATED_SNAPSHOT_FIXTURES).toHaveLength(8);
+	it('leaves only the 2 permanently hand-authored synthetic fixtures uncovered (issue #894)', () => {
+		expect(UNGENERATED_SNAPSHOT_FIXTURES).toHaveLength(2);
 	});
 
 	it('spells every fixture as a source-directory-relative path (#882)', () => {

@@ -1,77 +1,40 @@
 [
   {
-    "id": 1,
-    "record_type": "C",
-    "extra_text": "Seen at feeder",
+    "id": 60,
+    "record_type": "F",
+    "extra_text": null,
     "finding_condition": "8",
     "finding_circumstances": "2",
     "bird": {
-      "ring_no": "ARESIGHT01",
-      "species": { "species_name": "Blue Tit" }
+      "ring_no": "AKINGF9001",
+      "species": {
+        "species_name": "Kingfisher"
+      }
     },
     "session": {
-      "visit_date": "2024-03-01",
-      "location": { "location_name": "Garden Feeder Station" }
+      "location": {
+        "location_name": "Alpha Site A (CES)"
+      },
+      "visit_date": "2023-05-10"
     }
   },
   {
-    "id": 2,
-    "record_type": "F",
+    "id": 61,
+    "record_type": "U",
     "extra_text": null,
-    "finding_condition": null,
-    "finding_circumstances": null,
+    "finding_condition": "3",
+    "finding_circumstances": "5",
     "bird": {
-      "ring_no": "ARESIGHT02",
-      "species": { "species_name": "Robin" }
+      "ring_no": "ZWREN9001",
+      "species": {
+        "species_name": "Wren"
+      }
     },
     "session": {
-      "visit_date": "2024-06-15",
-      "location": { "location_name": "Garden Feeder Station" }
-    }
-  },
-  {
-    "id": 3,
-    "record_type": "T",
-    "extra_text": "Found dead",
-    "finding_condition": "5",
-    "finding_circumstances": "1",
-    "bird": {
-      "ring_no": "ARESIGHT03",
-      "species": { "species_name": "Kingfisher" }
-    },
-    "session": {
-      "visit_date": "2023-11-20",
-      "location": { "location_name": "River Bank" }
-    }
-  },
-  {
-    "id": 4,
-    "record_type": "C",
-    "extra_text": "Photographed",
-    "finding_condition": "8",
-    "finding_circumstances": "2",
-    "bird": {
-      "ring_no": "ARESIGHT04",
-      "species": { "species_name": "Blue Tit" }
-    },
-    "session": {
-      "visit_date": "2024-08-02",
-      "location": { "location_name": "Garden Feeder Station" }
-    }
-  },
-  {
-    "id": 5,
-    "record_type": "F",
-    "extra_text": null,
-    "finding_condition": null,
-    "finding_circumstances": null,
-    "bird": {
-      "ring_no": "ARESIGHT05",
-      "species": { "species_name": "Robin" }
-    },
-    "session": {
-      "visit_date": "2022-01-10",
-      "location": { "location_name": "River Bank" }
+      "location": {
+        "location_name": "Alpha Site A (CES)"
+      },
+      "visit_date": "2023-05-12"
     }
   }
 ]

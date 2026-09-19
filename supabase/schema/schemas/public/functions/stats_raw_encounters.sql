@@ -1,4 +1,4 @@
--- Shared plumbing for core_stats and population_stats (#800). Pre-aggregates
+-- Shared plumbing for core_stats and demographics_stats (#800). Pre-aggregates
 -- all Encounters/Sessions/Birds/Species rows in scope for a given
 -- (species_name_filter, from_date, to_date, ringing_group_filter) query window,
 -- with the day/month/year grouping columns precomputed for the caller to pick
@@ -55,7 +55,13 @@ CREATE FUNCTION public.stats_raw_encounters (
     date_trunc('year', sess.visit_date)::DATE AS session_year
   FROM public."Species" sp
   JOIN public."Birds" b ON sp.id = b.species_id
+  -- Resighting/recovery record_types (public.resighting_record_type: U/F/D) are
+  -- passive encounters with no bird in the hand, and must not surface in any stats
+  -- RPC (#874). Filtering in the LEFT JOIN's ON clause (not the WHERE) preserves the
+  -- NULL-preserving semantics: a bird whose only encounters are resightings still
+  -- appears with encounter_id IS NULL rather than being dropped entirely.
   LEFT JOIN public."Encounters" e ON b.id = e.bird_id
+    AND NOT (e.record_type = ANY (enum_range(NULL::public.resighting_record_type)::text[]))
   LEFT JOIN public."Sessions" sess ON e.session_id = sess.id
   WHERE (from_date IS NULL OR sess.visit_date >= from_date)
    AND (to_date IS NULL OR sess.visit_date <= to_date)

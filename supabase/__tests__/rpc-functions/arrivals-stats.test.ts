@@ -325,6 +325,9 @@ describe('arrivals_stats', () => {
 			...args
 		});
 		expect(error).toBeNull();
+		// The RPC client types `data` as generic Json, structurally incompatible
+		// with ArrivalsRow[] — a direct assertion doesn't compile.
+		// eslint-disable-next-line no-restricted-syntax -- see comment above
 		return data as unknown as ArrivalsRow[];
 	}
 

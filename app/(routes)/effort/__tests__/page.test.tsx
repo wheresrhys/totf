@@ -9,8 +9,14 @@ vi.mock('@/app/actions/pay-off-stats', () => ({
 	fetchPayOffStats: vi.fn()
 }));
 
+// These fixtures are not grouped by species, so species_name is genuinely
+// null — PayOffStatsData's underlying CoreStatsResult NonNullable mapped type
+// (app/models/db.ts) assumes every column is always present, so a direct
+// assertion doesn't compile (#895).
 const payOffSnapshot: PayOffStatsData = {
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	yearly: yearlySnapshot as unknown as PayOffStatsData['yearly'],
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	monthly: monthlySnapshot as unknown as PayOffStatsData['monthly']
 };
 

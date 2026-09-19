@@ -18,11 +18,10 @@ import {
 	type CoreStatsResult,
 	type CoreStatsWithBiometrics,
 	type BiometricsStatsResult,
-	type DemographicsStatsResult
+	type DemographicsStatsResult,
+	type ArrivalsStatsResult
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
-import { getTopPeriodsByMetric } from '@/app/actions/top-performers';
-import type { TopMetricsFilterParams, TopPeriodsResult } from '@/app/models/db';
 export async function fetchPageOfBirds(
 	speciesId: number,
 	viewedGroupId: number,
@@ -81,32 +80,6 @@ export async function fetchPageOfBirds(
 		catchSupabaseErrors
 	)) as BirdOfSpecies[];
 	return paginatedBirdResults.map(enrichBird) as EnrichedBirdOfSpecies[];
-}
-
-/**
- * The species page's "Busiest sessions" section (Highlights tab) — the top 5
- * sessions by encounter count for this species, optionally scoped to a
- * year/month. Reuses `getTopPeriodsByMetric` with the same
- * day/encounters/limit-5 shape the headline stats' "Top sessions" line used
- * before #782 moved it into the Highlights tab.
- */
-export async function fetchTopSessions(
-	speciesName: string,
-	viewedGroupId: number,
-	year?: number,
-	month?: number
-): Promise<TopPeriodsResult[]> {
-	return getTopPeriodsByMetric({
-		temporal_unit: 'day',
-		metric_name: 'encounters',
-		filters: {
-			species_filter: speciesName,
-			ringing_group_filter: viewedGroupId,
-			...(year !== undefined ? { year_filter: year } : {}),
-			...(month !== undefined ? { month_filter: month } : {})
-		} as TopMetricsFilterParams,
-		result_limit: 5
-	}) as Promise<TopPeriodsResult[]>;
 }
 
 export async function fetchNotableRetraps(
@@ -270,6 +243,34 @@ export async function getSpeciesDemographicsStats(
 			...(toDate ? { to_date: toDate } : {})
 		})
 		.then(catchSupabaseErrors) as Promise<DemographicsStatsResult[]>;
+}
+
+/**
+ * Monthly arrivals history for a single species — the `arrivals_stats`
+ * sibling of `getSpeciesStatsHistory`/`getSpeciesDemographicsStats` (#858).
+ * Counts each bird once per calendar year, at its first classifiable
+ * encounter of that year, bucketed into `new_adult`/`returning_adult`/
+ * `pullus`/`juv`/`postjuv` — feeds the "Demographics" tab's Arrivals tile
+ * (#860). Same call shape (species-filtered, `interval`-grouped, monthly by
+ * default) as its two siblings.
+ */
+export async function getSpeciesArrivalsStats(
+	species: string,
+	viewedGroupId: number,
+	fromDate?: string,
+	toDate?: string,
+	interval: StatsHistoryInterval = 'month'
+): Promise<ArrivalsStatsResult[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
+	return supabase
+		.rpc('arrivals_stats', {
+			species_name_filter: species,
+			ringing_group_filter: viewedGroupId,
+			group_by_time_period: interval,
+			...(fromDate ? { from_date: fromDate } : {}),
+			...(toDate ? { to_date: toDate } : {})
+		})
+		.then(catchSupabaseErrors) as Promise<ArrivalsStatsResult[]>;
 }
 
 /**

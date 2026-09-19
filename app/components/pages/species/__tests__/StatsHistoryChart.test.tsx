@@ -2,14 +2,17 @@ import { describe, it, expect } from 'vitest';
 import type {
 	CoreStatsResult,
 	CoreStatsWithBiometrics,
-	DemographicsStatsResult
+	DemographicsStatsResult,
+	ArrivalsStatsResult
 } from '@/app/models/db';
 import {
 	getCounts,
 	getReturningVsNew,
 	getAgeSplit,
+	getReturningAges,
 	getYoungCounts,
 	getNewYoungCounts,
+	getArrivals,
 	getSizes
 } from '../StatsHistoryChart';
 import robinDemographicsHistory from '@/test-fixtures/snapshots/demographics_stats/robin-alpha.monthly-history.json';
@@ -22,7 +25,7 @@ function aggregateRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
 		time_period: '2024-01-01',
 		bird_count: 0,
 		encounter_count: 0
-	} as unknown as CoreStatsResult & typeof overrides;
+	} as CoreStatsResult & typeof overrides;
 }
 
 // The demographics builder's *column set* comes from a real captured
@@ -31,7 +34,12 @@ function aggregateRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
 // hand-maintained literal, so a column added or removed at the RPC shows up
 // here instead of silently drifting (#883). Every count is zeroed so each test
 // still only sees the columns it explicitly sets.
+// This fixture is species-filtered rather than species-grouped, so
+// species_name is genuinely null — DemographicsStatsResult's NonNullable
+// mapped type (app/models/db.ts) assumes every column is always present, so
+// a direct assertion doesn't compile (#895).
 const [capturedDemographicsRow] =
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	robinDemographicsHistory as unknown as DemographicsStatsResult[];
 const zeroedDemographicsRow = Object.fromEntries(
 	Object.entries(capturedDemographicsRow).map(([column, value]) => [
@@ -253,6 +261,81 @@ describe('getAgeSplit', () => {
 	});
 });
 
+describe('getReturningAges', () => {
+	describe('Usual: four returning-age series from the right columns', () => {
+		it('maps 1 year / 2 years / 3+ years / Unknown age (new) from their columns', () => {
+			const rows = [
+				demographicsRow({
+					time_period: '2024-01-01',
+					returning_age_1_bird_count: 6,
+					returning_age_2_bird_count: 4,
+					returning_age_3_plus_bird_count: 3,
+					returning_new_unknown_age_bird_count: 9
+				})
+			];
+			const result = getReturningAges(rows);
+			expect(result.map((series) => series.name)).toEqual([
+				'1 year',
+				'2 years',
+				'3+ years',
+				'Unknown age (new)'
+			]);
+			expect(result[0].data).toEqual([['2024-01-01', 6]]);
+			expect(result[1].data).toEqual([['2024-01-01', 4]]);
+			expect(result[2].data).toEqual([['2024-01-01', 3]]);
+			expect(result[3].data).toEqual([['2024-01-01', 9]]);
+		});
+	});
+
+	describe('Structure: time_period ordering', () => {
+		it("preserves the input rows' time_period order across every series", () => {
+			const rows = [
+				demographicsRow({
+					time_period: '2024-03-01',
+					returning_age_1_bird_count: 1
+				}),
+				demographicsRow({
+					time_period: '2024-01-01',
+					returning_age_1_bird_count: 2
+				}),
+				demographicsRow({
+					time_period: '2024-02-01',
+					returning_age_1_bird_count: 3
+				})
+			];
+			const result = getReturningAges(rows);
+			for (const series of result) {
+				expect(series.data.map(([period]) => period)).toEqual([
+					'2024-03-01',
+					'2024-01-01',
+					'2024-02-01'
+				]);
+			}
+			expect(result[0].data).toEqual([
+				['2024-03-01', 1],
+				['2024-01-01', 2],
+				['2024-02-01', 3]
+			]);
+		});
+	});
+
+	describe('Edge: a bucket with no birds', () => {
+		it('emits zero-valued points rather than dropping the series', () => {
+			const rows = [
+				demographicsRow({
+					time_period: '2024-01-01',
+					returning_age_1_bird_count: 5
+				})
+			];
+			const result = getReturningAges(rows);
+			expect(result).toHaveLength(4);
+			expect(result[1].data).toEqual([['2024-01-01', 0]]);
+			expect(result[2].data).toEqual([['2024-01-01', 0]]);
+			expect(result[3].data).toEqual([['2024-01-01', 0]]);
+		});
+	});
+});
+
 describe('getYoungCounts', () => {
 	describe('Structure: two series from Juv/Postjuv columns', () => {
 		it('maps postjuv_juv_enc_count and postjuv_enc_count against time_period as Juv and Postjuv', () => {
@@ -285,6 +368,102 @@ describe('getYoungCounts', () => {
 		it('returns both series with empty data arrays', () => {
 			const result = getYoungCounts([]);
 			expect(result).toHaveLength(2);
+			expect(result.every((series) => series.data.length === 0)).toBe(true);
+		});
+	});
+});
+
+// No captured arrivals_stats fixture exists yet (unlike demographicsRow
+// above) — mirrors aggregateRow's plain-literal approach: only the columns
+// this mapper reads matter, so a minimal literal is enough.
+function arrivalsRow(
+	overrides: Partial<ArrivalsStatsResult>
+): ArrivalsStatsResult {
+	return {
+		species_name: 'Robin',
+		time_period: '2024-01-01',
+		new_adult_bird_count: 0,
+		returning_adult_bird_count: 0,
+		pullus_bird_count: 0,
+		juv_bird_count: 0,
+		postjuv_bird_count: 0,
+		...overrides
+	} as ArrivalsStatsResult;
+}
+
+describe('getArrivals', () => {
+	describe('Usual: maps each arrival bucket column to its own series', () => {
+		it('maps New adults/Returning adults/Pulli/Juv/Postjuv from their columns', () => {
+			const rows = [
+				arrivalsRow({
+					time_period: '2024-01-01',
+					new_adult_bird_count: 5,
+					returning_adult_bird_count: 8,
+					pullus_bird_count: 2,
+					juv_bird_count: 3,
+					postjuv_bird_count: 1
+				})
+			];
+			const result = getArrivals(rows);
+			expect(result.map((series) => series.name)).toEqual([
+				'New adults',
+				'Returning adults',
+				'Pulli',
+				'Juv',
+				'Postjuv'
+			]);
+			expect(result[0].data).toEqual([['2024-01-01', 5]]);
+			expect(result[1].data).toEqual([['2024-01-01', 8]]);
+			expect(result[2].data).toEqual([['2024-01-01', 2]]);
+			expect(result[3].data).toEqual([['2024-01-01', 3]]);
+			expect(result[4].data).toEqual([['2024-01-01', 1]]);
+		});
+	});
+
+	describe('Structure: Pulli series visibility (#920 follow-up)', () => {
+		it('omits the Pulli series when every row has a zero pullus count', () => {
+			const rows = [
+				arrivalsRow({ time_period: '2024-01-01', pullus_bird_count: 0 }),
+				arrivalsRow({ time_period: '2024-02-01', pullus_bird_count: 0 })
+			];
+			const result = getArrivals(rows);
+			expect(result.map((series) => series.name)).toEqual([
+				'New adults',
+				'Returning adults',
+				'Juv',
+				'Postjuv'
+			]);
+		});
+
+		it('includes the Pulli series when at least one row has a nonzero pullus count', () => {
+			const rows = [
+				arrivalsRow({ time_period: '2024-01-01', pullus_bird_count: 0 }),
+				arrivalsRow({ time_period: '2024-02-01', pullus_bird_count: 3 })
+			];
+			const result = getArrivals(rows);
+			expect(result.map((series) => series.name)).toEqual([
+				'New adults',
+				'Returning adults',
+				'Pulli',
+				'Juv',
+				'Postjuv'
+			]);
+			expect(result[2].data).toEqual([
+				['2024-01-01', 0],
+				['2024-02-01', 3]
+			]);
+		});
+	});
+
+	describe('Edge: empty input', () => {
+		it('returns an empty, Pulli-less series for empty input (vacuously zero pullus records)', () => {
+			const result = getArrivals([]);
+			expect(result.map((series) => series.name)).toEqual([
+				'New adults',
+				'Returning adults',
+				'Juv',
+				'Postjuv'
+			]);
 			expect(result.every((series) => series.data.length === 0)).toBe(true);
 		});
 	});

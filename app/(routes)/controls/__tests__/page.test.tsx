@@ -21,10 +21,12 @@ function makeRpcClient(data: unknown) {
 	return { rpc: vi.fn().mockReturnValue(thenable) };
 }
 
+const controls = controlsSnapshot as RingSequenceControlRow[];
+
 describe('controls page', () => {
 	beforeEach(() => {
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-			makeRpcClient(controlsSnapshot)
+			makeRpcClient(controls)
 		);
 	});
 
@@ -42,17 +44,13 @@ describe('controls page', () => {
 		render(await Page());
 		const table = await screen.findByRole('table');
 		const rows = table.querySelectorAll('tbody tr');
-		expect(rows.length).toBe(
-			(controlsSnapshot as RingSequenceControlRow[]).length
-		);
-		expect(getCellTextByHeading(table, 'Ring', 0)).toBe(
-			controlsSnapshot[0].ring_no
-		);
+		expect(rows.length).toBe(controls.length);
+		expect(getCellTextByHeading(table, 'Ring', 0)).toBe(controls[0].ring_no);
 		expect(getCellTextByHeading(table, 'Species', 0)).toBe(
-			controlsSnapshot[0].species_name
+			controls[0].species_name
 		);
 		expect(getCellTextByHeading(table, 'First date', 0)).toBe(
-			controlsSnapshot[0].first_date
+			controls[0].first_date
 		);
 	});
 

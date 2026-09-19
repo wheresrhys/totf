@@ -27,8 +27,12 @@ describe('group_ticks', () => {
 	});
 
 	// Alpha species first-encounter dates (across all locations, all record types):
+	//   Redwing 2023-03-20, Fieldfare 2023-03-15 (both added by #902),
 	//   Reed Warbler 2022-06-15, Blue Tit 2022-04-30, Kingfisher 2022-04-30,
 	//   Robin 2021-06-20, Wren 2021-06-20
+	// group_ticks doesn't use stats_raw_encounters, so it's unaffected by #874's
+	// resighting exclusion — Kingfisher/Wren's dates here are their real captures,
+	// unrelated to the resighting-only rows #902 also added for those species.
 	let alphaSiteBLocationId: number;
 
 	beforeAll(async () => {
@@ -45,6 +49,8 @@ describe('group_ticks', () => {
 		});
 		expect(error).toBeNull();
 		expect(data).toEqual([
+			{ species_name: 'Redwing', first_encounter_date: '2023-03-20' },
+			{ species_name: 'Fieldfare', first_encounter_date: '2023-03-15' },
 			{ species_name: 'Reed Warbler', first_encounter_date: '2022-06-15' },
 			{ species_name: 'Blue Tit', first_encounter_date: '2022-04-30' },
 			{ species_name: 'Kingfisher', first_encounter_date: '2022-04-30' },
@@ -94,8 +100,8 @@ describe('group_ticks', () => {
 			});
 			expect(error).toBeNull();
 			expect(data).toEqual([
-				{ species_name: 'Reed Warbler', first_encounter_date: '2022-06-15' },
-				{ species_name: 'Blue Tit', first_encounter_date: '2022-04-30' }
+				{ species_name: 'Redwing', first_encounter_date: '2023-03-20' },
+				{ species_name: 'Fieldfare', first_encounter_date: '2023-03-15' }
 			]);
 		});
 	});

@@ -510,18 +510,6 @@ export type Database = {
           species_name: string
         }[]
       }
-      metrics_by_period_and_species: {
-        Args: {
-          filters?: Database["public"]["CompositeTypes"]["top_metrics_filter_params"]
-          metric_name: string
-          temporal_unit: string
-        }
-        Returns: {
-          metric_value: number
-          species_name: string
-          visit_date: string
-        }[]
-      }
       most_caught_birds: {
         Args: {
           max_per_species?: number
@@ -556,23 +544,6 @@ export type Database = {
           ring_no: string
           species_name: string
         }[]
-      }
-      population_stats: {
-        Args: {
-          from_date?: string
-          group_by_species?: boolean
-          group_by_time_period?: string
-          ringing_group_filter?: number
-          species_name_filter?: string
-          to_date?: string
-        }
-        Returns: Database["public"]["CompositeTypes"]["population_stats_result"][]
-        SetofOptions: {
-          from: "*"
-          to: "population_stats_result"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       public_core_stats: {
         Args: {
@@ -629,6 +600,22 @@ export type Database = {
         Returns: {
           arrival_bucket: string
           bird_id: number
+          species_id: number
+          time_period: string
+        }[]
+      }
+      stats_bird_returning_age_bucket: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+        }
+        Returns: {
+          bird_id: number
+          returning_age_bucket: string
           species_id: number
           time_period: string
         }[]
@@ -712,33 +699,9 @@ export type Database = {
         }[]
       }
       text_soundex: { Args: { "": string }; Returns: string }
-      top_metrics_by_period: {
-        Args: {
-          filters?: Database["public"]["CompositeTypes"]["top_metrics_filter_params"]
-          metric_name: string
-          result_limit: number
-          temporal_unit: string
-        }
-        Returns: {
-          metric_value: number
-          visit_date: string
-        }[]
-      }
-      top_metrics_by_species_and_period: {
-        Args: {
-          filters?: Database["public"]["CompositeTypes"]["top_metrics_filter_params"]
-          metric_name: string
-          result_limit: number
-          temporal_unit: string
-        }
-        Returns: {
-          metric_value: number
-          species_name: string
-          visit_date: string
-        }[]
-      }
     }
     Enums: {
+      resighting_record_type: "U" | "F" | "D"
       ring_size:
         | "AA"
         | "A"
@@ -824,29 +787,10 @@ export type Database = {
         postjuv_juv_enc_count: number | null
         new_postjuv_juv_enc_count: number | null
         new_postjuv_enc_count: number | null
-      }
-      population_stats_result: {
-        species_name: string | null
-        time_period: string | null
-        adult_bird_count: number | null
-        juv_bird_count: number | null
-        juv_enc_count: number | null
-        postjuv_enc_count: number | null
-        new_young_bird_count: number | null
-        new_adult_bird_count: number | null
-        first_summer_bird_count: number | null
-        postjuv_juv_enc_count: number | null
-        new_postjuv_juv_enc_count: number | null
-        new_postjuv_enc_count: number | null
-        old_timers_bird_count: number | null
-      }
-      top_metrics_filter_params: {
-        month_filter: number | null
-        year_filter: number | null
-        exact_months_filter: string[] | null
-        months_filter: number[] | null
-        species_filter: string | null
-        ringing_group_filter: number | null
+        returning_age_1_bird_count: number | null
+        returning_age_2_bird_count: number | null
+        returning_age_3_plus_bird_count: number | null
+        returning_new_unknown_age_bird_count: number | null
       }
     }
   }
@@ -972,6 +916,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      resighting_record_type: ["U", "F", "D"],
       ring_size: [
         "AA",
         "A",

@@ -19,6 +19,12 @@ declare module 'react-chartkick' {
   };
   export function ScatterChart(props: ScatterChartProps): React.ReactNode;
   export function LineChart(props: LineChartProps): React.ReactNode;
+  // Same prop shape as LineChart — chartkick's AreaChart is a LineChart
+  // rendered with each dataset's `fill`/`backgroundColor` defaulted for a
+  // filled area instead of a plain line (see YearComparisonTrendChart.tsx's
+  // `AllTimeChart` for why this is the only way to get a filled dataset out
+  // of chartkick, rather than a `library` option on LineChart).
+  export function AreaChart(props: LineChartProps): React.ReactNode;
   export type LineChartProps = {
     data: LineChartData[];
     xtitle: string;

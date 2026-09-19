@@ -13,7 +13,12 @@ export default defineConfig({
 	fullyParallel: true,
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 2 : 0,
-	reporter: 'html',
+	// 'dot' keeps the console output concise (one character per test, full
+	// detail only for failures) instead of the default reporter's verbose
+	// per-test lines; 'html' still writes the full report for a human to
+	// inspect, but never auto-opens a browser — important since these tests
+	// commonly run from a subagent's headless environment (#927).
+	reporter: [['dot'], ['html', { open: 'never' }]],
 	globalSetup: './e2e/global-setup.ts',
 	timeout: 60_000,
 	use: {

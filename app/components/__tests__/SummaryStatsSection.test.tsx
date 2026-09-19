@@ -2,10 +2,16 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { SummaryStatsSection } from '../SummaryStatsSection';
 import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
-import zeroStats from '@/test-fixtures/snapshots/core_stats/zero.summary-totals.json';
+import zeroStats from '@/test-fixtures/snapshots/synthetic/zero.summary-totals.json';
 import type { CoreStatsResult } from '@/app/models/db';
 
+// Both are ungrouped core_stats fixtures, so species_name/time_period are
+// genuinely null — CoreStatsResult's NonNullable mapped type
+// (app/models/db.ts) assumes every column is always present, so a direct
+// assertion doesn't compile (#895).
+// eslint-disable-next-line no-restricted-syntax -- see comment above
 const populatedStats = alphaStats as unknown as CoreStatsResult;
+// eslint-disable-next-line no-restricted-syntax -- see comment above
 const zeroActivityStats = zeroStats as unknown as CoreStatsResult;
 
 afterEach(() => {
@@ -16,25 +22,52 @@ describe('SummaryStatsSection', () => {
 	describe('Usual', () => {
 		it('renders all twelve stat labels with their values from a populated row', () => {
 			render(<SummaryStatsSection stats={populatedStats} />);
-			expect(screen.getByText('Sessions').nextSibling?.textContent).toBe('10');
-			expect(screen.getByText('Species').nextSibling?.textContent).toBe('8');
+			expect(screen.getByText('Sessions').nextSibling?.textContent).toBe(
+				String(populatedStats.session_count)
+			);
+			expect(screen.getByText('Species').nextSibling?.textContent).toBe(
+				String(populatedStats.species_count)
+			);
 			expect(screen.getByText('Encounters').nextSibling?.textContent).toBe(
-				'70'
+				String(populatedStats.encounter_count)
 			);
 			expect(screen.getByText('Individuals').nextSibling?.textContent).toBe(
-				'60'
+				String(populatedStats.bird_count)
 			);
-			expect(screen.getByText('New').nextSibling?.textContent).toBe('40');
-			expect(screen.getByText('Retraps').nextSibling?.textContent).toBe('20');
-			expect(screen.getByText('Pulli').nextSibling?.textContent).toBe('10');
-			expect(screen.getByText('Adults').nextSibling?.textContent).toBe('22');
-			expect(screen.getByText('Juvs').nextSibling?.textContent).toBe('15');
-			expect(screen.getByText('Postjuvs').nextSibling?.textContent).toBe('8');
-			expect(screen.getByText('Not aged').nextSibling?.textContent).toBe('5');
+			expect(screen.getByText('New').nextSibling?.textContent).toBe(
+				String(populatedStats.new_bird_count)
+			);
+			expect(screen.getByText('Retraps').nextSibling?.textContent).toBe(
+				String(populatedStats.bird_count - populatedStats.new_bird_count)
+			);
+			expect(screen.getByText('Pulli').nextSibling?.textContent).toBe(
+				String(populatedStats.pullus_bird_count)
+			);
+			expect(screen.getByText('Adults').nextSibling?.textContent).toBe(
+				String(populatedStats.adult_bird_count)
+			);
+			expect(screen.getByText('Juvs').nextSibling?.textContent).toBe(
+				String(populatedStats.juv_bird_count)
+			);
+			expect(screen.getByText('Postjuvs').nextSibling?.textContent).toBe(
+				String(populatedStats.postjuv_bird_count)
+			);
+			expect(screen.getByText('Not aged').nextSibling?.textContent).toBe(
+				String(populatedStats.unknown_age_bird_count)
+			);
 		});
 
 		it('computes Retraps as bird_count - new_bird_count', () => {
-			render(<SummaryStatsSection stats={populatedStats} />);
+			// populatedStats' own bird_count/new_bird_count happen to be equal
+			// (real Alpha seed data has no retraps yet, #894), which wouldn't
+			// exercise the subtraction meaningfully — this asserts it against a
+			// row with a genuine gap between the two instead.
+			const statsWithRetraps: CoreStatsResult = {
+				...populatedStats,
+				bird_count: 60,
+				new_bird_count: 40
+			};
+			render(<SummaryStatsSection stats={statsWithRetraps} />);
 			expect(screen.getByText('Retraps').nextSibling?.textContent).toBe('20');
 		});
 	});

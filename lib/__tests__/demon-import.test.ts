@@ -8,6 +8,7 @@ import {
 	createRingSequenceLinker,
 	CasualtyEncounterError,
 	processEncounterRow,
+	RESIGHTING_RECORD_TYPES,
 	type DemonRow
 } from '../demon-import';
 
@@ -129,6 +130,19 @@ function makeDemonRow(overrides: Partial<DemonRow> = {}): DemonRow {
 	};
 }
 
+describe('RESIGHTING_RECORD_TYPES', () => {
+	// Exhaustiveness guard against the public.resighting_record_type enum
+	// (#874) — mirrors RING_SIZE_ENUM_ORDER's pinning test for the ring_size
+	// enum (app/models/__tests__/ring-sequences.test.ts). A DB-side rename or
+	// addition to the enum won't fail this test automatically (there's no
+	// runtime link to the DB here), but this is the single by-hand place to
+	// update alongside a schema change, per the comment above the constant.
+	it('lists exactly the 3 resighting_record_type enum values', () => {
+		expect(RESIGHTING_RECORD_TYPES).toHaveLength(3);
+		expect(RESIGHTING_RECORD_TYPES).toEqual(['U', 'F', 'D']);
+	});
+});
+
 describe('transformEmptyStringsToNull', () => {
 	it('converts empty strings to null', () => {
 		expect(transformEmptyStringsToNull({ a: '', b: 'hello' })).toEqual({
@@ -180,6 +194,7 @@ describe('createRingSequenceLookup', () => {
 		mockEqGroup = vi.fn(() => ({ eq: mockEqPrefix }));
 		mockSelect = vi.fn(() => ({ eq: mockEqGroup }));
 		mockFrom = vi.fn(() => ({ select: mockSelect }));
+		// eslint-disable-next-line no-restricted-syntax -- mock only implements the `from` chain this test needs, not the full SupabaseClient interface
 		const mockClient = { from: mockFrom } as unknown as SupabaseClient;
 		lookup = createRingSequenceLookup(mockClient);
 	});
@@ -240,6 +255,7 @@ describe('createRingSequenceLinker', () => {
 	beforeEach(() => {
 		mockUpsert = vi.fn().mockResolvedValue({ error: null });
 		mockFrom = vi.fn(() => ({ upsert: mockUpsert }));
+		// eslint-disable-next-line no-restricted-syntax -- mock only implements the `from` chain this test needs, not the full SupabaseClient interface
 		const mockClient = { from: mockFrom } as unknown as SupabaseClient;
 		link = createRingSequenceLinker(mockClient);
 	});
@@ -276,6 +292,7 @@ describe('createUpserter', () => {
 		mockSelect = vi.fn(() => ({ single: mockSingle }));
 		mockUpsertChain = vi.fn(() => ({ select: mockSelect }));
 		mockFrom = vi.fn(() => ({ upsert: mockUpsertChain }));
+		// eslint-disable-next-line no-restricted-syntax -- mock only implements the `from` chain this test needs, not the full SupabaseClient interface
 		const mockClient = { from: mockFrom } as unknown as SupabaseClient;
 		upsert = createUpserter(mockClient);
 	});

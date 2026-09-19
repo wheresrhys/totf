@@ -17,16 +17,29 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
 import { resolveAlphaBetaGammaClients } from './helpers/group-clients';
 import {
-	ALPHA_TOTAL_BIRDS,
 	PER_SPECIES_AGGREGATES,
 	ARRETRAP_DATES
 } from './helpers/alpha-seed-constants';
 
-// Seed has 9 Alpha sessions: 2021-06-20, 2022-04-30, 2022-06-15, 2022-08-10,
-// 2022-10-20, 2023-05-12, 2023-07-08, 2023-09-14, 2024-05-10
-const ALPHA_SESSION_COUNT = 9;
-const ALPHA_TOTAL_ENCOUNTERS = 57;
-const ALPHA_SPECIES_COUNT = 5; // Blue Tit, Kingfisher, Reed Warbler, Robin, Wren
+// Seed has 11 Alpha FULL_GROWN sessions: the 9 ARRETRAP dates (2021-06-20,
+// 2022-04-30, 2022-06-15, 2022-08-10, 2022-10-20, 2023-05-12, 2023-07-08,
+// 2023-09-14, 2024-05-10) plus 2023-03-15 and 2023-03-20 (Fieldfare/Redwing,
+// added by #902's fixture-coverage rows).
+const ALPHA_SESSION_COUNT = 11;
+// #902 also added a resighting-type ('F') Kingfisher and a resighting-type ('U')
+// Wren encounter to the same fixture, to exercise a "resightings" table fixture —
+// both are now excluded from core_stats' aggregates by #874's fix, so
+// ALPHA_TOTAL_ENCOUNTERS only nets the two new Fieldfare/Redwing captures (57 + 2).
+const ALPHA_TOTAL_ENCOUNTERS = 59;
+// Blue Tit, Fieldfare, Kingfisher, Reed Warbler, Redwing, Robin, Wren — Fieldfare
+// and Redwing added by #902.
+const ALPHA_SPECIES_COUNT = 7;
+// core_stats' resighting-exclusion-aware bird_count (#874) — 2 fewer than the raw
+// total Birds row count for Alpha (see ALPHA_TOTAL_BIRDS in alpha-seed-constants.ts,
+// which most_caught_birds uses unfiltered): the #902 Kingfisher/Wren resighting-only
+// birds each still have a row in Birds, but never surface in core_stats' per-bird
+// aggregation since their only encounter is filtered out upstream.
+const ALPHA_TOTAL_BIRDS_EXCLUDING_RESIGHTINGS = 48;
 const CES_2022_ENCOUNTERS = 30; // Apr–Aug 2022 only
 
 describe('core_stats', () => {
@@ -48,7 +61,7 @@ describe('core_stats', () => {
 		expect(row.time_period).toBeNull();
 		expect(row.session_count).toBe(ALPHA_SESSION_COUNT);
 		expect(row.encounter_count).toBe(ALPHA_TOTAL_ENCOUNTERS);
-		expect(row.bird_count).toBe(ALPHA_TOTAL_BIRDS);
+		expect(row.bird_count).toBe(ALPHA_TOTAL_BIRDS_EXCLUDING_RESIGHTINGS);
 		expect(row.species_count).toBe(ALPHA_SPECIES_COUNT);
 	});
 
@@ -129,7 +142,9 @@ describe('core_stats', () => {
 				r.encounter_count
 			])
 		);
-		expect(byYear).toEqual({ 2021: 2, 2022: 35, 2023: 15, 2024: 5 });
+		// 2023 is 15 + the 2 new Fieldfare/Redwing captures added by #902 (17); the
+		// same-year resighting-type Kingfisher/Wren encounters are excluded (#874).
+		expect(byYear).toEqual({ 2021: 2, 2022: 35, 2023: 17, 2024: 5 });
 	});
 
 	describe('non-FULL_GROWN sessions (FIELD_OBSERVATION and PULLI)', () => {
@@ -407,12 +422,15 @@ describe('core_stats', () => {
 						record_type: 'C',
 						capture_time: '05:00:00'
 					},
-					// foStandalone (fo3): a passive field observation (D) Wren on its own date.
+					// foStandalone (fo3): a passive field observation (C) Wren on its own date.
+					// (Not 'D' — that's now a resighting_record_type (#874) and would be
+					// excluded from stats_raw_encounters entirely, which isn't what this
+					// scenario is testing.)
 					{
 						...base_,
 						bird_id: b6,
 						session_id: foStandalone,
-						record_type: 'D',
+						record_type: 'C',
 						capture_time: '20:00:00'
 					},
 					// foOnly range: two passive field observations (C) Wrens, nothing else.
@@ -1106,8 +1124,15 @@ describe('core_stats', () => {
 	});
 
 	describe('group_by_time_period=day', () => {
-		// Alpha's 9 seed sessions (read-only): 2021-06-20, 2022-04-30, 2022-06-15,
-		// 2022-08-10, 2022-10-20, 2023-05-12, 2023-07-08, 2023-09-14, 2024-05-10.
+		// Alpha's 11 FULL_GROWN visit dates (read-only): the 9 ARRETRAP dates
+		// (2021-06-20, 2022-04-30, 2022-06-15, 2022-08-10, 2022-10-20, 2023-05-12,
+		// 2023-07-08, 2023-09-14, 2024-05-10) plus 2023-03-15/2023-03-20 (Fieldfare/
+		// Redwing, added by #902). The 2023-05-10 FIELD_OBSERVATION-only Kingfisher
+		// resighting date (also #902) never appears here — excluded twice over,
+		// by both stats_spine's FIELD_OBSERVATION exclusion and the resighting
+		// record_type exclusion on the encounter itself (#874).
+		const ALPHA_ALL_VISIT_DATES = [...ARRETRAP_DATES, '2023-03-15', '2023-03-20'];
+
 		// Usual
 		it("returns one row per distinct visit date, matching Alpha's known session dates", async () => {
 			const { data, error } = await alphaClient.rpc('core_stats', {
@@ -1115,9 +1140,9 @@ describe('core_stats', () => {
 				group_by_time_period: 'day'
 			});
 			expect(error).toBeNull();
-			expect(data).toHaveLength(ARRETRAP_DATES.length);
+			expect(data).toHaveLength(ALPHA_ALL_VISIT_DATES.length);
 			expect(data!.map((r) => r.time_period).sort()).toEqual(
-				[...ARRETRAP_DATES].sort()
+				[...ALPHA_ALL_VISIT_DATES].sort()
 			);
 		});
 
@@ -1235,6 +1260,98 @@ describe('core_stats', () => {
 					expect(row).not.toHaveProperty(column);
 				}
 			}
+		});
+	});
+
+	// Thin confirming assertion — the actual exclusion logic is covered in depth by
+	// stats-raw-encounters-and-spine.test.ts, since core_stats inherits it from the
+	// shared stats_raw_encounters utility RPC (#874).
+	describe('resighting record_type exclusion (#874)', () => {
+		let deltaId: number;
+		let deltaClient: SupabaseClient;
+		let locationId: number;
+		let sessionId: number;
+		let birdId: number;
+		let visitDate: string;
+
+		beforeAll(async () => {
+			deltaId = await getGroupIdByName('Delta');
+			deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+			const { data: robin, error: robinError } = await supabase
+				.from('Species')
+				.select('id')
+				.eq('species_name', 'Robin')
+				.single();
+			if (robinError || !robin) throw robinError ?? new Error('Robin not found');
+
+			const suffix = randomTestSuffix();
+			visitDate = randomFutureDate();
+
+			const { data: location, error: locationError } = await deltaClient
+				.from('Locations')
+				.insert({
+					location_name: `CoreStats Resighting ${suffix}`,
+					ringing_group_id: deltaId
+				})
+				.select('id')
+				.single();
+			if (locationError) throw locationError;
+			locationId = location!.id;
+
+			const { data: session, error: sessionError } = await deltaClient
+				.from('Sessions')
+				.insert({ visit_date: visitDate, location_id: locationId })
+				.select('id')
+				.single();
+			if (sessionError) throw sessionError;
+			sessionId = session!.id;
+
+			const { data: bird, error: birdError } = await deltaClient
+				.from('Birds')
+				.insert({ ring_no: `CS-RSE-${suffix}`, species_id: robin!.id })
+				.select('id')
+				.single();
+			if (birdError) throw birdError;
+			birdId = bird!.id;
+
+			// A single resighting-only encounter — no capture at all this session.
+			const { error: encounterError } = await deltaClient.from('Encounters').insert({
+				capture_time: '10:00:00',
+				scheme: 'BTO',
+				sex: 'M',
+				session_id: sessionId,
+				bird_id: birdId,
+				age_code: 4,
+				record_type: 'U',
+				weight: 10,
+				wing_length: 50
+			});
+			if (encounterError) throw encounterError;
+		});
+
+		afterAll(() => {
+			execSync(
+				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+					`DELETE FROM "Encounters" WHERE bird_id = ${birdId};` +
+					`DELETE FROM "Birds" WHERE id = ${birdId};` +
+					`DELETE FROM "Sessions" WHERE id = ${sessionId};` +
+					`DELETE FROM "Locations" WHERE id = ${locationId};'`
+			);
+		});
+
+		it('excludes a resighting-only session/bird from encounter_count and bird_count', async () => {
+			const { data, error } = await deltaClient.rpc('core_stats', {
+				ringing_group_filter: deltaId,
+				from_date: visitDate,
+				to_date: visitDate
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(1);
+			// The resighting-only encounter/bird/session must not surface at all — the
+			// row is the all-zero shape a date range with no in-scope captures returns.
+			expect(data![0].encounter_count).toBe(0);
+			expect(data![0].bird_count).toBe(0);
 		});
 	});
 });
