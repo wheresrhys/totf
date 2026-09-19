@@ -41,12 +41,14 @@ export async function defaultGetParams<
 	return decodedParams;
 }
 
+// `cacheKeys` and `ttl` are accepted (and already computed/passed by every
+// caller below) but currently unused: the `unstable_cache` wrapping they'd
+// feed is commented out below, pending re-enablement. Kept on the type so
+// call sites don't need to change when caching comes back.
 export async function fetchDataWithCache<DataType, ParamsType>({
 	params,
 	dataFetcher,
-	cacheKeys,
-	viewedGroupId,
-	ttl = 3600 // 1 hour
+	viewedGroupId
 }: {
 	params: ParamsType;
 	dataFetcher: (

@@ -121,20 +121,6 @@ describe('buildStandardColumnConfigs', () => {
 		unknownAge: number;
 	};
 
-	// A second caller whose RowModel carries extra fields of its own (proving
-	// `StandardField & keyof RowModel` doesn't require an exact match) and
-	// words the same logical fields differently in its headers.
-	type TotalsModel = {
-		species: string;
-		new: number;
-		retraps: number;
-		pullus: number;
-		juvs: number;
-		postjuv: number;
-		adults: number;
-		unknownAge: number;
-	};
-
 	it('returns age counts in logical order when hasPulli is false', () => {
 		const configs = buildStandardColumnConfigs<SessionModel>(false);
 		expect(Object.keys(configs)).toEqual([

@@ -104,7 +104,7 @@ describe('mistakes page', () => {
 
 	it('sorts rows by species ascending on first render', async () => {
 		render(await Page());
-		const table = await screen.findByRole('table');
+		await screen.findByRole('table');
 		const firstRowSpecies = getCellTextByHeading('Species', 0);
 		// age tab species: Blue Tit, Kingfisher, Robin -> Blue Tit first
 		expect(firstRowSpecies).toBe('Blue Tit');

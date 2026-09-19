@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { formatSecondsForDisplay } from '@/app/lib/postgres-interval';
 import type { CoreStatsResult } from '@/app/models/db';
 import {
 	derivePeriodTotalsRowByBird,

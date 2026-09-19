@@ -170,7 +170,8 @@ describe('state-file', () => {
 		});
 
 		it('throws SwarmStateSchemaError when an entry is missing a required key', async () => {
-			const { agentId: _agentId, ...withoutAgentId } = makeEntry();
+			const withoutAgentId: Partial<SwarmWorkerEntry> = { ...makeEntry() };
+			delete withoutAgentId.agentId;
 			await writeRawState(JSON.stringify([withoutAgentId]));
 			await expect(listState(repoDir)).rejects.toThrow(SwarmStateSchemaError);
 		});

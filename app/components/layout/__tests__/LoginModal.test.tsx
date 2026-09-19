@@ -44,7 +44,7 @@ describe('LoginModal', () => {
 
 	it('shows error message when login fails', async () => {
 		mockLoginGroup.mockImplementation(
-			async (_prev: LoginState, _formData: FormData): Promise<LoginState> => ({
+			async (): Promise<LoginState> => ({
 				success: false,
 				error: 'Invalid password'
 			})
@@ -60,7 +60,7 @@ describe('LoginModal', () => {
 
 	it('calls router.refresh on successful login', async () => {
 		mockLoginGroup.mockImplementation(
-			async (_prev: LoginState, _formData: FormData): Promise<LoginState> => ({
+			async (): Promise<LoginState> => ({
 				success: true
 			})
 		);

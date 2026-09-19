@@ -7,10 +7,9 @@ import { SearchPageContent, type SearchResult } from './PageContent';
 
 export type SearchParams = { q: string };
 
-export async function fetchSearchPageContent(
-	{ q }: SearchParams,
-	_viewedGroupId: number
-): Promise<SearchResult[]> {
+export async function fetchSearchPageContent({
+	q
+}: SearchParams): Promise<SearchResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const uppercaseQuery = q.toUpperCase();
 	const exactMatch = await supabase

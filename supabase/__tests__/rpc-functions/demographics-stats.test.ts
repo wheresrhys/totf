@@ -18,13 +18,6 @@ import { getGroupIdByName } from './helpers/seed-lookups';
 import { createIsolatedGroup, psql } from '../db-test-helpers';
 
 describe('demographics_stats', () => {
-	let alphaId: number;
-	let alphaClient: SupabaseClient;
-
-	beforeAll(async () => {
-		({ alphaId, alphaClient } = await resolveAlphaBetaGammaClients());
-	});
-
 	// new_adult_bird_count (#800): the subset of adult_bird_count whose first-ever
 	// year with the ringing group is the cell's own period_year. Resolved from each
 	// bird's LIFETIME history with the group (unwindowed), so every bird carries
