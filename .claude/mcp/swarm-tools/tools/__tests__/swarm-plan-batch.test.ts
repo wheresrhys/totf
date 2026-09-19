@@ -1,7 +1,12 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../lib/gh', () => ({ ghJson: vi.fn() }));
-vi.mock('../../lib/git', () => ({ listBranches: vi.fn() }));
+vi.mock('../../lib/git', () => ({
+	listBranches: vi.fn(),
+	listWorktrees: vi.fn(),
+	getBranchTip: vi.fn(),
+	getAheadBehind: vi.fn(),
+}));
 // Preserve the real schemas/types (planBatch and swarm-plan-batch import prunedEntrySchema etc.);
 // only listStateWithPruneReport is stubbed so tests can inject the pruned worker report.
 vi.mock('../../lib/state-file', async (importOriginal) => ({
@@ -10,7 +15,7 @@ vi.mock('../../lib/state-file', async (importOriginal) => ({
 }));
 
 import { ghJson } from '../../lib/gh';
-import { listBranches } from '../../lib/git';
+import { listBranches, listWorktrees, getBranchTip, getAheadBehind } from '../../lib/git';
 import { listStateWithPruneReport, type PrunedEntry, type SwarmWorkerEntry } from '../../lib/state-file';
 import {
 	getExclusiveLabel,
@@ -423,8 +428,19 @@ describe('classifyStaleBranchPrs', () => {
 		expect(classifyStaleBranchPrs([{ number: 610, state: 'MERGED' }])).toBe('excluded');
 	});
 
-	it('returns excluded when no PR ever existed for the branch', () => {
-		expect(classifyStaleBranchPrs([])).toBe('excluded');
+	it('returns no-pr-history when no PR ever existed for the branch', () => {
+		expect(classifyStaleBranchPrs([])).toBe('no-pr-history');
+	});
+
+	// Edge — a merged PR alongside nothing else is completed work, not a crashed attempt, so it
+	// must not be confused with the never-had-a-PR case.
+	it('keeps a merged-PR branch out of no-pr-history', () => {
+		expect(
+			classifyStaleBranchPrs([
+				{ number: 610, state: 'MERGED' },
+				{ number: 611, state: 'MERGED' },
+			])
+		).toBe('excluded');
 	});
 
 	// Edge — a branch re-attempted more than once: report the most recent (highest-numbered) closed PR.
@@ -441,10 +457,23 @@ describe('classifyStaleBranchPrs', () => {
 describe('findTicketCandidates', () => {
 	const mockGhJson = vi.mocked(ghJson);
 	const mockListBranches = vi.mocked(listBranches);
+	const mockListWorktrees = vi.mocked(listWorktrees);
+	const mockGetBranchTip = vi.mocked(getBranchTip);
+	const mockGetAheadBehind = vi.mocked(getAheadBehind);
+
+	beforeEach(() => {
+		// Default git answers for the orphaned-branch path; individual tests override as needed.
+		mockListWorktrees.mockResolvedValue([]);
+		mockGetBranchTip.mockResolvedValue(null);
+		mockGetAheadBehind.mockResolvedValue(null);
+	});
 
 	afterEach(() => {
 		mockGhJson.mockReset();
 		mockListBranches.mockReset();
+		mockListWorktrees.mockReset();
+		mockGetBranchTip.mockReset();
+		mockGetAheadBehind.mockReset();
 		resetSwarmPlanBatchCaches();
 	});
 
@@ -512,14 +541,33 @@ describe('findTicketCandidates', () => {
 		expect(result.staleClosedPrTickets).toEqual([]);
 	});
 
-	it('excludes an issue whose existing branch never had a PR from both lists (unchanged)', async () => {
+	it('reports an issue whose existing branch never had a PR as an orphanedBranchTicket, not a candidate', async () => {
 		stubGh({ issues: [issue], branchPrs: [] });
 		mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+		mockGetBranchTip.mockResolvedValue({ committedDate: '2026-01-05T09:30:00+00:00', subject: 'WIP: first pass' });
+		mockGetAheadBehind.mockResolvedValue({ ahead: 2, behind: 17 });
+		mockListWorktrees.mockResolvedValue([
+			{ path: '/repo', branch: 'main' },
+			{ path: '/repo/.claude/worktrees/agent-dead', branch: 'feature/600-do-the-thing' },
+		]);
 
 		const result = await findTicketCandidates(new Set());
 
 		expect(result.candidates).toEqual([]);
 		expect(result.staleClosedPrTickets).toEqual([]);
+		expect(result.orphanedBranchTickets).toEqual([
+			{
+				number: 600,
+				title: 'Do the thing',
+				labels: ['ready', 'opus'],
+				orphanedBranch: 'feature/600-do-the-thing',
+				lastCommitDate: '2026-01-05T09:30:00+00:00',
+				lastCommitMessage: 'WIP: first pass',
+				worktreePath: '/repo/.claude/worktrees/agent-dead',
+				aheadOfMain: 2,
+				behindMain: 17,
+			},
+		]);
 	});
 
 	it('returns a normal candidate for an issue with no existing branch, without a per-branch PR lookup', async () => {
@@ -558,6 +606,89 @@ describe('findTicketCandidates', () => {
 				closedPrNumber: 625,
 			},
 		]);
+	});
+
+	describe('orphaned branches (no PR history at all)', () => {
+		// Structure — the whole point of the runningBranches guard: a live worker's branch is
+		// normal in-flight work and must stay invisible, exactly as before.
+		it('does not report an orphan when a live state entry claims the branch', async () => {
+			stubGh({ issues: [issue], branchPrs: [] });
+			mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+
+			const result = await findTicketCandidates(new Set(), new Set(['feature/600-do-the-thing']));
+
+			expect(result.orphanedBranchTickets).toEqual([]);
+			expect(result.candidates).toEqual([]);
+			expect(result.staleClosedPrTickets).toEqual([]);
+		});
+
+		it('does not run any git detail lookup for a branch a live state entry claims', async () => {
+			stubGh({ issues: [issue], branchPrs: [] });
+			mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+
+			await findTicketCandidates(new Set(), new Set(['feature/600-do-the-thing']));
+
+			expect(mockGetBranchTip).not.toHaveBeenCalled();
+			expect(mockGetAheadBehind).not.toHaveBeenCalled();
+			expect(mockListWorktrees).not.toHaveBeenCalled();
+		});
+
+		it('does not report an orphan for a branch whose only PR was merged', async () => {
+			stubGh({ issues: [issue], branchPrs: [{ number: 610, state: 'MERGED' }] });
+			mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+
+			const result = await findTicketCandidates(new Set());
+
+			expect(result.orphanedBranchTickets).toEqual([]);
+		});
+
+		it('does not report an orphan for a branch with an open PR', async () => {
+			stubGh({ issues: [issue], branchPrs: [{ number: 610, state: 'OPEN' }] });
+			mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+
+			const result = await findTicketCandidates(new Set());
+
+			expect(result.orphanedBranchTickets).toEqual([]);
+		});
+
+		it('does not report an orphan for a branch with a closed-not-merged PR (that is a staleClosedPrTicket)', async () => {
+			stubGh({ issues: [issue], branchPrs: [{ number: 610, state: 'CLOSED' }] });
+			mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+
+			const result = await findTicketCandidates(new Set());
+
+			expect(result.orphanedBranchTickets).toEqual([]);
+			expect(result.staleClosedPrTickets).toHaveLength(1);
+		});
+
+		// Edge — every git-derived field is best-effort; a remote-only branch has no worktree and
+		// an unresolvable origin/main yields no divergence counts. Nulls, never zeros.
+		it('reports nulls rather than zeros when git cannot resolve the branch details', async () => {
+			stubGh({ issues: [issue], branchPrs: [] });
+			mockListBranches.mockResolvedValue(['feature/600-do-the-thing']);
+			mockListWorktrees.mockResolvedValue([{ path: '/repo', branch: 'main' }]);
+
+			const result = await findTicketCandidates(new Set());
+
+			expect(result.orphanedBranchTickets[0]).toMatchObject({
+				lastCommitDate: null,
+				lastCommitMessage: null,
+				worktreePath: null,
+				aheadOfMain: null,
+				behindMain: null,
+			});
+		});
+
+		it('resolves the worktree list at most once across several orphans', async () => {
+			const secondIssue = { ...issue, number: 601, title: 'Do the other thing' };
+			stubGh({ issues: [issue, secondIssue], branchPrs: [] });
+			mockListBranches.mockResolvedValue(['feature/600-do-the-thing', 'feature/601-do-the-other-thing']);
+
+			const result = await findTicketCandidates(new Set());
+
+			expect(result.orphanedBranchTickets.map((t) => t.number)).toEqual([600, 601]);
+			expect(mockListWorktrees).toHaveBeenCalledTimes(1);
+		});
 	});
 
 	describe('per-issue caches', () => {
@@ -813,11 +944,23 @@ describe('planBatch', () => {
 	const mockGhJson = vi.mocked(ghJson);
 	const mockListBranches = vi.mocked(listBranches);
 	const mockListState = vi.mocked(listStateWithPruneReport);
+	const mockListWorktrees = vi.mocked(listWorktrees);
+	const mockGetBranchTip = vi.mocked(getBranchTip);
+	const mockGetAheadBehind = vi.mocked(getAheadBehind);
+
+	beforeEach(() => {
+		mockListWorktrees.mockResolvedValue([]);
+		mockGetBranchTip.mockResolvedValue(null);
+		mockGetAheadBehind.mockResolvedValue(null);
+	});
 
 	afterEach(() => {
 		mockGhJson.mockReset();
 		mockListBranches.mockReset();
 		mockListState.mockReset();
+		mockListWorktrees.mockReset();
+		mockGetBranchTip.mockReset();
+		mockGetAheadBehind.mockReset();
 		resetSwarmPlanBatchCaches();
 	});
 
@@ -1117,6 +1260,168 @@ describe('planBatch', () => {
 		const numbers = result.ticketsToImplement.map((t) => t.number);
 		expect(numbers).not.toContain(600);
 		expect(numbers).toEqual([601, 602]);
+	});
+
+	describe('orphanedBranchTickets', () => {
+		const readyIssue = {
+			number: 874,
+			title: 'Exclude passive records from stats',
+			labels: [{ name: 'ready' }, { name: 'opus' }],
+			blockedBy: { nodes: [] },
+			blocking: { nodes: [] },
+			updatedAt: '2026-01-06T00:00:00Z',
+		};
+
+		/**
+		 * One ready issue with a matching existing branch and no PRs anywhere. `issue view` answers
+		 * both shapes the planner asks for — a label lookup (isSoloRunCurrentlyActive, when a live
+		 * worker entry exists) and closedByPullRequestsReferences — since the command shape is the
+		 * same for both.
+		 */
+		function stubReadyIssueWithBranch() {
+			mockGhJson.mockImplementation((args: string[]) => {
+				if (args[0] === 'issue' && args[1] === 'list') return Promise.resolve([readyIssue]);
+				if (args[0] === 'issue' && args[1] === 'view')
+					return Promise.resolve({ closedByPullRequestsReferences: [], labels: [{ name: 'opus' }] });
+				if (args[0] === 'pr' && args[1] === 'view') return Promise.resolve({ labels: [{ name: 'sonnet' }] });
+				return Promise.resolve([]);
+			});
+			mockListBranches.mockResolvedValue(['feature/874-exclude-passive-records']);
+		}
+
+		// Usual — the incident this field exists for: a branch with no PR history and no state
+		// entry, which used to be dropped with no signal at all.
+		it('reports a ready ticket whose branch has no PR history and no state entry', async () => {
+			mockListState.mockResolvedValue({ workers: [], pruned: [] });
+			stubReadyIssueWithBranch();
+			mockGetBranchTip.mockResolvedValue({ committedDate: '2026-01-04T11:00:00+00:00', subject: 'wip' });
+			mockGetAheadBehind.mockResolvedValue({ ahead: 1, behind: 9 });
+			mockListWorktrees.mockResolvedValue([
+				{ path: '/repo/.claude/worktrees/agent-874', branch: 'feature/874-exclude-passive-records' },
+			]);
+
+			const result = await planBatch(4);
+
+			expect(result.orphanedBranchTickets).toEqual([
+				{
+					number: 874,
+					title: 'Exclude passive records from stats',
+					labels: ['ready', 'opus'],
+					orphanedBranch: 'feature/874-exclude-passive-records',
+					lastCommitDate: '2026-01-04T11:00:00+00:00',
+					lastCommitMessage: 'wip',
+					worktreePath: '/repo/.claude/worktrees/agent-874',
+					aheadOfMain: 1,
+					behindMain: 9,
+					prunedThisCall: false,
+				},
+			]);
+			// Purely additive surfacing — it must never leak into the auto-spawn list.
+			expect(result.ticketsToImplement).toEqual([]);
+			expect(result.staleClosedPrTickets).toEqual([]);
+		});
+
+		// Structure — an orphan awaiting a user decision is pending work, so the pool isn't drained.
+		it('does not report drained while an orphaned-branch ticket is outstanding', async () => {
+			mockListState.mockResolvedValue({ workers: [], pruned: [] });
+			stubReadyIssueWithBranch();
+
+			const result = await planBatch(4);
+
+			expect(result.orphanedBranchTickets).toHaveLength(1);
+			expect(result.drained).toBe(false);
+		});
+
+		// Structure — the genuine in-progress case: a live worker holds the branch, so nothing is
+		// reported and the ticket stays invisible exactly as before.
+		it('reports nothing for a branch a live worker entry claims', async () => {
+			const liveWorker: SwarmWorkerEntry = {
+				kind: 'ticket',
+				issue: 874,
+				pr: null,
+				branch: 'feature/874-exclude-passive-records',
+				title: 'Exclude passive records from stats',
+				worktreePath: '/repo/.claude/worktrees/agent-874',
+				agentId: 'agent-874',
+				model: 'opus',
+				startedAt: '2026-01-06T00:00:00.000Z',
+			};
+			mockListState.mockResolvedValue({ workers: [liveWorker], pruned: [] });
+			stubReadyIssueWithBranch();
+
+			const result = await planBatch(4);
+
+			expect(result.orphanedBranchTickets).toEqual([]);
+			expect(result.ticketsToImplement).toEqual([]);
+		});
+
+		// Structure — a live *maintenance* entry carries no issue number, so the branch-name guard
+		// is what keeps it out of the orphan list.
+		it('reports nothing for a branch a live maintenance entry claims, despite it having no issue number', async () => {
+			const liveMaintenanceWorker: SwarmWorkerEntry = {
+				kind: 'maintenance',
+				issue: null,
+				pr: 880,
+				branch: 'feature/874-exclude-passive-records',
+				title: 'Maintaining the PR',
+				worktreePath: '/repo/.claude/worktrees/agent-880',
+				agentId: 'agent-880',
+				model: 'sonnet',
+				startedAt: '2026-01-06T00:00:00.000Z',
+			};
+			mockListState.mockResolvedValue({ workers: [liveMaintenanceWorker], pruned: [] });
+			stubReadyIssueWithBranch();
+
+			const result = await planBatch(4);
+
+			expect(result.orphanedBranchTickets).toEqual([]);
+		});
+
+		// Edge — the prune/orphan overlap: one incident, two signals, linked by prunedThisCall so
+		// the orchestrator can report it once rather than twice.
+		it('flags prunedThisCall when the same call also pruned a dead worker for that branch', async () => {
+			mockListState.mockResolvedValue({
+				workers: [],
+				pruned: [
+					{
+						agentId: 'agent-874',
+						branch: 'feature/874-exclude-passive-records',
+						issue: 874,
+						pr: null,
+						title: 'Exclude passive records from stats',
+						reason: 'stale-inactivity',
+					},
+				],
+			});
+			stubReadyIssueWithBranch();
+
+			const result = await planBatch(4);
+
+			expect(result.pruned).toHaveLength(1);
+			expect(result.orphanedBranchTickets).toHaveLength(1);
+			expect(result.orphanedBranchTickets[0].prunedThisCall).toBe(true);
+		});
+
+		it('leaves prunedThisCall false when the prune was for an unrelated worker', async () => {
+			mockListState.mockResolvedValue({
+				workers: [],
+				pruned: [
+					{
+						agentId: 'agent-other',
+						branch: 'feature/999-unrelated',
+						issue: 999,
+						pr: null,
+						title: 'Something else',
+						reason: 'worktree-missing',
+					},
+				],
+			});
+			stubReadyIssueWithBranch();
+
+			const result = await planBatch(4);
+
+			expect(result.orphanedBranchTickets[0].prunedThisCall).toBe(false);
+		});
 	});
 
 	// forceRescan clears the per-item caches before planning, so a manual re-check always hits
