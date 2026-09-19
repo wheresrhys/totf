@@ -101,6 +101,10 @@ half of the fix: an auto-prune that succeeds quietly reproduces the original "no
 complaint (just for over-provisioning instead of under-provisioning) if the heuristic is ever
 wrong, so the user can intervene if a prune looks mistaken.
 
+A pruned worker often leaves a branch behind that no PR was ever opened against, which the same
+`swarm_plan_batch` call also reports as an `orphanedBranchTickets` entry with `prunedThisCall:
+true`. That pairing is one incident, not two — report it as a single combined warning; see §1.7.
+
 **Concurrency is capped at 4 worker subagents.** The top-level swarm orchestrator (the parent
 agent running this skill) does not count toward the cap — it only selects, spawns, reports and
 refills; it holds no worktree and does no ticket work. So: 1 orchestrator + up to 4 workers.
@@ -168,6 +172,10 @@ there was genuinely nothing eligible (regardless of slots) and no workers runnin
 `staleClosedPrTickets` — ready tickets excluded *only* because a `feature/<issue>-*` branch left
 over from a closed-not-merged PR still exists — which need an explicit user decision before any can
 be spawned; handle these in §1.5 below, never by auto-spawning them alongside normal tickets.
+Alongside it, `orphanedBranchTickets` — ready tickets excluded *only* because a `feature/<issue>-*`
+branch exists that has **never had any PR opened against it** and that no live worker claims (a
+crashed attempt's leftover) — which likewise need an explicit user decision; handle these in §1.7,
+again never by auto-spawning.
 Finally, `pruned` lists any phantom worker entries this call auto-removed as presumed-dead — **if
 it is non-empty, warn the user about each before selecting/spawning** (see the self-healing
 dead-worker prune under "State file" above); a pruned worker has also already been discounted from
@@ -332,6 +340,65 @@ This subagent counts toward the normal 4-worker cap (same pool as ticket/mainten
 Append a `kind: "ticket"` entry (see State file) right after spawning it, with `issue` set to the
 original unlabeled issue's number, so self-healing prune still work on it.
 
+## 1.7 Orphaned ticket branches with no PR history (warn, then confirm resume vs fresh)
+
+`swarm_plan_batch`'s `orphanedBranchTickets` holds `ready`, unblocked issues excluded *only*
+because a `feature/<issue>-*` branch exists that has **never had any PR opened against it** —
+not open, not closed, not merged — and that no live `.claude/swarm-state.json` entry claims. That
+combination means a previous worker created the branch (usually a worktree too) and then died
+before it ever got as far as pushing a PR: a usage-limit hit, a `/clear`, a crash, or a session
+boundary that lost the state entry.
+
+This is the third branch-exists case and it used to be the *silent* one. §1.5's
+`staleClosedPrTickets` catches a branch left by a **closed** PR; an **open** PR means genuine
+in-flight work. A branch with no PR history at all fell through both and was simply treated as
+"someone is working on it" forever — the ticket vanished from the queue with no warning
+whatsoever, which is strictly worse than the closed-PR case because nothing at all signalled it.
+(A branch whose only PR was **merged** is deliberately *not* reported: that's completed work whose
+branch wasn't deleted, a ticket-hygiene matter, not a stuck queue.)
+
+Each entry carries `number`, `title`, `labels`, `orphanedBranch`, and what git knows about the
+branch — `lastCommitDate` and `lastCommitMessage` (its tip commit), `worktreePath` (a still-checked-out
+worktree, or `null`), and `aheadOfMain` / `behindMain` (commits either way versus `origin/main`).
+Every git-derived field is nullable: `null` means "couldn't determine", never zero. There is no
+closed PR to point at, so unlike §1.5 there is nothing to inspect for context beyond this — which
+is why the flow is a plain warn-then-confirm rather than §1.5's three-option branch-strategy
+question.
+
+For each entry, **before spawning anything for it**:
+1. **Warn the user plainly** — name the issue and title, say that an orphaned branch from a prior
+   crashed attempt exists, and quote its state: branch name, last commit date + message, whether a
+   worktree still exists (and where), and how far ahead/behind `origin/main` it is. E.g. "#874
+   'Exclude passive records from stats' has an orphaned branch `feature/874-exclude-passive-records`
+   from a crashed prior attempt — last commit 3 days ago ('wip: filter resightings'), 2 ahead / 17
+   behind `origin/main`, worktree still present at `.claude/worktrees/agent-874`. No PR was ever
+   opened."
+2. **Ask via `AskUserQuestion`** — one question per orphaned ticket — which to do:
+   - **Resume the existing branch/worktree** — treat it exactly like the §4.6 worker-failure
+     recovery path: spawn the §3 worker pointed at the *existing* `orphanedBranch` (and, if
+     `worktreePath` is non-null, at that existing worktree rather than a fresh one), instructed to
+     pick up from the last commit and `git merge origin/main` first. It does **not** run
+     `mcp__swarm-tools__derive_branch_name`.
+   - **Abandon it and start fresh** — derive a new branch name via
+     `mcp__swarm-tools__derive_branch_name` (`{issueNumber, title}`, collision-checked against
+     `orphanedBranch`) and spawn a §3 worker that implements cleanly from `origin/main`, ignoring
+     the orphan. Mention that the user may want to delete `orphanedBranch` and its worktree
+     separately; the orchestrator does not delete them itself.
+
+Only once the user has answered do you spawn that ticket's worker via §3 (still respecting the
+free-slot cap and the solo-run rule, and passing the chosen branch strategy into the worker's
+prompt in place of §3's default "create the ticket branch off `origin/main`" instruction). An
+orphaned ticket the user hasn't answered for is never spawned — it simply resurfaces on the next
+`swarm_plan_batch` call. Never auto-spawn one, same principle as §1.5.
+
+**When `prunedThisCall` is `true` on an entry, it is the same incident as one of that call's
+`pruned` warnings** — a worker died, its phantom state entry was pruned, and this is the branch it
+left behind. Report the two together as one message rather than as an unrelated prune warning plus
+an unrelated orphan warning ("Dropped presumed-dead worker on `feature/874-…` (no activity in over
+45 minutes) — it left an orphaned branch with no PR; here's its state: …"), then ask the question
+above once. Both are still reported deliberately: suppressing the orphan on the call that
+discovered the death would hide the ticket for exactly the pass that found the problem.
+
 ## 2. Select tickets (fill the remaining budget)
 
 `swarm_plan_batch`'s `ticketsToImplement` is already unblocked (no open `blockedBy` entry),
@@ -343,7 +410,10 @@ any ticket also carrying the `next` label ranks above every ticket without it, r
 selected here — see §1.6.
 
 If `drained` is `true`, neither §1 nor §2 found eligible work and no workers are running: report
-that and go idle (do not exit the loop — a later completion or new PR can refill).
+that and go idle (do not exit the loop — a later completion or new PR can refill). `drained` stays
+`false` while any `staleClosedPrTickets` or `orphanedBranchTickets` entry is outstanding — those
+are pending work awaiting a user decision (§1.5 / §1.7), so never report the pool drained without
+first surfacing them.
 
 ## 3. Spawn one worktree subagent per ticket
 
@@ -537,6 +607,13 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
 - Never auto-spawn a `staleClosedPrTickets` entry (an issue whose only leftover is a stale branch
   from a closed-not-merged PR). Always ask the user via `AskUserQuestion` (§1.5) to reuse the
   branch / start fresh referencing it / start fresh clean, and spawn only after they answer.
+- Never auto-spawn — and never silently drop — an `orphanedBranchTickets` entry (an issue whose
+  only leftover is a branch that never had *any* PR opened against it and that no live worker
+  claims: a crashed attempt). Warn the user plainly with the branch's state (tip commit, surviving
+  worktree, ahead/behind `origin/main`), then ask via `AskUserQuestion` (§1.7) whether to resume
+  that branch/worktree or abandon it and start fresh, and spawn only after they answer. Where the
+  entry's `prunedThisCall` is `true`, fold that warning together with the matching `pruned` entry —
+  it's one incident, not two.
 - Never implement or guess a model label for a `ready` issue missing `sonnet`/`opus`/`fable`.
   Instead spawn a dedicated `sonnet`-model subagent to run `ticketify` against it (§1.6), which
   drafts properly-labeled replacement ticket(s) and closes the original (or relabels it in place

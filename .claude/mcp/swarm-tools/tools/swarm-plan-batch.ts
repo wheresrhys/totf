@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { listStateWithPruneReport, prunedEntrySchema, type SwarmWorkerEntry } from '../lib/state-file';
-import { listBranches } from '../lib/git';
+import { listBranches, listWorktrees, getBranchTip, getAheadBehind } from '../lib/git';
 import { ghJson } from '../lib/gh';
 
 export const EXCLUSIVE_LABELS = ['db-migration', 'e2e-exclusive'] as const;
@@ -150,9 +150,70 @@ export interface StaleClosedPrTicket {
 	closedPrNumber: number;
 }
 
+/**
+ * A `ready`, unblocked issue whose only disqualifier is a pre-existing `feature/<issue>-*` branch
+ * that has **never had any PR opened against it** — open, closed or merged — and that no live
+ * `.claude/swarm-state.json` entry claims. That combination means a previous worker created the
+ * branch (and usually a worktree) and then died before it ever got as far as pushing a PR, so the
+ * branch is a crashed-attempt leftover rather than active in-flight work.
+ *
+ * This is the third branch-exists case, distinct from both of the others:
+ * - an **open** PR on the branch → genuinely in-flight, stays silently excluded;
+ * - a **closed-not-merged** PR → {@link StaleClosedPrTicket}, which has a `closedPrNumber` to point
+ *   the user back at for context;
+ * - **no PR at all** → this — there is no PR history to inspect, so instead of a three-option
+ *   reuse/replace flow the report just carries what git itself knows about the branch (tip commit,
+ *   surviving worktree, divergence from `origin/main`) for the orchestrator to show the user.
+ *
+ * A branch whose only PR was **merged** is deliberately *not* reported here: that's completed work
+ * whose branch simply wasn't deleted, not an interrupted attempt, and the issue being still open is
+ * a ticket-hygiene matter rather than a stuck-queue one.
+ *
+ * Before this existed (#546 covered only the closed-PR case) such an issue was excluded with no
+ * signal whatsoever — indistinguishable from "someone is working on it right now" — so it vanished
+ * from the queue permanently with nothing to tell the user why.
+ *
+ * Every git-derived field is nullable: a branch that exists only on `origin` has no local worktree,
+ * and `origin/main` may not resolve in an odd checkout. `null` means "couldn't determine", never
+ * zero.
+ */
+export interface OrphanedBranchTicket {
+	number: number;
+	title: string;
+	labels: string[];
+	orphanedBranch: string;
+	/** ISO 8601 committer date of the branch tip, or `null` if the branch tip can't be resolved. */
+	lastCommitDate: string | null;
+	/** Subject line of the branch's tip commit, or `null` alongside a null `lastCommitDate`. */
+	lastCommitMessage: string | null;
+	/** Absolute path of a still-checked-out worktree for the branch, or `null` if none survives. */
+	worktreePath: string | null;
+	/** Commits on the branch but not on `origin/main`, or `null` if the comparison failed. */
+	aheadOfMain: number | null;
+	/** Commits on `origin/main` but not on the branch, or `null` if the comparison failed. */
+	behindMain: number | null;
+}
+
+/**
+ * {@link OrphanedBranchTicket} as returned by `swarm_plan_batch`, plus the one field only
+ * `planBatch` can know: whether this same call's self-healing prune dropped a worker entry for this
+ * issue/branch.
+ *
+ * The two signals genuinely describe one incident — a worker died, its phantom state entry got
+ * pruned, and the branch it left behind is the orphan — so reporting them as two unrelated warnings
+ * would be a confusing double-signal. Suppressing the orphan instead would be worse: the ticket
+ * would then be invisible for exactly the call that discovered the death, which is the failure mode
+ * this whole field exists to end. So both are reported and the link between them is made explicit
+ * here, for the orchestrator to fold into a single message (see `/swarm` §1.7).
+ */
+export interface OrphanedBranchTicketReport extends OrphanedBranchTicket {
+	prunedThisCall: boolean;
+}
+
 export interface TicketCandidatesResult {
 	candidates: TicketCandidate[];
 	staleClosedPrTickets: StaleClosedPrTicket[];
+	orphanedBranchTickets: OrphanedBranchTicket[];
 }
 
 export function rankMaintenanceCandidates(candidates: MaintenanceCandidate[]): MaintenanceCandidate[] {
@@ -295,14 +356,50 @@ interface GhPrHeadItem {
  * - no open PR but ≥1 closed-not-merged PR → `{ closedPrNumber }` (stale leftover — a new
  *   candidate the orchestrator should prompt about), reporting the most recent (highest-numbered)
  *   closed PR when several exist (a branch re-attempted more than once)
- * - only a merged PR, or no PR ever → `'excluded'` (unchanged from prior behaviour)
+ * - no PR of any kind, ever → `'no-pr-history'` (a possible {@link OrphanedBranchTicket}; the
+ *   caller still has to rule out a live state-file entry before calling it orphaned)
+ * - only a merged PR → `'excluded'` (completed work whose branch wasn't deleted — stays silent)
  */
-export function classifyStaleBranchPrs(prs: GhPrHeadItem[]): 'in-flight' | 'excluded' | { closedPrNumber: number } {
+export function classifyStaleBranchPrs(
+	prs: GhPrHeadItem[]
+): 'in-flight' | 'excluded' | 'no-pr-history' | { closedPrNumber: number } {
 	if (prs.some((pr) => pr.state === 'OPEN')) return 'in-flight';
 	const closedUnmerged = prs.filter((pr) => pr.state === 'CLOSED');
-	if (closedUnmerged.length === 0) return 'excluded';
-	const mostRecent = closedUnmerged.reduce((a, b) => (b.number > a.number ? b : a));
-	return { closedPrNumber: mostRecent.number };
+	if (closedUnmerged.length > 0) {
+		const mostRecent = closedUnmerged.reduce((a, b) => (b.number > a.number ? b : a));
+		return { closedPrNumber: mostRecent.number };
+	}
+	return prs.length === 0 ? 'no-pr-history' : 'excluded';
+}
+
+/** Base ref every orphaned branch's ahead/behind count is measured against. */
+export const ORPHAN_BASE_REF = 'origin/main';
+
+/** The best-effort, git-derived half of an {@link OrphanedBranchTicket}. */
+type OrphanedBranchGitDetails = Pick<
+	OrphanedBranchTicket,
+	'lastCommitDate' | 'lastCommitMessage' | 'worktreePath' | 'aheadOfMain' | 'behindMain'
+>;
+
+/**
+ * Gathers the git-side facts about an orphaned branch for the user-facing report: its tip commit,
+ * whether a worktree is still checked out on it, and how far it has diverged from `origin/main`.
+ * Deliberately *not* cached alongside the branch classification — that cache is keyed on the
+ * issue's GitHub `updatedAt`, which says nothing about local git state, so a cached answer here
+ * could show a long-stale commit date. These are cheap local git calls on a rare path.
+ */
+async function describeOrphanedBranch(
+	branch: string,
+	worktrees: { path: string; branch: string | null }[]
+): Promise<OrphanedBranchGitDetails> {
+	const [tip, divergence] = await Promise.all([getBranchTip(branch), getAheadBehind(ORPHAN_BASE_REF, branch)]);
+	return {
+		lastCommitDate: tip?.committedDate ?? null,
+		lastCommitMessage: tip?.subject ?? null,
+		worktreePath: worktrees.find((worktree) => worktree.branch === branch)?.path ?? null,
+		aheadOfMain: divergence?.ahead ?? null,
+		behindMain: divergence?.behind ?? null,
+	};
 }
 
 export async function findMaintenanceCandidates(): Promise<MaintenanceCandidate[]> {
@@ -348,7 +445,18 @@ export async function findMaintenanceCandidates(): Promise<MaintenanceCandidate[
 	return candidates;
 }
 
-export async function findTicketCandidates(runningIssueNumbers: Set<number>): Promise<TicketCandidatesResult> {
+/**
+ * @param runningIssueNumbers issue numbers of live `kind: 'ticket'` state-file entries.
+ * @param runningBranches branch names of *every* live state-file entry, either kind. A branch
+ *   claimed here is being worked right now, so it must stay silently excluded rather than being
+ *   reported as orphaned — this is the guard that keeps the normal in-progress case invisible.
+ *   Issue-number matching alone isn't enough: a maintenance entry carries no issue number, and an
+ *   entry can outlive the issue-number association if the branch is re-pointed.
+ */
+export async function findTicketCandidates(
+	runningIssueNumbers: Set<number>,
+	runningBranches: Set<string> = new Set()
+): Promise<TicketCandidatesResult> {
 	const issues = await ghJson<GhIssueListItem[]>([
 		'issue',
 		'list',
@@ -362,6 +470,10 @@ export async function findTicketCandidates(runningIssueNumbers: Set<number>): Pr
 	const branches = await listBranches();
 	const candidates: TicketCandidate[] = [];
 	const staleClosedPrTickets: StaleClosedPrTicket[] = [];
+	const orphanedBranchTickets: OrphanedBranchTicket[] = [];
+	// Resolved at most once per call, and only if an orphan is actually found — the overwhelmingly
+	// common pass finds none and pays nothing for the `git worktree list`.
+	let worktreesPromise: ReturnType<typeof listWorktrees> | null = null;
 	for (const issue of issues) {
 		const isBlocked = issue.blockedBy.nodes.some((node) => node.state === 'OPEN');
 		if (isBlocked) continue;
@@ -401,9 +513,21 @@ export async function findTicketCandidates(runningIssueNumbers: Set<number>): Pr
 					staleBranch: existingBranch,
 					closedPrNumber: classification.closedPrNumber,
 				});
+			} else if (classification === 'no-pr-history' && !runningBranches.has(existingBranch)) {
+				// No PR was ever opened on this branch and no live worker claims it: a crashed
+				// attempt's leftover, which used to be excluded with no signal at all.
+				worktreesPromise ??= listWorktrees();
+				orphanedBranchTickets.push({
+					number: issue.number,
+					title: issue.title,
+					labels: issue.labels.map((l) => l.name),
+					orphanedBranch: existingBranch,
+					...(await describeOrphanedBranch(existingBranch, await worktreesPromise)),
+				});
 			}
-			// 'in-flight', 'excluded', and stale-closed alike stay out of `candidates` — the branch
-			// disqualifies the issue from being auto-implemented either way.
+			// 'in-flight', 'excluded', stale-closed and orphaned alike stay out of `candidates` —
+			// the branch disqualifies the issue from being auto-implemented either way. The two
+			// reported cases are surfaced for a user decision instead, never auto-spawned.
 			continue;
 		}
 		const cachedClosedBy = issueClosedByPrCache.get(issue.number);
@@ -429,7 +553,7 @@ export async function findTicketCandidates(runningIssueNumbers: Set<number>): Pr
 		const blockingCount = issue.blocking.nodes.filter((node) => node.state === 'OPEN').length;
 		candidates.push({ number: issue.number, title: issue.title, labels, model, blockingCount });
 	}
-	return { candidates, staleClosedPrTickets };
+	return { candidates, staleClosedPrTickets, orphanedBranchTickets };
 }
 
 /**
@@ -502,9 +626,25 @@ export async function planBatch(freeSlots: number, forceRescan = false) {
 	const runningIssueNumbers = new Set(
 		runningEntries.filter((e) => e.kind === 'ticket' && e.issue !== null).map((e) => e.issue as number)
 	);
+	// Every live entry's branch, both kinds — the "is someone working this branch right now?" guard
+	// for orphaned-branch detection. Taken from the *post-prune* entries, so a phantom worker can't
+	// keep masking its own orphaned branch forever.
+	const runningBranches = new Set(runningEntries.map((e) => e.branch));
 
 	const maintenanceCandidates = await findMaintenanceCandidates();
-	const { candidates: ticketCandidates, staleClosedPrTickets } = await findTicketCandidates(runningIssueNumbers);
+	const {
+		candidates: ticketCandidates,
+		staleClosedPrTickets,
+		orphanedBranchTickets,
+	} = await findTicketCandidates(runningIssueNumbers, runningBranches);
+
+	// Tie each orphan back to a worker entry this same call pruned, when there is one, so the
+	// orchestrator reports one incident rather than two unrelated warnings — see
+	// OrphanedBranchTicketReport for why both are reported at all.
+	const orphanedBranchTicketReports: OrphanedBranchTicketReport[] = orphanedBranchTickets.map((orphan) => ({
+		...orphan,
+		prunedThisCall: pruned.some((entry) => entry.branch === orphan.orphanedBranch || entry.issue === orphan.number),
+	}));
 
 	const rankedMaintenance = rankMaintenanceCandidates(maintenanceCandidates);
 	const rankedTickets = rankTicketCandidates(ticketCandidates);
@@ -526,13 +666,14 @@ export async function planBatch(freeSlots: number, forceRescan = false) {
 	);
 	const ticketsToImplement = allocation.tickets.map((ticket) => ({ ...ticket, blockedBySoloRun: false }));
 
-	// Stale-closed-PR tickets are pending work too (awaiting a user reuse/replace decision),
-	// so the pool isn't genuinely drained while any remain — otherwise the orchestrator would
-	// go idle and never surface them.
+	// Stale-closed-PR and orphaned-branch tickets are pending work too (each awaiting a user
+	// decision), so the pool isn't genuinely drained while any remain — otherwise the orchestrator
+	// would go idle and never surface them.
 	const drained =
 		maintenanceCandidates.length === 0 &&
 		ticketCandidates.length === 0 &&
 		staleClosedPrTickets.length === 0 &&
+		orphanedBranchTicketReports.length === 0 &&
 		runningEntries.length === 0;
 
 	return {
@@ -541,6 +682,7 @@ export async function planBatch(freeSlots: number, forceRescan = false) {
 		prsNeedingMaintenance,
 		ticketsToImplement,
 		staleClosedPrTickets,
+		orphanedBranchTickets: orphanedBranchTicketReports,
 		drained,
 		pruned,
 	};
@@ -551,7 +693,7 @@ export function registerSwarmPlanBatchTool(server: McpServer) {
 		'swarm_plan_batch',
 		{
 			description:
-				"Pre-filtered, pre-ranked PR-maintenance and ready-ticket lists for swarm's §1+§2 selection, already applying the unblocked/not-in-flight/solo-run rules and truncated to freeSlots. Also returns staleClosedPrTickets — ready tickets excluded only because a feature/<issue>-* branch from a closed-not-merged PR still exists — for the orchestrator to prompt on before reusing/replacing. `pruned` lists worker entries auto-removed from state this call as presumed-dead (missing worktree, or no worktree activity past the staleness threshold) — warn the user on any non-empty list before selecting. Per-item feedback/branch-classification results are cached in-process across calls, keyed by each PR/issue's own `updatedAt` — pass `forceRescan: true` (e.g. on a user-requested re-check) to bypass the cache and recompute everything from live GitHub state.",
+				"Pre-filtered, pre-ranked PR-maintenance and ready-ticket lists for swarm's §1+§2 selection, already applying the unblocked/not-in-flight/solo-run rules and truncated to freeSlots. Also returns staleClosedPrTickets — ready tickets excluded only because a feature/<issue>-* branch from a closed-not-merged PR still exists — for the orchestrator to prompt on before reusing/replacing. And orphanedBranchTickets — ready tickets excluded only because a feature/<issue>-* branch exists that never had ANY PR opened against it (open, closed or merged) and that no live swarm-state.json entry claims: a branch left behind by a worker that crashed before it ever pushed a PR. Each carries the branch's tip commit date/message, a surviving worktree path if any, ahead/behind counts vs origin/main, and prunedThisCall (true when this same call also pruned a dead worker entry for that branch/issue — report the two as one incident, not two warnings). Never auto-spawn either list; ask the user first (§1.5 / §1.7). `pruned` lists worker entries auto-removed from state this call as presumed-dead (missing worktree, or no worktree activity past the staleness threshold) — warn the user on any non-empty list before selecting. Per-item feedback/branch-classification results are cached in-process across calls, keyed by each PR/issue's own `updatedAt` — pass `forceRescan: true` (e.g. on a user-requested re-check) to bypass the cache and recompute everything from live GitHub state.",
 			inputSchema: {
 				freeSlots: z.number(),
 				forceRescan: z.boolean().optional(),
@@ -587,6 +729,20 @@ export function registerSwarmPlanBatchTool(server: McpServer) {
 						labels: z.array(z.string()),
 						staleBranch: z.string(),
 						closedPrNumber: z.number(),
+					})
+				),
+				orphanedBranchTickets: z.array(
+					z.object({
+						number: z.number(),
+						title: z.string(),
+						labels: z.array(z.string()),
+						orphanedBranch: z.string(),
+						lastCommitDate: z.string().nullable(),
+						lastCommitMessage: z.string().nullable(),
+						worktreePath: z.string().nullable(),
+						aheadOfMain: z.number().nullable(),
+						behindMain: z.number().nullable(),
+						prunedThisCall: z.boolean(),
 					})
 				),
 				drained: z.boolean(),

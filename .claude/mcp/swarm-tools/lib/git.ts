@@ -61,3 +61,70 @@ export async function listWorktrees(cwd?: string): Promise<Worktree[]> {
 	const { stdout } = await runGit(['worktree', 'list', '--porcelain'], cwd);
 	return parseWorktreeList(stdout);
 }
+
+/** The committer date (ISO 8601) and subject line of a branch's tip commit. */
+export interface BranchTip {
+	committedDate: string;
+	subject: string;
+}
+
+/**
+ * Field separator used in {@link BRANCH_TIP_FORMAT}. A literal `0x1f` (ASCII unit separator) rather
+ * than a tab or a pipe, since a commit subject can legitimately contain either but never a control
+ * character.
+ */
+const BRANCH_TIP_SEPARATOR = '\x1f';
+
+/** `git log -1` format string producing exactly what {@link parseBranchTip} expects. */
+export const BRANCH_TIP_FORMAT = `%cI${BRANCH_TIP_SEPARATOR}%s`;
+
+/**
+ * Parses `git log -1 --format=<BRANCH_TIP_FORMAT> <branch>` output. `null` for empty output (a
+ * branch that doesn't resolve, or a repo with no commits). Only the first separator splits, so a
+ * subject containing one is preserved intact.
+ */
+export function parseBranchTip(stdout: string): BranchTip | null {
+	const line = stdout.trim();
+	if (!line) return null;
+	const separatorIndex = line.indexOf(BRANCH_TIP_SEPARATOR);
+	if (separatorIndex === -1) return { committedDate: line, subject: '' };
+	return {
+		committedDate: line.slice(0, separatorIndex),
+		subject: line.slice(separatorIndex + BRANCH_TIP_SEPARATOR.length),
+	};
+}
+
+/** The tip commit's date + subject for `branch`, or `null` if it can't be resolved. */
+export async function getBranchTip(branch: string, cwd?: string): Promise<BranchTip | null> {
+	const { stdout, exitCode } = await runGit(['log', '-1', `--format=${BRANCH_TIP_FORMAT}`, branch], cwd);
+	if (exitCode !== 0) return null;
+	return parseBranchTip(stdout);
+}
+
+/** How far a branch has diverged from a base ref, in commits each way. */
+export interface AheadBehind {
+	ahead: number;
+	behind: number;
+}
+
+/**
+ * Parses `git rev-list --left-right --count <base>...<branch>` output, which is
+ * `<left>\t<right>` — left being commits reachable from `base` only (how far the branch is
+ * *behind*) and right commits reachable from `branch` only (how far it is *ahead*). `null` for
+ * anything that doesn't parse as two integers.
+ */
+export function parseAheadBehind(stdout: string): AheadBehind | null {
+	const parts = stdout.trim().split(/\s+/);
+	if (parts.length !== 2) return null;
+	const behind = Number(parts[0]);
+	const ahead = Number(parts[1]);
+	if (!Number.isInteger(behind) || !Number.isInteger(ahead)) return null;
+	return { ahead, behind };
+}
+
+/** Commits `branch` is ahead/behind `baseRef`, or `null` if either ref can't be resolved. */
+export async function getAheadBehind(baseRef: string, branch: string, cwd?: string): Promise<AheadBehind | null> {
+	const { stdout, exitCode } = await runGit(['rev-list', '--left-right', '--count', `${baseRef}...${branch}`], cwd);
+	if (exitCode !== 0) return null;
+	return parseAheadBehind(stdout);
+}

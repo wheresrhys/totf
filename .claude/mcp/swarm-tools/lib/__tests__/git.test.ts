@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseBranchList, parseWorktreeList } from '../git';
+import { parseBranchList, parseWorktreeList, parseBranchTip, parseAheadBehind } from '../git';
 
 describe('parseBranchList', () => {
 	// Usual
@@ -63,5 +63,61 @@ describe('parseWorktreeList', () => {
 
 	it('returns an empty array for empty output', () => {
 		expect(parseWorktreeList('')).toEqual([]);
+	});
+});
+
+describe('parseBranchTip', () => {
+	// Usual
+	it('splits the committer date from the subject', () => {
+		expect(parseBranchTip('2026-01-05T09:30:00+00:00\x1fAdd the thing')).toEqual({
+			committedDate: '2026-01-05T09:30:00+00:00',
+			subject: 'Add the thing',
+		});
+	});
+
+	// Structure — only the first separator splits, so a subject containing one survives intact.
+	it('keeps a separator inside the subject', () => {
+		expect(parseBranchTip('2026-01-05T09:30:00+00:00\x1fa\x1fb')?.subject).toBe('a\x1fb');
+	});
+
+	it('trims the trailing newline git appends', () => {
+		expect(parseBranchTip('2026-01-05T09:30:00+00:00\x1fAdd the thing\n')?.subject).toBe('Add the thing');
+	});
+
+	// Edge
+	it('returns an empty subject when the commit has no subject line', () => {
+		expect(parseBranchTip('2026-01-05T09:30:00+00:00\x1f')).toEqual({
+			committedDate: '2026-01-05T09:30:00+00:00',
+			subject: '',
+		});
+	});
+
+	it('returns null for empty output', () => {
+		expect(parseBranchTip('')).toBeNull();
+	});
+});
+
+describe('parseAheadBehind', () => {
+	// Usual — `git rev-list --left-right --count base...branch` prints "<behind>\t<ahead>".
+	it('reads the left count as behind and the right count as ahead', () => {
+		expect(parseAheadBehind('17\t2\n')).toEqual({ behind: 17, ahead: 2 });
+	});
+
+	// Structure
+	it('handles a branch level with its base', () => {
+		expect(parseAheadBehind('0\t0')).toEqual({ behind: 0, ahead: 0 });
+	});
+
+	// Edge
+	it('returns null for empty output', () => {
+		expect(parseAheadBehind('')).toBeNull();
+	});
+
+	it('returns null when the output is not two counts', () => {
+		expect(parseAheadBehind('17')).toBeNull();
+	});
+
+	it('returns null for non-numeric output', () => {
+		expect(parseAheadBehind('fatal: bad revision\tx')).toBeNull();
 	});
 });

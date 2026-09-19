@@ -216,6 +216,24 @@ accepted quirk. Note also that an adult-bucketed bird can never compute a period
 (any `age_code > 3` encounter in year V implies `max_hatch_year <= V - 1`), so the four columns in
 practice sum to `adult_bird_count`; the RPC's zero/NULL guard is defensive only.
 
+**Reading a bird's lifetime history "as of" a cell's year: merge the streams, don't join per
+cell (#932).** `stats_bird_returning_age_bucket` originally joined its per-cell `adult_birds`
+relation against each bird's whole per-encounter lifetime history and re-aggregated per cell —
+`O(cells_per_bird × lifetime_encounters_per_bird)`. It now collapses the history to one row per
+(bird, calendar year), `UNION ALL`s those rows with the cells on the same bird/year axis (an
+`event_ord` column ordering a year's history row *before* any cell row for that year, cell rows
+carrying a NULL payload so they never perturb the totals), and accumulates once per bird with
+`SUM`/`MIN`/`bool_or` over `PARTITION BY bird_id ORDER BY (event_year, event_ord) ROWS BETWEEN
+UNBOUNDED PRECEDING AND CURRENT ROW`. Measured 23.4s → 1.2s on a 300-bird × 240-encounter group
+grouped by month. Reuse this shape if another RPC needs the same "state as of year Y" lookup —
+and note the two alternatives that were measured and rejected: a `LEFT JOIN LATERAL … LIMIT 1`
+over the per-year series gets inlined and re-derives the history per cell anyway (8.2s), and a
+`MATERIALIZED` + `DISTINCT ON` variant was worse still (24–102s). The reason plan-dependent
+shapes are unreliable here is worth remembering on its own: **`adult_birds` is estimated at 1
+row when it actually returns tens of thousands** — the `IS NOT DISTINCT FROM` join against a
+SQL-function-backed relation defeats the estimator — so anything whose plan hinges on a sane row
+estimate is a coin flip. Prefer a shape with no join to mis-plan.
+
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
 two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
 counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
