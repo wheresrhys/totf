@@ -62,7 +62,7 @@ export async function generateSnapshots(
 ) {
 	// `relativePath` is a source-directory-relative path, e.g.
 	// `core_stats/alpha.by-species.json` or
-	// `tables/Birds/arretrap.bird-detail.json`.
+	// `tables/Birds/arretrap.bird.json`.
 	const writeSnapshot = async (relativePath: string, data: unknown) => {
 		const target = path.join(outputDir, relativePath);
 		await fs.mkdir(path.dirname(target), { recursive: true });
