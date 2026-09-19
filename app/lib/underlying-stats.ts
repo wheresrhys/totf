@@ -5,89 +5,13 @@ import type {
 	CoreStatsResult,
 	StatsPerDayAndSpeciesResult
 } from '@/app/models/db';
-
-// The stats blobs only change when new data is imported. Each cache entry
-// carries a version token (max Encounters.id for the group) so that a new
-// import invalidates the cache immediately, even across lambda instances.
-// The 60-min TTL is retained as a backstop for rare in-place re-imports
-// that edit existing encounters without adding rows.
-//
-// This is the single implementation of fetchSessionStats — app/actions/
-// session-highlights.ts imports it (and shares this cache instance) rather
-// than keeping its own copy, since importing a plain module from a
-// 'use server' file is fine.
-//
-// fetchYearStats/fetchMonthStats reuse the same version-checked,
-// TTL-backed caching via fetchWithVersionCache below, each keyed off its
-// own Map instance (yearStatsCache / monthStatsCache) — separate Map
-// instances per period type, rather than a shared Map keyed by group id
-// alone, so a year lookup and a month lookup for the same group can never
-// collide on the same cache entry.
-export const STATS_CACHE_TTL_MS = 60 * 60 * 1000;
-
-type StatsCacheEntry<T> = { version: number; expiresAt: number; stats: T };
-
-export const sessionStatsCache = new Map<
-	number,
-	StatsCacheEntry<SessionStatsData>
->();
-export const yearStatsCache = new Map<
-	number,
-	StatsCacheEntry<CoreStatsResult[] | null>
->();
-export const monthStatsCache = new Map<
-	number,
-	StatsCacheEntry<CoreStatsResult[] | null>
->();
-export const effortHistoryCache = new Map<
-	number,
-	StatsCacheEntry<CoreStatsResult[] | null>
->();
-
-export async function fetchStatsVersion(
-	supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>,
-	viewedGroupId: number
-): Promise<number> {
-	const { data } = await supabase
-		.from('Encounters')
-		.select('id')
-		.eq('ringing_group_id', viewedGroupId)
-		.order('id', { ascending: false })
-		.limit(1);
-	return data?.[0]?.id ?? 0;
-}
-
-async function fetchWithVersionCache<T>(
-	cache: Map<number, StatsCacheEntry<T>>,
-	viewedGroupId: number,
-	fetchStats: (
-		supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>
-	) => Promise<T>
-): Promise<T> {
-	const supabase = await getAuthenticatedSupabaseClient();
-	const currentVersion = await fetchStatsVersion(supabase, viewedGroupId);
-	const cached = cache.get(viewedGroupId);
-	if (
-		cached &&
-		cached.version === currentVersion &&
-		cached.expiresAt > Date.now()
-	) {
-		return cached.stats;
-	}
-	const stats = await fetchStats(supabase);
-	cache.set(viewedGroupId, {
-		version: currentVersion,
-		expiresAt: Date.now() + STATS_CACHE_TTL_MS,
-		stats
-	});
-	return stats;
-}
+import { cachedSupabaseFetch } from './cached-supabase-fetch';
 
 export async function fetchSessionStats(
 	viewedGroupId: number
 ): Promise<SessionStatsData> {
-	return fetchWithVersionCache(
-		sessionStatsCache,
+	return cachedSupabaseFetch(
+		'session-stats',
 		viewedGroupId,
 		async (supabase) => {
 			const [daySpeciesStats, sessionRows] = await Promise.all([
@@ -133,8 +57,8 @@ export async function fetchSessionStats(
 export async function fetchYearStats(
 	viewedGroupId: number
 ): Promise<CoreStatsResult[] | null> {
-	return fetchWithVersionCache(
-		yearStatsCache,
+	return cachedSupabaseFetch(
+		'year-species-core-stats',
 		viewedGroupId,
 		(supabase) =>
 			supabase
@@ -150,8 +74,8 @@ export async function fetchYearStats(
 export async function fetchMonthStats(
 	viewedGroupId: number
 ): Promise<CoreStatsResult[] | null> {
-	return fetchWithVersionCache(
-		monthStatsCache,
+	return cachedSupabaseFetch(
+		'month-species-core-stats',
 		viewedGroupId,
 		(supabase) =>
 			supabase
@@ -176,8 +100,8 @@ export async function fetchMonthStats(
 export async function fetchGroupEffortHistory(
 	viewedGroupId: number
 ): Promise<CoreStatsResult[] | null> {
-	return fetchWithVersionCache(
-		effortHistoryCache,
+	return cachedSupabaseFetch(
+		'monthly-group-effort-history',
 		viewedGroupId,
 		(supabase) =>
 			supabase
