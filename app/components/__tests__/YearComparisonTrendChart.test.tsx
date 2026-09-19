@@ -18,6 +18,7 @@ import {
 	aggregateSeriesByYear,
 	accumulateSeriesByYear,
 	buildTotalSeries,
+	toPercentStackedSeries,
 	spansMultipleYears,
 	isHiddenFromLegend,
 	YearComparisonTrendChart
@@ -42,12 +43,18 @@ function makeChartMock(testId: string) {
 		xtitle,
 		ytitle,
 		colors,
+		min,
+		max,
+		suffix,
 		library
 	}: {
 		data: LineChartData[];
 		xtitle: string;
 		ytitle: string;
 		colors?: string[];
+		min?: number | null;
+		max?: number;
+		suffix?: string;
 		library?: {
 			plugins?: { legend?: { labels?: { filter?: LegendLabelsFilter } } };
 			scales?: { y?: { stacked?: boolean } };
@@ -69,6 +76,11 @@ function makeChartMock(testId: string) {
 				data-xtitle={xtitle}
 				data-ytitle={ytitle}
 				data-colors={JSON.stringify(colors)}
+				// The y-axis bounds/suffix, so a test can assert the percent view's
+				// fixed 0–100% scale (and that the default view leaves them alone).
+				data-min={JSON.stringify(min)}
+				data-max={JSON.stringify(max)}
+				data-suffix={JSON.stringify(suffix)}
 				data-series={JSON.stringify(data.map((series) => series.name))}
 				data-values={JSON.stringify(data.map((series) => series.data))}
 				data-visible-in-legend={JSON.stringify(visibleInLegend)}
@@ -774,6 +786,174 @@ describe('buildTotalSeries', () => {
 
 		it('returns an empty series when given no input series', () => {
 			expect(buildTotalSeries([]).data).toEqual([]);
+		});
+	});
+});
+
+describe('toPercentStackedSeries', () => {
+	describe('Usual: each value as a share of its period total', () => {
+		it("converts each series' value at a date to its percentage share of that date's total across all series", () => {
+			const series: LineChartData[] = [
+				{
+					name: 'Juv',
+					data: [
+						['2024-01-01', 3],
+						['2024-02-01', 1]
+					]
+				},
+				{
+					name: 'Postjuv',
+					data: [
+						['2024-01-01', 1],
+						['2024-02-01', 3]
+					]
+				}
+			];
+			const [juv, postjuv] = toPercentStackedSeries(series);
+			expect(juv.data).toEqual([
+				['2024-01-01', 75],
+				['2024-02-01', 25]
+			]);
+			expect(postjuv.data).toEqual([
+				['2024-01-01', 25],
+				['2024-02-01', 75]
+			]);
+		});
+
+		it('produces proportions that sum to ~100 for every period across all series', () => {
+			const series: LineChartData[] = [
+				{
+					name: 'a',
+					data: [
+						['2024-01-01', 7],
+						['2024-02-01', 1]
+					]
+				},
+				{
+					name: 'b',
+					data: [
+						['2024-01-01', 11],
+						['2024-02-01', 2]
+					]
+				},
+				{
+					name: 'c',
+					data: [
+						['2024-01-01', 13],
+						['2024-02-01', 97]
+					]
+				}
+			];
+			const result = toPercentStackedSeries(series);
+			for (const pointIndex of [0, 1]) {
+				const total = result.reduce(
+					(runningTotal, metric) =>
+						runningTotal + (metric.data[pointIndex][1] ?? 0),
+					0
+				);
+				expect(total).toBeCloseTo(100, 10);
+			}
+		});
+	});
+
+	describe('Structure: series-count and transform-composition shapes', () => {
+		it('returns 100 for every reportable period on a single-series input', () => {
+			const series: LineChartData[] = [
+				{
+					name: 'only',
+					data: [
+						['2024-01-01', 4],
+						['2024-02-01', 900]
+					]
+				}
+			];
+			expect(toPercentStackedSeries(series)[0].data).toEqual([
+				['2024-01-01', 100],
+				['2024-02-01', 100]
+			]);
+		});
+
+		it('correctly apportions percentages across five or more series', () => {
+			// Five series at 1/2/3/4/10 → total 20, so 5/10/15/20/50 percent.
+			const series: LineChartData[] = [1, 2, 3, 4, 10].map((value, index) => ({
+				name: `metric ${index}`,
+				data: [['2024-01-01', value] as [string, number | null]]
+			}));
+			expect(
+				toPercentStackedSeries(series).map((metric) => metric.data[0][1])
+			).toEqual([5, 10, 15, 20, 50]);
+		});
+
+		it('produces identical percentages whether the input was effort-normalized first or not, since the same per-date divisor cancels out of the ratio', () => {
+			const series: LineChartData[] = [
+				{
+					name: 'Juv',
+					data: [
+						['2024-01-01', 3],
+						['2024-02-01', 5]
+					]
+				},
+				{
+					name: 'Postjuv',
+					data: [
+						['2024-01-01', 1],
+						['2024-02-01', 15]
+					]
+				}
+			];
+			const effortHistory: LineChartData = {
+				name: 'effort',
+				data: [
+					['2024-01-01', 2],
+					['2024-02-01', 8]
+				]
+			};
+			expect(
+				toPercentStackedSeries(normalizeSeriesByEffort(series, effortHistory))
+			).toEqual(toPercentStackedSeries(series));
+		});
+	});
+
+	describe('Edge: zero totals, gaps and empty input', () => {
+		it('outputs 0, not NaN or Infinity, for a period whose total across all series is zero', () => {
+			const series: LineChartData[] = [
+				{ name: 'Juv', data: [['2024-01-01', 0]] },
+				{ name: 'Postjuv', data: [['2024-01-01', 0]] }
+			];
+			expect(
+				toPercentStackedSeries(series).map((metric) => metric.data)
+			).toEqual([[['2024-01-01', 0]], [['2024-01-01', 0]]]);
+		});
+
+		it("preserves null as a gap for a series whose own value is null at a period, without corrupting the other series' percentages at that period", () => {
+			const series: LineChartData[] = [
+				{ name: 'Juv', data: [['2024-01-01', null]] },
+				{ name: 'Postjuv', data: [['2024-01-01', 6]] },
+				{ name: 'Pulli', data: [['2024-01-01', 2]] }
+			];
+			const [juv, postjuv, pulli] = toPercentStackedSeries(series);
+			// The null series stays a gap (not a manufactured 0%), and counts as 0
+			// in the denominator, so the two real series still sum to 100.
+			expect(juv.data).toEqual([['2024-01-01', null]]);
+			expect(postjuv.data).toEqual([['2024-01-01', 75]]);
+			expect(pulli.data).toEqual([['2024-01-01', 25]]);
+		});
+
+		it('returns an empty data array for an empty input series', () => {
+			expect(toPercentStackedSeries([])).toEqual([]);
+			expect(toPercentStackedSeries([{ name: 'Juv', data: [] }])).toEqual([
+				{ name: 'Juv', data: [] }
+			]);
+		});
+
+		it("leaves each series' name and array order unchanged", () => {
+			const series: LineChartData[] = [
+				{ name: 'Postjuv', data: [['2024-01-01', 1]] },
+				{ name: 'Juv', data: [['2024-01-01', 3]] }
+			];
+			expect(
+				toPercentStackedSeries(series).map((metric) => metric.name)
+			).toEqual(['Postjuv', 'Juv']);
 		});
 	});
 });
@@ -1640,6 +1820,260 @@ describe('YearComparisonTrendChart', () => {
 				['2024-01-01', 3],
 				['2024-02-01', 10]
 			]);
+		});
+	});
+
+	describe('Structure: percentStackable / % stacked toggle', () => {
+		// Two series over two calendar years (so the Interval toggle is offered
+		// too), with per-month splits that are exact percentages by hand:
+		// 2023-01 → 75/25, 2023-06 → 25/75, 2024-01 → 50/50.
+		const stackable: LineChartData[] = [
+			{
+				name: 'Juv',
+				data: [
+					['2023-01-01', 3],
+					['2023-06-01', 1],
+					['2024-01-01', 2]
+				]
+			},
+			{
+				name: 'Postjuv',
+				data: [
+					['2023-01-01', 1],
+					['2023-06-01', 3],
+					['2024-01-01', 2]
+				]
+			}
+		];
+		const stackableEffort: LineChartData = {
+			name: 'effort',
+			data: [
+				['2023-01-01', 2],
+				['2023-06-01', 8],
+				['2024-01-01', 4]
+			]
+		};
+		// Normalize and % stacked both render Yes/No radios, so every query has
+		// to be scoped to its own toggle group (the label span's parent holds
+		// that group's radios).
+		const toggle = (label: string) =>
+			within(screen.getByText(label).parentElement!);
+		const turnOn = () =>
+			fireEvent.click(toggle('% stacked').getByRole('radio', { name: 'Yes' }));
+
+		describe('Usual: switching the view between line and percent-stacked area', () => {
+			it('renders the line chart with the toggle defaulted to "No" when percentStackable is set', () => {
+				render(
+					<YearComparisonTrendChart series={stackable} percentStackable />
+				);
+				const no = toggle('% stacked').getByRole('radio', {
+					name: 'No'
+				}) as HTMLInputElement;
+				expect(no.checked).toBe(true);
+				const chart = screen.getByTestId('line-chart');
+				expect(JSON.parse(chart.dataset.values!)).toEqual([
+					stackable[0].data,
+					stackable[1].data
+				]);
+			});
+
+			it('renders an area chart with stacked percentages when the toggle is switched to "Yes"', () => {
+				render(
+					<YearComparisonTrendChart series={stackable} percentStackable />
+				);
+				turnOn();
+				expect(screen.queryByTestId('line-chart')).toBeNull();
+				const chart = screen.getByTestId('area-chart');
+				expect(chart.dataset.stacked).toBe('true');
+				expect(JSON.parse(chart.dataset.values!)).toEqual([
+					[
+						['2023-01-01', 75],
+						['2023-06-01', 25],
+						['2024-01-01', 50]
+					],
+					[
+						['2023-01-01', 25],
+						['2023-06-01', 75],
+						['2024-01-01', 50]
+					]
+				]);
+			});
+
+			it('reverts to the line chart when the toggle is switched back to "No"', () => {
+				render(
+					<YearComparisonTrendChart series={stackable} percentStackable />
+				);
+				turnOn();
+				fireEvent.click(toggle('% stacked').getByRole('radio', { name: 'No' }));
+				expect(screen.queryByTestId('area-chart')).toBeNull();
+				const chart = screen.getByTestId('line-chart');
+				expect(JSON.parse(chart.dataset.values!)).toEqual([
+					stackable[0].data,
+					stackable[1].data
+				]);
+			});
+
+			it('fixes the axis to 0–100 with a % suffix and a "% of total" ytitle while on', () => {
+				render(
+					<YearComparisonTrendChart
+						series={stackable}
+						ytitle="Count"
+						percentStackable
+					/>
+				);
+				const lineChart = screen.getByTestId('line-chart');
+				expect(lineChart.dataset.ytitle).toBe('Count');
+				expect(lineChart.dataset.max).toBeUndefined();
+				expect(lineChart.dataset.suffix).toBeUndefined();
+
+				turnOn();
+				const areaChart = screen.getByTestId('area-chart');
+				expect(areaChart.dataset.min).toBe('0');
+				expect(areaChart.dataset.max).toBe('100');
+				expect(JSON.parse(areaChart.dataset.suffix!)).toBe('%');
+				expect(areaChart.dataset.ytitle).toBe('% of total');
+			});
+
+			it('keeps the same per-metric colours the line view uses', () => {
+				const colors = ['#111111', '#222222'];
+				render(
+					<YearComparisonTrendChart
+						series={stackable}
+						colors={colors}
+						percentStackable
+					/>
+				);
+				turnOn();
+				expect(
+					JSON.parse(screen.getByTestId('area-chart').dataset.colors!)
+				).toEqual(colors);
+			});
+		});
+
+		describe('Structure: mode gating', () => {
+			it('shows the % stacked toggle in all-time mode when percentStackable is true', () => {
+				render(
+					<YearComparisonTrendChart series={stackable} percentStackable />
+				);
+				expect(screen.getByText('% stacked')).toBeTruthy();
+			});
+
+			it('hides the % stacked toggle in compare-years mode', () => {
+				render(
+					<YearComparisonTrendChart series={stackable} percentStackable />
+				);
+				fireEvent.click(screen.getByRole('radio', { name: 'Compare years' }));
+				expect(screen.queryByText('% stacked')).toBeNull();
+			});
+
+			it('hides the % stacked toggle in this-year mode', () => {
+				render(
+					<YearComparisonTrendChart series={stackable} percentStackable />
+				);
+				fireEvent.click(screen.getByRole('radio', { name: 'This year' }));
+				expect(screen.queryByText('% stacked')).toBeNull();
+			});
+
+			it('never renders the toggle at all when percentStackable is not set', () => {
+				render(<YearComparisonTrendChart series={stackable} />);
+				expect(screen.queryByText('% stacked')).toBeNull();
+				expect(screen.queryByTestId('area-chart')).toBeNull();
+			});
+		});
+
+		describe('Edge: composition with the other toggles', () => {
+			it('retains the previous % stacked toggle value when the user leaves and returns to all-time mode', () => {
+				render(
+					<YearComparisonTrendChart series={stackable} percentStackable />
+				);
+				turnOn();
+				fireEvent.click(screen.getByRole('radio', { name: 'Compare years' }));
+				fireEvent.click(screen.getByRole('radio', { name: 'All time' }));
+
+				expect(
+					(
+						toggle('% stacked').getByRole('radio', {
+							name: 'Yes'
+						}) as HTMLInputElement
+					).checked
+				).toBe(true);
+				expect(screen.getByTestId('area-chart')).toBeTruthy();
+			});
+
+			it('applies percent-stacking after year-aggregation when Interval is set to Year', () => {
+				render(
+					<YearComparisonTrendChart series={stackable} percentStackable />
+				);
+				turnOn();
+				fireEvent.click(screen.getByRole('radio', { name: 'Year' }));
+				const chart = screen.getByTestId('area-chart');
+				// Yearly sums are Juv 4/2 and Postjuv 4/2, so both years are a 50/50
+				// split. Percent-stacking *before* the yearly sum would instead
+				// aggregate the monthly percentages (75 + 25 = 100 for Juv in 2023).
+				expect(JSON.parse(chart.dataset.values!)).toEqual([
+					[
+						['2023', 50],
+						['2024', 50]
+					],
+					[
+						['2023', 50],
+						['2024', 50]
+					]
+				]);
+			});
+
+			it('produces the same percentages whether Normalize is on or off', () => {
+				render(
+					<YearComparisonTrendChart
+						series={stackable}
+						effortHistory={stackableEffort}
+						percentStackable
+					/>
+				);
+				turnOn();
+				const beforeNormalize = screen.getByTestId('area-chart').dataset.values;
+
+				fireEvent.click(
+					toggle('Normalize').getByRole('radio', { name: 'Yes' })
+				);
+				// Effort-normalizing divides every series at a date by the same
+				// scalar, so it cancels out of each series' share of the total.
+				expect(screen.getByTestId('area-chart').dataset.values).toBe(
+					beforeNormalize
+				);
+			});
+
+			it('excludes the Total series from the stack, so the bands still sum to 100', () => {
+				render(
+					<YearComparisonTrendChart
+						series={stackable}
+						includeTotalSeries
+						percentStackable
+					/>
+				);
+				// The line view plots the Total alongside its parts...
+				expect(
+					JSON.parse(screen.getByTestId('line-chart').dataset.series!)
+				).toEqual(['Juv', 'Postjuv', 'Total']);
+
+				turnOn();
+				const chart = screen.getByTestId('area-chart');
+				// ...but the percent view drops it: a Total is the whole, not one of
+				// the parts, so stacking it too would take every period to 200%.
+				expect(JSON.parse(chart.dataset.series!)).toEqual(['Juv', 'Postjuv']);
+				expect(JSON.parse(chart.dataset.values!)).toEqual([
+					[
+						['2023-01-01', 75],
+						['2023-06-01', 25],
+						['2024-01-01', 50]
+					],
+					[
+						['2023-01-01', 25],
+						['2023-06-01', 75],
+						['2024-01-01', 50]
+					]
+				]);
+			});
 		});
 	});
 
