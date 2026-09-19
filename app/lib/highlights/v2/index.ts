@@ -16,7 +16,7 @@ type HighlightType =
 	| 'newBirds'
 	| 'juvs';
 
-type Highlight = {
+export type Highlight = {
 	time_period: string;
 	value: number;
 };

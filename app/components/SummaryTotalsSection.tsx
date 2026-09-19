@@ -296,7 +296,7 @@ export function SummaryTotalsSection({
 					month: month as OneBasedMonth
 				}
 			}),
-		[viewedGroup]
+		[viewedGroup, year, month]
 	);
 	const { data: highlightsData, isLoading: isHighlightsLoading } =
 		useLazyTabData(
