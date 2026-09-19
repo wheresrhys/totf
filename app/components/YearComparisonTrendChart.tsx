@@ -404,6 +404,41 @@ export function buildTotalSeries(series: LineChartData[]): LineChartData {
 	};
 }
 
+// Rewrites every series' value at each date as that value's percentage share of
+// the date's total across all series, for the "% stacked" toggle — so the
+// stacked bands read as proportions of a whole (summing to 100 at every date)
+// rather than as absolute counts. Mirrors `buildTotalSeries`' "Map keyed by
+// date" join pattern for computing each date's denominator.
+//
+// Three conventions, matching the sibling transforms:
+//   - A `null` value stays `null` (a gap) rather than becoming `0` — the series
+//     had no data there, which is not the same as a 0% share. Its absence does
+//     still feed the denominator as a `0`, so the other series at that date
+//     keep summing to 100.
+//   - A date whose total is `0` (every series `0`/`null` there) maps every
+//     series to an explicit `0` — never `NaN`/`Infinity`.
+//   - Series `name`, order, and each series' own point order are unchanged, so
+//     the caller's `colors` array still lines up index-for-index.
+export function toPercentStackedSeries(
+	series: LineChartData[]
+): LineChartData[] {
+	const totalByDate = new Map<string, number>();
+	for (const metric of series) {
+		for (const [date, value] of metric.data) {
+			totalByDate.set(date, (totalByDate.get(date) ?? 0) + (value ?? 0));
+		}
+	}
+	return series.map((metric) => ({
+		...metric,
+		data: metric.data.map(([date, value]) => {
+			if (value == null) return [date, null] as [string, number | null];
+			const total = totalByDate.get(date);
+			if (!total) return [date, 0] as [string, number | null];
+			return [date, (value / total) * 100] as [string, number | null];
+		})
+	}));
+}
+
 // One colour per year (in the oldest-first order `toYearOnYearSeries` returns),
 // for the compare-years view. The current year is black; every previous year is
 // a shade of the metric's base colour — the most recent previous year at full
@@ -573,7 +608,8 @@ export function YearComparisonTrendChart({
 	yearlyAggregators,
 	includeTotalSeries,
 	fetchYearSeries,
-	allowYearAccumulation
+	allowYearAccumulation,
+	percentStackable
 }: {
 	series: LineChartData[];
 	xtitle?: string;
@@ -634,11 +670,27 @@ export function YearComparisonTrendChart({
 	// forced to `'month'` and its toggle is hidden. Omitting it (the default)
 	// leaves the component behaving exactly as before.
 	allowYearAccumulation?: boolean;
+	// When `true`, offers a "% stacked" toggle (all-time mode only). While on,
+	// the all-time series are rewritten as each series' percentage share of its
+	// period's total (see `toPercentStackedSeries`) and drawn as a stacked area
+	// over a fixed 0–100% axis. Omitting it (the default) leaves the component
+	// behaving exactly as before.
+	//
+	// Deliberately not offered in the compare-years/this-year modes: those render
+	// one small chart *per metric*, where that metric is trivially 100% of its
+	// own chart's total, so the view would say nothing.
+	percentStackable?: boolean;
 }) {
 	const [mode, setMode] = useState<ChartMode>('all-time');
 	const [normalize, setNormalize] = useState(false);
 	const [interval, setInterval] = useState<Interval>('month');
 	const [accumulate, setAccumulate] = useState(false);
+	// Unlike `accumulate`, this is *not* reset when the user leaves all-time
+	// mode: the toggle simply stops rendering, and the same choice is restored
+	// on returning. (Accumulate resets because it also forces the Interval to
+	// Month, so leaving it set-but-hidden would silently constrain a toggle the
+	// user can still see.)
+	const [percentStacked, setPercentStacked] = useState(false);
 	// Request-once cache for `fetchYearSeries` (same boolean-guard pattern as
 	// SpDemographicsTab/SpBiometricsTab's own fetches). `yearSeriesFailed` is
 	// distinct from "not yet arrived" so a rejected fetch falls back to the
@@ -758,11 +810,27 @@ export function YearComparisonTrendChart({
 	const showIntervalToggle =
 		mode === 'all-time' && spansMultipleYears(series) && !accumulate;
 	const showAccumulateToggle = !!allowYearAccumulation && mode === 'all-time';
-	// `accumulating` swaps the rendered component (not just the `library`
-	// config) between chartkick's LineChart and AreaChart — see
+	// Same `mode` gate as `accumulating`: the state survives a trip through
+	// another mode, but can never reach a per-metric sub-chart even for a single
+	// render.
+	const showPercentStackedToggle = !!percentStackable && mode === 'all-time';
+	const percentStacking = showPercentStackedToggle && percentStacked;
+	// A `Total` series is the whole, not one of its parts — stacking it
+	// alongside the series it sums would take the stack to 200% and flatten
+	// every real band into half its true share. So the percent view drops it
+	// (`appendTotalSeries` always appends it last) and re-derives each period's
+	// denominator from the parts alone, which is the same number anyway.
+	const displayedAllTimeSeries = percentStacking
+		? toPercentStackedSeries(
+				includeTotalSeries ? allTimeSeries.slice(0, -1) : allTimeSeries
+			)
+		: allTimeSeries;
+	// `accumulating`/`percentStacking` swap the rendered component (not just the
+	// `library` config) between chartkick's LineChart and AreaChart — see
 	// STACKED_AREA_CHART_LIBRARY's comment for why a `library` option alone
 	// can't produce a filled dataset here.
-	const AllTimeChart = accumulating ? AreaChart : LineChart;
+	const stackedArea = accumulating || percentStacking;
+	const AllTimeChart = stackedArea ? AreaChart : LineChart;
 	return (
 		<div className="flex flex-col">
 			<div className="mb-2 flex flex-wrap items-center justify-end gap-2">
@@ -877,6 +945,30 @@ export function YearComparisonTrendChart({
 						</div>
 					</div>
 				) : null}
+				{showPercentStackedToggle ? (
+					<div className="flex items-center gap-1">
+						<span className="text-sm">% stacked</span>
+						<div className="border-base-content/20 flex gap-0.5 rounded-field border p-0.5">
+							{YES_NO_OPTIONS.map((option) => (
+								<label
+									key={String(option.value)}
+									htmlFor={`${toggleName}-percent-stacked-${option.value}`}
+									className="btn btn-sm btn-text has-checked:btn-active"
+								>
+									<span>{option.label}</span>
+									<input
+										id={`${toggleName}-percent-stacked-${option.value}`}
+										name={`${toggleName}-percent-stacked`}
+										type="radio"
+										className="hidden"
+										checked={percentStacked === option.value}
+										onChange={() => setPercentStacked(option.value)}
+									/>
+								</label>
+							))}
+						</div>
+					</div>
+				) : null}
 			</div>
 			<div>
 				{mode === 'all-time' &&
@@ -890,13 +982,18 @@ export function YearComparisonTrendChart({
 						</div>
 					) : (
 						<AllTimeChart
-							min={min}
-							data={allTimeSeries}
+							// The percent view's axis is a fixed 0–100% scale with a `%`
+							// suffix on every tick, so the bands read as proportions
+							// regardless of the underlying counts' magnitude.
+							min={percentStacking ? 0 : min}
+							max={percentStacking ? 100 : undefined}
+							suffix={percentStacking ? '%' : undefined}
+							data={displayedAllTimeSeries}
 							colors={allTimeColors}
 							xtitle={xtitle}
-							ytitle={effectiveYtitle}
+							ytitle={percentStacking ? '% of total' : effectiveYtitle}
 							library={
-								accumulating ? STACKED_AREA_CHART_LIBRARY : TREND_CHART_LIBRARY
+								stackedArea ? STACKED_AREA_CHART_LIBRARY : TREND_CHART_LIBRARY
 							}
 						/>
 					))}

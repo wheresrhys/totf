@@ -31,6 +31,10 @@ declare module 'react-chartkick' {
     ytitle: string;
     colors?: string[];
     min: number | null;
+    /** Upper bound of the y-axis (chartkick's `max` option). */
+    max?: number;
+    /** Appended to every y-axis tick label and tooltip value, e.g. `'%'`. */
+    suffix?: string;
     library: {
       elements?: {
         point?: {
