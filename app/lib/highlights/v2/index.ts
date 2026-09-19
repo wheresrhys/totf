@@ -53,7 +53,7 @@ function getTopByPropertiesSum<T extends TimePeriodedItem>(
 		...DEFAULT_OPTIONS,
 		...(options || {})
 	};
-	const orderedStats = rawStats
+	return rawStats
 		.map((item) => ({
 			time_period: item.time_period as string,
 			value: sumProperties(item, properties),
@@ -62,11 +62,33 @@ function getTopByPropertiesSum<T extends TimePeriodedItem>(
 		}))
 		.filter((item) => item.value > threshold)
 		.sort((a, b) => b.value - a.value);
+}
 
-	const boundaryValue = orderedStats[limit - 1].value;
+function applyLimitToHighlight(
+	highlightWrapper: HighlightsOfType,
+	limit: number
+) {
+	const boundaryValue = highlightWrapper.highlights[limit - 1].value;
 	const itemsIncludingTies =
-		orderedStats.findLastIndex(({ value }) => value === boundaryValue) + 1;
-	return orderedStats.slice(0, itemsIncludingTies);
+		highlightWrapper.highlights.findLastIndex(
+			({ value }) => value === boundaryValue
+		) + 1;
+	return {
+		...highlightWrapper,
+		highlights: highlightWrapper.highlights.slice(0, itemsIncludingTies)
+	};
+}
+
+function applyLimitToHighlights(
+	highlights: Record<HighlightType, HighlightsOfType>,
+	limit: number
+): Record<HighlightType, HighlightsOfType> {
+	return Object.fromEntries(
+		Object.entries(highlights).map(([type, highlightWrapper]) => [
+			type,
+			applyLimitToHighlight(highlightWrapper, limit)
+		])
+	) as Record<HighlightType, HighlightsOfType>;
 }
 
 function getTopByProperty<T extends TimePeriodedItem>(
@@ -77,15 +99,14 @@ function getTopByProperty<T extends TimePeriodedItem>(
 	return getTopByPropertiesSum([property], rawStats, options);
 }
 
+type HighlightsOfType = {
+	name: string;
+	type: string;
+	highlights: Highlight[];
+};
+
 type Highlights = {
-	overall: Record<
-		HighlightType,
-		{
-			name: string;
-			type: string;
-			highlights: Highlight[];
-		}
-	>;
+	overall: Record<HighlightType, HighlightsOfType>;
 };
 
 //TODO do something to clear cache when logging out
@@ -103,75 +124,83 @@ function generateHighlights({
 	limit?: number;
 	cacheKey: string;
 }): Highlights {
-	const cached = cache.get(cacheKey);
-	if (cached) return cached;
-	const highlights = {
-		overall: {
-			birds: {
-				name: highlightNameMapping.birds,
-				type: 'birds',
-				highlights: getTopByProperty<CoreStatsResult>(
-					'bird_count',
-					stats.overall,
-					{
-						type: 'birds',
-						name: highlightNameMapping.birds,
-						limit
-					}
-				)
-			},
-			// encounters: {
-			// 	name: highlightNameMapping.encounters,
-			// 	type: 'encounters',
-			// 	highlights: getTopByProperty<CoreStatsResult>(
-			// 		'encounter_count',
-			// 		stats.overall,
-			// 		{ type: 'encounters', name: highlightNameMapping.encounters, limit }
-			// 	)
-			// },
-			species: {
-				name: highlightNameMapping.species,
-				type: 'species',
-				highlights: getTopByProperty<CoreStatsResult>(
-					'species_count',
-					stats.overall,
-					{
-						type: 'species',
-						name: highlightNameMapping.species,
-						limit
-					}
-				)
-			},
-			newBirds: {
-				name: highlightNameMapping.newBirds,
-				type: 'newBirds',
-				highlights: getTopByProperty<CoreStatsResult>(
-					'new_bird_count',
-					stats.overall,
-					{
-						type: 'newBirds',
-						name: highlightNameMapping.newBirds,
-						limit
-					}
-				)
-			},
-			juvs: {
-				name: highlightNameMapping.juvs,
-				type: 'juvs',
-				highlights: getTopByPropertiesSum<CoreStatsResult>(
-					['pullus_bird_count', 'juv_bird_count', 'postjuv_bird_count'],
-					stats.overall,
-					{ type: 'juvs', name: highlightNameMapping.juvs, limit }
-				)
+	let unboundedHighlights: Highlights;
+	if (cache.has(cacheKey)) {
+		unboundedHighlights = cache.get(cacheKey) as Highlights;
+	} else {
+		unboundedHighlights = {
+			overall: {
+				birds: {
+					name: highlightNameMapping.birds,
+					type: 'birds',
+					highlights: getTopByProperty<CoreStatsResult>(
+						'bird_count',
+						stats.overall,
+						{
+							type: 'birds',
+							name: highlightNameMapping.birds,
+							limit
+						}
+					)
+				},
+				// encounters: {
+				// 	name: highlightNameMapping.encounters,
+				// 	type: 'encounters',
+				// 	highlights: getTopByProperty<CoreStatsResult>(
+				// 		'encounter_count',
+				// 		stats.overall,
+				// 		{ type: 'encounters', name: highlightNameMapping.encounters, limit }
+				// 	)
+				// },
+				species: {
+					name: highlightNameMapping.species,
+					type: 'species',
+					highlights: getTopByProperty<CoreStatsResult>(
+						'species_count',
+						stats.overall,
+						{
+							type: 'species',
+							name: highlightNameMapping.species,
+							limit
+						}
+					)
+				},
+				newBirds: {
+					name: highlightNameMapping.newBirds,
+					type: 'newBirds',
+					highlights: getTopByProperty<CoreStatsResult>(
+						'new_bird_count',
+						stats.overall,
+						{
+							type: 'newBirds',
+							name: highlightNameMapping.newBirds,
+							limit
+						}
+					)
+				},
+				juvs: {
+					name: highlightNameMapping.juvs,
+					type: 'juvs',
+					highlights: getTopByPropertiesSum<CoreStatsResult>(
+						['pullus_bird_count', 'juv_bird_count', 'postjuv_bird_count'],
+						stats.overall,
+						{ type: 'juvs', name: highlightNameMapping.juvs, limit }
+					)
+				}
 			}
-		}
-		// bySpecies: {
-		//   // todo - upstream turn bySpecies into a better data structure to work with
-		//   counts: counts(dailyStats.bySpecies)
-		// }
+			// bySpecies: {
+			//   // todo - upstream turn bySpecies into a better data structure to work with
+			//   counts: counts(dailyStats.bySpecies)
+			// }
+		};
+		cache.set(cacheKey, unboundedHighlights);
+	}
+	return {
+		overall: applyLimitToHighlights(
+			unboundedHighlights.overall,
+			limit || DEFAULT_OPTIONS.limit
+		)
 	};
-	cache.set(cacheKey, highlights);
-	return highlights;
 }
 
 export async function dailyHighlights(
