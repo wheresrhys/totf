@@ -13,17 +13,6 @@ export type RingSize = Database['public']['Enums']['ring_size'];
 export type ResightingRecordType =
 	Database['public']['Enums']['resighting_record_type'];
 
-export type TopPeriodsResult =
-	Database['public']['Functions']['top_metrics_by_period']['Returns'][number];
-export type TopSpeciesResult =
-	Database['public']['Functions']['top_metrics_by_species_and_period']['Returns'][number];
-export type TopPeriodsArgs =
-	Database['public']['Functions']['top_metrics_by_period']['Args'];
-export type TopSpeciesArgs =
-	Database['public']['Functions']['top_metrics_by_species_and_period']['Args'];
-
-export type TopMetricsFilterParams =
-	Database['public']['CompositeTypes']['top_metrics_filter_params'];
 // core_stats and its public wrapper public_core_stats share the
 // core_stats_result composite type (#772). A Postgres composite type's
 // attributes can never be NOT NULL, so `supabase gen types` marks every column

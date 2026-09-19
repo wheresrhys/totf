@@ -24,7 +24,10 @@ async function getGroupIdByName(name: string): Promise<number> {
 	return data.id;
 }
 
-const ALPHA_SESSION_COUNT = 10;
+// Raw Sessions row count for Alpha (all session_types) — #902 added 4 new rows
+// (2 FULL_GROWN for Fieldfare/Redwing, 2 FIELD_OBSERVATION for the resighting-type
+// Kingfisher/Wren additions), on top of the pre-existing 10.
+const ALPHA_SESSION_COUNT = 14;
 
 describe('Row Level Security — cross-group data sharing', () => {
 	let alphaId: number;

@@ -1091,4 +1091,96 @@ describe('demographics_stats', () => {
 			});
 		});
 	});
+
+	// Thin confirming assertion — the actual exclusion logic is covered in depth by
+	// stats-raw-encounters-and-spine.test.ts, since demographics_stats inherits it from
+	// the shared stats_raw_encounters/stats_spine utility RPCs (#874).
+	describe('resighting record_type exclusion (#874)', () => {
+		let deltaId: number;
+		let deltaClient: SupabaseClient;
+		let locationId: number;
+		let sessionId: number;
+		let birdId: number;
+		let visitDate: string;
+
+		beforeAll(async () => {
+			deltaId = await getGroupIdByName('Delta');
+			deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+			const { data: robin, error: robinError } = await supabase
+				.from('Species')
+				.select('id')
+				.eq('species_name', 'Robin')
+				.single();
+			if (robinError || !robin) throw robinError ?? new Error('Robin not found');
+
+			const suffix = randomTestSuffix();
+			visitDate = randomFutureDate();
+
+			const { data: location, error: locationError } = await deltaClient
+				.from('Locations')
+				.insert({
+					location_name: `DemographicsStats Resighting ${suffix}`,
+					ringing_group_id: deltaId
+				})
+				.select('id')
+				.single();
+			if (locationError) throw locationError;
+			locationId = location!.id;
+
+			const { data: session, error: sessionError } = await deltaClient
+				.from('Sessions')
+				.insert({ visit_date: visitDate, location_id: locationId })
+				.select('id')
+				.single();
+			if (sessionError) throw sessionError;
+			sessionId = session!.id;
+
+			const { data: bird, error: birdError } = await deltaClient
+				.from('Birds')
+				.insert({ ring_no: `DS-RSE-${suffix}`, species_id: robin!.id })
+				.select('id')
+				.single();
+			if (birdError) throw birdError;
+			birdId = bird!.id;
+
+			// A single resighting-only encounter — an otherwise-adult record_type that
+			// would land in adult_bird_count were it not filtered out upstream.
+			const { error: encounterError } = await deltaClient
+				.from('Encounters')
+				.insert({
+					capture_time: '10:00:00',
+					scheme: 'BTO',
+					sex: 'M',
+					session_id: sessionId,
+					bird_id: birdId,
+					age_code: 4,
+					record_type: 'F',
+					weight: 10,
+					wing_length: 50
+				});
+			if (encounterError) throw encounterError;
+		});
+
+		afterAll(() => {
+			execSync(
+				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+					`DELETE FROM "Encounters" WHERE bird_id = ${birdId};` +
+					`DELETE FROM "Birds" WHERE id = ${birdId};` +
+					`DELETE FROM "Sessions" WHERE id = ${sessionId};` +
+					`DELETE FROM "Locations" WHERE id = ${locationId};'`
+			);
+		});
+
+		it('excludes a resighting-only bird from adult_bird_count', async () => {
+			const { data, error } = await deltaClient.rpc('demographics_stats', {
+				ringing_group_filter: deltaId,
+				from_date: visitDate,
+				to_date: visitDate
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(1);
+			expect(data![0].adult_bird_count).toBe(0);
+		});
+	});
 });
