@@ -77,12 +77,35 @@ function getTopByProperty<T extends TimePeriodedItem>(
 	return getTopByPropertiesSum([property], rawStats, options);
 }
 
-function generateHighlights(
-	stats: RawStats,
-	highlightNameMapping: Record<HighlightType, string>,
-	optionOverrides?: HighlightGeneratorOverrideOptions
-) {
-	return {
+type Highlights = {
+	overall: Record<
+		HighlightType,
+		{
+			name: string;
+			type: string;
+			highlights: Highlight[];
+		}
+	>;
+};
+
+//TODO do something to clear cache when logging out
+
+const cache: Map<string, Highlights> = new Map();
+
+function generateHighlights({
+	stats,
+	highlightNameMapping,
+	limit,
+	cacheKey
+}: {
+	stats: RawStats;
+	highlightNameMapping: Record<HighlightType, string>;
+	limit?: number;
+	cacheKey: string;
+}): Highlights {
+	const cached = cache.get(cacheKey);
+	if (cached) return cached;
+	const highlights = {
 		overall: {
 			birds: {
 				name: highlightNameMapping.birds,
@@ -93,7 +116,7 @@ function generateHighlights(
 					{
 						type: 'birds',
 						name: highlightNameMapping.birds,
-						...optionOverrides
+						limit
 					}
 				)
 			},
@@ -103,7 +126,7 @@ function generateHighlights(
 			// 	highlights: getTopByProperty<CoreStatsResult>(
 			// 		'encounter_count',
 			// 		stats.overall,
-			// 		{ type: 'encounters', name: highlightNameMapping.encounters, ...optionOverrides }
+			// 		{ type: 'encounters', name: highlightNameMapping.encounters, limit }
 			// 	)
 			// },
 			species: {
@@ -115,7 +138,7 @@ function generateHighlights(
 					{
 						type: 'species',
 						name: highlightNameMapping.species,
-						...optionOverrides
+						limit
 					}
 				)
 			},
@@ -128,7 +151,7 @@ function generateHighlights(
 					{
 						type: 'newBirds',
 						name: highlightNameMapping.newBirds,
-						...optionOverrides
+						limit
 					}
 				)
 			},
@@ -138,7 +161,7 @@ function generateHighlights(
 				highlights: getTopByPropertiesSum<CoreStatsResult>(
 					['pullus_bird_count', 'juv_bird_count', 'postjuv_bird_count'],
 					stats.overall,
-					{ type: 'juvs', name: highlightNameMapping.juvs, ...optionOverrides }
+					{ type: 'juvs', name: highlightNameMapping.juvs, limit }
 				)
 			}
 		}
@@ -147,6 +170,8 @@ function generateHighlights(
 		//   counts: counts(dailyStats.bySpecies)
 		// }
 	};
+	cache.set(cacheKey, highlights);
+	return highlights;
 }
 
 export async function dailyHighlights(
@@ -154,15 +179,19 @@ export async function dailyHighlights(
 	periodFilter?: YearMonthRestriction
 ) {
 	let dailyStats = await fetchDailyStats(groupId);
+	let cacheKey = 'daily';
 	if (periodFilter) {
 		const { month, year } = periodFilter;
 		let filter: (timePeriod: string) => boolean;
 		if (year && month) {
+			cacheKey = `daily-${year}-${month}`;
 			filter = (timePeriod) =>
 				timePeriod.startsWith(`${year}-${String(month).padStart(2, '0')}-`);
 		} else if (year) {
+			cacheKey = `daily-${year}`;
 			filter = (timePeriod) => timePeriod.startsWith(`${year}-`);
 		} else if (month) {
+			cacheKey = `daily-${month}`;
 			filter = (timePeriod) =>
 				timePeriod.includes(`-${String(month).padStart(2, '0')}-`);
 		} else {
@@ -181,9 +210,10 @@ export async function dailyHighlights(
 		DEFAULT_OPTIONS.limit,
 		Math.ceil(dailyStats.overall.length / 4)
 	);
-	return generateHighlights(
-		dailyStats,
-		{
+	return generateHighlights({
+		cacheKey,
+		stats: dailyStats,
+		highlightNameMapping: {
 			birds: limit > 1 ? 'Busiest sessions' : 'Busiest session',
 			// encounters: limit > 1 ? 'Busiest sessions' : 'Busiest session',
 			species: limit > 1 ? 'Most varied sessions' : 'Most varied session',
@@ -193,8 +223,6 @@ export async function dailyHighlights(
 					: 'Session with most new birds',
 			juvs: limit > 1 ? 'Sessions with most juvs' : 'Session with most juvs'
 		},
-		{
-			limit
-		}
-	);
+		limit
+	});
 }
