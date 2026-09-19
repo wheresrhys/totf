@@ -46,6 +46,41 @@
 --
 -- Group scoping of the lifetime history mirrors stats_raw_encounters' pattern, so
 -- a bird's history under a DIFFERENT group never counts as history with this one.
+--
+-- HOW the three "to date" values are computed (#932 — performance only; every
+-- classification rule above is unchanged). The original implementation joined the
+-- per-cell adult_birds relation straight against each bird's whole per-ENCOUNTER
+-- lifetime history and re-ran COUNT/MIN/bool_or from scratch for every cell —
+-- O(cells_per_bird x lifetime_encounters_per_bird), which blows up for a long-lived,
+-- heavily-retrapped bird grouped by month over many years. It is now a single
+-- merged-stream pass instead:
+--
+--   1. lifetime_encounters_by_year collapses the per-encounter history to one row
+--      per (bird, calendar year), pre-aggregating that year's own contribution.
+--   2. bird_year_events UNIONs those per-year rows (event_ord 0) with the cells
+--      (event_ord 1), keyed on the same bird_id/year axis.
+--   3. A single window pass over that stream, PARTITION BY bird_id ORDER BY
+--      (event_year, event_ord), gives every cell row the running SUM/MIN/bool_or of
+--      every history row at or before its own period_year — because event_ord orders
+--      a year's history row BEFORE a cell row for that same year, and cell rows
+--      contribute NULL (ignored by all three aggregates) so they never perturb the
+--      running totals, including for several cells sharing one period_year.
+--
+-- Cost is one sort of (cells + bird-years) rows rather than a per-cell re-scan.
+-- Measured on a synthetic 300-bird x 240-encounter group grouped by month:
+-- 23.4s -> 1.2s, with output verified byte-identical across ~1,200 parameter
+-- combinations. Deliberately NOT a LEFT JOIN LATERAL over the per-year series: the
+-- planner inlines the correlated subquery and re-derives each bird's history per cell
+-- anyway, keeping the quadratic term (measured 8.2s on the same fixture vs 1.2s here).
+--
+-- Two behaviours the merged stream preserves exactly:
+--   * A cell whose bird has no history row at or before its period_year gets NULL
+--     from MIN, hence a NULL bucket — same as the old LEFT JOIN finding no match.
+--     (Unreachable in practice: stats_raw_encounters scopes the windowed source by
+--     the same sess.ringing_group_id the lifetime CTE uses, so a bird's windowed
+--     encounters are always a subset of its lifetime ones. Defensive only.)
+--   * encounters_to_date is COALESCEd to 0 rather than left NULL, matching the old
+--     COUNT() over zero joined rows.
 CREATE FUNCTION public.stats_bird_returning_age_bucket (
 	species_name_filter text DEFAULT NULL::text,
 	from_date date DEFAULT NULL::date,
@@ -95,34 +130,67 @@ CREATE FUNCTION public.stats_bird_returning_age_bucket (
   -- Unwindowed lifetime history for every adult bird above, scoped to
   -- ringing_group_filter but IGNORING from_date/to_date — a period-relative age
   -- can't be answered from a windowed source. Mirrors (and extends, with
-  -- max_hatch_year/min_hatch_year) demographics_stats' own lifetime_encounters CTE.
-  lifetime_encounters AS (
+  -- max_hatch_year/min_hatch_year) demographics_stats' own lifetime_encounters CTE,
+  -- but pre-collapsed to ONE ROW PER (bird, calendar year): each year's own
+  -- contribution to the three "to date" values, ready to be accumulated once per
+  -- bird by the window pass below. Both hatch-year columns are NOT NULL, so a
+  -- non-empty year group always yields a non-null min/bool_or.
+  lifetime_encounters_by_year AS (
     SELECT
       e.bird_id,
-      e.max_hatch_year,
-      e.min_hatch_year,
-      EXTRACT(YEAR FROM sess.visit_date)::int AS enc_year
+      EXTRACT(YEAR FROM sess.visit_date)::int AS enc_year,
+      COUNT(*) AS year_encounter_count,
+      MIN(e.max_hatch_year) AS year_min_max_hatch_year,
+      bool_or(e.min_hatch_year <> 0) AS year_was_precisely_aged
     FROM public."Encounters" e
     JOIN public."Sessions" sess ON e.session_id = sess.id
     WHERE (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
       AND e.bird_id IN (SELECT DISTINCT ab.bird_id FROM adult_birds ab)
+    GROUP BY e.bird_id, EXTRACT(YEAR FROM sess.visit_date)::int
   ),
-  -- Per (bird, cell): that bird's history as it stood at the end of the cell's
-  -- period_year. LEFT JOIN so a (data-impossible) bird with no lifetime rows still
-  -- emits a row — with a NULL age, which the CASE below sends to the NULL bucket.
-  bird_history_to_date AS (
+  -- One merged stream per bird: its per-year history rows (event_ord 0) and the
+  -- cells that need to read that history (event_ord 1), both keyed on a year.
+  -- History rows carry no cell identity; cell rows carry no history payload — the
+  -- NULL payload is what makes a cell row invisible to the running aggregates.
+  bird_year_events AS (
+    SELECT
+      ley.bird_id,
+      ley.enc_year AS event_year,
+      0 AS event_ord,
+      NULL::bigint AS species_id,
+      NULL::date AS time_period,
+      ley.year_encounter_count,
+      ley.year_min_max_hatch_year,
+      ley.year_was_precisely_aged
+    FROM lifetime_encounters_by_year ley
+    UNION ALL
     SELECT
       ab.bird_id,
+      ab.period_year,
+      1,
       ab.species_id,
       ab.time_period,
-      COUNT(le.bird_id) AS encounters_to_date,
-      ab.period_year - MIN(le.max_hatch_year) AS period_relative_proven_age,
-      COALESCE(bool_or(le.min_hatch_year <> 0), FALSE) AS was_ever_precisely_aged_to_date
+      NULL::bigint,
+      NULL::smallint,
+      NULL::boolean
     FROM adult_birds ab
-    LEFT JOIN lifetime_encounters le
-      ON le.bird_id = ab.bird_id
-     AND le.enc_year <= ab.period_year
-    GROUP BY ab.bird_id, ab.species_id, ab.time_period, ab.period_year
+  ),
+  -- Per (bird, cell): that bird's history as it stood at the end of the cell's
+  -- period_year, read straight off the running window aggregates. Ordering by
+  -- (event_year, event_ord) puts a year's history row before any cell row for that
+  -- same year, so a cell's frame covers exactly enc_year <= period_year.
+  bird_history_to_date AS (
+    SELECT
+      ev.bird_id,
+      ev.species_id,
+      ev.time_period,
+      ev.event_ord,
+      COALESCE(SUM(ev.year_encounter_count) OVER w, 0) AS encounters_to_date,
+      ev.event_year - MIN(ev.year_min_max_hatch_year) OVER w AS period_relative_proven_age,
+      COALESCE(bool_or(ev.year_was_precisely_aged) OVER w, FALSE) AS was_ever_precisely_aged_to_date
+    FROM bird_year_events ev
+    WINDOW w AS (PARTITION BY ev.bird_id ORDER BY ev.event_year, ev.event_ord
+                 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
   )
   SELECT
     h.bird_id,
@@ -137,7 +205,10 @@ CREATE FUNCTION public.stats_bird_returning_age_bucket (
       WHEN h.period_relative_proven_age = 2 THEN '2'
       ELSE '3_plus'
     END AS returning_age_bucket
-  FROM bird_history_to_date h;
+  FROM bird_history_to_date h
+  -- Only the cell rows are output; the history rows existed solely to feed the
+  -- window frames above.
+  WHERE h.event_ord = 1;
 $function$;
 
 GRANT ALL ON FUNCTION public.stats_bird_returning_age_bucket (text, date, date, bigint, boolean, text) TO anon;
