@@ -16,7 +16,6 @@ import type {
 import {
 	getCounts,
 	getReturningVsNew,
-	getAgeSplit,
 	getReturningAges,
 	getYoungCounts,
 	getNewYoungCounts,
@@ -25,34 +24,11 @@ import {
 import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
 import { ChartTile } from '@/app/components/pages/species/ChartTile';
 
-// Returning vs new (#854): three plain categorical colours — unlike Age
-// split/Young counts below, these three series ("New adults", "Returning
-// adults", "Young") aren't paired concepts (no combining dark/light shades of
-// a shared hue), so a flat array is enough.
+// Returning vs new (#854): three plain categorical colours — unlike Young
+// counts below, these three series ("New adults", "Returning adults",
+// "Young") aren't paired concepts (no combining dark/light shades of a
+// shared hue), so a flat array is enough.
 export const RETURNING_VS_NEW_COLORS = ['#1f4fb0', '#b83a10', '#0f7a14'];
-
-// Explicit paired colours for the Age split, Young counts and New young counts
-// tiles, passed via
-// YearComparisonTrendChart's `colors` override prop. The chart's default
-// per-metric palette cycles one arbitrary colour per series index with no
-// concept of pairing, so a related pair (e.g. "New adults"/"New young", both new
-// to the group this year) wouldn't read as related. Each pair is a dark + light
-// shade of one base hue.
-//
-// Age split: two hues — "new" (new to the group this year: New adults, New
-// young) and "returning" (First summer, Oldies). Exported (with the hue map) so
-// the tab's test can assert the pairing rather than hard-coded indices.
-export const AGE_SPLIT_HUES = {
-	new: { dark: '#1f4fb0', light: '#8fb0e8' },
-	returning: { dark: '#b83a10', light: '#f0a88f' }
-};
-// Series order (matches getAgeSplit): New adults, First summer, Oldies, New young.
-export const AGE_SPLIT_COLORS = [
-	AGE_SPLIT_HUES.new.dark, // New adults
-	AGE_SPLIT_HUES.returning.dark, // First summer
-	AGE_SPLIT_HUES.returning.light, // Oldies
-	AGE_SPLIT_HUES.new.light // New young
-];
 
 // Returning ages (#843): '1 year' -> '2 years' -> '3+ years' is an ordered
 // progression through a returning bird's proven age, so it gets a dark-to-light
@@ -60,8 +36,7 @@ export const AGE_SPLIT_COLORS = [
 // (new)' is NOT a fourth step of that ramp — those birds aren't actually known to
 // be returning at all, just imprecisely coded on a single first encounter — so it
 // takes a visually distinct hue instead, signalling "different kind of thing"
-// rather than "older still". Fresh constants rather than an extension of
-// AGE_SPLIT_* above, which #855 removes along with the Age split tile.
+// rather than "older still".
 export const RETURNING_AGES_HUES = {
 	returning: { dark: '#7a0f3d', mid: '#c4487e', light: '#eda3c1' },
 	unknown: '#8a7a12'
@@ -101,9 +76,9 @@ export const NEW_YOUNG_COUNTS_COLORS = [
 ];
 
 // Arrivals tile (#860): two colour concepts share one hue map. "New adults"/
-// "Returning adults" are a paired dark/light draw off a single hue (mirroring
-// AGE_SPLIT_HUES' own dark-for-new/light-for-returning convention, but here as
-// one pair within a single tile rather than split across two hues). "Pulli"
+// "Returning adults" are a paired dark/light draw off a single hue (the same
+// dark-for-new/light-for-returning convention used elsewhere in this file, but
+// here as one pair within a single tile rather than split across two hues). "Pulli"
 // -> "Juv" -> "Postjuv" is instead an ordered progression through a bird's
 // first calendar year, so it gets a 3-tone single-hue ramp (dark to light)
 // rather than a two-value pair — the same convention #843's proven-age-bucket
@@ -144,7 +119,7 @@ function Spinner() {
 //
 // Two memoised species-scoped fetches back the tiles, each fired at most once
 // regardless of how often tiles expand/collapse: the Counts tile reads
-// `core_stats` (`getSpeciesStatsHistory`), while the Age split, Young
+// `core_stats` (`getSpeciesStatsHistory`), while the Returning ages, Young
 // counts and New young counts tiles share the companion `demographics_stats`
 // fetch (`getSpeciesDemographicsStats`) — #800 split the age-split/young-trends
 // derivations into that separate RPC (originally named `population_stats`,
@@ -358,35 +333,6 @@ export function SpDemographicsTab({
 						}}
 						fetchYearSeries={() =>
 							fetchYearDemographicsStats().then(getReturningAges)
-						}
-						effortHistory={effortHistory ?? undefined}
-						compareYearsUrl={compareYearsUrl}
-					/>
-				) : (
-					<Spinner />
-				)
-		},
-		{
-			id: 'age-split',
-			heading: 'Age split',
-			description: 'New adults, first summers, oldies and new young over time',
-			load: () => {
-				loadDemographicsStats();
-				loadEffortHistory();
-			},
-			renderChart: () =>
-				demographicsStats ? (
-					<YearComparisonTrendChart
-						series={getAgeSplit(demographicsStats)}
-						colors={AGE_SPLIT_COLORS}
-						yearlyAggregators={{
-							'New adults': 'sum',
-							'First summer': 'sum',
-							Oldies: 'sum',
-							'New young': 'sum'
-						}}
-						fetchYearSeries={() =>
-							fetchYearDemographicsStats().then(getAgeSplit)
 						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}

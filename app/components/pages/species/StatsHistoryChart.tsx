@@ -74,49 +74,9 @@ export function getReturningVsNew(
 	];
 }
 
-// Age split — bird-level breakdown of the "Demographics" tab's Age split tile,
-// consuming `demographics_stats`' age-split columns (#800/#801). "New adults" and
-// "New young" are birds new to the group this year; "First summer" and "Oldies"
-// are returning birds. The four counts partition the adults + new-young cohorts;
-// `new_young_bird_count` used to be duplicated on `core_stats` too, but #824
-// removed that unused copy — `demographics_stats` now holds the only one.
-export function getAgeSplit(
-	demographicsStats: DemographicsStatsResult[]
-): LineChartData[] {
-	return [
-		{
-			name: 'New adults',
-			data: demographicsStats.map((row) => [
-				row.time_period,
-				row.new_adult_bird_count
-			])
-		},
-		{
-			name: 'First summer',
-			data: demographicsStats.map((row) => [
-				row.time_period,
-				row.first_summer_bird_count
-			])
-		},
-		{
-			name: 'Oldies',
-			data: demographicsStats.map((row) => [
-				row.time_period,
-				row.old_timers_bird_count
-			])
-		},
-		{
-			name: 'New young',
-			data: demographicsStats.map((row) => [
-				row.time_period,
-				row.new_young_bird_count
-			])
-		}
-	];
-}
-
-// Returning ages — #843, the other replacement for the "Age split" tile
-// (alongside #854's "Returning vs new"): a bird-level breakdown of the
+// Returning ages — #843, one of two replacements for the removed "Age split"
+// tile (alongside #854's "Returning vs new", #855 removed the tile and its
+// getAgeSplit helper): a bird-level breakdown of the
 // returning-adult cohort ONLY, split by how old each bird was proven to be as of
 // the cell's own period_year. The four columns come straight off
 // `demographics_stats` (#843), which derives them per bird in the
@@ -220,7 +180,7 @@ export function getNewYoungCounts(
 
 // Arrivals — the "Demographics" tab's Arrivals tile (#860), consuming
 // `arrivals_stats`' five mutually-exclusive arrival-bucket columns (#858).
-// Unlike Counts/Age split/Young counts, an "arrival" here is a bird-year (one
+// Unlike Counts/Returning ages/Young counts, an "arrival" here is a bird-year (one
 // bird's first classifiable encounter of a calendar year), not a per-cell
 // encounter or bird-distinct count — see the RPC's own doc comment for why
 // that makes simply summing this tile's monthly points across a year exact
