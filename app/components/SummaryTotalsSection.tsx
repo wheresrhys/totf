@@ -459,7 +459,7 @@ export function SummaryTotalsSection({
 				) : (
 					<div>
 						{highlightsData &&
-							Object.values(highlightsData.overall).map((highlight) => (
+							highlightsData.map((highlight) => (
 								<p key={highlight.type}>
 									{highlight.name}:{' '}
 									{highlight.highlights.map(({ time_period, value }, i) => (
