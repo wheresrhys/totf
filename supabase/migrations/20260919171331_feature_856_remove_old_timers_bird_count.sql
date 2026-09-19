@@ -1,39 +1,10 @@
--- New-adult (new_adult_bird_count) and young-trends
--- (postjuv_juv/new_postjuv_juv/new_postjuv) derivations for the species page's
--- Demographics-tab charts (#800). Split out of core_stats into
--- its own RPC rather than folded into that already-large single query, both to
--- keep each query's plan simpler and to leave core_stats' existing
--- columns/performance untouched. Shares core_stats' input signature and
--- reuses its underlying plumbing via the stats_raw_encounters / stats_spine /
--- stats_encounter_age_classification / stats_bird_age_bucket utility RPCs (each
--- mirrors, and must be kept in sync by hand with, the equivalent inline CTE still
--- living in core_stats.sql). #843 added the returning-age columns, whose
--- per-bird resolution lives in the stats_bird_returning_age_bucket utility RPC.
--- #856 removed the first_summer_bird_count / old_timers_bird_count columns that
--- once made new_adult_bird_count one arm of an exhaustive three-way adult split
--- — "old timers" no longer exists as a concept at any layer, so all that
--- survives of that split is new_adult_bird_count itself.
---
--- The final projection below is wrapped in jsonb_populate_record rather than
--- returned as a bare positional SELECT. A bare `RETURN QUERY SELECT ...` binds to
--- demographics_stats_result's columns by ORDINAL POSITION, not by the "AS" alias
--- names below — and that position is only as stable as whatever DDL a given
--- environment's schema-diff run happens to emit for the composite type's
--- attributes (`ALTER TYPE ... ADD ATTRIBUTE` order is not guaranteed to match this
--- file's declared column order — confirmed while building this RPC: two
--- `db:schema:apply` runs on the same source files produced two different physical
--- attribute orders, silently scrambling values into the wrong named columns with
--- no error). Routing through to_jsonb(...)/jsonb_populate_record binds every
--- column by NAME instead, so the result is correct regardless of the composite
--- type's physical attribute order in any given environment.
-CREATE FUNCTION public.demographics_stats (
-	species_name_filter text DEFAULT NULL::text,
-	from_date date DEFAULT NULL::date,
-	to_date date DEFAULT NULL::date,
-	ringing_group_filter bigint DEFAULT NULL::bigint,
-	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
-) RETURNS SETOF public.demographics_stats_result LANGUAGE plpgsql AS $function$
+SET check_function_bodies = false;
+ALTER TYPE public.demographics_stats_result DROP ATTRIBUTE first_summer_bird_count;
+ALTER TYPE public.demographics_stats_result DROP ATTRIBUTE old_timers_bird_count;
+CREATE OR REPLACE FUNCTION public.demographics_stats(species_name_filter text DEFAULT NULL::text, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, ringing_group_filter bigint DEFAULT NULL::bigint, group_by_species boolean DEFAULT false, group_by_time_period text DEFAULT NULL::text)
+ RETURNS SETOF public.demographics_stats_result
+ LANGUAGE plpgsql
+AS $function$
   BEGIN
   RETURN QUERY
   SELECT (jsonb_populate_record(NULL::public.demographics_stats_result, to_jsonb(agg))).*
@@ -234,9 +205,3 @@ CREATE FUNCTION public.demographics_stats (
 
 END;
 $function$;
-
-GRANT ALL ON FUNCTION public.demographics_stats (text, date, date, bigint, boolean, text) TO anon;
-
-GRANT ALL ON FUNCTION public.demographics_stats (text, date, date, bigint, boolean, text) TO authenticated;
-
-GRANT ALL ON FUNCTION public.demographics_stats (text, date, date, bigint, boolean, text) TO service_role;

@@ -20,13 +20,11 @@
 --     stats_encounter_age_classification's per-encounter bucket.
 --   * adult splits into new_adult vs returning_adult off the bird's UNWINDOWED
 --     lifetime history with this ringing group (the same lifetime_encounters /
---     bird_first_year pattern population_stats.sql uses, ringing_group_filter
+--     bird_first_year pattern demographics_stats.sql uses, ringing_group_filter
 --     -scoped but ignoring from_date/to_date): new_adult iff this row's calendar
---     year is the bird's first-ever-with-group year, else returning_adult. No
---     majority-vote heuristic is needed here (unlike population_stats' historical
---     first_summer/old_timers split) because by construction the year of a bird's
---     first-ever encounter with the group IS the year its first-encounter-of-that-
---     year row falls in.
+--     year is the bird's first-ever-with-group year, else returning_adult — the
+--     same first-ever-year rule demographics_stats.new_adult_bird_count applies,
+--     just resolved per bird-year rather than per cell.
 --
 -- Note the per-year (not per-cell) granularity: under group_by_time_period =
 -- 'month'/'day' a bird encountered in two different calendar years yields two
