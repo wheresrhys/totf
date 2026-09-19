@@ -15,7 +15,7 @@ import { supabase } from '../../../lib/supabase';
 import { addDays, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
-import { resolveAlphaBetaGammaClients } from './helpers/group-clients';
+import { createIsolatedGroup, psql } from '../db-test-helpers';
 
 // arrivals_stats counts each bird exactly ONCE per calendar year, at whichever
 // (species, time_period) cell holds its first classifiable encounter of that year
@@ -31,16 +31,21 @@ import { resolveAlphaBetaGammaClients } from './helpers/group-clients';
 // scenario owns a disjoint slice of the lane so a narrowly-windowed query returns
 // only that scenario's birds.
 describe('arrivals_stats', () => {
-	let alphaId: number;
-	let alphaClient: SupabaseClient;
+	// A dedicated throwaway group for the cross-group isolation case, rather than
+	// the shared `Alpha` seed group — see #935: a temporary Alpha location/session,
+	// even cleaned up in afterAll, is visible to any concurrently-running test
+	// asserting on Alpha's full row set (e.g. core-stats.test.ts's
+	// ALPHA_ALL_VISIT_DATES) for the window between insert and teardown.
+	let otherGroupId: number;
+	let otherGroupClient: SupabaseClient;
 	let deltaId: number;
 	let deltaClient: SupabaseClient;
 
 	const locationIds: number[] = [];
 	const sessionIds: number[] = [];
 	const birdIds: number[] = [];
-	const alphaLocationIds: number[] = [];
-	const alphaSessionIds: number[] = [];
+	const otherGroupLocationIds: number[] = [];
+	const otherGroupSessionIds: number[] = [];
 
 	const PULLUS = { age_code: 1, is_juv: false };
 	const JUV = { age_code: 1, is_juv: true };
@@ -81,11 +86,12 @@ describe('arrivals_stats', () => {
 	const twoYearDates = [dayIn(priorYear, 250), dayIn(arrivalYear, 250)];
 
 	beforeAll(async () => {
-		({ alphaId, alphaClient } = await resolveAlphaBetaGammaClients());
 		deltaId = await getGroupIdByName('Delta');
 		deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
 
 		const testSuffix = randomTestSuffix();
+		otherGroupId = createIsolatedGroup(`Arrivals Other ${testSuffix}`);
+		otherGroupClient = await getAuthenticatedSupabaseClientForGroup(otherGroupId);
 
 		const { data: species } = await supabase
 			.from('Species')
@@ -127,11 +133,11 @@ describe('arrivals_stats', () => {
 			'Delta Loc 2',
 			locationIds
 		);
-		const alphaLocId = await addLocation(
-			alphaClient,
-			alphaId,
-			'Alpha Loc',
-			alphaLocationIds
+		const otherGroupLocId = await addLocation(
+			otherGroupClient,
+			otherGroupId,
+			'Other Loc',
+			otherGroupLocationIds
 		);
 
 		const sessionCache = new Map<string, number>();
@@ -260,9 +266,9 @@ describe('arrivals_stats', () => {
 			{ date: twoYearDates[1], ...ADULT, record_type: 'R' }
 		]);
 
-		// Cross-group: an Alpha-owned adult encounter in priorYear, then a first
-		// Delta encounter this year. Under ringing_group_filter = Delta the Alpha
-		// history must not count, so this reads as new_adult.
+		// Cross-group: an other-group-owned adult encounter in priorYear, then a
+		// first Delta encounter this year. Under ringing_group_filter = Delta the
+		// other group's history must not count, so this reads as new_adult.
 		const { data: crossGroupBird, error: cgErr } = await deltaClient
 			.from('Birds')
 			.insert({
@@ -273,16 +279,21 @@ describe('arrivals_stats', () => {
 			.single();
 		if (cgErr) throw cgErr;
 		birdIds.push(crossGroupBird!.id);
-		const alphaSessionId = await getSession(
-			alphaClient,
+		const otherGroupSessionId = await getSession(
+			otherGroupClient,
 			dayIn(priorYear, 200),
-			alphaLocId,
-			alphaSessionIds
+			otherGroupLocId,
+			otherGroupSessionIds
 		);
-		await insertEncounter(alphaClient, crossGroupBird!.id, alphaSessionId, {
-			...ADULT,
-			record_type: 'N'
-		});
+		await insertEncounter(
+			otherGroupClient,
+			crossGroupBird!.id,
+			otherGroupSessionId,
+			{
+				...ADULT,
+				record_type: 'N'
+			}
+		);
 		const crossGroupSessionId = await getSession(
 			deltaClient,
 			crossGroupDate,
@@ -296,8 +307,8 @@ describe('arrivals_stats', () => {
 	});
 
 	afterAll(() => {
-		const allSessions = [...sessionIds, ...alphaSessionIds];
-		const allLocations = [...locationIds, ...alphaLocationIds];
+		const allSessions = [...sessionIds, ...otherGroupSessionIds];
+		const allLocations = [...locationIds, ...otherGroupLocationIds];
 		execSync(
 			`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
 				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
@@ -305,6 +316,7 @@ describe('arrivals_stats', () => {
 				`DELETE FROM "Sessions" WHERE id IN (${allSessions.join(', ')});` +
 				`DELETE FROM "Locations" WHERE id IN (${allLocations.join(', ')});'`
 		);
+		psql(`DELETE FROM "RingingGroups" WHERE id = ${otherGroupId};`);
 	});
 
 	type ArrivalsRow = {
@@ -456,8 +468,8 @@ describe('arrivals_stats', () => {
 	});
 
 	it("excludes another ringing group's history when ringing_group_filter is set", async () => {
-		// Adult with a priorYear Alpha encounter but a first-ever Delta encounter
-		// this year: new_adult under Delta, not returning_adult.
+		// Adult with a priorYear other-group encounter but a first-ever Delta
+		// encounter this year: new_adult under Delta, not returning_adult.
 		expect(await rowForDates(crossGroupDate)).toMatchObject({
 			...ZERO_BUCKETS,
 			new_adult_bird_count: 1

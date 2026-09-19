@@ -247,6 +247,15 @@ export function SpDemographicsTab({
 			? `/species/${speciesName}?tabId=demographics`
 			: undefined;
 
+	// Five of the six tiles pass `percentStackable` (#844), offering a "%
+	// stacked" toggle that redraws their all-time series as proportional bands
+	// of each period's total: Counts, Returning vs new, Returning ages, Young
+	// counts and New young counts all plot parts of one whole, so "what share of
+	// this period was X?" is a real question about them. Arrivals is the
+	// exception purely because #844 predates it (#858/#860 added the tile after
+	// the ticket was written) and names the other five explicitly — its buckets
+	// are mutually exclusive too, so extending the toggle to it would be a
+	// reasonable follow-up rather than a correctness fix.
 	const charts: {
 		id: string;
 		heading: string;
@@ -270,6 +279,7 @@ export function SpDemographicsTab({
 						fetchYearSeries={() => fetchYearStatsHistory().then(getCounts)}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
+						percentStackable
 					/>
 				) : (
 					<Spinner />
@@ -306,6 +316,7 @@ export function SpDemographicsTab({
 						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
+						percentStackable
 					/>
 				) : (
 					<Spinner />
@@ -336,6 +347,7 @@ export function SpDemographicsTab({
 						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
+						percentStackable
 					/>
 				) : (
 					<Spinner />
@@ -363,6 +375,7 @@ export function SpDemographicsTab({
 						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
+						percentStackable
 						includeTotalSeries
 					/>
 				) : (
@@ -392,6 +405,7 @@ export function SpDemographicsTab({
 						}
 						effortHistory={effortHistory ?? undefined}
 						compareYearsUrl={compareYearsUrl}
+						percentStackable
 						includeTotalSeries
 					/>
 				) : (

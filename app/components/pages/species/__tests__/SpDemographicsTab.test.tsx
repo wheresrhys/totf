@@ -95,7 +95,8 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 		compareYearsUrl,
 		includeTotalSeries,
 		fetchYearSeries,
-		allowYearAccumulation
+		allowYearAccumulation,
+		percentStackable
 	}: {
 		series: { name: string; data: [string, number | null][] }[];
 		colors?: string[];
@@ -106,6 +107,7 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 			{ name: string; data: [string, number | null][] }[]
 		>;
 		allowYearAccumulation?: boolean;
+		percentStackable?: boolean;
 	}) => {
 		// Mirrors YearComparisonTrendChart's own includeTotalSeries summing
 		// (unit-tested against buildTotalSeries directly in
@@ -132,6 +134,7 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 				data-include-total-series={includeTotalSeries ? 'yes' : 'no'}
 				data-total={JSON.stringify(total)}
 				data-allow-year-accumulation={allowYearAccumulation ? 'yes' : 'no'}
+				data-percent-stackable={percentStackable ? 'yes' : 'no'}
 			>
 				{/* Stands in for the real chart's "Interval: Year" radio: clicking it
 				    invokes whatever fetcher the tab wired in, so a tab-level test can
@@ -808,6 +811,34 @@ describe('SpDemographicsTab', () => {
 			expect(returningAges.dataset.includeTotalSeries).toBe('no');
 			expect(youngCounts.dataset.includeTotalSeries).toBe('yes');
 			expect(newYoungCounts.dataset.includeTotalSeries).toBe('yes');
+		});
+	});
+
+	describe('Structure: percentStackable per tile', () => {
+		it('passes percentStackable to the Counts, Returning vs new, Returning ages, and both young-trends chart tiles', async () => {
+			render(<SpDemographicsTab {...props} />);
+			for (const name of [
+				/Counts/,
+				/Returning vs new/,
+				/Returning ages/,
+				/^Young counts/,
+				/New young counts/
+			]) {
+				fireEvent.click(screen.getByRole('button', { name }));
+			}
+			await waitFor(() =>
+				expect(screen.getAllByTestId('trend-chart').length).toBe(5)
+			);
+			for (const chart of screen.getAllByTestId('trend-chart')) {
+				expect(chart.dataset.percentStackable).toBe('yes');
+			}
+		});
+
+		it('does not pass percentStackable to the Arrivals tile', async () => {
+			render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Arrivals/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(chart.dataset.percentStackable).toBe('no');
 		});
 	});
 

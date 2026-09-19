@@ -15,7 +15,7 @@ import { supabase } from '../../../lib/supabase';
 import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
-import { resolveAlphaBetaGammaClients } from './helpers/group-clients';
+import { createIsolatedGroup, psql } from '../db-test-helpers';
 
 describe('demographics_stats', () => {
 	let alphaId: number;
@@ -45,12 +45,19 @@ describe('demographics_stats', () => {
 	describe('new adult count (new_adult_bird_count)', () => {
 		let deltaId: number;
 		let deltaClient: SupabaseClient;
+		// A dedicated throwaway group for the multi-group isolation case, rather than the
+		// shared `Alpha` seed group — see #935: a temporary Alpha location/session, even
+		// cleaned up in afterAll, is visible to any concurrently-running test asserting on
+		// Alpha's full row set (e.g. core-stats.test.ts's ALPHA_ALL_VISIT_DATES) for the
+		// window between insert and teardown.
+		let otherGroupId: number;
+		let otherGroupClient: SupabaseClient;
 		const locationIds: number[] = [];
 		const sessionIds: number[] = [];
 		const birdIds: number[] = [];
-		// Alpha-owned rows for the multi-group isolation case (cleaned up too).
-		const alphaLocationIds: number[] = [];
-		const alphaSessionIds: number[] = [];
+		// Other-group-owned rows for the multi-group isolation case (cleaned up too).
+		const otherGroupLocationIds: number[] = [];
+		const otherGroupSessionIds: number[] = [];
 
 		const ADULT = { age_code: 4, is_juv: false };
 		const AGE1J = { age_code: 1, is_juv: true };
@@ -75,6 +82,8 @@ describe('demographics_stats', () => {
 			deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
 
 			const testSuffix = randomTestSuffix();
+			otherGroupId = createIsolatedGroup(`Age Split Other ${testSuffix}`);
+			otherGroupClient = await getAuthenticatedSupabaseClientForGroup(otherGroupId);
 			const base = randomFutureDate();
 
 			const { data: robin } = await supabase
@@ -84,7 +93,7 @@ describe('demographics_stats', () => {
 				.single();
 			const robinId = robin!.id;
 
-			// One Delta location; one Alpha location for the cross-group bird.
+			// One Delta location; one other-group location for the cross-group bird.
 			const { data: deltaLoc, error: dLocErr } = await deltaClient
 				.from('Locations')
 				.insert({
@@ -97,17 +106,17 @@ describe('demographics_stats', () => {
 			locationIds.push(deltaLoc!.id);
 			const deltaLocId = deltaLoc!.id;
 
-			const { data: alphaLoc, error: aLocErr } = await alphaClient
+			const { data: otherGroupLoc, error: aLocErr } = await otherGroupClient
 				.from('Locations')
 				.insert({
-					location_name: `Age Split Alpha Loc ${testSuffix}`,
-					ringing_group_id: alphaId
+					location_name: `Age Split Other Loc ${testSuffix}`,
+					ringing_group_id: otherGroupId
 				})
 				.select('id')
 				.single();
 			if (aLocErr) throw aLocErr;
-			alphaLocationIds.push(alphaLoc!.id);
-			const alphaLocId = alphaLoc!.id;
+			otherGroupLocationIds.push(otherGroupLoc!.id);
+			const otherGroupLocId = otherGroupLoc!.id;
 
 			// One shared session per (client, date, location).
 			const sessionCache = new Map<string, number>();
@@ -194,12 +203,12 @@ describe('demographics_stats', () => {
 			juvDate = addDays(base, 160);
 			await addBird([{ date: juvDate, ...AGE1J, record_type: 'N' }]);
 
-			// Multi-group isolation: an earlier-year encounter under Alpha and a first
-			// Delta encounter this period, as adult. The Alpha history must NOT count as
-			// "first-ever with this group", so under ringing_group_filter=Delta this
-			// reads as new_adult.
+			// Multi-group isolation: an earlier-year encounter under a different group and a
+			// first Delta encounter this period, as adult. The other group's history must
+			// NOT count as "first-ever with this group", so under ringing_group_filter=Delta
+			// this reads as new_adult.
 			mgDate = addDays(base, 190);
-			const mgAlphaYear = yearOf(mgDate) - 2;
+			const mgOtherGroupYear = yearOf(mgDate) - 2;
 			const { data: mgBird, error: mgErr } = await deltaClient
 				.from('Birds')
 				.insert({ ring_no: `SPLIT-${testSuffix}-MG`, species_id: robinId })
@@ -207,13 +216,13 @@ describe('demographics_stats', () => {
 				.single();
 			if (mgErr) throw mgErr;
 			birdIds.push(mgBird!.id);
-			const alphaSess = await getSession(
-				alphaClient,
-				`${mgAlphaYear}-05-10`,
-				alphaLocId,
-				alphaSessionIds
+			const otherGroupSess = await getSession(
+				otherGroupClient,
+				`${mgOtherGroupYear}-05-10`,
+				otherGroupLocId,
+				otherGroupSessionIds
 			);
-			await insertEncounter(alphaClient, mgBird!.id, alphaSess, {
+			await insertEncounter(otherGroupClient, mgBird!.id, otherGroupSess, {
 				...ADULT,
 				record_type: 'N'
 			});
@@ -230,8 +239,8 @@ describe('demographics_stats', () => {
 		});
 
 		afterAll(() => {
-			const allSessions = [...sessionIds, ...alphaSessionIds];
-			const allLocations = [...locationIds, ...alphaLocationIds];
+			const allSessions = [...sessionIds, ...otherGroupSessionIds];
+			const allLocations = [...locationIds, ...otherGroupLocationIds];
 			execSync(
 				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
 					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
@@ -239,6 +248,7 @@ describe('demographics_stats', () => {
 					`DELETE FROM "Sessions" WHERE id IN (${allSessions.join(', ')});` +
 					`DELETE FROM "Locations" WHERE id IN (${allLocations.join(', ')});'`
 			);
+			psql(`DELETE FROM "RingingGroups" WHERE id = ${otherGroupId};`);
 		});
 
 		// An ungrouped single-date aggregate row (covers exactly the one bird on `date`).
@@ -646,11 +656,18 @@ describe('demographics_stats', () => {
 	describe('returning age buckets (returning_age_1/2/3_plus/new_unknown_age_bird_count)', () => {
 		let deltaId: number;
 		let deltaClient: SupabaseClient;
+		// A dedicated throwaway group for the multi-group isolation case, rather than the
+		// shared `Alpha` seed group — see #935: a temporary Alpha location/session, even
+		// cleaned up in afterAll, is visible to any concurrently-running test asserting on
+		// Alpha's full row set (e.g. core-stats.test.ts's ALPHA_ALL_VISIT_DATES) for the
+		// window between insert and teardown.
+		let otherGroupId: number;
+		let otherGroupClient: SupabaseClient;
 		const locationIds: number[] = [];
 		const sessionIds: number[] = [];
 		const birdIds: number[] = [];
-		const alphaLocationIds: number[] = [];
-		const alphaSessionIds: number[] = [];
+		const otherGroupLocationIds: number[] = [];
+		const otherGroupSessionIds: number[] = [];
 
 		type EncInput = { date: string; age_code: number; is_juv: boolean };
 
@@ -665,7 +682,7 @@ describe('demographics_stats', () => {
 		let periodRelativeEarlyDate: string; // same bird, earlier cell
 		let periodRelativeLateDate: string; // same bird, later cell
 		let periodRelativeBirdId: number;
-		let multiGroupDate: string; // Alpha history must not count under Delta
+		let multiGroupDate: string; // other-group history must not count under Delta
 
 		const yearOf = (d: string) => parseInt(d.slice(0, 4), 10);
 
@@ -674,6 +691,8 @@ describe('demographics_stats', () => {
 			deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
 
 			const testSuffix = randomTestSuffix();
+			otherGroupId = createIsolatedGroup(`Returning Age Other ${testSuffix}`);
+			otherGroupClient = await getAuthenticatedSupabaseClientForGroup(otherGroupId);
 			const base = randomFutureDate();
 
 			const { data: robin } = await supabase
@@ -695,17 +714,17 @@ describe('demographics_stats', () => {
 			locationIds.push(deltaLoc!.id);
 			const deltaLocId = deltaLoc!.id;
 
-			const { data: alphaLoc, error: aLocErr } = await alphaClient
+			const { data: otherGroupLoc, error: aLocErr } = await otherGroupClient
 				.from('Locations')
 				.insert({
-					location_name: `Returning Age Alpha Loc ${testSuffix}`,
-					ringing_group_id: alphaId
+					location_name: `Returning Age Other Loc ${testSuffix}`,
+					ringing_group_id: otherGroupId
 				})
 				.select('id')
 				.single();
 			if (aLocErr) throw aLocErr;
-			alphaLocationIds.push(alphaLoc!.id);
-			const alphaLocId = alphaLoc!.id;
+			otherGroupLocationIds.push(otherGroupLoc!.id);
+			const otherGroupLocId = otherGroupLoc!.id;
 
 			const sessionCache = new Map<string, number>();
 			async function getSession(
@@ -841,9 +860,9 @@ describe('demographics_stats', () => {
 				{ date: periodRelativeLateDate, age_code: 4, is_juv: false }
 			]);
 
-			// Multi-group isolation: a precisely-aged Alpha encounter five years back
-			// plus a first Delta encounter this period. Under ringing_group_filter =
-			// Delta the Alpha history is invisible, so this reads as a first-ever
+			// Multi-group isolation: a precisely-aged other-group encounter five years
+			// back plus a first Delta encounter this period. Under ringing_group_filter =
+			// Delta the other group's history is invisible, so this reads as a first-ever
 			// imprecise encounter ('new_unknown_age'), not a 5-year returner.
 			multiGroupDate = addDays(base, 160);
 			const { data: mgBird, error: mgErr } = await deltaClient
@@ -853,13 +872,13 @@ describe('demographics_stats', () => {
 				.single();
 			if (mgErr) throw mgErr;
 			birdIds.push(mgBird!.id);
-			const alphaSess = await getSession(
-				alphaClient,
+			const otherGroupSess = await getSession(
+				otherGroupClient,
 				`${yearOf(multiGroupDate) - 5}-05-10`,
-				alphaLocId,
-				alphaSessionIds
+				otherGroupLocId,
+				otherGroupSessionIds
 			);
-			await insertEncounter(alphaClient, mgBird!.id, alphaSess, {
+			await insertEncounter(otherGroupClient, mgBird!.id, otherGroupSess, {
 				age_code: 3,
 				is_juv: false
 			});
@@ -876,8 +895,8 @@ describe('demographics_stats', () => {
 		});
 
 		afterAll(() => {
-			const allSessions = [...sessionIds, ...alphaSessionIds];
-			const allLocations = [...locationIds, ...alphaLocationIds];
+			const allSessions = [...sessionIds, ...otherGroupSessionIds];
+			const allLocations = [...locationIds, ...otherGroupLocationIds];
 			execSync(
 				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
 					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
@@ -885,6 +904,7 @@ describe('demographics_stats', () => {
 					`DELETE FROM "Sessions" WHERE id IN (${allSessions.join(', ')});` +
 					`DELETE FROM "Locations" WHERE id IN (${allLocations.join(', ')});'`
 			);
+			psql(`DELETE FROM "RingingGroups" WHERE id = ${otherGroupId};`);
 		});
 
 		// An ungrouped single-date aggregate row (covers exactly the one bird on `date`).
