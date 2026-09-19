@@ -7,6 +7,7 @@ import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { fetchPeriodStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
+import { dailyHighlights } from '@/app/lib/highlights/v2';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
@@ -36,6 +37,7 @@ const ALL_TIME_MONTH_TOTALS_TAB = {
 const YEAR_TOTALS_TAB = { id: 'year-totals', label: 'Year totals' };
 const SESSION_TOTALS_TAB = { id: 'session-totals', label: 'Session totals' };
 const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
+const HIGHLIGHTS_TAB = { id: 'highlights', label: 'Highlights' };
 
 // The all-time page's combine-years "Month totals" tab content. Owns the
 // "Combine years" toggle's local state so it resets to the default (ON) each
@@ -243,7 +245,8 @@ export function SummaryTotalsSection({
 		...(monthTotals ? [MONTH_TOTALS_TAB] : []),
 		...(showAllTimeMonthTotals ? [ALL_TIME_MONTH_TOTALS_TAB] : []),
 		...(showSessionTotals ? [SESSION_TOTALS_TAB] : []),
-		SPECIES_TOTALS_TAB
+		SPECIES_TOTALS_TAB,
+		HIGHLIGHTS_TAB
 	];
 
 	const tabsWithTotalsRow = {
@@ -283,6 +286,25 @@ export function SummaryTotalsSection({
 				})
 		}
 	);
+	const isHighlightsActive = activeTab === HIGHLIGHTS_TAB.id;
+	const fetchHighlightsData = useCallback(
+		async () => dailyHighlights(viewedGroup!.id),
+		[viewedGroup]
+	);
+	const { data: highlightsData, isLoading: isHighlightsLoading } =
+		useLazyTabData(
+			isHighlightsActive && viewedGroup !== undefined,
+			fetchHighlightsData,
+			{
+				onError: (error) =>
+					console.error('Failed to fetch species totals', {
+						viewedGroupId: viewedGroup?.id,
+						fromDate,
+						toDate,
+						error
+					})
+			}
+		);
 
 	// The all-time combine-years month tab fetches lazily too, on first select —
 	// one row per (year, month) across the group's full history, folded into 12
@@ -335,6 +357,7 @@ export function SummaryTotalsSection({
 	// of which tab/table is currently active — `undefined` (not `null`) means
 	// "no totals row" to each table's `totalsStats` prop.
 	const totalsStats = summaryStats ?? undefined;
+	console.log(highlightsData);
 
 	return (
 		<>
@@ -424,6 +447,29 @@ export function SummaryTotalsSection({
 						totalsStats={undefined}
 						period={year === undefined ? undefined : { year, month }}
 					/>
+				))}
+			{isHighlightsActive &&
+				(isHighlightsLoading ? (
+					<div className="flex items-center justify-center">
+						<div className="loading loading-spinner loading-xl"></div>
+					</div>
+				) : (
+					<div>
+						{highlightsData &&
+							Object.entries(highlightsData.overall).map(
+								([highlightName, records]) => (
+									<p key={highlightName}>
+										{highlightName}:{' '}
+										{records.map(({ time_period, value }, i) => (
+											<span key={time_period}>
+												{i > 0 && ', '}
+												{value} on {time_period}
+											</span>
+										))}
+									</p>
+								)
+							)}
+					</div>
 				))}
 		</>
 	);
