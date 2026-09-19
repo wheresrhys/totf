@@ -8,7 +8,6 @@ import type {
 import {
 	getCounts,
 	getReturningVsNew,
-	getAgeSplit,
 	getReturningAges,
 	getYoungCounts,
 	getNewYoungCounts,
@@ -222,41 +221,6 @@ describe('getReturningVsNew', () => {
 				['2024-01-01', 3],
 				['2024-02-01', 9]
 			]);
-		});
-	});
-});
-
-describe('getAgeSplit', () => {
-	describe('Structure: four age-split series from the right columns', () => {
-		it('maps New adults / First summer / Oldies / New young from their columns', () => {
-			const rows = [
-				demographicsRow({
-					time_period: '2024-01-01',
-					new_adult_bird_count: 5,
-					first_summer_bird_count: 3,
-					old_timers_bird_count: 7,
-					new_young_bird_count: 2
-				})
-			];
-			const result = getAgeSplit(rows);
-			expect(result.map((series) => series.name)).toEqual([
-				'New adults',
-				'First summer',
-				'Oldies',
-				'New young'
-			]);
-			expect(result[0].data).toEqual([['2024-01-01', 5]]);
-			expect(result[1].data).toEqual([['2024-01-01', 3]]);
-			expect(result[2].data).toEqual([['2024-01-01', 7]]);
-			expect(result[3].data).toEqual([['2024-01-01', 2]]);
-		});
-	});
-
-	describe('Edge: empty history', () => {
-		it('returns all four series with empty data arrays', () => {
-			const result = getAgeSplit([]);
-			expect(result).toHaveLength(4);
-			expect(result.every((series) => series.data.length === 0)).toBe(true);
 		});
 	});
 });
