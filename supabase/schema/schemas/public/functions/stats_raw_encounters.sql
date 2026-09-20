@@ -50,9 +50,17 @@ CREATE FUNCTION public.stats_raw_encounters (
     sess.session_type,
     e.max_hatch_year,
     e.capture_time,
-    date_trunc('day', sess.visit_date)::DATE AS session_day,
-    date_trunc('month', sess.visit_date)::DATE AS session_month,
-    date_trunc('year', sess.visit_date)::DATE AS session_year
+    -- visit_date is already a DATE, so truncating it to a day is the identity — and
+    -- the ::timestamp casts on month/year are load-bearing, not cosmetic. Postgres has
+    -- no date_trunc(text, date) overload, so a bare `date_trunc('month', sess.visit_date)`
+    -- resolves to date_trunc(text, timestamptz), which is STABLE (timezone-dependent)
+    -- rather than IMMUTABLE and measurably slower to evaluate per row. Casting to
+    -- timestamp picks the IMMUTABLE overload. Verified identical output for every
+    -- session date in the seed data; it is also strictly more deterministic, since the
+    -- timestamptz form would depend on the connection's TimeZone setting.
+    sess.visit_date AS session_day,
+    date_trunc('month', sess.visit_date::timestamp)::DATE AS session_month,
+    date_trunc('year', sess.visit_date::timestamp)::DATE AS session_year
   FROM public."Species" sp
   JOIN public."Birds" b ON sp.id = b.species_id
   -- Resighting/recovery record_types (public.resighting_record_type: U/F/D) are
@@ -60,8 +68,21 @@ CREATE FUNCTION public.stats_raw_encounters (
   -- RPC (#874). Filtering in the LEFT JOIN's ON clause (not the WHERE) preserves the
   -- NULL-preserving semantics: a bird whose only encounters are resightings still
   -- appears with encounter_id IS NULL rather than being dropped entirely.
+  --
+  -- The exclusion list is spelled as an `IN (SELECT unnest(...))` sublink rather than
+  -- the equivalent `= ANY (enum_range(...)::text[])` array expression on purpose.
+  -- enum_range() is STABLE, not IMMUTABLE, so Postgres cannot constant-fold it at plan
+  -- time; written inline as an array it is re-evaluated (catalog lookups and all) once
+  -- PER ROW of Encounters. Measured on a 40k-row Encounters table that cost 81,782
+  -- shared buffer hits and ~36-56ms for the scan, versus 1,601 hits and ~7ms with the
+  -- value resolved once. The sublink form plans as a single hashed SubPlan evaluated
+  -- once per query instead. Because every stats RPC derives this row source (and
+  -- core_stats derives it 4x via its utility-RPC layering), that per-row cost was ~29%
+  -- of core_stats' total runtime. Do NOT "simplify" this back to the array form, and
+  -- keep the enum itself as the source of truth — don't inline a literal 'U'/'F'/'D'
+  -- list here (see CLAUDE.md on keeping RESIGHTING_RECORD_TYPES in sync by hand).
   LEFT JOIN public."Encounters" e ON b.id = e.bird_id
-    AND NOT (e.record_type = ANY (enum_range(NULL::public.resighting_record_type)::text[]))
+    AND NOT (e.record_type IN (SELECT unnest(enum_range(NULL::public.resighting_record_type)::text[])))
   LEFT JOIN public."Sessions" sess ON e.session_id = sess.id
   WHERE (from_date IS NULL OR sess.visit_date >= from_date)
    AND (to_date IS NULL OR sess.visit_date <= to_date)

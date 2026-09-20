@@ -3,6 +3,7 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
+import { resolveRingSearchDestination } from '@/app/actions/ring-search';
 import { SearchPageContent, type SearchResult } from './PageContent';
 
 export type SearchParams = { q: string };
@@ -10,20 +11,16 @@ export type SearchParams = { q: string };
 export async function fetchSearchPageContent({
 	q
 }: SearchParams): Promise<SearchResult[]> {
-	const supabase = await getAuthenticatedSupabaseClient();
-	const uppercaseQuery = q.toUpperCase();
-	const exactMatch = await supabase
-		.from('Birds')
-		.select('id')
-		.eq('ring_no', uppercaseQuery)
-		.maybeSingle()
-		.then(catchSupabaseErrors);
-
-	if (exactMatch) {
-		return redirect(`/bird/${q}`);
+	// Reached directly (bookmark, shared link, browser back/forward) rather
+	// than only via RingSearchForm's own pre-navigation check — see #950 —
+	// so this must still redirect an exact match itself.
+	const { isExactMatch, path } = await resolveRingSearchDestination(q);
+	if (isExactMatch) {
+		return redirect(path);
 	}
+	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('fuzzy_search_rings', { q: uppercaseQuery })
+		.rpc('fuzzy_search_rings', { q: q.toUpperCase() })
 		.then(catchSupabaseErrors);
 }
 

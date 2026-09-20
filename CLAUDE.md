@@ -68,6 +68,7 @@ incrementally; current inventory:
 | `create_ticket` | `gh issue create` with labels + sub-issue linking, no shell-escaping/tempfile dance |
 | `link_ticket_dependencies` | Apply GitHub blocked-by links to an issue (one comma-joined `gh issue edit --add-blocked-by` call) — ticketify's dependency wiring |
 | `ensure_local_migrations_applied` | Catch a worktree's shared local Postgres up to the committed `supabase/migrations/` before DB-dependent work — fast-paths off a locked `.claude/swarm-migration-state.json` marker, only running `npx supabase migration up --local` when the marker is behind (#863). Called by `swarm` on every worktree spawn. |
+| `ensure_worktree_env` | Copy `.env.dev` from the main checkout root into a worktree, no-clobber — `.env.dev` is gitignored so a freshly created worktree never has it, causing `npm run qa`/the pre-push hook to fail with `SUPABASE_JWT_ROLE environment variable is not set`. Called by `swarm` on every worktree spawn, replacing what used to be manual `cp` prose a worker could skip or botch. |
 
 Use these tools for anything that touches `.claude/swarm-state.json`, creates a GitHub issue,
 derives a branch name, or extracts backfill DML — never reimplement the `jq`/glob/anchor-text
@@ -211,6 +212,34 @@ spine past the range of real (`FULL_GROWN`/`PULLI`) sessions. `app/models/db.ts`
 `RESIGHTING_RECORD_TYPES` constant is typed against it — keep that constant in sync **by hand** if
 the enum ever changes, the same convention as the age-bucket definitions above.
 
+**Two per-row evaluation traps in `stats_raw_encounters`, both fixed in #947 — don't reintroduce
+either.** Because every stats RPC derives this row source (and `core_stats` derives it 4x through
+its utility-RPC layering), anything evaluated per row here is paid several times over:
+
+- **`enum_range()` is STABLE, not IMMUTABLE**, so Postgres cannot constant-fold it at plan time.
+  Written inline as `= ANY (enum_range(...)::text[])` it was re-evaluated, catalog lookups and
+  all, once per `Encounters` row — 81,782 shared buffer hits and ~36-56ms for a 40k-row scan
+  versus 1,601 hits and ~7ms once hoisted. It is now spelled `IN (SELECT unnest(enum_range(...)))`,
+  which plans as a single hashed SubPlan evaluated once per query. Keep the enum as the source of
+  truth — don't "fix" this by inlining a literal `'U'/'F'/'D'` list.
+- **There is no `date_trunc(text, date)` overload**, so `date_trunc('month', sess.visit_date)`
+  silently resolved to `date_trunc(text, timestamptz)` — STABLE and timezone-dependent. The casts
+  to `::timestamp` on `session_month`/`session_year` pick the IMMUTABLE overload, and `session_day`
+  is now just `sess.visit_date` (truncating a `DATE` to a day is the identity). Same values, and
+  strictly more deterministic since the result no longer depends on the connection's `TimeZone`.
+
+`core_stats` likewise reads `session_day`/`session_month`/`session_year` straight off its
+`raw_encounters` CTE instead of re-deriving them from `visit_date` in `session_counts` /
+`effort_per_period`. Together these took `core_stats` from a ~976ms to a ~643ms median on a
+40k-encounter / 15,000-output-row benchmark, with shared buffer traffic down from ~325k to ~2.2k.
+
+Note also what #947 ruled **out**: `stats_spine`'s internal `raw_encounters` CTE is **not**
+duplicated. It has two textual references, so Postgres's `cterefcount > 1` rule always materializes
+it — confirmed at every parameterization. What looks like two derivations in an `EXPLAIN ANALYZE`
+is the *first* `CTE Scan` on each of two different CTEs (`core_stats`' own and `stats_spine`'s)
+carrying its CTE's population cost inclusively. Adding `AS MATERIALIZED` there produces a
+byte-identical plan; don't spend time on it again.
+
 `demographics_stats`' four `returning_age_*_bird_count` columns (#843, driving the species page's
 "Returning ages" chart) are resolved per bird by a fifth utility RPC,
 `stats_bird_returning_age_bucket`. It takes the adult cohort straight from `stats_bird_age_bucket`
@@ -241,10 +270,30 @@ grouped by month. Reuse this shape if another RPC needs the same "state as of ye
 and note the two alternatives that were measured and rejected: a `LEFT JOIN LATERAL … LIMIT 1`
 over the per-year series gets inlined and re-derives the history per cell anyway (8.2s), and a
 `MATERIALIZED` + `DISTINCT ON` variant was worse still (24–102s). The reason plan-dependent
-shapes are unreliable here is worth remembering on its own: **`adult_birds` is estimated at 1
-row when it actually returns tens of thousands** — the `IS NOT DISTINCT FROM` join against a
+shapes are unreliable here is worth remembering on its own: **`adult_birds` used to be estimated
+at 1 row when it actually returned tens of thousands** — the `IS NOT DISTINCT FROM` join against a
 SQL-function-backed relation defeats the estimator — so anything whose plan hinges on a sane row
 estimate is a coin flip. Prefer a shape with no join to mis-plan.
+
+**That same advice was then applied to `adult_birds` itself (2026-09-20).** The cell's
+`period_year` is no longer attached to its adult birds by that `IS NOT DISTINCT FROM` join at all:
+`cell_period_year`'s one row per cell is `UNION ALL`ed with the adult-bird rows on the same
+`(species_id, time_period)` axis (a `cell_event_ord` column distinguishing them, bird rows carrying
+a NULL `period_year`), and a single `MAX(period_year) OVER (PARTITION BY species_id, time_period)`
+hands every bird row its own cell's value — `PARTITION BY` groups NULLs together, so it is NULL-safe
+for the ungrouped case exactly as `IS NOT DISTINCT FROM` was, with no sentinel value. Same
+merge-the-streams trick as #932 above, applied to the cell axis instead of the year axis. Two things
+motivated it, both measured on a synthetic 164k-encounter / 4-group / 4,000-bird / 60-species
+fixture: the join could only ever be a nested loop (neither hashable nor mergeable), costing
+`cells × adult-bird-cells` comparisons; and at its `rows=1` estimate the planner was free to
+re-execute `cell_period_year`'s whole aggregate once per outer row. The decisive case is **PL/pgSQL
+plan caching**, not any exotic data shape: `demographics_stats` is `LANGUAGE plpgsql`, so its
+`RETURN QUERY` statement switches to a **generic plan on the 6th execution in a session** — the
+worst estimate available — and PostgREST pools connections, so a busy backend reaches it routinely.
+Group-wide monthly `demographics_stats` measured ~670ms for executions 1–5 and **77,000ms from
+execution 6 onward**; after the rewrite, 520ms and 1,110ms. Keep this in mind for any future
+plpgsql RPC: a shape that is merely *lucky* under a custom plan is guaranteed to be tested under a
+generic one.
 
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
 two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
