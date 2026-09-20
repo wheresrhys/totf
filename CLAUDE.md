@@ -211,6 +211,34 @@ spine past the range of real (`FULL_GROWN`/`PULLI`) sessions. `app/models/db.ts`
 `RESIGHTING_RECORD_TYPES` constant is typed against it — keep that constant in sync **by hand** if
 the enum ever changes, the same convention as the age-bucket definitions above.
 
+**Two per-row evaluation traps in `stats_raw_encounters`, both fixed in #947 — don't reintroduce
+either.** Because every stats RPC derives this row source (and `core_stats` derives it 4x through
+its utility-RPC layering), anything evaluated per row here is paid several times over:
+
+- **`enum_range()` is STABLE, not IMMUTABLE**, so Postgres cannot constant-fold it at plan time.
+  Written inline as `= ANY (enum_range(...)::text[])` it was re-evaluated, catalog lookups and
+  all, once per `Encounters` row — 81,782 shared buffer hits and ~36-56ms for a 40k-row scan
+  versus 1,601 hits and ~7ms once hoisted. It is now spelled `IN (SELECT unnest(enum_range(...)))`,
+  which plans as a single hashed SubPlan evaluated once per query. Keep the enum as the source of
+  truth — don't "fix" this by inlining a literal `'U'/'F'/'D'` list.
+- **There is no `date_trunc(text, date)` overload**, so `date_trunc('month', sess.visit_date)`
+  silently resolved to `date_trunc(text, timestamptz)` — STABLE and timezone-dependent. The casts
+  to `::timestamp` on `session_month`/`session_year` pick the IMMUTABLE overload, and `session_day`
+  is now just `sess.visit_date` (truncating a `DATE` to a day is the identity). Same values, and
+  strictly more deterministic since the result no longer depends on the connection's `TimeZone`.
+
+`core_stats` likewise reads `session_day`/`session_month`/`session_year` straight off its
+`raw_encounters` CTE instead of re-deriving them from `visit_date` in `session_counts` /
+`effort_per_period`. Together these took `core_stats` from a ~976ms to a ~643ms median on a
+40k-encounter / 15,000-output-row benchmark, with shared buffer traffic down from ~325k to ~2.2k.
+
+Note also what #947 ruled **out**: `stats_spine`'s internal `raw_encounters` CTE is **not**
+duplicated. It has two textual references, so Postgres's `cterefcount > 1` rule always materializes
+it — confirmed at every parameterization. What looks like two derivations in an `EXPLAIN ANALYZE`
+is the *first* `CTE Scan` on each of two different CTEs (`core_stats`' own and `stats_spine`'s)
+carrying its CTE's population cost inclusively. Adding `AS MATERIALIZED` there produces a
+byte-identical plan; don't spend time on it again.
+
 `demographics_stats`' four `returning_age_*_bird_count` columns (#843, driving the species page's
 "Returning ages" chart) are resolved per bird by a fifth utility RPC,
 `stats_bird_returning_age_bucket`. It takes the adult cohort straight from `stats_bird_age_bucket`
