@@ -266,11 +266,10 @@ export function renderCountHighlight(highlight: CountHighlight): ReactElement {
 
 export function renderV2Highlight(highlight: HighlightInContext): ReactElement {
 	return (
-		<li key={`v2-${highlight.type}`}>
-			{' '}
-			v2 - {printSingleHighlightSentence(highlight)}
+		<li
+			key={`v2-${highlight.type}-${highlight.parentTimeWindow?.year ?? 'any'}-${highlight.parentTimeWindow?.month ?? 'any'}`}
+		>
+			{printSingleHighlightSentence(highlight)}
 		</li>
 	);
 }
-
-// printSingleHighlightSentence()

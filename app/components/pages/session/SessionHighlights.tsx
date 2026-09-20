@@ -143,8 +143,8 @@ export function SessionHighlights({
 				<>
 					<SecondaryHeading>Counts</SecondaryHeading>
 					<BoxyList testId="counts">
-						{countHighlights.map(renderCountHighlight)}
 						{highlights.v2.map(renderV2Highlight)}
+						{countHighlights.map(renderCountHighlight)}
 					</BoxyList>
 				</>
 			) : null}

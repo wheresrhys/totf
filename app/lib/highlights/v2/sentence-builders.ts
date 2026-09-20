@@ -1,11 +1,26 @@
 import type {
-	Highlight,
 	HighlightUnit,
 	HighlightsOfType,
 	HighlightTemporalUnit,
 	HighlightInContext,
 	YearMonthRestriction
 } from './';
+
+const fullMonthNames = [
+	undefined,
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December'
+];
 
 const plurals: Partial<Record<HighlightUnit | HighlightTemporalUnit, string>> =
 	{
@@ -45,22 +60,10 @@ function prettyPrintPosition(position: number) {
 }
 
 export function printProminenceQualifier({
-	siblingHighlights,
-	highlightIndex
-}: {
-	siblingHighlights: Highlight[];
-	highlightIndex: number;
-}) {
-	const activeHighlight = siblingHighlights[highlightIndex];
-	const activeValue = activeHighlight.value;
-	const allValues = [
-		...new Set(siblingHighlights.map(({ value }) => value))
-	].sort((a, b) => b - a);
-	const position = allValues.indexOf(activeValue) + 1;
-	const isJoint =
-		siblingHighlights.filter(({ value }) => value === activeValue).length > 1;
-
-	return `${isJoint ? 'Joint ' : ''}${prettyPrintPosition(position)}`;
+	position,
+	isTied
+}: HighlightInContext) {
+	return `${isTied ? 'Joint ' : ''}${prettyPrintPosition(position)}`;
 }
 
 export function printTimeQualifier({ year, month }: YearMonthRestriction) {
@@ -68,26 +71,18 @@ export function printTimeQualifier({ year, month }: YearMonthRestriction) {
 		// todo pretty print month
 		return year === new Date().getFullYear()
 			? `this ${month}`
-			: `in ${month} ${year}`;
+			: `of ${month} ${year}`;
 	} else if (year) {
 		return year === new Date().getFullYear() ? `this year` : `in ${year}`;
 	} else if (month) {
-		return `in any ${month}`;
+		return `in any ${fullMonthNames[month]}`;
 	} else {
 		return `ever`;
 	}
 }
 
-export function printSingleHighlightSentence({
-	parentTimeWindow,
-	siblingHighlights,
-	highlightIndex,
-	verb,
-	temporalUnit,
-	value,
-	unit
-}: HighlightInContext) {
-	return `${printProminenceQualifier({ highlightIndex, siblingHighlights })} ${printDescriptor({ verb, temporalUnit })} ${printTimeQualifier(parentTimeWindow || {})}: ${printValue(value, unit)}`.trim();
+export function printSingleHighlightSentence(highlight: HighlightInContext) {
+	return `${printProminenceQualifier(highlight)} ${printDescriptor(highlight)} ${printTimeQualifier(highlight.parentTimeWindow || {})}: ${printValue(highlight.value, highlight.unit)}`.trim();
 }
 
 export function printHighlightListPrefix({
