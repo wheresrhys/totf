@@ -27,7 +27,6 @@ import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
 import type { OneBasedMonth } from '@/app/lib/highlights/v2/index';
 import { printHighlightListPrefix } from '@/app/lib/highlights/v2/sentence-builders';
-import { NoPrefetchLink } from './shared/NoPrefetchLink';
 import { StatOutput } from '@/app/components/shared/StatOutput';
 
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
@@ -470,7 +469,7 @@ export function SummaryTotalsSection({
 								<div key={highlight.type}>
 									{printHighlightListPrefix(highlight)}:{' '}
 									<div className="flex gap-2">
-										{highlight.highlights.map(({ time_period, value }, i) => (
+										{highlight.highlights.map(({ time_period, value }) => (
 											<span className="badge badge-outline" key={time_period}>
 												<StatOutput
 													visitDate={time_period}

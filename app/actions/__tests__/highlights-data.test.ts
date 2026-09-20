@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { cachedSupabaseFetch } from '@/app/lib/cached-supabase-fetch';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
