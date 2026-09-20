@@ -1,3 +1,4 @@
+'use server';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
