@@ -4,10 +4,12 @@ import {
 	BoxyList,
 	SecondaryHeading
 } from '@/app/components/shared/DesignSystem';
+import { fetchSessionHighlights } from '@/app/actions/session-highlights';
+
 import {
-	fetchSessionHighlights,
-	type HighlightsData
-} from '@/app/actions/session-highlights';
+	fetchDayHighlights,
+	type HighlightInContext
+} from '@/app/lib/highlights/v2/index';
 import {
 	renderRarityHighlight,
 	RARITY_HIGHLIGHT_RENDERERS,
@@ -25,6 +27,10 @@ import type {
 } from '@/app/lib/highlights';
 import type { SessionEncounter } from '@/app/models/session';
 
+type HighlightsData = {
+	v1: SessionHighlight[];
+	v2: HighlightInContext[];
+};
 // Each group's own renderer map (from the barrel) is the single source of
 // truth for which highlight `type`s belong to that group — reusing its keys
 // here means this partitioning can never drift out of sync with the map
@@ -75,9 +81,17 @@ export function SessionHighlights({
 	);
 	useEffect(() => {
 		setStatus('loading');
-		fetchSessionHighlights({ date, viewedGroupId })
-			.then((fetched) => {
-				setHighlights(fetched);
+
+		Promise.all([
+			fetchDayHighlights(viewedGroupId, date),
+
+			fetchSessionHighlights({ date, viewedGroupId })
+		])
+			.then(([fetchedV2, fetchedV1]) => {
+				setHighlights({
+					v1: fetchedV1,
+					v2: fetchedV2
+				});
 				setStatus('loaded');
 			})
 			.catch((error) => {

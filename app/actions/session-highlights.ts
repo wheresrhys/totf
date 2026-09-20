@@ -10,24 +10,16 @@ import {
 	type SessionHighlight
 } from '@/app/lib/highlights';
 import type { LongAbsenceRetrapsResult } from '@/app/models/db';
-import {
-	fetchDayHighlights,
-	type HighlightInContext
-} from '@/app/lib/highlights/v2/index';
 
-export type HighlightsData = {
-	v1: SessionHighlight[];
-	v2: HighlightInContext[];
-};
 export async function fetchSessionHighlights({
 	date,
 	viewedGroupId
 }: {
 	date: string;
 	viewedGroupId: number;
-}): Promise<HighlightsData> {
+}): Promise<SessionHighlight[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	const [stats, longAbsenceRetrapResults, dayHighlights] = await Promise.all([
+	const [stats, longAbsenceRetrapResults] = await Promise.all([
 		fetchSessionStats(viewedGroupId),
 		supabase
 			.rpc('long_absence_retraps', {
@@ -35,8 +27,7 @@ export async function fetchSessionHighlights({
 				ringing_group_filter: viewedGroupId
 			})
 			.then(catchSupabaseErrors)
-			.then((results) => (results ?? []) as LongAbsenceRetrapsResult[]),
-		fetchDayHighlights(viewedGroupId, date)
+			.then((results) => (results ?? []) as LongAbsenceRetrapsResult[])
 	]);
 	// Each group composes its own already-ordered block list — see
 	// docs/session-highlight-ordering.md. This flat list is a literal
@@ -46,13 +37,10 @@ export async function fetchSessionHighlights({
 	// partitions it into its three sections via each group's own renderer map
 	// (per #760) — long-absence-retrap intentionally matches none of them and
 	// isn't rendered on the session page yet.
-	return {
-		v1: [
-			...rarities({ date, stats }),
-			...counts({ date, stats }),
-			...vitalStats({ date, stats }),
-			...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date)
-		],
-		v2: dayHighlights
-	};
+	return [
+		...rarities({ date, stats }),
+		...counts({ date, stats }),
+		...vitalStats({ date, stats }),
+		...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date)
+	];
 }
