@@ -11,6 +11,13 @@ function gitEnv(): NodeJS.ProcessEnv {
 	delete env.GIT_DIR;
 	delete env.GIT_WORK_TREE;
 	delete env.GIT_INDEX_FILE;
+	// CI runners have no global user.name/user.email configured, so `git commit`
+	// fails with exit 128 ("Please tell me who you are") unless an identity is
+	// supplied explicitly — don't rely on the ambient environment's git config.
+	env.GIT_AUTHOR_NAME = 'ensure-worktree-env test';
+	env.GIT_AUTHOR_EMAIL = 'ensure-worktree-env-test@example.com';
+	env.GIT_COMMITTER_NAME = 'ensure-worktree-env test';
+	env.GIT_COMMITTER_EMAIL = 'ensure-worktree-env-test@example.com';
 	return env;
 }
 
