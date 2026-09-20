@@ -1,7 +1,38 @@
 import { isBefore, subMonths } from 'date-fns';
 import type { SessionStatsData } from '@/app/lib/highlights/shared/session-stats';
 import type { SinceComparisonHighlight } from './types';
-import { buildDayTotals } from './derive-session-total';
+
+export type DayTotals = {
+	date: string;
+	encounters: number;
+	species: number;
+	juvs: number;
+};
+
+// Highlights compare the session against every other session in scope,
+// whenever it happened — later data can erase or demote a record
+export function buildDayTotals({
+	daySpeciesStats,
+	sessionDates
+}: SessionStatsData): DayTotals[] {
+	const totalsByDate = new Map<string, DayTotals>();
+	for (const date of sessionDates) {
+		totalsByDate.set(date, { date, encounters: 0, species: 0, juvs: 0 });
+	}
+	for (const row of daySpeciesStats) {
+		const dayTotals = totalsByDate.get(row.visit_date) ?? {
+			date: row.visit_date,
+			encounters: 0,
+			species: 0,
+			juvs: 0
+		};
+		dayTotals.encounters += row.encounter_count;
+		dayTotals.species += 1;
+		dayTotals.juvs += row.juv_count;
+		totalsByDate.set(row.visit_date, dayTotals);
+	}
+	return [...totalsByDate.values()];
+}
 
 // Busiest/quietest-since compares the session's encounter total against
 // prior session days only (later days can't have happened yet from the
