@@ -270,10 +270,30 @@ grouped by month. Reuse this shape if another RPC needs the same "state as of ye
 and note the two alternatives that were measured and rejected: a `LEFT JOIN LATERAL … LIMIT 1`
 over the per-year series gets inlined and re-derives the history per cell anyway (8.2s), and a
 `MATERIALIZED` + `DISTINCT ON` variant was worse still (24–102s). The reason plan-dependent
-shapes are unreliable here is worth remembering on its own: **`adult_birds` is estimated at 1
-row when it actually returns tens of thousands** — the `IS NOT DISTINCT FROM` join against a
+shapes are unreliable here is worth remembering on its own: **`adult_birds` used to be estimated
+at 1 row when it actually returned tens of thousands** — the `IS NOT DISTINCT FROM` join against a
 SQL-function-backed relation defeats the estimator — so anything whose plan hinges on a sane row
 estimate is a coin flip. Prefer a shape with no join to mis-plan.
+
+**That same advice was then applied to `adult_birds` itself (2026-09-20).** The cell's
+`period_year` is no longer attached to its adult birds by that `IS NOT DISTINCT FROM` join at all:
+`cell_period_year`'s one row per cell is `UNION ALL`ed with the adult-bird rows on the same
+`(species_id, time_period)` axis (a `cell_event_ord` column distinguishing them, bird rows carrying
+a NULL `period_year`), and a single `MAX(period_year) OVER (PARTITION BY species_id, time_period)`
+hands every bird row its own cell's value — `PARTITION BY` groups NULLs together, so it is NULL-safe
+for the ungrouped case exactly as `IS NOT DISTINCT FROM` was, with no sentinel value. Same
+merge-the-streams trick as #932 above, applied to the cell axis instead of the year axis. Two things
+motivated it, both measured on a synthetic 164k-encounter / 4-group / 4,000-bird / 60-species
+fixture: the join could only ever be a nested loop (neither hashable nor mergeable), costing
+`cells × adult-bird-cells` comparisons; and at its `rows=1` estimate the planner was free to
+re-execute `cell_period_year`'s whole aggregate once per outer row. The decisive case is **PL/pgSQL
+plan caching**, not any exotic data shape: `demographics_stats` is `LANGUAGE plpgsql`, so its
+`RETURN QUERY` statement switches to a **generic plan on the 6th execution in a session** — the
+worst estimate available — and PostgREST pools connections, so a busy backend reaches it routinely.
+Group-wide monthly `demographics_stats` measured ~670ms for executions 1–5 and **77,000ms from
+execution 6 onward**; after the rewrite, 520ms and 1,110ms. Keep this in mind for any future
+plpgsql RPC: a shape that is merely *lucky* under a custom plan is guaranteed to be tested under a
+generic one.
 
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
 two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
