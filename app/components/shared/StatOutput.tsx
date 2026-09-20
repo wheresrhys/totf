@@ -2,6 +2,7 @@ import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
 import type { LocationRow } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import { buildGroupSessionHref } from '@/app/lib/group-links';
 import { printLocationName } from './DesignSystem';
 export type TemporalUnit = 'day' | 'month' | 'year';
 export type StatOutputModel = {
@@ -57,7 +58,7 @@ export function StatOutput({
 			{temporalUnit === 'day' && link ? (
 				<NoPrefetchLink
 					className="link"
-					href={`/group/${viewedGroup?.slug}/session/${visitDate}${location ? `/site/${location.id}` : ''}`}
+					href={`${buildGroupSessionHref(viewedGroup, visitDate)}${location ? `/site/${location.id}` : ''}`}
 				>
 					{formatDate(
 						new Date(visitDate as string),

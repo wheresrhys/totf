@@ -1,6 +1,7 @@
 import type {
 	Highlight,
 	HighlightUnit,
+	HighlightsOfType,
 	HighlightTemporalUnit,
 	HighlightInContext,
 	YearMonthRestriction
@@ -87,4 +88,16 @@ export function printSingleHighlightSentence({
 	unit
 }: HighlightInContext) {
 	return `${printProminenceQualifier({ highlightIndex, siblingHighlights })} ${printDescriptor({ verb, temporalUnit })} ${printTimeQualifier(parentTimeWindow || {})}: ${printValue(value, unit)}`.trim();
+}
+
+export function printHighlightListPrefix({
+	verb,
+	temporalUnit,
+	highlights
+}: HighlightsOfType) {
+	return printDescriptor({
+		verb,
+		temporalUnit,
+		usePlural: highlights.length > 1
+	});
 }

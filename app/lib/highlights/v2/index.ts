@@ -8,7 +8,7 @@ export type YearMonthRestriction = {
 	month?: OneBasedMonth;
 };
 export type HighlightUnit = 'bird' | 'species' | 'encounter';
-export type HighlightTemporalUnit = 'session' | 'month';
+export type HighlightTemporalUnit = 'day' | 'month';
 type HighlightCategory = 'count' | 'rarity' | 'biometrics';
 type HighlightType =
 	| 'birds'
@@ -237,7 +237,7 @@ export async function dailyHighlights({
 	}
 	return generateHighlights({
 		cacheKey,
-		temporalUnit: 'session',
+		temporalUnit: 'day',
 		stats: dailyStats,
 		limit
 	});

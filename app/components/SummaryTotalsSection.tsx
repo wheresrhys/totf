@@ -26,6 +26,10 @@ import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
 import type { OneBasedMonth } from '@/app/lib/highlights/v2/index';
+import { printHighlightListPrefix } from '@/app/lib/highlights/v2/sentence-builders';
+import { NoPrefetchLink } from './shared/NoPrefetchLink';
+import { StatOutput } from '@/app/components/shared/StatOutput';
+
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
 // The all-time page's combine-years month tab — distinct from `MONTH_TOTALS_TAB`
 // (the year page's per-year, linked, toggle-enabled month rows). Same label,
@@ -463,15 +467,21 @@ export function SummaryTotalsSection({
 					<div>
 						{highlightsData &&
 							highlightsData.map((highlight) => (
-								<p key={highlight.type}>
-									{highlight.verb} {highlight.type}:{' '}
-									{highlight.highlights.map(({ time_period, value }, i) => (
-										<span key={time_period}>
-											{i > 0 && ', '}
-											{value} on {time_period}
-										</span>
-									))}
-								</p>
+								<div key={highlight.type}>
+									{printHighlightListPrefix(highlight)}:{' '}
+									<div className="flex gap-2">
+										{highlight.highlights.map(({ time_period, value }, i) => (
+											<span className="badge badge-outline" key={time_period}>
+												<StatOutput
+													visitDate={time_period}
+													temporalUnit={highlight.temporalUnit}
+													value={value}
+													viewedGroup={viewedGroup}
+												/>
+											</span>
+										))}
+									</div>
+								</div>
 							))}
 					</div>
 				))}
