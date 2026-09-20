@@ -10,12 +10,7 @@ export type YearMonthRestriction = {
 export type HighlightUnit = 'bird' | 'species' | 'encounter';
 export type HighlightTemporalUnit = 'day' | 'month';
 type HighlightCategory = 'count' | 'rarity' | 'biometrics';
-type HighlightType =
-	| 'birds'
-	// | 'encounters'
-	| 'species'
-	| 'newBirds'
-	| 'juvs';
+type HighlightType = 'birds' | 'encounters' | 'species' | 'newBirds' | 'juvs';
 
 export type Highlight = {
 	time_period: string;
@@ -144,15 +139,21 @@ function generateHighlights({
 					stats.overall
 				)
 			},
-			// encounters: {
-			// 	name: highlightNameMapping.encounters,
-			// 	type: 'encounters',
-			// 	highlights: getTopByProperty<CoreStatsResult>(
-			// 		'encounter_count',
-			// 		stats.overall,
-			// 		{ type: 'encounters', name: highlightNameMapping.encounters, limit }
-			// 	)
-			// },
+			...(temporalUnit === 'day'
+				? []
+				: [
+						{
+							type: 'encounters',
+							unit: 'encounter',
+							verb: 'Most encounters per',
+							category: 'count',
+							temporalUnit,
+							highlights: getTopByProperty<CoreStatsResult>(
+								'encounter_count',
+								stats.overall
+							)
+						} as HighlightsOfType
+					]),
 			{
 				type: 'species',
 				unit: 'species',
