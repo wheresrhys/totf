@@ -353,5 +353,8 @@ export async function fetchDayHighlights(
 			return true;
 		}
 	});
-	return filteredHighlights;
+	return filteredHighlights.toSorted((a, b) => {
+		if (a.category + a.type === b.category + b.type) return 0;
+		return a.category + a.type > b.category + b.type ? 1 : -1;
+	});
 }
