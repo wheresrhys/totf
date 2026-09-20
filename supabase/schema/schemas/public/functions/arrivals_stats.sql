@@ -29,7 +29,17 @@ CREATE FUNCTION public.arrivals_stats (
 ) RETURNS SETOF public.arrivals_stats_result LANGUAGE plpgsql AS $function$
   BEGIN
   RETURN QUERY
-  SELECT (jsonb_populate_record(NULL::public.arrivals_stats_result, to_jsonb(agg))).*
+  -- jsonb_populate_record is evaluated via CROSS JOIN LATERAL (once per outer
+  -- row) rather than as a bare `(...).* ` projection: Postgres does not
+  -- common-subexpression-eliminate a repeated function call across SELECT
+  -- target-list entries, so `(jsonb_populate_record(...)).* ` gets expanded at
+  -- parse time into one independent call PER output column — each re-running
+  -- to_jsonb(agg) and jsonb_populate_record from scratch just to extract one
+  -- field, multiplying cost by column count for no benefit (see core_stats.sql,
+  -- where this was measured at ~90% of total runtime). The LATERAL form still
+  -- binds by NAME (see above) but computes the populated record exactly once
+  -- per row.
+  SELECT r.*
   FROM (
   WITH spine AS (
     SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
@@ -75,7 +85,8 @@ CREATE FUNCTION public.arrivals_stats (
     ELSE true
   END
   ) AS agg
-  ORDER BY agg.species_name ASC, agg.time_period ASC;
+  CROSS JOIN LATERAL jsonb_populate_record(NULL::public.arrivals_stats_result, to_jsonb(agg)) AS r
+  ORDER BY r.species_name ASC, r.time_period ASC;
 
 END;
 $function$;

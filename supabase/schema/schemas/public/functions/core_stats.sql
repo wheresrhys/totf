@@ -15,7 +15,17 @@ CREATE FUNCTION public.core_stats (
   -- (confirmed empirically while building population_stats: two db:schema:apply
   -- runs on identical schema files produced two different physical attribute
   -- orders for the same composite type).
-  SELECT (jsonb_populate_record(NULL::public.core_stats_result, to_jsonb(agg))).*
+  -- jsonb_populate_record is evaluated via CROSS JOIN LATERAL (once per outer
+  -- row) rather than as a bare `(...).* ` projection: Postgres does not
+  -- common-subexpression-eliminate a repeated function call across SELECT
+  -- target-list entries, so `(jsonb_populate_record(...)).* ` gets expanded at
+  -- parse time into one independent call PER output column — each re-running
+  -- to_jsonb(agg) and jsonb_populate_record from scratch just to extract one
+  -- field. Measured on prod: this accounted for ~90% of core_stats' total
+  -- runtime (462ms of real aggregate work vs. 4457ms total) on a grouped,
+  -- ~8640-row x 23-column result. The LATERAL form still binds by NAME (see
+  -- above) but computes the populated record exactly once per row.
+  SELECT r.*
   FROM (
   -- Base windowed row source and grouping-cell spine, delegated to the shared
   -- stats_raw_encounters / stats_spine utility RPCs (#800) so this logic isn't
@@ -298,7 +308,8 @@ CREATE FUNCTION public.core_stats (
   abc.pullus_count, abc.juv_count, abc.postjuv_count, abc.adult_count, abc.unknown_age_count,
   eabc.pullus_enc_count, eabc.juv_enc_count, eabc.postjuv_enc_count, eabc.adult_enc_count, eabc.unknown_age_enc_count
   ) AS agg
-  ORDER BY agg.species_name ASC, agg.time_period ASC;
+  CROSS JOIN LATERAL jsonb_populate_record(NULL::public.core_stats_result, to_jsonb(agg)) AS r
+  ORDER BY r.species_name ASC, r.time_period ASC;
 
 END;
 $function$;
