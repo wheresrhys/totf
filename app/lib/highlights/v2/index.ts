@@ -1,6 +1,5 @@
 import {
-	fetchDailyStats,
-	fetchMonthlyStats,
+	getStatsByTemporalUnit,
 	type RawStats
 } from '@/app/actions/highlights-data';
 import type { CoreStatsResult } from '@/app/models/db';
@@ -116,7 +115,7 @@ function applyLimitToHighlights(highlights: HighlightsOfType[], limit: number) {
 
 const cache: Map<string, HighlightsOfType[]> = new Map();
 
-function generateHighlights({
+function generateHighlightsFromStats({
 	stats,
 	limit,
 	temporalUnit,
@@ -204,17 +203,19 @@ function generateHighlights({
 	);
 }
 
-export async function dailyHighlights({
+async function getHighlightsByTemporalUnit({
+	temporalUnit,
 	groupId,
 	limit,
 	periodFilter
 }: {
+	temporalUnit: HighlightTemporalUnit;
 	groupId: number;
 	limit?: number;
 	periodFilter?: YearMonthRestriction;
 }) {
-	let dailyStats = await fetchDailyStats(groupId);
-	let cacheKey = `${groupId}-daily`;
+	let dailyStats = await getStatsByTemporalUnit(temporalUnit, groupId);
+	let cacheKey = `${groupId}-${temporalUnit}`;
 	if (periodFilter) {
 		const { month, year } = periodFilter;
 		let filter: (timePeriod: string) => boolean;
@@ -247,11 +248,28 @@ export async function dailyHighlights({
 			Math.ceil(dailyStats.overall.length / 4)
 		);
 	}
-	return generateHighlights({
+	return generateHighlightsFromStats({
 		cacheKey,
-		temporalUnit: 'day',
+		temporalUnit,
 		stats: dailyStats,
 		limit
+	});
+}
+
+export async function dailyHighlights({
+	groupId,
+	limit,
+	periodFilter
+}: {
+	groupId: number;
+	limit?: number;
+	periodFilter?: YearMonthRestriction;
+}) {
+	return getHighlightsByTemporalUnit({
+		temporalUnit: 'day',
+		groupId,
+		limit,
+		periodFilter
 	});
 }
 
@@ -264,45 +282,11 @@ export async function monthlyHighlights({
 	limit?: number;
 	periodFilter?: YearMonthRestriction;
 }) {
-	let monthlyStats = await fetchMonthlyStats(groupId);
-	let cacheKey = `${groupId}-monthly`;
-	if (periodFilter) {
-		const { month, year } = periodFilter;
-		let filter: (timePeriod: string) => boolean;
-		if (year && month) {
-			cacheKey = `${cacheKey}-${year}-${month}`;
-			filter = (timePeriod) =>
-				timePeriod.startsWith(`${year}-${String(month).padStart(2, '0')}-`);
-		} else if (year) {
-			cacheKey = `${cacheKey}-${year}`;
-			filter = (timePeriod) => timePeriod.startsWith(`${year}-`);
-		} else if (month) {
-			cacheKey = `${cacheKey}-${month}`;
-			filter = (timePeriod) =>
-				timePeriod.includes(`-${String(month).padStart(2, '0')}-`);
-		} else {
-			filter = () => true;
-		}
-		monthlyStats = {
-			overall: monthlyStats.overall.filter(({ time_period }) =>
-				filter(time_period)
-			),
-			bySpecies: monthlyStats.bySpecies.filter(({ time_period }) =>
-				filter(time_period)
-			)
-		};
-	}
-	if (!limit) {
-		limit = Math.min(
-			DEFAULT_OPTIONS.limit,
-			Math.ceil(monthlyStats.overall.length / 4)
-		);
-	}
-	return generateHighlights({
-		cacheKey,
+	return getHighlightsByTemporalUnit({
 		temporalUnit: 'month',
-		stats: monthlyStats,
-		limit
+		groupId,
+		limit,
+		periodFilter
 	});
 }
 
@@ -376,7 +360,6 @@ export async function fetchDayHighlights(
 		periodFilter: monthPeriodFilter,
 		limit: 3
 	});
-	// parentTimeWindow
 	const allRelevantHighlights = [
 		...filterOutIrrelevantHighlights(allTimeDailyHighlights, timePeriod),
 		...filterOutIrrelevantHighlights(

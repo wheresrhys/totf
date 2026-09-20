@@ -4,111 +4,50 @@ import type { CoreStatsResult } from '@/app/models/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
 
+type TemporalUnit = 'day' | 'month' | 'year';
+
 export type RawStats = {
 	bySpecies: CoreStatsResult[];
 	overall: CoreStatsResult[];
 };
 
-export async function uncachedDailyCoreStats(
-	supabase: SupabaseClient,
-	viewedGroupId: number
+function getStatsRPCFetcher(
+	rpcName: string,
+	temporalUnit: TemporalUnit,
+	groupBySpecies: boolean = false
 ) {
-	return fetchAllPaginatedRows<CoreStatsResult>((fromRow, toRow) =>
-		supabase
-			.rpc('core_stats', {
-				ringing_group_filter: viewedGroupId,
-				group_by_time_period: 'day'
-			})
-			.order('time_period')
-			.order('species_name')
-			.range(fromRow, toRow)
-	);
+	return async (supabase: SupabaseClient, viewedGroupId: number) =>
+		fetchAllPaginatedRows<CoreStatsResult>((fromRow, toRow) => {
+			const request = supabase
+				.rpc(rpcName, {
+					ringing_group_filter: viewedGroupId,
+					group_by_species: groupBySpecies,
+					group_by_time_period: temporalUnit
+				})
+				.order('time_period');
+
+			return groupBySpecies
+				? request.order('species_name').range(fromRow, toRow)
+				: request.range(fromRow, toRow);
+		});
 }
 
-export async function uncachedDailySpeciesCoreStats(
-	supabase: SupabaseClient,
-	viewedGroupId: number
-) {
-	return fetchAllPaginatedRows<CoreStatsResult>((fromRow, toRow) =>
-		supabase
-			.rpc('core_stats', {
-				ringing_group_filter: viewedGroupId,
-				group_by_species: true,
-				group_by_time_period: 'day'
-			})
-			.order('time_period')
-			.order('species_name')
-			.range(fromRow, toRow)
-	);
-}
-
-export async function uncachedMonthlyCoreStats(
-	supabase: SupabaseClient,
-	viewedGroupId: number
-) {
-	return fetchAllPaginatedRows<CoreStatsResult>((fromRow, toRow) =>
-		supabase
-			.rpc('core_stats', {
-				ringing_group_filter: viewedGroupId,
-				group_by_time_period: 'month'
-			})
-			.order('time_period')
-			.order('species_name')
-			.range(fromRow, toRow)
-	);
-}
-
-export async function uncachedMonthlySpeciesCoreStats(
-	supabase: SupabaseClient,
-	viewedGroupId: number
-) {
-	return fetchAllPaginatedRows<CoreStatsResult>((fromRow, toRow) =>
-		supabase
-			.rpc('core_stats', {
-				ringing_group_filter: viewedGroupId,
-				group_by_species: true,
-				group_by_time_period: 'month'
-			})
-			.order('time_period')
-			.order('species_name')
-			.range(fromRow, toRow)
-	);
-}
-
-export async function fetchDailyStats(
+export async function getStatsByTemporalUnit(
+	temporalUnit: TemporalUnit,
 	viewedGroupId: number
 ): Promise<{ bySpecies: CoreStatsResult[]; overall: CoreStatsResult[] }> {
-	const [daily, dailySpecies] = await Promise.all([
+	const [overall, bySpecies] = await Promise.all([
 		cachedSupabaseFetch(
-			'daily-core-stats',
+			`${temporalUnit}-core-stats`,
 			viewedGroupId,
-			uncachedDailyCoreStats
+			getStatsRPCFetcher('core_stats', temporalUnit)
 		),
 		cachedSupabaseFetch(
-			'daily-species-core-stats',
+			`${temporalUnit}-species-core-stats`,
 			viewedGroupId,
-			uncachedDailySpeciesCoreStats
+			getStatsRPCFetcher('core_stats', temporalUnit, true)
 		)
 	]);
 
-	return { bySpecies: dailySpecies, overall: daily };
-}
-
-export async function fetchMonthlyStats(
-	viewedGroupId: number
-): Promise<{ bySpecies: CoreStatsResult[]; overall: CoreStatsResult[] }> {
-	const [monthly, monthlySpecies] = await Promise.all([
-		cachedSupabaseFetch(
-			'monthly-core-stats',
-			viewedGroupId,
-			uncachedMonthlyCoreStats
-		),
-		cachedSupabaseFetch(
-			'monthly-species-core-stats',
-			viewedGroupId,
-			uncachedMonthlySpeciesCoreStats
-		)
-	]);
-
-	return { bySpecies: monthlySpecies, overall: monthly };
+	return { bySpecies, overall };
 }
