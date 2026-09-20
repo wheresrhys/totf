@@ -213,13 +213,14 @@ both concerns for that PR:
      summary, with `#<pr-number>: ` (e.g. `#902: resolving merge conflict in
      generate-snapshots.ts`). The harness's live-status line renders this as an evolving one-line
      task summary; without the prefix the PR number that summary is *about* isn't visible in it.
-  1. **Copy local env config, if this is a fresh worktree** — if this step's worktree was just
-     created via `git worktree add` (not reused from an existing one), copy `.env.dev` from the
-     main checkout root before running any tests: `.env.dev` is gitignored, so a freshly created
-     worktree never has it, and `npm run qa` / the pre-push hook fail without it
-     (`SUPABASE_JWT_ROLE environment variable is not set`). Find the main checkout root via
-     `git rev-parse --path-format=absolute --git-common-dir` (its parent directory), then
-     `cp -n <that>/.env.dev .env.dev` (no-clobber, since a reused worktree may already have it).
+  1. **Copy local env config** — before running any tests, call
+     `mcp__swarm-tools__ensure_worktree_env` with `{ worktreePath: <this worktree's absolute
+     path> }`. `.env.dev` is gitignored, so a worktree just created via `git worktree add` never
+     has it, and `npm run qa` / the pre-push hook fail without it (`SUPABASE_JWT_ROLE environment
+     variable is not set`). The tool copies it in from the main checkout root, no-clobber, so it's
+     safe to call unconditionally whether this step's worktree is freshly created or reused (a
+     reused worktree that already has a `.env.dev` — possibly with different local state — is left
+     untouched).
   2. **Sync first, always** — regardless of `mergeable` status, `git fetch origin` then
      `git merge origin/main` (merge, not rebase — no force-push onto a shared branch) before any
      other step. GitHub's `mergeable` check only catches textual conflicts, not staleness on
@@ -427,11 +428,11 @@ For each selected issue, launch an Agent (default background, so they run in par
   self-reported progress/status text this worker produces during its run, including its final
   result summary, with `#<n>: ` (e.g. `#904: running affected summary/controls test files`), so
   the harness's live-status line keeps the ticket number visible alongside whatever it's currently
-  doing. Then, **first copy `.env.dev` from the main checkout root into this worktree** — isolation:
-  "worktree" creates a fresh git worktree, and `.env.dev` is gitignored so it's never carried
-  over; without it `npm run qa` / the pre-push hook fail with `SUPABASE_JWT_ROLE environment
-  variable is not set`. Find the main checkout root via `git rev-parse --path-format=absolute
-  --git-common-dir` (its parent directory), then `cp -n <that>/.env.dev .env.dev`. Then
+  doing. Then, **first call `mcp__swarm-tools__ensure_worktree_env`** with `{ worktreePath: <this
+  worktree's absolute path> }` — isolation: "worktree" creates a fresh git worktree, and
+  `.env.dev` is gitignored so it's never carried over; without it `npm run qa` / the pre-push hook
+  fail with `SUPABASE_JWT_ROLE environment variable is not set`. The tool copies `.env.dev` in
+  from the main checkout root, no-clobber. Then
   **`git fetch origin` and create the ticket branch off `origin/main`** (the
   worktree is cut from local `main`, which may be stale relative to origin — basing on
   `origin/main` picks up already-merged sibling tickets). Then, before starting any
@@ -659,6 +660,6 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
 - Keep `.claude/swarm-state.json` in sync with the live worker set on every spawn, completion,
   and halt — it's the only durable record of which agent id is working which branch.
 - Every freshly-created worktree (§1's `git worktree add`, or §3's `isolation: "worktree"`) gets
-  `.env.dev` copied in from the main checkout root before any tests run — it's gitignored so
-  worktree creation never carries it over, and without it `npm run qa`/the pre-push hook fail
-  (`SUPABASE_JWT_ROLE environment variable is not set`).
+  `.env.dev` copied in from the main checkout root via `mcp__swarm-tools__ensure_worktree_env`
+  before any tests run — it's gitignored so worktree creation never carries it over, and without
+  it `npm run qa`/the pre-push hook fail (`SUPABASE_JWT_ROLE environment variable is not set`).

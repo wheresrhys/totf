@@ -68,6 +68,7 @@ incrementally; current inventory:
 | `create_ticket` | `gh issue create` with labels + sub-issue linking, no shell-escaping/tempfile dance |
 | `link_ticket_dependencies` | Apply GitHub blocked-by links to an issue (one comma-joined `gh issue edit --add-blocked-by` call) — ticketify's dependency wiring |
 | `ensure_local_migrations_applied` | Catch a worktree's shared local Postgres up to the committed `supabase/migrations/` before DB-dependent work — fast-paths off a locked `.claude/swarm-migration-state.json` marker, only running `npx supabase migration up --local` when the marker is behind (#863). Called by `swarm` on every worktree spawn. |
+| `ensure_worktree_env` | Copy `.env.dev` from the main checkout root into a worktree, no-clobber — `.env.dev` is gitignored so a freshly created worktree never has it, causing `npm run qa`/the pre-push hook to fail with `SUPABASE_JWT_ROLE environment variable is not set`. Called by `swarm` on every worktree spawn, replacing what used to be manual `cp` prose a worker could skip or botch. |
 
 Use these tools for anything that touches `.claude/swarm-state.json`, creates a GitHub issue,
 derives a branch name, or extracts backfill DML — never reimplement the `jq`/glob/anchor-text
