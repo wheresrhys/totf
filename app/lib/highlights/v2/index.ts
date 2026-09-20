@@ -1,4 +1,8 @@
-import { fetchDailyStats, type RawStats } from '@/app/actions/highlights-data';
+import {
+	fetchDailyStats,
+	fetchMonthlyStats,
+	type RawStats
+} from '@/app/actions/highlights-data';
 import type { CoreStatsResult } from '@/app/models/db';
 const DEFAULT_OPTIONS = { limit: 3, threshold: 0 };
 export type OneBasedMonth = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
@@ -8,7 +12,7 @@ export type YearMonthRestriction = {
 	month?: OneBasedMonth;
 };
 export type HighlightUnit = 'bird' | 'species' | 'encounter';
-export type HighlightTemporalUnit = 'day' | 'month';
+export type HighlightTemporalUnit = 'day' | 'month' | 'year';
 type HighlightCategory = 'count' | 'rarity' | 'biometrics';
 type HighlightType = 'birds' | 'encounters' | 'species' | 'newBirds' | 'juvs';
 
@@ -247,6 +251,57 @@ export async function dailyHighlights({
 		cacheKey,
 		temporalUnit: 'day',
 		stats: dailyStats,
+		limit
+	});
+}
+
+export async function monthlyHighlights({
+	groupId,
+	limit,
+	periodFilter
+}: {
+	groupId: number;
+	limit?: number;
+	periodFilter?: YearMonthRestriction;
+}) {
+	let monthlyStats = await fetchMonthlyStats(groupId);
+	let cacheKey = `${groupId}-monthly`;
+	if (periodFilter) {
+		const { month, year } = periodFilter;
+		let filter: (timePeriod: string) => boolean;
+		if (year && month) {
+			cacheKey = `${cacheKey}-${year}-${month}`;
+			filter = (timePeriod) =>
+				timePeriod.startsWith(`${year}-${String(month).padStart(2, '0')}-`);
+		} else if (year) {
+			cacheKey = `${cacheKey}-${year}`;
+			filter = (timePeriod) => timePeriod.startsWith(`${year}-`);
+		} else if (month) {
+			cacheKey = `${cacheKey}-${month}`;
+			filter = (timePeriod) =>
+				timePeriod.includes(`-${String(month).padStart(2, '0')}-`);
+		} else {
+			filter = () => true;
+		}
+		monthlyStats = {
+			overall: monthlyStats.overall.filter(({ time_period }) =>
+				filter(time_period)
+			),
+			bySpecies: monthlyStats.bySpecies.filter(({ time_period }) =>
+				filter(time_period)
+			)
+		};
+	}
+	if (!limit) {
+		limit = Math.min(
+			DEFAULT_OPTIONS.limit,
+			Math.ceil(monthlyStats.overall.length / 4)
+		);
+	}
+	return generateHighlights({
+		cacheKey,
+		temporalUnit: 'month',
+		stats: monthlyStats,
 		limit
 	});
 }

@@ -42,6 +42,39 @@ export async function uncachedDailySpeciesCoreStats(
 	);
 }
 
+export async function uncachedMonthlyCoreStats(
+	supabase: SupabaseClient,
+	viewedGroupId: number
+) {
+	return fetchAllPaginatedRows<CoreStatsResult>((fromRow, toRow) =>
+		supabase
+			.rpc('core_stats', {
+				ringing_group_filter: viewedGroupId,
+				group_by_time_period: 'month'
+			})
+			.order('time_period')
+			.order('species_name')
+			.range(fromRow, toRow)
+	);
+}
+
+export async function uncachedMonthlySpeciesCoreStats(
+	supabase: SupabaseClient,
+	viewedGroupId: number
+) {
+	return fetchAllPaginatedRows<CoreStatsResult>((fromRow, toRow) =>
+		supabase
+			.rpc('core_stats', {
+				ringing_group_filter: viewedGroupId,
+				group_by_species: true,
+				group_by_time_period: 'month'
+			})
+			.order('time_period')
+			.order('species_name')
+			.range(fromRow, toRow)
+	);
+}
+
 export async function fetchDailyStats(
 	viewedGroupId: number
 ): Promise<{ bySpecies: CoreStatsResult[]; overall: CoreStatsResult[] }> {
@@ -59,4 +92,23 @@ export async function fetchDailyStats(
 	]);
 
 	return { bySpecies: dailySpecies, overall: daily };
+}
+
+export async function fetchMonthlyStats(
+	viewedGroupId: number
+): Promise<{ bySpecies: CoreStatsResult[]; overall: CoreStatsResult[] }> {
+	const [monthly, monthlySpecies] = await Promise.all([
+		cachedSupabaseFetch(
+			'monthly-core-stats',
+			viewedGroupId,
+			uncachedMonthlyCoreStats
+		),
+		cachedSupabaseFetch(
+			'monthly-species-core-stats',
+			viewedGroupId,
+			uncachedMonthlySpeciesCoreStats
+		)
+	]);
+
+	return { bySpecies: monthlySpecies, overall: monthly };
 }

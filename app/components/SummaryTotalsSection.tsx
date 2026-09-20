@@ -7,7 +7,7 @@ import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { fetchPeriodStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
-import { dailyHighlights } from '@/app/lib/highlights/v2';
+import { dailyHighlights, monthlyHighlights } from '@/app/lib/highlights/v2';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
@@ -290,8 +290,8 @@ export function SummaryTotalsSection({
 		}
 	);
 	const isHighlightsActive = activeTab === HIGHLIGHTS_TAB.id;
-	const fetchHighlightsData = useCallback(
-		async () =>
+	const fetchHighlightsData = useCallback(async () => {
+		const [daily, monthly] = await Promise.all([
 			dailyHighlights({
 				groupId: viewedGroup!.id,
 				periodFilter: {
@@ -299,8 +299,16 @@ export function SummaryTotalsSection({
 					month: month as OneBasedMonth
 				}
 			}),
-		[viewedGroup, year, month]
-	);
+			monthlyHighlights({
+				groupId: viewedGroup!.id,
+				periodFilter: {
+					year,
+					month: month as OneBasedMonth
+				}
+			})
+		]);
+		return [...daily, ...monthly];
+	}, [viewedGroup, year, month]);
 	const { data: highlightsData, isLoading: isHighlightsLoading } =
 		useLazyTabData(
 			isHighlightsActive && viewedGroup !== undefined,
@@ -466,7 +474,7 @@ export function SummaryTotalsSection({
 					<div>
 						{highlightsData &&
 							highlightsData.map((highlight) => (
-								<div key={highlight.type}>
+								<div key={`${highlight.type}-${highlight.temporalUnit}`}>
 									{printHighlightListPrefix(highlight)}:{' '}
 									<div className="flex gap-2">
 										{highlight.highlights.map(({ time_period, value }) => (
