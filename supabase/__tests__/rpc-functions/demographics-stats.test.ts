@@ -1420,4 +1420,148 @@ describe('demographics_stats', () => {
 			expect(data![0].adult_bird_count).toBe(0);
 		});
 	});
+
+	// Regression guards for the plan-stability rewrite of
+	// stats_bird_returning_age_bucket's adult_birds CTE (2026-09-20). A cell's
+	// period_year used to be attached to each of that cell's adult birds by a join
+	// on `py.species_id IS NOT DISTINCT FROM bab.species_id AND py.time_period IS
+	// NOT DISTINCT FROM bab.time_period`; it is now attached by
+	// MAX(period_year) OVER (PARTITION BY species_id, time_period) over a merged
+	// stream of cell rows and bird rows. Output is meant to be byte-for-byte
+	// unchanged, so every block above stays the primary guard, and the #932 block's
+	// multi-month query already pins per-cell attachment along the time_period axis.
+	//
+	// What no existing test pinned is the SPECIES axis with no time grouping at
+	// all. That is the one shape where a cell's period_year comes from the cell's
+	// own MAX(visit_date) rather than from its time_period, so a partition that
+	// leaked across species would silently stamp the latest species' year onto an
+	// earlier species' cell. The two tests below are the same two birds read as two
+	// cells and then as one: split by species each reads age 1, and merged into a
+	// single ungrouped cell the earlier bird reads 3_plus instead — so the first
+	// test cannot pass vacuously.
+	//
+	// Isolation: a throwaway group of its own, since these queries are unfiltered
+	// by species and must not see a concurrent worktree's rows.
+	describe('returning age buckets — per-cell period_year across the merged cell stream', () => {
+		let groupId: number;
+		let groupClient: SupabaseClient;
+		let earlyYear: number; // the Robin bird's only calendar year
+		let lateYear: number; // the Kingfisher bird's only calendar year, 4 years later
+		const birdIds: number[] = [];
+
+		beforeAll(async () => {
+			const testSuffix = randomTestSuffix();
+			groupId = createIsolatedGroup(`Returning Age Cells ${testSuffix}`);
+			groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+
+			earlyYear = parseInt(randomFutureDate().slice(0, 4), 10);
+			lateYear = earlyYear + 4;
+
+			const { data: location, error: locationError } = await groupClient
+				.from('Locations')
+				.insert({
+					location_name: `Returning Age Cells Loc ${testSuffix}`,
+					ringing_group_id: groupId
+				})
+				.select('id')
+				.single();
+			if (locationError) throw locationError;
+			const locationId = location!.id;
+
+			// One bird per species, each with a single precisely-aged adult encounter
+			// (age_code 5 -> max_hatch_year = visit year - 1, min_hatch_year likewise,
+			// so it is never carved out to 'new_unknown_age') in its own calendar year.
+			async function addBird(speciesName: string, year: number, ring: string) {
+				const { data: species, error: speciesError } = await supabase
+					.from('Species')
+					.select('id')
+					.eq('species_name', speciesName)
+					.single();
+				if (speciesError) throw speciesError;
+
+				const { data: session, error: sessionError } = await groupClient
+					.from('Sessions')
+					.insert({ visit_date: `${year}-05-15`, location_id: locationId })
+					.select('id')
+					.single();
+				if (sessionError) throw sessionError;
+
+				const { data: bird, error: birdError } = await groupClient
+					.from('Birds')
+					.insert({ ring_no: ring, species_id: species!.id })
+					.select('id')
+					.single();
+				if (birdError) throw birdError;
+				birdIds.push(bird!.id);
+
+				const { error: encounterError } = await groupClient
+					.from('Encounters')
+					.insert({
+						capture_time: '10:00:00',
+						scheme: 'BTO',
+						sex: 'M',
+						session_id: session!.id,
+						bird_id: bird!.id,
+						age_code: 5,
+						is_juv: false,
+						record_type: 'R'
+					});
+				if (encounterError) throw encounterError;
+			}
+
+			await addBird('Robin', earlyYear, `RETCELL-${testSuffix}-R`);
+			await addBird('Kingfisher', lateYear, `RETCELL-${testSuffix}-K`);
+		});
+
+		afterAll(() => {
+			psql(
+				`DELETE FROM "Encounters" WHERE ringing_group_id = ${groupId};` +
+					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+					`DELETE FROM "Sessions" WHERE ringing_group_id = ${groupId};` +
+					`DELETE FROM "Locations" WHERE ringing_group_id = ${groupId};` +
+					`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
+			);
+		});
+
+		// Structure
+		it('each species cell resolves its own period_year, so both birds read age 1', async () => {
+			const { data, error } = await groupClient.rpc('demographics_stats', {
+				ringing_group_filter: groupId,
+				group_by_species: true
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(2);
+			const bySpecies = Object.fromEntries(data!.map((row) => [row.species_name, row]));
+
+			// The earlier cell is the one a leaked period_year would break: read with
+			// the Kingfisher cell's year it would compute an age of 5, not 1.
+			expect(bySpecies['Robin']).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_1_bird_count: 1,
+				returning_age_2_bird_count: 0,
+				returning_age_3_plus_bird_count: 0,
+				returning_new_unknown_age_bird_count: 0
+			});
+			expect(bySpecies['Kingfisher']).toMatchObject({
+				adult_bird_count: 1,
+				returning_age_1_bird_count: 1,
+				returning_age_3_plus_bird_count: 0
+			});
+		});
+
+		it('the same two birds in one ungrouped cell share that cell’s period_year, so the earlier bird reads 3_plus', async () => {
+			const { data, error } = await groupClient.rpc('demographics_stats', {
+				ringing_group_filter: groupId
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(1);
+			expect(data![0]).toMatchObject({
+				adult_bird_count: 2,
+				returning_age_1_bird_count: 1,
+				returning_age_2_bird_count: 0,
+				returning_age_3_plus_bird_count: 1,
+				returning_new_unknown_age_bird_count: 0
+			});
+		});
+	});
 });
