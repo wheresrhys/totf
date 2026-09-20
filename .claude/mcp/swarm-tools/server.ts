@@ -7,6 +7,7 @@ import { registerCreateTicketTool } from './tools/create-ticket';
 import { registerSwarmPlanBatchTool } from './tools/swarm-plan-batch';
 import { registerLinkTicketDependenciesTool } from './tools/link-ticket-dependencies';
 import { registerEnsureLocalMigrationsAppliedTool } from './tools/ensure-local-migrations-applied';
+import { registerEnsureWorktreeEnvTool } from './tools/ensure-worktree-env';
 
 const server = new McpServer({
 	name: 'swarm-tools',
@@ -20,6 +21,7 @@ registerCreateTicketTool(server);
 registerSwarmPlanBatchTool(server);
 registerLinkTicketDependenciesTool(server);
 registerEnsureLocalMigrationsAppliedTool(server);
+registerEnsureWorktreeEnvTool(server);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
