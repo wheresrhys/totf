@@ -1,10 +1,12 @@
 import {
 	getStatsByTemporalUnit,
-	type RawStats
+	StatsRepository,
+	groupByColumn
 } from '@/app/actions/highlights-data';
 import { DEFAULT_OPTIONS, highlightRules } from './highlight-rules';
 import type { HighlightsOfType, YearMonthRestriction } from './types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import { CoreStatsResult } from '@/app/models/db';
 
 function applyLimitToHighlight(
 	highlightWrapper: HighlightsOfType,
@@ -47,7 +49,7 @@ function generateHighlightsFromStats({
 	parentTimeWindow,
 	cacheKey
 }: {
-	stats: RawStats;
+	stats: StatsRepository<CoreStatsResult>;
 	temporalUnit: TemporalUnit;
 	limit?: number;
 	parentTimeWindow?: YearMonthRestriction;
@@ -107,13 +109,17 @@ export async function getHighlightsByTemporalUnit({
 		} else {
 			filter = () => true;
 		}
+
+		const withSpecies = dailyStats.withSpecies.filter(({ time_period }) =>
+			filter(time_period)
+		);
+		const bySpecies = groupByColumn('species_name', withSpecies);
 		dailyStats = {
 			overall: dailyStats.overall.filter(({ time_period }) =>
 				filter(time_period)
 			),
-			bySpecies: dailyStats.bySpecies.filter(({ time_period }) =>
-				filter(time_period)
-			)
+			withSpecies,
+			bySpecies
 		};
 	}
 	if (!limit) {

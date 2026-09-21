@@ -1,8 +1,4 @@
-import type {
-	HighlightValue,
-	HighlightsGenerator,
-	TimePeriodedItem
-} from './types';
+import type { HighlightValue, HighlightsGenerator } from './types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { CoreStatsResult } from '@/app/models/db';
 
@@ -12,22 +8,25 @@ type HighlightFinderOptions = {
 	threshold?: number;
 };
 
-function sumProperties<T>(item: T, properties: (keyof T)[]) {
+function sumProperties(
+	item: CoreStatsResult,
+	properties: (keyof CoreStatsResult)[]
+) {
 	return properties.reduce(
 		(sum, property) => sum + ((item[property] as number) ?? 0),
 		0
 	);
 }
 
-function getTopByPropertiesSum<T extends TimePeriodedItem>(
-	properties: (keyof T)[],
+function getTopByPropertiesSum(
+	properties: (keyof CoreStatsResult)[],
 	options?: HighlightFinderOptions
-): (stats: T[]) => HighlightValue[] {
+): (stats: CoreStatsResult[]) => HighlightValue[] {
 	const { threshold } = {
 		...DEFAULT_OPTIONS,
 		...(options || {})
 	};
-	return (rawStats: T[]) =>
+	return (rawStats: CoreStatsResult[]) =>
 		rawStats
 			.map((item) => ({
 				timePeriod: item.time_period as string,
@@ -37,10 +36,10 @@ function getTopByPropertiesSum<T extends TimePeriodedItem>(
 			.sort((a, b) => b.value - a.value);
 }
 
-function getTopByProperty<T extends TimePeriodedItem>(
-	property: keyof T,
+function getTopByProperty(
+	property: keyof CoreStatsResult,
 	options?: HighlightFinderOptions
-): (stats: T[]) => HighlightValue[] {
+): (stats: CoreStatsResult[]) => HighlightValue[] {
 	return getTopByPropertiesSum([property], options);
 }
 
@@ -52,7 +51,7 @@ export const highlightRules: HighlightsGenerator[] = [
 			verb: 'Busiest',
 			category: 'count'
 		},
-		generator: getTopByProperty<CoreStatsResult>('bird_count')
+		generator: getTopByProperty('bird_count')
 	},
 	{
 		descriptor: {
@@ -61,7 +60,7 @@ export const highlightRules: HighlightsGenerator[] = [
 			verb: 'Most encounters per',
 			category: 'count'
 		},
-		generator: getTopByProperty<CoreStatsResult>('encounter_count'),
+		generator: getTopByProperty('encounter_count'),
 		condition: (temporalUnit: TemporalUnit) => temporalUnit !== 'day'
 	},
 	{
@@ -71,7 +70,7 @@ export const highlightRules: HighlightsGenerator[] = [
 			verb: 'Most varied',
 			category: 'count'
 		},
-		generator: getTopByProperty<CoreStatsResult>('species_count')
+		generator: getTopByProperty('species_count')
 	},
 	{
 		descriptor: {
@@ -80,7 +79,7 @@ export const highlightRules: HighlightsGenerator[] = [
 			unit: 'bird',
 			verb: 'Most new birds in a'
 		},
-		generator: getTopByProperty<CoreStatsResult>('new_bird_count')
+		generator: getTopByProperty('new_bird_count')
 	},
 	{
 		descriptor: {
@@ -89,7 +88,7 @@ export const highlightRules: HighlightsGenerator[] = [
 			unit: 'bird',
 			verb: 'Most juveniles in a'
 		},
-		generator: getTopByPropertiesSum<CoreStatsResult>([
+		generator: getTopByPropertiesSum([
 			'pullus_bird_count',
 			'juv_bird_count',
 			'postjuv_bird_count'

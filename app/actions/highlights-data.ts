@@ -5,11 +5,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 
-export type RawStats = {
-	bySpecies: CoreStatsResult[];
-	overall: CoreStatsResult[];
-};
-
 function getStatsRPCFetcher(
 	rpcName: string,
 	temporalUnit: TemporalUnit,
@@ -31,11 +26,32 @@ function getStatsRPCFetcher(
 		});
 }
 
+export function groupByColumn<T>(
+	column: keyof T,
+	rows: T[]
+): Record<string, T[]> {
+	const aggregator: Record<string, T[]> = {};
+	rows.forEach((row: T) => {
+		const groupKey = row[column] as string;
+		if (!(groupKey in aggregator)) {
+			aggregator[groupKey] = [];
+		}
+		aggregator[groupKey].push(row);
+	});
+	return aggregator;
+}
+
+export type StatsRepository<T> = {
+	overall: T[];
+	withSpecies: T[];
+	bySpecies: Record<string, T[]>;
+};
+
 export async function getStatsByTemporalUnit(
 	temporalUnit: TemporalUnit,
 	viewedGroupId: number
-): Promise<{ bySpecies: CoreStatsResult[]; overall: CoreStatsResult[] }> {
-	const [overall, bySpecies] = await Promise.all([
+): Promise<StatsRepository<CoreStatsResult>> {
+	const [overall, withSpecies] = await Promise.all([
 		cachedSupabaseFetch(
 			`${temporalUnit}-core-stats`,
 			viewedGroupId,
@@ -48,5 +64,9 @@ export async function getStatsByTemporalUnit(
 		)
 	]);
 
-	return { bySpecies, overall };
+	return {
+		overall,
+		withSpecies,
+		bySpecies: groupByColumn('species_name', withSpecies)
+	};
 }
