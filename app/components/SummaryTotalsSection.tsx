@@ -25,7 +25,7 @@ import {
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
-import type { OneBasedMonth } from '@/app/lib/highlights/v2/index';
+import type { OneBasedMonth } from '@/app/lib/highlights/v2/types';
 import { printHighlightListPrefix } from '@/app/lib/highlights/v2/sentence-builders';
 import { StatOutput } from '@/app/components/shared/StatOutput';
 

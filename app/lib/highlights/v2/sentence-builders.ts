@@ -4,7 +4,7 @@ import type {
 	HighlightTemporalUnit,
 	HighlightInContext,
 	YearMonthRestriction
-} from './';
+} from './types';
 
 const fullMonthNames = [
 	undefined,
@@ -54,6 +54,10 @@ function prettyPrintPosition(position: number) {
 			return 'Second';
 		case 3:
 			return 'Third';
+		case 4:
+			return 'Fourth';
+		case 5:
+			return 'Fifth';
 		default:
 			throw new Error('Should not be showing anything worse than 3rd best');
 	}

@@ -21,7 +21,7 @@ import {
 	renderSentence
 } from '@/app/components/highlights/shared/render-sentence';
 
-import type { HighlightInContext } from '@/app/lib/highlights/v2/index';
+import type { HighlightInContext } from '@/app/lib/highlights/v2/types';
 import { printSingleHighlightSentence } from '@/app/lib/highlights/v2/sentence-builders';
 // ---- copy builders ----
 

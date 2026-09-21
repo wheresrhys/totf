@@ -6,10 +6,9 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { fetchSessionHighlights } from '@/app/actions/session-highlights';
 
-import {
-	fetchDayHighlights,
-	type HighlightInContext
-} from '@/app/lib/highlights/v2/index';
+import { fetchDayHighlights } from '@/app/lib/highlights/v2/index';
+
+import { type HighlightInContext } from '@/app/lib/highlights/v2/types';
 import {
 	renderRarityHighlight,
 	RARITY_HIGHLIGHT_RENDERERS,

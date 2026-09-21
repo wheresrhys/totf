@@ -1,4 +1,8 @@
-import type { Highlight, HighlightsOfType, HighlightTemporalUnit } from './';
+import type {
+	Highlight,
+	HighlightsOfType,
+	HighlightTemporalUnit
+} from './types';
 import type { CoreStatsResult } from '@/app/models/db';
 
 export const DEFAULT_OPTIONS = { limit: 3, threshold: 0 };
