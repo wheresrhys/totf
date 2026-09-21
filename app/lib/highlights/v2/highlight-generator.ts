@@ -1,0 +1,132 @@
+import {
+	getStatsByTemporalUnit,
+	type RawStats
+} from '@/app/actions/highlights-data';
+import { DEFAULT_OPTIONS, highlightRules } from './highlight-rules';
+import type { HighlightsOfType, YearMonthRestriction } from './types';
+import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+
+function applyLimitToHighlight(
+	highlightWrapper: HighlightsOfType,
+	limit: number
+): HighlightsOfType {
+	if (highlightWrapper.values.length < limit) {
+		return {
+			...highlightWrapper
+		};
+	}
+	const boundaryValue = highlightWrapper.values[limit - 1].value;
+	const itemsIncludingTies =
+		highlightWrapper.values.findLastIndex(
+			({ value }) => value === boundaryValue
+		) + 1;
+	return {
+		...highlightWrapper,
+		values: highlightWrapper.values.slice(0, itemsIncludingTies)
+	};
+}
+
+function applyLimitToHighlights(highlights: HighlightsOfType[], limit: number) {
+	return highlights.map((highlightWrapper) =>
+		applyLimitToHighlight(highlightWrapper, limit)
+	);
+}
+
+//TODO do something to clear cache when logging out
+
+const cache: Map<string, HighlightsOfType[]> = new Map();
+
+function isHighlightsOfType(item: unknown): item is HighlightsOfType {
+	return Boolean(item);
+}
+
+function generateHighlightsFromStats({
+	stats,
+	limit,
+	temporalUnit,
+	parentTimeWindow,
+	cacheKey
+}: {
+	stats: RawStats;
+	temporalUnit: TemporalUnit;
+	limit?: number;
+	parentTimeWindow?: YearMonthRestriction;
+	cacheKey: string;
+}): HighlightsOfType[] {
+	let unboundedHighlights: HighlightsOfType[];
+	if (cache.has(cacheKey)) {
+		unboundedHighlights = cache.get(cacheKey) as HighlightsOfType[];
+	} else {
+		unboundedHighlights = highlightRules
+			.map((rule) => {
+				if (rule.condition && !rule.condition(temporalUnit)) return null;
+				const highlights: HighlightsOfType = {
+					...rule,
+					scope: { temporalUnit, parentTimeWindow: parentTimeWindow },
+					values: rule.generator(stats.overall)
+				};
+				return highlights;
+			})
+			.filter(isHighlightsOfType);
+
+		cache.set(cacheKey, unboundedHighlights);
+	}
+	return applyLimitToHighlights(
+		unboundedHighlights,
+		limit || DEFAULT_OPTIONS.limit
+	);
+}
+
+export async function getHighlightsByTemporalUnit({
+	temporalUnit,
+	groupId,
+	limit,
+	parentTimeWindow
+}: {
+	temporalUnit: TemporalUnit;
+	groupId: number;
+	limit?: number;
+	parentTimeWindow?: YearMonthRestriction;
+}) {
+	let dailyStats = await getStatsByTemporalUnit(temporalUnit, groupId);
+	let cacheKey = `${groupId}-${temporalUnit}`;
+	if (parentTimeWindow) {
+		const { month, year } = parentTimeWindow;
+		let filter: (timePeriod: string) => boolean;
+		if (year && month) {
+			cacheKey = `${cacheKey}-${year}-${month}`;
+			filter = (timePeriod) =>
+				timePeriod.startsWith(`${year}-${String(month).padStart(2, '0')}-`);
+		} else if (year) {
+			cacheKey = `${cacheKey}-${year}`;
+			filter = (timePeriod) => timePeriod.startsWith(`${year}-`);
+		} else if (month) {
+			cacheKey = `${cacheKey}-${month}`;
+			filter = (timePeriod) =>
+				timePeriod.includes(`-${String(month).padStart(2, '0')}-`);
+		} else {
+			filter = () => true;
+		}
+		dailyStats = {
+			overall: dailyStats.overall.filter(({ time_period }) =>
+				filter(time_period)
+			),
+			bySpecies: dailyStats.bySpecies.filter(({ time_period }) =>
+				filter(time_period)
+			)
+		};
+	}
+	if (!limit) {
+		limit = Math.min(
+			DEFAULT_OPTIONS.limit,
+			Math.ceil(dailyStats.overall.length / 4)
+		);
+	}
+	return generateHighlightsFromStats({
+		cacheKey,
+		temporalUnit,
+		parentTimeWindow,
+		stats: dailyStats,
+		limit
+	});
+}

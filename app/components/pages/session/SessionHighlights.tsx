@@ -6,7 +6,7 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import { fetchSessionHighlights } from '@/app/actions/session-highlights';
 
-import { fetchDayHighlights } from '@/app/lib/highlights/v2/index';
+import { sessionHighlights } from '@/app/lib/highlights/v2/session-highlights';
 
 import { type CombinedHighlights } from '@/app/lib/highlights/v2/types';
 import {
@@ -82,8 +82,7 @@ export function SessionHighlights({
 		setStatus('loading');
 
 		Promise.all([
-			fetchDayHighlights(viewedGroupId, date),
-
+			sessionHighlights(viewedGroupId, date),
 			fetchSessionHighlights({ date, viewedGroupId })
 		])
 			.then(([fetchedV2, fetchedV1]) => {
