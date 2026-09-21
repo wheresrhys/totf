@@ -473,7 +473,9 @@ export function SummaryTotalsSection({
 					<div>
 						{highlightsData &&
 							highlightsData.map((highlight) => (
-								<div key={`${highlight.type}-${highlight.scope.temporalUnit}`}>
+								<div
+									key={`${highlight.descriptor.type}-${highlight.scope.temporalUnit}`}
+								>
 									{printHighlightListPrefix(highlight)}:{' '}
 									<div className="flex gap-2">
 										{highlight.values.map(({ timePeriod, value }) => (

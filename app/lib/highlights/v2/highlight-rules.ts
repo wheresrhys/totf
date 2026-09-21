@@ -1,16 +1,12 @@
-import type { HighlightValue, HighlightContext } from './types';
+import type {
+	HighlightValue,
+	HighlightsGenerator,
+	TimePeriodedItem
+} from './types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { CoreStatsResult } from '@/app/models/db';
 
 export const DEFAULT_OPTIONS = { limit: 3, threshold: 0 };
-
-type HighlightsGenerator = HighlightContext & {
-	generator: (stats: CoreStatsResult[]) => HighlightValue[];
-	condition?: (temporalUnit: TemporalUnit) => boolean;
-};
-interface TimePeriodedItem {
-	time_period: string | null;
-}
 
 type HighlightFinderOptions = {
 	threshold?: number;
@@ -50,39 +46,49 @@ function getTopByProperty<T extends TimePeriodedItem>(
 
 export const highlightRules: HighlightsGenerator[] = [
 	{
-		type: 'birds',
-		unit: 'bird',
-		verb: 'Busiest',
-		category: 'count',
+		descriptor: {
+			type: 'birds',
+			unit: 'bird',
+			verb: 'Busiest',
+			category: 'count'
+		},
 		generator: getTopByProperty<CoreStatsResult>('bird_count')
 	},
 	{
-		type: 'encounters',
-		unit: 'encounter',
-		verb: 'Most encounters per',
-		category: 'count',
+		descriptor: {
+			type: 'encounters',
+			unit: 'encounter',
+			verb: 'Most encounters per',
+			category: 'count'
+		},
 		generator: getTopByProperty<CoreStatsResult>('encounter_count'),
 		condition: (temporalUnit: TemporalUnit) => temporalUnit !== 'day'
 	},
 	{
-		type: 'species',
-		unit: 'species',
-		verb: 'Most varied',
-		category: 'count',
+		descriptor: {
+			type: 'species',
+			unit: 'species',
+			verb: 'Most varied',
+			category: 'count'
+		},
 		generator: getTopByProperty<CoreStatsResult>('species_count')
 	},
 	{
-		type: 'newBirds',
-		category: 'count',
-		unit: 'bird',
-		verb: 'Most new birds in a',
+		descriptor: {
+			type: 'newBirds',
+			category: 'count',
+			unit: 'bird',
+			verb: 'Most new birds in a'
+		},
 		generator: getTopByProperty<CoreStatsResult>('new_bird_count')
 	},
 	{
-		type: 'juvs',
-		category: 'count',
-		unit: 'bird',
-		verb: 'Most juveniles in a',
+		descriptor: {
+			type: 'juvs',
+			category: 'count',
+			unit: 'bird',
+			verb: 'Most juveniles in a'
+		},
 		generator: getTopByPropertiesSum<CoreStatsResult>([
 			'pullus_bird_count',
 			'juv_bird_count',

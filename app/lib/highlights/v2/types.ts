@@ -1,8 +1,12 @@
+import type { CoreStatsResult } from '@/app/models/db';
 import type {
 	TemporalUnit,
 	StatUnit
 } from '@/app/components/shared/StatOutput';
 
+export interface TimePeriodedItem {
+	time_period: string | null;
+}
 export type YearMonthRestriction = {
 	year?: number;
 	month?: number;
@@ -14,7 +18,7 @@ export type HighlightValue = {
 	value: number;
 };
 
-export type HighlightContext = {
+export type HighlightDescriptor = {
 	category: HighlightCategory;
 	type: string;
 	verb: string;
@@ -26,20 +30,37 @@ type HighlightScope = {
 	parentTimeWindow?: YearMonthRestriction;
 };
 
-export type HighlightsOfType = HighlightContext & {
+export type HighlightsOfType = {
+	descriptor: HighlightDescriptor;
 	scope: HighlightScope;
 	values: HighlightValue[];
 };
 
-type HighlightRankingContext = {
+type HighlightRanking = {
 	highlightIndex: number;
 	siblingHighlights: HighlightValue[];
 	position: number;
 	isTied: boolean;
 };
 
-export type CherryPickedHighlight = HighlightContext & {
+export type CherryPickedHighlight = {
+	descriptor: HighlightDescriptor;
 	scope: HighlightScope;
 	value: HighlightValue;
-	ranking: HighlightRankingContext;
+	ranking: HighlightRanking;
+};
+
+export type CombinedHighlights = {
+	descriptor: HighlightDescriptor;
+	value: HighlightValue;
+	scopes: {
+		scope: HighlightScope;
+		ranking: HighlightRanking;
+	}[];
+};
+
+export type HighlightsGenerator = {
+	descriptor: HighlightDescriptor;
+	generator: (stats: CoreStatsResult[]) => HighlightValue[];
+	condition?: (temporalUnit: TemporalUnit) => boolean;
 };

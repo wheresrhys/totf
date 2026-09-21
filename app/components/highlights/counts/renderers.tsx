@@ -21,8 +21,8 @@ import {
 	renderSentence
 } from '@/app/components/highlights/shared/render-sentence';
 
-import type { CherryPickedHighlight } from '@/app/lib/highlights/v2/types';
-import { printSingleHighlightSentence } from '@/app/lib/highlights/v2/sentence-builders';
+import type { CombinedHighlights } from '@/app/lib/highlights/v2/types';
+import { printMultipleHighlightSentence } from '@/app/lib/highlights/v2/sentence-builders';
 // ---- copy builders ----
 
 type PeriodFields = {
@@ -264,14 +264,10 @@ export function renderCountHighlight(highlight: CountHighlight): ReactElement {
 	return render(highlight);
 }
 
-export function renderV2Highlight(
-	highlight: CherryPickedHighlight
-): ReactElement {
+export function renderV2Highlight(highlight: CombinedHighlights): ReactElement {
 	return (
-		<li
-			key={`v2-${highlight.type}-${highlight.scope.parentTimeWindow?.year ?? 'any'}-${highlight.scope.parentTimeWindow?.month ?? 'any'}`}
-		>
-			{printSingleHighlightSentence(highlight)}
+		<li key={`v2-${highlight.descriptor.type}`}>
+			{printMultipleHighlightSentence(highlight)}
 		</li>
 	);
 }

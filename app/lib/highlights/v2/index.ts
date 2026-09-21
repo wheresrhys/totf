@@ -7,7 +7,9 @@ import type {
 	HighlightsOfType,
 	CherryPickedHighlight,
 	YearMonthRestriction,
-	HighlightValue
+	HighlightDescriptor,
+	HighlightValue,
+	CombinedHighlights
 } from './types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 function applyLimitToHighlight(
@@ -214,10 +216,71 @@ function filterOutIrrelevantHighlights(
 	return relevantHighlights;
 }
 
+function descriptorToString(descriptor: HighlightDescriptor): string {
+	return (Object.keys(descriptor) as (keyof HighlightDescriptor)[])
+		.sort()
+		.map((key) => String(descriptor[key]))
+		.join(':');
+}
+
+function timeWindowToNumber(
+	timeWindow: YearMonthRestriction | undefined
+): number {
+	if (timeWindow?.month) return 10;
+	if (timeWindow?.year) return 1;
+	return 100;
+}
+
+function combineSimilarHighlights(
+	highlights: CherryPickedHighlight[]
+): CombinedHighlights[] {
+	const groupedByDescriptor: Map<string, CherryPickedHighlight[]> = new Map();
+	highlights.forEach((highlight) => {
+		const mapKey = descriptorToString(highlight.descriptor);
+		if (groupedByDescriptor.has(mapKey)) {
+			groupedByDescriptor.get(mapKey)?.push(highlight);
+		} else {
+			groupedByDescriptor.set(mapKey, [highlight]);
+		}
+	});
+
+	return [...groupedByDescriptor.values()].map((highlights) => {
+		highlights.sort(
+			(
+				{
+					scope: { parentTimeWindow: windowA },
+					ranking: { position: positionA, isTied: isTiedA }
+				},
+				{
+					scope: { parentTimeWindow: windowB },
+					ranking: { position: positionB, isTied: isTiedB }
+				}
+			): number => {
+				if (positionA === positionB) {
+					const windowAScore = timeWindowToNumber(windowA);
+					const windowBScore = timeWindowToNumber(windowB);
+					return windowBScore - windowAScore;
+					// return isTiedA ? 1 : -1;
+				} else {
+					return positionA - positionB;
+				}
+			}
+		);
+		return {
+			descriptor: highlights[0].descriptor,
+			value: highlights[0].value,
+			scopes: highlights.map((highlight) => ({
+				scope: highlight.scope,
+				ranking: highlight.ranking
+			}))
+		};
+	});
+}
+
 export async function fetchDayHighlights(
 	groupId: number,
 	timePeriod: string
-): Promise<CherryPickedHighlight[]> {
+): Promise<CombinedHighlights[]> {
 	const yearPeriodFilter = { year: Number(timePeriod.split('-')[0]) };
 	const monthPeriodFilter = {
 		month: Number(timePeriod.split('-')[1])
@@ -253,8 +316,9 @@ export async function fetchDayHighlights(
 		if (highlight.scope.parentTimeWindow) {
 			const isClobbered = allRelevantHighlights.some(
 				(potentialClobber) =>
-					potentialClobber.type === highlight.type &&
-					potentialClobber.category === highlight.category &&
+					potentialClobber.descriptor.type === highlight.descriptor.type &&
+					potentialClobber.descriptor.category ===
+						highlight.descriptor.category &&
 					!potentialClobber.scope.parentTimeWindow &&
 					!(highlight.ranking.position < potentialClobber.ranking.position) &&
 					!(
@@ -268,8 +332,16 @@ export async function fetchDayHighlights(
 			return true;
 		}
 	});
-	return filteredHighlights.toSorted((a, b) => {
-		if (a.category + a.type === b.category + b.type) return 0;
-		return a.category + a.type > b.category + b.type ? 1 : -1;
+
+	return combineSimilarHighlights(filteredHighlights).toSorted((a, b) => {
+		if (
+			a.descriptor.category + a.descriptor.type ===
+			b.descriptor.category + b.descriptor.type
+		)
+			return 0;
+		return a.descriptor.category + a.descriptor.type >
+			b.descriptor.category + b.descriptor.type
+			? 1
+			: -1;
 	});
 }

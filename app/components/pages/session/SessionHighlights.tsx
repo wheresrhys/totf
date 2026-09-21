@@ -8,7 +8,7 @@ import { fetchSessionHighlights } from '@/app/actions/session-highlights';
 
 import { fetchDayHighlights } from '@/app/lib/highlights/v2/index';
 
-import { type CherryPickedHighlight } from '@/app/lib/highlights/v2/types';
+import { type CombinedHighlights } from '@/app/lib/highlights/v2/types';
 import {
 	renderRarityHighlight,
 	RARITY_HIGHLIGHT_RENDERERS,
@@ -28,7 +28,7 @@ import type { SessionEncounter } from '@/app/models/session';
 
 type HighlightsData = {
 	v1: SessionHighlight[];
-	v2: CherryPickedHighlight[];
+	v2: CombinedHighlights[];
 };
 // Each group's own renderer map (from the barrel) is the single source of
 // truth for which highlight `type`s belong to that group — reusing its keys
