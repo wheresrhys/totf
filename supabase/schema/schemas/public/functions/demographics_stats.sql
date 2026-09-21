@@ -33,7 +33,18 @@ CREATE FUNCTION public.demographics_stats (
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
 	group_by_time_period text DEFAULT NULL::text
-) RETURNS SETOF public.demographics_stats_result LANGUAGE plpgsql AS $function$
+) RETURNS SETOF public.demographics_stats_result LANGUAGE plpgsql
+-- Replan on every call instead of letting the plan cache go generic on the 6th
+-- execution in a pooled backend. #952 removed the single worst generic-plan offender
+-- from this RPC's plumbing (stats_bird_returning_age_bucket's unplannable
+-- IS NOT DISTINCT FROM join, 77,000ms -> 1,100ms), but the cliff itself survived that
+-- fix: this RPC's own spine joins are still keyed by group_by_species /
+-- group_by_time_period, so the generic plan still degrades them to nested-loop join
+-- filters. Re-measured on a 160k-encounter synthetic fixture AFTER #952: group-wide
+-- monthly ran ~10,200ms for executions 1-5 and ~53,400ms from execution 6 onward. See
+-- core_stats.sql's copy of this comment for the full mechanism, and CLAUDE.md.
+SET
+	plan_cache_mode TO 'force_custom_plan' AS $function$
   BEGIN
   RETURN QUERY
   -- jsonb_populate_record is evaluated via CROSS JOIN LATERAL (once per outer

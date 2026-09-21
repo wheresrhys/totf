@@ -26,7 +26,15 @@ CREATE FUNCTION public.arrivals_stats (
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
 	group_by_time_period text DEFAULT NULL::text
-) RETURNS SETOF public.arrivals_stats_result LANGUAGE plpgsql AS $function$
+) RETURNS SETOF public.arrivals_stats_result LANGUAGE plpgsql
+-- Replan on every call instead of letting the plan cache go generic on the 6th
+-- execution in a pooled backend — this RPC's join shape depends on group_by_species /
+-- group_by_time_period, so no single generic plan can serve it. Measured on a
+-- 160k-encounter synthetic fixture: group-wide monthly ran 155ms for executions 1-5 and
+-- 945ms from execution 6 onward (group-wide by day: 253ms -> 2,366ms). See
+-- core_stats.sql's copy of this comment for the full mechanism, and CLAUDE.md.
+SET
+	plan_cache_mode TO 'force_custom_plan' AS $function$
   BEGIN
   RETURN QUERY
   -- jsonb_populate_record is evaluated via CROSS JOIN LATERAL (once per outer

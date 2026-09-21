@@ -295,6 +295,31 @@ execution 6 onward**; after the rewrite, 520ms and 1,110ms. Keep this in mind fo
 plpgsql RPC: a shape that is merely *lucky* under a custom plan is guaranteed to be tested under a
 generic one.
 
+**Every plpgsql RPC in this family now declares `SET plan_cache_mode TO 'force_custom_plan'`
+(2026-09-20) — keep it there, and put it on any new one.** An audit of the other three functions,
+prompted by the accidental discovery above, found the cliff is not specific to
+`stats_bird_returning_age_bucket`'s join: it is inherent to the whole family. These RPCs are
+parameterized by the **shape** of their own query, not just by filter values — `group_by_species`
+and `group_by_time_period` decide which columns the spine join is keyed on — so the join condition
+that constant-folds into a hashable/mergeable equality under a custom plan degrades, under a generic
+plan, into an OR of parameter-guarded equalities the planner can only run as a **nested-loop join
+filter**. Worse, the generic plan *costs less on paper* (measured on `biometrics_stats`: generic
+cost 20,910 / actual 32,112ms, custom cost 7,788,010 / actual 313ms, with 282,674,732 rows removed
+by the join filter), because `stats_spine` is a non-inlinable SQL SRF the planner estimates at its
+1,000-row default — so `plan_cache_mode = auto` adopts it eagerly. Measured on a 160k-encounter /
+4-group / 4,000-bird / 60-species synthetic fixture, executions 1-5 vs 6-8 of the same call in one
+session: `biometrics_stats` group-wide monthly 157ms → **10,335ms**, group-wide daily 193ms →
+**22,676ms**; `arrivals_stats` group-wide monthly 155ms → 945ms; `demographics_stats` group-wide
+monthly ~10,200ms → **~53,400ms** *after* #952's rewrite. `core_stats` does not cliff under
+homogeneous group-wide traffic (its generic plan happens to price above the custom average for that
+shape) but does through the most ordinary route there is: five cheap ungrouped calls on one pooled
+backend flip the cache to generic, and the next group-wide monthly call then takes **44,205ms
+instead of 437ms**, for the life of the connection. Forcing custom plans costs nothing measurable —
+planning is single-digit milliseconds against hundreds of milliseconds of execution, and executions
+1-5 were always custom plans anyway. Don't "optimise" it away, and don't try to fix this by
+restructuring the joins instead: sentinel-keyed equality joins would make the generic plan
+*tolerable*, but no single plan can be right for a query whose shape is a parameter.
+
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
 two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
 counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
