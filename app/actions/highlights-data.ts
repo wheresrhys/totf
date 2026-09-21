@@ -3,8 +3,7 @@ import { fetchAllPaginatedRows } from '@/lib/supabase';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
-
-type TemporalUnit = 'day' | 'month' | 'year';
+import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 
 export type RawStats = {
 	bySpecies: CoreStatsResult[];

@@ -1,44 +1,45 @@
-export type OneBasedMonth = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+import type {
+	TemporalUnit,
+	StatUnit
+} from '@/app/components/shared/StatOutput';
 
 export type YearMonthRestriction = {
 	year?: number;
-	month?: OneBasedMonth;
+	month?: number;
 };
-export type HighlightUnit = 'bird' | 'species' | 'encounter';
-export type HighlightTemporalUnit = 'day' | 'month' | 'year';
 export type HighlightCategory = 'count' | 'rarity' | 'biometrics';
-export type HighlightType =
-	| 'birds'
-	| 'encounters'
-	| 'species'
-	| 'newBirds'
-	| 'juvs';
 
-export type Highlight = {
-	time_period: string;
-	value: number;
-};
-
-export type HighlightsOfType = {
-	type: HighlightType;
-	verb: string;
-	temporalUnit: HighlightTemporalUnit;
-	unit: HighlightUnit;
-	category: HighlightCategory;
-	highlights: Highlight[];
-};
-
-export type HighlightInContext = {
-	type: HighlightType;
-	parentTimeWindow?: YearMonthRestriction;
-	verb: string;
-	temporalUnit: HighlightTemporalUnit;
-	unit: HighlightUnit;
-	category: HighlightCategory;
-	highlightIndex: number;
-	siblingHighlights: Highlight[];
-	value: number;
+export type HighlightValue = {
 	timePeriod: string;
+	value: number;
+};
+
+export type HighlightContext = {
+	category: HighlightCategory;
+	type: string;
+	verb: string;
+	unit: StatUnit;
+};
+
+type HighlightScope = {
+	temporalUnit: TemporalUnit;
+	parentTimeWindow?: YearMonthRestriction;
+};
+
+export type HighlightsOfType = HighlightContext & {
+	scope: HighlightScope;
+	values: HighlightValue[];
+};
+
+type HighlightRankingContext = {
+	highlightIndex: number;
+	siblingHighlights: HighlightValue[];
 	position: number;
 	isTied: boolean;
+};
+
+export type CherryPickedHighlight = HighlightContext & {
+	scope: HighlightScope;
+	value: HighlightValue;
+	ranking: HighlightRankingContext;
 };

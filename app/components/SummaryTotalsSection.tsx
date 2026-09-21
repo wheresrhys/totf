@@ -25,7 +25,6 @@ import {
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
-import type { OneBasedMonth } from '@/app/lib/highlights/v2/types';
 import { printHighlightListPrefix } from '@/app/lib/highlights/v2/sentence-builders';
 import { StatOutput } from '@/app/components/shared/StatOutput';
 
@@ -296,14 +295,14 @@ export function SummaryTotalsSection({
 				groupId: viewedGroup!.id,
 				periodFilter: {
 					year,
-					month: month as OneBasedMonth
+					month: month
 				}
 			}),
 			monthlyHighlights({
 				groupId: viewedGroup!.id,
 				periodFilter: {
 					year,
-					month: month as OneBasedMonth
+					month: month
 				}
 			})
 		]);
@@ -474,14 +473,14 @@ export function SummaryTotalsSection({
 					<div>
 						{highlightsData &&
 							highlightsData.map((highlight) => (
-								<div key={`${highlight.type}-${highlight.temporalUnit}`}>
+								<div key={`${highlight.type}-${highlight.scope.temporalUnit}`}>
 									{printHighlightListPrefix(highlight)}:{' '}
 									<div className="flex gap-2">
-										{highlight.highlights.map(({ time_period, value }) => (
-											<span className="badge badge-outline" key={time_period}>
+										{highlight.values.map(({ timePeriod, value }) => (
+											<span className="badge badge-outline" key={timePeriod}>
 												<StatOutput
-													visitDate={time_period}
-													temporalUnit={highlight.temporalUnit}
+													visitDate={timePeriod}
+													temporalUnit={highlight.scope.temporalUnit}
 													value={value}
 													viewedGroup={viewedGroup}
 												/>

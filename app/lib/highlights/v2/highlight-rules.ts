@@ -1,18 +1,12 @@
-import type {
-	Highlight,
-	HighlightsOfType,
-	HighlightTemporalUnit
-} from './types';
+import type { HighlightValue, HighlightContext } from './types';
+import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { CoreStatsResult } from '@/app/models/db';
 
 export const DEFAULT_OPTIONS = { limit: 3, threshold: 0 };
 
-type HighlightsGenerator = Omit<
-	HighlightsOfType,
-	'highlights' | 'temporalUnit'
-> & {
-	generator: (stats: CoreStatsResult[]) => Highlight[];
-	condition?: (temporalUnit: HighlightTemporalUnit) => boolean;
+type HighlightsGenerator = HighlightContext & {
+	generator: (stats: CoreStatsResult[]) => HighlightValue[];
+	condition?: (temporalUnit: TemporalUnit) => boolean;
 };
 interface TimePeriodedItem {
 	time_period: string | null;
@@ -32,7 +26,7 @@ function sumProperties<T>(item: T, properties: (keyof T)[]) {
 function getTopByPropertiesSum<T extends TimePeriodedItem>(
 	properties: (keyof T)[],
 	options?: HighlightFinderOptions
-): (stats: T[]) => Highlight[] {
+): (stats: T[]) => HighlightValue[] {
 	const { threshold } = {
 		...DEFAULT_OPTIONS,
 		...(options || {})
@@ -40,7 +34,7 @@ function getTopByPropertiesSum<T extends TimePeriodedItem>(
 	return (rawStats: T[]) =>
 		rawStats
 			.map((item) => ({
-				time_period: item.time_period as string,
+				timePeriod: item.time_period as string,
 				value: sumProperties(item, properties)
 			}))
 			.filter((item) => item.value > threshold)
@@ -50,7 +44,7 @@ function getTopByPropertiesSum<T extends TimePeriodedItem>(
 function getTopByProperty<T extends TimePeriodedItem>(
 	property: keyof T,
 	options?: HighlightFinderOptions
-): (stats: T[]) => Highlight[] {
+): (stats: T[]) => HighlightValue[] {
 	return getTopByPropertiesSum([property], options);
 }
 
@@ -68,7 +62,7 @@ export const highlightRules: HighlightsGenerator[] = [
 		verb: 'Most encounters per',
 		category: 'count',
 		generator: getTopByProperty<CoreStatsResult>('encounter_count'),
-		condition: (temporalUnit: HighlightTemporalUnit) => temporalUnit !== 'day'
+		condition: (temporalUnit: TemporalUnit) => temporalUnit !== 'day'
 	},
 	{
 		type: 'species',

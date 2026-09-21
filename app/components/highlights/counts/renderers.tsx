@@ -21,7 +21,7 @@ import {
 	renderSentence
 } from '@/app/components/highlights/shared/render-sentence';
 
-import type { HighlightInContext } from '@/app/lib/highlights/v2/types';
+import type { CherryPickedHighlight } from '@/app/lib/highlights/v2/types';
 import { printSingleHighlightSentence } from '@/app/lib/highlights/v2/sentence-builders';
 // ---- copy builders ----
 
@@ -264,10 +264,12 @@ export function renderCountHighlight(highlight: CountHighlight): ReactElement {
 	return render(highlight);
 }
 
-export function renderV2Highlight(highlight: HighlightInContext): ReactElement {
+export function renderV2Highlight(
+	highlight: CherryPickedHighlight
+): ReactElement {
 	return (
 		<li
-			key={`v2-${highlight.type}-${highlight.parentTimeWindow?.year ?? 'any'}-${highlight.parentTimeWindow?.month ?? 'any'}`}
+			key={`v2-${highlight.type}-${highlight.scope.parentTimeWindow?.year ?? 'any'}-${highlight.scope.parentTimeWindow?.month ?? 'any'}`}
 		>
 			{printSingleHighlightSentence(highlight)}
 		</li>

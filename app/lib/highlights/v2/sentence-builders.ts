@@ -1,11 +1,14 @@
 import type {
-	HighlightUnit,
 	HighlightsOfType,
-	HighlightTemporalUnit,
-	HighlightInContext,
+	CherryPickedHighlight,
 	YearMonthRestriction
 } from './types';
+import type {
+	TemporalUnit,
+	StatUnit
+} from '@/app/components/shared/StatOutput';
 
+import { getPlural } from '@/app/components/shared/StatOutput';
 const fullMonthNames = [
 	undefined,
 	'January',
@@ -22,15 +25,7 @@ const fullMonthNames = [
 	'December'
 ];
 
-const plurals: Partial<Record<HighlightUnit | HighlightTemporalUnit, string>> =
-	{
-		species: 'species'
-	};
-
-function getPlural(unit: HighlightUnit | HighlightTemporalUnit): string {
-	return unit in plurals ? (plurals[unit] as string) : `${unit}s`;
-}
-export function printValue(value: number, unit: HighlightUnit) {
+export function printValue(value: number, unit: StatUnit) {
 	return `${value} ${value > 1 ? getPlural(unit) : unit}`;
 }
 
@@ -41,7 +36,7 @@ export function printDescriptor({
 }: {
 	verb: string;
 	usePlural?: boolean;
-	temporalUnit: HighlightTemporalUnit;
+	temporalUnit: TemporalUnit;
 }) {
 	return `${verb} ${usePlural ? getPlural(temporalUnit) : temporalUnit}`;
 }
@@ -64,9 +59,8 @@ function prettyPrintPosition(position: number) {
 }
 
 export function printProminenceQualifier({
-	position,
-	isTied
-}: HighlightInContext) {
+	ranking: { position, isTied }
+}: CherryPickedHighlight) {
 	return `${isTied ? 'Joint ' : ''}${prettyPrintPosition(position)}`;
 }
 
@@ -85,18 +79,22 @@ export function printTimeQualifier({ year, month }: YearMonthRestriction) {
 	}
 }
 
-export function printSingleHighlightSentence(highlight: HighlightInContext) {
-	return `${printProminenceQualifier(highlight)} ${printDescriptor(highlight)} ${printTimeQualifier(highlight.parentTimeWindow || {})}: ${printValue(highlight.value, highlight.unit)}`.trim();
+export function printSingleHighlightSentence(highlight: CherryPickedHighlight) {
+	return `${printProminenceQualifier(highlight)} ${printDescriptor({
+		verb: highlight.verb,
+		usePlural: false,
+		temporalUnit: highlight.scope.temporalUnit
+	})} ${printTimeQualifier(highlight.scope.parentTimeWindow || {})}: ${printValue(highlight.value.value, highlight.unit)}`.trim();
 }
 
 export function printHighlightListPrefix({
 	verb,
-	temporalUnit,
-	highlights
+	scope: { temporalUnit },
+	values
 }: HighlightsOfType) {
 	return printDescriptor({
 		verb,
 		temporalUnit,
-		usePlural: highlights.length > 1
+		usePlural: values.length > 1
 	});
 }

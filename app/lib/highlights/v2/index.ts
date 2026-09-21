@@ -5,30 +5,28 @@ import {
 import { DEFAULT_OPTIONS, highlightRules } from './highlight-rules';
 import type {
 	HighlightsOfType,
-	HighlightTemporalUnit,
-	HighlightInContext,
+	CherryPickedHighlight,
 	YearMonthRestriction,
-	OneBasedMonth,
-	Highlight
+	HighlightValue
 } from './types';
-
+import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 function applyLimitToHighlight(
 	highlightWrapper: HighlightsOfType,
 	limit: number
 ): HighlightsOfType {
-	if (highlightWrapper.highlights.length < limit) {
+	if (highlightWrapper.values.length < limit) {
 		return {
 			...highlightWrapper
 		};
 	}
-	const boundaryValue = highlightWrapper.highlights[limit - 1].value;
+	const boundaryValue = highlightWrapper.values[limit - 1].value;
 	const itemsIncludingTies =
-		highlightWrapper.highlights.findLastIndex(
+		highlightWrapper.values.findLastIndex(
 			({ value }) => value === boundaryValue
 		) + 1;
 	return {
 		...highlightWrapper,
-		highlights: highlightWrapper.highlights.slice(0, itemsIncludingTies)
+		values: highlightWrapper.values.slice(0, itemsIncludingTies)
 	};
 }
 
@@ -53,7 +51,7 @@ function generateHighlightsFromStats({
 	cacheKey
 }: {
 	stats: RawStats;
-	temporalUnit: HighlightTemporalUnit;
+	temporalUnit: TemporalUnit;
 	limit?: number;
 	cacheKey: string;
 }): HighlightsOfType[] {
@@ -66,8 +64,8 @@ function generateHighlightsFromStats({
 				if (rule.condition && !rule.condition(temporalUnit)) return null;
 				const highlights: HighlightsOfType = {
 					...rule,
-					temporalUnit,
-					highlights: rule.generator(stats.overall)
+					scope: { temporalUnit },
+					values: rule.generator(stats.overall)
 				};
 				return highlights;
 			})
@@ -87,7 +85,7 @@ async function getHighlightsByTemporalUnit({
 	limit,
 	periodFilter
 }: {
-	temporalUnit: HighlightTemporalUnit;
+	temporalUnit: TemporalUnit;
 	groupId: number;
 	limit?: number;
 	periodFilter?: YearMonthRestriction;
@@ -169,7 +167,7 @@ export async function monthlyHighlights({
 }
 
 function calculatePosition(
-	siblingHighlights: Highlight[],
+	siblingHighlights: HighlightValue[],
 	highlightIndex: number
 ) {
 	const activeHighlight = siblingHighlights[highlightIndex];
@@ -189,27 +187,27 @@ function filterOutIrrelevantHighlights(
 	timePeriod: string,
 	parentTimeWindow?: YearMonthRestriction
 ) {
-	const relevantHighlights: HighlightInContext[] = [];
+	const relevantHighlights: CherryPickedHighlight[] = [];
 
 	highlights.forEach((highlightWrapper) => {
-		const relevantHighlightIndex = highlightWrapper.highlights.findIndex(
-			({ time_period }) => timePeriod === time_period
+		const relevantHighlightIndex = highlightWrapper.values.findIndex(
+			(value) => value.timePeriod === timePeriod
 		);
-		const relevantHighlight =
-			highlightWrapper.highlights[relevantHighlightIndex];
+		const relevantHighlight = highlightWrapper.values[relevantHighlightIndex];
 
 		if (relevantHighlightIndex > -1) {
 			relevantHighlights.push({
 				...highlightWrapper,
-				siblingHighlights: highlightWrapper.highlights,
-				highlightIndex: relevantHighlightIndex,
-				parentTimeWindow,
-				value: relevantHighlight.value,
-				timePeriod: relevantHighlight.time_period,
-				...calculatePosition(
-					highlightWrapper.highlights,
-					relevantHighlightIndex
-				)
+				scope: {
+					...highlightWrapper.scope,
+					parentTimeWindow
+				},
+				value: relevantHighlight,
+				ranking: {
+					...calculatePosition(highlightWrapper.values, relevantHighlightIndex),
+					siblingHighlights: highlightWrapper.values,
+					highlightIndex: relevantHighlightIndex
+				}
 			});
 		}
 	});
@@ -219,10 +217,10 @@ function filterOutIrrelevantHighlights(
 export async function fetchDayHighlights(
 	groupId: number,
 	timePeriod: string
-): Promise<HighlightInContext[]> {
+): Promise<CherryPickedHighlight[]> {
 	const yearPeriodFilter = { year: Number(timePeriod.split('-')[0]) };
 	const monthPeriodFilter = {
-		month: Number(timePeriod.split('-')[1]) as OneBasedMonth
+		month: Number(timePeriod.split('-')[1])
 	};
 	const allTimeDailyHighlights = await dailyHighlights({
 		groupId,
@@ -252,17 +250,17 @@ export async function fetchDayHighlights(
 		)
 	];
 	const filteredHighlights = allRelevantHighlights.filter((highlight) => {
-		if (highlight.parentTimeWindow) {
+		if (highlight.scope.parentTimeWindow) {
 			const isClobbered = allRelevantHighlights.some(
 				(potentialClobber) =>
 					potentialClobber.type === highlight.type &&
 					potentialClobber.category === highlight.category &&
-					!potentialClobber.parentTimeWindow &&
-					!(highlight.position < potentialClobber.position) &&
+					!potentialClobber.scope.parentTimeWindow &&
+					!(highlight.ranking.position < potentialClobber.ranking.position) &&
 					!(
-						highlight.position === potentialClobber.position &&
-						potentialClobber.isTied &&
-						!highlight.isTied
+						highlight.ranking.position === potentialClobber.ranking.position &&
+						potentialClobber.ranking.isTied &&
+						!highlight.ranking.isTied
 					)
 			);
 			return !isClobbered;

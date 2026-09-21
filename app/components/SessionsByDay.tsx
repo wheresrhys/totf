@@ -29,7 +29,7 @@ export function SessionsByDay({
 				<li className={wrapperClasses} key={date}>
 					{daySessions.length === 1 ? (
 						<StatOutput
-							unit="birds"
+							unit="bird"
 							value={daySessions[0].encounters[0].count}
 							speciesName={''}
 							visitDate={date}
@@ -41,7 +41,7 @@ export function SessionsByDay({
 					) : (
 						<>
 							<StatOutput
-								unit="birds"
+								unit="bird"
 								value={daySessions.reduce(
 									(acc, session) => acc + session.encounters[0].count,
 									0
