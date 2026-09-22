@@ -60,7 +60,8 @@ function generateHighlightsFromStats({
 	} else {
 		unboundedHighlights = highlightRules
 			.flatMap((rule) => {
-				if (rule.condition && !rule.condition(temporalUnit)) return null;
+				if (rule.condition && !rule.condition(temporalUnit, parentTimeWindow))
+					return null;
 				const workingStats = rule.statsSelector(stats);
 				if (Array.isArray(workingStats)) {
 					const highlights: HighlightsOfType = {
@@ -73,7 +74,6 @@ function generateHighlightsFromStats({
 					return Object.entries(workingStats).map(
 						([species, workingStatsChild]) => {
 							if (!workingStatsChild.length) return null;
-							console.log(species, workingStatsChild);
 							const highlights: HighlightsOfType = {
 								...rule,
 								scope: {

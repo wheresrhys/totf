@@ -59,6 +59,7 @@ export type CombinedHighlights = {
 	descriptor: HighlightDescriptor;
 	value: HighlightValue;
 	species: string | undefined;
+	bestPosition: number;
 	scopes: {
 		scope: HighlightScope;
 		ranking: HighlightRanking;
@@ -71,5 +72,8 @@ export type HighlightsGenerator = {
 		stats: StatsRepository<CoreStatsResult>
 	) => CoreStatsResult[] | Record<string, CoreStatsResult[]>;
 	generator: (stats: CoreStatsResult[]) => HighlightValue[];
-	condition?: (temporalUnit: TemporalUnit) => boolean;
+	condition?: (
+		temporalUnit: TemporalUnit,
+		parentTimeWindow?: YearMonthRestriction
+	) => boolean;
 };

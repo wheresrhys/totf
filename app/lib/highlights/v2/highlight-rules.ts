@@ -1,4 +1,8 @@
-import type { HighlightValue, HighlightsGenerator } from './types';
+import type {
+	HighlightValue,
+	HighlightsGenerator,
+	YearMonthRestriction
+} from './types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { StatsRepository } from '@/app/actions/highlights-data';
@@ -26,15 +30,17 @@ function getTopByPropertiesSum(
 		...DEFAULT_OPTIONS,
 		...(options || {})
 	};
-	return (stats: CoreStatsResult[]) =>
-		stats
-			.map((row) => ({
-				timePeriod: row.time_period as string,
-				value: sumProperties(row, properties),
-				species: row.species_name
-			}))
-			.filter((row) => row.value > threshold)
+	return (stats: CoreStatsResult[]) => {
+		const potentialHighlights = stats.map((row) => ({
+			timePeriod: row.time_period as string,
+			value: sumProperties(row, properties),
+			species: row.species_name
+		}));
+		const max = Math.max(...potentialHighlights.map((item) => item.value));
+		return potentialHighlights
+			.filter((row) => row.value > Math.max(threshold, max / 2))
 			.sort((a, b) => b.value - a.value);
+	};
 }
 
 function getTopByProperty(
@@ -76,7 +82,11 @@ export const highlightRules: HighlightsGenerator[] = [
 			verb: 'Most varied',
 			category: 'count'
 		},
-		generator: getTopByProperty('species_count')
+		generator: getTopByProperty('species_count'),
+		condition: (
+			temporalUnit: TemporalUnit,
+			parentTimeWindow?: YearMonthRestriction
+		) => !parentTimeWindow?.month
 	},
 	{
 		statsSelector: (stats: CoreStatsRepository) => stats.overall,
@@ -86,7 +96,11 @@ export const highlightRules: HighlightsGenerator[] = [
 			unit: 'bird',
 			verb: 'Most new birds in a'
 		},
-		generator: getTopByProperty('new_bird_count')
+		generator: getTopByProperty('new_bird_count'),
+		condition: (
+			temporalUnit: TemporalUnit,
+			parentTimeWindow?: YearMonthRestriction
+		) => !parentTimeWindow?.month
 	},
 	{
 		statsSelector: (stats: CoreStatsRepository) => stats.overall,
@@ -100,7 +114,11 @@ export const highlightRules: HighlightsGenerator[] = [
 			'pullus_bird_count',
 			'juv_bird_count',
 			'postjuv_bird_count'
-		])
+		]),
+		condition: (
+			temporalUnit: TemporalUnit,
+			parentTimeWindow?: YearMonthRestriction
+		) => !parentTimeWindow?.month
 	},
 	{
 		statsSelector: (stats: CoreStatsRepository) => stats.withSpecies,
@@ -111,7 +129,11 @@ export const highlightRules: HighlightsGenerator[] = [
 			verb: 'Highest single species count in a',
 			speciesUnitMode: 'replace'
 		},
-		generator: getTopByProperty('bird_count')
+		generator: getTopByProperty('bird_count'),
+		condition: (
+			temporalUnit: TemporalUnit,
+			parentTimeWindow?: YearMonthRestriction
+		) => !parentTimeWindow?.month
 	},
 	{
 		statsSelector: (stats: CoreStatsRepository) => stats.withSpecies,
@@ -123,7 +145,10 @@ export const highlightRules: HighlightsGenerator[] = [
 			speciesUnitMode: 'prefix'
 		},
 		generator: getTopByProperty('encounter_count'),
-		condition: (temporalUnit: TemporalUnit) => temporalUnit !== 'day'
+		condition: (
+			temporalUnit: TemporalUnit,
+			parentTimeWindow?: YearMonthRestriction
+		) => temporalUnit !== 'day' && !parentTimeWindow?.month
 	},
 	{
 		statsSelector: (stats: CoreStatsRepository) => stats.bySpecies,
@@ -134,6 +159,10 @@ export const highlightRules: HighlightsGenerator[] = [
 			verb: 'High species count',
 			speciesUnitMode: 'replace'
 		},
-		generator: getTopByProperty('encounter_count', { threshold: 1 })
+		generator: getTopByProperty('encounter_count', { threshold: 1 }),
+		condition: (
+			temporalUnit: TemporalUnit,
+			parentTimeWindow?: YearMonthRestriction
+		) => !parentTimeWindow?.month
 	}
 ];

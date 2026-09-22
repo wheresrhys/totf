@@ -115,6 +115,9 @@ function combineSimilarHighlights(
 			descriptor: highlights[0].descriptor,
 			value: highlights[0].value,
 			species: highlights[0].scope.species,
+			bestPosition: Math.min(
+				...highlights.map(({ ranking }) => ranking.position)
+			),
 			scopes: highlights.map((highlight) => ({
 				scope: highlight.scope,
 				ranking: highlight.ranking
@@ -153,10 +156,12 @@ export async function sessionHighlights(
 		...filterOutIrrelevantHighlights(yearDailyHighlights, timePeriod),
 		...filterOutIrrelevantHighlights(monthDailyHighlights, timePeriod)
 	];
+
 	const filteredHighlights = allRelevantHighlights.filter((highlight) => {
 		if (highlight.scope.parentTimeWindow) {
 			const isClobbered = allRelevantHighlights.some(
 				(potentialClobber) =>
+					potentialClobber.ranking.position >= highlight.ranking.position &&
 					potentialClobber.descriptor.type === highlight.descriptor.type &&
 					potentialClobber.descriptor.category ===
 						highlight.descriptor.category &&
@@ -182,15 +187,9 @@ export async function sessionHighlights(
 			highlightCategoryOrder.indexOf(a.descriptor.category);
 
 		if (categoryOrdering) return categoryOrdering;
-		return b.value.value - a.value.value;
-		// if (
-		// 	a.descriptor.category + a.descriptor.type ===
-		// 	b.descriptor.category + b.descriptor.type
-		// )
-		// 	return 0;
-		// return a.descriptor.category + a.descriptor.type >
-		// 	b.descriptor.category + b.descriptor.type
-		// 	? 1
-		// 	: -1;
+
+		return b.bestPosition === a.bestPosition
+			? b.value.value - a.value.value
+			: a.bestPosition - b.bestPosition;
 	});
 }
