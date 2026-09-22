@@ -1,7 +1,6 @@
 import {
 	getStatsByTemporalUnit,
-	StatsRepository,
-	groupByColumn
+	StatsRepository
 } from '@/app/actions/highlights-data';
 import { DEFAULT_OPTIONS, highlightRules } from './highlight-rules';
 import type { HighlightsOfType, YearMonthRestriction } from './types';
@@ -65,7 +64,7 @@ function generateHighlightsFromStats({
 				const highlights: HighlightsOfType = {
 					...rule,
 					scope: { temporalUnit, parentTimeWindow: parentTimeWindow },
-					values: rule.generator(stats.overall)
+					values: rule.generator(stats)
 				};
 				return highlights;
 			})
@@ -79,7 +78,18 @@ function generateHighlightsFromStats({
 	);
 }
 
-export async function getHighlightsByTemporalUnit({
+function groupByColumn<T>(column: keyof T, rows: T[]): Record<string, T[]> {
+	const aggregator: Record<string, T[]> = {};
+	rows.forEach((row: T) => {
+		const groupKey = row[column] as string;
+		if (!(groupKey in aggregator)) {
+			aggregator[groupKey] = [];
+		}
+		aggregator[groupKey].push(row);
+	});
+	return aggregator;
+}
+export async function getScopedHighlights({
 	temporalUnit,
 	groupId,
 	limit,

@@ -6,7 +6,7 @@ import type {
 	HighlightValue,
 	CombinedHighlights
 } from './types';
-import { getHighlightsByTemporalUnit } from './highlight-generator';
+import { getScopedHighlights } from './highlight-generator';
 function calculatePosition(
 	siblingHighlights: HighlightValue[],
 	highlightIndex: number
@@ -122,18 +122,18 @@ export async function sessionHighlights(
 	const monthparentTimeWindow = {
 		month: Number(timePeriod.split('-')[1])
 	};
-	const allTimeDailyHighlights = await getHighlightsByTemporalUnit({
+	const allTimeDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
 		limit: 5
 	});
-	const yearDailyHighlights = await getHighlightsByTemporalUnit({
+	const yearDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
 		parentTimeWindow: yearparentTimeWindow,
 		limit: 3
 	});
-	const monthDailyHighlights = await getHighlightsByTemporalUnit({
+	const monthDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
 		parentTimeWindow: monthparentTimeWindow,

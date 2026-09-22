@@ -3,6 +3,7 @@ import type {
 	TemporalUnit,
 	StatUnit
 } from '@/app/components/shared/StatOutput';
+import type { StatsRepository } from '@/app/actions/highlights-data';
 
 export interface TimePeriodedItem {
 	time_period: string | null;
@@ -16,13 +17,16 @@ export type HighlightCategory = 'count' | 'rarity' | 'biometrics';
 export type HighlightValue = {
 	timePeriod: string;
 	value: number;
+	species: string | null;
 };
 
+export type SpeciesUnitMode = 'replace' | 'prefix' | undefined;
 export type HighlightDescriptor = {
 	category: HighlightCategory;
 	type: string;
 	verb: string;
 	unit: StatUnit;
+	speciesUnitMode?: SpeciesUnitMode;
 };
 
 type HighlightScope = {
@@ -61,6 +65,6 @@ export type CombinedHighlights = {
 
 export type HighlightsGenerator = {
 	descriptor: HighlightDescriptor;
-	generator: (stats: CoreStatsResult[]) => HighlightValue[];
+	generator: (stats: StatsRepository<CoreStatsResult>) => HighlightValue[];
 	condition?: (temporalUnit: TemporalUnit) => boolean;
 };

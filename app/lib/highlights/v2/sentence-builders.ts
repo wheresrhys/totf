@@ -2,7 +2,9 @@ import type {
 	HighlightsOfType,
 	CherryPickedHighlight,
 	CombinedHighlights,
-	YearMonthRestriction
+	YearMonthRestriction,
+	HighlightValue,
+	HighlightDescriptor
 } from './types';
 import type {
 	TemporalUnit,
@@ -26,8 +28,18 @@ const fullMonthNames = [
 	'December'
 ];
 
-export function printValue(value: number, unit: StatUnit) {
-	return `${value} ${value > 1 ? getPlural(unit) : unit}`;
+export function printValue(
+	value: HighlightValue,
+	descriptor: HighlightDescriptor
+) {
+	switch (descriptor.speciesUnitMode) {
+		case 'replace':
+			return `${value.value} ${value.species}${value.value > 1 ? 's' : ''}`;
+		case 'prefix':
+			return `${value.value} ${value.species} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
+		default:
+			return `${value.value} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
+	}
 }
 
 export function printDescriptor({
@@ -90,7 +102,7 @@ function printSingleHighlightPreamble(highlight: CherryPickedHighlight) {
 
 export function printSingleHighlightSentence(highlight: CherryPickedHighlight) {
 	return sentenceCase(
-		`${printSingleHighlightPreamble(highlight)}: ${printValue(highlight.value.value, highlight.descriptor.unit)}`.trim()
+		`${printSingleHighlightPreamble(highlight)}: ${printValue(highlight.value, highlight.descriptor)}`.trim()
 	);
 }
 
@@ -121,7 +133,7 @@ export function printMultipleHighlightSentence(highlight: CombinedHighlights) {
 		})
 	);
 	return sentenceCase(
-		`${sentenceJoin(preambles)}: ${printValue(highlight.value.value, highlight.descriptor.unit)}`.trim()
+		`${sentenceJoin(preambles)}: ${printValue(highlight.value, highlight.descriptor)}`.trim()
 	);
 }
 

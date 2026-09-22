@@ -5,6 +5,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 
+export type StatsRepository<T> = {
+	overall: T[];
+	withSpecies: T[];
+	bySpecies: Record<string, T[]>;
+};
+
 function getStatsRPCFetcher(
 	rpcName: string,
 	temporalUnit: TemporalUnit,
@@ -26,10 +32,7 @@ function getStatsRPCFetcher(
 		});
 }
 
-export function groupByColumn<T>(
-	column: keyof T,
-	rows: T[]
-): Record<string, T[]> {
+function groupByColumn<T>(column: keyof T, rows: T[]): Record<string, T[]> {
 	const aggregator: Record<string, T[]> = {};
 	rows.forEach((row: T) => {
 		const groupKey = row[column] as string;
@@ -40,12 +43,6 @@ export function groupByColumn<T>(
 	});
 	return aggregator;
 }
-
-export type StatsRepository<T> = {
-	overall: T[];
-	withSpecies: T[];
-	bySpecies: Record<string, T[]>;
-};
 
 export async function getStatsByTemporalUnit(
 	temporalUnit: TemporalUnit,
