@@ -65,6 +65,9 @@ export type CombinedHighlights = {
 
 export type HighlightsGenerator = {
 	descriptor: HighlightDescriptor;
-	generator: (stats: StatsRepository<CoreStatsResult>) => HighlightValue[];
+	statsSelector: (
+		stats: StatsRepository<CoreStatsResult>
+	) => CoreStatsResult[] | Record<string, CoreStatsResult[]>;
+	generator: (stats: CoreStatsResult[]) => HighlightValue[];
 	condition?: (temporalUnit: TemporalUnit) => boolean;
 };

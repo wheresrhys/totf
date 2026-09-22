@@ -19,16 +19,15 @@ function sumProperties(
 }
 
 function getTopByPropertiesSum(
-	statsKey: 'overall' | 'withSpecies',
 	properties: (keyof CoreStatsResult)[],
 	options?: HighlightFinderOptions
-): (stats: StatsRepository<CoreStatsResult>) => HighlightValue[] {
+): (stats: CoreStatsResult[]) => HighlightValue[] {
 	const { threshold } = {
 		...DEFAULT_OPTIONS,
 		...(options || {})
 	};
-	return (rawStats: StatsRepository<CoreStatsResult>) =>
-		rawStats[statsKey]
+	return (stats: CoreStatsResult[]) =>
+		stats
 			.map((row) => ({
 				timePeriod: row.time_period as string,
 				value: sumProperties(row, properties),
@@ -39,65 +38,72 @@ function getTopByPropertiesSum(
 }
 
 function getTopByProperty(
-	statsKey: 'overall' | 'withSpecies',
 	property: keyof CoreStatsResult,
 	options?: HighlightFinderOptions
-): (stats: StatsRepository<CoreStatsResult>) => HighlightValue[] {
-	return getTopByPropertiesSum(statsKey, [property], options);
+): (stats: CoreStatsResult[]) => HighlightValue[] {
+	return getTopByPropertiesSum([property], options);
 }
+
+type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 
 export const highlightRules: HighlightsGenerator[] = [
 	{
+		statsSelector: (stats: CoreStatsRepository) => stats.overall,
 		descriptor: {
 			type: 'birds',
 			unit: 'bird',
 			verb: 'Busiest',
 			category: 'count'
 		},
-		generator: getTopByProperty('overall', 'bird_count')
+		generator: getTopByProperty('bird_count')
 	},
 	{
+		statsSelector: (stats: CoreStatsRepository) => stats.overall,
 		descriptor: {
 			type: 'encounters',
 			unit: 'encounter',
 			verb: 'Most encounters per',
 			category: 'count'
 		},
-		generator: getTopByProperty('overall', 'encounter_count'),
+		generator: getTopByProperty('encounter_count'),
 		condition: (temporalUnit: TemporalUnit) => temporalUnit !== 'day'
 	},
 	{
+		statsSelector: (stats: CoreStatsRepository) => stats.overall,
 		descriptor: {
 			type: 'species',
 			unit: 'species',
 			verb: 'Most varied',
 			category: 'count'
 		},
-		generator: getTopByProperty('overall', 'species_count')
+		generator: getTopByProperty('species_count')
 	},
 	{
+		statsSelector: (stats: CoreStatsRepository) => stats.overall,
 		descriptor: {
 			type: 'newBirds',
 			category: 'count',
 			unit: 'bird',
 			verb: 'Most new birds in a'
 		},
-		generator: getTopByProperty('overall', 'new_bird_count')
+		generator: getTopByProperty('new_bird_count')
 	},
 	{
+		statsSelector: (stats: CoreStatsRepository) => stats.overall,
 		descriptor: {
 			type: 'juvs',
 			category: 'count',
 			unit: 'bird',
 			verb: 'Most juveniles in a'
 		},
-		generator: getTopByPropertiesSum('overall', [
+		generator: getTopByPropertiesSum([
 			'pullus_bird_count',
 			'juv_bird_count',
 			'postjuv_bird_count'
 		])
 	},
 	{
+		statsSelector: (stats: CoreStatsRepository) => stats.withSpecies,
 		descriptor: {
 			type: 'singleSpeciesCount',
 			category: 'count',
@@ -105,17 +111,29 @@ export const highlightRules: HighlightsGenerator[] = [
 			verb: 'Highest single species count in a',
 			speciesUnitMode: 'replace'
 		},
-		generator: getTopByProperty('withSpecies', 'bird_count')
+		generator: getTopByProperty('bird_count')
 	},
 	{
+		statsSelector: (stats: CoreStatsRepository) => stats.withSpecies,
 		descriptor: {
-			type: 'singleSpeciesCount',
+			type: 'singleSpeciesEncounters',
 			category: 'count',
 			unit: 'encounter',
-			verb: 'MOst single encounters in a',
+			verb: 'Most single species encounters in a',
+			speciesUnitMode: 'prefix'
+		},
+		generator: getTopByProperty('encounter_count'),
+		condition: (temporalUnit: TemporalUnit) => temporalUnit !== 'day'
+	},
+	{
+		statsSelector: (stats: CoreStatsRepository) => stats.bySpecies,
+		descriptor: {
+			type: 'eachSpeciesCount',
+			category: 'count',
+			unit: 'bird',
+			verb: 'High species count',
 			speciesUnitMode: 'replace'
 		},
-		generator: getTopByProperty('withSpecies', 'encounter_count'),
-		condition: (temporalUnit: TemporalUnit) => temporalUnit !== 'day'
+		generator: getTopByProperty('encounter_count', { threshold: 1 })
 	}
 ];

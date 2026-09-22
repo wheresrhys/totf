@@ -73,7 +73,7 @@ function combineSimilarHighlights(
 ): CombinedHighlights[] {
 	const groupedByDescriptor: Map<string, CherryPickedHighlight[]> = new Map();
 	highlights.forEach((highlight) => {
-		const mapKey = descriptorToString(highlight.descriptor);
+		const mapKey = `${descriptorToString(highlight.descriptor)}-${highlight.value.species}`;
 		if (groupedByDescriptor.has(mapKey)) {
 			groupedByDescriptor.get(mapKey)?.push(highlight);
 		} else {

@@ -6,10 +6,7 @@ import type {
 	HighlightValue,
 	HighlightDescriptor
 } from './types';
-import type {
-	TemporalUnit,
-	StatUnit
-} from '@/app/components/shared/StatOutput';
+import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 
 import { getPlural } from '@/app/components/shared/StatOutput';
 const fullMonthNames = [

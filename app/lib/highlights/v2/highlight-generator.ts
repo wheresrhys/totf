@@ -59,16 +59,31 @@ function generateHighlightsFromStats({
 		unboundedHighlights = cache.get(cacheKey) as HighlightsOfType[];
 	} else {
 		unboundedHighlights = highlightRules
-			.map((rule) => {
+			.flatMap((rule) => {
 				if (rule.condition && !rule.condition(temporalUnit)) return null;
-				const highlights: HighlightsOfType = {
-					...rule,
-					scope: { temporalUnit, parentTimeWindow: parentTimeWindow },
-					values: rule.generator(stats)
-				};
-				return highlights;
+				const workingStats = rule.statsSelector(stats);
+				if (Array.isArray(workingStats)) {
+					const highlights: HighlightsOfType = {
+						...rule,
+						scope: { temporalUnit, parentTimeWindow: parentTimeWindow },
+						values: rule.generator(workingStats)
+					};
+					return highlights;
+				} else {
+					return Object.values(workingStats).map((workingStatsChild) => {
+						if (!workingStatsChild.length) return null;
+						const highlights: HighlightsOfType = {
+							...rule,
+							scope: { temporalUnit, parentTimeWindow: parentTimeWindow },
+							values: rule.generator(workingStatsChild)
+						};
+						return highlights.values.length ? highlights : null;
+					});
+				}
 			})
 			.filter(isHighlightsOfType);
+
+		console.log(unboundedHighlights);
 
 		cache.set(cacheKey, unboundedHighlights);
 	}
@@ -82,6 +97,7 @@ function groupByColumn<T>(column: keyof T, rows: T[]): Record<string, T[]> {
 	const aggregator: Record<string, T[]> = {};
 	rows.forEach((row: T) => {
 		const groupKey = row[column] as string;
+		console.log(groupKey);
 		if (!(groupKey in aggregator)) {
 			aggregator[groupKey] = [];
 		}
@@ -89,6 +105,7 @@ function groupByColumn<T>(column: keyof T, rows: T[]): Record<string, T[]> {
 	});
 	return aggregator;
 }
+
 export async function getScopedHighlights({
 	temporalUnit,
 	groupId,
