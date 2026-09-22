@@ -126,40 +126,10 @@ function combineSimilarHighlights(
 	});
 }
 
-export async function sessionHighlights(
-	groupId: number,
-	timePeriod: string
-): Promise<CombinedHighlights[]> {
-	const yearparentTimeWindow = { year: Number(timePeriod.split('-')[0]) };
-	const monthparentTimeWindow = {
-		month: Number(timePeriod.split('-')[1])
-	};
-	const allTimeDailyHighlights = await getScopedHighlights({
-		temporalUnit: 'day',
-		groupId,
-		limit: 5
-	});
-	const yearDailyHighlights = await getScopedHighlights({
-		temporalUnit: 'day',
-		groupId,
-		parentTimeWindow: yearparentTimeWindow,
-		limit: 3
-	});
-	const monthDailyHighlights = await getScopedHighlights({
-		temporalUnit: 'day',
-		groupId,
-		parentTimeWindow: monthparentTimeWindow,
-		limit: 3
-	});
-	const allRelevantHighlights = [
-		...filterOutIrrelevantHighlights(allTimeDailyHighlights, timePeriod),
-		...filterOutIrrelevantHighlights(yearDailyHighlights, timePeriod),
-		...filterOutIrrelevantHighlights(monthDailyHighlights, timePeriod)
-	];
-
-	const filteredHighlights = allRelevantHighlights.filter((highlight) => {
+function refineHighlights(highlights: CherryPickedHighlight[]) {
+	const filteredHighlights = highlights.filter((highlight) => {
 		if (highlight.scope.parentTimeWindow) {
-			const isClobbered = allRelevantHighlights.some(
+			const isClobbered = highlights.some(
 				(potentialClobber) =>
 					potentialClobber.ranking.position >= highlight.ranking.position &&
 					potentialClobber.descriptor.type === highlight.descriptor.type &&
@@ -192,4 +162,44 @@ export async function sessionHighlights(
 			? b.value.value - a.value.value
 			: a.bestPosition - b.bestPosition;
 	});
+}
+
+async function getAllRelevantHighlights(groupId: number, timePeriod: string) {
+	const yearparentTimeWindow = { year: Number(timePeriod.split('-')[0]) };
+	const monthparentTimeWindow = {
+		month: Number(timePeriod.split('-')[1])
+	};
+	const allTimeDailyHighlights = await getScopedHighlights({
+		temporalUnit: 'day',
+		groupId,
+		limit: 5
+	});
+	const yearDailyHighlights = await getScopedHighlights({
+		temporalUnit: 'day',
+		groupId,
+		parentTimeWindow: yearparentTimeWindow,
+		limit: 3
+	});
+	const monthDailyHighlights = await getScopedHighlights({
+		temporalUnit: 'day',
+		groupId,
+		parentTimeWindow: monthparentTimeWindow,
+		limit: 3
+	});
+	return [
+		...filterOutIrrelevantHighlights(allTimeDailyHighlights, timePeriod),
+		...filterOutIrrelevantHighlights(yearDailyHighlights, timePeriod),
+		...filterOutIrrelevantHighlights(monthDailyHighlights, timePeriod)
+	];
+}
+
+export async function sessionHighlights(
+	groupId: number,
+	timePeriod: string
+): Promise<CombinedHighlights[]> {
+	const allRelevantHighlights = await getAllRelevantHighlights(
+		groupId,
+		timePeriod
+	);
+	return refineHighlights(allRelevantHighlights);
 }
