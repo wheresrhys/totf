@@ -25,6 +25,10 @@ const fullMonthNames = [
 	'December'
 ];
 
+function printTemporalUnit(temporalUnit: TemporalUnit) {
+	return temporalUnit === 'day' ? 'session' : temporalUnit;
+}
+
 export function printValue(
 	value: HighlightValue,
 	descriptor: HighlightDescriptor
@@ -48,7 +52,7 @@ export function printDescriptor({
 	usePlural?: boolean;
 	temporalUnit: TemporalUnit;
 }) {
-	return `${verb.toLowerCase()} ${usePlural ? getPlural(temporalUnit) : temporalUnit}`;
+	return `${verb.toLowerCase()} ${usePlural ? getPlural(printTemporalUnit(temporalUnit)) : printTemporalUnit(temporalUnit)}`;
 }
 
 function prettyPrintPosition(position: number) {
