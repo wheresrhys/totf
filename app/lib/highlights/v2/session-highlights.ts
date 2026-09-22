@@ -126,8 +126,10 @@ function combineSimilarHighlights(
 	});
 }
 
-function refineHighlights(highlights: CherryPickedHighlight[]) {
-	const filteredHighlights = highlights.filter((highlight) => {
+function removeLessSignificantHighlights(
+	highlights: CherryPickedHighlight[]
+): CherryPickedHighlight[] {
+	return highlights.filter((highlight) => {
 		if (highlight.scope.parentTimeWindow) {
 			const isClobbered = highlights.some(
 				(potentialClobber) =>
@@ -148,8 +150,10 @@ function refineHighlights(highlights: CherryPickedHighlight[]) {
 			return true;
 		}
 	});
+}
 
-	return combineSimilarHighlights(filteredHighlights).toSorted((a, b) => {
+function sortHighlights(highlights: CombinedHighlights[]) {
+	return highlights.toSorted((a, b) => {
 		if (a.species && !b.species) return 1;
 		if (!a.species && b.species) return -1;
 		const categoryOrdering =
@@ -201,5 +205,10 @@ export async function sessionHighlights(
 		groupId,
 		timePeriod
 	);
-	return refineHighlights(allRelevantHighlights);
+	const significantHighlights = removeLessSignificantHighlights(
+		allRelevantHighlights
+	);
+	const combinedHighlights = combineSimilarHighlights(significantHighlights);
+	const sortedHighlights = sortHighlights(combinedHighlights);
+	return sortedHighlights;
 }
