@@ -105,7 +105,7 @@ export const highlightRules: HighlightsGenerator[] = [
 	{
 		statsSelector: (stats: CoreStatsRepository) => stats.overall,
 		descriptor: {
-			type: 'juvs',
+			type: 'young',
 			category: 'count',
 			unit: 'bird',
 			verb: 'Most young in a'
@@ -160,6 +160,26 @@ export const highlightRules: HighlightsGenerator[] = [
 			speciesUnitMode: 'replace'
 		},
 		generator: getTopByProperty('encounter_count', { threshold: 1 }),
+		condition: (
+			temporalUnit: TemporalUnit,
+			parentTimeWindow?: YearMonthRestriction
+		) => !parentTimeWindow?.month
+	},
+	{
+		statsSelector: (stats: CoreStatsRepository) => stats.bySpecies,
+		descriptor: {
+			type: 'eachSpeciesYoung',
+			category: 'count',
+			unit: 'bird',
+			verb: 'Most young of this species in a',
+			speciesUnitMode: 'replace'
+		},
+		generator: getTopByPropertiesSum([
+			'pullus_bird_count',
+			'juv_bird_count',
+			'postjuv_bird_count'
+		]),
+		limit: 1,
 		condition: (
 			temporalUnit: TemporalUnit,
 			parentTimeWindow?: YearMonthRestriction

@@ -27,12 +27,6 @@ function applyLimitToHighlight(
 	};
 }
 
-function applyLimitToHighlights(highlights: HighlightsOfType[], limit: number) {
-	return highlights.map((highlightWrapper) =>
-		applyLimitToHighlight(highlightWrapper, limit)
-	);
-}
-
 //TODO do something to clear cache when logging out
 
 const cache: Map<string, HighlightsOfType[]> = new Map();
@@ -55,6 +49,7 @@ function generateHighlightsFromStats({
 	cacheKey: string;
 }): HighlightsOfType[] {
 	let unboundedHighlights: HighlightsOfType[];
+	limit = limit || DEFAULT_OPTIONS.limit;
 	if (cache.has(cacheKey)) {
 		unboundedHighlights = cache.get(cacheKey) as HighlightsOfType[];
 	} else {
@@ -69,7 +64,10 @@ function generateHighlightsFromStats({
 						scope: { temporalUnit, parentTimeWindow: parentTimeWindow },
 						values: rule.generator(workingStats)
 					};
-					return highlights;
+					return applyLimitToHighlight(
+						highlights,
+						rule.limit ? Math.min(rule.limit, limit) : limit
+					);
 				} else {
 					return Object.entries(workingStats).map(
 						([species, workingStatsChild]) => {
@@ -83,7 +81,12 @@ function generateHighlightsFromStats({
 								},
 								values: rule.generator(workingStatsChild)
 							};
-							return highlights.values.length ? highlights : null;
+							return highlights.values.length
+								? applyLimitToHighlight(
+										highlights,
+										rule.limit ? Math.min(rule.limit, limit) : limit
+									)
+								: null;
 						}
 					);
 				}
@@ -92,10 +95,7 @@ function generateHighlightsFromStats({
 
 		cache.set(cacheKey, unboundedHighlights);
 	}
-	return applyLimitToHighlights(
-		unboundedHighlights,
-		limit || DEFAULT_OPTIONS.limit
-	);
+	return unboundedHighlights;
 }
 
 function groupByColumn<T>(column: keyof T, rows: T[]): Record<string, T[]> {

@@ -68,6 +68,7 @@ export type CombinedHighlights = {
 
 export type HighlightsGenerator = {
 	descriptor: HighlightDescriptor;
+	limit?: number;
 	statsSelector: (
 		stats: StatsRepository<CoreStatsResult>
 	) => CoreStatsResult[] | Record<string, CoreStatsResult[]>;

@@ -133,12 +133,17 @@ function removeLessSignificantHighlights(
 		if (highlight.scope.parentTimeWindow) {
 			const isClobbered = highlights.some(
 				(potentialClobber) =>
-					potentialClobber.ranking.position >= highlight.ranking.position &&
+					// don't clobber highlights of a completely different type
 					potentialClobber.descriptor.type === highlight.descriptor.type &&
 					potentialClobber.descriptor.category ===
 						highlight.descriptor.category &&
+					// clobberer must be higher ranked than subject, e.g. can't  clobber 1st place with 2nd place
+					potentialClobber.ranking.position >= highlight.ranking.position &&
+					// only clobber with highlights that are scopedd to all time
 					!potentialClobber.scope.parentTimeWindow &&
-					!(highlight.ranking.position < potentialClobber.ranking.position) &&
+					// // don't clobber 1st place with 2nd place... hmmm this seems dodgy!
+					// !(highlight.ranking.position < potentialClobber.ranking.position) &&
+					// don't clobbe if equal position but the more locally scoped item is not tied when the global one is tied
 					!(
 						highlight.ranking.position === potentialClobber.ranking.position &&
 						potentialClobber.ranking.isTied &&
@@ -176,13 +181,13 @@ async function getAllRelevantHighlights(groupId: number, timePeriod: string) {
 	const allTimeDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
-		limit: 5
+		limit: 3
 	});
 	const yearDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
 		parentTimeWindow: yearparentTimeWindow,
-		limit: 3
+		limit: 1
 	});
 	const monthDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
