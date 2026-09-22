@@ -94,7 +94,7 @@ export const highlightRules: HighlightsGenerator[] = [
 			type: 'juvs',
 			category: 'count',
 			unit: 'bird',
-			verb: 'Most juveniles in a'
+			verb: 'Most young in a'
 		},
 		generator: getTopByPropertiesSum([
 			'pullus_bird_count',

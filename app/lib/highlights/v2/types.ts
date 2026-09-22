@@ -32,6 +32,7 @@ export type HighlightDescriptor = {
 type HighlightScope = {
 	temporalUnit: TemporalUnit;
 	parentTimeWindow?: YearMonthRestriction;
+	species?: string;
 };
 
 export type HighlightsOfType = {
@@ -57,6 +58,7 @@ export type CherryPickedHighlight = {
 export type CombinedHighlights = {
 	descriptor: HighlightDescriptor;
 	value: HighlightValue;
+	species: string | undefined;
 	scopes: {
 		scope: HighlightScope;
 		ranking: HighlightRanking;

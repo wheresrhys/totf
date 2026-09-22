@@ -4,9 +4,17 @@ import type {
 	YearMonthRestriction,
 	HighlightDescriptor,
 	HighlightValue,
-	CombinedHighlights
+	CombinedHighlights,
+	HighlightCategory
 } from './types';
 import { getScopedHighlights } from './highlight-generator';
+
+const highlightCategoryOrder: HighlightCategory[] = [
+	'rarity',
+	'count',
+	'biometrics'
+];
+
 function calculatePosition(
 	siblingHighlights: HighlightValue[],
 	highlightIndex: number
@@ -106,6 +114,7 @@ function combineSimilarHighlights(
 		return {
 			descriptor: highlights[0].descriptor,
 			value: highlights[0].value,
+			species: highlights[0].scope.species,
 			scopes: highlights.map((highlight) => ({
 				scope: highlight.scope,
 				ranking: highlight.ranking
@@ -166,14 +175,22 @@ export async function sessionHighlights(
 	});
 
 	return combineSimilarHighlights(filteredHighlights).toSorted((a, b) => {
-		if (
-			a.descriptor.category + a.descriptor.type ===
-			b.descriptor.category + b.descriptor.type
-		)
-			return 0;
-		return a.descriptor.category + a.descriptor.type >
-			b.descriptor.category + b.descriptor.type
-			? 1
-			: -1;
+		if (a.species && !b.species) return 1;
+		if (!a.species && b.species) return -1;
+		const categoryOrdering =
+			highlightCategoryOrder.indexOf(b.descriptor.category) -
+			highlightCategoryOrder.indexOf(a.descriptor.category);
+
+		if (categoryOrdering) return categoryOrdering;
+		return b.value.value - a.value.value;
+		// if (
+		// 	a.descriptor.category + a.descriptor.type ===
+		// 	b.descriptor.category + b.descriptor.type
+		// )
+		// 	return 0;
+		// return a.descriptor.category + a.descriptor.type >
+		// 	b.descriptor.category + b.descriptor.type
+		// 	? 1
+		// 	: -1;
 	});
 }
