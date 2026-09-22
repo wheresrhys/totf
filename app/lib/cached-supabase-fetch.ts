@@ -42,10 +42,12 @@ export async function cachedSupabaseFetch<T>(
 	dataFetcher: (
 		supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>,
 		viewedGroupId: number
-	) => Promise<T>
+	) => Promise<T>,
+	supabaseClientOverride?: SupabaseClient
 ): Promise<T> {
 	const cache = getCache<T>(namespace);
-	const supabase = await getAuthenticatedSupabaseClient();
+	const supabase =
+		supabaseClientOverride ?? (await getAuthenticatedSupabaseClient());
 	const currentVersion = await fetchVersion(supabase, viewedGroupId);
 	const cachedResult = cache.get(viewedGroupId);
 	if (

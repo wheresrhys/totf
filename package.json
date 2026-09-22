@@ -21,6 +21,7 @@
 		"db:import:local": "dotenvx run -f .env.dev -- tsx scripts/import-csv.ts",
 		"set-group-password:local": "dotenvx run -f .env.dev -- tsx scripts/set-group-password.ts",
 		"set-group-password:prod": "./scripts/load-prod-write-env.sh tsx scripts/set-group-password.ts",
+		"report:session-highlights-refinement": "./scripts/load-prod-env.sh tsx scripts/session-highlights-refinement-report.ts",
 		"start": "next start",
 		"build": "next build --turbopack",
 		"next:dev": "dotenvx run -f .env.dev -- next dev --turbopack --inspect",

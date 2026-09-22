@@ -6,6 +6,7 @@ import { DEFAULT_OPTIONS, highlightRules } from './highlight-rules';
 import type { HighlightsOfType, YearMonthRestriction } from './types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import { CoreStatsResult } from '@/app/models/db';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 function applyLimitToHighlight(
 	highlightWrapper: HighlightsOfType,
@@ -114,14 +115,20 @@ export async function getScopedHighlights({
 	temporalUnit,
 	groupId,
 	limit,
-	parentTimeWindow
+	parentTimeWindow,
+	supabaseClientOverride
 }: {
 	temporalUnit: TemporalUnit;
 	groupId: number;
 	limit?: number;
 	parentTimeWindow?: YearMonthRestriction;
+	supabaseClientOverride?: SupabaseClient;
 }) {
-	let dailyStats = await getStatsByTemporalUnit(temporalUnit, groupId);
+	let dailyStats = await getStatsByTemporalUnit(
+		temporalUnit,
+		groupId,
+		supabaseClientOverride
+	);
 	let cacheKey = `${groupId}-${temporalUnit}`;
 	if (parentTimeWindow) {
 		const { month, year } = parentTimeWindow;

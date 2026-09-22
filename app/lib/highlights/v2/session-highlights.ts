@@ -8,6 +8,7 @@ import type {
 	HighlightCategory
 } from './types';
 import { getScopedHighlights } from './highlight-generator';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const highlightCategoryOrder: HighlightCategory[] = [
 	'rarity',
@@ -76,7 +77,7 @@ function timeWindowToNumber(
 	return 100;
 }
 
-function combineSimilarHighlights(
+export function combineSimilarHighlights(
 	highlights: CherryPickedHighlight[]
 ): CombinedHighlights[] {
 	const groupedByDescriptor: Map<string, CherryPickedHighlight[]> = new Map();
@@ -126,7 +127,7 @@ function combineSimilarHighlights(
 	});
 }
 
-function removeLessSignificantHighlights(
+export function removeLessSignificantHighlights(
 	highlights: CherryPickedHighlight[]
 ): CherryPickedHighlight[] {
 	return highlights.filter((highlight) => {
@@ -152,7 +153,7 @@ function removeLessSignificantHighlights(
 	});
 }
 
-function sortHighlights(highlights: CombinedHighlights[]) {
+export function sortHighlights(highlights: CombinedHighlights[]) {
 	return highlights.toSorted((a, b) => {
 		if (a.species && !b.species) return 1;
 		if (!a.species && b.species) return -1;
@@ -168,7 +169,11 @@ function sortHighlights(highlights: CombinedHighlights[]) {
 	});
 }
 
-async function getAllRelevantHighlights(groupId: number, timePeriod: string) {
+export async function getAllRelevantHighlights(
+	groupId: number,
+	timePeriod: string,
+	supabaseClientOverride?: SupabaseClient
+) {
 	const yearparentTimeWindow = { year: Number(timePeriod.split('-')[0]) };
 	const monthparentTimeWindow = {
 		month: Number(timePeriod.split('-')[1])
@@ -176,19 +181,22 @@ async function getAllRelevantHighlights(groupId: number, timePeriod: string) {
 	const allTimeDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
-		limit: 5
+		limit: 5,
+		supabaseClientOverride
 	});
 	const yearDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
 		parentTimeWindow: yearparentTimeWindow,
-		limit: 3
+		limit: 3,
+		supabaseClientOverride
 	});
 	const monthDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
 		parentTimeWindow: monthparentTimeWindow,
-		limit: 3
+		limit: 3,
+		supabaseClientOverride
 	});
 	return [
 		...filterOutIrrelevantHighlights(allTimeDailyHighlights, timePeriod),

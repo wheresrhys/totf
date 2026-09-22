@@ -66,3 +66,6 @@ e2e/group-slugs.json
 /.claude/swarm-state.json
 /.claude/swarm-migration-state.json
 /.claude/worktrees/
+
+# ad-hoc report script output (may contain real production ringing data)
+/reports/

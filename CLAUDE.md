@@ -47,6 +47,7 @@ This repo has a single shared local Supabase instance, so any ticket that will m
 **exclusive-resource label**, and `swarm` runs any exclusive-resource-labelled unit of work
 completely solo — no other worker (maintenance or ticket) runs concurrently with it — since
 concurrent worktrees doing either kind of mutation would otherwise collide:
+
 - `db-migration` — touches `supabase/schema/` (schema migrations or DB integration tests).
 - `e2e-exclusive` — touches a path listed in `e2e/mutating-spec-triggers.json` (an E2E spec
   tagged `@mutates`; see "E2E tests (Playwright)" below).
@@ -58,17 +59,17 @@ registered in `.mcp.json`) instead of hand-rolling `jq`/`gh api`/anchor-text-par
 wherever a pattern is multi-step, state-mutating, or repeats across skills. Tools land
 incrementally; current inventory:
 
-| Tool | Purpose |
-|---|---|
-| `swarm_tools_ping` | Health check — confirms the server is reachable |
-| `swarm_state_append` / `_remove` / `_list` | Read/mutate `.claude/swarm-state.json` (locked, atomic — never hand-write it) |
-| `swarm_state_release_db_lock` | Let an exclusive-resource worker release the shared-local-Postgres lock early (by `agentId`), once its migration/`@mutates` work is applied and verified and only push/PR steps remain — other non-exclusive tickets can then start, while a *new* exclusive-resource worker still waits for it to finish. One-way |
-| `swarm_plan_batch` | Pre-filtered, pre-ranked PR-maintenance + ready-ticket lists for `swarm` |
-| `derive_branch_name` | Ticket branch naming (wraps `lib/slugify.ts`) + collision check |
-| `create_ticket` | `gh issue create` with labels + sub-issue linking, no shell-escaping/tempfile dance |
-| `link_ticket_dependencies` | Apply GitHub blocked-by links to an issue (one comma-joined `gh issue edit --add-blocked-by` call) — ticketify's dependency wiring |
-| `ensure_local_migrations_applied` | Catch a worktree's shared local Postgres up to the committed `supabase/migrations/` before DB-dependent work — fast-paths off a locked `.claude/swarm-migration-state.json` marker, only running `npx supabase migration up --local` when the marker is behind (#863). Called by `swarm` on every worktree spawn. |
-| `ensure_worktree_env` | Copy `.env.dev` from the main checkout root into a worktree, no-clobber — `.env.dev` is gitignored so a freshly created worktree never has it, causing `npm run qa`/the pre-push hook to fail with `SUPABASE_JWT_ROLE environment variable is not set`. Called by `swarm` on every worktree spawn, replacing what used to be manual `cp` prose a worker could skip or botch. |
+| Tool                                       | Purpose                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `swarm_tools_ping`                         | Health check — confirms the server is reachable                                                                                                                                                                                                                                                                                                                              |
+| `swarm_state_append` / `_remove` / `_list` | Read/mutate `.claude/swarm-state.json` (locked, atomic — never hand-write it)                                                                                                                                                                                                                                                                                                |
+| `swarm_state_release_db_lock`              | Let an exclusive-resource worker release the shared-local-Postgres lock early (by `agentId`), once its migration/`@mutates` work is applied and verified and only push/PR steps remain — other non-exclusive tickets can then start, while a _new_ exclusive-resource worker still waits for it to finish. One-way                                                           |
+| `swarm_plan_batch`                         | Pre-filtered, pre-ranked PR-maintenance + ready-ticket lists for `swarm`                                                                                                                                                                                                                                                                                                     |
+| `derive_branch_name`                       | Ticket branch naming (wraps `lib/slugify.ts`) + collision check                                                                                                                                                                                                                                                                                                              |
+| `create_ticket`                            | `gh issue create` with labels + sub-issue linking, no shell-escaping/tempfile dance                                                                                                                                                                                                                                                                                          |
+| `link_ticket_dependencies`                 | Apply GitHub blocked-by links to an issue (one comma-joined `gh issue edit --add-blocked-by` call) — ticketify's dependency wiring                                                                                                                                                                                                                                           |
+| `ensure_local_migrations_applied`          | Catch a worktree's shared local Postgres up to the committed `supabase/migrations/` before DB-dependent work — fast-paths off a locked `.claude/swarm-migration-state.json` marker, only running `npx supabase migration up --local` when the marker is behind (#863). Called by `swarm` on every worktree spawn.                                                            |
+| `ensure_worktree_env`                      | Copy `.env.dev` from the main checkout root into a worktree, no-clobber — `.env.dev` is gitignored so a freshly created worktree never has it, causing `npm run qa`/the pre-push hook to fail with `SUPABASE_JWT_ROLE environment variable is not set`. Called by `swarm` on every worktree spawn, replacing what used to be manual `cp` prose a worker could skip or botch. |
 
 Use these tools for anything that touches `.claude/swarm-state.json`, creates a GitHub issue,
 derives a branch name, or extracts backfill DML — never reimplement the `jq`/glob/anchor-text
@@ -94,7 +95,7 @@ A group can opt an area of its data into public, unauthenticated view via `Ringi
 which returns real data only when the target group has opted in — otherwise nothing, with no JWT
 required. `app/lib/auth/group-summary-access.ts`'s `fetchAuthorisedCoreStats` implements the resulting
 4-case access model for a `(viewedGroupId, viewerGroupId)` pair (own group, always via the normal
-authenticated client; a public grant via `public_core_stats`, checked *before* any
+authenticated client; a public grant via `public_core_stats`, checked _before_ any
 authenticated/RLS attempt — since `public_core_stats` is a pure gated pass-through to
 `core_stats` for the same params, this never shows an already-authorised cross-group viewer a
 degraded view, and it spares an anonymous visitor a wasted authenticated attempt; an existing
@@ -144,16 +145,17 @@ the root layout, not a subtree one.
 
 Tables (PascalCase in Postgres, matching generated TypeScript types in `types/supabase.types.ts`):
 
-| Table | Purpose |
-|---|---|
-| `RingingGroups` | The "users" — ringing organisations |
-| `Birds` | Individual birds identified by ring number |
-| `Species` | Bird species reference data |
-| `Sessions` | A ringing session (date + location) |
-| `Encounters` | One bird captured once in one session, with measurements |
-| `Locations` | Ringing sites, owned by a group |
+| Table           | Purpose                                                  |
+| --------------- | -------------------------------------------------------- |
+| `RingingGroups` | The "users" — ringing organisations                      |
+| `Birds`         | Individual birds identified by ring number               |
+| `Species`       | Bird species reference data                              |
+| `Sessions`      | A ringing session (date + location)                      |
+| `Encounters`    | One bird captured once in one session, with measurements |
+| `Locations`     | Ringing sites, owned by a group                          |
 
 Key design notes:
+
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
 - Several fields are populated by triggers (e.g. `proven_age` on Birds, timestamps on Sessions/Encounters).
 - Complex queries are exposed as Postgres RPC functions (e.g. `core_stats`, `notable_retraps`, `find_discrepencies`).
@@ -195,7 +197,7 @@ three-way split of the adult cohort — `new_adult_bird_count` / `first_summer_b
 − 1)` encounters. #855 removed the client-side "Age split" tile that read them and #856 removed the
 two columns from `demographics_stats_result`, the `adult_age_split`/`adult_split_counts` CTEs and
 the now-unconsumed `bird_year_age_stats` CTE. What survives is `new_adult_bird_count` alone — an
-unchanged, non-exhaustive *subset* of `adult_bird_count` (adults whose first-ever year with the
+unchanged, non-exhaustive _subset_ of `adult_bird_count` (adults whose first-ever year with the
 group is the cell's own `period_year`), read by the "Returning vs new" chart (#854). Don't
 reintroduce either column or the majority-vote heuristic; `arrivals_stats`' `new_adult` /
 `returning_adult` split is the supported way to name the rest of the adult cohort.
@@ -236,7 +238,7 @@ its utility-RPC layering), anything evaluated per row here is paid several times
 Note also what #947 ruled **out**: `stats_spine`'s internal `raw_encounters` CTE is **not**
 duplicated. It has two textual references, so Postgres's `cterefcount > 1` rule always materializes
 it — confirmed at every parameterization. What looks like two derivations in an `EXPLAIN ANALYZE`
-is the *first* `CTE Scan` on each of two different CTEs (`core_stats`' own and `stats_spine`'s)
+is the _first_ `CTE Scan` on each of two different CTEs (`core_stats`' own and `stats_spine`'s)
 carrying its CTE's population cost inclusively. Adding `AS MATERIALIZED` there produces a
 byte-identical plan; don't spend time on it again.
 
@@ -262,7 +264,7 @@ cell (#932).** `stats_bird_returning_age_bucket` originally joined its per-cell 
 relation against each bird's whole per-encounter lifetime history and re-aggregated per cell —
 `O(cells_per_bird × lifetime_encounters_per_bird)`. It now collapses the history to one row per
 (bird, calendar year), `UNION ALL`s those rows with the cells on the same bird/year axis (an
-`event_ord` column ordering a year's history row *before* any cell row for that year, cell rows
+`event_ord` column ordering a year's history row _before_ any cell row for that year, cell rows
 carrying a NULL payload so they never perturb the totals), and accumulates once per bird with
 `SUM`/`MIN`/`bool_or` over `PARTITION BY bird_id ORDER BY (event_year, event_ord) ROWS BETWEEN
 UNBOUNDED PRECEDING AND CURRENT ROW`. Measured 23.4s → 1.2s on a 300-bird × 240-encounter group
@@ -292,18 +294,18 @@ plan caching**, not any exotic data shape: `demographics_stats` is `LANGUAGE plp
 worst estimate available — and PostgREST pools connections, so a busy backend reaches it routinely.
 Group-wide monthly `demographics_stats` measured ~670ms for executions 1–5 and **77,000ms from
 execution 6 onward**; after the rewrite, 520ms and 1,110ms. Keep this in mind for any future
-plpgsql RPC: a shape that is merely *lucky* under a custom plan is guaranteed to be tested under a
+plpgsql RPC: a shape that is merely _lucky_ under a custom plan is guaranteed to be tested under a
 generic one.
 
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
 two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
-counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
+counts per (species, time*period) cell \_independently*, so a bird encountered in Jan, Mar and Jun of
 one year is counted again in each monthly cell. `arrivals_stats` instead counts each bird exactly
 once per calendar year, at whichever cell holds its **first classifiable encounter of that year**,
 bucketed by what the bird was at that encounter — `new_adult` / `returning_adult` / `pullus` / `juv`
 / `postjuv` (mutually exclusive and exhaustive, so the five counts sum to the cell's distinct
 arriving-bird-year count). The per-bird-year resolution lives in the `stats_bird_first_encounter_of_year`
-utility RPC: it drops `'unknown'`-bucket encounters *before* the first-of-year pick (so an
+utility RPC: it drops `'unknown'`-bucket encounters _before_ the first-of-year pick (so an
 unclassifiable early encounter is skipped in favour of the next classifiable one that year, rather
 than losing the bird for that year), takes `DISTINCT ON (bird_id, enc_year)` ordered by
 `visit_date, encounter_id` for same-day determinism, and splits `adult` into `new_adult` vs
@@ -319,7 +321,7 @@ that arrived in two years contributes two counts.
 type's columns by ordinal attribute position, never by the `AS "..."` alias text. That position is
 only as stable as whatever DDL a given environment's `db:schema:apply` run happens to emit for the
 type — confirmed empirically while building `demographics_stats` (as `population_stats`): two
-schema-diff runs against the identical schema files produced two *different* physical attribute
+schema-diff runs against the identical schema files produced two _different_ physical attribute
 orders for a composite type's columns (one matching the file's declared order, one alphabetical),
 silently scrambling values into the wrong named output columns with no error either way.
 `demographics_stats` and `core_stats`
@@ -359,6 +361,7 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
 
 - **Models** (`app/models/`) hold domain types and pure transformation logic — no I/O.
   - Session highlights are plain-data objects (`app/models/highlights/`), split into three independent groups — Rarities, Counts, Vital stats — plus a `long-absence-retrap.ts` sibling; see [`docs/session-highlight-ordering.md`](docs/session-highlight-ordering.md) for the directory layout, each group's own derive → rules → compose pipeline, the fixed section order, and why long-absence-retrap sits outside the three groups. The plain data serialises across the server-action boundary; the client renders each group via its own renderer in `app/components/highlights/{rarities,counts,vital-stats}/renderers.tsx` (each a `type`-keyed `HIGHLIGHT_RENDERERS` map, mapped-typed against that group's own union only, plus a `render*Highlight` dispatch function), with formatting helpers reused across groups (e.g. `capitalize`, `buildSpeciesList`, `formatShortDate`) in `app/components/highlights/shared/render-sentence.tsx` and a barrel at `app/components/highlights/index.ts`. `long-absence-retrap`'s renderer is a sibling (`app/components/highlights/long-absence-retrap-renderer.tsx`), not part of any group and not re-exported from the barrel — it isn't wired into a page yet (see the doc's exclusion note). `app/components/pages/session/SessionHighlights.tsx` partitions the action's flat highlight list into each group's array (using that group's renderer-map keys as the membership check) and renders three independently-shown/hidden sections in the fixed Rarities → Counts → Vital stats order. Editorial refinements belong in a group's own rule (removal/combining) or block composition, or in a renderer (rewording); add a rule by writing a file and slotting it into that group's `RULES`.
+  - A second, experimental highlights pipeline (`app/lib/highlights/v2/session-highlights.ts`'s `sessionHighlights(groupId, date)`) runs alongside the one above on the session page (`SessionHighlights.tsx`) — `getAllRelevantHighlights` → `removeLessSignificantHighlights` → `combineSimilarHighlights` → `sortHighlights`. All four are exported (alongside `sessionHighlights` itself) so a standalone script can inspect each stage. `scripts/session-highlights-refinement-report.ts` (`npm run report:session-highlights-refinement -- <groupId>`, or against prod with `npm run prod:run -- tsx scripts/session-highlights-refinement-report.ts <groupId>`) runs the pipeline for every session date of a group and writes a per-stage diff report (markdown + raw JSON) to `reports/` (gitignored — output can contain real production data). This required threading an optional `supabaseClientOverride` through `getScopedHighlights` → `getStatsByTemporalUnit` → `cachedSupabaseFetch`, since that chain otherwise hardcodes the cookie-based `getAuthenticatedSupabaseClient()` and can't run outside a Next.js request; the override defaults to that same cookie lookup everywhere else, so the live page's behaviour is unchanged.
 - **Actions** (`app/actions/`) are `'use server'` functions that fetch data and return typed results.
 - **Components** (`app/components/`) and page files receive data as props; they do not fetch.
 - Route pages are in `app/(routes)/` — the `(routes)` group is just for organisation, it doesn't affect URLs.
@@ -407,12 +410,11 @@ entrypoint, its content, and its data fetcher:
 
 Naming reference (see #667 for the original design discussion):
 
-| Route | PageComponent (`page.tsx`) | ContentComponent (`PageContent.tsx`) | dataFetcher (`page.tsx`) | Child-component directory |
-|---|---|---|---|---|
-| `app/(routes)/group/[groupSlug]/session/[date]/page.tsx` | `GroupSessionPage` | `SessionPageContent` | `fetchSessionPageContent` | `components/pages/session` |
-| `app/(routes)/bird/[ring]/page.tsx` | `BirdPage` | `BirdPageContent` | `fetchBirdPageContent` | — |
-| `app/(routes)/species/[speciesName]/page.tsx` | `SpeciesPage` | `SpeciesPageContent` | `fetchSpeciesPageContent` | `components/pages/species` |
-
+| Route                                                    | PageComponent (`page.tsx`) | ContentComponent (`PageContent.tsx`) | dataFetcher (`page.tsx`)  | Child-component directory  |
+| -------------------------------------------------------- | -------------------------- | ------------------------------------ | ------------------------- | -------------------------- |
+| `app/(routes)/group/[groupSlug]/session/[date]/page.tsx` | `GroupSessionPage`         | `SessionPageContent`                 | `fetchSessionPageContent` | `components/pages/session` |
+| `app/(routes)/bird/[ring]/page.tsx`                      | `BirdPage`                 | `BirdPageContent`                    | `fetchBirdPageContent`    | —                          |
+| `app/(routes)/species/[speciesName]/page.tsx`            | `SpeciesPage`              | `SpeciesPageContent`                 | `fetchSpeciesPageContent` | `components/pages/species` |
 
 ## Development environment
 
@@ -461,12 +463,12 @@ users are unaffected — groups can still import via the web UI.
 
 Three separate Vitest configs:
 
-| Suite | Config | Command | Runs in |
-|---|---|---|---|
-| App tests | `vitest.config.ts` | `npm run test:nowatch` | pre-push hook + CI |
-| DB integration tests | `vitest.integration.config.ts` | `npm run test:integration` | manually (requires local Supabase); the fixture-freshness test alone also runs pre-push, diff-aware (`npm run test:fixture-freshness`) |
-| HTTP tests | `vitest.http.config.ts` | `npm run test:http` | manually (auto-starts Next.js dev server if not running) |
-| E2E tests | `playwright.config.ts` | `npm run test:e2e` (full) / `test:e2e:safe` / `test:e2e:mutates` | pre-push hook only (diff-aware, see below) |
+| Suite                | Config                         | Command                                                          | Runs in                                                                                                                                |
+| -------------------- | ------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| App tests            | `vitest.config.ts`             | `npm run test:nowatch`                                           | pre-push hook + CI                                                                                                                     |
+| DB integration tests | `vitest.integration.config.ts` | `npm run test:integration`                                       | manually (requires local Supabase); the fixture-freshness test alone also runs pre-push, diff-aware (`npm run test:fixture-freshness`) |
+| HTTP tests           | `vitest.http.config.ts`        | `npm run test:http`                                              | manually (auto-starts Next.js dev server if not running)                                                                               |
+| E2E tests            | `playwright.config.ts`         | `npm run test:e2e` (full) / `test:e2e:safe` / `test:e2e:mutates` | pre-push hook only (diff-aware, see below)                                                                                             |
 
 CI (`.github/workflows/ci.yml`) has exactly three jobs — `lint`, `type-check`, `unit-tests` — and no
 Supabase service, so **no** suite that needs a database runs in CI. The `unit-tests` job fabricates a
@@ -509,6 +511,7 @@ HTTP tests (`http-tests/`) use `http-tests/global-setup.ts` to start/stop the Ne
 ### App tests (Vitest + happy-dom)
 
 Tests live in `__tests__/` directories alongside the code they test. Global mocks in `vitest.setup.tsx`:
+
 - `next/link`, `next/navigation`
 - `app/actions/group-cookie` (returns group ID `1`)
 - `BootstrapPage` component
@@ -563,8 +566,8 @@ completely, so a fixture's shape is never compared against the type at all — a
 column the type has since gained goes uncaught. A direct single assertion still doesn't catch
 every drift (an imported JSON module isn't a fresh object literal, so TypeScript's
 excess-property check never applies to it — a fixture carrying a column the type has since
-*removed* stays assignable either way; that direction is `snapshot-fixture-freshness.test.ts`'s
-job, described below), but it does catch a newly-*added* required column, which the double
+_removed_ stays assignable either way; that direction is `snapshot-fixture-freshness.test.ts`'s
+job, described below), but it does catch a newly-_added_ required column, which the double
 assertion can't. Only fall back to `as unknown as SomeType` when the fixture is a genuine
 structural mismatch — e.g. an ungrouped/species-filtered `core_stats`-family fixture with a
 literal `null` in a column the row type (`CoreStatsResult`, `DemographicsStatsResult`,
@@ -630,7 +633,7 @@ same PR, and hand-edit the two `synthetic/` ones only if their edge case itself 
 regenerating every generated fixture, but they start from different baselines:
 
 - `npm run db:seed:e2e` is **upsert-only** — it never truncates, so it tops up whatever is already
-  in the local database. Fine for routine dev, but *not* a clean baseline: DB integration tests
+  in the local database. Fine for routine dev, but _not_ a clean baseline: DB integration tests
   write real, undeleted rows into the shared seed groups (e.g. `supabase/__tests__/ring-sequences.test.ts`
   and `triggers.test.ts` write into Gamma/Delta with no teardown), and those rows survive into
   whatever you regenerate next.
@@ -660,7 +663,7 @@ more than one table at once.
 
 **Fixing tests after a component default changes:** when a default prop/state value changes (e.g. a
 toggle's initial value flips), don't force old assertions to keep passing by adding a click/toggle
-to reach the old value — only tests whose stated purpose *is* that toggle should drive state via
+to reach the old value — only tests whose stated purpose _is_ that toggle should drive state via
 clicks. For every other test, a full-dataset row count used merely as an incidental "did it load"
 load-signal should just be corrected to whatever the new default actually renders. Toggle-specific
 describe blocks should be inverted (default-state assertions swap direction; a click now reveals the
@@ -709,7 +712,7 @@ source it exercises:
   compiler API and walks its import declarations, excluding type-only imports — so editing e.g.
   `lib/group-auth.ts` (imported by `app/api/import/route.ts`) still
   selects the full suite even though it isn't listed in `mutating-spec-triggers.json` itself.
-- The rare ticket whose scope *does* intersect a trigger path gets the `e2e-exclusive` label
+- The rare ticket whose scope _does_ intersect a trigger path gets the `e2e-exclusive` label
   (alongside `db-migration`, in the same exclusive-resource set `swarm` caps at 1 in-flight — see
   "Larger work" above) so two worktrees never run a `@mutates` spec concurrently.
 - Adding a new spec that writes to shared fixture rows: tag its `test.describe`/`test` with
@@ -718,13 +721,13 @@ source it exercises:
 
 ## Environment variables
 
-| Variable | Purpose |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (public) |
-| `SUPABASE_JWT_SECRET` | Used to sign group JWTs (must match Supabase project's JWT secret) |
-| `SUPABASE_JWT_ROLE` | Postgres role embedded in signed group JWTs. **Required** — the app fails closed if unset. `authenticated` for normal read/write (local dev, Vercel prod, explicit prod-write commands); `app_readonly` for read-only prod access (set by `load-prod-env.sh`) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (bypasses RLS — admin scripts only) |
+| Variable                        | Purpose                                                                                                                                                                                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase project URL                                                                                                                                                                                                                                          |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (public)                                                                                                                                                                                                                                    |
+| `SUPABASE_JWT_SECRET`           | Used to sign group JWTs (must match Supabase project's JWT secret)                                                                                                                                                                                            |
+| `SUPABASE_JWT_ROLE`             | Postgres role embedded in signed group JWTs. **Required** — the app fails closed if unset. `authenticated` for normal read/write (local dev, Vercel prod, explicit prod-write commands); `app_readonly` for read-only prod access (set by `load-prod-env.sh`) |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Supabase service role key (bypasses RLS — admin scripts only)                                                                                                                                                                                                 |
 
 Local values are in `.env.dev`. Production values are managed via 1Password (see `scripts/load-prod-env.sh`).
 
@@ -756,7 +759,6 @@ npm run set-group-password:prod "Group Name" "password"
 
 Passwords are bcrypt-hashed with a per-group random salt stored in the `password_salt` column of `RingingGroups`.
 
-
 ## Project structure
 
 This split is far from perfect and suggestions to improve the comprehensiveness and quality are welcome.
@@ -766,6 +768,8 @@ This split is far from perfect and suggestions to improve the comprehensiveness 
 - ./app/models should be mainly for data structures, with only very minimal functionlaity for transforming/massaging data into related data structures. Anything more complex should live in ./app/lib.
 
 ## Caveman
+
 Use the caveman skill judiciously:
+
 - extensively while implementing
 - less so when communicating with me

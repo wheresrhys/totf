@@ -46,18 +46,21 @@ function groupByColumn<T>(column: keyof T, rows: T[]): Record<string, T[]> {
 
 export async function getStatsByTemporalUnit(
 	temporalUnit: TemporalUnit,
-	viewedGroupId: number
+	viewedGroupId: number,
+	supabaseClientOverride?: SupabaseClient
 ): Promise<StatsRepository<CoreStatsResult>> {
 	const [overall, withSpecies] = await Promise.all([
 		cachedSupabaseFetch(
 			`${temporalUnit}-core-stats`,
 			viewedGroupId,
-			getStatsRPCFetcher('core_stats', temporalUnit)
+			getStatsRPCFetcher('core_stats', temporalUnit),
+			supabaseClientOverride
 		),
 		cachedSupabaseFetch(
 			`${temporalUnit}-species-core-stats`,
 			viewedGroupId,
-			getStatsRPCFetcher('core_stats', temporalUnit, true)
+			getStatsRPCFetcher('core_stats', temporalUnit, true),
+			supabaseClientOverride
 		)
 	]);
 
