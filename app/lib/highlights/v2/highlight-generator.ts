@@ -41,13 +41,15 @@ function generateHighlightsFromStats({
 	limit,
 	temporalUnit,
 	parentTimeWindow,
-	cacheKey
+	cacheKey,
+	includePerSpecies
 }: {
 	stats: StatsRepository<CoreStatsResult>;
 	temporalUnit: TemporalUnit;
 	limit?: number;
 	parentTimeWindow?: YearMonthRestriction;
 	cacheKey: string;
+	includePerSpecies: boolean;
 }): HighlightsOfType[] {
 	let unboundedHighlights: HighlightsOfType[];
 	limit = limit || DEFAULT_OPTIONS.limit;
@@ -70,6 +72,7 @@ function generateHighlightsFromStats({
 						rule.limit ? Math.min(rule.limit, limit) : limit
 					);
 				} else {
+					if (!includePerSpecies) return null;
 					return Object.entries(workingStats).map(
 						([species, workingStatsChild]) => {
 							if (!workingStatsChild.length) return null;
@@ -115,12 +118,14 @@ export async function getScopedHighlights({
 	temporalUnit,
 	groupId,
 	limit,
-	parentTimeWindow
+	parentTimeWindow,
+	includePerSpecies
 }: {
 	temporalUnit: TemporalUnit;
 	groupId: number;
 	limit?: number;
 	parentTimeWindow?: YearMonthRestriction;
+	includePerSpecies: boolean;
 }) {
 	let dailyStats = await getStatsByTemporalUnit(temporalUnit, groupId);
 	let cacheKey = `${groupId}-${temporalUnit}`;
@@ -165,6 +170,7 @@ export async function getScopedHighlights({
 		temporalUnit,
 		parentTimeWindow,
 		stats: dailyStats,
-		limit
+		limit,
+		includePerSpecies
 	});
 }

@@ -190,19 +190,22 @@ async function getAllRelevantHighlights(groupId: number, timePeriod: string) {
 	const allTimeDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
-		limit: 3
+		limit: 3,
+		includePerSpecies: true
 	});
 	const yearDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
 		parentTimeWindow: yearparentTimeWindow,
-		limit: 1
+		limit: 1,
+		includePerSpecies: true
 	});
 	const monthDailyHighlights = await getScopedHighlights({
 		temporalUnit: 'day',
 		groupId,
 		parentTimeWindow: monthparentTimeWindow,
-		limit: 3
+		limit: 3,
+		includePerSpecies: true
 	});
 	return [
 		...filterOutIrrelevantHighlights(allTimeDailyHighlights, timePeriod),

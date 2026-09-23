@@ -296,7 +296,8 @@ export function SummaryTotalsSection({
 				parentTimeWindow: {
 					year,
 					month: month
-				}
+				},
+				includePerSpecies: false
 			}),
 			getScopedHighlights({
 				temporalUnit: 'month',
@@ -304,7 +305,8 @@ export function SummaryTotalsSection({
 				parentTimeWindow: {
 					year,
 					month: month
-				}
+				},
+				includePerSpecies: false
 			})
 		]);
 		return [...daily, ...monthly];

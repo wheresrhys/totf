@@ -20,8 +20,6 @@ import {
 	formatShortDate,
 	renderSentence
 } from '@/app/components/highlights/shared/render-sentence';
-
-import type { CombinedHighlight } from '@/app/lib/highlights/v2/types';
 // ---- copy builders ----
 
 type PeriodFields = {

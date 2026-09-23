@@ -1,5 +1,4 @@
-import type { HighlightsGenerator, CherryPickedHighlight } from '../types';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { HighlightsGenerator } from '../types';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { StatsRepository } from '@/app/actions/highlights-data';
 import {

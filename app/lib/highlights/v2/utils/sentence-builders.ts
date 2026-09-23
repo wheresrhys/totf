@@ -1,7 +1,4 @@
 import type {
-	HighlightsOfType,
-	CherryPickedHighlight,
-	CombinedHighlight,
 	YearMonthRestriction,
 	HighlightValue,
 	HighlightDescriptor,

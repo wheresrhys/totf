@@ -1,6 +1,5 @@
 import type { HighlightValue } from '../types';
 import type { CoreStatsResult } from '@/app/models/db';
-import type { StatsRepository } from '@/app/actions/highlights-data';
 export const DEFAULT_OPTIONS = { limit: 3, threshold: 2 };
 
 type HighlightFinderOptions = {
@@ -44,5 +43,3 @@ export function getTopByProperty(
 ): (stats: CoreStatsResult[]) => HighlightValue[] {
 	return getTopByPropertiesSum([property], options);
 }
-
-type CoreStatsRepository = StatsRepository<CoreStatsResult>;
