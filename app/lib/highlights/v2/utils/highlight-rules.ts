@@ -52,46 +52,6 @@ export function getTopByProperty(
 
 type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 
-// export const highlightRules: HighlightsGenerator[] = [
-// 	{
-// 		statsSelector: (stats: CoreStatsRepository) => stats.overall,
-// 		highlightListPrefixPrinter: (highlightsOfType) =>
-// 		descriptor: {
-// 			type: 'birds',
-// 			unit: 'bird',
-// 			applyVerb: (temporalUnit, species, usePlural) =>
-// 				`Busiest ${printTemporalUnit(temporalUnit, usePlural)}`,
-// 			category: 'count'
-// 		},
-// 		generator: getTopByProperty('bird_count')
-// 	},
-// 	{
-// 		statsSelector: (stats: CoreStatsRepository) => stats.overall,
-// 		descriptor: {
-// 			type: 'encounters',
-// 			unit: 'encounter',
-// 			applyVerb: (temporalUnit, species, usePlural) =>
-// 				`${temporalUnit && `${printTemporalUnit(temporalUnit, usePlural)} with`}  most encounters`,
-// 			category: 'count'
-// 		},
-// 		generator: getTopByProperty('encounter_count'),
-// 		condition: (temporalUnit: TemporalUnit) => temporalUnit !== 'day'
-// 	},
-// 	{
-// 		statsSelector: (stats: CoreStatsRepository) => stats.overall,
-// 		descriptor: {
-// 			type: 'species',
-// 			unit: 'species',
-// 			applyVerb: (temporalUnit, species, usePlural) =>
-// 				`Most varied ${printTemporalUnit(temporalUnit, usePlural)}`,
-// 			category: 'count'
-// 		},
-// 		generator: getTopByProperty('species_count'),
-// 		condition: (
-// 			temporalUnit: TemporalUnit,
-// 			parentTimeWindow?: YearMonthRestriction
-// 		) => !parentTimeWindow?.month
-// 	},
 // 	{
 // 		statsSelector: (stats: CoreStatsRepository) => stats.overall,
 // 		descriptor: {
