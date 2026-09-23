@@ -2,11 +2,14 @@ import {
 	getStatsByTemporalUnit,
 	StatsRepository
 } from '@/app/actions/stats-cache';
+import { groupByColumn } from '@/app/lib/generic-utils';
 import { highlightRules } from '../rules';
 import type { HighlightsOfType, YearMonthRestriction } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import { CoreStatsResult } from '@/app/models/db';
 import { DEFAULT_LIMIT } from '../const';
+
+const cache: Map<string, HighlightsOfType[]> = new Map();
 
 function applyLimitToHighlight(
 	highlightWrapper: HighlightsOfType,
@@ -28,24 +31,8 @@ function applyLimitToHighlight(
 	};
 }
 
-//TODO do something to clear cache when logging out
-
-const cache: Map<string, HighlightsOfType[]> = new Map();
-
 function isHighlightsOfType(item: unknown): item is HighlightsOfType {
 	return Boolean(item);
-}
-
-function groupByColumn<T>(column: keyof T, rows: T[]): Record<string, T[]> {
-	const aggregator: Record<string, T[]> = {};
-	rows.forEach((row: T) => {
-		const groupKey = row[column] as string;
-		if (!(groupKey in aggregator)) {
-			aggregator[groupKey] = [];
-		}
-		aggregator[groupKey].push(row);
-	});
-	return aggregator;
 }
 
 function generateAllHighlights({
@@ -136,6 +123,27 @@ function getCacheUtils(
 	return { filter, cacheKey };
 }
 
+async function getFilteredStats(
+	temporalUnit: TemporalUnit,
+	groupId: number,
+	filter: ((timePeriod: string) => boolean) | null
+) {
+	const stats = await getStatsByTemporalUnit(temporalUnit, groupId);
+
+	if (!filter) {
+		return stats;
+	}
+	const withSpecies = stats.withSpecies.filter(({ time_period }) =>
+		filter(time_period)
+	);
+	const bySpecies = groupByColumn('species_name', withSpecies);
+	return {
+		overall: stats.overall.filter(({ time_period }) => filter(time_period)),
+		withSpecies,
+		bySpecies
+	};
+}
+
 export async function getHighlightsWithinTimeWindow({
 	temporalUnit,
 	groupId,
@@ -160,28 +168,15 @@ export async function getHighlightsWithinTimeWindow({
 	if (cache.has(cacheKey)) {
 		return cache.get(cacheKey) as HighlightsOfType[];
 	}
-	let stats = await getStatsByTemporalUnit(temporalUnit, groupId);
 
-	if (filter) {
-		const withSpecies = stats.withSpecies.filter(({ time_period }) =>
-			filter(time_period)
-		);
-		const bySpecies = groupByColumn('species_name', withSpecies);
-		stats = {
-			overall: stats.overall.filter(({ time_period }) => filter(time_period)),
-			withSpecies,
-			bySpecies
-		};
-	}
-
-	const unboundedHighlights = generateAllHighlights({
-		stats,
+	const highlights = generateAllHighlights({
+		stats: await getFilteredStats(temporalUnit, groupId, filter),
 		temporalUnit,
 		parentTimeWindow,
 		limit,
 		includePerSpecies
 	});
 
-	cache.set(cacheKey, unboundedHighlights);
-	return unboundedHighlights;
+	cache.set(cacheKey, highlights);
+	return highlights;
 }
