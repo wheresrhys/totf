@@ -1,12 +1,26 @@
 import type {
 	HighlightValue,
 	HighlightsGenerator,
-	YearMonthRestriction
+	YearMonthRestriction,
+	VerbApplier
 } from './types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { StatsRepository } from '@/app/actions/highlights-data';
 export const DEFAULT_OPTIONS = { limit: 3, threshold: 0 };
+
+import { getPlural } from '@/app/components/shared/StatOutput';
+
+function printTemporalUnit(
+	temporalUnit: TemporalUnit | null,
+	usePlural?: boolean
+) {
+	if (!temporalUnit) return '';
+
+	const base = temporalUnit === 'day' ? 'session' : temporalUnit;
+
+	return usePlural ? getPlural(base) : base;
+}
 
 type HighlightFinderOptions = {
 	threshold?: number;
@@ -58,7 +72,8 @@ export const highlightRules: HighlightsGenerator[] = [
 		descriptor: {
 			type: 'birds',
 			unit: 'bird',
-			verb: 'Busiest',
+			applyVerb: (temporalUnit, species, usePlural) =>
+				`Busiest ${printTemporalUnit(temporalUnit, usePlural)}`,
 			category: 'count'
 		},
 		generator: getTopByProperty('bird_count')
@@ -68,7 +83,8 @@ export const highlightRules: HighlightsGenerator[] = [
 		descriptor: {
 			type: 'encounters',
 			unit: 'encounter',
-			verb: 'Most encounters per',
+			applyVerb: (temporalUnit, species, usePlural) =>
+				`${temporalUnit && `${printTemporalUnit(temporalUnit, usePlural)} with`}  most encounters`,
 			category: 'count'
 		},
 		generator: getTopByProperty('encounter_count'),
@@ -79,7 +95,8 @@ export const highlightRules: HighlightsGenerator[] = [
 		descriptor: {
 			type: 'species',
 			unit: 'species',
-			verb: 'Most varied',
+			applyVerb: (temporalUnit, species, usePlural) =>
+				`Most varied ${printTemporalUnit(temporalUnit, usePlural)}`,
 			category: 'count'
 		},
 		generator: getTopByProperty('species_count'),
@@ -94,7 +111,8 @@ export const highlightRules: HighlightsGenerator[] = [
 			type: 'newBirds',
 			category: 'count',
 			unit: 'bird',
-			verb: 'Most new birds in a'
+			applyVerb: (temporalUnit, species, usePlural) =>
+				`${temporalUnit && `${printTemporalUnit(temporalUnit, usePlural)} with`} most new birds`
 		},
 		generator: getTopByProperty('new_bird_count'),
 		condition: (
@@ -108,7 +126,8 @@ export const highlightRules: HighlightsGenerator[] = [
 			type: 'young',
 			category: 'count',
 			unit: 'bird',
-			verb: 'Most young in a'
+			applyVerb: (temporalUnit, species, usePlural) =>
+				`${temporalUnit && `${printTemporalUnit(temporalUnit, usePlural)} with`}  most young birds`
 		},
 		generator: getTopByPropertiesSum([
 			'pullus_bird_count',
@@ -126,7 +145,12 @@ export const highlightRules: HighlightsGenerator[] = [
 			type: 'singleSpeciesCount',
 			category: 'count',
 			unit: 'bird',
-			verb: 'Highest single species count in a',
+			applyVerb: (temporalUnit, species, usePlural) =>
+				`Highest single species count ${
+					temporalUnit! == 'day'
+						? `in a ${printTemporalUnit(temporalUnit, usePlural)}`
+						: ''
+				}`,
 			speciesUnitMode: 'replace'
 		},
 		generator: getTopByProperty('bird_count'),
@@ -141,7 +165,8 @@ export const highlightRules: HighlightsGenerator[] = [
 			type: 'singleSpeciesEncounters',
 			category: 'count',
 			unit: 'encounter',
-			verb: 'Most single species encounters in a',
+			applyVerb: (temporalUnit, species, usePlural) =>
+				`Most single species encounters in a ${printTemporalUnit(temporalUnit, usePlural)}`,
 			speciesUnitMode: 'prefix'
 		},
 		generator: getTopByProperty('encounter_count'),
@@ -156,7 +181,8 @@ export const highlightRules: HighlightsGenerator[] = [
 			type: 'eachSpeciesCount',
 			category: 'count',
 			unit: 'bird',
-			verb: 'High species count',
+			applyVerb: (temporalUnit, species, usePlural) =>
+				`Most ${species} in a ${printTemporalUnit(temporalUnit, usePlural)}`,
 			speciesUnitMode: 'replace'
 		},
 		generator: getTopByProperty('encounter_count', { threshold: 1 }),
@@ -171,7 +197,8 @@ export const highlightRules: HighlightsGenerator[] = [
 			type: 'eachSpeciesYoung',
 			category: 'count',
 			unit: 'bird',
-			verb: 'Most young of this species in a',
+			applyVerb: (temporalUnit, species, usePlural) =>
+				`Most young ${species} in a ${printTemporalUnit(temporalUnit, usePlural)}`,
 			speciesUnitMode: 'replace'
 		},
 		generator: getTopByPropertiesSum([

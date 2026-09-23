@@ -19,12 +19,16 @@ export type HighlightValue = {
 	value: number;
 	species: string | null;
 };
-
+export type VerbApplier = (
+	temporalUnit: TemporalUnit | null,
+	species: string | undefined,
+	usePlural?: boolean
+) => string;
 export type SpeciesUnitMode = 'replace' | 'prefix' | undefined;
 export type HighlightDescriptor = {
 	category: HighlightCategory;
 	type: string;
-	verb: string;
+	applyVerb: VerbApplier;
 	unit: StatUnit;
 	speciesUnitMode?: SpeciesUnitMode;
 };

@@ -4,7 +4,8 @@ import type {
 	CombinedHighlights,
 	YearMonthRestriction,
 	HighlightValue,
-	HighlightDescriptor
+	HighlightDescriptor,
+	VerbApplier
 } from './types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 
@@ -25,10 +26,6 @@ const fullMonthNames = [
 	'December'
 ];
 
-function printTemporalUnit(temporalUnit: TemporalUnit) {
-	return temporalUnit === 'day' ? 'session' : temporalUnit;
-}
-
 export function printValue(
 	value: HighlightValue,
 	descriptor: HighlightDescriptor
@@ -44,15 +41,17 @@ export function printValue(
 }
 
 export function printDescriptor({
-	verb,
+	applyVerb,
 	usePlural = false,
-	temporalUnit
+	temporalUnit,
+	species
 }: {
-	verb: string;
+	applyVerb: VerbApplier;
 	usePlural?: boolean;
-	temporalUnit: TemporalUnit;
+	temporalUnit: TemporalUnit | null;
+	species?: string;
 }) {
-	return `${verb.toLowerCase()} ${usePlural ? getPlural(printTemporalUnit(temporalUnit)) : printTemporalUnit(temporalUnit)}`;
+	return applyVerb(temporalUnit, species, usePlural).toLowerCase();
 }
 
 function prettyPrintPosition(position: number) {
@@ -75,7 +74,7 @@ function prettyPrintPosition(position: number) {
 export function printProminenceQualifier({
 	ranking: { position, isTied }
 }: CherryPickedHighlight) {
-	return `${isTied ? 'joint ' : ''}${prettyPrintPosition(position)}`;
+	return `${isTied ? 'equal ' : ''}${prettyPrintPosition(position)}`;
 }
 
 export function printTimeQualifier({ year, month }: YearMonthRestriction) {
@@ -85,7 +84,7 @@ export function printTimeQualifier({ year, month }: YearMonthRestriction) {
 			? `this ${month}`
 			: `of ${month} ${year}`;
 	} else if (year) {
-		return year === new Date().getFullYear() ? `this year` : `in ${year}`;
+		return year === new Date().getFullYear() ? `this year` : `of ${year}`;
 	} else if (month) {
 		return `in any ${fullMonthNames[month]}`;
 	} else {
@@ -93,11 +92,16 @@ export function printTimeQualifier({ year, month }: YearMonthRestriction) {
 	}
 }
 
-function printSingleHighlightPreamble(highlight: CherryPickedHighlight) {
+function printSingleHighlightPreamble(
+	highlight: CherryPickedHighlight & { suppressTemporalUnit?: boolean }
+) {
 	return `${printProminenceQualifier(highlight)} ${printDescriptor({
-		verb: highlight.descriptor.verb,
+		applyVerb: highlight.descriptor.applyVerb,
 		usePlural: false,
-		temporalUnit: highlight.scope.temporalUnit
+		temporalUnit: highlight.suppressTemporalUnit
+			? null
+			: highlight.scope.temporalUnit,
+		species: highlight.scope.species
 	})} ${printTimeQualifier(highlight.scope.parentTimeWindow || {})}`;
 }
 
@@ -126,11 +130,12 @@ function sentenceCase(sentence: string) {
 }
 
 export function printMultipleHighlightSentence(highlight: CombinedHighlights) {
-	const preambles = highlight.scopes.map((scope) =>
+	const preambles = highlight.scopes.map((scope, i) =>
 		printSingleHighlightPreamble({
 			...scope,
 			descriptor: highlight.descriptor,
-			value: highlight.value
+			value: highlight.value,
+			suppressTemporalUnit: i > 0
 		})
 	);
 	return sentenceCase(
@@ -139,13 +144,13 @@ export function printMultipleHighlightSentence(highlight: CombinedHighlights) {
 }
 
 export function printHighlightListPrefix({
-	descriptor: { verb },
+	descriptor: { applyVerb },
 	scope: { temporalUnit },
 	values
 }: HighlightsOfType) {
 	return sentenceCase(
 		printDescriptor({
-			verb,
+			applyVerb,
 			temporalUnit,
 			usePlural: values.length > 1
 		})
