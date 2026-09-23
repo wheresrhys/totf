@@ -18,7 +18,7 @@ export const juvs: HighlightsGenerator = {
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement = `${printProminenceQualifier(scope.ranking)} most juvs ${printTimeQualifier(scope.scope.parentTimeWindow || {})}`;
+				const centralStatement = `${printProminenceQualifier(scope.ranking)} most juvs ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
 
 				return i === 0
 					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`

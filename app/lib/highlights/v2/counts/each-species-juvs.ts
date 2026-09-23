@@ -26,7 +26,7 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 						result += ` in a ${printTemporalUnit(scope.scope.temporalUnit)}`;
 					}
 				}
-				result += printTimeQualifier(scope.scope.parentTimeWindow || {});
+				result += printTimeQualifier(scope.scope.parentTimeWindow);
 				return result;
 			});
 			return sentenceCase(

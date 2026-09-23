@@ -93,9 +93,13 @@ export function printFullMonthName(monthIndex: number) {
 }
 
 export function printTimeQualifier(
-	{ year, month }: YearMonthRestriction,
+	timeQualifier?: YearMonthRestriction,
 	connector?: 'in' | 'of'
 ) {
+	if (!timeQualifier) {
+		return 'every';
+	}
+	const { year, month } = timeQualifier;
 	if (year && month) {
 		// todo pretty print month
 		return year === new Date().getFullYear()
@@ -107,8 +111,6 @@ export function printTimeQualifier(
 			: `${connector ?? 'of'} ${year}`;
 	} else if (month) {
 		return `${connector ?? 'in'} any ${fullMonthNames[month]}`;
-	} else {
-		return `ever`;
 	}
 }
 

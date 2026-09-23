@@ -24,7 +24,7 @@ export const birdCount: HighlightsGenerator = {
 					result += `${printFullMonthName(scope.scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.scope.temporalUnit)} ever`;
 				} else {
 					result +=
-						+`${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow || {})}`;
+						+`${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
 				}
 				return result;
 			});

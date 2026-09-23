@@ -19,7 +19,7 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map(
 				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking)} encounters of a single species ${i === 0 ? `in a ${printTemporalUnit(scope.scope.temporalUnit)}` : ''} ${printTimeQualifier(scope.scope.parentTimeWindow || {})}`
+					`${printProminenceQualifier(scope.ranking)} encounters of a single species ${i === 0 ? `in a ${printTemporalUnit(scope.scope.temporalUnit)}` : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`
 			);
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()

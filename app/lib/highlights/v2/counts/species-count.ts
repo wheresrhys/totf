@@ -20,7 +20,7 @@ export const speciesCount: HighlightsGenerator = {
 			const preambles = combinedHighlight.scopes.map(
 				(scope, i) =>
 					// todo don't actually need 'for species' here, but keeping for now as may be useful later
-					`${printProminenceQualifier(scope.ranking)} most varied ${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow || {})}`
+					`${printProminenceQualifier(scope.ranking)} most varied ${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`
 			);
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
