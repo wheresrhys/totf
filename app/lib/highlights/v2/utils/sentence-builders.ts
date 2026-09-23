@@ -37,15 +37,24 @@ export function printTemporalUnit(
 	return usePlural ? getPlural(base) : base;
 }
 
+export function pluraliseSpecies(species: string) {
+	if (species.toLowerCase().endsWith('finch')) return `${species}es`;
+	return `${species}s`;
+}
+
 export function printValue(
 	value: HighlightValue,
 	descriptor: HighlightDescriptor
 ) {
 	switch (descriptor.speciesUnitMode) {
 		case 'replace':
-			return `${value.value} ${value.species}${value.value > 1 ? 's' : ''}`;
+			if (value.species) {
+				return `${value.value} ${value.value > 1 ? pluraliseSpecies(value.species) : ''}`;
+			}
 		case 'prefix':
-			return `${value.value} ${value.species} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
+			if (value.species) {
+				return `${value.value} ${value.species} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
+			}
 		default:
 			return `${value.value} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
 	}
