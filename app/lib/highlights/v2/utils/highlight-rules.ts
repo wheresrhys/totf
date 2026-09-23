@@ -32,7 +32,7 @@ export function getTopByPropertiesSum(
 		}));
 		const max = Math.max(...potentialHighlights.map((item) => item.value));
 		return potentialHighlights
-			.filter((row) => row.value > Math.max(threshold, max / 2))
+			.filter((row) => row.value >= Math.max(threshold, max / 2))
 			.sort((a, b) => b.value - a.value);
 	};
 }

@@ -8,7 +8,7 @@ import type {
 	HighlightCategory
 } from './types';
 import { getScopedHighlights } from './highlight-generator';
-
+import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 const highlightCategoryOrder: HighlightCategory[] = [
 	'rarity',
 	'count',
@@ -182,45 +182,56 @@ function sortHighlights(highlights: CombinedHighlight[]) {
 	});
 }
 
-async function getAllRelevantHighlights(groupId: number, timePeriod: string) {
+async function getAllRelevantHighlights(
+	groupId: number,
+	timePeriod: string,
+	temporalUnit: TemporalUnit
+) {
 	const yearparentTimeWindow = { year: Number(timePeriod.split('-')[0]) };
 	const monthparentTimeWindow = {
 		month: Number(timePeriod.split('-')[1])
 	};
-	const allTimeDailyHighlights = await getScopedHighlights({
-		temporalUnit: 'day',
+	const allTimeHighlights = await getScopedHighlights({
+		temporalUnit: temporalUnit,
 		groupId,
 		limit: 3,
 		includePerSpecies: true
 	});
-	const yearDailyHighlights = await getScopedHighlights({
-		temporalUnit: 'day',
-		groupId,
-		parentTimeWindow: yearparentTimeWindow,
-		limit: 1,
-		includePerSpecies: true
-	});
-	const monthDailyHighlights = await getScopedHighlights({
-		temporalUnit: 'day',
-		groupId,
-		parentTimeWindow: monthparentTimeWindow,
-		limit: 3,
-		includePerSpecies: true
-	});
-	return [
-		...filterOutIrrelevantHighlights(allTimeDailyHighlights, timePeriod),
-		...filterOutIrrelevantHighlights(yearDailyHighlights, timePeriod),
-		...filterOutIrrelevantHighlights(monthDailyHighlights, timePeriod)
-	];
+	const yearHighlights =
+		temporalUnit !== 'year'
+			? await getScopedHighlights({
+					temporalUnit: temporalUnit,
+					groupId,
+					parentTimeWindow: yearparentTimeWindow,
+					limit: 1,
+					includePerSpecies: true
+				})
+			: [];
+	const monthHighlights =
+		temporalUnit === 'day'
+			? await getScopedHighlights({
+					temporalUnit: temporalUnit,
+					groupId,
+					parentTimeWindow: monthparentTimeWindow,
+					limit: 3,
+					includePerSpecies: true
+				})
+			: [];
+	return filterOutIrrelevantHighlights(
+		[...allTimeHighlights, ...yearHighlights, ...monthHighlights],
+		timePeriod
+	);
 }
 
-export async function sessionHighlights(
+export async function getCondensedTimePeriodHighlights(
 	groupId: number,
-	timePeriod: string
+	timePeriod: string,
+	temporalUnit: TemporalUnit
 ): Promise<CombinedHighlight[]> {
 	const allRelevantHighlights = await getAllRelevantHighlights(
 		groupId,
-		timePeriod
+		timePeriod,
+		temporalUnit
 	);
 	const significantHighlights = removeLessSignificantHighlights(
 		allRelevantHighlights

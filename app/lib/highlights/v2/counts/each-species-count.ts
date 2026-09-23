@@ -43,7 +43,7 @@ export const eachSpeciesCount: HighlightsGenerator = {
 		unit: 'bird',
 		category: 'count'
 	},
-	generator: getTopByProperty('bird_count', { threshold: 1 }),
+	generator: getTopByProperty('bird_count', { threshold: 2 }),
 	condition: (
 		temporalUnit: TemporalUnit,
 		parentTimeWindow?: YearMonthRestriction
