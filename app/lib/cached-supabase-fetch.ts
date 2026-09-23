@@ -1,5 +1,5 @@
 import { getAuthenticatedSupabaseClient } from './auth/group-auth';
-
+import type { SupabaseClient } from '@supabase/supabase-js';
 // This library is only used for fetching large matrices of stats, which
 // only change when new data is imported. Each cache entry
 // carries a version token (max Encounters.id for the group) so that a new
@@ -24,7 +24,7 @@ function getCache<T>(namespace: string): CacheByGroup<T> {
 }
 
 export async function fetchVersion(
-	supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>,
+	supabase: SupabaseClient,
 	viewedGroupId: number
 ): Promise<number> {
 	const { data } = await supabase
