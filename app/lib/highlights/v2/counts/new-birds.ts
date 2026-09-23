@@ -34,7 +34,7 @@ export const newBirds: HighlightsGenerator = {
 	descriptor: {
 		type: 'newBirds',
 		unit: 'bird',
-		category: 'count'
+		category: 'demographics'
 	},
 	generator: getTopByProperty('new_bird_count'),
 	condition: (

@@ -132,7 +132,7 @@ function removeLessSignificantHighlights(
 ): CherryPickedHighlight[] {
 	return highlights.filter((highlight) => {
 		if (highlight.scope.parentTimeWindow) {
-			const isClobbered = highlights.some(
+			const clobberer = highlights.find(
 				(potentialClobber) =>
 					// don't clobber highlights of a completely different type
 					potentialClobber.descriptor.type === highlight.descriptor.type &&
@@ -152,8 +152,10 @@ function removeLessSignificantHighlights(
 						!highlight.ranking.isTied
 					)
 			);
-
-			return !isClobbered;
+			if (clobberer) {
+				console.log(highlight, clobberer);
+			}
+			return !clobberer;
 		} else {
 			return true;
 		}
@@ -162,17 +164,21 @@ function removeLessSignificantHighlights(
 
 function sortHighlights(highlights: CombinedHighlight[]) {
 	return highlights.toSorted((a, b) => {
-		if (a.species && !b.species) return 1;
-		if (!a.species && b.species) return -1;
 		const categoryOrdering =
 			highlightCategoryOrder.indexOf(b.descriptor.category) -
 			highlightCategoryOrder.indexOf(a.descriptor.category);
 
 		if (categoryOrdering) return categoryOrdering;
+		if (a.species && !b.species) return 1;
+		if (!a.species && b.species) return -1;
 
-		return b.bestPosition === a.bestPosition
-			? b.value.value - a.value.value
-			: a.bestPosition - b.bestPosition;
+		if (b.bestPosition !== a.bestPosition)
+			return a.bestPosition - b.bestPosition;
+		const windowAScore = timeWindowToNumber(a.scopes[0].scope.parentTimeWindow);
+		const windowBScore = timeWindowToNumber(b.scopes[0].scope.parentTimeWindow);
+		if (windowAScore !== windowBScore) return windowBScore - windowAScore;
+
+		return b.value.value - a.value.value;
 	});
 }
 

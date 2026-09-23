@@ -12,7 +12,11 @@ export type YearMonthRestriction = {
 	year?: number;
 	month?: number;
 };
-export type HighlightCategory = 'count' | 'rarity' | 'biometrics';
+export type HighlightCategory =
+	| 'count'
+	| 'rarity'
+	| 'biometrics'
+	| 'demographics';
 
 export type HighlightValue = {
 	timePeriod: string;

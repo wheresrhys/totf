@@ -34,7 +34,7 @@ export const youngBirds: HighlightsGenerator = {
 	descriptor: {
 		type: 'young',
 		unit: 'bird',
-		category: 'count'
+		category: 'demographics'
 	},
 	generator: getTopByPropertiesSum([
 		'pullus_bird_count',

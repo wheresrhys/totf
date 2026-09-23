@@ -128,6 +128,19 @@ export function SessionHighlights({
 	}
 	return (
 		<section data-testid="session-highlights">
+			<>
+				<SecondaryHeading>V2</SecondaryHeading>
+				<BoxyList testId="counts">
+					{highlights.v2.map((highlight: CombinedHighlight) => {
+						return (
+							<li key={`v2-${highlight.descriptor.type}-${highlight.species}`}>
+								{highlight.descriptor.category}:{' '}
+								{highlight.formatters.combinedHighlightPrinter(highlight)}
+							</li>
+						);
+					})}
+				</BoxyList>
+			</>
 			{showRarities ? (
 				<>
 					<SecondaryHeading>Rarities</SecondaryHeading>
@@ -140,13 +153,6 @@ export function SessionHighlights({
 				<>
 					<SecondaryHeading>Counts</SecondaryHeading>
 					<BoxyList testId="counts">
-						{highlights.v2.map((highlight: CombinedHighlight) => {
-							return (
-								<li key={`v2-${highlight.descriptor.type}`}>
-									{highlight.formatters.combinedHighlightPrinter(highlight)}
-								</li>
-							);
-						})}
 						{countHighlights.map(renderCountHighlight)}
 					</BoxyList>
 				</>
