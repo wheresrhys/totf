@@ -2,7 +2,8 @@ import {
 	getStatsByTemporalUnit,
 	StatsRepository
 } from '@/app/actions/highlights-data';
-import { DEFAULT_OPTIONS, highlightRules } from './highlight-rules';
+import { DEFAULT_OPTIONS } from './utils/highlight-rules';
+import { highlightRules } from './rules';
 import type { HighlightsOfType, YearMonthRestriction } from './types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import { CoreStatsResult } from '@/app/models/db';

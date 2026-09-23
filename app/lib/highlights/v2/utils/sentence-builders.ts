@@ -1,12 +1,12 @@
 import type {
 	HighlightsOfType,
 	CherryPickedHighlight,
-	CombinedHighlights,
+	CombinedHighlight,
 	YearMonthRestriction,
 	HighlightValue,
 	HighlightDescriptor,
-	VerbApplier
-} from './types';
+	HighlightRanking
+} from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 
 import { getPlural } from '@/app/components/shared/StatOutput';
@@ -26,6 +26,17 @@ const fullMonthNames = [
 	'December'
 ];
 
+export function printTemporalUnit(
+	temporalUnit: TemporalUnit | null,
+	usePlural?: boolean
+) {
+	if (!temporalUnit) return '';
+
+	const base = temporalUnit === 'day' ? 'session' : temporalUnit;
+
+	return usePlural ? getPlural(base) : base;
+}
+
 export function printValue(
 	value: HighlightValue,
 	descriptor: HighlightDescriptor
@@ -40,21 +51,7 @@ export function printValue(
 	}
 }
 
-export function printDescriptor({
-	applyVerb,
-	usePlural = false,
-	temporalUnit,
-	species
-}: {
-	applyVerb: VerbApplier;
-	usePlural?: boolean;
-	temporalUnit: TemporalUnit | null;
-	species?: string;
-}) {
-	return applyVerb(temporalUnit, species, usePlural).toLowerCase();
-}
-
-function prettyPrintPosition(position: number) {
+export function prettyPrintPosition(position: number) {
 	switch (position) {
 		case 1:
 			return '';
@@ -72,8 +69,9 @@ function prettyPrintPosition(position: number) {
 }
 
 export function printProminenceQualifier({
-	ranking: { position, isTied }
-}: CherryPickedHighlight) {
+	position,
+	isTied
+}: HighlightRanking) {
 	return `${isTied ? 'equal ' : ''}${prettyPrintPosition(position)}`;
 }
 
@@ -92,26 +90,7 @@ export function printTimeQualifier({ year, month }: YearMonthRestriction) {
 	}
 }
 
-function printSingleHighlightPreamble(
-	highlight: CherryPickedHighlight & { suppressTemporalUnit?: boolean }
-) {
-	return `${printProminenceQualifier(highlight)} ${printDescriptor({
-		applyVerb: highlight.descriptor.applyVerb,
-		usePlural: false,
-		temporalUnit: highlight.suppressTemporalUnit
-			? null
-			: highlight.scope.temporalUnit,
-		species: highlight.scope.species
-	})} ${printTimeQualifier(highlight.scope.parentTimeWindow || {})}`;
-}
-
-export function printSingleHighlightSentence(highlight: CherryPickedHighlight) {
-	return sentenceCase(
-		`${printSingleHighlightPreamble(highlight)}: ${printValue(highlight.value, highlight.descriptor)}`.trim()
-	);
-}
-
-function sentenceJoin(clauses: string[]) {
+export function sentenceJoin(clauses: string[]) {
 	let sentence = clauses.pop();
 
 	if (clauses.length) {
@@ -125,34 +104,6 @@ function sentenceJoin(clauses: string[]) {
 	return sentence;
 }
 
-function sentenceCase(sentence: string) {
+export function sentenceCase(sentence: string) {
 	return sentence.charAt(0).toUpperCase() + sentence.substring(1);
-}
-
-export function printMultipleHighlightSentence(highlight: CombinedHighlights) {
-	const preambles = highlight.scopes.map((scope, i) =>
-		printSingleHighlightPreamble({
-			...scope,
-			descriptor: highlight.descriptor,
-			value: highlight.value,
-			suppressTemporalUnit: i > 0
-		})
-	);
-	return sentenceCase(
-		`${sentenceJoin(preambles)}: ${printValue(highlight.value, highlight.descriptor)}`.trim()
-	);
-}
-
-export function printHighlightListPrefix({
-	descriptor: { applyVerb },
-	scope: { temporalUnit },
-	values
-}: HighlightsOfType) {
-	return sentenceCase(
-		printDescriptor({
-			applyVerb,
-			temporalUnit,
-			usePlural: values.length > 1
-		})
-	);
 }

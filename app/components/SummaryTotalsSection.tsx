@@ -25,7 +25,6 @@ import {
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
-import { printHighlightListPrefix } from '@/app/lib/highlights/v2/sentence-builders';
 import { StatOutput } from '@/app/components/shared/StatOutput';
 
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
@@ -478,7 +477,7 @@ export function SummaryTotalsSection({
 								<div
 									key={`${highlight.descriptor.type}-${highlight.scope.temporalUnit}`}
 								>
-									{printHighlightListPrefix(highlight)}:{' '}
+									{highlight.formatters.highlightListPrefixPrinter(highlight)}:{' '}
 									<div className="flex gap-2">
 										{highlight.values.map(({ timePeriod, value }) => (
 											<span className="badge badge-outline" key={timePeriod}>

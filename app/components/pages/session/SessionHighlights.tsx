@@ -8,12 +8,11 @@ import { fetchSessionHighlights } from '@/app/actions/session-highlights';
 
 import { sessionHighlights } from '@/app/lib/highlights/v2/session-highlights';
 
-import { type CombinedHighlights } from '@/app/lib/highlights/v2/types';
+import { type CombinedHighlight } from '@/app/lib/highlights/v2/types';
 import {
 	renderRarityHighlight,
 	RARITY_HIGHLIGHT_RENDERERS,
 	renderCountHighlight,
-	renderV2Highlight,
 	COUNT_HIGHLIGHT_RENDERERS,
 	renderVitalStatHighlight,
 	VITAL_STAT_HIGHLIGHT_RENDERERS
@@ -28,7 +27,7 @@ import type { SessionEncounter } from '@/app/models/session';
 
 type HighlightsData = {
 	v1: SessionHighlight[];
-	v2: CombinedHighlights[];
+	v2: CombinedHighlight[];
 };
 // Each group's own renderer map (from the barrel) is the single source of
 // truth for which highlight `type`s belong to that group — reusing its keys
@@ -141,7 +140,13 @@ export function SessionHighlights({
 				<>
 					<SecondaryHeading>Counts</SecondaryHeading>
 					<BoxyList testId="counts">
-						{highlights.v2.map(renderV2Highlight)}
+						{highlights.v2.map((highlight: CombinedHighlight) => {
+							return (
+								<li key={`v2-${highlight.descriptor.type}`}>
+									{highlight.formatters.combinedHighlightPrinter(highlight)}
+								</li>
+							);
+						})}
 						{countHighlights.map(renderCountHighlight)}
 					</BoxyList>
 				</>

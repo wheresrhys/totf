@@ -4,7 +4,7 @@ import type {
 	YearMonthRestriction,
 	HighlightDescriptor,
 	HighlightValue,
-	CombinedHighlights,
+	CombinedHighlight,
 	HighlightCategory
 } from './types';
 import { getScopedHighlights } from './highlight-generator';
@@ -78,7 +78,7 @@ function timeWindowToNumber(
 
 function combineSimilarHighlights(
 	highlights: CherryPickedHighlight[]
-): CombinedHighlights[] {
+): CombinedHighlight[] {
 	const groupedByDescriptor: Map<string, CherryPickedHighlight[]> = new Map();
 	highlights.forEach((highlight) => {
 		const mapKey = `${descriptorToString(highlight.descriptor)}-${highlight.value.species}`;
@@ -112,6 +112,7 @@ function combineSimilarHighlights(
 			}
 		);
 		return {
+			formatters: highlights[0].formatters,
 			descriptor: highlights[0].descriptor,
 			value: highlights[0].value,
 			species: highlights[0].scope.species,
@@ -157,7 +158,7 @@ function removeLessSignificantHighlights(
 	});
 }
 
-function sortHighlights(highlights: CombinedHighlights[]) {
+function sortHighlights(highlights: CombinedHighlight[]) {
 	return highlights.toSorted((a, b) => {
 		if (a.species && !b.species) return 1;
 		if (!a.species && b.species) return -1;
@@ -205,7 +206,7 @@ async function getAllRelevantHighlights(groupId: number, timePeriod: string) {
 export async function sessionHighlights(
 	groupId: number,
 	timePeriod: string
-): Promise<CombinedHighlights[]> {
+): Promise<CombinedHighlight[]> {
 	const allRelevantHighlights = await getAllRelevantHighlights(
 		groupId,
 		timePeriod

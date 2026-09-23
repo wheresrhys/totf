@@ -21,8 +21,7 @@ import {
 	renderSentence
 } from '@/app/components/highlights/shared/render-sentence';
 
-import type { CombinedHighlights } from '@/app/lib/highlights/v2/types';
-import { printMultipleHighlightSentence } from '@/app/lib/highlights/v2/sentence-builders';
+import type { CombinedHighlight } from '@/app/lib/highlights/v2/types';
 // ---- copy builders ----
 
 type PeriodFields = {
@@ -262,12 +261,4 @@ export function renderCountHighlight(highlight: CountHighlight): ReactElement {
 		matched: CountHighlight
 	) => ReactElement;
 	return render(highlight);
-}
-
-export function renderV2Highlight(highlight: CombinedHighlights): ReactElement {
-	return (
-		<li key={`v2-${highlight.descriptor.type}`}>
-			{printMultipleHighlightSentence(highlight)}
-		</li>
-	);
 }

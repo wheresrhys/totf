@@ -19,33 +19,29 @@ export type HighlightValue = {
 	value: number;
 	species: string | null;
 };
-export type VerbApplier = (
-	temporalUnit: TemporalUnit | null,
-	species: string | undefined,
-	usePlural?: boolean
-) => string;
+
 export type SpeciesUnitMode = 'replace' | 'prefix' | undefined;
 export type HighlightDescriptor = {
 	category: HighlightCategory;
 	type: string;
-	applyVerb: VerbApplier;
 	unit: StatUnit;
 	speciesUnitMode?: SpeciesUnitMode;
 };
 
-type HighlightScope = {
+export type HighlightScope = {
 	temporalUnit: TemporalUnit;
 	parentTimeWindow?: YearMonthRestriction;
 	species?: string;
 };
 
 export type HighlightsOfType = {
+	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	scope: HighlightScope;
 	values: HighlightValue[];
 };
 
-type HighlightRanking = {
+export type HighlightRanking = {
 	highlightIndex: number;
 	siblingHighlights: HighlightValue[];
 	position: number;
@@ -53,13 +49,15 @@ type HighlightRanking = {
 };
 
 export type CherryPickedHighlight = {
+	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	scope: HighlightScope;
 	value: HighlightValue;
 	ranking: HighlightRanking;
 };
 
-export type CombinedHighlights = {
+export type CombinedHighlight = {
+	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	value: HighlightValue;
 	species: string | undefined;
@@ -70,7 +68,20 @@ export type CombinedHighlights = {
 	}[];
 };
 
+export type CombinedHighlightPrinter = (
+	combinedHighlight: CombinedHighlight
+) => string;
+export type HighlightListPrefixPrinter = (
+	highlightsOfType: HighlightsOfType
+) => string;
+
+type HighlightFormatters = {
+	combinedHighlightPrinter: CombinedHighlightPrinter;
+	highlightListPrefixPrinter: HighlightListPrefixPrinter;
+};
+
 export type HighlightsGenerator = {
+	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	limit?: number;
 	statsSelector: (
