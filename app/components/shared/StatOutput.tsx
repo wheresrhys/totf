@@ -2,14 +2,16 @@ import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
 import type { LocationRow } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import { buildGroupSessionHref } from '@/app/lib/group-links';
 import { printLocationName } from './DesignSystem';
 export type TemporalUnit = 'day' | 'month' | 'year';
+export type StatUnit = 'bird' | 'species' | 'encounter' | 'session';
 export type StatOutputModel = {
 	value: number;
 	speciesName?: string;
 	visitDate: string;
 	showUnit?: boolean;
-	unit?: string;
+	unit?: StatUnit;
 	temporalUnit: TemporalUnit;
 	dateFormat?: string;
 	classes?: string;
@@ -17,6 +19,15 @@ export type StatOutputModel = {
 	viewedGroup?: ViewedGroup;
 	link?: boolean;
 };
+
+const plurals: Partial<Record<StatUnit | TemporalUnit, string>> = {
+	species: 'species'
+};
+
+export function getPlural(unit: StatUnit | TemporalUnit | undefined): string {
+	if (!unit) return '';
+	return unit in plurals ? (plurals[unit] as string) : `${unit}s`;
+}
 
 const connectingVerbMap: Record<TemporalUnit, 'in' | 'on'> = {
 	day: 'on',
@@ -51,13 +62,15 @@ export function StatOutput({
 	return (
 		<span className={classes}>
 			<span className="font-bold">
-				{value} {speciesName || (showUnit ? ` ${unit}` : '')}
+				{value}{' '}
+				{speciesName ||
+					(showUnit ? ` ${value > 1 ? getPlural(unit) : unit}` : '')}
 			</span>{' '}
 			{connectingVerbMap[temporalUnit as TemporalUnit] as string}{' '}
 			{temporalUnit === 'day' && link ? (
 				<NoPrefetchLink
 					className="link"
-					href={`/group/${viewedGroup?.slug}/session/${visitDate}${location ? `/site/${location.id}` : ''}`}
+					href={`${buildGroupSessionHref(viewedGroup, visitDate)}${location ? `/site/${location.id}` : ''}`}
 				>
 					{formatDate(
 						new Date(visitDate as string),
