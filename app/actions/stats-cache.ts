@@ -4,7 +4,7 @@ import type { CoreStatsResult } from '@/app/models/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
-
+import { groupByColumn } from '@/app/lib/generic-utils';
 export type StatsRepository<T> = {
 	overall: T[];
 	withSpecies: T[];
@@ -30,18 +30,6 @@ function getStatsRPCFetcher(
 				? request.order('species_name').range(fromRow, toRow)
 				: request.range(fromRow, toRow);
 		});
-}
-
-function groupByColumn<T>(column: keyof T, rows: T[]): Record<string, T[]> {
-	const aggregator: Record<string, T[]> = {};
-	rows.forEach((row: T) => {
-		const groupKey = row[column] as string;
-		if (!(groupKey in aggregator)) {
-			aggregator[groupKey] = [];
-		}
-		aggregator[groupKey].push(row);
-	});
-	return aggregator;
 }
 
 export async function getStatsByTemporalUnit(
