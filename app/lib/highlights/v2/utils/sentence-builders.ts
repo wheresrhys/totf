@@ -35,7 +35,14 @@ export function printTemporalUnit(
 }
 
 export function pluraliseSpecies(species: string) {
-	if (species.toLowerCase().endsWith('finch')) return `${species}es`;
+	if (
+		species.toLowerCase().endsWith('finch') ||
+		species.toLowerCase().endsWith('thrush')
+	)
+		return `${species}es`;
+	if (species.toLowerCase().endsWith('goose'))
+		return species.replace(/oose$/, 'eese');
+	if (species.includes('(')) return species;
 	return `${species}s`;
 }
 
