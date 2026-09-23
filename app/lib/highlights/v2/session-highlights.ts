@@ -138,6 +138,7 @@ function removeLessSignificantHighlights(
 					potentialClobber.descriptor.type === highlight.descriptor.type &&
 					potentialClobber.descriptor.category ===
 						highlight.descriptor.category &&
+					potentialClobber.scope.species === highlight.scope.species &&
 					// clobberer must be higher ranked than subject, e.g. can't  clobber 1st place with 2nd place
 					potentialClobber.ranking.position >= highlight.ranking.position &&
 					// only clobber with highlights that are scopedd to all time
@@ -151,6 +152,7 @@ function removeLessSignificantHighlights(
 						!highlight.ranking.isTied
 					)
 			);
+
 			return !isClobbered;
 		} else {
 			return true;
