@@ -16,19 +16,26 @@ import { getTopByProperty } from '../utils/highlight-rules';
 type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 export const eachSpeciesCount: HighlightsGenerator = {
 	statsSelector: (stats: CoreStatsRepository) => stats.bySpecies,
-
+	// Highest Long- tailed Tit count of 2020, and highest ever: 5 birds
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map(
-				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking)} ${i === 0 ? `most ${pluraliseSpecies(combinedHighlight.species as string)} in a ${printTemporalUnit(scope.scope.temporalUnit)}` : 'most '} ${printTimeQualifier(scope.scope.parentTimeWindow || {})}`
-			);
+			const preambles = combinedHighlight.scopes.map((scope, i) => {
+				let result = `${printProminenceQualifier(scope.ranking)} highest `;
+				if (i === 0) {
+					result += ` ${combinedHighlight.species} count `;
+					if (combinedHighlight.scopes[0].scope.temporalUnit !== 'day') {
+						result += ` in a ${printTemporalUnit(scope.scope.temporalUnit)}`;
+					}
+				}
+				result += printTimeQualifier(scope.scope.parentTimeWindow || {});
+				return result;
+			});
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Most ${pluraliseSpecies(highlightsOfType.scope.species as string)} in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
+			`Highest ${highlightsOfType.scope.species} count in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
 	},
 
 	descriptor: {

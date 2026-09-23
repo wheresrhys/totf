@@ -18,16 +18,23 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 	statsSelector: (stats: CoreStatsRepository) => stats.bySpecies,
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map(
-				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking)} ${i === 0 ? `most juv ${pluraliseSpecies(combinedHighlight.species as string)} in a ${printTemporalUnit(scope.scope.temporalUnit)}` : 'most '} ${printTimeQualifier(scope.scope.parentTimeWindow || {})}`
-			);
+			const preambles = combinedHighlight.scopes.map((scope, i) => {
+				let result = `${printProminenceQualifier(scope.ranking)} highest `;
+				if (i === 0) {
+					result += `juv ${combinedHighlight.species} count `;
+					if (combinedHighlight.scopes[0].scope.temporalUnit !== 'day') {
+						result += ` in a ${printTemporalUnit(scope.scope.temporalUnit)}`;
+					}
+				}
+				result += printTimeQualifier(scope.scope.parentTimeWindow || {});
+				return result;
+			});
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Most juv ${pluraliseSpecies(highlightsOfType.scope.species as string)} in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
+			`Highest juv ${highlightsOfType.scope.species} count in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
 	},
 	descriptor: {
 		type: 'eachSpeciesJuvs',

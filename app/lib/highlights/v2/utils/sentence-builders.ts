@@ -85,19 +85,28 @@ export function printProminenceQualifier({
 	position,
 	isTied
 }: HighlightRanking) {
-	return `${isTied ? 'equal ' : ''}${prettyPrintPosition(position)}`;
+	return `${isTied ? 'joint ' : ''}${prettyPrintPosition(position)}`;
 }
 
-export function printTimeQualifier({ year, month }: YearMonthRestriction) {
+export function printFullMonthName(monthIndex: number) {
+	return fullMonthNames[monthIndex];
+}
+
+export function printTimeQualifier(
+	{ year, month }: YearMonthRestriction,
+	connector?: 'in' | 'of'
+) {
 	if (year && month) {
 		// todo pretty print month
 		return year === new Date().getFullYear()
 			? `this ${month}`
-			: `of ${month} ${year}`;
+			: `${connector ?? 'of'} ${month} ${year}`;
 	} else if (year) {
-		return year === new Date().getFullYear() ? `this year` : `of ${year}`;
+		return year === new Date().getFullYear()
+			? `this year`
+			: `${connector ?? 'of'} ${year}`;
 	} else if (month) {
-		return `in any ${fullMonthNames[month]}`;
+		return `${connector ?? 'in'} any ${fullMonthNames[month]}`;
 	} else {
 		return `ever`;
 	}

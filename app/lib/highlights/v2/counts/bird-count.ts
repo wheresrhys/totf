@@ -7,7 +7,8 @@ import {
 	sentenceCase,
 	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printFullMonthName
 } from '../utils/sentence-builders';
 import { getTopByProperty } from '../utils/highlight-rules';
 
@@ -16,11 +17,17 @@ export const birdCount: HighlightsGenerator = {
 	statsSelector: (stats: CoreStatsRepository) => stats.overall,
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map(
-				(scope, i) =>
-					// todo don't actually need 'for species' here, but keeping for now as may be useful later
-					`${printProminenceQualifier(scope.ranking)} busiest ${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow || {})} ${scope.scope.species ? `for ${scope.scope.species}` : ''}`
-			);
+			const preambles = combinedHighlight.scopes.map((scope, i) => {
+				let result = `${printProminenceQualifier(scope.ranking)} busiest `;
+
+				if (scope.scope.parentTimeWindow?.month) {
+					result += `${printFullMonthName(scope.scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.scope.temporalUnit)} ever`;
+				} else {
+					result +=
+						+`${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow || {})}`;
+				}
+				return result;
+			});
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);

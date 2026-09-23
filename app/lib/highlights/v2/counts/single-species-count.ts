@@ -16,10 +16,11 @@ type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 export const singleSpeciesCount: HighlightsGenerator = {
 	statsSelector: (stats: CoreStatsRepository) => stats.withSpecies,
 	formatters: {
+		// -> Highest count of a single species in 2021: 54 Reed Warblers
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map(
 				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking)} highest ${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} count ${printTimeQualifier(scope.scope.parentTimeWindow || {})} for a single species`
+					`${printProminenceQualifier(scope.ranking)} highest ${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} count for a single species ${printTimeQualifier(scope.scope.parentTimeWindow || {}, 'in')}`
 			);
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
