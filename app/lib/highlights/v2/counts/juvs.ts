@@ -13,12 +13,12 @@ import {
 import { getTopByPropertiesSum } from '../utils/highlight-rules';
 
 type CoreStatsRepository = StatsRepository<CoreStatsResult>;
-export const youngBirds: HighlightsGenerator = {
+export const juvs: HighlightsGenerator = {
 	statsSelector: (stats: CoreStatsRepository) => stats.overall,
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement = `${printProminenceQualifier(scope.ranking)} most young birds ${printTimeQualifier(scope.scope.parentTimeWindow || {})}`;
+				const centralStatement = `${printProminenceQualifier(scope.ranking)} most juvs ${printTimeQualifier(scope.scope.parentTimeWindow || {})}`;
 
 				return i === 0
 					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`
@@ -29,18 +29,14 @@ export const youngBirds: HighlightsGenerator = {
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most young birds`
+			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most juvs`
 	},
 	descriptor: {
-		type: 'young',
+		type: 'juvs',
 		unit: 'bird',
 		category: 'demographics'
 	},
-	generator: getTopByPropertiesSum([
-		'pullus_bird_count',
-		'juv_bird_count',
-		'postjuv_bird_count'
-	]),
+	generator: getTopByPropertiesSum(['pullus_bird_count', 'juv_bird_count']),
 	condition: (
 		temporalUnit: TemporalUnit,
 		parentTimeWindow?: YearMonthRestriction
