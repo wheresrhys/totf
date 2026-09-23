@@ -10,18 +10,19 @@ import {
 	printTemporalUnit,
 	printTimeQualifier,
 	pluraliseSpecies
-} from '../utils/sentence-builders';
-import { getTopByPropertiesSum } from '../utils/highlight-rules';
+} from '../lib/printer-utils';
+import { getTopByProperty } from '../lib/rule-utils';
 
 type CoreStatsRepository = StatsRepository<CoreStatsResult>;
-export const eachSpeciesJuvs: HighlightsGenerator = {
+export const eachSpeciesCount: HighlightsGenerator = {
 	statsSelector: (stats: CoreStatsRepository) => stats.bySpecies,
+	// Highest Long- tailed Tit count of 2020, and highest ever: 5 birds
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {
 				let result = `${printProminenceQualifier(scope.ranking)} highest `;
 				if (i === 0) {
-					result += `juv ${combinedHighlight.species} count `;
+					result += ` ${combinedHighlight.species} count `;
 					if (combinedHighlight.scopes[0].scope.temporalUnit !== 'day') {
 						result += ` in a ${printTemporalUnit(scope.scope.temporalUnit)}`;
 					}
@@ -34,15 +35,15 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Highest juv ${highlightsOfType.scope.species} count in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
+			`Highest ${highlightsOfType.scope.species} count in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
 	},
+
 	descriptor: {
-		type: 'eachSpeciesJuvs',
+		type: 'eachSpeciesCount',
 		unit: 'bird',
-		category: 'demographics'
+		category: 'count'
 	},
-	generator: getTopByPropertiesSum(['pullus_bird_count', 'juv_bird_count']),
-	limit: 1,
+	generator: getTopByProperty('bird_count', { threshold: 2 }),
 	condition: (
 		temporalUnit: TemporalUnit,
 		parentTimeWindow?: YearMonthRestriction

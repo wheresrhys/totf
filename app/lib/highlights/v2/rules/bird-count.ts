@@ -9,8 +9,8 @@ import {
 	printTemporalUnit,
 	printTimeQualifier,
 	printFullMonthName
-} from '../utils/sentence-builders';
-import { getTopByProperty } from '../utils/highlight-rules';
+} from '../lib/printer-utils';
+import { getTopByProperty } from '../lib/rule-utils';
 
 type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 export const birdCount: HighlightsGenerator = {

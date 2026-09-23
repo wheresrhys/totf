@@ -9,34 +9,33 @@ import {
 	sentenceJoin,
 	printTemporalUnit,
 	printTimeQualifier
-} from '../utils/sentence-builders';
-import { getTopByProperty } from '../utils/highlight-rules';
+} from '../lib/printer-utils';
+import { getTopByProperty } from '../lib/rule-utils';
 
 type CoreStatsRepository = StatsRepository<CoreStatsResult>;
-export const newBirds: HighlightsGenerator = {
-	statsSelector: (stats: CoreStatsRepository) => stats.overall,
+export const singleSpeciesCount: HighlightsGenerator = {
+	statsSelector: (stats: CoreStatsRepository) => stats.withSpecies,
 	formatters: {
+		// -> Highest count of a single species in 2021: 54 Reed Warblers
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement = `${printProminenceQualifier(scope.ranking)} highest new bird count ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
-
-				return i === 0 && !(scope.scope.temporalUnit === 'day')
-					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`
-					: centralStatement;
-			});
+			const preambles = combinedHighlight.scopes.map(
+				(scope, i) =>
+					`${printProminenceQualifier(scope.ranking)} highest ${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} count for a single species ${printTimeQualifier(scope.scope.parentTimeWindow, 'in')}`
+			);
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most new birds`
+			`Highest ${printTemporalUnit(highlightsOfType.scope.temporalUnit)} count${highlightsOfType.values.length > 1 ? 's' : ''} for a single species`
 	},
 	descriptor: {
-		type: 'newBirds',
+		type: 'singleSpeciesCount',
 		unit: 'bird',
-		category: 'demographics'
+		category: 'count',
+		speciesUnitMode: 'replace'
 	},
-	generator: getTopByProperty('new_bird_count'),
+	generator: getTopByProperty('bird_count'),
 	condition: (
 		temporalUnit: TemporalUnit,
 		parentTimeWindow?: YearMonthRestriction

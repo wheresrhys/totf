@@ -1,6 +1,6 @@
 import type { HighlightValue } from '../types';
 import type { CoreStatsResult } from '@/app/models/db';
-export const DEFAULT_OPTIONS = { limit: 3, threshold: 2 };
+import { DEFAULT_THRESHOLD } from '../const';
 
 type HighlightFinderOptions = {
 	threshold?: number;
@@ -20,10 +20,7 @@ export function getTopByPropertiesSum(
 	properties: (keyof CoreStatsResult)[],
 	options?: HighlightFinderOptions
 ): (stats: CoreStatsResult[]) => HighlightValue[] {
-	const { threshold } = {
-		...DEFAULT_OPTIONS,
-		...(options || {})
-	};
+	const threshold = options?.threshold ?? DEFAULT_THRESHOLD;
 	return (stats: CoreStatsResult[]) => {
 		const potentialHighlights = stats.map((row) => ({
 			timePeriod: row.time_period as string,

@@ -7,7 +7,7 @@ import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import { fetchPeriodStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
-import { getScopedHighlights } from '@/app/lib/highlights/v2/highlight-generator';
+import { getHighlightsWithinTimeWindow } from '@/app/lib/highlights/v2';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
@@ -290,7 +290,7 @@ export function SummaryTotalsSection({
 	const isHighlightsActive = activeTab === HIGHLIGHTS_TAB.id;
 	const fetchHighlightsData = useCallback(async () => {
 		const [daily, monthly] = await Promise.all([
-			getScopedHighlights({
+			getHighlightsWithinTimeWindow({
 				temporalUnit: 'day',
 				groupId: viewedGroup!.id,
 				parentTimeWindow: {
@@ -299,7 +299,7 @@ export function SummaryTotalsSection({
 				},
 				includePerSpecies: false
 			}),
-			getScopedHighlights({
+			getHighlightsWithinTimeWindow({
 				temporalUnit: 'month',
 				groupId: viewedGroup!.id,
 				parentTimeWindow: {

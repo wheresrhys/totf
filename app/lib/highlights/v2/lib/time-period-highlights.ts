@@ -6,8 +6,8 @@ import type {
 	HighlightValue,
 	CombinedHighlight,
 	HighlightCategory
-} from './types';
-import { getScopedHighlights } from './highlight-generator';
+} from '../types';
+import { getHighlightsWithinTimeWindow } from './highlight-generator';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 const highlightCategoryOrder: HighlightCategory[] = [
 	'rarity',
@@ -76,6 +76,24 @@ function timeWindowToNumber(
 	return 100;
 }
 
+type PositionAndTimeWindow = {
+	position: number;
+	window?: YearMonthRestriction;
+};
+
+function sortByPositionAndTimeWindow(
+	a: PositionAndTimeWindow,
+	b: PositionAndTimeWindow
+) {
+	if (a.position !== b.position) {
+		return a.position - b.position;
+	} else {
+		const windowAScore = timeWindowToNumber(a.window);
+		const windowBScore = timeWindowToNumber(b.window);
+		return windowBScore - windowAScore;
+	}
+}
+
 function combineSimilarHighlights(
 	highlights: CherryPickedHighlight[]
 ): CombinedHighlight[] {
@@ -91,25 +109,11 @@ function combineSimilarHighlights(
 
 	return [...groupedByDescriptor.values()].map((highlights) => {
 		highlights.sort(
-			(
-				{
-					scope: { parentTimeWindow: windowA },
-					ranking: { position: positionA, isTied: isTiedA }
-				},
-				{
-					scope: { parentTimeWindow: windowB },
-					ranking: { position: positionB, isTied: isTiedB }
-				}
-			): number => {
-				if (positionA === positionB) {
-					const windowAScore = timeWindowToNumber(windowA);
-					const windowBScore = timeWindowToNumber(windowB);
-					return windowBScore - windowAScore;
-					// return isTiedA ? 1 : -1;
-				} else {
-					return positionA - positionB;
-				}
-			}
+			(a: CherryPickedHighlight, b: CherryPickedHighlight): number =>
+				sortByPositionAndTimeWindow(
+					{ position: a.ranking.position, window: a.scope.parentTimeWindow },
+					{ position: b.ranking.position, window: b.scope.parentTimeWindow }
+				)
 		);
 		return {
 			formatters: highlights[0].formatters,
@@ -131,55 +135,55 @@ function removeLessSignificantHighlights(
 	highlights: CherryPickedHighlight[]
 ): CherryPickedHighlight[] {
 	return highlights.filter((highlight) => {
-		if (highlight.scope.parentTimeWindow) {
-			const clobberer = highlights.find(
-				(potentialClobber) =>
-					// don't clobber highlights of a completely different type
-					potentialClobber.descriptor.type === highlight.descriptor.type &&
-					potentialClobber.descriptor.category ===
-						highlight.descriptor.category &&
-					potentialClobber.scope.species === highlight.scope.species &&
-					// clobberer must be higher ranked than subject, e.g. can't  clobber 1st place with 2nd place
-					potentialClobber.ranking.position >= highlight.ranking.position &&
-					// only clobber with highlights that are scopedd to all time
-					!potentialClobber.scope.parentTimeWindow &&
-					// // don't clobber 1st place with 2nd place... hmmm this seems dodgy!
-					// !(highlight.ranking.position < potentialClobber.ranking.position) &&
-					// don't clobbe if equal position but the more locally scoped item is not tied when the global one is tied
-					!(
-						highlight.ranking.position === potentialClobber.ranking.position &&
-						potentialClobber.ranking.isTied &&
-						!highlight.ranking.isTied
-					)
-			);
-			if (clobberer) {
-				console.log(highlight, clobberer);
-			}
-			return !clobberer;
-		} else {
+		if (!highlight.scope.parentTimeWindow) {
 			return true;
 		}
+		return !highlights.some(
+			(potentialClobber) =>
+				// don't clobber highlights of a completely different type
+				potentialClobber.descriptor.type === highlight.descriptor.type &&
+				potentialClobber.descriptor.category ===
+					highlight.descriptor.category &&
+				potentialClobber.scope.species === highlight.scope.species &&
+				// clobberer must be higher ranked than subject, e.g. can't  clobber 1st place with 2nd place
+				potentialClobber.ranking.position >= highlight.ranking.position &&
+				// only clobber with highlights that are scopedd to all time
+				!potentialClobber.scope.parentTimeWindow &&
+				// // don't clobber 1st place with 2nd place... hmmm this seems dodgy!
+				// !(highlight.ranking.position < potentialClobber.ranking.position) &&
+				// don't clobbe if equal position but the more locally scoped item is not tied when the global one is tied
+				!(
+					highlight.ranking.position === potentialClobber.ranking.position &&
+					potentialClobber.ranking.isTied &&
+					!highlight.ranking.isTied
+				)
+		);
 	});
 }
 
 function sortHighlights(highlights: CombinedHighlight[]) {
-	return highlights.toSorted((a, b) => {
-		const categoryOrdering =
-			highlightCategoryOrder.indexOf(b.descriptor.category) -
-			highlightCategoryOrder.indexOf(a.descriptor.category);
+	return highlights.toSorted(
+		(a: CombinedHighlight, b: CombinedHighlight): number => {
+			const categoryOrdering =
+				highlightCategoryOrder.indexOf(b.descriptor.category) -
+				highlightCategoryOrder.indexOf(a.descriptor.category);
 
-		if (categoryOrdering) return categoryOrdering;
-		if (a.species && !b.species) return 1;
-		if (!a.species && b.species) return -1;
-
-		if (b.bestPosition !== a.bestPosition)
-			return a.bestPosition - b.bestPosition;
-		const windowAScore = timeWindowToNumber(a.scopes[0].scope.parentTimeWindow);
-		const windowBScore = timeWindowToNumber(b.scopes[0].scope.parentTimeWindow);
-		if (windowAScore !== windowBScore) return windowBScore - windowAScore;
-
-		return b.value.value - a.value.value;
-	});
+			if (categoryOrdering) return categoryOrdering;
+			if (a.species && !b.species) return 1;
+			if (!a.species && b.species) return -1;
+			const posWindowSorVal = sortByPositionAndTimeWindow(
+				{
+					position: a.bestPosition,
+					window: a.scopes[0].scope.parentTimeWindow
+				},
+				{
+					position: b.bestPosition,
+					window: b.scopes[0].scope.parentTimeWindow
+				}
+			);
+			return posWindowSorVal ? posWindowSorVal : b.value.value - a.value.value;
+		}
+	);
 }
 
 async function getAllRelevantHighlights(
@@ -191,7 +195,7 @@ async function getAllRelevantHighlights(
 	const monthparentTimeWindow = {
 		month: Number(timePeriod.split('-')[1])
 	};
-	const allTimeHighlights = await getScopedHighlights({
+	const allTimeHighlights = await getHighlightsWithinTimeWindow({
 		temporalUnit: temporalUnit,
 		groupId,
 		limit: 3,
@@ -199,7 +203,7 @@ async function getAllRelevantHighlights(
 	});
 	const yearHighlights =
 		temporalUnit !== 'year'
-			? await getScopedHighlights({
+			? await getHighlightsWithinTimeWindow({
 					temporalUnit: temporalUnit,
 					groupId,
 					parentTimeWindow: yearparentTimeWindow,
@@ -209,7 +213,7 @@ async function getAllRelevantHighlights(
 			: [];
 	const monthHighlights =
 		temporalUnit === 'day'
-			? await getScopedHighlights({
+			? await getHighlightsWithinTimeWindow({
 					temporalUnit: temporalUnit,
 					groupId,
 					parentTimeWindow: monthparentTimeWindow,
@@ -223,7 +227,7 @@ async function getAllRelevantHighlights(
 	);
 }
 
-export async function getCondensedTimePeriodHighlights(
+export async function getCondensedHighlightsAtTimePeriod(
 	groupId: number,
 	timePeriod: string,
 	temporalUnit: TemporalUnit

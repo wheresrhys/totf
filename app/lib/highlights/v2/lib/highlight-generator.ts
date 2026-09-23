@@ -2,11 +2,11 @@ import {
 	getStatsByTemporalUnit,
 	StatsRepository
 } from '@/app/actions/highlights-data';
-import { DEFAULT_OPTIONS } from './utils/highlight-rules';
-import { highlightRules } from './rules';
-import type { HighlightsOfType, YearMonthRestriction } from './types';
+import { highlightRules } from '../rules';
+import type { HighlightsOfType, YearMonthRestriction } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import { CoreStatsResult } from '@/app/models/db';
+import { DEFAULT_LIMIT } from '../const';
 
 function applyLimitToHighlight(
 	highlightWrapper: HighlightsOfType,
@@ -103,7 +103,40 @@ function generateAllHighlights({
 		.filter(isHighlightsOfType);
 }
 
-export async function getScopedHighlights({
+function getCacheUtils(
+	groupId: number,
+	temporalUnit: TemporalUnit,
+	limit?: number,
+	parentTimeWindow?: YearMonthRestriction
+): {
+	cacheKey: string;
+	filter: ((timePeriod: string) => boolean) | null;
+} {
+	let cacheKey = `${groupId}-${temporalUnit}-${limit || 'no-limit'}`;
+	if (!parentTimeWindow) {
+		return { cacheKey, filter: null };
+	}
+	const { month, year } = parentTimeWindow;
+	let filter: ((timePeriod: string) => boolean) | null;
+	if (year && month) {
+		cacheKey = `${cacheKey}-${year}-${month}`;
+		filter = (timePeriod) =>
+			timePeriod.startsWith(`${year}-${String(month).padStart(2, '0')}-`);
+	} else if (year) {
+		cacheKey = `${cacheKey}-${year}`;
+		filter = (timePeriod) => timePeriod.startsWith(`${year}-`);
+	} else if (month) {
+		cacheKey = `${cacheKey}-${month}`;
+		filter = (timePeriod) =>
+			timePeriod.includes(`-${String(month).padStart(2, '0')}-`);
+	} else {
+		filter = null;
+	}
+
+	return { filter, cacheKey };
+}
+
+export async function getHighlightsWithinTimeWindow({
 	temporalUnit,
 	groupId,
 	limit,
@@ -116,26 +149,20 @@ export async function getScopedHighlights({
 	parentTimeWindow?: YearMonthRestriction;
 	includePerSpecies: boolean;
 }) {
-	let stats = await getStatsByTemporalUnit(temporalUnit, groupId);
-	let cacheKey = `${groupId}-${temporalUnit}`;
-	if (parentTimeWindow) {
-		const { month, year } = parentTimeWindow;
-		let filter: (timePeriod: string) => boolean;
-		if (year && month) {
-			cacheKey = `${cacheKey}-${year}-${month}`;
-			filter = (timePeriod) =>
-				timePeriod.startsWith(`${year}-${String(month).padStart(2, '0')}-`);
-		} else if (year) {
-			cacheKey = `${cacheKey}-${year}`;
-			filter = (timePeriod) => timePeriod.startsWith(`${year}-`);
-		} else if (month) {
-			cacheKey = `${cacheKey}-${month}`;
-			filter = (timePeriod) =>
-				timePeriod.includes(`-${String(month).padStart(2, '0')}-`);
-		} else {
-			filter = () => true;
-		}
+	limit = limit ?? DEFAULT_LIMIT;
 
+	const { filter, cacheKey } = getCacheUtils(
+		groupId,
+		temporalUnit,
+		limit,
+		parentTimeWindow
+	);
+	if (cache.has(cacheKey)) {
+		return cache.get(cacheKey) as HighlightsOfType[];
+	}
+	let stats = await getStatsByTemporalUnit(temporalUnit, groupId);
+
+	if (filter) {
 		const withSpecies = stats.withSpecies.filter(({ time_period }) =>
 			filter(time_period)
 		);
@@ -146,26 +173,15 @@ export async function getScopedHighlights({
 			bySpecies
 		};
 	}
-	if (!limit) {
-		limit = Math.min(
-			DEFAULT_OPTIONS.limit,
-			Math.ceil(stats.overall.length / 4)
-		);
-	}
-	let unboundedHighlights: HighlightsOfType[];
-	limit = limit || DEFAULT_OPTIONS.limit;
-	if (cache.has(cacheKey)) {
-		unboundedHighlights = cache.get(cacheKey) as HighlightsOfType[];
-	} else {
-		unboundedHighlights = generateAllHighlights({
-			stats,
-			temporalUnit,
-			parentTimeWindow,
-			limit,
-			includePerSpecies
-		});
 
-		cache.set(cacheKey, unboundedHighlights);
-	}
+	const unboundedHighlights = generateAllHighlights({
+		stats,
+		temporalUnit,
+		parentTimeWindow,
+		limit,
+		includePerSpecies
+	});
+
+	cache.set(cacheKey, unboundedHighlights);
 	return unboundedHighlights;
 }

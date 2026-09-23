@@ -1,4 +1,4 @@
-import type { HighlightsGenerator, YearMonthRestriction } from '../types';
+import type { HighlightsGenerator } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { StatsRepository } from '@/app/actions/highlights-data';
@@ -9,16 +9,16 @@ import {
 	sentenceJoin,
 	printTemporalUnit,
 	printTimeQualifier
-} from '../utils/sentence-builders';
-import { getTopByPropertiesSum } from '../utils/highlight-rules';
+} from '../lib/printer-utils';
+import { getTopByProperty } from '../lib/rule-utils';
 
 type CoreStatsRepository = StatsRepository<CoreStatsResult>;
-export const juvs: HighlightsGenerator = {
+export const encounterCount: HighlightsGenerator = {
 	statsSelector: (stats: CoreStatsRepository) => stats.overall,
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement = `${printProminenceQualifier(scope.ranking)} most juvs ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
+				const centralStatement = `${printProminenceQualifier(scope.ranking)} most encounters ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
 
 				return i === 0
 					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`
@@ -29,16 +29,13 @@ export const juvs: HighlightsGenerator = {
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most juvs`
+			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most encounters`
 	},
 	descriptor: {
-		type: 'juvs',
-		unit: 'bird',
-		category: 'demographics'
+		type: 'encounters',
+		unit: 'encounter',
+		category: 'count'
 	},
-	generator: getTopByPropertiesSum(['pullus_bird_count', 'juv_bird_count']),
-	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => !parentTimeWindow?.month
+	generator: getTopByProperty('encounter_count'),
+	condition: (temporalUnit: TemporalUnit) => temporalUnit !== 'day'
 };
