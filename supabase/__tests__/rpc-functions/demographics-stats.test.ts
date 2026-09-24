@@ -16,6 +16,14 @@ import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
 import { createIsolatedGroup, psql } from '../db-test-helpers';
+import {
+	insertTestLocation,
+	insertTestSession,
+	createSessionResolver,
+	insertTestBird,
+	insertTestEncounter,
+	createRingNoSequence
+} from './helpers/encounter-fixtures';
 
 describe('demographics_stats', () => {
 	// new_adult_bird_count (#800): the subset of adult_bird_count whose first-ever
@@ -76,7 +84,8 @@ describe('demographics_stats', () => {
 
 			const testSuffix = randomTestSuffix();
 			otherGroupId = createIsolatedGroup(`Age Split Other ${testSuffix}`);
-			otherGroupClient = await getAuthenticatedSupabaseClientForGroup(otherGroupId);
+			otherGroupClient =
+				await getAuthenticatedSupabaseClientForGroup(otherGroupId);
 			const base = randomFutureDate();
 
 			const { data: robin } = await supabase
@@ -87,84 +96,29 @@ describe('demographics_stats', () => {
 			const robinId = robin!.id;
 
 			// One Delta location; one other-group location for the cross-group bird.
-			const { data: deltaLoc, error: dLocErr } = await deltaClient
-				.from('Locations')
-				.insert({
-					location_name: `Age Split Delta Loc ${testSuffix}`,
-					ringing_group_id: deltaId
-				})
-				.select('id')
-				.single();
-			if (dLocErr) throw dLocErr;
-			locationIds.push(deltaLoc!.id);
-			const deltaLocId = deltaLoc!.id;
+			const deltaLocId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`Age Split Delta Loc ${testSuffix}`
+			);
+			locationIds.push(deltaLocId);
 
-			const { data: otherGroupLoc, error: aLocErr } = await otherGroupClient
-				.from('Locations')
-				.insert({
-					location_name: `Age Split Other Loc ${testSuffix}`,
-					ringing_group_id: otherGroupId
-				})
-				.select('id')
-				.single();
-			if (aLocErr) throw aLocErr;
-			otherGroupLocationIds.push(otherGroupLoc!.id);
-			const otherGroupLocId = otherGroupLoc!.id;
+			const otherGroupLocId = await insertTestLocation(
+				otherGroupClient,
+				otherGroupId,
+				`Age Split Other Loc ${testSuffix}`
+			);
+			otherGroupLocationIds.push(otherGroupLocId);
 
 			// One shared session per (client, date, location).
-			const sessionCache = new Map<string, number>();
-			async function getSession(
-				client: SupabaseClient,
-				date: string,
-				locationId: number,
-				track: number[]
-			) {
-				const key = `${date}|${locationId}`;
-				const cached = sessionCache.get(key);
-				if (cached !== undefined) return cached;
-				const { data: session, error } = await client
-					.from('Sessions')
-					.insert({ visit_date: date, location_id: locationId })
-					.select('id')
-					.single();
-				if (error) throw error;
-				sessionCache.set(key, session!.id);
-				track.push(session!.id);
-				return session!.id;
-			}
+			const getSession = createSessionResolver();
+			const insertEncounter = insertTestEncounter;
 
-			let ringCounter = 0;
-			async function insertEncounter(
-				client: SupabaseClient,
-				bird_id: number,
-				sessionId: number,
-				enc: { age_code: number; is_juv: boolean; record_type: string }
-			) {
-				const { error } = await client.from('Encounters').insert({
-					capture_time: '10:00:00',
-					scheme: 'BTO',
-					sex: 'M',
-					session_id: sessionId,
-					bird_id,
-					age_code: enc.age_code,
-					is_juv: enc.is_juv,
-					record_type: enc.record_type
-				});
-				if (error) throw error;
-			}
-
+			const nextRing = createRingNoSequence(`SPLIT-${testSuffix}`);
 			// Insert a Delta-owned bird with the given Delta encounters.
 			async function addBird(encounters: EncInput[]): Promise<number> {
-				const { data: bird, error } = await deltaClient
-					.from('Birds')
-					.insert({
-						ring_no: `SPLIT-${testSuffix}-${ringCounter++}`,
-						species_id: robinId
-					})
-					.select('id')
-					.single();
-				if (error) throw error;
-				birdIds.push(bird!.id);
+				const birdId = await insertTestBird(deltaClient, nextRing(), robinId);
+				birdIds.push(birdId);
 				for (const e of encounters) {
 					const sessionId = await getSession(
 						deltaClient,
@@ -172,9 +126,13 @@ describe('demographics_stats', () => {
 						deltaLocId,
 						sessionIds
 					);
-					await insertEncounter(deltaClient, bird!.id, sessionId, e);
+					await insertEncounter(deltaClient, birdId, sessionId, {
+						age_code: e.age_code,
+						is_juv: e.is_juv,
+						record_type: e.record_type
+					});
 				}
-				return bird!.id;
+				return birdId;
 			}
 
 			// new_adult: first-ever (and only) encounter is this period year, as adult.
@@ -202,20 +160,19 @@ describe('demographics_stats', () => {
 			// this reads as new_adult.
 			mgDate = addDays(base, 190);
 			const mgOtherGroupYear = yearOf(mgDate) - 2;
-			const { data: mgBird, error: mgErr } = await deltaClient
-				.from('Birds')
-				.insert({ ring_no: `SPLIT-${testSuffix}-MG`, species_id: robinId })
-				.select('id')
-				.single();
-			if (mgErr) throw mgErr;
-			birdIds.push(mgBird!.id);
+			const mgBirdId = await insertTestBird(
+				deltaClient,
+				`SPLIT-${testSuffix}-MG`,
+				robinId
+			);
+			birdIds.push(mgBirdId);
 			const otherGroupSess = await getSession(
 				otherGroupClient,
 				`${mgOtherGroupYear}-05-10`,
 				otherGroupLocId,
 				otherGroupSessionIds
 			);
-			await insertEncounter(otherGroupClient, mgBird!.id, otherGroupSess, {
+			await insertEncounter(otherGroupClient, mgBirdId, otherGroupSess, {
 				...ADULT,
 				record_type: 'N'
 			});
@@ -225,7 +182,7 @@ describe('demographics_stats', () => {
 				deltaLocId,
 				sessionIds
 			);
-			await insertEncounter(deltaClient, mgBird!.id, mgDeltaSess, {
+			await insertEncounter(deltaClient, mgBirdId, mgDeltaSess, {
 				...ADULT,
 				record_type: 'N'
 			});
@@ -370,60 +327,26 @@ describe('demographics_stats', () => {
 				.single();
 			const robinId = robin!.id;
 
-			const { data: location, error: locErr } = await deltaClient
-				.from('Locations')
-				.insert({
-					location_name: `Young Trends Loc ${testSuffix}`,
-					ringing_group_id: deltaId
-				})
-				.select('id')
-				.single();
-			if (locErr) throw locErr;
-			locationIds.push(location!.id);
-			const locationId = location!.id;
+			const locationId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`Young Trends Loc ${testSuffix}`
+			);
+			locationIds.push(locationId);
 
-			const sessionCache = new Map<string, number>();
-			async function getSession(date: string) {
-				const cached = sessionCache.get(date);
-				if (cached !== undefined) return cached;
-				const { data: session, error } = await deltaClient
-					.from('Sessions')
-					.insert({ visit_date: date, location_id: locationId })
-					.select('id')
-					.single();
-				if (error) throw error;
-				sessionCache.set(date, session!.id);
-				sessionIds.push(session!.id);
-				return session!.id;
-			}
+			const getSessionResolver = createSessionResolver();
+			const getSession = (date: string) =>
+				getSessionResolver(deltaClient, date, locationId, sessionIds);
 
-			let ringCounter = 0;
+			const nextRing = createRingNoSequence(`YT-${testSuffix}`);
 			async function addBird(
 				date: string,
 				enc: { age_code: number; is_juv: boolean; record_type: string }
 			) {
-				const { data: bird, error } = await deltaClient
-					.from('Birds')
-					.insert({
-						ring_no: `YT-${testSuffix}-${ringCounter++}`,
-						species_id: robinId
-					})
-					.select('id')
-					.single();
-				if (error) throw error;
-				birdIds.push(bird!.id);
+				const birdId = await insertTestBird(deltaClient, nextRing(), robinId);
+				birdIds.push(birdId);
 				const sessionId = await getSession(date);
-				const { error: encErr } = await deltaClient.from('Encounters').insert({
-					capture_time: '10:00:00',
-					scheme: 'BTO',
-					sex: 'M',
-					session_id: sessionId,
-					bird_id: bird!.id,
-					age_code: enc.age_code,
-					is_juv: enc.is_juv,
-					record_type: enc.record_type
-				});
-				if (encErr) throw encErr;
+				await insertTestEncounter(deltaClient, birdId, sessionId, enc);
 			}
 
 			d3jR = addDays(base, 0);
@@ -540,51 +463,33 @@ describe('demographics_stats', () => {
 				.single();
 			const robinId = robin!.id;
 
-			const { data: location, error: locErr } = await deltaClient
-				.from('Locations')
-				.insert({
-					location_name: `New Young Loc ${testSuffix}`,
-					ringing_group_id: deltaId
-				})
-				.select('id')
-				.single();
-			if (locErr) throw locErr;
-			locationIds.push(location!.id);
-			const locationId = location!.id;
+			const locationId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`New Young Loc ${testSuffix}`
+			);
+			locationIds.push(locationId);
 
 			async function addBird(date: string, record_type: string) {
-				const { data: session, error: sessionError } = await deltaClient
-					.from('Sessions')
-					.insert({ visit_date: date, location_id: locationId })
-					.select('id')
-					.single();
-				if (sessionError) throw sessionError;
-				sessionIds.push(session!.id);
+				const sessionId = await insertTestSession(
+					deltaClient,
+					locationId,
+					date
+				);
+				sessionIds.push(sessionId);
 
-				const { data: bird, error: birdError } = await deltaClient
-					.from('Birds')
-					.insert({
-						ring_no: `NY-${testSuffix}-${date}`,
-						species_id: robinId
-					})
-					.select('id')
-					.single();
-				if (birdError) throw birdError;
-				birdIds.push(bird!.id);
+				const birdId = await insertTestBird(
+					deltaClient,
+					`NY-${testSuffix}-${date}`,
+					robinId
+				);
+				birdIds.push(birdId);
 
-				const { error: encError } = await deltaClient
-					.from('Encounters')
-					.insert({
-						capture_time: '10:00:00',
-						scheme: 'BTO',
-						sex: 'M',
-						session_id: session!.id,
-						bird_id: bird!.id,
-						age_code: 1,
-						is_juv: true,
-						record_type
-					});
-				if (encError) throw encError;
+				await insertTestEncounter(deltaClient, birdId, sessionId, {
+					age_code: 1,
+					is_juv: true,
+					record_type
+				});
 			}
 
 			newJuvDate = addDays(base, 0);
@@ -685,7 +590,8 @@ describe('demographics_stats', () => {
 
 			const testSuffix = randomTestSuffix();
 			otherGroupId = createIsolatedGroup(`Returning Age Other ${testSuffix}`);
-			otherGroupClient = await getAuthenticatedSupabaseClientForGroup(otherGroupId);
+			otherGroupClient =
+				await getAuthenticatedSupabaseClientForGroup(otherGroupId);
 			const base = randomFutureDate();
 
 			const { data: robin } = await supabase
@@ -695,82 +601,39 @@ describe('demographics_stats', () => {
 				.single();
 			const robinId = robin!.id;
 
-			const { data: deltaLoc, error: dLocErr } = await deltaClient
-				.from('Locations')
-				.insert({
-					location_name: `Returning Age Delta Loc ${testSuffix}`,
-					ringing_group_id: deltaId
-				})
-				.select('id')
-				.single();
-			if (dLocErr) throw dLocErr;
-			locationIds.push(deltaLoc!.id);
-			const deltaLocId = deltaLoc!.id;
+			const deltaLocId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`Returning Age Delta Loc ${testSuffix}`
+			);
+			locationIds.push(deltaLocId);
 
-			const { data: otherGroupLoc, error: aLocErr } = await otherGroupClient
-				.from('Locations')
-				.insert({
-					location_name: `Returning Age Other Loc ${testSuffix}`,
-					ringing_group_id: otherGroupId
-				})
-				.select('id')
-				.single();
-			if (aLocErr) throw aLocErr;
-			otherGroupLocationIds.push(otherGroupLoc!.id);
-			const otherGroupLocId = otherGroupLoc!.id;
+			const otherGroupLocId = await insertTestLocation(
+				otherGroupClient,
+				otherGroupId,
+				`Returning Age Other Loc ${testSuffix}`
+			);
+			otherGroupLocationIds.push(otherGroupLocId);
 
-			const sessionCache = new Map<string, number>();
-			async function getSession(
+			const getSession = createSessionResolver();
+
+			function insertEncounter(
 				client: SupabaseClient,
-				date: string,
-				locationId: number,
-				track: number[]
-			) {
-				const key = `${date}|${locationId}`;
-				const cached = sessionCache.get(key);
-				if (cached !== undefined) return cached;
-				const { data: session, error } = await client
-					.from('Sessions')
-					.insert({ visit_date: date, location_id: locationId })
-					.select('id')
-					.single();
-				if (error) throw error;
-				sessionCache.set(key, session!.id);
-				track.push(session!.id);
-				return session!.id;
-			}
-
-			async function insertEncounter(
-				client: SupabaseClient,
-				bird_id: number,
+				birdId: number,
 				sessionId: number,
 				enc: { age_code: number; is_juv: boolean }
 			) {
-				const { error } = await client.from('Encounters').insert({
-					capture_time: '10:00:00',
-					scheme: 'BTO',
-					sex: 'M',
-					session_id: sessionId,
-					bird_id,
+				return insertTestEncounter(client, birdId, sessionId, {
 					age_code: enc.age_code,
 					is_juv: enc.is_juv,
 					record_type: 'R'
 				});
-				if (error) throw error;
 			}
 
-			let ringCounter = 0;
+			const nextRing = createRingNoSequence(`RETAGE-${testSuffix}`);
 			async function addBird(encounters: EncInput[]): Promise<number> {
-				const { data: bird, error } = await deltaClient
-					.from('Birds')
-					.insert({
-						ring_no: `RETAGE-${testSuffix}-${ringCounter++}`,
-						species_id: robinId
-					})
-					.select('id')
-					.single();
-				if (error) throw error;
-				birdIds.push(bird!.id);
+				const birdId = await insertTestBird(deltaClient, nextRing(), robinId);
+				birdIds.push(birdId);
 				for (const e of encounters) {
 					const sessionId = await getSession(
 						deltaClient,
@@ -778,9 +641,9 @@ describe('demographics_stats', () => {
 						deltaLocId,
 						sessionIds
 					);
-					await insertEncounter(deltaClient, bird!.id, sessionId, e);
+					await insertEncounter(deltaClient, birdId, sessionId, e);
 				}
-				return bird!.id;
+				return birdId;
 			}
 
 			// Age 1, precisely aged and genuinely returning: ringed as a bare age-3
@@ -858,20 +721,19 @@ describe('demographics_stats', () => {
 			// Delta the other group's history is invisible, so this reads as a first-ever
 			// imprecise encounter ('new_unknown_age'), not a 5-year returner.
 			multiGroupDate = addDays(base, 160);
-			const { data: mgBird, error: mgErr } = await deltaClient
-				.from('Birds')
-				.insert({ ring_no: `RETAGE-${testSuffix}-MG`, species_id: robinId })
-				.select('id')
-				.single();
-			if (mgErr) throw mgErr;
-			birdIds.push(mgBird!.id);
+			const mgBirdId = await insertTestBird(
+				deltaClient,
+				`RETAGE-${testSuffix}-MG`,
+				robinId
+			);
+			birdIds.push(mgBirdId);
 			const otherGroupSess = await getSession(
 				otherGroupClient,
 				`${yearOf(multiGroupDate) - 5}-05-10`,
 				otherGroupLocId,
 				otherGroupSessionIds
 			);
-			await insertEncounter(otherGroupClient, mgBird!.id, otherGroupSess, {
+			await insertEncounter(otherGroupClient, mgBirdId, otherGroupSess, {
 				age_code: 3,
 				is_juv: false
 			});
@@ -881,7 +743,7 @@ describe('demographics_stats', () => {
 				deltaLocId,
 				sessionIds
 			);
-			await insertEncounter(deltaClient, mgBird!.id, mgDeltaSess, {
+			await insertEncounter(deltaClient, mgBirdId, mgDeltaSess, {
 				age_code: 4,
 				is_juv: false
 			});
@@ -1104,64 +966,36 @@ describe('demographics_stats', () => {
 			if (speciesError) throw speciesError;
 			const kingfisherId = kingfisher!.id;
 
-			const { data: location, error: locationError } = await deltaClient
-				.from('Locations')
-				.insert({
-					location_name: `Cumulative History Loc ${testSuffix}`,
-					ringing_group_id: deltaId
-				})
-				.select('id')
-				.single();
-			if (locationError) throw locationError;
-			locationIds.push(location!.id);
-			const locationId = location!.id;
+			const locationId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`Cumulative History Loc ${testSuffix}`
+			);
+			locationIds.push(locationId);
 
-			const sessionCache = new Map<string, number>();
-			async function getSession(date: string) {
-				const cached = sessionCache.get(date);
-				if (cached !== undefined) return cached;
-				const { data: session, error } = await deltaClient
-					.from('Sessions')
-					.insert({ visit_date: date, location_id: locationId })
-					.select('id')
-					.single();
-				if (error) throw error;
-				sessionCache.set(date, session!.id);
-				sessionIds.push(session!.id);
-				return session!.id;
-			}
+			const getSessionResolver = createSessionResolver();
+			const getSession = (date: string) =>
+				getSessionResolver(deltaClient, date, locationId, sessionIds);
 
-			let ringCounter = 0;
+			const nextRing = createRingNoSequence(`CUMHIST-${testSuffix}`);
 			async function addBird(
 				encounters: { date: string; age_code: number }[]
 			): Promise<number> {
-				const { data: bird, error } = await deltaClient
-					.from('Birds')
-					.insert({
-						ring_no: `CUMHIST-${testSuffix}-${ringCounter++}`,
-						species_id: kingfisherId
-					})
-					.select('id')
-					.single();
-				if (error) throw error;
-				birdIds.push(bird!.id);
+				const birdId = await insertTestBird(
+					deltaClient,
+					nextRing(),
+					kingfisherId
+				);
+				birdIds.push(birdId);
 				for (const encounter of encounters) {
 					const sessionId = await getSession(encounter.date);
-					const { error: encounterError } = await deltaClient
-						.from('Encounters')
-						.insert({
-							capture_time: '10:00:00',
-							scheme: 'BTO',
-							sex: 'M',
-							session_id: sessionId,
-							bird_id: bird!.id,
-							age_code: encounter.age_code,
-							is_juv: false,
-							record_type: 'R'
-						});
-					if (encounterError) throw encounterError;
+					await insertTestEncounter(deltaClient, birdId, sessionId, {
+						age_code: encounter.age_code,
+						is_juv: false,
+						record_type: 'R'
+					});
 				}
-				return bird!.id;
+				return birdId;
 			}
 
 			// (a) One bird read across many monthly cells spanning two calendar years.
@@ -1249,7 +1083,9 @@ describe('demographics_stats', () => {
 
 			// Two cells in the earlier year: period_year - max_hatch_year = 2.
 			for (const month of [3, 9]) {
-				expect(cellFor(visitDateIn(multiCellRingYear + 2, month))).toMatchObject({
+				expect(
+					cellFor(visitDateIn(multiCellRingYear + 2, month))
+				).toMatchObject({
 					adult_bird_count: 1,
 					returning_age_1_bird_count: 0,
 					returning_age_2_bird_count: 1,
@@ -1260,7 +1096,9 @@ describe('demographics_stats', () => {
 
 			// Three cells in the later year: the same bird, now reading 3.
 			for (const month of [2, 6, 11]) {
-				expect(cellFor(visitDateIn(multiCellRingYear + 3, month))).toMatchObject({
+				expect(
+					cellFor(visitDateIn(multiCellRingYear + 3, month))
+				).toMatchObject({
 					adult_bird_count: 1,
 					returning_age_1_bird_count: 0,
 					returning_age_2_bird_count: 0,
@@ -1304,8 +1142,14 @@ describe('demographics_stats', () => {
 		it('a bird with 17 distinct encounter years reads the exact bucket boundaries 1 / 2 / 3_plus in its first three returning years', async () => {
 			const expectations: [number, Record<string, number>][] = [
 				[1, { returning_age_1_bird_count: 1, returning_age_2_bird_count: 0 }],
-				[2, { returning_age_2_bird_count: 1, returning_age_3_plus_bird_count: 0 }],
-				[3, { returning_age_2_bird_count: 0, returning_age_3_plus_bird_count: 1 }]
+				[
+					2,
+					{ returning_age_2_bird_count: 1, returning_age_3_plus_bird_count: 0 }
+				],
+				[
+					3,
+					{ returning_age_2_bird_count: 0, returning_age_3_plus_bird_count: 1 }
+				]
 			];
 			for (const [yearOffset, expected] of expectations) {
 				const row = await kingfisherRowOn(
@@ -1349,7 +1193,8 @@ describe('demographics_stats', () => {
 				.select('id')
 				.eq('species_name', 'Robin')
 				.single();
-			if (robinError || !robin) throw robinError ?? new Error('Robin not found');
+			if (robinError || !robin)
+				throw robinError ?? new Error('Robin not found');
 
 			const suffix = randomTestSuffix();
 			visitDate = randomFutureDate();
@@ -1457,16 +1302,11 @@ describe('demographics_stats', () => {
 			earlyYear = parseInt(randomFutureDate().slice(0, 4), 10);
 			lateYear = earlyYear + 4;
 
-			const { data: location, error: locationError } = await groupClient
-				.from('Locations')
-				.insert({
-					location_name: `Returning Age Cells Loc ${testSuffix}`,
-					ringing_group_id: groupId
-				})
-				.select('id')
-				.single();
-			if (locationError) throw locationError;
-			const locationId = location!.id;
+			const locationId = await insertTestLocation(
+				groupClient,
+				groupId,
+				`Returning Age Cells Loc ${testSuffix}`
+			);
 
 			// One bird per species, each with a single precisely-aged adult encounter
 			// (age_code 5 -> max_hatch_year = visit year - 1, min_hatch_year likewise,
@@ -1479,34 +1319,20 @@ describe('demographics_stats', () => {
 					.single();
 				if (speciesError) throw speciesError;
 
-				const { data: session, error: sessionError } = await groupClient
-					.from('Sessions')
-					.insert({ visit_date: `${year}-05-15`, location_id: locationId })
-					.select('id')
-					.single();
-				if (sessionError) throw sessionError;
+				const sessionId = await insertTestSession(
+					groupClient,
+					locationId,
+					`${year}-05-15`
+				);
 
-				const { data: bird, error: birdError } = await groupClient
-					.from('Birds')
-					.insert({ ring_no: ring, species_id: species!.id })
-					.select('id')
-					.single();
-				if (birdError) throw birdError;
-				birdIds.push(bird!.id);
+				const birdId = await insertTestBird(groupClient, ring, species!.id);
+				birdIds.push(birdId);
 
-				const { error: encounterError } = await groupClient
-					.from('Encounters')
-					.insert({
-						capture_time: '10:00:00',
-						scheme: 'BTO',
-						sex: 'M',
-						session_id: session!.id,
-						bird_id: bird!.id,
-						age_code: 5,
-						is_juv: false,
-						record_type: 'R'
-					});
-				if (encounterError) throw encounterError;
+				await insertTestEncounter(groupClient, birdId, sessionId, {
+					age_code: 5,
+					is_juv: false,
+					record_type: 'R'
+				});
 			}
 
 			await addBird('Robin', earlyYear, `RETCELL-${testSuffix}-R`);
@@ -1531,7 +1357,9 @@ describe('demographics_stats', () => {
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(2);
-			const bySpecies = Object.fromEntries(data!.map((row) => [row.species_name, row]));
+			const bySpecies = Object.fromEntries(
+				data!.map((row) => [row.species_name, row])
+			);
 
 			// The earlier cell is the one a leaked period_year would break: read with
 			// the Kingfisher cell's year it would compute an age of 5, not 1.

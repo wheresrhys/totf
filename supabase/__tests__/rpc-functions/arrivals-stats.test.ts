@@ -16,6 +16,13 @@ import { addDays, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
 import { createIsolatedGroup, psql } from '../db-test-helpers';
+import {
+	insertTestLocation,
+	createSessionResolver,
+	insertTestBird,
+	insertTestEncounter,
+	createRingNoSequence
+} from './helpers/encounter-fixtures';
 
 // arrivals_stats counts each bird exactly ONCE per calendar year, at whichever
 // (species, time_period) cell holds its first classifiable encounter of that year
@@ -91,7 +98,8 @@ describe('arrivals_stats', () => {
 
 		const testSuffix = randomTestSuffix();
 		otherGroupId = createIsolatedGroup(`Arrivals Other ${testSuffix}`);
-		otherGroupClient = await getAuthenticatedSupabaseClientForGroup(otherGroupId);
+		otherGroupClient =
+			await getAuthenticatedSupabaseClientForGroup(otherGroupId);
 
 		const { data: species } = await supabase
 			.from('Species')
@@ -100,87 +108,30 @@ describe('arrivals_stats', () => {
 		const robinId = species!.find((s) => s.species_name === 'Robin')!.id;
 		const blueTitId = species!.find((s) => s.species_name === 'Blue Tit')!.id;
 
-		async function addLocation(
-			client: SupabaseClient,
-			ringingGroupId: number,
-			label: string,
-			track: number[]
-		) {
-			const { data, error } = await client
-				.from('Locations')
-				.insert({
-					location_name: `Arrivals ${label} ${testSuffix}`,
-					ringing_group_id: ringingGroupId
-				})
-				.select('id')
-				.single();
-			if (error) throw error;
-			track.push(data!.id);
-			return data!.id;
-		}
-
-		const deltaLocId = await addLocation(
+		const deltaLocId = await insertTestLocation(
 			deltaClient,
 			deltaId,
-			'Delta Loc',
-			locationIds
+			`Arrivals Delta Loc ${testSuffix}`
 		);
+		locationIds.push(deltaLocId);
 		// A second Delta location so two encounters of one bird can share a date
 		// without sharing a session (same-session retraps are suppressed by trigger).
-		const deltaLocId2 = await addLocation(
+		const deltaLocId2 = await insertTestLocation(
 			deltaClient,
 			deltaId,
-			'Delta Loc 2',
-			locationIds
+			`Arrivals Delta Loc 2 ${testSuffix}`
 		);
-		const otherGroupLocId = await addLocation(
+		locationIds.push(deltaLocId2);
+		const otherGroupLocId = await insertTestLocation(
 			otherGroupClient,
 			otherGroupId,
-			'Other Loc',
-			otherGroupLocationIds
+			`Arrivals Other Loc ${testSuffix}`
 		);
+		otherGroupLocationIds.push(otherGroupLocId);
 
-		const sessionCache = new Map<string, number>();
-		async function getSession(
-			client: SupabaseClient,
-			date: string,
-			locationId: number,
-			track: number[]
-		) {
-			const key = `${date}|${locationId}`;
-			const cached = sessionCache.get(key);
-			if (cached !== undefined) return cached;
-			const { data, error } = await client
-				.from('Sessions')
-				.insert({ visit_date: date, location_id: locationId })
-				.select('id')
-				.single();
-			if (error) throw error;
-			sessionCache.set(key, data!.id);
-			track.push(data!.id);
-			return data!.id;
-		}
+		const getSession = createSessionResolver();
 
-		async function insertEncounter(
-			client: SupabaseClient,
-			birdId: number,
-			sessionId: number,
-			enc: { age_code: number; is_juv: boolean; record_type: string }
-		) {
-			const { error } = await client.from('Encounters').insert({
-				capture_time: '10:00:00',
-				scheme: 'BTO',
-				sex: 'M',
-				session_id: sessionId,
-				bird_id: birdId,
-				age_code: enc.age_code,
-				is_juv: enc.is_juv,
-				record_type: enc.record_type
-			});
-			if (error) throw error;
-		}
-
-		let ringCounter = 0;
+		const nextRing = createRingNoSequence(`ARRIVE-${testSuffix}`);
 		async function addBird(
 			speciesId: number,
 			encounters: {
@@ -191,16 +142,8 @@ describe('arrivals_stats', () => {
 				locationId?: number;
 			}[]
 		): Promise<number> {
-			const { data, error } = await deltaClient
-				.from('Birds')
-				.insert({
-					ring_no: `ARRIVE-${testSuffix}-${ringCounter++}`,
-					species_id: speciesId
-				})
-				.select('id')
-				.single();
-			if (error) throw error;
-			birdIds.push(data!.id);
+			const birdId = await insertTestBird(deltaClient, nextRing(), speciesId);
+			birdIds.push(birdId);
 			// Sequential (not Promise.all) so encounter ids follow this array's order —
 			// the same-day tiebreak below depends on it.
 			for (const enc of encounters) {
@@ -210,9 +153,13 @@ describe('arrivals_stats', () => {
 					enc.locationId ?? deltaLocId,
 					sessionIds
 				);
-				await insertEncounter(deltaClient, data!.id, sessionId, enc);
+				await insertTestEncounter(deltaClient, birdId, sessionId, {
+					age_code: enc.age_code,
+					is_juv: enc.is_juv,
+					record_type: enc.record_type
+				});
 			}
-			return data!.id;
+			return birdId;
 		}
 
 		// new_adult: first-ever encounter with Delta is this year, as an adult.
@@ -269,25 +216,21 @@ describe('arrivals_stats', () => {
 		// Cross-group: an other-group-owned adult encounter in priorYear, then a
 		// first Delta encounter this year. Under ringing_group_filter = Delta the
 		// other group's history must not count, so this reads as new_adult.
-		const { data: crossGroupBird, error: cgErr } = await deltaClient
-			.from('Birds')
-			.insert({
-				ring_no: `ARRIVE-${testSuffix}-CROSSGROUP`,
-				species_id: robinId
-			})
-			.select('id')
-			.single();
-		if (cgErr) throw cgErr;
-		birdIds.push(crossGroupBird!.id);
+		const crossGroupBirdId = await insertTestBird(
+			deltaClient,
+			`ARRIVE-${testSuffix}-CROSSGROUP`,
+			robinId
+		);
+		birdIds.push(crossGroupBirdId);
 		const otherGroupSessionId = await getSession(
 			otherGroupClient,
 			dayIn(priorYear, 200),
 			otherGroupLocId,
 			otherGroupSessionIds
 		);
-		await insertEncounter(
+		await insertTestEncounter(
 			otherGroupClient,
-			crossGroupBird!.id,
+			crossGroupBirdId,
 			otherGroupSessionId,
 			{
 				...ADULT,
@@ -300,10 +243,15 @@ describe('arrivals_stats', () => {
 			deltaLocId,
 			sessionIds
 		);
-		await insertEncounter(deltaClient, crossGroupBird!.id, crossGroupSessionId, {
-			...ADULT,
-			record_type: 'N'
-		});
+		await insertTestEncounter(
+			deltaClient,
+			crossGroupBirdId,
+			crossGroupSessionId,
+			{
+				...ADULT,
+				record_type: 'N'
+			}
+		);
 	});
 
 	afterAll(() => {

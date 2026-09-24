@@ -26,6 +26,12 @@ import { supabase } from '../../../lib/supabase';
 import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
+import {
+	insertTestLocation,
+	insertTestSession,
+	insertTestBird,
+	insertTestEncounter
+} from './helpers/encounter-fixtures';
 
 async function getSpeciesId(speciesName: string): Promise<number> {
 	const { data, error } = await supabase
@@ -69,62 +75,36 @@ describe('stats_raw_encounters — resighting exclusion', () => {
 		const dResight = addDays(base, 1);
 		const dResightOnly = addDays(base, 2);
 
-		const { data: loc, error: locErr } = await deltaClient
-			.from('Locations')
-			.insert({
-				location_name: `RawEnc Loc ${suffix}`,
-				ringing_group_id: deltaId
-			})
-			.select('id')
-			.single();
-		if (locErr) throw locErr;
-		locationIds.push(loc!.id);
-		const locationId = loc!.id;
+		const locationId = await insertTestLocation(
+			deltaClient,
+			deltaId,
+			`RawEnc Loc ${suffix}`
+		);
+		locationIds.push(locationId);
 
 		async function makeSession(date: string): Promise<number> {
-			const { data: session, error } = await deltaClient
-				.from('Sessions')
-				.insert({ visit_date: date, location_id: locationId })
-				.select('id')
-				.single();
-			if (error) throw error;
-			sessionIds.push(session!.id);
-			return session!.id;
+			const sessionId = await insertTestSession(deltaClient, locationId, date);
+			sessionIds.push(sessionId);
+			return sessionId;
 		}
 
 		async function makeBird(ring: string, speciesId: number): Promise<number> {
-			const { data: bird, error } = await deltaClient
-				.from('Birds')
-				.insert({ ring_no: ring, species_id: speciesId })
-				.select('id')
-				.single();
-			if (error) throw error;
-			birdIds.push(bird!.id);
-			return bird!.id;
+			const birdId = await insertTestBird(deltaClient, ring, speciesId);
+			birdIds.push(birdId);
+			return birdId;
 		}
 
-		async function makeEncounter(
+		function makeEncounter(
 			birdId: number,
 			sessionId: number,
 			recordType: string
 		): Promise<number> {
-			const { data: enc, error } = await deltaClient
-				.from('Encounters')
-				.insert({
-					capture_time: '10:00:00',
-					scheme: 'BTO',
-					sex: 'M',
-					session_id: sessionId,
-					bird_id: birdId,
-					age_code: 4,
-					record_type: recordType,
-					weight: 10,
-					wing_length: 50
-				})
-				.select('id')
-				.single();
-			if (error) throw error;
-			return enc!.id;
+			return insertTestEncounter(deltaClient, birdId, sessionId, {
+				age_code: 4,
+				record_type: recordType,
+				weight: 10,
+				wing_length: 50
+			});
 		}
 
 		// mixedBird: one normal 'N' capture and one resighting 'F' for the same bird.
@@ -218,33 +198,24 @@ describe('stats_spine — FIELD_OBSERVATION session exclusion from date range', 
 		deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
 
 		const suffix = randomTestSuffix();
-		const { data: loc, error: locErr } = await deltaClient
-			.from('Locations')
-			.insert({
-				location_name: `Spine Loc ${suffix}`,
-				ringing_group_id: deltaId
-			})
-			.select('id')
-			.single();
-		if (locErr) throw locErr;
-		locationIds.push(loc!.id);
-		const locationId = loc!.id;
+		const locationId = await insertTestLocation(
+			deltaClient,
+			deltaId,
+			`Spine Loc ${suffix}`
+		);
+		locationIds.push(locationId);
 
 		async function makeSession(
 			date: string,
 			sessionType: 'FULL_GROWN' | 'FIELD_OBSERVATION'
 		): Promise<void> {
-			const { data: session, error } = await deltaClient
-				.from('Sessions')
-				.insert({
-					visit_date: date,
-					location_id: locationId,
-					session_type: sessionType
-				})
-				.select('id')
-				.single();
-			if (error) throw error;
-			sessionIds.push(session!.id);
+			const sessionId = await insertTestSession(
+				deltaClient,
+				locationId,
+				date,
+				sessionType
+			);
+			sessionIds.push(sessionId);
 		}
 
 		// Exclusion year: a FULL_GROWN session in March and a lone FIELD_OBSERVATION
@@ -316,50 +287,30 @@ describe('stats_raw_encounters/stats_spine — no filters supplied', () => {
 		const robinId = await getSpeciesId('Robin');
 		const date = randomFutureDate();
 
-		const { data: loc, error: locErr } = await deltaClient
-			.from('Locations')
-			.insert({
-				location_name: `NullFilter Loc ${suffix}`,
-				ringing_group_id: deltaId
-			})
-			.select('id')
-			.single();
-		if (locErr) throw locErr;
-		locationIds.push(loc!.id);
+		const locationId = await insertTestLocation(
+			deltaClient,
+			deltaId,
+			`NullFilter Loc ${suffix}`
+		);
+		locationIds.push(locationId);
 
-		const { data: session, error: sessErr } = await deltaClient
-			.from('Sessions')
-			.insert({ visit_date: date, location_id: loc!.id })
-			.select('id')
-			.single();
-		if (sessErr) throw sessErr;
-		sessionIds.push(session!.id);
+		const sessionId = await insertTestSession(deltaClient, locationId, date);
+		sessionIds.push(sessionId);
 
-		const { data: bird, error: birdErr } = await deltaClient
-			.from('Birds')
-			.insert({ ring_no: resightRing, species_id: robinId })
-			.select('id')
-			.single();
-		if (birdErr) throw birdErr;
-		birdIds.push(bird!.id);
+		const birdId = await insertTestBird(deltaClient, resightRing, robinId);
+		birdIds.push(birdId);
 
-		const { data: enc, error: encErr } = await deltaClient
-			.from('Encounters')
-			.insert({
-				capture_time: '10:00:00',
-				scheme: 'BTO',
-				sex: 'M',
-				session_id: session!.id,
-				bird_id: bird!.id,
+		resightingEncounterId = await insertTestEncounter(
+			deltaClient,
+			birdId,
+			sessionId,
+			{
 				age_code: 4,
 				record_type: 'D',
 				weight: 10,
 				wing_length: 50
-			})
-			.select('id')
-			.single();
-		if (encErr) throw encErr;
-		resightingEncounterId = enc!.id;
+			}
+		);
 	});
 
 	afterAll(() => {
