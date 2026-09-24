@@ -116,39 +116,66 @@ describe('getHighlightsWithinTimeWindow', () => {
 	});
 
 	describe('data sources', () => {
-		describe('day', () => {
-			it('combines all time, year and month highlights', async () => {
-				vi.mocked(getHighlightsWithinTimeWindow).mockImplementation(
-					async ({ parentTimeWindow }) => {
-						if (parentTimeWindow?.month) {
-							return [
-								makeHighlightsOfType({
-									type: 'month-rule',
-									temporalUnit: 'day',
-									parentTimeWindow,
-									values: singleValue(DAY_PERIOD, 1)
-								})
-							];
-						}
-						if (parentTimeWindow?.year) {
-							return [
-								makeHighlightsOfType({
-									type: 'year-rule',
-									temporalUnit: 'day',
-									parentTimeWindow,
-									values: singleValue(DAY_PERIOD, 1)
-								})
-							];
-						}
+		// one HighlightsOfType per tier that could respond, each with a single
+		// value at `matchingPeriod` - shared across the day/month/year "combines
+		// ... highlights" tests below, which differ only in which tiers the real
+		// code ends up calling for a given temporalUnit
+		function mockTierData(matchingPeriod: string) {
+			vi.mocked(getHighlightsWithinTimeWindow).mockImplementation(
+				async ({ parentTimeWindow }) => {
+					if (parentTimeWindow?.month) {
 						return [
 							makeHighlightsOfType({
-								type: 'all-time-rule',
-								temporalUnit: 'day',
-								values: singleValue(DAY_PERIOD, 1)
+								type: 'month-rule',
+								parentTimeWindow,
+								values: singleValue(matchingPeriod, 1)
 							})
 						];
 					}
-				);
+					if (parentTimeWindow?.year) {
+						return [
+							makeHighlightsOfType({
+								type: 'year-rule',
+								parentTimeWindow,
+								values: singleValue(matchingPeriod, 1)
+							})
+						];
+					}
+					return [
+						makeHighlightsOfType({
+							type: 'all-time-rule',
+							values: singleValue(matchingPeriod, 1)
+						})
+					];
+				}
+			);
+		}
+
+		// one HighlightsOfType (all-time tier only) with a value matching
+		// `matchingPeriod` alongside one at `otherPeriod`, plus a second
+		// HighlightsOfType whose only value is at `otherPeriod` - shared across
+		// the day/month/year "filters out ..." tests below
+		function mockFilterData(matchingPeriod: string, otherPeriod: string) {
+			vi.mocked(getHighlightsWithinTimeWindow).mockImplementation(
+				async ({ parentTimeWindow }) => {
+					if (parentTimeWindow) return [];
+					return [
+						makeHighlightsOfType({
+							type: 'matches',
+							values: [makeValue(otherPeriod, 5), makeValue(matchingPeriod, 9)]
+						}),
+						makeHighlightsOfType({
+							type: 'no-match',
+							values: [makeValue(otherPeriod, 2)]
+						})
+					];
+				}
+			);
+		}
+
+		describe('day', () => {
+			it('combines all time, year and month highlights', async () => {
+				mockTierData(DAY_PERIOD);
 
 				const result = await callForDay();
 
@@ -181,21 +208,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 			});
 
 			it('filters out highlights that do not occur on the relevant day', async () => {
-				vi.mocked(getHighlightsWithinTimeWindow).mockImplementation(
-					async ({ parentTimeWindow }) => {
-						if (parentTimeWindow) return [];
-						return [
-							makeHighlightsOfType({
-								type: 'matches',
-								values: [makeValue('2024-03-14', 5), makeValue(DAY_PERIOD, 9)]
-							}),
-							makeHighlightsOfType({
-								type: 'no-match',
-								values: [makeValue('2024-03-01', 2), makeValue('2024-04-01', 4)]
-							})
-						];
-					}
-				);
+				mockFilterData(DAY_PERIOD, '2024-03-01');
 
 				const result = await callForDay();
 
@@ -206,27 +219,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 
 		describe('month', () => {
 			it('combines all time and year highlights when calculating for a month', async () => {
-				vi.mocked(getHighlightsWithinTimeWindow).mockImplementation(
-					async ({ parentTimeWindow }) => {
-						if (parentTimeWindow?.year) {
-							return [
-								makeHighlightsOfType({
-									type: 'year-rule',
-									temporalUnit: 'month',
-									parentTimeWindow,
-									values: singleValue(MONTH_PERIOD, 1)
-								})
-							];
-						}
-						return [
-							makeHighlightsOfType({
-								type: 'all-time-rule',
-								temporalUnit: 'month',
-								values: singleValue(MONTH_PERIOD, 1)
-							})
-						];
-					}
-				);
+				mockTierData(MONTH_PERIOD);
 
 				const result = await callForMonth();
 
@@ -251,21 +244,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 			});
 
 			it('filters out highlights that do not occur in the relevant month', async () => {
-				vi.mocked(getHighlightsWithinTimeWindow).mockImplementation(
-					async ({ parentTimeWindow }) => {
-						if (parentTimeWindow) return [];
-						return [
-							makeHighlightsOfType({
-								type: 'matches',
-								values: [makeValue('2024-02', 5), makeValue(MONTH_PERIOD, 9)]
-							}),
-							makeHighlightsOfType({
-								type: 'no-match',
-								values: [makeValue('2024-01', 2), makeValue('2024-04', 4)]
-							})
-						];
-					}
-				);
+				mockFilterData(MONTH_PERIOD, '2024-01');
 
 				const result = await callForMonth();
 
@@ -276,9 +255,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 
 		describe('year', () => {
 			it('fetches all time highlights when calculating for a year', async () => {
-				vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
-					makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 7) })
-				]);
+				mockTierData(YEAR_PERIOD);
 
 				const result = await callForYear();
 
@@ -289,20 +266,11 @@ describe('getHighlightsWithinTimeWindow', () => {
 					limit: 3,
 					includePerSpecies: true
 				});
-				expect(result[0].value.value).toBe(7);
+				expect(result.map((r) => r.descriptor.type)).toEqual(['all-time-rule']);
 			});
 
 			it('filters out highlights that do not occur in the relevant year', async () => {
-				vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
-					makeHighlightsOfType({
-						type: 'matches',
-						values: [makeValue('2023', 5), makeValue(YEAR_PERIOD, 9)]
-					}),
-					makeHighlightsOfType({
-						type: 'no-match',
-						values: [makeValue('2022', 2), makeValue('2021', 4)]
-					})
-				]);
+				mockFilterData(YEAR_PERIOD, '2021');
 
 				const result = await callForYear();
 
@@ -366,7 +334,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 			expect(survivesWithWindow(result, 'year')).toBe(false);
 		});
 
-		it('remove year-scoped hihglight when all time scoped exists', async () => {
+		it('remove year-scoped highlight when all time scoped exists', async () => {
 			mockAllTimeAndYear(
 				allTimeMonth(singleValue(MONTH_PERIOD, 5)),
 				yearScopedMonth(singleValue(MONTH_PERIOD, 5))
@@ -377,7 +345,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 			expect(survivesWithWindow(result, 'year')).toBe(false);
 		});
 
-		it('remove month-scoped hihglight when all time scoped exists', async () => {
+		it('remove month-scoped highlight when all time scoped exists', async () => {
 			mockTwoOfThreeTiers({
 				allTime: makeHighlightsOfType({
 					temporalUnit: 'day',
@@ -458,7 +426,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 			expect(survivesWithWindow(result, 'year')).toBe(true);
 		});
 
-		it("don't remove month-scoped hihglight when year-scoped exists", async () => {
+		it("don't remove month-scoped highlight when year-scoped exists", async () => {
 			mockTwoOfThreeTiers({
 				year: makeHighlightsOfType({
 					temporalUnit: 'day',
@@ -497,7 +465,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 			expect(survivesWithWindow(result, 'year')).toBe(true);
 		});
 
-		it("don't remove wherer category doesn't match", async () => {
+		it("don't remove where category doesn't match", async () => {
 			mockAllTimeAndYear(
 				makeHighlightsOfType({
 					category: 'rarity',
