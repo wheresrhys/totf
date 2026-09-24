@@ -17,26 +17,10 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { randomTestSuffix, randomFutureDate, addDays } from './test-isolation';
-
-const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
-
-function psql(sql: string) {
-	execSync(`psql "${LOCAL_DB_URL}" -c "${sql.replace(/"/g, '\\"')}"`);
-}
-
-function psqlScalar(sql: string): string {
-	return execSync(
-		`psql "${LOCAL_DB_URL}" -t -A -c "${sql.replace(/"/g, '\\"')}"`
-	)
-		.toString()
-		.split('\n')
-		.map((line) => line.trim())
-		.filter(Boolean)[0];
-}
+import { psql, psqlScalar } from './db-test-helpers';
 
 function psqlColumnExists(table: string, column: string): boolean {
 	const count = psqlScalar(
