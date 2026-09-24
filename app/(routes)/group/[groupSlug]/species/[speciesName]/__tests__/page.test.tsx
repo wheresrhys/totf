@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
-import { notFound } from 'next/navigation';
+import { describe, vi, afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 import GroupSpeciesDetailPage from '../page';
+import { describeGroupScopeDelegation } from '@/app/__tests__/helpers/group-scope-delegation';
 
 const { mockResolveGroupIdBySlug } = vi.hoisted(() => ({
 	mockResolveGroupIdBySlug: vi.fn()
@@ -29,53 +29,12 @@ describe('group species detail page', () => {
 		vi.clearAllMocks();
 	});
 
-	describe('a known groupSlug', () => {
-		beforeEach(() => {
-			mockResolveGroupIdBySlug.mockResolvedValue(2);
-		});
-
-		it('passes viewedGroup matching { id, slug } resolved from resolveGroupIdBySlug to the underlying route page', async () => {
-			render(
-				await GroupSpeciesDetailPage({
-					params: Promise.resolve({
-						groupSlug: 'viewed-group-slug',
-						speciesName: 'Robin'
-					})
-				})
-			);
-			screen.getByTestId('mock-species-page');
-
-			expect(mockResolveGroupIdBySlug).toHaveBeenCalledWith(
-				'viewed-group-slug'
-			);
-			expect(vi.mocked(SpeciesPage).mock.calls[0][0]).toEqual(
-				expect.objectContaining({
-					viewedGroup: { id: 2, slug: 'viewed-group-slug' }
-				})
-			);
-		});
-	});
-
-	describe('an unknown groupSlug', () => {
-		beforeEach(() => {
-			mockResolveGroupIdBySlug.mockResolvedValue(null);
-			vi.mocked(notFound).mockImplementationOnce(() => {
-				throw new Error('NEXT_NOT_FOUND');
-			});
-		});
-
-		it('calls notFound() instead of rendering the route page', async () => {
-			await expect(
-				GroupSpeciesDetailPage({
-					params: Promise.resolve({
-						groupSlug: 'no-such-group',
-						speciesName: 'Robin'
-					})
-				})
-			).rejects.toThrow('NEXT_NOT_FOUND');
-
-			expect(vi.mocked(notFound)).toHaveBeenCalled();
-			expect(vi.mocked(SpeciesPage)).not.toHaveBeenCalled();
-		});
+	describeGroupScopeDelegation({
+		renderGroupPage: (params) =>
+			GroupSpeciesDetailPage({ params: Promise.resolve(params) }),
+		mockResolveGroupIdBySlug,
+		DelegatePage: SpeciesPage,
+		testId: 'mock-species-page',
+		extraParams: { speciesName: 'Robin' }
 	});
 });
