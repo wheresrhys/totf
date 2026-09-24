@@ -1,11 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { HighlightsOfType, HighlightValue } from '../../types';
+import type {
+	HighlightsOfType,
+	HighlightValue,
+	HighlightCategory,
+	YearMonthRestriction
+} from '../../types';
+import type {
+	StatUnit,
+	TemporalUnit
+} from '@/app/components/shared/StatOutput';
 // mock getHighlightsWithinTimeWindow
 vi.mock('../highlight-generator', () => ({
 	getHighlightsWithinTimeWindow: vi.fn()
 }));
 import { getHighlightsWithinTimeWindow } from '../highlight-generator';
 import { getCondensedHighlightsAtTimePeriod } from '../time-period-highlights';
+
+const GROUP_ID = 1;
+const DAY_PERIOD = '2024-03-15';
+const MONTH_PERIOD = '2024-03';
+const YEAR_PERIOD = '2024';
+
+const callForDay = () =>
+	getCondensedHighlightsAtTimePeriod(GROUP_ID, DAY_PERIOD, 'day');
+const callForMonth = () =>
+	getCondensedHighlightsAtTimePeriod(GROUP_ID, MONTH_PERIOD, 'month');
+const callForYear = () =>
+	getCondensedHighlightsAtTimePeriod(GROUP_ID, YEAR_PERIOD, 'year');
 
 function makeValue(
 	timePeriod: string,
@@ -15,19 +36,65 @@ function makeValue(
 	return { timePeriod, value, species };
 }
 
-function makeHighlightsOfType(
-	overrides: Partial<HighlightsOfType> = {}
-): HighlightsOfType {
+// a lone value is always ranked position 1, not tied
+function singleValue(
+	timePeriod: string,
+	value: number,
+	species: string | null = null
+) {
+	return [makeValue(timePeriod, value, species)];
+}
+
+// pads the sibling array with an equal decoy value so the target ties for position 1
+function tiedValue(
+	timePeriod: string,
+	value: number,
+	species: string | null = null
+) {
+	return [
+		makeValue(timePeriod, value, species),
+		makeValue('decoy', value, species)
+	];
+}
+
+// pads the sibling array with a bigger decoy value so the target ranks position 2, not tied
+function secondPlaceValue(
+	timePeriod: string,
+	value: number,
+	species: string | null = null
+) {
+	return [
+		makeValue('decoy', value + 1000, species),
+		makeValue(timePeriod, value, species)
+	];
+}
+
+function makeHighlightsOfType({
+	type = 'test',
+	category = 'count',
+	unit = 'bird',
+	temporalUnit = 'year',
+	parentTimeWindow,
+	species,
+	values
+}: {
+	type?: string;
+	category?: HighlightCategory;
+	unit?: StatUnit;
+	temporalUnit?: TemporalUnit;
+	parentTimeWindow?: YearMonthRestriction;
+	species?: string;
+	values: HighlightValue[];
+}): HighlightsOfType {
 	return {
 		formatters: {
 			highlightListPrefixPrinter: vi.fn(),
 			combinedHighlightPrinter: vi.fn()
 		},
-		descriptor: { category: 'count', type: 'test', unit: 'bird' },
-		scope: { temporalUnit: 'day' },
-		values: [],
-		...overrides
-	} as HighlightsOfType;
+		descriptor: { category, type, unit },
+		scope: { temporalUnit, parentTimeWindow, species },
+		values
+	};
 }
 
 // whether the result contains a highlight with a scope carrying this window key,
@@ -56,66 +123,52 @@ describe('getHighlightsWithinTimeWindow', () => {
 						if (parentTimeWindow?.month) {
 							return [
 								makeHighlightsOfType({
-									descriptor: {
-										category: 'count',
-										type: 'month-rule',
-										unit: 'bird'
-									},
-									scope: { temporalUnit: 'day', parentTimeWindow },
-									values: [makeValue('2024-03-15', 1)]
+									type: 'month-rule',
+									temporalUnit: 'day',
+									parentTimeWindow,
+									values: singleValue(DAY_PERIOD, 1)
 								})
 							];
 						}
 						if (parentTimeWindow?.year) {
 							return [
 								makeHighlightsOfType({
-									descriptor: {
-										category: 'count',
-										type: 'year-rule',
-										unit: 'bird'
-									},
-									scope: { temporalUnit: 'day', parentTimeWindow },
-									values: [makeValue('2024-03-15', 1)]
+									type: 'year-rule',
+									temporalUnit: 'day',
+									parentTimeWindow,
+									values: singleValue(DAY_PERIOD, 1)
 								})
 							];
 						}
 						return [
 							makeHighlightsOfType({
-								descriptor: {
-									category: 'count',
-									type: 'all-time-rule',
-									unit: 'bird'
-								},
-								scope: { temporalUnit: 'day' },
-								values: [makeValue('2024-03-15', 1)]
+								type: 'all-time-rule',
+								temporalUnit: 'day',
+								values: singleValue(DAY_PERIOD, 1)
 							})
 						];
 					}
 				);
 
-				const result = await getCondensedHighlightsAtTimePeriod(
-					1,
-					'2024-03-15',
-					'day'
-				);
+				const result = await callForDay();
 
 				expect(getHighlightsWithinTimeWindow).toHaveBeenCalledTimes(3);
 				expect(getHighlightsWithinTimeWindow).toHaveBeenCalledWith({
 					temporalUnit: 'day',
-					groupId: 1,
+					groupId: GROUP_ID,
 					limit: 3,
 					includePerSpecies: true
 				});
 				expect(getHighlightsWithinTimeWindow).toHaveBeenCalledWith({
 					temporalUnit: 'day',
-					groupId: 1,
+					groupId: GROUP_ID,
 					parentTimeWindow: { year: 2024 },
 					limit: 1,
 					includePerSpecies: true
 				});
 				expect(getHighlightsWithinTimeWindow).toHaveBeenCalledWith({
 					temporalUnit: 'day',
-					groupId: 1,
+					groupId: GROUP_ID,
 					parentTimeWindow: { month: 3 },
 					limit: 3,
 					includePerSpecies: true
@@ -133,30 +186,18 @@ describe('getHighlightsWithinTimeWindow', () => {
 						if (parentTimeWindow) return [];
 						return [
 							makeHighlightsOfType({
-								descriptor: {
-									category: 'count',
-									type: 'matches',
-									unit: 'bird'
-								},
-								values: [makeValue('2024-03-14', 5), makeValue('2024-03-15', 9)]
+								type: 'matches',
+								values: [makeValue('2024-03-14', 5), makeValue(DAY_PERIOD, 9)]
 							}),
 							makeHighlightsOfType({
-								descriptor: {
-									category: 'count',
-									type: 'no-match',
-									unit: 'bird'
-								},
+								type: 'no-match',
 								values: [makeValue('2024-03-01', 2), makeValue('2024-04-01', 4)]
 							})
 						];
 					}
 				);
 
-				const result = await getCondensedHighlightsAtTimePeriod(
-					1,
-					'2024-03-15',
-					'day'
-				);
+				const result = await callForDay();
 
 				expect(result.map((r) => r.descriptor.type)).toEqual(['matches']);
 				expect(result[0].value.value).toBe(9);
@@ -170,46 +211,35 @@ describe('getHighlightsWithinTimeWindow', () => {
 						if (parentTimeWindow?.year) {
 							return [
 								makeHighlightsOfType({
-									descriptor: {
-										category: 'count',
-										type: 'year-rule',
-										unit: 'bird'
-									},
-									scope: { temporalUnit: 'month', parentTimeWindow },
-									values: [makeValue('2024-03', 1)]
+									type: 'year-rule',
+									temporalUnit: 'month',
+									parentTimeWindow,
+									values: singleValue(MONTH_PERIOD, 1)
 								})
 							];
 						}
 						return [
 							makeHighlightsOfType({
-								descriptor: {
-									category: 'count',
-									type: 'all-time-rule',
-									unit: 'bird'
-								},
-								scope: { temporalUnit: 'month' },
-								values: [makeValue('2024-03', 1)]
+								type: 'all-time-rule',
+								temporalUnit: 'month',
+								values: singleValue(MONTH_PERIOD, 1)
 							})
 						];
 					}
 				);
 
-				const result = await getCondensedHighlightsAtTimePeriod(
-					1,
-					'2024-03',
-					'month'
-				);
+				const result = await callForMonth();
 
 				expect(getHighlightsWithinTimeWindow).toHaveBeenCalledTimes(2);
 				expect(getHighlightsWithinTimeWindow).toHaveBeenCalledWith({
 					temporalUnit: 'month',
-					groupId: 1,
+					groupId: GROUP_ID,
 					limit: 3,
 					includePerSpecies: true
 				});
 				expect(getHighlightsWithinTimeWindow).toHaveBeenCalledWith({
 					temporalUnit: 'month',
-					groupId: 1,
+					groupId: GROUP_ID,
 					parentTimeWindow: { year: 2024 },
 					limit: 1,
 					includePerSpecies: true
@@ -226,30 +256,18 @@ describe('getHighlightsWithinTimeWindow', () => {
 						if (parentTimeWindow) return [];
 						return [
 							makeHighlightsOfType({
-								descriptor: {
-									category: 'count',
-									type: 'matches',
-									unit: 'bird'
-								},
-								values: [makeValue('2024-02', 5), makeValue('2024-03', 9)]
+								type: 'matches',
+								values: [makeValue('2024-02', 5), makeValue(MONTH_PERIOD, 9)]
 							}),
 							makeHighlightsOfType({
-								descriptor: {
-									category: 'count',
-									type: 'no-match',
-									unit: 'bird'
-								},
+								type: 'no-match',
 								values: [makeValue('2024-01', 2), makeValue('2024-04', 4)]
 							})
 						];
 					}
 				);
 
-				const result = await getCondensedHighlightsAtTimePeriod(
-					1,
-					'2024-03',
-					'month'
-				);
+				const result = await callForMonth();
 
 				expect(result.map((r) => r.descriptor.type)).toEqual(['matches']);
 				expect(result[0].value.value).toBe(9);
@@ -259,22 +277,15 @@ describe('getHighlightsWithinTimeWindow', () => {
 		describe('year', () => {
 			it('fetches all time highlights when calculating for a year', async () => {
 				vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
-					makeHighlightsOfType({
-						scope: { temporalUnit: 'year' },
-						values: [makeValue('2024', 7)]
-					})
+					makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 7) })
 				]);
 
-				const result = await getCondensedHighlightsAtTimePeriod(
-					1,
-					'2024',
-					'year'
-				);
+				const result = await callForYear();
 
 				expect(getHighlightsWithinTimeWindow).toHaveBeenCalledTimes(1);
 				expect(getHighlightsWithinTimeWindow).toHaveBeenCalledWith({
 					temporalUnit: 'year',
-					groupId: 1,
+					groupId: GROUP_ID,
 					limit: 3,
 					includePerSpecies: true
 				});
@@ -284,20 +295,16 @@ describe('getHighlightsWithinTimeWindow', () => {
 			it('filters out highlights that do not occur in the relevant year', async () => {
 				vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
 					makeHighlightsOfType({
-						descriptor: { category: 'count', type: 'matches', unit: 'bird' },
-						values: [makeValue('2023', 5), makeValue('2024', 9)]
+						type: 'matches',
+						values: [makeValue('2023', 5), makeValue(YEAR_PERIOD, 9)]
 					}),
 					makeHighlightsOfType({
-						descriptor: { category: 'count', type: 'no-match', unit: 'bird' },
+						type: 'no-match',
 						values: [makeValue('2022', 2), makeValue('2021', 4)]
 					})
 				]);
 
-				const result = await getCondensedHighlightsAtTimePeriod(
-					1,
-					'2024',
-					'year'
-				);
+				const result = await callForYear();
 
 				expect(result.map((r) => r.descriptor.type)).toEqual(['matches']);
 				expect(result[0].value.value).toBe(9);
@@ -335,18 +342,13 @@ describe('getHighlightsWithinTimeWindow', () => {
 		}
 
 		function allTimeMonth(values: HighlightValue[], species?: string) {
-			return makeHighlightsOfType({
-				scope: { temporalUnit: 'month', species },
-				values
-			});
+			return makeHighlightsOfType({ temporalUnit: 'month', species, values });
 		}
 		function yearScopedMonth(values: HighlightValue[], species?: string) {
 			return makeHighlightsOfType({
-				scope: {
-					temporalUnit: 'month',
-					parentTimeWindow: { year: 2024 },
-					species
-				},
+				temporalUnit: 'month',
+				parentTimeWindow: { year: 2024 },
+				species,
 				values
 			});
 		}
@@ -355,30 +357,22 @@ describe('getHighlightsWithinTimeWindow', () => {
 			// all-time is worse-positioned (2) than the year-scoped highlight (1) -
 			// still enough to clobber it, since a clobberer only needs to be equal-or-worse
 			mockAllTimeAndYear(
-				allTimeMonth([makeValue('other', 9), makeValue('2024-03', 4)]),
-				yearScopedMonth([makeValue('2024-03', 7)])
+				allTimeMonth(secondPlaceValue(MONTH_PERIOD, 4)),
+				yearScopedMonth(singleValue(MONTH_PERIOD, 7))
 			);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03',
-				'month'
-			);
+			const result = await callForMonth();
 
 			expect(survivesWithWindow(result, 'year')).toBe(false);
 		});
 
 		it('remove year-scoped hihglight when all time scoped exists', async () => {
 			mockAllTimeAndYear(
-				allTimeMonth([makeValue('2024-03', 5)]),
-				yearScopedMonth([makeValue('2024-03', 5)])
+				allTimeMonth(singleValue(MONTH_PERIOD, 5)),
+				yearScopedMonth(singleValue(MONTH_PERIOD, 5))
 			);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03',
-				'month'
-			);
+			const result = await callForMonth();
 
 			expect(survivesWithWindow(result, 'year')).toBe(false);
 		});
@@ -386,80 +380,61 @@ describe('getHighlightsWithinTimeWindow', () => {
 		it('remove month-scoped hihglight when all time scoped exists', async () => {
 			mockTwoOfThreeTiers({
 				allTime: makeHighlightsOfType({
-					scope: { temporalUnit: 'day' },
-					values: [makeValue('2024-03-15', 5)]
+					temporalUnit: 'day',
+					values: singleValue(DAY_PERIOD, 5)
 				}),
 				month: makeHighlightsOfType({
-					scope: { temporalUnit: 'day', parentTimeWindow: { month: 3 } },
-					values: [makeValue('2024-03-15', 5)]
+					temporalUnit: 'day',
+					parentTimeWindow: { month: 3 },
+					values: singleValue(DAY_PERIOD, 5)
 				})
 			});
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03-15',
-				'day'
-			);
+			const result = await callForDay();
 
 			expect(survivesWithWindow(result, 'month')).toBe(false);
 		});
 
 		it('remove when both are tied', async () => {
 			mockAllTimeAndYear(
-				allTimeMonth([makeValue('2024-03', 5), makeValue('decoy-a', 5)]),
-				yearScopedMonth([makeValue('2024-03', 5), makeValue('decoy-b', 5)])
+				allTimeMonth(tiedValue(MONTH_PERIOD, 5)),
+				yearScopedMonth(tiedValue(MONTH_PERIOD, 5))
 			);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03',
-				'month'
-			);
+			const result = await callForMonth();
 
 			expect(survivesWithWindow(result, 'year')).toBe(false);
 		});
 
 		it('remove when both are not tied', async () => {
 			mockAllTimeAndYear(
-				allTimeMonth([makeValue('2024-03', 5)]),
-				yearScopedMonth([makeValue('2024-03', 5)])
+				allTimeMonth(singleValue(MONTH_PERIOD, 5)),
+				yearScopedMonth(singleValue(MONTH_PERIOD, 5))
 			);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03',
-				'month'
-			);
+			const result = await callForMonth();
 
 			expect(survivesWithWindow(result, 'year')).toBe(false);
 		});
 
 		it('remove when higher scoped is not tied and local scoped is tied', async () => {
 			mockAllTimeAndYear(
-				allTimeMonth([makeValue('2024-03', 5)]),
-				yearScopedMonth([makeValue('2024-03', 5), makeValue('decoy', 5)])
+				allTimeMonth(singleValue(MONTH_PERIOD, 5)),
+				yearScopedMonth(tiedValue(MONTH_PERIOD, 5))
 			);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03',
-				'month'
-			);
+			const result = await callForMonth();
 
 			expect(survivesWithWindow(result, 'year')).toBe(false);
 		});
 
 		it("don't remove when higher scoped is tied and local scoped is not tied", async () => {
 			mockAllTimeAndYear(
-				allTimeMonth([makeValue('2024-03', 5), makeValue('decoy', 5)]),
-				yearScopedMonth([makeValue('2024-03', 5)])
+				allTimeMonth(tiedValue(MONTH_PERIOD, 5)),
+				yearScopedMonth(singleValue(MONTH_PERIOD, 5))
 			);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03',
-				'month'
-			);
+			const result = await callForMonth();
 
 			expect(survivesWithWindow(result, 'year')).toBe(true);
 		});
@@ -467,20 +442,18 @@ describe('getHighlightsWithinTimeWindow', () => {
 		it("don't remove year-scoped highlight when month-scoped exists", async () => {
 			mockTwoOfThreeTiers({
 				year: makeHighlightsOfType({
-					scope: { temporalUnit: 'day', parentTimeWindow: { year: 2024 } },
-					values: [makeValue('2024-03-15', 5)]
+					temporalUnit: 'day',
+					parentTimeWindow: { year: 2024 },
+					values: singleValue(DAY_PERIOD, 5)
 				}),
 				month: makeHighlightsOfType({
-					scope: { temporalUnit: 'day', parentTimeWindow: { month: 3 } },
-					values: [makeValue('2024-03-15', 9)]
+					temporalUnit: 'day',
+					parentTimeWindow: { month: 3 },
+					values: singleValue(DAY_PERIOD, 9)
 				})
 			});
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03-15',
-				'day'
-			);
+			const result = await callForDay();
 
 			expect(survivesWithWindow(result, 'year')).toBe(true);
 		});
@@ -488,20 +461,18 @@ describe('getHighlightsWithinTimeWindow', () => {
 		it("don't remove month-scoped hihglight when year-scoped exists", async () => {
 			mockTwoOfThreeTiers({
 				year: makeHighlightsOfType({
-					scope: { temporalUnit: 'day', parentTimeWindow: { year: 2024 } },
-					values: [makeValue('2024-03-15', 9)]
+					temporalUnit: 'day',
+					parentTimeWindow: { year: 2024 },
+					values: singleValue(DAY_PERIOD, 9)
 				}),
 				month: makeHighlightsOfType({
-					scope: { temporalUnit: 'day', parentTimeWindow: { month: 3 } },
-					values: [makeValue('2024-03-15', 5)]
+					temporalUnit: 'day',
+					parentTimeWindow: { month: 3 },
+					values: singleValue(DAY_PERIOD, 5)
 				})
 			});
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03-15',
-				'day'
-			);
+			const result = await callForDay();
 
 			expect(survivesWithWindow(result, 'month')).toBe(true);
 		});
@@ -509,22 +480,19 @@ describe('getHighlightsWithinTimeWindow', () => {
 		it("don't remove where type doesn't match", async () => {
 			mockAllTimeAndYear(
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'type-a', unit: 'bird' },
-					scope: { temporalUnit: 'month' },
-					values: [makeValue('2024-03', 5)]
+					type: 'type-a',
+					temporalUnit: 'month',
+					values: singleValue(MONTH_PERIOD, 5)
 				}),
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'type-b', unit: 'bird' },
-					scope: { temporalUnit: 'month', parentTimeWindow: { year: 2024 } },
-					values: [makeValue('2024-03', 5)]
+					type: 'type-b',
+					temporalUnit: 'month',
+					parentTimeWindow: { year: 2024 },
+					values: singleValue(MONTH_PERIOD, 5)
 				})
 			);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03',
-				'month'
-			);
+			const result = await callForMonth();
 
 			expect(survivesWithWindow(result, 'year')).toBe(true);
 		});
@@ -532,37 +500,30 @@ describe('getHighlightsWithinTimeWindow', () => {
 		it("don't remove wherer category doesn't match", async () => {
 			mockAllTimeAndYear(
 				makeHighlightsOfType({
-					descriptor: { category: 'rarity', type: 'test', unit: 'bird' },
-					scope: { temporalUnit: 'month' },
-					values: [makeValue('2024-03', 5)]
+					category: 'rarity',
+					temporalUnit: 'month',
+					values: singleValue(MONTH_PERIOD, 5)
 				}),
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'test', unit: 'bird' },
-					scope: { temporalUnit: 'month', parentTimeWindow: { year: 2024 } },
-					values: [makeValue('2024-03', 5)]
+					category: 'count',
+					temporalUnit: 'month',
+					parentTimeWindow: { year: 2024 },
+					values: singleValue(MONTH_PERIOD, 5)
 				})
 			);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03',
-				'month'
-			);
+			const result = await callForMonth();
 
 			expect(survivesWithWindow(result, 'year')).toBe(true);
 		});
 
 		it("don't remove where species doesn't match", async () => {
 			mockAllTimeAndYear(
-				allTimeMonth([makeValue('2024-03', 5)], 'robin'),
-				yearScopedMonth([makeValue('2024-03', 5)], 'wren')
+				allTimeMonth(singleValue(MONTH_PERIOD, 5), 'robin'),
+				yearScopedMonth(singleValue(MONTH_PERIOD, 5), 'wren')
 			);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024-03',
-				'month'
-			);
+			const result = await callForMonth();
 
 			expect(survivesWithWindow(result, 'year')).toBe(true);
 		});
@@ -570,16 +531,12 @@ describe('getHighlightsWithinTimeWindow', () => {
 
 	describe('combining highlights', () => {
 		it('returns the correct shape for a combined highlight', async () => {
-			const values = [makeValue('2024', 5)];
+			const values = singleValue(YEAR_PERIOD, 5);
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
-				makeHighlightsOfType({ scope: { temporalUnit: 'year' }, values })
+				makeHighlightsOfType({ values })
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result).toHaveLength(1);
 			expect(Object.keys(result[0]).sort()).toEqual(
@@ -608,15 +565,11 @@ describe('getHighlightsWithinTimeWindow', () => {
 
 		it('combines highlights with exact same descriptor (no species)', async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
-				makeHighlightsOfType({ values: [makeValue('2024', 5)] }),
-				makeHighlightsOfType({ values: [makeValue('2024', 3)] })
+				makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 5) }),
+				makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 3) })
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result).toHaveLength(1);
 			expect(result[0].scopes).toHaveLength(2);
@@ -624,15 +577,11 @@ describe('getHighlightsWithinTimeWindow', () => {
 
 		it('combines highlights with exact same descriptor (with species)', async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
-				makeHighlightsOfType({ values: [makeValue('2024', 5, 'robin')] }),
-				makeHighlightsOfType({ values: [makeValue('2024', 3, 'robin')] })
+				makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 5, 'robin') }),
+				makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 3, 'robin') })
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result).toHaveLength(1);
 			expect(result[0].scopes).toHaveLength(2);
@@ -640,15 +589,11 @@ describe('getHighlightsWithinTimeWindow', () => {
 
 		it("doesn't combine highlights with and without species", async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
-				makeHighlightsOfType({ values: [makeValue('2024', 5, null)] }),
-				makeHighlightsOfType({ values: [makeValue('2024', 3, 'robin')] })
+				makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 5) }),
+				makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 3, 'robin') })
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result).toHaveLength(2);
 		});
@@ -656,62 +601,44 @@ describe('getHighlightsWithinTimeWindow', () => {
 		it("doesn't combine highlights of different type", async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'type-a', unit: 'bird' },
-					values: [makeValue('2024', 5)]
+					type: 'type-a',
+					values: singleValue(YEAR_PERIOD, 5)
 				}),
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'type-b', unit: 'bird' },
-					values: [makeValue('2024', 3)]
+					type: 'type-b',
+					values: singleValue(YEAR_PERIOD, 3)
 				})
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result).toHaveLength(2);
 		});
 
 		it("doesn't combine highlights of different category", async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
+				makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 5) }),
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'test', unit: 'bird' },
-					values: [makeValue('2024', 5)]
-				}),
-				makeHighlightsOfType({
-					descriptor: { category: 'rarity', type: 'test', unit: 'bird' },
-					values: [makeValue('2024', 3)]
+					category: 'rarity',
+					values: singleValue(YEAR_PERIOD, 3)
 				})
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result).toHaveLength(2);
 		});
 
 		it("doesn't combine highlights of different unit", async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
+				makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 5) }),
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'test', unit: 'bird' },
-					values: [makeValue('2024', 5)]
-				}),
-				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'test', unit: 'species' },
-					values: [makeValue('2024', 3)]
+					unit: 'species',
+					values: singleValue(YEAR_PERIOD, 3)
 				})
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result).toHaveLength(2);
 		});
@@ -722,33 +649,20 @@ describe('getHighlightsWithinTimeWindow', () => {
 				// clobbers the narrower-scoped ones in the significance filter, while
 				// value.species stays equal so combineSimilarHighlights still groups them
 				vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
+					makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 10) }),
 					makeHighlightsOfType({
-						scope: { temporalUnit: 'year' },
-						values: [makeValue('2024', 10)]
+						parentTimeWindow: { month: 3 },
+						species: 'decoy-month',
+						values: singleValue(YEAR_PERIOD, 7)
 					}),
 					makeHighlightsOfType({
-						scope: {
-							temporalUnit: 'year',
-							parentTimeWindow: { month: 3 },
-							species: 'decoy-month'
-						},
-						values: [makeValue('2024', 7)]
-					}),
-					makeHighlightsOfType({
-						scope: {
-							temporalUnit: 'year',
-							parentTimeWindow: { year: 2024 },
-							species: 'decoy-year'
-						},
-						values: [makeValue('2024', 3)]
+						parentTimeWindow: { year: 2024 },
+						species: 'decoy-year',
+						values: singleValue(YEAR_PERIOD, 3)
 					})
 				]);
 
-				const result = await getCondensedHighlightsAtTimePeriod(
-					1,
-					'2024',
-					'year'
-				);
+				const result = await callForYear();
 
 				expect(result).toHaveLength(1);
 				expect(result[0].value.value).toBe(10);
@@ -764,24 +678,16 @@ describe('getHighlightsWithinTimeWindow', () => {
 			it('sorts highlights of better position (i.e.lower number) first (disregarding time period scoping)', async () => {
 				vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
 					makeHighlightsOfType({
-						scope: { temporalUnit: 'year' },
-						values: [makeValue('other', 9), makeValue('2024', 4)]
+						values: secondPlaceValue(YEAR_PERIOD, 4)
 					}),
 					makeHighlightsOfType({
-						scope: {
-							temporalUnit: 'year',
-							parentTimeWindow: { year: 2024 },
-							species: 'decoy'
-						},
-						values: [makeValue('2024', 6)]
+						parentTimeWindow: { year: 2024 },
+						species: 'decoy',
+						values: singleValue(YEAR_PERIOD, 6)
 					})
 				]);
 
-				const result = await getCondensedHighlightsAtTimePeriod(
-					1,
-					'2024',
-					'year'
-				);
+				const result = await callForYear();
 
 				expect(result).toHaveLength(1);
 				expect(result[0].value.value).toBe(6);
@@ -794,17 +700,11 @@ describe('getHighlightsWithinTimeWindow', () => {
 
 		it('exposes the best position as bestPosition', async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
-				makeHighlightsOfType({ values: [makeValue('2024', 10)] }),
-				makeHighlightsOfType({
-					values: [makeValue('other', 50), makeValue('2024', 5)]
-				})
+				makeHighlightsOfType({ values: singleValue(YEAR_PERIOD, 10) }),
+				makeHighlightsOfType({ values: secondPlaceValue(YEAR_PERIOD, 5) })
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result).toHaveLength(1);
 			expect(result[0].bestPosition).toBe(1);
@@ -816,24 +716,23 @@ describe('getHighlightsWithinTimeWindow', () => {
 		it('sorts by category first, regardless of other properties', async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
 				makeHighlightsOfType({
-					descriptor: { category: 'rarity', type: 'r', unit: 'bird' },
-					values: [makeValue('2024', 1)]
+					category: 'rarity',
+					type: 'r',
+					values: singleValue(YEAR_PERIOD, 1)
 				}),
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'c', unit: 'bird' },
-					values: [makeValue('2024', 1)]
+					category: 'count',
+					type: 'c',
+					values: singleValue(YEAR_PERIOD, 1)
 				}),
 				makeHighlightsOfType({
-					descriptor: { category: 'biometrics', type: 'b', unit: 'bird' },
-					values: [makeValue('2024', 1)]
+					category: 'biometrics',
+					type: 'b',
+					values: singleValue(YEAR_PERIOD, 1)
 				})
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result.map((r) => r.descriptor.category)).toEqual([
 				'biometrics',
@@ -845,22 +744,17 @@ describe('getHighlightsWithinTimeWindow', () => {
 		it('within a category, sorts items scoped to species below unscoped, regardless of other properties', async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'unscoped', unit: 'bird' },
-					scope: { temporalUnit: 'year' },
-					values: [makeValue('other', 9), makeValue('2024', 4)]
+					type: 'unscoped',
+					values: secondPlaceValue(YEAR_PERIOD, 4)
 				}),
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'scoped', unit: 'bird' },
-					scope: { temporalUnit: 'year', species: 'robin' },
-					values: [makeValue('2024', 7, 'robin')]
+					type: 'scoped',
+					species: 'robin',
+					values: singleValue(YEAR_PERIOD, 7, 'robin')
 				})
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result.map((r) => r.descriptor.type)).toEqual([
 				'unscoped',
@@ -871,22 +765,17 @@ describe('getHighlightsWithinTimeWindow', () => {
 		it('within a category, sorts highlights of better position(i.e.lower number) first(disregarding time period scoping)', async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'a', unit: 'bird' },
-					scope: { temporalUnit: 'year' },
-					values: [makeValue('other', 9), makeValue('2024', 4)]
+					type: 'a',
+					values: secondPlaceValue(YEAR_PERIOD, 4)
 				}),
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'b', unit: 'bird' },
-					scope: { temporalUnit: 'year', parentTimeWindow: { year: 2024 } },
-					values: [makeValue('2024', 3)]
+					type: 'b',
+					parentTimeWindow: { year: 2024 },
+					values: singleValue(YEAR_PERIOD, 3)
 				})
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result.map((r) => r.descriptor.type)).toEqual(['b', 'a']);
 		});
@@ -894,22 +783,17 @@ describe('getHighlightsWithinTimeWindow', () => {
 		it('within a category, when bestPosition is equal sorts by the scope of the first nested highlight', async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'x', unit: 'bird' },
-					scope: { temporalUnit: 'year', parentTimeWindow: { month: 3 } },
-					values: [makeValue('2024', 5)]
+					type: 'x',
+					parentTimeWindow: { month: 3 },
+					values: singleValue(YEAR_PERIOD, 5)
 				}),
 				makeHighlightsOfType({
-					descriptor: { category: 'count', type: 'y', unit: 'bird' },
-					scope: { temporalUnit: 'year' },
-					values: [makeValue('2024', 2)]
+					type: 'y',
+					values: singleValue(YEAR_PERIOD, 2)
 				})
 			]);
 
-			const result = await getCondensedHighlightsAtTimePeriod(
-				1,
-				'2024',
-				'year'
-			);
+			const result = await callForYear();
 
 			expect(result.map((r) => r.descriptor.type)).toEqual(['y', 'x']);
 		});
