@@ -13,8 +13,8 @@ export type YearMonthRestriction = {
 	month?: number;
 };
 export type HighlightCategory =
-	| 'count'
 	| 'rarity'
+	| 'count'
 	| 'biometrics'
 	| 'demographics';
 
