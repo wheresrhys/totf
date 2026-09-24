@@ -6,19 +6,16 @@ import type {
 	RareSpeciesHighlight,
 	RarityHighlight
 } from '@/app/lib/highlights';
+import {
+	renderedText as renderedTextGeneric,
+	type HighlightFields
+} from '../../shared/__tests__/render-test-helpers';
 
 // Moved from the old flat app/components/session-highlight-renderers.tsx
 // coverage as part of #760's componentized-per-group renderers split.
 
-// Overrides for the per-family highlight factories — every field bar the
-// fixed `type` discriminant
-type HighlightFields<T extends RarityHighlight> = Omit<T, 'type'>;
-
-// Each highlight renders <li key={sentence}>{sentence}</li>; the copy tests
-// assert on the sentence text
 function renderedText(highlight: RarityHighlight): string {
-	return (renderRarityHighlight(highlight).props as { children: string })
-		.children;
+	return renderedTextGeneric(renderRarityHighlight, highlight);
 }
 
 describe('render — element shape', () => {
