@@ -2,46 +2,13 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SpSessionTotalsTab } from '../SpSessionTotalsTab';
 import type { CoreStatsResult } from '@/app/models/db';
+import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchSpeciesPeriodTotals: vi.fn()
 }));
 
 const viewedGroup = { id: 1, slug: 'alpha' };
-
-function buildDailyStat(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
-	return {
-		species_name: null,
-		time_period: '2026-03-14',
-		session_count: 1,
-		total_effort: '03:00:00',
-		effort_per_session: '03:00:00',
-		effort_per_encounter: '00:15:00',
-		avg_encounters_per_session: 12,
-		max_per_session: 12,
-		species_count: 1,
-		bird_count: 10,
-		encounter_count: 12,
-		new_bird_count: 8,
-		max_new_per_session: 8,
-		max_weight: 13.1,
-		avg_weight: 11.2,
-		min_weight: 9.8,
-		median_weight: 10.8,
-		max_wing: 68,
-		avg_wing: 66.6,
-		min_wing: 65,
-		median_wing: 67,
-		pullus_bird_count: 1,
-		juv_bird_count: 2,
-		postjuv_bird_count: 1,
-		adult_bird_count: 5,
-		unknown_age_bird_count: 1,
-		...overrides
-	} as CoreStatsResult;
-}
 
 describe('SpSessionTotalsTab', () => {
 	afterEach(() => {
@@ -51,8 +18,8 @@ describe('SpSessionTotalsTab', () => {
 	beforeEach(async () => {
 		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
 		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-			buildDailyStat({ time_period: '2026-03-14' }),
-			buildDailyStat({ time_period: '2026-03-21' })
+			buildDailyStatsRow({ time_period: '2026-03-14' }),
+			buildDailyStatsRow({ time_period: '2026-03-21' })
 		]);
 	});
 

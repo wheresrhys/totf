@@ -12,44 +12,11 @@ import {
 	getCellTextByHeading,
 	getColumnIndex
 } from '@/app/__tests__/helpers/table';
+import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchSpeciesPeriodTotals: vi.fn()
 }));
-
-function buildMonthlyStat(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
-	return {
-		species_name: null,
-		time_period: '2020-01-01',
-		session_count: 4,
-		total_effort: '18:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:34:17',
-		avg_encounters_per_session: 1.75,
-		max_per_session: 3,
-		species_count: 1,
-		bird_count: 40,
-		encounter_count: 55,
-		new_bird_count: 30,
-		max_new_per_session: 3,
-		max_weight: 13.1,
-		avg_weight: 11.2,
-		min_weight: 9.8,
-		median_weight: 10.8,
-		max_wing: 68,
-		avg_wing: 66.6,
-		min_wing: 65,
-		median_wing: 67,
-		pullus_bird_count: 2,
-		juv_bird_count: 5,
-		postjuv_bird_count: 3,
-		adult_bird_count: 15,
-		unknown_age_bird_count: 5,
-		...overrides
-	} as CoreStatsResult;
-}
 
 describe('SpCombinedMonthTotalsTab', () => {
 	afterEach(() => {
@@ -60,7 +27,7 @@ describe('SpCombinedMonthTotalsTab', () => {
 		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
 		vi.mocked(fetchSpeciesPeriodTotals).mockReset();
 		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-			buildMonthlyStat({ time_period: '2020-01-01' })
+			buildCoreStatsRow({ time_period: '2020-01-01' })
 		]);
 	});
 
@@ -127,8 +94,8 @@ describe('SpCombinedMonthTotalsTab', () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildMonthlyStat({ time_period: '2020-01-01', encounter_count: 30 }),
-				buildMonthlyStat({ time_period: '2021-01-01', encounter_count: 45 })
+				buildCoreStatsRow({ time_period: '2020-01-01', encounter_count: 30 }),
+				buildCoreStatsRow({ time_period: '2021-01-01', encounter_count: 45 })
 			]);
 			render(
 				<SpCombinedMonthTotalsTab
@@ -232,9 +199,9 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
 		vi.mocked(fetchSpeciesPeriodTotals).mockReset();
 		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-			buildMonthlyStat({ time_period: '2020-01-01' }),
-			buildMonthlyStat({ time_period: '2021-01-01' }),
-			buildMonthlyStat({ time_period: '2020-08-01' })
+			buildCoreStatsRow({ time_period: '2020-01-01' }),
+			buildCoreStatsRow({ time_period: '2021-01-01' }),
+			buildCoreStatsRow({ time_period: '2020-08-01' })
 		]);
 	});
 
@@ -292,7 +259,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildMonthlyStat({
+				buildCoreStatsRow({
 					time_period: '2020-01-01',
 					pullus_bird_count: 2,
 					...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
@@ -401,7 +368,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildMonthlyStat({ time_period: '2020-01-01', encounter_count: 30 })
+				buildCoreStatsRow({ time_period: '2020-01-01', encounter_count: 30 })
 			]);
 			render(
 				<SpCombinedMonthTotalsTab
@@ -456,7 +423,7 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
 		vi.mocked(fetchSpeciesPeriodTotals).mockReset();
 		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-			buildMonthlyStat({ time_period: '2020-01-01', session_count: 4 })
+			buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 })
 		]);
 	});
 
@@ -503,8 +470,8 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildMonthlyStat({ time_period: '2020-01-01', session_count: 4 }),
-				buildMonthlyStat({ time_period: '2020-08-01', session_count: 0 })
+				buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 }),
+				buildCoreStatsRow({ time_period: '2020-08-01', session_count: 0 })
 			]);
 			render(
 				<SpCombinedMonthTotalsTab
@@ -533,7 +500,7 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 				await import('@/app/actions/sp-data');
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue(
 				Array.from({ length: 12 }, (_unused, index) =>
-					buildMonthlyStat({
+					buildCoreStatsRow({
 						time_period: `2020-${String(index + 1).padStart(2, '0')}-01`,
 						session_count: 3
 					})
@@ -558,8 +525,8 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildMonthlyStat({ time_period: '2020-08-01', session_count: 5 }),
-				buildMonthlyStat({ time_period: '2021-08-01', session_count: 2 })
+				buildCoreStatsRow({ time_period: '2020-08-01', session_count: 5 }),
+				buildCoreStatsRow({ time_period: '2021-08-01', session_count: 2 })
 			]);
 			render(
 				<SpCombinedMonthTotalsTab
@@ -579,7 +546,7 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildMonthlyStat({ time_period: '2020-01-01', session_count: 4 })
+				buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 })
 			]);
 			render(
 				<SpCombinedMonthTotalsTab

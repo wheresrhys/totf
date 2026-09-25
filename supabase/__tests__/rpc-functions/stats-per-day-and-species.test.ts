@@ -9,7 +9,6 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../../app/lib/auth/group-auth';
 import { supabase } from '../../../lib/supabase';
 import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
@@ -20,6 +19,7 @@ import {
 	insertTestLocation,
 	insertTestSession
 } from './helpers/encounter-fixtures';
+import { psql } from '../db-test-helpers';
 
 describe('stats_per_day_and_species', () => {
 	let alphaId: number;
@@ -223,12 +223,11 @@ describe('stats_per_day_and_species', () => {
 		});
 
 		afterAll(() => {
-			execSync(
-				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
-					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+			psql(
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
-					`DELETE FROM "Locations" WHERE id = ${locationId};'`
+					`DELETE FROM "Locations" WHERE id = ${locationId};`
 			);
 		});
 
@@ -356,12 +355,11 @@ describe('stats_per_day_and_species', () => {
 		});
 
 		afterAll(() => {
-			execSync(
-				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
-					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+			psql(
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Sessions" WHERE id = ${sessionId};` +
-					`DELETE FROM "Locations" WHERE id = ${locationId};'`
+					`DELETE FROM "Locations" WHERE id = ${locationId};`
 			);
 		});
 
@@ -486,12 +484,11 @@ describe('stats_per_day_and_species', () => {
 		});
 
 		afterAll(() => {
-			execSync(
-				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
-					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+			psql(
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Sessions" WHERE id = ${sessionId};` +
-					`DELETE FROM "Locations" WHERE id = ${locationId};'`
+					`DELETE FROM "Locations" WHERE id = ${locationId};`
 			);
 		});
 
@@ -775,12 +772,11 @@ describe('stats_per_day_and_species', () => {
 		});
 
 		afterAll(() => {
-			execSync(
-				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
-					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+			psql(
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Sessions" WHERE location_id = ${locationId};` +
-					`DELETE FROM "Locations" WHERE id = ${locationId};'`
+					`DELETE FROM "Locations" WHERE id = ${locationId};`
 			);
 		});
 

@@ -6,6 +6,7 @@ import {
 	getCellByHeading,
 	getCellTextByHeading
 } from '@/app/__tests__/helpers/table';
+import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 // The real header <th>s live in the `<thead>` row without a `data-testid` —
 // `above-header-row` (the "Aggregate by" toggle row) and `totals-row` are
@@ -20,38 +21,6 @@ function getColumnHeaders(): HTMLTableCellElement[] {
 	) as HTMLTableCellElement[];
 }
 
-function buildStat(overrides: Partial<CoreStatsResult> = {}): CoreStatsResult {
-	return {
-		species_name: null,
-		time_period: '2026-01-01',
-		session_count: 4,
-		total_effort: '18:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:34:17',
-		avg_encounters_per_session: 1.75,
-		max_per_session: 3,
-		species_count: 12,
-		bird_count: 40,
-		encounter_count: 55,
-		new_bird_count: 30,
-		max_new_per_session: 3,
-		max_weight: 13.1,
-		avg_weight: 11.2,
-		min_weight: 9.8,
-		median_weight: 10.8,
-		max_wing: 68,
-		avg_wing: 66.6,
-		min_wing: 65,
-		median_wing: 67,
-		pullus_bird_count: 2,
-		juv_bird_count: 5,
-		postjuv_bird_count: 3,
-		adult_bird_count: 15,
-		unknown_age_bird_count: 5,
-		...overrides
-	} as CoreStatsResult;
-}
-
 describe('PeriodTotalsTable', () => {
 	afterEach(() => {
 		cleanup();
@@ -60,8 +29,8 @@ describe('PeriodTotalsTable', () => {
 	describe('Usual', () => {
 		it('renders one row per input stat, in the correct column order, using the caller-supplied header', () => {
 			const rows = [
-				buildStat({ time_period: '2026-01-01' }),
-				buildStat({ time_period: '2025-01-01', species_count: 3 })
+				buildCoreStatsRow({ time_period: '2026-01-01' }),
+				buildCoreStatsRow({ time_period: '2025-01-01', species_count: 3 })
 			];
 			render(
 				<PeriodTotalsTable
@@ -96,7 +65,7 @@ describe('PeriodTotalsTable', () => {
 			render(
 				<PeriodTotalsTable
 					timeInterval="year"
-					rows={[buildStat({ time_period: '2026-01-01' })]}
+					rows={[buildCoreStatsRow({ time_period: '2026-01-01' })]}
 					firstColumnHeader="Year"
 					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
 				/>
@@ -111,7 +80,7 @@ describe('PeriodTotalsTable', () => {
 			render(
 				<PeriodTotalsTable
 					timeInterval="month"
-					rows={[buildStat({ time_period: '2026-08-01' })]}
+					rows={[buildCoreStatsRow({ time_period: '2026-08-01' })]}
 					firstColumnHeader="Month"
 					buildHref={(timePeriod) => `/summary/2026/${timePeriod}`}
 				/>
@@ -125,7 +94,7 @@ describe('PeriodTotalsTable', () => {
 			render(
 				<PeriodTotalsTable
 					timeInterval="month"
-					rows={[buildStat({ time_period: '2026-01-01' })]}
+					rows={[buildCoreStatsRow({ time_period: '2026-01-01' })]}
 					firstColumnHeader="Month"
 					buildHref={(timePeriod) => `/summary/2026/${timePeriod}`}
 					buildLabel={() => 'Custom Label'}
@@ -140,7 +109,7 @@ describe('PeriodTotalsTable', () => {
 			render(
 				<PeriodTotalsTable
 					timeInterval="day"
-					rows={[buildStat({ time_period: '2026-08-16' })]}
+					rows={[buildCoreStatsRow({ time_period: '2026-08-16' })]}
 					firstColumnHeader="Session"
 					buildHref={(timePeriod) => `/session/${timePeriod}`}
 				/>
@@ -172,7 +141,7 @@ describe('PeriodTotalsTable', () => {
 				<PeriodTotalsTable
 					timeInterval="year"
 					rows={[
-						buildStat({
+						buildCoreStatsRow({
 							time_period: '2026-01-01',
 							session_count: 0,
 							total_effort: '00:00:00'
@@ -188,10 +157,10 @@ describe('PeriodTotalsTable', () => {
 
 	describe('totals row', () => {
 		const rows = [
-			buildStat({ time_period: '2026-01-01', session_count: 4 }),
-			buildStat({ time_period: '2025-01-01', session_count: 3 })
+			buildCoreStatsRow({ time_period: '2026-01-01', session_count: 4 }),
+			buildCoreStatsRow({ time_period: '2025-01-01', session_count: 3 })
 		];
-		const totalsStats = buildStat({
+		const totalsStats = buildCoreStatsRow({
 			time_period: '2026-01-01',
 			session_count: 7,
 			total_effort: '36:00:00',
@@ -225,7 +194,7 @@ describe('PeriodTotalsTable', () => {
 			render(
 				<PeriodTotalsTable
 					timeInterval="month"
-					rows={[buildStat({ time_period: '2026-08-01' })]}
+					rows={[buildCoreStatsRow({ time_period: '2026-08-01' })]}
 					firstColumnHeader="Month"
 					buildHref={(timePeriod) => `/summary/2026/${timePeriod}`}
 					totalsStats={totalsStats}
@@ -267,7 +236,7 @@ describe('PeriodTotalsTable', () => {
 				<PeriodTotalsTable
 					timeInterval="month"
 					rows={[
-						buildStat({
+						buildCoreStatsRow({
 							time_period: '2026-08-01',
 							session_count: 4,
 							total_effort: '18:00:00'
@@ -287,7 +256,7 @@ describe('PeriodTotalsTable', () => {
 				render(
 					<PeriodTotalsTable
 						timeInterval="year"
-						rows={[buildStat()]}
+						rows={[buildCoreStatsRow()]}
 						firstColumnHeader="Year"
 						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
 					/>
@@ -305,7 +274,10 @@ describe('PeriodTotalsTable', () => {
 					<PeriodTotalsTable
 						timeInterval="year"
 						rows={[
-							buildStat({ time_period: '2026-01-01', max_per_session: 17 })
+							buildCoreStatsRow({
+								time_period: '2026-01-01',
+								max_per_session: 17
+							})
 						]}
 						firstColumnHeader="Year"
 						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
@@ -318,10 +290,10 @@ describe('PeriodTotalsTable', () => {
 				render(
 					<PeriodTotalsTable
 						timeInterval="year"
-						rows={[buildStat()]}
+						rows={[buildCoreStatsRow()]}
 						firstColumnHeader="Year"
 						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
-						totalsStats={buildStat({ max_per_session: 23 })}
+						totalsStats={buildCoreStatsRow({ max_per_session: 23 })}
 					/>
 				);
 				const totalsRow = screen.getByTestId('totals-row');
@@ -334,7 +306,7 @@ describe('PeriodTotalsTable', () => {
 				render(
 					<PeriodTotalsTable
 						timeInterval="year"
-						rows={[buildStat()]}
+						rows={[buildCoreStatsRow()]}
 						firstColumnHeader="Year"
 						buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
 						showBusiestSession={false}
@@ -350,7 +322,7 @@ describe('PeriodTotalsTable', () => {
 
 	describe('fixed aggregation / encounters-only placeholder', () => {
 		function encStat(overrides: Partial<CoreStatsResult> = {}) {
-			return buildStat({
+			return buildCoreStatsRow({
 				time_period: '2000-01-01',
 				bird_count: 40,
 				encounter_count: 55,
@@ -489,7 +461,7 @@ describe('PeriodTotalsTable', () => {
 			render(
 				<PeriodTotalsTable
 					timeInterval="day"
-					rows={[buildStat()]}
+					rows={[buildCoreStatsRow()]}
 					firstColumnHeader="Session"
 					buildHref={() => ''}
 				/>
@@ -500,7 +472,7 @@ describe('PeriodTotalsTable', () => {
 
 		groupings.forEach(({ timeInterval, header }) => {
 			it(`defaults to bird-based counts and switches to encounter-based counts for the standard-block columns, for the "${timeInterval}" timeInterval`, () => {
-				const stat = buildStat({
+				const stat = buildCoreStatsRow({
 					time_period: '2026-01-01',
 					bird_count: 10,
 					encounter_count: 14,

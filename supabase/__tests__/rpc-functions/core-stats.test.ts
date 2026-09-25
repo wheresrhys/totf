@@ -9,12 +9,12 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../../app/lib/auth/group-auth';
 import { supabase } from '../../../lib/supabase';
 import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
+import { psql } from '../db-test-helpers';
 import { resolveAlphaBetaGammaClients } from './helpers/group-clients';
 import {
 	PER_SPECIES_AGGREGATES,
@@ -489,12 +489,11 @@ describe('core_stats', () => {
 		});
 
 		afterAll(() => {
-			execSync(
-				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
-					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+			psql(
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Sessions" WHERE location_id IN (${fieldObsLocationId}, ${fieldObsOnlyLocationId}, ${pulliLocationId});` +
-					`DELETE FROM "Locations" WHERE id IN (${fieldObsLocationId}, ${fieldObsOnlyLocationId}, ${pulliLocationId});'`
+					`DELETE FROM "Locations" WHERE id IN (${fieldObsLocationId}, ${fieldObsOnlyLocationId}, ${pulliLocationId});`
 			);
 		});
 
@@ -790,12 +789,11 @@ describe('core_stats', () => {
 		});
 
 		afterAll(() => {
-			execSync(
-				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
-					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+			psql(
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
 					`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
-					`DELETE FROM "Locations" WHERE id IN (${locationIds.join(', ')});'`
+					`DELETE FROM "Locations" WHERE id IN (${locationIds.join(', ')});`
 			);
 		});
 
@@ -1287,12 +1285,11 @@ describe('core_stats', () => {
 		});
 
 		afterAll(() => {
-			execSync(
-				`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
-					`DELETE FROM "Encounters" WHERE bird_id = ${birdId};` +
+			psql(
+				`DELETE FROM "Encounters" WHERE bird_id = ${birdId};` +
 					`DELETE FROM "Birds" WHERE id = ${birdId};` +
 					`DELETE FROM "Sessions" WHERE id = ${sessionId};` +
-					`DELETE FROM "Locations" WHERE id = ${locationId};'`
+					`DELETE FROM "Locations" WHERE id = ${locationId};`
 			);
 		});
 

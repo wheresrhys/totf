@@ -9,18 +9,12 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import { supabase } from '../../lib/supabase';
 import { createUpserter } from '../../lib/demon-import';
 import { randomTestSuffix } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
-
-function psql(sql: string) {
-	execSync(`psql "${LOCAL_DB_URL}" -c "${sql.replace(/"/g, '\\"')}"`);
-}
+import { psql } from './db-test-helpers';
 
 const BASE_ENCOUNTER = {
 	capture_time: '10:00:00',
