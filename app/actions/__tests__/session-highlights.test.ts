@@ -16,6 +16,7 @@ import {
 	VITAL_STAT_HIGHLIGHT_RENDERERS
 } from '@/app/components/highlights';
 import { renderLongAbsenceRetrapHighlight } from '@/app/components/highlights/long-absence-retrap-renderer';
+import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 
 // The action fans out across all four groups (three componentized renderers
 // plus the long-absence-retrap sibling, per #760); this dispatches a flat
@@ -84,49 +85,58 @@ function statsRow(
 	};
 }
 
-function pageForRange(pages: unknown[][], fromRow: number) {
-	return Promise.resolve({
-		data: pages[fromRow / PAGE_SIZE] ?? [],
-		error: null
-	});
-}
+let statsVersion = 100;
+// Overrides the Encounters version-query's resolved rows for a single test
+// (e.g. simulating a group with no encounters at all) — see
+// "treats a group with no encounters as version 0" below.
+let encountersRowsOverride: { id: number }[] | undefined;
 
-const mockRpcOrder = vi.fn();
-const mockRpcRange = vi.fn();
+// The paginated rpc (stats_per_day_and_species) and the Sessions query both
+// page through PAGE_SIZE-row batches, resolved from rpcPages/sessionPages by
+// whichever `.range(fromRow, ...)` call most recently ran on that chain.
+const rpcChain = makeQueryChain(
+	(fromRow: number = 0) => rpcPages[fromRow / PAGE_SIZE] ?? []
+);
+const sessionsChain = makeQueryChain(
+	(fromRow: number = 0) => sessionPages[fromRow / PAGE_SIZE] ?? []
+);
+// Encounters version query — not paginated, but re-reads mutable test state
+// (statsVersion/encountersRowsOverride) lazily on every `.limit()` call.
+const encountersChain = makeQueryChain(
+	() => encountersRowsOverride ?? [{ id: statsVersion }]
+);
+
 // The paginated rpc (stats_per_day_and_species) returns a query builder;
 // the non-paginated rpc (long_absence_retraps) returns a thenable.
-const paginatedRpcQueryBuilder = { order: mockRpcOrder, range: mockRpcRange };
 const mockLongAbsenceRpcResult = Promise.resolve({ data: [], error: null });
 const mockRpc = vi.fn();
-
-const mockSessionsOrder = vi.fn();
-const mockSessionsRange = vi.fn();
-const mockSessionsEq = vi.fn();
-// eq is also on the builder itself so it self-chains — fetchSessionStats now
-// calls .eq() twice (ringing_group_id, then session_type) before .order()
-const sessionsQueryBuilder = {
-	eq: mockSessionsEq,
-	order: mockSessionsOrder,
-	range: mockSessionsRange
-};
-const mockSessionsSelect = vi.fn(() => ({ eq: mockSessionsEq }));
-
-let statsVersion = 100;
-const mockEncountersLimit = vi.fn();
-const mockEncountersOrder = vi.fn(() => ({ limit: mockEncountersLimit }));
-const mockEncountersEq = vi.fn(() => ({ order: mockEncountersOrder }));
-const mockEncountersSelect = vi.fn(() => ({ eq: mockEncountersEq }));
+mockRpc.mockImplementation((functionName: string) => {
+	if (functionName === 'long_absence_retraps') {
+		return mockLongAbsenceRpcResult;
+	}
+	return rpcChain.chain;
+});
 
 const mockFrom = vi.fn((table: string) => {
 	if (table === 'Sessions') {
-		return { select: mockSessionsSelect };
+		return sessionsChain.chain;
 	}
 	// Encounters — version query
-	return { select: mockEncountersSelect };
+	return encountersChain.chain;
 });
 
-// Keep a single mockEq/mockSelect alias so existing tests that reference them
-// still work (they only call from('Sessions') paths).
+// Aliases so assertions below can name each mocked method directly, the same
+// way the ad hoc mockXxx references used to.
+const mockRpcOrder = rpcChain.chain.order;
+const mockRpcRange = rpcChain.chain.range;
+const mockSessionsOrder = sessionsChain.chain.order;
+const mockSessionsRange = sessionsChain.chain.range;
+const mockSessionsEq = sessionsChain.chain.eq;
+const mockSessionsSelect = sessionsChain.chain.select;
+const mockEncountersLimit = encountersChain.chain.limit;
+const mockEncountersOrder = encountersChain.chain.order;
+const mockEncountersEq = encountersChain.chain.eq;
+const mockEncountersSelect = encountersChain.chain.select;
 const mockEq = mockSessionsEq;
 const mockSelect = mockSessionsSelect;
 
@@ -141,6 +151,7 @@ async function importFetchSessionHighlights() {
 beforeEach(() => {
 	vi.clearAllMocks();
 	statsVersion = 100;
+	encountersRowsOverride = undefined;
 	rpcPages = [
 		[
 			statsRow('Robin', SESSION_DATE, 74),
@@ -149,27 +160,6 @@ beforeEach(() => {
 		]
 	];
 	sessionPages = [[{ visit_date: '2022-05-01' }, { visit_date: SESSION_DATE }]];
-	// Route rpc calls by function name: paginated vs non-paginated
-	mockRpc.mockImplementation((functionName: string) => {
-		if (functionName === 'long_absence_retraps') {
-			return mockLongAbsenceRpcResult;
-		}
-		return paginatedRpcQueryBuilder;
-	});
-	mockRpcOrder.mockReturnValue(paginatedRpcQueryBuilder);
-	mockRpcRange.mockImplementation((fromRow: number) =>
-		pageForRange(rpcPages, fromRow)
-	);
-	// Sessions from() chain
-	mockSessionsEq.mockReturnValue(sessionsQueryBuilder);
-	mockSessionsOrder.mockReturnValue(sessionsQueryBuilder);
-	mockSessionsRange.mockImplementation((fromRow: number) =>
-		pageForRange(sessionPages, fromRow)
-	);
-	// Encounters from() chain — version query
-	mockEncountersLimit.mockImplementation(() =>
-		Promise.resolve({ data: [{ id: statsVersion }], error: null })
-	);
 	mockGetAuthenticatedSupabaseClient.mockResolvedValue({
 		rpc: mockRpc,
 		from: mockFrom
@@ -450,7 +440,7 @@ describe('fetchSessionHighlights', () => {
 	});
 
 	it('treats a group with no encounters as version 0', async () => {
-		mockEncountersLimit.mockResolvedValue({ data: [], error: null });
+		encountersRowsOverride = [];
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		await fetchSessionHighlights({
 			date: SESSION_DATE,

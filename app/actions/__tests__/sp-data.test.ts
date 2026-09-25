@@ -10,6 +10,7 @@ import {
 	getGroupEffortHistory
 } from '../sp-data';
 import type { CoreStatsResult } from '@/app/models/db';
+import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchGroupEffortHistory } =
 	vi.hoisted(() => ({
@@ -35,33 +36,6 @@ const SPECIES_NAME = 'Robin';
 const GROUP_ID = 7;
 const FROM_DATE = '2023-01-01';
 const TO_DATE = '2023-12-31';
-
-type FilterCall = { column: string; operator: string; value: unknown };
-
-/**
- * A chainable `from().select()...` query mock that records the `select` string
- * and every `.filter()` call, and resolves (thenable) to the supplied rows.
- */
-function makeQueryChain(rows: unknown) {
-	const record: { select?: string; filters: FilterCall[] } = { filters: [] };
-	const chain: Record<string, unknown> = {
-		select: vi.fn((s: string) => {
-			record.select = s;
-			return chain;
-		}),
-		eq: vi.fn(() => chain),
-		contains: vi.fn(() => chain),
-		order: vi.fn(() => chain),
-		range: vi.fn(() => chain),
-		filter: vi.fn((column: string, operator: string, value: unknown) => {
-			record.filters.push({ column, operator, value });
-			return chain;
-		}),
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({ data: rows, error: null }).then(resolve)
-	};
-	return { chain, record };
-}
 
 function makeClient({
 	queryRows,
