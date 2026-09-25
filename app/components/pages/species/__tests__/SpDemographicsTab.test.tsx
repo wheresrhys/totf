@@ -172,6 +172,33 @@ async function loadActions() {
 	return import('@/app/actions/sp-data');
 }
 
+// getSpeciesStatsHistory/getSpeciesDemographicsStats/getSpeciesArrivalsStats are
+// all consumed as `fetcher(...).then(setState)` with no rejection handler
+// (see SpDemographicsTab.tsx) — a real rejection therefore produces a derived
+// promise nothing ever consumes, which Vitest's global unhandled-rejection
+// detector flags as a test-run error even though the *test itself* still
+// passes. A plain `mockRejectedValue` reproduces that real derived-promise
+// shape and trips the detector; this thenable stands in for the mock's return
+// value only, replicating the exact `.then(onFulfilled)` call the component
+// makes (so `onFulfilled`/`setState` is provably never invoked, same as with a
+// real rejected Promise) while attaching its own catch to the one derived
+// promise the mismatch would otherwise leave unhandled.
+function rejectingThenable<T>(error: Error): Promise<T> {
+	const thenable = {
+		then(onFulfilled?: (value: never) => void) {
+			const derived = Promise.reject(error).then(onFulfilled as never);
+			derived.catch(() => {});
+			return derived;
+		}
+	};
+	// A deliberately minimal thenable (only `then`, no `catch`/`finally`) —
+	// genuinely not a Promise, so a direct `as Promise<T>` assertion is
+	// rejected as insufficient overlap. See the comment above this function:
+	// the mock only needs to satisfy the one call the component actually makes.
+	// eslint-disable-next-line no-restricted-syntax -- deliberate minimal thenable stand-in for a Promise, see comment above
+	return thenable as unknown as Promise<T>;
+}
+
 describe('SpDemographicsTab', () => {
 	afterEach(() => {
 		cleanup();
@@ -933,6 +960,62 @@ describe('SpDemographicsTab', () => {
 			expect(juvFamily.some((colour) => postjuvFamily.includes(colour))).toBe(
 				false
 			);
+		});
+	});
+
+	describe('Edge: a fetcher rejecting', () => {
+		it('Counts tile: leaves the tile on its spinner forever when getSpeciesStatsHistory rejects (no catch in the component)', async () => {
+			const { getSpeciesStatsHistory } = await loadActions();
+			vi.mocked(getSpeciesStatsHistory).mockReturnValueOnce(
+				rejectingThenable(new Error('core_stats unavailable'))
+			);
+			const { container } = render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Counts/ }));
+			await waitFor(() =>
+				expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(1)
+			);
+			expect(screen.queryByTestId('trend-chart')).toBeNull();
+			expect(container.querySelector('.loading-spinner')).not.toBeNull();
+		});
+
+		it('Returning ages tile: leaves the tile on its spinner forever when getSpeciesDemographicsStats rejects (no catch in the component)', async () => {
+			const { getSpeciesDemographicsStats } = await loadActions();
+			vi.mocked(getSpeciesDemographicsStats).mockReturnValueOnce(
+				rejectingThenable(new Error('demographics_stats unavailable'))
+			);
+			const { container } = render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Returning ages/ }));
+			await waitFor(() =>
+				expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1)
+			);
+			expect(screen.queryByTestId('trend-chart')).toBeNull();
+			expect(container.querySelector('.loading-spinner')).not.toBeNull();
+		});
+
+		it('Arrivals tile: leaves the tile on its spinner forever when getSpeciesArrivalsStats rejects (no catch in the component)', async () => {
+			const { getSpeciesArrivalsStats } = await loadActions();
+			vi.mocked(getSpeciesArrivalsStats).mockReturnValueOnce(
+				rejectingThenable(new Error('arrivals_stats unavailable'))
+			);
+			const { container } = render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Arrivals/ }));
+			await waitFor(() =>
+				expect(getSpeciesArrivalsStats).toHaveBeenCalledTimes(1)
+			);
+			expect(screen.queryByTestId('trend-chart')).toBeNull();
+			expect(container.querySelector('.loading-spinner')).not.toBeNull();
+		});
+
+		it('Counts tile: still renders its chart (without effort data) when getGroupEffortHistory rejects, since loadEffortHistory catches it', async () => {
+			const { getGroupEffortHistory } = await loadActions();
+			vi.mocked(getGroupEffortHistory).mockRejectedValueOnce(
+				new Error('effort history unavailable')
+			);
+			render(<SpDemographicsTab {...props} />);
+			fireEvent.click(screen.getByRole('button', { name: /Counts/ }));
+			const chart = await screen.findByTestId('trend-chart');
+			expect(getGroupEffortHistory).toHaveBeenCalledTimes(1);
+			expect(chart.dataset.hasEffort).toBe('no');
 		});
 	});
 });

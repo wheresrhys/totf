@@ -131,4 +131,25 @@ describe('RingSequenceDetail', () => {
 			expect(screen.getByText('ARW000002')).toBeDefined();
 		});
 	});
+
+	it('renders nothing and does not throw when fetching bird data rejects', async () => {
+		const { fetchRingSequenceBirds } =
+			await import('@/app/actions/ring-sequences');
+		const consoleErrorSpy = vi
+			.spyOn(console, 'error')
+			.mockImplementation(() => {});
+		vi.mocked(fetchRingSequenceBirds).mockRejectedValue(
+			new Error('network error')
+		);
+
+		render(<RingSequenceDetail model={detailModel} expandedId={accordionId} />);
+
+		await waitFor(() => {
+			expect(consoleErrorSpy).toHaveBeenCalledWith(expect.any(Error));
+		});
+		expect(screen.queryByTestId('unused-rings')).toBeNull();
+		expect(screen.queryByText(/Robin/)).toBeNull();
+
+		consoleErrorSpy.mockRestore();
+	});
 });

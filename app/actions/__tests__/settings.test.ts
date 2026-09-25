@@ -15,7 +15,14 @@ type UpdateCall = { payload: unknown; id: number };
 function makeClient(
 	initialPublicAreas: string[],
 	selectCalls: number[] = [],
-	updateCalls: UpdateCall[] = []
+	updateCalls: UpdateCall[] = [],
+	// When set, the update chain's `.then(catchSupabaseErrors)` resolves with
+	// this Supabase-style error instead of succeeding — used to exercise
+	// updatePublicSummaryEnabled's try/catch branch the same way a real
+	// Supabase update failure would (catchSupabaseErrors throws
+	// `Failed to fetch data: <message>`, which the action's catch turns into
+	// `{ success: false, error }`).
+	updateError: { message: string } | null = null
 ) {
 	return {
 		from: vi.fn(() => ({
@@ -40,8 +47,12 @@ function makeClient(
 						updateCalls.push({ payload, id });
 						return chain;
 					}),
-					then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-						Promise.resolve({ data: null, error: null }).then(resolve)
+					then: (
+						resolve: (v: {
+							data: unknown;
+							error: { message: string } | null;
+						}) => unknown
+					) => Promise.resolve({ data: null, error: updateError }).then(resolve)
 				};
 				return chain;
 			})
@@ -119,6 +130,30 @@ describe('updatePublicSummaryEnabled', () => {
 
 			expect(selectCalls).toEqual([42]);
 			expect(updateCalls[0].id).toBe(42);
+		});
+
+		it('returns success:false without touching Supabase when no group is selected', async () => {
+			vi.mocked(getGroupCookie).mockResolvedValueOnce(null);
+
+			const result = await updatePublicSummaryEnabled(true);
+
+			expect(result).toEqual({ success: false, error: 'No group selected' });
+			expect(mockGetAuthenticatedSupabaseClient).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('error handling', () => {
+		it('returns success:false with the Supabase error message when the update fails', async () => {
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+				makeClient([], [], [], { message: 'connection refused' })
+			);
+
+			const result = await updatePublicSummaryEnabled(true);
+
+			expect(result).toEqual({
+				success: false,
+				error: 'Failed to fetch data: connection refused'
+			});
 		});
 	});
 });

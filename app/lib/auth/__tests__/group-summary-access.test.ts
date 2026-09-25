@@ -122,6 +122,17 @@ describe('summary read-path access model', () => {
 			expect(result.accessLevel).toBe('own');
 			expect(resolveGroupPublicAreasForRequest).not.toHaveBeenCalled();
 		});
+
+		it('propagates the error when the authenticated client itself fails to build (no try/catch around it)', async () => {
+			vi.mocked(getGroupCookie).mockResolvedValue(VIEWED_GROUP_ID);
+			vi.mocked(getAuthenticatedSupabaseClient).mockRejectedValue(
+				new Error('failed to sign group JWT')
+			);
+
+			await expect(fetchAuthorisedCoreStats(VIEWED_GROUP_ID)).rejects.toThrow(
+				'failed to sign group JWT'
+			);
+		});
 	});
 
 	describe('different group, logged in, no sharing grant', () => {
@@ -140,6 +151,17 @@ describe('summary read-path access model', () => {
 			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
 
 			expect(result).toEqual({ accessLevel: 'blocked', rows: [] });
+		});
+
+		it('target not public: propagates the error when the fallback authenticated (shared-grant) client fails to build', async () => {
+			vi.mocked(resolveGroupPublicAreasForRequest).mockResolvedValue([]);
+			vi.mocked(getAuthenticatedSupabaseClient).mockRejectedValue(
+				new Error('failed to sign group JWT')
+			);
+
+			await expect(fetchAuthorisedCoreStats(VIEWED_GROUP_ID)).rejects.toThrow(
+				'failed to sign group JWT'
+			);
 		});
 
 		it('target public: sees target public summary data via public_core_stats', async () => {
