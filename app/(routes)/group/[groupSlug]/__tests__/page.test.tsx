@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
-import { redirect, notFound } from 'next/navigation';
+import { cleanup } from '@testing-library/react';
+import { redirect } from 'next/navigation';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import GroupHomePage from '../page';
+import { describeGroupScopeDelegation } from '@/app/__tests__/helpers/group-scope-delegation';
 
 const { mockResolveGroupIdBySlug } = vi.hoisted(() => ({
 	mockResolveGroupIdBySlug: vi.fn()
@@ -36,44 +37,14 @@ describe('cross-group home page', () => {
 		vi.clearAllMocks();
 	});
 
-	describe('viewing a different group than the logged-in one', () => {
-		beforeEach(() => {
+	describeGroupScopeDelegation({
+		renderGroupPage: ({ groupSlug }) => renderPage(groupSlug),
+		mockResolveGroupIdBySlug,
+		DelegatePage: HomePage,
+		testId: 'mock-home',
+		beforeEachSetup: () => {
 			vi.mocked(getGroupCookie).mockResolvedValue(1);
-			mockResolveGroupIdBySlug.mockResolvedValue(2);
-		});
-
-		it('passes viewedGroup matching { id, slug } resolved from resolveGroupIdBySlug to the underlying route page', async () => {
-			render(await renderPage('viewed-group-slug'));
-			screen.getByTestId('mock-home');
-
-			expect(mockResolveGroupIdBySlug).toHaveBeenCalledWith(
-				'viewed-group-slug'
-			);
-			expect(vi.mocked(HomePage).mock.calls[0][0]).toEqual(
-				expect.objectContaining({
-					viewedGroup: { id: 2, slug: 'viewed-group-slug' }
-				})
-			);
-		});
-	});
-
-	describe('an unknown groupSlug', () => {
-		beforeEach(() => {
-			vi.mocked(getGroupCookie).mockResolvedValue(1);
-			mockResolveGroupIdBySlug.mockResolvedValue(null);
-			vi.mocked(notFound).mockImplementationOnce(() => {
-				throw new Error('NEXT_NOT_FOUND');
-			});
-		});
-
-		it('calls notFound() instead of rendering the route page', async () => {
-			await expect(renderPage('no-such-group')).rejects.toThrow(
-				'NEXT_NOT_FOUND'
-			);
-
-			expect(vi.mocked(notFound)).toHaveBeenCalled();
-			expect(vi.mocked(HomePage)).not.toHaveBeenCalled();
-		});
+		}
 	});
 
 	describe('groupSlug resolves to the logged-in group id', () => {

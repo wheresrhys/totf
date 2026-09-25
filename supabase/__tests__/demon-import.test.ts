@@ -22,7 +22,6 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect, vi } from 'vitest';
-import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import {
 	createUpserter,
@@ -31,20 +30,7 @@ import {
 } from '../../lib/demon-import';
 import { randomTestSuffix, randomFutureDate, addDays } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
-
-function psql(sql: string) {
-	execSync(`psql "${LOCAL_DB_URL}" -c "${sql.replace(/"/g, '\\"')}"`);
-}
-
-function psqlScalar(sql: string): string {
-	return execSync(`psql "${LOCAL_DB_URL}" -t -A -c "${sql.replace(/"/g, '\\"')}"`)
-		.toString()
-		.split('\n')
-		.map((line) => line.trim())
-		.filter(Boolean)[0];
-}
+import { psql, psqlScalar, createIsolatedGroup } from './db-test-helpers';
 
 function psqlCount(sql: string): number {
 	return Number(psqlScalar(sql));
@@ -53,14 +39,6 @@ function psqlCount(sql: string): number {
 /** Converts an ISO `YYYY-MM-DD` date into the DD/MM/YYYY format demon-import.ts expects. */
 function toDemonDate(isoDate: string): string {
 	return isoDate.split('-').reverse().join('/');
-}
-
-function createIsolatedGroup(name: string): number {
-	return Number(
-		psqlScalar(
-			`INSERT INTO "RingingGroups" (group_name, slug) VALUES ('${name}', '${name.toLowerCase().replace(/ /g, '-')}') RETURNING id;`
-		)
-	);
 }
 
 /** Builds a full DemonRow (all DemonColumnNames keys), overriding only what a test cares about. */

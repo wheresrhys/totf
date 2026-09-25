@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react';
 import Page, { fetchSummaryPageContent } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
+import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 const fetchYearlyTotalsMock = vi.fn().mockResolvedValue([]);
@@ -33,24 +34,6 @@ function renderSummaryPage(tabId?: string) {
 	return Page(
 		tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) }
 	);
-}
-
-function buildDayStat(time_period: string) {
-	return {
-		species_name: null,
-		time_period,
-		session_count: 1,
-		total_effort: '06:00:00',
-		species_count: 5,
-		bird_count: 12,
-		encounter_count: 14,
-		new_bird_count: 9,
-		pullus_bird_count: 1,
-		juv_bird_count: 2,
-		postjuv_bird_count: 1,
-		adult_bird_count: 6,
-		unknown_age_bird_count: 2
-	};
 }
 
 describe('/summary (all-time)', () => {
@@ -126,7 +109,9 @@ describe('/summary (all-time)', () => {
 
 	describe('Session totals tab', () => {
 		it("selecting the Session totals tab fetches day-grouped totals for the group's entire history, with no date bounds", async () => {
-			fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
+			fetchPeriodTotalsMock.mockResolvedValueOnce([
+				buildDailyStatsRow({ time_period: '2026-08-16' })
+			]);
 			render(await Page());
 			await screen.findByRole('heading', { level: 1 });
 			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
@@ -168,7 +153,9 @@ describe('/summary (all-time)', () => {
 		});
 
 		it("each returned day links to the group-scoped session route via the group's resolved slug", async () => {
-			fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
+			fetchPeriodTotalsMock.mockResolvedValueOnce([
+				buildDailyStatsRow({ time_period: '2026-08-16' })
+			]);
 			render(await Page());
 			await screen.findByRole('heading', { level: 1 });
 			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));

@@ -12,38 +12,7 @@ import {
 	postgresIntervalToSeconds
 } from '@/app/lib/postgres-interval';
 import type { CoreStatsResult } from '@/app/models/db';
-
-function buildStat(overrides: Partial<CoreStatsResult> = {}): CoreStatsResult {
-	return {
-		species_name: null,
-		time_period: '2026-01-01',
-		session_count: 4,
-		total_effort: '18:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:34:17',
-		avg_encounters_per_session: 1.75,
-		max_per_session: 3,
-		species_count: 12,
-		bird_count: 40,
-		encounter_count: 55,
-		new_bird_count: 30,
-		max_new_per_session: 3,
-		max_weight: 13.1,
-		avg_weight: 11.2,
-		min_weight: 9.8,
-		median_weight: 10.8,
-		max_wing: 68,
-		avg_wing: 66.6,
-		min_wing: 65,
-		median_wing: 67,
-		pullus_bird_count: 2,
-		juv_bird_count: 5,
-		postjuv_bird_count: 3,
-		adult_bird_count: 15,
-		unknown_age_bird_count: 5,
-		...overrides
-	} as CoreStatsResult;
-}
+import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 // A monthly stat row as `core_stats` returns it: `time_period` is the first
 // of the month.
@@ -53,7 +22,7 @@ function monthStat(
 	overrides: Partial<CoreStatsResult> = {}
 ): CoreStatsResult {
 	const timePeriod = `${year}-${String(month).padStart(2, '0')}-01`;
-	return buildStat({ time_period: timePeriod, ...overrides });
+	return buildCoreStatsRow({ time_period: timePeriod, ...overrides });
 }
 
 describe('buildMonthTotalsRows', () => {

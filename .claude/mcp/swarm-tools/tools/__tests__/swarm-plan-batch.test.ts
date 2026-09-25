@@ -17,6 +17,7 @@ vi.mock('../../lib/state-file', async (importOriginal) => ({
 import { ghJson } from '../../lib/gh';
 import { listBranches, listWorktrees, getBranchTip, getAheadBehind } from '../../lib/git';
 import { listStateWithPruneReport, type PrunedEntry, type SwarmWorkerEntry } from '../../lib/state-file';
+import { makeSwarmWorkerEntry } from '../../lib/__tests__/swarm-worker-entry-fixture';
 import {
 	getExclusiveLabel,
 	getModelLabel,
@@ -1045,17 +1046,14 @@ describe('planBatch', () => {
 	// Guards the accounting side: a still-live db-migration worker keeps the solo run active, so the
 	// pruning path can't be mistaken for the reason the exclusive gate opens above.
 	it('keeps the solo run active when a live db-migration ticket worker survives the prune', async () => {
-		const liveWorker: SwarmWorkerEntry = {
-			kind: 'ticket',
+		const liveWorker: SwarmWorkerEntry = makeSwarmWorkerEntry({
 			issue: 500,
-			pr: null,
 			branch: 'feature/500-migrate',
 			title: 'Live migration',
 			worktreePath: '/tmp/does-not-matter',
 			agentId: 'agent-live',
 			model: 'opus',
-			startedAt: '2026-01-01T00:00:00.000Z',
-		};
+		});
 		mockListState.mockResolvedValue({ workers: [liveWorker], pruned: [] });
 		mockGhJson.mockImplementation((args: string[]) => {
 			if (args[0] === 'issue' && args[1] === 'view' && args[2] === '500')
@@ -1075,18 +1073,15 @@ describe('planBatch', () => {
 	describe('early db-lock release (dbLockReleased)', () => {
 		/** A live db-migration ticket worker on issue #500, optionally having released its lock early. */
 		function dbMigrationWorker(overrides: Partial<SwarmWorkerEntry> = {}): SwarmWorkerEntry {
-			return {
-				kind: 'ticket',
+			return makeSwarmWorkerEntry({
 				issue: 500,
-				pr: null,
 				branch: 'feature/500-migrate',
 				title: 'Live migration',
 				worktreePath: '/tmp/does-not-matter',
 				agentId: 'agent-live',
 				model: 'opus',
-				startedAt: '2026-01-01T00:00:00.000Z',
 				...overrides,
-			};
+			});
 		}
 
 		/** Labels issue #500 db-migration, so any entry that *does* get looked up contributes an exclusive label. */
@@ -1202,17 +1197,13 @@ describe('planBatch', () => {
 	// true, so an exclusive ready ticket ranked first is omitted while the ordinary tickets behind it
 	// are still returned up to freeSlots — rather than the exclusive ticket hiding them all.
 	it('omits an exclusive ready ticket but still returns ordinary tickets while a non-exclusive worker runs', async () => {
-		const liveNonExclusiveWorker: SwarmWorkerEntry = {
-			kind: 'ticket',
+		const liveNonExclusiveWorker: SwarmWorkerEntry = makeSwarmWorkerEntry({
 			issue: 500,
-			pr: null,
 			branch: 'feature/500-ordinary',
 			title: 'Ordinary in-flight work',
 			worktreePath: '/tmp/does-not-matter',
 			agentId: 'agent-ordinary',
-			model: 'sonnet',
-			startedAt: '2026-01-01T00:00:00.000Z',
-		};
+		});
 		mockListState.mockResolvedValue({ workers: [liveNonExclusiveWorker], pruned: [] });
 		mockListBranches.mockResolvedValue([]);
 		mockGhJson.mockImplementation((args: string[]) => {
@@ -1335,17 +1326,15 @@ describe('planBatch', () => {
 		// Structure — the genuine in-progress case: a live worker holds the branch, so nothing is
 		// reported and the ticket stays invisible exactly as before.
 		it('reports nothing for a branch a live worker entry claims', async () => {
-			const liveWorker: SwarmWorkerEntry = {
-				kind: 'ticket',
+			const liveWorker: SwarmWorkerEntry = makeSwarmWorkerEntry({
 				issue: 874,
-				pr: null,
 				branch: 'feature/874-exclude-passive-records',
 				title: 'Exclude passive records from stats',
 				worktreePath: '/repo/.claude/worktrees/agent-874',
 				agentId: 'agent-874',
 				model: 'opus',
 				startedAt: '2026-01-06T00:00:00.000Z',
-			};
+			});
 			mockListState.mockResolvedValue({ workers: [liveWorker], pruned: [] });
 			stubReadyIssueWithBranch();
 
@@ -1358,7 +1347,7 @@ describe('planBatch', () => {
 		// Structure — a live *maintenance* entry carries no issue number, so the branch-name guard
 		// is what keeps it out of the orphan list.
 		it('reports nothing for a branch a live maintenance entry claims, despite it having no issue number', async () => {
-			const liveMaintenanceWorker: SwarmWorkerEntry = {
+			const liveMaintenanceWorker: SwarmWorkerEntry = makeSwarmWorkerEntry({
 				kind: 'maintenance',
 				issue: null,
 				pr: 880,
@@ -1366,9 +1355,8 @@ describe('planBatch', () => {
 				title: 'Maintaining the PR',
 				worktreePath: '/repo/.claude/worktrees/agent-880',
 				agentId: 'agent-880',
-				model: 'sonnet',
 				startedAt: '2026-01-06T00:00:00.000Z',
-			};
+			});
 			mockListState.mockResolvedValue({ workers: [liveMaintenanceWorker], pruned: [] });
 			stubReadyIssueWithBranch();
 
