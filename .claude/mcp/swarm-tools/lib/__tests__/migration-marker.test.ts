@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
-import { execa } from 'execa';
 import {
 	readMigrationMarker,
 	withMigrationMarkerLock,
@@ -11,17 +10,7 @@ import {
 	markerIsCaughtUp,
 	MigrationMarkerSchemaError,
 } from '../migration-marker';
-
-// git honours an inherited GIT_DIR over cwd (git sets it when invoking hooks), so strip the
-// discovery overrides for the temp-repo init — otherwise a suite run from the pre-push hook would
-// re-target the real repo instead of the isolated temp repo the marker resolves against.
-function gitEnv(): NodeJS.ProcessEnv {
-	const env = { ...process.env };
-	delete env.GIT_DIR;
-	delete env.GIT_WORK_TREE;
-	delete env.GIT_INDEX_FILE;
-	return env;
-}
+import { initGitRepo } from './git-test-env';
 
 async function writeMigrationFiles(worktreePath: string, filenames: string[]): Promise<void> {
 	const dir = path.join(worktreePath, 'supabase', 'migrations');
@@ -36,7 +25,7 @@ describe('migration-marker', () => {
 
 	beforeEach(async () => {
 		repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'swarm-migration-marker-'));
-		await execa('git', ['init', '--quiet'], { cwd: repoDir, env: gitEnv(), extendEnv: false });
+		await initGitRepo(repoDir);
 	});
 
 	afterEach(async () => {

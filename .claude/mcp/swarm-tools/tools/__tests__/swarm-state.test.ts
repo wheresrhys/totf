@@ -8,23 +8,14 @@ vi.mock('../../lib/state-file', async (importOriginal) => ({
 	withStateLock: vi.fn(),
 }));
 
-import { listStateWithPruneReport, withStateLock, type PrunedEntry, type SwarmWorkerEntry } from '../../lib/state-file';
+import {
+	listStateWithPruneReport,
+	withStateLock,
+	type PrunedEntry,
+	type SwarmWorkerEntry,
+} from '../../lib/state-file';
 import { listWorkersWithPrune, releaseDbLockForAgent } from '../swarm-state';
-
-function makeEntry(overrides: Partial<SwarmWorkerEntry> = {}): SwarmWorkerEntry {
-	return {
-		kind: 'ticket',
-		issue: 1,
-		pr: null,
-		branch: 'feature/1-example',
-		title: 'Example',
-		worktreePath: '/tmp/example',
-		agentId: 'agent-1',
-		model: 'sonnet',
-		startedAt: '2026-01-01T00:00:00.000Z',
-		...overrides,
-	};
-}
+import { makeSwarmWorkerEntry as makeEntry } from '../../lib/__tests__/swarm-worker-entry-fixture';
 
 describe('listWorkersWithPrune', () => {
 	const mockListState = vi.mocked(listStateWithPruneReport);

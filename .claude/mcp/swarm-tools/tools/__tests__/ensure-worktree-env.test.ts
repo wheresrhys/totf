@@ -5,20 +5,19 @@ import os from 'os';
 import path from 'path';
 import { execa } from 'execa';
 import { ensureWorktreeEnv } from '../ensure-worktree-env';
+import { gitEnv as baseGitEnv } from '../../lib/__tests__/git-test-env';
 
 function gitEnv(): NodeJS.ProcessEnv {
-	const env = { ...process.env };
-	delete env.GIT_DIR;
-	delete env.GIT_WORK_TREE;
-	delete env.GIT_INDEX_FILE;
 	// CI runners have no global user.name/user.email configured, so `git commit`
 	// fails with exit 128 ("Please tell me who you are") unless an identity is
 	// supplied explicitly — don't rely on the ambient environment's git config.
-	env.GIT_AUTHOR_NAME = 'ensure-worktree-env test';
-	env.GIT_AUTHOR_EMAIL = 'ensure-worktree-env-test@example.com';
-	env.GIT_COMMITTER_NAME = 'ensure-worktree-env test';
-	env.GIT_COMMITTER_EMAIL = 'ensure-worktree-env-test@example.com';
-	return env;
+	return {
+		...baseGitEnv(),
+		GIT_AUTHOR_NAME: 'ensure-worktree-env test',
+		GIT_AUTHOR_EMAIL: 'ensure-worktree-env-test@example.com',
+		GIT_COMMITTER_NAME: 'ensure-worktree-env test',
+		GIT_COMMITTER_EMAIL: 'ensure-worktree-env-test@example.com',
+	};
 }
 
 describe('ensure_worktree_env', () => {
