@@ -18,6 +18,25 @@ vi.mock('@/app/actions/ring-sequences', () => ({
 	promoteControlToSequence: mockPromoteControlToSequence
 }));
 
+function renderCreateSequenceForRing(
+	overrides: Partial<{
+		ringNo: string;
+		viewedGroupId: number;
+		onClose: () => void;
+	}> = {}
+) {
+	const onClose = overrides.onClose ?? vi.fn();
+	const props = { ringNo: 'ABC1234', viewedGroupId: 1, ...overrides, onClose };
+	const renderResult = render(
+		<CreateSequenceForRing
+			ringNo={props.ringNo}
+			viewedGroupId={props.viewedGroupId}
+			onClose={onClose}
+		/>
+	);
+	return { ...renderResult, onClose };
+}
+
 describe('CreateSequenceForRing', () => {
 	afterEach(() => {
 		cleanup();
@@ -25,30 +44,17 @@ describe('CreateSequenceForRing', () => {
 	});
 
 	it('names the ring and its derived prefix in the confirmation copy', () => {
-		render(
-			<CreateSequenceForRing
-				ringNo="ABC1234"
-				viewedGroupId={1}
-				onClose={vi.fn()}
-			/>
-		);
+		renderCreateSequenceForRing();
 		// Ring number and its first-3-characters prefix are both surfaced.
 		expect(screen.getByText('ABC1234')).toBeDefined();
 		expect(screen.getByText('ABC')).toBeDefined();
 	});
 
 	it('submits the ring number and viewed group id to the action and closes on success', async () => {
-		const onClose = vi.fn();
 		mockPromoteControlToSequence.mockImplementation(
 			async (): Promise<PromoteControlState> => ({ success: true })
 		);
-		render(
-			<CreateSequenceForRing
-				ringNo="ABC1234"
-				viewedGroupId={42}
-				onClose={onClose}
-			/>
-		);
+		const { onClose } = renderCreateSequenceForRing({ viewedGroupId: 42 });
 		fireEvent.submit(
 			screen.getByRole('button', { name: 'Confirm' }).closest('form')!
 		);
@@ -62,20 +68,13 @@ describe('CreateSequenceForRing', () => {
 	});
 
 	it('surfaces the action error and keeps the modal open on failure', async () => {
-		const onClose = vi.fn();
 		mockPromoteControlToSequence.mockImplementation(
 			async (): Promise<PromoteControlState> => ({
 				success: false,
 				error: 'Failed to fetch data: something went wrong'
 			})
 		);
-		render(
-			<CreateSequenceForRing
-				ringNo="ABC1234"
-				viewedGroupId={1}
-				onClose={onClose}
-			/>
-		);
+		const { onClose } = renderCreateSequenceForRing();
 		fireEvent.submit(
 			screen.getByRole('button', { name: 'Confirm' }).closest('form')!
 		);
@@ -89,14 +88,7 @@ describe('CreateSequenceForRing', () => {
 	});
 
 	it('closes without calling the action when Cancel is clicked', () => {
-		const onClose = vi.fn();
-		render(
-			<CreateSequenceForRing
-				ringNo="ABC1234"
-				viewedGroupId={1}
-				onClose={onClose}
-			/>
-		);
+		const { onClose } = renderCreateSequenceForRing();
 		fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 		expect(onClose).toHaveBeenCalled();
 		expect(mockPromoteControlToSequence).not.toHaveBeenCalled();

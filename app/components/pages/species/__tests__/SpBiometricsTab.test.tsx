@@ -61,6 +61,22 @@ async function loadActions() {
 	return import('@/app/actions/sp-data');
 }
 
+function renderBiometricsTab(
+	overrides: Partial<{ fromDate: string; toDate: string }> = {}
+) {
+	return render(<SpBiometricsTab {...props} {...overrides} />);
+}
+
+async function expandTrendTile() {
+	fireEvent.click(screen.getByRole('button', { name: /Biometrics trends/ }));
+	return screen.findByTestId('trend-chart');
+}
+
+async function expandScatterTile() {
+	fireEvent.click(screen.getByRole('button', { name: /Wing vs weight/ }));
+	return screen.findByTestId('scatter-chart');
+}
+
 describe('SpBiometricsTab', () => {
 	afterEach(() => {
 		cleanup();
@@ -80,14 +96,14 @@ describe('SpBiometricsTab', () => {
 
 	describe('Usual: sentences render from speciesStats', () => {
 		it('shows the Weight sentence with min-max range, avg and median', () => {
-			render(<SpBiometricsTab {...props} />);
+			renderBiometricsTab();
 			expect(
 				screen.getByText(/Weight:.*16\.5-21g.*avg: 18\.3g.*median: 18g/i)
 			).toBeDefined();
 		});
 
 		it('shows the Wing sentence with min-max range, avg and median', () => {
-			render(<SpBiometricsTab {...props} />);
+			renderBiometricsTab();
 			expect(
 				screen.getByText(/Wing:.*72-80mm.*avg: 74\.2mm.*median: 74mm/i)
 			).toBeDefined();
@@ -98,7 +114,7 @@ describe('SpBiometricsTab', () => {
 		it('renders a text tile per chart and fetches nothing until a tile is expanded', async () => {
 			const { getSpeciesStatsHistory, fetchGraphableEncounterData } =
 				await loadActions();
-			render(<SpBiometricsTab {...props} />);
+			renderBiometricsTab();
 			expect(
 				screen.getByRole('button', { name: /Biometrics trends/ })
 			).toBeDefined();
@@ -115,11 +131,8 @@ describe('SpBiometricsTab', () => {
 	describe('Structure: expanding the biometrics trend tile', () => {
 		it('fetches stats history once and renders the trend chart with a close button', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
-			render(<SpBiometricsTab {...props} />);
-			fireEvent.click(
-				screen.getByRole('button', { name: /Biometrics trends/ })
-			);
-			await screen.findByTestId('trend-chart');
+			renderBiometricsTab();
+			await expandTrendTile();
 			expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(1);
 			expect(getSpeciesStatsHistory).toHaveBeenCalledWith(
 				'Robin',
@@ -137,46 +150,32 @@ describe('SpBiometricsTab', () => {
 		// is fetched or passed through, which keeps the Normalize toggle (gated on
 		// `effortHistory` being passed) from ever appearing on this tile.
 		it('never passes effortHistory through to the trend chart, so no Normalize toggle can appear', async () => {
-			render(<SpBiometricsTab {...props} />);
-			fireEvent.click(
-				screen.getByRole('button', { name: /Biometrics trends/ })
-			);
-			const chart = await screen.findByTestId('trend-chart');
+			renderBiometricsTab();
+			const chart = await expandTrendTile();
 			expect(chart.dataset.effortHistory).toBe('');
 		});
 	});
 
 	describe('Structure: compareYearsUrl', () => {
 		it('is set to the Demographics tab (tabId=demographics) when the page is period-scoped', async () => {
-			render(
-				<SpBiometricsTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
-			);
-			fireEvent.click(
-				screen.getByRole('button', { name: /Biometrics trends/ })
-			);
-			const chart = await screen.findByTestId('trend-chart');
+			renderBiometricsTab({ fromDate: '2024-01-01', toDate: '2024-12-31' });
+			const chart = await expandTrendTile();
 			expect(chart.dataset.compareYearsUrl).toBe(
 				'/species/Robin?tabId=demographics'
 			);
 		});
 
 		it('is undefined on the all-time render (no fromDate/toDate)', async () => {
-			render(<SpBiometricsTab {...props} />);
-			fireEvent.click(
-				screen.getByRole('button', { name: /Biometrics trends/ })
-			);
-			const chart = await screen.findByTestId('trend-chart');
+			renderBiometricsTab();
+			const chart = await expandTrendTile();
 			expect(chart.dataset.compareYearsUrl).toBe('');
 		});
 	});
 
 	describe('Structure: yearly aggregators for the biometrics tile', () => {
 		it('passes max/mean/min aggregators per weight and wing metric', async () => {
-			render(<SpBiometricsTab {...props} />);
-			fireEvent.click(
-				screen.getByRole('button', { name: /Biometrics trends/ })
-			);
-			const chart = await screen.findByTestId('trend-chart');
+			renderBiometricsTab();
+			const chart = await expandTrendTile();
 			expect(JSON.parse(chart.dataset.aggregators!)).toEqual({
 				'max weight': 'max',
 				'median weight': 'mean',
@@ -192,9 +191,8 @@ describe('SpBiometricsTab', () => {
 		it('fetches graphable encounter data (not stats history) and renders the scatter chart', async () => {
 			const { getSpeciesStatsHistory, fetchGraphableEncounterData } =
 				await loadActions();
-			render(<SpBiometricsTab {...props} />);
-			fireEvent.click(screen.getByRole('button', { name: /Wing vs weight/ }));
-			await screen.findByTestId('scatter-chart');
+			renderBiometricsTab();
+			await expandScatterTile();
 			expect(fetchGraphableEncounterData).toHaveBeenCalledTimes(1);
 			expect(fetchGraphableEncounterData).toHaveBeenCalledWith(
 				42,
@@ -208,11 +206,8 @@ describe('SpBiometricsTab', () => {
 
 	describe('Structure: collapsing a tile', () => {
 		it('hides the chart again when the close button is clicked', async () => {
-			render(<SpBiometricsTab {...props} />);
-			fireEvent.click(
-				screen.getByRole('button', { name: /Biometrics trends/ })
-			);
-			await screen.findByTestId('trend-chart');
+			renderBiometricsTab();
+			await expandTrendTile();
 			fireEvent.click(
 				screen.getByRole('button', { name: 'Close Biometrics trends' })
 			);
@@ -228,21 +223,15 @@ describe('SpBiometricsTab', () => {
 	describe('Edge: independent fetch state from SpDemographicsTab', () => {
 		it('does not refetch when a tile is collapsed and re-expanded', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
-			render(<SpBiometricsTab {...props} />);
-			fireEvent.click(
-				screen.getByRole('button', { name: /Biometrics trends/ })
-			);
-			await screen.findByTestId('trend-chart');
+			renderBiometricsTab();
+			await expandTrendTile();
 			fireEvent.click(
 				screen.getByRole('button', { name: 'Close Biometrics trends' })
 			);
 			await waitFor(() =>
 				expect(screen.queryByTestId('trend-chart')).toBeNull()
 			);
-			fireEvent.click(
-				screen.getByRole('button', { name: /Biometrics trends/ })
-			);
-			await screen.findByTestId('trend-chart');
+			await expandTrendTile();
 			expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(1);
 		});
 	});
@@ -250,13 +239,8 @@ describe('SpBiometricsTab', () => {
 	describe('Edge: date-range scope forwarded to fetchers', () => {
 		it('passes fromDate/toDate through to the stats-history query', async () => {
 			const { getSpeciesStatsHistory } = await loadActions();
-			render(
-				<SpBiometricsTab {...props} fromDate="2024-01-01" toDate="2024-12-31" />
-			);
-			fireEvent.click(
-				screen.getByRole('button', { name: /Biometrics trends/ })
-			);
-			await screen.findByTestId('trend-chart');
+			renderBiometricsTab({ fromDate: '2024-01-01', toDate: '2024-12-31' });
+			await expandTrendTile();
 			expect(getSpeciesStatsHistory).toHaveBeenCalledWith(
 				'Robin',
 				1,

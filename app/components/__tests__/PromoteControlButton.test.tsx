@@ -14,23 +14,35 @@ vi.mock('@/app/actions/ring-sequences', () => ({
 	promoteControlToSequence: vi.fn()
 }));
 
+function renderPromoteControlButton(
+	overrides: Partial<{ ringNo: string; viewedGroupId: number }> = {}
+) {
+	const props = { ringNo: 'ABC1234', viewedGroupId: 1, ...overrides };
+	return render(
+		<PromoteControlButton
+			ringNo={props.ringNo}
+			viewedGroupId={props.viewedGroupId}
+		/>
+	);
+}
+
 describe('PromoteControlButton', () => {
 	afterEach(() => {
 		cleanup();
 	});
 
 	it('renders a promote button for the given ring', () => {
-		render(<PromoteControlButton ringNo="ABC1234" viewedGroupId={1} />);
+		renderPromoteControlButton();
 		expect(screen.getByTestId('promote-control-ABC1234')).toBeDefined();
 	});
 
 	it('does not show the modal until the promote button is clicked', () => {
-		render(<PromoteControlButton ringNo="ABC1234" viewedGroupId={1} />);
+		renderPromoteControlButton();
 		expect(screen.queryByTestId('promote-control-modal')).toBeNull();
 	});
 
 	it('opens the confirmation modal naming the ring and its prefix on click', () => {
-		render(<PromoteControlButton ringNo="XYZ9999" viewedGroupId={1} />);
+		renderPromoteControlButton({ ringNo: 'XYZ9999' });
 		fireEvent.click(screen.getByTestId('promote-control-XYZ9999'));
 		const modal = screen.getByTestId('promote-control-modal');
 		expect(modal).toBeDefined();
@@ -39,7 +51,7 @@ describe('PromoteControlButton', () => {
 	});
 
 	it('closes the modal when Cancel is clicked', () => {
-		render(<PromoteControlButton ringNo="XYZ9999" viewedGroupId={1} />);
+		renderPromoteControlButton({ ringNo: 'XYZ9999' });
 		fireEvent.click(screen.getByTestId('promote-control-XYZ9999'));
 		fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 		expect(screen.queryByTestId('promote-control-modal')).toBeNull();

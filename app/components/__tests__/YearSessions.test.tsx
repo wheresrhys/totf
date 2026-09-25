@@ -17,6 +17,34 @@ const yearData: SessionWithEncountersCount[][] = [
 
 const mockOnToggle = vi.fn();
 
+function renderYearSessions(
+	overrides: Partial<{
+		year: SessionWithEncountersCount[][];
+		yearString: string;
+		viewedGroup: { id: number; slug: string };
+		expandedYear: string | false;
+		onToggle: (id: string | false) => void;
+	}> = {}
+) {
+	const props = {
+		year: yearData,
+		yearString: '2022',
+		viewedGroup: { id: 1, slug: 'alpha' },
+		expandedYear: false as string | false,
+		onToggle: mockOnToggle,
+		...overrides
+	};
+	return render(
+		<YearSessions
+			year={props.year}
+			yearString={props.yearString}
+			viewedGroup={props.viewedGroup}
+			expandedYear={props.expandedYear}
+			onToggle={props.onToggle}
+		/>
+	);
+}
+
 describe('YearSessions', () => {
 	afterEach(() => {
 		cleanup();
@@ -24,44 +52,20 @@ describe('YearSessions', () => {
 	});
 
 	it('renders the year heading', () => {
-		render(
-			<YearSessions
-				year={yearData}
-				yearString="2022"
-				viewedGroup={{ id: 1, slug: 'alpha' }}
-				expandedYear={false}
-				onToggle={mockOnToggle}
-			/>
-		);
+		renderYearSessions();
 		const yearButton = document.getElementById('2022-header');
 		expect(yearButton?.textContent).toContain('2022');
 	});
 
 	it('calls onToggle when year heading is clicked', () => {
-		render(
-			<YearSessions
-				year={yearData}
-				yearString="2022"
-				viewedGroup={{ id: 1, slug: 'alpha' }}
-				expandedYear={false}
-				onToggle={mockOnToggle}
-			/>
-		);
+		renderYearSessions();
 		const yearButton = document.getElementById('2022-header') as HTMLElement;
 		fireEvent.click(yearButton);
 		expect(mockOnToggle).toHaveBeenCalledWith('2022');
 	});
 
 	it('renders month accordions when expanded', () => {
-		render(
-			<YearSessions
-				year={yearData}
-				yearString="2022"
-				viewedGroup={{ id: 1, slug: 'alpha' }}
-				expandedYear="2022"
-				onToggle={mockOnToggle}
-			/>
-		);
+		renderYearSessions({ expandedYear: '2022' });
 		const monthsContainer = screen.getByTestId('months-of-year');
 		const monthButtons = monthsContainer.querySelectorAll('button');
 		expect(monthButtons.length).toBe(4);
@@ -71,15 +75,7 @@ describe('YearSessions', () => {
 	// tree from viewedGroup.id to viewedGroup.slug, now that the
 	// /group/[groupSlug] route accepts slugs.
 	it('threads viewedGroup.slug into session hrefs', () => {
-		render(
-			<YearSessions
-				year={yearData}
-				yearString="2022"
-				viewedGroup={{ id: 1, slug: 'alpha' }}
-				expandedYear="2022"
-				onToggle={mockOnToggle}
-			/>
-		);
+		renderYearSessions({ expandedYear: '2022' });
 		const sessionLink = document.querySelector(
 			'a[href="/group/alpha/session/2022-10-20"]'
 		);

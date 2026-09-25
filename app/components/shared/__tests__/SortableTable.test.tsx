@@ -40,47 +40,56 @@ function SimpleBody({ data }: { data: RowModelWithRawData<Row, Row>[] }) {
 	);
 }
 
+function renderTable(
+	overrides: Partial<{
+		columnConfigs: Partial<Record<keyof Row, ColumnConfig>>;
+		data: Row[];
+		initialSortColumn: keyof Row;
+		totalsRow: React.ReactNode;
+		TableBodyComponent: React.ComponentType<{
+			data: RowModelWithRawData<Row, Row>[];
+			columnConfigs?: Partial<Record<keyof Row, ColumnConfig>>;
+		}>;
+	}> = {}
+) {
+	const props = {
+		columnConfigs,
+		data,
+		TableBodyComponent: SimpleBody,
+		...overrides
+	};
+	return render(
+		<SortableTable<Row, Row>
+			columnConfigs={props.columnConfigs}
+			data={props.data}
+			rowDataTransform={(r) => r}
+			initialSortColumn={props.initialSortColumn}
+			totalsRow={props.totalsRow}
+			TableBodyComponent={props.TableBodyComponent}
+		/>
+	);
+}
+
 describe('SortableTable', () => {
 	afterEach(() => {
 		cleanup();
 	});
 
 	it('renders all column headers', () => {
-		render(
-			<SortableTable<Row, Row>
-				columnConfigs={columnConfigs}
-				data={data}
-				rowDataTransform={(r) => r}
-				TableBodyComponent={SimpleBody}
-			/>
-		);
+		renderTable();
 		expect(screen.getByText('Name')).toBeDefined();
 		expect(screen.getByText('Count')).toBeDefined();
 	});
 
 	it('renders compact on small screens and full size from sm: up, per issue #605', () => {
-		render(
-			<SortableTable<Row, Row>
-				columnConfigs={columnConfigs}
-				data={data}
-				rowDataTransform={(r) => r}
-				TableBodyComponent={SimpleBody}
-			/>
-		);
+		renderTable();
 		const table = document.querySelector('table');
 		expect(table?.className).toContain('table-xs');
 		expect(table?.className).toContain('sm:table-md');
 	});
 
 	it('renders all data rows in original order by default', () => {
-		render(
-			<SortableTable<Row, Row>
-				columnConfigs={columnConfigs}
-				data={data}
-				rowDataTransform={(r) => r}
-				TableBodyComponent={SimpleBody}
-			/>
-		);
+		renderTable();
 		const rows = document.querySelectorAll('tbody tr');
 		expect(rows[0].textContent).toContain('Chiffchaff');
 		expect(rows[1].textContent).toContain('Robin');
@@ -88,14 +97,7 @@ describe('SortableTable', () => {
 	});
 
 	it('sorts descending by column on first click', () => {
-		render(
-			<SortableTable<Row, Row>
-				columnConfigs={columnConfigs}
-				data={data}
-				rowDataTransform={(r) => r}
-				TableBodyComponent={SimpleBody}
-			/>
-		);
+		renderTable();
 		fireEvent.click(screen.getByText('Count'));
 		const rows = document.querySelectorAll('tbody tr');
 		// descending: 12, 5, 3
@@ -105,14 +107,7 @@ describe('SortableTable', () => {
 	});
 
 	it('toggles to ascending sort on second click of same column', () => {
-		render(
-			<SortableTable<Row, Row>
-				columnConfigs={columnConfigs}
-				data={data}
-				rowDataTransform={(r) => r}
-				TableBodyComponent={SimpleBody}
-			/>
-		);
+		renderTable();
 		fireEvent.click(screen.getByText('Count'));
 		fireEvent.click(screen.getByText('Count'));
 		const rows = document.querySelectorAll('tbody tr');
@@ -123,30 +118,14 @@ describe('SortableTable', () => {
 	});
 
 	it('sorts by initialSortColumn descending on first render', () => {
-		render(
-			<SortableTable<Row, Row>
-				columnConfigs={columnConfigs}
-				data={data}
-				rowDataTransform={(r) => r}
-				initialSortColumn="count"
-				TableBodyComponent={SimpleBody}
-			/>
-		);
+		renderTable({ initialSortColumn: 'count' });
 		const rows = document.querySelectorAll('tbody tr');
 		expect(rows[0].textContent).toContain('Robin');
 	});
 
 	describe('totalsRow', () => {
 		it('renders the supplied totalsRow as an extra row inside <thead>', () => {
-			render(
-				<SortableTable<Row, Row>
-					columnConfigs={columnConfigs}
-					data={data}
-					rowDataTransform={(r) => r}
-					totalsRow={totalsCells}
-					TableBodyComponent={SimpleBody}
-				/>
-			);
+			renderTable({ totalsRow: totalsCells });
 			const totalsRow = screen.getByTestId('totals-row');
 			expect(totalsRow.closest('thead')).not.toBeNull();
 			expect(totalsRow.closest('tbody')).toBeNull();
@@ -155,15 +134,7 @@ describe('SortableTable', () => {
 		});
 
 		it('renders the totals row immediately after the header row, before any tbody row', () => {
-			render(
-				<SortableTable<Row, Row>
-					columnConfigs={columnConfigs}
-					data={data}
-					rowDataTransform={(r) => r}
-					totalsRow={totalsCells}
-					TableBodyComponent={SimpleBody}
-				/>
-			);
+			renderTable({ totalsRow: totalsCells });
 			const theadRows = document.querySelectorAll('thead tr');
 			// header row first, totals row second
 			expect(theadRows).toHaveLength(2);
@@ -174,15 +145,7 @@ describe('SortableTable', () => {
 		});
 
 		it('leaves the totals row position and content unchanged when sorting a data column (asc and desc)', () => {
-			render(
-				<SortableTable<Row, Row>
-					columnConfigs={columnConfigs}
-					data={data}
-					rowDataTransform={(r) => r}
-					totalsRow={totalsCells}
-					TableBodyComponent={SimpleBody}
-				/>
-			);
+			renderTable({ totalsRow: totalsCells });
 			const readTotals = () => {
 				const theadRows = document.querySelectorAll('thead tr');
 				return {
@@ -200,14 +163,7 @@ describe('SortableTable', () => {
 		});
 
 		it('renders no extra <thead> row when totalsRow is omitted', () => {
-			render(
-				<SortableTable<Row, Row>
-					columnConfigs={columnConfigs}
-					data={data}
-					rowDataTransform={(r) => r}
-					TableBodyComponent={SimpleBody}
-				/>
-			);
+			renderTable();
 			expect(screen.queryByTestId('totals-row')).toBeNull();
 			expect(document.querySelectorAll('thead tr')).toHaveLength(1);
 		});
@@ -220,14 +176,7 @@ describe('SortableTable', () => {
 				count: { label: 'Count', headerClassName: 'bg-green-50' },
 				species: { label: 'Species' }
 			};
-			render(
-				<SortableTable<Row, Row>
-					columnConfigs={styledColumnConfigs}
-					data={data}
-					rowDataTransform={(r) => r}
-					TableBodyComponent={SimpleBody}
-				/>
-			);
+			renderTable({ columnConfigs: styledColumnConfigs });
 			expect(screen.getByText('Count').closest('th')?.className).toContain(
 				'bg-green-50'
 			);
@@ -240,14 +189,7 @@ describe('SortableTable', () => {
 			const partialColumnConfigs: Partial<Record<keyof Row, ColumnConfig>> = {
 				name: { label: 'Name' }
 			};
-			render(
-				<SortableTable<Row, Row>
-					columnConfigs={partialColumnConfigs}
-					data={data}
-					rowDataTransform={(r) => r}
-					TableBodyComponent={SimpleBody}
-				/>
-			);
+			renderTable({ columnConfigs: partialColumnConfigs });
 			expect(screen.queryByText('Count')).toBeNull();
 		});
 
@@ -263,14 +205,7 @@ describe('SortableTable', () => {
 				receivedColumnConfigs = bodyColumnConfigs;
 				return <SimpleBody data={data} />;
 			}
-			render(
-				<SortableTable<Row, Row>
-					columnConfigs={columnConfigs}
-					data={data}
-					rowDataTransform={(r) => r}
-					TableBodyComponent={CapturingBody}
-				/>
-			);
+			renderTable({ TableBodyComponent: CapturingBody });
 			expect(receivedColumnConfigs).toBe(columnConfigs);
 		});
 	});
