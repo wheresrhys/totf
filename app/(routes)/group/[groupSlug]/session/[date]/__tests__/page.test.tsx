@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import Page from '../page';
+import {
+	TEST_DATE,
+	TEST_GROUP_ID,
+	TEST_GROUP_SLUG,
+	mockSessions,
+	mockMultiLocationSessions,
+	mockPreviousSession,
+	mockNextSession,
+	makeMockEncounter,
+	makeChain
+} from '@/app/__tests__/helpers/session-page-fixtures';
 
 const { mockGetAuthenticatedSupabaseClient, mockResolveGroupIdBySlug } =
 	vi.hoisted(() => ({
@@ -30,49 +41,14 @@ vi.mock('@/app/actions/session-highlights', () => ({
 	])
 }));
 
-const TEST_DATE = '2024-03-15';
-const TEST_GROUP_ID = '1';
-const TEST_GROUP_SLUG = 'test-group-slug';
-
-const mockSessions = [
-	{
-		id: 1,
-		location_id: 10,
-		location: { id: 10, location_name: 'Test Reserve', ringing_group_id: 1 }
-	}
-];
-
 const mockEncounters = [
-	{
-		id: 1,
-		session_id: 1,
-		age_code: 4,
-		breeding_condition: null,
-		capture_time: '08:00:00',
-		moult_code: null,
-		record_type: 'N',
-		ringing_group_id: 1,
-		sex: 'M',
-		sexing_method: null,
-		weight: 18.5,
-		wing_length: 75,
-		bird: {
-			ring_no: 'ABC001',
-			proven_age: 5,
-			species: { id: 1, species_name: 'Robin' }
-		}
-	},
-	{
+	makeMockEncounter(),
+	makeMockEncounter({
 		id: 2,
-		session_id: 1,
 		age_code: 1,
-		breeding_condition: null,
 		capture_time: '08:15:00',
-		moult_code: null,
 		record_type: 'S',
-		ringing_group_id: 1,
 		sex: 'F',
-		sexing_method: null,
 		weight: null,
 		wing_length: null,
 		bird: {
@@ -80,18 +56,12 @@ const mockEncounters = [
 			proven_age: 2,
 			species: { id: 1, species_name: 'Robin' }
 		}
-	},
-	{
+	}),
+	makeMockEncounter({
 		id: 3,
-		session_id: 1,
 		age_code: 2,
-		breeding_condition: null,
 		capture_time: '08:30:00',
-		moult_code: null,
-		record_type: 'N',
-		ringing_group_id: 1,
 		sex: 'U',
-		sexing_method: null,
 		weight: 11.0,
 		wing_length: 55,
 		bird: {
@@ -99,26 +69,8 @@ const mockEncounters = [
 			proven_age: 0,
 			species: { id: 2, species_name: 'Blue Tit' }
 		}
-	}
+	})
 ];
-
-const mockPreviousSession = [{ visit_date: '2024-03-01' }];
-const mockNextSession = [{ visit_date: '2024-04-01' }];
-
-function makeChain(data: unknown) {
-	return {
-		select: vi.fn().mockReturnThis(),
-		eq: vi.fn().mockReturnThis(),
-		in: vi.fn().mockReturnThis(),
-		lt: vi.fn().mockReturnThis(),
-		gt: vi.fn().mockReturnThis(),
-		order: vi.fn().mockReturnThis(),
-		limit: vi.fn().mockReturnThis(),
-		maybeSingle: vi.fn().mockReturnThis(),
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({ data, error: null }).then(resolve)
-	};
-}
 
 // The wrapper page also resolves the group's numeric id from its slug via
 // `resolveGroupIdBySlug` (`@/lib/group-slug`, mocked directly above) rather
@@ -289,19 +241,6 @@ describe('session detail page', () => {
 	});
 
 	describe('multiple locations on the same date', () => {
-		const mockMultiLocationSessions = [
-			{
-				id: 1,
-				location_id: 10,
-				location: { id: 10, location_name: 'Test Reserve', ringing_group_id: 1 }
-			},
-			{
-				id: 2,
-				location_id: 20,
-				location: { id: 20, location_name: 'Other Site', ringing_group_id: 1 }
-			}
-		];
-
 		it('links each location badge to the group-slug-based site href', async () => {
 			const client = makeSessionClient([
 				makeChain(mockMultiLocationSessions),
