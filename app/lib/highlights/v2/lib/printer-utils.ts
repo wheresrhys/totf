@@ -97,7 +97,7 @@ export function printTimeQualifier(
 	connector?: 'in' | 'of'
 ) {
 	if (!timeQualifier) {
-		return 'every';
+		return 'ever';
 	}
 	const { year, month } = timeQualifier;
 	if (year && month) {
