@@ -29,14 +29,30 @@ vi.mock('@/app/lib/group-slug', () => ({
 
 vi.mock('@/app/actions/session-highlights', () => ({
 	// The action returns plain highlight data; the component renders each
-	fetchSessionHighlights: vi.fn().mockResolvedValue([
+	fetchSessionHighlights: vi.fn().mockResolvedValue([])
+}));
+
+// Counts now comes from the v2 pipeline (getCondensedHighlightsAtTimePeriod),
+// fetched in parallel with the v1 action — see SessionHighlights.tsx. Mock it
+// as the one collaborator it is; the printer is a test double returning a
+// fixed sentence, not the real v2 formatting logic (covered by the v2
+// pipeline's own tests).
+vi.mock('@/app/lib/highlights/v2', () => ({
+	getCondensedHighlightsAtTimePeriod: vi.fn().mockResolvedValue([
 		{
-			type: 'session-total-record',
-			metric: 'encounters',
-			scope: 'all-time',
-			value: 3,
-			year: 2024,
-			isCurrentYear: false
+			formatters: {
+				combinedHighlightPrinter: () => 'Busiest session ever — 3 birds',
+				highlightListPrefixPrinter: () => ''
+			},
+			descriptor: {
+				category: 'count',
+				type: 'session-total',
+				unit: 'encounter'
+			},
+			value: { timePeriod: '2024-03-15', value: 3, species: null },
+			species: undefined,
+			bestPosition: 1,
+			scopes: []
 		}
 	])
 }));
@@ -205,10 +221,9 @@ describe('session detail page', () => {
 
 		const highlights = await screen.findByTestId('session-highlights');
 		// The section no longer carries a literal "Highlights" heading — that text
-		// now lives only on the tab button. The mocked highlight is a Counts-group
-		// type (session-total-record), so it renders under the "Counts" section;
-		// the Best-of-the-session subsection holds the oldest-bird fact (ABC001,
-		// proven_age 5, from this file's mockEncounters).
+		// now lives only on the tab button. The mocked v2 highlight renders under
+		// the "Counts" section; the Best-of-the-session subsection holds the
+		// oldest-bird fact (ABC001, proven_age 5, from this file's mockEncounters).
 		expect(highlights.textContent).toContain('Counts');
 		expect(highlights.textContent).toContain('Busiest session ever — 3 birds');
 		expect(highlights.textContent).toContain(

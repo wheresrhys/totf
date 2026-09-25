@@ -2,10 +2,18 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SessionHighlights } from '../SessionHighlights';
 import type { SessionHighlight } from '@/app/lib/highlights';
+import type { CombinedHighlight } from '@/app/lib/highlights/v2/types';
 import type { SessionEncounter } from '@/app/models/session';
 
 vi.mock('@/app/actions/session-highlights', () => ({
 	fetchSessionHighlights: vi.fn()
+}));
+
+// Counts now comes from the v2 pipeline (getCondensedHighlightsAtTimePeriod),
+// fetched in parallel with the v1 action — see SessionHighlights.tsx. Mock it
+// as the one collaborator it is, independently of the v1 fetch.
+vi.mock('@/app/lib/highlights/v2', () => ({
+	getCondensedHighlightsAtTimePeriod: vi.fn()
 }));
 
 // One highlight per group, used across the "all sections populated" tests.
@@ -15,13 +23,20 @@ const RARITY_HIGHLIGHT: SessionHighlight = {
 	multipleIndividualsRecorded: false,
 	isOnlyRecord: false
 };
-const COUNT_HIGHLIGHT: SessionHighlight = {
-	type: 'session-total-record',
-	metric: 'encounters',
-	scope: 'all-time',
-	value: 74,
-	year: 2024,
-	isCurrentYear: false
+// v2 (Counts) highlight fixture — treat getCondensedHighlightsAtTimePeriod as
+// a black box: the printer is a test double returning a fixed sentence, not
+// the real v2 formatting logic (that's covered by the v2 pipeline's own
+// tests).
+const COUNT_HIGHLIGHT: CombinedHighlight = {
+	formatters: {
+		combinedHighlightPrinter: () => 'Busiest session ever — 74 birds',
+		highlightListPrefixPrinter: () => ''
+	},
+	descriptor: { category: 'count', type: 'session-total', unit: 'encounter' },
+	value: { timePeriod: '2024-09-15', value: 74, species: null },
+	species: undefined,
+	bestPosition: 1,
+	scopes: []
 };
 const VITAL_STAT_HIGHLIGHT: SessionHighlight = {
 	type: 'weight-record',
@@ -46,9 +61,9 @@ const LONG_ABSENCE_HIGHLIGHT: SessionHighlight = {
 	gapMonths: 10
 };
 
+// v1 (Rarities + Vital stats) fixture — Counts is v2-only, see COUNT_HIGHLIGHT.
 const ALL_SECTION_HIGHLIGHTS: SessionHighlight[] = [
 	RARITY_HIGHLIGHT,
-	COUNT_HIGHLIGHT,
 	VITAL_STAT_HIGHLIGHT
 ];
 
@@ -69,6 +84,12 @@ async function mockHighlights(highlights: SessionHighlight[]) {
 	const { fetchSessionHighlights } =
 		await import('@/app/actions/session-highlights');
 	vi.mocked(fetchSessionHighlights).mockResolvedValue(highlights);
+}
+
+async function mockCountHighlights(highlights: CombinedHighlight[]) {
+	const { getCondensedHighlightsAtTimePeriod } =
+		await import('@/app/lib/highlights/v2');
+	vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue(highlights);
 }
 
 function renderSessionHighlights(
@@ -101,6 +122,7 @@ describe('SessionHighlights', () => {
 
 	beforeEach(async () => {
 		await mockHighlights(ALL_SECTION_HIGHLIGHTS);
+		await mockCountHighlights([]);
 	});
 
 	it('renders a loading spinner before data loads', async () => {
@@ -118,6 +140,7 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders a Rarities/Counts/Vital stats heading and item per section when all three groups have highlights', async () => {
+		await mockCountHighlights([COUNT_HIGHLIGHT]);
 		renderSessionHighlights();
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
@@ -155,6 +178,7 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders every section together when highlights and an oldest encounter are both present', async () => {
+		await mockCountHighlights([COUNT_HIGHLIGHT]);
 		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
@@ -183,7 +207,8 @@ describe('SessionHighlights', () => {
 		});
 
 		it('shows only the Counts section when only a count highlight is present', async () => {
-			await mockHighlights([COUNT_HIGHLIGHT]);
+			await mockHighlights([]);
+			await mockCountHighlights([COUNT_HIGHLIGHT]);
 			renderSessionHighlights();
 			await waitFor(() => {
 				expect(screen.getByRole('heading', { name: 'Counts' })).toBeDefined();
