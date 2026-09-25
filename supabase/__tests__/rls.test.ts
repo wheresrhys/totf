@@ -11,18 +11,8 @@
 
 import { describe, it, beforeAll, expect } from 'vitest';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
-import { supabase } from '../../lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-async function getGroupIdByName(name: string): Promise<number> {
-	const { data, error } = await supabase
-		.from('RingingGroups')
-		.select('id')
-		.eq('group_name', name)
-		.single();
-	if (error || !data) throw new Error(`Group "${name}" not found — run npm run db:seed:e2e first`);
-	return data.id;
-}
+import { getGroupIdByName } from './rpc-functions/helpers/seed-lookups';
 
 // Raw Sessions row count for Alpha (all session_types) — #902 added 4 new rows
 // (2 FULL_GROWN for Fieldfare/Redwing, 2 FIELD_OBSERVATION for the resighting-type

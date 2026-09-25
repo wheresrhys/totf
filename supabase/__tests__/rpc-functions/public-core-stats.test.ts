@@ -9,11 +9,11 @@
  */
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
-import { execSync } from 'child_process';
 import { getAuthenticatedSupabaseClientForGroup } from '../../../app/lib/auth/group-auth';
 import { supabase } from '../../../lib/supabase';
 import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { psql, psqlScalar } from '../db-test-helpers';
 
 // public_core_stats (#768) — a SECURITY DEFINER wrapper around core_stats that
 // only returns data for a group that has published its summary area ('summary' = ANY
@@ -24,8 +24,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // worktree runs against the shared local Supabase instance never collide (see CLAUDE.md's
 // "DB integration tests" section). `supabase` is the anon client (anon key, no JWT).
 describe('public_core_stats', () => {
-	const LOCAL_DB_URL =
-		'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
 	const suffix = randomTestSuffix();
 
 	// Two isolated groups: one that publishes 'summary', one that publishes nothing. Each
@@ -45,16 +43,6 @@ describe('public_core_stats', () => {
 	// has two months to split across.
 	let month1Date: string;
 	let month2Date: string;
-
-	function psqlScalar(sql: string): string {
-		return execSync(
-			`psql "${LOCAL_DB_URL}" -t -A -c "${sql.replace(/"/g, '\\"')}"`
-		)
-			.toString()
-			.split('\n')
-			.map((line) => line.trim())
-			.filter(Boolean)[0];
-	}
 
 	function createGroup(name: string, publicAreas: 'summary'[] = []): number {
 		const areasLiteral =
@@ -206,13 +194,12 @@ describe('public_core_stats', () => {
 	});
 
 	afterAll(() => {
-		execSync(
-			`psql "${LOCAL_DB_URL}" -c '` +
-				`DELETE FROM "Encounters" WHERE bird_id IN (${createdBirdIds.join(', ')});` +
+		psql(
+			`DELETE FROM "Encounters" WHERE bird_id IN (${createdBirdIds.join(', ')});` +
 				`DELETE FROM "Birds" WHERE id IN (${createdBirdIds.join(', ')});` +
 				`DELETE FROM "Sessions" WHERE id IN (${createdSessionIds.join(', ')});` +
 				`DELETE FROM "Locations" WHERE id IN (${createdLocationIds.join(', ')});` +
-				`DELETE FROM "RingingGroups" WHERE id IN (${publicGroupId}, ${privateGroupId});'`
+				`DELETE FROM "RingingGroups" WHERE id IN (${publicGroupId}, ${privateGroupId});`
 		);
 	});
 
