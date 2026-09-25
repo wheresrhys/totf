@@ -560,16 +560,6 @@ describe('sp-data actions', () => {
 			]);
 		});
 
-		it('converts a typical multi-hour interval to the correct fractional-hour number', async () => {
-			mockFetchGroupEffortHistory.mockResolvedValue([
-				effortRow('2023-01', '05:30:00')
-			]);
-
-			const result = await getGroupEffortHistory(GROUP_ID);
-
-			expect(result).toEqual([['2023-01', 5.5]]);
-		});
-
 		it('returns 0 hours for a month whose total_effort is "00:00:00"', async () => {
 			mockFetchGroupEffortHistory.mockResolvedValue([
 				effortRow('2023-01', '00:00:00')

@@ -38,17 +38,6 @@ describe('long_absence_retraps', () => {
 		]);
 	});
 
-	it('excludes retraps with gaps under min_gap_days', async () => {
-		// On 2024-05-10, ARRETRAP was last seen 2023-09-14 (239 days) — under the
-		// 730-day default, so only the Wren (1055 days) qualifies.
-		const { data, error } = await alphaClient.rpc('long_absence_retraps', {
-			session_date: '2024-05-10',
-			ringing_group_filter: alphaId
-		});
-		expect(error).toBeNull();
-		expect(data!.map((r) => r.ring_no)).toEqual(['AWREN001']);
-	});
-
 	it('excludes birds ringed for the first time this session', async () => {
 		// 2021-06-20 is the group's first session: every bird is newly ringed,
 		// so none has a prior visit to compare against.

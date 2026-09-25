@@ -344,20 +344,7 @@ describe('processEncounterRow', () => {
 	});
 
 	describe('casualty encounters', () => {
-		it('throws CasualtyEncounterError when ring_no is empty', async () => {
-			const row = makeDemonRow({ ring_no: '' });
-			await expect(
-				processEncounterRow(
-					row,
-					upsert,
-					lookupRingSequence,
-					RINGING_GROUP_ID,
-					linkRingSequence
-				)
-			).rejects.toBeInstanceOf(CasualtyEncounterError);
-		});
-
-		it('does not call upsert when ring_no is empty', async () => {
+		it('throws CasualtyEncounterError and does not call upsert when ring_no is empty', async () => {
 			const row = makeDemonRow({ ring_no: '' });
 			await expect(
 				processEncounterRow(

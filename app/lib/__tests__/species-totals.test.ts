@@ -3,7 +3,8 @@ import {
 	calculateEncounterRetraps,
 	calculateRetraps,
 	deriveSpeciesTotalsRow,
-	deriveSpeciesTotalsRowByEncounter
+	deriveSpeciesTotalsRowByEncounter,
+	type SpeciesTotalsRow
 } from '../species-totals';
 import type { CoreStatsResult } from '../../models/db';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
@@ -67,19 +68,9 @@ describe('deriveSpeciesTotalsRow', () => {
 		});
 	});
 
-	it('computes retrapsCount as bird_count minus new_bird_count', () => {
+	it('computes retrapsCount via the shared calculateRetraps helper', () => {
 		const stat = buildCoreStatsRow({ bird_count: 10, new_bird_count: 3 });
 		expect(deriveSpeciesTotalsRow(stat).retrapsCount).toBe(7);
-	});
-
-	it('returns retrapsCount of 0 when every bird is new (bird_count === new_bird_count)', () => {
-		const stat = buildCoreStatsRow({ bird_count: 5, new_bird_count: 5 });
-		expect(deriveSpeciesTotalsRow(stat).retrapsCount).toBe(0);
-	});
-
-	it('returns retrapsCount equal to bird_count when new_bird_count is 0', () => {
-		const stat = buildCoreStatsRow({ bird_count: 8, new_bird_count: 0 });
-		expect(deriveSpeciesTotalsRow(stat).retrapsCount).toBe(8);
 	});
 
 	it('maps max_per_session to maxPerSession', () => {
@@ -124,30 +115,24 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 		});
 	});
 
-	it('sources pullusCount from pullus_enc_count', () => {
-		const stat = buildCoreStatsRow({ pullus_enc_count: 9 });
-		expect(deriveSpeciesTotalsRowByEncounter(stat).pullusCount).toBe(9);
-	});
-
-	it('sources juvsCount from juv_enc_count', () => {
-		const stat = buildCoreStatsRow({ juv_enc_count: 9 });
-		expect(deriveSpeciesTotalsRowByEncounter(stat).juvsCount).toBe(9);
-	});
-
-	it('sources postjuvCount from postjuv_enc_count', () => {
-		const stat = buildCoreStatsRow({ postjuv_enc_count: 9 });
-		expect(deriveSpeciesTotalsRowByEncounter(stat).postjuvCount).toBe(9);
-	});
-
-	it('sources adultsCount from adult_enc_count', () => {
-		const stat = buildCoreStatsRow({ adult_enc_count: 9 });
-		expect(deriveSpeciesTotalsRowByEncounter(stat).adultsCount).toBe(9);
-	});
-
-	it('sources unknownAgeCount from unknown_age_enc_count', () => {
-		const stat = buildCoreStatsRow({ unknown_age_enc_count: 9 });
-		expect(deriveSpeciesTotalsRowByEncounter(stat).unknownAgeCount).toBe(9);
-	});
+	it.each<{
+		sourceField: keyof CoreStatsResult;
+		resultField: keyof SpeciesTotalsRow;
+	}>([
+		{ sourceField: 'pullus_enc_count', resultField: 'pullusCount' },
+		{ sourceField: 'juv_enc_count', resultField: 'juvsCount' },
+		{ sourceField: 'postjuv_enc_count', resultField: 'postjuvCount' },
+		{ sourceField: 'adult_enc_count', resultField: 'adultsCount' },
+		{ sourceField: 'unknown_age_enc_count', resultField: 'unknownAgeCount' }
+	])(
+		'sources $resultField from $sourceField',
+		({ sourceField, resultField }) => {
+			const stat = buildCoreStatsRow({
+				[sourceField]: 9
+			} as Partial<CoreStatsResult>);
+			expect(deriveSpeciesTotalsRowByEncounter(stat)[resultField]).toBe(9);
+		}
+	);
 
 	it('sources newCount from new_bird_count, not any *_enc_count field', () => {
 		const stat = buildCoreStatsRow({
