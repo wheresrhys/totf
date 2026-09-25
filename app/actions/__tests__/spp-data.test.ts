@@ -1,16 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
-import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
+import type { BiometricsStatsResult } from '@/app/models/db';
 import { fetchSpeciesData } from '../spp-data';
 import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
 import gammaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/gamma.by-species.json';
+import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 // Real captured biometrics_stats output for the exact call fetchSpeciesData
 // makes (group-wide, group_by_species). Alpha's first row is the Blue Tit that
-// buildAggregateRow below also defaults to, so the two builders line up on
-// species_name; Gamma's is genuinely empty — that group has no
-// biometric-eligible encounters at all — which is the fixture-backed
-// no-biometrics-anywhere edge case (#883).
+// every bare buildCoreStatsRow({ species_name: 'Blue Tit' }) call below
+// deliberately matches (buildCoreStatsRow's own default `species_name` is
+// `null`), so the two builders line up on species_name and
+// mergeSpeciesBiometrics actually joins them; Gamma's is genuinely empty —
+// that group has no biometric-eligible encounters at all — which is the
+// fixture-backed no-biometrics-anywhere edge case (#883).
 const capturedBiometricsRows =
 	alphaBiometricsBySpecies as BiometricsStatsResult[];
 const emptyBiometricsRows = gammaBiometricsBySpecies as BiometricsStatsResult[];
@@ -30,45 +33,6 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 const GROUP_ID = 1;
 const FROM_DATE = '2026-01-01';
 const TO_DATE = '2026-12-31';
-
-function buildAggregateRow(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
-	return {
-		species_name: 'Blue Tit',
-		time_period: null,
-		session_count: 4,
-		total_effort: '18:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:34:17',
-		avg_encounters_per_session: 1.75,
-		max_per_session: 3,
-		species_count: 1,
-		bird_count: 6,
-		encounter_count: 7,
-		new_bird_count: 4,
-		pullus_bird_count: 0,
-		juv_bird_count: 0,
-		postjuv_bird_count: 5,
-		adult_bird_count: 0,
-		unknown_age_bird_count: 1,
-		pullus_enc_count: 0,
-		juv_enc_count: 0,
-		postjuv_enc_count: 6,
-		adult_enc_count: 1,
-		unknown_age_enc_count: 0,
-		max_new_per_session: 3,
-		max_weight: 13.1,
-		avg_weight: 11.2,
-		min_weight: 9.8,
-		median_weight: 10.8,
-		max_wing: 68,
-		avg_wing: 66.6,
-		min_wing: 65,
-		median_wing: 67,
-		...overrides
-	} as CoreStatsResult;
-}
 
 function buildBiometricsRow(
 	overrides: Partial<BiometricsStatsResult> = {}
@@ -105,7 +69,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 		it('merges biometrics_stats fields onto matching core_stats rows by species_name', async () => {
 			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 				accessLevel: 'own',
-				rows: [buildAggregateRow()]
+				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
 			});
 			makeRpcClient([buildBiometricsRow({ max_weight: 20, max_wing: 70 })]);
 
@@ -119,7 +83,8 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 				accessLevel: 'own',
 				rows: [
-					buildAggregateRow({
+					buildCoreStatsRow({
+						species_name: 'Blue Tit',
 						bird_count: 12,
 						encounter_count: 15,
 						session_count: 3,
@@ -142,7 +107,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 		it('calls biometrics_stats with the same viewedGroupId/from_date/to_date/group_by_species params as core_stats', async () => {
 			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 				accessLevel: 'own',
-				rows: [buildAggregateRow()]
+				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
 			});
 			const rpcCalls = makeRpcClient([]);
 
@@ -180,7 +145,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 		it('does not call biometrics_stats when fetchAuthorisedCoreStats resolves accessLevel "public"', async () => {
 			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 				accessLevel: 'public',
-				rows: [buildAggregateRow()]
+				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
 			});
 
 			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
@@ -191,7 +156,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 		it('calls biometrics_stats when accessLevel is "shared"', async () => {
 			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 				accessLevel: 'shared',
-				rows: [buildAggregateRow()]
+				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
 			});
 			makeRpcClient([]);
 
@@ -205,7 +170,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 		it('leaves the 8 biometric fields undefined for a species present in core_stats but absent from biometrics_stats', async () => {
 			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 				accessLevel: 'own',
-				rows: [buildAggregateRow({ species_name: 'Robin' })]
+				rows: [buildCoreStatsRow({ species_name: 'Robin' })]
 			});
 			makeRpcClient([buildBiometricsRow({ species_name: 'Wren' })]);
 
@@ -224,7 +189,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 		it('leaves the 8 biometric fields undefined when biometrics_stats returns no rows at all for the group', async () => {
 			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 				accessLevel: 'own',
-				rows: [buildAggregateRow()]
+				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
 			});
 			makeRpcClient(emptyBiometricsRows);
 

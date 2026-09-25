@@ -6,47 +6,28 @@ import {
 	type PeriodTotalsGrouping
 } from '../period-totals';
 import type { CoreStatsResult } from '../../models/db';
+import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
-function buildStat(overrides: Partial<CoreStatsResult> = {}): CoreStatsResult {
-	return {
-		species_name: null,
-		time_period: '2026-08-16',
-		session_count: 4,
-		total_effort: '18:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:34:17',
-		avg_encounters_per_session: 1.75,
-		max_per_session: 3,
-		species_count: 5,
-		bird_count: 6,
-		encounter_count: 7,
-		new_bird_count: 4,
-		max_new_per_session: 3,
-		max_weight: 13.1,
-		avg_weight: 11.2,
-		min_weight: 9.8,
-		median_weight: 10.8,
-		max_wing: 68,
-		avg_wing: 66.6,
-		min_wing: 65,
-		median_wing: 67,
-		pullus_bird_count: 1,
-		juv_bird_count: 2,
-		postjuv_bird_count: 1,
-		adult_bird_count: 1,
-		unknown_age_bird_count: 1,
-		pullus_enc_count: 2,
-		juv_enc_count: 3,
-		postjuv_enc_count: 1,
-		adult_enc_count: 1,
-		unknown_age_enc_count: 0,
-		...overrides
-	} as CoreStatsResult;
-}
+// This file's tests assert against a specific full row shape (not just the
+// field(s) each test overrides), so the shared builder's own defaults don't
+// apply here — these are the exact values the file's original local
+// `buildStat` defaulted to.
+const fullRowOverrides: Partial<CoreStatsResult> = {
+	time_period: '2026-08-16',
+	species_count: 5,
+	bird_count: 6,
+	encounter_count: 7,
+	new_bird_count: 4,
+	pullus_bird_count: 1,
+	juv_bird_count: 2,
+	postjuv_bird_count: 1,
+	adult_bird_count: 1,
+	unknown_age_bird_count: 1
+};
 
 describe('derivePeriodTotalsRowByBird', () => {
 	it('maps every CoreStatsResult bucket field to its PeriodTotalsRow counterpart', () => {
-		const stat = buildStat();
+		const stat = buildCoreStatsRow(fullRowOverrides);
 		expect(derivePeriodTotalsRowByBird(stat)).toEqual({
 			timePeriod: '2026-08-16',
 			sessionsCount: 4,
@@ -65,23 +46,27 @@ describe('derivePeriodTotalsRowByBird', () => {
 	});
 
 	it('maps species_count to speciesCount', () => {
-		const stat = buildStat({ species_count: 9 });
+		const stat = buildCoreStatsRow({ species_count: 9 });
 		expect(derivePeriodTotalsRowByBird(stat).speciesCount).toBe(9);
 	});
 
 	it('maps session_count to sessionsCount', () => {
-		const stat = buildStat({ session_count: 11, total_effort: '01:00:00' });
+		const stat = buildCoreStatsRow({
+			session_count: 11,
+			total_effort: '01:00:00'
+		});
 		const row = derivePeriodTotalsRowByBird(stat);
 		expect(row.sessionsCount).toBe(11);
 	});
 
 	it('maps max_per_session to maxPerSession', () => {
-		const stat = buildStat({ max_per_session: 9 });
+		const stat = buildCoreStatsRow({ max_per_session: 9 });
 		expect(derivePeriodTotalsRowByBird(stat).maxPerSession).toBe(9);
 	});
 
 	it('returns all-zero fields for a period with no activity', () => {
-		const stat = buildStat({
+		const stat = buildCoreStatsRow({
+			time_period: '2026-08-16',
 			session_count: 0,
 			total_effort: '00:00:00',
 			species_count: 0,
@@ -112,14 +97,14 @@ describe('derivePeriodTotalsRowByBird', () => {
 	});
 
 	it('computes retraps via the shared calculateRetraps helper', () => {
-		const stat = buildStat({ bird_count: 10, new_bird_count: 3 });
+		const stat = buildCoreStatsRow({ bird_count: 10, new_bird_count: 3 });
 		expect(derivePeriodTotalsRowByBird(stat).retraps).toBe(7);
 	});
 });
 
 describe('derivePeriodTotalsRowByEncounter', () => {
 	it('maps each field correctly, with age-bucket fields from *_enc_count and New from new_bird_count', () => {
-		const stat = buildStat();
+		const stat = buildCoreStatsRow(fullRowOverrides);
 		expect(derivePeriodTotalsRowByEncounter(stat)).toEqual({
 			timePeriod: '2026-08-16',
 			sessionsCount: 4,
@@ -138,12 +123,12 @@ describe('derivePeriodTotalsRowByEncounter', () => {
 	});
 
 	it('computes retraps via the shared calculateEncounterRetraps helper', () => {
-		const stat = buildStat({ encounter_count: 10, new_bird_count: 3 });
+		const stat = buildCoreStatsRow({ encounter_count: 10, new_bird_count: 3 });
 		expect(derivePeriodTotalsRowByEncounter(stat).retraps).toBe(7);
 	});
 
 	it('maps max_per_session to maxPerSession', () => {
-		const stat = buildStat({ max_per_session: 9 });
+		const stat = buildCoreStatsRow({ max_per_session: 9 });
 		expect(derivePeriodTotalsRowByEncounter(stat).maxPerSession).toBe(9);
 	});
 });
