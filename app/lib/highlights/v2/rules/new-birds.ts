@@ -18,7 +18,8 @@ export const newBirds: HighlightsGenerator = {
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement = `${printProminenceQualifier(scope.ranking)} highest new bird count ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
+				const centralStatement =
+					`${printProminenceQualifier(scope.ranking)} highest${i === 0 ? ' new bird count' : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`.trim();
 
 				return i === 0 && !(scope.scope.temporalUnit === 'day')
 					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`

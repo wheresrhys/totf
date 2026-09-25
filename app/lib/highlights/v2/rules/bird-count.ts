@@ -21,16 +21,19 @@ export const birdCount: HighlightsGenerator = {
 				let result = `${printProminenceQualifier(scope.ranking)} busiest `;
 
 				if (scope.scope.parentTimeWindow?.month) {
-					result += `${printFullMonthName(scope.scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.scope.temporalUnit)} ever`;
+					if (i === 0) {
+						result += `${printFullMonthName(scope.scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.scope.temporalUnit)} ever`;
+					} else {
+						result += `in any ${printFullMonthName(scope.scope.parentTimeWindow?.month)}`;
+					}
 				} else {
-					result +=
-						+`${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
+					result += `${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
 				}
 				return result;
 			});
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
+			).replace(/  /g, ' ');
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Busiest ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`

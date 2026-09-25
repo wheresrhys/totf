@@ -18,7 +18,7 @@ export const encounterCount: HighlightsGenerator = {
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement = `${printProminenceQualifier(scope.ranking)} most encounters ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
+				const centralStatement = `${printProminenceQualifier(scope.ranking, 'equal')} most ${i === 0 ? 'encounters ' : ''}${printTimeQualifier(scope.scope.parentTimeWindow, 'of', 'of')}${scope.scope.parentTimeWindow?.month && combinedHighlight.scopes[0].scope.temporalUnit === 'day' && i > 0 ? ' session' : ''}`;
 
 				return i === 0
 					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`
@@ -26,7 +26,7 @@ export const encounterCount: HighlightsGenerator = {
 			});
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
+			).replace(/  /g, ' ');
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most encounters`

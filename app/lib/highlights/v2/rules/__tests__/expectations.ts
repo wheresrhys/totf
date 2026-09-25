@@ -4,14 +4,14 @@ export const expectations = {
 		'tied global': 'Joint busiest session ever: 12 birds',
 		'second global': 'Second busiest session ever: 12 birds',
 		'tied second global': 'Joint second busiest session ever: 12 birds',
-		'tied second of year': 'Joint second busiest session ever: 12 birds',
+		'tied second of year': 'Joint second busiest session of 2020: 12 birds',
 		'this year': 'Busiest session this year: 12 birds',
 		'tied second of month':
 			'Joint second busiest February session ever: 12 birds',
 		'tied global and second of year':
-			'Joint busiest session ever and second busiest this year: 12 birds',
+			'Joint busiest session ever and second busiest of 2020: 12 birds',
 		'global and tied second of year and third of month':
-			'Busiest session ever, joint second busiest this year and third busiest in any February: 12 birds'
+			'Busiest session ever, joint second busiest of 2020 and third busiest in any February: 12 birds'
 	},
 	encounters: {
 		global: 'Session with most encounters ever: 12 birds',
@@ -23,11 +23,11 @@ export const expectations = {
 			'Session with equal second most encounters of 2020: 12 birds',
 		'this year': 'Session with most encounters this year: 12 birds',
 		'tied second of month':
-			'Session with equal second most encounters in any February: 12 birds',
+			'Session with equal second most encounters of any February: 12 birds',
 		'tied global and second of year':
-			'Session with equal most encounters ever, and second most  of 2020: 12 birds',
+			'Session with equal most encounters ever and second most of 2020: 12 birds',
 		'global and tied second of year and third of month':
-			'Session with most encounters ever, joint second most of 2020 and third most of any February session: 12 birds'
+			'Session with most encounters ever, equal second most of 2020 and third most of any February session: 12 birds'
 	},
 	species: {
 		global: 'Most varied session ever: 12 birds',
@@ -39,9 +39,9 @@ export const expectations = {
 		'tied second of month':
 			'Joint second most varied session in any February: 12 birds',
 		'tied global and second of year':
-			'Joint most varied session ever and second most of 2020: 12 birds',
+			'Joint most varied session ever and second most varied of 2020: 12 birds',
 		'global and tied second of year and third of month':
-			'Most varied session ever, joint second most of 2020 and third most in any February: 12 birds'
+			'Most varied session ever, joint second most varied of 2020 and third most varied in any February: 12 birds'
 	},
 	newBirds: {
 		global: 'Highest new bird count ever: 12 birds',
@@ -71,7 +71,7 @@ export const expectations = {
 		'tied global and second of year':
 			'Session with equal most juvs ever and second most of 2020: 12 birds',
 		'global and tied second of year and third of month':
-			'Session with most juvs ever, equal second of 2020 and third most in any February: 12 birds'
+			'Session with most juvs ever, equal second most of 2020 and third most in any February: 12 birds'
 	},
 	singleSpeciesCount: {
 		global: 'Highest single species session count ever: 12 birds',

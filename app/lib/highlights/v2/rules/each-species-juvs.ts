@@ -18,7 +18,7 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				let result = `${printProminenceQualifier(scope.ranking)} highest `;
+				let result = `${printProminenceQualifier(scope.ranking, 'equal')} highest `;
 				if (i === 0) {
 					result += `juv ${combinedHighlight.species} count `;
 					if (combinedHighlight.scopes[0].scope.temporalUnit !== 'day') {

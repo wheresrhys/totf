@@ -81,11 +81,11 @@ export function prettyPrintPosition(position: number) {
 	}
 }
 
-export function printProminenceQualifier({
-	position,
-	isTied
-}: HighlightRanking) {
-	return `${isTied ? 'joint ' : ''}${prettyPrintPosition(position)}`;
+export function printProminenceQualifier(
+	{ position, isTied }: HighlightRanking,
+	tiedQualifier: string = 'joint'
+) {
+	return `${isTied ? `${tiedQualifier ?? 'joint'} ` : ''}${prettyPrintPosition(position)}`.trim();
 }
 
 export function printFullMonthName(monthIndex: number) {
@@ -94,7 +94,8 @@ export function printFullMonthName(monthIndex: number) {
 
 export function printTimeQualifier(
 	timeQualifier?: YearMonthRestriction,
-	connector?: 'in' | 'of'
+	yearConnector?: 'in' | 'of',
+	monthConnector?: 'in' | 'of'
 ) {
 	if (!timeQualifier) {
 		return 'ever';
@@ -104,13 +105,13 @@ export function printTimeQualifier(
 		// todo pretty print month
 		return year === new Date().getFullYear()
 			? `this ${month}`
-			: `${connector ?? 'of'} ${month} ${year}`;
+			: `${monthConnector ?? 'of'} ${month} ${year}`;
 	} else if (year) {
 		return year === new Date().getFullYear()
 			? `this year`
-			: `${connector ?? 'of'} ${year}`;
+			: `${yearConnector ?? 'of'} ${year}`;
 	} else if (month) {
-		return `${connector ?? 'in'} any ${fullMonthNames[month]}`;
+		return `${monthConnector ?? 'in'} any ${fullMonthNames[month]}`;
 	}
 }
 
