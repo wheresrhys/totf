@@ -636,4 +636,68 @@ describe('RingSequences table', () => {
 			expect(unchanged?.size).toBe('C');
 		});
 	});
+
+	describe('RLS — DELETE', () => {
+		const suffix = randomTestSuffix();
+		let ownerGroupId: number;
+		let otherGroupId: number;
+		let ownerClient: SupabaseClient;
+		let otherClient: SupabaseClient;
+		let rowId: number;
+
+		beforeAll(async () => {
+			ownerGroupId = createIsolatedGroup(`ring-sequences-delete-owner-${suffix}`);
+			otherGroupId = createIsolatedGroup(`ring-sequences-delete-other-${suffix}`);
+			[ownerClient, otherClient] = await Promise.all([
+				getAuthenticatedSupabaseClientForGroup(ownerGroupId),
+				getAuthenticatedSupabaseClientForGroup(otherGroupId),
+			]);
+			const { data, error } = await ownerClient
+				.from('RingSequences')
+				.insert({ prefix: 'DEL', ringing_group_id: ownerGroupId })
+				.select('id')
+				.single();
+			if (error || !data) throw error ?? new Error('Failed to seed RingSequences row');
+			rowId = data.id;
+		});
+
+		afterAll(() => {
+			psql(
+				`DELETE FROM "RingSequences" WHERE ringing_group_id IN (${ownerGroupId}, ${otherGroupId});` +
+					`DELETE FROM "RingingGroups" WHERE id IN (${ownerGroupId}, ${otherGroupId});`
+			);
+		});
+
+		it("a group cannot delete another group's RingSequences row", async () => {
+			const { data, error } = await otherClient
+				.from('RingSequences')
+				.delete()
+				.eq('id', rowId)
+				.select('id');
+			expect(error).toBeNull();
+			expect(data).toHaveLength(0);
+
+			const { data: stillThere } = await ownerClient
+				.from('RingSequences')
+				.select('id')
+				.eq('id', rowId);
+			expect(stillThere).toHaveLength(1);
+		});
+
+		it("a group cannot delete its own RingSequences row either — unlike RingSequences_Birds, this table has no DELETE RLS policy at all (deleting a ring sequence isn't a supported operation; app code only ever deletes RingSequences_Birds link rows, never a RingSequences row itself)", async () => {
+			const { data, error } = await ownerClient
+				.from('RingSequences')
+				.delete()
+				.eq('id', rowId)
+				.select('id');
+			expect(error).toBeNull(); // RLS default-deny silently matches zero rows rather than erroring
+			expect(data).toHaveLength(0);
+
+			const { data: stillThere } = await ownerClient
+				.from('RingSequences')
+				.select('id')
+				.eq('id', rowId);
+			expect(stillThere).toHaveLength(1);
+		});
+	});
 });
