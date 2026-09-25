@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { mergeSpeciesBiometrics } from '../species-stats';
-import type { CoreStatsResult, BiometricsStatsResult } from '../../models/db';
+import type { BiometricsStatsResult } from '../../models/db';
 import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
+import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 // A real captured biometrics_stats row (Alpha, group_by_species — the exact
 // call fetchSpeciesData makes) rather than a hand-written literal, so the
@@ -9,45 +10,6 @@ import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats
 // silently drift from the RPC's shape (#883).
 const [capturedBiometricsRow] =
 	alphaBiometricsBySpecies as BiometricsStatsResult[];
-
-function buildAggregateRow(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
-	return {
-		species_name: 'Blue Tit',
-		time_period: null,
-		session_count: 4,
-		total_effort: '18:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:34:17',
-		avg_encounters_per_session: 1.75,
-		max_per_session: 3,
-		species_count: 1,
-		bird_count: 6,
-		encounter_count: 7,
-		new_bird_count: 4,
-		pullus_bird_count: 0,
-		juv_bird_count: 0,
-		postjuv_bird_count: 5,
-		adult_bird_count: 0,
-		unknown_age_bird_count: 1,
-		pullus_enc_count: 0,
-		juv_enc_count: 0,
-		postjuv_enc_count: 6,
-		adult_enc_count: 1,
-		unknown_age_enc_count: 0,
-		max_new_per_session: 3,
-		max_weight: 13.1,
-		avg_weight: 11.2,
-		min_weight: 9.8,
-		median_weight: 10.8,
-		max_wing: 68,
-		avg_wing: 66.6,
-		min_wing: 65,
-		median_wing: 67,
-		...overrides
-	} as CoreStatsResult;
-}
 
 function buildBiometricsRow(
 	overrides: Partial<BiometricsStatsResult> = {}
@@ -63,8 +25,8 @@ describe('mergeSpeciesBiometrics', () => {
 		it('joins two arrays by species_name into one row per species', () => {
 			const merged = mergeSpeciesBiometrics(
 				[
-					buildAggregateRow({ species_name: 'Blue Tit' }),
-					buildAggregateRow({ species_name: 'Robin' })
+					buildCoreStatsRow({ species_name: 'Blue Tit' }),
+					buildCoreStatsRow({ species_name: 'Robin' })
 				],
 				[
 					buildBiometricsRow({ species_name: 'Blue Tit', max_weight: 20 }),
@@ -86,7 +48,7 @@ describe('mergeSpeciesBiometrics', () => {
 		it('keeps every non-biometric field from the core_stats row', () => {
 			const [row] = mergeSpeciesBiometrics(
 				[
-					buildAggregateRow({
+					buildCoreStatsRow({
 						bird_count: 9,
 						encounter_count: 11,
 						session_count: 2,
@@ -117,7 +79,7 @@ describe('mergeSpeciesBiometrics', () => {
 
 		it('returns core_stats rows with biometric fields undefined when the biometrics array is empty', () => {
 			const [row] = mergeSpeciesBiometrics(
-				[buildAggregateRow({ species_name: 'Blue Tit' })],
+				[buildCoreStatsRow({ species_name: 'Blue Tit' })],
 				[]
 			);
 

@@ -13,17 +13,8 @@ import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group
 import { supabase } from '../../lib/supabase';
 import { randomTestSuffix, randomFutureDate } from './test-isolation';
 import { psql } from './db-test-helpers';
+import { getGroupIdByName } from './rpc-functions/helpers/seed-lookups';
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-async function getGroupIdByName(name: string): Promise<number> {
-	const { data, error } = await supabase
-		.from('RingingGroups')
-		.select('id')
-		.eq('group_name', name)
-		.single();
-	if (error || !data) throw new Error(`Group "${name}" not found — run npm run db:seed:e2e first`);
-	return data.id;
-}
 
 describe('ring sequence RPC functions', () => {
 	let alphaId: number;

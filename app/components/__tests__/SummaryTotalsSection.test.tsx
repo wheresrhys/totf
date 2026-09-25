@@ -16,6 +16,10 @@ import {
 	getCellTextByHeading,
 	getColumnIndex
 } from '@/app/__tests__/helpers/table';
+import {
+	buildCoreStatsRow,
+	buildDailyStatsRow
+} from '@/app/__tests__/helpers/core-stats-fixtures';
 
 const fetchSpeciesDataMock = vi.fn();
 vi.mock('@/app/actions/spp-data', () => ({
@@ -47,90 +51,22 @@ const summaryStats = {
 	bird_count: 99
 } as CoreStatsResult;
 
-function buildDayStat(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
-	return {
-		species_name: null,
-		time_period: '2026-08-16',
-		session_count: 2,
-		total_effort: '06:00:00',
-		effort_per_session: '03:00:00',
-		effort_per_encounter: '00:30:00',
-		avg_encounters_per_session: 6,
-		max_per_session: 8,
-		species_count: 5,
-		bird_count: 12,
-		encounter_count: 14,
-		new_bird_count: 9,
-		max_new_per_session: 6,
-		max_weight: 13.1,
-		avg_weight: 11.2,
-		min_weight: 9.8,
-		median_weight: 10.8,
-		max_wing: 68,
-		avg_wing: 66.6,
-		min_wing: 65,
-		median_wing: 67,
-		pullus_bird_count: 1,
-		juv_bird_count: 2,
-		postjuv_bird_count: 1,
-		adult_bird_count: 6,
-		unknown_age_bird_count: 2,
-		...overrides
-	} as CoreStatsResult;
-}
-
-function buildYearlyStat(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
-	return {
-		species_name: null,
-		time_period: '2026-01-01',
-		session_count: 4,
-		total_effort: '18:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:34:17',
-		avg_encounters_per_session: 1.75,
-		max_per_session: 3,
-		species_count: 12,
-		bird_count: 40,
-		encounter_count: 55,
-		new_bird_count: 30,
-		max_new_per_session: 3,
-		max_weight: 13.1,
-		avg_weight: 11.2,
-		min_weight: 9.8,
-		median_weight: 10.8,
-		max_wing: 68,
-		avg_wing: 66.6,
-		min_wing: 65,
-		median_wing: 67,
-		pullus_bird_count: 2,
-		juv_bird_count: 5,
-		postjuv_bird_count: 3,
-		adult_bird_count: 15,
-		unknown_age_bird_count: 5,
-		...overrides
-	} as CoreStatsResult;
-}
-
 // Monthly (year, month) stats as `fetchPeriodStats(_, 'month')` returns them —
 // two Januaries and one August, to exercise the combine-years fold.
 const monthlyPeriodStats: CoreStatsResult[] = [
-	buildYearlyStat({
+	buildCoreStatsRow({
 		time_period: '2020-01-01',
 		session_count: 4,
 		encounter_count: 30,
 		bird_count: 25
 	}),
-	buildYearlyStat({
+	buildCoreStatsRow({
 		time_period: '2021-01-01',
 		session_count: 6,
 		encounter_count: 45,
 		bird_count: 33
 	}),
-	buildYearlyStat({
+	buildCoreStatsRow({
 		time_period: '2020-08-01',
 		session_count: 2,
 		encounter_count: 11,
@@ -207,7 +143,7 @@ describe('SummaryTotalsSection', () => {
 			// At least one populated month, since Hide default filters an
 			// all-empty monthTotals down to zero rows (and no totals row).
 			const populatedMonthTotals = buildMonthTotalsRows(2026, [
-				buildYearlyStat({ time_period: '2026-03-01', session_count: 5 })
+				buildCoreStatsRow({ time_period: '2026-03-01', session_count: 5 })
 			]);
 			render(
 				<SummaryTotalsSection
@@ -223,7 +159,7 @@ describe('SummaryTotalsSection', () => {
 			// At least one populated month, since Hide default filters an
 			// all-empty monthTotals down to zero rows (and no header row).
 			const populatedMonthTotals = buildMonthTotalsRows(2026, [
-				buildYearlyStat({ time_period: '2026-03-01', session_count: 5 })
+				buildCoreStatsRow({ time_period: '2026-03-01', session_count: 5 })
 			]);
 			render(
 				<SummaryTotalsSection
@@ -243,7 +179,7 @@ describe('SummaryTotalsSection', () => {
 		it('renders "Session totals" as the first tab, active by default, with "Species totals" present as a second tab', () => {
 			render(
 				<SummaryTotalsSection
-					sessionTotals={[buildDayStat()]}
+					sessionTotals={[buildDailyStatsRow()]}
 					viewedGroup={viewedGroup}
 				/>
 			);
@@ -263,8 +199,8 @@ describe('SummaryTotalsSection', () => {
 			render(
 				<SummaryTotalsSection
 					sessionTotals={[
-						buildDayStat({ time_period: '2026-08-02' }),
-						buildDayStat({ time_period: '2026-08-16' })
+						buildDailyStatsRow({ time_period: '2026-08-02' }),
+						buildDailyStatsRow({ time_period: '2026-08-16' })
 					]}
 					viewedGroup={viewedGroup}
 				/>
@@ -285,7 +221,7 @@ describe('SummaryTotalsSection', () => {
 		it('lazily switches to the "Species totals" table when its tab is clicked', async () => {
 			render(
 				<SummaryTotalsSection
-					sessionTotals={[buildDayStat()]}
+					sessionTotals={[buildDailyStatsRow()]}
 					viewedGroup={viewedGroup}
 				/>
 			);
@@ -303,7 +239,7 @@ describe('SummaryTotalsSection', () => {
 		it('renders a single session day', () => {
 			render(
 				<SummaryTotalsSection
-					sessionTotals={[buildDayStat({ time_period: '2026-08-16' })]}
+					sessionTotals={[buildDailyStatsRow({ time_period: '2026-08-16' })]}
 					viewedGroup={viewedGroup}
 				/>
 			);
@@ -330,7 +266,7 @@ describe('SummaryTotalsSection', () => {
 		it('forwards summaryStats to the Session totals table as its totals row', () => {
 			render(
 				<SummaryTotalsSection
-					sessionTotals={[buildDayStat()]}
+					sessionTotals={[buildDailyStatsRow()]}
 					viewedGroup={viewedGroup}
 					summaryStats={summaryStats}
 				/>
@@ -341,7 +277,7 @@ describe('SummaryTotalsSection', () => {
 		it('does not render a "Busiest session" column (eager sessionTotals path)', () => {
 			render(
 				<SummaryTotalsSection
-					sessionTotals={[buildDayStat()]}
+					sessionTotals={[buildDailyStatsRow()]}
 					viewedGroup={viewedGroup}
 				/>
 			);
@@ -351,7 +287,7 @@ describe('SummaryTotalsSection', () => {
 		});
 
 		it('does not render a "Busiest session" column (lazy-fetch path)', async () => {
-			fetchPeriodTotalsMock.mockResolvedValue([buildDayStat()]);
+			fetchPeriodTotalsMock.mockResolvedValue([buildDailyStatsRow()]);
 			render(
 				<SummaryTotalsSection
 					monthTotals={monthTotals}
@@ -370,7 +306,7 @@ describe('SummaryTotalsSection', () => {
 
 	describe('with yearlyTotals (all-time summary page)', () => {
 		it('renders "Year totals" as the first tab, active by default, with its content visible beneath it', () => {
-			const yearlyTotals = [buildYearlyStat()];
+			const yearlyTotals = [buildCoreStatsRow()];
 			render(
 				<SummaryTotalsSection
 					yearlyTotals={yearlyTotals}
@@ -388,7 +324,7 @@ describe('SummaryTotalsSection', () => {
 		});
 
 		it('renders the first column as a plain year number linking to /group/{slug}/summary/{year}', () => {
-			const yearlyTotals = [buildYearlyStat({ time_period: '2026-01-01' })];
+			const yearlyTotals = [buildCoreStatsRow({ time_period: '2026-01-01' })];
 			render(
 				<SummaryTotalsSection
 					yearlyTotals={yearlyTotals}
@@ -400,7 +336,7 @@ describe('SummaryTotalsSection', () => {
 		});
 
 		it('keeps "Species totals" present and lazily switches to it on click', async () => {
-			const yearlyTotals = [buildYearlyStat()];
+			const yearlyTotals = [buildCoreStatsRow()];
 			render(
 				<SummaryTotalsSection
 					yearlyTotals={yearlyTotals}
@@ -429,7 +365,7 @@ describe('SummaryTotalsSection', () => {
 		});
 
 		it('forwards summaryStats to the Year totals table as its totals row', () => {
-			const yearlyTotals = [buildYearlyStat()];
+			const yearlyTotals = [buildCoreStatsRow()];
 			render(
 				<SummaryTotalsSection
 					yearlyTotals={yearlyTotals}
@@ -441,7 +377,7 @@ describe('SummaryTotalsSection', () => {
 		});
 
 		it('renders a "Busiest session" column between Encounters and Birds', () => {
-			const yearlyTotals = [buildYearlyStat()];
+			const yearlyTotals = [buildCoreStatsRow()];
 			render(
 				<SummaryTotalsSection
 					yearlyTotals={yearlyTotals}
@@ -460,7 +396,7 @@ describe('SummaryTotalsSection', () => {
 		// The all-time page shape: yearlyTotals present (Year totals tab) plus the
 		// combine-years month tab enabled.
 		const allTimeProps = {
-			yearlyTotals: [buildYearlyStat()],
+			yearlyTotals: [buildCoreStatsRow()],
 			showAllTimeMonthTotals: true,
 			viewedGroup
 		};
@@ -511,7 +447,7 @@ describe('SummaryTotalsSection', () => {
 			it('does not render the Month totals tab when showAllTimeMonthTotals is undefined', () => {
 				render(
 					<SummaryTotalsSection
-						yearlyTotals={[buildYearlyStat()]}
+						yearlyTotals={[buildCoreStatsRow()]}
 						viewedGroup={viewedGroup}
 					/>
 				);
@@ -657,7 +593,7 @@ describe('SummaryTotalsSection', () => {
 			describe('Structure', () => {
 				it('in the "By year" state, toggling AggregateByToggle between Bird and Encounter changes the rendered counts', async () => {
 					fetchPeriodStatsMock.mockResolvedValue([
-						buildYearlyStat({
+						buildCoreStatsRow({
 							time_period: '2020-01-01',
 							pullus_bird_count: 2,
 							...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
@@ -696,8 +632,8 @@ describe('SummaryTotalsSection', () => {
 
 				it('renders a single row per month (not zero-filled to 12) in the "By year" state when history spans only one year', async () => {
 					fetchPeriodStatsMock.mockResolvedValue([
-						buildYearlyStat({ time_period: '2020-01-01' }),
-						buildYearlyStat({ time_period: '2020-08-01' })
+						buildCoreStatsRow({ time_period: '2020-01-01' }),
+						buildCoreStatsRow({ time_period: '2020-08-01' })
 					]);
 					render(<SummaryTotalsSection {...allTimeProps} />);
 					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
@@ -717,7 +653,7 @@ describe('SummaryTotalsSection', () => {
 		it('falls back to "Species totals" as the sole default tab, suppressing the session tab and not attempting a fetch', async () => {
 			render(
 				<SummaryTotalsSection
-					sessionTotals={[buildDayStat()]}
+					sessionTotals={[buildDailyStatsRow()]}
 					viewedGroup={undefined}
 				/>
 			);
@@ -745,7 +681,7 @@ describe('SummaryTotalsSection', () => {
 			);
 			render(
 				<SummaryTotalsSection
-					yearlyTotals={[buildYearlyStat()]}
+					yearlyTotals={[buildCoreStatsRow()]}
 					viewedGroup={viewedGroup}
 				/>
 			);
@@ -767,7 +703,7 @@ describe('SummaryTotalsSection', () => {
 			]);
 			render(
 				<SummaryTotalsSection
-					yearlyTotals={[buildYearlyStat()]}
+					yearlyTotals={[buildCoreStatsRow()]}
 					viewedGroup={viewedGroup}
 				/>
 			);
@@ -778,9 +714,9 @@ describe('SummaryTotalsSection', () => {
 		});
 
 		it.each([
-			['yearlyTotals', { yearlyTotals: [buildYearlyStat()] }],
+			['yearlyTotals', { yearlyTotals: [buildCoreStatsRow()] }],
 			['monthTotals', { monthTotals }],
-			['sessionTotals', { sessionTotals: [buildDayStat()] }]
+			['sessionTotals', { sessionTotals: [buildDailyStatsRow()] }]
 		])(
 			'fetches species data exactly once when selected on the %s page shape',
 			async (_label, pageProps) => {
@@ -797,7 +733,7 @@ describe('SummaryTotalsSection', () => {
 		it('does not refetch when switching to Species, away, and back again', async () => {
 			render(
 				<SummaryTotalsSection
-					yearlyTotals={[buildYearlyStat()]}
+					yearlyTotals={[buildCoreStatsRow()]}
 					viewedGroup={viewedGroup}
 				/>
 			);
@@ -822,7 +758,7 @@ describe('SummaryTotalsSection', () => {
 			fetchSpeciesDataMock.mockRejectedValue(new Error('boom'));
 			render(
 				<SummaryTotalsSection
-					yearlyTotals={[buildYearlyStat()]}
+					yearlyTotals={[buildCoreStatsRow()]}
 					viewedGroup={viewedGroup}
 				/>
 			);
@@ -841,8 +777,8 @@ describe('SummaryTotalsSection', () => {
 	describe('empty months toggle - year month totals tab', () => {
 		// Two populated months (March, July); the other ten are zero-filled.
 		const populatedMonthTotals = buildMonthTotalsRows(2026, [
-			buildYearlyStat({ time_period: '2026-03-01', session_count: 5 }),
-			buildYearlyStat({ time_period: '2026-07-01', session_count: 2 })
+			buildCoreStatsRow({ time_period: '2026-03-01', session_count: 5 }),
+			buildCoreStatsRow({ time_period: '2026-07-01', session_count: 2 })
 		]);
 
 		it('renders only months with data by default (Hide)', () => {
@@ -876,7 +812,7 @@ describe('SummaryTotalsSection', () => {
 			const allMonths = buildMonthTotalsRows(
 				2026,
 				Array.from({ length: 12 }, (_unused, index) =>
-					buildYearlyStat({
+					buildCoreStatsRow({
 						time_period: `2026-${String(index + 1).padStart(2, '0')}-01`,
 						session_count: 3
 					})
@@ -896,7 +832,7 @@ describe('SummaryTotalsSection', () => {
 
 		it('shows exactly one month for a year that is empty except one', () => {
 			const oneMonth = buildMonthTotalsRows(2026, [
-				buildYearlyStat({ time_period: '2026-08-01', session_count: 4 })
+				buildCoreStatsRow({ time_period: '2026-08-01', session_count: 4 })
 			]);
 			render(
 				<SummaryTotalsSection
@@ -935,7 +871,7 @@ describe('SummaryTotalsSection', () => {
 
 	describe('empty months toggle - all-time month totals tab', () => {
 		const allTimeProps = {
-			yearlyTotals: [buildYearlyStat()],
+			yearlyTotals: [buildCoreStatsRow()],
 			showAllTimeMonthTotals: true,
 			viewedGroup
 		};
@@ -968,8 +904,8 @@ describe('SummaryTotalsSection', () => {
 
 		it('shows zero-session months in the by-year view when toggled to Show', async () => {
 			fetchPeriodStatsMock.mockResolvedValue([
-				buildYearlyStat({ time_period: '2020-01-01', session_count: 4 }),
-				buildYearlyStat({ time_period: '2020-08-01', session_count: 0 })
+				buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 }),
+				buildCoreStatsRow({ time_period: '2020-08-01', session_count: 0 })
 			]);
 			render(<SummaryTotalsSection {...allTimeProps} />);
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
@@ -989,7 +925,7 @@ describe('SummaryTotalsSection', () => {
 		it('has no visible effect when no calendar month is empty across any year', async () => {
 			fetchPeriodStatsMock.mockResolvedValue(
 				Array.from({ length: 12 }, (_unused, index) =>
-					buildYearlyStat({
+					buildCoreStatsRow({
 						time_period: `2020-${String(index + 1).padStart(2, '0')}-01`,
 						session_count: 3
 					})
