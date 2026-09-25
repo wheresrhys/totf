@@ -4,7 +4,6 @@ import { catchSupabaseErrors } from '@/lib/supabase';
 import { fetchSessionStats } from '@/app/lib/underlying-stats';
 import {
 	rarities,
-	counts,
 	vitalStats,
 	deriveLongAbsenceRetraps,
 	type SessionHighlight
@@ -39,7 +38,6 @@ export async function fetchSessionHighlights({
 	// isn't rendered on the session page yet.
 	return [
 		...rarities({ date, stats }),
-		...counts({ date, stats }),
 		...vitalStats({ date, stats }),
 		...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date)
 	];

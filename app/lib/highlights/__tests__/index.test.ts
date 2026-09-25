@@ -6,7 +6,7 @@ import {
 	speciesRow,
 	statsFor
 } from './fixtures';
-import { rarities, counts, vitalStats, deriveLongAbsenceRetraps } from '..';
+import { rarities, vitalStats, deriveLongAbsenceRetraps } from '..';
 
 // Regression guard for #409's "no user-visible behaviour change" claim:
 // asserts the top-level rarities + counts + vitalStats + longAbsenceRetraps
@@ -34,11 +34,6 @@ describe('SessionHighlight groups — top-level composition (integration)', () =
 			stats,
 			today: PAST_PERIOD_TODAY
 		});
-		const countsHighlights = counts({
-			date: SESSION_DATE,
-			stats,
-			today: PAST_PERIOD_TODAY
-		});
 		const vitalStatsHighlights = vitalStats({
 			date: SESSION_DATE,
 			stats,
@@ -48,7 +43,6 @@ describe('SessionHighlight groups — top-level composition (integration)', () =
 
 		const flatList = [
 			...raritiesHighlights,
-			...countsHighlights,
 			...vitalStatsHighlights,
 			...longAbsenceHighlights
 		];

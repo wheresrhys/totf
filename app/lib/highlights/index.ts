@@ -1,5 +1,4 @@
 import { runRaritiesGroup } from './rarities';
-import { runCountsGroup } from './counts';
 import { runVitalStatsGroup } from './vital-stats';
 import type { RarityHighlight } from './rarities/types';
 import type { CountHighlight } from './counts/types';
@@ -36,5 +35,4 @@ export type SessionHighlight =
 // fourth, sibling group (see long-absence-retrap.ts for why it isn't folded
 // into any of the three).
 export const rarities = runRaritiesGroup;
-export const counts = runCountsGroup;
 export const vitalStats = runVitalStatsGroup;
