@@ -1,0 +1,45 @@
+import type { HighlightsGenerator, YearMonthRestriction } from '../types';
+import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { CoreStatsResult } from '@/app/models/db';
+import type { StatsRepository } from '@/app/actions/stats-cache';
+import {
+	printProminenceQualifier,
+	printValue,
+	sentenceCase,
+	sentenceJoin,
+	printTemporalUnit,
+	printTimeQualifier
+} from '../lib/printer-utils';
+import { getTopByPropertiesSum } from '../lib/rule-utils';
+
+type CoreStatsRepository = StatsRepository<CoreStatsResult>;
+export const juvs: HighlightsGenerator = {
+	statsSelector: (stats: CoreStatsRepository) => stats.overall,
+	formatters: {
+		combinedHighlightPrinter: (combinedHighlight) => {
+			const preambles = combinedHighlight.scopes.map((scope, i) => {
+				const centralStatement =
+					`${printProminenceQualifier(scope.ranking, 'equal')} most${i === 0 ? ' juvs' : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`.trim();
+
+				return i === 0
+					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`
+					: centralStatement;
+			});
+			return sentenceCase(
+				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
+			);
+		},
+		highlightListPrefixPrinter: (highlightsOfType) =>
+			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most juvs`
+	},
+	descriptor: {
+		type: 'juvs',
+		unit: 'bird',
+		category: 'demographics'
+	},
+	generator: getTopByPropertiesSum(['pullus_bird_count', 'juv_bird_count']),
+	condition: (
+		temporalUnit: TemporalUnit,
+		parentTimeWindow?: YearMonthRestriction
+	) => !parentTimeWindow?.month
+};

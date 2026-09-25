@@ -1,0 +1,47 @@
+import type { HighlightsGenerator } from '../types';
+import type { CoreStatsResult } from '@/app/models/db';
+import type { StatsRepository } from '@/app/actions/stats-cache';
+import {
+	printProminenceQualifier,
+	printValue,
+	sentenceCase,
+	sentenceJoin,
+	printTemporalUnit,
+	printTimeQualifier,
+	printFullMonthName
+} from '../lib/printer-utils';
+import { getTopByProperty } from '../lib/rule-utils';
+
+type CoreStatsRepository = StatsRepository<CoreStatsResult>;
+export const birdCount: HighlightsGenerator = {
+	statsSelector: (stats: CoreStatsRepository) => stats.overall,
+	formatters: {
+		combinedHighlightPrinter: (combinedHighlight) => {
+			const preambles = combinedHighlight.scopes.map((scope, i) => {
+				let result = `${printProminenceQualifier(scope.ranking)} busiest `;
+
+				if (scope.scope.parentTimeWindow?.month) {
+					if (i === 0) {
+						result += `${printFullMonthName(scope.scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.scope.temporalUnit)} ever`;
+					} else {
+						result += `in any ${printFullMonthName(scope.scope.parentTimeWindow?.month)}`;
+					}
+				} else {
+					result += `${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
+				}
+				return result;
+			});
+			return sentenceCase(
+				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
+			).replace(/  /g, ' ');
+		},
+		highlightListPrefixPrinter: (highlightsOfType) =>
+			`Busiest ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
+	},
+	descriptor: {
+		type: 'birds',
+		unit: 'bird',
+		category: 'count'
+	},
+	generator: getTopByProperty('bird_count')
+};
