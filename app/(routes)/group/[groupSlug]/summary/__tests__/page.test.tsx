@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
-import { notFound } from 'next/navigation';
+import { describe, vi, afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 import GroupSummaryPage from '../page';
+import { describeGroupScopeDelegation } from '@/app/__tests__/helpers/group-scope-delegation';
 
 const { mockResolveGroupIdBySlug } = vi.hoisted(() => ({
 	mockResolveGroupIdBySlug: vi.fn()
@@ -29,62 +29,11 @@ describe('GroupSummaryPage', () => {
 		vi.clearAllMocks();
 	});
 
-	describe('a known groupSlug', () => {
-		beforeEach(() => {
-			mockResolveGroupIdBySlug.mockResolvedValue(2);
-		});
-
-		it('delegates to the top-level summary page with the resolved viewedGroup', async () => {
-			render(
-				await GroupSummaryPage({
-					params: Promise.resolve({ groupSlug: 'viewed-group-slug' })
-				})
-			);
-			screen.getByTestId('mock-summary-page');
-
-			expect(mockResolveGroupIdBySlug).toHaveBeenCalledWith(
-				'viewed-group-slug'
-			);
-			expect(vi.mocked(AllTimeSummaryPage).mock.calls[0][0]).toEqual(
-				expect.objectContaining({
-					viewedGroup: { id: 2, slug: 'viewed-group-slug' }
-				})
-			);
-		});
-
-		// #804: the top-level summary page's new `searchParams` prop is
-		// optional precisely so this call site (which `withGroupScope` never
-		// threads it through) keeps rendering/type-checking unaffected.
-		it('delegates without a searchParams prop, since withGroupScope does not thread one through', async () => {
-			render(
-				await GroupSummaryPage({
-					params: Promise.resolve({ groupSlug: 'viewed-group-slug' })
-				})
-			);
-			screen.getByTestId('mock-summary-page');
-			expect(vi.mocked(AllTimeSummaryPage).mock.calls[0][0]).not.toHaveProperty(
-				'searchParams'
-			);
-		});
-	});
-
-	describe('an unknown groupSlug', () => {
-		beforeEach(() => {
-			mockResolveGroupIdBySlug.mockResolvedValue(null);
-			vi.mocked(notFound).mockImplementationOnce(() => {
-				throw new Error('NEXT_NOT_FOUND');
-			});
-		});
-
-		it('calls notFound() instead of rendering the route page', async () => {
-			await expect(
-				GroupSummaryPage({
-					params: Promise.resolve({ groupSlug: 'no-such-group' })
-				})
-			).rejects.toThrow('NEXT_NOT_FOUND');
-
-			expect(vi.mocked(notFound)).toHaveBeenCalled();
-			expect(vi.mocked(AllTimeSummaryPage)).not.toHaveBeenCalled();
-		});
+	describeGroupScopeDelegation({
+		renderGroupPage: (params) =>
+			GroupSummaryPage({ params: Promise.resolve(params) }),
+		mockResolveGroupIdBySlug,
+		DelegatePage: AllTimeSummaryPage,
+		testId: 'mock-summary-page'
 	});
 });
