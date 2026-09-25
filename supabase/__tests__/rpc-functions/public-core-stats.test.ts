@@ -13,6 +13,12 @@ import { getAuthenticatedSupabaseClientForGroup } from '../../../app/lib/auth/gr
 import { supabase } from '../../../lib/supabase';
 import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+	insertTestLocation,
+	insertTestSession,
+	insertTestBird,
+	insertTestEncounter
+} from './helpers/encounter-fixtures';
 import { psql, psqlScalar } from '../db-test-helpers';
 
 // public_core_stats (#768) — a SECURITY DEFINER wrapper around core_stats that
@@ -72,6 +78,8 @@ describe('public_core_stats', () => {
 
 	// Insert one FULL_GROWN session with the given encounters for a group, via that group's
 	// authenticated client (so RLS insert policies and the ringing_group_id trigger apply).
+	// Insert one FULL_GROWN session with the given encounters for a group, via that group's
+	// authenticated client (so RLS insert policies and the ringing_group_id trigger apply).
 	async function insertSessionWithEncounters(
 		client: SupabaseClient,
 		groupId: number,
@@ -83,41 +91,27 @@ describe('public_core_stats', () => {
 			captureTime: string;
 		}>
 	): Promise<void> {
-		const { data: session, error: sessionError } = await client
-			.from('Sessions')
-			.insert({
-				visit_date: visitDate,
-				location_id: locationId,
-				session_type: 'FULL_GROWN'
-			})
-			.select('id')
-			.single();
-		if (sessionError) throw sessionError;
-		createdSessionIds.push(session!.id);
+		const sessionId = await insertTestSession(
+			client,
+			locationId,
+			visitDate,
+			'FULL_GROWN'
+		);
+		createdSessionIds.push(sessionId);
 
-		for (let i = 0; i < encounters.length; i++) {
-			const { speciesId, recordType, captureTime } = encounters[i];
-			const { data: bird, error: birdError } = await client
-				.from('Birds')
-				.insert({
-					ring_no: `PAS-${suffix}-${groupId}-${createdBirdIds.length}`,
-					species_id: speciesId
-				})
-				.select('id')
-				.single();
-			if (birdError) throw birdError;
-			createdBirdIds.push(bird!.id);
+		for (const { speciesId, recordType, captureTime } of encounters) {
+			const birdId = await insertTestBird(
+				client,
+				`PAS-${suffix}-${groupId}-${createdBirdIds.length}`,
+				speciesId
+			);
+			createdBirdIds.push(birdId);
 
-			const { error: encounterError } = await client.from('Encounters').insert({
-				bird_id: bird!.id,
-				session_id: session!.id,
-				scheme: 'BTO',
-				sex: 'M',
+			await insertTestEncounter(client, birdId, sessionId, {
 				age_code: 4,
 				record_type: recordType,
 				capture_time: captureTime
 			});
-			if (encounterError) throw encounterError;
 		}
 	}
 
@@ -126,17 +120,13 @@ describe('public_core_stats', () => {
 		groupId: number,
 		label: string
 	): Promise<number> {
-		const { data, error } = await client
-			.from('Locations')
-			.insert({
-				location_name: `Public Agg ${label} ${suffix}`,
-				ringing_group_id: groupId
-			})
-			.select('id')
-			.single();
-		if (error) throw error;
-		createdLocationIds.push(data!.id);
-		return data!.id;
+		const locationId = await insertTestLocation(
+			client,
+			groupId,
+			`Public Agg ${label} ${suffix}`
+		);
+		createdLocationIds.push(locationId);
+		return locationId;
 	}
 
 	beforeAll(async () => {

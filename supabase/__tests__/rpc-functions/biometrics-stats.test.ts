@@ -24,6 +24,13 @@ import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
 import { createIsolatedGroup, psql } from '../db-test-helpers';
+import {
+	insertTestLocation,
+	createSessionResolver,
+	insertTestBird,
+	insertTestEncounter,
+	createRingNoSequence
+} from './helpers/encounter-fixtures';
 
 // numeric-typed columns can come back as a JS number or a stringified numeric
 // depending on the driver; coerce before comparing.
@@ -36,7 +43,9 @@ async function getSpeciesId(speciesName: string): Promise<number> {
 		.eq('species_name', speciesName)
 		.single();
 	if (error || !data)
-		throw new Error(`Species "${speciesName}" not found — run npm run db:seed:e2e first`);
+		throw new Error(
+			`Species "${speciesName}" not found — run npm run db:seed:e2e first`
+		);
 	return data.id;
 }
 
@@ -75,7 +84,8 @@ describe('biometrics_stats', () => {
 
 			const testSuffix = randomTestSuffix();
 			otherGroupId = createIsolatedGroup(`Biometrics Other ${testSuffix}`);
-			otherGroupClient = await getAuthenticatedSupabaseClientForGroup(otherGroupId);
+			otherGroupClient =
+				await getAuthenticatedSupabaseClientForGroup(otherGroupId);
 			base = randomFutureDate();
 			d0 = addDays(base, 0);
 			d1 = addDays(base, 1);
@@ -88,49 +98,22 @@ describe('biometrics_stats', () => {
 			const robinId = await getSpeciesId('Robin');
 			const wrenId = await getSpeciesId('Wren');
 
-			const { data: deltaLoc, error: dLocErr } = await deltaClient
-				.from('Locations')
-				.insert({ location_name: `Biometrics Delta Loc ${testSuffix}`, ringing_group_id: deltaId })
-				.select('id')
-				.single();
-			if (dLocErr) throw dLocErr;
-			locationIds.push(deltaLoc!.id);
-			const deltaLocId = deltaLoc!.id;
+			const deltaLocId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`Biometrics Delta Loc ${testSuffix}`
+			);
+			locationIds.push(deltaLocId);
 
-			const { data: otherGroupLoc, error: aLocErr } = await otherGroupClient
-				.from('Locations')
-				.insert({
-					location_name: `Biometrics Other Loc ${testSuffix}`,
-					ringing_group_id: otherGroupId
-				})
-				.select('id')
-				.single();
-			if (aLocErr) throw aLocErr;
-			otherGroupLocationIds.push(otherGroupLoc!.id);
-			const otherGroupLocId = otherGroupLoc!.id;
+			const otherGroupLocId = await insertTestLocation(
+				otherGroupClient,
+				otherGroupId,
+				`Biometrics Other Loc ${testSuffix}`
+			);
+			otherGroupLocationIds.push(otherGroupLocId);
 
-			const sessionCache = new Map<string, number>();
-			async function getSession(
-				client: SupabaseClient,
-				date: string,
-				locationId: number,
-				track: number[]
-			): Promise<number> {
-				const key = `${date}|${locationId}`;
-				const cached = sessionCache.get(key);
-				if (cached !== undefined) return cached;
-				const { data: session, error } = await client
-					.from('Sessions')
-					.insert({ visit_date: date, location_id: locationId })
-					.select('id')
-					.single();
-				if (error) throw error;
-				sessionCache.set(key, session!.id);
-				track.push(session!.id);
-				return session!.id;
-			}
-
-			let ringCounter = 0;
+			const getSession = createSessionResolver();
+			const nextRing = createRingNoSequence(`BIO-${testSuffix}`);
 			async function addBird(
 				client: SupabaseClient,
 				speciesId: number,
@@ -140,26 +123,20 @@ describe('biometrics_stats', () => {
 				weight: number | null,
 				wing: number | null
 			): Promise<void> {
-				const { data: bird, error } = await client
-					.from('Birds')
-					.insert({ ring_no: `BIO-${testSuffix}-${ringCounter++}`, species_id: speciesId })
-					.select('id')
-					.single();
-				if (error) throw error;
-				birdIds.push(bird!.id);
-				const sessionId = await getSession(client, date, locationId, sessionTrack);
-				const { error: encErr } = await client.from('Encounters').insert({
-					capture_time: '10:00:00',
-					scheme: 'BTO',
-					sex: 'M',
-					session_id: sessionId,
-					bird_id: bird!.id,
+				const birdId = await insertTestBird(client, nextRing(), speciesId);
+				birdIds.push(birdId);
+				const sessionId = await getSession(
+					client,
+					date,
+					locationId,
+					sessionTrack
+				);
+				await insertTestEncounter(client, birdId, sessionId, {
 					age_code: 4,
 					record_type: 'N',
 					weight,
 					wing_length: wing
 				});
-				if (encErr) throw encErr;
 			}
 
 			// Core Delta Robin set: weights 10/20/30/40, wings 50/60/70/80.
@@ -168,8 +145,24 @@ describe('biometrics_stats', () => {
 			await addBird(deltaClient, robinId, d2, deltaLocId, sessionIds, 30, 70);
 			await addBird(deltaClient, robinId, d3, deltaLocId, sessionIds, 40, 80);
 			// Null-column rows (each nulls exactly one of the two measurements).
-			await addBird(deltaClient, robinId, dNullWeight, deltaLocId, sessionIds, null, 90);
-			await addBird(deltaClient, robinId, dNullWing, deltaLocId, sessionIds, 15, null);
+			await addBird(
+				deltaClient,
+				robinId,
+				dNullWeight,
+				deltaLocId,
+				sessionIds,
+				null,
+				90
+			);
+			await addBird(
+				deltaClient,
+				robinId,
+				dNullWing,
+				deltaLocId,
+				sessionIds,
+				15,
+				null
+			);
 			// A Delta Wren on d0 for the species_name_filter case.
 			await addBird(deltaClient, wrenId, d0, deltaLocId, sessionIds, 8, 44);
 			// An other-group Robin on d0 with an extreme weight for the ringing_group_filter case.
@@ -222,7 +215,7 @@ describe('biometrics_stats', () => {
 			expect(num(row.median_wing)).toBeCloseTo(65, 0);
 		});
 
-		it('filters by ringing_group_filter so another group\'s encounters do not affect the stats', async () => {
+		it("filters by ringing_group_filter so another group's encounters do not affect the stats", async () => {
 			const deltaRow = await statsRow({
 				ringing_group_filter: deltaId,
 				species_name_filter: 'Robin',
@@ -260,7 +253,7 @@ describe('biometrics_stats', () => {
 			expect(num(row.min_wing)).toBe(50);
 		});
 
-		it('filters by species_name_filter so only the named species\' encounters are included', async () => {
+		it("filters by species_name_filter so only the named species' encounters are included", async () => {
 			// d0 holds a Delta Robin (10/50), a Delta Wren (8/44) and an other-group
 			// Robin (1000/300); filtering to Wren must isolate the single Wren encounter.
 			const row = await statsRow({
@@ -275,7 +268,7 @@ describe('biometrics_stats', () => {
 		});
 
 		// Edge
-		it('a cell with exactly one encounter returns that encounter\'s weight/wing as max = avg = min = median', async () => {
+		it("a cell with exactly one encounter returns that encounter's weight/wing as max = avg = min = median", async () => {
 			const row = await statsRow({
 				ringing_group_filter: deltaId,
 				species_name_filter: 'Robin',
@@ -292,7 +285,7 @@ describe('biometrics_stats', () => {
 			expect(num(row.median_wing)).toBeCloseTo(80, 0);
 		});
 
-		it('a NULL weight or wing_length is excluded from that column\'s aggregate but does not null the other column', async () => {
+		it("a NULL weight or wing_length is excluded from that column's aggregate but does not null the other column", async () => {
 			// dNullWeight: weight NULL, wing 90; dNullWing: weight 15, wing NULL.
 			const row = await statsRow({
 				ringing_group_filter: deltaId,
@@ -354,7 +347,11 @@ describe('biometrics_stats', () => {
 
 		let yr: number;
 		// Windows/dates derived from a random future year for isolation.
-		let marEarly: string, marLate: string, may: string, nextJun: string, wrenMar: string;
+		let marEarly: string,
+			marLate: string,
+			may: string,
+			nextJun: string,
+			wrenMar: string;
 
 		beforeAll(async () => {
 			deltaId = await getGroupIdByName('Delta');
@@ -371,57 +368,35 @@ describe('biometrics_stats', () => {
 			const robinId = await getSpeciesId('Robin');
 			const wrenId = await getSpeciesId('Wren');
 
-			const { data: loc, error: locErr } = await deltaClient
-				.from('Locations')
-				.insert({ location_name: `Biometrics Grouping Loc ${testSuffix}`, ringing_group_id: deltaId })
-				.select('id')
-				.single();
-			if (locErr) throw locErr;
-			locationIds.push(loc!.id);
-			const locationId = loc!.id;
+			const locationId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`Biometrics Grouping Loc ${testSuffix}`
+			);
+			locationIds.push(locationId);
 
-			const sessionCache = new Map<string, number>();
-			async function getSession(date: string): Promise<number> {
-				const cached = sessionCache.get(date);
-				if (cached !== undefined) return cached;
-				const { data: session, error } = await deltaClient
-					.from('Sessions')
-					.insert({ visit_date: date, location_id: locationId })
-					.select('id')
-					.single();
-				if (error) throw error;
-				sessionCache.set(date, session!.id);
-				sessionIds.push(session!.id);
-				return session!.id;
-			}
-
-			let ringCounter = 0;
+			const getSession = createSessionResolver();
+			const nextRing = createRingNoSequence(`BIOGRP-${testSuffix}`);
 			async function addBird(
 				speciesId: number,
 				date: string,
 				weight: number,
 				wing: number
 			): Promise<void> {
-				const { data: bird, error } = await deltaClient
-					.from('Birds')
-					.insert({ ring_no: `BIOGRP-${testSuffix}-${ringCounter++}`, species_id: speciesId })
-					.select('id')
-					.single();
-				if (error) throw error;
-				birdIds.push(bird!.id);
-				const sessionId = await getSession(date);
-				const { error: encErr } = await deltaClient.from('Encounters').insert({
-					capture_time: '10:00:00',
-					scheme: 'BTO',
-					sex: 'M',
-					session_id: sessionId,
-					bird_id: bird!.id,
+				const birdId = await insertTestBird(deltaClient, nextRing(), speciesId);
+				birdIds.push(birdId);
+				const sessionId = await getSession(
+					deltaClient,
+					date,
+					locationId,
+					sessionIds
+				);
+				await insertTestEncounter(deltaClient, birdId, sessionId, {
 					age_code: 4,
 					record_type: 'N',
 					weight,
 					wing_length: wing
 				});
-				if (encErr) throw encErr;
 			}
 
 			// Robin: two March encounters, one May, one the following June.
@@ -517,7 +492,9 @@ describe('biometrics_stats', () => {
 				group_by_species: true
 			});
 			expect(error).toBeNull();
-			const bySpecies = Object.fromEntries(data!.map((r) => [r.species_name, r]));
+			const bySpecies = Object.fromEntries(
+				data!.map((r) => [r.species_name, r])
+			);
 			// Robin in-window: 10/20/30 → max 30, min 10.
 			expect(num(bySpecies['Robin'].max_weight)).toBe(30);
 			expect(num(bySpecies['Robin'].min_weight)).toBe(10);
@@ -538,7 +515,9 @@ describe('biometrics_stats', () => {
 			// 2 species × 3 dense months (Mar/Apr/May) = 6 cells.
 			expect(data).toHaveLength(6);
 			const cell = (species: string, month: string) =>
-				data!.find((r) => r.species_name === species && r.time_period === month)!;
+				data!.find(
+					(r) => r.species_name === species && r.time_period === month
+				)!;
 			// Robin/March holds 10 and 20.
 			expect(num(cell('Robin', `${yr}-03-01`).max_weight)).toBe(20);
 			expect(num(cell('Robin', `${yr}-03-01`).min_weight)).toBe(10);
@@ -569,7 +548,8 @@ describe('biometrics_stats', () => {
 				.select('id')
 				.eq('species_name', 'Robin')
 				.single();
-			if (robinError || !robin) throw robinError ?? new Error('Robin not found');
+			if (robinError || !robin)
+				throw robinError ?? new Error('Robin not found');
 
 			const suffix = randomTestSuffix();
 			visitDate = randomFutureDate();

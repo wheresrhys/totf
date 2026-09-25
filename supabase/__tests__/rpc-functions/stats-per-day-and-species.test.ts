@@ -15,6 +15,10 @@ import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
 import { resolveAlphaBetaGammaClients } from './helpers/group-clients';
+import {
+	insertTestLocation,
+	insertTestSession
+} from './helpers/encounter-fixtures';
 import { psql } from '../db-test-helpers';
 
 describe('stats_per_day_and_species', () => {
@@ -152,16 +156,11 @@ describe('stats_per_day_and_species', () => {
 				.eq('species_name', 'Robin')
 				.single();
 
-			const { data: location, error: locationError } = await deltaClient
-				.from('Locations')
-				.insert({
-					location_name: `Stats Per Day Test Location ${testSuffix}`,
-					ringing_group_id: deltaId
-				})
-				.select('id')
-				.single();
-			if (locationError) throw locationError;
-			locationId = location!.id;
+			locationId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`Stats Per Day Test Location ${testSuffix}`
+			);
 
 			const sessions = await Promise.all(
 				visitDates.map((visitDate) =>
@@ -301,16 +300,11 @@ describe('stats_per_day_and_species', () => {
 				.eq('species_name', 'Robin')
 				.single();
 
-			const { data: location, error: locationError } = await deltaClient
-				.from('Locations')
-				.insert({
-					location_name: `Juv Stats Test Location ${testSuffix}`,
-					ringing_group_id: deltaId
-				})
-				.select('id')
-				.single();
-			if (locationError) throw locationError;
-			locationId = location!.id;
+			locationId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`Juv Stats Test Location ${testSuffix}`
+			);
 
 			const { data: session, error: sessionError } = await deltaClient
 				.from('Sessions')
@@ -416,16 +410,11 @@ describe('stats_per_day_and_species', () => {
 				.eq('species_name', 'Robin')
 				.single();
 
-			const { data: location, error: locationError } = await deltaClient
-				.from('Locations')
-				.insert({
-					location_name: `Age Class Stats Test Location ${testSuffix}`,
-					ringing_group_id: deltaId
-				})
-				.select('id')
-				.single();
-			if (locationError) throw locationError;
-			locationId = location!.id;
+			locationId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`Age Class Stats Test Location ${testSuffix}`
+			);
 
 			const { data: session, error: sessionError } = await deltaClient
 				.from('Sessions')
@@ -637,21 +626,11 @@ describe('stats_per_day_and_species', () => {
 		let pulliOnlyDate: string;
 		let pulliMixedDate: string;
 
-		async function insertSession(
+		function insertSession(
 			visitDate: string,
 			sessionType: 'FULL_GROWN' | 'FIELD_OBSERVATION' | 'PULLI'
 		): Promise<number> {
-			const { data, error } = await deltaClient
-				.from('Sessions')
-				.insert({
-					visit_date: visitDate,
-					location_id: locationId,
-					session_type: sessionType
-				})
-				.select('id')
-				.single();
-			if (error) throw error;
-			return data!.id;
+			return insertTestSession(deltaClient, locationId, visitDate, sessionType);
 		}
 
 		beforeAll(async () => {
@@ -674,16 +653,11 @@ describe('stats_per_day_and_species', () => {
 				.eq('species_name', 'Robin')
 				.single();
 
-			const { data: location, error: locationError } = await deltaClient
-				.from('Locations')
-				.insert({
-					location_name: `NonFG Stats Test Location ${testSuffix}`,
-					ringing_group_id: deltaId
-				})
-				.select('id')
-				.single();
-			if (locationError) throw locationError;
-			locationId = location!.id;
+			locationId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`NonFG Stats Test Location ${testSuffix}`
+			);
 
 			const fieldObsOnlySessionId = await insertSession(
 				fieldObsOnlyDate,

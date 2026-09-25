@@ -20,6 +20,13 @@ import {
 	PER_SPECIES_AGGREGATES,
 	ARRETRAP_DATES
 } from './helpers/alpha-seed-constants';
+import {
+	insertTestLocation,
+	insertTestSession,
+	createSessionResolver,
+	insertTestBird,
+	createRingNoSequence
+} from './helpers/encounter-fixtures';
 
 // Seed has 11 Alpha FULL_GROWN sessions: the 9 ARRETRAP dates (2021-06-20,
 // 2022-04-30, 2022-06-15, 2022-08-10, 2022-10-20, 2023-05-12, 2023-07-08,
@@ -187,35 +194,16 @@ describe('core_stats', () => {
 			return data.id;
 		}
 
-		async function insertSession(
+		function insertSession(
 			locationId: number,
 			visitDate: string,
 			sessionType: 'FULL_GROWN' | 'FIELD_OBSERVATION' | 'PULLI'
 		): Promise<number> {
-			const { data, error } = await deltaClient
-				.from('Sessions')
-				.insert({
-					visit_date: visitDate,
-					location_id: locationId,
-					session_type: sessionType
-				})
-				.select('id')
-				.single();
-			if (error) throw error;
-			return data!.id;
+			return insertTestSession(deltaClient, locationId, visitDate, sessionType);
 		}
 
-		async function insertBird(
-			ringNo: string,
-			speciesId: number
-		): Promise<number> {
-			const { data, error } = await deltaClient
-				.from('Birds')
-				.insert({ ring_no: ringNo, species_id: speciesId })
-				.select('id')
-				.single();
-			if (error) throw error;
-			return data!.id;
+		function insertBird(ringNo: string, speciesId: number): Promise<number> {
+			return insertTestBird(deltaClient, ringNo, speciesId);
 		}
 
 		// Query the single whole-period aggregate row for a bounded date range.
@@ -253,39 +241,24 @@ describe('core_stats', () => {
 			pulliTo = pu3;
 			pulliOnlyDate = addDays(base, 300); // disjoint from the PULLI mixed range
 
-			const [fieldObsLocation, fieldObsOnlyLocation, pulliLocation] =
+			[fieldObsLocationId, fieldObsOnlyLocationId, pulliLocationId] =
 				await Promise.all([
-					deltaClient
-						.from('Locations')
-						.insert({
-							location_name: `NonFG Agg FieldObs ${testSuffix}`,
-							ringing_group_id: deltaId
-						})
-						.select('id')
-						.single(),
-					deltaClient
-						.from('Locations')
-						.insert({
-							location_name: `NonFG Agg FieldObsOnly ${testSuffix}`,
-							ringing_group_id: deltaId
-						})
-						.select('id')
-						.single(),
-					deltaClient
-						.from('Locations')
-						.insert({
-							location_name: `NonFG Agg Pulli ${testSuffix}`,
-							ringing_group_id: deltaId
-						})
-						.select('id')
-						.single()
+					insertTestLocation(
+						deltaClient,
+						deltaId,
+						`NonFG Agg FieldObs ${testSuffix}`
+					),
+					insertTestLocation(
+						deltaClient,
+						deltaId,
+						`NonFG Agg FieldObsOnly ${testSuffix}`
+					),
+					insertTestLocation(
+						deltaClient,
+						deltaId,
+						`NonFG Agg Pulli ${testSuffix}`
+					)
 				]);
-			if (fieldObsLocation.error) throw fieldObsLocation.error;
-			if (fieldObsOnlyLocation.error) throw fieldObsOnlyLocation.error;
-			if (pulliLocation.error) throw pulliLocation.error;
-			fieldObsLocationId = fieldObsLocation.data!.id;
-			fieldObsOnlyLocationId = fieldObsOnlyLocation.data!.id;
-			pulliLocationId = pulliLocation.data!.id;
 
 			// FIELD_OBSERVATION scenario sessions.
 			const foReal1 = await insertSession(
@@ -714,36 +687,20 @@ describe('core_stats', () => {
 			// (visit_date, location_id, session_type) and Encounters on (bird_id,
 			// session_id). Both sessions are FULL_GROWN, so both encounters still count.
 			for (let i = 0; i < 2; i++) {
-				const { data: location, error: locationError } = await deltaClient
-					.from('Locations')
-					.insert({
-						location_name: `Age Bucket Test Location ${testSuffix}-${i}`,
-						ringing_group_id: deltaId
-					})
-					.select('id')
-					.single();
-				if (locationError) throw locationError;
-				locationIds.push(location!.id);
+				const locationId = await insertTestLocation(
+					deltaClient,
+					deltaId,
+					`Age Bucket Test Location ${testSuffix}-${i}`
+				);
+				locationIds.push(locationId);
 			}
 
 			// One shared session per (date, location), reused across birds on that date.
-			const sessionCache = new Map<string, number>();
-			async function getSession(date: string, locationId: number) {
-				const key = `${date}|${locationId}`;
-				const cached = sessionCache.get(key);
-				if (cached !== undefined) return cached;
-				const { data: session, error: sessionError } = await deltaClient
-					.from('Sessions')
-					.insert({ visit_date: date, location_id: locationId })
-					.select('id')
-					.single();
-				if (sessionError) throw sessionError;
-				sessionCache.set(key, session!.id);
-				sessionIds.push(session!.id);
-				return session!.id;
-			}
+			const getSessionResolver = createSessionResolver();
+			const getSession = (date: string, locationId: number) =>
+				getSessionResolver(deltaClient, date, locationId, sessionIds);
 
-			let ringCounter = 0;
+			const nextRing = createRingNoSequence(`BKT-${testSuffix}`);
 			async function addBird(
 				date: string,
 				speciesId: number,
@@ -753,16 +710,8 @@ describe('core_stats', () => {
 					record_type: string;
 				}>
 			) {
-				const { data: bird, error: birdError } = await deltaClient
-					.from('Birds')
-					.insert({
-						ring_no: `BKT-${testSuffix}-${ringCounter++}`,
-						species_id: speciesId
-					})
-					.select('id')
-					.single();
-				if (birdError) throw birdError;
-				birdIds.push(bird!.id);
+				const birdId = await insertTestBird(deltaClient, nextRing(), speciesId);
+				birdIds.push(birdId);
 
 				const rows = [];
 				for (let i = 0; i < encounters.length; i++) {
@@ -772,7 +721,7 @@ describe('core_stats', () => {
 						scheme: 'BTO',
 						sex: 'M',
 						session_id: sessionId,
-						bird_id: bird!.id,
+						bird_id: birdId,
 						...encounters[i]
 					});
 				}
@@ -1129,7 +1078,11 @@ describe('core_stats', () => {
 		// resighting date (also #902) never appears here — excluded twice over,
 		// by both stats_spine's FIELD_OBSERVATION exclusion and the resighting
 		// record_type exclusion on the encounter itself (#874).
-		const ALPHA_ALL_VISIT_DATES = [...ARRETRAP_DATES, '2023-03-15', '2023-03-20'];
+		const ALPHA_ALL_VISIT_DATES = [
+			...ARRETRAP_DATES,
+			'2023-03-15',
+			'2023-03-20'
+		];
 
 		// Usual
 		it("returns one row per distinct visit date, matching Alpha's known session dates", async () => {
@@ -1281,7 +1234,8 @@ describe('core_stats', () => {
 				.select('id')
 				.eq('species_name', 'Robin')
 				.single();
-			if (robinError || !robin) throw robinError ?? new Error('Robin not found');
+			if (robinError || !robin)
+				throw robinError ?? new Error('Robin not found');
 
 			const suffix = randomTestSuffix();
 			visitDate = randomFutureDate();
@@ -1314,17 +1268,19 @@ describe('core_stats', () => {
 			birdId = bird!.id;
 
 			// A single resighting-only encounter — no capture at all this session.
-			const { error: encounterError } = await deltaClient.from('Encounters').insert({
-				capture_time: '10:00:00',
-				scheme: 'BTO',
-				sex: 'M',
-				session_id: sessionId,
-				bird_id: birdId,
-				age_code: 4,
-				record_type: 'U',
-				weight: 10,
-				wing_length: 50
-			});
+			const { error: encounterError } = await deltaClient
+				.from('Encounters')
+				.insert({
+					capture_time: '10:00:00',
+					scheme: 'BTO',
+					sex: 'M',
+					session_id: sessionId,
+					bird_id: birdId,
+					age_code: 4,
+					record_type: 'U',
+					weight: 10,
+					wing_length: 50
+				});
 			if (encounterError) throw encounterError;
 		});
 
