@@ -71,6 +71,28 @@ async function mockHighlights(highlights: SessionHighlight[]) {
 	vi.mocked(fetchSessionHighlights).mockResolvedValue(highlights);
 }
 
+function renderSessionHighlights(
+	overrides: Partial<{
+		date: string;
+		viewedGroupId: number;
+		oldestEncounter: SessionEncounter | null;
+	}> = {}
+) {
+	const props = {
+		date: '2024-09-15',
+		viewedGroupId: 1,
+		oldestEncounter: null as SessionEncounter | null,
+		...overrides
+	};
+	return render(
+		<SessionHighlights
+			date={props.date}
+			viewedGroupId={props.viewedGroupId}
+			oldestEncounter={props.oldestEncounter}
+		/>
+	);
+}
+
 describe('SessionHighlights', () => {
 	afterEach(() => {
 		cleanup();
@@ -90,25 +112,13 @@ describe('SessionHighlights', () => {
 				resolveData = resolve;
 			})
 		);
-		render(
-			<SessionHighlights
-				date="2024-09-15"
-				viewedGroupId={1}
-				oldestEncounter={null}
-			/>
-		);
+		renderSessionHighlights();
 		expect(document.querySelector('.loading')).not.toBeNull();
 		resolveData(ALL_SECTION_HIGHLIGHTS);
 	});
 
 	it('renders a Rarities/Counts/Vital stats heading and item per section when all three groups have highlights', async () => {
-		render(
-			<SessionHighlights
-				date="2024-09-15"
-				viewedGroupId={1}
-				oldestEncounter={null}
-			/>
-		);
+		renderSessionHighlights();
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
 		});
@@ -133,13 +143,7 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders a "Best of the session" heading with the oldest-bird sentence when an oldest encounter is provided', async () => {
-		render(
-			<SessionHighlights
-				date="2024-09-15"
-				viewedGroupId={1}
-				oldestEncounter={makeOldestEncounter(5)}
-			/>
-		);
+		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
 		await waitFor(() => {
 			expect(
 				screen.getByRole('heading', { name: 'Best of the session' })
@@ -151,13 +155,7 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders every section together when highlights and an oldest encounter are both present', async () => {
-		render(
-			<SessionHighlights
-				date="2024-09-15"
-				viewedGroupId={1}
-				oldestEncounter={makeOldestEncounter(5)}
-			/>
-		);
+		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
 		});
@@ -174,13 +172,7 @@ describe('SessionHighlights', () => {
 	describe('per-section show/hide', () => {
 		it('shows only the Rarities section when only a rarity highlight is present', async () => {
 			await mockHighlights([RARITY_HIGHLIGHT]);
-			render(
-				<SessionHighlights
-					date="2024-09-15"
-					viewedGroupId={1}
-					oldestEncounter={null}
-				/>
-			);
+			renderSessionHighlights();
 			await waitFor(() => {
 				expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
 			});
@@ -192,13 +184,7 @@ describe('SessionHighlights', () => {
 
 		it('shows only the Counts section when only a count highlight is present', async () => {
 			await mockHighlights([COUNT_HIGHLIGHT]);
-			render(
-				<SessionHighlights
-					date="2024-09-15"
-					viewedGroupId={1}
-					oldestEncounter={null}
-				/>
-			);
+			renderSessionHighlights();
 			await waitFor(() => {
 				expect(screen.getByRole('heading', { name: 'Counts' })).toBeDefined();
 			});
@@ -210,13 +196,7 @@ describe('SessionHighlights', () => {
 
 		it('shows only the Vital stats section when only a vital-stat highlight is present', async () => {
 			await mockHighlights([VITAL_STAT_HIGHLIGHT]);
-			render(
-				<SessionHighlights
-					date="2024-09-15"
-					viewedGroupId={1}
-					oldestEncounter={null}
-				/>
-			);
+			renderSessionHighlights();
 			await waitFor(() => {
 				expect(
 					screen.getByRole('heading', { name: 'Vital stats' })
@@ -231,13 +211,7 @@ describe('SessionHighlights', () => {
 
 	it('renders nothing for a long-absence-retrap highlight — it matches no section', async () => {
 		await mockHighlights([LONG_ABSENCE_HIGHLIGHT]);
-		const { container } = render(
-			<SessionHighlights
-				date="2024-09-15"
-				viewedGroupId={1}
-				oldestEncounter={null}
-			/>
-		);
+		const { container } = renderSessionHighlights();
 		await waitFor(() => {
 			expect(document.querySelector('.loading')).toBeNull();
 		});
@@ -246,13 +220,7 @@ describe('SessionHighlights', () => {
 
 	it('renders only the Best-of-the-session subsection when there are no highlights but an oldest encounter is provided', async () => {
 		await mockHighlights([]);
-		render(
-			<SessionHighlights
-				date="2024-09-15"
-				viewedGroupId={1}
-				oldestEncounter={makeOldestEncounter(5)}
-			/>
-		);
+		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
 		await waitFor(() => {
 			expect(
 				screen.getByRole('heading', { name: 'Best of the session' })
@@ -265,13 +233,7 @@ describe('SessionHighlights', () => {
 
 	it('renders the oldest-bird sentence in the existing "Oldest: N years — Species (RING)" format', async () => {
 		await mockHighlights([]);
-		render(
-			<SessionHighlights
-				date="2024-09-15"
-				viewedGroupId={1}
-				oldestEncounter={makeOldestEncounter(5)}
-			/>
-		);
+		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
 		await waitFor(() => {
 			expect(
 				screen.getByRole('heading', { name: 'Best of the session' })
@@ -284,13 +246,7 @@ describe('SessionHighlights', () => {
 
 	it('renders nothing when there are no highlights and no oldest encounter', async () => {
 		await mockHighlights([]);
-		const { container } = render(
-			<SessionHighlights
-				date="2024-09-15"
-				viewedGroupId={1}
-				oldestEncounter={null}
-			/>
-		);
+		const { container } = renderSessionHighlights();
 		await waitFor(() => {
 			expect(document.querySelector('.loading')).toBeNull();
 		});
@@ -299,13 +255,9 @@ describe('SessionHighlights', () => {
 
 	it('renders nothing for an oldest encounter with proven_age 0', async () => {
 		await mockHighlights([]);
-		const { container } = render(
-			<SessionHighlights
-				date="2024-09-15"
-				viewedGroupId={1}
-				oldestEncounter={makeOldestEncounter(0)}
-			/>
-		);
+		const { container } = renderSessionHighlights({
+			oldestEncounter: makeOldestEncounter(0)
+		});
 		await waitFor(() => {
 			expect(document.querySelector('.loading')).toBeNull();
 		});
@@ -321,13 +273,9 @@ describe('SessionHighlights', () => {
 		vi.mocked(fetchSessionHighlights).mockRejectedValue(
 			new Error('action failed')
 		);
-		const { container } = render(
-			<SessionHighlights
-				date="2024-09-15"
-				viewedGroupId={1}
-				oldestEncounter={makeOldestEncounter(5)}
-			/>
-		);
+		const { container } = renderSessionHighlights({
+			oldestEncounter: makeOldestEncounter(5)
+		});
 		await waitFor(() => {
 			expect(document.querySelector('.loading')).toBeNull();
 		});

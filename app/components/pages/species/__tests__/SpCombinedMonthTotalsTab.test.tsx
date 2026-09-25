@@ -18,6 +18,28 @@ vi.mock('@/app/actions/sp-data', () => ({
 	fetchSpeciesPeriodTotals: vi.fn()
 }));
 
+function renderTab(
+	overrides: Partial<{
+		speciesName: string;
+		viewedGroupId: number;
+		isActive: boolean;
+	}> = {}
+) {
+	const props = {
+		speciesName: 'Robin',
+		viewedGroupId: 1,
+		isActive: true,
+		...overrides
+	};
+	return render(
+		<SpCombinedMonthTotalsTab
+			speciesName={props.speciesName}
+			viewedGroupId={props.viewedGroupId}
+			isActive={props.isActive}
+		/>
+	);
+}
+
 describe('SpCombinedMonthTotalsTab', () => {
 	afterEach(() => {
 		cleanup();
@@ -35,13 +57,7 @@ describe('SpCombinedMonthTotalsTab', () => {
 		it('fetches species month totals with no date range once the tab becomes active', async () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() => {
 				expect(screen.getByTestId('period-totals-table')).toBeTruthy();
 			});
@@ -53,13 +69,7 @@ describe('SpCombinedMonthTotalsTab', () => {
 		});
 
 		it("renders the folded rows through PeriodTotalsTable with month labels consistent with the group-wide 'Month totals' convention", async () => {
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() => {
 				// Hide default: only January (the sole nonzero folded bucket) shows.
 				expect(document.querySelectorAll('tbody tr').length).toBe(1);
@@ -71,13 +81,7 @@ describe('SpCombinedMonthTotalsTab', () => {
 		});
 
 		it('renders a "Busiest session" column between Encounters and Birds', async () => {
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() => {
 				expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			});
@@ -97,13 +101,7 @@ describe('SpCombinedMonthTotalsTab', () => {
 				buildCoreStatsRow({ time_period: '2020-01-01', encounter_count: 30 }),
 				buildCoreStatsRow({ time_period: '2021-01-01', encounter_count: 45 })
 			]);
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() => {
 				// Hide default: only January (the sole nonzero folded bucket) shows.
 				expect(document.querySelectorAll('tbody tr').length).toBe(1);
@@ -120,13 +118,7 @@ describe('SpCombinedMonthTotalsTab', () => {
 					resolveData = resolve;
 				})
 			);
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			expect(document.querySelector('.loading')).toBeTruthy();
 			resolveData([]);
 		});
@@ -136,13 +128,7 @@ describe('SpCombinedMonthTotalsTab', () => {
 		it('does not call fetchSpeciesPeriodTotals until the tab is selected', async () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={false}
-				/>
-			);
+			renderTab({ isActive: false });
 			expect(fetchSpeciesPeriodTotals).not.toHaveBeenCalled();
 		});
 
@@ -150,13 +136,7 @@ describe('SpCombinedMonthTotalsTab', () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([]);
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() => {
 				// Every zero-filled month is empty, so Hide default filters all 12
 				// away.
@@ -166,13 +146,7 @@ describe('SpCombinedMonthTotalsTab', () => {
 		});
 
 		it("disables the AggregateByToggle and renders the birds/individuals column as '-'", async () => {
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() => {
 				// Hide default: only January (the sole nonzero folded bucket) shows.
 				expect(document.querySelectorAll('tbody tr').length).toBe(1);
@@ -207,13 +181,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 
 	describe('Usual', () => {
 		it('defaults to combined calendar-month rows, encounters-only, with the bird/encounter toggle disabled', async () => {
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				// Hide default: only January and August (the nonzero folded
 				// buckets) show.
@@ -230,13 +198,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 		});
 
 		it('switching the toggle off renders one row per (month, year) combination returned for the species, without summing', async () => {
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				expect(document.querySelectorAll('tbody tr').length).toBe(2)
 			);
@@ -265,13 +227,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 					...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
 				})
 			]);
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				expect(document.querySelectorAll('tbody tr').length).toBe(1)
 			);
@@ -295,13 +251,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 		});
 
 		it('switching the toggle back on restores the combined, encounters-only view and disables the bird/encounter toggle again', async () => {
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				expect(document.querySelectorAll('tbody tr').length).toBe(2)
 			);
@@ -320,13 +270,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 
 	describe('Structure', () => {
 		it('the combine-years control is the same shared component/pattern used by the group-wide all-time Month totals tab (#635), not a bespoke implementation', async () => {
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				expect(document.querySelectorAll('tbody tr').length).toBe(2)
 			);
@@ -339,13 +283,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 		});
 
 		it('per-row (toggle-off) rows link to /species/{speciesName}/{year}/{month} for each row', async () => {
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Blackbird"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab({ speciesName: 'Blackbird' });
 			await waitFor(() =>
 				expect(document.querySelectorAll('tbody tr').length).toBe(2)
 			);
@@ -370,13 +308,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
 				buildCoreStatsRow({ time_period: '2020-01-01', encounter_count: 30 })
 			]);
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				// Hide default: only the single nonzero folded January bucket shows.
 				expect(document.querySelectorAll('tbody tr').length).toBe(1)
@@ -393,13 +325,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 		it('toggling combine-years on and off repeatedly does not trigger any additional fetch of species period totals', async () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				expect(document.querySelectorAll('tbody tr').length).toBe(2)
 			);
@@ -429,13 +355,7 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 
 	describe('Usual', () => {
 		it('renders only months with data by default (Hide)', async () => {
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				// Only January is folded from a real year; the rest are synthesized
 				// and hidden by default.
@@ -451,13 +371,7 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 
 	describe('Structure', () => {
 		it('shows zero-session months in the combined view when toggled to Show', async () => {
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				expect(document.querySelectorAll('tbody tr').length).toBe(1)
 			);
@@ -473,13 +387,7 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 				buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 }),
 				buildCoreStatsRow({ time_period: '2020-08-01', session_count: 0 })
 			]);
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				// The August row (session_count 0) is dropped by default; January
 				// (4) stays.
@@ -506,13 +414,7 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 					})
 				)
 			);
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				// Hide default has nothing to filter, since no month is empty.
 				expect(document.querySelectorAll('tbody tr').length).toBe(12)
@@ -528,13 +430,7 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 				buildCoreStatsRow({ time_period: '2020-08-01', session_count: 5 }),
 				buildCoreStatsRow({ time_period: '2021-08-01', session_count: 2 })
 			]);
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				// Both years fold into the single August bucket.
 				expect(document.querySelectorAll('tbody tr').length).toBe(1)
@@ -548,13 +444,7 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
 				buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 })
 			]);
-			render(
-				<SpCombinedMonthTotalsTab
-					speciesName="Robin"
-					viewedGroupId={1}
-					isActive={true}
-				/>
-			);
+			renderTab();
 			await waitFor(() =>
 				expect(document.querySelectorAll('tbody tr').length).toBe(1)
 			);

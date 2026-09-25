@@ -17,33 +17,48 @@ const birds = (birdsSnapshot as BirdOfSpecies[]).map(
 	(b) => enrichBird(b) as EnrichedBirdOfSpecies
 );
 
+function renderIndividualsTab(
+	overrides: Partial<{
+		speciesId: number;
+		viewedGroupId: number;
+		birds: EnrichedBirdOfSpecies[];
+		birdCount: number;
+		fromDate: string;
+		toDate: string;
+	}> = {}
+) {
+	const props = {
+		speciesId: 1,
+		viewedGroupId: 1,
+		birds,
+		birdCount: birds.length,
+		...overrides
+	};
+	return render(
+		<SpIndividualsTab
+			speciesId={props.speciesId}
+			viewedGroupId={props.viewedGroupId}
+			birds={props.birds}
+			birdCount={props.birdCount}
+			fromDate={props.fromDate}
+			toDate={props.toDate}
+		/>
+	);
+}
+
 describe('SpIndividualsTab', () => {
 	afterEach(() => {
 		cleanup();
 	});
 
 	it('renders bird rows', () => {
-		render(
-			<SpIndividualsTab
-				speciesId={1}
-				viewedGroupId={1}
-				birds={birds}
-				birdCount={birds.length}
-			/>
-		);
+		renderIndividualsTab();
 		const rows = document.querySelector('tbody')?.querySelectorAll('tr');
 		expect(rows?.length).toBe(birds.length);
 	});
 
 	it('renders Wing and Weight range columns', () => {
-		render(
-			<SpIndividualsTab
-				speciesId={1}
-				viewedGroupId={1}
-				birds={birds}
-				birdCount={birds.length}
-			/>
-		);
+		renderIndividualsTab();
 		const headers = [...document.querySelectorAll('th')].map(
 			(th) => th.textContent
 		);
@@ -52,14 +67,7 @@ describe('SpIndividualsTab', () => {
 	});
 
 	it('renders a wing range with its bold parenthesised dominant value', () => {
-		render(
-			<SpIndividualsTab
-				speciesId={1}
-				viewedGroupId={1}
-				birds={birds}
-				birdCount={birds.length}
-			/>
-		);
+		renderIndividualsTab();
 		// ARRETRAP has wing lengths 74–80 with a dominant (majority) value of 75.
 		const arretrapRow = [...document.querySelectorAll('tbody tr')].find((row) =>
 			row.textContent?.includes('ARRETRAP')
@@ -74,26 +82,12 @@ describe('SpIndividualsTab', () => {
 
 	describe('birdCount prop', () => {
 		it('hides infinite scroll loader when birdCount equals loaded birds', () => {
-			render(
-				<SpIndividualsTab
-					speciesId={1}
-					viewedGroupId={1}
-					birds={birds}
-					birdCount={birds.length}
-				/>
-			);
+			renderIndividualsTab();
 			expect(() => screen.getByTestId('infinite-scroll-loader')).toThrow();
 		});
 
 		it('shows infinite scroll loader when birdCount exceeds loaded birds', () => {
-			render(
-				<SpIndividualsTab
-					speciesId={1}
-					viewedGroupId={1}
-					birds={birds}
-					birdCount={birds.length + 10}
-				/>
-			);
+			renderIndividualsTab({ birdCount: birds.length + 10 });
 			expect(screen.getByTestId('infinite-scroll-loader')).toBeDefined();
 		});
 	});
@@ -103,14 +97,7 @@ describe('SpIndividualsTab', () => {
 		vi.mocked(fetchPageOfBirds).mockResolvedValue(
 			birds as Awaited<ReturnType<typeof fetchPageOfBirds>>
 		);
-		render(
-			<SpIndividualsTab
-				speciesId={1}
-				viewedGroupId={1}
-				birds={birds}
-				birdCount={birds.length + 10}
-			/>
-		);
+		renderIndividualsTab({ birdCount: birds.length + 10 });
 		const loader = screen.getByTestId('infinite-scroll-loader');
 		await act(async () => {
 			io.enterNode(loader);
@@ -129,16 +116,11 @@ describe('SpIndividualsTab', () => {
 		vi.mocked(fetchPageOfBirds).mockResolvedValue(
 			birds as Awaited<ReturnType<typeof fetchPageOfBirds>>
 		);
-		render(
-			<SpIndividualsTab
-				speciesId={1}
-				viewedGroupId={1}
-				birds={birds}
-				birdCount={birds.length + 10}
-				fromDate="2026-01-01"
-				toDate="2026-12-31"
-			/>
-		);
+		renderIndividualsTab({
+			birdCount: birds.length + 10,
+			fromDate: '2026-01-01',
+			toDate: '2026-12-31'
+		});
 		const loader = screen.getByTestId('infinite-scroll-loader');
 		await act(async () => {
 			io.enterNode(loader);

@@ -24,6 +24,18 @@ const mockBirdRows: RingSequenceBirdRow[] = [
 const detailModel = { id: 42, prefix: 'ARW' };
 const accordionId = '42';
 
+function renderRingSequenceDetail(
+	overrides: Partial<{
+		model: typeof detailModel;
+		expandedId: string;
+	}> = {}
+) {
+	const props = { model: detailModel, expandedId: accordionId, ...overrides };
+	return render(
+		<RingSequenceDetail model={props.model} expandedId={props.expandedId} />
+	);
+}
+
 describe('RingSequenceDetail', () => {
 	afterEach(() => {
 		cleanup();
@@ -35,7 +47,7 @@ describe('RingSequenceDetail', () => {
 			await import('@/app/actions/ring-sequences');
 		vi.mocked(fetchRingSequenceBirds).mockResolvedValue(mockBirdRows);
 
-		render(<RingSequenceDetail model={detailModel} expandedId={accordionId} />);
+		renderRingSequenceDetail();
 
 		await waitFor(() => {
 			expect(vi.mocked(fetchRingSequenceBirds)).toHaveBeenCalledWith(42);
@@ -43,7 +55,7 @@ describe('RingSequenceDetail', () => {
 	});
 
 	it('renders nothing when not expanded', () => {
-		render(<RingSequenceDetail model={detailModel} expandedId="other-id" />);
+		renderRingSequenceDetail({ expandedId: 'other-id' });
 		expect(screen.queryByTestId('unused-rings')).toBeNull();
 	});
 
@@ -52,7 +64,7 @@ describe('RingSequenceDetail', () => {
 			await import('@/app/actions/ring-sequences');
 		vi.mocked(fetchRingSequenceBirds).mockResolvedValue(mockBirdRows);
 
-		render(<RingSequenceDetail model={detailModel} expandedId={accordionId} />);
+		renderRingSequenceDetail();
 
 		await waitFor(() => {
 			expect(screen.getByTestId('unused-rings')).toBeDefined();
@@ -75,7 +87,7 @@ describe('RingSequenceDetail', () => {
 		];
 		vi.mocked(fetchRingSequenceBirds).mockResolvedValue(contiguousRows);
 
-		render(<RingSequenceDetail model={detailModel} expandedId={accordionId} />);
+		renderRingSequenceDetail();
 
 		await waitFor(() => {
 			expect(screen.queryByTestId('unused-rings')).toBeNull();
@@ -87,7 +99,7 @@ describe('RingSequenceDetail', () => {
 			await import('@/app/actions/ring-sequences');
 		vi.mocked(fetchRingSequenceBirds).mockResolvedValue(mockBirdRows);
 
-		render(<RingSequenceDetail model={detailModel} expandedId={accordionId} />);
+		renderRingSequenceDetail();
 
 		await waitFor(() => {
 			expect(screen.getByText(/Robin/)).toBeDefined();
@@ -100,7 +112,7 @@ describe('RingSequenceDetail', () => {
 			await import('@/app/actions/ring-sequences');
 		vi.mocked(fetchRingSequenceBirds).mockResolvedValue(mockBirdRows);
 
-		render(<RingSequenceDetail model={detailModel} expandedId={accordionId} />);
+		renderRingSequenceDetail();
 
 		await waitFor(() => {
 			const robinHeading = screen
@@ -115,7 +127,7 @@ describe('RingSequenceDetail', () => {
 			await import('@/app/actions/ring-sequences');
 		vi.mocked(fetchRingSequenceBirds).mockResolvedValue(mockBirdRows);
 
-		render(<RingSequenceDetail model={detailModel} expandedId={accordionId} />);
+		renderRingSequenceDetail();
 
 		await waitFor(() => {
 			expect(screen.getByText('Robin')).toBeDefined();
