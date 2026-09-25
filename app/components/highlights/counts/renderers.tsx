@@ -20,7 +20,6 @@ import {
 	formatShortDate,
 	renderSentence
 } from '@/app/components/highlights/shared/render-sentence';
-
 // ---- copy builders ----
 
 type PeriodFields = {
