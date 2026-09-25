@@ -8,7 +8,7 @@ import {
 	sentenceCase,
 	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier,
+	printTimeQualifier
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 

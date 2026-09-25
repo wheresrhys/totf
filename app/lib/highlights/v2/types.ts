@@ -3,6 +3,10 @@ import type {
 	TemporalUnit,
 	StatUnit
 } from '@/app/components/shared/StatOutput';
+export type {
+	TemporalUnit,
+	StatUnit
+} from '@/app/components/shared/StatOutput';
 import type { StatsRepository } from '@/app/actions/stats-cache';
 
 export interface TimePeriodedItem {
