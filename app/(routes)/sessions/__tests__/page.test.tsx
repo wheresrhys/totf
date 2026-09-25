@@ -3,6 +3,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
 import alphaSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.all-sessions.json';
 import betaSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/beta.all-sessions.json';
+import { makeSupabaseTableClient } from '@/app/__tests__/helpers/supabase-client';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -13,17 +14,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 }));
 
 function makeChainClient(data: unknown) {
-	const thenable = {
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({ data, error: null }).then(resolve)
-	};
-	const chain = {
-		select: vi.fn().mockReturnThis(),
-		eq: vi.fn().mockReturnThis(),
-		order: vi.fn().mockReturnThis(),
-		...thenable
-	};
-	return { from: vi.fn().mockReturnValue(chain) };
+	return makeSupabaseTableClient(data, ['select', 'eq', 'order']).client;
 }
 
 describe('sessions page', () => {

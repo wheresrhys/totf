@@ -5,6 +5,7 @@ import resightingsSnapshot from '@/test-fixtures/snapshots/tables/Encounters/alp
 import type { ResightingEncounter } from '@/app/models/session';
 import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
+import { makeSupabaseTableClient } from '@/app/__tests__/helpers/supabase-client';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -15,15 +16,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 }));
 
 function makeEncountersClient(data: unknown) {
-	const chain = {
-		select: vi.fn().mockReturnThis(),
-		eq: vi.fn().mockReturnThis(),
-		in: vi.fn().mockReturnThis(),
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({ data, error: null }).then(resolve)
-	};
-	const client = { from: vi.fn().mockReturnValue(chain) };
-	return { client, chain };
+	return makeSupabaseTableClient(data, ['select', 'eq', 'in']);
 }
 
 // Alpha's real seed data now has two resighting/recovery records (#902 review

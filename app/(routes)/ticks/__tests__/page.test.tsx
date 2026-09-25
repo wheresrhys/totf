@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
 import type { GroupTicksResult } from '@/app/models/db';
+import { makeSupabaseRpcClient as makeRpcClient } from '@/app/__tests__/helpers/supabase-client';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -16,14 +17,6 @@ const ticksSnapshot: GroupTicksResult[] = [
 	{ species_name: 'Robin', first_encounter_date: '2025-11-20' },
 	{ species_name: 'Blue Tit', first_encounter_date: '2024-03-01' }
 ];
-
-function makeRpcClient(data: unknown) {
-	const thenable = {
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({ data, error: null }).then(resolve)
-	};
-	return { rpc: vi.fn().mockReturnValue(thenable) };
-}
 
 describe('ticks page', () => {
 	beforeEach(() => {

@@ -4,6 +4,7 @@ import Page from '../page';
 import retrapsSnapshot from '@/test-fixtures/snapshots/notable_retraps/alpha.retraps.json';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
+import { makeSupabaseRpcClient as makeRpcClient } from '@/app/__tests__/helpers/supabase-client';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -12,14 +13,6 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
-
-function makeRpcClient(data: unknown) {
-	const thenable = {
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({ data, error: null }).then(resolve)
-	};
-	return { rpc: vi.fn().mockReturnValue(thenable) };
-}
 
 describe('retraps page', () => {
 	beforeEach(() => {

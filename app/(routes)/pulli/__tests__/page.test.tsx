@@ -4,6 +4,7 @@ import Page, { fetchPulliPageContent } from '../page';
 import pulliEncountersSnapshot from '@/test-fixtures/snapshots/tables/Encounters/alpha.pulli-encounters.json';
 import type { PulliEncounter } from '@/app/models/session';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
+import { makeSupabaseTableClient as makeEncountersClient } from '@/app/__tests__/helpers/supabase-client';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -12,17 +13,6 @@ const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
-
-function makeEncountersClient(data: unknown) {
-	const chain = {
-		select: vi.fn().mockReturnThis(),
-		eq: vi.fn().mockReturnThis(),
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({ data, error: null }).then(resolve)
-	};
-	const client = { from: vi.fn().mockReturnValue(chain) };
-	return { client, chain };
-}
 
 describe('pulli page', () => {
 	beforeEach(() => {
