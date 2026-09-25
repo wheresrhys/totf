@@ -1,3 +1,4 @@
+import '@/app/__tests__/helpers/mock-species-tab-components';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
 	render,
@@ -10,7 +11,7 @@ import Page, { getSpeciesStats } from '../page';
 import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
 import robinBiometricsHeadline from '@/test-fixtures/snapshots/biometrics_stats/robin-alpha.headline.json';
 import {
-	ROBIN_SPECIES_ID,
+	makeSpeciesClient,
 	robinSpeciesStats as speciesStats
 } from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '../PageContent';
@@ -31,58 +32,7 @@ vi.mock('@/app/actions/sp-data', () => ({
 	fetchPageOfBirds: mockFetchPageOfBirds
 }));
 
-vi.mock('@/app/components/pages/species/SpIndividualsTab', () => ({
-	SpIndividualsTab: () => <div data-testid="sp-individuals-tab" />
-}));
-
-vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
-	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
-}));
-
-vi.mock('@/app/components/pages/species/SpDemographicsTab', () => ({
-	SpDemographicsTab: () => <div data-testid="sp-demographics-tab" />
-}));
-
-vi.mock('@/app/components/pages/species/SpBiometricsTab', () => ({
-	SpBiometricsTab: () => <div data-testid="sp-biometrics-tab" />
-}));
-
-vi.mock('@/app/components/pages/species/SpYearTotalsTab', () => ({
-	SpYearTotalsTab: () => <div data-testid="sp-year-totals-tab" />
-}));
-
-vi.mock('@/app/components/pages/species/SpCombinedMonthTotalsTab', () => ({
-	SpCombinedMonthTotalsTab: () => (
-		<div data-testid="sp-combined-month-totals-tab" />
-	)
-}));
-
-vi.mock('@/app/components/pages/species/SpSessionTotalsTab', () => ({
-	SpSessionTotalsTab: () => <div data-testid="sp-session-totals-tab" />
-}));
-
 const birds = birdsSnapshot as FullFatPageData['birds'];
-
-function makeSpeciesClient() {
-	const fromChain = {
-		select: vi.fn().mockReturnThis(),
-		eq: vi.fn().mockReturnThis(),
-		single: vi.fn().mockReturnThis(),
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({
-				data: { id: ROBIN_SPECIES_ID },
-				error: null
-			}).then(resolve)
-	};
-	const rpcThenable = {
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({ data: [speciesStats], error: null }).then(resolve)
-	};
-	return {
-		from: vi.fn().mockReturnValue(fromChain),
-		rpc: vi.fn().mockReturnValue(rpcThenable)
-	};
-}
 
 function renderSpeciesPage(speciesName = 'Robin', tabId?: string) {
 	return Page({
