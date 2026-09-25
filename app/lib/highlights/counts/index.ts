@@ -1,7 +1,5 @@
 import { SCOPE_BREADTH_RANK } from '@/app/lib/highlights/shared/record-scope';
 import type { SessionStatsData } from '@/app/lib/highlights/shared/session-stats';
-import { deriveSessionTotalRecords } from './derive-session-total';
-import { deriveSessionTotalJuvRecords } from './derive-session-total-juv';
 import { deriveSinceHighlights } from './derive-since-comparison';
 import { deriveSpeciesRecords } from './derive-species-count';
 import { deriveSpeciesJuvRecords } from './derive-species-juv-count';
@@ -12,11 +10,6 @@ import { combineYearSpeciesCounts } from './rules/combine-year-species-counts';
 import { combineSpeciesPlacementRecords } from './rules/combine-species-placement-records';
 import type { CountHighlight } from './types';
 
-export {
-	buildDayTotals,
-	deriveSessionTotalRecords
-} from './derive-session-total';
-export { deriveSessionTotalJuvRecords } from './derive-session-total-juv';
 export { deriveSinceHighlights } from './derive-since-comparison';
 export {
 	deriveAllTimePlacement,
@@ -118,8 +111,8 @@ export function runCountsGroup({
 	today?: Date;
 }): CountHighlight[] {
 	const pool: CountHighlight[] = [
-		...deriveSessionTotalRecords({ date, stats, today }),
-		...deriveSessionTotalJuvRecords({ date, stats, today }),
+		// ...deriveSessionTotalRecords({ date, stats, today }),
+		// ...deriveSessionTotalJuvRecords({ date, stats, today }),
 		...deriveSinceHighlights({ date, stats }),
 		...deriveSpeciesRecords({ date, stats, today }),
 		...deriveSpeciesJuvRecords({ date, stats, today })
