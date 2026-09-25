@@ -137,5 +137,43 @@ export const expectations = {
 			'Equal highest juv Robin count ever and second highest of 2020: 12 birds',
 		'global and tied second of year and third of month':
 			'Highest juv Robin count ever, equal second highest of 2020 and third highest in any February: 12 birds'
+	},
+	firstSpeciesRecord: {
+		global: 'First Robin records ever',
+		'tied global': 'First Robin records ever',
+		'second global': 'First Robin records ever',
+		'tied second global': 'First Robin records ever',
+		'tied second of year': 'First Robin records of 2020',
+		'this year': 'First Robin records this year',
+		'tied second of month': 'First Robin records in any February',
+		'tied global and second of year': 'First Robin records ever',
+		'global and tied second of year and third of month':
+			'First Robin records ever'
+	},
+	onlySpeciesRecord: {
+		global: 'Only Robin records ever',
+		'tied global': 'Only Robin records ever',
+		'second global': 'Only Robin records ever',
+		'tied second global': 'Only Robin records ever',
+		'tied second of year': 'Only Robin records of 2020',
+		'this year': 'Only Robin records this year',
+		'tied second of month': 'Only Robin records in any February',
+		'tied global and second of year': 'Only Robin records ever',
+		'global and tied second of year and third of month':
+			'Only Robin records ever'
+	},
+	rareSpecies: {
+		global: 'MEGA — Robin seen in only 12 sessions ever',
+		'tied global': 'MEGA — Robin seen in only 12 sessions ever',
+		'second global': 'MEGA — Robin seen in only 12 sessions ever',
+		'tied second global': 'MEGA — Robin seen in only 12 sessions ever',
+		'tied second of year': 'MEGA — Robin seen in only 12 sessions of 2020',
+		'this year': 'MEGA — Robin seen in only 12 sessions this year',
+		'tied second of month':
+			'MEGA — Robin seen in only 12 sessions in any February',
+		'tied global and second of year':
+			'MEGA — Robin seen in only 12 sessions ever',
+		'global and tied second of year and third of month':
+			'MEGA — Robin seen in only 12 sessions ever'
 	}
 };

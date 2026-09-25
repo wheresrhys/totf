@@ -9,35 +9,46 @@ vi.mock('@/app/actions/session-highlights', () => ({
 	fetchSessionHighlights: vi.fn()
 }));
 
-// Counts now comes from the v2 pipeline (getCondensedHighlightsAtTimePeriod),
-// fetched in parallel with the v1 action — see SessionHighlights.tsx. Mock it
-// as the one collaborator it is, independently of the v1 fetch.
+// Rarities (#990) and Counts (#989) both come from the v2 pipeline
+// (getCondensedHighlightsAtTimePeriod), fetched in parallel with the v1 action —
+// see SessionHighlights.tsx. Mock it as the one collaborator it is,
+// independently of the v1 fetch.
 vi.mock('@/app/lib/highlights/v2', () => ({
 	getCondensedHighlightsAtTimePeriod: vi.fn()
 }));
 
-// One highlight per group, used across the "all sections populated" tests.
-const RARITY_HIGHLIGHT: SessionHighlight = {
-	type: 'first-ever-species',
-	speciesName: 'Firecrest',
-	multipleIndividualsRecorded: false,
-	isOnlyRecord: false
-};
-// v2 (Counts) highlight fixture — treat getCondensedHighlightsAtTimePeriod as
-// a black box: the printer is a test double returning a fixed sentence, not
-// the real v2 formatting logic (that's covered by the v2 pipeline's own
-// tests).
-const COUNT_HIGHLIGHT: CombinedHighlight = {
-	formatters: {
-		combinedHighlightPrinter: () => 'Busiest session ever — 74 birds',
-		highlightListPrefixPrinter: () => ''
-	},
-	descriptor: { category: 'count', type: 'session-total', unit: 'encounter' },
-	value: { timePeriod: '2024-09-15', value: 74, species: null },
-	species: undefined,
-	bestPosition: 1,
-	scopes: []
-};
+// v2 highlight fixtures — treat getCondensedHighlightsAtTimePeriod as a black
+// box: each printer is a test double returning a fixed sentence, not the real v2
+// formatting logic (that's covered by the v2 pipeline's own tests). The component
+// tells the two sections apart by descriptor.category alone.
+function makeV2Highlight(
+	category: CombinedHighlight['descriptor']['category'],
+	type: string,
+	sentence: string
+): CombinedHighlight {
+	return {
+		formatters: {
+			combinedHighlightPrinter: () => sentence,
+			highlightListPrefixPrinter: () => ''
+		},
+		descriptor: { category, type, unit: 'encounter' },
+		value: { timePeriod: '2024-09-15', value: 74, species: null },
+		species: undefined,
+		bestPosition: 1,
+		scopes: []
+	};
+}
+
+const RARITY_HIGHLIGHT = makeV2Highlight(
+	'rarity',
+	'firstSpeciesRecord',
+	'First Firecrest record ever'
+);
+const COUNT_HIGHLIGHT = makeV2Highlight(
+	'count',
+	'session-total',
+	'Busiest session ever — 74 birds'
+);
 const VITAL_STAT_HIGHLIGHT: SessionHighlight = {
 	type: 'weight-record',
 	speciesName: 'Blue Tit',
@@ -49,7 +60,7 @@ const VITAL_STAT_HIGHLIGHT: SessionHighlight = {
 	year: 2024,
 	isCurrentYear: false
 };
-// long-absence-retrap matches none of the three sections — see
+// long-absence-retrap matches no section — see
 // docs/session-highlight-ordering.md — so it's used to assert it renders
 // nowhere on the page.
 const LONG_ABSENCE_HIGHLIGHT: SessionHighlight = {
@@ -61,11 +72,9 @@ const LONG_ABSENCE_HIGHLIGHT: SessionHighlight = {
 	gapMonths: 10
 };
 
-// v1 (Rarities + Vital stats) fixture — Counts is v2-only, see COUNT_HIGHLIGHT.
-const ALL_SECTION_HIGHLIGHTS: SessionHighlight[] = [
-	RARITY_HIGHLIGHT,
-	VITAL_STAT_HIGHLIGHT
-];
+// Vital stats is all that's left on the v1 side — Rarities and Counts are
+// v2-only, see the fixtures above.
+const ALL_SECTION_HIGHLIGHTS: SessionHighlight[] = [VITAL_STAT_HIGHLIGHT];
 
 // The "Best of the session" subsection only reads bird.proven_age,
 // bird.species.species_name and bird.ring_no off the oldest encounter — the
@@ -86,7 +95,7 @@ async function mockHighlights(highlights: SessionHighlight[]) {
 	vi.mocked(fetchSessionHighlights).mockResolvedValue(highlights);
 }
 
-async function mockCountHighlights(highlights: CombinedHighlight[]) {
+async function mockV2Highlights(highlights: CombinedHighlight[]) {
 	const { getCondensedHighlightsAtTimePeriod } =
 		await import('@/app/lib/highlights/v2');
 	vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue(highlights);
@@ -122,7 +131,7 @@ describe('SessionHighlights', () => {
 
 	beforeEach(async () => {
 		await mockHighlights(ALL_SECTION_HIGHLIGHTS);
-		await mockCountHighlights([]);
+		await mockV2Highlights([]);
 	});
 
 	it('renders a loading spinner before data loads', async () => {
@@ -140,7 +149,7 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders a Rarities/Counts/Vital stats heading and item per section when all three groups have highlights', async () => {
-		await mockCountHighlights([COUNT_HIGHLIGHT]);
+		await mockV2Highlights([RARITY_HIGHLIGHT, COUNT_HIGHLIGHT]);
 		renderSessionHighlights();
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
@@ -150,7 +159,7 @@ describe('SessionHighlights', () => {
 
 		const rarityItems = screen.getByTestId('rarities').querySelectorAll('li');
 		expect(rarityItems.length).toBe(1);
-		expect(rarityItems[0].textContent).toBe('First ever Firecrest record');
+		expect(rarityItems[0].textContent).toBe('First Firecrest record ever');
 
 		const countItems = screen.getByTestId('counts').querySelectorAll('li');
 		expect(countItems.length).toBe(1);
@@ -178,7 +187,7 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders every section together when highlights and an oldest encounter are both present', async () => {
-		await mockCountHighlights([COUNT_HIGHLIGHT]);
+		await mockV2Highlights([RARITY_HIGHLIGHT, COUNT_HIGHLIGHT]);
 		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
@@ -195,7 +204,8 @@ describe('SessionHighlights', () => {
 
 	describe('per-section show/hide', () => {
 		it('shows only the Rarities section when only a rarity highlight is present', async () => {
-			await mockHighlights([RARITY_HIGHLIGHT]);
+			await mockHighlights([]);
+			await mockV2Highlights([RARITY_HIGHLIGHT]);
 			renderSessionHighlights();
 			await waitFor(() => {
 				expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
@@ -208,7 +218,7 @@ describe('SessionHighlights', () => {
 
 		it('shows only the Counts section when only a count highlight is present', async () => {
 			await mockHighlights([]);
-			await mockCountHighlights([COUNT_HIGHLIGHT]);
+			await mockV2Highlights([COUNT_HIGHLIGHT]);
 			renderSessionHighlights();
 			await waitFor(() => {
 				expect(screen.getByRole('heading', { name: 'Counts' })).toBeDefined();

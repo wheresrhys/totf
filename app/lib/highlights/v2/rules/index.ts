@@ -8,6 +8,9 @@ import { singleSpeciesCount } from './single-species-count';
 import { singleSpeciesEncounters } from './single-species-encounters';
 import { eachSpeciesCount } from './each-species-count';
 import { eachSpeciesJuvs } from './each-species-juvs';
+import { firstSpeciesRecord } from './first-species-record';
+import { onlySpeciesRecord } from './only-species-record';
+import { rareSpecies } from './rare-species';
 
 export const highlightRules: HighlightsGenerator[] = [
 	birdCount,
@@ -18,5 +21,8 @@ export const highlightRules: HighlightsGenerator[] = [
 	singleSpeciesCount,
 	singleSpeciesEncounters,
 	eachSpeciesCount,
-	eachSpeciesJuvs
+	eachSpeciesJuvs,
+	firstSpeciesRecord,
+	onlySpeciesRecord,
+	rareSpecies
 ];

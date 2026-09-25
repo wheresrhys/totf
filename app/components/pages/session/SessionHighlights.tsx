@@ -10,13 +10,10 @@ import { getCondensedHighlightsAtTimePeriod } from '@/app/lib/highlights/v2';
 
 import { type CombinedHighlight } from '@/app/lib/highlights/v2/types';
 import {
-	renderRarityHighlight,
-	RARITY_HIGHLIGHT_RENDERERS,
 	renderVitalStatHighlight,
 	VITAL_STAT_HIGHLIGHT_RENDERERS
 } from '@/app/components/highlights';
 import type {
-	RarityHighlight,
 	SessionHighlight,
 	VitalStatHighlight
 } from '@/app/lib/highlights';
@@ -29,24 +26,31 @@ type HighlightsData = {
 // Each group's own renderer map (from the barrel) is the single source of
 // truth for which highlight `type`s belong to that group — reusing its keys
 // here means this partitioning can never drift out of sync with the map
-// itself. long-absence-retrap intentionally matches none of the three: it's
+// itself. long-absence-retrap intentionally matches none of the sections: it's
 // a sibling of the groups, not wired into any section yet (see
 // docs/session-highlight-ordering.md).
-const RARITY_TYPES = new Set<string>(Object.keys(RARITY_HIGHLIGHT_RENDERERS));
+//
+// Vital stats is the only section still partitioned this way. Rarities (#990)
+// and Counts (#989) come from the v2 pipeline, where a highlight's own
+// descriptor.category names its section and its own printer formats the line.
 const VITAL_STAT_TYPES = new Set<string>(
 	Object.keys(VITAL_STAT_HIGHLIGHT_RENDERERS)
 );
-
-function isRarityHighlight(
-	highlight: SessionHighlight
-): highlight is RarityHighlight {
-	return RARITY_TYPES.has(highlight.type);
-}
 
 function isVitalStatHighlight(
 	highlight: SessionHighlight
 ): highlight is VitalStatHighlight {
 	return VITAL_STAT_TYPES.has(highlight.type);
+}
+
+// A v2 highlight carries its own printer, so both v2-backed sections render
+// identically — only the highlights they're handed differ.
+function renderCombinedHighlights(highlights: CombinedHighlight[]) {
+	return highlights.map((highlight: CombinedHighlight) => (
+		<li key={`${highlight.descriptor.type}-${highlight.species}`}>
+			{highlight.formatters.combinedHighlightPrinter(highlight)}
+		</li>
+	));
 }
 
 export function SessionHighlights({
@@ -105,7 +109,9 @@ export function SessionHighlights({
 	// top of an errored fetch.
 	if (status === 'error') return null;
 
-	const rarityHighlights = highlights.v1.filter(isRarityHighlight);
+	const rarityHighlights = highlights.v2.filter(
+		(highlight) => highlight.descriptor.category === 'rarity'
+	);
 	const countHighlights = highlights.v2.filter(
 		(highlight) => highlight.descriptor.category === 'count'
 	);
@@ -126,7 +132,7 @@ export function SessionHighlights({
 				<>
 					<SecondaryHeading>Rarities</SecondaryHeading>
 					<BoxyList testId="rarities">
-						{rarityHighlights.map(renderRarityHighlight)}
+						{renderCombinedHighlights(rarityHighlights)}
 					</BoxyList>
 				</>
 			) : null}
@@ -134,13 +140,7 @@ export function SessionHighlights({
 				<>
 					<SecondaryHeading>Counts</SecondaryHeading>
 					<BoxyList testId="counts">
-						{countHighlights.map((highlight: CombinedHighlight) => {
-							return (
-								<li key={`${highlight.descriptor.type}-${highlight.species}`}>
-									{highlight.formatters.combinedHighlightPrinter(highlight)}
-								</li>
-							);
-						})}
+						{renderCombinedHighlights(countHighlights)}
 					</BoxyList>
 				</>
 			) : null}

@@ -2,30 +2,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
 import type {
 	LongAbsenceRetrapHighlight,
-	RarityHighlight,
 	SessionHighlight,
 	VitalStatHighlight
 } from '@/app/lib/highlights';
 import {
-	renderRarityHighlight,
-	RARITY_HIGHLIGHT_RENDERERS,
 	renderVitalStatHighlight,
 	VITAL_STAT_HIGHLIGHT_RENDERERS
 } from '@/app/components/highlights';
 import { renderLongAbsenceRetrapHighlight } from '@/app/components/highlights/long-absence-retrap-renderer';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 
-// The action fans out across all four groups (three componentized renderers
-// plus the long-absence-retrap sibling, per #760); this dispatches a flat
-// SessionHighlight[] to whichever group's renderer matches, the same way
-// SessionHighlights.tsx partitions the list into its sections.
-const RARITY_TYPES = new Set(Object.keys(RARITY_HIGHLIGHT_RENDERERS));
+// The action now fans out across two groups only — Vital stats plus the
+// long-absence-retrap sibling (per #760) — since Counts (#989) and Rarities
+// (#990) moved to the v2 pipeline (app/lib/highlights/v2), which the session
+// page fetches separately. This dispatches a flat SessionHighlight[] to
+// whichever group's renderer matches, the same way SessionHighlights.tsx
+// partitions the list into its sections. Vital stats' weight records are
+// therefore this suite's observable for "a row reached the derive functions".
 const VITAL_STAT_TYPES = new Set(Object.keys(VITAL_STAT_HIGHLIGHT_RENDERERS));
 
 function renderHighlight(highlight: SessionHighlight) {
-	if (RARITY_TYPES.has(highlight.type)) {
-		return renderRarityHighlight(highlight as RarityHighlight);
-	}
 	if (VITAL_STAT_TYPES.has(highlight.type)) {
 		return renderVitalStatHighlight(highlight as VitalStatHighlight);
 	}
@@ -63,7 +59,8 @@ let sessionPages: { visit_date: string }[][];
 function statsRow(
 	species_name: string,
 	visit_date: string,
-	encounter_count: number
+	encounter_count: number,
+	weights?: { weighed: number; min: number; max: number }
 ): StatsPerDayAndSpeciesResult {
 	return {
 		species_name,
@@ -72,10 +69,47 @@ function statsRow(
 		juv_count: 0,
 		postjuv_count: 0,
 		pullus_count: 0,
-		weighed_birds_count: 0,
-		min_weight: 0,
-		max_weight: 0
+		weighed_birds_count: weights?.weighed ?? 0,
+		min_weight: weights?.min ?? 0,
+		max_weight: weights?.max ?? 0
 	};
+}
+
+// Three earlier days on which Blue Tit was weighed — enough weighed encounters
+// (and a low enough heaviest) for a heavier bird on any later day to take the
+// all-time heaviest-weight record. The session's own lightest (11g) is heavier
+// than all three, so only the "heaviest" line is ever derived.
+const BLUE_TIT_BASELINE_DATES = ['2022-05-01', '2022-06-01', '2022-07-01'];
+
+function blueTitBaselineRows(): StatsPerDayAndSpeciesResult[] {
+	return [
+		statsRow('Blue Tit', BLUE_TIT_BASELINE_DATES[0], 4, {
+			weighed: 4,
+			min: 10.5,
+			max: 13.0
+		}),
+		statsRow('Blue Tit', BLUE_TIT_BASELINE_DATES[1], 4, {
+			weighed: 4,
+			min: 10.7,
+			max: 12.8
+		}),
+		statsRow('Blue Tit', BLUE_TIT_BASELINE_DATES[2], 4, {
+			weighed: 4,
+			min: 10.8,
+			max: 12.9
+		})
+	];
+}
+
+function blueTitRecordRow(
+	visit_date: string,
+	max: number
+): StatsPerDayAndSpeciesResult {
+	return statsRow('Blue Tit', visit_date, 5, { weighed: 5, min: 11, max });
+}
+
+function heaviestSentence(max: number) {
+	return `Heaviest Blue Tit ever weighed — ${max}g`;
 }
 
 let statsVersion = 100;
@@ -145,14 +179,13 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	statsVersion = 100;
 	encountersRowsOverride = undefined;
-	rpcPages = [
+	rpcPages = [[...blueTitBaselineRows(), blueTitRecordRow(SESSION_DATE, 13.1)]];
+	sessionPages = [
 		[
-			statsRow('Robin', SESSION_DATE, 74),
-			statsRow('Robin', '2022-05-01', 30),
-			statsRow('Wren', '2022-05-01', 30)
+			...BLUE_TIT_BASELINE_DATES.map((visit_date) => ({ visit_date })),
+			{ visit_date: SESSION_DATE }
 		]
 	];
-	sessionPages = [[{ visit_date: '2022-05-01' }, { visit_date: SESSION_DATE }]];
 	mockGetAuthenticatedSupabaseClient.mockResolvedValue({
 		rpc: mockRpc,
 		from: mockFrom
@@ -178,18 +211,12 @@ describe('fetchSessionHighlights', () => {
 			(call) => (call as [string, unknown])[0] === 'stats_per_day_and_species'
 		) as [string, { ringing_group_filter: number }];
 		expect(statsArgs.ringing_group_filter).toBe(GROUP_ID);
-		// Robin is a rare species here (seen on only 2 days ever). This is also
-		// the first session of 2024 (the only prior session is 2022), so Robin —
-		// last seen in 2022 — is first (in fact only) of the year. That "only of
-		// year" line and Robin's rare-species line fold together (rarities'
-		// Comb-0) into a single MEGA headline that leads the list. The Counts
-		// group (busiest/quietest session, species record-day lines) has been
-		// removed from this fan-out — see the v2 highlight pipeline
-		// (app/lib/highlights/v2), which now produces those lines separately —
-		// so only the Rarities-group MEGA headline survives here.
-		expect(sentencesOf(highlights)).toEqual([
-			'MEGA — Only Robin records of 2024 (only 2 records ever)'
-		]);
+		// The session's 13.1g Blue Tit beats the heaviest of all three baseline
+		// days, so the Vital-stats group derives its all-time heaviest record.
+		// Counts (#989) and Rarities (#990) have both left this fan-out for the v2
+		// pipeline (app/lib/highlights/v2), which produces their lines separately,
+		// so the weight record is all that survives here.
+		expect(sentencesOf(highlights)).toEqual([heaviestSentence(13.1)]);
 	});
 
 	it('fetches session dates', async () => {
@@ -227,10 +254,13 @@ describe('fetchSessionHighlights', () => {
 
 	it('derives highlights from rows beyond the first page', async () => {
 		rpcPages = [
-			Array.from({ length: PAGE_SIZE }, (_, index) =>
-				statsRow(`Species ${index}`, '2022-05-01', 1)
-			),
-			[statsRow('Robin', SESSION_DATE, 2000)]
+			[
+				...blueTitBaselineRows(),
+				...Array.from({ length: PAGE_SIZE - 3 }, (_, index) =>
+					statsRow(`Species ${index}`, '2022-05-01', 1)
+				)
+			],
+			[blueTitRecordRow(SESSION_DATE, 13.1)]
 		];
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		const highlights = await fetchSessionHighlights({
@@ -243,102 +273,11 @@ describe('fetchSessionHighlights', () => {
 			PAGE_SIZE,
 			2 * PAGE_SIZE - 1
 		);
-		// Robin only appears on the second page (page 1 is 1000 unrelated
-		// species) — this proves the second page's row genuinely reached the
-		// derive functions, since Robin's "first ever, only record" status can
-		// only be computed if its page-2 row was included in the stats blob.
-		expect(sentencesOf(highlights)).toContain('Only Robin records ever');
-	});
-
-	it('includes weight record highlights in the fan-out', async () => {
-		// Blue Tit appears on enough session days to be a common (non-rare)
-		// species — this test is about the Vital-stats weight fan-out
-		rpcPages = [
-			[
-				{
-					species_name: 'Blue Tit',
-					visit_date: SESSION_DATE,
-					encounter_count: 5,
-					juv_count: 0,
-					postjuv_count: 0,
-					pullus_count: 0,
-					weighed_birds_count: 5,
-					min_weight: 11,
-					max_weight: 13.1
-				},
-				{
-					species_name: 'Blue Tit',
-					visit_date: '2022-05-01',
-					encounter_count: 4,
-					juv_count: 0,
-					postjuv_count: 0,
-					pullus_count: 0,
-					weighed_birds_count: 4,
-					min_weight: 10.5,
-					max_weight: 13.0
-				},
-				{
-					species_name: 'Blue Tit',
-					visit_date: '2022-06-01',
-					encounter_count: 4,
-					juv_count: 0,
-					postjuv_count: 0,
-					pullus_count: 0,
-					weighed_birds_count: 4,
-					min_weight: 10.7,
-					max_weight: 12.8
-				},
-				{
-					species_name: 'Blue Tit',
-					visit_date: '2022-07-01',
-					encounter_count: 4,
-					juv_count: 0,
-					postjuv_count: 0,
-					pullus_count: 0,
-					weighed_birds_count: 4,
-					min_weight: 10.8,
-					max_weight: 12.9
-				}
-			]
-		];
-		sessionPages = [
-			[
-				{ visit_date: '2022-05-01' },
-				{ visit_date: '2022-06-01' },
-				{ visit_date: '2022-07-01' },
-				{ visit_date: SESSION_DATE }
-			]
-		];
-		const fetchSessionHighlights = await importFetchSessionHighlights();
-		const highlights = await fetchSessionHighlights({
-			date: SESSION_DATE,
-			viewedGroupId: GROUP_ID
-		});
-		expect(sentencesOf(highlights)).toContain(
-			'Heaviest Blue Tit ever weighed — 13.1g'
-		);
-	});
-
-	it('includes rare-species highlights in the fan-out', async () => {
-		// Both Firecrest days fall in the session's year, so it is not first of the
-		// year — the rare-species line stands alone rather than folding into a MEGA
-		rpcPages = [
-			[
-				statsRow('Firecrest', SESSION_DATE, 1),
-				statsRow('Firecrest', '2024-05-01', 1)
-			]
-		];
-		sessionPages = [
-			[{ visit_date: '2024-05-01' }, { visit_date: SESSION_DATE }]
-		];
-		const fetchSessionHighlights = await importFetchSessionHighlights();
-		const highlights = await fetchSessionHighlights({
-			date: SESSION_DATE,
-			viewedGroupId: GROUP_ID
-		});
-		expect(sentencesOf(highlights)).toContain(
-			'MEGA — Firecrest seen on only 2 days ever'
-		);
+		// The session's own Blue Tit row only appears on the second page (page 1 is
+		// the three baseline days plus unrelated species) — this proves the second
+		// page's row genuinely reached the derive functions, since the weight record
+		// can only be computed if that page-2 row was included in the stats blob.
+		expect(sentencesOf(highlights)).toContain(heaviestSentence(13.1));
 	});
 
 	it('derives no highlights for a date whose only session is PULLI or FIELD_OBSERVATION, while other days stay unaffected', async () => {
@@ -348,23 +287,13 @@ describe('fetchSessionHighlights', () => {
 		// .eq('session_type', 'FULL_GROWN')) — it's simply absent from both stats
 		// blobs fed into every derive* function, so it's indistinguishable from
 		// "no session happened that day".
-		// An earlier, different-species session (2021-01-01) establishes group
-		// history predating 2022-05-01, so 2022-05-01 isn't the group's own
-		// first-ever session — Wren's first-ever-species highlight there is
-		// otherwise suppressed on a group's literal first session (every
-		// species would trivially be "first ever" on day one).
 		rpcPages = [
-			[
-				statsRow('Robin', '2021-01-01', 2),
-				statsRow('Wren', '2022-05-01', 5),
-				statsRow('Wren', '2022-06-01', 3)
-			]
+			[...blueTitBaselineRows(), blueTitRecordRow('2022-08-01', 13.5)]
 		];
 		sessionPages = [
 			[
-				{ visit_date: '2021-01-01' },
-				{ visit_date: '2022-05-01' },
-				{ visit_date: '2022-06-01' }
+				...BLUE_TIT_BASELINE_DATES.map((visit_date) => ({ visit_date })),
+				{ visit_date: '2022-08-01' }
 			]
 		];
 		const fetchSessionHighlights = await importFetchSessionHighlights();
@@ -376,26 +305,22 @@ describe('fetchSessionHighlights', () => {
 		// A real session day untouched by the flagged date still derives its
 		// species-level highlights normally
 		const realDayHighlights = await fetchSessionHighlights({
-			date: '2022-05-01',
+			date: '2022-08-01',
 			viewedGroupId: GROUP_ID
 		});
-		expect(sentencesOf(realDayHighlights)).toEqual(['First ever Wren records']);
+		expect(sentencesOf(realDayHighlights)).toEqual([heaviestSentence(13.5)]);
 	});
 
 	it('serves cached stats when the data version is unchanged', async () => {
-		// An earlier session (2021-01-01) predates both query dates, so neither
-		// is the group's first-ever session — Wren's first-ever-species
-		// highlight on 2022-05-01 is then observable rather than suppressed.
+		// The Blue Tit weight record falls on 2022-08-01, not on the first date
+		// queried, so the second fetch can only produce it from the cached blob.
 		rpcPages = [
-			[
-				statsRow('Blackbird', '2021-01-01', 2),
-				statsRow('Wren', '2022-05-01', 5)
-			]
+			[...blueTitBaselineRows(), blueTitRecordRow('2022-08-01', 13.5)]
 		];
 		sessionPages = [
 			[
-				{ visit_date: '2021-01-01' },
-				{ visit_date: '2022-05-01' },
+				...BLUE_TIT_BASELINE_DATES.map((visit_date) => ({ visit_date })),
+				{ visit_date: '2022-08-01' },
 				{ visit_date: SESSION_DATE }
 			]
 		];
@@ -405,7 +330,7 @@ describe('fetchSessionHighlights', () => {
 			viewedGroupId: GROUP_ID
 		});
 		const secondResult = await fetchSessionHighlights({
-			date: '2022-05-01',
+			date: '2022-08-01',
 			viewedGroupId: GROUP_ID
 		});
 		// stats_per_day_and_species is cached (called once), but
@@ -419,10 +344,10 @@ describe('fetchSessionHighlights', () => {
 		expect(mockSessionsEq).toHaveBeenCalledTimes(2);
 		// version query is run on each call
 		expect(mockEncountersLimit).toHaveBeenCalledTimes(2);
-		// the cached blob still serves other session dates — Wren's only
-		// appearance (2022-05-01) is derived from the same cached stats blob
-		// used for the SESSION_DATE fetch above
-		expect(sentencesOf(secondResult)).toEqual(['Only Wren records ever']);
+		// the cached blob still serves other session dates — the 2022-08-01 weight
+		// record is derived from the same cached stats blob used for the
+		// SESSION_DATE fetch above
+		expect(sentencesOf(secondResult)).toEqual([heaviestSentence(13.5)]);
 	});
 
 	it('re-fetches stats when the data version changes', async () => {
@@ -460,18 +385,15 @@ describe('fetchSessionHighlights', () => {
 
 	it('treats a group with no encounters as version 0', async () => {
 		encountersRowsOverride = [];
-		// Same rationale as the caching test above: an earlier session
-		// (2021-01-01) means 2022-05-01 isn't the group's first-ever session.
+		// Same fixture as the caching test above: the weight record falls on
+		// 2022-08-01, so the second fetch can only produce it from the cache.
 		rpcPages = [
-			[
-				statsRow('Blackbird', '2021-01-01', 2),
-				statsRow('Wren', '2022-05-01', 5)
-			]
+			[...blueTitBaselineRows(), blueTitRecordRow('2022-08-01', 13.5)]
 		];
 		sessionPages = [
 			[
-				{ visit_date: '2021-01-01' },
-				{ visit_date: '2022-05-01' },
+				...BLUE_TIT_BASELINE_DATES.map((visit_date) => ({ visit_date })),
+				{ visit_date: '2022-08-01' },
 				{ visit_date: SESSION_DATE }
 			]
 		];
@@ -481,7 +403,7 @@ describe('fetchSessionHighlights', () => {
 			viewedGroupId: GROUP_ID
 		});
 		const secondResult = await fetchSessionHighlights({
-			date: '2022-05-01',
+			date: '2022-08-01',
 			viewedGroupId: GROUP_ID
 		});
 		// stats_per_day_and_species should be cached (called once)
@@ -489,6 +411,6 @@ describe('fetchSessionHighlights', () => {
 			(call) => (call as [string])[0] === 'stats_per_day_and_species'
 		);
 		expect(metricsCalls).toHaveLength(1);
-		expect(sentencesOf(secondResult)).toEqual(['Only Wren records ever']);
+		expect(sentencesOf(secondResult)).toEqual([heaviestSentence(13.5)]);
 	});
 });

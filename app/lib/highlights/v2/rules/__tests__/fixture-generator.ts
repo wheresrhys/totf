@@ -2,13 +2,34 @@ import type {
 	HighlightScope,
 	HighlightRanking,
 	TemporalUnit,
-	CombinedHighlight
+	CombinedHighlight,
+	HighlightsGenerator
 } from '../../types';
+import type { CoreStatsResult } from '@/app/models/db';
+import type { StatsRepository } from '@/app/actions/stats-cache';
+
 // call each rule set's printers with standard data input shapes
 // save as fixtures
 // then write a test rule against outputs helper
 // then the test suite is just running this for each onefor nopw just tests for day timePeriod
 // TODO
+
+// A rule scoped to one species at a time gets fixtures carrying a species (its
+// printer reads combinedHighlight.species); a group-wide rule gets fixtures
+// without one. Asking the rule's own statsSelector is what decides it: a
+// per-species selector returns the bySpecies record, every other selector
+// returns a flat array — the same distinction generateAllHighlights makes when
+// it builds a scope per species. Reading it off the selector rather than off a
+// naming convention ('eachSpecies…') means a new per-species rule is covered
+// without also having to be named like one.
+export function isPerSpeciesRule(rule: HighlightsGenerator): boolean {
+	const emptyStats: StatsRepository<CoreStatsResult> = {
+		overall: [],
+		withSpecies: [],
+		bySpecies: {}
+	};
+	return !Array.isArray(rule.statsSelector(emptyStats));
+}
 
 function getBaseScope(
 	withSpecies: boolean,

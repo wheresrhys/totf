@@ -4,14 +4,15 @@
 // dispatch function and its underlying renderer map lets a caller either
 // render a single highlight or derive group membership from the map's keys
 // (e.g. app/components/pages/session/SessionHighlights.tsx partitioning a
-// flat SessionHighlight[] into its three sections).
+// flat SessionHighlight[] into its sections).
+//
+// Only Vital stats is left here: the Counts (#989) and Rarities (#990) sections
+// are now rendered by their v2 rules' own printers
+// (app/lib/highlights/v2/rules/*), which travel on the highlight itself, so
+// neither needs a renderer map on this side.
 //
 // long-absence-retrap-renderer.tsx is a deliberate omission — it's a sibling
-// of the three groups, not one of them, and isn't wired into any page yet.
-export {
-	renderRarityHighlight,
-	HIGHLIGHT_RENDERERS as RARITY_HIGHLIGHT_RENDERERS
-} from './rarities/renderers';
+// of the groups, not one of them, and isn't wired into any page yet.
 export {
 	renderVitalStatHighlight,
 	HIGHLIGHT_RENDERERS as VITAL_STAT_HIGHLIGHT_RENDERERS
