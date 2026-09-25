@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
 import type {
-	CountHighlight,
 	LongAbsenceRetrapHighlight,
 	RarityHighlight,
 	SessionHighlight,
@@ -10,8 +9,6 @@ import type {
 import {
 	renderRarityHighlight,
 	RARITY_HIGHLIGHT_RENDERERS,
-	renderCountHighlight,
-	COUNT_HIGHLIGHT_RENDERERS,
 	renderVitalStatHighlight,
 	VITAL_STAT_HIGHLIGHT_RENDERERS
 } from '@/app/components/highlights';
@@ -23,15 +20,11 @@ import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 // SessionHighlight[] to whichever group's renderer matches, the same way
 // SessionHighlights.tsx partitions the list into its sections.
 const RARITY_TYPES = new Set(Object.keys(RARITY_HIGHLIGHT_RENDERERS));
-const COUNT_TYPES = new Set(Object.keys(COUNT_HIGHLIGHT_RENDERERS));
 const VITAL_STAT_TYPES = new Set(Object.keys(VITAL_STAT_HIGHLIGHT_RENDERERS));
 
 function renderHighlight(highlight: SessionHighlight) {
 	if (RARITY_TYPES.has(highlight.type)) {
 		return renderRarityHighlight(highlight as RarityHighlight);
-	}
-	if (COUNT_TYPES.has(highlight.type)) {
-		return renderCountHighlight(highlight as CountHighlight);
 	}
 	if (VITAL_STAT_TYPES.has(highlight.type)) {
 		return renderVitalStatHighlight(highlight as VitalStatHighlight);
