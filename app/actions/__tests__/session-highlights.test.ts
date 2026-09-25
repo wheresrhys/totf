@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
 import type {
-	CountHighlight,
 	LongAbsenceRetrapHighlight,
 	RarityHighlight,
 	SessionHighlight,
@@ -10,8 +9,6 @@ import type {
 import {
 	renderRarityHighlight,
 	RARITY_HIGHLIGHT_RENDERERS,
-	renderCountHighlight,
-	COUNT_HIGHLIGHT_RENDERERS,
 	renderVitalStatHighlight,
 	VITAL_STAT_HIGHLIGHT_RENDERERS
 } from '@/app/components/highlights';
@@ -23,15 +20,11 @@ import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 // SessionHighlight[] to whichever group's renderer matches, the same way
 // SessionHighlights.tsx partitions the list into its sections.
 const RARITY_TYPES = new Set(Object.keys(RARITY_HIGHLIGHT_RENDERERS));
-const COUNT_TYPES = new Set(Object.keys(COUNT_HIGHLIGHT_RENDERERS));
 const VITAL_STAT_TYPES = new Set(Object.keys(VITAL_STAT_HIGHLIGHT_RENDERERS));
 
 function renderHighlight(highlight: SessionHighlight) {
 	if (RARITY_TYPES.has(highlight.type)) {
 		return renderRarityHighlight(highlight as RarityHighlight);
-	}
-	if (COUNT_TYPES.has(highlight.type)) {
-		return renderCountHighlight(highlight as CountHighlight);
 	}
 	if (VITAL_STAT_TYPES.has(highlight.type)) {
 		return renderVitalStatHighlight(highlight as VitalStatHighlight);
@@ -189,17 +182,13 @@ describe('fetchSessionHighlights', () => {
 		// the first session of 2024 (the only prior session is 2022), so Robin —
 		// last seen in 2022 — is first (in fact only) of the year. That "only of
 		// year" line and Robin's rare-species line fold together (rarities'
-		// Comb-0) into a single MEGA headline that leads the list.
-		// Per #409: the cross-group rare-species suppression that used to drop a
-		// rare species' own count/weight lines (old Rem-3) is intentionally left
-		// unwired in this restructure — #418 designs and wires it properly — so
-		// Robin's own species-count-record (74 beats its prior day's 30, all-time)
-		// now survives into the Counts block instead of being suppressed.
+		// Comb-0) into a single MEGA headline that leads the list. The Counts
+		// group (busiest/quietest session, species record-day lines) has been
+		// removed from this fan-out — see the v2 highlight pipeline
+		// (app/lib/highlights/v2), which now produces those lines separately —
+		// so only the Rarities-group MEGA headline survives here.
 		expect(sentencesOf(highlights)).toEqual([
-			'MEGA — Only Robin records of 2024 (only 2 records ever)',
-			'Busiest session ever — 74 birds',
-			'Record day for Robin — 74 caught, the most ever',
-			'Quietest session since 1 May 2022 — 74 birds'
+			'MEGA — Only Robin records of 2024 (only 2 records ever)'
 		]);
 	});
 
@@ -254,9 +243,11 @@ describe('fetchSessionHighlights', () => {
 			PAGE_SIZE,
 			2 * PAGE_SIZE - 1
 		);
-		expect(sentencesOf(highlights)).toContain(
-			'Busiest session ever — 2000 birds'
-		);
+		// Robin only appears on the second page (page 1 is 1000 unrelated
+		// species) — this proves the second page's row genuinely reached the
+		// derive functions, since Robin's "first ever, only record" status can
+		// only be computed if its page-2 row was included in the stats blob.
+		expect(sentencesOf(highlights)).toContain('Only Robin records ever');
 	});
 
 	it('includes weight record highlights in the fan-out', async () => {
@@ -357,11 +348,24 @@ describe('fetchSessionHighlights', () => {
 		// .eq('session_type', 'FULL_GROWN')) — it's simply absent from both stats
 		// blobs fed into every derive* function, so it's indistinguishable from
 		// "no session happened that day".
+		// An earlier, different-species session (2021-01-01) establishes group
+		// history predating 2022-05-01, so 2022-05-01 isn't the group's own
+		// first-ever session — Wren's first-ever-species highlight there is
+		// otherwise suppressed on a group's literal first session (every
+		// species would trivially be "first ever" on day one).
 		rpcPages = [
-			[statsRow('Wren', '2022-05-01', 5), statsRow('Wren', '2022-06-01', 3)]
+			[
+				statsRow('Robin', '2021-01-01', 2),
+				statsRow('Wren', '2022-05-01', 5),
+				statsRow('Wren', '2022-06-01', 3)
+			]
 		];
 		sessionPages = [
-			[{ visit_date: '2022-05-01' }, { visit_date: '2022-06-01' }]
+			[
+				{ visit_date: '2021-01-01' },
+				{ visit_date: '2022-05-01' },
+				{ visit_date: '2022-06-01' }
+			]
 		];
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		const flaggedDateHighlights = await fetchSessionHighlights({
@@ -375,10 +379,26 @@ describe('fetchSessionHighlights', () => {
 			date: '2022-05-01',
 			viewedGroupId: GROUP_ID
 		});
-		expect(sentencesOf(realDayHighlights).length).toBeGreaterThan(0);
+		expect(sentencesOf(realDayHighlights)).toEqual(['First ever Wren records']);
 	});
 
 	it('serves cached stats when the data version is unchanged', async () => {
+		// An earlier session (2021-01-01) predates both query dates, so neither
+		// is the group's first-ever session — Wren's first-ever-species
+		// highlight on 2022-05-01 is then observable rather than suppressed.
+		rpcPages = [
+			[
+				statsRow('Blackbird', '2021-01-01', 2),
+				statsRow('Wren', '2022-05-01', 5)
+			]
+		];
+		sessionPages = [
+			[
+				{ visit_date: '2021-01-01' },
+				{ visit_date: '2022-05-01' },
+				{ visit_date: SESSION_DATE }
+			]
+		];
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		await fetchSessionHighlights({
 			date: SESSION_DATE,
@@ -399,11 +419,10 @@ describe('fetchSessionHighlights', () => {
 		expect(mockSessionsEq).toHaveBeenCalledTimes(2);
 		// version query is run on each call
 		expect(mockEncountersLimit).toHaveBeenCalledTimes(2);
-		// the cached blob still serves other session dates — the 2022 session
-		// holds the most-varied record (2 species vs 1 on the 2024 day)
-		expect(sentencesOf(secondResult)).toEqual([
-			'Most varied session ever — 2 species'
-		]);
+		// the cached blob still serves other session dates — Wren's only
+		// appearance (2022-05-01) is derived from the same cached stats blob
+		// used for the SESSION_DATE fetch above
+		expect(sentencesOf(secondResult)).toEqual(['Only Wren records ever']);
 	});
 
 	it('re-fetches stats when the data version changes', async () => {
@@ -441,6 +460,21 @@ describe('fetchSessionHighlights', () => {
 
 	it('treats a group with no encounters as version 0', async () => {
 		encountersRowsOverride = [];
+		// Same rationale as the caching test above: an earlier session
+		// (2021-01-01) means 2022-05-01 isn't the group's first-ever session.
+		rpcPages = [
+			[
+				statsRow('Blackbird', '2021-01-01', 2),
+				statsRow('Wren', '2022-05-01', 5)
+			]
+		];
+		sessionPages = [
+			[
+				{ visit_date: '2021-01-01' },
+				{ visit_date: '2022-05-01' },
+				{ visit_date: SESSION_DATE }
+			]
+		];
 		const fetchSessionHighlights = await importFetchSessionHighlights();
 		await fetchSessionHighlights({
 			date: SESSION_DATE,
@@ -455,8 +489,6 @@ describe('fetchSessionHighlights', () => {
 			(call) => (call as [string])[0] === 'stats_per_day_and_species'
 		);
 		expect(metricsCalls).toHaveLength(1);
-		expect(sentencesOf(secondResult)).toEqual([
-			'Most varied session ever — 2 species'
-		]);
+		expect(sentencesOf(secondResult)).toEqual(['Only Wren records ever']);
 	});
 });

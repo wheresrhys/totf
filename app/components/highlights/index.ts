@@ -13,10 +13,6 @@ export {
 	HIGHLIGHT_RENDERERS as RARITY_HIGHLIGHT_RENDERERS
 } from './rarities/renderers';
 export {
-	renderCountHighlight,
-	HIGHLIGHT_RENDERERS as COUNT_HIGHLIGHT_RENDERERS
-} from './counts/renderers';
-export {
 	renderVitalStatHighlight,
 	HIGHLIGHT_RENDERERS as VITAL_STAT_HIGHLIGHT_RENDERERS
 } from './vital-stats/renderers';
