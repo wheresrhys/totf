@@ -13,6 +13,8 @@ import {
 	SwarmStateSchemaError,
 	type SwarmWorkerEntry,
 } from '../state-file';
+import { gitEnv, initGitRepo } from './git-test-env';
+import { makeSwarmWorkerEntry } from './swarm-worker-entry-fixture';
 
 // listState() prunes entries by two independent signals: a missing worktreePath, and a worktree
 // that exists but has gone quiet past STALE_INACTIVITY_THRESHOLD_MS. Default entries to a real,
@@ -27,30 +29,13 @@ afterAll(() => {
 });
 
 function makeEntry(overrides: Partial<SwarmWorkerEntry> = {}): SwarmWorkerEntry {
-	return {
-		kind: 'ticket',
-		issue: 1,
-		pr: null,
-		branch: 'feature/1-example',
-		title: 'Example',
-		worktreePath: LIVE_WORKTREE,
-		agentId: 'agent-1',
-		model: 'sonnet',
-		startedAt: '2026-01-01T00:00:00.000Z',
-		...overrides,
-	};
+	return makeSwarmWorkerEntry({ worktreePath: LIVE_WORKTREE, ...overrides });
 }
 
 // git honours an inherited GIT_DIR over cwd (git sets it when invoking hooks), so strip the
 // discovery overrides for every git call these tests make — otherwise a suite run from the
 // pre-push hook would re-target the real repo instead of the isolated temp worktree.
-const GIT_ENV = (() => {
-	const env = { ...process.env };
-	delete env.GIT_DIR;
-	delete env.GIT_WORK_TREE;
-	delete env.GIT_INDEX_FILE;
-	return env;
-})();
+const GIT_ENV = gitEnv();
 
 async function gitInWorktree(args: string[], cwd: string, extraEnv: Record<string, string> = {}): Promise<void> {
 	await execa('git', args, { cwd, env: { ...GIT_ENV, ...extraEnv }, extendEnv: false });
@@ -87,14 +72,10 @@ describe('state-file', () => {
 		repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'swarm-state-test-'));
 		// `git init` honours an inherited GIT_DIR over cwd — git sets GIT_DIR when invoking hooks,
 		// so running this suite from the pre-push hook would otherwise re-target the real repo's
-		// .git instead of creating an isolated one here. Strip it (and disable execa's default
-		// extendEnv, which would otherwise re-merge it back in from process.env) so the temp repo
-		// is genuinely isolated regardless of what invoked the test run.
-		const env = { ...process.env };
-		delete env.GIT_DIR;
-		delete env.GIT_WORK_TREE;
-		delete env.GIT_INDEX_FILE;
-		await execa('git', ['init', '--quiet'], { cwd: repoDir, env, extendEnv: false });
+		// .git instead of creating an isolated one here. `initGitRepo` strips it (and disables
+		// execa's default extendEnv, which would otherwise re-merge it back in from process.env)
+		// so the temp repo is genuinely isolated regardless of what invoked the test run.
+		await initGitRepo(repoDir);
 	});
 
 	afterEach(async () => {

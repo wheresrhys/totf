@@ -3,20 +3,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
-import { execa } from 'execa';
 import {
 	ensureLocalMigrationsApplied,
 	type MigrationUpRunner,
 } from '../ensure-local-migrations-applied';
 import { readMigrationMarker, withMigrationMarkerLock } from '../../lib/migration-marker';
-
-function gitEnv(): NodeJS.ProcessEnv {
-	const env = { ...process.env };
-	delete env.GIT_DIR;
-	delete env.GIT_WORK_TREE;
-	delete env.GIT_INDEX_FILE;
-	return env;
-}
+import { initGitRepo } from '../../lib/__tests__/git-test-env';
 
 async function writeMigrationFiles(worktreePath: string, filenames: string[]): Promise<void> {
 	const dir = path.join(worktreePath, 'supabase', 'migrations');
@@ -38,7 +30,7 @@ describe('ensure_local_migrations_applied', () => {
 
 	beforeEach(async () => {
 		worktreeDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ensure-migrations-'));
-		await execa('git', ['init', '--quiet'], { cwd: worktreeDir, env: gitEnv(), extendEnv: false });
+		await initGitRepo(worktreeDir);
 	});
 
 	afterEach(async () => {

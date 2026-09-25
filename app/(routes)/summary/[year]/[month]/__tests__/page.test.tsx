@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import Page, { fetchSummaryYearMonthPageContent } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
+import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 vi.mock('@/app/actions/summary-stats', () => ({
@@ -33,24 +34,6 @@ function renderSummaryYearMonthPage(
 		params: Promise.resolve({ year, month }),
 		...(tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) })
 	});
-}
-
-function buildDayStat(time_period: string) {
-	return {
-		species_name: null,
-		time_period,
-		session_count: 1,
-		total_effort: '06:00:00',
-		species_count: 5,
-		bird_count: 12,
-		encounter_count: 14,
-		new_bird_count: 9,
-		pullus_bird_count: 1,
-		juv_bird_count: 2,
-		postjuv_bird_count: 1,
-		adult_bird_count: 6,
-		unknown_age_bird_count: 2
-	};
 }
 
 describe('/summary/[year]/[month]', () => {
@@ -171,7 +154,9 @@ describe('/summary/[year]/[month]', () => {
 	});
 
 	it('links each session day to the group-scoped session route', async () => {
-		fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
+		fetchPeriodTotalsMock.mockResolvedValueOnce([
+			buildDailyStatsRow({ time_period: '2026-08-16' })
+		]);
 		render(
 			await Page({
 				params: Promise.resolve({ year: '2026', month: '08' })
@@ -231,7 +216,9 @@ describe('/summary/[year]/[month]', () => {
 		});
 
 		it('?tabId=session-totals (the already-default tab, a no-op case) still loads', async () => {
-			fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
+			fetchPeriodTotalsMock.mockResolvedValueOnce([
+				buildDailyStatsRow({ time_period: '2026-08-16' })
+			]);
 			render(await renderSummaryYearMonthPage('2026', '08', 'session-totals'));
 			await screen.findByRole('link', { name: '16th August 2026' });
 			expect(

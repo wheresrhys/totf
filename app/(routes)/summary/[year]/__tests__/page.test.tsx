@@ -10,6 +10,7 @@ import {
 } from '@testing-library/react';
 import Page, { fetchSummaryYearPageContent } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
+import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 const fetchPeriodStatsMock = vi.fn().mockResolvedValue([]);
@@ -33,24 +34,6 @@ function renderSummaryYearPage(year = '2026', tabId?: string) {
 		params: Promise.resolve({ year }),
 		...(tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) })
 	});
-}
-
-function buildDayStat(time_period: string) {
-	return {
-		species_name: null,
-		time_period,
-		session_count: 1,
-		total_effort: '06:00:00',
-		species_count: 5,
-		bird_count: 12,
-		encounter_count: 14,
-		new_bird_count: 9,
-		pullus_bird_count: 1,
-		juv_bird_count: 2,
-		postjuv_bird_count: 1,
-		adult_bird_count: 6,
-		unknown_age_bird_count: 2
-	};
 }
 
 describe('/summary/[year]', () => {
@@ -157,7 +140,9 @@ describe('/summary/[year]', () => {
 
 	describe('Session totals tab', () => {
 		it('selecting the Session totals tab fetches day-grouped totals bounded to {year}-01-01 / {year}-12-31', async () => {
-			fetchPeriodTotalsMock.mockResolvedValueOnce([buildDayStat('2026-08-16')]);
+			fetchPeriodTotalsMock.mockResolvedValueOnce([
+				buildDailyStatsRow({ time_period: '2026-08-16' })
+			]);
 			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
 			await screen.findByRole('heading', { level: 1 });
 			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));

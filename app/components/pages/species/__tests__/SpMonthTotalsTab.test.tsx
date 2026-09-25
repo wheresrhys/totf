@@ -9,44 +9,11 @@ import {
 import { SpMonthTotalsTab } from '../SpMonthTotalsTab';
 import type { CoreStatsResult } from '@/app/models/db';
 import { getColumnIndex } from '@/app/__tests__/helpers/table';
+import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchSpeciesPeriodTotals: vi.fn()
 }));
-
-function buildMonthlyStat(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
-	return {
-		species_name: null,
-		time_period: '2026-03-01',
-		session_count: 2,
-		total_effort: '06:00:00',
-		effort_per_session: '03:00:00',
-		effort_per_encounter: '00:30:00',
-		avg_encounters_per_session: 6,
-		max_per_session: 8,
-		species_count: 1,
-		bird_count: 12,
-		encounter_count: 14,
-		new_bird_count: 9,
-		max_new_per_session: 6,
-		max_weight: 13.1,
-		avg_weight: 11.2,
-		min_weight: 9.8,
-		median_weight: 10.8,
-		max_wing: 68,
-		avg_wing: 66.6,
-		min_wing: 65,
-		median_wing: 67,
-		pullus_bird_count: 1,
-		juv_bird_count: 2,
-		postjuv_bird_count: 1,
-		adult_bird_count: 6,
-		unknown_age_bird_count: 2,
-		...overrides
-	} as CoreStatsResult;
-}
 
 describe('SpMonthTotalsTab', () => {
 	afterEach(() => {
@@ -56,7 +23,7 @@ describe('SpMonthTotalsTab', () => {
 	beforeEach(async () => {
 		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
 		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-			buildMonthlyStat({ time_period: '2026-03-01' })
+			buildCoreStatsRow({ time_period: '2026-03-01' })
 		]);
 	});
 
@@ -174,7 +141,7 @@ describe('SpMonthTotalsTab', () => {
 				await import('@/app/actions/sp-data');
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue(
 				Array.from({ length: 12 }, (_unused, index) =>
-					buildMonthlyStat({
+					buildCoreStatsRow({
 						time_period: `2026-${String(index + 1).padStart(2, '0')}-01`,
 						session_count: 2
 					})
@@ -194,7 +161,7 @@ describe('SpMonthTotalsTab', () => {
 			const { fetchSpeciesPeriodTotals } =
 				await import('@/app/actions/sp-data');
 			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildMonthlyStat({ time_period: '2026-08-01', session_count: 3 })
+				buildCoreStatsRow({ time_period: '2026-08-01', session_count: 3 })
 			]);
 			render(
 				<SpMonthTotalsTab speciesName="Robin" viewedGroupId={1} year={2026} />
