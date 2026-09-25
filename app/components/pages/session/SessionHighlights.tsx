@@ -106,7 +106,9 @@ export function SessionHighlights({
 	if (status === 'error') return null;
 
 	const rarityHighlights = highlights.v1.filter(isRarityHighlight);
-	const countHighlights = highlights.v2.filter(highlight => highlight.descriptor.category === 'count')
+	const countHighlights = highlights.v2.filter(
+		(highlight) => highlight.descriptor.category === 'count'
+	);
 	const vitalStatHighlights = highlights.v1.filter(isVitalStatHighlight);
 
 	const showRarities = rarityHighlights.length > 0;
@@ -120,7 +122,6 @@ export function SessionHighlights({
 	}
 	return (
 		<section data-testid="session-highlights">
-
 			{showRarities ? (
 				<>
 					<SecondaryHeading>Rarities</SecondaryHeading>
