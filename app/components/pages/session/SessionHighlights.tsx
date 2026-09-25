@@ -5,22 +5,27 @@ import {
 	SecondaryHeading
 } from '@/app/components/shared/DesignSystem';
 import { fetchSessionHighlights } from '@/app/actions/session-highlights';
+
+import { getCondensedHighlightsAtTimePeriod } from '@/app/lib/highlights/v2';
+
+import { type CombinedHighlight } from '@/app/lib/highlights/v2/types';
 import {
 	renderRarityHighlight,
 	RARITY_HIGHLIGHT_RENDERERS,
-	renderCountHighlight,
-	COUNT_HIGHLIGHT_RENDERERS,
 	renderVitalStatHighlight,
 	VITAL_STAT_HIGHLIGHT_RENDERERS
 } from '@/app/components/highlights';
 import type {
-	CountHighlight,
 	RarityHighlight,
 	SessionHighlight,
 	VitalStatHighlight
 } from '@/app/lib/highlights';
 import type { SessionEncounter } from '@/app/models/session';
 
+type HighlightsData = {
+	v1: SessionHighlight[];
+	v2: CombinedHighlight[];
+};
 // Each group's own renderer map (from the barrel) is the single source of
 // truth for which highlight `type`s belong to that group — reusing its keys
 // here means this partitioning can never drift out of sync with the map
@@ -28,7 +33,6 @@ import type { SessionEncounter } from '@/app/models/session';
 // a sibling of the groups, not wired into any section yet (see
 // docs/session-highlight-ordering.md).
 const RARITY_TYPES = new Set<string>(Object.keys(RARITY_HIGHLIGHT_RENDERERS));
-const COUNT_TYPES = new Set<string>(Object.keys(COUNT_HIGHLIGHT_RENDERERS));
 const VITAL_STAT_TYPES = new Set<string>(
 	Object.keys(VITAL_STAT_HIGHLIGHT_RENDERERS)
 );
@@ -38,11 +42,7 @@ function isRarityHighlight(
 ): highlight is RarityHighlight {
 	return RARITY_TYPES.has(highlight.type);
 }
-function isCountHighlight(
-	highlight: SessionHighlight
-): highlight is CountHighlight {
-	return COUNT_TYPES.has(highlight.type);
-}
+
 function isVitalStatHighlight(
 	highlight: SessionHighlight
 ): highlight is VitalStatHighlight {
@@ -62,15 +62,25 @@ export function SessionHighlights({
 	// pool, fetched async; the action returns plain highlight data and the
 	// client partitions + renders each group here. The "Best of the session"
 	// subsection is plain prop data, available synchronously.
-	const [highlights, setHighlights] = useState<SessionHighlight[]>([]);
+	const [highlights, setHighlights] = useState<HighlightsData>({
+		v1: [],
+		v2: []
+	});
 	const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>(
 		'loading'
 	);
 	useEffect(() => {
 		setStatus('loading');
-		fetchSessionHighlights({ date, viewedGroupId })
-			.then((fetched) => {
-				setHighlights(fetched);
+
+		Promise.all([
+			getCondensedHighlightsAtTimePeriod(viewedGroupId, date, 'day'),
+			fetchSessionHighlights({ date, viewedGroupId })
+		])
+			.then(([fetchedV2, fetchedV1]) => {
+				setHighlights({
+					v1: fetchedV1,
+					v2: fetchedV2
+				});
 				setStatus('loaded');
 			})
 			.catch((error) => {
@@ -79,7 +89,7 @@ export function SessionHighlights({
 					viewedGroupId,
 					error
 				});
-				setHighlights([]);
+				setHighlights({ v1: [], v2: [] });
 				setStatus('error');
 			});
 	}, [date, viewedGroupId]);
@@ -95,9 +105,9 @@ export function SessionHighlights({
 	// top of an errored fetch.
 	if (status === 'error') return null;
 
-	const rarityHighlights = highlights.filter(isRarityHighlight);
-	const countHighlights = highlights.filter(isCountHighlight);
-	const vitalStatHighlights = highlights.filter(isVitalStatHighlight);
+	const rarityHighlights = highlights.v1.filter(isRarityHighlight);
+	const countHighlights = highlights.v2.filter(highlight => highlight.descriptor.category === 'count')
+	const vitalStatHighlights = highlights.v1.filter(isVitalStatHighlight);
 
 	const showRarities = rarityHighlights.length > 0;
 	const showCounts = countHighlights.length > 0;
@@ -110,6 +120,7 @@ export function SessionHighlights({
 	}
 	return (
 		<section data-testid="session-highlights">
+
 			{showRarities ? (
 				<>
 					<SecondaryHeading>Rarities</SecondaryHeading>
@@ -122,7 +133,13 @@ export function SessionHighlights({
 				<>
 					<SecondaryHeading>Counts</SecondaryHeading>
 					<BoxyList testId="counts">
-						{countHighlights.map(renderCountHighlight)}
+						{countHighlights.map((highlight: CombinedHighlight) => {
+							return (
+								<li key={`${highlight.descriptor.type}-${highlight.species}`}>
+									{highlight.formatters.combinedHighlightPrinter(highlight)}
+								</li>
+							);
+						})}
 					</BoxyList>
 				</>
 			) : null}
