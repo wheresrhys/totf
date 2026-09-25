@@ -70,4 +70,14 @@ describe('combineOnlyOfYearHighlights (Comb-2)', () => {
 		const pool = [rare('Wryneck', 2), rare('Dunnock', 2)];
 		expect(combineOnlyOfYearHighlights(pool)).toEqual(pool);
 	});
+
+	it('does not mutate the input list', () => {
+		const pool = [
+			firstOfYear('Chaffinch', true),
+			firstOfYear('Goldfinch', true)
+		];
+		const snapshot = [...pool];
+		combineOnlyOfYearHighlights(pool);
+		expect(pool).toEqual(snapshot);
+	});
 });

@@ -72,4 +72,17 @@ describe('removeNarrowerScopeSpeciesRecords (Rem-2)', () => {
 		];
 		expect(removeNarrowerScopeSpeciesRecords(pool)).toEqual(pool);
 	});
+
+	it('does not mutate the input list', () => {
+		const pool = [
+			speciesCountRecord('Reed Warbler', 'all-time', 67, {
+				placementRank: 2,
+				isJointPlacement: false
+			}),
+			speciesCountRecord('Reed Warbler', 'this-year', 67)
+		];
+		const snapshot = [...pool];
+		removeNarrowerScopeSpeciesRecords(pool);
+		expect(pool).toEqual(snapshot);
+	});
 });

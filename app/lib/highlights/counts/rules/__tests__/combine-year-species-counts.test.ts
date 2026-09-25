@@ -58,4 +58,14 @@ describe('combineYearSpeciesCounts (Comb-3)', () => {
 		const pool = [speciesCountRecord('Wren', 'all-time', 3), busiestSince];
 		expect(combineYearSpeciesCounts(pool)).toEqual(pool);
 	});
+
+	it('does not mutate the input list', () => {
+		const pool = [
+			speciesCountRecord("Cetti's Warbler", 'this-year', 6),
+			speciesCountRecord('Chiffchaff', 'this-year', 5)
+		];
+		const snapshot = [...pool];
+		combineYearSpeciesCounts(pool);
+		expect(pool).toEqual(snapshot);
+	});
 });

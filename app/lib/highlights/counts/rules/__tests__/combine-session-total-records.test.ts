@@ -39,4 +39,14 @@ describe('combineSessionTotalRecords (Comb-1)', () => {
 		const lone = sessionTotalRecord('encounters', 'this-year', 120);
 		expect(combineSessionTotalRecords([lone])).toEqual([lone]);
 	});
+
+	it('does not mutate the input list', () => {
+		const pool = [
+			sessionTotalRecord('encounters', 'this-year', 120),
+			sessionTotalRecord('species', 'this-year', 15)
+		];
+		const snapshot = [...pool];
+		combineSessionTotalRecords(pool);
+		expect(pool).toEqual(snapshot);
+	});
 });
