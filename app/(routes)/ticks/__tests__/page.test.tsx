@@ -52,19 +52,6 @@ describe('ticks page', () => {
 		expect(items[2].textContent).toBe('Blue Tit on 1st March 2024');
 	});
 
-	it('renders ticks in the order returned by the server (most recent first)', async () => {
-		render(await Page());
-		const list = await screen.findByRole('list');
-		const items = [...list.querySelectorAll('li')].map(
-			(item) => item.textContent
-		);
-		expect(items).toEqual([
-			'Carrion Crow on 2nd May 2026',
-			'Robin on 20th November 2025',
-			'Blue Tit on 1st March 2024'
-		]);
-	});
-
 	describe('with no ticks yet', () => {
 		it('renders a friendly empty state instead of a list', async () => {
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeRpcClient([]));

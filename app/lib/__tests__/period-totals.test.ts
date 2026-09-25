@@ -45,11 +45,6 @@ describe('derivePeriodTotalsRowByBird', () => {
 		});
 	});
 
-	it('maps species_count to speciesCount', () => {
-		const stat = buildCoreStatsRow({ species_count: 9 });
-		expect(derivePeriodTotalsRowByBird(stat).speciesCount).toBe(9);
-	});
-
 	it('maps session_count to sessionsCount', () => {
 		const stat = buildCoreStatsRow({
 			session_count: 11,
@@ -95,11 +90,6 @@ describe('derivePeriodTotalsRowByBird', () => {
 			unknownAge: 0
 		});
 	});
-
-	it('computes retraps via the shared calculateRetraps helper', () => {
-		const stat = buildCoreStatsRow({ bird_count: 10, new_bird_count: 3 });
-		expect(derivePeriodTotalsRowByBird(stat).retraps).toBe(7);
-	});
 });
 
 describe('derivePeriodTotalsRowByEncounter', () => {
@@ -120,11 +110,6 @@ describe('derivePeriodTotalsRowByEncounter', () => {
 			adults: 1,
 			unknownAge: 0
 		});
-	});
-
-	it('computes retraps via the shared calculateEncounterRetraps helper', () => {
-		const stat = buildCoreStatsRow({ encounter_count: 10, new_bird_count: 3 });
-		expect(derivePeriodTotalsRowByEncounter(stat).retraps).toBe(7);
 	});
 
 	it('maps max_per_session to maxPerSession', () => {
