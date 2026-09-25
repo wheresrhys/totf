@@ -4,22 +4,13 @@ import { PeriodTotalsTable } from '../PeriodTotalsTable';
 import type { CoreStatsResult } from '@/app/models/db';
 import {
 	getCellByHeading,
-	getCellTextByHeading
+	getCellTextByHeading,
+	getColumnHeaders
 } from '@/app/__tests__/helpers/table';
-import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
-
-// The real header <th>s live in the `<thead>` row without a `data-testid` —
-// `above-header-row` (the "Aggregate by" toggle row) and `totals-row` are
-// the other two possible `<thead>` rows, both explicitly testid'd, so this
-// excludes them rather than relying on the header row's fixed position.
-function getColumnHeaders(): HTMLTableCellElement[] {
-	const headerRow = Array.from(document.querySelectorAll('thead tr')).find(
-		(row) => !row.hasAttribute('data-testid')
-	);
-	return Array.from(
-		headerRow?.querySelectorAll('th') ?? []
-	) as HTMLTableCellElement[];
-}
+import {
+	buildCoreStatsRow,
+	withEncCounts
+} from '@/app/__tests__/helpers/core-stats-fixtures';
 
 describe('PeriodTotalsTable', () => {
 	afterEach(() => {
@@ -332,13 +323,13 @@ describe('PeriodTotalsTable', () => {
 				postjuv_bird_count: 3,
 				adult_bird_count: 15,
 				unknown_age_bird_count: 5,
-				...({
+				...withEncCounts({
 					pullus_enc_count: 9,
 					juv_enc_count: 8,
 					postjuv_enc_count: 7,
 					adult_enc_count: 6,
 					unknown_age_enc_count: 4
-				} as Partial<CoreStatsResult>),
+				}),
 				...overrides
 			});
 		}
@@ -484,13 +475,13 @@ describe('PeriodTotalsTable', () => {
 					unknown_age_bird_count: 0,
 					// `*_enc_count` columns — see #602. `pullus_enc_count` deliberately
 					// differs from `pullus_bird_count` so the toggle's effect is visible.
-					...({
+					...withEncCounts({
 						pullus_enc_count: 3,
 						juv_enc_count: 2,
 						postjuv_enc_count: 2,
 						adult_enc_count: 4,
 						unknown_age_enc_count: 1
-					} as Partial<CoreStatsResult>)
+					})
 				});
 
 				render(

@@ -6,6 +6,21 @@ import {
 } from '@testing-library/react';
 
 /**
+ * The real header <th>s live in the `<thead>` row without a `data-testid` —
+ * `above-header-row` (the "Aggregate by" toggle row) and `totals-row` are
+ * the other two possible `<thead>` rows, both explicitly testid'd, so this
+ * excludes them rather than relying on the header row's fixed position.
+ */
+export function getColumnHeaders(): HTMLTableCellElement[] {
+	const headerRow = Array.from(document.querySelectorAll('thead tr')).find(
+		(row) => !row.hasAttribute('data-testid')
+	);
+	return Array.from(
+		headerRow?.querySelectorAll('th') ?? []
+	) as HTMLTableCellElement[];
+}
+
+/**
  * Index (0-based) of the column whose <th> text matches headingText.
  * container defaults to the sole table in the document (screen.getByRole('table')).
  */

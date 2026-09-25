@@ -69,3 +69,33 @@ export function buildDailyStatsRow(
 ): CoreStatsResult {
 	return buildCoreStatsRow({ time_period: '2026-08-16', ...overrides });
 }
+
+/**
+ * The five `*_enc_count` age-bucket columns (see #602) as a `Partial<CoreStatsResult>`
+ * spread fragment, defaulted to 0 and overridden per call — for tests exercising
+ * the "Aggregate by" bird/encounter toggle, where a row needs its encounter-derived
+ * counts to differ from its `*_bird_count` counts so the toggle's effect is visible.
+ * Was independently hand-rolled 3 times across `PeriodTotalsTable.test.tsx` and
+ * `SpeciesTotalsTable.test.tsx` — see `reports/test-quality.md`.
+ */
+export function withEncCounts(
+	overrides: Partial<
+		Pick<
+			CoreStatsResult,
+			| 'pullus_enc_count'
+			| 'juv_enc_count'
+			| 'postjuv_enc_count'
+			| 'adult_enc_count'
+			| 'unknown_age_enc_count'
+		>
+	> = {}
+): Partial<CoreStatsResult> {
+	return {
+		pullus_enc_count: 0,
+		juv_enc_count: 0,
+		postjuv_enc_count: 0,
+		adult_enc_count: 0,
+		unknown_age_enc_count: 0,
+		...overrides
+	};
+}

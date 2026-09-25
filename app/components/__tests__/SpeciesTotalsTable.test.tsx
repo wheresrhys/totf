@@ -5,27 +5,16 @@ import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-s
 import type { CoreStatsResult } from '@/app/models/db';
 import {
 	getCellByHeading,
-	getCellTextByHeading
+	getCellTextByHeading,
+	getColumnHeaders
 } from '@/app/__tests__/helpers/table';
+import { withEncCounts } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 // This fixture is grouped by species only, so time_period is genuinely null —
 // CoreStatsResult's NonNullable mapped type (app/models/db.ts) assumes every
 // column is always present, so a direct assertion doesn't compile (#895).
 // eslint-disable-next-line no-restricted-syntax -- see comment above
 const speciesStats = speciesDataSnapshot as unknown as CoreStatsResult[];
-
-// The real header <th>s live in the `<thead>` row without a `data-testid` —
-// `above-header-row` (the "Aggregate by" toggle row) and `totals-row` are
-// the other two possible `<thead>` rows, both explicitly testid'd, so this
-// excludes them rather than relying on the header row's fixed position.
-function getColumnHeaders(): HTMLTableCellElement[] {
-	const headerRow = Array.from(document.querySelectorAll('thead tr')).find(
-		(row) => !row.hasAttribute('data-testid')
-	);
-	return Array.from(
-		headerRow?.querySelectorAll('th') ?? []
-	) as HTMLTableCellElement[];
-}
 
 function makeStat(
 	overrides: Partial<CoreStatsResult> & { species_name: string }
@@ -455,13 +444,13 @@ describe('SpeciesTotalsTable', () => {
 				postjuv_bird_count: 0,
 				adult_bird_count: 0,
 				unknown_age_bird_count: 0,
-				...({
+				...withEncCounts({
 					pullus_enc_count: 1,
 					juv_enc_count: 0,
 					postjuv_enc_count: 0,
 					adult_enc_count: 1,
 					unknown_age_enc_count: 0
-				} as Partial<CoreStatsResult>)
+				})
 			})
 		];
 
