@@ -32,7 +32,9 @@ CREATE FUNCTION public.demographics_stats (
 	to_date date DEFAULT NULL::date,
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
+	group_by_time_period text DEFAULT NULL::text,
+	year_filter smallint DEFAULT NULL::smallint,
+	month_filter smallint DEFAULT NULL::smallint
 ) RETURNS SETOF public.demographics_stats_result LANGUAGE plpgsql
 -- Replan on every call instead of letting the plan cache go generic on the 6th
 -- execution in a pooled backend. #952 removed the single worst generic-plan offender
@@ -60,13 +62,13 @@ SET
   SELECT r.*
   FROM (
   WITH spine AS (
-    SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ), encounter_age_classification AS (
-    SELECT * FROM public.stats_encounter_age_classification(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_encounter_age_classification(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ), bird_age_bucket AS (
-    SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ), bird_returning_age_bucket AS (
-    SELECT * FROM public.stats_bird_returning_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_bird_returning_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ),
   -- Bird-level bucket counts (context columns + the new_young_bird_count copy).
   -- Mirrors core_stats' age_bucket_counts, restricted to the columns this RPC
@@ -257,8 +259,35 @@ SET
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.demographics_stats (text, date, date, bigint, boolean, text) TO anon;
+GRANT ALL ON FUNCTION public.demographics_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO anon;
 
-GRANT ALL ON FUNCTION public.demographics_stats (text, date, date, bigint, boolean, text) TO authenticated;
+GRANT ALL ON FUNCTION public.demographics_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO authenticated;
 
-GRANT ALL ON FUNCTION public.demographics_stats (text, date, date, bigint, boolean, text) TO service_role;
+GRANT ALL ON FUNCTION public.demographics_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO service_role;

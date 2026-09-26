@@ -402,9 +402,11 @@ export type Database = {
           from_date?: string
           group_by_species?: boolean
           group_by_time_period?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: Database["public"]["CompositeTypes"]["arrivals_stats_result"][]
         SetofOptions: {
@@ -419,9 +421,11 @@ export type Database = {
           from_date?: string
           group_by_species?: boolean
           group_by_time_period?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: Database["public"]["CompositeTypes"]["biometrics_stats_result"][]
         SetofOptions: {
@@ -436,9 +440,11 @@ export type Database = {
           from_date?: string
           group_by_species?: boolean
           group_by_time_period?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: Database["public"]["CompositeTypes"]["core_stats_result"][]
         SetofOptions: {
@@ -454,9 +460,11 @@ export type Database = {
           from_date?: string
           group_by_species?: boolean
           group_by_time_period?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: Database["public"]["CompositeTypes"]["demographics_stats_result"][]
         SetofOptions: {
@@ -550,9 +558,11 @@ export type Database = {
           from_date?: string
           group_by_species?: boolean
           group_by_time_period?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: Database["public"]["CompositeTypes"]["core_stats_result"][]
         SetofOptions: {
@@ -576,9 +586,11 @@ export type Database = {
           from_date?: string
           group_by_species?: boolean
           group_by_time_period?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: {
           age_bucket: string
@@ -593,9 +605,11 @@ export type Database = {
           from_date?: string
           group_by_species?: boolean
           group_by_time_period?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: {
           arrival_bucket: string
@@ -609,9 +623,11 @@ export type Database = {
           from_date?: string
           group_by_species?: boolean
           group_by_time_period?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: {
           bird_id: number
@@ -625,9 +641,11 @@ export type Database = {
           from_date?: string
           group_by_species?: boolean
           group_by_time_period?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: {
           age_bucket: string
@@ -658,9 +676,11 @@ export type Database = {
       stats_raw_encounters: {
         Args: {
           from_date?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: {
           age_code: number
@@ -688,9 +708,11 @@ export type Database = {
           from_date?: string
           group_by_species?: boolean
           group_by_time_period?: string
+          month_filter?: number
           ringing_group_filter?: number
           species_name_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: {
           species_id: number

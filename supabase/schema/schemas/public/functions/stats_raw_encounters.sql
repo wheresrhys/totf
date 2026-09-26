@@ -13,7 +13,9 @@ CREATE FUNCTION public.stats_raw_encounters (
 	species_name_filter text DEFAULT NULL::text,
 	from_date date DEFAULT NULL::date,
 	to_date date DEFAULT NULL::date,
-	ringing_group_filter bigint DEFAULT NULL::bigint
+	ringing_group_filter bigint DEFAULT NULL::bigint,
+	year_filter smallint DEFAULT NULL::smallint,
+	month_filter smallint DEFAULT NULL::smallint
 ) RETURNS TABLE (
 	species_id bigint,
 	species_name text,
@@ -87,11 +89,13 @@ CREATE FUNCTION public.stats_raw_encounters (
   WHERE (from_date IS NULL OR sess.visit_date >= from_date)
    AND (to_date IS NULL OR sess.visit_date <= to_date)
    AND (species_name_filter IS NULL OR sp.species_name = species_name_filter)
-   AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter);
+   AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
+   AND (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
+   AND (month_filter IS NULL OR EXTRACT(MONTH FROM sess.visit_date) = month_filter);
 $function$;
 
-GRANT ALL ON FUNCTION public.stats_raw_encounters (text, date, date, bigint) TO anon;
+GRANT ALL ON FUNCTION public.stats_raw_encounters (text, date, date, bigint, smallint, smallint) TO anon;
 
-GRANT ALL ON FUNCTION public.stats_raw_encounters (text, date, date, bigint) TO authenticated;
+GRANT ALL ON FUNCTION public.stats_raw_encounters (text, date, date, bigint, smallint, smallint) TO authenticated;
 
-GRANT ALL ON FUNCTION public.stats_raw_encounters (text, date, date, bigint) TO service_role;
+GRANT ALL ON FUNCTION public.stats_raw_encounters (text, date, date, bigint, smallint, smallint) TO service_role;

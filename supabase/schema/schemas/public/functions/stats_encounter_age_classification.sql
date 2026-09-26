@@ -21,7 +21,9 @@ CREATE FUNCTION public.stats_encounter_age_classification (
 	to_date date DEFAULT NULL::date,
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
+	group_by_time_period text DEFAULT NULL::text,
+	year_filter smallint DEFAULT NULL::smallint,
+	month_filter smallint DEFAULT NULL::smallint
 ) RETURNS TABLE (
 	encounter_id bigint,
 	bird_id bigint,
@@ -34,7 +36,7 @@ CREATE FUNCTION public.stats_encounter_age_classification (
 	age_bucket text
 ) LANGUAGE sql STABLE AS $function$
   WITH raw_encounters AS (
-    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter)
+    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter, year_filter, month_filter)
   )
   SELECT
     re.encounter_id,
@@ -61,8 +63,35 @@ CREATE FUNCTION public.stats_encounter_age_classification (
   WHERE re.encounter_id IS NOT NULL;
 $function$;
 
-GRANT ALL ON FUNCTION public.stats_encounter_age_classification (text, date, date, bigint, boolean, text) TO anon;
+GRANT ALL ON FUNCTION public.stats_encounter_age_classification (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO anon;
 
-GRANT ALL ON FUNCTION public.stats_encounter_age_classification (text, date, date, bigint, boolean, text) TO authenticated;
+GRANT ALL ON FUNCTION public.stats_encounter_age_classification (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO authenticated;
 
-GRANT ALL ON FUNCTION public.stats_encounter_age_classification (text, date, date, bigint, boolean, text) TO service_role;
+GRANT ALL ON FUNCTION public.stats_encounter_age_classification (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO service_role;
