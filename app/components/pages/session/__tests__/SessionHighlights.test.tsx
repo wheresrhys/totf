@@ -42,7 +42,7 @@ function makeV2Highlight(
 const RARITY_HIGHLIGHT = makeV2Highlight(
 	'rarity',
 	'firstSpeciesRecord',
-	'First Firecrest record ever'
+	'First Firecrest ever'
 );
 const COUNT_HIGHLIGHT = makeV2Highlight(
 	'count',
@@ -159,7 +159,7 @@ describe('SessionHighlights', () => {
 
 		const rarityItems = screen.getByTestId('rarities').querySelectorAll('li');
 		expect(rarityItems.length).toBe(1);
-		expect(rarityItems[0].textContent).toBe('First Firecrest record ever');
+		expect(rarityItems[0].textContent).toBe('First Firecrest ever');
 
 		const countItems = screen.getByTestId('counts').querySelectorAll('li');
 		expect(countItems.length).toBe(1);

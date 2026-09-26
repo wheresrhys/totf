@@ -46,6 +46,18 @@ export function pluraliseSpecies(species: string) {
 	return `${species}s`;
 }
 
+// The species name agreeing with the count the sentence is about: "Robin" for a
+// single bird, "Robins" for more. Used by the rarity rules, whose sentences name
+// the species instead of a unit ("First Robins ever" rather than "First Robin
+// records ever"), so the species name is what has to agree with the value.
+export function printSpeciesForCount(
+	species: string | undefined,
+	count: number
+) {
+	if (!species) return '';
+	return count > 1 ? pluraliseSpecies(species) : species;
+}
+
 export function printValue(
 	value: HighlightValue,
 	descriptor: HighlightDescriptor

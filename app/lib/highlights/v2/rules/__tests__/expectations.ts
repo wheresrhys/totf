@@ -2,6 +2,7 @@ export const expectations = {
 	birds: {
 		global: 'Busiest session ever: 12 birds',
 		'tied global': 'Joint busiest session ever: 12 birds',
+		'singular global': 'Busiest session ever: 1 bird',
 		'second global': 'Second busiest session ever: 12 birds',
 		'tied second global': 'Joint second busiest session ever: 12 birds',
 		'tied second of year': 'Joint second busiest session of 2020: 12 birds',
@@ -16,6 +17,7 @@ export const expectations = {
 	encounters: {
 		global: 'Session with most encounters ever: 12 birds',
 		'tied global': 'Session with equal most encounters ever: 12 birds',
+		'singular global': 'Session with most encounters ever: 1 bird',
 		'second global': 'Session with second most encounters ever: 12 birds',
 		'tied second global':
 			'Session with equal second most encounters ever: 12 birds',
@@ -32,6 +34,7 @@ export const expectations = {
 	species: {
 		global: 'Most varied session ever: 12 birds',
 		'tied global': 'Joint most varied session ever: 12 birds',
+		'singular global': 'Most varied session ever: 1 bird',
 		'second global': 'Second most varied session ever: 12 birds',
 		'tied second global': 'Joint second most varied session ever: 12 birds',
 		'tied second of year': 'Joint second most varied session of 2020: 12 birds',
@@ -46,6 +49,7 @@ export const expectations = {
 	newBirds: {
 		global: 'Highest new bird count ever: 12 birds',
 		'tied global': 'Joint highest new bird count ever: 12 birds',
+		'singular global': 'Highest new bird count ever: 1 bird',
 		'second global': 'Second highest new bird count ever: 12 birds',
 		'tied second global': 'Joint second highest new bird count ever: 12 birds',
 		'tied second of year':
@@ -61,6 +65,7 @@ export const expectations = {
 	juvs: {
 		global: 'Session with most juvs ever: 12 birds',
 		'tied global': 'Session with equal most juvs ever: 12 birds',
+		'singular global': 'Session with most juvs ever: 1 bird',
 		'second global': 'Session with second most juvs ever: 12 birds',
 		'tied second global': 'Session with equal second most juvs ever: 12 birds',
 		'tied second of year':
@@ -76,6 +81,7 @@ export const expectations = {
 	singleSpeciesCount: {
 		global: 'Highest single species session count ever: 12 birds',
 		'tied global': 'Joint highest single species session count ever: 12 birds',
+		'singular global': 'Highest single species session count ever: 1 bird',
 		'second global':
 			'Second highest single species session count ever: 12 birds',
 		'tied second global':
@@ -94,6 +100,8 @@ export const expectations = {
 		global: 'Most encounters of a single species in a session ever: 12 birds',
 		'tied global':
 			'Equal most encounters of a single species in a session ever: 12 birds',
+		'singular global':
+			'Most encounters of a single species in a session ever: 1 bird',
 		'second global':
 			'Second most encounters of a single species in a session ever: 12 birds',
 		'tied second global':
@@ -112,6 +120,7 @@ export const expectations = {
 	eachSpeciesCount: {
 		global: 'Highest Robin count ever: 12 birds',
 		'tied global': 'Equal highest Robin count ever: 12 birds',
+		'singular global': 'Highest Robin count ever: 1 bird',
 		'second global': 'Second highest Robin count ever: 12 birds',
 		'tied second global': 'Equal second highest Robin count ever: 12 birds',
 		'tied second of year': 'Equal second highest Robin count of 2020: 12 birds',
@@ -126,6 +135,7 @@ export const expectations = {
 	eachSpeciesJuvs: {
 		global: 'Highest juv Robin count ever: 12 birds',
 		'tied global': 'Equal highest juv Robin count ever: 12 birds',
+		'singular global': 'Highest juv Robin count ever: 1 bird',
 		'second global': 'Second highest juv Robin count ever: 12 birds',
 		'tied second global': 'Equal second highest juv Robin count ever: 12 birds',
 		'tied second of year':
@@ -139,41 +149,40 @@ export const expectations = {
 			'Highest juv Robin count ever, equal second highest of 2020 and third highest in any February: 12 birds'
 	},
 	firstSpeciesRecord: {
-		global: 'First Robin records ever',
-		'tied global': 'First Robin records ever',
-		'second global': 'First Robin records ever',
-		'tied second global': 'First Robin records ever',
-		'tied second of year': 'First Robin records of 2020',
-		'this year': 'First Robin records this year',
-		'tied second of month': 'First Robin records in any February',
-		'tied global and second of year': 'First Robin records ever',
-		'global and tied second of year and third of month':
-			'First Robin records ever'
+		global: 'First Robins ever',
+		'tied global': 'First Robins ever',
+		'singular global': 'First Robin ever',
+		'second global': 'First Robins ever',
+		'tied second global': 'First Robins ever',
+		'tied second of year': 'First Robins of 2020',
+		'this year': 'First Robins this year',
+		'tied second of month': 'First Robins in any February',
+		'tied global and second of year': 'First Robins ever',
+		'global and tied second of year and third of month': 'First Robins ever'
 	},
 	onlySpeciesRecord: {
-		global: 'Only Robin records ever',
-		'tied global': 'Only Robin records ever',
-		'second global': 'Only Robin records ever',
-		'tied second global': 'Only Robin records ever',
-		'tied second of year': 'Only Robin records of 2020',
-		'this year': 'Only Robin records this year',
-		'tied second of month': 'Only Robin records in any February',
-		'tied global and second of year': 'Only Robin records ever',
-		'global and tied second of year and third of month':
-			'Only Robin records ever'
+		global: 'Only Robins ever',
+		'tied global': 'Only Robins ever',
+		'singular global': 'Only Robin ever',
+		'second global': 'Only Robins ever',
+		'tied second global': 'Only Robins ever',
+		'tied second of year': 'Only Robins of 2020',
+		'this year': 'Only Robins this year',
+		'tied second of month': 'Only Robins in any February',
+		'tied global and second of year': 'Only Robins ever',
+		'global and tied second of year and third of month': 'Only Robins ever'
 	},
 	rareSpecies: {
-		global: 'MEGA — Robin seen in only 12 sessions ever',
-		'tied global': 'MEGA — Robin seen in only 12 sessions ever',
-		'second global': 'MEGA — Robin seen in only 12 sessions ever',
-		'tied second global': 'MEGA — Robin seen in only 12 sessions ever',
-		'tied second of year': 'MEGA — Robin seen in only 12 sessions of 2020',
-		'this year': 'MEGA — Robin seen in only 12 sessions this year',
-		'tied second of month':
-			'MEGA — Robin seen in only 12 sessions in any February',
-		'tied global and second of year':
-			'MEGA — Robin seen in only 12 sessions ever',
+		global: 'Robins seen in only 12 sessions ever',
+		'tied global': 'Robins seen in only 12 sessions ever',
+		'singular global': 'Robin seen in only 1 session ever',
+		'second global': 'Robins seen in only 12 sessions ever',
+		'tied second global': 'Robins seen in only 12 sessions ever',
+		'tied second of year': 'Robins seen in only 12 sessions of 2020',
+		'this year': 'Robins seen in only 12 sessions this year',
+		'tied second of month': 'Robins seen in only 12 sessions in any February',
+		'tied global and second of year': 'Robins seen in only 12 sessions ever',
 		'global and tied second of year and third of month':
-			'MEGA — Robin seen in only 12 sessions ever'
+			'Robins seen in only 12 sessions ever'
 	}
 };

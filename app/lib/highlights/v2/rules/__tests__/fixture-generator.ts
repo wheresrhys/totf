@@ -44,12 +44,17 @@ function getCombinedHighlight(
 		ranking: Partial<HighlightRanking>;
 	}[],
 	withSpecies: boolean,
-	year: number = 2020
+	year: number = 2020,
+	// The count the highlight is about. Every fixture but 'singular global' uses
+	// the same arbitrary 12, so a printer that has to agree with its value
+	// grammatically (a plural species name, a plural unit) is exercised in both
+	// directions by that one fixture.
+	value: number = 12
 ): Partial<CombinedHighlight> {
 	return {
 		descriptor: { type: 'test-type', unit: 'bird', category: 'count' },
 		value: {
-			value: 12,
+			value,
 			timePeriod: `${year}-02-02`,
 			species: null
 		},
@@ -96,6 +101,24 @@ export function getCombinedHighlightFixtures(
 				}
 			],
 			withSpecies
+		),
+		// The same highlight as 'global', about a single bird rather than 12 —
+		// the one fixture that exercises a printer's singular wording.
+		'singular global': getCombinedHighlight(
+			[
+				{
+					scope: {
+						...getBaseScope(withSpecies, 'day')
+					},
+					ranking: {
+						position: 1,
+						isTied: false
+					}
+				}
+			],
+			withSpecies,
+			2020,
+			1
 		),
 		'second global': getCombinedHighlight(
 			[

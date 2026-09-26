@@ -1,14 +1,18 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { StatsRepository } from '@/app/actions/stats-cache';
-import { sentenceCase, printTimeQualifier } from '../lib/printer-utils';
+import {
+	sentenceCase,
+	printTimeQualifier,
+	printSpeciesForCount
+} from '../lib/printer-utils';
 import { getFirstAppearance } from '../lib/rule-utils';
 
 type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 
-// "First Robin record ever" / "First Robin records of 2020" — the period in
-// which a species was first recorded, read at whatever scope the machine is
-// asking about.
+// "First Robin ever" / "First Robins of 2020" — the period in which a species was
+// first recorded, read at whatever scope the machine is asking about. The species
+// name carries the count: plural when the period held more than one bird.
 //
 // One rule covers both readings, which is the whole reason this migrated cleanly
 // from v1's two separate derive functions (deriveFirstEverSpecies and
@@ -41,16 +45,16 @@ export const firstSpeciesRecord: HighlightsGenerator = {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const [{ scope }] = combinedHighlight.scopes;
 			return sentenceCase(
-				`First ${combinedHighlight.species} record${combinedHighlight.value.value > 1 ? 's' : ''} ${printTimeQualifier(scope.parentTimeWindow)}`.trim()
+				`First ${printSpeciesForCount(combinedHighlight.species, combinedHighlight.value.value)} ${printTimeQualifier(scope.parentTimeWindow)}`.trim()
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`First ${highlightsOfType.scope.species} record ${printTimeQualifier(highlightsOfType.scope.parentTimeWindow)}`
+			`First ${highlightsOfType.scope.species} ${printTimeQualifier(highlightsOfType.scope.parentTimeWindow)}`
 	},
 	descriptor: {
 		type: 'firstSpeciesRecord',
 		// The value carried is the cell's encounter count, which only ever gets
-		// read as the singular/plural switch for the word "record" above.
+		// read as the singular/plural switch on the species name above.
 		unit: 'encounter',
 		category: 'rarity'
 	},
