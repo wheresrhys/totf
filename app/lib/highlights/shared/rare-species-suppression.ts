@@ -9,6 +9,11 @@ import type { VitalStatHighlight } from '@/app/lib/highlights/vital-stats/types'
 // it yet, so it is currently unwired/no-op. #418 designs and wires the
 // threading mechanism that gets a Rarities-derived signal to Counts/Vital-stats
 // before their own combine steps run.
+//
+// Note that the two ends of that thread have since moved: Rarities (#990) and
+// Counts (#989) are both produced by the v2 pipeline now
+// (app/lib/highlights/v2), so a signal from one to the other would be internal
+// to that pipeline, and only the Vital-stats half is still on this side.
 export type RareSpeciesSuppressionSignal = ReadonlySet<string>;
 
 const SPECIES_COUNT_AND_WEIGHT_TYPES = [

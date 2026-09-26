@@ -3,7 +3,6 @@ import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { fetchSessionStats } from '@/app/lib/underlying-stats';
 import {
-	rarities,
 	vitalStats,
 	deriveLongAbsenceRetraps,
 	type SessionHighlight
@@ -30,14 +29,17 @@ export async function fetchSessionHighlights({
 	]);
 	// Each group composes its own already-ordered block list — see
 	// docs/session-highlight-ordering.md. This flat list is a literal
-	// concatenation, long-absence-retrap last (it's a sibling of the three
-	// groups, not one of them). Highlights are plain data, so this serialises
-	// across the RSC boundary as-is; the client (SessionHighlights.tsx)
-	// partitions it into its three sections via each group's own renderer map
-	// (per #760) — long-absence-retrap intentionally matches none of them and
-	// isn't rendered on the session page yet.
+	// concatenation, long-absence-retrap last (it's a sibling of the groups, not
+	// one of them). Highlights are plain data, so this serialises across the RSC
+	// boundary as-is; the client (SessionHighlights.tsx) partitions it into its
+	// sections via each group's own renderer map (per #760) —
+	// long-absence-retrap intentionally matches none of them and isn't rendered
+	// on the session page yet.
+	//
+	// Only Vital stats is left in this fan-out: the Counts (#989) and Rarities
+	// (#990) sections are now produced by the v2 pipeline, which the client
+	// fetches alongside this action.
 	return [
-		...rarities({ date, stats }),
 		...vitalStats({ date, stats }),
 		...deriveLongAbsenceRetraps(longAbsenceRetrapResults, date)
 	];

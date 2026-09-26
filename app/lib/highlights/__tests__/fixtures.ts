@@ -1,8 +1,9 @@
 import type { StatsPerDayAndSpeciesResult } from '@/app/models/db';
 import type { SessionStatsData } from '@/app/lib/highlights/shared/session-stats';
 
-// Shared test fixtures for every group's derive-function tests (rarities,
-// counts, vital-stats) — consolidates what were two near-identical row
+// Shared test fixtures for the derive-function tests still on this side of the
+// split (vital-stats, and the top-level composition test)
+// — consolidates what were two near-identical row
 // builders (dayRows/statsFor and speciesRow/statsForSpecies) in the old
 // monolithic session-highlights.test.ts into one canonical set.
 

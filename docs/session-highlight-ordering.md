@@ -1,5 +1,18 @@
 # Session highlight ordering
 
+> **Status: this describes the Vital-stats group only.** Everything below was written when all
+> three sections came from this derive → rules → compose architecture. Since then the **Counts**
+> ([#989](https://github.com/wheresrhys/totf/issues/989)) and **Rarities**
+> ([#990](https://github.com/wheresrhys/totf/issues/990)) groups have been deleted and rebuilt as
+> rules in the v2 highlight pipeline (`app/lib/highlights/v2/`), where one generic machine finds,
+> ranks, de-duplicates across scopes and prints every highlight — so their model directories,
+> combine rules and renderer maps no longer exist, and neither does the `rarities/counts` half of
+> every list in this doc. Two kinds of editorial folding were lost in the Rarities migration rather
+> than relocated (multi-species "First A, B and C records" lines, and the cross-metric MEGA badge);
+> `combineSimilarHighlights` in `app/lib/highlights/v2/lib/time-period-highlights.ts` documents
+> precisely why neither is expressible there. Note also that the model layer moved from
+> `app/models/highlights/` to `app/lib/highlights/` after this doc was written.
+
 Session highlights (the Rarities/Counts/Vital stats sections on a session page) are produced by
 `app/models/highlights/` and rendered by `app/components/highlights/`. This doc covers the
 directory layout of both, how each group composes its own order, the fixed section order, and why

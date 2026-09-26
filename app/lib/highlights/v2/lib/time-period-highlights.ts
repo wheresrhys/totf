@@ -94,6 +94,41 @@ function sortByPositionAndTimeWindow(
 	}
 }
 
+// Folds every highlight describing the same metric for the same species into one
+// line, whatever scopes it was found at — "busiest session ever AND busiest of
+// 2020" becomes a single sentence with two scopes rather than two sentences. The
+// grouping key is the descriptor (category + type + unit + speciesUnitMode)
+// *plus* value.species, so what it combines is always one metric, one species,
+// several scopes.
+//
+// That is the whole shape of combining this pipeline supports, and two kinds of
+// editorial folding are therefore inexpressible here. Both existed in the v1
+// Rarities implementation (app/lib/highlights/rarities/, removed when those
+// rules migrated to rules/first-species-record.ts, only-species-record.ts and
+// rare-species.ts) and neither survived the migration — they are *lost*
+// behaviour, not relocated behaviour, so this is the note that stops the next
+// person reading the gap as an accident:
+//
+//  - **Cross-species folding.** v1's combineFirstEverHighlights,
+//    combineFirstOfYearHighlights and combineOnlyOfYearHighlights each collapsed
+//    several species' identical lines into one — "First ever Chiffchaff,
+//    Blackcap and Whitethroat records" instead of three separate sentences. The
+//    key here includes value.species precisely so that two species never merge,
+//    so there is no key under which those three lines are siblings. This matters
+//    most on a year's first session, where every returning species is a first of
+//    the year and v1 printed one line for the lot.
+//  - **Cross-type folding.** v1's combineFirstRareHighlights (the "MEGA" badge)
+//    fused a *different metric* for the same species — a first/only record plus
+//    that species' rare-species line — into one headline: "MEGA — Only Meadow
+//    Pipit records of 2023 (only 3 records ever)". Two metrics about one species
+//    is not "the same metric at a wider scope", which is the only relationship
+//    scopes[] can express, so the two now print as separate lines.
+//
+// Neither is a missing feature of this function so much as a different idea:
+// combining here is about one fact seen through several windows, while both of
+// the above are about several distinct facts sharing a subject. Adding either
+// would mean a second combining pass with its own notion of identity — don't
+// bolt it onto this one.
 function combineSimilarHighlights(
 	highlights: CherryPickedHighlight[]
 ): CombinedHighlight[] {
