@@ -40,7 +40,9 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 		unit: 'bird',
 		category: 'demographics'
 	},
-	generator: getTopByPropertiesSum(['pullus_bird_count', 'juv_bird_count']),
+	generator: getTopByPropertiesSum(['pullus_bird_count', 'juv_bird_count'], {
+		threshold: 3
+	}),
 	limit: 1,
 	condition: (
 		temporalUnit: TemporalUnit,
