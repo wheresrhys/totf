@@ -12,14 +12,16 @@ CREATE FUNCTION public.stats_spine (
 	to_date date DEFAULT NULL::date,
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
+	group_by_time_period text DEFAULT NULL::text,
+	year_filter smallint DEFAULT NULL::smallint,
+	month_filter smallint DEFAULT NULL::smallint
 ) RETURNS TABLE (
 	species_id bigint,
 	species_name text,
 	time_period date
 ) LANGUAGE sql STABLE AS $function$
   WITH raw_encounters AS (
-    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter)
+    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter, year_filter, month_filter)
   ), species_spine AS (
     SELECT
       DISTINCT re.species_id, re.species_name
@@ -42,6 +44,16 @@ CREATE FUNCTION public.stats_spine (
       -- must not stretch the month/year spine's min..max range. session_type is NOT
       -- NULL (default 'FULL_GROWN'), so a plain <> is safe here.
       AND sess.session_type <> 'FIELD_OBSERVATION'
+      AND (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
+      -- month_filter is deliberately applied here too, for consistency with
+      -- from_date/to_date/year_filter's treatment above — but note the accepted
+      -- edge case documented in CLAUDE.md: combined with group_by_time_period =
+      -- 'month' this narrows min/max to month_filter-matching dates without making
+      -- the dense month generate_series below skip non-matching months in between.
+      -- Combining year-grouping with month_filter is unaffected (year-truncation
+      -- smooths over the narrowing); day-grouping is unaffected (sparse, driven off
+      -- raw_encounters' actual distinct days).
+      AND (month_filter IS NULL OR EXTRACT(MONTH FROM sess.visit_date) = month_filter)
   ), period_spine AS (
     SELECT date_trunc('month', d)::date AS time_period
     FROM session_date_range sdr,
@@ -89,8 +101,35 @@ CREATE FUNCTION public.stats_spine (
   CROSS JOIN period_spine p;
 $function$;
 
-GRANT ALL ON FUNCTION public.stats_spine (text, date, date, bigint, boolean, text) TO anon;
+GRANT ALL ON FUNCTION public.stats_spine (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO anon;
 
-GRANT ALL ON FUNCTION public.stats_spine (text, date, date, bigint, boolean, text) TO authenticated;
+GRANT ALL ON FUNCTION public.stats_spine (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO authenticated;
 
-GRANT ALL ON FUNCTION public.stats_spine (text, date, date, bigint, boolean, text) TO service_role;
+GRANT ALL ON FUNCTION public.stats_spine (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO service_role;

@@ -25,7 +25,9 @@ CREATE FUNCTION public.arrivals_stats (
 	to_date date DEFAULT NULL::date,
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
+	group_by_time_period text DEFAULT NULL::text,
+	year_filter smallint DEFAULT NULL::smallint,
+	month_filter smallint DEFAULT NULL::smallint
 ) RETURNS SETOF public.arrivals_stats_result LANGUAGE plpgsql
 -- Replan on every call instead of letting the plan cache go generic on the 6th
 -- execution in a pooled backend — this RPC's join shape depends on group_by_species /
@@ -50,9 +52,9 @@ SET
   SELECT r.*
   FROM (
   WITH spine AS (
-    SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ), bird_first_encounter_of_year AS (
-    SELECT * FROM public.stats_bird_first_encounter_of_year(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_bird_first_encounter_of_year(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ),
   -- One count per arrival bucket per cell. Buckets are mutually exclusive and
   -- exhaustive over the rows above (which already exclude 'unknown'), so the five
@@ -99,8 +101,35 @@ SET
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.arrivals_stats (text, date, date, bigint, boolean, text) TO anon;
+GRANT ALL ON FUNCTION public.arrivals_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO anon;
 
-GRANT ALL ON FUNCTION public.arrivals_stats (text, date, date, bigint, boolean, text) TO authenticated;
+GRANT ALL ON FUNCTION public.arrivals_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO authenticated;
 
-GRANT ALL ON FUNCTION public.arrivals_stats (text, date, date, bigint, boolean, text) TO service_role;
+GRANT ALL ON FUNCTION public.arrivals_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO service_role;

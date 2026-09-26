@@ -4,7 +4,9 @@ CREATE FUNCTION public.core_stats (
 	to_date date DEFAULT NULL::date,
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
+	group_by_time_period text DEFAULT NULL::text,
+	year_filter smallint DEFAULT NULL::smallint,
+	month_filter smallint DEFAULT NULL::smallint
 ) RETURNS SETOF public.core_stats_result LANGUAGE plpgsql
 -- Every stats RPC in this family is parameterized by the SHAPE of its own query, not
 -- just by filter values: group_by_species and group_by_time_period decide which columns
@@ -53,9 +55,9 @@ SET
   -- called exactly once here and materialized into a local CTE (reused by every
   -- downstream reference below), so the base tables aren't rescanned per use.
   WITH raw_encounters AS (
-    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter)
+    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter, year_filter, month_filter)
   ), spine AS (
-    SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ),
   stats_per_bird_month AS (
     -- Calculate per-bird statistics once
@@ -82,10 +84,10 @@ SET
   -- defined in TypeScript by getAgeClass() (app/models/encounter.ts, #527) — keep
   -- the two in sync by hand.
   encounter_age_classification AS (
-    SELECT * FROM public.stats_encounter_age_classification(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_encounter_age_classification(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ),
   bird_age_bucket AS (
-    SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ),
   age_bucket_counts AS (
     SELECT
@@ -339,8 +341,35 @@ SET
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.core_stats (text, date, date, bigint, boolean, text) TO anon;
+GRANT ALL ON FUNCTION public.core_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO anon;
 
-GRANT ALL ON FUNCTION public.core_stats (text, date, date, bigint, boolean, text) TO authenticated;
+GRANT ALL ON FUNCTION public.core_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO authenticated;
 
-GRANT ALL ON FUNCTION public.core_stats (text, date, date, bigint, boolean, text) TO service_role;
+GRANT ALL ON FUNCTION public.core_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO service_role;

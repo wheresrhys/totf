@@ -33,7 +33,9 @@ CREATE FUNCTION public.biometrics_stats (
 	to_date date DEFAULT NULL::date,
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
+	group_by_time_period text DEFAULT NULL::text,
+	year_filter smallint DEFAULT NULL::smallint,
+	month_filter smallint DEFAULT NULL::smallint
 ) RETURNS SETOF public.biometrics_stats_result LANGUAGE plpgsql
 -- Replan on every call instead of letting the plan cache go generic on the 6th
 -- execution in a pooled backend — this RPC's spine/raw_encounters join is keyed by
@@ -59,9 +61,9 @@ SET
   SELECT r.*
   FROM (
   WITH raw_encounters AS (
-    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter)
+    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter, year_filter, month_filter)
   ), spine AS (
-    SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_spine(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   )
   SELECT
     CASE WHEN group_by_species THEN spine.species_name ELSE NULL::text END AS "species_name",
@@ -110,8 +112,35 @@ SET
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.biometrics_stats (text, date, date, bigint, boolean, text) TO anon;
+GRANT ALL ON FUNCTION public.biometrics_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO anon;
 
-GRANT ALL ON FUNCTION public.biometrics_stats (text, date, date, bigint, boolean, text) TO authenticated;
+GRANT ALL ON FUNCTION public.biometrics_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO authenticated;
 
-GRANT ALL ON FUNCTION public.biometrics_stats (text, date, date, bigint, boolean, text) TO service_role;
+GRANT ALL ON FUNCTION public.biometrics_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO service_role;

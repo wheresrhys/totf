@@ -87,7 +87,9 @@ CREATE FUNCTION public.stats_bird_returning_age_bucket (
 	to_date date DEFAULT NULL::date,
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
+	group_by_time_period text DEFAULT NULL::text,
+	year_filter smallint DEFAULT NULL::smallint,
+	month_filter smallint DEFAULT NULL::smallint
 ) RETURNS TABLE (
 	bird_id bigint,
 	species_id bigint,
@@ -95,9 +97,9 @@ CREATE FUNCTION public.stats_bird_returning_age_bucket (
 	returning_age_bucket text
 ) LANGUAGE sql STABLE AS $function$
   WITH encounter_age_classification AS (
-    SELECT * FROM public.stats_encounter_age_classification(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_encounter_age_classification(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ), bird_age_bucket AS (
-    SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period)
+    SELECT * FROM public.stats_bird_age_bucket(species_name_filter, from_date, to_date, ringing_group_filter, group_by_species, group_by_time_period, year_filter, month_filter)
   ),
   -- Resolve the calendar year each (species, time_period) cell represents.
   -- Identical rule to demographics_stats' own cell_period_year CTE (keep the two
@@ -289,8 +291,35 @@ CREATE FUNCTION public.stats_bird_returning_age_bucket (
   WHERE h.event_ord = 1;
 $function$;
 
-GRANT ALL ON FUNCTION public.stats_bird_returning_age_bucket (text, date, date, bigint, boolean, text) TO anon;
+GRANT ALL ON FUNCTION public.stats_bird_returning_age_bucket (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO anon;
 
-GRANT ALL ON FUNCTION public.stats_bird_returning_age_bucket (text, date, date, bigint, boolean, text) TO authenticated;
+GRANT ALL ON FUNCTION public.stats_bird_returning_age_bucket (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO authenticated;
 
-GRANT ALL ON FUNCTION public.stats_bird_returning_age_bucket (text, date, date, bigint, boolean, text) TO service_role;
+GRANT ALL ON FUNCTION public.stats_bird_returning_age_bucket (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO service_role;

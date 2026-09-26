@@ -17,7 +17,9 @@ CREATE FUNCTION public.public_core_stats (
 	to_date date DEFAULT NULL::date,
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text
+	group_by_time_period text DEFAULT NULL::text,
+	year_filter smallint DEFAULT NULL::smallint,
+	month_filter smallint DEFAULT NULL::smallint
 ) RETURNS SETOF public.core_stats_result LANGUAGE plpgsql SECURITY DEFINER
 SET
 	search_path TO 'public',
@@ -42,13 +44,42 @@ BEGIN
     to_date,
     ringing_group_filter,
     group_by_species,
-    group_by_time_period
+    group_by_time_period,
+    year_filter,
+    month_filter
   );
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.public_core_stats (text, date, date, bigint, boolean, text) TO anon;
+GRANT ALL ON FUNCTION public.public_core_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO anon;
 
-GRANT ALL ON FUNCTION public.public_core_stats (text, date, date, bigint, boolean, text) TO authenticated;
+GRANT ALL ON FUNCTION public.public_core_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO authenticated;
 
-GRANT ALL ON FUNCTION public.public_core_stats (text, date, date, bigint, boolean, text) TO service_role;
+GRANT ALL ON FUNCTION public.public_core_stats (
+	text,
+	date,
+	date,
+	bigint,
+	boolean,
+	text,
+	smallint,
+	smallint
+) TO service_role;
