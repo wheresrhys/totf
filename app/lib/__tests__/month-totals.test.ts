@@ -146,18 +146,36 @@ describe('buildCombinedMonthTotalsRows', () => {
 			expect(postgresIntervalToSeconds(rows[0].stats.total_effort)).toBe(55800);
 		});
 
-		it('sums species_count across years as a documented approximation (does not attempt cross-year de-duplication)', () => {
-			const rows = buildCombinedMonthTotalsRows([
-				monthStat(2020, 1, { species_count: 12 }),
-				monthStat(2021, 1, { species_count: 9 })
-			]);
-			// Deliberate over-count: the same species in Jan 2020 and Jan 2021
-			// contributes twice — an exact distinct count is out of scope.
-			expect(rows[0].stats.species_count).toBe(21);
+		it('uses the provided speciesCountByMonth map for species_count instead of summing the input rows', () => {
+			const rows = buildCombinedMonthTotalsRows(
+				[
+					monthStat(2020, 1, { species_count: 12 }),
+					monthStat(2021, 1, { species_count: 9 })
+				],
+				{ 0: 15 }
+			);
+			// Not 21 (12 + 9) — the true cross-year distinct count is supplied
+			// separately, never derived by summing per-year species_count values.
+			expect(rows[0].stats.species_count).toBe(15);
 		});
 	});
 
 	describe('Edge', () => {
+		it('defaults species_count to 0 for a month missing from speciesCountByMonth', () => {
+			const rows = buildCombinedMonthTotalsRows(
+				[monthStat(2020, 3, { species_count: 7 })],
+				{ 0: 15 } // only January supplied
+			);
+			expect(rows[2].stats.species_count).toBe(0);
+		});
+
+		it('defaults every month to species_count 0 when speciesCountByMonth is omitted entirely', () => {
+			const rows = buildCombinedMonthTotalsRows([
+				monthStat(2020, 1, { species_count: 12 })
+			]);
+			expect(rows[0].stats.species_count).toBe(0);
+		});
+
 		it('zero-fills a calendar month with no sessions in any year', () => {
 			const rows = buildCombinedMonthTotalsRows([
 				monthStat(2020, 1, { session_count: 4, encounter_count: 30 })

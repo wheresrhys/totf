@@ -27,8 +27,11 @@ vi.mock('@/app/actions/spp-data', () => ({
 }));
 
 const fetchPeriodStatsMock = vi.fn();
+const fetchCombinedMonthSpeciesCountsMock = vi.fn();
 vi.mock('@/app/actions/summary-stats', () => ({
-	fetchPeriodStats: (...args: unknown[]) => fetchPeriodStatsMock(...args)
+	fetchPeriodStats: (...args: unknown[]) => fetchPeriodStatsMock(...args),
+	fetchCombinedMonthSpeciesCounts: (...args: unknown[]) =>
+		fetchCombinedMonthSpeciesCountsMock(...args)
 }));
 
 const fetchPeriodTotalsMock = vi.fn();
@@ -78,12 +81,14 @@ describe('SummaryTotalsSection', () => {
 	beforeEach(() => {
 		fetchSpeciesDataMock.mockResolvedValue(speciesStats);
 		fetchPeriodStatsMock.mockResolvedValue(monthlyPeriodStats);
+		fetchCombinedMonthSpeciesCountsMock.mockResolvedValue({});
 		fetchPeriodTotalsMock.mockResolvedValue([]);
 	});
 	afterEach(() => {
 		cleanup();
 		fetchSpeciesDataMock.mockReset();
 		fetchPeriodStatsMock.mockReset();
+		fetchCombinedMonthSpeciesCountsMock.mockReset();
 		fetchPeriodTotalsMock.mockReset();
 	});
 
@@ -440,6 +445,26 @@ describe('SummaryTotalsSection', () => {
 				const birdsIndex = getColumnIndex('Birds');
 				expect(busiestSessionIndex).toBe(encountersIndex + 1);
 				expect(busiestSessionIndex).toBe(birdsIndex - 1);
+			});
+		});
+
+		describe('Species column (#994)', () => {
+			it('renders the true cross-year distinct count from fetchCombinedMonthSpeciesCounts, not a sum of the per-year rows', async () => {
+				// monthlyPeriodStats has two January rows (species_count 12 each,
+				// the fixture default) and one August row — summing would give
+				// January 24, but the fix must use the mocked distinct counts below.
+				fetchCombinedMonthSpeciesCountsMock.mockResolvedValue({
+					0: 7, // January
+					7: 3 // August
+				});
+				render(<SummaryTotalsSection {...allTimeProps} />);
+				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
+				await waitFor(() =>
+					expect(document.querySelectorAll('tbody tr').length).toBe(2)
+				);
+				const table = screen.getByRole('table');
+				expect(getCellTextByHeading(table, 'Species', 'January')).toBe('7');
+				expect(getCellTextByHeading(table, 'Species', 'August')).toBe('3');
 			});
 		});
 

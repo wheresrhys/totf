@@ -126,14 +126,14 @@ export function formatMonthLabel(
 
 // Fields that combine additively across years for a given calendar month. Only
 // the columns the "Month totals" tab actually renders (encounters-only, so the
-// age buckets are the `*_enc_count` variants) plus `species_count`, which is
-// summed as a documented approximation — it can double-count a species caught in
-// the same calendar month across multiple years (an exact cross-year distinct
-// count would need a further species+month-grouped RPC call, out of scope).
+// age buckets are the `*_enc_count` variants). `species_count` is deliberately
+// NOT summed here — it's a `COUNT(DISTINCT species_id)` per cell, so summing it
+// across years would double-count a species caught in the same calendar month
+// in more than one year (#994). `buildCombinedMonthTotalsRows` instead takes the
+// true cross-year distinct count separately, via `fetchCombinedMonthSpeciesCounts`.
 const SUMMABLE_STAT_FIELDS = [
 	'session_count',
 	'encounter_count',
-	'species_count',
 	'bird_count',
 	'new_bird_count',
 	'pullus_enc_count',
@@ -163,7 +163,12 @@ function secondsToPostgresInterval(totalSeconds: number): string {
 // to the same shape `buildMonthTotalsRows` uses. Matching is by the `MM` slice of
 // `time_period` (string comparison — avoids `Date` timezone pitfalls).
 export function buildCombinedMonthTotalsRows(
-	periodStats: CoreStatsResult[]
+	periodStats: CoreStatsResult[],
+	// True cross-year distinct species count per calendar month, keyed by
+	// zeroIndexedMonth (0-11) — see `fetchCombinedMonthSpeciesCounts`. Defaults to
+	// `{}` (every month renders 0) for callers that hide the Species column
+	// anyway, e.g. `SpCombinedMonthTotalsTab` (`showSpeciesColumn={false}`).
+	speciesCountByMonth: Record<number, number> = {}
 ): CombinedMonthTotalsRow[] {
 	return Array.from({ length: 12 }, (_unused, index) => {
 		const month = index + 1;
@@ -175,6 +180,7 @@ export function buildCombinedMonthTotalsRows(
 		// label is supplied separately and there's no link), only used as a
 		// row/lookup key and to keep the Jan→Dec order if the table is sorted.
 		const stats = synthesizeZeroStats(`2000-${monthKey}-01`);
+		stats.species_count = speciesCountByMonth[index] ?? 0;
 		let effortSeconds = 0;
 		for (const yearStat of yearsForMonth) {
 			for (const field of SUMMABLE_STAT_FIELDS) {

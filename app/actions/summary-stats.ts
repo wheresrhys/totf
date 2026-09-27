@@ -40,6 +40,38 @@ export async function fetchPeriodStats(
 }
 
 /**
+ * True distinct species count for each calendar month across the group's
+ * entire history. `core_stats` has no "group by calendar month across years"
+ * shape, so this makes one ungrouped call per month via `month_filter` — each
+ * returns exactly one row (an ungrouped `core_stats` call always does, see
+ * `fetchAuthorisedCoreStats`'s `hasVisibleData` comment) with a true
+ * `COUNT(DISTINCT species_id)` for that calendar month across every year.
+ * Powers the all-time summary page's "Month totals" tab with "Combine years"
+ * on — replaces the additive-across-years approximation
+ * `buildCombinedMonthTotalsRows` used to apply to `species_count`, which
+ * double-counted a species caught in the same calendar month in more than one
+ * year (#994).
+ */
+export async function fetchCombinedMonthSpeciesCounts(
+	viewedGroupId: number
+): Promise<Record<number, number>> {
+	const results = await Promise.all(
+		Array.from({ length: 12 }, (_unused, zeroIndexedMonth) =>
+			fetchAuthorisedCoreStats(viewedGroupId, {
+				group_by_species: false,
+				month_filter: zeroIndexedMonth + 1
+			})
+		)
+	);
+	return Object.fromEntries(
+		results.map(({ rows }, zeroIndexedMonth) => [
+			zeroIndexedMonth,
+			rows[0]?.species_count ?? 0
+		])
+	);
+}
+
+/**
  * One row per year with data, for the all-time summary page's "Year totals"
  * tab. `core_stats`'s `period_spine` CTE is already dense across the
  * group's earliest-to-latest session year and arrives `ORDER BY time_period
