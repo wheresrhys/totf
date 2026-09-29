@@ -23,11 +23,12 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 }));
 
 // getGroupEffortHistory delegates the RPC call + caching to
-// fetchGroupEffortHistory (lib/underlying-stats.ts) — that function's own
-// RPC-args/caching behaviour is covered by lib/__tests__/underlying-stats.test.ts,
-// so here it's mocked directly and these tests only assert the
-// interval->hours conversion + [time_period, hours] pair shaping.
-vi.mock('@/app/lib/underlying-stats', () => ({
+// fetchGroupEffortHistory (app/actions/stats-cache.ts) — that function's own
+// RPC-args/caching behaviour is covered by the fetchGroupEffortHistory
+// describe block in __tests__/stats-cache.test.ts, so here it's mocked
+// directly and these tests only assert the interval->hours conversion +
+// [time_period, hours] pair shaping.
+vi.mock('../stats-cache', () => ({
 	fetchGroupEffortHistory: mockFetchGroupEffortHistory
 }));
 
@@ -542,14 +543,6 @@ describe('sp-data actions', () => {
 			const result = await getGroupEffortHistory(GROUP_ID);
 
 			expect(result).toEqual([['2023-01', 0]]);
-		});
-
-		it('returns [] when fetchGroupEffortHistory resolves null', async () => {
-			mockFetchGroupEffortHistory.mockResolvedValue(null);
-
-			const result = await getGroupEffortHistory(GROUP_ID);
-
-			expect(result).toEqual([]);
 		});
 
 		it('converts an interval spanning whole days to its total hour count', async () => {

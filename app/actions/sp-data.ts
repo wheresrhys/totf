@@ -7,7 +7,7 @@ import {
 } from '@/app/models/bird';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { fetchGroupEffortHistory } from '@/app/lib/underlying-stats';
+import { fetchGroupEffortHistory } from './stats-cache';
 import { postgresIntervalToHours } from '@/app/lib/postgres-interval';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
@@ -254,12 +254,12 @@ export async function getSpeciesArrivalsStats(
  * Group-wide (not species-filtered) monthly ringing-effort history for the
  * species page's Demographics/Biometrics tabs — effort is a property of a
  * session, not of the species caught in it, so this wraps
- * `fetchGroupEffortHistory` (`lib/underlying-stats.ts`, cached across both
- * tabs within a session) rather than filtering by species. Shapes the raw
- * `total_effort` interval into fractional hours and pairs it with
- * `time_period`, matching the `[time_period, value]` tuple shape
- * `YearComparisonTrendChart`'s existing series already use (see
- * `getCounts`/`getReturningAges` in
+ * `fetchGroupEffortHistory` (`app/actions/stats-cache.ts`, sharing its
+ * `'month-core-stats'` cache namespace with `getStatsByTemporalUnit`) rather
+ * than filtering by species. Shapes the raw `total_effort` interval into
+ * fractional hours and pairs it with `time_period`, matching the
+ * `[time_period, value]` tuple shape `YearComparisonTrendChart`'s existing
+ * series already use (see `getCounts`/`getReturningAges` in
  * `app/components/pages/species/StatsHistoryChart.tsx`), so it can be zipped
  * against a species-filtered series by `time_period`.
  */
@@ -267,7 +267,6 @@ export async function getGroupEffortHistory(
 	viewedGroupId: number
 ): Promise<[string, number][]> {
 	const statsHistory = await fetchGroupEffortHistory(viewedGroupId);
-	if (!statsHistory) return [];
 	return statsHistory.map((row): [string, number] => [
 		row.time_period,
 		postgresIntervalToHours(row.total_effort)

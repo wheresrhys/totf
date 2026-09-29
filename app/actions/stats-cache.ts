@@ -64,3 +64,20 @@ export async function getStatsByTemporalUnit(
 		biometricsStatsWithSpecies
 	};
 }
+
+// Group-wide, ungrouped-by-species monthly core_stats — shares its cache
+// namespace ('month-core-stats') with getStatsByTemporalUnit('month', ...)'s
+// coreStats field, so a call to either is a cache hit for the other within
+// the version/TTL window. Kept as its own function (rather than callers
+// using getStatsByTemporalUnit directly) so a caller that only needs the
+// ungrouped totals doesn't also trigger the species-grouped and biometrics
+// RPC calls getStatsByTemporalUnit bundles alongside it.
+export async function fetchGroupEffortHistory(
+	viewedGroupId: number
+): Promise<CoreStatsResult[]> {
+	return cachedSupabaseFetch(
+		'month-core-stats',
+		viewedGroupId,
+		getStatsRPCFetcher<CoreStatsResult>('core_stats', 'month')
+	);
+}

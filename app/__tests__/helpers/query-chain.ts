@@ -13,7 +13,8 @@ export type FilterCall = { column: string; operator: string; value: unknown };
  * e.g. `fetchPageOfBirds`' single non-paginated query), or a
  * `(fromRow?, toRow?) => data` function evaluated lazily at resolution time —
  * for a paginated call, keyed off the most recent `.range(fromRow, toRow)`
- * (e.g. `fetchSessionStats`' page-by-page RPC/Sessions queries); for a
+ * (e.g. `getStatsRPCFetcher`'s page-by-page RPC queries in
+ * `app/actions/stats-cache.ts`); for a
  * non-paginated call whose result still needs to reflect test state that
  * mutates between calls on the same chain (e.g. a version-query `.limit()`
  * read after a test bumps a version variable), a zero-arg function works
