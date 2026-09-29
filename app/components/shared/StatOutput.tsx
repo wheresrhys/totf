@@ -5,7 +5,13 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 import { buildGroupSessionHref } from '@/app/lib/group-links';
 import { printLocationName } from './DesignSystem';
 export type TemporalUnit = 'day' | 'month' | 'year';
-export type StatUnit = 'bird' | 'species' | 'encounter' | 'session';
+export type StatUnit =
+	| 'bird'
+	| 'species'
+	| 'encounter'
+	| 'session'
+	| 'mm'
+	| 'gram';
 export type StatOutputModel = {
 	value: number;
 	speciesName?: string;
@@ -21,7 +27,8 @@ export type StatOutputModel = {
 };
 
 const plurals: Partial<Record<StatUnit | TemporalUnit, string>> = {
-	species: 'species'
+	species: 'species',
+	mm: 'mm'
 };
 
 export function getPlural(unit: StatUnit | TemporalUnit | undefined): string {

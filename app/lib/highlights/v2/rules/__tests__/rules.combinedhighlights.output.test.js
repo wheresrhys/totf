@@ -10,9 +10,8 @@ import {
 describe('rules output for comibned highlights', () => {
 	highlightRules.forEach((rule) => {
 		describe(rule.descriptor.type, () => {
-			const combinedHighlightFixtures = getCombinedHighlightFixtures(
-				isPerSpeciesRule(rule)
-			);
+			const combinedHighlightFixtures = getCombinedHighlightFixtures(rule);
+
 			const expectations = allExpectations[rule.descriptor.type];
 			Object.entries(combinedHighlightFixtures).map(
 				([testCase, combinedHighlight]) => {
