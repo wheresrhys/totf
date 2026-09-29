@@ -1,7 +1,5 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
-import type { CoreStatsResult } from '@/app/models/db';
-import type { StatsRepository } from '@/app/actions/stats-cache';
 import {
 	printProminenceQualifier,
 	printValue,
@@ -12,9 +10,8 @@ import {
 } from '../lib/printer-utils';
 import { getTopByPropertiesSum } from '../lib/rule-utils';
 
-type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 export const juvs: HighlightsGenerator = {
-	statsSelector: (stats: CoreStatsRepository) => stats.overall,
+	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {

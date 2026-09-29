@@ -1,7 +1,5 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
-import type { CoreStatsResult } from '@/app/models/db';
-import type { StatsRepository } from '@/app/actions/stats-cache';
 import {
 	printProminenceQualifier,
 	printValue,
@@ -12,9 +10,8 @@ import {
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
-type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 export const singleSpeciesCount: HighlightsGenerator = {
-	statsSelector: (stats: CoreStatsRepository) => stats.withSpecies,
+	statsSelector: 'coreStatsWithSpecies',
 	formatters: {
 		// -> Highest count of a single species in 2021: 54 Reed Warblers
 		combinedHighlightPrinter: (combinedHighlight) => {

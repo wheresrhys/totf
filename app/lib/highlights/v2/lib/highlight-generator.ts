@@ -4,9 +4,13 @@ import {
 } from '@/app/actions/stats-cache';
 import { groupByColumn } from '@/app/lib/generic-utils';
 import { highlightRules } from '../rules';
-import type { HighlightsOfType, YearMonthRestriction } from '../types';
+import type {
+	HighlightsOfType,
+	YearMonthRestriction,
+	EnhancedStatsRepository,
+	HighlightValue
+} from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
-import { CoreStatsResult } from '@/app/models/db';
 import { DEFAULT_LIMIT } from '../const';
 
 const cache: Map<string, HighlightsOfType[]> = new Map();
@@ -42,7 +46,7 @@ function generateAllHighlights({
 	limit,
 	includePerSpecies
 }: {
-	stats: StatsRepository<CoreStatsResult>;
+	stats: EnhancedStatsRepository;
 	temporalUnit: TemporalUnit;
 	parentTimeWindow?: YearMonthRestriction;
 	limit: number;
@@ -52,12 +56,18 @@ function generateAllHighlights({
 		.flatMap((rule) => {
 			if (rule.condition && !rule.condition(temporalUnit, parentTimeWindow))
 				return null;
-			const workingStats = rule.statsSelector(stats);
+			const workingStats = stats[rule.statsSelector];
 			if (Array.isArray(workingStats)) {
 				const highlights: HighlightsOfType = {
 					...rule,
 					scope: { temporalUnit, parentTimeWindow: parentTimeWindow },
-					values: rule.generator(workingStats)
+					// rule.statsSelector always names the array whose row type matches rule.generator's
+					// param type (enforced by HighlightsGenerator's discriminated union in types.ts) —
+					// TS can't see that correlation across this generic dispatch loop, so assert it here,
+					// the one place that needs it.
+					values: (rule.generator as (stats: unknown[]) => HighlightValue[])(
+						workingStats
+					)
 				};
 				return applyLimitToHighlight(
 					highlights,
@@ -75,7 +85,9 @@ function generateAllHighlights({
 								parentTimeWindow: parentTimeWindow,
 								species
 							},
-							values: rule.generator(workingStatsChild)
+							values: (
+								rule.generator as (stats: unknown[]) => HighlightValue[]
+							)(workingStatsChild)
 						};
 						return highlights.values.length
 							? applyLimitToHighlight(
@@ -123,25 +135,42 @@ function getCacheUtils(
 	return { filter, cacheKey };
 }
 
+function enhanceStatsRepository(
+	stats: StatsRepository
+): EnhancedStatsRepository {
+	return {
+		...stats,
+		coreStatsBySpecies: groupByColumn(
+			'species_name',
+			stats.coreStatsWithSpecies
+		),
+		biometricsStatsBySpecies: groupByColumn(
+			'species_name',
+			stats.biometricsStatsWithSpecies
+		)
+	};
+}
+
 async function getFilteredStats(
 	temporalUnit: TemporalUnit,
 	groupId: number,
 	filter: ((timePeriod: string) => boolean) | null
-) {
+): Promise<EnhancedStatsRepository> {
 	const stats = await getStatsByTemporalUnit(temporalUnit, groupId);
 
 	if (!filter) {
-		return stats;
+		return enhanceStatsRepository(stats);
 	}
-	const withSpecies = stats.withSpecies.filter(({ time_period }) =>
-		filter(time_period)
-	);
-	const bySpecies = groupByColumn('species_name', withSpecies);
-	return {
-		overall: stats.overall.filter(({ time_period }) => filter(time_period)),
-		withSpecies,
-		bySpecies
-	};
+
+	return enhanceStatsRepository({
+		coreStats: stats.coreStats.filter(({ time_period }) => filter(time_period)),
+		coreStatsWithSpecies: stats.coreStatsWithSpecies.filter(({ time_period }) =>
+			filter(time_period)
+		),
+		biometricsStatsWithSpecies: stats.biometricsStatsWithSpecies.filter(
+			({ time_period }) => filter(time_period as string)
+		)
+	});
 }
 
 export async function getHighlightsWithinTimeWindow({

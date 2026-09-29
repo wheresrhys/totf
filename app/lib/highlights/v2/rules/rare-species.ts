@@ -1,6 +1,4 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
-import type { CoreStatsResult } from '@/app/models/db';
-import type { StatsRepository } from '@/app/actions/stats-cache';
 import {
 	printTemporalUnit,
 	printTimeQualifier,
@@ -8,8 +6,6 @@ import {
 	sentenceCase
 } from '../lib/printer-utils';
 import { getInfrequentAppearances } from '../lib/rule-utils';
-
-type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 
 // "Firecrests seen in only 2 sessions ever" — a species the group has only ever
 // recorded in a handful of periods is worth a line every time it turns up again,
@@ -27,7 +23,7 @@ type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 // means anything against the group's full history, so a windowed scope is
 // refused outright rather than gated behind a different threshold.
 export const rareSpecies: HighlightsGenerator = {
-	statsSelector: (stats: CoreStatsRepository) => stats.bySpecies,
+	statsSelector: 'coreStatsBySpecies',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const [{ scope }] = combinedHighlight.scopes;

@@ -1,4 +1,4 @@
-import type { CoreStatsResult } from '@/app/models/db';
+import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 import type {
 	TemporalUnit,
 	StatUnit
@@ -8,6 +8,11 @@ export type {
 	StatUnit
 } from '@/app/components/shared/StatOutput';
 import type { StatsRepository } from '@/app/actions/stats-cache';
+
+export type EnhancedStatsRepository = StatsRepository & {
+	coreStatsBySpecies: Record<string, CoreStatsResult[]>;
+	biometricsStatsBySpecies: Record<string, BiometricsStatsResult[]>;
+};
 
 export interface TimePeriodedItem {
 	time_period: string | null;
@@ -88,16 +93,29 @@ type HighlightFormatters = {
 	highlightListPrefixPrinter: HighlightListPrefixPrinter;
 };
 
-export type HighlightsGenerator = {
+type StatsRowOf<StatsProperty> =
+	StatsProperty extends Record<string, (infer Row)[]>
+		? Row
+		: StatsProperty extends (infer Row)[]
+			? Row
+			: never;
+
+type HighlightsGeneratorFor<
+	StatsSelectorKey extends keyof EnhancedStatsRepository
+> = {
 	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	limit?: number;
-	statsSelector: (
-		stats: StatsRepository<CoreStatsResult>
-	) => CoreStatsResult[] | Record<string, CoreStatsResult[]>;
-	generator: (stats: CoreStatsResult[]) => HighlightValue[];
+	statsSelector: StatsSelectorKey;
+	generator: (
+		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[]
+	) => HighlightValue[];
 	condition?: (
 		temporalUnit: TemporalUnit,
 		parentTimeWindow?: YearMonthRestriction
 	) => boolean;
 };
+
+export type HighlightsGenerator = {
+	[StatsSelectorKey in keyof EnhancedStatsRepository]: HighlightsGeneratorFor<StatsSelectorKey>;
+}[keyof EnhancedStatsRepository];

@@ -11,6 +11,8 @@ import { eachSpeciesJuvs } from './each-species-juvs';
 import { firstSpeciesRecord } from './first-species-record';
 import { onlySpeciesRecord } from './only-species-record';
 import { rareSpecies } from './rare-species';
+import { heaviestOfSpecies } from './heaviest-of-species';
+import { lightestOfSpecies } from './lightest-of-species';
 
 export const highlightRules: HighlightsGenerator[] = [
 	birdCount,
@@ -24,5 +26,7 @@ export const highlightRules: HighlightsGenerator[] = [
 	eachSpeciesJuvs,
 	firstSpeciesRecord,
 	onlySpeciesRecord,
-	rareSpecies
+	rareSpecies,
+	heaviestOfSpecies,
+	lightestOfSpecies
 ];

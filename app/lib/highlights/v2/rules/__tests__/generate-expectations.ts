@@ -1,14 +1,11 @@
 import { highlightRules } from '../';
-import {
-	getCombinedHighlightFixtures,
-	isPerSpeciesRule
-} from './fixture-generator';
+import { getCombinedHighlightFixtures } from './fixture-generator';
 import type { CombinedHighlight } from '../../types';
 import { writeFileSync } from 'node:fs';
 
 const fixtures = Object.fromEntries(
 	highlightRules.map((rule) => {
-		const fixtures = getCombinedHighlightFixtures(isPerSpeciesRule(rule));
+		const fixtures = getCombinedHighlightFixtures(rule);
 
 		const fixture = Object.fromEntries(
 			Object.entries(fixtures).map(([name, fixture]) => [
