@@ -27,11 +27,6 @@ vi.mock('@/app/lib/group-slug', () => ({
 	resolveGroupIdBySlug: mockResolveGroupIdBySlug
 }));
 
-vi.mock('@/app/actions/session-highlights', () => ({
-	// The action returns plain highlight data; the component renders each
-	fetchSessionHighlights: vi.fn().mockResolvedValue([])
-}));
-
 // Counts now comes from the v2 pipeline (getCondensedHighlightsAtTimePeriod),
 // fetched in parallel with the v1 action — see SessionHighlights.tsx. Mock it
 // as the one collaborator it is; the printer is a test double returning a
