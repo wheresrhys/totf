@@ -1,5 +1,4 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
-import type { EnhancedStatsRepository } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import {
 	printProminenceQualifier,

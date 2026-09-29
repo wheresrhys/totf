@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { HighlightsGenerator } from '../../types';
-import type { StatsRepository } from '@/app/actions/stats-cache';
 import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 vi.mock('../../rules', () => ({ highlightRules: [] }));
 vi.mock('@/app/actions/stats-cache', () => ({
@@ -29,12 +28,13 @@ describe('highlight-generator', () => {
 				highlightListPrefixPrinter: vi.fn(),
 				combinedHighlightPrinter: vi.fn()
 			},
-			generator: () => []
+			generator: vi.fn().mockReturnValue([])
 		} as HighlightsGenerator;
 		beforeEach(() => {
 			highlightRules.push(reporterRule);
 		});
 		beforeEach(() => {
+			vi.clearAllMocks();
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
 				coreStats: [
 					{ time_period: '2020-03-01', bird_count: 1 },
@@ -71,62 +71,12 @@ describe('highlight-generator', () => {
 				groupId: 2,
 				includePerSpecies: true
 			});
-			expect(reporterRule.statsSelector).toHaveBeenCalledWith({
-				coreStats: [
-					{ time_period: '2020-03-01', bird_count: 1 },
-					{ time_period: '2020-04-01', bird_count: 2 },
-					{ time_period: '2021-03-01', bird_count: 1 },
-					{ time_period: '2021-04-01', bird_count: 2 }
-				],
-				coreStatsWithSpecies: [
-					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' },
-					{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' },
-					{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' },
-					{ time_period: '2021-04-01', bird_count: 2, species_name: 'owl' }
-				],
-				coreStatsBySpecies: {
-					cat: [
-						{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
-					],
-					dog: [
-						{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' }
-					],
-					fish: [
-						{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' }
-					],
-					owl: [
-						{
-							time_period: '2021-04-01',
-							bird_count: 2,
-							species_name: 'owl'
-						}
-					]
-				},
-				biometricsStatsWithSpecies: [
-					{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' },
-					{ time_period: '2020-04-01', max_wing: 2, species_name: 'dog' },
-					{ time_period: '2021-03-01', max_wing: 1, species_name: 'fish' },
-					{ time_period: '2021-04-01', max_wing: 2, species_name: 'owl' }
-				],
-				biometricsStatsBySpecies: {
-					cat: [
-						{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' }
-					],
-					dog: [
-						{ time_period: '2020-04-01', max_wing: 2, species_name: 'dog' }
-					],
-					fish: [
-						{ time_period: '2021-03-01', max_wing: 1, species_name: 'fish' }
-					],
-					owl: [
-						{
-							time_period: '2021-04-01',
-							max_wing: 2,
-							species_name: 'owl'
-						}
-					]
-				}
-			});
+			expect(reporterRule.generator).toHaveBeenCalledWith([
+				{ time_period: '2020-03-01', bird_count: 1 },
+				{ time_period: '2020-04-01', bird_count: 2 },
+				{ time_period: '2021-03-01', bird_count: 1 },
+				{ time_period: '2021-04-01', bird_count: 2 }
+			]);
 		});
 		it('filters correctly for a year window', async () => {
 			await getHighlightsWithinTimeWindow({
@@ -135,34 +85,10 @@ describe('highlight-generator', () => {
 				includePerSpecies: true,
 				parentTimeWindow: { year: 2020 }
 			});
-			expect(reporterRule.statsSelector).toHaveBeenCalledWith({
-				coreStats: [
-					{ time_period: '2020-03-01', bird_count: 1 },
-					{ time_period: '2020-04-01', bird_count: 2 }
-				],
-				coreStatsWithSpecies: [
-					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' },
-					{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' }
-				],
-				coreStatsBySpecies: {
-					cat: [
-						{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
-					],
-					dog: [
-						{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' }
-					]
-				},
-				biometricsStatsWithSpecies: [
-					{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' },
-					{ time_period: '2020-04-01', max_wing: 2, species_name: 'dog' }
-				],
-				biometricsStatsBySpecies: {
-					cat: [
-						{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' }
-					],
-					dog: [{ time_period: '2020-04-01', max_wing: 2, species_name: 'dog' }]
-				}
-			});
+			expect(reporterRule.generator).toHaveBeenCalledWith([
+				{ time_period: '2020-03-01', bird_count: 1 },
+				{ time_period: '2020-04-01', bird_count: 2 }
+			]);
 		});
 		it('filters correctly for a month window', async () => {
 			await getHighlightsWithinTimeWindow({
@@ -171,36 +97,10 @@ describe('highlight-generator', () => {
 				includePerSpecies: true,
 				parentTimeWindow: { month: 3 }
 			});
-			expect(reporterRule.statsSelector).toHaveBeenCalledWith({
-				coreStats: [
-					{ time_period: '2020-03-01', bird_count: 1 },
-					{ time_period: '2021-03-01', bird_count: 1 }
-				],
-				coreStatsWithSpecies: [
-					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' },
-					{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' }
-				],
-				coreStatsBySpecies: {
-					cat: [
-						{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
-					],
-					fish: [
-						{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' }
-					]
-				},
-				biometricsStatsWithSpecies: [
-					{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' },
-					{ time_period: '2021-03-01', max_wing: 1, species_name: 'fish' }
-				],
-				biometricsStatsBySpecies: {
-					cat: [
-						{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' }
-					],
-					fish: [
-						{ time_period: '2021-03-01', max_wing: 1, species_name: 'fish' }
-					]
-				}
-			});
+			expect(reporterRule.generator).toHaveBeenCalledWith([
+				{ time_period: '2020-03-01', bird_count: 1 },
+				{ time_period: '2021-03-01', bird_count: 1 }
+			]);
 		});
 		it('filters correctly for a year and month window', async () => {
 			await getHighlightsWithinTimeWindow({
@@ -209,23 +109,9 @@ describe('highlight-generator', () => {
 				includePerSpecies: true,
 				parentTimeWindow: { year: 2020, month: 3 }
 			});
-			expect(reporterRule.statsSelector).toHaveBeenCalledWith({
-				coreStats: [{ time_period: '2020-03-01', bird_count: 1 }],
-				coreStatsWithSpecies: [
-					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
-				],
-				coreStatsBySpecies: {
-					cat: [
-						{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
-					]
-				},
-				biometricsStatsWithSpecies: [
-					{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' }
-				],
-				biometricsStatsBySpecies: {
-					cat: [{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' }]
-				}
-			});
+			expect(reporterRule.generator).toHaveBeenCalledWith([
+				{ time_period: '2020-03-01', bird_count: 1 }
+			]);
 		});
 	});
 

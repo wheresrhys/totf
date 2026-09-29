@@ -178,5 +178,19 @@ export const expectations = {
 		'tied second of month': 'Robins seen in only 12 sessions in any February',
 		'global and tied second of year and third of month':
 			'Robins seen in only 12 sessions ever'
+	},
+	heaviestOfSpecies: {
+		global: 'Heaviest Robin ever: 12 g',
+		'tied global': 'Joint heaviest Robin ever: 12 g',
+		'singular global': 'Heaviest Robin ever: 1 g',
+		'second global': 'Second heaviest Robin ever: 12 g',
+		'tied second global': 'Joint second heaviest Robin ever: 12 g',
+		'tied second of year': 'Joint second heaviest Robin of 2020: 12 g',
+		'this year': 'Heaviest Robin this year: 12 g',
+		'tied global and second of year':
+			'Joint heaviest Robin ever and second heaviest of 2020: 12 g',
+		'tied second of month': 'Joint second heaviest Robin in any February: 12 g',
+		'global and tied second of year and third of month':
+			'Heaviest Robin ever, joint second heaviest of 2020 and third heaviest in any February: 12 g'
 	}
 };

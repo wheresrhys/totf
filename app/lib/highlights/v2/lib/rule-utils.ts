@@ -12,6 +12,7 @@ type HighlightFinderOptions = {
 	// first year) every species is trivially a first record, which says more
 	// about the start of the data than about the birds.
 	suppressInEarliestPeriod?: boolean;
+	smallestWins?: boolean;
 };
 
 type RowWithIdentity = {
@@ -43,7 +44,9 @@ export function getTopByPropertiesSum<Row extends RowWithIdentity>(
 		const max = Math.max(...potentialHighlights.map((item) => item.value));
 		return potentialHighlights
 			.filter((row) => row.value >= Math.max(threshold, max / 2))
-			.sort((a, b) => b.value - a.value);
+			.sort((a, b) =>
+				options?.smallestWins ? a.value - b.value : b.value - a.value
+			);
 	};
 }
 

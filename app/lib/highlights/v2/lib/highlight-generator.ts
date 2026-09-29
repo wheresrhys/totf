@@ -7,7 +7,8 @@ import { highlightRules } from '../rules';
 import type {
 	HighlightsOfType,
 	YearMonthRestriction,
-	EnhancedStatsRepository
+	EnhancedStatsRepository,
+	HighlightValue
 } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import { DEFAULT_LIMIT } from '../const';
@@ -55,12 +56,18 @@ function generateAllHighlights({
 		.flatMap((rule) => {
 			if (rule.condition && !rule.condition(temporalUnit, parentTimeWindow))
 				return null;
-			const workingStats = stats[statsSelector];
+			const workingStats = stats[rule.statsSelector];
 			if (Array.isArray(workingStats)) {
 				const highlights: HighlightsOfType = {
 					...rule,
 					scope: { temporalUnit, parentTimeWindow: parentTimeWindow },
-					values: rule.generator(workingStats)
+					// rule.statsSelector always names the array whose row type matches rule.generator's
+					// param type (enforced by HighlightsGenerator's discriminated union in types.ts) —
+					// TS can't see that correlation across this generic dispatch loop, so assert it here,
+					// the one place that needs it.
+					values: (rule.generator as (stats: unknown[]) => HighlightValue[])(
+						workingStats
+					)
 				};
 				return applyLimitToHighlight(
 					highlights,
@@ -78,7 +85,9 @@ function generateAllHighlights({
 								parentTimeWindow: parentTimeWindow,
 								species
 							},
-							values: rule.generator(workingStatsChild)
+							values: (
+								rule.generator as (stats: unknown[]) => HighlightValue[]
+							)(workingStatsChild)
 						};
 						return highlights.values.length
 							? applyLimitToHighlight(

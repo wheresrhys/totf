@@ -1,4 +1,3 @@
-import { statfsSync } from 'fs';
 import type {
 	HighlightScope,
 	HighlightRanking,
