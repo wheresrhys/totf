@@ -54,10 +54,10 @@ export async function cachedSupabaseFetch<T>(
 		cachedResult.version === currentVersion &&
 		cachedResult.expiresAt > Date.now()
 	) {
-		console.log('CACHE_HIT', namespace)
+		console.log('CACHE_HIT', namespace);
 		return cachedResult.data;
 	}
-	console.log('CACHE_MISS', namespace)
+	console.log('CACHE_MISS', namespace);
 	const data = await dataFetcher(supabase, viewedGroupId);
 	cache.set(viewedGroupId, {
 		version: currentVersion,
