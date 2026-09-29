@@ -30,7 +30,7 @@ export const heaviestOfSpecies: HighlightsGenerator = {
 		unit: 'g',
 		category: 'biometrics'
 	},
-	generator: getTopByProperty<BiometricsStatsResult>('max_wing', {
+	generator: getTopByProperty<BiometricsStatsResult>('max_weight', {
 		threshold: 3
 	})
 };
