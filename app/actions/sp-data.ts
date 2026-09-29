@@ -7,7 +7,7 @@ import {
 } from '@/app/models/bird';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { fetchGroupEffortHistory } from './stats-cache';
+import { fetchCoreStatsByMonth } from './stats-cache';
 import { postgresIntervalToHours } from '@/app/lib/postgres-interval';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
@@ -254,7 +254,7 @@ export async function getSpeciesArrivalsStats(
  * Group-wide (not species-filtered) monthly ringing-effort history for the
  * species page's Demographics/Biometrics tabs — effort is a property of a
  * session, not of the species caught in it, so this wraps
- * `fetchGroupEffortHistory` (`app/actions/stats-cache.ts`, sharing its
+ * `fetchCoreStatsByMonth` (`app/actions/stats-cache.ts`, sharing its
  * `'month-core-stats'` cache namespace with `getStatsByTemporalUnit`) rather
  * than filtering by species. Shapes the raw `total_effort` interval into
  * fractional hours and pairs it with `time_period`, matching the
@@ -266,7 +266,7 @@ export async function getSpeciesArrivalsStats(
 export async function getGroupEffortHistory(
 	viewedGroupId: number
 ): Promise<[string, number][]> {
-	const statsHistory = await fetchGroupEffortHistory(viewedGroupId);
+	const statsHistory = await fetchCoreStatsByMonth(viewedGroupId);
 	return statsHistory.map((row): [string, number] => [
 		row.time_period,
 		postgresIntervalToHours(row.total_effort)

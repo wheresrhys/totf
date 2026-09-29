@@ -12,10 +12,10 @@ import {
 import type { CoreStatsResult } from '@/app/models/db';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 
-const { mockGetAuthenticatedSupabaseClient, mockFetchGroupEffortHistory } =
+const { mockGetAuthenticatedSupabaseClient, mockFetchCoreStatsByMonth } =
 	vi.hoisted(() => ({
 		mockGetAuthenticatedSupabaseClient: vi.fn(),
-		mockFetchGroupEffortHistory: vi.fn()
+		mockFetchCoreStatsByMonth: vi.fn()
 	}));
 
 vi.mock('@/app/lib/auth/group-auth', () => ({
@@ -23,13 +23,13 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 }));
 
 // getGroupEffortHistory delegates the RPC call + caching to
-// fetchGroupEffortHistory (app/actions/stats-cache.ts) — that function's own
-// RPC-args/caching behaviour is covered by the fetchGroupEffortHistory
+// fetchCoreStatsByMonth (app/actions/stats-cache.ts) — that function's own
+// RPC-args/caching behaviour is covered by the fetchCoreStatsByMonth
 // describe block in __tests__/stats-cache.test.ts, so here it's mocked
 // directly and these tests only assert the interval->hours conversion +
 // [time_period, hours] pair shaping.
 vi.mock('../stats-cache', () => ({
-	fetchGroupEffortHistory: mockFetchGroupEffortHistory
+	fetchCoreStatsByMonth: mockFetchCoreStatsByMonth
 }));
 
 const SPECIES_ID = 1;
@@ -521,14 +521,14 @@ describe('sp-data actions', () => {
 		}
 
 		it('converts core_stats rows into [time_period, hours] pairs in the same order', async () => {
-			mockFetchGroupEffortHistory.mockResolvedValue([
+			mockFetchCoreStatsByMonth.mockResolvedValue([
 				effortRow('2023-01', '05:30:00'),
 				effortRow('2023-02', '02:00:00')
 			]);
 
 			const result = await getGroupEffortHistory(GROUP_ID);
 
-			expect(mockFetchGroupEffortHistory).toHaveBeenCalledWith(GROUP_ID);
+			expect(mockFetchCoreStatsByMonth).toHaveBeenCalledWith(GROUP_ID);
 			expect(result).toEqual([
 				['2023-01', 5.5],
 				['2023-02', 2]
@@ -536,7 +536,7 @@ describe('sp-data actions', () => {
 		});
 
 		it('returns 0 hours for a month whose total_effort is "00:00:00"', async () => {
-			mockFetchGroupEffortHistory.mockResolvedValue([
+			mockFetchCoreStatsByMonth.mockResolvedValue([
 				effortRow('2023-01', '00:00:00')
 			]);
 
@@ -546,7 +546,7 @@ describe('sp-data actions', () => {
 		});
 
 		it('converts an interval spanning whole days to its total hour count', async () => {
-			mockFetchGroupEffortHistory.mockResolvedValue([
+			mockFetchCoreStatsByMonth.mockResolvedValue([
 				effortRow('2023-01', '2 days 03:00:00')
 			]);
 

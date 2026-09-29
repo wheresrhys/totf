@@ -28,7 +28,7 @@ const mockDataFetcher = vi.fn();
 
 // The module memoises each stats blob at module scope via its own cache Map,
 // so each test imports a fresh copy of the module — shared by
-// getStatsByTemporalUnit, fetchGroupEffortHistory and cachedSupabaseFetch
+// getStatsByTemporalUnit, fetchCoreStatsByMonth and cachedSupabaseFetch
 // tests alike since they all reuse the same fetchWithVersionCache mechanism.
 async function importCachedFetch() {
 	vi.resetModules();

@@ -72,7 +72,7 @@ export async function getStatsByTemporalUnit(
 // using getStatsByTemporalUnit directly) so a caller that only needs the
 // ungrouped totals doesn't also trigger the species-grouped and biometrics
 // RPC calls getStatsByTemporalUnit bundles alongside it.
-export async function fetchGroupEffortHistory(
+export async function fetchCoreStatsByMonth(
 	viewedGroupId: number
 ): Promise<CoreStatsResult[]> {
 	return cachedSupabaseFetch(

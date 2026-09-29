@@ -2,10 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { cachedSupabaseFetch } from '@/app/lib/cached-supabase-fetch';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
-import {
-	getStatsByTemporalUnit,
-	fetchGroupEffortHistory
-} from '../stats-cache';
+import { getStatsByTemporalUnit, fetchCoreStatsByMonth } from '../stats-cache';
 
 type CachedSupabaseChainCall = { rpcCall: unknown[]; orderCalls: unknown[][] };
 let cachedSupabaseChainCalls: CachedSupabaseChainCall[] = [];
@@ -163,7 +160,7 @@ describe('getStatsByTemporalUnit', () => {
 	});
 });
 
-describe('fetchGroupEffortHistory', () => {
+describe('fetchCoreStatsByMonth', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		cachedSupabaseChainCalls = [];
@@ -190,7 +187,7 @@ describe('fetchGroupEffortHistory', () => {
 	});
 
 	it('calls the core_stats rpc ungrouped by species, month-grouped by time period, scoped to the group', async () => {
-		await fetchGroupEffortHistory(GROUP_ID);
+		await fetchCoreStatsByMonth(GROUP_ID);
 		expect(cachedSupabaseFetch).toHaveBeenCalledWith(
 			'month-core-stats',
 			GROUP_ID,
@@ -213,7 +210,7 @@ describe('fetchGroupEffortHistory', () => {
 		mockRange.mockResolvedValueOnce({
 			data: [{ time_period: '2023-01', total_effort: '05:30:00' }]
 		});
-		const result = await fetchGroupEffortHistory(GROUP_ID);
+		const result = await fetchCoreStatsByMonth(GROUP_ID);
 		expect(result).toStrictEqual([
 			{ time_period: '2023-01', total_effort: '05:30:00' }
 		]);
