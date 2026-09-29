@@ -17,13 +17,14 @@ const highlightCategoryOrder: HighlightCategory[] = [
 
 function calculatePosition(
 	siblingHighlights: HighlightValue[],
-	highlightIndex: number
+	highlightIndex: number,
+	smallestWins?: boolean
 ) {
 	const activeHighlight = siblingHighlights[highlightIndex];
 	const activeValue = activeHighlight.value;
 	const allValues = [
 		...new Set(siblingHighlights.map(({ value }) => value))
-	].sort((a, b) => b - a);
+	].sort((a, b) => (smallestWins ? a - b : b - a));
 	const position = allValues.indexOf(activeValue) + 1;
 	const isTied =
 		siblingHighlights.filter(({ value }) => value === activeValue).length > 1;
@@ -51,7 +52,11 @@ function filterOutIrrelevantHighlights(
 				},
 				value: relevantHighlight,
 				ranking: {
-					...calculatePosition(highlightWrapper.values, relevantHighlightIndex),
+					...calculatePosition(
+						highlightWrapper.values,
+						relevantHighlightIndex,
+						highlightWrapper.descriptor.smallestWins
+					),
 					siblingHighlights: highlightWrapper.values,
 					highlightIndex: relevantHighlightIndex
 				}
