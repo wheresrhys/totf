@@ -30,7 +30,7 @@ export const lightestOfSpecies: HighlightsGenerator = {
 		unit: 'g',
 		category: 'biometrics'
 	},
-	generator: getTopByProperty<BiometricsStatsResult>('min_wing', {
+	generator: getTopByProperty<BiometricsStatsResult>('min_weight', {
 		threshold: 3,
 		smallestWins: true
 	})
