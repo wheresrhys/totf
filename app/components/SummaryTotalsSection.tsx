@@ -5,7 +5,10 @@ import { SpeciesTotalsTable } from '@/app/components/SpeciesTotalsTable';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
-import { fetchPeriodStats } from '@/app/actions/summary-stats';
+import {
+	fetchPeriodStats,
+	fetchCombinedMonthSpeciesCounts
+} from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
@@ -47,10 +50,12 @@ const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
 // returns) — toggling re-renders in place, no new fetch either way.
 function AllTimeMonthTotalsTab({
 	periodStats,
+	speciesCountByMonth,
 	totalsStats,
 	viewedGroup
 }: {
 	periodStats: CoreStatsResult[];
+	speciesCountByMonth: Record<number, number>;
 	totalsStats?: CoreStatsResult;
 	viewedGroup?: ViewedGroup;
 }) {
@@ -62,7 +67,10 @@ function AllTimeMonthTotalsTab({
 	// ON: 12 calendar-month buckets summed across every year. Look each row
 	// back up by its sentinel `time_period` (there's no year to link to, so no
 	// href) and format its label on demand.
-	const combinedRows = buildCombinedMonthTotalsRows(periodStats);
+	const combinedRows = buildCombinedMonthTotalsRows(
+		periodStats,
+		speciesCountByMonth
+	);
 	const combinedLabelByTimePeriod = new Map(
 		combinedRows.map((row) => [row.stats.time_period, formatMonthLabel(row)])
 	);
@@ -287,13 +295,19 @@ export function SummaryTotalsSection({
 	// The all-time combine-years month tab fetches lazily too, on first select —
 	// one row per (year, month) across the group's full history, folded into 12
 	// calendar-month buckets client-side. Encounters-only, so it needs no date
-	// range (all-time) and no per-year drill-down link.
+	// range (all-time) and no per-year drill-down link. `species_count` can't be
+	// folded from the same rows (summing per-cell distinct counts double-counts a
+	// species across years, #994), so it's fetched separately as a true
+	// cross-year distinct count and composed alongside.
 	const isAllTimeMonthActive = activeTab === ALL_TIME_MONTH_TOTALS_TAB.id;
-	const fetchCombinedMonthStats = useCallback(
-		() => fetchPeriodStats(viewedGroup!.id, 'month'),
-		[viewedGroup]
-	);
-	const { data: combinedMonthStats, isLoading: isCombinedMonthLoading } =
+	const fetchCombinedMonthStats = useCallback(async () => {
+		const [periodStats, speciesCountByMonth] = await Promise.all([
+			fetchPeriodStats(viewedGroup!.id, 'month'),
+			fetchCombinedMonthSpeciesCounts(viewedGroup!.id)
+		]);
+		return { periodStats, speciesCountByMonth };
+	}, [viewedGroup]);
+	const { data: combinedMonthData, isLoading: isCombinedMonthLoading } =
 		useLazyTabData(
 			isAllTimeMonthActive && viewedGroup !== undefined,
 			fetchCombinedMonthStats,
@@ -370,7 +384,8 @@ export function SummaryTotalsSection({
 					</div>
 				) : (
 					<AllTimeMonthTotalsTab
-						periodStats={combinedMonthStats ?? []}
+						periodStats={combinedMonthData?.periodStats ?? []}
+						speciesCountByMonth={combinedMonthData?.speciesCountByMonth ?? {}}
 						totalsStats={
 							tabsWithTotalsRow[ALL_TIME_MONTH_TOTALS_TAB.id]
 								? totalsStats

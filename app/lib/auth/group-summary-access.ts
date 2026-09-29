@@ -15,6 +15,8 @@ export type CoreStatsRpcParams = {
 	to_date?: string;
 	group_by_species?: boolean;
 	group_by_time_period?: string;
+	year_filter?: number;
+	month_filter?: number;
 };
 
 export type GroupSummaryAccessLevel = 'own' | 'shared' | 'public' | 'blocked';
