@@ -48,13 +48,16 @@ export async function cachedSupabaseFetch<T>(
 	const supabase = await getAuthenticatedSupabaseClient();
 	const currentVersion = await fetchVersion(supabase, viewedGroupId);
 	const cachedResult = cache.get(viewedGroupId);
+
 	if (
 		cachedResult &&
 		cachedResult.version === currentVersion &&
 		cachedResult.expiresAt > Date.now()
 	) {
+		console.log('CACHE_HIT', namespace)
 		return cachedResult.data;
 	}
+	console.log('CACHE_MISS', namespace)
 	const data = await dataFetcher(supabase, viewedGroupId);
 	cache.set(viewedGroupId, {
 		version: currentVersion,
