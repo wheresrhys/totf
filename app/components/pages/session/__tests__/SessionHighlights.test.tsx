@@ -1,19 +1,13 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SessionHighlights } from '../SessionHighlights';
-import type { SessionHighlight } from '@/app/lib/highlights';
-import type { CombinedHighlight } from '@/app/lib/highlights/v2/types';
+import type { CombinedHighlight } from '@/app/lib/highlights/types';
 import type { SessionEncounter } from '@/app/models/session';
 
-vi.mock('@/app/actions/session-highlights', () => ({
-	fetchSessionHighlights: vi.fn()
-}));
-
-// Rarities (#990) and Counts (#989) both come from the v2 pipeline
-// (getCondensedHighlightsAtTimePeriod), fetched in parallel with the v1 action —
-// see SessionHighlights.tsx. Mock it as the one collaborator it is,
-// independently of the v1 fetch.
-vi.mock('@/app/lib/highlights/v2', () => ({
+// Rarities (#990), Counts (#989) and Vital stats all come from the highlights
+// pipeline's getCondensedHighlightsAtTimePeriod — see SessionHighlights.tsx.
+// Mock it as the one collaborator it is.
+vi.mock('@/app/lib/highlights', () => ({
 	getCondensedHighlightsAtTimePeriod: vi.fn()
 }));
 
@@ -49,32 +43,11 @@ const COUNT_HIGHLIGHT = makeV2Highlight(
 	'session-total',
 	'Busiest session ever — 74 birds'
 );
-const VITAL_STAT_HIGHLIGHT: SessionHighlight = {
-	type: 'weight-record',
-	speciesName: 'Blue Tit',
-	scope: 'all-time',
-	extreme: 'heaviest',
-	weight: 13.1,
-	placementRank: 1,
-	isJointPlacement: false,
-	year: 2024,
-	isCurrentYear: false
-};
-// long-absence-retrap matches no section — see
-// docs/session-highlight-ordering.md — so it's used to assert it renders
-// nowhere on the page.
-const LONG_ABSENCE_HIGHLIGHT: SessionHighlight = {
-	type: 'long-absence-retrap',
-	ringNo: 'ARRETRAP',
-	speciesName: 'Robin',
-	previousDate: '2021-06-20',
-	gapYears: 2,
-	gapMonths: 10
-};
-
-// Vital stats is all that's left on the v1 side — Rarities and Counts are
-// v2-only, see the fixtures above.
-const ALL_SECTION_HIGHLIGHTS: SessionHighlight[] = [VITAL_STAT_HIGHLIGHT];
+const VITAL_STAT_HIGHLIGHT = makeV2Highlight(
+	'biometrics',
+	'heaviestOfSpecies',
+	'Heaviest Robin ever — 12g'
+);
 
 // The "Best of the session" subsection only reads bird.proven_age,
 // bird.species.species_name and bird.ring_no off the oldest encounter — the
@@ -89,16 +62,18 @@ function makeOldestEncounter(provenAge: number): SessionEncounter {
 	} as SessionEncounter;
 }
 
-async function mockHighlights(highlights: SessionHighlight[]) {
-	const { fetchSessionHighlights } =
-		await import('@/app/actions/session-highlights');
-	vi.mocked(fetchSessionHighlights).mockResolvedValue(highlights);
-}
-
 async function mockV2Highlights(highlights: CombinedHighlight[]) {
 	const { getCondensedHighlightsAtTimePeriod } =
-		await import('@/app/lib/highlights/v2');
+		await import('@/app/lib/highlights');
 	vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue(highlights);
+}
+
+async function mockV2HighlightsRejection() {
+	const { getCondensedHighlightsAtTimePeriod } =
+		await import('@/app/lib/highlights');
+	vi.mocked(getCondensedHighlightsAtTimePeriod).mockRejectedValue(
+		new Error('fetch failed')
+	);
 }
 
 function renderSessionHighlights(
@@ -130,26 +105,20 @@ describe('SessionHighlights', () => {
 	});
 
 	beforeEach(async () => {
-		await mockHighlights(ALL_SECTION_HIGHLIGHTS);
 		await mockV2Highlights([]);
 	});
 
 	it('renders a loading spinner before data loads', async () => {
-		const { fetchSessionHighlights } =
-			await import('@/app/actions/session-highlights');
-		let resolveData!: (v: SessionHighlight[]) => void;
-		vi.mocked(fetchSessionHighlights).mockReturnValue(
-			new Promise((resolve) => {
-				resolveData = resolve;
-			})
-		);
 		renderSessionHighlights();
 		expect(document.querySelector('.loading')).not.toBeNull();
-		resolveData(ALL_SECTION_HIGHLIGHTS);
 	});
 
 	it('renders a Rarities/Counts/Vital stats heading and item per section when all three groups have highlights', async () => {
-		await mockV2Highlights([RARITY_HIGHLIGHT, COUNT_HIGHLIGHT]);
+		await mockV2Highlights([
+			RARITY_HIGHLIGHT,
+			COUNT_HIGHLIGHT,
+			VITAL_STAT_HIGHLIGHT
+		]);
 		renderSessionHighlights();
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
@@ -169,9 +138,7 @@ describe('SessionHighlights', () => {
 			.getByTestId('vital-stats')
 			.querySelectorAll('li');
 		expect(vitalStatItems.length).toBe(1);
-		expect(vitalStatItems[0].textContent).toBe(
-			'Heaviest Blue Tit ever weighed — 13.1g'
-		);
+		expect(vitalStatItems[0].textContent).toBe('Heaviest Robin ever — 12g');
 	});
 
 	it('renders a "Best of the session" heading with the oldest-bird sentence when an oldest encounter is provided', async () => {
@@ -187,7 +154,11 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders every section together when highlights and an oldest encounter are both present', async () => {
-		await mockV2Highlights([RARITY_HIGHLIGHT, COUNT_HIGHLIGHT]);
+		await mockV2Highlights([
+			RARITY_HIGHLIGHT,
+			COUNT_HIGHLIGHT,
+			VITAL_STAT_HIGHLIGHT
+		]);
 		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
@@ -204,7 +175,6 @@ describe('SessionHighlights', () => {
 
 	describe('per-section show/hide', () => {
 		it('shows only the Rarities section when only a rarity highlight is present', async () => {
-			await mockHighlights([]);
 			await mockV2Highlights([RARITY_HIGHLIGHT]);
 			renderSessionHighlights();
 			await waitFor(() => {
@@ -217,7 +187,6 @@ describe('SessionHighlights', () => {
 		});
 
 		it('shows only the Counts section when only a count highlight is present', async () => {
-			await mockHighlights([]);
 			await mockV2Highlights([COUNT_HIGHLIGHT]);
 			renderSessionHighlights();
 			await waitFor(() => {
@@ -230,7 +199,7 @@ describe('SessionHighlights', () => {
 		});
 
 		it('shows only the Vital stats section when only a vital-stat highlight is present', async () => {
-			await mockHighlights([VITAL_STAT_HIGHLIGHT]);
+			await mockV2Highlights([VITAL_STAT_HIGHLIGHT]);
 			renderSessionHighlights();
 			await waitFor(() => {
 				expect(
@@ -244,17 +213,7 @@ describe('SessionHighlights', () => {
 		});
 	});
 
-	it('renders nothing for a long-absence-retrap highlight — it matches no section', async () => {
-		await mockHighlights([LONG_ABSENCE_HIGHLIGHT]);
-		const { container } = renderSessionHighlights();
-		await waitFor(() => {
-			expect(document.querySelector('.loading')).toBeNull();
-		});
-		expect(container.innerHTML).toBe('');
-	});
-
 	it('renders only the Best-of-the-session subsection when there are no highlights but an oldest encounter is provided', async () => {
-		await mockHighlights([]);
 		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
 		await waitFor(() => {
 			expect(
@@ -267,7 +226,6 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders the oldest-bird sentence in the existing "Oldest: N years — Species (RING)" format', async () => {
-		await mockHighlights([]);
 		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
 		await waitFor(() => {
 			expect(
@@ -280,7 +238,6 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders nothing when there are no highlights and no oldest encounter', async () => {
-		await mockHighlights([]);
 		const { container } = renderSessionHighlights();
 		await waitFor(() => {
 			expect(document.querySelector('.loading')).toBeNull();
@@ -289,7 +246,6 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders nothing for an oldest encounter with proven_age 0', async () => {
-		await mockHighlights([]);
 		const { container } = renderSessionHighlights({
 			oldestEncounter: makeOldestEncounter(0)
 		});
@@ -303,11 +259,7 @@ describe('SessionHighlights', () => {
 		const consoleErrorSpy = vi
 			.spyOn(console, 'error')
 			.mockImplementation(() => {});
-		const { fetchSessionHighlights } =
-			await import('@/app/actions/session-highlights');
-		vi.mocked(fetchSessionHighlights).mockRejectedValue(
-			new Error('action failed')
-		);
+		await mockV2HighlightsRejection();
 		const { container } = renderSessionHighlights({
 			oldestEncounter: makeOldestEncounter(5)
 		});

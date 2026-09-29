@@ -39,6 +39,7 @@ export type HighlightDescriptor = {
 	type: string;
 	unit: StatUnit;
 	speciesUnitMode?: SpeciesUnitMode;
+	smallestWins?: boolean;
 };
 
 export type HighlightScope = {

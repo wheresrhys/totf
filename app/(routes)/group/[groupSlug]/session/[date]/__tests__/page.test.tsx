@@ -27,17 +27,11 @@ vi.mock('@/app/lib/group-slug', () => ({
 	resolveGroupIdBySlug: mockResolveGroupIdBySlug
 }));
 
-vi.mock('@/app/actions/session-highlights', () => ({
-	// The action returns plain highlight data; the component renders each
-	fetchSessionHighlights: vi.fn().mockResolvedValue([])
-}));
-
-// Counts now comes from the v2 pipeline (getCondensedHighlightsAtTimePeriod),
-// fetched in parallel with the v1 action — see SessionHighlights.tsx. Mock it
-// as the one collaborator it is; the printer is a test double returning a
-// fixed sentence, not the real v2 formatting logic (covered by the v2
-// pipeline's own tests).
-vi.mock('@/app/lib/highlights/v2', () => ({
+// Counts comes from the highlights pipeline's getCondensedHighlightsAtTimePeriod.
+// Mock it as the one collaborator it is; the printer is a test double returning a
+// fixed sentence, not the real formatting logic (covered by the pipeline's own
+// tests).
+vi.mock('@/app/lib/highlights', () => ({
 	getCondensedHighlightsAtTimePeriod: vi.fn().mockResolvedValue([
 		{
 			formatters: {

@@ -1,4 +1,4 @@
-import { highlightRules } from '../';
+import { highlightRules } from '..';
 import { getCombinedHighlightFixtures } from './fixture-generator';
 import type { CombinedHighlight } from '../../types';
 import { writeFileSync } from 'node:fs';

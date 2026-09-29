@@ -27,20 +27,6 @@ vi.mock('@/app/lib/group-slug', () => ({
 	resolveGroupIdBySlug: mockResolveGroupIdBySlug
 }));
 
-vi.mock('@/app/actions/session-highlights', () => ({
-	// The action returns plain highlight data; the component renders each
-	fetchSessionHighlights: vi.fn().mockResolvedValue([
-		{
-			type: 'session-total-record',
-			metric: 'encounters',
-			scope: 'all-time',
-			value: 1,
-			year: 2024,
-			isCurrentYear: false
-		}
-	])
-}));
-
 const TEST_LOCATION_ID = '10';
 
 const mockEncounters = [
@@ -120,10 +106,7 @@ describe('session site page', () => {
 	it('does not render highlights on the location-filtered page', async () => {
 		render(await renderPage());
 		await screen.findByTestId('session-stats');
-		const { fetchSessionHighlights } =
-			await import('@/app/actions/session-highlights');
 		expect(screen.queryByTestId('session-highlights')).toBeNull();
-		expect(vi.mocked(fetchSessionHighlights)).not.toHaveBeenCalled();
 	});
 
 	describe('when the date has more than one location', () => {
