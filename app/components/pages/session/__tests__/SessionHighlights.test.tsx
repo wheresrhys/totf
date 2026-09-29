@@ -1,14 +1,13 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { SessionHighlights } from '../SessionHighlights';
-import type { CombinedHighlight } from '@/app/lib/highlights/v2/types';
+import type { CombinedHighlight } from '@/app/lib/highlights/types';
 import type { SessionEncounter } from '@/app/models/session';
 
-// Rarities (#990) and Counts (#989) both come from the v2 pipeline
-// (getCondensedHighlightsAtTimePeriod), fetched in parallel with the v1 action —
-// see SessionHighlights.tsx. Mock it as the one collaborator it is,
-// independently of the v1 fetch.
-vi.mock('@/app/lib/highlights/v2', () => ({
+// Rarities (#990), Counts (#989) and Vital stats all come from the highlights
+// pipeline's getCondensedHighlightsAtTimePeriod — see SessionHighlights.tsx.
+// Mock it as the one collaborator it is.
+vi.mock('@/app/lib/highlights', () => ({
 	getCondensedHighlightsAtTimePeriod: vi.fn()
 }));
 
@@ -65,8 +64,16 @@ function makeOldestEncounter(provenAge: number): SessionEncounter {
 
 async function mockV2Highlights(highlights: CombinedHighlight[]) {
 	const { getCondensedHighlightsAtTimePeriod } =
-		await import('@/app/lib/highlights/v2');
+		await import('@/app/lib/highlights');
 	vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue(highlights);
+}
+
+async function mockV2HighlightsRejection() {
+	const { getCondensedHighlightsAtTimePeriod } =
+		await import('@/app/lib/highlights');
+	vi.mocked(getCondensedHighlightsAtTimePeriod).mockRejectedValue(
+		new Error('fetch failed')
+	);
 }
 
 function renderSessionHighlights(
@@ -131,9 +138,7 @@ describe('SessionHighlights', () => {
 			.getByTestId('vital-stats')
 			.querySelectorAll('li');
 		expect(vitalStatItems.length).toBe(1);
-		expect(vitalStatItems[0].textContent).toBe(
-			'Heaviest Blue Tit ever weighed — 13.1g'
-		);
+		expect(vitalStatItems[0].textContent).toBe('Heaviest Robin ever — 12g');
 	});
 
 	it('renders a "Best of the session" heading with the oldest-bird sentence when an oldest encounter is provided', async () => {
@@ -149,7 +154,11 @@ describe('SessionHighlights', () => {
 	});
 
 	it('renders every section together when highlights and an oldest encounter are both present', async () => {
-		await mockV2Highlights([RARITY_HIGHLIGHT, COUNT_HIGHLIGHT]);
+		await mockV2Highlights([
+			RARITY_HIGHLIGHT,
+			COUNT_HIGHLIGHT,
+			VITAL_STAT_HIGHLIGHT
+		]);
 		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
 		await waitFor(() => {
 			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
@@ -190,6 +199,7 @@ describe('SessionHighlights', () => {
 		});
 
 		it('shows only the Vital stats section when only a vital-stat highlight is present', async () => {
+			await mockV2Highlights([VITAL_STAT_HIGHLIGHT]);
 			renderSessionHighlights();
 			await waitFor(() => {
 				expect(
@@ -201,14 +211,6 @@ describe('SessionHighlights', () => {
 			expect(screen.queryByRole('heading', { name: 'Counts' })).toBeNull();
 			expect(screen.queryByTestId('counts')).toBeNull();
 		});
-	});
-
-	it('renders nothing for a long-absence-retrap highlight — it matches no section', async () => {
-		const { container } = renderSessionHighlights();
-		await waitFor(() => {
-			expect(document.querySelector('.loading')).toBeNull();
-		});
-		expect(container.innerHTML).toBe('');
 	});
 
 	it('renders only the Best-of-the-session subsection when there are no highlights but an oldest encounter is provided', async () => {
@@ -257,6 +259,7 @@ describe('SessionHighlights', () => {
 		const consoleErrorSpy = vi
 			.spyOn(console, 'error')
 			.mockImplementation(() => {});
+		await mockV2HighlightsRejection();
 		const { container } = renderSessionHighlights({
 			oldestEncounter: makeOldestEncounter(5)
 		});

@@ -4,9 +4,9 @@ import {
 	BoxyList,
 	SecondaryHeading
 } from '@/app/components/shared/DesignSystem';
-import { getCondensedHighlightsAtTimePeriod } from '@/app/lib/highlights/v2';
+import { getCondensedHighlightsAtTimePeriod } from '@/app/lib/highlights';
 
-import { type CombinedHighlight } from '@/app/lib/highlights/v2/types';
+import { type CombinedHighlight } from '@/app/lib/highlights/types';
 import type { SessionEncounter } from '@/app/models/session';
 
 // A v2 highlight carries its own printer, so both v2-backed sections render
