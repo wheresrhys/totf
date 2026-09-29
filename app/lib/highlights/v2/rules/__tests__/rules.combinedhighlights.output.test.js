@@ -2,10 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import { highlightRules } from '../';
 import { expectations as allExpectations } from './expectations';
-import {
-	getCombinedHighlightFixtures,
-	isPerSpeciesRule
-} from './fixture-generator';
+import { getCombinedHighlightFixtures } from './fixture-generator';
 
 describe('rules output for comibned highlights', () => {
 	highlightRules.forEach((rule) => {

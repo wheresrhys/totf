@@ -1,5 +1,6 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { BiometricsStatsResult } from '@/app/models/db';
 import {
 	printProminenceQualifier,
 	printValue,
@@ -10,8 +11,8 @@ import {
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
-export const singleSpeciesCount: HighlightsGenerator = {
-	statsSelector: 'coreStatsWithSpecies',
+export const heaviestBirdOfSpecies: HighlightsGenerator = {
+	statsSelector: 'biometricsStatsBySpecies',
 	formatters: {
 		// -> Highest count of a single species in 2021: 54 Reed Warblers
 		combinedHighlightPrinter: (combinedHighlight) => {
@@ -27,12 +28,13 @@ export const singleSpeciesCount: HighlightsGenerator = {
 			`Highest ${printTemporalUnit(highlightsOfType.scope.temporalUnit)} count${highlightsOfType.values.length > 1 ? 's' : ''} for a single species`
 	},
 	descriptor: {
-		type: 'singleSpeciesCount',
-		unit: 'bird',
-		category: 'count',
-		speciesUnitMode: 'replace'
+		type: 'heaviestBirdOfSpecies',
+		unit: 'g',
+		category: 'count'
 	},
-	generator: getTopByProperty('bird_count', { threshold: 3 }),
+	generator: getTopByProperty<BiometricsStatsResult>('max_wing', {
+		threshold: 3
+	}),
 	condition: (
 		temporalUnit: TemporalUnit,
 		parentTimeWindow?: YearMonthRestriction

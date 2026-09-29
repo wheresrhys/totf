@@ -11,7 +11,7 @@ export type StatUnit =
 	| 'encounter'
 	| 'session'
 	| 'mm'
-	| 'gram';
+	| 'g';
 export type StatOutputModel = {
 	value: number;
 	speciesName?: string;
@@ -28,7 +28,8 @@ export type StatOutputModel = {
 
 const plurals: Partial<Record<StatUnit | TemporalUnit, string>> = {
 	species: 'species',
-	mm: 'mm'
+	mm: 'mm',
+	g: 'g'
 };
 
 export function getPlural(unit: StatUnit | TemporalUnit | undefined): string {

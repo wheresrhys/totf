@@ -7,8 +7,6 @@ import {
 } from '../lib/printer-utils';
 import { getInfrequentAppearances } from '../lib/rule-utils';
 
-import type { EnhancedStatsRepository } from '../types';
-
 // "Firecrests seen in only 2 sessions ever" — a species the group has only ever
 // recorded in a handful of periods is worth a line every time it turns up again,
 // and the count of those periods is the whole story.
@@ -25,7 +23,7 @@ import type { EnhancedStatsRepository } from '../types';
 // means anything against the group's full history, so a windowed scope is
 // refused outright rather than gated behind a different threshold.
 export const rareSpecies: HighlightsGenerator = {
-	statsSelector: (stats: EnhancedStatsRepository) => stats.coreStatsBySpecies,
+	statsSelector: 'coreStatsBySpecies',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const [{ scope }] = combinedHighlight.scopes;

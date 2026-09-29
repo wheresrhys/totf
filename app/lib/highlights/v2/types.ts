@@ -93,16 +93,29 @@ type HighlightFormatters = {
 	highlightListPrefixPrinter: HighlightListPrefixPrinter;
 };
 
-export type HighlightsGenerator = {
+type StatsRowOf<StatsProperty> =
+	StatsProperty extends Record<string, (infer Row)[]>
+		? Row
+		: StatsProperty extends (infer Row)[]
+			? Row
+			: never;
+
+type HighlightsGeneratorFor<
+	StatsSelectorKey extends keyof EnhancedStatsRepository
+> = {
 	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	limit?: number;
-	statsSelector: (
-		stats: EnhancedStatsRepository
-	) => CoreStatsResult[] | Record<string, CoreStatsResult[]>;
-	generator: (stats: CoreStatsResult[]) => HighlightValue[];
+	statsSelector: StatsSelectorKey;
+	generator: (
+		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[]
+	) => HighlightValue[];
 	condition?: (
 		temporalUnit: TemporalUnit,
 		parentTimeWindow?: YearMonthRestriction
 	) => boolean;
 };
+
+export type HighlightsGenerator = {
+	[StatsSelectorKey in keyof EnhancedStatsRepository]: HighlightsGeneratorFor<StatsSelectorKey>;
+}[keyof EnhancedStatsRepository];

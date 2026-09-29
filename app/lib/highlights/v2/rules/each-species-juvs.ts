@@ -10,9 +10,8 @@ import {
 } from '../lib/printer-utils';
 import { getTopByPropertiesSum } from '../lib/rule-utils';
 
-import type { EnhancedStatsRepository } from '../types';
 export const eachSpeciesJuvs: HighlightsGenerator = {
-	statsSelector: (stats: EnhancedStatsRepository) => stats.coreStatsBySpecies,
+	statsSelector: 'coreStatsBySpecies',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {

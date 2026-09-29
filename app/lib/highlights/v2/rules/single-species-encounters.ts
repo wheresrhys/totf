@@ -10,9 +10,8 @@ import {
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
-import type { EnhancedStatsRepository } from '../types';
 export const singleSpeciesEncounters: HighlightsGenerator = {
-	statsSelector: (stats: EnhancedStatsRepository) => stats.coreStatsWithSpecies,
+	statsSelector: 'coreStatsWithSpecies',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map(

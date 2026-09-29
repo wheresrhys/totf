@@ -14,9 +14,14 @@ type HighlightFinderOptions = {
 	suppressInEarliestPeriod?: boolean;
 };
 
-function sumProperties(
-	item: CoreStatsResult,
-	properties: (keyof CoreStatsResult)[]
+type RowWithIdentity = {
+	time_period: string | null;
+	species_name: string | null;
+};
+
+function sumProperties<Row extends RowWithIdentity>(
+	item: Row,
+	properties: (keyof Row)[]
 ) {
 	return properties.reduce(
 		(sum, property) => sum + ((item[property] as number) ?? 0),
@@ -24,12 +29,12 @@ function sumProperties(
 	);
 }
 
-export function getTopByPropertiesSum(
-	properties: (keyof CoreStatsResult)[],
+export function getTopByPropertiesSum<Row extends RowWithIdentity>(
+	properties: (keyof Row)[],
 	options?: HighlightFinderOptions
-): (stats: CoreStatsResult[]) => HighlightValue[] {
+): (stats: Row[]) => HighlightValue[] {
 	const threshold = options?.threshold ?? DEFAULT_THRESHOLD;
-	return (stats: CoreStatsResult[]) => {
+	return (stats: Row[]) => {
 		const potentialHighlights = stats.map((row) => ({
 			timePeriod: row.time_period as string,
 			value: sumProperties(row, properties),
@@ -42,11 +47,11 @@ export function getTopByPropertiesSum(
 	};
 }
 
-export function getTopByProperty(
-	property: keyof CoreStatsResult,
+export function getTopByProperty<Row extends RowWithIdentity>(
+	property: keyof Row,
 	options?: HighlightFinderOptions
-): (stats: CoreStatsResult[]) => HighlightValue[] {
-	return getTopByPropertiesSum([property], options);
+): (stats: Row[]) => HighlightValue[] {
+	return getTopByPropertiesSum<Row>([property], options);
 }
 
 // ---- rarity finders ----

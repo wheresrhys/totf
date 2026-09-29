@@ -55,7 +55,7 @@ function generateAllHighlights({
 		.flatMap((rule) => {
 			if (rule.condition && !rule.condition(temporalUnit, parentTimeWindow))
 				return null;
-			const workingStats = rule.statsSelector(stats);
+			const workingStats = stats[statsSelector];
 			if (Array.isArray(workingStats)) {
 				const highlights: HighlightsOfType = {
 					...rule,

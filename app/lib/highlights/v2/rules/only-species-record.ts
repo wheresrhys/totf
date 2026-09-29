@@ -6,8 +6,6 @@ import {
 } from '../lib/printer-utils';
 import { getSoleAppearance } from '../lib/rule-utils';
 
-import type { EnhancedStatsRepository } from '../types';
-
 // "Only Robin ever" / "Only Robins of 2020" — a species recorded in exactly one
 // period of the scope being asked about. v1 carried this as an isOnlyRecord flag
 // on its first-ever and first-of-year highlights; here it is its own metric,
@@ -27,7 +25,7 @@ import type { EnhancedStatsRepository } from '../types';
 // That is the cross-type folding the generic combiner can't do (again, see
 // combineSimilarHighlights' header).
 export const onlySpeciesRecord: HighlightsGenerator = {
-	statsSelector: (stats: EnhancedStatsRepository) => stats.coreStatsBySpecies,
+	statsSelector: 'coreStatsBySpecies',
 	formatters: {
 		// scopes[0] only, for the same reason as firstSpeciesRecord: a species'
 		// only record ever is necessarily also its only record of that year.

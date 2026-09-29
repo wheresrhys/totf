@@ -6,8 +6,6 @@ import {
 } from '../lib/printer-utils';
 import { getFirstAppearance } from '../lib/rule-utils';
 
-import type { EnhancedStatsRepository } from '../types';
-
 // "First Robin ever" / "First Robins of 2020" — the period in which a species was
 // first recorded, read at whatever scope the machine is asking about. The species
 // name carries the count: plural when the period held more than one bird.
@@ -33,7 +31,7 @@ import type { EnhancedStatsRepository } from '../types';
 // group's first-ever session (v1 suppressed this too, for the same reason) or the
 // first session of a year.
 export const firstSpeciesRecord: HighlightsGenerator = {
-	statsSelector: (stats: EnhancedStatsRepository) => stats.coreStatsBySpecies,
+	statsSelector: 'coreStatsBySpecies',
 	formatters: {
 		// Only scopes[0] is read. Unlike a count metric, where each extra scope
 		// adds information ("busiest ever AND busiest of 2020"), every extra scope

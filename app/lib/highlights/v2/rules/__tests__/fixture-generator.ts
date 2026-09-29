@@ -1,3 +1,4 @@
+import { statfsSync } from 'fs';
 import type {
 	HighlightScope,
 	HighlightRanking,
@@ -30,7 +31,7 @@ export function isPerSpeciesRule(rule: HighlightsGenerator): boolean {
 		biometricsStatsWithSpecies: [],
 		biometricsStatsBySpecies: {}
 	};
-	return !Array.isArray(rule.statsSelector(emptyStats));
+	return !Array.isArray(emptyStats[rule.statsSelector]);
 }
 
 function getBaseScope(

@@ -12,7 +12,7 @@ import {
 import { getTopByProperty } from '../lib/rule-utils';
 
 export const eachSpeciesCount: HighlightsGenerator = {
-	statsSelector: (stats: EnhancedStatsRepository) => stats.coreStatsBySpecies,
+	statsSelector: 'coreStatsBySpecies',
 	// Highest Long- tailed Tit count of 2020, and highest ever: 5 birds
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {

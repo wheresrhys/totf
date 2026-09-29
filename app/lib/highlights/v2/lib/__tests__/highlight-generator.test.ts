@@ -19,7 +19,7 @@ describe('highlight-generator', () => {
 	// Note - for now caching behaviour is not tested
 	describe('underlying data fetching', () => {
 		const reporterRule = {
-			statsSelector: vi.fn(),
+			statsSelector: 'coreStats',
 			descriptor: {
 				type: 'a',
 				unit: 'bird',
@@ -33,9 +33,6 @@ describe('highlight-generator', () => {
 		} as HighlightsGenerator;
 		beforeEach(() => {
 			highlightRules.push(reporterRule);
-			vi.mocked(reporterRule.statsSelector).mockImplementation(
-				(stats: StatsRepository) => stats.coreStats
-			);
 		});
 		beforeEach(() => {
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
@@ -254,7 +251,7 @@ describe('highlight-generator', () => {
 			overrides: Partial<HighlightsGenerator> = {}
 		): HighlightsGenerator {
 			return {
-				statsSelector: (stats) => stats.coreStats,
+				statsSelector: 'coreStats',
 				descriptor: { type: 'test', unit: 'bird', category: 'count' },
 				formatters: {
 					highlightListPrefixPrinter: () => '',
@@ -413,7 +410,7 @@ describe('highlight-generator', () => {
 
 		it('can execute against the coreStatsWithSpecies stats array', async () => {
 			const rule = makeRule({
-				statsSelector: (stats) => stats.coreStatsWithSpecies
+				statsSelector: 'coreStatsWithSpecies'
 			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
@@ -438,7 +435,7 @@ describe('highlight-generator', () => {
 
 		it('can execute against the coreStatsBySpecies stats map', async () => {
 			const rule = makeRule({
-				statsSelector: (stats) => stats.coreStatsBySpecies
+				statsSelector: 'coreStatsBySpecies'
 			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
@@ -464,7 +461,7 @@ describe('highlight-generator', () => {
 
 		it('can opt out of executing coreStatsBySpecies rules', async () => {
 			const rule = makeRule({
-				statsSelector: (stats) => stats.coreStatsBySpecies
+				statsSelector: 'coreStatsBySpecies'
 			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
@@ -484,7 +481,7 @@ describe('highlight-generator', () => {
 
 		it('applies minimum limit to coreStatsBySpecies rules too', async () => {
 			const rule = makeRule({
-				statsSelector: (stats) => stats.coreStatsBySpecies,
+				statsSelector: 'coreStatsBySpecies',
 				limit: 1
 			});
 			highlightRules.push(rule);
@@ -518,7 +515,7 @@ describe('highlight-generator', () => {
 		it('safely combines coreStatsBySpecies and ordinary rules', async () => {
 			const coreStatsRule = makeRule();
 			const coreStatsBySpeciesRule = makeRule({
-				statsSelector: (stats) => stats.coreStatsBySpecies
+				statsSelector: 'coreStatsBySpecies'
 			});
 			highlightRules.push(coreStatsRule, coreStatsBySpeciesRule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
