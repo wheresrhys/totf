@@ -1,7 +1,6 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
+import type { EnhancedStatsRepository } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
-import type { CoreStatsResult } from '@/app/models/db';
-import type { StatsRepository } from '@/app/actions/stats-cache';
 import {
 	printProminenceQualifier,
 	printValue,
@@ -12,9 +11,8 @@ import {
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
-type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 export const eachSpeciesCount: HighlightsGenerator = {
-	statsSelector: (stats: CoreStatsRepository) => stats.bySpecies,
+	statsSelector: (stats: EnhancedStatsRepository) => stats.coreStatsBySpecies,
 	// Highest Long- tailed Tit count of 2020, and highest ever: 5 birds
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {

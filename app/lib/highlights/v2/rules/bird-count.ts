@@ -1,6 +1,4 @@
 import type { HighlightsGenerator } from '../types';
-import type { CoreStatsResult } from '@/app/models/db';
-import type { StatsRepository } from '@/app/actions/stats-cache';
 import {
 	printProminenceQualifier,
 	printValue,
@@ -12,9 +10,9 @@ import {
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
-type CoreStatsRepository = StatsRepository<CoreStatsResult>;
+import type { EnhancedStatsRepository } from '../types';
 export const birdCount: HighlightsGenerator = {
-	statsSelector: (stats: CoreStatsRepository) => stats.overall,
+	statsSelector: (stats: EnhancedStatsRepository) => stats.coreStats,
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {

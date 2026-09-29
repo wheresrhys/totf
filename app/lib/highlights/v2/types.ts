@@ -9,6 +9,10 @@ export type {
 } from '@/app/components/shared/StatOutput';
 import type { StatsRepository } from '@/app/actions/stats-cache';
 
+export type EnhancedStatsRepository = StatsRepository & {
+	coreStatsBySpecies: Record<string, CoreStatsResult[]>;
+};
+
 export interface TimePeriodedItem {
 	time_period: string | null;
 }
@@ -93,7 +97,7 @@ export type HighlightsGenerator = {
 	descriptor: HighlightDescriptor;
 	limit?: number;
 	statsSelector: (
-		stats: StatsRepository<CoreStatsResult>
+		stats: EnhancedStatsRepository
 	) => CoreStatsResult[] | Record<string, CoreStatsResult[]>;
 	generator: (stats: CoreStatsResult[]) => HighlightValue[];
 	condition?: (

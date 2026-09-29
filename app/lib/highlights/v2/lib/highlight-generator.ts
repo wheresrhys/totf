@@ -4,9 +4,12 @@ import {
 } from '@/app/actions/stats-cache';
 import { groupByColumn } from '@/app/lib/generic-utils';
 import { highlightRules } from '../rules';
-import type { HighlightsOfType, YearMonthRestriction } from '../types';
+import type {
+	HighlightsOfType,
+	YearMonthRestriction,
+	EnhancedStatsRepository
+} from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
-import { CoreStatsResult } from '@/app/models/db';
 import { DEFAULT_LIMIT } from '../const';
 
 const cache: Map<string, HighlightsOfType[]> = new Map();
@@ -42,7 +45,7 @@ function generateAllHighlights({
 	limit,
 	includePerSpecies
 }: {
-	stats: StatsRepository<CoreStatsResult>;
+	stats: EnhancedStatsRepository;
 	temporalUnit: TemporalUnit;
 	parentTimeWindow?: YearMonthRestriction;
 	limit: number;
@@ -123,25 +126,35 @@ function getCacheUtils(
 	return { filter, cacheKey };
 }
 
+function enhanceStatsRepository(
+	stats: StatsRepository
+): EnhancedStatsRepository {
+	return {
+		...stats,
+		coreStatsBySpecies: groupByColumn(
+			'species_name',
+			stats.coreStatsWithSpecies
+		)
+	};
+}
+
 async function getFilteredStats(
 	temporalUnit: TemporalUnit,
 	groupId: number,
 	filter: ((timePeriod: string) => boolean) | null
-) {
+): Promise<EnhancedStatsRepository> {
 	const stats = await getStatsByTemporalUnit(temporalUnit, groupId);
 
 	if (!filter) {
-		return stats;
+		return enhanceStatsRepository(stats);
 	}
-	const withSpecies = stats.withSpecies.filter(({ time_period }) =>
-		filter(time_period)
-	);
-	const bySpecies = groupByColumn('species_name', withSpecies);
-	return {
-		overall: stats.overall.filter(({ time_period }) => filter(time_period)),
-		withSpecies,
-		bySpecies
-	};
+
+	return enhanceStatsRepository({
+		coreStats: stats.coreStats.filter(({ time_period }) => filter(time_period)),
+		coreStatsWithSpecies: stats.coreStatsWithSpecies.filter(({ time_period }) =>
+			filter(time_period)
+		)
+	});
 }
 
 export async function getHighlightsWithinTimeWindow({

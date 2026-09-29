@@ -3,10 +3,9 @@ import type {
 	HighlightRanking,
 	TemporalUnit,
 	CombinedHighlight,
-	HighlightsGenerator
+	HighlightsGenerator,
+	EnhancedStatsRepository
 } from '../../types';
-import type { CoreStatsResult } from '@/app/models/db';
-import type { StatsRepository } from '@/app/actions/stats-cache';
 
 // call each rule set's printers with standard data input shapes
 // save as fixtures
@@ -17,25 +16,27 @@ import type { StatsRepository } from '@/app/actions/stats-cache';
 // A rule scoped to one species at a time gets fixtures carrying a species (its
 // printer reads combinedHighlight.species); a group-wide rule gets fixtures
 // without one. Asking the rule's own statsSelector is what decides it: a
-// per-species selector returns the bySpecies record, every other selector
+// per-species selector returns the coreStatsBySpecies record, every other selector
 // returns a flat array — the same distinction generateAllHighlights makes when
 // it builds a scope per species. Reading it off the selector rather than off a
 // naming convention ('eachSpecies…') means a new per-species rule is covered
 // without also having to be named like one.
 export function isPerSpeciesRule(rule: HighlightsGenerator): boolean {
-	const emptyStats: StatsRepository<CoreStatsResult> = {
-		overall: [],
-		withSpecies: [],
-		bySpecies: {}
+	const emptyStats: EnhancedStatsRepository = {
+		coreStats: [],
+		coreStatsWithSpecies: [],
+		coreStatsBySpecies: {}
 	};
 	return !Array.isArray(rule.statsSelector(emptyStats));
 }
 
 function getBaseScope(
-	withSpecies: boolean,
+	coreStatsWithSpecies: boolean,
 	temporalUnit: TemporalUnit
 ): HighlightScope {
-	return withSpecies ? { temporalUnit, species: 'Robin' } : { temporalUnit };
+	return coreStatsWithSpecies
+		? { temporalUnit, species: 'Robin' }
+		: { temporalUnit };
 }
 
 function getCombinedHighlight(
@@ -43,7 +44,7 @@ function getCombinedHighlight(
 		scope: HighlightScope;
 		ranking: Partial<HighlightRanking>;
 	}[],
-	withSpecies: boolean,
+	coreStatsWithSpecies: boolean,
 	year: number = 2020,
 	// The count the highlight is about. Every fixture but 'singular global' uses
 	// the same arbitrary 12, so a printer that has to agree with its value
@@ -58,7 +59,7 @@ function getCombinedHighlight(
 			timePeriod: `${year}-02-02`,
 			species: null
 		},
-		species: withSpecies ? 'Robin' : undefined,
+		species: coreStatsWithSpecies ? 'Robin' : undefined,
 		bestPosition: Math.max(
 			...scopes.map((scope) => scope.ranking.position as number)
 		),
@@ -70,14 +71,14 @@ function getCombinedHighlight(
 }
 
 export function getCombinedHighlightFixtures(
-	withSpecies: boolean
+	coreStatsWithSpecies: boolean
 ): Record<string, Partial<CombinedHighlight>> {
 	return {
 		global: getCombinedHighlight(
 			[
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day')
+						...getBaseScope(coreStatsWithSpecies, 'day')
 					},
 					ranking: {
 						position: 1,
@@ -85,14 +86,14 @@ export function getCombinedHighlightFixtures(
 					}
 				}
 			],
-			withSpecies
+			coreStatsWithSpecies
 		),
 
 		'tied global': getCombinedHighlight(
 			[
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day')
+						...getBaseScope(coreStatsWithSpecies, 'day')
 					},
 					ranking: {
 						position: 1,
@@ -100,7 +101,7 @@ export function getCombinedHighlightFixtures(
 					}
 				}
 			],
-			withSpecies
+			coreStatsWithSpecies
 		),
 		// The same highlight as 'global', about a single bird rather than 12 —
 		// the one fixture that exercises a printer's singular wording.
@@ -108,7 +109,7 @@ export function getCombinedHighlightFixtures(
 			[
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day')
+						...getBaseScope(coreStatsWithSpecies, 'day')
 					},
 					ranking: {
 						position: 1,
@@ -116,7 +117,7 @@ export function getCombinedHighlightFixtures(
 					}
 				}
 			],
-			withSpecies,
+			coreStatsWithSpecies,
 			2020,
 			1
 		),
@@ -124,7 +125,7 @@ export function getCombinedHighlightFixtures(
 			[
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day')
+						...getBaseScope(coreStatsWithSpecies, 'day')
 					},
 					ranking: {
 						position: 2,
@@ -132,13 +133,13 @@ export function getCombinedHighlightFixtures(
 					}
 				}
 			],
-			withSpecies
+			coreStatsWithSpecies
 		),
 		'tied second global': getCombinedHighlight(
 			[
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day')
+						...getBaseScope(coreStatsWithSpecies, 'day')
 					},
 					ranking: {
 						position: 2,
@@ -146,13 +147,13 @@ export function getCombinedHighlightFixtures(
 					}
 				}
 			],
-			withSpecies
+			coreStatsWithSpecies
 		),
 		'tied second of year': getCombinedHighlight(
 			[
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day'),
+						...getBaseScope(coreStatsWithSpecies, 'day'),
 						parentTimeWindow: { year: 2020 }
 					},
 					ranking: {
@@ -161,13 +162,13 @@ export function getCombinedHighlightFixtures(
 					}
 				}
 			],
-			withSpecies
+			coreStatsWithSpecies
 		),
 		'this year': getCombinedHighlight(
 			[
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day'),
+						...getBaseScope(coreStatsWithSpecies, 'day'),
 						parentTimeWindow: { year: new Date().getFullYear() }
 					},
 					ranking: {
@@ -175,7 +176,7 @@ export function getCombinedHighlightFixtures(
 					}
 				}
 			],
-			withSpecies,
+			coreStatsWithSpecies,
 			new Date().getFullYear()
 		),
 
@@ -183,7 +184,7 @@ export function getCombinedHighlightFixtures(
 			[
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day'),
+						...getBaseScope(coreStatsWithSpecies, 'day'),
 						parentTimeWindow: { month: 2 }
 					},
 					ranking: {
@@ -192,13 +193,13 @@ export function getCombinedHighlightFixtures(
 					}
 				}
 			],
-			withSpecies
+			coreStatsWithSpecies
 		),
 		'tied global and second of year': getCombinedHighlight(
 			[
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day')
+						...getBaseScope(coreStatsWithSpecies, 'day')
 					},
 					ranking: {
 						position: 1,
@@ -207,7 +208,7 @@ export function getCombinedHighlightFixtures(
 				},
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day'),
+						...getBaseScope(coreStatsWithSpecies, 'day'),
 						parentTimeWindow: { year: 2020 }
 					},
 					ranking: {
@@ -216,13 +217,13 @@ export function getCombinedHighlightFixtures(
 					}
 				}
 			],
-			withSpecies
+			coreStatsWithSpecies
 		),
 		'global and tied second of year and third of month': getCombinedHighlight(
 			[
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day')
+						...getBaseScope(coreStatsWithSpecies, 'day')
 					},
 					ranking: {
 						position: 1,
@@ -231,7 +232,7 @@ export function getCombinedHighlightFixtures(
 				},
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day'),
+						...getBaseScope(coreStatsWithSpecies, 'day'),
 						parentTimeWindow: { year: 2020 }
 					},
 					ranking: {
@@ -241,7 +242,7 @@ export function getCombinedHighlightFixtures(
 				},
 				{
 					scope: {
-						...getBaseScope(withSpecies, 'day'),
+						...getBaseScope(coreStatsWithSpecies, 'day'),
 						parentTimeWindow: { month: 2 }
 					},
 					ranking: {
@@ -250,7 +251,7 @@ export function getCombinedHighlightFixtures(
 					}
 				}
 			],
-			withSpecies
+			coreStatsWithSpecies
 		)
 	};
 }

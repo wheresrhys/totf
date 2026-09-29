@@ -1,6 +1,4 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
-import type { CoreStatsResult } from '@/app/models/db';
-import type { StatsRepository } from '@/app/actions/stats-cache';
 import {
 	sentenceCase,
 	printTimeQualifier,
@@ -8,7 +6,7 @@ import {
 } from '../lib/printer-utils';
 import { getFirstAppearance } from '../lib/rule-utils';
 
-type CoreStatsRepository = StatsRepository<CoreStatsResult>;
+import type { EnhancedStatsRepository } from '../types';
 
 // "First Robin ever" / "First Robins of 2020" — the period in which a species was
 // first recorded, read at whatever scope the machine is asking about. The species
@@ -35,7 +33,7 @@ type CoreStatsRepository = StatsRepository<CoreStatsResult>;
 // group's first-ever session (v1 suppressed this too, for the same reason) or the
 // first session of a year.
 export const firstSpeciesRecord: HighlightsGenerator = {
-	statsSelector: (stats: CoreStatsRepository) => stats.bySpecies,
+	statsSelector: (stats: EnhancedStatsRepository) => stats.coreStatsBySpecies,
 	formatters: {
 		// Only scopes[0] is read. Unlike a count metric, where each extra scope
 		// adds information ("busiest ever AND busiest of 2020"), every extra scope

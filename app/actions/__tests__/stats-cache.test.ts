@@ -94,15 +94,11 @@ describe('getStatsByTemporalUnit', () => {
 		});
 		const result = await getStatsByTemporalUnit('day', GROUP_ID);
 		expect(result).toStrictEqual({
-			overall: [{ species_name: null, time_period: 1 }],
-			withSpecies: [
+			coreStats: [{ species_name: null, time_period: 1 }],
+			coreStatsWithSpecies: [
 				{ species_name: 'cat', time_period: 1 },
 				{ species_name: 'dog', time_period: 1 }
 			],
-			bySpecies: {
-				cat: [{ species_name: 'cat', time_period: 1 }],
-				dog: [{ species_name: 'dog', time_period: 1 }]
-			}
 		});
 	});
 });

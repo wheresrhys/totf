@@ -59,7 +59,7 @@ export function getTopByProperty(
 // sequence rather than by magnitude.
 //
 // They only ever make sense over a per-species working set
-// (`statsSelector: (stats) => stats.bySpecies`): the sequence they walk is one
+// (`statsSelector: (stats) => stats.coreStatsBySpecies`): the sequence they walk is one
 // species' own history, not a leaderboard across species.
 
 // core_stats returns a row for every (species, period) cell in range whether or

@@ -34,41 +34,23 @@ describe('highlight-generator', () => {
 		beforeEach(() => {
 			highlightRules.push(reporterRule);
 			vi.mocked(reporterRule.statsSelector).mockImplementation(
-				(stats: StatsRepository<CoreStatsResult>) => stats.overall
+				(stats: StatsRepository) => stats.coreStats
 			);
 		});
 		beforeEach(() => {
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [
+				coreStats: [
 					{ time_period: '2020-03-01', bird_count: 1 },
 					{ time_period: '2020-04-01', bird_count: 2 },
 					{ time_period: '2021-03-01', bird_count: 1 },
 					{ time_period: '2021-04-01', bird_count: 2 }
 				] as CoreStatsResult[],
-				withSpecies: [
+				coreStatsWithSpecies: [
 					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' },
 					{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' },
 					{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' },
 					{ time_period: '2021-04-01', bird_count: 2, species_name: 'tortoise' }
-				] as CoreStatsResult[],
-				bySpecies: {
-					cat: [
-						{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
-					] as CoreStatsResult[],
-					dog: [
-						{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' }
-					] as CoreStatsResult[],
-					fish: [
-						{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' }
-					] as CoreStatsResult[],
-					tortoise: [
-						{
-							time_period: '2021-04-01',
-							bird_count: 2,
-							species_name: 'tortoise'
-						}
-					] as CoreStatsResult[]
-				}
+				] as CoreStatsResult[]
 			});
 		});
 		it('fetches stats for the temporal unit provided', async () => {
@@ -87,19 +69,19 @@ describe('highlight-generator', () => {
 				includePerSpecies: true
 			});
 			expect(reporterRule.statsSelector).toHaveBeenCalledWith({
-				overall: [
+				coreStats: [
 					{ time_period: '2020-03-01', bird_count: 1 },
 					{ time_period: '2020-04-01', bird_count: 2 },
 					{ time_period: '2021-03-01', bird_count: 1 },
 					{ time_period: '2021-04-01', bird_count: 2 }
 				],
-				withSpecies: [
+				coreStatsWithSpecies: [
 					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' },
 					{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' },
 					{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' },
 					{ time_period: '2021-04-01', bird_count: 2, species_name: 'tortoise' }
 				],
-				bySpecies: {
+				coreStatsBySpecies: {
 					cat: [
 						{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
 					],
@@ -127,15 +109,15 @@ describe('highlight-generator', () => {
 				parentTimeWindow: { year: 2020 }
 			});
 			expect(reporterRule.statsSelector).toHaveBeenCalledWith({
-				overall: [
+				coreStats: [
 					{ time_period: '2020-03-01', bird_count: 1 },
 					{ time_period: '2020-04-01', bird_count: 2 }
 				],
-				withSpecies: [
+				coreStatsWithSpecies: [
 					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' },
 					{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' }
 				],
-				bySpecies: {
+				coreStatsBySpecies: {
 					cat: [
 						{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
 					],
@@ -153,15 +135,15 @@ describe('highlight-generator', () => {
 				parentTimeWindow: { month: 3 }
 			});
 			expect(reporterRule.statsSelector).toHaveBeenCalledWith({
-				overall: [
+				coreStats: [
 					{ time_period: '2020-03-01', bird_count: 1 },
 					{ time_period: '2021-03-01', bird_count: 1 }
 				],
-				withSpecies: [
+				coreStatsWithSpecies: [
 					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' },
 					{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' }
 				],
-				bySpecies: {
+				coreStatsBySpecies: {
 					cat: [
 						{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
 					],
@@ -179,11 +161,11 @@ describe('highlight-generator', () => {
 				parentTimeWindow: { year: 2020, month: 3 }
 			});
 			expect(reporterRule.statsSelector).toHaveBeenCalledWith({
-				overall: [{ time_period: '2020-03-01', bird_count: 1 }],
-				withSpecies: [
+				coreStats: [{ time_period: '2020-03-01', bird_count: 1 }],
+				coreStatsWithSpecies: [
 					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
 				],
-				bySpecies: {
+				coreStatsBySpecies: {
 					cat: [
 						{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
 					]
@@ -214,7 +196,7 @@ describe('highlight-generator', () => {
 			overrides: Partial<HighlightsGenerator> = {}
 		): HighlightsGenerator {
 			return {
-				statsSelector: (stats) => stats.overall,
+				statsSelector: (stats) => stats.coreStats,
 				descriptor: { type: 'test', unit: 'bird', category: 'count' },
 				formatters: {
 					highlightListPrefixPrinter: () => '',
@@ -231,9 +213,8 @@ describe('highlight-generator', () => {
 			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [makeRow('2020-01-01', 5)],
-				withSpecies: [],
-				bySpecies: {}
+				coreStats: [makeRow('2020-01-01', 5)],
+				coreStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -251,9 +232,8 @@ describe('highlight-generator', () => {
 			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [makeRow('2020-01-01', 5)],
-				withSpecies: [],
-				bySpecies: {}
+				coreStats: [makeRow('2020-01-01', 5)],
+				coreStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -270,9 +250,8 @@ describe('highlight-generator', () => {
 			const rule = makeRule();
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [makeRow('2020-01-01', 5)],
-				withSpecies: [],
-				bySpecies: {}
+				coreStats: [makeRow('2020-01-01', 5)],
+				coreStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -293,15 +272,14 @@ describe('highlight-generator', () => {
 			const rule = makeRule();
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [
+				coreStats: [
 					makeRow('2020-01-01', 5),
 					makeRow('2020-01-02', 4),
 					makeRow('2020-01-03', 3),
 					makeRow('2020-01-04', 2),
 					makeRow('2020-01-05', 1)
 				],
-				withSpecies: [],
-				bySpecies: {}
+				coreStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -318,15 +296,14 @@ describe('highlight-generator', () => {
 			const rule = makeRule({ limit: 2 });
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [
+				coreStats: [
 					makeRow('2020-01-01', 5),
 					makeRow('2020-01-02', 4),
 					makeRow('2020-01-03', 3),
 					makeRow('2020-01-04', 2),
 					makeRow('2020-01-05', 1)
 				],
-				withSpecies: [],
-				bySpecies: {}
+				coreStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -343,15 +320,14 @@ describe('highlight-generator', () => {
 			const rule = makeRule({ limit: 3 });
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [
+				coreStats: [
 					makeRow('2020-01-01', 5),
 					makeRow('2020-01-02', 4),
 					makeRow('2020-01-03', 3),
 					makeRow('2020-01-04', 2),
 					makeRow('2020-01-05', 1)
 				],
-				withSpecies: [],
-				bySpecies: {}
+				coreStatsWithSpecies: []
 			});
 
 			const smallerParam = await getHighlightsWithinTimeWindow({
@@ -371,16 +347,17 @@ describe('highlight-generator', () => {
 			expect(smallerRuleLimit[0].values.map((v) => v.value)).toEqual([5, 4, 3]);
 		});
 
-		it('can execute against the withSpecies stats array', async () => {
-			const rule = makeRule({ statsSelector: (stats) => stats.withSpecies });
+		it('can execute against the coreStatsWithSpecies stats array', async () => {
+			const rule = makeRule({
+				statsSelector: (stats) => stats.coreStatsWithSpecies
+			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [],
-				withSpecies: [
+				coreStats: [],
+				coreStatsWithSpecies: [
 					makeRow('2020-01-01', 2, 'cat'),
 					makeRow('2020-01-02', 1, 'dog')
-				],
-				bySpecies: {}
+				]
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -394,16 +371,17 @@ describe('highlight-generator', () => {
 			expect(result[0].values.map((v) => v.species)).toEqual(['cat', 'dog']);
 		});
 
-		it('can execute against the bySpecies stats map', async () => {
-			const rule = makeRule({ statsSelector: (stats) => stats.bySpecies });
+		it('can execute against the coreStatsBySpecies stats map', async () => {
+			const rule = makeRule({
+				statsSelector: (stats) => stats.coreStatsBySpecies
+			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [],
-				withSpecies: [],
-				bySpecies: {
-					cat: [makeRow('2020-01-01', 2, 'cat')],
-					dog: [makeRow('2020-01-02', 1, 'dog')]
-				}
+				coreStats: [],
+				coreStatsWithSpecies: [
+					makeRow('2020-01-01', 2, 'cat'),
+					makeRow('2020-01-02', 1, 'dog')
+				]
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -418,15 +396,14 @@ describe('highlight-generator', () => {
 			expect(result[1].values[0].value).toBe(1);
 		});
 
-		it('can opt out of executing bySpecies rules', async () => {
-			const rule = makeRule({ statsSelector: (stats) => stats.bySpecies });
+		it('can opt out of executing coreStatsBySpecies rules', async () => {
+			const rule = makeRule({
+				statsSelector: (stats) => stats.coreStatsBySpecies
+			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [],
-				withSpecies: [],
-				bySpecies: {
-					cat: [makeRow('2020-01-01', 2, 'cat')]
-				}
+				coreStats: [],
+				coreStatsWithSpecies: [makeRow('2020-01-01', 2, 'cat')]
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -438,22 +415,19 @@ describe('highlight-generator', () => {
 			expect(result).toEqual([]);
 		});
 
-		it('applies minimum limit to bySpecies rules too', async () => {
+		it('applies minimum limit to coreStatsBySpecies rules too', async () => {
 			const rule = makeRule({
-				statsSelector: (stats) => stats.bySpecies,
+				statsSelector: (stats) => stats.coreStatsBySpecies,
 				limit: 1
 			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [],
-				withSpecies: [],
-				bySpecies: {
-					cat: [
-						makeRow('2020-01-01', 3, 'cat'),
-						makeRow('2020-01-02', 2, 'cat'),
-						makeRow('2020-01-03', 1, 'cat')
-					]
-				}
+				coreStats: [],
+				coreStatsWithSpecies: [
+					makeRow('2020-01-01', 3, 'cat'),
+					makeRow('2020-01-02', 2, 'cat'),
+					makeRow('2020-01-03', 1, 'cat')
+				]
 			});
 
 			const smallerRuleLimit = await getHighlightsWithinTimeWindow({
@@ -473,19 +447,19 @@ describe('highlight-generator', () => {
 			expect(smallerParam[0].values.map((v) => v.value)).toEqual([3]);
 		});
 
-		it('safely combines bySpecies and ordinary rules', async () => {
-			const overallRule = makeRule();
-			const bySpeciesRule = makeRule({
-				statsSelector: (stats) => stats.bySpecies
+		it('safely combines coreStatsBySpecies and ordinary rules', async () => {
+			const coreStatsRule = makeRule();
+			const coreStatsBySpeciesRule = makeRule({
+				statsSelector: (stats) => stats.coreStatsBySpecies
 			});
-			highlightRules.push(overallRule, bySpeciesRule);
+			highlightRules.push(coreStatsRule, coreStatsBySpeciesRule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
-				overall: [makeRow('2020-01-01', 9)],
-				withSpecies: [],
-				bySpecies: {
-					cat: [makeRow('2020-01-01', 2, 'cat')],
-					dog: [makeRow('2020-01-02', 1, 'dog')]
-				}
+				coreStats: [makeRow('2020-01-01', 9)],
+				coreStatsWithSpecies: [
+					makeRow('2020-01-01', 2, 'cat'),
+
+					makeRow('2020-01-02', 1, 'dog')
+				]
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
