@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { cachedSupabaseFetch } from '@/app/lib/cached-supabase-fetch';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
-import { getStatsByTemporalUnit } from '../stats-cache';
+import { getStatsByTemporalUnit, fetchCoreStatsByMonth } from '../stats-cache';
 
 type CachedSupabaseChainCall = { rpcCall: unknown[]; orderCalls: unknown[][] };
 let cachedSupabaseChainCalls: CachedSupabaseChainCall[] = [];
@@ -157,5 +157,62 @@ describe('getStatsByTemporalUnit', () => {
 				{ species_name: 'owl', time_period: 1 }
 			]
 		});
+	});
+});
+
+describe('fetchCoreStatsByMonth', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		cachedSupabaseChainCalls = [];
+		mockRange.mockReset().mockResolvedValue({ data: [], error: null });
+
+		mockRpc.mockReset().mockImplementation((...rpcArgs) => {
+			const call: CachedSupabaseChainCall = {
+				rpcCall: rpcArgs,
+				orderCalls: []
+			};
+			const builder = {
+				order: (...orderArgs: unknown[]) => {
+					mockOrder(...orderArgs);
+					call.orderCalls.push(orderArgs);
+					return builder;
+				},
+				range: (...rangeArgs: unknown[]) => {
+					cachedSupabaseChainCalls.push(call);
+					return mockRange(...rangeArgs);
+				}
+			};
+			return builder;
+		});
+	});
+
+	it('calls the core_stats rpc ungrouped by species, month-grouped by time period, scoped to the group', async () => {
+		await fetchCoreStatsByMonth(GROUP_ID);
+		expect(cachedSupabaseFetch).toHaveBeenCalledWith(
+			'month-core-stats',
+			GROUP_ID,
+			expect.any(Function)
+		);
+		expect(cachedSupabaseChainCalls).toContainEqual({
+			rpcCall: [
+				'core_stats',
+				{
+					ringing_group_filter: GROUP_ID,
+					group_by_species: false,
+					group_by_time_period: 'month'
+				}
+			],
+			orderCalls: [['time_period']]
+		});
+	});
+
+	it('returns the result of the rpc call', async () => {
+		mockRange.mockResolvedValueOnce({
+			data: [{ time_period: '2023-01', total_effort: '05:30:00' }]
+		});
+		const result = await fetchCoreStatsByMonth(GROUP_ID);
+		expect(result).toStrictEqual([
+			{ time_period: '2023-01', total_effort: '05:30:00' }
+		]);
 	});
 });
