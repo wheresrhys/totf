@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { HighlightsGenerator } from '../../types';
 import type { StatsRepository } from '@/app/actions/stats-cache';
-import type { CoreStatsResult } from '@/app/models/db';
+import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 vi.mock('../../rules', () => ({ highlightRules: [] }));
 vi.mock('@/app/actions/stats-cache', () => ({
 	getStatsByTemporalUnit: vi.fn()
@@ -49,8 +49,14 @@ describe('highlight-generator', () => {
 					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' },
 					{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' },
 					{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' },
-					{ time_period: '2021-04-01', bird_count: 2, species_name: 'tortoise' }
-				] as CoreStatsResult[]
+					{ time_period: '2021-04-01', bird_count: 2, species_name: 'owl' }
+				] as CoreStatsResult[],
+				biometricsStatsWithSpecies: [
+					{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' },
+					{ time_period: '2020-04-01', max_wing: 2, species_name: 'dog' },
+					{ time_period: '2021-03-01', max_wing: 1, species_name: 'fish' },
+					{ time_period: '2021-04-01', max_wing: 2, species_name: 'owl' }
+				] as BiometricsStatsResult[]
 			});
 		});
 		it('fetches stats for the temporal unit provided', async () => {
@@ -79,7 +85,7 @@ describe('highlight-generator', () => {
 					{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' },
 					{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' },
 					{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' },
-					{ time_period: '2021-04-01', bird_count: 2, species_name: 'tortoise' }
+					{ time_period: '2021-04-01', bird_count: 2, species_name: 'owl' }
 				],
 				coreStatsBySpecies: {
 					cat: [
@@ -91,11 +97,35 @@ describe('highlight-generator', () => {
 					fish: [
 						{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' }
 					],
-					tortoise: [
+					owl: [
 						{
 							time_period: '2021-04-01',
 							bird_count: 2,
-							species_name: 'tortoise'
+							species_name: 'owl'
+						}
+					]
+				},
+				biometricsStatsWithSpecies: [
+					{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' },
+					{ time_period: '2020-04-01', max_wing: 2, species_name: 'dog' },
+					{ time_period: '2021-03-01', max_wing: 1, species_name: 'fish' },
+					{ time_period: '2021-04-01', max_wing: 2, species_name: 'owl' }
+				],
+				biometricsStatsBySpecies: {
+					cat: [
+						{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' }
+					],
+					dog: [
+						{ time_period: '2020-04-01', max_wing: 2, species_name: 'dog' }
+					],
+					fish: [
+						{ time_period: '2021-03-01', max_wing: 1, species_name: 'fish' }
+					],
+					owl: [
+						{
+							time_period: '2021-04-01',
+							max_wing: 2,
+							species_name: 'owl'
 						}
 					]
 				}
@@ -124,6 +154,16 @@ describe('highlight-generator', () => {
 					dog: [
 						{ time_period: '2020-04-01', bird_count: 2, species_name: 'dog' }
 					]
+				},
+				biometricsStatsWithSpecies: [
+					{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' },
+					{ time_period: '2020-04-01', max_wing: 2, species_name: 'dog' }
+				],
+				biometricsStatsBySpecies: {
+					cat: [
+						{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' }
+					],
+					dog: [{ time_period: '2020-04-01', max_wing: 2, species_name: 'dog' }]
 				}
 			});
 		});
@@ -150,6 +190,18 @@ describe('highlight-generator', () => {
 					fish: [
 						{ time_period: '2021-03-01', bird_count: 1, species_name: 'fish' }
 					]
+				},
+				biometricsStatsWithSpecies: [
+					{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' },
+					{ time_period: '2021-03-01', max_wing: 1, species_name: 'fish' }
+				],
+				biometricsStatsBySpecies: {
+					cat: [
+						{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' }
+					],
+					fish: [
+						{ time_period: '2021-03-01', max_wing: 1, species_name: 'fish' }
+					]
 				}
 			});
 		});
@@ -169,6 +221,12 @@ describe('highlight-generator', () => {
 					cat: [
 						{ time_period: '2020-03-01', bird_count: 1, species_name: 'cat' }
 					]
+				},
+				biometricsStatsWithSpecies: [
+					{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' }
+				],
+				biometricsStatsBySpecies: {
+					cat: [{ time_period: '2020-03-01', max_wing: 1, species_name: 'cat' }]
 				}
 			});
 		});
@@ -214,7 +272,8 @@ describe('highlight-generator', () => {
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
 				coreStats: [makeRow('2020-01-01', 5)],
-				coreStatsWithSpecies: []
+				coreStatsWithSpecies: [],
+				biometricsStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -233,7 +292,8 @@ describe('highlight-generator', () => {
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
 				coreStats: [makeRow('2020-01-01', 5)],
-				coreStatsWithSpecies: []
+				coreStatsWithSpecies: [],
+				biometricsStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -251,7 +311,8 @@ describe('highlight-generator', () => {
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
 				coreStats: [makeRow('2020-01-01', 5)],
-				coreStatsWithSpecies: []
+				coreStatsWithSpecies: [],
+				biometricsStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -279,7 +340,8 @@ describe('highlight-generator', () => {
 					makeRow('2020-01-04', 2),
 					makeRow('2020-01-05', 1)
 				],
-				coreStatsWithSpecies: []
+				coreStatsWithSpecies: [],
+				biometricsStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -303,7 +365,8 @@ describe('highlight-generator', () => {
 					makeRow('2020-01-04', 2),
 					makeRow('2020-01-05', 1)
 				],
-				coreStatsWithSpecies: []
+				coreStatsWithSpecies: [],
+				biometricsStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -327,7 +390,8 @@ describe('highlight-generator', () => {
 					makeRow('2020-01-04', 2),
 					makeRow('2020-01-05', 1)
 				],
-				coreStatsWithSpecies: []
+				coreStatsWithSpecies: [],
+				biometricsStatsWithSpecies: []
 			});
 
 			const smallerParam = await getHighlightsWithinTimeWindow({
@@ -357,7 +421,8 @@ describe('highlight-generator', () => {
 				coreStatsWithSpecies: [
 					makeRow('2020-01-01', 2, 'cat'),
 					makeRow('2020-01-02', 1, 'dog')
-				]
+				],
+				biometricsStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -381,7 +446,8 @@ describe('highlight-generator', () => {
 				coreStatsWithSpecies: [
 					makeRow('2020-01-01', 2, 'cat'),
 					makeRow('2020-01-02', 1, 'dog')
-				]
+				],
+				biometricsStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -403,7 +469,8 @@ describe('highlight-generator', () => {
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
 				coreStats: [],
-				coreStatsWithSpecies: [makeRow('2020-01-01', 2, 'cat')]
+				coreStatsWithSpecies: [makeRow('2020-01-01', 2, 'cat')],
+				biometricsStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({
@@ -427,7 +494,8 @@ describe('highlight-generator', () => {
 					makeRow('2020-01-01', 3, 'cat'),
 					makeRow('2020-01-02', 2, 'cat'),
 					makeRow('2020-01-03', 1, 'cat')
-				]
+				],
+				biometricsStatsWithSpecies: []
 			});
 
 			const smallerRuleLimit = await getHighlightsWithinTimeWindow({
@@ -457,9 +525,9 @@ describe('highlight-generator', () => {
 				coreStats: [makeRow('2020-01-01', 9)],
 				coreStatsWithSpecies: [
 					makeRow('2020-01-01', 2, 'cat'),
-
 					makeRow('2020-01-02', 1, 'dog')
-				]
+				],
+				biometricsStatsWithSpecies: []
 			});
 
 			const result = await getHighlightsWithinTimeWindow({

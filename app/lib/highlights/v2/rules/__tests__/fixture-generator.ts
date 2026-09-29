@@ -25,7 +25,9 @@ export function isPerSpeciesRule(rule: HighlightsGenerator): boolean {
 	const emptyStats: EnhancedStatsRepository = {
 		coreStats: [],
 		coreStatsWithSpecies: [],
-		coreStatsBySpecies: {}
+		coreStatsBySpecies: {},
+		biometricsStatsWithSpecies: [],
+		biometricsStatsBySpecies: {}
 	};
 	return !Array.isArray(rule.statsSelector(emptyStats));
 }

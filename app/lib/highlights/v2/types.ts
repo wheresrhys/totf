@@ -1,4 +1,4 @@
-import type { CoreStatsResult } from '@/app/models/db';
+import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 import type {
 	TemporalUnit,
 	StatUnit
@@ -11,6 +11,7 @@ import type { StatsRepository } from '@/app/actions/stats-cache';
 
 export type EnhancedStatsRepository = StatsRepository & {
 	coreStatsBySpecies: Record<string, CoreStatsResult[]>;
+	biometricsStatsBySpecies: Record<string, BiometricsStatsResult[]>;
 };
 
 export interface TimePeriodedItem {

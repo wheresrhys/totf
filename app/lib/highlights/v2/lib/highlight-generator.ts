@@ -134,6 +134,10 @@ function enhanceStatsRepository(
 		coreStatsBySpecies: groupByColumn(
 			'species_name',
 			stats.coreStatsWithSpecies
+		),
+		biometricsStatsBySpecies: groupByColumn(
+			'species_name',
+			stats.biometricsStatsWithSpecies
 		)
 	};
 }
@@ -153,6 +157,9 @@ async function getFilteredStats(
 		coreStats: stats.coreStats.filter(({ time_period }) => filter(time_period)),
 		coreStatsWithSpecies: stats.coreStatsWithSpecies.filter(({ time_period }) =>
 			filter(time_period)
+		),
+		biometricsStatsWithSpecies: stats.biometricsStatsWithSpecies.filter(
+			({ time_period }) => filter(time_period as string)
 		)
 	});
 }

@@ -1,23 +1,22 @@
 'use server';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
-import type { CoreStatsResult } from '@/app/models/db';
+import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
-import { groupByColumn } from '@/app/lib/generic-utils';
-export type StatsRepository<T> = {
-	overall: T[];
-	withSpecies: T[];
-	bySpecies: Record<string, T[]>;
+export type StatsRepository = {
+	coreStats: CoreStatsResult[];
+	coreStatsWithSpecies: CoreStatsResult[];
+	biometricsStatsWithSpecies: BiometricsStatsResult[];
 };
 
-function getStatsRPCFetcher(
+function getStatsRPCFetcher<ResultType>(
 	rpcName: string,
 	temporalUnit: TemporalUnit,
 	groupBySpecies: boolean = false
 ) {
 	return async (supabase: SupabaseClient, viewedGroupId: number) =>
-		fetchAllPaginatedRows<CoreStatsResult>((fromRow, toRow) => {
+		fetchAllPaginatedRows<ResultType>((fromRow, toRow) => {
 			const request = supabase
 				.rpc(rpcName, {
 					ringing_group_filter: viewedGroupId,
@@ -35,23 +34,33 @@ function getStatsRPCFetcher(
 export async function getStatsByTemporalUnit(
 	temporalUnit: TemporalUnit,
 	viewedGroupId: number
-): Promise<StatsRepository<CoreStatsResult>> {
-	const [overall, withSpecies] = await Promise.all([
-		cachedSupabaseFetch(
-			`${temporalUnit}-core-stats`,
-			viewedGroupId,
-			getStatsRPCFetcher('core_stats', temporalUnit)
-		),
-		cachedSupabaseFetch(
-			`${temporalUnit}-species-core-stats`,
-			viewedGroupId,
-			getStatsRPCFetcher('core_stats', temporalUnit, true)
-		)
-	]);
+): Promise<StatsRepository> {
+	const [coreStats, coreStatsWithSpecies, biometricsStatsWithSpecies] =
+		await Promise.all([
+			cachedSupabaseFetch(
+				`${temporalUnit}-core-stats`,
+				viewedGroupId,
+				getStatsRPCFetcher<CoreStatsResult>('core_stats', temporalUnit)
+			),
+			cachedSupabaseFetch(
+				`${temporalUnit}-species-core-stats`,
+				viewedGroupId,
+				getStatsRPCFetcher<CoreStatsResult>('core_stats', temporalUnit, true)
+			),
+			cachedSupabaseFetch(
+				`${temporalUnit}-species-biometrics-stats`,
+				viewedGroupId,
+				getStatsRPCFetcher<BiometricsStatsResult>(
+					'biometrics_stats',
+					temporalUnit,
+					true
+				)
+			)
+		]);
 
 	return {
-		overall,
-		withSpecies,
-		bySpecies: groupByColumn('species_name', withSpecies)
+		coreStats,
+		coreStatsWithSpecies,
+		biometricsStatsWithSpecies
 	};
 }
