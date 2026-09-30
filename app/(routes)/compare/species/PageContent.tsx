@@ -10,8 +10,7 @@ import {
 import { TabNav } from '@/app/components/TabNav';
 import {
 	biometricsComparisonColumns,
-	coreStatsComparisonColumns,
-	demographicsComparisonColumns
+	coreStatsComparisonColumns
 } from '@/app/components/pages/compare-species/comparison-columns';
 import { SpeciesComparisonTable } from '@/app/components/pages/compare-species/SpeciesComparisonTable';
 import { SpeciesPillSelector } from '@/app/components/pages/compare-species/SpeciesPillSelector';
@@ -92,13 +91,6 @@ export function CompareSpeciesPageContent({
 				<SpeciesComparisonTable
 					rows={selectComparisonRows(data.biometricsStats, selectedSpecies)}
 					columnConfigs={biometricsComparisonColumns}
-					testId={COMPARISON_TABLE_TEST_ID}
-				/>
-			) : null}
-			{datasetId === 'demographics' ? (
-				<SpeciesComparisonTable
-					rows={selectComparisonRows(data.demographicsStats, selectedSpecies)}
-					columnConfigs={demographicsComparisonColumns}
 					testId={COMPARISON_TABLE_TEST_ID}
 				/>
 			) : null}

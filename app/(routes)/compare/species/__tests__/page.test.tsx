@@ -1,15 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type {
-	BiometricsStatsResult,
-	CoreStatsResult,
-	DemographicsStatsResult
-} from '@/app/models/db';
+import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 import Page, { type CompareSpeciesSearchParams } from '../page';
 import alphaCoreBySpecies from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
 import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
-import robinDemographicsHistory from '@/test-fixtures/snapshots/demographics_stats/robin-alpha.monthly-history.json';
 
 const { mockFetchSpeciesComparisonStats } = vi.hoisted(() => ({
 	mockFetchSpeciesComparisonStats: vi.fn()
@@ -32,46 +27,12 @@ const biometricsRows = alphaBiometricsBySpecies as BiometricsStatsResult[];
 // built by withholding one — see the Biometrics describe below.
 const ALPHA_SPECIES = coreStatsRows.map((row) => row.species_name);
 
-// demographics_stats has no captured by-species snapshot, so its column set is
-// taken from the species-filtered monthly-history one (the only capture there
-// is) with every count zeroed, so each row below only shows the columns it
-// explicitly sets. That fixture is species-filtered, so its species_name is
-// genuinely null — DemographicsStatsResult's NonNullable mapped type
-// (app/models/db.ts) assumes every column is present, so a direct assertion
-// doesn't compile (#895).
-const [capturedDemographicsRow] =
-	// eslint-disable-next-line no-restricted-syntax -- see comment above
-	robinDemographicsHistory as unknown as DemographicsStatsResult[];
-
-function demographicsRow(
-	speciesName: string,
-	overrides: Partial<DemographicsStatsResult> = {}
-): DemographicsStatsResult {
-	return {
-		...Object.fromEntries(
-			Object.entries(capturedDemographicsRow).map(([column, value]) => [
-				column,
-				typeof value === 'number' ? 0 : value
-			])
-		),
-		species_name: speciesName,
-		...overrides
-	} as DemographicsStatsResult;
-}
-
-const demographicsRows = ALPHA_SPECIES.map((speciesName) =>
-	demographicsRow(speciesName, {
-		new_adult_bird_count: speciesName === 'Robin' ? 4 : 1
-	})
-);
-
 function mockStats({
 	biometricsStats = biometricsRows
 }: { biometricsStats?: BiometricsStatsResult[] } = {}) {
 	mockFetchSpeciesComparisonStats.mockResolvedValue({
 		coreStats: coreStatsRows,
-		biometricsStats,
-		demographicsStats: demographicsRows
+		biometricsStats
 	});
 }
 
@@ -131,8 +92,7 @@ describe('compare species page', () => {
 		it('renders a message instead of pills when the group has no species at all', async () => {
 			mockFetchSpeciesComparisonStats.mockResolvedValue({
 				coreStats: [],
-				biometricsStats: [],
-				demographicsStats: []
+				biometricsStats: []
 			});
 
 			render(await Page({ searchParams: Promise.resolve({}) }));
@@ -255,18 +215,10 @@ describe('compare species page', () => {
 			);
 		});
 
-		it('shows the demographics columns when the Demographics tab is selected', async () => {
-			await renderComparePage({ name: ['Robin'] });
-
-			fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
-
-			expect(getCellTextByHeading('New adults', 'Robin')).toBe('4');
-		});
-
 		it('keeps the selected species when switching dataset', async () => {
 			await renderComparePage({ name: ['Robin', 'Wren'] });
 
-			fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
+			fireEvent.click(screen.getByRole('button', { name: 'Biometrics' }));
 
 			expect(dataRowCount(screen.getByTestId('species-comparison-table'))).toBe(
 				2

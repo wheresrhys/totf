@@ -1,16 +1,11 @@
 'use server';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import type {
-	BiometricsStatsResult,
-	CoreStatsResult,
-	DemographicsStatsResult
-} from '@/app/models/db';
+import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 
 export type SpeciesComparisonStats = {
 	coreStats: CoreStatsResult[];
 	biometricsStats: BiometricsStatsResult[];
-	demographicsStats: DemographicsStatsResult[];
 };
 
 /**
@@ -38,16 +33,13 @@ export async function fetchSpeciesComparisonStats(
 		ringing_group_filter: viewedGroupId,
 		group_by_species: true
 	};
-	const [coreStats, biometricsStats, demographicsStats] = await Promise.all([
+	const [coreStats, biometricsStats] = await Promise.all([
 		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
 			CoreStatsResult[]
 		>,
 		supabase
 			.rpc('biometrics_stats', rpcArgs)
-			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>,
-		supabase
-			.rpc('demographics_stats', rpcArgs)
-			.then(catchSupabaseErrors) as Promise<DemographicsStatsResult[]>
+			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>
 	]);
-	return { coreStats, biometricsStats, demographicsStats };
+	return { coreStats, biometricsStats };
 }

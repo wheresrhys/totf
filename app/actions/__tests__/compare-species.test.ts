@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type {
-	BiometricsStatsResult,
-	CoreStatsResult,
-	DemographicsStatsResult
-} from '@/app/models/db';
+import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 import { makeRpcCallRecorder } from '@/app/__tests__/helpers/rpc-recorder';
 import { fetchSpeciesComparisonStats } from '../compare-species';
 import alphaCoreBySpecies from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
@@ -29,15 +25,11 @@ const GROUP_ID = 7;
 // eslint-disable-next-line no-restricted-syntax -- see comment above
 const coreStatsRows = alphaCoreBySpecies as unknown as CoreStatsResult[];
 const biometricsRows = alphaBiometricsBySpecies as BiometricsStatsResult[];
-const demographicsRows = [
-	{ species_name: 'Robin', adult_bird_count: 2 }
-] as DemographicsStatsResult[];
 
 function makeClient() {
 	const recorder = makeRpcCallRecorder((name: string) => {
 		if (name === 'core_stats') return coreStatsRows;
-		if (name === 'biometrics_stats') return biometricsRows;
-		return demographicsRows;
+		return biometricsRows;
 	});
 	mockGetAuthenticatedSupabaseClient.mockResolvedValue({ rpc: recorder.rpc });
 	return recorder;
@@ -55,8 +47,7 @@ describe('fetchSpeciesComparisonStats — fetches all three by-species datasets 
 
 		expect(recorder.calls.map((call) => call.name)).toEqual([
 			'core_stats',
-			'biometrics_stats',
-			'demographics_stats'
+			'biometrics_stats'
 		]);
 		recorder.calls.forEach((call) => {
 			expect(call.args).toEqual({
@@ -73,8 +64,7 @@ describe('fetchSpeciesComparisonStats — fetches all three by-species datasets 
 
 		expect(stats).toEqual({
 			coreStats: coreStatsRows,
-			biometricsStats: biometricsRows,
-			demographicsStats: demographicsRows
+			biometricsStats: biometricsRows
 		});
 	});
 });
