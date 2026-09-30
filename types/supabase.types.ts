@@ -63,6 +63,7 @@ export type Database = {
           finding_condition: string | null
           id: number
           is_juv: boolean
+          location_id: number
           lure_code_1: string | null
           lure_code_2: string | null
           max_hatch_year: number
@@ -77,6 +78,7 @@ export type Database = {
           session_id: number
           sex: string
           sexing_method: string | null
+          visit_date: string
           weight: number | null
           wing_length: number | null
         }
@@ -92,6 +94,7 @@ export type Database = {
           finding_condition?: string | null
           id?: number
           is_juv?: boolean
+          location_id: number
           lure_code_1?: string | null
           lure_code_2?: string | null
           max_hatch_year: number
@@ -106,6 +109,7 @@ export type Database = {
           session_id: number
           sex: string
           sexing_method?: string | null
+          visit_date: string
           weight?: number | null
           wing_length?: number | null
         }
@@ -121,6 +125,7 @@ export type Database = {
           finding_condition?: string | null
           id?: number
           is_juv?: boolean
+          location_id?: number
           lure_code_1?: string | null
           lure_code_2?: string | null
           max_hatch_year?: number
@@ -135,6 +140,7 @@ export type Database = {
           session_id?: number
           sex?: string
           sexing_method?: string | null
+          visit_date?: string
           weight?: number | null
           wing_length?: number | null
         }
@@ -144,6 +150,13 @@ export type Database = {
             columns: ["bird_id"]
             isOneToOne: false
             referencedRelation: "Birds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounters_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "Locations"
             referencedColumns: ["id"]
           },
           {

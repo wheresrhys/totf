@@ -1,6 +1,8 @@
 /**
  * Shared encounter-seeding building blocks for the RPC integration test suites
- * under `supabase/__tests__/rpc-functions/`.
+ * under `supabase/__tests__/rpc-functions/` (plus, for the two session-lookup
+ * helpers at the bottom, any integration test that builds an Encounters row by
+ * hand — `app/actions/__tests__/ring-sequences.test.ts` included).
  *
  * Every RPC integration test's `beforeAll` needs the same small set of raw
  * inserts — a Locations row, a Sessions row (sometimes cached per `(date,
@@ -104,6 +106,11 @@ export async function insertTestBird(
  * / sex: 'M'` defaults nearly every RPC integration test fixture uses,
  * overridden/extended by `fields` (age_code, is_juv, record_type, weight,
  * wing_length, capture_time, ...). Returns the new row's id.
+ *
+ * `location_id`/`visit_date` are `NOT NULL` on `Encounters` (#1015) but are read
+ * off the session by default, so a fixture that just wants "an encounter in this
+ * session" stays a three-argument call. Pass either in `fields` to make an
+ * encounter's own location/date differ from its session's.
  */
 export async function insertTestEncounter(
 	client: SupabaseClient,
@@ -118,8 +125,15 @@ export async function insertTestEncounter(
 		capture_time?: string;
 		scheme?: string;
 		sex?: string;
+		location_id?: number;
+		visit_date?: string;
 	}
 ): Promise<number> {
+	const session =
+		fields.location_id === undefined || fields.visit_date === undefined
+			? await readTestSessionLocationAndDate(client, sessionId)
+			: undefined;
+
 	const { data, error } = await client
 		.from('Encounters')
 		.insert({
@@ -128,12 +142,69 @@ export async function insertTestEncounter(
 			sex: 'M',
 			session_id: sessionId,
 			bird_id: birdId,
-			...fields
+			...fields,
+			location_id: fields.location_id ?? session!.location_id,
+			visit_date: fields.visit_date ?? session!.visit_date
 		})
 		.select('id')
 		.single();
 	if (error) throw error;
 	return data!.id;
+}
+
+/**
+ * Reads the `location_id`/`visit_date` of an existing Sessions row, to copy onto an
+ * Encounters row built by hand (both are NOT NULL on `Encounters` since #1015).
+ */
+export async function readTestSessionLocationAndDate(
+	client: SupabaseClient,
+	sessionId: number
+): Promise<{ location_id: number; visit_date: string }> {
+	const { data, error } = await client
+		.from('Sessions')
+		.select('location_id, visit_date')
+		.eq('id', sessionId)
+		.single();
+	if (error) throw error;
+	return data!;
+}
+
+type EncounterRowWithSession = {
+	session_id: number;
+	location_id?: number;
+	visit_date?: string;
+};
+
+/**
+ * The bulk-insert counterpart to `insertTestEncounter`'s session lookup: fills in
+ * the `location_id`/`visit_date` every Encounters row needs (both NOT NULL since
+ * #1015) from the Sessions row each one links to, in one query for the whole batch.
+ * Use it where a fixture writes out an array of encounter literals naming only a
+ * `session_id`. A row that already names its own location/date keeps it.
+ */
+export async function withSessionLocationAndDate<T extends EncounterRowWithSession>(
+	client: SupabaseClient,
+	rows: T[]
+): Promise<(T & { location_id: number; visit_date: string })[]> {
+	const sessionIds = [...new Set(rows.map((row) => row.session_id))];
+	const { data, error } = await client
+		.from('Sessions')
+		.select('id, location_id, visit_date')
+		.in('id', sessionIds);
+	if (error) throw error;
+	const sessionsById = new Map<number, { location_id: number; visit_date: string }>(
+		data!.map((session) => [session.id, session])
+	);
+
+	return rows.map((row) => {
+		const session = sessionsById.get(row.session_id);
+		if (!session) throw new Error(`Session ${row.session_id} not found`);
+		return {
+			...row,
+			location_id: row.location_id ?? session.location_id,
+			visit_date: row.visit_date ?? session.visit_date
+		};
+	});
 }
 
 /** Returns a ring-number generator producing `${prefix}-0`, `${prefix}-1`, ... */

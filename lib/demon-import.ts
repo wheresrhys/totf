@@ -365,6 +365,13 @@ export async function processEncounterRow(
 			record_type: row.record_type as string,
 			bird_id: birdId,
 			session_id: sessionId,
+			// Every encounter carries its own location/date, independent of the
+			// Session it is linked to (#1015). Both come from the same values the
+			// Sessions upsert above uses, so they always agree today — the point is
+			// that a future resighting row can stop needing a Session at all (#1024)
+			// without losing where/when it happened.
+			location_id: locationId,
+			visit_date: visitDate,
 			scheme: row.scheme as string,
 			sex: row.sex as string,
 			sexing_method: row.sexing_method as string | null,

@@ -152,6 +152,7 @@ describe('ring_sequence_controls with linked sequences', () => {
 	let robinId: number;
 	let deltaLocationId: number;
 	let deltaSessionId: number;
+	let deltaVisitDate: string;
 
 	const createdBirdIds: number[] = [];
 	const createdSeqIds: number[] = [];
@@ -177,6 +178,8 @@ describe('ring_sequence_controls with linked sequences', () => {
 			sex: 'M',
 			age_code: 4,
 			session_id: deltaSessionId,
+			location_id: deltaLocationId,
+			visit_date: deltaVisitDate,
 			bird_id: bird!.id,
 		});
 		if (encounterError) throw encounterError;
@@ -251,9 +254,10 @@ describe('ring_sequence_controls with linked sequences', () => {
 		if (locationError) throw locationError;
 		deltaLocationId = location!.id;
 
+		deltaVisitDate = randomFutureDate();
 		const { data: session, error: sessionError } = await deltaClient
 			.from('Sessions')
-			.insert({ visit_date: randomFutureDate(), location_id: deltaLocationId })
+			.insert({ visit_date: deltaVisitDate, location_id: deltaLocationId })
 			.select('id')
 			.single();
 		if (sessionError) throw sessionError;

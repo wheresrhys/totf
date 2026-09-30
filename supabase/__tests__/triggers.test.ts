@@ -23,6 +23,9 @@ const BASE_ENCOUNTER = {
 	age_code: 1,
 };
 
+// The one shared session every encounter in the suppression suite below belongs to.
+const SESSION_VISIT_DATE = '2099-01-01';
+
 describe('Encounters — same-session retrap suppression trigger', () => {
 	let groupClient: SupabaseClient;
 	let locationId: number;
@@ -62,7 +65,7 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 
 		const { data: sess, error: sessError } = await groupClient
 			.from('Sessions')
-			.insert({ visit_date: '2099-01-01', location_id: locationId })
+			.insert({ visit_date: SESSION_VISIT_DATE, location_id: locationId })
 			.select('id')
 			.single();
 		if (sessError) throw sessError;
@@ -86,6 +89,18 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 		birdIdFresh = birdFresh.data!.id;
 	});
 
+	// Each encounter here sits in the one shared session, so it repeats that
+	// session's location/date on its own row (Encounters.location_id/visit_date are
+	// NOT NULL, #1015).
+	const encounterInSession = (birdId: number, recordType: string) => ({
+		...BASE_ENCOUNTER,
+		record_type: recordType,
+		bird_id: birdId,
+		session_id: sessionId,
+		location_id: locationId,
+		visit_date: SESSION_VISIT_DATE,
+	});
+
 	afterAll(() => {
 		psql(
 			`DELETE FROM "Encounters" WHERE bird_id IN (${birdIdN}, ${birdIdS}, ${birdIdFresh});` +
@@ -96,17 +111,16 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 	});
 
 	it('preserves N record_type when upsert would change it to S', async () => {
-		await groupClient.from('Encounters').insert({
-			...BASE_ENCOUNTER,
-			record_type: 'N',
-			bird_id: birdIdN,
-			session_id: sessionId,
-		});
+		await groupClient
+			.from('Encounters')
+			.insert(encounterInSession(birdIdN, 'N'));
 
-		await groupClient.from('Encounters').upsert(
-			{ ...BASE_ENCOUNTER, record_type: 'S', bird_id: birdIdN, session_id: sessionId },
-			{ onConflict: 'bird_id,session_id', ignoreDuplicates: false }
-		);
+		await groupClient
+			.from('Encounters')
+			.upsert(encounterInSession(birdIdN, 'S'), {
+				onConflict: 'bird_id,session_id',
+				ignoreDuplicates: false,
+			});
 
 		const { data } = await groupClient
 			.from('Encounters')
@@ -119,17 +133,16 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 	});
 
 	it('allows S→N update (does not block fixing bad data)', async () => {
-		await groupClient.from('Encounters').insert({
-			...BASE_ENCOUNTER,
-			record_type: 'S',
-			bird_id: birdIdS,
-			session_id: sessionId,
-		});
+		await groupClient
+			.from('Encounters')
+			.insert(encounterInSession(birdIdS, 'S'));
 
-		await groupClient.from('Encounters').upsert(
-			{ ...BASE_ENCOUNTER, record_type: 'N', bird_id: birdIdS, session_id: sessionId },
-			{ onConflict: 'bird_id,session_id', ignoreDuplicates: false }
-		);
+		await groupClient
+			.from('Encounters')
+			.upsert(encounterInSession(birdIdS, 'N'), {
+				onConflict: 'bird_id,session_id',
+				ignoreDuplicates: false,
+			});
 
 		const { data } = await groupClient
 			.from('Encounters')
@@ -142,12 +155,9 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 	});
 
 	it('allows inserting a fresh S encounter with no prior encounter in session', async () => {
-		const { error } = await groupClient.from('Encounters').insert({
-			...BASE_ENCOUNTER,
-			record_type: 'S',
-			bird_id: birdIdFresh,
-			session_id: sessionId,
-		});
+		const { error } = await groupClient
+			.from('Encounters')
+			.insert(encounterInSession(birdIdFresh, 'S'));
 
 		expect(error).toBeNull();
 

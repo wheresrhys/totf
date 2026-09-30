@@ -239,10 +239,13 @@ describe('DB constraints — Encounters uniqueness (bird_id, session_id)', () =>
 		);
 	});
 
-	function createBirdAndSession(label: string): {
+	type BirdAndSession = {
 		birdId: number;
 		sessionId: number;
-	} {
+		visitDate: string;
+	};
+
+	function createBirdAndSession(label: string): BirdAndSession {
 		const speciesId = Number(
 			psqlScalar(
 				`INSERT INTO "Species" (species_name) VALUES ('DbConstraintsSpecies-${suffix}-${label}') RETURNING id;`
@@ -255,53 +258,56 @@ describe('DB constraints — Encounters uniqueness (bird_id, session_id)', () =>
 			)
 		);
 		birdIds.push(birdId);
+		const visitDate = randomFutureDate();
 		const sessionId = Number(
 			psqlScalar(
-				`INSERT INTO "Sessions" (visit_date, location_id) VALUES ('${randomFutureDate()}', ${locationId}) RETURNING id;`
+				`INSERT INTO "Sessions" (visit_date, location_id) VALUES ('${visitDate}', ${locationId}) RETURNING id;`
 			)
 		);
 		sessionIds.push(sessionId);
-		return { birdId, sessionId };
+		return { birdId, sessionId, visitDate };
 	}
 
-	it('allows inserting an Encounters row with a unique (bird_id, session_id) pair', async () => {
-		const { birdId, sessionId } = createBirdAndSession('unique');
-
-		const { error } = await groupClient.from('Encounters').insert({
+	// An encounter carries its own location/date as well as its session link
+	// (Encounters.location_id/visit_date are NOT NULL, #1015); only capture_time
+	// varies between the rows these tests insert.
+	function encounterRow(
+		{ birdId, sessionId, visitDate }: BirdAndSession,
+		captureTime: string
+	) {
+		return {
 			bird_id: birdId,
 			session_id: sessionId,
-			capture_time: '09:00:00',
+			location_id: locationId,
+			visit_date: visitDate,
+			capture_time: captureTime,
 			record_type: 'N',
 			scheme: 'BTO',
 			sex: 'M',
 			age_code: 5
-		});
+		};
+	}
+
+	it('allows inserting an Encounters row with a unique (bird_id, session_id) pair', async () => {
+		const birdAndSession = createBirdAndSession('unique');
+
+		const { error } = await groupClient
+			.from('Encounters')
+			.insert(encounterRow(birdAndSession, '09:00:00'));
 		expect(error).toBeNull();
 	});
 
 	it('rejects a raw duplicate (bird_id, session_id) insert with a unique-violation error', async () => {
-		const { birdId, sessionId } = createBirdAndSession('dup');
+		const birdAndSession = createBirdAndSession('dup');
 
-		const first = await groupClient.from('Encounters').insert({
-			bird_id: birdId,
-			session_id: sessionId,
-			capture_time: '09:00:00',
-			record_type: 'N',
-			scheme: 'BTO',
-			sex: 'M',
-			age_code: 5
-		});
+		const first = await groupClient
+			.from('Encounters')
+			.insert(encounterRow(birdAndSession, '09:00:00'));
 		expect(first.error).toBeNull();
 
-		const duplicate = await groupClient.from('Encounters').insert({
-			bird_id: birdId,
-			session_id: sessionId,
-			capture_time: '10:00:00',
-			record_type: 'N',
-			scheme: 'BTO',
-			sex: 'M',
-			age_code: 5
-		});
+		const duplicate = await groupClient
+			.from('Encounters')
+			.insert(encounterRow(birdAndSession, '10:00:00'));
 		expect(duplicate.error?.code).toBe('23505');
 	});
 });
