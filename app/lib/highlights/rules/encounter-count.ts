@@ -15,7 +15,13 @@ export const encounterCount: HighlightsGenerator = {
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement = `${printProminenceQualifier(scope.ranking, 'equal')} most ${i === 0 ? 'encounters ' : ''}${printTimeQualifier(scope.scope.parentTimeWindow, 'of', 'of')}${scope.scope.parentTimeWindow?.month && combinedHighlight.scopes[0].scope.temporalUnit === 'day' && i > 0 ? ' session' : ''}`;
+				const centralStatement = `${printProminenceQualifier(scope.ranking, 'equal')} most ${i === 0 ? 'encounters ' : ''}${printTimeQualifier(
+					scope.scope.parentTimeWindow,
+					{
+						yearConnector: 'of',
+						monthConnector: 'of'
+					}
+				)}${scope.scope.parentTimeWindow?.month && combinedHighlight.scopes[0].scope.temporalUnit === 'day' && i > 0 ? ' session' : ''}`;
 
 				return i === 0
 					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`

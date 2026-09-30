@@ -41,7 +41,5 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 		threshold: 3
 	}),
 	limit: 1,
-	condition: (
-		scope
-	) => !scope.parentTimeWindow?.month
+	condition: (scope) => !scope.parentTimeWindow?.month
 };

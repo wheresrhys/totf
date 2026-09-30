@@ -16,7 +16,7 @@ export const lightestOfSpecies: HighlightsGenerator = {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map(
 				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking)} lightest${i === 0 ? ` ${combinedHighlight.species}` : ''} ${printTimeQualifier(scope.scope.parentTimeWindow, 'of')}`
+					`${printProminenceQualifier(scope.ranking)} lightest${i === 0 ? ` ${combinedHighlight.species}` : ''} ${printTimeQualifier(scope.scope.parentTimeWindow, { yearConnector: 'of' })}`
 			);
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()

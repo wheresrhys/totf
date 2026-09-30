@@ -16,7 +16,7 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map(
 				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking, 'equal')} most ${i === 0 ? `encounters of a single species in a ${printTemporalUnit(scope.scope.temporalUnit)} ` : ''}${printTimeQualifier(scope.scope.parentTimeWindow, i === 0 ? 'in' : 'of')}`
+					`${printProminenceQualifier(scope.ranking, 'equal')} most ${i === 0 ? `encounters of a single species in a ${printTemporalUnit(scope.scope.temporalUnit)} ` : ''}${printTimeQualifier(scope.scope.parentTimeWindow, { yearConnector: i === 0 ? 'in' : 'of' })}`
 			);
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
@@ -32,7 +32,6 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 		speciesUnitMode: 'replace'
 	},
 	generator: getTopByProperty('encounter_count'),
-	condition: (
-		scope
-	) => scope.temporalUnit !== 'day' && !scope.parentTimeWindow?.month
+	condition: (scope) =>
+		scope.temporalUnit !== 'day' && !scope.parentTimeWindow?.month
 };

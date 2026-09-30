@@ -2,7 +2,9 @@ import type {
 	YearMonthRestriction,
 	HighlightValue,
 	HighlightDescriptor,
-	HighlightRanking
+	HighlightRanking,
+	CombinedHighlight,
+	HighlightScope
 } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 
@@ -89,7 +91,7 @@ export function prettyPrintPosition(position: number) {
 		case 5:
 			return 'fifth';
 		default:
-			throw new Error('Should not be showing anything worse than 3rd best');
+			throw new Error('Should not be showing anything worse than fifth best');
 	}
 }
 
@@ -105,10 +107,21 @@ export function printFullMonthName(monthIndex: number) {
 }
 
 export function printTimeQualifier(
-	timeQualifier?: YearMonthRestriction,
-	yearConnector?: 'in' | 'of',
-	monthConnector?: 'in' | 'of'
+	timeQualifier: YearMonthRestriction | undefined,
+	options: {
+		yearConnector?: 'in' | 'of';
+		monthConnector?: 'in' | 'of';
+	} = {}
 ) {
+	options = {
+		...{
+			yearConnector: 'of',
+			monthConnector: 'in',
+			yearMonthConnector: 'of'
+		},
+		...options
+	};
+
 	if (!timeQualifier) {
 		return 'ever';
 	}
@@ -117,18 +130,21 @@ export function printTimeQualifier(
 		// todo pretty print month
 		return year === new Date().getFullYear()
 			? `this ${month}`
-			: `${monthConnector ?? 'of'} ${month} ${year}`;
+			: `${options.monthConnector ?? 'of'} ${month} ${year}`;
 	} else if (year) {
 		return year === new Date().getFullYear()
 			? `this year`
-			: `${yearConnector ?? 'of'} ${year}`;
+			: `${options.yearConnector ?? 'of'} ${year}`;
 	} else if (month) {
-		return `${monthConnector ?? 'in'} any ${fullMonthNames[month]}`;
+		return `${options.monthConnector ?? 'in'} any ${fullMonthNames[month]}`;
 	}
 }
-
-export function sentenceJoin(clauses: string[]) {
-	let sentence = clauses.pop();
+// todo enforce length of min 1 in the types
+export function sentenceJoin(clauses: string[]): string {
+	if (clauses.length) {
+		throw new Error('combined highlight with no scopes listed');
+	}
+	let sentence = clauses.pop() as string;
 
 	if (clauses.length) {
 		sentence = `${clauses.pop()} and ${sentence}`;
@@ -141,6 +157,35 @@ export function sentenceJoin(clauses: string[]) {
 	return sentence;
 }
 
-export function sentenceCase(sentence: string) {
+export function sentenceCase(sentence: string): string {
 	return sentence.charAt(0).toUpperCase() + sentence.substring(1);
+}
+
+type CombinedHighlightScope = {
+	scope: HighlightScope;
+	ranking: HighlightRanking;
+};
+export function printCombinedHighlight(
+	combinedHighlight: CombinedHighlight,
+	{
+		firstSentence,
+		restSentence
+	}: {
+		firstSentence: (
+			scope: CombinedHighlightScope,
+			combinedHighlight: CombinedHighlight
+		) => string;
+		restSentence: (
+			scope: CombinedHighlightScope,
+			combinedHighlight: CombinedHighlight
+		) => string;
+	}
+): string {
+	return sentenceJoin(
+		combinedHighlight.scopes.map((scope, i) =>
+			i === 0
+				? firstSentence(scope, combinedHighlight)
+				: restSentence(scope, combinedHighlight)
+		)
+	);
 }

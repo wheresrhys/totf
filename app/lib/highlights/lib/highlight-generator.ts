@@ -53,8 +53,7 @@ function generateAllHighlights({
 }) {
 	return highlightRules
 		.flatMap((rule) => {
-			if (rule.condition && !rule.condition(scope))
-				return null;
+			if (rule.condition && !rule.condition(scope)) return null;
 			const workingStats = stats[rule.statsSelector];
 			if (Array.isArray(workingStats)) {
 				const highlights: HighlightsOfType = {
@@ -198,8 +197,7 @@ export async function getHighlightsWithinTimeWindow({
 
 	const highlights = generateAllHighlights({
 		stats: await getFilteredStats(temporalUnit, groupId, filter),
-		scope: {temporalUnit,
-		parentTimeWindow},
+		scope: { temporalUnit, parentTimeWindow },
 		limit,
 		includePerSpecies
 	});

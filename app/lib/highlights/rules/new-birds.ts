@@ -35,7 +35,5 @@ export const newBirds: HighlightsGenerator = {
 		category: 'demographics'
 	},
 	generator: getTopByProperty('new_bird_count'),
-	condition: (
-		scope
-	) => !scope.parentTimeWindow?.month
+	condition: (scope) => !scope.parentTimeWindow?.month
 };
