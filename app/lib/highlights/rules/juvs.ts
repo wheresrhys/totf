@@ -1,31 +1,23 @@
-import type { HighlightsGenerator, YearMonthRestriction } from '../types';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { HighlightsGenerator } from '../types';
 import {
 	printProminenceQualifier,
-	printValue,
-	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByPropertiesSum } from '../lib/rule-utils';
 
 export const juvs: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement =
-					`${printProminenceQualifier(scope.ranking, 'equal')} most${i === 0 ? ' juvs' : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`.trim();
-
-				return i === 0
-					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`
-					: centralStatement;
-			});
-			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
+				firstLineItem: ({ scope, ranking }) =>
+					`${printTemporalUnit(scope.temporalUnit)} with ${printProminenceQualifier(ranking, 'equal')} most juvs ${printTimeQualifier(scope.parentTimeWindow)}`,
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking, 'equal')} most ${printTimeQualifier(scope.parentTimeWindow)}`,
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most juvs`
 	},
@@ -35,8 +27,5 @@ export const juvs: HighlightsGenerator = {
 		category: 'demographics'
 	},
 	generator: getTopByPropertiesSum(['pullus_bird_count', 'juv_bird_count']),
-	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => !parentTimeWindow?.month
+	condition: (scope) => !scope.parentTimeWindow?.month
 };

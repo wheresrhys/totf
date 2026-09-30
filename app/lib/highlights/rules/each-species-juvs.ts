@@ -1,34 +1,29 @@
-import type { HighlightsGenerator, YearMonthRestriction } from '../types';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { HighlightsGenerator } from '../types';
 import {
 	printProminenceQualifier,
-	printValue,
-	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByPropertiesSum } from '../lib/rule-utils';
 
 export const eachSpeciesJuvs: HighlightsGenerator = {
 	statsSelector: 'coreStatsBySpecies',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				let result = `${printProminenceQualifier(scope.ranking, 'equal')} highest `;
-				if (i === 0) {
-					result += `juv ${combinedHighlight.species} count `;
-					if (combinedHighlight.scopes[0].scope.temporalUnit !== 'day') {
-						result += ` in a ${printTemporalUnit(scope.scope.temporalUnit)}`;
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
+				firstLineItem: ({ scope, ranking, combinedHighlight }) => {
+					let result = `${printProminenceQualifier(ranking, 'equal')} highest juv ${combinedHighlight.species} count `;
+					if (scope.temporalUnit !== 'day') {
+						result += ` in a ${printTemporalUnit(scope.temporalUnit)}`;
 					}
-				}
-				result += printTimeQualifier(scope.scope.parentTimeWindow);
-				return result;
-			});
-			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+					result += printTimeQualifier(scope.parentTimeWindow);
+					return result;
+				},
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking, 'equal')} highest ${printTimeQualifier(scope.parentTimeWindow)}`,
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Highest juv ${highlightsOfType.scope.species} count in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
 	},
@@ -41,8 +36,5 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 		threshold: 3
 	}),
 	limit: 1,
-	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => !parentTimeWindow?.month
+	condition: (scope) => !scope.parentTimeWindow?.month
 };

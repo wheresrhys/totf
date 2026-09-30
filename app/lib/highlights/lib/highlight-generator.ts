@@ -8,7 +8,8 @@ import type {
 	HighlightsOfType,
 	YearMonthRestriction,
 	EnhancedStatsRepository,
-	HighlightValue
+	HighlightValue,
+	HighlightScope
 } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import { DEFAULT_LIMIT } from '../const';
@@ -41,26 +42,23 @@ function isHighlightsOfType(item: unknown): item is HighlightsOfType {
 
 function generateAllHighlights({
 	stats,
-	temporalUnit,
-	parentTimeWindow,
+	scope,
 	limit,
 	includePerSpecies
 }: {
 	stats: EnhancedStatsRepository;
-	temporalUnit: TemporalUnit;
-	parentTimeWindow?: YearMonthRestriction;
+	scope: HighlightScope;
 	limit: number;
 	includePerSpecies: boolean;
 }) {
 	return highlightRules
 		.flatMap((rule) => {
-			if (rule.condition && !rule.condition(temporalUnit, parentTimeWindow))
-				return null;
+			if (rule.condition && !rule.condition(scope)) return null;
 			const workingStats = stats[rule.statsSelector];
 			if (Array.isArray(workingStats)) {
 				const highlights: HighlightsOfType = {
 					...rule,
-					scope: { temporalUnit, parentTimeWindow: parentTimeWindow },
+					scope,
 					// rule.statsSelector always names the array whose row type matches rule.generator's
 					// param type (enforced by HighlightsGenerator's discriminated union in types.ts) —
 					// TS can't see that correlation across this generic dispatch loop, so assert it here,
@@ -81,8 +79,7 @@ function generateAllHighlights({
 						const highlights: HighlightsOfType = {
 							...rule,
 							scope: {
-								temporalUnit,
-								parentTimeWindow: parentTimeWindow,
+								...scope,
 								species
 							},
 							values: (
@@ -200,8 +197,7 @@ export async function getHighlightsWithinTimeWindow({
 
 	const highlights = generateAllHighlights({
 		stats: await getFilteredStats(temporalUnit, groupId, filter),
-		temporalUnit,
-		parentTimeWindow,
+		scope: { temporalUnit, parentTimeWindow },
 		limit,
 		includePerSpecies
 	});

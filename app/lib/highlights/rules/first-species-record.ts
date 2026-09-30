@@ -1,8 +1,8 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
 import {
-	sentenceCase,
 	printTimeQualifier,
-	printSpeciesForCount
+	printSpeciesForCount,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getFirstAppearance } from '../lib/rule-utils';
 
@@ -38,12 +38,13 @@ export const firstSpeciesRecord: HighlightsGenerator = {
 		// on a first record merely restates the broadest one: a species' first
 		// record ever is necessarily also its first of that year. scopes[0] is the
 		// broadest (see sortByPositionAndTimeWindow), so it is the one to print.
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const [{ scope }] = combinedHighlight.scopes;
-			return sentenceCase(
-				`First ${printSpeciesForCount(combinedHighlight.species, combinedHighlight.value.value)} ${printTimeQualifier(scope.parentTimeWindow)}`.trim()
-			);
-		},
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
+				onlyBroadestScope: true,
+				lineItem: ({ scope, combinedHighlight }) =>
+					`First ${printSpeciesForCount(combinedHighlight.species, combinedHighlight.value.value)} ${printTimeQualifier(scope.parentTimeWindow)}`,
+				shouldPrintValue: false
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`First ${highlightsOfType.scope.species} ${printTimeQualifier(highlightsOfType.scope.parentTimeWindow)}`
 	},

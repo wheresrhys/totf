@@ -1,28 +1,26 @@
-import type { HighlightsGenerator, YearMonthRestriction } from '../types';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { HighlightsGenerator } from '../types';
 import {
 	printProminenceQualifier,
-	printValue,
-	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight,
+	type TimeQualifierOptions
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
+const timeQualifierOptions: TimeQualifierOptions = { yearConnector: 'of' };
 export const singleSpeciesCount: HighlightsGenerator = {
 	statsSelector: 'coreStatsWithSpecies',
 	formatters: {
 		// -> Highest count of a single species in 2021: 54 Reed Warblers
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map(
-				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking)} highest ${i === 0 ? `single species ${printTemporalUnit(scope.scope.temporalUnit)} count ` : ''}${printTimeQualifier(scope.scope.parentTimeWindow, 'in')}`
-			);
-			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
+				firstLineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking)} highest single species ${printTemporalUnit(scope.temporalUnit)} count ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking)} highest ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Highest ${printTemporalUnit(highlightsOfType.scope.temporalUnit)} count${highlightsOfType.values.length > 1 ? 's' : ''} for a single species`
 	},
@@ -33,8 +31,5 @@ export const singleSpeciesCount: HighlightsGenerator = {
 		speciesUnitMode: 'replace'
 	},
 	generator: getTopByProperty('bird_count', { threshold: 3 }),
-	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => !parentTimeWindow?.month
+	condition: (scope) => !scope.parentTimeWindow?.month
 };

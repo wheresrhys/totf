@@ -1,37 +1,32 @@
 import type { HighlightsGenerator } from '../types';
 import {
 	printProminenceQualifier,
-	printValue,
-	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
 	printTimeQualifier,
-	printFullMonthName
+	printFullMonthName,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
 export const birdCount: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				let result = `${printProminenceQualifier(scope.ranking)} busiest `;
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
+				firstLineItem: ({ scope, ranking }) => {
+					let result = `${printProminenceQualifier(ranking)} busiest `;
 
-				if (scope.scope.parentTimeWindow?.month) {
-					if (i === 0) {
-						result += `${printFullMonthName(scope.scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.scope.temporalUnit)} ever`;
+					if (scope.parentTimeWindow?.month) {
+						result += `${printFullMonthName(scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.temporalUnit)} ever`;
 					} else {
-						result += `in any ${printFullMonthName(scope.scope.parentTimeWindow?.month)}`;
+						result += `${printTemporalUnit(scope.temporalUnit)} ${printTimeQualifier(scope.parentTimeWindow)}`;
 					}
-				} else {
-					result += `${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
-				}
-				return result;
-			});
-			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			).replace(/  /g, ' ');
-		},
+					return result;
+				},
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking)} busiest ${printTimeQualifier(scope.parentTimeWindow)}`,
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Busiest ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
 	},

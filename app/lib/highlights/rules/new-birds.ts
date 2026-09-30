@@ -1,31 +1,28 @@
-import type { HighlightsGenerator, YearMonthRestriction } from '../types';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { HighlightsGenerator } from '../types';
 import {
 	printProminenceQualifier,
-	printValue,
-	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
 export const newBirds: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement =
-					`${printProminenceQualifier(scope.ranking)} highest${i === 0 ? ' new bird count' : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`.trim();
-
-				return i === 0 && !(scope.scope.temporalUnit === 'day')
-					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`
-					: centralStatement;
-			});
-			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
+				firstLineItem: ({ scope, ranking }) => {
+					const temporalUnitQualifier =
+						scope.temporalUnit === 'day'
+							? ''
+							: `${printTemporalUnit(scope.temporalUnit)} with`;
+					return `${temporalUnitQualifier} ${printProminenceQualifier(ranking)} highest new bird count ${printTimeQualifier(scope.parentTimeWindow)}`;
+				},
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking)} highest ${printTimeQualifier(scope.parentTimeWindow)}`,
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most new birds`
 	},
@@ -35,8 +32,5 @@ export const newBirds: HighlightsGenerator = {
 		category: 'demographics'
 	},
 	generator: getTopByProperty('new_bird_count'),
-	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => !parentTimeWindow?.month
+	condition: (scope) => !scope.parentTimeWindow?.month
 };

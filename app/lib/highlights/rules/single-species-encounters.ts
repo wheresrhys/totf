@@ -1,27 +1,23 @@
-import type { HighlightsGenerator, YearMonthRestriction } from '../types';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { HighlightsGenerator } from '../types';
 import {
 	printProminenceQualifier,
-	printValue,
-	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
 export const singleSpeciesEncounters: HighlightsGenerator = {
 	statsSelector: 'coreStatsWithSpecies',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map(
-				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking, 'equal')} most ${i === 0 ? `encounters of a single species in a ${printTemporalUnit(scope.scope.temporalUnit)} ` : ''}${printTimeQualifier(scope.scope.parentTimeWindow, i === 0 ? 'in' : 'of')}`
-			);
-			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
+				firstLineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking, 'equal')} most encounters of a single species in a ${printTemporalUnit(scope.temporalUnit)} ${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'in' })}`,
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking, 'equal')} most ${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'of' })}`,
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Most encounters of a single species in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit)}`
 	},
@@ -32,8 +28,6 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 		speciesUnitMode: 'replace'
 	},
 	generator: getTopByProperty('encounter_count'),
-	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => temporalUnit !== 'day' && !parentTimeWindow?.month
+	condition: (scope) =>
+		scope.temporalUnit !== 'day' && !scope.parentTimeWindow?.month
 };

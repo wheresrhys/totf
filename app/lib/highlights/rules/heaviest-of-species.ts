@@ -2,26 +2,26 @@ import type { HighlightsGenerator } from '../types';
 import type { BiometricsStatsResult } from '@/app/models/db';
 import {
 	printProminenceQualifier,
-	printValue,
-	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight,
+	type TimeQualifierOptions
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
-
+const timeQualifierOptions: TimeQualifierOptions = {
+	yearConnector: 'of'
+};
 export const heaviestOfSpecies: HighlightsGenerator = {
 	statsSelector: 'biometricsStatsBySpecies',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map(
-				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking)} heaviest${i === 0 ? ` ${combinedHighlight.species}` : ''} ${printTimeQualifier(scope.scope.parentTimeWindow, 'of')}`
-			);
-			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
+				firstLineItem: ({ scope, ranking, combinedHighlight }) =>
+					`${printProminenceQualifier(ranking)} heaviest ${combinedHighlight.species} ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking)} heaviest ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Heaviest ${printTemporalUnit(highlightsOfType.scope.temporalUnit)} count${highlightsOfType.values.length > 1 ? 's' : ''} for a single species`
 	},

@@ -111,10 +111,7 @@ type HighlightsGeneratorFor<
 	generator: (
 		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[]
 	) => HighlightValue[];
-	condition?: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => boolean;
+	condition?: (scope: HighlightScope) => boolean;
 };
 
 export type HighlightsGenerator = {

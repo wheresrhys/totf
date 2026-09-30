@@ -2,11 +2,16 @@ import type {
 	YearMonthRestriction,
 	HighlightValue,
 	HighlightDescriptor,
-	HighlightRanking
+	HighlightRanking,
+	CombinedHighlight,
+	HighlightScope
 } from '../types';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 
-import { getPlural } from '@/app/components/shared/StatOutput';
+import {
+	getPlural,
+	getSpaceForUnit,
+	type TemporalUnit
+} from '@/app/components/shared/StatOutput';
 const fullMonthNames = [
 	undefined,
 	'January',
@@ -69,10 +74,10 @@ export function printValue(
 			}
 		case 'prefix':
 			if (value.species) {
-				return `${value.value} ${value.species} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
+				return `${value.value}${getSpaceForUnit(descriptor.unit)}${value.species} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
 			}
 		default:
-			return `${value.value} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
+			return `${value.value}${getSpaceForUnit(descriptor.unit)}${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
 	}
 }
 
@@ -89,7 +94,7 @@ export function prettyPrintPosition(position: number) {
 		case 5:
 			return 'fifth';
 		default:
-			throw new Error('Should not be showing anything worse than 3rd best');
+			throw new Error('Should not be showing anything worse than fifth best');
 	}
 }
 
@@ -103,12 +108,25 @@ export function printProminenceQualifier(
 export function printFullMonthName(monthIndex: number) {
 	return fullMonthNames[monthIndex];
 }
+export type TimeQualifierOptions = {
+	yearConnector?: 'in' | 'of';
+	monthConnector?: 'in' | 'of';
+	yearMonthConnector?: 'in' | 'of';
+};
 
 export function printTimeQualifier(
-	timeQualifier?: YearMonthRestriction,
-	yearConnector?: 'in' | 'of',
-	monthConnector?: 'in' | 'of'
+	timeQualifier: YearMonthRestriction | undefined,
+	options: TimeQualifierOptions = {}
 ) {
+	options = {
+		...{
+			yearConnector: 'of',
+			monthConnector: 'in',
+			yearMonthConnector: 'of'
+		},
+		...options
+	};
+
 	if (!timeQualifier) {
 		return 'ever';
 	}
@@ -117,18 +135,21 @@ export function printTimeQualifier(
 		// todo pretty print month
 		return year === new Date().getFullYear()
 			? `this ${month}`
-			: `${monthConnector ?? 'of'} ${month} ${year}`;
+			: `${options.monthConnector ?? 'of'} ${month} ${year}`;
 	} else if (year) {
 		return year === new Date().getFullYear()
 			? `this year`
-			: `${yearConnector ?? 'of'} ${year}`;
+			: `${options.yearConnector ?? 'of'} ${year}`;
 	} else if (month) {
-		return `${monthConnector ?? 'in'} any ${fullMonthNames[month]}`;
+		return `${options.monthConnector ?? 'in'} any ${fullMonthNames[month]}`;
 	}
 }
-
-export function sentenceJoin(clauses: string[]) {
-	let sentence = clauses.pop();
+// todo enforce length of min 1 in the types
+function sentenceJoin(clauses: string[]): string {
+	// if (clauses.length) {
+	// 	throw new Error('combined highlight with no scopes listed');
+	// }
+	let sentence = clauses.pop() as string;
 
 	if (clauses.length) {
 		sentence = `${clauses.pop()} and ${sentence}`;
@@ -141,6 +162,47 @@ export function sentenceJoin(clauses: string[]) {
 	return sentence;
 }
 
-export function sentenceCase(sentence: string) {
+function sentenceCase(sentence: string): string {
 	return sentence.charAt(0).toUpperCase() + sentence.substring(1);
+}
+
+type LineItemInput = {
+	scope: HighlightScope;
+	ranking: HighlightRanking;
+	combinedHighlight: CombinedHighlight;
+	index: number;
+};
+export function printCombinedHighlight(
+	combinedHighlight: CombinedHighlight,
+	{
+		firstLineItem,
+		lineItem,
+		onlyBroadestScope,
+		shouldPrintValue
+	}: {
+		firstLineItem?: (input: Omit<LineItemInput, 'index'>) => string;
+		lineItem: (input: LineItemInput) => string;
+		shouldPrintValue: boolean;
+		// Some metrics (first/only/rare species records) are the same fact whichever
+		// scope they were found at, so a narrower scope is discarded rather than
+		// combined into the sentence — set this instead of relying on firstLineItem,
+		// which still prints every scope.
+		onlyBroadestScope?: boolean;
+	}
+): string {
+	const scopes = onlyBroadestScope
+		? combinedHighlight.scopes.slice(0, 1)
+		: combinedHighlight.scopes;
+	let result = sentenceJoin(
+		scopes.map((scope, index) =>
+			index === 0 && firstLineItem
+				? firstLineItem({ ...scope, combinedHighlight })
+				: lineItem({ ...scope, combinedHighlight, index })
+		)
+	);
+
+	if (shouldPrintValue) {
+		result += `: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`;
+	}
+	return sentenceCase(result.trim().replace(/  /g, ' '));
 }
