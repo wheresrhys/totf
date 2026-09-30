@@ -128,6 +128,15 @@ entrypoint, its content, and its data fetcher:
   `app/components/pages/{route-name}/` (e.g. `components/pages/session/`,
   `components/pages/species/`). Components used by more than one page family stay in top-level
   `app/components/`.
+- **URL-addressable client state** (e.g. `/compare/species`' repeated `?name=` species selection,
+  #115): the server `page.tsx` parses `searchParams` in its `getParams` into the shape the content
+  component wants, seeds `useState` from it, and mirrors later changes back onto the URL with
+  `window.history.replaceState` — not `router.replace`/`push`. Next.js supports the native history
+  API for search-param updates, and where the state is a pure client-side filter over data the page
+  has already fetched (as it is there — one fetch covers every selection), a real navigation would
+  re-run the server component and its RPCs to produce byte-identical data. `replaceState` rather
+  than `pushState` keeps a run of toggling out of the back button. Reach for `router.replace` only
+  when the new URL genuinely needs a different server render.
 
 Naming reference (see #667 for the original design discussion):
 
