@@ -34,7 +34,8 @@ CREATE FUNCTION public.stats_raw_encounters (
 	capture_time time without time zone,
 	session_day date,
 	session_month date,
-	session_year date
+	session_year date,
+	session_month_squashed date
 ) LANGUAGE sql STABLE AS $function$
   SELECT
     sp.id AS species_id,
@@ -62,7 +63,17 @@ CREATE FUNCTION public.stats_raw_encounters (
     -- timestamptz form would depend on the connection's TimeZone setting.
     sess.visit_date AS session_day,
     date_trunc('month', sess.visit_date::timestamp)::DATE AS session_month,
-    date_trunc('year', sess.visit_date::timestamp)::DATE AS session_year
+    date_trunc('year', sess.visit_date::timestamp)::DATE AS session_year,
+    -- Year-agnostic join key for the 'month-squashed' group_by_time_period mode
+    -- (#996): buckets a row by calendar month alone, using the same 2000-<mm>-01
+    -- sentinel-year convention app/lib/month-totals.ts's synthesizeZeroStats
+    -- already established, so spine rows and raw-encounter rows join on equal
+    -- dates. make_date() and EXTRACT(MONTH FROM date) are both IMMUTABLE (unlike
+    -- date_trunc(text, timestamptz) above), so this needs no timestamp cast.
+    CASE
+      WHEN sess.visit_date IS NULL THEN NULL
+      ELSE make_date(2000, EXTRACT(MONTH FROM sess.visit_date)::int, 1)
+    END AS session_month_squashed
   FROM public."Species" sp
   JOIN public."Birds" b ON sp.id = b.species_id
   -- Resighting/recovery record_types (public.resighting_record_type: U/F/D) are

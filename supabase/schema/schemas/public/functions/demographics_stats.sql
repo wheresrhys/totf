@@ -196,6 +196,7 @@ SET
       WHEN group_by_time_period = 'day' THEN spine.time_period
       WHEN group_by_time_period = 'month' THEN spine.time_period
       WHEN group_by_time_period = 'year' THEN spine.time_period
+      WHEN group_by_time_period = 'month-squashed' THEN spine.time_period
       ELSE NULL::date
     END AS "time_period",
 
@@ -229,6 +230,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period = abc.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = abc.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = abc.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = abc.time_period
     ELSE true
   END
   LEFT JOIN encounter_age_bucket_counts eabc ON CASE WHEN group_by_species THEN spine.species_id = eabc.species_id ELSE true END
@@ -236,6 +238,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period = eabc.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = eabc.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = eabc.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = eabc.time_period
     ELSE true
   END
   LEFT JOIN adult_split_counts asc2 ON CASE WHEN group_by_species THEN spine.species_id = asc2.species_id ELSE true END
@@ -243,6 +246,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period = asc2.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = asc2.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = asc2.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = asc2.time_period
     ELSE true
   END
   LEFT JOIN returning_age_counts rac ON CASE WHEN group_by_species THEN spine.species_id = rac.species_id ELSE true END
@@ -250,6 +254,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period = rac.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = rac.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = rac.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = rac.time_period
     ELSE true
   END
   ) AS agg

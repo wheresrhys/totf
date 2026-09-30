@@ -50,6 +50,7 @@ CREATE FUNCTION public.stats_encounter_age_classification (
       WHEN group_by_time_period = 'day' THEN re.session_day
       WHEN group_by_time_period = 'month' THEN re.session_month
       WHEN group_by_time_period = 'year' THEN re.session_year
+      WHEN group_by_time_period = 'month-squashed' THEN re.session_month_squashed
       ELSE NULL::date
     END AS time_period,
     CASE
