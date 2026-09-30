@@ -11,8 +11,9 @@ description: >-
   estimate (likely files touched, rough LOC, flagged if over this repo's <400 LOC heuristic) so
   the user can drill into or resize any ticket while it's still cheap to change. Enumerates
   commits and tests, picks a model label (fable/sonnet/opus) + `ready`, tags `db-migration` where
-  a task touches `supabase/schema/` and `e2e-exclusive` where it touches a path in
-  `e2e/mutating-spec-triggers.json`, and expresses inter-task dependencies as GitHub native
+  a task touches `supabase/schema/`, `e2e-exclusive` where it touches a path in
+  `e2e/mutating-spec-triggers.json`, and one or more `zone:*` labels per `CLAUDE.md`'s "Repo
+  zones", and expresses inter-task dependencies as GitHub native
   "blocked by" links. When run under a named tracking issue, each created ticket is filed as its
   GitHub sub-issue. Drafting and creation are both parallelised across subagents — each subagent
   creates its own ticket directly and reports back a one-line receipt (issue number + URL); there
@@ -109,9 +110,11 @@ concurrently:
   (so it can identify dependencies on other tasks) and the `parentIssue` number if this run is
   scoped under a tracking issue.
 - Instruct each subagent to draft the ticket (title/body/labels/model-label per
-  `flesh-out-ticket` steps 1–5), then call `mcp__swarm-tools__create_ticket` itself with `title`,
+  `flesh-out-ticket` steps 1–5, including step 2's zone identification), then call
+  `mcp__swarm-tools__create_ticket` itself with `title`,
   `body`, `modelLabel`, `extraLabels` (`db-migration` if it touches `supabase/schema/`,
-  `e2e-exclusive` if it touches a path in `e2e/mutating-spec-triggers.json`), and `parentIssue` if
+  `e2e-exclusive` if it touches a path in `e2e/mutating-spec-triggers.json`), `zoneLabels` (one or
+  more of `zone:app`/`zone:data-layer`/`zone:agentic-tooling` — never empty), and `parentIssue` if
   given (the tool links the sub-issue itself). Do NOT pass `blockedBy` yet — sibling issue numbers
   aren't known at draft time; that's wired up in §6.
 - Each subagent returns **only** these compact fields — no full body, no narrative wrapper, no
@@ -158,8 +161,8 @@ links.
   remaining visibility (not approval) step.
 - Every issue: one model label (`fable`|`sonnet`|`opus`) + `ready`, plus `db-migration` when it
   touches `supabase/schema/` and/or `e2e-exclusive` when it touches a path in
-  `e2e/mutating-spec-triggers.json`, plus any blocked-by links and (when scoped under a tracking
-  issue) sub-issue membership.
+  `e2e/mutating-spec-triggers.json`, plus one or more `zone:*` labels (never zero), plus any
+  blocked-by links and (when scoped under a tracking issue) sub-issue membership.
 - Dependency links (§6) are applied incrementally as issue numbers become known, not in a single
   batch after every ticket exists — `link_ticket_dependencies` only ever needs one issue's own
   `blockedBy` list, never a global view of all created tickets.
