@@ -12,14 +12,12 @@ import {
 } from '@/app/components/shared/DesignSystem';
 import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
-import { Fragment } from 'react';
 import { calculateSessionChronology } from '@/app/lib/session-chronology';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type PageParams = {
 	viewedGroupId: number;
 	date: string;
-	locationId: number | undefined;
 	// The optional `?tabId=` search param (#803, applied here by #805) — never
 	// affects `getCacheKeys`, only which tab `SessionTabs` focuses/loads first.
 	tabId?: string;
@@ -84,49 +82,25 @@ export function buildSessionSummarySentence(
 	return `${birdCount} ${birdWord} of ${speciesCount} species, ${newCount} new and ${retrapCount} ${retrapWord}`;
 }
 
-function Locations({
-	locations,
-	date,
-	selectedLocation,
-	viewedGroup
-}: {
-	locations: LocationRow[];
-	date: string;
-	selectedLocation: number | undefined;
-	viewedGroup: ViewedGroup;
-}) {
-	return locations.length > 1 ? (
-		<small className="text-sm text-gray-500 flex flex-wrap gap-2 mt-2">
-			{locations.length === 1
-				? printLocationName(locations[0].location_name)
-				: locations.map((location) => (
-						<Fragment key={location.id}>
-							{selectedLocation && selectedLocation === location.id ? (
-								<span className="badge badge-secondary">
-									{printLocationName(location.location_name)}
-								</span>
-							) : (
-								<Link
-									className="link badge badge-outline"
-									href={`/group/${viewedGroup.slug}/session/${date}/site/${location.id}`}
-								>
-									{printLocationName(location.location_name)}
-								</Link>
-							)}
-						</Fragment>
-					))}
-			{selectedLocation && locations.length > 1 ? (
-				<>
-					<Link
-						className="link badge badge-outline"
-						href={`/group/${viewedGroup.slug}/session/${date}`}
-					>
-						View all
-					</Link>
-				</>
-			) : null}
+/**
+ * Display-only strip naming the locations the day's birds were caught at. There
+ * is no location-scoped session view any more (#1020) — this is information,
+ * not navigation, so nothing here is a link or a filter control.
+ */
+function Locations({ locations }: { locations: LocationRow[] }) {
+	if (locations.length === 0) return null;
+	return (
+		<small
+			className="text-sm text-gray-500 flex flex-wrap gap-2 mt-2"
+			data-testid="session-locations"
+		>
+			{locations.map((location) => (
+				<span key={location.id} className="badge badge-outline">
+					{printLocationName(location.location_name)}
+				</span>
+			))}
 		</small>
-	) : null;
+	);
 }
 
 function SessionNavigation({
@@ -162,13 +136,12 @@ function SessionNavigation({
 
 export function SessionPageContent({
 	data: dayData,
-	params: { date, locationId, tabId },
+	params: { date, tabId },
 	viewedGroup
 }: {
 	data: DayData;
 	params: {
 		date: string;
-		locationId: number | undefined;
 		tabId?: string;
 	};
 	viewedGroup: ViewedGroup;
@@ -177,13 +150,12 @@ export function SessionPageContent({
 	const chronology = calculateSessionChronology(dayData.encounters);
 	const oldestEncounter = findOldestEncounter(dayData.encounters);
 
-	if (dayData.locations.length === 0) {
+	if (dayData.encounters.length === 0) {
 		return (
 			<PageWrapper>
 				<p>
-					No session found: either no session occurred on this date{' '}
-					{locationId ? 'at this location ' : ''}, or you are not authorised to
-					view it
+					No session found: either no session occurred on this date, or you are
+					not authorised to view it
 				</p>
 			</PageWrapper>
 		);
@@ -201,17 +173,11 @@ export function SessionPageContent({
 			<Standfirst testId="session-stats">
 				{buildSessionSummarySentence(dayData.encounters, speciesList.length)}
 			</Standfirst>
-			<Locations
-				locations={dayData.locations}
-				date={date}
-				selectedLocation={locationId}
-				viewedGroup={viewedGroup}
-			/>
+			<Locations locations={dayData.locations} />
 
 			<SessionTabs
 				speciesList={speciesList}
 				netRounds={chronology.netRounds}
-				locationId={locationId}
 				date={date}
 				viewedGroupId={viewedGroup.id}
 				oldestEncounter={oldestEncounter}

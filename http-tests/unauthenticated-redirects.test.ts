@@ -25,7 +25,6 @@ const crossGroupRoutes = [
   '/group/1/retraps',
   '/group/1/sessions',
   '/group/1/session/2024-01-01',
-  '/group/1/session/2024-01-01/site/1',
 ]
 
 describe('own-group routes (unauthenticated)', () => {

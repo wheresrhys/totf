@@ -24,7 +24,7 @@ describe('StatOutput', () => {
 			expect(link.getAttribute('href')).toBe('/group/alpha/session/2022-10-20');
 		});
 
-		it('appends the site segment from location.id when a location is given', () => {
+		it('still links to the whole day when a location is given, naming the site only in the trailing text', () => {
 			const location = {
 				id: 31,
 				location_name: 'Alpha Site B'
@@ -39,9 +39,8 @@ describe('StatOutput', () => {
 				/>
 			);
 			const link = screen.getByRole('link') as HTMLAnchorElement;
-			expect(link.getAttribute('href')).toBe(
-				'/group/alpha/session/2022-10-20/site/31'
-			);
+			expect(link.getAttribute('href')).toBe('/group/alpha/session/2022-10-20');
+			expect(screen.getByText(/at Alpha Site B/)).not.toBeNull();
 		});
 
 		it('throws when viewedGroup is missing for a day temporal unit', () => {
