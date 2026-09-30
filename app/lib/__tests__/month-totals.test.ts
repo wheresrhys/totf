@@ -127,70 +127,47 @@ describe('buildCombinedMonthTotalsRows', () => {
 	}
 
 	describe('Usual', () => {
-		it('returns exactly 12 rows in Jan→Dec order, with no year field', () => {
-			const rows = buildCombinedMonthTotalsRows([]);
-			expect(rows).toHaveLength(12);
-			expect(rows.map((row) => row.zeroIndexedMonth)).toEqual([
-				0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+		it("returns one row per input row, deriving zeroIndexedMonth from each row's sentinel time_period", () => {
+			const rows = buildCombinedMonthTotalsRows([
+				monthSquashedStat(1),
+				monthSquashedStat(8)
 			]);
+			expect(rows.map((row) => row.zeroIndexedMonth)).toEqual([0, 7]);
+		});
+
+		it("passes each row's stats through unchanged", () => {
+			const rows = buildCombinedMonthTotalsRows([
+				monthSquashedStat(8, { encounter_count: 123, session_count: 9 })
+			]);
+			expect(rows[0].stats.encounter_count).toBe(123);
+			expect(rows[0].stats.session_count).toBe(9);
 		});
 	});
 
 	describe('Structure', () => {
-		it('uses the real RPC stats for a matched calendar month rather than zeroes', () => {
-			const rows = buildCombinedMonthTotalsRows([
-				monthSquashedStat(8, { encounter_count: 123, session_count: 9 })
-			]);
-			const august = rows[7];
-			expect(august.stats.encounter_count).toBe(123);
-			expect(august.stats.session_count).toBe(9);
-		});
-
-		it('orders output Jan→Dec even when the RPC rows arrive reversed/shuffled', () => {
-			const reversed = [
+		it('trusts the RPC for row count/order rather than zero-filling or re-sorting — derives zeroIndexedMonth per row regardless of array position', () => {
+			// Deliberately out of calendar order — the RPC guarantees Jan→Dec
+			// order (core_stats' ORDER BY ... time_period ASC), but this asserts
+			// the function doesn't itself depend on that: each row's month comes
+			// from its own time_period, not its position in the array.
+			const shuffled = [
 				monthSquashedStat(12),
-				monthSquashedStat(7),
-				monthSquashedStat(3),
-				monthSquashedStat(1)
+				monthSquashedStat(1),
+				monthSquashedStat(7)
 			];
-			const rows = buildCombinedMonthTotalsRows(reversed);
-			expect(rows.map((row) => row.stats.time_period)).toEqual([
-				'2000-01-01',
-				'2000-02-01',
-				'2000-03-01',
-				'2000-04-01',
-				'2000-05-01',
-				'2000-06-01',
-				'2000-07-01',
-				'2000-08-01',
-				'2000-09-01',
-				'2000-10-01',
-				'2000-11-01',
-				'2000-12-01'
-			]);
+			const rows = buildCombinedMonthTotalsRows(shuffled);
+			expect(rows.map((row) => row.zeroIndexedMonth)).toEqual([11, 0, 6]);
 		});
 	});
 
 	describe('Edge', () => {
-		it('zero-fills a calendar month missing from the input', () => {
-			const rows = buildCombinedMonthTotalsRows([
-				monthSquashedStat(1, { session_count: 4, encounter_count: 30 })
-			]);
-			const february = rows[1];
-			expect(february.stats.session_count).toBe(0);
-			expect(february.stats.encounter_count).toBe(0);
-			expect(february.stats.total_effort).toBe('00:00:00');
+		it('does not zero-fill a calendar month missing from the input, trusting the RPC to always return all 12', () => {
+			const rows = buildCombinedMonthTotalsRows([monthSquashedStat(1)]);
+			expect(rows).toHaveLength(1);
 		});
 
-		it('zero-fills all 12 months when given an empty array', () => {
-			const rows = buildCombinedMonthTotalsRows([]);
-			expect(rows).toHaveLength(12);
-			rows.forEach((row) => {
-				expect(row.stats.session_count).toBe(0);
-				expect(row.stats.encounter_count).toBe(0);
-				expect(row.stats.bird_count).toBe(0);
-				expect(row.stats.total_effort).toBe('00:00:00');
-			});
+		it('returns an empty array when given no rows', () => {
+			expect(buildCombinedMonthTotalsRows([])).toEqual([]);
 		});
 	});
 });

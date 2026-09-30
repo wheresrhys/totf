@@ -123,38 +123,32 @@ export function formatMonthLabel(
 	return formatDate(new Date(2000, row.zeroIndexedMonth, 1), 'LLLL');
 }
 
-// Build all 12 calendar months from `core_stats`' `'month-squashed'`
-// `group_by_time_period` mode (#996) — one row per calendar month, already
-// summed across the group's entire history in SQL (every column, including
-// distinct-count columns like `species_count`/`bird_count`, is a true
-// cross-year aggregate, unlike the additive-across-years approximation this
-// used to compute client-side). Zero-fills defensively if a calendar month is
-// ever missing from the input, same shape as `buildMonthTotalsRows`. Matching
-// is by the `MM` slice of `time_period` (string comparison — avoids `Date`
-// timezone pitfalls).
+// One row per calendar month from `core_stats`' `'month-squashed'`
+// `group_by_time_period` mode (#996) — every column, including distinct-count
+// columns like `species_count`/`bird_count`, is already a true cross-year
+// aggregate computed in SQL. Unlike `buildMonthTotalsRows`/
+// `buildPerYearMonthTotalsRows`, there's nothing left to zero-fill or re-sort
+// here: `stats_spine`'s month-squashed branch is an unconditional
+// `generate_series(1, 12)` (always exactly 12 rows — `stats_spine.sql`) and
+// `core_stats`' final `SELECT` is `ORDER BY ... time_period ASC`
+// (`core_stats.sql`), both exercised by
+// `supabase/__tests__/rpc-functions/stats-month-squashed.test.ts`. This just
+// derives each row's `zeroIndexedMonth` from its sentinel `time_period`.
 export function buildCombinedMonthTotalsRows(
 	monthSquashedStats: CoreStatsResult[]
 ): CombinedMonthTotalsRow[] {
-	return Array.from({ length: 12 }, (_unused, zeroIndexedMonth) => {
-		const monthKey = String(zeroIndexedMonth + 1).padStart(2, '0');
-		const matchedStats = monthSquashedStats.find(
-			(stat) => stat.time_period?.slice(5, 7) === monthKey
-		);
-		return {
-			zeroIndexedMonth,
-			// A stable, year-agnostic sentinel `time_period` — never displayed (the
-			// label is supplied separately and there's no link), only used as a
-			// row/lookup key and to keep the Jan→Dec order if the table is sorted.
-			stats: matchedStats ?? synthesizeZeroStats(`2000-${monthKey}-01`)
-		};
-	});
+	return monthSquashedStats.map((stats) => ({
+		zeroIndexedMonth: Number(stats.time_period.slice(5, 7)) - 1,
+		stats
+	}));
 }
 
 // Post-processing filter shared by every month-totals table's "Empty months:
-// hide/show" toggle. When `hideEmptyMonths` is true it drops the synthetic
-// zero-session rows `buildMonthTotalsRows`/`buildCombinedMonthTotalsRows`
-// zero-fill in (a month with genuine sessions never has `session_count === 0`,
-// so this only removes synthesized months); when false it returns the rows
+// hide/show" toggle. When `hideEmptyMonths` is true it drops every zero-session
+// row — the synthetic ones `buildMonthTotalsRows` zero-fills in, and the
+// genuine zero-count rows `core_stats`' `'month-squashed'` mode returns for a
+// calendar month with no sessions in any year (a month with genuine sessions
+// never has `session_count === 0` either way); when false it returns the rows
 // untouched, preserving today's always-render-all-months baseline. Generic over
 // both `MonthTotalsRow` and `CombinedMonthTotalsRow` since both carry a
 // `stats.session_count`. Pure — never mutates the input array. Callers apply it

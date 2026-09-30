@@ -18,7 +18,8 @@ import {
 } from '@/app/__tests__/helpers/table';
 import {
 	buildCoreStatsRow,
-	buildDailyStatsRow
+	buildDailyStatsRow,
+	buildMonthSquashedFixture
 } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 const fetchSpeciesDataMock = vi.fn();
@@ -79,29 +80,27 @@ const monthlyPeriodStats: CoreStatsResult[] = [
 ];
 
 // One row per calendar month as `core_stats`' `'month-squashed'` mode (#996)
-// returns them — already a true cross-year aggregate, so `bird_count`/
-// `species_count` are deliberately NOT the sum of `monthlyPeriodStats`' two
-// January rows (which would be 58/24) — that's exactly the double-count the
-// fix removes. Feeds only the all-time Month-totals tab's "Combined" (Combine
-// years ON) view.
-const monthSquashedTotals: CoreStatsResult[] = [
-	buildCoreStatsRow({
-		time_period: '2000-01-01',
+// returns them — a realistic 12-row fixture (the real RPC always returns all
+// 12), zero except January and August. `bird_count`/`species_count` are
+// deliberately NOT the sum of `monthlyPeriodStats`' two January rows (which
+// would be 58/24) — that's exactly the double-count the fix removes. Feeds
+// only the all-time Month-totals tab's "Combined" (Combine years ON) view.
+const monthSquashedTotals: CoreStatsResult[] = buildMonthSquashedFixture({
+	1: {
 		session_count: 10,
 		encounter_count: 75,
 		bird_count: 50,
 		species_count: 7,
 		pullus_bird_count: 2,
 		...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
-	}),
-	buildCoreStatsRow({
-		time_period: '2000-08-01',
+	},
+	8: {
 		session_count: 2,
 		encounter_count: 11,
 		bird_count: 9,
 		species_count: 3
-	})
-];
+	}
+});
 
 describe('SummaryTotalsSection', () => {
 	beforeEach(() => {

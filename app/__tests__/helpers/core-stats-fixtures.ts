@@ -69,3 +69,55 @@ export function buildDailyStatsRow(
 ): CoreStatsResult {
 	return buildCoreStatsRow({ time_period: '2026-08-16', ...overrides });
 }
+
+// Every count/effort column zeroed out, for a calendar month with no sessions
+// in any year of a group's history — the shape a real `'month-squashed'`
+// `group_by_time_period` (#996) row has for such a month.
+const ZERO_MONTH_SQUASHED_STATS: Partial<CoreStatsResult> = {
+	session_count: 0,
+	total_effort: '00:00:00',
+	effort_per_session: '00:00:00',
+	effort_per_encounter: '00:00:00',
+	avg_encounters_per_session: 0,
+	max_per_session: 0,
+	species_count: 0,
+	bird_count: 0,
+	encounter_count: 0,
+	new_bird_count: 0,
+	max_new_per_session: 0,
+	pullus_bird_count: 0,
+	juv_bird_count: 0,
+	postjuv_bird_count: 0,
+	adult_bird_count: 0,
+	unknown_age_bird_count: 0,
+	...({
+		pullus_enc_count: 0,
+		juv_enc_count: 0,
+		postjuv_enc_count: 0,
+		adult_enc_count: 0,
+		unknown_age_enc_count: 0
+	} as Partial<CoreStatsResult>)
+};
+
+/**
+ * A realistic 12-row `core_stats` `group_by_time_period: 'month-squashed'`
+ * (#996) fixture — one row per calendar month (sentinel `time_period`
+ * `2000-<mm>-01`), all-zero except the 1-indexed months named in
+ * `overridesByMonth`. Mirrors the RPC's own density guarantee
+ * (`stats_spine`'s unconditional `generate_series(1, 12)`), which
+ * `buildCombinedMonthTotalsRows` (`app/lib/month-totals.ts`) now trusts
+ * rather than zero-filling client-side — a mock for this RPC call should
+ * return 12 rows just like the real one does.
+ */
+export function buildMonthSquashedFixture(
+	overridesByMonth: Partial<Record<number, Partial<CoreStatsResult>>> = {}
+): CoreStatsResult[] {
+	return Array.from({ length: 12 }, (_unused, index) => {
+		const month = index + 1;
+		return buildCoreStatsRow({
+			time_period: `2000-${String(month).padStart(2, '0')}-01`,
+			...ZERO_MONTH_SQUASHED_STATS,
+			...overridesByMonth[month]
+		});
+	});
+}

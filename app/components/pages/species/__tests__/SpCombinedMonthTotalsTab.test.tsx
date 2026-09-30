@@ -12,7 +12,10 @@ import {
 	getCellTextByHeading,
 	getColumnIndex
 } from '@/app/__tests__/helpers/table';
-import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import {
+	buildCoreStatsRow,
+	buildMonthSquashedFixture
+} from '@/app/__tests__/helpers/core-stats-fixtures';
 
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchSpeciesPeriodTotals: vi.fn(),
@@ -419,9 +422,11 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
 			buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 })
 		]);
-		vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue([
-			buildCoreStatsRow({ time_period: '2000-01-01', session_count: 4 })
-		]);
+		// A realistic 12-row fixture (the real RPC always returns all 12), zero
+		// except January.
+		vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue(
+			buildMonthSquashedFixture({ 1: { session_count: 4 } })
+		);
 	});
 
 	describe('Usual', () => {
