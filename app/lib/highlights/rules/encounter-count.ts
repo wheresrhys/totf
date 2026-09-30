@@ -3,28 +3,29 @@ import {
 	printProminenceQualifier,
 	printTemporalUnit,
 	printTimeQualifier,
-	printCombinedHighlight
+	printCombinedHighlight,
+	type TimeQualifierOptions
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
-
+const timeQualifierOptions: TimeQualifierOptions = {
+	yearConnector: 'of',
+	monthConnector: 'of'
+};
 export const encounterCount: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
-				lineItem: ({ scope, ranking, index, combinedHighlight }) => {
-					const centralStatement = `${printProminenceQualifier(ranking, 'equal')} most ${index === 0 ? 'encounters ' : ''}${printTimeQualifier(
+				firstLineItem: ({ scope, ranking }) =>
+					`${printTemporalUnit(scope.temporalUnit)} with ${printProminenceQualifier(ranking, 'equal')} most encounters ${printTimeQualifier(
 						scope.parentTimeWindow,
-						{
-							yearConnector: 'of',
-							monthConnector: 'of'
-						}
-					)}${scope.parentTimeWindow?.month && combinedHighlight.scopes[0].scope.temporalUnit === 'day' && index > 0 ? ' session' : ''}`;
-
-					return index === 0
-						? `${printTemporalUnit(scope.temporalUnit)} with ${centralStatement}`
-						: centralStatement;
-				},
+						timeQualifierOptions
+					)}`,
+				lineItem: ({ scope, ranking, combinedHighlight }) =>
+					`${printProminenceQualifier(ranking, 'equal')} most ${printTimeQualifier(
+						scope.parentTimeWindow,
+						timeQualifierOptions
+					)}${scope.parentTimeWindow?.month && combinedHighlight.scopes[0].scope.temporalUnit === 'day' ? ' session' : ''}`,
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>

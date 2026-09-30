@@ -108,13 +108,15 @@ export function printProminenceQualifier(
 export function printFullMonthName(monthIndex: number) {
 	return fullMonthNames[monthIndex];
 }
+export type TimeQualifierOptions = {
+	yearConnector?: 'in' | 'of';
+	monthConnector?: 'in' | 'of';
+	yearMonthConnector?: 'in' | 'of';
+};
 
 export function printTimeQualifier(
 	timeQualifier: YearMonthRestriction | undefined,
-	options: {
-		yearConnector?: 'in' | 'of';
-		monthConnector?: 'in' | 'of';
-	} = {}
+	options: TimeQualifierOptions = {}
 ) {
 	options = {
 		...{
@@ -143,7 +145,7 @@ export function printTimeQualifier(
 	}
 }
 // todo enforce length of min 1 in the types
-export function sentenceJoin(clauses: string[]): string {
+function sentenceJoin(clauses: string[]): string {
 	// if (clauses.length) {
 	// 	throw new Error('combined highlight with no scopes listed');
 	// }
@@ -160,7 +162,7 @@ export function sentenceJoin(clauses: string[]): string {
 	return sentence;
 }
 
-export function sentenceCase(sentence: string): string {
+function sentenceCase(sentence: string): string {
 	return sentence.charAt(0).toUpperCase() + sentence.substring(1);
 }
 
@@ -178,7 +180,7 @@ export function printCombinedHighlight(
 		onlyBroadestScope,
 		shouldPrintValue
 	}: {
-		firstLineItem?: (input: LineItemInput) => string;
+		firstLineItem?: (input: Omit<LineItemInput, 'index'>) => string;
 		lineItem: (input: LineItemInput) => string;
 		shouldPrintValue: boolean;
 		// Some metrics (first/only/rare species records) are the same fact whichever
@@ -194,7 +196,7 @@ export function printCombinedHighlight(
 	let result = sentenceJoin(
 		scopes.map((scope, index) =>
 			index === 0 && firstLineItem
-				? firstLineItem({ ...scope, combinedHighlight, index })
+				? firstLineItem({ ...scope, combinedHighlight })
 				: lineItem({ ...scope, combinedHighlight, index })
 		)
 	);

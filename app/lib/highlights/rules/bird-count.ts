@@ -13,20 +13,18 @@ export const birdCount: HighlightsGenerator = {
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
-				lineItem: ({ scope, ranking, index }) => {
+				firstLineItem: ({ scope, ranking }) => {
 					let result = `${printProminenceQualifier(ranking)} busiest `;
 
 					if (scope.parentTimeWindow?.month) {
-						if (index === 0) {
-							result += `${printFullMonthName(scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.temporalUnit)} ever`;
-						} else {
-							result += `in any ${printFullMonthName(scope.parentTimeWindow?.month)}`;
-						}
+						result += `${printFullMonthName(scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.temporalUnit)} ever`;
 					} else {
-						result += `${index === 0 ? printTemporalUnit(scope.temporalUnit) : ''} ${printTimeQualifier(scope.parentTimeWindow)}`;
+						result += `${printTemporalUnit(scope.temporalUnit)} ${printTimeQualifier(scope.parentTimeWindow)}`;
 					}
 					return result;
 				},
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking)} busiest ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>

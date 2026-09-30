@@ -12,14 +12,15 @@ export const newBirds: HighlightsGenerator = {
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
-				lineItem: ({ scope, ranking, index }) => {
-					const centralStatement =
-						`${printProminenceQualifier(ranking)} highest${index === 0 ? ' new bird count' : ''} ${printTimeQualifier(scope.parentTimeWindow)}`.trim();
-
-					return index === 0 && !(scope.temporalUnit === 'day')
-						? `${printTemporalUnit(scope.temporalUnit)} with ${centralStatement}`
-						: centralStatement;
+				firstLineItem: ({ scope, ranking }) => {
+					const temporalUnitQualifier =
+						scope.temporalUnit === 'day'
+							? ''
+							: `${printTemporalUnit(scope.temporalUnit)} with`;
+					return `${temporalUnitQualifier} ${printProminenceQualifier(ranking)} highest new bird count ${printTimeQualifier(scope.parentTimeWindow)}`;
 				},
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking)} highest ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>

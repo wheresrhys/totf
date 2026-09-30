@@ -12,14 +12,10 @@ export const juvs: HighlightsGenerator = {
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
-				lineItem: ({ scope, ranking, index }) => {
-					const centralStatement =
-						`${printProminenceQualifier(ranking, 'equal')} most${index === 0 ? ' juvs' : ''} ${printTimeQualifier(scope.parentTimeWindow)}`.trim();
-
-					return index === 0
-						? `${printTemporalUnit(scope.temporalUnit)} with ${centralStatement}`
-						: centralStatement;
-				},
+				firstLineItem: ({ scope, ranking }) =>
+					`${printTemporalUnit(scope.temporalUnit)} with ${printProminenceQualifier(ranking, 'equal')} most juvs ${printTimeQualifier(scope.parentTimeWindow)}`,
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking, 'equal')} most ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>

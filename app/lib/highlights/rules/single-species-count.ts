@@ -3,18 +3,22 @@ import {
 	printProminenceQualifier,
 	printTemporalUnit,
 	printTimeQualifier,
-	printCombinedHighlight
+	printCombinedHighlight,
+	type TimeQualifierOptions
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
+const timeQualifierOptions: TimeQualifierOptions = { yearConnector: 'of' };
 export const singleSpeciesCount: HighlightsGenerator = {
 	statsSelector: 'coreStatsWithSpecies',
 	formatters: {
 		// -> Highest count of a single species in 2021: 54 Reed Warblers
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
-				lineItem: ({ scope, ranking, index }) =>
-					`${printProminenceQualifier(ranking)} highest ${index === 0 ? `single species ${printTemporalUnit(scope.temporalUnit)} count ` : ''}${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'of' })}`,
+				firstLineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking)} highest single species ${printTemporalUnit(scope.temporalUnit)} count ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking)} highest ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>

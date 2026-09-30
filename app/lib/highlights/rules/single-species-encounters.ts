@@ -12,8 +12,10 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
-				lineItem: ({ scope, ranking, index }) =>
-					`${printProminenceQualifier(ranking, 'equal')} most ${index === 0 ? `encounters of a single species in a ${printTemporalUnit(scope.temporalUnit)} ` : ''}${printTimeQualifier(scope.parentTimeWindow, { yearConnector: index === 0 ? 'in' : 'of' })}`,
+				firstLineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking, 'equal')} most encounters of a single species in a ${printTemporalUnit(scope.temporalUnit)} ${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'in' })}`,
+				lineItem: ({ scope, ranking }) =>
+					`${printProminenceQualifier(ranking, 'equal')} most ${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'of' })}`,
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
