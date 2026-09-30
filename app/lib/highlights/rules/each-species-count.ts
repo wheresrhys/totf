@@ -41,7 +41,6 @@ export const eachSpeciesCount: HighlightsGenerator = {
 	},
 	generator: getTopByProperty('bird_count', { threshold: 2 }),
 	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => !parentTimeWindow?.month
+		scope
+	) => !scope.parentTimeWindow?.month
 };

@@ -33,7 +33,6 @@ export const speciesCount: HighlightsGenerator = {
 	},
 	generator: getTopByProperty('species_count'),
 	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => !parentTimeWindow?.month
+		scope
+	) => !scope.parentTimeWindow?.month
 };

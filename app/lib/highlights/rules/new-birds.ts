@@ -36,7 +36,6 @@ export const newBirds: HighlightsGenerator = {
 	},
 	generator: getTopByProperty('new_bird_count'),
 	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => !parentTimeWindow?.month
+		scope
+	) => !scope.parentTimeWindow?.month
 };

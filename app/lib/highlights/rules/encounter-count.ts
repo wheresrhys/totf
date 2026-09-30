@@ -34,5 +34,5 @@ export const encounterCount: HighlightsGenerator = {
 		category: 'count'
 	},
 	generator: getTopByProperty('encounter_count'),
-	condition: (temporalUnit: TemporalUnit) => temporalUnit !== 'day'
+	condition: (scope) => scope.temporalUnit !== 'day'
 };

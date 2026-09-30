@@ -33,7 +33,6 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 	},
 	generator: getTopByProperty('encounter_count'),
 	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => temporalUnit !== 'day' && !parentTimeWindow?.month
+		scope
+	) => scope.temporalUnit !== 'day' && !scope.parentTimeWindow?.month
 };

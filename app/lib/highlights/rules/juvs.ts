@@ -36,7 +36,6 @@ export const juvs: HighlightsGenerator = {
 	},
 	generator: getTopByPropertiesSum(['pullus_bird_count', 'juv_bird_count']),
 	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => !parentTimeWindow?.month
+		scope
+	) => !scope.parentTimeWindow?.month
 };

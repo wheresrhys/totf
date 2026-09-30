@@ -42,7 +42,6 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 	}),
 	limit: 1,
 	condition: (
-		temporalUnit: TemporalUnit,
-		parentTimeWindow?: YearMonthRestriction
-	) => !parentTimeWindow?.month
+		scope
+	) => !scope.parentTimeWindow?.month
 };
