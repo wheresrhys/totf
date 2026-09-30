@@ -122,6 +122,43 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 			]);
 		});
 
+		it('passes month_filter through to both core_stats and biometrics_stats when monthFilter is supplied', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
+			});
+			const { rpc, calls: rpcCalls } = makeRpcCallRecorder([]);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue({ rpc });
+
+			await fetchSpeciesData(GROUP_ID, undefined, undefined, 1);
+
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(GROUP_ID, {
+				from_date: undefined,
+				to_date: undefined,
+				group_by_species: true,
+				month_filter: 1
+			});
+			expect(rpcCalls[0].args).toMatchObject({ month_filter: 1 });
+		});
+
+		it('omits month_filter from both calls when no monthFilter is supplied', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
+			});
+			const { rpc, calls: rpcCalls } = makeRpcCallRecorder([]);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue({ rpc });
+
+			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(GROUP_ID, {
+				from_date: FROM_DATE,
+				to_date: TO_DATE,
+				group_by_species: true
+			});
+			expect(rpcCalls[0].args).not.toHaveProperty('month_filter');
+		});
+
 		it('does not call biometrics_stats when fetchAuthorisedCoreStats resolves accessLevel "blocked"', async () => {
 			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 				accessLevel: 'blocked',

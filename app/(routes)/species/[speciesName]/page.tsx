@@ -48,14 +48,16 @@ export async function getSpeciesStats(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
+	monthFilter?: number
 ): Promise<CoreStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
 		species_name_filter: species,
 		ringing_group_filter: viewedGroupId,
 		...(fromDate ? { from_date: fromDate } : {}),
-		...(toDate ? { to_date: toDate } : {})
+		...(toDate ? { to_date: toDate } : {}),
+		...(monthFilter ? { month_filter: monthFilter } : {})
 	};
 	const [aggregateRows, biometricsRows] = await Promise.all([
 		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<

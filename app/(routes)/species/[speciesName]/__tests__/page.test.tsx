@@ -421,6 +421,40 @@ describe('getSpeciesStats', () => {
 		}
 	});
 
+	it('passes month_filter to both calls when monthFilter is supplied', async () => {
+		const { rpcCalls } = makeStatsClient({
+			aggregateRows: [makeAggregateRow()],
+			biometricsRows: [makeBiometricsRow()]
+		});
+
+		await getSpeciesStats(
+			STATS_SPECIES_NAME,
+			STATS_GROUP_ID,
+			undefined,
+			undefined,
+			1
+		);
+
+		expect(rpcCalls).toHaveLength(2);
+		for (const call of rpcCalls) {
+			expect(call.args).toMatchObject({ month_filter: 1 });
+		}
+	});
+
+	it('omits month_filter from both calls when no monthFilter is supplied', async () => {
+		const { rpcCalls } = makeStatsClient({
+			aggregateRows: [makeAggregateRow()],
+			biometricsRows: [makeBiometricsRow()]
+		});
+
+		await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
+
+		expect(rpcCalls).toHaveLength(2);
+		for (const call of rpcCalls) {
+			expect(call.args).not.toHaveProperty('month_filter');
+		}
+	});
+
 	it('still returns a valid speciesStats row when core_stats happens to already omit the wing/weight columns', async () => {
 		makeStatsClient({
 			aggregateRows: [omitBiometricsFields(makeAggregateRow())],

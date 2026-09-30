@@ -19,7 +19,8 @@ import {
 async function fetchBiometricsStats(
 	viewedGroupId: number,
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
+	monthFilter?: number
 ): Promise<BiometricsStatsResult[]> {
 	const client = await getAuthenticatedSupabaseClient();
 	const rows = (await client
@@ -27,7 +28,8 @@ async function fetchBiometricsStats(
 			ringing_group_filter: viewedGroupId,
 			from_date: fromDate,
 			to_date: toDate,
-			group_by_species: true
+			group_by_species: true,
+			...(monthFilter ? { month_filter: monthFilter } : {})
 		})
 		.then(catchSupabaseErrors)) as BiometricsStatsResult[] | null;
 	return rows ?? [];
@@ -36,17 +38,19 @@ async function fetchBiometricsStats(
 export async function fetchSpeciesData(
 	viewedGroupId: number,
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
+	monthFilter?: number
 ): Promise<SpeciesStatsRow[]> {
 	const { accessLevel, rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		from_date: fromDate,
 		to_date: toDate,
-		group_by_species: true
+		group_by_species: true,
+		...(monthFilter ? { month_filter: monthFilter } : {})
 	});
 
 	const biometricsRows =
 		accessLevel === 'own' || accessLevel === 'shared'
-			? await fetchBiometricsStats(viewedGroupId, fromDate, toDate)
+			? await fetchBiometricsStats(viewedGroupId, fromDate, toDate, monthFilter)
 			: [];
 
 	return mergeSpeciesBiometrics(rows, biometricsRows);
