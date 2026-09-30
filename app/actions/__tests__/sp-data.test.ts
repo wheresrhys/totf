@@ -7,6 +7,7 @@ import {
 	getSpeciesDemographicsStats,
 	getSpeciesArrivalsStats,
 	fetchSpeciesPeriodTotals,
+	fetchSpeciesCombinedMonthTotals,
 	getGroupEffortHistory
 } from '../sp-data';
 import type { CoreStatsResult } from '@/app/models/db';
@@ -612,6 +613,33 @@ describe('sp-data actions', () => {
 
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
+		});
+	});
+
+	describe('fetchSpeciesCombinedMonthTotals', () => {
+		it("calls core_stats with species_name_filter, ringing_group_filter and group_by_time_period 'month-squashed'", async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await fetchSpeciesCombinedMonthTotals(SPECIES_NAME, GROUP_ID);
+
+			expect(rpcCalls[0].name).toBe('core_stats');
+			expect(rpcCalls[0].args).toMatchObject({
+				species_name_filter: SPECIES_NAME,
+				ringing_group_filter: GROUP_ID,
+				group_by_time_period: 'month-squashed'
+			});
+		});
+
+		it('returns the rows as-is', async () => {
+			const rows = [{ time_period: '2000-01-01' } as CoreStatsResult];
+			makeClient({ rpcRows: rows });
+
+			const result = await fetchSpeciesCombinedMonthTotals(
+				SPECIES_NAME,
+				GROUP_ID
+			);
+
+			expect(result).toEqual(rows);
 		});
 	});
 });

@@ -1,5 +1,4 @@
 import { format as formatDate } from 'date-fns';
-import { postgresIntervalToSeconds } from '@/app/lib/postgres-interval';
 import type { CoreStatsResult } from '../models/db';
 
 // A single month's row for the year summary page's "Month totals" tab, and
@@ -124,74 +123,29 @@ export function formatMonthLabel(
 	return formatDate(new Date(2000, row.zeroIndexedMonth, 1), 'LLLL');
 }
 
-// Fields that combine additively across years for a given calendar month. Only
-// the columns the "Month totals" tab actually renders (encounters-only, so the
-// age buckets are the `*_enc_count` variants). `species_count` is deliberately
-// NOT summed here — it's a `COUNT(DISTINCT species_id)` per cell, so summing it
-// across years would double-count a species caught in the same calendar month
-// in more than one year (#994). `buildCombinedMonthTotalsRows` instead takes the
-// true cross-year distinct count separately, via `fetchCombinedMonthSpeciesCounts`.
-const SUMMABLE_STAT_FIELDS = [
-	'session_count',
-	'encounter_count',
-	'bird_count',
-	'new_bird_count',
-	'pullus_enc_count',
-	'juv_enc_count',
-	'postjuv_enc_count',
-	'adult_enc_count',
-	'unknown_age_enc_count'
-] as const satisfies readonly (keyof CoreStatsResult)[];
-
-// Re-format a second count back into a Postgres-interval string that
-// `postgresIntervalToSeconds` round-trips. Hours are unbounded (e.g. `36:00:00`)
-// — exactly the shape `core_stats` returns for a multi-day `total_effort` —
-// so summing then re-parsing is lossless.
-function secondsToPostgresInterval(totalSeconds: number): string {
-	const whole = Math.round(totalSeconds);
-	const hours = Math.floor(whole / 3600);
-	const minutes = Math.floor((whole % 3600) / 60);
-	const seconds = whole % 60;
-	const pad = (value: number) => String(value).padStart(2, '0');
-	return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-}
-
-// Fold `(year, month)` rows into exactly 12 calendar-month buckets, in Jan→Dec
-// order regardless of input order, summing each summable field across every year
-// that shares the calendar month. `total_effort` is summed in seconds then
-// re-serialised to an interval string. A month absent from every year zero-fills
-// to the same shape `buildMonthTotalsRows` uses. Matching is by the `MM` slice of
-// `time_period` (string comparison — avoids `Date` timezone pitfalls).
+// Build all 12 calendar months from `core_stats`' `'month-squashed'`
+// `group_by_time_period` mode (#996) — one row per calendar month, already
+// summed across the group's entire history in SQL (every column, including
+// distinct-count columns like `species_count`/`bird_count`, is a true
+// cross-year aggregate, unlike the additive-across-years approximation this
+// used to compute client-side). Zero-fills defensively if a calendar month is
+// ever missing from the input, same shape as `buildMonthTotalsRows`. Matching
+// is by the `MM` slice of `time_period` (string comparison — avoids `Date`
+// timezone pitfalls).
 export function buildCombinedMonthTotalsRows(
-	periodStats: CoreStatsResult[],
-	// True cross-year distinct species count per calendar month, keyed by
-	// zeroIndexedMonth (0-11) — see `fetchCombinedMonthSpeciesCounts`. Defaults to
-	// `{}` (every month renders 0) for callers that hide the Species column
-	// anyway, e.g. `SpCombinedMonthTotalsTab` (`showSpeciesColumn={false}`).
-	speciesCountByMonth: Record<number, number> = {}
+	monthSquashedStats: CoreStatsResult[]
 ): CombinedMonthTotalsRow[] {
-	return Array.from({ length: 12 }, (_unused, index) => {
-		const month = index + 1;
-		const monthKey = String(month).padStart(2, '0');
-		const yearsForMonth = periodStats.filter(
+	return Array.from({ length: 12 }, (_unused, zeroIndexedMonth) => {
+		const monthKey = String(zeroIndexedMonth + 1).padStart(2, '0');
+		const matchedStats = monthSquashedStats.find(
 			(stat) => stat.time_period?.slice(5, 7) === monthKey
 		);
-		// A stable, year-agnostic sentinel `time_period` — never displayed (the
-		// label is supplied separately and there's no link), only used as a
-		// row/lookup key and to keep the Jan→Dec order if the table is sorted.
-		const stats = synthesizeZeroStats(`2000-${monthKey}-01`);
-		stats.species_count = speciesCountByMonth[index] ?? 0;
-		let effortSeconds = 0;
-		for (const yearStat of yearsForMonth) {
-			for (const field of SUMMABLE_STAT_FIELDS) {
-				(stats[field] as number) += (yearStat[field] as number) ?? 0;
-			}
-			effortSeconds += postgresIntervalToSeconds(yearStat.total_effort);
-		}
-		stats.total_effort = secondsToPostgresInterval(effortSeconds);
 		return {
-			zeroIndexedMonth: index,
-			stats
+			zeroIndexedMonth,
+			// A stable, year-agnostic sentinel `time_period` — never displayed (the
+			// label is supplied separately and there's no link), only used as a
+			// row/lookup key and to keep the Jan→Dec order if the table is sorted.
+			stats: matchedStats ?? synthesizeZeroStats(`2000-${monthKey}-01`)
 		};
 	});
 }

@@ -7,10 +7,7 @@ import {
 	formatMonthYearLabel,
 	formatMonthLabel
 } from '../month-totals';
-import {
-	formatPostgresIntervalForDisplay,
-	postgresIntervalToSeconds
-} from '@/app/lib/postgres-interval';
+import { formatPostgresIntervalForDisplay } from '@/app/lib/postgres-interval';
 import type { CoreStatsResult } from '@/app/models/db';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
@@ -115,6 +112,20 @@ describe('buildMonthTotalsRows', () => {
 });
 
 describe('buildCombinedMonthTotalsRows', () => {
+	// Rows are already the true cross-year aggregate per calendar month —
+	// `core_stats`' `'month-squashed'` `group_by_time_period` mode (#996) — one
+	// row per month, keyed by the `MM` slice of the sentinel `time_period`
+	// (`2000-<mm>-01`), not by full `YYYY-MM`.
+	function monthSquashedStat(
+		month: number,
+		overrides: Partial<CoreStatsResult> = {}
+	): CoreStatsResult {
+		return buildCoreStatsRow({
+			time_period: `2000-${String(month).padStart(2, '0')}-01`,
+			...overrides
+		});
+	}
+
 	describe('Usual', () => {
 		it('returns exactly 12 rows in Jan→Dec order, with no year field', () => {
 			const rows = buildCombinedMonthTotalsRows([]);
@@ -126,59 +137,44 @@ describe('buildCombinedMonthTotalsRows', () => {
 	});
 
 	describe('Structure', () => {
-		it('sums session_count/encounter_count across every year sharing the same calendar month', () => {
+		it('uses the real RPC stats for a matched calendar month rather than zeroes', () => {
 			const rows = buildCombinedMonthTotalsRows([
-				monthStat(2020, 1, { session_count: 4, encounter_count: 30 }),
-				monthStat(2021, 1, { session_count: 6, encounter_count: 45 }),
-				monthStat(2022, 1, { session_count: 1, encounter_count: 5 })
+				monthSquashedStat(8, { encounter_count: 123, session_count: 9 })
 			]);
-			const january = rows[0];
-			expect(january.stats.session_count).toBe(11);
-			expect(january.stats.encounter_count).toBe(80);
+			const august = rows[7];
+			expect(august.stats.encounter_count).toBe(123);
+			expect(august.stats.session_count).toBe(9);
 		});
 
-		it('sums total_effort correctly across years rather than taking the last year value', () => {
-			const rows = buildCombinedMonthTotalsRows([
-				monthStat(2020, 1, { total_effort: '10:00:00' }),
-				monthStat(2021, 1, { total_effort: '05:30:00' })
+		it('orders output Jan→Dec even when the RPC rows arrive reversed/shuffled', () => {
+			const reversed = [
+				monthSquashedStat(12),
+				monthSquashedStat(7),
+				monthSquashedStat(3),
+				monthSquashedStat(1)
+			];
+			const rows = buildCombinedMonthTotalsRows(reversed);
+			expect(rows.map((row) => row.stats.time_period)).toEqual([
+				'2000-01-01',
+				'2000-02-01',
+				'2000-03-01',
+				'2000-04-01',
+				'2000-05-01',
+				'2000-06-01',
+				'2000-07-01',
+				'2000-08-01',
+				'2000-09-01',
+				'2000-10-01',
+				'2000-11-01',
+				'2000-12-01'
 			]);
-			// 10h + 5h30m = 15h30m = 55800s — a sum, not the last year's 5h30m.
-			expect(postgresIntervalToSeconds(rows[0].stats.total_effort)).toBe(55800);
-		});
-
-		it('uses the provided speciesCountByMonth map for species_count instead of summing the input rows', () => {
-			const rows = buildCombinedMonthTotalsRows(
-				[
-					monthStat(2020, 1, { species_count: 12 }),
-					monthStat(2021, 1, { species_count: 9 })
-				],
-				{ 0: 15 }
-			);
-			// Not 21 (12 + 9) — the true cross-year distinct count is supplied
-			// separately, never derived by summing per-year species_count values.
-			expect(rows[0].stats.species_count).toBe(15);
 		});
 	});
 
 	describe('Edge', () => {
-		it('defaults species_count to 0 for a month missing from speciesCountByMonth', () => {
-			const rows = buildCombinedMonthTotalsRows(
-				[monthStat(2020, 3, { species_count: 7 })],
-				{ 0: 15 } // only January supplied
-			);
-			expect(rows[2].stats.species_count).toBe(0);
-		});
-
-		it('defaults every month to species_count 0 when speciesCountByMonth is omitted entirely', () => {
+		it('zero-fills a calendar month missing from the input', () => {
 			const rows = buildCombinedMonthTotalsRows([
-				monthStat(2020, 1, { species_count: 12 })
-			]);
-			expect(rows[0].stats.species_count).toBe(0);
-		});
-
-		it('zero-fills a calendar month with no sessions in any year', () => {
-			const rows = buildCombinedMonthTotalsRows([
-				monthStat(2020, 1, { session_count: 4, encounter_count: 30 })
+				monthSquashedStat(1, { session_count: 4, encounter_count: 30 })
 			]);
 			const february = rows[1];
 			expect(february.stats.session_count).toBe(0);
@@ -186,33 +182,7 @@ describe('buildCombinedMonthTotalsRows', () => {
 			expect(february.stats.total_effort).toBe('00:00:00');
 		});
 
-		it('degenerates to the same per-month totals as a single year of history', () => {
-			const singleYear = [
-				monthStat(2026, 3, { session_count: 5, encounter_count: 40 }),
-				monthStat(2026, 7, { session_count: 2, encounter_count: 11 })
-			];
-			const rows = buildCombinedMonthTotalsRows(singleYear);
-			expect(rows[2].stats.session_count).toBe(5);
-			expect(rows[2].stats.encounter_count).toBe(40);
-			expect(rows[6].stats.session_count).toBe(2);
-			expect(rows[6].stats.encounter_count).toBe(11);
-		});
-
-		it('produces Jan→Dec order regardless of input row order', () => {
-			const rows = buildCombinedMonthTotalsRows([
-				monthStat(2021, 12, { session_count: 1 }),
-				monthStat(2020, 3, { session_count: 2 }),
-				monthStat(2022, 1, { session_count: 3 })
-			]);
-			expect(rows.map((row) => row.zeroIndexedMonth)).toEqual([
-				0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
-			]);
-			expect(rows[0].stats.session_count).toBe(3);
-			expect(rows[2].stats.session_count).toBe(2);
-			expect(rows[11].stats.session_count).toBe(1);
-		});
-
-		it('returns all-zero rows for 12 months when periodStats is empty', () => {
+		it('zero-fills all 12 months when given an empty array', () => {
 			const rows = buildCombinedMonthTotalsRows([]);
 			expect(rows).toHaveLength(12);
 			rows.forEach((row) => {

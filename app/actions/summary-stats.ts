@@ -40,35 +40,24 @@ export async function fetchPeriodStats(
 }
 
 /**
- * True distinct species count for each calendar month across the group's
- * entire history. `core_stats` has no "group by calendar month across years"
- * shape, so this makes one ungrouped call per month via `month_filter` — each
- * returns exactly one row (an ungrouped `core_stats` call always does, see
- * `fetchAuthorisedCoreStats`'s `hasVisibleData` comment) with a true
- * `COUNT(DISTINCT species_id)` for that calendar month across every year.
- * Powers the all-time summary page's "Month totals" tab with "Combine years"
- * on — replaces the additive-across-years approximation
- * `buildCombinedMonthTotalsRows` used to apply to `species_count`, which
- * double-counted a species caught in the same calendar month in more than one
- * year (#994).
+ * One row per calendar month, summed across the group's entire history via
+ * `core_stats`' `'month-squashed'` `group_by_time_period` mode (#996) —
+ * every column, including `species_count`/`bird_count`, is a true
+ * cross-year aggregate computed in SQL. Powers the all-time summary page's
+ * "Month totals" tab with "Combine years" on — supersedes the old
+ * `fetchCombinedMonthSpeciesCounts` (12x round-trip via `month_filter`) plus
+ * `buildCombinedMonthTotalsRows`' additive-across-years summing, which
+ * double-counted any distinct-count column for a species/bird appearing in
+ * the same calendar month in more than one year (#994/#996).
  */
-export async function fetchCombinedMonthSpeciesCounts(
+export async function fetchCombinedMonthTotals(
 	viewedGroupId: number
-): Promise<Record<number, number>> {
-	const results = await Promise.all(
-		Array.from({ length: 12 }, (_unused, zeroIndexedMonth) =>
-			fetchAuthorisedCoreStats(viewedGroupId, {
-				group_by_species: false,
-				month_filter: zeroIndexedMonth + 1
-			})
-		)
-	);
-	return Object.fromEntries(
-		results.map(({ rows }, zeroIndexedMonth) => [
-			zeroIndexedMonth,
-			rows[0]?.species_count ?? 0
-		])
-	);
+): Promise<CoreStatsResult[]> {
+	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
+		group_by_species: false,
+		group_by_time_period: 'month-squashed'
+	});
+	return rows;
 }
 
 /**
