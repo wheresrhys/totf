@@ -21,7 +21,7 @@ import type { TableQueryDefinition } from './types';
 
 /**
  * Every query definition in this directory, in no particular order — the
- * single source `scripts/generate-snapshots.ts`'s consistency test
+ * single source `supabase/scripts/generate-snapshots.ts`'s consistency test
  * (`queries/__tests__/consistency.test.ts`) iterates to check against
  * `GENERATED_SNAPSHOT_FIXTURES`.
  */

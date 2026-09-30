@@ -34,9 +34,9 @@
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import fs from 'fs/promises';
-import { supabase } from '../lib/supabase';
-import { getAuthenticatedSupabaseClientForGroup } from '../app/lib/auth/group-auth';
-import { RESIGHTING_RECORD_TYPES } from '../lib/demon-import';
+import { supabase } from '../../lib/supabase';
+import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
+import { RESIGHTING_RECORD_TYPES } from '../../lib/demon-import';
 import {
 	allSessionsQuery,
 	recentSessionsQuery,
@@ -46,11 +46,11 @@ import {
 	pageOfBirdsQuery,
 	birdDetailQuery,
 	arretrapEncountersQuery
-} from '../queries';
+} from '../../queries';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(__dirname, '../..');
 export const SNAPSHOTS_DIR = path.join(ROOT, 'test-fixtures', 'snapshots');
 
 async function getGroupId(name: string): Promise<number> {

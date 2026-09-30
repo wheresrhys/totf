@@ -1,7 +1,7 @@
 # Synthetic fixtures
 
 Every other subdirectory under `test-fixtures/snapshots/` holds a real query result
-captured from the local e2e seed data by `scripts/generate-snapshots.ts` (run via
+captured from the local e2e seed data by `supabase/scripts/generate-snapshots.ts` (run via
 `npm run db:generate-snapshots`). The two files here are the deliberate exception:
 
 - `zero.home-page-summary.json` — an all-zero/null `HomePageSummaryStats` composite

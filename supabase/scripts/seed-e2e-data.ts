@@ -12,14 +12,14 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { supabase } from '../lib/supabase';
-import { slugify } from '../lib/slugify';
+import { supabase } from '../../lib/supabase';
+import { slugify } from '../../lib/slugify';
 import { generateSnapshots } from './generate-snapshots';
 import { importCSV } from './import-csv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(__dirname, '../..');
 
 // Local postgres connection – bypasses RLS (used only for GroupDataSharing INSERT)
 const LOCAL_DB_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
@@ -60,7 +60,7 @@ async function getGroupId(name: string): Promise<number> {
 
 async function main() {
 	// Step 1: Pre-create all four groups with slugs, before any CSV import runs.
-	// scripts/import-csv.ts no longer creates a RingingGroups row when the given name
+	// supabase/scripts/import-csv.ts no longer creates a RingingGroups row when the given name
 	// isn't found (#473), so Alpha must exist here too, not just Beta/Gamma/Delta.
 	// INSERT is allowed for all; UPDATE is restricted. Use ignoreDuplicates-via-23505 so
 	// re-running doesn't fail when a group already exists.

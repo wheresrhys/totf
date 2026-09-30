@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
-import { supabase } from '../lib/supabase';
-import { getAuthenticatedSupabaseClientForGroup } from '../app/lib/auth/group-auth';
+import { supabase } from '../../lib/supabase';
+import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 
 const [groupName, password] = process.argv.slice(2);
 

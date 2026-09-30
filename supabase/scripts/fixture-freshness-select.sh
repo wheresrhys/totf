@@ -17,7 +17,7 @@ CHANGED=$(git diff --name-only origin/main...HEAD)
 # committed fixtures themselves, and the test.
 TRIGGER_PATHS="supabase/schema/
 types/supabase.types.ts
-scripts/generate-snapshots.ts
+supabase/scripts/generate-snapshots.ts
 lib/snapshot-fixtures.ts
 test-fixtures/snapshots/
 supabase/__tests__/snapshot-fixture-freshness.test.ts"

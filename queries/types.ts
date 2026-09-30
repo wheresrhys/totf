@@ -4,7 +4,7 @@
  * have a canonical name, the RPC function itself, so this directory
  * deliberately doesn't cover them; see #913).
  *
- * Both `scripts/generate-snapshots.ts` (which fixture to write, and under what
+ * Both `supabase/scripts/generate-snapshots.ts` (which fixture to write, and under what
  * name) and the app's own call sites import a query's `select` string from
  * here instead of duplicating it inline — that duplication, and the drift it
  * allowed between a fixture's name and what it actually tested, is what #913
