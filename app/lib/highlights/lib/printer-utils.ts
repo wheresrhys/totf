@@ -164,31 +164,40 @@ export function sentenceCase(sentence: string): string {
 	return sentence.charAt(0).toUpperCase() + sentence.substring(1);
 }
 
-type CombinedHighlightScope = {
+type LineItemInput = {
 	scope: HighlightScope;
 	ranking: HighlightRanking;
+	combinedHighlight: CombinedHighlight;
+	index: number;
 };
 export function printCombinedHighlight(
 	combinedHighlight: CombinedHighlight,
 	{
-		firstSentence,
-		restSentence
+		firstLineItem,
+		lineItem,
+		onlyBroadestScope
 	}: {
-		firstSentence: (
-			scope: CombinedHighlightScope,
-			combinedHighlight: CombinedHighlight
+		firstLineItem?: (
+			input: LineItemInput
 		) => string;
-		restSentence: (
-			scope: CombinedHighlightScope,
-			combinedHighlight: CombinedHighlight
+		lineItem: (
+			input: LineItemInput
 		) => string;
+		// Some metrics (first/only/rare species records) are the same fact whichever
+		// scope they were found at, so a narrower scope is discarded rather than
+		// combined into the sentence — set this instead of relying on firstLineItem,
+		// which still prints every scope.
+		onlyBroadestScope?: boolean;
 	}
 ): string {
+	const scopes = onlyBroadestScope
+		? combinedHighlight.scopes.slice(0, 1)
+		: combinedHighlight.scopes;
 	return sentenceJoin(
-		combinedHighlight.scopes.map((scope, i) =>
-			i === 0
-				? firstSentence(scope, combinedHighlight)
-				: restSentence(scope, combinedHighlight)
+		scopes.map((scope, index) =>
+			index === 0 && firstLineItem
+				? firstLineItem({...scope, combinedHighlight, index})
+				: lineItem({ ...scope, combinedHighlight, index })
 		)
 	);
 }

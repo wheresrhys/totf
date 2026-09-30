@@ -4,9 +4,9 @@ import {
 	printProminenceQualifier,
 	printValue,
 	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
@@ -14,12 +14,12 @@ export const lightestOfSpecies: HighlightsGenerator = {
 	statsSelector: 'biometricsStatsBySpecies',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map(
-				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking)} lightest${i === 0 ? ` ${combinedHighlight.species}` : ''} ${printTimeQualifier(scope.scope.parentTimeWindow, { yearConnector: 'of' })}`
-			);
+			const preValue = printCombinedHighlight(combinedHighlight, {
+				lineItem: ({ scope, ranking, index, combinedHighlight }) =>
+					`${printProminenceQualifier(ranking)} lightest${index === 0 ? ` ${combinedHighlight.species}` : ''} ${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'of' })}`
+			});
 			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
+				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>

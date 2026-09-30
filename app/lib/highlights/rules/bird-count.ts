@@ -3,10 +3,10 @@ import {
 	printProminenceQualifier,
 	printValue,
 	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
 	printTimeQualifier,
-	printFullMonthName
+	printFullMonthName,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
@@ -14,22 +14,24 @@ export const birdCount: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				let result = `${printProminenceQualifier(scope.ranking)} busiest `;
+			const preValue = printCombinedHighlight(combinedHighlight, {
+				lineItem: ({ scope, ranking, index }) => {
+					let result = `${printProminenceQualifier(ranking)} busiest `;
 
-				if (scope.scope.parentTimeWindow?.month) {
-					if (i === 0) {
-						result += `${printFullMonthName(scope.scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.scope.temporalUnit)} ever`;
+					if (scope.parentTimeWindow?.month) {
+						if (index === 0) {
+							result += `${printFullMonthName(scope.parentTimeWindow?.month)} ${printTemporalUnit(scope.temporalUnit)} ever`;
+						} else {
+							result += `in any ${printFullMonthName(scope.parentTimeWindow?.month)}`;
+						}
 					} else {
-						result += `in any ${printFullMonthName(scope.scope.parentTimeWindow?.month)}`;
+						result += `${index === 0 ? printTemporalUnit(scope.temporalUnit) : ''} ${printTimeQualifier(scope.parentTimeWindow)}`;
 					}
-				} else {
-					result += `${i === 0 ? printTemporalUnit(scope.scope.temporalUnit) : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`;
+					return result;
 				}
-				return result;
 			});
 			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
+				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			).replace(/  /g, ' ');
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>

@@ -2,7 +2,8 @@ import type { HighlightsGenerator, YearMonthRestriction } from '../types';
 import {
 	sentenceCase,
 	printTimeQualifier,
-	printSpeciesForCount
+	printSpeciesForCount,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getSoleAppearance } from '../lib/rule-utils';
 
@@ -30,10 +31,12 @@ export const onlySpeciesRecord: HighlightsGenerator = {
 		// scopes[0] only, for the same reason as firstSpeciesRecord: a species'
 		// only record ever is necessarily also its only record of that year.
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const [{ scope }] = combinedHighlight.scopes;
-			return sentenceCase(
-				`Only ${printSpeciesForCount(combinedHighlight.species, combinedHighlight.value.value)} ${printTimeQualifier(scope.parentTimeWindow)}`.trim()
-			);
+			const preValue = printCombinedHighlight(combinedHighlight, {
+				onlyBroadestScope: true,
+				lineItem: ({ scope, combinedHighlight }) =>
+					`Only ${printSpeciesForCount(combinedHighlight.species, combinedHighlight.value.value)} ${printTimeQualifier(scope.parentTimeWindow)}`
+			});
+			return sentenceCase(preValue.trim());
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Only ${highlightsOfType.scope.species} ${printTimeQualifier(highlightsOfType.scope.parentTimeWindow)}`

@@ -4,9 +4,9 @@ import {
 	printProminenceQualifier,
 	printValue,
 	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
@@ -14,21 +14,23 @@ export const encounterCount: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement = `${printProminenceQualifier(scope.ranking, 'equal')} most ${i === 0 ? 'encounters ' : ''}${printTimeQualifier(
-					scope.scope.parentTimeWindow,
-					{
-						yearConnector: 'of',
-						monthConnector: 'of'
-					}
-				)}${scope.scope.parentTimeWindow?.month && combinedHighlight.scopes[0].scope.temporalUnit === 'day' && i > 0 ? ' session' : ''}`;
+			const preValue = printCombinedHighlight(combinedHighlight, {
+				lineItem: ({ scope, ranking, index, combinedHighlight }) => {
+					const centralStatement = `${printProminenceQualifier(ranking, 'equal')} most ${index === 0 ? 'encounters ' : ''}${printTimeQualifier(
+						scope.parentTimeWindow,
+						{
+							yearConnector: 'of',
+							monthConnector: 'of'
+						}
+					)}${scope.parentTimeWindow?.month && combinedHighlight.scopes[0].scope.temporalUnit === 'day' && index > 0 ? ' session' : ''}`;
 
-				return i === 0
-					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`
-					: centralStatement;
+					return index === 0
+						? `${printTemporalUnit(scope.temporalUnit)} with ${centralStatement}`
+						: centralStatement;
+				}
 			});
 			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
+				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			).replace(/  /g, ' ');
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>

@@ -4,9 +4,9 @@ import {
 	printProminenceQualifier,
 	printValue,
 	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByPropertiesSum } from '../lib/rule-utils';
 
@@ -14,16 +14,18 @@ export const juvs: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement =
-					`${printProminenceQualifier(scope.ranking, 'equal')} most${i === 0 ? ' juvs' : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`.trim();
+			const preValue = printCombinedHighlight(combinedHighlight, {
+				lineItem: ({ scope, ranking, index }) => {
+					const centralStatement =
+						`${printProminenceQualifier(ranking, 'equal')} most${index === 0 ? ' juvs' : ''} ${printTimeQualifier(scope.parentTimeWindow)}`.trim();
 
-				return i === 0
-					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`
-					: centralStatement;
+					return index === 0
+						? `${printTemporalUnit(scope.temporalUnit)} with ${centralStatement}`
+						: centralStatement;
+				}
 			});
 			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
+				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>

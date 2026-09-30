@@ -4,9 +4,9 @@ import {
 	printProminenceQualifier,
 	printValue,
 	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
@@ -15,12 +15,12 @@ export const singleSpeciesCount: HighlightsGenerator = {
 	formatters: {
 		// -> Highest count of a single species in 2021: 54 Reed Warblers
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map(
-				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking)} highest ${i === 0 ? `single species ${printTemporalUnit(scope.scope.temporalUnit)} count ` : ''}${printTimeQualifier(scope.scope.parentTimeWindow, { yearConnector: 'of' })}`
-			);
+			const preValue = printCombinedHighlight(combinedHighlight, {
+				lineItem: ({ scope, ranking, index }) =>
+					`${printProminenceQualifier(ranking)} highest ${index === 0 ? `single species ${printTemporalUnit(scope.temporalUnit)} count ` : ''}${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'of' })}`
+			});
 			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
+				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>

@@ -4,9 +4,9 @@ import {
 	printProminenceQualifier,
 	printValue,
 	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
@@ -14,16 +14,18 @@ export const newBirds: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map((scope, i) => {
-				const centralStatement =
-					`${printProminenceQualifier(scope.ranking)} highest${i === 0 ? ' new bird count' : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`.trim();
+			const preValue = printCombinedHighlight(combinedHighlight, {
+				lineItem: ({ scope, ranking, index }) => {
+					const centralStatement =
+						`${printProminenceQualifier(ranking)} highest${index === 0 ? ' new bird count' : ''} ${printTimeQualifier(scope.parentTimeWindow)}`.trim();
 
-				return i === 0 && !(scope.scope.temporalUnit === 'day')
-					? `${printTemporalUnit(scope.scope.temporalUnit)} with ${centralStatement}`
-					: centralStatement;
+					return index === 0 && !(scope.temporalUnit === 'day')
+						? `${printTemporalUnit(scope.temporalUnit)} with ${centralStatement}`
+						: centralStatement;
+				}
 			});
 			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
+				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>

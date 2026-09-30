@@ -4,9 +4,9 @@ import {
 	printProminenceQualifier,
 	printValue,
 	sentenceCase,
-	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
@@ -14,12 +14,12 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 	statsSelector: 'coreStatsWithSpecies',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map(
-				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking, 'equal')} most ${i === 0 ? `encounters of a single species in a ${printTemporalUnit(scope.scope.temporalUnit)} ` : ''}${printTimeQualifier(scope.scope.parentTimeWindow, { yearConnector: i === 0 ? 'in' : 'of' })}`
-			);
+			const preValue = printCombinedHighlight(combinedHighlight, {
+				lineItem: ({ scope, ranking, index }) =>
+					`${printProminenceQualifier(ranking, 'equal')} most ${index === 0 ? `encounters of a single species in a ${printTemporalUnit(scope.temporalUnit)} ` : ''}${printTimeQualifier(scope.parentTimeWindow, { yearConnector: index === 0 ? 'in' : 'of' })}`
+			});
 			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
+				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>

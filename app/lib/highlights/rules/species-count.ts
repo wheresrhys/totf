@@ -6,7 +6,8 @@ import {
 	sentenceCase,
 	sentenceJoin,
 	printTemporalUnit,
-	printTimeQualifier
+	printTimeQualifier,
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
@@ -14,13 +15,13 @@ export const speciesCount: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
-			const preambles = combinedHighlight.scopes.map(
-				(scope, i) =>
+			const preValue = printCombinedHighlight(combinedHighlight, {
+				lineItem: ({scope, ranking, index}) =>
 					// todo don't actually need 'for species' here, but keeping for now as may be useful later
-					`${printProminenceQualifier(scope.ranking)} most varied${i === 0 ? ` ${printTemporalUnit(scope.scope.temporalUnit)}` : ''} ${printTimeQualifier(scope.scope.parentTimeWindow)}`
-			);
+					`${printProminenceQualifier(ranking)} most varied${index === 0 ? ` ${printTemporalUnit(scope.temporalUnit)}` : ''} ${printTimeQualifier(scope.parentTimeWindow)}`
+			})
 			return sentenceCase(
-				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
+				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);
 		},
 		highlightListPrefixPrinter: (highlightsOfType) =>
