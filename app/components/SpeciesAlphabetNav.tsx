@@ -27,7 +27,7 @@ export function SpeciesAlphabetNav({
 	}
 
 	return (
-		<div className="relative">
+		<div className="relative mb-2">
 			<ul
 				className="flex flex-wrap gap-2"
 				aria-label="Browse species by letter"

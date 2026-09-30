@@ -178,74 +178,33 @@ describe('home page', () => {
 		});
 	});
 
-	describe('species section', () => {
-		it('renders Species heading with a "View all" link to /species', async () => {
+	describe('last tick (last group tick)', () => {
+		it('renders "Last tick: {species} on {date}" after the species letter nav', async () => {
 			render(await HomePage());
-			const heading = await screen.findByRole('heading', {
-				name: 'Species View all'
+			await screen.findByRole('heading', {
+				name: 'Sessions View all'
 			});
-			expect(heading).toBeDefined();
-			const link = within(heading).getByRole('link', { name: 'View all' });
-			expect(link.getAttribute('href')).toBe('/species');
+			const paragraph = screen.getByText(/Last tick:/);
+			expect(paragraph.textContent).toContain(
+				'Last tick: Carrion Crow on 12th February 2026'
+			);
 		});
 
-		describe('last tick (last group tick)', () => {
-			it('renders "Last tick: {species} on {date}" after the species letter nav', async () => {
-				render(await HomePage());
-				const heading = await screen.findByRole('heading', {
-					name: 'Species View all'
-				});
-				const container = heading.parentElement as HTMLElement;
-				const letterNav = within(container).getByRole('list', {
-					name: 'Browse species by letter'
-				});
-				const paragraph = screen.getByText(/Last tick:/);
-				expect(paragraph.textContent).toContain(
-					'Last tick: Carrion Crow on 12th February 2026'
-				);
-				expect(
-					letterNav.compareDocumentPosition(paragraph) &
-						Node.DOCUMENT_POSITION_FOLLOWING
-				).toBeTruthy();
+		it('renders a "View all ticks" link to /ticks', async () => {
+			render(await HomePage());
+			const link = await screen.findByRole('link', {
+				name: 'View all ticks'
 			});
-
-			it('renders a "View all ticks" link to /ticks', async () => {
-				render(await HomePage());
-				const link = await screen.findByRole('link', {
-					name: 'View all ticks'
-				});
-				expect(link.getAttribute('href')).toBe('/ticks');
-			});
-
-			describe('with no ticks yet', () => {
-				it('omits the paragraph entirely', async () => {
-					mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-						makeChainClient({ lastGroupTick: [] })
-					);
-					render(await HomePage());
-					const heading = await screen.findByRole('heading', {
-						name: 'Species View all'
-					});
-					expect(heading).toBeDefined();
-					expect(screen.queryByText(/Last tick:/)).toBeNull();
-				});
-
-				it('omits the "View all ticks" link', async () => {
-					mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-						makeChainClient({ lastGroupTick: [] })
-					);
-					render(await HomePage());
-					await screen.findByRole('heading', { name: 'Species View all' });
-					expect(
-						screen.queryByRole('link', { name: 'View all ticks' })
-					).toBeNull();
-				});
-			});
+			expect(link.getAttribute('href')).toBe('/ticks');
 		});
+	});
 
+	describe('species nav', () => {
 		it('renders one letter button per distinct first letter among species the group has actually caught', async () => {
 			render(await HomePage());
-			await screen.findByRole('heading', { name: 'Species View all' });
+			await screen.findByRole('button', {
+				name: 'Show species starting with B'
+			});
 			// Fixture species: Blue Tit, Reed Warbler, Fieldfare, Redwing,
 			// Kingfisher, Wren, Robin (count > 0) and Chaffinch (count 0, so its
 			// letter "C" must not appear).
@@ -259,21 +218,12 @@ describe('home page', () => {
 			]);
 		});
 
-		describe('with no species yet caught', () => {
-			it('renders no letter buttons', async () => {
-				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-					makeChainClient({ Species: [] })
-				);
-				render(await HomePage());
-				await screen.findByRole('heading', { name: 'Species View all' });
-				expect(screen.queryAllByRole('button')).toHaveLength(0);
-			});
-		});
-
 		describe('tapping a letter button', () => {
 			it('reveals links to every species page starting with that letter, sorted alphabetically', async () => {
 				render(await HomePage());
-				await screen.findByRole('heading', { name: 'Species View all' });
+				await screen.findByRole('button', {
+					name: 'Show species starting with B'
+				});
 				fireEvent.click(
 					screen.getByRole('button', { name: 'Show species starting with R' })
 				);

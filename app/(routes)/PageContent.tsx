@@ -130,27 +130,6 @@ function LastGroupTick({ data }: { data: GroupTicksResult | null }) {
 		</p>
 	);
 }
-function SpeciesSection({
-	data,
-	lastGroupTick
-}: {
-	data: SpeciesWithBirdsCount[];
-	lastGroupTick: GroupTicksResult | null;
-}) {
-	return (
-		<div>
-			<SecondaryHeading>
-				Species{' '}
-				<NoPrefetchLink href="/species" className="link link-secondary text-sm">
-					View all
-				</NoPrefetchLink>
-			</SecondaryHeading>
-
-			<SpeciesAlphabetNav species={data} />
-			<LastGroupTick data={lastGroupTick} />
-		</div>
-	);
-}
 export function HomePageContent({
 	data,
 	viewedGroup
@@ -160,12 +139,10 @@ export function HomePageContent({
 }) {
 	return (
 		<PageWrapper>
+			<SpeciesAlphabetNav species={data.groupSpecies} />
 			<SummaryStatsTable data={data.summaryStats} />
 			<RecentSessions data={data.recentSessions} viewedGroup={viewedGroup} />
-			<SpeciesSection
-				data={data.groupSpecies}
-				lastGroupTick={data.lastGroupTick}
-			/>
+			<LastGroupTick data={data.lastGroupTick} />
 		</PageWrapper>
 	);
 }
