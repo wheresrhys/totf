@@ -8,7 +8,7 @@ import {
 	getAllByRole,
 	waitFor
 } from '@testing-library/react';
-import Page, { fetchSummaryYearPageContent } from '../page';
+import Page, { fetchSummaryYearOrMonthPageContent } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
 import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
@@ -29,14 +29,14 @@ vi.mock('@/app/actions/period-totals', () => ({
 	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
 }));
 
-function renderSummaryYearPage(year = '2026', tabId?: string) {
+function renderSummaryYearPage(yearOrMonth = '2026', tabId?: string) {
 	return Page({
-		params: Promise.resolve({ year }),
+		params: Promise.resolve({ yearOrMonth }),
 		...(tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) })
 	});
 }
 
-describe('/summary/[year]', () => {
+describe('/summary/[yearOrMonth]', () => {
 	afterEach(() => {
 		cleanup();
 		fetchSummaryStatsMock.mockClear();
@@ -48,19 +48,19 @@ describe('/summary/[year]', () => {
 	});
 
 	it('renders "{year} summary" for a well-formed year', async () => {
-		render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+		render(await Page({ params: Promise.resolve({ yearOrMonth: '2026' }) }));
 		const heading = await screen.findByRole('heading', { level: 1 });
 		expect(heading.textContent).toBe('2026 summary');
 	});
 
 	it('renders the heading even with zero sessions that year (no DB check)', async () => {
-		render(await Page({ params: Promise.resolve({ year: '1901' }) }));
+		render(await Page({ params: Promise.resolve({ yearOrMonth: '1901' }) }));
 		const heading = await screen.findByRole('heading', { level: 1 });
 		expect(heading.textContent).toBe('1901 summary');
 	});
 
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
-		await fetchSummaryYearPageContent({ year: '2026' }, 1);
+		await fetchSummaryYearOrMonthPageContent({ yearOrMonth: '2026' }, 1);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
 			1,
 			'2026-01-01',
@@ -69,18 +69,23 @@ describe('/summary/[year]', () => {
 	});
 
 	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
-		await fetchSummaryYearPageContent({ year: '2026' }, 1);
+		await fetchSummaryYearOrMonthPageContent({ yearOrMonth: '2026' }, 1);
 		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
 
 	it('returns the year date bounds for the lazy species fetch', async () => {
-		const data = await fetchSummaryYearPageContent({ year: '2026' }, 1);
-		expect(data.fromDate).toBe('2026-01-01');
-		expect(data.toDate).toBe('2026-12-31');
+		const data = await fetchSummaryYearOrMonthPageContent(
+			{ yearOrMonth: '2026' },
+			1
+		);
+		expect(data).toMatchObject({
+			fromDate: '2026-01-01',
+			toDate: '2026-12-31'
+		});
 	});
 
 	it('passes the fetched summary stats through to the rendered section', async () => {
-		render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+		render(await Page({ params: Promise.resolve({ yearOrMonth: '2026' }) }));
 		await screen.findByRole('heading', { level: 1 });
 		const summaryStatsSection = screen.getByTestId('summary-stats-section');
 		expect(summaryStatsSection).not.toBeNull();
@@ -89,8 +94,8 @@ describe('/summary/[year]', () => {
 		).toBe(String(alphaStats.session_count));
 	});
 
-	it('fetchSummaryYearPageContent calls fetchPeriodStats with month timeInterval and the year bounds', async () => {
-		await fetchSummaryYearPageContent({ year: '2026' }, 1);
+	it('fetchSummaryYearOrMonthPageContent calls fetchPeriodStats with month timeInterval and the year bounds', async () => {
+		await fetchSummaryYearOrMonthPageContent({ yearOrMonth: '2026' }, 1);
 		expect(fetchPeriodStatsMock).toHaveBeenCalledWith(
 			1,
 			'month',
@@ -103,7 +108,11 @@ describe('/summary/[year]', () => {
 		fetchPeriodStatsMock.mockResolvedValueOnce([
 			{ ...(alphaStats as object), time_period: '2026-08-01' }
 		]);
-		const data = await fetchSummaryYearPageContent({ year: '2026' }, 1);
+		const data = await fetchSummaryYearOrMonthPageContent(
+			{ yearOrMonth: '2026' },
+			1
+		);
+		if (!('monthTotals' in data)) throw new Error('expected year-page data');
 		expect(data.monthTotals).toHaveLength(12);
 		expect(data.monthTotals[0]).toMatchObject({
 			year: 2026,
@@ -117,7 +126,7 @@ describe('/summary/[year]', () => {
 
 	it('renders without the stats section when fetchSummaryStats resolves null', async () => {
 		fetchSummaryStatsMock.mockResolvedValueOnce(null);
-		render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+		render(await Page({ params: Promise.resolve({ yearOrMonth: '2026' }) }));
 		await screen.findByRole('heading', { level: 1 });
 		expect(screen.queryByTestId('summary-stats-section')).toBeNull();
 	});
@@ -126,7 +135,7 @@ describe('/summary/[year]', () => {
 		fetchSpeciesDataMock.mockResolvedValueOnce([
 			{ ...(alphaStats as object), species_name: 'Robin' }
 		]);
-		render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+		render(await Page({ params: Promise.resolve({ yearOrMonth: '2026' }) }));
 		await screen.findByRole('heading', { level: 1 });
 		fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
 		const link = await screen.findByRole('link', { name: 'Robin' });
@@ -143,7 +152,7 @@ describe('/summary/[year]', () => {
 			fetchPeriodTotalsMock.mockResolvedValueOnce([
 				buildDailyStatsRow({ time_period: '2026-08-16' })
 			]);
-			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+			render(await Page({ params: Promise.resolve({ yearOrMonth: '2026' }) }));
 			await screen.findByRole('heading', { level: 1 });
 			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
 			await screen.findByRole('link', { name: '16th August 2026' });
@@ -156,7 +165,7 @@ describe('/summary/[year]', () => {
 		});
 
 		it('Session totals tab appears immediately after Month totals, which remains the default tab', async () => {
-			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+			render(await Page({ params: Promise.resolve({ yearOrMonth: '2026' }) }));
 			await screen.findByRole('heading', { level: 1 });
 			const tabs = getAllByRole(screen.getByRole('tablist'), 'button');
 			expect(tabs.map((tab) => tab.textContent)).toEqual([
@@ -168,20 +177,20 @@ describe('/summary/[year]', () => {
 		});
 
 		it("the page's initial render (Month totals active) triggers no day-grouped fetch", async () => {
-			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+			render(await Page({ params: Promise.resolve({ yearOrMonth: '2026' }) }));
 			await screen.findByRole('heading', { level: 1 });
 			expect(fetchPeriodTotalsMock).not.toHaveBeenCalled();
 		});
 
 		it('renders the shared empty state when that year has no sessions', async () => {
-			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+			render(await Page({ params: Promise.resolve({ yearOrMonth: '2026' }) }));
 			await screen.findByRole('heading', { level: 1 });
 			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
 			await screen.findByText('No data recorded.');
 		});
 
 		it('selecting the Session totals tab a second time does not trigger a second fetch', async () => {
-			render(await Page({ params: Promise.resolve({ year: '2026' }) }));
+			render(await Page({ params: Promise.resolve({ yearOrMonth: '2026' }) }));
 			await screen.findByRole('heading', { level: 1 });
 			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
 			await waitFor(() =>
@@ -239,6 +248,61 @@ describe('/summary/[year]', () => {
 					.getByRole('button', { name: 'Month totals' })
 					.getAttribute('aria-current')
 			).toBe('true');
+		});
+	});
+
+	describe('squashed month variant (#1005)', () => {
+		afterEach(() => {
+			fetchSummaryStatsMock.mockResolvedValue(alphaStats);
+		});
+
+		it('routes to the squashed-month fetch path for a month abbreviation', async () => {
+			const data = await fetchSummaryYearOrMonthPageContent(
+				{ yearOrMonth: 'jan' },
+				1
+			);
+			expect(data).toMatchObject({ squashedMonth: 1 });
+			expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
+				1,
+				undefined,
+				undefined,
+				1
+			);
+		});
+
+		it('is case-insensitive', async () => {
+			const data = await fetchSummaryYearOrMonthPageContent(
+				{ yearOrMonth: 'JAN' },
+				1
+			);
+			expect(data).toMatchObject({ squashedMonth: 1 });
+		});
+
+		it('falls through to the existing numeric-year behaviour for a numeric segment', async () => {
+			const data = await fetchSummaryYearOrMonthPageContent(
+				{ yearOrMonth: '2026' },
+				1
+			);
+			expect(data).toMatchObject({ year: 2026 });
+			expect('squashedMonth' in data).toBe(false);
+		});
+
+		it('renders "{month name} summary" as the heading for a squashed month', async () => {
+			render(await Page({ params: Promise.resolve({ yearOrMonth: 'jan' }) }));
+			const heading = await screen.findByRole('heading', { level: 1 });
+			expect(heading.textContent).toBe('January summary');
+		});
+
+		it('renders Species totals, Year totals, Session totals in that order', async () => {
+			render(await Page({ params: Promise.resolve({ yearOrMonth: 'jan' }) }));
+			await screen.findByRole('heading', { level: 1 });
+			const tabs = getAllByRole(screen.getByRole('tablist'), 'button');
+			expect(tabs.map((tab) => tab.textContent)).toEqual([
+				'Species totals',
+				'Year totals',
+				'Session totals'
+			]);
+			expect(tabs[0].getAttribute('aria-current')).toBe('true');
 		});
 	});
 });

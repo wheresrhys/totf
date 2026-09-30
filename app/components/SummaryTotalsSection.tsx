@@ -16,6 +16,7 @@ import {
 	buildGroupSummaryHref,
 	buildGroupSessionHref
 } from '@/app/lib/group-links';
+import { buildGroupSquashedMonthSummaryHref } from '@/app/lib/squashed-month';
 import {
 	buildCombinedMonthTotalsRows,
 	buildPerYearMonthTotalsRows,
@@ -101,9 +102,15 @@ function AllTimeMonthTotalsTab({
 						(row) => row.stats
 					)}
 					firstColumnHeader="Month"
-					// No single year to drill into — an empty href renders the
-					// month label as plain text rather than a link.
-					buildHref={() => ''}
+					// Links into the squashed-month summary page (#1005) for this
+					// calendar month — no single year to drill into, but every
+					// occurrence of the month across the group's whole history.
+					buildHref={(timePeriod) =>
+						buildGroupSquashedMonthSummaryHref(
+							viewedGroup,
+							Number(timePeriod.slice(5, 7))
+						)
+					}
 					buildLabel={(timePeriod) =>
 						combinedLabelByTimePeriod.get(timePeriod) ?? ''
 					}
