@@ -3,13 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { cachedSupabaseFetch } from '@/app/lib/cached-supabase-fetch';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
 import { getStatsByTemporalUnit, fetchCoreStatsByMonth } from '../stats-cache';
+import { makeRpcChainRecorder } from '@/app/__tests__/helpers/rpc-recorder';
 
-type CachedSupabaseChainCall = { rpcCall: unknown[]; orderCalls: unknown[][] };
-let cachedSupabaseChainCalls: CachedSupabaseChainCall[] = [];
-
-const mockOrder = vi.fn();
-const mockRange = vi.fn();
-const mockRpc = vi.fn();
+let recorder: ReturnType<typeof makeRpcChainRecorder>;
 
 vi.mock('@/lib/supabase', () => ({
 	fetchAllPaginatedRows: vi
@@ -19,9 +15,7 @@ vi.mock('@/lib/supabase', () => ({
 		)
 }));
 
-const mockSupabaseClient = {
-	rpc: mockRpc
-};
+const mockSupabaseClient: { rpc: unknown } = { rpc: undefined };
 
 vi.mock('@/app/lib/cached-supabase-fetch', () => ({
 	cachedSupabaseFetch: vi
@@ -36,27 +30,9 @@ const GROUP_ID = 1;
 describe('getStatsByTemporalUnit', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		cachedSupabaseChainCalls = [];
-		mockRange.mockReset().mockResolvedValue({ data: [], error: null });
-
-		mockRpc.mockReset().mockImplementation((...rpcArgs) => {
-			const call: CachedSupabaseChainCall = {
-				rpcCall: rpcArgs,
-				orderCalls: []
-			};
-			const builder = {
-				order: (...orderArgs: unknown[]) => {
-					mockOrder(...orderArgs);
-					call.orderCalls.push(orderArgs);
-					return builder;
-				},
-				range: (...rangeArgs: unknown[]) => {
-					cachedSupabaseChainCalls.push(call);
-					return mockRange(...rangeArgs);
-				}
-			};
-			return builder;
-		});
+		recorder = makeRpcChainRecorder();
+		mockSupabaseClient.rpc = recorder.rpc;
+		recorder.range.mockResolvedValue({ data: [], error: null });
 	});
 
 	it('wraps the db calls in the cached-supabase-fetch utility', async () => {
@@ -82,13 +58,13 @@ describe('getStatsByTemporalUnit', () => {
 		await getStatsByTemporalUnit('day', GROUP_ID);
 		expect(fetchAllPaginatedRows).toHaveBeenCalledTimes(3);
 		// ensures the range values from fetchAllPaginatedRows actually get used in the underlying query
-		expect(mockRange).toHaveBeenCalledTimes(3);
-		expect(mockRange).toHaveBeenCalledWith(10, 20);
+		expect(recorder.range).toHaveBeenCalledTimes(3);
+		expect(recorder.range).toHaveBeenCalledWith(10, 20);
 	});
 
 	it('calls the core_stats rpc ungrouped by species, ordered by day', async () => {
 		await getStatsByTemporalUnit('day', GROUP_ID);
-		expect(cachedSupabaseChainCalls).toContainEqual({
+		expect(recorder.calls).toContainEqual({
 			rpcCall: [
 				'core_stats',
 				{
@@ -102,7 +78,7 @@ describe('getStatsByTemporalUnit', () => {
 	});
 	it('calls the core_stats rpc grouped by species, ordered by day and species', async () => {
 		await getStatsByTemporalUnit('day', GROUP_ID);
-		expect(cachedSupabaseChainCalls).toContainEqual({
+		expect(recorder.calls).toContainEqual({
 			rpcCall: [
 				'core_stats',
 				{
@@ -116,7 +92,7 @@ describe('getStatsByTemporalUnit', () => {
 	});
 	it('calls the biometrics_stats rpc grouped by species, ordered by day and species', async () => {
 		await getStatsByTemporalUnit('day', GROUP_ID);
-		expect(cachedSupabaseChainCalls).toContainEqual({
+		expect(recorder.calls).toContainEqual({
 			rpcCall: [
 				'biometrics_stats',
 				{
@@ -130,16 +106,16 @@ describe('getStatsByTemporalUnit', () => {
 	});
 
 	it('returns the result of the rpc calls', async () => {
-		mockRange.mockResolvedValueOnce({
+		recorder.range.mockResolvedValueOnce({
 			data: [{ species_name: null, time_period: 1 }]
 		});
-		mockRange.mockResolvedValueOnce({
+		recorder.range.mockResolvedValueOnce({
 			data: [
 				{ species_name: 'cat', time_period: 1 },
 				{ species_name: 'dog', time_period: 1 }
 			]
 		});
-		mockRange.mockResolvedValueOnce({
+		recorder.range.mockResolvedValueOnce({
 			data: [
 				{ species_name: 'fish', time_period: 1 },
 				{ species_name: 'owl', time_period: 1 }
@@ -163,27 +139,9 @@ describe('getStatsByTemporalUnit', () => {
 describe('fetchCoreStatsByMonth', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		cachedSupabaseChainCalls = [];
-		mockRange.mockReset().mockResolvedValue({ data: [], error: null });
-
-		mockRpc.mockReset().mockImplementation((...rpcArgs) => {
-			const call: CachedSupabaseChainCall = {
-				rpcCall: rpcArgs,
-				orderCalls: []
-			};
-			const builder = {
-				order: (...orderArgs: unknown[]) => {
-					mockOrder(...orderArgs);
-					call.orderCalls.push(orderArgs);
-					return builder;
-				},
-				range: (...rangeArgs: unknown[]) => {
-					cachedSupabaseChainCalls.push(call);
-					return mockRange(...rangeArgs);
-				}
-			};
-			return builder;
-		});
+		recorder = makeRpcChainRecorder();
+		mockSupabaseClient.rpc = recorder.rpc;
+		recorder.range.mockResolvedValue({ data: [], error: null });
 	});
 
 	it('calls the core_stats rpc ungrouped by species, month-grouped by time period, scoped to the group', async () => {
@@ -193,7 +151,7 @@ describe('fetchCoreStatsByMonth', () => {
 			GROUP_ID,
 			expect.any(Function)
 		);
-		expect(cachedSupabaseChainCalls).toContainEqual({
+		expect(recorder.calls).toContainEqual({
 			rpcCall: [
 				'core_stats',
 				{
@@ -207,7 +165,7 @@ describe('fetchCoreStatsByMonth', () => {
 	});
 
 	it('returns the result of the rpc call', async () => {
-		mockRange.mockResolvedValueOnce({
+		recorder.range.mockResolvedValueOnce({
 			data: [{ time_period: '2023-01', total_effort: '05:30:00' }]
 		});
 		const result = await fetchCoreStatsByMonth(GROUP_ID);
