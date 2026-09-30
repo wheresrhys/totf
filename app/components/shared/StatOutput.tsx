@@ -32,9 +32,20 @@ const plurals: Partial<Record<StatUnit | TemporalUnit, string>> = {
 	g: 'g'
 };
 
+const spacelessUnits: Partial<Record<StatUnit | TemporalUnit, boolean>> = {
+	mm: true,
+	g: true
+};
+
 export function getPlural(unit: StatUnit | TemporalUnit | undefined): string {
 	if (!unit) return '';
 	return unit in plurals ? (plurals[unit] as string) : `${unit}s`;
+}
+
+export function getSpaceForUnit(
+	unit: StatUnit | TemporalUnit | undefined
+): string {
+	return unit && unit in spacelessUnits ? '' : ' ';
 }
 
 const connectingVerbMap: Record<TemporalUnit, 'in' | 'on'> = {
@@ -70,7 +81,8 @@ export function StatOutput({
 	return (
 		<span className={classes}>
 			<span className="font-bold">
-				{value}{' '}
+				{value}
+				{getSpaceForUnit(unit)}
 				{speciesName ||
 					(showUnit ? ` ${value > 1 ? getPlural(unit) : unit}` : '')}
 			</span>{' '}

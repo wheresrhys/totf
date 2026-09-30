@@ -150,7 +150,7 @@ describe('highlight-generator', () => {
 
 		it('can opt to skip a rule based on timePeriod', async () => {
 			const rule = makeRule({
-				condition: (temporalUnit) => temporalUnit !== 'day'
+				condition: ({ temporalUnit }) => temporalUnit !== 'day'
 			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({
@@ -170,7 +170,7 @@ describe('highlight-generator', () => {
 
 		it('can opt to skip a rule based on parentWindow', async () => {
 			const rule = makeRule({
-				condition: (_temporalUnit, parentTimeWindow) => !parentTimeWindow?.month
+				condition: ({ parentTimeWindow }) => !parentTimeWindow?.month
 			});
 			highlightRules.push(rule);
 			vi.mocked(getStatsByTemporalUnit).mockResolvedValue({

@@ -17,7 +17,7 @@ export const singleSpeciesCount: HighlightsGenerator = {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preambles = combinedHighlight.scopes.map(
 				(scope, i) =>
-					`${printProminenceQualifier(scope.ranking)} highest ${i === 0 ? `single species ${printTemporalUnit(scope.scope.temporalUnit)} count ` : ''}${printTimeQualifier(scope.scope.parentTimeWindow, { yearConnector: 'in' })}`
+					`${printProminenceQualifier(scope.ranking)} highest ${i === 0 ? `single species ${printTemporalUnit(scope.scope.temporalUnit)} count ` : ''}${printTimeQualifier(scope.scope.parentTimeWindow, { yearConnector: 'of' })}`
 			);
 			return sentenceCase(
 				`${sentenceJoin(preambles)}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()

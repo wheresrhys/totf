@@ -78,7 +78,9 @@ export function getCombinedHighlightFixtures(
 ): Record<string, Partial<CombinedHighlight>> {
 	const bySpecies = isPerSpeciesRule(rule);
 	const temporalUnit =
-		!rule.condition || rule.condition('day') ? 'day' : 'month';
+		!rule.condition || rule.condition({ temporalUnit: 'day' })
+			? 'day'
+			: 'month';
 	const getCombinedHighlight = getCombinedHighlightMaker(rule.descriptor);
 	const fixtures: Record<string, Partial<CombinedHighlight>> = {
 		global: getCombinedHighlight(

@@ -6,9 +6,12 @@ import type {
 	CombinedHighlight,
 	HighlightScope
 } from '../types';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 
-import { getPlural } from '@/app/components/shared/StatOutput';
+import {
+	getPlural,
+	getSpaceForUnit,
+	type TemporalUnit
+} from '@/app/components/shared/StatOutput';
 const fullMonthNames = [
 	undefined,
 	'January',
@@ -71,10 +74,10 @@ export function printValue(
 			}
 		case 'prefix':
 			if (value.species) {
-				return `${value.value} ${value.species} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
+				return `${value.value}${getSpaceForUnit(descriptor.unit)}${value.species} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
 			}
 		default:
-			return `${value.value} ${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
+			return `${value.value}${getSpaceForUnit(descriptor.unit)}${value.value > 1 ? getPlural(descriptor.unit) : descriptor.unit}`;
 	}
 }
 
@@ -141,9 +144,9 @@ export function printTimeQualifier(
 }
 // todo enforce length of min 1 in the types
 export function sentenceJoin(clauses: string[]): string {
-	if (clauses.length) {
-		throw new Error('combined highlight with no scopes listed');
-	}
+	// if (clauses.length) {
+	// 	throw new Error('combined highlight with no scopes listed');
+	// }
 	let sentence = clauses.pop() as string;
 
 	if (clauses.length) {
