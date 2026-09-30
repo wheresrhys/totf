@@ -13,8 +13,8 @@ import { getTopByPropertiesSum } from '../lib/rule-utils';
 export const juvs: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preValue = printCombinedHighlight(combinedHighlight, {
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
 				lineItem: ({ scope, ranking, index }) => {
 					const centralStatement =
 						`${printProminenceQualifier(ranking, 'equal')} most${index === 0 ? ' juvs' : ''} ${printTimeQualifier(scope.parentTimeWindow)}`.trim();
@@ -22,12 +22,9 @@ export const juvs: HighlightsGenerator = {
 					return index === 0
 						? `${printTemporalUnit(scope.temporalUnit)} with ${centralStatement}`
 						: centralStatement;
-				}
-			});
-			return sentenceCase(
-				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+				},
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most juvs`
 	},

@@ -13,8 +13,8 @@ import { getTopByPropertiesSum } from '../lib/rule-utils';
 export const eachSpeciesJuvs: HighlightsGenerator = {
 	statsSelector: 'coreStatsBySpecies',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preValue = printCombinedHighlight(combinedHighlight, {
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
 				lineItem: ({ scope, ranking, index, combinedHighlight }) => {
 					let result = `${printProminenceQualifier(ranking, 'equal')} highest `;
 					if (index === 0) {
@@ -25,12 +25,9 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 					}
 					result += printTimeQualifier(scope.parentTimeWindow);
 					return result;
-				}
-			});
-			return sentenceCase(
-				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+				},
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Highest juv ${highlightsOfType.scope.species} count in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
 	},

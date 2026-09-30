@@ -175,14 +175,12 @@ export function printCombinedHighlight(
 	{
 		firstLineItem,
 		lineItem,
-		onlyBroadestScope
+		onlyBroadestScope,
+		shouldPrintValue
 	}: {
-		firstLineItem?: (
-			input: LineItemInput
-		) => string;
-		lineItem: (
-			input: LineItemInput
-		) => string;
+		firstLineItem?: (input: LineItemInput) => string;
+		lineItem: (input: LineItemInput) => string;
+		shouldPrintValue: boolean;
 		// Some metrics (first/only/rare species records) are the same fact whichever
 		// scope they were found at, so a narrower scope is discarded rather than
 		// combined into the sentence — set this instead of relying on firstLineItem,
@@ -193,11 +191,16 @@ export function printCombinedHighlight(
 	const scopes = onlyBroadestScope
 		? combinedHighlight.scopes.slice(0, 1)
 		: combinedHighlight.scopes;
-	return sentenceJoin(
+	let result = sentenceJoin(
 		scopes.map((scope, index) =>
 			index === 0 && firstLineItem
-				? firstLineItem({...scope, combinedHighlight, index})
+				? firstLineItem({ ...scope, combinedHighlight, index })
 				: lineItem({ ...scope, combinedHighlight, index })
 		)
 	);
+
+	if (shouldPrintValue) {
+		result += `: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`;
+	}
+	return sentenceCase(result.trim().replace(/  /g, ' '));
 }

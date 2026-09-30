@@ -13,8 +13,8 @@ import { getTopByProperty } from '../lib/rule-utils';
 export const birdCount: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preValue = printCombinedHighlight(combinedHighlight, {
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
 				lineItem: ({ scope, ranking, index }) => {
 					let result = `${printProminenceQualifier(ranking)} busiest `;
 
@@ -28,12 +28,9 @@ export const birdCount: HighlightsGenerator = {
 						result += `${index === 0 ? printTemporalUnit(scope.temporalUnit) : ''} ${printTimeQualifier(scope.parentTimeWindow)}`;
 					}
 					return result;
-				}
-			});
-			return sentenceCase(
-				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			).replace(/  /g, ' ');
-		},
+				},
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Busiest ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
 	},

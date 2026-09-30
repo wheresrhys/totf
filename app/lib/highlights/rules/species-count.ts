@@ -16,10 +16,10 @@ export const speciesCount: HighlightsGenerator = {
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) => {
 			const preValue = printCombinedHighlight(combinedHighlight, {
-				lineItem: ({scope, ranking, index}) =>
+				lineItem: ({ scope, ranking, index }) =>
 					// todo don't actually need 'for species' here, but keeping for now as may be useful later
 					`${printProminenceQualifier(ranking)} most varied${index === 0 ? ` ${printTemporalUnit(scope.temporalUnit)}` : ''} ${printTimeQualifier(scope.parentTimeWindow)}`
-			})
+			});
 			return sentenceCase(
 				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
 			);

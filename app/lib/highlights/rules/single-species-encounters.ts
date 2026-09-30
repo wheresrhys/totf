@@ -13,15 +13,12 @@ import { getTopByProperty } from '../lib/rule-utils';
 export const singleSpeciesEncounters: HighlightsGenerator = {
 	statsSelector: 'coreStatsWithSpecies',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preValue = printCombinedHighlight(combinedHighlight, {
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
 				lineItem: ({ scope, ranking, index }) =>
-					`${printProminenceQualifier(ranking, 'equal')} most ${index === 0 ? `encounters of a single species in a ${printTemporalUnit(scope.temporalUnit)} ` : ''}${printTimeQualifier(scope.parentTimeWindow, { yearConnector: index === 0 ? 'in' : 'of' })}`
-			});
-			return sentenceCase(
-				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+					`${printProminenceQualifier(ranking, 'equal')} most ${index === 0 ? `encounters of a single species in a ${printTemporalUnit(scope.temporalUnit)} ` : ''}${printTimeQualifier(scope.parentTimeWindow, { yearConnector: index === 0 ? 'in' : 'of' })}`,
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Most encounters of a single species in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit)}`
 	},

@@ -39,14 +39,13 @@ export const firstSpeciesRecord: HighlightsGenerator = {
 		// on a first record merely restates the broadest one: a species' first
 		// record ever is necessarily also its first of that year. scopes[0] is the
 		// broadest (see sortByPositionAndTimeWindow), so it is the one to print.
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preValue = printCombinedHighlight(combinedHighlight, {
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
 				onlyBroadestScope: true,
 				lineItem: ({ scope, combinedHighlight }) =>
-					`First ${printSpeciesForCount(combinedHighlight.species, combinedHighlight.value.value)} ${printTimeQualifier(scope.parentTimeWindow)}`
-			});
-			return sentenceCase(preValue.trim());
-		},
+					`First ${printSpeciesForCount(combinedHighlight.species, combinedHighlight.value.value)} ${printTimeQualifier(scope.parentTimeWindow)}`,
+				shouldPrintValue: false
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`First ${highlightsOfType.scope.species} ${printTimeQualifier(highlightsOfType.scope.parentTimeWindow)}`
 	},

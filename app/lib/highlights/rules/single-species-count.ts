@@ -14,15 +14,12 @@ export const singleSpeciesCount: HighlightsGenerator = {
 	statsSelector: 'coreStatsWithSpecies',
 	formatters: {
 		// -> Highest count of a single species in 2021: 54 Reed Warblers
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preValue = printCombinedHighlight(combinedHighlight, {
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
 				lineItem: ({ scope, ranking, index }) =>
-					`${printProminenceQualifier(ranking)} highest ${index === 0 ? `single species ${printTemporalUnit(scope.temporalUnit)} count ` : ''}${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'of' })}`
-			});
-			return sentenceCase(
-				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+					`${printProminenceQualifier(ranking)} highest ${index === 0 ? `single species ${printTemporalUnit(scope.temporalUnit)} count ` : ''}${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'of' })}`,
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Highest ${printTemporalUnit(highlightsOfType.scope.temporalUnit)} count${highlightsOfType.values.length > 1 ? 's' : ''} for a single species`
 	},

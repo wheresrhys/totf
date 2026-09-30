@@ -13,8 +13,8 @@ import { getTopByProperty } from '../lib/rule-utils';
 export const encounterCount: HighlightsGenerator = {
 	statsSelector: 'coreStats',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preValue = printCombinedHighlight(combinedHighlight, {
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
 				lineItem: ({ scope, ranking, index, combinedHighlight }) => {
 					const centralStatement = `${printProminenceQualifier(ranking, 'equal')} most ${index === 0 ? 'encounters ' : ''}${printTimeQualifier(
 						scope.parentTimeWindow,
@@ -27,12 +27,9 @@ export const encounterCount: HighlightsGenerator = {
 					return index === 0
 						? `${printTemporalUnit(scope.temporalUnit)} with ${centralStatement}`
 						: centralStatement;
-				}
-			});
-			return sentenceCase(
-				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			).replace(/  /g, ' ');
-		},
+				},
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most encounters`
 	},

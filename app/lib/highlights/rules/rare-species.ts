@@ -26,16 +26,15 @@ import { getInfrequentAppearances } from '../lib/rule-utils';
 export const rareSpecies: HighlightsGenerator = {
 	statsSelector: 'coreStatsBySpecies',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preValue = printCombinedHighlight(combinedHighlight, {
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
 				onlyBroadestScope: true,
 				lineItem: ({ scope, combinedHighlight }) => {
 					const appearances = combinedHighlight.value.value;
 					return `${printSpeciesForCount(combinedHighlight.species, appearances)} seen in only ${appearances} ${printTemporalUnit(scope.temporalUnit, appearances > 1)} ${printTimeQualifier(scope.parentTimeWindow)}`;
-				}
-			});
-			return sentenceCase(preValue.trim());
-		},
+				},
+				shouldPrintValue: false
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with a rare ${highlightsOfType.scope.species} appearance`
 	},

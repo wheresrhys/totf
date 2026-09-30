@@ -14,8 +14,8 @@ export const eachSpeciesCount: HighlightsGenerator = {
 	statsSelector: 'coreStatsBySpecies',
 	// Highest Long- tailed Tit count of 2020, and highest ever: 5 birds
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preValue = printCombinedHighlight(combinedHighlight, {
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
 				lineItem: ({ scope, ranking, index, combinedHighlight }) => {
 					let result = `${printProminenceQualifier(ranking, 'equal')} highest `;
 					if (index === 0) {
@@ -26,12 +26,9 @@ export const eachSpeciesCount: HighlightsGenerator = {
 					}
 					result += printTimeQualifier(scope.parentTimeWindow);
 					return result;
-				}
-			});
-			return sentenceCase(
-				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+				},
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Highest ${highlightsOfType.scope.species} count in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
 	},

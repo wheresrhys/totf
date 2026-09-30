@@ -13,15 +13,12 @@ import { getTopByProperty } from '../lib/rule-utils';
 export const heaviestOfSpecies: HighlightsGenerator = {
 	statsSelector: 'biometricsStatsBySpecies',
 	formatters: {
-		combinedHighlightPrinter: (combinedHighlight) => {
-			const preValue = printCombinedHighlight(combinedHighlight, {
+		combinedHighlightPrinter: (combinedHighlight) =>
+			printCombinedHighlight(combinedHighlight, {
 				lineItem: ({ scope, ranking, index, combinedHighlight }) =>
-					`${printProminenceQualifier(ranking)} heaviest${index === 0 ? ` ${combinedHighlight.species}` : ''} ${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'of' })}`
-			});
-			return sentenceCase(
-				`${preValue}: ${printValue(combinedHighlight.value, combinedHighlight.descriptor)}`.trim()
-			);
-		},
+					`${printProminenceQualifier(ranking)} heaviest${index === 0 ? ` ${combinedHighlight.species}` : ''} ${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'of' })}`,
+				shouldPrintValue: true
+			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Heaviest ${printTemporalUnit(highlightsOfType.scope.temporalUnit)} count${highlightsOfType.values.length > 1 ? 's' : ''} for a single species`
 	},
