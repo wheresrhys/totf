@@ -7,7 +7,7 @@ import {
 	within,
 	fireEvent
 } from '@testing-library/react';
-import Page, { fetchSpeciesYearPageContent } from '../page';
+import Page, { fetchSpeciesYearOrMonthPageContent } from '../page';
 import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
 import {
 	ROBIN_SPECIES_ID,
@@ -32,14 +32,18 @@ vi.mock('@/app/actions/sp-data', () => ({
 
 const birds = birdsSnapshot as FullFatPageData['birds'];
 
-function renderYearPage(speciesName = 'Robin', year = '2026', tabId?: string) {
+function renderYearPage(
+	speciesName = 'Robin',
+	yearOrMonth = '2026',
+	tabId?: string
+) {
 	return Page({
-		params: Promise.resolve({ speciesName, year }),
+		params: Promise.resolve({ speciesName, yearOrMonth }),
 		...(tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) })
 	});
 }
 
-describe('/species/[speciesName]/[year]', () => {
+describe('/species/[speciesName]/[yearOrMonth]', () => {
 	afterEach(() => {
 		cleanup();
 		mockFetchPageOfBirds.mockReset();
@@ -180,8 +184,8 @@ describe('/species/[speciesName]/[year]', () => {
 		});
 
 		it('threads the whole-year from/to bounds into fetchPageOfBirds', async () => {
-			await fetchSpeciesYearPageContent(
-				{ speciesName: 'Robin', year: '2026' },
+			await fetchSpeciesYearOrMonthPageContent(
+				{ speciesName: 'Robin', yearOrMonth: '2026' },
 				1
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
@@ -196,8 +200,8 @@ describe('/species/[speciesName]/[year]', () => {
 		it('threads the whole-year range into aggregate stats', async () => {
 			const client = makeSpeciesClient();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-			await fetchSpeciesYearPageContent(
-				{ speciesName: 'Robin', year: '2026' },
+			await fetchSpeciesYearOrMonthPageContent(
+				{ speciesName: 'Robin', yearOrMonth: '2026' },
 				1
 			);
 			expect(client.rpc).toHaveBeenCalledWith(
@@ -240,11 +244,81 @@ describe('/species/[speciesName]/[year]', () => {
 
 		it('rejects when the species lookup finds no row (surfacing the not-found path)', async () => {
 			await expect(
-				fetchSpeciesYearPageContent(
-					{ speciesName: 'Nonexistent', year: '2026' },
+				fetchSpeciesYearOrMonthPageContent(
+					{ speciesName: 'Nonexistent', yearOrMonth: '2026' },
 					1
 				)
 			).rejects.toThrow();
+		});
+	});
+
+	describe('squashed month variant (#1005)', () => {
+		beforeEach(() => {
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeSpeciesClient());
+			mockFetchPageOfBirds.mockResolvedValue(birds);
+		});
+
+		it('routes to the squashed-month fetch path for a month abbreviation', async () => {
+			const data = await fetchSpeciesYearOrMonthPageContent(
+				{ speciesName: 'Robin', yearOrMonth: 'jan' },
+				1
+			);
+			expect(data).toMatchObject({ squashedMonth: 1 });
+		});
+
+		it('is case-insensitive', async () => {
+			const data = await fetchSpeciesYearOrMonthPageContent(
+				{ speciesName: 'Robin', yearOrMonth: 'JAN' },
+				1
+			);
+			expect(data).toMatchObject({ squashedMonth: 1 });
+		});
+
+		it('falls through to the existing numeric-year behaviour for a numeric segment', async () => {
+			const data = await fetchSpeciesYearOrMonthPageContent(
+				{ speciesName: 'Robin', yearOrMonth: '2026' },
+				1
+			);
+			expect(data).toMatchObject({ year: 2026 });
+			expect(data && 'squashedMonth' in data && data.squashedMonth).toBeFalsy();
+		});
+
+		it('renders "{species} {month name}" as the heading, with an "All time" link', async () => {
+			render(await renderYearPage('Robin', 'jan'));
+			await screen.findByTestId('sp-squashed-month-year-totals-tab');
+			const heading = screen.getByRole('heading', { level: 1 });
+			expect(heading.textContent).toContain('Robin January');
+			expect(
+				within(heading)
+					.getByRole('link', { name: 'All time' })
+					.getAttribute('href')
+			).toBe('/species/Robin');
+		});
+
+		it('renders tab buttons in the order Year totals, Session totals, Highlights, Biometrics, Demographics, Bird list', async () => {
+			render(await renderYearPage('Robin', 'jan'));
+			await screen.findByTestId('sp-squashed-month-year-totals-tab');
+			const labels = within(screen.getByRole('tablist'))
+				.getAllByRole('button')
+				.map((button) => button.textContent);
+			expect(labels).toEqual([
+				'Year totals',
+				'Session totals',
+				'Highlights',
+				'Biometrics',
+				'Demographics',
+				'Bird list'
+			]);
+		});
+
+		it('renders the squashed-month Year totals tab on initial render, active by default (no click needed)', async () => {
+			render(await renderYearPage('Robin', 'jan'));
+			await screen.findByTestId('sp-squashed-month-year-totals-tab');
+			expect(
+				screen
+					.getByRole('button', { name: 'Year totals' })
+					.getAttribute('aria-current')
+			).toBe('true');
 		});
 	});
 });

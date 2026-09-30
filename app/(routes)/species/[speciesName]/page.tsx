@@ -85,7 +85,7 @@ export async function fetchSpeciesPageContentForPeriod(
 	viewedGroupId: number,
 	period: PeriodScope = {}
 ): Promise<PageData | null> {
-	const { year, month, fromDate, toDate } = period;
+	const { year, month, fromDate, toDate, squashedMonth } = period;
 	const supabase = await getAuthenticatedSupabaseClient();
 	const { id: speciesId } = (await supabase
 		.from('Species')
@@ -98,7 +98,13 @@ export async function fetchSpeciesPageContentForPeriod(
 	}
 	const [birds, speciesStats] = await Promise.all([
 		fetchPageOfBirds(speciesId, viewedGroupId, 0, fromDate, toDate),
-		getSpeciesStats(params.speciesName, viewedGroupId, fromDate, toDate)
+		getSpeciesStats(
+			params.speciesName,
+			viewedGroupId,
+			fromDate,
+			toDate,
+			squashedMonth
+		)
 	]);
 	if (birds.length === 0) {
 		return {
@@ -106,7 +112,8 @@ export async function fetchSpeciesPageContentForPeriod(
 			year,
 			month,
 			fromDate,
-			toDate
+			toDate,
+			squashedMonth
 		};
 	}
 	return {
@@ -117,7 +124,8 @@ export async function fetchSpeciesPageContentForPeriod(
 		year,
 		month,
 		fromDate,
-		toDate
+		toDate,
+		squashedMonth
 	};
 }
 

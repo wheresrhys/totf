@@ -85,10 +85,12 @@ describe('SpCombinedMonthTotalsTab', () => {
 				// shows.
 				expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			});
-			// Combine-years labels are month name only — no year, no link.
-			expect(screen.getByText('January')).toBeTruthy();
+			// Combine-years labels are month name only — no year — and link into
+			// the squashed-month species page (#1005).
 			expect(screen.queryByText('January 2020')).toBeNull();
-			expect(screen.queryByRole('link', { name: 'January' })).toBeNull();
+			expect(
+				screen.getByRole('link', { name: 'January' }).getAttribute('href')
+			).toBe('/species/Robin/jan');
 		});
 
 		it('renders a "Busiest session" column between Encounters and Birds', async () => {

@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 /**
  * Shared `vi.mock(...)` declarations for every `Sp*Tab` component rendered by
  * the species-page test family (`app/(routes)/species/[speciesName]/__tests__/page.test.tsx`
- * and its `[year]`/`[year]/[month]` siblings). Each of those three files
+ * and its `[yearOrMonth]`/`[yearOrMonth]/[month]` siblings). Each of those three files
  * exercises a different subset of this same set of components, all stubbed
  * the same way — a `data-testid` div standing in for the real (heavier) tab
  * content, which these page-level tests don't need to render.
@@ -54,6 +54,12 @@ vi.mock('@/app/components/pages/species/SpStatsHistoryTab', () => ({
 
 vi.mock('@/app/components/pages/species/SpMonthTotalsTab', () => ({
 	SpMonthTotalsTab: () => <div data-testid="sp-month-totals-tab" />
+}));
+
+vi.mock('@/app/components/pages/species/SpSquashedMonthYearTotalsTab', () => ({
+	SpSquashedMonthYearTotalsTab: () => (
+		<div data-testid="sp-squashed-month-year-totals-tab" />
+	)
 }));
 
 vi.mock('@/app/components/pages/species/SpWeightWingTab', () => ({
