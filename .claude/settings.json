@@ -13,5 +13,18 @@
 			"Bash(supabase migration up --linked*)",
 			"Bash(npx supabase migration up --linked*)"
 		]
+	},
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "Read|Grep",
+				"hooks": [
+					{
+						"type": "command",
+						"command": ".claude/hooks/gate-migration-reads.sh"
+					}
+				]
+			}
+		]
 	}
 }
