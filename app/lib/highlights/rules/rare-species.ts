@@ -3,7 +3,6 @@ import {
 	printTemporalUnit,
 	printTimeQualifier,
 	printSpeciesForCount,
-	sentenceCase,
 	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getInfrequentAppearances } from '../lib/rule-utils';

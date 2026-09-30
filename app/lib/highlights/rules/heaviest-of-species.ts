@@ -2,8 +2,6 @@ import type { HighlightsGenerator } from '../types';
 import type { BiometricsStatsResult } from '@/app/models/db';
 import {
 	printProminenceQualifier,
-	printValue,
-	sentenceCase,
 	printTemporalUnit,
 	printTimeQualifier,
 	printCombinedHighlight

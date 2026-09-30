@@ -1,6 +1,5 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
 import {
-	sentenceCase,
 	printTimeQualifier,
 	printSpeciesForCount,
 	printCombinedHighlight

@@ -1,9 +1,6 @@
 import type { HighlightsGenerator } from '../types';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import {
 	printProminenceQualifier,
-	printValue,
-	sentenceCase,
 	printTemporalUnit,
 	printTimeQualifier,
 	printCombinedHighlight

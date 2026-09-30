@@ -1,8 +1,6 @@
 import type { HighlightsGenerator } from '../types';
 import {
 	printProminenceQualifier,
-	printValue,
-	sentenceCase,
 	printTemporalUnit,
 	printTimeQualifier,
 	printFullMonthName,

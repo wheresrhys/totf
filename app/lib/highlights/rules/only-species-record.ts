@@ -1,6 +1,5 @@
 import type { HighlightsGenerator, YearMonthRestriction } from '../types';
 import {
-	sentenceCase,
 	printTimeQualifier,
 	printSpeciesForCount,
 	printCombinedHighlight
@@ -34,7 +33,8 @@ export const onlySpeciesRecord: HighlightsGenerator = {
 			printCombinedHighlight(combinedHighlight, {
 				onlyBroadestScope: true,
 				lineItem: ({ scope, combinedHighlight }) =>
-					`Only ${printSpeciesForCount(combinedHighlight.species, combinedHighlight.value.value)} ${printTimeQualifier(scope.parentTimeWindow)}`
+					`Only ${printSpeciesForCount(combinedHighlight.species, combinedHighlight.value.value)} ${printTimeQualifier(scope.parentTimeWindow)}`,
+				shouldPrintValue: false
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
 			`Only ${highlightsOfType.scope.species} ${printTimeQualifier(highlightsOfType.scope.parentTimeWindow)}`
