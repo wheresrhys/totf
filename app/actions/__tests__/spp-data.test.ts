@@ -5,6 +5,7 @@ import { fetchSpeciesData } from '../spp-data';
 import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
 import gammaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/gamma.by-species.json';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import { makeRpcCallRecorder } from '@/app/__tests__/helpers/rpc-recorder';
 
 // Real captured biometrics_stats output for the exact call fetchSpeciesData
 // makes (group-wide, group_by_species). Alpha's first row is the Blue Tit that
@@ -43,23 +44,6 @@ function buildBiometricsRow(
 	};
 }
 
-// Mirrors the rpc() mock pattern used by app/actions/__tests__/sp-data.test.ts —
-// records every rpc() call and resolves it to the given rows.
-function makeRpcClient(rpcRows: unknown) {
-	const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
-	const client = {
-		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
-			rpcCalls.push({ name, args });
-			return {
-				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-					Promise.resolve({ data: rpcRows, error: null }).then(resolve)
-			};
-		})
-	};
-	mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-	return rpcCalls;
-}
-
 describe('fetchSpeciesData — merges core_stats and biometrics_stats by species_name', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -71,7 +55,11 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				accessLevel: 'own',
 				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
 			});
-			makeRpcClient([buildBiometricsRow({ max_weight: 20, max_wing: 70 })]);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue({
+				rpc: makeRpcCallRecorder([
+					buildBiometricsRow({ max_weight: 20, max_wing: 70 })
+				]).rpc
+			});
 
 			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
 
@@ -92,7 +80,9 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 					})
 				]
 			});
-			makeRpcClient([buildBiometricsRow()]);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue({
+				rpc: makeRpcCallRecorder([buildBiometricsRow()]).rpc
+			});
 
 			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
 
@@ -109,7 +99,8 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				accessLevel: 'own',
 				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
 			});
-			const rpcCalls = makeRpcClient([]);
+			const { rpc, calls: rpcCalls } = makeRpcCallRecorder([]);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue({ rpc });
 
 			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
 
@@ -158,7 +149,9 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				accessLevel: 'shared',
 				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
 			});
-			makeRpcClient([]);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue({
+				rpc: makeRpcCallRecorder([]).rpc
+			});
 
 			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
 
@@ -172,7 +165,10 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				accessLevel: 'own',
 				rows: [buildCoreStatsRow({ species_name: 'Robin' })]
 			});
-			makeRpcClient([buildBiometricsRow({ species_name: 'Wren' })]);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue({
+				rpc: makeRpcCallRecorder([buildBiometricsRow({ species_name: 'Wren' })])
+					.rpc
+			});
 
 			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
 
@@ -191,7 +187,9 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				accessLevel: 'own',
 				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
 			});
-			makeRpcClient(emptyBiometricsRows);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue({
+				rpc: makeRpcCallRecorder(emptyBiometricsRows).rpc
+			});
 
 			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
 
@@ -211,7 +209,9 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				accessLevel: 'own',
 				rows: []
 			});
-			makeRpcClient([]);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue({
+				rpc: makeRpcCallRecorder([]).rpc
+			});
 
 			const result = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
 
