@@ -39,6 +39,7 @@ import {
 	psqlScalar,
 	createIsolatedGroup
 } from '@/supabase/__tests__/db-test-helpers';
+import { readTestSessionLocationAndDate } from '@/supabase/__tests__/rpc-functions/helpers/encounter-fixtures';
 
 // The active group for the mocked `getGroupJwt()` below. `authenticateAs()` sets
 // this before an action call to stand in for "the caller is logged in as this
@@ -246,6 +247,7 @@ describe('updateRingSequence — bounds reconciliation (#731)', () => {
 			sex: 'U',
 			age_code: 4,
 			session_id: onSessionId,
+			...(await readTestSessionLocationAndDate(client, onSessionId)),
 			bird_id: bird.id
 		});
 		if (encounterError) throw encounterError;
@@ -556,6 +558,7 @@ describe('promoteControlToSequence', () => {
 			sex: 'U',
 			age_code: 4,
 			session_id: onSessionId,
+			...(await readTestSessionLocationAndDate(client, onSessionId)),
 			bird_id: bird.id
 		});
 		if (encounterError) throw encounterError;
@@ -925,6 +928,7 @@ describe('fetchUnassignedImportPrefixes', () => {
 			sex: 'U',
 			age_code: 4,
 			session_id: onSessionId,
+			...(await readTestSessionLocationAndDate(client, onSessionId)),
 			bird_id: bird.id
 		});
 		if (encounterError) throw encounterError;
@@ -1103,6 +1107,7 @@ describe('createSequenceFromImportPrefix', () => {
 				sex: 'U',
 				age_code: 4,
 				session_id: sessionId,
+				...(await readTestSessionLocationAndDate(groupClient, sessionId)),
 				bird_id: bird.id
 			});
 		if (encounterError) throw encounterError;

@@ -590,6 +590,8 @@ describe('biometrics_stats', () => {
 					scheme: 'BTO',
 					sex: 'M',
 					session_id: sessionId,
+					location_id: locationId,
+					visit_date: visitDate,
 					bird_id: birdId,
 					age_code: 4,
 					record_type: 'D',

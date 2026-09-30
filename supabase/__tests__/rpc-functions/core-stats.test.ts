@@ -25,7 +25,8 @@ import {
 	insertTestSession,
 	createSessionResolver,
 	insertTestBird,
-	createRingNoSequence
+	createRingNoSequence,
+	withSessionLocationAndDate
 } from './helpers/encounter-fixtures';
 
 // Seed has 11 Alpha FULL_GROWN sessions: the 9 ARRETRAP dates (2021-06-20,
@@ -354,137 +355,139 @@ describe('core_stats', () => {
 			const base_ = { scheme: 'BTO', sex: 'M', age_code: 1 };
 			const { error: encountersError } = await deltaClient
 				.from('Encounters')
-				.insert([
-					// --- FIELD_OBSERVATION scenario ---
-					// foReal1 (fo1): three new (N) Robin encounters spanning 09:00–12:00 → 3h effort.
-					{
-						...base_,
-						bird_id: b1,
-						session_id: foReal1,
-						record_type: 'N',
-						capture_time: '09:00:00'
-					},
-					{
-						...base_,
-						bird_id: b2,
-						session_id: foReal1,
-						record_type: 'N',
-						capture_time: '10:00:00'
-					},
-					{
-						...base_,
-						bird_id: b3,
-						session_id: foReal1,
-						record_type: 'N',
-						capture_time: '12:00:00'
-					},
-					// foReal2 (fo2): one new (N) Robin encounter → clamped to 2h minimum effort.
-					{
-						...base_,
-						bird_id: b4,
-						session_id: foReal2,
-						record_type: 'N',
-						capture_time: '10:00:00'
-					},
-					// foTwin (fo1, same location): a passive field observation (C) Wren — an early
-					// capture_time that must NOT stretch foReal1's effort span.
-					{
-						...base_,
-						bird_id: b5,
-						session_id: foTwin,
-						record_type: 'C',
-						capture_time: '05:00:00'
-					},
-					// foStandalone (fo3): a passive field observation (C) Wren on its own date.
-					// (Not 'D' — that's now a resighting_record_type (#874) and would be
-					// excluded from stats_raw_encounters entirely, which isn't what this
-					// scenario is testing.)
-					{
-						...base_,
-						bird_id: b6,
-						session_id: foStandalone,
-						record_type: 'C',
-						capture_time: '20:00:00'
-					},
-					// foOnly range: two passive field observations (C) Wrens, nothing else.
-					{
-						...base_,
-						bird_id: b7,
-						session_id: foOnly,
-						record_type: 'C',
-						capture_time: '08:00:00'
-					},
-					{
-						...base_,
-						bird_id: b8,
-						session_id: foOnly,
-						record_type: 'C',
-						capture_time: '09:00:00'
-					},
-					// --- PULLI scenario (mirrors the above, but PULLI encounters are new-ring N) ---
-					// puReal1 (pu1): three new (N) Robin encounters spanning 09:00–12:00 → 3h effort.
-					{
-						...base_,
-						bird_id: b9,
-						session_id: puReal1,
-						record_type: 'N',
-						capture_time: '09:00:00'
-					},
-					{
-						...base_,
-						bird_id: b10,
-						session_id: puReal1,
-						record_type: 'N',
-						capture_time: '10:00:00'
-					},
-					{
-						...base_,
-						bird_id: b11,
-						session_id: puReal1,
-						record_type: 'N',
-						capture_time: '12:00:00'
-					},
-					// puReal2 (pu2): one new (N) Robin encounter → clamped to 2h minimum effort.
-					{
-						...base_,
-						bird_id: b12,
-						session_id: puReal2,
-						record_type: 'N',
-						capture_time: '10:00:00'
-					},
-					// puTwin (pu1, same location): a PULLI new-ring (N) Wren — an early capture_time
-					// that must NOT stretch puReal1's effort span, but DOES count in new_bird_count.
-					{
-						...base_,
-						bird_id: b13,
-						session_id: puTwin,
-						record_type: 'N',
-						capture_time: '05:00:00'
-					},
-					// puStandalone (pu3): a PULLI new-ring (N) Wren on its own date.
-					{
-						...base_,
-						bird_id: b14,
-						session_id: puStandalone,
-						record_type: 'N',
-						capture_time: '20:00:00'
-					},
-					// puOnly range: two PULLI new-ring (N) Wrens, nothing else.
-					{
-						...base_,
-						bird_id: b15,
-						session_id: puOnly,
-						record_type: 'N',
-						capture_time: '08:00:00'
-					},
-					{
-						...base_,
-						bird_id: b16,
-						session_id: puOnly,
-						record_type: 'N',
-						capture_time: '09:00:00'
-					}
-				]);
+				.insert(
+					await withSessionLocationAndDate(deltaClient, [
+						// --- FIELD_OBSERVATION scenario ---
+						// foReal1 (fo1): three new (N) Robin encounters spanning 09:00–12:00 → 3h effort.
+						{
+							...base_,
+							bird_id: b1,
+							session_id: foReal1,
+							record_type: 'N',
+							capture_time: '09:00:00'
+						},
+						{
+							...base_,
+							bird_id: b2,
+							session_id: foReal1,
+							record_type: 'N',
+							capture_time: '10:00:00'
+						},
+						{
+							...base_,
+							bird_id: b3,
+							session_id: foReal1,
+							record_type: 'N',
+							capture_time: '12:00:00'
+						},
+						// foReal2 (fo2): one new (N) Robin encounter → clamped to 2h minimum effort.
+						{
+							...base_,
+							bird_id: b4,
+							session_id: foReal2,
+							record_type: 'N',
+							capture_time: '10:00:00'
+						},
+						// foTwin (fo1, same location): a passive field observation (C) Wren — an early
+						// capture_time that must NOT stretch foReal1's effort span.
+						{
+							...base_,
+							bird_id: b5,
+							session_id: foTwin,
+							record_type: 'C',
+							capture_time: '05:00:00'
+						},
+						// foStandalone (fo3): a passive field observation (C) Wren on its own date.
+						// (Not 'D' — that's now a resighting_record_type (#874) and would be
+						// excluded from stats_raw_encounters entirely, which isn't what this
+						// scenario is testing.)
+						{
+							...base_,
+							bird_id: b6,
+							session_id: foStandalone,
+							record_type: 'C',
+							capture_time: '20:00:00'
+						},
+						// foOnly range: two passive field observations (C) Wrens, nothing else.
+						{
+							...base_,
+							bird_id: b7,
+							session_id: foOnly,
+							record_type: 'C',
+							capture_time: '08:00:00'
+						},
+						{
+							...base_,
+							bird_id: b8,
+							session_id: foOnly,
+							record_type: 'C',
+							capture_time: '09:00:00'
+						},
+						// --- PULLI scenario (mirrors the above, but PULLI encounters are new-ring N) ---
+						// puReal1 (pu1): three new (N) Robin encounters spanning 09:00–12:00 → 3h effort.
+						{
+							...base_,
+							bird_id: b9,
+							session_id: puReal1,
+							record_type: 'N',
+							capture_time: '09:00:00'
+						},
+						{
+							...base_,
+							bird_id: b10,
+							session_id: puReal1,
+							record_type: 'N',
+							capture_time: '10:00:00'
+						},
+						{
+							...base_,
+							bird_id: b11,
+							session_id: puReal1,
+							record_type: 'N',
+							capture_time: '12:00:00'
+						},
+						// puReal2 (pu2): one new (N) Robin encounter → clamped to 2h minimum effort.
+						{
+							...base_,
+							bird_id: b12,
+							session_id: puReal2,
+							record_type: 'N',
+							capture_time: '10:00:00'
+						},
+						// puTwin (pu1, same location): a PULLI new-ring (N) Wren — an early capture_time
+						// that must NOT stretch puReal1's effort span, but DOES count in new_bird_count.
+						{
+							...base_,
+							bird_id: b13,
+							session_id: puTwin,
+							record_type: 'N',
+							capture_time: '05:00:00'
+						},
+						// puStandalone (pu3): a PULLI new-ring (N) Wren on its own date.
+						{
+							...base_,
+							bird_id: b14,
+							session_id: puStandalone,
+							record_type: 'N',
+							capture_time: '20:00:00'
+						},
+						// puOnly range: two PULLI new-ring (N) Wrens, nothing else.
+						{
+							...base_,
+							bird_id: b15,
+							session_id: puOnly,
+							record_type: 'N',
+							capture_time: '08:00:00'
+						},
+						{
+							...base_,
+							bird_id: b16,
+							session_id: puOnly,
+							record_type: 'N',
+							capture_time: '09:00:00'
+						}
+					])
+				);
 			if (encountersError) throw encountersError;
 		});
 
@@ -727,7 +730,7 @@ describe('core_stats', () => {
 				}
 				const { error: encountersError } = await deltaClient
 					.from('Encounters')
-					.insert(rows);
+					.insert(await withSessionLocationAndDate(deltaClient, rows));
 				if (encountersError) throw encountersError;
 			}
 
@@ -1275,6 +1278,8 @@ describe('core_stats', () => {
 					scheme: 'BTO',
 					sex: 'M',
 					session_id: sessionId,
+					location_id: locationId,
+					visit_date: visitDate,
 					bird_id: birdId,
 					age_code: 4,
 					record_type: 'U',

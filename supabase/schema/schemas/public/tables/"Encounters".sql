@@ -22,6 +22,8 @@ CREATE TABLE public."Encounters" (
 	id bigint DEFAULT nextval('public."Encounters_id_seq"'::regclass) NOT NULL,
 	bird_id bigint NOT NULL,
 	session_id bigint NOT NULL,
+	location_id bigint NOT NULL,
+	visit_date date NOT NULL,
 	ringing_group_id bigint NOT NULL,
 	age_code smallint NOT NULL,
 	max_hatch_year smallint NOT NULL,
@@ -30,7 +32,11 @@ CREATE TABLE public."Encounters" (
 
 CREATE INDEX idx_encounters_bird_id ON public."Encounters" (bird_id);
 
+CREATE INDEX idx_encounters_location_id ON public."Encounters" (location_id);
+
 CREATE INDEX idx_encounters_ringing_group_id ON public."Encounters" (ringing_group_id);
+
+CREATE INDEX idx_encounters_ringing_group_id_visit_date ON public."Encounters" (ringing_group_id, visit_date);
 
 CREATE INDEX idx_encounters_session_id ON public."Encounters" (session_id);
 
@@ -134,6 +140,9 @@ ADD CONSTRAINT encounters_bird_id_fkey FOREIGN KEY (bird_id) REFERENCES public."
 
 ALTER TABLE public."Encounters"
 ADD CONSTRAINT encounters_bird_id_session_id_unique UNIQUE (bird_id, session_id);
+
+ALTER TABLE public."Encounters"
+ADD CONSTRAINT encounters_location_id_fkey FOREIGN KEY (location_id) REFERENCES public."Locations" (id);
 
 ALTER TABLE public."Encounters"
 ADD CONSTRAINT encounters_ringing_group_id_fkey FOREIGN KEY (ringing_group_id) REFERENCES public."RingingGroups" (id);

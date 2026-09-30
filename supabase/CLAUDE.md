@@ -20,6 +20,16 @@ Tables (PascalCase in Postgres, matching generated TypeScript types in `types/su
 
 Key design notes:
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
+- `Encounters` carries its own `location_id`/`visit_date` (both `NOT NULL`, #1015) alongside
+  `session_id`, so an encounter knows where and when it happened without going through a `Session`.
+  Today they always agree with the linked Session's values — `lib/demon-import.ts` writes both from
+  the same values its `Sessions` upsert uses, and the phase-1 backfill copied them off each row's
+  Session — but that redundancy is deliberate groundwork: it lets #1024 stop giving resighting rows
+  a Session at all. Any new `Encounters` row (test fixtures included) must supply both columns;
+  `supabase/__tests__/rpc-functions/helpers/encounter-fixtures.ts` exposes
+  `readTestSessionLocationAndDate` / `withSessionLocationAndDate` for copying them off a Sessions row
+  rather than restating them per call site. No query or RPC reads them yet — every stats RPC still
+  goes through `Sessions.visit_date`.
 - Several fields are populated by triggers (e.g. `proven_age` on Birds, timestamps on Sessions/Encounters).
 - Complex queries are exposed as Postgres RPC functions (e.g. `core_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
