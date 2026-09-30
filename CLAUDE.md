@@ -534,7 +534,7 @@ line per file scanned. This matters most when tests/lint run inside a subagent (
 per-test/per-file output there burns tokens for no signal.
 
 The pre-push hook runs app tests, then two diff-aware selection scripts —
-`scripts/fixture-freshness-select.sh` (see "App tests" below) and `scripts/e2e-select-suite.sh`
+`supabase/scripts/fixture-freshness-select.sh` (see "App tests" below) and `scripts/e2e-select-suite.sh`
 (see "E2E tests" below). It never runs the DB integration suite as a whole; that stays manual,
 and the fixture-freshness check is the one integration test it can reach, gated on the branch
 diff. Local Supabase must be running (`npm run db:start:local`) and seeded
@@ -564,7 +564,7 @@ generated from a raw `core_stats` call) — naming by source instead of by consu
 means a fixture's location can never overstate what it verifies. Within each directory, filenames
 follow `<callingGroupOrParams>.<intent>.json` (e.g. `core_stats/alpha.by-species.json`,
 `core_stats/alpha.home-page-summary.json`). See the comment above the relevant block in
-`scripts/generate-snapshots.ts`, which documents every fixture's actual RPC/table and consuming
+`supabase/scripts/generate-snapshots.ts`, which documents every fixture's actual RPC/table and consuming
 action(s), keeping a fixture's location from silently drifting from what it actually tests.
 Regenerate every fixture here with `npm run db:generate-snapshots` — the sole exception is
 `synthetic/` (#894), two hand-authored all-zero/null edge-case fixtures that no real query can ever
@@ -638,7 +638,7 @@ how #870's column removal reached `main` with every check green (full investigat
   column/row vocabulary when touching this code: it's uniform across the module, its tests and its
   failure messages. The comparison helpers and the two fixture inventories live in
   `lib/snapshot-fixtures.ts` (pure, no I/O, unit-tested in the app suite).
-- **What it covers.** Exactly the 27 fixtures `scripts/generate-snapshots.ts` writes
+- **What it covers.** Exactly the 27 fixtures `supabase/scripts/generate-snapshots.ts` writes
   (`GENERATED_SNAPSHOT_FIXTURES`). It asserts the generator still produces precisely that set, so a
   fixture silently dropping out of the generator fails rather than quietly stopping being checked.
 - **What it doesn't.** The 2 permanently hand-authored `synthetic/` fixtures
@@ -651,10 +651,10 @@ how #870's column removal reached `main` with every check green (full investigat
   their raw sources, so this list is now just the two `synthetic/` fixtures rather than an
   open-ended gap. A second coverage test pins the on-disk file list to generated + ungenerated, so
   any future hand-added fixture stays visible rather than implied-covered.
-- **When it runs.** Pre-push only — CI has no Supabase service. `scripts/fixture-freshness-select.sh`
+- **When it runs.** Pre-push only — CI has no Supabase service. `supabase/scripts/fixture-freshness-select.sh`
   mirrors `scripts/e2e-select-suite.sh`: it diffs the branch against `origin/main` and runs
   `npm run test:fixture-freshness` only when the diff touches `supabase/schema/`,
-  `types/supabase.types.ts`, `scripts/generate-snapshots.ts`, `lib/snapshot-fixtures.ts`,
+  `types/supabase.types.ts`, `supabase/scripts/generate-snapshots.ts`, `lib/snapshot-fixtures.ts`,
   `test-fixtures/snapshots/`, or the test itself. Any branch changing an RPC's shape touches at
   least the first two; most branches pay nothing. It's read-only and writes solely to a temp
   directory, so it stays safe alongside sibling swarm worktrees.
@@ -679,8 +679,8 @@ regenerating every generated fixture, but they start from different baselines:
 Determinism also depends on the seed importing serially: every table's `id` is `DEFAULT
 nextval(...)` rather than `GENERATED ALWAYS AS IDENTITY`, so under concurrent row processing the id
 a row gets depends on I/O timing, and the fixtures embed literal ids (e.g.
-`tables/Birds/robin-alpha.page-of-birds.json`). `scripts/seed-e2e-data.ts` therefore calls
-`importCSV` from `scripts/import-csv.ts` in-process at `concurrency: 1`, rather than shelling out
+`tables/Birds/robin-alpha.page-of-birds.json`). `supabase/scripts/seed-e2e-data.ts` therefore calls
+`importCSV` from `supabase/scripts/import-csv.ts` in-process at `concurrency: 1`, rather than shelling out
 to `npm run db:import:local` at the default 30. That's seeding-only: the CLI (`db:import:{local,prod}`)
 and the web import route keep the default concurrency. Two consecutive `db:sync:e2e` +
 `db:generate-snapshots` runs now produce byte-identical fixtures.
@@ -774,7 +774,7 @@ npm run db:import:local ./path/to/data.csv "Group Name"
 npm run db:import:prod ./path/to/data.csv "Group Name"
 ```
 
-The import script (`scripts/import-csv.ts`) upserts Species, RingingGroups, Birds, Locations, Sessions, and Encounters in dependency order, rate-limited to 30 req/s.
+The import script (`supabase/scripts/import-csv.ts`) upserts Species, RingingGroups, Birds, Locations, Sessions, and Encounters in dependency order, rate-limited to 30 req/s.
 
 Core import logic (types, transforms, `createUpserter`, `processEncounterRow`) lives in `lib/demon-import.ts` and is shared by both the CLI script and the web import route.
 

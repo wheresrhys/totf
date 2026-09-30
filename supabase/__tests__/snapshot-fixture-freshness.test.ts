@@ -34,7 +34,7 @@ import { supabase } from '../../lib/supabase';
 import {
 	generateSnapshots,
 	SNAPSHOTS_DIR
-} from '../../scripts/generate-snapshots';
+} from '../scripts/generate-snapshots';
 import {
 	GENERATED_SNAPSHOT_FIXTURES,
 	UNGENERATED_SNAPSHOT_FIXTURES,

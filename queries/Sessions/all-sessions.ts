@@ -3,7 +3,7 @@ import type { TableQueryDefinition } from '../types';
 /**
  * Sessions with their location and encounter count, most recent first —
  * powers `fetchSessionsPageContent` (`app/(routes)/sessions/page.tsx`).
- * Captured for both Alpha and Beta by `scripts/generate-snapshots.ts`.
+ * Captured for both Alpha and Beta by `supabase/scripts/generate-snapshots.ts`.
  */
 export const allSessionsQuery: TableQueryDefinition = {
 	table: 'Sessions',

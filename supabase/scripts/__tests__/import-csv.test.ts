@@ -31,7 +31,7 @@ vi.mock('fs', () => ({
 
 vi.mock('csv-parser', () => ({ default: vi.fn(() => ({})) }));
 
-vi.mock('../../lib/supabase', () => ({
+vi.mock('../../../lib/supabase', () => ({
 	supabase: {
 		from: () => ({
 			select: () => ({
@@ -43,11 +43,11 @@ vi.mock('../../lib/supabase', () => ({
 	}
 }));
 
-vi.mock('../../app/lib/auth/group-auth', () => ({
+vi.mock('../../../app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClientForGroup: vi.fn(async () => ({}))
 }));
 
-vi.mock('../../lib/demon-import', () => ({
+vi.mock('../../../lib/demon-import', () => ({
 	createUpserter: vi.fn(() => vi.fn()),
 	createRingSequenceLookup: vi.fn(() => vi.fn()),
 	createRingSequenceLinker: vi.fn(() => vi.fn()),

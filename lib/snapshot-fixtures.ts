@@ -38,7 +38,7 @@
  */
 
 /**
- * The 27 fixtures `scripts/generate-snapshots.ts` produces, and therefore the
+ * The 27 fixtures `supabase/scripts/generate-snapshots.ts` produces, and therefore the
  * exact set the freshness check covers. Paths are relative to
  * `test-fixtures/snapshots/` and follow #882's source-directory layout (one
  * subdirectory per RPC, `tables/<TableName>/` for direct PostgREST reads).
@@ -57,7 +57,7 @@
  * `biometrics_stats/robin-alpha.monthly-history.json`,
  * `tables/Birds/robin-alpha.graphable-encounters.json`,
  * `find_discrepencies`/`notable_retraps` `beta.*` counterparts to the alpha-only
- * fixtures below) — see `scripts/generate-snapshots.ts`'s per-block comments for
+ * fixtures below) — see `supabase/scripts/generate-snapshots.ts`'s per-block comments for
  * why each one is safe to skip.
  *
  * #901 split the last two compound fixtures (each merging two RPC/table results

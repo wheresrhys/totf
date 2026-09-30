@@ -8,13 +8,13 @@
  *
  * Also importable as a library (`importCSV`) — the CLI block at the bottom only
  * runs when this file is the process entrypoint, so importing it is side-effect
- * free. `scripts/seed-e2e-data.ts` uses that to import at `concurrency: 1`,
+ * free. `supabase/scripts/seed-e2e-data.ts` uses that to import at `concurrency: 1`,
  * which makes row processing (and therefore `nextval`-assigned row ids)
  * deterministic — see #903.
  */
 import { pRateLimit } from 'p-ratelimit';
-import { getAuthenticatedSupabaseClientForGroup } from '../app/lib/auth/group-auth';
-import { supabase } from '../lib/supabase';
+import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
+import { supabase } from '../../lib/supabase';
 import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
@@ -24,7 +24,7 @@ import {
 	createRingSequenceLookup,
 	createRingSequenceLinker,
 	processEncounterRow
-} from '../lib/demon-import';
+} from '../../lib/demon-import';
 
 /**
  * Default max number of rows processed at once. Unchanged from the value this
