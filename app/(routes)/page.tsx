@@ -6,10 +6,10 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	HomePageContent,
 	type PageModel,
-	type HomePageSummaryStats,
-	type SpeciesWithBirdsCount
+	type HomePageSummaryStats
 } from './PageContent';
 import type { CoreStatsResult, GroupTicksResult } from '../models/db';
+import type { SpeciesWithBirdsCount } from '../models/species';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
@@ -82,16 +82,16 @@ export async function fetchLastGroupTick(
 	return ticks?.[0] ?? null;
 }
 
-export async function fetchTopSpecies(): Promise<SpeciesWithBirdsCount[]> {
+// Every species the group has actually recorded (birds count > 0), for the
+// home page's species-by-letter nav (#1025) — replaced the previous
+// top-10-by-count badge list, so this no longer sorts by count or slices.
+export async function fetchGroupSpecies(): Promise<SpeciesWithBirdsCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const species = (await supabase
 		.from('Species')
 		.select(topSpeciesQuery.select)
 		.then(catchSupabaseErrors)) as SpeciesWithBirdsCount[];
-	return species
-		.filter((s) => (s.birds[0]?.count ?? 0) > 0)
-		.sort((a, b) => (b.birds[0]?.count ?? 0) - (a.birds[0]?.count ?? 0))
-		.slice(0, 10);
+	return species.filter((s) => (s.birds[0]?.count ?? 0) > 0);
 }
 
 export async function fetchHomePageContent(
@@ -100,7 +100,7 @@ export async function fetchHomePageContent(
 ): Promise<PageModel> {
 	return {
 		recentSessions: await fetchRecentSessions(viewedGroupId),
-		topSpecies: await fetchTopSpecies(),
+		groupSpecies: await fetchGroupSpecies(),
 		summaryStats: await fetchHomePageSummaryStats(viewedGroupId),
 		lastGroupTick: await fetchLastGroupTick(viewedGroupId)
 	};

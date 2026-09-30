@@ -260,11 +260,12 @@ export async function generateSnapshots(
 	);
 
 	// Table: Species (embedded Birds count, unfiltered/unsliced) — powers
-	// fetchTopSpecies (app/(routes)/page.tsx); the action itself filters to
-	// birds count > 0, sorts descending and slices to the top 10 client-side —
-	// this fixture is the raw query result before that in-memory processing,
-	// since the raw DB read is what a shape drift would actually break. Query:
-	// queries/Species/top-species.ts
+	// fetchGroupSpecies (app/(routes)/page.tsx), which filters to birds count
+	// > 0 for the home page's species-by-letter nav (#1025). This fixture is
+	// the raw query result before that in-memory filtering, since the raw DB
+	// read is what a shape drift would actually break. Query:
+	// queries/Species/top-species.ts (name/fixture path kept as "top-species"
+	// since the underlying query itself is unchanged)
 	{
 		const { data: topSpecies } = await alpha
 			.from('Species')

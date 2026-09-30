@@ -6,18 +6,14 @@ import {
 } from '../components/shared/DesignSystem';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '../models/session';
-import type {
-	CoreStatsResult,
-	SpeciesRow,
-	GroupTicksResult
-} from '../models/db';
+import type { CoreStatsResult, GroupTicksResult } from '../models/db';
+import type { SpeciesWithBirdsCount } from '../models/species';
 import { SessionsByDay } from '../components/SessionsByDay';
+import { SpeciesAlphabetNav } from '../components/SpeciesAlphabetNav';
 import { NoPrefetchLink } from '../components/shared/NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
 
-export type SpeciesWithBirdsCount = Pick<SpeciesRow, 'id' | 'species_name'> & {
-	birds: { count: number }[];
-};
+export type { SpeciesWithBirdsCount };
 
 export type HomePageSummaryStats = {
 	allTime: CoreStatsResult | null;
@@ -27,7 +23,7 @@ export type HomePageSummaryStats = {
 
 export type PageModel = {
 	recentSessions: SessionWithEncountersCount[];
-	topSpecies: SpeciesWithBirdsCount[];
+	groupSpecies: SpeciesWithBirdsCount[];
 	summaryStats: HomePageSummaryStats | null;
 	lastGroupTick: GroupTicksResult | null;
 };
@@ -134,7 +130,7 @@ function LastGroupTick({ data }: { data: GroupTicksResult | null }) {
 		</p>
 	);
 }
-function TopSpecies({
+function SpeciesSection({
 	data,
 	lastGroupTick
 }: {
@@ -150,18 +146,7 @@ function TopSpecies({
 				</NoPrefetchLink>
 			</SecondaryHeading>
 
-			<ul className="flex flex-wrap gap-2">
-				{data.map((species) => (
-					<li key={species.id}>
-						<NoPrefetchLink
-							className="link badge badge-outline"
-							href={`/species/${species.species_name}`}
-						>
-							{species.species_name}
-						</NoPrefetchLink>
-					</li>
-				))}
-			</ul>
+			<SpeciesAlphabetNav species={data} />
 			<LastGroupTick data={lastGroupTick} />
 		</div>
 	);
@@ -177,7 +162,10 @@ export function HomePageContent({
 		<PageWrapper>
 			<SummaryStatsTable data={data.summaryStats} />
 			<RecentSessions data={data.recentSessions} viewedGroup={viewedGroup} />
-			<TopSpecies data={data.topSpecies} lastGroupTick={data.lastGroupTick} />
+			<SpeciesSection
+				data={data.groupSpecies}
+				lastGroupTick={data.lastGroupTick}
+			/>
 		</PageWrapper>
 	);
 }

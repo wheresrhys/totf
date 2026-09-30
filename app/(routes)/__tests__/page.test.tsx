@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, within } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	within,
+	fireEvent
+} from '@testing-library/react';
 import HomePage from '../page';
 import recentSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.recent-sessions.json';
 import topSpeciesSnapshot from '@/test-fixtures/snapshots/tables/Species/alpha.top-species.json';
@@ -184,24 +190,23 @@ describe('home page', () => {
 		});
 
 		describe('last tick (last group tick)', () => {
-			it('renders "Last tick: {species} on {date}" after the species badge list', async () => {
+			it('renders "Last tick: {species} on {date}" after the species letter nav', async () => {
 				render(await HomePage());
 				const heading = await screen.findByRole('heading', {
 					name: 'Species View all'
 				});
 				const container = heading.parentElement as HTMLElement;
-				const children = Array.from(container.children);
-				const list = container.querySelector('ul');
-				const paragraph = children.find(
-					(el) => el.tagName === 'P' && el.textContent?.includes('Last tick:')
-				);
-				expect(paragraph?.textContent).toContain(
+				const letterNav = within(container).getByRole('list', {
+					name: 'Browse species by letter'
+				});
+				const paragraph = screen.getByText(/Last tick:/);
+				expect(paragraph.textContent).toContain(
 					'Last tick: Carrion Crow on 12th February 2026'
 				);
-				expect(list).not.toBeNull();
-				expect(children.indexOf(list as Element)).toBeLessThan(
-					children.indexOf(paragraph as Element)
-				);
+				expect(
+					letterNav.compareDocumentPosition(paragraph) &
+						Node.DOCUMENT_POSITION_FOLLOWING
+				).toBeTruthy();
 			});
 
 			it('renders a "View all ticks" link to /ticks', async () => {
@@ -238,33 +243,50 @@ describe('home page', () => {
 			});
 		});
 
-		it('renders a badge link per top species from the fixture', async () => {
+		it('renders one letter button per distinct first letter among species the group has actually caught', async () => {
 			render(await HomePage());
-			const heading = await screen.findByRole('heading', {
-				name: 'Species View all'
-			});
-			const speciesList = heading.parentElement?.querySelector('ul');
-			const speciesLinks = Array.from(speciesList?.querySelectorAll('a') ?? []);
-			expect(speciesLinks.length).toBeGreaterThan(0);
-			for (const link of speciesLinks) {
-				expect(link.getAttribute('href')).toBe(
-					`/species/${link.textContent?.trim()}`
-				);
-			}
+			await screen.findByRole('heading', { name: 'Species View all' });
+			// Fixture species: Blue Tit, Reed Warbler, Fieldfare, Redwing,
+			// Kingfisher, Wren, Robin (count > 0) and Chaffinch (count 0, so its
+			// letter "C" must not appear).
+			const letterButtons = screen.getAllByRole('button');
+			expect(letterButtons.map((button) => button.textContent)).toEqual([
+				'B',
+				'F',
+				'K',
+				'R',
+				'W'
+			]);
 		});
 
 		describe('with no species yet caught', () => {
-			it('renders no badge links', async () => {
+			it('renders no letter buttons', async () => {
 				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
 					makeChainClient({ Species: [] })
 				);
 				render(await HomePage());
-				const heading = await screen.findByRole('heading', {
-					name: 'Species View all'
-				});
-				const speciesList = heading.parentElement?.querySelector('ul');
-				const speciesLinks = speciesList?.querySelectorAll('a') ?? [];
-				expect(speciesLinks.length).toBe(0);
+				await screen.findByRole('heading', { name: 'Species View all' });
+				expect(screen.queryAllByRole('button')).toHaveLength(0);
+			});
+		});
+
+		describe('tapping a letter button', () => {
+			it('reveals links to every species page starting with that letter, sorted alphabetically', async () => {
+				render(await HomePage());
+				await screen.findByRole('heading', { name: 'Species View all' });
+				fireEvent.click(
+					screen.getByRole('button', { name: 'Show species starting with R' })
+				);
+				const links = screen.getAllByRole('link', { name: /^[A-Z]/ });
+				const speciesLinks = links.filter((link) =>
+					link.getAttribute('href')?.startsWith('/species/')
+				);
+				expect(speciesLinks.map((link) => link.textContent?.trim())).toEqual([
+					'Redwing',
+					'Reed Warbler',
+					'Robin'
+				]);
+				expect(speciesLinks[0].getAttribute('href')).toBe('/species/Redwing');
 			});
 		});
 	});
