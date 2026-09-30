@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, within } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	within,
+	fireEvent
+} from '@testing-library/react';
 import HomePage from '../page';
 import recentSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.recent-sessions.json';
 import topSpeciesSnapshot from '@/test-fixtures/snapshots/tables/Species/alpha.top-species.json';
@@ -172,99 +178,65 @@ describe('home page', () => {
 		});
 	});
 
-	describe('species section', () => {
-		it('renders Species heading with a "View all" link to /species', async () => {
+	describe('last tick (last group tick)', () => {
+		it('renders "Last tick: {species} on {date}" after the species letter nav', async () => {
 			render(await HomePage());
-			const heading = await screen.findByRole('heading', {
-				name: 'Species View all'
+			await screen.findByRole('heading', {
+				name: 'Sessions View all'
 			});
-			expect(heading).toBeDefined();
-			const link = within(heading).getByRole('link', { name: 'View all' });
-			expect(link.getAttribute('href')).toBe('/species');
+			const paragraph = screen.getByText(/Last tick:/);
+			expect(paragraph.textContent).toContain(
+				'Last tick: Carrion Crow on 12th February 2026'
+			);
 		});
 
-		describe('last tick (last group tick)', () => {
-			it('renders "Last tick: {species} on {date}" after the species badge list', async () => {
-				render(await HomePage());
-				const heading = await screen.findByRole('heading', {
-					name: 'Species View all'
-				});
-				const container = heading.parentElement as HTMLElement;
-				const children = Array.from(container.children);
-				const list = container.querySelector('ul');
-				const paragraph = children.find(
-					(el) => el.tagName === 'P' && el.textContent?.includes('Last tick:')
-				);
-				expect(paragraph?.textContent).toContain(
-					'Last tick: Carrion Crow on 12th February 2026'
-				);
-				expect(list).not.toBeNull();
-				expect(children.indexOf(list as Element)).toBeLessThan(
-					children.indexOf(paragraph as Element)
-				);
-			});
-
-			it('renders a "View all ticks" link to /ticks', async () => {
-				render(await HomePage());
-				const link = await screen.findByRole('link', {
-					name: 'View all ticks'
-				});
-				expect(link.getAttribute('href')).toBe('/ticks');
-			});
-
-			describe('with no ticks yet', () => {
-				it('omits the paragraph entirely', async () => {
-					mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-						makeChainClient({ lastGroupTick: [] })
-					);
-					render(await HomePage());
-					const heading = await screen.findByRole('heading', {
-						name: 'Species View all'
-					});
-					expect(heading).toBeDefined();
-					expect(screen.queryByText(/Last tick:/)).toBeNull();
-				});
-
-				it('omits the "View all ticks" link', async () => {
-					mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-						makeChainClient({ lastGroupTick: [] })
-					);
-					render(await HomePage());
-					await screen.findByRole('heading', { name: 'Species View all' });
-					expect(
-						screen.queryByRole('link', { name: 'View all ticks' })
-					).toBeNull();
-				});
-			});
-		});
-
-		it('renders a badge link per top species from the fixture', async () => {
+		it('renders a "View all ticks" link to /ticks', async () => {
 			render(await HomePage());
-			const heading = await screen.findByRole('heading', {
-				name: 'Species View all'
+			const link = await screen.findByRole('link', {
+				name: 'View all ticks'
 			});
-			const speciesList = heading.parentElement?.querySelector('ul');
-			const speciesLinks = Array.from(speciesList?.querySelectorAll('a') ?? []);
-			expect(speciesLinks.length).toBeGreaterThan(0);
-			for (const link of speciesLinks) {
-				expect(link.getAttribute('href')).toBe(
-					`/species/${link.textContent?.trim()}`
-				);
-			}
+			expect(link.getAttribute('href')).toBe('/ticks');
+		});
+	});
+
+	describe('species nav', () => {
+		it('renders one letter button per distinct first letter among species the group has actually caught', async () => {
+			render(await HomePage());
+			await screen.findByRole('button', {
+				name: 'Show species starting with B'
+			});
+			// Fixture species: Blue Tit, Reed Warbler, Fieldfare, Redwing,
+			// Kingfisher, Wren, Robin (count > 0) and Chaffinch (count 0, so its
+			// letter "C" must not appear).
+			const letterButtons = screen.getAllByRole('button');
+			expect(letterButtons.map((button) => button.textContent)).toEqual([
+				'B',
+				'F',
+				'K',
+				'R',
+				'W'
+			]);
 		});
 
-		describe('with no species yet caught', () => {
-			it('renders no badge links', async () => {
-				mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-					makeChainClient({ Species: [] })
-				);
+		describe('tapping a letter button', () => {
+			it('reveals links to every species page starting with that letter, sorted alphabetically', async () => {
 				render(await HomePage());
-				const heading = await screen.findByRole('heading', {
-					name: 'Species View all'
+				await screen.findByRole('button', {
+					name: 'Show species starting with B'
 				});
-				const speciesList = heading.parentElement?.querySelector('ul');
-				const speciesLinks = speciesList?.querySelectorAll('a') ?? [];
-				expect(speciesLinks.length).toBe(0);
+				fireEvent.click(
+					screen.getByRole('button', { name: 'Show species starting with R' })
+				);
+				const links = screen.getAllByRole('link', { name: /^[A-Z]/ });
+				const speciesLinks = links.filter((link) =>
+					link.getAttribute('href')?.startsWith('/species/')
+				);
+				expect(speciesLinks.map((link) => link.textContent?.trim())).toEqual([
+					'Redwing',
+					'Reed Warbler',
+					'Robin'
+				]);
+				expect(speciesLinks[0].getAttribute('href')).toBe('/species/Redwing');
 			});
 		});
 	});

@@ -1,9 +1,10 @@
 import type { TableQueryDefinition } from '../types';
 
 /**
- * Species with their bird count, unfiltered/unsliced — powers `fetchTopSpecies`
- * (`app/(routes)/page.tsx`), which filters to birds count > 0, sorts
- * descending and slices to the top 10 client-side.
+ * Species with their bird count, unfiltered/unsliced — powers `fetchGroupSpecies`
+ * (`app/(routes)/page.tsx`), which filters to birds count > 0 for the home
+ * page's species-by-letter nav (#1025). Query name/fixture kept as
+ * `top-species` since the underlying query itself is unchanged.
  */
 export const topSpeciesQuery: TableQueryDefinition = {
 	table: 'Species',
