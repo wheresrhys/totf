@@ -21,7 +21,7 @@ export function randomTestSuffix(): string {
  * A random date far enough in the future to never collide with e2e seed data (which
  * spans 2021–2024) or with the same date chosen by a concurrent test run. Use this
  * instead of a fixed literal date for any row that feeds a query aggregating across a
- * whole group (e.g. `stats_per_day_and_species`), where two concurrent runs picking the
+ * whole group, where two concurrent runs picking the
  * same date would combine their rows into a single aggregate and break both runs'
  * expectations.
  */

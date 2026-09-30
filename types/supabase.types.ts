@@ -659,20 +659,6 @@ export type Database = {
           visit_date: string
         }[]
       }
-      stats_per_day_and_species: {
-        Args: { ringing_group_filter: number }
-        Returns: {
-          encounter_count: number
-          juv_count: number
-          max_weight: number
-          min_weight: number
-          postjuv_count: number
-          pullus_count: number
-          species_name: string
-          visit_date: string
-          weighed_birds_count: number
-        }[]
-      }
       stats_raw_encounters: {
         Args: {
           from_date?: string
