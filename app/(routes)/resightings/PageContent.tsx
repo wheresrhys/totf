@@ -98,8 +98,8 @@ function rowDataTransform(
 	return {
 		ringNo: resighting.bird.ring_no,
 		speciesName: resighting.bird.species.species_name,
-		visitDate: new Date(resighting.session.visit_date),
-		locationName: resighting.session.location.location_name,
+		visitDate: new Date(resighting.visit_date),
+		locationName: resighting.location.location_name,
 		recordType: resighting.record_type,
 		notes: resighting.extra_text,
 		findingCondition: resighting.finding_condition,

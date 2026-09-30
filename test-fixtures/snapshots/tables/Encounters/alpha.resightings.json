@@ -5,17 +5,15 @@
     "extra_text": null,
     "finding_condition": "8",
     "finding_circumstances": "2",
+    "visit_date": "2023-05-10",
     "bird": {
       "ring_no": "AKINGF9001",
       "species": {
         "species_name": "Kingfisher"
       }
     },
-    "session": {
-      "location": {
-        "location_name": "Alpha Site A (CES)"
-      },
-      "visit_date": "2023-05-10"
+    "location": {
+      "location_name": "Alpha Site A (CES)"
     }
   },
   {
@@ -24,17 +22,15 @@
     "extra_text": null,
     "finding_condition": "3",
     "finding_circumstances": "5",
+    "visit_date": "2023-05-12",
     "bird": {
       "ring_no": "ZWREN9001",
       "species": {
         "species_name": "Wren"
       }
     },
-    "session": {
-      "location": {
-        "location_name": "Alpha Site A (CES)"
-      },
-      "visit_date": "2023-05-12"
+    "location": {
+      "location_name": "Alpha Site A (CES)"
     }
   }
 ]

@@ -11,10 +11,8 @@ function makeResighting(id: number, speciesName: string): ResightingEncounter {
 			ring_no: `RING${id}`,
 			species: { species_name: speciesName }
 		},
-		session: {
-			visit_date: '2024-01-01',
-			location: { location_name: 'Test Site' }
-		}
+		visit_date: '2024-01-01',
+		location: { location_name: 'Test Site' }
 	} as ResightingEncounter;
 }
 
