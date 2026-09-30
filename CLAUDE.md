@@ -372,6 +372,17 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
    `.github/workflows/deploy-migrations.yml` job added in #862 was exercised and then deliberately
    removed, so `npm run db:migration:push` is once again the sole deploy path.
 
+**Every `supabase/schema/` change must produce a migration via step 4 above — no exceptions.**
+`supabase/migrations/` holds 79+ historical files (~944KB) that are pure noise for almost any
+single task, so a `PreToolUse` hook (`.claude/hooks/gate-migration-reads.sh`, wired in
+`.claude/settings.json`) denies `Read`/`Grep` access to any migration file that isn't part of the
+current branch's diff (or still uncommitted) — keeping that history out of default context. The
+migration `db:schema:apply` just generated for your change stays readable automatically, because
+it *is* part of the branch's diff; only pre-existing, unrelated migrations are gated. If a task
+genuinely needs to inspect a specific historical migration (e.g. to understand a past decision a
+ticket must account for), name the file and why to the user and get their sign-off before reading
+it — the hook denies rather than asks, since ticket-workflow subagents run non-interactively.
+
 ## Data fetching conventions
 
 - Data fetching happens in **server actions** (`app/actions/`) or in server-rendered pages/components — never in client components (anything marked `'use client'`).
