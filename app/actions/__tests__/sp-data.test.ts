@@ -602,6 +602,29 @@ describe('sp-data actions', () => {
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
 		});
+
+		it('passes month_filter through when supplied', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await fetchSpeciesPeriodTotals(
+				SPECIES_NAME,
+				GROUP_ID,
+				'year',
+				undefined,
+				undefined,
+				1
+			);
+
+			expect(rpcCalls[0].args).toMatchObject({ month_filter: 1 });
+		});
+
+		it('omits month_filter when not supplied', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+
+			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'month');
+
+			expect(rpcCalls[0].args).not.toHaveProperty('month_filter');
+		});
 	});
 
 	describe('fetchSpeciesCombinedMonthTotals', () => {

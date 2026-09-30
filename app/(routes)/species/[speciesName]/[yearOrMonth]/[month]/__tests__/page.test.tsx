@@ -34,17 +34,17 @@ const birds = birdsSnapshot as FullFatPageData['birds'];
 
 function renderMonthPage(
 	speciesName = 'Robin',
-	year = '2026',
+	yearOrMonth = '2026',
 	month = '08',
 	tabId?: string
 ) {
 	return Page({
-		params: Promise.resolve({ speciesName, year, month }),
+		params: Promise.resolve({ speciesName, yearOrMonth, month }),
 		...(tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) })
 	});
 }
 
-describe('/species/[speciesName]/[year]/[month]', () => {
+describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 	afterEach(() => {
 		cleanup();
 		mockFetchPageOfBirds.mockReset();
@@ -180,7 +180,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 
 		it("threads the month's first/last calendar day into fetchPageOfBirds", async () => {
 			await fetchSpeciesYearMonthPageContent(
-				{ speciesName: 'Robin', year: '2026', month: '08' },
+				{ speciesName: 'Robin', yearOrMonth: '2026', month: '08' },
 				1
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
@@ -194,7 +194,7 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 
 		it('computes the correct bounds for a shorter month (April)', async () => {
 			await fetchSpeciesYearMonthPageContent(
-				{ speciesName: 'Robin', year: '2026', month: '04' },
+				{ speciesName: 'Robin', yearOrMonth: '2026', month: '04' },
 				1
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
@@ -243,10 +243,19 @@ describe('/species/[speciesName]/[year]/[month]', () => {
 		it('rejects when the species lookup finds no row (surfacing the not-found path)', async () => {
 			await expect(
 				fetchSpeciesYearMonthPageContent(
-					{ speciesName: 'Nonexistent', year: '2026', month: '08' },
+					{ speciesName: 'Nonexistent', yearOrMonth: '2026', month: '08' },
 					1
 				)
 			).rejects.toThrow();
 		});
+	});
+
+	it('calls notFound() when the parent segment is a month abbreviation (no day-drill under a squashed month)', async () => {
+		await expect(
+			fetchSpeciesYearMonthPageContent(
+				{ speciesName: 'Robin', yearOrMonth: 'jan', month: '08' },
+				1
+			)
+		).rejects.toThrow();
 	});
 });

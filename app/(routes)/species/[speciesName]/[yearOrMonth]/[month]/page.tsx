@@ -1,4 +1,5 @@
 import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { notFound } from 'next/navigation';
 import {
 	BootstrapPage,
 	defaultGetParams
@@ -6,43 +7,51 @@ import {
 import { SpeciesPageContent, type PageData } from '../../PageContent';
 import { fetchSpeciesPageContentForPeriod } from '@/app/(routes)/species/[speciesName]/page';
 import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
+import { parseMonthAbbreviation } from '@/app/lib/squashed-month';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type PageParams = {
 	speciesName: string;
-	year: string;
+	yearOrMonth: string;
 	month: string;
 	tabId?: string;
 };
 type PageProps = {
-	params: Promise<{ speciesName: string; year: string; month: string }>;
+	params: Promise<{ speciesName: string; yearOrMonth: string; month: string }>;
 	searchParams?: Promise<{ tabId?: string }>;
 };
 
-// Merges the route's `speciesName`/`year`/`month` with the optional
+// Merges the route's `speciesName`/`yearOrMonth`/`month` with the optional
 // `?tabId=` search param (#803) — see the bare species `page.tsx`'s
 // `getSpeciesPageParams` for the shared rationale.
 async function getSpeciesYearMonthPageParams(
 	pageProps: PageProps
 ): Promise<PageParams> {
-	const { speciesName, year, month } = await defaultGetParams<
+	const { speciesName, yearOrMonth, month } = await defaultGetParams<
 		PageProps,
-		{ speciesName: string; year: string; month: string }
+		{ speciesName: string; yearOrMonth: string; month: string }
 	>(pageProps);
 	const tabId = await readTabIdSearchParam(pageProps.searchParams);
-	return { speciesName, year, month, ...(tabId ? { tabId } : {}) };
+	return { speciesName, yearOrMonth, month, ...(tabId ? { tabId } : {}) };
 }
 
 export async function fetchSpeciesYearMonthPageContent(
 	params: PageParams,
 	viewedGroupId: number
 ): Promise<PageData | null> {
-	// Calendar-month range, mirroring `summary/[year]/[month]/page.tsx`.
-	const monthDate = new Date(Number(params.year), Number(params.month) - 1, 1);
+	// A squashed month (e.g. `/species/{name}/jan/5`) has no single year to
+	// drill a specific day-range into — this nested route only makes sense
+	// under a real calendar year.
+	if (parseMonthAbbreviation(params.yearOrMonth) !== undefined) {
+		notFound();
+	}
+	// Calendar-month range, mirroring `summary/[yearOrMonth]/[month]/page.tsx`.
+	const year = params.yearOrMonth;
+	const monthDate = new Date(Number(year), Number(params.month) - 1, 1);
 	const fromDate = format(startOfMonth(monthDate), 'yyyy-MM-dd');
 	const toDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
 	return fetchSpeciesPageContentForPeriod(params, viewedGroupId, {
-		year: Number(params.year),
+		year: Number(year),
 		month: Number(params.month),
 		fromDate,
 		toDate
@@ -60,7 +69,7 @@ export default async function SpeciesYearMonthPage(
 			getCacheKeys={(params: PageParams) => [
 				'species',
 				params.speciesName,
-				params.year,
+				params.yearOrMonth,
 				params.month
 			]}
 			dataFetcher={fetchSpeciesYearMonthPageContent}

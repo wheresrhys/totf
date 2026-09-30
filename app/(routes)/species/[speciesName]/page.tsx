@@ -48,14 +48,16 @@ export async function getSpeciesStats(
 	species: string,
 	viewedGroupId: number,
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
+	monthFilter?: number
 ): Promise<CoreStatsWithBiometrics[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
 		species_name_filter: species,
 		ringing_group_filter: viewedGroupId,
 		...(fromDate ? { from_date: fromDate } : {}),
-		...(toDate ? { to_date: toDate } : {})
+		...(toDate ? { to_date: toDate } : {}),
+		...(monthFilter ? { month_filter: monthFilter } : {})
 	};
 	const [aggregateRows, biometricsRows] = await Promise.all([
 		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
@@ -83,7 +85,7 @@ export async function fetchSpeciesPageContentForPeriod(
 	viewedGroupId: number,
 	period: PeriodScope = {}
 ): Promise<PageData | null> {
-	const { year, month, fromDate, toDate } = period;
+	const { year, month, fromDate, toDate, squashedMonth } = period;
 	const supabase = await getAuthenticatedSupabaseClient();
 	const { id: speciesId } = (await supabase
 		.from('Species')
@@ -96,7 +98,13 @@ export async function fetchSpeciesPageContentForPeriod(
 	}
 	const [birds, speciesStats] = await Promise.all([
 		fetchPageOfBirds(speciesId, viewedGroupId, 0, fromDate, toDate),
-		getSpeciesStats(params.speciesName, viewedGroupId, fromDate, toDate)
+		getSpeciesStats(
+			params.speciesName,
+			viewedGroupId,
+			fromDate,
+			toDate,
+			squashedMonth
+		)
 	]);
 	if (birds.length === 0) {
 		return {
@@ -104,7 +112,8 @@ export async function fetchSpeciesPageContentForPeriod(
 			year,
 			month,
 			fromDate,
-			toDate
+			toDate,
+			squashedMonth
 		};
 	}
 	return {
@@ -115,7 +124,8 @@ export async function fetchSpeciesPageContentForPeriod(
 		year,
 		month,
 		fromDate,
-		toDate
+		toDate,
+		squashedMonth
 	};
 }
 

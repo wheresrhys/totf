@@ -287,13 +287,15 @@ export async function fetchSpeciesPeriodTotals(
 	viewedGroupId: number,
 	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
+	monthFilter?: number
 ): Promise<CoreStatsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('core_stats', {
 			...(fromDate ? { from_date: fromDate } : {}),
 			...(toDate ? { to_date: toDate } : {}),
+			...(monthFilter ? { month_filter: monthFilter } : {}),
 			ringing_group_filter: viewedGroupId,
 			species_name_filter: speciesName,
 			group_by_time_period: timeInterval

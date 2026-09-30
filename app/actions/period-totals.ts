@@ -14,11 +14,13 @@ export async function fetchPeriodTotals(
 	viewedGroupId: number,
 	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
+	monthFilter?: number
 ): Promise<CoreStatsResult[]> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {}),
+		...(monthFilter ? { month_filter: monthFilter } : {}),
 		group_by_species: false,
 		group_by_time_period: timeInterval
 	});

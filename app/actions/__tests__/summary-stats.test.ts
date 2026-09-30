@@ -46,6 +46,30 @@ describe('summary-stats actions — route through the group-summary access helpe
 			expect(result).toBeNull();
 			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {});
 		});
+
+		it('passes month_filter through when a monthFilter is supplied', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [ROW]
+			});
+
+			await fetchSummaryStats(1, undefined, undefined, 1);
+
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+				month_filter: 1
+			});
+		});
+
+		it('omits month_filter when no monthFilter is supplied', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [ROW]
+			});
+
+			await fetchSummaryStats(1);
+
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {});
+		});
 	});
 
 	describe('fetchPeriodStats', () => {
@@ -68,6 +92,35 @@ describe('summary-stats actions — route through the group-summary access helpe
 				group_by_time_period: 'month',
 				from_date: '2026-01-01',
 				to_date: '2026-12-31'
+			});
+		});
+
+		it('passes month_filter through when a monthFilter is supplied', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [ROW]
+			});
+
+			await fetchPeriodStats(1, 'year', undefined, undefined, 1);
+
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+				group_by_species: false,
+				group_by_time_period: 'year',
+				month_filter: 1
+			});
+		});
+
+		it('omits month_filter when no monthFilter is supplied', async () => {
+			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+				accessLevel: 'own',
+				rows: [ROW]
+			});
+
+			await fetchPeriodStats(1, 'day');
+
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+				group_by_species: false,
+				group_by_time_period: 'day'
 			});
 		});
 	});

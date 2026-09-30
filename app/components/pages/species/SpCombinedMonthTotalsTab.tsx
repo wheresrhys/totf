@@ -15,6 +15,7 @@ import {
 } from '@/app/lib/month-totals';
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
+import { buildSpeciesSquashedMonthHref } from '@/app/lib/squashed-month';
 
 // The all-time species page's combine-years "Month totals" tab — the
 // species-scoped counterpart to `SummaryTotalsSection`'s
@@ -123,7 +124,15 @@ export function SpCombinedMonthTotalsTab({
 					).map((row) => row.stats)}
 					firstColumnHeader="Month"
 					showSpeciesColumn={false}
-					buildHref={() => ''}
+					// Links into the squashed-month species page (#1005) for this
+					// calendar month — no single year to drill into, but every
+					// occurrence of the month across the group's whole history.
+					buildHref={(timePeriod) =>
+						buildSpeciesSquashedMonthHref(
+							speciesName,
+							Number(timePeriod.slice(5, 7))
+						)
+					}
 					buildLabel={(timePeriod) =>
 						combinedMonthLabelByTimePeriod.get(timePeriod) ?? ''
 					}

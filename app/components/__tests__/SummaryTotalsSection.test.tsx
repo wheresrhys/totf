@@ -454,9 +454,12 @@ describe('SummaryTotalsSection', () => {
 				['January', 'August'].forEach((monthName) => {
 					expect(screen.getByText(monthName)).toBeTruthy();
 				});
-				// Combine-years labels are month name only — no year, no link.
+				// Combine-years labels are month name only — no year — and link
+				// into the squashed-month summary page (#1005).
 				expect(screen.queryByText('January 2020')).toBeNull();
-				expect(screen.queryByRole('link', { name: 'January' })).toBeNull();
+				expect(
+					screen.getByRole('link', { name: 'January' }).getAttribute('href')
+				).toBe('/group/alpha/summary/jan');
 			});
 
 			it('renders a "Busiest session" column between Encounters and Birds', async () => {

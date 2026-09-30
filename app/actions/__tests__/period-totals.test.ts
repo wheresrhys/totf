@@ -49,4 +49,33 @@ describe('fetchPeriodTotals — routes through the group-summary access helper',
 			group_by_time_period: 'year'
 		});
 	});
+
+	it('passes month_filter through when a monthFilter is supplied', async () => {
+		vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+			accessLevel: 'own',
+			rows: [ROW]
+		});
+
+		await fetchPeriodTotals(1, 'day', undefined, undefined, 3);
+
+		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+			month_filter: 3,
+			group_by_species: false,
+			group_by_time_period: 'day'
+		});
+	});
+
+	it('omits month_filter when no monthFilter is supplied', async () => {
+		vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
+			accessLevel: 'own',
+			rows: [ROW]
+		});
+
+		await fetchPeriodTotals(1, 'day');
+
+		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+			group_by_species: false,
+			group_by_time_period: 'day'
+		});
+	});
 });

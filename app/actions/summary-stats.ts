@@ -9,11 +9,13 @@ import type { CoreStatsResult } from '@/app/models/db';
 export async function fetchSummaryStats(
 	viewedGroupId: number,
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
+	monthFilter?: number
 ): Promise<CoreStatsResult | null> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		...(fromDate ? { from_date: fromDate } : {}),
-		...(toDate ? { to_date: toDate } : {})
+		...(toDate ? { to_date: toDate } : {}),
+		...(monthFilter ? { month_filter: monthFilter } : {})
 	});
 	return rows[0] ?? null;
 }
@@ -28,13 +30,15 @@ export async function fetchPeriodStats(
 	viewedGroupId: number,
 	timeInterval: 'year' | 'month' | 'day',
 	fromDate?: string,
-	toDate?: string
+	toDate?: string,
+	monthFilter?: number
 ): Promise<CoreStatsResult[]> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
 		group_by_species: false,
 		group_by_time_period: timeInterval,
 		...(fromDate ? { from_date: fromDate } : {}),
-		...(toDate ? { to_date: toDate } : {})
+		...(toDate ? { to_date: toDate } : {}),
+		...(monthFilter ? { month_filter: monthFilter } : {})
 	});
 	return rows;
 }

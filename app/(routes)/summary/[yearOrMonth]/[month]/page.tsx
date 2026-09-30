@@ -1,4 +1,5 @@
 import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { notFound } from 'next/navigation';
 import {
 	BootstrapPage,
 	defaultGetParams
@@ -6,16 +7,17 @@ import {
 import { fetchSummaryStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
 import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
+import { parseMonthAbbreviation } from '@/app/lib/squashed-month';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
 import { SummaryPageContent } from '../../PageContent';
 
 // `tabId` (#804, reusing #803's mechanism) is the optional `?tabId=` search
-// param, merged alongside the route's `year`/`month` params — it never
+// param, merged alongside the route's `yearOrMonth`/`month` params — it never
 // affects `getCacheKeys`, only which tab `SummaryTotalsSection`
 // focuses/loads first.
-export type PageParams = { year: string; month: string; tabId?: string };
-type RouteParams = { year: string; month: string };
+export type PageParams = { yearOrMonth: string; month: string; tabId?: string };
+type RouteParams = { yearOrMonth: string; month: string };
 type PageProps = {
 	params: Promise<RouteParams>;
 	searchParams?: Promise<{ tabId?: string }>;
@@ -24,11 +26,11 @@ type PageProps = {
 async function getSummaryYearMonthPageParams(
 	pageProps: PageProps
 ): Promise<PageParams> {
-	const { year, month } = await defaultGetParams<PageProps, RouteParams>(
+	const { yearOrMonth, month } = await defaultGetParams<PageProps, RouteParams>(
 		pageProps
 	);
 	const tabId = await readTabIdSearchParam(pageProps.searchParams);
-	return { year, month, ...(tabId ? { tabId } : {}) };
+	return { yearOrMonth, month, ...(tabId ? { tabId } : {}) };
 }
 
 export type PageData = {
@@ -41,9 +43,16 @@ export type PageData = {
 };
 
 export async function fetchSummaryYearMonthPageContent(
-	{ year, month }: PageParams,
+	{ yearOrMonth, month }: PageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
+	// A squashed month (e.g. `/summary/jan/5`) has no single year to drill a
+	// specific day-range into — this nested route only makes sense under a
+	// real calendar year.
+	if (parseMonthAbbreviation(yearOrMonth) !== undefined) {
+		notFound();
+	}
+	const year = yearOrMonth;
 	const monthDate = new Date(Number(year), Number(month) - 1, 1);
 	const fromDate = format(startOfMonth(monthDate), 'yyyy-MM-dd');
 	const toDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
@@ -94,7 +103,7 @@ export default async function YearMonthSummaryPage(
 			getParams={getSummaryYearMonthPageParams}
 			getCacheKeys={(params: PageParams) => [
 				'summary',
-				params.year,
+				params.yearOrMonth,
 				params.month
 			]}
 			dataFetcher={fetchSummaryYearMonthPageContent}

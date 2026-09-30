@@ -9,12 +9,17 @@ export function SpSessionTotalsTab({
 	speciesName,
 	viewedGroup,
 	fromDate,
-	toDate
+	toDate,
+	monthFilter
 }: {
 	speciesName: string;
 	viewedGroup: ViewedGroup;
 	fromDate?: string;
 	toDate?: string;
+	// Set only by the squashed-month route (#1005) — mutually exclusive with
+	// `fromDate`/`toDate`, filters every session day to this calendar month
+	// across every year rather than a single real date range.
+	monthFilter?: number;
 }) {
 	const [sessionTotals, setSessionTotals] = useState<CoreStatsResult[]>([]);
 	const [isLoaded, setIsLoaded] = useState(false);
@@ -26,12 +31,13 @@ export function SpSessionTotalsTab({
 			viewedGroup.id,
 			'day',
 			fromDate,
-			toDate
+			toDate,
+			monthFilter
 		).then((data) => {
 			setSessionTotals(data);
 			setIsLoaded(true);
 		});
-	}, [speciesName, viewedGroup, fromDate, toDate, isLoaded]);
+	}, [speciesName, viewedGroup, fromDate, toDate, monthFilter, isLoaded]);
 
 	if (!isLoaded) {
 		return (

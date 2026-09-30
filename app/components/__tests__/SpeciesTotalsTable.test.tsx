@@ -134,6 +134,17 @@ describe('SpeciesTotalsTable', () => {
 			expect(link.getAttribute('href')).toBe('/species/Robin/2024/3');
 		});
 
+		it('links to /species/{speciesName}/{monthAbbreviation} when period is a squashed month (#1005)', () => {
+			render(
+				<SpeciesTotalsTable
+					speciesStats={stats}
+					period={{ squashedMonth: 1 }}
+				/>
+			);
+			const link = screen.getByRole('link', { name: 'Robin' });
+			expect(link.getAttribute('href')).toBe('/species/Robin/jan');
+		});
+
 		it('produces a valid link at every period depth for a species name requiring URL-encoding', () => {
 			const spacedStats = [makeStat({ species_name: 'Blue Tit' })];
 
