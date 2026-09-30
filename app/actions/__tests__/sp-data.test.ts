@@ -12,6 +12,7 @@ import {
 } from '../sp-data';
 import type { CoreStatsResult } from '@/app/models/db';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
+import { makeRpcCallRecorder } from '@/app/__tests__/helpers/rpc-recorder';
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchCoreStatsByMonth } =
 	vi.hoisted(() => ({
@@ -47,16 +48,10 @@ function makeClient({
 	rpcRows?: unknown;
 } = {}) {
 	const query = makeQueryChain(queryRows ?? []);
-	const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
+	const { rpc, calls: rpcCalls } = makeRpcCallRecorder(rpcRows ?? []);
 	const client = {
 		from: vi.fn(() => query.chain),
-		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
-			rpcCalls.push({ name, args });
-			return {
-				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-					Promise.resolve({ data: rpcRows ?? [], error: null }).then(resolve)
-			};
-		})
+		rpc
 	};
 	mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 	return { client, queryRecord: query.record, rpcCalls };
@@ -69,17 +64,10 @@ function makeStatsHistoryClient({
 	aggregateRows: unknown[];
 	biometricsRows: unknown[];
 }) {
-	const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
-	const client = {
-		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
-			rpcCalls.push({ name, args });
-			const data = name === 'core_stats' ? aggregateRows : biometricsRows;
-			return {
-				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-					Promise.resolve({ data, error: null }).then(resolve)
-			};
-		})
-	};
+	const { rpc, calls: rpcCalls } = makeRpcCallRecorder((name: string) =>
+		name === 'core_stats' ? aggregateRows : biometricsRows
+	);
+	const client = { rpc };
 	mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 	return { rpcCalls };
 }
