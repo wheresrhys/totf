@@ -14,8 +14,9 @@ description: >-
   a fresh GitHub re-scan for newly-available work. A stop command prompts the user to confirm
   halt-all vs drain. Tracks every live worker in a gitignored local state file
   (`.claude/swarm-state.json`). Orchestration only — PR maintenance, selection, worktree isolation, model
-  routing, parallelism, refill, termination, teardown. Triggers: "swarm", "/swarm", "pick up
-  ready tickets", "work the ready queue".
+  routing, zone-scoped worker prompts (a single-zone-labelled ticket's worker is told to scope
+  investigation to that subtree by default), parallelism, refill, termination, teardown. Triggers:
+  "swarm", "/swarm", "pick up ready tickets", "work the ready queue".
 ---
 
 # swarm
@@ -322,7 +323,7 @@ input task description:
   doing. Then run `ticketify` against issue `<n>`'s current title+body. Let it do its normal job —
   including splitting the issue into more than one commit-sized ticket if the body actually
   bundles multiple distinct changes. It drafts properly-labeled replacement ticket(s) (model label
-  + `ready`, plus `db-migration`/`e2e-exclusive` if applicable) and closes the original issue in
+  + `ready` + `zone:*`, plus `db-migration`/`e2e-exclusive` if applicable) and closes the original issue in
   favor of the new one(s), linking back with a comment (e.g. "Superseded by #NNN") — or, if
   `ticketify` determines the issue is already atomic and just needs a label, it may instead simply
   add the correct label to the original issue in place. Use whichever of `ticketify`'s own normal
@@ -445,6 +446,12 @@ For each selected issue, launch an Agent (default background, so they run in par
   `npx supabase migration up --local`, and that apply case is safe because a `db-migration` unit
   already runs solo (the exclusive-resource rule) — no new coordination primitive. Finally, run the
   `implement-ticket` skill for issue `<n>` and return its result (PR number + URL + test status).
+
+  **If (and only if) this ticket carries exactly one `zone:*` label** (already present in
+  `swarm_plan_batch`'s `ticketsToImplement[].labels` — no extra `gh` call needed), add one further
+  instruction to the prompt: scope `implement-ticket` step 2's initial investigation to that zone's
+  subtree (`app/`, `supabase/`, or `.claude/`) by default, per `CLAUDE.md`'s "Repo zones" — a
+  default, not a wall; cross into another zone if the work genuinely needs it.
 
   **If (and only if) this ticket is labelled `db-migration` or `e2e-exclusive`**, add one further
   instruction to the prompt: partway through `implement-ticket` — once the migration is applied and
@@ -620,6 +627,9 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   drafts properly-labeled replacement ticket(s) and closes the original (or relabels it in place
   if already atomic). That subagent must never block on `AskUserQuestion` directly — it posts
   questions up to the parent orchestrator and waits for the answer to come back down.
+- A ticket carrying exactly one `zone:*` label gets a worker-prompt instruction (§3) to scope its
+  investigation to that zone's subtree by default — a hint the worker can override if the work
+  turns out to need another zone, never a hard constraint enforced by `swarm` itself.
 - **Exclusive-resource work (`db-migration` or `e2e-exclusive`) runs completely solo** — across
   both tracks, not just within §2. Don't spawn it alongside any other worker, and don't spawn any
   other worker while it's running. A `db-migration`/`e2e-exclusive` PR being maintained (§1) is the

@@ -9,13 +9,22 @@ const EXCLUSIVE_LABEL_DESCRIPTIONS: Record<string, string> = {
 		'Touches a @mutates E2E spec\'s trigger path — swarm runs at most one exclusive-resource ticket at a time',
 };
 
+const ZONE_LABEL_DESCRIPTIONS: Record<string, string> = {
+	'zone:app': 'Touches only app/ — safe to scope investigation/context to that subtree',
+	'zone:data-layer':
+		'Touches only supabase/ (schema, scripts, tests) — safe to scope investigation/context to that subtree',
+	'zone:agentic-tooling':
+		'Touches only .claude/ (skills, MCP, hooks) — safe to scope investigation/context to that subtree',
+};
+
 async function ensureLabelsExist(labels: string[], cwd?: string): Promise<void> {
 	const existing = new Set(await listLabelNames(cwd));
 	for (const label of labels) {
 		if (existing.has(label)) continue;
-		const description = EXCLUSIVE_LABEL_DESCRIPTIONS[label];
+		const description = EXCLUSIVE_LABEL_DESCRIPTIONS[label] ?? ZONE_LABEL_DESCRIPTIONS[label];
 		if (!description) continue; // ready/opus/sonnet/fable are expected to already exist in this repo
-		const result = await runGh(['label', 'create', label, '--color', 'b60205', '--description', description], {
+		const color = ZONE_LABEL_DESCRIPTIONS[label] ? '1d76db' : 'b60205';
+		const result = await runGh(['label', 'create', label, '--color', color, '--description', description], {
 			cwd,
 		});
 		if (result.exitCode !== 0) throw new GhCommandError(['label', 'create', label], result.stderr);
@@ -33,12 +42,16 @@ export function registerCreateTicketTool(server: McpServer) {
 		'create_ticket',
 		{
 			description:
-				'Create a labelled GitHub issue: ensures the model + ready + any exclusive-resource labels exist, creates the issue with the body piped over stdin (no shell-escaping/tempfile dance), and optionally links it as a sub-issue of a parent and/or blocked-by other issues.',
+				'Create a labelled GitHub issue: ensures the model + ready + any exclusive-resource/zone labels exist, creates the issue with the body piped over stdin (no shell-escaping/tempfile dance), and optionally links it as a sub-issue of a parent and/or blocked-by other issues.',
 			inputSchema: {
 				title: z.string(),
 				body: z.string(),
 				modelLabel: z.enum(['opus', 'sonnet', 'fable']),
 				extraLabels: z.array(z.enum(['db-migration', 'e2e-exclusive'])).optional(),
+				zoneLabels: z
+					.array(z.enum(['zone:app', 'zone:data-layer', 'zone:agentic-tooling']))
+					.min(1)
+					.optional(),
 				parentIssue: z.number().optional(),
 				blockedBy: z.array(z.number()).optional(),
 			},
@@ -50,9 +63,9 @@ export function registerCreateTicketTool(server: McpServer) {
 				blockedByApplied: z.array(z.number()),
 			},
 		},
-		async ({ title, body, modelLabel, extraLabels = [], parentIssue, blockedBy = [] }) => {
-			const labels = [modelLabel, 'ready', ...extraLabels];
-			await ensureLabelsExist(extraLabels);
+		async ({ title, body, modelLabel, extraLabels = [], zoneLabels = [], parentIssue, blockedBy = [] }) => {
+			const labels = [modelLabel, 'ready', ...extraLabels, ...zoneLabels];
+			await ensureLabelsExist([...extraLabels, ...zoneLabels]);
 
 			const args = ['issue', 'create', '--title', title, '--body-file', '-'];
 			for (const label of labels) args.push('--label', label);

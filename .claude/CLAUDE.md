@@ -31,6 +31,15 @@ concurrent worktrees doing either kind of mutation would otherwise collide:
   tagged `@mutates`). See `supabase/CLAUDE.md`'s "E2E `@mutates` / exclusive-resource mechanics"
   for the full selection/trigger logic this label plugs into.
 
+Every ticket also gets one or more **zone labels** matching the repo zones in the root
+[`CLAUDE.md`](../CLAUDE.md#repo-zones) — `zone:app`, `zone:data-layer`, `zone:agentic-tooling`
+(multi-label only when the ticket genuinely spans more than one zone). `flesh-out-ticket` and
+`ticketify` always add these at creation; `implement-ticket` reads a single-zone label back off
+the issue to scope its own investigation to that zone's subtree by default, and `swarm` passes the
+same instruction into a ticket worker's spawn prompt when `swarm_plan_batch` surfaces exactly one
+`zone:*` label for it — a default that narrows context loaded for a single-zone task, not a hard
+boundary either skill enforces.
+
 ### MCP tools for skills
 
 The ticket-workflow skills above call a project-local MCP server (`.claude/mcp/swarm-tools/`,
