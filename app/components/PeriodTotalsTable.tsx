@@ -29,7 +29,6 @@ function buildColumnConfigs({
 	timeInterval,
 	firstColumnHeader,
 	hasPulli,
-	dashIndividuals,
 	aggregateBy,
 	showSpeciesColumn,
 	showBusiestSession
@@ -37,7 +36,6 @@ function buildColumnConfigs({
 	timeInterval: PeriodTotalsGrouping;
 	firstColumnHeader: string;
 	hasPulli: boolean;
-	dashIndividuals: boolean;
 	aggregateBy: string;
 	showSpeciesColumn: boolean;
 	showBusiestSession: boolean;
@@ -59,12 +57,7 @@ function buildColumnConfigs({
 		...(showBusiestSession
 			? { maxPerSession: { label: 'Busiest session' } }
 			: {}),
-		// On an encounters-only tab a per-period bird count is meaningless, so
-		// the whole column renders a `'-'` placeholder rather than a number.
-		individualsCount: {
-			label: 'Birds',
-			...(dashIndividuals ? { formatter: () => '-' } : {})
-		},
+		individualsCount: { label: 'Birds' },
 		...buildStandardColumnConfigs<PeriodTotalsRow>(hasPulli, true, aggregateBy)
 	};
 }
@@ -76,8 +69,6 @@ export function PeriodTotalsTable({
 	buildHref,
 	buildLabel,
 	totalsStats,
-	aggregationFixedTo,
-	dashIndividuals = false,
 	extraControls,
 	showSpeciesColumn = true,
 	showBusiestSession = true
@@ -91,12 +82,6 @@ export function PeriodTotalsTable({
 	// from integer year/month rather than parsing the `time_period` string.
 	buildLabel?: (timePeriod: string) => string;
 	totalsStats?: CoreStatsResult;
-	// When set, aggregation is locked to this value and the Bird/Encounter toggle
-	// still renders but is disabled — the all-time "Month totals" tab fixes it to
-	// `'encounter'`, since combine-years bird counts aren't meaningful.
-	aggregationFixedTo?: AggregateByValue;
-	// Renders every Individuals cell (data rows and the totals row) as `'-'`.
-	dashIndividuals?: boolean;
 	// Optional extra controls rendered above the table, e.g. a toggle to switch
 	// between combined-months and per-year-months views.
 	extraControls?: React.ReactNode;
@@ -105,9 +90,8 @@ export function PeriodTotalsTable({
 }) {
 	// Local to this table (not persisted across tab switches) — resets to
 	// 'bird' whenever `SummaryTotalsSection` remounts this table for a
-	// different tab, per #604. Ignored when `aggregationFixedTo` locks the mode.
-	const [aggregateByState, setAggregateBy] = useState<AggregateByValue>('bird');
-	const aggregateBy = aggregationFixedTo ?? aggregateByState;
+	// different tab, per #604.
+	const [aggregateBy, setAggregateBy] = useState<AggregateByValue>('bird');
 
 	if (rows.length === 0) {
 		return <p>No data recorded.</p>;
@@ -126,7 +110,6 @@ export function PeriodTotalsTable({
 	const columnConfigs = buildColumnConfigs({
 		firstColumnHeader,
 		hasPulli,
-		dashIndividuals,
 		aggregateBy,
 		showSpeciesColumn,
 		showBusiestSession,
@@ -136,8 +119,7 @@ export function PeriodTotalsTable({
 	const totalsRow = totalsStats
 		? buildTotalsRowCells<PeriodTotalsRow>({
 				columnConfigs,
-				totalsRowModel: activeDeriveRow(totalsStats),
-				...(dashIndividuals ? { cellOverrides: { individualsCount: '-' } } : {})
+				totalsRowModel: activeDeriveRow(totalsStats)
 			})
 		: undefined;
 
@@ -187,11 +169,7 @@ export function PeriodTotalsTable({
 		<>
 			<div data-test-id="above-header-row" className="m-2 flex gap-4">
 				{timeInterval !== 'day' && (
-					<AggregateByToggle
-						value={aggregateBy}
-						onChange={setAggregateBy}
-						disabled={aggregationFixedTo !== undefined}
-					/>
+					<AggregateByToggle value={aggregateBy} onChange={setAggregateBy} />
 				)}
 				{extraControls ?? null}
 			</div>

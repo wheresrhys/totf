@@ -2,10 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { PeriodTotalsTable } from '../PeriodTotalsTable';
 import type { CoreStatsResult } from '@/app/models/db';
-import {
-	getCellByHeading,
-	getCellTextByHeading
-} from '@/app/__tests__/helpers/table';
+import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 // The real header <th>s live in the `<thead>` row without a `data-testid` —
@@ -316,134 +313,6 @@ describe('PeriodTotalsTable', () => {
 					getColumnHeaders().map((header) => header.textContent)
 				).not.toContain('Busiest session');
 				expect(screen.queryByText('Busiest session')).toBeNull();
-			});
-		});
-	});
-
-	describe('fixed aggregation / encounters-only placeholder', () => {
-		function encStat(overrides: Partial<CoreStatsResult> = {}) {
-			return buildCoreStatsRow({
-				time_period: '2000-01-01',
-				bird_count: 40,
-				encounter_count: 55,
-				new_bird_count: 30,
-				pullus_bird_count: 2,
-				juv_bird_count: 5,
-				postjuv_bird_count: 3,
-				adult_bird_count: 15,
-				unknown_age_bird_count: 5,
-				...({
-					pullus_enc_count: 9,
-					juv_enc_count: 8,
-					postjuv_enc_count: 7,
-					adult_enc_count: 6,
-					unknown_age_enc_count: 4
-				} as Partial<CoreStatsResult>),
-				...overrides
-			});
-		}
-
-		describe('Usual', () => {
-			it('still shows the AggregateByToggle, disabled and pre-set to Encounter, when a fixed aggregation is supplied', () => {
-				render(
-					<PeriodTotalsTable
-						timeInterval="month"
-						rows={[encStat()]}
-						firstColumnHeader="Month"
-						buildHref={() => ''}
-						buildLabel={() => 'January'}
-						aggregationFixedTo="encounter"
-					/>
-				);
-				const encounter = screen.getByRole('radio', {
-					name: 'Encounter'
-				}) as HTMLInputElement;
-				const bird = screen.getByRole('radio', {
-					name: 'Bird'
-				}) as HTMLInputElement;
-				expect(encounter.checked).toBe(true);
-				expect(encounter.disabled).toBe(true);
-				expect(bird.checked).toBe(false);
-				expect(bird.disabled).toBe(true);
-			});
-
-			it("renders encounter-derived age-bucket values when fixed aggregation is 'encounter'", () => {
-				render(
-					<PeriodTotalsTable
-						timeInterval="month"
-						rows={[encStat()]}
-						firstColumnHeader="Month"
-						buildHref={() => ''}
-						buildLabel={() => 'January'}
-						aggregationFixedTo="encounter"
-					/>
-				);
-				// retraps (enc 55 - new 30 = 25), then the encounter-derived
-				// age-bucket columns.
-				expect(getCellTextByHeading('Retrap', 0)).toBe('25');
-				expect(getCellTextByHeading('Pulli', 0)).toBe('9');
-				expect(getCellTextByHeading('Juv', 0)).toBe('8');
-				expect(getCellTextByHeading('Postjuv', 0)).toBe('7');
-				expect(getCellTextByHeading('Adult', 0)).toBe('6');
-				expect(getCellTextByHeading('Not aged', 0)).toBe('4');
-			});
-		});
-
-		describe('Edge', () => {
-			it("renders '-' in every row's Individuals column when the placeholder option is set, regardless of underlying bird_count", () => {
-				render(
-					<PeriodTotalsTable
-						timeInterval="month"
-						rows={[
-							encStat({ time_period: '2000-01-01', bird_count: 40 }),
-							encStat({ time_period: '2000-02-01', bird_count: 7 })
-						]}
-						firstColumnHeader="Month"
-						buildHref={() => ''}
-						buildLabel={(tp) => tp}
-						aggregationFixedTo="encounter"
-						dashIndividuals
-					/>
-				);
-				const table = screen.getByRole('table');
-				table.querySelectorAll('tbody tr').forEach((_, rowIndex) => {
-					expect(getCellTextByHeading(table, 'Birds', rowIndex)).toBe('-');
-				});
-			});
-
-			it("renders the totals row's Individuals cell as '-' too", () => {
-				render(
-					<PeriodTotalsTable
-						timeInterval="month"
-						rows={[encStat()]}
-						firstColumnHeader="Month"
-						buildHref={() => ''}
-						buildLabel={() => 'January'}
-						aggregationFixedTo="encounter"
-						dashIndividuals
-						totalsStats={encStat({ bird_count: 123 })}
-					/>
-				);
-				const totalsRow = screen.getByTestId('totals-row');
-				expect(getCellTextByHeading('Birds', totalsRow)).toBe('-');
-			});
-
-			it('renders the first column as plain text, not a link, when no href is available for a row', () => {
-				render(
-					<PeriodTotalsTable
-						timeInterval="month"
-						rows={[encStat()]}
-						firstColumnHeader="Month"
-						buildHref={() => ''}
-						buildLabel={() => 'January'}
-						aggregationFixedTo="encounter"
-						dashIndividuals
-					/>
-				);
-				expect(screen.queryByRole('link', { name: 'January' })).toBeNull();
-				const firstCell = getCellByHeading('Month', 0);
-				expect(firstCell.textContent).toBe('January');
-				expect(firstCell.querySelector('a')).toBeNull();
 			});
 		});
 	});
