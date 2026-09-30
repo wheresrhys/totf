@@ -84,14 +84,14 @@ export const expectations = {
 		'tied second global':
 			'Joint second highest single species session count ever: 12 birds',
 		'tied second of year':
-			'Joint second highest single species session count in 2020: 12 birds',
+			'Joint second highest single species session count of 2020: 12 birds',
 		'this year': 'Highest single species session count this year: 12 birds',
 		'tied global and second of year':
-			'Joint highest single species session count ever and second highest in 2020: 12 birds',
+			'Joint highest single species session count ever and second highest of 2020: 12 birds',
 		'tied second of month':
 			'Joint second highest single species session count in any February: 12 birds',
 		'global and tied second of year and third of month':
-			'Highest single species session count ever, joint second highest in 2020 and third highest in any February: 12 birds'
+			'Highest single species session count ever, joint second highest of 2020 and third highest in any February: 12 birds'
 	},
 	singleSpeciesEncounters: {
 		global:
@@ -180,31 +180,31 @@ export const expectations = {
 			'Robins seen in only 12 sessions ever'
 	},
 	heaviestOfSpecies: {
-		global: 'Heaviest Robin ever: 12 g',
-		'tied global': 'Joint heaviest Robin ever: 12 g',
-		'singular global': 'Heaviest Robin ever: 1 g',
-		'second global': 'Second heaviest Robin ever: 12 g',
-		'tied second global': 'Joint second heaviest Robin ever: 12 g',
-		'tied second of year': 'Joint second heaviest Robin of 2020: 12 g',
-		'this year': 'Heaviest Robin this year: 12 g',
+		global: 'Heaviest Robin ever: 12g',
+		'tied global': 'Joint heaviest Robin ever: 12g',
+		'singular global': 'Heaviest Robin ever: 1g',
+		'second global': 'Second heaviest Robin ever: 12g',
+		'tied second global': 'Joint second heaviest Robin ever: 12g',
+		'tied second of year': 'Joint second heaviest Robin of 2020: 12g',
+		'this year': 'Heaviest Robin this year: 12g',
 		'tied global and second of year':
-			'Joint heaviest Robin ever and second heaviest of 2020: 12 g',
-		'tied second of month': 'Joint second heaviest Robin in any February: 12 g',
+			'Joint heaviest Robin ever and second heaviest of 2020: 12g',
+		'tied second of month': 'Joint second heaviest Robin in any February: 12g',
 		'global and tied second of year and third of month':
-			'Heaviest Robin ever, joint second heaviest of 2020 and third heaviest in any February: 12 g'
+			'Heaviest Robin ever, joint second heaviest of 2020 and third heaviest in any February: 12g'
 	},
 	lightestOfSpecies: {
-		global: 'Lightest Robin ever: 12 g',
-		'tied global': 'Joint lightest Robin ever: 12 g',
-		'singular global': 'Lightest Robin ever: 1 g',
-		'second global': 'Second lightest Robin ever: 12 g',
-		'tied second global': 'Joint second lightest Robin ever: 12 g',
-		'tied second of year': 'Joint second lightest Robin of 2020: 12 g',
-		'this year': 'Lightest Robin this year: 12 g',
+		global: 'Lightest Robin ever: 12g',
+		'tied global': 'Joint lightest Robin ever: 12g',
+		'singular global': 'Lightest Robin ever: 1g',
+		'second global': 'Second lightest Robin ever: 12g',
+		'tied second global': 'Joint second lightest Robin ever: 12g',
+		'tied second of year': 'Joint second lightest Robin of 2020: 12g',
+		'this year': 'Lightest Robin this year: 12g',
 		'tied global and second of year':
-			'Joint lightest Robin ever and second lightest of 2020: 12 g',
-		'tied second of month': 'Joint second lightest Robin in any February: 12 g',
+			'Joint lightest Robin ever and second lightest of 2020: 12g',
+		'tied second of month': 'Joint second lightest Robin in any February: 12g',
 		'global and tied second of year and third of month':
-			'Lightest Robin ever, joint second lightest of 2020 and third lightest in any February: 12 g'
+			'Lightest Robin ever, joint second lightest of 2020 and third lightest in any February: 12g'
 	}
 };
