@@ -51,6 +51,7 @@ describe('SpSessionTotalsTab', () => {
 			1,
 			'day',
 			undefined,
+			undefined,
 			undefined
 		);
 	});
@@ -73,7 +74,30 @@ describe('SpSessionTotalsTab', () => {
 			1,
 			'day',
 			'2026-01-01',
-			'2026-12-31'
+			'2026-12-31',
+			undefined
+		);
+	});
+
+	it('fetches day-grouped totals scoped to the species and the given monthFilter, on the squashed-month page', async () => {
+		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
+		render(
+			<SpSessionTotalsTab
+				speciesName="Robin"
+				viewedGroup={viewedGroup}
+				monthFilter={1}
+			/>
+		);
+		await waitFor(() => {
+			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+		});
+		expect(fetchSpeciesPeriodTotals).toHaveBeenCalledWith(
+			'Robin',
+			1,
+			'day',
+			undefined,
+			undefined,
+			1
 		);
 	});
 
