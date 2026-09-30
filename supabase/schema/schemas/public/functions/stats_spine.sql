@@ -93,8 +93,22 @@ CREATE FUNCTION public.stats_spine (
 
     UNION ALL
 
+    -- 'month-squashed' (#996): a dense, always-12-row spine — one row per
+    -- calendar month (Jan-Dec), independent of any actual session data —
+    -- unlike the month/year branches above, which are dense only within the
+    -- group's own min..max date range. Unconditional generate_series(1, 12),
+    -- deliberately not gated on session_date_range like the branches above, so
+    -- the mode returns all 12 months even when the group's history only spans
+    -- one calendar month across every year. Dates use the same 2000-<mm>-01
+    -- sentinel-year convention as stats_raw_encounters.session_month_squashed.
+    SELECT make_date(2000, m, 1) AS time_period
+    FROM generate_series(1, 12) AS m
+    WHERE group_by_time_period = 'month-squashed'
+
+    UNION ALL
+
     SELECT NULL::date
-    WHERE group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day')
+    WHERE group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day', 'month-squashed')
   )
   SELECT s.species_id, s.species_name, p.time_period
   FROM species_spine s

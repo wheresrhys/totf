@@ -77,6 +77,7 @@ SET
       WHEN group_by_time_period = 'day' THEN spine.time_period
       WHEN group_by_time_period = 'month' THEN spine.time_period
       WHEN group_by_time_period = 'year' THEN spine.time_period
+      WHEN group_by_time_period = 'month-squashed' THEN spine.time_period
       ELSE NULL::date
     END AS "time_period",
 
@@ -92,6 +93,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period = abc.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = abc.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = abc.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = abc.time_period
     ELSE true
   END
   ) AS agg

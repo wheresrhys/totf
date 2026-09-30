@@ -67,6 +67,7 @@ SET
       re.session_day,
       re.session_month,
       re.session_year,
+      re.session_month_squashed,
       COUNT(*) AS encounter_count,
       MIN(re.visit_date) AS first_visit,
       MAX(re.visit_date) AS last_visit,
@@ -74,7 +75,7 @@ SET
       EXTRACT(EPOCH FROM (MAX(re.visit_date)::timestamp - MIN(re.visit_date)::timestamp)) / 86400.0 AS time_span_days
     FROM raw_encounters re
     WHERE re.encounter_id IS NOT NULL
-    GROUP BY re.species_id, re.bird_id, re.session_day, re.session_month, re.session_year
+    GROUP BY re.species_id, re.bird_id, re.session_day, re.session_month, re.session_year, re.session_month_squashed
   ),
   -- Canonical per-encounter age classification and its bird-level bucket
   -- resolution, delegated to the shared stats_encounter_age_classification /
@@ -126,6 +127,7 @@ SET
         WHEN group_by_time_period = 'day' THEN spbm.session_day
         WHEN group_by_time_period = 'month' THEN spbm.session_month
         WHEN group_by_time_period = 'year' THEN spbm.session_year
+        WHEN group_by_time_period = 'month-squashed' THEN spbm.session_month_squashed
         ELSE NULL::date
       END AS time_period,
       MAX(spbm.encounter_count) AS max_encounter_count,
@@ -139,6 +141,7 @@ SET
       WHEN group_by_time_period = 'day' THEN spbm.session_day
       WHEN group_by_time_period = 'month' THEN spbm.session_month
       WHEN group_by_time_period = 'year' THEN spbm.session_year
+      WHEN group_by_time_period = 'month-squashed' THEN spbm.session_month_squashed
       ELSE NULL::date
     END
   ),
@@ -153,12 +156,13 @@ SET
       re.session_day,
       re.session_month,
       re.session_year,
+      re.session_month_squashed,
       COUNT(*) AS encounter_count,
       COUNT(CASE WHEN re.record_type = 'N' THEN 1 END) AS new_encounter_count
     FROM raw_encounters re
     WHERE re.session_id IS NOT NULL
       AND re.session_type = 'FULL_GROWN'
-    GROUP BY re.species_id, re.session_id, re.session_day, re.session_month, re.session_year
+    GROUP BY re.species_id, re.session_id, re.session_day, re.session_month, re.session_year, re.session_month_squashed
   ),
   aggregated_session_counts AS (
     -- Get max encounters per session per species
@@ -168,6 +172,7 @@ SET
         WHEN group_by_time_period = 'day' THEN sc.session_day
         WHEN group_by_time_period = 'month' THEN sc.session_month
         WHEN group_by_time_period = 'year' THEN sc.session_year
+        WHEN group_by_time_period = 'month-squashed' THEN sc.session_month_squashed
         ELSE NULL::date
       END AS time_period,
       MAX(sc.encounter_count) AS max_per_session,
@@ -181,6 +186,7 @@ SET
       WHEN group_by_time_period = 'day' THEN sc.session_day
       WHEN group_by_time_period = 'month' THEN sc.session_month
       WHEN group_by_time_period = 'year' THEN sc.session_year
+      WHEN group_by_time_period = 'month-squashed' THEN sc.session_month_squashed
       ELSE NULL::date
     END
   ), session_effort AS (
@@ -197,17 +203,20 @@ SET
         WHEN group_by_time_period = 'day' THEN re.session_day
         WHEN group_by_time_period = 'month' THEN re.session_month
         WHEN group_by_time_period = 'year' THEN re.session_year
+        WHEN group_by_time_period = 'month-squashed' THEN re.session_month_squashed
         ELSE NULL::date
       END AS time_period,
       SUM(sess_effort.total_effort) AS total_effort,
       SUM(sess_effort.total_effort) / COUNT(DISTINCT re.session_id) AS effort_per_session
     FROM (
-      -- session_day/month/year come straight off raw_encounters rather than being
-      -- re-derived from re.visit_date — same values, computed once (see session_counts).
+      -- session_day/month/year/session_month_squashed come straight off
+      -- raw_encounters rather than being re-derived from re.visit_date — same
+      -- values, computed once (see session_counts).
       SELECT DISTINCT re.session_id,
             re.session_day,
             re.session_month,
-            re.session_year
+            re.session_year,
+            re.session_month_squashed
       FROM raw_encounters as re
     ) re
     JOIN session_effort sess_effort ON re.session_id = sess_effort.session_id
@@ -216,6 +225,7 @@ SET
         WHEN group_by_time_period = 'day' THEN re.session_day
         WHEN group_by_time_period = 'month' THEN re.session_month
         WHEN group_by_time_period = 'year' THEN re.session_year
+        WHEN group_by_time_period = 'month-squashed' THEN re.session_month_squashed
         ELSE NULL::date
       END
   )
@@ -226,6 +236,7 @@ SET
       WHEN group_by_time_period = 'day' THEN spine.time_period
       WHEN group_by_time_period = 'month' THEN spine.time_period
       WHEN group_by_time_period = 'year' THEN spine.time_period
+      WHEN group_by_time_period = 'month-squashed' THEN spine.time_period
     ELSE NULL::date END AS "time_period",
 
     COALESCE(COUNT(DISTINCT CASE WHEN raw_enc.session_type = 'FULL_GROWN' THEN raw_enc.visit_date END), 0) AS "session_count",
@@ -279,7 +290,8 @@ SET
     (group_by_time_period = 'day' AND spine.time_period = raw_enc.session_day)
     OR (group_by_time_period = 'month' AND spine.time_period = raw_enc.session_month)
     OR (group_by_time_period = 'year' AND spine.time_period = raw_enc.session_year)
-    OR (group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day'))
+    OR (group_by_time_period = 'month-squashed' AND spine.time_period = raw_enc.session_month_squashed)
+    OR (group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day', 'month-squashed'))
   )
   -- LEFT JOIN stats_per_bird_month bm_stats ON raw_enc.bird_id = bm_stats.bird_id
   LEFT JOIN effort_per_period effort ON
@@ -287,6 +299,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period = effort.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = effort.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = effort.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = effort.time_period
     ELSE true
   END
   LEFT JOIN stats_per_species_period agg_sta ON CASE WHEN group_by_species THEN spine.species_id = agg_sta.species_id ELSE true END
@@ -295,6 +308,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period = agg_sta.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = agg_sta.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = agg_sta.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = agg_sta.time_period
     ELSE true
   END
   LEFT JOIN aggregated_session_counts agg_sess ON CASE WHEN group_by_species THEN spine.species_id = agg_sess.species_id ELSE true END
@@ -302,6 +316,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period = agg_sess.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = agg_sess.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = agg_sess.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = agg_sess.time_period
     ELSE true
   END
   LEFT JOIN age_bucket_counts abc ON CASE WHEN group_by_species THEN spine.species_id = abc.species_id ELSE true END
@@ -309,6 +324,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period = abc.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = abc.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = abc.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = abc.time_period
     ELSE true
   END
   LEFT JOIN encounter_age_bucket_counts eabc ON CASE WHEN group_by_species THEN spine.species_id = eabc.species_id ELSE true END
@@ -316,6 +332,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period = eabc.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period = eabc.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period = eabc.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = eabc.time_period
     ELSE true
   END
   GROUP BY CASE
@@ -328,6 +345,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period
     ELSE NULL::date
   END, agg_sta.max_encounter_count, agg_sess.max_per_session,
   -- agg_sta.max_proven_age, agg_sta.max_time_span_days,

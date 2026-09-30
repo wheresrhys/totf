@@ -71,6 +71,7 @@ SET
       WHEN group_by_time_period = 'day' THEN spine.time_period
       WHEN group_by_time_period = 'month' THEN spine.time_period
       WHEN group_by_time_period = 'year' THEN spine.time_period
+      WHEN group_by_time_period = 'month-squashed' THEN spine.time_period
       ELSE NULL::date
     END AS "time_period",
 
@@ -91,7 +92,8 @@ SET
     (group_by_time_period = 'day' AND spine.time_period = raw_enc.session_day)
     OR (group_by_time_period = 'month' AND spine.time_period = raw_enc.session_month)
     OR (group_by_time_period = 'year' AND spine.time_period = raw_enc.session_year)
-    OR (group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day'))
+    OR (group_by_time_period = 'month-squashed' AND spine.time_period = raw_enc.session_month_squashed)
+    OR (group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day', 'month-squashed'))
   )
   GROUP BY CASE
     WHEN group_by_species THEN spine.species_id
@@ -103,6 +105,7 @@ SET
     WHEN group_by_time_period = 'day' THEN spine.time_period
     WHEN group_by_time_period = 'month' THEN spine.time_period
     WHEN group_by_time_period = 'year' THEN spine.time_period
+    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period
     ELSE NULL::date
   END
   ) AS agg

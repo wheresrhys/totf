@@ -694,6 +694,7 @@ export type Database = {
           session_day: string
           session_id: number
           session_month: string
+          session_month_squashed: string
           session_type: string
           session_year: string
           species_id: number
