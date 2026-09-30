@@ -21,6 +21,7 @@ import {
 	AggregateByToggle,
 	type AggregateByValue
 } from './shared/AggregateByToggle';
+import { buildSpeciesSquashedMonthHref } from '@/app/lib/squashed-month';
 
 type RowModel = {
 	speciesName: string;
@@ -39,12 +40,19 @@ type RowModel = {
 
 // The period a summary page's species table is scoped to — mirrors the
 // `/species/{name}[/{year}[/{month}]]` route depth. Undefined (the all-time
-// `/summary` page) keeps today's unscoped `/species/{name}` links.
-export type SpeciesPeriod = { year: number; month?: number };
+// `/summary` page) keeps today's unscoped `/species/{name}` links. The
+// `squashedMonth` variant (#1005) is the summary squashed-month page's own
+// shape — `/species/{name}/{abbr}` rather than a real year.
+export type SpeciesPeriod =
+	| { year: number; month?: number }
+	| { squashedMonth: number };
 
 function buildSpeciesHref(speciesName: string, period?: SpeciesPeriod): string {
 	if (!period) {
 		return `/species/${speciesName}`;
+	}
+	if ('squashedMonth' in period) {
+		return buildSpeciesSquashedMonthHref(speciesName, period.squashedMonth);
 	}
 	if (period.month === undefined) {
 		return `/species/${speciesName}/${period.year}`;

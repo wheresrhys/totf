@@ -1,6 +1,6 @@
 import { describe, vi, afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
-import GroupSummaryYearMonthPage from '../page';
+import GroupSummaryYearPage from '../page';
 import { describeGroupScopeDelegation } from '@/app/__tests__/helpers/group-scope-delegation';
 
 const { mockResolveGroupIdBySlug } = vi.hoisted(() => ({
@@ -15,13 +15,13 @@ vi.mock('next/navigation', () => ({
 	notFound: vi.fn()
 }));
 
-vi.mock('@/app/(routes)/summary/[year]/[month]/page', () => ({
-	default: vi.fn(() => <div data-testid="mock-year-month-summary-page" />)
+vi.mock('@/app/(routes)/summary/[yearOrMonth]/page', () => ({
+	default: vi.fn(() => <div data-testid="mock-year-summary-page" />)
 }));
 
-import YearMonthSummaryPage from '@/app/(routes)/summary/[year]/[month]/page';
+import YearSummaryPage from '@/app/(routes)/summary/[yearOrMonth]/page';
 
-describe('GroupSummaryYearMonthPage', () => {
+describe('GroupSummaryYearPage', () => {
 	afterEach(() => {
 		cleanup();
 		vi.clearAllMocks();
@@ -29,10 +29,10 @@ describe('GroupSummaryYearMonthPage', () => {
 
 	describeGroupScopeDelegation({
 		renderGroupPage: (params) =>
-			GroupSummaryYearMonthPage({ params: Promise.resolve(params) }),
+			GroupSummaryYearPage({ params: Promise.resolve(params) }),
 		mockResolveGroupIdBySlug,
-		DelegatePage: YearMonthSummaryPage,
-		testId: 'mock-year-month-summary-page',
-		extraParams: { year: '2025', month: '3' }
+		DelegatePage: YearSummaryPage,
+		testId: 'mock-year-summary-page',
+		extraParams: { yearOrMonth: '2025' }
 	});
 });

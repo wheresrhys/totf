@@ -26,17 +26,17 @@ vi.mock('@/app/actions/period-totals', () => ({
 }));
 
 function renderSummaryYearMonthPage(
-	year = '2026',
+	yearOrMonth = '2026',
 	month = '08',
 	tabId?: string
 ) {
 	return Page({
-		params: Promise.resolve({ year, month }),
+		params: Promise.resolve({ yearOrMonth, month }),
 		...(tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) })
 	});
 }
 
-describe('/summary/[year]/[month]', () => {
+describe('/summary/[yearOrMonth]/[month]', () => {
 	afterEach(() => {
 		cleanup();
 		fetchSummaryStatsMock.mockClear();
@@ -48,7 +48,7 @@ describe('/summary/[year]/[month]', () => {
 	it('renders "{long month} {year} summary" for a well-formed year/month', async () => {
 		render(
 			await Page({
-				params: Promise.resolve({ year: '2026', month: '08' })
+				params: Promise.resolve({ yearOrMonth: '2026', month: '08' })
 			})
 		);
 		const heading = await screen.findByRole('heading', { level: 1 });
@@ -58,7 +58,7 @@ describe('/summary/[year]/[month]', () => {
 	it('renders "{long month} {year} summary" for an unpadded month', async () => {
 		render(
 			await Page({
-				params: Promise.resolve({ year: '2026', month: '8' })
+				params: Promise.resolve({ yearOrMonth: '2026', month: '8' })
 			})
 		);
 		const heading = await screen.findByRole('heading', { level: 1 });
@@ -66,13 +66,16 @@ describe('/summary/[year]/[month]', () => {
 	});
 
 	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
-		await fetchSummaryYearMonthPageContent({ year: '2026', month: '08' }, 1);
+		await fetchSummaryYearMonthPageContent(
+			{ yearOrMonth: '2026', month: '08' },
+			1
+		);
 		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
 
 	it("returns the month's first and last calendar day as the lazy species-fetch bounds", async () => {
 		const data = await fetchSummaryYearMonthPageContent(
-			{ year: '2026', month: '08' },
+			{ yearOrMonth: '2026', month: '08' },
 			1
 		);
 		expect(data.fromDate).toBe('2026-08-01');
@@ -80,7 +83,10 @@ describe('/summary/[year]/[month]', () => {
 	});
 
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
-		await fetchSummaryYearMonthPageContent({ year: '2026', month: '08' }, 1);
+		await fetchSummaryYearMonthPageContent(
+			{ yearOrMonth: '2026', month: '08' },
+			1
+		);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
 			1,
 			'2026-08-01',
@@ -89,7 +95,10 @@ describe('/summary/[year]/[month]', () => {
 	});
 
 	it('calls fetchSummaryStats with the correct bounds for a shorter month (April)', async () => {
-		await fetchSummaryYearMonthPageContent({ year: '2026', month: '04' }, 1);
+		await fetchSummaryYearMonthPageContent(
+			{ yearOrMonth: '2026', month: '04' },
+			1
+		);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
 			1,
 			'2026-04-01',
@@ -100,7 +109,7 @@ describe('/summary/[year]/[month]', () => {
 	it('passes the fetched summary stats through to the rendered section', async () => {
 		render(
 			await Page({
-				params: Promise.resolve({ year: '2026', month: '08' })
+				params: Promise.resolve({ yearOrMonth: '2026', month: '08' })
 			})
 		);
 		await screen.findByRole('heading', { level: 1 });
@@ -114,7 +123,7 @@ describe('/summary/[year]/[month]', () => {
 		fetchSummaryStatsMock.mockResolvedValueOnce(null);
 		render(
 			await Page({
-				params: Promise.resolve({ year: '2026', month: '08' })
+				params: Promise.resolve({ yearOrMonth: '2026', month: '08' })
 			})
 		);
 		await screen.findByRole('heading', { level: 1 });
@@ -123,7 +132,7 @@ describe('/summary/[year]/[month]', () => {
 
 	it('computes correct month bounds for December (year-end month)', async () => {
 		const data = await fetchSummaryYearMonthPageContent(
-			{ year: '2026', month: '12' },
+			{ yearOrMonth: '2026', month: '12' },
 			1
 		);
 		expect(data.fromDate).toBe('2026-12-01');
@@ -131,7 +140,10 @@ describe('/summary/[year]/[month]', () => {
 	});
 
 	it("fetchSummaryYearMonthPageContent requests per-day period totals scoped to the month's bounds", async () => {
-		await fetchSummaryYearMonthPageContent({ year: '2026', month: '08' }, 1);
+		await fetchSummaryYearMonthPageContent(
+			{ yearOrMonth: '2026', month: '08' },
+			1
+		);
 		expect(fetchPeriodTotalsMock).toHaveBeenCalledWith(
 			1,
 			'day',
@@ -143,7 +155,7 @@ describe('/summary/[year]/[month]', () => {
 	it('renders "Session totals" as the first, default-active tab', async () => {
 		render(
 			await Page({
-				params: Promise.resolve({ year: '2026', month: '08' })
+				params: Promise.resolve({ yearOrMonth: '2026', month: '08' })
 			})
 		);
 		await screen.findByRole('heading', { level: 1 });
@@ -159,7 +171,7 @@ describe('/summary/[year]/[month]', () => {
 		]);
 		render(
 			await Page({
-				params: Promise.resolve({ year: '2026', month: '08' })
+				params: Promise.resolve({ yearOrMonth: '2026', month: '08' })
 			})
 		);
 		await screen.findByRole('heading', { level: 1 });
@@ -176,7 +188,7 @@ describe('/summary/[year]/[month]', () => {
 		]);
 		render(
 			await Page({
-				params: Promise.resolve({ year: '2026', month: '08' })
+				params: Promise.resolve({ yearOrMonth: '2026', month: '08' })
 			})
 		);
 		await screen.findByRole('heading', { level: 1 });
@@ -188,6 +200,12 @@ describe('/summary/[year]/[month]', () => {
 			'2026-08-01',
 			'2026-08-31'
 		);
+	});
+
+	it('calls notFound() when the parent segment is a month abbreviation (no day-drill under a squashed month)', async () => {
+		await expect(
+			fetchSummaryYearMonthPageContent({ yearOrMonth: 'jan', month: '08' }, 1)
+		).rejects.toThrow();
 	});
 
 	describe('?tabId= query param (#804)', () => {

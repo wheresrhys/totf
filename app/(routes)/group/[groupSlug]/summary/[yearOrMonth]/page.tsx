@@ -1,8 +1,8 @@
-import YearMonthSummaryPage from '@/app/(routes)/summary/[year]/[month]/page';
+import YearOrMonthSummaryPage from '@/app/(routes)/summary/[yearOrMonth]/page';
 import { withGroupScope } from '@/app/components/layout/withGroupScope';
-export default withGroupScope<{ year: string; month: string }>(
+export default withGroupScope<{ yearOrMonth: string }>(
 	({ viewedGroup, params }) => (
-		<YearMonthSummaryPage
+		<YearOrMonthSummaryPage
 			params={Promise.resolve(params)}
 			viewedGroup={viewedGroup}
 		/>
