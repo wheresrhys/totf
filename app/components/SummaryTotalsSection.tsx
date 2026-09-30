@@ -7,7 +7,7 @@ import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import {
 	fetchPeriodStats,
-	fetchCombinedMonthSpeciesCounts
+	fetchCombinedMonthTotals
 } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
 import type { CoreStatsResult } from '@/app/models/db';
@@ -45,17 +45,18 @@ const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
 // time the tab remounts — mirroring how `PeriodTotalsTable`'s own
 // `aggregateByState` resets per #604 — since `SummaryTotalsSection` itself
 // never unmounts across tab switches, so the state has to live down here
-// instead. Both row shapes are derived from the same already-fetched
-// `periodStats` array (the raw per-`(year, month)` rows `core_stats`
-// returns) — toggling re-renders in place, no new fetch either way.
+// instead. `periodStats` (raw per-`(year, month)` rows) feeds the OFF view;
+// `monthSquashedStats` (`core_stats`' `'month-squashed'` mode, #996) feeds the
+// ON view — both already fetched before this renders, so toggling re-renders
+// in place, no new fetch either way.
 function AllTimeMonthTotalsTab({
 	periodStats,
-	speciesCountByMonth,
+	monthSquashedStats,
 	totalsStats,
 	viewedGroup
 }: {
 	periodStats: CoreStatsResult[];
-	speciesCountByMonth: Record<number, number>;
+	monthSquashedStats: CoreStatsResult[];
 	totalsStats?: CoreStatsResult;
 	viewedGroup?: ViewedGroup;
 }) {
@@ -64,13 +65,11 @@ function AllTimeMonthTotalsTab({
 	// shown, and resets to Hide (`true`) on tab remount alongside it.
 	const [hideEmptyMonths, setHideEmptyMonths] = useState(true);
 
-	// ON: 12 calendar-month buckets summed across every year. Look each row
-	// back up by its sentinel `time_period` (there's no year to link to, so no
-	// href) and format its label on demand.
-	const combinedRows = buildCombinedMonthTotalsRows(
-		periodStats,
-		speciesCountByMonth
-	);
+	// ON: 12 calendar-month buckets, already summed across every year in SQL via
+	// `core_stats`' `'month-squashed'` mode. Look each row back up by its
+	// sentinel `time_period` (there's no year to link to, so no href) and format
+	// its label on demand.
+	const combinedRows = buildCombinedMonthTotalsRows(monthSquashedStats);
 	const combinedLabelByTimePeriod = new Map(
 		combinedRows.map((row) => [row.stats.time_period, formatMonthLabel(row)])
 	);
@@ -109,8 +108,6 @@ function AllTimeMonthTotalsTab({
 						combinedLabelByTimePeriod.get(timePeriod) ?? ''
 					}
 					totalsStats={totalsStats}
-					aggregationFixedTo="encounter"
-					dashIndividuals
 					extraControls={extraControls}
 				/>
 			) : (
@@ -292,20 +289,20 @@ export function SummaryTotalsSection({
 		}
 	);
 
-	// The all-time combine-years month tab fetches lazily too, on first select —
-	// one row per (year, month) across the group's full history, folded into 12
-	// calendar-month buckets client-side. Encounters-only, so it needs no date
-	// range (all-time) and no per-year drill-down link. `species_count` can't be
-	// folded from the same rows (summing per-cell distinct counts double-counts a
-	// species across years, #994), so it's fetched separately as a true
-	// cross-year distinct count and composed alongside.
+	// The all-time combine-years month tab fetches lazily too, on first select.
+	// The "Combine years OFF" view needs the raw per-(year, month) rows
+	// (`periodStats`); the "ON" view needs the true cross-year aggregate per
+	// calendar month, fetched separately via `core_stats`' `'month-squashed'`
+	// mode (#996) rather than folded client-side from `periodStats` (that would
+	// double-count any distinct-count column for a species/bird appearing in the
+	// same calendar month in more than one year, #994).
 	const isAllTimeMonthActive = activeTab === ALL_TIME_MONTH_TOTALS_TAB.id;
 	const fetchCombinedMonthStats = useCallback(async () => {
-		const [periodStats, speciesCountByMonth] = await Promise.all([
+		const [periodStats, monthSquashedStats] = await Promise.all([
 			fetchPeriodStats(viewedGroup!.id, 'month'),
-			fetchCombinedMonthSpeciesCounts(viewedGroup!.id)
+			fetchCombinedMonthTotals(viewedGroup!.id)
 		]);
-		return { periodStats, speciesCountByMonth };
+		return { periodStats, monthSquashedStats };
 	}, [viewedGroup]);
 	const { data: combinedMonthData, isLoading: isCombinedMonthLoading } =
 		useLazyTabData(
@@ -385,7 +382,7 @@ export function SummaryTotalsSection({
 				) : (
 					<AllTimeMonthTotalsTab
 						periodStats={combinedMonthData?.periodStats ?? []}
-						speciesCountByMonth={combinedMonthData?.speciesCountByMonth ?? {}}
+						monthSquashedStats={combinedMonthData?.monthSquashedStats ?? []}
 						totalsStats={
 							tabsWithTotalsRow[ALL_TIME_MONTH_TOTALS_TAB.id]
 								? totalsStats

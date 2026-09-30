@@ -1,6 +1,9 @@
 'use client';
 import { useCallback, useState } from 'react';
-import { fetchSpeciesPeriodTotals } from '@/app/actions/sp-data';
+import {
+	fetchSpeciesPeriodTotals,
+	fetchSpeciesCombinedMonthTotals
+} from '@/app/actions/sp-data';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import {
@@ -15,11 +18,10 @@ import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 
 // The all-time species page's combine-years "Month totals" tab — the
 // species-scoped counterpart to `SummaryTotalsSection`'s
-// `ALL_TIME_MONTH_TOTALS_TAB`. Fetches one row per `(year, month)` recorded
-// for this species across all history (no date range), then folds them into
-// 12 calendar-month buckets via the same cross-year fold `SummaryTotalsSection`
-// uses. Encounters-only: summing distinct birds across years would
-// double-count a bird retrapped in the same calendar month in a later year.
+// `ALL_TIME_MONTH_TOTALS_TAB`. Fetches both the raw per-`(year, month)` rows
+// (for "Combine years OFF") and the true cross-year aggregate per calendar
+// month via `core_stats`' `'month-squashed'` mode (#996, for "ON") — the same
+// two-fetch shape `SummaryTotalsSection` uses.
 export function SpCombinedMonthTotalsTab({
 	speciesName,
 	viewedGroupId,
@@ -34,11 +36,20 @@ export function SpCombinedMonthTotalsTab({
 	// `useLazyTabData` explicitly, per this ticket's reuse requirement.
 	isActive: boolean;
 }) {
-	const fetchCombinedMonthStats = useCallback(
-		() => fetchSpeciesPeriodTotals(speciesName, viewedGroupId, 'month'),
-		[speciesName, viewedGroupId]
-	);
-	const { data: monthlyStats, isLoading } = useLazyTabData(
+	// The "Combine years OFF" view needs the raw per-(year, month) rows; the
+	// "ON" view needs the true cross-year aggregate per calendar month, fetched
+	// separately via `core_stats`' `'month-squashed'` mode (#996) rather than
+	// folded client-side from the per-year rows (that would double-count any
+	// distinct-count column, e.g. `bird_count`, for a bird retrapped in the same
+	// calendar month in more than one year).
+	const fetchCombinedMonthStats = useCallback(async () => {
+		const [monthlyStats, monthSquashedStats] = await Promise.all([
+			fetchSpeciesPeriodTotals(speciesName, viewedGroupId, 'month'),
+			fetchSpeciesCombinedMonthTotals(speciesName, viewedGroupId)
+		]);
+		return { monthlyStats, monthSquashedStats };
+	}, [speciesName, viewedGroupId]);
+	const { data, isLoading } = useLazyTabData(
 		isActive,
 		fetchCombinedMonthStats,
 		{
@@ -59,18 +70,20 @@ export function SpCombinedMonthTotalsTab({
 	// resets to Hide (`true`) on tab remount alongside `combineYears`.
 	const [hideEmptyMonths, setHideEmptyMonths] = useState(true);
 
-	if (isLoading || monthlyStats === undefined) {
+	if (isLoading || data === undefined) {
 		return (
 			<div className="flex items-center justify-center">
 				<div className="loading loading-spinner loading-xl"></div>
 			</div>
 		);
 	}
+	const { monthlyStats, monthSquashedStats } = data;
 
-	// ON: 12 calendar-month buckets summed across every year, encounters-only —
-	// unchanged from #637. Look each row back up by its sentinel `time_period`
-	// (there's no year to link to, so no href) and format its label on demand.
-	const combinedMonthRows = buildCombinedMonthTotalsRows(monthlyStats);
+	// ON: 12 calendar-month buckets, already summed across every year in SQL via
+	// `core_stats`' `'month-squashed'` mode (#996). Look each row back up by its
+	// sentinel `time_period` (there's no year to link to, so no href) and format
+	// its label on demand.
+	const combinedMonthRows = buildCombinedMonthTotalsRows(monthSquashedStats);
 	const combinedMonthLabelByTimePeriod = new Map(
 		combinedMonthRows.map((row) => [
 			row.stats.time_period,
@@ -114,8 +127,6 @@ export function SpCombinedMonthTotalsTab({
 					buildLabel={(timePeriod) =>
 						combinedMonthLabelByTimePeriod.get(timePeriod) ?? ''
 					}
-					aggregationFixedTo="encounter"
-					dashIndividuals
 					extraControls={extraControls}
 				/>
 			) : (

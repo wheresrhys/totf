@@ -300,3 +300,24 @@ export async function fetchSpeciesPeriodTotals(
 		})
 		.then(catchSupabaseErrors) as Promise<CoreStatsResult[]>;
 }
+
+/**
+ * One row per calendar month for a single species, summed across the group's
+ * entire history via `core_stats`' `'month-squashed'` `group_by_time_period`
+ * mode (#996) — the species-scoped sibling of `fetchCombinedMonthTotals`
+ * (`app/actions/summary-stats.ts`). Feeds the species page's "Month totals"
+ * tab with "Combine years" on.
+ */
+export async function fetchSpeciesCombinedMonthTotals(
+	speciesName: string,
+	viewedGroupId: number
+): Promise<CoreStatsResult[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
+	return supabase
+		.rpc('core_stats', {
+			ringing_group_filter: viewedGroupId,
+			species_name_filter: speciesName,
+			group_by_time_period: 'month-squashed'
+		})
+		.then(catchSupabaseErrors) as Promise<CoreStatsResult[]>;
+}
