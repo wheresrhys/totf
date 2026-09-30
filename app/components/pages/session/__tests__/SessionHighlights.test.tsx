@@ -26,7 +26,12 @@ function makeV2Highlight(
 			highlightListPrefixPrinter: () => ''
 		},
 		descriptor: { category, type, unit: 'encounter' },
-		value: { timePeriod: '2024-09-15', value: 74, species: null },
+		value: {
+			timePeriod: '2024-09-15',
+			value: 74,
+			species: null,
+			descriptor: { category, type, unit: 'encounter' }
+		},
 		species: undefined,
 		bestPosition: 1,
 		scopes: []

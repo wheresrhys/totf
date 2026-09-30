@@ -31,6 +31,7 @@ export type HighlightValue = {
 	timePeriod: string;
 	value: number;
 	species: string | null;
+	descriptor: HighlightDescriptor;
 };
 
 export type SpeciesUnitMode = 'replace' | 'prefix' | undefined;
@@ -85,6 +86,7 @@ export type CombinedHighlight = {
 export type CombinedHighlightPrinter = (
 	combinedHighlight: CombinedHighlight
 ) => string;
+
 export type HighlightListPrefixPrinter = (
 	highlightsOfType: HighlightsOfType
 ) => string;
@@ -110,7 +112,7 @@ type HighlightsGeneratorFor<
 	statsSelector: StatsSelectorKey;
 	generator: (
 		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[]
-	) => HighlightValue[];
+	) => Omit<HighlightValue, 'descriptor'>[];
 	condition?: (scope: HighlightScope) => boolean;
 };
 

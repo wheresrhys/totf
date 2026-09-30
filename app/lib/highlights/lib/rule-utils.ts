@@ -33,7 +33,7 @@ function sumProperties<Row extends RowWithIdentity>(
 export function getTopByPropertiesSum<Row extends RowWithIdentity>(
 	properties: (keyof Row)[],
 	options?: HighlightFinderOptions
-): (stats: Row[]) => HighlightValue[] {
+): (stats: Row[]) => Omit<HighlightValue, 'descriptor'>[] {
 	const threshold = options?.threshold ?? DEFAULT_THRESHOLD;
 	return (stats: Row[]) => {
 		const potentialHighlights = stats.map((row) => ({
@@ -53,7 +53,7 @@ export function getTopByPropertiesSum<Row extends RowWithIdentity>(
 export function getTopByProperty<Row extends RowWithIdentity>(
 	property: keyof Row,
 	options?: HighlightFinderOptions
-): (stats: Row[]) => HighlightValue[] {
+): (stats: Row[]) => Omit<HighlightValue, 'descriptor'>[] {
 	return getTopByPropertiesSum<Row>([property], options);
 }
 
@@ -101,7 +101,7 @@ function isEarliestPeriod(
 function toAppearanceHighlight(
 	row: CoreStatsResult,
 	value: number = row.encounter_count
-): HighlightValue {
+): Omit<HighlightValue, 'descriptor'> {
 	return {
 		timePeriod: row.time_period as string,
 		value,
@@ -120,7 +120,7 @@ function toAppearanceHighlight(
 // printing both a "first" and an "only" line for the same cell.
 export function getFirstAppearance(
 	options?: HighlightFinderOptions
-): (stats: CoreStatsResult[]) => HighlightValue[] {
+): (stats: CoreStatsResult[]) => Omit<HighlightValue, 'descriptor'>[] {
 	return (stats: CoreStatsResult[]) => {
 		const appearances = getAppearances(stats);
 		if (appearances.length < 2) return [];
@@ -139,7 +139,7 @@ export function getFirstAppearance(
 // an all-time scope, its only record of the year under a year-scoped window.
 export function getSoleAppearance(
 	options?: HighlightFinderOptions
-): (stats: CoreStatsResult[]) => HighlightValue[] {
+): (stats: CoreStatsResult[]) => Omit<HighlightValue, 'descriptor'>[] {
 	return (stats: CoreStatsResult[]) => {
 		const appearances = getAppearances(stats);
 		if (appearances.length !== 1) return [];
@@ -163,7 +163,7 @@ export function getSoleAppearance(
 // same cell.
 export function getInfrequentAppearances(
 	options?: HighlightFinderOptions
-): (stats: CoreStatsResult[]) => HighlightValue[] {
+): (stats: CoreStatsResult[]) => Omit<HighlightValue, 'descriptor'>[] {
 	const maxAppearances = options?.maxAppearances ?? DEFAULT_MAX_APPEARANCES;
 	return (stats: CoreStatsResult[]) => {
 		const appearances = getAppearances(stats);

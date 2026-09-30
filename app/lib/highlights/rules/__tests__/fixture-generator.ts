@@ -59,7 +59,8 @@ function getCombinedHighlightMaker(descriptor: HighlightDescriptor) {
 			value: {
 				value,
 				timePeriod: `${year}-02-02`,
-				species: null
+				species: null,
+				descriptor
 			},
 			species: bySpecies ? 'Robin' : undefined,
 			bestPosition: Math.max(
