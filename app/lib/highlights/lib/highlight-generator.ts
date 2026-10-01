@@ -44,18 +44,20 @@ function generateAllHighlights({
 	stats,
 	scope,
 	limit,
-	includePerSpecies
+	includePerSpecies,
+	excludeGlobal
 }: {
 	stats: EnhancedStatsRepository;
 	scope: HighlightScope;
 	limit: number;
 	includePerSpecies: boolean;
+	excludeGlobal?: boolean;
 }) {
 	return highlightRules
 		.flatMap((rule) => {
 			if (rule.condition && !rule.condition(scope)) return null;
 			const workingStats = stats[rule.statsSelector];
-			if (Array.isArray(workingStats)) {
+			if (!excludeGlobal && Array.isArray(workingStats)) {
 				const highlights: HighlightsOfType = {
 					...rule,
 					scope,
@@ -99,6 +101,10 @@ function generateAllHighlights({
 		.filter(isHighlightsOfType);
 }
 
+type StatFilter = (stat: {
+	time_period: string | null;
+	species_name: string | null;
+}) => boolean;
 function getCacheUtils(
 	groupId: number,
 	temporalUnit: TemporalUnit,
@@ -107,9 +113,7 @@ function getCacheUtils(
 	parentTimeWindow?: YearMonthRestriction
 ): {
 	cacheKey: string;
-	filter:
-		| ((stat: { time_period: string; species_name: string | null }) => boolean)
-		| null;
+	filter: StatFilter | null;
 } {
 	let cacheKey = `${groupId}-${temporalUnit}-${limit || 'no-limit'}-${species || 'no-species'}`;
 	if (!parentTimeWindow) {
@@ -119,19 +123,18 @@ function getCacheUtils(
 	const speciesFilter = species
 		? (species_name: string | null) => species_name === species
 		: () => true;
-	let filter: ((stat: {
-		time_period: string;
-		species_name: string | null;
-	}) => boolean) | null;
+	let filter: StatFilter | null;
 	if (year && month) {
 		cacheKey = `${cacheKey}-${year}-${month}`;
 		filter = ({ time_period, species_name }) =>
-			(time_period as string).startsWith(`${year}-${String(month).padStart(2, '0')}-`) &&
-			speciesFilter(species_name);
+			(time_period as string).startsWith(
+				`${year}-${String(month).padStart(2, '0')}-`
+			) && speciesFilter(species_name);
 	} else if (year) {
 		cacheKey = `${cacheKey}-${year}`;
 		filter = ({ time_period, species_name }) =>
-			(time_period as string).startsWith(`${year}-`) && speciesFilter(species_name);
+			(time_period as string).startsWith(`${year}-`) &&
+			speciesFilter(species_name);
 	} else if (month) {
 		cacheKey = `${cacheKey}-${month}`;
 		filter = ({ time_period, species_name }) =>
@@ -165,10 +168,7 @@ function enhanceStatsRepository(
 async function getFilteredStats(
 	temporalUnit: TemporalUnit,
 	groupId: number,
-	filter: ((stat: {
-		time_period: string;
-		species_name: string | null;
-	}) => boolean) | null
+	filter: StatFilter | null
 ): Promise<EnhancedStatsRepository> {
 	const stats = await getStatsByTemporalUnit(temporalUnit, groupId);
 
@@ -189,7 +189,8 @@ export async function getHighlightsWithinTimeWindow({
 	limit,
 	species,
 	parentTimeWindow,
-	includePerSpecies
+	includePerSpecies,
+	excludeGlobal
 }: {
 	temporalUnit: TemporalUnit;
 	groupId: number;
@@ -197,6 +198,7 @@ export async function getHighlightsWithinTimeWindow({
 	species?: string;
 	parentTimeWindow?: YearMonthRestriction;
 	includePerSpecies: boolean;
+	excludeGlobal?: boolean;
 }) {
 	limit = limit ?? DEFAULT_LIMIT;
 
@@ -215,7 +217,8 @@ export async function getHighlightsWithinTimeWindow({
 		stats: await getFilteredStats(temporalUnit, groupId, filter),
 		scope: { temporalUnit, parentTimeWindow },
 		limit,
-		includePerSpecies
+		includePerSpecies,
+		excludeGlobal
 	});
 
 	cache.set(cacheKey, highlights);

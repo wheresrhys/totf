@@ -43,7 +43,7 @@ export function SpHighlightsTab({
 					year,
 					month
 				},
-				// todo needs to have a 'justForSpecies" option
+				excludeGlobal: true,
 				includePerSpecies: true
 			}),
 			month
@@ -51,12 +51,13 @@ export function SpHighlightsTab({
 				: getHighlightsWithinTimeWindow({
 						temporalUnit: 'month',
 						groupId: viewedGroup.id,
-					species: speciesName,
+						species: speciesName,
 						parentTimeWindow: {
 							year,
 							month
 						},
-						includePerSpecies: true
+						includePerSpecies: true,
+						excludeGlobal: true
 					})
 		]);
 		setHighlightsData({ sessionHighlights: daily, monthHighlights: monthly });

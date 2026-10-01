@@ -55,11 +55,13 @@ const HIGHLIGHTS_TAB = { id: 'highlights', label: 'Highlights' };
 export function HighlightsByTimePeriod({
 	highlights,
 	heading,
-	viewedGroup
+	viewedGroup,
+	excludeSpeciesName
 }: {
 	highlights: HighlightsOfType[];
 	heading: string;
 	viewedGroup?: ViewedGroup;
+	excludeSpeciesName?: boolean;
 }) {
 	if (!highlights.length) return null;
 	return (
@@ -83,7 +85,7 @@ export function HighlightsByTimePeriod({
 										showUnit={Boolean(highlightValue.species)}
 										value={highlightValue.value}
 										unit={
-											(highlightValue.species as SpeciesName) ??
+											(highlightValue.species as SpeciesName) ||
 											highlight.descriptor.unit
 										}
 										viewedGroup={viewedGroup}
