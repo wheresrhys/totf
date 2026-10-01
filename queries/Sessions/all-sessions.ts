@@ -4,7 +4,7 @@ import type { TableQueryDefinition } from '../types';
  * Sessions with their encounter count, most recent first — powers
  * `fetchSessionsPageContent` (`app/(routes)/sessions/page.tsx`). No longer
  * selects location — the `/sessions` page stopped displaying/querying
- * per-session location ahead of #1024 dropping `Sessions.location_id`.
+ * per-session location, and #1024 then dropped `Sessions.location_id` outright.
  * Captured for both Alpha and Beta by `supabase/scripts/generate-snapshots.ts`.
  */
 export const allSessionsQuery: TableQueryDefinition = {

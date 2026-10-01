@@ -154,58 +154,48 @@ describe('DB constraints — Locations uniqueness (location_name, ringing_group_
 	});
 });
 
-describe('DB constraints — Sessions uniqueness (visit_date, location_id, session_type)', () => {
+describe('DB constraints — Sessions uniqueness (visit_date, ringing_group_id)', () => {
 	const suffix = randomTestSuffix();
 	let groupId: number;
 	let groupClient: SupabaseClient;
-	let locationId: number;
 
 	beforeAll(async () => {
 		groupId = createIsolatedGroup(`db-constraints-${suffix}-sessions`);
 		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
-		locationId = Number(
-			psqlScalar(
-				`INSERT INTO "Locations" (location_name, ringing_group_id) VALUES ('DbConstraintsLoc-${suffix}-sessions', ${groupId}) RETURNING id;`
-			)
-		);
 	});
 
 	afterAll(() => {
 		psql(
-			`DELETE FROM "Sessions" WHERE location_id = ${locationId};` +
-				`DELETE FROM "Locations" WHERE id = ${locationId};` +
+			`DELETE FROM "Sessions" WHERE ringing_group_id = ${groupId};` +
 				`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
 		);
 	});
 
-	it('allows inserting a Sessions row with a unique (visit_date, location_id, session_type) triple', async () => {
+	it('allows inserting a Sessions row with a unique (visit_date, ringing_group_id) pair', async () => {
 		const { error } = await groupClient.from('Sessions').insert({
 			visit_date: randomFutureDate(),
-			location_id: locationId,
-			session_type: 'FULL_GROWN'
+			ringing_group_id: groupId
 		});
 		expect(error).toBeNull();
 	});
 
-	it('rejects a raw duplicate (visit_date, location_id, session_type) insert with a unique-violation error', async () => {
+	it('rejects a second Sessions row for the same group and date with a unique-violation error', async () => {
 		const visitDate = randomFutureDate();
 		const first = await groupClient.from('Sessions').insert({
 			visit_date: visitDate,
-			location_id: locationId,
-			session_type: 'FULL_GROWN'
+			ringing_group_id: groupId
 		});
 		expect(first.error).toBeNull();
 
 		const duplicate = await groupClient.from('Sessions').insert({
 			visit_date: visitDate,
-			location_id: locationId,
-			session_type: 'FULL_GROWN'
+			ringing_group_id: groupId
 		});
 		expect(duplicate.error?.code).toBe('23505');
 	});
 });
 
-describe('DB constraints — Encounters uniqueness (bird_id, session_id)', () => {
+describe('DB constraints — Encounters uniqueness (bird_id, location_id, visit_date)', () => {
 	const suffix = randomTestSuffix();
 	let groupId: number;
 	let groupClient: SupabaseClient;
@@ -234,7 +224,7 @@ describe('DB constraints — Encounters uniqueness (bird_id, session_id)', () =>
 				`DELETE FROM "Sessions" WHERE id = ANY(ARRAY[${sessionIds.join(',') || 'NULL'}]::bigint[]);` +
 				`DELETE FROM "Birds" WHERE id = ANY(ARRAY[${birdIds.join(',') || 'NULL'}]::bigint[]);` +
 				`DELETE FROM "Species" WHERE id = ANY(ARRAY[${speciesIds.join(',') || 'NULL'}]::bigint[]);` +
-				`DELETE FROM "Locations" WHERE id = ${locationId};` +
+				`DELETE FROM "Locations" WHERE ringing_group_id = ${groupId};` +
 				`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
 		);
 	});
@@ -261,7 +251,7 @@ describe('DB constraints — Encounters uniqueness (bird_id, session_id)', () =>
 		const visitDate = randomFutureDate();
 		const sessionId = Number(
 			psqlScalar(
-				`INSERT INTO "Sessions" (visit_date, location_id) VALUES ('${visitDate}', ${locationId}) RETURNING id;`
+				`INSERT INTO "Sessions" (visit_date, ringing_group_id) VALUES ('${visitDate}', ${groupId}) RETURNING id;`
 			)
 		);
 		sessionIds.push(sessionId);
@@ -269,8 +259,9 @@ describe('DB constraints — Encounters uniqueness (bird_id, session_id)', () =>
 	}
 
 	// An encounter carries its own location/date as well as its session link
-	// (Encounters.location_id/visit_date are NOT NULL, #1015); only capture_time
-	// varies between the rows these tests insert.
+	// (Encounters.location_id/visit_date are NOT NULL, #1015, and since #1024 they
+	// are what the uniqueness constraint keys on); only capture_time varies
+	// between the rows these tests insert.
 	function encounterRow(
 		{ birdId, sessionId, visitDate }: BirdAndSession,
 		captureTime: string
@@ -288,7 +279,7 @@ describe('DB constraints — Encounters uniqueness (bird_id, session_id)', () =>
 		};
 	}
 
-	it('allows inserting an Encounters row with a unique (bird_id, session_id) pair', async () => {
+	it('allows inserting an Encounters row with a unique (bird_id, location_id, visit_date) triple', async () => {
 		const birdAndSession = createBirdAndSession('unique');
 
 		const { error } = await groupClient
@@ -297,7 +288,7 @@ describe('DB constraints — Encounters uniqueness (bird_id, session_id)', () =>
 		expect(error).toBeNull();
 	});
 
-	it('rejects a raw duplicate (bird_id, session_id) insert with a unique-violation error', async () => {
+	it('rejects a raw duplicate (bird_id, location_id, visit_date) insert with a unique-violation error', async () => {
 		const birdAndSession = createBirdAndSession('dup');
 
 		const first = await groupClient
@@ -309,6 +300,29 @@ describe('DB constraints — Encounters uniqueness (bird_id, session_id)', () =>
 			.from('Encounters')
 			.insert(encounterRow(birdAndSession, '10:00:00'));
 		expect(duplicate.error?.code).toBe('23505');
+	});
+
+	// The distinction (bird_id, session_id) silently lost when a Session became
+	// one row per group-day (#1024), and the reason the constraint moved onto the
+	// encounter's own columns rather than staying on session_id.
+	it('allows the same bird twice on one date in one session when the two encounters are at different locations', async () => {
+		const birdAndSession = createBirdAndSession('two-locations');
+		const otherLocationId = Number(
+			psqlScalar(
+				`INSERT INTO "Locations" (location_name, ringing_group_id) VALUES ('DbConstraintsLoc-${suffix}-encounters-other', ${groupId}) RETURNING id;`
+			)
+		);
+
+		const first = await groupClient
+			.from('Encounters')
+			.insert(encounterRow(birdAndSession, '09:00:00'));
+		expect(first.error).toBeNull();
+
+		const atOtherLocation = await groupClient.from('Encounters').insert({
+			...encounterRow(birdAndSession, '14:00:00'),
+			location_id: otherLocationId
+		});
+		expect(atOtherLocation.error).toBeNull();
 	});
 });
 

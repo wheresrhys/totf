@@ -39,7 +39,14 @@ import {
 	psqlScalar,
 	createIsolatedGroup
 } from '@/supabase/__tests__/db-test-helpers';
-import { readTestSessionLocationAndDate } from '@/supabase/__tests__/rpc-functions/helpers/encounter-fixtures';
+import { readTestSessionDate } from '@/supabase/__tests__/rpc-functions/helpers/encounter-fixtures';
+
+// A Session no longer carries a location (#1024), so every Encounters row has to
+// name its own `location_id`. Each fixture session in this file is a single
+// location's visit, so each describe block registers that pairing once in its
+// setup and the local `createBird` reads it back — rather than threading a
+// location id through all ~40 `createBird` call sites.
+const fixtureLocationIdBySessionId = new Map<number, number>();
 
 // The active group for the mocked `getGroupJwt()` below. `authenticateAs()` sets
 // this before an action call to stand in for "the caller is logged in as this
@@ -247,7 +254,8 @@ describe('updateRingSequence — bounds reconciliation (#731)', () => {
 			sex: 'U',
 			age_code: 4,
 			session_id: onSessionId,
-			...(await readTestSessionLocationAndDate(client, onSessionId)),
+			location_id: fixtureLocationIdBySessionId.get(onSessionId)!,
+			...(await readTestSessionDate(client, onSessionId)),
 			bird_id: bird.id
 		});
 		if (encounterError) throw encounterError;
@@ -340,12 +348,13 @@ describe('updateRingSequence — bounds reconciliation (#731)', () => {
 			throw locationError ?? new Error('Failed to create location');
 		const { data: session, error: sessionError } = await groupClient
 			.from('Sessions')
-			.insert({ visit_date: '2090-01-01', location_id: location.id })
+			.insert({ visit_date: '2090-01-01', ringing_group_id: groupId })
 			.select('id')
 			.single();
 		if (sessionError || !session)
 			throw sessionError ?? new Error('Failed to create session');
 		sessionId = session.id;
+		fixtureLocationIdBySessionId.set(sessionId, location.id);
 
 		const { data: otherLocation, error: otherLocationError } =
 			await otherGroupClient
@@ -361,12 +370,13 @@ describe('updateRingSequence — bounds reconciliation (#731)', () => {
 		const { data: otherSession, error: otherSessionError } =
 			await otherGroupClient
 				.from('Sessions')
-				.insert({ visit_date: '2090-01-01', location_id: otherLocation.id })
+				.insert({ visit_date: '2090-01-01', ringing_group_id: otherGroupId })
 				.select('id')
 				.single();
 		if (otherSessionError || !otherSession)
 			throw otherSessionError ?? new Error('Failed to create other session');
 		otherSessionId = otherSession.id;
+		fixtureLocationIdBySessionId.set(otherSessionId, otherLocation.id);
 	});
 
 	afterAll(() => {
@@ -558,7 +568,8 @@ describe('promoteControlToSequence', () => {
 			sex: 'U',
 			age_code: 4,
 			session_id: onSessionId,
-			...(await readTestSessionLocationAndDate(client, onSessionId)),
+			location_id: fixtureLocationIdBySessionId.get(onSessionId)!,
+			...(await readTestSessionDate(client, onSessionId)),
 			bird_id: bird.id
 		});
 		if (encounterError) throw encounterError;
@@ -621,12 +632,13 @@ describe('promoteControlToSequence', () => {
 
 		const { data: session, error: sessionError } = await groupClient
 			.from('Sessions')
-			.insert({ visit_date: '2090-01-01', location_id: locationId })
+			.insert({ visit_date: '2090-01-01', ringing_group_id: groupId })
 			.select('id')
 			.single();
 		if (sessionError || !session)
 			throw sessionError ?? new Error('Failed to create session');
 		sessionId = session.id;
+		fixtureLocationIdBySessionId.set(sessionId, locationId);
 
 		const { data: otherLocation, error: otherLocationError } =
 			await otherGroupClient
@@ -644,12 +656,13 @@ describe('promoteControlToSequence', () => {
 		const { data: otherSession, error: otherSessionError } =
 			await otherGroupClient
 				.from('Sessions')
-				.insert({ visit_date: '2090-01-01', location_id: otherLocationId })
+				.insert({ visit_date: '2090-01-01', ringing_group_id: otherGroupId })
 				.select('id')
 				.single();
 		if (otherSessionError || !otherSession)
 			throw otherSessionError ?? new Error('Failed to create other session');
 		otherSessionId = otherSession.id;
+		fixtureLocationIdBySessionId.set(otherSessionId, otherLocationId);
 	});
 
 	afterAll(() => {
@@ -928,7 +941,8 @@ describe('fetchUnassignedImportPrefixes', () => {
 			sex: 'U',
 			age_code: 4,
 			session_id: onSessionId,
-			...(await readTestSessionLocationAndDate(client, onSessionId)),
+			location_id: fixtureLocationIdBySessionId.get(onSessionId)!,
+			...(await readTestSessionDate(client, onSessionId)),
 			bird_id: bird.id
 		});
 		if (encounterError) throw encounterError;
@@ -967,12 +981,13 @@ describe('fetchUnassignedImportPrefixes', () => {
 			throw locationError ?? new Error('Failed to create location');
 		const { data: session, error: sessionError } = await groupClient
 			.from('Sessions')
-			.insert({ visit_date: '2090-01-01', location_id: location.id })
+			.insert({ visit_date: '2090-01-01', ringing_group_id: groupId })
 			.select('id')
 			.single();
 		if (sessionError || !session)
 			throw sessionError ?? new Error('Failed to create session');
 		sessionId = session.id;
+		fixtureLocationIdBySessionId.set(sessionId, location.id);
 
 		const { data: otherLocation, error: otherLocationError } =
 			await otherGroupClient
@@ -988,12 +1003,13 @@ describe('fetchUnassignedImportPrefixes', () => {
 		const { data: otherSession, error: otherSessionError } =
 			await otherGroupClient
 				.from('Sessions')
-				.insert({ visit_date: '2090-01-01', location_id: otherLocation.id })
+				.insert({ visit_date: '2090-01-01', ringing_group_id: otherGroupId })
 				.select('id')
 				.single();
 		if (otherSessionError || !otherSession)
 			throw otherSessionError ?? new Error('Failed to create other session');
 		otherSessionId = otherSession.id;
+		fixtureLocationIdBySessionId.set(otherSessionId, otherLocation.id);
 	});
 
 	afterAll(() => {
@@ -1107,7 +1123,8 @@ describe('createSequenceFromImportPrefix', () => {
 				sex: 'U',
 				age_code: 4,
 				session_id: sessionId,
-				...(await readTestSessionLocationAndDate(groupClient, sessionId)),
+				location_id: fixtureLocationIdBySessionId.get(sessionId)!,
+				...(await readTestSessionDate(groupClient, sessionId)),
 				bird_id: bird.id
 			});
 		if (encounterError) throw encounterError;
@@ -1159,12 +1176,13 @@ describe('createSequenceFromImportPrefix', () => {
 			throw locationError ?? new Error('Failed to create location');
 		const { data: session, error: sessionError } = await groupClient
 			.from('Sessions')
-			.insert({ visit_date: '2090-01-01', location_id: location.id })
+			.insert({ visit_date: '2090-01-01', ringing_group_id: groupId })
 			.select('id')
 			.single();
 		if (sessionError || !session)
 			throw sessionError ?? new Error('Failed to create session');
 		sessionId = session.id;
+		fixtureLocationIdBySessionId.set(sessionId, location.id);
 	});
 
 	afterAll(() => {

@@ -17,8 +17,11 @@ A leaderboard/statistics dashboard for bird ringing data. Bird ringing groups (o
 
 - A **RingingGroup** is the "user" in this system — it represents an organisation that rings birds. There are no individual user accounts. The `RingingGroups` table is what you treat as "users".
 - A **Bird** is an individual bird identified by its ring number. It can appear across multiple sessions and groups (if caught by more than one group).
-- An **Encounter** is a single capture event: one bird, one session, with measurements.
-- A **Session** is a visit to a ringing location on a given date.
+- An **Encounter** is a single capture event: one bird, at one location, on one date, with
+  measurements. It is where a capture's location and date actually live.
+- A **Session** is a group's day of ringing — one row per group per date (#1024). It groups a day's
+  encounters together and nothing more; it carries no location of its own, so a day spent at
+  several sites is one Session whose encounters sit at different locations.
 
 **Standard terminology/enum reference:** imported CSV data follows the DemOn ringing-software
 field spec — [`demon-ringing-data-entry-fields.xls`](https://app.bto.org/static/files/demon/demon-ringing-data-entry-fields.xls),

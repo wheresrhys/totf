@@ -256,8 +256,8 @@
     "total_effort": "02:00:00",
     "effort_per_session": "02:00:00",
     "effort_per_encounter": "00:10:54.545455",
-    "avg_encounters_per_session": 3.3333333333333335,
-    "max_per_session": 6,
+    "avg_encounters_per_session": 3.6666666666666665,
+    "max_per_session": 7,
     "species_count": 3,
     "bird_count": 11,
     "encounter_count": 11,
@@ -272,7 +272,7 @@
     "postjuv_enc_count": 6,
     "adult_enc_count": 4,
     "unknown_age_enc_count": 0,
-    "max_new_per_session": 5
+    "max_new_per_session": 6
   },
   {
     "species_name": null,

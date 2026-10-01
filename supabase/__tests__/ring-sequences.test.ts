@@ -257,7 +257,7 @@ describe('ring_sequence_controls with linked sequences', () => {
 		deltaVisitDate = randomFutureDate();
 		const { data: session, error: sessionError } = await deltaClient
 			.from('Sessions')
-			.insert({ visit_date: deltaVisitDate, location_id: deltaLocationId })
+			.insert({ visit_date: deltaVisitDate, ringing_group_id: deltaId })
 			.select('id')
 			.single();
 		if (sessionError) throw sessionError;

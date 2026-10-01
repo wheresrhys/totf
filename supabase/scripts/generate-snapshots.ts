@@ -207,7 +207,7 @@ export async function generateSnapshots(
 		await writeSnapshot(`notable_retraps/${name}.retraps.json`, data ?? []);
 	}
 
-	// Table: Encounters (matching the PULLI session-type definition) — powers
+	// Table: Encounters (matching what used to be the PULLI session_type, dropped in #1024) — powers
 	// fetchPulliPageContent (app/(routes)/pulli/page.tsx). Query:
 	// queries/Encounters/pulli-encounters.ts
 	{

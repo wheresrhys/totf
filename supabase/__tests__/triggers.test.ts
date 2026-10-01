@@ -12,7 +12,7 @@ import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import { supabase } from '../../lib/supabase';
 import { createUpserter } from '../../lib/demon-import';
-import { randomTestSuffix } from './test-isolation';
+import { randomTestSuffix, randomFutureDate } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { psql } from './db-test-helpers';
 
@@ -23,8 +23,13 @@ const BASE_ENCOUNTER = {
 	age_code: 1,
 };
 
-// The one shared session every encounter in the suppression suite below belongs to.
-const SESSION_VISIT_DATE = '2099-01-01';
+// The one shared session every encounter in the suppression suite below belongs
+// to. Deliberately a random date rather than the fixed '2099-01-01' it used to
+// be: these rows go in the shared Delta seed group, and since #1024 a Session is
+// unique on (ringing_group_id, visit_date) — so a fixed date would collide with
+// a concurrent worktree's run, or with this suite's own leftovers, where a
+// random-suffixed location used to keep them apart.
+const SESSION_VISIT_DATE = randomFutureDate();
 
 describe('Encounters — same-session retrap suppression trigger', () => {
 	let groupClient: SupabaseClient;
@@ -65,7 +70,7 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 
 		const { data: sess, error: sessError } = await groupClient
 			.from('Sessions')
-			.insert({ visit_date: SESSION_VISIT_DATE, location_id: locationId })
+			.insert({ visit_date: SESSION_VISIT_DATE, ringing_group_id: deltaId })
 			.select('id')
 			.single();
 		if (sessError) throw sessError;
@@ -118,7 +123,7 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 		await groupClient
 			.from('Encounters')
 			.upsert(encounterInSession(birdIdN, 'S'), {
-				onConflict: 'bird_id,session_id',
+				onConflict: 'bird_id,location_id,visit_date',
 				ignoreDuplicates: false,
 			});
 
@@ -140,7 +145,7 @@ describe('Encounters — same-session retrap suppression trigger', () => {
 		await groupClient
 			.from('Encounters')
 			.upsert(encounterInSession(birdIdS, 'N'), {
-				onConflict: 'bird_id,session_id',
+				onConflict: 'bird_id,location_id,visit_date',
 				ignoreDuplicates: false,
 			});
 

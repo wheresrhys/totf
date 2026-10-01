@@ -69,23 +69,6 @@
   },
   {
     "bird_id": 1,
-    "id": 32,
-    "age_code": 5,
-    "is_juv": false,
-    "capture_time": "07:00:00",
-    "max_hatch_year": 2021,
-    "min_hatch_year": 2021,
-    "record_type": "S",
-    "sex": "M",
-    "ringing_group_id": 1,
-    "weight": 19.2,
-    "wing_length": 75,
-    "session": {
-      "visit_date": "2022-10-20"
-    }
-  },
-  {
-    "bird_id": 1,
     "id": 37,
     "age_code": 5,
     "is_juv": false,
@@ -120,23 +103,6 @@
   },
   {
     "bird_id": 1,
-    "id": 50,
-    "age_code": 5,
-    "is_juv": false,
-    "capture_time": "07:00:00",
-    "max_hatch_year": 2022,
-    "min_hatch_year": 2022,
-    "record_type": "S",
-    "sex": "M",
-    "ringing_group_id": 1,
-    "weight": 19.1,
-    "wing_length": 80,
-    "session": {
-      "visit_date": "2023-09-14"
-    }
-  },
-  {
-    "bird_id": 1,
     "id": 52,
     "age_code": 5,
     "is_juv": false,
@@ -150,6 +116,40 @@
     "wing_length": 80,
     "session": {
       "visit_date": "2024-05-10"
+    }
+  },
+  {
+    "bird_id": 1,
+    "id": 32,
+    "age_code": 5,
+    "is_juv": false,
+    "capture_time": "07:00:00",
+    "max_hatch_year": 2021,
+    "min_hatch_year": 2021,
+    "record_type": "S",
+    "sex": "M",
+    "ringing_group_id": 1,
+    "weight": 19.2,
+    "wing_length": 75,
+    "session": {
+      "visit_date": "2022-10-20"
+    }
+  },
+  {
+    "bird_id": 1,
+    "id": 50,
+    "age_code": 5,
+    "is_juv": false,
+    "capture_time": "07:00:00",
+    "max_hatch_year": 2022,
+    "min_hatch_year": 2022,
+    "record_type": "S",
+    "sex": "M",
+    "ringing_group_id": 1,
+    "weight": 19.1,
+    "wing_length": 80,
+    "session": {
+      "visit_date": "2023-09-14"
     }
   }
 ]

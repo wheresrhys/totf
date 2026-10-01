@@ -567,7 +567,7 @@ describe('biometrics_stats', () => {
 
 			const { data: session, error: sessionError } = await deltaClient
 				.from('Sessions')
-				.insert({ visit_date: visitDate, location_id: locationId })
+				.insert({ visit_date: visitDate, ringing_group_id: deltaId })
 				.select('id')
 				.single();
 			if (sessionError) throw sessionError;
