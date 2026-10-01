@@ -354,33 +354,20 @@ export type Database = {
       Sessions: {
         Row: {
           id: number
-          location_id: number
           ringing_group_id: number
-          session_type: string
           visit_date: string
         }
         Insert: {
           id?: number
-          location_id: number
           ringing_group_id: number
-          session_type?: string
           visit_date: string
         }
         Update: {
           id?: number
-          location_id?: number
           ringing_group_id?: number
-          session_type?: string
           visit_date?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "sessions_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "Locations"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "sessions_ringing_group_id_fkey"
             columns: ["ringing_group_id"]
@@ -694,7 +681,6 @@ export type Database = {
           session_id: number
           session_month: string
           session_month_squashed: string
-          session_type: string
           session_year: string
           species_id: number
           species_name: string

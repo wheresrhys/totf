@@ -1,3 +1,7 @@
+-- Reads each encounter's own visit_date (#1015) instead of joining through
+-- Sessions to reach it (#1024). Identical results — the two columns have always
+-- agreed — with one less join and no dependency on an encounter having a Session
+-- at all.
 CREATE FUNCTION public.trg_encounters_refresh_bird_proven_age () RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER
 SET
 	search_path TO 'public' AS $function$
@@ -13,9 +17,8 @@ BEGIN
   UPDATE "public"."Birds" b
   SET proven_age = COALESCE(
     (SELECT
-      EXTRACT(YEAR FROM MAX(s.visit_date))::integer - MIN(e.max_hatch_year)
+      EXTRACT(YEAR FROM MAX(e.visit_date))::integer - MIN(e.max_hatch_year)
     FROM "public"."Encounters" e
-    JOIN "public"."Sessions" s ON s.id = e.session_id
     WHERE e.bird_id = v_bird_id),
     0
   )
@@ -26,9 +29,8 @@ BEGIN
     UPDATE "public"."Birds" b
     SET proven_age = COALESCE(
       (SELECT
-        EXTRACT(YEAR FROM MAX(s.visit_date))::integer - MIN(e.max_hatch_year)
+        EXTRACT(YEAR FROM MAX(e.visit_date))::integer - MIN(e.max_hatch_year)
       FROM "public"."Encounters" e
-      JOIN "public"."Sessions" s ON s.id = e.session_id
       WHERE e.bird_id = OLD.bird_id),
       0
     )
