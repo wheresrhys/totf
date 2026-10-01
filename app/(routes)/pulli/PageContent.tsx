@@ -59,8 +59,8 @@ function rowDataTransform(encounter: PulliEncounter): PulliRowModel {
 	return {
 		ringNo: encounter.bird.ring_no,
 		speciesName: encounter.bird.species.species_name,
-		visitDate: new Date(encounter.session.visit_date),
-		locationName: encounter.session.location.location_name,
+		visitDate: new Date(encounter.visit_date),
+		locationName: encounter.location.location_name,
 		notes: encounter.extra_text
 	};
 }

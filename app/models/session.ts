@@ -23,9 +23,7 @@ export type PulliEncounter = EncounterRow & {
 	bird: BirdRow & {
 		species: SpeciesRow;
 	};
-	session: SessionRow & {
-		location: LocationRow;
-	};
+	location: LocationRow;
 };
 
 export type SessionWithEncountersCount = SessionRow & {
