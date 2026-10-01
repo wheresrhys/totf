@@ -1,7 +1,7 @@
 import { type SessionWithEncountersCount } from '@/app/models/session';
 import { printLocationName } from '@/app/components/shared/DesignSystem';
 import { StatOutput } from './shared/StatOutput';
-import { NoPrefetchLink } from './shared/NoPrefetchLink';
+import { Fragment } from 'react';
 
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
@@ -54,16 +54,14 @@ export function SessionsByDay({
 								viewedGroup={viewedGroup}
 							/>{' '}
 							at{' '}
+							{/* Location names are plain text, not links — the day link above
+							    already covers the whole day and there is no location-scoped
+							    session route any more (#1020). */}
 							{daySessions.map((session, index) => (
-								<>
+								<Fragment key={session.location.id}>
 									{index > 0 ? ', ' : null}
-									<NoPrefetchLink
-										className="link"
-										href={`/group/${viewedGroup.slug}/session/${session.visit_date}/site/${session.location.id}`}
-									>
-										{printLocationName(session.location.location_name)}
-									</NoPrefetchLink>
-								</>
+									{printLocationName(session.location.location_name)}
+								</Fragment>
 							))}
 						</>
 					)}

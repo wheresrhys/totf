@@ -78,6 +78,9 @@ export function StatOutput({
 			'viewedGroup is required to output stats for day temporal unit'
 		);
 	}
+	// There is no location-scoped session route any more (#1020) — a `location`
+	// still names the site in the trailing text, but the day link always points
+	// at the whole day.
 	return (
 		<span className={classes}>
 			<span className="font-bold">
@@ -90,7 +93,7 @@ export function StatOutput({
 			{temporalUnit === 'day' && link ? (
 				<NoPrefetchLink
 					className="link"
-					href={`${buildGroupSessionHref(viewedGroup, visitDate)}${location ? `/site/${location.id}` : ''}`}
+					href={buildGroupSessionHref(viewedGroup, visitDate)}
 				>
 					{formatDate(
 						new Date(visitDate as string),

@@ -67,7 +67,6 @@ function renderSessionTabs(
 	overrides: Partial<{
 		speciesList: SpeciesWithEncounters[];
 		netRounds: NetRound[];
-		locationId: number | undefined;
 		viewedGroupId: number;
 		date: string;
 		initialTabId: string;
@@ -76,7 +75,6 @@ function renderSessionTabs(
 	const props = {
 		speciesList,
 		netRounds,
-		locationId: undefined as number | undefined,
 		viewedGroupId: 1,
 		date: '2024-09-15',
 		...overrides
@@ -85,7 +83,6 @@ function renderSessionTabs(
 		<SessionTabs
 			speciesList={props.speciesList}
 			netRounds={props.netRounds}
-			locationId={props.locationId}
 			viewedGroupId={props.viewedGroupId}
 			date={props.date}
 			initialTabId={props.initialTabId}
@@ -534,7 +531,7 @@ describe('SessionTabs', () => {
 			expect(screen.queryByTestId('session-table')).toBeNull();
 		});
 
-		describe('when locationId is unset — one test per known tab id', () => {
+		describe('one test per known tab id', () => {
 			it.each(['species', 'net-rounds', 'highlights'])(
 				'initialTabId=%s focuses that tab',
 				(tabId) => {
@@ -550,30 +547,6 @@ describe('SessionTabs', () => {
 					expect(button.getAttribute('aria-current')).toBe('true');
 				}
 			);
-		});
-
-		describe('when locationId is set — one test per known tab id (highlights excluded)', () => {
-			it.each(['species', 'net-rounds'])(
-				'initialTabId=%s focuses that tab',
-				(tabId) => {
-					renderSessionTabs({ locationId: 10, initialTabId: tabId });
-					const button = screen.getByRole('button', {
-						name: tabId === 'species' ? 'Species totals' : 'Net rounds'
-					});
-					expect(button.getAttribute('aria-current')).toBe('true');
-				}
-			);
-
-			it('does not offer a Highlights tab at all', () => {
-				renderSessionTabs({ locationId: 10, initialTabId: 'species' });
-				expect(screen.queryByRole('button', { name: 'Highlights' })).toBeNull();
-			});
-		});
-
-		it('initialTabId="highlights" while locationId is set falls back to species (not a known tab for this render)', () => {
-			renderSessionTabs({ locationId: 10, initialTabId: 'highlights' });
-			expect(screen.getByTestId('session-table')).not.toBeNull();
-			expect(screen.queryByText('Net round 1: 09:00')).toBeNull();
 		});
 
 		it('initialTabId="not-a-real-tab" falls back to species, with no crash and no blank pane', () => {

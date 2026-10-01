@@ -172,9 +172,11 @@ describe('home page', () => {
 			});
 			const sessionLinks =
 				heading.nextElementSibling?.querySelectorAll('a') ?? [];
-			// 2 sessions on same date: 1 day-total link (StatOutput) + 2 site links
-			// + 1 link each for the 2 single-session dates = 5 total
-			expect(sessionLinks.length).toBe(5);
+			// One link per distinct date: the shared date contributes a single
+			// day-total link (StatOutput), its two location names now being plain
+			// text since the location-scoped session route is gone (#1020), plus 1
+			// link each for the 2 single-session dates = 3 total.
+			expect(sessionLinks.length).toBe(3);
 		});
 	});
 

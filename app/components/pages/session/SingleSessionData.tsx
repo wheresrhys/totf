@@ -142,7 +142,6 @@ function ConditionalTabPanel({
 export function SessionTabs({
 	speciesList,
 	netRounds,
-	locationId,
 	date,
 	viewedGroupId,
 	oldestEncounter = null,
@@ -150,7 +149,6 @@ export function SessionTabs({
 }: {
 	speciesList: SpeciesWithEncounters[];
 	netRounds: NetRound[];
-	locationId?: number;
 	date: string;
 	viewedGroupId: number;
 	oldestEncounter?: SessionEncounter | null;
@@ -173,18 +171,14 @@ export function SessionTabs({
 
 	const tabNavConfig = [
 		{ id: 'species', label: 'Species totals' },
-		{ id: 'net-rounds', label: 'Net rounds' }
+		{ id: 'net-rounds', label: 'Net rounds' },
+		{ id: 'highlights', label: 'Highlights' }
 	];
 
-	if (!locationId) {
-		tabNavConfig.push({ id: 'highlights', label: 'Highlights' });
-	}
-
 	// The `?tabId=` param (#803, applied here by #805) wins over the hardcoded
-	// 'species' default when it names one of this render's actual tabs (the
-	// `highlights` tab only exists when `!locationId` — see `tabNavConfig`
-	// above); an unknown/garbage value or no param at all falls back to
-	// 'species' unchanged. Shared with the species and summary pages via
+	// 'species' default when it names one of this render's actual tabs; an
+	// unknown/garbage value or no param at all falls back to 'species'
+	// unchanged. Shared with the species and summary pages via
 	// `useLinkableTabs` (#818).
 	const { activeTab, loadedTabs, selectTab } = useLinkableTabs({
 		tabIds: tabNavConfig.map((tab) => tab.id),
@@ -236,19 +230,17 @@ export function SessionTabs({
 					))}
 				</div>
 			</ConditionalTabPanel>
-			{locationId ? null : (
-				<ConditionalTabPanel
-					loadedTabs={loadedTabs}
-					tabId="highlights"
-					activeTabId={activeTab}
-				>
-					<SessionHighlights
-						date={date}
-						viewedGroupId={viewedGroupId}
-						oldestEncounter={oldestEncounter}
-					/>
-				</ConditionalTabPanel>
-			)}
+			<ConditionalTabPanel
+				loadedTabs={loadedTabs}
+				tabId="highlights"
+				activeTabId={activeTab}
+			>
+				<SessionHighlights
+					date={date}
+					viewedGroupId={viewedGroupId}
+					oldestEncounter={oldestEncounter}
+				/>
+			</ConditionalTabPanel>
 		</>
 	);
 }
