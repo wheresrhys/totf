@@ -34,16 +34,20 @@ CREATE FUNCTION public.stats_spine (
     SELECT NULL::bigint, NULL::text
     WHERE NOT group_by_species
   ), session_date_range AS (
+    -- Every session date in the query window bounds the spine, whatever its
+    -- session_type. This used to exclude 'FIELD_OBSERVATION' sessions (#874) so a
+    -- passive-resighting-only date couldn't stretch the month/year range past the
+    -- real sessions — vestigial since the session/location remodel (#1015/#1021),
+    -- which stops session_type meaningfully varying, and due to be dropped
+    -- entirely in #1024. Passive encounters are already excluded at the row level
+    -- by stats_raw_encounters' resighting-record_type filter, which is the
+    -- durable fix point.
     SELECT
       MIN(sess.visit_date) AS min_date,
       MAX(sess.visit_date) AS max_date
     FROM public."Sessions" as sess
     WHERE (from_date IS NULL OR sess.visit_date >= from_date)
       AND (to_date IS NULL OR sess.visit_date <= to_date)
-      -- Field-observation-only sessions are passive resightings (#874): their dates
-      -- must not stretch the month/year spine's min..max range. session_type is NOT
-      -- NULL (default 'FULL_GROWN'), so a plain <> is safe here.
-      AND sess.session_type <> 'FIELD_OBSERVATION'
       AND (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
       -- month_filter is deliberately applied here too, for consistency with
       -- from_date/to_date/year_filter's treatment above — but note the accepted

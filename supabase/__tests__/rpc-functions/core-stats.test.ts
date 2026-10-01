@@ -156,12 +156,15 @@ describe('core_stats', () => {
 	});
 
 	describe('non-FULL_GROWN sessions (FIELD_OBSERVATION and PULLI)', () => {
-		// core_stats derives its day/session-level statistics — session_count,
-		// effort, and the per-session encounter aggregates — only from FULL_GROWN
-		// sessions; FIELD_OBSERVATION and PULLI sessions are excluded from those, but
-		// their encounters still count toward the per-species/per-bird totals. PULLI
+		// core_stats derives effort and the per-session encounter aggregates
+		// (total_effort, effort_per_session, avg_encounters_per_session,
+		// max_per_session, max_new_per_session) only from FULL_GROWN sessions, so
+		// FIELD_OBSERVATION and PULLI sessions are excluded from those. session_count
+		// is NOT: since #1021 it is a plain COUNT(DISTINCT visit_date) over every
+		// in-hand encounter in the cell, whatever the Session's session_type — which
+		// is what the per-species/per-bird totals have always done. PULLI
 		// differs from FIELD_OBSERVATION in that it can carry new-ring (record_type =
-		// 'N') encounters, so excluding it from session stats must NOT remove those
+		// 'N') encounters, so excluding it from the effort stats must NOT remove those
 		// birds from new_bird_count. Fixtures are Delta-group, on random far-future
 		// dates, and every query is bounded by an explicit date range so it only ever
 		// sees this test's rows (never seed or concurrent-run data).
@@ -500,12 +503,13 @@ describe('core_stats', () => {
 			);
 		});
 
-		describe('FIELD_OBSERVATION excluded from day/session-level stats', () => {
-			it('excludes a FIELD_OBSERVATION session from session_count', async () => {
+		describe('FIELD_OBSERVATION counted in session_count but excluded from effort stats', () => {
+			it('counts a FIELD_OBSERVATION-only date in session_count (#1021)', async () => {
 				const row = await aggregateRow(fieldObsFrom, fieldObsTo);
-				// Two FULL_GROWN session dates (fo1, fo2); the standalone FIELD_OBSERVATION
-				// date (fo3) and the fo1 FIELD_OBSERVATION twin contribute nothing.
-				expect(row.session_count).toBe(2);
+				// Three distinct dates carry an in-hand encounter: fo1 (FULL_GROWN +
+				// its FIELD_OBSERVATION twin), fo2 (FULL_GROWN) and fo3 (the standalone
+				// FIELD_OBSERVATION). Before #1021 fo3 was excluded and this was 2.
+				expect(row.session_count).toBe(3);
 			});
 
 			it("excludes a FIELD_OBSERVATION session's duration from total_effort and effort_per_session", async () => {
@@ -531,6 +535,8 @@ describe('core_stats', () => {
 		});
 
 		describe('FIELD_OBSERVATION unaffected per-species/per-bird totals', () => {
+			// session_count now shares these columns' session_type-blind definition
+			// (#1021), so the only asymmetry left is the effort/per-session family.
 			it("still counts a FIELD_OBSERVATION session's encounters in species_count, bird_count and encounter_count", async () => {
 				const row = await aggregateRow(fieldObsFrom, fieldObsTo);
 				// Robin (4 FULL_GROWN) + Wren (2 FIELD_OBSERVATION) across 6 birds / 6 encounters.
@@ -549,7 +555,9 @@ describe('core_stats', () => {
 		describe('FIELD_OBSERVATION edge cases', () => {
 			it('counts a FULL_GROWN and a same-date/location FIELD_OBSERVATION session as one session, not two', async () => {
 				// Restrict to fo1 only, where a FULL_GROWN and a FIELD_OBSERVATION session
-				// share the date/location. session_count is 1 (the FULL_GROWN one), never 2.
+				// share the date/location. session_count counts distinct dates, so two
+				// Sessions rows on one date still give 1 — the dedup survives #1021
+				// dropping the session_type condition.
 				const row = await aggregateRow(fieldObsFrom, fieldObsFrom);
 				expect(row.session_count).toBe(1);
 				// The FIELD_OBSERVATION Wren still shows up in the per-species totals for that day.
@@ -557,20 +565,24 @@ describe('core_stats', () => {
 				expect(row.encounter_count).toBe(4);
 			});
 
-			it('returns session_count=0 and zero effort but a nonzero encounter_count for a range of only FIELD_OBSERVATION sessions', async () => {
+			it('returns a nonzero session_count but zero effort for a range of only FIELD_OBSERVATION sessions', async () => {
 				const row = await aggregateRow(fieldObsOnlyDate, fieldObsOnlyDate);
-				expect(row.session_count).toBe(0);
+				// One date, two in-hand (record_type 'C') encounters. session_count was 0
+				// before #1021; effort stays 00:00:00 because session_effort still only
+				// looks at FULL_GROWN sessions.
+				expect(row.session_count).toBe(1);
 				expect(row.total_effort).toBe('00:00:00');
 				expect(row.encounter_count).toBe(2);
 			});
 		});
 
-		describe('PULLI excluded from day/session-level stats', () => {
-			it('excludes a PULLI session from session_count', async () => {
+		describe('PULLI counted in session_count but excluded from effort stats', () => {
+			it('counts a PULLI-only date in session_count (#1021)', async () => {
 				const row = await aggregateRow(pulliFrom, pulliTo);
-				// Two FULL_GROWN session dates (pu1, pu2); the standalone PULLI date (pu3)
-				// and the pu1 PULLI twin contribute nothing.
-				expect(row.session_count).toBe(2);
+				// Three distinct dates carry an in-hand encounter: pu1 (FULL_GROWN + its
+				// PULLI twin), pu2 (FULL_GROWN) and pu3 (the standalone PULLI). Before
+				// #1021 pu3 was excluded and this was 2.
+				expect(row.session_count).toBe(3);
 			});
 
 			it("excludes a PULLI session's duration from total_effort and effort_per_session", async () => {
@@ -617,7 +629,8 @@ describe('core_stats', () => {
 		describe('PULLI edge cases', () => {
 			it('counts a FULL_GROWN and a same-date/location PULLI session as one session, not two', async () => {
 				// Restrict to pu1 only, where a FULL_GROWN and a PULLI session share the
-				// date/location. session_count is 1 (the FULL_GROWN one), never 2.
+				// date/location. session_count counts distinct dates, so two Sessions
+				// rows on one date still give 1.
 				const row = await aggregateRow(pulliFrom, pulliFrom);
 				expect(row.session_count).toBe(1);
 				// The PULLI Wren still shows up in the per-species totals for that day.
@@ -625,9 +638,12 @@ describe('core_stats', () => {
 				expect(row.encounter_count).toBe(4);
 			});
 
-			it('returns session_count=0 and zero effort but a nonzero encounter_count for a range of only PULLI sessions', async () => {
+			it('returns a nonzero session_count but zero effort for a range of only PULLI sessions', async () => {
 				const row = await aggregateRow(pulliOnlyDate, pulliOnlyDate);
-				expect(row.session_count).toBe(0);
+				// One date, two new-ring ('N') PULLI encounters. session_count was 0
+				// before #1021; effort stays 00:00:00 because session_effort still only
+				// looks at FULL_GROWN sessions.
+				expect(row.session_count).toBe(1);
 				expect(row.total_effort).toBe('00:00:00');
 				expect(row.encounter_count).toBe(2);
 			});
@@ -1078,9 +1094,12 @@ describe('core_stats', () => {
 		// (2021-06-20, 2022-04-30, 2022-06-15, 2022-08-10, 2022-10-20, 2023-05-12,
 		// 2023-07-08, 2023-09-14, 2024-05-10) plus 2023-03-15/2023-03-20 (Fieldfare/
 		// Redwing, added by #902). The 2023-05-10 FIELD_OBSERVATION-only Kingfisher
-		// resighting date (also #902) never appears here — excluded twice over,
-		// by both stats_spine's FIELD_OBSERVATION exclusion and the resighting
-		// record_type exclusion on the encounter itself (#874).
+		// resighting date (also #902) never appears here: the 'day' spine is sparse,
+		// built from raw_encounters' own session_day values, and that date's only
+		// encounters are resighting record_types stats_raw_encounters drops (#874).
+		// That row-level filter is now the sole reason — #1021 removed
+		// stats_spine's separate FIELD_OBSERVATION exclusion, which only ever
+		// affected the dense month/year spines anyway.
 		const ALPHA_ALL_VISIT_DATES = [
 			...ARRETRAP_DATES,
 			'2023-03-15',

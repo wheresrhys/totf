@@ -1,23 +1,5 @@
 [
   {
-    "id": 56,
-    "species_name": "Wren",
-    "birds": [
-      {
-        "count": 2
-      }
-    ]
-  },
-  {
-    "id": 99,
-    "species_name": "Dunnock",
-    "birds": [
-      {
-        "count": 0
-      }
-    ]
-  },
-  {
     "id": 8,
     "species_name": "Blue Tit",
     "birds": [
@@ -56,6 +38,15 @@
   {
     "id": 11,
     "species_name": "Kingfisher",
+    "birds": [
+      {
+        "count": 2
+      }
+    ]
+  },
+  {
+    "id": 56,
+    "species_name": "Wren",
     "birds": [
       {
         "count": 2
