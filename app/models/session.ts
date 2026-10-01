@@ -30,5 +30,4 @@ export type PulliEncounter = EncounterRow & {
 
 export type SessionWithEncountersCount = SessionRow & {
 	encounters: { count: number }[];
-	location: LocationRow;
 };

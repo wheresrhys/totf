@@ -2,10 +2,6 @@
   {
     "id": 62,
     "visit_date": "2023-06-01",
-    "location": {
-      "id": 62,
-      "location_name": "Beta Site"
-    },
     "encounters": [
       {
         "count": 3
