@@ -8,9 +8,7 @@ import { singleSpeciesCount } from './single-species-count';
 import { singleSpeciesEncounters } from './single-species-encounters';
 import { eachSpeciesCount } from './each-species-count';
 import { eachSpeciesJuvs } from './each-species-juvs';
-import { firstSpeciesRecord } from './first-species-record';
-import { onlySpeciesRecord } from './only-species-record';
-import { rareSpecies } from './rare-species';
+import { rarities } from './rarities';
 import { heaviestOfSpecies } from './heaviest-of-species';
 import { lightestOfSpecies } from './lightest-of-species';
 
@@ -24,9 +22,7 @@ export const highlightRules: HighlightsGenerator[] = [
 	singleSpeciesEncounters,
 	eachSpeciesCount,
 	eachSpeciesJuvs,
-	firstSpeciesRecord,
-	onlySpeciesRecord,
-	rareSpecies,
+	rarities,
 	heaviestOfSpecies,
 	lightestOfSpecies
 ];
