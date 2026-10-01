@@ -207,14 +207,17 @@ export async function generateSnapshots(
 		await writeSnapshot(`notable_retraps/${name}.retraps.json`, data ?? []);
 	}
 
-	// Table: Encounters (PULLI session type) — powers fetchPulliPageContent
-	// (app/(routes)/pulli/page.tsx). Query: queries/Encounters/pulli-encounters.ts
+	// Table: Encounters (matching the PULLI session-type definition) — powers
+	// fetchPulliPageContent (app/(routes)/pulli/page.tsx). Query:
+	// queries/Encounters/pulli-encounters.ts
 	{
 		const { data } = await alpha
 			.from('Encounters')
 			.select(pulliEncountersQuery.select)
 			.eq('ringing_group_id', alphaId)
-			.eq('session.session_type', 'PULLI');
+			.not('record_type', 'in', `(${RESIGHTING_RECORD_TYPES.join(',')})`)
+			.eq('age_code', 1)
+			.eq('is_juv', false);
 		await writeSnapshot(
 			`tables/Encounters/alpha.pulli-encounters.json`,
 			data ?? []
