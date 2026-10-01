@@ -701,3 +701,66 @@ describe('demon-import — fat/pectoral_muscle/primary_moult persistence', () =>
 		).toBe(1);
 	});
 });
+
+describe('demon-import — capture_method persistence', () => {
+	let groupId: number;
+	let groupClient: SupabaseClient;
+	let locationName: string;
+	let lookupRingSequence: ReturnType<typeof vi.fn>;
+
+	beforeAll(async () => {
+		groupId = createIsolatedGroup(`demon-import-${suffix}-capture-method`);
+		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+		locationName = `DemonImportLoc-${suffix}-capture-method`;
+		lookupRingSequence = vi.fn().mockResolvedValue(null);
+	});
+
+	// Regression test: capture_method was recognized in DemonColumnNames but never
+	// written onto the Encounters payload, so every imported row landed with
+	// capture_method = NULL regardless of the CSV's actual value (the gap #1022's
+	// isMistNetEncounter predicate was written to tolerate).
+	it('persists a capture_method value from a CSV row onto the Encounters row', async () => {
+		const upsert = createUpserter(groupClient);
+		const ringNo = `DEMON-TEST-${suffix}-capture-method-set`;
+
+		await processEncounterRow(
+			makeRow({
+				ring_no: ringNo,
+				species_name: `DemonImportSpecies-${suffix}-capture-method-set`,
+				loc_id: locationName,
+				capture_method: 'M'
+			}),
+			upsert,
+			lookupRingSequence,
+			groupId
+		);
+
+		const capture_method = psqlScalar(
+			`SELECT e.capture_method FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
+		);
+		expect(capture_method).toBe('M');
+	});
+
+	it('persists null for capture_method when the CSV row leaves it blank', async () => {
+		const upsert = createUpserter(groupClient);
+		const ringNo = `DEMON-TEST-${suffix}-capture-method-blank`;
+
+		await processEncounterRow(
+			makeRow({
+				ring_no: ringNo,
+				species_name: `DemonImportSpecies-${suffix}-capture-method-blank`,
+				loc_id: locationName,
+				capture_method: ''
+			}),
+			upsert,
+			lookupRingSequence,
+			groupId
+		);
+
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}' AND e.capture_method IS NULL;`
+			)
+		).toBe(1);
+	});
+});
