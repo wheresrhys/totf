@@ -126,6 +126,19 @@ export function PeriodTotalsTable({
 	// Recreated each render since `timeInterval`/`buildHref` are props, not static
 	// — the cell itself is stateless, so this only costs identity, not
 	// behaviour.
+	//
+	// Gating on `sessionsCount` (`core_stats.session_count`) truthy is still
+	// correct after #1021 redefined it to a plain `COUNT(DISTINCT visit_date)`,
+	// unconditional on `Sessions.session_type` (audited in #1023): the count is
+	// grounded in `stats_raw_encounters`, which already drops resighting-type
+	// encounters at the row level (#874), so a date whose only encounters are
+	// resightings contributes no `visit_date` and `session_count` stays 0 for
+	// it — same end result as the old `session_type = 'FULL_GROWN'` filter, via
+	// the row-level filter instead of the session-level one. For `day`-grouped
+	// rows specifically, this is doubly guaranteed: `stats_spine`'s day branch
+	// is sparse, keyed off that same resighting-filtered `raw_encounters`, so a
+	// resighting-only date never even produces a row to gate in the first
+	// place.
 	const PeriodLabelCell = createNameLinkCell<CoreStatsResult, PeriodTotalsRow>(
 		(model) => resolveLabel(model.timePeriod),
 		(model) => (model.sessionsCount ? buildHref(model.timePeriod) : undefined)

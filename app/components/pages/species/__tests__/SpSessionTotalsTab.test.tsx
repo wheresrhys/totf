@@ -143,6 +143,21 @@ describe('SpSessionTotalsTab', () => {
 		).toBeNull();
 	});
 
+	it("does not render a session-page link for a day with session_count 0 (a resighting-only date), inheriting PeriodTotalsTable's gating (#1023)", async () => {
+		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
+		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
+			buildDailyStatsRow({ time_period: '2026-03-14', session_count: 0 })
+		]);
+		render(
+			<SpSessionTotalsTab speciesName="Robin" viewedGroup={viewedGroup} />
+		);
+		await waitFor(() => {
+			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+		});
+		expect(screen.queryByRole('link', { name: '14th March 2026' })).toBeNull();
+		expect(screen.getByText('14th March 2026')).toBeTruthy();
+	});
+
 	it("renders the table's empty state when the species has no sessions in range, without crashing", async () => {
 		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
 		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([]);

@@ -227,6 +227,28 @@ describe('PeriodTotalsTable', () => {
 		});
 	});
 
+	describe('Session-day link gating (#1023)', () => {
+		it('renders plain text, not a link, for a day row with session_count 0 (a date with only resighting-type encounters)', () => {
+			render(
+				<PeriodTotalsTable
+					timeInterval="day"
+					rows={[
+						buildCoreStatsRow({
+							time_period: '2026-08-16',
+							session_count: 0
+						})
+					]}
+					firstColumnHeader="Session"
+					buildHref={(timePeriod) => `/session/${timePeriod}`}
+				/>
+			);
+			expect(
+				screen.queryByRole('link', { name: '16th August 2026' })
+			).toBeNull();
+			expect(screen.getByText('16th August 2026')).toBeTruthy();
+		});
+	});
+
 	describe('Sessions column', () => {
 		it('renders session_count and formatted total_effort for each timeInterval', () => {
 			render(
