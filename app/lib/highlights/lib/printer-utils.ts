@@ -10,7 +10,8 @@ import { isNumericHighlightValue } from '../types';
 import {
 	getPlural,
 	getSpaceForUnit,
-	type TemporalUnit
+	type TemporalUnit,
+	type SpeciesName
 } from '@/app/components/shared/StatOutput';
 const fullMonthNames = [
 	undefined,
@@ -38,19 +39,9 @@ export function printTemporalUnit(
 
 	return usePlural ? getPlural(base) : base;
 }
-
-export function pluraliseSpecies(species: string) {
-	if (
-		species.toLowerCase().endsWith('finch') ||
-		species.toLowerCase().endsWith('thrush')
-	)
-		return `${species}es`;
-	if (species.toLowerCase().endsWith('goose'))
-		return species.replace(/oose$/, 'eese');
-	if (species.includes('(')) return species;
-	return `${species}s`;
+export function pluraliseSpecies(subject: string) {
+	return getPlural(subject as SpeciesName);
 }
-
 // The species name agreeing with the count the sentence is about: "Robin" for a
 // single bird, "Robins" for more. Used by the rarity rules, whose sentences name
 // the species instead of a unit ("First Robins ever" rather than "First Robin
