@@ -38,6 +38,7 @@ export function SpHighlightsTab({
 			getHighlightsWithinTimeWindow({
 				temporalUnit: 'day',
 				groupId: viewedGroup.id,
+				species: speciesName,
 				parentTimeWindow: {
 					year,
 					month
@@ -50,6 +51,7 @@ export function SpHighlightsTab({
 				: getHighlightsWithinTimeWindow({
 						temporalUnit: 'month',
 						groupId: viewedGroup.id,
+					species: speciesName,
 						parentTimeWindow: {
 							year,
 							month
@@ -58,9 +60,10 @@ export function SpHighlightsTab({
 					})
 		]);
 		setHighlightsData({ sessionHighlights: daily, monthHighlights: monthly });
-	}, [viewedGroup.id, year, month]);
+	}, [viewedGroup.id, year, month, speciesName]);
 
 	useEffect(() => {
+		fetchHighlightsData();
 		if (notableRetraps.length > 0) return;
 		fetchNotableRetraps(speciesName, viewedGroup.id, fromDate, toDate).then(
 			(data) => {
