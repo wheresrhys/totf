@@ -374,6 +374,7 @@ export async function processEncounterRow(
 			visit_date: visitDate,
 			scheme: row.scheme as string,
 			sex: row.sex as string,
+			capture_method: row.capture_method as string | null,
 			sexing_method: row.sexing_method as string | null,
 			weight: row.weight ? Number(row.weight) : null,
 			wing_length: row.wing_length ? Number(row.wing_length) : null

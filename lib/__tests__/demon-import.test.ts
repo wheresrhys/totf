@@ -570,7 +570,8 @@ describe('processEncounterRow', () => {
 			finding_circumstances: '2',
 			primary_moult: 'FF',
 			fat: 'B4',
-			pectoral_muscle: '2'
+			pectoral_muscle: '2',
+			capture_method: 'M'
 		});
 		await processEncounterRow(
 			row,
@@ -603,7 +604,8 @@ describe('processEncounterRow', () => {
 				finding_circumstances: '2',
 				primary_moult: 'FF',
 				fat: 'B4',
-				pectoral_muscle: 2
+				pectoral_muscle: 2,
+				capture_method: 'M'
 			}),
 			['bird_id', 'session_id']
 		);
@@ -622,7 +624,8 @@ describe('processEncounterRow', () => {
 			finding_circumstances: '',
 			primary_moult: '',
 			fat: '',
-			pectoral_muscle: ''
+			pectoral_muscle: '',
+			capture_method: ''
 		});
 		await processEncounterRow(
 			row,
@@ -645,7 +648,8 @@ describe('processEncounterRow', () => {
 				finding_circumstances: null,
 				primary_moult: null,
 				fat: null,
-				pectoral_muscle: null
+				pectoral_muscle: null,
+				capture_method: null
 			}),
 			['bird_id', 'session_id']
 		);
