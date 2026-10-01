@@ -5,13 +5,17 @@ import { SpeciesTotalsTable } from '@/app/components/SpeciesTotalsTable';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
+import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
 import {
 	fetchPeriodStats,
 	fetchCombinedMonthTotals
 } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
 import { getHighlightsWithinTimeWindow } from '@/app/lib/highlights';
-import { isNumericHighlightValue } from '@/app/lib/highlights/types';
+import {
+	isNumericHighlightValue,
+	type HighlightsOfType
+} from '@/app/lib/highlights/types';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
@@ -47,6 +51,54 @@ const YEAR_TOTALS_TAB = { id: 'year-totals', label: 'Year totals' };
 const SESSION_TOTALS_TAB = { id: 'session-totals', label: 'Session totals' };
 const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
 const HIGHLIGHTS_TAB = { id: 'highlights', label: 'Highlights' };
+
+function HighlightsByTimePeriod({
+	highlights,
+	heading,
+	viewedGroup
+}: {
+	highlights: HighlightsOfType[];
+	heading: string;
+	viewedGroup?: ViewedGroup;
+}) {
+	if (!highlights.length) return null;
+	return (
+		<div>
+			<SecondaryHeading>{heading}</SecondaryHeading>
+			{highlights.map((highlight) => (
+				<div
+					key={`${highlight.descriptor.type}-${highlight.scope.temporalUnit}`}
+				>
+					{highlight.formatters.highlightListPrefixPrinter(highlight)}:{' '}
+					<div className="flex gap-2">
+						{highlight.values.map((highlightValue) => (
+							<span
+								className="badge badge-outline"
+								key={highlightValue.timePeriod}
+							>
+								{isNumericHighlightValue(highlightValue) ? (
+									<StatOutput
+										visitDate={highlightValue.timePeriod}
+										temporalUnit={highlight.scope.temporalUnit}
+										showUnit={Boolean(highlightValue.species)}
+										value={highlightValue.value}
+										unit={
+											(highlightValue.species as SpeciesName) ??
+											highlight.descriptor.unit
+										}
+										viewedGroup={viewedGroup}
+									/>
+								) : (
+									'placeholder'
+								)}
+							</span>
+						))}
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
 
 // The all-time page's combine-years "Month totals" tab content. Owns the
 // "Combine years" toggle's local state so it resets to the default (ON) each
@@ -315,17 +367,19 @@ export function SummaryTotalsSection({
 				},
 				includePerSpecies: false
 			}),
-			getHighlightsWithinTimeWindow({
-				temporalUnit: 'month',
-				groupId: viewedGroup!.id,
-				parentTimeWindow: {
-					year,
-					month: month
-				},
-				includePerSpecies: false
-			})
+			month
+				? []
+				: getHighlightsWithinTimeWindow({
+						temporalUnit: 'month',
+						groupId: viewedGroup!.id,
+						parentTimeWindow: {
+							year,
+							month: month
+						},
+						includePerSpecies: false
+					})
 		]);
-		return [...daily, ...monthly];
+		return { sessionHighlights: daily, monthHighlights: monthly };
 	}, [viewedGroup, year, month]);
 	const { data: highlightsData, isLoading: isHighlightsLoading } =
 		useLazyTabData(
@@ -495,38 +549,20 @@ export function SummaryTotalsSection({
 					</div>
 				) : (
 					<div>
-						{highlightsData &&
-							highlightsData.map((highlight) => (
-								<div
-									key={`${highlight.descriptor.type}-${highlight.scope.temporalUnit}`}
-								>
-									{highlight.formatters.highlightListPrefixPrinter(highlight)}:{' '}
-									<div className="flex gap-2">
-										{highlight.values.map((highlightValue) => (
-											<span
-												className="badge badge-outline"
-												key={highlightValue.timePeriod}
-											>
-												{isNumericHighlightValue(highlightValue) ? (
-													<StatOutput
-														visitDate={highlightValue.timePeriod}
-														temporalUnit={highlight.scope.temporalUnit}
-														showUnit={Boolean(highlightValue.species)}
-														value={highlightValue.value}
-														unit={
-															(highlightValue.species as SpeciesName) ??
-															highlight.descriptor.unit
-														}
-														viewedGroup={viewedGroup}
-													/>
-												) : (
-													'placeholder'
-												)}
-											</span>
-										))}
-									</div>
-								</div>
-							))}
+						{highlightsData && (
+							<>
+								<HighlightsByTimePeriod
+									highlights={highlightsData.sessionHighlights}
+									viewedGroup={viewedGroup}
+									heading="Session highlights"
+								/>
+								<HighlightsByTimePeriod
+									highlights={highlightsData.monthHighlights}
+									viewedGroup={viewedGroup}
+									heading="Month highlights"
+								/>
+							</>
+						)}
 					</div>
 				))}
 		</>

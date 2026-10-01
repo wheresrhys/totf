@@ -22,7 +22,7 @@ export const singleSpeciesCount: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Highest ${printTemporalUnit(highlightsOfType.scope.temporalUnit)} count${highlightsOfType.values.length > 1 ? 's' : ''} for a single species`
+			`Most individuals of a single species`
 	},
 	descriptor: {
 		type: 'singleSpeciesCount',

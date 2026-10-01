@@ -25,9 +25,7 @@ export const newBirds: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			sentenceCase(
-				`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most new birds`
-			)
+			sentenceCase(`Most new birds`)
 	},
 	descriptor: {
 		type: 'newBirds',

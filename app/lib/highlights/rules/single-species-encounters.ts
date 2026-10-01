@@ -19,7 +19,7 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Most encounters of a single species in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit)}`
+			`Most encounters of a single species`
 	},
 	descriptor: {
 		type: 'singleSpeciesEncounters',

@@ -30,9 +30,7 @@ export const encounterCount: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			sentenceCase(
-				`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most encounters`
-			)
+			sentenceCase(`Most encounters`)
 	},
 	descriptor: {
 		type: 'encounters',

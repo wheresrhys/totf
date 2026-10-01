@@ -25,7 +25,7 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Highest juv count${highlightsOfType.values.length > 1 ? 's' : ''} in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit)} for ${highlightsOfType.values[0].species}`
+			`Highest juv count${highlightsOfType.values.length > 1 ? 's' : ''} for ${highlightsOfType.values[0].species}`
 	},
 	descriptor: {
 		type: 'eachSpeciesJuvs',
