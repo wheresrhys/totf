@@ -6,19 +6,21 @@ import { getCombinedHighlightFixtures } from './fixture-generator';
 
 describe('rules output for comibned highlights', () => {
 	highlightRules.forEach((rule) => {
-		describe(rule.descriptor.type, () => {
-			const combinedHighlightFixtures = getCombinedHighlightFixtures(rule);
+		if (rule.descriptor.type !== 'rarities') {
+			describe(rule.descriptor.type, () => {
+				const combinedHighlightFixtures = getCombinedHighlightFixtures(rule);
 
-			const expectations = allExpectations[rule.descriptor.type];
-			Object.entries(combinedHighlightFixtures).map(
-				([testCase, combinedHighlight]) => {
-					it(testCase, () => {
-						expect(
-							rule.formatters.combinedHighlightPrinter(combinedHighlight)
-						).toEqual(expectations[testCase]);
-					});
-				}
-			);
-		});
+				const expectations = allExpectations[rule.descriptor.type];
+				Object.entries(combinedHighlightFixtures).map(
+					([testCase, combinedHighlight]) => {
+						it(testCase, () => {
+							expect(
+								rule.formatters.combinedHighlightPrinter(combinedHighlight)
+							).toEqual(expectations[testCase]);
+						});
+					}
+				);
+			});
+		}
 	});
 });

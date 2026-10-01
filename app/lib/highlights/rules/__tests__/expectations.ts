@@ -142,42 +142,17 @@ export const expectations = {
 		'global and tied second of year and third of month':
 			'Highest juv Robin count ever, equal second highest of 2020 and third highest in any February: 12 birds'
 	},
-	firstSpeciesRecord: {
-		global: 'First Robins ever',
-		'tied global': 'First Robins ever',
-		'singular global': 'First Robin ever',
-		'second global': 'First Robins ever',
-		'tied second global': 'First Robins ever',
-		'tied second of year': 'First Robins of 2020',
-		'this year': 'First Robins this year',
-		'tied global and second of year': 'First Robins ever',
-		'tied second of month': 'First Robins in any February',
-		'global and tied second of year and third of month': 'First Robins ever'
-	},
-	onlySpeciesRecord: {
-		global: 'Only Robins ever',
-		'tied global': 'Only Robins ever',
-		'singular global': 'Only Robin ever',
-		'second global': 'Only Robins ever',
-		'tied second global': 'Only Robins ever',
-		'tied second of year': 'Only Robins of 2020',
-		'this year': 'Only Robins this year',
-		'tied global and second of year': 'Only Robins ever',
-		'tied second of month': 'Only Robins in any February',
-		'global and tied second of year and third of month': 'Only Robins ever'
-	},
-	rareSpecies: {
-		global: 'Robins seen in only 12 sessions ever',
-		'tied global': 'Robins seen in only 12 sessions ever',
-		'singular global': 'Robin seen in only 1 session ever',
-		'second global': 'Robins seen in only 12 sessions ever',
-		'tied second global': 'Robins seen in only 12 sessions ever',
-		'tied second of year': 'Robins seen in only 12 sessions of 2020',
-		'this year': 'Robins seen in only 12 sessions this year',
-		'tied global and second of year': 'Robins seen in only 12 sessions ever',
-		'tied second of month': 'Robins seen in only 12 sessions in any February',
-		'global and tied second of year and third of month':
-			'Robins seen in only 12 sessions ever'
+	rarities: {
+		global: '12 Robin ever',
+		'tied global': '12 Robin ever',
+		'singular global': '1 Robin ever',
+		'second global': '12 Robin ever',
+		'tied second global': '12 Robin ever',
+		'tied second of year': '12 Robin of 2020',
+		'this year': '12 Robin this year',
+		'tied global and second of year': '12 Robin ever',
+		'tied second of month': '12 Robin in any February',
+		'global and tied second of year and third of month': '12 Robin ever'
 	},
 	heaviestOfSpecies: {
 		global: 'Heaviest Robin ever: 12g',
