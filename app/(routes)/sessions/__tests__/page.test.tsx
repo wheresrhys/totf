@@ -20,6 +20,8 @@ function makeChainClient(data: unknown) {
 	const chain = {
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
+		not: vi.fn().mockReturnThis(),
+		or: vi.fn().mockReturnThis(),
 		order: vi.fn().mockReturnThis(),
 		...thenable
 	};
@@ -40,13 +42,22 @@ describe('sessions page', () => {
 		expect(heading.textContent).toBe('Session history');
 	});
 
-	it('excludes non-FULL_GROWN sessions from the query', async () => {
+	it('excludes non-FULL_GROWN-equivalent sessions from the query via Encounters columns, not Sessions.session_type', async () => {
 		const client = makeChainClient(alphaSessionsSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 		render(await Page());
 		await screen.findByRole('heading', { level: 1 });
 		const chain = client.from.mock.results[0].value;
-		expect(chain.eq).toHaveBeenCalledWith('session_type', 'FULL_GROWN');
+		// FIELD_OBSERVATION-equivalent: a resighting/recovery record_type.
+		expect(chain.not).toHaveBeenCalledWith(
+			'qualifying.record_type',
+			'in',
+			'(U,F,D)'
+		);
+		// PULLI-equivalent: a pullus-age, non-juvenile capture.
+		expect(chain.or).toHaveBeenCalledWith('age_code.neq.1,is_juv.eq.true', {
+			referencedTable: 'qualifying'
+		});
 	});
 
 	describe('with multi-year data (alpha fixture)', () => {
