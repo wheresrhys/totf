@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
-import { SpNotableRetrapsTab } from '../SpNotableRetrapsTab';
+import { SpHighlightsTab } from '../SpHighlightsTab';
 import notableRetrapsSnapshot from '@/test-fixtures/snapshots/notable_retraps/robin-alpha.retraps.json';
 import type { NotableRetrapsResult } from '@/app/models/db';
 
@@ -8,7 +8,7 @@ vi.mock('@/app/actions/sp-data', () => ({
 	fetchNotableRetraps: vi.fn()
 }));
 
-describe('SpNotableRetrapsTab', () => {
+describe('SpHighlightsTab', () => {
 	afterEach(() => {
 		cleanup();
 	});
@@ -28,13 +28,23 @@ describe('SpNotableRetrapsTab', () => {
 				resolveData = resolve;
 			})
 		);
-		render(<SpNotableRetrapsTab speciesName="Robin" viewedGroupId={1} />);
+		render(
+			<SpHighlightsTab
+				speciesName="Robin"
+				viewedGroup={{ id: 1, slug: 'gp' }}
+			/>
+		);
 		expect(document.querySelector('.loading')).toBeDefined();
 		resolveData(notableRetrapsSnapshot as NotableRetrapsResult[]);
 	});
 
 	it('renders notable retraps table after data loads', async () => {
-		render(<SpNotableRetrapsTab speciesName="Robin" viewedGroupId={1} />);
+		render(
+			<SpHighlightsTab
+				speciesName="Robin"
+				viewedGroup={{ id: 1, slug: 'gp' }}
+			/>
+		);
 		await waitFor(() => {
 			expect(screen.getByRole('table')).toBeDefined();
 		});
@@ -45,7 +55,12 @@ describe('SpNotableRetrapsTab', () => {
 	it('shows empty state when no retraps found', async () => {
 		const { fetchNotableRetraps } = await import('@/app/actions/sp-data');
 		vi.mocked(fetchNotableRetraps).mockResolvedValue([]);
-		render(<SpNotableRetrapsTab speciesName="Robin" viewedGroupId={1} />);
+		render(
+			<SpHighlightsTab
+				speciesName="Robin"
+				viewedGroup={{ id: 1, slug: 'gp' }}
+			/>
+		);
 		await waitFor(() => {
 			expect(screen.getByText('No notable retraps found')).toBeDefined();
 		});
