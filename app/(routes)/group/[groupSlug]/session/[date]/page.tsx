@@ -63,6 +63,8 @@ async function fetchDayEncounters(
 	viewedGroupId: number,
 	date: string
 ): Promise<SessionPageEncounter[]> {
+	// TODO switch back to querying by session once sessions
+	// are one per day
 	return (await supabase
 		.from('Encounters')
 		.select(
