@@ -65,7 +65,7 @@ function generateAllHighlights({
 					// the one place that needs it.
 					values: (rule.generator as (stats: unknown[]) => HighlightValue[])(
 						workingStats
-					).map((value) => ({ ...value, descriptor: rule.descriptor }))
+					)
 				};
 				return applyLimitToHighlight(
 					highlights,
@@ -84,10 +84,7 @@ function generateAllHighlights({
 							},
 							values: (
 								rule.generator as (stats: unknown[]) => HighlightValue[]
-							)(workingStatsChild).map((value) => ({
-								...value,
-								descriptor: rule.descriptor
-							}))
+							)(workingStatsChild)
 						};
 						return highlights.values.length
 							? applyLimitToHighlight(

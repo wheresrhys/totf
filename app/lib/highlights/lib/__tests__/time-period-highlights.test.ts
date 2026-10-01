@@ -33,12 +33,7 @@ function makeValue(
 	value: number,
 	species: string | null = null
 ): HighlightValue {
-	return {
-		timePeriod,
-		value,
-		species,
-		descriptor: { unit: 'bird', type: 'rule', category: 'count' }
-	};
+	return { timePeriod, value, species };
 }
 
 // a lone value is always ranked position 1, not tied

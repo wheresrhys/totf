@@ -32,7 +32,7 @@ function sumProperties<Row extends RowWithIdentity>(
 export function getTopByPropertiesSum<Row extends RowWithIdentity>(
 	properties: (keyof Row)[],
 	options?: HighlightFinderOptions
-): (stats: Row[]) => Omit<HighlightValue, 'descriptor'>[] {
+): (stats: Row[]) => HighlightValue[] {
 	const threshold = options?.threshold ?? DEFAULT_THRESHOLD;
 	return (stats: Row[]) => {
 		const potentialHighlights = stats.map((row) => ({
@@ -52,6 +52,6 @@ export function getTopByPropertiesSum<Row extends RowWithIdentity>(
 export function getTopByProperty<Row extends RowWithIdentity>(
 	property: keyof Row,
 	options?: HighlightFinderOptions
-): (stats: Row[]) => Omit<HighlightValue, 'descriptor'>[] {
+): (stats: Row[]) => HighlightValue[] {
 	return getTopByPropertiesSum<Row>([property], options);
 }
