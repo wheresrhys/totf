@@ -165,7 +165,7 @@ function sentenceJoin(clauses: string[]): string {
 	return sentence;
 }
 
-function sentenceCase(sentence: string): string {
+export function sentenceCase(sentence: string): string {
 	return sentence.charAt(0).toUpperCase() + sentence.substring(1);
 }
 

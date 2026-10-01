@@ -78,7 +78,7 @@ export function getHighlightsOfTypeFixtures(
 	rule: HighlightsGenerator
 ): Record<string, HighlightsOfType> {
 	return {
-		single: {
+		'single session': {
 			descriptor: rule.descriptor,
 			scope: {
 				temporalUnit: 'day'
@@ -92,10 +92,10 @@ export function getHighlightsOfTypeFixtures(
 			],
 			formatters: rule.formatters
 		},
-		multiple: {
+		'multiple month': {
 			descriptor: rule.descriptor,
 			scope: {
-				temporalUnit: 'day'
+				temporalUnit: 'month'
 			},
 			values: [
 				{

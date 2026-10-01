@@ -2,9 +2,9 @@ import type { HighlightsGenerator } from '../types';
 import type { BiometricsStatsResult } from '@/app/models/db';
 import {
 	printProminenceQualifier,
-	printTemporalUnit,
 	printTimeQualifier,
 	printCombinedHighlight,
+	pluraliseSpecies,
 	type TimeQualifierOptions
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
@@ -23,7 +23,7 @@ export const lightestOfSpecies: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Lightest ${printTemporalUnit(highlightsOfType.scope.temporalUnit)} count${highlightsOfType.values.length > 1 ? 's' : ''} for a single species`
+			`Lightest ${highlightsOfType.values.length > 1 ? pluraliseSpecies(highlightsOfType.values[0].species as string) : highlightsOfType.values[0].species}`
 	},
 	descriptor: {
 		type: 'lightestOfSpecies',

@@ -9,8 +9,8 @@ import {
 
 describe('rules output for comibned highlights', () => {
 	highlightRules.forEach((rule) => {
-		if (rule.descriptor.type !== 'rarities') {
-			describe(rule.descriptor.type, () => {
+		describe(rule.descriptor.type, () => {
+			if (rule.descriptor.type !== 'rarities') {
 				describe('combined highlight printers', () => {
 					const combinedHighlightFixtures = getCombinedHighlightFixtures(rule);
 
@@ -26,23 +26,23 @@ describe('rules output for comibned highlights', () => {
 						}
 					);
 				});
+			}
 
-				describe('list prefix printers', () => {
-					const highlightsOfTypeFixtures = getHighlightsOfTypeFixtures(rule);
+			describe('list prefix printers', () => {
+				const highlightsOfTypeFixtures = getHighlightsOfTypeFixtures(rule);
 
-					const expectations =
-						allExpectations[rule.descriptor.type].printedHighlightsOfType;
-					Object.entries(highlightsOfTypeFixtures).map(
-						([testCase, highlightsOfType]) => {
-							it(testCase, () => {
-								expect(
-									rule.formatters.highlightListPrefixPrinter(highlightsOfType)
-								).toEqual(expectations[testCase]);
-							});
-						}
-					);
-				});
+				const expectations =
+					allExpectations[rule.descriptor.type].printedHighlightsOfType;
+				Object.entries(highlightsOfTypeFixtures).map(
+					([testCase, highlightsOfType]) => {
+						it(testCase, () => {
+							expect(
+								rule.formatters.highlightListPrefixPrinter(highlightsOfType)
+							).toEqual(expectations[testCase]);
+						});
+					}
+				);
 			});
-		}
+		});
 	});
 });
