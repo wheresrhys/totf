@@ -42,6 +42,7 @@ type MockEncounter = {
 	visit_date: string;
 	age_code: number;
 	breeding_condition: null;
+	capture_method: string | null;
 	capture_time: string;
 	moult_code: null;
 	record_type: string;
@@ -72,6 +73,7 @@ export function makeMockEncounter(
 		visit_date: TEST_DATE,
 		age_code: 4,
 		breeding_condition: null,
+		capture_method: 'M',
 		capture_time: '08:00:00',
 		moult_code: null,
 		record_type: 'N',

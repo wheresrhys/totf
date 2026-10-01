@@ -311,12 +311,13 @@ describe('session detail page', () => {
 
 	it('does not render the highlights section before its tab is opened', async () => {
 		render(await renderPage());
-		// The species table is always mounted; wait for it so the render has
+		// The mist-netting species table is always mounted (every fixture
+		// encounter here is capture_method 'M'); wait for it so the render has
 		// settled before asserting the highlights section is absent.
 		await screen.findByTestId('session-table');
 		// The "highlights" ConditionalTabPanel only mounts once its tab is loaded,
-		// and loadedTabs starts as Set(['species']) — so before the Highlights tab
-		// is ever clicked, the section is not in the DOM at all.
+		// and loadedTabs starts as Set(['mist-netting']) — so before the
+		// Highlights tab is ever clicked, the section is not in the DOM at all.
 		expect(screen.queryByTestId('session-highlights')).toBeNull();
 	});
 
@@ -343,7 +344,7 @@ describe('session detail page', () => {
 	});
 
 	describe('?tabId= query param (#805)', () => {
-		it('with no tabId search param, the Species totals tab renders unchanged', async () => {
+		it('with no tabId search param, the Mist-netting tab renders unchanged', async () => {
 			render(await renderPage());
 			await screen.findByTestId('session-table');
 			expect(screen.queryByText(/Net round 1/)).toBeNull();
@@ -361,11 +362,66 @@ describe('session detail page', () => {
 			expect(highlights.textContent).toContain('Counts');
 		});
 
-		it('?tabId=not-a-real-tab falls back to the Species totals tab, with no crash and no blank pane', async () => {
+		it('?tabId=not-a-real-tab falls back to the Mist-netting tab, with no crash and no blank pane', async () => {
 			render(await renderPage('not-a-real-tab'));
 			await screen.findByTestId('session-table');
 			expect(screen.queryByTestId('session-highlights')).toBeNull();
 			expect(screen.queryByText(/Net round 1/)).toBeNull();
+		});
+	});
+
+	describe('Mist-netting / Other catches tabs (capture_method, #1022)', () => {
+		it('puts a capture_method "M" encounter in the Mist-netting tab and a net round', async () => {
+			await renderWithClient(
+				makeDefaultSessionClient([makeMockEncounter({ capture_method: 'M' })])
+			);
+			const table = await screen.findByTestId('session-table');
+			expect(table.textContent).toContain('Robin');
+			fireEvent.click(screen.getByRole('button', { name: 'Net rounds' }));
+			await screen.findByText('Net round 1: 08:00');
+		});
+
+		it('puts a non-"M" capture_method encounter in Other catches, not Mist-netting, and excludes it from net rounds', async () => {
+			await renderWithClient(
+				makeDefaultSessionClient([makeMockEncounter({ capture_method: 'C' })])
+			);
+			expect(screen.queryByRole('button', { name: 'Mist-netting' })).toBeNull();
+			const table = await screen.findByTestId('other-catches-table');
+			expect(table.textContent).toContain('Robin');
+			fireEvent.click(screen.getByRole('button', { name: 'Net rounds' }));
+			expect(screen.queryByText(/Net round \d/)).toBeNull();
+		});
+
+		it('shows both tabs when the day has both mist-net and other-method encounters', async () => {
+			await renderWithClient(
+				makeDefaultSessionClient([
+					makeMockEncounter({ capture_method: 'M' }),
+					makeMockEncounter({
+						id: 2,
+						capture_method: 'C',
+						bird: {
+							ring_no: 'XYZ002',
+							proven_age: 2,
+							species: { id: 2, species_name: 'Blue Tit' }
+						}
+					})
+				])
+			);
+			await screen.findByRole('button', { name: 'Mist-netting' });
+			await screen.findByRole('button', { name: 'Other catches' });
+		});
+
+		it('treats a null capture_method as mist-net, not "other" — the real shape of existing/seed data', async () => {
+			await renderWithClient(
+				makeDefaultSessionClient([makeMockEncounter({ capture_method: null })])
+			);
+			expect(
+				screen.queryByRole('button', { name: 'Other catches' })
+			).toBeNull();
+			const table = await screen.findByTestId('session-table');
+			expect(table.textContent).toContain('Robin');
+			fireEvent.click(screen.getByRole('button', { name: 'Net rounds' }));
+			await screen.findByText('Net round 1: 08:00');
 		});
 	});
 });

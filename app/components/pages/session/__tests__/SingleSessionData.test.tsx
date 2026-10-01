@@ -20,7 +20,8 @@ function makeEncounter(
 	species: string,
 	capture_time: string,
 	proven_age = 0,
-	ageOptions: { age_code?: number; is_juv?: boolean } = {}
+	ageOptions: { age_code?: number; is_juv?: boolean } = {},
+	capture_method: string | null = 'M'
 ): SessionEncounter {
 	return {
 		id,
@@ -28,6 +29,7 @@ function makeEncounter(
 		age_code: ageOptions.age_code ?? 4,
 		is_juv: ageOptions.is_juv ?? false,
 		breeding_condition: null,
+		capture_method,
 		capture_time,
 		moult_code: null,
 		record_type: 'N',
@@ -53,7 +55,7 @@ const robinEncounter = makeEncounter(1, 'Robin', '09:00:00', 3);
 const olderRobinEncounter = makeEncounter(3, 'Robin', '09:15:00', 7);
 const titmouseEncounter = makeEncounter(2, 'Blue Tit', '09:30:00');
 
-const speciesList: SpeciesWithEncounters[] = [
+const mistNetSpeciesList: SpeciesWithEncounters[] = [
 	{ species: 'Robin', encounters: [robinEncounter, olderRobinEncounter] },
 	{ species: 'Blue Tit', encounters: [titmouseEncounter] }
 ];
@@ -65,7 +67,8 @@ const netRounds: NetRound[] = [
 
 function renderSessionTabs(
 	overrides: Partial<{
-		speciesList: SpeciesWithEncounters[];
+		mistNetSpeciesList: SpeciesWithEncounters[];
+		otherCatchesSpeciesList: SpeciesWithEncounters[];
 		netRounds: NetRound[];
 		viewedGroupId: number;
 		date: string;
@@ -73,7 +76,8 @@ function renderSessionTabs(
 	}> = {}
 ) {
 	const props = {
-		speciesList,
+		mistNetSpeciesList,
+		otherCatchesSpeciesList: [] as SpeciesWithEncounters[],
 		netRounds,
 		viewedGroupId: 1,
 		date: '2024-09-15',
@@ -81,7 +85,8 @@ function renderSessionTabs(
 	};
 	return render(
 		<SessionTabs
-			speciesList={props.speciesList}
+			mistNetSpeciesList={props.mistNetSpeciesList}
+			otherCatchesSpeciesList={props.otherCatchesSpeciesList}
 			netRounds={props.netRounds}
 			viewedGroupId={props.viewedGroupId}
 			date={props.date}
@@ -95,17 +100,18 @@ describe('SessionTabs', () => {
 		cleanup();
 	});
 
-	it('renders both tab buttons', () => {
+	it('renders the Mist-netting and Net rounds tab buttons, but not Other catches, by default', () => {
 		renderSessionTabs();
 		expect(
-			screen.getByRole('button', { name: 'Species totals' }).textContent
-		).toContain('Species totals');
+			screen.getByRole('button', { name: 'Mist-netting' }).textContent
+		).toContain('Mist-netting');
 		expect(
 			screen.getByRole('button', { name: 'Net rounds' }).textContent
 		).toContain('Net rounds');
+		expect(screen.queryByRole('button', { name: 'Other catches' })).toBeNull();
 	});
 
-	it('shows species table by default', () => {
+	it('shows the mist-netting species table by default', () => {
 		renderSessionTabs();
 		expect(screen.getByTestId('session-table')).not.toBeNull();
 	});
@@ -133,6 +139,62 @@ describe('SessionTabs', () => {
 		expect(screen.getByText('Net round 2: 09:30').textContent).toContain(
 			'Net round 2: 09:30'
 		);
+	});
+
+	describe('Mist-netting / Other catches tab visibility (#1022)', () => {
+		it('hides the Mist-netting tab entirely on a day with zero mist-net encounters', () => {
+			renderSessionTabs({
+				mistNetSpeciesList: [],
+				otherCatchesSpeciesList: mistNetSpeciesList
+			});
+			expect(screen.queryByRole('button', { name: 'Mist-netting' })).toBeNull();
+		});
+
+		it('shows the Other catches tab when at least one non-mist-net encounter exists', () => {
+			renderSessionTabs({ otherCatchesSpeciesList: mistNetSpeciesList });
+			expect(
+				screen.getByRole('button', { name: 'Other catches' })
+			).not.toBeNull();
+		});
+
+		it('renders the Other catches species table in its own testId, independent of Mist-netting', () => {
+			renderSessionTabs({
+				otherCatchesSpeciesList: [
+					{
+						species: 'Wren',
+						encounters: [makeEncounter(99, 'Wren', '10:00:00', 1, {}, 'C')]
+					}
+				],
+				initialTabId: 'other-catches'
+			});
+			const table = screen.getByTestId('other-catches-table');
+			expect(table.textContent).toContain('Wren');
+			expect(screen.queryByTestId('session-table')).toBeNull();
+		});
+
+		it('defaults to the Other catches tab when Mist-netting is empty but Other catches has data', () => {
+			renderSessionTabs({
+				mistNetSpeciesList: [],
+				otherCatchesSpeciesList: mistNetSpeciesList
+			});
+			expect(screen.getByTestId('other-catches-table')).not.toBeNull();
+			const button = screen.getByRole('button', { name: 'Other catches' });
+			expect(button.getAttribute('aria-current')).toBe('true');
+		});
+
+		it('defaults to Net rounds when neither Mist-netting nor Other catches has any data', () => {
+			renderSessionTabs({
+				mistNetSpeciesList: [],
+				otherCatchesSpeciesList: [],
+				netRounds: []
+			});
+			expect(screen.queryByRole('button', { name: 'Mist-netting' })).toBeNull();
+			expect(
+				screen.queryByRole('button', { name: 'Other catches' })
+			).toBeNull();
+			const button = screen.getByRole('button', { name: 'Net rounds' });
+			expect(button.getAttribute('aria-current')).toBe('true');
+		});
 	});
 
 	describe('Net rounds — EncountersTable adoption', () => {
@@ -206,7 +268,7 @@ describe('SessionTabs', () => {
 
 	describe('Expanded species row — EncountersTable adoption', () => {
 		function renderAndExpandFirstSpecies(list: SpeciesWithEncounters[]) {
-			renderSessionTabs({ speciesList: list });
+			renderSessionTabs({ mistNetSpeciesList: list });
 			const sessionTable = screen.getByTestId('session-table');
 			const expandButton = sessionTable.querySelector(
 				'tbody button'
@@ -215,7 +277,7 @@ describe('SessionTabs', () => {
 		}
 
 		it('does not render a Species column; renders a Time column', () => {
-			renderAndExpandFirstSpecies(speciesList);
+			renderAndExpandFirstSpecies(mistNetSpeciesList);
 			const detailsTable = screen.getByTestId('species-details-table');
 			const headers = within(detailsTable)
 				.getAllByRole('columnheader')
@@ -225,7 +287,7 @@ describe('SessionTabs', () => {
 		});
 
 		it('renders clickable, sortable column headers (EncountersTable is always sortable)', () => {
-			renderAndExpandFirstSpecies(speciesList);
+			renderAndExpandFirstSpecies(mistNetSpeciesList);
 			const detailsTable = screen.getByTestId('species-details-table');
 			within(detailsTable)
 				.getAllByRole('columnheader')
@@ -250,7 +312,7 @@ describe('SessionTabs', () => {
 				is_juv: true
 			});
 			renderSessionTabs({
-				speciesList: [{ species: 'Wren', encounters: [encounter] }],
+				mistNetSpeciesList: [{ species: 'Wren', encounters: [encounter] }],
 				netRounds: []
 			});
 			expect(getCellTextByHeading('Juv', 'Wren')).toBe('1');
@@ -263,7 +325,7 @@ describe('SessionTabs', () => {
 				is_juv: true
 			});
 			renderSessionTabs({
-				speciesList: [{ species: 'Dunnock', encounters: [encounter] }],
+				mistNetSpeciesList: [{ species: 'Dunnock', encounters: [encounter] }],
 				netRounds: []
 			});
 			expect(getCellTextByHeading('Juv', 'Dunnock')).toBe('1');
@@ -276,7 +338,7 @@ describe('SessionTabs', () => {
 				is_juv: true
 			});
 			renderSessionTabs({
-				speciesList: [{ species: 'Starling', encounters: [encounter] }],
+				mistNetSpeciesList: [{ species: 'Starling', encounters: [encounter] }],
 				netRounds: []
 			});
 			expect(getCellTextByHeading('Juv', 'Starling')).toBe('1');
@@ -289,7 +351,7 @@ describe('SessionTabs', () => {
 				is_juv: false
 			});
 			renderSessionTabs({
-				speciesList: [{ species: 'Swallow', encounters: [encounter] }],
+				mistNetSpeciesList: [{ species: 'Swallow', encounters: [encounter] }],
 				netRounds: []
 			});
 			expect(getCellTextByHeading('Pulli', 'Swallow')).toBe('1');
@@ -302,7 +364,7 @@ describe('SessionTabs', () => {
 				is_juv: false
 			});
 			renderSessionTabs({
-				speciesList: [{ species: 'Chaffinch', encounters: [encounter] }],
+				mistNetSpeciesList: [{ species: 'Chaffinch', encounters: [encounter] }],
 				netRounds: []
 			});
 			expect(getCellTextByHeading('Postjuv', 'Chaffinch')).toBe('1');
@@ -317,7 +379,9 @@ describe('SessionTabs', () => {
 				is_juv: false
 			});
 			renderSessionTabs({
-				speciesList: [{ species: 'Robin', encounters: [pulliEncounter] }],
+				mistNetSpeciesList: [
+					{ species: 'Robin', encounters: [pulliEncounter] }
+				],
 				netRounds: []
 			});
 			expect(
@@ -351,13 +415,39 @@ describe('SessionTabs', () => {
 				is_juv: false
 			});
 			renderSessionTabs({
-				speciesList: [
-					...speciesList,
+				mistNetSpeciesList: [
+					...mistNetSpeciesList,
 					{ species: 'Wren', encounters: [pulliEncounter] }
 				]
 			});
 			expect(
 				screen.getAllByRole('columnheader').map((header) => header.textContent)
+			).toContain('Pulli');
+		});
+
+		it("decides the Other catches tab's Pulli visibility independently of Mist-netting's", () => {
+			const otherCatchesPulliEncounter = makeEncounter(
+				23,
+				'Wren',
+				'10:00:00',
+				0,
+				{ age_code: 1, is_juv: false },
+				'C'
+			);
+			renderSessionTabs({
+				// Mist-netting has no pulli...
+				mistNetSpeciesList,
+				// ...but Other catches does.
+				otherCatchesSpeciesList: [
+					{ species: 'Wren', encounters: [otherCatchesPulliEncounter] }
+				],
+				initialTabId: 'other-catches'
+			});
+			const otherCatchesTable = screen.getByTestId('other-catches-table');
+			expect(
+				within(otherCatchesTable)
+					.getAllByRole('columnheader')
+					.map((header) => header.textContent)
 			).toContain('Pulli');
 		});
 	});
@@ -396,7 +486,9 @@ describe('SessionTabs', () => {
 				is_juv: false
 			});
 			renderSessionTabs({
-				speciesList: [{ species: 'Robin', encounters: [pulliEncounter] }],
+				mistNetSpeciesList: [
+					{ species: 'Robin', encounters: [pulliEncounter] }
+				],
 				netRounds: []
 			});
 			const headers = screen.getAllByRole('columnheader');
@@ -460,7 +552,7 @@ describe('SessionTabs', () => {
 				is_juv: false
 			});
 			renderSessionTabs({
-				speciesList: [
+				mistNetSpeciesList: [
 					{
 						species: 'Wren',
 						encounters: [pulliEncounter, anotherPulliEncounter]
@@ -495,7 +587,7 @@ describe('SessionTabs', () => {
 				is_juv: false
 			});
 			renderSessionTabs({
-				speciesList: [{ species: 'Wren', encounters: [encounter] }],
+				mistNetSpeciesList: [{ species: 'Wren', encounters: [encounter] }],
 				netRounds: []
 			});
 			expect(totalsRowCellValue('Total')).toBe(
@@ -519,7 +611,7 @@ describe('SessionTabs', () => {
 	});
 
 	describe('initialTabId (#805)', () => {
-		it('defaults activeTab to species when initialTabId is undefined (existing behaviour)', () => {
+		it('defaults activeTab to mist-netting when initialTabId is undefined (existing behaviour)', () => {
 			renderSessionTabs();
 			expect(screen.getByTestId('session-table')).not.toBeNull();
 			expect(screen.queryByText('Net round 1: 09:00')).toBeNull();
@@ -532,24 +624,29 @@ describe('SessionTabs', () => {
 		});
 
 		describe('one test per known tab id', () => {
-			it.each(['species', 'net-rounds', 'highlights'])(
+			it.each(['mist-netting', 'other-catches', 'net-rounds', 'highlights'])(
 				'initialTabId=%s focuses that tab',
 				(tabId) => {
-					renderSessionTabs({ initialTabId: tabId });
+					renderSessionTabs({
+						otherCatchesSpeciesList: mistNetSpeciesList,
+						initialTabId: tabId
+					});
 					const button = screen.getByRole('button', {
 						name:
-							tabId === 'species'
-								? 'Species totals'
-								: tabId === 'net-rounds'
-									? 'Net rounds'
-									: 'Highlights'
+							tabId === 'mist-netting'
+								? 'Mist-netting'
+								: tabId === 'other-catches'
+									? 'Other catches'
+									: tabId === 'net-rounds'
+										? 'Net rounds'
+										: 'Highlights'
 					});
 					expect(button.getAttribute('aria-current')).toBe('true');
 				}
 			);
 		});
 
-		it('initialTabId="not-a-real-tab" falls back to species, with no crash and no blank pane', () => {
+		it('initialTabId="not-a-real-tab" falls back to the first tab (mist-netting), with no crash and no blank pane', () => {
 			renderSessionTabs({ initialTabId: 'not-a-real-tab' });
 			expect(screen.getByTestId('session-table')).not.toBeNull();
 		});

@@ -139,20 +139,22 @@ function ConditionalTabPanel({
 	return null;
 }
 
-export function SessionTabs({
+// Shared by the Mist-netting and Other catches tabs (#1022) — same species-totals
+// table, just over a differently-filtered `speciesList`. Each computes its own
+// `hasPulli`/totals independently, since one capture method catching pulli says
+// nothing about whether the other did too.
+function SpeciesTotalsPanel({
 	speciesList,
-	netRounds,
-	date,
-	viewedGroupId,
-	oldestEncounter = null,
-	initialTabId
+	tabId,
+	activeTab,
+	loadedTabs,
+	testId
 }: {
 	speciesList: SpeciesWithEncounters[];
-	netRounds: NetRound[];
-	date: string;
-	viewedGroupId: number;
-	oldestEncounter?: SessionEncounter | null;
-	initialTabId?: string;
+	tabId: string;
+	activeTab: string;
+	loadedTabs: Set<string>;
+	testId: string;
 }) {
 	const hasPulli = speciesList.some((speciesWithEncounters) =>
 		speciesWithEncounters.encounters.some(
@@ -169,20 +171,66 @@ export function SessionTabs({
 		}
 	});
 
-	const tabNavConfig = [
-		{ id: 'species', label: 'Species totals' },
-		{ id: 'net-rounds', label: 'Net rounds' },
-		{ id: 'highlights', label: 'Highlights' }
-	];
+	return (
+		<ConditionalTabPanel
+			loadedTabs={loadedTabs}
+			tabId={tabId}
+			activeTabId={activeTab}
+		>
+			<SortableTable<SpeciesWithEncounters, RowModel>
+				columnConfigs={columnConfigs}
+				data={speciesList}
+				testId={testId}
+				initialSortColumn="total"
+				rowDataTransform={rowDataTransform}
+				totalsRow={totalsRow}
+				TableBodyComponent={SessionTableBody}
+			/>
+		</ConditionalTabPanel>
+	);
+}
 
-	// The `?tabId=` param (#803, applied here by #805) wins over the hardcoded
-	// 'species' default when it names one of this render's actual tabs; an
-	// unknown/garbage value or no param at all falls back to 'species'
-	// unchanged. Shared with the species and summary pages via
-	// `useLinkableTabs` (#818).
+export function SessionTabs({
+	mistNetSpeciesList,
+	otherCatchesSpeciesList,
+	netRounds,
+	date,
+	viewedGroupId,
+	oldestEncounter = null,
+	initialTabId
+}: {
+	mistNetSpeciesList: SpeciesWithEncounters[];
+	otherCatchesSpeciesList: SpeciesWithEncounters[];
+	netRounds: NetRound[];
+	date: string;
+	viewedGroupId: number;
+	oldestEncounter?: SessionEncounter | null;
+	initialTabId?: string;
+}) {
+	const hasMistNetEncounters = mistNetSpeciesList.length > 0;
+	const hasOtherCatches = otherCatchesSpeciesList.length > 0;
+
+	const tabNavConfig: { id: string; label: string }[] = [];
+	if (hasMistNetEncounters) {
+		tabNavConfig.push({ id: 'mist-netting', label: 'Mist-netting' });
+	}
+	if (hasOtherCatches) {
+		tabNavConfig.push({ id: 'other-catches', label: 'Other catches' });
+	}
+	tabNavConfig.push({ id: 'net-rounds', label: 'Net rounds' });
+	tabNavConfig.push({ id: 'highlights', label: 'Highlights' });
+
+	// The `?tabId=` param (#803, applied here by #805) wins over this render's
+	// first tab when it names one of this render's actual tabs; an
+	// unknown/garbage value or no param at all falls back to that first tab.
+	// Which tab is first varies by day (#1022): Mist-netting and Other catches
+	// are only in `tabNavConfig` at all when the day has a matching encounter,
+	// so the default is whichever of those two (if either) actually has data,
+	// falling through to the always-present Net rounds tab otherwise. Shared
+	// with the species and summary pages via `useLinkableTabs` (#818).
 	const { activeTab, loadedTabs, selectTab } = useLinkableTabs({
 		tabIds: tabNavConfig.map((tab) => tab.id),
-		defaultTabId: 'species',
+		defaultTabId: tabNavConfig[0].id,
 		initialTabId
 	});
 
@@ -193,21 +241,24 @@ export function SessionTabs({
 				activeTab={activeTab}
 				onTabChange={selectTab}
 			/>
-			<ConditionalTabPanel
-				loadedTabs={loadedTabs}
-				tabId="species"
-				activeTabId={activeTab}
-			>
-				<SortableTable<SpeciesWithEncounters, RowModel>
-					columnConfigs={columnConfigs}
-					data={speciesList}
+			{hasMistNetEncounters && (
+				<SpeciesTotalsPanel
+					speciesList={mistNetSpeciesList}
+					tabId="mist-netting"
+					activeTab={activeTab}
+					loadedTabs={loadedTabs}
 					testId="session-table"
-					initialSortColumn="total"
-					rowDataTransform={rowDataTransform}
-					totalsRow={totalsRow}
-					TableBodyComponent={SessionTableBody}
 				/>
-			</ConditionalTabPanel>
+			)}
+			{hasOtherCatches && (
+				<SpeciesTotalsPanel
+					speciesList={otherCatchesSpeciesList}
+					tabId="other-catches"
+					activeTab={activeTab}
+					loadedTabs={loadedTabs}
+					testId="other-catches-table"
+				/>
+			)}
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
 				tabId="net-rounds"
