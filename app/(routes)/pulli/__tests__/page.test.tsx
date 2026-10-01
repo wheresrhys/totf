@@ -3,6 +3,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import Page, { fetchPulliPageContent } from '../page';
 import pulliEncountersSnapshot from '@/test-fixtures/snapshots/tables/Encounters/alpha.pulli-encounters.json';
 import type { PulliEncounter } from '@/app/models/session';
+import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
@@ -17,6 +18,7 @@ function makeEncountersClient(data: unknown) {
 	const chain = {
 		select: vi.fn().mockReturnThis(),
 		eq: vi.fn().mockReturnThis(),
+		not: vi.fn().mockReturnThis(),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({ data, error: null }).then(resolve)
 	};
@@ -108,10 +110,28 @@ describe('fetchPulliPageContent query building', () => {
 		expect(chain.eq).toHaveBeenCalledWith('ringing_group_id', 42);
 	});
 
-	it('filters to session.session_type = PULLI via the embedded-join filter', async () => {
+	it('excludes resighting/recovery record types in the query', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 		await fetchPulliPageContent({}, 42);
-		expect(chain.eq).toHaveBeenCalledWith('session.session_type', 'PULLI');
+		expect(chain.not).toHaveBeenCalledWith(
+			'record_type',
+			'in',
+			`(${RESIGHTING_RECORD_TYPES.join(',')})`
+		);
+	});
+
+	it('matches only age_code 1 in the query', async () => {
+		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+		await fetchPulliPageContent({}, 42);
+		expect(chain.eq).toHaveBeenCalledWith('age_code', 1);
+	});
+
+	it('matches only is_juv false in the query', async () => {
+		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
+		await fetchPulliPageContent({}, 42);
+		expect(chain.eq).toHaveBeenCalledWith('is_juv', false);
 	});
 });
