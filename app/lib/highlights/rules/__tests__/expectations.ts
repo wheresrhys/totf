@@ -16,8 +16,8 @@ export const expectations = {
 				'Busiest session ever, joint second busiest of 2020 and third busiest in any February: 12 birds'
 		},
 		printedHighlightsOfType: {
-			'single session': 'Busiest session',
-			'multiple month': 'Busiest months'
+			'single session': 'Busiest',
+			'multiple month': 'Most individuals'
 		}
 	},
 	encounters: {
@@ -35,8 +35,8 @@ export const expectations = {
 				'Month with equal most encounters ever and second most of 2020: 12 encounters'
 		},
 		printedHighlightsOfType: {
-			'single session': 'Session with most encounters',
-			'multiple month': 'Months with most encounters'
+			'single session': 'Most encounters',
+			'multiple month': 'Most encounters'
 		}
 	},
 	species: {
@@ -57,8 +57,8 @@ export const expectations = {
 				'Most varied session ever, joint second most varied of 2020 and third most varied in any February: 12 species'
 		},
 		printedHighlightsOfType: {
-			'single session': 'Most varied session',
-			'multiple month': 'Most varied months'
+			'single session': 'Most varied',
+			'multiple month': 'Most varied'
 		}
 	},
 	newBirds: {
@@ -80,8 +80,8 @@ export const expectations = {
 				'Highest new bird count ever, joint second highest of 2020 and third highest in any February: 12 birds'
 		},
 		printedHighlightsOfType: {
-			'single session': 'Session with most new birds',
-			'multiple month': 'Months with most new birds'
+			'single session': 'Most new birds',
+			'multiple month': 'Most new birds'
 		}
 	},
 	juvs: {
@@ -103,8 +103,8 @@ export const expectations = {
 				'Session with most juvs ever, equal second most of 2020 and third most in any February: 12 birds'
 		},
 		printedHighlightsOfType: {
-			'single session': 'Session with most juvs',
-			'multiple month': 'Months with most juvs'
+			'single session': 'Most juvs',
+			'multiple month': 'Most juvs'
 		}
 	},
 	singleSpeciesCount: {
@@ -128,8 +128,8 @@ export const expectations = {
 				'Highest single species session count ever, joint second highest of 2020 and third highest in any February: 12 birds'
 		},
 		printedHighlightsOfType: {
-			'single session': 'Highest session count for a single species',
-			'multiple month': 'Highest month counts for a single species'
+			'single session': 'Most individuals of a single species',
+			'multiple month': 'Most individuals of a single species'
 		}
 	},
 	singleSpeciesEncounters: {
@@ -152,8 +152,8 @@ export const expectations = {
 				'Equal most encounters of a single species in a month ever and second most of 2020: 12 encounters'
 		},
 		printedHighlightsOfType: {
-			'single session': 'Most encounters of a single species in a session',
-			'multiple month': 'Most encounters of a single species in a month'
+			'single session': 'Most encounters of a single species',
+			'multiple month': 'Most encounters of a single species'
 		}
 	},
 	eachSpeciesCount: {
@@ -174,11 +174,8 @@ export const expectations = {
 				'Highest Robin count ever, equal second highest of 2020 and third highest in any February: 12 birds'
 		},
 		printedHighlightsOfType: {
-			'single session': 'Highest session count for Robin',
-			// Note that even though the data for the second value in the fixture has species: Blackcap,
-			// the printer, by design, safely, only reads species off the first value because within this
-			// rule all entries shoudl be for the same species - the fixture just takes a shortcut
-			'multiple month': 'Highest month counts for Robin'
+			'single session': 'Highest count for Robin',
+			'multiple month': 'Highest counts for Robin'
 		}
 	},
 	eachSpeciesJuvs: {
@@ -200,8 +197,8 @@ export const expectations = {
 				'Highest juv Robin count ever, equal second highest of 2020 and third highest in any February: 12 birds'
 		},
 		printedHighlightsOfType: {
-			'single session': 'Highest juv count in a session for Robin',
-			'multiple month': 'Highest juv counts in a month for Robin'
+			'single session': 'Highest juv count for Robin',
+			'multiple month': 'Highest juv counts for Robin'
 		}
 	},
 	rarities: {
@@ -218,7 +215,6 @@ export const expectations = {
 			'global and tied second of year and third of month': '12 Robin ever'
 		},
 		printedHighlightsOfType: {
-			// TODO could do with thinking about the list bit of the printer too
 			'single session': 'Rarities',
 			'multiple month': 'Rarities'
 		}

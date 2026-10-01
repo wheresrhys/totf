@@ -171,7 +171,8 @@ describe('/summary/[yearOrMonth]', () => {
 			expect(tabs.map((tab) => tab.textContent)).toEqual([
 				'Month totals',
 				'Session totals',
-				'Species totals'
+				'Species totals',
+				'Highlights'
 			]);
 			expect(tabs[0].getAttribute('aria-current')).toBe('true');
 		});
@@ -300,7 +301,8 @@ describe('/summary/[yearOrMonth]', () => {
 			expect(tabs.map((tab) => tab.textContent)).toEqual([
 				'Species totals',
 				'Year totals',
-				'Session totals'
+				'Session totals',
+				'Highlights'
 			]);
 			expect(tabs[0].getAttribute('aria-current')).toBe('true');
 		});

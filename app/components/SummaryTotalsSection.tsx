@@ -52,7 +52,7 @@ const SESSION_TOTALS_TAB = { id: 'session-totals', label: 'Session totals' };
 const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
 const HIGHLIGHTS_TAB = { id: 'highlights', label: 'Highlights' };
 
-function HighlightsByTimePeriod({
+export function HighlightsByTimePeriod({
 	highlights,
 	heading,
 	viewedGroup
@@ -315,7 +315,7 @@ export function SummaryTotalsSection({
 		...(showAllTimeMonthTotals ? [ALL_TIME_MONTH_TOTALS_TAB] : []),
 		...(showSessionTotals ? [SESSION_TOTALS_TAB] : []),
 		SPECIES_TOTALS_TAB,
-		HIGHLIGHTS_TAB
+		...(viewedGroup !== undefined ? [HIGHLIGHTS_TAB] : [])
 	];
 
 	const tabsWithTotalsRow = {
