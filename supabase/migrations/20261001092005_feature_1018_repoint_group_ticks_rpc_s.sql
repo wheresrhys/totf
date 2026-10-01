@@ -1,11 +1,10 @@
-CREATE FUNCTION public.group_ticks (
-	ringing_group_filter bigint DEFAULT NULL::bigint,
-	location_filter bigint DEFAULT NULL::bigint,
-	result_limit integer DEFAULT NULL::integer
-) RETURNS TABLE (species_name text, first_encounter_date date) LANGUAGE plpgsql STABLE
-SET
-	search_path TO 'public',
-	'pg_catalog' AS $function$
+SET check_function_bodies = false;
+CREATE OR REPLACE FUNCTION public.group_ticks(ringing_group_filter bigint DEFAULT NULL::bigint, location_filter bigint DEFAULT NULL::bigint, result_limit integer DEFAULT NULL::integer)
+ RETURNS TABLE(species_name text, first_encounter_date date)
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO 'public', 'pg_catalog'
+AS $function$
 BEGIN
   RETURN QUERY
 	SELECT
@@ -24,9 +23,3 @@ BEGIN
 	LIMIT result_limit;
 END;
 $function$;
-
-GRANT ALL ON FUNCTION public.group_ticks (bigint, bigint, integer) TO anon;
-
-GRANT ALL ON FUNCTION public.group_ticks (bigint, bigint, integer) TO authenticated;
-
-GRANT ALL ON FUNCTION public.group_ticks (bigint, bigint, integer) TO service_role;
