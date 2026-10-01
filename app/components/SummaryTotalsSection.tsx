@@ -13,6 +13,7 @@ import {
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
 import { getHighlightsWithinTimeWindow } from '@/app/lib/highlights';
 import {
+	HighlightValue,
 	isNumericHighlightValue,
 	type HighlightsOfType
 } from '@/app/lib/highlights/types';
@@ -52,6 +53,30 @@ const SESSION_TOTALS_TAB = { id: 'session-totals', label: 'Session totals' };
 const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
 const HIGHLIGHTS_TAB = { id: 'highlights', label: 'Highlights' };
 
+function showHighlightUnit(
+	highlight: HighlightsOfType,
+	highlightValue: HighlightValue,
+	excludeSpeciesName?: boolean
+) {
+	if (['g', 'mm'].includes(highlight.descriptor.unit)) {
+		return true;
+	}
+	return !excludeSpeciesName;
+}
+
+function getHighlightUnit(
+	highlight: HighlightsOfType,
+	highlightValue: HighlightValue,
+	excludeSpeciesName?: boolean
+) {
+	if (['g', 'mm'].includes(highlight.descriptor.unit)) {
+		return highlight.descriptor.unit;
+	}
+	return excludeSpeciesName
+		? undefined
+		: (highlightValue.species as SpeciesName) || highlight.descriptor.unit;
+}
+
 export function HighlightsByTimePeriod({
 	highlights,
 	heading,
@@ -82,12 +107,17 @@ export function HighlightsByTimePeriod({
 									<StatOutput
 										visitDate={highlightValue.timePeriod}
 										temporalUnit={highlight.scope.temporalUnit}
-										showUnit={Boolean(highlightValue.species)}
+										showUnit={showHighlightUnit(
+											highlight,
+											highlightValue,
+											excludeSpeciesName
+										)}
 										value={highlightValue.value}
-										unit={
-											(highlightValue.species as SpeciesName) ||
-											highlight.descriptor.unit
-										}
+										unit={getHighlightUnit(
+											highlight,
+											highlightValue,
+											excludeSpeciesName
+										)}
 										viewedGroup={viewedGroup}
 									/>
 								) : (

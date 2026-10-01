@@ -58,6 +58,7 @@ export function SpHighlightsTab({
 						},
 						includePerSpecies: true,
 						excludeGlobal: true
+						// TODO need to exclude the weight records
 					})
 		]);
 		setHighlightsData({ sessionHighlights: daily, monthHighlights: monthly });
@@ -81,11 +82,13 @@ export function SpHighlightsTab({
 						highlights={highlightsData.sessionHighlights}
 						viewedGroup={viewedGroup}
 						heading="Session highlights"
+						excludeSpeciesName={true}
 					/>
 					<HighlightsByTimePeriod
 						highlights={highlightsData.monthHighlights}
 						viewedGroup={viewedGroup}
 						heading="Month highlights"
+						excludeSpeciesName={true}
 					/>
 				</>
 			)}
