@@ -75,17 +75,30 @@ group is the cell's own `period_year`), read by the "Returning vs new" chart (#8
 reintroduce either column or the majority-vote heuristic; `arrivals_stats`' `new_adult` /
 `returning_adult` split is the supported way to name the rest of the adult cohort.
 
-`stats_raw_encounters` and `stats_spine` also exclude passive, no-bird-in-hand data so it never
-leaks into any stats RPC built on them (#874). `stats_raw_encounters` filters out any `Encounters`
-row whose `record_type` is a resighting/recovery type — `public.resighting_record_type` (`U`/`F`/`D`
-— see the DemOn field spec) — by adding the condition to its `LEFT JOIN ... ON` clause rather than a
-`WHERE`, so a bird whose only encounters are resightings still surfaces as a NULL-`encounter_id` row
-instead of disappearing from the result entirely. `stats_spine`'s `session_date_range` separately
-excludes `FIELD_OBSERVATION` sessions, so a field-observation-only date can't stretch the month/year
-spine past the range of real (`FULL_GROWN`/`PULLI`) sessions. `app/models/db.ts` exports
-`ResightingRecordType` from the generated enum, and `lib/demon-import.ts`'s
-`RESIGHTING_RECORD_TYPES` constant is typed against it — keep that constant in sync **by hand** if
-the enum ever changes, the same convention as the age-bucket definitions above.
+`stats_raw_encounters` excludes passive, no-bird-in-hand data so it never leaks into any stats RPC
+built on it (#874): it filters out any `Encounters` row whose `record_type` is a resighting/recovery
+type — `public.resighting_record_type` (`U`/`F`/`D` — see the DemOn field spec) — by adding the
+condition to its `LEFT JOIN ... ON` clause rather than a `WHERE`, so a bird whose only encounters
+are resightings still surfaces as a NULL-`encounter_id` row instead of disappearing from the result
+entirely. `app/models/db.ts` exports `ResightingRecordType` from the generated enum, and
+`lib/demon-import.ts`'s `RESIGHTING_RECORD_TYPES` constant is typed against it — keep that constant
+in sync **by hand** if the enum ever changes, the same convention as the age-bucket definitions
+above.
+
+**That record_type filter is the single fix point — no stats RPC reads `Sessions.session_type`
+to decide what is "real" data any more (#1021).** `stats_spine`'s `session_date_range` used to
+exclude `FIELD_OBSERVATION` sessions (so a field-observation-only date couldn't stretch the
+month/year spine past the range of `FULL_GROWN`/`PULLI` sessions), and `core_stats.session_count`
+used to be `COUNT(DISTINCT CASE WHEN session_type = 'FULL_GROWN' THEN visit_date END)`. Both are
+gone: the spine is bounded by every session date in the window, and `session_count` is a plain
+`COUNT(DISTINCT visit_date)` — which also makes it consistent with
+`species_count`/`bird_count`/`encounter_count` for the first time (they always counted encounters
+from any `session_type`). This is a visible behaviour change, not a refactor: a group/period whose
+history includes pulli-only or field-observation-only days reports a HIGHER `session_count` than it
+used to. The remaining `session_type = 'FULL_GROWN'` reads in `core_stats`' `session_counts` /
+`session_effort` CTEs (feeding `total_effort`, `effort_per_session`,
+`avg_encounters_per_session`, `max_per_session`, `max_new_per_session`) are deliberately still
+there pending #1024, so a pulli-only date can report `session_count = 1` against zero effort.
 
 **Two per-row evaluation traps in `stats_raw_encounters`, both fixed in #947 — don't reintroduce
 either.** Because every stats RPC derives this row source (and `core_stats` derives it 4x through

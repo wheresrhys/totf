@@ -1,33 +1,9 @@
-CREATE FUNCTION public.core_stats (
-	species_name_filter text DEFAULT NULL::text,
-	from_date date DEFAULT NULL::date,
-	to_date date DEFAULT NULL::date,
-	ringing_group_filter bigint DEFAULT NULL::bigint,
-	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text,
-	year_filter smallint DEFAULT NULL::smallint,
-	month_filter smallint DEFAULT NULL::smallint
-) RETURNS SETOF public.core_stats_result LANGUAGE plpgsql
--- Every stats RPC in this family is parameterized by the SHAPE of its own query, not
--- just by filter values: group_by_species and group_by_time_period decide which columns
--- the spine/raw_encounters join is keyed on. A plpgsql RETURN QUERY is plan-cached per
--- backend and switches to a GENERIC plan (one built with no parameter values at all) on
--- the 6th execution in a session, and PostgREST pools connections, so a busy backend
--- reaches that point routinely. With the shape parameters unknown, the join condition
--- below degrades from an equality join the planner can hash/merge into an OR of
--- parameter-guarded equalities it can only evaluate as a nested-loop join filter — and
--- the generic plan COSTS LESS on paper than the custom one, so plan_cache_mode = auto
--- happily adopts it. Measured on a 160k-encounter synthetic fixture: five cheap
--- ungrouped calls on one backend flip the cache to generic, after which the very next
--- group-wide monthly call takes 44,205ms instead of 437ms.
---
--- force_custom_plan makes the choice explicit: replan on every call. That is the
--- intended use of the GUC for a query whose shape depends on its parameters, and it
--- costs nothing measurable here — planning is single-digit milliseconds against
--- hundreds of milliseconds of execution, and executions 1-5 were already custom plans.
--- Keep this on every plpgsql RPC in the core_stats family (see CLAUDE.md).
-SET
-	plan_cache_mode TO 'force_custom_plan' AS $function$
+SET check_function_bodies = false;
+CREATE OR REPLACE FUNCTION public.core_stats(species_name_filter text DEFAULT NULL::text, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, ringing_group_filter bigint DEFAULT NULL::bigint, group_by_species boolean DEFAULT false, group_by_time_period text DEFAULT NULL::text, year_filter smallint DEFAULT NULL::smallint, month_filter smallint DEFAULT NULL::smallint)
+ RETURNS SETOF public.core_stats_result
+ LANGUAGE plpgsql
+ SET plan_cache_mode TO 'force_custom_plan'
+AS $function$
   BEGIN
   RETURN QUERY
   -- The final projection below is wrapped in jsonb_populate_record rather than
@@ -370,36 +346,106 @@ SET
 
 END;
 $function$;
+CREATE OR REPLACE FUNCTION public.stats_spine(species_name_filter text DEFAULT NULL::text, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, ringing_group_filter bigint DEFAULT NULL::bigint, group_by_species boolean DEFAULT false, group_by_time_period text DEFAULT NULL::text, year_filter smallint DEFAULT NULL::smallint, month_filter smallint DEFAULT NULL::smallint)
+ RETURNS TABLE(species_id bigint, species_name text, time_period date)
+ LANGUAGE sql
+ STABLE
+AS $function$
+  WITH raw_encounters AS (
+    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter, year_filter, month_filter)
+  ), species_spine AS (
+    SELECT
+      DISTINCT re.species_id, re.species_name
+    FROM raw_encounters as re
+    WHERE (species_name_filter IS NULL OR re.species_name = species_name_filter)
+    AND group_by_species
 
-GRANT ALL ON FUNCTION public.core_stats (
-	text,
-	date,
-	date,
-	bigint,
-	boolean,
-	text,
-	smallint,
-	smallint
-) TO anon;
+    UNION ALL
 
-GRANT ALL ON FUNCTION public.core_stats (
-	text,
-	date,
-	date,
-	bigint,
-	boolean,
-	text,
-	smallint,
-	smallint
-) TO authenticated;
+    SELECT NULL::bigint, NULL::text
+    WHERE NOT group_by_species
+  ), session_date_range AS (
+    -- Every session date in the query window bounds the spine, whatever its
+    -- session_type. This used to exclude 'FIELD_OBSERVATION' sessions (#874) so a
+    -- passive-resighting-only date couldn't stretch the month/year range past the
+    -- real sessions — vestigial since the session/location remodel (#1015/#1021),
+    -- which stops session_type meaningfully varying, and due to be dropped
+    -- entirely in #1024. Passive encounters are already excluded at the row level
+    -- by stats_raw_encounters' resighting-record_type filter, which is the
+    -- durable fix point.
+    SELECT
+      MIN(sess.visit_date) AS min_date,
+      MAX(sess.visit_date) AS max_date
+    FROM public."Sessions" as sess
+    WHERE (from_date IS NULL OR sess.visit_date >= from_date)
+      AND (to_date IS NULL OR sess.visit_date <= to_date)
+      AND (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
+      -- month_filter is deliberately applied here too, for consistency with
+      -- from_date/to_date/year_filter's treatment above — but note the accepted
+      -- edge case documented in CLAUDE.md: combined with group_by_time_period =
+      -- 'month' this narrows min/max to month_filter-matching dates without making
+      -- the dense month generate_series below skip non-matching months in between.
+      -- Combining year-grouping with month_filter is unaffected (year-truncation
+      -- smooths over the narrowing); day-grouping is unaffected (sparse, driven off
+      -- raw_encounters' actual distinct days).
+      AND (month_filter IS NULL OR EXTRACT(MONTH FROM sess.visit_date) = month_filter)
+  ), period_spine AS (
+    SELECT date_trunc('month', d)::date AS time_period
+    FROM session_date_range sdr,
+    LATERAL generate_series(
+      date_trunc('month', COALESCE(sdr.min_date, from_date, CURRENT_DATE))::timestamp,
+      date_trunc('month', COALESCE(sdr.max_date, to_date, CURRENT_DATE))::timestamp,
+      '1 month'::interval
+    ) d
+    WHERE group_by_time_period = 'month'
+      AND sdr.min_date IS NOT NULL
+      AND sdr.max_date IS NOT NULL
 
-GRANT ALL ON FUNCTION public.core_stats (
-	text,
-	date,
-	date,
-	bigint,
-	boolean,
-	text,
-	smallint,
-	smallint
-) TO service_role;
+    UNION ALL
+
+    SELECT date_trunc('year', d)::date AS time_period
+    FROM session_date_range sdr,
+    LATERAL generate_series(
+      date_trunc('year', COALESCE(sdr.min_date, from_date, CURRENT_DATE))::timestamp,
+      date_trunc('year', COALESCE(sdr.max_date, to_date, CURRENT_DATE))::timestamp,
+      '1 year'::interval
+    ) d
+    WHERE group_by_time_period = 'year'
+      AND sdr.min_date IS NOT NULL
+      AND sdr.max_date IS NOT NULL
+
+    UNION ALL
+
+    -- The 'day' spine is sparse: one row per distinct session date actually present
+    -- in the filtered data, unlike the dense month/year spines (which span every
+    -- period in the min..max range, including empty ones). A dense day spine would
+    -- emit a row for every calendar day in range — thousands of mostly-empty rows —
+    -- so we key off the encounter data instead, and days with no session never appear.
+    SELECT DISTINCT re.session_day AS time_period
+    FROM raw_encounters re
+    WHERE group_by_time_period = 'day'
+      AND re.session_day IS NOT NULL
+
+    UNION ALL
+
+    -- 'month-squashed' (#996): a dense, always-12-row spine — one row per
+    -- calendar month (Jan-Dec), independent of any actual session data —
+    -- unlike the month/year branches above, which are dense only within the
+    -- group's own min..max date range. Unconditional generate_series(1, 12),
+    -- deliberately not gated on session_date_range like the branches above, so
+    -- the mode returns all 12 months even when the group's history only spans
+    -- one calendar month across every year. Dates use the same 2000-<mm>-01
+    -- sentinel-year convention as stats_raw_encounters.session_month_squashed.
+    SELECT make_date(2000, m, 1) AS time_period
+    FROM generate_series(1, 12) AS m
+    WHERE group_by_time_period = 'month-squashed'
+
+    UNION ALL
+
+    SELECT NULL::date
+    WHERE group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day', 'month-squashed')
+  )
+  SELECT s.species_id, s.species_name, p.time_period
+  FROM species_spine s
+  CROSS JOIN period_spine p;
+$function$;

@@ -9,8 +9,11 @@
  *   resighting type (public.resighting_record_type: U/F/D) via the LEFT JOIN's ON
  *   clause, preserving NULL-preserving semantics (a bird with only resightings still
  *   appears with encounter_id IS NULL rather than vanishing).
- * - stats_spine's session_date_range excludes FIELD_OBSERVATION sessions so their
- *   dates no longer stretch the month/year spine.
+ * - stats_spine's session_date_range bounds the month/year spine by every session
+ *   date in the window, whatever its session_type. It used to exclude
+ *   FIELD_OBSERVATION sessions; that exclusion was dropped in #1021 ahead of the
+ *   column itself going away in #1024, leaving stats_raw_encounters' row-level
+ *   resighting-record_type filter as the single fix point for passive data.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -176,7 +179,7 @@ describe('stats_raw_encounters — resighting exclusion', () => {
 	});
 });
 
-describe('stats_spine — FIELD_OBSERVATION session exclusion from date range', () => {
+describe('stats_spine — session date range spans every session_type', () => {
 	let deltaId: number;
 	let deltaClient: SupabaseClient;
 
@@ -186,11 +189,11 @@ describe('stats_spine — FIELD_OBSERVATION session exclusion from date range', 
 	// Two independent years so the two windows never overlap each other's sessions.
 	// session_date_range is not group-filtered, so tight per-year windows are what
 	// isolate each assertion from the rest of the shared Sessions table.
-	const yrExclude = 2080 + Math.floor(Math.random() * 18); // 2080–2097
-	const yrShared = yrExclude + 1;
+	const yrMixed = 2080 + Math.floor(Math.random() * 18); // 2080–2097
+	const yrShared = yrMixed + 1;
 
-	const fullGrownDate = `${yrExclude}-03-15`;
-	const fieldObsDate = `${yrExclude}-09-15`;
+	const fullGrownDate = `${yrMixed}-03-15`;
+	const fieldObsDate = `${yrMixed}-09-15`;
 	const sharedDate = `${yrShared}-06-10`;
 
 	beforeAll(async () => {
@@ -218,8 +221,8 @@ describe('stats_spine — FIELD_OBSERVATION session exclusion from date range', 
 			sessionIds.push(sessionId);
 		}
 
-		// Exclusion year: a FULL_GROWN session in March and a lone FIELD_OBSERVATION
-		// session in September (the later, spine-stretching one under the old bug).
+		// Mixed year: a FULL_GROWN session in March and a lone FIELD_OBSERVATION
+		// session in September (the later of the two, so it alone decides max_date).
 		await makeSession(fullGrownDate, 'FULL_GROWN');
 		await makeSession(fieldObsDate, 'FIELD_OBSERVATION');
 
@@ -237,24 +240,28 @@ describe('stats_spine — FIELD_OBSERVATION session exclusion from date range', 
 		);
 	});
 
-	// Usual — the bug scenario
-	it('a FIELD_OBSERVATION-only session outside the range of any FULL_GROWN/PULLI session does not extend the month/year spine', async () => {
+	// Usual — a non-FULL_GROWN session bounds the spine like any other (#1021)
+	it('a FIELD_OBSERVATION-only session beyond the last FULL_GROWN session extends the month spine out to its own month', async () => {
 		const { data, error } = await deltaClient.rpc('stats_spine', {
 			ringing_group_filter: deltaId,
-			from_date: `${yrExclude}-01-01`,
-			to_date: `${yrExclude}-12-31`,
+			from_date: `${yrMixed}-01-01`,
+			to_date: `${yrMixed}-12-31`,
 			group_by_time_period: 'month'
 		});
 		expect(error).toBeNull();
 		const months = data!.map((r) => r.time_period);
-		// The FULL_GROWN March session bounds the spine; September's field-obs session
-		// must not stretch it out to September.
-		expect(months).toContain(`${yrExclude}-03-01`);
-		expect(months).not.toContain(`${yrExclude}-09-01`);
+		// March (FULL_GROWN) is min_date and September (FIELD_OBSERVATION) is now
+		// max_date, so the dense month spine covers every month between the two.
+		expect(months).toContain(`${yrMixed}-03-01`);
+		expect(months).toContain(`${yrMixed}-09-01`);
+		// Dense between the bounds, and nothing outside them.
+		expect(months).toContain(`${yrMixed}-06-01`);
+		expect(months).not.toContain(`${yrMixed}-01-01`);
+		expect(months).not.toContain(`${yrMixed}-10-01`);
 	});
 
-	// Edge — don't over-exclude
-	it('a FIELD_OBSERVATION session sharing a date with a real session does not remove that date from the spine', async () => {
+	// Edge — two session rows on one date still contribute one date
+	it('a FIELD_OBSERVATION session sharing a date with a FULL_GROWN session keeps that date in the spine exactly once', async () => {
 		const { data, error } = await deltaClient.rpc('stats_spine', {
 			ringing_group_filter: deltaId,
 			from_date: `${yrShared}-06-01`,
@@ -263,8 +270,9 @@ describe('stats_spine — FIELD_OBSERVATION session exclusion from date range', 
 		});
 		expect(error).toBeNull();
 		const months = data!.map((r) => r.time_period);
-		// The real FULL_GROWN session on that date keeps June in the spine.
-		expect(months).toContain(`${yrShared}-06-01`);
+		// Two Sessions rows share the date; the spine is keyed on the date, so June
+		// appears once rather than twice.
+		expect(months).toEqual([`${yrShared}-06-01`]);
 	});
 });
 
