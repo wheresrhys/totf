@@ -13,6 +13,7 @@ import {
 import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { calculateSessionChronology } from '@/app/lib/session-chronology';
+import { isMistNetEncounter } from '@/app/models/encounter';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type PageParams = {
@@ -147,6 +148,17 @@ export function SessionPageContent({
 	viewedGroup: ViewedGroup;
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
+	// Mist-netting vs Other catches (#1022): anything else non-resighting
+	// (already excluded by this page's own fetch, see
+	// RESIGHTING_RECORD_TYPES_FILTER_LIST in page.tsx) that isn't mist-netted
+	// — see isMistNetEncounter — counts as an "other catch": hand-caught, box
+	// trap, etc.
+	const mistNetSpeciesList = groupBySpecies(
+		dayData.encounters.filter(isMistNetEncounter)
+	);
+	const otherCatchesSpeciesList = groupBySpecies(
+		dayData.encounters.filter((encounter) => !isMistNetEncounter(encounter))
+	);
 	const chronology = calculateSessionChronology(dayData.encounters);
 	const oldestEncounter = findOldestEncounter(dayData.encounters);
 
@@ -176,7 +188,8 @@ export function SessionPageContent({
 			<Locations locations={dayData.locations} />
 
 			<SessionTabs
-				speciesList={speciesList}
+				mistNetSpeciesList={mistNetSpeciesList}
+				otherCatchesSpeciesList={otherCatchesSpeciesList}
 				netRounds={chronology.netRounds}
 				date={date}
 				viewedGroupId={viewedGroup.id}

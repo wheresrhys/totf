@@ -76,6 +76,7 @@ async function fetchDayEncounters(
 			age_code,
 			is_juv,
 			breeding_condition,
+			capture_method,
 			capture_time,
 			fat,
 			moult_code,

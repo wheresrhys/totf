@@ -1,4 +1,5 @@
 import type { SessionEncounter } from '../models/session';
+import { isMistNetEncounter } from '../models/encounter';
 
 // Matches SQL: GREATEST(MAX(capture_time) - MIN(capture_time), '02:00:00') in core_stats RPC.
 // That 2h floor applies to effort calculations only — display uses actual duration.
@@ -23,10 +24,14 @@ function timeToMinutes(time: string): number {
 	return h * 60 + m;
 }
 
+// Net rounds are a mist-netting concept — a non-mist-net catch (hand-caught,
+// box trap, etc, #1022) isn't checked on a round schedule, so it's excluded
+// from the chronology before any of the grouping below runs.
 export function calculateSessionChronology(
 	encounters: SessionEncounter[]
 ): SessionChronology {
-	const timedEncounters = encounters.filter((e) => e.capture_time);
+	const mistNetEncounters = encounters.filter(isMistNetEncounter);
+	const timedEncounters = mistNetEncounters.filter((e) => e.capture_time);
 
 	if (timedEncounters.length === 0) {
 		return {

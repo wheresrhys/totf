@@ -7,13 +7,15 @@ import type { SessionEncounter } from '../../models/session';
 
 function makeEncounter(
 	id: number,
-	capture_time: string | null
+	capture_time: string | null,
+	capture_method: string | null = 'M'
 ): SessionEncounter {
 	return {
 		id,
 		session_id: 1,
 		age_code: 4,
 		breeding_condition: null,
+		capture_method,
 		capture_time,
 		moult_code: null,
 		record_type: 'N',
@@ -30,6 +32,37 @@ function makeEncounter(
 }
 
 describe('calculateSessionChronology', () => {
+	describe('filtering to mist-net encounters', () => {
+		it('excludes a non-mist-net (capture_method != "M") encounter from the chronology entirely', () => {
+			const result = calculateSessionChronology([
+				makeEncounter(1, '09:00:00', 'M'),
+				makeEncounter(2, '09:05:00', 'C')
+			]);
+			expect(result.netRounds).toHaveLength(1);
+			expect(result.netRounds[0].encounters).toHaveLength(1);
+			expect(result.netRounds[0].encounters[0].id).toBe(1);
+		});
+
+		it('returns nulls/empty when every encounter is non-mist-net', () => {
+			const result = calculateSessionChronology([
+				makeEncounter(1, '09:00:00', 'C')
+			]);
+			expect(result).toEqual({
+				startTime: null,
+				endTime: null,
+				durationMinutes: null,
+				netRounds: []
+			});
+		});
+
+		it('treats a null capture_method as mist-net (unset defaults to the historical norm, #1022)', () => {
+			const result = calculateSessionChronology([
+				makeEncounter(1, '09:00:00', null)
+			]);
+			expect(result.netRounds).toHaveLength(1);
+		});
+	});
+
 	it('returns nulls for empty encounters', () => {
 		const result = calculateSessionChronology([]);
 		expect(result).toEqual({
