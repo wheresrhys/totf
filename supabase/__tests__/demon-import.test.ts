@@ -166,7 +166,7 @@ const suffix = randomTestSuffix();
 function cleanupAll() {
 	psql(
 		`DELETE FROM "Encounters" WHERE bird_id IN (SELECT id FROM "Birds" WHERE ring_no LIKE 'DEMON-TEST-${suffix}-%');` +
-			`DELETE FROM "Sessions" WHERE location_id IN (SELECT id FROM "Locations" WHERE location_name LIKE 'DemonImportLoc-${suffix}-%');` +
+			`DELETE FROM "Sessions" WHERE ringing_group_id IN (SELECT id FROM "RingingGroups" WHERE group_name LIKE 'demon-import-${suffix}-%');` +
 			`DELETE FROM "Birds" WHERE ring_no LIKE 'DEMON-TEST-${suffix}-%';` +
 			`DELETE FROM "Locations" WHERE location_name LIKE 'DemonImportLoc-${suffix}-%';` +
 			`DELETE FROM "Species" WHERE species_name LIKE 'DemonImportSpecies-${suffix}-%';` +
@@ -387,7 +387,11 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 	});
 });
 
-describe('demon-import — Sessions uniqueness (visit_date, location_id, session_type)', () => {
+// #1024 rewrote the Sessions upsert key from (visit_date, location_id,
+// session_type) to (visit_date, ringing_group_id), so three of the four
+// scenarios this block used to assert "creates separate Session rows" for now
+// correctly reuse one row. Only a different visit_date still separates them.
+describe('demon-import — Sessions uniqueness (visit_date, ringing_group_id)', () => {
 	let groupId: number;
 	let groupClient: SupabaseClient;
 	let locationName: string;
@@ -400,164 +404,118 @@ describe('demon-import — Sessions uniqueness (visit_date, location_id, session
 		lookupRingSequence = vi.fn().mockResolvedValue(null);
 	});
 
-	it('upserting rows with the same visit_date/location but different session_type creates separate Session rows', async () => {
-		const upsert = createUpserter(groupClient);
+	/** Sessions this group holds for the given date(s). */
+	function sessionCount(...visitDates: string[]): number {
+		const dateList = visitDates.map((date) => `'${date}'`).join(', ');
+		return psqlCount(
+			`SELECT COUNT(*) FROM "Sessions" WHERE ringing_group_id = ${groupId} AND visit_date IN (${dateList});`
+		);
+	}
+
+	/** Imports one CSV row for this group, labelled so rows never collide. */
+	async function importRow(
+		label: string,
+		fields: { loc_id: string; visit_date: string; record_type: string; age: string }
+	): Promise<void> {
+		await processEncounterRow(
+			makeRow({
+				ring_no: `DEMON-TEST-${suffix}-${label}`,
+				species_name: `DemonImportSpecies-${suffix}-${label}`,
+				...fields
+			}),
+			createUpserter(groupClient),
+			lookupRingSequence,
+			groupId
+		);
+	}
+
+	it('reuses one Session row for two rows on the same date at the same location', async () => {
 		const visitDate = randomFutureDate();
+		await importRow('session-same-1', {
+			loc_id: locationName,
+			visit_date: toDemonDate(visitDate),
+			record_type: 'N',
+			age: '5'
+		});
+		await importRow('session-same-2', {
+			loc_id: locationName,
+			visit_date: toDemonDate(visitDate),
+			record_type: 'N',
+			age: '6'
+		});
 
-		// record_type 'N' + age 5 buckets as FULL_GROWN; record_type 'U' (resighting)
-		// buckets as FIELD_OBSERVATION regardless of age — see processEncounterRow.
-		await processEncounterRow(
-			makeRow({
-				ring_no: `DEMON-TEST-${suffix}-session-type-fg`,
-				species_name: `DemonImportSpecies-${suffix}-session-type-fg`,
-				loc_id: locationName,
-				visit_date: toDemonDate(visitDate),
-				record_type: 'N',
-				age: '5'
-			}),
-			upsert,
-			lookupRingSequence,
-			groupId
-		);
-		await processEncounterRow(
-			makeRow({
-				ring_no: `DEMON-TEST-${suffix}-session-type-fo`,
-				species_name: `DemonImportSpecies-${suffix}-session-type-fo`,
-				loc_id: locationName,
-				visit_date: toDemonDate(visitDate),
-				record_type: 'U',
-				age: '5'
-			}),
-			upsert,
-			lookupRingSequence,
-			groupId
-		);
-
-		expect(
-			psqlCount(
-				`SELECT COUNT(*) FROM "Sessions" s JOIN "Locations" l ON l.id = s.location_id WHERE l.location_name = '${locationName}' AND s.visit_date = '${visitDate}';`
-			)
-		).toBe(2);
+		expect(sessionCount(visitDate)).toBe(1);
 	});
 
-	it('upserting rows with the same visit_date/location/session_type reuses the same Session row', async () => {
-		const upsert = createUpserter(groupClient);
+	// Used to create two Sessions, one FULL_GROWN and one FIELD_OBSERVATION —
+	// record_type 'N' + age 5 bucketed as the former, resighting type 'U' as the
+	// latter. There is no session_type to split them on any more.
+	it('reuses one Session row whatever the rows’ record_type and age', async () => {
 		const visitDate = randomFutureDate();
+		await importRow('session-type-fg', {
+			loc_id: locationName,
+			visit_date: toDemonDate(visitDate),
+			record_type: 'N',
+			age: '5'
+		});
+		await importRow('session-type-fo', {
+			loc_id: locationName,
+			visit_date: toDemonDate(visitDate),
+			record_type: 'U',
+			age: '5'
+		});
 
-		await processEncounterRow(
-			makeRow({
-				ring_no: `DEMON-TEST-${suffix}-session-same-1`,
-				species_name: `DemonImportSpecies-${suffix}-session-same-1`,
-				loc_id: locationName,
-				visit_date: toDemonDate(visitDate),
-				record_type: 'N',
-				age: '5'
-			}),
-			upsert,
-			lookupRingSequence,
-			groupId
-		);
-		await processEncounterRow(
-			makeRow({
-				ring_no: `DEMON-TEST-${suffix}-session-same-2`,
-				species_name: `DemonImportSpecies-${suffix}-session-same-2`,
-				loc_id: locationName,
-				visit_date: toDemonDate(visitDate),
-				record_type: 'N',
-				age: '6'
-			}),
-			upsert,
-			lookupRingSequence,
-			groupId
-		);
-
-		expect(
-			psqlCount(
-				`SELECT COUNT(*) FROM "Sessions" s JOIN "Locations" l ON l.id = s.location_id WHERE l.location_name = '${locationName}' AND s.visit_date = '${visitDate}' AND s.session_type = 'FULL_GROWN';`
-			)
-		).toBe(1);
+		expect(sessionCount(visitDate)).toBe(1);
 	});
 
-	it('upserting rows with the same location/session_type but a different visit_date creates separate Session rows', async () => {
-		const upsert = createUpserter(groupClient);
-		const firstVisitDate = randomFutureDate();
-		const secondVisitDate = addDays(firstVisitDate, 1);
-
-		await processEncounterRow(
-			makeRow({
-				ring_no: `DEMON-TEST-${suffix}-session-date-1`,
-				species_name: `DemonImportSpecies-${suffix}-session-date-1`,
-				loc_id: locationName,
-				visit_date: toDemonDate(firstVisitDate),
-				record_type: 'N',
-				age: '5'
-			}),
-			upsert,
-			lookupRingSequence,
-			groupId
-		);
-		await processEncounterRow(
-			makeRow({
-				ring_no: `DEMON-TEST-${suffix}-session-date-2`,
-				species_name: `DemonImportSpecies-${suffix}-session-date-2`,
-				loc_id: locationName,
-				visit_date: toDemonDate(secondVisitDate),
-				record_type: 'N',
-				age: '5'
-			}),
-			upsert,
-			lookupRingSequence,
-			groupId
-		);
-
-		expect(
-			psqlCount(
-				`SELECT COUNT(*) FROM "Sessions" s JOIN "Locations" l ON l.id = s.location_id WHERE l.location_name = '${locationName}' AND s.visit_date IN ('${firstVisitDate}', '${secondVisitDate}') AND s.session_type = 'FULL_GROWN';`
-			)
-		).toBe(2);
-	});
-
-	it('upserting rows with the same visit_date/session_type but a different location creates separate Session rows', async () => {
-		const upsert = createUpserter(groupClient);
+	// Also used to create two Sessions. The per-location distinction now lives on
+	// the Encounters rows, which is what the assertion checks for instead — losing
+	// it is exactly what the Encounters uniqueness repoint guards against.
+	it('reuses one Session row across two locations visited on the same date, with each encounter keeping its own location', async () => {
 		const visitDate = randomFutureDate();
 		const otherLocationName = `DemonImportLoc-${suffix}-sessions-other-location`;
+		await importRow('session-location-1', {
+			loc_id: locationName,
+			visit_date: toDemonDate(visitDate),
+			record_type: 'N',
+			age: '5'
+		});
+		await importRow('session-location-2', {
+			loc_id: otherLocationName,
+			visit_date: toDemonDate(visitDate),
+			record_type: 'N',
+			age: '5'
+		});
 
-		await processEncounterRow(
-			makeRow({
-				ring_no: `DEMON-TEST-${suffix}-session-location-1`,
-				species_name: `DemonImportSpecies-${suffix}-session-location-1`,
-				loc_id: locationName,
-				visit_date: toDemonDate(visitDate),
-				record_type: 'N',
-				age: '5'
-			}),
-			upsert,
-			lookupRingSequence,
-			groupId
-		);
-		await processEncounterRow(
-			makeRow({
-				ring_no: `DEMON-TEST-${suffix}-session-location-2`,
-				species_name: `DemonImportSpecies-${suffix}-session-location-2`,
-				loc_id: otherLocationName,
-				visit_date: toDemonDate(visitDate),
-				record_type: 'N',
-				age: '5'
-			}),
-			upsert,
-			lookupRingSequence,
-			groupId
-		);
-
+		expect(sessionCount(visitDate)).toBe(1);
 		expect(
 			psqlCount(
-				`SELECT COUNT(*) FROM "Sessions" s JOIN "Locations" l ON l.id = s.location_id WHERE l.location_name IN ('${locationName}', '${otherLocationName}') AND s.visit_date = '${visitDate}' AND s.session_type = 'FULL_GROWN';`
+				`SELECT COUNT(DISTINCT e.location_id) FROM "Encounters" e WHERE e.ringing_group_id = ${groupId} AND e.visit_date = '${visitDate}';`
 			)
 		).toBe(2);
+	});
+
+	it('creates separate Session rows for two different visit_dates', async () => {
+		const firstVisitDate = randomFutureDate();
+		const secondVisitDate = addDays(firstVisitDate, 1);
+		await importRow('session-date-1', {
+			loc_id: locationName,
+			visit_date: toDemonDate(firstVisitDate),
+			record_type: 'N',
+			age: '5'
+		});
+		await importRow('session-date-2', {
+			loc_id: locationName,
+			visit_date: toDemonDate(secondVisitDate),
+			record_type: 'N',
+			age: '5'
+		});
+
+		expect(sessionCount(firstVisitDate, secondVisitDate)).toBe(2);
 	});
 });
 
-describe('demon-import — Encounters uniqueness (bird_id, session_id)', () => {
+describe('demon-import — Encounters uniqueness (bird_id, location_id, visit_date)', () => {
 	let groupId: number;
 	let groupClient: SupabaseClient;
 	let locationName: string;
@@ -600,7 +558,48 @@ describe('demon-import — Encounters uniqueness (bird_id, session_id)', () => {
 		expect(Number(weight)).toBeCloseTo(12.3);
 	});
 
-	it('processing the same bird on a different session (near-duplicate) creates a new Encounters row', async () => {
+	// The case the repointed key exists for: before #1024 these two rows landed in
+	// two Sessions (different location_id) and so had two distinct (bird_id,
+	// session_id) keys. They now share one Session, and only the encounter's own
+	// location_id keeps them apart — on the old key the second row would have
+	// overwritten the first.
+	it('processing the same bird on the same date at two different locations creates two Encounters rows', async () => {
+		const upsert = createUpserter(groupClient);
+		const ringNo = `DEMON-TEST-${suffix}-encounter-two-locations`;
+		const speciesName = `DemonImportSpecies-${suffix}-encounter-two-locations`;
+		const visitDate = randomFutureDate();
+
+		await processEncounterRow(
+			makeRow({
+				ring_no: ringNo,
+				species_name: speciesName,
+				loc_id: locationName,
+				visit_date: toDemonDate(visitDate)
+			}),
+			upsert,
+			lookupRingSequence,
+			groupId
+		);
+		await processEncounterRow(
+			makeRow({
+				ring_no: ringNo,
+				species_name: speciesName,
+				loc_id: `DemonImportLoc-${suffix}-encounters-second-site`,
+				visit_date: toDemonDate(visitDate)
+			}),
+			upsert,
+			lookupRingSequence,
+			groupId
+		);
+
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
+			)
+		).toBe(2);
+	});
+
+	it('processing the same bird on a different date (near-duplicate) creates a new Encounters row', async () => {
 		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-encounter-near-dup`;
 		const speciesName = `DemonImportSpecies-${suffix}-encounter-near-dup`;

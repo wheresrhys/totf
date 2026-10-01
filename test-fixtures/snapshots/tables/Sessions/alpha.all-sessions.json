@@ -31,16 +31,7 @@
     "visit_date": "2023-05-12",
     "encounters": [
       {
-        "count": 10
-      }
-    ]
-  },
-  {
-    "id": 61,
-    "visit_date": "2023-05-12",
-    "encounters": [
-      {
-        "count": 1
+        "count": 11
       }
     ]
   },
@@ -99,20 +90,11 @@
     ]
   },
   {
-    "id": 4,
-    "visit_date": "2022-04-30",
-    "encounters": [
-      {
-        "count": 1
-      }
-    ]
-  },
-  {
     "id": 2,
     "visit_date": "2022-04-30",
     "encounters": [
       {
-        "count": 10
+        "count": 11
       }
     ]
   },

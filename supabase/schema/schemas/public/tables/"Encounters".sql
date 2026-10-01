@@ -54,9 +54,13 @@ EXECUTE FUNCTION public.trg_encounters_refresh_bird_proven_age ();
 CREATE TRIGGER trigger_trg_remove_bird_ringing_group_id BEFORE DELETE ON public."Encounters" FOR EACH ROW
 EXECUTE FUNCTION public.trg_remove_bird_ringing_group_id ();
 
+-- Watches location_id/visit_date rather than session_id (#1024): those are the
+-- columns the function now derives ringing_group_id/max_hatch_year/
+-- min_hatch_year and Birds.last_encountered_timestamp from.
 CREATE TRIGGER trigger_trg_set_encounter_generated_fields BEFORE INSERT
 OR
-UPDATE OF session_id,
+UPDATE OF location_id,
+visit_date,
 capture_time ON public."Encounters" FOR EACH ROW
 EXECUTE FUNCTION public.trg_set_encounter_generated_fields ();
 
@@ -138,8 +142,24 @@ ADD CONSTRAINT "Encounters_pkey" PRIMARY KEY (id);
 ALTER TABLE public."Encounters"
 ADD CONSTRAINT encounters_bird_id_fkey FOREIGN KEY (bird_id) REFERENCES public."Birds" (id);
 
+-- Repointed off (bird_id, session_id) in #1024. A Session is now one row per
+-- (ringing_group_id, visit_date), so keying on session_id would have silently
+-- weakened to "one encounter per bird per group per day" — collapsing a bird
+-- genuinely caught at two different sites on one day into a single row on
+-- import. Keying on the encounter's own location_id/visit_date preserves
+-- exactly what (bird_id, session_id) used to mean when a Session was
+-- (date, location, type), minus the session_type axis that no longer exists.
+--
+-- NOTE: #1024's body specified this as UNIQUE (bird_id, location_id). That is
+-- a two-column key with no date in it, so it would have rejected every retrap
+-- of a bird at a site it had been caught at before — the central case this app
+-- exists to record. Probed against the seeded local DB it collided on 5
+-- bird/location pairs and would have discarded 10 of 64 encounters. visit_date
+-- is therefore kept in the key, matching the (bird_id, visit_date, location_id)
+-- shape the ticket's own prior-investigation comment proposed and the only
+-- shape its "0 existing collisions" measurement is true of.
 ALTER TABLE public."Encounters"
-ADD CONSTRAINT encounters_bird_id_session_id_unique UNIQUE (bird_id, session_id);
+ADD CONSTRAINT encounters_bird_id_location_id_visit_date_unique UNIQUE (bird_id, location_id, visit_date);
 
 ALTER TABLE public."Encounters"
 ADD CONSTRAINT encounters_location_id_fkey FOREIGN KEY (location_id) REFERENCES public."Locations" (id);

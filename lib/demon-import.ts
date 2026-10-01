@@ -11,10 +11,11 @@ type EncountersInsert = Omit<
 	Database['public']['Tables']['Encounters']['Insert'],
 	'ringing_group_id' | 'max_hatch_year' | 'min_hatch_year'
 >;
-type SessionsInsert = Omit<
-	Database['public']['Tables']['Sessions']['Insert'],
-	'ringing_group_id'
->;
+// Unlike the Encounters/Birds inserts above, nothing is omitted here: Sessions'
+// ringing_group_id used to be derived by the trg_set_session_generated_fields
+// trigger from Sessions.location_id, and #1024 dropped both, so the import
+// writes it itself.
+type SessionsInsert = Database['public']['Tables']['Sessions']['Insert'];
 type LocationsInsert = Database['public']['Tables']['Locations']['Insert'];
 type RingSequencesBirdsInsert =
 	Database['public']['Tables']['RingSequences_Birds']['Insert'];
@@ -316,33 +317,30 @@ export async function processEncounterRow(
 
 	const visitDate = convertDateFormat(row.visit_date as string);
 
-	// Parse the age code once, up front — it feeds both the session-type decision
-	// and the Encounters insert below.
 	const age_code = Number(String(row.age).replace('J', ''));
 	const is_juv = String(row.age).endsWith('J');
 
-	// A row's own record_type/age deterministically picks its session bucket
-	// (no cross-row aggregation, no import-order sensitivity). record_type wins
-	// over age: a resighting/recovery of a pulli-age bird is still a
-	// FIELD_OBSERVATION, not a PULLI capture. A raw age of 1 (but not 1J) is a
-	// pulli; is_juv guards against a recently-fledged juvenile being mistaken
-	// for a nestling.
-	const sessionType = (RESIGHTING_RECORD_TYPES as readonly string[]).includes(
-		row.record_type as string
-	)
-		? 'FIELD_OBSERVATION'
-		: age_code === 1 && !is_juv
-			? 'PULLI'
-			: 'FULL_GROWN';
-
+	// One Session per group per date (#1024). It used to be one per
+	// (visit_date, location_id, session_type), where session_type bucketed the row
+	// as FULL_GROWN / PULLI / FIELD_OBSERVATION from its own record_type and age —
+	// so a group visiting two sites on one day, or ringing both nestlings and
+	// full-grown birds at one site, produced several Session rows for the same day.
+	// All three of those axes now live on the Encounters rows themselves
+	// (location_id/visit_date per #1015, record_type/age_code/is_juv as always), and
+	// every read path derives what it needs from there, so a Session is just the
+	// group-day the encounters hang off.
+	//
+	// ringing_group_id is written explicitly: it used to be derived by the
+	// trg_set_session_generated_fields trigger via a Locations lookup on
+	// Sessions.location_id, and #1024 retires that trigger along with the column it
+	// looked up.
 	const sessionId = await upsert<SessionsInsert>(
 		'Sessions',
 		{
 			visit_date: visitDate,
-			location_id: locationId,
-			session_type: sessionType
+			ringing_group_id: ringingGroupId
 		},
-		['visit_date', 'location_id', 'session_type'] as (keyof SessionsInsert)[]
+		['visit_date', 'ringing_group_id'] as (keyof SessionsInsert)[]
 	);
 
 	await upsert<EncountersInsert>(
@@ -366,10 +364,9 @@ export async function processEncounterRow(
 			bird_id: birdId,
 			session_id: sessionId,
 			// Every encounter carries its own location/date, independent of the
-			// Session it is linked to (#1015). Both come from the same values the
-			// Sessions upsert above uses, so they always agree today — the point is
-			// that a future resighting row can stop needing a Session at all (#1024)
-			// without losing where/when it happened.
+			// Session it is linked to (#1015) — and since #1024 collapsed Sessions to
+			// one row per group-day, these are the only place the per-encounter
+			// location survives.
 			location_id: locationId,
 			visit_date: visitDate,
 			scheme: row.scheme as string,
@@ -379,7 +376,14 @@ export async function processEncounterRow(
 			weight: row.weight ? Number(row.weight) : null,
 			wing_length: row.wing_length ? Number(row.wing_length) : null
 		},
-		['bird_id', 'session_id'] as (keyof EncountersInsert)[]
+		// Follows encounters_bird_id_location_id_visit_date_unique, repointed off
+		// (bird_id, session_id) in #1024. A session_id key would now mean "one
+		// encounter per bird per group per day", silently merging a bird caught at
+		// two sites on one day; (bird_id, location_id, visit_date) is what
+		// (bird_id, session_id) actually meant while a Session was (date, location,
+		// type), so re-importing the same row still updates in place rather than
+		// inserting a duplicate.
+		['bird_id', 'location_id', 'visit_date'] as (keyof EncountersInsert)[]
 	);
 
 	return { visitDate };

@@ -10,10 +10,10 @@
  *   clause, preserving NULL-preserving semantics (a bird with only resightings still
  *   appears with encounter_id IS NULL rather than vanishing).
  * - stats_spine's session_date_range bounds the month/year spine by every session
- *   date in the window, whatever its session_type. It used to exclude
- *   FIELD_OBSERVATION sessions; that exclusion was dropped in #1021 ahead of the
- *   column itself going away in #1024, leaving stats_raw_encounters' row-level
- *   resighting-record_type filter as the single fix point for passive data.
+ *   date in the window. It used to exclude FIELD_OBSERVATION sessions; that
+ *   exclusion was dropped in #1021 and the session_type column itself in #1024,
+ *   leaving stats_raw_encounters' row-level resighting-record_type filter as the
+ *   single fix point for passive data.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -179,7 +179,7 @@ describe('stats_raw_encounters — resighting exclusion', () => {
 	});
 });
 
-describe('stats_spine — session date range spans every session_type', () => {
+describe('stats_spine — session date range spans every session date', () => {
 	let deltaId: number;
 	let deltaClient: SupabaseClient;
 
@@ -192,9 +192,14 @@ describe('stats_spine — session date range spans every session_type', () => {
 	const yrMixed = 2080 + Math.floor(Math.random() * 18); // 2080–2097
 	const yrShared = yrMixed + 1;
 
-	const fullGrownDate = `${yrMixed}-03-15`;
-	const fieldObsDate = `${yrMixed}-09-15`;
+	const earlyDate = `${yrMixed}-03-15`;
+	const lateDate = `${yrMixed}-09-15`;
 	const sharedDate = `${yrShared}-06-10`;
+
+	// Set by beforeAll: the two ids `insertTestSession` returned for the same
+	// group-day, asserted on below.
+	let firstSharedDateSessionId: number;
+	let secondSharedDateSessionId: number;
 
 	beforeAll(async () => {
 		deltaId = await getGroupIdByName('Delta');
@@ -207,29 +212,39 @@ describe('stats_spine — session date range spans every session_type', () => {
 			`Spine Loc ${suffix}`
 		);
 		locationIds.push(locationId);
+		const secondLocationId = await insertTestLocation(
+			deltaClient,
+			deltaId,
+			`Spine Loc 2 ${suffix}`
+		);
+		locationIds.push(secondLocationId);
 
 		async function makeSession(
 			date: string,
-			sessionType: 'FULL_GROWN' | 'FIELD_OBSERVATION'
-		): Promise<void> {
+			atLocationId = locationId
+		): Promise<number> {
 			const sessionId = await insertTestSession(
 				deltaClient,
-				locationId,
-				date,
-				sessionType
+				atLocationId,
+				date
 			);
 			sessionIds.push(sessionId);
+			return sessionId;
 		}
 
-		// Mixed year: a FULL_GROWN session in March and a lone FIELD_OBSERVATION
-		// session in September (the later of the two, so it alone decides max_date).
-		await makeSession(fullGrownDate, 'FULL_GROWN');
-		await makeSession(fieldObsDate, 'FIELD_OBSERVATION');
+		// Two sessions a year apart from each other's bounds: March and September,
+		// the later of the two alone deciding max_date. These used to be a
+		// FULL_GROWN and a FIELD_OBSERVATION session respectively, to show that a
+		// non-FULL_GROWN session bounds the spine like any other (#1021); with
+		// session_type gone entirely (#1024) they are simply two session dates.
+		await makeSession(earlyDate);
+		await makeSession(lateDate);
 
-		// Shared-date year: a FULL_GROWN and a FIELD_OBSERVATION on the same date
-		// (allowed — the unique key includes session_type).
-		await makeSession(sharedDate, 'FULL_GROWN');
-		await makeSession(sharedDate, 'FIELD_OBSERVATION');
+		// Shared-date year: two visits to two different locations on one date.
+		// Before #1024 that was two Sessions rows (the unique key included
+		// location_id and session_type); it is now one.
+		firstSharedDateSessionId = await makeSession(sharedDate);
+		secondSharedDateSessionId = await makeSession(sharedDate, secondLocationId);
 	});
 
 	afterAll(() => {
@@ -240,8 +255,8 @@ describe('stats_spine — session date range spans every session_type', () => {
 		);
 	});
 
-	// Usual — a non-FULL_GROWN session bounds the spine like any other (#1021)
-	it('a FIELD_OBSERVATION-only session beyond the last FULL_GROWN session extends the month spine out to its own month', async () => {
+	// Usual — the outermost session dates bound the spine, densely filled between
+	it('the latest session date extends the month spine out to its own month', async () => {
 		const { data, error } = await deltaClient.rpc('stats_spine', {
 			ringing_group_filter: deltaId,
 			from_date: `${yrMixed}-01-01`,
@@ -250,8 +265,8 @@ describe('stats_spine — session date range spans every session_type', () => {
 		});
 		expect(error).toBeNull();
 		const months = data!.map((r) => r.time_period);
-		// March (FULL_GROWN) is min_date and September (FIELD_OBSERVATION) is now
-		// max_date, so the dense month spine covers every month between the two.
+		// March is min_date and September max_date, so the dense month spine covers
+		// every month between the two.
 		expect(months).toContain(`${yrMixed}-03-01`);
 		expect(months).toContain(`${yrMixed}-09-01`);
 		// Dense between the bounds, and nothing outside them.
@@ -260,8 +275,12 @@ describe('stats_spine — session date range spans every session_type', () => {
 		expect(months).not.toContain(`${yrMixed}-10-01`);
 	});
 
-	// Edge — two session rows on one date still contribute one date
-	it('a FIELD_OBSERVATION session sharing a date with a FULL_GROWN session keeps that date in the spine exactly once', async () => {
+	// Edge — a group-day is one session however many locations it covers
+	it('two visits to different locations on one date resolve to a single Session row', () => {
+		expect(secondSharedDateSessionId).toBe(firstSharedDateSessionId);
+	});
+
+	it('a date visited twice appears in the spine exactly once', async () => {
 		const { data, error } = await deltaClient.rpc('stats_spine', {
 			ringing_group_filter: deltaId,
 			from_date: `${yrShared}-06-01`,
@@ -270,8 +289,6 @@ describe('stats_spine — session date range spans every session_type', () => {
 		});
 		expect(error).toBeNull();
 		const months = data!.map((r) => r.time_period);
-		// Two Sessions rows share the date; the spine is keyed on the date, so June
-		// appears once rather than twice.
 		expect(months).toEqual([`${yrShared}-06-01`]);
 	});
 });

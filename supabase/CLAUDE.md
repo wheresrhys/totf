@@ -14,22 +14,38 @@ Tables (PascalCase in Postgres, matching generated TypeScript types in `types/su
 | `RingingGroups` | The "users" — ringing organisations |
 | `Birds` | Individual birds identified by ring number |
 | `Species` | Bird species reference data |
-| `Sessions` | A ringing session (date + location) |
-| `Encounters` | One bird captured once in one session, with measurements |
+| `Sessions` | A group's visit on a date — one row per `(ringing_group_id, visit_date)` |
+| `Encounters` | One bird captured once at one location on one date, with measurements |
 | `Locations` | Ringing sites, owned by a group |
 
 Key design notes:
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
+- **A `Session` is just a group-day (#1024).** It holds `visit_date` + `ringing_group_id` and
+  nothing else, `UNIQUE (visit_date, ringing_group_id)`. It used to be
+  `(visit_date, location_id, session_type)`, so one day could carry several Session rows — one per
+  site visited, and one per `FULL_GROWN`/`PULLI`/`FIELD_OBSERVATION` bucket within a site. Both of
+  those columns are gone:
+  - **Where** an encounter happened lives on `Encounters.location_id` (`NOT NULL`, #1015). A
+    group-day spanning several sites is now one Session whose encounters point at several
+    `Locations`.
+  - **What kind** of record it is is re-derived per encounter from `record_type`/`age_code`/`is_juv`
+    wherever it's still wanted — see `app/(routes)/sessions/page.tsx` (the FULL_GROWN-equivalent
+    filter) and `queries/Encounters/pulli-encounters.ts`. No stats RPC buckets on it at all any more
+    (see the `record_type`-filter note below).
+  - `ringing_group_id` is written directly by `lib/demon-import.ts`. The
+    `trg_set_session_generated_fields` trigger that used to derive it from `Sessions.location_id` is
+    retired, and `supabase/__tests__/sessions-schema.test.ts` pins both columns and the trigger as
+    gone.
 - `Encounters` carries its own `location_id`/`visit_date` (both `NOT NULL`, #1015) alongside
-  `session_id`, so an encounter knows where and when it happened without going through a `Session`.
-  Today they always agree with the linked Session's values — `lib/demon-import.ts` writes both from
-  the same values its `Sessions` upsert uses, and the phase-1 backfill copied them off each row's
-  Session — but that redundancy is deliberate groundwork: it lets #1024 stop giving resighting rows
-  a Session at all. Any new `Encounters` row (test fixtures included) must supply both columns;
-  `supabase/__tests__/rpc-functions/helpers/encounter-fixtures.ts` exposes
-  `readTestSessionLocationAndDate` / `withSessionLocationAndDate` for copying them off a Sessions row
-  rather than restating them per call site. No query or RPC reads them yet — every stats RPC still
-  goes through `Sessions.visit_date`.
+  `session_id`, and since #1024 they are the only record of where/when an individual encounter
+  happened. They are also what its uniqueness keys on —
+  `encounters_bird_id_location_id_visit_date_unique`, repointed off `(bird_id, session_id)`: with a
+  Session covering a whole group-day, a `session_id` key would have meant "one encounter per bird
+  per group per day" and silently merged a bird caught at two sites on one day. `lib/demon-import.ts`
+  conflict-targets the same three columns. Any new `Encounters` row (test fixtures included) must
+  supply both; `supabase/__tests__/rpc-functions/helpers/encounter-fixtures.ts` defaults
+  `visit_date` off the Sessions row (`readTestSessionDate` / `withSessionDate`) and `location_id`
+  off the location its session was created for, so most fixtures need neither explicitly.
 - Several fields are populated by triggers (e.g. `proven_age` on Birds, timestamps on Sessions/Encounters).
 - Complex queries are exposed as Postgres RPC functions (e.g. `core_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
@@ -85,20 +101,25 @@ entirely. `app/models/db.ts` exports `ResightingRecordType` from the generated e
 in sync **by hand** if the enum ever changes, the same convention as the age-bucket definitions
 above.
 
-**That record_type filter is the single fix point — no stats RPC reads `Sessions.session_type`
-to decide what is "real" data any more (#1021).** `stats_spine`'s `session_date_range` used to
-exclude `FIELD_OBSERVATION` sessions (so a field-observation-only date couldn't stretch the
-month/year spine past the range of `FULL_GROWN`/`PULLI` sessions), and `core_stats.session_count`
-used to be `COUNT(DISTINCT CASE WHEN session_type = 'FULL_GROWN' THEN visit_date END)`. Both are
-gone: the spine is bounded by every session date in the window, and `session_count` is a plain
-`COUNT(DISTINCT visit_date)` — which also makes it consistent with
-`species_count`/`bird_count`/`encounter_count` for the first time (they always counted encounters
-from any `session_type`). This is a visible behaviour change, not a refactor: a group/period whose
-history includes pulli-only or field-observation-only days reports a HIGHER `session_count` than it
-used to. The remaining `session_type = 'FULL_GROWN'` reads in `core_stats`' `session_counts` /
-`session_effort` CTEs (feeding `total_effort`, `effort_per_session`,
-`avg_encounters_per_session`, `max_per_session`, `max_new_per_session`) are deliberately still
-there pending #1024, so a pulli-only date can report `session_count = 1` against zero effort.
+**That record_type filter is now the ONLY thing deciding what is "real" data in any stats RPC
+(#1021, completed by #1024).** `stats_spine`'s `session_date_range` used to exclude
+`FIELD_OBSERVATION` sessions (so a field-observation-only date couldn't stretch the month/year
+spine past the range of `FULL_GROWN`/`PULLI` sessions), and `core_stats.session_count` used to be
+`COUNT(DISTINCT CASE WHEN session_type = 'FULL_GROWN' THEN visit_date END)`. #1021 removed both,
+and #1024 then dropped the `session_type` column itself — along with `stats_raw_encounters`'
+`session_type` output column and the two `session_type = 'FULL_GROWN'` filters that survived #1021
+in `core_stats`' `session_counts` / `session_effort` CTEs.
+
+Two visible behaviour changes, not refactors, landed across the pair:
+- `session_count` is a plain `COUNT(DISTINCT visit_date)`, so a group/period whose history includes
+  pulli-only or field-observation-only days reports a HIGHER `session_count` than before #1021.
+- `total_effort` / `effort_per_session` / `avg_encounters_per_session` / `max_per_session` /
+  `max_new_per_session` now cover every session in a cell (#1024). A pulli-only date used to report
+  `session_count = 1` against zero effort; it now reports real effort, and a day's nestling
+  captures count toward its effort span and per-session maxima like any other capture. All these
+  columns are finally on the same session_type-blind basis as
+  `species_count`/`bird_count`/`encounter_count`, which always counted encounters from any
+  `session_type`.
 
 **Two per-row evaluation traps in `stats_raw_encounters`, both fixed in #947 — don't reintroduce
 either.** Because every stats RPC derives this row source (and `core_stats` derives it 4x through

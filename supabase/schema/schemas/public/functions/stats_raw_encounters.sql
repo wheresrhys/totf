@@ -29,7 +29,6 @@ CREATE FUNCTION public.stats_raw_encounters (
 	is_juv boolean,
 	session_id bigint,
 	visit_date date,
-	session_type text,
 	max_hatch_year smallint,
 	capture_time time without time zone,
 	session_day date,
@@ -50,7 +49,6 @@ CREATE FUNCTION public.stats_raw_encounters (
     e.is_juv,
     sess.id AS session_id,
     sess.visit_date,
-    sess.session_type,
     e.max_hatch_year,
     e.capture_time,
     -- visit_date is already a DATE, so truncating it to a day is the identity — and

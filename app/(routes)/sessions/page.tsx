@@ -16,13 +16,13 @@ const RESIGHTING_RECORD_TYPES_FILTER_LIST = `(${RESIGHTING_RECORD_TYPES.join(','
 
 /**
  * The list used to show only FULL_GROWN-type sessions (`Sessions.session_type`),
- * excluding PULLI and FIELD_OBSERVATION sessions from the calendar. Ahead of
- * #1024 dropping `Sessions.session_type` entirely, this re-expresses the same
- * bucketing rule `lib/demon-import.ts` uses to assign a row's session_type in
- * the first place, directly off `Encounters` columns: not a
- * resighting/recovery record (`record_type` in `RESIGHTING_RECORD_TYPES` —
- * that would make it FIELD_OBSERVATION), and not a pullus capture (`age_code
- * === 1 && !is_juv` — that would make it PULLI).
+ * excluding PULLI and FIELD_OBSERVATION sessions from the calendar. That column
+ * is gone as of #1024, and this re-expresses the same bucketing rule
+ * `lib/demon-import.ts` used to assign a row's session_type with, directly off
+ * `Encounters` columns: not a resighting/recovery record (`record_type` in
+ * `RESIGHTING_RECORD_TYPES` — that would have made it FIELD_OBSERVATION), and
+ * not a pullus capture (`age_code === 1 && !is_juv` — that would have made it
+ * PULLI).
  *
  * Expressed as a second, non-aggregate `!inner` embed of `Encounters`
  * (`qualifying`) purely to gate which `Sessions` rows survive, kept separate
@@ -30,12 +30,15 @@ const RESIGHTING_RECORD_TYPES_FILTER_LIST = `(${RESIGHTING_RECORD_TYPES.join(','
  * count — PostgREST turns an aggregated embed into a LEFT JOIN regardless of
  * `!inner`, so filtering the same aggregated embed would silently stop
  * excluding non-matching sessions (it'd return them with `count: 0` instead).
- * This relies on a Session's Encounters always being homogeneous — every
- * Encounters row upserted under one Sessions row shares that Sessions row's
- * session_type by construction (`lib/demon-import.ts`'s upsert key is
- * `(visit_date, location_id, session_type)`) — so "has at least one
- * qualifying encounter" and "is itself a FULL_GROWN session" agree for any
- * session created via the normal import path.
+ *
+ * Note what the semantics are now, since #1024 made a Session one row per
+ * `(ringing_group_id, visit_date)`: a date qualifies if it carries AT LEAST ONE
+ * full-grown capture, and its displayed encounter count covers the whole
+ * group-day including any pulli or passive records. While a Session was
+ * `(visit_date, location_id, session_type)` its Encounters were homogeneous by
+ * construction, so "has a qualifying encounter" and "is a FULL_GROWN session"
+ * were the same thing; a group-day Session mixes them, and this filter keeps the
+ * date rather than splitting it.
  */
 const FULL_GROWN_EQUIVALENT_SELECT = `${allSessionsQuery.select}, qualifying:Encounters!inner(id)`;
 

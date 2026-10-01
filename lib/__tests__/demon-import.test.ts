@@ -429,126 +429,43 @@ describe('processEncounterRow', () => {
 		);
 	});
 
-	it('upserts Session with converted visit_date and location ID', async () => {
-		const row = makeDemonRow({ visit_date: '15/03/2023' });
-		await processEncounterRow(
-			row,
-			upsert,
-			lookupRingSequence,
-			RINGING_GROUP_ID,
-			linkRingSequence
-		);
-		const locationId = 30; // third call returns 30
-		expect(upsert).toHaveBeenCalledWith(
-			'Sessions',
-			{
-				visit_date: '2023-03-15',
-				location_id: locationId,
-				session_type: 'FULL_GROWN'
-			},
-			['visit_date', 'location_id', 'session_type']
-		);
-	});
-
-	describe('session_type bucketing', () => {
-		function sessionData() {
-			return upsert.mock.calls.find(([table]) => table === 'Sessions')?.[1];
+	// The old (visit_date, location_id, session_type) key and the record_type/age
+	// bucketing that computed session_type are both gone (#1024) — a Session is one
+	// row per group-day now, and the whole `session_type bucketing` describe block
+	// that used to sit here went with the column it asserted on.
+	describe('Sessions upsert', () => {
+		function sessionUpsertCall() {
+			return upsert.mock.calls.find(([table]) => table === 'Sessions');
 		}
 
-		it('buckets an N record_type with a non-pulli age as FULL_GROWN', async () => {
+		it('upserts Session with the converted visit_date and the importing group', async () => {
 			await processEncounterRow(
-				makeDemonRow({ record_type: 'N', age: '3' }),
+				makeDemonRow({ visit_date: '15/03/2023' }),
 				upsert,
 				lookupRingSequence,
 				RINGING_GROUP_ID,
 				linkRingSequence
 			);
-			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
+			expect(upsert).toHaveBeenCalledWith(
+				'Sessions',
+				{
+					visit_date: '2023-03-15',
+					ringing_group_id: RINGING_GROUP_ID
+				},
+				['visit_date', 'ringing_group_id']
+			);
 		});
 
-		it('buckets an N record_type with age 1J (recently-fledged juvenile) as FULL_GROWN, not PULLI', async () => {
+		it('writes no location_id or session_type onto the Session, whatever the row looks like', async () => {
 			await processEncounterRow(
-				makeDemonRow({ record_type: 'N', age: '1J' }),
+				makeDemonRow({ record_type: 'U', age: '1' }),
 				upsert,
 				lookupRingSequence,
 				RINGING_GROUP_ID,
 				linkRingSequence
 			);
-			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
-		});
-
-		it('buckets an N record_type with raw age 1 (nestling) as PULLI', async () => {
-			await processEncounterRow(
-				makeDemonRow({ record_type: 'N', age: '1' }),
-				upsert,
-				lookupRingSequence,
-				RINGING_GROUP_ID,
-				linkRingSequence
-			);
-			expect(sessionData()).toMatchObject({ session_type: 'PULLI' });
-		});
-
-		it.each(['U', 'F', 'D'])(
-			'buckets a %s record_type as FIELD_OBSERVATION regardless of age (record-type precedence over age 1)',
-			async (recordType) => {
-				await processEncounterRow(
-					makeDemonRow({ record_type: recordType, age: '1' }),
-					upsert,
-					lookupRingSequence,
-					RINGING_GROUP_ID,
-					linkRingSequence
-				);
-				expect(sessionData()).toMatchObject({
-					session_type: 'FIELD_OBSERVATION'
-				});
-			}
-		);
-
-		it.each(['N', 'S', 'C', 'T'])(
-			'buckets a %s record_type with a non-pulli age as FULL_GROWN',
-			async (recordType) => {
-				await processEncounterRow(
-					makeDemonRow({ record_type: recordType, age: '3' }),
-					upsert,
-					lookupRingSequence,
-					RINGING_GROUP_ID,
-					linkRingSequence
-				);
-				expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
-			}
-		);
-
-		it('buckets an unrecognised record_type with a non-pulli age as FULL_GROWN', async () => {
-			await processEncounterRow(
-				makeDemonRow({ record_type: 'Z', age: '3' }),
-				upsert,
-				lookupRingSequence,
-				RINGING_GROUP_ID,
-				linkRingSequence
-			);
-			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
-		});
-
-		it('buckets an unrecognised record_type with raw age 1 as PULLI', async () => {
-			await processEncounterRow(
-				makeDemonRow({ record_type: 'Z', age: '1' }),
-				upsert,
-				lookupRingSequence,
-				RINGING_GROUP_ID,
-				linkRingSequence
-			);
-			expect(sessionData()).toMatchObject({ session_type: 'PULLI' });
-		});
-
-		it('buckets an empty/unparseable age as FULL_GROWN (NaN must not equal 1)', async () => {
-			await processEncounterRow(
-				makeDemonRow({ record_type: 'N', age: '' }),
-				upsert,
-				lookupRingSequence,
-				RINGING_GROUP_ID,
-				linkRingSequence
-			);
-			expect(sessionData()).toMatchObject({ session_type: 'FULL_GROWN' });
+			expect(sessionUpsertCall()?.[1]).not.toHaveProperty('location_id');
+			expect(sessionUpsertCall()?.[1]).not.toHaveProperty('session_type');
 		});
 	});
 
@@ -607,7 +524,7 @@ describe('processEncounterRow', () => {
 				pectoral_muscle: 2,
 				capture_method: 'M'
 			}),
-			['bird_id', 'session_id']
+			['bird_id', 'location_id', 'visit_date']
 		);
 	});
 
@@ -651,7 +568,7 @@ describe('processEncounterRow', () => {
 				pectoral_muscle: null,
 				capture_method: null
 			}),
-			['bird_id', 'session_id']
+			['bird_id', 'location_id', 'visit_date']
 		);
 	});
 
@@ -667,7 +584,7 @@ describe('processEncounterRow', () => {
 		expect(upsert).toHaveBeenCalledWith(
 			'Encounters',
 			expect.objectContaining({ age_code: 3, is_juv: true }),
-			['bird_id', 'session_id']
+			['bird_id', 'location_id', 'visit_date']
 		);
 	});
 
@@ -683,7 +600,7 @@ describe('processEncounterRow', () => {
 		expect(upsert).toHaveBeenCalledWith(
 			'Encounters',
 			expect.objectContaining({ age_code: 6, is_juv: false }),
-			['bird_id', 'session_id']
+			['bird_id', 'location_id', 'visit_date']
 		);
 	});
 

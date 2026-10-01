@@ -44,8 +44,8 @@ describe('public_core_stats', () => {
 	const createdSessionIds: number[] = [];
 	const createdBirdIds: number[] = [];
 
-	// Month 1 holds a two-species FULL_GROWN session; month 2 (~40 days later, a guaranteed
-	// different calendar month) holds a second FULL_GROWN session, so group_by_time_period
+	// Month 1 holds a two-species session; month 2 (~40 days later, a guaranteed
+	// different calendar month) holds a second session, so group_by_time_period
 	// has two months to split across.
 	let month1Date: string;
 	let month2Date: string;
@@ -76,10 +76,10 @@ describe('public_core_stats', () => {
 		return data.id;
 	}
 
-	// Insert one FULL_GROWN session with the given encounters for a group, via that group's
-	// authenticated client (so RLS insert policies and the ringing_group_id trigger apply).
-	// Insert one FULL_GROWN session with the given encounters for a group, via that group's
-	// authenticated client (so RLS insert policies and the ringing_group_id trigger apply).
+	// Insert one session with the given encounters for a group, via that group's
+	// authenticated client, so RLS insert policies apply. (Sessions' ringing_group_id
+	// used to be trigger-derived from its location; since #1024 insertTestSession
+	// resolves it from the location itself and writes it directly.)
 	async function insertSessionWithEncounters(
 		client: SupabaseClient,
 		groupId: number,
@@ -91,12 +91,7 @@ describe('public_core_stats', () => {
 			captureTime: string;
 		}>
 	): Promise<void> {
-		const sessionId = await insertTestSession(
-			client,
-			locationId,
-			visitDate,
-			'FULL_GROWN'
-		);
+		const sessionId = await insertTestSession(client, locationId, visitDate);
 		createdSessionIds.push(sessionId);
 
 		for (const { speciesId, recordType, captureTime } of encounters) {
@@ -287,7 +282,7 @@ describe('public_core_stats', () => {
 		]);
 		expect(publicRes.error).toBeNull();
 		expect(authRes.error).toBeNull();
-		// Two FULL_GROWN sessions across two distinct calendar months.
+		// Two sessions across two distinct calendar months.
 		expect(authRes.data!.filter((r) => r.session_count > 0)).toHaveLength(2);
 		expect(publicRes.data).toEqual(authRes.data);
 	});
