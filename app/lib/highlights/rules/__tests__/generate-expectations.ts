@@ -18,6 +18,6 @@ const fixtures = Object.fromEntries(
 );
 
 writeFileSync(
-	'./app/lib/highlights/v2/rules/__tests__/expectations.ts',
+	'./app/lib/highlights/rules/__tests__/expectations.ts',
 	`export const expectations = ${JSON.stringify(fixtures, null, '\t')}`
 );

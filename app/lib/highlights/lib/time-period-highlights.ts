@@ -5,8 +5,11 @@ import type {
 	HighlightDescriptor,
 	HighlightValue,
 	CombinedHighlight,
-	HighlightCategory
+	HighlightCategory,
+	NumericHighlightValue
 } from '../types';
+
+import { isNumericHighlightValue } from '../types';
 import { getHighlightsWithinTimeWindow } from './highlight-generator';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 const highlightCategoryOrder: HighlightCategory[] = [
@@ -21,15 +24,22 @@ function calculatePosition(
 	smallestWins?: boolean
 ) {
 	const activeHighlight = siblingHighlights[highlightIndex];
-	const activeValue = activeHighlight.value;
-	const allValues = [
-		...new Set(siblingHighlights.map(({ value }) => value))
-	].sort((a, b) => (smallestWins ? a - b : b - a));
-	const position = allValues.indexOf(activeValue) + 1;
-	const isTied =
-		siblingHighlights.filter(({ value }) => value === activeValue).length > 1;
 
-	return { position, isTied };
+	if (isNumericHighlightValue(activeHighlight)) {
+		const activeValue = activeHighlight.value;
+		const allValues = [
+			...new Set(
+				(siblingHighlights as NumericHighlightValue[]).map(({ value }) => value)
+			)
+		].sort((a, b) => (smallestWins ? a - b : b - a));
+		const position = allValues.indexOf(activeValue) + 1;
+		const isTied =
+			siblingHighlights.filter(({ value }) => value === activeValue).length > 1;
+
+		return { position, isTied };
+	} else {
+		return { position: 1, isTied: false };
+	}
 }
 
 function filterOutIrrelevantHighlights(
@@ -209,6 +219,7 @@ function sortHighlights(highlights: CombinedHighlight[]) {
 			if (categoryOrdering) return categoryOrdering;
 			if (a.species && !b.species) return 1;
 			if (!a.species && b.species) return -1;
+
 			const posWindowSorVal = sortByPositionAndTimeWindow(
 				{
 					position: a.bestPosition,
@@ -219,7 +230,16 @@ function sortHighlights(highlights: CombinedHighlight[]) {
 					window: b.scopes[0].scope.parentTimeWindow
 				}
 			);
-			return posWindowSorVal ? posWindowSorVal : b.value.value - a.value.value;
+			if (posWindowSorVal) return posWindowSorVal;
+
+			if (
+				isNumericHighlightValue(a.value) &&
+				isNumericHighlightValue(b.value)
+			) {
+				return b.value.value - a.value.value;
+			} else {
+				return 0;
+			}
 		}
 	);
 }

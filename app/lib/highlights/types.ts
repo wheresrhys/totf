@@ -27,9 +27,24 @@ export type HighlightCategory =
 	| 'biometrics'
 	| 'demographics';
 
-export type HighlightValue = {
+export interface NumericHighlightValue {
 	timePeriod: string;
 	value: number;
+}
+
+export interface TextHighlightValue {
+	timePeriod: string;
+	value: string;
+}
+
+export function isNumericHighlightValue(
+	highlight: HighlightValue
+): highlight is HighlightValue & NumericHighlightValue {
+	return typeof highlight.value === 'number';
+}
+export type HighlightValue = {
+	timePeriod: string;
+	value: number | string;
 	species: string | null;
 };
 
@@ -109,7 +124,8 @@ type HighlightsGeneratorFor<
 	limit?: number;
 	statsSelector: StatsSelectorKey;
 	generator: (
-		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[]
+		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[],
+		scope?: HighlightScope
 	) => HighlightValue[];
 	condition?: (scope: HighlightScope) => boolean;
 };

@@ -6,7 +6,7 @@ import type {
 	CombinedHighlight,
 	HighlightScope
 } from '../types';
-
+import { isNumericHighlightValue } from '../types';
 import {
 	getPlural,
 	getSpaceForUnit,
@@ -67,6 +67,9 @@ export function printValue(
 	value: HighlightValue,
 	descriptor: HighlightDescriptor
 ) {
+	if (!isNumericHighlightValue(value)) {
+		throw new Error('printValue cannot be used with string values');
+	}
 	switch (descriptor.speciesUnitMode) {
 		case 'replace':
 			if (value.species) {
