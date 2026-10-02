@@ -3,7 +3,8 @@ import {
 	printProminenceQualifier,
 	printTemporalUnit,
 	printTimeQualifier,
-	printCombinedHighlight
+	printCombinedHighlight,
+	sentenceCase
 } from '../lib/printer-utils';
 import { getTopByPropertiesSum } from '../lib/rule-utils';
 
@@ -18,8 +19,7 @@ export const juvs: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking, 'equal')} most ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most juvs`
+		highlightListPrefixPrinter: (highlightsOfType) => sentenceCase(`Most juvs`)
 	},
 	descriptor: {
 		type: 'juvs',
@@ -27,5 +27,6 @@ export const juvs: HighlightsGenerator = {
 		category: 'demographics'
 	},
 	generator: getTopByPropertiesSum(['pullus_bird_count', 'juv_bird_count']),
-	condition: (scope) => !scope.parentTimeWindow?.month
+	condition: (scope) =>
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
 };

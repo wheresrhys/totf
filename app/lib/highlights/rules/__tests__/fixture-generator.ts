@@ -5,7 +5,8 @@ import type {
 	CombinedHighlight,
 	HighlightsGenerator,
 	EnhancedStatsRepository,
-	HighlightDescriptor
+	HighlightDescriptor,
+	HighlightsOfType
 } from '../../types';
 
 // call each rule set's printers with standard data input shapes
@@ -59,7 +60,7 @@ function getCombinedHighlightMaker(descriptor: HighlightDescriptor) {
 			value: {
 				value,
 				timePeriod: `${year}-02-02`,
-				species: null
+				species: bySpecies ? 'Robin' : null
 			},
 			species: bySpecies ? 'Robin' : undefined,
 			bestPosition: Math.max(
@@ -70,6 +71,46 @@ function getCombinedHighlightMaker(descriptor: HighlightDescriptor) {
 				ranking: HighlightRanking;
 			}[]
 		};
+	};
+}
+
+export function getHighlightsOfTypeFixtures(
+	rule: HighlightsGenerator
+): Record<string, HighlightsOfType> {
+	return {
+		'single session': {
+			descriptor: rule.descriptor,
+			scope: {
+				temporalUnit: 'day'
+			},
+			values: [
+				{
+					value: 12,
+					timePeriod: `2020-02-02`,
+					species: 'Robin'
+				}
+			],
+			formatters: rule.formatters
+		},
+		'multiple month': {
+			descriptor: rule.descriptor,
+			scope: {
+				temporalUnit: 'month'
+			},
+			values: [
+				{
+					value: 12,
+					timePeriod: `2020-02-02`,
+					species: 'Robin'
+				},
+				{
+					value: 1,
+					timePeriod: `2020-02-02`,
+					species: 'Blackcap'
+				}
+			],
+			formatters: rule.formatters
+		}
 	};
 }
 

@@ -48,7 +48,8 @@ describe('SquashedMonthSummaryTotalsSection', () => {
 		expect(tabs.map((tab) => tab.textContent)).toEqual([
 			'Species totals',
 			'Year totals',
-			'Session totals'
+			'Session totals',
+			'Highlights'
 		]);
 		expect(tabs[0].getAttribute('aria-current')).toBe('true');
 	});

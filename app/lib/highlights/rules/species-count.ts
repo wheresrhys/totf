@@ -18,8 +18,7 @@ export const speciesCount: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking)} most varied ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Most varied ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
+		highlightListPrefixPrinter: (highlightsOfType) => `Most varied`
 	},
 	descriptor: {
 		type: 'species',
@@ -27,5 +26,6 @@ export const speciesCount: HighlightsGenerator = {
 		category: 'count'
 	},
 	generator: getTopByProperty('species_count'),
-	condition: (scope) => !scope.parentTimeWindow?.month
+	condition: (scope) =>
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
 };

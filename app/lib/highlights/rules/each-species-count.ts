@@ -26,7 +26,7 @@ export const eachSpeciesCount: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Highest ${highlightsOfType.scope.species} count in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
+			`Highest count${highlightsOfType.values.length > 1 ? 's' : ''} for ${highlightsOfType.values[0].species}`
 	},
 
 	descriptor: {
@@ -35,5 +35,6 @@ export const eachSpeciesCount: HighlightsGenerator = {
 		category: 'count'
 	},
 	generator: getTopByProperty('bird_count', { threshold: 2 }),
-	condition: (scope) => !scope.parentTimeWindow?.month
+	condition: (scope) =>
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
 };

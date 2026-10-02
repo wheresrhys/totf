@@ -25,7 +25,7 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Highest juv ${highlightsOfType.scope.species} count in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
+			`Highest juv count${highlightsOfType.values.length > 1 ? 's' : ''} for ${highlightsOfType.values[0].species}`
 	},
 	descriptor: {
 		type: 'eachSpeciesJuvs',
@@ -36,5 +36,6 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 		threshold: 3
 	}),
 	limit: 1,
-	condition: (scope) => !scope.parentTimeWindow?.month
+	condition: (scope) =>
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
 };
