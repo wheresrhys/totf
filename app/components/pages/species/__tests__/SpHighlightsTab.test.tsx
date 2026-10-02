@@ -8,6 +8,10 @@ vi.mock('@/app/actions/sp-data', () => ({
 	fetchNotableRetraps: vi.fn()
 }));
 
+vi.mock('@/app/lib/highlights', () => ({
+	getHighlightsWithinTimeWindow: vi.fn()
+}));
+
 describe('SpHighlightsTab', () => {
 	afterEach(() => {
 		cleanup();
@@ -15,9 +19,12 @@ describe('SpHighlightsTab', () => {
 
 	beforeEach(async () => {
 		const { fetchNotableRetraps } = await import('@/app/actions/sp-data');
+		const { getHighlightsWithinTimeWindow } =
+			await import('@/app/lib/highlights');
 		vi.mocked(fetchNotableRetraps).mockResolvedValue(
 			notableRetrapsSnapshot as NotableRetrapsResult[]
 		);
+		vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([]);
 	});
 
 	it('renders loading spinner before data loads', async () => {
