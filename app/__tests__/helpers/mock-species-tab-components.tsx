@@ -22,8 +22,8 @@ vi.mock('@/app/components/pages/species/SpIndividualsTab', () => ({
 	SpIndividualsTab: () => <div data-testid="sp-individuals-tab" />
 }));
 
-vi.mock('@/app/components/pages/species/SpNotableRetrapsTab', () => ({
-	SpNotableRetrapsTab: () => <div data-testid="sp-notable-retraps-tab" />
+vi.mock('@/app/components/pages/species/SpHighlightsTab', () => ({
+	SpHighlightsTab: () => <div data-testid="sp-highlights-tab" />
 }));
 
 vi.mock('@/app/components/pages/species/SpDemographicsTab', () => ({
