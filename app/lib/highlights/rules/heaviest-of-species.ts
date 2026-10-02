@@ -32,5 +32,6 @@ export const heaviestOfSpecies: HighlightsGenerator = {
 	},
 	generator: getTopByProperty<BiometricsStatsResult>('max_weight', {
 		threshold: 3
-	})
+	}),
+	condition: (scope) => scope.temporalUnit === 'day'
 };

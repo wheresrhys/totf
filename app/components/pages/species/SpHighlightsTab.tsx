@@ -58,22 +58,22 @@ export function SpHighlightsTab({
 						},
 						includePerSpecies: true,
 						excludeGlobal: true
-						// TODO need to exclude the weight records
 					})
 		]);
-		setHighlightsData({ sessionHighlights: daily, monthHighlights: monthly });
+		return { sessionHighlights: daily, monthHighlights: monthly };
 	}, [viewedGroup.id, year, month, speciesName]);
 
 	useEffect(() => {
-		fetchHighlightsData();
-		if (notableRetraps.length > 0) return;
-		fetchNotableRetraps(speciesName, viewedGroup.id, fromDate, toDate).then(
-			(data) => {
-				setNotableRetraps(data);
-				setIsLoaded(true);
-			}
-		);
-	}, [speciesName, viewedGroup.id, fromDate, toDate, notableRetraps.length]);
+		if (isLoaded) return;
+		Promise.all([
+			fetchHighlightsData(),
+			fetchNotableRetraps(speciesName, viewedGroup.id, fromDate, toDate)
+		]).then(([highlights, retraps]) => {
+			setNotableRetraps(retraps);
+			setHighlightsData(highlights);
+			setIsLoaded(true);
+		});
+	}, [speciesName, viewedGroup.id, fromDate, toDate, isLoaded]);
 	return (
 		<>
 			{highlightsData && (
@@ -92,14 +92,18 @@ export function SpHighlightsTab({
 					/>
 				</>
 			)}
-			<SecondaryHeading>Notable Retraps</SecondaryHeading>
+
 			{notableRetraps.length > 0 ? (
-				<NotableRetrapsTable data={notableRetraps} omitSpeciesName={true} />
+				<>
+					<SecondaryHeading>Notable Retraps</SecondaryHeading>
+					<NotableRetrapsTable data={notableRetraps} omitSpeciesName={true} />
+				</>
 			) : isLoaded ? (
-				<p>No notable retraps found</p>
-			) : (
-				<div className="loading loading-spinner loading-xl"></div>
-			)}
+				<>
+					<SecondaryHeading>Notable Retraps</SecondaryHeading>
+					<p>No notable retraps found</p>
+				</>
+			) : null}
 			{isLoaded ? null : (
 				<div className="flex items-center justify-center">
 					<div className="loading loading-spinner loading-xl"></div>

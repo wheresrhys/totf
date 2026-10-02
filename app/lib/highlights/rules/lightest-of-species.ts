@@ -34,5 +34,6 @@ export const lightestOfSpecies: HighlightsGenerator = {
 	generator: getTopByProperty<BiometricsStatsResult>('min_weight', {
 		threshold: 3,
 		smallestWins: true
-	})
+	}),
+	condition: (scope) => scope.temporalUnit === 'day'
 };

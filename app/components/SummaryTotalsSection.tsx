@@ -92,42 +92,49 @@ export function HighlightsByTimePeriod({
 	return (
 		<div>
 			<SecondaryHeading>{heading}</SecondaryHeading>
-			{highlights.map((highlight) => (
-				<div
-					key={`${highlight.descriptor.type}-${highlight.scope.temporalUnit}`}
-				>
-					{highlight.formatters.highlightListPrefixPrinter(highlight)}:{' '}
-					<div className="flex gap-2">
-						{highlight.values.map((highlightValue) => (
-							<span
-								className="badge badge-outline"
-								key={highlightValue.timePeriod}
-							>
-								{isNumericHighlightValue(highlightValue) ? (
-									<StatOutput
-										visitDate={highlightValue.timePeriod}
-										temporalUnit={highlight.scope.temporalUnit}
-										showUnit={showHighlightUnit(
-											highlight,
-											highlightValue,
-											excludeSpeciesName
-										)}
-										value={highlightValue.value}
-										unit={getHighlightUnit(
-											highlight,
-											highlightValue,
-											excludeSpeciesName
-										)}
-										viewedGroup={viewedGroup}
-									/>
-								) : (
-									'placeholder'
+			{highlights.map(
+				(highlight) =>
+					isNumericHighlightValue(highlight.values[0]) && (
+						<div
+							key={`${highlight.descriptor.type}-${highlight.scope.temporalUnit}`}
+						>
+							{highlight.formatters.highlightListPrefixPrinter(highlight)}:{' '}
+							<div className="flex gap-2">
+								{highlight.values.map(
+									(highlightValue) =>
+										isNumericHighlightValue(highlightValue) && (
+											<span
+												className="badge badge-outline"
+												key={highlightValue.timePeriod}
+											>
+												<StatOutput
+													dateFormat={
+														highlight.scope.temporalUnit === 'day'
+															? 'dd/MM/yy'
+															: 'MMM yyyy'
+													}
+													visitDate={highlightValue.timePeriod}
+													temporalUnit={highlight.scope.temporalUnit}
+													showUnit={showHighlightUnit(
+														highlight,
+														highlightValue,
+														excludeSpeciesName
+													)}
+													value={highlightValue.value}
+													unit={getHighlightUnit(
+														highlight,
+														highlightValue,
+														excludeSpeciesName
+													)}
+													viewedGroup={viewedGroup}
+												/>
+											</span>
+										)
 								)}
-							</span>
-						))}
-					</div>
-				</div>
-			))}
+							</div>
+						</div>
+					)
+			)}
 		</div>
 	);
 }
