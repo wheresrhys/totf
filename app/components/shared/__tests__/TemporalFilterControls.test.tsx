@@ -26,13 +26,15 @@ const years = [2021, 2022, 2023];
 function renderControls({
 	baseUrl = '/species',
 	initialSelection,
-	navigationController
+	navigationController,
+	treatMonthWithoutYearAsInvalid
 }: {
 	baseUrl?: string;
 	initialSelection?: TemporalSelection;
 	navigationController?: (
 		selected: TemporalSelection
 	) => TemporalNavigationTarget;
+	treatMonthWithoutYearAsInvalid?: boolean;
 } = {}) {
 	render(
 		<TemporalFilterControls
@@ -40,6 +42,7 @@ function renderControls({
 			baseUrl={baseUrl}
 			initialSelection={initialSelection}
 			navigationController={navigationController}
+			treatMonthWithoutYearAsInvalid={treatMonthWithoutYearAsInvalid}
 		/>
 	);
 }
@@ -78,6 +81,14 @@ function getSelect(label: string) {
 
 function getEffectiveDateRange() {
 	return screen.getByTestId('effective-date-range').textContent;
+}
+
+function queryEffectiveDateRange() {
+	return screen.queryByTestId('effective-date-range');
+}
+
+function queryFilterError() {
+	return screen.queryByTestId('temporal-filter-error');
 }
 
 function openWarning() {
@@ -212,6 +223,93 @@ describe('TemporalFilterControls', () => {
 			expect(getEffectiveDateRange()).toBe(
 				'Showing: May in every year, 2021-01-01 onwards'
 			);
+		});
+
+		it('reports no dates when the year and the explicit date range do not overlap at all', () => {
+			renderControls();
+
+			selectYear(2022);
+			setFromDate('2023-01-01');
+
+			expect(getEffectiveDateRange()).toBe('Showing: no dates');
+		});
+
+		it('reports no dates when a yearless month never falls inside the explicit date range', () => {
+			renderControls();
+
+			selectMonth(5);
+			setFromDate('2021-06-01');
+			setToDate('2022-03-31');
+
+			expect(getEffectiveDateRange()).toBe('Showing: no dates');
+		});
+	});
+
+	describe('treating a month without a year as invalid', () => {
+		it('shows the recurring-month range as usual when the prop is not set', () => {
+			renderControls();
+
+			selectMonth(5);
+
+			expect(queryFilterError()).toBeNull();
+			expect(getEffectiveDateRange()).toBe('Showing: May in every year');
+		});
+
+		it('replaces the effective range with an error when a month is selected without a year', () => {
+			renderControls({ treatMonthWithoutYearAsInvalid: true });
+
+			selectMonth(5);
+
+			expect(queryFilterError()?.textContent).toBe(
+				'Select a year as well as a month.'
+			);
+			expect(queryEffectiveDateRange()).toBeNull();
+		});
+
+		it('marks the month select itself invalid', () => {
+			renderControls({ treatMonthWithoutYearAsInvalid: true });
+
+			selectMonth(5);
+
+			expect(getSelect('Month').getAttribute('aria-invalid')).toBe('true');
+		});
+
+		it('does not navigate while the selection is invalid, but keeps the month in the control', () => {
+			renderControls({ treatMonthWithoutYearAsInvalid: true });
+
+			selectMonth(5);
+
+			expect(mockPush).not.toHaveBeenCalled();
+			expect(getSelect('Month').value).toBe('5');
+		});
+
+		it('clears the error and navigates once a year is added to the month', () => {
+			renderControls({ treatMonthWithoutYearAsInvalid: true });
+
+			selectMonth(5);
+			selectYear(2022);
+
+			expect(queryFilterError()).toBeNull();
+			expect(getEffectiveDateRange()).toBe('Showing: 2022-05-01 to 2022-05-31');
+			expect(lastPushedHref()).toBe('/species?year=2022&month=5');
+		});
+
+		it('leaves a year-only selection valid', () => {
+			renderControls({ treatMonthWithoutYearAsInvalid: true });
+
+			selectYear(2022);
+
+			expect(queryFilterError()).toBeNull();
+			expect(getEffectiveDateRange()).toBe('Showing: 2022-01-01 to 2022-12-31');
+		});
+
+		it('renders the error for an initial selection seeded from the URL', () => {
+			renderControls({
+				treatMonthWithoutYearAsInvalid: true,
+				initialSelection: { month: 5 }
+			});
+
+			expect(queryFilterError()).not.toBeNull();
 		});
 	});
 

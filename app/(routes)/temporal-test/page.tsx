@@ -6,7 +6,7 @@
 // a browser and watch what it derives. Delete once the component is wired into
 // a real page.
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { TemporalFilterControls } from '@/app/components/shared/TemporalFilterControls';
 import {
 	computeEffectiveDateRange,
@@ -38,14 +38,28 @@ function TemporalTestHarness() {
 	// duplicating the component's own state here.
 	const selection = parseSelectionFromSearchParams(useSearchParams());
 	const effectiveDateRange = computeEffectiveDateRange(selection);
+	const [treatMonthWithoutYearAsInvalid, setTreatMonthWithoutYearAsInvalid] =
+		useState(false);
 
 	return (
 		<main className="p-6 flex flex-col gap-6">
 			<h1 className="text-xl">TemporalFilterControls manual test</h1>
+			<label className="flex items-center gap-2 text-sm">
+				<input
+					type="checkbox"
+					className="checkbox"
+					checked={treatMonthWithoutYearAsInvalid}
+					onChange={(event) =>
+						setTreatMonthWithoutYearAsInvalid(event.target.checked)
+					}
+				/>
+				treatMonthWithoutYearAsInvalid
+			</label>
 			<TemporalFilterControls
 				years={years}
 				baseUrl="/temporal-test"
 				initialSelection={selection}
+				treatMonthWithoutYearAsInvalid={treatMonthWithoutYearAsInvalid}
 			/>
 			<section className="flex flex-col gap-2">
 				<h2 className="text-lg">Selection (from the URL)</h2>

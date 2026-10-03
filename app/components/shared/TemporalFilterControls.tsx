@@ -6,6 +6,7 @@ import {
 	buildTemporalHref,
 	buildTemporalQueryStrings,
 	computeEffectiveDateRange,
+	isMonthSelectedWithoutYear,
 	type TemporalSelection
 } from '@/app/lib/temporal-filter';
 
@@ -28,8 +29,13 @@ function describeBounds(fromDate?: string, toDate?: string): string {
 }
 
 function describeEffectiveDateRange(selection: TemporalSelection): string {
-	const { fromDate, toDate, recurringMonth } =
-		computeEffectiveDateRange(selection);
+	const effectiveDateRange = computeEffectiveDateRange(selection);
+	// Nothing satisfies the selection at all — say so outright rather than
+	// printing bounds that would read as a (very small) window of real dates.
+	if (!effectiveDateRange) {
+		return 'no dates';
+	}
+	const { fromDate, toDate, recurringMonth } = effectiveDateRange;
 	if (!recurringMonth) {
 		return describeBounds(fromDate, toDate);
 	}
@@ -52,7 +58,8 @@ export function TemporalFilterControls({
 	years,
 	baseUrl,
 	initialSelection = {},
-	navigationController
+	navigationController,
+	treatMonthWithoutYearAsInvalid = false
 }: {
 	years: number[];
 	baseUrl: string;
@@ -66,6 +73,11 @@ export function TemporalFilterControls({
 	navigationController?: (
 		selected: TemporalSelection
 	) => TemporalNavigationTarget;
+	// Opt out of the recurring-month reading of a yearless month: with this
+	// set, a month selected without a year is an error the user has to resolve
+	// (pick a year, or clear the month) rather than a selection spanning every
+	// year. For callers whose data model only has room for one concrete year.
+	treatMonthWithoutYearAsInvalid?: boolean;
 }) {
 	const router = useRouter();
 	const [selection, setSelection] =
@@ -75,9 +87,20 @@ export function TemporalFilterControls({
 	const hasYearOrMonth = !!(selection.year || selection.month);
 	const hasDateRange = !!(selection.fromDate || selection.toDate);
 	const hasConflict = hasYearOrMonth && hasDateRange;
+	const isMonthWithoutYearInvalid =
+		treatMonthWithoutYearAsInvalid && isMonthSelectedWithoutYear(selection);
 
 	function applySelection(nextSelection: TemporalSelection) {
 		setSelection(nextSelection);
+		// An invalid selection is still held in local state — the user is
+		// mid-edit and needs to see what they picked — but isn't navigated to,
+		// since no page can serve it. The next valid change pushes as normal.
+		if (
+			treatMonthWithoutYearAsInvalid &&
+			isMonthSelectedWithoutYear(nextSelection)
+		) {
+			return;
+		}
 		const { path, queryStrings } = navigationController
 			? navigationController(nextSelection)
 			: {
@@ -135,7 +158,15 @@ export function TemporalFilterControls({
 				</label>
 				<select
 					id="temporal-month-select"
-					className="select max-w-sm appearance-none"
+					className={`select max-w-sm appearance-none ${
+						isMonthWithoutYearInvalid ? 'is-invalid' : ''
+					}`}
+					aria-invalid={isMonthWithoutYearInvalid}
+					aria-errormessage={
+						isMonthWithoutYearInvalid
+							? 'temporal-month-without-year-error'
+							: undefined
+					}
 					value={selection.month ?? ''}
 					onChange={(event) =>
 						updateSelection({
@@ -223,9 +254,23 @@ export function TemporalFilterControls({
 					) : null}
 				</div>
 			) : null}
-			<p className="text-sm" data-testid="effective-date-range">
-				Showing: {describeEffectiveDateRange(selection)}
-			</p>
+			{isMonthWithoutYearInvalid ? (
+				// Replaces the "Showing:" line rather than sitting beside it:
+				// while the selection is invalid there is no effective range to
+				// show, and printing one would imply the filter had been applied.
+				<p
+					id="temporal-month-without-year-error"
+					role="alert"
+					className="text-error text-sm"
+					data-testid="temporal-filter-error"
+				>
+					Select a year as well as a month.
+				</p>
+			) : (
+				<p className="text-sm" data-testid="effective-date-range">
+					Showing: {describeEffectiveDateRange(selection)}
+				</p>
+			)}
 		</form>
 	);
 }

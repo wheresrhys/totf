@@ -94,11 +94,43 @@ function earliestBound(...bounds: (string | undefined)[]): string | undefined {
 		.at(0);
 }
 
+// Whether a recurring (yearless) month falls inside the bounds at least once.
+// With either bound absent the recurrence is unbounded in that direction, so
+// it always does. With both set, only the years the bounds span can contain an
+// occurrence, and each year's window has to actually overlap them — e.g. May
+// with 2021-06-01..2022-03-31 spans two years yet contains no May at all.
+function monthRecursWithinBounds(
+	month: number,
+	fromDate?: string,
+	toDate?: string
+): boolean {
+	if (!fromDate || !toDate) {
+		return true;
+	}
+	const paddedMonth = padToTwoDigits(month);
+	const firstYearSpanned = parseInt(fromDate.slice(0, 4));
+	const lastYearSpanned = parseInt(toDate.slice(0, 4));
+	for (let year = firstYearSpanned; year <= lastYearSpanned; year++) {
+		const lastDay = padToTwoDigits(getLastDayOfMonth(year, month));
+		const monthStart = `${year}-${paddedMonth}-01`;
+		const monthEnd = `${year}-${paddedMonth}-${lastDay}`;
+		if (monthStart <= toDate && monthEnd >= fromDate) {
+			return true;
+		}
+	}
+	return false;
+}
+
 // The always-computed intersection of the year/month-derived range with the
 // explicit fromDate/toDate — never an either/or choice between the two modes.
-// An intersection can come out empty (fromDate after toDate); that's exactly
-// the misalignment `TemporalFilterControls`' conflict warning flags, so it's
-// returned as-is rather than silently normalised away.
+//
+// Returns `null` when nothing at all satisfies the whole selection, so an
+// unsatisfiable combination can't be mistaken for a range that merely happens
+// to be narrow. Two ways that happens: the intersection inverts (`fromDate`
+// after `toDate` — e.g. year 2022 with an explicit 2023-01-01 onwards), or a
+// recurring month never occurs inside the bounds at all (May within
+// 2021-06-01..2022-03-31). Callers decide how to present "no dates"; this
+// function won't hand back an empty-but-present range for them to misread.
 //
 // A month selected with no year makes the result non-contiguous — e.g. May
 // plus 2021-01-01..2023-12-31 means three separate Mays, not three unbroken
@@ -110,10 +142,19 @@ function earliestBound(...bounds: (string | undefined)[]): string | undefined {
 // narrowing it now would not.
 export function computeEffectiveDateRange(
 	selection: TemporalSelection
-): EffectiveDateRange {
+): EffectiveDateRange | null {
 	const derived = deriveYearMonthDateRange(selection);
 	const fromDate = latestBound(derived.fromDate, selection.fromDate);
 	const toDate = earliestBound(derived.toDate, selection.toDate);
+	if (fromDate && toDate && fromDate > toDate) {
+		return null;
+	}
+	if (
+		derived.recurringMonth &&
+		!monthRecursWithinBounds(derived.recurringMonth, fromDate, toDate)
+	) {
+		return null;
+	}
 	return {
 		...(fromDate ? { fromDate } : {}),
 		...(toDate ? { toDate } : {}),
@@ -121,6 +162,18 @@ export function computeEffectiveDateRange(
 			? { recurringMonth: derived.recurringMonth }
 			: {})
 	};
+}
+
+// A month selected with no year is a recurring selection rather than a single
+// window (see `deriveYearMonthDateRange`). A caller whose data model can't
+// express that — a page keyed on one concrete year, say — opts out by treating
+// the combination as invalid instead, via `TemporalFilterControls`'
+// `treatMonthWithoutYearAsInvalid` prop.
+export function isMonthSelectedWithoutYear({
+	year,
+	month
+}: TemporalSelection): boolean {
+	return !!month && !year;
 }
 
 // Query-string form of a selection: only the fields actually set appear.
