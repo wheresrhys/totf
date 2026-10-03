@@ -17,7 +17,7 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 					if (scope.temporalUnit !== 'day') {
 						result += ` in a ${printTemporalUnit(scope.temporalUnit)}`;
 					}
-					result += printTimeQualifier(scope.parentTimeWindow);
+					result += ` ${printTimeQualifier(scope.parentTimeWindow)}`;
 					return result;
 				},
 				lineItem: ({ scope, ranking }) =>
