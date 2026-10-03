@@ -4,6 +4,7 @@ import { type SessionEncounter } from '@/app/models/session';
 import { type NetRound } from '@/app/lib/session-chronology';
 import { getAgeClass } from '@/app/models/encounter';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
+import { ConditionalTabPanel } from '@/app/components/shared/ConditionalTabPanel';
 export type SpeciesWithEncounters = {
 	species: string;
 	encounters: SessionEncounter[];
@@ -115,29 +116,6 @@ const SessionTableBody = createStatsTableBody<SpeciesWithEncounters, RowModel>({
 	getKey: (model) => model.species,
 	ExpandedContentComponent: ExpandedSpeciesEncounters
 });
-
-function ConditionalTabPanel({
-	loadedTabs,
-	tabId,
-	activeTabId,
-	children
-}: {
-	loadedTabs: Set<string>;
-	tabId: string;
-	activeTabId: string;
-	children: React.ReactNode;
-}) {
-	if (loadedTabs.has(tabId)) {
-		return tabId === activeTabId ? (
-			<div>{children}</div>
-		) : (
-			<div className="hidden" aria-hidden="true">
-				{children}
-			</div>
-		);
-	}
-	return null;
-}
 
 // Shared by the Mist-netting and Other catches tabs (#1022) — same species-totals
 // table, just over a differently-filtered `speciesList`. Each computes its own
