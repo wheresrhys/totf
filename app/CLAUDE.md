@@ -146,6 +146,12 @@ entrypoint, its content, and its data fetcher:
   re-run the server component and its RPCs to produce byte-identical data. `replaceState` rather
   than `pushState` keeps a run of toggling out of the back button. Reach for `router.replace` only
   when the new URL genuinely needs a different server render.
+  Tab selection follows the same convention and needs no per-page wiring: `useLinkableTabs`
+  (`app/components/shared/useLinkableTabs.ts`) reads `?tabId=` on load via
+  `app/lib/tab-query-param.ts`'s `resolveInitialTabId` and writes the selected tab back via its
+  `setTabIdSearchParam` (#1013), so every page that takes its tab state from that hook — directly,
+  or through the shared `TabSet` component (`app/components/shared/TabSet.tsx`) — gets
+  reload-survivable, copy-pasteable tab links for free.
 
 Naming reference (see #667 for the original design discussion):
 
