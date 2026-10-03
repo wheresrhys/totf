@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { resolveInitialTabId } from '@/app/lib/tab-query-param';
+import {
+	resolveInitialTabId,
+	setTabIdSearchParam
+} from '@/app/lib/tab-query-param';
 
 /**
  * Shared tab-state hook for the app's `?tabId=`-linkable tab pages — species,
@@ -15,7 +18,10 @@ import { resolveInitialTabId } from '@/app/lib/tab-query-param';
  *    known requested tab wins; anything else falls back to `defaultTabId`),
  *  - seeds `activeTab` and a `loadedTabs` set (for lazy per-tab loading) from
  *    that resolved tab, so the linked tab is active and loaded on first paint,
- *  - and returns a `selectTab` handler that marks a tab both loaded and active.
+ *  - and returns a `selectTab` handler that marks a tab both loaded and active,
+ *    and mirrors the newly-focused tab onto the URL's `?tabId=` param (#1013)
+ *    so a reload, a copied link or a browser-restored session reopens the same
+ *    tab.
  *
  * Pages that lazily load per-tab data (species, session) read `loadedTabs` to
  * gate their `ConditionalTabPanel`s; pages that render every tab eagerly
@@ -40,9 +46,20 @@ export function useLinkableTabs({
 		() => new Set([initialTab])
 	);
 	const [activeTab, setActiveTab] = useState(initialTab);
+	// `window.history.replaceState` rather than `router.replace`, per CLAUDE.md's
+	// URL-addressable-client-state convention: which tab is focused is pure
+	// client state over data this page has already fetched (or fetches itself on
+	// select), so a Next.js navigation would re-run the server component and its
+	// RPCs to produce identical data. `replaceState` rather than `pushState`
+	// keeps a run of tab-flicking out of the back button.
 	const selectTab = useCallback((tabId: string) => {
 		setLoadedTabs((prev) => new Set([...prev, tabId]));
 		setActiveTab(tabId);
+		window.history.replaceState(
+			null,
+			'',
+			setTabIdSearchParam(window.location.href, tabId)
+		);
 	}, []);
 	return { activeTab, loadedTabs, selectTab };
 }
