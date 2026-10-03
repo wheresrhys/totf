@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { resolveInitialTabId } from '@/app/lib/tab-query-param';
+import {
+	resolveInitialTabId,
+	setTabIdSearchParam
+} from '@/app/lib/tab-query-param';
 
 /**
  * Shared tab-state hook for the app's `?tabId=`-linkable tab pages — species,
@@ -15,7 +18,10 @@ import { resolveInitialTabId } from '@/app/lib/tab-query-param';
  *    known requested tab wins; anything else falls back to `defaultTabId`),
  *  - seeds `activeTab` and a `loadedTabs` set (for lazy per-tab loading) from
  *    that resolved tab, so the linked tab is active and loaded on first paint,
- *  - and returns a `selectTab` handler that marks a tab both loaded and active.
+ *  - and returns a `selectTab` handler that marks a tab both loaded and active,
+ *    and mirrors it back onto the URL's `tabId` param (#1013) so the link side
+ *    is symmetrical: what `?tabId=` restores on load is what selecting a tab
+ *    writes.
  *
  * Pages that lazily load per-tab data (species, session) read `loadedTabs` to
  * gate their `ConditionalTabPanel`s; pages that render every tab eagerly
@@ -43,6 +49,10 @@ export function useLinkableTabs({
 	const selectTab = useCallback((tabId: string) => {
 		setLoadedTabs((prev) => new Set([...prev, tabId]));
 		setActiveTab(tabId);
+		// The read side (`resolveInitialTabId` above) already lives here, so the
+		// write side belongs here too — this is the single place a tab selection
+		// happens for every tabbed page (#1013).
+		setTabIdSearchParam(tabId);
 	}, []);
 	return { activeTab, loadedTabs, selectTab };
 }

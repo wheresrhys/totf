@@ -40,3 +40,31 @@ export async function readTabIdSearchParam(
 	const resolved = await searchParams;
 	return resolved.tabId;
 }
+
+/**
+ * The write side of the same mechanism (#1013): mirror the tab the user just
+ * selected back onto the URL's `tabId` param, so a reload — or a link copied
+ * out of the address bar after switching tabs — reopens that tab rather than
+ * the page's default. Every other search param on the URL is preserved.
+ *
+ * `window.history.replaceState` rather than `router.replace`/`push`, per
+ * `app/CLAUDE.md`'s "URL-addressable client state": switching tabs is a pure
+ * client-side selection over panels the page has already mounted, so a real
+ * Next.js navigation would re-run the server component to produce identical
+ * data. `replaceState` rather than `pushState` keeps a run of tab-flicking out
+ * of the back button.
+ */
+export function setTabIdSearchParam(tabId: string): void {
+	// Guard for any non-browser render path (SSR, a hook exercised outside a
+	// DOM environment) — there's simply no URL to write to there.
+	if (typeof window === 'undefined') {
+		return;
+	}
+	const url = new URL(window.location.href);
+	url.searchParams.set('tabId', tabId);
+	window.history.replaceState(
+		null,
+		'',
+		`${url.pathname}${url.search}${url.hash}`
+	);
+}

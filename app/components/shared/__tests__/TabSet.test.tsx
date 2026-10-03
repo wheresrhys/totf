@@ -93,6 +93,13 @@ function visibleTabPanelIds() {
 		.map((panel) => panel.getAttribute('data-testid'));
 }
 
+/** Wait for a lazily-fetched tab to finish loading and render its data. */
+function waitForTabData(tabId: string, expectedText: string) {
+	return waitFor(() =>
+		expect(screen.getByTestId(`panel-${tabId}`).textContent).toBe(expectedText)
+	);
+}
+
 describe('TabSet', () => {
 	describe('tab selection', () => {
 		it('renders the first tab active by default when no initialTabId is given', async () => {
@@ -158,6 +165,57 @@ describe('TabSet', () => {
 				)
 			);
 			expect(tabs[0].dataFetcher).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	describe('URL write-back', () => {
+		// `replaceState` is spied rather than stubbed so the URL genuinely
+		// changes, letting a test assert on `window.location` as well as on how
+		// the history API was called.
+		function spyOnHistory() {
+			return {
+				replaceState: vi.spyOn(window.history, 'replaceState'),
+				pushState: vi.spyOn(window.history, 'pushState')
+			};
+		}
+
+		it('updates the tabId search param when a tab is selected', async () => {
+			window.history.replaceState(null, '', '/species/Blue%20Tit');
+			renderTabSet();
+			await waitForTabData('overview', 'overview data');
+
+			fireEvent.click(screen.getByRole('button', { name: 'Notes' }));
+
+			expect(window.location.search).toBe('?tabId=notes');
+		});
+
+		it('does not push a new history entry', async () => {
+			window.history.replaceState(null, '', '/species/Blue%20Tit');
+			renderTabSet();
+			await waitForTabData('overview', 'overview data');
+			const history = spyOnHistory();
+
+			fireEvent.click(screen.getByRole('button', { name: 'Notes' }));
+
+			expect(history.replaceState).toHaveBeenCalledTimes(1);
+			expect(history.pushState).not.toHaveBeenCalled();
+		});
+
+		it('leaves other search params untouched when updating tabId', async () => {
+			window.history.replaceState(
+				null,
+				'',
+				'/species/Blue%20Tit?combineYears=true&tabId=overview'
+			);
+			renderTabSet();
+			await waitForTabData('overview', 'overview data');
+
+			fireEvent.click(screen.getByRole('button', { name: 'Trends' }));
+			await waitForTabData('trends', 'trends data');
+
+			const searchParams = new URLSearchParams(window.location.search);
+			expect(searchParams.get('combineYears')).toBe('true');
+			expect(searchParams.get('tabId')).toBe('trends');
 		});
 	});
 });
