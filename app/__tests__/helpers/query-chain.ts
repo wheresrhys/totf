@@ -4,10 +4,10 @@ export type FilterCall = { column: string; operator: string; value: unknown };
 
 /**
  * A chainable Supabase query-builder mock (`.select()`/`.eq()`/`.contains()`/
- * `.order()`/`.range()`/`.limit()`/`.filter()`, each returning the same chain
- * so calls compose in any order/number the real PostgrestFilterBuilder
- * allows) that resolves (thenable, like the real builder) to `{ data, error:
- * null }`.
+ * `.order()`/`.range()`/`.limit()`/`.filter()`/`.gte()`/`.lte()`, each
+ * returning the same chain so calls compose in any order/number the real
+ * PostgrestFilterBuilder allows) that resolves (thenable, like the real
+ * builder) to `{ data, error: null }`.
  *
  * `rows` is either the static data to resolve with (matches every call,
  * e.g. `fetchPageOfBirds`' single non-paginated query), or a
@@ -20,8 +20,10 @@ export type FilterCall = { column: string; operator: string; value: unknown };
  * read after a test bumps a version variable), a zero-arg function works
  * too — `fromRow`/`toRow` are simply ignored.
  *
- * Also records the `select` string and every `.filter()` call, for
- * assertions that don't want a dedicated mock reference per method.
+ * Also records the `select` string and every filtering call — `.filter()`
+ * plus the `.gte()`/`.lte()` shorthands, all normalised into the same
+ * `{column, operator, value}` shape — for assertions that don't want a
+ * dedicated mock reference per method.
  */
 export function makeQueryChain(
 	rows: unknown | ((fromRow?: number, toRow?: number) => unknown)
@@ -46,6 +48,14 @@ export function makeQueryChain(
 		limit: vi.fn(() => chain),
 		filter: vi.fn((column: string, operator: string, value: unknown) => {
 			record.filters.push({ column, operator, value });
+			return chain;
+		}),
+		gte: vi.fn((column: string, value: unknown) => {
+			record.filters.push({ column, operator: 'gte', value });
+			return chain;
+		}),
+		lte: vi.fn((column: string, value: unknown) => {
+			record.filters.push({ column, operator: 'lte', value });
 			return chain;
 		}),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) => {

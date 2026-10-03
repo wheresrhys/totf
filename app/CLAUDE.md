@@ -77,6 +77,15 @@ the root layout, not a subtree one.
 - Errors from Supabase calls are handled via `catchSupabaseErrors()`.
 - RPC calls go through `.rpc('function_name', args)` on the Supabase client.
 - TypeScript types for DB rows come from `app/models/db.ts`, which re-exports from the auto-generated types. Types for a query's return shape (e.g. an embedded-relation select used by only one page) can live alongside the page/component that fetches and renders it instead, if not reused elsewhere.
+- **Temporal filtering** of a direct `Encounters` table query goes through `applyTemporalFilter`
+  (`app/lib/supabase/temporal-filter.ts`, #1075) — never hand-rolled `.gte`/`.lte` calls. It takes
+  the standard `{fromDate, toDate, year, month}` filter (#1051, the same shape as the stats RPC
+  family's `from_date`/`to_date`/`year_filter`/`month_filter`), intersects all four into inclusive
+  `Encounters.visit_date` bounds, and returns the same query builder so it composes inside a
+  `fetchAllPaginatedRows` callback — it never calls `.range()`/`.order()`/`.select()`, which stay
+  the caller's. A bare `month` with no `year` is a squashed-month filter, not a contiguous range,
+  so PostgREST can't express it and the helper throws: route that through the RPC family's
+  `month_filter` instead.
 
 ## Code conventions
 
