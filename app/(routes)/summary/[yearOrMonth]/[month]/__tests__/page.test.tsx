@@ -179,7 +179,7 @@ describe('/summary/[yearOrMonth]/[month]', () => {
 			screen
 				.getByRole('link', { name: '16th August 2026' })
 				.getAttribute('href')
-		).toBe('/group/alpha/session/2026-08-16');
+		).toBe('/group/alpha/session/2026-08-16?tabId=session-totals');
 	});
 
 	it('lazily renders species table rows linking to the year-and-month-scoped species URL (#625)', async () => {
@@ -194,7 +194,9 @@ describe('/summary/[yearOrMonth]/[month]', () => {
 		await screen.findByRole('heading', { level: 1 });
 		fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
 		const link = await screen.findByRole('link', { name: 'Robin' });
-		expect(link.getAttribute('href')).toBe('/species/Robin/2026/8');
+		expect(link.getAttribute('href')).toBe(
+			'/species/Robin/2026/8?tabId=species-totals'
+		);
 		expect(fetchSpeciesDataMock).toHaveBeenCalledWith(
 			1,
 			'2026-08-01',

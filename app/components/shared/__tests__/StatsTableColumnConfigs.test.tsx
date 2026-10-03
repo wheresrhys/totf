@@ -6,6 +6,7 @@ import {
 	buildTotalsRowCells,
 	columnBlock
 } from '../StatsTableColumnConfigs';
+import { CurrentTabProvider } from '../CurrentTabContext';
 import type { ColumnConfig, RowModelWithRawData } from '../SortableTable';
 
 afterEach(() => {
@@ -68,6 +69,21 @@ describe('createNameLinkCell', () => {
 		render(<Cell model={makeRow('Reed & Sedge')} />);
 		expect(screen.getByRole('link').getAttribute('href')).toBe(
 			'/species/Reed%20%26%20Sedge'
+		);
+	});
+
+	it('carries the enclosing tab onto the href when rendered inside a tab panel', () => {
+		const Cell = createNameLinkCell<Raw, Model>(
+			(model) => model.name,
+			(model) => `/species/${model.name}`
+		);
+		render(
+			<CurrentTabProvider currentTabId="species-totals">
+				<Cell model={makeRow('Robin')} />
+			</CurrentTabProvider>
+		);
+		expect(screen.getByRole('link').getAttribute('href')).toBe(
+			'/species/Robin?tabId=species-totals'
 		);
 	});
 

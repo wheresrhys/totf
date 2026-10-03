@@ -139,7 +139,9 @@ describe('/summary/[yearOrMonth]', () => {
 		await screen.findByRole('heading', { level: 1 });
 		fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
 		const link = await screen.findByRole('link', { name: 'Robin' });
-		expect(link.getAttribute('href')).toBe('/species/Robin/2026');
+		expect(link.getAttribute('href')).toBe(
+			'/species/Robin/2026?tabId=species-totals'
+		);
 		expect(fetchSpeciesDataMock).toHaveBeenCalledWith(
 			1,
 			'2026-01-01',

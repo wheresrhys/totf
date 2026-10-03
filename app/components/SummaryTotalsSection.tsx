@@ -41,11 +41,13 @@ import {
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
+import { CurrentTabProvider } from '@/app/components/shared/CurrentTabContext';
 import {
 	StatOutput,
 	type SpeciesName
 } from '@/app/components/shared/StatOutput';
 import { renderCombinedHighlights } from '@/app/components/pages/session/SessionHighlights';
+
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
 // The all-time page's combine-years month tab — distinct from `MONTH_TOTALS_TAB`
 // (the year page's per-year, linked, toggle-enabled month rows). Same label,
@@ -510,7 +512,7 @@ export function SummaryTotalsSection({
 	const totalsStats = summaryStats ?? undefined;
 
 	return (
-		<>
+		<CurrentTabProvider currentTabId={activeTab}>
 			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={selectTab} />
 			{yearlyTotals !== undefined && activeTab === YEAR_TOTALS_TAB.id && (
 				<PeriodTotalsTable
@@ -630,6 +632,6 @@ export function SummaryTotalsSection({
 						)}
 					</div>
 				))}
-		</>
+		</CurrentTabProvider>
 	);
 }

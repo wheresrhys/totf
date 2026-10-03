@@ -3,6 +3,7 @@ import { TabNav } from '@/app/components/TabNav';
 import { SpeciesTotalsTable } from '@/app/components/SpeciesTotalsTable';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
+import { CurrentTabProvider } from '@/app/components/shared/CurrentTabContext';
 import { getHighlightsWithinTimeWindow } from '@/app/lib/highlights';
 import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import {
@@ -104,7 +105,7 @@ export function SquashedMonthSummaryTotalsSection({
 		);
 
 	return (
-		<>
+		<CurrentTabProvider currentTabId={activeTab}>
 			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={selectTab} />
 			{activeTab === SPECIES_TOTALS_TAB.id && (
 				<SpeciesTotalsTable
@@ -161,6 +162,6 @@ export function SquashedMonthSummaryTotalsSection({
 						)}
 					</div>
 				))}
-		</>
+		</CurrentTabProvider>
 	);
 }

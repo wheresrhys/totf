@@ -64,7 +64,23 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 				within(heading)
 					.getByRole('link', { name: 'All time' })
 					.getAttribute('href')
-			).toBe('/species/Robin');
+			).toBe('/species/Robin?tabId=month-totals');
+		});
+
+		// #1013: the period-scoped and all-time species pages share most of their
+		// tab vocabulary, so the "All time" drill-up link carries the focused tab
+		// and the reader stays on it instead of landing on the all-time page's
+		// default Year totals tab.
+		it('keeps the "All time" link pointed at whichever tab is focused', async () => {
+			render(await renderYearPage());
+			await screen.findByTestId('sp-month-totals-tab');
+			const allTimeLinkHref = () =>
+				screen.getByRole('link', { name: 'All time' }).getAttribute('href');
+			expect(allTimeLinkHref()).toBe('/species/Robin?tabId=month-totals');
+
+			fireEvent.click(screen.getByRole('button', { name: 'Bird list' }));
+			await screen.findByTestId('sp-individuals-tab');
+			expect(allTimeLinkHref()).toBe('/species/Robin?tabId=bird-list');
 		});
 
 		it('renders the species tabs and stats for the scoped data', async () => {
@@ -292,7 +308,7 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 				within(heading)
 					.getByRole('link', { name: 'All time' })
 					.getAttribute('href')
-			).toBe('/species/Robin');
+			).toBe('/species/Robin?tabId=squashed-month-year-totals');
 		});
 
 		it('renders tab buttons in the order Year totals, Session totals, Highlights, Biometrics, Demographics, Bird list', async () => {

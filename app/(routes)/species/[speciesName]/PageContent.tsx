@@ -5,7 +5,7 @@ import {
 	PrimaryHeading,
 	Standfirst
 } from '@/app/components/shared/DesignSystem';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+import { TabAwareLink } from '@/app/components/shared/TabAwareLink';
 import { formatMonthLabel } from '@/app/lib/month-totals';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
@@ -21,6 +21,7 @@ import { SpSquashedMonthYearTotalsTab } from '@/app/components/pages/species/SpS
 import { SpSessionTotalsTab } from '@/app/components/pages/species/SpSessionTotalsTab';
 import { TabNav } from '@/app/components/TabNav';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
+import { CurrentTabProvider } from '@/app/components/shared/CurrentTabContext';
 
 // `tabId` (#803) is the optional `?tabId=` search param, threaded in from
 // each route depth's `page.tsx` — it never affects `getCacheKeys`, only which
@@ -135,6 +136,14 @@ function buildSpeciesCountsSentence({
 // reporting the species' totals for the period in view — only passed by
 // `SpeciesPageContent` on the `FullFatPageData` branch, since the "not
 // authorised" branch has no species stats to report.
+//
+// The "All time" link is a `TabAwareLink` (#1013) and the heading is rendered
+// inside `SpeciesData`'s `CurrentTabProvider`, so drilling up to the unscoped
+// page keeps whichever tab the reader was on. This is the one link in the app
+// where that matters most: the period-scoped and all-time species pages share
+// most of their tab vocabulary (Session totals, Highlights, Biometrics,
+// Demographics, Bird list), so the tab genuinely survives the hop rather than
+// falling back to the target depth's default.
 export function SpeciesHeading({
 	speciesName,
 	year,
@@ -155,12 +164,12 @@ export function SpeciesHeading({
 				{(year !== undefined || squashedMonth !== undefined) && (
 					<>
 						{' '}
-						<NoPrefetchLink
+						<TabAwareLink
 							className="link text-lg align-middle"
 							href={`/species/${speciesName}`}
 						>
 							All time
-						</NoPrefetchLink>
+						</TabAwareLink>
 					</>
 				)}
 			</PrimaryHeading>
@@ -199,11 +208,19 @@ function ConditionalTabPanel({
 function SpeciesData({
 	data,
 	viewedGroup,
-	initialTabId
+	initialTabId,
+	heading
 }: {
 	data: FullFatPageData;
 	viewedGroup: ViewedGroup;
 	initialTabId?: string;
+	// The page's `SpeciesHeading`, passed in rather than rendered by
+	// `SpeciesPageContent` itself so it sits inside this component's
+	// `CurrentTabProvider` (#1013) — its "All time" drill-up link is a
+	// `TabAwareLink` and needs the focused tab. The "not authorised" branch
+	// renders the very same node outside any provider, where the link is left
+	// alone.
+	heading: React.ReactNode;
 }) {
 	// Cascading period tab, same convention `SummaryTotalsSection` uses: the
 	// all-time page gets "Year totals" (drilling into a year), the year-scoped
@@ -246,7 +263,8 @@ function SpeciesData({
 	});
 
 	return (
-		<>
+		<CurrentTabProvider currentTabId={activeTab}>
+			{heading}
 			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={selectTab} />
 			{isAllTime && (
 				<ConditionalTabPanel
@@ -368,7 +386,7 @@ function SpeciesData({
 					toDate={data.toDate}
 				/>
 			</ConditionalTabPanel>
-		</>
+		</CurrentTabProvider>
 	);
 }
 
@@ -385,31 +403,40 @@ export function SpeciesPageContent({
 	data: PageData;
 	viewedGroup: ViewedGroup;
 }) {
+	// Built here but rendered by whichever branch below owns it, so the
+	// authorised branch can hand it to `SpeciesData` and have it land inside that
+	// component's `CurrentTabProvider` (#1013) without the props being restated.
+	const heading = (
+		<SpeciesHeading
+			speciesName={speciesName}
+			year={data.year}
+			month={data.month}
+			squashedMonth={data.squashedMonth}
+			counts={
+				fullFatTypeGuard(data)
+					? {
+							birdCount: data.speciesStats.bird_count,
+							encounterCount: data.speciesStats.encounter_count,
+							sessionCount: data.speciesStats.session_count
+						}
+					: undefined
+			}
+		/>
+	);
 	return (
 		<PageWrapper>
-			<SpeciesHeading
-				speciesName={speciesName}
-				year={data.year}
-				month={data.month}
-				squashedMonth={data.squashedMonth}
-				counts={
-					fullFatTypeGuard(data)
-						? {
-								birdCount: data.speciesStats.bird_count,
-								encounterCount: data.speciesStats.encounter_count,
-								sessionCount: data.speciesStats.session_count
-							}
-						: undefined
-				}
-			/>
 			{fullFatTypeGuard(data) ? (
 				<SpeciesData
 					data={data}
 					viewedGroup={viewedGroup}
 					initialTabId={tabId}
+					heading={heading}
 				/>
 			) : (
-				<p>Not authorised to view any encounter data for this species</p>
+				<>
+					{heading}
+					<p>Not authorised to view any encounter data for this species</p>
+				</>
 			)}
 		</PageWrapper>
 	);

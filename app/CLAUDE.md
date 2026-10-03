@@ -137,6 +137,25 @@ entrypoint, its content, and its data fetcher:
   re-run the server component and its RPCs to produce byte-identical data. `replaceState` rather
   than `pushState` keeps a run of toggling out of the back button. Reach for `router.replace` only
   when the new URL genuinely needs a different server render.
+- **Persistent tabs** (#1013) — the one instance of the above that every tab-owning page shares.
+  Four components own tab state (`SummaryTotalsSection`, `SquashedMonthSummaryTotalsSection`,
+  `SessionTabs` in `components/pages/session/SingleSessionData.tsx`, and `SpeciesData` in
+  `species/[speciesName]/PageContent.tsx`) and all four go through the same three pieces:
+  - `components/shared/useLinkableTabs.ts` resolves the initial tab from the `?tabId=` search param
+    (threaded in from each route depth's `page.tsx`, see `lib/tab-query-param.ts`) and mirrors every
+    later selection back onto `?tabId=` with `replaceState`, per the convention above — so a reload
+    or a copied link reopens the same tab.
+  - each wraps its `TabNav` + panels in `components/shared/CurrentTabContext.tsx`'s
+    `CurrentTabProvider`, publishing the focused tab to the whole subtree so nothing has to
+    prop-thread it through the tables in between.
+  - `components/shared/TabAwareLink.tsx` (a `NoPrefetchLink` that appends the ambient tab to its
+    href) is what consumes it: the shared `createNameLinkCell` drill-down cell
+    (`components/shared/StatsTableColumnConfigs.tsx`) and the species page's "All time" drill-up
+    link both use it, so following a link lands on the equivalent tab of the target page. Outside
+    any provider — the `/species` list page's table, say — it degrades to a plain `NoPrefetchLink`;
+    a target page whose tab vocabulary has no such tab falls back to its own default, so a
+    carried-over tab is always a hint, never a requirement. Adding a new link inside a tab panel
+    gets this for free; use `TabAwareLink` rather than `NoPrefetchLink` there.
 
 Naming reference (see #667 for the original design discussion):
 
