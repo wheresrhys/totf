@@ -21,6 +21,7 @@ import { SpSquashedMonthYearTotalsTab } from '@/app/components/pages/species/SpS
 import { SpSessionTotalsTab } from '@/app/components/pages/species/SpSessionTotalsTab';
 import { TabNav } from '@/app/components/TabNav';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
+import { ConditionalTabPanel } from '@/app/components/shared/ConditionalTabPanel';
 
 // `tabId` (#803) is the optional `?tabId=` search param, threaded in from
 // each route depth's `page.tsx` — it never affects `getCacheKeys`, only which
@@ -171,29 +172,6 @@ export function SpeciesHeading({
 			</Standfirst>
 		</>
 	);
-}
-
-function ConditionalTabPanel({
-	loadedTabs,
-	tabId,
-	activeTabId,
-	children
-}: {
-	loadedTabs: Set<string>;
-	tabId: string;
-	activeTabId: string;
-	children: React.ReactNode;
-}) {
-	if (loadedTabs.has(tabId)) {
-		return tabId === activeTabId ? (
-			<div>{children}</div>
-		) : (
-			<div className="hidden" aria-hidden="true">
-				{children}
-			</div>
-		);
-	}
-	return null;
 }
 
 function SpeciesData({
