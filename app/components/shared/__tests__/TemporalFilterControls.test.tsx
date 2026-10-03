@@ -188,8 +188,29 @@ describe('TemporalFilterControls', () => {
 
 			selectMonth(5);
 
+			expect(getEffectiveDateRange()).toBe('Showing: May in every year');
+		});
+
+		it('describes a yearless month plus a multi-year date range as a recurrence within those bounds, not one contiguous range', () => {
+			renderControls();
+
+			selectMonth(5);
+			setFromDate('2021-01-01');
+			setToDate('2023-12-31');
+
 			expect(getEffectiveDateRange()).toBe(
-				'Showing: all dates (May in every year)'
+				'Showing: May in every year, 2021-01-01 to 2023-12-31'
+			);
+		});
+
+		it('describes a yearless month with only one bound set as a recurrence from that bound on', () => {
+			renderControls();
+
+			selectMonth(5);
+			setFromDate('2021-01-01');
+
+			expect(getEffectiveDateRange()).toBe(
+				'Showing: May in every year, 2021-01-01 onwards'
 			);
 		});
 	});

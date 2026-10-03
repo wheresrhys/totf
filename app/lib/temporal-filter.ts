@@ -31,9 +31,19 @@ export type TemporalSelection = {
 
 // A pair of inclusive `YYYY-MM-DD` bounds. Either side may be absent, meaning
 // "unbounded in that direction".
+//
+// `recurringMonth` (1-indexed) is set when a month is selected with no year. In
+// that case the bounds are only an *outer envelope*: the selection is that
+// month's recurrence inside them — one disjoint window per year spanned, not
+// one contiguous run of dates. So a consumer must apply `recurringMonth` as a
+// filter of its own alongside the bounds; treating `{fromDate, toDate}` as the
+// whole selection would wrongly include the other eleven months of every year
+// in between. The field lives on the returned value rather than only in a
+// comment so that's impossible to miss at the call site.
 export type EffectiveDateRange = {
 	fromDate?: string;
 	toDate?: string;
+	recurringMonth?: number;
 };
 
 function padToTwoDigits(value: number): string {
@@ -49,13 +59,13 @@ function getLastDayOfMonth(year: number, month: number): number {
 // The date range a year/month selection implies on its own. A month with no
 // year recurs in every year, so it has no contiguous bounds at all (the same
 // "squashed month" idea as `/summary/jan`) — it contributes nothing to the
-// range and is applied as a separate recurring filter downstream.
+// bounds and comes back as `recurringMonth` for the caller to apply separately.
 export function deriveYearMonthDateRange({
 	year,
 	month
 }: TemporalSelection): EffectiveDateRange {
 	if (!year) {
-		return {};
+		return month ? { recurringMonth: month } : {};
 	}
 	if (!month) {
 		return { fromDate: `${year}-01-01`, toDate: `${year}-12-31` };
@@ -89,6 +99,15 @@ function earliestBound(...bounds: (string | undefined)[]): string | undefined {
 // An intersection can come out empty (fromDate after toDate); that's exactly
 // the misalignment `TemporalFilterControls`' conflict warning flags, so it's
 // returned as-is rather than silently normalised away.
+//
+// A month selected with no year makes the result non-contiguous — e.g. May
+// plus 2021-01-01..2023-12-31 means three separate Mays, not three unbroken
+// years — so the bounds come back as the envelope around those windows and the
+// month comes back as `recurringMonth` for the caller to apply as well. The
+// envelope is deliberately not narrowed to the first/last occurrence of the
+// month: nothing downstream needs tighter bounds while `recurringMonth` is
+// being applied anyway, and widening later would be a behaviour change where
+// narrowing it now would not.
 export function computeEffectiveDateRange(
 	selection: TemporalSelection
 ): EffectiveDateRange {
@@ -97,7 +116,10 @@ export function computeEffectiveDateRange(
 	const toDate = earliestBound(derived.toDate, selection.toDate);
 	return {
 		...(fromDate ? { fromDate } : {}),
-		...(toDate ? { toDate } : {})
+		...(toDate ? { toDate } : {}),
+		...(derived.recurringMonth
+			? { recurringMonth: derived.recurringMonth }
+			: {})
 	};
 }
 

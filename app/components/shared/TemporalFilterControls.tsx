@@ -14,24 +14,34 @@ export type TemporalNavigationTarget = {
 	queryStrings: Record<string, string>;
 };
 
-function describeEffectiveDateRange(selection: TemporalSelection): string {
-	const { fromDate, toDate } = computeEffectiveDateRange(selection);
-	// A month with no year has no contiguous bounds to show, so name it
-	// explicitly rather than letting the range read as unfiltered.
-	const recurringMonth =
-		selection.month && !selection.year
-			? ` (${MONTH_NAMES[selection.month - 1]} in every year)`
-			: '';
+function describeBounds(fromDate?: string, toDate?: string): string {
 	if (fromDate && toDate) {
-		return `${fromDate} to ${toDate}${recurringMonth}`;
+		return `${fromDate} to ${toDate}`;
 	}
 	if (fromDate) {
-		return `${fromDate} onwards${recurringMonth}`;
+		return `${fromDate} onwards`;
 	}
 	if (toDate) {
-		return `up to ${toDate}${recurringMonth}`;
+		return `up to ${toDate}`;
 	}
-	return `all dates${recurringMonth}`;
+	return 'all dates';
+}
+
+function describeEffectiveDateRange(selection: TemporalSelection): string {
+	const { fromDate, toDate, recurringMonth } =
+		computeEffectiveDateRange(selection);
+	if (!recurringMonth) {
+		return describeBounds(fromDate, toDate);
+	}
+	// A month with no year isn't one contiguous stretch — it's that month over
+	// again in each year the bounds span — so it leads the sentence and the
+	// bounds are phrased as the window it recurs within, rather than reading as
+	// an unbroken range with the month tacked on as an aside.
+	const monthName = MONTH_NAMES[recurringMonth - 1];
+	if (!fromDate && !toDate) {
+		return `${monthName} in every year`;
+	}
+	return `${monthName} in every year, ${describeBounds(fromDate, toDate)}`;
 }
 
 // Reusable year / month / date-range filter (#1051). The two filtering modes
