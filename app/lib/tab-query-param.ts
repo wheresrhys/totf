@@ -56,7 +56,10 @@ export const TAB_ID_SEARCH_PARAM = 'tabId';
  * are preserved; an existing `tabId` is overwritten, since the tab the user
  * just clicked is by definition the current one (#1013).
  */
-export function setTabIdSearchParam(absoluteUrl: string, tabId: string): string {
+export function setTabIdSearchParam(
+	absoluteUrl: string,
+	tabId: string
+): string {
 	const parsed = new URL(absoluteUrl);
 	parsed.searchParams.set(TAB_ID_SEARCH_PARAM, tabId);
 	return `${parsed.pathname}${parsed.search}${parsed.hash}`;

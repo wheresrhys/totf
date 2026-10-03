@@ -21,7 +21,10 @@ export function TabAwareLink({
 }) {
 	const currentTabId = useCurrentTabId();
 	return (
-		<NoPrefetchLink {...props} href={appendTabIdSearchParam(href, currentTabId)}>
+		<NoPrefetchLink
+			{...props}
+			href={appendTabIdSearchParam(href, currentTabId)}
+		>
 			{children}
 		</NoPrefetchLink>
 	);
