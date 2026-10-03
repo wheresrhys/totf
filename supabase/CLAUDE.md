@@ -121,6 +121,18 @@ Two visible behaviour changes, not refactors, landed across the pair:
   `species_count`/`bird_count`/`encounter_count`, which always counted encounters from any
   `session_type`.
 
+**`session_counts` honours `group_by_species`, like every other CTE in `core_stats` (#1049).** It
+used to group by a bare `species_id` whatever the caller asked for, so a group-wide call got one row
+per `(species, session)` pair rather than one per session — and `max_per_session` ("Busiest
+session"), `max_new_per_session` and `avg_encounters_per_session`, all built on top of it, described
+the busiest/average *species within* a session rather than the session itself. Prod's `/summary/sep`
+reported 39 (its biggest single species) for a 2026 whose busiest session held 62 birds.
+`session_count`/`species_count`/`bird_count`/`encounter_count` read `raw_encounters` directly and
+were never affected. When `group_by_species` IS true the per-species reading is the wanted one and is
+unchanged. `session_effort`/`effort_per_period` have always been species-blind, so `total_effort` and
+`effort_per_session` are not species-split even under `group_by_species` — a known asymmetry with
+`avg_encounters_per_session`, left as-is.
+
 **Two per-row evaluation traps in `stats_raw_encounters`, both fixed in #947 — don't reintroduce
 either.** Because every stats RPC derives this row source (and `core_stats` derives it 4x through
 its utility-RPC layering), anything evaluated per row here is paid several times over:
