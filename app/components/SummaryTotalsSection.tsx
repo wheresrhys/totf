@@ -5,13 +5,19 @@ import { SpeciesTotalsTable } from '@/app/components/SpeciesTotalsTable';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
-import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
+import {
+	BoxyList,
+	SecondaryHeading
+} from '@/app/components/shared/DesignSystem';
 import {
 	fetchPeriodStats,
 	fetchCombinedMonthTotals
 } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
-import { getHighlightsWithinTimeWindow } from '@/app/lib/highlights';
+import {
+	getHighlightsWithinTimeWindow,
+	getCondensedHighlightsAtTimePeriod
+} from '@/app/lib/highlights';
 import {
 	HighlightValue,
 	isNumericHighlightValue,
@@ -39,7 +45,7 @@ import {
 	StatOutput,
 	type SpeciesName
 } from '@/app/components/shared/StatOutput';
-
+import { renderCombinedHighlights } from '@/app/components/pages/session/SessionHighlights';
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
 // The all-time page's combine-years month tab — distinct from `MONTH_TOTALS_TAB`
 // (the year page's per-year, linked, toggle-enabled month rows). Same label,
@@ -396,7 +402,7 @@ export function SummaryTotalsSection({
 	);
 	const isHighlightsActive = activeTab === HIGHLIGHTS_TAB.id;
 	const fetchHighlightsData = useCallback(async () => {
-		const [daily, monthly] = await Promise.all([
+		const [daily, monthly, local] = await Promise.all([
 			getHighlightsWithinTimeWindow({
 				temporalUnit: 'day',
 				groupId: viewedGroup!.id,
@@ -416,9 +422,21 @@ export function SummaryTotalsSection({
 							month: month
 						},
 						includePerSpecies: false
-					})
+					}),
+			year
+				? getCondensedHighlightsAtTimePeriod(
+						viewedGroup!.id,
+						`${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
+						month ? 'month' : 'year',
+						1
+					)
+				: []
 		]);
-		return { sessionHighlights: daily, monthHighlights: monthly };
+		return {
+			sessionHighlights: daily,
+			monthHighlights: monthly,
+			localHighlights: local
+		};
 	}, [viewedGroup, year, month]);
 	const { data: highlightsData, isLoading: isHighlightsLoading } =
 		useLazyTabData(
@@ -590,6 +608,14 @@ export function SummaryTotalsSection({
 					<div>
 						{highlightsData && (
 							<>
+								{highlightsData.localHighlights.length && (
+									<>
+										<h2>Records</h2>
+										<BoxyList>
+											{renderCombinedHighlights(highlightsData.localHighlights)}
+										</BoxyList>
+									</>
+								)}
 								<HighlightsByTimePeriod
 									highlights={highlightsData.sessionHighlights}
 									viewedGroup={viewedGroup}
