@@ -1,33 +1,9 @@
-CREATE FUNCTION public.core_stats (
-	species_name_filter text DEFAULT NULL::text,
-	from_date date DEFAULT NULL::date,
-	to_date date DEFAULT NULL::date,
-	ringing_group_filter bigint DEFAULT NULL::bigint,
-	group_by_species boolean DEFAULT FALSE,
-	group_by_time_period text DEFAULT NULL::text,
-	year_filter smallint DEFAULT NULL::smallint,
-	month_filter smallint DEFAULT NULL::smallint
-) RETURNS SETOF public.core_stats_result LANGUAGE plpgsql
--- Every stats RPC in this family is parameterized by the SHAPE of its own query, not
--- just by filter values: group_by_species and group_by_time_period decide which columns
--- the spine/raw_encounters join is keyed on. A plpgsql RETURN QUERY is plan-cached per
--- backend and switches to a GENERIC plan (one built with no parameter values at all) on
--- the 6th execution in a session, and PostgREST pools connections, so a busy backend
--- reaches that point routinely. With the shape parameters unknown, the join condition
--- below degrades from an equality join the planner can hash/merge into an OR of
--- parameter-guarded equalities it can only evaluate as a nested-loop join filter — and
--- the generic plan COSTS LESS on paper than the custom one, so plan_cache_mode = auto
--- happily adopts it. Measured on a 160k-encounter synthetic fixture: five cheap
--- ungrouped calls on one backend flip the cache to generic, after which the very next
--- group-wide monthly call takes 44,205ms instead of 437ms.
---
--- force_custom_plan makes the choice explicit: replan on every call. That is the
--- intended use of the GUC for a query whose shape depends on its parameters, and it
--- costs nothing measurable here — planning is single-digit milliseconds against
--- hundreds of milliseconds of execution, and executions 1-5 were already custom plans.
--- Keep this on every plpgsql RPC in the core_stats family (see CLAUDE.md).
-SET
-	plan_cache_mode TO 'force_custom_plan' AS $function$
+SET check_function_bodies = false;
+CREATE OR REPLACE FUNCTION public.core_stats(species_name_filter text DEFAULT NULL::text, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, ringing_group_filter bigint DEFAULT NULL::bigint, group_by_species boolean DEFAULT false, group_by_time_period text DEFAULT NULL::text, year_filter smallint DEFAULT NULL::smallint, month_filter smallint DEFAULT NULL::smallint)
+ RETURNS SETOF public.core_stats_result
+ LANGUAGE plpgsql
+ SET plan_cache_mode TO 'force_custom_plan'
+AS $function$
   BEGIN
   RETURN QUERY
   -- The final projection below is wrapped in jsonb_populate_record rather than
@@ -387,36 +363,3 @@ SET
 
 END;
 $function$;
-
-GRANT ALL ON FUNCTION public.core_stats (
-	text,
-	date,
-	date,
-	bigint,
-	boolean,
-	text,
-	smallint,
-	smallint
-) TO anon;
-
-GRANT ALL ON FUNCTION public.core_stats (
-	text,
-	date,
-	date,
-	bigint,
-	boolean,
-	text,
-	smallint,
-	smallint
-) TO authenticated;
-
-GRANT ALL ON FUNCTION public.core_stats (
-	text,
-	date,
-	date,
-	bigint,
-	boolean,
-	text,
-	smallint,
-	smallint
-) TO service_role;
