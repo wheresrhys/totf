@@ -29,8 +29,7 @@ export const rarities: HighlightsGenerator = {
 					`${combinedHighlight.value.value} ${combinedHighlight.species} ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: false
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			`First ${highlightsOfType.scope.species} ${printTimeQualifier(highlightsOfType.scope.parentTimeWindow)}`
+		highlightListPrefixPrinter: () => 'Rarities'
 	},
 	descriptor: {
 		type: 'rarities',

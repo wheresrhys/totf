@@ -6,10 +6,23 @@ import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
 import {
+	BoxyList,
+	SecondaryHeading
+} from '@/app/components/shared/DesignSystem';
+import {
 	fetchPeriodStats,
 	fetchCombinedMonthTotals
 } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
+import {
+	getHighlightsWithinTimeWindow,
+	getCondensedHighlightsAtTimePeriod
+} from '@/app/lib/highlights';
+import {
+	HighlightValue,
+	isNumericHighlightValue,
+	type HighlightsOfType
+} from '@/app/lib/highlights/types';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
@@ -29,6 +42,11 @@ import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
 import { CurrentTabProvider } from '@/app/components/shared/CurrentTabContext';
+import {
+	StatOutput,
+	type SpeciesName
+} from '@/app/components/shared/StatOutput';
+import { renderCombinedHighlights } from '@/app/components/pages/session/SessionHighlights';
 
 const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
 // The all-time page's combine-years month tab — distinct from `MONTH_TOTALS_TAB`
@@ -41,6 +59,93 @@ const ALL_TIME_MONTH_TOTALS_TAB = {
 const YEAR_TOTALS_TAB = { id: 'year-totals', label: 'Year totals' };
 const SESSION_TOTALS_TAB = { id: 'session-totals', label: 'Session totals' };
 const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
+const HIGHLIGHTS_TAB = { id: 'highlights', label: 'Highlights' };
+
+function showHighlightUnit(
+	highlight: HighlightsOfType,
+	highlightValue: HighlightValue,
+	excludeSpeciesName?: boolean
+) {
+	if (['g', 'mm'].includes(highlight.descriptor.unit)) {
+		return true;
+	}
+	return !excludeSpeciesName;
+}
+
+function getHighlightUnit(
+	highlight: HighlightsOfType,
+	highlightValue: HighlightValue,
+	excludeSpeciesName?: boolean
+) {
+	if (['g', 'mm'].includes(highlight.descriptor.unit)) {
+		return highlight.descriptor.unit;
+	}
+	return excludeSpeciesName
+		? undefined
+		: (highlightValue.species as SpeciesName) || highlight.descriptor.unit;
+}
+
+export function HighlightsByTimePeriod({
+	highlights,
+	heading,
+	viewedGroup,
+	excludeSpeciesName
+}: {
+	highlights: HighlightsOfType[];
+	heading: string;
+	viewedGroup?: ViewedGroup;
+	excludeSpeciesName?: boolean;
+}) {
+	if (!highlights.length) return null;
+	return (
+		<div>
+			<SecondaryHeading>{heading}</SecondaryHeading>
+			{highlights.map(
+				(highlight) =>
+					isNumericHighlightValue(highlight.values[0]) && (
+						<div
+							key={`${highlight.descriptor.type}-${highlight.scope.temporalUnit}`}
+						>
+							{highlight.formatters.highlightListPrefixPrinter(highlight)}:{' '}
+							<div className="flex gap-2">
+								{highlight.values.map(
+									(highlightValue) =>
+										isNumericHighlightValue(highlightValue) && (
+											<span
+												className="badge badge-outline"
+												key={highlightValue.timePeriod}
+											>
+												<StatOutput
+													dateFormat={
+														highlight.scope.temporalUnit === 'day'
+															? 'dd/MM/yy'
+															: 'MMM yyyy'
+													}
+													visitDate={highlightValue.timePeriod}
+													temporalUnit={highlight.scope.temporalUnit}
+													showUnit={showHighlightUnit(
+														highlight,
+														highlightValue,
+														excludeSpeciesName
+													)}
+													value={highlightValue.value}
+													unit={getHighlightUnit(
+														highlight,
+														highlightValue,
+														excludeSpeciesName
+													)}
+													viewedGroup={viewedGroup}
+												/>
+											</span>
+										)
+								)}
+							</div>
+						</div>
+					)
+			)}
+		</div>
+	);
+}
 
 // The all-time page's combine-years "Month totals" tab content. Owns the
 // "Combine years" toggle's local state so it resets to the default (ON) each
@@ -256,7 +361,8 @@ export function SummaryTotalsSection({
 		...(monthTotals ? [MONTH_TOTALS_TAB] : []),
 		...(showAllTimeMonthTotals ? [ALL_TIME_MONTH_TOTALS_TAB] : []),
 		...(showSessionTotals ? [SESSION_TOTALS_TAB] : []),
-		SPECIES_TOTALS_TAB
+		SPECIES_TOTALS_TAB,
+		...(viewedGroup !== undefined ? [HIGHLIGHTS_TAB] : [])
 	];
 
 	const tabsWithTotalsRow = {
@@ -296,6 +402,56 @@ export function SummaryTotalsSection({
 				})
 		}
 	);
+	const isHighlightsActive = activeTab === HIGHLIGHTS_TAB.id;
+	const fetchHighlightsData = useCallback(async () => {
+		const [daily, monthly, local] = await Promise.all([
+			getHighlightsWithinTimeWindow({
+				temporalUnit: 'day',
+				groupId: viewedGroup!.id,
+				parentTimeWindow: {
+					year,
+					month: month
+				},
+				includePerSpecies: false
+			}),
+			month
+				? []
+				: getHighlightsWithinTimeWindow({
+						temporalUnit: 'month',
+						groupId: viewedGroup!.id,
+						parentTimeWindow: {
+							year,
+							month: month
+						},
+						includePerSpecies: false
+					}),
+			year
+				? getCondensedHighlightsAtTimePeriod(
+						viewedGroup!.id,
+						`${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
+						month ? 'month' : 'year',
+						1
+					)
+				: []
+		]);
+		return {
+			sessionHighlights: daily,
+			monthHighlights: monthly,
+			localHighlights: local
+		};
+	}, [viewedGroup, year, month]);
+	const { data: highlightsData, isLoading: isHighlightsLoading } =
+		useLazyTabData(
+			isHighlightsActive && viewedGroup !== undefined,
+			fetchHighlightsData,
+			{
+				onError: (error) =>
+					console.error('Failed to fetch highlights', {
+						viewedGroupId: viewedGroup?.id,
+						error
+					})
+			}
+		);
 
 	// The all-time combine-years month tab fetches lazily too, on first select.
 	// The "Combine years OFF" view needs the raw per-(year, month) rows
@@ -444,6 +600,37 @@ export function SummaryTotalsSection({
 						totalsStats={undefined}
 						period={year === undefined ? undefined : { year, month }}
 					/>
+				))}
+			{isHighlightsActive &&
+				(isHighlightsLoading ? (
+					<div className="flex items-center justify-center">
+						<div className="loading loading-spinner loading-xl"></div>
+					</div>
+				) : (
+					<div>
+						{highlightsData && (
+							<>
+								{highlightsData.localHighlights.length && (
+									<>
+										<h2>Records</h2>
+										<BoxyList>
+											{renderCombinedHighlights(highlightsData.localHighlights)}
+										</BoxyList>
+									</>
+								)}
+								<HighlightsByTimePeriod
+									highlights={highlightsData.sessionHighlights}
+									viewedGroup={viewedGroup}
+									heading="Session highlights"
+								/>
+								<HighlightsByTimePeriod
+									highlights={highlightsData.monthHighlights}
+									viewedGroup={viewedGroup}
+									heading="Month highlights"
+								/>
+							</>
+						)}
+					</div>
 				))}
 		</CurrentTabProvider>
 	);

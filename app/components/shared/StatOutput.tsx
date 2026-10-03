@@ -5,6 +5,7 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 import { buildGroupSessionHref } from '@/app/lib/group-links';
 import { printLocationName } from './DesignSystem';
 export type TemporalUnit = 'day' | 'month' | 'year';
+export type SpeciesName = 'string';
 export type StatUnit =
 	| 'bird'
 	| 'species'
@@ -12,12 +13,13 @@ export type StatUnit =
 	| 'session'
 	| 'mm'
 	| 'g';
+
 export type StatOutputModel = {
 	value: number;
 	speciesName?: string;
 	visitDate: string;
 	showUnit?: boolean;
-	unit?: StatUnit;
+	unit?: StatUnit | SpeciesName;
 	temporalUnit: TemporalUnit;
 	dateFormat?: string;
 	classes?: string;
@@ -26,24 +28,29 @@ export type StatOutputModel = {
 	link?: boolean;
 };
 
-const plurals: Partial<Record<StatUnit | TemporalUnit, string>> = {
-	species: 'species',
-	mm: 'mm',
-	g: 'g'
-};
-
 const spacelessUnits: Partial<Record<StatUnit | TemporalUnit, boolean>> = {
 	mm: true,
 	g: true
 };
 
-export function getPlural(unit: StatUnit | TemporalUnit | undefined): string {
+export function getPlural(
+	unit: StatUnit | TemporalUnit | SpeciesName | undefined
+): string {
 	if (!unit) return '';
-	return unit in plurals ? (plurals[unit] as string) : `${unit}s`;
+	if (/^g|mm|species$/.test(unit)) return unit as string;
+	if (
+		unit.toLowerCase().endsWith('finch') ||
+		unit.toLowerCase().endsWith('thrush')
+	)
+		return `${unit}es`;
+	if (unit.toLowerCase().endsWith('goose'))
+		return unit.replace(/oose$/, 'eese');
+	if (unit.includes('(')) return unit;
+	return `${unit}s`;
 }
 
 export function getSpaceForUnit(
-	unit: StatUnit | TemporalUnit | undefined
+	unit: StatUnit | TemporalUnit | SpeciesName | undefined
 ): string {
 	return unit && unit in spacelessUnits ? '' : ' ';
 }

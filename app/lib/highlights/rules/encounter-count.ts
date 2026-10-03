@@ -4,6 +4,7 @@ import {
 	printTemporalUnit,
 	printTimeQualifier,
 	printCombinedHighlight,
+	sentenceCase,
 	type TimeQualifierOptions
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
@@ -29,7 +30,7 @@ export const encounterCount: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most encounters`
+			sentenceCase(`Most encounters`)
 	},
 	descriptor: {
 		type: 'encounters',

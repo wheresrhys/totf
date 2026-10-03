@@ -28,7 +28,9 @@ export const birdCount: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Busiest ${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)}`
+			highlightsOfType.scope.temporalUnit === 'day'
+				? 'Busiest'
+				: 'Most individuals'
 	},
 	descriptor: {
 		type: 'birds',

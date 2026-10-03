@@ -147,7 +147,8 @@ describe('/summary (all-time)', () => {
 				'Year totals',
 				'Month totals',
 				'Session totals',
-				'Species totals'
+				'Species totals',
+				'Highlights'
 			]);
 			expect(tabs[0].getAttribute('aria-current')).toBe('true');
 		});

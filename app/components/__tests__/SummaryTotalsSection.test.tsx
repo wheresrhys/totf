@@ -129,7 +129,8 @@ describe('SummaryTotalsSection', () => {
 			expect(tabs.map((tab) => tab.textContent)).toEqual([
 				'Month totals',
 				'Session totals',
-				'Species totals'
+				'Species totals',
+				'Highlights'
 			]);
 			expect(tabs[0].getAttribute('aria-current')).toBe('true');
 		});
@@ -216,7 +217,8 @@ describe('SummaryTotalsSection', () => {
 			const tabs = getAllByRole(screen.getByRole('tablist'), 'button');
 			expect(tabs.map((tab) => tab.textContent)).toEqual([
 				'Session totals',
-				'Species totals'
+				'Species totals',
+				'Highlights'
 			]);
 			expect(
 				screen
@@ -347,7 +349,8 @@ describe('SummaryTotalsSection', () => {
 			expect(tabs.map((tab) => tab.textContent)).toEqual([
 				'Year totals',
 				'Session totals',
-				'Species totals'
+				'Species totals',
+				'Highlights'
 			]);
 			expect(tabs[0].getAttribute('aria-current')).toBe('true');
 			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
@@ -441,7 +444,8 @@ describe('SummaryTotalsSection', () => {
 					'Year totals',
 					'Month totals',
 					'Session totals',
-					'Species totals'
+					'Species totals',
+					'Highlights'
 				]);
 			});
 

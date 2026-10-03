@@ -110,11 +110,11 @@ describe('species detail page', () => {
 		});
 
 		describe('highlights tab (click to activate)', () => {
-			it('renders SpNotableRetrapsTab after clicking Highlights button', async () => {
+			it('renders SpHighlightsTab after clicking Highlights button', async () => {
 				render(await renderSpeciesPage());
 				await screen.findByTestId('sp-year-totals-tab');
 				fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
-				await screen.findByTestId('sp-notable-retraps-tab');
+				await screen.findByTestId('sp-highlights-tab');
 			});
 		});
 

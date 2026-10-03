@@ -19,7 +19,7 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Most encounters of a single species in a ${printTemporalUnit(highlightsOfType.scope.temporalUnit)}`
+			`Most encounters of a single species`
 	},
 	descriptor: {
 		type: 'singleSpeciesEncounters',
@@ -29,5 +29,6 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 	},
 	generator: getTopByProperty('encounter_count'),
 	condition: (scope) =>
-		scope.temporalUnit !== 'day' && !scope.parentTimeWindow?.month
+		scope.temporalUnit !== 'day' &&
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
 };

@@ -11,7 +11,7 @@ import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { SpIndividualsTab } from '@/app/components/pages/species/SpIndividualsTab';
-import { SpNotableRetrapsTab } from '@/app/components/pages/species/SpNotableRetrapsTab';
+import { SpHighlightsTab } from '@/app/components/pages/species/SpHighlightsTab';
 import { SpDemographicsTab } from '@/app/components/pages/species/SpDemographicsTab';
 import { SpBiometricsTab } from '@/app/components/pages/species/SpBiometricsTab';
 import { SpYearTotalsTab } from '@/app/components/pages/species/SpYearTotalsTab';
@@ -337,11 +337,13 @@ function SpeciesData({
 				tabId="highlights"
 				activeTabId={activeTab}
 			>
-				<SpNotableRetrapsTab
+				<SpHighlightsTab
 					speciesName={data.speciesName}
-					viewedGroupId={viewedGroup.id}
+					viewedGroup={viewedGroup}
 					fromDate={data.fromDate}
 					toDate={data.toDate}
+					year={data.year}
+					month={data.year}
 				/>
 			</ConditionalTabPanel>
 			<ConditionalTabPanel

@@ -3,7 +3,8 @@ import {
 	printProminenceQualifier,
 	printTemporalUnit,
 	printTimeQualifier,
-	printCombinedHighlight
+	printCombinedHighlight,
+	sentenceCase
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
@@ -24,7 +25,7 @@ export const newBirds: HighlightsGenerator = {
 				shouldPrintValue: true
 			}),
 		highlightListPrefixPrinter: (highlightsOfType) =>
-			`${printTemporalUnit(highlightsOfType.scope.temporalUnit, highlightsOfType.values.length > 1)} with most new birds`
+			sentenceCase(`Most new birds`)
 	},
 	descriptor: {
 		type: 'newBirds',
@@ -32,5 +33,6 @@ export const newBirds: HighlightsGenerator = {
 		category: 'demographics'
 	},
 	generator: getTopByProperty('new_bird_count'),
-	condition: (scope) => !scope.parentTimeWindow?.month
+	condition: (scope) =>
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
 };

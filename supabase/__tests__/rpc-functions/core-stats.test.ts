@@ -51,6 +51,17 @@ const ALPHA_SPECIES_COUNT = 7;
 const ALPHA_TOTAL_BIRDS_EXCLUDING_RESIGHTINGS = 48;
 const CES_2022_ENCOUNTERS = 30; // Apr–Aug 2022 only
 
+// Species rows are seed data, readable without a group-authenticated client.
+async function getSpeciesId(name: string): Promise<number> {
+	const { data, error } = await supabase
+		.from('Species')
+		.select('id')
+		.eq('species_name', name)
+		.single();
+	if (error || !data) throw new Error(`Species "${name}" not found`);
+	return data.id;
+}
+
 describe('core_stats', () => {
 	let alphaId: number;
 	let alphaClient: SupabaseClient;
@@ -178,16 +189,6 @@ describe('core_stats', () => {
 		// PULLI Session, excluded from every effort column.
 		let visitDate: string;
 
-		async function getSpeciesId(name: string): Promise<number> {
-			const { data, error } = await supabase
-				.from('Species')
-				.select('id')
-				.eq('species_name', name)
-				.single();
-			if (error || !data) throw new Error(`Species "${name}" not found`);
-			return data.id;
-		}
-
 		// Query the single whole-period aggregate row for a bounded date range.
 		async function aggregateRow(fromDate: string, toDate: string) {
 			const { data, error } = await deltaClient.rpc('core_stats', {
@@ -278,6 +279,159 @@ describe('core_stats', () => {
 			expect(row.bird_count).toBe(3);
 			expect(row.encounter_count).toBe(3);
 			expect(row.new_bird_count).toBe(3);
+		});
+	});
+
+	// The `session_counts` CTE used to split its per-session tallies by species_id
+	// whatever the caller asked for, so on a group-wide call max_per_session
+	// ("Busiest session"), max_new_per_session and avg_encounters_per_session
+	// described the busiest/average SPECIES WITHIN a session rather than the session
+	// itself (#1049 — prod's /summary/sep reported 39, its biggest single species, for
+	// a 2026 whose busiest session held 62 birds). Two mixed-species group-days inside
+	// a private date window separate the two readings: no single species accounts for
+	// a whole session, and a species-split average divides by a different denominator.
+	describe('per-session aggregates when not grouping by species (#1049)', () => {
+		let deltaId: number;
+		let deltaClient: SupabaseClient;
+		let locationId: number;
+		let sessionIds: number[];
+		let birdIds: number[];
+		// 5 encounters across two species (3 Robin, 2 Wren), 4 of them new. Its
+		// biggest single species is 3, and its biggest single species' new count is 2.
+		let busiestDate: string;
+		// 2 encounters, both Robin, both new.
+		let quieterDate: string;
+
+		// The whole-window aggregate: one ungrouped row covering both dates.
+		async function windowRow() {
+			const { data, error } = await deltaClient.rpc('core_stats', {
+				ringing_group_filter: deltaId,
+				from_date: busiestDate,
+				to_date: quieterDate
+			});
+			expect(error).toBeNull();
+			expect(data).toHaveLength(1);
+			return data![0];
+		}
+
+		// The same window, broken down per species.
+		async function windowRowForSpecies(speciesName: string) {
+			const { data, error } = await deltaClient.rpc('core_stats', {
+				ringing_group_filter: deltaId,
+				from_date: busiestDate,
+				to_date: quieterDate,
+				group_by_species: true
+			});
+			expect(error).toBeNull();
+			const row = data!.find(
+				(candidate: { species_name: string }) =>
+					candidate.species_name === speciesName
+			);
+			expect(row).toBeDefined();
+			return row;
+		}
+
+		beforeAll(async () => {
+			deltaId = await getGroupIdByName('Delta');
+			deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+			const [robinId, wrenId] = await Promise.all([
+				getSpeciesId('Robin'),
+				getSpeciesId('Wren')
+			]);
+
+			const testSuffix = randomTestSuffix();
+			busiestDate = randomFutureDate();
+			quieterDate = addDays(busiestDate, 1);
+
+			locationId = await insertTestLocation(
+				deltaClient,
+				deltaId,
+				`Busiest ${testSuffix}`
+			);
+			const [busiestSessionId, quieterSessionId] = await Promise.all([
+				insertTestSession(deltaClient, locationId, busiestDate),
+				insertTestSession(deltaClient, locationId, quieterDate)
+			]);
+			sessionIds = [busiestSessionId, quieterSessionId];
+
+			// 3 Robins + 2 Wrens on the busy day, 2 Robins on the quiet one.
+			const ringNos = [
+				'BUSY-R1',
+				'BUSY-R2',
+				'BUSY-R3',
+				'BUSY-W1',
+				'BUSY-W2',
+				'QUIET-R1',
+				'QUIET-R2'
+			];
+			const speciesIds = [
+				robinId,
+				robinId,
+				robinId,
+				wrenId,
+				wrenId,
+				robinId,
+				robinId
+			];
+			birdIds = await Promise.all(
+				ringNos.map((ringNo, index) =>
+					insertTestBird(
+						deltaClient,
+						`${ringNo}-${testSuffix}`,
+						speciesIds[index]
+					)
+				)
+			);
+
+			// One of the three Robins on the busy day is a retrap, so the day's new
+			// count (4) is higher than any single species' new count (2 Robin, 2 Wren)
+			// but lower than its encounter count (5).
+			const recordTypes = ['N', 'N', 'R', 'N', 'N', 'N', 'N'];
+			for (const [index, birdId] of birdIds.entries()) {
+				await insertTestEncounter(
+					deltaClient,
+					birdId,
+					index < 5 ? busiestSessionId : quieterSessionId,
+					{ age_code: 4, record_type: recordTypes[index] }
+				);
+			}
+		});
+
+		afterAll(() => {
+			psql(
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+					`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
+					`DELETE FROM "Locations" WHERE id = ${locationId};`
+			);
+		});
+
+		it('reports the busiest session by its whole encounter count, not its biggest single species', async () => {
+			const row = await windowRow();
+			expect(row.session_count).toBe(2);
+			// 3 Robin + 2 Wren on the busy day. The species-split reading was 3.
+			expect(row.max_per_session).toBe(5);
+		});
+
+		it('counts new encounters across every species in the busiest session', async () => {
+			const row = await windowRow();
+			// 4 of the busy day's 5 encounters are new. The species-split reading was 2.
+			expect(row.max_new_per_session).toBe(4);
+		});
+
+		it('averages encounters over sessions, not over species-within-a-session cells', async () => {
+			const row = await windowRow();
+			// (5 + 2) / 2 sessions. The species-split reading divided 7 by 3 cells.
+			expect(Number(row.avg_encounters_per_session)).toBe(3.5);
+		});
+
+		it('still reports a species’ own busiest session when grouping by species', async () => {
+			const [robinRow, wrenRow] = await Promise.all([
+				windowRowForSpecies('Robin'),
+				windowRowForSpecies('Wren')
+			]);
+			expect(robinRow.max_per_session).toBe(3);
+			expect(wrenRow.max_per_session).toBe(2);
 		});
 	});
 

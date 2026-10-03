@@ -11,7 +11,7 @@ import type { SessionEncounter } from '@/app/models/session';
 
 // A v2 highlight carries its own printer, so both v2-backed sections render
 // identically — only the highlights they're handed differ.
-function renderCombinedHighlights(highlights: CombinedHighlight[]) {
+export function renderCombinedHighlights(highlights: CombinedHighlight[]) {
 	return highlights.map((highlight: CombinedHighlight) => (
 		<li key={`${highlight.descriptor.type}-${highlight.species}`}>
 			{highlight.formatters.combinedHighlightPrinter(highlight)}
