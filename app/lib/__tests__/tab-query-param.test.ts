@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { resolveInitialTabId, readTabIdSearchParam } from '../tab-query-param';
+import { describe, it, expect, vi } from 'vitest';
+import type { ViewedGroup } from '../group-slug';
+import {
+	resolveInitialTabId,
+	readTabIdSearchParam,
+	prefetchActiveTabData
+} from '../tab-query-param';
 
 describe('resolveInitialTabId', () => {
 	const knownTabIds = ['year-totals', 'session-totals', 'bird-list'];
@@ -71,6 +76,81 @@ describe('readTabIdSearchParam', () => {
 			await expect(
 				readTabIdSearchParam(Promise.resolve({}))
 			).resolves.toBeUndefined();
+		});
+	});
+});
+
+describe('prefetchActiveTabData', () => {
+	type SpeciesPageParams = { speciesName: string };
+	const params: SpeciesPageParams = { speciesName: 'Blue Tit' };
+	const viewedGroup: ViewedGroup = { id: 7, slug: 'alpha' };
+
+	// One tab that prefetches and one that fetches for itself, so every test
+	// can assert both that the right fetcher ran and that the other didn't.
+	const buildTabs = (fetchingTabResult: unknown = { totals: 42 }) => {
+		const fetchingTabFetcher = vi.fn<
+			(params: SpeciesPageParams, viewedGroup: ViewedGroup) => Promise<unknown>
+		>(async () => fetchingTabResult);
+		return {
+			fetchingTabFetcher,
+			tabs: [
+				{ id: 'self-fetching-tab' },
+				{ id: 'fetching-tab', dataFetcher: fetchingTabFetcher }
+			]
+		};
+	};
+
+	describe('tab has a dataFetcher', () => {
+		it("awaits the matching tab's dataFetcher with the given params and viewedGroup, and returns its resolved data keyed by the active tab id", async () => {
+			const { tabs, fetchingTabFetcher } = buildTabs({ totals: 42 });
+
+			const prefetched = await prefetchActiveTabData(
+				tabs,
+				'fetching-tab',
+				params,
+				viewedGroup
+			);
+
+			expect(fetchingTabFetcher).toHaveBeenCalledExactlyOnceWith(
+				params,
+				viewedGroup
+			);
+			expect(prefetched).toEqual({
+				tabId: 'fetching-tab',
+				data: { totals: 42 }
+			});
+		});
+	});
+
+	describe('tab has no dataFetcher', () => {
+		it("returns undefined without calling any other tab's dataFetcher", async () => {
+			const { tabs, fetchingTabFetcher } = buildTabs();
+
+			const prefetched = await prefetchActiveTabData(
+				tabs,
+				'self-fetching-tab',
+				params,
+				viewedGroup
+			);
+
+			expect(prefetched).toBeUndefined();
+			expect(fetchingTabFetcher).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('activeTabId matches no tab in the list', () => {
+		it('returns undefined without throwing, given an unvalidated id', async () => {
+			const { tabs, fetchingTabFetcher } = buildTabs();
+
+			const prefetched = await prefetchActiveTabData(
+				tabs,
+				'not-a-real-tab',
+				params,
+				viewedGroup
+			);
+
+			expect(prefetched).toBeUndefined();
+			expect(fetchingTabFetcher).not.toHaveBeenCalled();
 		});
 	});
 });
