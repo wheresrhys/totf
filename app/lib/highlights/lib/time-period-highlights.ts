@@ -244,11 +244,17 @@ function sortHighlights(highlights: CombinedHighlight[]) {
 	);
 }
 
-async function getAllRelevantHighlights(
-	groupId: number,
-	timePeriod: string,
-	temporalUnit: TemporalUnit
-) {
+async function getAllRelevantHighlights({
+	groupId,
+	timePeriod,
+	temporalUnit,
+	limit
+}: {
+	groupId: number;
+	timePeriod: string;
+	temporalUnit: TemporalUnit;
+	limit?: number;
+}): Promise<CherryPickedHighlight[]> {
 	const yearparentTimeWindow = { year: Number(timePeriod.split('-')[0]) };
 	const monthparentTimeWindow = {
 		month: Number(timePeriod.split('-')[1])
@@ -256,7 +262,7 @@ async function getAllRelevantHighlights(
 	const allTimeHighlights = await getHighlightsWithinTimeWindow({
 		temporalUnit: temporalUnit,
 		groupId,
-		limit: 3,
+		limit: limit ?? 3,
 		includePerSpecies: true
 	});
 	const yearHighlights =
@@ -265,7 +271,7 @@ async function getAllRelevantHighlights(
 					temporalUnit: temporalUnit,
 					groupId,
 					parentTimeWindow: yearparentTimeWindow,
-					limit: 1,
+					limit: limit ?? 1,
 					includePerSpecies: true
 				})
 			: [];
@@ -275,7 +281,7 @@ async function getAllRelevantHighlights(
 					temporalUnit: temporalUnit,
 					groupId,
 					parentTimeWindow: monthparentTimeWindow,
-					limit: 3,
+					limit: limit ?? 3,
 					includePerSpecies: true
 				})
 			: [];
@@ -288,13 +294,15 @@ async function getAllRelevantHighlights(
 export async function getCondensedHighlightsAtTimePeriod(
 	groupId: number,
 	timePeriod: string,
-	temporalUnit: TemporalUnit
+	temporalUnit: TemporalUnit,
+	limit?: number
 ): Promise<CombinedHighlight[]> {
-	const allRelevantHighlights = await getAllRelevantHighlights(
+	const allRelevantHighlights = await getAllRelevantHighlights({
 		groupId,
 		timePeriod,
-		temporalUnit
-	);
+		temporalUnit,
+		limit
+	});
 	const significantHighlights = removeLessSignificantHighlights(
 		allRelevantHighlights
 	);

@@ -7,7 +7,7 @@ import {
 	getHighlightsOfTypeFixtures
 } from './fixture-generator';
 
-describe('rules output for comibned highlights', () => {
+describe('rules output for combined highlights', () => {
 	highlightRules.forEach((rule) => {
 		describe(rule.descriptor.type, () => {
 			if (rule.descriptor.type !== 'rarities') {

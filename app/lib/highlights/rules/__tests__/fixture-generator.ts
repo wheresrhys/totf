@@ -117,114 +117,80 @@ export function getHighlightsOfTypeFixtures(
 export function getCombinedHighlightFixtures(
 	rule: HighlightsGenerator
 ): Record<string, Partial<CombinedHighlight>> {
+	const supportsMonth = rule.condition?.({ temporalUnit: 'month' }) ?? true;
+	const supportsDay = rule.condition?.({ temporalUnit: 'day' }) ?? true;
+
+	return {
+		...(supportsDay
+			? getCombinedHighlightFixturesForTemporalUnit(rule, 'day')
+			: {}),
+		...(supportsMonth
+			? getCombinedHighlightFixturesForTemporalUnit(rule, 'month')
+			: {})
+	};
+}
+
+function getRankedScope(
+	bySpecies: boolean,
+	temporalUnit: TemporalUnit,
+	position: number,
+	isTied: boolean,
+	parentTimeWindow?: { year?: number; month?: number }
+): { scope: HighlightScope; ranking: Partial<HighlightRanking> } {
+	return {
+		scope: {
+			...getBaseScope(bySpecies, temporalUnit),
+			parentTimeWindow
+		},
+		ranking: {
+			position: 1,
+			isTied: false
+		}
+	};
+}
+
+export function getCombinedHighlightFixturesForTemporalUnit(
+	rule: HighlightsGenerator,
+	temporalUnit: TemporalUnit
+): Record<string, Partial<CombinedHighlight>> {
 	const bySpecies = isPerSpeciesRule(rule);
-	const temporalUnit =
-		!rule.condition || rule.condition({ temporalUnit: 'day' })
-			? 'day'
-			: 'month';
+
 	const getCombinedHighlight = getCombinedHighlightMaker(rule.descriptor);
 	const fixtures: Record<string, Partial<CombinedHighlight>> = {
 		global: getCombinedHighlight(
-			[
-				{
-					scope: {
-						...getBaseScope(bySpecies, 'day')
-					},
-					ranking: {
-						position: 1,
-						isTied: false
-					}
-				}
-			],
+			[getRankedScope(bySpecies, temporalUnit, 1, false)],
 			bySpecies
 		),
 
 		'tied global': getCombinedHighlight(
-			[
-				{
-					scope: {
-						...getBaseScope(bySpecies, temporalUnit)
-					},
-					ranking: {
-						position: 1,
-						isTied: true
-					}
-				}
-			],
+			[getRankedScope(bySpecies, temporalUnit, 1, true)],
 			bySpecies
 		),
 		// The same highlight as 'global', about a single bird rather than 12 —
 		// the one fixture that exercises a printer's singular wording.
 		'singular global': getCombinedHighlight(
-			[
-				{
-					scope: {
-						...getBaseScope(bySpecies, temporalUnit)
-					},
-					ranking: {
-						position: 1,
-						isTied: false
-					}
-				}
-			],
+			[getRankedScope(bySpecies, temporalUnit, 1, false)],
 			bySpecies,
 			2020,
 			1
 		),
 		'second global': getCombinedHighlight(
-			[
-				{
-					scope: {
-						...getBaseScope(bySpecies, temporalUnit)
-					},
-					ranking: {
-						position: 2,
-						isTied: false
-					}
-				}
-			],
+			[getRankedScope(bySpecies, temporalUnit, 2, false)],
 			bySpecies
 		),
 		'tied second global': getCombinedHighlight(
-			[
-				{
-					scope: {
-						...getBaseScope(bySpecies, temporalUnit)
-					},
-					ranking: {
-						position: 2,
-						isTied: true
-					}
-				}
-			],
+			[getRankedScope(bySpecies, temporalUnit, 2, true)],
 			bySpecies
 		),
 		'tied second of year': getCombinedHighlight(
-			[
-				{
-					scope: {
-						...getBaseScope(bySpecies, temporalUnit),
-						parentTimeWindow: { year: 2020 }
-					},
-					ranking: {
-						position: 2,
-						isTied: true
-					}
-				}
-			],
+			[getRankedScope(bySpecies, temporalUnit, 2, true, { year: 2020 })],
 			bySpecies
 		),
 		'this year': getCombinedHighlight(
 			[
-				{
-					scope: {
-						...getBaseScope(bySpecies, temporalUnit),
-						parentTimeWindow: { year: new Date().getFullYear() }
-					},
-					ranking: {
-						position: 1
-					}
-				}
+				getRankedScope(bySpecies, temporalUnit, 1, false, {
+					year: new Date().getFullYear()
+				})
 			],
 			bySpecies,
 			new Date().getFullYear()
@@ -232,25 +198,8 @@ export function getCombinedHighlightFixtures(
 
 		'tied global and second of year': getCombinedHighlight(
 			[
-				{
-					scope: {
-						...getBaseScope(bySpecies, temporalUnit)
-					},
-					ranking: {
-						position: 1,
-						isTied: true
-					}
-				},
-				{
-					scope: {
-						...getBaseScope(bySpecies, temporalUnit),
-						parentTimeWindow: { year: 2020 }
-					},
-					ranking: {
-						position: 2,
-						isTied: false
-					}
-				}
+				getRankedScope(bySpecies, temporalUnit, 1, true),
+				getRankedScope(bySpecies, temporalUnit, 2, false, { year: 2020 })
 			],
 			bySpecies
 		)
@@ -258,55 +207,23 @@ export function getCombinedHighlightFixtures(
 
 	if (temporalUnit === 'day') {
 		fixtures['tied second of month'] = getCombinedHighlight(
-			[
-				{
-					scope: {
-						...getBaseScope(bySpecies, temporalUnit),
-						parentTimeWindow: { month: 2 }
-					},
-					ranking: {
-						position: 2,
-						isTied: true
-					}
-				}
-			],
+			[getRankedScope(bySpecies, temporalUnit, 2, true, { month: 2 })],
 			bySpecies
 		);
 		fixtures['global and tied second of year and third of month'] =
 			getCombinedHighlight(
 				[
-					{
-						scope: {
-							...getBaseScope(bySpecies, temporalUnit)
-						},
-						ranking: {
-							position: 1,
-							isTied: false
-						}
-					},
-					{
-						scope: {
-							...getBaseScope(bySpecies, temporalUnit),
-							parentTimeWindow: { year: 2020 }
-						},
-						ranking: {
-							position: 2,
-							isTied: true
-						}
-					},
-					{
-						scope: {
-							...getBaseScope(bySpecies, temporalUnit),
-							parentTimeWindow: { month: 2 }
-						},
-						ranking: {
-							position: 3,
-							isTied: false
-						}
-					}
+					getRankedScope(bySpecies, temporalUnit, 2, false),
+					getRankedScope(bySpecies, temporalUnit, 2, true, { year: 2020 }),
+					getRankedScope(bySpecies, temporalUnit, 3, false, { month: 2 })
 				],
 				bySpecies
 			);
 	}
-	return fixtures;
+	return Object.fromEntries(
+		Object.entries(fixtures).map(([name, fixture]) => [
+			`${name} (${temporalUnit})`,
+			fixture
+		])
+	);
 }
