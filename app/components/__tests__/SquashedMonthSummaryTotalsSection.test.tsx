@@ -65,7 +65,7 @@ describe('SquashedMonthSummaryTotalsSection', () => {
 		);
 		expect(
 			screen.getByRole('link', { name: 'Robin' }).getAttribute('href')
-		).toBe('/species/Robin/jan');
+		).toBe('/species/Robin/jan?tabId=species-totals');
 	});
 
 	describe('Year totals tab', () => {
@@ -81,9 +81,13 @@ describe('SquashedMonthSummaryTotalsSection', () => {
 			);
 			fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
 			const link2024 = screen.getByRole('link', { name: 'January 2024' });
-			expect(link2024.getAttribute('href')).toBe('/group/alpha/summary/2024/1');
+			expect(link2024.getAttribute('href')).toBe(
+				'/group/alpha/summary/2024/1?tabId=year-totals'
+			);
 			const link2025 = screen.getByRole('link', { name: 'January 2025' });
-			expect(link2025.getAttribute('href')).toBe('/group/alpha/summary/2025/1');
+			expect(link2025.getAttribute('href')).toBe(
+				'/group/alpha/summary/2025/1?tabId=year-totals'
+			);
 		});
 
 		it('uses the requested squashed month for every row regardless of its own bucket month', () => {
@@ -100,7 +104,7 @@ describe('SquashedMonthSummaryTotalsSection', () => {
 			expect(screen.getByText('December 2024')).toBeTruthy();
 			expect(
 				screen.getByRole('link', { name: 'December 2024' }).getAttribute('href')
-			).toBe('/group/alpha/summary/2024/12');
+			).toBe('/group/alpha/summary/2024/12?tabId=year-totals');
 		});
 	});
 
@@ -120,7 +124,7 @@ describe('SquashedMonthSummaryTotalsSection', () => {
 				screen
 					.getByRole('link', { name: '16th January 2025' })
 					.getAttribute('href')
-			).toBe('/group/alpha/session/2025-01-16');
+			).toBe('/group/alpha/session/2025-01-16?tabId=session-totals');
 		});
 	});
 

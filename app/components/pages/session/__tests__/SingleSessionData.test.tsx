@@ -652,6 +652,29 @@ describe('SessionTabs', () => {
 		});
 	});
 
+	// #1013: the focused tab is published to the whole tab subtree, so the
+	// species drill-down links carry it and the species page opens on the
+	// equivalent tab rather than its own default.
+	describe('publishing the focused tab to its drill-down links', () => {
+		it('stamps whichever tab is focused onto each species link', () => {
+			renderSessionTabs({ otherCatchesSpeciesList: mistNetSpeciesList });
+
+			expect(
+				within(screen.getByTestId('session-table'))
+					.getByRole('link', { name: 'Robin' })
+					.getAttribute('href')
+			).toBe('/species/Robin?tabId=mist-netting');
+
+			fireEvent.click(screen.getByRole('button', { name: 'Other catches' }));
+
+			expect(
+				within(screen.getByTestId('other-catches-table'))
+					.getByRole('link', { name: 'Robin' })
+					.getAttribute('href')
+			).toBe('/species/Robin?tabId=other-catches');
+		});
+	});
+
 	it.skip('renders session highlights in a tab', async () => {
 		renderSessionTabs();
 		expect(screen.getByRole('button', { name: 'Highlights' })).not.toBeNull();

@@ -1,4 +1,4 @@
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+import { TabAwareLink } from '@/app/components/shared/TabAwareLink';
 import { type ColumnConfig, type RowModelWithRawData } from './SortableTable';
 
 // A thicker border marks where the "age class" block of columns
@@ -33,6 +33,12 @@ export function columnBlock(
 // `buildHref` yields a falsy value (empty string), the name renders as plain
 // text instead of a link — for rows with no single drill-down target, e.g. the
 // all-time "Month totals" tab whose combine-years rows span every year at once.
+//
+// The link is a `TabAwareLink` (#1013), so a cell rendered inside a tab panel
+// carries that tab onto its href and the target page opens on the equivalent
+// tab. Rendered outside any `CurrentTabProvider` — e.g. the `/species` list
+// page's own table — it degrades to a plain `NoPrefetchLink` with the href
+// untouched.
 export function createNameLinkCell<RawRowData, RowModel>(
 	getName: (model: RowModelWithRawData<RawRowData, RowModel>) => string,
 	buildHref: (
@@ -49,9 +55,9 @@ export function createNameLinkCell<RawRowData, RowModel>(
 			return <span className="text-wrap">{getName(model)}</span>;
 		}
 		return (
-			<NoPrefetchLink className="link text-wrap" href={href}>
+			<TabAwareLink className="link text-wrap" href={href}>
 				{getName(model)}
-			</NoPrefetchLink>
+			</TabAwareLink>
 		);
 	};
 }

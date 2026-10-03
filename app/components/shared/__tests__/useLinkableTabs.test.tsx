@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { useLinkableTabs } from '../useLinkableTabs';
 
@@ -76,6 +76,50 @@ describe('useLinkableTabs', () => {
 			act(() => result.current.selectTab('net-rounds'));
 			expect(result.current.activeTab).toBe('net-rounds');
 			expect(result.current.loadedTabs).toEqual(new Set(['net-rounds']));
+		});
+	});
+
+	// #1013's reload half: the focused tab is mirrored onto `?tabId=` so a
+	// reload, a copied link or a browser-restored session reopens it. Which URL
+	// string gets produced is `setTabIdSearchParam`'s own unit tests' business
+	// (app/lib/__tests__/tab-query-param.test.ts) — these cover the wiring: that
+	// selecting a tab replaces (rather than pushes) history state with that tab
+	// named, and that a first paint doesn't touch history at all.
+	describe('mirroring the focused tab onto the URL', () => {
+		let replaceState: ReturnType<typeof vi.spyOn>;
+
+		beforeEach(() => {
+			replaceState = vi.spyOn(window.history, 'replaceState');
+			window.history.replaceState(null, '', '/group/alpha/session/2026-08-16');
+			replaceState.mockClear();
+		});
+
+		afterEach(() => {
+			replaceState.mockRestore();
+		});
+
+		it('replaces history state with the newly-selected tab named in ?tabId=', () => {
+			const { result } = renderHook(() =>
+				useLinkableTabs({ tabIds, defaultTabId: 'species' })
+			);
+
+			act(() => result.current.selectTab('highlights'));
+			expect(replaceState).toHaveBeenCalledWith(
+				null,
+				'',
+				'/group/alpha/session/2026-08-16?tabId=highlights'
+			);
+		});
+
+		it('leaves the URL alone on first paint, before any tab is selected', () => {
+			renderHook(() =>
+				useLinkableTabs({
+					tabIds,
+					defaultTabId: 'species',
+					initialTabId: 'highlights'
+				})
+			);
+			expect(replaceState).not.toHaveBeenCalled();
 		});
 	});
 });

@@ -65,7 +65,7 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 				within(heading)
 					.getByRole('link', { name: 'All time' })
 					.getAttribute('href')
-			).toBe('/species/Robin');
+			).toBe('/species/Robin?tabId=session-totals');
 		});
 
 		it('renders the species tabs and stats for the scoped data', async () => {

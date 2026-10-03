@@ -145,11 +145,11 @@ describe('SummaryTotalsSection', () => {
 			expect(document.querySelectorAll('tbody tr').length).toBe(12);
 			const januaryLink = screen.getByRole('link', { name: 'January 2026' });
 			expect(januaryLink.getAttribute('href')).toBe(
-				'/group/alpha/summary/2026/1'
+				'/group/alpha/summary/2026/1?tabId=month-totals'
 			);
 			const decemberLink = screen.getByRole('link', { name: 'December 2026' });
 			expect(decemberLink.getAttribute('href')).toBe(
-				'/group/alpha/summary/2026/12'
+				'/group/alpha/summary/2026/12?tabId=month-totals'
 			);
 		});
 
@@ -243,8 +243,8 @@ describe('SummaryTotalsSection', () => {
 				'16th August 2026'
 			]);
 			expect(links.map((link) => link.getAttribute('href'))).toEqual([
-				'/group/alpha/session/2026-08-02',
-				'/group/alpha/session/2026-08-16'
+				'/group/alpha/session/2026-08-02?tabId=session-totals',
+				'/group/alpha/session/2026-08-16?tabId=session-totals'
 			]);
 		});
 
@@ -278,7 +278,7 @@ describe('SummaryTotalsSection', () => {
 				screen
 					.getByRole('link', { name: '16th August 2026' })
 					.getAttribute('href')
-			).toBe('/group/alpha/session/2026-08-16');
+			).toBe('/group/alpha/session/2026-08-16?tabId=session-totals');
 		});
 
 		it('renders the period table empty state when there were no sessions that month', () => {
@@ -362,7 +362,9 @@ describe('SummaryTotalsSection', () => {
 				/>
 			);
 			const link = screen.getByRole('link', { name: '2026' });
-			expect(link.getAttribute('href')).toBe('/group/alpha/summary/2026');
+			expect(link.getAttribute('href')).toBe(
+				'/group/alpha/summary/2026?tabId=year-totals'
+			);
 		});
 
 		it('keeps "Species totals" present and lazily switches to it on click', async () => {
@@ -459,7 +461,7 @@ describe('SummaryTotalsSection', () => {
 				expect(screen.queryByText('January 2020')).toBeNull();
 				expect(
 					screen.getByRole('link', { name: 'January' }).getAttribute('href')
-				).toBe('/group/alpha/summary/jan');
+				).toBe('/group/alpha/summary/jan?tabId=all-time-month-totals');
 			});
 
 			it('renders a "Busiest session" column between Encounters and Birds', async () => {
@@ -598,17 +600,17 @@ describe('SummaryTotalsSection', () => {
 						screen
 							.getByRole('link', { name: 'January 2020' })
 							.getAttribute('href')
-					).toBe('/group/alpha/summary/2020/1');
+					).toBe('/group/alpha/summary/2020/1?tabId=all-time-month-totals');
 					expect(
 						screen
 							.getByRole('link', { name: 'January 2021' })
 							.getAttribute('href')
-					).toBe('/group/alpha/summary/2021/1');
+					).toBe('/group/alpha/summary/2021/1?tabId=all-time-month-totals');
 					expect(
 						screen
 							.getByRole('link', { name: 'August 2020' })
 							.getAttribute('href')
-					).toBe('/group/alpha/summary/2020/8');
+					).toBe('/group/alpha/summary/2020/8?tabId=all-time-month-totals');
 					expect(
 						(
 							screen.getByRole('radio', {
@@ -1033,6 +1035,33 @@ describe('SummaryTotalsSection', () => {
 				(screen.getByRole('radio', { name: 'Hide' }) as HTMLInputElement)
 					.checked
 			).toBe(true);
+		});
+	});
+
+	// #1013: the focused tab is published to the whole tab subtree, so every
+	// drill-down link inside it carries that tab onto its href and the target
+	// page opens on the equivalent tab rather than its own default.
+	describe('publishing the focused tab to its drill-down links', () => {
+		it('stamps whichever tab is focused onto each drill-down link', async () => {
+			render(
+				<SummaryTotalsSection
+					sessionTotals={[buildDailyStatsRow({ time_period: '2026-08-16' })]}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			expect(
+				screen
+					.getByRole('link', { name: '16th August 2026' })
+					.getAttribute('href')
+			).toBe('/group/alpha/session/2026-08-16?tabId=session-totals');
+
+			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
+			const speciesLink = await screen.findByRole('link', {
+				name: 'Blue Tit'
+			});
+			expect(speciesLink.getAttribute('href')).toBe(
+				'/species/Blue Tit?tabId=species-totals'
+			);
 		});
 	});
 });

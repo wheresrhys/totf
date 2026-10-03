@@ -162,7 +162,9 @@ describe('/summary (all-time)', () => {
 			const link = await screen.findByRole('link', {
 				name: '16th August 2026'
 			});
-			expect(link.getAttribute('href')).toBe('/group/alpha/session/2026-08-16');
+			expect(link.getAttribute('href')).toBe(
+				'/group/alpha/session/2026-08-16?tabId=session-totals'
+			);
 		});
 
 		it("the page's initial render (Year totals active) triggers no day-grouped fetch", async () => {

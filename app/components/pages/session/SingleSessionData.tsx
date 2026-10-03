@@ -4,6 +4,7 @@ import { type SessionEncounter } from '@/app/models/session';
 import { type NetRound } from '@/app/lib/session-chronology';
 import { getAgeClass } from '@/app/models/encounter';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
+import { CurrentTabProvider } from '@/app/components/shared/CurrentTabContext';
 export type SpeciesWithEncounters = {
 	species: string;
 	encounters: SessionEncounter[];
@@ -235,7 +236,7 @@ export function SessionTabs({
 	});
 
 	return (
-		<>
+		<CurrentTabProvider currentTabId={activeTab}>
 			<TabNav
 				tabs={tabNavConfig}
 				activeTab={activeTab}
@@ -292,6 +293,6 @@ export function SessionTabs({
 					oldestEncounter={oldestEncounter}
 				/>
 			</ConditionalTabPanel>
-		</>
+		</CurrentTabProvider>
 	);
 }
