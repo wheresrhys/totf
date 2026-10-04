@@ -163,6 +163,16 @@ entrypoint, its content, and its data fetcher:
   `as const` (or an explicit tuple annotation), since a plain `const tabs = [...]` widens to a
   single union element type and loses the per-tab params types. A homogeneous array needs nothing
   special.
+- **Where a page's tab ids live:** in a plain module with no `'use client'` directive, alongside
+  the shared params type (`app/components/pages/summary/summary-tab-params.ts`,
+  `squashed-month-tab-params.ts`), _not_ next to each tab's component. A `page.tsx` needs those
+  ids server-side for `resolveInitialTabId`, and anything imported from a `'use client'` module
+  into a server module is a client reference rather than a plain value.
+- **Tabs the page already has data for** (the squashed-month summary page's Species/Year/Session
+  totals) declare no `dataFetcher` at all and read their rows off `TabSet`'s shared `params`
+  instead. `TabContent` renders such a tab immediately with `data: null` — "lazy" here means
+  lazy-_mount_, not a per-tab fetch. Don't add a `dataFetcher` that re-fetches what the page's
+  own `fetch___PageContent` already returned.
 
 Naming reference (see #667 for the original design discussion):
 
