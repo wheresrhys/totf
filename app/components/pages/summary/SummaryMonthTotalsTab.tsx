@@ -11,7 +11,10 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { SummaryTabParams } from './summary-tab-params';
 
-export const MONTH_TOTALS_TAB_ID = 'month-totals';
+// From the plain sibling module, where every summary tab id lives so the
+// server-side `page.tsx`es can read them as real strings (#1096).
+import { MONTH_TOTALS_TAB_ID } from './summary-tab-prefetchers';
+export { MONTH_TOTALS_TAB_ID } from './summary-tab-prefetchers';
 
 // The year summary page's per-year "Month totals" tab — distinct from the
 // all-time page's combine-years "Month totals" tab

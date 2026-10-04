@@ -92,7 +92,7 @@ the root layout, not a subtree one.
 - **Models** (`app/models/`) hold domain types and pure transformation logic — no I/O.
   - Session highlights (`app/lib/highlights/`) A rule is one `HighlightsGenerator` object (`rules/*.ts`, registered in `rules/index.ts`): a `statsSelector` picking `overall` / `withSpecies` / `bySpecies` off the `core_stats` repository (`app/actions/stats-cache.ts`), a `generator` built by a finder in `lib/rule-utils.ts`, a `descriptor` whose `category` names the page section, a `condition` gating which temporal unit / parent window it applies to, and `formatters` that print the sentence. `lib/highlight-generator.ts` runs every rule at the all-time, year and month scopes; `lib/time-period-highlights.ts` then cherry-picks the highlights landing on the period being rendered, drops narrower-scoped restatements (`removeLessSignificantHighlights`), folds what's left across scopes (`combineSimilarHighlights`) and sorts by category. Registering a rule is enough to cover it: `rules/__tests__/rules.combinedhighlights.output.test.js` snapshot-tests every registered rule's printer against a battery of generated `CombinedHighlight` shapes — regenerate `rules/__tests__/expectations.ts` (`npx tsx app/lib/highlights/rules/__tests__/generate-expectations.ts`, then `npm run lint` to format it) and commit it with any new or changed rule, rather than hand-writing a per-rule test file. The two sanctioned extension points are new finders in `lib/rule-utils.ts` and new properties on its `HighlightFinderOptions`; don't add a second combining mechanism. **Combining is strictly one metric, one species, several scopes** — the Rarities migration (#990) deliberately lost v1's multi-species "First A, B and C records" lines and its cross-metric MEGA badge because neither is expressible that way; `combineSimilarHighlights`' header comment is the authority on this, read it before trying to reinstate either.
     - The session page's Highlights tab fetches this pipeline through `fetchSessionHighlights` (`app/components/pages/session/session-tab-config.ts`, the tab's `TabConfig.dataFetcher`) and `app/components/pages/session/SessionHighlights.tsx` renders the same three independently-shown/hidden sections in the fixed Rarities → Counts → Vital stats order, filtering by `descriptor.category`. Editorial refinements still belong in a v2 rule's finder/printer. `SummaryTotalsSection` renders the same live `CombinedHighlight`s and shares `renderCombinedHighlights`, exported from `SessionHighlights.tsx`.
-    - **Highlights are generated client-side on purpose** — a conscious caching/performance decision, to be revisited deliberately (#1089) rather than eroded page by page. Any tab that renders them therefore declares `clientSideOnly: true` on its `TabConfig` (`app/components/shared/TabContent.tsx`), which makes `prefetchActiveTabData` decline to run its `dataFetcher` server-side even when `?tabId=` deep-links straight into it: the tab opens focused, shows `TabContent`'s spinner, and fetches on mount (#1061). Don't "optimise" that away by dropping the flag; `renderCombinedHighlights` also depends on it, since a `CombinedHighlight` carries its printers as function properties and so could never cross a server→client boundary intact anyway.
+    - **Highlights are generated client-side on purpose** — a conscious caching/performance decision, to be revisited deliberately (#1089) rather than eroded page by page. Any tab that renders them therefore declares `clientSideOnly: true` on its `TabConfig` (`app/components/shared/TabContent.tsx`), which makes `prefetchActiveTabData` decline to run its `dataFetcher` server-side even when `?tabId=` deep-links straight into it: the tab opens focused, shows `TabContent`'s spinner, and fetches on mount (#1061). Don't "optimise" that away by dropping the flag; `renderCombinedHighlights` also depends on it, since a `CombinedHighlight` carries its printers as function properties and so could never cross a server→client boundary intact anyway. That last point is not theoretical — #1096 verified it against a real dev server: drop the flag and a `?tabId=highlights` deep link logs `Functions cannot be passed directly to Client Components` once per printer. The session, summary and squashed-month Highlights tabs all carry it (#1096 added the two summary ones, which had been protected only by the client-reference bug that stopped their prefetch running at all).
 - **Actions** (`app/actions/`) are `'use server'` functions that fetch data and return typed results.
 - **Components** (`app/components/`) and page files receive data as props; they do not fetch.
 - Route pages are in `app/(routes)/` — the `(routes)` group is just for organisation, it doesn't affect URLs.
@@ -178,11 +178,29 @@ entrypoint, its content, and its data fetcher:
   `as const` (or an explicit tuple annotation), since a plain `const tabs = [...]` widens to a
   single union element type and loses the per-tab params types. A homogeneous array needs nothing
   special.
-- **Where a page's tab ids live:** in a plain module with no `'use client'` directive, alongside
-  the shared params type (`app/components/pages/summary/summary-tab-params.ts`,
-  `squashed-month-tab-params.ts`), _not_ next to each tab's component. A `page.tsx` needs those
-  ids server-side for `resolveInitialTabId`, and anything imported from a `'use client'` module
-  into a server module is a client reference rather than a plain value.
+- **Where a page's tab ids _and_ `dataFetcher`s live:** in a plain module with no `'use client'`
+  directive, alongside the shared params type (`app/components/pages/summary/summary-tab-prefetchers.ts`
+  and `summary-tab-params.ts`, `squashed-month-tab-params.ts`,
+  `app/(routes)/species/[speciesName]/species-tabs.ts`,
+  `app/components/pages/session/session-tab-config.ts`), _not_ next to each tab's component. A
+  `page.tsx` needs the ids server-side for `resolveInitialTabId` and the fetchers for
+  `prefetchActiveTabData`, and anything imported from a `'use client'` module into a server
+  module is a client reference rather than a plain value. The `'use client'` tab component file
+  imports the id/fetcher back from the plain module for its own `TabConfig`, so there is exactly
+  one definition of each.
+  **This fails silently, and no test can catch it (#1096).** Dotting into a client reference
+  yields `undefined` rather than throwing, so a `page.tsx` that builds its tab list out of
+  `'use client'`-exported `TabConfig`s gets a list of `{id: undefined, dataFetcher: undefined}`:
+  `resolveInitialTabId` falls back to the page default for every `?tabId=`, `prefetchActiveTabData`
+  matches no tab and prefetches nothing, and the page still renders a perfectly good 200. Vitest
+  imports modules directly with no client-reference boundary, so a violating page behaves
+  correctly in the suite and is dead in production — which is exactly how all four Summary tabs
+  shipped broken. `app/components/pages/summary/__tests__/summary-tab-prefetchers.test.ts` guards
+  the invariant at the source level (no `'use client'` in the prefetch-source modules; no value
+  import of a tab component file in a summary `page.tsx`) since it can't be guarded behaviourally.
+- **A group-scoped page must forward `searchParams` explicitly.** `withGroupScope` hands it to the
+  callback, but a delegating one-liner that only passes `viewedGroup` drops it, and `?tabId=` then
+  never reaches the delegated page's `getParams` — another silent, test-invisible break (#1096).
 - **Tabs the page already has data for** (the squashed-month summary page's Species/Year/Session
   totals) declare no `dataFetcher` at all and read their rows off `TabSet`'s shared `params`
   instead. `TabContent` renders such a tab immediately with `data: null` — "lazy" here means

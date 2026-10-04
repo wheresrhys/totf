@@ -44,6 +44,11 @@ export const squashedMonthHighlightsTab: TabConfig<
 	id: SQUASHED_MONTH_HIGHLIGHTS_TAB_ID,
 	label: 'Highlights',
 	dataFetcher: fetchSquashedMonthHighlights,
+	// Highlights are generated client-side on purpose (#1089), and a
+	// `CombinedHighlight` carries its printers as function properties, so a
+	// server-prefetched payload could never cross the boundary back into this
+	// client component anyway. See `summary-tab-prefetchers.ts` (#1096).
+	clientSideOnly: true,
 	TabComponent: ({ data, viewedGroup }) => (
 		<div>
 			<HighlightsByTimePeriod

@@ -4,10 +4,6 @@ import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import {
-	fetchPeriodStats,
-	fetchCombinedMonthTotals
-} from '@/app/actions/summary-stats';
-import {
 	buildCombinedMonthTotalsRows,
 	buildPerYearMonthTotalsRows,
 	filterEmptyMonthTotalsRows,
@@ -20,19 +16,19 @@ import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { SummaryTabParams } from './summary-tab-params';
+// Id and `dataFetcher` live in the plain (non-`'use client'`) sibling module
+// so `summary/**/page.tsx` can read them server-side — see its header comment
+// (#1096). This file owns only the presentational half.
+import {
+	ALL_TIME_MONTH_TOTALS_TAB_ID,
+	fetchAllTimeMonthTotalsData,
+	type SummaryAllTimeMonthTotalsData
+} from './summary-tab-prefetchers';
 
-export const ALL_TIME_MONTH_TOTALS_TAB_ID = 'all-time-month-totals';
-
-async function fetchAllTimeMonthTotalsData(
-	_params: SummaryTabParams,
-	viewedGroup: ViewedGroup
-) {
-	const [periodStats, monthSquashedStats] = await Promise.all([
-		fetchPeriodStats(viewedGroup.id, 'month'),
-		fetchCombinedMonthTotals(viewedGroup.id)
-	]);
-	return { periodStats, monthSquashedStats };
-}
+export {
+	ALL_TIME_MONTH_TOTALS_TAB_ID,
+	type SummaryAllTimeMonthTotalsData
+} from './summary-tab-prefetchers';
 
 // The all-time page's combine-years "Month totals" tab content, moved out of
 // `SummaryTotalsSection.tsx` verbatim (#1072). Owns the "Combine years" and
@@ -135,13 +131,6 @@ function AllTimeMonthTotalsTab({
 		</>
 	);
 }
-
-// Exported so call sites (e.g. `SummaryTotalsSection`'s `initialTabData` spread)
-// can cast a server-prefetched `unknown` payload back to this tab's concrete
-// `DataType` without reaching for `as unknown as` (#921).
-export type SummaryAllTimeMonthTotalsData = Awaited<
-	ReturnType<typeof fetchAllTimeMonthTotalsData>
->;
 
 export const summaryAllTimeMonthTotalsTab: TabConfig<
 	SummaryAllTimeMonthTotalsData,

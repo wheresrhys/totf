@@ -8,11 +8,12 @@ import {
 	resolveInitialTabId,
 	prefetchActiveTabData
 } from '@/app/lib/tab-query-param';
-import type { TabConfig } from '@/app/components/shared/TabContent';
-import { summarySpeciesTotalsTab } from '@/app/components/pages/summary/SummarySpeciesTotalsTab';
-import { summaryHighlightsTab } from '@/app/components/pages/summary/SummaryHighlightsTab';
-import { summaryAllTimeMonthTotalsTab } from '@/app/components/pages/summary/SummaryAllTimeMonthTotalsTab';
-import { summarySessionTotalsTab } from '@/app/components/pages/summary/SummarySessionTotalsTab';
+// From the plain (non-`'use client'`) prefetcher module, never by dotting into
+// a tab's `'use client'` `TabConfig` — see that module's header comment (#1096).
+import {
+	allTimeSummaryPrefetchers,
+	YEAR_TOTALS_TAB_ID
+} from '@/app/components/pages/summary/summary-tab-prefetchers';
 import type { SummaryTabParams } from '@/app/components/pages/summary/summary-tab-params';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
@@ -35,23 +36,6 @@ async function getSummaryPageParams(pageProps: PageProps): Promise<PageParams> {
 	return tabId ? { tabId } : {};
 }
 
-// Mirrors `SummaryTotalsSection`'s own `tabs` array for this page shape
-// (`yearlyTotals` always set, `showAllTimeMonthTotals` always true, session
-// totals always lazy here since this page never supplies `sessionTotals`) —
-// `'year-totals'` has no `dataFetcher` since Year totals stays eager/inline,
-// so `prefetchActiveTabData` simply no-ops for it.
-const YEAR_TOTALS_TAB_ID = 'year-totals';
-const allTimeSummaryTabs: Pick<
-	TabConfig<unknown, SummaryTabParams>,
-	'id' | 'dataFetcher'
->[] = [
-	{ id: YEAR_TOTALS_TAB_ID },
-	summaryAllTimeMonthTotalsTab,
-	summarySessionTotalsTab,
-	summarySpeciesTotalsTab,
-	summaryHighlightsTab
-];
-
 export async function fetchSummaryPageContent(
 	params: PageParams,
 	viewedGroupId: number
@@ -62,7 +46,7 @@ export async function fetchSummaryPageContent(
 	]);
 	const activeTabId = resolveInitialTabId(
 		params.tabId,
-		allTimeSummaryTabs.map((tab) => tab.id),
+		allTimeSummaryPrefetchers.map((tab) => tab.id),
 		YEAR_TOTALS_TAB_ID
 	);
 	// `fromDate`/`toDate`/`year`/`month` are all unscoped (undefined) on this
@@ -73,7 +57,7 @@ export async function fetchSummaryPageContent(
 		SummaryTabParams,
 		SummaryTabParams[]
 	>(
-		allTimeSummaryTabs,
+		allTimeSummaryPrefetchers,
 		activeTabId,
 		{ totalsStats: undefined },
 		// No full `ViewedGroup` (with slug) is resolved yet at this point in
