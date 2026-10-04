@@ -193,3 +193,63 @@ describe('fetchResightingsPageContent query building', () => {
 		]);
 	});
 });
+
+describe('fetchResightingsPageContent tab resolution', () => {
+	beforeEach(() => {
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+			makeEncountersClient(resightings).client
+		);
+	});
+
+	afterEach(() => {
+		cleanup();
+	});
+
+	describe('no ?tabId= given', () => {
+		it('resolves "All" as the initial active tab', async () => {
+			const { initialTabId } = await fetchResightingsPageContent({}, 42);
+			expect(initialTabId).toBe('All');
+		});
+	});
+
+	describe('?tabId= names a species present in the data', () => {
+		it('resolves that species as the initial active tab', async () => {
+			const { initialTabId } = await fetchResightingsPageContent(
+				{ tabId: 'Kingfisher' },
+				42
+			);
+			expect(initialTabId).toBe('Kingfisher');
+		});
+
+		it('opens that species tab on first render', async () => {
+			render(
+				await Page({
+					searchParams: Promise.resolve({ tabId: 'Kingfisher' })
+				})
+			);
+			const table = await screen.findByRole('table');
+			expect(table.textContent).toContain('Kingfisher');
+			expect(table.textContent).not.toContain('Wren');
+		});
+	});
+
+	describe('?tabId= names a species not present in the data', () => {
+		it('falls back to "All"', async () => {
+			const { initialTabId } = await fetchResightingsPageContent(
+				{ tabId: 'Dodo' },
+				42
+			);
+			expect(initialTabId).toBe('All');
+		});
+	});
+
+	describe('prefetching the active tab', () => {
+		it('returns no prefetched data, since no resightings tab has a dataFetcher', async () => {
+			const { initialTabData } = await fetchResightingsPageContent(
+				{ tabId: 'Kingfisher' },
+				42
+			);
+			expect(initialTabData).toBeUndefined();
+		});
+	});
+});

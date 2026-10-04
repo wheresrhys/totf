@@ -163,6 +163,16 @@ entrypoint, its content, and its data fetcher:
   `as const` (or an explicit tuple annotation), since a plain `const tabs = [...]` widens to a
   single union element type and loses the per-tab params types. A homogeneous array needs nothing
   special.
+- **A data-driven tab list** (resightings, #1070 — one tab per species actually present in the
+  group's resighting data, plus an `All` default) can't resolve `?tabId=` until the page's data
+  is in hand, so its `fetch___PageContent` does the whole
+  `resolveInitialTabId` → `prefetchActiveTabData` step itself and returns the resolved
+  `initialTabId`/`initialTabData` alongside the data, rather than the page resolving them before
+  the fetch. That keeps it to one Supabase round-trip with no `cache()` dedupe. The helper the
+  tab ids are derived from (`groupResightingsBySpecies`, `app/lib/resightings.ts`) has to live
+  in a **non-`'use client'`** module for this: the server fetcher and the client content
+  component both call it, and a `'use client'` module's exports become client references that a
+  server component can't call.
 
 Naming reference (see #667 for the original design discussion):
 

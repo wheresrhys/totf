@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupResightingsBySpecies } from '../PageContent';
+import { groupResightingsBySpecies } from '../resightings';
 import type { ResightingEncounter } from '@/app/models/session';
 
 function makeResighting(id: number, speciesName: string): ResightingEncounter {
