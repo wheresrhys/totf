@@ -18,8 +18,15 @@ import { vi } from 'vitest';
  * `Page` import) — that ordering is what makes the mocks take effect.
  */
 
+// These 3 render their received props as JSON text (rather than an empty
+// stub like every other mock below) so a test can assert a `TabConfig`
+// adapter mapped them correctly — see `PageContent.test.tsx`'s "species
+// detail tabs" describe block (#1060), which is the only current consumer of
+// this. `JSON.parse(element.textContent)` recovers the props object.
 vi.mock('@/app/components/pages/species/SpIndividualsTab', () => ({
-	SpIndividualsTab: () => <div data-testid="sp-individuals-tab" />
+	SpIndividualsTab: (props: Record<string, unknown>) => (
+		<div data-testid="sp-individuals-tab">{JSON.stringify(props)}</div>
+	)
 }));
 
 vi.mock('@/app/components/pages/species/SpHighlightsTab', () => ({
@@ -38,11 +45,15 @@ vi.mock('@/app/components/pages/species/SpHighlightsTab', () => ({
 }));
 
 vi.mock('@/app/components/pages/species/SpDemographicsTab', () => ({
-	SpDemographicsTab: () => <div data-testid="sp-demographics-tab" />
+	SpDemographicsTab: (props: Record<string, unknown>) => (
+		<div data-testid="sp-demographics-tab">{JSON.stringify(props)}</div>
+	)
 }));
 
 vi.mock('@/app/components/pages/species/SpBiometricsTab', () => ({
-	SpBiometricsTab: () => <div data-testid="sp-biometrics-tab" />
+	SpBiometricsTab: (props: Record<string, unknown>) => (
+		<div data-testid="sp-biometrics-tab">{JSON.stringify(props)}</div>
+	)
 }));
 
 vi.mock('@/app/components/pages/species/SpYearTotalsTab', () => ({
