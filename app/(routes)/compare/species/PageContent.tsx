@@ -1,37 +1,39 @@
 'use client';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import type { SpeciesComparisonStats } from '@/app/actions/compare-species';
 import {
 	PageWrapper,
 	PrimaryHeading,
 	Standfirst
 } from '@/app/components/shared/DesignSystem';
-import { TabNav } from '@/app/components/TabNav';
-import {
-	biometricsComparisonColumns,
-	coreStatsComparisonColumns
-} from '@/app/components/pages/compare-species/comparison-columns';
-import { SpeciesComparisonTable } from '@/app/components/pages/compare-species/SpeciesComparisonTable';
+import { TabSet } from '@/app/components/shared/TabSet';
+import { compareSpeciesBiometricsTab } from '@/app/components/pages/compare-species/CompareSpeciesBiometricsTab';
+import { compareSpeciesCoreTab } from '@/app/components/pages/compare-species/CompareSpeciesCoreTab';
+import type { CompareSpeciesTabParams } from '@/app/components/pages/compare-species/compare-species-tab-params';
 import { SpeciesPillSelector } from '@/app/components/pages/compare-species/SpeciesPillSelector';
 import {
 	buildSpeciesComparisonQuery,
-	comparisonDatasetTabs,
 	listAvailableSpecies,
-	selectComparisonRows,
-	toggleSpeciesSelection,
-	type ComparisonDatasetId
+	toggleSpeciesSelection
 } from '@/app/lib/compare-species';
-import type { CompareSpeciesParams } from './page';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { CompareSpeciesPageData, CompareSpeciesParams } from './page';
 
-const COMPARISON_TABLE_TEST_ID = 'species-comparison-table';
+/**
+ * The dataset toggle, as a `TabSet` tabs array. Homogeneous (both tabs take
+ * the same `CompareSpeciesTabParams`), so it needs no `as const` to keep its
+ * per-tab params types.
+ */
+const compareSpeciesTabs = [compareSpeciesCoreTab, compareSpeciesBiometricsTab];
 
 export function CompareSpeciesPageContent({
 	params,
-	data
+	data,
+	viewedGroup
 }: {
 	params: CompareSpeciesParams;
-	data: SpeciesComparisonStats;
+	data: CompareSpeciesPageData;
+	viewedGroup: ViewedGroup;
 }) {
 	const pathname = usePathname();
 	const availableSpecies = listAvailableSpecies(data.coreStats);
@@ -43,15 +45,12 @@ export function CompareSpeciesPageContent({
 			availableSpecies.includes(speciesName)
 		)
 	);
-	const [datasetId, setDatasetId] = useState<ComparisonDatasetId>(
-		comparisonDatasetTabs[0].id
-	);
 
 	// `window.history.replaceState` rather than `router.replace`: the selection
 	// is a pure filter over data this page has already fetched, so a Next.js
-	// navigation would re-run the server component (and its three RPCs) to
-	// produce identical data. `replaceState` rather than `pushState` keeps a
-	// session of pill-tapping out of the back button's history.
+	// navigation would re-run the server component (and its RPCs) to produce
+	// identical data. `replaceState` rather than `pushState` keeps a session of
+	// pill-tapping out of the back button's history.
 	function handleSpeciesToggle(speciesName: string) {
 		const nextSelection = toggleSpeciesSelection(selectedSpecies, speciesName);
 		setSelectedSpecies(nextSelection);
@@ -62,6 +61,15 @@ export function CompareSpeciesPageContent({
 			query ? `${pathname}?${query}` : pathname
 		);
 	}
+
+	// Rebuilt every render so a pill tap re-renders whichever dataset tab is
+	// showing with the new selection — neither tab fetches, both read their
+	// rows straight off here (see `CompareSpeciesTabParams`).
+	const tabParams: CompareSpeciesTabParams = {
+		coreStats: data.coreStats,
+		biometricsStats: data.biometricsStats,
+		selectedSpecies
+	};
 
 	return (
 		<PageWrapper>
@@ -74,26 +82,14 @@ export function CompareSpeciesPageContent({
 				selectedSpecies={selectedSpecies}
 				onToggle={handleSpeciesToggle}
 			/>
-			<TabNav
-				tabs={comparisonDatasetTabs}
-				activeTab={datasetId}
-				onTabChange={(tabId) => setDatasetId(tabId as ComparisonDatasetId)}
+			<TabSet
+				tabs={compareSpeciesTabs}
+				params={tabParams}
+				viewedGroup={viewedGroup}
+				initialTabId={params.activeTabId}
+				initialTabData={data.initialTabData}
 				ariaLabel="Dataset"
 			/>
-			{datasetId === 'core' ? (
-				<SpeciesComparisonTable
-					rows={selectComparisonRows(data.coreStats, selectedSpecies)}
-					columnConfigs={coreStatsComparisonColumns}
-					testId={COMPARISON_TABLE_TEST_ID}
-				/>
-			) : null}
-			{datasetId === 'biometrics' ? (
-				<SpeciesComparisonTable
-					rows={selectComparisonRows(data.biometricsStats, selectedSpecies)}
-					columnConfigs={biometricsComparisonColumns}
-					testId={COMPARISON_TABLE_TEST_ID}
-				/>
-			) : null}
 		</PageWrapper>
 	);
 }
