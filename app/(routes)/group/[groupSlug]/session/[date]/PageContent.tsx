@@ -26,7 +26,9 @@ export type PageParams = {
 	// The deep-linked tab's data, already fetched server-side by `page.tsx`'s
 	// `prefetchActiveTabData` call (#1059), so the tab renders with its content
 	// in hand instead of flashing a spinner and refetching on hydration.
-	// `undefined` whenever there was nothing to prefetch.
+	// `undefined` whenever there was nothing to prefetch — which, today, is
+	// always: the only session tab with a `dataFetcher` is Highlights, and it is
+	// `clientSideOnly` by design (see `sessionTabPrefetchers`).
 	prefetchedTabData?: { tabId: string; data: unknown };
 };
 

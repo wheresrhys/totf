@@ -204,6 +204,33 @@ describe('prefetchActiveTabData', () => {
 		});
 	});
 
+	describe('tab is declared clientSideOnly', () => {
+		it('returns undefined without running its dataFetcher, so the tab fetches for itself after hydration', async () => {
+			const clientSideOnlyFetcher = vi.fn<
+				(
+					params: SpeciesPageParams,
+					viewedGroup: ViewedGroup
+				) => Promise<unknown>
+			>(async () => 'should never be reached');
+
+			const prefetched = await prefetchActiveTabData(
+				[
+					{
+						id: 'highlights',
+						dataFetcher: clientSideOnlyFetcher,
+						clientSideOnly: true
+					}
+				],
+				'highlights',
+				params,
+				viewedGroup
+			);
+
+			expect(prefetched).toBeUndefined();
+			expect(clientSideOnlyFetcher).not.toHaveBeenCalled();
+		});
+	});
+
 	describe('activeTabId matches no tab in the list', () => {
 		it('returns undefined without throwing, given an unvalidated id', async () => {
 			const { tabs, fetchingTabFetcher } = buildTabs();

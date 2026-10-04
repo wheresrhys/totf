@@ -4,7 +4,7 @@ import { TabSet } from '@/app/components/shared/TabSet';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
-	fetchSessionHighlightLines,
+	fetchSessionHighlights,
 	type SessionTabParams
 } from './session-tab-config';
 import { SessionMistNettingTab } from './SessionMistNettingTab';
@@ -58,7 +58,14 @@ export function buildSessionTabs({
 		{
 			id: 'highlights',
 			label: 'Highlights',
-			dataFetcher: fetchSessionHighlightLines,
+			dataFetcher: fetchSessionHighlights,
+			// Highlights are generated in the browser by deliberate design (a
+			// caching/performance decision), so this tab opts out of
+			// `prefetchActiveTabData` even when `?tabId=highlights` deep-links
+			// straight into it: it opens focused, shows `TabContent`'s spinner and
+			// fetches on mount. Kept in step with `sessionTabPrefetchers`, which is
+			// the copy `page.tsx` actually consults server-side.
+			clientSideOnly: true,
 			// `TabSet` types its whole tab list as `TabConfig<unknown, Params>[]`,
 			// so a tab that knows its own data type can't be assigned without
 			// widening it back to `unknown` here. Narrowing inside
@@ -93,7 +100,7 @@ export function SessionTabs({
 	});
 
 	return (
-		<TabSet<SessionTabParams>
+		<TabSet
 			tabs={tabs}
 			params={params}
 			viewedGroup={viewedGroup}

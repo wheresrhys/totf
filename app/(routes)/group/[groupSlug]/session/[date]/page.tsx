@@ -157,15 +157,23 @@ type PageProps = { params: Promise<{ groupSlug: string; date: string }> };
 
 /**
  * Resolve the `?tabId=` deep link and, when it names a tab that fetches its
- * own data, fetch that data here rather than letting the tab fetch it again
- * after hydration (#1059).
+ * own data server-side, fetch that data here rather than letting the tab fetch
+ * it again after hydration (#1059).
+ *
+ * Today no session tab does. Highlights is the only one with a `dataFetcher`
+ * at all, and it is declared `clientSideOnly` (see `sessionTabPrefetchers`) —
+ * highlights generation stays in the browser on purpose — so this resolves to
+ * `undefined` every time and the tab renders focused-with-a-spinner. The
+ * wiring stays because the declaration is what makes that a decision rather
+ * than an oversight, and because the next session tab to want a real prefetch
+ * only has to say so.
  *
  * The prefetch doesn't need the day's encounters, even though the tab list
- * does: Highlights is the only tab with a `dataFetcher`, and it can never be a
- * day's *default* tab (it always sits last, behind the always-present Net
- * rounds tab). So the active tab is only ever prefetchable when the URL asked
- * for it by name — and `prefetchActiveTabData` already returns `undefined` for
- * any id it doesn't recognise, which covers a garbage `?tabId=` too.
+ * does: Highlights can never be a day's *default* tab (it always sits last,
+ * behind the always-present Net rounds tab), so the active tab is only ever
+ * prefetchable when the URL asked for it by name — and `prefetchActiveTabData`
+ * already returns `undefined` for any id it doesn't recognise, which covers a
+ * garbage `?tabId=` too.
  */
 async function resolveSessionTabParams(
 	date: string,

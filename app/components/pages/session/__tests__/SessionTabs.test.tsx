@@ -7,6 +7,7 @@ import {
 	within
 } from '@testing-library/react';
 import { SessionTabs, buildSessionTabs } from '../SessionTabs';
+import type { CombinedHighlight } from '@/app/lib/highlights/types';
 import type { NetRound } from '@/app/lib/session-chronology';
 import type {
 	SessionEncounter,
@@ -149,6 +150,14 @@ describe('SessionTabs', () => {
 				.filter((tab) => tab.dataFetcher !== undefined)
 				.map((tab) => tab.id);
 			expect(tabsWithFetchers).toEqual(['highlights']);
+		});
+
+		it('declares the Highlights tab clientSideOnly, keeping highlights generation out of the server-side prefetch', () => {
+			const highlightsTab = buildSessionTabs({
+				hasMistNetEncounters: true,
+				hasOtherCatches: true
+			}).find((tab) => tab.id === 'highlights');
+			expect(highlightsTab?.clientSideOnly).toBe(true);
 		});
 	});
 
@@ -705,43 +714,57 @@ describe('SessionTabs', () => {
 	});
 
 	describe('Highlights tab data (#1061)', () => {
-		const prefetchedCountLine = {
-			tabId: 'highlights',
-			data: [
-				{
-					category: 'count' as const,
-					key: 'session-total-undefined',
-					text: 'Busiest session ever — 3 birds'
-				}
-			]
+		// A v2 highlight carries its own printer, so what the tab renders is
+		// whatever that printer returns — a test double here, not the real v2
+		// formatting logic (covered by the v2 pipeline's own tests).
+		const countHighlight: CombinedHighlight = {
+			formatters: {
+				combinedHighlightPrinter: () => 'Busiest session ever — 3 birds',
+				highlightListPrefixPrinter: () => ''
+			},
+			descriptor: {
+				category: 'count',
+				type: 'session-total',
+				unit: 'encounter'
+			},
+			value: { timePeriod: '2024-09-15', value: 3, species: null },
+			species: 'Robin',
+			bestPosition: 1,
+			scopes: []
 		};
 
-		it('renders prefetched highlights immediately, without a client fetch, when the tab is deep-linked', async () => {
+		async function mockHighlightsPipeline(highlights: CombinedHighlight[]) {
 			const { getCondensedHighlightsAtTimePeriod } =
 				await import('@/app/lib/highlights');
-			renderSessionTabs({
-				initialTabId: 'highlights',
-				initialTabData: prefetchedCountLine
-			});
-			expect(screen.getByTestId('session-highlights').textContent).toContain(
+			vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue(
+				highlights
+			);
+			return getCondensedHighlightsAtTimePeriod;
+		}
+
+		it('fetches highlights client-side, behind a spinner, when the tab is opened', async () => {
+			const pipeline = await mockHighlightsPipeline([countHighlight]);
+			renderSessionTabs();
+
+			fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
+
+			expect(document.querySelector('.loading')).not.toBeNull();
+			const highlights = await screen.findByTestId('session-highlights');
+			expect(pipeline).toHaveBeenCalledWith(1, '2024-09-15', 'day');
+			expect(highlights.textContent).toContain(
 				'Busiest session ever — 3 birds'
 			);
-			expect(getCondensedHighlightsAtTimePeriod).not.toHaveBeenCalled();
 		});
 
-		it('fetches highlights client-side when the tab is opened without prefetched data', async () => {
-			const { getCondensedHighlightsAtTimePeriod } =
-				await import('@/app/lib/highlights');
-			vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue([]);
-			renderSessionTabs();
-			fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
+		it('still fetches client-side, behind a spinner, when the tab is deep-linked — it is declared clientSideOnly, so nothing was prefetched', async () => {
+			const pipeline = await mockHighlightsPipeline([countHighlight]);
+			renderSessionTabs({ initialTabId: 'highlights' });
+
 			expect(document.querySelector('.loading')).not.toBeNull();
-			await vi.waitFor(() =>
-				expect(getCondensedHighlightsAtTimePeriod).toHaveBeenCalledWith(
-					1,
-					'2024-09-15',
-					'day'
-				)
+			const highlights = await screen.findByTestId('session-highlights');
+			expect(pipeline).toHaveBeenCalledWith(1, '2024-09-15', 'day');
+			expect(highlights.textContent).toContain(
+				'Busiest session ever — 3 birds'
 			);
 		});
 	});

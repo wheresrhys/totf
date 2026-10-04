@@ -363,15 +363,15 @@ describe('session detail page', () => {
 			expect(highlights.textContent).toContain('Counts');
 		});
 
-		it('?tabId=highlights prefetches that tab server-side, so it never shows a loading spinner', async () => {
+		it('?tabId=highlights does NOT prefetch the tab server-side — it is clientSideOnly, so the fetch runs once, from the browser', async () => {
 			const { getCondensedHighlightsAtTimePeriod } =
 				await import('@/app/lib/highlights');
 			render(await renderPage('highlights'));
 			await screen.findByTestId('session-highlights');
-			// Fetched exactly once — by `page.tsx`'s `prefetchActiveTabData`, not
-			// again by `TabContent` once the tab mounted.
+			// Fetched exactly once — by `TabContent` after the tab mounted, never
+			// by `page.tsx`'s `prefetchActiveTabData`, which declines to run a
+			// `clientSideOnly` tab's fetcher.
 			expect(getCondensedHighlightsAtTimePeriod).toHaveBeenCalledTimes(1);
-			expect(document.querySelector('.loading')).toBeNull();
 		});
 
 		it('does not prefetch anything for a tabId naming a tab that fetches nothing of its own', async () => {

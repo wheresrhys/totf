@@ -91,7 +91,7 @@ export async function fetchSummaryYearMonthPageContent(
 	);
 	// `totalsStats` is never read by any `dataFetcher` (display-only), so its
 	// value here is irrelevant to fetch correctness.
-	const initialTabData = await prefetchActiveTabData<SummaryTabParams>(
+	const initialTabData = await prefetchActiveTabData(
 		monthSummaryTabs,
 		activeTabId,
 		{
