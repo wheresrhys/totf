@@ -1,250 +1,57 @@
 'use client';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { TabNav } from '@/app/components/TabNav';
-import { SpeciesTotalsTable } from '@/app/components/SpeciesTotalsTable';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
-import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
-import { fetchSpeciesData } from '@/app/actions/spp-data';
+import { ConditionalTabPanel } from '@/app/components/shared/ConditionalTabPanel';
+import { TabContent } from '@/app/components/shared/TabContent';
 import {
-	BoxyList,
-	SecondaryHeading
-} from '@/app/components/shared/DesignSystem';
+	summarySpeciesTotalsTab,
+	type SummarySpeciesTotalsData
+} from '@/app/components/pages/summary/SummarySpeciesTotalsTab';
 import {
-	fetchPeriodStats,
-	fetchCombinedMonthTotals
-} from '@/app/actions/summary-stats';
-import { fetchPeriodTotals } from '@/app/actions/period-totals';
+	summaryHighlightsTab,
+	type SummaryHighlightsData
+} from '@/app/components/pages/summary/SummaryHighlightsTab';
 import {
-	getHighlightsWithinTimeWindow,
-	getCondensedHighlightsAtTimePeriod
-} from '@/app/lib/highlights';
+	summaryAllTimeMonthTotalsTab,
+	type SummaryAllTimeMonthTotalsData
+} from '@/app/components/pages/summary/SummaryAllTimeMonthTotalsTab';
 import {
-	HighlightValue,
-	isNumericHighlightValue,
-	type HighlightsOfType
-} from '@/app/lib/highlights/types';
+	summarySessionTotalsTab,
+	type SummarySessionTotalsData
+} from '@/app/components/pages/summary/SummarySessionTotalsTab';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	buildGroupSummaryHref,
 	buildGroupSessionHref
 } from '@/app/lib/group-links';
-import { buildGroupSquashedMonthSummaryHref } from '@/app/lib/squashed-month';
 import {
-	buildCombinedMonthTotalsRows,
-	buildPerYearMonthTotalsRows,
 	filterEmptyMonthTotalsRows,
 	formatMonthYearLabel,
-	formatMonthLabel,
 	type MonthTotalsRow
 } from '@/app/lib/month-totals';
-import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
-import {
-	StatOutput,
-	type SpeciesName
-} from '@/app/components/shared/StatOutput';
-import { renderCombinedHighlights } from '@/app/components/pages/session/SessionHighlights';
-const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
-// The all-time page's combine-years month tab — distinct from `MONTH_TOTALS_TAB`
-// (the year page's per-year, linked, toggle-enabled month rows). Same label,
+// Re-exported (not relocated) so this file's other two existing consumers
+// (`SquashedMonthSummaryTotalsSection.tsx`, `SpHighlightsTab.tsx`) keep
+// working unchanged — see `HighlightsByTimePeriod.tsx`'s doc comment for why
+// the implementation itself had to move (breaking a circular import with
+// `SummaryHighlightsTab.tsx` below).
+export { HighlightsByTimePeriod } from '@/app/components/HighlightsByTimePeriod';
+// `MONTH_TOTALS_TAB` (the year page's per-year, linked, toggle-enabled month
+// rows) stays eager/inline — distinct from the all-time page's combine-years
+// "Month totals" tab, now `summaryAllTimeMonthTotalsTab` below. Same label,
 // different semantics: 12 rows summed across every year, encounters-only.
-const ALL_TIME_MONTH_TOTALS_TAB = {
-	id: 'all-time-month-totals',
-	label: 'Month totals'
-};
+const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
 const YEAR_TOTALS_TAB = { id: 'year-totals', label: 'Year totals' };
-const SESSION_TOTALS_TAB = { id: 'session-totals', label: 'Session totals' };
-const SPECIES_TOTALS_TAB = { id: 'species-totals', label: 'Species totals' };
-const HIGHLIGHTS_TAB = { id: 'highlights', label: 'Highlights' };
-
-function showHighlightUnit(
-	highlight: HighlightsOfType,
-	highlightValue: HighlightValue,
-	excludeSpeciesName?: boolean
-) {
-	if (['g', 'mm'].includes(highlight.descriptor.unit)) {
-		return true;
-	}
-	return !excludeSpeciesName;
-}
-
-function getHighlightUnit(
-	highlight: HighlightsOfType,
-	highlightValue: HighlightValue,
-	excludeSpeciesName?: boolean
-) {
-	if (['g', 'mm'].includes(highlight.descriptor.unit)) {
-		return highlight.descriptor.unit;
-	}
-	return excludeSpeciesName
-		? undefined
-		: (highlightValue.species as SpeciesName) || highlight.descriptor.unit;
-}
-
-export function HighlightsByTimePeriod({
-	highlights,
-	heading,
-	viewedGroup,
-	excludeSpeciesName
-}: {
-	highlights: HighlightsOfType[];
-	heading: string;
-	viewedGroup?: ViewedGroup;
-	excludeSpeciesName?: boolean;
-}) {
-	if (!highlights.length) return null;
-	return (
-		<div>
-			<SecondaryHeading>{heading}</SecondaryHeading>
-			{highlights.map(
-				(highlight) =>
-					isNumericHighlightValue(highlight.values[0]) && (
-						<div
-							key={`${highlight.descriptor.type}-${highlight.scope.temporalUnit}`}
-						>
-							{highlight.formatters.highlightListPrefixPrinter(highlight)}:{' '}
-							<div className="flex gap-2">
-								{highlight.values.map(
-									(highlightValue) =>
-										isNumericHighlightValue(highlightValue) && (
-											<span
-												className="badge badge-outline"
-												key={highlightValue.timePeriod}
-											>
-												<StatOutput
-													dateFormat={
-														highlight.scope.temporalUnit === 'day'
-															? 'dd/MM/yy'
-															: 'MMM yyyy'
-													}
-													visitDate={highlightValue.timePeriod}
-													temporalUnit={highlight.scope.temporalUnit}
-													showUnit={showHighlightUnit(
-														highlight,
-														highlightValue,
-														excludeSpeciesName
-													)}
-													value={highlightValue.value}
-													unit={getHighlightUnit(
-														highlight,
-														highlightValue,
-														excludeSpeciesName
-													)}
-													viewedGroup={viewedGroup}
-												/>
-											</span>
-										)
-								)}
-							</div>
-						</div>
-					)
-			)}
-		</div>
-	);
-}
-
-// The all-time page's combine-years "Month totals" tab content. Owns the
-// "Combine years" toggle's local state so it resets to the default (ON) each
-// time the tab remounts — mirroring how `PeriodTotalsTable`'s own
-// `aggregateByState` resets per #604 — since `SummaryTotalsSection` itself
-// never unmounts across tab switches, so the state has to live down here
-// instead. `periodStats` (raw per-`(year, month)` rows) feeds the OFF view;
-// `monthSquashedStats` (`core_stats`' `'month-squashed'` mode, #996) feeds the
-// ON view — both already fetched before this renders, so toggling re-renders
-// in place, no new fetch either way.
-function AllTimeMonthTotalsTab({
-	periodStats,
-	monthSquashedStats,
-	totalsStats,
-	viewedGroup
-}: {
-	periodStats: CoreStatsResult[];
-	monthSquashedStats: CoreStatsResult[];
-	totalsStats?: CoreStatsResult;
-	viewedGroup?: ViewedGroup;
-}) {
-	const [combineYears, setCombineYears] = useState(true);
-	// Sibling of `combineYears` — independent state, applies to whichever view is
-	// shown, and resets to Hide (`true`) on tab remount alongside it.
-	const [hideEmptyMonths, setHideEmptyMonths] = useState(true);
-
-	// ON: 12 calendar-month buckets, already summed across every year in SQL via
-	// `core_stats`' `'month-squashed'` mode. Look each row back up by its
-	// sentinel `time_period` (there's no year to link to, so no href) and format
-	// its label on demand.
-	const combinedRows = buildCombinedMonthTotalsRows(monthSquashedStats);
-	const combinedLabelByTimePeriod = new Map(
-		combinedRows.map((row) => [row.stats.time_period, formatMonthLabel(row)])
-	);
-
-	// OFF: one row per real `(year, month)` combination, unsummed. Look each
-	// row back up by `time_period` so the shared table can derive its
-	// label/href from the raw row rather than re-deriving from the date string.
-	const perYearRows = buildPerYearMonthTotalsRows(periodStats);
-	const perYearRowByTimePeriod = new Map(
-		perYearRows.map((row) => [row.stats.time_period, row])
-	);
-
-	const extraControls = (
-		<>
-			<CombineYearsToggle value={combineYears} onChange={setCombineYears} />
-			<EmptyMonthsToggle
-				value={hideEmptyMonths}
-				onChange={setHideEmptyMonths}
-			/>
-		</>
-	);
-
-	return (
-		<>
-			{combineYears ? (
-				<PeriodTotalsTable
-					timeInterval="month"
-					rows={filterEmptyMonthTotalsRows(combinedRows, hideEmptyMonths).map(
-						(row) => row.stats
-					)}
-					firstColumnHeader="Month"
-					// Links into the squashed-month summary page (#1005) for this
-					// calendar month — no single year to drill into, but every
-					// occurrence of the month across the group's whole history.
-					buildHref={(timePeriod) =>
-						buildGroupSquashedMonthSummaryHref(
-							viewedGroup,
-							Number(timePeriod.slice(5, 7))
-						)
-					}
-					buildLabel={(timePeriod) =>
-						combinedLabelByTimePeriod.get(timePeriod) ?? ''
-					}
-					totalsStats={totalsStats}
-					extraControls={extraControls}
-				/>
-			) : (
-				<PeriodTotalsTable
-					timeInterval="month"
-					rows={filterEmptyMonthTotalsRows(perYearRows, hideEmptyMonths).map(
-						(row) => row.stats
-					)}
-					firstColumnHeader="Month"
-					buildHref={(timePeriod) => {
-						const row = perYearRowByTimePeriod.get(timePeriod);
-						return buildGroupSummaryHref(
-							viewedGroup,
-							row && { year: row.year, month: row.zeroIndexedMonth + 1 }
-						);
-					}}
-					buildLabel={(timePeriod) =>
-						formatMonthYearLabel(perYearRowByTimePeriod.get(timePeriod))
-					}
-					totalsStats={totalsStats}
-					extraControls={extraControls}
-				/>
-			)}
-		</>
-	);
-}
+// Same tab id/label whichever variant renders (eager, prop-fed, on the month
+// page; lazy, `summarySessionTotalsTab`-fetched, on the all-time/year pages)
+// — the two are mutually exclusive per page, see `showSessionTotals` below.
+const SESSION_TOTALS_TAB = summarySessionTotalsTab;
+const SPECIES_TOTALS_TAB = summarySpeciesTotalsTab;
+const HIGHLIGHTS_TAB = summaryHighlightsTab;
+const ALL_TIME_MONTH_TOTALS_TAB = summaryAllTimeMonthTotalsTab;
 
 // The year summary page's "Month totals" tab content. Extracted from
 // `SummaryTotalsSection`'s inline JSX purely so its `hideEmptyMonths` state
@@ -306,7 +113,8 @@ export function SummaryTotalsSection({
 	toDate,
 	year,
 	month,
-	initialTabId
+	initialTabId,
+	initialTabData
 }: {
 	// The page's aggregate stats for whichever table/tab is active — used to
 	// derive the pinned totals row. `null` (no data yet) renders no totals row.
@@ -347,6 +155,11 @@ export function SummaryTotalsSection({
 	// this render's own `tabs`; an unknown/garbage value or no param at all
 	// falls back to `tabs[0].id` unchanged.
 	initialTabId?: string;
+	// The one migrated tab's server-prefetched data, matching `initialTabId`
+	// (#1072's `prefetchActiveTabData` wiring, one route-depth-specific caller
+	// per `page.tsx`) — `undefined` when the resolved initial tab isn't one of
+	// the 4 migrated tabs, or has no `dataFetcher` output to prefetch.
+	initialTabData?: { tabId: string; data: unknown };
 }) {
 	// Each summary page supplies at most one period tab's data: year totals on
 	// the all-time page, month totals on the year page, session totals on the
@@ -370,144 +183,22 @@ export function SummaryTotalsSection({
 		[SESSION_TOTALS_TAB.id]: !monthTotals && !yearlyTotals
 	};
 	// Shared with the species and session pages via `useLinkableTabs` (#818).
-	// Summary renders every tab eagerly, so it ignores the hook's `loadedTabs`
-	// and just uses `activeTab` + `selectTab`.
-	const { activeTab, selectTab } = useLinkableTabs({
+	// The 3 untouched tabs (Year/Month totals, eager Session totals) ignore
+	// `loadedTabs` and render from `activeTab` alone, same as before; the 4
+	// migrated tabs below gate their `ConditionalTabPanel` on it so they mount
+	// (and fetch) once, on first selection, and stay mounted-but-hidden
+	// thereafter rather than unmounting on every tab switch (#1072).
+	const { activeTab, loadedTabs, selectTab } = useLinkableTabs({
 		tabIds: tabs.map((tab) => tab.id),
 		defaultTabId: tabs[0].id,
 		initialTabId
 	});
 
-	// Species totals are fetched lazily: only once the Species tab is first
-	// selected (or on first paint when it is the sole/default tab), and never
-	// again for the component's mounted lifetime — the page no longer eagerly
-	// fetches this data server-side.
-	const isSpeciesActive = activeTab === SPECIES_TOTALS_TAB.id;
-	const fetchSpeciesStats = useCallback(
-		() => fetchSpeciesData(viewedGroup!.id, fromDate, toDate),
-		[viewedGroup, fromDate, toDate]
-	);
-	const { data: speciesStats, isLoading: isSpeciesLoading } = useLazyTabData(
-		isSpeciesActive && viewedGroup !== undefined,
-		fetchSpeciesStats,
-		{
-			onError: (error) =>
-				console.error('Failed to fetch species totals', {
-					viewedGroupId: viewedGroup?.id,
-					fromDate,
-					toDate,
-					error
-				})
-		}
-	);
-	const isHighlightsActive = activeTab === HIGHLIGHTS_TAB.id;
-	const fetchHighlightsData = useCallback(async () => {
-		const [daily, monthly, local] = await Promise.all([
-			getHighlightsWithinTimeWindow({
-				temporalUnit: 'day',
-				groupId: viewedGroup!.id,
-				parentTimeWindow: {
-					year,
-					month: month
-				},
-				includePerSpecies: false
-			}),
-			month
-				? []
-				: getHighlightsWithinTimeWindow({
-						temporalUnit: 'month',
-						groupId: viewedGroup!.id,
-						parentTimeWindow: {
-							year,
-							month: month
-						},
-						includePerSpecies: false
-					}),
-			year
-				? getCondensedHighlightsAtTimePeriod(
-						viewedGroup!.id,
-						`${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
-						month ? 'month' : 'year',
-						1
-					)
-				: []
-		]);
-		return {
-			sessionHighlights: daily,
-			monthHighlights: monthly,
-			localHighlights: local
-		};
-	}, [viewedGroup, year, month]);
-	const { data: highlightsData, isLoading: isHighlightsLoading } =
-		useLazyTabData(
-			isHighlightsActive && viewedGroup !== undefined,
-			fetchHighlightsData,
-			{
-				onError: (error) =>
-					console.error('Failed to fetch highlights', {
-						viewedGroupId: viewedGroup?.id,
-						error
-					})
-			}
-		);
-
-	// The all-time combine-years month tab fetches lazily too, on first select.
-	// The "Combine years OFF" view needs the raw per-(year, month) rows
-	// (`periodStats`); the "ON" view needs the true cross-year aggregate per
-	// calendar month, fetched separately via `core_stats`' `'month-squashed'`
-	// mode (#996) rather than folded client-side from `periodStats` (that would
-	// double-count any distinct-count column for a species/bird appearing in the
-	// same calendar month in more than one year, #994).
-	const isAllTimeMonthActive = activeTab === ALL_TIME_MONTH_TOTALS_TAB.id;
-	const fetchCombinedMonthStats = useCallback(async () => {
-		const [periodStats, monthSquashedStats] = await Promise.all([
-			fetchPeriodStats(viewedGroup!.id, 'month'),
-			fetchCombinedMonthTotals(viewedGroup!.id)
-		]);
-		return { periodStats, monthSquashedStats };
-	}, [viewedGroup]);
-	const { data: combinedMonthData, isLoading: isCombinedMonthLoading } =
-		useLazyTabData(
-			isAllTimeMonthActive && viewedGroup !== undefined,
-			fetchCombinedMonthStats,
-			{
-				onError: (error) =>
-					console.error('Failed to fetch all-time month totals', {
-						viewedGroupId: viewedGroup?.id,
-						error
-					})
-			}
-		);
-
-	// Session totals follow the same fetch-on-select shape as Species totals. When
-	// `sessionTotals` is already supplied (the month page's eager fetch) this
-	// never fires, since `isActive` below is gated on `sessionTotals` being
-	// undefined.
-	const isSessionActive = activeTab === SESSION_TOTALS_TAB.id;
-	const fetchSessionStats = useCallback(
-		() => fetchPeriodTotals(viewedGroup!.id, 'day', fromDate, toDate),
-		[viewedGroup, fromDate, toDate]
-	);
-	const { data: lazySessionStats, isLoading: isSessionLoading } =
-		useLazyTabData(
-			isSessionActive &&
-				sessionTotals === undefined &&
-				viewedGroup !== undefined,
-			fetchSessionStats,
-			{
-				onError: (error) =>
-					console.error('Failed to fetch session totals', {
-						viewedGroupId: viewedGroup?.id,
-						fromDate,
-						toDate,
-						error
-					})
-			}
-		);
 	// The totals row always reflects the page's own aggregate stats, regardless
 	// of which tab/table is currently active — `undefined` (not `null`) means
 	// "no totals row" to each table's `totalsStats` prop.
 	const totalsStats = summaryStats ?? undefined;
+	const isSessionActive = activeTab === SESSION_TOTALS_TAB.id;
 
 	return (
 		<>
@@ -536,100 +227,115 @@ export function SummaryTotalsSection({
 					viewedGroup={viewedGroup}
 				/>
 			)}
-			{isAllTimeMonthActive &&
-				(isCombinedMonthLoading ? (
-					<div className="flex items-center justify-center">
-						<div className="loading loading-spinner loading-xl"></div>
-					</div>
-				) : (
-					<AllTimeMonthTotalsTab
-						periodStats={combinedMonthData?.periodStats ?? []}
-						monthSquashedStats={combinedMonthData?.monthSquashedStats ?? []}
-						totalsStats={
-							tabsWithTotalsRow[ALL_TIME_MONTH_TOTALS_TAB.id]
-								? totalsStats
-								: undefined
-						}
+			<ConditionalTabPanel
+				loadedTabs={loadedTabs}
+				tabId={ALL_TIME_MONTH_TOTALS_TAB.id}
+				activeTabId={activeTab}
+			>
+				<TabContent
+					dataFetcher={
+						viewedGroup ? ALL_TIME_MONTH_TOTALS_TAB.dataFetcher : undefined
+					}
+					TabComponent={ALL_TIME_MONTH_TOTALS_TAB.TabComponent}
+					params={{
+						totalsStats: tabsWithTotalsRow[ALL_TIME_MONTH_TOTALS_TAB.id]
+							? totalsStats
+							: undefined
+					}}
+					viewedGroup={viewedGroup!}
+					{...(initialTabData?.tabId === ALL_TIME_MONTH_TOTALS_TAB.id
+						? {
+								initialData:
+									initialTabData.data as SummaryAllTimeMonthTotalsData | null
+							}
+						: {})}
+				/>
+			</ConditionalTabPanel>
+			{showSessionTotals && viewedGroup !== undefined && (
+				<>
+					{sessionTotals !== undefined ? (
+						isSessionActive && (
+							<PeriodTotalsTable
+								timeInterval="day"
+								rows={sessionTotals}
+								firstColumnHeader="Session"
+								buildHref={(timePeriod) =>
+									buildGroupSessionHref(viewedGroup, timePeriod)
+								}
+								totalsStats={
+									tabsWithTotalsRow[SESSION_TOTALS_TAB.id]
+										? totalsStats
+										: undefined
+								}
+								showBusiestSession={false}
+							/>
+						)
+					) : (
+						<ConditionalTabPanel
+							loadedTabs={loadedTabs}
+							tabId={SESSION_TOTALS_TAB.id}
+							activeTabId={activeTab}
+						>
+							<TabContent
+								dataFetcher={SESSION_TOTALS_TAB.dataFetcher}
+								TabComponent={SESSION_TOTALS_TAB.TabComponent}
+								params={{
+									fromDate,
+									toDate,
+									totalsStats: tabsWithTotalsRow[SESSION_TOTALS_TAB.id]
+										? totalsStats
+										: undefined
+								}}
+								viewedGroup={viewedGroup}
+								{...(initialTabData?.tabId === SESSION_TOTALS_TAB.id
+									? {
+											initialData:
+												initialTabData.data as SummarySessionTotalsData | null
+										}
+									: {})}
+							/>
+						</ConditionalTabPanel>
+					)}
+				</>
+			)}
+			<ConditionalTabPanel
+				loadedTabs={loadedTabs}
+				tabId={SPECIES_TOTALS_TAB.id}
+				activeTabId={activeTab}
+			>
+				<TabContent
+					dataFetcher={viewedGroup ? SPECIES_TOTALS_TAB.dataFetcher : undefined}
+					TabComponent={SPECIES_TOTALS_TAB.TabComponent}
+					params={{ fromDate, toDate, year, month }}
+					viewedGroup={viewedGroup!}
+					{...(initialTabData?.tabId === SPECIES_TOTALS_TAB.id
+						? {
+								initialData:
+									initialTabData.data as SummarySpeciesTotalsData | null
+							}
+						: {})}
+				/>
+			</ConditionalTabPanel>
+			{viewedGroup !== undefined && (
+				<ConditionalTabPanel
+					loadedTabs={loadedTabs}
+					tabId={HIGHLIGHTS_TAB.id}
+					activeTabId={activeTab}
+				>
+					<TabContent
+						dataFetcher={HIGHLIGHTS_TAB.dataFetcher}
+						TabComponent={HIGHLIGHTS_TAB.TabComponent}
+						params={{ year, month }}
 						viewedGroup={viewedGroup}
+						{...(initialTabData?.tabId === HIGHLIGHTS_TAB.id
+							? {
+									initialData:
+										initialTabData.data as SummaryHighlightsData | null
+								}
+							: {})}
 					/>
-				))}
-			{showSessionTotals &&
-				viewedGroup !== undefined &&
-				isSessionActive &&
-				(sessionTotals !== undefined ? (
-					<PeriodTotalsTable
-						timeInterval="day"
-						rows={sessionTotals}
-						firstColumnHeader="Session"
-						buildHref={(timePeriod) =>
-							buildGroupSessionHref(viewedGroup, timePeriod)
-						}
-						totalsStats={
-							tabsWithTotalsRow[SESSION_TOTALS_TAB.id] ? totalsStats : undefined
-						}
-						showBusiestSession={false}
-					/>
-				) : isSessionLoading ? (
-					<div className="flex items-center justify-center">
-						<div className="loading loading-spinner loading-xl"></div>
-					</div>
-				) : (
-					<PeriodTotalsTable
-						timeInterval="day"
-						rows={lazySessionStats ?? []}
-						firstColumnHeader="Session"
-						buildHref={(timePeriod) =>
-							buildGroupSessionHref(viewedGroup, timePeriod)
-						}
-						totalsStats={
-							tabsWithTotalsRow[SESSION_TOTALS_TAB.id] ? totalsStats : undefined
-						}
-						showBusiestSession={false}
-					/>
-				))}
-			{isSpeciesActive &&
-				(isSpeciesLoading ? (
-					<div className="flex items-center justify-center">
-						<div className="loading loading-spinner loading-xl"></div>
-					</div>
-				) : (
-					<SpeciesTotalsTable
-						speciesStats={speciesStats ?? []}
-						totalsStats={undefined}
-						period={year === undefined ? undefined : { year, month }}
-					/>
-				))}
-			{isHighlightsActive &&
-				(isHighlightsLoading ? (
-					<div className="flex items-center justify-center">
-						<div className="loading loading-spinner loading-xl"></div>
-					</div>
-				) : (
-					<div>
-						{highlightsData && (
-							<>
-								{highlightsData.localHighlights.length && (
-									<>
-										<h2>Records</h2>
-										<BoxyList>
-											{renderCombinedHighlights(highlightsData.localHighlights)}
-										</BoxyList>
-									</>
-								)}
-								<HighlightsByTimePeriod
-									highlights={highlightsData.sessionHighlights}
-									viewedGroup={viewedGroup}
-									heading="Session highlights"
-								/>
-								<HighlightsByTimePeriod
-									highlights={highlightsData.monthHighlights}
-									viewedGroup={viewedGroup}
-									heading="Month highlights"
-								/>
-							</>
-						)}
-					</div>
-				))}
+				</ConditionalTabPanel>
+			)}
 		</>
 	);
 }

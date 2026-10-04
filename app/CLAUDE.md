@@ -157,15 +157,26 @@ entrypoint, its content, and its data fetcher:
   species page (`app/(routes)/species/[speciesName]/page.tsx`'s `fetchSpeciesPageContentForPeriod`,
   #1065) is the first to do this: it resolves `?tabId=` and calls `tab-query-param.ts`'s
   `prefetchActiveTabData` alongside its own data fetch, passing the result down as `initialTabId`/
-  `initialTabData`. `TabSet` forces one shared `ParamsType` across every tab in its array (a
-  per-tab `ParamsType` was requested on #1058's PR review but never implemented), so a page with
-  tabs needing different extra fields — like species' Year/Month/Session totals — needs a single
-  superset `params` shape and `data: unknown`-typed `TabComponent`s that cast back to their real
-  type (see `SpYearTotalsTab.tsx`'s doc comment). A page mid-migration — only some of its tabs on
-  `TabConfig`, the rest still on the hand-rolled mechanism above — necessarily renders two separate
-  tab strips for the interim (give the migrated one's `TabSet` a non-default `ariaLabel` so
+  `initialTabData`. Species' Year/Month/Session totals tabs predate per-tab params (below) — they
+  share a single superset `SpeciesTotalsTabParams` with `data: unknown`-typed `TabComponent`s that
+  cast back to their real type (see `SpYearTotalsTab.tsx`'s doc comment), a homogeneous array so
+  per-tab params wasn't needed for them to compile; migrating them onto it is a candidate follow-up
+  rather than something #1065 did. A page mid-migration — only some of its tabs on `TabConfig`, the
+  rest still on the hand-rolled mechanism above — necessarily renders two separate tab strips for
+  the interim (give the migrated one's `TabSet` a non-default `ariaLabel` so
   `getByRole('tablist', { name: ... })` can address either strip in tests); see `SpeciesData`'s own
   doc comment in `PageContent.tsx` for the full reasoning.
+- **Per-tab params on a `TabSet`:** `TabSet`'s `params` prop is only the _default_. Each entry in
+  its `tabs` array carries its own independent params type, inferred from that tab's own
+  `dataFetcher`/`TabComponent`, and any tab can override the shared params with its own `params`
+  property. `TabConfigInSet` (`app/components/shared/TabContent.tsx`) is the single rule both
+  consumers of a tabs array apply — `TabSet` and, server-side, `prefetchActiveTabData`
+  (`app/lib/tab-query-param.ts`) — so a tab whose params the shared ones _can't_ satisfy is
+  obliged by the compiler to declare its own, in both the client and prefetch paths. One
+  consequence worth knowing: a **heterogeneous** tabs array hoisted into a variable needs
+  `as const` (or an explicit tuple annotation), since a plain `const tabs = [...]` widens to a
+  single union element type and loses the per-tab params types. A homogeneous array needs nothing
+  special.
 
 Naming reference (see #667 for the original design discussion):
 

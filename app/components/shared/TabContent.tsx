@@ -10,6 +10,20 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 export type TabConfig<DataType, ParamsType> = {
 	id: string;
 	label: string;
+	/**
+	 * This tab's own params, used in place of the shared `params` a `TabSet`
+	 * threads to every tab. Omit it — the common case — and the tab is handed
+	 * the set's shared params instead; supply it when this one tab needs a
+	 * different shape entirely, in which case its `ParamsType` is independent
+	 * of every other tab's in the same set (see `TabConfigInSet` below, which
+	 * is what turns this into a *required* property for such a tab).
+	 *
+	 * `NoInfer` so a tab's `ParamsType` is always pinned by the two things that
+	 * actually have to agree on it — `dataFetcher` and `TabComponent` — rather
+	 * than being widened to `ParamsType | undefined` by this optional property
+	 * when inferred from a `TabConfig`-typed array.
+	 */
+	params?: NoInfer<ParamsType>;
 	dataFetcher?: (
 		params: ParamsType,
 		viewedGroup: ViewedGroup
@@ -20,6 +34,32 @@ export type TabConfig<DataType, ParamsType> = {
 		viewedGroup: ViewedGroup;
 	}) => React.ReactNode;
 };
+
+/**
+ * One tab's entry in a set of tabs that also carries *shared* params — the
+ * single source of truth for "a tab the shared params can't satisfy must
+ * declare its own". Both consumers of a tabs array apply it, so the client
+ * (`TabSet`) and server (`prefetchActiveTabData`) halves can't drift into
+ * disagreeing about which tabs are legal.
+ *
+ * `TabShape` is whichever config shape the consumer takes — a whole
+ * `TabConfig` for `TabSet`, the `id`/`dataFetcher`/`params` subset for
+ * `prefetchActiveTabData`. The two cases are:
+ *  - `OwnParamsType` is satisfied by the shared params (identical to them, or
+ *    a subset of them) — the tab may just omit `params` and be handed the
+ *    shared ones,
+ *  - it isn't — the tab *must* carry its own `params`, and intersecting the
+ *    required property over `TabConfig`'s optional one makes forgetting it a
+ *    compile error rather than a runtime shape mismatch.
+ *
+ * `[SharedParamsType] extends [OwnParamsType]` is wrapped in tuples to stop
+ * the check distributing over a union-typed `SharedParamsType`.
+ */
+export type TabConfigInSet<SharedParamsType, OwnParamsType, TabShape> = [
+	SharedParamsType
+] extends [OwnParamsType]
+	? TabShape
+	: TabShape & { params: NoInfer<OwnParamsType> };
 
 /**
  * Runs one `TabConfig`: fetches its data once (or skips the fetch entirely

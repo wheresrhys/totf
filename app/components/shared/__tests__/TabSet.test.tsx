@@ -22,16 +22,34 @@ afterEach(() => {
 
 /**
  * One tab's `TabComponent`, tagged with its own id so a test can tell which
- * tab's content it is looking at and what data that tab received.
+ * tab's content it is looking at, what data that tab received, and — on a
+ * `data-params` attribute, to keep it out of the panel's text content — which
+ * params it was handed.
  */
 function buildTabComponent(tabId: string) {
-	return function RenderedTab({ data }: { data: unknown }) {
+	return function RenderedTab({
+		params: receivedParams,
+		data
+	}: {
+		params: unknown;
+		data: unknown;
+	}) {
 		return (
-			<p data-testid={`panel-${tabId}`}>
+			<p
+				data-testid={`panel-${tabId}`}
+				data-params={JSON.stringify(receivedParams)}
+			>
 				{(data as string | null) ?? 'no data'}
 			</p>
 		);
 	};
+}
+
+/** The params the named tab's `TabComponent` was rendered with. */
+function paramsReceivedBy(tabId: string) {
+	return JSON.parse(
+		screen.getByTestId(`panel-${tabId}`).getAttribute('data-params') ?? 'null'
+	);
 }
 
 function buildTab(
@@ -64,7 +82,7 @@ function buildTabs() {
 
 function renderTabSet({ initialTabId }: { initialTabId?: string } = {}) {
 	return render(
-		<TabSet<Params>
+		<TabSet
 			tabs={buildTabs()}
 			params={params}
 			viewedGroup={viewedGroup}
@@ -138,11 +156,83 @@ describe('TabSet', () => {
 		});
 	});
 
+	describe('per-tab params', () => {
+		// A set whose second tab needs a completely different params shape from
+		// the page's shared one, so it carries its own.
+		type MonthParams = { month: string };
+		const ownParams: MonthParams = { month: '2024-05' };
+
+		// Both fetchers are typed rather than bare `vi.fn()`s, so this fixture
+		// also exercises the type-level half of the feature: each tab's
+		// `ParamsType` is inferred from its own fetcher, and a tab the shared
+		// params can't satisfy only compiles because it carries its own.
+		function renderMixedParamsTabSet() {
+			const sharedParamsFetcher = vi
+				.fn<(params: Params, viewedGroup: ViewedGroup) => Promise<unknown>>()
+				.mockResolvedValue('shared data');
+			const ownParamsFetcher = vi
+				.fn<
+					(params: MonthParams, viewedGroup: ViewedGroup) => Promise<unknown>
+				>()
+				.mockResolvedValue('own data');
+			const utils = render(
+				<TabSet
+					tabs={
+						[
+							{
+								id: 'overview',
+								label: 'Overview',
+								dataFetcher: sharedParamsFetcher,
+								TabComponent: buildTabComponent('overview')
+							},
+							{
+								id: 'month',
+								label: 'Month',
+								params: ownParams,
+								dataFetcher: ownParamsFetcher,
+								TabComponent: buildTabComponent('month')
+							}
+						] as const
+					}
+					params={params}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			return { ...utils, sharedParamsFetcher, ownParamsFetcher };
+		}
+
+		it("hands the set's shared params to a tab that declares none", async () => {
+			const { sharedParamsFetcher } = renderMixedParamsTabSet();
+
+			await waitForTabData('overview', 'shared data');
+
+			expect(paramsReceivedBy('overview')).toEqual(params);
+			expect(sharedParamsFetcher).toHaveBeenCalledExactlyOnceWith(
+				params,
+				viewedGroup
+			);
+		});
+
+		it('hands a tab that declares its own params those instead, leaving the other tabs on the shared ones', async () => {
+			const { ownParamsFetcher } = renderMixedParamsTabSet();
+
+			fireEvent.click(screen.getByRole('button', { name: 'Month' }));
+			await waitForTabData('month', 'own data');
+
+			expect(paramsReceivedBy('month')).toEqual(ownParams);
+			expect(ownParamsFetcher).toHaveBeenCalledExactlyOnceWith(
+				ownParams,
+				viewedGroup
+			);
+			expect(paramsReceivedBy('overview')).toEqual(params);
+		});
+	});
+
 	describe('initialTabData', () => {
 		it('passes initialData only to the tab whose id matches initialTabData.tabId', async () => {
 			const tabs = buildTabs();
 			render(
-				<TabSet<Params>
+				<TabSet
 					tabs={tabs}
 					params={params}
 					viewedGroup={viewedGroup}

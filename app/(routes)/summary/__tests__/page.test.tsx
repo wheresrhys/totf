@@ -14,10 +14,17 @@ import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures'
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 const fetchYearlyTotalsMock = vi.fn().mockResolvedValue([]);
 const fetchPeriodStatsMock = vi.fn().mockResolvedValue([]);
+// `fetchCombinedMonthTotals` is reachable from this page's own data-fetcher
+// now too (#1072): `prefetchActiveTabData` calls
+// `summaryAllTimeMonthTotalsTab.dataFetcher` when `all-time-month-totals`
+// resolves as the active tab, which calls both this and `fetchPeriodStats`.
+const fetchCombinedMonthTotalsMock = vi.fn().mockResolvedValue([]);
 vi.mock('@/app/actions/summary-stats', () => ({
 	fetchSummaryStats: (...args: unknown[]) => fetchSummaryStatsMock(...args),
 	fetchYearlyTotals: (...args: unknown[]) => fetchYearlyTotalsMock(...args),
-	fetchPeriodStats: (...args: unknown[]) => fetchPeriodStatsMock(...args)
+	fetchPeriodStats: (...args: unknown[]) => fetchPeriodStatsMock(...args),
+	fetchCombinedMonthTotals: (...args: unknown[]) =>
+		fetchCombinedMonthTotalsMock(...args)
 }));
 
 const fetchSpeciesDataMock = vi.fn().mockResolvedValue([]);
@@ -45,6 +52,7 @@ describe('/summary (all-time)', () => {
 		fetchSpeciesDataMock.mockClear();
 		fetchPeriodTotalsMock.mockClear();
 		fetchPeriodTotalsMock.mockResolvedValue([]);
+		fetchCombinedMonthTotalsMock.mockClear();
 	});
 
 	it('renders the "All time summary" heading', async () => {
