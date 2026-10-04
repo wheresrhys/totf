@@ -1,23 +1,29 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import { SessionHighlights } from '../SessionHighlights';
-import type { CombinedHighlight } from '@/app/lib/highlights/types';
+import {
+	fetchSessionHighlights,
+	type SessionTabParams
+} from '../session-tab-config';
+import type {
+	CombinedHighlight,
+	HighlightCategory
+} from '@/app/lib/highlights/types';
 import type { SessionEncounter } from '@/app/models/session';
 
 // Rarities (#990), Counts (#989) and Vital stats all come from the highlights
-// pipeline's getCondensedHighlightsAtTimePeriod — see SessionHighlights.tsx.
+// pipeline's getCondensedHighlightsAtTimePeriod — see session-tab-config.ts.
 // Mock it as the one collaborator it is.
 vi.mock('@/app/lib/highlights', () => ({
 	getCondensedHighlightsAtTimePeriod: vi.fn()
 }));
 
-// v2 highlight fixtures — treat getCondensedHighlightsAtTimePeriod as a black
-// box: each printer is a test double returning a fixed sentence, not the real v2
-// formatting logic (that's covered by the v2 pipeline's own tests). The component
-// tells the two sections apart by descriptor.category alone.
-function makeV2Highlight(
-	category: CombinedHighlight['descriptor']['category'],
-	type: string,
+// A v2 highlight carries its own printer, so the sentence a section renders is
+// whatever that printer returns — a test double here returning a fixed
+// sentence, not the real v2 formatting logic (covered by the v2 pipeline's own
+// tests).
+function makeHighlight(
+	category: HighlightCategory,
 	sentence: string
 ): CombinedHighlight {
 	return {
@@ -25,27 +31,21 @@ function makeV2Highlight(
 			combinedHighlightPrinter: () => sentence,
 			highlightListPrefixPrinter: () => ''
 		},
-		descriptor: { category, type, unit: 'encounter' },
+		descriptor: { category, type: `${category}-type`, unit: 'encounter' },
 		value: { timePeriod: '2024-09-15', value: 74, species: null },
-		species: undefined,
+		species: 'Robin',
 		bestPosition: 1,
 		scopes: []
-	};
+	} as CombinedHighlight;
 }
 
-const RARITY_HIGHLIGHT = makeV2Highlight(
-	'rarity',
-	'firstSpeciesRecord',
-	'First Firecrest ever'
-);
-const COUNT_HIGHLIGHT = makeV2Highlight(
+const RARITY_HIGHLIGHT = makeHighlight('rarity', 'First Firecrest ever');
+const COUNT_HIGHLIGHT = makeHighlight(
 	'count',
-	'session-total',
 	'Busiest session ever — 74 birds'
 );
-const VITAL_STAT_HIGHLIGHT = makeV2Highlight(
+const VITAL_STAT_HIGHLIGHT = makeHighlight(
 	'biometrics',
-	'heaviestOfSpecies',
 	'Heaviest Robin ever — 12g'
 );
 
@@ -62,67 +62,53 @@ function makeOldestEncounter(provenAge: number): SessionEncounter {
 	} as SessionEncounter;
 }
 
-async function mockV2Highlights(highlights: CombinedHighlight[]) {
-	const { getCondensedHighlightsAtTimePeriod } =
-		await import('@/app/lib/highlights');
-	vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue(highlights);
-}
-
-async function mockV2HighlightsRejection() {
-	const { getCondensedHighlightsAtTimePeriod } =
-		await import('@/app/lib/highlights');
-	vi.mocked(getCondensedHighlightsAtTimePeriod).mockRejectedValue(
-		new Error('fetch failed')
-	);
-}
-
-function renderSessionHighlights(
-	overrides: Partial<{
-		date: string;
-		viewedGroupId: number;
-		oldestEncounter: SessionEncounter | null;
-	}> = {}
-) {
-	const props = {
+function renderSessionHighlights({
+	highlights = [] as CombinedHighlight[] | null,
+	oldestEncounter = null as SessionEncounter | null
+} = {}) {
+	const params = {
 		date: '2024-09-15',
-		viewedGroupId: 1,
-		oldestEncounter: null as SessionEncounter | null,
-		...overrides
-	};
-	return render(
-		<SessionHighlights
-			date={props.date}
-			viewedGroupId={props.viewedGroupId}
-			oldestEncounter={props.oldestEncounter}
-		/>
-	);
+		mistNetSpeciesList: [],
+		otherCatchesSpeciesList: [],
+		netRounds: [],
+		oldestEncounter
+	} satisfies SessionTabParams;
+	return render(<SessionHighlights params={params} data={highlights} />);
 }
+
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+});
+
+describe('fetchSessionHighlights', () => {
+	async function mockPipeline(highlights: CombinedHighlight[]) {
+		const { getCondensedHighlightsAtTimePeriod } =
+			await import('@/app/lib/highlights');
+		vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue(highlights);
+		return getCondensedHighlightsAtTimePeriod;
+	}
+
+	it("asks the pipeline for the viewed group's highlights at the day scope, and hands them straight back", async () => {
+		const pipelineHighlights = [COUNT_HIGHLIGHT];
+		const pipeline = await mockPipeline(pipelineHighlights);
+
+		const highlights = await fetchSessionHighlights(
+			{ date: '2024-09-15' },
+			{ id: 7, slug: 'alpha' }
+		);
+
+		expect(pipeline).toHaveBeenCalledWith(7, '2024-09-15', 'day');
+		expect(highlights).toBe(pipelineHighlights);
+	});
+});
 
 describe('SessionHighlights', () => {
-	afterEach(() => {
-		cleanup();
-		vi.restoreAllMocks();
-	});
-
-	beforeEach(async () => {
-		await mockV2Highlights([]);
-	});
-
-	it('renders a loading spinner before data loads', async () => {
-		renderSessionHighlights();
-		expect(document.querySelector('.loading')).not.toBeNull();
-	});
-
-	it('renders a Rarities/Counts/Vital stats heading and item per section when all three groups have highlights', async () => {
-		await mockV2Highlights([
-			RARITY_HIGHLIGHT,
-			COUNT_HIGHLIGHT,
-			VITAL_STAT_HIGHLIGHT
-		]);
-		renderSessionHighlights();
-		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
+	it('renders a Rarities/Counts/Vital stats heading and item per section when all three categories have highlights', () => {
+		renderSessionHighlights({
+			highlights: [RARITY_HIGHLIGHT, COUNT_HIGHLIGHT, VITAL_STAT_HIGHLIGHT]
 		});
+		expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
 		expect(screen.getByRole('heading', { name: 'Counts' })).toBeDefined();
 		expect(screen.getByRole('heading', { name: 'Vital stats' })).toBeDefined();
 
@@ -141,133 +127,73 @@ describe('SessionHighlights', () => {
 		expect(vitalStatItems[0].textContent).toBe('Heaviest Robin ever — 12g');
 	});
 
-	it('renders a "Best of the session" heading with the oldest-bird sentence when an oldest encounter is provided', async () => {
-		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
-		await waitFor(() => {
-			expect(
-				screen.getByRole('heading', { name: 'Best of the session' })
-			).toBeDefined();
+	it('renders every section together when highlights and an oldest encounter are both present', () => {
+		renderSessionHighlights({
+			highlights: [RARITY_HIGHLIGHT, COUNT_HIGHLIGHT, VITAL_STAT_HIGHLIGHT],
+			oldestEncounter: makeOldestEncounter(5)
 		});
-		const items = screen.getByTestId('best-of-session').querySelectorAll('li');
-		expect(items.length).toBe(1);
-		expect(items[0].textContent).toBe('Oldest: 5 years — Robin (ABC001)');
-	});
-
-	it('renders every section together when highlights and an oldest encounter are both present', async () => {
-		await mockV2Highlights([
-			RARITY_HIGHLIGHT,
-			COUNT_HIGHLIGHT,
-			VITAL_STAT_HIGHLIGHT
-		]);
-		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
-		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
-		});
+		expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
 		expect(screen.getByRole('heading', { name: 'Counts' })).toBeDefined();
 		expect(screen.getByRole('heading', { name: 'Vital stats' })).toBeDefined();
 		expect(
 			screen.getByRole('heading', { name: 'Best of the session' })
 		).toBeDefined();
-		expect(
-			screen.getByTestId('best-of-session').querySelectorAll('li').length
-		).toBe(1);
 	});
 
 	describe('per-section show/hide', () => {
-		it('shows only the Rarities section when only a rarity highlight is present', async () => {
-			await mockV2Highlights([RARITY_HIGHLIGHT]);
-			renderSessionHighlights();
-			await waitFor(() => {
-				expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
-			});
-			expect(screen.queryByRole('heading', { name: 'Counts' })).toBeNull();
+		it('shows only the Rarities section when only a rarity highlight is present', () => {
+			renderSessionHighlights({ highlights: [RARITY_HIGHLIGHT] });
+			expect(screen.getByRole('heading', { name: 'Rarities' })).toBeDefined();
 			expect(screen.queryByTestId('counts')).toBeNull();
-			expect(screen.queryByRole('heading', { name: 'Vital stats' })).toBeNull();
 			expect(screen.queryByTestId('vital-stats')).toBeNull();
 		});
 
-		it('shows only the Counts section when only a count highlight is present', async () => {
-			await mockV2Highlights([COUNT_HIGHLIGHT]);
-			renderSessionHighlights();
-			await waitFor(() => {
-				expect(screen.getByRole('heading', { name: 'Counts' })).toBeDefined();
-			});
-			expect(screen.queryByRole('heading', { name: 'Rarities' })).toBeNull();
+		it('shows only the Counts section when only a count highlight is present', () => {
+			renderSessionHighlights({ highlights: [COUNT_HIGHLIGHT] });
+			expect(screen.getByRole('heading', { name: 'Counts' })).toBeDefined();
 			expect(screen.queryByTestId('rarities')).toBeNull();
-			expect(screen.queryByRole('heading', { name: 'Vital stats' })).toBeNull();
 			expect(screen.queryByTestId('vital-stats')).toBeNull();
 		});
 
-		it('shows only the Vital stats section when only a vital-stat highlight is present', async () => {
-			await mockV2Highlights([VITAL_STAT_HIGHLIGHT]);
-			renderSessionHighlights();
-			await waitFor(() => {
-				expect(
-					screen.getByRole('heading', { name: 'Vital stats' })
-				).toBeDefined();
-			});
-			expect(screen.queryByRole('heading', { name: 'Rarities' })).toBeNull();
+		it('shows only the Vital stats section when only a biometrics highlight is present', () => {
+			renderSessionHighlights({ highlights: [VITAL_STAT_HIGHLIGHT] });
+			expect(
+				screen.getByRole('heading', { name: 'Vital stats' })
+			).toBeDefined();
 			expect(screen.queryByTestId('rarities')).toBeNull();
-			expect(screen.queryByRole('heading', { name: 'Counts' })).toBeNull();
 			expect(screen.queryByTestId('counts')).toBeNull();
 		});
 	});
 
-	it('renders only the Best-of-the-session subsection when there are no highlights but an oldest encounter is provided', async () => {
-		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
-		await waitFor(() => {
+	describe('"Best of the session" — prop-fed, independent of the fetch', () => {
+		it('renders the oldest-bird sentence in the existing "Oldest: N years — Species (RING)" format', () => {
+			renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
+			expect(screen.getByTestId('best-of-session').textContent).toBe(
+				'Oldest: 5 years — Robin (ABC001)'
+			);
+		});
+
+		it('renders it even when the tab fetched no highlights at all', () => {
+			renderSessionHighlights({
+				highlights: null,
+				oldestEncounter: makeOldestEncounter(5)
+			});
 			expect(
 				screen.getByRole('heading', { name: 'Best of the session' })
 			).toBeDefined();
+			expect(screen.queryByRole('heading', { name: 'Rarities' })).toBeNull();
 		});
-		expect(screen.queryByRole('heading', { name: 'Rarities' })).toBeNull();
-		expect(screen.queryByRole('heading', { name: 'Counts' })).toBeNull();
-		expect(screen.queryByRole('heading', { name: 'Vital stats' })).toBeNull();
+
+		it('renders nothing for an oldest encounter with proven_age 0', () => {
+			const { container } = renderSessionHighlights({
+				oldestEncounter: makeOldestEncounter(0)
+			});
+			expect(container.innerHTML).toBe('');
+		});
 	});
 
-	it('renders the oldest-bird sentence in the existing "Oldest: N years — Species (RING)" format', async () => {
-		renderSessionHighlights({ oldestEncounter: makeOldestEncounter(5) });
-		await waitFor(() => {
-			expect(
-				screen.getByRole('heading', { name: 'Best of the session' })
-			).toBeDefined();
-		});
-		expect(screen.getByTestId('best-of-session').textContent).toBe(
-			'Oldest: 5 years — Robin (ABC001)'
-		);
-	});
-
-	it('renders nothing when there are no highlights and no oldest encounter', async () => {
+	it('renders nothing when there are no highlights and no oldest encounter', () => {
 		const { container } = renderSessionHighlights();
-		await waitFor(() => {
-			expect(document.querySelector('.loading')).toBeNull();
-		});
 		expect(container.innerHTML).toBe('');
-	});
-
-	it('renders nothing for an oldest encounter with proven_age 0', async () => {
-		const { container } = renderSessionHighlights({
-			oldestEncounter: makeOldestEncounter(0)
-		});
-		await waitFor(() => {
-			expect(document.querySelector('.loading')).toBeNull();
-		});
-		expect(container.innerHTML).toBe('');
-	});
-
-	it('renders nothing when the action rejects, even with an oldest encounter provided', async () => {
-		const consoleErrorSpy = vi
-			.spyOn(console, 'error')
-			.mockImplementation(() => {});
-		await mockV2HighlightsRejection();
-		const { container } = renderSessionHighlights({
-			oldestEncounter: makeOldestEncounter(5)
-		});
-		await waitFor(() => {
-			expect(document.querySelector('.loading')).toBeNull();
-		});
-		expect(container.innerHTML).toBe('');
-		expect(screen.queryByTestId('rarities')).toBeNull();
-		expect(consoleErrorSpy).toHaveBeenCalled();
 	});
 });

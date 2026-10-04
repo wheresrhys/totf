@@ -99,11 +99,13 @@ export function setTabIdSearchParam(tabId: string): void {
  * raw search param, so exactly one tab's `dataFetcher` can ever run.
  *
  * Returns `undefined` — do nothing, let the tab fetch for itself on the
- * client — in the two cases where there is nothing to prefetch: the active tab
- * has no `dataFetcher` (it manages its own internal fetching/pagination), or
- * `activeTabId` matches no tab at all. The latter shouldn't happen when the id
- * came from `resolveInitialTabId`, but a caller that skipped that validation
- * gets a no-op rather than a throw.
+ * client — in the three cases where there is nothing to prefetch: the active
+ * tab has no `dataFetcher` (it manages its own internal fetching/pagination),
+ * it declared itself `clientSideOnly` (its data is deliberately produced in
+ * the browser — see `TabConfig.clientSideOnly`), or `activeTabId` matches no
+ * tab at all. The last shouldn't happen when the id came from
+ * `resolveInitialTabId`, but a caller that skipped that validation gets a
+ * no-op rather than a throw.
  *
  * `params` is the shared default, exactly as it is for `TabSet`: a tab that
  * declared its own `params` is prefetched with those instead, so the data this
@@ -127,7 +129,7 @@ export async function prefetchActiveTabData<
 			TabParamsTuple[Index],
 			Pick<
 				TabConfig<unknown, TabParamsTuple[Index]>,
-				'id' | 'dataFetcher' | 'params'
+				'id' | 'dataFetcher' | 'params' | 'clientSideOnly'
 			>
 		>;
 	},
@@ -136,7 +138,7 @@ export async function prefetchActiveTabData<
 	viewedGroup: ViewedGroup
 ): Promise<{ tabId: string; data: unknown } | undefined> {
 	const activeTab = tabs.find((tab) => tab.id === activeTabId);
-	if (!activeTab?.dataFetcher) {
+	if (!activeTab?.dataFetcher || activeTab.clientSideOnly) {
 		return undefined;
 	}
 	return {
