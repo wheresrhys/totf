@@ -122,6 +122,72 @@ describe('prefetchActiveTabData', () => {
 		});
 	});
 
+	describe('tab declares its own params', () => {
+		type MonthTabParams = { month: string };
+		const ownParams: MonthTabParams = { month: '2024-05' };
+
+		// A tab whose fetcher wants a params shape the page's shared one can't
+		// satisfy, so it carries its own — the case `TabConfigInSet` makes the
+		// compiler insist on. Both fetchers are typed rather than bare
+		// `vi.fn()`s so this fixture exercises that type-level half too: each
+		// tab's `ParamsType` is inferred from its own fetcher.
+		const buildMixedParamsTabs = () => {
+			const sharedParamsFetcher = vi.fn<
+				(
+					params: SpeciesPageParams,
+					viewedGroup: ViewedGroup
+				) => Promise<unknown>
+			>(async () => 'shared data');
+			const ownParamsFetcher = vi.fn<
+				(params: MonthTabParams, viewedGroup: ViewedGroup) => Promise<unknown>
+			>(async () => 'own data');
+			return {
+				sharedParamsFetcher,
+				ownParamsFetcher,
+				tabs: [
+					{ id: 'overview', dataFetcher: sharedParamsFetcher },
+					{ id: 'month', params: ownParams, dataFetcher: ownParamsFetcher }
+				] as const
+			};
+		};
+
+		it("prefetches it with its own params rather than the set's shared ones", async () => {
+			const { tabs, ownParamsFetcher, sharedParamsFetcher } =
+				buildMixedParamsTabs();
+
+			const prefetched = await prefetchActiveTabData(
+				tabs,
+				'month',
+				params,
+				viewedGroup
+			);
+
+			expect(ownParamsFetcher).toHaveBeenCalledExactlyOnceWith(
+				ownParams,
+				viewedGroup
+			);
+			expect(sharedParamsFetcher).not.toHaveBeenCalled();
+			expect(prefetched).toEqual({ tabId: 'month', data: 'own data' });
+		});
+
+		it("still prefetches a sibling tab that declares none with the set's shared params", async () => {
+			const { tabs, sharedParamsFetcher } = buildMixedParamsTabs();
+
+			const prefetched = await prefetchActiveTabData(
+				tabs,
+				'overview',
+				params,
+				viewedGroup
+			);
+
+			expect(sharedParamsFetcher).toHaveBeenCalledExactlyOnceWith(
+				params,
+				viewedGroup
+			);
+			expect(prefetched).toEqual({ tabId: 'overview', data: 'shared data' });
+		});
+	});
+
 	describe('tab has no dataFetcher', () => {
 		it("returns undefined without calling any other tab's dataFetcher", async () => {
 			const { tabs, fetchingTabFetcher } = buildTabs();
