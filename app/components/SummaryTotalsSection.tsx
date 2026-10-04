@@ -1,106 +1,23 @@
 'use client';
-import { useState } from 'react';
-import { TabNav } from '@/app/components/TabNav';
-import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
-import { ConditionalTabPanel } from '@/app/components/shared/ConditionalTabPanel';
-import { TabContent } from '@/app/components/shared/TabContent';
-import {
-	summarySpeciesTotalsTab,
-	type SummarySpeciesTotalsData
-} from '@/app/components/pages/summary/SummarySpeciesTotalsTab';
-import {
-	summaryHighlightsTab,
-	type SummaryHighlightsData
-} from '@/app/components/pages/summary/SummaryHighlightsTab';
-import {
-	summaryAllTimeMonthTotalsTab,
-	type SummaryAllTimeMonthTotalsData
-} from '@/app/components/pages/summary/SummaryAllTimeMonthTotalsTab';
-import {
-	summarySessionTotalsTab,
-	type SummarySessionTotalsData
-} from '@/app/components/pages/summary/SummarySessionTotalsTab';
+import { TabSet } from '@/app/components/shared/TabSet';
+import type { TabConfig } from '@/app/components/shared/TabContent';
+import { summarySpeciesTotalsTab } from '@/app/components/pages/summary/SummarySpeciesTotalsTab';
+import { summaryHighlightsTab } from '@/app/components/pages/summary/SummaryHighlightsTab';
+import { summaryAllTimeMonthTotalsTab } from '@/app/components/pages/summary/SummaryAllTimeMonthTotalsTab';
+import { summarySessionTotalsTab } from '@/app/components/pages/summary/SummarySessionTotalsTab';
+import { summaryYearTotalsTab } from '@/app/components/pages/summary/SummaryYearTotalsTab';
+import { summaryMonthTotalsTab } from '@/app/components/pages/summary/SummaryMonthTotalsTab';
+import { summaryEagerSessionTotalsTab } from '@/app/components/pages/summary/SummaryEagerSessionTotalsTab';
+import type { SummaryTabParams } from '@/app/components/pages/summary/summary-tab-params';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import {
-	buildGroupSummaryHref,
-	buildGroupSessionHref
-} from '@/app/lib/group-links';
-import {
-	filterEmptyMonthTotalsRows,
-	formatMonthYearLabel,
-	type MonthTotalsRow
-} from '@/app/lib/month-totals';
-import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
-import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
+import type { MonthTotalsRow } from '@/app/lib/month-totals';
 // Re-exported (not relocated) so this file's other two existing consumers
 // (`SquashedMonthSummaryTotalsSection.tsx`, `SpHighlightsTab.tsx`) keep
 // working unchanged — see `HighlightsByTimePeriod.tsx`'s doc comment for why
 // the implementation itself had to move (breaking a circular import with
 // `SummaryHighlightsTab.tsx` below).
 export { HighlightsByTimePeriod } from '@/app/components/HighlightsByTimePeriod';
-// `MONTH_TOTALS_TAB` (the year page's per-year, linked, toggle-enabled month
-// rows) stays eager/inline — distinct from the all-time page's combine-years
-// "Month totals" tab, now `summaryAllTimeMonthTotalsTab` below. Same label,
-// different semantics: 12 rows summed across every year, encounters-only.
-const MONTH_TOTALS_TAB = { id: 'month-totals', label: 'Month totals' };
-const YEAR_TOTALS_TAB = { id: 'year-totals', label: 'Year totals' };
-// Same tab id/label whichever variant renders (eager, prop-fed, on the month
-// page; lazy, `summarySessionTotalsTab`-fetched, on the all-time/year pages)
-// — the two are mutually exclusive per page, see `showSessionTotals` below.
-const SESSION_TOTALS_TAB = summarySessionTotalsTab;
-const SPECIES_TOTALS_TAB = summarySpeciesTotalsTab;
-const HIGHLIGHTS_TAB = summaryHighlightsTab;
-const ALL_TIME_MONTH_TOTALS_TAB = summaryAllTimeMonthTotalsTab;
-
-// The year summary page's "Month totals" tab content. Extracted from
-// `SummaryTotalsSection`'s inline JSX purely so its `hideEmptyMonths` state
-// resets on tab remount — `SummaryTotalsSection` itself never unmounts across
-// tab switches, so keeping the state up there would persist it for the whole
-// page view (same reason `AllTimeMonthTotalsTab` gives for its own state). The
-// rows are pre-built and passed in; this component only owns the toggle and
-// applies the filter.
-function YearMonthTotalsTab({
-	monthTotals,
-	totalsStats,
-	viewedGroup
-}: {
-	monthTotals: MonthTotalsRow[];
-	totalsStats?: CoreStatsResult;
-	viewedGroup?: ViewedGroup;
-}) {
-	const [hideEmptyMonths, setHideEmptyMonths] = useState(true);
-
-	const monthTotalsByTimePeriod = new Map(
-		monthTotals.map((row) => [row.stats.time_period, row])
-	);
-	const visibleRows = filterEmptyMonthTotalsRows(monthTotals, hideEmptyMonths);
-
-	return (
-		<PeriodTotalsTable
-			timeInterval="month"
-			rows={visibleRows.map((row) => row.stats)}
-			firstColumnHeader="Month"
-			buildHref={(timePeriod) => {
-				const row = monthTotalsByTimePeriod.get(timePeriod);
-				return buildGroupSummaryHref(
-					viewedGroup,
-					row && { year: row.year, month: row.zeroIndexedMonth + 1 }
-				);
-			}}
-			buildLabel={(timePeriod) =>
-				formatMonthYearLabel(monthTotalsByTimePeriod.get(timePeriod))
-			}
-			totalsStats={totalsStats}
-			extraControls={
-				<EmptyMonthsToggle
-					value={hideEmptyMonths}
-					onChange={setHideEmptyMonths}
-				/>
-			}
-		/>
-	);
-}
 
 export function SummaryTotalsSection({
 	summaryStats,
@@ -158,7 +75,7 @@ export function SummaryTotalsSection({
 	// The one migrated tab's server-prefetched data, matching `initialTabId`
 	// (#1072's `prefetchActiveTabData` wiring, one route-depth-specific caller
 	// per `page.tsx`) — `undefined` when the resolved initial tab isn't one of
-	// the 4 migrated tabs, or has no `dataFetcher` output to prefetch.
+	// the migrated tabs, or has no `dataFetcher` output to prefetch.
 	initialTabData?: { tabId: string; data: unknown };
 }) {
 	// Each summary page supplies at most one period tab's data: year totals on
@@ -167,175 +84,87 @@ export function SummaryTotalsSection({
 	// present is prepended and shown first/by default; the day page passes none
 	// and keeps Species totals as its sole/default tab.
 	const showSessionTotals = viewedGroup !== undefined;
-	const tabs = [
-		...(yearlyTotals !== undefined ? [YEAR_TOTALS_TAB] : []),
-		...(monthTotals ? [MONTH_TOTALS_TAB] : []),
-		...(showAllTimeMonthTotals ? [ALL_TIME_MONTH_TOTALS_TAB] : []),
-		...(showSessionTotals ? [SESSION_TOTALS_TAB] : []),
-		SPECIES_TOTALS_TAB,
-		...(viewedGroup !== undefined ? [HIGHLIGHTS_TAB] : [])
-	];
-
-	const tabsWithTotalsRow = {
-		[YEAR_TOTALS_TAB.id]: true,
-		[MONTH_TOTALS_TAB.id]: !yearlyTotals,
-		[ALL_TIME_MONTH_TOTALS_TAB.id]: !yearlyTotals,
-		[SESSION_TOTALS_TAB.id]: !monthTotals && !yearlyTotals
-	};
-	// Shared with the species and session pages via `useLinkableTabs` (#818).
-	// The 3 untouched tabs (Year/Month totals, eager Session totals) ignore
-	// `loadedTabs` and render from `activeTab` alone, same as before; the 4
-	// migrated tabs below gate their `ConditionalTabPanel` on it so they mount
-	// (and fetch) once, on first selection, and stay mounted-but-hidden
-	// thereafter rather than unmounting on every tab switch (#1072).
-	const { activeTab, loadedTabs, selectTab } = useLinkableTabs({
-		tabIds: tabs.map((tab) => tab.id),
-		defaultTabId: tabs[0].id,
-		initialTabId
-	});
 
 	// The totals row always reflects the page's own aggregate stats, regardless
 	// of which tab/table is currently active — `undefined` (not `null`) means
 	// "no totals row" to each table's `totalsStats` prop.
 	const totalsStats = summaryStats ?? undefined;
-	const isSessionActive = activeTab === SESSION_TOTALS_TAB.id;
+
+	// Which tabs get a pinned totals row — carried over unchanged from the
+	// pre-#1067 behaviour. Looked up by each prop-fed tab's own `TabComponent`
+	// (off the shared `params` below) and overridden per-tab for the 4
+	// migrated tabs, same as #1072 left it.
+	const tabsWithTotalsRow: Record<string, boolean> = {
+		[summaryYearTotalsTab.id]: true,
+		[summaryMonthTotalsTab.id]: !yearlyTotals,
+		[summaryAllTimeMonthTotalsTab.id]: !yearlyTotals,
+		[summarySessionTotalsTab.id]: !monthTotals && !yearlyTotals
+	};
+
+	// The single combined params object every tab in this page's `TabSet` is
+	// handed (#1067) — each `TabComponent`/`dataFetcher` reads only the fields
+	// it actually needs off this and ignores the rest, extending the
+	// `SummaryTabParams` shape #1072 already built for its 4 migrated tabs.
+	const params: SummaryTabParams = {
+		fromDate,
+		toDate,
+		year,
+		month,
+		totalsStats,
+		yearlyTotals,
+		monthTotals,
+		sessionTotals,
+		tabsWithTotalsRow
+	};
+
+	// All 7 possible tabs, conditionally included exactly as before (#1072's
+	// 4 plus this ticket's 3) — only the mechanism that renders/gates each tab
+	// changed, not which tabs appear. Every entry shares the one
+	// `SummaryTabParams` shape above, so each is cast to `TabConfig<unknown,
+	// SummaryTabParams>` to erase its own concrete `DataType` — required
+	// because `TabComponent` is contravariant in its `data` parameter, so a
+	// `TabConfig<Specific, P>` doesn't structurally widen to
+	// `TabConfig<unknown, P>` on its own.
+	const tabs: TabConfig<unknown, SummaryTabParams>[] = [
+		...(yearlyTotals !== undefined
+			? [summaryYearTotalsTab as TabConfig<unknown, SummaryTabParams>]
+			: []),
+		...(monthTotals
+			? [summaryMonthTotalsTab as TabConfig<unknown, SummaryTabParams>]
+			: []),
+		...(showAllTimeMonthTotals
+			? [
+					{
+						...summaryAllTimeMonthTotalsTab,
+						dataFetcher: viewedGroup
+							? summaryAllTimeMonthTotalsTab.dataFetcher
+							: undefined
+					} as TabConfig<unknown, SummaryTabParams>
+				]
+			: []),
+		...(showSessionTotals
+			? [
+					(sessionTotals !== undefined
+						? summaryEagerSessionTotalsTab
+						: summarySessionTotalsTab) as TabConfig<unknown, SummaryTabParams>
+				]
+			: []),
+		{
+			...summarySpeciesTotalsTab,
+			dataFetcher: viewedGroup ? summarySpeciesTotalsTab.dataFetcher : undefined
+		} as TabConfig<unknown, SummaryTabParams>,
+		...(viewedGroup !== undefined
+			? [summaryHighlightsTab as TabConfig<unknown, SummaryTabParams>]
+			: [])
+	];
 
 	return (
-		<>
-			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={selectTab} />
-			{yearlyTotals !== undefined && activeTab === YEAR_TOTALS_TAB.id && (
-				<PeriodTotalsTable
-					timeInterval="year"
-					rows={yearlyTotals}
-					firstColumnHeader="Year"
-					buildHref={(timePeriod) =>
-						buildGroupSummaryHref(viewedGroup, {
-							year: new Date(timePeriod).getFullYear()
-						})
-					}
-					totalsStats={
-						tabsWithTotalsRow[YEAR_TOTALS_TAB.id] ? totalsStats : undefined
-					}
-				/>
-			)}
-			{activeTab === MONTH_TOTALS_TAB.id && monthTotals && (
-				<YearMonthTotalsTab
-					monthTotals={monthTotals}
-					totalsStats={
-						tabsWithTotalsRow[MONTH_TOTALS_TAB.id] ? totalsStats : undefined
-					}
-					viewedGroup={viewedGroup}
-				/>
-			)}
-			<ConditionalTabPanel
-				loadedTabs={loadedTabs}
-				tabId={ALL_TIME_MONTH_TOTALS_TAB.id}
-				activeTabId={activeTab}
-			>
-				<TabContent
-					dataFetcher={
-						viewedGroup ? ALL_TIME_MONTH_TOTALS_TAB.dataFetcher : undefined
-					}
-					TabComponent={ALL_TIME_MONTH_TOTALS_TAB.TabComponent}
-					params={{
-						totalsStats: tabsWithTotalsRow[ALL_TIME_MONTH_TOTALS_TAB.id]
-							? totalsStats
-							: undefined
-					}}
-					viewedGroup={viewedGroup!}
-					{...(initialTabData?.tabId === ALL_TIME_MONTH_TOTALS_TAB.id
-						? {
-								initialData:
-									initialTabData.data as SummaryAllTimeMonthTotalsData | null
-							}
-						: {})}
-				/>
-			</ConditionalTabPanel>
-			{showSessionTotals && viewedGroup !== undefined && (
-				<>
-					{sessionTotals !== undefined ? (
-						isSessionActive && (
-							<PeriodTotalsTable
-								timeInterval="day"
-								rows={sessionTotals}
-								firstColumnHeader="Session"
-								buildHref={(timePeriod) =>
-									buildGroupSessionHref(viewedGroup, timePeriod)
-								}
-								totalsStats={
-									tabsWithTotalsRow[SESSION_TOTALS_TAB.id]
-										? totalsStats
-										: undefined
-								}
-								showBusiestSession={false}
-							/>
-						)
-					) : (
-						<ConditionalTabPanel
-							loadedTabs={loadedTabs}
-							tabId={SESSION_TOTALS_TAB.id}
-							activeTabId={activeTab}
-						>
-							<TabContent
-								dataFetcher={SESSION_TOTALS_TAB.dataFetcher}
-								TabComponent={SESSION_TOTALS_TAB.TabComponent}
-								params={{
-									fromDate,
-									toDate,
-									totalsStats: tabsWithTotalsRow[SESSION_TOTALS_TAB.id]
-										? totalsStats
-										: undefined
-								}}
-								viewedGroup={viewedGroup}
-								{...(initialTabData?.tabId === SESSION_TOTALS_TAB.id
-									? {
-											initialData:
-												initialTabData.data as SummarySessionTotalsData | null
-										}
-									: {})}
-							/>
-						</ConditionalTabPanel>
-					)}
-				</>
-			)}
-			<ConditionalTabPanel
-				loadedTabs={loadedTabs}
-				tabId={SPECIES_TOTALS_TAB.id}
-				activeTabId={activeTab}
-			>
-				<TabContent
-					dataFetcher={viewedGroup ? SPECIES_TOTALS_TAB.dataFetcher : undefined}
-					TabComponent={SPECIES_TOTALS_TAB.TabComponent}
-					params={{ fromDate, toDate, year, month }}
-					viewedGroup={viewedGroup!}
-					{...(initialTabData?.tabId === SPECIES_TOTALS_TAB.id
-						? {
-								initialData:
-									initialTabData.data as SummarySpeciesTotalsData | null
-							}
-						: {})}
-				/>
-			</ConditionalTabPanel>
-			{viewedGroup !== undefined && (
-				<ConditionalTabPanel
-					loadedTabs={loadedTabs}
-					tabId={HIGHLIGHTS_TAB.id}
-					activeTabId={activeTab}
-				>
-					<TabContent
-						dataFetcher={HIGHLIGHTS_TAB.dataFetcher}
-						TabComponent={HIGHLIGHTS_TAB.TabComponent}
-						params={{ year, month }}
-						viewedGroup={viewedGroup}
-						{...(initialTabData?.tabId === HIGHLIGHTS_TAB.id
-							? {
-									initialData:
-										initialTabData.data as SummaryHighlightsData | null
-								}
-							: {})}
-					/>
-				</ConditionalTabPanel>
-			)}
-		</>
+		<TabSet<SummaryTabParams, SummaryTabParams[]>
+			tabs={tabs}
+			params={params}
+			viewedGroup={viewedGroup!}
+			initialTabId={initialTabId}
+			initialTabData={initialTabData}
+		/>
 	);
 }
