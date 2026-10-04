@@ -73,7 +73,10 @@ describe('LoadWithData', () => {
 		});
 
 		expect((await screen.findByTestId('page-content')).textContent).toBe('42');
-		expect(dataFetcher).toHaveBeenCalledWith({}, 42);
+		expect(dataFetcher).toHaveBeenCalledWith({}, 42, {
+			id: 42,
+			slug: 'explicit-slug'
+		});
 		expect(mockResolveGroupSlugById).not.toHaveBeenCalled();
 	});
 
@@ -85,7 +88,10 @@ describe('LoadWithData', () => {
 
 		expect((await screen.findByTestId('page-content')).textContent).toBe('7');
 		expect(mockResolveGroupSlugById).toHaveBeenCalledWith(7);
-		expect(dataFetcher).toHaveBeenCalledWith({}, 7);
+		expect(dataFetcher).toHaveBeenCalledWith({}, 7, {
+			id: 7,
+			slug: 'cookie-slug'
+		});
 	});
 
 	it('renders the "select a group" fallback when there is no viewedGroup and no logged-in group', async () => {

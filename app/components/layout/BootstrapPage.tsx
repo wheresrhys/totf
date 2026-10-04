@@ -16,7 +16,8 @@ export type BootstrapPageProps<DataType, PagePropsType, ParamsType> = {
 	getParams?: (pageProps: PagePropsType) => Promise<ParamsType>;
 	dataFetcher: (
 		params: ParamsType,
-		viewedGroupId: number
+		viewedGroupId: number,
+		viewedGroup: ViewedGroup
 	) => Promise<DataType | null>;
 	PageComponent: (props: {
 		params: ParamsType;
@@ -48,18 +49,21 @@ export async function defaultGetParams<
 export async function fetchDataWithCache<DataType, ParamsType>({
 	params,
 	dataFetcher,
-	viewedGroupId
+	viewedGroupId,
+	viewedGroup
 }: {
 	params: ParamsType;
 	dataFetcher: (
 		params: ParamsType,
-		viewedGroupId: number
+		viewedGroupId: number,
+		viewedGroup: ViewedGroup
 	) => Promise<DataType | null>;
 	cacheKeys: string[];
 	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 	ttl?: number;
 }): Promise<DataType | null> {
-	return dataFetcher(params, viewedGroupId);
+	return dataFetcher(params, viewedGroupId, viewedGroup);
 	// return unstable_cache(async () => dataFetcher(params, groupId), cacheKeys, {
 	// 	// 1 day in production, 1 second in development to allow for quick testing
 	// 	revalidate: process.env.VERCEL_ENV === 'production' ? ttl : 1,
@@ -106,6 +110,7 @@ export async function LoadWithData<DataType, PagePropsType, ParamsType>({
 		dataFetcher,
 		cacheKeys: groupScopedCacheKeys,
 		viewedGroupId: viewedGroup.id,
+		viewedGroup,
 		ttl
 	});
 	if (!data) {
