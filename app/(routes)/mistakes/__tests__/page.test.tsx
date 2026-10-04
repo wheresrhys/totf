@@ -21,17 +21,39 @@ function makeRpcClient(data: unknown) {
 	return { rpc: vi.fn().mockReturnValue(thenable) };
 }
 
+// The fixture holds three discrepancy types — `age` (3 rows), `sex` and
+// `wing_length` (1 row each) — with `age` first, so it's the page's default
+// tab.
+const AGE_TAB_ROW_COUNT = 3;
+
+function getTabButtons(): HTMLButtonElement[] {
+	return [...screen.getByRole('tablist').querySelectorAll('button')];
+}
+
+function getActiveTabLabel(): string | undefined {
+	return getTabButtons().find(
+		(button) => button.getAttribute('aria-current') === 'true'
+	)?.textContent;
+}
+
+function getVisibleRowCount(): number {
+	// `getByRole` skips the `aria-hidden` panels `ConditionalTabPanel` keeps
+	// mounted for already-visited tabs, so this is always the active tab's
+	// table.
+	return screen.getByRole('table').querySelectorAll('tbody tr').length;
+}
+
+beforeEach(() => {
+	mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+		makeRpcClient(mistakesSnapshot)
+	);
+});
+
+afterEach(() => {
+	cleanup();
+});
+
 describe('mistakes page', () => {
-	beforeEach(() => {
-		mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-			makeRpcClient(mistakesSnapshot)
-		);
-	});
-
-	afterEach(() => {
-		cleanup();
-	});
-
 	it('renders heading', async () => {
 		render(await Page());
 		const heading = await screen.findByRole('heading', { level: 1 });
@@ -128,5 +150,57 @@ describe('mistakes page', () => {
 		render(await Page());
 		const tabList = screen.queryByRole('tablist');
 		expect(tabList?.querySelectorAll('button').length ?? 0).toBe(0);
+	});
+});
+
+describe('deep-linking the active discrepancy tab', () => {
+	async function renderMistakesPage(tabId?: string) {
+		render(
+			await Page(
+				tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) }
+			)
+		);
+		await screen.findByRole('tablist');
+	}
+
+	it('opens the tab named by ?tabId= when it is a discrepancy type present in the data', async () => {
+		await renderMistakesPage('wing_length');
+		expect(getActiveTabLabel()).toBe('Wing length');
+		expect(getVisibleRowCount()).toBe(1);
+		expect(screen.getByRole('table').textContent).toContain('Robin');
+	});
+
+	it('falls back to the first discrepancy type when ?tabId= names an unknown value', async () => {
+		await renderMistakesPage('not-a-discrepancy-type');
+		expect(getActiveTabLabel()).toBe('Age');
+		expect(getVisibleRowCount()).toBe(AGE_TAB_ROW_COUNT);
+	});
+
+	it('falls back to the first discrepancy type when no ?tabId= is given', async () => {
+		await renderMistakesPage();
+		expect(getActiveTabLabel()).toBe('Age');
+		expect(getVisibleRowCount()).toBe(AGE_TAB_ROW_COUNT);
+	});
+});
+
+describe('tab content preservation across switches', () => {
+	it("does not remount a discrepancy type's table when switching away and back", async () => {
+		render(await Page());
+		const ageTable = await screen.findByRole('table');
+		// Re-sort by last seen (descending) — state owned by the tab's own
+		// `SortableTable`, so it only survives if that table is never remounted.
+		fireEvent.click(
+			[...ageTable.querySelectorAll('thead th')].find((th) =>
+				th.textContent?.includes('Last seen')
+			)!
+		);
+		expect(getCellTextByHeading('Species', 0)).toBe('Robin');
+
+		const [ageTab, sexTab] = getTabButtons();
+		fireEvent.click(sexTab);
+		fireEvent.click(ageTab);
+
+		expect(screen.getByRole('table')).toBe(ageTable);
+		expect(getCellTextByHeading('Species', 0)).toBe('Robin');
 	});
 });
