@@ -5,7 +5,10 @@ import { buildGroupSummaryHref } from '@/app/lib/group-links';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { SummaryTabParams } from './summary-tab-params';
 
-export const YEAR_TOTALS_TAB_ID = 'year-totals';
+// From the plain sibling module, where every summary tab id lives so the
+// server-side `page.tsx`es can read them as real strings (#1096).
+import { YEAR_TOTALS_TAB_ID } from './summary-tab-prefetchers';
+export { YEAR_TOTALS_TAB_ID } from './summary-tab-prefetchers';
 
 // The all-time summary page's "Year totals" tab — prop-fed, no `dataFetcher`:
 // `yearlyTotals` arrives already-resolved from the page's own fetch, so

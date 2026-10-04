@@ -13,9 +13,12 @@ import {
 	prefetchActiveTabData
 } from '@/app/lib/tab-query-param';
 import type { TabConfig } from '@/app/components/shared/TabContent';
-import { summarySpeciesTotalsTab } from '@/app/components/pages/summary/SummarySpeciesTotalsTab';
-import { summaryHighlightsTab } from '@/app/components/pages/summary/SummaryHighlightsTab';
-import { summarySessionTotalsTab } from '@/app/components/pages/summary/SummarySessionTotalsTab';
+// From the plain (non-`'use client'`) prefetcher module, never by dotting into
+// a tab's `'use client'` `TabConfig` — see that module's header comment (#1096).
+import {
+	yearSummaryPrefetchers,
+	MONTH_TOTALS_TAB_ID
+} from '@/app/components/pages/summary/summary-tab-prefetchers';
 import type { SummaryTabParams } from '@/app/components/pages/summary/summary-tab-params';
 import {
 	SQUASHED_MONTH_TAB_IDS,
@@ -74,33 +77,17 @@ export type PageData =
 			initialTabData?: { tabId: string; data: unknown };
 	  };
 
-// Mirrors `SummaryTotalsSection`'s own `tabs` array for this page shape
-// (`monthTotals` always set, `showAllTimeMonthTotals` never set here, session
-// totals always lazy here since this page never supplies `sessionTotals`) —
-// `'month-totals'` has no `dataFetcher` since Month totals stays eager/inline,
-// so `prefetchActiveTabData` simply no-ops for it.
-const MONTH_TOTALS_TAB_ID = 'month-totals';
-const yearSummaryTabs: Pick<
-	TabConfig<unknown, SummaryTabParams>,
-	'id' | 'dataFetcher'
->[] = [
-	{ id: MONTH_TOTALS_TAB_ID },
-	summarySessionTotalsTab,
-	summarySpeciesTotalsTab,
-	summaryHighlightsTab
-];
-
 // The squashed-month variant's 4 tabs (`SquashedMonthSummaryTotalsSection`),
 // for `resolveInitialTabId`/`prefetchActiveTabData`. Every entry is id-only:
 //  - Species/Year/Session totals have no `dataFetcher` by design — this page's
 //    own fetch below already has their rows, which reach them through
 //    `TabSet`'s shared params.
-//  - Highlights does have a client-side `dataFetcher`, deliberately not
-//    offered here. Highlights generation is a client-side decision (#1089),
-//    and `SquashedMonthHighlightsTab.tsx` is a `'use client'` module, so
-//    dotting into its config from this server module to reach the fetcher is
-//    exactly what that ticket is about. When #1089 settles the question, this
-//    is the one line that changes.
+//  - Highlights does have a `dataFetcher`, deliberately not offered here:
+//    highlights generation is a client-side decision (#1089), and
+//    `squashedMonthHighlightsTab` is `clientSideOnly` accordingly, so
+//    `prefetchActiveTabData` would decline to run it even if it were listed.
+// The ids themselves come from `squashed-month-tab-params.ts`, a plain module,
+// so they are real strings here rather than client references (#1096).
 // So the prefetch below always resolves to `undefined` today, and the
 // `?tabId=`-focused tab fetches for itself on mount, as it did before.
 const squashedMonthSummaryTabs: Pick<
@@ -179,7 +166,7 @@ export async function fetchSummaryYearOrMonthPageContent(
 	]);
 	const activeTabId = resolveInitialTabId(
 		tabId,
-		yearSummaryTabs.map((tab) => tab.id),
+		yearSummaryPrefetchers.map((tab) => tab.id),
 		MONTH_TOTALS_TAB_ID
 	);
 	// `totalsStats` is never read by any `dataFetcher` (display-only), so its
@@ -188,7 +175,7 @@ export async function fetchSummaryYearOrMonthPageContent(
 		SummaryTabParams,
 		SummaryTabParams[]
 	>(
-		yearSummaryTabs,
+		yearSummaryPrefetchers,
 		activeTabId,
 		{ fromDate, toDate, year, totalsStats: undefined },
 		// See `summary/page.tsx` for why `slug: null` is a safe stand-in here.

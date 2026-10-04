@@ -118,6 +118,27 @@ export function setTabIdSearchParam(tabId: string): void {
  * required, so a caller can hand this the same array it hands `TabSet`.
  *
  * No caching or deduplication: `dataFetcher` is awaited exactly once per call.
+ *
+ * **Every entry in `tabs` must come from a module with no `'use client'`
+ * directive** — ids and `dataFetcher`s alike. This runs in a Server Component,
+ * and a value a Server Component imports from a `'use client'` module is a
+ * *client reference*, not the real value: `tab.id` reads back `undefined` and
+ * `tab.dataFetcher` reads back `undefined`, so the `.find` below matches
+ * nothing and this silently returns `undefined` for every tab. It does not
+ * throw, nothing is logged, and the page still renders — the prefetch just
+ * never happens. Nor will any test catch it: Vitest imports modules directly
+ * with no client-reference boundary, so a violating tabs array behaves
+ * perfectly in the suite and is dead in production. (#1096 found all four
+ * summary tabs in exactly that state; #1065's species page and #1059's session
+ * page were already right.)
+ *
+ * The pattern that satisfies this: keep each tab's `id`/`dataFetcher` — and
+ * the descriptor list assembled from them — in a plain `.ts` module, import
+ * *that* from `page.tsx`, and have the `'use client'` component file import
+ * the same id/fetcher back for its own `TabConfig`. See
+ * `app/components/pages/summary/summary-tab-prefetchers.ts`,
+ * `app/(routes)/species/[speciesName]/species-tabs.ts`, and
+ * `app/components/pages/session/session-tab-config.ts`.
  */
 export async function prefetchActiveTabData<
 	SharedParamsType,

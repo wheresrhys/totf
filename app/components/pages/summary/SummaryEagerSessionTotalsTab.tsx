@@ -4,7 +4,7 @@ import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { buildGroupSessionHref } from '@/app/lib/group-links';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { SummaryTabParams } from './summary-tab-params';
-import { SESSION_TOTALS_TAB_ID } from './SummarySessionTotalsTab';
+import { SESSION_TOTALS_TAB_ID } from './summary-tab-prefetchers';
 
 // The eager, prop-fed variant of the Session totals tab — shown on the month
 // summary page, where `SummaryTotalsSection` already has `sessionTotals` in
