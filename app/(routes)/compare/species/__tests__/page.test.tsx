@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
+import { compareSpeciesBiometricsTab } from '@/app/components/pages/compare-species/CompareSpeciesBiometricsTab';
+import { compareSpeciesCoreTab } from '@/app/components/pages/compare-species/CompareSpeciesCoreTab';
 import Page, { type CompareSpeciesSearchParams } from '../page';
 import alphaCoreBySpecies from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
 import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
@@ -42,15 +44,25 @@ async function renderComparePage(searchParams?: CompareSpeciesSearchParams) {
 			searchParams: Promise.resolve(searchParams ?? {})
 		})
 	);
-	return screen.findByTestId('species-comparison-table');
+	// Settles the `BootstrapPage` mock's async params/data load before any
+	// assertion runs.
+	await screen.findByTestId('species-comparison-table');
 }
 
 function pill(speciesName: string) {
 	return screen.getByRole('button', { name: speciesName });
 }
 
-function dataRowCount(table: HTMLElement) {
-	return table.querySelectorAll('tbody tr').length;
+// The active dataset's table. `TabSet` lazy-*mounts* rather than unmounts, so
+// once a second tab has been visited both tables are in the DOM — but the
+// inactive one sits inside `ConditionalTabPanel`'s `aria-hidden` wrapper, so a
+// role query (unlike `getByTestId`) only ever sees the visible one.
+function visibleTable() {
+	return screen.getByRole('table');
+}
+
+function dataRowCount() {
+	return visibleTable().querySelectorAll('tbody tr').length;
 }
 
 describe('compare species page', () => {
@@ -104,53 +116,53 @@ describe('compare species page', () => {
 
 	describe('the comparison table', () => {
 		it('renders an empty table when nothing is selected', async () => {
-			const table = await renderComparePage();
+			await renderComparePage();
 
-			expect(dataRowCount(table)).toBe(0);
+			expect(dataRowCount()).toBe(0);
 			expect(
 				screen.getByRole('columnheader', { name: 'Species' })
 			).toBeTruthy();
 		});
 
 		it('adds a row when a pill is tapped', async () => {
-			const table = await renderComparePage();
+			await renderComparePage();
 
 			fireEvent.click(pill('Robin'));
 
-			expect(dataRowCount(table)).toBe(1);
+			expect(dataRowCount()).toBe(1);
 			expect(getCellTextByHeading('Species', 0)).toBe('Robin');
 		});
 
 		it('adds a further row when a second pill is tapped', async () => {
-			const table = await renderComparePage();
+			await renderComparePage();
 
 			fireEvent.click(pill('Robin'));
 			fireEvent.click(pill('Wren'));
 
-			expect(dataRowCount(table)).toBe(2);
+			expect(dataRowCount()).toBe(2);
 		});
 
 		it('removes the row when a selected pill is tapped again', async () => {
-			const table = await renderComparePage({ name: ['Robin', 'Wren'] });
+			await renderComparePage({ name: ['Robin', 'Wren'] });
 
 			fireEvent.click(pill('Robin'));
 
-			expect(dataRowCount(table)).toBe(1);
+			expect(dataRowCount()).toBe(1);
 			expect(getCellTextByHeading('Species', 0)).toBe('Wren');
 		});
 
 		it('preselects a row for each species named in the URL', async () => {
-			const table = await renderComparePage({ name: ['Wren', 'Robin'] });
+			await renderComparePage({ name: ['Wren', 'Robin'] });
 
-			expect(dataRowCount(table)).toBe(2);
+			expect(dataRowCount()).toBe(2);
 		});
 
 		it('ignores a name param for a species the group has no data for', async () => {
-			const table = await renderComparePage({
+			await renderComparePage({
 				name: ['Robin', 'Andean Condor']
 			});
 
-			expect(dataRowCount(table)).toBe(1);
+			expect(dataRowCount()).toBe(1);
 			expect(getCellTextByHeading('Species', 0)).toBe('Robin');
 		});
 	});
@@ -220,9 +232,7 @@ describe('compare species page', () => {
 
 			fireEvent.click(screen.getByRole('button', { name: 'Biometrics' }));
 
-			expect(dataRowCount(screen.getByTestId('species-comparison-table'))).toBe(
-				2
-			);
+			expect(dataRowCount()).toBe(2);
 		});
 
 		it('renders blank cells for a selected species the dataset has no row for', async () => {
@@ -235,10 +245,69 @@ describe('compare species page', () => {
 
 			fireEvent.click(screen.getByRole('button', { name: 'Biometrics' }));
 
-			expect(dataRowCount(screen.getByTestId('species-comparison-table'))).toBe(
-				2
-			);
+			expect(dataRowCount()).toBe(2);
 			expect(getCellTextByHeading('Avg weight (g)', 'Robin')).toBe('—');
+		});
+	});
+
+	describe('?tabId= query param', () => {
+		it('renders the core dataset tab active and loaded when no tabId is given', async () => {
+			await renderComparePage({ name: ['Robin'] });
+
+			expect(
+				screen
+					.getByRole('button', { name: 'Core stats' })
+					.getAttribute('aria-current')
+			).toBe('true');
+			expect(
+				screen.getByRole('columnheader', { name: 'Encounters' })
+			).toBeTruthy();
+		});
+
+		it('focuses the Biometrics tab and renders its columns without a click', async () => {
+			await renderComparePage({ name: ['Robin'], tabId: 'biometrics' });
+
+			expect(
+				screen
+					.getByRole('button', { name: 'Biometrics' })
+					.getAttribute('aria-current')
+			).toBe('true');
+			expect(
+				screen.getByRole('columnheader', { name: 'Avg weight (g)' })
+			).toBeTruthy();
+			expect(screen.queryByRole('columnheader', { name: 'Encounters' })).toBe(
+				null
+			);
+		});
+
+		it('falls back to the core dataset for a tabId naming no real tab', async () => {
+			await renderComparePage({ name: ['Robin'], tabId: 'not-a-real-tab' });
+
+			expect(
+				screen
+					.getByRole('button', { name: 'Core stats' })
+					.getAttribute('aria-current')
+			).toBe('true');
+			expect(dataRowCount()).toBe(1);
+			expect(getCellTextByHeading('Encounters', 'Robin')).toBe(
+				String(
+					coreStatsRows.find((row) => row.species_name === 'Robin')
+						?.encounter_count
+				)
+			);
+		});
+	});
+
+	describe('compareSpeciesTabs', () => {
+		it('declares both dataset tabs with no dataFetcher of their own', () => {
+			expect(
+				[compareSpeciesCoreTab, compareSpeciesBiometricsTab].map(
+					({ id, dataFetcher }) => [id, dataFetcher]
+				)
+			).toEqual([
+				['core', undefined],
+				['biometrics', undefined]
+			]);
 		});
 	});
 });
