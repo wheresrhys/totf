@@ -26,7 +26,10 @@
 // graph. `setTabIdSearchParam` is the one export that only means anything in a
 // browser — it guards on `typeof window` rather than forcing the whole module
 // client-side, so the server-side helpers above can keep living next to it.
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import type {
+	TabConfig,
+	TabConfigInSet
+} from '@/app/components/shared/TabContent';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 /**
@@ -102,12 +105,34 @@ export function setTabIdSearchParam(tabId: string): void {
  * came from `resolveInitialTabId`, but a caller that skipped that validation
  * gets a no-op rather than a throw.
  *
+ * `params` is the shared default, exactly as it is for `TabSet`: a tab that
+ * declared its own `params` is prefetched with those instead, so the data this
+ * returns matches what the tab would have fetched for itself on the client.
+ * `tabs` is typed as a mapped tuple of `TabConfigInSet` for the same reasons
+ * `TabSet`'s is — the tuple is what lets each tab's `ParamsType` be inferred
+ * separately rather than forcing one shared type across the array, and
+ * `TabConfigInSet` is the shared rule obliging a tab the shared params can't
+ * satisfy to declare its own. Only the three properties read here are
+ * required, so a caller can hand this the same array it hands `TabSet`.
+ *
  * No caching or deduplication: `dataFetcher` is awaited exactly once per call.
  */
-export async function prefetchActiveTabData<ParamsType>(
-	tabs: readonly Pick<TabConfig<unknown, ParamsType>, 'id' | 'dataFetcher'>[],
+export async function prefetchActiveTabData<
+	SharedParamsType,
+	TabParamsTuple extends readonly unknown[]
+>(
+	tabs: {
+		[Index in keyof TabParamsTuple]: TabConfigInSet<
+			SharedParamsType,
+			TabParamsTuple[Index],
+			Pick<
+				TabConfig<unknown, TabParamsTuple[Index]>,
+				'id' | 'dataFetcher' | 'params'
+			>
+		>;
+	},
 	activeTabId: string,
-	params: ParamsType,
+	params: SharedParamsType,
 	viewedGroup: ViewedGroup
 ): Promise<{ tabId: string; data: unknown } | undefined> {
 	const activeTab = tabs.find((tab) => tab.id === activeTabId);
@@ -116,6 +141,6 @@ export async function prefetchActiveTabData<ParamsType>(
 	}
 	return {
 		tabId: activeTabId,
-		data: await activeTab.dataFetcher(params, viewedGroup)
+		data: await activeTab.dataFetcher(activeTab.params ?? params, viewedGroup)
 	};
 }

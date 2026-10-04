@@ -825,7 +825,17 @@ describe('SummaryTotalsSection', () => {
 			expect(fetchSpeciesDataMock).toHaveBeenCalledTimes(1);
 		});
 
-		it('renders the table empty state rather than throwing when the fetch rejects', async () => {
+		// #1072: the fetch/render path now flows through the shared `TabContent`
+		// primitive (ticket #2, #1057) rather than `useLazyTabData` directly.
+		// `TabContent` always surfaces a rejection as its own generic error
+		// alert (see its doc comment — this replaces `SpHighlightsTab.tsx`'s
+		// pre-existing missing-`.catch` bug) rather than delegating back to the
+		// tab's own empty-state rendering, and logs generically
+		// ('Failed to fetch tab data') rather than with a species-specific
+		// message — both deliberate consequences of reusing the shared
+		// primitive, not something this ticket's `SummarySpeciesTotalsTab`
+		// controls.
+		it('shows a generic error message rather than throwing when the fetch rejects', async () => {
 			const consoleError = vi
 				.spyOn(console, 'error')
 				.mockImplementation(() => {});
@@ -838,10 +848,14 @@ describe('SummaryTotalsSection', () => {
 			);
 			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
 			await waitFor(() =>
-				expect(screen.getByText('No species recorded.')).toBeTruthy()
+				expect(
+					screen.getByText(
+						'Something went wrong loading this tab. Please try again later.'
+					)
+				).toBeTruthy()
 			);
 			expect(consoleError).toHaveBeenCalledWith(
-				'Failed to fetch species totals',
+				'Failed to fetch tab data',
 				expect.objectContaining({ viewedGroupId: 1 })
 			);
 			consoleError.mockRestore();
@@ -934,8 +948,17 @@ describe('SummaryTotalsSection', () => {
 					speciesStats.length
 				)
 			);
+			// Species totals is one of #1072's migrated tabs, so it now stays
+			// mounted-but-hidden (not unmounted) once loaded — switching back to
+			// Month totals leaves its rows still in the DOM behind an
+			// `aria-hidden` wrapper. Scope the row count to the one *visible*
+			// table (`getByRole` excludes `aria-hidden` content by default)
+			// rather than the whole document, which would otherwise double-count
+			// Species totals' still-mounted rows alongside Month totals'.
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(2);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(2);
 			expect(
 				(screen.getByRole('radio', { name: 'Hide' }) as HTMLInputElement)
 					.checked
@@ -1019,7 +1042,14 @@ describe('SummaryTotalsSection', () => {
 			expect(document.querySelectorAll('tbody tr').length).toBe(12);
 		});
 
-		it('resets to Hide after switching to another tab and back', async () => {
+		// Inverted per #1072: this panel now renders through `ConditionalTabPanel`'s
+		// hide-not-unmount semantics instead of the old `{isActive && (...)}` JSX
+		// that fully unmounted it on every tab switch, so the toggle's local state
+		// persists across reselecting this tab within one page view rather than
+		// resetting to its default each time — a deliberate consequence of
+		// hide-not-unmount, not a regression (see `SummaryAllTimeMonthTotalsTab.tsx`'s
+		// doc comment).
+		it('persists the Show toggle after switching to another tab and back', async () => {
 			render(<SummaryTotalsSection {...allTimeProps} />);
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 			await waitFor(() =>
@@ -1030,13 +1060,11 @@ describe('SummaryTotalsSection', () => {
 
 			fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
-			);
 			expect(
-				(screen.getByRole('radio', { name: 'Hide' }) as HTMLInputElement)
+				(screen.getByRole('radio', { name: 'Show' }) as HTMLInputElement)
 					.checked
 			).toBe(true);
+			expect(document.querySelectorAll('tbody tr').length).toBe(12);
 		});
 	});
 });

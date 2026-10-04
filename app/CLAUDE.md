@@ -152,6 +152,17 @@ entrypoint, its content, and its data fetcher:
   `setTabIdSearchParam` (#1013), so every page that takes its tab state from that hook — directly,
   or through the shared `TabSet` component (`app/components/shared/TabSet.tsx`) — gets
   reload-survivable, copy-pasteable tab links for free.
+- **Per-tab params on a `TabSet`:** `TabSet`'s `params` prop is only the _default_. Each entry in
+  its `tabs` array carries its own independent params type, inferred from that tab's own
+  `dataFetcher`/`TabComponent`, and any tab can override the shared params with its own `params`
+  property. `TabConfigInSet` (`app/components/shared/TabContent.tsx`) is the single rule both
+  consumers of a tabs array apply — `TabSet` and, server-side, `prefetchActiveTabData`
+  (`app/lib/tab-query-param.ts`) — so a tab whose params the shared ones _can't_ satisfy is
+  obliged by the compiler to declare its own, in both the client and prefetch paths. One
+  consequence worth knowing: a **heterogeneous** tabs array hoisted into a variable needs
+  `as const` (or an explicit tuple annotation), since a plain `const tabs = [...]` widens to a
+  single union element type and loses the per-tab params types. A homogeneous array needs nothing
+  special.
 
 Naming reference (see #667 for the original design discussion):
 
