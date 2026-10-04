@@ -14,14 +14,30 @@ import { SpIndividualsTab } from '@/app/components/pages/species/SpIndividualsTa
 import { SpHighlightsTab } from '@/app/components/pages/species/SpHighlightsTab';
 import { SpDemographicsTab } from '@/app/components/pages/species/SpDemographicsTab';
 import { SpBiometricsTab } from '@/app/components/pages/species/SpBiometricsTab';
-import { SpYearTotalsTab } from '@/app/components/pages/species/SpYearTotalsTab';
-import { SpMonthTotalsTab } from '@/app/components/pages/species/SpMonthTotalsTab';
 import { SpCombinedMonthTotalsTab } from '@/app/components/pages/species/SpCombinedMonthTotalsTab';
 import { SpSquashedMonthYearTotalsTab } from '@/app/components/pages/species/SpSquashedMonthYearTotalsTab';
-import { SpSessionTotalsTab } from '@/app/components/pages/species/SpSessionTotalsTab';
+import { type SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import { TabNav } from '@/app/components/TabNav';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
 import { ConditionalTabPanel } from '@/app/components/shared/ConditionalTabPanel';
+import { TabSet } from '@/app/components/shared/TabSet';
+// Imported (and re-exported below) rather than defined here — see
+// `species-tabs.ts`'s doc comment for why these 3 pure helpers live outside
+// this `'use client'` file (`page.tsx` imports them directly from there
+// instead, to stay off the client-reference path entirely). Re-exporting
+// keeps this file's own `SpeciesData` below and
+// `__tests__/PageContent.test.tsx` importing from the same `./PageContent`
+// path as before.
+import {
+	getDefaultSpeciesTabId,
+	getSpeciesKnownTabIds,
+	buildSpeciesTotalsTabs
+} from './species-tabs';
+export {
+	getDefaultSpeciesTabId,
+	getSpeciesKnownTabIds,
+	buildSpeciesTotalsTabs
+};
 
 // `tabId` (#803) is the optional `?tabId=` search param, threaded in from
 // each route depth's `page.tsx` — it never affects `getCacheKeys`, only which
@@ -58,34 +74,16 @@ export type FullFatPageData = {
 	speciesName: string;
 } & PeriodScope;
 export type ThinPageData = { speciesId: number } & PeriodScope;
-export type PageData = FullFatPageData | ThinPageData;
-
-// The tab eagerly mounted (and initially active) at each route depth: the
-// first totals tab shown for that depth. Mirrors the route-depth cascade the
-// `tabs` array uses (all-time → Year totals, year-scoped → Month totals,
-// month-scoped → Session totals, squashed-month → its own Year totals) so
-// the first visible tab is loaded on initial page load instead of always
-// eager-loading the Bird list.
-export function getDefaultSpeciesTabId(
-	isAllTime: boolean,
-	isYearScoped: boolean,
-	isSquashedMonth: boolean = false
-):
-	| 'year-totals'
-	| 'month-totals'
-	| 'session-totals'
-	| 'squashed-month-year-totals' {
-	if (isAllTime) {
-		return 'year-totals';
-	}
-	if (isYearScoped) {
-		return 'month-totals';
-	}
-	if (isSquashedMonth) {
-		return 'squashed-month-year-totals';
-	}
-	return 'session-totals';
-}
+// `initialTabId`/`initialTabData` (#1065) are added on top of the existing
+// `FullFatPageData`/`ThinPageData` union, not folded into either type: they
+// carry `page.tsx`'s server-side tab resolution/prefetch result down to
+// `SpeeciesData` below, alongside (not instead of) the page's own data —
+// `fullFatTypeGuard`'s `'birds' in data` check still narrows correctly since
+// TypeScript distributes the intersection over the union.
+export type PageData = (FullFatPageData | ThinPageData) & {
+	initialTabId?: string;
+	initialTabData?: { tabId: string; data: unknown };
+};
 
 export function buildSpeciesHeadingText(
 	speciesName: string,
@@ -177,11 +175,13 @@ export function SpeciesHeading({
 function SpeciesData({
 	data,
 	viewedGroup,
-	initialTabId
+	initialTabId,
+	initialTabData
 }: {
 	data: FullFatPageData;
 	viewedGroup: ViewedGroup;
 	initialTabId?: string;
+	initialTabData?: { tabId: string; data: unknown };
 }) {
 	// Cascading period tab, same convention `SummaryTotalsSection` uses: the
 	// all-time page gets "Year totals" (drilling into a year), the year-scoped
@@ -191,6 +191,29 @@ function SpeciesData({
 	const isAllTime = data.year === undefined && data.squashedMonth === undefined;
 	const isYearScoped = data.year !== undefined && data.month === undefined;
 	const isSquashedMonth = data.squashedMonth !== undefined;
+
+	// The 3 "totals" tabs (Year/Month/Session, #1065) render through the shared
+	// `TabSet` below, each server-prefetched when it's the resolved initial tab
+	// (`page.tsx`'s `prefetchActiveTabData` call). The other 6 species tabs
+	// (Combined Month Totals, Squashed Month/Year Totals, Highlights,
+	// Biometrics, Demographics, Individuals) aren't on `TabConfig` yet
+	// (follow-ups, including #1060) and keep rendering below via the original
+	// `useLinkableTabs`/`TabNav`/`ConditionalTabPanel` mechanism — so this page
+	// deliberately shows two separate tab strips for the interim: `TabSet`'s
+	// own nav covers just the totals tabs, this `TabNav` covers the rest. Each
+	// strip resolves `initialTabId` independently against its own known ids
+	// (see `getSpeciesKnownTabIds`'s doc comment), so a `?tabId=` naming a tab
+	// in the *other* strip is a harmless no-op here — that strip simply starts
+	// with nothing active/loaded, since the real initial tab lives elsewhere.
+	const totalsTabs = buildSpeciesTotalsTabs(isAllTime, isYearScoped);
+	const totalsTabParams: SpeciesTotalsTabParams = {
+		speciesName: data.speciesName,
+		year: data.year,
+		fromDate: data.fromDate,
+		toDate: data.toDate,
+		monthFilter: data.squashedMonth
+	};
+
 	const defaultTabId = getDefaultSpeciesTabId(
 		isAllTime,
 		isYearScoped,
@@ -198,15 +221,12 @@ function SpeciesData({
 	);
 
 	const tabs = [
-		...(isAllTime ? [{ id: 'year-totals', label: 'Year totals' }] : []),
 		...(isAllTime
 			? [{ id: 'all-time-month-totals', label: 'Month totals' }]
 			: []),
-		...(isYearScoped ? [{ id: 'month-totals', label: 'Month totals' }] : []),
 		...(isSquashedMonth
 			? [{ id: 'squashed-month-year-totals', label: 'Year totals' }]
 			: []),
-		{ id: 'session-totals', label: 'Session totals' },
 		{ id: 'highlights', label: 'Highlights' },
 		{ id: 'biometrics', label: 'Biometrics' },
 		{ id: 'demographics', label: 'Demographics' },
@@ -216,7 +236,11 @@ function SpeciesData({
 	// The `?tabId=` param (#803) wins over the route-depth default when it
 	// names one of this route depth's actual tabs; an unknown/garbage value or
 	// no param at all falls back to `defaultTabId` unchanged. Shared with the
-	// summary and session pages via `useLinkableTabs` (#818).
+	// summary and session pages via `useLinkableTabs` (#818). `defaultTabId`
+	// may legitimately name a tab that isn't in this (reduced) `tabs` list any
+	// more (e.g. `'year-totals'` on the all-time page) — that's fine, it just
+	// means this strip starts with nothing active/loaded, since that tab now
+	// lives in `TabSet` above instead.
 	const { activeTab, loadedTabs, selectTab } = useLinkableTabs({
 		tabIds: tabs.map((tab) => tab.id),
 		defaultTabId,
@@ -225,19 +249,15 @@ function SpeciesData({
 
 	return (
 		<>
+			<TabSet
+				tabs={totalsTabs}
+				params={totalsTabParams}
+				viewedGroup={viewedGroup}
+				initialTabId={initialTabId}
+				initialTabData={initialTabData}
+				ariaLabel="Totals"
+			/>
 			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={selectTab} />
-			{isAllTime && (
-				<ConditionalTabPanel
-					loadedTabs={loadedTabs}
-					tabId="year-totals"
-					activeTabId={activeTab}
-				>
-					<SpYearTotalsTab
-						speciesName={data.speciesName}
-						viewedGroupId={viewedGroup.id}
-					/>
-				</ConditionalTabPanel>
-			)}
 			{isAllTime && (
 				<ConditionalTabPanel
 					loadedTabs={loadedTabs}
@@ -248,21 +268,6 @@ function SpeciesData({
 						speciesName={data.speciesName}
 						viewedGroupId={viewedGroup.id}
 						isActive={activeTab === 'all-time-month-totals'}
-					/>
-				</ConditionalTabPanel>
-			)}
-			{isYearScoped && data.year !== undefined && (
-				<ConditionalTabPanel
-					loadedTabs={loadedTabs}
-					tabId="month-totals"
-					activeTabId={activeTab}
-				>
-					<SpMonthTotalsTab
-						speciesName={data.speciesName}
-						viewedGroupId={viewedGroup.id}
-						year={data.year}
-						fromDate={data.fromDate}
-						toDate={data.toDate}
 					/>
 				</ConditionalTabPanel>
 			)}
@@ -279,19 +284,6 @@ function SpeciesData({
 					/>
 				</ConditionalTabPanel>
 			)}
-			<ConditionalTabPanel
-				loadedTabs={loadedTabs}
-				tabId="session-totals"
-				activeTabId={activeTab}
-			>
-				<SpSessionTotalsTab
-					speciesName={data.speciesName}
-					viewedGroup={viewedGroup}
-					fromDate={data.fromDate}
-					toDate={data.toDate}
-					monthFilter={data.squashedMonth}
-				/>
-			</ConditionalTabPanel>
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
 				tabId="highlights"
@@ -384,7 +376,12 @@ export function SpeciesPageContent({
 				<SpeciesData
 					data={data}
 					viewedGroup={viewedGroup}
-					initialTabId={tabId}
+					// `data.initialTabId` is `page.tsx`'s server-resolved tab id
+					// (#1065) — falls back to the raw `?tabId=` param only for a
+					// `PageData` fixture that predates that resolution (e.g. a test
+					// building `data` by hand without it).
+					initialTabId={data.initialTabId ?? tabId}
+					initialTabData={data.initialTabData}
 				/>
 			) : (
 				<p>Not authorised to view any encounter data for this species</p>

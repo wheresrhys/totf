@@ -8,7 +8,11 @@ import {
 	getSpeciesArrivalsStats,
 	fetchSpeciesPeriodTotals,
 	fetchSpeciesCombinedMonthTotals,
-	getGroupEffortHistory
+	getGroupEffortHistory,
+	fetchYearTotalsTabData,
+	fetchMonthTotalsTabData,
+	fetchSessionTotalsTabData,
+	type SpeciesTotalsTabParams
 } from '../sp-data';
 import type { CoreStatsResult } from '@/app/models/db';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
@@ -624,6 +628,70 @@ describe('sp-data actions', () => {
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'month');
 
 			expect(rpcCalls[0].args).not.toHaveProperty('month_filter');
+		});
+	});
+
+	// Thin `TabConfig.dataFetcher` wrappers around `fetchSpeciesPeriodTotals`
+	// (#1065) — each just needs to confirm it delegates with the right
+	// `timeInterval`/args; `fetchSpeciesPeriodTotals`'s own describe block above
+	// already covers the underlying RPC-args behaviour in full.
+	describe('fetchYearTotalsTabData', () => {
+		it('delegates to fetchSpeciesPeriodTotals with timeInterval "year"', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+			const params: SpeciesTotalsTabParams = { speciesName: SPECIES_NAME };
+
+			await fetchYearTotalsTabData(params, { id: GROUP_ID, slug: 'alpha' });
+
+			expect(rpcCalls[0].args).toMatchObject({
+				species_name_filter: SPECIES_NAME,
+				ringing_group_filter: GROUP_ID,
+				group_by_time_period: 'year'
+			});
+		});
+	});
+
+	describe('fetchMonthTotalsTabData', () => {
+		it('delegates to fetchSpeciesPeriodTotals with timeInterval "month" and the given date range', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+			const params: SpeciesTotalsTabParams = {
+				speciesName: SPECIES_NAME,
+				year: 2026,
+				fromDate: FROM_DATE,
+				toDate: TO_DATE
+			};
+
+			await fetchMonthTotalsTabData(params, { id: GROUP_ID, slug: 'alpha' });
+
+			expect(rpcCalls[0].args).toMatchObject({
+				species_name_filter: SPECIES_NAME,
+				ringing_group_filter: GROUP_ID,
+				group_by_time_period: 'month',
+				from_date: FROM_DATE,
+				to_date: TO_DATE
+			});
+		});
+	});
+
+	describe('fetchSessionTotalsTabData', () => {
+		it('delegates to fetchSpeciesPeriodTotals with timeInterval "day" and the given date range/monthFilter', async () => {
+			const { rpcCalls } = makeClient({ rpcRows: [] });
+			const params: SpeciesTotalsTabParams = {
+				speciesName: SPECIES_NAME,
+				fromDate: FROM_DATE,
+				toDate: TO_DATE,
+				monthFilter: 3
+			};
+
+			await fetchSessionTotalsTabData(params, { id: GROUP_ID, slug: 'alpha' });
+
+			expect(rpcCalls[0].args).toMatchObject({
+				species_name_filter: SPECIES_NAME,
+				ringing_group_filter: GROUP_ID,
+				group_by_time_period: 'day',
+				from_date: FROM_DATE,
+				to_date: TO_DATE,
+				month_filter: 3
+			});
 		});
 	});
 

@@ -91,7 +91,8 @@ the root layout, not a subtree one.
 
 - **Models** (`app/models/`) hold domain types and pure transformation logic — no I/O.
   - Session highlights (`app/lib/highlights/`) A rule is one `HighlightsGenerator` object (`rules/*.ts`, registered in `rules/index.ts`): a `statsSelector` picking `overall` / `withSpecies` / `bySpecies` off the `core_stats` repository (`app/actions/stats-cache.ts`), a `generator` built by a finder in `lib/rule-utils.ts`, a `descriptor` whose `category` names the page section, a `condition` gating which temporal unit / parent window it applies to, and `formatters` that print the sentence. `lib/highlight-generator.ts` runs every rule at the all-time, year and month scopes; `lib/time-period-highlights.ts` then cherry-picks the highlights landing on the period being rendered, drops narrower-scoped restatements (`removeLessSignificantHighlights`), folds what's left across scopes (`combineSimilarHighlights`) and sorts by category. Registering a rule is enough to cover it: `rules/__tests__/rules.combinedhighlights.output.test.js` snapshot-tests every registered rule's printer against a battery of generated `CombinedHighlight` shapes — regenerate `rules/__tests__/expectations.ts` (`npx tsx app/lib/highlights/rules/__tests__/generate-expectations.ts`, then `npm run lint` to format it) and commit it with any new or changed rule, rather than hand-writing a per-rule test file. The two sanctioned extension points are new finders in `lib/rule-utils.ts` and new properties on its `HighlightFinderOptions`; don't add a second combining mechanism. **Combining is strictly one metric, one species, several scopes** — the Rarities migration (#990) deliberately lost v1's multi-species "First A, B and C records" lines and its cross-metric MEGA badge because neither is expressible that way; `combineSimilarHighlights`' header comment is the authority on this, read it before trying to reinstate either.
-    - `app/components/pages/session/SessionHighlights.tsx` fetches this pipeline (`getCondensedHighlightsAtTimePeriod`) and renders the same three independently-shown/hidden sections in the fixed Rarities → Counts → Vital stats order: the first two filter the v2 list by `descriptor.category` and print with each highlight's own `combinedHighlightPrinter`, the third partitions the v1 list by the renderer map's keys. Editorial refinements belong in a v2 rule's finder/printer for those two sections, and in a v1 rule or renderer for Vital stats.
+    - The session page's Highlights tab fetches this pipeline through `fetchSessionHighlights` (`app/components/pages/session/session-tab-config.ts`, the tab's `TabConfig.dataFetcher`) and `app/components/pages/session/SessionHighlights.tsx` renders the same three independently-shown/hidden sections in the fixed Rarities → Counts → Vital stats order, filtering by `descriptor.category`. Editorial refinements still belong in a v2 rule's finder/printer. `SummaryTotalsSection` renders the same live `CombinedHighlight`s and shares `renderCombinedHighlights`, exported from `SessionHighlights.tsx`.
+    - **Highlights are generated client-side on purpose** — a conscious caching/performance decision, to be revisited deliberately (#1089) rather than eroded page by page. Any tab that renders them therefore declares `clientSideOnly: true` on its `TabConfig` (`app/components/shared/TabContent.tsx`), which makes `prefetchActiveTabData` decline to run its `dataFetcher` server-side even when `?tabId=` deep-links straight into it: the tab opens focused, shows `TabContent`'s spinner, and fetches on mount (#1061). Don't "optimise" that away by dropping the flag; `renderCombinedHighlights` also depends on it, since a `CombinedHighlight` carries its printers as function properties and so could never cross a server→client boundary intact anyway.
 - **Actions** (`app/actions/`) are `'use server'` functions that fetch data and return typed results.
 - **Components** (`app/components/`) and page files receive data as props; they do not fetch.
 - Route pages are in `app/(routes)/` — the `(routes)` group is just for organisation, it doesn't affect URLs.
@@ -151,7 +152,21 @@ entrypoint, its content, and its data fetcher:
   `app/lib/tab-query-param.ts`'s `resolveInitialTabId` and writes the selected tab back via its
   `setTabIdSearchParam` (#1013), so every page that takes its tab state from that hook — directly,
   or through the shared `TabSet` component (`app/components/shared/TabSet.tsx`) — gets
-  reload-survivable, copy-pasteable tab links for free.
+  reload-survivable, copy-pasteable tab links for free. A `TabSet`-based page can go one step
+  further and resolve its initial tab _server-side_, prefetching that one tab's data before first
+  paint instead of flashing `TabContent`'s own loading spinner on a deep `?tabId=` link — the
+  species page (`app/(routes)/species/[speciesName]/page.tsx`'s `fetchSpeciesPageContentForPeriod`,
+  #1065) is the first to do this: it resolves `?tabId=` and calls `tab-query-param.ts`'s
+  `prefetchActiveTabData` alongside its own data fetch, passing the result down as `initialTabId`/
+  `initialTabData`. Species' Year/Month/Session totals tabs predate per-tab params (below) — they
+  share a single superset `SpeciesTotalsTabParams` with `data: unknown`-typed `TabComponent`s that
+  cast back to their real type (see `SpYearTotalsTab.tsx`'s doc comment), a homogeneous array so
+  per-tab params wasn't needed for them to compile; migrating them onto it is a candidate follow-up
+  rather than something #1065 did. A page mid-migration — only some of its tabs on `TabConfig`, the
+  rest still on the hand-rolled mechanism above — necessarily renders two separate tab strips for
+  the interim (give the migrated one's `TabSet` a non-default `ariaLabel` so
+  `getByRole('tablist', { name: ... })` can address either strip in tests); see `SpeciesData`'s own
+  doc comment in `PageContent.tsx` for the full reasoning.
 - **Per-tab params on a `TabSet`:** `TabSet`'s `params` prop is only the _default_. Each entry in
   its `tabs` array carries its own independent params type, inferred from that tab's own
   `dataFetcher`/`TabComponent`, and any tab can override the shared params with its own `params`
@@ -163,6 +178,16 @@ entrypoint, its content, and its data fetcher:
   `as const` (or an explicit tuple annotation), since a plain `const tabs = [...]` widens to a
   single union element type and loses the per-tab params types. A homogeneous array needs nothing
   special.
+- **Where a page's tab ids live:** in a plain module with no `'use client'` directive, alongside
+  the shared params type (`app/components/pages/summary/summary-tab-params.ts`,
+  `squashed-month-tab-params.ts`), _not_ next to each tab's component. A `page.tsx` needs those
+  ids server-side for `resolveInitialTabId`, and anything imported from a `'use client'` module
+  into a server module is a client reference rather than a plain value.
+- **Tabs the page already has data for** (the squashed-month summary page's Species/Year/Session
+  totals) declare no `dataFetcher` at all and read their rows off `TabSet`'s shared `params`
+  instead. `TabContent` renders such a tab immediately with `data: null` — "lazy" here means
+  lazy-_mount_, not a per-tab fetch. Don't add a `dataFetcher` that re-fetches what the page's
+  own `fetch___PageContent` already returned.
 - **A data-driven tab list** (resightings, #1070 — one tab per species actually present in the
   group's resighting data, plus an `All` default) can't resolve `?tabId=` until the page's data
   is in hand, so its `fetch___PageContent` does the whole

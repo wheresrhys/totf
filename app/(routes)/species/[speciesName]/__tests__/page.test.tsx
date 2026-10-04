@@ -1,13 +1,10 @@
 import '@/app/__tests__/helpers/mock-species-tab-components';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-	render,
-	screen,
-	cleanup,
-	fireEvent,
-	within
-} from '@testing-library/react';
-import Page, { getSpeciesStats } from '../page';
+import { render, screen, cleanup } from '@testing-library/react';
+import Page, {
+	getSpeciesStats,
+	fetchSpeciesPageContentForPeriod
+} from '../page';
 import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
 import robinBiometricsHeadline from '@/test-fixtures/snapshots/biometrics_stats/robin-alpha.headline.json';
 import {
@@ -17,19 +14,29 @@ import {
 import type { FullFatPageData } from '../PageContent';
 import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 
-const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
-	() => ({
-		mockGetAuthenticatedSupabaseClient: vi.fn(),
-		mockFetchPageOfBirds: vi.fn()
-	})
-);
+const {
+	mockGetAuthenticatedSupabaseClient,
+	mockFetchPageOfBirds,
+	mockFetchYearTotalsTabData,
+	mockFetchMonthTotalsTabData,
+	mockFetchSessionTotalsTabData
+} = vi.hoisted(() => ({
+	mockGetAuthenticatedSupabaseClient: vi.fn(),
+	mockFetchPageOfBirds: vi.fn(),
+	mockFetchYearTotalsTabData: vi.fn(),
+	mockFetchMonthTotalsTabData: vi.fn(),
+	mockFetchSessionTotalsTabData: vi.fn()
+}));
 
 vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
 vi.mock('@/app/actions/sp-data', () => ({
-	fetchPageOfBirds: mockFetchPageOfBirds
+	fetchPageOfBirds: mockFetchPageOfBirds,
+	fetchYearTotalsTabData: mockFetchYearTotalsTabData,
+	fetchMonthTotalsTabData: mockFetchMonthTotalsTabData,
+	fetchSessionTotalsTabData: mockFetchSessionTotalsTabData
 }));
 
 const birds = birdsSnapshot as FullFatPageData['birds'];
@@ -48,200 +55,62 @@ describe('species detail page', () => {
 
 	describe('with full data (Robin fixture)', () => {
 		beforeEach(() => {
+			vi.clearAllMocks();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeSpeciesClient());
 			mockFetchPageOfBirds.mockResolvedValue(birds);
+			mockFetchYearTotalsTabData.mockResolvedValue([]);
+			mockFetchMonthTotalsTabData.mockResolvedValue([]);
+			mockFetchSessionTotalsTabData.mockResolvedValue([]);
 		});
 
-		describe('tab order and defaults (all-time page)', () => {
-			it('renders tab buttons in the order Year totals, Month totals, Session totals, Highlights, Biometrics, Demographics, Bird list', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				const labels = within(screen.getByRole('tablist'))
-					.getAllByRole('button')
-					.map((button) => button.textContent);
-				expect(labels).toEqual([
-					'Year totals',
-					'Month totals',
-					'Session totals',
-					'Highlights',
-					'Biometrics',
-					'Demographics',
-					'Bird list'
-				]);
-				expect(screen.queryByRole('button', { name: 'Graphs' })).toBeNull();
-				expect(
-					screen.queryByRole('button', { name: 'Trend charts' })
-				).toBeNull();
-				expect(screen.queryByRole('button', { name: 'Size plot' })).toBeNull();
+		// `page.tsx`'s own `fetchSpeciesPageContentForPeriod` is what resolves
+		// `?tabId=` server-side and decides whether to prefetch — exercised
+		// directly here (same style as the `getSpeciesStats` describe below),
+		// rather than through the full `Page(...)` → `BootstrapPage` → React
+		// render pipeline, since that pipeline's own async-Server-Component
+		// resolution timing can't distinguish "prefetched server-side" from "the
+		// resolved tab was merely mounted and fetched client-side a moment
+		// later" — this function's return value and the dataFetcher mocks it
+		// calls can. Tab-by-tab rendering/click-through behaviour (which buttons
+		// appear, which panel a click reveals) is covered at the
+		// `PageContent.test.tsx` level instead, closer to the components that
+		// actually render it.
+		describe('initial tab resolution', () => {
+			it('resolves ?tabId= to one of the 3 in-scope tabs and calls prefetchActiveTabData', async () => {
+				const data = await fetchSpeciesPageContentForPeriod(
+					{ speciesName: 'Robin', tabId: 'year-totals' },
+					1
+				);
+				expect(mockFetchYearTotalsTabData).toHaveBeenCalledTimes(1);
+				expect(mockFetchMonthTotalsTabData).not.toHaveBeenCalled();
+				expect(mockFetchSessionTotalsTabData).not.toHaveBeenCalled();
+				expect(data).toMatchObject({
+					initialTabId: 'year-totals',
+					initialTabData: { tabId: 'year-totals', data: [] }
+				});
 			});
 
-			it('renders SpYearTotalsTab on initial render without clicking (eager default)', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
+			it('resolves ?tabId= to one of the 6 not-yet-migrated tabs and skips prefetchActiveTabData', async () => {
+				const data = await fetchSpeciesPageContentForPeriod(
+					{ speciesName: 'Robin', tabId: 'highlights' },
+					1
+				);
+				expect(mockFetchYearTotalsTabData).not.toHaveBeenCalled();
+				expect(mockFetchMonthTotalsTabData).not.toHaveBeenCalled();
+				expect(mockFetchSessionTotalsTabData).not.toHaveBeenCalled();
+				expect(data).toMatchObject({
+					initialTabId: 'highlights',
+					initialTabData: undefined
+				});
 			});
 
-			it('does not mount SpIndividualsTab until the Bird list tab is clicked (now lazy)', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				expect(screen.queryByTestId('sp-individuals-tab')).toBeNull();
-				fireEvent.click(screen.getByRole('button', { name: 'Bird list' }));
-				await screen.findByTestId('sp-individuals-tab');
-			});
-
-			it('keeps Bird list mounted after being clicked once even when another tab is reselected', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Bird list' }));
-				await screen.findByTestId('sp-individuals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
-				await screen.findByTestId('sp-year-totals-tab');
-				// bird-list panel stays mounted (hidden) once loaded
-				expect(screen.getByTestId('sp-individuals-tab')).toBeDefined();
-			});
-		});
-
-		it("shows both 'Year totals' and 'Month totals' tabs on the all-time species page", async () => {
-			render(await renderSpeciesPage());
-			await screen.findByTestId('sp-year-totals-tab');
-			expect(screen.getByRole('button', { name: 'Year totals' })).toBeDefined();
-			expect(
-				screen.getByRole('button', { name: 'Month totals' })
-			).toBeDefined();
-		});
-
-		describe('highlights tab (click to activate)', () => {
-			it('renders SpHighlightsTab after clicking Highlights button', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
-				await screen.findByTestId('sp-highlights-tab');
-			});
-		});
-
-		describe('month-totals tab (click to activate)', () => {
-			it('renders SpCombinedMonthTotalsTab after clicking Month totals button', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
-				await screen.findByTestId('sp-combined-month-totals-tab');
-			});
-		});
-
-		describe('session-totals tab (click to activate)', () => {
-			it('renders SpSessionTotalsTab after clicking Session totals button', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
-				await screen.findByTestId('sp-session-totals-tab');
-			});
-
-			it('lazily loads SpSessionTotalsTab only once "Session totals" is selected, consistent with the other tabs', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				expect(screen.queryByTestId('sp-session-totals-tab')).toBeNull();
-				fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
-				await screen.findByTestId('sp-session-totals-tab');
-			});
-		});
-
-		describe('biometrics tab (click to activate)', () => {
-			it('renders SpBiometricsTab after clicking Biometrics button', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Biometrics' }));
-				await screen.findByTestId('sp-biometrics-tab');
-			});
-		});
-
-		describe('demographics tab (click to activate, labelled "Demographics")', () => {
-			it('renders SpDemographicsTab after clicking the Demographics button', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
-				await screen.findByTestId('sp-demographics-tab');
-			});
-
-			it('lazily loads SpDemographicsTab only once "Demographics" is selected', async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				expect(screen.queryByTestId('sp-demographics-tab')).toBeNull();
-				fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
-				await screen.findByTestId('sp-demographics-tab');
-			});
-
-			it("renders a 'Demographics' button that activates the 'demographics' tab panel", async () => {
-				render(await renderSpeciesPage());
-				await screen.findByTestId('sp-year-totals-tab');
-				expect(screen.queryByRole('button', { name: 'Graphs' })).toBeNull();
-				fireEvent.click(screen.getByRole('button', { name: 'Demographics' }));
-				await screen.findByTestId('sp-demographics-tab');
-			});
-		});
-
-		describe('?tabId= query param (#803)', () => {
-			it('with no tabId search param, the existing route-depth default tab renders and loads unchanged', async () => {
-				render(await renderSpeciesPage('Robin'));
-				await screen.findByTestId('sp-year-totals-tab');
-				expect(
-					screen
-						.getByRole('button', { name: 'Year totals' })
-						.getAttribute('aria-current')
-				).toBe('true');
-			});
-
-			it('?tabId=biometrics focuses the Biometrics tab and renders SpBiometricsTab without a click', async () => {
-				render(await renderSpeciesPage('Robin', 'biometrics'));
-				await screen.findByTestId('sp-biometrics-tab');
-				expect(
-					screen
-						.getByRole('button', { name: 'Biometrics' })
-						.getAttribute('aria-current')
-				).toBe('true');
-			});
-
-			it.each([
-				['year-totals', 'Year totals', 'sp-year-totals-tab'],
-				[
-					'all-time-month-totals',
-					'Month totals',
-					'sp-combined-month-totals-tab'
-				],
-				['session-totals', 'Session totals', 'sp-session-totals-tab'],
-				['biometrics', 'Biometrics', 'sp-biometrics-tab'],
-				['demographics', 'Demographics', 'sp-demographics-tab'],
-				['bird-list', 'Bird list', 'sp-individuals-tab']
-			])(
-				'?tabId=%s selects the %s tab and loads its data without a click',
-				async (tabId, buttonName, testId) => {
-					render(await renderSpeciesPage('Robin', tabId));
-					await screen.findByTestId(testId);
-					expect(
-						screen
-							.getByRole('button', { name: buttonName })
-							.getAttribute('aria-current')
-					).toBe('true');
-				}
-			);
-
-			it('?tabId=not-a-real-tab falls back to the route-depth default, with no crash and no blank pane', async () => {
-				render(await renderSpeciesPage('Robin', 'not-a-real-tab'));
-				await screen.findByTestId('sp-year-totals-tab');
-				expect(
-					screen
-						.getByRole('button', { name: 'Year totals' })
-						.getAttribute('aria-current')
-				).toBe('true');
-			});
-
-			it("?tabId=bird-list wins over the all-time route's Year totals default", async () => {
-				render(await renderSpeciesPage('Robin', 'bird-list'));
-				await screen.findByTestId('sp-individuals-tab');
-				expect(screen.queryByTestId('sp-year-totals-tab')).toBeNull();
-				expect(
-					screen
-						.getByRole('button', { name: 'Bird list' })
-						.getAttribute('aria-current')
-				).toBe('true');
+			it('falls back to the route-depth default tab id when no ?tabId= is given', async () => {
+				const data = await fetchSpeciesPageContentForPeriod(
+					{ speciesName: 'Robin' },
+					1
+				);
+				expect(mockFetchYearTotalsTabData).toHaveBeenCalledTimes(1);
+				expect(data).toMatchObject({ initialTabId: 'year-totals' });
 			});
 		});
 	});

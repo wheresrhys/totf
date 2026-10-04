@@ -1,51 +1,22 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { fetchSpeciesPeriodTotals } from '@/app/actions/sp-data';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import type { CoreStatsResult } from '@/app/models/db';
+import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
+// Pure presentational `TabConfig.TabComponent` (#1065) — see `SpYearTotalsTab`'s
+// comment on `data: unknown` for why the cast below is needed; fetching/
+// loading/error state now lives in `TabContent` (#1057), driven by
+// `fetchSessionTotalsTabData` (`app/actions/sp-data.ts`) via `TabSet`.
 export function SpSessionTotalsTab({
-	speciesName,
-	viewedGroup,
-	fromDate,
-	toDate,
-	monthFilter
+	data,
+	viewedGroup
 }: {
-	speciesName: string;
+	params: SpeciesTotalsTabParams;
+	data: unknown;
 	viewedGroup: ViewedGroup;
-	fromDate?: string;
-	toDate?: string;
-	// Set only by the squashed-month route (#1005) — mutually exclusive with
-	// `fromDate`/`toDate`, filters every session day to this calendar month
-	// across every year rather than a single real date range.
-	monthFilter?: number;
 }) {
-	const [sessionTotals, setSessionTotals] = useState<CoreStatsResult[]>([]);
-	const [isLoaded, setIsLoaded] = useState(false);
-
-	useEffect(() => {
-		if (isLoaded) return;
-		fetchSpeciesPeriodTotals(
-			speciesName,
-			viewedGroup.id,
-			'day',
-			fromDate,
-			toDate,
-			monthFilter
-		).then((data) => {
-			setSessionTotals(data);
-			setIsLoaded(true);
-		});
-	}, [speciesName, viewedGroup, fromDate, toDate, monthFilter, isLoaded]);
-
-	if (!isLoaded) {
-		return (
-			<div className="flex items-center justify-center">
-				<div className="loading loading-spinner loading-xl"></div>
-			</div>
-		);
-	}
+	const sessionTotals = (data as CoreStatsResult[] | null) ?? [];
 
 	return (
 		<PeriodTotalsTable

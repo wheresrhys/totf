@@ -1,9 +1,13 @@
 import type { CoreStatsResult } from '@/app/models/db';
+import type { MonthTotalsRow } from '@/app/lib/month-totals';
 
 /**
- * Shared `params` shape for all 4 of summary's `TabSet`-primitive-driven tabs
- * (Species totals, Highlights, All-time Month totals, the lazy variant of
- * Session totals, #1072).
+ * Shared `params` shape for every one of summary's tabs — the original 4
+ * `TabSet`-primitive-driven tabs (Species totals, Highlights, All-time Month
+ * totals, the lazy variant of Session totals, #1072), plus the 3 prop-fed
+ * tabs with no `dataFetcher` of their own that #1067 converged onto the same
+ * `TabSet` call (Year totals, year-page Month totals, the eager variant of
+ * Session totals).
  *
  * `TabConfig`/`TabContent` (`app/components/shared/TabContent.tsx`) and
  * `prefetchActiveTabData` (`app/lib/tab-query-param.ts`) are each generic
@@ -28,4 +32,18 @@ export type SummaryTabParams = {
 	// `dataFetcher` below (display-only), so its value during server-side
 	// prefetch is irrelevant to fetch correctness.
 	totalsStats?: CoreStatsResult;
+	// The 3 prop-fed tabs' own rows (#1067) — each arrives already-resolved
+	// from `SummaryTotalsSection`'s own props, so there's no `dataFetcher` to
+	// fetch it; it's threaded through here instead. Each is `undefined` on
+	// every page shape that doesn't have that tab at all.
+	yearlyTotals?: CoreStatsResult[];
+	monthTotals?: MonthTotalsRow[];
+	sessionTotals?: CoreStatsResult[];
+	// Per-tab totals-row gating (`SummaryTotalsSection`'s `tabsWithTotalsRow`
+	// map, carried over unchanged by #1067) — a prop-fed tab's own
+	// `TabComponent` looks itself up here by id to decide whether to show
+	// `totalsStats` at all, since (unlike the 4 migrated tabs, which get a
+	// pre-gated `totalsStats` via their own per-tab `params` override) all 3
+	// prop-fed tabs share this same object.
+	tabsWithTotalsRow?: Record<string, boolean>;
 };

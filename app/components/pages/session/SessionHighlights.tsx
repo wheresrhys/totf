@@ -1,16 +1,17 @@
-'use client';
-import { useState, useEffect } from 'react';
 import {
 	BoxyList,
 	SecondaryHeading
 } from '@/app/components/shared/DesignSystem';
-import { getCondensedHighlightsAtTimePeriod } from '@/app/lib/highlights';
+import {
+	type CombinedHighlight,
+	type HighlightCategory
+} from '@/app/lib/highlights/types';
+import type { SessionTabParams } from './session-tab-config';
 
-import { type CombinedHighlight } from '@/app/lib/highlights/types';
-import type { SessionEncounter } from '@/app/models/session';
-
-// A v2 highlight carries its own printer, so both v2-backed sections render
-// identically — only the highlights they're handed differ.
+// A v2 highlight carries its own printer, so every v2-backed section renders
+// identically — only the highlights they're handed differ. Shared by this tab
+// and `SummaryTotalsSection`, both of which render live `CombinedHighlight`s
+// fetched in the browser.
 export function renderCombinedHighlights(highlights: CombinedHighlight[]) {
 	return highlights.map((highlight: CombinedHighlight) => (
 		<li key={`${highlight.descriptor.type}-${highlight.species}`}>
@@ -19,103 +20,69 @@ export function renderCombinedHighlights(highlights: CombinedHighlight[]) {
 	));
 }
 
-export function SessionHighlights({
-	date,
-	viewedGroupId,
-	oldestEncounter
+function HighlightsSection({
+	heading,
+	testId,
+	highlights
 }: {
-	date: string;
-	viewedGroupId: number;
-	oldestEncounter: SessionEncounter | null;
+	heading: string;
+	testId: string;
+	highlights: CombinedHighlight[];
 }) {
-	// The Rarities/Counts/Vital-stats subsections are the highlight-machine
-	// pool, fetched async; the action returns plain highlight data and the
-	// client partitions + renders each group here. The "Best of the session"
-	// subsection is plain prop data, available synchronously.
-	const [highlights, setHighlights] = useState<CombinedHighlight[]>([]);
-	const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>(
-		'loading'
+	if (highlights.length === 0) return null;
+	return (
+		<>
+			<SecondaryHeading>{heading}</SecondaryHeading>
+			<BoxyList testId={testId}>
+				{renderCombinedHighlights(highlights)}
+			</BoxyList>
+		</>
 	);
-	useEffect(() => {
-		setStatus('loading');
+}
 
-		getCondensedHighlightsAtTimePeriod(viewedGroupId, date, 'day')
-			.then((highlights) => {
-				setHighlights(highlights);
-				setStatus('loaded');
-			})
-			.catch((error) => {
-				console.error('Failed to fetch session highlights', {
-					date,
-					viewedGroupId,
-					error
-				});
-				setHighlights([]);
-				setStatus('error');
-			});
-	}, [date, viewedGroupId]);
-	if (status === 'loading') {
-		return (
-			<div className="flex items-center justify-center">
-				<div className="loading loading-spinner loading-xl"></div>
-			</div>
+/**
+ * The Highlights tab's `TabComponent`. The Rarities/Counts/Vital-stats
+ * subsections come from the tab's own `dataFetcher` (`fetchSessionHighlights`),
+ * which `TabContent` runs on mount — the tab is `clientSideOnly`, so these are
+ * always generated in the browser, deep link or not. "Best of the session" is
+ * plain page data, handed over in `params` and rendered whatever the fetch did.
+ */
+export function SessionHighlights({
+	params: { oldestEncounter },
+	data
+}: {
+	params: SessionTabParams;
+	data: CombinedHighlight[] | null;
+}) {
+	const highlights = data ?? [];
+	const inCategory = (category: HighlightCategory) =>
+		highlights.filter(
+			(highlight) => highlight.descriptor.category === category
 		);
-	}
-	// A failed fetch hides the whole tab, exactly as it did before this was split
-	// into subsections — we don't surface a half-loaded "Best of the session" on
-	// top of an errored fetch.
-	if (status === 'error') return null;
 
-	const rarityHighlights = highlights.filter(
-		(highlight) => highlight.descriptor.category === 'rarity'
-	);
-	const countHighlights = highlights.filter(
-		(highlight) => highlight.descriptor.category === 'count'
-	);
-	const biometricsHighlights = highlights.filter(
-		(highlight) => highlight.descriptor.category === 'biometrics'
-	);
-
-	const showRarities = rarityHighlights.length > 0;
-	const showCounts = countHighlights.length > 0;
-	const showBiometricsStats = biometricsHighlights.length > 0;
 	const showBestOfSession =
 		oldestEncounter !== null && oldestEncounter.bird.proven_age > 0;
-	// All-or-nothing hide behaviour, now evaluated per-subsection.
-	if (
-		!showRarities &&
-		!showCounts &&
-		!showBiometricsStats &&
-		!showBestOfSession
-	) {
+	// All-or-nothing hide behaviour, evaluated per-subsection.
+	if (highlights.length === 0 && !showBestOfSession) {
 		return null;
 	}
 	return (
 		<section data-testid="session-highlights">
-			{showRarities ? (
-				<>
-					<SecondaryHeading>Rarities</SecondaryHeading>
-					<BoxyList testId="rarities">
-						{renderCombinedHighlights(rarityHighlights)}
-					</BoxyList>
-				</>
-			) : null}
-			{showCounts ? (
-				<>
-					<SecondaryHeading>Counts</SecondaryHeading>
-					<BoxyList testId="counts">
-						{renderCombinedHighlights(countHighlights)}
-					</BoxyList>
-				</>
-			) : null}
-			{showBiometricsStats ? (
-				<>
-					<SecondaryHeading>Vital stats</SecondaryHeading>
-					<BoxyList testId="vital-stats">
-						{renderCombinedHighlights(biometricsHighlights)}
-					</BoxyList>
-				</>
-			) : null}
+			<HighlightsSection
+				heading="Rarities"
+				testId="rarities"
+				highlights={inCategory('rarity')}
+			/>
+			<HighlightsSection
+				heading="Counts"
+				testId="counts"
+				highlights={inCategory('count')}
+			/>
+			<HighlightsSection
+				heading="Vital stats"
+				testId="vital-stats"
+				highlights={inCategory('biometrics')}
+			/>
 			{showBestOfSession && oldestEncounter ? (
 				<>
 					<SecondaryHeading>Best of the session</SecondaryHeading>
