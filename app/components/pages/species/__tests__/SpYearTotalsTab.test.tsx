@@ -1,78 +1,103 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { TabContent } from '@/app/components/shared/TabContent';
 import { SpYearTotalsTab } from '../SpYearTotalsTab';
 import type { CoreStatsResult } from '@/app/models/db';
+import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import { getColumnIndex } from '@/app/__tests__/helpers/table';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
-vi.mock('@/app/actions/sp-data', () => ({
-	fetchSpeciesPeriodTotals: vi.fn()
-}));
+// `SpYearTotalsTab` is a pure presentational `TabConfig.TabComponent` (#1065)
+// — fetching/loading/error state lives in `TabContent` (#1057), so these
+// tests mount it through a real `TabContent`, exactly as `TabSet` does,
+// rather than reaching into the component's own internals (it has none left).
+const params: SpeciesTotalsTabParams = { speciesName: 'Robin' };
+const viewedGroup = { id: 1, slug: 'alpha' };
+
+function renderYearTotalsTab({
+	initialData,
+	dataFetcher = vi.fn()
+}: {
+	initialData?: CoreStatsResult[] | null;
+	dataFetcher?: () => Promise<CoreStatsResult[]>;
+}) {
+	return render(
+		<TabContent
+			dataFetcher={dataFetcher}
+			TabComponent={SpYearTotalsTab}
+			params={params}
+			viewedGroup={viewedGroup}
+			{...(initialData === undefined ? {} : { initialData })}
+		/>
+	);
+}
 
 describe('SpYearTotalsTab', () => {
 	afterEach(() => {
 		cleanup();
 	});
 
-	beforeEach(async () => {
-		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-			buildCoreStatsRow({ time_period: '2025-01-01' }),
-			buildCoreStatsRow({ time_period: '2026-01-01' })
-		]);
-	});
-
-	it('shows a loading spinner while data is fetching', async () => {
-		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		let resolveData!: (v: CoreStatsResult[]) => void;
-		vi.mocked(fetchSpeciesPeriodTotals).mockReturnValue(
-			new Promise((resolve) => {
-				resolveData = resolve;
-			})
-		);
-		render(<SpYearTotalsTab speciesName="Robin" viewedGroupId={1} />);
-		expect(document.querySelector('.loading')).toBeDefined();
-		resolveData([]);
-	});
-
-	it('fetches year-grouped totals scoped to the species', async () => {
-		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		render(<SpYearTotalsTab speciesName="Robin" viewedGroupId={1} />);
-		await waitFor(() => {
+	describe('rendering with server-prefetched data', () => {
+		it('renders the totals table immediately when `data` is supplied as a prop, with no loading spinner', () => {
+			renderYearTotalsTab({
+				initialData: [buildCoreStatsRow({ time_period: '2026-01-01' })]
+			});
 			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+			expect(document.querySelector('.loading')).toBeNull();
 		});
-		expect(fetchSpeciesPeriodTotals).toHaveBeenCalledWith('Robin', 1, 'year');
-	});
 
-	it('renders a row per year, each linking to /species/{name}/{year}', async () => {
-		render(<SpYearTotalsTab speciesName="Robin" viewedGroupId={1} />);
-		await waitFor(() => {
+		it('renders the correct rows/columns for the supplied data', () => {
+			renderYearTotalsTab({
+				initialData: [
+					buildCoreStatsRow({ time_period: '2025-01-01' }),
+					buildCoreStatsRow({ time_period: '2026-01-01' })
+				]
+			});
 			expect(document.querySelectorAll('tbody tr').length).toBe(2);
+			const link2025 = screen.getByRole('link', { name: '2025' });
+			const link2026 = screen.getByRole('link', { name: '2026' });
+			expect(link2025.getAttribute('href')).toBe('/species/Robin/2025');
+			expect(link2026.getAttribute('href')).toBe('/species/Robin/2026');
+			const encountersIndex = getColumnIndex('Encounters');
+			const busiestSessionIndex = getColumnIndex('Busiest session');
+			const birdsIndex = getColumnIndex('Birds');
+			expect(busiestSessionIndex).toBe(encountersIndex + 1);
+			expect(busiestSessionIndex).toBe(birdsIndex - 1);
 		});
-		const link2025 = screen.getByRole('link', { name: '2025' });
-		const link2026 = screen.getByRole('link', { name: '2026' });
-		expect(link2025.getAttribute('href')).toBe('/species/Robin/2025');
-		expect(link2026.getAttribute('href')).toBe('/species/Robin/2026');
 	});
 
-	it('renders a "Busiest session" column between Encounters and Birds', async () => {
-		render(<SpYearTotalsTab speciesName="Robin" viewedGroupId={1} />);
-		await waitFor(() => {
-			expect(document.querySelectorAll('tbody tr').length).toBe(2);
+	describe('rendering without prefetched data', () => {
+		it('shows a loading state before data arrives', () => {
+			let resolveData!: (v: CoreStatsResult[]) => void;
+			const dataFetcher = vi.fn(
+				() =>
+					new Promise<CoreStatsResult[]>((resolve) => {
+						resolveData = resolve;
+					})
+			);
+			renderYearTotalsTab({ dataFetcher });
+			expect(document.querySelector('.loading')).toBeTruthy();
+			resolveData([]);
 		});
-		const encountersIndex = getColumnIndex('Encounters');
-		const busiestSessionIndex = getColumnIndex('Busiest session');
-		const birdsIndex = getColumnIndex('Birds');
-		expect(busiestSessionIndex).toBe(encountersIndex + 1);
-		expect(busiestSessionIndex).toBe(birdsIndex - 1);
-	});
 
-	it('shows the period table empty state when no years are returned', async () => {
-		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([]);
-		render(<SpYearTotalsTab speciesName="Robin" viewedGroupId={1} />);
-		await waitFor(() => {
-			expect(screen.getByText('No data recorded.')).toBeTruthy();
+		it('renders the totals table once the dataFetcher resolves', async () => {
+			const dataFetcher = vi
+				.fn()
+				.mockResolvedValue([buildCoreStatsRow({ time_period: '2026-01-01' })]);
+			renderYearTotalsTab({ dataFetcher });
+			await waitFor(() => {
+				expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+			});
+			expect(dataFetcher).toHaveBeenCalledWith(params, viewedGroup);
+			expect(screen.getByRole('link', { name: '2026' })).toBeTruthy();
+		});
+
+		it('shows the period table empty state when no years are returned', async () => {
+			const dataFetcher = vi.fn().mockResolvedValue([]);
+			renderYearTotalsTab({ dataFetcher });
+			await waitFor(() => {
+				expect(screen.getByText('No data recorded.')).toBeTruthy();
+			});
 		});
 	});
 });
