@@ -20,12 +20,6 @@ import {
 	summarySessionTotalsTab,
 	type SummarySessionTotalsData
 } from '@/app/components/pages/summary/SummarySessionTotalsTab';
-import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
-import {
-	HighlightValue,
-	isNumericHighlightValue,
-	type HighlightsOfType
-} from '@/app/lib/highlights/types';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
@@ -39,10 +33,12 @@ import {
 } from '@/app/lib/month-totals';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
-import {
-	StatOutput,
-	type SpeciesName
-} from '@/app/components/shared/StatOutput';
+// Re-exported (not relocated) so this file's other two existing consumers
+// (`SquashedMonthSummaryTotalsSection.tsx`, `SpHighlightsTab.tsx`) keep
+// working unchanged — see `HighlightsByTimePeriod.tsx`'s doc comment for why
+// the implementation itself had to move (breaking a circular import with
+// `SummaryHighlightsTab.tsx` below).
+export { HighlightsByTimePeriod } from '@/app/components/HighlightsByTimePeriod';
 // `MONTH_TOTALS_TAB` (the year page's per-year, linked, toggle-enabled month
 // rows) stays eager/inline — distinct from the all-time page's combine-years
 // "Month totals" tab, now `summaryAllTimeMonthTotalsTab` below. Same label,
@@ -56,92 +52,6 @@ const SESSION_TOTALS_TAB = summarySessionTotalsTab;
 const SPECIES_TOTALS_TAB = summarySpeciesTotalsTab;
 const HIGHLIGHTS_TAB = summaryHighlightsTab;
 const ALL_TIME_MONTH_TOTALS_TAB = summaryAllTimeMonthTotalsTab;
-
-function showHighlightUnit(
-	highlight: HighlightsOfType,
-	highlightValue: HighlightValue,
-	excludeSpeciesName?: boolean
-) {
-	if (['g', 'mm'].includes(highlight.descriptor.unit)) {
-		return true;
-	}
-	return !excludeSpeciesName;
-}
-
-function getHighlightUnit(
-	highlight: HighlightsOfType,
-	highlightValue: HighlightValue,
-	excludeSpeciesName?: boolean
-) {
-	if (['g', 'mm'].includes(highlight.descriptor.unit)) {
-		return highlight.descriptor.unit;
-	}
-	return excludeSpeciesName
-		? undefined
-		: (highlightValue.species as SpeciesName) || highlight.descriptor.unit;
-}
-
-export function HighlightsByTimePeriod({
-	highlights,
-	heading,
-	viewedGroup,
-	excludeSpeciesName
-}: {
-	highlights: HighlightsOfType[];
-	heading: string;
-	viewedGroup?: ViewedGroup;
-	excludeSpeciesName?: boolean;
-}) {
-	if (!highlights.length) return null;
-	return (
-		<div>
-			<SecondaryHeading>{heading}</SecondaryHeading>
-			{highlights.map(
-				(highlight) =>
-					isNumericHighlightValue(highlight.values[0]) && (
-						<div
-							key={`${highlight.descriptor.type}-${highlight.scope.temporalUnit}`}
-						>
-							{highlight.formatters.highlightListPrefixPrinter(highlight)}:{' '}
-							<div className="flex gap-2">
-								{highlight.values.map(
-									(highlightValue) =>
-										isNumericHighlightValue(highlightValue) && (
-											<span
-												className="badge badge-outline"
-												key={highlightValue.timePeriod}
-											>
-												<StatOutput
-													dateFormat={
-														highlight.scope.temporalUnit === 'day'
-															? 'dd/MM/yy'
-															: 'MMM yyyy'
-													}
-													visitDate={highlightValue.timePeriod}
-													temporalUnit={highlight.scope.temporalUnit}
-													showUnit={showHighlightUnit(
-														highlight,
-														highlightValue,
-														excludeSpeciesName
-													)}
-													value={highlightValue.value}
-													unit={getHighlightUnit(
-														highlight,
-														highlightValue,
-														excludeSpeciesName
-													)}
-													viewedGroup={viewedGroup}
-												/>
-											</span>
-										)
-								)}
-							</div>
-						</div>
-					)
-			)}
-		</div>
-	);
-}
 
 // The year summary page's "Month totals" tab content. Extracted from
 // `SummaryTotalsSection`'s inline JSX purely so its `hideEmptyMonths` state

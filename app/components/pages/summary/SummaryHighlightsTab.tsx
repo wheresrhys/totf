@@ -5,12 +5,13 @@ import {
 	getCondensedHighlightsAtTimePeriod
 } from '@/app/lib/highlights';
 import { BoxyList } from '@/app/components/shared/DesignSystem';
-// Imported, not relocated — `HighlightsByTimePeriod` (`SummaryTotalsSection.tsx`)
-// and `renderCombinedHighlights` (`SessionHighlights.tsx`) both have other
-// consumers already importing them from their current locations
-// (`SquashedMonthSummaryTotalsSection.tsx`, `SpHighlightsTab.tsx`), so moving
-// either here would break those import paths.
-import { HighlightsByTimePeriod } from '@/app/components/SummaryTotalsSection';
+// Imported from its own file (not from `SummaryTotalsSection.tsx`, which
+// re-exports it for its other two consumers) to avoid a circular import:
+// `SummaryTotalsSection.tsx` itself imports `summaryHighlightsTab` from this
+// file. `renderCombinedHighlights` (`SessionHighlights.tsx`) has other
+// consumers already importing it from its current location
+// (`SpHighlightsTab.tsx`), so moving it here would break that import path.
+import { HighlightsByTimePeriod } from '@/app/components/HighlightsByTimePeriod';
 import { renderCombinedHighlights } from '@/app/components/pages/session/SessionHighlights';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { ViewedGroup } from '@/app/lib/group-slug';
