@@ -11,11 +11,8 @@ import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { SpIndividualsTab } from '@/app/components/pages/species/SpIndividualsTab';
-import { SpHighlightsTab } from '@/app/components/pages/species/SpHighlightsTab';
 import { SpDemographicsTab } from '@/app/components/pages/species/SpDemographicsTab';
 import { SpBiometricsTab } from '@/app/components/pages/species/SpBiometricsTab';
-import { SpCombinedMonthTotalsTab } from '@/app/components/pages/species/SpCombinedMonthTotalsTab';
-import { SpSquashedMonthYearTotalsTab } from '@/app/components/pages/species/SpSquashedMonthYearTotalsTab';
 import { type SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import { TabNav } from '@/app/components/TabNav';
 import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
@@ -192,23 +189,39 @@ function SpeciesData({
 	const isYearScoped = data.year !== undefined && data.month === undefined;
 	const isSquashedMonth = data.squashedMonth !== undefined;
 
-	// The 3 "totals" tabs (Year/Month/Session, #1065) render through the shared
-	// `TabSet` below, each server-prefetched when it's the resolved initial tab
-	// (`page.tsx`'s `prefetchActiveTabData` call). The other 6 species tabs
-	// (Combined Month Totals, Squashed Month/Year Totals, Highlights,
-	// Biometrics, Demographics, Individuals) aren't on `TabConfig` yet
-	// (follow-ups, including #1060) and keep rendering below via the original
-	// `useLinkableTabs`/`TabNav`/`ConditionalTabPanel` mechanism — so this page
-	// deliberately shows two separate tab strips for the interim: `TabSet`'s
-	// own nav covers just the totals tabs, this `TabNav` covers the rest. Each
-	// strip resolves `initialTabId` independently against its own known ids
-	// (see `getSpeciesKnownTabIds`'s doc comment), so a `?tabId=` naming a tab
-	// in the *other* strip is a harmless no-op here — that strip simply starts
-	// with nothing active/loaded, since the real initial tab lives elsewhere.
-	const totalsTabs = buildSpeciesTotalsTabs(isAllTime, isYearScoped);
+	// All 6 of species' data-fetching tabs (Year/Month/Session totals #1065;
+	// all-time Month totals, squashed-month Year totals and Highlights #1066)
+	// now render through the shared `TabSet` below, each server-prefetched
+	// when it's the resolved initial tab (`page.tsx`'s `prefetchActiveTabData`
+	// call) — except Highlights, which declares itself `clientSideOnly`
+	// (`SpHighlightsTab.tsx`'s `spHighlightsTab`) and always fetches
+	// client-side regardless. Only Biometrics, Demographics and Bird list
+	// aren't on `TabConfig` yet (a follow-up ticket) and keep rendering below
+	// via the original `useLinkableTabs`/`TabNav`/`ConditionalTabPanel`
+	// mechanism — so this page deliberately shows two separate tab strips for
+	// the interim: `TabSet`'s own nav covers the 6 migrated tabs, this
+	// `TabNav` covers the remaining 3. Each strip resolves `initialTabId`
+	// independently against its own known ids (see `getSpeciesKnownTabIds`'s
+	// doc comment), so a `?tabId=` naming a tab in the *other* strip is a
+	// harmless no-op here — that strip simply starts with nothing
+	// active/loaded, since the real initial tab lives elsewhere.
+	const totalsTabs = buildSpeciesTotalsTabs(
+		isAllTime,
+		isYearScoped,
+		isSquashedMonth
+	);
 	const totalsTabParams: SpeciesTotalsTabParams = {
 		speciesName: data.speciesName,
 		year: data.year,
+		// Passed as `month` to the Highlights tab's `dataFetcher` too — this
+		// reproduces a pre-existing quirk in `SpHighlightsTab`'s old prop
+		// wiring (it was called with `month={data.year}`, not `data.month`),
+		// which suppresses its "Month highlights" section on both the
+		// year-scoped and month-scoped pages rather than just the latter.
+		// #1066 is a pure mechanism migration (handrolled fetch → `TabConfig`
+		// `dataFetcher`) — preserved here rather than silently fixed, since
+		// any behaviour change is explicitly out of scope for this ticket.
+		month: data.year,
 		fromDate: data.fromDate,
 		toDate: data.toDate,
 		monthFilter: data.squashedMonth
@@ -221,13 +234,6 @@ function SpeciesData({
 	);
 
 	const tabs = [
-		...(isAllTime
-			? [{ id: 'all-time-month-totals', label: 'Month totals' }]
-			: []),
-		...(isSquashedMonth
-			? [{ id: 'squashed-month-year-totals', label: 'Year totals' }]
-			: []),
-		{ id: 'highlights', label: 'Highlights' },
 		{ id: 'biometrics', label: 'Biometrics' },
 		{ id: 'demographics', label: 'Demographics' },
 		{ id: 'bird-list', label: 'Bird list' }
@@ -258,46 +264,6 @@ function SpeciesData({
 				ariaLabel="Totals"
 			/>
 			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={selectTab} />
-			{isAllTime && (
-				<ConditionalTabPanel
-					loadedTabs={loadedTabs}
-					tabId="all-time-month-totals"
-					activeTabId={activeTab}
-				>
-					<SpCombinedMonthTotalsTab
-						speciesName={data.speciesName}
-						viewedGroupId={viewedGroup.id}
-						isActive={activeTab === 'all-time-month-totals'}
-					/>
-				</ConditionalTabPanel>
-			)}
-			{isSquashedMonth && data.squashedMonth !== undefined && (
-				<ConditionalTabPanel
-					loadedTabs={loadedTabs}
-					tabId="squashed-month-year-totals"
-					activeTabId={activeTab}
-				>
-					<SpSquashedMonthYearTotalsTab
-						speciesName={data.speciesName}
-						viewedGroupId={viewedGroup.id}
-						squashedMonth={data.squashedMonth}
-					/>
-				</ConditionalTabPanel>
-			)}
-			<ConditionalTabPanel
-				loadedTabs={loadedTabs}
-				tabId="highlights"
-				activeTabId={activeTab}
-			>
-				<SpHighlightsTab
-					speciesName={data.speciesName}
-					viewedGroup={viewedGroup}
-					fromDate={data.fromDate}
-					toDate={data.toDate}
-					year={data.year}
-					month={data.year}
-				/>
-			</ConditionalTabPanel>
 			<ConditionalTabPanel
 				loadedTabs={loadedTabs}
 				tabId="biometrics"

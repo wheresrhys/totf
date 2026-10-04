@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
 	render,
 	screen,
@@ -6,8 +6,13 @@ import {
 	waitFor,
 	fireEvent
 } from '@testing-library/react';
+import { TabContent } from '@/app/components/shared/TabContent';
 import { SpCombinedMonthTotalsTab } from '../SpCombinedMonthTotalsTab';
 import type { CoreStatsResult } from '@/app/models/db';
+import type {
+	SpeciesTotalsTabParams,
+	SpCombinedMonthTotalsData
+} from '@/app/actions/sp-data';
 import {
 	getCellTextByHeading,
 	getColumnIndex
@@ -17,31 +22,39 @@ import {
 	buildMonthSquashedFixture
 } from '@/app/__tests__/helpers/core-stats-fixtures';
 
-vi.mock('@/app/actions/sp-data', () => ({
-	fetchSpeciesPeriodTotals: vi.fn(),
-	fetchSpeciesCombinedMonthTotals: vi.fn()
-}));
+// `SpCombinedMonthTotalsTab` is a pure presentational `TabConfig.TabComponent`
+// (#1066) — fetching/loading/error state lives in `TabContent` (#1057), so
+// these tests mount it through a real `TabContent`, exactly as `TabSet` does,
+// rather than reaching into the component's own internals (it has none left).
+const params: SpeciesTotalsTabParams = { speciesName: 'Robin' };
+const viewedGroup = { id: 1, slug: 'alpha' };
 
-function renderTab(
-	overrides: Partial<{
-		speciesName: string;
-		viewedGroupId: number;
-		isActive: boolean;
-	}> = {}
-) {
-	const props = {
-		speciesName: 'Robin',
-		viewedGroupId: 1,
-		isActive: true,
-		...overrides
-	};
+function renderTab({
+	initialData,
+	dataFetcher = vi.fn()
+}: {
+	initialData?: SpCombinedMonthTotalsData | null;
+	dataFetcher?: () => Promise<SpCombinedMonthTotalsData>;
+} = {}) {
 	return render(
-		<SpCombinedMonthTotalsTab
-			speciesName={props.speciesName}
-			viewedGroupId={props.viewedGroupId}
-			isActive={props.isActive}
+		<TabContent
+			dataFetcher={dataFetcher}
+			TabComponent={SpCombinedMonthTotalsTab}
+			params={params}
+			viewedGroup={viewedGroup}
+			{...(initialData === undefined ? {} : { initialData })}
 		/>
 	);
+}
+
+function buildData(
+	overrides: Partial<SpCombinedMonthTotalsData> = {}
+): SpCombinedMonthTotalsData {
+	return {
+		monthlyStats: [buildCoreStatsRow({ time_period: '2020-01-01' })],
+		monthSquashedStats: [buildCoreStatsRow({ time_period: '2000-01-01' })],
+		...overrides
+	};
 }
 
 describe('SpCombinedMonthTotalsTab', () => {
@@ -49,42 +62,18 @@ describe('SpCombinedMonthTotalsTab', () => {
 		cleanup();
 	});
 
-	beforeEach(async () => {
-		const { fetchSpeciesPeriodTotals, fetchSpeciesCombinedMonthTotals } =
-			await import('@/app/actions/sp-data');
-		vi.mocked(fetchSpeciesPeriodTotals).mockReset();
-		vi.mocked(fetchSpeciesCombinedMonthTotals).mockReset();
-		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-			buildCoreStatsRow({ time_period: '2020-01-01' })
-		]);
-		vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue([
-			buildCoreStatsRow({ time_period: '2000-01-01' })
-		]);
-	});
-
 	describe('Usual', () => {
-		it('fetches both species period totals and species combined month totals with no date range once the tab becomes active', async () => {
-			const { fetchSpeciesPeriodTotals, fetchSpeciesCombinedMonthTotals } =
-				await import('@/app/actions/sp-data');
-			renderTab();
-			await waitFor(() => {
-				expect(screen.getByTestId('period-totals-table')).toBeTruthy();
-			});
-			expect(fetchSpeciesPeriodTotals).toHaveBeenCalledWith(
-				'Robin',
-				1,
-				'month'
-			);
-			expect(fetchSpeciesCombinedMonthTotals).toHaveBeenCalledWith('Robin', 1);
+		it('renders the totals table immediately when `data` is supplied as a prop, with no loading spinner', () => {
+			renderTab({ initialData: buildData() });
+			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+			expect(document.querySelector('.loading')).toBeNull();
 		});
 
-		it("renders the month-squashed rows through PeriodTotalsTable with month labels consistent with the group-wide 'Month totals' convention", async () => {
-			renderTab();
-			await waitFor(() => {
-				// Hide default: only January (the sole nonzero month-squashed row)
-				// shows.
-				expect(document.querySelectorAll('tbody tr').length).toBe(1);
-			});
+		it("renders the month-squashed rows through PeriodTotalsTable with month labels consistent with the group-wide 'Month totals' convention", () => {
+			renderTab({ initialData: buildData() });
+			// Hide default: only January (the sole nonzero month-squashed row)
+			// shows.
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			// Combine-years labels are month name only — no year — and link into
 			// the squashed-month species page (#1005).
 			expect(screen.queryByText('January 2020')).toBeNull();
@@ -93,11 +82,8 @@ describe('SpCombinedMonthTotalsTab', () => {
 			).toBe('/species/Robin/jan');
 		});
 
-		it('renders a "Busiest session" column between Encounters and Birds', async () => {
-			renderTab();
-			await waitFor(() => {
-				expect(document.querySelectorAll('tbody tr').length).toBe(1);
-			});
+		it('renders a "Busiest session" column between Encounters and Birds', () => {
+			renderTab({ initialData: buildData() });
 			const encountersIndex = getColumnIndex('Encounters');
 			const busiestSessionIndex = getColumnIndex('Busiest session');
 			const birdsIndex = getColumnIndex('Birds');
@@ -107,74 +93,74 @@ describe('SpCombinedMonthTotalsTab', () => {
 	});
 
 	describe('Structure', () => {
-		it("uses the 'month-squashed' RPC row's value directly, not summed from the per-year fetchSpeciesPeriodTotals rows", async () => {
-			const { fetchSpeciesPeriodTotals, fetchSpeciesCombinedMonthTotals } =
-				await import('@/app/actions/sp-data');
+		it("uses the 'month-squashed' RPC row's value directly, not summed from the per-year rows", () => {
 			// Per-year rows that would sum to 75 if folded client-side — the
 			// combined view must ignore these and use the RPC's own value instead.
-			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildCoreStatsRow({ time_period: '2020-01-01', encounter_count: 30 }),
-				buildCoreStatsRow({ time_period: '2021-01-01', encounter_count: 45 })
-			]);
-			vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue([
-				buildCoreStatsRow({ time_period: '2000-01-01', encounter_count: 75 })
-			]);
-			renderTab();
-			await waitFor(() => {
-				// Hide default: only January (the sole nonzero month-squashed row)
-				// shows.
-				expect(document.querySelectorAll('tbody tr').length).toBe(1);
+			renderTab({
+				initialData: buildData({
+					monthlyStats: [
+						buildCoreStatsRow({
+							time_period: '2020-01-01',
+							encounter_count: 30
+						}),
+						buildCoreStatsRow({
+							time_period: '2021-01-01',
+							encounter_count: 45
+						})
+					],
+					monthSquashedStats: [
+						buildCoreStatsRow({
+							time_period: '2000-01-01',
+							encounter_count: 75
+						})
+					]
+				})
 			});
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			expect(getCellTextByHeading('Encounters', 'January')).toBe('75');
 		});
 
-		it('shows a loading state before the fetch resolves', async () => {
-			const { fetchSpeciesPeriodTotals } =
-				await import('@/app/actions/sp-data');
-			let resolveData!: (v: CoreStatsResult[]) => void;
-			vi.mocked(fetchSpeciesPeriodTotals).mockReturnValue(
-				new Promise((resolve) => {
-					resolveData = resolve;
-				})
+		it('shows a loading state before the fetch resolves', () => {
+			let resolveData!: (v: SpCombinedMonthTotalsData) => void;
+			const dataFetcher = vi.fn(
+				() =>
+					new Promise<SpCombinedMonthTotalsData>((resolve) => {
+						resolveData = resolve;
+					})
 			);
-			renderTab();
+			renderTab({ dataFetcher });
 			expect(document.querySelector('.loading')).toBeTruthy();
-			resolveData([]);
+			resolveData(buildData({ monthlyStats: [], monthSquashedStats: [] }));
+		});
+
+		it('renders the totals table once the dataFetcher resolves', async () => {
+			const dataFetcher = vi.fn().mockResolvedValue(buildData());
+			renderTab({ dataFetcher });
+			await waitFor(() => {
+				expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+			});
+			expect(dataFetcher).toHaveBeenCalledWith(params, viewedGroup);
 		});
 	});
 
 	describe('Edge', () => {
-		it('does not call fetchSpeciesPeriodTotals or fetchSpeciesCombinedMonthTotals until the tab is selected', async () => {
-			const { fetchSpeciesPeriodTotals, fetchSpeciesCombinedMonthTotals } =
-				await import('@/app/actions/sp-data');
-			renderTab({ isActive: false });
-			expect(fetchSpeciesPeriodTotals).not.toHaveBeenCalled();
-			expect(fetchSpeciesCombinedMonthTotals).not.toHaveBeenCalled();
-		});
-
-		it('shows "No data recorded." rather than erroring when the species has no recorded history at all', async () => {
-			const { fetchSpeciesPeriodTotals, fetchSpeciesCombinedMonthTotals } =
-				await import('@/app/actions/sp-data');
-			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([]);
-			vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue([]);
-			renderTab();
-			await waitFor(() => {
-				// Every zero-filled month is empty, so Hide default filters all 12
-				// away.
-				expect(screen.getByText('No data recorded.')).toBeTruthy();
+		it('shows "No data recorded." rather than erroring when the species has no recorded history at all', () => {
+			renderTab({
+				initialData: buildData({ monthlyStats: [], monthSquashedStats: [] })
 			});
+			// Every zero-filled month is empty, so Hide default filters all 12
+			// away.
+			expect(screen.getByText('No data recorded.')).toBeTruthy();
 			expect(document.querySelectorAll('tbody tr').length).toBe(0);
 		});
 
-		it('no longer locks the Aggregate-by toggle to Encounter, now that bird_count is accurate', async () => {
-			const { fetchSpeciesCombinedMonthTotals } =
-				await import('@/app/actions/sp-data');
-			vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue([
-				buildCoreStatsRow({ time_period: '2000-01-01', bird_count: 40 })
-			]);
-			renderTab();
-			await waitFor(() => {
-				expect(document.querySelectorAll('tbody tr').length).toBe(1);
+		it('no longer locks the Aggregate-by toggle to Encounter, now that bird_count is accurate', () => {
+			renderTab({
+				initialData: buildData({
+					monthSquashedStats: [
+						buildCoreStatsRow({ time_period: '2000-01-01', bird_count: 40 })
+					]
+				})
 			});
 			const bird = screen.getByRole('radio', {
 				name: 'Bird'
@@ -195,20 +181,16 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 		cleanup();
 	});
 
-	beforeEach(async () => {
-		const { fetchSpeciesPeriodTotals, fetchSpeciesCombinedMonthTotals } =
-			await import('@/app/actions/sp-data');
-		vi.mocked(fetchSpeciesPeriodTotals).mockReset();
-		vi.mocked(fetchSpeciesCombinedMonthTotals).mockReset();
-		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
+	// One row per calendar month as the 'month-squashed' RPC mode returns
+	// them — deliberately not the sum of the two January rows below (that's
+	// exactly the double-count the fix removes).
+	const toggleData = buildData({
+		monthlyStats: [
 			buildCoreStatsRow({ time_period: '2020-01-01' }),
 			buildCoreStatsRow({ time_period: '2021-01-01' }),
 			buildCoreStatsRow({ time_period: '2020-08-01' })
-		]);
-		// One row per calendar month as the 'month-squashed' RPC mode returns
-		// them — deliberately not the sum of the two January rows above (that's
-		// exactly the double-count the fix removes).
-		vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue([
+		],
+		monthSquashedStats: [
 			buildCoreStatsRow({
 				time_period: '2000-01-01',
 				session_count: 10,
@@ -223,17 +205,15 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 				encounter_count: 11,
 				bird_count: 9
 			})
-		]);
+		]
 	});
 
 	describe('Usual', () => {
-		it('defaults to combined calendar-month rows, encounters-only, with the bird/encounter toggle enabled', async () => {
-			renderTab();
-			await waitFor(() =>
-				// Hide default: only January and August (the nonzero month-squashed
-				// rows) show.
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
-			);
+		it('defaults to combined calendar-month rows, encounters-only, with the bird/encounter toggle enabled', () => {
+			renderTab({ initialData: toggleData });
+			// Hide default: only January and August (the nonzero month-squashed
+			// rows) show.
+			expect(document.querySelectorAll('tbody tr').length).toBe(2);
 			expect(
 				(screen.getByRole('radio', { name: 'Combined' }) as HTMLInputElement)
 					.checked
@@ -248,12 +228,8 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 			).toBe(false);
 		});
 
-		it('switching the toggle off renders one row per (month, year) combination returned for the species, without summing', async () => {
-			renderTab();
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
-			);
-
+		it('switching the toggle off renders one row per (month, year) combination returned for the species, without summing', () => {
+			renderTab({ initialData: toggleData });
 			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
 
 			expect(document.querySelectorAll('tbody tr').length).toBe(3);
@@ -268,26 +244,24 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 			).toBe('/species/Robin/2020/8');
 		});
 
-		it("switching the toggle off enables the bird/encounter toggle, and selecting 'Bird' re-derives the rendered rows as bird-based", async () => {
-			const { fetchSpeciesPeriodTotals } =
-				await import('@/app/actions/sp-data');
-			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildCoreStatsRow({
-					time_period: '2020-01-01',
-					pullus_bird_count: 2,
-					...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
+		it("switching the toggle off enables the bird/encounter toggle, and selecting 'Bird' re-derives the rendered rows as bird-based", () => {
+			renderTab({
+				initialData: buildData({
+					monthlyStats: [
+						buildCoreStatsRow({
+							time_period: '2020-01-01',
+							pullus_bird_count: 2,
+							...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
+						})
+					],
+					monthSquashedStats: toggleData.monthSquashedStats
 				})
-			]);
-			renderTab();
-			await waitFor(() =>
-				// Combined (default) view uses the mocked month-squashed rows,
-				// unaffected by the fetchSpeciesPeriodTotals override above.
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
-			);
+			});
+			// Combined (default) view uses the mocked month-squashed rows,
+			// unaffected by the monthlyStats override above.
+			expect(document.querySelectorAll('tbody tr').length).toBe(2);
 			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(1)
-			);
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 
 			// Unlocked, the toggle defaults to 'Bird' (matching every other
 			// unlocked `PeriodTotalsTable` usage), so the bird-based count is
@@ -305,12 +279,8 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 			expect(getCellTextByHeading('Pulli', 0)).toBe('2');
 		});
 
-		it('switching the toggle back on restores the combined, encounters-only view, keeping the bird/encounter toggle enabled', async () => {
-			renderTab();
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
-			);
-
+		it('switching the toggle back on restores the combined, encounters-only view, keeping the bird/encounter toggle enabled', () => {
+			renderTab({ initialData: toggleData });
 			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
 			expect(document.querySelectorAll('tbody tr').length).toBe(3);
 
@@ -324,21 +294,15 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 	});
 
 	describe('Structure', () => {
-		it("in the 'Combined' state, toggling AggregateByToggle between Bird and Encounter changes the rendered counts, now that it's unlocked", async () => {
-			renderTab();
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
-			);
+		it("in the 'Combined' state, toggling AggregateByToggle between Bird and Encounter changes the rendered counts, now that it's unlocked", () => {
+			renderTab({ initialData: toggleData });
 			expect(getCellTextByHeading('Pulli', 0)).toBe('2');
 			fireEvent.click(screen.getByRole('radio', { name: 'Encounter' }));
 			expect(getCellTextByHeading('Pulli', 0)).toBe('5');
 		});
 
-		it('the combine-years control is the same shared component/pattern used by the group-wide all-time Month totals tab (#635), not a bespoke implementation', async () => {
-			renderTab();
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
-			);
+		it('the combine-years control is the same shared component/pattern used by the group-wide all-time Month totals tab (#635), not a bespoke implementation', () => {
+			renderTab({ initialData: toggleData });
 			// `CombineYearsToggle`'s exact copy/markup (shared with
 			// `SummaryTotalsSection`'s `AllTimeMonthTotalsTab`) rather than a
 			// bespoke species-only control.
@@ -347,10 +311,15 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 			expect(screen.getByRole('radio', { name: 'By year' })).toBeTruthy();
 		});
 
-		it('per-row (toggle-off) rows link to /species/{speciesName}/{year}/{month} for each row', async () => {
-			renderTab({ speciesName: 'Blackbird' });
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
+		it('per-row (toggle-off) rows link to /species/{speciesName}/{year}/{month} for each row', () => {
+			render(
+				<TabContent
+					dataFetcher={vi.fn()}
+					TabComponent={SpCombinedMonthTotalsTab}
+					params={{ speciesName: 'Blackbird' }}
+					viewedGroup={viewedGroup}
+					initialData={toggleData}
+				/>
 			);
 			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
 
@@ -367,21 +336,26 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 	});
 
 	describe('Edge', () => {
-		it('a species with data in only one year renders matching values for that month whether combine-years is on or off', async () => {
-			const { fetchSpeciesPeriodTotals, fetchSpeciesCombinedMonthTotals } =
-				await import('@/app/actions/sp-data');
-			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildCoreStatsRow({ time_period: '2020-01-01', encounter_count: 30 })
-			]);
-			vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue([
-				buildCoreStatsRow({ time_period: '2000-01-01', encounter_count: 30 })
-			]);
-			renderTab();
-			await waitFor(() =>
-				// Hide default: only the single nonzero month-squashed January row
-				// shows.
-				expect(document.querySelectorAll('tbody tr').length).toBe(1)
-			);
+		it('a species with data in only one year renders matching values for that month whether combine-years is on or off', () => {
+			renderTab({
+				initialData: buildData({
+					monthlyStats: [
+						buildCoreStatsRow({
+							time_period: '2020-01-01',
+							encounter_count: 30
+						})
+					],
+					monthSquashedStats: [
+						buildCoreStatsRow({
+							time_period: '2000-01-01',
+							encounter_count: 30
+						})
+					]
+				})
+			});
+			// Hide default: only the single nonzero month-squashed January row
+			// shows.
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			// Combined: with only one contributing year, the RPC's January value
 			// equals that single year's own value.
 			expect(getCellTextByHeading('Encounters', 'January')).toBe('30');
@@ -389,24 +363,6 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
 			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			expect(getCellTextByHeading('Encounters', 'January')).toBe('30');
-		});
-
-		it('toggling combine-years on and off repeatedly does not trigger any additional fetch of species period totals', async () => {
-			const { fetchSpeciesPeriodTotals, fetchSpeciesCombinedMonthTotals } =
-				await import('@/app/actions/sp-data');
-			renderTab();
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
-			);
-			expect(fetchSpeciesPeriodTotals).toHaveBeenCalledTimes(1);
-			expect(fetchSpeciesCombinedMonthTotals).toHaveBeenCalledTimes(1);
-
-			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
-			fireEvent.click(screen.getByRole('radio', { name: 'Combined' }));
-			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
-
-			expect(fetchSpeciesPeriodTotals).toHaveBeenCalledTimes(1);
-			expect(fetchSpeciesCombinedMonthTotals).toHaveBeenCalledTimes(1);
 		});
 	});
 });
@@ -416,29 +372,23 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 		cleanup();
 	});
 
-	beforeEach(async () => {
-		const { fetchSpeciesPeriodTotals, fetchSpeciesCombinedMonthTotals } =
-			await import('@/app/actions/sp-data');
-		vi.mocked(fetchSpeciesPeriodTotals).mockReset();
-		vi.mocked(fetchSpeciesCombinedMonthTotals).mockReset();
-		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
+	// A realistic 12-row fixture (the real RPC always returns all 12), zero
+	// except January.
+	const emptyMonthsData = buildData({
+		monthlyStats: [
 			buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 })
-		]);
-		// A realistic 12-row fixture (the real RPC always returns all 12), zero
-		// except January.
-		vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue(
-			buildMonthSquashedFixture({ 1: { session_count: 4 } })
-		);
+		],
+		monthSquashedStats: buildMonthSquashedFixture({
+			1: { session_count: 4 }
+		})
 	});
 
 	describe('Usual', () => {
-		it('renders only months with data by default (Hide)', async () => {
-			renderTab();
-			await waitFor(() =>
-				// Only January is a nonzero month-squashed row; the rest are
-				// synthesized and hidden by default.
-				expect(document.querySelectorAll('tbody tr').length).toBe(1)
-			);
+		it('renders only months with data by default (Hide)', () => {
+			renderTab({ initialData: emptyMonthsData });
+			// Only January is a nonzero month-squashed row; the rest are
+			// synthesized and hidden by default.
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			expect(
 				(screen.getByRole('radio', { name: 'Hide' }) as HTMLInputElement)
 					.checked
@@ -448,35 +398,30 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 	});
 
 	describe('Structure', () => {
-		it('shows zero-session months in the combined view when toggled to Show', async () => {
-			renderTab();
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(1)
-			);
+		it('shows zero-session months in the combined view when toggled to Show', () => {
+			renderTab({ initialData: emptyMonthsData });
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
 			expect(document.querySelectorAll('tbody tr').length).toBe(12);
 			expect(screen.getByText('January')).toBeTruthy();
 		});
 
-		it('shows zero-session months in the by-year view when toggled to Show', async () => {
-			const { fetchSpeciesPeriodTotals } =
-				await import('@/app/actions/sp-data');
-			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 }),
-				buildCoreStatsRow({ time_period: '2020-08-01', session_count: 0 })
-			]);
-			renderTab();
-			await waitFor(() =>
-				// Combined (default) view uses the mocked month-squashed rows,
-				// unaffected by the fetchSpeciesPeriodTotals override above.
-				expect(document.querySelectorAll('tbody tr').length).toBe(1)
-			);
+		it('shows zero-session months in the by-year view when toggled to Show', () => {
+			renderTab({
+				initialData: buildData({
+					monthlyStats: [
+						buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 }),
+						buildCoreStatsRow({ time_period: '2020-08-01', session_count: 0 })
+					],
+					monthSquashedStats: emptyMonthsData.monthSquashedStats
+				})
+			});
+			// Combined (default) view uses the mocked month-squashed rows,
+			// unaffected by the monthlyStats override above.
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
-			await waitFor(() =>
-				// The August row (session_count 0) is dropped by default; January
-				// (4) stays.
-				expect(document.querySelectorAll('tbody tr').length).toBe(1)
-			);
+			// The August row (session_count 0) is dropped by default; January
+			// (4) stays.
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			expect(screen.getByText('January 2020')).toBeTruthy();
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
 			expect(document.querySelectorAll('tbody tr').length).toBe(2);
@@ -485,49 +430,44 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 	});
 
 	describe('Edge', () => {
-		it('has no visible effect when no calendar month is empty across any year', async () => {
-			const { fetchSpeciesCombinedMonthTotals } =
-				await import('@/app/actions/sp-data');
-			vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue(
-				Array.from({ length: 12 }, (_unused, index) =>
-					buildCoreStatsRow({
-						time_period: `2000-${String(index + 1).padStart(2, '0')}-01`,
-						session_count: 3
-					})
-				)
-			);
-			renderTab();
-			await waitFor(() =>
-				// Hide default has nothing to filter, since no month is empty.
-				expect(document.querySelectorAll('tbody tr').length).toBe(12)
-			);
+		it('has no visible effect when no calendar month is empty across any year', () => {
+			renderTab({
+				initialData: buildData({
+					monthSquashedStats: Array.from({ length: 12 }, (_unused, index) =>
+						buildCoreStatsRow({
+							time_period: `2000-${String(index + 1).padStart(2, '0')}-01`,
+							session_count: 3
+						})
+					)
+				})
+			});
+			// Hide default has nothing to filter, since no month is empty.
+			expect(document.querySelectorAll('tbody tr').length).toBe(12);
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
 			expect(document.querySelectorAll('tbody tr').length).toBe(12);
 		});
 
-		it('shows only the month with data by default when every other calendar month is empty', async () => {
-			const { fetchSpeciesCombinedMonthTotals } =
-				await import('@/app/actions/sp-data');
-			vi.mocked(fetchSpeciesCombinedMonthTotals).mockResolvedValue([
-				buildCoreStatsRow({ time_period: '2000-08-01', session_count: 7 })
-			]);
-			renderTab();
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(1)
-			);
+		it('shows only the month with data by default when every other calendar month is empty', () => {
+			renderTab({
+				initialData: buildData({
+					monthSquashedStats: [
+						buildCoreStatsRow({ time_period: '2000-08-01', session_count: 7 })
+					]
+				})
+			});
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			expect(screen.getByText('August')).toBeTruthy();
 		});
 
-		it('toggling combine-years does not reset the empty-months toggle, and vice versa', async () => {
-			const { fetchSpeciesPeriodTotals } =
-				await import('@/app/actions/sp-data');
-			vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-				buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 })
-			]);
-			renderTab();
-			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(1)
-			);
+		it('toggling combine-years does not reset the empty-months toggle, and vice versa', () => {
+			renderTab({
+				initialData: buildData({
+					monthlyStats: [
+						buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 })
+					],
+					monthSquashedStats: emptyMonthsData.monthSquashedStats
+				})
+			});
 			// Hide is already the default. Flip combine-years — empty-months
 			// stays Hide.
 			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
