@@ -13,13 +13,19 @@ import {
 } from '@/app/lib/tab-query-param';
 import {
 	SpeciesPageContent,
-	getDefaultSpeciesTabId,
-	getSpeciesKnownTabIds,
-	buildSpeciesTotalsTabs,
 	type PageParams,
 	type PeriodScope,
 	type PageData
 } from './PageContent';
+// Imported from `./species-tabs` (not `./PageContent`, which is `'use
+// client'`) deliberately — see that file's doc comment: calling a function
+// exported from a `'use client'` module directly (as this server file does)
+// throws at runtime even though it type-checks and unit-tests fine.
+import {
+	getDefaultSpeciesTabId,
+	getSpeciesKnownTabIds,
+	buildSpeciesTotalsTabs
+} from './species-tabs';
 
 import {
 	mergeBiometricsFields,
