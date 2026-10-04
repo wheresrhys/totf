@@ -19,13 +19,17 @@ const {
 	mockFetchPageOfBirds,
 	mockFetchYearTotalsTabData,
 	mockFetchMonthTotalsTabData,
-	mockFetchSessionTotalsTabData
+	mockFetchSessionTotalsTabData,
+	mockFetchCombinedMonthTotalsTabData,
+	mockFetchSquashedMonthYearTotalsTabData
 } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn(),
 	mockFetchPageOfBirds: vi.fn(),
 	mockFetchYearTotalsTabData: vi.fn(),
 	mockFetchMonthTotalsTabData: vi.fn(),
-	mockFetchSessionTotalsTabData: vi.fn()
+	mockFetchSessionTotalsTabData: vi.fn(),
+	mockFetchCombinedMonthTotalsTabData: vi.fn(),
+	mockFetchSquashedMonthYearTotalsTabData: vi.fn()
 }));
 
 vi.mock('@/app/lib/auth/group-auth', () => ({
@@ -36,7 +40,9 @@ vi.mock('@/app/actions/sp-data', () => ({
 	fetchPageOfBirds: mockFetchPageOfBirds,
 	fetchYearTotalsTabData: mockFetchYearTotalsTabData,
 	fetchMonthTotalsTabData: mockFetchMonthTotalsTabData,
-	fetchSessionTotalsTabData: mockFetchSessionTotalsTabData
+	fetchSessionTotalsTabData: mockFetchSessionTotalsTabData,
+	fetchCombinedMonthTotalsTabData: mockFetchCombinedMonthTotalsTabData,
+	fetchSquashedMonthYearTotalsTabData: mockFetchSquashedMonthYearTotalsTabData
 }));
 
 const birds = birdsSnapshot as FullFatPageData['birds'];
@@ -61,6 +67,11 @@ describe('species detail page', () => {
 			mockFetchYearTotalsTabData.mockResolvedValue([]);
 			mockFetchMonthTotalsTabData.mockResolvedValue([]);
 			mockFetchSessionTotalsTabData.mockResolvedValue([]);
+			mockFetchCombinedMonthTotalsTabData.mockResolvedValue({
+				monthlyStats: [],
+				monthSquashedStats: []
+			});
+			mockFetchSquashedMonthYearTotalsTabData.mockResolvedValue([]);
 		});
 
 		// `page.tsx`'s own `fetchSpeciesPageContentForPeriod` is what resolves
@@ -90,14 +101,25 @@ describe('species detail page', () => {
 				});
 			});
 
-			it('resolves ?tabId= to one of the 6 not-yet-migrated tabs and skips prefetchActiveTabData', async () => {
+			it('resolves ?tabId= to one of the 3 not-yet-migrated tabs and skips prefetchActiveTabData', async () => {
 				const data = await fetchSpeciesPageContentForPeriod(
-					{ speciesName: 'Robin', tabId: 'highlights' },
+					{ speciesName: 'Robin', tabId: 'biometrics' },
 					1
 				);
 				expect(mockFetchYearTotalsTabData).not.toHaveBeenCalled();
 				expect(mockFetchMonthTotalsTabData).not.toHaveBeenCalled();
 				expect(mockFetchSessionTotalsTabData).not.toHaveBeenCalled();
+				expect(data).toMatchObject({
+					initialTabId: 'biometrics',
+					initialTabData: undefined
+				});
+			});
+			it('resolves ?tabId=highlights to the Highlights tab but still skips prefetchActiveTabData, since it is declared clientSideOnly', async () => {
+				const data = await fetchSpeciesPageContentForPeriod(
+					{ speciesName: 'Robin', tabId: 'highlights' },
+					1
+				);
+				expect(mockFetchYearTotalsTabData).not.toHaveBeenCalled();
 				expect(data).toMatchObject({
 					initialTabId: 'highlights',
 					initialTabData: undefined

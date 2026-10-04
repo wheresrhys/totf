@@ -112,11 +112,14 @@ export async function fetchSpeciesPageContentForPeriod(
 	}
 
 	// Resolve which tab should be focused on first paint (#1059), and — if it's
-	// one of the 3 totals tabs already migrated onto `TabSet` (#1065) — fetch
+	// one of the 6 totals tabs migrated onto `TabSet` (#1065, #1066) — fetch
 	// its data right here, server-side, so that tab renders immediately with no
-	// loading spinner instead of flashing one and re-fetching on hydration. The
-	// other 6 species tabs aren't on `TabConfig` yet (follow-ups, including
-	// #1060): `prefetchActiveTabData` naturally no-ops for those, since
+	// loading spinner instead of flashing one and re-fetching on hydration.
+	// Highlights is one of the 6 but declares itself `clientSideOnly`
+	// (`SpHighlightsTab.tsx`'s `spHighlightsTab`), so `prefetchActiveTabData`
+	// still skips it even when it's the resolved tab. Biometrics/Demographics/
+	// Bird list aren't on `TabConfig` yet (a follow-up ticket):
+	// `prefetchActiveTabData` naturally no-ops for those too, since
 	// `totalsTabs` below never contains them.
 	//
 	// `isAllTime`/`isYearScoped`/`isSquashedMonth` are route-depth facts, not
@@ -153,10 +156,20 @@ export async function fetchSpeciesPageContentForPeriod(
 		knownTabIds,
 		defaultTabId
 	);
-	const totalsTabs = buildSpeciesTotalsTabs(isAllTime, isYearScoped);
+	const totalsTabs = buildSpeciesTotalsTabs(
+		isAllTime,
+		isYearScoped,
+		isSquashedMonth
+	);
 	const totalsTabParams: SpeciesTotalsTabParams = {
 		speciesName: params.speciesName,
 		year,
+		// Matches `SpeciesData`'s own `totalsTabParams` in `PageContent.tsx` —
+		// see that file's comment on this exact assignment for why it's `year`
+		// rather than `month` (a pre-existing quirk in the Highlights tab's
+		// param wiring, preserved as-is; #1066 is a pure mechanism migration,
+		// not a behaviour change).
+		month: year,
 		fromDate,
 		toDate,
 		monthFilter: squashedMonth
