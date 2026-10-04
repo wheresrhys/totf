@@ -26,8 +26,17 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
+// `fetchSpeciesPageContentForPeriod` (shared across all 3 species route
+// depths) now also resolves/prefetches the 3 `TabSet`-migrated totals tabs
+// (#1065) — these 3 stub out to an empty array by default so that prefetch
+// never fails here; this file's own tests don't assert on them (that's
+// `page.test.tsx`'s/`PageContent.test.tsx`'s job), just on this route's own
+// `fetchSpeciesYearOrMonthPageContent` behaviour.
 vi.mock('@/app/actions/sp-data', () => ({
-	fetchPageOfBirds: mockFetchPageOfBirds
+	fetchPageOfBirds: mockFetchPageOfBirds,
+	fetchYearTotalsTabData: vi.fn().mockResolvedValue([]),
+	fetchMonthTotalsTabData: vi.fn().mockResolvedValue([]),
+	fetchSessionTotalsTabData: vi.fn().mockResolvedValue([])
 }));
 
 const birds = birdsSnapshot as FullFatPageData['birds'];
@@ -74,15 +83,26 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 		});
 
 		describe('tab order and defaults (year-scoped page)', () => {
-			it('renders tab buttons in the order Month totals, Session totals, Highlights, Biometrics, Demographics, Bird list (no Year totals)', async () => {
+			// Month/Session totals (#1065) now render through `TabSet`'s own strip
+			// (`ariaLabel="Totals"`), separate from the legacy
+			// `useLinkableTabs`/`TabNav` strip (`ariaLabel="Tabs"`, default)
+			// covering the tabs not yet migrated — see `SpeciesData`'s doc comment
+			// in `PageContent.tsx` for why there are two for the interim.
+			it('renders Month totals/Session totals in the TabSet strip, and Highlights/Biometrics/Demographics/Bird list in the legacy strip (no Year totals)', async () => {
 				render(await renderYearPage());
 				await screen.findByTestId('sp-month-totals-tab');
-				const labels = within(screen.getByRole('tablist'))
+				const totalsLabels = within(
+					screen.getByRole('tablist', { name: 'Totals' })
+				)
 					.getAllByRole('button')
 					.map((button) => button.textContent);
-				expect(labels).toEqual([
-					'Month totals',
-					'Session totals',
+				expect(totalsLabels).toEqual(['Month totals', 'Session totals']);
+				const legacyLabels = within(
+					screen.getByRole('tablist', { name: 'Tabs' })
+				)
+					.getAllByRole('button')
+					.map((button) => button.textContent);
+				expect(legacyLabels).toEqual([
 					'Highlights',
 					'Biometrics',
 					'Demographics',
@@ -160,10 +180,13 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 			).toBe('true');
 		});
 
-		it('?tabId=bird-list wins over the year-scoped route’s Month totals default', async () => {
+		it('?tabId=bird-list wins within the legacy strip; TabSet falls back to its own Month totals default since "bird-list" isn\'t one of its ids', async () => {
 			render(await renderYearPage('Robin', '2026', 'bird-list'));
 			await screen.findByTestId('sp-individuals-tab');
-			expect(screen.queryByTestId('sp-month-totals-tab')).toBeNull();
+			// Not prefetched (the resolved initial tab is `bird-list`, not
+			// `month-totals`), so `TabContent` fetches it client-side —
+			// `findByTestId` waits that out.
+			await screen.findByTestId('sp-month-totals-tab');
 		});
 
 		it('?tabId=not-a-real-tab falls back to the year-scoped default, with no crash and no blank pane', async () => {
@@ -295,15 +318,25 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 			).toBe('/species/Robin');
 		});
 
-		it('renders tab buttons in the order Year totals, Session totals, Highlights, Biometrics, Demographics, Bird list', async () => {
+		// Squashed-month's own "Year totals" tab (`SpSquashedMonthYearTotalsTab`)
+		// deliberately stays on the legacy strip — migrating *its* internal
+		// fetching is out of scope for #1065 (see `buildSpeciesTotalsTabs`'s doc
+		// comment in `PageContent.tsx`) — so only Session totals renders via the
+		// new `TabSet` strip here.
+		it('renders Session totals in the TabSet strip, and Year totals/Highlights/Biometrics/Demographics/Bird list in the legacy strip', async () => {
 			render(await renderYearPage('Robin', 'jan'));
 			await screen.findByTestId('sp-squashed-month-year-totals-tab');
-			const labels = within(screen.getByRole('tablist'))
+			const totalsLabels = within(
+				screen.getByRole('tablist', { name: 'Totals' })
+			)
 				.getAllByRole('button')
 				.map((button) => button.textContent);
-			expect(labels).toEqual([
+			expect(totalsLabels).toEqual(['Session totals']);
+			const legacyLabels = within(screen.getByRole('tablist', { name: 'Tabs' }))
+				.getAllByRole('button')
+				.map((button) => button.textContent);
+			expect(legacyLabels).toEqual([
 				'Year totals',
-				'Session totals',
 				'Highlights',
 				'Biometrics',
 				'Demographics',

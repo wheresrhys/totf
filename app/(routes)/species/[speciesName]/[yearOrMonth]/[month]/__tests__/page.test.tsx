@@ -26,8 +26,17 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
+// `fetchSpeciesPageContentForPeriod` (shared across all 3 species route
+// depths) now also resolves/prefetches the 3 `TabSet`-migrated totals tabs
+// (#1065) — these 3 stub out to an empty array by default so that prefetch
+// never fails here; this file's own tests don't assert on them (that's
+// `page.test.tsx`'s/`PageContent.test.tsx`'s job), just on this route's own
+// `fetchSpeciesYearMonthPageContent` behaviour.
 vi.mock('@/app/actions/sp-data', () => ({
-	fetchPageOfBirds: mockFetchPageOfBirds
+	fetchPageOfBirds: mockFetchPageOfBirds,
+	fetchYearTotalsTabData: vi.fn().mockResolvedValue([]),
+	fetchMonthTotalsTabData: vi.fn().mockResolvedValue([]),
+	fetchSessionTotalsTabData: vi.fn().mockResolvedValue([])
 }));
 
 const birds = birdsSnapshot as FullFatPageData['birds'];
@@ -89,14 +98,26 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 		});
 
 		describe('tab order and defaults (month-scoped page)', () => {
-			it('renders tab buttons in the order Session totals, Highlights, Biometrics, Demographics, Bird list (no Year/Month totals)', async () => {
+			// Session totals (#1065) now renders through `TabSet`'s own strip
+			// (`ariaLabel="Totals"`), separate from the legacy
+			// `useLinkableTabs`/`TabNav` strip (`ariaLabel="Tabs"`, default)
+			// covering the tabs not yet migrated — see `SpeciesData`'s doc comment
+			// in `PageContent.tsx` for why there are two for the interim.
+			it('renders Session totals in its own TabSet strip, and Highlights/Biometrics/Demographics/Bird list in the legacy strip (no Year/Month totals)', async () => {
 				render(await renderMonthPage());
 				await screen.findByTestId('sp-session-totals-tab');
-				const labels = within(screen.getByRole('tablist'))
+				const totalsLabels = within(
+					screen.getByRole('tablist', { name: 'Totals' })
+				)
 					.getAllByRole('button')
 					.map((button) => button.textContent);
-				expect(labels).toEqual([
-					'Session totals',
+				expect(totalsLabels).toEqual(['Session totals']);
+				const legacyLabels = within(
+					screen.getByRole('tablist', { name: 'Tabs' })
+				)
+					.getAllByRole('button')
+					.map((button) => button.textContent);
+				expect(legacyLabels).toEqual([
 					'Highlights',
 					'Biometrics',
 					'Demographics',
@@ -150,10 +171,15 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 			).toBe('true');
 		});
 
-		it('?tabId=bird-list wins over the month-scoped route’s Session totals default', async () => {
+		it('?tabId=bird-list wins over the month-scoped route’s Session totals default in the legacy strip, though Session totals keeps rendering in its own TabSet strip', async () => {
 			render(await renderMonthPage('Robin', '2026', '08', 'bird-list'));
 			await screen.findByTestId('sp-individuals-tab');
-			expect(screen.queryByTestId('sp-session-totals-tab')).toBeNull();
+			// Session totals is `TabSet`'s sole tab at this route depth (#1065),
+			// so it's unconditionally mounted there — `bird-list` only wins within
+			// the legacy strip's own mutual exclusivity. Not prefetched (the
+			// resolved initial tab is `bird-list`, not `session-totals`), so
+			// `TabContent` fetches it client-side — `findByTestId` waits that out.
+			await screen.findByTestId('sp-session-totals-tab');
 			expect(
 				screen
 					.getByRole('button', { name: 'Bird list' })

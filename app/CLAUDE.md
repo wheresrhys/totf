@@ -151,7 +151,21 @@ entrypoint, its content, and its data fetcher:
   `app/lib/tab-query-param.ts`'s `resolveInitialTabId` and writes the selected tab back via its
   `setTabIdSearchParam` (#1013), so every page that takes its tab state from that hook — directly,
   or through the shared `TabSet` component (`app/components/shared/TabSet.tsx`) — gets
-  reload-survivable, copy-pasteable tab links for free.
+  reload-survivable, copy-pasteable tab links for free. A `TabSet`-based page can go one step
+  further and resolve its initial tab _server-side_, prefetching that one tab's data before first
+  paint instead of flashing `TabContent`'s own loading spinner on a deep `?tabId=` link — the
+  species page (`app/(routes)/species/[speciesName]/page.tsx`'s `fetchSpeciesPageContentForPeriod`,
+  #1065) is the first to do this: it resolves `?tabId=` and calls `tab-query-param.ts`'s
+  `prefetchActiveTabData` alongside its own data fetch, passing the result down as `initialTabId`/
+  `initialTabData`. `TabSet` forces one shared `ParamsType` across every tab in its array (a
+  per-tab `ParamsType` was requested on #1058's PR review but never implemented), so a page with
+  tabs needing different extra fields — like species' Year/Month/Session totals — needs a single
+  superset `params` shape and `data: unknown`-typed `TabComponent`s that cast back to their real
+  type (see `SpYearTotalsTab.tsx`'s doc comment). A page mid-migration — only some of its tabs on
+  `TabConfig`, the rest still on the hand-rolled mechanism above — necessarily renders two separate
+  tab strips for the interim (give the migrated one's `TabSet` a non-default `ariaLabel` so
+  `getByRole('tablist', { name: ... })` can address either strip in tests); see `SpeciesData`'s own
+  doc comment in `PageContent.tsx` for the full reasoning.
 
 Naming reference (see #667 for the original design discussion):
 
