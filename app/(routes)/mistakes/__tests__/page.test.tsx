@@ -76,7 +76,7 @@ describe('mistakes page', () => {
 		const firstActiveType = (mistakesSnapshot as DiscrepenciesResult[])[0]
 			.discrepency_type;
 		// The table's initial sort is by species ascending (see
-		// MistakesDiscrepancyTable's initialSortColumn), so the first rendered row
+		// MistakesDiscrepancyTab's initialSortColumn), so the first rendered row
 		// is the alphabetically-first species within the active tab, not
 		// necessarily the first matching row in the snapshot's raw array order.
 		const firstOfType = (mistakesSnapshot as DiscrepenciesResult[])
