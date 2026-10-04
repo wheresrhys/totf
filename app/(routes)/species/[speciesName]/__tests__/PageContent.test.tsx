@@ -1,10 +1,53 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, cleanup, within } from '@testing-library/react';
+import '@/app/__tests__/helpers/mock-species-tab-components';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+	render,
+	screen,
+	cleanup,
+	within,
+	waitFor,
+	fireEvent
+} from '@testing-library/react';
 import {
 	SpeciesHeading,
+	SpeciesPageContent,
 	buildSpeciesHeadingText,
-	getDefaultSpeciesTabId
+	getDefaultSpeciesTabId,
+	type FullFatPageData,
+	type PageData
 } from '../PageContent';
+import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import type { CoreStatsWithBiometrics } from '@/app/models/db';
+
+const {
+	mockFetchYearTotalsTabData,
+	mockFetchMonthTotalsTabData,
+	mockFetchSessionTotalsTabData
+} = vi.hoisted(() => ({
+	mockFetchYearTotalsTabData: vi.fn(),
+	mockFetchMonthTotalsTabData: vi.fn(),
+	mockFetchSessionTotalsTabData: vi.fn()
+}));
+
+vi.mock('@/app/actions/sp-data', () => ({
+	fetchYearTotalsTabData: mockFetchYearTotalsTabData,
+	fetchMonthTotalsTabData: mockFetchMonthTotalsTabData,
+	fetchSessionTotalsTabData: mockFetchSessionTotalsTabData
+}));
+
+const viewedGroup = { id: 1, slug: 'alpha' };
+
+function buildFullFatPageData(
+	overrides: Partial<Extract<PageData, FullFatPageData>> = {}
+): Extract<PageData, FullFatPageData> {
+	return {
+		birds: [],
+		speciesStats: buildCoreStatsRow() as CoreStatsWithBiometrics,
+		speciesId: 1,
+		speciesName: 'Robin',
+		...overrides
+	};
+}
 
 describe('SpeciesHeading', () => {
 	afterEach(() => {
@@ -193,5 +236,169 @@ describe('SpeciesHeading', () => {
 				'Robin August 2026'
 			);
 		});
+	});
+});
+
+// `SpeciesData`'s Year/Month/Session totals tabs now render through the
+// shared `TabSet` (#1065), with their own tab strip (`ariaLabel="Totals"`)
+// separate from the pre-existing `TabNav`-driven strip (default `ariaLabel`
+// "Tabs") covering the 6 tabs not yet migrated — see `SpeciesData`'s own doc
+// comment in `PageContent.tsx` for why there are deliberately two strips for
+// the interim. `screen.getByRole('tablist', { name: ... })` distinguishes
+// between them.
+describe('TabSet-based totals tabs', () => {
+	afterEach(() => {
+		cleanup();
+		vi.clearAllMocks();
+	});
+
+	beforeEach(() => {
+		mockFetchYearTotalsTabData.mockResolvedValue([]);
+		mockFetchMonthTotalsTabData.mockResolvedValue([]);
+		mockFetchSessionTotalsTabData.mockResolvedValue([]);
+	});
+
+	it('renders TabSet with the 3 in-scope tabs at the all-time route depth (year-totals present)', async () => {
+		render(
+			<SpeciesPageContent
+				params={{ speciesName: 'Robin' }}
+				data={buildFullFatPageData()}
+				viewedGroup={viewedGroup}
+			/>
+		);
+		const totalsTabs = screen.getByRole('tablist', { name: 'Totals' });
+		expect(
+			within(totalsTabs).getByRole('button', { name: 'Year totals' })
+		).toBeTruthy();
+		expect(
+			within(totalsTabs).getByRole('button', { name: 'Session totals' })
+		).toBeTruthy();
+		expect(
+			within(totalsTabs).queryByRole('button', { name: 'Month totals' })
+		).toBeNull();
+		await screen.findByTestId('sp-year-totals-tab');
+	});
+
+	it('renders TabSet with month-totals instead of year-totals at the year-scoped route depth', async () => {
+		render(
+			<SpeciesPageContent
+				params={{ speciesName: 'Robin' }}
+				data={buildFullFatPageData({ year: 2026 })}
+				viewedGroup={viewedGroup}
+			/>
+		);
+		const totalsTabs = screen.getByRole('tablist', { name: 'Totals' });
+		expect(
+			within(totalsTabs).getByRole('button', { name: 'Month totals' })
+		).toBeTruthy();
+		expect(
+			within(totalsTabs).getByRole('button', { name: 'Session totals' })
+		).toBeTruthy();
+		expect(
+			within(totalsTabs).queryByRole('button', { name: 'Year totals' })
+		).toBeNull();
+		await screen.findByTestId('sp-month-totals-tab');
+	});
+
+	// Deviates from #1065's literal scope-bullet wording, which lists
+	// `squashed-month-year-totals` as part of the migrated `TabConfig[]` — but
+	// the ticket's own "Out of scope" section lists "Squashed Month/Year
+	// Totals" among the 6 *not* migrated, and the 3-in-scope/6-not-migrated
+	// tab-id counts only add up to the pre-existing 9 total ids if
+	// `squashed-month-year-totals` stays in the 6. Treated here as a drafting
+	// slip in the scope bullet, not a real requirement — see
+	// `buildSpeciesTotalsTabs`'s doc comment in `PageContent.tsx`.
+	it('renders TabSet with only session-totals (no year/month slot) at the squashed-month route depth, leaving squashed-month-year-totals on the old mechanism', async () => {
+		render(
+			<SpeciesPageContent
+				params={{ speciesName: 'Robin' }}
+				data={buildFullFatPageData({ squashedMonth: 3 })}
+				viewedGroup={viewedGroup}
+			/>
+		);
+		const totalsTabs = screen.getByRole('tablist', { name: 'Totals' });
+		expect(
+			within(totalsTabs).getByRole('button', { name: 'Session totals' })
+		).toBeTruthy();
+		expect(within(totalsTabs).getAllByRole('button')).toHaveLength(1);
+		const legacyTabs = screen.getByRole('tablist', { name: 'Tabs' });
+		expect(
+			within(legacyTabs).getByRole('button', { name: 'Year totals' })
+		).toBeTruthy();
+		fireEvent.click(
+			within(legacyTabs).getByRole('button', { name: 'Year totals' })
+		);
+		await screen.findByTestId('sp-squashed-month-year-totals-tab');
+	});
+
+	it('passes initialTabData through to TabSet when the resolved initial tab is one of the 3 in-scope tabs', async () => {
+		render(
+			<SpeciesPageContent
+				params={{ speciesName: 'Robin' }}
+				data={buildFullFatPageData({
+					initialTabId: 'year-totals',
+					initialTabData: {
+						tabId: 'year-totals',
+						data: [buildCoreStatsRow({ time_period: '2026-01-01' })]
+					}
+				})}
+				viewedGroup={viewedGroup}
+			/>
+		);
+		// Prefetched data renders immediately with no spinner and no client fetch.
+		expect(screen.getByTestId('sp-year-totals-tab')).toBeTruthy();
+		expect(mockFetchYearTotalsTabData).not.toHaveBeenCalled();
+	});
+
+	it('omits initialTabData when the resolved initial tab is one of the 6 not-yet-migrated tabs', async () => {
+		render(
+			<SpeciesPageContent
+				params={{ speciesName: 'Robin' }}
+				data={buildFullFatPageData({ initialTabId: 'highlights' })}
+				viewedGroup={viewedGroup}
+			/>
+		);
+		// TabSet's own tab strip falls back to its own default (`year-totals`)
+		// and fetches client-side, since the real initial tab lives in the old
+		// mechanism's strip instead.
+		await waitFor(() => {
+			expect(mockFetchYearTotalsTabData).toHaveBeenCalled();
+		});
+		await screen.findByTestId('sp-highlights-tab');
+	});
+});
+
+describe('legacy tab rendering for not-yet-migrated tabs', () => {
+	afterEach(() => {
+		cleanup();
+		vi.clearAllMocks();
+	});
+
+	beforeEach(() => {
+		mockFetchYearTotalsTabData.mockResolvedValue([]);
+		mockFetchMonthTotalsTabData.mockResolvedValue([]);
+		mockFetchSessionTotalsTabData.mockResolvedValue([]);
+	});
+
+	it('still renders Highlights/Biometrics/Demographics/Individuals/Combined/Squashed tabs via the existing ConditionalTabPanel mechanism, unaffected by the TabSet changes', async () => {
+		render(
+			<SpeciesPageContent
+				params={{ speciesName: 'Robin' }}
+				data={buildFullFatPageData({ squashedMonth: 3 })}
+				viewedGroup={viewedGroup}
+			/>
+		);
+		const legacyTabs = screen.getByRole('tablist', { name: 'Tabs' });
+		const cases: [string, string][] = [
+			['Year totals', 'sp-squashed-month-year-totals-tab'],
+			['Highlights', 'sp-highlights-tab'],
+			['Biometrics', 'sp-biometrics-tab'],
+			['Demographics', 'sp-demographics-tab'],
+			['Bird list', 'sp-individuals-tab']
+		];
+		for (const [label, testId] of cases) {
+			fireEvent.click(within(legacyTabs).getByRole('button', { name: label }));
+			await screen.findByTestId(testId);
+		}
 	});
 });

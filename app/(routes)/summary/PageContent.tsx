@@ -76,10 +76,9 @@ export function SummaryPageContent({
 	// passed straight through to `SummaryTotalsSection`, which resolves it
 	// against its own per-render `tabs` array.
 	initialTabId?: string;
-	// The one migrated tab's server-prefetched data (#1072's
-	// `prefetchActiveTabData` wiring), passed straight through to
-	// `SummaryTotalsSection`. `undefined` on the squashed-month branch, which
-	// has no migrated tabs of its own.
+	// The active tab's server-prefetched data (#1072/#1068's
+	// `prefetchActiveTabData` wiring), passed straight through to whichever
+	// totals section this branch renders.
 	initialTabData?: { tabId: string; data: unknown };
 }) {
 	return (
@@ -100,6 +99,7 @@ export function SummaryPageContent({
 					sessionTotalsForMonth={sessionTotalsForMonth ?? []}
 					viewedGroup={viewedGroup}
 					initialTabId={initialTabId}
+					initialTabData={initialTabData}
 				/>
 			) : (
 				<SummaryTotalsSection

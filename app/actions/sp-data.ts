@@ -23,6 +23,7 @@ import {
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
 import { buildPageOfBirdsSelect } from '@/queries';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 export async function fetchPageOfBirds(
 	speciesId: number,
 	viewedGroupId: number,
@@ -301,6 +302,65 @@ export async function fetchSpeciesPeriodTotals(
 			group_by_time_period: timeInterval
 		})
 		.then(catchSupabaseErrors) as Promise<CoreStatsResult[]>;
+}
+
+// The single shared `params` shape for the species page's 3 `TabSet`-managed
+// totals tabs (#1065) — `TabSet` forces one `ParamsType` across every tab in
+// its array (app/components/shared/TabSet.tsx; a per-tab `ParamsType` was
+// requested on #1058's PR review but never implemented), so this is a
+// superset of whatever each of the 3 dataFetchers below actually reads:
+// `year` only matters to `fetchMonthTotalsTabData`/`SpMonthTotalsTab`,
+// `monthFilter` only to `fetchSessionTotalsTabData`/`SpSessionTotalsTab`.
+export type SpeciesTotalsTabParams = {
+	speciesName: string;
+	year?: number;
+	fromDate?: string;
+	toDate?: string;
+	monthFilter?: number;
+};
+
+/**
+ * `TabConfig.dataFetcher`s (#1057) for the species page's Year/Month/Session
+ * totals tabs (#1065) — thin wrappers around `fetchSpeciesPeriodTotals` above,
+ * one per tab, matching `(params, viewedGroup) => Promise<DataType | null>`.
+ * Live here rather than on the (`'use client'`) tab components themselves per
+ * this repo's data-fetching convention (CLAUDE.md: data fetching happens in
+ * server actions, never in client components) — `page.tsx`'s server-side
+ * `prefetchActiveTabData` call and each tab's own `TabContent`-driven
+ * client-side fetch both call the same function either way.
+ */
+export async function fetchYearTotalsTabData(
+	params: SpeciesTotalsTabParams,
+	viewedGroup: ViewedGroup
+): Promise<CoreStatsResult[]> {
+	return fetchSpeciesPeriodTotals(params.speciesName, viewedGroup.id, 'year');
+}
+
+export async function fetchMonthTotalsTabData(
+	params: SpeciesTotalsTabParams,
+	viewedGroup: ViewedGroup
+): Promise<CoreStatsResult[]> {
+	return fetchSpeciesPeriodTotals(
+		params.speciesName,
+		viewedGroup.id,
+		'month',
+		params.fromDate,
+		params.toDate
+	);
+}
+
+export async function fetchSessionTotalsTabData(
+	params: SpeciesTotalsTabParams,
+	viewedGroup: ViewedGroup
+): Promise<CoreStatsResult[]> {
+	return fetchSpeciesPeriodTotals(
+		params.speciesName,
+		viewedGroup.id,
+		'day',
+		params.fromDate,
+		params.toDate,
+		params.monthFilter
+	);
 }
 
 /**
