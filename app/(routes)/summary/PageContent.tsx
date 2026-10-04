@@ -45,7 +45,8 @@ export function SummaryPageContent({
 	viewedGroup,
 	fromDate,
 	toDate,
-	initialTabId
+	initialTabId,
+	initialTabData
 }: {
 	year?: number;
 	month?: number;
@@ -75,6 +76,11 @@ export function SummaryPageContent({
 	// passed straight through to `SummaryTotalsSection`, which resolves it
 	// against its own per-render `tabs` array.
 	initialTabId?: string;
+	// The one migrated tab's server-prefetched data (#1072's
+	// `prefetchActiveTabData` wiring), passed straight through to
+	// `SummaryTotalsSection`. `undefined` on the squashed-month branch, which
+	// has no migrated tabs of its own.
+	initialTabData?: { tabId: string; data: unknown };
 }) {
 	return (
 		<PageWrapper>
@@ -108,6 +114,7 @@ export function SummaryPageContent({
 					year={year}
 					month={month}
 					initialTabId={initialTabId}
+					initialTabData={initialTabData}
 				/>
 			)}
 		</PageWrapper>
