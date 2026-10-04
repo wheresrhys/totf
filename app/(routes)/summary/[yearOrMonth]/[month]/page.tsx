@@ -6,7 +6,15 @@ import {
 } from '@/app/components/layout/BootstrapPage';
 import { fetchSummaryStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
-import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
+import {
+	readTabIdSearchParam,
+	resolveInitialTabId,
+	prefetchActiveTabData
+} from '@/app/lib/tab-query-param';
+import type { TabConfig } from '@/app/components/shared/TabContent';
+import { summarySpeciesTotalsTab } from '@/app/components/pages/summary/SummarySpeciesTotalsTab';
+import { summaryHighlightsTab } from '@/app/components/pages/summary/SummaryHighlightsTab';
+import type { SummaryTabParams } from '@/app/components/pages/summary/summary-tab-params';
 import { parseMonthAbbreviation } from '@/app/lib/squashed-month';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
@@ -40,10 +48,26 @@ export type PageData = {
 	sessionTotals: CoreStatsResult[];
 	fromDate: string;
 	toDate: string;
+	initialTabData?: { tabId: string; data: unknown };
 };
 
+// Mirrors `SummaryTotalsSection`'s own `tabs` array for this page shape:
+// `sessionTotals` is always supplied eagerly here, so Session totals is the
+// *eager*, untouched variant — `'session-totals'` has no `dataFetcher`
+// (`prefetchActiveTabData` no-ops for it), and the lazy `summarySessionTotalsTab`
+// never appears on this page at all. No `all-time-month-totals` tab here either.
+const SESSION_TOTALS_TAB_ID = 'session-totals';
+const monthSummaryTabs: Pick<
+	TabConfig<unknown, SummaryTabParams>,
+	'id' | 'dataFetcher'
+>[] = [
+	{ id: SESSION_TOTALS_TAB_ID },
+	summarySpeciesTotalsTab,
+	summaryHighlightsTab
+];
+
 export async function fetchSummaryYearMonthPageContent(
-	{ yearOrMonth, month }: PageParams,
+	{ yearOrMonth, month, tabId }: PageParams,
 	viewedGroupId: number
 ): Promise<PageData> {
 	// A squashed month (e.g. `/summary/jan/5`) has no single year to drill a
@@ -60,13 +84,34 @@ export async function fetchSummaryYearMonthPageContent(
 		fetchSummaryStats(viewedGroupId, fromDate, toDate),
 		fetchPeriodTotals(viewedGroupId, 'day', fromDate, toDate)
 	]);
+	const activeTabId = resolveInitialTabId(
+		tabId,
+		monthSummaryTabs.map((tab) => tab.id),
+		SESSION_TOTALS_TAB_ID
+	);
+	// `totalsStats` is never read by any `dataFetcher` (display-only), so its
+	// value here is irrelevant to fetch correctness.
+	const initialTabData = await prefetchActiveTabData<SummaryTabParams>(
+		monthSummaryTabs,
+		activeTabId,
+		{
+			fromDate,
+			toDate,
+			year: Number(year),
+			month: Number(month),
+			totalsStats: undefined
+		},
+		// See `summary/page.tsx` for why `slug: null` is a safe stand-in here.
+		{ id: viewedGroupId, slug: null }
+	);
 	return {
 		year: Number(year),
 		month: Number(month),
 		summaryStats,
 		sessionTotals,
 		fromDate,
-		toDate
+		toDate,
+		initialTabData
 	};
 }
 
@@ -89,6 +134,7 @@ function YearMonthSummary({
 			fromDate={data.fromDate}
 			toDate={data.toDate}
 			initialTabId={params.tabId}
+			initialTabData={data.initialTabData}
 		/>
 	);
 }
