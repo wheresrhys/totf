@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
 	render,
 	screen,
@@ -6,14 +6,22 @@ import {
 	fireEvent,
 	within
 } from '@testing-library/react';
-import { SessionTabs } from '../SingleSessionData';
-import type { SpeciesWithEncounters } from '../SingleSessionData';
+import { SessionTabs, buildSessionTabs } from '../SessionTabs';
 import type { NetRound } from '@/app/lib/session-chronology';
-import type { SessionEncounter } from '@/app/models/session';
+import type {
+	SessionEncounter,
+	SpeciesWithEncounters
+} from '@/app/models/session';
 import {
 	getCellByHeading,
 	getCellTextByHeading
 } from '@/app/__tests__/helpers/table';
+
+// The Highlights tab fetches through this; mock it as the one collaborator it
+// is, so opening that tab in a test never reaches the real stats pipeline.
+vi.mock('@/app/lib/highlights', () => ({
+	getCondensedHighlightsAtTimePeriod: vi.fn().mockResolvedValue([])
+}));
 
 function makeEncounter(
 	id: number,
@@ -70,34 +78,78 @@ function renderSessionTabs(
 		mistNetSpeciesList: SpeciesWithEncounters[];
 		otherCatchesSpeciesList: SpeciesWithEncounters[];
 		netRounds: NetRound[];
-		viewedGroupId: number;
+		oldestEncounter: SessionEncounter | null;
 		date: string;
 		initialTabId: string;
+		initialTabData: { tabId: string; data: unknown };
 	}> = {}
 ) {
-	const props = {
+	const { initialTabId, initialTabData, ...params } = {
 		mistNetSpeciesList,
 		otherCatchesSpeciesList: [] as SpeciesWithEncounters[],
 		netRounds,
-		viewedGroupId: 1,
+		oldestEncounter: null as SessionEncounter | null,
 		date: '2024-09-15',
 		...overrides
 	};
 	return render(
 		<SessionTabs
-			mistNetSpeciesList={props.mistNetSpeciesList}
-			otherCatchesSpeciesList={props.otherCatchesSpeciesList}
-			netRounds={props.netRounds}
-			viewedGroupId={props.viewedGroupId}
-			date={props.date}
-			initialTabId={props.initialTabId}
+			params={params}
+			viewedGroup={{ id: 1, slug: 'alpha' }}
+			initialTabId={initialTabId}
+			initialTabData={initialTabData}
 		/>
 	);
 }
 
+const tabIdsFor = (gating: {
+	hasMistNetEncounters: boolean;
+	hasOtherCatches: boolean;
+}) => buildSessionTabs(gating).map((tab) => tab.id);
+
 describe('SessionTabs', () => {
 	afterEach(() => {
 		cleanup();
+		vi.clearAllMocks();
+	});
+
+	describe('tab list construction', () => {
+		it('includes the Mist-netting tab only when the day has mist-net encounters', () => {
+			expect(
+				tabIdsFor({ hasMistNetEncounters: true, hasOtherCatches: false })
+			).toContain('mist-netting');
+			expect(
+				tabIdsFor({ hasMistNetEncounters: false, hasOtherCatches: false })
+			).not.toContain('mist-netting');
+		});
+
+		it('includes the Other catches tab only when the day has non-mist-net encounters', () => {
+			expect(
+				tabIdsFor({ hasMistNetEncounters: false, hasOtherCatches: true })
+			).toContain('other-catches');
+			expect(
+				tabIdsFor({ hasMistNetEncounters: false, hasOtherCatches: false })
+			).not.toContain('other-catches');
+		});
+
+		it('always includes Net rounds and Highlights, in that order, after the conditional tabs', () => {
+			expect(
+				tabIdsFor({ hasMistNetEncounters: true, hasOtherCatches: true })
+			).toEqual(['mist-netting', 'other-catches', 'net-rounds', 'highlights']);
+			expect(
+				tabIdsFor({ hasMistNetEncounters: false, hasOtherCatches: false })
+			).toEqual(['net-rounds', 'highlights']);
+		});
+
+		it('gives only the Highlights tab a dataFetcher — the other three take their data from the page-wide fetch', () => {
+			const tabsWithFetchers = buildSessionTabs({
+				hasMistNetEncounters: true,
+				hasOtherCatches: true
+			})
+				.filter((tab) => tab.dataFetcher !== undefined)
+				.map((tab) => tab.id);
+			expect(tabsWithFetchers).toEqual(['highlights']);
+		});
 	});
 
 	it('renders the Mist-netting and Net rounds tab buttons, but not Other catches, by default', () => {
@@ -652,12 +704,45 @@ describe('SessionTabs', () => {
 		});
 	});
 
-	it.skip('renders session highlights in a tab', async () => {
-		renderSessionTabs();
-		expect(screen.getByRole('button', { name: 'Highlights' })).not.toBeNull();
-		fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
-		const highlights = await screen.findByTestId('session-highlights');
-		expect(highlights.textContent).toContain('Highlights');
-		expect(highlights.textContent).toContain('Busiest session ever — 3 birds');
+	describe('Highlights tab data (#1061)', () => {
+		const prefetchedCountLine = {
+			tabId: 'highlights',
+			data: [
+				{
+					category: 'count' as const,
+					key: 'session-total-undefined',
+					text: 'Busiest session ever — 3 birds'
+				}
+			]
+		};
+
+		it('renders prefetched highlights immediately, without a client fetch, when the tab is deep-linked', async () => {
+			const { getCondensedHighlightsAtTimePeriod } =
+				await import('@/app/lib/highlights');
+			renderSessionTabs({
+				initialTabId: 'highlights',
+				initialTabData: prefetchedCountLine
+			});
+			expect(screen.getByTestId('session-highlights').textContent).toContain(
+				'Busiest session ever — 3 birds'
+			);
+			expect(getCondensedHighlightsAtTimePeriod).not.toHaveBeenCalled();
+		});
+
+		it('fetches highlights client-side when the tab is opened without prefetched data', async () => {
+			const { getCondensedHighlightsAtTimePeriod } =
+				await import('@/app/lib/highlights');
+			vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue([]);
+			renderSessionTabs();
+			fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));
+			expect(document.querySelector('.loading')).not.toBeNull();
+			await vi.waitFor(() =>
+				expect(getCondensedHighlightsAtTimePeriod).toHaveBeenCalledWith(
+					1,
+					'2024-09-15',
+					'day'
+				)
+			);
+		});
 	});
 });

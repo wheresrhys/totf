@@ -3,7 +3,12 @@ import { withGroupScope } from '@/app/components/layout/withGroupScope';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
-import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
+import {
+	prefetchActiveTabData,
+	readTabIdSearchParam
+} from '@/app/lib/tab-query-param';
+import { sessionTabPrefetchers } from '@/app/components/pages/session/session-tab-config';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionEncounter } from '@/app/models/session';
 import type { LocationRow } from '@/app/models/db';
 import {
@@ -150,6 +155,38 @@ export async function fetchSessionPageContent({
 
 type PageProps = { params: Promise<{ groupSlug: string; date: string }> };
 
+/**
+ * Resolve the `?tabId=` deep link and, when it names a tab that fetches its
+ * own data, fetch that data here rather than letting the tab fetch it again
+ * after hydration (#1059).
+ *
+ * The prefetch doesn't need the day's encounters, even though the tab list
+ * does: Highlights is the only tab with a `dataFetcher`, and it can never be a
+ * day's *default* tab (it always sits last, behind the always-present Net
+ * rounds tab). So the active tab is only ever prefetchable when the URL asked
+ * for it by name — and `prefetchActiveTabData` already returns `undefined` for
+ * any id it doesn't recognise, which covers a garbage `?tabId=` too.
+ */
+async function resolveSessionTabParams(
+	date: string,
+	viewedGroup: ViewedGroup,
+	searchParams?: Promise<{ tabId?: string }>
+): Promise<Pick<PageParams, 'tabId' | 'prefetchedTabData'>> {
+	const tabId = await readTabIdSearchParam(searchParams);
+	if (!tabId) {
+		return { tabId };
+	}
+	return {
+		tabId,
+		prefetchedTabData: await prefetchActiveTabData(
+			sessionTabPrefetchers,
+			tabId,
+			{ date },
+			viewedGroup
+		)
+	};
+}
+
 export default withGroupScope<{ date: string }>(
 	({ viewedGroup, params, searchParams }) => (
 		<BootstrapPage<DayData, PageProps, PageParams>
@@ -157,7 +194,11 @@ export default withGroupScope<{ date: string }>(
 			getParams={async () => ({
 				viewedGroupId: viewedGroup.id,
 				date: params.date,
-				tabId: await readTabIdSearchParam(searchParams)
+				...(await resolveSessionTabParams(
+					params.date,
+					viewedGroup,
+					searchParams
+				))
 			})}
 			getCacheKeys={() => ['session', params.date]}
 			dataFetcher={fetchSessionPageContent}
