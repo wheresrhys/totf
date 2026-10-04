@@ -88,21 +88,19 @@ export function MistakesPageContent({
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Mistakes</PrimaryHeading>
-			{/* A group with no discrepancies at all has no tabs to show — and
-			    `TabSet` reads `tabs[0].id` for its default, so an empty array
-			    can't be handed to it anyway. */}
-			{tabs.length > 0 && (
-				<TabSet
-					tabs={tabs}
-					params={params}
-					viewedGroup={viewedGroup}
-					initialTabId={resolveInitialTabId(
-						params.tabId,
-						discrepancyTypes,
-						discrepancyTypes[0]
-					)}
-				/>
-			)}
+			{/* A group with no discrepancies at all has no tabs to show;
+			    `TabSet` itself renders nothing for an empty array (#1095), so
+			    no guard is needed here. */}
+			<TabSet
+				tabs={tabs}
+				params={params}
+				viewedGroup={viewedGroup}
+				initialTabId={resolveInitialTabId(
+					params.tabId,
+					discrepancyTypes,
+					discrepancyTypes[0]
+				)}
+			/>
 		</PageWrapper>
 	);
 }

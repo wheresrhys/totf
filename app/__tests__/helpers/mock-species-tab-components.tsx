@@ -23,7 +23,18 @@ vi.mock('@/app/components/pages/species/SpIndividualsTab', () => ({
 }));
 
 vi.mock('@/app/components/pages/species/SpHighlightsTab', () => ({
-	SpHighlightsTab: () => <div data-testid="sp-highlights-tab" />
+	SpHighlightsTab: () => <div data-testid="sp-highlights-tab" />,
+	// `buildSpeciesTotalsTabs` (`species-tabs.ts`) imports the whole
+	// `TabConfig` object, not just the bare component — see
+	// `SpHighlightsTab.tsx`'s own doc comment on why its `dataFetcher` is
+	// assembled there rather than in `app/actions/sp-data.ts`.
+	spHighlightsTab: {
+		id: 'highlights',
+		label: 'Highlights',
+		clientSideOnly: true,
+		dataFetcher: vi.fn().mockResolvedValue(null),
+		TabComponent: () => <div data-testid="sp-highlights-tab" />
+	}
 }));
 
 vi.mock('@/app/components/pages/species/SpDemographicsTab', () => ({

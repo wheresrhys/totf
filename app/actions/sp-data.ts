@@ -23,6 +23,7 @@ import {
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
 import { buildPageOfBirdsSelect } from '@/queries';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 export async function fetchPageOfBirds(
 	speciesId: number,
 	viewedGroupId: number,
@@ -303,6 +304,96 @@ export async function fetchSpeciesPeriodTotals(
 		.then(catchSupabaseErrors) as Promise<CoreStatsResult[]>;
 }
 
+// The single shared `params` shape for the species page's 6 `TabSet`-managed
+// totals tabs (#1065 landed the first 3; #1066 appended the remaining 3) —
+// `TabSet` forces one `ParamsType` across every tab in its array
+// (app/components/shared/TabSet.tsx; a per-tab `ParamsType` was requested on
+// #1058's PR review but never implemented), so this is a superset of
+// whatever each dataFetcher below actually reads: `year` matters to
+// `fetchMonthTotalsTabData`/`SpMonthTotalsTab` and the Highlights
+// dataFetcher, `monthFilter` to `fetchSessionTotalsTabData`/
+// `SpSessionTotalsTab` and (doubling as the squashed calendar month, the same
+// value either way) `fetchSquashedMonthYearTotalsTabData`/
+// `SpSquashedMonthYearTotalsTab`, and `month` only to the Highlights
+// dataFetcher.
+export type SpeciesTotalsTabParams = {
+	speciesName: string;
+	year?: number;
+	month?: number;
+	fromDate?: string;
+	toDate?: string;
+	monthFilter?: number;
+};
+
+/**
+ * `TabConfig.dataFetcher`s (#1057) for the species page's Year/Month/Session
+ * totals tabs (#1065) — thin wrappers around `fetchSpeciesPeriodTotals` above,
+ * one per tab, matching `(params, viewedGroup) => Promise<DataType | null>`.
+ * Live here rather than on the (`'use client'`) tab components themselves per
+ * this repo's data-fetching convention (CLAUDE.md: data fetching happens in
+ * server actions, never in client components) — `page.tsx`'s server-side
+ * `prefetchActiveTabData` call and each tab's own `TabContent`-driven
+ * client-side fetch both call the same function either way.
+ */
+export async function fetchYearTotalsTabData(
+	params: SpeciesTotalsTabParams,
+	viewedGroup: ViewedGroup
+): Promise<CoreStatsResult[]> {
+	return fetchSpeciesPeriodTotals(params.speciesName, viewedGroup.id, 'year');
+}
+
+export async function fetchMonthTotalsTabData(
+	params: SpeciesTotalsTabParams,
+	viewedGroup: ViewedGroup
+): Promise<CoreStatsResult[]> {
+	return fetchSpeciesPeriodTotals(
+		params.speciesName,
+		viewedGroup.id,
+		'month',
+		params.fromDate,
+		params.toDate
+	);
+}
+
+export async function fetchSessionTotalsTabData(
+	params: SpeciesTotalsTabParams,
+	viewedGroup: ViewedGroup
+): Promise<CoreStatsResult[]> {
+	return fetchSpeciesPeriodTotals(
+		params.speciesName,
+		viewedGroup.id,
+		'day',
+		params.fromDate,
+		params.toDate,
+		params.monthFilter
+	);
+}
+
+/**
+ * `TabConfig.dataFetcher` (#1066) for the squashed-month species page's own
+ * "Year totals" tab — one row per year, scoped to a single calendar month
+ * across the group's whole history. Thin wrapper around
+ * `fetchSpeciesPeriodTotals`, same arguments/shape
+ * `SpSquashedMonthYearTotalsTab`'s own handrolled `useEffect` fetch used
+ * before this migration. Reuses `monthFilter` for the squashed calendar
+ * month rather than adding a second field to `SpeciesTotalsTabParams` — it's
+ * the same value `fetchSessionTotalsTabData` already reads for the same
+ * purpose (a specific calendar month to scope sessions to).
+ */
+export async function fetchSquashedMonthYearTotalsTabData(
+	params: SpeciesTotalsTabParams,
+	viewedGroup: ViewedGroup
+): Promise<CoreStatsResult[]> {
+	return fetchSpeciesPeriodTotals(
+		params.speciesName,
+		viewedGroup.id,
+		'year',
+		undefined,
+		undefined,
+		params.monthFilter
+	);
+}
+
 /**
  * One row per calendar month for a single species, summed across the group's
  * entire history via `core_stats`' `'month-squashed'` `group_by_time_period`
@@ -322,4 +413,32 @@ export async function fetchSpeciesCombinedMonthTotals(
 			group_by_time_period: 'month-squashed'
 		})
 		.then(catchSupabaseErrors) as Promise<CoreStatsResult[]>;
+}
+
+// Data shape for the all-time species page's "Month totals" tab (#1066) —
+// both the "Combine years OFF" per-(year, month) rows and the "ON" true
+// cross-year aggregate per calendar month, fetched in parallel exactly as
+// `SpCombinedMonthTotalsTab`'s own `useLazyTabData` call did before this
+// migration.
+export type SpCombinedMonthTotalsData = {
+	monthlyStats: CoreStatsResult[];
+	monthSquashedStats: CoreStatsResult[];
+};
+
+/**
+ * `TabConfig.dataFetcher` (#1066) for the all-time species page's "Month
+ * totals" tab — thin wrapper around `fetchSpeciesPeriodTotals` +
+ * `fetchSpeciesCombinedMonthTotals`, same two parallel calls/arguments
+ * `SpCombinedMonthTotalsTab`'s own `useLazyTabData` call made before this
+ * migration.
+ */
+export async function fetchCombinedMonthTotalsTabData(
+	params: SpeciesTotalsTabParams,
+	viewedGroup: ViewedGroup
+): Promise<SpCombinedMonthTotalsData> {
+	const [monthlyStats, monthSquashedStats] = await Promise.all([
+		fetchSpeciesPeriodTotals(params.speciesName, viewedGroup.id, 'month'),
+		fetchSpeciesCombinedMonthTotals(params.speciesName, viewedGroup.id)
+	]);
+	return { monthlyStats, monthSquashedStats };
 }

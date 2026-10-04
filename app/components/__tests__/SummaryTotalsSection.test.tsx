@@ -117,6 +117,76 @@ describe('SummaryTotalsSection', () => {
 		fetchPeriodTotalsMock.mockReset();
 	});
 
+	describe('initial render (lazy-mount)', () => {
+		it("renders only the default-active tab's content on first render — other configured tabs' content is absent, not merely hidden, until first selected", () => {
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildCoreStatsRow()]}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			expect(screen.getByRole('table')).toBeTruthy();
+			// Species totals, not yet selected, hasn't mounted at all — absent
+			// from the DOM entirely, not merely hidden behind an `aria-hidden`
+			// wrapper.
+			expect(screen.queryByTestId('species-totals-table')).toBeNull();
+			expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('tab switching preserves fetched state (hide, not unmount)', () => {
+		it("keeps a previously-active tab's content mounted-but-hidden rather than unmounted after switching away", async () => {
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildCoreStatsRow()]}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
+			await waitFor(() =>
+				expect(fetchSpeciesDataMock).toHaveBeenCalledTimes(1)
+			);
+
+			fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
+
+			// Species totals' panel is still in the DOM — not unmounted — just
+			// hidden behind `ConditionalTabPanel`'s `aria-hidden` wrapper.
+			const speciesPanel = screen
+				.getByTestId('species-totals-table')
+				.closest('[aria-hidden="true"]');
+			expect(speciesPanel).toBeTruthy();
+		});
+	});
+
+	describe('Year totals tab (prop-fed, no dataFetcher)', () => {
+		it('renders yearlyTotals rows immediately, with no loading state and no dataFetcher call', () => {
+			render(
+				<SummaryTotalsSection
+					yearlyTotals={[buildCoreStatsRow()]}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			expect(screen.getByRole('table')).toBeTruthy();
+			expect(document.querySelector('.loading-spinner')).toBeNull();
+		});
+	});
+
+	describe('Month totals tab (prop-fed, no dataFetcher)', () => {
+		it('renders monthTotals rows immediately, with no loading state and no dataFetcher call', () => {
+			const populatedMonthTotals = buildMonthTotalsRows(2026, [
+				buildCoreStatsRow({ time_period: '2026-03-01', session_count: 5 })
+			]);
+			render(
+				<SummaryTotalsSection
+					monthTotals={populatedMonthTotals}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			expect(screen.getByRole('table')).toBeTruthy();
+			expect(document.querySelector('.loading-spinner')).toBeNull();
+		});
+	});
+
 	describe('with monthTotals (year page)', () => {
 		it('renders the "Month totals" tab first, active by default', () => {
 			render(
@@ -143,7 +213,9 @@ describe('SummaryTotalsSection', () => {
 					viewedGroup={viewedGroup}
 				/>
 			);
-			expect(document.querySelectorAll('tbody tr').length).toBe(12);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(12);
 			const januaryLink = screen.getByRole('link', { name: 'January 2026' });
 			expect(januaryLink.getAttribute('href')).toBe(
 				'/group/alpha/summary/2026/1'
@@ -163,9 +235,9 @@ describe('SummaryTotalsSection', () => {
 			);
 			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
 			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(
-					speciesStats.length
-				)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(speciesStats.length)
 			);
 			expect(screen.queryByRole('link', { name: 'January 2026' })).toBeNull();
 		});
@@ -259,9 +331,9 @@ describe('SummaryTotalsSection', () => {
 			);
 			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
 			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(
-					speciesStats.length
-				)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(speciesStats.length)
 			);
 			expect(
 				screen.queryByRole('link', { name: '16th August 2026' })
@@ -275,7 +347,9 @@ describe('SummaryTotalsSection', () => {
 					viewedGroup={viewedGroup}
 				/>
 			);
-			expect(document.querySelectorAll('tbody tr').length).toBe(1);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(1);
 			expect(
 				screen
 					.getByRole('link', { name: '16th August 2026' })
@@ -383,9 +457,9 @@ describe('SummaryTotalsSection', () => {
 					.getAttribute('aria-current')
 			).toBe('true');
 			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(
-					speciesStats.length
-				)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(speciesStats.length)
 			);
 		});
 
@@ -453,7 +527,9 @@ describe('SummaryTotalsSection', () => {
 				await waitFor(() =>
 					// Hide default: only January and August (the two nonzero rows in
 					// the mocked month-squashed data) show.
-					expect(document.querySelectorAll('tbody tr').length).toBe(2)
+					expect(
+						screen.getByRole('table').querySelectorAll('tbody tr').length
+					).toBe(2)
 				);
 				['January', 'August'].forEach((monthName) => {
 					expect(screen.getByText(monthName)).toBeTruthy();
@@ -470,7 +546,9 @@ describe('SummaryTotalsSection', () => {
 				render(<SummaryTotalsSection {...allTimeProps} />);
 				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 				await waitFor(() =>
-					expect(document.querySelectorAll('tbody tr').length).toBe(2)
+					expect(
+						screen.getByRole('table').querySelectorAll('tbody tr').length
+					).toBe(2)
 				);
 				const encountersIndex = getColumnIndex('Encounters');
 				const busiestSessionIndex = getColumnIndex('Busiest session');
@@ -485,7 +563,9 @@ describe('SummaryTotalsSection', () => {
 				render(<SummaryTotalsSection {...allTimeProps} />);
 				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 				await waitFor(() =>
-					expect(document.querySelectorAll('tbody tr').length).toBe(2)
+					expect(
+						screen.getByRole('table').querySelectorAll('tbody tr').length
+					).toBe(2)
 				);
 				const table = screen.getByRole('table');
 				expect(getCellTextByHeading(table, 'Species', 'January')).toBe('7');
@@ -528,7 +608,9 @@ describe('SummaryTotalsSection', () => {
 				);
 				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 				await waitFor(() =>
-					expect(document.querySelectorAll('tbody tr').length).toBe(2)
+					expect(
+						screen.getByRole('table').querySelectorAll('tbody tr').length
+					).toBe(2)
 				);
 				const table = screen.getByRole('table');
 				// monthlyPeriodStats' two January rows sum to 58 (25 + 33) — the fix
@@ -541,7 +623,9 @@ describe('SummaryTotalsSection', () => {
 				render(<SummaryTotalsSection {...allTimeProps} />);
 				fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 				await waitFor(() =>
-					expect(document.querySelectorAll('tbody tr').length).toBe(2)
+					expect(
+						screen.getByRole('table').querySelectorAll('tbody tr').length
+					).toBe(2)
 				);
 				const bird = screen.getByRole('radio', {
 					name: 'Bird'
@@ -563,7 +647,9 @@ describe('SummaryTotalsSection', () => {
 					await waitFor(() =>
 						// Hide default: only January and August (the nonzero rows in the
 						// mocked month-squashed data) show.
-						expect(document.querySelectorAll('tbody tr').length).toBe(2)
+						expect(
+							screen.getByRole('table').querySelectorAll('tbody tr').length
+						).toBe(2)
 					);
 					expect(
 						(
@@ -592,12 +678,16 @@ describe('SummaryTotalsSection', () => {
 					render(<SummaryTotalsSection {...allTimeProps} />);
 					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 					await waitFor(() =>
-						expect(document.querySelectorAll('tbody tr').length).toBe(2)
+						expect(
+							screen.getByRole('table').querySelectorAll('tbody tr').length
+						).toBe(2)
 					);
 
 					fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
 
-					expect(document.querySelectorAll('tbody tr').length).toBe(3);
+					expect(
+						screen.getByRole('table').querySelectorAll('tbody tr').length
+					).toBe(3);
 					expect(
 						screen
 							.getByRole('link', { name: 'January 2020' })
@@ -626,14 +716,20 @@ describe('SummaryTotalsSection', () => {
 					render(<SummaryTotalsSection {...allTimeProps} />);
 					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 					await waitFor(() =>
-						expect(document.querySelectorAll('tbody tr').length).toBe(2)
+						expect(
+							screen.getByRole('table').querySelectorAll('tbody tr').length
+						).toBe(2)
 					);
 
 					fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
-					expect(document.querySelectorAll('tbody tr').length).toBe(3);
+					expect(
+						screen.getByRole('table').querySelectorAll('tbody tr').length
+					).toBe(3);
 
 					fireEvent.click(screen.getByRole('radio', { name: 'Combined' }));
-					expect(document.querySelectorAll('tbody tr').length).toBe(2);
+					expect(
+						screen.getByRole('table').querySelectorAll('tbody tr').length
+					).toBe(2);
 					expect(
 						(
 							screen.getByRole('radio', {
@@ -649,7 +745,9 @@ describe('SummaryTotalsSection', () => {
 					render(<SummaryTotalsSection {...allTimeProps} />);
 					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 					await waitFor(() =>
-						expect(document.querySelectorAll('tbody tr').length).toBe(2)
+						expect(
+							screen.getByRole('table').querySelectorAll('tbody tr').length
+						).toBe(2)
 					);
 
 					expect(getCellTextByHeading('Pulli', 0)).toBe('2');
@@ -671,12 +769,16 @@ describe('SummaryTotalsSection', () => {
 					await waitFor(() =>
 						// Combined (default) view uses the mocked month-squashed rows,
 						// unaffected by the fetchPeriodStatsMock override above.
-						expect(document.querySelectorAll('tbody tr').length).toBe(2)
+						expect(
+							screen.getByRole('table').querySelectorAll('tbody tr').length
+						).toBe(2)
 					);
 
 					fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
 					await waitFor(() =>
-						expect(document.querySelectorAll('tbody tr').length).toBe(1)
+						expect(
+							screen.getByRole('table').querySelectorAll('tbody tr').length
+						).toBe(1)
 					);
 
 					expect(getCellTextByHeading('Pulli', 0)).toBe('2');
@@ -691,7 +793,9 @@ describe('SummaryTotalsSection', () => {
 					render(<SummaryTotalsSection {...allTimeProps} />);
 					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 					await waitFor(() =>
-						expect(document.querySelectorAll('tbody tr').length).toBe(2)
+						expect(
+							screen.getByRole('table').querySelectorAll('tbody tr').length
+						).toBe(2)
 					);
 					expect(fetchPeriodStatsMock).toHaveBeenCalledTimes(1);
 					expect(fetchCombinedMonthTotalsMock).toHaveBeenCalledTimes(1);
@@ -712,12 +816,16 @@ describe('SummaryTotalsSection', () => {
 					render(<SummaryTotalsSection {...allTimeProps} />);
 					fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 					await waitFor(() =>
-						expect(document.querySelectorAll('tbody tr').length).toBe(2)
+						expect(
+							screen.getByRole('table').querySelectorAll('tbody tr').length
+						).toBe(2)
 					);
 
 					fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
 
-					expect(document.querySelectorAll('tbody tr').length).toBe(2);
+					expect(
+						screen.getByRole('table').querySelectorAll('tbody tr').length
+					).toBe(2);
 				});
 			});
 		});
@@ -818,9 +926,9 @@ describe('SummaryTotalsSection', () => {
 			fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
 			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
 			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(
-					speciesStats.length
-				)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(speciesStats.length)
 			);
 			expect(fetchSpeciesDataMock).toHaveBeenCalledTimes(1);
 		});
@@ -876,7 +984,9 @@ describe('SummaryTotalsSection', () => {
 					viewedGroup={viewedGroup}
 				/>
 			);
-			expect(document.querySelectorAll('tbody tr').length).toBe(2);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(2);
 			expect(
 				(screen.getByRole('radio', { name: 'Hide' }) as HTMLInputElement)
 					.checked
@@ -893,7 +1003,9 @@ describe('SummaryTotalsSection', () => {
 				/>
 			);
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(12);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(12);
 		});
 
 		it('has no visible effect for a year with no empty months', () => {
@@ -913,9 +1025,13 @@ describe('SummaryTotalsSection', () => {
 				/>
 			);
 			// Hide default has nothing to filter, since no month is empty.
-			expect(document.querySelectorAll('tbody tr').length).toBe(12);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(12);
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(12);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(12);
 		});
 
 		it('shows exactly one month for a year that is empty except one', () => {
@@ -928,11 +1044,29 @@ describe('SummaryTotalsSection', () => {
 					viewedGroup={viewedGroup}
 				/>
 			);
-			expect(document.querySelectorAll('tbody tr').length).toBe(1);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(1);
 			expect(screen.getByText('August 2026')).toBeTruthy();
 		});
+	});
 
-		it('resets to Hide after switching to another tab and back', async () => {
+	// #1067: `SummaryMonthTotalsTab` now renders through the shared `TabSet`'s
+	// `ConditionalTabPanel` hide-not-unmount mechanism rather than the old
+	// `{activeTab === ... && (...)}` JSX that fully unmounted it on every tab
+	// switch — so `hideEmptyMonths` now PERSISTS for the rest of the page view
+	// once this tab has first loaded, instead of resetting to its default each
+	// time it's reselected. This inverts the pre-#1067 "resets to Hide after
+	// switching to another tab and back" assumption: a deliberate, accepted
+	// consequence of hide-not-unmount (same as every other converged tab's
+	// local UI state), not a regression.
+	describe('SummaryMonthTotalsTab — hideEmptyMonths persists across tab switches', () => {
+		const populatedMonthTotals = buildMonthTotalsRows(2026, [
+			buildCoreStatsRow({ time_period: '2026-03-01', session_count: 5 }),
+			buildCoreStatsRow({ time_period: '2026-07-01', session_count: 2 })
+		]);
+
+		it('does not reset the hideEmptyMonths toggle back to its default when the Month totals tab is deselected and reselected', async () => {
 			render(
 				<SummaryTotalsSection
 					monthTotals={populatedMonthTotals}
@@ -940,13 +1074,15 @@ describe('SummaryTotalsSection', () => {
 				/>
 			);
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(12);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(12);
 
 			fireEvent.click(screen.getByRole('button', { name: 'Species totals' }));
 			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(
-					speciesStats.length
-				)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(speciesStats.length)
 			);
 			// Species totals is one of #1072's migrated tabs, so it now stays
 			// mounted-but-hidden (not unmounted) once loaded — switching back to
@@ -957,12 +1093,12 @@ describe('SummaryTotalsSection', () => {
 			// Species totals' still-mounted rows alongside Month totals'.
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 			expect(
-				screen.getByRole('table').querySelectorAll('tbody tr').length
-			).toBe(2);
-			expect(
-				(screen.getByRole('radio', { name: 'Hide' }) as HTMLInputElement)
+				(screen.getByRole('radio', { name: 'Show' }) as HTMLInputElement)
 					.checked
 			).toBe(true);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(12);
 		});
 	});
 
@@ -979,7 +1115,9 @@ describe('SummaryTotalsSection', () => {
 			await waitFor(() =>
 				// The mocked month-squashed data has two non-empty months: January
 				// and August.
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(2)
 			);
 			expect(
 				(screen.getByRole('radio', { name: 'Hide' }) as HTMLInputElement)
@@ -993,10 +1131,14 @@ describe('SummaryTotalsSection', () => {
 			render(<SummaryTotalsSection {...allTimeProps} />);
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(2)
 			);
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(12);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(12);
 		});
 
 		it('shows zero-session months in the by-year view when toggled to Show', async () => {
@@ -1009,17 +1151,23 @@ describe('SummaryTotalsSection', () => {
 			await waitFor(() =>
 				// Combined (default) view uses the mocked month-squashed rows,
 				// unaffected by the fetchPeriodStatsMock override above.
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(2)
 			);
 			fireEvent.click(screen.getByRole('radio', { name: 'By year' }));
 			await waitFor(() =>
 				// The August row (session_count 0) is dropped by default; January
 				// (4) stays.
-				expect(document.querySelectorAll('tbody tr').length).toBe(1)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(1)
 			);
 			expect(screen.getByText('January 2020')).toBeTruthy();
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(2);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(2);
 			expect(screen.getByText('August 2020')).toBeTruthy();
 		});
 
@@ -1036,10 +1184,14 @@ describe('SummaryTotalsSection', () => {
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 			await waitFor(() =>
 				// Hide default has nothing to filter, since no month is empty.
-				expect(document.querySelectorAll('tbody tr').length).toBe(12)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(12)
 			);
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(12);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(12);
 		});
 
 		// Inverted per #1072: this panel now renders through `ConditionalTabPanel`'s
@@ -1053,10 +1205,14 @@ describe('SummaryTotalsSection', () => {
 			render(<SummaryTotalsSection {...allTimeProps} />);
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
 			await waitFor(() =>
-				expect(document.querySelectorAll('tbody tr').length).toBe(2)
+				expect(
+					screen.getByRole('table').querySelectorAll('tbody tr').length
+				).toBe(2)
 			);
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(12);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(12);
 
 			fireEvent.click(screen.getByRole('button', { name: 'Year totals' }));
 			fireEvent.click(screen.getByRole('button', { name: 'Month totals' }));
@@ -1064,7 +1220,9 @@ describe('SummaryTotalsSection', () => {
 				(screen.getByRole('radio', { name: 'Show' }) as HTMLInputElement)
 					.checked
 			).toBe(true);
-			expect(document.querySelectorAll('tbody tr').length).toBe(12);
+			expect(
+				screen.getByRole('table').querySelectorAll('tbody tr').length
+			).toBe(12);
 		});
 	});
 });

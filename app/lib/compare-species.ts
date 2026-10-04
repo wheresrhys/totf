@@ -2,13 +2,14 @@
  * Selection + URL plumbing for the species-comparison page (#115,
  * `/compare/species?name=x&name=y`).
  *
- * The page's whole state is which species are selected and which of the three
- * by-species stats datasets is on show. Only the species selection is
- * URL-addressable (repeated `?name=` params, so a comparison can be
- * bookmarked/shared), so everything that reads or writes that param lives here
- * rather than in the page's client component — the route's `page.tsx` needs the
- * parse half on the server, the content component needs the build/toggle halves
- * on the client.
+ * The page's whole state is which species are selected and which by-species
+ * stats dataset is on show. Everything that reads or writes the species
+ * selection's repeated `?name=` params (so a comparison can be
+ * bookmarked/shared) lives here rather than in the page's client component —
+ * the route's `page.tsx` needs the parse half on the server, the content
+ * component needs the build/toggle halves on the client. The dataset half is
+ * now plain `?tabId=` tab state, owned by `TabSet` and
+ * `app/components/pages/compare-species/compare-species-tab-params.ts`.
  *
  * Deliberately free of React and of any table/column concerns: the column
  * definitions for each dataset live next to the components that render them
@@ -17,23 +18,6 @@
 
 /** The repeated multi-value query-string param carrying the selection. */
 export const SPECIES_QUERY_PARAM = 'name';
-
-export type ComparisonDatasetId = 'core' | 'biometrics' | 'demographics';
-
-/**
- * The dataset toggle's tabs, in display order. `core` is the default (the
- * ticket's "by default loads core_stats data"), which is why it is listed
- * first — the page reads its initial dataset off this list's head rather than
- * repeating the literal.
- */
-export const comparisonDatasetTabs: {
-	id: ComparisonDatasetId;
-	label: string;
-}[] = [
-	{ id: 'core', label: 'Core stats' },
-	{ id: 'biometrics', label: 'Biometrics' },
-	{ id: 'demographics', label: 'Demographics' }
-];
 
 /**
  * Normalise Next.js' `searchParams.name` into a species list. Next gives a

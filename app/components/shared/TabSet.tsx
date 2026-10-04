@@ -44,6 +44,16 @@ export type TabSetTabConfig<SharedParamsType, OwnParamsType> = TabConfigInSet<
  *
  * Pure composition: it adds no state of its own beyond what `useLinkableTabs`
  * already owns.
+ *
+ * An empty `tabs` array renders nothing (#1095) rather than throwing on the
+ * unguarded `tabs[0]` a default tab id needs — a data-driven tab list (e.g.
+ * Mistakes, whose tabs are one per discrepancy type actually found) can
+ * legitimately have zero entries, and that's a normal empty state, not a bug
+ * to defend against in every such caller. `useLinkableTabs` is still called
+ * unconditionally above the empty check, same as any other hook — React
+ * requires that regardless of what this render ends up returning; feeding it
+ * an empty `tabIds`/a fallback `''` default is harmless since nothing reads
+ * `activeTab` once the component bails out to `null`.
  */
 export function TabSet<
 	SharedParamsType,
@@ -70,9 +80,13 @@ export function TabSet<
 }) {
 	const { activeTab, loadedTabs, selectTab } = useLinkableTabs({
 		tabIds: tabs.map((tab) => tab.id),
-		defaultTabId: tabs[0].id,
+		defaultTabId: tabs[0]?.id ?? '',
 		initialTabId
 	});
+
+	if (tabs.length === 0) {
+		return null;
+	}
 
 	return (
 		<>

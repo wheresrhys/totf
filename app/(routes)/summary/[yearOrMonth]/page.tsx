@@ -13,10 +13,18 @@ import {
 	prefetchActiveTabData
 } from '@/app/lib/tab-query-param';
 import type { TabConfig } from '@/app/components/shared/TabContent';
-import { summarySpeciesTotalsTab } from '@/app/components/pages/summary/SummarySpeciesTotalsTab';
-import { summaryHighlightsTab } from '@/app/components/pages/summary/SummaryHighlightsTab';
-import { summarySessionTotalsTab } from '@/app/components/pages/summary/SummarySessionTotalsTab';
+// From the plain (non-`'use client'`) prefetcher module, never by dotting into
+// a tab's `'use client'` `TabConfig` — see that module's header comment (#1096).
+import {
+	yearSummaryPrefetchers,
+	MONTH_TOTALS_TAB_ID
+} from '@/app/components/pages/summary/summary-tab-prefetchers';
 import type { SummaryTabParams } from '@/app/components/pages/summary/summary-tab-params';
+import {
+	SQUASHED_MONTH_TAB_IDS,
+	SQUASHED_MONTH_SPECIES_TOTALS_TAB_ID,
+	type SquashedMonthTabParams
+} from '@/app/components/pages/summary/squashed-month-tab-params';
 import { parseMonthAbbreviation } from '@/app/lib/squashed-month';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
@@ -66,26 +74,30 @@ export type PageData =
 			speciesTotalsForMonth: SpeciesStatsRow[];
 			yearTotalsForMonth: CoreStatsResult[];
 			sessionTotalsForMonth: CoreStatsResult[];
+			initialTabData?: { tabId: string; data: unknown };
 	  };
 
-// Mirrors `SummaryTotalsSection`'s own `tabs` array for this page shape
-// (`monthTotals` always set, `showAllTimeMonthTotals` never set here, session
-// totals always lazy here since this page never supplies `sessionTotals`) —
-// `'month-totals'` has no `dataFetcher` since Month totals stays eager/inline,
-// so `prefetchActiveTabData` simply no-ops for it.
-const MONTH_TOTALS_TAB_ID = 'month-totals';
-const yearSummaryTabs: Pick<
-	TabConfig<unknown, SummaryTabParams>,
+// The squashed-month variant's 4 tabs (`SquashedMonthSummaryTotalsSection`),
+// for `resolveInitialTabId`/`prefetchActiveTabData`. Every entry is id-only:
+//  - Species/Year/Session totals have no `dataFetcher` by design — this page's
+//    own fetch below already has their rows, which reach them through
+//    `TabSet`'s shared params.
+//  - Highlights does have a `dataFetcher`, deliberately not offered here:
+//    highlights generation is a client-side decision (#1089), and
+//    `squashedMonthHighlightsTab` is `clientSideOnly` accordingly, so
+//    `prefetchActiveTabData` would decline to run it even if it were listed.
+// The ids themselves come from `squashed-month-tab-params.ts`, a plain module,
+// so they are real strings here rather than client references (#1096).
+// So the prefetch below always resolves to `undefined` today, and the
+// `?tabId=`-focused tab fetches for itself on mount, as it did before.
+const squashedMonthSummaryTabs: Pick<
+	TabConfig<unknown, SquashedMonthTabParams>,
 	'id' | 'dataFetcher'
->[] = [
-	{ id: MONTH_TOTALS_TAB_ID },
-	summarySessionTotalsTab,
-	summarySpeciesTotalsTab,
-	summaryHighlightsTab
-];
+>[] = SQUASHED_MONTH_TAB_IDS.map((id) => ({ id }));
 
 async function fetchSummarySquashedMonthPageContent(
 	squashedMonth: number,
+	tabId: string | undefined,
 	viewedGroupId: number
 ): Promise<PageData> {
 	const [
@@ -105,12 +117,31 @@ async function fetchSummarySquashedMonthPageContent(
 		),
 		fetchPeriodStats(viewedGroupId, 'day', undefined, undefined, squashedMonth)
 	]);
+	const activeTabId = resolveInitialTabId(
+		tabId,
+		SQUASHED_MONTH_TAB_IDS,
+		SQUASHED_MONTH_SPECIES_TOTALS_TAB_ID
+	);
+	const initialTabData = await prefetchActiveTabData(
+		squashedMonthSummaryTabs,
+		activeTabId,
+		{
+			squashedMonth,
+			totalsStats: undefined,
+			speciesTotalsForMonth,
+			yearTotalsForMonth,
+			sessionTotalsForMonth
+		},
+		// See `summary/page.tsx` for why `slug: null` is a safe stand-in here.
+		{ id: viewedGroupId, slug: null }
+	);
 	return {
 		squashedMonth,
 		summaryStats,
 		speciesTotalsForMonth,
 		yearTotalsForMonth,
-		sessionTotalsForMonth
+		sessionTotalsForMonth,
+		initialTabData
 	};
 }
 
@@ -120,7 +151,11 @@ export async function fetchSummaryYearOrMonthPageContent(
 ): Promise<PageData> {
 	const squashedMonth = parseMonthAbbreviation(yearOrMonth);
 	if (squashedMonth !== undefined) {
-		return fetchSummarySquashedMonthPageContent(squashedMonth, viewedGroupId);
+		return fetchSummarySquashedMonthPageContent(
+			squashedMonth,
+			tabId,
+			viewedGroupId
+		);
 	}
 	const fromDate = `${yearOrMonth}-01-01`;
 	const toDate = `${yearOrMonth}-12-31`;
@@ -131,7 +166,7 @@ export async function fetchSummaryYearOrMonthPageContent(
 	]);
 	const activeTabId = resolveInitialTabId(
 		tabId,
-		yearSummaryTabs.map((tab) => tab.id),
+		yearSummaryPrefetchers.map((tab) => tab.id),
 		MONTH_TOTALS_TAB_ID
 	);
 	// `totalsStats` is never read by any `dataFetcher` (display-only), so its
@@ -140,7 +175,7 @@ export async function fetchSummaryYearOrMonthPageContent(
 		SummaryTabParams,
 		SummaryTabParams[]
 	>(
-		yearSummaryTabs,
+		yearSummaryPrefetchers,
 		activeTabId,
 		{ fromDate, toDate, year, totalsStats: undefined },
 		// See `summary/page.tsx` for why `slug: null` is a safe stand-in here.
@@ -175,6 +210,7 @@ function YearOrMonthSummary({
 				sessionTotalsForMonth={data.sessionTotalsForMonth}
 				viewedGroup={viewedGroup}
 				initialTabId={params.tabId}
+				initialTabData={data.initialTabData}
 			/>
 		);
 	}

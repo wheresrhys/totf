@@ -1,11 +1,10 @@
 'use client';
-import { useCallback, useState } from 'react';
-import {
-	fetchSpeciesPeriodTotals,
-	fetchSpeciesCombinedMonthTotals
+import { useState } from 'react';
+import type {
+	SpeciesTotalsTabParams,
+	SpCombinedMonthTotalsData
 } from '@/app/actions/sp-data';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
-import { useLazyTabData } from '@/app/components/shared/useLazyTabData';
 import {
 	buildCombinedMonthTotalsRows,
 	buildPerYearMonthTotalsRows,
@@ -16,69 +15,38 @@ import {
 import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
 import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
 import { buildSpeciesSquashedMonthHref } from '@/app/lib/squashed-month';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
-// The all-time species page's combine-years "Month totals" tab — the
-// species-scoped counterpart to `SummaryTotalsSection`'s
-// `ALL_TIME_MONTH_TOTALS_TAB`. Fetches both the raw per-`(year, month)` rows
-// (for "Combine years OFF") and the true cross-year aggregate per calendar
-// month via `core_stats`' `'month-squashed'` mode (#996, for "ON") — the same
-// two-fetch shape `SummaryTotalsSection` uses.
+// Pure, presentational `TabConfig.TabComponent` (#1066) — see
+// `SpYearTotalsTab`'s doc comment for why `data` is typed `unknown` and cast
+// back to this tab's real shape immediately. Fetching/loading/error state now
+// lives in `TabContent` (#1057), driven by `fetchCombinedMonthTotalsTabData`
+// (`app/actions/sp-data.ts`) via `TabSet`/`buildSpeciesTotalsTabs`
+// (`species-tabs.ts`) — previously this component called `useLazyTabData`
+// itself, gated by an explicit `isActive` prop; both are gone now that
+// `TabContent` owns that lifecycle.
 export function SpCombinedMonthTotalsTab({
-	speciesName,
-	viewedGroupId,
-	isActive
+	params,
+	data
 }: {
-	speciesName: string;
-	viewedGroupId: number;
-	// Gates the lazy fetch — true once this tab is the selected tab. Unlike
-	// `SpYearTotalsTab`/`SpMonthTotalsTab` (which rely solely on
-	// `SpeciesPageContent`'s `ConditionalTabPanel` deferring their mount), this
-	// tab uses #633's
-	// `useLazyTabData` explicitly, per this ticket's reuse requirement.
-	isActive: boolean;
+	params: SpeciesTotalsTabParams;
+	data: unknown;
+	viewedGroup: ViewedGroup;
 }) {
-	// The "Combine years OFF" view needs the raw per-(year, month) rows; the
-	// "ON" view needs the true cross-year aggregate per calendar month, fetched
-	// separately via `core_stats`' `'month-squashed'` mode (#996) rather than
-	// folded client-side from the per-year rows (that would double-count any
-	// distinct-count column, e.g. `bird_count`, for a bird retrapped in the same
-	// calendar month in more than one year).
-	const fetchCombinedMonthStats = useCallback(async () => {
-		const [monthlyStats, monthSquashedStats] = await Promise.all([
-			fetchSpeciesPeriodTotals(speciesName, viewedGroupId, 'month'),
-			fetchSpeciesCombinedMonthTotals(speciesName, viewedGroupId)
-		]);
-		return { monthlyStats, monthSquashedStats };
-	}, [speciesName, viewedGroupId]);
-	const { data, isLoading } = useLazyTabData(
-		isActive,
-		fetchCombinedMonthStats,
-		{
-			onError: (error) =>
-				console.error('Failed to fetch species combined month totals', {
-					speciesName,
-					viewedGroupId,
-					error
-				})
-		}
-	);
+	const { speciesName } = params;
+	const { monthlyStats, monthSquashedStats } =
+		(data as SpCombinedMonthTotalsData | null) ?? {
+			monthlyStats: [],
+			monthSquashedStats: []
+		};
+
 	// Defaults to ON (combined) — resets each time this tab remounts, mirroring
-	// `SummaryTotalsSection`'s `AllTimeMonthTotalsTab`, since this component
-	// itself never unmounts across tab switches (`SpeciesPageContent`'s tab nav
-	// keeps it mounted via `isActive`).
+	// `SummaryTotalsSection`'s `AllTimeMonthTotalsTab`, since `TabSet`'s
+	// `ConditionalTabPanel` unmounts this tab on every tab switch.
 	const [combineYears, setCombineYears] = useState(true);
 	// Independent of `combineYears` — applies to whichever view is shown, and
 	// resets to Hide (`true`) on tab remount alongside `combineYears`.
 	const [hideEmptyMonths, setHideEmptyMonths] = useState(true);
-
-	if (isLoading || data === undefined) {
-		return (
-			<div className="flex items-center justify-center">
-				<div className="loading loading-spinner loading-xl"></div>
-			</div>
-		);
-	}
-	const { monthlyStats, monthSquashedStats } = data;
 
 	// ON: 12 calendar-month buckets, already summed across every year in SQL via
 	// `core_stats`' `'month-squashed'` mode (#996). Look each row back up by its

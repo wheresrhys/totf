@@ -1,156 +1,111 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { TabContent } from '@/app/components/shared/TabContent';
 import { SpSessionTotalsTab } from '../SpSessionTotalsTab';
 import type { CoreStatsResult } from '@/app/models/db';
+import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
-vi.mock('@/app/actions/sp-data', () => ({
-	fetchSpeciesPeriodTotals: vi.fn()
-}));
-
+// `SpSessionTotalsTab` is a pure presentational `TabConfig.TabComponent`
+// (#1065) — fetching/loading/error state lives in `TabContent` (#1057), so
+// these tests mount it through a real `TabContent`, exactly as `TabSet` does.
 const viewedGroup = { id: 1, slug: 'alpha' };
+
+function renderSessionTotalsTab({
+	params = { speciesName: 'Robin' },
+	initialData,
+	dataFetcher = vi.fn()
+}: {
+	params?: SpeciesTotalsTabParams;
+	initialData?: CoreStatsResult[] | null;
+	dataFetcher?: () => Promise<CoreStatsResult[]>;
+}) {
+	return render(
+		<TabContent
+			dataFetcher={dataFetcher}
+			TabComponent={SpSessionTotalsTab}
+			params={params}
+			viewedGroup={viewedGroup}
+			{...(initialData === undefined ? {} : { initialData })}
+		/>
+	);
+}
 
 describe('SpSessionTotalsTab', () => {
 	afterEach(() => {
 		cleanup();
 	});
 
-	beforeEach(async () => {
-		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([
-			buildDailyStatsRow({ time_period: '2026-03-14' }),
-			buildDailyStatsRow({ time_period: '2026-03-21' })
-		]);
-	});
-
-	it('shows a loading spinner while data is fetching', async () => {
-		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		let resolveData!: (v: CoreStatsResult[]) => void;
-		vi.mocked(fetchSpeciesPeriodTotals).mockReturnValue(
-			new Promise((resolve) => {
-				resolveData = resolve;
-			})
-		);
-		render(
-			<SpSessionTotalsTab speciesName="Robin" viewedGroup={viewedGroup} />
-		);
-		expect(document.querySelector('.loading')).toBeDefined();
-		resolveData([]);
-	});
-
-	it('fetches day-grouped totals scoped to the species, with no date range, on the all-time page', async () => {
-		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		render(
-			<SpSessionTotalsTab speciesName="Robin" viewedGroup={viewedGroup} />
-		);
-		await waitFor(() => {
+	describe('rendering with server-prefetched data', () => {
+		it('renders the totals table immediately when `data` is supplied as a prop, with no loading spinner', () => {
+			renderSessionTotalsTab({
+				initialData: [buildDailyStatsRow({ time_period: '2026-03-14' })]
+			});
 			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+			expect(document.querySelector('.loading')).toBeNull();
 		});
-		expect(fetchSpeciesPeriodTotals).toHaveBeenCalledWith(
-			'Robin',
-			1,
-			'day',
-			undefined,
-			undefined,
-			undefined
-		);
-	});
 
-	it('fetches day-grouped totals scoped to the species and the given date range, on the year page', async () => {
-		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		render(
-			<SpSessionTotalsTab
-				speciesName="Robin"
-				viewedGroup={viewedGroup}
-				fromDate="2026-01-01"
-				toDate="2026-12-31"
-			/>
-		);
-		await waitFor(() => {
-			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
-		});
-		expect(fetchSpeciesPeriodTotals).toHaveBeenCalledWith(
-			'Robin',
-			1,
-			'day',
-			'2026-01-01',
-			'2026-12-31',
-			undefined
-		);
-	});
-
-	it('fetches day-grouped totals scoped to the species and the given monthFilter, on the squashed-month page', async () => {
-		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		render(
-			<SpSessionTotalsTab
-				speciesName="Robin"
-				viewedGroup={viewedGroup}
-				monthFilter={1}
-			/>
-		);
-		await waitFor(() => {
-			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
-		});
-		expect(fetchSpeciesPeriodTotals).toHaveBeenCalledWith(
-			'Robin',
-			1,
-			'day',
-			undefined,
-			undefined,
-			1
-		);
-	});
-
-	it('renders a row per day returned by the RPC, each linking to /group/{slug}/session/{date}', async () => {
-		render(
-			<SpSessionTotalsTab speciesName="Robin" viewedGroup={viewedGroup} />
-		);
-		await waitFor(() => {
+		it('renders the correct rows/columns for the supplied data', () => {
+			renderSessionTotalsTab({
+				initialData: [
+					buildDailyStatsRow({ time_period: '2026-03-14' }),
+					buildDailyStatsRow({ time_period: '2026-03-21' })
+				]
+			});
 			expect(document.querySelectorAll('tbody tr').length).toBe(2);
+			const march14Link = screen.getByRole('link', { name: '14th March 2026' });
+			const march21Link = screen.getByRole('link', { name: '21st March 2026' });
+			expect(march14Link.getAttribute('href')).toBe(
+				'/group/alpha/session/2026-03-14'
+			);
+			expect(march21Link.getAttribute('href')).toBe(
+				'/group/alpha/session/2026-03-21'
+			);
+			expect(
+				screen.queryByRole('columnheader', { name: 'Busiest session' })
+			).toBeNull();
 		});
-		const march14Link = screen.getByRole('link', { name: '14th March 2026' });
-		const march21Link = screen.getByRole('link', { name: '21st March 2026' });
-		expect(march14Link.getAttribute('href')).toBe(
-			'/group/alpha/session/2026-03-14'
-		);
-		expect(march21Link.getAttribute('href')).toBe(
-			'/group/alpha/session/2026-03-21'
-		);
 	});
 
-	it("renders through PeriodTotalsTable with timeInterval='day'", async () => {
-		render(
-			<SpSessionTotalsTab speciesName="Robin" viewedGroup={viewedGroup} />
-		);
-		await waitFor(() => {
-			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+	describe('rendering without prefetched data', () => {
+		it('shows a loading state before data arrives', () => {
+			let resolveData!: (v: CoreStatsResult[]) => void;
+			const dataFetcher = vi.fn(
+				() =>
+					new Promise<CoreStatsResult[]>((resolve) => {
+						resolveData = resolve;
+					})
+			);
+			renderSessionTotalsTab({ dataFetcher });
+			expect(document.querySelector('.loading')).toBeTruthy();
+			resolveData([]);
 		});
-		// Day-grouped rows format their label as "do MMMM yyyy" (e.g. "14th March
-		// 2026"), distinct from year/month timeInterval's formatting — confirms
-		// `timeInterval="day"` was actually threaded through to `PeriodTotalsTable`.
-		expect(screen.getByRole('link', { name: '14th March 2026' })).toBeTruthy();
-	});
 
-	it('does not render a "Busiest session" column', async () => {
-		render(
-			<SpSessionTotalsTab speciesName="Robin" viewedGroup={viewedGroup} />
-		);
-		await waitFor(() => {
-			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+		it('renders the totals table once the dataFetcher resolves', async () => {
+			const dataFetcher = vi
+				.fn()
+				.mockResolvedValue([buildDailyStatsRow({ time_period: '2026-03-14' })]);
+			const params: SpeciesTotalsTabParams = {
+				speciesName: 'Robin',
+				fromDate: '2026-01-01',
+				toDate: '2026-12-31'
+			};
+			renderSessionTotalsTab({ params, dataFetcher });
+			await waitFor(() => {
+				expect(screen.getByTestId('period-totals-table')).toBeTruthy();
+			});
+			expect(dataFetcher).toHaveBeenCalledWith(params, viewedGroup);
+			expect(
+				screen.getByRole('link', { name: '14th March 2026' })
+			).toBeTruthy();
 		});
-		expect(
-			screen.queryByRole('columnheader', { name: 'Busiest session' })
-		).toBeNull();
-	});
 
-	it("renders the table's empty state when the species has no sessions in range, without crashing", async () => {
-		const { fetchSpeciesPeriodTotals } = await import('@/app/actions/sp-data');
-		vi.mocked(fetchSpeciesPeriodTotals).mockResolvedValue([]);
-		render(
-			<SpSessionTotalsTab speciesName="Robin" viewedGroup={viewedGroup} />
-		);
-		await waitFor(() => {
-			expect(screen.getByText('No data recorded.')).toBeTruthy();
+		it("renders the table's empty state when the species has no sessions in range, without crashing", async () => {
+			const dataFetcher = vi.fn().mockResolvedValue([]);
+			renderSessionTotalsTab({ dataFetcher });
+			await waitFor(() => {
+				expect(screen.getByText('No data recorded.')).toBeTruthy();
+			});
 		});
 	});
 });

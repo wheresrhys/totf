@@ -1,18 +1,18 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { fetchSpeciesPeriodTotals } from '@/app/actions/sp-data';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import {
 	formatMonthYearLabel,
 	type MonthTotalsRow
 } from '@/app/lib/month-totals';
 import type { CoreStatsResult } from '@/app/models/db';
+import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
-// `fetchSpeciesPeriodTotals(..., 'year', ..., squashedMonth)` returns one
-// row per year (bucketed by year, but every column already computed only
-// from that year's `squashedMonth` sessions) — reshape into `MonthTotalsRow`
-// so `formatMonthYearLabel` can print "January 2026" rather than plain
-// "2026" (explicit spec).
+// `fetchSquashedMonthYearTotalsTabData(..., 'year', ..., squashedMonth)`
+// returns one row per year (bucketed by year, but every column already
+// computed only from that year's `squashedMonth` sessions) — reshape into
+// `MonthTotalsRow` so `formatMonthYearLabel` can print "January 2026" rather
+// than plain "2026" (explicit spec).
 function toYearTotalsRows(
 	rows: CoreStatsResult[],
 	squashedMonth: number
@@ -24,43 +24,32 @@ function toYearTotalsRows(
 	}));
 }
 
+// Pure, presentational `TabConfig.TabComponent` (#1066) — see
+// `SpYearTotalsTab`'s doc comment for why `data` is typed `unknown` and cast
+// back to this tab's real shape immediately. Fetching/loading/error state now
+// lives in `TabContent` (#1057), driven by `fetchSquashedMonthYearTotalsTabData`
+// (`app/actions/sp-data.ts`) via `TabSet`/`buildSpeciesTotalsTabs`
+// (`species-tabs.ts`) — previously this component handrolled its own
+// `useState`/`useEffect` fetch with no `.catch`.
+//
 // The squashed-month species page's "Year totals" tab (#1005) — the
 // species-scoped counterpart to `SquashedMonthSummaryTotalsSection`'s Year
 // totals tab. One row per year, filtered to `squashedMonth`.
 export function SpSquashedMonthYearTotalsTab({
-	speciesName,
-	viewedGroupId,
-	squashedMonth
+	params,
+	data
 }: {
-	speciesName: string;
-	viewedGroupId: number;
-	squashedMonth: number;
+	params: SpeciesTotalsTabParams;
+	data: unknown;
+	viewedGroup: ViewedGroup;
 }) {
-	const [yearTotals, setYearTotals] = useState<CoreStatsResult[]>([]);
-	const [isLoaded, setIsLoaded] = useState(false);
-
-	useEffect(() => {
-		if (isLoaded) return;
-		fetchSpeciesPeriodTotals(
-			speciesName,
-			viewedGroupId,
-			'year',
-			undefined,
-			undefined,
-			squashedMonth
-		).then((data) => {
-			setYearTotals(data);
-			setIsLoaded(true);
-		});
-	}, [speciesName, viewedGroupId, squashedMonth, isLoaded]);
-
-	if (!isLoaded) {
-		return (
-			<div className="flex items-center justify-center">
-				<div className="loading loading-spinner loading-xl"></div>
-			</div>
-		);
-	}
+	const { speciesName } = params;
+	// Always defined when this tab is mounted — `buildSpeciesTotalsTabs`
+	// (`species-tabs.ts`) only includes `squashed-month-year-totals` when the
+	// route is squashed-month-scoped, which is also what supplies
+	// `monthFilter` on the shared `totalsTabParams`.
+	const squashedMonth = params.monthFilter as number;
+	const yearTotals = (data as CoreStatsResult[] | null) ?? [];
 
 	const yearTotalsRows = toYearTotalsRows(yearTotals, squashedMonth);
 	const yearTotalsRowByTimePeriod = new Map(

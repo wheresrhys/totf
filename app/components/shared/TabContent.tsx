@@ -28,6 +28,22 @@ export type TabConfig<DataType, ParamsType> = {
 		params: ParamsType,
 		viewedGroup: ViewedGroup
 	) => Promise<DataType | null>;
+	/**
+	 * Declare this tab's `dataFetcher` client-side only: `prefetchActiveTabData`
+	 * refuses to run it on the server even when the URL deep-linked straight
+	 * into this tab, so the page still renders with the tab focused, but
+	 * `TabContent` fetches it after hydration — spinner first, content once the
+	 * browser-side fetch resolves. Nothing else changes; this is purely about
+	 * *where* the fetch runs.
+	 *
+	 * For a tab whose data is deliberately produced in the browser rather than
+	 * on the server. Highlights are the case this exists for: generating them
+	 * client-side is a conscious caching/performance decision, so a server-side
+	 * prefetch would quietly undo it — and a `dataFetcher` that lives in a
+	 * `'use client'` module is only a client reference on the server anyway, so
+	 * calling it there would throw rather than fetch.
+	 */
+	clientSideOnly?: boolean;
 	TabComponent: (props: {
 		params: ParamsType;
 		data: DataType | null;

@@ -127,6 +127,7 @@ async function renderWithClient(
 describe('session detail page', () => {
 	afterEach(() => {
 		cleanup();
+		vi.clearAllMocks();
 	});
 
 	beforeEach(() => {
@@ -360,6 +361,25 @@ describe('session detail page', () => {
 			render(await renderPage('highlights'));
 			const highlights = await screen.findByTestId('session-highlights');
 			expect(highlights.textContent).toContain('Counts');
+		});
+
+		it('?tabId=highlights does NOT prefetch the tab server-side — it is clientSideOnly, so the fetch runs once, from the browser', async () => {
+			const { getCondensedHighlightsAtTimePeriod } =
+				await import('@/app/lib/highlights');
+			render(await renderPage('highlights'));
+			await screen.findByTestId('session-highlights');
+			// Fetched exactly once — by `TabContent` after the tab mounted, never
+			// by `page.tsx`'s `prefetchActiveTabData`, which declines to run a
+			// `clientSideOnly` tab's fetcher.
+			expect(getCondensedHighlightsAtTimePeriod).toHaveBeenCalledTimes(1);
+		});
+
+		it('does not prefetch anything for a tabId naming a tab that fetches nothing of its own', async () => {
+			const { getCondensedHighlightsAtTimePeriod } =
+				await import('@/app/lib/highlights');
+			render(await renderPage('net-rounds'));
+			await screen.findByText('Net round 1: 08:00');
+			expect(getCondensedHighlightsAtTimePeriod).not.toHaveBeenCalled();
 		});
 
 		it('?tabId=not-a-real-tab falls back to the Mist-netting tab, with no crash and no blank pane', async () => {

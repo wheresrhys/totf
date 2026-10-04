@@ -1,8 +1,9 @@
-import {
-	SessionTabs,
-	type SpeciesWithEncounters
-} from '@/app/components/pages/session/SingleSessionData';
-import type { SessionEncounter } from '@/app/models/session';
+import { SessionTabs } from '@/app/components/pages/session/SessionTabs';
+import type { SessionTabParams } from '@/app/components/pages/session/session-tab-config';
+import type {
+	SessionEncounter,
+	SpeciesWithEncounters
+} from '@/app/models/session';
 import type { LocationRow } from '@/app/models/db';
 import {
 	PageWrapper,
@@ -22,6 +23,13 @@ export type PageParams = {
 	// The optional `?tabId=` search param (#803, applied here by #805) — never
 	// affects `getCacheKeys`, only which tab `SessionTabs` focuses/loads first.
 	tabId?: string;
+	// The deep-linked tab's data, already fetched server-side by `page.tsx`'s
+	// `prefetchActiveTabData` call (#1059), so the tab renders with its content
+	// in hand instead of flashing a spinner and refetching on hydration.
+	// `undefined` whenever there was nothing to prefetch — which, today, is
+	// always: the only session tab with a `dataFetcher` is Highlights, and it is
+	// `clientSideOnly` by design (see `sessionTabPrefetchers`).
+	prefetchedTabData?: { tabId: string; data: unknown };
 };
 
 export type AdjacentSessionDates = {
@@ -137,14 +145,11 @@ function SessionNavigation({
 
 export function SessionPageContent({
 	data: dayData,
-	params: { date, tabId },
+	params: { date, tabId, prefetchedTabData },
 	viewedGroup
 }: {
 	data: DayData;
-	params: {
-		date: string;
-		tabId?: string;
-	};
+	params: Omit<PageParams, 'viewedGroupId'>;
 	viewedGroup: ViewedGroup;
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);
@@ -161,6 +166,13 @@ export function SessionPageContent({
 	);
 	const chronology = calculateSessionChronology(dayData.encounters);
 	const oldestEncounter = findOldestEncounter(dayData.encounters);
+	const sessionTabParams: SessionTabParams = {
+		date,
+		mistNetSpeciesList,
+		otherCatchesSpeciesList,
+		netRounds: chronology.netRounds,
+		oldestEncounter
+	};
 
 	if (dayData.encounters.length === 0) {
 		return (
@@ -188,13 +200,10 @@ export function SessionPageContent({
 			<Locations locations={dayData.locations} />
 
 			<SessionTabs
-				mistNetSpeciesList={mistNetSpeciesList}
-				otherCatchesSpeciesList={otherCatchesSpeciesList}
-				netRounds={chronology.netRounds}
-				date={date}
-				viewedGroupId={viewedGroup.id}
-				oldestEncounter={oldestEncounter}
+				params={sessionTabParams}
+				viewedGroup={viewedGroup}
 				initialTabId={tabId}
+				initialTabData={prefetchedTabData}
 			/>
 		</PageWrapper>
 	);

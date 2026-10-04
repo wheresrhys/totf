@@ -11,9 +11,12 @@ import {
 	resolveInitialTabId,
 	prefetchActiveTabData
 } from '@/app/lib/tab-query-param';
-import type { TabConfig } from '@/app/components/shared/TabContent';
-import { summarySpeciesTotalsTab } from '@/app/components/pages/summary/SummarySpeciesTotalsTab';
-import { summaryHighlightsTab } from '@/app/components/pages/summary/SummaryHighlightsTab';
+// From the plain (non-`'use client'`) prefetcher module, never by dotting into
+// a tab's `'use client'` `TabConfig` — see that module's header comment (#1096).
+import {
+	monthSummaryPrefetchers,
+	SESSION_TOTALS_TAB_ID
+} from '@/app/components/pages/summary/summary-tab-prefetchers';
 import type { SummaryTabParams } from '@/app/components/pages/summary/summary-tab-params';
 import { parseMonthAbbreviation } from '@/app/lib/squashed-month';
 import type { ViewedGroup } from '@/app/lib/group-slug';
@@ -51,21 +54,6 @@ export type PageData = {
 	initialTabData?: { tabId: string; data: unknown };
 };
 
-// Mirrors `SummaryTotalsSection`'s own `tabs` array for this page shape:
-// `sessionTotals` is always supplied eagerly here, so Session totals is the
-// *eager*, untouched variant — `'session-totals'` has no `dataFetcher`
-// (`prefetchActiveTabData` no-ops for it), and the lazy `summarySessionTotalsTab`
-// never appears on this page at all. No `all-time-month-totals` tab here either.
-const SESSION_TOTALS_TAB_ID = 'session-totals';
-const monthSummaryTabs: Pick<
-	TabConfig<unknown, SummaryTabParams>,
-	'id' | 'dataFetcher'
->[] = [
-	{ id: SESSION_TOTALS_TAB_ID },
-	summarySpeciesTotalsTab,
-	summaryHighlightsTab
-];
-
 export async function fetchSummaryYearMonthPageContent(
 	{ yearOrMonth, month, tabId }: PageParams,
 	viewedGroupId: number
@@ -86,7 +74,7 @@ export async function fetchSummaryYearMonthPageContent(
 	]);
 	const activeTabId = resolveInitialTabId(
 		tabId,
-		monthSummaryTabs.map((tab) => tab.id),
+		monthSummaryPrefetchers.map((tab) => tab.id),
 		SESSION_TOTALS_TAB_ID
 	);
 	// `totalsStats` is never read by any `dataFetcher` (display-only), so its
@@ -95,7 +83,7 @@ export async function fetchSummaryYearMonthPageContent(
 		SummaryTabParams,
 		SummaryTabParams[]
 	>(
-		monthSummaryTabs,
+		monthSummaryPrefetchers,
 		activeTabId,
 		{
 			fromDate,

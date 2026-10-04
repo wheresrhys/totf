@@ -99,11 +99,13 @@ export function setTabIdSearchParam(tabId: string): void {
  * raw search param, so exactly one tab's `dataFetcher` can ever run.
  *
  * Returns `undefined` — do nothing, let the tab fetch for itself on the
- * client — in the two cases where there is nothing to prefetch: the active tab
- * has no `dataFetcher` (it manages its own internal fetching/pagination), or
- * `activeTabId` matches no tab at all. The latter shouldn't happen when the id
- * came from `resolveInitialTabId`, but a caller that skipped that validation
- * gets a no-op rather than a throw.
+ * client — in the three cases where there is nothing to prefetch: the active
+ * tab has no `dataFetcher` (it manages its own internal fetching/pagination),
+ * it declared itself `clientSideOnly` (its data is deliberately produced in
+ * the browser — see `TabConfig.clientSideOnly`), or `activeTabId` matches no
+ * tab at all. The last shouldn't happen when the id came from
+ * `resolveInitialTabId`, but a caller that skipped that validation gets a
+ * no-op rather than a throw.
  *
  * `params` is the shared default, exactly as it is for `TabSet`: a tab that
  * declared its own `params` is prefetched with those instead, so the data this
@@ -116,6 +118,27 @@ export function setTabIdSearchParam(tabId: string): void {
  * required, so a caller can hand this the same array it hands `TabSet`.
  *
  * No caching or deduplication: `dataFetcher` is awaited exactly once per call.
+ *
+ * **Every entry in `tabs` must come from a module with no `'use client'`
+ * directive** — ids and `dataFetcher`s alike. This runs in a Server Component,
+ * and a value a Server Component imports from a `'use client'` module is a
+ * *client reference*, not the real value: `tab.id` reads back `undefined` and
+ * `tab.dataFetcher` reads back `undefined`, so the `.find` below matches
+ * nothing and this silently returns `undefined` for every tab. It does not
+ * throw, nothing is logged, and the page still renders — the prefetch just
+ * never happens. Nor will any test catch it: Vitest imports modules directly
+ * with no client-reference boundary, so a violating tabs array behaves
+ * perfectly in the suite and is dead in production. (#1096 found all four
+ * summary tabs in exactly that state; #1065's species page and #1059's session
+ * page were already right.)
+ *
+ * The pattern that satisfies this: keep each tab's `id`/`dataFetcher` — and
+ * the descriptor list assembled from them — in a plain `.ts` module, import
+ * *that* from `page.tsx`, and have the `'use client'` component file import
+ * the same id/fetcher back for its own `TabConfig`. See
+ * `app/components/pages/summary/summary-tab-prefetchers.ts`,
+ * `app/(routes)/species/[speciesName]/species-tabs.ts`, and
+ * `app/components/pages/session/session-tab-config.ts`.
  */
 export async function prefetchActiveTabData<
 	SharedParamsType,
@@ -127,7 +150,7 @@ export async function prefetchActiveTabData<
 			TabParamsTuple[Index],
 			Pick<
 				TabConfig<unknown, TabParamsTuple[Index]>,
-				'id' | 'dataFetcher' | 'params'
+				'id' | 'dataFetcher' | 'params' | 'clientSideOnly'
 			>
 		>;
 	},
@@ -136,7 +159,7 @@ export async function prefetchActiveTabData<
 	viewedGroup: ViewedGroup
 ): Promise<{ tabId: string; data: unknown } | undefined> {
 	const activeTab = tabs.find((tab) => tab.id === activeTabId);
-	if (!activeTab?.dataFetcher) {
+	if (!activeTab?.dataFetcher || activeTab.clientSideOnly) {
 		return undefined;
 	}
 	return {

@@ -5,13 +5,27 @@ import {
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { fetchPageOfBirds } from '@/app/actions/sp-data';
-import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
+import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
+import {
+	readTabIdSearchParam,
+	resolveInitialTabId,
+	prefetchActiveTabData
+} from '@/app/lib/tab-query-param';
 import {
 	SpeciesPageContent,
 	type PageParams,
 	type PeriodScope,
 	type PageData
 } from './PageContent';
+// Imported from `./species-tabs` (not `./PageContent`, which is `'use
+// client'`) deliberately — see that file's doc comment: calling a function
+// exported from a `'use client'` module directly (as this server file does)
+// throws at runtime even though it type-checks and unit-tests fine.
+import {
+	getDefaultSpeciesTabId,
+	getSpeciesKnownTabIds,
+	buildSpeciesTotalsTabs
+} from './species-tabs';
 
 import {
 	mergeBiometricsFields,
@@ -96,7 +110,72 @@ export async function fetchSpeciesPageContentForPeriod(
 	if (!speciesId) {
 		throw new Error(`Species ${params.speciesName} not found`);
 	}
-	const [birds, speciesStats] = await Promise.all([
+
+	// Resolve which tab should be focused on first paint (#1059), and — if it's
+	// one of the 6 totals tabs migrated onto `TabSet` (#1065, #1066) — fetch
+	// its data right here, server-side, so that tab renders immediately with no
+	// loading spinner instead of flashing one and re-fetching on hydration.
+	// Highlights is one of the 6 but declares itself `clientSideOnly`
+	// (`SpHighlightsTab.tsx`'s `spHighlightsTab`), so `prefetchActiveTabData`
+	// still skips it even when it's the resolved tab. Biometrics/Demographics/
+	// Bird list aren't on `TabConfig` yet (a follow-up ticket):
+	// `prefetchActiveTabData` naturally no-ops for those too, since
+	// `totalsTabs` below never contains them.
+	//
+	// `isAllTime`/`isYearScoped`/`isSquashedMonth` are route-depth facts, not
+	// fetched ones — every caller of this function passes a `period` that's
+	// hardcoded per route file (the bare page below always passes `{}`, its
+	// `[yearOrMonth]`/`[yearOrMonth]/[month]` siblings always pass a
+	// year/month-shaped one) — so they can be (and are, identically) derived
+	// again from `data.year`/`data.squashedMonth`/`data.month` client-side in
+	// `PageContent.tsx`'s `SpeciesData`, which doesn't have `period` in scope.
+	//
+	// Open design note (flag, don't resolve here): this is the first per-tab
+	// server-side `dataFetcher` prefetch in the codebase — `buildSpeciesTotalsTabs`
+	// lives in `PageContent.tsx` rather than here partly so this file doesn't
+	// need to import `SpYearTotalsTab` et al. directly, but it's still reached
+	// through that import. Worth revisiting once more pages adopt this pattern:
+	// does a page's `TabConfig[]` belong fully colocated with its
+	// `PageContent.tsx`, or is some shared "build this page's tab configs"
+	// helper the better long-term shape? Leave as-is for now.
+	const isAllTime = year === undefined && squashedMonth === undefined;
+	const isYearScoped = year !== undefined && month === undefined;
+	const isSquashedMonth = squashedMonth !== undefined;
+	const defaultTabId = getDefaultSpeciesTabId(
+		isAllTime,
+		isYearScoped,
+		isSquashedMonth
+	);
+	const knownTabIds = getSpeciesKnownTabIds(
+		isAllTime,
+		isYearScoped,
+		isSquashedMonth
+	);
+	const activeTabId = resolveInitialTabId(
+		params.tabId,
+		knownTabIds,
+		defaultTabId
+	);
+	const totalsTabs = buildSpeciesTotalsTabs(
+		isAllTime,
+		isYearScoped,
+		isSquashedMonth
+	);
+	const totalsTabParams: SpeciesTotalsTabParams = {
+		speciesName: params.speciesName,
+		year,
+		// Matches `SpeciesData`'s own `totalsTabParams` in `PageContent.tsx` —
+		// see that file's comment on this exact assignment for why it's `year`
+		// rather than `month` (a pre-existing quirk in the Highlights tab's
+		// param wiring, preserved as-is; #1066 is a pure mechanism migration,
+		// not a behaviour change).
+		month: year,
+		fromDate,
+		toDate,
+		monthFilter: squashedMonth
+	};
+
+	const [birds, speciesStats, initialTabData] = await Promise.all([
 		fetchPageOfBirds(speciesId, viewedGroupId, 0, fromDate, toDate),
 		getSpeciesStats(
 			params.speciesName,
@@ -104,7 +183,16 @@ export async function fetchSpeciesPageContentForPeriod(
 			fromDate,
 			toDate,
 			squashedMonth
-		)
+		),
+		// None of the 3 dataFetchers above ever read `.slug` — only `.id` — so a
+		// synthetic `ViewedGroup` avoids widening this function's own signature
+		// (shared by every route-depth variant, and fixed by `BootstrapPage`'s
+		// `dataFetcher` contract to a plain `viewedGroupId: number`) just to
+		// carry a slug this prefetch step never uses.
+		prefetchActiveTabData(totalsTabs, activeTabId, totalsTabParams, {
+			id: viewedGroupId,
+			slug: ''
+		})
 	]);
 	if (birds.length === 0) {
 		return {
@@ -113,7 +201,9 @@ export async function fetchSpeciesPageContentForPeriod(
 			month,
 			fromDate,
 			toDate,
-			squashedMonth
+			squashedMonth,
+			initialTabId: activeTabId,
+			initialTabData
 		};
 	}
 	return {
@@ -125,7 +215,9 @@ export async function fetchSpeciesPageContentForPeriod(
 		month,
 		fromDate,
 		toDate,
-		squashedMonth
+		squashedMonth,
+		initialTabId: activeTabId,
+		initialTabData
 	};
 }
 
