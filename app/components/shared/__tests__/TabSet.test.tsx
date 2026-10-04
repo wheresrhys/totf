@@ -119,6 +119,16 @@ function waitForTabData(tabId: string, expectedText: string) {
 }
 
 describe('TabSet', () => {
+	describe('empty tabs array', () => {
+		it('renders nothing rather than throwing when tabs is empty', () => {
+			const { container } = render(
+				<TabSet tabs={[]} params={params} viewedGroup={viewedGroup} />
+			);
+
+			expect(container.innerHTML).toBe('');
+		});
+	});
+
 	describe('tab selection', () => {
 		it('renders the first tab active by default when no initialTabId is given', async () => {
 			renderTabSet();
