@@ -135,10 +135,12 @@ describe('group_ticks', () => {
 		]);
 	});
 
-	// The temporal filters narrow which encounters are in scope before the
-	// per-species MIN(visit_date), so `first_encounter_date` becomes "first
-	// encounter within the window" and a species with no in-window encounter drops
-	// out of the result entirely.
+	// A tick is always resolved against the group's whole history: the temporal
+	// filters never narrow which encounters the per-species MIN(visit_date) sees,
+	// they only select which of the already-resolved tick dates are returned. So
+	// `first_encounter_date` is always the species' true first-ever date, and a
+	// species ticked outside the window is absent rather than re-ticked at an
+	// in-window date.
 	describe('date-range filtering', () => {
 		it('returns only ticks on or after from_date', async () => {
 			const { data, error } = await alphaClient.rpc('group_ticks', {
@@ -146,12 +148,9 @@ describe('group_ticks', () => {
 				from_date: '2023-01-01'
 			});
 			expect(error).toBeNull();
+			// Blue Tit/Reed Warbler/Robin/Wren/Kingfisher all have 2023 encounters,
+			// but each was first encountered in 2021 or 2022, so none is a 2023 tick.
 			expect(data).toEqual([
-				{ species_name: 'Blue Tit', first_encounter_date: '2023-05-12' },
-				{ species_name: 'Reed Warbler', first_encounter_date: '2023-05-12' },
-				{ species_name: 'Robin', first_encounter_date: '2023-05-12' },
-				{ species_name: 'Wren', first_encounter_date: '2023-05-12' },
-				{ species_name: 'Kingfisher', first_encounter_date: '2023-05-10' },
 				{ species_name: 'Redwing', first_encounter_date: '2023-03-20' },
 				{ species_name: 'Fieldfare', first_encounter_date: '2023-03-15' }
 			]);
@@ -163,13 +162,28 @@ describe('group_ticks', () => {
 				to_date: '2022-12-31'
 			});
 			expect(error).toBeNull();
-			// Fieldfare/Redwing were only ever encountered in 2023, so they drop out.
+			// Fieldfare/Redwing were first encountered in 2023, so they drop out.
 			expect(data).toEqual([
 				{ species_name: 'Reed Warbler', first_encounter_date: '2022-06-15' },
 				{ species_name: 'Blue Tit', first_encounter_date: '2022-04-30' },
 				{ species_name: 'Kingfisher', first_encounter_date: '2022-04-30' },
 				{ species_name: 'Robin', first_encounter_date: '2021-06-20' },
 				{ species_name: 'Wren', first_encounter_date: '2021-06-20' }
+			]);
+		});
+
+		it('resolves the tick date over the whole history even when combined with location_filter', async () => {
+			// Alpha Site B's Reed Warbler tick is 2023-09-14 — later than Alpha's
+			// group-wide 2022-06-15 one, because the filters that decide *which*
+			// encounters count (group, location) still apply before the MIN().
+			const { data, error } = await alphaClient.rpc('group_ticks', {
+				ringing_group_filter: alphaId,
+				location_filter: alphaSiteBLocationId,
+				from_date: '2023-01-01'
+			});
+			expect(error).toBeNull();
+			expect(data).toEqual([
+				{ species_name: 'Reed Warbler', first_encounter_date: '2023-09-14' }
 			]);
 		});
 	});
@@ -190,16 +204,14 @@ describe('group_ticks', () => {
 
 	describe('month filtering', () => {
 		it('returns every occurrence of that calendar month across all years', async () => {
-			// A bare month_filter is a recurring month, not a contiguous range: June
-			// 2021 and June 2022 encounters are both in scope, so Robin/Wren keep
-			// their 2021 dates while Blue Tit/Reed Warbler get their 2022 ones.
+			// A bare month_filter is a recurring month, not a contiguous range: a
+			// June 2021 tick and a June 2022 tick are both in scope.
 			const { data, error } = await alphaClient.rpc('group_ticks', {
 				ringing_group_filter: alphaId,
 				month_filter: 6
 			});
 			expect(error).toBeNull();
 			expect(data).toEqual([
-				{ species_name: 'Blue Tit', first_encounter_date: '2022-06-15' },
 				{ species_name: 'Reed Warbler', first_encounter_date: '2022-06-15' },
 				{ species_name: 'Robin', first_encounter_date: '2021-06-20' },
 				{ species_name: 'Wren', first_encounter_date: '2021-06-20' }
@@ -212,15 +224,12 @@ describe('group_ticks', () => {
 				from_date: '2022-01-01',
 				to_date: '2024-12-31',
 				year_filter: 2023,
-				month_filter: 5
+				month_filter: 3
 			});
 			expect(error).toBeNull();
 			expect(data).toEqual([
-				{ species_name: 'Blue Tit', first_encounter_date: '2023-05-12' },
-				{ species_name: 'Reed Warbler', first_encounter_date: '2023-05-12' },
-				{ species_name: 'Robin', first_encounter_date: '2023-05-12' },
-				{ species_name: 'Wren', first_encounter_date: '2023-05-12' },
-				{ species_name: 'Kingfisher', first_encounter_date: '2023-05-10' }
+				{ species_name: 'Redwing', first_encounter_date: '2023-03-20' },
+				{ species_name: 'Fieldfare', first_encounter_date: '2023-03-15' }
 			]);
 		});
 	});

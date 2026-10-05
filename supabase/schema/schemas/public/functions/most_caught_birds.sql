@@ -4,10 +4,7 @@ CREATE FUNCTION public.most_caught_birds (
 	significance_threshold integer DEFAULT 3,
 	species_filter text DEFAULT NULL::text,
 	year_filter integer DEFAULT NULL::integer,
-	ringing_group_filter bigint DEFAULT NULL::bigint,
-	from_date date DEFAULT NULL::date,
-	to_date date DEFAULT NULL::date,
-	month_filter smallint DEFAULT NULL::smallint
+	ringing_group_filter bigint DEFAULT NULL::bigint
 ) RETURNS TABLE (
 	species_name text,
 	ring_no text,
@@ -31,10 +28,7 @@ BEGIN
     LEFT JOIN public."Sessions" sess on sess.id=en.session_id
   WHERE
     (species_filter IS NULL OR sp.species_name ilike species_filter) AND
-    (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter) AND
-    (from_date IS NULL OR sess.visit_date >= from_date) AND
-    (to_date IS NULL OR sess.visit_date <= to_date) AND
-    (month_filter IS NULL OR EXTRACT(MONTH FROM sess.visit_date) = month_filter)
+    (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
 		AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
   GROUP BY
     sp.species_name,
@@ -57,38 +51,8 @@ BEGIN
 END;
 $function$;
 
-GRANT ALL ON FUNCTION public.most_caught_birds (
-	integer,
-	integer,
-	integer,
-	text,
-	integer,
-	bigint,
-	date,
-	date,
-	smallint
-) TO anon;
+GRANT ALL ON FUNCTION public.most_caught_birds (integer, integer, integer, text, integer, bigint) TO anon;
 
-GRANT ALL ON FUNCTION public.most_caught_birds (
-	integer,
-	integer,
-	integer,
-	text,
-	integer,
-	bigint,
-	date,
-	date,
-	smallint
-) TO authenticated;
+GRANT ALL ON FUNCTION public.most_caught_birds (integer, integer, integer, text, integer, bigint) TO authenticated;
 
-GRANT ALL ON FUNCTION public.most_caught_birds (
-	integer,
-	integer,
-	integer,
-	text,
-	integer,
-	bigint,
-	date,
-	date,
-	smallint
-) TO service_role;
+GRANT ALL ON FUNCTION public.most_caught_birds (integer, integer, integer, text, integer, bigint) TO service_role;

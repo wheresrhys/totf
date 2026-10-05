@@ -1,6 +1,5 @@
 SET check_function_bodies = false;
 DROP FUNCTION public.group_ticks(IN ringing_group_filter bigint, IN location_filter bigint, IN result_limit integer);
-DROP FUNCTION public.most_caught_birds(IN result_limit integer, IN max_per_species integer, IN significance_threshold integer, IN species_filter text, IN year_filter integer, IN ringing_group_filter bigint);
 DROP FUNCTION public.notable_retraps(IN result_limit integer, IN result_limit_per_species integer, IN min_proven_age integer, IN min_encounter_count integer, IN species_filter text, IN from_date date, IN to_date date, IN ringing_group_filter bigint);
 CREATE FUNCTION public.group_ticks(ringing_group_filter bigint DEFAULT NULL::bigint, location_filter bigint DEFAULT NULL::bigint, result_limit integer DEFAULT NULL::integer, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, year_filter smallint DEFAULT NULL::smallint, month_filter smallint DEFAULT NULL::smallint)
  RETURNS TABLE(species_name text, first_encounter_date date)
@@ -10,77 +9,42 @@ CREATE FUNCTION public.group_ticks(ringing_group_filter bigint DEFAULT NULL::big
 AS $function$
 BEGIN
   RETURN QUERY
+	-- A tick is always resolved against the group's (or location's) WHOLE history:
+	-- it is the first time that species was ever encountered, full stop. The
+	-- temporal filters must therefore not narrow which encounters the MIN() sees —
+	-- that would report a species' first encounter *within the window* and would
+	-- re-tick a species already ticked years earlier. Find the ticks first, then
+	-- filter the resulting tick dates down to the requested time window.
+	WITH species_ticks AS (
+		SELECT
+			sp.species_name as species_name,
+			MIN(sess.visit_date) as first_encounter_date
+		FROM public."Encounters" en
+			LEFT JOIN public."Birds" b on b.id=en.bird_id
+			LEFT JOIN public."Species" sp on sp.id=b.species_id
+			LEFT JOIN public."Sessions" sess on sess.id=en.session_id
+		WHERE
+			(ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter) AND
+			(location_filter IS NULL OR en.location_id = location_filter)
+		GROUP BY
+			sp.species_name
+	)
 	SELECT
-		sp.species_name as species_name,
-		MIN(sess.visit_date) as first_encounter_date
-	FROM public."Encounters" en
-		LEFT JOIN public."Birds" b on b.id=en.bird_id
-		LEFT JOIN public."Species" sp on sp.id=b.species_id
-		LEFT JOIN public."Sessions" sess on sess.id=en.session_id
+		st.species_name,
+		st.first_encounter_date
+	FROM species_ticks st
 	WHERE
-		(ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter) AND
-		(location_filter IS NULL OR en.location_id = location_filter) AND
-		(from_date IS NULL OR sess.visit_date >= from_date) AND
-		(to_date IS NULL OR sess.visit_date <= to_date) AND
-		(year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter) AND
-		(month_filter IS NULL OR EXTRACT(MONTH FROM sess.visit_date) = month_filter)
-	GROUP BY
-		sp.species_name
-	ORDER BY first_encounter_date DESC, sp.species_name ASC
+		(from_date IS NULL OR st.first_encounter_date >= from_date) AND
+		(to_date IS NULL OR st.first_encounter_date <= to_date) AND
+		(year_filter IS NULL OR EXTRACT(YEAR FROM st.first_encounter_date) = year_filter) AND
+		(month_filter IS NULL OR EXTRACT(MONTH FROM st.first_encounter_date) = month_filter)
+	ORDER BY st.first_encounter_date DESC, st.species_name ASC
 	LIMIT result_limit;
 END;
 $function$;
 GRANT ALL ON FUNCTION public.group_ticks(bigint, bigint, integer, date, date, smallint, smallint) TO anon;
 GRANT ALL ON FUNCTION public.group_ticks(bigint, bigint, integer, date, date, smallint, smallint) TO authenticated;
 GRANT ALL ON FUNCTION public.group_ticks(bigint, bigint, integer, date, date, smallint, smallint) TO service_role;
-CREATE FUNCTION public.most_caught_birds(result_limit integer DEFAULT NULL::integer, max_per_species integer DEFAULT NULL::integer, significance_threshold integer DEFAULT 3, species_filter text DEFAULT NULL::text, year_filter integer DEFAULT NULL::integer, ringing_group_filter bigint DEFAULT NULL::bigint, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, month_filter smallint DEFAULT NULL::smallint)
- RETURNS TABLE(species_name text, ring_no text, encounter_count bigint, encounter_dates date[])
- LANGUAGE plpgsql
- STABLE
- SET search_path TO 'public', 'pg_catalog'
-AS $function$
-BEGIN
-  RETURN QUERY
-	WITH bird_encounter_counts AS (
-  SELECT
-    sp.species_name as species_name,
-    b.ring_no as ring_no,
-    count(en.*) as encounter_count,
-		array_agg(sess.visit_date order by sess.visit_date ASC) as encounter_dates
-  FROM public."Encounters" en
-    LEFT JOIN public."Birds" b on  b.id=en.bird_id
-    LEFT JOIN public."Species" sp on sp.id=b.species_id
-    LEFT JOIN public."Sessions" sess on sess.id=en.session_id
-  WHERE
-    (species_filter IS NULL OR sp.species_name ilike species_filter) AND
-    (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter) AND
-    (from_date IS NULL OR sess.visit_date >= from_date) AND
-    (to_date IS NULL OR sess.visit_date <= to_date) AND
-    (month_filter IS NULL OR EXTRACT(MONTH FROM sess.visit_date) = month_filter)
-		AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
-  GROUP BY
-    sp.species_name,
-    b.ring_no
-  ), significant_birds AS (
-    SELECT * FROM bird_encounter_counts as bec
-    WHERE bec.encounter_count >= significance_threshold
-  ), top_per_species AS (
-		SELECT *
-		FROM (
-			SELECT *,
-				ROW_NUMBER() OVER (PARTITION BY sb.species_name ORDER BY sb.encounter_count DESC) AS rn
-			FROM significant_birds as sb
-		) sub
-		WHERE max_per_species IS NULL OR rn <= max_per_species
-	)
-	SELECT tps.species_name, tps.ring_no, tps.encounter_count, tps.encounter_dates FROM top_per_species as tps
-	ORDER BY tps.encounter_count DESC, tps.ring_no DESC
-	LIMIT result_limit;
-END;
-$function$;
-GRANT ALL ON FUNCTION public.most_caught_birds(integer, integer, integer, text, integer, bigint, date, date, smallint) TO anon;
-GRANT ALL ON FUNCTION public.most_caught_birds(integer, integer, integer, text, integer, bigint, date, date, smallint) TO authenticated;
-GRANT ALL ON FUNCTION public.most_caught_birds(integer, integer, integer, text, integer, bigint, date, date, smallint) TO service_role;
 CREATE FUNCTION public.notable_retraps(result_limit integer DEFAULT NULL::integer, result_limit_per_species integer DEFAULT NULL::integer, min_proven_age integer DEFAULT NULL::integer, min_encounter_count integer DEFAULT NULL::integer, species_filter text DEFAULT NULL::text, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, ringing_group_filter bigint DEFAULT NULL::bigint, year_filter smallint DEFAULT NULL::smallint, month_filter smallint DEFAULT NULL::smallint)
  RETURNS TABLE(species_name text, ring_no text, encounter_count bigint, encounter_dates date[], proven_age smallint)
  LANGUAGE plpgsql
