@@ -6,6 +6,7 @@ import {
 } from '@/app/components/layout/BootstrapPage';
 import { fetchSummaryStats } from '@/app/actions/summary-stats';
 import { fetchPeriodTotals } from '@/app/actions/period-totals';
+import { fetchYears } from '@/app/(routes)/species/page';
 import {
 	readTabIdSearchParam,
 	resolveInitialTabId,
@@ -51,6 +52,7 @@ export type PageData = {
 	sessionTotals: CoreStatsResult[];
 	fromDate: string;
 	toDate: string;
+	years: number[];
 	initialTabData?: { tabId: string; data: unknown };
 };
 
@@ -69,9 +71,10 @@ export async function fetchSummaryYearMonthPageContent(
 	const monthDate = new Date(Number(year), Number(month) - 1, 1);
 	const fromDate = format(startOfMonth(monthDate), 'yyyy-MM-dd');
 	const toDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
-	const [summaryStats, sessionTotals] = await Promise.all([
+	const [summaryStats, sessionTotals, years] = await Promise.all([
 		fetchSummaryStats(viewedGroup, fromDate, toDate),
-		fetchPeriodTotals(viewedGroup, 'day', fromDate, toDate)
+		fetchPeriodTotals(viewedGroup, 'day', fromDate, toDate),
+		fetchYears(viewedGroup)
 	]);
 	const activeTabId = resolveInitialTabId(
 		tabId,
@@ -102,6 +105,7 @@ export async function fetchSummaryYearMonthPageContent(
 		sessionTotals,
 		fromDate,
 		toDate,
+		years,
 		initialTabData
 	};
 }
@@ -124,6 +128,7 @@ function YearMonthSummary({
 			viewedGroup={viewedGroup}
 			fromDate={data.fromDate}
 			toDate={data.toDate}
+			years={data.years}
 			initialTabId={params.tabId}
 			initialTabData={data.initialTabData}
 		/>

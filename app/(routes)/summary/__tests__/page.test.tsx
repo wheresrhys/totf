@@ -44,6 +44,14 @@ vi.mock('@/app/actions/period-totals', () => ({
 	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
 }));
 
+// `fetchYears` (#1076) powers `TemporalFilterControls`' year dropdown on
+// every summary route depth — mocked here rather than pulling in the real
+// `getAuthenticatedSupabaseClient()` chain this page doesn't otherwise need.
+const fetchYearsMock = vi.fn().mockResolvedValue([]);
+vi.mock('@/app/(routes)/species/page', () => ({
+	fetchYears: (...args: unknown[]) => fetchYearsMock(...args)
+}));
+
 function renderSummaryPage(tabId?: string) {
 	return Page(
 		tabId === undefined ? {} : { searchParams: Promise.resolve({ tabId }) }
@@ -60,6 +68,7 @@ describe('/summary (all-time)', () => {
 		fetchPeriodTotalsMock.mockClear();
 		fetchPeriodTotalsMock.mockResolvedValue([]);
 		fetchCombinedMonthTotalsMock.mockClear();
+		fetchYearsMock.mockClear();
 	});
 
 	it('renders the "All time summary" heading', async () => {
@@ -70,7 +79,24 @@ describe('/summary (all-time)', () => {
 
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
 		await fetchSummaryPageContent({}, 1, VIEWED_GROUP);
-		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(VIEWED_GROUP);
+		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
+			VIEWED_GROUP,
+			undefined,
+			undefined
+		);
+	});
+
+	it('threads an explicit TemporalFilterControls fromDate/toDate query-string range into fetchSummaryStats', async () => {
+		await fetchSummaryPageContent(
+			{ fromDate: '2026-03-01', toDate: '2026-03-31' },
+			1,
+			VIEWED_GROUP
+		);
+		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
+			VIEWED_GROUP,
+			'2026-03-01',
+			'2026-03-31'
+		);
 	});
 
 	it('passes the fetched summary stats through to the rendered section', async () => {

@@ -7,10 +7,50 @@ import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';
 import { SquashedMonthSummaryTotalsSection } from '@/app/components/SquashedMonthSummaryTotalsSection';
+import {
+	TemporalFilterControls,
+	type TemporalNavigationTarget
+} from '@/app/components/shared/TemporalFilterControls';
+import type { TemporalSelection } from '@/app/lib/temporal-filter';
+import { formatMonthAbbreviation } from '@/app/lib/squashed-month';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 import { formatMonthLabel, type MonthTotalsRow } from '@/app/lib/month-totals';
+
+// Maps a `TemporalFilterControls` selection onto this page's existing
+// year/month path-param routing (`/summary`, `/summary/{year}`,
+// `/summary/{year}/{month}`) or its squashed-month sibling (`/summary/{monthAbbrev}`)
+// when a month is picked with no year — the same "recurring month" case that
+// route already exists for (#1005). Only `fromDate`/`toDate` ever become query
+// strings; year/month always resolve to a path segment.
+//
+// `fromDate`/`toDate` are carried through as query strings on every route
+// depth so a selection isn't silently dropped, but only the all-time
+// `/summary` page's own data-fetcher currently applies them (#1076) — the
+// year/month-scoped sub-routes already derive their own date bounds from the
+// path and don't yet support a further explicit narrowing on top. Revisit
+// once that's asked for.
+function buildSummaryNavigationTarget(
+	selection: TemporalSelection
+): TemporalNavigationTarget {
+	const { year, month, fromDate, toDate } = selection;
+	const queryStrings: Record<string, string> = {
+		...(fromDate ? { fromDate } : {}),
+		...(toDate ? { toDate } : {})
+	};
+	if (year !== undefined) {
+		const yearPath = `/summary/${year}`;
+		return {
+			path: month !== undefined ? `${yearPath}/${month}` : yearPath,
+			queryStrings
+		};
+	}
+	if (month !== undefined) {
+		return { path: `/summary/${formatMonthAbbreviation(month)}`, queryStrings };
+	}
+	return { path: '/summary', queryStrings };
+}
 
 function buildHeading(
 	year?: number,
@@ -45,6 +85,7 @@ export function SummaryPageContent({
 	viewedGroup,
 	fromDate,
 	toDate,
+	years = [],
 	initialTabId,
 	initialTabData
 }: {
@@ -69,9 +110,15 @@ export function SummaryPageContent({
 	sessionTotalsForMonth?: CoreStatsResult[];
 	viewedGroup?: ViewedGroup;
 	// Date bounds for the lazily-fetched Species totals tab — undefined on the
-	// all-time page (unscoped species totals).
+	// all-time page unless the user has picked an explicit range via
+	// `TemporalFilterControls` (#1076).
 	fromDate?: string;
 	toDate?: string;
+	// The years `TemporalFilterControls`' year dropdown offers — every route
+	// depth fetches the same group-wide list (`fetchYears`,
+	// `app/(routes)/species/page.tsx`) so the control looks identical however
+	// deep the user is.
+	years?: number[];
 	// The resolved `?tabId=` search param (#804, reusing #803's mechanism) —
 	// passed straight through to `SummaryTotalsSection`, which resolves it
 	// against its own per-render `tabs` array.
@@ -81,11 +128,19 @@ export function SummaryPageContent({
 	// totals section this branch renders.
 	initialTabData?: { tabId: string; data: unknown };
 }) {
+	const initialSelection: TemporalSelection =
+		squashedMonth !== undefined ? { month: squashedMonth } : { year, month };
 	return (
 		<PageWrapper>
 			<PrimaryHeading>
 				{buildHeading(year, month, squashedMonth)}
 			</PrimaryHeading>
+			<TemporalFilterControls
+				years={years}
+				baseUrl="/summary"
+				initialSelection={initialSelection}
+				navigationController={buildSummaryNavigationTarget}
+			/>
 			<div className="sm:hidden">
 				<SummaryStatsSection stats={summaryStats} />
 				<HighlightsSection />
