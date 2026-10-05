@@ -496,9 +496,13 @@ export type Database = {
       }
       group_ticks: {
         Args: {
+          from_date?: string
           location_filter?: number
+          month_filter?: number
           result_limit?: number
           ringing_group_filter?: number
+          to_date?: string
+          year_filter?: number
         }
         Returns: {
           first_encounter_date: string
@@ -539,11 +543,13 @@ export type Database = {
           from_date?: string
           min_encounter_count?: number
           min_proven_age?: number
+          month_filter?: number
           result_limit?: number
           result_limit_per_species?: number
           ringing_group_filter?: number
           species_filter?: string
           to_date?: string
+          year_filter?: number
         }
         Returns: {
           encounter_count: number
