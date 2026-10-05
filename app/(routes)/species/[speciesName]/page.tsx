@@ -4,6 +4,7 @@ import {
 } from '@/app/components/layout/BootstrapPage';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
+import { fetchYears } from '@/app/(routes)/species/page';
 import { fetchPageOfBirds } from '@/app/actions/sp-data';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import {
@@ -37,20 +38,35 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 
 type PageProps = {
 	params: Promise<{ speciesName: string }>;
-	searchParams?: Promise<{ tabId?: string }>;
+	searchParams?: Promise<{
+		tabId?: string;
+		fromDate?: string;
+		toDate?: string;
+	}>;
 };
 
 // Merges the route's `speciesName` with the optional `?tabId=` search param
 // (#803) into the shared `PageParams` shape, so the requested tab is known
 // before first paint (see PageContent.tsx's `SpeciesData` for how it's
 // resolved against the page's known tab ids and seeded as the initial tab).
+// `?fromDate=`/`?toDate=` (#1076) are this bare page's own explicit
+// `TemporalFilterControls` narrowing — the only species route depth with no
+// year/month-derived date bounds of its own already in play (the
+// `[yearOrMonth]`/`[yearOrMonth]/[month]` siblings already derive theirs from
+// the path).
 async function getSpeciesPageParams(pageProps: PageProps): Promise<PageParams> {
 	const { speciesName } = await defaultGetParams<
 		PageProps,
 		{ speciesName: string }
 	>(pageProps);
 	const tabId = await readTabIdSearchParam(pageProps.searchParams);
-	return { speciesName, ...(tabId ? { tabId } : {}) };
+	const searchParams = (await pageProps.searchParams) ?? {};
+	return {
+		speciesName,
+		...(tabId ? { tabId } : {}),
+		...(searchParams.fromDate ? { fromDate: searchParams.fromDate } : {}),
+		...(searchParams.toDate ? { toDate: searchParams.toDate } : {})
+	};
 }
 
 // Fetches the species page's headline stats row, merging biometrics_stats'
@@ -175,7 +191,7 @@ export async function fetchSpeciesPageContentForPeriod(
 		monthFilter: squashedMonth
 	};
 
-	const [birds, speciesStats, initialTabData] = await Promise.all([
+	const [birds, speciesStats, initialTabData, years] = await Promise.all([
 		fetchPageOfBirds(speciesId, viewedGroup, 0, fromDate, toDate),
 		getSpeciesStats(
 			params.speciesName,
@@ -184,7 +200,13 @@ export async function fetchSpeciesPageContentForPeriod(
 			toDate,
 			squashedMonth
 		),
-		prefetchActiveTabData(totalsTabs, activeTabId, totalsTabParams, viewedGroup)
+		prefetchActiveTabData(
+			totalsTabs,
+			activeTabId,
+			totalsTabParams,
+			viewedGroup
+		),
+		fetchYears(viewedGroup)
 	]);
 	if (birds.length === 0) {
 		return {
@@ -195,7 +217,8 @@ export async function fetchSpeciesPageContentForPeriod(
 			toDate,
 			squashedMonth,
 			initialTabId: activeTabId,
-			initialTabData
+			initialTabData,
+			years
 		};
 	}
 	return {
@@ -209,16 +232,26 @@ export async function fetchSpeciesPageContentForPeriod(
 		toDate,
 		squashedMonth,
 		initialTabId: activeTabId,
-		initialTabData
+		initialTabData,
+		years
 	};
 }
 
+// `fromDate`/`toDate` (#1076) are this bare page's own `TemporalFilterControls`
+// query-string narrowing — see `getSpeciesPageParams`'s doc comment for why
+// only this route depth reads them. A bare `month` (recurring, no year) never
+// reaches here: the controls' `navigationController`
+// (`PageContent.tsx`'s `buildSpeciesNavigationTarget`) routes that selection
+// to the squashed-month sibling route instead.
 export async function fetchSpeciesPageContent(
 	params: PageParams,
 	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageData | null> {
-	return fetchSpeciesPageContentForPeriod(params, viewedGroup);
+	return fetchSpeciesPageContentForPeriod(params, viewedGroup, {
+		fromDate: params.fromDate,
+		toDate: params.toDate
+	});
 }
 
 export default async function SpeciesPage(
