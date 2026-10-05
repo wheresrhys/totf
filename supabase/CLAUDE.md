@@ -515,6 +515,16 @@ Core import logic (types, transforms, `createUpserter`, `processEncounterRow`) l
 `lib/demon-import.ts` and is shared by both this CLI script and the web import route — see
 `app/CLAUDE.md`'s "Web import".
 
+Both entry points run the same **location pre-flight** before any row is processed (#1079): a CSV
+naming a `loc_id` the group has no `Locations` row for aborts the whole import with zero writes
+(the CLI `console.error`s the names and exits 1). An unrecognised site name is far more often a
+rename than a genuinely new site, and importing it silently forks the Locations row and duplicates
+every encounter under the new `location_id` (#1048). The consequence for seeding: a group's first
+import can't create its own locations any more, so `seed-e2e-data.ts` pre-creates the ones
+`alpha.csv`/`beta.csv` reference via psql (in each CSV's first-appearance order, so location ids
+stay reproducible across reseeds — see #903 above), and `e2e/authenticated/import.spec.ts` re-creates
+`Delta Site` after wiping Delta's rows.
+
 ## Setting group passwords
 
 After creating a group, set its login password with:

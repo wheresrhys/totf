@@ -13,7 +13,8 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 	return {
 		...actual,
 		createUpserter: vi.fn(),
-		processEncounterRow: vi.fn()
+		processEncounterRow: vi.fn(),
+		findUnrecognisedLocationNames: vi.fn()
 	};
 });
 
@@ -86,6 +87,11 @@ describe('POST /api/import', () => {
 		mockUpsert = vi.fn().mockResolvedValue(1);
 		vi.mocked(createUpserter).mockReturnValue(mockUpsert as never);
 		vi.mocked(getAuthenticatedSupabaseClient).mockResolvedValue({} as never);
+
+		// Every location in the CSV is already known unless a test says otherwise.
+		const { findUnrecognisedLocationNames } =
+			await import('@/lib/demon-import');
+		vi.mocked(findUnrecognisedLocationNames).mockResolvedValue([]);
 	});
 
 	describe('authentication', () => {
@@ -164,6 +170,82 @@ describe('POST /api/import', () => {
 			);
 			await readStreamMessages(response);
 			expect(response.headers.get('Content-Type')).toBe('application/x-ndjson');
+		});
+	});
+
+	describe('unrecognised location names', () => {
+		beforeEach(async () => {
+			// The shared module mock isn't auto-reset between tests, so clear the
+			// call history these tests assert on.
+			const { processEncounterRow, createUpserter } =
+				await import('@/lib/demon-import');
+			vi.mocked(createUpserter).mockClear();
+			vi.mocked(processEncounterRow).mockClear();
+			vi.mocked(processEncounterRow).mockResolvedValue({
+				visitDate: '2024-06-01'
+			});
+		});
+
+		it('streams an unrecognised_locations message listing the names, instead of processing any rows', async () => {
+			const { findUnrecognisedLocationNames } =
+				await import('@/lib/demon-import');
+			vi.mocked(findUnrecognisedLocationNames).mockResolvedValue([
+				'CES972',
+				'Reedbed'
+			]);
+
+			const file = makeCsvFile([
+				makeCsvRow({ loc_id: 'CES972' }),
+				makeCsvRow({ ring_no: 'B654321', loc_id: 'Reedbed' })
+			]);
+			const response = await POST(await makeRequest(file));
+			const messages = await readStreamMessages(response);
+
+			expect(messages).toEqual([
+				{ type: 'unrecognised_locations', locations: ['CES972', 'Reedbed'] }
+			]);
+		});
+
+		it('calls neither createUpserter nor processEncounterRow when aborting for unrecognised locations', async () => {
+			const {
+				findUnrecognisedLocationNames,
+				createUpserter,
+				processEncounterRow
+			} = await import('@/lib/demon-import');
+			vi.mocked(findUnrecognisedLocationNames).mockResolvedValue(['CES972']);
+
+			const response = await POST(
+				await makeRequest(makeCsvFile([makeCsvRow({ loc_id: 'CES972' })]))
+			);
+			await readStreamMessages(response);
+
+			expect(vi.mocked(createUpserter)).not.toHaveBeenCalled();
+			expect(vi.mocked(processEncounterRow)).not.toHaveBeenCalled();
+		});
+
+		it('proceeds with normal row processing when every loc_id already matches an existing Location', async () => {
+			const { findUnrecognisedLocationNames, processEncounterRow } =
+				await import('@/lib/demon-import');
+
+			const file = makeCsvFile([
+				makeCsvRow(),
+				makeCsvRow({ ring_no: 'B654321' })
+			]);
+			const response = await POST(await makeRequest(file));
+			const messages = await readStreamMessages(response);
+
+			expect(vi.mocked(findUnrecognisedLocationNames)).toHaveBeenCalledWith(
+				expect.anything(),
+				['Garden Trap'],
+				1
+			);
+			expect(vi.mocked(processEncounterRow)).toHaveBeenCalledTimes(2);
+			expect(messages.find((m) => m.type === 'complete')).toEqual({
+				type: 'complete',
+				processed: 2,
+				successful: 2,
+				failed: 0
+			});
 		});
 	});
 
