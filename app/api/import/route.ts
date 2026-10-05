@@ -8,6 +8,8 @@ import {
 	createRingSequenceLookup,
 	createRingSequenceLinker,
 	processEncounterRow,
+	getDistinctLocationNames,
+	findUnrecognisedLocationNames,
 	CasualtyEncounterError,
 	type DemonRow
 } from '@/lib/demon-import';
@@ -28,11 +30,18 @@ export type ImportTimeoutMessage = {
 	endDate: string | null;
 };
 export type ImportErrorMessage = { type: 'error'; message: string };
+// The CSV named locations this group has no `Locations` row for, so the import
+// was abandoned before any row was written (#1079).
+export type ImportUnrecognisedLocationsMessage = {
+	type: 'unrecognised_locations';
+	locations: string[];
+};
 export type ImportMessage =
 	| ImportProgressMessage
 	| ImportCompleteMessage
 	| ImportTimeoutMessage
-	| ImportErrorMessage;
+	| ImportErrorMessage
+	| ImportUnrecognisedLocationsMessage;
 
 const TIMEOUT_MS = 280_000;
 
@@ -50,9 +59,6 @@ export async function POST(request: Request): Promise<Response> {
 
 	const buffer = Buffer.from(await file.arrayBuffer());
 	const supabaseClient = await getAuthenticatedSupabaseClient();
-	const upsert = createUpserter(supabaseClient);
-	const lookupRingSequence = createRingSequenceLookup(supabaseClient);
-	const linkRingSequence = createRingSequenceLinker(supabaseClient);
 	const deadline = Date.now() + TIMEOUT_MS;
 	const encoder = new TextEncoder();
 
@@ -84,6 +90,31 @@ export async function POST(request: Request): Promise<Response> {
 						.on('end', resolve)
 						.on('error', reject);
 				});
+
+				// Pre-flight: a `loc_id` the group has no Location for is far more
+				// often a renamed site than a genuinely new one (#1048), and
+				// importing it would fork the Locations row and duplicate every
+				// encounter under it. Abort before the first write, so the whole
+				// upload is a no-op and a plain re-upload is safe once the name has
+				// been resolved.
+				const unrecognisedLocations = await findUnrecognisedLocationNames(
+					supabaseClient,
+					getDistinctLocationNames(rows),
+					ringingGroupId
+				);
+				if (unrecognisedLocations.length > 0) {
+					send({
+						type: 'unrecognised_locations',
+						locations: unrecognisedLocations
+					});
+					return;
+				}
+
+				// Deliberately built only once the pre-flight has passed, so an
+				// aborted import never even constructs the writers.
+				const upsert = createUpserter(supabaseClient);
+				const lookupRingSequence = createRingSequenceLookup(supabaseClient);
+				const linkRingSequence = createRingSequenceLinker(supabaseClient);
 
 				await Promise.all(
 					rows.map((row) =>
