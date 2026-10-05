@@ -87,19 +87,19 @@ describe('notable_retraps', () => {
 	});
 
 	// ARRETRAP is the seed's long-lived Robin, encountered on every ARRETRAP_DATES
-	// date (2021-06-20 → 2024-05-10). `from_date`/`to_date` filter `visit_date`
-	// inclusively, so both `encounter_count` and `encounter_dates` shrink to the
-	// in-range encounters. Each test pulls the ARRETRAP row out of a Robin query
+	// date (2021-06-20 → 2024-05-10). The temporal filters narrow `visit_date`, so
+	// both `encounter_count` and `encounter_dates` shrink to the in-scope
+	// encounters. Each test pulls the ARRETRAP row out of a Robin query
 	// (`min_encounter_count: 1`) and checks its date-scoped shape.
-	describe('date-range filtering', () => {
-		const findArretrap = (
-			rows: {
-				ring_no: string;
-				encounter_count: number;
-				encounter_dates: string[];
-			}[]
-		) => rows.find((r) => r.ring_no === 'ARRETRAP');
+	const findArretrap = (
+		rows: {
+			ring_no: string;
+			encounter_count: number;
+			encounter_dates: string[];
+		}[]
+	) => rows.find((r) => r.ring_no === 'ARRETRAP');
 
+	describe('date-range filtering', () => {
 		it('both from_date and to_date returns only encounters within the range', async () => {
 			const { data, error } = await alphaClient.rpc('notable_retraps', {
 				ringing_group_filter: alphaId,
@@ -211,6 +211,73 @@ describe('notable_retraps', () => {
 			});
 			expect(error).toBeNull();
 			expect(data).toHaveLength(0);
+		});
+	});
+
+	describe('year filtering', () => {
+		it('returns only encounters in year_filter', async () => {
+			const { data, error } = await alphaClient.rpc('notable_retraps', {
+				ringing_group_filter: alphaId,
+				species_filter: 'Robin',
+				min_encounter_count: 1,
+				year_filter: 2022
+			});
+			expect(error).toBeNull();
+			expect(
+				data!.every((r) =>
+					r.encounter_dates.every((d: string) => d.slice(0, 4) === '2022')
+				)
+			).toBe(true);
+			expect(findArretrap(data!)).toMatchObject({
+				encounter_count: 4,
+				encounter_dates: [
+					'2022-04-30',
+					'2022-06-15',
+					'2022-08-10',
+					'2022-10-20'
+				]
+			});
+		});
+	});
+
+	describe('month filtering', () => {
+		it('returns every occurrence of that calendar month across all years', async () => {
+			// A bare month_filter is a recurring month, not a contiguous range:
+			// ARRETRAP's two May encounters sit in different calendar years.
+			const { data, error } = await alphaClient.rpc('notable_retraps', {
+				ringing_group_filter: alphaId,
+				species_filter: 'Robin',
+				min_encounter_count: 1,
+				month_filter: 5
+			});
+			expect(error).toBeNull();
+			expect(
+				data!.every((r) =>
+					r.encounter_dates.every((d: string) => d.slice(5, 7) === '05')
+				)
+			).toBe(true);
+			expect(findArretrap(data!)).toMatchObject({
+				encounter_count: 2,
+				encounter_dates: ['2023-05-12', '2024-05-10']
+			});
+		});
+
+		it('intersects year_filter and month_filter with the existing from_date/to_date', async () => {
+			// The range spans 2022-2023 and year/month narrow it to May 2023 alone.
+			const { data, error } = await alphaClient.rpc('notable_retraps', {
+				ringing_group_filter: alphaId,
+				species_filter: 'Robin',
+				min_encounter_count: 1,
+				from_date: '2022-01-01',
+				to_date: '2023-12-31',
+				year_filter: 2023,
+				month_filter: 5
+			});
+			expect(error).toBeNull();
+			expect(findArretrap(data!)).toMatchObject({
+				encounter_count: 1,
+				encounter_dates: ['2023-05-12']
+			});
 		});
 	});
 });
