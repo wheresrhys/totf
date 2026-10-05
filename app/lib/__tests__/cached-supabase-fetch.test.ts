@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -10,6 +11,8 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 
 const GROUP_ID = 1;
 const OTHER_GROUP_ID = 2;
+const viewedGroup: ViewedGroup = { id: GROUP_ID, slug: 'alpha' };
+const otherViewedGroup: ViewedGroup = { id: OTHER_GROUP_ID, slug: 'beta' };
 const TTL_MS = 60 * 60 * 1000;
 
 let statsVersion = 100;
@@ -58,7 +61,7 @@ describe('Cached supabase fetch', () => {
 		mockDataFetcher.mockResolvedValue('test ok');
 		const result = await cachedSupabaseFetch(
 			'test-cache-1',
-			GROUP_ID,
+			viewedGroup,
 			mockDataFetcher
 		);
 		expect(mockDataFetcher).toHaveBeenCalledOnce();
@@ -68,17 +71,17 @@ describe('Cached supabase fetch', () => {
 	it('passes the same supabase client used to check version into the data fetcher', async () => {
 		const { cachedSupabaseFetch } = await importCachedFetch();
 		mockDataFetcher.mockResolvedValue('test ok');
-		await cachedSupabaseFetch('test-cache-1', GROUP_ID, mockDataFetcher);
+		await cachedSupabaseFetch('test-cache-1', viewedGroup, mockDataFetcher);
 		expect(mockDataFetcher).toHaveBeenCalledWith(mockSupabaseClient, GROUP_ID);
 	});
 	it('returns a cached response if a cached item for the group exists', async () => {
 		const { cachedSupabaseFetch } = await importCachedFetch();
 		mockDataFetcher.mockResolvedValue('test ok');
-		await cachedSupabaseFetch('test-cache-1', GROUP_ID, mockDataFetcher);
+		await cachedSupabaseFetch('test-cache-1', viewedGroup, mockDataFetcher);
 		expect(mockDataFetcher).toHaveBeenCalledOnce();
 		const result = await cachedSupabaseFetch(
 			'test-cache-1',
-			GROUP_ID,
+			viewedGroup,
 			mockDataFetcher
 		);
 		expect(mockDataFetcher).toHaveBeenCalledOnce();
@@ -95,11 +98,11 @@ describe('Cached supabase fetch', () => {
 				return 'other test ok';
 			}
 		});
-		await cachedSupabaseFetch('test-cache-1', GROUP_ID, mockDataFetcher);
+		await cachedSupabaseFetch('test-cache-1', viewedGroup, mockDataFetcher);
 		expect(mockDataFetcher).toHaveBeenCalledOnce();
 		const result = await cachedSupabaseFetch(
 			'test-cache-1',
-			OTHER_GROUP_ID,
+			otherViewedGroup,
 			mockDataFetcher
 		);
 		expect(mockDataFetcher).toHaveBeenCalledTimes(2);
@@ -120,14 +123,14 @@ describe('Cached supabase fetch', () => {
 				return 'other test ok';
 			}
 		});
-		await cachedSupabaseFetch('test-cache-1', GROUP_ID, mockDataFetcher);
+		await cachedSupabaseFetch('test-cache-1', viewedGroup, mockDataFetcher);
 		expect(mockDataFetcher).toHaveBeenCalledOnce();
-		await cachedSupabaseFetch('test-cache-2', GROUP_ID, mockDataFetcher);
+		await cachedSupabaseFetch('test-cache-2', viewedGroup, mockDataFetcher);
 		expect(
-			await cachedSupabaseFetch('test-cache-1', GROUP_ID, mockDataFetcher)
+			await cachedSupabaseFetch('test-cache-1', viewedGroup, mockDataFetcher)
 		).toBe('test ok');
 		expect(
-			await cachedSupabaseFetch('test-cache-2', GROUP_ID, mockDataFetcher)
+			await cachedSupabaseFetch('test-cache-2', viewedGroup, mockDataFetcher)
 		).toBe('other test ok');
 	});
 	describe('expiry', () => {
@@ -145,11 +148,11 @@ describe('Cached supabase fetch', () => {
 			const now = Date.now();
 			const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
 
-			await cachedSupabaseFetch('test-cache-1', GROUP_ID, mockDataFetcher);
+			await cachedSupabaseFetch('test-cache-1', viewedGroup, mockDataFetcher);
 			dateNowSpy.mockReturnValue(now + TTL_MS + 1);
 			const result = await cachedSupabaseFetch(
 				'test-cache-1',
-				GROUP_ID,
+				viewedGroup,
 				mockDataFetcher
 			);
 
@@ -167,11 +170,11 @@ describe('Cached supabase fetch', () => {
 					return 'second test ok';
 				}
 			});
-			await cachedSupabaseFetch('test-cache-1', GROUP_ID, mockDataFetcher);
+			await cachedSupabaseFetch('test-cache-1', viewedGroup, mockDataFetcher);
 			statsVersion = 101;
 			const result = await cachedSupabaseFetch(
 				'test-cache-1',
-				GROUP_ID,
+				viewedGroup,
 				mockDataFetcher
 			);
 			expect(mockDataFetcher).toHaveBeenCalledTimes(2);
@@ -184,7 +187,7 @@ describe('Cached supabase fetch', () => {
 			// and low value/fidelity given the complexity of the mock
 			const { cachedSupabaseFetch } = await importCachedFetch();
 			mockDataFetcher.mockResolvedValue('test ok');
-			await cachedSupabaseFetch('test-cache-1', GROUP_ID, mockDataFetcher);
+			await cachedSupabaseFetch('test-cache-1', viewedGroup, mockDataFetcher);
 			expect(mockEncountersEq).toHaveBeenCalledWith(
 				'ringing_group_id',
 				GROUP_ID

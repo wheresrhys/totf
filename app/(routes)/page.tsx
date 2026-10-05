@@ -16,13 +16,13 @@ import type { SessionWithEncountersCount } from '../models/session';
 import { recentSessionsQuery, topSpeciesQuery } from '@/queries';
 
 export async function fetchRecentSessions(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<SessionWithEncountersCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const sessions = (await supabase
 		.from('Sessions')
 		.select(recentSessionsQuery.select)
-		.eq('ringing_group_id', viewedGroupId)
+		.eq('ringing_group_id', viewedGroup.id)
 		.order('visit_date', { ascending: false })
 		.limit(30)
 		.then(catchSupabaseErrors)) as SessionWithEncountersCount[];
@@ -34,7 +34,7 @@ export async function fetchRecentSessions(
 }
 
 export async function fetchHomePageSummaryStats(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<HomePageSummaryStats | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const currentYear = new Date().getFullYear();
@@ -43,17 +43,17 @@ export async function fetchHomePageSummaryStats(
 	const endOfLastYear = `${currentYear - 1}-12-31`;
 	const [allTime, thisYear, lastYear] = await Promise.all([
 		supabase
-			.rpc('core_stats', { ringing_group_filter: viewedGroupId })
+			.rpc('core_stats', { ringing_group_filter: viewedGroup.id })
 			.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>,
 		supabase
 			.rpc('core_stats', {
-				ringing_group_filter: viewedGroupId,
+				ringing_group_filter: viewedGroup.id,
 				from_date: startOfCurrentYear
 			})
 			.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>,
 		supabase
 			.rpc('core_stats', {
-				ringing_group_filter: viewedGroupId,
+				ringing_group_filter: viewedGroup.id,
 				from_date: startOfLastYear,
 				to_date: endOfLastYear
 			})
@@ -70,12 +70,12 @@ export async function fetchHomePageSummaryStats(
 }
 
 export async function fetchLastGroupTick(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<GroupTicksResult | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const ticks = (await supabase
 		.rpc('group_ticks', {
-			ringing_group_filter: viewedGroupId,
+			ringing_group_filter: viewedGroup.id,
 			result_limit: 1
 		})
 		.then(catchSupabaseErrors)) as GroupTicksResult[] | null;
@@ -96,13 +96,14 @@ export async function fetchGroupSpecies(): Promise<SpeciesWithBirdsCount[]> {
 
 export async function fetchHomePageContent(
 	_: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<PageModel> {
 	return {
-		recentSessions: await fetchRecentSessions(viewedGroupId),
+		recentSessions: await fetchRecentSessions(viewedGroup),
 		groupSpecies: await fetchGroupSpecies(),
-		summaryStats: await fetchHomePageSummaryStats(viewedGroupId),
-		lastGroupTick: await fetchLastGroupTick(viewedGroupId)
+		summaryStats: await fetchHomePageSummaryStats(viewedGroup),
+		lastGroupTick: await fetchLastGroupTick(viewedGroup)
 	};
 }
 

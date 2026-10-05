@@ -34,14 +34,14 @@ type SessionPageEncounter = SessionEncounter & { location: LocationRow };
 
 async function fetchAdjacentSessionDates(
 	supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	date: string
 ): Promise<AdjacentSessionDates> {
 	const [previousResult, nextResult] = await Promise.all([
 		supabase
 			.from('Encounters')
 			.select('visit_date')
-			.eq('ringing_group_id', viewedGroupId)
+			.eq('ringing_group_id', viewedGroup.id)
 			.not('record_type', 'in', RESIGHTING_RECORD_TYPES_FILTER_LIST)
 			.lt('visit_date', date)
 			.order('visit_date', { ascending: false })
@@ -50,7 +50,7 @@ async function fetchAdjacentSessionDates(
 		supabase
 			.from('Encounters')
 			.select('visit_date')
-			.eq('ringing_group_id', viewedGroupId)
+			.eq('ringing_group_id', viewedGroup.id)
 			.not('record_type', 'in', RESIGHTING_RECORD_TYPES_FILTER_LIST)
 			.gt('visit_date', date)
 			.order('visit_date', { ascending: true })
@@ -65,7 +65,7 @@ async function fetchAdjacentSessionDates(
 
 async function fetchDayEncounters(
 	supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	date: string
 ): Promise<SessionPageEncounter[]> {
 	// TODO switch back to querying by session once sessions
@@ -109,7 +109,7 @@ async function fetchDayEncounters(
 		)
 	`
 		)
-		.eq('ringing_group_id', viewedGroupId)
+		.eq('ringing_group_id', viewedGroup.id)
 		.eq('visit_date', date)
 		.not('record_type', 'in', RESIGHTING_RECORD_TYPES_FILTER_LIST)
 		.order('capture_time', { ascending: true })
@@ -136,14 +136,15 @@ function collectDistinctLocations(
 	);
 }
 
-export async function fetchSessionPageContent({
-	viewedGroupId,
-	date
-}: PageParams): Promise<DayData | null> {
+export async function fetchSessionPageContent(
+	{ date }: PageParams,
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
+): Promise<DayData | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const [encounters, adjacentSessionDates] = await Promise.all([
-		fetchDayEncounters(supabase, viewedGroupId, date),
-		fetchAdjacentSessionDates(supabase, viewedGroupId, date)
+		fetchDayEncounters(supabase, viewedGroup, date),
+		fetchAdjacentSessionDates(supabase, viewedGroup, date)
 	]);
 
 	return {
@@ -200,7 +201,6 @@ export default withGroupScope<{ date: string }>(
 		<BootstrapPage<DayData, PageProps, PageParams>
 			viewedGroup={viewedGroup}
 			getParams={async () => ({
-				viewedGroupId: viewedGroup.id,
 				date: params.date,
 				...(await resolveSessionTabParams(
 					params.date,

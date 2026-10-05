@@ -10,11 +10,12 @@ import { TicksPageContent } from './PageContent';
 
 export async function fetchTicksPageContent(
 	_: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<GroupTicksResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('group_ticks', { ringing_group_filter: viewedGroupId })
+		.rpc('group_ticks', { ringing_group_filter: viewedGroup.id })
 		.then(catchSupabaseErrors) as Promise<GroupTicksResult[]>;
 }
 

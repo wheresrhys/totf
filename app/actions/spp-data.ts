@@ -7,6 +7,7 @@ import {
 	mergeSpeciesBiometrics,
 	type SpeciesStatsRow
 } from '@/app/lib/species-stats';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // biometrics_stats needs an authenticated session to be meaningful (it has no
 // public-gated wrapper analogous to public_core_stats — /species sits
@@ -17,7 +18,7 @@ import {
 // caller of this access pattern, but this stays defensive rather than assuming
 // it's the only one.
 async function fetchBiometricsStats(
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
@@ -25,7 +26,7 @@ async function fetchBiometricsStats(
 	const client = await getAuthenticatedSupabaseClient();
 	const rows = (await client
 		.rpc('biometrics_stats', {
-			ringing_group_filter: viewedGroupId,
+			ringing_group_filter: viewedGroup.id,
 			from_date: fromDate,
 			to_date: toDate,
 			group_by_species: true,
@@ -36,12 +37,12 @@ async function fetchBiometricsStats(
 }
 
 export async function fetchSpeciesData(
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
 ): Promise<SpeciesStatsRow[]> {
-	const { accessLevel, rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
+	const { accessLevel, rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		from_date: fromDate,
 		to_date: toDate,
 		group_by_species: true,
@@ -50,7 +51,7 @@ export async function fetchSpeciesData(
 
 	const biometricsRows =
 		accessLevel === 'own' || accessLevel === 'shared'
-			? await fetchBiometricsStats(viewedGroupId, fromDate, toDate, monthFilter)
+			? await fetchBiometricsStats(viewedGroup, fromDate, toDate, monthFilter)
 			: [];
 
 	return mergeSpeciesBiometrics(rows, biometricsRows);

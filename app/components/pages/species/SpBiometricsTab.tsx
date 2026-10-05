@@ -14,6 +14,7 @@ import {
 	type SexedGraphableBird
 } from '@/app/components/pages/species/WeightAndWingChart';
 import { ChartTile } from '@/app/components/pages/species/ChartTile';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 function Spinner() {
 	return (
@@ -61,14 +62,14 @@ export function SpBiometricsTab({
 	speciesStats,
 	speciesName,
 	speciesId,
-	viewedGroupId,
+	viewedGroup,
 	fromDate,
 	toDate
 }: {
 	speciesStats: CoreStatsWithBiometrics;
 	speciesName: string;
 	speciesId: number;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 	fromDate?: string;
 	toDate?: string;
 }) {
@@ -81,7 +82,7 @@ export function SpBiometricsTab({
 	function loadStatsHistory() {
 		if (statsRequested) return;
 		setStatsRequested(true);
-		getSpeciesStatsHistory(speciesName, viewedGroupId, fromDate, toDate).then(
+		getSpeciesStatsHistory(speciesName, viewedGroup, fromDate, toDate).then(
 			setStatsHistory
 		);
 	}
@@ -93,12 +94,9 @@ export function SpBiometricsTab({
 	function loadScatterData() {
 		if (scatterRequested) return;
 		setScatterRequested(true);
-		fetchGraphableEncounterData(
-			speciesId,
-			viewedGroupId,
-			fromDate,
-			toDate
-		).then(setScatterData);
+		fetchGraphableEncounterData(speciesId, viewedGroup, fromDate, toDate).then(
+			setScatterData
+		);
 	}
 
 	const charts: {

@@ -63,7 +63,10 @@ describe('highlight-generator', () => {
 				includePerSpecies: true
 			});
 			expect(getStatsByTemporalUnit).toHaveBeenCalledOnce();
-			expect(getStatsByTemporalUnit).toHaveBeenCalledWith('day', 1);
+			expect(getStatsByTemporalUnit).toHaveBeenCalledWith('day', {
+				id: 1,
+				slug: null
+			});
 		});
 		it('returns all stats by default', async () => {
 			await getHighlightsWithinTimeWindow({

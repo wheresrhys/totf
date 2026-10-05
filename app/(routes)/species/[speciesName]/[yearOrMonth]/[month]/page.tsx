@@ -37,7 +37,8 @@ async function getSpeciesYearMonthPageParams(
 
 export async function fetchSpeciesYearMonthPageContent(
 	params: PageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<PageData | null> {
 	// A squashed month (e.g. `/species/{name}/jan/5`) has no single year to
 	// drill a specific day-range into — this nested route only makes sense
@@ -50,7 +51,7 @@ export async function fetchSpeciesYearMonthPageContent(
 	const monthDate = new Date(Number(year), Number(params.month) - 1, 1);
 	const fromDate = format(startOfMonth(monthDate), 'yyyy-MM-dd');
 	const toDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
-	return fetchSpeciesPageContentForPeriod(params, viewedGroupId, {
+	return fetchSpeciesPageContentForPeriod(params, viewedGroup, {
 		year: Number(year),
 		month: Number(params.month),
 		fromDate,

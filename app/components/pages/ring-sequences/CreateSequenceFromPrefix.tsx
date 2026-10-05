@@ -6,6 +6,7 @@ import {
 	type CreateSequenceFromPrefixState
 } from '@/app/actions/ring-sequences';
 import { deriveRingBounds } from '@/app/models/ring-sequences';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // Confirmation modal for creating a ring sequence from an unassigned import
 // prefix (issue #697). Mirrors `CreateSequenceForRing` / `RingSequenceEditModal`:
@@ -18,12 +19,12 @@ import { deriveRingBounds } from '@/app/models/ring-sequences';
 export function CreateSequenceFromPrefix({
 	prefix,
 	ringNos,
-	viewedGroupId,
+	viewedGroup,
 	onClose
 }: {
 	prefix: string;
 	ringNos: string[];
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 	onClose: () => void;
 }) {
 	const router = useRouter();
@@ -64,7 +65,7 @@ export function CreateSequenceFromPrefix({
 				</ul>
 				<form action={action} className="flex flex-col gap-4">
 					<input type="hidden" name="prefix" value={prefix} />
-					<input type="hidden" name="viewed_group_id" value={viewedGroupId} />
+					<input type="hidden" name="viewed_group_id" value={viewedGroup.id} />
 					<label className="flex flex-col gap-1">
 						<span className="text-sm">First ring</span>
 						<input

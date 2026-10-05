@@ -12,13 +12,14 @@ import { ResightingsPageContent } from './PageContent';
 
 export async function fetchResightingsPageContent(
 	_: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<ResightingEncounter[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Encounters')
 		.select(resightingsQuery.select)
-		.eq('ringing_group_id', viewedGroupId)
+		.eq('ringing_group_id', viewedGroup.id)
 		.in('record_type', [...RESIGHTING_RECORD_TYPES])
 		.then(catchSupabaseErrors) as Promise<ResightingEncounter[]>;
 }

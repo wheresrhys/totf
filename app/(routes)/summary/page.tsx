@@ -38,11 +38,12 @@ async function getSummaryPageParams(pageProps: PageProps): Promise<PageParams> {
 
 export async function fetchSummaryPageContent(
 	params: PageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<PageData> {
 	const [summaryStats, yearlyTotals] = await Promise.all([
-		fetchSummaryStats(viewedGroupId),
-		fetchYearlyTotals(viewedGroupId)
+		fetchSummaryStats(viewedGroup),
+		fetchYearlyTotals(viewedGroup)
 	]);
 	const activeTabId = resolveInitialTabId(
 		params.tabId,
@@ -60,11 +61,7 @@ export async function fetchSummaryPageContent(
 		allTimeSummaryPrefetchers,
 		activeTabId,
 		{ totalsStats: undefined },
-		// No full `ViewedGroup` (with slug) is resolved yet at this point in
-		// `BootstrapPage` — only the numeric id. None of these 4 tabs'
-		// `dataFetcher`s read `slug`, so `null` (a legitimate `ViewedGroup`
-		// value, not a lie) is a safe stand-in rather than re-resolving it here.
-		{ id: viewedGroupId, slug: null }
+		viewedGroup
 	);
 	return { summaryStats, yearlyTotals, initialTabData };
 }

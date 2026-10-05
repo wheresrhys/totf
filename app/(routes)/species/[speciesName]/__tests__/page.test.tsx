@@ -13,6 +13,9 @@ import {
 } from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '../PageContent';
 import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
 const {
 	mockGetAuthenticatedSupabaseClient,
@@ -90,7 +93,7 @@ describe('species detail page', () => {
 			it('resolves ?tabId= to one of the 3 in-scope tabs and calls prefetchActiveTabData', async () => {
 				const data = await fetchSpeciesPageContentForPeriod(
 					{ speciesName: 'Robin', tabId: 'year-totals' },
-					1
+					VIEWED_GROUP
 				);
 				expect(mockFetchYearTotalsTabData).toHaveBeenCalledTimes(1);
 				expect(mockFetchMonthTotalsTabData).not.toHaveBeenCalled();
@@ -104,7 +107,7 @@ describe('species detail page', () => {
 			it('resolves ?tabId= to one of the 3 not-yet-migrated tabs and skips prefetchActiveTabData', async () => {
 				const data = await fetchSpeciesPageContentForPeriod(
 					{ speciesName: 'Robin', tabId: 'biometrics' },
-					1
+					VIEWED_GROUP
 				);
 				expect(mockFetchYearTotalsTabData).not.toHaveBeenCalled();
 				expect(mockFetchMonthTotalsTabData).not.toHaveBeenCalled();
@@ -117,7 +120,7 @@ describe('species detail page', () => {
 			it('resolves ?tabId=highlights to the Highlights tab but still skips prefetchActiveTabData, since it is declared clientSideOnly', async () => {
 				const data = await fetchSpeciesPageContentForPeriod(
 					{ speciesName: 'Robin', tabId: 'highlights' },
-					1
+					VIEWED_GROUP
 				);
 				expect(mockFetchYearTotalsTabData).not.toHaveBeenCalled();
 				expect(data).toMatchObject({
@@ -129,7 +132,7 @@ describe('species detail page', () => {
 			it('falls back to the route-depth default tab id when no ?tabId= is given', async () => {
 				const data = await fetchSpeciesPageContentForPeriod(
 					{ speciesName: 'Robin' },
-					1
+					VIEWED_GROUP
 				);
 				expect(mockFetchYearTotalsTabData).toHaveBeenCalledTimes(1);
 				expect(data).toMatchObject({ initialTabId: 'year-totals' });
@@ -229,6 +232,7 @@ function makeStatsClient({
 
 const STATS_SPECIES_NAME = 'Robin';
 const STATS_GROUP_ID = 7;
+const STATS_VIEWED_GROUP: ViewedGroup = { id: STATS_GROUP_ID, slug: 'alpha' };
 const STATS_FROM_DATE = '2023-01-01';
 const STATS_TO_DATE = '2023-12-31';
 
@@ -243,7 +247,10 @@ describe('getSpeciesStats', () => {
 			biometricsRows: [makeBiometricsRow({ min_weight: 99 })]
 		});
 
-		const result = await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
+		const result = await getSpeciesStats(
+			STATS_SPECIES_NAME,
+			STATS_VIEWED_GROUP
+		);
 
 		expect(result[0].min_weight).toBe(99);
 		expect(result[0].bird_count).toBe(
@@ -257,7 +264,7 @@ describe('getSpeciesStats', () => {
 			biometricsRows: [makeBiometricsRow()]
 		});
 
-		await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
+		await getSpeciesStats(STATS_SPECIES_NAME, STATS_VIEWED_GROUP);
 
 		const aggregateCall = rpcCalls.find((call) => call.name === 'core_stats');
 		const biometricsCall = rpcCalls.find(
@@ -281,7 +288,7 @@ describe('getSpeciesStats', () => {
 			biometricsRows: [makeBiometricsRow()]
 		});
 
-		await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
+		await getSpeciesStats(STATS_SPECIES_NAME, STATS_VIEWED_GROUP);
 
 		expect(rpcCalls).toHaveLength(2);
 		for (const call of rpcCalls) {
@@ -298,7 +305,7 @@ describe('getSpeciesStats', () => {
 
 		await getSpeciesStats(
 			STATS_SPECIES_NAME,
-			STATS_GROUP_ID,
+			STATS_VIEWED_GROUP,
 			STATS_FROM_DATE,
 			STATS_TO_DATE
 		);
@@ -320,7 +327,7 @@ describe('getSpeciesStats', () => {
 
 		await getSpeciesStats(
 			STATS_SPECIES_NAME,
-			STATS_GROUP_ID,
+			STATS_VIEWED_GROUP,
 			undefined,
 			undefined,
 			1
@@ -338,7 +345,7 @@ describe('getSpeciesStats', () => {
 			biometricsRows: [makeBiometricsRow()]
 		});
 
-		await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
+		await getSpeciesStats(STATS_SPECIES_NAME, STATS_VIEWED_GROUP);
 
 		expect(rpcCalls).toHaveLength(2);
 		for (const call of rpcCalls) {
@@ -352,7 +359,10 @@ describe('getSpeciesStats', () => {
 			biometricsRows: [makeBiometricsRow({ min_weight: 12, max_wing: 88 })]
 		});
 
-		const result = await getSpeciesStats(STATS_SPECIES_NAME, STATS_GROUP_ID);
+		const result = await getSpeciesStats(
+			STATS_SPECIES_NAME,
+			STATS_VIEWED_GROUP
+		);
 
 		expect(result[0].min_weight).toBe(12);
 		expect(result[0].max_wing).toBe(88);

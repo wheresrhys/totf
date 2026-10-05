@@ -21,6 +21,9 @@ import type {
 	DemographicsStatsResult,
 	ArrivalsStatsResult
 } from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
 // chartkick registers Chart.js as a side effect; nothing renders a real canvas
 // here because the presentational chart components are mocked below.
@@ -165,7 +168,7 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 
 const props = {
 	speciesName: 'Robin',
-	viewedGroupId: 1
+	viewedGroup: VIEWED_GROUP
 };
 
 async function loadActions() {
@@ -287,7 +290,7 @@ describe('SpDemographicsTab', () => {
 			expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(1);
 			expect(getSpeciesStatsHistory).toHaveBeenCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined
 			);
@@ -352,7 +355,7 @@ describe('SpDemographicsTab', () => {
 			expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1);
 			expect(getSpeciesDemographicsStats).toHaveBeenCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined
 			);
@@ -368,7 +371,7 @@ describe('SpDemographicsTab', () => {
 			expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1);
 			expect(getSpeciesDemographicsStats).toHaveBeenCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined
 			);
@@ -400,7 +403,7 @@ describe('SpDemographicsTab', () => {
 			expect(getSpeciesDemographicsStats).toHaveBeenCalledTimes(1);
 			expect(getSpeciesDemographicsStats).toHaveBeenCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined
 			);
@@ -447,7 +450,7 @@ describe('SpDemographicsTab', () => {
 			expect(getSpeciesArrivalsStats).toHaveBeenCalledTimes(1);
 			expect(getSpeciesArrivalsStats).toHaveBeenCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined
 			);
@@ -526,14 +529,14 @@ describe('SpDemographicsTab', () => {
 			expect(getSpeciesStatsHistory).toHaveBeenNthCalledWith(
 				1,
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined
 			);
 			expect(getSpeciesStatsHistory).toHaveBeenNthCalledWith(
 				2,
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined,
 				'year'
@@ -553,7 +556,7 @@ describe('SpDemographicsTab', () => {
 			);
 			expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined,
 				'year'
@@ -570,7 +573,7 @@ describe('SpDemographicsTab', () => {
 			);
 			expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined,
 				'year'
@@ -587,7 +590,7 @@ describe('SpDemographicsTab', () => {
 			);
 			expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined,
 				'year'
@@ -605,14 +608,14 @@ describe('SpDemographicsTab', () => {
 			);
 			expect(getSpeciesStatsHistory).toHaveBeenLastCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined,
 				'year'
 			);
 			expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined,
 				'year'
@@ -627,7 +630,7 @@ describe('SpDemographicsTab', () => {
 			await waitFor(() =>
 				expect(getSpeciesDemographicsStats).toHaveBeenLastCalledWith(
 					'Robin',
-					1,
+					VIEWED_GROUP,
 					'2024-01-01',
 					'2024-12-31',
 					'year'
@@ -712,13 +715,13 @@ describe('SpDemographicsTab', () => {
 			);
 			expect(getSpeciesStatsHistory).toHaveBeenCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				'2024-01-01',
 				'2024-12-31'
 			);
 			expect(getSpeciesDemographicsStats).toHaveBeenCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				'2024-01-01',
 				'2024-12-31'
 			);

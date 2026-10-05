@@ -9,6 +9,7 @@ import {
 import { CreateSequenceForRing } from '../CreateSequenceForRing';
 import type { PromoteControlState } from '@/app/actions/ring-sequences';
 import { mockRefresh } from '@/vitest.setup';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const { mockPromoteControlToSequence } = vi.hoisted(() => ({
 	mockPromoteControlToSequence: vi.fn()
@@ -21,16 +22,21 @@ vi.mock('@/app/actions/ring-sequences', () => ({
 function renderCreateSequenceForRing(
 	overrides: Partial<{
 		ringNo: string;
-		viewedGroupId: number;
+		viewedGroup: ViewedGroup;
 		onClose: () => void;
 	}> = {}
 ) {
 	const onClose = overrides.onClose ?? vi.fn();
-	const props = { ringNo: 'ABC1234', viewedGroupId: 1, ...overrides, onClose };
+	const props = {
+		ringNo: 'ABC1234',
+		viewedGroup: { id: 1, slug: 'alpha' },
+		...overrides,
+		onClose
+	};
 	const renderResult = render(
 		<CreateSequenceForRing
 			ringNo={props.ringNo}
-			viewedGroupId={props.viewedGroupId}
+			viewedGroup={props.viewedGroup}
 			onClose={onClose}
 		/>
 	);
@@ -54,7 +60,9 @@ describe('CreateSequenceForRing', () => {
 		mockPromoteControlToSequence.mockImplementation(
 			async (): Promise<PromoteControlState> => ({ success: true })
 		);
-		const { onClose } = renderCreateSequenceForRing({ viewedGroupId: 42 });
+		const { onClose } = renderCreateSequenceForRing({
+			viewedGroup: { id: 42, slug: 'alpha' }
+		});
 		fireEvent.submit(
 			screen.getByRole('button', { name: 'Confirm' }).closest('form')!
 		);

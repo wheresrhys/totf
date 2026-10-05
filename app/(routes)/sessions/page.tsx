@@ -44,13 +44,14 @@ const FULL_GROWN_EQUIVALENT_SELECT = `${allSessionsQuery.select}, qualifying:Enc
 
 export async function fetchSessionsPageContent(
 	params: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<SessionWithEncountersCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Sessions')
 		.select(FULL_GROWN_EQUIVALENT_SELECT)
-		.eq('ringing_group_id', viewedGroupId)
+		.eq('ringing_group_id', viewedGroup.id)
 		.not('qualifying.record_type', 'in', RESIGHTING_RECORD_TYPES_FILTER_LIST)
 		.or('age_code.neq.1,is_juv.eq.true', { referencedTable: 'qualifying' })
 		.order('visit_date', { ascending: false })

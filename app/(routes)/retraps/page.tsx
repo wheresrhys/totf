@@ -10,12 +10,13 @@ import { RetrapsPageContent } from './PageContent';
 
 export async function fetchRetrapsPageContent(
 	_: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<NotableRetrapsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('notable_retraps', {
-			ringing_group_filter: viewedGroupId,
+			ringing_group_filter: viewedGroup.id,
 			result_limit_per_species: 5,
 			min_proven_age: 3,
 			min_encounter_count: 6

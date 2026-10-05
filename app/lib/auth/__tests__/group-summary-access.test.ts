@@ -3,6 +3,7 @@ import { getGroupCookie } from '../../../actions/group-cookie';
 import { getAuthenticatedSupabaseClient } from '../group-auth';
 import { resolveGroupPublicAreasForRequest } from '../../group-slug';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const { mockPublicSupabaseFrom, mockPublicSupabaseRpc } = vi.hoisted(() => ({
 	mockPublicSupabaseFrom: vi.fn(),
@@ -88,6 +89,7 @@ function mockPublicRpcReturning(rows: CoreStatsWithBiometrics[] | null) {
 }
 
 const VIEWED_GROUP_ID = 10;
+const viewedGroup: ViewedGroup = { id: VIEWED_GROUP_ID, slug: 'alpha' };
 
 describe('summary read-path access model', () => {
 	beforeEach(() => {
@@ -103,7 +105,7 @@ describe('summary read-path access model', () => {
 				client as never
 			);
 
-			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(viewedGroup);
 
 			expect(result).toEqual({ accessLevel: 'own', rows: ownRows });
 			expect(resolveGroupPublicAreasForRequest).not.toHaveBeenCalled();
@@ -117,7 +119,7 @@ describe('summary read-path access model', () => {
 				client as never
 			);
 
-			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(viewedGroup);
 
 			expect(result.accessLevel).toBe('own');
 			expect(resolveGroupPublicAreasForRequest).not.toHaveBeenCalled();
@@ -137,7 +139,7 @@ describe('summary read-path access model', () => {
 		it('target not public: blocked (gated), not a 500', async () => {
 			vi.mocked(resolveGroupPublicAreasForRequest).mockResolvedValue([]);
 
-			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(viewedGroup);
 
 			expect(result).toEqual({ accessLevel: 'blocked', rows: [] });
 		});
@@ -149,7 +151,7 @@ describe('summary read-path access model', () => {
 			const publicRows = [buildStatsRow({ encounter_count: 42 })];
 			mockPublicRpcReturning(publicRows);
 
-			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(viewedGroup);
 
 			expect(result).toEqual({ accessLevel: 'public', rows: publicRows });
 			expect(mockPublicSupabaseRpc).toHaveBeenCalledWith(
@@ -169,7 +171,7 @@ describe('summary read-path access model', () => {
 			);
 			vi.mocked(resolveGroupPublicAreasForRequest).mockResolvedValue([]);
 
-			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(viewedGroup);
 
 			expect(result).toEqual({ accessLevel: 'shared', rows: sharedRows });
 			expect(mockPublicSupabaseRpc).not.toHaveBeenCalled();
@@ -183,7 +185,7 @@ describe('summary read-path access model', () => {
 			const publicRows = [buildStatsRow({ encounter_count: 17 })];
 			mockPublicRpcReturning(publicRows);
 
-			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(viewedGroup);
 
 			// accessLevel is 'public' rather than 'shared' here — a deliberate
 			// labelling tradeoff (see fetchAuthorisedCoreStats's own
@@ -213,7 +215,7 @@ describe('summary read-path access model', () => {
 			const publicRows = [buildStatsRow({ encounter_count: 3 })];
 			mockPublicRpcReturning(publicRows);
 
-			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(viewedGroup);
 
 			expect(result).toEqual({ accessLevel: 'public', rows: publicRows });
 			expect(getAuthenticatedSupabaseClient).not.toHaveBeenCalled();
@@ -222,7 +224,7 @@ describe('summary read-path access model', () => {
 		it('target not public: gated gracefully without ever attempting the authenticated client, not a 500', async () => {
 			vi.mocked(resolveGroupPublicAreasForRequest).mockResolvedValue([]);
 
-			await expect(fetchAuthorisedCoreStats(VIEWED_GROUP_ID)).resolves.toEqual({
+			await expect(fetchAuthorisedCoreStats(viewedGroup)).resolves.toEqual({
 				accessLevel: 'blocked',
 				rows: []
 			});
@@ -242,7 +244,7 @@ describe('summary read-path access model', () => {
 			const genuinelyEmptyRows = [buildStatsRow({ encounter_count: 0 })];
 			mockPublicRpcReturning(genuinelyEmptyRows);
 
-			const result = await fetchAuthorisedCoreStats(VIEWED_GROUP_ID);
+			const result = await fetchAuthorisedCoreStats(viewedGroup);
 
 			expect(result.accessLevel).toBe('public');
 			expect(result.rows).toEqual(genuinelyEmptyRows);

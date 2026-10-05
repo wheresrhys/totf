@@ -11,9 +11,10 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 
 async function fetchControlsPageContent(
 	_: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<RingSequenceControlRow[] | null> {
-	return fetchRingSequenceControls(viewedGroupId);
+	return fetchRingSequenceControls(viewedGroup);
 }
 
 export default async function ControlsPage({

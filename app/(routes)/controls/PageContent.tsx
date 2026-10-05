@@ -50,7 +50,7 @@ export function ControlsPageContent({
 							<td>
 								<PromoteControlButton
 									ringNo={row.ring_no}
-									viewedGroupId={viewedGroup.id}
+									viewedGroup={viewedGroup}
 								/>
 							</td>
 						</tr>

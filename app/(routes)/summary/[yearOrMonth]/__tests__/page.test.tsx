@@ -11,6 +11,9 @@ import {
 import Page, { fetchSummaryYearOrMonthPageContent } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
 import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 const fetchPeriodStatsMock = vi.fn().mockResolvedValue([]);
@@ -71,23 +74,32 @@ describe('/summary/[yearOrMonth]', () => {
 	});
 
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
-		await fetchSummaryYearOrMonthPageContent({ yearOrMonth: '2026' }, 1);
-		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
+		await fetchSummaryYearOrMonthPageContent(
+			{ yearOrMonth: '2026' },
 			1,
+			VIEWED_GROUP
+		);
+		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
+			VIEWED_GROUP,
 			'2026-01-01',
 			'2026-12-31'
 		);
 	});
 
 	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
-		await fetchSummaryYearOrMonthPageContent({ yearOrMonth: '2026' }, 1);
+		await fetchSummaryYearOrMonthPageContent(
+			{ yearOrMonth: '2026' },
+			1,
+			VIEWED_GROUP
+		);
 		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
 
 	it('returns the year date bounds for the lazy species fetch', async () => {
 		const data = await fetchSummaryYearOrMonthPageContent(
 			{ yearOrMonth: '2026' },
-			1
+			1,
+			VIEWED_GROUP
 		);
 		expect(data).toMatchObject({
 			fromDate: '2026-01-01',
@@ -106,9 +118,13 @@ describe('/summary/[yearOrMonth]', () => {
 	});
 
 	it('fetchSummaryYearOrMonthPageContent calls fetchPeriodStats with month timeInterval and the year bounds', async () => {
-		await fetchSummaryYearOrMonthPageContent({ yearOrMonth: '2026' }, 1);
-		expect(fetchPeriodStatsMock).toHaveBeenCalledWith(
+		await fetchSummaryYearOrMonthPageContent(
+			{ yearOrMonth: '2026' },
 			1,
+			VIEWED_GROUP
+		);
+		expect(fetchPeriodStatsMock).toHaveBeenCalledWith(
+			VIEWED_GROUP,
 			'month',
 			'2026-01-01',
 			'2026-12-31'
@@ -121,7 +137,8 @@ describe('/summary/[yearOrMonth]', () => {
 		]);
 		const data = await fetchSummaryYearOrMonthPageContent(
 			{ yearOrMonth: '2026' },
-			1
+			1,
+			VIEWED_GROUP
 		);
 		if (!('monthTotals' in data)) throw new Error('expected year-page data');
 		expect(data.monthTotals).toHaveLength(12);
@@ -152,7 +169,7 @@ describe('/summary/[yearOrMonth]', () => {
 		const link = await screen.findByRole('link', { name: 'Robin' });
 		expect(link.getAttribute('href')).toBe('/species/Robin/2026');
 		expect(fetchSpeciesDataMock).toHaveBeenCalledWith(
-			1,
+			VIEWED_GROUP,
 			'2026-01-01',
 			'2026-12-31'
 		);
@@ -168,7 +185,7 @@ describe('/summary/[yearOrMonth]', () => {
 			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
 			await screen.findByRole('link', { name: '16th August 2026' });
 			expect(fetchPeriodTotalsMock).toHaveBeenCalledWith(
-				1,
+				VIEWED_GROUP,
 				'day',
 				'2026-01-01',
 				'2026-12-31'
@@ -271,11 +288,12 @@ describe('/summary/[yearOrMonth]', () => {
 		it('routes to the squashed-month fetch path for a month abbreviation', async () => {
 			const data = await fetchSummaryYearOrMonthPageContent(
 				{ yearOrMonth: 'jan' },
-				1
+				1,
+				VIEWED_GROUP
 			);
 			expect(data).toMatchObject({ squashedMonth: 1 });
 			expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined,
 				1
@@ -285,7 +303,8 @@ describe('/summary/[yearOrMonth]', () => {
 		it('is case-insensitive', async () => {
 			const data = await fetchSummaryYearOrMonthPageContent(
 				{ yearOrMonth: 'JAN' },
-				1
+				1,
+				VIEWED_GROUP
 			);
 			expect(data).toMatchObject({ squashedMonth: 1 });
 		});
@@ -293,7 +312,8 @@ describe('/summary/[yearOrMonth]', () => {
 		it('falls through to the existing numeric-year behaviour for a numeric segment', async () => {
 			const data = await fetchSummaryYearOrMonthPageContent(
 				{ yearOrMonth: '2026' },
-				1
+				1,
+				VIEWED_GROUP
 			);
 			expect(data).toMatchObject({ year: 2026 });
 			expect('squashedMonth' in data).toBe(false);
@@ -332,7 +352,8 @@ describe('/summary/[yearOrMonth]', () => {
 			it('leaves Highlights to the client rather than prefetching it server-side (#1089)', async () => {
 				const data = await fetchSummaryYearOrMonthPageContent(
 					{ yearOrMonth: 'jan', tabId: 'highlights' },
-					1
+					1,
+					VIEWED_GROUP
 				);
 				expect(data).toMatchObject({ squashedMonth: 1 });
 				expect('initialTabData' in data && data.initialTabData).toBeFalsy();

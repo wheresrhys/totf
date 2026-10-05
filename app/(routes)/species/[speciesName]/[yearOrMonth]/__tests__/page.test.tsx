@@ -14,6 +14,9 @@ import {
 	makeSpeciesClient
 } from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
 	() => ({
@@ -216,11 +219,12 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 		it('threads the whole-year from/to bounds into fetchPageOfBirds', async () => {
 			await fetchSpeciesYearOrMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: '2026' },
-				1
+				1,
+				VIEWED_GROUP
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
 				ROBIN_SPECIES_ID,
-				1,
+				VIEWED_GROUP,
 				0,
 				'2026-01-01',
 				'2026-12-31'
@@ -232,7 +236,8 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 			await fetchSpeciesYearOrMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: '2026' },
-				1
+				1,
+				VIEWED_GROUP
 			);
 			expect(client.rpc).toHaveBeenCalledWith(
 				'core_stats',
@@ -276,7 +281,8 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 			await expect(
 				fetchSpeciesYearOrMonthPageContent(
 					{ speciesName: 'Nonexistent', yearOrMonth: '2026' },
-					1
+					1,
+					VIEWED_GROUP
 				)
 			).rejects.toThrow();
 		});
@@ -291,7 +297,8 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 		it('routes to the squashed-month fetch path for a month abbreviation', async () => {
 			const data = await fetchSpeciesYearOrMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: 'jan' },
-				1
+				1,
+				VIEWED_GROUP
 			);
 			expect(data).toMatchObject({ squashedMonth: 1 });
 		});
@@ -299,7 +306,8 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 		it('is case-insensitive', async () => {
 			const data = await fetchSpeciesYearOrMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: 'JAN' },
-				1
+				1,
+				VIEWED_GROUP
 			);
 			expect(data).toMatchObject({ squashedMonth: 1 });
 		});
@@ -307,7 +315,8 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 		it('falls through to the existing numeric-year behaviour for a numeric segment', async () => {
 			const data = await fetchSpeciesYearOrMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: '2026' },
-				1
+				1,
+				VIEWED_GROUP
 			);
 			expect(data).toMatchObject({ year: 2026 });
 			expect(data && 'squashedMonth' in data && data.squashedMonth).toBeFalsy();

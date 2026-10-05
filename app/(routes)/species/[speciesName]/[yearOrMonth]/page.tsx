@@ -34,16 +34,17 @@ async function getSpeciesYearOrMonthPageParams(
 
 export async function fetchSpeciesYearOrMonthPageContent(
 	params: PageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<PageData | null> {
 	const squashedMonth = parseMonthAbbreviation(params.yearOrMonth);
 	if (squashedMonth !== undefined) {
-		return fetchSpeciesPageContentForPeriod(params, viewedGroupId, {
+		return fetchSpeciesPageContentForPeriod(params, viewedGroup, {
 			squashedMonth
 		});
 	}
 	// Whole-calendar-year range, mirroring `summary/[yearOrMonth]/page.tsx`.
-	return fetchSpeciesPageContentForPeriod(params, viewedGroupId, {
+	return fetchSpeciesPageContentForPeriod(params, viewedGroup, {
 		year: Number(params.yearOrMonth),
 		fromDate: `${params.yearOrMonth}-01-01`,
 		toDate: `${params.yearOrMonth}-12-31`

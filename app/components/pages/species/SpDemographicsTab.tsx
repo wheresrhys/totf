@@ -23,6 +23,7 @@ import {
 } from '@/app/components/pages/species/StatsHistoryChart';
 import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
 import { ChartTile } from '@/app/components/pages/species/ChartTile';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // Returning vs new (#854): three plain categorical colours — unlike Young
 // counts below, these three series ("New adults", "Returning adults",
@@ -140,12 +141,12 @@ function Spinner() {
 // wing-vs-weight scatter) live on the "Biometrics" tab (SpBiometricsTab.tsx).
 export function SpDemographicsTab({
 	speciesName,
-	viewedGroupId,
+	viewedGroup,
 	fromDate,
 	toDate
 }: {
 	speciesName: string;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 	fromDate?: string;
 	toDate?: string;
 }) {
@@ -158,7 +159,7 @@ export function SpDemographicsTab({
 	function loadStatsHistory() {
 		if (statsRequested) return;
 		setStatsRequested(true);
-		getSpeciesStatsHistory(speciesName, viewedGroupId, fromDate, toDate).then(
+		getSpeciesStatsHistory(speciesName, viewedGroup, fromDate, toDate).then(
 			setStatsHistory
 		);
 	}
@@ -172,7 +173,7 @@ export function SpDemographicsTab({
 		setDemographicsRequested(true);
 		getSpeciesDemographicsStats(
 			speciesName,
-			viewedGroupId,
+			viewedGroup,
 			fromDate,
 			toDate
 		).then(setDemographicsStats);
@@ -193,7 +194,7 @@ export function SpDemographicsTab({
 	function fetchYearStatsHistory() {
 		yearStatsHistoryPromise.current ??= getSpeciesStatsHistory(
 			speciesName,
-			viewedGroupId,
+			viewedGroup,
 			fromDate,
 			toDate,
 			'year'
@@ -207,7 +208,7 @@ export function SpDemographicsTab({
 	function fetchYearDemographicsStats() {
 		yearDemographicsStatsPromise.current ??= getSpeciesDemographicsStats(
 			speciesName,
-			viewedGroupId,
+			viewedGroup,
 			fromDate,
 			toDate,
 			'year'
@@ -222,7 +223,7 @@ export function SpDemographicsTab({
 	function loadArrivalsStats() {
 		if (arrivalsRequested) return;
 		setArrivalsRequested(true);
-		getSpeciesArrivalsStats(speciesName, viewedGroupId, fromDate, toDate).then(
+		getSpeciesArrivalsStats(speciesName, viewedGroup, fromDate, toDate).then(
 			setArrivalsStats
 		);
 	}
@@ -234,7 +235,7 @@ export function SpDemographicsTab({
 	function loadEffortHistory() {
 		if (effortHistoryRequested) return;
 		setEffortHistoryRequested(true);
-		getGroupEffortHistory(viewedGroupId)
+		getGroupEffortHistory(viewedGroup)
 			.then((data) => setEffortHistory({ name: 'effort', data }))
 			.catch(() => setEffortHistory(null));
 	}

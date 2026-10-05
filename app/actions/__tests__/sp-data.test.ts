@@ -15,6 +15,7 @@ import {
 	type SpeciesTotalsTabParams
 } from '../sp-data';
 import type { CoreStatsResult } from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 import { makeRpcCallRecorder } from '@/app/__tests__/helpers/rpc-recorder';
 
@@ -41,6 +42,7 @@ vi.mock('../stats-cache', () => ({
 const SPECIES_ID = 1;
 const SPECIES_NAME = 'Robin';
 const GROUP_ID = 7;
+const viewedGroup: ViewedGroup = { id: GROUP_ID, slug: 'alpha' };
 const FROM_DATE = '2023-01-01';
 const TO_DATE = '2023-12-31';
 
@@ -110,7 +112,7 @@ describe('sp-data actions', () => {
 				queryRows: [birdRow(['2023-05-12'])]
 			});
 
-			const result = await fetchPageOfBirds(SPECIES_ID, GROUP_ID);
+			const result = await fetchPageOfBirds(SPECIES_ID, viewedGroup);
 
 			expect(queryRecord.select).not.toContain('!inner');
 			expect(queryRecord.filters).toHaveLength(0);
@@ -123,7 +125,7 @@ describe('sp-data actions', () => {
 				queryRows: [birdRow(['2023-05-12'])]
 			});
 
-			await fetchPageOfBirds(SPECIES_ID, GROUP_ID, 0, FROM_DATE, TO_DATE);
+			await fetchPageOfBirds(SPECIES_ID, viewedGroup, 0, FROM_DATE, TO_DATE);
 
 			expect(queryRecord.select).toContain('Encounters!inner');
 			expect(queryRecord.select).toContain('Sessions!inner');
@@ -146,7 +148,7 @@ describe('sp-data actions', () => {
 				queryRows: [birdRow(['2023-05-12'])]
 			});
 
-			await fetchPageOfBirds(SPECIES_ID, GROUP_ID, 0, FROM_DATE);
+			await fetchPageOfBirds(SPECIES_ID, viewedGroup, 0, FROM_DATE);
 
 			expect(queryRecord.select).toContain('Encounters!inner');
 			expect(queryRecord.filters).toEqual([
@@ -163,7 +165,7 @@ describe('sp-data actions', () => {
 		it('without a date range omits from_date/to_date from the RPC args', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await fetchNotableRetraps(SPECIES_NAME, GROUP_ID);
+			await fetchNotableRetraps(SPECIES_NAME, viewedGroup);
 
 			expect(rpcCalls[0].name).toBe('notable_retraps');
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
@@ -173,7 +175,7 @@ describe('sp-data actions', () => {
 		it('forwards from_date/to_date to the notable_retraps RPC when supplied', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await fetchNotableRetraps(SPECIES_NAME, GROUP_ID, FROM_DATE, TO_DATE);
+			await fetchNotableRetraps(SPECIES_NAME, viewedGroup, FROM_DATE, TO_DATE);
 
 			expect(rpcCalls[0].args).toMatchObject({
 				species_filter: SPECIES_NAME,
@@ -190,7 +192,7 @@ describe('sp-data actions', () => {
 				queryRows: [{ encounters: [{ sex: 'U' }] }]
 			});
 
-			await fetchGraphableEncounterData(SPECIES_ID, GROUP_ID);
+			await fetchGraphableEncounterData(SPECIES_ID, viewedGroup);
 
 			expect(queryRecord.select).not.toContain('!inner');
 			expect(queryRecord.filters).toHaveLength(0);
@@ -203,7 +205,7 @@ describe('sp-data actions', () => {
 
 			await fetchGraphableEncounterData(
 				SPECIES_ID,
-				GROUP_ID,
+				viewedGroup,
 				FROM_DATE,
 				TO_DATE
 			);
@@ -229,7 +231,12 @@ describe('sp-data actions', () => {
 		it('forwards from_date/to_date to core_stats alongside the monthly timeInterval', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID, FROM_DATE, TO_DATE);
+			await getSpeciesStatsHistory(
+				SPECIES_NAME,
+				viewedGroup,
+				FROM_DATE,
+				TO_DATE
+			);
 
 			expect(rpcCalls[0].name).toBe('core_stats');
 			expect(rpcCalls[0].args).toMatchObject({
@@ -244,7 +251,7 @@ describe('sp-data actions', () => {
 		it('omits from_date/to_date when no range is supplied', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+			await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
 
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
@@ -256,7 +263,7 @@ describe('sp-data actions', () => {
 				biometricsRows: []
 			});
 
-			await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+			await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
 
 			const biometricsCall = rpcCalls.find(
 				(call) => call.name === 'biometrics_stats'
@@ -288,7 +295,7 @@ describe('sp-data actions', () => {
 				]
 			});
 
-			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
 
 			expect(result).toEqual([
 				expect.objectContaining({
@@ -309,7 +316,7 @@ describe('sp-data actions', () => {
 		it('returns an empty array without erroring when neither RPC returns rows', async () => {
 			makeStatsHistoryClient({ aggregateRows: [], biometricsRows: [] });
 
-			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
 
 			expect(result).toEqual([]);
 		});
@@ -322,7 +329,7 @@ describe('sp-data actions', () => {
 
 			await getSpeciesStatsHistory(
 				SPECIES_NAME,
-				GROUP_ID,
+				viewedGroup,
 				undefined,
 				undefined,
 				'year'
@@ -342,7 +349,7 @@ describe('sp-data actions', () => {
 
 			await getSpeciesStatsHistory(
 				SPECIES_NAME,
-				GROUP_ID,
+				viewedGroup,
 				undefined,
 				undefined,
 				'month'
@@ -359,7 +366,7 @@ describe('sp-data actions', () => {
 				biometricsRows: []
 			});
 
-			const result = await getSpeciesStatsHistory(SPECIES_NAME, GROUP_ID);
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
 
 			// core_stats no longer carries its own wing/weight columns (#827),
 			// so a period with no matching biometrics_stats row gets all 8 fields
@@ -387,7 +394,7 @@ describe('sp-data actions', () => {
 
 			await getSpeciesDemographicsStats(
 				SPECIES_NAME,
-				GROUP_ID,
+				viewedGroup,
 				FROM_DATE,
 				TO_DATE
 			);
@@ -405,7 +412,7 @@ describe('sp-data actions', () => {
 		it('omits from_date/to_date when no range is supplied', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesDemographicsStats(SPECIES_NAME, GROUP_ID);
+			await getSpeciesDemographicsStats(SPECIES_NAME, viewedGroup);
 
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
@@ -416,7 +423,7 @@ describe('sp-data actions', () => {
 
 			await getSpeciesDemographicsStats(
 				SPECIES_NAME,
-				GROUP_ID,
+				viewedGroup,
 				undefined,
 				undefined,
 				'year'
@@ -432,7 +439,7 @@ describe('sp-data actions', () => {
 
 			await getSpeciesDemographicsStats(
 				SPECIES_NAME,
-				GROUP_ID,
+				viewedGroup,
 				undefined,
 				undefined,
 				'month'
@@ -448,7 +455,12 @@ describe('sp-data actions', () => {
 		it('forwards from_date/to_date to arrivals_stats alongside the monthly timeInterval', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesArrivalsStats(SPECIES_NAME, GROUP_ID, FROM_DATE, TO_DATE);
+			await getSpeciesArrivalsStats(
+				SPECIES_NAME,
+				viewedGroup,
+				FROM_DATE,
+				TO_DATE
+			);
 
 			expect(rpcCalls[0].name).toBe('arrivals_stats');
 			expect(rpcCalls[0].args).toMatchObject({
@@ -463,7 +475,7 @@ describe('sp-data actions', () => {
 		it('omits from_date/to_date when no range is supplied', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await getSpeciesArrivalsStats(SPECIES_NAME, GROUP_ID);
+			await getSpeciesArrivalsStats(SPECIES_NAME, viewedGroup);
 
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
@@ -474,7 +486,7 @@ describe('sp-data actions', () => {
 
 			await getSpeciesArrivalsStats(
 				SPECIES_NAME,
-				GROUP_ID,
+				viewedGroup,
 				undefined,
 				undefined,
 				'year'
@@ -490,7 +502,7 @@ describe('sp-data actions', () => {
 
 			await getSpeciesArrivalsStats(
 				SPECIES_NAME,
-				GROUP_ID,
+				viewedGroup,
 				undefined,
 				undefined,
 				'month'
@@ -519,9 +531,9 @@ describe('sp-data actions', () => {
 				effortRow('2023-02', '02:00:00')
 			]);
 
-			const result = await getGroupEffortHistory(GROUP_ID);
+			const result = await getGroupEffortHistory(viewedGroup);
 
-			expect(mockFetchCoreStatsByMonth).toHaveBeenCalledWith(GROUP_ID);
+			expect(mockFetchCoreStatsByMonth).toHaveBeenCalledWith(viewedGroup);
 			expect(result).toEqual([
 				['2023-01', 5.5],
 				['2023-02', 2]
@@ -533,7 +545,7 @@ describe('sp-data actions', () => {
 				effortRow('2023-01', '00:00:00')
 			]);
 
-			const result = await getGroupEffortHistory(GROUP_ID);
+			const result = await getGroupEffortHistory(viewedGroup);
 
 			expect(result).toEqual([['2023-01', 0]]);
 		});
@@ -543,7 +555,7 @@ describe('sp-data actions', () => {
 				effortRow('2023-01', '2 days 03:00:00')
 			]);
 
-			const result = await getGroupEffortHistory(GROUP_ID);
+			const result = await getGroupEffortHistory(viewedGroup);
 
 			expect(result).toEqual([['2023-01', 51]]);
 		});
@@ -559,7 +571,7 @@ describe('sp-data actions', () => {
 		it('with timeInterval "year" calls core_stats with species_name_filter and group_by_time_period "year"', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'year');
+			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'year');
 
 			expect(rpcCalls[0].name).toBe('core_stats');
 			expect(rpcCalls[0].args).toMatchObject({
@@ -572,7 +584,7 @@ describe('sp-data actions', () => {
 		it('with timeInterval "month" calls core_stats with group_by_time_period "month"', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'month');
+			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'month');
 
 			expect(rpcCalls[0].args).toMatchObject({
 				species_name_filter: SPECIES_NAME,
@@ -586,7 +598,7 @@ describe('sp-data actions', () => {
 
 			await fetchSpeciesPeriodTotals(
 				SPECIES_NAME,
-				GROUP_ID,
+				viewedGroup,
 				'month',
 				FROM_DATE,
 				TO_DATE
@@ -601,7 +613,7 @@ describe('sp-data actions', () => {
 		it('omits from_date/to_date when no range is supplied', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'month');
+			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'month');
 
 			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
 			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
@@ -612,7 +624,7 @@ describe('sp-data actions', () => {
 
 			await fetchSpeciesPeriodTotals(
 				SPECIES_NAME,
-				GROUP_ID,
+				viewedGroup,
 				'year',
 				undefined,
 				undefined,
@@ -625,7 +637,7 @@ describe('sp-data actions', () => {
 		it('omits month_filter when not supplied', async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await fetchSpeciesPeriodTotals(SPECIES_NAME, GROUP_ID, 'month');
+			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'month');
 
 			expect(rpcCalls[0].args).not.toHaveProperty('month_filter');
 		});
@@ -640,7 +652,7 @@ describe('sp-data actions', () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 			const params: SpeciesTotalsTabParams = { speciesName: SPECIES_NAME };
 
-			await fetchYearTotalsTabData(params, { id: GROUP_ID, slug: 'alpha' });
+			await fetchYearTotalsTabData(params, viewedGroup);
 
 			expect(rpcCalls[0].args).toMatchObject({
 				species_name_filter: SPECIES_NAME,
@@ -660,7 +672,7 @@ describe('sp-data actions', () => {
 				toDate: TO_DATE
 			};
 
-			await fetchMonthTotalsTabData(params, { id: GROUP_ID, slug: 'alpha' });
+			await fetchMonthTotalsTabData(params, viewedGroup);
 
 			expect(rpcCalls[0].args).toMatchObject({
 				species_name_filter: SPECIES_NAME,
@@ -682,7 +694,7 @@ describe('sp-data actions', () => {
 				monthFilter: 3
 			};
 
-			await fetchSessionTotalsTabData(params, { id: GROUP_ID, slug: 'alpha' });
+			await fetchSessionTotalsTabData(params, viewedGroup);
 
 			expect(rpcCalls[0].args).toMatchObject({
 				species_name_filter: SPECIES_NAME,
@@ -699,7 +711,7 @@ describe('sp-data actions', () => {
 		it("calls core_stats with species_name_filter, ringing_group_filter and group_by_time_period 'month-squashed'", async () => {
 			const { rpcCalls } = makeClient({ rpcRows: [] });
 
-			await fetchSpeciesCombinedMonthTotals(SPECIES_NAME, GROUP_ID);
+			await fetchSpeciesCombinedMonthTotals(SPECIES_NAME, viewedGroup);
 
 			expect(rpcCalls[0].name).toBe('core_stats');
 			expect(rpcCalls[0].args).toMatchObject({
@@ -715,7 +727,7 @@ describe('sp-data actions', () => {
 
 			const result = await fetchSpeciesCombinedMonthTotals(
 				SPECIES_NAME,
-				GROUP_ID
+				viewedGroup
 			);
 
 			expect(result).toEqual(rows);

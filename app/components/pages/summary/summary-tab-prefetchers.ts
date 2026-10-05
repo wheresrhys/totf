@@ -46,7 +46,7 @@ export function fetchSummarySpeciesTotalsData(
 	params: SummaryTabParams,
 	viewedGroup: ViewedGroup
 ): Promise<SummarySpeciesTotalsData> {
-	return fetchSpeciesData(viewedGroup.id, params.fromDate, params.toDate);
+	return fetchSpeciesData(viewedGroup, params.fromDate, params.toDate);
 }
 
 export type SummarySessionTotalsData = CoreStatsResult[];
@@ -55,12 +55,7 @@ export function fetchSummarySessionTotalsData(
 	params: SummaryTabParams,
 	viewedGroup: ViewedGroup
 ): Promise<SummarySessionTotalsData> {
-	return fetchPeriodTotals(
-		viewedGroup.id,
-		'day',
-		params.fromDate,
-		params.toDate
-	);
+	return fetchPeriodTotals(viewedGroup, 'day', params.fromDate, params.toDate);
 }
 
 export async function fetchAllTimeMonthTotalsData(
@@ -68,8 +63,8 @@ export async function fetchAllTimeMonthTotalsData(
 	viewedGroup: ViewedGroup
 ) {
 	const [periodStats, monthSquashedStats] = await Promise.all([
-		fetchPeriodStats(viewedGroup.id, 'month'),
-		fetchCombinedMonthTotals(viewedGroup.id)
+		fetchPeriodStats(viewedGroup, 'month'),
+		fetchCombinedMonthTotals(viewedGroup)
 	]);
 	return { periodStats, monthSquashedStats };
 }

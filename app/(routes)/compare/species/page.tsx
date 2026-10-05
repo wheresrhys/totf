@@ -61,9 +61,10 @@ const compareSpeciesTabPrefetchers: Pick<
  */
 export async function fetchCompareSpeciesPageContent(
 	params: CompareSpeciesParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<CompareSpeciesPageData> {
-	const comparisonStats = await fetchSpeciesComparisonStats(viewedGroupId);
+	const comparisonStats = await fetchSpeciesComparisonStats(viewedGroup);
 	const initialTabData = await prefetchActiveTabData<
 		CompareSpeciesTabParams,
 		CompareSpeciesTabParams[]
@@ -71,10 +72,7 @@ export async function fetchCompareSpeciesPageContent(
 		compareSpeciesTabPrefetchers,
 		params.activeTabId,
 		{ ...comparisonStats, selectedSpecies: params.selectedSpecies },
-		// `BootstrapPage`'s `dataFetcher` contract hands over a bare numeric id,
-		// not a full `ViewedGroup`. `slug: null` is a legitimate `ViewedGroup`
-		// value rather than a lie, and no tab here has a `dataFetcher` to read it.
-		{ id: viewedGroupId, slug: null }
+		viewedGroup
 	);
 	return { ...comparisonStats, initialTabData };
 }

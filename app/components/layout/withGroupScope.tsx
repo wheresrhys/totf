@@ -59,11 +59,11 @@ export function withGroupScope<ExtraParams = Record<never, never>>(
 		searchParams?: Promise<{ tabId?: string }>;
 	}) {
 		const { groupSlug, ...extraParams } = await params;
-		const viewedGroupId = await resolveGroupIdBySlug(groupSlug);
-		if (viewedGroupId === null) {
+		const groupId = await resolveGroupIdBySlug(groupSlug);
+		if (groupId === null) {
 			notFound();
 		}
-		const viewedGroup: ViewedGroup = { id: viewedGroupId, slug: groupSlug };
+		const viewedGroup: ViewedGroup = { id: groupId, slug: groupSlug };
 		return renderPage({
 			viewedGroup,
 			params: extraParams as ExtraParams,

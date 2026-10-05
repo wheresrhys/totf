@@ -5,6 +5,9 @@ import resightingsSnapshot from '@/test-fixtures/snapshots/tables/Encounters/alp
 import type { ResightingEncounter } from '@/app/models/session';
 import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+const VIEWED_GROUP: ViewedGroup = { id: 42, slug: 'alpha' };
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -180,14 +183,14 @@ describe('fetchResightingsPageContent query building', () => {
 	it('filters encounters to the viewed group', async () => {
 		const { client, chain } = makeEncountersClient(resightings);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchResightingsPageContent({}, 42);
+		await fetchResightingsPageContent({}, 42, VIEWED_GROUP);
 		expect(chain.eq).toHaveBeenCalledWith('ringing_group_id', 42);
 	});
 
 	it('matches only resighting/recovery record types in the query', async () => {
 		const { client, chain } = makeEncountersClient(resightings);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchResightingsPageContent({}, 42);
+		await fetchResightingsPageContent({}, 42, VIEWED_GROUP);
 		expect(chain.in).toHaveBeenCalledWith('record_type', [
 			...RESIGHTING_RECORD_TYPES
 		]);

@@ -17,13 +17,14 @@ import { PulliPageContent } from './PageContent';
 // https://github.com/wheresrhys/totf/issues/1024#issuecomment-5930001521.
 export async function fetchPulliPageContent(
 	_: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<PulliEncounter[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('Encounters')
 		.select(pulliEncountersQuery.select)
-		.eq('ringing_group_id', viewedGroupId)
+		.eq('ringing_group_id', viewedGroup.id)
 		.not('record_type', 'in', `(${RESIGHTING_RECORD_TYPES.join(',')})`)
 		.eq('age_code', 1)
 		.eq('is_juv', false)

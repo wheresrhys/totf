@@ -273,7 +273,7 @@ function SpeciesData({
 					speciesStats={data.speciesStats}
 					speciesName={data.speciesName}
 					speciesId={data.speciesId}
-					viewedGroupId={viewedGroup.id}
+					viewedGroup={viewedGroup}
 					fromDate={data.fromDate}
 					toDate={data.toDate}
 				/>
@@ -285,7 +285,7 @@ function SpeciesData({
 			>
 				<SpDemographicsTab
 					speciesName={data.speciesName}
-					viewedGroupId={viewedGroup.id}
+					viewedGroup={viewedGroup}
 					fromDate={data.fromDate}
 					toDate={data.toDate}
 				/>
@@ -297,7 +297,7 @@ function SpeciesData({
 			>
 				<SpIndividualsTab
 					speciesId={data.speciesId}
-					viewedGroupId={viewedGroup.id}
+					viewedGroup={viewedGroup}
 					birds={data.birds}
 					birdCount={data.speciesStats.bird_count ?? 0}
 					fromDate={data.fromDate}

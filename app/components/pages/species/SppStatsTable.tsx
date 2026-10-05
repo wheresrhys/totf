@@ -57,7 +57,6 @@ export function SppStatsTable({
 	data: PageData;
 	viewedGroup: ViewedGroup;
 }) {
-	const viewedGroupId = viewedGroup.id;
 	const formRef = useRef<HTMLFormElement>(null);
 	const [year, setYear] = useState<number | null>(null);
 	const [cesOnly, setCesOnly] = useState<boolean>(false);
@@ -72,11 +71,11 @@ export function SppStatsTable({
 			return;
 		}
 		fetchSpeciesData(
-			viewedGroupId,
+			viewedGroup,
 			fromDate ?? undefined,
 			toDate ?? undefined
 		).then(setSpeciesStats);
-	}, [viewedGroupId, fromDate, toDate]);
+	}, [viewedGroup, fromDate, toDate]);
 
 	function clearSettings() {
 		setYear(null);

@@ -6,6 +6,9 @@ import { SpIndividualsTab } from '../SpIndividualsTab';
 import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
 import { enrichBird } from '@/app/models/bird';
 import type { EnrichedBirdOfSpecies, BirdOfSpecies } from '@/app/models/bird';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchPageOfBirds: vi.fn()
@@ -20,7 +23,7 @@ const birds = (birdsSnapshot as BirdOfSpecies[]).map(
 function renderIndividualsTab(
 	overrides: Partial<{
 		speciesId: number;
-		viewedGroupId: number;
+		viewedGroup: ViewedGroup;
 		birds: EnrichedBirdOfSpecies[];
 		birdCount: number;
 		fromDate: string;
@@ -29,7 +32,7 @@ function renderIndividualsTab(
 ) {
 	const props = {
 		speciesId: 1,
-		viewedGroupId: 1,
+		viewedGroup: VIEWED_GROUP,
 		birds,
 		birdCount: birds.length,
 		...overrides
@@ -37,7 +40,7 @@ function renderIndividualsTab(
 	return render(
 		<SpIndividualsTab
 			speciesId={props.speciesId}
-			viewedGroupId={props.viewedGroupId}
+			viewedGroup={props.viewedGroup}
 			birds={props.birds}
 			birdCount={props.birdCount}
 			fromDate={props.fromDate}
@@ -104,7 +107,7 @@ describe('SpIndividualsTab', () => {
 		});
 		expect(vi.mocked(fetchPageOfBirds)).toHaveBeenCalledWith(
 			1,
-			1,
+			VIEWED_GROUP,
 			1,
 			undefined,
 			undefined
@@ -127,7 +130,7 @@ describe('SpIndividualsTab', () => {
 		});
 		expect(vi.mocked(fetchPageOfBirds)).toHaveBeenCalledWith(
 			1,
-			1,
+			VIEWED_GROUP,
 			1,
 			'2026-01-01',
 			'2026-12-31'

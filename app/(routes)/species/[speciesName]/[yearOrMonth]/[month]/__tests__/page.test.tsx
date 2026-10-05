@@ -14,6 +14,9 @@ import {
 	makeSpeciesClient
 } from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
 const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
 	() => ({
@@ -210,11 +213,12 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 		it("threads the month's first/last calendar day into fetchPageOfBirds", async () => {
 			await fetchSpeciesYearMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: '2026', month: '08' },
-				1
+				1,
+				VIEWED_GROUP
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
 				ROBIN_SPECIES_ID,
-				1,
+				VIEWED_GROUP,
 				0,
 				'2026-08-01',
 				'2026-08-31'
@@ -224,11 +228,12 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 		it('computes the correct bounds for a shorter month (April)', async () => {
 			await fetchSpeciesYearMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: '2026', month: '04' },
-				1
+				1,
+				VIEWED_GROUP
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
 				ROBIN_SPECIES_ID,
-				1,
+				VIEWED_GROUP,
 				0,
 				'2026-04-01',
 				'2026-04-30'
@@ -273,7 +278,8 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 			await expect(
 				fetchSpeciesYearMonthPageContent(
 					{ speciesName: 'Nonexistent', yearOrMonth: '2026', month: '08' },
-					1
+					1,
+					VIEWED_GROUP
 				)
 			).rejects.toThrow();
 		});
@@ -283,7 +289,8 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 		await expect(
 			fetchSpeciesYearMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: 'jan', month: '08' },
-				1
+				1,
+				VIEWED_GROUP
 			)
 		).rejects.toThrow();
 	});
