@@ -64,6 +64,57 @@ describe('species list page', () => {
 		});
 	});
 
+	describe('species list page filtering', () => {
+		beforeEach(() => {
+			mockFetchSpeciesData.mockResolvedValue(alphaSpeciesSnapshot as unknown[]);
+			mockGetAuthenticatedSupabaseClient.mockResolvedValue(
+				makeYearsClient([2023, 2022])
+			);
+		});
+
+		describe('TemporalFilterControls integration', () => {
+			it('selecting a year narrows the displayed species stats to that year', async () => {
+				render(await Page({ searchParams: Promise.resolve({ year: '2022' }) }));
+				await screen.findByRole('table');
+				expect(mockFetchSpeciesData).toHaveBeenCalledWith(
+					{ id: 1, slug: 'alpha' },
+					'2022-01-01',
+					'2022-12-31',
+					undefined
+				);
+			});
+
+			it('selecting a month narrows the displayed species stats to that month', async () => {
+				render(await Page({ searchParams: Promise.resolve({ month: '5' }) }));
+				await screen.findByRole('table');
+				expect(mockFetchSpeciesData).toHaveBeenCalledWith(
+					{ id: 1, slug: 'alpha' },
+					undefined,
+					undefined,
+					5
+				);
+			});
+
+			it('selecting an explicit date range narrows the displayed species stats to that range', async () => {
+				render(
+					await Page({
+						searchParams: Promise.resolve({
+							fromDate: '2022-03-01',
+							toDate: '2022-03-31'
+						})
+					})
+				);
+				await screen.findByRole('table');
+				expect(mockFetchSpeciesData).toHaveBeenCalledWith(
+					{ id: 1, slug: 'alpha' },
+					'2022-03-01',
+					'2022-03-31',
+					undefined
+				);
+			});
+		});
+	});
+
 	describe('with sparse data (beta fixture)', () => {
 		beforeEach(() => {
 			mockFetchSpeciesData.mockResolvedValue(betaSpeciesSnapshot as unknown[]);
