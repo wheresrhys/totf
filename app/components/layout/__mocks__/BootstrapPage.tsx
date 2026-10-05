@@ -42,11 +42,10 @@ export function BootstrapPage<
 
 				if (!mounted) return;
 				setParams(resolvedParams);
-				const fetchedData = await bootstrapProps.dataFetcher(
-					resolvedParams,
-					1,
-					{ id: 1, slug: 'alpha' }
-				);
+				const fetchedData = await bootstrapProps.dataFetcher(resolvedParams, {
+					id: 1,
+					slug: 'alpha'
+				});
 				if (!mounted) return;
 				setData(fetchedData);
 			} catch (error) {

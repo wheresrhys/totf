@@ -204,7 +204,6 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 		it("threads the month's first/last calendar day into fetchPageOfBirds", async () => {
 			await fetchSpeciesYearMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: '2026', month: '08' },
-				1,
 				VIEWED_GROUP
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
@@ -219,7 +218,6 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 		it('computes the correct bounds for a shorter month (April)', async () => {
 			await fetchSpeciesYearMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: '2026', month: '04' },
-				1,
 				VIEWED_GROUP
 			);
 			expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
@@ -269,7 +267,6 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 			await expect(
 				fetchSpeciesYearMonthPageContent(
 					{ speciesName: 'Nonexistent', yearOrMonth: '2026', month: '08' },
-					1,
 					VIEWED_GROUP
 				)
 			).rejects.toThrow();
@@ -280,7 +277,6 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 		await expect(
 			fetchSpeciesYearMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: 'jan', month: '08' },
-				1,
 				VIEWED_GROUP
 			)
 		).rejects.toThrow();

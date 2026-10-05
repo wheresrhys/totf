@@ -11,7 +11,6 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 
 async function fetchControlsPageContent(
 	_: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<RingSequenceControlRow[] | null> {
 	return fetchRingSequenceControls(viewedGroup);

@@ -17,7 +17,6 @@ import { PulliPageContent } from './PageContent';
 // https://github.com/wheresrhys/totf/issues/1024#issuecomment-5930001521.
 export async function fetchPulliPageContent(
 	_: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PulliEncounter[]> {
 	const supabase = await getAuthenticatedSupabaseClient();

@@ -96,7 +96,6 @@ export async function fetchGroupSpecies(): Promise<SpeciesWithBirdsCount[]> {
 
 export async function fetchHomePageContent(
 	_: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageModel> {
 	return {
