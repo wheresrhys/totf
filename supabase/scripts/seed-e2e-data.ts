@@ -30,6 +30,30 @@ function run(cmd: string) {
 }
 
 /**
+ * Pre-create the `Locations` rows a seed CSV's `loc_id` column references.
+ *
+ * Both import entry points now abort on a `loc_id` the group has no Location
+ * for (#1079) — an unrecognised site name is far more often a rename than a
+ * genuinely new site, and importing it silently forks the Locations row. That
+ * guard is unconditional, so the first-ever import for a group can no longer
+ * bootstrap its own locations: the seed has to create them up front, the same
+ * way it pre-creates the RingingGroups rows in step 1.
+ *
+ * Inserted via psql (no INSERT policy on Locations for the anon role), in the
+ * order each name first appears in its CSV, so a reseed reproduces the same
+ * location ids it always did (#903).
+ */
+function seedLocations(ringingGroupId: number, locationNames: string[]): void {
+	const values = locationNames
+		.map((name) => `('${name.replace(/'/g, "''")}', ${ringingGroupId})`)
+		.join(', ');
+	execSync(
+		`psql "${LOCAL_DB_URL}" -c "INSERT INTO \\"Locations\\" (location_name, ringing_group_id) VALUES ${values} ON CONFLICT (location_name, ringing_group_id) DO NOTHING;"`,
+		{ stdio: 'inherit', cwd: ROOT }
+	);
+}
+
+/**
  * Import one seed CSV in-process at `concurrency: 1`.
  *
  * Deliberately not `npm run db:import:local` (a child process at the default
@@ -83,7 +107,10 @@ async function main() {
 		`Groups: Alpha(${alphaId}), Beta(${betaId}), Gamma(${gammaId}), Delta(${deltaId})`
 	);
 
-	// Step 2: Import Alpha CSV (Alpha group already exists from step 1)
+	// Step 2: Pre-create every Location the seed CSVs reference, then import the
+	// Alpha CSV (Alpha group already exists from step 1).
+	seedLocations(alphaId, ['Alpha Site A (CES)', 'Alpha Site B']);
+	seedLocations(betaId, ['Beta Site']);
 	await seedImport('test-fixtures/csv/alpha.csv', 'Alpha');
 
 	// Step 3: Insert GroupDataSharing via direct Postgres (bypasses RLS — no INSERT policy exists)

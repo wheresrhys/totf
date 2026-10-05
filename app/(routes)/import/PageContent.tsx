@@ -22,7 +22,12 @@ type ImportState =
 			startDate: string | null;
 			endDate: string | null;
 	  }
-	| { status: 'error'; message: string };
+	| { status: 'error'; message: string }
+	// The import was abandoned before any row was written because the CSV named
+	// locations this group has no `Locations` row for (#1079). Deliberately a
+	// plain notice for now — a follow-up ticket replaces this branch's body with
+	// a review screen letting the group say "new site" vs "renamed site".
+	| { status: 'unrecognisedLocations'; locations: string[] };
 
 export function ImportPageContent() {
 	const [state, setState] = useState<ImportState>({ status: 'idle' });
@@ -91,6 +96,12 @@ export function ImportPageContent() {
 						break;
 					case 'error':
 						setState({ status: 'error', message: message.message });
+						break;
+					case 'unrecognised_locations':
+						setState({
+							status: 'unrecognisedLocations',
+							locations: message.locations
+						});
 						break;
 				}
 			}
@@ -167,6 +178,20 @@ export function ImportPageContent() {
 							records no older than this date and import again.
 						</p>
 					)}
+				</div>
+			)}
+
+			{state.status === 'unrecognisedLocations' && (
+				<div className="mt-4 flex flex-col gap-2">
+					<p>
+						Import aborted — these locations were not recognised:{' '}
+						{state.locations.join(', ')}. Nothing was imported.
+					</p>
+					<p>
+						If one of your sites has been renamed, rename its existing location
+						to match before importing again. If it is a genuinely new site,
+						create it first.
+					</p>
 				</div>
 			)}
 

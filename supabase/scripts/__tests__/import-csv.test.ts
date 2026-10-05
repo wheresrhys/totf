@@ -2,6 +2,11 @@ import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pRateLimit } from 'p-ratelimit';
 import {
+	findUnrecognisedLocationNames,
+	getDistinctLocationNames,
+	processEncounterRow
+} from '../../../lib/demon-import';
+import {
 	DEFAULT_IMPORT_CONCURRENCY,
 	importCSV,
 	runRowsWithConcurrency
@@ -51,13 +56,20 @@ vi.mock('../../../lib/demon-import', () => ({
 	createUpserter: vi.fn(() => vi.fn()),
 	createRingSequenceLookup: vi.fn(() => vi.fn()),
 	createRingSequenceLinker: vi.fn(() => vi.fn()),
-	processEncounterRow: vi.fn(async () => {})
+	processEncounterRow: vi.fn(async () => {}),
+	getDistinctLocationNames: vi.fn(() => ['Garden Trap']),
+	// Every location in the CSV is already known unless a test says otherwise.
+	findUnrecognisedLocationNames: vi.fn(async () => [] as string[])
 }));
 
 const mockedPRateLimit = vi.mocked(pRateLimit);
 
 beforeEach(() => {
 	mockedPRateLimit.mockClear();
+	vi.mocked(processEncounterRow).mockClear();
+	vi.mocked(findUnrecognisedLocationNames).mockClear();
+	vi.mocked(findUnrecognisedLocationNames).mockResolvedValue([]);
+	vi.mocked(getDistinctLocationNames).mockReturnValue(['Garden Trap']);
 });
 
 afterEach(() => {
@@ -110,6 +122,47 @@ describe('importCSV concurrency option', () => {
 
 		expect(mockedPRateLimit).toHaveBeenCalledWith(
 			expect.objectContaining({ concurrency: 1 })
+		);
+	});
+});
+
+describe('importCSV unrecognised location names', () => {
+	it('exits non-zero and prints the unrecognised names without processing any rows', async () => {
+		// `process.exit` never returns in production, so the spy throws rather
+		// than letting `importCSV` fall through into row processing.
+		const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
+			throw new Error(`process.exit(${code})`);
+		});
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.mocked(findUnrecognisedLocationNames).mockResolvedValue([
+			'CES972',
+			'Reedbed'
+		]);
+
+		await expect(
+			importCSV({ csvFilePath: '/fake/alpha.csv', ringingGroupName: 'Alpha' })
+		).rejects.toThrow('process.exit(1)');
+
+		expect(errorSpy).toHaveBeenCalledWith(
+			expect.stringContaining('CES972, Reedbed')
+		);
+		expect(exitSpy).toHaveBeenCalledWith(1);
+		expect(vi.mocked(processEncounterRow)).not.toHaveBeenCalled();
+	});
+
+	it('proceeds with the existing row-processing behaviour when every loc_id is already known', async () => {
+		await importCSV({
+			csvFilePath: '/fake/alpha.csv',
+			ringingGroupName: 'Alpha'
+		});
+
+		expect(vi.mocked(findUnrecognisedLocationNames)).toHaveBeenCalledWith(
+			expect.anything(),
+			['Garden Trap'],
+			7
+		);
+		expect(vi.mocked(processEncounterRow)).toHaveBeenCalledTimes(
+			csvRows.length
 		);
 	});
 });

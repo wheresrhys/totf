@@ -23,7 +23,10 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
-	processEncounterRow
+	processEncounterRow,
+	getDistinctLocationNames,
+	findUnrecognisedLocationNames,
+	type DemonRow
 } from '../../lib/demon-import';
 
 /**
@@ -150,10 +153,37 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 	const lookupRingSequence = createRingSequenceLookup(groupSupabaseClient);
 	const linkRingSequence = createRingSequenceLinker(groupSupabaseClient);
 
+	// The whole CSV is buffered rather than streamed straight into row
+	// processing, because the location pre-flight below has to see every row's
+	// `loc_id` before the first row is written. `runRowsWithConcurrency` still
+	// accepts a stream for other callers; an array just dispatches every row to
+	// the rate limiter up front, which caps concurrency exactly as before (and
+	// so keeps `concurrency: 1` seeding deterministic).
 	const rowStream = fs.createReadStream(csvFilePath).pipe(csvParser());
+	const rows: DemonRow[] = [];
+	for await (const row of rowStream) {
+		rows.push(row as DemonRow);
+	}
+
+	// A `loc_id` the group has no Location for is far more often a renamed site
+	// than a genuinely new one (#1048), and importing it would fork the Locations
+	// row and duplicate every encounter under it. Abort before the first write,
+	// so the whole import is a no-op and a plain re-run is safe once the name has
+	// been resolved.
+	const unrecognisedLocations = await findUnrecognisedLocationNames(
+		groupSupabaseClient,
+		getDistinctLocationNames(rows),
+		ringingGroupId
+	);
+	if (unrecognisedLocations.length > 0) {
+		console.error(
+			`Error: these locations in ${csvFilePath} are not recognised for ringing group "${ringingGroupName}": ${unrecognisedLocations.join(', ')}. No rows were imported. If a site was renamed, rename its existing Location to match before importing; if it is genuinely new, create it first.`
+		);
+		process.exit(1);
+	}
 
 	const { totalRecords, successfulRecords, failedRecords } =
-		await runRowsWithConcurrency(rowStream, concurrency, (row) =>
+		await runRowsWithConcurrency(rows, concurrency, (row) =>
 			processEncounterRow(
 				row,
 				upsert,
