@@ -161,6 +161,33 @@ is the *first* `CTE Scan` on each of two different CTEs (`core_stats`' own and `
 carrying its CTE's population cost inclusively. Adding `AS MATERIALIZED` there produces a
 byte-identical plan; don't spend time on it again.
 
+**#947 also prototyped and measured "Option A" — passing `raw_encounters` into `stats_spine` /
+`stats_encounter_age_classification` / `stats_bird_age_bucket` as an array-of-composite parameter
+(`UNNEST`ed inside) instead of each re-deriving it via its own call to `stats_raw_encounters` — and
+it's **not worth shipping**. Two rounds, both interleaved 5×5 A/B against a 41k-encounter synthetic
+fixture with `plan_cache_mode = force_custom_plan` set (matching the real RPCs):
+- Passing the array as a scalar subquery (`(SELECT arr FROM some_cte)`, the obvious shape) measured
+  *slower* than baseline (785.9ms vs 717.7ms median) — because it silently defeats Postgres's
+  SQL-function inlining: any call argument containing a sub-SELECT makes `inline_function()` bail
+  out, so `stats_spine` etc. stop merging into the surrounding query and show up as an opaque
+  `Function Scan` node pinned at the default `rows=1000` estimate. Confirmed in isolated
+  minimal-repro functions; unrelated to CTE/parameter naming.
+- Restructuring to pass the array via `CROSS JOIN LATERAL stats_spine(raw_encounters_arr.arr, ...)`
+  (a plain column reference, not a subquery) **does** restore full inlining — verified via zero
+  `Function Scan` nodes and a genuine 4x drop in shared buffer hits (92.8k → 23.2k, exactly
+  eliminating the 3 redundant re-derivations) — but still measured no faster than baseline (790.0ms
+  vs 768.6ms median). The saved buffer hits didn't translate to wall-clock time because `temp
+  read`/`written` (disk-backed sort/hash spill) went *up* enough to offset them: the 4 redundant
+  derivations in the baseline mostly hit already-warm shared buffers (they happen back-to-back in
+  one query, re-reading the same recently-touched pages), so there was less real cost to eliminate
+  than "4x redundant work" suggests, while `array_agg`-ing ~32k composite rows and `UNNEST`-ing that
+  array 3 times is itself not free and gets a much rougher planner row estimate than a SQL
+  function's own declared cost, nudging some downstream joins into more spill-prone plans. Output
+  verified byte-identical (`EXCEPT ALL`, 0 rows) across both rounds. No PR, no schema/migration
+  change, nothing applied to any database — the benchmark ran inside one uncommitted transaction,
+  rolled back at the end. Don't re-attempt Option A as specified without a new reason to think the
+  array-marshaling cost would come out differently.
+
 `demographics_stats`' four `returning_age_*_bird_count` columns (#843, driving the species page's
 "Returning ages" chart) are resolved per bird by a fifth utility RPC,
 `stats_bird_returning_age_bucket`. It takes the adult cohort straight from `stats_bird_age_bucket`
