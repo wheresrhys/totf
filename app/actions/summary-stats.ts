@@ -1,18 +1,19 @@
 'use server';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
 import type { CoreStatsResult } from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 /**
  * Page-wide (ungrouped) totals for a summary period — no `group_by_species`/
  * `group_by_time_period`, so `core_stats` returns at most one row.
  */
 export async function fetchSummaryStats(
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
 ): Promise<CoreStatsResult | null> {
-	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
+	const { rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {}),
 		...(monthFilter ? { month_filter: monthFilter } : {})
@@ -27,13 +28,13 @@ export async function fetchSummaryStats(
  * present (e.g. all 12 months) zero-fill the gaps themselves.
  */
 export async function fetchPeriodStats(
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	timeInterval: 'year' | 'month' | 'day',
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
 ): Promise<CoreStatsResult[]> {
-	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
+	const { rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		group_by_species: false,
 		group_by_time_period: timeInterval,
 		...(fromDate ? { from_date: fromDate } : {}),
@@ -55,9 +56,9 @@ export async function fetchPeriodStats(
  * the same calendar month in more than one year (#994/#996).
  */
 export async function fetchCombinedMonthTotals(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<CoreStatsResult[]> {
-	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
+	const { rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		group_by_species: false,
 		group_by_time_period: 'month-squashed'
 	});
@@ -71,9 +72,9 @@ export async function fetchCombinedMonthTotals(
  * ASC` — no client-side zero-fill or re-sorting needed.
  */
 export async function fetchYearlyTotals(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<CoreStatsResult[]> {
-	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
+	const { rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		group_by_species: false,
 		group_by_time_period: 'year'
 	});

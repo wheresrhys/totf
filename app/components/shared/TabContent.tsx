@@ -131,7 +131,7 @@ export function TabContent<DataType, ParamsType>({
 			.then((result) => setData(result))
 			.catch((caughtError) => {
 				console.error('Failed to fetch tab data', {
-					viewedGroupId: viewedGroup.id,
+					groupId: viewedGroup.id,
 					error: caughtError
 				});
 				setError(caughtError);

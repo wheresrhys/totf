@@ -5,6 +5,9 @@ import pulliEncountersSnapshot from '@/test-fixtures/snapshots/tables/Encounters
 import type { PulliEncounter } from '@/app/models/session';
 import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+const VIEWED_GROUP: ViewedGroup = { id: 42, slug: 'alpha' };
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -106,14 +109,14 @@ describe('fetchPulliPageContent query building', () => {
 	it('filters encounters to the viewed group', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchPulliPageContent({}, 42);
+		await fetchPulliPageContent({}, 42, VIEWED_GROUP);
 		expect(chain.eq).toHaveBeenCalledWith('ringing_group_id', 42);
 	});
 
 	it('excludes resighting/recovery record types in the query', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchPulliPageContent({}, 42);
+		await fetchPulliPageContent({}, 42, VIEWED_GROUP);
 		expect(chain.not).toHaveBeenCalledWith(
 			'record_type',
 			'in',
@@ -124,14 +127,14 @@ describe('fetchPulliPageContent query building', () => {
 	it('matches only age_code 1 in the query', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchPulliPageContent({}, 42);
+		await fetchPulliPageContent({}, 42, VIEWED_GROUP);
 		expect(chain.eq).toHaveBeenCalledWith('age_code', 1);
 	});
 
 	it('matches only is_juv false in the query', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchPulliPageContent({}, 42);
+		await fetchPulliPageContent({}, 42, VIEWED_GROUP);
 		expect(chain.eq).toHaveBeenCalledWith('is_juv', false);
 	});
 });

@@ -4,6 +4,7 @@ import { cachedSupabaseFetch } from '@/app/lib/cached-supabase-fetch';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
 import { getStatsByTemporalUnit, fetchCoreStatsByMonth } from '../stats-cache';
 import { makeRpcChainRecorder } from '@/app/__tests__/helpers/rpc-recorder';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 let recorder: ReturnType<typeof makeRpcChainRecorder>;
 
@@ -20,12 +21,13 @@ const mockSupabaseClient: { rpc: unknown } = { rpc: undefined };
 vi.mock('@/app/lib/cached-supabase-fetch', () => ({
 	cachedSupabaseFetch: vi
 		.fn()
-		.mockImplementation((namespace, viewedGroupId, dataFetcher) =>
-			dataFetcher(mockSupabaseClient, viewedGroupId)
+		.mockImplementation((namespace, viewedGroup, dataFetcher) =>
+			dataFetcher(mockSupabaseClient, viewedGroup.id)
 		)
 }));
 
 const GROUP_ID = 1;
+const viewedGroup: ViewedGroup = { id: GROUP_ID, slug: 'alpha' };
 
 describe('getStatsByTemporalUnit', () => {
 	beforeEach(() => {
@@ -36,26 +38,26 @@ describe('getStatsByTemporalUnit', () => {
 	});
 
 	it('wraps the db calls in the cached-supabase-fetch utility', async () => {
-		await getStatsByTemporalUnit('day', GROUP_ID);
+		await getStatsByTemporalUnit('day', viewedGroup);
 		expect(cachedSupabaseFetch).toHaveBeenCalledTimes(3);
 		expect(cachedSupabaseFetch).toHaveBeenCalledWith(
 			'day-core-stats',
-			GROUP_ID,
+			viewedGroup,
 			expect.any(Function)
 		);
 		expect(cachedSupabaseFetch).toHaveBeenCalledWith(
 			'day-species-core-stats',
-			GROUP_ID,
+			viewedGroup,
 			expect.any(Function)
 		);
 		expect(cachedSupabaseFetch).toHaveBeenCalledWith(
 			'day-species-biometrics-stats',
-			GROUP_ID,
+			viewedGroup,
 			expect.any(Function)
 		);
 	});
 	it('wraps the db calls in the fetchAllPaginatedRows utility appropriately', async () => {
-		await getStatsByTemporalUnit('day', GROUP_ID);
+		await getStatsByTemporalUnit('day', viewedGroup);
 		expect(fetchAllPaginatedRows).toHaveBeenCalledTimes(3);
 		// ensures the range values from fetchAllPaginatedRows actually get used in the underlying query
 		expect(recorder.range).toHaveBeenCalledTimes(3);
@@ -63,7 +65,7 @@ describe('getStatsByTemporalUnit', () => {
 	});
 
 	it('calls the core_stats rpc ungrouped by species, ordered by day', async () => {
-		await getStatsByTemporalUnit('day', GROUP_ID);
+		await getStatsByTemporalUnit('day', viewedGroup);
 		expect(recorder.calls).toContainEqual({
 			rpcCall: [
 				'core_stats',
@@ -77,7 +79,7 @@ describe('getStatsByTemporalUnit', () => {
 		});
 	});
 	it('calls the core_stats rpc grouped by species, ordered by day and species', async () => {
-		await getStatsByTemporalUnit('day', GROUP_ID);
+		await getStatsByTemporalUnit('day', viewedGroup);
 		expect(recorder.calls).toContainEqual({
 			rpcCall: [
 				'core_stats',
@@ -91,7 +93,7 @@ describe('getStatsByTemporalUnit', () => {
 		});
 	});
 	it('calls the biometrics_stats rpc grouped by species, ordered by day and species', async () => {
-		await getStatsByTemporalUnit('day', GROUP_ID);
+		await getStatsByTemporalUnit('day', viewedGroup);
 		expect(recorder.calls).toContainEqual({
 			rpcCall: [
 				'biometrics_stats',
@@ -121,7 +123,7 @@ describe('getStatsByTemporalUnit', () => {
 				{ species_name: 'owl', time_period: 1 }
 			]
 		});
-		const result = await getStatsByTemporalUnit('day', GROUP_ID);
+		const result = await getStatsByTemporalUnit('day', viewedGroup);
 		expect(result).toStrictEqual({
 			coreStats: [{ species_name: null, time_period: 1 }],
 			coreStatsWithSpecies: [
@@ -145,10 +147,10 @@ describe('fetchCoreStatsByMonth', () => {
 	});
 
 	it('calls the core_stats rpc ungrouped by species, month-grouped by time period, scoped to the group', async () => {
-		await fetchCoreStatsByMonth(GROUP_ID);
+		await fetchCoreStatsByMonth(viewedGroup);
 		expect(cachedSupabaseFetch).toHaveBeenCalledWith(
 			'month-core-stats',
-			GROUP_ID,
+			viewedGroup,
 			expect.any(Function)
 		);
 		expect(recorder.calls).toContainEqual({
@@ -168,7 +170,7 @@ describe('fetchCoreStatsByMonth', () => {
 		recorder.range.mockResolvedValueOnce({
 			data: [{ time_period: '2023-01', total_effort: '05:30:00' }]
 		});
-		const result = await fetchCoreStatsByMonth(GROUP_ID);
+		const result = await fetchCoreStatsByMonth(viewedGroup);
 		expect(result).toStrictEqual([
 			{ time_period: '2023-01', total_effort: '05:30:00' }
 		]);

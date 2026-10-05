@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
 import type { CoreStatsResult } from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import { fetchPeriodTotals } from '../period-totals';
 
 vi.mock('@/app/lib/auth/group-summary-access', () => ({
@@ -8,6 +9,7 @@ vi.mock('@/app/lib/auth/group-summary-access', () => ({
 }));
 
 const ROW = { encounter_count: 5 } as CoreStatsResult;
+const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 
 describe('fetchPeriodTotals — routes through the group-summary access helper', () => {
 	beforeEach(() => {
@@ -21,14 +23,14 @@ describe('fetchPeriodTotals — routes through the group-summary access helper',
 		});
 
 		const result = await fetchPeriodTotals(
-			1,
+			viewedGroup,
 			'day',
 			'2026-03-01',
 			'2026-03-31'
 		);
 
 		expect(result).toEqual([ROW]);
-		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 			from_date: '2026-03-01',
 			to_date: '2026-03-31',
 			group_by_species: false,
@@ -42,9 +44,9 @@ describe('fetchPeriodTotals — routes through the group-summary access helper',
 			rows: []
 		});
 
-		await fetchPeriodTotals(1, 'year');
+		await fetchPeriodTotals(viewedGroup, 'year');
 
-		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 			group_by_species: false,
 			group_by_time_period: 'year'
 		});
@@ -56,9 +58,9 @@ describe('fetchPeriodTotals — routes through the group-summary access helper',
 			rows: [ROW]
 		});
 
-		await fetchPeriodTotals(1, 'day', undefined, undefined, 3);
+		await fetchPeriodTotals(viewedGroup, 'day', undefined, undefined, 3);
 
-		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 			month_filter: 3,
 			group_by_species: false,
 			group_by_time_period: 'day'
@@ -71,9 +73,9 @@ describe('fetchPeriodTotals — routes through the group-summary access helper',
 			rows: [ROW]
 		});
 
-		await fetchPeriodTotals(1, 'day');
+		await fetchPeriodTotals(viewedGroup, 'day');
 
-		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+		expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 			group_by_species: false,
 			group_by_time_period: 'day'
 		});

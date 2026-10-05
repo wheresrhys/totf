@@ -4,6 +4,7 @@ import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 export type StatsRepository = {
 	coreStats: CoreStatsResult[];
 	coreStatsWithSpecies: CoreStatsResult[];
@@ -15,11 +16,11 @@ function getStatsRPCFetcher<ResultType>(
 	temporalUnit: TemporalUnit,
 	groupBySpecies: boolean = false
 ) {
-	return async (supabase: SupabaseClient, viewedGroupId: number) =>
+	return async (supabase: SupabaseClient, groupId: number) =>
 		fetchAllPaginatedRows<ResultType>((fromRow, toRow) => {
 			const request = supabase
 				.rpc(rpcName, {
-					ringing_group_filter: viewedGroupId,
+					ringing_group_filter: groupId,
 					group_by_species: groupBySpecies,
 					group_by_time_period: temporalUnit
 				})
@@ -33,23 +34,23 @@ function getStatsRPCFetcher<ResultType>(
 
 export async function getStatsByTemporalUnit(
 	temporalUnit: TemporalUnit,
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<StatsRepository> {
 	const [coreStats, coreStatsWithSpecies, biometricsStatsWithSpecies] =
 		await Promise.all([
 			cachedSupabaseFetch(
 				`${temporalUnit}-core-stats`,
-				viewedGroupId,
+				viewedGroup,
 				getStatsRPCFetcher<CoreStatsResult>('core_stats', temporalUnit)
 			),
 			cachedSupabaseFetch(
 				`${temporalUnit}-species-core-stats`,
-				viewedGroupId,
+				viewedGroup,
 				getStatsRPCFetcher<CoreStatsResult>('core_stats', temporalUnit, true)
 			),
 			cachedSupabaseFetch(
 				`${temporalUnit}-species-biometrics-stats`,
-				viewedGroupId,
+				viewedGroup,
 				getStatsRPCFetcher<BiometricsStatsResult>(
 					'biometrics_stats',
 					temporalUnit,
@@ -73,11 +74,11 @@ export async function getStatsByTemporalUnit(
 // ungrouped totals doesn't also trigger the species-grouped and biometrics
 // RPC calls getStatsByTemporalUnit bundles alongside it.
 export async function fetchCoreStatsByMonth(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<CoreStatsResult[]> {
 	return cachedSupabaseFetch(
 		'month-core-stats',
-		viewedGroupId,
+		viewedGroup,
 		getStatsRPCFetcher<CoreStatsResult>('core_stats', 'month')
 	);
 }

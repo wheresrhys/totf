@@ -556,7 +556,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 	}
 
 	describe('Biometrics tab', () => {
-		it('renders SpBiometricsTab with data: null routed through the adapter, with speciesStats/speciesName/speciesId/fromDate/toDate/viewedGroupId mapped correctly from params/viewedGroup', async () => {
+		it('renders SpBiometricsTab with data: null routed through the adapter, with speciesStats/speciesName/speciesId/fromDate/toDate/viewedGroup mapped correctly from params/viewedGroup', async () => {
 			const speciesStats = buildCoreStatsRow() as CoreStatsWithBiometrics;
 			render(
 				<SpeciesPageContent
@@ -575,7 +575,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 				speciesStats,
 				speciesName: 'Robin',
 				speciesId: 7,
-				viewedGroupId: 1,
+				viewedGroup,
 				fromDate: '2026-01-01',
 				toDate: '2026-12-31'
 			});
@@ -583,7 +583,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 	});
 
 	describe('Demographics tab', () => {
-		it('renders SpDemographicsTab with data: null routed through the adapter, with speciesName/fromDate/toDate/viewedGroupId mapped correctly from params/viewedGroup', async () => {
+		it('renders SpDemographicsTab with data: null routed through the adapter, with speciesName/fromDate/toDate/viewedGroup mapped correctly from params/viewedGroup', async () => {
 			render(
 				<SpeciesPageContent
 					params={{ speciesName: 'Robin' }}
@@ -597,7 +597,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 			);
 			expect(await renderPropsOf('sp-demographics-tab')).toMatchObject({
 				speciesName: 'Robin',
-				viewedGroupId: 1,
+				viewedGroup,
 				fromDate: '2026-01-01',
 				toDate: '2026-12-31'
 			});
@@ -605,7 +605,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 	});
 
 	describe('Individuals ("Bird list") tab', () => {
-		it('renders SpIndividualsTab with data: null routed through the adapter, with speciesId/birds/birdCount/fromDate/toDate/viewedGroupId mapped correctly from params/viewedGroup', async () => {
+		it('renders SpIndividualsTab with data: null routed through the adapter, with speciesId/birds/birdCount/fromDate/toDate/viewedGroup mapped correctly from params/viewedGroup', async () => {
 			const birds: FullFatPageData['birds'] = [];
 			render(
 				<SpeciesPageContent
@@ -627,7 +627,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 				speciesId: 7,
 				birds,
 				birdCount: 12,
-				viewedGroupId: 1,
+				viewedGroup,
 				fromDate: '2026-01-01',
 				toDate: '2026-12-31'
 			});

@@ -2,13 +2,16 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabaseClient } from './group-auth';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
-import { resolveGroupPublicAreasForRequest } from '../group-slug';
+import {
+	resolveGroupPublicAreasForRequest,
+	type ViewedGroup
+} from '../group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
 
 // Shared param shape for both `core_stats` and `public_core_stats`
 // (the two functions share an identical Args signature — see #772/#768).
 // `ringing_group_filter` is supplied separately by the resolver below, since
-// every caller of this module always scopes to one `viewedGroupId`.
+// every caller of this module always scopes to one `viewedGroup`.
 export type CoreStatsRpcParams = {
 	species_name_filter?: string;
 	from_date?: string;
@@ -29,11 +32,11 @@ export type AuthorisedSummaryResult = {
 async function runCoreStats(
 	rpcName: 'core_stats' | 'public_core_stats',
 	client: SupabaseClient,
-	viewedGroupId: number,
+	groupId: number,
 	rpcParams: CoreStatsRpcParams
 ): Promise<CoreStatsResult[]> {
 	const rows = (await client
-		.rpc(rpcName, { ringing_group_filter: viewedGroupId, ...rpcParams })
+		.rpc(rpcName, { ringing_group_filter: groupId, ...rpcParams })
 		.then(catchSupabaseErrors)) as CoreStatsResult[] | null;
 	return rows ?? [];
 }
@@ -51,7 +54,7 @@ function hasVisibleData(rows: CoreStatsResult[]): boolean {
 /**
  * Resolves the correct read path for a group's aggregate summary stats, and
  * which of it actually reached the caller — see #770 for the full model.
- * `viewedGroupId` is the group whose data is being requested; the viewer is
+ * `viewedGroup` is the group whose data is being requested; the viewer is
  * derived internally from the session cookie (or its absence), never passed
  * in — this is deliberately not a cookie-presence check:
  *
@@ -90,28 +93,28 @@ function hasVisibleData(rows: CoreStatsResult[]): boolean {
  * — every existing action function currently only destructures `rows`.
  */
 export async function fetchAuthorisedCoreStats(
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	rpcParams: CoreStatsRpcParams = {}
 ): Promise<AuthorisedSummaryResult> {
 	const viewerGroupId = await getGroupCookie();
 
-	if (viewerGroupId === viewedGroupId) {
+	if (viewerGroupId === viewedGroup.id) {
 		const client = await getAuthenticatedSupabaseClient();
 		const rows = await runCoreStats(
 			'core_stats',
 			client,
-			viewedGroupId,
+			viewedGroup.id,
 			rpcParams
 		);
 		return { accessLevel: 'own', rows };
 	}
 
-	const publicAreas = await resolveGroupPublicAreasForRequest(viewedGroupId);
+	const publicAreas = await resolveGroupPublicAreasForRequest(viewedGroup.id);
 	if (publicAreas.includes('summary')) {
 		const rows = await runCoreStats(
 			'public_core_stats',
 			supabase,
-			viewedGroupId,
+			viewedGroup.id,
 			rpcParams
 		);
 		return { accessLevel: 'public', rows };
@@ -125,7 +128,7 @@ export async function fetchAuthorisedCoreStats(
 	const sharedRows = await runCoreStats(
 		'core_stats',
 		client,
-		viewedGroupId,
+		viewedGroup.id,
 		rpcParams
 	);
 

@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { CreateSequenceForRing } from './CreateSequenceForRing';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // Row-level "Promote to sequence" action for the /controls table. Owns the
 // open/closed state of its own confirmation modal so `ControlsPageContent`
@@ -8,10 +9,10 @@ import { CreateSequenceForRing } from './CreateSequenceForRing';
 // only this button and the modal it opens are client components.
 export function PromoteControlButton({
 	ringNo,
-	viewedGroupId
+	viewedGroup
 }: {
 	ringNo: string;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 }) {
 	const [isPromoting, setIsPromoting] = useState(false);
 
@@ -28,7 +29,7 @@ export function PromoteControlButton({
 			{isPromoting && (
 				<CreateSequenceForRing
 					ringNo={ringNo}
-					viewedGroupId={viewedGroupId}
+					viewedGroup={viewedGroup}
 					onClose={() => setIsPromoting(false)}
 				/>
 			)}

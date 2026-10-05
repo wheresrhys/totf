@@ -88,7 +88,7 @@ describe('SppStatsTable', () => {
 			fireEvent.change(yearSelect, { target: { value: '2022' } });
 			await waitFor(() => {
 				expect(vi.mocked(fetchSpeciesData)).toHaveBeenCalledWith(
-					1,
+					{ id: 1, slug: 'alpha' },
 					'2022-01-01',
 					'2022-12-31'
 				);

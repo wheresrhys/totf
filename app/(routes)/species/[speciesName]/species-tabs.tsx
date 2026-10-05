@@ -199,7 +199,7 @@ function BiometricsTabAdapter({
 			speciesStats={params.speciesStats}
 			speciesName={params.speciesName}
 			speciesId={params.speciesId}
-			viewedGroupId={viewedGroup.id}
+			viewedGroup={viewedGroup}
 			fromDate={params.fromDate}
 			toDate={params.toDate}
 		/>
@@ -217,7 +217,7 @@ function DemographicsTabAdapter({
 	return (
 		<SpDemographicsTab
 			speciesName={params.speciesName}
-			viewedGroupId={viewedGroup.id}
+			viewedGroup={viewedGroup}
 			fromDate={params.fromDate}
 			toDate={params.toDate}
 		/>
@@ -240,7 +240,7 @@ function IndividualsTabAdapter({
 	return (
 		<SpIndividualsTab
 			speciesId={params.speciesId}
-			viewedGroupId={viewedGroup.id}
+			viewedGroup={viewedGroup}
 			birds={params.birds}
 			birdCount={params.speciesStats.bird_count ?? 0}
 			fromDate={params.fromDate}

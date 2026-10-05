@@ -964,7 +964,7 @@ describe('SummaryTotalsSection', () => {
 			);
 			expect(consoleError).toHaveBeenCalledWith(
 				'Failed to fetch tab data',
-				expect.objectContaining({ viewedGroupId: 1 })
+				expect.objectContaining({ groupId: 1 })
 			);
 			consoleError.mockRestore();
 		});

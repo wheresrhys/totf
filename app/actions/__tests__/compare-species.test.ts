@@ -4,6 +4,7 @@ import { makeRpcCallRecorder } from '@/app/__tests__/helpers/rpc-recorder';
 import { fetchSpeciesComparisonStats } from '../compare-species';
 import alphaCoreBySpecies from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
 import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -14,6 +15,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 }));
 
 const GROUP_ID = 7;
+const viewedGroup: ViewedGroup = { id: GROUP_ID, slug: 'alpha' };
 
 // Real captured output for the exact group-wide, group_by_species calls this
 // action makes. demographics_stats has no captured by-species snapshot, so its
@@ -43,7 +45,7 @@ describe('fetchSpeciesComparisonStats — fetches all three by-species datasets 
 	it('calls each of the three RPCs grouped by species for the viewed group', async () => {
 		const recorder = makeClient();
 
-		await fetchSpeciesComparisonStats(GROUP_ID);
+		await fetchSpeciesComparisonStats(viewedGroup);
 
 		expect(recorder.calls.map((call) => call.name)).toEqual([
 			'core_stats',
@@ -60,7 +62,7 @@ describe('fetchSpeciesComparisonStats — fetches all three by-species datasets 
 	it('returns each RPC result under its own key', async () => {
 		makeClient();
 
-		const stats = await fetchSpeciesComparisonStats(GROUP_ID);
+		const stats = await fetchSpeciesComparisonStats(viewedGroup);
 
 		expect(stats).toEqual({
 			coreStats: coreStatsRows,

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
 import type { CoreStatsResult } from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	fetchSummaryStats,
 	fetchPeriodStats,
@@ -13,6 +14,7 @@ vi.mock('@/app/lib/auth/group-summary-access', () => ({
 }));
 
 const ROW = { encounter_count: 5 } as CoreStatsResult;
+const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 
 describe('summary-stats actions — route through the group-summary access helper', () => {
 	beforeEach(() => {
@@ -26,10 +28,14 @@ describe('summary-stats actions — route through the group-summary access helpe
 				rows: [ROW]
 			});
 
-			const result = await fetchSummaryStats(1, '2026-01-01', '2026-01-31');
+			const result = await fetchSummaryStats(
+				viewedGroup,
+				'2026-01-01',
+				'2026-01-31'
+			);
 
 			expect(result).toBe(ROW);
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 				from_date: '2026-01-01',
 				to_date: '2026-01-31'
 			});
@@ -41,10 +47,10 @@ describe('summary-stats actions — route through the group-summary access helpe
 				rows: []
 			});
 
-			const result = await fetchSummaryStats(1);
+			const result = await fetchSummaryStats(viewedGroup);
 
 			expect(result).toBeNull();
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {});
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {});
 		});
 
 		it('passes month_filter through when a monthFilter is supplied', async () => {
@@ -53,9 +59,9 @@ describe('summary-stats actions — route through the group-summary access helpe
 				rows: [ROW]
 			});
 
-			await fetchSummaryStats(1, undefined, undefined, 1);
+			await fetchSummaryStats(viewedGroup, undefined, undefined, 1);
 
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 				month_filter: 1
 			});
 		});
@@ -66,9 +72,9 @@ describe('summary-stats actions — route through the group-summary access helpe
 				rows: [ROW]
 			});
 
-			await fetchSummaryStats(1);
+			await fetchSummaryStats(viewedGroup);
 
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {});
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {});
 		});
 	});
 
@@ -80,14 +86,14 @@ describe('summary-stats actions — route through the group-summary access helpe
 			});
 
 			const result = await fetchPeriodStats(
-				1,
+				viewedGroup,
 				'month',
 				'2026-01-01',
 				'2026-12-31'
 			);
 
 			expect(result).toEqual([ROW]);
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 				group_by_species: false,
 				group_by_time_period: 'month',
 				from_date: '2026-01-01',
@@ -101,9 +107,9 @@ describe('summary-stats actions — route through the group-summary access helpe
 				rows: [ROW]
 			});
 
-			await fetchPeriodStats(1, 'year', undefined, undefined, 1);
+			await fetchPeriodStats(viewedGroup, 'year', undefined, undefined, 1);
 
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 				group_by_species: false,
 				group_by_time_period: 'year',
 				month_filter: 1
@@ -116,9 +122,9 @@ describe('summary-stats actions — route through the group-summary access helpe
 				rows: [ROW]
 			});
 
-			await fetchPeriodStats(1, 'day');
+			await fetchPeriodStats(viewedGroup, 'day');
 
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 				group_by_species: false,
 				group_by_time_period: 'day'
 			});
@@ -132,10 +138,10 @@ describe('summary-stats actions — route through the group-summary access helpe
 				rows: [ROW]
 			});
 
-			const result = await fetchCombinedMonthTotals(1);
+			const result = await fetchCombinedMonthTotals(viewedGroup);
 
 			expect(result).toEqual([ROW]);
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 				group_by_species: false,
 				group_by_time_period: 'month-squashed'
 			});
@@ -147,7 +153,7 @@ describe('summary-stats actions — route through the group-summary access helpe
 				rows: []
 			});
 
-			const result = await fetchCombinedMonthTotals(1);
+			const result = await fetchCombinedMonthTotals(viewedGroup);
 
 			expect(result).toEqual([]);
 		});
@@ -160,10 +166,10 @@ describe('summary-stats actions — route through the group-summary access helpe
 				rows: [ROW]
 			});
 
-			const result = await fetchYearlyTotals(1);
+			const result = await fetchYearlyTotals(viewedGroup);
 
 			expect(result).toEqual([ROW]);
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(1, {
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 				group_by_species: false,
 				group_by_time_period: 'year'
 			});

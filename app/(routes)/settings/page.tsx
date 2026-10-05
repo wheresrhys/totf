@@ -8,9 +8,10 @@ import { SettingsPageContent, type SettingsPageData } from './PageContent';
 
 export async function fetchSettingsPageContent(
 	_: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<SettingsPageData> {
-	const publicAreas = await fetchOwnGroupPublicAreas(viewedGroupId);
+	const publicAreas = await fetchOwnGroupPublicAreas(viewedGroup.id);
 	return { publicSummaryEnabled: publicAreas.includes('summary') };
 }
 

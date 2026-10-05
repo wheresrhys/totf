@@ -26,7 +26,7 @@ import { buildPageOfBirdsSelect } from '@/queries';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 export async function fetchPageOfBirds(
 	speciesId: number,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	page: number = 0,
 	fromDate?: string,
 	toDate?: string
@@ -42,7 +42,7 @@ export async function fetchPageOfBirds(
 		.from('Birds')
 		.select(buildPageOfBirdsSelect(hasDateRange))
 		.eq('species_id', speciesId)
-		.contains('ringing_group_ids', [viewedGroupId])
+		.contains('ringing_group_ids', [viewedGroup.id])
 		.order('last_encountered_timestamp', { ascending: false })
 		.range(
 			page * SPECIES_PAGE_BATCH_SIZE,
@@ -62,14 +62,14 @@ export async function fetchPageOfBirds(
 
 export async function fetchNotableRetraps(
 	speciesName: string,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string
 ): Promise<NotableRetrapsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('notable_retraps', {
-			ringing_group_filter: viewedGroupId,
+			ringing_group_filter: viewedGroup.id,
 			species_filter: speciesName,
 			result_limit: 10,
 			min_proven_age: 3,
@@ -82,7 +82,7 @@ export async function fetchNotableRetraps(
 
 export async function fetchGraphableEncounterData(
 	speciesId: number,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string
 ): Promise<SexedGraphableBird[]> {
@@ -114,7 +114,7 @@ export async function fetchGraphableEncounterData(
 		.from('Birds')
 		.select(encountersEmbed)
 		.eq('species_id', speciesId)
-		.contains('ringing_group_ids', [viewedGroupId]);
+		.contains('ringing_group_ids', [viewedGroup.id]);
 	if (fromDate) {
 		query = query.filter('encounters.session.visit_date', 'gte', fromDate);
 	}
@@ -159,7 +159,7 @@ export type StatsHistoryInterval = 'month' | 'year';
 // included in the output (the output shape is driven by core_stats).
 export async function getSpeciesStatsHistory(
 	species: string,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string,
 	interval: StatsHistoryInterval = 'month'
@@ -167,7 +167,7 @@ export async function getSpeciesStatsHistory(
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
 		species_name_filter: species,
-		ringing_group_filter: viewedGroupId,
+		ringing_group_filter: viewedGroup.id,
 		group_by_time_period: interval,
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {})
@@ -206,7 +206,7 @@ export async function getSpeciesStatsHistory(
  */
 export async function getSpeciesDemographicsStats(
 	species: string,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string,
 	interval: StatsHistoryInterval = 'month'
@@ -215,7 +215,7 @@ export async function getSpeciesDemographicsStats(
 	return supabase
 		.rpc('demographics_stats', {
 			species_name_filter: species,
-			ringing_group_filter: viewedGroupId,
+			ringing_group_filter: viewedGroup.id,
 			group_by_time_period: interval,
 			...(fromDate ? { from_date: fromDate } : {}),
 			...(toDate ? { to_date: toDate } : {})
@@ -234,7 +234,7 @@ export async function getSpeciesDemographicsStats(
  */
 export async function getSpeciesArrivalsStats(
 	species: string,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string,
 	interval: StatsHistoryInterval = 'month'
@@ -243,7 +243,7 @@ export async function getSpeciesArrivalsStats(
 	return supabase
 		.rpc('arrivals_stats', {
 			species_name_filter: species,
-			ringing_group_filter: viewedGroupId,
+			ringing_group_filter: viewedGroup.id,
 			group_by_time_period: interval,
 			...(fromDate ? { from_date: fromDate } : {}),
 			...(toDate ? { to_date: toDate } : {})
@@ -265,9 +265,9 @@ export async function getSpeciesArrivalsStats(
  * against a species-filtered series by `time_period`.
  */
 export async function getGroupEffortHistory(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<[string, number][]> {
-	const statsHistory = await fetchCoreStatsByMonth(viewedGroupId);
+	const statsHistory = await fetchCoreStatsByMonth(viewedGroup);
 	return statsHistory.map((row): [string, number] => [
 		row.time_period,
 		postgresIntervalToHours(row.total_effort)
@@ -285,7 +285,7 @@ export async function getGroupEffortHistory(
  */
 export async function fetchSpeciesPeriodTotals(
 	speciesName: string,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
 	toDate?: string,
@@ -297,7 +297,7 @@ export async function fetchSpeciesPeriodTotals(
 			...(fromDate ? { from_date: fromDate } : {}),
 			...(toDate ? { to_date: toDate } : {}),
 			...(monthFilter ? { month_filter: monthFilter } : {}),
-			ringing_group_filter: viewedGroupId,
+			ringing_group_filter: viewedGroup.id,
 			species_name_filter: speciesName,
 			group_by_time_period: timeInterval
 		})
@@ -339,7 +339,7 @@ export async function fetchYearTotalsTabData(
 	params: SpeciesTotalsTabParams,
 	viewedGroup: ViewedGroup
 ): Promise<CoreStatsResult[]> {
-	return fetchSpeciesPeriodTotals(params.speciesName, viewedGroup.id, 'year');
+	return fetchSpeciesPeriodTotals(params.speciesName, viewedGroup, 'year');
 }
 
 export async function fetchMonthTotalsTabData(
@@ -348,7 +348,7 @@ export async function fetchMonthTotalsTabData(
 ): Promise<CoreStatsResult[]> {
 	return fetchSpeciesPeriodTotals(
 		params.speciesName,
-		viewedGroup.id,
+		viewedGroup,
 		'month',
 		params.fromDate,
 		params.toDate
@@ -361,7 +361,7 @@ export async function fetchSessionTotalsTabData(
 ): Promise<CoreStatsResult[]> {
 	return fetchSpeciesPeriodTotals(
 		params.speciesName,
-		viewedGroup.id,
+		viewedGroup,
 		'day',
 		params.fromDate,
 		params.toDate,
@@ -386,7 +386,7 @@ export async function fetchSquashedMonthYearTotalsTabData(
 ): Promise<CoreStatsResult[]> {
 	return fetchSpeciesPeriodTotals(
 		params.speciesName,
-		viewedGroup.id,
+		viewedGroup,
 		'year',
 		undefined,
 		undefined,
@@ -403,12 +403,12 @@ export async function fetchSquashedMonthYearTotalsTabData(
  */
 export async function fetchSpeciesCombinedMonthTotals(
 	speciesName: string,
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<CoreStatsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.rpc('core_stats', {
-			ringing_group_filter: viewedGroupId,
+			ringing_group_filter: viewedGroup.id,
 			species_name_filter: speciesName,
 			group_by_time_period: 'month-squashed'
 		})
@@ -437,8 +437,8 @@ export async function fetchCombinedMonthTotalsTabData(
 	viewedGroup: ViewedGroup
 ): Promise<SpCombinedMonthTotalsData> {
 	const [monthlyStats, monthSquashedStats] = await Promise.all([
-		fetchSpeciesPeriodTotals(params.speciesName, viewedGroup.id, 'month'),
-		fetchSpeciesCombinedMonthTotals(params.speciesName, viewedGroup.id)
+		fetchSpeciesPeriodTotals(params.speciesName, viewedGroup, 'month'),
+		fetchSpeciesCombinedMonthTotals(params.speciesName, viewedGroup)
 	]);
 	return { monthlyStats, monthSquashedStats };
 }

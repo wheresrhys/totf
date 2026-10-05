@@ -170,7 +170,15 @@ async function getFilteredStats(
 	groupId: number,
 	filter: StatFilter | null
 ): Promise<EnhancedStatsRepository> {
-	const stats = await getStatsByTemporalUnit(temporalUnit, groupId);
+	// This module's own public API is plain-`groupId`-based throughout (it
+	// predates, and is out of scope for, the `ViewedGroup` migration) — `.slug`
+	// is never read by `getStatsByTemporalUnit`, so a synthetic `ViewedGroup`
+	// is a safe stand-in rather than widening every caller up the chain just to
+	// carry a slug this fetch never uses.
+	const stats = await getStatsByTemporalUnit(temporalUnit, {
+		id: groupId,
+		slug: null
+	});
 
 	if (!filter) {
 		return enhanceStatsRepository(stats);

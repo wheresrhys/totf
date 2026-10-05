@@ -11,9 +11,10 @@ import { EffortPageContent } from './PageContent';
 
 export async function fetchEffortPageContent(
 	_params: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<PayOffStatsData | null> {
-	return fetchPayOffStats(viewedGroupId);
+	return fetchPayOffStats(viewedGroup);
 }
 
 export default function EffortPage({

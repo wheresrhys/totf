@@ -6,6 +6,7 @@ import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats
 import gammaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/gamma.by-species.json';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import { makeRpcCallRecorder } from '@/app/__tests__/helpers/rpc-recorder';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // Real captured biometrics_stats output for the exact call fetchSpeciesData
 // makes (group-wide, group_by_species). Alpha's first row is the Blue Tit that
@@ -32,6 +33,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 }));
 
 const GROUP_ID = 1;
+const viewedGroup: ViewedGroup = { id: GROUP_ID, slug: 'alpha' };
 const FROM_DATE = '2026-01-01';
 const TO_DATE = '2026-12-31';
 
@@ -61,7 +63,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				]).rpc
 			});
 
-			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+			const [row] = await fetchSpeciesData(viewedGroup, FROM_DATE, TO_DATE);
 
 			expect(row.max_weight).toBe(20);
 			expect(row.max_wing).toBe(70);
@@ -84,7 +86,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				rpc: makeRpcCallRecorder([buildBiometricsRow()]).rpc
 			});
 
-			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+			const [row] = await fetchSpeciesData(viewedGroup, FROM_DATE, TO_DATE);
 
 			expect(row.bird_count).toBe(12);
 			expect(row.encounter_count).toBe(15);
@@ -94,7 +96,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 	});
 
 	describe('Structure', () => {
-		it('calls biometrics_stats with the same viewedGroupId/from_date/to_date/group_by_species params as core_stats', async () => {
+		it('calls biometrics_stats with the same viewedGroup/from_date/to_date/group_by_species params as core_stats', async () => {
 			vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({
 				accessLevel: 'own',
 				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
@@ -102,9 +104,9 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 			const { rpc, calls: rpcCalls } = makeRpcCallRecorder([]);
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue({ rpc });
 
-			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+			await fetchSpeciesData(viewedGroup, FROM_DATE, TO_DATE);
 
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(GROUP_ID, {
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 				from_date: FROM_DATE,
 				to_date: TO_DATE,
 				group_by_species: true
@@ -130,9 +132,9 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 			const { rpc, calls: rpcCalls } = makeRpcCallRecorder([]);
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue({ rpc });
 
-			await fetchSpeciesData(GROUP_ID, undefined, undefined, 1);
+			await fetchSpeciesData(viewedGroup, undefined, undefined, 1);
 
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(GROUP_ID, {
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 				from_date: undefined,
 				to_date: undefined,
 				group_by_species: true,
@@ -149,9 +151,9 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 			const { rpc, calls: rpcCalls } = makeRpcCallRecorder([]);
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue({ rpc });
 
-			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+			await fetchSpeciesData(viewedGroup, FROM_DATE, TO_DATE);
 
-			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(GROUP_ID, {
+			expect(fetchAuthorisedCoreStats).toHaveBeenCalledWith(viewedGroup, {
 				from_date: FROM_DATE,
 				to_date: TO_DATE,
 				group_by_species: true
@@ -165,7 +167,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				rows: []
 			});
 
-			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+			await fetchSpeciesData(viewedGroup, FROM_DATE, TO_DATE);
 
 			expect(mockGetAuthenticatedSupabaseClient).not.toHaveBeenCalled();
 		});
@@ -176,7 +178,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				rows: [buildCoreStatsRow({ species_name: 'Blue Tit' })]
 			});
 
-			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+			await fetchSpeciesData(viewedGroup, FROM_DATE, TO_DATE);
 
 			expect(mockGetAuthenticatedSupabaseClient).not.toHaveBeenCalled();
 		});
@@ -190,7 +192,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				rpc: makeRpcCallRecorder([]).rpc
 			});
 
-			await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+			await fetchSpeciesData(viewedGroup, FROM_DATE, TO_DATE);
 
 			expect(mockGetAuthenticatedSupabaseClient).toHaveBeenCalled();
 		});
@@ -207,7 +209,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 					.rpc
 			});
 
-			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+			const [row] = await fetchSpeciesData(viewedGroup, FROM_DATE, TO_DATE);
 
 			expect(row.max_weight).toBeUndefined();
 			expect(row.avg_weight).toBeUndefined();
@@ -228,7 +230,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				rpc: makeRpcCallRecorder(emptyBiometricsRows).rpc
 			});
 
-			const [row] = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+			const [row] = await fetchSpeciesData(viewedGroup, FROM_DATE, TO_DATE);
 
 			expect(row.species_name).toBe('Blue Tit');
 			expect(row.max_weight).toBeUndefined();
@@ -250,7 +252,7 @@ describe('fetchSpeciesData — merges core_stats and biometrics_stats by species
 				rpc: makeRpcCallRecorder([]).rpc
 			});
 
-			const result = await fetchSpeciesData(GROUP_ID, FROM_DATE, TO_DATE);
+			const result = await fetchSpeciesData(viewedGroup, FROM_DATE, TO_DATE);
 
 			expect(result).toEqual([]);
 		});

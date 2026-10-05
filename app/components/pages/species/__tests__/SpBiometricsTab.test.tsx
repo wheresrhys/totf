@@ -10,6 +10,9 @@ import { SpBiometricsTab } from '../SpBiometricsTab';
 import { robinSpeciesStats as speciesStatsWithBiometrics } from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { SexedGraphableBird } from '../WeightAndWingChart';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
 // chartkick registers Chart.js as a side effect; nothing renders a real canvas
 // here because the presentational chart components are mocked below.
@@ -54,7 +57,7 @@ const props = {
 	speciesStats: speciesStatsWithBiometrics,
 	speciesName: 'Robin',
 	speciesId: 42,
-	viewedGroupId: 1
+	viewedGroup: VIEWED_GROUP
 };
 
 async function loadActions() {
@@ -136,7 +139,7 @@ describe('SpBiometricsTab', () => {
 			expect(getSpeciesStatsHistory).toHaveBeenCalledTimes(1);
 			expect(getSpeciesStatsHistory).toHaveBeenCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined
 			);
@@ -196,7 +199,7 @@ describe('SpBiometricsTab', () => {
 			expect(fetchGraphableEncounterData).toHaveBeenCalledTimes(1);
 			expect(fetchGraphableEncounterData).toHaveBeenCalledWith(
 				42,
-				1,
+				VIEWED_GROUP,
 				undefined,
 				undefined
 			);
@@ -243,7 +246,7 @@ describe('SpBiometricsTab', () => {
 			await expandTrendTile();
 			expect(getSpeciesStatsHistory).toHaveBeenCalledWith(
 				'Robin',
-				1,
+				VIEWED_GROUP,
 				'2024-01-01',
 				'2024-12-31'
 			);

@@ -98,7 +98,7 @@ const squashedMonthSummaryTabs: Pick<
 async function fetchSummarySquashedMonthPageContent(
 	squashedMonth: number,
 	tabId: string | undefined,
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<PageData> {
 	const [
 		summaryStats,
@@ -106,16 +106,10 @@ async function fetchSummarySquashedMonthPageContent(
 		yearTotalsForMonth,
 		sessionTotalsForMonth
 	] = await Promise.all([
-		fetchSummaryStats(viewedGroupId, undefined, undefined, squashedMonth),
-		fetchSpeciesData(viewedGroupId, undefined, undefined, squashedMonth),
-		fetchPeriodStats(
-			viewedGroupId,
-			'year',
-			undefined,
-			undefined,
-			squashedMonth
-		),
-		fetchPeriodStats(viewedGroupId, 'day', undefined, undefined, squashedMonth)
+		fetchSummaryStats(viewedGroup, undefined, undefined, squashedMonth),
+		fetchSpeciesData(viewedGroup, undefined, undefined, squashedMonth),
+		fetchPeriodStats(viewedGroup, 'year', undefined, undefined, squashedMonth),
+		fetchPeriodStats(viewedGroup, 'day', undefined, undefined, squashedMonth)
 	]);
 	const activeTabId = resolveInitialTabId(
 		tabId,
@@ -132,8 +126,7 @@ async function fetchSummarySquashedMonthPageContent(
 			yearTotalsForMonth,
 			sessionTotalsForMonth
 		},
-		// See `summary/page.tsx` for why `slug: null` is a safe stand-in here.
-		{ id: viewedGroupId, slug: null }
+		viewedGroup
 	);
 	return {
 		squashedMonth,
@@ -147,22 +140,23 @@ async function fetchSummarySquashedMonthPageContent(
 
 export async function fetchSummaryYearOrMonthPageContent(
 	{ yearOrMonth, tabId }: PageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<PageData> {
 	const squashedMonth = parseMonthAbbreviation(yearOrMonth);
 	if (squashedMonth !== undefined) {
 		return fetchSummarySquashedMonthPageContent(
 			squashedMonth,
 			tabId,
-			viewedGroupId
+			viewedGroup
 		);
 	}
 	const fromDate = `${yearOrMonth}-01-01`;
 	const toDate = `${yearOrMonth}-12-31`;
 	const year = Number(yearOrMonth);
 	const [summaryStats, monthlyStats] = await Promise.all([
-		fetchSummaryStats(viewedGroupId, fromDate, toDate),
-		fetchPeriodStats(viewedGroupId, 'month', fromDate, toDate)
+		fetchSummaryStats(viewedGroup, fromDate, toDate),
+		fetchPeriodStats(viewedGroup, 'month', fromDate, toDate)
 	]);
 	const activeTabId = resolveInitialTabId(
 		tabId,
@@ -178,8 +172,7 @@ export async function fetchSummaryYearOrMonthPageContent(
 		yearSummaryPrefetchers,
 		activeTabId,
 		{ fromDate, toDate, year, totalsStats: undefined },
-		// See `summary/page.tsx` for why `slug: null` is a safe stand-in here.
-		{ id: viewedGroupId, slug: null }
+		viewedGroup
 	);
 	return {
 		year,

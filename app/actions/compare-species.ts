@@ -2,6 +2,7 @@
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type SpeciesComparisonStats = {
 	coreStats: CoreStatsResult[];
@@ -26,11 +27,11 @@ export type SpeciesComparisonStats = {
  * (`app/actions/spp-data.ts`).
  */
 export async function fetchSpeciesComparisonStats(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<SpeciesComparisonStats> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
-		ringing_group_filter: viewedGroupId,
+		ringing_group_filter: viewedGroup.id,
 		group_by_species: true
 	};
 	const [coreStats, biometricsStats] = await Promise.all([

@@ -227,7 +227,7 @@ export function RingSequencesPageContent({
 				<CreateSequenceFromPrefix
 					prefix={creatingPrefix.prefix}
 					ringNos={creatingPrefix.ring_nos}
-					viewedGroupId={viewedGroup.id}
+					viewedGroup={viewedGroup}
 					onClose={() => setCreatingPrefix(null)}
 				/>
 			)}

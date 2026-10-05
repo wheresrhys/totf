@@ -60,7 +60,7 @@ async function getSpeciesPageParams(pageProps: PageProps): Promise<PageParams> {
 // so the two rows line up 1:1 without needing a join key.
 export async function getSpeciesStats(
 	species: string,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
@@ -68,7 +68,7 @@ export async function getSpeciesStats(
 	const supabase = await getAuthenticatedSupabaseClient();
 	const rpcArgs = {
 		species_name_filter: species,
-		ringing_group_filter: viewedGroupId,
+		ringing_group_filter: viewedGroup.id,
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {}),
 		...(monthFilter ? { month_filter: monthFilter } : {})
@@ -96,7 +96,7 @@ export async function getSpeciesStats(
 // an empty period, reproducing today's all-time behaviour exactly.
 export async function fetchSpeciesPageContentForPeriod(
 	params: PageParams,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	period: PeriodScope = {}
 ): Promise<PageData | null> {
 	const { year, month, fromDate, toDate, squashedMonth } = period;
@@ -176,23 +176,15 @@ export async function fetchSpeciesPageContentForPeriod(
 	};
 
 	const [birds, speciesStats, initialTabData] = await Promise.all([
-		fetchPageOfBirds(speciesId, viewedGroupId, 0, fromDate, toDate),
+		fetchPageOfBirds(speciesId, viewedGroup, 0, fromDate, toDate),
 		getSpeciesStats(
 			params.speciesName,
-			viewedGroupId,
+			viewedGroup,
 			fromDate,
 			toDate,
 			squashedMonth
 		),
-		// None of the 3 dataFetchers above ever read `.slug` — only `.id` — so a
-		// synthetic `ViewedGroup` avoids widening this function's own signature
-		// (shared by every route-depth variant, and fixed by `BootstrapPage`'s
-		// `dataFetcher` contract to a plain `viewedGroupId: number`) just to
-		// carry a slug this prefetch step never uses.
-		prefetchActiveTabData(totalsTabs, activeTabId, totalsTabParams, {
-			id: viewedGroupId,
-			slug: ''
-		})
+		prefetchActiveTabData(totalsTabs, activeTabId, totalsTabParams, viewedGroup)
 	]);
 	if (birds.length === 0) {
 		return {
@@ -223,9 +215,10 @@ export async function fetchSpeciesPageContentForPeriod(
 
 export async function fetchSpeciesPageContent(
 	params: PageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<PageData | null> {
-	return fetchSpeciesPageContentForPeriod(params, viewedGroupId);
+	return fetchSpeciesPageContentForPeriod(params, viewedGroup);
 }
 
 export default async function SpeciesPage(

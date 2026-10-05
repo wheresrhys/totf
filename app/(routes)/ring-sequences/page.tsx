@@ -11,11 +11,12 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export async function fetchRingSequencesPageContent(
 	_params: Record<string, string>,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<RingSequencesPageData | null> {
 	const [sequences, unassignedPrefixes] = await Promise.all([
-		fetchRingSequences(viewedGroupId),
-		fetchUnassignedImportPrefixes(viewedGroupId)
+		fetchRingSequences(viewedGroup),
+		fetchUnassignedImportPrefixes(viewedGroup)
 	]);
 	if (!sequences || !unassignedPrefixes) return null;
 	return { sequences, unassignedPrefixes };

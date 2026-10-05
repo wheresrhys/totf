@@ -26,11 +26,11 @@ export async function resolvePublicPageViewedGroupId(
 		return null;
 	}
 
-	const viewedGroupId = await resolveGroupIdBySlug(match[1]);
-	if (!viewedGroupId) {
+	const groupId = await resolveGroupIdBySlug(match[1]);
+	if (!groupId) {
 		return null;
 	}
 
-	const publicAreas = await resolveGroupPublicAreasForRequest(viewedGroupId);
-	return publicAreas.includes('summary') ? viewedGroupId : null;
+	const publicAreas = await resolveGroupPublicAreasForRequest(groupId);
+	return publicAreas.includes('summary') ? groupId : null;
 }

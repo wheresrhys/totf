@@ -7,6 +7,7 @@ import {
 	within
 } from '@testing-library/react';
 import { PromoteControlButton } from '../PromoteControlButton';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // PromoteControlButton renders CreateSequenceForRing, which imports the
 // server action; mock it so importing the tree doesn't pull the real action.
@@ -15,13 +16,17 @@ vi.mock('@/app/actions/ring-sequences', () => ({
 }));
 
 function renderPromoteControlButton(
-	overrides: Partial<{ ringNo: string; viewedGroupId: number }> = {}
+	overrides: Partial<{ ringNo: string; viewedGroup: ViewedGroup }> = {}
 ) {
-	const props = { ringNo: 'ABC1234', viewedGroupId: 1, ...overrides };
+	const props = {
+		ringNo: 'ABC1234',
+		viewedGroup: { id: 1, slug: 'alpha' },
+		...overrides
+	};
 	return render(
 		<PromoteControlButton
 			ringNo={props.ringNo}
-			viewedGroupId={props.viewedGroupId}
+			viewedGroup={props.viewedGroup}
 		/>
 	);
 }

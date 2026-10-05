@@ -10,11 +10,12 @@ import { MistakesPageContent } from './PageContent';
 
 export async function fetchMistakesPageContent(
 	_: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<DiscrepenciesResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('find_discrepencies', { ringing_group_filter: viewedGroupId })
+		.rpc('find_discrepencies', { ringing_group_filter: viewedGroup.id })
 		.then(catchSupabaseErrors) as Promise<DiscrepenciesResult[]>;
 }
 

@@ -2,8 +2,9 @@ import { cache } from 'react';
 import { supabase, catchSupabaseErrors } from '../../lib/supabase';
 
 // A resolved { id, slug } pair for the group whose data is currently being
-// viewed. Carried alongside the existing numeric viewedGroupId through the
-// /group/[groupId]/** wrapper layer and the route pages it calls.
+// viewed. Threaded through the /group/[groupId]/** wrapper layer and the
+// route pages it calls, in place of the bare numeric group id this replaced
+// (#1102).
 export type ViewedGroup = { id: number; slug: string | null };
 
 // Module-scope caches, one per resolution direction. Only successful

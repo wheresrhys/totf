@@ -40,6 +40,15 @@ import {
 	createIsolatedGroup
 } from '@/supabase/__tests__/db-test-helpers';
 import { readTestSessionDate } from '@/supabase/__tests__/rpc-functions/helpers/encounter-fixtures';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+// `fetchRingSequences`/`fetchUnassignedImportPrefixes` now take a `ViewedGroup`
+// rather than a bare numeric id (#1102) — this suite only ever has the raw id
+// from `createIsolatedGroup()`/`authenticateAs()` to hand, with no slug lookup
+// in play, so `null` is a legitimate stand-in (nothing here reads `.slug`).
+function asViewedGroup(groupId: number): ViewedGroup {
+	return { id: groupId, slug: null };
+}
 
 // A Session no longer carries a location (#1024), so every Encounters row has to
 // name its own `location_id`. Each fixture session in this file is a single
@@ -110,19 +119,19 @@ describe('fetchRingSequences', () => {
 
 	it("returns the group's ring sequences ordered by prefix", async () => {
 		authenticateAs(groupId);
-		const result = await fetchRingSequences(groupId);
+		const result = await fetchRingSequences(asViewedGroup(groupId));
 		expect(result?.map((row) => row.prefix)).toEqual(['AAA', 'ZZZ']);
 	});
 
 	it("does not return another group's ring sequences, even when asked for by id (RLS + explicit filter)", async () => {
 		authenticateAs(otherGroupId);
-		const result = await fetchRingSequences(groupId);
+		const result = await fetchRingSequences(asViewedGroup(groupId));
 		expect(result).toEqual([]);
 	});
 
 	it('returns an empty array (not null) when the group has no ring sequences', async () => {
 		authenticateAs(otherGroupId);
-		const result = await fetchRingSequences(otherGroupId);
+		const result = await fetchRingSequences(asViewedGroup(otherGroupId));
 		expect(result).toEqual([]);
 	});
 });
@@ -1034,7 +1043,7 @@ describe('fetchUnassignedImportPrefixes', () => {
 		await createBird(groupClient, `${prefixB}0001`, sessionId, 'N');
 
 		authenticateAs(groupId);
-		const result = await fetchUnassignedImportPrefixes(groupId);
+		const result = await fetchUnassignedImportPrefixes(asViewedGroup(groupId));
 		const relevant = (result ?? []).filter((entry) =>
 			[prefixA, prefixB].includes(entry.prefix)
 		);
@@ -1070,7 +1079,7 @@ describe('fetchUnassignedImportPrefixes', () => {
 			.single();
 		createdSeqIds.push(seq!.id);
 
-		const result = await fetchUnassignedImportPrefixes(groupId);
+		const result = await fetchUnassignedImportPrefixes(asViewedGroup(groupId));
 		expect((result ?? []).some((entry) => entry.prefix === prefix)).toBe(false);
 		// The bird itself still exists — it was excluded, not deleted.
 		expect(createdBirdIds).toContain(birdId);
@@ -1081,7 +1090,7 @@ describe('fetchUnassignedImportPrefixes', () => {
 		await createBird(groupClient, `${prefix}0001`, sessionId, 'R');
 
 		authenticateAs(groupId);
-		const result = await fetchUnassignedImportPrefixes(groupId);
+		const result = await fetchUnassignedImportPrefixes(asViewedGroup(groupId));
 		expect((result ?? []).some((entry) => entry.prefix === prefix)).toBe(false);
 	});
 
@@ -1090,7 +1099,7 @@ describe('fetchUnassignedImportPrefixes', () => {
 		await createBird(otherGroupClient, `${prefix}0001`, otherSessionId, 'N');
 
 		authenticateAs(groupId);
-		const result = await fetchUnassignedImportPrefixes(groupId);
+		const result = await fetchUnassignedImportPrefixes(asViewedGroup(groupId));
 		expect((result ?? []).some((entry) => entry.prefix === prefix)).toBe(false);
 	});
 });
@@ -1228,7 +1237,9 @@ describe('createSequenceFromImportPrefix', () => {
 		);
 
 		// The prefix is no longer offered as unassigned.
-		const unassigned = await fetchUnassignedImportPrefixes(groupId);
+		const unassigned = await fetchUnassignedImportPrefixes(
+			asViewedGroup(groupId)
+		);
 		expect((unassigned ?? []).some((entry) => entry.prefix === prefix)).toBe(
 			false
 		);

@@ -16,12 +16,12 @@ export type PageData = {
 	years: number[];
 };
 
-export async function fetchYears(viewedGroupId: number): Promise<number[]> {
+export async function fetchYears(viewedGroup: ViewedGroup): Promise<number[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	const dates = (await supabase
 		.from('Sessions')
 		.select('visit_date')
-		.eq('ringing_group_id', viewedGroupId)
+		.eq('ringing_group_id', viewedGroup.id)
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors)) as { visit_date: string }[];
 
@@ -32,11 +32,12 @@ export async function fetchYears(viewedGroupId: number): Promise<number[]> {
 
 export async function fetchSpeciesListPageContent(
 	_: DefaultPageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<PageData> {
 	const [speciesStats, years] = await Promise.all([
-		fetchSpeciesData(viewedGroupId),
-		fetchYears(viewedGroupId)
+		fetchSpeciesData(viewedGroup),
+		fetchYears(viewedGroup)
 	]);
 	return {
 		speciesStats,

@@ -1,5 +1,6 @@
 import { getAuthenticatedSupabaseClient } from './auth/group-auth';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ViewedGroup } from './group-slug';
 // This library is only used for fetching large matrices of stats, which
 // only change when new data is imported. Each cache entry
 // carries a version token (max Encounters.id for the group) so that a new
@@ -25,12 +26,12 @@ function getCache<T>(namespace: string): CacheByGroup<T> {
 
 export async function fetchVersion(
 	supabase: SupabaseClient,
-	viewedGroupId: number
+	groupId: number
 ): Promise<number> {
 	const { data } = await supabase
 		.from('Encounters')
 		.select('id')
-		.eq('ringing_group_id', viewedGroupId)
+		.eq('ringing_group_id', groupId)
 		.order('id', { ascending: false })
 		.limit(1);
 	return data?.[0]?.id ?? 0;
@@ -38,16 +39,16 @@ export async function fetchVersion(
 
 export async function cachedSupabaseFetch<T>(
 	namespace: string,
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	dataFetcher: (
 		supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>,
-		viewedGroupId: number
+		groupId: number
 	) => Promise<T>
 ): Promise<T> {
 	const cache = getCache<T>(namespace);
 	const supabase = await getAuthenticatedSupabaseClient();
-	const currentVersion = await fetchVersion(supabase, viewedGroupId);
-	const cachedResult = cache.get(viewedGroupId);
+	const currentVersion = await fetchVersion(supabase, viewedGroup.id);
+	const cachedResult = cache.get(viewedGroup.id);
 
 	if (
 		cachedResult &&
@@ -58,8 +59,8 @@ export async function cachedSupabaseFetch<T>(
 		return cachedResult.data;
 	}
 	console.log('CACHE_MISS', namespace);
-	const data = await dataFetcher(supabase, viewedGroupId);
-	cache.set(viewedGroupId, {
+	const data = await dataFetcher(supabase, viewedGroup.id);
+	cache.set(viewedGroup.id, {
 		version: currentVersion,
 		expiresAt: Date.now() + CACHE_TTL_MS,
 		data

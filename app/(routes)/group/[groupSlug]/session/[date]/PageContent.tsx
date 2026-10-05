@@ -18,7 +18,6 @@ import { isMistNetEncounter } from '@/app/models/encounter';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type PageParams = {
-	viewedGroupId: number;
 	date: string;
 	// The optional `?tabId=` search param (#803, applied here by #805) — never
 	// affects `getCacheKeys`, only which tab `SessionTabs` focuses/loads first.
@@ -149,7 +148,7 @@ export function SessionPageContent({
 	viewedGroup
 }: {
 	data: DayData;
-	params: Omit<PageParams, 'viewedGroupId'>;
+	params: PageParams;
 	viewedGroup: ViewedGroup;
 }) {
 	const speciesList = groupBySpecies(dayData.encounters);

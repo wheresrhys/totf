@@ -56,7 +56,8 @@ export type PageData = {
 
 export async function fetchSummaryYearMonthPageContent(
 	{ yearOrMonth, month, tabId }: PageParams,
-	viewedGroupId: number
+	_unusedGroupId: number,
+	viewedGroup: ViewedGroup
 ): Promise<PageData> {
 	// A squashed month (e.g. `/summary/jan/5`) has no single year to drill a
 	// specific day-range into — this nested route only makes sense under a
@@ -69,8 +70,8 @@ export async function fetchSummaryYearMonthPageContent(
 	const fromDate = format(startOfMonth(monthDate), 'yyyy-MM-dd');
 	const toDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
 	const [summaryStats, sessionTotals] = await Promise.all([
-		fetchSummaryStats(viewedGroupId, fromDate, toDate),
-		fetchPeriodTotals(viewedGroupId, 'day', fromDate, toDate)
+		fetchSummaryStats(viewedGroup, fromDate, toDate),
+		fetchPeriodTotals(viewedGroup, 'day', fromDate, toDate)
 	]);
 	const activeTabId = resolveInitialTabId(
 		tabId,
@@ -92,8 +93,7 @@ export async function fetchSummaryYearMonthPageContent(
 			month: Number(month),
 			totalsStats: undefined
 		},
-		// See `summary/page.tsx` for why `slug: null` is a safe stand-in here.
-		{ id: viewedGroupId, slug: null }
+		viewedGroup
 	);
 	return {
 		year: Number(year),

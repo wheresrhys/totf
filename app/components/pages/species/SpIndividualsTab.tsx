@@ -4,17 +4,18 @@ import { useState } from 'react';
 import { fetchPageOfBirds } from '@/app/actions/sp-data';
 import { useOnInView } from 'react-intersection-observer';
 import type { EnrichedBirdOfSpecies } from '@/app/models/bird';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export function SpIndividualsTab({
 	speciesId,
-	viewedGroupId,
+	viewedGroup,
 	birds: initialBirds,
 	birdCount,
 	fromDate,
 	toDate
 }: {
 	speciesId: number;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 	birds: EnrichedBirdOfSpecies[];
 	birdCount: number;
 	fromDate?: string;
@@ -28,7 +29,7 @@ export function SpIndividualsTab({
 		setPage(nextPage);
 		const newBirds = await fetchPageOfBirds(
 			speciesId,
-			viewedGroupId,
+			viewedGroup,
 			nextPage,
 			fromDate,
 			toDate

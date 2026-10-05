@@ -71,7 +71,7 @@ async function fetchHighlightsTabData(
 						includePerSpecies: true,
 						excludeGlobal: true
 					}),
-			fetchNotableRetraps(speciesName, viewedGroup.id, fromDate, toDate)
+			fetchNotableRetraps(speciesName, viewedGroup, fromDate, toDate)
 		]);
 	return { sessionHighlights, monthHighlights, notableRetraps };
 }

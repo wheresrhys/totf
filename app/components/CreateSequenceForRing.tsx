@@ -5,6 +5,7 @@ import {
 	promoteControlToSequence,
 	type PromoteControlState
 } from '@/app/actions/ring-sequences';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // First 3 characters of a ring number, matching the server action's prefix
 // derivation, so the modal names the same prefix the promote will actually
@@ -21,11 +22,11 @@ function ringPrefix(ringNo: string): string {
 // the controls list) and closes.
 export function CreateSequenceForRing({
 	ringNo,
-	viewedGroupId,
+	viewedGroup,
 	onClose
 }: {
 	ringNo: string;
-	viewedGroupId: number;
+	viewedGroup: ViewedGroup;
 	onClose: () => void;
 }) {
 	const router = useRouter();
@@ -56,7 +57,7 @@ export function CreateSequenceForRing({
 				</p>
 				<form action={action} className="flex flex-col gap-4">
 					<input type="hidden" name="ring_no" value={ringNo} />
-					<input type="hidden" name="viewed_group_id" value={viewedGroupId} />
+					<input type="hidden" name="viewed_group_id" value={viewedGroup.id} />
 					{state && !state.success && (
 						<p className="text-error text-sm">{state.error}</p>
 					)}

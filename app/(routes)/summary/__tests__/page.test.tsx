@@ -10,6 +10,13 @@ import {
 import Page, { fetchSummaryPageContent } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
 import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+// The global `group-cookie`/`group-slug` mocks (`vitest.setup.tsx`) resolve
+// the logged-in group to id 1 / slug 'alpha' — this mirrors what `Page()`'s
+// own `BootstrapPage` resolution hands `fetchSummaryPageContent` for real, so
+// direct calls below match what the rendered-page tests exercise.
+const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 const fetchYearlyTotalsMock = vi.fn().mockResolvedValue([]);
@@ -62,8 +69,8 @@ describe('/summary (all-time)', () => {
 	});
 
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
-		await fetchSummaryPageContent({}, 1);
-		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(1);
+		await fetchSummaryPageContent({}, 1, VIEWED_GROUP);
+		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(VIEWED_GROUP);
 	});
 
 	it('passes the fetched summary stats through to the rendered section', async () => {
@@ -83,7 +90,7 @@ describe('/summary (all-time)', () => {
 	});
 
 	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
-		await fetchSummaryPageContent({}, 1);
+		await fetchSummaryPageContent({}, 1, VIEWED_GROUP);
 		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
 
@@ -96,14 +103,14 @@ describe('/summary (all-time)', () => {
 	});
 
 	it('fetchSummaryPageContent calls fetchYearlyTotals with the viewed group id', async () => {
-		await fetchSummaryPageContent({}, 1);
-		expect(fetchYearlyTotalsMock).toHaveBeenCalledWith(1);
+		await fetchSummaryPageContent({}, 1, VIEWED_GROUP);
+		expect(fetchYearlyTotalsMock).toHaveBeenCalledWith(VIEWED_GROUP);
 	});
 
 	it('includes yearlyTotals in the returned page data', async () => {
 		const yearlyStats = [{ time_period: '2026-01-01' }];
 		fetchYearlyTotalsMock.mockResolvedValueOnce(yearlyStats);
-		const data = await fetchSummaryPageContent({}, 1);
+		const data = await fetchSummaryPageContent({}, 1, VIEWED_GROUP);
 		expect(data.yearlyTotals).toBe(yearlyStats);
 	});
 
@@ -125,7 +132,7 @@ describe('/summary (all-time)', () => {
 			fireEvent.click(screen.getByRole('button', { name: 'Session totals' }));
 			await screen.findByRole('link', { name: '16th August 2026' });
 			expect(fetchPeriodTotalsMock).toHaveBeenCalledWith(
-				1,
+				VIEWED_GROUP,
 				'day',
 				undefined,
 				undefined

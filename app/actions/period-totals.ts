@@ -2,6 +2,7 @@
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 /**
  * Per-time-period totals for a summary period — `core_stats` grouped by
@@ -11,13 +12,13 @@ import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
  * `PeriodTotalsTable`.
  */
 export async function fetchPeriodTotals(
-	viewedGroupId: number,
+	viewedGroup: ViewedGroup,
 	timeInterval: PeriodTotalsGrouping,
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
 ): Promise<CoreStatsResult[]> {
-	const { rows } = await fetchAuthorisedCoreStats(viewedGroupId, {
+	const { rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {}),
 		...(monthFilter ? { month_filter: monthFilter } : {}),

@@ -7,6 +7,7 @@ import {
 	type UnassignedImportPrefix
 } from '@/app/models/ring-sequences';
 import type { RingSequenceRow, RingSize } from '@/app/models/db';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type RingSequenceControlRow = {
 	ring_no: string;
@@ -15,11 +16,11 @@ export type RingSequenceControlRow = {
 };
 
 export async function fetchRingSequenceControls(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<RingSequenceControlRow[] | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
-		.rpc('ring_sequence_controls', { ringing_group_filter: viewedGroupId })
+		.rpc('ring_sequence_controls', { ringing_group_filter: viewedGroup.id })
 		.then(catchSupabaseErrors) as Promise<RingSequenceControlRow[] | null>;
 }
 
@@ -49,13 +50,13 @@ export type UpdateRingSequenceState =
 // filters on `ringing_group_id` explicitly so it asks only for the data it
 // needs (defence-in-depth, not relying on RLS alone).
 export async function fetchRingSequences(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<RingSequenceRow[] | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 	return supabase
 		.from('RingSequences')
 		.select('*')
-		.eq('ringing_group_id', viewedGroupId)
+		.eq('ringing_group_id', viewedGroup.id)
 		.order('prefix')
 		.then(catchSupabaseErrors) as Promise<RingSequenceRow[] | null>;
 }
@@ -73,7 +74,7 @@ export async function fetchRingSequences(
 // Grouping the survivors into prefixes is the pure `groupRingNosByPrefix` model
 // function.
 export async function fetchUnassignedImportPrefixes(
-	viewedGroupId: number
+	viewedGroup: ViewedGroup
 ): Promise<UnassignedImportPrefix[] | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
 
@@ -83,7 +84,7 @@ export async function fetchUnassignedImportPrefixes(
 				.from('Birds')
 				.select('id, ring_no, encounters:Encounters!inner(record_type)')
 				.eq('encounters.record_type', 'N')
-				.contains('ringing_group_ids', [viewedGroupId])
+				.contains('ringing_group_ids', [viewedGroup.id])
 				.order('ring_no')
 				.range(fromRow, toRow)
 	)) as { id: number; ring_no: string }[] | null;
@@ -96,7 +97,7 @@ export async function fetchUnassignedImportPrefixes(
 			supabase
 				.from('RingSequences_Birds')
 				.select('bird_id')
-				.eq('ringing_group_id', viewedGroupId)
+				.eq('ringing_group_id', viewedGroup.id)
 				.order('id')
 				.range(fromRow, toRow)
 	)) as { bird_id: number }[] | null;
@@ -529,12 +530,12 @@ export async function promoteControlToSequence(
 	formData: FormData
 ): Promise<PromoteControlState> {
 	const ringNo = (formData.get('ring_no') as string)?.trim();
-	const viewedGroupId = Number(formData.get('viewed_group_id'));
+	const ringingGroupId = Number(formData.get('viewed_group_id'));
 
 	if (!ringNo) {
 		return { success: false, error: 'Missing ring number' };
 	}
-	if (!viewedGroupId) {
+	if (!ringingGroupId) {
 		return { success: false, error: 'Missing group' };
 	}
 
@@ -542,7 +543,11 @@ export async function promoteControlToSequence(
 
 	try {
 		const supabase = await getAuthenticatedSupabaseClient();
-		await findOrCreateRingSequenceAndLinkBirds(supabase, prefix, viewedGroupId);
+		await findOrCreateRingSequenceAndLinkBirds(
+			supabase,
+			prefix,
+			ringingGroupId
+		);
 
 		return { success: true };
 	} catch (error) {
@@ -573,12 +578,12 @@ export async function createSequenceFromImportPrefix(
 	const prefix = (formData.get('prefix') as string)?.trim();
 	const firstRing = (formData.get('first_ring') as string)?.trim() || null;
 	const lastRing = (formData.get('last_ring') as string)?.trim() || null;
-	const viewedGroupId = Number(formData.get('viewed_group_id'));
+	const ringingGroupId = Number(formData.get('viewed_group_id'));
 
 	if (!prefix) {
 		return { success: false, error: 'Missing prefix' };
 	}
-	if (!viewedGroupId) {
+	if (!ringingGroupId) {
 		return { success: false, error: 'Missing group' };
 	}
 
@@ -587,7 +592,7 @@ export async function createSequenceFromImportPrefix(
 		await findOrCreateRingSequenceAndLinkBirds(
 			supabase,
 			prefix,
-			viewedGroupId,
+			ringingGroupId,
 			{
 				ownedByGroup: true,
 				firstRing,

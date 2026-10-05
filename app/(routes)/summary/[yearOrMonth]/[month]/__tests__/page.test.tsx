@@ -9,6 +9,9 @@ import {
 import Page, { fetchSummaryYearMonthPageContent } from '../page';
 import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
 import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+
+const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
 const fetchSummaryStatsMock = vi.fn().mockResolvedValue(alphaStats);
 vi.mock('@/app/actions/summary-stats', () => ({
@@ -68,7 +71,8 @@ describe('/summary/[yearOrMonth]/[month]', () => {
 	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
 		await fetchSummaryYearMonthPageContent(
 			{ yearOrMonth: '2026', month: '08' },
-			1
+			1,
+			VIEWED_GROUP
 		);
 		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
@@ -76,7 +80,8 @@ describe('/summary/[yearOrMonth]/[month]', () => {
 	it("returns the month's first and last calendar day as the lazy species-fetch bounds", async () => {
 		const data = await fetchSummaryYearMonthPageContent(
 			{ yearOrMonth: '2026', month: '08' },
-			1
+			1,
+			VIEWED_GROUP
 		);
 		expect(data.fromDate).toBe('2026-08-01');
 		expect(data.toDate).toBe('2026-08-31');
@@ -85,10 +90,11 @@ describe('/summary/[yearOrMonth]/[month]', () => {
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
 		await fetchSummaryYearMonthPageContent(
 			{ yearOrMonth: '2026', month: '08' },
-			1
+			1,
+			VIEWED_GROUP
 		);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
-			1,
+			VIEWED_GROUP,
 			'2026-08-01',
 			'2026-08-31'
 		);
@@ -97,10 +103,11 @@ describe('/summary/[yearOrMonth]/[month]', () => {
 	it('calls fetchSummaryStats with the correct bounds for a shorter month (April)', async () => {
 		await fetchSummaryYearMonthPageContent(
 			{ yearOrMonth: '2026', month: '04' },
-			1
+			1,
+			VIEWED_GROUP
 		);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
-			1,
+			VIEWED_GROUP,
 			'2026-04-01',
 			'2026-04-30'
 		);
@@ -133,7 +140,8 @@ describe('/summary/[yearOrMonth]/[month]', () => {
 	it('computes correct month bounds for December (year-end month)', async () => {
 		const data = await fetchSummaryYearMonthPageContent(
 			{ yearOrMonth: '2026', month: '12' },
-			1
+			1,
+			VIEWED_GROUP
 		);
 		expect(data.fromDate).toBe('2026-12-01');
 		expect(data.toDate).toBe('2026-12-31');
@@ -142,10 +150,11 @@ describe('/summary/[yearOrMonth]/[month]', () => {
 	it("fetchSummaryYearMonthPageContent requests per-day period totals scoped to the month's bounds", async () => {
 		await fetchSummaryYearMonthPageContent(
 			{ yearOrMonth: '2026', month: '08' },
-			1
+			1,
+			VIEWED_GROUP
 		);
 		expect(fetchPeriodTotalsMock).toHaveBeenCalledWith(
-			1,
+			VIEWED_GROUP,
 			'day',
 			'2026-08-01',
 			'2026-08-31'
@@ -196,7 +205,7 @@ describe('/summary/[yearOrMonth]/[month]', () => {
 		const link = await screen.findByRole('link', { name: 'Robin' });
 		expect(link.getAttribute('href')).toBe('/species/Robin/2026/8');
 		expect(fetchSpeciesDataMock).toHaveBeenCalledWith(
-			1,
+			VIEWED_GROUP,
 			'2026-08-01',
 			'2026-08-31'
 		);
@@ -204,7 +213,11 @@ describe('/summary/[yearOrMonth]/[month]', () => {
 
 	it('calls notFound() when the parent segment is a month abbreviation (no day-drill under a squashed month)', async () => {
 		await expect(
-			fetchSummaryYearMonthPageContent({ yearOrMonth: 'jan', month: '08' }, 1)
+			fetchSummaryYearMonthPageContent(
+				{ yearOrMonth: 'jan', month: '08' },
+				1,
+				VIEWED_GROUP
+			)
 		).rejects.toThrow();
 	});
 
