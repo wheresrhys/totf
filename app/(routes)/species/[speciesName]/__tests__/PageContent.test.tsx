@@ -5,7 +5,6 @@ import {
 	screen,
 	cleanup,
 	within,
-	waitFor,
 	fireEvent
 } from '@testing-library/react';
 import {
@@ -245,15 +244,13 @@ describe('SpeciesHeading', () => {
 	});
 });
 
-// `SpeciesData`'s 6 data-fetching tabs now render through the shared
-// `TabSet` (#1065 landed Year/Month/Session totals; #1066 appended all-time
-// Month totals, squashed-month Year totals and Highlights), with their own
-// tab strip (`ariaLabel="Totals"`) separate from the pre-existing
-// `TabNav`-driven strip (default `ariaLabel` "Tabs") covering the remaining 3
-// tabs not yet migrated (Biometrics/Demographics/Bird list) — see
-// `SpeciesData`'s own doc comment in `PageContent.tsx` for why there are
-// deliberately two strips for the interim. `screen.getByRole('tablist', {
-// name: ... })` distinguishes between them.
+// `SpeciesData`'s 9 tabs all render through one single shared `TabSet` now
+// (#1065 landed Year/Month/Session totals; #1066 appended all-time Month
+// totals, squashed-month Year totals and Highlights; #1060 appended
+// Biometrics/Demographics/Bird list, species' finish line for the
+// tab-unification initiative) — a single `tablist` (default `ariaLabel`
+// "Tabs") covers every tab, so `screen.getByRole('tablist')` always resolves
+// to the one strip.
 describe('TabSet-based totals tabs', () => {
 	afterEach(() => {
 		cleanup();
@@ -271,7 +268,7 @@ describe('TabSet-based totals tabs', () => {
 		mockFetchSquashedMonthYearTotalsTabData.mockResolvedValue([]);
 	});
 
-	it('renders TabSet with Year totals, Session totals, all-time Month totals and Highlights at the all-time route depth', async () => {
+	it('renders TabSet with Year totals, Session totals, all-time Month totals, Highlights and the 3 detail tabs at the all-time route depth', async () => {
 		render(
 			<SpeciesPageContent
 				params={{ speciesName: 'Robin' }}
@@ -279,20 +276,31 @@ describe('TabSet-based totals tabs', () => {
 				viewedGroup={viewedGroup}
 			/>
 		);
-		const totalsTabs = screen.getByRole('tablist', { name: 'Totals' });
+		const tabs = screen.getByRole('tablist');
 		expect(
-			within(totalsTabs).getByRole('button', { name: 'Year totals' })
+			within(tabs).getByRole('button', { name: 'Year totals' })
 		).toBeTruthy();
 		expect(
-			within(totalsTabs).getByRole('button', { name: 'Session totals' })
+			within(tabs).getByRole('button', { name: 'Session totals' })
 		).toBeTruthy();
 		expect(
-			within(totalsTabs).getByRole('button', { name: 'Month totals' })
+			within(tabs).getByRole('button', { name: 'Month totals' })
 		).toBeTruthy();
 		expect(
-			within(totalsTabs).getByRole('button', { name: 'Highlights' })
+			within(tabs).getByRole('button', { name: 'Highlights' })
 		).toBeTruthy();
-		expect(within(totalsTabs).getAllByRole('button')).toHaveLength(4);
+		expect(
+			within(tabs).getByRole('button', { name: 'Biometrics' })
+		).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Demographics' })
+		).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Bird list' })
+		).toBeTruthy();
+		// Year totals, Session totals, Month totals, Highlights, Biometrics,
+		// Demographics, Bird list.
+		expect(within(tabs).getAllByRole('button')).toHaveLength(7);
 		await screen.findByTestId('sp-year-totals-tab');
 	});
 
@@ -304,22 +312,24 @@ describe('TabSet-based totals tabs', () => {
 				viewedGroup={viewedGroup}
 			/>
 		);
-		const totalsTabs = screen.getByRole('tablist', { name: 'Totals' });
+		const tabs = screen.getByRole('tablist');
 		expect(
-			within(totalsTabs).getByRole('button', { name: 'Month totals' })
+			within(tabs).getByRole('button', { name: 'Month totals' })
 		).toBeTruthy();
 		expect(
-			within(totalsTabs).getByRole('button', { name: 'Session totals' })
+			within(tabs).getByRole('button', { name: 'Session totals' })
 		).toBeTruthy();
 		expect(
-			within(totalsTabs).getByRole('button', { name: 'Highlights' })
+			within(tabs).getByRole('button', { name: 'Highlights' })
 		).toBeTruthy();
 		expect(
-			within(totalsTabs).queryByRole('button', { name: 'Year totals' })
+			within(tabs).queryByRole('button', { name: 'Year totals' })
 		).toBeNull();
 		// Exactly one "Month totals" button — year-scoped's own, not the
 		// all-time one (mutually exclusive route depths).
-		expect(within(totalsTabs).getAllByRole('button')).toHaveLength(3);
+		// Month totals, Session totals, Highlights, Biometrics, Demographics,
+		// Bird list.
+		expect(within(tabs).getAllByRole('button')).toHaveLength(6);
 		await screen.findByTestId('sp-month-totals-tab');
 	});
 
@@ -331,20 +341,20 @@ describe('TabSet-based totals tabs', () => {
 				viewedGroup={viewedGroup}
 			/>
 		);
-		const totalsTabs = screen.getByRole('tablist', { name: 'Totals' });
+		const tabs = screen.getByRole('tablist');
 		expect(
-			within(totalsTabs).getByRole('button', { name: 'Session totals' })
+			within(tabs).getByRole('button', { name: 'Session totals' })
 		).toBeTruthy();
 		expect(
-			within(totalsTabs).getByRole('button', { name: 'Year totals' })
+			within(tabs).getByRole('button', { name: 'Year totals' })
 		).toBeTruthy();
 		expect(
-			within(totalsTabs).getByRole('button', { name: 'Highlights' })
+			within(tabs).getByRole('button', { name: 'Highlights' })
 		).toBeTruthy();
-		expect(within(totalsTabs).getAllByRole('button')).toHaveLength(3);
-		fireEvent.click(
-			within(totalsTabs).getByRole('button', { name: 'Year totals' })
-		);
+		// Session totals, Year totals, Highlights, Biometrics, Demographics,
+		// Bird list.
+		expect(within(tabs).getAllByRole('button')).toHaveLength(6);
+		fireEvent.click(within(tabs).getByRole('button', { name: 'Year totals' }));
 		await screen.findByTestId('sp-squashed-month-year-totals-tab');
 	});
 
@@ -367,7 +377,7 @@ describe('TabSet-based totals tabs', () => {
 		expect(mockFetchYearTotalsTabData).not.toHaveBeenCalled();
 	});
 
-	it('omits initialTabData when the resolved initial tab is one of the 3 not-yet-migrated tabs', async () => {
+	it('resolves directly to a dataFetcher: undefined detail tab when it is the resolved initial tab, fetching no totals tab at all', async () => {
 		render(
 			<SpeciesPageContent
 				params={{ speciesName: 'Robin' }}
@@ -375,13 +385,12 @@ describe('TabSet-based totals tabs', () => {
 				viewedGroup={viewedGroup}
 			/>
 		);
-		// TabSet's own tab strip falls back to its own default (`year-totals`)
-		// and fetches client-side, since the real initial tab lives in the old
-		// mechanism's strip instead.
-		await waitFor(() => {
-			expect(mockFetchYearTotalsTabData).toHaveBeenCalled();
-		});
+		// Biometrics is now a real entry in the same `TabSet`/`tabIds` list, so
+		// it becomes the active/loaded tab directly — Year totals (the route's
+		// own default) never mounts and never fetches.
 		await screen.findByTestId('sp-biometrics-tab');
+		expect(mockFetchYearTotalsTabData).not.toHaveBeenCalled();
+		expect(screen.queryByTestId('sp-year-totals-tab')).toBeNull();
 	});
 });
 
@@ -411,10 +420,9 @@ describe('SpeciesData tab list', () => {
 			/>
 		);
 		expect(
-			within(screen.getByRole('tablist', { name: 'Totals' })).getByRole(
-				'button',
-				{ name: 'Month totals' }
-			)
+			within(screen.getByRole('tablist')).getByRole('button', {
+				name: 'Month totals'
+			})
 		).toBeTruthy();
 		unmount();
 
@@ -426,10 +434,9 @@ describe('SpeciesData tab list', () => {
 			/>
 		);
 		expect(
-			within(screen.getByRole('tablist', { name: 'Totals' })).queryByRole(
-				'button',
-				{ name: 'Month totals' }
-			)
+			within(screen.getByRole('tablist')).queryByRole('button', {
+				name: 'Month totals'
+			})
 		).toBeNull();
 	});
 
@@ -442,10 +449,9 @@ describe('SpeciesData tab list', () => {
 			/>
 		);
 		expect(
-			within(screen.getByRole('tablist', { name: 'Totals' })).getByRole(
-				'button',
-				{ name: 'Year totals' }
-			)
+			within(screen.getByRole('tablist')).getByRole('button', {
+				name: 'Year totals'
+			})
 		).toBeTruthy();
 		unmount();
 
@@ -459,10 +465,9 @@ describe('SpeciesData tab list', () => {
 		// The all-time page's own "Year totals" (year-totals, not the squashed
 		// one) is still present — only one such button either way.
 		expect(
-			within(screen.getByRole('tablist', { name: 'Totals' })).getAllByRole(
-				'button',
-				{ name: 'Year totals' }
-			)
+			within(screen.getByRole('tablist')).getAllByRole('button', {
+				name: 'Year totals'
+			})
 		).toHaveLength(1);
 	});
 
@@ -482,51 +487,175 @@ describe('SpeciesData tab list', () => {
 				/>
 			);
 			expect(
-				within(screen.getByRole('tablist', { name: 'Totals' })).getByRole(
-					'button',
-					{ name: 'Highlights' }
-				)
+				within(screen.getByRole('tablist')).getByRole('button', {
+					name: 'Highlights'
+				})
+			).toBeTruthy();
+			unmount();
+		}
+	});
+
+	it('always includes the 3 dataFetcher: undefined detail tabs regardless of period scope', () => {
+		const depths: Partial<Extract<PageData, FullFatPageData>>[] = [
+			{},
+			{ year: 2026 },
+			{ year: 2026, month: 8 },
+			{ squashedMonth: 3 }
+		];
+		for (const overrides of depths) {
+			const { unmount } = render(
+				<SpeciesPageContent
+					params={{ speciesName: 'Robin' }}
+					data={buildFullFatPageData(overrides)}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			const tabs = screen.getByRole('tablist');
+			expect(
+				within(tabs).getByRole('button', { name: 'Biometrics' })
+			).toBeTruthy();
+			expect(
+				within(tabs).getByRole('button', { name: 'Demographics' })
+			).toBeTruthy();
+			expect(
+				within(tabs).getByRole('button', { name: 'Bird list' })
 			).toBeTruthy();
 			unmount();
 		}
 	});
 });
 
-describe('legacy tab rendering for not-yet-migrated tabs', () => {
+// `SpeciesData`'s Biometrics/Demographics/Bird list tabs (#1060) now render
+// through the same single `TabSet` as every other species tab, each a
+// `dataFetcher: undefined` entry whose `TabComponent` is a thin adapter
+// mapping `TabSet`'s shared `params`/`viewedGroup` onto the existing
+// `SpBiometricsTab`/`SpDemographicsTab`/`SpIndividualsTab`'s own prop names —
+// none of those 3 components' own internals change, so
+// `mock-species-tab-components.tsx` stubs them out rendering their received
+// props as JSON text, letting these tests assert the adapter mapped them
+// correctly without exercising the real (heavier) tab content.
+describe('species detail tabs (dataFetcher: undefined)', () => {
 	afterEach(() => {
 		cleanup();
 		vi.clearAllMocks();
 	});
 
 	beforeEach(() => {
+		// The totals tabs still render alongside these in the same `TabSet` on
+		// every `SpeciesPageContent` render — their own `dataFetcher`s need a
+		// resolvable mock regardless of which tab this describe block is
+		// exercising.
 		mockFetchYearTotalsTabData.mockResolvedValue([]);
 		mockFetchMonthTotalsTabData.mockResolvedValue([]);
 		mockFetchSessionTotalsTabData.mockResolvedValue([]);
-		mockFetchCombinedMonthTotalsTabData.mockResolvedValue({
-			monthlyStats: [],
-			monthSquashedStats: []
-		});
-		mockFetchSquashedMonthYearTotalsTabData.mockResolvedValue([]);
 	});
 
-	it('still renders Biometrics/Demographics/Bird list via the existing ConditionalTabPanel mechanism, unaffected by the TabSet changes', async () => {
-		render(
-			<SpeciesPageContent
-				params={{ speciesName: 'Robin' }}
-				data={buildFullFatPageData({ squashedMonth: 3 })}
-				viewedGroup={viewedGroup}
-			/>
-		);
-		const legacyTabs = screen.getByRole('tablist', { name: 'Tabs' });
-		expect(within(legacyTabs).getAllByRole('button')).toHaveLength(3);
-		const cases: [string, string][] = [
-			['Biometrics', 'sp-biometrics-tab'],
-			['Demographics', 'sp-demographics-tab'],
-			['Bird list', 'sp-individuals-tab']
-		];
-		for (const [label, testId] of cases) {
-			fireEvent.click(within(legacyTabs).getByRole('button', { name: label }));
-			await screen.findByTestId(testId);
-		}
+	async function renderPropsOf(testId: string) {
+		const element = await screen.findByTestId(testId);
+		return JSON.parse(element.textContent ?? '{}');
+	}
+
+	describe('Biometrics tab', () => {
+		it('renders SpBiometricsTab with data: null routed through the adapter, with speciesStats/speciesName/speciesId/fromDate/toDate/viewedGroupId mapped correctly from params/viewedGroup', async () => {
+			const speciesStats = buildCoreStatsRow() as CoreStatsWithBiometrics;
+			render(
+				<SpeciesPageContent
+					params={{ speciesName: 'Robin' }}
+					data={buildFullFatPageData({
+						speciesStats,
+						speciesId: 7,
+						fromDate: '2026-01-01',
+						toDate: '2026-12-31',
+						initialTabId: 'biometrics'
+					})}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			expect(await renderPropsOf('sp-biometrics-tab')).toMatchObject({
+				speciesStats,
+				speciesName: 'Robin',
+				speciesId: 7,
+				viewedGroupId: 1,
+				fromDate: '2026-01-01',
+				toDate: '2026-12-31'
+			});
+		});
+	});
+
+	describe('Demographics tab', () => {
+		it('renders SpDemographicsTab with data: null routed through the adapter, with speciesName/fromDate/toDate/viewedGroupId mapped correctly from params/viewedGroup', async () => {
+			render(
+				<SpeciesPageContent
+					params={{ speciesName: 'Robin' }}
+					data={buildFullFatPageData({
+						fromDate: '2026-01-01',
+						toDate: '2026-12-31',
+						initialTabId: 'demographics'
+					})}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			expect(await renderPropsOf('sp-demographics-tab')).toMatchObject({
+				speciesName: 'Robin',
+				viewedGroupId: 1,
+				fromDate: '2026-01-01',
+				toDate: '2026-12-31'
+			});
+		});
+	});
+
+	describe('Individuals ("Bird list") tab', () => {
+		it('renders SpIndividualsTab with data: null routed through the adapter, with speciesId/birds/birdCount/fromDate/toDate/viewedGroupId mapped correctly from params/viewedGroup', async () => {
+			const birds: FullFatPageData['birds'] = [];
+			render(
+				<SpeciesPageContent
+					params={{ speciesName: 'Robin' }}
+					data={buildFullFatPageData({
+						birds,
+						speciesId: 7,
+						speciesStats: buildCoreStatsRow({
+							bird_count: 12
+						}) as CoreStatsWithBiometrics,
+						fromDate: '2026-01-01',
+						toDate: '2026-12-31',
+						initialTabId: 'bird-list'
+					})}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			expect(await renderPropsOf('sp-individuals-tab')).toMatchObject({
+				speciesId: 7,
+				birds,
+				birdCount: 12,
+				viewedGroupId: 1,
+				fromDate: '2026-01-01',
+				toDate: '2026-12-31'
+			});
+		});
+
+		it('derives birdCount from params.speciesStats.bird_count, defaulting to 0 when null', async () => {
+			// `CoreStatsResult.bird_count` is non-null (`NonNullable`-stripped,
+			// app/models/db.ts) even though the underlying RPC can return `null`
+			// for an ungrouped row with zero birds — a literal `null` override
+			// needs the documented `as unknown as` escape hatch (app/CLAUDE.md).
+			// eslint-disable-next-line no-restricted-syntax -- see comment above
+			const speciesStats = {
+				...buildCoreStatsRow(),
+				bird_count: null
+			} as unknown as CoreStatsWithBiometrics;
+			render(
+				<SpeciesPageContent
+					params={{ speciesName: 'Robin' }}
+					data={buildFullFatPageData({
+						speciesStats,
+						initialTabId: 'bird-list'
+					})}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			expect(await renderPropsOf('sp-individuals-tab')).toMatchObject({
+				birdCount: 0
+			});
+		});
 	});
 });
