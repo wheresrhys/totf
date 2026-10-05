@@ -135,6 +135,96 @@ describe('group_ticks', () => {
 		]);
 	});
 
+	// The temporal filters narrow which encounters are in scope before the
+	// per-species MIN(visit_date), so `first_encounter_date` becomes "first
+	// encounter within the window" and a species with no in-window encounter drops
+	// out of the result entirely.
+	describe('date-range filtering', () => {
+		it('returns only ticks on or after from_date', async () => {
+			const { data, error } = await alphaClient.rpc('group_ticks', {
+				ringing_group_filter: alphaId,
+				from_date: '2023-01-01'
+			});
+			expect(error).toBeNull();
+			expect(data).toEqual([
+				{ species_name: 'Blue Tit', first_encounter_date: '2023-05-12' },
+				{ species_name: 'Reed Warbler', first_encounter_date: '2023-05-12' },
+				{ species_name: 'Robin', first_encounter_date: '2023-05-12' },
+				{ species_name: 'Wren', first_encounter_date: '2023-05-12' },
+				{ species_name: 'Kingfisher', first_encounter_date: '2023-05-10' },
+				{ species_name: 'Redwing', first_encounter_date: '2023-03-20' },
+				{ species_name: 'Fieldfare', first_encounter_date: '2023-03-15' }
+			]);
+		});
+
+		it('returns only ticks on or before to_date', async () => {
+			const { data, error } = await alphaClient.rpc('group_ticks', {
+				ringing_group_filter: alphaId,
+				to_date: '2022-12-31'
+			});
+			expect(error).toBeNull();
+			// Fieldfare/Redwing were only ever encountered in 2023, so they drop out.
+			expect(data).toEqual([
+				{ species_name: 'Reed Warbler', first_encounter_date: '2022-06-15' },
+				{ species_name: 'Blue Tit', first_encounter_date: '2022-04-30' },
+				{ species_name: 'Kingfisher', first_encounter_date: '2022-04-30' },
+				{ species_name: 'Robin', first_encounter_date: '2021-06-20' },
+				{ species_name: 'Wren', first_encounter_date: '2021-06-20' }
+			]);
+		});
+	});
+
+	describe('year filtering', () => {
+		it('returns only ticks in year_filter', async () => {
+			const { data, error } = await alphaClient.rpc('group_ticks', {
+				ringing_group_filter: alphaId,
+				year_filter: 2021
+			});
+			expect(error).toBeNull();
+			expect(data).toEqual([
+				{ species_name: 'Robin', first_encounter_date: '2021-06-20' },
+				{ species_name: 'Wren', first_encounter_date: '2021-06-20' }
+			]);
+		});
+	});
+
+	describe('month filtering', () => {
+		it('returns every occurrence of that calendar month across all years', async () => {
+			// A bare month_filter is a recurring month, not a contiguous range: June
+			// 2021 and June 2022 encounters are both in scope, so Robin/Wren keep
+			// their 2021 dates while Blue Tit/Reed Warbler get their 2022 ones.
+			const { data, error } = await alphaClient.rpc('group_ticks', {
+				ringing_group_filter: alphaId,
+				month_filter: 6
+			});
+			expect(error).toBeNull();
+			expect(data).toEqual([
+				{ species_name: 'Blue Tit', first_encounter_date: '2022-06-15' },
+				{ species_name: 'Reed Warbler', first_encounter_date: '2022-06-15' },
+				{ species_name: 'Robin', first_encounter_date: '2021-06-20' },
+				{ species_name: 'Wren', first_encounter_date: '2021-06-20' }
+			]);
+		});
+
+		it('intersects all four temporal filters when combined', async () => {
+			const { data, error } = await alphaClient.rpc('group_ticks', {
+				ringing_group_filter: alphaId,
+				from_date: '2022-01-01',
+				to_date: '2024-12-31',
+				year_filter: 2023,
+				month_filter: 5
+			});
+			expect(error).toBeNull();
+			expect(data).toEqual([
+				{ species_name: 'Blue Tit', first_encounter_date: '2023-05-12' },
+				{ species_name: 'Reed Warbler', first_encounter_date: '2023-05-12' },
+				{ species_name: 'Robin', first_encounter_date: '2023-05-12' },
+				{ species_name: 'Wren', first_encounter_date: '2023-05-12' },
+				{ species_name: 'Kingfisher', first_encounter_date: '2023-05-10' }
+			]);
+		});
+	});
+
 	it("a species' first-ever encounter logged with a non-'N' record_type still sets first_encounter_date", async () => {
 		// Beta's only Robin encounter is SHARED01, logged as record_type 'S' (a retrap-type
 		// record — the bird was originally ringed by Alpha). group_ticks must not filter to
