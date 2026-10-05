@@ -20,6 +20,10 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		psql(`UPDATE "Birds" SET ringing_group_ids = array_remove(ringing_group_ids, ${deltaId}) WHERE ${deltaId} = ANY(ringing_group_ids)`)
 		psql(`DELETE FROM "Birds" WHERE ringing_group_ids = '{}'`)
 		psql(`ALTER TABLE "Encounters" ENABLE TRIGGER trigger_encounters_refresh_bird_proven_age`)
+		// The import now aborts on a loc_id the group has no Location for (#1079),
+		// so delta.csv's site has to exist before the upload — the wiped Locations
+		// rows can no longer be re-created by the import itself.
+		psql(`INSERT INTO "Locations" (location_name, ringing_group_id) VALUES ('Delta Site', ${deltaId}) ON CONFLICT (location_name, ringing_group_id) DO NOTHING`)
 	})
 
 	test('uploads delta.csv and shows completion message', async ({ page }) => {
