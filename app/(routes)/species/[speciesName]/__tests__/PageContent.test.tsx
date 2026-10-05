@@ -277,17 +277,27 @@ describe('TabSet-based totals tabs', () => {
 			/>
 		);
 		const tabs = screen.getByRole('tablist');
-		expect(within(tabs).getByRole('button', { name: 'Year totals' })).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Year totals' })
+		).toBeTruthy();
 		expect(
 			within(tabs).getByRole('button', { name: 'Session totals' })
 		).toBeTruthy();
-		expect(within(tabs).getByRole('button', { name: 'Month totals' })).toBeTruthy();
-		expect(within(tabs).getByRole('button', { name: 'Highlights' })).toBeTruthy();
-		expect(within(tabs).getByRole('button', { name: 'Biometrics' })).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Month totals' })
+		).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Highlights' })
+		).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Biometrics' })
+		).toBeTruthy();
 		expect(
 			within(tabs).getByRole('button', { name: 'Demographics' })
 		).toBeTruthy();
-		expect(within(tabs).getByRole('button', { name: 'Bird list' })).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Bird list' })
+		).toBeTruthy();
 		// Year totals, Session totals, Month totals, Highlights, Biometrics,
 		// Demographics, Bird list.
 		expect(within(tabs).getAllByRole('button')).toHaveLength(7);
@@ -303,11 +313,15 @@ describe('TabSet-based totals tabs', () => {
 			/>
 		);
 		const tabs = screen.getByRole('tablist');
-		expect(within(tabs).getByRole('button', { name: 'Month totals' })).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Month totals' })
+		).toBeTruthy();
 		expect(
 			within(tabs).getByRole('button', { name: 'Session totals' })
 		).toBeTruthy();
-		expect(within(tabs).getByRole('button', { name: 'Highlights' })).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Highlights' })
+		).toBeTruthy();
 		expect(
 			within(tabs).queryByRole('button', { name: 'Year totals' })
 		).toBeNull();
@@ -331,8 +345,12 @@ describe('TabSet-based totals tabs', () => {
 		expect(
 			within(tabs).getByRole('button', { name: 'Session totals' })
 		).toBeTruthy();
-		expect(within(tabs).getByRole('button', { name: 'Year totals' })).toBeTruthy();
-		expect(within(tabs).getByRole('button', { name: 'Highlights' })).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Year totals' })
+		).toBeTruthy();
+		expect(
+			within(tabs).getByRole('button', { name: 'Highlights' })
+		).toBeTruthy();
 		// Session totals, Year totals, Highlights, Biometrics, Demographics,
 		// Bird list.
 		expect(within(tabs).getAllByRole('button')).toHaveLength(6);
@@ -493,11 +511,15 @@ describe('SpeciesData tab list', () => {
 				/>
 			);
 			const tabs = screen.getByRole('tablist');
-			expect(within(tabs).getByRole('button', { name: 'Biometrics' })).toBeTruthy();
+			expect(
+				within(tabs).getByRole('button', { name: 'Biometrics' })
+			).toBeTruthy();
 			expect(
 				within(tabs).getByRole('button', { name: 'Demographics' })
 			).toBeTruthy();
-			expect(within(tabs).getByRole('button', { name: 'Bird list' })).toBeTruthy();
+			expect(
+				within(tabs).getByRole('button', { name: 'Bird list' })
+			).toBeTruthy();
 			unmount();
 		}
 	});
@@ -616,10 +638,10 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 			// app/models/db.ts) even though the underlying RPC can return `null`
 			// for an ungrouped row with zero birds — a literal `null` override
 			// needs the documented `as unknown as` escape hatch (app/CLAUDE.md).
+			// eslint-disable-next-line no-restricted-syntax -- see comment above
 			const speciesStats = {
 				...buildCoreStatsRow(),
 				bird_count: null
-				// eslint-disable-next-line no-restricted-syntax -- see comment above
 			} as unknown as CoreStatsWithBiometrics;
 			render(
 				<SpeciesPageContent
