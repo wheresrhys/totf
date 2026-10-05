@@ -5,7 +5,10 @@ import {
 	PageWrapper,
 	PrimaryHeading
 } from '@/app/components/shared/DesignSystem';
+import { useRingingGroup } from '@/app/components/layout/RingingGroupProvider';
+import { UnrecognisedLocationsReview } from '@/app/components/pages/import/UnrecognisedLocationsReview';
 import type { ImportMessage } from '@/app/api/import/route';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 type ImportState =
 	| { status: 'idle' }
@@ -24,15 +27,22 @@ type ImportState =
 	  }
 	| { status: 'error'; message: string }
 	// The import was abandoned before any row was written because the CSV named
-	// locations this group has no `Locations` row for (#1079). Deliberately a
-	// plain notice for now — a follow-up ticket replaces this branch's body with
-	// a review screen letting the group say "new site" vs "renamed site".
+	// locations this group has no `Locations` row for (#1079). Resolved via
+	// `UnrecognisedLocationsReview` (#1080), which lets the group say "new
+	// site" vs "renamed site" for each name, then returns to `idle` so the
+	// group re-selects/re-uploads the same file.
 	| { status: 'unrecognisedLocations'; locations: string[] };
 
 export function ImportPageContent() {
 	const [state, setState] = useState<ImportState>({ status: 'idle' });
 	const [fileName, setFileName] = useState<string>('');
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const ringingGroupId = useRingingGroup();
+	// The import route has no `/group/[slug]` variant (it always acts on the
+	// logged-in group, read from the session cookie via context) — there's no
+	// slug to resolve here, and `fetchGroupLocations`/`resolveUnrecognisedLocations`
+	// only ever read `.id`.
+	const viewedGroup: ViewedGroup = { id: ringingGroupId, slug: null };
 
 	const handleFileChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,17 +192,11 @@ export function ImportPageContent() {
 			)}
 
 			{state.status === 'unrecognisedLocations' && (
-				<div className="mt-4 flex flex-col gap-2">
-					<p>
-						Import aborted — these locations were not recognised:{' '}
-						{state.locations.join(', ')}. Nothing was imported.
-					</p>
-					<p>
-						If one of your sites has been renamed, rename its existing location
-						to match before importing again. If it is a genuinely new site,
-						create it first.
-					</p>
-				</div>
+				<UnrecognisedLocationsReview
+					names={state.locations}
+					viewedGroup={viewedGroup}
+					onResolved={() => setState({ status: 'idle' })}
+				/>
 			)}
 
 			{state.status === 'error' && (
