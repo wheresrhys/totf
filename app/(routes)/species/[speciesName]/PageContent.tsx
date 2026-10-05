@@ -10,31 +10,28 @@ import { formatMonthLabel } from '@/app/lib/month-totals';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import { SpIndividualsTab } from '@/app/components/pages/species/SpIndividualsTab';
-import { SpDemographicsTab } from '@/app/components/pages/species/SpDemographicsTab';
-import { SpBiometricsTab } from '@/app/components/pages/species/SpBiometricsTab';
 import { type SpeciesTotalsTabParams } from '@/app/actions/sp-data';
-import { TabNav } from '@/app/components/TabNav';
-import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
-import { ConditionalTabPanel } from '@/app/components/shared/ConditionalTabPanel';
 import { TabSet } from '@/app/components/shared/TabSet';
 // Imported (and re-exported below) rather than defined here — see
-// `species-tabs.ts`'s doc comment for why these 3 pure helpers live outside
-// this `'use client'` file (`page.tsx` imports them directly from there
-// instead, to stay off the client-reference path entirely). Re-exporting
-// keeps this file's own `SpeciesData` below and
-// `__tests__/PageContent.test.tsx` importing from the same `./PageContent`
-// path as before.
+// `species-tabs.tsx`'s doc comment for why these helpers live outside this
+// `'use client'` file (`page.tsx` imports them directly from there instead,
+// to stay off the client-reference path entirely). Re-exporting keeps this
+// file's own `SpeciesData` below and `__tests__/PageContent.test.tsx`
+// importing from the same `./PageContent` path as before.
 import {
 	getDefaultSpeciesTabId,
 	getSpeciesKnownTabIds,
-	buildSpeciesTotalsTabs
+	buildSpeciesTotalsTabs,
+	buildSpeciesDetailTabs,
+	type SpeciesDetailTabParams
 } from './species-tabs';
 export {
 	getDefaultSpeciesTabId,
 	getSpeciesKnownTabIds,
-	buildSpeciesTotalsTabs
+	buildSpeciesTotalsTabs,
+	buildSpeciesDetailTabs
 };
+export type { SpeciesDetailTabParams };
 
 // `tabId` (#803) is the optional `?tabId=` search param, threaded in from
 // each route depth's `page.tsx` — it never affects `getCacheKeys`, only which
@@ -189,22 +186,32 @@ function SpeciesData({
 	const isYearScoped = data.year !== undefined && data.month === undefined;
 	const isSquashedMonth = data.squashedMonth !== undefined;
 
-	// All 6 of species' data-fetching tabs (Year/Month/Session totals #1065;
-	// all-time Month totals, squashed-month Year totals and Highlights #1066)
-	// now render through the shared `TabSet` below, each server-prefetched
-	// when it's the resolved initial tab (`page.tsx`'s `prefetchActiveTabData`
-	// call) — except Highlights, which declares itself `clientSideOnly`
+	// All 9 of species' tabs now render through one single `TabSet` below —
+	// this is species' finish line for the tab-unification initiative. The 6
+	// data-fetching tabs (Year/Month/Session totals #1065; all-time Month
+	// totals, squashed-month Year totals and Highlights #1066) come from
+	// `buildSpeciesTotalsTabs`, each server-prefetched when it's the resolved
+	// initial tab (`page.tsx`'s `prefetchActiveTabData` call) — except
+	// Highlights, which declares itself `clientSideOnly`
 	// (`SpHighlightsTab.tsx`'s `spHighlightsTab`) and always fetches
-	// client-side regardless. Only Biometrics, Demographics and Bird list
-	// aren't on `TabConfig` yet (a follow-up ticket) and keep rendering below
-	// via the original `useLinkableTabs`/`TabNav`/`ConditionalTabPanel`
-	// mechanism — so this page deliberately shows two separate tab strips for
-	// the interim: `TabSet`'s own nav covers the 6 migrated tabs, this
-	// `TabNav` covers the remaining 3. Each strip resolves `initialTabId`
-	// independently against its own known ids (see `getSpeciesKnownTabIds`'s
-	// doc comment), so a `?tabId=` naming a tab in the *other* strip is a
-	// harmless no-op here — that strip simply starts with nothing
-	// active/loaded, since the real initial tab lives elsewhere.
+	// client-side regardless. The remaining 3 (Biometrics, Demographics, Bird
+	// list, #1060) come from `buildSpeciesDetailTabs` and are never
+	// prefetched, since none of the 3 has a `dataFetcher` (each manages its
+	// own internal fetching/pagination unchanged, joining `TabSet` purely for
+	// the shared `TabNav`/`ConditionalTabPanel` wiring) — `page.tsx` only
+	// passes the totals 6 into `prefetchActiveTabData`, never these 3.
+	//
+	// The two arrays are spread into one combined literal (`as const`) rather
+	// than passed as two separate `TabSet`s: `buildSpeciesTotalsTabs`'s 6
+	// tabs share `totalsTabParams` (`SpeciesTotalsTabParams`), while
+	// `buildSpeciesDetailTabs`'s 3 each carry their own `params`
+	// (`SpeciesDetailTabParams` — a shape `totalsTabParams` can't satisfy,
+	// since `speciesId`/`speciesStats`/`birds` aren't known yet at the point
+	// `page.tsx` builds its prefetch params, see that function's own doc
+	// comment). `TabSet`'s per-tab generic inference needs the combined
+	// literal `as const`'d as a whole, with `buildSpeciesDetailTabs`'s own
+	// tuple spread in directly rather than re-typed through an intermediate
+	// variable — see `buildSpeciesDetailTabs`'s own doc comment for why.
 	const totalsTabs = buildSpeciesTotalsTabs(
 		isAllTime,
 		isYearScoped,
@@ -226,85 +233,24 @@ function SpeciesData({
 		toDate: data.toDate,
 		monthFilter: data.squashedMonth
 	};
-
-	const defaultTabId = getDefaultSpeciesTabId(
-		isAllTime,
-		isYearScoped,
-		isSquashedMonth
-	);
-
-	const tabs = [
-		{ id: 'biometrics', label: 'Biometrics' },
-		{ id: 'demographics', label: 'Demographics' },
-		{ id: 'bird-list', label: 'Bird list' }
-	];
-
-	// The `?tabId=` param (#803) wins over the route-depth default when it
-	// names one of this route depth's actual tabs; an unknown/garbage value or
-	// no param at all falls back to `defaultTabId` unchanged. Shared with the
-	// summary and session pages via `useLinkableTabs` (#818). `defaultTabId`
-	// may legitimately name a tab that isn't in this (reduced) `tabs` list any
-	// more (e.g. `'year-totals'` on the all-time page) — that's fine, it just
-	// means this strip starts with nothing active/loaded, since that tab now
-	// lives in `TabSet` above instead.
-	const { activeTab, loadedTabs, selectTab } = useLinkableTabs({
-		tabIds: tabs.map((tab) => tab.id),
-		defaultTabId,
-		initialTabId
-	});
+	const detailTabParams: SpeciesDetailTabParams = {
+		speciesStats: data.speciesStats,
+		speciesName: data.speciesName,
+		speciesId: data.speciesId,
+		birds: data.birds,
+		fromDate: data.fromDate,
+		toDate: data.toDate
+	};
+	const detailTabs = buildSpeciesDetailTabs(detailTabParams);
 
 	return (
-		<>
-			<TabSet
-				tabs={totalsTabs}
-				params={totalsTabParams}
-				viewedGroup={viewedGroup}
-				initialTabId={initialTabId}
-				initialTabData={initialTabData}
-				ariaLabel="Totals"
-			/>
-			<TabNav tabs={tabs} activeTab={activeTab} onTabChange={selectTab} />
-			<ConditionalTabPanel
-				loadedTabs={loadedTabs}
-				tabId="biometrics"
-				activeTabId={activeTab}
-			>
-				<SpBiometricsTab
-					speciesStats={data.speciesStats}
-					speciesName={data.speciesName}
-					speciesId={data.speciesId}
-					viewedGroup={viewedGroup}
-					fromDate={data.fromDate}
-					toDate={data.toDate}
-				/>
-			</ConditionalTabPanel>
-			<ConditionalTabPanel
-				loadedTabs={loadedTabs}
-				tabId="demographics"
-				activeTabId={activeTab}
-			>
-				<SpDemographicsTab
-					speciesName={data.speciesName}
-					viewedGroup={viewedGroup}
-					fromDate={data.fromDate}
-					toDate={data.toDate}
-				/>
-			</ConditionalTabPanel>
-			<ConditionalTabPanel
-				loadedTabs={loadedTabs}
-				tabId="bird-list"
-				activeTabId={activeTab}
-			>
-				<SpIndividualsTab
-					speciesId={data.speciesId}
-					viewedGroup={viewedGroup}
-					birds={data.birds}
-					birdCount={data.speciesStats.bird_count ?? 0}
-					fromDate={data.fromDate}
-					toDate={data.toDate}
-				/>
-			</ConditionalTabPanel>
-		</>
+		<TabSet
+			tabs={[...totalsTabs, ...detailTabs] as const}
+			params={totalsTabParams}
+			viewedGroup={viewedGroup}
+			initialTabId={initialTabId}
+			initialTabData={initialTabData}
+		/>
 	);
 }
 

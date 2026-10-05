@@ -18,7 +18,7 @@ import {
 	type PageData
 } from './PageContent';
 // Imported from `./species-tabs` (not `./PageContent`, which is `'use
-// client'`) deliberately — see that file's doc comment: calling a function
+// client'`) deliberately — see that module's doc comment: calling a function
 // exported from a `'use client'` module directly (as this server file does)
 // throws at runtime even though it type-checks and unit-tests fine.
 import {

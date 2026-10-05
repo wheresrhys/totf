@@ -310,4 +310,19 @@ spec (`e2e/authenticated/import.spec.ts`) is kept from colliding across concurre
 
 ## Web import
 
-Logged-in groups can also upload CSVs via the UI at `/import`. The page POSTs to `POST /api/import` (`app/api/import/route.ts`), which streams NDJSON progress back to the browser. Processing is sequential (no rate limiter) and aborts with a date-range summary after 280 seconds. Vercel `maxDuration` is set to 300s. Core import logic is shared with the CLI script — see `supabase/CLAUDE.md`'s "CSV data import".
+Logged-in groups can also upload CSVs via the UI at `/import`. The page POSTs to `POST /api/import` (`app/api/import/route.ts`), which streams NDJSON progress back to the browser.
+
+Before processing any row, the route runs a **location pre-flight** (#1079): every distinct
+`loc_id` in the CSV is checked against the group's existing `Locations`
+(`getDistinctLocationNames` / `findUnrecognisedLocationNames` in `lib/demon-import.ts`), and if any
+name is unrecognised the route streams an `unrecognised_locations` message and closes the stream
+without a single write — not even for the rows whose location _was_ known. The guard exists because
+`processEncounterRow` upserts Locations on raw `(location_name, ringing_group_id)`, so a group
+re-coding an existing site (#1048: `972` → `CES972`) silently forks the Locations row and
+re-imports every encounter under it. `PageContent.tsx` renders that message as a plain notice for
+now; a follow-up ticket replaces it with a review screen letting the group say "new site" vs
+"renamed site". Because the guard is unconditional, a group's **first** import can no longer
+bootstrap its own locations — they must exist first (which is why `supabase/scripts/seed-e2e-data.ts`
+and `e2e/authenticated/import.spec.ts` pre-create theirs).
+
+Processing is sequential (no rate limiter) and aborts with a date-range summary after 280 seconds. Vercel `maxDuration` is set to 300s. Core import logic is shared with the CLI script — see `supabase/CLAUDE.md`'s "CSV data import".

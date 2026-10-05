@@ -105,26 +105,18 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 		});
 
 		describe('tab order and defaults (month-scoped page)', () => {
-			// Session totals (#1065) now renders through `TabSet`'s own strip
-			// (`ariaLabel="Totals"`), separate from the legacy
-			// `useLinkableTabs`/`TabNav` strip (`ariaLabel="Tabs"`, default)
-			// covering the tabs not yet migrated — see `SpeciesData`'s doc comment
-			// in `PageContent.tsx` for why there are two for the interim.
-			it('renders Session totals/Highlights in its own TabSet strip, and Biometrics/Demographics/Bird list in the legacy strip (no Year/Month totals)', async () => {
+			// #1060: species' finish line — Session totals, Highlights, Biometrics,
+			// Demographics and Bird list now all render through the same single
+			// `TabSet` (default `ariaLabel="Tabs"`).
+			it('renders Session totals/Highlights/Biometrics/Demographics/Bird list in a single TabSet strip (no Year/Month totals)', async () => {
 				render(await renderMonthPage());
 				await screen.findByTestId('sp-session-totals-tab');
-				const totalsLabels = within(
-					screen.getByRole('tablist', { name: 'Totals' })
-				)
+				const labels = within(screen.getByRole('tablist', { name: 'Tabs' }))
 					.getAllByRole('button')
 					.map((button) => button.textContent);
-				expect(totalsLabels).toEqual(['Session totals', 'Highlights']);
-				const legacyLabels = within(
-					screen.getByRole('tablist', { name: 'Tabs' })
-				)
-					.getAllByRole('button')
-					.map((button) => button.textContent);
-				expect(legacyLabels).toEqual([
+				expect(labels).toEqual([
+					'Session totals',
+					'Highlights',
 					'Biometrics',
 					'Demographics',
 					'Bird list'
@@ -177,20 +169,19 @@ describe('/species/[speciesName]/[yearOrMonth]/[month]', () => {
 			).toBe('true');
 		});
 
-		it('?tabId=bird-list wins over the month-scoped route’s Session totals default in the legacy strip, though Session totals keeps rendering in its own TabSet strip', async () => {
+		// #1060: bird-list is now one of the single TabSet's own ids, so
+		// `useLinkableTabs` selects it directly instead of falling back to the
+		// month-scoped default — unlike the pre-#1060 legacy strip, which had no
+		// `?tabId=` awareness of its own.
+		it('?tabId=bird-list selects the Bird list tab directly, without rendering Session totals', async () => {
 			render(await renderMonthPage('Robin', '2026', '08', 'bird-list'));
 			await screen.findByTestId('sp-individuals-tab');
-			// Session totals is `TabSet`'s sole tab at this route depth (#1065),
-			// so it's unconditionally mounted there — `bird-list` only wins within
-			// the legacy strip's own mutual exclusivity. Not prefetched (the
-			// resolved initial tab is `bird-list`, not `session-totals`), so
-			// `TabContent` fetches it client-side — `findByTestId` waits that out.
-			await screen.findByTestId('sp-session-totals-tab');
 			expect(
 				screen
 					.getByRole('button', { name: 'Bird list' })
 					.getAttribute('aria-current')
 			).toBe('true');
+			expect(screen.queryByTestId('sp-session-totals-tab')).toBeNull();
 		});
 
 		it('?tabId=not-a-real-tab falls back to the month-scoped default, with no crash and no blank pane', async () => {
