@@ -1,15 +1,3 @@
-// `'use client'` (#1113) — `buildSummaryNavigationTarget` below is passed as
-// `TemporalFilterControls`' `navigationController` prop. Passing a plain
-// function value from a Server Component into a Client Component's props
-// throws at runtime ("Functions cannot be passed directly to Client
-// Components..."), since RSC serialization can't carry a function across that
-// boundary — it only type-checks and unit-tests fine, same silent-until-
-// production shape as the client-reference pitfall documented in
-// `app/CLAUDE.md`'s "Where a page's tab ids _and_ `dataFetcher`s live". Making
-// this whole module a Client Component (matching
-// `species/[speciesName]/PageContent.tsx`'s existing convention) means the
-// closure is constructed and consumed entirely client-side and never crosses
-// the boundary at all.
 'use client';
 import { format } from 'date-fns';
 import {
