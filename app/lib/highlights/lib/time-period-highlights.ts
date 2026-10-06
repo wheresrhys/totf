@@ -259,32 +259,33 @@ async function getAllRelevantHighlights({
 	const monthparentTimeWindow = {
 		month: Number(timePeriod.split('-')[1])
 	};
-	const allTimeHighlights = await getHighlightsWithinTimeWindow({
-		temporalUnit: temporalUnit,
-		groupId,
-		limit: limit ?? 3,
-		includePerSpecies: true
-	});
-	const yearHighlights =
-		temporalUnit !== 'year'
-			? await getHighlightsWithinTimeWindow({
-					temporalUnit: temporalUnit,
-					groupId,
-					parentTimeWindow: yearparentTimeWindow,
-					limit: limit ?? 1,
-					includePerSpecies: true
-				})
-			: [];
-	const monthHighlights =
-		temporalUnit === 'day'
-			? await getHighlightsWithinTimeWindow({
-					temporalUnit: temporalUnit,
-					groupId,
-					parentTimeWindow: monthparentTimeWindow,
-					limit: limit ?? 3,
-					includePerSpecies: true
-				})
-			: [];
+	const [allTimeHighlights, yearHighlights, monthHighlights] =
+		await Promise.all([
+			getHighlightsWithinTimeWindow({
+				temporalUnit: temporalUnit,
+				groupId,
+				limit: limit ?? 3,
+				includePerSpecies: true
+			}),
+			temporalUnit !== 'year'
+				? getHighlightsWithinTimeWindow({
+						temporalUnit: temporalUnit,
+						groupId,
+						parentTimeWindow: yearparentTimeWindow,
+						limit: limit ?? 1,
+						includePerSpecies: true
+					})
+				: [],
+			temporalUnit === 'day'
+				? getHighlightsWithinTimeWindow({
+						temporalUnit: temporalUnit,
+						groupId,
+						parentTimeWindow: monthparentTimeWindow,
+						limit: limit ?? 3,
+						includePerSpecies: true
+					})
+				: []
+		]);
 	return filterOutIrrelevantHighlights(
 		[...allTimeHighlights, ...yearHighlights, ...monthHighlights],
 		timePeriod
