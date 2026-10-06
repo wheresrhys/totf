@@ -183,14 +183,14 @@ describe('fetchResightingsPageContent query building', () => {
 	it('filters encounters to the viewed group', async () => {
 		const { client, chain } = makeEncountersClient(resightings);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchResightingsPageContent({}, 42, VIEWED_GROUP);
+		await fetchResightingsPageContent({}, VIEWED_GROUP);
 		expect(chain.eq).toHaveBeenCalledWith('ringing_group_id', 42);
 	});
 
 	it('matches only resighting/recovery record types in the query', async () => {
 		const { client, chain } = makeEncountersClient(resightings);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchResightingsPageContent({}, 42, VIEWED_GROUP);
+		await fetchResightingsPageContent({}, VIEWED_GROUP);
 		expect(chain.in).toHaveBeenCalledWith('record_type', [
 			...RESIGHTING_RECORD_TYPES
 		]);

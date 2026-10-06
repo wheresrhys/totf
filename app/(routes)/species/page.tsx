@@ -71,7 +71,6 @@ export async function fetchYears(viewedGroup: ViewedGroup): Promise<number[]> {
 
 export async function fetchSpeciesListPageContent(
 	params: PageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageData> {
 	// A bare month (no year) comes back as `recurringMonth` rather than

@@ -58,7 +58,6 @@ export type PageData = {
 
 export async function fetchSummaryYearMonthPageContent(
 	{ yearOrMonth, month, tabId }: PageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageData> {
 	// A squashed month (e.g. `/summary/jan/5`) has no single year to drill a

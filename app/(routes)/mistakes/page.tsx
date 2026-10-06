@@ -10,7 +10,6 @@ import { MistakesPageContent } from './PageContent';
 
 export async function fetchMistakesPageContent(
 	_: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<DiscrepenciesResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();

@@ -61,7 +61,6 @@ const compareSpeciesTabPrefetchers: Pick<
  */
 export async function fetchCompareSpeciesPageContent(
 	params: CompareSpeciesParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<CompareSpeciesPageData> {
 	const comparisonStats = await fetchSpeciesComparisonStats(viewedGroup);

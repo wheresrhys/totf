@@ -245,7 +245,6 @@ export async function fetchSpeciesPageContentForPeriod(
 // to the squashed-month sibling route instead.
 export async function fetchSpeciesPageContent(
 	params: PageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageData | null> {
 	return fetchSpeciesPageContentForPeriod(params, viewedGroup, {

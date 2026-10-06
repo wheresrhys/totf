@@ -11,7 +11,6 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export async function fetchRingSequencesPageContent(
 	_params: Record<string, string>,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<RingSequencesPageData | null> {
 	const [sequences, unassignedPrefixes] = await Promise.all([

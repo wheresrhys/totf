@@ -146,7 +146,6 @@ async function fetchSummarySquashedMonthPageContent(
 
 export async function fetchSummaryYearOrMonthPageContent(
 	{ yearOrMonth, tabId }: PageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageData> {
 	const squashedMonth = parseMonthAbbreviation(yearOrMonth);

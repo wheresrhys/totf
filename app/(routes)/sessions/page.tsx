@@ -44,7 +44,6 @@ const FULL_GROWN_EQUIVALENT_SELECT = `${allSessionsQuery.select}, qualifying:Enc
 
 export async function fetchSessionsPageContent(
 	params: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<SessionWithEncountersCount[]> {
 	const supabase = await getAuthenticatedSupabaseClient();

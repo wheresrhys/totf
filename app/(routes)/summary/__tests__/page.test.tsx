@@ -78,7 +78,7 @@ describe('/summary (all-time)', () => {
 	});
 
 	it('calls fetchSummaryStats with the correct from_date/to_date bounds for this page', async () => {
-		await fetchSummaryPageContent({}, 1, VIEWED_GROUP);
+		await fetchSummaryPageContent({}, VIEWED_GROUP);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
 			VIEWED_GROUP,
 			undefined,
@@ -89,7 +89,6 @@ describe('/summary (all-time)', () => {
 	it('threads an explicit TemporalFilterControls fromDate/toDate query-string range into fetchSummaryStats', async () => {
 		await fetchSummaryPageContent(
 			{ fromDate: '2026-03-01', toDate: '2026-03-31' },
-			1,
 			VIEWED_GROUP
 		);
 		expect(fetchSummaryStatsMock).toHaveBeenCalledWith(
@@ -116,7 +115,7 @@ describe('/summary (all-time)', () => {
 	});
 
 	it('does not eagerly fetch species data in the page data-fetcher (now lazy)', async () => {
-		await fetchSummaryPageContent({}, 1, VIEWED_GROUP);
+		await fetchSummaryPageContent({}, VIEWED_GROUP);
 		expect(fetchSpeciesDataMock).not.toHaveBeenCalled();
 	});
 
@@ -129,14 +128,14 @@ describe('/summary (all-time)', () => {
 	});
 
 	it('fetchSummaryPageContent calls fetchYearlyTotals with the viewed group id', async () => {
-		await fetchSummaryPageContent({}, 1, VIEWED_GROUP);
+		await fetchSummaryPageContent({}, VIEWED_GROUP);
 		expect(fetchYearlyTotalsMock).toHaveBeenCalledWith(VIEWED_GROUP);
 	});
 
 	it('includes yearlyTotals in the returned page data', async () => {
 		const yearlyStats = [{ time_period: '2026-01-01' }];
 		fetchYearlyTotalsMock.mockResolvedValueOnce(yearlyStats);
-		const data = await fetchSummaryPageContent({}, 1, VIEWED_GROUP);
+		const data = await fetchSummaryPageContent({}, VIEWED_GROUP);
 		expect(data.yearlyTotals).toBe(yearlyStats);
 	});
 
