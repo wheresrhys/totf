@@ -12,7 +12,6 @@ import { ResightingsPageContent } from './PageContent';
 
 export async function fetchResightingsPageContent(
 	_: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<ResightingEncounter[]> {
 	const supabase = await getAuthenticatedSupabaseClient();

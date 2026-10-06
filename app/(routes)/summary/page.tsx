@@ -38,7 +38,6 @@ async function getSummaryPageParams(pageProps: PageProps): Promise<PageParams> {
 
 export async function fetchSummaryPageContent(
 	params: PageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageData> {
 	const [summaryStats, yearlyTotals] = await Promise.all([

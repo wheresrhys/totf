@@ -34,7 +34,6 @@ async function getSpeciesYearOrMonthPageParams(
 
 export async function fetchSpeciesYearOrMonthPageContent(
 	params: PageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageData | null> {
 	const squashedMonth = parseMonthAbbreviation(params.yearOrMonth);

@@ -37,7 +37,6 @@ async function getSpeciesYearMonthPageParams(
 
 export async function fetchSpeciesYearMonthPageContent(
 	params: PageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageData | null> {
 	// A squashed month (e.g. `/species/{name}/jan/5`) has no single year to

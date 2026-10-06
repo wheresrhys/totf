@@ -11,7 +11,6 @@ import { EffortPageContent } from './PageContent';
 
 export async function fetchEffortPageContent(
 	_params: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PayOffStatsData | null> {
 	return fetchPayOffStats(viewedGroup);

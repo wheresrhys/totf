@@ -10,7 +10,6 @@ import { RetrapsPageContent } from './PageContent';
 
 export async function fetchRetrapsPageContent(
 	_: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<NotableRetrapsResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();

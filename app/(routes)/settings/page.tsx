@@ -8,7 +8,6 @@ import { SettingsPageContent, type SettingsPageData } from './PageContent';
 
 export async function fetchSettingsPageContent(
 	_: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<SettingsPageData> {
 	const publicAreas = await fetchOwnGroupPublicAreas(viewedGroup.id);

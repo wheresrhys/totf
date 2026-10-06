@@ -215,7 +215,6 @@ export async function fetchSpeciesPageContentForPeriod(
 
 export async function fetchSpeciesPageContent(
 	params: PageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageData | null> {
 	return fetchSpeciesPageContentForPeriod(params, viewedGroup);

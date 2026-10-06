@@ -32,7 +32,6 @@ export async function fetchYears(viewedGroup: ViewedGroup): Promise<number[]> {
 
 export async function fetchSpeciesListPageContent(
 	_: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<PageData> {
 	const [speciesStats, years] = await Promise.all([

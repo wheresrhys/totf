@@ -10,7 +10,6 @@ import { TicksPageContent } from './PageContent';
 
 export async function fetchTicksPageContent(
 	_: DefaultPageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<GroupTicksResult[]> {
 	const supabase = await getAuthenticatedSupabaseClient();

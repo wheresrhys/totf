@@ -109,14 +109,14 @@ describe('fetchPulliPageContent query building', () => {
 	it('filters encounters to the viewed group', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchPulliPageContent({}, 42, VIEWED_GROUP);
+		await fetchPulliPageContent({}, VIEWED_GROUP);
 		expect(chain.eq).toHaveBeenCalledWith('ringing_group_id', 42);
 	});
 
 	it('excludes resighting/recovery record types in the query', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchPulliPageContent({}, 42, VIEWED_GROUP);
+		await fetchPulliPageContent({}, VIEWED_GROUP);
 		expect(chain.not).toHaveBeenCalledWith(
 			'record_type',
 			'in',
@@ -127,14 +127,14 @@ describe('fetchPulliPageContent query building', () => {
 	it('matches only age_code 1 in the query', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchPulliPageContent({}, 42, VIEWED_GROUP);
+		await fetchPulliPageContent({}, VIEWED_GROUP);
 		expect(chain.eq).toHaveBeenCalledWith('age_code', 1);
 	});
 
 	it('matches only is_juv false in the query', async () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-		await fetchPulliPageContent({}, 42, VIEWED_GROUP);
+		await fetchPulliPageContent({}, VIEWED_GROUP);
 		expect(chain.eq).toHaveBeenCalledWith('is_juv', false);
 	});
 });

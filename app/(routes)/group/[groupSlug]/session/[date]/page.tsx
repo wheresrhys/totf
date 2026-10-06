@@ -138,7 +138,6 @@ function collectDistinctLocations(
 
 export async function fetchSessionPageContent(
 	{ date }: PageParams,
-	_unusedGroupId: number,
 	viewedGroup: ViewedGroup
 ): Promise<DayData | null> {
 	const supabase = await getAuthenticatedSupabaseClient();
