@@ -8,9 +8,12 @@ import type {
 	HighlightCategory,
 	NumericHighlightValue
 } from '../types';
-
+import { fetchStatsSpines } from '@/app/actions/stats-cache';
 import { isNumericHighlightValue } from '../types';
-import { getHighlightsWithinTimeWindow } from './highlight-generator';
+import {
+	getHighlightsWithinTimeWindow,
+	buildTimeWindowFilter
+} from './highlight-generator';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 const highlightCategoryOrder: HighlightCategory[] = [
 	'rarity',
@@ -292,7 +295,7 @@ async function getAllRelevantHighlights({
 	);
 }
 
-export async function getCondensedHighlightsAtTimePeriod(
+export async function _getCondensedHighlightsAtTimePeriod(
 	groupId: number,
 	timePeriod: string,
 	temporalUnit: TemporalUnit,
@@ -307,7 +310,68 @@ export async function getCondensedHighlightsAtTimePeriod(
 	const significantHighlights = removeLessSignificantHighlights(
 		allRelevantHighlights
 	);
-	const combinedHighlights = combineSimilarHighlights(significantHighlights);
-	const sortedHighlights = sortHighlights(combinedHighlights);
-	return sortedHighlights;
+	return combineSimilarHighlights(significantHighlights);
+}
+
+export async function getCondensedHighlightsAtTimePeriod(
+	groupId: number,
+	timePeriod: string,
+	temporalUnit: TemporalUnit,
+	limit?: number
+): Promise<CombinedHighlight[]> {
+	const combinedHighlights = await _getCondensedHighlightsAtTimePeriod(
+		groupId,
+		timePeriod,
+		temporalUnit,
+		limit
+	);
+	return sortHighlights(combinedHighlights);
+}
+
+async function getContainedTimePeriods(
+	groupId: number,
+	parentTimeWindow: YearMonthRestriction
+) {
+	const { years, months, days } = await fetchStatsSpines({
+		id: groupId,
+		slug: null
+	});
+	const timeWindowFilter = buildTimeWindowFilter(parentTimeWindow);
+	return [
+		...years.filter(timeWindowFilter),
+		...months.filter(timeWindowFilter),
+		...days.filter(timeWindowFilter)
+	];
+}
+
+// Goals
+// On year summary show the very best things at month and session level
+// busiest/most varied month ever
+// busiest/most varied sesison ever
+// show some exceptional species records, TBD what
+// On month summary show the best things at session level
+// busiest/most varied session ever/of the year
+// show some species records, TBD what
+export async function getCondensedHighlightsWithinTimeWindow(
+	groupId: number,
+	parentTimeWindow: YearMonthRestriction,
+	temporalUnit: TemporalUnit,
+	limit?: number
+): Promise<CombinedHighlight[]> {
+	const containedTimePeriods: string[] = await getContainedTimePeriods(
+		groupId,
+		parentTimeWindow
+	);
+	const combinedHighlights = await Promise.all(
+		containedTimePeriods.map((timePeriod) =>
+			_getCondensedHighlightsAtTimePeriod(
+				groupId,
+				timePeriod,
+				temporalUnit,
+				limit
+			)
+		)
+	);
+
+	return sortHighlights(combinedHighlights.flatMap((highlights) => highlights));
 }

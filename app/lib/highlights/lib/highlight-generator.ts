@@ -105,6 +105,24 @@ type StatFilter = (stat: {
 	time_period: string | null;
 	species_name: string | null;
 }) => boolean;
+
+export function buildTimeWindowFilter(parentTimeWindow?: YearMonthRestriction) {
+	if (!parentTimeWindow) {
+		return () => true;
+	}
+	const { year, month } = parentTimeWindow;
+	if (year && month) {
+		return (timePeriod: string) =>
+			timePeriod.startsWith(`${year}-${String(month).padStart(2, '0')}-`);
+	} else if (year) {
+		return (timePeriod: string) => timePeriod.startsWith(`${year}-`);
+	} else if (month) {
+		return (timePeriod: string) =>
+			timePeriod.includes(`-${String(month).padStart(2, '0')}-`);
+	} else {
+		return () => true;
+	}
+}
 function getCacheUtils(
 	groupId: number,
 	temporalUnit: TemporalUnit,
@@ -119,6 +137,7 @@ function getCacheUtils(
 	if (!parentTimeWindow) {
 		return { cacheKey, filter: null };
 	}
+	const timeWindowFilter = buildTimeWindowFilter(parentTimeWindow);
 	const { month, year } = parentTimeWindow;
 	const speciesFilter = species
 		? (species_name: string | null) => species_name === species
@@ -127,19 +146,15 @@ function getCacheUtils(
 	if (year && month) {
 		cacheKey = `${cacheKey}-${year}-${month}`;
 		filter = ({ time_period, species_name }) =>
-			(time_period as string).startsWith(
-				`${year}-${String(month).padStart(2, '0')}-`
-			) && speciesFilter(species_name);
+			timeWindowFilter(time_period as string) && speciesFilter(species_name);
 	} else if (year) {
 		cacheKey = `${cacheKey}-${year}`;
 		filter = ({ time_period, species_name }) =>
-			(time_period as string).startsWith(`${year}-`) &&
-			speciesFilter(species_name);
+			timeWindowFilter(time_period as string) && speciesFilter(species_name);
 	} else if (month) {
 		cacheKey = `${cacheKey}-${month}`;
 		filter = ({ time_period, species_name }) =>
-			(time_period as string).includes(`-${String(month).padStart(2, '0')}-`) &&
-			speciesFilter(species_name);
+			timeWindowFilter(time_period as string) && speciesFilter(species_name);
 	} else if (species) {
 		filter = ({ species_name }) => speciesFilter(species_name);
 	} else {
