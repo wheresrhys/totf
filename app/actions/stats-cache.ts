@@ -14,6 +14,7 @@ export type StatsRepository = {
 	coreStatsWithSpecies: CoreStatsResult[];
 	biometricsStatsWithSpecies: BiometricsStatsResult[];
 };
+import { groupByColumn } from '@/app/lib/generic-utils';
 
 function getStatsRPCFetcher<ResultType>(
 	rpcName: string,
@@ -34,6 +35,24 @@ function getStatsRPCFetcher<ResultType>(
 				? request.order('species_name').range(fromRow, toRow)
 				: request.range(fromRow, toRow);
 		});
+}
+
+export async function getCachedStats<RowType>({
+	rpcName,
+	fetchDataBySpecies,
+	temporalUnit,
+	viewedGroup
+}: {
+	rpcName: string;
+	fetchDataBySpecies: boolean;
+	temporalUnit: TemporalUnit;
+	viewedGroup: ViewedGroup;
+}): Promise<RowType[]> {
+	return cachedSupabaseFetch(
+		`${temporalUnit}-${rpcName}${fetchDataBySpecies ? '-by-species' : ''}`,
+		viewedGroup,
+		getStatsRPCFetcher<RowType>(rpcName, temporalUnit)
+	);
 }
 
 export async function getStatsByTemporalUnit(

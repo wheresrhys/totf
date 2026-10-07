@@ -6,10 +6,12 @@ import type {
 	HighlightValue,
 	CombinedHighlight,
 	HighlightCategory,
-	NumericHighlightValue
+	NumericHighlightValue,
+	HighlightInitConfig
 } from '../types';
 import { fetchStatsSpines } from '@/app/actions/stats-cache';
 import { isNumericHighlightValue } from '../types';
+import { getRule } from '../rules';
 import {
 	getHighlightsWithinTimeWindow,
 	buildTimeWindowFilter
@@ -64,15 +66,11 @@ function filterOutIrrelevantHighlights(
 					...highlightWrapper.scope
 				},
 				value: relevantHighlight,
-				ranking: {
-					...calculatePosition(
-						highlightWrapper.values,
-						relevantHighlightIndex,
-						highlightWrapper.descriptor.smallestWins
-					),
-					siblingHighlights: highlightWrapper.values,
-					highlightIndex: relevantHighlightIndex
-				}
+				ranking: calculatePosition(
+					highlightWrapper.values,
+					relevantHighlightIndex,
+					highlightWrapper.descriptor.smallestWins
+				)
 			});
 		}
 	});
@@ -307,9 +305,11 @@ export async function _getCondensedHighlightsAtTimePeriod(
 		temporalUnit,
 		limit
 	});
+
 	const significantHighlights = removeLessSignificantHighlights(
 		allRelevantHighlights
 	);
+
 	return combineSimilarHighlights(significantHighlights);
 }
 

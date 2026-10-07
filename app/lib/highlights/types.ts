@@ -14,9 +14,6 @@ export type EnhancedStatsRepository = StatsRepository & {
 	biometricsStatsBySpecies: Record<string, BiometricsStatsResult[]>;
 };
 
-export interface TimePeriodedItem {
-	time_period: string | null;
-}
 export type YearMonthRestriction = {
 	year?: number;
 	month?: number;
@@ -49,6 +46,7 @@ export type HighlightValue = {
 };
 
 export type SpeciesUnitMode = 'replace' | 'prefix' | undefined;
+
 export type HighlightDescriptor = {
 	category: HighlightCategory;
 	type: string;
@@ -71,8 +69,6 @@ export type HighlightsOfType = {
 };
 
 export type HighlightRanking = {
-	highlightIndex: number;
-	siblingHighlights: HighlightValue[];
 	position: number;
 	isTied: boolean;
 };
@@ -123,6 +119,8 @@ type HighlightsGeneratorFor<
 	descriptor: HighlightDescriptor;
 	limit?: number;
 	statsSelector: StatsSelectorKey;
+	rpcName: string; // better!!!
+	speciesPresence: 'none' | 'present' | 'grouped';
 	generator: (
 		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[],
 		scope?: HighlightScope
@@ -133,3 +131,19 @@ type HighlightsGeneratorFor<
 export type HighlightsGenerator = {
 	[StatsSelectorKey in keyof EnhancedStatsRepository]: HighlightsGeneratorFor<StatsSelectorKey>;
 }[keyof EnhancedStatsRepository];
+
+type HighlightPositionsLimit = 1 | 2 | 3;
+
+export type HighlightInitConfig = {
+	selfRelativeToParentMonth?: HighlightPositionsLimit;
+	selfRelativeToParentYear?: HighlightPositionsLimit;
+	selfRelativeToAllTimeMonth?: HighlightPositionsLimit;
+	selfRelativeToAllTime?: HighlightPositionsLimit;
+	childSessionsRelativeToSelf?: HighlightPositionsLimit;
+	childSessionsRelativeToParentYear?: HighlightPositionsLimit;
+	childSessionsRelativeToAllTimeMonth?: HighlightPositionsLimit;
+	childSessionsRelativeToAllTime?: HighlightPositionsLimit;
+	childMonthsRelativeToSelf?: HighlightPositionsLimit;
+	childMonthsRelativeToParentYear?: HighlightPositionsLimit;
+	childMonthsRelativeToAllTime?: HighlightPositionsLimit;
+};

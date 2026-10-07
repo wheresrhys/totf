@@ -123,6 +123,7 @@ export function buildTimeWindowFilter(parentTimeWindow?: YearMonthRestriction) {
 		return () => true;
 	}
 }
+
 function getCacheUtils(
 	groupId: number,
 	temporalUnit: TemporalUnit,
