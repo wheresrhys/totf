@@ -14,8 +14,11 @@ import { isNumericHighlightValue } from '../types';
 import { getRule } from '../rules';
 import {
 	getHighlightsWithinTimeWindow,
-	buildTimeWindowFilter
 } from './highlight-generator';
+
+import {
+	buildTimeWindowFilter
+} from './highlight-utils';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 const highlightCategoryOrder: HighlightCategory[] = [
 	'rarity',

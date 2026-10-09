@@ -119,8 +119,9 @@ type HighlightsGeneratorFor<
 	descriptor: HighlightDescriptor;
 	limit?: number;
 	statsSelector: StatsSelectorKey;
-	rpcName: string; // better!!!
-	speciesPresence: 'none' | 'present' | 'grouped';
+	rpcName: 'core_stats' | 'biometrics_stats';
+	speciesUsed: 'none' | 'present' | 'grouped';
+	presence?: HighlightPresenceConfig;
 	generator: (
 		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[],
 		scope?: HighlightScope
@@ -146,4 +147,62 @@ export type HighlightInitConfig = {
 	childMonthsRelativeToSelf?: HighlightPositionsLimit;
 	childMonthsRelativeToParentYear?: HighlightPositionsLimit;
 	childMonthsRelativeToAllTime?: HighlightPositionsLimit;
+};
+
+export type HighlightDataLake = {
+	relativeToAllTime?: number;
+	relativeToYear?: number;
+	relativeToAllTimeMonth?: number;
+	relativeToMonth?: number;
+};
+
+type AllTimeHighlightDataLake = Pick<HighlightDataLake, 'relativeToAllTime'>;
+type YearHighlightDataLake = Pick<
+	HighlightDataLake,
+	'relativeToAllTime' | 'relativeToYear'
+>;
+type MonthHighlightDataLake = Pick<
+	HighlightDataLake,
+	'relativeToAllTime' | 'relativeToYear' | 'relativeToMonth'
+>;
+
+type AllTimeMonthHighlightDataLake = Pick<
+	HighlightDataLake,
+	'relativeToAllTime' | 'relativeToAllTimeMonth'
+>;
+
+export type ExtendedTemporalUnit = TemporalUnit | 'all time' | 'all time month';
+export type HighlightIterator = 'perDay' | 'perMonth' | 'perYear';
+export type HighlightPageLevelPresence = Record<
+	HighlightIterator,
+	HighlightDataLake
+>;
+
+export type HighlightPresenceAtScopes = {
+	allTime: {
+		perYear?: AllTimeHighlightDataLake;
+		perMonth?: AllTimeHighlightDataLake;
+		perDay?: AllTimeHighlightDataLake;
+	};
+	year: {
+		perYear?: AllTimeHighlightDataLake;
+		perMonth?: YearHighlightDataLake;
+		perDay?: YearHighlightDataLake;
+	};
+	allTimeMonth: {
+		perMonth?: AllTimeMonthHighlightDataLake;
+		perDay?: AllTimeMonthHighlightDataLake;
+	};
+	month: {
+		perMonth?: YearHighlightDataLake;
+		perDay?: MonthHighlightDataLake;
+	};
+	day: {
+		perDay?: HighlightDataLake;
+	};
+};
+
+type HighlightPresenceConfig = {
+	species: HighlightPresenceAtScopes;
+	general: HighlightPresenceAtScopes;
 };

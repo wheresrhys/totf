@@ -8,6 +8,7 @@
 // Nothing here is ever *called* server-side (see `sessionTabPrefetchers`), but
 // the descriptor list itself has to be readable there.
 import { getCondensedHighlightsAtTimePeriod } from '@/app/lib/highlights';
+import { getAllHighlightsAcrossScopes } from '@/app/lib/highlights/lib/hg2';
 import type { CombinedHighlight } from '@/app/lib/highlights/types';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { ViewedGroup } from '@/app/lib/group-slug';
@@ -36,6 +37,12 @@ export async function fetchSessionHighlights(
 	{ date }: Pick<SessionTabParams, 'date'>,
 	viewedGroup: ViewedGroup
 ): Promise<CombinedHighlight[]> {
+	const newData = await getAllHighlightsAcrossScopes({
+		timePeriod: date,
+		temporalUnit: 'day',
+		viewedGroup
+	});
+	console.log('new data', newData);
 	return getCondensedHighlightsAtTimePeriod(viewedGroup.id, date, 'day');
 }
 

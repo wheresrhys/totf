@@ -13,28 +13,15 @@ import type {
 } from '../types';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import { DEFAULT_LIMIT } from '../const';
+import {
+	getHighlightsOfTypeFromStatsRows,
+	getCacheKey,
+	getScopedStatsFilter,
+	type FilteredStatsCache,
+	type StatFilter
+} from './highlight-utils';
 
-const cache: Map<string, HighlightsOfType[]> = new Map();
-
-function applyLimitToHighlight(
-	highlightWrapper: HighlightsOfType,
-	limit: number
-): HighlightsOfType {
-	if (highlightWrapper.values.length < limit) {
-		return {
-			...highlightWrapper
-		};
-	}
-	const boundaryValue = highlightWrapper.values[limit - 1].value;
-	const itemsIncludingTies =
-		highlightWrapper.values.findLastIndex(
-			({ value }) => value === boundaryValue
-		) + 1;
-	return {
-		...highlightWrapper,
-		values: highlightWrapper.values.slice(0, itemsIncludingTies)
-	};
-}
+const highlightsCache: Map<string, HighlightsOfType[]> = new Map();
 
 function isHighlightsOfType(item: unknown): item is HighlightsOfType {
 	return Boolean(item);
@@ -58,111 +45,39 @@ function generateAllHighlights({
 			if (rule.condition && !rule.condition(scope)) return null;
 			const workingStats = stats[rule.statsSelector];
 			if (!excludeGlobal && Array.isArray(workingStats)) {
-				const highlights: HighlightsOfType = {
+				return {
 					...rule,
 					scope,
-					// rule.statsSelector always names the array whose row type matches rule.generator's
-					// param type (enforced by HighlightsGenerator's discriminated union in types.ts) —
-					// TS can't see that correlation across this generic dispatch loop, so assert it here,
-					// the one place that needs it.
-					values: (rule.generator as (stats: unknown[]) => HighlightValue[])(
-						workingStats
-					)
+					values: getHighlightsOfTypeFromStatsRows({
+						rule,
+						stats: workingStats,
+						limit: rule.limit ? Math.min(rule.limit, limit) : limit,
+						timeWindowFilter: () => true
+					})
 				};
-				return applyLimitToHighlight(
-					highlights,
-					rule.limit ? Math.min(rule.limit, limit) : limit
-				);
 			} else {
 				if (!includePerSpecies) return null;
 				return Object.entries(workingStats).map(
 					([species, workingStatsChild]) => {
 						if (!workingStatsChild.length) return null;
-						const highlights: HighlightsOfType = {
+						return {
 							...rule,
 							scope: {
 								...scope,
 								species
 							},
-							values: (
-								rule.generator as (stats: unknown[]) => HighlightValue[]
-							)(workingStatsChild)
-						};
-						return highlights.values.length
-							? applyLimitToHighlight(
-									highlights,
-									rule.limit ? Math.min(rule.limit, limit) : limit
-								)
-							: null;
+							values: getHighlightsOfTypeFromStatsRows({
+								rule,
+								stats: workingStatsChild,
+								limit: rule.limit ? Math.min(rule.limit, limit) : limit,
+								timeWindowFilter: () => true
+							})
+						} as HighlightsOfType;
 					}
 				);
 			}
 		})
 		.filter(isHighlightsOfType);
-}
-
-type StatFilter = (stat: {
-	time_period: string | null;
-	species_name: string | null;
-}) => boolean;
-
-export function buildTimeWindowFilter(parentTimeWindow?: YearMonthRestriction) {
-	if (!parentTimeWindow) {
-		return () => true;
-	}
-	const { year, month } = parentTimeWindow;
-	if (year && month) {
-		return (timePeriod: string) =>
-			timePeriod.startsWith(`${year}-${String(month).padStart(2, '0')}-`);
-	} else if (year) {
-		return (timePeriod: string) => timePeriod.startsWith(`${year}-`);
-	} else if (month) {
-		return (timePeriod: string) =>
-			timePeriod.includes(`-${String(month).padStart(2, '0')}-`);
-	} else {
-		return () => true;
-	}
-}
-
-function getCacheUtils(
-	groupId: number,
-	temporalUnit: TemporalUnit,
-	limit?: number,
-	species?: string,
-	parentTimeWindow?: YearMonthRestriction
-): {
-	cacheKey: string;
-	filter: StatFilter | null;
-} {
-	let cacheKey = `${groupId}-${temporalUnit}-${limit || 'no-limit'}-${species || 'no-species'}`;
-	if (!parentTimeWindow) {
-		return { cacheKey, filter: null };
-	}
-	const timeWindowFilter = buildTimeWindowFilter(parentTimeWindow);
-	const { month, year } = parentTimeWindow;
-	const speciesFilter = species
-		? (species_name: string | null) => species_name === species
-		: () => true;
-	let filter: StatFilter | null;
-	if (year && month) {
-		cacheKey = `${cacheKey}-${year}-${month}`;
-		filter = ({ time_period, species_name }) =>
-			timeWindowFilter(time_period as string) && speciesFilter(species_name);
-	} else if (year) {
-		cacheKey = `${cacheKey}-${year}`;
-		filter = ({ time_period, species_name }) =>
-			timeWindowFilter(time_period as string) && speciesFilter(species_name);
-	} else if (month) {
-		cacheKey = `${cacheKey}-${month}`;
-		filter = ({ time_period, species_name }) =>
-			timeWindowFilter(time_period as string) && speciesFilter(species_name);
-	} else if (species) {
-		filter = ({ species_name }) => speciesFilter(species_name);
-	} else {
-		filter = null;
-	}
-
-	return { filter, cacheKey };
 }
 
 function enhanceStatsRepository(
@@ -225,16 +140,16 @@ export async function getHighlightsWithinTimeWindow({
 	excludeGlobal?: boolean;
 }) {
 	limit = limit ?? DEFAULT_LIMIT;
-
-	const { filter, cacheKey } = getCacheUtils(
-		groupId,
+	const scope = {
 		temporalUnit,
-		limit,
 		species,
 		parentTimeWindow
-	);
-	if (cache.has(cacheKey)) {
-		return cache.get(cacheKey) as HighlightsOfType[];
+	};
+	const cacheKey = getCacheKey(groupId, scope, limit);
+	const filter = getScopedStatsFilter(scope);
+
+	if (highlightsCache.has(cacheKey)) {
+		return highlightsCache.get(cacheKey) as HighlightsOfType[];
 	}
 
 	const highlights = generateAllHighlights({
@@ -245,6 +160,6 @@ export async function getHighlightsWithinTimeWindow({
 		excludeGlobal
 	});
 
-	cache.set(cacheKey, highlights);
+	highlightsCache.set(cacheKey, highlights);
 	return highlights;
 }

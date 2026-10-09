@@ -1,3 +1,4 @@
+import { camelCase, noCase } from 'change-case';
 import type {
 	HighlightsOfType,
 	CherryPickedHighlight,
@@ -9,35 +10,33 @@ import type {
 	NumericHighlightValue,
 	HighlightsGenerator,
 	HighlightInitConfig,
-	HighlightScope
+	HighlightScope,
+	HighlightDataLake,
+	ExtendedTemporalUnit,
+	HighlightPageLevelPresence,
+	HighlightPresenceAtScopes
 } from '../types';
 import {
 	getStatsByTemporalUnit,
 	StatsRepository,
 	fetchStatsSpines,
-	getCachedStats
+	getServerCachedStats,
+	StatsResult
 } from '@/app/actions/stats-cache';
 import { isNumericHighlightValue } from '../types';
-import { getRule } from '../rules';
+import { getRule, ruleTypes } from '../rules';
 import {
-	getHighlightsWithinTimeWindow,
-	buildTimeWindowFilter
-} from './highlight-generator';
+	dateToYearMonth,
+	getHighlightsOfTypeFromStatsRows,
+	buildTimeWindowFilter,
+	getFilteredStatsCache,
+	getSpeciesFilter,
+	filterStats,
+	getTimePeriodSampler
+} from './highlight-utils';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { groupByColumn } from '../../generic-utils';
-const highlightCategoryOrder: HighlightCategory[] = [
-	'rarity',
-	'count',
-	'biometrics'
-];
-
-function dateToYearMonth(date: string): YearMonthRestriction {
-	const [year, month] = date.split('-');
-	return { year: Number(year), month: Number(month) };
-}
-
-const temporalUnitHierachy = ['year', 'month', 'day'];
 
 type BaseHighlightsOfTypeParams = {
 	highlightType: string;
@@ -53,55 +52,7 @@ type HighlightsOfTypeParams = BaseHighlightsOfTypeParams & {
 	limit: number;
 };
 
-type AllHighlightsOfTypeParams = BaseHighlightsOfTypeParams & {
-	highlightInit: HighlightInitConfig;
-};
-
-function applyLimitToHighlights(
-	highlights: NewHighlight[],
-	limit: number
-): NewHighlight[] {
-	if (highlights.length < limit) {
-		return highlights;
-	}
-	const boundaryValue = highlights[limit - 1].value;
-	const itemsIncludingTies =
-		highlights.findLastIndex(({ value }) => value === boundaryValue) + 1;
-	return highlights.slice(0, itemsIncludingTies);
-}
-
-type NewHighlight = HighlightValue & {
-	scope: HighlightScope;
-	descriptor: HighlightDescriptor;
-};
-function getHighlightsOfTypeFromDataSet({
-	rule,
-	data,
-	scope,
-	samplesTimeWindowFilter,
-	limit
-}: {
-	rule: HighlightsGenerator;
-	data: unknown[];
-	scope: HighlightScope;
-	limit: number;
-	samplesTimeWindowFilter: (timePeriod: string) => boolean;
-}): NewHighlight[] {
-	const highlights = (rule.generator as (stats: unknown[]) => HighlightValue[])(
-		data
-	).map((value) => ({
-		...value,
-		scope,
-		descriptor: rule.descriptor
-	}));
-	const limitedHighlights = applyLimitToHighlights(highlights, limit);
-
-	return limitedHighlights.filter(({ timePeriod }) =>
-		samplesTimeWindowFilter(timePeriod)
-	);
-}
-
-async function getHighlightsOfType({
+async function getScopedHighlightsOfType({
 	highlightType,
 	viewedGroup,
 	timePeriod,
@@ -112,150 +63,159 @@ async function getHighlightsOfType({
 	limit
 }: HighlightsOfTypeParams) {
 	const rule = getRule(highlightType);
-	const baseData = await getCachedStats({
+	const baseData = await getServerCachedStats({
 		viewedGroup,
 		rpcName: rule.rpcName,
-		fetchDataBySpecies: Boolean(species) || rule.speciesPresence !== 'none',
+		fetchDataBySpecies: Boolean(species) || rule.speciesUsed !== 'none',
 		temporalUnit
 	});
-	const lakeTimeWindowFilter = buildTimeWindowFilter(lakeTimeWindow);
-	const samplesTimeWindowFilter = samplesTimeWindow
-		? buildTimeWindowFilter(samplesTimeWindow)
-		: (highlightTimePeriod: string) => highlightTimePeriod === timePeriod;
-	const timeScopedData = baseData.filter(({ time_period }) =>
-		lakeTimeWindowFilter(time_period as string)
+
+	const filteredStats = filterStats({
+		rule,
+		scope: {
+			temporalUnit,
+			parentTimeWindow: lakeTimeWindow,
+			species
+		},
+		viewedGroup,
+		baseData
+	});
+
+	const samplesTimeWindowFilter = getTimePeriodSampler(
+		timePeriod,
+		samplesTimeWindow
 	);
-	let results;
-	if (rule.speciesPresence === 'grouped') {
-		const dataPerSpecies = groupByColumn('species_name', timeScopedData);
+
+	if (rule.speciesUsed === 'grouped') {
+		const dataPerSpecies = groupByColumn('species_name', filteredStats);
 		return Object.entries(dataPerSpecies).flatMap(([species, data]) =>
-			getHighlightsOfTypeFromDataSet({
+			getHighlightsOfTypeFromStatsRows({
 				rule,
-				data,
+				stats: data,
 				limit,
-				samplesTimeWindowFilter,
+				timeWindowFilter: samplesTimeWindowFilter
+			}).map((value) => ({
+				...value,
 				scope: {
 					temporalUnit,
 					species,
 					parentTimeWindow: lakeTimeWindow
-				}
-			})
+				},
+				descriptor: rule.descriptor
+			}))
 		);
 	} else {
-		return getHighlightsOfTypeFromDataSet({
+		return getHighlightsOfTypeFromStatsRows({
 			rule,
-			data: timeScopedData,
+			stats: filteredStats,
 			limit,
-			samplesTimeWindowFilter,
+			timeWindowFilter: samplesTimeWindowFilter
+		}).map((value) => ({
+			...value,
 			scope: {
 				temporalUnit,
 				parentTimeWindow: lakeTimeWindow
-			}
-		});
+			},
+			descriptor: rule.descriptor
+		}));
 	}
 }
 
-async function getAllRelevantHighlightsOfType(
-	options: AllHighlightsOfTypeParams
-) {
-	const { year, month } = dateToYearMonth(options.timePeriod);
-	let selfTimeWindow: YearMonthRestriction;
+const DEFAULT_HIGHLIGHT_INIT_CONFIG: HighlightInitConfig = {
+	selfRelativeToAllTime: 1,
+	childSessionsRelativeToSelf: 1
+};
 
-	if (options.temporalUnit === 'month') {
-		selfTimeWindow = { month, year };
-	}
+function getPresence(
+	rule: HighlightsGenerator,
+	temporalUnit: ExtendedTemporalUnit,
+	species?: string
+): Partial<HighlightPageLevelPresence> {
+	if (!rule.presence) return {};
+	const rulePresence = species ? rule.presence.species : rule.presence.general;
+	const timePeriodAccessorProperty = camelCase(
+		temporalUnit
+	) as keyof HighlightPresenceAtScopes;
+	return rulePresence[timePeriodAccessorProperty];
+}
 
-	if (options.temporalUnit === 'month') {
-		selfTimeWindow = { year };
+function getTimeWindow(
+	timePeriod: string,
+	temporalUnit: ExtendedTemporalUnit
+): YearMonthRestriction | undefined {
+	const { year, month } = dateToYearMonth(timePeriod);
+
+	if (temporalUnit === 'month') {
+		return { month, year };
+	} else if (temporalUnit === 'year') {
+		return { year };
+	} else if (temporalUnit === 'all time') {
+		return;
+	} else if (temporalUnit === 'all time month') {
+		return { month };
 	}
-	const fetchers = Object.entries(options.highlightInit).map(
-		([highlighScoping, limit]) => {
-			switch (highlighScoping) {
-				case 'self':
-					break;
-				case 'selfRelativeToParentMonth':
-					return getHighlightsOfType({
-						...options,
-						lakeTimeWindow: { year, month },
-						limit
-					});
-				case 'selfRelativeToParentYear':
-					return getHighlightsOfType({
-						...options,
-						lakeTimeWindow: { year },
-						limit
-					});
-				case 'selfRelativeToAllTimeMonth':
-					return getHighlightsOfType({
-						...options,
-						lakeTimeWindow: { month },
-						limit
-					});
-				case 'selfRelativeToAllTime':
-					return getHighlightsOfType({
-						...options,
-						limit
-					});
-				case 'childSessionsRelativeToSelf':
-					return getHighlightsOfType({
-						...options,
-						samplesTimeWindow: selfTimeWindow,
-						lakeTimeWindow: selfTimeWindow,
-						temporalUnit: 'day',
-						limit
-					});
-				case 'childSessionsRelativeToParentYear':
-					return getHighlightsOfType({
-						...options,
-						samplesTimeWindow: selfTimeWindow,
-						lakeTimeWindow: { year },
-						temporalUnit: 'day',
-						limit
-					});
-				case 'childSessionsRelativeToAllTimeMonth':
-					return getHighlightsOfType({
-						...options,
-						samplesTimeWindow: selfTimeWindow,
-						lakeTimeWindow: { month },
-						temporalUnit: 'day',
-						limit
-					});
-				case 'childSessionsRelativeToAllTime':
-					return getHighlightsOfType({
-						...options,
-						samplesTimeWindow: selfTimeWindow,
-						temporalUnit: 'day',
-						limit
-					});
-				case 'childMonthsRelativeToSelf':
-					return getHighlightsOfType({
-						...options,
-						samplesTimeWindow: selfTimeWindow,
-						lakeTimeWindow: selfTimeWindow,
-						temporalUnit: 'month',
-						limit
-					});
-				case 'childMonthsRelativeToParentYear':
-					return getHighlightsOfType({
-						...options,
-						samplesTimeWindow: selfTimeWindow,
-						lakeTimeWindow: { year },
-						temporalUnit: 'month',
-						limit
-					});
-					break;
-				case 'childMonthsRelativeToAllTime':
-					return getHighlightsOfType({
-						...options,
-						samplesTimeWindow: selfTimeWindow,
-						temporalUnit: 'month',
-						limit
-					});
-					break;
-				default:
-					return [];
-			}
-		}
+}
+
+export async function getHighlightsOfTypeAcrossScopes({
+	highlightType,
+	timePeriod,
+	temporalUnit,
+	viewedGroup,
+	species
+}: {
+	highlightType: string;
+	timePeriod: string;
+	temporalUnit: ExtendedTemporalUnit;
+	viewedGroup: ViewedGroup;
+	species?: string;
+}) {
+	const rule = getRule(highlightType);
+	const presence = getPresence(rule, temporalUnit, species);
+	if (!presence) return [];
+
+	const configs = Object.entries(presence)
+		.flatMap(([highlightIterator, dataLakeConfig]) => {
+			const sampleTemporalUnit = highlightIterator
+				.substring(3)
+				.toLowerCase() as TemporalUnit;
+			return Object.entries(dataLakeConfig).map(([lakeScope, limit]) => {
+				if (limit === 0) return;
+				const lakeScopeTemporalUnit = camelCase(
+					lakeScope.replace('relativeTo', '')
+				) as ExtendedTemporalUnit;
+				return {
+					highlightType,
+					viewedGroup,
+					timePeriod,
+					lakeTimeWindow: getTimeWindow(timePeriod, lakeScopeTemporalUnit),
+					samplesTimeWindow: getTimeWindow(timePeriod, temporalUnit),
+					temporalUnit: sampleTemporalUnit,
+					species,
+					limit
+				};
+			});
+		})
+		.filter((config) => Boolean(config)) as HighlightsOfTypeParams[];
+
+	return (
+		await Promise.all(
+			configs.map((config) => getScopedHighlightsOfType(config))
+		)
+	).flatMap((data) => data);
+}
+
+// next reimplement getAllRelevantHighlights as getAllHighlights({
+
+export function getAllHighlightsAcrossScopes(options: {
+	timePeriod: string;
+	temporalUnit: ExtendedTemporalUnit;
+	viewedGroup: ViewedGroup;
+	species?: string;
+}) {
+	ruleTypes.map((type) =>
+		getHighlightsOfTypeAcrossScopes({
+			highlightType: type,
+			...options
+		})
 	);
-	return (await Promise.all(fetchers)).flatMap((data) => data);
 }

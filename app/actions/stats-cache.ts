@@ -37,7 +37,9 @@ function getStatsRPCFetcher<ResultType>(
 		});
 }
 
-export async function getCachedStats<RowType>({
+export type StatsResult = CoreStatsResult | BiometricsStatsResult;
+
+export async function getServerCachedStats({
 	rpcName,
 	fetchDataBySpecies,
 	temporalUnit,
@@ -47,11 +49,11 @@ export async function getCachedStats<RowType>({
 	fetchDataBySpecies: boolean;
 	temporalUnit: TemporalUnit;
 	viewedGroup: ViewedGroup;
-}): Promise<RowType[]> {
+}): Promise<StatsResult[]> {
 	return cachedSupabaseFetch(
 		`${temporalUnit}-${rpcName}${fetchDataBySpecies ? '-by-species' : ''}`,
 		viewedGroup,
-		getStatsRPCFetcher<RowType>(rpcName, temporalUnit)
+		getStatsRPCFetcher<StatsResult>(rpcName, temporalUnit)
 	);
 }
 
