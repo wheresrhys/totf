@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page, {
 	getSpeciesStats,
+	fetchSpeciesPageContent,
 	fetchSpeciesPageContentForPeriod
 } from '../page';
 import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
@@ -136,6 +137,31 @@ describe('species detail page', () => {
 				);
 				expect(mockFetchYearTotalsTabData).toHaveBeenCalledTimes(1);
 				expect(data).toMatchObject({ initialTabId: 'year-totals' });
+			});
+		});
+
+		describe('TemporalFilterControls query-string date range (#1076)', () => {
+			it("threads ?fromDate=/?toDate= into the bare page's period", async () => {
+				const data = await fetchSpeciesPageContent(
+					{
+						speciesName: 'Robin',
+						fromDate: '2026-01-01',
+						toDate: '2026-06-30'
+					},
+					1,
+					VIEWED_GROUP
+				);
+				expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
+					1,
+					VIEWED_GROUP,
+					0,
+					'2026-01-01',
+					'2026-06-30'
+				);
+				expect(data).toMatchObject({
+					fromDate: '2026-01-01',
+					toDate: '2026-06-30'
+				});
 			});
 		});
 	});

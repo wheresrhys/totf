@@ -86,6 +86,26 @@ the root layout, not a subtree one.
   the caller's. A bare `month` with no `year` is a squashed-month filter, not a contiguous range,
   so PostgREST can't express it and the helper throws: route that through the RPC family's
   `month_filter` instead.
+  - **`TemporalFilterControls`** (`app/components/shared/TemporalFilterControls.tsx`, #1073) is the
+    generic UI over the same `{year, month, fromDate, toDate}` selection — Summary, the species list
+    and `/species/[name]` all use it (#1076). For an **RPC-backed** page (`core_stats`/
+    `biometrics_stats` and siblings), don't reach for `applyTemporalFilter` at all: call
+    `computeEffectiveDateRange` (`app/lib/temporal-filter.ts`) on the raw selection to fold
+    `year`/`month` into `fromDate`/`toDate` bounds, then pass its `recurringMonth` straight through as
+    the RPC's own `month_filter` — the RPC already applies `month_filter` independently of
+    `from_date`/`to_date` (`EXTRACT(MONTH FROM visit_date) = month_filter`), which is exactly the
+    "recurs every year" semantics a bare month needs, with no throw-and-reroute dance required. Only a
+    **direct-table-query** call site needs `applyTemporalFilter`'s throw-on-bare-month guard, since
+    PostgREST itself can't express a recurring filter as column bounds.
+  - A page with its own year/month path-param routing (Summary's `/summary/[year]/[month]`,
+    species' `/species/{name}/[year]/[month]`) passes `TemporalFilterControls` a
+    `navigationController` mapping the selection onto that routing: `year`/`month` always resolve to
+    a path segment (falling back to the squashed-month sibling route,
+    `buildSpeciesSquashedMonthHref`/`formatMonthAbbreviation`, `app/lib/squashed-month.ts`, when a
+    month is picked with no year — the "recurring month" case those routes already exist for), and
+    only `fromDate`/`toDate` ever become query strings. A page with no such routing (the species list)
+    omits `navigationController` entirely and lets every field land in the query string via the
+    component's default navigation.
 
 ## Code conventions
 

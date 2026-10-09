@@ -18,6 +18,24 @@ import {
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
 
+// Local override of the global next/navigation mock (vitest.setup.tsx) so the
+// `TemporalFilterControls` push calls below can be asserted on directly —
+// same pattern as `TemporalFilterControls.test.tsx` itself.
+const { mockPush } = vi.hoisted(() => ({ mockPush: vi.fn() }));
+vi.mock('next/navigation', () => ({
+	useRouter: () => ({
+		push: mockPush,
+		replace: vi.fn(),
+		refresh: vi.fn(),
+		back: vi.fn(),
+		forward: vi.fn(),
+		prefetch: vi.fn()
+	}),
+	usePathname: () => '/',
+	useSearchParams: () => new URLSearchParams(),
+	redirect: vi.fn()
+}));
+
 const {
 	mockFetchYearTotalsTabData,
 	mockFetchMonthTotalsTabData,
@@ -656,6 +674,63 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 			expect(await renderPropsOf('sp-individuals-tab')).toMatchObject({
 				birdCount: 0
 			});
+		});
+	});
+});
+
+describe('species detail page filtering', () => {
+	afterEach(() => {
+		cleanup();
+		mockPush.mockClear();
+	});
+
+	describe('TemporalFilterControls integration', () => {
+		it('selecting a year navigates to the year-scoped species route', () => {
+			render(
+				<SpeciesPageContent
+					params={{ speciesName: 'Robin' }}
+					data={buildFullFatPageData({ years: [2026] })}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.change(screen.getByLabelText('Year'), {
+				target: { value: '2026' }
+			});
+			expect(mockPush).toHaveBeenCalledWith('/species/Robin/2026');
+		});
+
+		it('selecting a year and month navigates to the month-scoped species route', () => {
+			render(
+				<SpeciesPageContent
+					params={{ speciesName: 'Robin' }}
+					data={buildFullFatPageData({ years: [2026] })}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.change(screen.getByLabelText('Year'), {
+				target: { value: '2026' }
+			});
+			fireEvent.change(screen.getByLabelText('Month'), {
+				target: { value: '8' }
+			});
+			expect(mockPush).toHaveBeenLastCalledWith('/species/Robin/2026/8');
+		});
+
+		it('clearing the selection navigates back to the all-time species route', () => {
+			render(
+				<SpeciesPageContent
+					params={{ speciesName: 'Robin' }}
+					data={buildFullFatPageData({ year: 2026, month: 8, years: [2026] })}
+					viewedGroup={viewedGroup}
+				/>
+			);
+			fireEvent.change(screen.getByLabelText('Year'), {
+				target: { value: '' }
+			});
+			fireEvent.change(screen.getByLabelText('Month'), {
+				target: { value: '' }
+			});
+			expect(mockPush).toHaveBeenLastCalledWith('/species/Robin');
 		});
 	});
 });

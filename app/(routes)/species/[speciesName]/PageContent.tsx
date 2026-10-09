@@ -12,6 +12,12 @@ import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { type SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import { TabSet } from '@/app/components/shared/TabSet';
+import {
+	TemporalFilterControls,
+	type TemporalNavigationTarget
+} from '@/app/components/shared/TemporalFilterControls';
+import type { TemporalSelection } from '@/app/lib/temporal-filter';
+import { buildSpeciesSquashedMonthHref } from '@/app/lib/squashed-month';
 // Imported (and re-exported below) rather than defined here — see
 // `species-tabs.tsx`'s doc comment for why these helpers live outside this
 // `'use client'` file (`page.tsx` imports them directly from there instead,
@@ -42,6 +48,10 @@ export type { SpeciesDetailTabParams };
 export type PageParams = {
 	speciesName: string;
 	tabId?: string;
+	// Explicit `TemporalFilterControls` narrowing on the bare (all-time) route
+	// depth only (#1076) — see `page.tsx`'s `getSpeciesPageParams` doc comment.
+	fromDate?: string;
+	toDate?: string;
 };
 
 // A resolved period passed to `fetchSpeciesPageContentForPeriod`. `year`/`month`
@@ -77,7 +87,47 @@ export type ThinPageData = { speciesId: number } & PeriodScope;
 export type PageData = (FullFatPageData | ThinPageData) & {
 	initialTabId?: string;
 	initialTabData?: { tabId: string; data: unknown };
+	// The years `TemporalFilterControls`' year dropdown offers (#1076) —
+	// fetched once via `fetchYears` (`app/(routes)/species/page.tsx`) and
+	// echoed back at every route depth so the control looks identical
+	// however deep the user is. Optional/defaulted to `[]` so existing
+	// `PageData` fixtures that predate this field keep compiling.
+	years?: number[];
 };
+
+// Maps a `TemporalFilterControls` selection onto this page's own year/month
+// path-param routing (`/species/{name}`, `/species/{name}/{year}`,
+// `/species/{name}/{year}/{month}`) or its squashed-month sibling
+// (`/species/{name}/{monthAbbrev}`, #1005) when a month is picked with no
+// year — the same "recurring month" case that route already exists for, so
+// there's no need to route a bare month through the RPC family's
+// `month_filter` here the way a direct-table-query call site would have to.
+// Only `fromDate`/`toDate` ever become query strings; year/month always
+// resolve to a path segment.
+function buildSpeciesNavigationTarget(
+	speciesName: string,
+	selection: TemporalSelection
+): TemporalNavigationTarget {
+	const { year, month, fromDate, toDate } = selection;
+	const queryStrings: Record<string, string> = {
+		...(fromDate ? { fromDate } : {}),
+		...(toDate ? { toDate } : {})
+	};
+	if (year !== undefined) {
+		const yearPath = `/species/${speciesName}/${year}`;
+		return {
+			path: month !== undefined ? `${yearPath}/${month}` : yearPath,
+			queryStrings
+		};
+	}
+	if (month !== undefined) {
+		return {
+			path: buildSpeciesSquashedMonthHref(speciesName, month),
+			queryStrings
+		};
+	}
+	return { path: `/species/${speciesName}`, queryStrings };
+}
 
 export function buildSpeciesHeadingText(
 	speciesName: string,
@@ -267,6 +317,10 @@ export function SpeciesPageContent({
 	data: PageData;
 	viewedGroup: ViewedGroup;
 }) {
+	const initialSelection: TemporalSelection =
+		data.squashedMonth !== undefined
+			? { month: data.squashedMonth }
+			: { year: data.year, month: data.month };
 	return (
 		<PageWrapper>
 			<SpeciesHeading
@@ -282,6 +336,14 @@ export function SpeciesPageContent({
 								sessionCount: data.speciesStats.session_count
 							}
 						: undefined
+				}
+			/>
+			<TemporalFilterControls
+				years={data.years ?? []}
+				baseUrl={`/species/${speciesName}`}
+				initialSelection={initialSelection}
+				navigationController={(selection) =>
+					buildSpeciesNavigationTarget(speciesName, selection)
 				}
 			/>
 			{fullFatTypeGuard(data) ? (
