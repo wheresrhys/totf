@@ -12,13 +12,9 @@ import type {
 import { fetchStatsSpines } from '@/app/actions/stats-cache';
 import { isNumericHighlightValue } from '../types';
 import { getRule } from '../rules';
-import {
-	getHighlightsWithinTimeWindow,
-} from './highlight-generator';
+import { getHighlightsWithinTimeWindow } from './highlight-generator';
 
-import {
-	buildTimeWindowFilter
-} from './highlight-utils';
+import { buildTimeWindowFilter } from './highlight-utils';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 const highlightCategoryOrder: HighlightCategory[] = [
 	'rarity',

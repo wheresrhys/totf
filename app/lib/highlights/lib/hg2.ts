@@ -85,10 +85,11 @@ async function getScopedHighlightsOfType({
 		timePeriod,
 		samplesTimeWindow
 	);
+	let returnVal;
 
 	if (rule.speciesUsed === 'grouped') {
 		const dataPerSpecies = groupByColumn('species_name', filteredStats);
-		return Object.entries(dataPerSpecies).flatMap(([species, data]) =>
+		returnVal = Object.entries(dataPerSpecies).flatMap(([species, data]) =>
 			getHighlightsOfTypeFromStatsRows({
 				rule,
 				stats: data,
@@ -105,7 +106,7 @@ async function getScopedHighlightsOfType({
 			}))
 		);
 	} else {
-		return getHighlightsOfTypeFromStatsRows({
+		returnVal = getHighlightsOfTypeFromStatsRows({
 			rule,
 			stats: filteredStats,
 			limit,
@@ -119,6 +120,8 @@ async function getScopedHighlightsOfType({
 			descriptor: rule.descriptor
 		}));
 	}
+	console.log('rv', returnVal);
+	return returnVal;
 }
 
 const DEFAULT_HIGHLIGHT_INIT_CONFIG: HighlightInitConfig = {
@@ -178,12 +181,12 @@ export async function getHighlightsOfTypeAcrossScopes({
 			const sampleTemporalUnit = highlightIterator
 				.substring(3)
 				.toLowerCase() as TemporalUnit;
-			return Object.entries(dataLakeConfig).map(([lakeScope, limit]) => {
+			const confs = Object.entries(dataLakeConfig).map(([lakeScope, limit]) => {
 				if (limit === 0) return;
-				const lakeScopeTemporalUnit = camelCase(
+				const lakeScopeTemporalUnit = noCase(
 					lakeScope.replace('relativeTo', '')
 				) as ExtendedTemporalUnit;
-				return {
+				const conf = {
 					highlightType,
 					viewedGroup,
 					timePeriod,
@@ -193,10 +196,13 @@ export async function getHighlightsOfTypeAcrossScopes({
 					species,
 					limit
 				};
+				return conf;
 			});
+			return confs;
 		})
 		.filter((config) => Boolean(config)) as HighlightsOfTypeParams[];
 
+	console.log('configs', configs);
 	return (
 		await Promise.all(
 			configs.map((config) => getScopedHighlightsOfType(config))
@@ -206,16 +212,19 @@ export async function getHighlightsOfTypeAcrossScopes({
 
 // next reimplement getAllRelevantHighlights as getAllHighlights({
 
-export function getAllHighlightsAcrossScopes(options: {
+export async function getAllHighlightsAcrossScopes(options: {
 	timePeriod: string;
 	temporalUnit: ExtendedTemporalUnit;
 	viewedGroup: ViewedGroup;
 	species?: string;
 }) {
-	ruleTypes.map((type) =>
-		getHighlightsOfTypeAcrossScopes({
-			highlightType: type,
-			...options
-		})
+	const allHighlights = await Promise.all(
+		ruleTypes.map((type) =>
+			getHighlightsOfTypeAcrossScopes({
+				highlightType: type,
+				...options
+			})
+		)
 	);
+	return allHighlights;
 }

@@ -183,26 +183,26 @@ export type HighlightPresenceAtScopes = {
 		perYear?: AllTimeHighlightDataLake;
 		perMonth?: AllTimeHighlightDataLake;
 		perDay?: AllTimeHighlightDataLake;
-	};
+	} | null;
 	year: {
 		perYear?: AllTimeHighlightDataLake;
 		perMonth?: YearHighlightDataLake;
 		perDay?: YearHighlightDataLake;
-	};
+	} | null;
 	allTimeMonth: {
 		perMonth?: AllTimeMonthHighlightDataLake;
 		perDay?: AllTimeMonthHighlightDataLake;
-	};
+	} | null;
 	month: {
 		perMonth?: YearHighlightDataLake;
 		perDay?: MonthHighlightDataLake;
-	};
+	} | null;
 	day: {
 		perDay?: HighlightDataLake;
-	};
+	} | null;
 };
 
 type HighlightPresenceConfig = {
-	species: HighlightPresenceAtScopes;
-	general: HighlightPresenceAtScopes;
+	species: HighlightPresenceAtScopes | null;
+	general: HighlightPresenceAtScopes | null;
 };

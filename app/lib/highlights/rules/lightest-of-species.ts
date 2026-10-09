@@ -35,5 +35,23 @@ export const lightestOfSpecies: HighlightsGenerator = {
 		threshold: 3,
 		smallestWins: true
 	}),
-	condition: (scope) => scope.temporalUnit === 'day'
+	condition: (scope) => scope.temporalUnit === 'day',
+	rpcName: 'biometrics_stats',
+	speciesUsed: 'grouped',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToAllTimeMonth: 1,
+					relativeToYear: 1
+				}
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

@@ -41,6 +41,7 @@ export const birdCount: HighlightsGenerator = {
 	rpcName: 'core_stats',
 	speciesUsed: 'none',
 	presence: {
+		species: null,
 		general: {
 			day: {
 				perDay: {
@@ -48,7 +49,11 @@ export const birdCount: HighlightsGenerator = {
 					relativeToAllTimeMonth: 3,
 					relativeToYear: 3
 				}
-			}
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
 		}
 	}
 };
