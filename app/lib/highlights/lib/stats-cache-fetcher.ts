@@ -7,9 +7,10 @@ import {
 function getCacheKey({
 	rpcName,
 	fetchDataBySpecies,
-	temporalUnit
+	temporalUnit,
+	viewedGroup
 }: ServerCachedStatsParams): string {
-	return `${temporalUnit}-${rpcName}${fetchDataBySpecies ? '-by-species' : ''}`;
+	return `group(${viewedGroup.id})-${temporalUnit}-${rpcName}${fetchDataBySpecies ? '-by-species' : ''}`;
 }
 
 const requestCache: Map<
