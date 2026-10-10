@@ -73,6 +73,15 @@ export type HighlightRanking = {
 	isTied: boolean;
 };
 
+export type HighlightValueWithRanking = HighlightValue & {
+	ranking: HighlightRanking;
+};
+
+export type NewHighlightValue = HighlightValueWithRanking & {
+	descriptor: HighlightDescriptor;
+	scope: HighlightScope;
+};
+
 export type CherryPickedHighlight = {
 	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;

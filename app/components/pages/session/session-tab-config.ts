@@ -37,12 +37,20 @@ export async function fetchSessionHighlights(
 	{ date }: Pick<SessionTabParams, 'date'>,
 	viewedGroup: ViewedGroup
 ): Promise<CombinedHighlight[]> {
-	const newData = await getAllHighlightsAcrossScopes({
-		timePeriod: date,
-		temporalUnit: 'day',
-		viewedGroup
-	});
-	console.log('new data', newData);
+	try {
+		const newData = await getAllHighlightsAcrossScopes({
+			timePeriod: date,
+			temporalUnit: 'day',
+			viewedGroup
+		});
+		newData.forEach((v) =>
+			console.log(
+				`${v.descriptor.type}, ${v.scopes.map((scope) => `${scope.scope.species}, ${scope.scope.parentTimeWindow ? JSON.stringify(scope.scope.parentTimeWindow) : 'all time'}, ${scope.ranking.isTied ? '=' : ''}${scope.ranking.position}`).join(' :: ')}: ${v.value.value}`
+			)
+		);
+	} catch (err) {
+		console.log(err);
+	}
 	return getCondensedHighlightsAtTimePeriod(viewedGroup.id, date, 'day');
 }
 

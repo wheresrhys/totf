@@ -59,7 +59,7 @@ export const rarities: HighlightsGenerator = {
 			];
 		}
 
-		if (totalEncounters <= 4 && !scope?.parentTimeWindow) {
+		if (totalEncounters <= 5 && !scope?.parentTimeWindow) {
 			return appearances.map((appearance, i) => ({
 				timePeriod: appearance.time_period,
 				value:
@@ -83,13 +83,14 @@ export const rarities: HighlightsGenerator = {
 	// first of anything.
 	condition: (scope) => !scope.parentTimeWindow?.month,
 	rpcName: 'core_stats',
-	speciesUsed: 'none',
+	speciesUsed: 'grouped',
 	presence: {
 		species: null,
 		general: {
 			day: {
 				perDay: {
-					relativeToAllTime: 1
+					relativeToAllTime: 1,
+					relativeToYear: 1
 				}
 			},
 			month: null,

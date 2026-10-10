@@ -13,14 +13,13 @@ import { fetchStatsSpines } from '@/app/actions/stats-cache';
 import { isNumericHighlightValue } from '../types';
 import { getRule } from '../rules';
 import { getHighlightsWithinTimeWindow } from './highlight-generator';
-
-import { buildTimeWindowFilter } from './highlight-utils';
+import { descriptorToString } from './highlight-utils';
+import {
+	buildTimeWindowFilter,
+	sortByPositionAndTimeWindow,
+	sortHighlights
+} from './highlight-utils';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
-const highlightCategoryOrder: HighlightCategory[] = [
-	'rarity',
-	'count',
-	'biometrics'
-];
 
 function calculatePosition(
 	siblingHighlights: HighlightValue[],
@@ -74,39 +73,6 @@ function filterOutIrrelevantHighlights(
 		}
 	});
 	return relevantHighlights;
-}
-
-function descriptorToString(descriptor: HighlightDescriptor): string {
-	return (Object.keys(descriptor) as (keyof HighlightDescriptor)[])
-		.sort()
-		.map((key) => String(descriptor[key]))
-		.join(':');
-}
-
-function timeWindowToNumber(
-	timeWindow: YearMonthRestriction | undefined
-): number {
-	if (timeWindow?.month) return 10;
-	if (timeWindow?.year) return 1;
-	return 100;
-}
-
-type PositionAndTimeWindow = {
-	position: number;
-	window?: YearMonthRestriction;
-};
-
-function sortByPositionAndTimeWindow(
-	a: PositionAndTimeWindow,
-	b: PositionAndTimeWindow
-) {
-	if (a.position !== b.position) {
-		return a.position - b.position;
-	} else {
-		const windowAScore = timeWindowToNumber(a.window);
-		const windowBScore = timeWindowToNumber(b.window);
-		return windowBScore - windowAScore;
-	}
 }
 
 // Folds every highlight describing the same metric for the same species into one
@@ -207,41 +173,6 @@ function removeLessSignificantHighlights(
 				)
 		);
 	});
-}
-
-function sortHighlights(highlights: CombinedHighlight[]) {
-	return highlights.toSorted(
-		(a: CombinedHighlight, b: CombinedHighlight): number => {
-			const categoryOrdering =
-				highlightCategoryOrder.indexOf(b.descriptor.category) -
-				highlightCategoryOrder.indexOf(a.descriptor.category);
-
-			if (categoryOrdering) return categoryOrdering;
-			if (a.species && !b.species) return 1;
-			if (!a.species && b.species) return -1;
-
-			const posWindowSorVal = sortByPositionAndTimeWindow(
-				{
-					position: a.bestPosition,
-					window: a.scopes[0].scope.parentTimeWindow
-				},
-				{
-					position: b.bestPosition,
-					window: b.scopes[0].scope.parentTimeWindow
-				}
-			);
-			if (posWindowSorVal) return posWindowSorVal;
-
-			if (
-				isNumericHighlightValue(a.value) &&
-				isNumericHighlightValue(b.value)
-			) {
-				return b.value.value - a.value.value;
-			} else {
-				return 0;
-			}
-		}
-	);
 }
 
 async function getAllRelevantHighlights({

@@ -1,7 +1,6 @@
 import { camelCase, noCase } from 'change-case';
 import type {
 	HighlightsOfType,
-	CherryPickedHighlight,
 	YearMonthRestriction,
 	HighlightDescriptor,
 	HighlightValue,
@@ -14,7 +13,9 @@ import type {
 	HighlightDataLake,
 	ExtendedTemporalUnit,
 	HighlightPageLevelPresence,
-	HighlightPresenceAtScopes
+	HighlightPresenceAtScopes,
+	HighlightValueWithRanking,
+	NewHighlightValue
 } from '../types';
 import {
 	getStatsByTemporalUnit,
@@ -32,7 +33,11 @@ import {
 	getFilteredStatsCache,
 	getSpeciesFilter,
 	filterStats,
-	getTimePeriodSampler
+	getTimePeriodSampler,
+	descriptorToString,
+	sortHighlights,
+	sortByPositionAndTimeWindow,
+	type PositionAndTimeWindow
 } from './highlight-utils';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { ViewedGroup } from '@/app/lib/group-slug';
@@ -61,7 +66,7 @@ async function getScopedHighlightsOfType({
 	temporalUnit,
 	species,
 	limit
-}: HighlightsOfTypeParams) {
+}: HighlightsOfTypeParams): Promise<NewHighlightValue[]> {
 	const rule = getRule(highlightType);
 	const baseData = await getServerCachedStats({
 		viewedGroup,
@@ -85,28 +90,28 @@ async function getScopedHighlightsOfType({
 		timePeriod,
 		samplesTimeWindow
 	);
-	let returnVal;
 
 	if (rule.speciesUsed === 'grouped') {
 		const dataPerSpecies = groupByColumn('species_name', filteredStats);
-		returnVal = Object.entries(dataPerSpecies).flatMap(([species, data]) =>
-			getHighlightsOfTypeFromStatsRows({
-				rule,
-				stats: data,
-				limit,
-				timeWindowFilter: samplesTimeWindowFilter
-			}).map((value) => ({
-				...value,
-				scope: {
-					temporalUnit,
-					species,
-					parentTimeWindow: lakeTimeWindow
-				},
-				descriptor: rule.descriptor
-			}))
+		return Object.entries(dataPerSpecies).flatMap(
+			([species, data]) =>
+				getHighlightsOfTypeFromStatsRows({
+					rule,
+					stats: data,
+					limit,
+					timeWindowFilter: samplesTimeWindowFilter
+				}).map((value) => ({
+					...value,
+					scope: {
+						temporalUnit,
+						species,
+						parentTimeWindow: lakeTimeWindow
+					},
+					descriptor: rule.descriptor
+				})) as NewHighlightValue[]
 		);
 	} else {
-		returnVal = getHighlightsOfTypeFromStatsRows({
+		return getHighlightsOfTypeFromStatsRows({
 			rule,
 			stats: filteredStats,
 			limit,
@@ -118,10 +123,8 @@ async function getScopedHighlightsOfType({
 				parentTimeWindow: lakeTimeWindow
 			},
 			descriptor: rule.descriptor
-		}));
+		})) as NewHighlightValue[];
 	}
-	console.log('rv', returnVal);
-	return returnVal;
 }
 
 const DEFAULT_HIGHLIGHT_INIT_CONFIG: HighlightInitConfig = {
@@ -133,13 +136,12 @@ function getPresence(
 	rule: HighlightsGenerator,
 	temporalUnit: ExtendedTemporalUnit,
 	species?: string
-): Partial<HighlightPageLevelPresence> {
+): Partial<HighlightPageLevelPresence> | undefined {
 	if (!rule.presence) return {};
 	const rulePresence = species ? rule.presence.species : rule.presence.general;
-	const timePeriodAccessorProperty = camelCase(
-		temporalUnit
-	) as keyof HighlightPresenceAtScopes;
-	return rulePresence[timePeriodAccessorProperty];
+	return rulePresence?.[
+		camelCase(temporalUnit) as keyof HighlightPresenceAtScopes
+	];
 }
 
 function getTimeWindow(
@@ -181,12 +183,12 @@ export async function getHighlightsOfTypeAcrossScopes({
 			const sampleTemporalUnit = highlightIterator
 				.substring(3)
 				.toLowerCase() as TemporalUnit;
-			const confs = Object.entries(dataLakeConfig).map(([lakeScope, limit]) => {
+			return Object.entries(dataLakeConfig).map(([lakeScope, limit]) => {
 				if (limit === 0) return;
 				const lakeScopeTemporalUnit = noCase(
 					lakeScope.replace('relativeTo', '')
 				) as ExtendedTemporalUnit;
-				const conf = {
+				return {
 					highlightType,
 					viewedGroup,
 					timePeriod,
@@ -196,21 +198,16 @@ export async function getHighlightsOfTypeAcrossScopes({
 					species,
 					limit
 				};
-				return conf;
 			});
-			return confs;
 		})
 		.filter((config) => Boolean(config)) as HighlightsOfTypeParams[];
 
-	console.log('configs', configs);
 	return (
 		await Promise.all(
 			configs.map((config) => getScopedHighlightsOfType(config))
 		)
 	).flatMap((data) => data);
 }
-
-// next reimplement getAllRelevantHighlights as getAllHighlights({
 
 export async function getAllHighlightsAcrossScopes(options: {
 	timePeriod: string;
@@ -219,12 +216,89 @@ export async function getAllHighlightsAcrossScopes(options: {
 	species?: string;
 }) {
 	const allHighlights = await Promise.all(
-		ruleTypes.map((type) =>
-			getHighlightsOfTypeAcrossScopes({
+		ruleTypes.map(async (type) => {
+			const allHighlightsOfType = await getHighlightsOfTypeAcrossScopes({
 				highlightType: type,
 				...options
-			})
-		)
+			});
+			const significantHighlights =
+				removeLessSignificantHighlights(allHighlightsOfType);
+			const combined = combineSimilarHighlights(significantHighlights, type);
+			return combined;
+		})
 	);
-	return allHighlights;
+	return sortHighlights(allHighlights.flatMap((x) => x));
+}
+
+function removeLessSignificantHighlights(
+	highlights: NewHighlightValue[]
+): NewHighlightValue[] {
+	return highlights.filter((highlight, i) => {
+		if (!highlight.scope.parentTimeWindow) {
+			return true;
+		}
+
+		return !highlights.some(
+			(potentialClobber, j) =>
+				// don't compare with self
+				i !== j &&
+				// don't clobber highlights of a completely different type
+				potentialClobber.descriptor.type === highlight.descriptor.type &&
+				potentialClobber.descriptor.category ===
+					highlight.descriptor.category &&
+				potentialClobber.scope.species === highlight.scope.species &&
+				// clobberer must be higher ranked than subject, e.g. can't  clobber 1st place with 2nd place
+				potentialClobber.ranking.position >= highlight.ranking.position &&
+				// only clobber with highlights that are scoped to all time
+				!potentialClobber.scope.parentTimeWindow &&
+				// don't clobbe if equal position but the more locally scoped item is not tied when the global one is tied
+				!(
+					highlight.ranking.position === potentialClobber.ranking.position &&
+					potentialClobber.ranking.isTied &&
+					!highlight.ranking.isTied
+				)
+		);
+	});
+}
+
+function combineSimilarHighlights(
+	highlights: NewHighlightValue[],
+	ruleType: string
+): CombinedHighlight[] {
+	const rule = getRule(ruleType);
+	const groupedByDescriptor: Map<string, NewHighlightValue[]> = new Map();
+	highlights.forEach((highlight) => {
+		const mapKey = highlight.species ?? 'none';
+		if (groupedByDescriptor.has(mapKey)) {
+			groupedByDescriptor.get(mapKey)?.push(highlight);
+		} else {
+			groupedByDescriptor.set(mapKey, [highlight]);
+		}
+	});
+
+	return [...groupedByDescriptor.values()].map((highlights) => {
+		highlights.sort((a: NewHighlightValue, b: NewHighlightValue): number =>
+			sortByPositionAndTimeWindow(
+				{ position: a.ranking.position, window: a.scope.parentTimeWindow },
+				{ position: b.ranking.position, window: b.scope.parentTimeWindow }
+			)
+		);
+		return {
+			formatters: rule.formatters,
+			descriptor: rule.descriptor,
+			value: {
+				timePeriod: highlights[0].timePeriod,
+				value: highlights[0].value,
+				species: highlights[0].species
+			},
+			species: highlights[0].scope.species,
+			bestPosition: Math.min(
+				...highlights.map(({ ranking }) => ranking.position)
+			),
+			scopes: highlights.map((highlight) => ({
+				scope: highlight.scope,
+				ranking: highlight.ranking
+			}))
+		};
+	});
 }

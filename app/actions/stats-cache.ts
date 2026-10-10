@@ -53,7 +53,7 @@ export async function getServerCachedStats({
 	return cachedSupabaseFetch(
 		`${temporalUnit}-${rpcName}${fetchDataBySpecies ? '-by-species' : ''}`,
 		viewedGroup,
-		getStatsRPCFetcher<StatsResult>(rpcName, temporalUnit)
+		getStatsRPCFetcher<StatsResult>(rpcName, temporalUnit, fetchDataBySpecies)
 	);
 }
 

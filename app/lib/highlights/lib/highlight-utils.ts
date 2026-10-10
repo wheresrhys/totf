@@ -10,8 +10,10 @@ import type {
 	HighlightsGenerator,
 	HighlightInitConfig,
 	HighlightScope,
-	TextHighlightValue
+	TextHighlightValue,
+	HighlightValueWithRanking
 } from '../types';
+import { isNumericHighlightValue } from '../types';
 import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { StatsResult } from '@/app/actions/stats-cache';
@@ -20,7 +22,12 @@ export type StatFilter = (stat: {
 	time_period: string | null;
 	species_name: string | null;
 }) => boolean;
-
+const highlightCategoryOrder: HighlightCategory[] = [
+	'rarity',
+	'count',
+	'biometrics',
+	'demographics'
+];
 export function getTimePeriodSampler(
 	timePeriod: string,
 	timeWindow?: YearMonthRestriction
@@ -64,17 +71,79 @@ export function filterStats({
 	return filteredStats;
 }
 
+function timeWindowToNumber(
+	timeWindow: YearMonthRestriction | undefined
+): number {
+	if (timeWindow?.month) return 10;
+	if (timeWindow?.year) return 1;
+	return 100;
+}
+
+export type PositionAndTimeWindow = {
+	position: number;
+	window?: YearMonthRestriction;
+};
+
+export function sortByPositionAndTimeWindow(
+	a: PositionAndTimeWindow,
+	b: PositionAndTimeWindow
+) {
+	if (a.position !== b.position) {
+		return a.position - b.position;
+	} else {
+		const windowAScore = timeWindowToNumber(a.window);
+		const windowBScore = timeWindowToNumber(b.window);
+		return windowBScore - windowAScore;
+	}
+}
+
+export function descriptorToString(descriptor: HighlightDescriptor): string {
+	return (Object.keys(descriptor) as (keyof HighlightDescriptor)[])
+		.sort()
+		.map((key) => String(descriptor[key]))
+		.join(':');
+}
+
 export function limitHighlights(
 	highlights: HighlightValue[],
 	limit: number
-): HighlightValue[] {
-	if (highlights.length < limit) {
-		return highlights;
+): HighlightValueWithRanking[] {
+	if (!highlights.length) {
+		return [];
 	}
-	const boundaryValue = highlights[limit - 1].value;
-	const itemsIncludingTies =
-		highlights.findLastIndex(({ value }) => value === boundaryValue) + 1;
-	return highlights.slice(0, itemsIncludingTies);
+	if (!isNumericHighlightValue(highlights[0])) {
+		return highlights.map(
+			(highlight) =>
+				({
+					...highlight,
+					ranking: {
+						position: 1,
+						isTied: false
+					}
+				}) as HighlightValueWithRanking
+		);
+	}
+	let topHighlights;
+	if (highlights.length <= limit) {
+		topHighlights = highlights;
+	} else {
+		const boundaryValue = highlights[limit - 1].value;
+		const itemsIncludingTies =
+			highlights.findLastIndex(({ value }) => value === boundaryValue) + 1;
+		topHighlights = highlights.slice(0, itemsIncludingTies);
+	}
+	const values = topHighlights.map((x) => x.value);
+	const uniqueValues = [...new Set(values)].sort();
+
+	return topHighlights.map((highlight) => {
+		return {
+			...highlight,
+			ranking: {
+				position: uniqueValues.indexOf(highlight.value) + 1,
+				isTied: values.filter((val) => val === highlight.value).length > 1
+			}
+		} as HighlightValueWithRanking;
+	});
 }
 
 export function dateToYearMonth(date: string): YearMonthRestriction {
@@ -201,4 +270,39 @@ export function getScopedStatsFilter(scope: HighlightScope): StatFilter | null {
 	}
 
 	return filter;
+}
+
+export function sortHighlights(highlights: CombinedHighlight[]) {
+	return highlights.toSorted(
+		(a: CombinedHighlight, b: CombinedHighlight): number => {
+			const categoryOrdering =
+				highlightCategoryOrder.indexOf(a.descriptor.category) -
+				highlightCategoryOrder.indexOf(b.descriptor.category);
+
+			if (categoryOrdering) return categoryOrdering;
+			if (a.species && !b.species) return 1;
+			if (!a.species && b.species) return -1;
+
+			const posWindowSorVal = sortByPositionAndTimeWindow(
+				{
+					position: a.bestPosition,
+					window: a.scopes[0].scope.parentTimeWindow
+				},
+				{
+					position: b.bestPosition,
+					window: b.scopes[0].scope.parentTimeWindow
+				}
+			);
+			if (posWindowSorVal) return posWindowSorVal;
+
+			if (
+				isNumericHighlightValue(a.value) &&
+				isNumericHighlightValue(b.value)
+			) {
+				return b.value.value - a.value.value;
+			} else {
+				return 0;
+			}
+		}
+	);
 }
