@@ -79,65 +79,62 @@ export async function fetchSummaryHighlightsData(
 	viewedGroup: ViewedGroup
 ) {
 	const { year, month } = params;
-	const [daily, monthly, local, local2, local3, local4] = await Promise.all([
-		[],
-		[],
-		[],
-		// getHighlightsWithinTimeWindow({
-		// 	temporalUnit: 'day',
-		// 	groupId: viewedGroup.id,
-		// 	parentTimeWindow: {
-		// 		year,
-		// 		month: month
-		// 	},
-		// 	includePerSpecies: false
-		// }),
+	const [daily, monthly, local] = await Promise.all([
+		getHighlightsWithinTimeWindow({
+			temporalUnit: 'day',
+			groupId: viewedGroup.id,
+			parentTimeWindow: {
+				year,
+				month: month
+			},
+			includePerSpecies: false
+		}),
 
-		// month
-		// 	? []
-		// 	: getHighlightsWithinTimeWindow({
-		// 			temporalUnit: 'month',
-		// 			groupId: viewedGroup.id,
-		// 			parentTimeWindow: {
-		// 				year,
-		// 				month: month
-		// 			},
-		// 			includePerSpecies: false
-		// 		}),
-		// year
-		// 	? getCondensedHighlightsAtTimePeriod(
-		// 			viewedGroup.id,
-		// 			`${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
-		// 			month ? 'month' : 'year',
-		// 			1
-		// 		)
-		// 	: [],
-		year
-			? getCondensedHighlightsWithinTimeWindow(
-					viewedGroup.id,
-					{ year, month },
-					'day'
-				)
-			: [],
 		month
 			? []
-			: getCondensedHighlightsWithinTimeWindow(
+			: getHighlightsWithinTimeWindow({
+					temporalUnit: 'month',
+					groupId: viewedGroup.id,
+					parentTimeWindow: {
+						year,
+						month: month
+					},
+					includePerSpecies: false
+				}),
+		year
+			? getCondensedHighlightsAtTimePeriod(
 					viewedGroup.id,
-					{ year, month },
-					'month'
-				),
-		month || year
-			? []
-			: getCondensedHighlightsWithinTimeWindow(
-					viewedGroup.id,
-					{ year, month },
-					'year'
+					`${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
+					month ? 'month' : 'year',
+					1
 				)
+			: []
+		// year
+		// 	? getCondensedHighlightsWithinTimeWindow(
+		// 			viewedGroup.id,
+		// 			{ year, month },
+		// 			'day'
+		// 		)
+		// 	: [],
+		// month
+		// 	? []
+		// 	: getCondensedHighlightsWithinTimeWindow(
+		// 			viewedGroup.id,
+		// 			{ year, month },
+		// 			'month'
+		// 		),
+		// month || year
+		// 	? []
+		// 	: getCondensedHighlightsWithinTimeWindow(
+		// 			viewedGroup.id,
+		// 			{ year, month },
+		// 			'year'
+		// 		)
 	]);
 	return {
 		sessionHighlights: daily,
 		monthHighlights: monthly,
-		localHighlights: [...local, ...local2, ...local3, ...local4]
+		localHighlights: local
 	};
 }
 
