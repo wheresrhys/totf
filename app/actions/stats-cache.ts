@@ -14,7 +14,6 @@ export type StatsRepository = {
 	coreStatsWithSpecies: CoreStatsResult[];
 	biometricsStatsWithSpecies: BiometricsStatsResult[];
 };
-import { groupByColumn } from '@/app/lib/generic-utils';
 
 function getStatsRPCFetcher<ResultType>(
 	rpcName: string,
@@ -38,20 +37,33 @@ function getStatsRPCFetcher<ResultType>(
 }
 
 export type StatsResult = CoreStatsResult | BiometricsStatsResult;
+export type ServerCachedStatsParams = {
+	rpcName: string;
+	fetchDataBySpecies: boolean;
+	temporalUnit: TemporalUnit;
+	viewedGroup: ViewedGroup;
+};
+function getCacheKey({
+	rpcName,
+	fetchDataBySpecies,
+	temporalUnit
+}: ServerCachedStatsParams): string {
+	return `${temporalUnit}-${rpcName}${fetchDataBySpecies ? '-by-species' : ''}`;
+}
 
 export async function getServerCachedStats({
 	rpcName,
 	fetchDataBySpecies,
 	temporalUnit,
 	viewedGroup
-}: {
-	rpcName: string;
-	fetchDataBySpecies: boolean;
-	temporalUnit: TemporalUnit;
-	viewedGroup: ViewedGroup;
-}): Promise<StatsResult[]> {
+}: ServerCachedStatsParams): Promise<StatsResult[]> {
 	return cachedSupabaseFetch(
-		`${temporalUnit}-${rpcName}${fetchDataBySpecies ? '-by-species' : ''}`,
+		getCacheKey({
+			rpcName,
+			fetchDataBySpecies,
+			temporalUnit,
+			viewedGroup
+		}),
 		viewedGroup,
 		getStatsRPCFetcher<StatsResult>(rpcName, temporalUnit, fetchDataBySpecies)
 	);

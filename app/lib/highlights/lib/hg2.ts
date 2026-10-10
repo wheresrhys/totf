@@ -39,6 +39,7 @@ import {
 	sortByPositionAndTimeWindow,
 	type PositionAndTimeWindow
 } from './highlight-utils';
+import { pooledRequestForStats } from './stats-cache-fetcher';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { groupByColumn } from '../../generic-utils';
@@ -68,7 +69,7 @@ async function getScopedHighlightsOfType({
 	limit
 }: HighlightsOfTypeParams): Promise<NewHighlightValue[]> {
 	const rule = getRule(highlightType);
-	const baseData = await getServerCachedStats({
+	const baseData = await pooledRequestForStats({
 		viewedGroup,
 		rpcName: rule.rpcName,
 		fetchDataBySpecies: Boolean(species) || rule.speciesUsed !== 'none',
