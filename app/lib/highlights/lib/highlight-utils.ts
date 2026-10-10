@@ -74,9 +74,10 @@ export function filterStats({
 function timeWindowToNumber(
 	timeWindow: YearMonthRestriction | undefined
 ): number {
+	if (timeWindow?.month && timeWindow?.year) return 1;
 	if (timeWindow?.month) return 10;
-	if (timeWindow?.year) return 1;
-	return 100;
+	if (timeWindow?.year) return 100;
+	return 1000;
 }
 
 export type PositionAndTimeWindow = {
@@ -88,12 +89,12 @@ export function sortByPositionAndTimeWindow(
 	a: PositionAndTimeWindow,
 	b: PositionAndTimeWindow
 ) {
-	if (a.position !== b.position) {
-		return a.position - b.position;
-	} else {
-		const windowAScore = timeWindowToNumber(a.window);
-		const windowBScore = timeWindowToNumber(b.window);
+	const windowAScore = timeWindowToNumber(a.window);
+	const windowBScore = timeWindowToNumber(b.window);
+	if (windowBScore !== windowAScore) {
 		return windowBScore - windowAScore;
+	} else {
+		return a.position - b.position;
 	}
 }
 

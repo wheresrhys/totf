@@ -137,7 +137,7 @@ function getPresence(
 	rule: HighlightsGenerator,
 	temporalUnit: ExtendedTemporalUnit,
 	species?: string
-): Partial<HighlightPageLevelPresence> | undefined {
+): Partial<HighlightPageLevelPresence> | undefined | null {
 	if (!rule.presence) return {};
 	const rulePresence = species ? rule.presence.species : rule.presence.general;
 	return rulePresence?.[

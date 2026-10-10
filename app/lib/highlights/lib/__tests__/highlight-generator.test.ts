@@ -29,9 +29,9 @@ describe('highlight-generator', () => {
 				combinedHighlightPrinter: vi.fn()
 			},
 			generator: vi.fn().mockReturnValue([])
-		} as HighlightsGenerator;
+		} as Partial<HighlightsGenerator>;
 		beforeEach(() => {
-			highlightRules.push(reporterRule);
+			highlightRules.push(reporterRule as HighlightsGenerator);
 		});
 		beforeEach(() => {
 			vi.clearAllMocks();

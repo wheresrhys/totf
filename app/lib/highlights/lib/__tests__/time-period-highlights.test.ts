@@ -697,15 +697,21 @@ describe('getHighlightsWithinTimeWindow', () => {
 					category: 'biometrics',
 					type: 'b',
 					values: singleValue(YEAR_PERIOD, 1)
+				}),
+				makeHighlightsOfType({
+					category: 'demographics',
+					type: 'b',
+					values: singleValue(YEAR_PERIOD, 1)
 				})
 			]);
 
 			const result = await callForYear();
 
 			expect(result.map((r) => r.descriptor.category)).toEqual([
-				'biometrics',
+				'rarity',
 				'count',
-				'rarity'
+				'biometrics',
+				'demographics'
 			]);
 		});
 

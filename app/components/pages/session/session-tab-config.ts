@@ -37,21 +37,24 @@ export async function fetchSessionHighlights(
 	{ date }: Pick<SessionTabParams, 'date'>,
 	viewedGroup: ViewedGroup
 ): Promise<CombinedHighlight[]> {
-	try {
-		const newData = await getAllHighlightsAcrossScopes({
+	const [condensed] = await Promise.all([
+
+
+		// getCondensedHighlightsAtTimePeriod(viewedGroup.id, date, 'day'),
+		getAllHighlightsAcrossScopes({
 			timePeriod: date,
 			temporalUnit: 'day',
 			viewedGroup
-		});
-		newData.forEach((v) =>
-			console.log(
-				`${v.descriptor.type}, ${v.scopes.map((scope) => `${scope.scope.species}, ${scope.scope.parentTimeWindow ? JSON.stringify(scope.scope.parentTimeWindow) : 'all time'}, ${scope.ranking.isTied ? '=' : ''}${scope.ranking.position}`).join(' :: ')}: ${v.value.value}`
-			)
-		);
-	} catch (err) {
-		console.log(err);
-	}
-	return getCondensedHighlightsAtTimePeriod(viewedGroup.id, date, 'day');
+		}).then(res => {
+			res.forEach((v) =>
+				console.log(
+					`${v.descriptor.type}, ${v.scopes.map((scope) => `${scope.scope.species}, ${scope.scope.parentTimeWindow ? JSON.stringify(scope.scope.parentTimeWindow) : 'all time'}, ${scope.ranking.isTied ? '=' : ''}${scope.ranking.position}`).join(' :: ')}: ${v.value.value}`
+				)
+			);
+			return res;
+		}),
+	])
+	return condensed
 }
 
 /**

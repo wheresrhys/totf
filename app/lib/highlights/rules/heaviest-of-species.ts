@@ -30,9 +30,13 @@ export const heaviestOfSpecies: HighlightsGenerator = {
 		unit: 'g',
 		category: 'biometrics'
 	},
-	generator: getTopByProperty<BiometricsStatsResult>('max_weight', {
-		threshold: 3
-	}),
+	generator: (rows) => {
+		const results = getTopByProperty<BiometricsStatsResult>('max_weight', {
+			threshold: 3,
+		})(rows)
+		// avoid generating highlights when there are actually very few birds to build a reasonable data set
+		return results.length >= 10 ? results : [];
+	},
 	condition: (scope) => scope.temporalUnit === 'day',
 	rpcName: 'biometrics_stats',
 	speciesUsed: 'grouped',
@@ -42,7 +46,6 @@ export const heaviestOfSpecies: HighlightsGenerator = {
 			day: {
 				perDay: {
 					relativeToAllTime: 3,
-					relativeToAllTimeMonth: 1,
 					relativeToYear: 1
 				}
 			},
