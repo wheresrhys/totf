@@ -31,9 +31,30 @@ export const lightestOfSpecies: HighlightsGenerator = {
 		category: 'biometrics',
 		smallestWins: true
 	},
-	generator: getTopByProperty<BiometricsStatsResult>('min_weight', {
-		threshold: 3,
-		smallestWins: true
-	}),
-	condition: (scope) => scope.temporalUnit === 'day'
+	generator: (rows) => {
+		const results = getTopByProperty<BiometricsStatsResult>('min_weight', {
+			threshold: 3,
+			smallestWins: true
+		})(rows);
+		// avoid generating highlights when there are actually very few birds to build a reasonable data set
+		return results.length >= 10 ? results : [];
+	},
+	condition: (scope) => scope.temporalUnit === 'day',
+	rpcName: 'biometrics_stats',
+	speciesUsed: 'grouped',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToYear: 1
+				}
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

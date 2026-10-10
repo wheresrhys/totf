@@ -6,17 +6,20 @@ import type {
 	HighlightValue,
 	CombinedHighlight,
 	HighlightCategory,
-	NumericHighlightValue
+	NumericHighlightValue,
+	HighlightInitConfig
 } from '../types';
-
+import { fetchStatsSpines } from '@/app/actions/stats-cache';
 import { isNumericHighlightValue } from '../types';
+import { getRule } from '../rules';
 import { getHighlightsWithinTimeWindow } from './highlight-generator';
+import { descriptorToString } from './highlight-utils';
+import {
+	buildTimeWindowFilter,
+	sortByPositionAndTimeWindow,
+	sortHighlights
+} from './highlight-utils';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
-const highlightCategoryOrder: HighlightCategory[] = [
-	'rarity',
-	'count',
-	'biometrics'
-];
 
 function calculatePosition(
 	siblingHighlights: HighlightValue[],
@@ -61,52 +64,15 @@ function filterOutIrrelevantHighlights(
 					...highlightWrapper.scope
 				},
 				value: relevantHighlight,
-				ranking: {
-					...calculatePosition(
-						highlightWrapper.values,
-						relevantHighlightIndex,
-						highlightWrapper.descriptor.smallestWins
-					),
-					siblingHighlights: highlightWrapper.values,
-					highlightIndex: relevantHighlightIndex
-				}
+				ranking: calculatePosition(
+					highlightWrapper.values,
+					relevantHighlightIndex,
+					highlightWrapper.descriptor.smallestWins
+				)
 			});
 		}
 	});
 	return relevantHighlights;
-}
-
-function descriptorToString(descriptor: HighlightDescriptor): string {
-	return (Object.keys(descriptor) as (keyof HighlightDescriptor)[])
-		.sort()
-		.map((key) => String(descriptor[key]))
-		.join(':');
-}
-
-function timeWindowToNumber(
-	timeWindow: YearMonthRestriction | undefined
-): number {
-	if (timeWindow?.month) return 10;
-	if (timeWindow?.year) return 1;
-	return 100;
-}
-
-type PositionAndTimeWindow = {
-	position: number;
-	window?: YearMonthRestriction;
-};
-
-function sortByPositionAndTimeWindow(
-	a: PositionAndTimeWindow,
-	b: PositionAndTimeWindow
-) {
-	if (a.position !== b.position) {
-		return a.position - b.position;
-	} else {
-		const windowAScore = timeWindowToNumber(a.window);
-		const windowBScore = timeWindowToNumber(b.window);
-		return windowBScore - windowAScore;
-	}
 }
 
 // Folds every highlight describing the same metric for the same species into one
@@ -209,41 +175,6 @@ function removeLessSignificantHighlights(
 	});
 }
 
-function sortHighlights(highlights: CombinedHighlight[]) {
-	return highlights.toSorted(
-		(a: CombinedHighlight, b: CombinedHighlight): number => {
-			const categoryOrdering =
-				highlightCategoryOrder.indexOf(b.descriptor.category) -
-				highlightCategoryOrder.indexOf(a.descriptor.category);
-
-			if (categoryOrdering) return categoryOrdering;
-			if (a.species && !b.species) return 1;
-			if (!a.species && b.species) return -1;
-
-			const posWindowSorVal = sortByPositionAndTimeWindow(
-				{
-					position: a.bestPosition,
-					window: a.scopes[0].scope.parentTimeWindow
-				},
-				{
-					position: b.bestPosition,
-					window: b.scopes[0].scope.parentTimeWindow
-				}
-			);
-			if (posWindowSorVal) return posWindowSorVal;
-
-			if (
-				isNumericHighlightValue(a.value) &&
-				isNumericHighlightValue(b.value)
-			) {
-				return b.value.value - a.value.value;
-			} else {
-				return 0;
-			}
-		}
-	);
-}
-
 async function getAllRelevantHighlights({
 	groupId,
 	timePeriod,
@@ -292,7 +223,7 @@ async function getAllRelevantHighlights({
 	);
 }
 
-export async function getCondensedHighlightsAtTimePeriod(
+export async function _getCondensedHighlightsAtTimePeriod(
 	groupId: number,
 	timePeriod: string,
 	temporalUnit: TemporalUnit,
@@ -304,10 +235,73 @@ export async function getCondensedHighlightsAtTimePeriod(
 		temporalUnit,
 		limit
 	});
+
 	const significantHighlights = removeLessSignificantHighlights(
 		allRelevantHighlights
 	);
-	const combinedHighlights = combineSimilarHighlights(significantHighlights);
-	const sortedHighlights = sortHighlights(combinedHighlights);
-	return sortedHighlights;
+
+	return combineSimilarHighlights(significantHighlights);
+}
+
+export async function getCondensedHighlightsAtTimePeriod(
+	groupId: number,
+	timePeriod: string,
+	temporalUnit: TemporalUnit,
+	limit?: number
+): Promise<CombinedHighlight[]> {
+	const combinedHighlights = await _getCondensedHighlightsAtTimePeriod(
+		groupId,
+		timePeriod,
+		temporalUnit,
+		limit
+	);
+	return sortHighlights(combinedHighlights);
+}
+
+async function getContainedTimePeriods(
+	groupId: number,
+	parentTimeWindow: YearMonthRestriction
+) {
+	const { years, months, days } = await fetchStatsSpines({
+		id: groupId,
+		slug: null
+	});
+	const timeWindowFilter = buildTimeWindowFilter(parentTimeWindow);
+	return [
+		...years.filter(timeWindowFilter),
+		...months.filter(timeWindowFilter),
+		...days.filter(timeWindowFilter)
+	];
+}
+
+// Goals
+// On year summary show the very best things at month and session level
+// busiest/most varied month ever
+// busiest/most varied sesison ever
+// show some exceptional species records, TBD what
+// On month summary show the best things at session level
+// busiest/most varied session ever/of the year
+// show some species records, TBD what
+export async function getCondensedHighlightsWithinTimeWindow(
+	groupId: number,
+	parentTimeWindow: YearMonthRestriction,
+	temporalUnit: TemporalUnit,
+	limit?: number
+): Promise<CombinedHighlight[]> {
+	const containedTimePeriods: string[] = await getContainedTimePeriods(
+		groupId,
+		parentTimeWindow
+	);
+	const combinedHighlights = await Promise.all(
+		containedTimePeriods.map((timePeriod) =>
+			_getCondensedHighlightsAtTimePeriod(
+				groupId,
+				timePeriod,
+				temporalUnit,
+				limit
+			)
+		)
+	);
+
+	return sortHighlights(combinedHighlights.flatMap((highlights) => highlights));
 }

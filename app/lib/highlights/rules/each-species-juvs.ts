@@ -37,5 +37,22 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 	}),
 	limit: 1,
 	condition: (scope) =>
-		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
+	rpcName: 'core_stats',
+	speciesUsed: 'grouped',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				perDay: {
+					relativeToAllTime: 1,
+					relativeToYear: 1
+				}
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

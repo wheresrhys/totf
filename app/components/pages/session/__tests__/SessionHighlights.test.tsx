@@ -11,11 +11,11 @@ import type {
 } from '@/app/lib/highlights/types';
 import type { SessionEncounter } from '@/app/models/session';
 
-// Rarities (#990), Counts (#989) and Vital stats all come from the highlights
-// pipeline's getCondensedHighlightsAtTimePeriod — see session-tab-config.ts.
-// Mock it as the one collaborator it is.
-vi.mock('@/app/lib/highlights', () => ({
-	getCondensedHighlightsAtTimePeriod: vi.fn()
+// Rarities (#990), Counts (#989) and Vital stats all come from the v2
+// highlights pipeline's getAllHighlightsAcrossScopes — see
+// session-tab-config.ts. Mock it as the one collaborator it is.
+vi.mock('@/app/lib/highlights/lib/hg2', () => ({
+	getAllHighlightsAcrossScopes: vi.fn()
 }));
 
 // A v2 highlight carries its own printer, so the sentence a section renders is
@@ -83,22 +83,27 @@ afterEach(() => {
 
 describe('fetchSessionHighlights', () => {
 	async function mockPipeline(highlights: CombinedHighlight[]) {
-		const { getCondensedHighlightsAtTimePeriod } =
-			await import('@/app/lib/highlights');
-		vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue(highlights);
-		return getCondensedHighlightsAtTimePeriod;
+		const { getAllHighlightsAcrossScopes } =
+			await import('@/app/lib/highlights/lib/hg2');
+		vi.mocked(getAllHighlightsAcrossScopes).mockResolvedValue(highlights);
+		return getAllHighlightsAcrossScopes;
 	}
 
 	it("asks the pipeline for the viewed group's highlights at the day scope, and hands them straight back", async () => {
 		const pipelineHighlights = [COUNT_HIGHLIGHT];
 		const pipeline = await mockPipeline(pipelineHighlights);
+		const viewedGroup = { id: 7, slug: 'alpha' };
 
 		const highlights = await fetchSessionHighlights(
 			{ date: '2024-09-15' },
-			{ id: 7, slug: 'alpha' }
+			viewedGroup
 		);
 
-		expect(pipeline).toHaveBeenCalledWith(7, '2024-09-15', 'day');
+		expect(pipeline).toHaveBeenCalledWith({
+			timePeriod: '2024-09-15',
+			temporalUnit: 'day',
+			viewedGroup
+		});
 		expect(highlights).toBe(pipelineHighlights);
 	});
 });

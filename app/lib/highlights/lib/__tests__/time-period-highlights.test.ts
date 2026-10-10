@@ -612,7 +612,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 		});
 
 		describe('sorting highlights', () => {
-			it('when position is equal sorts all time scoped highlights ahead of month-scoped ahead of year-scoped highlights', async () => {
+			it('when position is equal sorts all time scoped highlights ahead of year-scoped ahead of month-scoped highlights', async () => {
 				// scope.species differs across entries so the all-time one never
 				// clobbers the narrower-scoped ones in the significance filter, while
 				// value.species stays equal so combineSimilarHighlights still groups them
@@ -636,14 +636,14 @@ describe('getHighlightsWithinTimeWindow', () => {
 				expect(result[0].value.value).toBe(10);
 				expect(result[0].scopes[0].scope.parentTimeWindow).toBeUndefined();
 				expect(result[0].scopes[1].scope.parentTimeWindow).toEqual({
-					month: 3
+					year: 2024
 				});
 				expect(result[0].scopes[2].scope.parentTimeWindow).toEqual({
-					year: 2024
+					month: 3
 				});
 			});
 
-			it('sorts highlights of better position (i.e.lower number) first (disregarding time period scoping)', async () => {
+			it('sorts highlights of broader time-window scope ahead of narrower, taking priority over position', async () => {
 				vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
 					makeHighlightsOfType({
 						values: secondPlaceValue(YEAR_PERIOD, 4)
@@ -658,11 +658,11 @@ describe('getHighlightsWithinTimeWindow', () => {
 				const result = await callForYear();
 
 				expect(result).toHaveLength(1);
-				expect(result[0].value.value).toBe(6);
-				expect(result[0].scopes[0].scope.parentTimeWindow).toEqual({
+				expect(result[0].value.value).toBe(4);
+				expect(result[0].scopes[0].scope.parentTimeWindow).toBeUndefined();
+				expect(result[0].scopes[1].scope.parentTimeWindow).toEqual({
 					year: 2024
 				});
-				expect(result[0].scopes[1].scope.parentTimeWindow).toBeUndefined();
 			});
 		});
 
@@ -697,15 +697,21 @@ describe('getHighlightsWithinTimeWindow', () => {
 					category: 'biometrics',
 					type: 'b',
 					values: singleValue(YEAR_PERIOD, 1)
+				}),
+				makeHighlightsOfType({
+					category: 'demographics',
+					type: 'b',
+					values: singleValue(YEAR_PERIOD, 1)
 				})
 			]);
 
 			const result = await callForYear();
 
 			expect(result.map((r) => r.descriptor.category)).toEqual([
-				'biometrics',
+				'rarity',
 				'count',
-				'rarity'
+				'biometrics',
+				'demographics'
 			]);
 		});
 
@@ -730,7 +736,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 			]);
 		});
 
-		it('within a category, sorts highlights of better position(i.e.lower number) first(disregarding time period scoping)', async () => {
+		it('within a category, sorts highlights of broader time-window scope ahead of narrower, taking priority over position', async () => {
 			vi.mocked(getHighlightsWithinTimeWindow).mockResolvedValue([
 				makeHighlightsOfType({
 					type: 'a',
@@ -745,7 +751,7 @@ describe('getHighlightsWithinTimeWindow', () => {
 
 			const result = await callForYear();
 
-			expect(result.map((r) => r.descriptor.type)).toEqual(['b', 'a']);
+			expect(result.map((r) => r.descriptor.type)).toEqual(['a', 'b']);
 		});
 
 		it('within a category, when bestPosition is equal sorts by the scope of the first nested highlight', async () => {

@@ -28,12 +28,12 @@ vi.mock('@/app/lib/group-slug', () => ({
 	resolveGroupIdBySlug: mockResolveGroupIdBySlug
 }));
 
-// Counts comes from the highlights pipeline's getCondensedHighlightsAtTimePeriod.
+// Counts comes from the v2 highlights pipeline's getAllHighlightsAcrossScopes.
 // Mock it as the one collaborator it is; the printer is a test double returning a
 // fixed sentence, not the real formatting logic (covered by the pipeline's own
 // tests).
-vi.mock('@/app/lib/highlights', () => ({
-	getCondensedHighlightsAtTimePeriod: vi.fn().mockResolvedValue([
+vi.mock('@/app/lib/highlights/lib/hg2', () => ({
+	getAllHighlightsAcrossScopes: vi.fn().mockResolvedValue([
 		{
 			formatters: {
 				combinedHighlightPrinter: () => 'Busiest session ever — 3 birds',
@@ -364,22 +364,22 @@ describe('session detail page', () => {
 		});
 
 		it('?tabId=highlights does NOT prefetch the tab server-side — it is clientSideOnly, so the fetch runs once, from the browser', async () => {
-			const { getCondensedHighlightsAtTimePeriod } =
-				await import('@/app/lib/highlights');
+			const { getAllHighlightsAcrossScopes } =
+				await import('@/app/lib/highlights/lib/hg2');
 			render(await renderPage('highlights'));
 			await screen.findByTestId('session-highlights');
 			// Fetched exactly once — by `TabContent` after the tab mounted, never
 			// by `page.tsx`'s `prefetchActiveTabData`, which declines to run a
 			// `clientSideOnly` tab's fetcher.
-			expect(getCondensedHighlightsAtTimePeriod).toHaveBeenCalledTimes(1);
+			expect(getAllHighlightsAcrossScopes).toHaveBeenCalledTimes(1);
 		});
 
 		it('does not prefetch anything for a tabId naming a tab that fetches nothing of its own', async () => {
-			const { getCondensedHighlightsAtTimePeriod } =
-				await import('@/app/lib/highlights');
+			const { getAllHighlightsAcrossScopes } =
+				await import('@/app/lib/highlights/lib/hg2');
 			render(await renderPage('net-rounds'));
 			await screen.findByText('Net round 1: 08:00');
-			expect(getCondensedHighlightsAtTimePeriod).not.toHaveBeenCalled();
+			expect(getAllHighlightsAcrossScopes).not.toHaveBeenCalled();
 		});
 
 		it('?tabId=not-a-real-tab falls back to the Mist-netting tab, with no crash and no blank pane', async () => {

@@ -25,7 +25,8 @@ import {
 } from '@/app/actions/summary-stats';
 import {
 	getHighlightsWithinTimeWindow,
-	getCondensedHighlightsAtTimePeriod
+	getCondensedHighlightsAtTimePeriod,
+	getCondensedHighlightsWithinTimeWindow
 } from '@/app/lib/highlights';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { ViewedGroup } from '@/app/lib/group-slug';
@@ -88,6 +89,7 @@ export async function fetchSummaryHighlightsData(
 			},
 			includePerSpecies: false
 		}),
+
 		month
 			? []
 			: getHighlightsWithinTimeWindow({
@@ -107,6 +109,27 @@ export async function fetchSummaryHighlightsData(
 					1
 				)
 			: []
+		// year
+		// 	? getCondensedHighlightsWithinTimeWindow(
+		// 			viewedGroup.id,
+		// 			{ year, month },
+		// 			'day'
+		// 		)
+		// 	: [],
+		// month
+		// 	? []
+		// 	: getCondensedHighlightsWithinTimeWindow(
+		// 			viewedGroup.id,
+		// 			{ year, month },
+		// 			'month'
+		// 		),
+		// month || year
+		// 	? []
+		// 	: getCondensedHighlightsWithinTimeWindow(
+		// 			viewedGroup.id,
+		// 			{ year, month },
+		// 			'year'
+		// 		)
 	]);
 	return {
 		sessionHighlights: daily,

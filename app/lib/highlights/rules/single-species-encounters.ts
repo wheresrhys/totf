@@ -30,5 +30,17 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 	generator: getTopByProperty('encounter_count'),
 	condition: (scope) =>
 		scope.temporalUnit !== 'day' &&
-		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
+	rpcName: 'core_stats',
+	speciesUsed: 'present',
+	presence: {
+		species: null,
+		general: {
+			day: null,
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

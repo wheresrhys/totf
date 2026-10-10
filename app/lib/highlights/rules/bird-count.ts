@@ -37,5 +37,23 @@ export const birdCount: HighlightsGenerator = {
 		unit: 'bird',
 		category: 'count'
 	},
-	generator: getTopByProperty('bird_count')
+	generator: getTopByProperty('bird_count'),
+	rpcName: 'core_stats',
+	speciesUsed: 'none',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToAllTimeMonth: 3,
+					relativeToYear: 3
+				}
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

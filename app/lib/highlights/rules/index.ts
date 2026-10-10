@@ -26,3 +26,19 @@ export const highlightRules: HighlightsGenerator[] = [
 	heaviestOfSpecies,
 	lightestOfSpecies
 ];
+
+const rulesMap: Record<string, HighlightsGenerator> = {};
+
+highlightRules.forEach((rule) => {
+	rulesMap[rule.descriptor.type] = rule;
+});
+
+export const ruleTypes = highlightRules.map((rule) => rule.descriptor.type);
+
+export function getRule(ruleName: string): HighlightsGenerator {
+	const rule = rulesMap[ruleName];
+	if (!rule) {
+		throw new Error('bad rule name');
+	}
+	return rule;
+}

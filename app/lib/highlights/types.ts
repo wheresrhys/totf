@@ -14,9 +14,6 @@ export type EnhancedStatsRepository = StatsRepository & {
 	biometricsStatsBySpecies: Record<string, BiometricsStatsResult[]>;
 };
 
-export interface TimePeriodedItem {
-	time_period: string | null;
-}
 export type YearMonthRestriction = {
 	year?: number;
 	month?: number;
@@ -49,6 +46,7 @@ export type HighlightValue = {
 };
 
 export type SpeciesUnitMode = 'replace' | 'prefix' | undefined;
+
 export type HighlightDescriptor = {
 	category: HighlightCategory;
 	type: string;
@@ -71,10 +69,17 @@ export type HighlightsOfType = {
 };
 
 export type HighlightRanking = {
-	highlightIndex: number;
-	siblingHighlights: HighlightValue[];
 	position: number;
 	isTied: boolean;
+};
+
+export type HighlightValueWithRanking = HighlightValue & {
+	ranking: HighlightRanking;
+};
+
+export type NewHighlightValue = HighlightValueWithRanking & {
+	descriptor: HighlightDescriptor;
+	scope: HighlightScope;
 };
 
 export type CherryPickedHighlight = {
@@ -123,6 +128,9 @@ type HighlightsGeneratorFor<
 	descriptor: HighlightDescriptor;
 	limit?: number;
 	statsSelector: StatsSelectorKey;
+	rpcName: 'core_stats' | 'biometrics_stats';
+	speciesUsed: 'none' | 'present' | 'grouped';
+	presence?: HighlightPresenceConfig;
 	generator: (
 		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[],
 		scope?: HighlightScope
@@ -133,3 +141,77 @@ type HighlightsGeneratorFor<
 export type HighlightsGenerator = {
 	[StatsSelectorKey in keyof EnhancedStatsRepository]: HighlightsGeneratorFor<StatsSelectorKey>;
 }[keyof EnhancedStatsRepository];
+
+type HighlightPositionsLimit = 1 | 2 | 3;
+
+export type HighlightInitConfig = {
+	selfRelativeToParentMonth?: HighlightPositionsLimit;
+	selfRelativeToParentYear?: HighlightPositionsLimit;
+	selfRelativeToAllTimeMonth?: HighlightPositionsLimit;
+	selfRelativeToAllTime?: HighlightPositionsLimit;
+	childSessionsRelativeToSelf?: HighlightPositionsLimit;
+	childSessionsRelativeToParentYear?: HighlightPositionsLimit;
+	childSessionsRelativeToAllTimeMonth?: HighlightPositionsLimit;
+	childSessionsRelativeToAllTime?: HighlightPositionsLimit;
+	childMonthsRelativeToSelf?: HighlightPositionsLimit;
+	childMonthsRelativeToParentYear?: HighlightPositionsLimit;
+	childMonthsRelativeToAllTime?: HighlightPositionsLimit;
+};
+
+export type HighlightDataLake = {
+	relativeToAllTime?: number;
+	relativeToYear?: number;
+	relativeToAllTimeMonth?: number;
+	relativeToMonth?: number;
+};
+
+type AllTimeHighlightDataLake = Pick<HighlightDataLake, 'relativeToAllTime'>;
+type YearHighlightDataLake = Pick<
+	HighlightDataLake,
+	'relativeToAllTime' | 'relativeToYear'
+>;
+type MonthHighlightDataLake = Pick<
+	HighlightDataLake,
+	'relativeToAllTime' | 'relativeToYear' | 'relativeToMonth'
+>;
+
+type AllTimeMonthHighlightDataLake = Pick<
+	HighlightDataLake,
+	'relativeToAllTime' | 'relativeToAllTimeMonth'
+>;
+
+export type ExtendedTemporalUnit = TemporalUnit | 'all time' | 'all time month';
+export type HighlightIterator = 'perDay' | 'perMonth' | 'perYear';
+export type HighlightPageLevelPresence = Record<
+	HighlightIterator,
+	HighlightDataLake
+>;
+
+export type HighlightPresenceAtScopes = {
+	allTime: {
+		perYear?: AllTimeHighlightDataLake;
+		perMonth?: AllTimeHighlightDataLake;
+		perDay?: AllTimeHighlightDataLake;
+	} | null;
+	year: {
+		perYear?: AllTimeHighlightDataLake;
+		perMonth?: YearHighlightDataLake;
+		perDay?: YearHighlightDataLake;
+	} | null;
+	allTimeMonth: {
+		perMonth?: AllTimeMonthHighlightDataLake;
+		perDay?: AllTimeMonthHighlightDataLake;
+	} | null;
+	month: {
+		perMonth?: YearHighlightDataLake;
+		perDay?: MonthHighlightDataLake;
+	} | null;
+	day: {
+		perDay?: HighlightDataLake;
+	} | null;
+};
+
+type HighlightPresenceConfig = {
+	species: HighlightPresenceAtScopes | null;
+	general: HighlightPresenceAtScopes | null;
+};

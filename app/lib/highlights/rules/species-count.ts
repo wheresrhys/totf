@@ -27,5 +27,22 @@ export const speciesCount: HighlightsGenerator = {
 	},
 	generator: getTopByProperty('species_count'),
 	condition: (scope) =>
-		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
+	rpcName: 'core_stats',
+	speciesUsed: 'present',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToYear: 3
+				}
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

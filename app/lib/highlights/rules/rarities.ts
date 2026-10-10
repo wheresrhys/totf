@@ -59,7 +59,7 @@ export const rarities: HighlightsGenerator = {
 			];
 		}
 
-		if (totalEncounters <= 4 && !scope?.parentTimeWindow) {
+		if (totalEncounters <= 5 && !scope?.parentTimeWindow) {
 			return appearances.map((appearance, i) => ({
 				timePeriod: appearance.time_period,
 				value:
@@ -81,5 +81,22 @@ export const rarities: HighlightsGenerator = {
 	// A month-only window asks "of any February", which has no coherent reading
 	// as a first record — the earliest February a species appeared in is not a
 	// first of anything.
-	condition: (scope) => !scope.parentTimeWindow?.month
+	condition: (scope) => !scope.parentTimeWindow?.month,
+	rpcName: 'core_stats',
+	speciesUsed: 'grouped',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				perDay: {
+					relativeToAllTime: 1,
+					relativeToYear: 1
+				}
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };
