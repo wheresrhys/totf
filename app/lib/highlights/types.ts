@@ -204,7 +204,7 @@ export type HighlightPresenceAtScopes = {
 	} | null;
 	month: {
 		perMonth?: YearHighlightDataLake;
-		perDay?: MonthHighlightDataLake;
+		perDay?: HighlightDataLake;
 	} | null;
 	day: {
 		perDay?: HighlightDataLake;

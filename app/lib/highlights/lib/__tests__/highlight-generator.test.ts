@@ -74,12 +74,18 @@ describe('highlight-generator', () => {
 				groupId: 2,
 				includePerSpecies: true
 			});
-			expect(reporterRule.generator).toHaveBeenCalledWith([
-				{ time_period: '2020-03-01', bird_count: 1 },
-				{ time_period: '2020-04-01', bird_count: 2 },
-				{ time_period: '2021-03-01', bird_count: 1 },
-				{ time_period: '2021-04-01', bird_count: 2 }
-			]);
+			expect(reporterRule.generator).toHaveBeenCalledWith(
+				[
+					{ time_period: '2020-03-01', bird_count: 1 },
+					{ time_period: '2020-04-01', bird_count: 2 },
+					{ time_period: '2021-03-01', bird_count: 1 },
+					{ time_period: '2021-04-01', bird_count: 2 }
+				],
+				{
+					parentTimeWindow: undefined,
+					temporalUnit: 'day'
+				}
+			);
 		});
 		it('filters correctly for a year window', async () => {
 			await getHighlightsWithinTimeWindow({
@@ -88,10 +94,18 @@ describe('highlight-generator', () => {
 				includePerSpecies: true,
 				parentTimeWindow: { year: 2020 }
 			});
-			expect(reporterRule.generator).toHaveBeenCalledWith([
-				{ time_period: '2020-03-01', bird_count: 1 },
-				{ time_period: '2020-04-01', bird_count: 2 }
-			]);
+			expect(reporterRule.generator).toHaveBeenCalledWith(
+				[
+					{ time_period: '2020-03-01', bird_count: 1 },
+					{ time_period: '2020-04-01', bird_count: 2 }
+				],
+				{
+					parentTimeWindow: {
+						year: 2020
+					},
+					temporalUnit: 'day'
+				}
+			);
 		});
 		it('filters correctly for a month window', async () => {
 			await getHighlightsWithinTimeWindow({
@@ -100,10 +114,18 @@ describe('highlight-generator', () => {
 				includePerSpecies: true,
 				parentTimeWindow: { month: 3 }
 			});
-			expect(reporterRule.generator).toHaveBeenCalledWith([
-				{ time_period: '2020-03-01', bird_count: 1 },
-				{ time_period: '2021-03-01', bird_count: 1 }
-			]);
+			expect(reporterRule.generator).toHaveBeenCalledWith(
+				[
+					{ time_period: '2020-03-01', bird_count: 1 },
+					{ time_period: '2021-03-01', bird_count: 1 }
+				],
+				{
+					parentTimeWindow: {
+						month: 3
+					},
+					temporalUnit: 'day'
+				}
+			);
 		});
 		it('filters correctly for a year and month window', async () => {
 			await getHighlightsWithinTimeWindow({
@@ -112,9 +134,16 @@ describe('highlight-generator', () => {
 				includePerSpecies: true,
 				parentTimeWindow: { year: 2020, month: 3 }
 			});
-			expect(reporterRule.generator).toHaveBeenCalledWith([
-				{ time_period: '2020-03-01', bird_count: 1 }
-			]);
+			expect(reporterRule.generator).toHaveBeenCalledWith(
+				[{ time_period: '2020-03-01', bird_count: 1 }],
+				{
+					parentTimeWindow: {
+						month: 3,
+						year: 2020
+					},
+					temporalUnit: 'day'
+				}
+			);
 		});
 	});
 

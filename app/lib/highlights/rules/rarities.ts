@@ -40,9 +40,11 @@ export const rarities: HighlightsGenerator = {
 	},
 	generator: (
 		stats: CoreStatsResult[],
-		scope: HighlightScope | undefined
+		scope?: HighlightScope
 	): Omit<HighlightValue, 'descriptor'>[] => {
 		const appearances = getAppearances(stats);
+		const isAllTime = !Boolean(scope?.parentTimeWindow);
+		const rarityAppearancesThreshold = isAllTime ? 5 : 2;
 		if (!appearances.length) return [];
 		const totalEncounters = appearances.reduce(
 			(total, { encounter_count }) => total + encounter_count,
@@ -59,7 +61,7 @@ export const rarities: HighlightsGenerator = {
 			];
 		}
 
-		if (totalEncounters <= 5 && !scope?.parentTimeWindow) {
+		if (totalEncounters <= rarityAppearancesThreshold) {
 			return appearances.map((appearance, i) => ({
 				timePeriod: appearance.time_period,
 				value:

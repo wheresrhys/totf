@@ -50,10 +50,40 @@ export const birdCount: HighlightsGenerator = {
 					relativeToYear: 3
 				}
 			},
-			month: null,
-			year: null,
-			allTimeMonth: null,
-			allTime: null
+			allTime: {
+				perYear: {
+					relativeToAllTime: 1
+				},
+				perMonth: {
+					relativeToAllTime: 1
+				},
+				perDay: {
+					relativeToAllTime: 3
+				}
+			},
+			year: {
+				perMonth: {
+					relativeToAllTime: 1
+				},
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToYear: 3
+				}
+			},
+			allTimeMonth: {
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToAllTimeMonth: 3
+				}
+			},
+			month: {
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToYear: 3,
+					relativeToAllTimeMonth: 3,
+					relativeToMonth: 1
+				}
+			}
 		}
 	}
 };

@@ -14,7 +14,10 @@ import type { SessionTabParams } from './session-tab-config';
 // fetched in the browser.
 export function renderCombinedHighlights(highlights: CombinedHighlight[]) {
 	return highlights.map((highlight: CombinedHighlight) => (
-		<li key={`${highlight.descriptor.type}-${highlight.species}`}>
+		<li
+			key={`${highlight.descriptor.type}-${highlight.species}`}
+			title={JSON.stringify(highlight, null, 2)}
+		>
 			{highlight.formatters.combinedHighlightPrinter(highlight)}
 		</li>
 	));
