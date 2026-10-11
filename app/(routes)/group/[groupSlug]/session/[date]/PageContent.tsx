@@ -29,6 +29,9 @@ export type PageParams = {
 	// always: the only session tab with a `dataFetcher` is Highlights, and it is
 	// `clientSideOnly` by design (see `sessionTabPrefetchers`).
 	prefetchedTabData?: { tabId: string; data: unknown };
+	// Whether to show a "Report" button on each rendered highlight (#1122),
+	// resolved server-side by page.tsx and forwarded onto SessionTabParams.
+	canReportHighlights: boolean;
 };
 
 export type AdjacentSessionDates = {
@@ -144,7 +147,7 @@ function SessionNavigation({
 
 export function SessionPageContent({
 	data: dayData,
-	params: { date, tabId, prefetchedTabData },
+	params: { date, tabId, prefetchedTabData, canReportHighlights },
 	viewedGroup
 }: {
 	data: DayData;
@@ -170,7 +173,8 @@ export function SessionPageContent({
 		mistNetSpeciesList,
 		otherCatchesSpeciesList,
 		netRounds: chronology.netRounds,
-		oldestEncounter
+		oldestEncounter,
+		canReportHighlights
 	};
 
 	if (dayData.encounters.length === 0) {

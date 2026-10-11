@@ -46,7 +46,8 @@ export function SummaryPageContent({
 	fromDate,
 	toDate,
 	initialTabId,
-	initialTabData
+	initialTabData,
+	canReportHighlights = false
 }: {
 	year?: number;
 	month?: number;
@@ -80,6 +81,11 @@ export function SummaryPageContent({
 	// `prefetchActiveTabData` wiring), passed straight through to whichever
 	// totals section this branch renders.
 	initialTabData?: { tabId: string; data: unknown };
+	// Whether to show a "Report" button on each rendered highlight in the
+	// Records section (#1122) — resolved server-side by each page.tsx. Only
+	// the non-squashed-month branch (`SummaryTotalsSection`) reads this; the
+	// squashed-month branch renders no Records section at all.
+	canReportHighlights?: boolean;
 }) {
 	return (
 		<PageWrapper>
@@ -115,6 +121,7 @@ export function SummaryPageContent({
 					month={month}
 					initialTabId={initialTabId}
 					initialTabData={initialTabData}
+					canReportHighlights={canReportHighlights}
 				/>
 			)}
 		</PageWrapper>

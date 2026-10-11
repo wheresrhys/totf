@@ -18,6 +18,13 @@ vi.mock('@/app/lib/highlights/lib/hg2', () => ({
 	getAllHighlightsAcrossScopes: vi.fn()
 }));
 
+// Each rendered highlight's ReportHighlightButton (#1122) renders
+// ReportHighlightModal, which imports the real server action — mock it so
+// importing the tree doesn't pull that in, same as PromoteControlButton.test.tsx.
+vi.mock('@/app/actions/highlight-reports', () => ({
+	reportHighlight: vi.fn()
+}));
+
 // A v2 highlight carries its own printer, so the sentence a section renders is
 // whatever that printer returns — a test double here returning a fixed
 // sentence, not the real v2 formatting logic (covered by the v2 pipeline's own
@@ -64,14 +71,16 @@ function makeOldestEncounter(provenAge: number): SessionEncounter {
 
 function renderSessionHighlights({
 	highlights = [] as CombinedHighlight[] | null,
-	oldestEncounter = null as SessionEncounter | null
+	oldestEncounter = null as SessionEncounter | null,
+	canReportHighlights = false
 } = {}) {
 	const params = {
 		date: '2024-09-15',
 		mistNetSpeciesList: [],
 		otherCatchesSpeciesList: [],
 		netRounds: [],
-		oldestEncounter
+		oldestEncounter,
+		canReportHighlights
 	} satisfies SessionTabParams;
 	return render(<SessionHighlights params={params} data={highlights} />);
 }
@@ -200,5 +209,23 @@ describe('SessionHighlights', () => {
 	it('renders nothing when there are no highlights and no oldest encounter', () => {
 		const { container } = renderSessionHighlights();
 		expect(container.innerHTML).toBe('');
+	});
+
+	describe('report button (#1122)', () => {
+		it('renders no report button when canReportHighlights is false', () => {
+			renderSessionHighlights({
+				highlights: [RARITY_HIGHLIGHT],
+				canReportHighlights: false
+			});
+			expect(screen.queryByRole('button', { name: 'Report' })).toBeNull();
+		});
+
+		it('renders a report button per highlight when canReportHighlights is true', () => {
+			renderSessionHighlights({
+				highlights: [RARITY_HIGHLIGHT, COUNT_HIGHLIGHT],
+				canReportHighlights: true
+			});
+			expect(screen.getAllByRole('button', { name: 'Report' })).toHaveLength(2);
+		});
 	});
 });

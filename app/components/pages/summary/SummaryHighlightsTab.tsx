@@ -37,7 +37,7 @@ export const summaryHighlightsTab: TabConfig<
 	// server-prefetched payload could never cross the boundary back into this
 	// client component anyway. See `summary-tab-prefetchers.ts`.
 	clientSideOnly: true,
-	TabComponent: ({ data, viewedGroup }) => (
+	TabComponent: ({ data, viewedGroup, params }) => (
 		<div>
 			{data && (
 				<>
@@ -45,7 +45,10 @@ export const summaryHighlightsTab: TabConfig<
 						<>
 							<h2>Records</h2>
 							<BoxyList>
-								{renderCombinedHighlights(data.localHighlights)}
+								{renderCombinedHighlights(
+									data.localHighlights,
+									params.canReportHighlights ?? false
+								)}
 							</BoxyList>
 						</>
 					)}
