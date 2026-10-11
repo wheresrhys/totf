@@ -22,9 +22,12 @@ async function fetchHighlightReports(): Promise<HighlightReportRow[]> {
 
 // Deliberately unlinked admin listing of every submitted highlight report
 // (#1122) — gated by the same production + qa cookie check as the report
-// button itself, so there's nothing new to lock down here. Not following the
-// usual page/PageContent/dataFetcher split: this page has no client-
-// interactive content at all, so that split would be pure overhead.
+// button itself, so there's nothing new to lock down here. Visiting this page
+// in production is itself the activation step for the cookie: `proxy.ts` sets
+// it on the request before this component ever runs, since a Server
+// Component can't set cookies itself. Not following the usual
+// page/PageContent/dataFetcher split: this page has no client-interactive
+// content at all, so that split would be pure overhead.
 export default async function HighlightReportsAdminPage() {
 	if (!(await canReportHighlights())) {
 		notFound();
