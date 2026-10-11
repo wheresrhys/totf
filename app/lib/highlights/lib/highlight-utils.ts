@@ -71,6 +71,17 @@ export function filterStats({
 	return filteredStats;
 }
 
+export function getTemporalUnitFromTimeWindow(window: YearMonthRestriction) {
+	if (window.year && window.month) {
+		return 'month';
+	} else if (window.year) {
+		return 'year';
+	} else if (window.month) {
+		return 'all time month';
+	}
+	return 'all time';
+}
+
 function timeWindowToNumber(
 	timeWindow: YearMonthRestriction | undefined
 ): number {
@@ -156,15 +167,18 @@ export function getHighlightsOfTypeFromStatsRows({
 	rule,
 	stats,
 	timeWindowFilter,
-	limit
+	limit,
+	scope
 }: {
 	rule: HighlightsGenerator;
 	stats: (CoreStatsResult | BiometricsStatsResult)[];
 	limit: number;
 	timeWindowFilter: (timePeriod: string) => boolean;
+	scope: HighlightScope;
 }): HighlightValue[] {
 	const highlights = rule.generator(
-		stats as CoreStatsResult[] & BiometricsStatsResult[]
+		stats as CoreStatsResult[] & BiometricsStatsResult[],
+		scope
 	);
 
 	return limitHighlights(highlights, limit).filter(({ timePeriod }) =>

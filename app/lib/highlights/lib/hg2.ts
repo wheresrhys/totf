@@ -94,35 +94,38 @@ async function getScopedHighlightsOfType({
 
 	if (rule.speciesUsed === 'grouped') {
 		const dataPerSpecies = groupByColumn('species_name', filteredStats);
-		return Object.entries(dataPerSpecies).flatMap(
-			([species, data]) =>
-				getHighlightsOfTypeFromStatsRows({
-					rule,
-					stats: data,
-					limit,
-					timeWindowFilter: samplesTimeWindowFilter
-				}).map((value) => ({
-					...value,
-					scope: {
-						temporalUnit,
-						species,
-						parentTimeWindow: lakeTimeWindow
-					},
-					descriptor: rule.descriptor
-				})) as NewHighlightValue[]
-		);
+		return Object.entries(dataPerSpecies).flatMap(([species, data]) => {
+			const scope = {
+				temporalUnit,
+				species,
+				parentTimeWindow: lakeTimeWindow
+			};
+			return getHighlightsOfTypeFromStatsRows({
+				rule,
+				stats: data,
+				limit,
+				timeWindowFilter: samplesTimeWindowFilter,
+				scope
+			}).map((value) => ({
+				...value,
+				scope,
+				descriptor: rule.descriptor
+			})) as NewHighlightValue[];
+		});
 	} else {
+		const scope = {
+			temporalUnit,
+			parentTimeWindow: lakeTimeWindow
+		};
 		return getHighlightsOfTypeFromStatsRows({
 			rule,
 			stats: filteredStats,
 			limit,
-			timeWindowFilter: samplesTimeWindowFilter
+			timeWindowFilter: samplesTimeWindowFilter,
+			scope
 		}).map((value) => ({
 			...value,
-			scope: {
-				temporalUnit,
-				parentTimeWindow: lakeTimeWindow
-			},
+			scope,
 			descriptor: rule.descriptor
 		})) as NewHighlightValue[];
 	}
@@ -210,27 +213,6 @@ export async function getHighlightsOfTypeAcrossScopes({
 	).flatMap((data) => data);
 }
 
-export async function getAllHighlightsAcrossScopes(options: {
-	timePeriod: string;
-	temporalUnit: ExtendedTemporalUnit;
-	viewedGroup: ViewedGroup;
-	species?: string;
-}) {
-	const allHighlights = await Promise.all(
-		ruleTypes.map(async (type) => {
-			const allHighlightsOfType = await getHighlightsOfTypeAcrossScopes({
-				highlightType: type,
-				...options
-			});
-			const significantHighlights =
-				removeLessSignificantHighlights(allHighlightsOfType);
-			const combined = combineSimilarHighlights(significantHighlights, type);
-			return combined;
-		})
-	);
-	return sortHighlights(allHighlights.flatMap((x) => x));
-}
-
 function removeLessSignificantHighlights(
 	highlights: NewHighlightValue[]
 ): NewHighlightValue[] {
@@ -247,6 +229,7 @@ function removeLessSignificantHighlights(
 				potentialClobber.descriptor.type === highlight.descriptor.type &&
 				potentialClobber.descriptor.category ===
 					highlight.descriptor.category &&
+				potentialClobber.scope.temporalUnit === highlight.scope.temporalUnit &&
 				potentialClobber.scope.species === highlight.scope.species &&
 				// clobberer must be higher ranked than subject, e.g. can't  clobber 1st place with 2nd place
 				potentialClobber.ranking.position >= highlight.ranking.position &&
@@ -302,4 +285,25 @@ function combineSimilarHighlights(
 			}))
 		};
 	});
+}
+
+export async function getAllHighlightsAcrossScopes(options: {
+	timePeriod: string;
+	temporalUnit: ExtendedTemporalUnit;
+	viewedGroup: ViewedGroup;
+	species?: string;
+}) {
+	const allHighlights = await Promise.all(
+		ruleTypes.map(async (type) => {
+			const allHighlightsOfType = await getHighlightsOfTypeAcrossScopes({
+				highlightType: type,
+				...options
+			});
+			const significantHighlights =
+				removeLessSignificantHighlights(allHighlightsOfType);
+			const combined = combineSimilarHighlights(significantHighlights, type);
+			return combined;
+		})
+	);
+	return sortHighlights(allHighlights.flatMap((x) => x));
 }

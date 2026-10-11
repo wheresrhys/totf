@@ -52,7 +52,8 @@ function generateAllHighlights({
 						rule,
 						stats: workingStats,
 						limit: rule.limit ? Math.min(rule.limit, limit) : limit,
-						timeWindowFilter: () => true
+						timeWindowFilter: () => true,
+						scope
 					})
 				};
 			} else {
@@ -60,17 +61,19 @@ function generateAllHighlights({
 				return Object.entries(workingStats).map(
 					([species, workingStatsChild]) => {
 						if (!workingStatsChild.length) return null;
+						const speciesScope = {
+							...scope,
+							species
+						};
 						return {
 							...rule,
-							scope: {
-								...scope,
-								species
-							},
+							scope: speciesScope,
 							values: getHighlightsOfTypeFromStatsRows({
 								rule,
 								stats: workingStatsChild,
 								limit: rule.limit ? Math.min(rule.limit, limit) : limit,
-								timeWindowFilter: () => true
+								timeWindowFilter: () => true,
+								scope: speciesScope
 							})
 						} as HighlightsOfType;
 					}
