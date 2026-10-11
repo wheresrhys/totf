@@ -15,6 +15,7 @@ import {
 	YEAR_TOTALS_TAB_ID
 } from '@/app/components/pages/summary/summary-tab-prefetchers';
 import type { SummaryTabParams } from '@/app/components/pages/summary/summary-tab-params';
+import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
 import { SummaryPageContent } from './PageContent';
@@ -22,7 +23,7 @@ import { SummaryPageContent } from './PageContent';
 // `tabId` (#804, reusing #803's mechanism) is the optional `?tabId=` search
 // param — it never affects `getCacheKeys`, only which tab
 // `SummaryTotalsSection` focuses/loads first.
-export type PageParams = { tabId?: string };
+export type PageParams = { tabId?: string; canReportHighlights?: boolean };
 type PageProps = { searchParams?: Promise<{ tabId?: string }> };
 
 export type PageData = {
@@ -33,7 +34,10 @@ export type PageData = {
 
 async function getSummaryPageParams(pageProps: PageProps): Promise<PageParams> {
 	const tabId = await readTabIdSearchParam(pageProps.searchParams);
-	return tabId ? { tabId } : {};
+	return {
+		...(tabId ? { tabId } : {}),
+		canReportHighlights: await canReportHighlights()
+	};
 }
 
 export async function fetchSummaryPageContent(
@@ -59,7 +63,10 @@ export async function fetchSummaryPageContent(
 	>(
 		allTimeSummaryPrefetchers,
 		activeTabId,
-		{ totalsStats: undefined },
+		// `canReportHighlights` is never read by any `dataFetcher` either (same
+		// reasoning as `totalsStats` above) — the real value reaches the page
+		// via `params.canReportHighlights` below, not through this stub.
+		{ totalsStats: undefined, canReportHighlights: false },
 		viewedGroup
 	);
 	return { summaryStats, yearlyTotals, initialTabData };
@@ -82,6 +89,7 @@ function AllTimeSummary({
 			viewedGroup={viewedGroup}
 			initialTabId={params.tabId}
 			initialTabData={data.initialTabData}
+			canReportHighlights={params.canReportHighlights}
 		/>
 	);
 }

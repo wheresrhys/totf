@@ -46,4 +46,9 @@ export type SummaryTabParams = {
 	// pre-gated `totalsStats` via their own per-tab `params` override) all 3
 	// prop-fed tabs share this same object.
 	tabsWithTotalsRow?: Record<string, boolean>;
+	// Whether to show a "Report" button on each rendered highlight in the
+	// Records section (#1122) — resolved server-side (production + a qa
+	// cookie) by `SummaryPageContent` and threaded through here. `undefined`
+	// (every call site but the real page render) is treated as `false`.
+	canReportHighlights?: boolean;
 };

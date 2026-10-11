@@ -31,6 +31,11 @@ export type SessionTabParams = {
 	otherCatchesSpeciesList: SpeciesWithEncounters[];
 	netRounds: NetRound[];
 	oldestEncounter: SessionEncounter | null;
+	// Whether to show a "Report" button on each rendered highlight (#1122) —
+	// resolved server-side (production + a qa cookie) and threaded down through
+	// this shared params object since it's the only prop every session tab's
+	// TabComponent, including the clientSideOnly Highlights tab, receives.
+	canReportHighlights: boolean;
 };
 
 export async function fetchSessionHighlights(

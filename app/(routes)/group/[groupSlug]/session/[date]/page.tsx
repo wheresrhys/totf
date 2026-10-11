@@ -8,6 +8,7 @@ import {
 	readTabIdSearchParam
 } from '@/app/lib/tab-query-param';
 import { sessionTabPrefetchers } from '@/app/components/pages/session/session-tab-config';
+import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionEncounter } from '@/app/models/session';
 import type { LocationRow } from '@/app/models/db';
@@ -201,6 +202,7 @@ export default withGroupScope<{ date: string }>(
 			viewedGroup={viewedGroup}
 			getParams={async () => ({
 				date: params.date,
+				canReportHighlights: await canReportHighlights(),
 				...(await resolveSessionTabParams(
 					params.date,
 					viewedGroup,

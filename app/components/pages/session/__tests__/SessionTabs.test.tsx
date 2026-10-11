@@ -91,6 +91,7 @@ function renderSessionTabs(
 		netRounds,
 		oldestEncounter: null as SessionEncounter | null,
 		date: '2024-09-15',
+		canReportHighlights: false,
 		...overrides
 	};
 	return render(
