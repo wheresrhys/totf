@@ -211,6 +211,33 @@ export type Database = {
           },
         ]
       }
+      HighlightReports: {
+        Row: {
+          created_at: string
+          highlight_body: Json
+          highlight_text: string
+          id: number
+          page_url: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          highlight_body: Json
+          highlight_text: string
+          id?: number
+          page_url: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          highlight_body?: Json
+          highlight_text?: string
+          id?: number
+          page_url?: string
+          reason?: string
+        }
+        Relationships: []
+      }
       Locations: {
         Row: {
           id: number
