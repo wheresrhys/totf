@@ -1,6 +1,7 @@
 'use server';
 
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { Json } from '@/types/supabase.types';
 
@@ -37,6 +38,7 @@ export async function reportHighlight(
 	}
 
 	try {
+		const supabase = await getAuthenticatedSupabaseClient();
 		await supabase
 			.from('HighlightReports')
 			.insert({

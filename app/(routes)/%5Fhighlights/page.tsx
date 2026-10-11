@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { catchSupabaseErrors } from '@/lib/supabase';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { canReportHighlights } from '@/app/lib/qa-reporting';
 import {
 	PageWrapper,
@@ -11,6 +12,7 @@ type HighlightReportRow =
 	Database['public']['Tables']['HighlightReports']['Row'];
 
 async function fetchHighlightReports(): Promise<HighlightReportRow[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
 	return (await supabase
 		.from('HighlightReports')
 		.select('*')

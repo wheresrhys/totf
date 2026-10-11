@@ -18,8 +18,11 @@ vi.mock('@/app/lib/qa-reporting', () => ({
 	canReportHighlights: mockCanReportHighlights
 }));
 
+vi.mock('@/app/lib/auth/group-auth', () => ({
+	getAuthenticatedSupabaseClient: vi.fn().mockResolvedValue({ from: mockFrom })
+}));
+
 vi.mock('@/lib/supabase', () => ({
-	supabase: { from: mockFrom },
 	catchSupabaseErrors: ({
 		data,
 		error
