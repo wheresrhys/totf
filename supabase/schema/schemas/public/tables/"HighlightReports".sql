@@ -9,20 +9,19 @@ CREATE TABLE public."HighlightReports" (
 	created_at timestamptz NOT NULL DEFAULT NOW()
 );
 
-COMMENT ON TABLE public."HighlightReports" IS 'QA-submitted reports of bad/wrong highlight output, submitted anonymously from production behind a qa cookie gate';
+COMMENT ON TABLE public."HighlightReports" IS 'QA-submitted reports of bad/wrong highlight output, submitted from production behind a qa cookie gate';
 
--- Public, unauthenticated reporting: anyone can submit a report and anyone can read the list back
--- (the admin page at /_highlights relies on this to use the plain anon client). No UPDATE/DELETE
--- policy, so reports are append-only via the API.
-CREATE POLICY highlight_reports_insert ON public."HighlightReports" FOR INSERT TO anon,
-authenticated
+-- Every authenticated group is authorised to insert and read reports — no
+-- group scoping needed, and no anon access (reports always come from a
+-- logged-in group, see "Species".sql for the same authenticated-only shape).
+-- No UPDATE/DELETE policy, so reports are append-only via the API.
+CREATE POLICY highlight_reports_insert ON public."HighlightReports" FOR INSERT TO authenticated
 WITH
 	CHECK (TRUE);
 
 CREATE POLICY highlight_reports_select ON public."HighlightReports" FOR
 SELECT
-	TO anon,
-	authenticated USING (TRUE);
+	TO authenticated USING (TRUE);
 
 ALTER SEQUENCE public."HighlightReports_id_seq" OWNED BY public."HighlightReports".id;
 
@@ -30,8 +29,6 @@ ALTER TABLE public."HighlightReports" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public."HighlightReports"
 ADD CONSTRAINT "HighlightReports_pkey" PRIMARY KEY (id);
-
-GRANT ALL ON public."HighlightReports" TO anon;
 
 GRANT ALL ON public."HighlightReports" TO authenticated;
 
