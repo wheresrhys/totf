@@ -1,12 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { reportHighlight } from '../highlight-reports';
+import { reportHighlight, dismissHighlightReport } from '../highlight-reports';
 
-const { mockCanReportHighlights, mockInsert, mockFrom } = vi.hoisted(() => {
-	const mockCanReportHighlights = vi.fn();
-	const mockInsert = vi.fn();
-	const mockFrom = vi.fn(() => ({ insert: mockInsert }));
-	return { mockCanReportHighlights, mockInsert, mockFrom };
-});
+const { mockCanReportHighlights, mockInsert, mockUpdate, mockEq, mockFrom } =
+	vi.hoisted(() => {
+		const mockCanReportHighlights = vi.fn();
+		const mockInsert = vi.fn();
+		const mockEq = vi.fn();
+		const mockUpdate = vi.fn(() => ({ eq: mockEq }));
+		const mockFrom = vi.fn(() => ({ insert: mockInsert, update: mockUpdate }));
+		return {
+			mockCanReportHighlights,
+			mockInsert,
+			mockUpdate,
+			mockEq,
+			mockFrom
+		};
+	});
 
 vi.mock('@/app/lib/qa-reporting', () => ({
 	canReportHighlights: mockCanReportHighlights
@@ -135,6 +144,81 @@ describe('reportHighlight', () => {
 				pageUrl: VALID_FIELDS.pageUrl,
 				highlightText: VALID_FIELDS.highlightText
 			})
+		);
+
+		consoleErrorSpy.mockRestore();
+	});
+});
+
+function makeDismissFormData(reportId: number): FormData {
+	const fd = new FormData();
+	fd.append('reportId', String(reportId));
+	return fd;
+}
+
+describe('dismissHighlightReport', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockCanReportHighlights.mockResolvedValue(true);
+		mockEq.mockReturnValue({
+			then: (resolve: (v: { data: null; error: null }) => unknown) =>
+				Promise.resolve({ data: null, error: null }).then(resolve)
+		});
+	});
+
+	it('returns a failure state without updating when canReportHighlights is false', async () => {
+		mockCanReportHighlights.mockResolvedValue(false);
+
+		const result = await dismissHighlightReport(null, makeDismissFormData(1));
+
+		expect(result).toEqual({
+			success: false,
+			error: 'Reporting is not enabled'
+		});
+		expect(mockFrom).not.toHaveBeenCalled();
+	});
+
+	it('returns a failure state for a malformed report id', async () => {
+		const result = await dismissHighlightReport(null, makeDismissFormData(NaN));
+
+		expect(result).toEqual({
+			success: false,
+			error: 'Malformed report id'
+		});
+		expect(mockFrom).not.toHaveBeenCalled();
+	});
+
+	it('updates is_dismissed to true and returns success for a valid id', async () => {
+		const result = await dismissHighlightReport(null, makeDismissFormData(42));
+
+		expect(result).toEqual({ success: true });
+		expect(mockFrom).toHaveBeenCalledWith('HighlightReports');
+		expect(mockUpdate).toHaveBeenCalledWith({ is_dismissed: true });
+		expect(mockEq).toHaveBeenCalledWith('id', 42);
+	});
+
+	it('logs the error with metadata and returns a failure state when the Supabase update fails', async () => {
+		const consoleErrorSpy = vi
+			.spyOn(console, 'error')
+			.mockImplementation(() => {});
+		mockEq.mockReturnValue({
+			then: (
+				resolve: (v: { data: null; error: { message: string } }) => unknown
+			) =>
+				Promise.resolve({ data: null, error: { message: 'boom' } }).then(
+					resolve
+				)
+		});
+
+		const result = await dismissHighlightReport(null, makeDismissFormData(42));
+
+		expect(result).toEqual({
+			success: false,
+			error: 'Failed to dismiss report'
+		});
+		expect(consoleErrorSpy).toHaveBeenCalledWith(
+			'Failed to dismiss highlight report',
+			expect.objectContaining({ reportId: 42 })
 		);
 
 		consoleErrorSpy.mockRestore();
