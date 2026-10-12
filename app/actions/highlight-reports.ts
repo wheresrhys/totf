@@ -58,3 +58,38 @@ export async function reportHighlight(
 		return { success: false, error: 'Failed to submit report' };
 	}
 }
+
+export type DismissHighlightReportState =
+	| { success: true }
+	| { success: false; error: string }
+	| null;
+
+export async function dismissHighlightReport(
+	_prevState: DismissHighlightReportState,
+	formData: FormData
+): Promise<DismissHighlightReportState> {
+	if (!(await canReportHighlights())) {
+		return { success: false, error: 'Reporting is not enabled' };
+	}
+
+	const reportId = Number(formData.get('reportId'));
+	if (!Number.isFinite(reportId)) {
+		return { success: false, error: 'Malformed report id' };
+	}
+
+	try {
+		const supabase = await getAuthenticatedSupabaseClient();
+		await supabase
+			.from('HighlightReports')
+			.update({ is_dismissed: true })
+			.eq('id', reportId)
+			.then(catchSupabaseErrors);
+		return { success: true };
+	} catch (error) {
+		console.error('Failed to dismiss highlight report', {
+			reportId,
+			error
+		});
+		return { success: false, error: 'Failed to dismiss report' };
+	}
+}

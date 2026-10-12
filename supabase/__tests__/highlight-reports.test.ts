@@ -1,9 +1,10 @@
 /**
  * Integration tests for HighlightReports RLS.
  *
- * Every authenticated group can insert a report and read reports back — no
- * group scoping, no anon access (reports always come from a logged-in
- * group). No UPDATE/DELETE policy exists, so reports are append-only. See
+ * Every authenticated group can insert a report, read reports back and
+ * update is_dismissed — no group scoping, no anon access (reports always
+ * come from a logged-in group). There is still no DELETE policy, so a report
+ * can be dismissed but never removed. See
  * supabase/schema/schemas/public/tables/"HighlightReports".sql.
  *
  * Requires local Supabase running:
@@ -75,14 +76,10 @@ describe('HighlightReports RLS', () => {
 		expect(error).not.toBeNull();
 	});
 
-	it('silently no-ops an update or delete against an existing report (no UPDATE/DELETE policy)', async () => {
-		// With no UPDATE/DELETE policy, RLS filters the target row out of the
-		// statement entirely — PostgREST reports this as a successful no-op (zero
-		// rows affected, no error), not a permissions error. Confirmed against the
-		// real local database rather than assumed.
+	it('allows an authenticated group to dismiss a report (sets is_dismissed)', async () => {
 		const alphaId = await getGroupIdByName('Alpha');
 		const authenticatedClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
-		const highlightText = `Immutable highlight ${randomTestSuffix()}`;
+		const highlightText = `Dismissable highlight ${randomTestSuffix()}`;
 		const { data: inserted, error: insertError } = await authenticatedClient
 			.from('HighlightReports')
 			.insert({
@@ -97,9 +94,68 @@ describe('HighlightReports RLS', () => {
 
 		const { error: updateError } = await authenticatedClient
 			.from('HighlightReports')
-			.update({ reason: 'Changed reason' })
+			.update({ is_dismissed: true })
 			.eq('id', inserted!.id);
 		expect(updateError).toBeNull();
+
+		const { data: afterwards, error: selectError } = await authenticatedClient
+			.from('HighlightReports')
+			.select('is_dismissed')
+			.eq('id', inserted!.id)
+			.single();
+		expect(selectError).toBeNull();
+		expect(afterwards?.is_dismissed).toBe(true);
+	});
+
+	it('rejects an anonymous client updating is_dismissed', async () => {
+		const alphaId = await getGroupIdByName('Alpha');
+		const authenticatedClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
+		const highlightText = `Anon-update-rejected highlight ${randomTestSuffix()}`;
+		const { data: inserted, error: insertError } = await authenticatedClient
+			.from('HighlightReports')
+			.insert({
+				page_url: `https://example.test/species-${randomTestSuffix()}`,
+				highlight_text: highlightText,
+				reason: 'Initial reason',
+				highlight_body: { descriptor: { type: 'test' } }
+			})
+			.select('id')
+			.single();
+		expect(insertError).toBeNull();
+
+		await supabase
+			.from('HighlightReports')
+			.update({ is_dismissed: true })
+			.eq('id', inserted!.id);
+
+		const { data: afterwards, error: selectError } = await authenticatedClient
+			.from('HighlightReports')
+			.select('is_dismissed')
+			.eq('id', inserted!.id)
+			.single();
+		expect(selectError).toBeNull();
+		expect(afterwards?.is_dismissed).toBe(false);
+	});
+
+	it('silently no-ops a delete against an existing report (no DELETE policy)', async () => {
+		// With no DELETE policy, RLS filters the target row out of the statement
+		// entirely — PostgREST reports this as a successful no-op (zero rows
+		// affected, no error), not a permissions error. Confirmed against the
+		// real local database rather than assumed.
+		const alphaId = await getGroupIdByName('Alpha');
+		const authenticatedClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
+		const highlightText = `Undeletable highlight ${randomTestSuffix()}`;
+		const { data: inserted, error: insertError } = await authenticatedClient
+			.from('HighlightReports')
+			.insert({
+				page_url: `https://example.test/species-${randomTestSuffix()}`,
+				highlight_text: highlightText,
+				reason: 'Initial reason',
+				highlight_body: { descriptor: { type: 'test' } }
+			})
+			.select('id')
+			.single();
+		expect(insertError).toBeNull();
 
 		const { error: deleteError } = await authenticatedClient
 			.from('HighlightReports')

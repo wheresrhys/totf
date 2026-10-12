@@ -217,6 +217,7 @@ export type Database = {
           highlight_body: Json
           highlight_text: string
           id: number
+          is_dismissed: boolean
           page_url: string
           reason: string
         }
@@ -225,6 +226,7 @@ export type Database = {
           highlight_body: Json
           highlight_text: string
           id?: number
+          is_dismissed?: boolean
           page_url: string
           reason: string
         }
@@ -233,6 +235,7 @@ export type Database = {
           highlight_body?: Json
           highlight_text?: string
           id?: number
+          is_dismissed?: boolean
           page_url?: string
           reason?: string
         }

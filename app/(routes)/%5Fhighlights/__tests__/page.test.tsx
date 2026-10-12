@@ -9,9 +9,11 @@ const { mockCanReportHighlights, mockNotFound, mockFrom } = vi.hoisted(() => {
 });
 
 // Local override of the global next/navigation mock (vitest.setup.tsx) — this
-// page needs notFound(), which the global mock doesn't provide.
+// page needs notFound(), which the global mock doesn't provide, and
+// DismissHighlightReportButton (rendered per report) needs useRouter.
 vi.mock('next/navigation', () => ({
-	notFound: mockNotFound
+	notFound: mockNotFound,
+	useRouter: () => ({ refresh: vi.fn() })
 }));
 
 vi.mock('@/app/lib/qa-reporting', () => ({
@@ -59,6 +61,7 @@ const REPORT_ROWS = [
 function mockSelectChain(rows: typeof REPORT_ROWS) {
 	const chain: Record<string, unknown> = {
 		select: vi.fn(() => chain),
+		eq: vi.fn(() => chain),
 		order: vi.fn(() => chain),
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({ data: rows, error: null }).then(resolve)
@@ -89,6 +92,7 @@ describe('HighlightReportsAdminPage', () => {
 		render(page);
 
 		expect(mockFrom).toHaveBeenCalledWith('HighlightReports');
+		expect(chain.eq).toHaveBeenCalledWith('is_dismissed', false);
 		expect(chain.order).toHaveBeenCalledWith('created_at', {
 			ascending: false
 		});
