@@ -23,11 +23,6 @@ import {
 	fetchPeriodStats,
 	fetchCombinedMonthTotals
 } from '@/app/actions/summary-stats';
-import {
-	getHighlightsWithinTimeWindow,
-	getCondensedHighlightsAtTimePeriod,
-	getCondensedHighlightsWithinTimeWindow
-} from '@/app/lib/highlights';
 import { getAllHighlightsAcrossScopes } from '@/app/lib/highlights/lib/hg2';
 import { getTemporalUnitFromTimeWindow } from '@/app/lib/highlights/lib/highlight-utils';
 import type { TabConfig } from '@/app/components/shared/TabContent';
