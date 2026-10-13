@@ -42,11 +42,13 @@ export async function fetchSessionHighlights(
 	{ date }: Pick<SessionTabParams, 'date'>,
 	viewedGroup: ViewedGroup
 ): Promise<CombinedHighlight[]> {
-	return getAllHighlightsAcrossScopes({
-		timePeriod: date,
-		temporalUnit: 'day',
-		viewedGroup
-	});
+	return (
+		await getAllHighlightsAcrossScopes({
+			timePeriod: date,
+			temporalUnit: 'day',
+			viewedGroup
+		})
+	).inter;
 }
 
 /**

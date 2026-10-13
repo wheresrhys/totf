@@ -176,6 +176,7 @@ export type HighlightPageLevelPresence = Record<
 	HighlightDataLake
 >;
 
+export type HighlightOutlook = 'inter' | 'intra';
 export type HighlightGenerationConfig = {
 	sample: CamelCaseExtendedTemporalUnit;
 	lakes: HighlightDataLake;

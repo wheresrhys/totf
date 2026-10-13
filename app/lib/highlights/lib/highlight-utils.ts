@@ -145,7 +145,7 @@ export function limitHighlights(
 		topHighlights = highlights.slice(0, itemsIncludingTies);
 	}
 	const values = topHighlights.map((x) => x.value);
-	const uniqueValues = [...new Set(values)].sort();
+	const uniqueValues = [...new Set(values)].sort().reverse();
 
 	return topHighlights.map((highlight) => {
 		return {
@@ -181,9 +181,11 @@ export function getHighlightsOfTypeFromStatsRows({
 		scope
 	);
 
-	return limitHighlights(highlights, limit).filter(({ timePeriod }) =>
+	const b = limitHighlights(highlights, limit).filter(({ timePeriod }) =>
 		timeWindowFilter(timePeriod)
 	);
+	console.log(b);
+	return b;
 }
 
 export function buildTimeWindowFilter(parentTimeWindow?: YearMonthRestriction) {
