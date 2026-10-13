@@ -81,40 +81,11 @@ export async function fetchSummaryHighlightsData(
 	viewedGroup: ViewedGroup
 ) {
 	const { year, month } = params;
-	const [daily, monthly, local] = await Promise.all([
-		getHighlightsWithinTimeWindow({
-			temporalUnit: 'day',
-			groupId: viewedGroup.id,
-			parentTimeWindow: {
-				year,
-				month: month
-			},
-			includePerSpecies: false
-		}),
-
-		month
-			? []
-			: getHighlightsWithinTimeWindow({
-					temporalUnit: 'month',
-					groupId: viewedGroup.id,
-					parentTimeWindow: {
-						year,
-						month: month
-					},
-					includePerSpecies: false
-				}),
-		getAllHighlightsAcrossScopes({
-			timePeriod: `${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
-			temporalUnit: getTemporalUnitFromTimeWindow({ year, month }),
-			viewedGroup
-		})
-	]);
-	console.log(local);
-	return {
-		sessionHighlights: daily,
-		monthHighlights: monthly,
-		localHighlights: local.inter
-	};
+	return await getAllHighlightsAcrossScopes({
+		timePeriod: `${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
+		temporalUnit: getTemporalUnitFromTimeWindow({ year, month }),
+		viewedGroup
+	});
 }
 
 export type SummaryHighlightsData = Awaited<

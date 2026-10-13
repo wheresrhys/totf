@@ -1,13 +1,12 @@
 'use client';
 
-import { BoxyList } from '@/app/components/shared/DesignSystem';
+import { BoxyList, PrimaryHeading } from '@/app/components/shared/DesignSystem';
 // Imported from its own file (not from `SummaryTotalsSection.tsx`, which
 // re-exports it for its other two consumers) to avoid a circular import:
 // `SummaryTotalsSection.tsx` itself imports `summaryHighlightsTab` from this
 // file. `renderCombinedHighlights` (`SessionHighlights.tsx`) has other
 // consumers already importing it from its current location
 // (`SpHighlightsTab.tsx`), so moving it here would break that import path.
-import { HighlightsByTimePeriod } from '@/app/components/HighlightsByTimePeriod';
 import { renderCombinedHighlights } from '@/app/components/pages/session/SessionHighlights';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { SummaryTabParams } from './summary-tab-params';
@@ -37,31 +36,33 @@ export const summaryHighlightsTab: TabConfig<
 	// server-prefetched payload could never cross the boundary back into this
 	// client component anyway. See `summary-tab-prefetchers.ts`.
 	clientSideOnly: true,
-	TabComponent: ({ data, viewedGroup, params }) => (
+	TabComponent: ({ data, params }) => (
 		<div>
+			<PrimaryHeading>!!!Work in progress!!!</PrimaryHeading>
 			{data && (
 				<>
-					{data.localHighlights.length && (
+					{data.inter.length && (
 						<>
-							<h2>Records</h2>
+							<h2>Compared to other periods</h2>
 							<BoxyList>
 								{renderCombinedHighlights(
-									data.localHighlights,
+									data.inter,
 									params.canReportHighlights ?? false
 								)}
 							</BoxyList>
 						</>
 					)}
-					<HighlightsByTimePeriod
-						highlights={data.sessionHighlights}
-						viewedGroup={viewedGroup}
-						heading="Session highlights"
-					/>
-					<HighlightsByTimePeriod
-						highlights={data.monthHighlights}
-						viewedGroup={viewedGroup}
-						heading="Month highlights"
-					/>
+					{data.intra.length && (
+						<>
+							<h2>Within this period</h2>
+							<BoxyList>
+								{renderCombinedHighlights(
+									data.intra,
+									params.canReportHighlights ?? false
+								)}
+							</BoxyList>
+						</>
+					)}
 				</>
 			)}
 		</div>
