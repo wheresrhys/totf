@@ -159,56 +159,39 @@ export type HighlightInitConfig = {
 };
 
 export type HighlightDataLake = {
-	relativeToAllTime?: number;
-	relativeToYear?: number;
-	relativeToAllTimeMonth?: number;
-	relativeToMonth?: number;
+	allTime?: number;
+	year?: number;
+	allTimeMonth?: number;
+	month?: number;
 };
 
-type AllTimeHighlightDataLake = Pick<HighlightDataLake, 'relativeToAllTime'>;
-type YearHighlightDataLake = Pick<
-	HighlightDataLake,
-	'relativeToAllTime' | 'relativeToYear'
->;
-type MonthHighlightDataLake = Pick<
-	HighlightDataLake,
-	'relativeToAllTime' | 'relativeToYear' | 'relativeToMonth'
->;
-
-type AllTimeMonthHighlightDataLake = Pick<
-	HighlightDataLake,
-	'relativeToAllTime' | 'relativeToAllTimeMonth'
->;
-
 export type ExtendedTemporalUnit = TemporalUnit | 'all time' | 'all time month';
+export type CamelCaseExtendedTemporalUnit =
+	| TemporalUnit
+	| 'allTime'
+	| 'allTimeMonth';
 export type HighlightIterator = 'perDay' | 'perMonth' | 'perYear';
 export type HighlightPageLevelPresence = Record<
 	HighlightIterator,
 	HighlightDataLake
 >;
 
+export type HighlightGenerationConfig = {
+	sample: CamelCaseExtendedTemporalUnit;
+	lakes: HighlightDataLake;
+};
+
+export type ScopeHighlightConfig = {
+	intra?: HighlightGenerationConfig[];
+	inter?: HighlightGenerationConfig[];
+};
+
 export type HighlightPresenceAtScopes = {
-	allTime: {
-		perYear?: AllTimeHighlightDataLake;
-		perMonth?: AllTimeHighlightDataLake;
-		perDay?: AllTimeHighlightDataLake;
-	} | null;
-	year: {
-		perYear?: AllTimeHighlightDataLake;
-		perMonth?: YearHighlightDataLake;
-		perDay?: YearHighlightDataLake;
-	} | null;
-	allTimeMonth: {
-		perMonth?: AllTimeMonthHighlightDataLake;
-		perDay?: AllTimeMonthHighlightDataLake;
-	} | null;
-	month: {
-		perMonth?: YearHighlightDataLake;
-		perDay?: MonthHighlightDataLake;
-	} | null;
-	day: {
-		perDay?: HighlightDataLake;
-	} | null;
+	allTime: ScopeHighlightConfig | null;
+	year: ScopeHighlightConfig | null;
+	allTimeMonth: ScopeHighlightConfig | null;
+	month: ScopeHighlightConfig | null;
+	day: ScopeHighlightConfig | null;
 };
 
 type HighlightPresenceConfig = {

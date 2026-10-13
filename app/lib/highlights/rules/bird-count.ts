@@ -44,45 +44,54 @@ export const birdCount: HighlightsGenerator = {
 		species: null,
 		general: {
 			day: {
-				perDay: {
-					relativeToAllTime: 3,
-					relativeToAllTimeMonth: 3,
-					relativeToYear: 3
-				}
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 3,
+							allTimeMonth: 3,
+							year: 3
+						}
+					}
+				]
 			},
-			allTime: {
-				perYear: {
-					relativeToAllTime: 1
-				},
-				perMonth: {
-					relativeToAllTime: 1
-				},
-				perDay: {
-					relativeToAllTime: 3
-				}
-			},
-			year: {
-				perMonth: {
-					relativeToAllTime: 1
-				},
-				perDay: {
-					relativeToAllTime: 3,
-					relativeToYear: 3
-				}
-			},
-			allTimeMonth: {
-				perDay: {
-					relativeToAllTime: 3,
-					relativeToAllTimeMonth: 3
-				}
-			},
-			month: {
-				perDay: {
-					relativeToAllTime: 3,
-					relativeToYear: 3,
-					relativeToMonth: 1
-				}
-			}
+			allTime: null,
+			year: null,
+			allTimeMonth: null,
+			month: null
+			// allTime: {
+			// 	perYear: {
+			// 		relativeToAllTime: 1
+			// 	},
+			// 	perMonth: {
+			// 		relativeToAllTime: 1
+			// 	},
+			// 	perDay: {
+			// 		relativeToAllTime: 3
+			// 	}
+			// },
+			// year: {
+			// 	perMonth: {
+			// 		relativeToAllTime: 1
+			// 	},
+			// 	perDay: {
+			// 		relativeToAllTime: 3,
+			// 		relativeToYear: 3
+			// 	}
+			// },
+			// allTimeMonth: {
+			// 	perDay: {
+			// 		relativeToAllTime: 3,
+			// 		relativeToAllTimeMonth: 3
+			// 	}
+			// },
+			// month: {
+			// 	perDay: {
+			// 		relativeToAllTime: 3,
+			// 		relativeToYear: 3,
+			// 		relativeToMonth: 1
+			// 	}
+			// }
 		}
 	}
 };

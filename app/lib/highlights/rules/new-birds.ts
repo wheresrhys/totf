@@ -41,10 +41,15 @@ export const newBirds: HighlightsGenerator = {
 		species: null,
 		general: {
 			day: {
-				perDay: {
-					relativeToAllTime: 1,
-					relativeToYear: 1
-				}
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 1,
+							year: 1
+						}
+					}
+				]
 			},
 			month: null,
 			year: null,

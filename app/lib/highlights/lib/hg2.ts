@@ -15,7 +15,8 @@ import type {
 	HighlightPageLevelPresence,
 	HighlightPresenceAtScopes,
 	HighlightValueWithRanking,
-	NewHighlightValue
+	NewHighlightValue,
+	HighlightGenerationConfig
 } from '../types';
 import {
 	getStatsByTemporalUnit,
@@ -139,13 +140,14 @@ const DEFAULT_HIGHLIGHT_INIT_CONFIG: HighlightInitConfig = {
 function getPresence(
 	rule: HighlightsGenerator,
 	temporalUnit: ExtendedTemporalUnit,
+	outlook: 'inter' | 'intra',
 	species?: string
-): Partial<HighlightPageLevelPresence> | undefined | null {
-	if (!rule.presence) return {};
+): HighlightGenerationConfig[] | undefined | null {
+	if (!rule.presence) return [];
 	const rulePresence = species ? rule.presence.species : rule.presence.general;
 	return rulePresence?.[
 		camelCase(temporalUnit) as keyof HighlightPresenceAtScopes
-	];
+	]?.[outlook];
 }
 
 function getTimeWindow(
@@ -179,15 +181,12 @@ export async function getHighlightsOfTypeAcrossScopes({
 	species?: string;
 }) {
 	const rule = getRule(highlightType);
-	const presence = getPresence(rule, temporalUnit, species);
+	const presence = getPresence(rule, temporalUnit, 'inter', species);
 	if (!presence) return [];
 
-	const configs = Object.entries(presence)
-		.flatMap(([highlightIterator, dataLakeConfig]) => {
-			const sampleTemporalUnit = highlightIterator
-				.substring(3)
-				.toLowerCase() as TemporalUnit;
-			return Object.entries(dataLakeConfig).map(([lakeScope, limit]) => {
+	const configs = presence
+		.flatMap(({ sample: sampleTemporalUnit, lakes}) => {
+			return Object.entries(lakes).map(([lakeScope, limit]) => {
 				if (limit === 0) return;
 				const lakeScopeTemporalUnit = noCase(
 					lakeScope.replace('relativeTo', '')

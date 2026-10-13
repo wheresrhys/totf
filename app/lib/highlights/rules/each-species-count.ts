@@ -62,11 +62,16 @@ export const eachSpeciesCount: HighlightsGenerator = {
 		species: null,
 		general: {
 			day: {
-				perDay: {
-					relativeToAllTime: 3,
-					relativeToAllTimeMonth: 0,
-					relativeToYear: 1
-				}
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 3,
+							allTimeMonth: 0,
+							year: 1
+						}
+					}
+				]
 			},
 			month: null,
 			year: null,
