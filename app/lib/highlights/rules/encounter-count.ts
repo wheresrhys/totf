@@ -45,10 +45,31 @@ export const encounterCount: HighlightsGenerator = {
 		species: null,
 		general: {
 			day: null,
-			month: null,
-			year: null,
-			allTimeMonth: null,
-			allTime: null
+			month: {
+				perMonth: {
+					relativeToAllTime: 3
+				}
+			},
+			year: {
+				perMonth: {
+					relativeToAllTime: 1,
+					relativeToYear: 3
+				}
+			},
+			allTimeMonth: {
+				perMonth: {
+					relativeToAllTime: 3,
+					relativeToAllTimeMonth: 3
+				}
+			},
+			allTime: {
+				perYear: {
+					relativeToAllTime: 1
+				},
+				perMonth: {
+					relativeToAllTime: 3
+				}
+			}
 		}
 	}
 };

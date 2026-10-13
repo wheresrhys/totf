@@ -95,10 +95,27 @@ export const rarities: HighlightsGenerator = {
 					relativeToYear: 1
 				}
 			},
-			month: null,
-			year: null,
-			allTimeMonth: null,
-			allTime: null
+			month: {
+				perDay: {
+					relativeToAllTime: 1,
+					relativeToYear: 1
+				}
+			},
+			year: {
+				perDay: {
+					relativeToAllTime: 1
+				}
+			},
+			allTimeMonth: {
+				perDay: {
+					relativeToAllTime: 1
+				}
+			},
+			allTime: {
+				perDay: {
+					relativeToAllTime: 1
+				}
+			}
 		}
 	}
 };

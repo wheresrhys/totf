@@ -49,10 +49,37 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 					relativeToYear: 1
 				}
 			},
-			month: null,
-			year: null,
-			allTimeMonth: null,
-			allTime: null
+			month: {
+				perDay: {
+					relativeToAllTime: 1,
+					relativeToYear: 1
+				}
+			},
+			year: {
+				perMonth: {
+					relativeToAllTime: 1
+				},
+				perDay: {
+					relativeToAllTime: 1,
+					relativeToYear: 1
+				}
+			},
+			allTimeMonth: {
+				perDay: {
+					relativeToAllTime: 1
+				}
+			},
+			allTime: {
+				perYear: {
+					relativeToAllTime: 1
+				},
+				perMonth: {
+					relativeToAllTime: 1
+				},
+				perDay: {
+					relativeToAllTime: 1
+				}
+			}
 		}
 	}
 };

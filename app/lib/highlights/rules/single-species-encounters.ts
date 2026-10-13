@@ -38,9 +38,26 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 		general: {
 			day: null,
 			month: null,
-			year: null,
-			allTimeMonth: null,
-			allTime: null
+			year: {
+				perMonth: {
+					relativeToAllTime: 1,
+					relativeToYear: 3
+				}
+			},
+			allTimeMonth: {
+				perMonth: {
+					relativeToAllTime: 3,
+					relativeToAllTimeMonth: 3
+				}
+			},
+			allTime: {
+				perYear: {
+					relativeToAllTime: 1
+				},
+				perMonth: {
+					relativeToAllTime: 3
+				}
+			}
 		}
 	}
 };
