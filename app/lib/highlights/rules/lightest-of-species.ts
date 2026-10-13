@@ -33,7 +33,6 @@ export const lightestOfSpecies: HighlightsGenerator = {
 	},
 	generator: (rows) => {
 		const results = getTopByProperty<BiometricsStatsResult>('min_weight', {
-			threshold: 3,
 			smallestWins: true
 		})(rows);
 		// avoid generating highlights when there are actually very few birds to build a reasonable data set

@@ -80,7 +80,6 @@ export const birdCount: HighlightsGenerator = {
 				perDay: {
 					relativeToAllTime: 3,
 					relativeToYear: 3,
-					relativeToAllTimeMonth: 3,
 					relativeToMonth: 1
 				}
 			}
