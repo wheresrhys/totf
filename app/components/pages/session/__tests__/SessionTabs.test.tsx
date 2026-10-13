@@ -21,7 +21,9 @@ import {
 // The Highlights tab fetches through this; mock it as the one collaborator it
 // is, so opening that tab in a test never reaches the real stats pipeline.
 vi.mock('@/app/lib/highlights/lib/hg2', () => ({
-	getAllHighlightsAcrossScopes: vi.fn().mockResolvedValue([])
+	getAllHighlightsAcrossScopes: vi
+		.fn()
+		.mockResolvedValue({ inter: [], intra: [] })
 }));
 
 function makeEncounter(
@@ -737,7 +739,10 @@ describe('SessionTabs', () => {
 		async function mockHighlightsPipeline(highlights: CombinedHighlight[]) {
 			const { getAllHighlightsAcrossScopes } =
 				await import('@/app/lib/highlights/lib/hg2');
-			vi.mocked(getAllHighlightsAcrossScopes).mockResolvedValue(highlights);
+			vi.mocked(getAllHighlightsAcrossScopes).mockResolvedValue({
+				inter: highlights,
+				intra: []
+			});
 			return getAllHighlightsAcrossScopes;
 		}
 
