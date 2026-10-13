@@ -10,7 +10,6 @@ import {
 import { SquashedMonthSummaryTotalsSection } from '../SquashedMonthSummaryTotalsSection';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SpeciesStatsRow } from '@/app/lib/species-stats';
-import type { HighlightsOfType } from '@/app/lib/highlights/types';
 import {
 	buildCoreStatsRow,
 	buildDailyStatsRow
@@ -34,23 +33,6 @@ const yearTotalsForMonth = [
 const sessionTotalsForMonth = [
 	buildDailyStatsRow({ time_period: '2025-01-16' })
 ];
-
-/**
- * One renderable highlight. `highlightListPrefixPrinter` is the only formatter
- * `HighlightsByTimePeriod` reaches, so it carries the identifying text a test
- * asserts on; `combinedHighlightPrinter` is a never-called stub.
- */
-function buildHighlight(prefix: string): HighlightsOfType {
-	return {
-		descriptor: { category: 'count', type: 'most-birds', unit: 'bird' },
-		scope: { temporalUnit: 'day' },
-		values: [{ timePeriod: '2025-01-16', value: 42, species: null }],
-		formatters: {
-			highlightListPrefixPrinter: () => prefix,
-			combinedHighlightPrinter: () => prefix
-		}
-	};
-}
 
 function renderSection({
 	squashedMonth = 1,

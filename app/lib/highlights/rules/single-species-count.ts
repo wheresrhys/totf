@@ -21,8 +21,6 @@ export const singleSpeciesCount: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking)} highest ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Most individuals of a single species`
 	},
 	descriptor: {
 		type: 'singleSpeciesCount',

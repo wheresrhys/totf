@@ -24,8 +24,6 @@ export const newBirds: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking)} highest ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			sentenceCase(`Most new birds`)
 	},
 	descriptor: {
 		type: 'newBirds',

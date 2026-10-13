@@ -61,13 +61,6 @@ export type HighlightScope = {
 	species?: string;
 };
 
-export type HighlightsOfType = {
-	formatters: HighlightFormatters;
-	descriptor: HighlightDescriptor;
-	scope: HighlightScope;
-	values: HighlightValue[];
-};
-
 export type HighlightRanking = {
 	position: number;
 	isTied: boolean;
@@ -80,14 +73,6 @@ export type HighlightValueWithRanking = HighlightValue & {
 export type NewHighlightValue = HighlightValueWithRanking & {
 	descriptor: HighlightDescriptor;
 	scope: HighlightScope;
-};
-
-export type CherryPickedHighlight = {
-	formatters: HighlightFormatters;
-	descriptor: HighlightDescriptor;
-	scope: HighlightScope;
-	value: HighlightValue;
-	ranking: HighlightRanking;
 };
 
 export type CombinedHighlight = {
@@ -105,13 +90,9 @@ export type CombinedHighlight = {
 export type CombinedHighlightPrinter = (
 	combinedHighlight: CombinedHighlight
 ) => string;
-export type HighlightListPrefixPrinter = (
-	highlightsOfType: HighlightsOfType
-) => string;
 
 type HighlightFormatters = {
 	combinedHighlightPrinter: CombinedHighlightPrinter;
-	highlightListPrefixPrinter: HighlightListPrefixPrinter;
 };
 
 type StatsRowOf<StatsProperty> =
@@ -142,27 +123,14 @@ export type HighlightsGenerator = {
 	[StatsSelectorKey in keyof EnhancedStatsRepository]: HighlightsGeneratorFor<StatsSelectorKey>;
 }[keyof EnhancedStatsRepository];
 
-type HighlightPositionsLimit = 1 | 2 | 3;
+type HighlightPositionsLimit = 0 | 1 | 2 | 3;
 
-export type HighlightInitConfig = {
-	selfRelativeToParentMonth?: HighlightPositionsLimit;
-	selfRelativeToParentYear?: HighlightPositionsLimit;
-	selfRelativeToAllTimeMonth?: HighlightPositionsLimit;
-	selfRelativeToAllTime?: HighlightPositionsLimit;
-	childSessionsRelativeToSelf?: HighlightPositionsLimit;
-	childSessionsRelativeToParentYear?: HighlightPositionsLimit;
-	childSessionsRelativeToAllTimeMonth?: HighlightPositionsLimit;
-	childSessionsRelativeToAllTime?: HighlightPositionsLimit;
-	childMonthsRelativeToSelf?: HighlightPositionsLimit;
-	childMonthsRelativeToParentYear?: HighlightPositionsLimit;
-	childMonthsRelativeToAllTime?: HighlightPositionsLimit;
-};
 
 export type HighlightDataLake = {
-	allTime?: number;
-	year?: number;
-	allTimeMonth?: number;
-	month?: number;
+	allTime?: HighlightPositionsLimit;
+	year?: HighlightPositionsLimit;
+	allTimeMonth?: HighlightPositionsLimit;
+	month?: HighlightPositionsLimit;
 };
 
 export type ExtendedTemporalUnit = TemporalUnit | 'all time' | 'all time month';
@@ -170,11 +138,10 @@ export type CamelCaseExtendedTemporalUnit =
 	| TemporalUnit
 	| 'allTime'
 	| 'allTimeMonth';
-export type HighlightIterator = 'perDay' | 'perMonth' | 'perYear';
-export type HighlightPageLevelPresence = Record<
-	HighlightIterator,
-	HighlightDataLake
->;
+// export type HighlightPageLevelPresence = Record<
+// 	HighlightIterator,
+// 	HighlightDataLake
+// >;
 
 export type HighlightOutlook = 'inter' | 'intra';
 export type HighlightGenerationConfig = {

@@ -3,7 +3,6 @@ import type {
 	YearMonthRestriction,
 	CombinedHighlight,
 	HighlightsGenerator,
-	HighlightInitConfig,
 	HighlightOutlook,
 	ExtendedTemporalUnit,
 	HighlightPresenceAtScopes,
@@ -110,11 +109,6 @@ async function getScopedHighlightsOfType({
 		})) as NewHighlightValue[];
 	}
 }
-
-const DEFAULT_HIGHLIGHT_INIT_CONFIG: HighlightInitConfig = {
-	selfRelativeToAllTime: 1,
-	childSessionsRelativeToSelf: 1
-};
 
 function getPresence(
 	rule: HighlightsGenerator,

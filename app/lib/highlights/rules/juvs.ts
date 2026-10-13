@@ -19,7 +19,6 @@ export const juvs: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking, 'equal')} most ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) => sentenceCase(`Most juvs`)
 	},
 	descriptor: {
 		type: 'juvs',

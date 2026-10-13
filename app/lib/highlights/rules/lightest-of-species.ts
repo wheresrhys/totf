@@ -22,8 +22,6 @@ export const lightestOfSpecies: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking)} lightest ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Lightest ${highlightsOfType.values.length > 1 ? pluraliseSpecies(highlightsOfType.values[0].species as string) : highlightsOfType.values[0].species}`
 	},
 	descriptor: {
 		type: 'lightestOfSpecies',

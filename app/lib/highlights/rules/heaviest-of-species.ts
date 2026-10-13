@@ -22,8 +22,6 @@ export const heaviestOfSpecies: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking)} heaviest ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Heaviest ${highlightsOfType.values.length > 1 ? pluraliseSpecies(highlightsOfType.values[0].species as string) : highlightsOfType.values[0].species}`
 	},
 	descriptor: {
 		type: 'heaviestOfSpecies',

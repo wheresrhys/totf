@@ -24,8 +24,6 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking, 'equal')} highest ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Highest juv count${highlightsOfType.values.length > 1 ? 's' : ''} for ${highlightsOfType.values[0].species}`
 	},
 	descriptor: {
 		type: 'eachSpeciesJuvs',

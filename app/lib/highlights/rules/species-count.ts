@@ -18,7 +18,6 @@ export const speciesCount: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking)} most varied ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) => `Most varied`
 	},
 	descriptor: {
 		type: 'species',

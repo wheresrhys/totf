@@ -27,10 +27,6 @@ export const birdCount: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking)} busiest ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			highlightsOfType.scope.temporalUnit === 'day'
-				? 'Busiest'
-				: 'Most individuals'
 	},
 	descriptor: {
 		type: 'birds',

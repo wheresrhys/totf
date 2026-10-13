@@ -18,8 +18,6 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 					`${printProminenceQualifier(ranking, 'equal')} most ${printTimeQualifier(scope.parentTimeWindow, { yearConnector: 'of' })}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Most encounters of a single species`
 	},
 	descriptor: {
 		type: 'singleSpeciesEncounters',

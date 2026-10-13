@@ -1,6 +1,4 @@
 import type {
-	HighlightsOfType,
-	CherryPickedHighlight,
 	YearMonthRestriction,
 	HighlightDescriptor,
 	HighlightValue,
@@ -8,9 +6,7 @@ import type {
 	HighlightCategory,
 	NumericHighlightValue,
 	HighlightsGenerator,
-	HighlightInitConfig,
 	HighlightScope,
-	TextHighlightValue,
 	HighlightValueWithRanking
 } from '../types';
 import { isNumericHighlightValue } from '../types';

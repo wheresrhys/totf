@@ -29,8 +29,6 @@ export const encounterCount: HighlightsGenerator = {
 					)}${scope.parentTimeWindow?.month && combinedHighlight.scopes[0].scope.temporalUnit === 'day' ? ' session' : ''}`,
 				shouldPrintValue: true
 			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			sentenceCase(`Most encounters`)
 	},
 	descriptor: {
 		type: 'encounters',
