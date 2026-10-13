@@ -6,6 +6,7 @@ import {
 	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
+import { CoreStatsResult } from '@/app/models/db';
 
 export const eachSpeciesCount: HighlightsGenerator = {
 	statsSelector: 'coreStatsBySpecies',
@@ -34,7 +35,25 @@ export const eachSpeciesCount: HighlightsGenerator = {
 		unit: 'bird',
 		category: 'count'
 	},
-	generator: getTopByProperty('bird_count', { threshold: 2 }),
+	generator: (rows) => {
+		const results = getTopByProperty<CoreStatsResult>('bird_count', {
+			threshold: 2
+		})(rows);
+		const max = Math.max(...results.map((result) => result.value as number));
+		// avoids outputting a highlight for a low count if that count is quite common
+		// e.g. we catch 2 kingfishers every now and then, but never more than 2. No need to highlight the
+		// catch of 2 every time it happens
+		// conversely, we have only ever caught a amx of 2 redpoll, but this is (maybe?) worth mentioning
+		if (max < 5) {
+			const occasionsWithMax = results.filter(
+				(result) => result.value === max
+			).length;
+			if (occasionsWithMax >= 2) {
+				return [];
+			}
+		}
+		return results;
+	},
 	condition: (scope) =>
 		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
 	rpcName: 'core_stats',
@@ -45,6 +64,7 @@ export const eachSpeciesCount: HighlightsGenerator = {
 			day: {
 				perDay: {
 					relativeToAllTime: 3,
+					relativeToAllTimeMonth: 0,
 					relativeToYear: 1
 				}
 			},
