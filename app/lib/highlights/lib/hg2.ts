@@ -185,7 +185,7 @@ export async function getHighlightsOfTypeAcrossScopes({
 	if (!presence) return [];
 
 	const configs = presence
-		.flatMap(({ sample: sampleTemporalUnit, lakes}) => {
+		.flatMap(({ sample: sampleTemporalUnit, lakes }) => {
 			return Object.entries(lakes).map(([lakeScope, limit]) => {
 				if (limit === 0) return;
 				const lakeScopeTemporalUnit = noCase(
