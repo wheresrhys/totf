@@ -20,6 +20,9 @@
 CREATE TYPE public.biometrics_stats_result AS (
 	species_name text,
 	time_period date,
+	-- Sample size backing the metric columns below (core_stats.encounter_count's
+	-- same per-cell semantics, see biometrics_stats.sql).
+	encounter_count bigint,
 	max_weight real,
 	avg_weight numeric,
 	min_weight real,

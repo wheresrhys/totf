@@ -791,6 +791,7 @@ export type Database = {
         avg_wing: number | null
         min_wing: number | null
         median_wing: number | null
+        encounter_count: number | null
       }
       core_stats_result: {
         species_name: string | null
@@ -833,6 +834,7 @@ export type Database = {
         returning_age_2_bird_count: number | null
         returning_age_3_plus_bird_count: number | null
         returning_new_unknown_age_bird_count: number | null
+        encounter_count: number | null
       }
     }
   }

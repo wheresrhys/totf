@@ -98,6 +98,7 @@ SET
     SELECT
       eac.species_id,
       eac.time_period,
+      COUNT(*) AS encounter_count,
       COUNT(*) FILTER (WHERE eac.age_bucket = 'juv') AS juv_enc_count,
       COUNT(*) FILTER (WHERE eac.age_bucket = 'postjuv') AS postjuv_enc_count,
       COUNT(*) FILTER (WHERE eac.age_code = 3 AND eac.is_juv) AS postjuv_juv_enc_count,
@@ -199,6 +200,8 @@ SET
       WHEN group_by_time_period = 'month-squashed' THEN spine.time_period
       ELSE NULL::date
     END AS "time_period",
+
+    COALESCE(eabc.encounter_count, 0) AS "encounter_count",
 
     COALESCE(abc.adult_count, 0) AS "adult_bird_count",
     COALESCE(abc.juv_count, 0) AS "juv_bird_count",
