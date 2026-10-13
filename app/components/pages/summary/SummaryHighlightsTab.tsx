@@ -43,7 +43,7 @@ export const summaryHighlightsTab: TabConfig<
 				<>
 					{data.inter.length && (
 						<>
-							<h2>Compared to other periods</h2>
+							<h2>{params.year} {params.month} Compared to other periods</h2>
 							<BoxyList>
 								{renderCombinedHighlights(
 									data.inter,
@@ -54,7 +54,7 @@ export const summaryHighlightsTab: TabConfig<
 					)}
 					{data.intra.length && (
 						<>
-							<h2>Within this period</h2>
+							<h2>Highlights Within {params.year} {params.month}</h2>
 							<BoxyList>
 								{renderCombinedHighlights(
 									data.intra,
