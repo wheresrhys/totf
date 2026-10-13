@@ -45,7 +45,6 @@ export const eachSpeciesCount: HighlightsGenerator = {
 			day: {
 				perDay: {
 					relativeToAllTime: 3,
-					relativeToAllTimeMonth: 1,
 					relativeToYear: 1
 				}
 			},
