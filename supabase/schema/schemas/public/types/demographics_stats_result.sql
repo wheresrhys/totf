@@ -20,6 +20,9 @@
 CREATE TYPE public.demographics_stats_result AS (
 	species_name text,
 	time_period date,
+	-- Sample size for this cell (core_stats.encounter_count's same per-cell
+	-- semantics, see demographics_stats.sql's encounter_age_bucket_counts CTE).
+	encounter_count bigint,
 	-- Context/denominator columns, duplicated from core_stats' own bucket
 	-- counts so this RPC's rows are self-contained (e.g. to read the adult
 	-- subsets below as proportions without a second RPC call).

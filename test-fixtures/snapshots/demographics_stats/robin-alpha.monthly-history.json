@@ -14,7 +14,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 1
   },
   {
     "species_name": null,
@@ -31,7 +32,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -48,7 +50,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -65,7 +68,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -82,7 +86,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -99,7 +104,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -116,7 +122,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -133,7 +140,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -150,7 +158,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -167,7 +176,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -184,7 +194,8 @@
     "returning_age_1_bird_count": 3,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 1
+    "returning_new_unknown_age_bird_count": 1,
+    "encounter_count": 7
   },
   {
     "species_name": null,
@@ -201,7 +212,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -218,7 +230,8 @@
     "returning_age_1_bird_count": 3,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 6
   },
   {
     "species_name": null,
@@ -235,7 +248,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -252,7 +266,8 @@
     "returning_age_1_bird_count": 1,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 4
   },
   {
     "species_name": null,
@@ -269,7 +284,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -286,7 +302,8 @@
     "returning_age_1_bird_count": 1,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 3
   },
   {
     "species_name": null,
@@ -303,7 +320,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -320,7 +338,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -337,7 +356,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -354,7 +374,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -371,7 +392,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -388,7 +410,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -405,7 +428,8 @@
     "returning_age_1_bird_count": 2,
     "returning_age_2_bird_count": 1,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 1
+    "returning_new_unknown_age_bird_count": 1,
+    "encounter_count": 7
   },
   {
     "species_name": null,
@@ -422,7 +446,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -439,7 +464,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 1,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 1
   },
   {
     "species_name": null,
@@ -456,7 +482,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -473,7 +500,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 1,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 1
   },
   {
     "species_name": null,
@@ -490,7 +518,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -507,7 +536,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -524,7 +554,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -541,7 +572,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -558,7 +590,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -575,7 +608,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -592,7 +626,8 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 0,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 0
   },
   {
     "species_name": null,
@@ -609,6 +644,7 @@
     "returning_age_1_bird_count": 0,
     "returning_age_2_bird_count": 0,
     "returning_age_3_plus_bird_count": 1,
-    "returning_new_unknown_age_bird_count": 0
+    "returning_new_unknown_age_bird_count": 0,
+    "encounter_count": 1
   }
 ]
