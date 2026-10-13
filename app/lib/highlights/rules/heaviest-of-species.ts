@@ -49,10 +49,29 @@ export const heaviestOfSpecies: HighlightsGenerator = {
 					relativeToYear: 1
 				}
 			},
-			month: null,
-			year: null,
-			allTimeMonth: null,
-			allTime: null
+			month: {
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToYear: 1,
+					relativeToMonth: 1
+				}
+			},
+			year: {
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToYear: 1
+				}
+			},
+			allTimeMonth: {
+				perDay: {
+					relativeToAllTime: 3
+				}
+			},
+			allTime: {
+				perDay: {
+					relativeToAllTime: 3
+				}
+			}
 		}
 	}
 };

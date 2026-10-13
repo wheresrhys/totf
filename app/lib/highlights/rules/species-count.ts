@@ -39,10 +39,37 @@ export const speciesCount: HighlightsGenerator = {
 					relativeToYear: 3
 				}
 			},
-			month: null,
-			year: null,
-			allTimeMonth: null,
-			allTime: null
+			month: {
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToYear: 3
+				}
+			},
+			year: {
+				perMonth: {
+					relativeToAllTime: 1
+				},
+				perDay: {
+					relativeToAllTime: 3,
+					relativeToYear: 3
+				}
+			},
+			allTimeMonth: {
+				perDay: {
+					relativeToAllTime: 3
+				}
+			},
+			allTime: {
+				perYear: {
+					relativeToAllTime: 1
+				},
+				perMonth: {
+					relativeToAllTime: 1
+				},
+				perDay: {
+					relativeToAllTime: 3
+				}
+			}
 		}
 	}
 };

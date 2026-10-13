@@ -25,9 +25,10 @@ import {
 } from '@/app/actions/summary-stats';
 import {
 	getHighlightsWithinTimeWindow,
-	getCondensedHighlightsAtTimePeriod,
-	getCondensedHighlightsWithinTimeWindow
+	getCondensedHighlightsAtTimePeriod
 } from '@/app/lib/highlights';
+import { getAllHighlightsAcrossScopes } from '@/app/lib/highlights/lib/hg2';
+import { getTemporalUnitFromTimeWindow } from '@/app/lib/highlights/lib/highlight-utils';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
@@ -101,36 +102,13 @@ export async function fetchSummaryHighlightsData(
 					},
 					includePerSpecies: false
 				}),
-		year
-			? getCondensedHighlightsAtTimePeriod(
-					viewedGroup.id,
-					`${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
-					month ? 'month' : 'year',
-					1
-				)
-			: []
-		// year
-		// 	? getCondensedHighlightsWithinTimeWindow(
-		// 			viewedGroup.id,
-		// 			{ year, month },
-		// 			'day'
-		// 		)
-		// 	: [],
-		// month
-		// 	? []
-		// 	: getCondensedHighlightsWithinTimeWindow(
-		// 			viewedGroup.id,
-		// 			{ year, month },
-		// 			'month'
-		// 		),
-		// month || year
-		// 	? []
-		// 	: getCondensedHighlightsWithinTimeWindow(
-		// 			viewedGroup.id,
-		// 			{ year, month },
-		// 			'year'
-		// 		)
+		getAllHighlightsAcrossScopes({
+			timePeriod: `${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
+			temporalUnit: getTemporalUnitFromTimeWindow({ year, month }),
+			viewedGroup
+		})
 	]);
+	console.log(local);
 	return {
 		sessionHighlights: daily,
 		monthHighlights: monthly,
