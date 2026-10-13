@@ -31,9 +31,7 @@ export const heaviestOfSpecies: HighlightsGenerator = {
 		category: 'biometrics'
 	},
 	generator: (rows) => {
-		const results = getTopByProperty<BiometricsStatsResult>('max_weight', {
-			threshold: 3
-		})(rows);
+		const results = getTopByProperty<BiometricsStatsResult>('max_weight')(rows);
 		// avoid generating highlights when there are actually very few birds to build a reasonable data set
 		return results.length >= 10 ? results : [];
 	},

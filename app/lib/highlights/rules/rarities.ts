@@ -71,14 +71,16 @@ export const rarities: HighlightsGenerator = {
 				species: appearance.species_name
 			}));
 		}
-
-		return [
-			{
-				timePeriod: appearances[0].time_period,
-				value: 'first',
-				species: appearances[0].species_name
-			}
-		];
+		// if (/\/04|05|10|11\//.test(appearances[0].time_period)) {
+		// 	return [
+		// 		{
+		// 			timePeriod: appearances[0].time_period,
+		// 			value: 'first',
+		// 			species: appearances[0].species_name
+		// 		}
+		// 	];
+		// }
+		return [];
 	},
 	// A month-only window asks "of any February", which has no coherent reading
 	// as a first record — the earliest February a species appeared in is not a
