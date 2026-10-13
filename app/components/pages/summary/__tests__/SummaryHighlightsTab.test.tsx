@@ -45,11 +45,8 @@ function renderHighlightsTab({
 	localHighlights = [] as CombinedHighlight[],
 	canReportHighlights = false
 } = {}) {
-	const data: SummaryHighlightsData = {
-		sessionHighlights: [],
-		monthHighlights: [],
-		localHighlights
-	};
+	const data: SummaryHighlightsData = { inter: localHighlights, intra: [] };
+
 	const params = { canReportHighlights } as SummaryTabParams;
 	return render(
 		summaryHighlightsTab.TabComponent({ data, viewedGroup, params })

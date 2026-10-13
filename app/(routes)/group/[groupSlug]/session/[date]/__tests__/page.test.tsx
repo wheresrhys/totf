@@ -33,23 +33,26 @@ vi.mock('@/app/lib/group-slug', () => ({
 // fixed sentence, not the real formatting logic (covered by the pipeline's own
 // tests).
 vi.mock('@/app/lib/highlights/lib/hg2', () => ({
-	getAllHighlightsAcrossScopes: vi.fn().mockResolvedValue([
-		{
-			formatters: {
-				combinedHighlightPrinter: () => 'Busiest session ever — 3 birds',
-				highlightListPrefixPrinter: () => ''
-			},
-			descriptor: {
-				category: 'count',
-				type: 'session-total',
-				unit: 'encounter'
-			},
-			value: { timePeriod: '2024-03-15', value: 3, species: null },
-			species: undefined,
-			bestPosition: 1,
-			scopes: []
-		}
-	])
+	getAllHighlightsAcrossScopes: vi.fn().mockResolvedValue({
+		inter: [
+			{
+				formatters: {
+					combinedHighlightPrinter: () => 'Busiest session ever — 3 birds',
+					highlightListPrefixPrinter: () => ''
+				},
+				descriptor: {
+					category: 'count',
+					type: 'session-total',
+					unit: 'encounter'
+				},
+				value: { timePeriod: '2024-03-15', value: 3, species: null },
+				species: undefined,
+				bestPosition: 1,
+				scopes: []
+			}
+		],
+		intra: []
+	})
 }));
 
 const mockEncounters = [

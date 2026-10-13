@@ -10,12 +10,14 @@ import type {
 	HighlightsGenerator,
 	HighlightInitConfig,
 	HighlightScope,
+	HighlightOutlook,
 	HighlightDataLake,
 	ExtendedTemporalUnit,
 	HighlightPageLevelPresence,
 	HighlightPresenceAtScopes,
 	HighlightValueWithRanking,
-	NewHighlightValue
+	NewHighlightValue,
+	HighlightGenerationConfig
 } from '../types';
 import {
 	getStatsByTemporalUnit,
@@ -139,13 +141,14 @@ const DEFAULT_HIGHLIGHT_INIT_CONFIG: HighlightInitConfig = {
 function getPresence(
 	rule: HighlightsGenerator,
 	temporalUnit: ExtendedTemporalUnit,
+	outlook: HighlightOutlook,
 	species?: string
-): Partial<HighlightPageLevelPresence> | undefined | null {
-	if (!rule.presence) return {};
+): HighlightGenerationConfig[] | undefined | null {
+	if (!rule.presence) return [];
 	const rulePresence = species ? rule.presence.species : rule.presence.general;
 	return rulePresence?.[
 		camelCase(temporalUnit) as keyof HighlightPresenceAtScopes
-	];
+	]?.[outlook];
 }
 
 function getTimeWindow(
@@ -170,28 +173,25 @@ export async function getHighlightsOfTypeAcrossScopes({
 	timePeriod,
 	temporalUnit,
 	viewedGroup,
+	outlook,
 	species
 }: {
 	highlightType: string;
 	timePeriod: string;
 	temporalUnit: ExtendedTemporalUnit;
 	viewedGroup: ViewedGroup;
+	outlook: HighlightOutlook;
 	species?: string;
 }) {
 	const rule = getRule(highlightType);
-	const presence = getPresence(rule, temporalUnit, species);
+	const presence = getPresence(rule, temporalUnit, outlook, species);
 	if (!presence) return [];
 
-	const configs = Object.entries(presence)
-		.flatMap(([highlightIterator, dataLakeConfig]) => {
-			const sampleTemporalUnit = highlightIterator
-				.substring(3)
-				.toLowerCase() as TemporalUnit;
-			return Object.entries(dataLakeConfig).map(([lakeScope, limit]) => {
+	const configs = presence
+		.flatMap(({ sample: sampleTemporalUnit, lakes }) => {
+			return Object.entries(lakes).map(([lakeScope, limit]) => {
 				if (limit === 0) return;
-				const lakeScopeTemporalUnit = noCase(
-					lakeScope.replace('relativeTo', '')
-				) as ExtendedTemporalUnit;
+				const lakeScopeTemporalUnit = noCase(lakeScope) as ExtendedTemporalUnit;
 				return {
 					highlightType,
 					viewedGroup,
@@ -250,17 +250,17 @@ function combineSimilarHighlights(
 	ruleType: string
 ): CombinedHighlight[] {
 	const rule = getRule(ruleType);
-	const groupedByDescriptor: Map<string, NewHighlightValue[]> = new Map();
+	const groupings: Map<string, NewHighlightValue[]> = new Map();
 	highlights.forEach((highlight) => {
-		const mapKey = highlight.species ?? 'none';
-		if (groupedByDescriptor.has(mapKey)) {
-			groupedByDescriptor.get(mapKey)?.push(highlight);
+		const mapKey = `${highlight.scope.temporalUnit}-${highlight.timePeriod}-${highlight.species ?? 'no-species'}`;
+		if (groupings.has(mapKey)) {
+			groupings.get(mapKey)?.push(highlight);
 		} else {
-			groupedByDescriptor.set(mapKey, [highlight]);
+			groupings.set(mapKey, [highlight]);
 		}
 	});
 
-	return [...groupedByDescriptor.values()].map((highlights) => {
+	return [...groupings.values()].map((highlights) => {
 		highlights.sort((a: NewHighlightValue, b: NewHighlightValue): number =>
 			sortByPositionAndTimeWindow(
 				{ position: a.ranking.position, window: a.scope.parentTimeWindow },
@@ -287,10 +287,11 @@ function combineSimilarHighlights(
 	});
 }
 
-export async function getAllHighlightsAcrossScopes(options: {
+export async function getAllHighlightsOfOutlookAcrossScopes(options: {
 	timePeriod: string;
 	temporalUnit: ExtendedTemporalUnit;
 	viewedGroup: ViewedGroup;
+	outlook: HighlightOutlook;
 	species?: string;
 }) {
 	const allHighlights = await Promise.all(
@@ -302,8 +303,31 @@ export async function getAllHighlightsAcrossScopes(options: {
 			const significantHighlights =
 				removeLessSignificantHighlights(allHighlightsOfType);
 			const combined = combineSimilarHighlights(significantHighlights, type);
+
 			return combined;
 		})
 	);
 	return sortHighlights(allHighlights.flatMap((x) => x));
+}
+
+export async function getAllHighlightsAcrossScopes(options: {
+	timePeriod: string;
+	temporalUnit: ExtendedTemporalUnit;
+	viewedGroup: ViewedGroup;
+	species?: string;
+}) {
+	const [inter, intra] = await Promise.all([
+		getAllHighlightsOfOutlookAcrossScopes({
+			...options,
+			outlook: 'inter'
+		}),
+		getAllHighlightsOfOutlookAcrossScopes({
+			...options,
+			outlook: 'intra'
+		})
+	]);
+	return {
+		inter,
+		intra
+	};
 }

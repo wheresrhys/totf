@@ -94,7 +94,10 @@ describe('fetchSessionHighlights', () => {
 	async function mockPipeline(highlights: CombinedHighlight[]) {
 		const { getAllHighlightsAcrossScopes } =
 			await import('@/app/lib/highlights/lib/hg2');
-		vi.mocked(getAllHighlightsAcrossScopes).mockResolvedValue(highlights);
+		vi.mocked(getAllHighlightsAcrossScopes).mockResolvedValue({
+			inter: highlights,
+			intra: []
+		});
 		return getAllHighlightsAcrossScopes;
 	}
 

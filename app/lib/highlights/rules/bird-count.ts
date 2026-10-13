@@ -44,44 +44,127 @@ export const birdCount: HighlightsGenerator = {
 		species: null,
 		general: {
 			day: {
-				perDay: {
-					relativeToAllTime: 3,
-					relativeToAllTimeMonth: 3,
-					relativeToYear: 3
-				}
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 3,
+							allTimeMonth: 3,
+							year: 3
+						}
+					}
+				]
 			},
 			allTime: {
-				perYear: {
-					relativeToAllTime: 1
-				},
-				perMonth: {
-					relativeToAllTime: 1
-				},
-				perDay: {
-					relativeToAllTime: 3
-				}
+				intra: [
+					{
+						sample: 'year',
+						lakes: {
+							allTime: 3
+						}
+					},
+					{
+						sample: 'month',
+						lakes: {
+							allTime: 3
+						}
+					},
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 3
+						}
+					}
+				]
 			},
 			year: {
-				perMonth: {
-					relativeToAllTime: 1
-				},
-				perDay: {
-					relativeToAllTime: 3,
-					relativeToYear: 3
-				}
+				inter: [
+					{
+						sample: 'year',
+						lakes: {
+							allTime: 3
+						}
+					},
+					{
+						sample: 'month',
+						lakes: {
+							allTime: 3
+						}
+					},
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 3
+						}
+					}
+				],
+				intra: [
+					{
+						sample: 'day',
+						lakes: {
+							year: 3
+						}
+					}
+				]
 			},
 			allTimeMonth: {
-				perDay: {
-					relativeToAllTime: 3,
-					relativeToAllTimeMonth: 3
-				}
+				intra: [
+					{
+						sample: 'day',
+						lakes: {
+							allTimeMonth: 3
+						}
+					},
+					{
+						sample: 'month',
+						lakes: {
+							allTimeMonth: 3
+						}
+					}
+				],
+				inter: []
 			},
 			month: {
-				perDay: {
-					relativeToAllTime: 3,
-					relativeToYear: 3,
-					relativeToMonth: 1
-				}
+				intra: [
+					{
+						sample: 'day',
+						lakes: {
+							month: 3
+						}
+					}
+				],
+				inter: [
+					{
+						sample: 'month',
+						lakes: {
+							allTimeMonth: 3
+						}
+					},
+					{
+						sample: 'month',
+						lakes: {
+							allTime: 3
+						}
+					},
+					{
+						sample: 'day',
+						lakes: {
+							allTimeMonth: 3
+						}
+					},
+					{
+						sample: 'day',
+						lakes: {
+							year: 3
+						}
+					},
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 3
+						}
+					}
+				]
 			}
 		}
 	}

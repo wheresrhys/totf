@@ -45,10 +45,15 @@ export const lightestOfSpecies: HighlightsGenerator = {
 		species: null,
 		general: {
 			day: {
-				perDay: {
-					relativeToAllTime: 3,
-					relativeToYear: 1
-				}
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 3,
+							year: 1
+						}
+					}
+				]
 			},
 			month: null,
 			year: null,

@@ -116,6 +116,12 @@ export function descriptorToString(descriptor: HighlightDescriptor): string {
 		.join(':');
 }
 
+function areNumericHighlights(
+	highlights: HighlightValue[]
+): highlights is (HighlightValue & NumericHighlightValue)[] {
+	return isNumericHighlightValue(highlights[0]);
+}
+
 export function limitHighlights(
 	highlights: HighlightValue[],
 	limit: number
@@ -123,7 +129,7 @@ export function limitHighlights(
 	if (!highlights.length) {
 		return [];
 	}
-	if (!isNumericHighlightValue(highlights[0])) {
+	if (!areNumericHighlights(highlights)) {
 		return highlights.map(
 			(highlight) =>
 				({
@@ -145,8 +151,7 @@ export function limitHighlights(
 		topHighlights = highlights.slice(0, itemsIncludingTies);
 	}
 	const values = topHighlights.map((x) => x.value);
-	const uniqueValues = [...new Set(values)].sort();
-
+	const uniqueValues = [...new Set(values)].sort((a, b) => b - a);
 	return topHighlights.map((highlight) => {
 		return {
 			...highlight,
@@ -181,9 +186,11 @@ export function getHighlightsOfTypeFromStatsRows({
 		scope
 	);
 
-	return limitHighlights(highlights, limit).filter(({ timePeriod }) =>
+	const b = limitHighlights(highlights, limit).filter(({ timePeriod }) =>
 		timeWindowFilter(timePeriod)
 	);
+	console.log(b);
+	return b;
 }
 
 export function buildTimeWindowFilter(parentTimeWindow?: YearMonthRestriction) {

@@ -83,19 +83,6 @@ describe('SpHighlightsTab', () => {
 	});
 
 	describe('rendering with server-prefetched data', () => {
-		it('renders session and month highlights sections once data loads', () => {
-			renderTab({
-				initialData: buildData({
-					sessionHighlights: [buildHighlight('Busiest session')],
-					monthHighlights: [buildHighlight('Busiest month')]
-				})
-			});
-			expect(screen.getByText('Session highlights')).toBeTruthy();
-			expect(screen.getByText(/Busiest session/)).toBeTruthy();
-			expect(screen.getByText('Month highlights')).toBeTruthy();
-			expect(screen.getByText(/Busiest month/)).toBeTruthy();
-		});
-
 		it('renders the notable retraps table when notableRetraps is non-empty', () => {
 			renderTab({ initialData: buildData() });
 			expect(screen.getByRole('table')).toBeTruthy();
