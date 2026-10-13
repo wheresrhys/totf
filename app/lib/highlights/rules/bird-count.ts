@@ -60,7 +60,7 @@ export const birdCount: HighlightsGenerator = {
 					{
 						sample: 'year',
 						lakes: {
-							allTime: 3
+							allTime: 1
 						}
 					},
 					{

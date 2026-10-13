@@ -82,7 +82,9 @@ export async function fetchSummaryHighlightsData(
 ) {
 	const { year, month } = params;
 	return await getAllHighlightsAcrossScopes({
-		timePeriod: `${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
+		timePeriod: year
+			? `${year}-${String(month).padStart(2, '0') ?? '01'}-01`
+			: null,
 		temporalUnit: getTemporalUnitFromTimeWindow({ year, month }),
 		viewedGroup
 	});

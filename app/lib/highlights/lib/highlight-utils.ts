@@ -29,9 +29,10 @@ const highlightCategoryOrder: HighlightCategory[] = [
 	'demographics'
 ];
 export function getTimePeriodSampler(
-	timePeriod: string,
+	timePeriod?: string,
 	timeWindow?: YearMonthRestriction
 ) {
+	if (!timePeriod) return () => true;
 	return timeWindow
 		? buildTimeWindowFilter(timeWindow)
 		: (highlightTimePeriod: string) => highlightTimePeriod === timePeriod;

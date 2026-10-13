@@ -1,45 +1,23 @@
 import { camelCase, noCase } from 'change-case';
 import type {
-	HighlightsOfType,
 	YearMonthRestriction,
-	HighlightDescriptor,
-	HighlightValue,
 	CombinedHighlight,
-	HighlightCategory,
-	NumericHighlightValue,
 	HighlightsGenerator,
 	HighlightInitConfig,
-	HighlightScope,
 	HighlightOutlook,
-	HighlightDataLake,
 	ExtendedTemporalUnit,
-	HighlightPageLevelPresence,
 	HighlightPresenceAtScopes,
-	HighlightValueWithRanking,
 	NewHighlightValue,
 	HighlightGenerationConfig
 } from '../types';
-import {
-	getStatsByTemporalUnit,
-	StatsRepository,
-	fetchStatsSpines,
-	getServerCachedStats,
-	StatsResult
-} from '@/app/actions/stats-cache';
-import { isNumericHighlightValue } from '../types';
 import { getRule, ruleTypes } from '../rules';
 import {
 	dateToYearMonth,
 	getHighlightsOfTypeFromStatsRows,
-	buildTimeWindowFilter,
-	getFilteredStatsCache,
-	getSpeciesFilter,
 	filterStats,
 	getTimePeriodSampler,
-	descriptorToString,
 	sortHighlights,
-	sortByPositionAndTimeWindow,
-	type PositionAndTimeWindow
+	sortByPositionAndTimeWindow
 } from './highlight-utils';
 import { pooledRequestForStats } from './stats-cache-fetcher';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
@@ -152,9 +130,12 @@ function getPresence(
 }
 
 function getTimeWindow(
-	timePeriod: string,
+	timePeriod: string | null,
 	temporalUnit: ExtendedTemporalUnit
 ): YearMonthRestriction | undefined {
+	if (!timePeriod) {
+		return;
+	}
 	const { year, month } = dateToYearMonth(timePeriod);
 
 	if (temporalUnit === 'month') {
@@ -177,7 +158,7 @@ export async function getHighlightsOfTypeAcrossScopes({
 	species
 }: {
 	highlightType: string;
-	timePeriod: string;
+	timePeriod: string | null;
 	temporalUnit: ExtendedTemporalUnit;
 	viewedGroup: ViewedGroup;
 	outlook: HighlightOutlook;
@@ -288,7 +269,7 @@ function combineSimilarHighlights(
 }
 
 export async function getAllHighlightsOfOutlookAcrossScopes(options: {
-	timePeriod: string;
+	timePeriod: string | null;
 	temporalUnit: ExtendedTemporalUnit;
 	viewedGroup: ViewedGroup;
 	outlook: HighlightOutlook;
@@ -311,7 +292,7 @@ export async function getAllHighlightsOfOutlookAcrossScopes(options: {
 }
 
 export async function getAllHighlightsAcrossScopes(options: {
-	timePeriod: string;
+	timePeriod: string | null;
 	temporalUnit: ExtendedTemporalUnit;
 	viewedGroup: ViewedGroup;
 	species?: string;
