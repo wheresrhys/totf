@@ -17,7 +17,6 @@ import type { MonthTotalsRow } from '@/app/lib/month-totals';
 // working unchanged — see `HighlightsByTimePeriod.tsx`'s doc comment for why
 // the implementation itself had to move (breaking a circular import with
 // `SummaryHighlightsTab.tsx` below).
-export { HighlightsByTimePeriod } from '@/app/components/HighlightsByTimePeriod';
 
 export function SummaryTotalsSection({
 	summaryStats,

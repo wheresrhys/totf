@@ -5,7 +5,6 @@ import { SpHighlightsTab, type SpHighlightsTabData } from '../SpHighlightsTab';
 import notableRetrapsSnapshot from '@/test-fixtures/snapshots/notable_retraps/robin-alpha.retraps.json';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
-import type { HighlightsOfType } from '@/app/lib/highlights/types';
 
 // `SpHighlightsTab.tsx` statically imports `fetchNotableRetraps` (a real
 // server action whose module eagerly constructs a Supabase client at import
@@ -30,29 +29,10 @@ vi.mock('@/app/lib/highlights', () => ({
 const params: SpeciesTotalsTabParams = { speciesName: 'Robin' };
 const viewedGroup = { id: 1, slug: 'alpha' };
 
-/**
- * One renderable highlight. `highlightListPrefixPrinter` is the only
- * formatter `HighlightsByTimePeriod` reaches, so it carries the identifying
- * text a test asserts on.
- */
-function buildHighlight(prefix: string): HighlightsOfType {
-	return {
-		descriptor: { category: 'count', type: 'most-birds', unit: 'bird' },
-		scope: { temporalUnit: 'day' },
-		values: [{ timePeriod: '2025-01-16', value: 42, species: null }],
-		formatters: {
-			highlightListPrefixPrinter: () => prefix,
-			combinedHighlightPrinter: () => prefix
-		}
-	};
-}
-
 function buildData(
 	overrides: Partial<SpHighlightsTabData> = {}
 ): SpHighlightsTabData {
 	return {
-		sessionHighlights: [],
-		monthHighlights: [],
 		notableRetraps: notableRetrapsSnapshot as NotableRetrapsResult[],
 		...overrides
 	};

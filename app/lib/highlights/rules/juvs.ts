@@ -3,13 +3,11 @@ import {
 	printProminenceQualifier,
 	printTemporalUnit,
 	printTimeQualifier,
-	printCombinedHighlight,
-	sentenceCase
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByPropertiesSum } from '../lib/rule-utils';
 
 export const juvs: HighlightsGenerator = {
-	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
@@ -18,7 +16,7 @@ export const juvs: HighlightsGenerator = {
 				lineItem: ({ scope, ranking }) =>
 					`${printProminenceQualifier(ranking, 'equal')} most ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
-			}),
+			})
 	},
 	descriptor: {
 		type: 'juvs',

@@ -10,7 +10,6 @@ import { getTopByProperty } from '../lib/rule-utils';
 
 const timeQualifierOptions: TimeQualifierOptions = { yearConnector: 'of' };
 export const singleSpeciesCount: HighlightsGenerator = {
-	statsSelector: 'coreStatsWithSpecies',
 	formatters: {
 		// -> Highest count of a single species in 2021: 54 Reed Warblers
 		combinedHighlightPrinter: (combinedHighlight) =>
@@ -20,7 +19,7 @@ export const singleSpeciesCount: HighlightsGenerator = {
 				lineItem: ({ scope, ranking }) =>
 					`${printProminenceQualifier(ranking)} highest ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
 				shouldPrintValue: true
-			}),
+			})
 	},
 	descriptor: {
 		type: 'singleSpeciesCount',

@@ -8,7 +8,6 @@ import {
 import { getTopByPropertiesSum } from '../lib/rule-utils';
 
 export const eachSpeciesJuvs: HighlightsGenerator = {
-	statsSelector: 'coreStatsBySpecies',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
@@ -23,7 +22,7 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 				lineItem: ({ scope, ranking }) =>
 					`${printProminenceQualifier(ranking, 'equal')} highest ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
-			}),
+			})
 	},
 	descriptor: {
 		type: 'eachSpeciesJuvs',

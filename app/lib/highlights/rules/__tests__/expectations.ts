@@ -22,10 +22,6 @@ export const expectations = {
 			'this year (month)': 'Busiest month this year: 12 birds',
 			'tied global and second of year (month)':
 				'Busiest month ever and busiest of 2020: 12 birds'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Busiest',
-			'multiple month': 'Most individuals'
 		}
 	},
 	encounters: {
@@ -42,10 +38,6 @@ export const expectations = {
 				'Month with most encounters this year: 12 encounters',
 			'tied global and second of year (month)':
 				'Month with most encounters ever and most of 2020: 12 encounters'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Most encounters',
-			'multiple month': 'Most encounters'
 		}
 	},
 	species: {
@@ -72,10 +64,6 @@ export const expectations = {
 			'this year (month)': 'Most varied month this year: 12 species',
 			'tied global and second of year (month)':
 				'Most varied month ever and most varied of 2020: 12 species'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Most varied',
-			'multiple month': 'Most varied'
 		}
 	},
 	newBirds: {
@@ -107,10 +95,6 @@ export const expectations = {
 				'Month with highest new bird count this year: 12 birds',
 			'tied global and second of year (month)':
 				'Month with highest new bird count ever and highest of 2020: 12 birds'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Most new birds',
-			'multiple month': 'Most new birds'
 		}
 	},
 	juvs: {
@@ -137,10 +121,6 @@ export const expectations = {
 			'this year (month)': 'Month with most juvs this year: 12 birds',
 			'tied global and second of year (month)':
 				'Month with most juvs ever and most of 2020: 12 birds'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Most juvs',
-			'multiple month': 'Most juvs'
 		}
 	},
 	singleSpeciesCount: {
@@ -179,10 +159,6 @@ export const expectations = {
 				'Highest single species month count this year: 12 birds',
 			'tied global and second of year (month)':
 				'Highest single species month count ever and highest of 2020: 12 birds'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Most individuals of a single species',
-			'multiple month': 'Most individuals of a single species'
 		}
 	},
 	singleSpeciesEncounters: {
@@ -203,10 +179,6 @@ export const expectations = {
 				'Most encounters of a single species in a month this year: 12 encounters',
 			'tied global and second of year (month)':
 				'Most encounters of a single species in a month ever and most of 2020: 12 encounters'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Most encounters of a single species',
-			'multiple month': 'Most encounters of a single species'
 		}
 	},
 	eachSpeciesCount: {
@@ -235,10 +207,6 @@ export const expectations = {
 			'this year (month)': 'Highest Robin count in a month this year: 12 birds',
 			'tied global and second of year (month)':
 				'Highest Robin count in a month ever and highest of 2020: 12 birds'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Highest count for Robin',
-			'multiple month': 'Highest counts for Robin'
 		}
 	},
 	eachSpeciesJuvs: {
@@ -271,10 +239,6 @@ export const expectations = {
 				'Highest juv Robin count in a month this year: 12 birds',
 			'tied global and second of year (month)':
 				'Highest juv Robin count in a month ever and highest of 2020: 12 birds'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Highest juv count for Robin',
-			'multiple month': 'Highest juv counts for Robin'
 		}
 	},
 	rarities: {
@@ -298,10 +262,6 @@ export const expectations = {
 			'tied second of year (month)': '12 Robin of 2020',
 			'this year (month)': '12 Robin this year',
 			'tied global and second of year (month)': '12 Robin ever'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Rarities',
-			'multiple month': 'Rarities'
 		}
 	},
 	heaviestOfSpecies: {
@@ -318,10 +278,6 @@ export const expectations = {
 			'tied second of month (day)': 'Heaviest Robin in any February: 12g',
 			'global and tied second of year and third of month (day)':
 				'Heaviest Robin ever, heaviest of 2020 and heaviest in any February: 12g'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Heaviest Robin',
-			'multiple month': 'Heaviest Robins'
 		}
 	},
 	lightestOfSpecies: {
@@ -338,10 +294,6 @@ export const expectations = {
 			'tied second of month (day)': 'Lightest Robin in any February: 12g',
 			'global and tied second of year and third of month (day)':
 				'Lightest Robin ever, lightest of 2020 and lightest in any February: 12g'
-		},
-		printedHighlightsOfType: {
-			'single session': 'Lightest Robin',
-			'multiple month': 'Lightest Robins'
 		}
 	}
 };

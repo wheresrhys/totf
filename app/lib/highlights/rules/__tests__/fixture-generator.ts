@@ -4,9 +4,7 @@ import type {
 	TemporalUnit,
 	CombinedHighlight,
 	HighlightsGenerator,
-	EnhancedStatsRepository,
-	HighlightDescriptor,
-	HighlightsOfType
+	HighlightDescriptor
 } from '../../types';
 
 // call each rule set's printers with standard data input shapes
@@ -17,21 +15,10 @@ import type {
 
 // A rule scoped to one species at a time gets fixtures carrying a species (its
 // printer reads combinedHighlight.species); a group-wide rule gets fixtures
-// without one. Asking the rule's own statsSelector is what decides it: a
-// per-species selector returns the coreStatsBySpecies record, every other selector
-// returns a flat array — the same distinction generateAllHighlights makes when
-// it builds a scope per species. Reading it off the selector rather than off a
-// naming convention ('eachSpecies…') means a new per-species rule is covered
-// without also having to be named like one.
+// without one. speciesUsed === 'grouped' is exactly this distinction — the same
+// one generateAllHighlights uses when it builds a scope per species.
 export function isPerSpeciesRule(rule: HighlightsGenerator): boolean {
-	const emptyStats: EnhancedStatsRepository = {
-		coreStats: [],
-		coreStatsWithSpecies: [],
-		coreStatsBySpecies: {},
-		biometricsStatsWithSpecies: [],
-		biometricsStatsBySpecies: {}
-	};
-	return !Array.isArray(emptyStats[rule.statsSelector]);
+	return rule.speciesUsed === 'grouped';
 }
 
 function getBaseScope(
@@ -71,46 +58,6 @@ function getCombinedHighlightMaker(descriptor: HighlightDescriptor) {
 				ranking: HighlightRanking;
 			}[]
 		};
-	};
-}
-
-export function getHighlightsOfTypeFixtures(
-	rule: HighlightsGenerator
-): Record<string, HighlightsOfType> {
-	return {
-		'single session': {
-			descriptor: rule.descriptor,
-			scope: {
-				temporalUnit: 'day'
-			},
-			values: [
-				{
-					value: 12,
-					timePeriod: `2020-02-02`,
-					species: 'Robin'
-				}
-			],
-			formatters: rule.formatters
-		},
-		'multiple month': {
-			descriptor: rule.descriptor,
-			scope: {
-				temporalUnit: 'month'
-			},
-			values: [
-				{
-					value: 12,
-					timePeriod: `2020-02-02`,
-					species: 'Robin'
-				},
-				{
-					value: 1,
-					timePeriod: `2020-02-02`,
-					species: 'Blackcap'
-				}
-			],
-			formatters: rule.formatters
-		}
 	};
 }
 

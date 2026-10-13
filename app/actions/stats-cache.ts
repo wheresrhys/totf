@@ -9,11 +9,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-export type StatsRepository = {
-	coreStats: CoreStatsResult[];
-	coreStatsWithSpecies: CoreStatsResult[];
-	biometricsStatsWithSpecies: BiometricsStatsResult[];
-};
 
 function getStatsRPCFetcher<ResultType>(
 	rpcName: string,
@@ -67,40 +62,6 @@ export async function getServerCachedStats({
 		viewedGroup,
 		getStatsRPCFetcher<StatsResult>(rpcName, temporalUnit, fetchDataBySpecies)
 	);
-}
-
-export async function getStatsByTemporalUnit(
-	temporalUnit: TemporalUnit,
-	viewedGroup: ViewedGroup
-): Promise<StatsRepository> {
-	const [coreStats, coreStatsWithSpecies, biometricsStatsWithSpecies] =
-		await Promise.all([
-			cachedSupabaseFetch(
-				`${temporalUnit}-core-stats`,
-				viewedGroup,
-				getStatsRPCFetcher<CoreStatsResult>('core_stats', temporalUnit)
-			),
-			cachedSupabaseFetch(
-				`${temporalUnit}-species-core-stats`,
-				viewedGroup,
-				getStatsRPCFetcher<CoreStatsResult>('core_stats', temporalUnit, true)
-			),
-			cachedSupabaseFetch(
-				`${temporalUnit}-species-biometrics-stats`,
-				viewedGroup,
-				getStatsRPCFetcher<BiometricsStatsResult>(
-					'biometrics_stats',
-					temporalUnit,
-					true
-				)
-			)
-		]);
-
-	return {
-		coreStats,
-		coreStatsWithSpecies,
-		biometricsStatsWithSpecies
-	};
 }
 
 // Group-wide, ungrouped-by-species monthly core_stats — shares its cache

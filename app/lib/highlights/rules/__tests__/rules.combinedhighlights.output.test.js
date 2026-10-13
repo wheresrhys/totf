@@ -2,10 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import { highlightRules } from '../';
 import { expectations as allExpectations } from './expectations';
-import {
-	getCombinedHighlightFixtures,
-	getHighlightsOfTypeFixtures
-} from './fixture-generator';
+import { getCombinedHighlightFixtures } from './fixture-generator';
 
 describe('rules output for combined highlights', () => {
 	highlightRules.forEach((rule) => {
@@ -27,22 +24,6 @@ describe('rules output for combined highlights', () => {
 					);
 				});
 			}
-
-			describe('list prefix printers', () => {
-				const highlightsOfTypeFixtures = getHighlightsOfTypeFixtures(rule);
-
-				const expectations =
-					allExpectations[rule.descriptor.type].printedHighlightsOfType;
-				Object.entries(highlightsOfTypeFixtures).map(
-					([testCase, highlightsOfType]) => {
-						it(testCase, () => {
-							expect(
-								rule.formatters.highlightListPrefixPrinter(highlightsOfType)
-							).toEqual(expectations[testCase]);
-						});
-					}
-				);
-			});
 		});
 	});
 });

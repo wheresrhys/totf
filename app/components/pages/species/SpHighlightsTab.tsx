@@ -9,7 +9,6 @@ import {
 } from '@/app/actions/sp-data';
 import { NotableRetrapsTable } from '@/app/components/NotableRetrapsTable';
 import type { NotableRetrapsResult } from '@/app/models/db';
-import type { HighlightsOfType } from '@/app/lib/highlights/types';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 
@@ -18,8 +17,6 @@ import type { TabConfig } from '@/app/components/shared/TabContent';
 // x2 + `fetchNotableRetraps`) this tab's own handrolled `useEffect` made
 // before this migration, flattened into a single `dataFetcher`.
 export type SpHighlightsTabData = {
-	sessionHighlights: HighlightsOfType[];
-	monthHighlights: HighlightsOfType[];
 	notableRetraps: NotableRetrapsResult[];
 };
 
@@ -52,7 +49,7 @@ async function fetchHighlightsTabData(
 			[],
 			fetchNotableRetraps(speciesName, viewedGroup, fromDate, toDate)
 		]);
-	return { sessionHighlights, monthHighlights, notableRetraps };
+	return { notableRetraps };
 }
 
 // Pure, presentational `TabConfig.TabComponent` (#1066) — fetching/loading/
@@ -69,12 +66,9 @@ export function SpHighlightsTab({
 	data: unknown;
 	viewedGroup: ViewedGroup;
 }) {
-	const { sessionHighlights, monthHighlights, notableRetraps } =
-		(data as SpHighlightsTabData | null) ?? {
-			sessionHighlights: [],
-			monthHighlights: [],
-			notableRetraps: []
-		};
+	const { notableRetraps } = (data as SpHighlightsTabData | null) ?? {
+		notableRetraps: []
+	};
 
 	return (
 		<>

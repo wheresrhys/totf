@@ -7,12 +7,6 @@ export type {
 	TemporalUnit,
 	StatUnit
 } from '@/app/components/shared/StatOutput';
-import type { StatsRepository } from '@/app/actions/stats-cache';
-
-export type EnhancedStatsRepository = StatsRepository & {
-	coreStatsBySpecies: Record<string, CoreStatsResult[]>;
-	biometricsStatsBySpecies: Record<string, BiometricsStatsResult[]>;
-};
 
 export type YearMonthRestriction = {
 	year?: number;
@@ -95,36 +89,30 @@ type HighlightFormatters = {
 	combinedHighlightPrinter: CombinedHighlightPrinter;
 };
 
-type StatsRowOf<StatsProperty> =
-	StatsProperty extends Record<string, (infer Row)[]>
-		? Row
-		: StatsProperty extends (infer Row)[]
-			? Row
-			: never;
+type RpcRowMap = {
+	core_stats: CoreStatsResult;
+	biometrics_stats: BiometricsStatsResult;
+};
 
-type HighlightsGeneratorFor<
-	StatsSelectorKey extends keyof EnhancedStatsRepository
-> = {
+type HighlightsGeneratorFor<RpcName extends keyof RpcRowMap> = {
 	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	limit?: number;
-	statsSelector: StatsSelectorKey;
-	rpcName: 'core_stats' | 'biometrics_stats';
+	rpcName: RpcName;
 	speciesUsed: 'none' | 'present' | 'grouped';
 	presence?: HighlightPresenceConfig;
 	generator: (
-		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[],
+		stats: RpcRowMap[RpcName][],
 		scope?: HighlightScope
 	) => HighlightValue[];
 	condition?: (scope: HighlightScope) => boolean;
 };
 
 export type HighlightsGenerator = {
-	[StatsSelectorKey in keyof EnhancedStatsRepository]: HighlightsGeneratorFor<StatsSelectorKey>;
-}[keyof EnhancedStatsRepository];
+	[RpcName in keyof RpcRowMap]: HighlightsGeneratorFor<RpcName>;
+}[keyof RpcRowMap];
 
 type HighlightPositionsLimit = 0 | 1 | 2 | 3;
-
 
 export type HighlightDataLake = {
 	allTime?: HighlightPositionsLimit;
@@ -138,10 +126,6 @@ export type CamelCaseExtendedTemporalUnit =
 	| TemporalUnit
 	| 'allTime'
 	| 'allTimeMonth';
-// export type HighlightPageLevelPresence = Record<
-// 	HighlightIterator,
-// 	HighlightDataLake
-// >;
 
 export type HighlightOutlook = 'inter' | 'intra';
 export type HighlightGenerationConfig = {
