@@ -4,7 +4,6 @@ import {
 	printTemporalUnit,
 	printTimeQualifier,
 	printCombinedHighlight,
-	sentenceCase,
 	type TimeQualifierOptions
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
@@ -13,7 +12,6 @@ const timeQualifierOptions: TimeQualifierOptions = {
 	monthConnector: 'of'
 };
 export const encounterCount: HighlightsGenerator = {
-	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
@@ -28,9 +26,7 @@ export const encounterCount: HighlightsGenerator = {
 						timeQualifierOptions
 					)}${scope.parentTimeWindow?.month && combinedHighlight.scopes[0].scope.temporalUnit === 'day' ? ' session' : ''}`,
 				shouldPrintValue: true
-			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			sentenceCase(`Most encounters`)
+			})
 	},
 	descriptor: {
 		type: 'encounters',

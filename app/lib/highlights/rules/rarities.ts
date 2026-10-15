@@ -15,7 +15,6 @@ function getAppearances(stats: CoreStatsResult[]): CoreStatsResult[] {
 }
 
 export const rarities: HighlightsGenerator = {
-	statsSelector: 'coreStatsBySpecies',
 	formatters: {
 		// Only scopes[0] is read. Unlike a count metric, where each extra scope
 		// adds information ("busiest ever AND busiest of 2020"), every extra scope
@@ -28,8 +27,7 @@ export const rarities: HighlightsGenerator = {
 				lineItem: ({ scope, combinedHighlight }) =>
 					`${combinedHighlight.value.value} ${combinedHighlight.species} ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: false
-			}),
-		highlightListPrefixPrinter: () => 'Rarities'
+			})
 	},
 	descriptor: {
 		type: 'rarities',

@@ -23,11 +23,6 @@ import {
 	fetchPeriodStats,
 	fetchCombinedMonthTotals
 } from '@/app/actions/summary-stats';
-import {
-	getHighlightsWithinTimeWindow,
-	getCondensedHighlightsAtTimePeriod,
-	getCondensedHighlightsWithinTimeWindow
-} from '@/app/lib/highlights';
 import { getAllHighlightsAcrossScopes } from '@/app/lib/highlights/lib/hg2';
 import { getTemporalUnitFromTimeWindow } from '@/app/lib/highlights/lib/highlight-utils';
 import type { TabConfig } from '@/app/components/shared/TabContent';
@@ -82,7 +77,9 @@ export async function fetchSummaryHighlightsData(
 ) {
 	const { year, month } = params;
 	return await getAllHighlightsAcrossScopes({
-		timePeriod: `${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
+		timePeriod: year
+			? `${year}-${String(month).padStart(2, '0') ?? '01'}-01`
+			: null,
 		temporalUnit: getTemporalUnitFromTimeWindow({ year, month }),
 		viewedGroup
 	});

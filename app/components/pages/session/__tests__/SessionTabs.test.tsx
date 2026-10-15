@@ -722,8 +722,7 @@ describe('SessionTabs', () => {
 		// formatting logic (covered by the v2 pipeline's own tests).
 		const countHighlight: CombinedHighlight = {
 			formatters: {
-				combinedHighlightPrinter: () => 'Busiest session ever — 3 birds',
-				highlightListPrefixPrinter: () => ''
+				combinedHighlightPrinter: () => 'Busiest session ever — 3 birds'
 			},
 			descriptor: {
 				category: 'count',

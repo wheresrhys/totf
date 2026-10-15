@@ -8,7 +8,6 @@ import {
 import { getTopByProperty } from '../lib/rule-utils';
 
 export const speciesCount: HighlightsGenerator = {
-	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
@@ -17,8 +16,7 @@ export const speciesCount: HighlightsGenerator = {
 				lineItem: ({ scope, ranking }) =>
 					`${printProminenceQualifier(ranking)} most varied ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
-			}),
-		highlightListPrefixPrinter: (highlightsOfType) => `Most varied`
+			})
 	},
 	descriptor: {
 		type: 'species',

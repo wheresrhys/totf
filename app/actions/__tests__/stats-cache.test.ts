@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { cachedSupabaseFetch } from '@/app/lib/cached-supabase-fetch';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
-import { getStatsByTemporalUnit, fetchCoreStatsByMonth } from '../stats-cache';
+import { fetchCoreStatsByMonth } from '../stats-cache';
 import { makeRpcChainRecorder } from '@/app/__tests__/helpers/rpc-recorder';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
@@ -28,115 +28,6 @@ vi.mock('@/app/lib/cached-supabase-fetch', () => ({
 
 const GROUP_ID = 1;
 const viewedGroup: ViewedGroup = { id: GROUP_ID, slug: 'alpha' };
-
-describe('getStatsByTemporalUnit', () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-		recorder = makeRpcChainRecorder();
-		mockSupabaseClient.rpc = recorder.rpc;
-		recorder.range.mockResolvedValue({ data: [], error: null });
-	});
-
-	it('wraps the db calls in the cached-supabase-fetch utility', async () => {
-		await getStatsByTemporalUnit('day', viewedGroup);
-		expect(cachedSupabaseFetch).toHaveBeenCalledTimes(3);
-		expect(cachedSupabaseFetch).toHaveBeenCalledWith(
-			'day-core-stats',
-			viewedGroup,
-			expect.any(Function)
-		);
-		expect(cachedSupabaseFetch).toHaveBeenCalledWith(
-			'day-species-core-stats',
-			viewedGroup,
-			expect.any(Function)
-		);
-		expect(cachedSupabaseFetch).toHaveBeenCalledWith(
-			'day-species-biometrics-stats',
-			viewedGroup,
-			expect.any(Function)
-		);
-	});
-	it('wraps the db calls in the fetchAllPaginatedRows utility appropriately', async () => {
-		await getStatsByTemporalUnit('day', viewedGroup);
-		expect(fetchAllPaginatedRows).toHaveBeenCalledTimes(3);
-		// ensures the range values from fetchAllPaginatedRows actually get used in the underlying query
-		expect(recorder.range).toHaveBeenCalledTimes(3);
-		expect(recorder.range).toHaveBeenCalledWith(10, 20);
-	});
-
-	it('calls the core_stats rpc ungrouped by species, ordered by day', async () => {
-		await getStatsByTemporalUnit('day', viewedGroup);
-		expect(recorder.calls).toContainEqual({
-			rpcCall: [
-				'core_stats',
-				{
-					ringing_group_filter: GROUP_ID,
-					group_by_species: false,
-					group_by_time_period: 'day'
-				}
-			],
-			orderCalls: [['time_period']]
-		});
-	});
-	it('calls the core_stats rpc grouped by species, ordered by day and species', async () => {
-		await getStatsByTemporalUnit('day', viewedGroup);
-		expect(recorder.calls).toContainEqual({
-			rpcCall: [
-				'core_stats',
-				{
-					ringing_group_filter: GROUP_ID,
-					group_by_species: true,
-					group_by_time_period: 'day'
-				}
-			],
-			orderCalls: [['time_period'], ['species_name']]
-		});
-	});
-	it('calls the biometrics_stats rpc grouped by species, ordered by day and species', async () => {
-		await getStatsByTemporalUnit('day', viewedGroup);
-		expect(recorder.calls).toContainEqual({
-			rpcCall: [
-				'biometrics_stats',
-				{
-					ringing_group_filter: GROUP_ID,
-					group_by_species: true,
-					group_by_time_period: 'day'
-				}
-			],
-			orderCalls: [['time_period'], ['species_name']]
-		});
-	});
-
-	it('returns the result of the rpc calls', async () => {
-		recorder.range.mockResolvedValueOnce({
-			data: [{ species_name: null, time_period: 1 }]
-		});
-		recorder.range.mockResolvedValueOnce({
-			data: [
-				{ species_name: 'cat', time_period: 1 },
-				{ species_name: 'dog', time_period: 1 }
-			]
-		});
-		recorder.range.mockResolvedValueOnce({
-			data: [
-				{ species_name: 'fish', time_period: 1 },
-				{ species_name: 'owl', time_period: 1 }
-			]
-		});
-		const result = await getStatsByTemporalUnit('day', viewedGroup);
-		expect(result).toStrictEqual({
-			coreStats: [{ species_name: null, time_period: 1 }],
-			coreStatsWithSpecies: [
-				{ species_name: 'cat', time_period: 1 },
-				{ species_name: 'dog', time_period: 1 }
-			],
-			biometricsStatsWithSpecies: [
-				{ species_name: 'fish', time_period: 1 },
-				{ species_name: 'owl', time_period: 1 }
-			]
-		});
-	});
-});
 
 describe('fetchCoreStatsByMonth', () => {
 	beforeEach(() => {

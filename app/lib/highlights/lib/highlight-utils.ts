@@ -1,6 +1,4 @@
 import type {
-	HighlightsOfType,
-	CherryPickedHighlight,
 	YearMonthRestriction,
 	HighlightDescriptor,
 	HighlightValue,
@@ -8,9 +6,7 @@ import type {
 	HighlightCategory,
 	NumericHighlightValue,
 	HighlightsGenerator,
-	HighlightInitConfig,
 	HighlightScope,
-	TextHighlightValue,
 	HighlightValueWithRanking
 } from '../types';
 import { isNumericHighlightValue } from '../types';
@@ -29,9 +25,10 @@ const highlightCategoryOrder: HighlightCategory[] = [
 	'demographics'
 ];
 export function getTimePeriodSampler(
-	timePeriod: string,
+	timePeriod?: string,
 	timeWindow?: YearMonthRestriction
 ) {
+	if (!timePeriod) return () => true;
 	return timeWindow
 		? buildTimeWindowFilter(timeWindow)
 		: (highlightTimePeriod: string) => highlightTimePeriod === timePeriod;

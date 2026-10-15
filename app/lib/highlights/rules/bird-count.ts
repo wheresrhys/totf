@@ -9,7 +9,6 @@ import {
 import { getTopByProperty } from '../lib/rule-utils';
 
 export const birdCount: HighlightsGenerator = {
-	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
@@ -26,11 +25,7 @@ export const birdCount: HighlightsGenerator = {
 				lineItem: ({ scope, ranking }) =>
 					`${printProminenceQualifier(ranking)} busiest ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
-			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			highlightsOfType.scope.temporalUnit === 'day'
-				? 'Busiest'
-				: 'Most individuals'
+			})
 	},
 	descriptor: {
 		type: 'birds',
@@ -60,7 +55,7 @@ export const birdCount: HighlightsGenerator = {
 					{
 						sample: 'year',
 						lakes: {
-							allTime: 3
+							allTime: 1
 						}
 					},
 					{

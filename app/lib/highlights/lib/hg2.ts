@@ -1,45 +1,22 @@
 import { camelCase, noCase } from 'change-case';
 import type {
-	HighlightsOfType,
 	YearMonthRestriction,
-	HighlightDescriptor,
-	HighlightValue,
 	CombinedHighlight,
-	HighlightCategory,
-	NumericHighlightValue,
 	HighlightsGenerator,
-	HighlightInitConfig,
-	HighlightScope,
 	HighlightOutlook,
-	HighlightDataLake,
 	ExtendedTemporalUnit,
-	HighlightPageLevelPresence,
 	HighlightPresenceAtScopes,
-	HighlightValueWithRanking,
 	NewHighlightValue,
 	HighlightGenerationConfig
 } from '../types';
-import {
-	getStatsByTemporalUnit,
-	StatsRepository,
-	fetchStatsSpines,
-	getServerCachedStats,
-	StatsResult
-} from '@/app/actions/stats-cache';
-import { isNumericHighlightValue } from '../types';
 import { getRule, ruleTypes } from '../rules';
 import {
 	dateToYearMonth,
 	getHighlightsOfTypeFromStatsRows,
-	buildTimeWindowFilter,
-	getFilteredStatsCache,
-	getSpeciesFilter,
 	filterStats,
 	getTimePeriodSampler,
-	descriptorToString,
 	sortHighlights,
-	sortByPositionAndTimeWindow,
-	type PositionAndTimeWindow
+	sortByPositionAndTimeWindow
 } from './highlight-utils';
 import { pooledRequestForStats } from './stats-cache-fetcher';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
@@ -133,11 +110,6 @@ async function getScopedHighlightsOfType({
 	}
 }
 
-const DEFAULT_HIGHLIGHT_INIT_CONFIG: HighlightInitConfig = {
-	selfRelativeToAllTime: 1,
-	childSessionsRelativeToSelf: 1
-};
-
 function getPresence(
 	rule: HighlightsGenerator,
 	temporalUnit: ExtendedTemporalUnit,
@@ -152,9 +124,12 @@ function getPresence(
 }
 
 function getTimeWindow(
-	timePeriod: string,
+	timePeriod: string | null,
 	temporalUnit: ExtendedTemporalUnit
 ): YearMonthRestriction | undefined {
+	if (!timePeriod) {
+		return;
+	}
 	const { year, month } = dateToYearMonth(timePeriod);
 
 	if (temporalUnit === 'month') {
@@ -168,7 +143,7 @@ function getTimeWindow(
 	}
 }
 
-export async function getHighlightsOfTypeAcrossScopes({
+export async function getRawHighlightsOfTypeAcrossScopes({
 	highlightType,
 	timePeriod,
 	temporalUnit,
@@ -177,7 +152,7 @@ export async function getHighlightsOfTypeAcrossScopes({
 	species
 }: {
 	highlightType: string;
-	timePeriod: string;
+	timePeriod: string | null;
 	temporalUnit: ExtendedTemporalUnit;
 	viewedGroup: ViewedGroup;
 	outlook: HighlightOutlook;
@@ -287,31 +262,45 @@ function combineSimilarHighlights(
 	});
 }
 
+export async function getCombinedHighlightsOfTypeAcrossScopes(options: {
+	timePeriod: string | null;
+	temporalUnit: ExtendedTemporalUnit;
+	viewedGroup: ViewedGroup;
+	outlook: HighlightOutlook;
+	species?: string;
+	highlightType: string;
+}) {
+	const allHighlightsOfType = await getRawHighlightsOfTypeAcrossScopes(options);
+	const significantHighlights =
+		removeLessSignificantHighlights(allHighlightsOfType);
+	const combined = combineSimilarHighlights(
+		significantHighlights,
+		options.highlightType
+	);
+
+	return combined;
+}
+
 export async function getAllHighlightsOfOutlookAcrossScopes(options: {
-	timePeriod: string;
+	timePeriod: string | null;
 	temporalUnit: ExtendedTemporalUnit;
 	viewedGroup: ViewedGroup;
 	outlook: HighlightOutlook;
 	species?: string;
 }) {
 	const allHighlights = await Promise.all(
-		ruleTypes.map(async (type) => {
-			const allHighlightsOfType = await getHighlightsOfTypeAcrossScopes({
+		ruleTypes.map(async (type) =>
+			getCombinedHighlightsOfTypeAcrossScopes({
 				highlightType: type,
 				...options
-			});
-			const significantHighlights =
-				removeLessSignificantHighlights(allHighlightsOfType);
-			const combined = combineSimilarHighlights(significantHighlights, type);
-
-			return combined;
-		})
+			})
+		)
 	);
 	return sortHighlights(allHighlights.flatMap((x) => x));
 }
 
 export async function getAllHighlightsAcrossScopes(options: {
-	timePeriod: string;
+	timePeriod: string | null;
 	temporalUnit: ExtendedTemporalUnit;
 	viewedGroup: ViewedGroup;
 	species?: string;

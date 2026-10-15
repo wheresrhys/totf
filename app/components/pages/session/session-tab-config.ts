@@ -7,7 +7,6 @@
 // importing a `'use client'` module only ever gets client references back.
 // Nothing here is ever *called* server-side (see `sessionTabPrefetchers`), but
 // the descriptor list itself has to be readable there.
-import { getCondensedHighlightsAtTimePeriod } from '@/app/lib/highlights';
 import { getAllHighlightsAcrossScopes } from '@/app/lib/highlights/lib/hg2';
 import type { CombinedHighlight } from '@/app/lib/highlights/types';
 import type { TabConfig } from '@/app/components/shared/TabContent';

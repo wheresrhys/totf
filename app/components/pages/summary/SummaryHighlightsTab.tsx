@@ -41,7 +41,7 @@ export const summaryHighlightsTab: TabConfig<
 			<PrimaryHeading>!!!Work in progress!!!</PrimaryHeading>
 			{data && (
 				<>
-					{data.inter.length && (
+					{data.inter.length ? (
 						<>
 							<h2>
 								{params.year} {params.month} Compared to other periods
@@ -53,8 +53,8 @@ export const summaryHighlightsTab: TabConfig<
 								)}
 							</BoxyList>
 						</>
-					)}
-					{data.intra.length && (
+					) : null}
+					{data.intra.length ? (
 						<>
 							<h2>
 								Highlights Within {params.year} {params.month}
@@ -66,7 +66,7 @@ export const summaryHighlightsTab: TabConfig<
 								)}
 							</BoxyList>
 						</>
-					)}
+					) : null}
 				</>
 			)}
 		</div>

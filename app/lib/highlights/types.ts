@@ -7,12 +7,6 @@ export type {
 	TemporalUnit,
 	StatUnit
 } from '@/app/components/shared/StatOutput';
-import type { StatsRepository } from '@/app/actions/stats-cache';
-
-export type EnhancedStatsRepository = StatsRepository & {
-	coreStatsBySpecies: Record<string, CoreStatsResult[]>;
-	biometricsStatsBySpecies: Record<string, BiometricsStatsResult[]>;
-};
 
 export type YearMonthRestriction = {
 	year?: number;
@@ -61,13 +55,6 @@ export type HighlightScope = {
 	species?: string;
 };
 
-export type HighlightsOfType = {
-	formatters: HighlightFormatters;
-	descriptor: HighlightDescriptor;
-	scope: HighlightScope;
-	values: HighlightValue[];
-};
-
 export type HighlightRanking = {
 	position: number;
 	isTied: boolean;
@@ -80,14 +67,6 @@ export type HighlightValueWithRanking = HighlightValue & {
 export type NewHighlightValue = HighlightValueWithRanking & {
 	descriptor: HighlightDescriptor;
 	scope: HighlightScope;
-};
-
-export type CherryPickedHighlight = {
-	formatters: HighlightFormatters;
-	descriptor: HighlightDescriptor;
-	scope: HighlightScope;
-	value: HighlightValue;
-	ranking: HighlightRanking;
 };
 
 export type CombinedHighlight = {
@@ -105,64 +84,41 @@ export type CombinedHighlight = {
 export type CombinedHighlightPrinter = (
 	combinedHighlight: CombinedHighlight
 ) => string;
-export type HighlightListPrefixPrinter = (
-	highlightsOfType: HighlightsOfType
-) => string;
 
 type HighlightFormatters = {
 	combinedHighlightPrinter: CombinedHighlightPrinter;
-	highlightListPrefixPrinter: HighlightListPrefixPrinter;
 };
 
-type StatsRowOf<StatsProperty> =
-	StatsProperty extends Record<string, (infer Row)[]>
-		? Row
-		: StatsProperty extends (infer Row)[]
-			? Row
-			: never;
+type RpcRowMap = {
+	core_stats: CoreStatsResult;
+	biometrics_stats: BiometricsStatsResult;
+};
 
-type HighlightsGeneratorFor<
-	StatsSelectorKey extends keyof EnhancedStatsRepository
-> = {
+type HighlightsGeneratorFor<RpcName extends keyof RpcRowMap> = {
 	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	limit?: number;
-	statsSelector: StatsSelectorKey;
-	rpcName: 'core_stats' | 'biometrics_stats';
+	rpcName: RpcName;
 	speciesUsed: 'none' | 'present' | 'grouped';
 	presence?: HighlightPresenceConfig;
 	generator: (
-		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[],
+		stats: RpcRowMap[RpcName][],
 		scope?: HighlightScope
 	) => HighlightValue[];
 	condition?: (scope: HighlightScope) => boolean;
 };
 
 export type HighlightsGenerator = {
-	[StatsSelectorKey in keyof EnhancedStatsRepository]: HighlightsGeneratorFor<StatsSelectorKey>;
-}[keyof EnhancedStatsRepository];
+	[RpcName in keyof RpcRowMap]: HighlightsGeneratorFor<RpcName>;
+}[keyof RpcRowMap];
 
-type HighlightPositionsLimit = 1 | 2 | 3;
-
-export type HighlightInitConfig = {
-	selfRelativeToParentMonth?: HighlightPositionsLimit;
-	selfRelativeToParentYear?: HighlightPositionsLimit;
-	selfRelativeToAllTimeMonth?: HighlightPositionsLimit;
-	selfRelativeToAllTime?: HighlightPositionsLimit;
-	childSessionsRelativeToSelf?: HighlightPositionsLimit;
-	childSessionsRelativeToParentYear?: HighlightPositionsLimit;
-	childSessionsRelativeToAllTimeMonth?: HighlightPositionsLimit;
-	childSessionsRelativeToAllTime?: HighlightPositionsLimit;
-	childMonthsRelativeToSelf?: HighlightPositionsLimit;
-	childMonthsRelativeToParentYear?: HighlightPositionsLimit;
-	childMonthsRelativeToAllTime?: HighlightPositionsLimit;
-};
+type HighlightPositionsLimit = 0 | 1 | 2 | 3;
 
 export type HighlightDataLake = {
-	allTime?: number;
-	year?: number;
-	allTimeMonth?: number;
-	month?: number;
+	allTime?: HighlightPositionsLimit;
+	year?: HighlightPositionsLimit;
+	allTimeMonth?: HighlightPositionsLimit;
+	month?: HighlightPositionsLimit;
 };
 
 export type ExtendedTemporalUnit = TemporalUnit | 'all time' | 'all time month';
@@ -170,11 +126,6 @@ export type CamelCaseExtendedTemporalUnit =
 	| TemporalUnit
 	| 'allTime'
 	| 'allTimeMonth';
-export type HighlightIterator = 'perDay' | 'perMonth' | 'perYear';
-export type HighlightPageLevelPresence = Record<
-	HighlightIterator,
-	HighlightDataLake
->;
 
 export type HighlightOutlook = 'inter' | 'intra';
 export type HighlightGenerationConfig = {
