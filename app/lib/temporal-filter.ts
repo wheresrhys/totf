@@ -50,7 +50,10 @@ function padToTwoDigits(value: number): string {
 	return String(value).padStart(2, '0');
 }
 
-function getLastDayOfMonth(year: number, month: number): number {
+// Exported for the highlights-review debug page's period-enumeration logic
+// (`app/components/pages/highlights-review/period-enumeration.ts`), which
+// needs the same UTC-safe month-length arithmetic to walk days one at a time.
+export function getLastDayOfMonth(year: number, month: number): number {
 	// Day 0 of the *next* month is the last day of this one. UTC throughout so
 	// the result never shifts with the runner's timezone.
 	return new Date(Date.UTC(year, month, 0)).getUTCDate();
