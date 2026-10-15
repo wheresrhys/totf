@@ -6,8 +6,8 @@ import { getCombinedHighlightFixtures } from './fixture-generator';
 
 describe('rules output for combined highlights', () => {
 	highlightRules.forEach((rule) => {
-		describe(rule.descriptor.type, () => {
-			if (rule.descriptor.type !== 'rarities') {
+		if (rule.descriptor.type !== 'rarities') {
+			describe(rule.descriptor.type, () => {
 				describe('combined highlight printers', () => {
 					const combinedHighlightFixtures = getCombinedHighlightFixtures(rule);
 
@@ -23,7 +23,7 @@ describe('rules output for combined highlights', () => {
 						}
 					);
 				});
-			}
-		});
+			});
+		}
 	});
 });

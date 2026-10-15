@@ -143,7 +143,7 @@ function getTimeWindow(
 	}
 }
 
-export async function getHighlightsOfTypeAcrossScopes({
+export async function getRawHighlightsOfTypeAcrossScopes({
 	highlightType,
 	timePeriod,
 	temporalUnit,
@@ -262,6 +262,25 @@ function combineSimilarHighlights(
 	});
 }
 
+export async function getCombinedHighlightsOfTypeAcrossScopes(options: {
+	timePeriod: string | null;
+	temporalUnit: ExtendedTemporalUnit;
+	viewedGroup: ViewedGroup;
+	outlook: HighlightOutlook;
+	species?: string;
+	highlightType: string;
+}) {
+	const allHighlightsOfType = await getRawHighlightsOfTypeAcrossScopes(options);
+	const significantHighlights =
+		removeLessSignificantHighlights(allHighlightsOfType);
+	const combined = combineSimilarHighlights(
+		significantHighlights,
+		options.highlightType
+	);
+
+	return combined;
+}
+
 export async function getAllHighlightsOfOutlookAcrossScopes(options: {
 	timePeriod: string | null;
 	temporalUnit: ExtendedTemporalUnit;
@@ -270,17 +289,12 @@ export async function getAllHighlightsOfOutlookAcrossScopes(options: {
 	species?: string;
 }) {
 	const allHighlights = await Promise.all(
-		ruleTypes.map(async (type) => {
-			const allHighlightsOfType = await getHighlightsOfTypeAcrossScopes({
+		ruleTypes.map(async (type) =>
+			getCombinedHighlightsOfTypeAcrossScopes({
 				highlightType: type,
 				...options
-			});
-			const significantHighlights =
-				removeLessSignificantHighlights(allHighlightsOfType);
-			const combined = combineSimilarHighlights(significantHighlights, type);
-
-			return combined;
-		})
+			})
+		)
 	);
 	return sortHighlights(allHighlights.flatMap((x) => x));
 }
