@@ -4,8 +4,7 @@ import {
 } from '@/app/components/layout/BootstrapPage';
 import { SppStatsTable } from '@/app/components/pages/species/SppStatsTable';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
-import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
-import { catchSupabaseErrors } from '@/lib/supabase';
+import { fetchYears } from '@/app/lib/fetch-years';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 
@@ -15,20 +14,6 @@ export type PageData = {
 	speciesStats: SpeciesStatsRow[];
 	years: number[];
 };
-
-export async function fetchYears(viewedGroup: ViewedGroup): Promise<number[]> {
-	const supabase = await getAuthenticatedSupabaseClient();
-	const dates = (await supabase
-		.from('Sessions')
-		.select('visit_date')
-		.eq('ringing_group_id', viewedGroup.id)
-		.order('visit_date', { ascending: false })
-		.then(catchSupabaseErrors)) as { visit_date: string }[];
-
-	return [
-		...new Set(dates.map((date) => new Date(date.visit_date).getFullYear()))
-	] as number[];
-}
 
 export async function fetchSpeciesListPageContent(
 	_: DefaultPageParams,
