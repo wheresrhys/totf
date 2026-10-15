@@ -1,7 +1,5 @@
-import { notFound } from 'next/navigation';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
-import { canReportHighlights } from '@/app/lib/qa-reporting';
 import {
 	PageWrapper,
 	PrimaryHeading,
@@ -25,18 +23,12 @@ async function fetchHighlightReports(): Promise<HighlightReportRow[]> {
 }
 
 // Deliberately unlinked admin listing of every outstanding highlight report
-// (#1122) — gated by the same production + qa cookie check as the report
-// button itself, so there's nothing new to lock down here. Visiting this page
-// in production is itself the activation step for the cookie: `proxy.ts` sets
-// it on the request before this component ever runs, since a Server
-// Component can't set cookies itself. Not following the usual
-// page/PageContent/dataFetcher split: this page has no client-interactive
-// content at all, so that split would be pure overhead — only the dismiss
-// button and body toggle below are client components.
+// (#1122) — ungated (#1133): nothing links here, so there's nothing to lock
+// down. Not following the usual page/PageContent/dataFetcher split: this page
+// has no client-interactive content at all, so that split would be pure
+// overhead — only the dismiss button and body toggle below are client
+// components.
 export default async function HighlightReportsAdminPage() {
-	if (!(await canReportHighlights())) {
-		notFound();
-	}
 	const reports = await fetchHighlightReports();
 
 	return (

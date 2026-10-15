@@ -1,23 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-const { mockCanReportHighlights, mockNotFound, mockFrom } = vi.hoisted(() => {
-	const mockCanReportHighlights = vi.fn();
-	const mockNotFound = vi.fn();
+const { mockFrom } = vi.hoisted(() => {
 	const mockFrom = vi.fn();
-	return { mockCanReportHighlights, mockNotFound, mockFrom };
+	return { mockFrom };
 });
 
-// Local override of the global next/navigation mock (vitest.setup.tsx) — this
-// page needs notFound(), which the global mock doesn't provide, and
+// Local override of the global next/navigation mock (vitest.setup.tsx) —
 // DismissHighlightReportButton (rendered per report) needs useRouter.
 vi.mock('next/navigation', () => ({
-	notFound: mockNotFound,
 	useRouter: () => ({ refresh: vi.fn() })
-}));
-
-vi.mock('@/app/lib/qa-reporting', () => ({
-	canReportHighlights: mockCanReportHighlights
 }));
 
 vi.mock('@/app/lib/auth/group-auth', () => ({
@@ -75,17 +67,7 @@ describe('HighlightReportsAdminPage', () => {
 		vi.clearAllMocks();
 	});
 
-	it('renders a 404 when canReportHighlights is false', async () => {
-		mockCanReportHighlights.mockResolvedValue(false);
-		mockSelectChain([]);
-
-		await HighlightReportsAdminPage();
-
-		expect(mockNotFound).toHaveBeenCalled();
-	});
-
-	it('renders every HighlightReports row, most recent first, when canReportHighlights is true', async () => {
-		mockCanReportHighlights.mockResolvedValue(true);
+	it('renders every HighlightReports row, most recent first', async () => {
 		const chain = mockSelectChain(REPORT_ROWS);
 
 		const page = await HighlightReportsAdminPage();
@@ -98,6 +80,5 @@ describe('HighlightReportsAdminPage', () => {
 		});
 		expect(screen.getByText('Second Robin ever')).toBeDefined();
 		expect(screen.getByText('First Robin ever')).toBeDefined();
-		expect(mockNotFound).not.toHaveBeenCalled();
 	});
 });

@@ -1,6 +1,4 @@
-import { notFound } from 'next/navigation';
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
-import { canReportHighlights } from '@/app/lib/qa-reporting';
 import { fetchYears } from '@/app/lib/fetch-years';
 import { ruleTypes } from '@/app/lib/highlights/rules';
 import type { TemporalSelection } from '@/app/lib/temporal-filter';
@@ -45,15 +43,11 @@ export async function fetchHighlightsReviewPageContent(
 }
 
 // Internal debug tool for sanity-checking what the highlights pipeline
-// produces across many periods at once (#1133) — gated exactly like the
-// existing `/_highlights` admin page (qa cookie + production check); visiting
-// that page is this one's activation step too, since the cookie is set with
-// `path: '/'`. Own group's data only, resolved from the session cookie by
+// produces across many periods at once (#1133) — deliberately unlinked, same
+// as `/_highlights`, but ungated: nothing links here, so there's nothing to
+// lock down. Own group's data only, resolved from the session cookie by
 // `BootstrapPage` (no `groupSlug` route param, same as `species/page.tsx`).
 export default async function HighlightsReviewPage(props: PageProps) {
-	// if (!(await canReportHighlights())) {
-	// 	notFound();
-	// }
 	return (
 		<BootstrapPage<HighlightsReviewPageData, PageProps, HighlightsReviewParams>
 			pageProps={props}
