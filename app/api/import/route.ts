@@ -7,6 +7,7 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
+	ImportJobTracker,
 	processEncounterRow,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
@@ -80,6 +81,11 @@ export async function POST(request: Request): Promise<Response> {
 			let startDate: string | null = null;
 			let endDate: string | null = null;
 			let timedOut = false;
+			// Null until the pre-flight has passed and the job row has been opened, so
+			// the catch branch below knows whether there is anything to mark failed.
+			let importJobId: number | null = null;
+
+			const importJobTracker = new ImportJobTracker(supabaseClient);
 
 			try {
 				const rows: DemonRow[] = [];
@@ -109,6 +115,12 @@ export async function POST(request: Request): Promise<Response> {
 					});
 					return;
 				}
+
+				// Opened only once the pre-flight has passed, for the same reason the
+				// writers below are: an aborted upload stays a complete no-op (#1079)
+				// rather than leaving an orphan `in_progress` row behind for a run
+				// that never wrote anything.
+				importJobId = await importJobTracker.createImportJob(ringingGroupId);
 
 				// Deliberately built only once the pre-flight has passed, so an
 				// aborted import never even constructs the writers.
@@ -146,15 +158,36 @@ export async function POST(request: Request): Promise<Response> {
 				);
 
 				if (timedOut) {
+					await importJobTracker.markImportJobTimedOut(importJobId, {
+						processed,
+						startDate,
+						endDate
+					});
 					send({ type: 'timeout', processed, startDate, endDate });
 				} else {
+					await importJobTracker.completeImportJob(importJobId, {
+						processed,
+						successful,
+						failed
+					});
 					send({ type: 'complete', processed, successful, failed });
 				}
 			} catch (err) {
-				send({
-					type: 'error',
-					message: err instanceof Error ? err.message : String(err)
-				});
+				const message = err instanceof Error ? err.message : String(err);
+				// `importJobId` is still null if the throw came from CSV parsing or the
+				// location pre-flight, i.e. before any job row existed.
+				if (importJobId !== null) {
+					try {
+						await importJobTracker.failImportJob(importJobId, message);
+					} catch (failureRecordingError) {
+						console.error(
+							`Failed to mark ImportJobs row ${importJobId} as failed`,
+							{ ringingGroupId, message },
+							failureRecordingError
+						);
+					}
+				}
+				send({ type: 'error', message });
 			} finally {
 				controller.close();
 			}

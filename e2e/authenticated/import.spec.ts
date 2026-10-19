@@ -10,6 +10,16 @@ function psql(sql: string) {
 	if (result.status !== 0) throw new Error(`psql failed: ${result.stderr}`)
 }
 
+/** Tuple-only, unaligned psql read — one row of `|`-separated column values. */
+function psqlRow(sql: string): string[] {
+	const result = spawnSync('psql', [LOCAL_DB_URL, '-t', '-A', '-c', sql], {
+		stdio: 'pipe',
+		encoding: 'utf8'
+	})
+	if (result.status !== 0) throw new Error(`psql failed: ${result.stderr}`)
+	return result.stdout.trim().split('|')
+}
+
 test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 	test.beforeAll(async () => {
 		// Disable trigger to avoid NOT NULL proven_age violation when all encounters for a bird are deleted
@@ -17,6 +27,9 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		psql(`DELETE FROM "Encounters" WHERE ringing_group_id = ${deltaId}`)
 		psql(`DELETE FROM "Sessions" WHERE ringing_group_id = ${deltaId}`)
 		psql(`DELETE FROM "Locations" WHERE ringing_group_id = ${deltaId}`)
+		// So the ImportJobs assertion below reads this run's job row, not a previous
+		// run's.
+		psql(`DELETE FROM "ImportJobs" WHERE ringing_group_id = ${deltaId}`)
 		psql(`UPDATE "Birds" SET ringing_group_ids = array_remove(ringing_group_ids, ${deltaId}) WHERE ${deltaId} = ANY(ringing_group_ids)`)
 		psql(`DELETE FROM "Birds" WHERE ringing_group_ids = '{}'`)
 		psql(`ALTER TABLE "Encounters" ENABLE TRIGGER trigger_encounters_refresh_bird_proven_age`)
@@ -40,6 +53,23 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		await expect(
 			page.getByText('Import complete: 10 rows imported successfully')
 		).toBeVisible({ timeout: 30_000 })
+	})
+
+	// The timeout branch is deliberately not covered here: the route's abort fires at
+	// 280s, and no amount of fixture data makes that practical to provoke in a
+	// browser test. lib/__tests__/demon-import.test.ts covers the transition instead.
+	test('records a succeeded ImportJobs row with the reported row counts', async () => {
+		const [status, rowsProcessed, rowsSuccessful, rowsFailed, finishedAt] = psqlRow(
+			`SELECT status, rows_processed, rows_successful, rows_failed, finished_at IS NOT NULL FROM "ImportJobs" WHERE ringing_group_id = ${deltaId}`
+		)
+
+		expect(status).toBe('succeeded')
+		// delta.csv's 10 rows, matching the "10 rows imported successfully"
+		// completion message the previous test asserted on.
+		expect(rowsProcessed).toBe('10')
+		expect(rowsSuccessful).toBe('10')
+		expect(rowsFailed).toBe('0')
+		expect(finishedAt).toBe('t')
 	})
 
 	test('imported species appear on /species page', async ({ page }) => {

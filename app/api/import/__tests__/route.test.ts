@@ -13,10 +13,13 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 	return {
 		...actual,
 		createUpserter: vi.fn(),
+		ImportJobTracker: vi.fn(),
 		processEncounterRow: vi.fn(),
 		findUnrecognisedLocationNames: vi.fn()
 	};
 });
+
+const IMPORT_JOB_ID = 42;
 
 const CSV_HEADER =
 	'ring_no,species_name,visit_date,capture_time,loc_id,age,sex,sexing_method,record_type,scheme,breeding_condition,extra_text,moult_code,old_greater_coverts,weight,wing_length,entered_by,nest_link_code,validation_comments,submission_status,filename,new/subsequent,scheme2,ring_no2,pulli_ringed,pulli_alive,provisional_sex,gridref,habitat_1,habitat_2,status_code_1,status_code_2,lure_code_1,lure_code_2,date_measured,time_w,condition,alula,primary_moult,primary_covert_moult_scores,secondary_moult_scores,finding_condition,finding_circumstances,capture_method,metal_mark_info,ringer_initials,ringer_check_initials,processor_initials,extractor_initials,wing_initials,colour_mark_info,metal_mark_position,fat,pectoral_muscle,body_moult,greater_covert_moult_scores,alula_moult_scores,carpal_covert_moult,wing_point,primary_length,bill_length_method,bill_length,head_bill_length,bill_depth_method,bill_depth,tarsus_length_method,tail_moult_scores,tarsus_length,tail_length,claw_length,plumage,tail_diff,lesser_median_covert_moult,underwing_covert_moult,head_moult,upperparts_moult,underparts_moult,permit_no,pullus_stage,date_accuracy,left_leg_below,right_leg_below,left_leg_above,right_leg_above,neck_collar,left_wing_tag,right_wing_tag,nasal_saddle,sample_processed,high_tide_time,finder_name,own,own2,userc1,userc2,email,userc3,userc4,userc5,userv1,userv2,userv3,userv4,userv5,l_primary_moult_scores,l_secondary_moult_scores,l_tail_moult_scores,l_primary_covert_moult_scores,l_greater_covert_moult_scores,l_carpal_covert_moult,l_alula_moult_scores,toe_span';
@@ -76,6 +79,7 @@ async function readStreamMessages(
 describe('POST /api/import', () => {
 	let POST: (request: Request) => Promise<Response>;
 	let mockUpsert: ReturnType<typeof vi.fn>;
+	let mockImportJobTracker: Record<string, ReturnType<typeof vi.fn>>;
 
 	beforeEach(async () => {
 		vi.resetModules();
@@ -83,9 +87,24 @@ describe('POST /api/import', () => {
 
 		const { getAuthenticatedSupabaseClient } =
 			await import('@/app/lib/auth/group-auth');
-		const { createUpserter } = await import('@/lib/demon-import');
+		const { createUpserter, ImportJobTracker } =
+			await import('@/lib/demon-import');
 		mockUpsert = vi.fn().mockResolvedValue(1);
 		vi.mocked(createUpserter).mockReturnValue(mockUpsert as never);
+		mockImportJobTracker = {
+			createImportJob: vi.fn().mockResolvedValue(IMPORT_JOB_ID),
+			recordAffectedDates: vi.fn().mockResolvedValue(undefined),
+			completeImportJob: vi.fn().mockResolvedValue(undefined),
+			failImportJob: vi.fn().mockResolvedValue(undefined),
+			markImportJobTimedOut: vi.fn().mockResolvedValue(undefined),
+			markStatsCacheRefreshed: vi.fn().mockResolvedValue(undefined)
+		};
+		// A plain arrow function is not newable, and the route now does `new
+		// ImportJobTracker(...)` — so the stub has to be a `function`, whose
+		// returned object becomes the constructed instance.
+		vi.mocked(ImportJobTracker).mockImplementation(function () {
+			return mockImportJobTracker as never;
+		} as never);
 		vi.mocked(getAuthenticatedSupabaseClient).mockResolvedValue({} as never);
 
 		// Every location in the CSV is already known unless a test says otherwise.
@@ -317,13 +336,28 @@ describe('POST /api/import', () => {
 			vi.doMock('@/app/lib/auth/group-auth', () => ({
 				getAuthenticatedSupabaseClient: vi.fn().mockResolvedValue({})
 			}));
+			// This doMock replaces the file-level vi.mock registration for every
+			// later import too, so it has to mock the same exports — otherwise the
+			// tests after this one get the real ones back and the beforeEach above
+			// fails trying to stub them.
 			vi.doMock('@/lib/demon-import', async (importOriginal) => {
 				const actual =
 					await importOriginal<typeof import('@/lib/demon-import')>();
 				return {
 					...actual,
 					createUpserter: vi.fn().mockReturnValue(vi.fn()),
-					processEncounterRow: vi.fn()
+					ImportJobTracker: vi.fn(function () {
+						return {
+							createImportJob: vi.fn().mockResolvedValue(IMPORT_JOB_ID),
+							recordAffectedDates: vi.fn(),
+							completeImportJob: vi.fn(),
+							failImportJob: vi.fn(),
+							markImportJobTimedOut: vi.fn(),
+							markStatsCacheRefreshed: vi.fn()
+						};
+					}),
+					processEncounterRow: vi.fn(),
+					findUnrecognisedLocationNames: vi.fn()
 				};
 			});
 
@@ -332,6 +366,74 @@ describe('POST /api/import', () => {
 			const response = await freshPOST(await makeRequest(file));
 			const messages = await readStreamMessages(response);
 			expect(messages.some((m) => m.type === 'error')).toBe(true);
+
+			// `vi.doMock` persists past the test that registered it, and an
+			// always-erroring CSV parser would break every test declared after this
+			// one. (The demon-import doMock above is shape-compatible with the
+			// file-level one, so that one can safely stay.)
+			vi.doUnmock('csv-parser');
+		});
+	});
+
+	// The fourth exit branch — the 280s timeout — isn't provoked here: it needs the
+	// real deadline to pass. `markImportJobTimedOut` itself is covered in
+	// lib/__tests__/demon-import.test.ts.
+	describe('ImportJobs tracking', () => {
+		it('opens a job for the group and completes it with the counts it reported', async () => {
+			const { processEncounterRow } = await import('@/lib/demon-import');
+			vi.mocked(processEncounterRow).mockResolvedValue({
+				visitDate: '2024-06-01'
+			});
+
+			const file = makeCsvFile([
+				makeCsvRow(),
+				makeCsvRow({ ring_no: 'B000001' })
+			]);
+			await readStreamMessages(await POST(await makeRequest(file)));
+
+			// Group ID 1 — group-cookie is mocked globally in vitest.setup.tsx.
+			expect(mockImportJobTracker.createImportJob).toHaveBeenCalledWith(1);
+			expect(mockImportJobTracker.completeImportJob).toHaveBeenCalledWith(
+				IMPORT_JOB_ID,
+				{ processed: 2, successful: 2, failed: 0 }
+			);
+		});
+
+		it('opens no job at all when aborting for unrecognised locations', async () => {
+			const { findUnrecognisedLocationNames } =
+				await import('@/lib/demon-import');
+			vi.mocked(findUnrecognisedLocationNames).mockResolvedValue(['CES972']);
+
+			const file = makeCsvFile([makeCsvRow({ loc_id: 'CES972' })]);
+			await readStreamMessages(await POST(await makeRequest(file)));
+
+			// Opening one first would leave an orphan 'in_progress' row behind for an
+			// upload that wrote nothing (#1079's zero-write guarantee).
+			expect(mockImportJobTracker.createImportJob).not.toHaveBeenCalled();
+		});
+
+		it('marks the job failed with the error message when the run throws', async () => {
+			const { createUpserter } = await import('@/lib/demon-import');
+			// Thrown after the job row has been opened — unlike a CSV parse error,
+			// which happens before there is anything to mark.
+			vi.mocked(createUpserter).mockImplementation(() => {
+				throw new Error('could not build writers');
+			});
+
+			const file = makeCsvFile([makeCsvRow()]);
+			const messages = await readStreamMessages(
+				await POST(await makeRequest(file))
+			);
+
+			expect(messages).toContainEqual({
+				type: 'error',
+				message: 'could not build writers'
+			});
+			expect(mockImportJobTracker.failImportJob).toHaveBeenCalledWith(
+				IMPORT_JOB_ID,
+				'could not build writers'
+			);
+			expect(mockImportJobTracker.completeImportJob).not.toHaveBeenCalled();
 		});
 	});
 });

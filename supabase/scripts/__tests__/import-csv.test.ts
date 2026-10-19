@@ -52,10 +52,30 @@ vi.mock('../../../app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClientForGroup: vi.fn(async () => ({}))
 }));
 
+const IMPORT_JOB_ID = 42;
+
+// Hoisted so the `vi.mock` factory below (which is hoisted too) can return the same
+// object the tests assert against.
+const { mockImportJobTracker } = vi.hoisted(() => ({
+	mockImportJobTracker: {
+		createImportJob: vi.fn(),
+		recordAffectedDates: vi.fn(),
+		completeImportJob: vi.fn(),
+		failImportJob: vi.fn(),
+		markImportJobTimedOut: vi.fn(),
+		markStatsCacheRefreshed: vi.fn()
+	}
+}));
+
 vi.mock('../../../lib/demon-import', () => ({
 	createUpserter: vi.fn(() => vi.fn()),
 	createRingSequenceLookup: vi.fn(() => vi.fn()),
 	createRingSequenceLinker: vi.fn(() => vi.fn()),
+	// `function`, not an arrow: the script does `new ImportJobTracker(...)`, and
+	// only a newable stub's returned object becomes the constructed instance.
+	ImportJobTracker: vi.fn(function () {
+		return mockImportJobTracker;
+	}),
 	processEncounterRow: vi.fn(async () => {}),
 	getDistinctLocationNames: vi.fn(() => ['Garden Trap']),
 	// Every location in the CSV is already known unless a test says otherwise.
@@ -70,6 +90,11 @@ beforeEach(() => {
 	vi.mocked(findUnrecognisedLocationNames).mockClear();
 	vi.mocked(findUnrecognisedLocationNames).mockResolvedValue([]);
 	vi.mocked(getDistinctLocationNames).mockReturnValue(['Garden Trap']);
+	for (const trackerOperation of Object.values(mockImportJobTracker)) {
+		trackerOperation.mockReset();
+		trackerOperation.mockResolvedValue(undefined);
+	}
+	mockImportJobTracker.createImportJob.mockResolvedValue(IMPORT_JOB_ID);
 });
 
 afterEach(() => {
@@ -148,6 +173,9 @@ describe('importCSV unrecognised location names', () => {
 		);
 		expect(exitSpy).toHaveBeenCalledWith(1);
 		expect(vi.mocked(processEncounterRow)).not.toHaveBeenCalled();
+		// The job row is opened after the pre-flight precisely so an aborted import
+		// stays a complete no-op, rather than leaving an orphan 'in_progress' row.
+		expect(mockImportJobTracker.createImportJob).not.toHaveBeenCalled();
 	});
 
 	it('proceeds with the existing row-processing behaviour when every loc_id is already known', async () => {
@@ -164,6 +192,46 @@ describe('importCSV unrecognised location names', () => {
 		expect(vi.mocked(processEncounterRow)).toHaveBeenCalledTimes(
 			csvRows.length
 		);
+	});
+});
+
+describe('importCSV ImportJobs tracking', () => {
+	it('opens a job for the group and completes it with the run’s row counts', async () => {
+		await importCSV({
+			csvFilePath: '/fake/alpha.csv',
+			ringingGroupName: 'Alpha'
+		});
+
+		expect(mockImportJobTracker.createImportJob).toHaveBeenCalledWith(7);
+		// `runRowsWithConcurrency`'s totalRecords/successfulRecords/failedRecords,
+		// renamed onto the processed/successful/failed shape the column names use.
+		expect(mockImportJobTracker.completeImportJob).toHaveBeenCalledWith(
+			IMPORT_JOB_ID,
+			{ processed: csvRows.length, successful: csvRows.length, failed: 0 }
+		);
+		expect(mockImportJobTracker.failImportJob).not.toHaveBeenCalled();
+	});
+
+	it('marks the job failed and re-raises when the run throws systemically', async () => {
+		// Per-row failures are absorbed into failedRecords, so this stands in for a
+		// systemic failure of the whole run rather than one bad row.
+		const limiterFailure = new Error('rate limiter exploded');
+		mockedPRateLimit.mockImplementationOnce(
+			() =>
+				(() => {
+					throw limiterFailure;
+				}) as never
+		);
+
+		await expect(
+			importCSV({ csvFilePath: '/fake/alpha.csv', ringingGroupName: 'Alpha' })
+		).rejects.toThrow('rate limiter exploded');
+
+		expect(mockImportJobTracker.failImportJob).toHaveBeenCalledWith(
+			IMPORT_JOB_ID,
+			'rate limiter exploded'
+		);
+		expect(mockImportJobTracker.completeImportJob).not.toHaveBeenCalled();
 	});
 });
 

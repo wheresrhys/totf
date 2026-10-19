@@ -17,6 +17,7 @@ Tables (PascalCase in Postgres, matching generated TypeScript types in `types/su
 | `Sessions` | A group's visit on a date — one row per `(ringing_group_id, visit_date)` |
 | `Encounters` | One bird captured once at one location on one date, with measurements |
 | `Locations` | Ringing sites, owned by a group |
+| `ImportJobs` | One row per CSV import run — counts, outcome, dates covered, per-stats-cache refresh outcomes |
 
 Key design notes:
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
@@ -514,6 +515,26 @@ The import script (`supabase/scripts/import-csv.ts`) upserts Species, RingingGro
 Core import logic (types, transforms, `createUpserter`, `processEncounterRow`) lives in
 `lib/demon-import.ts` and is shared by both this CLI script and the web import route — see
 `app/CLAUDE.md`'s "Web import".
+
+**Every import run is tracked in `ImportJobs` (#961).** `lib/demon-import.ts`'s
+`new ImportJobTracker(supabaseClient)` exposes the six operations both entry points share —
+`createImportJob` / `recordAffectedDates` / `completeImportJob` / `failImportJob` /
+`markImportJobTimedOut` / `markStatsCacheRefreshed`. It's a class rather than a `create*` factory
+(the `createUpserter`/`createRingSequenceLookup` shape) because those each expose a single
+operation, whereas these are six variations on the same `update(...).eq('id', …)` sharing one
+`supabaseClient` and one private update helper. The import job id stays a per-call argument — it's
+`createImportJob` that mints it. Two things to know when touching it:
+
+- **The job row is opened *after* the location pre-flight, not at the top of the run.** The ticket
+  sketched "right after resolving `ringingGroupId`", but the pre-flight's whole point (#1079) is
+  that an unrecognised `loc_id` makes the import a complete no-op — opening a job row first would
+  both break that and leave an orphan `in_progress` row for a run that wrote nothing. So the
+  `unrecognised_locations` branch has no job row to update, by construction.
+- **Each `*_stats_refresh_status` column is set on its own.** `markStatsCacheRefreshed` writes
+  exactly one column and never `status`, `affected_dates` or the other two caches' columns — "all
+  the rows imported but the biometrics cache never refreshed" has to stay a distinguishable state.
+  The unit tests assert the whole `.update()` payload rather than individual keys, specifically so
+  a transition that starts touching a neighbouring column fails.
 
 Both entry points run the same **location pre-flight** before any row is processed (#1079): a CSV
 naming a `loc_id` the group has no `Locations` row for aborts the whole import with zero writes
