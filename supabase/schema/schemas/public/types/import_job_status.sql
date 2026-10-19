@@ -1,0 +1,11 @@
+-- Outcome of an import run, and — reused on the same table — the outcome of each
+-- individual stats-cache refresh that run triggered. One enum serves both: an
+-- ImportJobs row's own `status` and its three `*_stats_refresh_status` columns all
+-- answer the same four-state question ("still going / worked / broke / ran out of
+-- time"), so a second near-duplicate type would buy nothing. `'in_progress'` on a
+-- refresh-status column means "not yet attempted" (it is that column's default), and
+-- `'timed_out'` is not expected to occur there in practice.
+--
+-- Mirrors the resighting_record_type.sql / ring_size.sql enum-file convention, and is
+-- the generated-types anchor for app/models/db.ts's ImportJobStatus.
+CREATE TYPE public.import_job_status AS ENUM('in_progress', 'succeeded', 'failed', 'timed_out');

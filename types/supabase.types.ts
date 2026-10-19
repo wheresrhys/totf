@@ -241,6 +241,68 @@ export type Database = {
         }
         Relationships: []
       }
+      ImportJobs: {
+        Row: {
+          affected_dates: string[] | null
+          biometrics_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
+          core_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
+          demographics_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
+          end_date: string | null
+          error_message: string | null
+          finished_at: string | null
+          id: number
+          ringing_group_id: number
+          rows_failed: number | null
+          rows_processed: number | null
+          rows_successful: number | null
+          start_date: string | null
+          started_at: string
+          status: Database["public"]["Enums"]["import_job_status"]
+        }
+        Insert: {
+          affected_dates?: string[] | null
+          biometrics_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          core_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          demographics_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          end_date?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: number
+          ringing_group_id: number
+          rows_failed?: number | null
+          rows_processed?: number | null
+          rows_successful?: number | null
+          start_date?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["import_job_status"]
+        }
+        Update: {
+          affected_dates?: string[] | null
+          biometrics_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          core_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          demographics_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          end_date?: string | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: number
+          ringing_group_id?: number
+          rows_failed?: number | null
+          rows_processed?: number | null
+          rows_successful?: number | null
+          start_date?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["import_job_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_jobs_ringing_group_id_fkey"
+            columns: ["ringing_group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       Locations: {
         Row: {
           id: number
@@ -745,6 +807,7 @@ export type Database = {
       text_soundex: { Args: { "": string }; Returns: string }
     }
     Enums: {
+      import_job_status: "in_progress" | "succeeded" | "failed" | "timed_out"
       resighting_record_type: "U" | "F" | "D"
       ring_size:
         | "AA"
@@ -960,6 +1023,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      import_job_status: ["in_progress", "succeeded", "failed", "timed_out"],
       resighting_record_type: ["U", "F", "D"],
       ring_size: [
         "AA",

@@ -1,0 +1,18 @@
+CREATE TYPE public.import_job_status AS ENUM ('in_progress', 'succeeded', 'failed', 'timed_out');
+CREATE SEQUENCE public."ImportJobs_id_seq";
+CREATE TABLE public."ImportJobs" (id bigint DEFAULT nextval('public."ImportJobs_id_seq"'::regclass) NOT NULL, ringing_group_id bigint NOT NULL, status public.import_job_status DEFAULT 'in_progress'::public.import_job_status NOT NULL, started_at timestamp with time zone DEFAULT now() NOT NULL, finished_at timestamp with time zone, rows_processed integer, rows_successful integer, rows_failed integer, start_date date, end_date date, error_message text, affected_dates date[], core_stats_refresh_status public.import_job_status DEFAULT 'in_progress'::public.import_job_status NOT NULL, biometrics_stats_refresh_status public.import_job_status DEFAULT 'in_progress'::public.import_job_status NOT NULL, demographics_stats_refresh_status public.import_job_status DEFAULT 'in_progress'::public.import_job_status NOT NULL);
+ALTER SEQUENCE public."ImportJobs_id_seq" OWNED BY public."ImportJobs".id;
+GRANT UPDATE ON SEQUENCE public."ImportJobs_id_seq" TO anon;
+GRANT UPDATE ON SEQUENCE public."ImportJobs_id_seq" TO authenticated;
+GRANT UPDATE ON SEQUENCE public."ImportJobs_id_seq" TO service_role;
+COMMENT ON TABLE public."ImportJobs" IS 'One row per CSV import run: row counts, start/finish, overall outcome, dates covered, and the outcome of each stats-cache refresh tracked independently';
+ALTER TABLE public."ImportJobs" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."ImportJobs" ADD CONSTRAINT "ImportJobs_pkey" PRIMARY KEY (id);
+ALTER TABLE public."ImportJobs" ADD CONSTRAINT import_jobs_ringing_group_id_fkey FOREIGN KEY (ringing_group_id) REFERENCES public."RingingGroups"(id) ON DELETE CASCADE;
+GRANT MAINTAIN, REFERENCES, TRIGGER, TRUNCATE ON public."ImportJobs" TO anon;
+GRANT ALL ON public."ImportJobs" TO authenticated;
+GRANT ALL ON public."ImportJobs" TO service_role;
+CREATE INDEX idx_import_jobs_ringing_group_id ON public."ImportJobs" (ringing_group_id);
+CREATE POLICY group_import_jobs_access ON public."ImportJobs" FOR SELECT USING ((ringing_group_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'ringing_group_id'::text))::bigint));
+CREATE POLICY group_import_jobs_insert ON public."ImportJobs" FOR INSERT WITH CHECK ((ringing_group_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'ringing_group_id'::text))::bigint));
+CREATE POLICY group_import_jobs_update ON public."ImportJobs" FOR UPDATE USING ((ringing_group_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'ringing_group_id'::text))::bigint)) WITH CHECK ((ringing_group_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'ringing_group_id'::text))::bigint));
