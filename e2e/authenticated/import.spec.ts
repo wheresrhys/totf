@@ -27,8 +27,10 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		psql(`DELETE FROM "Encounters" WHERE ringing_group_id = ${deltaId}`)
 		psql(`DELETE FROM "Sessions" WHERE ringing_group_id = ${deltaId}`)
 		psql(`DELETE FROM "Locations" WHERE ringing_group_id = ${deltaId}`)
-		// So the ImportJobs assertion below reads this run's job row, not a previous
-		// run's.
+		// So the DemonRecords/ImportJobs assertions below read this run's rows, not a
+		// previous run's. DemonRecords first — it has an import_job_id FK onto
+		// ImportJobs.
+		psql(`DELETE FROM "DemonRecords" WHERE ringing_group_id = ${deltaId}`)
 		psql(`DELETE FROM "ImportJobs" WHERE ringing_group_id = ${deltaId}`)
 		psql(`UPDATE "Birds" SET ringing_group_ids = array_remove(ringing_group_ids, ${deltaId}) WHERE ${deltaId} = ANY(ringing_group_ids)`)
 		psql(`DELETE FROM "Birds" WHERE ringing_group_ids = '{}'`)
@@ -70,6 +72,41 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		expect(rowsSuccessful).toBe('10')
 		expect(rowsFailed).toBe('0')
 		expect(finishedAt).toBe('t')
+	})
+
+	test('stages every delta.csv row in DemonRecords, keyed to the run’s job', async () => {
+		const [rowCount, distinctRings, distinctDates, jobsReferenced] = psqlRow(
+			`SELECT COUNT(*), COUNT(DISTINCT ring_no), COUNT(DISTINCT encounter_date), COUNT(DISTINCT import_job_id) FROM "DemonRecords" WHERE ringing_group_id = ${deltaId}`
+		)
+
+		// delta.csv's 10 rows, one staging row each, all under the single ImportJobs
+		// row this upload opened.
+		expect(rowCount).toBe('10')
+		expect(distinctRings).toBe('10')
+		expect(distinctDates).toBe('1')
+		expect(jobsReferenced).toBe('1')
+	})
+
+	test('stages each row near-verbatim, with the dedup key pulled out as real columns', async () => {
+		const [rawSpeciesName, rawVisitDate, encounterDate, encounterTime] = psqlRow(
+			`SELECT raw_row->>'species_name', raw_row->>'visit_date', encounter_date, encounter_time FROM "DemonRecords" WHERE ringing_group_id = ${deltaId} AND ring_no = 'DLWREN001'`
+		)
+
+		// raw_row keeps the CSV's own values, DD/MM/YYYY dates included…
+		expect(rawSpeciesName).toBe('Wren')
+		expect(rawVisitDate).toBe('15/03/2024')
+		// …while the dedup-key columns hold the converted, Postgres-typed ones.
+		expect(encounterDate).toBe('2024-03-15')
+		expect(encounterTime).toBe('06:00:00')
+	})
+
+	test('records the staged dates on the run’s ImportJobs row', async () => {
+		const [affectedDates] = psqlRow(
+			`SELECT affected_dates FROM "ImportJobs" WHERE ringing_group_id = ${deltaId}`
+		)
+
+		// Every delta.csv row is the same day, so the staged range is that one date.
+		expect(affectedDates).toBe('{2024-03-15}')
 	})
 
 	test('imported species appear on /species page', async ({ page }) => {
