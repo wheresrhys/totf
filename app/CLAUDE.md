@@ -326,3 +326,10 @@ bootstrap its own locations — they must exist first (which is why `supabase/sc
 and `e2e/authenticated/import.spec.ts` pre-create theirs).
 
 Processing is sequential (no rate limiter) and aborts with a date-range summary after 280 seconds. Vercel `maxDuration` is set to 300s. Core import logic is shared with the CLI script — see `supabase/CLAUDE.md`'s "CSV data import".
+
+Once the pre-flight has passed, the route opens an `ImportJobs` row (#961) and updates it at
+whichever exit branch fires: `complete` → `succeeded` with the three row counts, `timeout` →
+`timed_out` with the partial `start_date`/`end_date` (previously the 280s abort reported _only_ to
+the browser and left no persistent trace at all), and the catch branch → `failed` with the error
+message. See `supabase/CLAUDE.md`'s "CSV data import" for the tracker helpers and why the row is
+opened after the pre-flight rather than at the top of the handler.
