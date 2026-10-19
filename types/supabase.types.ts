@@ -50,6 +50,57 @@ export type Database = {
           },
         ]
       }
+      DemonRecords: {
+        Row: {
+          created_at: string
+          encounter_date: string
+          encounter_time: string
+          id: number
+          import_job_id: number
+          raw_row: Json
+          ring_no: string
+          ringing_group_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          encounter_date: string
+          encounter_time: string
+          id?: number
+          import_job_id: number
+          raw_row: Json
+          ring_no: string
+          ringing_group_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          encounter_date?: string
+          encounter_time?: string
+          id?: number
+          import_job_id?: number
+          raw_row?: Json
+          ring_no?: string
+          ringing_group_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demon_records_import_job_id_fkey"
+            columns: ["import_job_id"]
+            isOneToOne: false
+            referencedRelation: "ImportJobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demon_records_ringing_group_id_fkey"
+            columns: ["ringing_group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       Encounters: {
         Row: {
           age_code: number
