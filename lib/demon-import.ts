@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase.types';
-import type { ResightingRecordType } from '@/app/models/db';
+import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Omit<
@@ -19,6 +19,8 @@ type SessionsInsert = Database['public']['Tables']['Sessions']['Insert'];
 type LocationsInsert = Database['public']['Tables']['Locations']['Insert'];
 type RingSequencesBirdsInsert =
 	Database['public']['Tables']['RingSequences_Birds']['Insert'];
+type ImportJobsInsert = Database['public']['Tables']['ImportJobs']['Insert'];
+type ImportJobsUpdate = Database['public']['Tables']['ImportJobs']['Update'];
 
 export type DemonColumnNames =
 	| 'entered_by'
@@ -308,6 +310,180 @@ export function createRingSequenceLinker(supabaseClient: SupabaseClient) {
 				}
 			);
 		if (error) throw error;
+	};
+}
+
+/**
+ * The three row counts both import entry points already compute, under the one set
+ * of names the `ImportJobs` columns use. The web route's `ImportCompleteMessage`
+ * (`{processed, successful, failed}`) matches this shape as-is; the CLI script's
+ * `ImportRowCounts` (`{totalRecords, successfulRecords, failedRecords}`) is the same
+ * three numbers under different names and maps onto it at the call site.
+ */
+export type ImportJobRowCounts = {
+	processed: number;
+	successful: number;
+	failed: number;
+};
+
+/** Which of the three stats caches a refresh outcome is being recorded for. */
+export type StatsCacheType = 'core' | 'biometrics' | 'demographics';
+
+/**
+ * The outcome a stats-cache refresh can actually be recorded as. The columns are
+ * `import_job_status`, which also carries `'in_progress'` (their default, meaning
+ * "not yet attempted") and `'timed_out'` (not reachable for a refresh) — neither of
+ * which a setter should ever be asked to write.
+ */
+export type StatsCacheRefreshOutcome = Extract<
+	ImportJobStatus,
+	'succeeded' | 'failed'
+>;
+
+const STATS_CACHE_REFRESH_STATUS_COLUMNS: Record<StatsCacheType, string> = {
+	core: 'core_stats_refresh_status',
+	biometrics: 'biometrics_stats_refresh_status',
+	demographics: 'demographics_stats_refresh_status'
+};
+
+/**
+ * Reads and writes the `ImportJobs` row tracking one import run.
+ *
+ * Unlike `createUpserter`/`createRingSequenceLookup`/`createRingSequenceLinker`
+ * above — one factory per operation — this one factory returns all six operations as
+ * an object. They are six variations on the same two-line `.update(...).eq('id', …)`
+ * against the same table, so six separate factories would be six copies of that
+ * plumbing; the convention (a factory taking a `SupabaseClient`, returning the
+ * operations bound to it) is otherwise the same.
+ *
+ * Every operation is deliberately independent: recording one stats cache's refresh
+ * outcome never touches `status`, `affected_dates` or the other two caches' columns,
+ * and vice versa. That separation is the whole point of the table — "the rows all
+ * imported but the biometrics cache never refreshed" has to stay visible rather than
+ * collapsing into "import succeeded".
+ */
+export function createImportJobTracker(supabaseClient: SupabaseClient) {
+	async function updateImportJob(
+		importJobId: number,
+		changes: ImportJobsUpdate
+	): Promise<void> {
+		const { error } = await supabaseClient
+			.from('ImportJobs')
+			.update(changes)
+			.eq('id', importJobId);
+		if (error) throw error;
+	}
+
+	return {
+		/**
+		 * Opens a job row for `ringingGroupId` and returns its id, for every later
+		 * transition to key on. `status`, `started_at` and the three refresh-status
+		 * columns are written explicitly even though the table defaults all five to
+		 * the same values, so the opening state of a run is readable at the call site
+		 * (and assertable) rather than implied by the schema. `started_at` has to be
+		 * client-side anyway to stay consistent with `finished_at`, which no trigger
+		 * sets.
+		 */
+		createImportJob: async (ringingGroupId: number): Promise<number> => {
+			const { data, error } = await supabaseClient
+				.from('ImportJobs')
+				.insert<ImportJobsInsert>({
+					ringing_group_id: ringingGroupId,
+					status: 'in_progress',
+					started_at: new Date().toISOString(),
+					core_stats_refresh_status: 'in_progress',
+					biometrics_stats_refresh_status: 'in_progress',
+					demographics_stats_refresh_status: 'in_progress'
+				})
+				.select('id')
+				.single();
+
+			if (error) throw error;
+			if (!data) throw new Error('Insert into ImportJobs returned no data');
+			return data.id;
+		},
+
+		/**
+		 * Records the distinct dates present in the imported batch. Written mid-run —
+		 * once the staging rows exist but before domain-table import begins (#959) —
+		 * so this is its own operation rather than part of any terminal transition,
+		 * and it leaves `status` and the refresh-status columns alone. Deduplicated
+		 * and sorted here so the caller can pass a per-row date straight through.
+		 */
+		recordAffectedDates: async (
+			importJobId: number,
+			affectedDates: string[]
+		): Promise<void> => {
+			await updateImportJob(importJobId, {
+				affected_dates: [...new Set(affectedDates)].sort()
+			});
+		},
+
+		/** Terminal: every row was processed and the run finished normally. */
+		completeImportJob: async (
+			importJobId: number,
+			{ processed, successful, failed }: ImportJobRowCounts
+		): Promise<void> => {
+			await updateImportJob(importJobId, {
+				status: 'succeeded',
+				finished_at: new Date().toISOString(),
+				rows_processed: processed,
+				rows_successful: successful,
+				rows_failed: failed
+			});
+		},
+
+		/**
+		 * Terminal: the run threw. Row counts are deliberately not recorded — an
+		 * unhandled error leaves them unknown rather than merely incomplete.
+		 */
+		failImportJob: async (
+			importJobId: number,
+			errorMessage: string
+		): Promise<void> => {
+			await updateImportJob(importJobId, {
+				status: 'failed',
+				finished_at: new Date().toISOString(),
+				error_message: errorMessage
+			});
+		},
+
+		/**
+		 * Terminal: the web route's 280s abort fired. Records exactly the partial
+		 * progress the route already reports to the browser in its
+		 * `ImportTimeoutMessage`, which until now was the only place it went.
+		 */
+		markImportJobTimedOut: async (
+			importJobId: number,
+			partialProgress: {
+				processed: number;
+				startDate: string | null;
+				endDate: string | null;
+			}
+		): Promise<void> => {
+			await updateImportJob(importJobId, {
+				status: 'timed_out',
+				finished_at: new Date().toISOString(),
+				rows_processed: partialProgress.processed,
+				start_date: partialProgress.startDate,
+				end_date: partialProgress.endDate
+			});
+		},
+
+		/**
+		 * Records how one stats cache's refresh went, on that cache's own column and
+		 * nothing else. The caller is whatever runs the refreshes (#B2) — this ticket
+		 * only provides somewhere to record the outcome.
+		 */
+		markStatsCacheRefreshed: async (
+			importJobId: number,
+			statsCacheType: StatsCacheType,
+			refreshOutcome: StatsCacheRefreshOutcome
+		): Promise<void> => {
+			await updateImportJob(importJobId, {
+				[STATS_CACHE_REFRESH_STATUS_COLUMNS[statsCacheType]]: refreshOutcome
+			});
+		}
 	};
 }
 
