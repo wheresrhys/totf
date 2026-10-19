@@ -192,13 +192,31 @@ unchanged — that's the whole point of a user-requested re-check.
 
 ## 1. Maintain open PRs — resolve conflicts + address feedback (first call on the budget)
 
-A PR appears in `prsNeedingMaintenance` because it either has merge conflicts (`mergeable` was
-`CONFLICTING`) or outstanding feedback (a human review/comment, `CHANGES_REQUESTED`, or anything
-newer than the head commit and not yet replied to — the tool ignores the PR's own
-mermaid-diff/behaviour-change comments, bot authors, and any comment carrying the
-`<!-- swarm-worker-reply -->` marker a maintenance worker appends to its own replies, step 4
-below). Its `reason` field says which
-(`conflict` | `feedback` | `conflict+feedback`).
+**This is an automatic scan, and it only ever touches PRs swarm/`implement-ticket` itself
+created.** `swarm_plan_batch` requires every candidate PR's body to carry the
+`<!-- swarm-created-pr -->` marker — stamped by `implement-ticket` step 7 into every PR it opens —
+before it's even considered for `prsNeedingMaintenance`, regardless of conflict/feedback state. A
+PR the user opened by hand (wrong branch convention, no ticket behind it, outside the
+ticket-workflow system entirely) never carries this marker and is therefore never auto-picked-up
+by this scan — this is the #1127 fix: swarm previously judged every open PR on conflict/feedback
+state alone, with no notion of provenance, and swept up a PR the user was actively working on
+themselves just because it had a merge conflict.
+
+This marker-gate applies **only** to the automatic scan this section describes. If the user
+explicitly asks swarm/the orchestrator to work on a specific PR by number ("go fix PR 1127 for
+me"), that is a direct, deliberate, human-initiated request — it does not go through
+`swarm_plan_batch` at all, so it is not gated by the marker and remains fully possible. The
+orchestrator can already serve that request today via a normal one-off subagent spawn (same shape
+as a §1 maintenance worker, just pointed at a user-named PR instead of one `swarm_plan_batch`
+surfaced) without touching this tool or its filtering.
+
+Once a candidate clears the marker check, it appears in `prsNeedingMaintenance` because it either
+has merge conflicts (`mergeable` was `CONFLICTING`) or outstanding feedback (a human
+review/comment, `CHANGES_REQUESTED`, or anything newer than the head commit and not yet replied to
+— the tool ignores the PR's own mermaid-diff/behaviour-change comments, bot authors, and any
+comment carrying the `<!-- swarm-worker-reply -->` marker a maintenance worker appends to its own
+replies, step 4 below). Its `reason` field says which (`conflict` | `feedback` |
+`conflict+feedback`).
 
 For each PR needing maintenance (up to the budget), launch **one** background Agent that handles
 both concerns for that PR:
@@ -596,6 +614,13 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
 - Run the Top-level-only guard before anything else — if this session is a subagent spawned via
   the Agent tool rather than the top-level interactive session, stop immediately and report the
   error; do not run the Precheck or touch the state file.
+- **Automatic PR maintenance only ever touches PRs swarm/`implement-ticket` itself created** —
+  `swarm_plan_batch` requires the `<!-- swarm-created-pr -->` marker in a PR's body before
+  `prsNeedingMaintenance` will surface it at all, regardless of conflict/feedback state. A PR the
+  user opened by hand is never auto-picked-up by this scan (#1127). This gate applies only to the
+  automatic scan — a user explicitly asking swarm to work on a specific PR by number is a separate,
+  deliberate one-off request that never goes through `swarm_plan_batch` and is therefore never
+  blocked by the marker check; serve it via a normal subagent spawn exactly as today.
 - Open-PR maintenance (conflicts + feedback) is handled first; ready tickets fill the remaining
   budget. One subagent per PR does both concerns for that PR.
 - Every maintenance worker unconditionally `git fetch origin` + `git merge origin/main` first,
