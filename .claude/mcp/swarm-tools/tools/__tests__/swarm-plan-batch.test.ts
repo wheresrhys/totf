@@ -34,6 +34,7 @@ import {
 	planBatch,
 	resetSwarmPlanBatchCaches,
 	SWARM_WORKER_REPLY_MARKER,
+	SWARM_CREATED_PR_MARKER,
 	type MaintenanceCandidate,
 	type TicketCandidate,
 } from '../swarm-plan-batch';
@@ -311,6 +312,7 @@ describe('findMaintenanceCandidates', () => {
 		reviews: [],
 		commits: [{ committedDate: '2026-01-05T00:00:00Z' }],
 		updatedAt: '2026-01-06T00:00:00Z',
+		body: `Some PR body.\n\n${SWARM_CREATED_PR_MARKER}`,
 	};
 
 	// Usual
@@ -354,6 +356,64 @@ describe('findMaintenanceCandidates', () => {
 		const candidates = await findMaintenanceCandidates();
 
 		expect(candidates).toEqual([]);
+	});
+
+	// #1127 — automatic maintenance must only ever pick up a PR implement-ticket itself created
+	// (carrying SWARM_CREATED_PR_MARKER), never a PR the human opened by hand, regardless of its
+	// conflict/feedback state.
+	describe('PR provenance marker (#1127)', () => {
+		const humanOpenedPr = {
+			number: 1127,
+			title: 'A PR the human opened by hand',
+			headRefName: 'summary-highlights-v2',
+			labels: [],
+			mergeable: 'CONFLICTING',
+			reviews: [],
+			commits: [{ committedDate: '2026-01-05T00:00:00Z' }],
+			updatedAt: '2026-01-06T00:00:00Z',
+			body: 'Just a normal PR description, no marker here.',
+		};
+
+		// Usual
+		it('excludes a conflicting PR with no swarm-created-pr marker in its body', async () => {
+			mockGhJson.mockResolvedValueOnce([humanOpenedPr]); // pr list only — never reached for comments
+
+			const candidates = await findMaintenanceCandidates();
+
+			expect(candidates).toEqual([]);
+		});
+
+		// Structure
+		it('never fetches feedback comments for an unmarked PR, even with a merge conflict', async () => {
+			mockGhJson.mockResolvedValueOnce([humanOpenedPr]);
+
+			await findMaintenanceCandidates();
+
+			expect(mockGhJson).toHaveBeenCalledTimes(1);
+		});
+
+		it('includes a conflicting, marked PR exactly as before', async () => {
+			mockGhJson
+				.mockResolvedValueOnce([{ ...pr, mergeable: 'CONFLICTING' }]) // pr list
+				.mockResolvedValueOnce([]) // inline comments
+				.mockResolvedValueOnce([]); // issue comments
+
+			const candidates = await findMaintenanceCandidates();
+
+			expect(candidates).toEqual([
+				{ number: 515, title: 'Some PR', headRefName: 'feature/515-x', labels: [], reason: 'conflict' },
+			]);
+		});
+
+		// Edge
+		it('excludes an unmarked PR even when it also carries outstanding feedback', async () => {
+			mockGhJson.mockResolvedValueOnce([{ ...humanOpenedPr, mergeable: 'MERGEABLE' }]);
+
+			const candidates = await findMaintenanceCandidates();
+
+			expect(candidates).toEqual([]);
+			expect(mockGhJson).toHaveBeenCalledTimes(1); // feedback lookups never happen either
+		});
 	});
 
 	describe('per-PR feedback cache', () => {
@@ -1426,6 +1486,7 @@ describe('planBatch', () => {
 			reviews: [],
 			commits: [{ committedDate: '2026-01-05T00:00:00Z' }],
 			updatedAt: '2026-01-06T00:00:00Z',
+			body: `Some PR body.\n\n${SWARM_CREATED_PR_MARKER}`,
 		};
 		mockGhJson.mockImplementation((args: string[]) => {
 			if (args[0] === 'pr' && args[1] === 'list') return Promise.resolve([pr]);

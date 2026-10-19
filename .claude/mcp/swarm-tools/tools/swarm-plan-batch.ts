@@ -46,6 +46,31 @@ function isSwarmWorkerReply(body: string | undefined): boolean {
 	return Boolean(body?.includes(SWARM_WORKER_REPLY_MARKER));
 }
 
+/**
+ * Marker `implement-ticket` stamps into the body of every PR it opens (step 7), the same HTML-comment
+ * convention as {@link SWARM_WORKER_REPLY_MARKER} — invisible in GitHub's rendered view. Its purpose is
+ * the mirror image of the reply marker: that one tells a worker's own reply apart from genuine human
+ * feedback; this one tells a swarm/implement-ticket-created PR apart from one the human opened by hand.
+ *
+ * `findMaintenanceCandidates` requires this marker before a PR is even considered for
+ * `prsNeedingMaintenance` — a PR the user opened themselves (wrong branch-naming convention, no ticket
+ * behind it, outside the whole ticket-workflow system) must never be auto-picked-up by the automatic
+ * scan just because it happens to have a merge conflict or outstanding feedback, regardless of who
+ * opened it. This is what went wrong with PR #1127: a manually-opened PR got swept into maintenance
+ * because the scan judged every open PR on conflict/feedback state alone, with no notion of provenance.
+ *
+ * This gate applies only to the *automatic* scan. A user explicitly telling swarm/the orchestrator to
+ * work on a specific PR by number ("go fix PR 1127 for me") is a direct, deliberate request — it never
+ * goes through `swarm_plan_batch` at all (the orchestrator can already spawn a one-off maintenance
+ * agent for a named PR without touching this tool), so it is not gated by this marker and is not
+ * affected by this check.
+ */
+export const SWARM_CREATED_PR_MARKER = '<!-- swarm-created-pr -->';
+
+function isSwarmCreatedPr(body: string | undefined): boolean {
+	return Boolean(body?.includes(SWARM_CREATED_PR_MARKER));
+}
+
 interface ReviewLike {
 	author?: { login?: string };
 	state?: string;
@@ -309,6 +334,7 @@ interface GhPrListItem {
 	reviews: ReviewLike[];
 	commits: { committedDate: string }[];
 	updatedAt: string;
+	body: string;
 }
 
 interface GhIssueListItem {
@@ -409,10 +435,15 @@ export async function findMaintenanceCandidates(): Promise<MaintenanceCandidate[
 		'--state',
 		'open',
 		'--json',
-		'number,title,headRefName,labels,reviews,mergeable,commits,updatedAt',
+		'number,title,headRefName,labels,reviews,mergeable,commits,updatedAt,body',
 	]);
 	const candidates: MaintenanceCandidate[] = [];
 	for (const pr of prs) {
+		// Automatic maintenance only ever touches a PR implement-ticket itself created (carrying the
+		// marker it stamps into every PR body it opens) — never a PR a human opened by hand, regardless
+		// of its conflict/feedback state. See SWARM_CREATED_PR_MARKER for why (#1127). A user-directed
+		// one-off request to work on a specific PR bypasses this entirely by never calling this tool.
+		if (!isSwarmCreatedPr(pr.body)) continue;
 		const labels = pr.labels.map((l) => l.name);
 		const hasConflict = pr.mergeable === 'CONFLICTING';
 		const headCommitDate = pr.commits.at(-1)?.committedDate ?? '';
@@ -693,7 +724,7 @@ export function registerSwarmPlanBatchTool(server: McpServer) {
 		'swarm_plan_batch',
 		{
 			description:
-				"Pre-filtered, pre-ranked PR-maintenance and ready-ticket lists for swarm's §1+§2 selection, already applying the unblocked/not-in-flight/solo-run rules and truncated to freeSlots. Also returns staleClosedPrTickets — ready tickets excluded only because a feature/<issue>-* branch from a closed-not-merged PR still exists — for the orchestrator to prompt on before reusing/replacing. And orphanedBranchTickets — ready tickets excluded only because a feature/<issue>-* branch exists that never had ANY PR opened against it (open, closed or merged) and that no live swarm-state.json entry claims: a branch left behind by a worker that crashed before it ever pushed a PR. Each carries the branch's tip commit date/message, a surviving worktree path if any, ahead/behind counts vs origin/main, and prunedThisCall (true when this same call also pruned a dead worker entry for that branch/issue — report the two as one incident, not two warnings). Never auto-spawn either list; ask the user first (§1.5 / §1.7). `pruned` lists worker entries auto-removed from state this call as presumed-dead (missing worktree, or no worktree activity past the staleness threshold) — warn the user on any non-empty list before selecting. Per-item feedback/branch-classification results are cached in-process across calls, keyed by each PR/issue's own `updatedAt` — pass `forceRescan: true` (e.g. on a user-requested re-check) to bypass the cache and recompute everything from live GitHub state.",
+				"Pre-filtered, pre-ranked PR-maintenance and ready-ticket lists for swarm's §1+§2 selection, already applying the unblocked/not-in-flight/solo-run rules and truncated to freeSlots. prsNeedingMaintenance only ever includes a PR carrying the <!-- swarm-created-pr --> marker that implement-ticket stamps into every PR it opens — a PR the user opened by hand never has this marker and is therefore never surfaced here, regardless of conflict/feedback state (#1127). This gate only affects the automatic scan; a user-directed one-off request to maintain a specific PR by number doesn't call this tool at all. Also returns staleClosedPrTickets — ready tickets excluded only because a feature/<issue>-* branch from a closed-not-merged PR still exists — for the orchestrator to prompt on before reusing/replacing. And orphanedBranchTickets — ready tickets excluded only because a feature/<issue>-* branch exists that never had ANY PR opened against it (open, closed or merged) and that no live swarm-state.json entry claims: a branch left behind by a worker that crashed before it ever pushed a PR. Each carries the branch's tip commit date/message, a surviving worktree path if any, ahead/behind counts vs origin/main, and prunedThisCall (true when this same call also pruned a dead worker entry for that branch/issue — report the two as one incident, not two warnings). Never auto-spawn either list; ask the user first (§1.5 / §1.7). `pruned` lists worker entries auto-removed from state this call as presumed-dead (missing worktree, or no worktree activity past the staleness threshold) — warn the user on any non-empty list before selecting. Per-item feedback/branch-classification results are cached in-process across calls, keyed by each PR/issue's own `updatedAt` — pass `forceRescan: true` (e.g. on a user-requested re-check) to bypass the cache and recompute everything from live GitHub state.",
 			inputSchema: {
 				freeSlots: z.number(),
 				forceRescan: z.boolean().optional(),

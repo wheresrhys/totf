@@ -159,6 +159,16 @@ For each PR:
        `db-migration` warning rule below.
 7. Push and open a PR against `main` (or the previous increment's branch if chaining). Include
    the trailer `🤖 Generated with [Claude Code](https://claude.com/claude-code)` in the PR body.
+   **Also include the marker line `<!-- swarm-created-pr -->`** somewhere in the PR body (an HTML
+   comment, invisible in GitHub's rendered view — same convention as the `<!-- swarm-worker-reply
+   -->` marker a maintenance worker appends to its own replies). `swarm_plan_batch`'s automatic PR
+   maintenance scan requires this marker before it will even consider a PR for
+   `prsNeedingMaintenance` — without it, a PR this skill creates wouldn't be distinguishable from
+   one the user opened by hand, and the whole point of the marker is to make that distinction (see
+   `/swarm` §1 and CLAUDE.md's "Ticket workflow"). Add it regardless of whether this run is
+   interactive or subagent/swarm — a PR opened by running `implement-ticket` directly from the
+   interactive session is just as much "swarm/implement-ticket-created" as one opened by a swarm
+   worker.
    If the issue carries `db-migration` and/or `e2e-exclusive` (the exclusive-resource label set —
    see CLAUDE.md > Ticket workflow), apply the same label(s) to the PR with `--label`. This lets
    `swarm` read exclusive-resource status directly off `gh pr list --json labels` when deciding
@@ -205,6 +215,10 @@ tracks the whole piece of work — it stays open until all increments are merged
   the result handed back to the caller.
 - Commit trailer names the model actually doing the work; PR body carries the Claude Code
   trailer.
+- Every PR this skill opens carries the `<!-- swarm-created-pr -->` marker in its body — it's how
+  `swarm_plan_batch`'s automatic maintenance scan tells a swarm/implement-ticket-created PR apart
+  from one the user opened by hand (see CLAUDE.md > Ticket workflow, and `/swarm` §1). Applies
+  whether this run is interactive or a subagent.
 - DB integration tests must isolate the rows they write (random/ticket-specific identifiers) —
   tickets can run concurrently in separate worktrees against the same local Supabase instance.
 - Keep `CLAUDE.md` up to date if changes affect documented conventions.
