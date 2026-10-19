@@ -148,7 +148,6 @@ describe('species detail page', () => {
 						fromDate: '2026-01-01',
 						toDate: '2026-06-30'
 					},
-					1,
 					VIEWED_GROUP
 				);
 				expect(mockFetchPageOfBirds).toHaveBeenCalledWith(
