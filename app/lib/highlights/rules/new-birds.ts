@@ -3,13 +3,11 @@ import {
 	printProminenceQualifier,
 	printTemporalUnit,
 	printTimeQualifier,
-	printCombinedHighlight,
-	sentenceCase
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
 
 export const newBirds: HighlightsGenerator = {
-	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
@@ -23,9 +21,7 @@ export const newBirds: HighlightsGenerator = {
 				lineItem: ({ scope, ranking }) =>
 					`${printProminenceQualifier(ranking)} highest ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
-			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			sentenceCase(`Most new birds`)
+			})
 	},
 	descriptor: {
 		type: 'newBirds',
@@ -34,5 +30,27 @@ export const newBirds: HighlightsGenerator = {
 	},
 	generator: getTopByProperty('new_bird_count'),
 	condition: (scope) =>
-		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
+	rpcName: 'core_stats',
+	speciesUsed: 'none',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 1,
+							year: 1
+						}
+					}
+				]
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

@@ -136,3 +136,5 @@ export type LongAbsenceRetrapsResult =
 	Database['public']['Functions']['long_absence_retraps']['Returns'][number];
 export type GroupTicksResult =
 	Database['public']['Functions']['group_ticks']['Returns'][number];
+export type StatsSpineResult =
+	Database['public']['Functions']['stats_spine']['Returns'][number];

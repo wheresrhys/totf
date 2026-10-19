@@ -9,6 +9,7 @@
     "max_wing": 80,
     "avg_wing": 74.2,
     "min_wing": 72,
-    "median_wing": 74
+    "median_wing": 74,
+    "encounter_count": 31
   }
 ]

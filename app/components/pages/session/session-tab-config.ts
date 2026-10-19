@@ -7,7 +7,7 @@
 // importing a `'use client'` module only ever gets client references back.
 // Nothing here is ever *called* server-side (see `sessionTabPrefetchers`), but
 // the descriptor list itself has to be readable there.
-import { getCondensedHighlightsAtTimePeriod } from '@/app/lib/highlights';
+import { getAllHighlightsAcrossScopes } from '@/app/lib/highlights/lib/hg2';
 import type { CombinedHighlight } from '@/app/lib/highlights/types';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { ViewedGroup } from '@/app/lib/group-slug';
@@ -30,13 +30,24 @@ export type SessionTabParams = {
 	otherCatchesSpeciesList: SpeciesWithEncounters[];
 	netRounds: NetRound[];
 	oldestEncounter: SessionEncounter | null;
+	// Whether to show a "Report" button on each rendered highlight (#1122) —
+	// resolved server-side (production + a qa cookie) and threaded down through
+	// this shared params object since it's the only prop every session tab's
+	// TabComponent, including the clientSideOnly Highlights tab, receives.
+	canReportHighlights: boolean;
 };
 
 export async function fetchSessionHighlights(
 	{ date }: Pick<SessionTabParams, 'date'>,
 	viewedGroup: ViewedGroup
 ): Promise<CombinedHighlight[]> {
-	return getCondensedHighlightsAtTimePeriod(viewedGroup.id, date, 'day');
+	return (
+		await getAllHighlightsAcrossScopes({
+			timePeriod: date,
+			temporalUnit: 'day',
+			viewedGroup
+		})
+	).inter;
 }
 
 /**

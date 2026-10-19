@@ -27,6 +27,7 @@ import {
 	type SquashedMonthTabParams
 } from '@/app/components/pages/summary/squashed-month-tab-params';
 import { parseMonthAbbreviation } from '@/app/lib/squashed-month';
+import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesStatsRow } from '@/app/lib/species-stats';
@@ -39,7 +40,11 @@ import { SummaryPageContent } from '../PageContent';
 // `tabId` (#804, reusing #803's mechanism) is the optional `?tabId=` search
 // param, merged alongside the route's `yearOrMonth` param — it never affects
 // `getCacheKeys`, only which tab focuses/loads first.
-export type PageParams = { yearOrMonth: string; tabId?: string };
+export type PageParams = {
+	yearOrMonth: string;
+	tabId?: string;
+	canReportHighlights?: boolean;
+};
 type RouteParams = { yearOrMonth: string };
 type PageProps = {
 	params: Promise<RouteParams>;
@@ -53,7 +58,11 @@ async function getSummaryYearOrMonthPageParams(
 		pageProps
 	);
 	const tabId = await readTabIdSearchParam(pageProps.searchParams);
-	return { yearOrMonth, ...(tabId ? { tabId } : {}) };
+	return {
+		yearOrMonth,
+		...(tabId ? { tabId } : {}),
+		canReportHighlights: await canReportHighlights()
+	};
 }
 
 // A real calendar year (`yearOrMonth` didn't parse as a month abbreviation —
@@ -177,7 +186,16 @@ export async function fetchSummaryYearOrMonthPageContent(
 	>(
 		yearSummaryPrefetchers,
 		activeTabId,
-		{ fromDate, toDate, year, totalsStats: undefined },
+		// `canReportHighlights` is never read by any `dataFetcher` either (same
+		// reasoning as `totalsStats` above) — the real value reaches the page
+		// via `params.canReportHighlights` below, not through this stub.
+		{
+			fromDate,
+			toDate,
+			year,
+			totalsStats: undefined,
+			canReportHighlights: false
+		},
 		viewedGroup
 	);
 	return {
@@ -226,6 +244,7 @@ function YearOrMonthSummary({
 			years={data.years}
 			initialTabId={params.tabId}
 			initialTabData={data.initialTabData}
+			canReportHighlights={params.canReportHighlights}
 		/>
 	);
 }

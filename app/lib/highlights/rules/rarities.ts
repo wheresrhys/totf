@@ -15,7 +15,6 @@ function getAppearances(stats: CoreStatsResult[]): CoreStatsResult[] {
 }
 
 export const rarities: HighlightsGenerator = {
-	statsSelector: 'coreStatsBySpecies',
 	formatters: {
 		// Only scopes[0] is read. Unlike a count metric, where each extra scope
 		// adds information ("busiest ever AND busiest of 2020"), every extra scope
@@ -28,8 +27,7 @@ export const rarities: HighlightsGenerator = {
 				lineItem: ({ scope, combinedHighlight }) =>
 					`${combinedHighlight.value.value} ${combinedHighlight.species} ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: false
-			}),
-		highlightListPrefixPrinter: () => 'Rarities'
+			})
 	},
 	descriptor: {
 		type: 'rarities',
@@ -40,9 +38,11 @@ export const rarities: HighlightsGenerator = {
 	},
 	generator: (
 		stats: CoreStatsResult[],
-		scope: HighlightScope | undefined
+		scope?: HighlightScope
 	): Omit<HighlightValue, 'descriptor'>[] => {
 		const appearances = getAppearances(stats);
+		const isAllTime = !Boolean(scope?.parentTimeWindow);
+		const rarityAppearancesThreshold = isAllTime ? 5 : 2;
 		if (!appearances.length) return [];
 		const totalEncounters = appearances.reduce(
 			(total, { encounter_count }) => total + encounter_count,
@@ -59,7 +59,7 @@ export const rarities: HighlightsGenerator = {
 			];
 		}
 
-		if (totalEncounters <= 4 && !scope?.parentTimeWindow) {
+		if (totalEncounters <= rarityAppearancesThreshold) {
 			return appearances.map((appearance, i) => ({
 				timePeriod: appearance.time_period,
 				value:
@@ -69,17 +69,41 @@ export const rarities: HighlightsGenerator = {
 				species: appearance.species_name
 			}));
 		}
-
-		return [
-			{
-				timePeriod: appearances[0].time_period,
-				value: 'first',
-				species: appearances[0].species_name
-			}
-		];
+		// if (/\/04|05|10|11\//.test(appearances[0].time_period)) {
+		// 	return [
+		// 		{
+		// 			timePeriod: appearances[0].time_period,
+		// 			value: 'first',
+		// 			species: appearances[0].species_name
+		// 		}
+		// 	];
+		// }
+		return [];
 	},
 	// A month-only window asks "of any February", which has no coherent reading
 	// as a first record — the earliest February a species appeared in is not a
 	// first of anything.
-	condition: (scope) => !scope.parentTimeWindow?.month
+	condition: (scope) => !scope.parentTimeWindow?.month,
+	rpcName: 'core_stats',
+	speciesUsed: 'grouped',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 1,
+							year: 1
+						}
+					}
+				]
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

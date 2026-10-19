@@ -23,10 +23,8 @@ import {
 	fetchPeriodStats,
 	fetchCombinedMonthTotals
 } from '@/app/actions/summary-stats';
-import {
-	getHighlightsWithinTimeWindow,
-	getCondensedHighlightsAtTimePeriod
-} from '@/app/lib/highlights';
+import { getAllHighlightsAcrossScopes } from '@/app/lib/highlights/lib/hg2';
+import { getTemporalUnitFromTimeWindow } from '@/app/lib/highlights/lib/highlight-utils';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
@@ -78,41 +76,13 @@ export async function fetchSummaryHighlightsData(
 	viewedGroup: ViewedGroup
 ) {
 	const { year, month } = params;
-	const [daily, monthly, local] = await Promise.all([
-		getHighlightsWithinTimeWindow({
-			temporalUnit: 'day',
-			groupId: viewedGroup.id,
-			parentTimeWindow: {
-				year,
-				month: month
-			},
-			includePerSpecies: false
-		}),
-		month
-			? []
-			: getHighlightsWithinTimeWindow({
-					temporalUnit: 'month',
-					groupId: viewedGroup.id,
-					parentTimeWindow: {
-						year,
-						month: month
-					},
-					includePerSpecies: false
-				}),
-		year
-			? getCondensedHighlightsAtTimePeriod(
-					viewedGroup.id,
-					`${year}-${String(month).padStart(2, '0') ?? '01'}-01`,
-					month ? 'month' : 'year',
-					1
-				)
-			: []
-	]);
-	return {
-		sessionHighlights: daily,
-		monthHighlights: monthly,
-		localHighlights: local
-	};
+	return await getAllHighlightsAcrossScopes({
+		timePeriod: year
+			? `${year}-${String(month).padStart(2, '0') ?? '01'}-01`
+			: null,
+		temporalUnit: getTemporalUnitFromTimeWindow({ year, month }),
+		viewedGroup
+	});
 }
 
 export type SummaryHighlightsData = Awaited<

@@ -16,6 +16,7 @@ import {
 	YEAR_TOTALS_TAB_ID
 } from '@/app/components/pages/summary/summary-tab-prefetchers';
 import type { SummaryTabParams } from '@/app/components/pages/summary/summary-tab-params';
+import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
 import { SummaryPageContent } from './PageContent';
@@ -26,7 +27,12 @@ import { SummaryPageContent } from './PageContent';
 // this all-time page's own explicit `TemporalFilterControls` narrowing — the
 // only summary route depth with no year/month-derived bounds of its own
 // already in play.
-export type PageParams = { tabId?: string; fromDate?: string; toDate?: string };
+export type PageParams = {
+	tabId?: string;
+	fromDate?: string;
+	toDate?: string;
+	canReportHighlights?: boolean;
+};
 type PageProps = {
 	searchParams?: Promise<{
 		tabId?: string;
@@ -48,7 +54,8 @@ async function getSummaryPageParams(pageProps: PageProps): Promise<PageParams> {
 	return {
 		...(tabId ? { tabId } : {}),
 		...(searchParams.fromDate ? { fromDate: searchParams.fromDate } : {}),
-		...(searchParams.toDate ? { toDate: searchParams.toDate } : {})
+		...(searchParams.toDate ? { toDate: searchParams.toDate } : {}),
+		canReportHighlights: await canReportHighlights()
 	};
 }
 
@@ -76,10 +83,14 @@ export async function fetchSummaryPageContent(
 	>(
 		allTimeSummaryPrefetchers,
 		activeTabId,
+		// `canReportHighlights` is never read by any `dataFetcher` either (same
+		// reasoning as `totalsStats` above) — the real value reaches the page
+		// via `params.canReportHighlights` below, not through this stub.
 		{
 			fromDate: params.fromDate,
 			toDate: params.toDate,
-			totalsStats: undefined
+			totalsStats: undefined,
+			canReportHighlights: false
 		},
 		viewedGroup
 	);
@@ -106,6 +117,7 @@ function AllTimeSummary({
 			toDate={params.toDate}
 			initialTabId={params.tabId}
 			initialTabData={data.initialTabData}
+			canReportHighlights={params.canReportHighlights}
 		/>
 	);
 }

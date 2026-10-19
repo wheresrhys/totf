@@ -75,6 +75,8 @@ SET
       ELSE NULL::date
     END AS "time_period",
 
+    COALESCE(COUNT(DISTINCT raw_enc.encounter_id), 0) AS "encounter_count",
+
     MAX(raw_enc.weight) AS "max_weight",
     ROUND(AVG(raw_enc.weight)::numeric, 1) AS "avg_weight",
     MIN(raw_enc.weight) AS "min_weight",

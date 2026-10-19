@@ -1,6 +1,5 @@
 import type { HighlightValue } from '../types';
 import { DEFAULT_THRESHOLD } from '../const';
-
 type HighlightFinderOptions = {
 	threshold?: number;
 	// Rarity finders only: the most periods a species can have ever appeared in

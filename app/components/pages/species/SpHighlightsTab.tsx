@@ -1,24 +1,22 @@
 'use client';
-import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
+import {
+	SecondaryHeading,
+	PrimaryHeading
+} from '@/app/components/shared/DesignSystem';
 import {
 	fetchNotableRetraps,
 	type SpeciesTotalsTabParams
 } from '@/app/actions/sp-data';
 import { NotableRetrapsTable } from '@/app/components/NotableRetrapsTable';
 import type { NotableRetrapsResult } from '@/app/models/db';
-import { getHighlightsWithinTimeWindow } from '@/app/lib/highlights';
-import type { HighlightsOfType } from '@/app/lib/highlights/types';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { TabConfig } from '@/app/components/shared/TabContent';
-import { HighlightsByTimePeriod } from '../../SummaryTotalsSection';
 
 // Data shape for the species page's Highlights tab (#1066) — the combined
 // result of the two previously-separate fetches (`getHighlightsWithinTimeWindow`
 // x2 + `fetchNotableRetraps`) this tab's own handrolled `useEffect` made
 // before this migration, flattened into a single `dataFetcher`.
 export type SpHighlightsTabData = {
-	sessionHighlights: HighlightsOfType[];
-	monthHighlights: HighlightsOfType[];
 	notableRetraps: NotableRetrapsResult[];
 };
 
@@ -47,33 +45,11 @@ async function fetchHighlightsTabData(
 	const { speciesName, year, month, fromDate, toDate } = params;
 	const [sessionHighlights, monthHighlights, notableRetraps] =
 		await Promise.all([
-			getHighlightsWithinTimeWindow({
-				temporalUnit: 'day',
-				groupId: viewedGroup.id,
-				species: speciesName,
-				parentTimeWindow: {
-					year,
-					month
-				},
-				excludeGlobal: true,
-				includePerSpecies: true
-			}),
-			month
-				? []
-				: getHighlightsWithinTimeWindow({
-						temporalUnit: 'month',
-						groupId: viewedGroup.id,
-						species: speciesName,
-						parentTimeWindow: {
-							year,
-							month
-						},
-						includePerSpecies: true,
-						excludeGlobal: true
-					}),
+			[],
+			[],
 			fetchNotableRetraps(speciesName, viewedGroup, fromDate, toDate)
 		]);
-	return { sessionHighlights, monthHighlights, notableRetraps };
+	return { notableRetraps };
 }
 
 // Pure, presentational `TabConfig.TabComponent` (#1066) — fetching/loading/
@@ -90,27 +66,13 @@ export function SpHighlightsTab({
 	data: unknown;
 	viewedGroup: ViewedGroup;
 }) {
-	const { sessionHighlights, monthHighlights, notableRetraps } =
-		(data as SpHighlightsTabData | null) ?? {
-			sessionHighlights: [],
-			monthHighlights: [],
-			notableRetraps: []
-		};
+	const { notableRetraps } = (data as SpHighlightsTabData | null) ?? {
+		notableRetraps: []
+	};
 
 	return (
 		<>
-			<HighlightsByTimePeriod
-				highlights={sessionHighlights}
-				viewedGroup={viewedGroup}
-				heading="Session highlights"
-				excludeSpeciesName={true}
-			/>
-			<HighlightsByTimePeriod
-				highlights={monthHighlights}
-				viewedGroup={viewedGroup}
-				heading="Month highlights"
-				excludeSpeciesName={true}
-			/>
+			<PrimaryHeading>!!! Work in progress !!!</PrimaryHeading>
 			{notableRetraps.length > 0 ? (
 				<>
 					<SecondaryHeading>Notable Retraps</SecondaryHeading>

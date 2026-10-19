@@ -7,16 +7,7 @@ export type {
 	TemporalUnit,
 	StatUnit
 } from '@/app/components/shared/StatOutput';
-import type { StatsRepository } from '@/app/actions/stats-cache';
 
-export type EnhancedStatsRepository = StatsRepository & {
-	coreStatsBySpecies: Record<string, CoreStatsResult[]>;
-	biometricsStatsBySpecies: Record<string, BiometricsStatsResult[]>;
-};
-
-export interface TimePeriodedItem {
-	time_period: string | null;
-}
 export type YearMonthRestriction = {
 	year?: number;
 	month?: number;
@@ -49,6 +40,7 @@ export type HighlightValue = {
 };
 
 export type SpeciesUnitMode = 'replace' | 'prefix' | undefined;
+
 export type HighlightDescriptor = {
 	category: HighlightCategory;
 	type: string;
@@ -63,26 +55,18 @@ export type HighlightScope = {
 	species?: string;
 };
 
-export type HighlightsOfType = {
-	formatters: HighlightFormatters;
-	descriptor: HighlightDescriptor;
-	scope: HighlightScope;
-	values: HighlightValue[];
-};
-
 export type HighlightRanking = {
-	highlightIndex: number;
-	siblingHighlights: HighlightValue[];
 	position: number;
 	isTied: boolean;
 };
 
-export type CherryPickedHighlight = {
-	formatters: HighlightFormatters;
+export type HighlightValueWithRanking = HighlightValue & {
+	ranking: HighlightRanking;
+};
+
+export type NewHighlightValue = HighlightValueWithRanking & {
 	descriptor: HighlightDescriptor;
 	scope: HighlightScope;
-	value: HighlightValue;
-	ranking: HighlightRanking;
 };
 
 export type CombinedHighlight = {
@@ -100,36 +84,69 @@ export type CombinedHighlight = {
 export type CombinedHighlightPrinter = (
 	combinedHighlight: CombinedHighlight
 ) => string;
-export type HighlightListPrefixPrinter = (
-	highlightsOfType: HighlightsOfType
-) => string;
 
 type HighlightFormatters = {
 	combinedHighlightPrinter: CombinedHighlightPrinter;
-	highlightListPrefixPrinter: HighlightListPrefixPrinter;
 };
 
-type StatsRowOf<StatsProperty> =
-	StatsProperty extends Record<string, (infer Row)[]>
-		? Row
-		: StatsProperty extends (infer Row)[]
-			? Row
-			: never;
+type RpcRowMap = {
+	core_stats: CoreStatsResult;
+	biometrics_stats: BiometricsStatsResult;
+};
 
-type HighlightsGeneratorFor<
-	StatsSelectorKey extends keyof EnhancedStatsRepository
-> = {
+type HighlightsGeneratorFor<RpcName extends keyof RpcRowMap> = {
 	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	limit?: number;
-	statsSelector: StatsSelectorKey;
+	rpcName: RpcName;
+	speciesUsed: 'none' | 'present' | 'grouped';
+	presence?: HighlightPresenceConfig;
 	generator: (
-		stats: StatsRowOf<EnhancedStatsRepository[StatsSelectorKey]>[],
+		stats: RpcRowMap[RpcName][],
 		scope?: HighlightScope
 	) => HighlightValue[];
 	condition?: (scope: HighlightScope) => boolean;
 };
 
 export type HighlightsGenerator = {
-	[StatsSelectorKey in keyof EnhancedStatsRepository]: HighlightsGeneratorFor<StatsSelectorKey>;
-}[keyof EnhancedStatsRepository];
+	[RpcName in keyof RpcRowMap]: HighlightsGeneratorFor<RpcName>;
+}[keyof RpcRowMap];
+
+type HighlightPositionsLimit = 0 | 1 | 2 | 3;
+
+export type HighlightDataLake = {
+	allTime?: HighlightPositionsLimit;
+	year?: HighlightPositionsLimit;
+	allTimeMonth?: HighlightPositionsLimit;
+	month?: HighlightPositionsLimit;
+};
+
+export type ExtendedTemporalUnit = TemporalUnit | 'all time' | 'all time month';
+export type CamelCaseExtendedTemporalUnit =
+	| TemporalUnit
+	| 'allTime'
+	| 'allTimeMonth';
+
+export type HighlightOutlook = 'inter' | 'intra';
+export type HighlightGenerationConfig = {
+	sample: CamelCaseExtendedTemporalUnit;
+	lakes: HighlightDataLake;
+};
+
+export type ScopeHighlightConfig = {
+	intra?: HighlightGenerationConfig[];
+	inter?: HighlightGenerationConfig[];
+};
+
+export type HighlightPresenceAtScopes = {
+	allTime: ScopeHighlightConfig | null;
+	year: ScopeHighlightConfig | null;
+	allTimeMonth: ScopeHighlightConfig | null;
+	month: ScopeHighlightConfig | null;
+	day: ScopeHighlightConfig | null;
+};
+
+type HighlightPresenceConfig = {
+	species: HighlightPresenceAtScopes | null;
+	general: HighlightPresenceAtScopes | null;
+};

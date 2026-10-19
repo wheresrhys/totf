@@ -20,8 +20,10 @@ import {
 
 // The Highlights tab fetches through this; mock it as the one collaborator it
 // is, so opening that tab in a test never reaches the real stats pipeline.
-vi.mock('@/app/lib/highlights', () => ({
-	getCondensedHighlightsAtTimePeriod: vi.fn().mockResolvedValue([])
+vi.mock('@/app/lib/highlights/lib/hg2', () => ({
+	getAllHighlightsAcrossScopes: vi
+		.fn()
+		.mockResolvedValue({ inter: [], intra: [] })
 }));
 
 function makeEncounter(
@@ -91,6 +93,7 @@ function renderSessionTabs(
 		netRounds,
 		oldestEncounter: null as SessionEncounter | null,
 		date: '2024-09-15',
+		canReportHighlights: false,
 		...overrides
 	};
 	return render(
@@ -719,8 +722,7 @@ describe('SessionTabs', () => {
 		// formatting logic (covered by the v2 pipeline's own tests).
 		const countHighlight: CombinedHighlight = {
 			formatters: {
-				combinedHighlightPrinter: () => 'Busiest session ever — 3 birds',
-				highlightListPrefixPrinter: () => ''
+				combinedHighlightPrinter: () => 'Busiest session ever — 3 birds'
 			},
 			descriptor: {
 				category: 'count',
@@ -734,12 +736,13 @@ describe('SessionTabs', () => {
 		};
 
 		async function mockHighlightsPipeline(highlights: CombinedHighlight[]) {
-			const { getCondensedHighlightsAtTimePeriod } =
-				await import('@/app/lib/highlights');
-			vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue(
-				highlights
-			);
-			return getCondensedHighlightsAtTimePeriod;
+			const { getAllHighlightsAcrossScopes } =
+				await import('@/app/lib/highlights/lib/hg2');
+			vi.mocked(getAllHighlightsAcrossScopes).mockResolvedValue({
+				inter: highlights,
+				intra: []
+			});
+			return getAllHighlightsAcrossScopes;
 		}
 
 		it('fetches highlights client-side, behind a spinner, when the tab is opened', async () => {
@@ -750,7 +753,11 @@ describe('SessionTabs', () => {
 
 			expect(document.querySelector('.loading')).not.toBeNull();
 			const highlights = await screen.findByTestId('session-highlights');
-			expect(pipeline).toHaveBeenCalledWith(1, '2024-09-15', 'day');
+			expect(pipeline).toHaveBeenCalledWith({
+				timePeriod: '2024-09-15',
+				temporalUnit: 'day',
+				viewedGroup: { id: 1, slug: 'alpha' }
+			});
 			expect(highlights.textContent).toContain(
 				'Busiest session ever — 3 birds'
 			);
@@ -762,7 +769,11 @@ describe('SessionTabs', () => {
 
 			expect(document.querySelector('.loading')).not.toBeNull();
 			const highlights = await screen.findByTestId('session-highlights');
-			expect(pipeline).toHaveBeenCalledWith(1, '2024-09-15', 'day');
+			expect(pipeline).toHaveBeenCalledWith({
+				timePeriod: '2024-09-15',
+				temporalUnit: 'day',
+				viewedGroup: { id: 1, slug: 'alpha' }
+			});
 			expect(highlights.textContent).toContain(
 				'Busiest session ever — 3 birds'
 			);

@@ -1,15 +1,11 @@
 import { highlightRules } from '..';
-import {
-	getCombinedHighlightFixtures,
-	getHighlightsOfTypeFixtures
-} from './fixture-generator';
-import type { CombinedHighlight, HighlightsOfType } from '../../types';
+import { getCombinedHighlightFixtures } from './fixture-generator';
+import type { CombinedHighlight } from '../../types';
 import { writeFileSync } from 'node:fs';
 
 const fixtures = Object.fromEntries(
 	highlightRules.map((rule) => {
 		const combinedHighlights = getCombinedHighlightFixtures(rule);
-		const highlightsOfType = getHighlightsOfTypeFixtures(rule);
 
 		return [
 			rule.descriptor.type,
@@ -19,14 +15,6 @@ const fixtures = Object.fromEntries(
 						name,
 						rule.formatters.combinedHighlightPrinter(
 							fixture as CombinedHighlight
-						)
-					])
-				),
-				printedHighlightsOfType: Object.fromEntries(
-					Object.entries(highlightsOfType).map(([name, fixture]) => [
-						name,
-						rule.formatters.highlightListPrefixPrinter(
-							fixture as HighlightsOfType
 						)
 					])
 				)

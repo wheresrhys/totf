@@ -11,11 +11,18 @@ import type {
 } from '@/app/lib/highlights/types';
 import type { SessionEncounter } from '@/app/models/session';
 
-// Rarities (#990), Counts (#989) and Vital stats all come from the highlights
-// pipeline's getCondensedHighlightsAtTimePeriod — see session-tab-config.ts.
-// Mock it as the one collaborator it is.
-vi.mock('@/app/lib/highlights', () => ({
-	getCondensedHighlightsAtTimePeriod: vi.fn()
+// Rarities (#990), Counts (#989) and Vital stats all come from the v2
+// highlights pipeline's getAllHighlightsAcrossScopes — see
+// session-tab-config.ts. Mock it as the one collaborator it is.
+vi.mock('@/app/lib/highlights/lib/hg2', () => ({
+	getAllHighlightsAcrossScopes: vi.fn()
+}));
+
+// Each rendered highlight's ReportHighlightButton (#1122) renders
+// ReportHighlightModal, which imports the real server action — mock it so
+// importing the tree doesn't pull that in, same as PromoteControlButton.test.tsx.
+vi.mock('@/app/actions/highlight-reports', () => ({
+	reportHighlight: vi.fn()
 }));
 
 // A v2 highlight carries its own printer, so the sentence a section renders is
@@ -64,14 +71,16 @@ function makeOldestEncounter(provenAge: number): SessionEncounter {
 
 function renderSessionHighlights({
 	highlights = [] as CombinedHighlight[] | null,
-	oldestEncounter = null as SessionEncounter | null
+	oldestEncounter = null as SessionEncounter | null,
+	canReportHighlights = false
 } = {}) {
 	const params = {
 		date: '2024-09-15',
 		mistNetSpeciesList: [],
 		otherCatchesSpeciesList: [],
 		netRounds: [],
-		oldestEncounter
+		oldestEncounter,
+		canReportHighlights
 	} satisfies SessionTabParams;
 	return render(<SessionHighlights params={params} data={highlights} />);
 }
@@ -83,22 +92,30 @@ afterEach(() => {
 
 describe('fetchSessionHighlights', () => {
 	async function mockPipeline(highlights: CombinedHighlight[]) {
-		const { getCondensedHighlightsAtTimePeriod } =
-			await import('@/app/lib/highlights');
-		vi.mocked(getCondensedHighlightsAtTimePeriod).mockResolvedValue(highlights);
-		return getCondensedHighlightsAtTimePeriod;
+		const { getAllHighlightsAcrossScopes } =
+			await import('@/app/lib/highlights/lib/hg2');
+		vi.mocked(getAllHighlightsAcrossScopes).mockResolvedValue({
+			inter: highlights,
+			intra: []
+		});
+		return getAllHighlightsAcrossScopes;
 	}
 
 	it("asks the pipeline for the viewed group's highlights at the day scope, and hands them straight back", async () => {
 		const pipelineHighlights = [COUNT_HIGHLIGHT];
 		const pipeline = await mockPipeline(pipelineHighlights);
+		const viewedGroup = { id: 7, slug: 'alpha' };
 
 		const highlights = await fetchSessionHighlights(
 			{ date: '2024-09-15' },
-			{ id: 7, slug: 'alpha' }
+			viewedGroup
 		);
 
-		expect(pipeline).toHaveBeenCalledWith(7, '2024-09-15', 'day');
+		expect(pipeline).toHaveBeenCalledWith({
+			timePeriod: '2024-09-15',
+			temporalUnit: 'day',
+			viewedGroup
+		});
 		expect(highlights).toBe(pipelineHighlights);
 	});
 });
@@ -195,5 +212,23 @@ describe('SessionHighlights', () => {
 	it('renders nothing when there are no highlights and no oldest encounter', () => {
 		const { container } = renderSessionHighlights();
 		expect(container.innerHTML).toBe('');
+	});
+
+	describe('report button (#1122)', () => {
+		it('renders no report button when canReportHighlights is false', () => {
+			renderSessionHighlights({
+				highlights: [RARITY_HIGHLIGHT],
+				canReportHighlights: false
+			});
+			expect(screen.queryByRole('button', { name: 'Report' })).toBeNull();
+		});
+
+		it('renders a report button per highlight when canReportHighlights is true', () => {
+			renderSessionHighlights({
+				highlights: [RARITY_HIGHLIGHT, COUNT_HIGHLIGHT],
+				canReportHighlights: true
+			});
+			expect(screen.getAllByRole('button', { name: 'Report' })).toHaveLength(2);
+		});
 	});
 });

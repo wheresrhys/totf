@@ -3,13 +3,11 @@ import {
 	printProminenceQualifier,
 	printTemporalUnit,
 	printTimeQualifier,
-	printCombinedHighlight,
-	sentenceCase
+	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByPropertiesSum } from '../lib/rule-utils';
 
 export const juvs: HighlightsGenerator = {
-	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
@@ -18,8 +16,7 @@ export const juvs: HighlightsGenerator = {
 				lineItem: ({ scope, ranking }) =>
 					`${printProminenceQualifier(ranking, 'equal')} most ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
-			}),
-		highlightListPrefixPrinter: (highlightsOfType) => sentenceCase(`Most juvs`)
+			})
 	},
 	descriptor: {
 		type: 'juvs',
@@ -28,5 +25,27 @@ export const juvs: HighlightsGenerator = {
 	},
 	generator: getTopByPropertiesSum(['pullus_bird_count', 'juv_bird_count']),
 	condition: (scope) =>
-		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
+	rpcName: 'core_stats',
+	speciesUsed: 'none',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 1,
+							year: 1
+						}
+					}
+				]
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

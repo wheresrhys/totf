@@ -6,35 +6,55 @@ import {
 	type CombinedHighlight,
 	type HighlightCategory
 } from '@/app/lib/highlights/types';
+import { ReportHighlightButton } from '@/app/components/ReportHighlightButton';
 import type { SessionTabParams } from './session-tab-config';
 
 // A v2 highlight carries its own printer, so every v2-backed section renders
 // identically — only the highlights they're handed differ. Shared by this tab
 // and `SummaryTotalsSection`, both of which render live `CombinedHighlight`s
-// fetched in the browser.
-export function renderCombinedHighlights(highlights: CombinedHighlight[]) {
-	return highlights.map((highlight: CombinedHighlight) => (
-		<li key={`${highlight.descriptor.type}-${highlight.species}`}>
-			{highlight.formatters.combinedHighlightPrinter(highlight)}
-		</li>
-	));
+// fetched in the browser. `canReport` (#1122) shows a "Report" button per
+// highlight, gated server-side (production + a qa cookie) by the caller.
+export function renderCombinedHighlights(
+	highlights: CombinedHighlight[],
+	canReport: boolean
+) {
+	return highlights.map((highlight: CombinedHighlight) => {
+		const displayedText =
+			highlight.formatters.combinedHighlightPrinter(highlight);
+		return (
+			<li
+				key={`${highlight.descriptor.type}-${highlight.species}`}
+				title={JSON.stringify(highlight, null, 2)}
+			>
+				{displayedText}
+				{canReport && (
+					<ReportHighlightButton
+						highlight={highlight}
+						displayedText={displayedText}
+					/>
+				)}
+			</li>
+		);
+	});
 }
 
 function HighlightsSection({
 	heading,
 	testId,
-	highlights
+	highlights,
+	canReport
 }: {
 	heading: string;
 	testId: string;
 	highlights: CombinedHighlight[];
+	canReport: boolean;
 }) {
 	if (highlights.length === 0) return null;
 	return (
 		<>
 			<SecondaryHeading>{heading}</SecondaryHeading>
 			<BoxyList testId={testId}>
-				{renderCombinedHighlights(highlights)}
+				{renderCombinedHighlights(highlights, canReport)}
 			</BoxyList>
 		</>
 	);
@@ -48,7 +68,7 @@ function HighlightsSection({
  * plain page data, handed over in `params` and rendered whatever the fetch did.
  */
 export function SessionHighlights({
-	params: { oldestEncounter },
+	params: { oldestEncounter, canReportHighlights },
 	data
 }: {
 	params: SessionTabParams;
@@ -72,16 +92,19 @@ export function SessionHighlights({
 				heading="Rarities"
 				testId="rarities"
 				highlights={inCategory('rarity')}
+				canReport={canReportHighlights}
 			/>
 			<HighlightsSection
 				heading="Counts"
 				testId="counts"
 				highlights={inCategory('count')}
+				canReport={canReportHighlights}
 			/>
 			<HighlightsSection
 				heading="Vital stats"
 				testId="vital-stats"
 				highlights={inCategory('biometrics')}
+				canReport={canReportHighlights}
 			/>
 			{showBestOfSession && oldestEncounter ? (
 				<>

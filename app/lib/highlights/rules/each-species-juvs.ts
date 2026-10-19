@@ -8,7 +8,6 @@ import {
 import { getTopByPropertiesSum } from '../lib/rule-utils';
 
 export const eachSpeciesJuvs: HighlightsGenerator = {
-	statsSelector: 'coreStatsBySpecies',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
@@ -23,9 +22,7 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 				lineItem: ({ scope, ranking }) =>
 					`${printProminenceQualifier(ranking, 'equal')} highest ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
-			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Highest juv count${highlightsOfType.values.length > 1 ? 's' : ''} for ${highlightsOfType.values[0].species}`
+			})
 	},
 	descriptor: {
 		type: 'eachSpeciesJuvs',
@@ -37,5 +34,27 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 	}),
 	limit: 1,
 	condition: (scope) =>
-		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
+	rpcName: 'core_stats',
+	speciesUsed: 'grouped',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 1,
+							year: 1
+						}
+					}
+				]
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

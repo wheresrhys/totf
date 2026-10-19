@@ -17,7 +17,6 @@ import type { MonthTotalsRow } from '@/app/lib/month-totals';
 // working unchanged — see `HighlightsByTimePeriod.tsx`'s doc comment for why
 // the implementation itself had to move (breaking a circular import with
 // `SummaryHighlightsTab.tsx` below).
-export { HighlightsByTimePeriod } from '@/app/components/HighlightsByTimePeriod';
 
 export function SummaryTotalsSection({
 	summaryStats,
@@ -31,7 +30,8 @@ export function SummaryTotalsSection({
 	year,
 	month,
 	initialTabId,
-	initialTabData
+	initialTabData,
+	canReportHighlights = false
 }: {
 	// The page's aggregate stats for whichever table/tab is active — used to
 	// derive the pinned totals row. `null` (no data yet) renders no totals row.
@@ -77,6 +77,9 @@ export function SummaryTotalsSection({
 	// per `page.tsx`) — `undefined` when the resolved initial tab isn't one of
 	// the migrated tabs, or has no `dataFetcher` output to prefetch.
 	initialTabData?: { tabId: string; data: unknown };
+	// Whether to show a "Report" button on each rendered highlight in the
+	// Records section (#1122) — resolved server-side by `SummaryPageContent`.
+	canReportHighlights?: boolean;
 }) {
 	// Each summary page supplies at most one period tab's data: year totals on
 	// the all-time page, month totals on the year page, session totals on the
@@ -114,7 +117,8 @@ export function SummaryTotalsSection({
 		yearlyTotals,
 		monthTotals,
 		sessionTotals,
-		tabsWithTotalsRow
+		tabsWithTotalsRow,
+		canReportHighlights
 	};
 
 	// All 7 possible tabs, conditionally included exactly as before (#1072's

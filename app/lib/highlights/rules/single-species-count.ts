@@ -10,7 +10,6 @@ import { getTopByProperty } from '../lib/rule-utils';
 
 const timeQualifierOptions: TimeQualifierOptions = { yearConnector: 'of' };
 export const singleSpeciesCount: HighlightsGenerator = {
-	statsSelector: 'coreStatsWithSpecies',
 	formatters: {
 		// -> Highest count of a single species in 2021: 54 Reed Warblers
 		combinedHighlightPrinter: (combinedHighlight) =>
@@ -20,9 +19,7 @@ export const singleSpeciesCount: HighlightsGenerator = {
 				lineItem: ({ scope, ranking }) =>
 					`${printProminenceQualifier(ranking)} highest ${printTimeQualifier(scope.parentTimeWindow, timeQualifierOptions)}`,
 				shouldPrintValue: true
-			}),
-		highlightListPrefixPrinter: (highlightsOfType) =>
-			`Most individuals of a single species`
+			})
 	},
 	descriptor: {
 		type: 'singleSpeciesCount',
@@ -32,5 +29,27 @@ export const singleSpeciesCount: HighlightsGenerator = {
 	},
 	generator: getTopByProperty('bird_count', { threshold: 3 }),
 	condition: (scope) =>
-		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
+	rpcName: 'core_stats',
+	speciesUsed: 'present',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 3,
+							year: 1
+						}
+					}
+				]
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };

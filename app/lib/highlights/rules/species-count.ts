@@ -8,7 +8,6 @@ import {
 import { getTopByProperty } from '../lib/rule-utils';
 
 export const speciesCount: HighlightsGenerator = {
-	statsSelector: 'coreStats',
 	formatters: {
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
@@ -17,8 +16,7 @@ export const speciesCount: HighlightsGenerator = {
 				lineItem: ({ scope, ranking }) =>
 					`${printProminenceQualifier(ranking)} most varied ${printTimeQualifier(scope.parentTimeWindow)}`,
 				shouldPrintValue: true
-			}),
-		highlightListPrefixPrinter: (highlightsOfType) => `Most varied`
+			})
 	},
 	descriptor: {
 		type: 'species',
@@ -27,5 +25,27 @@ export const speciesCount: HighlightsGenerator = {
 	},
 	generator: getTopByProperty('species_count'),
 	condition: (scope) =>
-		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year)
+		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
+	rpcName: 'core_stats',
+	speciesUsed: 'present',
+	presence: {
+		species: null,
+		general: {
+			day: {
+				inter: [
+					{
+						sample: 'day',
+						lakes: {
+							allTime: 3,
+							year: 3
+						}
+					}
+				]
+			},
+			month: null,
+			year: null,
+			allTimeMonth: null,
+			allTime: null
+		}
+	}
 };
