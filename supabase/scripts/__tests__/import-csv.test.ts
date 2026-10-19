@@ -71,7 +71,11 @@ vi.mock('../../../lib/demon-import', () => ({
 	createUpserter: vi.fn(() => vi.fn()),
 	createRingSequenceLookup: vi.fn(() => vi.fn()),
 	createRingSequenceLinker: vi.fn(() => vi.fn()),
-	createImportJobTracker: vi.fn(() => mockImportJobTracker),
+	// `function`, not an arrow: the script does `new ImportJobTracker(...)`, and
+	// only a newable stub's returned object becomes the constructed instance.
+	ImportJobTracker: vi.fn(function () {
+		return mockImportJobTracker;
+	}),
 	processEncounterRow: vi.fn(async () => {}),
 	getDistinctLocationNames: vi.fn(() => ['Garden Trap']),
 	// Every location in the CSV is already known unless a test says otherwise.

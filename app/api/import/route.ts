@@ -7,7 +7,7 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
-	createImportJobTracker,
+	ImportJobTracker,
 	processEncounterRow,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
@@ -85,12 +85,7 @@ export async function POST(request: Request): Promise<Response> {
 			// the catch branch below knows whether there is anything to mark failed.
 			let importJobId: number | null = null;
 
-			const {
-				createImportJob,
-				completeImportJob,
-				failImportJob,
-				markImportJobTimedOut
-			} = createImportJobTracker(supabaseClient);
+			const importJobTracker = new ImportJobTracker(supabaseClient);
 
 			try {
 				const rows: DemonRow[] = [];
@@ -125,7 +120,7 @@ export async function POST(request: Request): Promise<Response> {
 				// writers below are: an aborted upload stays a complete no-op (#1079)
 				// rather than leaving an orphan `in_progress` row behind for a run
 				// that never wrote anything.
-				importJobId = await createImportJob(ringingGroupId);
+				importJobId = await importJobTracker.createImportJob(ringingGroupId);
 
 				// Deliberately built only once the pre-flight has passed, so an
 				// aborted import never even constructs the writers.
@@ -163,14 +158,14 @@ export async function POST(request: Request): Promise<Response> {
 				);
 
 				if (timedOut) {
-					await markImportJobTimedOut(importJobId, {
+					await importJobTracker.markImportJobTimedOut(importJobId, {
 						processed,
 						startDate,
 						endDate
 					});
 					send({ type: 'timeout', processed, startDate, endDate });
 				} else {
-					await completeImportJob(importJobId, {
+					await importJobTracker.completeImportJob(importJobId, {
 						processed,
 						successful,
 						failed
@@ -183,7 +178,7 @@ export async function POST(request: Request): Promise<Response> {
 				// location pre-flight, i.e. before any job row existed.
 				if (importJobId !== null) {
 					try {
-						await failImportJob(importJobId, message);
+						await importJobTracker.failImportJob(importJobId, message);
 					} catch (failureRecordingError) {
 						console.error(
 							`Failed to mark ImportJobs row ${importJobId} as failed`,

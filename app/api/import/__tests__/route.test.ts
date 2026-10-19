@@ -13,7 +13,7 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 	return {
 		...actual,
 		createUpserter: vi.fn(),
-		createImportJobTracker: vi.fn(),
+		ImportJobTracker: vi.fn(),
 		processEncounterRow: vi.fn(),
 		findUnrecognisedLocationNames: vi.fn()
 	};
@@ -87,7 +87,7 @@ describe('POST /api/import', () => {
 
 		const { getAuthenticatedSupabaseClient } =
 			await import('@/app/lib/auth/group-auth');
-		const { createUpserter, createImportJobTracker } =
+		const { createUpserter, ImportJobTracker } =
 			await import('@/lib/demon-import');
 		mockUpsert = vi.fn().mockResolvedValue(1);
 		vi.mocked(createUpserter).mockReturnValue(mockUpsert as never);
@@ -99,9 +99,12 @@ describe('POST /api/import', () => {
 			markImportJobTimedOut: vi.fn().mockResolvedValue(undefined),
 			markStatsCacheRefreshed: vi.fn().mockResolvedValue(undefined)
 		};
-		vi.mocked(createImportJobTracker).mockReturnValue(
-			mockImportJobTracker as never
-		);
+		// A plain arrow function is not newable, and the route now does `new
+		// ImportJobTracker(...)` — so the stub has to be a `function`, whose
+		// returned object becomes the constructed instance.
+		vi.mocked(ImportJobTracker).mockImplementation(function () {
+			return mockImportJobTracker as never;
+		} as never);
 		vi.mocked(getAuthenticatedSupabaseClient).mockResolvedValue({} as never);
 
 		// Every location in the CSV is already known unless a test says otherwise.
@@ -343,14 +346,16 @@ describe('POST /api/import', () => {
 				return {
 					...actual,
 					createUpserter: vi.fn().mockReturnValue(vi.fn()),
-					createImportJobTracker: vi.fn(() => ({
-						createImportJob: vi.fn().mockResolvedValue(IMPORT_JOB_ID),
-						recordAffectedDates: vi.fn(),
-						completeImportJob: vi.fn(),
-						failImportJob: vi.fn(),
-						markImportJobTimedOut: vi.fn(),
-						markStatsCacheRefreshed: vi.fn()
-					})),
+					ImportJobTracker: vi.fn(function () {
+						return {
+							createImportJob: vi.fn().mockResolvedValue(IMPORT_JOB_ID),
+							recordAffectedDates: vi.fn(),
+							completeImportJob: vi.fn(),
+							failImportJob: vi.fn(),
+							markImportJobTimedOut: vi.fn(),
+							markStatsCacheRefreshed: vi.fn()
+						};
+					}),
 					processEncounterRow: vi.fn(),
 					findUnrecognisedLocationNames: vi.fn()
 				};

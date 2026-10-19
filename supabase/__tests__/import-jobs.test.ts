@@ -21,7 +21,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
-import { createImportJobTracker } from '../../lib/demon-import';
+import { ImportJobTracker } from '../../lib/demon-import';
 import { createIsolatedGroup, psql } from './db-test-helpers';
 import { randomTestSuffix } from './test-isolation';
 
@@ -41,7 +41,7 @@ describe('ImportJobs RLS', () => {
 		otherGroupClient =
 			await getAuthenticatedSupabaseClientForGroup(otherGroupId);
 
-		importJobId = await createImportJobTracker(
+		importJobId = await new ImportJobTracker(
 			importingGroupClient
 		).createImportJob(importingGroupId);
 	});

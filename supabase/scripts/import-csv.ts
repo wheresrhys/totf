@@ -23,7 +23,7 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
-	createImportJobTracker,
+	ImportJobTracker,
 	processEncounterRow,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
@@ -153,8 +153,7 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 	const upsert = createUpserter(groupSupabaseClient);
 	const lookupRingSequence = createRingSequenceLookup(groupSupabaseClient);
 	const linkRingSequence = createRingSequenceLinker(groupSupabaseClient);
-	const { createImportJob, completeImportJob, failImportJob } =
-		createImportJobTracker(groupSupabaseClient);
+	const importJobTracker = new ImportJobTracker(groupSupabaseClient);
 
 	// The whole CSV is buffered rather than streamed straight into row
 	// processing, because the location pre-flight below has to see every row's
@@ -188,7 +187,7 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 	// Opened only once the pre-flight above has passed, so an aborted import stays
 	// the complete no-op #1079 made it — rather than leaving an orphan
 	// `in_progress` row behind for a run that never wrote anything.
-	const importJobId = await createImportJob(ringingGroupId);
+	const importJobId = await importJobTracker.createImportJob(ringingGroupId);
 
 	let rowCounts: ImportRowCounts;
 	try {
@@ -206,7 +205,7 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 		// count, so anything thrown here is systemic. Record it against the job and
 		// re-raise the original error — never let the bookkeeping write mask it.
 		try {
-			await failImportJob(
+			await importJobTracker.failImportJob(
 				importJobId,
 				error instanceof Error ? error.message : String(error)
 			);
@@ -221,7 +220,7 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 	}
 
 	const { totalRecords, successfulRecords, failedRecords } = rowCounts;
-	await completeImportJob(importJobId, {
+	await importJobTracker.completeImportJob(importJobId, {
 		processed: totalRecords,
 		successful: successfulRecords,
 		failed: failedRecords

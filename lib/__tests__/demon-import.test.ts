@@ -6,7 +6,7 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
-	createImportJobTracker,
+	ImportJobTracker,
 	CasualtyEncounterError,
 	processEncounterRow,
 	RESIGHTING_RECORD_TYPES,
@@ -446,7 +446,7 @@ describe('createUpserter', () => {
 	});
 });
 
-describe('createImportJobTracker', () => {
+describe('ImportJobTracker', () => {
 	const IMPORT_JOB_ID = 42;
 	const TRACKED_RINGING_GROUP_ID = 7;
 	// Every timestamp the tracker writes is `new Date().toISOString()`.
@@ -460,7 +460,7 @@ describe('createImportJobTracker', () => {
 	let mockEq: ReturnType<typeof vi.fn>;
 	let mockUpdate: ReturnType<typeof vi.fn>;
 	let mockFrom: ReturnType<typeof vi.fn>;
-	let tracker: ReturnType<typeof createImportJobTracker>;
+	let tracker: ImportJobTracker;
 
 	/**
 	 * The one payload handed to `.update()`. Asserted whole rather than per-key, so
@@ -480,7 +480,7 @@ describe('createImportJobTracker', () => {
 		mockEq = vi.fn().mockResolvedValue({ error: null });
 		mockUpdate = vi.fn(() => ({ eq: mockEq }));
 		mockFrom = vi.fn(() => ({ insert: mockInsert, update: mockUpdate }));
-		tracker = createImportJobTracker(
+		tracker = new ImportJobTracker(
 			// eslint-disable-next-line no-restricted-syntax -- mock only implements the `from` chain this test needs, not the full SupabaseClient interface
 			{ from: mockFrom } as unknown as SupabaseClient
 		);

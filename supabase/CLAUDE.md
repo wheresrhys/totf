@@ -517,12 +517,13 @@ Core import logic (types, transforms, `createUpserter`, `processEncounterRow`) l
 `app/CLAUDE.md`'s "Web import".
 
 **Every import run is tracked in `ImportJobs` (#961).** `lib/demon-import.ts`'s
-`createImportJobTracker(supabaseClient)` returns the six operations both entry points share —
+`new ImportJobTracker(supabaseClient)` exposes the six operations both entry points share —
 `createImportJob` / `recordAffectedDates` / `completeImportJob` / `failImportJob` /
-`markImportJobTimedOut` / `markStatsCacheRefreshed`. It's one factory returning six operations
-rather than six factories (the `createUpserter`/`createRingSequenceLookup` shape) because they're
-six variations on the same `update(...).eq('id', …)`; the "factory taking a `SupabaseClient`"
-convention is otherwise unchanged. Two things to know when touching it:
+`markImportJobTimedOut` / `markStatsCacheRefreshed`. It's a class rather than a `create*` factory
+(the `createUpserter`/`createRingSequenceLookup` shape) because those each expose a single
+operation, whereas these are six variations on the same `update(...).eq('id', …)` sharing one
+`supabaseClient` and one private update helper. The import job id stays a per-call argument — it's
+`createImportJob` that mints it. Two things to know when touching it:
 
 - **The job row is opened *after* the location pre-flight, not at the top of the run.** The ticket
   sketched "right after resolving `ringingGroupId`", but the pre-flight's whole point (#1079) is
