@@ -327,6 +327,14 @@ and `e2e/authenticated/import.spec.ts` pre-create theirs).
 
 Processing is sequential (no rate limiter) and aborts with a date-range summary after 280 seconds. Vercel `maxDuration` is set to 300s. Core import logic is shared with the CLI script — see `supabase/CLAUDE.md`'s "CSV data import".
 
+Each row is then staged into `DemonRecords` before it is interpreted into the domain tables
+(#959), and the run's `ImportJobs.affected_dates` is written once every staging batch has landed —
+see `supabase/CLAUDE.md`'s "CSV data import" for the batch writer and the rate-limiter constraint
+it imposes. One route-specific consequence: the 280s deadline check now lives **inside** the
+rate-limited callback (surfacing as a module-private `ImportDeadlineExceededError`) rather than at
+row dispatch, because every row is dispatched at t≈0 and a check there would never fire for a
+large upload.
+
 Once the pre-flight has passed, the route opens an `ImportJobs` row (#961) and updates it at
 whichever exit branch fires: `complete` → `succeeded` with the three row counts, `timeout` →
 `timed_out` with the partial `start_date`/`end_date` (previously the 280s abort reported _only_ to

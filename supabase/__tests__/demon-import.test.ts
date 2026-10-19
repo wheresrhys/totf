@@ -4,7 +4,7 @@
  * demon-import.ts leans entirely on the DB's unique constraints to decide whether a
  * given upsert reuses an existing row or creates a new one (see `createUpserter`'s
  * `uniqueColumns` argument, matched against each table's `ON CONFLICT` target). These
- * tests exercise `createUpserter` + `processEncounterRow` against the real schema so a
+ * tests exercise `createUpserter` + `writeEncounterRow` against the real schema so a
  * change to a table's unique constraints (or a mismatch between demon-import.ts and the
  * schema) fails loudly here rather than being caught only at import time in production.
  * The existing unit tests in lib/__tests__/demon-import.test.ts mock the Supabase client
@@ -25,7 +25,7 @@ import { describe, it, beforeAll, afterAll, expect, vi } from 'vitest';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import {
 	createUpserter,
-	processEncounterRow,
+	writeEncounterRow,
 	type DemonRow
 } from '../../lib/demon-import';
 import { randomTestSuffix, randomFutureDate, addDays } from './test-isolation';
@@ -200,7 +200,7 @@ describe('demon-import — multi-record import (usual case)', () => {
 		);
 
 		for (const row of rows) {
-			await processEncounterRow(row, upsert, lookupRingSequence, groupId);
+			await writeEncounterRow(row, upsert, lookupRingSequence, groupId);
 		}
 
 		const encounterCount = psqlCount(
@@ -228,8 +228,8 @@ describe('demon-import — multi-record import (usual case)', () => {
 			visit_date: toDemonDate(randomFutureDate())
 		});
 
-		await processEncounterRow(row, upsert, lookupRingSequence, groupId);
-		await processEncounterRow(row, upsert, lookupRingSequence, groupId);
+		await writeEncounterRow(row, upsert, lookupRingSequence, groupId);
+		await writeEncounterRow(row, upsert, lookupRingSequence, groupId);
 
 		expect(
 			psqlCount(
@@ -269,7 +269,7 @@ describe('demon-import — Species uniqueness (species_name)', () => {
 		const upsert = createUpserter(groupClient);
 		const speciesName = `DemonImportSpecies-${suffix}-shared`;
 
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-species-a`,
 				species_name: speciesName,
@@ -279,7 +279,7 @@ describe('demon-import — Species uniqueness (species_name)', () => {
 			lookupRingSequence,
 			groupId
 		);
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-species-b`,
 				species_name: speciesName,
@@ -321,7 +321,7 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 		const upsertA = createUpserter(groupClientA);
 		const upsertB = createUpserter(groupClientB);
 
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-loc-cross-a`,
 				species_name: `DemonImportSpecies-${suffix}-loc-cross-a`,
@@ -331,7 +331,7 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 			lookupRingSequence,
 			groupIdA
 		);
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-loc-cross-b`,
 				species_name: `DemonImportSpecies-${suffix}-loc-cross-b`,
@@ -358,7 +358,7 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 		const locationName = `DemonImportLoc-${suffix}-same-group`;
 		const upsertA = createUpserter(groupClientA);
 
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-loc-same-1`,
 				species_name: `DemonImportSpecies-${suffix}-loc-same-1`,
@@ -368,7 +368,7 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 			lookupRingSequence,
 			groupIdA
 		);
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-loc-same-2`,
 				species_name: `DemonImportSpecies-${suffix}-loc-same-2`,
@@ -417,7 +417,7 @@ describe('demon-import — Sessions uniqueness (visit_date, ringing_group_id)', 
 		label: string,
 		fields: { loc_id: string; visit_date: string; record_type: string; age: string }
 	): Promise<void> {
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-${label}`,
 				species_name: `DemonImportSpecies-${suffix}-${label}`,
@@ -538,8 +538,8 @@ describe('demon-import — Encounters uniqueness (bird_id, location_id, visit_da
 			weight: '10.5'
 		});
 
-		await processEncounterRow(row, upsert, lookupRingSequence, groupId);
-		await processEncounterRow(
+		await writeEncounterRow(row, upsert, lookupRingSequence, groupId);
+		await writeEncounterRow(
 			{ ...row, weight: '12.3' }, // near-identical row: same key, different measurement
 			upsert,
 			lookupRingSequence,
@@ -569,7 +569,7 @@ describe('demon-import — Encounters uniqueness (bird_id, location_id, visit_da
 		const speciesName = `DemonImportSpecies-${suffix}-encounter-two-locations`;
 		const visitDate = randomFutureDate();
 
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: ringNo,
 				species_name: speciesName,
@@ -580,7 +580,7 @@ describe('demon-import — Encounters uniqueness (bird_id, location_id, visit_da
 			lookupRingSequence,
 			groupId
 		);
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: ringNo,
 				species_name: speciesName,
@@ -605,7 +605,7 @@ describe('demon-import — Encounters uniqueness (bird_id, location_id, visit_da
 		const speciesName = `DemonImportSpecies-${suffix}-encounter-near-dup`;
 		const firstVisitDate = randomFutureDate();
 
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: ringNo,
 				species_name: speciesName,
@@ -616,7 +616,7 @@ describe('demon-import — Encounters uniqueness (bird_id, location_id, visit_da
 			lookupRingSequence,
 			groupId
 		);
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: ringNo,
 				species_name: speciesName,
@@ -655,7 +655,7 @@ describe('demon-import — fat/pectoral_muscle/primary_moult persistence', () =>
 		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-biometrics-set`;
 
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: ringNo,
 				species_name: `DemonImportSpecies-${suffix}-biometrics-set`,
@@ -679,7 +679,7 @@ describe('demon-import — fat/pectoral_muscle/primary_moult persistence', () =>
 		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-biometrics-blank`;
 
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: ringNo,
 				species_name: `DemonImportSpecies-${suffix}-biometrics-blank`,
@@ -722,7 +722,7 @@ describe('demon-import — capture_method persistence', () => {
 		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-capture-method-set`;
 
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: ringNo,
 				species_name: `DemonImportSpecies-${suffix}-capture-method-set`,
@@ -744,7 +744,7 @@ describe('demon-import — capture_method persistence', () => {
 		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-capture-method-blank`;
 
-		await processEncounterRow(
+		await writeEncounterRow(
 			makeRow({
 				ring_no: ringNo,
 				species_name: `DemonImportSpecies-${suffix}-capture-method-blank`,

@@ -21,6 +21,8 @@ type RingSequencesBirdsInsert =
 	Database['public']['Tables']['RingSequences_Birds']['Insert'];
 type ImportJobsInsert = Database['public']['Tables']['ImportJobs']['Insert'];
 type ImportJobsUpdate = Database['public']['Tables']['ImportJobs']['Update'];
+type DemonRecordsInsert =
+	Database['public']['Tables']['DemonRecords']['Insert'];
 
 export type DemonColumnNames =
 	| 'entered_by'
@@ -173,7 +175,7 @@ export function convertDateFormat(dateString: string): string {
 }
 
 // The distinct, non-empty `loc_id` values across a parsed CSV, normalised the
-// same way `processEncounterRow` normalises the row it upserts a Location from
+// same way `writeEncounterRow` normalises the row it upserts a Location from
 // (`transformEmptyStringsToNull` — trimmed, with '' becoming null), so a name
 // checked here is byte-identical to the name that would be written.
 export function getDistinctLocationNames(rows: DemonRow[]): string[] {
@@ -190,7 +192,7 @@ export function getDistinctLocationNames(rows: DemonRow[]): string[] {
 // Which of `distinctLocationNames` the group has no `Locations` row for.
 //
 // An import's `loc_id` column is the group's own DemOn site code, and the
-// per-row upsert in `processEncounterRow` keys Locations on
+// per-row upsert in `writeEncounterRow` keys Locations on
 // `(location_name, ringing_group_id)` — so a group re-coding an existing site
 // (#1048: `972` → `CES972`) silently forks a second Locations row and
 // re-imports every encounter under it. Both import entry points therefore run
@@ -491,7 +493,223 @@ export class ImportJobTracker {
 	}
 }
 
+/**
+ * Rows per `DemonRecords` insert. Big enough that a typical import is a handful
+ * of multi-row inserts rather than one per row, small enough that a row doesn't
+ * wait on hundreds of unrelated rows before its own domain-table write can start
+ * (every row in a batch is unblocked together, when that batch lands).
+ */
+export const DEFAULT_DEMON_RECORDS_BATCH_SIZE = 100;
+
+/**
+ * `demon_records_group_ring_date_time_unique` (#960) — re-importing an
+ * overlapping CSV targets the same staging row rather than duplicating it.
+ */
+const DEMON_RECORDS_CONFLICT_TARGET =
+	'ringing_group_id,ring_no,encounter_date,encounter_time';
+
+export type DemonRecordsBatchWriter = {
+	/**
+	 * Buffers `rawRow` for the next `DemonRecords` insert and resolves once the
+	 * whole batch containing it has landed — not when it was buffered. A row that
+	 * can't be staged at all resolves immediately; see `buildDemonRecord`.
+	 */
+	writeDemonRecord(rawRow: DemonRow): Promise<void>;
+	/**
+	 * Flushes the trailing partial batch and waits for every batch of the run to
+	 * have landed. Call it once, after every row has been handed to
+	 * `writeDemonRecord` but before awaiting any row's promise.
+	 */
+	flushRemaining(): Promise<void>;
+	/** The distinct `encounter_date`s across every batch that has landed so far. */
+	getDistinctDates(): string[];
+};
+
+type BufferedDemonRecord = {
+	record: DemonRecordsInsert;
+	/** Position in the run, for the batch-failure log only. */
+	rowIndex: number;
+	resolve: () => void;
+	reject: (reason: unknown) => void;
+};
+
+/**
+ * The staging row for one CSV row, or `null` when the row can't be staged at
+ * all.
+ *
+ * `ring_no`/`encounter_date`/`encounter_time` are `NOT NULL` on `DemonRecords`
+ * and are its dedup key, so a row missing any of them has no representable
+ * staging row — most commonly a casualty record, which carries no ring number
+ * and which `writeEncounterRow` rejects outright anyway. Such a row is skipped
+ * here rather than failing its whole batch, and goes on to fail (or not) in
+ * exactly the way it did before this staging step existed.
+ *
+ * `raw_row` is the untransformed row: the point of the table is a non-lossy
+ * copy of what was submitted, so the empty-string-to-null normalisation the
+ * domain-table write applies is deliberately not applied to it.
+ */
+function buildDemonRecord(
+	rawRow: DemonRow,
+	importJobId: number,
+	ringingGroupId: number
+): DemonRecordsInsert | null {
+	const row = transformEmptyStringsToNull(rawRow) as DemonRow;
+	if (!row.ring_no || !row.visit_date || !row.capture_time) return null;
+
+	return {
+		raw_row: rawRow,
+		ring_no: row.ring_no,
+		encounter_date: convertDateFormat(row.visit_date),
+		encounter_time: row.capture_time,
+		ringing_group_id: ringingGroupId,
+		import_job_id: importJobId
+	};
+}
+
+/**
+ * Writes every imported CSV row into `DemonRecords` (#960) in batched multi-row
+ * inserts, so a completeness/recovery record of what was submitted exists before
+ * the row is interpreted into Species/Birds/Sessions/Encounters.
+ *
+ * A `create*` factory closing over the client, like `createUpserter` — but
+ * returning three operations rather than one, because the buffer they share is
+ * the whole mechanism: `writeDemonRecord` appends and hands back a promise,
+ * `flushRemaining` drains what's left, `getDistinctDates` reports what landed.
+ *
+ * Batching is interleaved with row processing rather than a phase of its own, so
+ * the import keeps the per-row concurrency it relies on: a row's own promise
+ * resolves as soon as *its* batch lands, not once the whole run is staged. The
+ * ordering guarantee is per row, not per run — rows in an earlier batch may well
+ * be writing to the domain tables while a later batch is still in flight.
+ *
+ * Note the cooperation this requires from the caller, and why
+ * `writeDemonRecord` must not be inside the run's rate limiter: a batch only
+ * fills if every row can reach `writeDemonRecord` promptly. Throttle that and a
+ * batch larger than the concurrency cap can never fill — the rows that would
+ * complete it are queued behind the rows already blocked on it.
+ */
+export function createDemonRecordsBatchWriter(
+	supabaseClient: SupabaseClient,
+	{
+		importJobId,
+		ringingGroupId,
+		batchSize = DEFAULT_DEMON_RECORDS_BATCH_SIZE
+	}: {
+		importJobId: number;
+		ringingGroupId: number;
+		batchSize?: number;
+	}
+): DemonRecordsBatchWriter {
+	let buffer: BufferedDemonRecord[] = [];
+	let rowsBuffered = 0;
+	const landedEncounterDates = new Set<string>();
+	// Batches are chained rather than fired off in parallel, so they land in the
+	// order they filled. That keeps the order rows are released in — and so the
+	// order they enter the rate limiter and acquire their row ids — a function of
+	// the CSV rather than of which insert happened to return first, which is what
+	// `seed-e2e-data.ts`'s `concurrency: 1` determinism (#903) depends on.
+	let batchChain: Promise<void> = Promise.resolve();
+
+	async function writeBatch(batch: BufferedDemonRecord[]): Promise<void> {
+		const { error } = await supabaseClient
+			.from('DemonRecords')
+			.upsert<DemonRecordsInsert>(
+				batch.map(({ record }) => record),
+				{
+					onConflict: DEMON_RECORDS_CONFLICT_TARGET,
+					// ON CONFLICT DO NOTHING: re-importing an overlapping CSV is a
+					// no-op per already-staged row, not an error and not a duplicate.
+					ignoreDuplicates: true
+				}
+			);
+
+		// Resolved/rejected rather than thrown: this promise is what
+		// `flushRemaining` awaits, and the failure belongs to the rows of this
+		// batch, which each surface it through their own promise.
+		if (error) {
+			console.error(
+				'Failed to write a DemonRecords batch; its rows will not be imported',
+				{
+					importJobId,
+					ringingGroupId,
+					rowCount: batch.length,
+					rowIndices: batch.map(({ rowIndex }) => rowIndex)
+				},
+				error
+			);
+			for (const bufferedRecord of batch) bufferedRecord.reject(error);
+			return;
+		}
+
+		for (const bufferedRecord of batch) {
+			landedEncounterDates.add(bufferedRecord.record.encounter_date);
+			bufferedRecord.resolve();
+		}
+	}
+
+	function flushBufferedBatch(): void {
+		if (buffer.length === 0) return;
+		const batch = buffer;
+		buffer = [];
+		batchChain = batchChain.then(() => writeBatch(batch));
+	}
+
+	return {
+		writeDemonRecord(rawRow: DemonRow): Promise<void> {
+			const record = buildDemonRecord(rawRow, importJobId, ringingGroupId);
+			if (!record) return Promise.resolve();
+
+			const rowIndex = rowsBuffered++;
+			// The executor runs synchronously, so the row is buffered before this
+			// returns — which is what lets a whole batch fill within one
+			// synchronous dispatch pass over the rows.
+			const batchLanded = new Promise<void>((resolve, reject) => {
+				buffer.push({ record, rowIndex, resolve, reject });
+			});
+			if (buffer.length >= batchSize) flushBufferedBatch();
+			return batchLanded;
+		},
+
+		async flushRemaining(): Promise<void> {
+			flushBufferedBatch();
+			// Nothing appends to the chain once the caller has stopped buffering
+			// rows (`writeBatch` never does), so the chain as it stands here is the
+			// whole run's worth of batches.
+			await batchChain;
+		},
+
+		getDistinctDates(): string[] {
+			return [...landedEncounterDates].sort();
+		}
+	};
+}
+
+/**
+ * One CSV row, end to end: staged into `DemonRecords` first, and only then — once
+ * that row's batch has actually landed — interpreted into the domain tables.
+ *
+ * Splitting it this way is the point of #959: whatever happens to a row's
+ * domain-table write, a record of what was submitted for it already exists. A
+ * row whose staging batch failed therefore never reaches
+ * `writeEncounterRowRateLimited` at all.
+ *
+ * `writeEncounterRowRateLimited` is built once per run by the caller, and is
+ * where the run's concurrency cap lives — around the domain-table write alone,
+ * never around the staging write above it (see
+ * `createDemonRecordsBatchWriter`).
+ */
 export async function processEncounterRow(
+	rawRow: DemonRow,
+	demonRecordsBatchWriter: DemonRecordsBatchWriter,
+	writeEncounterRowRateLimited: (
+		rawRow: DemonRow
+	) => Promise<{ visitDate: string }>
+): Promise<{ visitDate: string }> {
+	await demonRecordsBatchWriter.writeDemonRecord(rawRow);
+	return writeEncounterRowRateLimited(rawRow);
+}
+
+export async function writeEncounterRow(
 	rawRow: DemonRow,
 	upsert: ReturnType<typeof createUpserter>,
 	lookupRingSequence: ReturnType<typeof createRingSequenceLookup>,

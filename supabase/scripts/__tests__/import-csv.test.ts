@@ -2,14 +2,16 @@ import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pRateLimit } from 'p-ratelimit';
 import {
+	createDemonRecordsBatchWriter,
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames,
 	processEncounterRow
 } from '../../../lib/demon-import';
 import {
+	createRowLimiter,
 	DEFAULT_IMPORT_CONCURRENCY,
 	importCSV,
-	runRowsWithConcurrency
+	runRows
 } from '../import-csv';
 
 // Spy on the real rate limiter rather than replacing it, so the same test file
@@ -56,21 +58,30 @@ const IMPORT_JOB_ID = 42;
 
 // Hoisted so the `vi.mock` factory below (which is hoisted too) can return the same
 // object the tests assert against.
-const { mockImportJobTracker } = vi.hoisted(() => ({
-	mockImportJobTracker: {
-		createImportJob: vi.fn(),
-		recordAffectedDates: vi.fn(),
-		completeImportJob: vi.fn(),
-		failImportJob: vi.fn(),
-		markImportJobTimedOut: vi.fn(),
-		markStatsCacheRefreshed: vi.fn()
-	}
-}));
+const { mockImportJobTracker, mockDemonRecordsBatchWriter } = vi.hoisted(
+	() => ({
+		mockImportJobTracker: {
+			createImportJob: vi.fn(),
+			recordAffectedDates: vi.fn(),
+			completeImportJob: vi.fn(),
+			failImportJob: vi.fn(),
+			markImportJobTimedOut: vi.fn(),
+			markStatsCacheRefreshed: vi.fn()
+		},
+		mockDemonRecordsBatchWriter: {
+			writeDemonRecord: vi.fn(),
+			flushRemaining: vi.fn(),
+			getDistinctDates: vi.fn()
+		}
+	})
+);
 
 vi.mock('../../../lib/demon-import', () => ({
 	createUpserter: vi.fn(() => vi.fn()),
 	createRingSequenceLookup: vi.fn(() => vi.fn()),
 	createRingSequenceLinker: vi.fn(() => vi.fn()),
+	createDemonRecordsBatchWriter: vi.fn(() => mockDemonRecordsBatchWriter),
+	writeEncounterRow: vi.fn(async () => ({ visitDate: '2024-06-01' })),
 	// `function`, not an arrow: the script does `new ImportJobTracker(...)`, and
 	// only a newable stub's returned object becomes the constructed instance.
 	ImportJobTracker: vi.fn(function () {
@@ -87,6 +98,11 @@ const mockedPRateLimit = vi.mocked(pRateLimit);
 beforeEach(() => {
 	mockedPRateLimit.mockClear();
 	vi.mocked(processEncounterRow).mockClear();
+	// Re-stated rather than just cleared: a test that swaps the implementation out
+	// (to observe call ordering) must not leak it into the tests after it.
+	vi.mocked(processEncounterRow).mockImplementation(async () => ({
+		visitDate: '2024-06-01'
+	}));
 	vi.mocked(findUnrecognisedLocationNames).mockClear();
 	vi.mocked(findUnrecognisedLocationNames).mockResolvedValue([]);
 	vi.mocked(getDistinctLocationNames).mockReturnValue(['Garden Trap']);
@@ -95,6 +111,13 @@ beforeEach(() => {
 		trackerOperation.mockResolvedValue(undefined);
 	}
 	mockImportJobTracker.createImportJob.mockResolvedValue(IMPORT_JOB_ID);
+	vi.mocked(createDemonRecordsBatchWriter).mockClear();
+	for (const writerOperation of Object.values(mockDemonRecordsBatchWriter)) {
+		writerOperation.mockClear();
+	}
+	mockDemonRecordsBatchWriter.writeDemonRecord.mockResolvedValue(undefined);
+	mockDemonRecordsBatchWriter.flushRemaining.mockResolvedValue(undefined);
+	mockDemonRecordsBatchWriter.getDistinctDates.mockReturnValue(['2024-06-01']);
 });
 
 afterEach(() => {
@@ -203,8 +226,8 @@ describe('importCSV ImportJobs tracking', () => {
 		});
 
 		expect(mockImportJobTracker.createImportJob).toHaveBeenCalledWith(7);
-		// `runRowsWithConcurrency`'s totalRecords/successfulRecords/failedRecords,
-		// renamed onto the processed/successful/failed shape the column names use.
+		// `runRows`' totalRecords/successfulRecords/failedRecords, renamed onto the
+		// processed/successful/failed shape the column names use.
 		expect(mockImportJobTracker.completeImportJob).toHaveBeenCalledWith(
 			IMPORT_JOB_ID,
 			{ processed: csvRows.length, successful: csvRows.length, failed: 0 }
@@ -215,65 +238,132 @@ describe('importCSV ImportJobs tracking', () => {
 	it('marks the job failed and re-raises when the run throws systemically', async () => {
 		// Per-row failures are absorbed into failedRecords, so this stands in for a
 		// systemic failure of the whole run rather than one bad row.
-		const limiterFailure = new Error('rate limiter exploded');
-		mockedPRateLimit.mockImplementationOnce(
-			() =>
-				(() => {
-					throw limiterFailure;
-				}) as never
+		mockDemonRecordsBatchWriter.flushRemaining.mockRejectedValue(
+			new Error('staging flush exploded')
 		);
 
 		await expect(
 			importCSV({ csvFilePath: '/fake/alpha.csv', ringingGroupName: 'Alpha' })
-		).rejects.toThrow('rate limiter exploded');
+		).rejects.toThrow('staging flush exploded');
 
 		expect(mockImportJobTracker.failImportJob).toHaveBeenCalledWith(
 			IMPORT_JOB_ID,
-			'rate limiter exploded'
+			'staging flush exploded'
 		);
 		expect(mockImportJobTracker.completeImportJob).not.toHaveBeenCalled();
 	});
 });
 
-describe('per-row concurrency actually serializes at concurrency: 1', () => {
+describe('importCSV DemonRecords staging', () => {
+	it('stages every row for the run’s job and group, then records the staged dates', async () => {
+		await importCSV({
+			csvFilePath: '/fake/alpha.csv',
+			ringingGroupName: 'Alpha'
+		});
+
+		expect(vi.mocked(createDemonRecordsBatchWriter)).toHaveBeenCalledWith(
+			expect.anything(),
+			{ importJobId: IMPORT_JOB_ID, ringingGroupId: 7 }
+		);
+		expect(mockDemonRecordsBatchWriter.flushRemaining).toHaveBeenCalledTimes(1);
+		expect(mockImportJobTracker.recordAffectedDates).toHaveBeenCalledWith(
+			IMPORT_JOB_ID,
+			['2024-06-01']
+		);
+	});
+
+	it('flushes the trailing batch before awaiting any row’s domain-table write', async () => {
+		// The buffer only holds exactly the trailing partial batch at the moment
+		// every row has been dispatched and none awaited — so a flush that happened
+		// after the rows had been awaited could deadlock on a batch that can no
+		// longer fill.
+		const callOrder: string[] = [];
+		mockDemonRecordsBatchWriter.flushRemaining.mockImplementation(async () => {
+			callOrder.push('flushRemaining');
+		});
+		vi.mocked(processEncounterRow).mockImplementation(async () => {
+			callOrder.push('processEncounterRow');
+		});
+
+		await importCSV({
+			csvFilePath: '/fake/alpha.csv',
+			ringingGroupName: 'Alpha'
+		});
+
+		expect(callOrder).toEqual([
+			'processEncounterRow',
+			'processEncounterRow',
+			'flushRemaining'
+		]);
+	});
+});
+
+describe('createRowLimiter', () => {
 	/**
-	 * Fake row processor that records the highest number of simultaneously
+	 * Fake domain-table write that records the highest number of simultaneously
 	 * in-flight calls it ever saw.
 	 */
-	function trackingProcessRow() {
+	function trackingWrite() {
 		let inFlight = 0;
 		let maxInFlight = 0;
-		const processRow = async () => {
+		const write = async () => {
 			inFlight++;
 			maxInFlight = Math.max(maxInFlight, inFlight);
 			await new Promise((resolve) => setTimeout(resolve, 20));
 			inFlight--;
 		};
-		return { processRow, getMaxInFlight: () => maxInFlight };
+		return { write, getMaxInFlight: () => maxInFlight };
 	}
 
-	it('never runs two processRow calls concurrently when concurrency is 1', async () => {
-		const { processRow, getMaxInFlight } = trackingProcessRow();
-		const rows = [1, 2, 3, 4, 5];
+	it('never runs two writes concurrently when concurrency is 1', async () => {
+		const { write, getMaxInFlight } = trackingWrite();
+		const limit = createRowLimiter(1);
 
-		const counts = await runRowsWithConcurrency(rows, 1, processRow);
+		await Promise.all([1, 2, 3, 4, 5].map(() => limit(write)));
 
 		expect(getMaxInFlight()).toBe(1);
-		expect(counts).toEqual({
-			totalRecords: 5,
-			successfulRecords: 5,
-			failedRecords: 0
-		});
 	});
 
-	it('allows up to N concurrent processRow calls when concurrency is N>1', async () => {
-		const { processRow, getMaxInFlight } = trackingProcessRow();
-		const rows = [1, 2, 3, 4, 5];
+	it('allows up to N concurrent writes when concurrency is N>1', async () => {
+		const { write, getMaxInFlight } = trackingWrite();
+		const limit = createRowLimiter(5);
 
-		const counts = await runRowsWithConcurrency(rows, 5, processRow);
+		await Promise.all([1, 2, 3, 4, 5].map(() => limit(write)));
 
 		expect(getMaxInFlight()).toBeGreaterThan(1);
 		expect(getMaxInFlight()).toBeLessThanOrEqual(5);
-		expect(counts.totalRecords).toBe(5);
+	});
+});
+
+describe('runRows', () => {
+	it('counts every row, splitting successes from the ones that threw', async () => {
+		const counts = await runRows([1, 2, 3, 4, 5], async (row) => {
+			if (row === 3) throw new Error('bad row');
+		});
+
+		expect(counts).toEqual({
+			totalRecords: 5,
+			successfulRecords: 4,
+			failedRecords: 1
+		});
+	});
+
+	it('runs onAllRowsDispatched after every row is dispatched but before any has settled', async () => {
+		const settledRows: number[] = [];
+		let rowsSettledWhenDispatchCompleted = -1;
+
+		await runRows(
+			[1, 2, 3],
+			async (row: number) => {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+				settledRows.push(row);
+			},
+			async () => {
+				rowsSettledWhenDispatchCompleted = settledRows.length;
+			}
+		);
+
+		expect(rowsSettledWhenDispatchCompleted).toBe(0);
+		expect(settledRows).toEqual([1, 2, 3]);
 	});
 });

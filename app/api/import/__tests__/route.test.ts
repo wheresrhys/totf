@@ -13,6 +13,7 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 	return {
 		...actual,
 		createUpserter: vi.fn(),
+		createDemonRecordsBatchWriter: vi.fn(),
 		ImportJobTracker: vi.fn(),
 		processEncounterRow: vi.fn(),
 		findUnrecognisedLocationNames: vi.fn()
@@ -20,6 +21,7 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 });
 
 const IMPORT_JOB_ID = 42;
+const STAGED_DATES = ['2024-06-01'];
 
 const CSV_HEADER =
 	'ring_no,species_name,visit_date,capture_time,loc_id,age,sex,sexing_method,record_type,scheme,breeding_condition,extra_text,moult_code,old_greater_coverts,weight,wing_length,entered_by,nest_link_code,validation_comments,submission_status,filename,new/subsequent,scheme2,ring_no2,pulli_ringed,pulli_alive,provisional_sex,gridref,habitat_1,habitat_2,status_code_1,status_code_2,lure_code_1,lure_code_2,date_measured,time_w,condition,alula,primary_moult,primary_covert_moult_scores,secondary_moult_scores,finding_condition,finding_circumstances,capture_method,metal_mark_info,ringer_initials,ringer_check_initials,processor_initials,extractor_initials,wing_initials,colour_mark_info,metal_mark_position,fat,pectoral_muscle,body_moult,greater_covert_moult_scores,alula_moult_scores,carpal_covert_moult,wing_point,primary_length,bill_length_method,bill_length,head_bill_length,bill_depth_method,bill_depth,tarsus_length_method,tail_moult_scores,tarsus_length,tail_length,claw_length,plumage,tail_diff,lesser_median_covert_moult,underwing_covert_moult,head_moult,upperparts_moult,underparts_moult,permit_no,pullus_stage,date_accuracy,left_leg_below,right_leg_below,left_leg_above,right_leg_above,neck_collar,left_wing_tag,right_wing_tag,nasal_saddle,sample_processed,high_tide_time,finder_name,own,own2,userc1,userc2,email,userc3,userc4,userc5,userv1,userv2,userv3,userv4,userv5,l_primary_moult_scores,l_secondary_moult_scores,l_tail_moult_scores,l_primary_covert_moult_scores,l_greater_covert_moult_scores,l_carpal_covert_moult,l_alula_moult_scores,toe_span';
@@ -80,6 +82,7 @@ describe('POST /api/import', () => {
 	let POST: (request: Request) => Promise<Response>;
 	let mockUpsert: ReturnType<typeof vi.fn>;
 	let mockImportJobTracker: Record<string, ReturnType<typeof vi.fn>>;
+	let mockDemonRecordsBatchWriter: Record<string, ReturnType<typeof vi.fn>>;
 
 	beforeEach(async () => {
 		vi.resetModules();
@@ -87,10 +90,18 @@ describe('POST /api/import', () => {
 
 		const { getAuthenticatedSupabaseClient } =
 			await import('@/app/lib/auth/group-auth');
-		const { createUpserter, ImportJobTracker } =
+		const { createUpserter, createDemonRecordsBatchWriter, ImportJobTracker } =
 			await import('@/lib/demon-import');
 		mockUpsert = vi.fn().mockResolvedValue(1);
 		vi.mocked(createUpserter).mockReturnValue(mockUpsert as never);
+		mockDemonRecordsBatchWriter = {
+			writeDemonRecord: vi.fn().mockResolvedValue(undefined),
+			flushRemaining: vi.fn().mockResolvedValue(undefined),
+			getDistinctDates: vi.fn().mockReturnValue(STAGED_DATES)
+		};
+		vi.mocked(createDemonRecordsBatchWriter).mockReturnValue(
+			mockDemonRecordsBatchWriter as never
+		);
 		mockImportJobTracker = {
 			createImportJob: vi.fn().mockResolvedValue(IMPORT_JOB_ID),
 			recordAffectedDates: vi.fn().mockResolvedValue(undefined),
@@ -346,6 +357,11 @@ describe('POST /api/import', () => {
 				return {
 					...actual,
 					createUpserter: vi.fn().mockReturnValue(vi.fn()),
+					createDemonRecordsBatchWriter: vi.fn().mockReturnValue({
+						writeDemonRecord: vi.fn(),
+						flushRemaining: vi.fn(),
+						getDistinctDates: vi.fn(() => [])
+					}),
 					ImportJobTracker: vi.fn(function () {
 						return {
 							createImportJob: vi.fn().mockResolvedValue(IMPORT_JOB_ID),
@@ -396,6 +412,33 @@ describe('POST /api/import', () => {
 			expect(mockImportJobTracker.completeImportJob).toHaveBeenCalledWith(
 				IMPORT_JOB_ID,
 				{ processed: 2, successful: 2, failed: 0 }
+			);
+		});
+
+		it('records the staged dates once every DemonRecords batch has landed', async () => {
+			const { createDemonRecordsBatchWriter, processEncounterRow } =
+				await import('@/lib/demon-import');
+			vi.mocked(processEncounterRow).mockResolvedValue({
+				visitDate: '2024-06-01'
+			});
+
+			const file = makeCsvFile([
+				makeCsvRow(),
+				makeCsvRow({ ring_no: 'B000001' })
+			]);
+			await readStreamMessages(await POST(await makeRequest(file)));
+
+			// Group ID 1 — group-cookie is mocked globally in vitest.setup.tsx.
+			expect(vi.mocked(createDemonRecordsBatchWriter)).toHaveBeenCalledWith(
+				expect.anything(),
+				{ importJobId: IMPORT_JOB_ID, ringingGroupId: 1 }
+			);
+			expect(mockDemonRecordsBatchWriter.flushRemaining).toHaveBeenCalledTimes(
+				1
+			);
+			expect(mockImportJobTracker.recordAffectedDates).toHaveBeenCalledWith(
+				IMPORT_JOB_ID,
+				STAGED_DATES
 			);
 		});
 
