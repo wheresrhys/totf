@@ -175,7 +175,7 @@ export function convertDateFormat(dateString: string): string {
 }
 
 // The distinct, non-empty `loc_id` values across a parsed CSV, normalised the
-// same way `writeEncounterRow` normalises the row it upserts a Location from
+// same way `EncounterRowBatchWriter` normalises the row it upserts a Location from
 // (`transformEmptyStringsToNull` — trimmed, with '' becoming null), so a name
 // checked here is byte-identical to the name that would be written.
 export function getDistinctLocationNames(rows: DemonRow[]): string[] {
@@ -192,7 +192,7 @@ export function getDistinctLocationNames(rows: DemonRow[]): string[] {
 // Which of `distinctLocationNames` the group has no `Locations` row for.
 //
 // An import's `loc_id` column is the group's own DemOn site code, and the
-// per-row upsert in `writeEncounterRow` keys Locations on
+// Locations upsert in `EncounterRowBatchWriter` keys Locations on
 // `(location_name, ringing_group_id)` — so a group re-coding an existing site
 // (#1048: `972` → `CES972`) silently forks a second Locations row and
 // re-imports every encounter under it. Both import entry points therefore run
@@ -219,28 +219,6 @@ export async function findUnrecognisedLocationNames(
 	return distinctLocationNames.filter(
 		(locationName) => !knownLocationNames.has(locationName)
 	);
-}
-
-export function createUpserter(supabaseClient: SupabaseClient) {
-	return async <DataInsertModel>(
-		tableName: string,
-		upsertData: DataInsertModel,
-		uniqueColumns: (keyof DataInsertModel)[]
-	): Promise<number> => {
-		const { data: upsertResult, error: upsertError } = await supabaseClient
-			.from(tableName)
-			.upsert(upsertData, {
-				onConflict: uniqueColumns.join(',') as string,
-				ignoreDuplicates: false
-			})
-			.select('id')
-			.single();
-
-		if (upsertError) throw upsertError;
-		if (!upsertResult)
-			throw new Error(`Upsert to ${tableName} returned no data`);
-		return upsertResult.id;
-	};
 }
 
 // Looks up the existing `RingSequences` row a ring number belongs to and returns
@@ -351,8 +329,8 @@ const STATS_CACHE_REFRESH_STATUS_COLUMNS: Record<StatsCacheType, string> = {
 /**
  * Reads and writes the `ImportJobs` row tracking one import run.
  *
- * A class rather than the `create*` factory that `createUpserter`/
- * `createRingSequenceLookup`/`createRingSequenceLinker` above use: those each expose
+ * A class rather than the `create*` factory that `createRingSequenceLookup`/
+ * `createRingSequenceLinker` above use: those each expose
  * one operation, whereas this exposes six variations on the same two-line
  * `.update(...).eq('id', …)` against the same table, which a class groups around the
  * shared `supabaseClient` and the shared `updateImportJob` plumbing without six
@@ -523,9 +501,9 @@ type BufferedDemonRecord = {
  * `ring_no`/`encounter_date`/`encounter_time` are `NOT NULL` on `DemonRecords`
  * and are its dedup key, so a row missing any of them has no representable
  * staging row — most commonly a casualty record, which carries no ring number
- * and which `writeEncounterRow` rejects outright anyway. Such a row is skipped
- * here rather than failing its whole batch, and goes on to fail (or not) in
- * exactly the way it did before this staging step existed.
+ * and which `EncounterRowBatchWriter` rejects outright anyway. Such a row is
+ * skipped here rather than failing its whole batch, and goes on to fail (or not)
+ * in exactly the way it did before this staging step existed.
  *
  * `raw_row` is the untransformed row: the point of the table is a non-lossy
  * copy of what was submitted, so the empty-string-to-null normalisation the
@@ -554,7 +532,8 @@ function buildDemonRecord(
  * inserts, so a completeness/recovery record of what was submitted exists before
  * the row is interpreted into Species/Birds/Sessions/Encounters.
  *
- * A class rather than a `create*` closure factory like `createUpserter`, because
+ * A class rather than a `create*` closure factory like `createRingSequenceLookup`,
+ * because
  * this is three operations over one piece of mutable state rather than a single
  * operation over a captured client: the shared buffer is the whole mechanism —
  * `writeDemonRecord` appends and hands back a promise, `flushRemaining` drains
@@ -699,145 +678,498 @@ export class DemonRecordsBatchWriter {
  * Splitting it this way is the point of #959: whatever happens to a row's
  * domain-table write, a record of what was submitted for it already exists. A
  * row whose staging batch failed therefore never reaches
- * `writeEncounterRowRateLimited` at all.
+ * `encounterRowBatchWriter` at all.
  *
- * `writeEncounterRowRateLimited` is built once per run by the caller, and is
- * where the run's concurrency cap lives — around the domain-table write alone,
- * never around the staging write above it (see
- * `DemonRecordsBatchWriter`).
+ * Both writers are built once per run by the caller. Neither this function nor
+ * the staging writer knows anything about the run's concurrency cap: since #1139
+ * that lives inside `EncounterRowBatchWriter`, around a whole chunk flush, and
+ * never around the staging write above it (see `DemonRecordsBatchWriter`).
  */
 export async function processEncounterRow(
 	rawRow: DemonRow,
 	demonRecordsBatchWriter: DemonRecordsBatchWriter,
-	writeEncounterRowRateLimited: (
-		rawRow: DemonRow
-	) => Promise<{ visitDate: string }>
+	encounterRowBatchWriter: EncounterRowBatchWriter
 ): Promise<{ visitDate: string }> {
 	await demonRecordsBatchWriter.writeDemonRecord(rawRow);
-	return writeEncounterRowRateLimited(rawRow);
+	return encounterRowBatchWriter.writeEncounterRow(rawRow);
 }
 
-export async function writeEncounterRow(
-	rawRow: DemonRow,
-	upsert: ReturnType<typeof createUpserter>,
-	lookupRingSequence: ReturnType<typeof createRingSequenceLookup>,
-	ringingGroupId: number,
-	linkRingSequence: ReturnType<typeof createRingSequenceLinker>
-): Promise<{ visitDate: string }> {
-	const row = transformEmptyStringsToNull(rawRow) as DemonRow;
-	if (!row.ring_no) {
-		throw new CasualtyEncounterError();
+/**
+ * Rows per chunk of domain-table writes (#1139).
+ *
+ * Deliberately the same size as a `DemonRecords` staging batch: a row only
+ * reaches this writer once *its* staging batch has landed, so rows arrive in
+ * staging-batch-sized waves. An equal chunk size means one wave fills exactly
+ * one chunk — no row waits on a later wave before its chunk can flush, and no
+ * chunk is cut short by a wave boundary.
+ */
+export const DEFAULT_ENCOUNTER_ROW_CHUNK_SIZE =
+	DEFAULT_DEMON_RECORDS_BATCH_SIZE;
+
+type BufferedEncounterRow = {
+	/** Empty-string-normalised, which is what every insert builder below expects. */
+	row: DemonRow;
+	/** Position in the run, for the chunk-failure log only. */
+	rowIndex: number;
+	resolve: (result: { visitDate: string }) => void;
+	reject: (reason: unknown) => void;
+};
+
+/** The id one chunk position's entity of a given type landed on. */
+type ChunkEntityIdResolver = (chunkIndex: number) => number;
+
+/**
+ * A natural-key tuple flattened into something a `Map` can key on. JSON rather
+ * than a joined string so no separator can collide with a value containing it.
+ */
+function naturalKeyOf(keyValues: unknown[]): string {
+	return JSON.stringify(keyValues);
+}
+
+/**
+ * Follows `encounters_bird_id_location_id_visit_date_unique`, repointed off
+ * (bird_id, session_id) in #1024. A session_id key would now mean "one encounter
+ * per bird per group per day", silently merging a bird caught at two sites on one
+ * day; (bird_id, location_id, visit_date) is what (bird_id, session_id) actually
+ * meant while a Session was (date, location, type), so re-importing the same row
+ * still updates in place rather than inserting a duplicate.
+ */
+const ENCOUNTERS_CONFLICT_COLUMNS = [
+	'bird_id',
+	'location_id',
+	'visit_date'
+] as (keyof EncountersInsert & string)[];
+
+/**
+ * One Session per group per date (#1024). It used to be one per
+ * (visit_date, location_id, session_type), where session_type bucketed the row as
+ * FULL_GROWN / PULLI / FIELD_OBSERVATION from its own record_type and age — so a
+ * group visiting two sites on one day, or ringing both nestlings and full-grown
+ * birds at one site, produced several Session rows for the same day. All three of
+ * those axes now live on the Encounters rows themselves (location_id/visit_date
+ * per #1015, record_type/age_code/is_juv as always), and every read path derives
+ * what it needs from there, so a Session is just the group-day the encounters
+ * hang off.
+ */
+const SESSIONS_CONFLICT_COLUMNS = [
+	'visit_date',
+	'ringing_group_id'
+] as (keyof SessionsInsert & string)[];
+
+function buildEncounterInsert(
+	row: DemonRow,
+	{
+		birdId,
+		sessionId,
+		locationId,
+		visitDate
+	}: {
+		birdId: number;
+		sessionId: number;
+		locationId: number;
+		visitDate: string;
+	}
+): EncountersInsert {
+	return {
+		age_code: Number(String(row.age).replace('J', '')),
+		breeding_condition: row.breeding_condition as string | null,
+		capture_time: row.capture_time as string,
+		extra_text: row.extra_text as string | null,
+		fat: row.fat as string | null,
+		finding_condition: row.finding_condition as string | null,
+		finding_circumstances: row.finding_circumstances as string | null,
+		is_juv: String(row.age).endsWith('J'),
+		moult_code: row.moult_code as string | null,
+		old_greater_coverts: row.old_greater_coverts
+			? Number(row.old_greater_coverts)
+			: null,
+		pectoral_muscle: row.pectoral_muscle ? Number(row.pectoral_muscle) : null,
+		primary_moult: row.primary_moult as string | null,
+		record_type: row.record_type as string,
+		bird_id: birdId,
+		session_id: sessionId,
+		// Every encounter carries its own location/date, independent of the
+		// Session it is linked to (#1015) — and since #1024 collapsed Sessions to
+		// one row per group-day, these are the only place the per-encounter
+		// location survives.
+		location_id: locationId,
+		visit_date: visitDate,
+		scheme: row.scheme as string,
+		sex: row.sex as string,
+		capture_method: row.capture_method as string | null,
+		sexing_method: row.sexing_method as string | null,
+		weight: row.weight ? Number(row.weight) : null,
+		wing_length: row.wing_length ? Number(row.wing_length) : null
+	};
+}
+
+/**
+ * Interprets CSV rows into the domain tables — Species, Birds, Locations,
+ * Sessions, Encounters — a chunk at a time (#1139), rather than five sequential
+ * single-row upserts per row.
+ *
+ * Buffer-then-flush, same shape as `DemonRecordsBatchWriter`: `writeEncounterRow`
+ * appends a row and hands back a promise that settles when the chunk containing
+ * it has been written, and `flushRemaining` drains the trailing partial chunk.
+ * One instance per import run.
+ *
+ * Within a chunk each entity type is written by exactly one multi-row upsert, in
+ * FK dependency order (Species before Birds, Birds/Locations/Sessions before
+ * Encounters), with each later upsert's payload carrying the ids the earlier ones
+ * resolved. So a chunk of 100 rows costs 5 round trips for these tables instead
+ * of 500.
+ *
+ * Three things the chunking forces, all of which are correctness requirements
+ * rather than optimisations:
+ *
+ * - **Dedup per entity type.** Postgres rejects a multi-row `ON CONFLICT DO
+ *   UPDATE` that targets the same conflict key twice ("command cannot affect row
+ *   a second time"), and a chunk routinely holds several rows sharing a species,
+ *   a location or a date. Each entity type is therefore reduced to one insert per
+ *   distinct natural key before its upsert.
+ * - **Id resolution by natural key.** A multi-row upsert's returned row order
+ *   isn't guaranteed to match the request, so ids are mapped back by the
+ *   natural-key columns selected alongside `id`, never by array position.
+ * - **Chunk-level failure.** A failed bulk upsert fails every row buffered in
+ *   that chunk, matching `DemonRecordsBatchWriter`'s per-batch precedent (#959).
+ *   This is a deliberate coarsening of the strictly-per-row failure isolation the
+ *   five sequential upserts used to give.
+ */
+export class EncounterRowBatchWriter {
+	private readonly ringingGroupId: number;
+	private readonly importJobId: number | undefined;
+	private readonly chunkSize: number;
+	private readonly lookupRingSequence: ReturnType<
+		typeof createRingSequenceLookup
+	>;
+	private readonly linkRingSequence: ReturnType<
+		typeof createRingSequenceLinker
+	>;
+	private readonly limitChunkFlush: (
+		flushChunk: () => Promise<void>
+	) => Promise<void>;
+
+	private buffer: BufferedEncounterRow[] = [];
+	private rowsBuffered = 0;
+	// Chunk flushes run concurrently, governed by `limitChunkFlush` — unlike
+	// `DemonRecordsBatchWriter`'s strictly chained batches. That is what keeps the
+	// callers' concurrency option meaningful: at `concurrency: 1` the flushes
+	// serialize in fill order, which is what `seed-e2e-data.ts`'s deterministic
+	// id assignment (#903) depends on, and above 1 they overlap exactly as the
+	// per-row domain writes used to.
+	private readonly chunkWrites: Promise<void>[] = [];
+
+	constructor(
+		private readonly supabaseClient: SupabaseClient,
+		{
+			ringingGroupId,
+			lookupRingSequence,
+			linkRingSequence,
+			importJobId,
+			chunkSize = DEFAULT_ENCOUNTER_ROW_CHUNK_SIZE,
+			limitChunkFlush = (flushChunk) => flushChunk()
+		}: {
+			ringingGroupId: number;
+			lookupRingSequence: ReturnType<typeof createRingSequenceLookup>;
+			linkRingSequence: ReturnType<typeof createRingSequenceLinker>;
+			/** The run's `ImportJobs` row, for the chunk-failure log only. */
+			importJobId?: number;
+			chunkSize?: number;
+			/**
+			 * Wraps each chunk flush, and is where the run's concurrency cap lives.
+			 * Before #1139 the callers' rate limiter capped concurrent *per-row*
+			 * domain writes; it now caps concurrent *chunk flushes*, each of which
+			 * issues one request at a time (see `linkRingSequencesForChunk`), so it
+			 * still caps in-flight requests at roughly the same number.
+			 *
+			 * It must never wrap `writeEncounterRow` itself, for the same reason the
+			 * staging write must stay unthrottled (see `DemonRecordsBatchWriter`): a
+			 * chunk only fills if every row can reach the buffer promptly.
+			 */
+			limitChunkFlush?: (flushChunk: () => Promise<void>) => Promise<void>;
+		}
+	) {
+		this.ringingGroupId = ringingGroupId;
+		this.lookupRingSequence = lookupRingSequence;
+		this.linkRingSequence = linkRingSequence;
+		this.importJobId = importJobId;
+		this.chunkSize = chunkSize;
+		this.limitChunkFlush = limitChunkFlush;
 	}
 
-	const speciesId = await upsert<SpeciesInsert>(
-		'Species',
-		{ species_name: row.species_name as string },
-		['species_name']
-	);
+	/**
+	 * One entity type's write for a chunk: reduce the chunk to one insert per
+	 * distinct natural key, upsert them all in a single multi-row call, and hand
+	 * back a resolver from chunk position to the id that row's entity landed on.
+	 *
+	 * Deduplication keeps the **last** occurrence's payload at the **first**
+	 * occurrence's position, which is what the old row-by-row upserts did: a later
+	 * row targeting an earlier row's key updated it in place, so last-write-wins,
+	 * while the row order ids were handed out in stayed the CSV's.
+	 */
+	private async upsertChunkEntities<Insert extends Record<string, unknown>>(
+		tableName: string,
+		uniqueColumns: (keyof Insert & string)[],
+		chunk: BufferedEncounterRow[],
+		buildInsert: (
+			bufferedRow: BufferedEncounterRow,
+			chunkIndex: number
+		) => Insert
+	): Promise<ChunkEntityIdResolver> {
+		const insertPerChunkIndex = chunk.map(buildInsert);
+		const keyPerChunkIndex = insertPerChunkIndex.map((insert) =>
+			naturalKeyOf(uniqueColumns.map((column) => insert[column]))
+		);
+		const insertsByKey = new Map<string, Insert>();
+		keyPerChunkIndex.forEach((key, chunkIndex) => {
+			insertsByKey.set(key, insertPerChunkIndex[chunkIndex]);
+		});
 
-	// Only a 'N' (new ring) record assigns a ring to this group for the first
-	// time, so it's the only record_type that looks up a matching RingSequences
-	// row. Any other record_type — and any 'N' ring with no matching sequence
-	// (lookup returns null) — leaves the bird unlinked for this group.
-	let ringSequenceId: number | null = null;
-	if (row.record_type === 'N') {
-		ringSequenceId = await lookupRingSequence(
-			row.ring_no as string,
-			ringingGroupId
+		const idsByKey = await this.bulkUpsert(
+			tableName,
+			uniqueColumns,
+			insertsByKey
+		);
+
+		return (chunkIndex: number) => {
+			const id = idsByKey.get(keyPerChunkIndex[chunkIndex]);
+			if (id === undefined)
+				throw new Error(
+					`Upsert to ${tableName} returned no id for ${keyPerChunkIndex[chunkIndex]}`
+				);
+			return id;
+		};
+	}
+
+	/**
+	 * The multi-row upsert itself. Same options as the per-row upserter this
+	 * replaced (`onConflict` + `ignoreDuplicates: false`), applied to an array, and
+	 * selecting the natural-key columns alongside `id` so the returned rows can be
+	 * matched back to what was sent.
+	 *
+	 * Inserts are ordered by natural key rather than by first appearance, so every
+	 * concurrent chunk flush locks the rows it conflicts with in the same order and
+	 * two overlapping chunks can't deadlock against each other. It stays
+	 * deterministic, which is what `concurrency: 1` seeding needs.
+	 */
+	private async bulkUpsert<Insert extends Record<string, unknown>>(
+		tableName: string,
+		uniqueColumns: (keyof Insert & string)[],
+		insertsByKey: Map<string, Insert>
+	): Promise<Map<string, number>> {
+		if (insertsByKey.size === 0) return new Map();
+
+		const sortedInserts = [...insertsByKey.entries()]
+			.sort(([keyA], [keyB]) => (keyA < keyB ? -1 : keyA > keyB ? 1 : 0))
+			.map(([, insert]) => insert);
+
+		const { data, error } = await this.supabaseClient
+			.from(tableName)
+			.upsert(sortedInserts, {
+				onConflict: uniqueColumns.join(','),
+				ignoreDuplicates: false
+			})
+			// The column list is built at runtime, so PostgREST can't infer a row
+			// shape from it (it falls back to `GenericStringError`) — the second type
+			// argument says what the selected `id` + natural-key columns actually are.
+			.select<string, Record<string, unknown>>(
+				['id', ...uniqueColumns].join(',')
+			);
+
+		if (error) throw error;
+		if (!data) throw new Error(`Upsert to ${tableName} returned no data`);
+
+		const idsByKey = new Map<string, number>();
+		for (const row of data) {
+			const upsertedRow: Record<string, unknown> = row;
+			idsByKey.set(
+				naturalKeyOf(uniqueColumns.map((column) => upsertedRow[column])),
+				upsertedRow.id as number
+			);
+		}
+		return idsByKey;
+	}
+
+	/**
+	 * The per-row `RingSequences` work, deliberately left un-batched by #1139: the
+	 * lookup is a numeric-range match (`prefix` + a `first_index`/`last_index`
+	 * window) rather than a keyed upsert, so batching it is a separate problem.
+	 *
+	 * Only a 'N' (new ring) record assigns a ring to this group for the first time,
+	 * so it's the only record_type that looks one up. Any other record_type — and
+	 * any 'N' ring with no matching sequence — leaves the bird unlinked for this
+	 * group. The link goes through the per-group `RingSequences_Birds` join table
+	 * (#703) rather than a group-agnostic FK on the Bird.
+	 *
+	 * Run one row at a time so a chunk flush still only ever has a single request
+	 * in flight, which is what keeps `limitChunkFlush`'s cap a cap on concurrent
+	 * requests and not merely on concurrent chunks.
+	 */
+	private async linkRingSequencesForChunk(
+		chunk: BufferedEncounterRow[],
+		birdIdOf: ChunkEntityIdResolver
+	): Promise<void> {
+		for (const [chunkIndex, { row }] of chunk.entries()) {
+			if (row.record_type !== 'N') continue;
+			const ringSequenceId = await this.lookupRingSequence(
+				row.ring_no as string,
+				this.ringingGroupId
+			);
+			if (ringSequenceId === null) continue;
+			await this.linkRingSequence(
+				birdIdOf(chunkIndex),
+				ringSequenceId,
+				this.ringingGroupId
+			);
+		}
+	}
+
+	private async writeChunk(chunk: BufferedEncounterRow[]): Promise<void> {
+		const speciesIdOf = await this.upsertChunkEntities<SpeciesInsert>(
+			'Species',
+			['species_name'],
+			chunk,
+			({ row }) => ({ species_name: row.species_name as string })
+		);
+
+		const birdIdOf = await this.upsertChunkEntities<BirdsInsert>(
+			'Birds',
+			['ring_no'],
+			chunk,
+			({ row }, chunkIndex) => ({
+				ring_no: row.ring_no as string,
+				species_id: speciesIdOf(chunkIndex)
+			})
+		);
+
+		await this.linkRingSequencesForChunk(chunk, birdIdOf);
+
+		const locationIdOf = await this.upsertChunkEntities<LocationsInsert>(
+			'Locations',
+			['location_name', 'ringing_group_id'],
+			chunk,
+			({ row }) => ({
+				location_name: row.loc_id as string,
+				ringing_group_id: this.ringingGroupId
+			})
+		);
+
+		// ringing_group_id is written explicitly: it used to be derived by the
+		// trg_set_session_generated_fields trigger via a Locations lookup on
+		// Sessions.location_id, and #1024 retired that trigger along with the column
+		// it looked up.
+		const sessionIdOf = await this.upsertChunkEntities<SessionsInsert>(
+			'Sessions',
+			SESSIONS_CONFLICT_COLUMNS,
+			chunk,
+			({ row }) => ({
+				visit_date: convertDateFormat(row.visit_date as string),
+				ringing_group_id: this.ringingGroupId
+			})
+		);
+
+		await this.upsertChunkEntities<EncountersInsert>(
+			'Encounters',
+			ENCOUNTERS_CONFLICT_COLUMNS,
+			chunk,
+			({ row }, chunkIndex) =>
+				buildEncounterInsert(row, {
+					birdId: birdIdOf(chunkIndex),
+					sessionId: sessionIdOf(chunkIndex),
+					locationId: locationIdOf(chunkIndex),
+					visitDate: convertDateFormat(row.visit_date as string)
+				})
+		);
+
+		for (const bufferedRow of chunk) {
+			bufferedRow.resolve({
+				visitDate: convertDateFormat(bufferedRow.row.visit_date as string)
+			});
+		}
+	}
+
+	/**
+	 * Rejected rather than thrown: the failure belongs to this chunk's rows, which
+	 * each surface it through their own promise, and `flushRemaining` must not blow
+	 * up because one chunk did.
+	 */
+	private failChunk(chunk: BufferedEncounterRow[], error: unknown): void {
+		console.error(
+			'Failed to write a domain-table chunk; none of its rows were imported',
+			{
+				importJobId: this.importJobId,
+				ringingGroupId: this.ringingGroupId,
+				rowCount: chunk.length,
+				rowIndices: chunk.map(({ rowIndex }) => rowIndex)
+			},
+			error
+		);
+		for (const bufferedRow of chunk) bufferedRow.reject(error);
+	}
+
+	private flushBufferedChunk(): void {
+		if (this.buffer.length === 0) return;
+		const chunk = this.buffer;
+		this.buffer = [];
+		this.chunkWrites.push(
+			(async () => {
+				try {
+					await this.limitChunkFlush(() => this.writeChunk(chunk));
+				} catch (error) {
+					this.failChunk(chunk, error);
+				}
+			})()
 		);
 	}
 
-	const birdId = await upsert<BirdsInsert>(
-		'Birds',
-		{
-			ring_no: row.ring_no as string,
-			species_id: speciesId
-		},
-		['ring_no']
-	);
+	/**
+	 * Buffers `rawRow` for the next chunk of domain-table writes and resolves once
+	 * the whole chunk containing it has been written — not when it was buffered.
+	 *
+	 * A casualty record carries no ring number, so it has no representable Bird and
+	 * is filtered out before it can reach a chunk (where it would fail the whole
+	 * chunk's `Birds` upsert on a NOT NULL column). It rejects straight away with
+	 * the same `CasualtyEncounterError` the per-row writer always threw, which both
+	 * entry points already distinguish from a genuine failure.
+	 */
+	writeEncounterRow(rawRow: DemonRow): Promise<{ visitDate: string }> {
+		const row = transformEmptyStringsToNull(rawRow) as DemonRow;
+		if (!row.ring_no) return Promise.reject(new CasualtyEncounterError());
 
-	// Record this group's link to the matched sequence via the per-group join
-	// table (issue #703) rather than a group-agnostic FK on the Bird.
-	if (ringSequenceId !== null) {
-		await linkRingSequence(birdId, ringSequenceId, ringingGroupId);
+		const rowIndex = this.rowsBuffered++;
+		// The executor runs synchronously, so the row is buffered before this
+		// returns — which is what lets a whole chunk fill within one synchronous
+		// dispatch pass over the rows released by a staging batch.
+		const chunkWritten = new Promise<{ visitDate: string }>(
+			(resolve, reject) => {
+				this.buffer.push({ row, rowIndex, resolve, reject });
+			}
+		);
+		if (this.buffer.length >= this.chunkSize) this.flushBufferedChunk();
+		return chunkWritten;
 	}
 
-	const locationId = await upsert<LocationsInsert>(
-		'Locations',
-		{ location_name: row.loc_id as string, ringing_group_id: ringingGroupId },
-		['location_name', 'ringing_group_id']
-	);
-
-	const visitDate = convertDateFormat(row.visit_date as string);
-
-	const age_code = Number(String(row.age).replace('J', ''));
-	const is_juv = String(row.age).endsWith('J');
-
-	// One Session per group per date (#1024). It used to be one per
-	// (visit_date, location_id, session_type), where session_type bucketed the row
-	// as FULL_GROWN / PULLI / FIELD_OBSERVATION from its own record_type and age —
-	// so a group visiting two sites on one day, or ringing both nestlings and
-	// full-grown birds at one site, produced several Session rows for the same day.
-	// All three of those axes now live on the Encounters rows themselves
-	// (location_id/visit_date per #1015, record_type/age_code/is_juv as always), and
-	// every read path derives what it needs from there, so a Session is just the
-	// group-day the encounters hang off.
-	//
-	// ringing_group_id is written explicitly: it used to be derived by the
-	// trg_set_session_generated_fields trigger via a Locations lookup on
-	// Sessions.location_id, and #1024 retires that trigger along with the column it
-	// looked up.
-	const sessionId = await upsert<SessionsInsert>(
-		'Sessions',
-		{
-			visit_date: visitDate,
-			ringing_group_id: ringingGroupId
-		},
-		['visit_date', 'ringing_group_id'] as (keyof SessionsInsert)[]
-	);
-
-	await upsert<EncountersInsert>(
-		'Encounters',
-		{
-			age_code,
-			breeding_condition: row.breeding_condition as string | null,
-			capture_time: row.capture_time as string,
-			extra_text: row.extra_text as string | null,
-			fat: row.fat as string | null,
-			finding_condition: row.finding_condition as string | null,
-			finding_circumstances: row.finding_circumstances as string | null,
-			is_juv,
-			moult_code: row.moult_code as string | null,
-			old_greater_coverts: row.old_greater_coverts
-				? Number(row.old_greater_coverts)
-				: null,
-			pectoral_muscle: row.pectoral_muscle ? Number(row.pectoral_muscle) : null,
-			primary_moult: row.primary_moult as string | null,
-			record_type: row.record_type as string,
-			bird_id: birdId,
-			session_id: sessionId,
-			// Every encounter carries its own location/date, independent of the
-			// Session it is linked to (#1015) — and since #1024 collapsed Sessions to
-			// one row per group-day, these are the only place the per-encounter
-			// location survives.
-			location_id: locationId,
-			visit_date: visitDate,
-			scheme: row.scheme as string,
-			sex: row.sex as string,
-			capture_method: row.capture_method as string | null,
-			sexing_method: row.sexing_method as string | null,
-			weight: row.weight ? Number(row.weight) : null,
-			wing_length: row.wing_length ? Number(row.wing_length) : null
-		},
-		// Follows encounters_bird_id_location_id_visit_date_unique, repointed off
-		// (bird_id, session_id) in #1024. A session_id key would now mean "one
-		// encounter per bird per group per day", silently merging a bird caught at
-		// two sites on one day; (bird_id, location_id, visit_date) is what
-		// (bird_id, session_id) actually meant while a Session was (date, location,
-		// type), so re-importing the same row still updates in place rather than
-		// inserting a duplicate.
-		['bird_id', 'location_id', 'visit_date'] as (keyof EncountersInsert)[]
-	);
-
-	return { visitDate };
+	/**
+	 * Flushes the trailing partial chunk and waits for every chunk of the run to
+	 * have been written. Call it once every row has been handed to
+	 * `processEncounterRow` — in practice right after the staging writer's own
+	 * `flushRemaining` — and before awaiting any row's promise.
+	 *
+	 * The caller can't simply await the rows first: a row's promise is what settles
+	 * when its chunk lands, so awaiting them before flushing would deadlock on the
+	 * trailing chunk. Hence the macrotask yield: the rows released by the final
+	 * staging batch reach this buffer in microtasks queued by that batch landing,
+	 * and the staging writer's `flushRemaining` can resume before the last of them
+	 * has run. One macrotask boundary guarantees every such continuation has
+	 * executed, so the buffer really does hold the run's trailing chunk.
+	 */
+	async flushRemaining(): Promise<void> {
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		// Looped, so a row that arrived while an earlier chunk was still in flight
+		// can't be left behind in the buffer.
+		do {
+			this.flushBufferedChunk();
+			await Promise.all(this.chunkWrites);
+		} while (this.buffer.length > 0);
+	}
 }

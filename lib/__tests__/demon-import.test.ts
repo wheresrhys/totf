@@ -3,14 +3,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
 	transformEmptyStringsToNull,
 	convertDateFormat,
-	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
 	DemonRecordsBatchWriter,
+	EncounterRowBatchWriter,
 	ImportJobTracker,
 	CasualtyEncounterError,
 	processEncounterRow,
-	writeEncounterRow,
 	RESIGHTING_RECORD_TYPES,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
@@ -399,52 +398,6 @@ describe('createRingSequenceLinker', () => {
 		await expect(link(11, 22, 33)).rejects.toMatchObject({
 			message: 'upsert failed'
 		});
-	});
-});
-
-describe('createUpserter', () => {
-	let mockSingle: ReturnType<typeof vi.fn>;
-	let mockSelect: ReturnType<typeof vi.fn>;
-	let mockUpsertChain: ReturnType<typeof vi.fn>;
-	let mockFrom: ReturnType<typeof vi.fn>;
-	let upsert: ReturnType<typeof createUpserter>;
-
-	beforeEach(() => {
-		mockSingle = vi.fn();
-		mockSelect = vi.fn(() => ({ single: mockSingle }));
-		mockUpsertChain = vi.fn(() => ({ select: mockSelect }));
-		mockFrom = vi.fn(() => ({ upsert: mockUpsertChain }));
-		// eslint-disable-next-line no-restricted-syntax -- mock only implements the `from` chain this test needs, not the full SupabaseClient interface
-		const mockClient = { from: mockFrom } as unknown as SupabaseClient;
-		upsert = createUpserter(mockClient);
-	});
-
-	it('calls supabase upsert on the correct table with provided data', async () => {
-		mockSingle.mockResolvedValue({ data: { id: 1 }, error: null });
-		await upsert('Species', { species_name: 'Robin' }, ['species_name']);
-		expect(mockFrom).toHaveBeenCalledWith('Species');
-		expect(mockUpsertChain).toHaveBeenCalledWith(
-			{ species_name: 'Robin' },
-			{ onConflict: 'species_name', ignoreDuplicates: false }
-		);
-	});
-
-	it('returns the id from the upserted record', async () => {
-		mockSingle.mockResolvedValue({ data: { id: 99 }, error: null });
-		const result = await upsert('Species', { species_name: 'Robin' }, [
-			'species_name'
-		]);
-		expect(result).toBe(99);
-	});
-
-	it('throws when supabase returns an error', async () => {
-		mockSingle.mockResolvedValue({
-			data: null,
-			error: { message: 'conflict error' }
-		});
-		await expect(
-			upsert('Species', { species_name: 'Robin' }, ['species_name'])
-		).rejects.toMatchObject({ message: 'conflict error' });
 	});
 });
 
@@ -975,87 +928,245 @@ describe('DemonRecordsBatchWriter buffering', () => {
 	});
 });
 
+const DOMAIN_RINGING_GROUP_ID = 7;
+const DOMAIN_IMPORT_JOB_ID = 42;
+
+/**
+ * Distinct id ranges per table, so an id that has been routed onto the wrong
+ * column is obvious from a failure message rather than a plausible-looking `1`.
+ */
+const MOCK_ID_BASE: Record<string, number> = {
+	Species: 100,
+	Birds: 200,
+	Locations: 300,
+	Sessions: 400,
+	Encounters: 500
+};
+
+/**
+ * Mock Supabase client for the domain-table writer: records every bulk upsert and
+ * answers it with the natural-key columns it was asked to select plus a
+ * table-scoped id, exactly as PostgREST would — which is what lets a test assert
+ * that a later entity's payload carries the id an earlier one actually resolved.
+ */
+function makeDomainTablesClient() {
+	const upsertCalls: {
+		table: string;
+		rows: Record<string, unknown>[];
+		options: Record<string, unknown>;
+		selectedColumns: string[];
+	}[] = [];
+	const idsByTableAndKey = new Map<string, number>();
+	const nextIdByTable: Record<string, number> = {};
+	let failingTable: string | null = null;
+	let failure: unknown = null;
+	let reverseResponseRows = false;
+
+	/** A stable id per (table, natural key), minted in the order rows are seen. */
+	function idFor(table: string, naturalKey: string): number {
+		const mapKey = `${table}|${naturalKey}`;
+		const existingId = idsByTableAndKey.get(mapKey);
+		if (existingId !== undefined) return existingId;
+		const mintedId = (nextIdByTable[table] ?? MOCK_ID_BASE[table]) + 1;
+		nextIdByTable[table] = mintedId;
+		idsByTableAndKey.set(mapKey, mintedId);
+		return mintedId;
+	}
+
+	function respondTo(
+		table: string,
+		rows: Record<string, unknown>[],
+		selectedColumns: string[]
+	) {
+		const keyColumns = selectedColumns.filter((column) => column !== 'id');
+		const data = rows.map((row) => {
+			const echoedRow: Record<string, unknown> = {
+				id: idFor(
+					table,
+					JSON.stringify(keyColumns.map((column) => row[column]))
+				)
+			};
+			for (const column of keyColumns) echoedRow[column] = row[column];
+			return echoedRow;
+		});
+		return reverseResponseRows ? data.reverse() : data;
+	}
+
+	const from = vi.fn((table: string) => ({
+		upsert: (
+			rows: Record<string, unknown>[],
+			options: Record<string, unknown>
+		) => ({
+			select: (selectedColumnList: string) => {
+				const selectedColumns = selectedColumnList.split(',');
+				upsertCalls.push({ table, rows, options, selectedColumns });
+				if (failingTable === table)
+					return Promise.resolve({ data: null, error: failure });
+				return Promise.resolve({
+					data: respondTo(table, rows, selectedColumns),
+					error: null
+				});
+			}
+		})
+	}));
+
+	return {
+		// eslint-disable-next-line no-restricted-syntax -- mock only implements the `from` chain the batch writer uses, not the full SupabaseClient interface
+		client: { from } as unknown as SupabaseClient,
+		upsertCalls,
+		/** Which tables were upserted into, in the order the calls were made. */
+		tablesInCallOrder: () => upsertCalls.map(({ table }) => table),
+		/** The rows of the first (usually only) bulk upsert into `table`. */
+		rowsUpsertedInto: (table: string) =>
+			upsertCalls.find((call) => call.table === table)?.rows ?? [],
+		/** The id this client answered with for one natural key — assert against it. */
+		idFor: (table: string, ...keyValues: unknown[]) =>
+			idFor(table, JSON.stringify(keyValues)),
+		failOn: (table: string, error: unknown) => {
+			failingTable = table;
+			failure = error;
+		},
+		/** Answer every upsert with its rows in reverse request order. */
+		reverseResponses: () => {
+			reverseResponseRows = true;
+		}
+	};
+}
+
+function makeEncounterRowWriter({
+	chunkSize = 2,
+	ringSequenceId = null,
+	limitChunkFlush
+}: {
+	chunkSize?: number;
+	ringSequenceId?: number | null;
+	limitChunkFlush?: (flushChunk: () => Promise<void>) => Promise<void>;
+} = {}) {
+	const domainTablesClient = makeDomainTablesClient();
+	const lookupRingSequence = vi.fn().mockResolvedValue(ringSequenceId);
+	const linkRingSequence = vi.fn().mockResolvedValue(undefined);
+	const writer = new EncounterRowBatchWriter(domainTablesClient.client, {
+		ringingGroupId: DOMAIN_RINGING_GROUP_ID,
+		importJobId: DOMAIN_IMPORT_JOB_ID,
+		lookupRingSequence,
+		linkRingSequence,
+		chunkSize,
+		limitChunkFlush
+	});
+	return { domainTablesClient, writer, lookupRingSequence, linkRingSequence };
+}
+
+/** A limiter that admits every chunk flush but never lets one run. */
+function neverRunningChunkLimiter() {
+	const flushesAdmitted: (() => Promise<void>)[] = [];
+	return {
+		flushesAdmitted,
+		limitChunkFlush: (flushChunk: () => Promise<void>) => {
+			flushesAdmitted.push(flushChunk);
+			return new Promise<void>(() => {});
+		}
+	};
+}
+
 describe('processEncounterRow orchestration', () => {
-	it('awaits writeDemonRecord before calling writeEncounterRow for a given row', async () => {
-		const { demonRecordsClient, writer } = makeStagingWriter(1);
-		const writeEncounterRowRateLimited = vi
-			.fn()
-			.mockResolvedValue({ visitDate: '2024-06-01' });
+	it('awaits writeDemonRecord before handing the row to the domain-table writer', async () => {
+		const { demonRecordsClient, writer: stagingWriter } = makeStagingWriter(1);
+		const { writer: encounterRowBatchWriter } = makeEncounterRowWriter({
+			chunkSize: 1
+		});
+		const writeEncounterRow = vi.spyOn(
+			encounterRowBatchWriter,
+			'writeEncounterRow'
+		);
 
 		const row = makeDemonRow();
 		const processed = processEncounterRow(
 			row,
-			writer,
-			writeEncounterRowRateLimited
+			stagingWriter,
+			encounterRowBatchWriter
 		);
 		await settlePendingMicrotasks();
 
 		expect(demonRecordsClient.upsert).toHaveBeenCalledTimes(1);
-		expect(writeEncounterRowRateLimited).not.toHaveBeenCalled();
+		expect(writeEncounterRow).not.toHaveBeenCalled();
 
 		await demonRecordsClient.landBatch();
 
 		await expect(processed).resolves.toEqual({ visitDate: '2024-06-01' });
-		expect(writeEncounterRowRateLimited).toHaveBeenCalledWith(row);
+		expect(writeEncounterRow).toHaveBeenCalledWith(row);
 	});
 
-	it('a row whose writeDemonRecord promise rejects never reaches writeEncounterRow', async () => {
-		const { demonRecordsClient, writer } = makeStagingWriter(1);
+	it('a row whose writeDemonRecord promise rejects never reaches the domain-table writer', async () => {
+		const { demonRecordsClient, writer: stagingWriter } = makeStagingWriter(1);
+		const { writer: encounterRowBatchWriter } = makeEncounterRowWriter({
+			chunkSize: 1
+		});
+		const writeEncounterRow = vi.spyOn(
+			encounterRowBatchWriter,
+			'writeEncounterRow'
+		);
 		vi.spyOn(console, 'error').mockImplementation(() => {});
-		const writeEncounterRowRateLimited = vi
-			.fn()
-			.mockResolvedValue({ visitDate: '2024-06-01' });
 
 		const settlement = trackSettlement(
-			processEncounterRow(makeDemonRow(), writer, writeEncounterRowRateLimited)
+			processEncounterRow(
+				makeDemonRow(),
+				stagingWriter,
+				encounterRowBatchWriter
+			)
 		);
 		await demonRecordsClient.failBatch(0, { message: 'staging write failed' });
 
 		expect(settlement.rejectedWith).toMatchObject({
 			message: 'staging write failed'
 		});
-		expect(writeEncounterRowRateLimited).not.toHaveBeenCalled();
+		expect(writeEncounterRow).not.toHaveBeenCalled();
 	});
 
 	it('lets an earlier batch’s rows write to the domain tables while a later batch is still in flight', async () => {
-		const { demonRecordsClient, writer } = makeStagingWriter(2);
-		const writeEncounterRowRateLimited = vi
-			.fn()
-			.mockResolvedValue({ visitDate: '2024-06-01' });
+		const { demonRecordsClient, writer: stagingWriter } = makeStagingWriter(2);
+		const { writer: encounterRowBatchWriter, domainTablesClient } =
+			makeEncounterRowWriter({ chunkSize: 2 });
 
 		const rows = makeDemonRows(4);
 		const processed = rows.map((row) =>
-			processEncounterRow(row, writer, writeEncounterRowRateLimited)
+			processEncounterRow(row, stagingWriter, encounterRowBatchWriter)
 		);
-		const flushed = writer.flushRemaining();
+		const flushed = stagingWriter.flushRemaining();
 
 		// Only the first batch has landed; the second is still in flight.
 		await demonRecordsClient.landBatch(0);
 		await Promise.all(processed.slice(0, 2));
 
-		expect(writeEncounterRowRateLimited).toHaveBeenCalledTimes(2);
+		expect(domainTablesClient.rowsUpsertedInto('Encounters')).toHaveLength(2);
 
 		await demonRecordsClient.landBatch(1);
 		await flushed;
+		await encounterRowBatchWriter.flushRemaining();
 		await Promise.all(processed);
 
-		expect(writeEncounterRowRateLimited).toHaveBeenCalledTimes(4);
+		expect(
+			domainTablesClient
+				.tablesInCallOrder()
+				.filter((table) => table === 'Encounters')
+		).toHaveLength(2);
 	});
 
-	it("fills a batch larger than the limiter's concurrency cap, because the limiter wraps only writeEncounterRow", async () => {
-		const { demonRecordsClient, writer } = makeStagingWriter(3);
-		// A limiter that admits one call at a time and never releases it, standing
-		// in for a concurrency cap smaller than the batch size. If it wrapped the
-		// whole row rather than just the domain-table write, rows 2 and 3 could
-		// never reach the buffer and the batch could never fill.
-		const admittedToLimiter: DemonRow[] = [];
-		const writeEncounterRowRateLimited = (row: DemonRow) => {
-			admittedToLimiter.push(row);
-			return new Promise<{ visitDate: string }>(() => {});
-		};
+	it('fills a staging batch larger than the domain limiter’s concurrency cap, because the limiter wraps only a chunk flush', async () => {
+		const { demonRecordsClient, writer: stagingWriter } = makeStagingWriter(3);
+		// A limiter that admits one flush at a time and never releases it, standing
+		// in for a concurrency cap smaller than the staging batch. If it wrapped the
+		// whole row rather than just the chunk flush, rows 2 and 3 could never reach
+		// the staging buffer and the batch could never fill.
+		const { limitChunkFlush, flushesAdmitted } = neverRunningChunkLimiter();
+		const { writer: encounterRowBatchWriter } = makeEncounterRowWriter({
+			chunkSize: 3,
+			limitChunkFlush
+		});
 
 		for (const row of makeDemonRows(3)) {
-			processEncounterRow(row, writer, writeEncounterRowRateLimited);
+			trackSettlement(
+				processEncounterRow(row, stagingWriter, encounterRowBatchWriter)
+			);
 		}
 		await settlePendingMicrotasks();
 
@@ -1064,188 +1175,417 @@ describe('processEncounterRow orchestration', () => {
 
 		await demonRecordsClient.landBatch();
 
-		expect(admittedToLimiter).toHaveLength(3);
+		// All three rows reached the domain writer and filled one chunk.
+		expect(flushesAdmitted).toHaveLength(1);
 	});
 });
 
-describe('writeEncounterRow', () => {
-	const RINGING_GROUP_ID = 7;
-	const RESOLVED_RING_SEQUENCE_ID = 555;
-	let upsert: ReturnType<typeof vi.fn>;
-	let lookupRingSequence: ReturnType<typeof vi.fn>;
-	let linkRingSequence: ReturnType<typeof vi.fn>;
+describe('EncounterRowBatchWriter', () => {
+	describe('buffering rows until the chunk size is reached', () => {
+		it('flushes a chunk as one bulk upsert per entity type once writeEncounterRow has been called chunkSize times', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 3
+			});
 
-	beforeEach(() => {
-		let callCount = 0;
-		upsert = vi.fn().mockImplementation(() => {
-			callCount++;
-			return Promise.resolve(callCount * 10);
+			const written = makeDemonRows(3).map((row) =>
+				writer.writeEncounterRow(row)
+			);
+			await Promise.all(written);
+
+			expect(domainTablesClient.tablesInCallOrder()).toEqual([
+				'Species',
+				'Birds',
+				'Locations',
+				'Sessions',
+				'Encounters'
+			]);
+			expect(domainTablesClient.rowsUpsertedInto('Encounters')).toHaveLength(3);
 		});
-		lookupRingSequence = vi.fn().mockResolvedValue(RESOLVED_RING_SEQUENCE_ID);
-		linkRingSequence = vi.fn().mockResolvedValue(undefined);
-	});
 
-	describe('casualty encounters', () => {
-		it('throws CasualtyEncounterError and does not call upsert when ring_no is empty', async () => {
-			const row = makeDemonRow({ ring_no: '' });
+		it('leaves a chunk that has not reached chunkSize unwritten, with its rows still pending', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 3
+			});
+
+			const settlements = makeDemonRows(2).map((row) =>
+				trackSettlement(writer.writeEncounterRow(row))
+			);
+			await settlePendingMicrotasks();
+
+			expect(domainTablesClient.upsertCalls).toHaveLength(0);
+			expect(settlements.map(({ resolved }) => resolved)).toEqual([
+				false,
+				false
+			]);
+		});
+
+		it('rejects a casualty row with no ring number straight away, without buffering it', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
+
+			// A casualty record has no representable Bird, so it would fail the whole
+			// chunk's Birds upsert on a NOT NULL column — it is filtered out before it
+			// can reach one, same as `buildDemonRecord` skips it before staging.
 			await expect(
-				writeEncounterRow(
-					row,
-					upsert,
-					lookupRingSequence,
-					RINGING_GROUP_ID,
-					linkRingSequence
-				)
+				writer.writeEncounterRow(makeDemonRow({ ring_no: '' }))
 			).rejects.toBeInstanceOf(CasualtyEncounterError);
-			expect(upsert).not.toHaveBeenCalled();
+			expect(domainTablesClient.upsertCalls).toHaveLength(0);
 		});
 
-		it('processes normally when ring_no is present (already-ringed bird)', async () => {
-			const row = makeDemonRow({ ring_no: 'A123456' });
-			await expect(
-				writeEncounterRow(
-					row,
-					upsert,
-					lookupRingSequence,
-					RINGING_GROUP_ID,
-					linkRingSequence
+		it('applies ON CONFLICT DO UPDATE against each entity type’s own unique constraint', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
+
+			await writer.writeEncounterRow(makeDemonRow());
+
+			expect(
+				domainTablesClient.upsertCalls.map(({ table, options }) => [
+					table,
+					options
+				])
+			).toEqual([
+				['Species', { onConflict: 'species_name', ignoreDuplicates: false }],
+				['Birds', { onConflict: 'ring_no', ignoreDuplicates: false }],
+				[
+					'Locations',
+					{
+						onConflict: 'location_name,ringing_group_id',
+						ignoreDuplicates: false
+					}
+				],
+				[
+					'Sessions',
+					{
+						onConflict: 'visit_date,ringing_group_id',
+						ignoreDuplicates: false
+					}
+				],
+				[
+					'Encounters',
+					{
+						onConflict: 'bird_id,location_id,visit_date',
+						ignoreDuplicates: false
+					}
+				]
+			]);
+		});
+	});
+
+	describe('deduplicating repeated entity values within a chunk', () => {
+		it('dedupes two rows sharing a species_name down to one Species entry', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 2
+			});
+
+			await Promise.all([
+				writer.writeEncounterRow(
+					makeDemonRow({ ring_no: 'A000001', species_name: 'Robin' })
+				),
+				writer.writeEncounterRow(
+					makeDemonRow({ ring_no: 'A000002', species_name: 'Robin' })
 				)
-			).resolves.toBeDefined();
-			expect(upsert).toHaveBeenCalled();
+			]);
+
+			// Postgres rejects a multi-row ON CONFLICT DO UPDATE that targets the same
+			// conflict key twice, so this is correctness rather than efficiency.
+			expect(domainTablesClient.rowsUpsertedInto('Species')).toEqual([
+				{ species_name: 'Robin' }
+			]);
+		});
+
+		it('dedupes each entity type independently, so rows sharing a species still write their own Birds', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 2
+			});
+
+			await Promise.all([
+				writer.writeEncounterRow(
+					makeDemonRow({ ring_no: 'A000001', species_name: 'Robin' })
+				),
+				writer.writeEncounterRow(
+					makeDemonRow({ ring_no: 'A000002', species_name: 'Robin' })
+				)
+			]);
+
+			expect(domainTablesClient.rowsUpsertedInto('Species')).toHaveLength(1);
+			expect(
+				domainTablesClient
+					.rowsUpsertedInto('Birds')
+					.map(({ ring_no }) => ring_no)
+			).toEqual(['A000001', 'A000002']);
+		});
+
+		it('upserts exactly one entry per entity type when every row in the chunk shares all four lookup values', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 3
+			});
+
+			const identicalRow = makeDemonRow();
+			await Promise.all(
+				[1, 2, 3].map(() => writer.writeEncounterRow({ ...identicalRow }))
+			);
+
+			for (const table of [
+				'Species',
+				'Birds',
+				'Locations',
+				'Sessions',
+				'Encounters'
+			]) {
+				expect(domainTablesClient.rowsUpsertedInto(table)).toHaveLength(1);
+			}
 		});
 	});
 
-	it('upserts Species with the species name', async () => {
-		const row = makeDemonRow({ species_name: 'Blue Tit' });
-		await writeEncounterRow(
-			row,
-			upsert,
-			lookupRingSequence,
-			RINGING_GROUP_ID,
-			linkRingSequence
-		);
-		expect(upsert).toHaveBeenCalledWith(
-			'Species',
-			{ species_name: 'Blue Tit' },
-			['species_name']
-		);
-	});
+	describe('writing entity types in FK dependency order', () => {
+		it('writes Species, Birds, Locations, Sessions then Encounters, each payload carrying the ids the earlier upserts resolved', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
 
-	it('upserts Bird with ring_no and the species ID from Species upsert (ring-sequence linkage is a separate write, not part of this payload)', async () => {
-		const row = makeDemonRow({
-			ring_no: 'A123456',
-			species_name: 'Blue Tit',
-			record_type: 'N'
+			await writer.writeEncounterRow(
+				makeDemonRow({
+					ring_no: 'A123456',
+					species_name: 'Robin',
+					loc_id: 'Garden Trap',
+					visit_date: '15/03/2024'
+				})
+			);
+
+			expect(domainTablesClient.tablesInCallOrder()).toEqual([
+				'Species',
+				'Birds',
+				'Locations',
+				'Sessions',
+				'Encounters'
+			]);
+			expect(domainTablesClient.rowsUpsertedInto('Birds')).toEqual([
+				{
+					ring_no: 'A123456',
+					species_id: domainTablesClient.idFor('Species', 'Robin')
+				}
+			]);
+			expect(
+				domainTablesClient.rowsUpsertedInto('Encounters')[0]
+			).toMatchObject({
+				bird_id: domainTablesClient.idFor('Birds', 'A123456'),
+				location_id: domainTablesClient.idFor(
+					'Locations',
+					'Garden Trap',
+					DOMAIN_RINGING_GROUP_ID
+				),
+				session_id: domainTablesClient.idFor(
+					'Sessions',
+					'2024-03-15',
+					DOMAIN_RINGING_GROUP_ID
+				)
+			});
 		});
-		await writeEncounterRow(
-			row,
-			upsert,
-			lookupRingSequence,
-			RINGING_GROUP_ID,
-			linkRingSequence
-		);
-		const speciesId = 10; // first call returns 10
-		expect(upsert).toHaveBeenCalledWith(
-			'Birds',
-			{
-				ring_no: 'A123456',
-				species_id: speciesId
-			},
-			['ring_no']
-		);
 	});
 
-	it('upserts Location with loc_id and ringing group ID', async () => {
-		const row = makeDemonRow({ loc_id: 'Garden Trap' });
-		await writeEncounterRow(
-			row,
-			upsert,
-			lookupRingSequence,
-			RINGING_GROUP_ID,
-			linkRingSequence
-		);
-		expect(upsert).toHaveBeenCalledWith(
-			'Locations',
-			{ location_name: 'Garden Trap', ringing_group_id: RINGING_GROUP_ID },
-			['location_name', 'ringing_group_id']
-		);
+	describe('resolving bulk-upsert results back to each row by natural key', () => {
+		it('selects each entity type’s natural-key columns alongside its id, so a returned row can be matched to what was sent', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
+
+			await writer.writeEncounterRow(makeDemonRow());
+
+			expect(
+				domainTablesClient.upsertCalls.map(({ table, selectedColumns }) => [
+					table,
+					selectedColumns
+				])
+			).toEqual([
+				['Species', ['id', 'species_name']],
+				['Birds', ['id', 'ring_no']],
+				['Locations', ['id', 'location_name', 'ringing_group_id']],
+				['Sessions', ['id', 'visit_date', 'ringing_group_id']],
+				['Encounters', ['id', 'bird_id', 'location_id', 'visit_date']]
+			]);
+		});
+
+		it('maps the right id onto each row even when the response rows come back in a different order than the request', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 2
+			});
+			domainTablesClient.reverseResponses();
+
+			await Promise.all([
+				writer.writeEncounterRow(
+					makeDemonRow({ ring_no: 'A000001', species_name: 'Robin' })
+				),
+				writer.writeEncounterRow(
+					makeDemonRow({ ring_no: 'A000002', species_name: 'Wren' })
+				)
+			]);
+
+			expect(domainTablesClient.rowsUpsertedInto('Birds')).toEqual([
+				{
+					ring_no: 'A000001',
+					species_id: domainTablesClient.idFor('Species', 'Robin')
+				},
+				{
+					ring_no: 'A000002',
+					species_id: domainTablesClient.idFor('Species', 'Wren')
+				}
+			]);
+		});
 	});
 
-	// The old (visit_date, location_id, session_type) key and the record_type/age
-	// bucketing that computed session_type are both gone (#1024) — a Session is one
-	// row per group-day now, and the whole `session_type bucketing` describe block
-	// that used to sit here went with the column it asserted on.
-	describe('Sessions upsert', () => {
-		function sessionUpsertCall() {
-			return upsert.mock.calls.find(([table]) => table === 'Sessions');
+	describe('looking up and linking a new ring’s RingSequence per row', () => {
+		it('looks up the matching RingSequences row by full ring number and links the bird to it for this group', async () => {
+			const RESOLVED_RING_SEQUENCE_ID = 555;
+			const {
+				domainTablesClient,
+				writer,
+				lookupRingSequence,
+				linkRingSequence
+			} = makeEncounterRowWriter({
+				chunkSize: 1,
+				ringSequenceId: RESOLVED_RING_SEQUENCE_ID
+			});
+
+			await writer.writeEncounterRow(
+				makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' })
+			);
+
+			expect(lookupRingSequence).toHaveBeenCalledTimes(1);
+			expect(lookupRingSequence).toHaveBeenCalledWith(
+				'AEL1699',
+				DOMAIN_RINGING_GROUP_ID
+			);
+			expect(linkRingSequence).toHaveBeenCalledWith(
+				domainTablesClient.idFor('Birds', 'AEL1699'),
+				RESOLVED_RING_SEQUENCE_ID,
+				DOMAIN_RINGING_GROUP_ID
+			);
+		});
+
+		it.each(['S', 'C', 'U', 'F', 'D'])(
+			'does not look up a RingSequences row or link anything for a non-N record_type (%s)',
+			async (recordType) => {
+				const { writer, lookupRingSequence, linkRingSequence } =
+					makeEncounterRowWriter({ chunkSize: 1, ringSequenceId: 555 });
+
+				await writer.writeEncounterRow(
+					makeDemonRow({ ring_no: 'AEL1699', record_type: recordType })
+				);
+
+				expect(lookupRingSequence).not.toHaveBeenCalled();
+				expect(linkRingSequence).not.toHaveBeenCalled();
+			}
+		);
+
+		it('does not link anything when no sequence matches (lookup returns null)', async () => {
+			const { writer, lookupRingSequence, linkRingSequence } =
+				makeEncounterRowWriter({ chunkSize: 1, ringSequenceId: null });
+
+			await writer.writeEncounterRow(
+				makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' })
+			);
+
+			expect(lookupRingSequence).toHaveBeenCalledWith(
+				'AEL1699',
+				DOMAIN_RINGING_GROUP_ID
+			);
+			expect(linkRingSequence).not.toHaveBeenCalled();
+		});
+
+		it('looks a sequence up once per N row in the chunk, not once per chunk', async () => {
+			const { writer, lookupRingSequence } = makeEncounterRowWriter({
+				chunkSize: 2,
+				ringSequenceId: null
+			});
+
+			await Promise.all(
+				makeDemonRows(2, { record_type: 'N' }).map((row) =>
+					writer.writeEncounterRow(row)
+				)
+			);
+
+			expect(lookupRingSequence.mock.calls).toEqual([
+				['A000000', DOMAIN_RINGING_GROUP_ID],
+				['A000001', DOMAIN_RINGING_GROUP_ID]
+			]);
+		});
+	});
+
+	describe('building each entity type’s insert payload', () => {
+		/** Imports one row in a chunk of its own, and hands back what was written. */
+		async function writeOneRow(overrides: Partial<DemonRow> = {}) {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
+			const result = await writer.writeEncounterRow(makeDemonRow(overrides));
+			return { domainTablesClient, result };
 		}
 
-		it('upserts Session with the converted visit_date and the importing group', async () => {
-			await writeEncounterRow(
-				makeDemonRow({ visit_date: '15/03/2023' }),
-				upsert,
-				lookupRingSequence,
-				RINGING_GROUP_ID,
-				linkRingSequence
-			);
-			expect(upsert).toHaveBeenCalledWith(
-				'Sessions',
+		it('upserts Species on the species name alone', async () => {
+			const { domainTablesClient } = await writeOneRow({
+				species_name: 'Blue Tit'
+			});
+			expect(domainTablesClient.rowsUpsertedInto('Species')).toEqual([
+				{ species_name: 'Blue Tit' }
+			]);
+		});
+
+		it('upserts Locations on the row’s loc_id and the importing group', async () => {
+			const { domainTablesClient } = await writeOneRow({
+				loc_id: 'Garden Trap'
+			});
+			expect(domainTablesClient.rowsUpsertedInto('Locations')).toEqual([
+				{
+					location_name: 'Garden Trap',
+					ringing_group_id: DOMAIN_RINGING_GROUP_ID
+				}
+			]);
+		});
+
+		// The old (visit_date, location_id, session_type) key and the record_type/age
+		// bucketing that computed session_type are both gone (#1024) — a Session is
+		// one row per group-day now.
+		it('upserts Sessions on the converted visit_date and the importing group, with no location_id or session_type', async () => {
+			const { domainTablesClient } = await writeOneRow({
+				visit_date: '15/03/2023',
+				record_type: 'U',
+				age: '1'
+			});
+			expect(domainTablesClient.rowsUpsertedInto('Sessions')).toEqual([
 				{
 					visit_date: '2023-03-15',
-					ringing_group_id: RINGING_GROUP_ID
-				},
-				['visit_date', 'ringing_group_id']
-			);
+					ringing_group_id: DOMAIN_RINGING_GROUP_ID
+				}
+			]);
 		});
 
-		it('writes no location_id or session_type onto the Session, whatever the row looks like', async () => {
-			await writeEncounterRow(
-				makeDemonRow({ record_type: 'U', age: '1' }),
-				upsert,
-				lookupRingSequence,
-				RINGING_GROUP_ID,
-				linkRingSequence
-			);
-			expect(sessionUpsertCall()?.[1]).not.toHaveProperty('location_id');
-			expect(sessionUpsertCall()?.[1]).not.toHaveProperty('session_type');
-		});
-	});
+		it('upserts Encounters with the row’s own measurements alongside the resolved ids', async () => {
+			const { domainTablesClient } = await writeOneRow({
+				capture_time: '09:15',
+				record_type: 'N',
+				scheme: 'BTO',
+				sex: 'F',
+				sexing_method: 'P',
+				age: '5',
+				weight: '11.2',
+				wing_length: '67',
+				old_greater_coverts: '3',
+				moult_code: 'M',
+				breeding_condition: 'B',
+				extra_text: 'some note',
+				finding_condition: '8',
+				finding_circumstances: '2',
+				primary_moult: 'FF',
+				fat: 'B4',
+				pectoral_muscle: '2',
+				capture_method: 'M'
+			});
 
-	it('upserts Encounter with bird and session IDs from prior upserts', async () => {
-		const row = makeDemonRow({
-			capture_time: '09:15',
-			record_type: 'N',
-			scheme: 'BTO',
-			sex: 'F',
-			sexing_method: 'P',
-			age: '5',
-			weight: '11.2',
-			wing_length: '67',
-			old_greater_coverts: '3',
-			moult_code: 'M',
-			breeding_condition: 'B',
-			extra_text: 'some note',
-			finding_condition: '8',
-			finding_circumstances: '2',
-			primary_moult: 'FF',
-			fat: 'B4',
-			pectoral_muscle: '2',
-			capture_method: 'M'
-		});
-		await writeEncounterRow(
-			row,
-			upsert,
-			lookupRingSequence,
-			RINGING_GROUP_ID,
-			linkRingSequence
-		);
-		const birdId = 20; // second call returns 20
-		const sessionId = 40; // fourth call returns 40
-		expect(upsert).toHaveBeenCalledWith(
-			'Encounters',
-			expect.objectContaining({
-				bird_id: birdId,
-				session_id: sessionId,
+			expect(
+				domainTablesClient.rowsUpsertedInto('Encounters')[0]
+			).toMatchObject({
 				capture_time: '09:15',
 				record_type: 'N',
 				scheme: 'BTO',
@@ -1264,38 +1604,31 @@ describe('writeEncounterRow', () => {
 				primary_moult: 'FF',
 				fat: 'B4',
 				pectoral_muscle: 2,
-				capture_method: 'M'
-			}),
-			['bird_id', 'location_id', 'visit_date']
-		);
-	});
-
-	it('converts empty string fields to null in Encounter', async () => {
-		const row = makeDemonRow({
-			breeding_condition: '',
-			moult_code: '',
-			extra_text: '',
-			sexing_method: '',
-			weight: '',
-			wing_length: '',
-			old_greater_coverts: '',
-			finding_condition: '',
-			finding_circumstances: '',
-			primary_moult: '',
-			fat: '',
-			pectoral_muscle: '',
-			capture_method: ''
+				capture_method: 'M',
+				visit_date: '2024-06-01'
+			});
 		});
-		await writeEncounterRow(
-			row,
-			upsert,
-			lookupRingSequence,
-			RINGING_GROUP_ID,
-			linkRingSequence
-		);
-		expect(upsert).toHaveBeenCalledWith(
-			'Encounters',
-			expect.objectContaining({
+
+		it('converts empty-string fields to null on the Encounters payload', async () => {
+			const { domainTablesClient } = await writeOneRow({
+				breeding_condition: '',
+				moult_code: '',
+				extra_text: '',
+				sexing_method: '',
+				weight: '',
+				wing_length: '',
+				old_greater_coverts: '',
+				finding_condition: '',
+				finding_circumstances: '',
+				primary_moult: '',
+				fat: '',
+				pectoral_muscle: '',
+				capture_method: ''
+			});
+
+			expect(
+				domainTablesClient.rowsUpsertedInto('Encounters')[0]
+			).toMatchObject({
 				breeding_condition: null,
 				moult_code: null,
 				extra_text: null,
@@ -1309,135 +1642,164 @@ describe('writeEncounterRow', () => {
 				fat: null,
 				pectoral_muscle: null,
 				capture_method: null
-			}),
-			['bird_id', 'location_id', 'visit_date']
-		);
-	});
-
-	it('parses juvenile age codes (e.g. "3J") into age_code and is_juv', async () => {
-		const row = makeDemonRow({ age: '3J' });
-		await writeEncounterRow(
-			row,
-			upsert,
-			lookupRingSequence,
-			RINGING_GROUP_ID,
-			linkRingSequence
-		);
-		expect(upsert).toHaveBeenCalledWith(
-			'Encounters',
-			expect.objectContaining({ age_code: 3, is_juv: true }),
-			['bird_id', 'location_id', 'visit_date']
-		);
-	});
-
-	it('parses non-juvenile age codes into age_code and is_juv: false', async () => {
-		const row = makeDemonRow({ age: '6' });
-		await writeEncounterRow(
-			row,
-			upsert,
-			lookupRingSequence,
-			RINGING_GROUP_ID,
-			linkRingSequence
-		);
-		expect(upsert).toHaveBeenCalledWith(
-			'Encounters',
-			expect.objectContaining({ age_code: 6, is_juv: false }),
-			['bird_id', 'location_id', 'visit_date']
-		);
-	});
-
-	it('returns the converted visit date', async () => {
-		const row = makeDemonRow({ visit_date: '22/11/2022' });
-		const result = await writeEncounterRow(
-			row,
-			upsert,
-			lookupRingSequence,
-			RINGING_GROUP_ID,
-			linkRingSequence
-		);
-		expect(result.visitDate).toBe('2022-11-22');
-	});
-
-	it('calls upsert exactly 5 times (Species, Birds, Locations, Sessions, Encounters) — the lookup is a separate injected function, not routed through upsert', async () => {
-		const row = makeDemonRow();
-		await writeEncounterRow(
-			row,
-			upsert,
-			lookupRingSequence,
-			RINGING_GROUP_ID,
-			linkRingSequence
-		);
-		expect(upsert).toHaveBeenCalledTimes(5);
-	});
-
-	describe('RingSequences (record_type "N")', () => {
-		it('looks up the matching RingSequences row by full ring number and links the bird to it for this group via linkRingSequence', async () => {
-			const row = makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' });
-			await writeEncounterRow(
-				row,
-				upsert,
-				lookupRingSequence,
-				RINGING_GROUP_ID,
-				linkRingSequence
-			);
-			expect(lookupRingSequence).toHaveBeenCalledWith(
-				'AEL1699',
-				RINGING_GROUP_ID
-			);
-			const birdId = 20; // second call (Birds) returns 20
-			expect(linkRingSequence).toHaveBeenCalledWith(
-				birdId,
-				RESOLVED_RING_SEQUENCE_ID,
-				RINGING_GROUP_ID
-			);
+			});
 		});
 
-		it.each(['S', 'C', 'U', 'F', 'D'])(
-			'does not look up a RingSequences row or call linkRingSequence for a non-N record_type (%s)',
-			async (recordType) => {
-				const row = makeDemonRow({
-					ring_no: 'AEL1699',
-					record_type: recordType
-				});
-				await writeEncounterRow(
-					row,
-					upsert,
-					lookupRingSequence,
-					RINGING_GROUP_ID,
-					linkRingSequence
-				);
-				expect(lookupRingSequence).not.toHaveBeenCalled();
-				expect(linkRingSequence).not.toHaveBeenCalled();
+		it.each([
+			['3J', 3, true],
+			['6', 6, false]
+		])(
+			'parses age "%s" into age_code %i with is_juv %s',
+			async (age, ageCode, isJuv) => {
+				const { domainTablesClient } = await writeOneRow({ age: String(age) });
+				expect(
+					domainTablesClient.rowsUpsertedInto('Encounters')[0]
+				).toMatchObject({ age_code: ageCode, is_juv: isJuv });
 			}
 		);
 
-		it('does not call linkRingSequence when no sequence matches (lookup returns null)', async () => {
-			lookupRingSequence.mockResolvedValueOnce(null);
-			const row = makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' });
-			await writeEncounterRow(
-				row,
-				upsert,
-				lookupRingSequence,
-				RINGING_GROUP_ID,
-				linkRingSequence
+		it('resolves each row with its converted visit date', async () => {
+			const { result } = await writeOneRow({ visit_date: '22/11/2022' });
+			expect(result).toEqual({ visitDate: '2022-11-22' });
+		});
+	});
+
+	describe('handing each chunk flush to the caller’s concurrency limiter', () => {
+		it('wraps a whole chunk flush rather than a row, so the limiter caps concurrent chunks', async () => {
+			const { limitChunkFlush, flushesAdmitted } = neverRunningChunkLimiter();
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1,
+				limitChunkFlush
+			});
+
+			for (const row of makeDemonRows(2)) {
+				trackSettlement(writer.writeEncounterRow(row));
+			}
+			await settlePendingMicrotasks();
+
+			// Both chunks were offered to the limiter, and neither wrote anything
+			// while it withheld them.
+			expect(flushesAdmitted).toHaveLength(2);
+			expect(domainTablesClient.upsertCalls).toHaveLength(0);
+		});
+	});
+
+	describe('chunk-level failure handling', () => {
+		const CHUNK_FAILURE = { message: 'upsert into Locations denied' };
+
+		it('rejects every row buffered in the chunk when one entity type’s bulk upsert fails', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 2
+			});
+			vi.spyOn(console, 'error').mockImplementation(() => {});
+			domainTablesClient.failOn('Locations', CHUNK_FAILURE);
+
+			const settlements = makeDemonRows(2).map((row) =>
+				trackSettlement(writer.writeEncounterRow(row))
 			);
-			expect(lookupRingSequence).toHaveBeenCalledWith(
-				'AEL1699',
-				RINGING_GROUP_ID
-			);
-			expect(linkRingSequence).not.toHaveBeenCalled();
+			await writer.flushRemaining();
+
+			expect(settlements.map(({ rejectedWith }) => rejectedWith)).toEqual([
+				CHUNK_FAILURE,
+				CHUNK_FAILURE
+			]);
+			// Nothing downstream of the failed entity type was attempted.
+			expect(domainTablesClient.tablesInCallOrder()).toEqual([
+				'Species',
+				'Birds',
+				'Locations'
+			]);
 		});
 
-		it('calls lookupRingSequence exactly once per N row', async () => {
-			const row = makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' });
-			await writeEncounterRow(
-				row,
-				upsert,
-				lookupRingSequence,
-				RINGING_GROUP_ID,
-				linkRingSequence
+		it('logs a chunk failure with the job, group, row count and row positions', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 2
+			});
+			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			domainTablesClient.failOn('Locations', CHUNK_FAILURE);
+
+			const settlements = makeDemonRows(2).map((row) =>
+				trackSettlement(writer.writeEncounterRow(row))
 			);
-			expect(lookupRingSequence).toHaveBeenCalledTimes(1);
+			await writer.flushRemaining();
+
+			expect(errorSpy).toHaveBeenCalledWith(
+				expect.stringContaining('domain-table chunk'),
+				{
+					importJobId: DOMAIN_IMPORT_JOB_ID,
+					ringingGroupId: DOMAIN_RINGING_GROUP_ID,
+					rowCount: 2,
+					rowIndices: [0, 1]
+				},
+				CHUNK_FAILURE
+			);
+			// Asserted so the rejections above are observed, not unhandled.
+			expect(settlements.map(({ rejectedWith }) => rejectedWith)).not.toContain(
+				undefined
+			);
+		});
+
+		it('fails the chunk without writing anything when the caller’s limiter rejects first (the route’s 280s deadline)', async () => {
+			const deadlineExceeded = new Error('Import deadline exceeded');
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 2,
+				limitChunkFlush: () => Promise.reject(deadlineExceeded)
+			});
+			vi.spyOn(console, 'error').mockImplementation(() => {});
+
+			const settlements = makeDemonRows(2).map((row) =>
+				trackSettlement(writer.writeEncounterRow(row))
+			);
+			await writer.flushRemaining();
+
+			expect(settlements.map(({ rejectedWith }) => rejectedWith)).toEqual([
+				deadlineExceeded,
+				deadlineExceeded
+			]);
+			expect(domainTablesClient.upsertCalls).toHaveLength(0);
+		});
+	});
+
+	describe('flushing the trailing partial chunk', () => {
+		it('writes the trailing chunk and resolves only once every chunk write has finished', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 2
+			});
+
+			const settlements = makeDemonRows(3).map((row) =>
+				trackSettlement(writer.writeEncounterRow(row))
+			);
+			await settlePendingMicrotasks();
+
+			// The first two filled a chunk; the third is still sitting in the buffer.
+			expect(domainTablesClient.upsertCalls).toHaveLength(5);
+			expect(settlements.map(({ resolved }) => resolved)).toEqual([
+				true,
+				true,
+				false
+			]);
+
+			await writer.flushRemaining();
+
+			expect(domainTablesClient.upsertCalls).toHaveLength(10);
+			expect(settlements.map(({ resolved }) => resolved)).toEqual([
+				true,
+				true,
+				true
+			]);
+		});
+
+		it('is a no-op once every row has already been written in a full chunk', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 2
+			});
+
+			await Promise.all(
+				makeDemonRows(2).map((row) => writer.writeEncounterRow(row))
+			);
+			await writer.flushRemaining();
+
+			expect(domainTablesClient.upsertCalls).toHaveLength(5);
 		});
 	});
 });
