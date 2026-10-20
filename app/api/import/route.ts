@@ -7,8 +7,10 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
+	DemonRecordsBatchWriter,
 	ImportJobTracker,
 	processEncounterRow,
+	writeEncounterRow,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
 	CasualtyEncounterError,
@@ -46,6 +48,20 @@ export type ImportMessage =
 
 const TIMEOUT_MS = 280_000;
 
+/**
+ * Thrown in place of a row's domain-table write once the 280s deadline has
+ * passed. The check has to happen at the moment the rate limiter grants the row
+ * a slot — not when the row is dispatched, which for a large upload is t≈0 for
+ * every row — and since #959 that moment is inside the limited callback, whose
+ * only way out is to throw. Never leaves this module.
+ */
+class ImportDeadlineExceededError extends Error {
+	constructor() {
+		super('Import deadline exceeded');
+		this.name = 'ImportDeadlineExceededError';
+	}
+}
+
 export async function POST(request: Request): Promise<Response> {
 	const ringingGroupId = await getGroupCookie();
 	if (!ringingGroupId) {
@@ -68,12 +84,6 @@ export async function POST(request: Request): Promise<Response> {
 			function send(message: ImportMessage): void {
 				controller.enqueue(encoder.encode(JSON.stringify(message) + '\n'));
 			}
-
-			const limit = pRateLimit({
-				interval: 1000,
-				rate: 30,
-				concurrency: 30
-			}) as <T>(fn: () => Promise<T>) => Promise<T>;
 
 			let processed = 0;
 			let successful = 0;
@@ -127,35 +137,73 @@ export async function POST(request: Request): Promise<Response> {
 				const upsert = createUpserter(supabaseClient);
 				const lookupRingSequence = createRingSequenceLookup(supabaseClient);
 				const linkRingSequence = createRingSequenceLinker(supabaseClient);
-
-				await Promise.all(
-					rows.map((row) =>
-						limit(async () => {
-							if (Date.now() > deadline) {
-								timedOut = true;
-								return;
-							}
-							try {
-								const { visitDate } = await processEncounterRow(
-									row,
-									upsert,
-									lookupRingSequence,
-									ringingGroupId,
-									linkRingSequence
-								);
-								successful++;
-								if (startDate === null || visitDate < startDate)
-									startDate = visitDate;
-								if (endDate === null || visitDate > endDate)
-									endDate = visitDate;
-							} catch (err) {
-								if (!(err instanceof CasualtyEncounterError)) failed++;
-							}
-							processed++;
-							if (processed % 10 === 0) send({ type: 'progress', processed });
-						})
-					)
+				// Every row is staged into DemonRecords before it is interpreted
+				// into the domain tables (#959), batched so the per-row concurrency
+				// below survives.
+				const demonRecordsBatchWriter = new DemonRecordsBatchWriter(
+					supabaseClient,
+					{ importJobId, ringingGroupId }
 				);
+
+				// Wrapped around the domain-table write alone — never around a whole
+				// row, whose DemonRecords staging write must stay unthrottled so a
+				// batch can fill (see `DemonRecordsBatchWriter`).
+				const limit = pRateLimit({
+					interval: 1000,
+					rate: 30,
+					concurrency: 30
+				}) as <T>(fn: () => Promise<T>) => Promise<T>;
+				const writeEncounterRowRateLimited = (row: DemonRow) =>
+					limit(() => {
+						if (Date.now() > deadline) throw new ImportDeadlineExceededError();
+						return writeEncounterRow(
+							row,
+							upsert,
+							lookupRingSequence,
+							ringingGroupId,
+							linkRingSequence
+						);
+					});
+
+				// Mapped (not awaited) first, so every row reaches
+				// `writeDemonRecord` and the buffer holds exactly the trailing
+				// partial batch by the time `flushRemaining` runs below.
+				const pendingRows = rows.map(async (row) => {
+					try {
+						const { visitDate } = await processEncounterRow(
+							row,
+							demonRecordsBatchWriter,
+							writeEncounterRowRateLimited
+						);
+						successful++;
+						if (startDate === null || visitDate < startDate)
+							startDate = visitDate;
+						if (endDate === null || visitDate > endDate) endDate = visitDate;
+					} catch (err) {
+						// An abandoned row is neither a success nor a failure, and is
+						// left out of `processed` exactly as it was before the deadline
+						// check moved inside the limiter.
+						if (err instanceof ImportDeadlineExceededError) {
+							timedOut = true;
+							return;
+						}
+						if (!(err instanceof CasualtyEncounterError)) failed++;
+					}
+					processed++;
+					if (processed % 10 === 0) send({ type: 'progress', processed });
+				});
+
+				await demonRecordsBatchWriter.flushRemaining();
+				// Recorded once every staging batch has landed, and before the
+				// still-pending domain-table writes are awaited: `affected_dates`
+				// describes what is durably staged, independent of how the
+				// domain-table import then goes.
+				await importJobTracker.recordAffectedDates(
+					importJobId,
+					demonRecordsBatchWriter.getDistinctDates()
+				);
+
+				await Promise.all(pendingRows);
 
 				if (timedOut) {
 					await importJobTracker.markImportJobTimedOut(importJobId, {

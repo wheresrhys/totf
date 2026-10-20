@@ -6,9 +6,11 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
+	DemonRecordsBatchWriter,
 	ImportJobTracker,
 	CasualtyEncounterError,
 	processEncounterRow,
+	writeEncounterRow,
 	RESIGHTING_RECORD_TYPES,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
@@ -193,7 +195,7 @@ describe('getDistinctLocationNames', () => {
 	it('ignores rows with an empty or missing loc_id', () => {
 		// A surrounding-whitespace-only value is empty once
 		// transformEmptyStringsToNull has trimmed it, exactly as it would be for
-		// the Location upsert in processEncounterRow.
+		// the Location upsert in writeEncounterRow.
 		const rows = [
 			makeDemonRow({ loc_id: 'Garden Trap' }),
 			makeDemonRow({ loc_id: '' }),
@@ -656,7 +658,417 @@ describe('ImportJobTracker', () => {
 	});
 });
 
-describe('processEncounterRow', () => {
+const STAGING_IMPORT_JOB_ID = 42;
+const STAGING_RINGING_GROUP_ID = 7;
+
+/**
+ * Mock Supabase client whose `DemonRecords` upsert settles only when a test says
+ * so — which is what makes "has this row's batch landed yet?" directly
+ * observable rather than a matter of microtask timing.
+ */
+function makeDemonRecordsClient() {
+	const pendingBatches: ((result: { error: unknown }) => void)[] = [];
+	const upsert = vi.fn(
+		() =>
+			new Promise<{ error: unknown }>((resolve) => {
+				pendingBatches.push(resolve);
+			})
+	);
+	const from = vi.fn(() => ({ upsert }));
+
+	return {
+		// eslint-disable-next-line no-restricted-syntax -- mock only implements the `from` chain the batch writer uses, not the full SupabaseClient interface
+		client: { from } as unknown as SupabaseClient,
+		from,
+		upsert,
+		/** The rows handed to the `callIndex`th (0-based) batch insert. */
+		rowsOfBatch: (callIndex = 0) =>
+			upsert.mock.calls[callIndex][0] as Record<string, unknown>[],
+		/** The upsert options handed to the `callIndex`th batch insert. */
+		optionsOfBatch: (callIndex = 0) =>
+			upsert.mock.calls[callIndex][1] as Record<string, unknown>,
+		// Batches are chained, so the nth insert isn't even issued until the
+		// (n-1)th has landed — hence waiting for it to appear before settling it.
+		landBatch: async (callIndex = 0) => {
+			await settlePendingMicrotasks();
+			pendingBatches[callIndex]({ error: null });
+			await settlePendingMicrotasks();
+		},
+		failBatch: async (callIndex: number, error: unknown) => {
+			await settlePendingMicrotasks();
+			pendingBatches[callIndex]({ error });
+			await settlePendingMicrotasks();
+		}
+	};
+}
+
+/**
+ * Whether a promise has settled yet, and how — without awaiting it. Handlers are
+ * attached synchronously, so a rejection tracked here is never an unhandled one.
+ */
+function trackSettlement(promise: Promise<unknown>) {
+	const settlement: { resolved: boolean; rejectedWith: unknown } = {
+		resolved: false,
+		rejectedWith: undefined
+	};
+	promise.then(
+		() => {
+			settlement.resolved = true;
+		},
+		(rejectionReason) => {
+			settlement.rejectedWith = rejectionReason;
+		}
+	);
+	return settlement;
+}
+
+/** Let every already-queued microtask run. */
+function settlePendingMicrotasks(): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function makeStagingWriter(batchSize: number) {
+	const demonRecordsClient = makeDemonRecordsClient();
+	const writer = new DemonRecordsBatchWriter(demonRecordsClient.client, {
+		importJobId: STAGING_IMPORT_JOB_ID,
+		ringingGroupId: STAGING_RINGING_GROUP_ID,
+		batchSize
+	});
+	return { demonRecordsClient, writer };
+}
+
+/** `count` rows, each distinguishable by ring number. */
+function makeDemonRows(count: number, overrides: Partial<DemonRow> = {}) {
+	return Array.from({ length: count }, (_, rowIndex) =>
+		makeDemonRow({
+			ring_no: `A${rowIndex.toString().padStart(6, '0')}`,
+			...overrides
+		})
+	);
+}
+
+describe('DemonRecordsBatchWriter buffering', () => {
+	it('flushes a batch as a single multi-row upsert once writeDemonRecord has been called batchSize times', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(3);
+
+		for (const row of makeDemonRows(3)) writer.writeDemonRecord(row);
+		await settlePendingMicrotasks();
+
+		expect(demonRecordsClient.from).toHaveBeenCalledWith('DemonRecords');
+		expect(demonRecordsClient.upsert).toHaveBeenCalledTimes(1);
+		expect(demonRecordsClient.rowsOfBatch()).toHaveLength(3);
+		expect(demonRecordsClient.rowsOfBatch().map((row) => row.ring_no)).toEqual([
+			'A000000',
+			'A000001',
+			'A000002'
+		]);
+	});
+
+	it("resolves every row's writeDemonRecord promise together, only once their shared batch has flushed", async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(3);
+
+		const settlements = makeDemonRows(3).map((row) =>
+			trackSettlement(writer.writeDemonRecord(row))
+		);
+		await settlePendingMicrotasks();
+
+		// The insert is in flight, so no row is clear to be interpreted yet.
+		expect(settlements.map(({ resolved }) => resolved)).toEqual([
+			false,
+			false,
+			false
+		]);
+
+		await demonRecordsClient.landBatch();
+
+		expect(settlements.map(({ resolved }) => resolved)).toEqual([
+			true,
+			true,
+			true
+		]);
+	});
+
+	it("stamps every row in a flushed batch with the current run's import_job_id and group", async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(2);
+
+		for (const row of makeDemonRows(2)) writer.writeDemonRecord(row);
+		await settlePendingMicrotasks();
+
+		for (const stagedRow of demonRecordsClient.rowsOfBatch()) {
+			expect(stagedRow.import_job_id).toBe(STAGING_IMPORT_JOB_ID);
+			expect(stagedRow.ringing_group_id).toBe(STAGING_RINGING_GROUP_ID);
+		}
+	});
+
+	it('stages the row essentially verbatim, alongside the dedup key pulled out as real columns', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(1);
+
+		const rawRow = makeDemonRow({
+			ring_no: ' A123456 ',
+			visit_date: '15/03/2024',
+			capture_time: '08:30'
+		});
+		writer.writeDemonRecord(rawRow);
+		await settlePendingMicrotasks();
+
+		expect(demonRecordsClient.rowsOfBatch()[0]).toMatchObject({
+			// Untransformed: a non-lossy copy of what was submitted is the whole
+			// point of the table.
+			raw_row: rawRow,
+			// Trimmed and date-converted, so they match Birds.ring_no /
+			// Sessions.visit_date and can take part in the dedup constraint.
+			ring_no: 'A123456',
+			encounter_date: '2024-03-15',
+			encounter_time: '08:30'
+		});
+	});
+
+	it('applies ON CONFLICT DO NOTHING against the group/ring/date/time dedup key', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(1);
+
+		writer.writeDemonRecord(makeDemonRow());
+		await settlePendingMicrotasks();
+
+		expect(demonRecordsClient.optionsOfBatch()).toEqual({
+			onConflict: 'ringing_group_id,ring_no,encounter_date,encounter_time',
+			ignoreDuplicates: true
+		});
+	});
+
+	it('flushRemaining flushes a partial batch smaller than batchSize left over after all rows have been pushed', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(3);
+
+		const settlements = makeDemonRows(4).map((row) =>
+			trackSettlement(writer.writeDemonRecord(row))
+		);
+		// The first three filled a batch; the fourth is still sitting in the buffer.
+		await settlePendingMicrotasks();
+		expect(demonRecordsClient.upsert).toHaveBeenCalledTimes(1);
+
+		const flushed = writer.flushRemaining();
+		await demonRecordsClient.landBatch(0);
+
+		expect(demonRecordsClient.upsert).toHaveBeenCalledTimes(2);
+		expect(demonRecordsClient.rowsOfBatch(1)).toHaveLength(1);
+
+		await demonRecordsClient.landBatch(1);
+		await flushed;
+
+		expect(settlements.map(({ resolved }) => resolved)).toEqual([
+			true,
+			true,
+			true,
+			true
+		]);
+	});
+
+	it('getDistinctDates returns the distinct dates across every batch flushed so far', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(2);
+
+		writer.writeDemonRecord(makeDemonRow({ visit_date: '15/03/2024' }));
+		writer.writeDemonRecord(
+			makeDemonRow({ ring_no: 'A000001', visit_date: '15/03/2024' })
+		);
+		writer.writeDemonRecord(
+			makeDemonRow({ ring_no: 'A000002', visit_date: '14/03/2024' })
+		);
+		const flushed = writer.flushRemaining();
+
+		// Nothing has landed yet, so nothing is reportable as durably staged.
+		expect(writer.getDistinctDates()).toEqual([]);
+
+		await demonRecordsClient.landBatch(0);
+		await demonRecordsClient.landBatch(1);
+		await flushed;
+
+		expect(writer.getDistinctDates()).toEqual(['2024-03-14', '2024-03-15']);
+	});
+
+	it('skips a row with no ring number, rather than failing its whole batch on a NOT NULL column', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(2);
+
+		// A casualty record carries no ring number, so it has no representable
+		// staging row — it resolves straight away and is left to fail (or not) in
+		// the domain-table write as it always did.
+		const casualtyRow = trackSettlement(
+			writer.writeDemonRecord(makeDemonRow({ ring_no: '' }))
+		);
+		await settlePendingMicrotasks();
+		expect(casualtyRow.resolved).toBe(true);
+		expect(demonRecordsClient.upsert).not.toHaveBeenCalled();
+
+		writer.writeDemonRecord(makeDemonRow());
+		writer.writeDemonRecord(makeDemonRow({ ring_no: 'A000001' }));
+		await settlePendingMicrotasks();
+
+		expect(demonRecordsClient.rowsOfBatch()).toHaveLength(2);
+	});
+
+	it('re-staging the same rows (a simulated retry) inserts them again under ON CONFLICT DO NOTHING rather than erroring', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(2);
+		const rows = makeDemonRows(2);
+
+		const firstAttempt = rows.map((row) => writer.writeDemonRecord(row));
+		await demonRecordsClient.landBatch(0);
+		await Promise.all(firstAttempt);
+
+		const retry = rows.map((row) => writer.writeDemonRecord(row));
+		await demonRecordsClient.landBatch(1);
+		await expect(Promise.all(retry)).resolves.toBeDefined();
+
+		// Identical payload and identical conflict handling both times — the
+		// database, not the writer, is what makes the retry a no-op per row.
+		expect(demonRecordsClient.rowsOfBatch(1)).toEqual(
+			demonRecordsClient.rowsOfBatch(0)
+		);
+		expect(demonRecordsClient.optionsOfBatch(1)).toEqual(
+			demonRecordsClient.optionsOfBatch(0)
+		);
+		expect(writer.getDistinctDates()).toEqual(['2024-06-01']);
+	});
+
+	it('a batch flush failure rejects every pending promise in that batch', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(2);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const batchFailure = { message: 'insert into DemonRecords denied' };
+
+		const settlements = makeDemonRows(2).map((row) =>
+			trackSettlement(writer.writeDemonRecord(row))
+		);
+		await demonRecordsClient.failBatch(0, batchFailure);
+		await writer.flushRemaining();
+
+		expect(settlements.map(({ rejectedWith }) => rejectedWith)).toEqual([
+			batchFailure,
+			batchFailure
+		]);
+		// A failed batch contributes no dates: affected_dates only ever describes
+		// what is durably staged.
+		expect(writer.getDistinctDates()).toEqual([]);
+	});
+
+	it('a batch flush failure is logged with the job, group, row count and row positions', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(2);
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const batchFailure = { message: 'insert into DemonRecords denied' };
+
+		const settlements = makeDemonRows(2).map((row) =>
+			trackSettlement(writer.writeDemonRecord(row))
+		);
+		await demonRecordsClient.failBatch(0, batchFailure);
+		await writer.flushRemaining();
+
+		expect(errorSpy).toHaveBeenCalledWith(
+			expect.stringContaining('DemonRecords batch'),
+			{
+				importJobId: STAGING_IMPORT_JOB_ID,
+				ringingGroupId: STAGING_RINGING_GROUP_ID,
+				rowCount: 2,
+				rowIndices: [0, 1]
+			},
+			batchFailure
+		);
+		// Asserted so the rejections above are observed, not unhandled.
+		expect(settlements.map(({ rejectedWith }) => rejectedWith)).not.toContain(
+			undefined
+		);
+	});
+});
+
+describe('processEncounterRow orchestration', () => {
+	it('awaits writeDemonRecord before calling writeEncounterRow for a given row', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(1);
+		const writeEncounterRowRateLimited = vi
+			.fn()
+			.mockResolvedValue({ visitDate: '2024-06-01' });
+
+		const row = makeDemonRow();
+		const processed = processEncounterRow(
+			row,
+			writer,
+			writeEncounterRowRateLimited
+		);
+		await settlePendingMicrotasks();
+
+		expect(demonRecordsClient.upsert).toHaveBeenCalledTimes(1);
+		expect(writeEncounterRowRateLimited).not.toHaveBeenCalled();
+
+		await demonRecordsClient.landBatch();
+
+		await expect(processed).resolves.toEqual({ visitDate: '2024-06-01' });
+		expect(writeEncounterRowRateLimited).toHaveBeenCalledWith(row);
+	});
+
+	it('a row whose writeDemonRecord promise rejects never reaches writeEncounterRow', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(1);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const writeEncounterRowRateLimited = vi
+			.fn()
+			.mockResolvedValue({ visitDate: '2024-06-01' });
+
+		const settlement = trackSettlement(
+			processEncounterRow(makeDemonRow(), writer, writeEncounterRowRateLimited)
+		);
+		await demonRecordsClient.failBatch(0, { message: 'staging write failed' });
+
+		expect(settlement.rejectedWith).toMatchObject({
+			message: 'staging write failed'
+		});
+		expect(writeEncounterRowRateLimited).not.toHaveBeenCalled();
+	});
+
+	it('lets an earlier batch’s rows write to the domain tables while a later batch is still in flight', async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(2);
+		const writeEncounterRowRateLimited = vi
+			.fn()
+			.mockResolvedValue({ visitDate: '2024-06-01' });
+
+		const rows = makeDemonRows(4);
+		const processed = rows.map((row) =>
+			processEncounterRow(row, writer, writeEncounterRowRateLimited)
+		);
+		const flushed = writer.flushRemaining();
+
+		// Only the first batch has landed; the second is still in flight.
+		await demonRecordsClient.landBatch(0);
+		await Promise.all(processed.slice(0, 2));
+
+		expect(writeEncounterRowRateLimited).toHaveBeenCalledTimes(2);
+
+		await demonRecordsClient.landBatch(1);
+		await flushed;
+		await Promise.all(processed);
+
+		expect(writeEncounterRowRateLimited).toHaveBeenCalledTimes(4);
+	});
+
+	it("fills a batch larger than the limiter's concurrency cap, because the limiter wraps only writeEncounterRow", async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(3);
+		// A limiter that admits one call at a time and never releases it, standing
+		// in for a concurrency cap smaller than the batch size. If it wrapped the
+		// whole row rather than just the domain-table write, rows 2 and 3 could
+		// never reach the buffer and the batch could never fill.
+		const admittedToLimiter: DemonRow[] = [];
+		const writeEncounterRowRateLimited = (row: DemonRow) => {
+			admittedToLimiter.push(row);
+			return new Promise<{ visitDate: string }>(() => {});
+		};
+
+		for (const row of makeDemonRows(3)) {
+			processEncounterRow(row, writer, writeEncounterRowRateLimited);
+		}
+		await settlePendingMicrotasks();
+
+		expect(demonRecordsClient.upsert).toHaveBeenCalledTimes(1);
+		expect(demonRecordsClient.rowsOfBatch()).toHaveLength(3);
+
+		await demonRecordsClient.landBatch();
+
+		expect(admittedToLimiter).toHaveLength(3);
+	});
+});
+
+describe('writeEncounterRow', () => {
 	const RINGING_GROUP_ID = 7;
 	const RESOLVED_RING_SEQUENCE_ID = 555;
 	let upsert: ReturnType<typeof vi.fn>;
@@ -677,7 +1089,7 @@ describe('processEncounterRow', () => {
 		it('throws CasualtyEncounterError and does not call upsert when ring_no is empty', async () => {
 			const row = makeDemonRow({ ring_no: '' });
 			await expect(
-				processEncounterRow(
+				writeEncounterRow(
 					row,
 					upsert,
 					lookupRingSequence,
@@ -691,7 +1103,7 @@ describe('processEncounterRow', () => {
 		it('processes normally when ring_no is present (already-ringed bird)', async () => {
 			const row = makeDemonRow({ ring_no: 'A123456' });
 			await expect(
-				processEncounterRow(
+				writeEncounterRow(
 					row,
 					upsert,
 					lookupRingSequence,
@@ -705,7 +1117,7 @@ describe('processEncounterRow', () => {
 
 	it('upserts Species with the species name', async () => {
 		const row = makeDemonRow({ species_name: 'Blue Tit' });
-		await processEncounterRow(
+		await writeEncounterRow(
 			row,
 			upsert,
 			lookupRingSequence,
@@ -725,7 +1137,7 @@ describe('processEncounterRow', () => {
 			species_name: 'Blue Tit',
 			record_type: 'N'
 		});
-		await processEncounterRow(
+		await writeEncounterRow(
 			row,
 			upsert,
 			lookupRingSequence,
@@ -745,7 +1157,7 @@ describe('processEncounterRow', () => {
 
 	it('upserts Location with loc_id and ringing group ID', async () => {
 		const row = makeDemonRow({ loc_id: 'Garden Trap' });
-		await processEncounterRow(
+		await writeEncounterRow(
 			row,
 			upsert,
 			lookupRingSequence,
@@ -769,7 +1181,7 @@ describe('processEncounterRow', () => {
 		}
 
 		it('upserts Session with the converted visit_date and the importing group', async () => {
-			await processEncounterRow(
+			await writeEncounterRow(
 				makeDemonRow({ visit_date: '15/03/2023' }),
 				upsert,
 				lookupRingSequence,
@@ -787,7 +1199,7 @@ describe('processEncounterRow', () => {
 		});
 
 		it('writes no location_id or session_type onto the Session, whatever the row looks like', async () => {
-			await processEncounterRow(
+			await writeEncounterRow(
 				makeDemonRow({ record_type: 'U', age: '1' }),
 				upsert,
 				lookupRingSequence,
@@ -820,7 +1232,7 @@ describe('processEncounterRow', () => {
 			pectoral_muscle: '2',
 			capture_method: 'M'
 		});
-		await processEncounterRow(
+		await writeEncounterRow(
 			row,
 			upsert,
 			lookupRingSequence,
@@ -874,7 +1286,7 @@ describe('processEncounterRow', () => {
 			pectoral_muscle: '',
 			capture_method: ''
 		});
-		await processEncounterRow(
+		await writeEncounterRow(
 			row,
 			upsert,
 			lookupRingSequence,
@@ -904,7 +1316,7 @@ describe('processEncounterRow', () => {
 
 	it('parses juvenile age codes (e.g. "3J") into age_code and is_juv', async () => {
 		const row = makeDemonRow({ age: '3J' });
-		await processEncounterRow(
+		await writeEncounterRow(
 			row,
 			upsert,
 			lookupRingSequence,
@@ -920,7 +1332,7 @@ describe('processEncounterRow', () => {
 
 	it('parses non-juvenile age codes into age_code and is_juv: false', async () => {
 		const row = makeDemonRow({ age: '6' });
-		await processEncounterRow(
+		await writeEncounterRow(
 			row,
 			upsert,
 			lookupRingSequence,
@@ -936,7 +1348,7 @@ describe('processEncounterRow', () => {
 
 	it('returns the converted visit date', async () => {
 		const row = makeDemonRow({ visit_date: '22/11/2022' });
-		const result = await processEncounterRow(
+		const result = await writeEncounterRow(
 			row,
 			upsert,
 			lookupRingSequence,
@@ -948,7 +1360,7 @@ describe('processEncounterRow', () => {
 
 	it('calls upsert exactly 5 times (Species, Birds, Locations, Sessions, Encounters) — the lookup is a separate injected function, not routed through upsert', async () => {
 		const row = makeDemonRow();
-		await processEncounterRow(
+		await writeEncounterRow(
 			row,
 			upsert,
 			lookupRingSequence,
@@ -961,7 +1373,7 @@ describe('processEncounterRow', () => {
 	describe('RingSequences (record_type "N")', () => {
 		it('looks up the matching RingSequences row by full ring number and links the bird to it for this group via linkRingSequence', async () => {
 			const row = makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' });
-			await processEncounterRow(
+			await writeEncounterRow(
 				row,
 				upsert,
 				lookupRingSequence,
@@ -987,7 +1399,7 @@ describe('processEncounterRow', () => {
 					ring_no: 'AEL1699',
 					record_type: recordType
 				});
-				await processEncounterRow(
+				await writeEncounterRow(
 					row,
 					upsert,
 					lookupRingSequence,
@@ -1002,7 +1414,7 @@ describe('processEncounterRow', () => {
 		it('does not call linkRingSequence when no sequence matches (lookup returns null)', async () => {
 			lookupRingSequence.mockResolvedValueOnce(null);
 			const row = makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' });
-			await processEncounterRow(
+			await writeEncounterRow(
 				row,
 				upsert,
 				lookupRingSequence,
@@ -1018,7 +1430,7 @@ describe('processEncounterRow', () => {
 
 		it('calls lookupRingSequence exactly once per N row', async () => {
 			const row = makeDemonRow({ ring_no: 'AEL1699', record_type: 'N' });
-			await processEncounterRow(
+			await writeEncounterRow(
 				row,
 				upsert,
 				lookupRingSequence,

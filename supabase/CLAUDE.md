@@ -516,6 +516,34 @@ Core import logic (types, transforms, `createUpserter`, `processEncounterRow`) l
 `lib/demon-import.ts` and is shared by both this CLI script and the web import route — see
 `app/CLAUDE.md`'s "Web import".
 
+**Every row is staged into `DemonRecords` before it is interpreted (#959).** `processEncounterRow`
+is a two-step orchestrator: `await writer.writeDemonRecord(row)`, then the rate-limited
+`writeEncounterRow(row, …)` — the Species/RingSequence/Birds/Locations/Sessions/Encounters body
+that used to be `processEncounterRow`'s own. `new DemonRecordsBatchWriter(client, {importJobId,
+ringingGroupId, batchSize})` buffers rows and inserts them in multi-row `ON CONFLICT DO NOTHING`
+batches against `demon_records_group_ring_date_time_unique`; a row's own promise resolves when
+*its* batch lands, so staging stays interleaved with per-row processing rather than becoming an
+up-front phase. Four things to keep in mind when touching it:
+
+- **The rate limiter must wrap `writeEncounterRow` only, never a whole row.** Throttle
+  `writeDemonRecord` and a batch bigger than the concurrency cap can never fill — the rows that
+  would complete it are queued behind the rows already blocked on it, and the import deadlocks.
+  Both entry points therefore build one `writeEncounterRowRateLimited` per run and pass it in.
+- **Both entry points use the same map → `flushRemaining` → `recordAffectedDates` →
+  `Promise.all` sequence**, because the buffer only holds exactly the run's trailing partial batch
+  at the moment every row has been dispatched and none awaited. The CLI gets there via `runRows`'
+  `onAllRowsDispatched` callback (`runRows` replaced `runRowsWithConcurrency`, which owned the
+  limiter it no longer needs); the route maps without awaiting and flushes inline.
+- **Batch flushes are chained, not parallel**, so batches land in the order they filled — which is
+  what keeps row-release order (and so row-id order) a function of the CSV, as `seed-e2e-data.ts`'s
+  `concurrency: 1` determinism (#903) requires.
+- **A row with no ring number / visit date / capture time is skipped, not staged**: those are the
+  table's `NOT NULL` dedup-key columns, so a casualty record has no representable staging row. It
+  resolves immediately and goes on to fail in `writeEncounterRow` exactly as it always did. A
+  batch whose insert fails rejects only its own rows' promises (they never reach the domain
+  tables) and logs job id, group, row count and row positions; rows in batches that already landed
+  are not rolled back.
+
 **Every import run is tracked in `ImportJobs` (#961).** `lib/demon-import.ts`'s
 `new ImportJobTracker(supabaseClient)` exposes the six operations both entry points share —
 `createImportJob` / `recordAffectedDates` / `completeImportJob` / `failImportJob` /

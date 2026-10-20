@@ -23,8 +23,10 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
+	DemonRecordsBatchWriter,
 	ImportJobTracker,
 	processEncounterRow,
+	writeEncounterRow,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
 	type DemonRow
@@ -56,9 +58,18 @@ export interface ImportRowCounts {
 	failedRecords: number;
 }
 
-// Rate limiter: up to 30 API calls per second, with at most `concurrency`
-// running at once.
-function createRowLimiter(concurrency: number) {
+/**
+ * Rate limiter: up to 30 API calls per second, with at most `concurrency`
+ * running at once.
+ *
+ * Built once per run and wrapped around the **domain-table write alone** —
+ * `writeEncounterRow` — never around a whole row's `processEncounterRow` call
+ * (#959). Throttling the whole row would throttle its `DemonRecords` staging
+ * write too, and a batch bigger than `concurrency` could then never fill: the
+ * rows needed to complete it would be queued behind the rows already waiting on
+ * it. Exported for its own unit test.
+ */
+export function createRowLimiter(concurrency: number) {
 	return pRateLimit({
 		interval: 1000, // 1000 ms == 1 second
 		rate: 30, // 30 API calls per interval
@@ -68,20 +79,27 @@ function createRowLimiter(concurrency: number) {
 }
 
 /**
- * Run `processRow` over every row, never letting more than `concurrency` calls
- * be in flight at once (and never exceeding the rate limit). Rows are dispatched
- * as they arrive, so a streaming source doesn't have to be buffered in full.
+ * Run `processRow` over every row and count the outcomes. Rows are dispatched as
+ * they arrive, so a streaming source doesn't have to be buffered in full.
  *
- * Extracted from `importCSV` so the concurrency behaviour is unit-testable
- * without a filesystem, a CSV parser or a database.
+ * `onAllRowsDispatched` runs once every row has been handed to `processRow` but
+ * before any row's promise is awaited. That is the only point at which the
+ * `DemonRecords` buffer is known to hold exactly the run's trailing partial
+ * batch, so it's where `flushRemaining` (and the `affected_dates` write that
+ * depends on it) belongs.
+ *
+ * Concurrency is deliberately not this function's business: the rate limiter
+ * lives inside the `processRow` the caller builds, around the domain-table write
+ * alone (see `createRowLimiter`).
+ *
+ * Extracted from `importCSV` so the dispatch behaviour is unit-testable without
+ * a filesystem, a CSV parser or a database.
  */
-export async function runRowsWithConcurrency<Row>(
+export async function runRows<Row>(
 	rows: Iterable<Row> | AsyncIterable<Row>,
-	concurrency: number,
-	processRow: (row: Row) => Promise<void>
+	processRow: (row: Row) => Promise<void>,
+	onAllRowsDispatched: () => Promise<void> = async () => {}
 ): Promise<ImportRowCounts> {
-	const limit = createRowLimiter(concurrency);
-
 	let totalRecords = 0;
 	let successfulRecords = 0;
 	let failedRecords = 0;
@@ -92,22 +110,25 @@ export async function runRowsWithConcurrency<Row>(
 	for await (const row of rows) {
 		const rowIndex = totalRecords;
 		totalRecords++;
-		pendingRows[rowIndex] = limit(() =>
-			processRow(row)
-				.then(
-					() => {
-						successfulRecords++;
-					},
-					(err) => {
-						console.log(err);
-						failedRecords++;
-					}
-				)
-				.then(() => {
-					pendingRows[rowIndex] = null;
-				})
-		);
+		// The counting handlers are attached at dispatch time, so a row that
+		// rejects can never surface as an unhandled rejection even if
+		// `onAllRowsDispatched` throws before the `Promise.all` below is reached.
+		pendingRows[rowIndex] = processRow(row)
+			.then(
+				() => {
+					successfulRecords++;
+				},
+				(err) => {
+					console.log(err);
+					failedRecords++;
+				}
+			)
+			.then(() => {
+				pendingRows[rowIndex] = null;
+			});
 	}
+
+	await onAllRowsDispatched();
 
 	await Promise.all(pendingRows.filter((p) => Boolean(p)));
 
@@ -157,10 +178,10 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 
 	// The whole CSV is buffered rather than streamed straight into row
 	// processing, because the location pre-flight below has to see every row's
-	// `loc_id` before the first row is written. `runRowsWithConcurrency` still
-	// accepts a stream for other callers; an array just dispatches every row to
-	// the rate limiter up front, which caps concurrency exactly as before (and
-	// so keeps `concurrency: 1` seeding deterministic).
+	// `loc_id` before the first row is written. `runRows` still accepts a stream
+	// for other callers; an array just dispatches every row up front, which caps
+	// concurrency exactly as before via the limiter inside each row's
+	// domain-table write (and so keeps `concurrency: 1` seeding deterministic).
 	const rowStream = fs.createReadStream(csvFilePath).pipe(csvParser());
 	const rows: DemonRow[] = [];
 	for await (const row of rowStream) {
@@ -189,10 +210,16 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 	// `in_progress` row behind for a run that never wrote anything.
 	const importJobId = await importJobTracker.createImportJob(ringingGroupId);
 
-	let rowCounts: ImportRowCounts;
-	try {
-		rowCounts = await runRowsWithConcurrency(rows, concurrency, (row) =>
-			processEncounterRow(
+	// Every row is staged into DemonRecords before it is interpreted into the
+	// domain tables (#959), batched so the per-row concurrency above survives.
+	const demonRecordsBatchWriter = new DemonRecordsBatchWriter(
+		groupSupabaseClient,
+		{ importJobId, ringingGroupId }
+	);
+	const limit = createRowLimiter(concurrency);
+	const writeEncounterRowRateLimited = (row: DemonRow) =>
+		limit(() =>
+			writeEncounterRow(
 				row,
 				upsert,
 				lookupRingSequence,
@@ -200,8 +227,31 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 				linkRingSequence
 			)
 		);
+
+	let rowCounts: ImportRowCounts;
+	try {
+		rowCounts = await runRows(
+			rows,
+			(row) =>
+				processEncounterRow(
+					row,
+					demonRecordsBatchWriter,
+					writeEncounterRowRateLimited
+				),
+			async () => {
+				await demonRecordsBatchWriter.flushRemaining();
+				// Recorded once every staging batch has landed, and before the
+				// still-pending domain-table writes are awaited: `affected_dates`
+				// describes what is durably staged, independent of how the
+				// domain-table import then goes.
+				await importJobTracker.recordAffectedDates(
+					importJobId,
+					demonRecordsBatchWriter.getDistinctDates()
+				);
+			}
+		);
 	} catch (error) {
-		// `runRowsWithConcurrency` absorbs per-row failures into its `failedRecords`
+		// `runRows` absorbs per-row failures into its `failedRecords`
 		// count, so anything thrown here is systemic. Record it against the job and
 		// re-raise the original error — never let the bookkeeping write mask it.
 		try {
