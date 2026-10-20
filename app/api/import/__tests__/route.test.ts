@@ -20,6 +20,14 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 	};
 });
 
+vi.mock('@/lib/stats-cache-refresh-events', () => ({
+	buildStatsCacheRefreshEvents: vi.fn()
+}));
+
+vi.mock('@/lib/queue-dispatch', () => ({
+	dispatchStatsCacheRefreshWindow: vi.fn()
+}));
+
 const IMPORT_JOB_ID = 42;
 const STAGED_DATES = ['2024-06-01'];
 
@@ -132,6 +140,17 @@ describe('POST /api/import', () => {
 		const { findUnrecognisedLocationNames } =
 			await import('@/lib/demon-import');
 		vi.mocked(findUnrecognisedLocationNames).mockResolvedValue([]);
+
+		// No stats-cache-refresh events by default — tests in the dedicated
+		// describe block below override this.
+		const { buildStatsCacheRefreshEvents } =
+			await import('@/lib/stats-cache-refresh-events');
+		vi.mocked(buildStatsCacheRefreshEvents).mockClear();
+		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([]);
+		const { dispatchStatsCacheRefreshWindow } =
+			await import('@/lib/queue-dispatch');
+		vi.mocked(dispatchStatsCacheRefreshWindow).mockClear();
+		vi.mocked(dispatchStatsCacheRefreshWindow).mockResolvedValue(undefined);
 	});
 
 	describe('authentication', () => {
@@ -525,6 +544,164 @@ describe('POST /api/import', () => {
 				'could not build writers'
 			);
 			expect(mockImportJobTracker.completeImportJob).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('stats-cache-refresh-window dispatch', () => {
+		it("dispatches one event per distinct time window derived from the run's affected dates, after the job is marked succeeded", async () => {
+			const { buildStatsCacheRefreshEvents } =
+				await import('@/lib/stats-cache-refresh-events');
+			const { dispatchStatsCacheRefreshWindow } =
+				await import('@/lib/queue-dispatch');
+			const fakeEvents = [
+				{ importJobId: IMPORT_JOB_ID, rpcParams: { ringing_group_filter: 1 } },
+				{
+					importJobId: IMPORT_JOB_ID,
+					rpcParams: {
+						ringing_group_filter: 1,
+						group_by_time_period: 'day' as const,
+						from_date: '2024-06-01',
+						to_date: '2024-06-01'
+					}
+				}
+			];
+			vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue(fakeEvents);
+
+			const file = makeCsvFile([makeCsvRow()]);
+			await readStreamMessages(await POST(await makeRequest(file)));
+
+			// Group ID 1 — group-cookie is mocked globally in vitest.setup.tsx.
+			expect(buildStatsCacheRefreshEvents).toHaveBeenCalledWith(
+				IMPORT_JOB_ID,
+				1,
+				STAGED_DATES
+			);
+			expect(dispatchStatsCacheRefreshWindow).toHaveBeenCalledTimes(2);
+			expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
+				1,
+				fakeEvents[0]
+			);
+			expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
+				2,
+				fakeEvents[1]
+			);
+
+			// Ordering: dispatch happens only after the job is marked succeeded.
+			const completeOrder =
+				mockImportJobTracker.completeImportJob.mock.invocationCallOrder[0];
+			const dispatchOrder = vi.mocked(dispatchStatsCacheRefreshWindow).mock
+				.invocationCallOrder[0];
+			expect(dispatchOrder).toBeGreaterThan(completeOrder);
+		});
+
+		it('does not dispatch any events when the run times out', async () => {
+			const { EncounterRowBatchWriter, processEncounterRow } =
+				await import('@/lib/demon-import');
+			const { dispatchStatsCacheRefreshWindow } =
+				await import('@/lib/queue-dispatch');
+
+			// Captured so the test can trigger the real (unmocked)
+			// `ImportDeadlineExceededError` the route closes over internally —
+			// `instanceof` only recognises that exact class reference, so this is
+			// the only way to provoke the timeout branch without waiting out the
+			// real 280s deadline.
+			let capturedLimitChunkFlush:
+				| ((flushChunk: () => Promise<void>) => Promise<unknown>)
+				| undefined;
+			vi.mocked(EncounterRowBatchWriter).mockImplementation(function (
+				_client: unknown,
+				options: { limitChunkFlush: typeof capturedLimitChunkFlush }
+			) {
+				capturedLimitChunkFlush = options.limitChunkFlush;
+				return mockEncounterRowBatchWriter as never;
+			} as never);
+
+			// Fake timers freeze `Date.now()` at a single deterministic value
+			// (rather than ticking on real wall-clock time), so the route's
+			// deadline computation and the later deadline check can be put on
+			// either side of an explicit jump with no dependence on how many
+			// incidental `Date.now()` calls (p-ratelimit's own bookkeeping,
+			// `happy-dom`'s `File`, console interception, etc.) happen in between.
+			vi.useFakeTimers();
+
+			vi.mocked(processEncounterRow).mockImplementation(async () => {
+				// Past the route's 280s deadline, which was computed against the
+				// frozen "now" in place before this jump.
+				vi.setSystemTime(Date.now() + 281_000);
+				await capturedLimitChunkFlush!(async () => {});
+				return { visitDate: '2024-06-01' };
+			});
+
+			const file = makeCsvFile([makeCsvRow()]);
+			const messages = await readStreamMessages(
+				await POST(await makeRequest(file))
+			);
+			vi.useRealTimers();
+
+			expect(messages.some((m) => m.type === 'timeout')).toBe(true);
+			expect(dispatchStatsCacheRefreshWindow).not.toHaveBeenCalled();
+		});
+
+		it('does not dispatch any events when the run fails before completion', async () => {
+			const { EncounterRowBatchWriter } = await import('@/lib/demon-import');
+			const { dispatchStatsCacheRefreshWindow } =
+				await import('@/lib/queue-dispatch');
+			vi.mocked(EncounterRowBatchWriter).mockImplementation(function () {
+				throw new Error('could not build writers');
+			} as never);
+
+			const file = makeCsvFile([makeCsvRow()]);
+			const messages = await readStreamMessages(
+				await POST(await makeRequest(file))
+			);
+
+			expect(messages).toContainEqual({
+				type: 'error',
+				message: 'could not build writers'
+			});
+			expect(dispatchStatsCacheRefreshWindow).not.toHaveBeenCalled();
+		});
+
+		it('logs and swallows a dispatch failure rather than turning the response into an error message', async () => {
+			const { processEncounterRow } = await import('@/lib/demon-import');
+			const { buildStatsCacheRefreshEvents } =
+				await import('@/lib/stats-cache-refresh-events');
+			const { dispatchStatsCacheRefreshWindow } =
+				await import('@/lib/queue-dispatch');
+			vi.mocked(processEncounterRow).mockResolvedValue({
+				visitDate: '2024-06-01'
+			});
+			const fakeEvent = {
+				importJobId: IMPORT_JOB_ID,
+				rpcParams: { ringing_group_filter: 1 }
+			};
+			vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([fakeEvent]);
+			vi.mocked(dispatchStatsCacheRefreshWindow).mockRejectedValueOnce(
+				new Error('queue unavailable')
+			);
+			const consoleErrorSpy = vi
+				.spyOn(console, 'error')
+				.mockImplementation(() => {});
+
+			const file = makeCsvFile([makeCsvRow()]);
+			const messages = await readStreamMessages(
+				await POST(await makeRequest(file))
+			);
+
+			expect(messages.find((m) => m.type === 'complete')).toEqual({
+				type: 'complete',
+				processed: 1,
+				successful: 1,
+				failed: 0
+			});
+			expect(messages.some((m) => m.type === 'error')).toBe(false);
+			expect(consoleErrorSpy).toHaveBeenCalledWith(
+				'Failed to dispatch stats-cache-refresh-window events',
+				expect.objectContaining({ importJobId: IMPORT_JOB_ID }),
+				expect.any(Error)
+			);
+
+			consoleErrorSpy.mockRestore();
 		});
 	});
 });

@@ -15,6 +15,8 @@ import {
 	CasualtyEncounterError,
 	type DemonRow
 } from '@/lib/demon-import';
+import { buildStatsCacheRefreshEvents } from '@/lib/stats-cache-refresh-events';
+import { dispatchStatsCacheRefreshWindow } from '@/lib/queue-dispatch';
 
 export const maxDuration = 300;
 
@@ -227,6 +229,26 @@ export async function POST(request: Request): Promise<Response> {
 						successful,
 						failed
 					});
+					// A dispatch failure is caught and logged rather than thrown —
+					// refresh is a recoverable derived step (#957's precedent), so a
+					// successful import must still report success even if dispatching
+					// the follow-up stats-cache-refresh events fails.
+					try {
+						const statsCacheRefreshEvents = buildStatsCacheRefreshEvents(
+							importJobId,
+							ringingGroupId,
+							demonRecordsBatchWriter.getDistinctDates()
+						);
+						for (const event of statsCacheRefreshEvents) {
+							await dispatchStatsCacheRefreshWindow(event);
+						}
+					} catch (dispatchError) {
+						console.error(
+							'Failed to dispatch stats-cache-refresh-window events',
+							{ importJobId, ringingGroupId },
+							dispatchError
+						);
+					}
 					send({ type: 'complete', processed, successful, failed });
 				}
 			} catch (err) {
