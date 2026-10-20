@@ -325,15 +325,21 @@ now; a follow-up ticket replaces it with a review screen letting the group say "
 bootstrap its own locations — they must exist first (which is why `supabase/scripts/seed-e2e-data.ts`
 and `e2e/authenticated/import.spec.ts` pre-create theirs).
 
-Processing is sequential (no rate limiter) and aborts with a date-range summary after 280 seconds. Vercel `maxDuration` is set to 300s. Core import logic is shared with the CLI script — see `supabase/CLAUDE.md`'s "CSV data import".
+The route aborts with a date-range summary after 280 seconds. Vercel `maxDuration` is set to 300s.
+Core import logic is shared with the CLI script — see `supabase/CLAUDE.md`'s "CSV data import".
 
-Each row is then staged into `DemonRecords` before it is interpreted into the domain tables
-(#959), and the run's `ImportJobs.affected_dates` is written once every staging batch has landed —
-see `supabase/CLAUDE.md`'s "CSV data import" for the batch writer and the rate-limiter constraint
-it imposes. One route-specific consequence: the 280s deadline check now lives **inside** the
-rate-limited callback (surfacing as a module-private `ImportDeadlineExceededError`) rather than at
-row dispatch, because every row is dispatched at t≈0 and a check there would never fire for a
-large upload.
+Each row is staged into `DemonRecords` before it is interpreted into the domain tables (#959), the
+run's `ImportJobs.affected_dates` is written once every staging batch has landed, and the
+domain-table write itself is chunked (#1139) — see `supabase/CLAUDE.md`'s "CSV data import" for
+both batch writers and the rate-limiter constraint they impose. Two route-specific consequences:
+
+- The route's `pRateLimit` (30/s, concurrency 30) is passed in as `EncounterRowBatchWriter`'s
+  `limitChunkFlush`, so it caps concurrent **chunk flushes** rather than concurrent per-row domain
+  writes.
+- The 280s deadline check lives **inside** that limited callback (surfacing as a module-private
+  `ImportDeadlineExceededError`) rather than at row dispatch, because every row is dispatched at
+  t≈0 and a check there would never fire for a large upload. Since the callback is now a whole
+  chunk flush, a fired deadline abandons that chunk's rows together rather than one row.
 
 Once the pre-flight has passed, the route opens an `ImportJobs` row (#961) and updates it at
 whichever exit branch fires: `complete` → `succeeded` with the three row counts, `timeout` →

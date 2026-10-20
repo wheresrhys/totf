@@ -12,8 +12,8 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('@/lib/demon-import')>();
 	return {
 		...actual,
-		createUpserter: vi.fn(),
 		DemonRecordsBatchWriter: vi.fn(),
+		EncounterRowBatchWriter: vi.fn(),
 		ImportJobTracker: vi.fn(),
 		processEncounterRow: vi.fn(),
 		findUnrecognisedLocationNames: vi.fn()
@@ -80,9 +80,9 @@ async function readStreamMessages(
 
 describe('POST /api/import', () => {
 	let POST: (request: Request) => Promise<Response>;
-	let mockUpsert: ReturnType<typeof vi.fn>;
 	let mockImportJobTracker: Record<string, ReturnType<typeof vi.fn>>;
 	let mockDemonRecordsBatchWriter: Record<string, ReturnType<typeof vi.fn>>;
+	let mockEncounterRowBatchWriter: Record<string, ReturnType<typeof vi.fn>>;
 
 	beforeEach(async () => {
 		vi.resetModules();
@@ -90,10 +90,11 @@ describe('POST /api/import', () => {
 
 		const { getAuthenticatedSupabaseClient } =
 			await import('@/app/lib/auth/group-auth');
-		const { createUpserter, DemonRecordsBatchWriter, ImportJobTracker } =
-			await import('@/lib/demon-import');
-		mockUpsert = vi.fn().mockResolvedValue(1);
-		vi.mocked(createUpserter).mockReturnValue(mockUpsert as never);
+		const {
+			DemonRecordsBatchWriter,
+			EncounterRowBatchWriter,
+			ImportJobTracker
+		} = await import('@/lib/demon-import');
 		mockDemonRecordsBatchWriter = {
 			writeDemonRecord: vi.fn().mockResolvedValue(undefined),
 			flushRemaining: vi.fn().mockResolvedValue(undefined),
@@ -102,6 +103,14 @@ describe('POST /api/import', () => {
 		// Newable for the same reason as the `ImportJobTracker` stub below.
 		vi.mocked(DemonRecordsBatchWriter).mockImplementation(function () {
 			return mockDemonRecordsBatchWriter as never;
+		} as never);
+		mockEncounterRowBatchWriter = {
+			writeEncounterRow: vi.fn().mockResolvedValue({ visitDate: '2024-06-01' }),
+			flushRemaining: vi.fn().mockResolvedValue(undefined)
+		};
+		// Newable for the same reason as the two stubs either side of it.
+		vi.mocked(EncounterRowBatchWriter).mockImplementation(function () {
+			return mockEncounterRowBatchWriter as never;
 		} as never);
 		mockImportJobTracker = {
 			createImportJob: vi.fn().mockResolvedValue(IMPORT_JOB_ID),
@@ -208,9 +217,9 @@ describe('POST /api/import', () => {
 		beforeEach(async () => {
 			// The shared module mock isn't auto-reset between tests, so clear the
 			// call history these tests assert on.
-			const { processEncounterRow, createUpserter } =
+			const { processEncounterRow, EncounterRowBatchWriter } =
 				await import('@/lib/demon-import');
-			vi.mocked(createUpserter).mockClear();
+			vi.mocked(EncounterRowBatchWriter).mockClear();
 			vi.mocked(processEncounterRow).mockClear();
 			vi.mocked(processEncounterRow).mockResolvedValue({
 				visitDate: '2024-06-01'
@@ -237,10 +246,10 @@ describe('POST /api/import', () => {
 			]);
 		});
 
-		it('calls neither createUpserter nor processEncounterRow when aborting for unrecognised locations', async () => {
+		it('constructs no domain-table writer and processes no rows when aborting for unrecognised locations', async () => {
 			const {
 				findUnrecognisedLocationNames,
-				createUpserter,
+				EncounterRowBatchWriter,
 				processEncounterRow
 			} = await import('@/lib/demon-import');
 			vi.mocked(findUnrecognisedLocationNames).mockResolvedValue(['CES972']);
@@ -250,7 +259,7 @@ describe('POST /api/import', () => {
 			);
 			await readStreamMessages(response);
 
-			expect(vi.mocked(createUpserter)).not.toHaveBeenCalled();
+			expect(vi.mocked(EncounterRowBatchWriter)).not.toHaveBeenCalled();
 			expect(vi.mocked(processEncounterRow)).not.toHaveBeenCalled();
 		});
 
@@ -357,12 +366,17 @@ describe('POST /api/import', () => {
 					await importOriginal<typeof import('@/lib/demon-import')>();
 				return {
 					...actual,
-					createUpserter: vi.fn().mockReturnValue(vi.fn()),
 					DemonRecordsBatchWriter: vi.fn(function () {
 						return {
 							writeDemonRecord: vi.fn(),
 							flushRemaining: vi.fn(),
 							getDistinctDates: vi.fn(() => [])
+						};
+					}),
+					EncounterRowBatchWriter: vi.fn(function () {
+						return {
+							writeEncounterRow: vi.fn(),
+							flushRemaining: vi.fn()
 						};
 					}),
 					ImportJobTracker: vi.fn(function () {
@@ -391,6 +405,37 @@ describe('POST /api/import', () => {
 			// one. (The demon-import doMock above is shape-compatible with the
 			// file-level one, so that one can safely stay.)
 			vi.doUnmock('csv-parser');
+		});
+	});
+
+	describe('chunked domain-table writing', () => {
+		it('builds the domain-table writer for the run’s group and job, and flushes its trailing chunk', async () => {
+			const { EncounterRowBatchWriter, processEncounterRow } =
+				await import('@/lib/demon-import');
+			vi.mocked(processEncounterRow).mockResolvedValue({
+				visitDate: '2024-06-01'
+			});
+
+			const file = makeCsvFile([
+				makeCsvRow(),
+				makeCsvRow({ ring_no: 'B000001' })
+			]);
+			await readStreamMessages(await POST(await makeRequest(file)));
+
+			// Group ID 1 — group-cookie is mocked globally in vitest.setup.tsx.
+			expect(vi.mocked(EncounterRowBatchWriter)).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.objectContaining({
+					ringingGroupId: 1,
+					importJobId: IMPORT_JOB_ID,
+					limitChunkFlush: expect.any(Function)
+				})
+			);
+			// Without this the run would deadlock on the trailing chunk, whose rows
+			// the `Promise.all` below it is waiting on.
+			expect(mockEncounterRowBatchWriter.flushRemaining).toHaveBeenCalledTimes(
+				1
+			);
 		});
 	});
 
@@ -459,12 +504,12 @@ describe('POST /api/import', () => {
 		});
 
 		it('marks the job failed with the error message when the run throws', async () => {
-			const { createUpserter } = await import('@/lib/demon-import');
+			const { EncounterRowBatchWriter } = await import('@/lib/demon-import');
 			// Thrown after the job row has been opened — unlike a CSV parse error,
 			// which happens before there is anything to mark.
-			vi.mocked(createUpserter).mockImplementation(() => {
+			vi.mocked(EncounterRowBatchWriter).mockImplementation(function () {
 				throw new Error('could not build writers');
-			});
+			} as never);
 
 			const file = makeCsvFile([makeCsvRow()]);
 			const messages = await readStreamMessages(
