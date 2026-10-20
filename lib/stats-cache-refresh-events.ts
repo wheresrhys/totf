@@ -111,11 +111,13 @@ export function buildStatsCacheRefreshEvents(
 	}
 
 	// One 'month-squashed' event per distinct month number (no year_filter).
-	const squashedMonths = [...new Set(yearMonths.map(({ month }) => month))].sort(
-		(a, b) => a - b
-	);
+	const squashedMonths = [
+		...new Set(yearMonths.map(({ month }) => month))
+	].sort((a, b) => a - b);
 	for (const month of squashedMonths) {
-		events.push(stamp({ group_by_time_period: 'month-squashed', month_filter: month }));
+		events.push(
+			stamp({ group_by_time_period: 'month-squashed', month_filter: month })
+		);
 	}
 
 	// One 'year' event per distinct year (no month_filter).
