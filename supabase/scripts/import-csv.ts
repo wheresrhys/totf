@@ -28,10 +28,9 @@ import {
 	processEncounterRow,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
+	dispatchStatsCacheRefreshEvents,
 	type DemonRow
 } from '../../lib/demon-import';
-import { buildStatsCacheRefreshEvents } from '../../lib/stats-cache-refresh-events';
-import { dispatchStatsCacheRefreshWindow } from '../../lib/queue-dispatch';
 
 /**
  * Default max number of rows processed at once. Unchanged from the value this
@@ -285,26 +284,12 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 		failed: failedRecords
 	});
 
-	// A dispatch failure is caught and logged rather than thrown — refresh is a
-	// recoverable derived step (#957's precedent), so a successful import must
-	// still report success even if dispatching the follow-up stats-cache-refresh
-	// events fails.
-	try {
-		const statsCacheRefreshEvents = buildStatsCacheRefreshEvents(
-			importJobId,
-			ringingGroupId,
-			demonRecordsBatchWriter.getDistinctDates()
-		);
-		for (const event of statsCacheRefreshEvents) {
-			await dispatchStatsCacheRefreshWindow(event);
-		}
-	} catch (dispatchError) {
-		console.error(
-			'Failed to dispatch stats-cache-refresh-window events',
-			{ csvFilePath, ringingGroupName, ringingGroupId },
-			dispatchError
-		);
-	}
+	await dispatchStatsCacheRefreshEvents(
+		importJobId,
+		ringingGroupId,
+		demonRecordsBatchWriter.getDistinctDates(),
+		{ csvFilePath, ringingGroupName }
+	);
 
 	console.log('\n✓ Import completed');
 	console.log(`Total records: ${totalRecords}`);

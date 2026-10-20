@@ -1,6 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase.types';
 import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
+// Relative, not `@/`-aliased, for the same reason `lib/queue-dispatch.ts` imports
+// its queue consumer relatively: these are value imports `lib/` needs at
+// runtime (the CLI importer's `tsx` runner included), and `@/` alias
+// resolution is scoped to tsconfig.json's `include`, which `lib/` sits outside
+// of. The two `@/`-aliased imports above are `import type` only, erased before
+// either runtime sees them, so they aren't subject to the same constraint.
+import { buildStatsCacheRefreshEvents } from './stats-cache-refresh-events';
+import { dispatchStatsCacheRefreshWindow } from './queue-dispatch';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Omit<
@@ -1171,5 +1179,44 @@ export class EncounterRowBatchWriter {
 			this.flushBufferedChunk();
 			await Promise.all(this.chunkWrites);
 		} while (this.buffer.length > 0);
+	}
+}
+
+/**
+ * Builds and dispatches every stats-cache-refresh event a successful import's
+ * affected dates imply (#1141), the one piece of orchestration both import
+ * entry points need once `completeImportJob` has run. Each writes its own
+ * `logContext` (the CLI script's `csvFilePath`/`ringingGroupName`, the web
+ * route's none) onto the shared `{importJobId, ringingGroupId}` base so a
+ * dispatch-failure log line is still identifiable per caller.
+ *
+ * A dispatch failure is caught and logged rather than thrown: refresh is a
+ * recoverable derived step (#957's precedent), so a successful import must
+ * still report success even if dispatching its follow-up events fails. This
+ * is a plain function rather than a method on `ImportJobTracker` — it doesn't
+ * read or write the `ImportJobs` row at all, it only consumes the id the
+ * tracker already minted.
+ */
+export async function dispatchStatsCacheRefreshEvents(
+	importJobId: number,
+	ringingGroupId: number,
+	affectedDates: string[],
+	logContext: Record<string, unknown> = {}
+): Promise<void> {
+	try {
+		const statsCacheRefreshEvents = buildStatsCacheRefreshEvents(
+			importJobId,
+			ringingGroupId,
+			affectedDates
+		);
+		for (const event of statsCacheRefreshEvents) {
+			await dispatchStatsCacheRefreshWindow(event);
+		}
+	} catch (dispatchError) {
+		console.error(
+			'Failed to dispatch stats-cache-refresh-window events',
+			{ importJobId, ringingGroupId, ...logContext },
+			dispatchError
+		);
 	}
 }

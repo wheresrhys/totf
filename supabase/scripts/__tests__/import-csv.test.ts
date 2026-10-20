@@ -6,7 +6,8 @@ import {
 	EncounterRowBatchWriter,
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames,
-	processEncounterRow
+	processEncounterRow,
+	dispatchStatsCacheRefreshEvents
 } from '../../../lib/demon-import';
 import {
 	createRowLimiter,
@@ -14,8 +15,6 @@ import {
 	importCSV,
 	runRows
 } from '../import-csv';
-import { buildStatsCacheRefreshEvents } from '../../../lib/stats-cache-refresh-events';
-import { dispatchStatsCacheRefreshWindow } from '../../../lib/queue-dispatch';
 
 // Spy on the real rate limiter rather than replacing it, so the same test file
 // can assert both *how* it's constructed and that it genuinely limits
@@ -55,14 +54,6 @@ vi.mock('../../../lib/supabase', () => ({
 
 vi.mock('../../../app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClientForGroup: vi.fn(async () => ({}))
-}));
-
-vi.mock('../../../lib/stats-cache-refresh-events', () => ({
-	buildStatsCacheRefreshEvents: vi.fn()
-}));
-
-vi.mock('../../../lib/queue-dispatch', () => ({
-	dispatchStatsCacheRefreshWindow: vi.fn()
 }));
 
 const IMPORT_JOB_ID = 42;
@@ -112,7 +103,8 @@ vi.mock('../../../lib/demon-import', () => ({
 	processEncounterRow: vi.fn(async () => {}),
 	getDistinctLocationNames: vi.fn(() => ['Garden Trap']),
 	// Every location in the CSV is already known unless a test says otherwise.
-	findUnrecognisedLocationNames: vi.fn(async () => [] as string[])
+	findUnrecognisedLocationNames: vi.fn(async () => [] as string[]),
+	dispatchStatsCacheRefreshEvents: vi.fn(async () => {})
 }));
 
 const mockedPRateLimit = vi.mocked(pRateLimit);
@@ -149,12 +141,8 @@ beforeEach(() => {
 	});
 	mockEncounterRowBatchWriter.flushRemaining.mockResolvedValue(undefined);
 
-	// No stats-cache-refresh events by default — the dedicated describe block
-	// below overrides this.
-	vi.mocked(buildStatsCacheRefreshEvents).mockClear();
-	vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([]);
-	vi.mocked(dispatchStatsCacheRefreshWindow).mockClear();
-	vi.mocked(dispatchStatsCacheRefreshWindow).mockResolvedValue(undefined);
+	vi.mocked(dispatchStatsCacheRefreshEvents).mockClear();
+	vi.mocked(dispatchStatsCacheRefreshEvents).mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -381,81 +369,31 @@ describe('importCSV chunked domain-table writing', () => {
 	});
 });
 
-describe('stats-cache-refresh-window dispatch', () => {
-	it('dispatches one event per distinct time window derived from the run’s affected dates, after completeImportJob', async () => {
-		const fakeEvents = [
-			{ importJobId: IMPORT_JOB_ID, rpcParams: { ringing_group_filter: 7 } },
-			{
-				importJobId: IMPORT_JOB_ID,
-				rpcParams: {
-					ringing_group_filter: 7,
-					group_by_time_period: 'day' as const,
-					from_date: '2024-06-01',
-					to_date: '2024-06-01'
-				}
-			}
-		];
-		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue(fakeEvents);
-
+describe('stats-cache-refresh dispatch', () => {
+	// Event-building, per-event dispatch and dispatch-failure handling are
+	// `dispatchStatsCacheRefreshEvents`'s own responsibility, unit-tested in
+	// `lib/__tests__/demon-import.test.ts`. This only has to prove the script
+	// calls it with the run's own ids/dates/log-context, after the job is
+	// marked complete.
+	it('calls dispatchStatsCacheRefreshEvents with the run’s ids, affected dates and CLI log context, after completeImportJob', async () => {
 		await importCSV({
 			csvFilePath: '/fake/alpha.csv',
 			ringingGroupName: 'Alpha'
 		});
 
-		expect(buildStatsCacheRefreshEvents).toHaveBeenCalledWith(
+		expect(dispatchStatsCacheRefreshEvents).toHaveBeenCalledWith(
 			IMPORT_JOB_ID,
 			7,
-			['2024-06-01']
-		);
-		expect(dispatchStatsCacheRefreshWindow).toHaveBeenCalledTimes(2);
-		expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
-			1,
-			fakeEvents[0]
-		);
-		expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
-			2,
-			fakeEvents[1]
+			['2024-06-01'],
+			{ csvFilePath: '/fake/alpha.csv', ringingGroupName: 'Alpha' }
 		);
 
 		// Dispatch happens only after the job is marked complete.
 		const completeOrder =
 			mockImportJobTracker.completeImportJob.mock.invocationCallOrder[0];
-		const dispatchOrder = vi.mocked(dispatchStatsCacheRefreshWindow).mock
+		const dispatchOrder = vi.mocked(dispatchStatsCacheRefreshEvents).mock
 			.invocationCallOrder[0];
 		expect(dispatchOrder).toBeGreaterThan(completeOrder);
-	});
-
-	it('logs and swallows a dispatch failure without throwing past the script’s own success reporting', async () => {
-		const fakeEvent = {
-			importJobId: IMPORT_JOB_ID,
-			rpcParams: { ringing_group_filter: 7 }
-		};
-		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([fakeEvent]);
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockRejectedValueOnce(
-			new Error('queue unavailable')
-		);
-		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-		await importCSV({
-			csvFilePath: '/fake/alpha.csv',
-			ringingGroupName: 'Alpha'
-		});
-
-		expect(errorSpy).toHaveBeenCalledWith(
-			'Failed to dispatch stats-cache-refresh-window events',
-			expect.objectContaining({
-				csvFilePath: '/fake/alpha.csv',
-				ringingGroupName: 'Alpha',
-				ringingGroupId: 7
-			}),
-			expect.any(Error)
-		);
-		// The script's own success-reporting log is still reached, not aborted
-		// by the swallowed dispatch failure.
-		expect(logSpy).toHaveBeenCalledWith(
-			expect.stringContaining('Import completed')
-		);
 	});
 });
 
