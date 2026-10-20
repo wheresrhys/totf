@@ -20,13 +20,12 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import csvParser from 'csv-parser';
 import {
-	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
 	DemonRecordsBatchWriter,
+	EncounterRowBatchWriter,
 	ImportJobTracker,
 	processEncounterRow,
-	writeEncounterRow,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
 	type DemonRow
@@ -62,12 +61,17 @@ export interface ImportRowCounts {
  * Rate limiter: up to 30 API calls per second, with at most `concurrency`
  * running at once.
  *
- * Built once per run and wrapped around the **domain-table write alone** —
- * `writeEncounterRow` — never around a whole row's `processEncounterRow` call
- * (#959). Throttling the whole row would throttle its `DemonRecords` staging
- * write too, and a batch bigger than `concurrency` could then never fill: the
- * rows needed to complete it would be queued behind the rows already waiting on
- * it. Exported for its own unit test.
+ * Built once per run and wrapped around **a whole chunk flush** of the
+ * domain-table writer — never around a whole row's `processEncounterRow` call
+ * (#959). Until #1139 it wrapped one row's five sequential domain-table upserts;
+ * it now wraps one chunk's five bulk upserts, so `concurrency` caps concurrent
+ * chunk flushes rather than concurrent rows. Each chunk flush issues one request
+ * at a time, so that still caps in-flight requests at roughly `concurrency`.
+ *
+ * Throttling the whole row would throttle its `DemonRecords` staging write too,
+ * and a batch bigger than `concurrency` could then never fill: the rows needed to
+ * complete it would be queued behind the rows already waiting on it. Exported for
+ * its own unit test.
  */
 export function createRowLimiter(concurrency: number) {
 	return pRateLimit({
@@ -171,9 +175,6 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 	const groupSupabaseClient =
 		await getAuthenticatedSupabaseClientForGroup(ringingGroupId);
 
-	const upsert = createUpserter(groupSupabaseClient);
-	const lookupRingSequence = createRingSequenceLookup(groupSupabaseClient);
-	const linkRingSequence = createRingSequenceLinker(groupSupabaseClient);
 	const importJobTracker = new ImportJobTracker(groupSupabaseClient);
 
 	// The whole CSV is buffered rather than streamed straight into row
@@ -216,17 +217,19 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 		groupSupabaseClient,
 		{ importJobId, ringingGroupId }
 	);
-	const limit = createRowLimiter(concurrency);
-	const writeEncounterRowRateLimited = (row: DemonRow) =>
-		limit(() =>
-			writeEncounterRow(
-				row,
-				upsert,
-				lookupRingSequence,
-				ringingGroupId,
-				linkRingSequence
-			)
-		);
+	// The domain-table write is chunked too (#1139): rows are buffered and each
+	// entity type written by one bulk upsert per chunk, with the limiter above now
+	// capping concurrent chunk flushes.
+	const encounterRowBatchWriter = new EncounterRowBatchWriter(
+		groupSupabaseClient,
+		{
+			ringingGroupId,
+			importJobId,
+			lookupRingSequence: createRingSequenceLookup(groupSupabaseClient),
+			linkRingSequence: createRingSequenceLinker(groupSupabaseClient),
+			limitChunkFlush: createRowLimiter(concurrency)
+		}
+	);
 
 	let rowCounts: ImportRowCounts;
 	try {
@@ -236,7 +239,7 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 				processEncounterRow(
 					row,
 					demonRecordsBatchWriter,
-					writeEncounterRowRateLimited
+					encounterRowBatchWriter
 				),
 			async () => {
 				await demonRecordsBatchWriter.flushRemaining();
@@ -248,6 +251,10 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 					importJobId,
 					demonRecordsBatchWriter.getDistinctDates()
 				);
+				// Flushed here for the same reason: a row's promise is what settles
+				// when its chunk lands, so `runRows`' own `Promise.all` over the rows
+				// would deadlock on the trailing chunk if it ran first.
+				await encounterRowBatchWriter.flushRemaining();
 			}
 		);
 	} catch (error) {

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pRateLimit } from 'p-ratelimit';
 import {
 	DemonRecordsBatchWriter,
+	EncounterRowBatchWriter,
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames,
 	processEncounterRow
@@ -58,35 +59,43 @@ const IMPORT_JOB_ID = 42;
 
 // Hoisted so the `vi.mock` factory below (which is hoisted too) can return the same
 // object the tests assert against.
-const { mockImportJobTracker, mockDemonRecordsBatchWriter } = vi.hoisted(
-	() => ({
-		mockImportJobTracker: {
-			createImportJob: vi.fn(),
-			recordAffectedDates: vi.fn(),
-			completeImportJob: vi.fn(),
-			failImportJob: vi.fn(),
-			markImportJobTimedOut: vi.fn(),
-			markStatsCacheRefreshed: vi.fn()
-		},
-		mockDemonRecordsBatchWriter: {
-			writeDemonRecord: vi.fn(),
-			flushRemaining: vi.fn(),
-			getDistinctDates: vi.fn()
-		}
-	})
-);
+const {
+	mockImportJobTracker,
+	mockDemonRecordsBatchWriter,
+	mockEncounterRowBatchWriter
+} = vi.hoisted(() => ({
+	mockImportJobTracker: {
+		createImportJob: vi.fn(),
+		recordAffectedDates: vi.fn(),
+		completeImportJob: vi.fn(),
+		failImportJob: vi.fn(),
+		markImportJobTimedOut: vi.fn(),
+		markStatsCacheRefreshed: vi.fn()
+	},
+	mockDemonRecordsBatchWriter: {
+		writeDemonRecord: vi.fn(),
+		flushRemaining: vi.fn(),
+		getDistinctDates: vi.fn()
+	},
+	mockEncounterRowBatchWriter: {
+		writeEncounterRow: vi.fn(),
+		flushRemaining: vi.fn()
+	}
+}));
 
 vi.mock('../../../lib/demon-import', () => ({
-	createUpserter: vi.fn(() => vi.fn()),
 	createRingSequenceLookup: vi.fn(() => vi.fn()),
 	createRingSequenceLinker: vi.fn(() => vi.fn()),
-	// `function`, not an arrow, for both of these: the script does `new
-	// DemonRecordsBatchWriter(...)`/`new ImportJobTracker(...)`, and only a
-	// newable stub's returned object becomes the constructed instance.
+	// `function`, not an arrow, for all three of these: the script does `new
+	// DemonRecordsBatchWriter(...)`/`new EncounterRowBatchWriter(...)`/`new
+	// ImportJobTracker(...)`, and only a newable stub's returned object becomes
+	// the constructed instance.
 	DemonRecordsBatchWriter: vi.fn(function () {
 		return mockDemonRecordsBatchWriter;
 	}),
-	writeEncounterRow: vi.fn(async () => ({ visitDate: '2024-06-01' })),
+	EncounterRowBatchWriter: vi.fn(function () {
+		return mockEncounterRowBatchWriter;
+	}),
 	ImportJobTracker: vi.fn(function () {
 		return mockImportJobTracker;
 	}),
@@ -121,6 +130,14 @@ beforeEach(() => {
 	mockDemonRecordsBatchWriter.writeDemonRecord.mockResolvedValue(undefined);
 	mockDemonRecordsBatchWriter.flushRemaining.mockResolvedValue(undefined);
 	mockDemonRecordsBatchWriter.getDistinctDates.mockReturnValue(['2024-06-01']);
+	vi.mocked(EncounterRowBatchWriter).mockClear();
+	for (const writerOperation of Object.values(mockEncounterRowBatchWriter)) {
+		writerOperation.mockClear();
+	}
+	mockEncounterRowBatchWriter.writeEncounterRow.mockResolvedValue({
+		visitDate: '2024-06-01'
+	});
+	mockEncounterRowBatchWriter.flushRemaining.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -282,6 +299,52 @@ describe('importCSV DemonRecords staging', () => {
 		// longer fill.
 		const callOrder: string[] = [];
 		mockDemonRecordsBatchWriter.flushRemaining.mockImplementation(async () => {
+			callOrder.push('flushRemaining');
+		});
+		vi.mocked(processEncounterRow).mockImplementation(async () => {
+			callOrder.push('processEncounterRow');
+		});
+
+		await importCSV({
+			csvFilePath: '/fake/alpha.csv',
+			ringingGroupName: 'Alpha'
+		});
+
+		expect(callOrder).toEqual([
+			'processEncounterRow',
+			'processEncounterRow',
+			'flushRemaining'
+		]);
+	});
+});
+
+describe('importCSV chunked domain-table writing', () => {
+	it('builds the domain-table writer for the group and job, with the run’s rate limiter capping chunk flushes', async () => {
+		await importCSV({
+			csvFilePath: '/fake/alpha.csv',
+			ringingGroupName: 'Alpha',
+			concurrency: 5
+		});
+
+		expect(vi.mocked(EncounterRowBatchWriter)).toHaveBeenCalledWith(
+			expect.anything(),
+			expect.objectContaining({
+				ringingGroupId: 7,
+				importJobId: IMPORT_JOB_ID,
+				limitChunkFlush: expect.any(Function)
+			})
+		);
+		expect(mockedPRateLimit).toHaveBeenCalledWith(
+			expect.objectContaining({ concurrency: 5 })
+		);
+	});
+
+	it('flushes the trailing chunk once every row has been dispatched, before any row is awaited', async () => {
+		// A row's promise is what settles when its chunk lands, so `runRows`'
+		// `Promise.all` over the rows would deadlock on the trailing chunk if the
+		// flush ran after it rather than in `onAllRowsDispatched`.
+		const callOrder: string[] = [];
+		mockEncounterRowBatchWriter.flushRemaining.mockImplementation(async () => {
 			callOrder.push('flushRemaining');
 		});
 		vi.mocked(processEncounterRow).mockImplementation(async () => {

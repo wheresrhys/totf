@@ -4,13 +4,12 @@ import { pRateLimit } from 'p-ratelimit';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import {
-	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
 	DemonRecordsBatchWriter,
+	EncounterRowBatchWriter,
 	ImportJobTracker,
 	processEncounterRow,
-	writeEncounterRow,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
 	CasualtyEncounterError,
@@ -49,11 +48,13 @@ export type ImportMessage =
 const TIMEOUT_MS = 280_000;
 
 /**
- * Thrown in place of a row's domain-table write once the 280s deadline has
- * passed. The check has to happen at the moment the rate limiter grants the row
- * a slot — not when the row is dispatched, which for a large upload is t≈0 for
- * every row — and since #959 that moment is inside the limited callback, whose
- * only way out is to throw. Never leaves this module.
+ * Thrown in place of a chunk's domain-table writes once the 280s deadline has
+ * passed. The check has to happen at the moment the rate limiter grants a slot —
+ * not when a row is dispatched, which for a large upload is t≈0 for every row —
+ * and since #959 that moment is inside the limited callback, whose only way out
+ * is to throw. Since #1139 the limited callback is a whole chunk flush, so the
+ * error abandons every row of that chunk rather than a single row. Never leaves
+ * this module.
  */
 class ImportDeadlineExceededError extends Error {
 	constructor() {
@@ -134,9 +135,6 @@ export async function POST(request: Request): Promise<Response> {
 
 				// Deliberately built only once the pre-flight has passed, so an
 				// aborted import never even constructs the writers.
-				const upsert = createUpserter(supabaseClient);
-				const lookupRingSequence = createRingSequenceLookup(supabaseClient);
-				const linkRingSequence = createRingSequenceLinker(supabaseClient);
 				// Every row is staged into DemonRecords before it is interpreted
 				// into the domain tables (#959), batched so the per-row concurrency
 				// below survives.
@@ -145,25 +143,32 @@ export async function POST(request: Request): Promise<Response> {
 					{ importJobId, ringingGroupId }
 				);
 
-				// Wrapped around the domain-table write alone — never around a whole
-				// row, whose DemonRecords staging write must stay unthrottled so a
-				// batch can fill (see `DemonRecordsBatchWriter`).
+				// Wrapped around a whole chunk flush — never around a row's own
+				// buffering call, whose DemonRecords staging write and whose chunk
+				// must both stay unthrottled so a batch/chunk can fill (see
+				// `DemonRecordsBatchWriter` and `EncounterRowBatchWriter`). Before
+				// #1139 this capped concurrent per-row domain writes; it now caps
+				// concurrent chunk flushes.
 				const limit = pRateLimit({
 					interval: 1000,
 					rate: 30,
 					concurrency: 30
 				}) as <T>(fn: () => Promise<T>) => Promise<T>;
-				const writeEncounterRowRateLimited = (row: DemonRow) =>
-					limit(() => {
-						if (Date.now() > deadline) throw new ImportDeadlineExceededError();
-						return writeEncounterRow(
-							row,
-							upsert,
-							lookupRingSequence,
-							ringingGroupId,
-							linkRingSequence
-						);
-					});
+				const encounterRowBatchWriter = new EncounterRowBatchWriter(
+					supabaseClient,
+					{
+						ringingGroupId,
+						importJobId,
+						lookupRingSequence: createRingSequenceLookup(supabaseClient),
+						linkRingSequence: createRingSequenceLinker(supabaseClient),
+						limitChunkFlush: (flushChunk) =>
+							limit(() => {
+								if (Date.now() > deadline)
+									throw new ImportDeadlineExceededError();
+								return flushChunk();
+							})
+					}
+				);
 
 				// Mapped (not awaited) first, so every row reaches
 				// `writeDemonRecord` and the buffer holds exactly the trailing
@@ -173,7 +178,7 @@ export async function POST(request: Request): Promise<Response> {
 						const { visitDate } = await processEncounterRow(
 							row,
 							demonRecordsBatchWriter,
-							writeEncounterRowRateLimited
+							encounterRowBatchWriter
 						);
 						successful++;
 						if (startDate === null || visitDate < startDate)
@@ -202,6 +207,10 @@ export async function POST(request: Request): Promise<Response> {
 					importJobId,
 					demonRecordsBatchWriter.getDistinctDates()
 				);
+				// Flushed before the rows are awaited, for the same reason the staging
+				// buffer is: a row's promise is what settles when its chunk lands, so
+				// awaiting the rows first would deadlock on the trailing chunk.
+				await encounterRowBatchWriter.flushRemaining();
 
 				await Promise.all(pendingRows);
 

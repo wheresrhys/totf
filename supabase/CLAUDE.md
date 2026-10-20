@@ -510,45 +510,85 @@ npm run db:import:local ./path/to/data.csv "Group Name"
 npm run db:import:prod ./path/to/data.csv "Group Name"
 ```
 
-The import script (`supabase/scripts/import-csv.ts`) upserts Species, RingingGroups, Birds, Locations, Sessions, and Encounters in dependency order, rate-limited to 30 req/s.
+The import script (`supabase/scripts/import-csv.ts`) upserts Species, Birds, Locations, Sessions, and Encounters in dependency order, rate-limited to 30 req/s.
 
-Core import logic (types, transforms, `createUpserter`, `processEncounterRow`) lives in
+Core import logic (types, transforms, `processEncounterRow`, both batch writers) lives in
 `lib/demon-import.ts` and is shared by both this CLI script and the web import route — see
 `app/CLAUDE.md`'s "Web import".
 
-**Every row is staged into `DemonRecords` before it is interpreted (#959).** `processEncounterRow`
-is a two-step orchestrator: `await writer.writeDemonRecord(row)`, then the rate-limited
-`writeEncounterRow(row, …)` — the Species/RingSequence/Birds/Locations/Sessions/Encounters body
-that used to be `processEncounterRow`'s own. `new DemonRecordsBatchWriter(client, {importJobId,
-ringingGroupId, batchSize})` buffers rows and inserts them in multi-row `ON CONFLICT DO NOTHING`
-batches against `demon_records_group_ring_date_time_unique`; a row's own promise resolves when
-*its* batch lands, so staging stays interleaved with per-row processing rather than becoming an
-up-front phase. Four things to keep in mind when touching it:
+**Both halves of a row's write are batched, and `processEncounterRow` is the two-step
+orchestrator joining them**: `await demonRecordsBatchWriter.writeDemonRecord(row)` (staging,
+#959), then `encounterRowBatchWriter.writeEncounterRow(row)` (the domain tables, #1139). Each
+writer buffers rows and hands a row back a promise that settles when *its* batch/chunk lands, so
+both stay interleaved with row processing rather than becoming up-front phases, and a row whose
+staging batch failed never reaches the domain tables at all.
 
-- **The rate limiter must wrap `writeEncounterRow` only, never a whole row.** Throttle
-  `writeDemonRecord` and a batch bigger than the concurrency cap can never fill — the rows that
-  would complete it are queued behind the rows already blocked on it, and the import deadlocks.
-  Both entry points therefore build one `writeEncounterRowRateLimited` per run and pass it in.
-- **Both entry points use the same map → `flushRemaining` → `recordAffectedDates` →
-  `Promise.all` sequence**, because the buffer only holds exactly the run's trailing partial batch
-  at the moment every row has been dispatched and none awaited. The CLI gets there via `runRows`'
-  `onAllRowsDispatched` callback (`runRows` replaced `runRowsWithConcurrency`, which owned the
-  limiter it no longer needs); the route maps without awaiting and flushes inline.
+**Staging — `DemonRecordsBatchWriter` (#959).** `new DemonRecordsBatchWriter(client, {importJobId,
+ringingGroupId, batchSize})` inserts rows in multi-row `ON CONFLICT DO NOTHING` batches against
+`demon_records_group_ring_date_time_unique` (`DEFAULT_DEMON_RECORDS_BATCH_SIZE` = 100).
+
 - **Batch flushes are chained, not parallel**, so batches land in the order they filled — which is
   what keeps row-release order (and so row-id order) a function of the CSV, as `seed-e2e-data.ts`'s
   `concurrency: 1` determinism (#903) requires.
 - **A row with no ring number / visit date / capture time is skipped, not staged**: those are the
   table's `NOT NULL` dedup-key columns, so a casualty record has no representable staging row. It
-  resolves immediately and goes on to fail in `writeEncounterRow` exactly as it always did. A
+  resolves immediately and goes on to fail in the domain-table write exactly as it always did. A
   batch whose insert fails rejects only its own rows' promises (they never reach the domain
   tables) and logs job id, group, row count and row positions; rows in batches that already landed
   are not rolled back.
+
+**Domain tables — `EncounterRowBatchWriter` (#1139).** Replaced five sequential single-row upserts
+per row (the old `createUpserter` + `writeEncounterRow`, both gone) with one bulk multi-row upsert
+per entity type per chunk, in FK dependency order Species → Birds → Locations → Sessions →
+Encounters, each later payload carrying the ids the earlier ones resolved. A chunk of 100 rows
+costs 5 round trips for these tables instead of 500. `DEFAULT_ENCOUNTER_ROW_CHUNK_SIZE` is
+deliberately `DEFAULT_DEMON_RECORDS_BATCH_SIZE`: rows arrive here in staging-batch-sized waves, so
+an equal chunk size means one wave fills exactly one chunk. Five things to keep in mind when
+touching it:
+
+- **Each entity type is deduplicated per chunk, keeping the last payload at the first
+  occurrence's position.** This is correctness, not efficiency: Postgres rejects a multi-row
+  `ON CONFLICT DO UPDATE` that targets the same conflict key twice ("command cannot affect row a
+  second time"), and a chunk routinely holds several rows sharing a species, a location or a date.
+  Last-payload-wins reproduces what the old row-by-row upserts did when a later row updated an
+  earlier row's key.
+- **Ids are mapped back by natural key, never by response position** — a multi-row upsert's
+  returned row order isn't guaranteed to match the request — which is why each bulk upsert
+  `.select()`s its conflict-target columns alongside `id`.
+- **Inserts are ordered by natural key, not first appearance**, so two concurrent chunk flushes
+  touching overlapping keys always lock them in the same order and can't deadlock. It stays
+  deterministic, which is what `concurrency: 1` seeding needs — but note the id *sequence* changed
+  versus the per-row path (dedup no longer burns a `nextval` per repeated key), which is why
+  #1139 regenerated the snapshot fixtures.
+- **A chunk's failure fails every row buffered in it** — a documented coarsening of the old
+  strictly-per-row failure isolation, matching `DemonRecordsBatchWriter`'s per-batch precedent. It
+  logs job id, group, row count and row positions, same shape as the staging writer.
+- **The `RingSequences` lookup/link stays per row** (a numeric-range match, not a keyed upsert —
+  batching it is a separate problem), run one row at a time inside a chunk flush so a flush only
+  ever has one request in flight.
+
+**Two shared constraints across both writers:**
+
+- **The rate limiter must wrap a chunk flush only, never a whole row.** Throttle
+  `writeDemonRecord` (or a row's own `writeEncounterRow` buffering call) and a batch/chunk bigger
+  than the concurrency cap can never fill — the rows that would complete it are queued behind the
+  rows already blocked on it, and the import deadlocks. Both entry points therefore pass one
+  `limitChunkFlush` per run into `EncounterRowBatchWriter`. Its role since #1139 is to cap
+  concurrent *chunk flushes* rather than concurrent per-row domain writes.
+- **Both entry points use the same map → staging `flushRemaining` → `recordAffectedDates` →
+  domain `flushRemaining` → `Promise.all` sequence.** Neither buffer can be flushed after the rows
+  are awaited — a row's promise is what settles when its batch/chunk lands, so that would deadlock
+  on the trailing one. The CLI gets there via `runRows`' `onAllRowsDispatched` callback (`runRows`
+  replaced `runRowsWithConcurrency`, which owned the limiter it no longer needs); the route maps
+  without awaiting and flushes inline. `EncounterRowBatchWriter.flushRemaining` yields one
+  macrotask first, because the rows released by the final staging batch reach its buffer in
+  microtasks the staging writer's own `flushRemaining` can resume ahead of.
 
 **Every import run is tracked in `ImportJobs` (#961).** `lib/demon-import.ts`'s
 `new ImportJobTracker(supabaseClient)` exposes the six operations both entry points share —
 `createImportJob` / `recordAffectedDates` / `completeImportJob` / `failImportJob` /
 `markImportJobTimedOut` / `markStatsCacheRefreshed`. It's a class rather than a `create*` factory
-(the `createUpserter`/`createRingSequenceLookup` shape) because those each expose a single
+(the `createRingSequenceLookup`/`createRingSequenceLinker` shape) because those each expose a single
 operation, whereas these are six variations on the same `update(...).eq('id', …)` sharing one
 `supabaseClient` and one private update helper. The import job id stays a per-call argument — it's
 `createImportJob` that mints it. Two things to know when touching it:

@@ -2,13 +2,14 @@
  * Integration tests for lib/demon-import.ts against the real Postgres schema (#464).
  *
  * demon-import.ts leans entirely on the DB's unique constraints to decide whether a
- * given upsert reuses an existing row or creates a new one (see `createUpserter`'s
- * `uniqueColumns` argument, matched against each table's `ON CONFLICT` target). These
- * tests exercise `createUpserter` + `writeEncounterRow` against the real schema so a
- * change to a table's unique constraints (or a mismatch between demon-import.ts and the
- * schema) fails loudly here rather than being caught only at import time in production.
- * The existing unit tests in lib/__tests__/demon-import.test.ts mock the Supabase client
- * entirely, so none of this DB-level behaviour is covered there.
+ * given upsert reuses an existing row or creates a new one (see
+ * `EncounterRowBatchWriter`'s per-entity-type `uniqueColumns`, matched against each
+ * table's `ON CONFLICT` target). These tests exercise `EncounterRowBatchWriter`
+ * against the real schema so a change to a table's unique constraints (or a mismatch
+ * between demon-import.ts and the schema) fails loudly here rather than being caught
+ * only at import time in production. The existing unit tests in
+ * lib/__tests__/demon-import.test.ts mock the Supabase client entirely, so none of
+ * this DB-level behaviour is covered there.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -24,8 +25,8 @@
 import { describe, it, beforeAll, afterAll, expect, vi } from 'vitest';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import {
-	createUpserter,
-	writeEncounterRow,
+	createRingSequenceLinker,
+	EncounterRowBatchWriter,
 	type DemonRow
 } from '../../lib/demon-import';
 import { randomTestSuffix, randomFutureDate, addDays } from './test-isolation';
@@ -160,6 +161,44 @@ function makeRow(overrides: Partial<DemonRow> = {}): DemonRow {
 	};
 }
 
+/**
+ * Imports one CSV row through the real batched writer (#1139), in a chunk of its
+ * own.
+ *
+ * Stands in for the per-row writer this file used to call. The writer's own
+ * per-chunk deduplication is unit-tested against a mocked client in
+ * lib/__tests__/demon-import.test.ts; what this file exists for is the DB's unique
+ * constraints deciding whether each upsert reuses a row, which a chunk of one
+ * exercises exactly as the old per-row path did. `importChunkThroughWriter` below
+ * covers the multi-row case against the same real constraints.
+ */
+async function importRowThroughWriter(
+	row: DemonRow,
+	groupClient: SupabaseClient,
+	lookupRingSequence: ReturnType<typeof vi.fn>,
+	groupId: number
+): Promise<void> {
+	await importChunkThroughWriter([row], groupClient, lookupRingSequence, groupId);
+}
+
+/** Imports every row as a single chunk, so one bulk upsert covers them all. */
+async function importChunkThroughWriter(
+	rows: DemonRow[],
+	groupClient: SupabaseClient,
+	lookupRingSequence: ReturnType<typeof vi.fn>,
+	groupId: number
+): Promise<void> {
+	const writer = new EncounterRowBatchWriter(groupClient, {
+		ringingGroupId: groupId,
+		lookupRingSequence,
+		linkRingSequence: createRingSequenceLinker(groupClient),
+		chunkSize: rows.length
+	});
+	const written = rows.map((rowOfChunk) => writer.writeEncounterRow(rowOfChunk));
+	await writer.flushRemaining();
+	await Promise.all(written);
+}
+
 const suffix = randomTestSuffix();
 
 /** Deletes every row this file could have created, identified by the shared suffix. */
@@ -189,7 +228,6 @@ describe('demon-import — multi-record import (usual case)', () => {
 
 
 	it('writes independent Species/Birds/Locations/Sessions/Encounters rows for multiple distinct CSV rows', async () => {
-		const upsert = createUpserter(groupClient);
 		const rows = [1, 2, 3].map((n) =>
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-multi-${n}`,
@@ -200,7 +238,7 @@ describe('demon-import — multi-record import (usual case)', () => {
 		);
 
 		for (const row of rows) {
-			await writeEncounterRow(row, upsert, lookupRingSequence, groupId);
+			await importRowThroughWriter(row, groupClient, lookupRingSequence, groupId);
 		}
 
 		const encounterCount = psqlCount(
@@ -220,7 +258,6 @@ describe('demon-import — multi-record import (usual case)', () => {
 	});
 
 	it('re-importing the same CSV rows a second time does not create duplicate rows', async () => {
-		const upsert = createUpserter(groupClient);
 		const row = makeRow({
 			ring_no: `DEMON-TEST-${suffix}-repeat`,
 			species_name: `DemonImportSpecies-${suffix}-repeat`,
@@ -228,8 +265,8 @@ describe('demon-import — multi-record import (usual case)', () => {
 			visit_date: toDemonDate(randomFutureDate())
 		});
 
-		await writeEncounterRow(row, upsert, lookupRingSequence, groupId);
-		await writeEncounterRow(row, upsert, lookupRingSequence, groupId);
+		await importRowThroughWriter(row, groupClient, lookupRingSequence, groupId);
+		await importRowThroughWriter(row, groupClient, lookupRingSequence, groupId);
 
 		expect(
 			psqlCount(
@@ -266,26 +303,25 @@ describe('demon-import — Species uniqueness (species_name)', () => {
 	});
 
 	it('upserting two rows with the same species_name resolves to the same Species row', async () => {
-		const upsert = createUpserter(groupClient);
 		const speciesName = `DemonImportSpecies-${suffix}-shared`;
 
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-species-a`,
 				species_name: speciesName,
 				loc_id: `DemonImportLoc-${suffix}-species`
 			}),
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-species-b`,
 				species_name: speciesName,
 				loc_id: `DemonImportLoc-${suffix}-species`
 			}),
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
@@ -318,26 +354,24 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 
 	it('upserting the same location_name under two different ringing groups creates two separate Location rows', async () => {
 		const locationName = `DemonImportLoc-${suffix}-cross-group`;
-		const upsertA = createUpserter(groupClientA);
-		const upsertB = createUpserter(groupClientB);
 
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-loc-cross-a`,
 				species_name: `DemonImportSpecies-${suffix}-loc-cross-a`,
 				loc_id: locationName
 			}),
-			upsertA,
+			groupClientA,
 			lookupRingSequence,
 			groupIdA
 		);
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-loc-cross-b`,
 				species_name: `DemonImportSpecies-${suffix}-loc-cross-b`,
 				loc_id: locationName
 			}),
-			upsertB,
+			groupClientB,
 			lookupRingSequence,
 			groupIdB
 		);
@@ -356,25 +390,24 @@ describe('demon-import — Locations uniqueness (location_name, ringing_group_id
 
 	it('upserting the same location_name twice under the same group reuses the same Location row', async () => {
 		const locationName = `DemonImportLoc-${suffix}-same-group`;
-		const upsertA = createUpserter(groupClientA);
 
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-loc-same-1`,
 				species_name: `DemonImportSpecies-${suffix}-loc-same-1`,
 				loc_id: locationName
 			}),
-			upsertA,
+			groupClientA,
 			lookupRingSequence,
 			groupIdA
 		);
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-loc-same-2`,
 				species_name: `DemonImportSpecies-${suffix}-loc-same-2`,
 				loc_id: locationName
 			}),
-			upsertA,
+			groupClientA,
 			lookupRingSequence,
 			groupIdA
 		);
@@ -417,13 +450,13 @@ describe('demon-import — Sessions uniqueness (visit_date, ringing_group_id)', 
 		label: string,
 		fields: { loc_id: string; visit_date: string; record_type: string; age: string }
 	): Promise<void> {
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: `DEMON-TEST-${suffix}-${label}`,
 				species_name: `DemonImportSpecies-${suffix}-${label}`,
 				...fields
 			}),
-			createUpserter(groupClient),
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
@@ -529,7 +562,6 @@ describe('demon-import — Encounters uniqueness (bird_id, location_id, visit_da
 	});
 
 	it('reprocessing the exact same row (same bird + session) updates the existing Encounters row instead of creating a duplicate', async () => {
-		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-encounter-exact-dup`;
 		const row = makeRow({
 			ring_no: ringNo,
@@ -538,10 +570,10 @@ describe('demon-import — Encounters uniqueness (bird_id, location_id, visit_da
 			weight: '10.5'
 		});
 
-		await writeEncounterRow(row, upsert, lookupRingSequence, groupId);
-		await writeEncounterRow(
+		await importRowThroughWriter(row, groupClient, lookupRingSequence, groupId);
+		await importRowThroughWriter(
 			{ ...row, weight: '12.3' }, // near-identical row: same key, different measurement
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
@@ -564,30 +596,29 @@ describe('demon-import — Encounters uniqueness (bird_id, location_id, visit_da
 	// location_id keeps them apart — on the old key the second row would have
 	// overwritten the first.
 	it('processing the same bird on the same date at two different locations creates two Encounters rows', async () => {
-		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-encounter-two-locations`;
 		const speciesName = `DemonImportSpecies-${suffix}-encounter-two-locations`;
 		const visitDate = randomFutureDate();
 
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: ringNo,
 				species_name: speciesName,
 				loc_id: locationName,
 				visit_date: toDemonDate(visitDate)
 			}),
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: ringNo,
 				species_name: speciesName,
 				loc_id: `DemonImportLoc-${suffix}-encounters-second-site`,
 				visit_date: toDemonDate(visitDate)
 			}),
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
@@ -600,30 +631,29 @@ describe('demon-import — Encounters uniqueness (bird_id, location_id, visit_da
 	});
 
 	it('processing the same bird on a different date (near-duplicate) creates a new Encounters row', async () => {
-		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-encounter-near-dup`;
 		const speciesName = `DemonImportSpecies-${suffix}-encounter-near-dup`;
 		const firstVisitDate = randomFutureDate();
 
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: ringNo,
 				species_name: speciesName,
 				loc_id: locationName,
 				visit_date: toDemonDate(firstVisitDate)
 			}),
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: ringNo,
 				species_name: speciesName,
 				loc_id: locationName,
 				visit_date: toDemonDate(addDays(firstVisitDate, 1))
 			}),
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
@@ -652,10 +682,9 @@ describe('demon-import — fat/pectoral_muscle/primary_moult persistence', () =>
 	// Regression test for the historical bug where primary_moult (despite having a column)
 	// was never written by any import, and fat/pectoral_muscle had no column at all.
 	it('persists fat, pectoral_muscle and primary_moult values from a CSV row onto the Encounters row', async () => {
-		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-biometrics-set`;
 
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: ringNo,
 				species_name: `DemonImportSpecies-${suffix}-biometrics-set`,
@@ -664,7 +693,7 @@ describe('demon-import — fat/pectoral_muscle/primary_moult persistence', () =>
 				fat: 'B4',
 				pectoral_muscle: '2'
 			}),
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
@@ -676,10 +705,9 @@ describe('demon-import — fat/pectoral_muscle/primary_moult persistence', () =>
 	});
 
 	it('persists null for fat, pectoral_muscle and primary_moult when the CSV row leaves them blank', async () => {
-		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-biometrics-blank`;
 
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: ringNo,
 				species_name: `DemonImportSpecies-${suffix}-biometrics-blank`,
@@ -688,7 +716,7 @@ describe('demon-import — fat/pectoral_muscle/primary_moult persistence', () =>
 				fat: '',
 				pectoral_muscle: ''
 			}),
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
@@ -719,17 +747,16 @@ describe('demon-import — capture_method persistence', () => {
 	// capture_method = NULL regardless of the CSV's actual value (the gap #1022's
 	// isMistNetEncounter predicate was written to tolerate).
 	it('persists a capture_method value from a CSV row onto the Encounters row', async () => {
-		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-capture-method-set`;
 
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: ringNo,
 				species_name: `DemonImportSpecies-${suffix}-capture-method-set`,
 				loc_id: locationName,
 				capture_method: 'M'
 			}),
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
@@ -741,17 +768,16 @@ describe('demon-import — capture_method persistence', () => {
 	});
 
 	it('persists null for capture_method when the CSV row leaves it blank', async () => {
-		const upsert = createUpserter(groupClient);
 		const ringNo = `DEMON-TEST-${suffix}-capture-method-blank`;
 
-		await writeEncounterRow(
+		await importRowThroughWriter(
 			makeRow({
 				ring_no: ringNo,
 				species_name: `DemonImportSpecies-${suffix}-capture-method-blank`,
 				loc_id: locationName,
 				capture_method: ''
 			}),
-			upsert,
+			groupClient,
 			lookupRingSequence,
 			groupId
 		);
@@ -759,6 +785,163 @@ describe('demon-import — capture_method persistence', () => {
 		expect(
 			psqlCount(
 				`SELECT COUNT(*) FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}' AND e.capture_method IS NULL;`
+			)
+		).toBe(1);
+	});
+});
+
+// The chunked writer's reason for existing (#1139): one bulk upsert per entity
+// type per chunk. Every assertion here is about what the real constraints do with
+// a *multi-row* upsert — the case the per-row writer could never produce, and the
+// case Postgres is strictest about ("ON CONFLICT DO UPDATE command cannot affect
+// row a second time").
+describe('demon-import — chunked multi-row upserts', () => {
+	let groupId: number;
+	let groupClient: SupabaseClient;
+	let locationName: string;
+	let lookupRingSequence: ReturnType<typeof vi.fn>;
+
+	beforeAll(async () => {
+		groupId = createIsolatedGroup(`demon-import-${suffix}-chunk`);
+		groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+		locationName = `DemonImportLoc-${suffix}-chunk`;
+		lookupRingSequence = vi.fn().mockResolvedValue(null);
+	});
+
+	it('writes one row per distinct entity for a chunk of distinct CSV rows', async () => {
+		const visitDate = randomFutureDate();
+		await importChunkThroughWriter(
+			[1, 2, 3].map((n) =>
+				makeRow({
+					ring_no: `DEMON-TEST-${suffix}-chunk-distinct-${n}`,
+					species_name: `DemonImportSpecies-${suffix}-chunk-distinct-${n}`,
+					loc_id: `${locationName}-distinct-${n}`,
+					visit_date: toDemonDate(visitDate)
+				})
+			),
+			groupClient,
+			lookupRingSequence,
+			groupId
+		);
+
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no LIKE 'DEMON-TEST-${suffix}-chunk-distinct-%';`
+			)
+		).toBe(3);
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Locations" WHERE location_name LIKE '${locationName}-distinct-%';`
+			)
+		).toBe(3);
+		// One group-day, however many sites the chunk spans (#1024).
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Sessions" WHERE ringing_group_id = ${groupId} AND visit_date = '${visitDate}';`
+			)
+		).toBe(1);
+	});
+
+	it('writes one Species row for a chunk whose rows all share a species_name', async () => {
+		const speciesName = `DemonImportSpecies-${suffix}-chunk-shared`;
+		await importChunkThroughWriter(
+			[1, 2, 3].map((n) =>
+				makeRow({
+					ring_no: `DEMON-TEST-${suffix}-chunk-shared-${n}`,
+					species_name: speciesName,
+					loc_id: `${locationName}-shared`,
+					visit_date: toDemonDate(randomFutureDate())
+				})
+			),
+			groupClient,
+			lookupRingSequence,
+			groupId
+		);
+
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Species" WHERE species_name = '${speciesName}';`
+			)
+		).toBe(1);
+		expect(
+			psqlCount(
+				`SELECT COUNT(DISTINCT species_id) FROM "Birds" WHERE ring_no LIKE 'DEMON-TEST-${suffix}-chunk-shared-%';`
+			)
+		).toBe(1);
+	});
+
+	it('writes one Encounters row, carrying the last row’s measurements, for a chunk holding the same bird/location/date twice', async () => {
+		const ringNo = `DEMON-TEST-${suffix}-chunk-dup`;
+		const sharedFields = {
+			ring_no: ringNo,
+			species_name: `DemonImportSpecies-${suffix}-chunk-dup`,
+			loc_id: `${locationName}-dup`,
+			visit_date: toDemonDate(randomFutureDate())
+		};
+
+		// Deduped to one entry before the bulk upsert — Postgres would reject the
+		// statement outright otherwise. Last payload wins, which is what the old
+		// row-by-row upserts did when a later row updated an earlier row's key.
+		await importChunkThroughWriter(
+			[
+				makeRow({ ...sharedFields, weight: '10.5' }),
+				makeRow({ ...sharedFields, weight: '12.3' })
+			],
+			groupClient,
+			lookupRingSequence,
+			groupId
+		);
+
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
+			)
+		).toBe(1);
+		expect(
+			Number(
+				psqlScalar(
+					`SELECT e.weight FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
+				)
+			)
+		).toBeCloseTo(12.3);
+	});
+
+	it('re-importing an identical chunk does not duplicate any row', async () => {
+		const rows = [1, 2].map((n) =>
+			makeRow({
+				ring_no: `DEMON-TEST-${suffix}-chunk-reimport-${n}`,
+				species_name: `DemonImportSpecies-${suffix}-chunk-reimport`,
+				loc_id: `${locationName}-reimport`,
+				visit_date: toDemonDate(randomFutureDate())
+			})
+		);
+
+		await importChunkThroughWriter(
+			rows,
+			groupClient,
+			lookupRingSequence,
+			groupId
+		);
+		await importChunkThroughWriter(
+			rows,
+			groupClient,
+			lookupRingSequence,
+			groupId
+		);
+
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Birds" WHERE ring_no LIKE 'DEMON-TEST-${suffix}-chunk-reimport-%';`
+			)
+		).toBe(2);
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no LIKE 'DEMON-TEST-${suffix}-chunk-reimport-%';`
+			)
+		).toBe(2);
+		expect(
+			psqlCount(
+				`SELECT COUNT(*) FROM "Locations" WHERE location_name = '${locationName}-reimport';`
 			)
 		).toBe(1);
 	});

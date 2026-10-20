@@ -11,7 +11,6 @@
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import { supabase } from '../../lib/supabase';
-import { createUpserter } from '../../lib/demon-import';
 import { randomTestSuffix, randomFutureDate } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { psql } from './db-test-helpers';
@@ -272,38 +271,40 @@ describe('Birds — species_id immutability trigger', () => {
 		expect(bird?.species_id).toBe(speciesIdB);
 	});
 
-	describe('import path (createUpserter on ring_no, as processEncounterRow uses)', () => {
+	// Mirrors the `Birds` upsert `EncounterRowBatchWriter` issues — same
+	// `ON CONFLICT (ring_no) DO UPDATE` target, written as the one-row case so the
+	// trigger's behaviour is what the test is about rather than the chunking.
+	describe('import path (ON CONFLICT (ring_no) DO UPDATE, as the import issues)', () => {
+		async function upsertBird(ringNo: string, speciesId: number) {
+			const { data, error } = await groupClient
+				.from('Birds')
+				.upsert(
+					{ ring_no: ringNo, species_id: speciesId },
+					{ onConflict: 'ring_no', ignoreDuplicates: false }
+				)
+				.select('id')
+				.single();
+			if (error) throw error;
+			return data.id as number;
+		}
+
 		it('re-importing the same ring_no with the same species is a no-op update, unaffected by the trigger', async () => {
-			const upsert = createUpserter(groupClient);
 			const ringNo = `${ringPrefix}-REIMPORT-SAME-${testSuffix}`;
 
-			const firstId = await upsert(
-				'Birds',
-				{ ring_no: ringNo, species_id: speciesIdA },
-				['ring_no']
-			);
-			const secondId = await upsert(
-				'Birds',
-				{ ring_no: ringNo, species_id: speciesIdA },
-				['ring_no']
-			);
+			const firstId = await upsertBird(ringNo, speciesIdA);
+			const secondId = await upsertBird(ringNo, speciesIdA);
 
 			expect(secondId).toBe(firstId);
 		});
 
 		it('re-importing the same ring_no with a different species no longer silently changes species_id — it errors, and species_id is preserved', async () => {
-			const upsert = createUpserter(groupClient);
 			const ringNo = `${ringPrefix}-REIMPORT-DIFF-${testSuffix}`;
 
-			const birdId = await upsert(
-				'Birds',
-				{ ring_no: ringNo, species_id: speciesIdA },
-				['ring_no']
-			);
+			const birdId = await upsertBird(ringNo, speciesIdA);
 
-			await expect(
-				upsert('Birds', { ring_no: ringNo, species_id: speciesIdB }, ['ring_no'])
-			).rejects.toMatchObject({ code: '23514' });
+			await expect(upsertBird(ringNo, speciesIdB)).rejects.toMatchObject({
+				code: '23514'
+			});
 
 			// The original species must survive the rejected re-import.
 			const { data: after } = await groupClient
