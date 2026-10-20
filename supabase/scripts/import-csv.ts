@@ -23,7 +23,7 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
-	createDemonRecordsBatchWriter,
+	DemonRecordsBatchWriter,
 	ImportJobTracker,
 	processEncounterRow,
 	writeEncounterRow,
@@ -212,7 +212,7 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 
 	// Every row is staged into DemonRecords before it is interpreted into the
 	// domain tables (#959), batched so the per-row concurrency above survives.
-	const demonRecordsBatchWriter = createDemonRecordsBatchWriter(
+	const demonRecordsBatchWriter = new DemonRecordsBatchWriter(
 		groupSupabaseClient,
 		{ importJobId, ringingGroupId }
 	);

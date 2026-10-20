@@ -13,7 +13,7 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 	return {
 		...actual,
 		createUpserter: vi.fn(),
-		createDemonRecordsBatchWriter: vi.fn(),
+		DemonRecordsBatchWriter: vi.fn(),
 		ImportJobTracker: vi.fn(),
 		processEncounterRow: vi.fn(),
 		findUnrecognisedLocationNames: vi.fn()
@@ -90,7 +90,7 @@ describe('POST /api/import', () => {
 
 		const { getAuthenticatedSupabaseClient } =
 			await import('@/app/lib/auth/group-auth');
-		const { createUpserter, createDemonRecordsBatchWriter, ImportJobTracker } =
+		const { createUpserter, DemonRecordsBatchWriter, ImportJobTracker } =
 			await import('@/lib/demon-import');
 		mockUpsert = vi.fn().mockResolvedValue(1);
 		vi.mocked(createUpserter).mockReturnValue(mockUpsert as never);
@@ -99,9 +99,10 @@ describe('POST /api/import', () => {
 			flushRemaining: vi.fn().mockResolvedValue(undefined),
 			getDistinctDates: vi.fn().mockReturnValue(STAGED_DATES)
 		};
-		vi.mocked(createDemonRecordsBatchWriter).mockReturnValue(
-			mockDemonRecordsBatchWriter as never
-		);
+		// Newable for the same reason as the `ImportJobTracker` stub below.
+		vi.mocked(DemonRecordsBatchWriter).mockImplementation(function () {
+			return mockDemonRecordsBatchWriter as never;
+		} as never);
 		mockImportJobTracker = {
 			createImportJob: vi.fn().mockResolvedValue(IMPORT_JOB_ID),
 			recordAffectedDates: vi.fn().mockResolvedValue(undefined),
@@ -357,10 +358,12 @@ describe('POST /api/import', () => {
 				return {
 					...actual,
 					createUpserter: vi.fn().mockReturnValue(vi.fn()),
-					createDemonRecordsBatchWriter: vi.fn().mockReturnValue({
-						writeDemonRecord: vi.fn(),
-						flushRemaining: vi.fn(),
-						getDistinctDates: vi.fn(() => [])
+					DemonRecordsBatchWriter: vi.fn(function () {
+						return {
+							writeDemonRecord: vi.fn(),
+							flushRemaining: vi.fn(),
+							getDistinctDates: vi.fn(() => [])
+						};
 					}),
 					ImportJobTracker: vi.fn(function () {
 						return {
@@ -416,7 +419,7 @@ describe('POST /api/import', () => {
 		});
 
 		it('records the staged dates once every DemonRecords batch has landed', async () => {
-			const { createDemonRecordsBatchWriter, processEncounterRow } =
+			const { DemonRecordsBatchWriter, processEncounterRow } =
 				await import('@/lib/demon-import');
 			vi.mocked(processEncounterRow).mockResolvedValue({
 				visitDate: '2024-06-01'
@@ -429,7 +432,7 @@ describe('POST /api/import', () => {
 			await readStreamMessages(await POST(await makeRequest(file)));
 
 			// Group ID 1 — group-cookie is mocked globally in vitest.setup.tsx.
-			expect(vi.mocked(createDemonRecordsBatchWriter)).toHaveBeenCalledWith(
+			expect(vi.mocked(DemonRecordsBatchWriter)).toHaveBeenCalledWith(
 				expect.anything(),
 				{ importJobId: IMPORT_JOB_ID, ringingGroupId: 1 }
 			);

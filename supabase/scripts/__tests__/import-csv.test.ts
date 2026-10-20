@@ -2,7 +2,7 @@ import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pRateLimit } from 'p-ratelimit';
 import {
-	createDemonRecordsBatchWriter,
+	DemonRecordsBatchWriter,
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames,
 	processEncounterRow
@@ -80,10 +80,13 @@ vi.mock('../../../lib/demon-import', () => ({
 	createUpserter: vi.fn(() => vi.fn()),
 	createRingSequenceLookup: vi.fn(() => vi.fn()),
 	createRingSequenceLinker: vi.fn(() => vi.fn()),
-	createDemonRecordsBatchWriter: vi.fn(() => mockDemonRecordsBatchWriter),
+	// `function`, not an arrow, for both of these: the script does `new
+	// DemonRecordsBatchWriter(...)`/`new ImportJobTracker(...)`, and only a
+	// newable stub's returned object becomes the constructed instance.
+	DemonRecordsBatchWriter: vi.fn(function () {
+		return mockDemonRecordsBatchWriter;
+	}),
 	writeEncounterRow: vi.fn(async () => ({ visitDate: '2024-06-01' })),
-	// `function`, not an arrow: the script does `new ImportJobTracker(...)`, and
-	// only a newable stub's returned object becomes the constructed instance.
 	ImportJobTracker: vi.fn(function () {
 		return mockImportJobTracker;
 	}),
@@ -111,7 +114,7 @@ beforeEach(() => {
 		trackerOperation.mockResolvedValue(undefined);
 	}
 	mockImportJobTracker.createImportJob.mockResolvedValue(IMPORT_JOB_ID);
-	vi.mocked(createDemonRecordsBatchWriter).mockClear();
+	vi.mocked(DemonRecordsBatchWriter).mockClear();
 	for (const writerOperation of Object.values(mockDemonRecordsBatchWriter)) {
 		writerOperation.mockClear();
 	}
@@ -261,7 +264,7 @@ describe('importCSV DemonRecords staging', () => {
 			ringingGroupName: 'Alpha'
 		});
 
-		expect(vi.mocked(createDemonRecordsBatchWriter)).toHaveBeenCalledWith(
+		expect(vi.mocked(DemonRecordsBatchWriter)).toHaveBeenCalledWith(
 			expect.anything(),
 			{ importJobId: IMPORT_JOB_ID, ringingGroupId: 7 }
 		);

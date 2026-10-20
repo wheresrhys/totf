@@ -508,23 +508,6 @@ export const DEFAULT_DEMON_RECORDS_BATCH_SIZE = 100;
 const DEMON_RECORDS_CONFLICT_TARGET =
 	'ringing_group_id,ring_no,encounter_date,encounter_time';
 
-export type DemonRecordsBatchWriter = {
-	/**
-	 * Buffers `rawRow` for the next `DemonRecords` insert and resolves once the
-	 * whole batch containing it has landed — not when it was buffered. A row that
-	 * can't be staged at all resolves immediately; see `buildDemonRecord`.
-	 */
-	writeDemonRecord(rawRow: DemonRow): Promise<void>;
-	/**
-	 * Flushes the trailing partial batch and waits for every batch of the run to
-	 * have landed. Call it once, after every row has been handed to
-	 * `writeDemonRecord` but before awaiting any row's promise.
-	 */
-	flushRemaining(): Promise<void>;
-	/** The distinct `encounter_date`s across every batch that has landed so far. */
-	getDistinctDates(): string[];
-};
-
 type BufferedDemonRecord = {
 	record: DemonRecordsInsert;
 	/** Position in the run, for the batch-failure log only. */
@@ -571,10 +554,12 @@ function buildDemonRecord(
  * inserts, so a completeness/recovery record of what was submitted exists before
  * the row is interpreted into Species/Birds/Sessions/Encounters.
  *
- * A `create*` factory closing over the client, like `createUpserter` — but
- * returning three operations rather than one, because the buffer they share is
- * the whole mechanism: `writeDemonRecord` appends and hands back a promise,
- * `flushRemaining` drains what's left, `getDistinctDates` reports what landed.
+ * A class rather than a `create*` closure factory like `createUpserter`, because
+ * this is three operations over one piece of mutable state rather than a single
+ * operation over a captured client: the shared buffer is the whole mechanism —
+ * `writeDemonRecord` appends and hands back a promise, `flushRemaining` drains
+ * what's left, `getDistinctDates` reports what landed. One instance per import
+ * run, same as `ImportJobTracker`.
  *
  * Batching is interleaved with row processing rather than a phase of its own, so
  * the import keeps the per-row concurrency it relies on: a row's own promise
@@ -588,30 +573,40 @@ function buildDemonRecord(
  * batch larger than the concurrency cap can never fill — the rows that would
  * complete it are queued behind the rows already blocked on it.
  */
-export function createDemonRecordsBatchWriter(
-	supabaseClient: SupabaseClient,
-	{
-		importJobId,
-		ringingGroupId,
-		batchSize = DEFAULT_DEMON_RECORDS_BATCH_SIZE
-	}: {
-		importJobId: number;
-		ringingGroupId: number;
-		batchSize?: number;
-	}
-): DemonRecordsBatchWriter {
-	let buffer: BufferedDemonRecord[] = [];
-	let rowsBuffered = 0;
-	const landedEncounterDates = new Set<string>();
+export class DemonRecordsBatchWriter {
+	private readonly importJobId: number;
+	private readonly ringingGroupId: number;
+	private readonly batchSize: number;
+
+	private buffer: BufferedDemonRecord[] = [];
+	private rowsBuffered = 0;
+	private readonly landedEncounterDates = new Set<string>();
 	// Batches are chained rather than fired off in parallel, so they land in the
 	// order they filled. That keeps the order rows are released in — and so the
 	// order they enter the rate limiter and acquire their row ids — a function of
 	// the CSV rather than of which insert happened to return first, which is what
 	// `seed-e2e-data.ts`'s `concurrency: 1` determinism (#903) depends on.
-	let batchChain: Promise<void> = Promise.resolve();
+	private batchChain: Promise<void> = Promise.resolve();
 
-	async function writeBatch(batch: BufferedDemonRecord[]): Promise<void> {
-		const { error } = await supabaseClient
+	constructor(
+		private readonly supabaseClient: SupabaseClient,
+		{
+			importJobId,
+			ringingGroupId,
+			batchSize = DEFAULT_DEMON_RECORDS_BATCH_SIZE
+		}: {
+			importJobId: number;
+			ringingGroupId: number;
+			batchSize?: number;
+		}
+	) {
+		this.importJobId = importJobId;
+		this.ringingGroupId = ringingGroupId;
+		this.batchSize = batchSize;
+	}
+
+	private async writeBatch(batch: BufferedDemonRecord[]): Promise<void> {
+		const { error } = await this.supabaseClient
 			.from('DemonRecords')
 			.upsert<DemonRecordsInsert>(
 				batch.map(({ record }) => record),
@@ -630,8 +625,8 @@ export function createDemonRecordsBatchWriter(
 			console.error(
 				'Failed to write a DemonRecords batch; its rows will not be imported',
 				{
-					importJobId,
-					ringingGroupId,
+					importJobId: this.importJobId,
+					ringingGroupId: this.ringingGroupId,
 					rowCount: batch.length,
 					rowIndices: batch.map(({ rowIndex }) => rowIndex)
 				},
@@ -642,46 +637,59 @@ export function createDemonRecordsBatchWriter(
 		}
 
 		for (const bufferedRecord of batch) {
-			landedEncounterDates.add(bufferedRecord.record.encounter_date);
+			this.landedEncounterDates.add(bufferedRecord.record.encounter_date);
 			bufferedRecord.resolve();
 		}
 	}
 
-	function flushBufferedBatch(): void {
-		if (buffer.length === 0) return;
-		const batch = buffer;
-		buffer = [];
-		batchChain = batchChain.then(() => writeBatch(batch));
+	private flushBufferedBatch(): void {
+		if (this.buffer.length === 0) return;
+		const batch = this.buffer;
+		this.buffer = [];
+		this.batchChain = this.batchChain.then(() => this.writeBatch(batch));
 	}
 
-	return {
-		writeDemonRecord(rawRow: DemonRow): Promise<void> {
-			const record = buildDemonRecord(rawRow, importJobId, ringingGroupId);
-			if (!record) return Promise.resolve();
+	/**
+	 * Buffers `rawRow` for the next `DemonRecords` insert and resolves once the
+	 * whole batch containing it has landed — not when it was buffered. A row that
+	 * can't be staged at all resolves immediately; see `buildDemonRecord`.
+	 */
+	writeDemonRecord(rawRow: DemonRow): Promise<void> {
+		const record = buildDemonRecord(
+			rawRow,
+			this.importJobId,
+			this.ringingGroupId
+		);
+		if (!record) return Promise.resolve();
 
-			const rowIndex = rowsBuffered++;
-			// The executor runs synchronously, so the row is buffered before this
-			// returns — which is what lets a whole batch fill within one
-			// synchronous dispatch pass over the rows.
-			const batchLanded = new Promise<void>((resolve, reject) => {
-				buffer.push({ record, rowIndex, resolve, reject });
-			});
-			if (buffer.length >= batchSize) flushBufferedBatch();
-			return batchLanded;
-		},
+		const rowIndex = this.rowsBuffered++;
+		// The executor runs synchronously, so the row is buffered before this
+		// returns — which is what lets a whole batch fill within one synchronous
+		// dispatch pass over the rows.
+		const batchLanded = new Promise<void>((resolve, reject) => {
+			this.buffer.push({ record, rowIndex, resolve, reject });
+		});
+		if (this.buffer.length >= this.batchSize) this.flushBufferedBatch();
+		return batchLanded;
+	}
 
-		async flushRemaining(): Promise<void> {
-			flushBufferedBatch();
-			// Nothing appends to the chain once the caller has stopped buffering
-			// rows (`writeBatch` never does), so the chain as it stands here is the
-			// whole run's worth of batches.
-			await batchChain;
-		},
+	/**
+	 * Flushes the trailing partial batch and waits for every batch of the run to
+	 * have landed. Call it once, after every row has been handed to
+	 * `writeDemonRecord` but before awaiting any row's promise.
+	 */
+	async flushRemaining(): Promise<void> {
+		this.flushBufferedBatch();
+		// Nothing appends to the chain once the caller has stopped buffering rows
+		// (`writeBatch` never does), so the chain as it stands here is the whole
+		// run's worth of batches.
+		await this.batchChain;
+	}
 
-		getDistinctDates(): string[] {
-			return [...landedEncounterDates].sort();
-		}
-	};
+	/** The distinct `encounter_date`s across every batch that has landed so far. */
+	getDistinctDates(): string[] {
+		return [...this.landedEncounterDates].sort();
+	}
 }
 
 /**
@@ -696,7 +704,7 @@ export function createDemonRecordsBatchWriter(
  * `writeEncounterRowRateLimited` is built once per run by the caller, and is
  * where the run's concurrency cap lives — around the domain-table write alone,
  * never around the staging write above it (see
- * `createDemonRecordsBatchWriter`).
+ * `DemonRecordsBatchWriter`).
  */
 export async function processEncounterRow(
 	rawRow: DemonRow,

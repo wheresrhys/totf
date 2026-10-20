@@ -519,7 +519,7 @@ Core import logic (types, transforms, `createUpserter`, `processEncounterRow`) l
 **Every row is staged into `DemonRecords` before it is interpreted (#959).** `processEncounterRow`
 is a two-step orchestrator: `await writer.writeDemonRecord(row)`, then the rate-limited
 `writeEncounterRow(row, …)` — the Species/RingSequence/Birds/Locations/Sessions/Encounters body
-that used to be `processEncounterRow`'s own. `createDemonRecordsBatchWriter(client, {importJobId,
+that used to be `processEncounterRow`'s own. `new DemonRecordsBatchWriter(client, {importJobId,
 ringingGroupId, batchSize})` buffers rows and inserts them in multi-row `ON CONFLICT DO NOTHING`
 batches against `demon_records_group_ring_date_time_unique`; a row's own promise resolves when
 *its* batch lands, so staging stays interleaved with per-row processing rather than becoming an

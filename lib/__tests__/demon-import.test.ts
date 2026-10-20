@@ -6,7 +6,7 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
-	createDemonRecordsBatchWriter,
+	DemonRecordsBatchWriter,
 	ImportJobTracker,
 	CasualtyEncounterError,
 	processEncounterRow,
@@ -729,7 +729,7 @@ function settlePendingMicrotasks(): Promise<void> {
 
 function makeStagingWriter(batchSize: number) {
 	const demonRecordsClient = makeDemonRecordsClient();
-	const writer = createDemonRecordsBatchWriter(demonRecordsClient.client, {
+	const writer = new DemonRecordsBatchWriter(demonRecordsClient.client, {
 		importJobId: STAGING_IMPORT_JOB_ID,
 		ringingGroupId: STAGING_RINGING_GROUP_ID,
 		batchSize
@@ -747,7 +747,7 @@ function makeDemonRows(count: number, overrides: Partial<DemonRow> = {}) {
 	);
 }
 
-describe('createDemonRecordsBatchWriter buffering', () => {
+describe('DemonRecordsBatchWriter buffering', () => {
 	it('flushes a batch as a single multi-row upsert once writeDemonRecord has been called batchSize times', async () => {
 		const { demonRecordsClient, writer } = makeStagingWriter(3);
 

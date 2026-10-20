@@ -7,7 +7,7 @@ import {
 	createUpserter,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
-	createDemonRecordsBatchWriter,
+	DemonRecordsBatchWriter,
 	ImportJobTracker,
 	processEncounterRow,
 	writeEncounterRow,
@@ -140,14 +140,14 @@ export async function POST(request: Request): Promise<Response> {
 				// Every row is staged into DemonRecords before it is interpreted
 				// into the domain tables (#959), batched so the per-row concurrency
 				// below survives.
-				const demonRecordsBatchWriter = createDemonRecordsBatchWriter(
+				const demonRecordsBatchWriter = new DemonRecordsBatchWriter(
 					supabaseClient,
 					{ importJobId, ringingGroupId }
 				);
 
 				// Wrapped around the domain-table write alone — never around a whole
 				// row, whose DemonRecords staging write must stay unthrottled so a
-				// batch can fill (see `createDemonRecordsBatchWriter`).
+				// batch can fill (see `DemonRecordsBatchWriter`).
 				const limit = pRateLimit({
 					interval: 1000,
 					rate: 30,
