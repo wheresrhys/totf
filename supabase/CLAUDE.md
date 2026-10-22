@@ -294,6 +294,22 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
    `.github/workflows/deploy-migrations.yml` job added in #862 was exercised and then deliberately
    removed, so `npm run db:migration:push` is once again the sole deploy path.
 
+**A brand-new table needs step 4 run TWICE (#1167).** The public schema has `ALTER DEFAULT
+PRIVILEGES ... GRANT ALL ON TABLES TO anon, authenticated, service_role`, so `CREATE TABLE` hands
+every role the full privilege set the moment the table exists — and declarative sync's first pass
+only ever *adds* the `GRANT`s your schema file declares, it never notices the surplus. The table
+therefore lands with `DELETE`/`UPDATE` (and a full set for `anon`) regardless of what the file
+says, which is exactly the kind of thing an RLS test is written to catch: #1167's "blocks an
+authenticated update/delete" cases failed with `error` undefined rather than `42501`. A second
+`npm run db:schema:apply` diffs the now-existing table against the file and emits the missing
+`REVOKE`s, as its own migration — so a new-table branch legitimately carries two migration files,
+and you should expect the second one to be nothing but `REVOKE`s. Don't try to collapse them by
+hand-editing the first: it has already been applied locally, so `migration up` would never re-run
+it. Corollary: a new-table branch's first `db:schema:apply` may also sweep up unrelated
+`REVOKE`s left pending by whichever earlier branch last created an object (#1167's picked up two
+for `upsert_{simple,complex}_stats_cache_rows` from the #1144/#1152 work) — check them against the
+declared schema, but they're reconciliation, not drift you introduced.
+
 **Every `supabase/schema/` change must produce a migration via step 4 above — no exceptions.**
 `supabase/migrations/` holds 79+ historical files (~944KB) that are pure noise for almost any
 single task, so a `PreToolUse` hook (`.claude/hooks/gate-migration-reads.sh`, wired in

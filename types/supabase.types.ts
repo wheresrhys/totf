@@ -280,6 +280,57 @@ export type Database = {
           },
         ]
       }
+      FailedStatsCacheRefreshes: {
+        Row: {
+          cache_table: string
+          created_at: string
+          details: Json | null
+          group_id: number
+          id: number
+          reason: string
+          species_id: number | null
+          temporal_unit: string
+          time_period: string | null
+        }
+        Insert: {
+          cache_table: string
+          created_at?: string
+          details?: Json | null
+          group_id: number
+          id?: number
+          reason: string
+          species_id?: number | null
+          temporal_unit: string
+          time_period?: string | null
+        }
+        Update: {
+          cache_table?: string
+          created_at?: string
+          details?: Json | null
+          group_id?: number
+          id?: number
+          reason?: string
+          species_id?: number | null
+          temporal_unit?: string
+          time_period?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "failed_stats_cache_refreshes_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "failed_stats_cache_refreshes_species_id_fkey"
+            columns: ["species_id"]
+            isOneToOne: false
+            referencedRelation: "Species"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       GroupDataSharing: {
         Row: {
           created_at: string
