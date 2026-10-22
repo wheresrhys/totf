@@ -1,8 +1,10 @@
 /**
- * DB integration tests for the `SimpleStatsCache` table's own schema — the
- * unique constraint, column types/nullability and RLS — independent of the
- * (not-yet-written, see sibling ticket) `refresh_simple_stats_cache` write
- * path. See supabase/schema/schemas/public/tables/"SimpleStatsCache".sql.
+ * DB integration tests for the `SimpleStatsCache` table's own schema — its four
+ * unique indexes, column types/nullability and RLS — independent of the
+ * (not-yet-written, see sibling ticket) `refresh_simple_stats_cache`
+ * orchestrator. The upsert RPC that orchestrator will call has its own tests in
+ * upsert-simple-stats-cache-rows.test.ts. See
+ * supabase/schema/schemas/public/tables/"SimpleStatsCache".sql.
  *
  * Requires local Supabase running:
  *   npm run db:start:local
@@ -15,103 +17,17 @@
  * supabase/__tests__/test-isolation.ts).
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
-import { createIsolatedGroup, psql, psqlScalar } from './db-test-helpers';
+import { createIsolatedGroup, psql } from './db-test-helpers';
 import { randomTestSuffix, randomFutureDate } from './test-isolation';
+import {
+	DEFAULT_SIMPLE_METRICS,
+	buildSimpleStatsCacheRow,
+	createIsolatedSpecies,
+} from './stats-cache-fixtures';
 
-/** Sentinel `time_period` value for the 'all-time' grain — see the table's own
- * column comment in supabase/schema/schemas/public/tables/"SimpleStatsCache".sql. */
-const ALL_TIME_SENTINEL = '0001-01-01';
-
-type TemporalUnit = 'day' | 'month' | 'year' | 'month-squashed' | 'all-time';
-
-/** Every non-key column, with one representative, round-trip-safe value per
- * source type (bigint, interval, numeric, real, smallint) — used as the
- * default metric payload so most tests need only override group_id/species_id/
- * temporal_unit/time_period. */
-const DEFAULT_METRICS = {
-	species_count: 7,
-	bird_count: 42,
-	encounter_count: 100,
-	new_bird_count: 5,
-	session_count: 3,
-	total_effort: '10:30:00',
-	effort_per_session: '03:30:00',
-	effort_per_encounter: '00:06:18',
-	avg_encounters_per_session: 12.5,
-	max_per_session: 40,
-	max_new_per_session: 10,
-	max_weight: 15.75,
-	avg_weight: 12.345,
-	min_weight: 9.5,
-	median_weight: 12,
-	max_wing: 95,
-	avg_wing: 88.4,
-	min_wing: 80,
-	median_wing: 85,
-	pullus_bird_count: 1,
-	juv_bird_count: 2,
-	postjuv_bird_count: 3,
-	adult_bird_count: 36,
-	unknown_age_bird_count: 0,
-	new_young_bird_count: 2,
-	pullus_enc_count: 1,
-	juv_enc_count: 2,
-	postjuv_enc_count: 3,
-	adult_enc_count: 90,
-	unknown_age_enc_count: 4,
-	postjuv_juv_enc_count: 5,
-	new_postjuv_juv_enc_count: 1,
-	new_postjuv_enc_count: 1,
-} as const;
-
-/** The eight biometric columns are genuinely nullable in the schema (see
- * supabase/schema/schemas/public/tables/"SimpleStatsCache".sql) even though
- * DEFAULT_METRICS gives each a representative non-null default — so the
- * builder's param type widens just these to `number | null` rather than
- * inheriting DEFAULT_METRICS' inferred non-null `number` type. */
-type NullableBiometricColumn =
-	| 'max_weight'
-	| 'avg_weight'
-	| 'min_weight'
-	| 'median_weight'
-	| 'max_wing'
-	| 'avg_wing'
-	| 'min_wing'
-	| 'median_wing';
-
-type SimpleStatsCacheRowParams = {
-	groupId: number;
-	speciesId: number;
-	temporalUnit?: TemporalUnit;
-	timePeriod?: string;
-} & Partial<Omit<typeof DEFAULT_METRICS, NullableBiometricColumn>> &
-	Partial<Record<NullableBiometricColumn, number | null>>;
-
-/** Fixture builder: flat params merged over sensible defaults. */
-function buildSimpleStatsCacheRow({
-	groupId,
-	speciesId,
-	temporalUnit = 'month',
-	timePeriod = randomFutureDate(),
-	...metricOverrides
-}: SimpleStatsCacheRowParams) {
-	return {
-		group_id: groupId,
-		species_id: speciesId,
-		temporal_unit: temporalUnit,
-		time_period: timePeriod,
-		...DEFAULT_METRICS,
-		...metricOverrides,
-	};
-}
-
-/** Creates a throwaway `Species` row and returns its id. */
-function createIsolatedSpecies(name: string): number {
-	return Number(psqlScalar(`INSERT INTO "Species" (species_name) VALUES ('${name}') RETURNING id;`));
-}
 
 describe('SimpleStatsCache', () => {
 	const suffix = randomTestSuffix();
@@ -139,46 +55,71 @@ describe('SimpleStatsCache', () => {
 		);
 	});
 
-	describe('the unique constraint', () => {
-		afterAll(() => {
+	/** Each of the four null-patterns the table's four unique indexes police, as
+	 * the pair of builder params that produces it. */
+	const NULL_PATTERNS = {
+		perSpeciesPerPeriod: { speciesId: () => speciesId, timePeriod: () => randomFutureDate() },
+		allSpeciesPerPeriod: { speciesId: () => null, timePeriod: () => randomFutureDate() },
+		perSpeciesAllTime: { speciesId: () => speciesId, timePeriod: () => null },
+		allSpeciesAllTime: { speciesId: () => null, timePeriod: () => null },
+	} as const;
+
+	describe('the unique indexes', () => {
+		// Per-test rather than per-block cleanup: the two all-time patterns key on
+		// (group_id, temporal_unit[, species_id]) with no time_period to vary, so
+		// rows left behind by one test would collide with the next one's.
+		afterEach(() => {
 			psql(`DELETE FROM "SimpleStatsCache" WHERE group_id IN (${ownerGroupId}, ${otherGroupId});`);
 		});
 
-		it('rejects a duplicate dated row for the same group/species/grain/period', async () => {
-			const timePeriod = randomFutureDate();
-			const first = await ownerClient
-				.from('SimpleStatsCache')
-				.insert(buildSimpleStatsCacheRow({ groupId: ownerGroupId, speciesId, temporalUnit: 'month', timePeriod }));
-			expect(first.error).toBeNull();
+		/** Inserts the same null-pattern twice for one group/grain and returns both
+		 * results, so each index's own duplicate-rejection test is a one-liner. */
+		async function insertTwice(pattern: keyof typeof NULL_PATTERNS) {
+			const { speciesId: speciesIdFor, timePeriod: timePeriodFor } = NULL_PATTERNS[pattern];
+			const row = buildSimpleStatsCacheRow({
+				groupId: ownerGroupId,
+				speciesId: speciesIdFor(),
+				temporalUnit: 'month',
+				timePeriod: timePeriodFor(),
+			});
+			const first = await ownerClient.from('SimpleStatsCache').insert(row);
+			const second = await ownerClient.from('SimpleStatsCache').insert(row);
+			return { first, second };
+		}
 
-			const second = await ownerClient
-				.from('SimpleStatsCache')
-				.insert(buildSimpleStatsCacheRow({ groupId: ownerGroupId, speciesId, temporalUnit: 'month', timePeriod }));
-			expect(second.error).not.toBeNull();
+		it('rejects a duplicate per-species, dated row — the plain unique constraint', async () => {
+			const { first, second } = await insertTwice('perSpeciesPerPeriod');
+			expect(first.error).toBeNull();
 			expect(second.error?.code).toBe('23505'); // unique_violation
 		});
 
-		it('rejects a second all-time row for the same group/species (same sentinel time_period)', async () => {
-			const first = await ownerClient.from('SimpleStatsCache').insert(
-				buildSimpleStatsCacheRow({
-					groupId: ownerGroupId,
-					speciesId,
-					temporalUnit: 'all-time',
-					timePeriod: ALL_TIME_SENTINEL,
-				})
-			);
+		it('rejects a duplicate all-species, dated row — the NULL species_id partial index', async () => {
+			const { first, second } = await insertTwice('allSpeciesPerPeriod');
 			expect(first.error).toBeNull();
-
-			const second = await ownerClient.from('SimpleStatsCache').insert(
-				buildSimpleStatsCacheRow({
-					groupId: ownerGroupId,
-					speciesId,
-					temporalUnit: 'all-time',
-					timePeriod: ALL_TIME_SENTINEL,
-				})
-			);
-			expect(second.error).not.toBeNull();
 			expect(second.error?.code).toBe('23505'); // unique_violation
+		});
+
+		it('rejects a duplicate per-species, all-time row — the NULL time_period partial index', async () => {
+			const { first, second } = await insertTwice('perSpeciesAllTime');
+			expect(first.error).toBeNull();
+			expect(second.error?.code).toBe('23505'); // unique_violation
+		});
+
+		it('rejects a duplicate all-species, all-time row — the both-NULL partial index', async () => {
+			const { first, second } = await insertTwice('allSpeciesAllTime');
+			expect(first.error).toBeNull();
+			expect(second.error?.code).toBe('23505'); // unique_violation
+		});
+
+		it('allows all four null-patterns to coexist for the same group/species/grain', async () => {
+			const timePeriod = randomFutureDate();
+			const { error } = await ownerClient.from('SimpleStatsCache').insert([
+				buildSimpleStatsCacheRow({ groupId: ownerGroupId, speciesId, temporalUnit: 'month', timePeriod }),
+				buildSimpleStatsCacheRow({ groupId: ownerGroupId, speciesId: null, temporalUnit: 'month', timePeriod }),
+				buildSimpleStatsCacheRow({ groupId: ownerGroupId, speciesId, temporalUnit: 'month', timePeriod: null }),
+				buildSimpleStatsCacheRow({ groupId: ownerGroupId, speciesId: null, temporalUnit: 'month', timePeriod: null }),
+			]);
+			expect(error).toBeNull();
 		});
 
 		it('allows the same species/grain/period for two different groups', async () => {
@@ -231,8 +172,8 @@ describe('SimpleStatsCache', () => {
 				.eq('id', inserted.data!.id)
 				.single();
 			expect(error).toBeNull();
-			for (const [column, value] of Object.entries(DEFAULT_METRICS)) {
-				expect(data?.[column as keyof typeof DEFAULT_METRICS], column).toBe(value);
+			for (const [column, value] of Object.entries(DEFAULT_SIMPLE_METRICS)) {
+				expect(data?.[column as keyof typeof DEFAULT_SIMPLE_METRICS], column).toBe(value);
 			}
 			expect(data?.group_id).toBe(ownerGroupId);
 			expect(data?.species_id).toBe(speciesId);
@@ -267,14 +208,22 @@ describe('SimpleStatsCache', () => {
 			expect(data?.median_wing).toBeNull();
 		});
 
-		it('rejects a NULL time_period — the column is NOT NULL, all-time rows use the sentinel value instead', async () => {
-			const row = buildSimpleStatsCacheRow({ groupId: ownerGroupId, speciesId, temporalUnit: 'all-time' });
+		it('round-trips a NULL species_id and time_period as the "all species, all time" cell rather than rejecting them', async () => {
+			const row = buildSimpleStatsCacheRow({
+				groupId: ownerGroupId,
+				speciesId: null,
+				temporalUnit: 'all-time',
+				timePeriod: null,
+			});
 
-			const { error } = await ownerClient
+			const { data, error } = await ownerClient
 				.from('SimpleStatsCache')
-				.insert({ ...row, time_period: null } as never);
-			expect(error).not.toBeNull();
-			expect(error?.code).toBe('23502'); // not_null_violation
+				.insert(row)
+				.select('species_id, time_period')
+				.single();
+			expect(error).toBeNull();
+			expect(data?.species_id).toBeNull();
+			expect(data?.time_period).toBeNull();
 		});
 	});
 
