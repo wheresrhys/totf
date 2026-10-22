@@ -95,11 +95,24 @@ ADD CONSTRAINT "ImportJobs_pkey" PRIMARY KEY (id);
 ALTER TABLE public."ImportJobs"
 ADD CONSTRAINT import_jobs_ringing_group_id_fkey FOREIGN KEY (ringing_group_id) REFERENCES public."RingingGroups" (id) ON DELETE CASCADE;
 
--- `anon` is deliberately not granted here, but schema.sql's ALTER DEFAULT PRIVILEGES
--- hands it SELECT/INSERT/UPDATE/DELETE on every new public table regardless. That is
--- harmless: none of the three policies above has a `TO` clause, so they apply to
--- `anon` too, and an anonymous request has no `app_metadata.ringing_group_id` claim —
--- the comparison is NULL, so it reads no rows and can write none.
+-- `anon` is deliberately granted the same SELECT/INSERT/UPDATE/DELETE here
+-- (explicitly, rather than relying on schema.sql's ALTER DEFAULT PRIVILEGES
+-- auto-granting it at CREATE TABLE time — a declarative-sync re-run silently
+-- revokes that implicit grant as unwanted drift, since it can't see a
+-- CREATE-time side effect isn't backed by any literal GRANT statement here).
+-- This is harmless: none of the three policies above has a `TO` clause, so
+-- they apply to `anon` too, and an anonymous request has no
+-- `app_metadata.ringing_group_id` claim — the comparison is NULL, so it reads
+-- no rows and can write none. supabase/__tests__/import-jobs.test.ts pins
+-- this: an anonymous SELECT must come back as an empty 200 (RLS filtering),
+-- never a 42501 permission error.
+GRANT
+SELECT
+,
+	INSERT,
+UPDATE,
+DELETE ON public."ImportJobs" TO anon;
+
 GRANT ALL ON public."ImportJobs" TO authenticated;
 
 GRANT ALL ON public."ImportJobs" TO service_role;
