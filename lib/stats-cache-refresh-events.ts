@@ -4,9 +4,13 @@
  * touched — an all-time event, a day-range, and one event per parent month,
  * squashed-month, and year — each carrying the RPC params a future worker
  * needs to refresh the stats cache at exactly that granularity, rather than
- * recomputing a group's whole history. The consumer that acts on these events
- * is deliberately a noop for now (`app/api/queues/stats-cache-refresh-window/`);
- * this module only decides *what* to dispatch.
+ * recomputing a group's whole history. The day-range event additionally
+ * carries `affectedDates` — the exact dates that changed, since its own
+ * from/to range can span gap days with no activity (see
+ * `StatsCacheRefreshEvent`'s doc comment); no other event needs or carries
+ * this field. The consumer that acts on these events is deliberately a noop
+ * for now (`app/api/queues/stats-cache-refresh-window/`); this module only
+ * decides *what* to dispatch.
  */
 
 /**
@@ -29,9 +33,24 @@ export type StatsCacheRefreshRpcParams = {
 	month_filter?: number;
 };
 
+/**
+ * `affectedDates` is event metadata, not an RPC filter — it lives top-level
+ * on the event rather than inside `rpcParams`. It is only ever set on the
+ * day-range event (see `buildStatsCacheRefreshEvents`'s day-range comment
+ * for why): that event's `from_date`/`to_date` span the min/max of the
+ * affected dates, which can include gap days with no actual activity (e.g.
+ * an import touching the 1st and the 28th of a month produces a day-range
+ * event spanning the 1st–28th). A future consumer refreshing by exact day
+ * needs the precise set of changed days, which only this field supplies —
+ * the broader-granularity events (month/month-squashed/year/all-time)
+ * don't have this gap, since their own from/to or filter already covers
+ * their whole bucket, so they omit the field entirely rather than carrying
+ * it unset.
+ */
 export type StatsCacheRefreshEvent = {
 	importJobId: number;
 	rpcParams: StatsCacheRefreshRpcParams;
+	affectedDates?: string[];
 };
 
 /**
@@ -79,14 +98,19 @@ export function buildStatsCacheRefreshEvents(
 	// All-time: no group_by_time_period key at all, no date/year/month filters.
 	events.push(stamp({}));
 
-	// Day-range: spans the min/max of the affected dates.
-	events.push(
-		stamp({
+	// Day-range: spans the min/max of the affected dates. This range can
+	// contain gap days with no actual activity (e.g. dates on the 1st and
+	// the 28th produce a range spanning the whole month), so this is the
+	// only event stamped with `affectedDates` — the exact deduped/sorted
+	// list of days a day-granularity consumer actually needs to refresh.
+	events.push({
+		...stamp({
 			group_by_time_period: 'day',
 			from_date: sortedDates[0],
 			to_date: sortedDates[sortedDates.length - 1]
-		})
-	);
+		}),
+		affectedDates: sortedDates
+	});
 
 	const yearMonths = sortedDates.map(toYearMonth);
 

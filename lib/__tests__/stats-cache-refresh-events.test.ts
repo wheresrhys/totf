@@ -38,7 +38,8 @@ describe('the all-time event', () => {
 				group_by_time_period: 'day',
 				from_date: '2024-06-01',
 				to_date: '2024-06-01'
-			}
+			},
+			affectedDates: ['2024-06-01']
 		});
 	});
 });
@@ -53,7 +54,8 @@ describe('the day-range event', () => {
 				group_by_time_period: 'day',
 				from_date: '2024-06-01',
 				to_date: '2024-07-15'
-			}
+			},
+			affectedDates: ['2024-06-01', '2024-06-20', '2024-07-15']
 		});
 	});
 
@@ -66,8 +68,26 @@ describe('the day-range event', () => {
 				group_by_time_period: 'day',
 				from_date: '2024-06-01',
 				to_date: '2024-06-01'
-			}
+			},
+			affectedDates: ['2024-06-01']
 		});
+	});
+
+	it('sets affectedDates to the deduped, sorted list of affected dates when multiple dates are affected and the input is unsorted', () => {
+		const events = build([
+			'2024-07-15',
+			'2024-06-01',
+			'2024-06-20',
+			'2024-06-01'
+		]);
+		const dayEvent = events.find(
+			({ rpcParams }) => rpcParams.group_by_time_period === 'day'
+		);
+		expect(dayEvent?.affectedDates).toEqual([
+			'2024-06-01',
+			'2024-06-20',
+			'2024-07-15'
+		]);
 	});
 });
 
@@ -191,6 +211,19 @@ describe('stamped fields', () => {
 describe('no affected dates', () => {
 	it('returns an empty array when affectedDates is empty', () => {
 		expect(build([])).toEqual([]);
+	});
+});
+
+describe('affectedDates scoping', () => {
+	it('does not set affectedDates on the all-time, month, month-squashed, or year events', () => {
+		const events = build(['2024-06-01', '2025-07-15']);
+		const nonDayEvents = events.filter(
+			({ rpcParams }) => rpcParams.group_by_time_period !== 'day'
+		);
+		expect(nonDayEvents.length).toBeGreaterThan(0);
+		for (const event of nonDayEvents) {
+			expect('affectedDates' in event).toBe(false);
+		}
 	});
 });
 
