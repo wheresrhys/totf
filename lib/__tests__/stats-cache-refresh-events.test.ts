@@ -13,7 +13,7 @@ function build(affectedDates: string[]) {
 }
 
 describe('the all-time event', () => {
-	it('emits exactly one event with only ringing_group_filter set, no group_by_time_period/date/year/month filters', () => {
+	it('emits exactly one event with only ringing_group_filter set, no group_by_time_period/date/periods filters', () => {
 		const events = build(['2024-06-01', '2024-07-15']);
 		const allTimeEvents = events.filter(
 			({ rpcParams }) => Object.keys(rpcParams).length === 1
@@ -91,109 +91,76 @@ describe('the day-range event', () => {
 	});
 });
 
-describe('month events', () => {
-	it('emits one "month" event per distinct year+month pair, with year_filter and month_filter set', () => {
-		const events = build(['2024-06-01', '2025-07-15']);
-		expect(events).toContainEqual({
-			importJobId: IMPORT_JOB_ID,
-			rpcParams: {
-				ringing_group_filter: RINGING_GROUP_ID,
-				group_by_time_period: 'month',
-				year_filter: 2024,
-				month_filter: 6
-			}
-		});
-		expect(events).toContainEqual({
-			importJobId: IMPORT_JOB_ID,
-			rpcParams: {
-				ringing_group_filter: RINGING_GROUP_ID,
-				group_by_time_period: 'month',
-				year_filter: 2025,
-				month_filter: 7
-			}
-		});
-	});
-
-	it('deduplicates two affected dates in the same calendar month into one month event', () => {
-		const events = build(['2024-06-01', '2024-06-20']);
+describe('the month event', () => {
+	it('emits exactly one month event for multiple months touched, with every month in its periods array as a first-of-month date', () => {
+		const events = build(['2024-06-01', '2024-06-20', '2025-07-15']);
 		const monthEvents = events.filter(
 			({ rpcParams }) => rpcParams.group_by_time_period === 'month'
 		);
-		expect(monthEvents).toHaveLength(1);
-		expect(monthEvents[0].rpcParams).toMatchObject({
-			year_filter: 2024,
-			month_filter: 6
-		});
-	});
-
-	it('emits separate month events for dates in different months', () => {
-		const events = build(['2024-06-01', '2024-07-01']);
-		const monthEvents = events.filter(
-			({ rpcParams }) => rpcParams.group_by_time_period === 'month'
-		);
-		expect(monthEvents).toHaveLength(2);
+		expect(monthEvents).toEqual([
+			{
+				importJobId: IMPORT_JOB_ID,
+				rpcParams: {
+					ringing_group_filter: RINGING_GROUP_ID,
+					group_by_time_period: 'month',
+					periods: ['2024-06-01', '2025-07-01']
+				}
+			}
+		]);
 	});
 });
 
-describe('squashed-month events', () => {
-	it('emits one "month-squashed" event per distinct month number, with month_filter only and no year_filter', () => {
-		const events = build(['2024-06-01', '2025-07-15']);
-		expect(events).toContainEqual({
-			importJobId: IMPORT_JOB_ID,
-			rpcParams: {
-				ringing_group_filter: RINGING_GROUP_ID,
-				group_by_time_period: 'month-squashed',
-				month_filter: 6
-			}
-		});
-		expect(events).toContainEqual({
-			importJobId: IMPORT_JOB_ID,
-			rpcParams: {
-				ringing_group_filter: RINGING_GROUP_ID,
-				group_by_time_period: 'month-squashed',
-				month_filter: 7
-			}
-		});
-	});
-
-	it('deduplicates two affected dates with the same month in different years into one squashed-month event', () => {
-		const events = build(['2024-06-01', '2025-06-20']);
+describe('the month-squashed event', () => {
+	it('emits exactly one month-squashed event, not one per calendar month touched, carrying no periods at all', () => {
+		const events = build(['2024-06-01', '2024-07-15', '2025-08-02']);
 		const squashedMonthEvents = events.filter(
 			({ rpcParams }) => rpcParams.group_by_time_period === 'month-squashed'
 		);
-		expect(squashedMonthEvents).toHaveLength(1);
-		expect(squashedMonthEvents[0].rpcParams).toMatchObject({ month_filter: 6 });
+		expect(squashedMonthEvents).toEqual([
+			{
+				importJobId: IMPORT_JOB_ID,
+				rpcParams: {
+					ringing_group_filter: RINGING_GROUP_ID,
+					group_by_time_period: 'month-squashed'
+				}
+			}
+		]);
 	});
 });
 
-describe('year events', () => {
-	it('emits one "year" event per distinct year, with year_filter only and no month_filter/from_date/to_date', () => {
-		const events = build(['2024-06-01', '2025-07-15']);
-		expect(events).toContainEqual({
-			importJobId: IMPORT_JOB_ID,
-			rpcParams: {
-				ringing_group_filter: RINGING_GROUP_ID,
-				group_by_time_period: 'year',
-				year_filter: 2024
-			}
-		});
-		expect(events).toContainEqual({
-			importJobId: IMPORT_JOB_ID,
-			rpcParams: {
-				ringing_group_filter: RINGING_GROUP_ID,
-				group_by_time_period: 'year',
-				year_filter: 2025
-			}
-		});
-	});
-
-	it('deduplicates two affected dates in the same year into one year event', () => {
-		const events = build(['2024-06-01', '2024-11-20']);
+describe('the year event', () => {
+	it('emits exactly one year event for multiple years touched, with every year in its periods array as a first-of-year date', () => {
+		const events = build(['2024-06-01', '2024-11-20', '2025-07-15']);
 		const yearEvents = events.filter(
 			({ rpcParams }) => rpcParams.group_by_time_period === 'year'
 		);
-		expect(yearEvents).toHaveLength(1);
-		expect(yearEvents[0].rpcParams).toMatchObject({ year_filter: 2024 });
+		expect(yearEvents).toEqual([
+			{
+				importJobId: IMPORT_JOB_ID,
+				rpcParams: {
+					ringing_group_filter: RINGING_GROUP_ID,
+					group_by_time_period: 'year',
+					periods: ['2024-01-01', '2025-01-01']
+				}
+			}
+		]);
+	});
+});
+
+describe('how many events are emitted', () => {
+	it('emits exactly 5 events — one per temporal unit — for a maximally scattered multi-month/multi-year import', () => {
+		const events = build([
+			'2023-01-05',
+			'2023-04-18',
+			'2024-02-29',
+			'2024-09-01',
+			'2025-12-31'
+		]);
+		expect(events).toHaveLength(5);
+		// `undefined` is the all-time event — it omits the key entirely.
+		expect(
+			events.map(({ rpcParams }) => rpcParams.group_by_time_period)
+		).toEqual([undefined, 'day', 'month', 'month-squashed', 'year']);
 	});
 });
 

@@ -463,9 +463,11 @@ describe('ImportJobTracker', () => {
 				ringing_group_id: TRACKED_RINGING_GROUP_ID,
 				status: 'in_progress',
 				started_at: ISO_TIMESTAMP,
-				core_stats_refresh_status: 'in_progress',
-				biometrics_stats_refresh_status: 'in_progress',
-				demographics_stats_refresh_status: 'in_progress'
+				day_stats_refresh_status: 'in_progress',
+				month_stats_refresh_status: 'in_progress',
+				year_stats_refresh_status: 'in_progress',
+				month_squashed_stats_refresh_status: 'in_progress',
+				all_time_stats_refresh_status: 'in_progress'
 			});
 			expect(importJobId).toBe(IMPORT_JOB_ID);
 		});
@@ -551,47 +553,61 @@ describe('ImportJobTracker', () => {
 		});
 	});
 
-	// One test per stats type, varying only which cache is named — the point of
-	// these columns is that each is settable without disturbing the other two or
+	// One test per temporal unit, varying only which unit is named — the point of
+	// these columns is that each is settable without disturbing the other four or
 	// the job's own `status`, which the whole-payload assertion is what proves.
-	describe('recording one stats cache’s refresh outcome', () => {
-		it('records the core cache on its own column alone', async () => {
-			await tracker.markStatsCacheRefreshed(IMPORT_JOB_ID, 'core', 'succeeded');
+	describe('recording one temporal unit’s refresh outcome', () => {
+		it('records the day temporal unit on its own column alone', async () => {
+			await tracker.markStatsCacheRefreshed(IMPORT_JOB_ID, 'day', 'succeeded');
 			expect(soleUpdatePayload()).toEqual({
-				core_stats_refresh_status: 'succeeded'
+				day_stats_refresh_status: 'succeeded'
 			});
 		});
 
-		it('records the biometrics cache on its own column alone', async () => {
+		it('records the month temporal unit on its own column alone', async () => {
 			await tracker.markStatsCacheRefreshed(
 				IMPORT_JOB_ID,
-				'biometrics',
+				'month',
 				'succeeded'
 			);
 			expect(soleUpdatePayload()).toEqual({
-				biometrics_stats_refresh_status: 'succeeded'
+				month_stats_refresh_status: 'succeeded'
 			});
 		});
 
-		it('records the demographics cache on its own column alone', async () => {
+		it('records the year temporal unit on its own column alone', async () => {
+			await tracker.markStatsCacheRefreshed(IMPORT_JOB_ID, 'year', 'succeeded');
+			expect(soleUpdatePayload()).toEqual({
+				year_stats_refresh_status: 'succeeded'
+			});
+		});
+
+		it('records the month-squashed temporal unit on its own column alone', async () => {
 			await tracker.markStatsCacheRefreshed(
 				IMPORT_JOB_ID,
-				'demographics',
+				'month-squashed',
 				'succeeded'
 			);
 			expect(soleUpdatePayload()).toEqual({
-				demographics_stats_refresh_status: 'succeeded'
+				month_squashed_stats_refresh_status: 'succeeded'
+			});
+		});
+
+		it('records the all-time temporal unit on its own column alone', async () => {
+			await tracker.markStatsCacheRefreshed(
+				IMPORT_JOB_ID,
+				'all-time',
+				'succeeded'
+			);
+			expect(soleUpdatePayload()).toEqual({
+				all_time_stats_refresh_status: 'succeeded'
 			});
 		});
 
 		it('records a failed refresh the same way, leaving the job’s own status alone', async () => {
-			await tracker.markStatsCacheRefreshed(
-				IMPORT_JOB_ID,
-				'biometrics',
-				'failed'
-			);
+			await tracker.markStatsCacheRefreshed(IMPORT_JOB_ID, 'month', 'failed');
 			expect(soleUpdatePayload()).toEqual({
-				biometrics_stats_refresh_status: 'failed'
+				month_stats_refresh_status: 'failed'
 			});
 		});
 	});

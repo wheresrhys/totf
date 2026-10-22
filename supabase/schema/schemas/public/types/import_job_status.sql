@@ -1,6 +1,7 @@
 -- Outcome of an import run, and — reused on the same table — the outcome of each
 -- individual stats-cache refresh that run triggered. One enum serves both: an
--- ImportJobs row's own `status` and its three `*_stats_refresh_status` columns all
+-- ImportJobs row's own `status` and its five per-temporal-unit
+-- `*_stats_refresh_status` columns all
 -- answer the same four-state question ("still going / worked / broke / ran out of
 -- time"), so a second near-duplicate type would buy nothing. `'in_progress'` on a
 -- refresh-status column means "not yet attempted" (it is that column's default), and

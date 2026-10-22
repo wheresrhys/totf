@@ -9,6 +9,7 @@ import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
 // either runtime sees them, so they aren't subject to the same constraint.
 import { buildStatsCacheRefreshEvents } from './stats-cache-refresh-events';
 import { dispatchStatsCacheRefreshWindow } from './queue-dispatch';
+import type { TemporalUnit } from './stats-cache-refresh';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Omit<
@@ -314,8 +315,22 @@ export type ImportJobRowCounts = {
 	failed: number;
 };
 
-/** Which of the three stats caches a refresh outcome is being recorded for. */
-export type StatsCacheType = 'core' | 'biometrics' | 'demographics';
+/**
+ * Which temporal unit's stats-cache refresh an outcome is being recorded for
+ * (#1154). Deliberately `lib/stats-cache-refresh.ts`'s own `TemporalUnit`
+ * rather than a fourth copy of the same five-value union: the column an
+ * outcome lands on and the temporal unit
+ * `refreshSimpleStatsCache`/`refreshComplexStatsCache` were called with are the
+ * same axis by construction, so they must not be able to drift apart.
+ *
+ * This replaced a `StatsCacheType = 'core' | 'biometrics' | 'demographics'`,
+ * not as a rename but as a change of axis: the three stats-type cache tables
+ * were replaced by the temporal-unit-shaped `SimpleStatsCache`/
+ * `ComplexStatsCache` split (#1144/#1147), each refreshed one temporal unit per
+ * call, so a temporal unit is now the finest granularity at which a refresh can
+ * succeed or fail.
+ */
+export type StatsCacheTemporalUnit = TemporalUnit;
 
 /**
  * The outcome a stats-cache refresh can actually be recorded as. The columns are
@@ -328,10 +343,15 @@ export type StatsCacheRefreshOutcome = Extract<
 	'succeeded' | 'failed'
 >;
 
-const STATS_CACHE_REFRESH_STATUS_COLUMNS: Record<StatsCacheType, string> = {
-	core: 'core_stats_refresh_status',
-	biometrics: 'biometrics_stats_refresh_status',
-	demographics: 'demographics_stats_refresh_status'
+const STATS_CACHE_REFRESH_STATUS_COLUMNS: Record<
+	StatsCacheTemporalUnit,
+	string
+> = {
+	day: 'day_stats_refresh_status',
+	month: 'month_stats_refresh_status',
+	year: 'year_stats_refresh_status',
+	'month-squashed': 'month_squashed_stats_refresh_status',
+	'all-time': 'all_time_stats_refresh_status'
 };
 
 /**
@@ -344,10 +364,10 @@ const STATS_CACHE_REFRESH_STATUS_COLUMNS: Record<StatsCacheType, string> = {
  * shared `supabaseClient` and the shared `updateImportJob` plumbing without six
  * copies of either.
  *
- * Every operation is deliberately independent: recording one stats cache's refresh
- * outcome never touches `status`, `affected_dates` or the other two caches' columns,
- * and vice versa. That separation is the whole point of the table — "the rows all
- * imported but the biometrics cache never refreshed" has to stay visible rather than
+ * Every operation is deliberately independent: recording one temporal unit's refresh
+ * outcome never touches `status`, `affected_dates` or the other four temporal units'
+ * columns, and vice versa. That separation is the whole point of the table — "the rows
+ * all imported but the monthly stats never refreshed" has to stay visible rather than
  * collapsing into "import succeeded".
  *
  * The import job id is a per-call argument rather than constructor state, because
@@ -370,9 +390,9 @@ export class ImportJobTracker {
 
 	/**
 	 * Opens a job row for `ringingGroupId` and returns its id, for every later
-	 * transition to key on. `status`, `started_at` and the three refresh-status
-	 * columns are written explicitly even though the table defaults all five to
-	 * the same values, so the opening state of a run is readable at the call site
+	 * transition to key on. `status`, `started_at` and the five per-temporal-unit
+	 * refresh-status columns are written explicitly even though the table defaults
+	 * all seven to the same values, so the opening state of a run is readable at the call site
 	 * (and assertable) rather than implied by the schema. `started_at` has to be
 	 * client-side anyway to stay consistent with `finished_at`, which no trigger
 	 * sets.
@@ -384,9 +404,11 @@ export class ImportJobTracker {
 				ringing_group_id: ringingGroupId,
 				status: 'in_progress',
 				started_at: new Date().toISOString(),
-				core_stats_refresh_status: 'in_progress',
-				biometrics_stats_refresh_status: 'in_progress',
-				demographics_stats_refresh_status: 'in_progress'
+				day_stats_refresh_status: 'in_progress',
+				month_stats_refresh_status: 'in_progress',
+				year_stats_refresh_status: 'in_progress',
+				month_squashed_stats_refresh_status: 'in_progress',
+				all_time_stats_refresh_status: 'in_progress'
 			})
 			.select('id')
 			.single();
@@ -464,17 +486,19 @@ export class ImportJobTracker {
 	}
 
 	/**
-	 * Records how one stats cache's refresh went, on that cache's own column and
-	 * nothing else. The caller is whatever runs the refreshes (#B2) — this ticket
+	 * Records how one temporal unit's stats-cache refresh went, on that temporal
+	 * unit's own column and nothing else. The caller is whatever runs the
+	 * refreshes — the queue consumer that calls `refreshSimpleStatsCache`/
+	 * `refreshComplexStatsCache` per dispatched temporal-unit event (T10); this
 	 * only provides somewhere to record the outcome.
 	 */
 	async markStatsCacheRefreshed(
 		importJobId: number,
-		statsCacheType: StatsCacheType,
+		temporalUnit: StatsCacheTemporalUnit,
 		refreshOutcome: StatsCacheRefreshOutcome
 	): Promise<void> {
 		await this.updateImportJob(importJobId, {
-			[STATS_CACHE_REFRESH_STATUS_COLUMNS[statsCacheType]]: refreshOutcome
+			[STATS_CACHE_REFRESH_STATUS_COLUMNS[temporalUnit]]: refreshOutcome
 		});
 	}
 }
@@ -1185,7 +1209,9 @@ export class EncounterRowBatchWriter {
 /**
  * Builds and dispatches every stats-cache-refresh event a successful import's
  * affected dates imply (#1141), the one piece of orchestration both import
- * entry points need once `completeImportJob` has run. Each writes its own
+ * entry points need once `completeImportJob` has run. Since #1154 that is at
+ * most five events — one per temporal unit touched — so the loop below is
+ * exactly one dispatch call per temporal unit. Each writes its own
  * `logContext` (the CLI script's `csvFilePath`/`ringingGroupName`, the web
  * route's none) onto the shared `{importJobId, ringingGroupId}` base so a
  * dispatch-failure log line is still identifiable per caller.
