@@ -24,13 +24,13 @@ import { catchSupabaseErrors } from './supabase';
  *   `stats_cache_returning_age_metrics`).
  *
  * Both share the same shape — merge their metric RPCs' per-cell rows in TS,
- * then write through the table's dedicated `upsert_*_stats_cache_rows` RPC
- * rather than a native `supabase-js` `.upsert()`, because PostgREST's upsert
- * can only target a plain unique constraint by column list and each table's
- * four null-patterns need four partial indexes (see each upsert RPC's own file
- * for why). Both also dead-letter any cell they could not write to the shared
- * `FailedStatsCacheRefreshes` table (#1167), tagged with the `cache_table` the
- * refresh was targeting.
+ * then write them to the cache's `*BySpecies` table with one native
+ * `supabase-js` `.upsert()` naming that table's single unique constraint as
+ * its conflict target (#1169 split each cache into a species and a non-species
+ * table precisely so there is exactly one such constraint to name; see
+ * `"SimpleStatsCache".sql`). Both also dead-letter any cell they could not
+ * write to the shared `FailedStatsCacheRefreshes` table (#1167), tagged with
+ * the `cache_table` the refresh was targeting.
  *
  * What differs between them is **which temporal units may narrow by affected
  * dates**, and that difference is the entire reason the two tables and the two
@@ -98,21 +98,36 @@ type ReturningAgeMetricsRow =
 	Database['public']['CompositeTypes']['stats_cache_returning_age_metrics_result'];
 
 /**
- * The jsonb row shape `upsert_simple_stats_cache_rows` expects in `p_rows` —
- * `SimpleStatsCache`'s own Insert shape minus the columns the RPC takes as
- * separate scalar parameters (`group_id`, `temporal_unit`) or derives itself
- * (`id`).
+ * The two columns every merged cell is keyed on, with the *metric RPCs'* own
+ * nullability rather than the cache tables'. `cellKey`/`indexByCell` match a
+ * cell across several RPC results on this pair, and the RPCs emit a real NULL
+ * `time_period` for the all-time grain, so a merged cell has to keep that NULL
+ * — `writeBySpeciesRows` is where it becomes the tables' sentinel date.
+ */
+type MergedCellKey = {
+	species_id: number | null;
+	time_period: string | null;
+};
+
+/**
+ * One merged `SimpleStatsCache` cell, pre-write: the `SimpleStatsCacheBySpecies`
+ * Insert shape minus the columns `writeBySpeciesRows` supplies itself
+ * (`group_id`, `temporal_unit`), the one the database derives (`id`), and the
+ * two key columns, re-added via `MergedCellKey` at the merge step's own
+ * nullability.
  */
 type SimpleMergedCell = Omit<
-	Database['public']['Tables']['SimpleStatsCache']['Insert'],
-	'id' | 'group_id' | 'temporal_unit'
->;
+	Database['public']['Tables']['SimpleStatsCacheBySpecies']['Insert'],
+	'id' | 'group_id' | 'temporal_unit' | keyof MergedCellKey
+> &
+	MergedCellKey;
 
-/** The same, for `upsert_complex_stats_cache_rows`/`ComplexStatsCache`. */
+/** The same, for `ComplexStatsCacheBySpecies`. */
 type ComplexMergedCell = Omit<
-	Database['public']['Tables']['ComplexStatsCache']['Insert'],
-	'id' | 'group_id' | 'temporal_unit'
->;
+	Database['public']['Tables']['ComplexStatsCacheBySpecies']['Insert'],
+	'id' | 'group_id' | 'temporal_unit' | keyof MergedCellKey
+> &
+	MergedCellKey;
 
 /**
  * One dead-letter row for `FailedStatsCacheRefreshes` (#1167) — a cell a
@@ -130,6 +145,26 @@ type FailedRefreshRow = Omit<
  * migration — see that table's own column comment.
  */
 const MISSING_FROM_METRIC_RPC = 'missing_from_metric_rpc';
+
+/**
+ * The `time_period` value the cache tables use for the all-time grain. Those
+ * columns are NOT NULL so that a single plain UNIQUE constraint arbitrates
+ * every grain and a native `.upsert()` can name it as a conflict target
+ * (#1169), but the metric RPCs emit a real NULL for all-time — the two
+ * conventions meet in `writeBySpeciesRows`. A genuinely out-of-domain date, not
+ * a merely unlikely one: no ringing data comes anywhere near it.
+ */
+const ALL_TIME_SENTINEL_DATE = '0001-01-01';
+
+/**
+ * Both `*BySpecies` tables' sole unique constraint, as the bare column list
+ * PostgREST's `onConflict` takes. Keep in sync **by hand** with
+ * `simple_stats_cache_by_species_group_grain_period_species_key` and
+ * `complex_stats_cache_by_species_grain_period_species_key` — see either
+ * table's own schema file.
+ */
+const BY_SPECIES_CONFLICT_TARGET =
+	'group_id,temporal_unit,time_period,species_id';
 
 /**
  * The temporal units `refreshSimpleStatsCache` may narrow by affected dates.
@@ -282,10 +317,10 @@ function indexByCell<
  * has finished.
  *
  * Never zero-fill, NULL-fill, or otherwise invent a value for a column a
- * refresh pass has no real data for: both `upsert_*_stats_cache_rows` RPCs
- * require a fully-populated row by design specifically so no half-written/
- * placeholder row can ever land in either cache table, and replicating that
- * gap here in TS would defeat the point.
+ * refresh pass has no real data for: every cache-table metric column bar the
+ * eight biometric ones is NOT NULL by design, specifically so no half-written/
+ * placeholder row can ever land in either cache table, and faking a value here
+ * in TS would defeat the point.
  */
 function recordMissingCellAnomaly({
 	groupId,
@@ -326,10 +361,44 @@ function recordMissingCellAnomaly({
 }
 
 /**
+ * Writes one refresh pass's merged cells to its cache's `*BySpecies` table, in
+ * a single native `.upsert()` against that table's one unique constraint.
+ *
+ * This is where the two `time_period` conventions are reconciled: the metric
+ * RPCs emit a real NULL for the all-time grain, the cache column is NOT NULL,
+ * so a null becomes `ALL_TIME_SENTINEL_DATE` here rather than in the merge —
+ * which has to keep the NULL to match cells across RPC results by key.
+ *
+ * Only the `BySpecies` tables are ever written, and `species_id` is asserted
+ * non-null for the same reason: every metric RPC call in this module hardcodes
+ * `group_by_species: true`, so every cell carries a real species id. The
+ * all-species-combined tables are schema-complete but have no writer.
+ */
+async function writeBySpeciesRows<Cell extends MergedCellKey>(
+	supabaseClient: SupabaseClient,
+	cacheTable: 'SimpleStatsCacheBySpecies' | 'ComplexStatsCacheBySpecies',
+	cells: Cell[],
+	{ groupId, temporalUnit }: { groupId: number; temporalUnit: TemporalUnit }
+): Promise<void> {
+	await supabaseClient
+		.from(cacheTable)
+		.upsert(
+			cells.map(({ species_id, time_period, ...metrics }) => ({
+				...metrics,
+				group_id: groupId,
+				temporal_unit: temporalUnit,
+				species_id: species_id!,
+				time_period: time_period ?? ALL_TIME_SENTINEL_DATE
+			})),
+			{ onConflict: BY_SPECIES_CONFLICT_TARGET }
+		)
+		.then(catchSupabaseErrors);
+}
+
+/**
  * Dead-letters the cells a merge pass had to skip, in one multi-row insert —
- * a plain PostgREST insert, not an RPC: `FailedStatsCacheRefreshes` has no
- * uniqueness to arbitrate, so nothing needs the custom-upsert treatment the two
- * cache tables need.
+ * a plain insert rather than the `.upsert()` above: `FailedStatsCacheRefreshes`
+ * has no uniqueness to arbitrate, so there is no conflict target to name.
  *
  * Called *after* the cache write in both refresh functions: a failure recording
  * the anomaly must never cost us the rest of the refresh, which has already
@@ -490,8 +559,8 @@ type MergeComplexMetricRowsParams = {
  * is unaffected.
  *
  * `group_id` and `temporal_unit` are deliberately absent from the merged rows:
- * `upsert_complex_stats_cache_rows` takes those as scalar parameters, and one
- * call carries exactly one null-pattern.
+ * one refresh pass covers exactly one of each, so `writeBySpeciesRows` adds
+ * them once at the write rather than per cell here.
  */
 function mergeComplexMetricRows({
 	groupId,
@@ -537,8 +606,9 @@ function mergeComplexMetricRows({
 
 		mergedRows.push({
 			species_id: newAdult.species_id,
-			// Passed straight through — since #1162 `time_period` is nullable and
-			// NULL *is* the all-time value, so there is no sentinel to map to.
+			// Passed straight through, NULL included — `writeBySpeciesRows` maps
+			// the all-time grain's NULL onto the table's sentinel date at the
+			// write, not here.
 			time_period: newAdult.time_period,
 			// Same SQL-level guarantee the simple merge's assertions rely on: the
 			// metric RPCs' composite return types mark every column nullable
@@ -572,9 +642,9 @@ function mergeComplexMetricRows({
  * `month-squashed`/`all-time` always full-replace the group's whole history,
  * ignoring `periods` entirely.
  *
- * Writes go through exactly one `upsert_simple_stats_cache_rows` call — never
- * a native `.upsert()` (see that RPC's own file for why) and never more than
- * one call per metric RPC's worth of rows.
+ * Writes go through exactly one `.upsert()` against `SimpleStatsCacheBySpecies`
+ * — one call per invocation, not one per metric RPC's worth of rows. See
+ * `writeBySpeciesRows`.
  *
  * Any cell `mergeSimpleMetricRows` had to skip is then dead-lettered to
  * `FailedStatsCacheRefreshes` in one batched insert (#1167) — see
@@ -634,14 +704,12 @@ export async function refreshSimpleStatsCache(
 		SIMPLE_NARROWING_TEMPORAL_UNITS
 	);
 
-	await supabaseClient
-		.rpc('upsert_simple_stats_cache_rows', {
-			p_group_id: groupId,
-			p_temporal_unit: temporalUnit,
-			p_group_by_species: true,
-			p_rows: rowsToWrite
-		})
-		.then(catchSupabaseErrors);
+	await writeBySpeciesRows(
+		supabaseClient,
+		'SimpleStatsCacheBySpecies',
+		rowsToWrite,
+		{ groupId, temporalUnit }
+	);
 
 	await deadLetterAnomalies(supabaseClient, anomalies);
 }
@@ -664,9 +732,9 @@ export async function refreshSimpleStatsCache(
  * reason this cache is a separate table and this a separate function; see
  * `COMPLEX_NARROWING_TEMPORAL_UNITS`.
  *
- * Writes go through exactly one `upsert_complex_stats_cache_rows` call — never
- * a native `.upsert()` (see that RPC's own file for why) and never more than
- * one call per metric RPC's worth of rows.
+ * Writes go through exactly one `.upsert()` against
+ * `ComplexStatsCacheBySpecies` — one call per invocation, not one per metric
+ * RPC's worth of rows. See `writeBySpeciesRows`.
  *
  * Any cell `mergeComplexMetricRows` had to skip is then dead-lettered to
  * `FailedStatsCacheRefreshes` in one batched insert (#1167), with
@@ -719,14 +787,12 @@ export async function refreshComplexStatsCache(
 		COMPLEX_NARROWING_TEMPORAL_UNITS
 	);
 
-	await supabaseClient
-		.rpc('upsert_complex_stats_cache_rows', {
-			p_group_id: groupId,
-			p_temporal_unit: temporalUnit,
-			p_group_by_species: true,
-			p_rows: rowsToWrite
-		})
-		.then(catchSupabaseErrors);
+	await writeBySpeciesRows(
+		supabaseClient,
+		'ComplexStatsCacheBySpecies',
+		rowsToWrite,
+		{ groupId, temporalUnit }
+	);
 
 	await deadLetterAnomalies(supabaseClient, anomalies);
 }
