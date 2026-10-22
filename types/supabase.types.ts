@@ -50,6 +50,60 @@ export type Database = {
           },
         ]
       }
+      ComplexStatsCache: {
+        Row: {
+          group_id: number
+          id: number
+          new_adult_bird_count: number
+          returning_age_1_bird_count: number
+          returning_age_2_bird_count: number
+          returning_age_3_plus_bird_count: number
+          returning_new_unknown_age_bird_count: number
+          species_id: number
+          temporal_unit: string
+          time_period: string
+        }
+        Insert: {
+          group_id: number
+          id?: number
+          new_adult_bird_count: number
+          returning_age_1_bird_count: number
+          returning_age_2_bird_count: number
+          returning_age_3_plus_bird_count: number
+          returning_new_unknown_age_bird_count: number
+          species_id: number
+          temporal_unit: string
+          time_period: string
+        }
+        Update: {
+          group_id?: number
+          id?: number
+          new_adult_bird_count?: number
+          returning_age_1_bird_count?: number
+          returning_age_2_bird_count?: number
+          returning_age_3_plus_bird_count?: number
+          returning_new_unknown_age_bird_count?: number
+          species_id?: number
+          temporal_unit?: string
+          time_period?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "complex_stats_cache_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "complex_stats_cache_species_id_fkey"
+            columns: ["species_id"]
+            isOneToOne: false
+            referencedRelation: "Species"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       DemonRecords: {
         Row: {
           created_at: string
@@ -942,6 +996,25 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      stats_cache_basic_session_metrics: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          month_filter?: number
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+          year_filter?: number
+        }
+        Returns: Database["public"]["CompositeTypes"]["stats_cache_basic_session_metrics_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "stats_cache_basic_session_metrics_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       stats_cache_biometrics_metrics: {
         Args: {
           from_date?: string
@@ -1135,6 +1208,21 @@ export type Database = {
         adult_bird_count: number | null
         unknown_age_bird_count: number | null
         new_young_bird_count: number | null
+      }
+      stats_cache_basic_session_metrics_result: {
+        species_id: number | null
+        time_period: string | null
+        species_count: number | null
+        bird_count: number | null
+        encounter_count: number | null
+        new_bird_count: number | null
+        session_count: number | null
+        total_effort: string | null
+        effort_per_session: string | null
+        effort_per_encounter: string | null
+        avg_encounters_per_session: number | null
+        max_per_session: number | null
+        max_new_per_session: number | null
       }
       stats_cache_biometrics_metrics_result: {
         species_id: number | null
