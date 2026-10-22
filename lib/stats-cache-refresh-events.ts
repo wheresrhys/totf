@@ -1,16 +1,32 @@
 /**
  * Builds the set of stats-cache-refresh events a successful import's affected
- * dates imply (#1141). One event per distinct time window the import actually
- * touched — an all-time event, a day-range, and one event per parent month,
- * squashed-month, and year — each carrying the RPC params a future worker
- * needs to refresh the stats cache at exactly that granularity, rather than
- * recomputing a group's whole history. The day-range event additionally
- * carries `affectedDates` — the exact dates that changed, since its own
- * from/to range can span gap days with no activity (see
- * `StatsCacheRefreshEvent`'s doc comment); no other event needs or carries
- * this field. The consumer that acts on these events is deliberately a noop
- * for now (`app/api/queues/stats-cache-refresh-window/`); this module only
- * decides *what* to dispatch.
+ * dates imply (#1141, collapsed to one-event-per-temporal-unit by #1154).
+ * **At most five events** — one per temporal unit the import actually touched
+ * (`all-time`, `day`, `month`, `month-squashed`, `year`) — each carrying
+ * everything a worker needs to refresh that whole temporal unit in a single
+ * pass, rather than recomputing a group's whole history.
+ *
+ * One event per temporal unit rather than one per distinct period instance,
+ * because `refreshSimpleStatsCache`/`refreshComplexStatsCache` (#1152/#1153)
+ * take `{groupId, temporalUnit, periods?}` and refresh **one temporal unit per
+ * call**, over however many periods are handed to them. Emitting an event per
+ * month and per year touched (as this module originally did) would force the
+ * consumer into a per-period loop, defeating the one-worker-invocation-per-
+ * temporal-unit point of that design.
+ *
+ * Two of the five events carry no period data at all:
+ * - `all-time` spans everything, so there is nothing to narrow by.
+ * - `month-squashed` cells span every year's copy of a month, so both refresh
+ *   functions always full-replace that temporal unit and ignore `periods`
+ *   entirely — the event carries only the temporal-unit marker.
+ *
+ * The day event is the odd one out: it narrows via `from_date`/`to_date` plus
+ * `affectedDates` rather than `periods`, for the reason set out on
+ * `StatsCacheRefreshEvent` below.
+ *
+ * The consumer that acts on these events is deliberately a noop for now
+ * (`app/api/queues/stats-cache-refresh-window/`); this module only decides
+ * *what* to dispatch.
  */
 
 /**
@@ -23,29 +39,42 @@
  * all-time event can omit the key entirely — the same "omit the key for
  * all-time" convention `app/actions/summary-stats.ts`'s `fetchSummaryStats`
  * uses.
+ *
+ * `periods` is the one member that isn't an RPC filter in its own right: it is
+ * the exact set of `time_period` values the month/year event's temporal unit
+ * should write, in the literal string shape the metric RPCs return it in — a
+ * first-of-month (`YYYY-MM-01`) or first-of-year (`YYYY-01-01`) ISO date, since
+ * `stats_spine.sql`'s period_spine CTE computes those cells as
+ * `date_trunc('month'|'year', d)::date`. `refreshSimpleStatsCache`/
+ * `refreshComplexStatsCache` derive their own `from_date`/`to_date` window from
+ * `min(periods)`..`max(periods)` and then filter the merged rows back down to
+ * `periods` by literal string membership against `time_period`, so the strings
+ * have to match that shape exactly. It replaced the per-single-value
+ * `year_filter`/`month_filter` pair, which no call site needs any more now that
+ * every temporal unit either carries an array, carries its own date window
+ * (`day`), or full-replaces (`month-squashed`/`all-time`).
  */
 export type StatsCacheRefreshRpcParams = {
 	ringing_group_filter: number;
 	group_by_time_period?: 'day' | 'month' | 'month-squashed' | 'year';
 	from_date?: string;
 	to_date?: string;
-	year_filter?: number;
-	month_filter?: number;
+	periods?: string[];
 };
 
 /**
  * `affectedDates` is event metadata, not an RPC filter — it lives top-level
- * on the event rather than inside `rpcParams`. It is only ever set on the
- * day-range event (see `buildStatsCacheRefreshEvents`'s day-range comment
- * for why): that event's `from_date`/`to_date` span the min/max of the
- * affected dates, which can include gap days with no actual activity (e.g.
- * an import touching the 1st and the 28th of a month produces a day-range
- * event spanning the 1st–28th). A future consumer refreshing by exact day
- * needs the precise set of changed days, which only this field supplies —
- * the broader-granularity events (month/month-squashed/year/all-time)
- * don't have this gap, since their own from/to or filter already covers
- * their whole bucket, so they omit the field entirely rather than carrying
- * it unset.
+ * on the event rather than inside `rpcParams`, and it stays a separate field
+ * from `rpcParams.periods` because it answers a different question. It is only
+ * ever set on the day-range event: that event's `from_date`/`to_date` span the
+ * min/max of the affected dates, which can include gap days with no actual
+ * activity (e.g. an import touching the 1st and the 28th of a month produces a
+ * day-range event spanning the 1st–28th). A consumer refreshing by exact day
+ * needs the precise set of changed days, which only this field supplies. The
+ * coarser temporal units don't have that gap — month/year narrow by their own
+ * `periods` array (every entry of which was genuinely touched), and
+ * `month-squashed`/`all-time` full-replace — so all four omit the field
+ * entirely rather than carrying it unset.
  */
 export type StatsCacheRefreshEvent = {
 	importJobId: number;
@@ -54,21 +83,10 @@ export type StatsCacheRefreshEvent = {
 };
 
 /**
- * Minimal duplicate of `app/lib/highlights/lib/highlight-utils.ts`'s
- * `dateToYearMonth` — deliberately not imported, since `lib/` is cross-zone
- * shared code and `app/lib/` is app-only (root `CLAUDE.md`'s "Project
- * structure").
- */
-function toYearMonth(date: string): { year: number; month: number } {
-	const [year, month] = date.split('-');
-	return { year: Number(year), month: Number(month) };
-}
-
-/**
- * Builds one `StatsCacheRefreshEvent` per distinct time window
- * `affectedDates` touches. Returns `[]` for an empty input — there is nothing
- * to refresh. Every emitted event is stamped with `importJobId` and
- * `ringing_group_filter`. Dedup/order follows
+ * Builds one `StatsCacheRefreshEvent` per temporal unit `affectedDates`
+ * touches — five of them whenever there is anything at all to refresh, and
+ * `[]` for an empty input, since then there is nothing. Every emitted event is
+ * stamped with `importJobId` and `ringing_group_filter`. Dedup/order follows
  * `ImportJobTracker.recordAffectedDates`'s `[...new Set(...)].sort()`
  * convention throughout, so output is deterministic regardless of input
  * order.
@@ -93,64 +111,52 @@ export function buildStatsCacheRefreshEvents(
 		};
 	}
 
-	const events: StatsCacheRefreshEvent[] = [];
+	/**
+	 * `yyyy-MM-dd` strings sort lexicographically in date order, so truncating
+	 * each date to its period's first day and deduping leaves the list sorted
+	 * chronologically without a date-aware comparator.
+	 */
+	function periodsTouched(
+		firstDayOfPeriod: (date: string) => string
+	): string[] {
+		return [...new Set(sortedDates.map(firstDayOfPeriod))].sort();
+	}
 
-	// All-time: no group_by_time_period key at all, no date/year/month filters.
-	events.push(stamp({}));
+	return [
+		// All-time: no group_by_time_period key at all, and no periods — this
+		// temporal unit always full-replaces the group's whole history.
+		stamp({}),
 
-	// Day-range: spans the min/max of the affected dates. This range can
-	// contain gap days with no actual activity (e.g. dates on the 1st and
-	// the 28th produce a range spanning the whole month), so this is the
-	// only event stamped with `affectedDates` — the exact deduped/sorted
-	// list of days a day-granularity consumer actually needs to refresh.
-	events.push({
-		...stamp({
-			group_by_time_period: 'day',
-			from_date: sortedDates[0],
-			to_date: sortedDates[sortedDates.length - 1]
+		// Day-range: spans the min/max of the affected dates. This range can
+		// contain gap days with no actual activity (e.g. dates on the 1st and
+		// the 28th produce a range spanning the whole month), so this is the
+		// only event stamped with `affectedDates` — the exact deduped/sorted
+		// list of days a day-temporal-unit consumer actually needs to refresh.
+		{
+			...stamp({
+				group_by_time_period: 'day',
+				from_date: sortedDates[0],
+				to_date: sortedDates[sortedDates.length - 1]
+			}),
+			affectedDates: sortedDates
+		},
+
+		// Month: every distinct month touched, as first-of-month ISO dates.
+		stamp({
+			group_by_time_period: 'month',
+			periods: periodsTouched((date) => `${date.slice(0, 7)}-01`)
 		}),
-		affectedDates: sortedDates
-	});
 
-	const yearMonths = sortedDates.map(toYearMonth);
+		// Month-squashed: the temporal-unit marker alone. A squashed-month cell
+		// spans every year's copy of its month, so both refresh functions
+		// full-replace this temporal unit and ignore `periods` — there is
+		// nothing meaningful to narrow by.
+		stamp({ group_by_time_period: 'month-squashed' }),
 
-	// One 'month' event per distinct (year, month) pair, zero-padded so string
-	// sort stays chronological.
-	const monthKeys = [
-		...new Set(
-			yearMonths.map(
-				({ year, month }) => `${year}-${String(month).padStart(2, '0')}`
-			)
-		)
-	].sort();
-	for (const key of monthKeys) {
-		const [yearPart, monthPart] = key.split('-');
-		events.push(
-			stamp({
-				group_by_time_period: 'month',
-				year_filter: Number(yearPart),
-				month_filter: Number(monthPart)
-			})
-		);
-	}
-
-	// One 'month-squashed' event per distinct month number (no year_filter).
-	const squashedMonths = [
-		...new Set(yearMonths.map(({ month }) => month))
-	].sort((a, b) => a - b);
-	for (const month of squashedMonths) {
-		events.push(
-			stamp({ group_by_time_period: 'month-squashed', month_filter: month })
-		);
-	}
-
-	// One 'year' event per distinct year (no month_filter).
-	const years = [...new Set(yearMonths.map(({ year }) => year))].sort(
-		(a, b) => a - b
-	);
-	for (const year of years) {
-		events.push(stamp({ group_by_time_period: 'year', year_filter: year }));
-	}
-
-	return events;
+		// Year: every distinct year touched, as first-of-year ISO dates.
+		stamp({
+			group_by_time_period: 'year',
+			periods: periodsTouched((date) => `${date.slice(0, 4)}-01-01`)
+		})
+	];
 }

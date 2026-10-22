@@ -400,13 +400,14 @@ export type Database = {
       ImportJobs: {
         Row: {
           affected_dates: string[] | null
-          biometrics_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
-          core_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
-          demographics_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
+          all_time_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
+          day_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
           end_date: string | null
           error_message: string | null
           finished_at: string | null
           id: number
+          month_squashed_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
+          month_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
           ringing_group_id: number
           rows_failed: number | null
           rows_processed: number | null
@@ -414,16 +415,18 @@ export type Database = {
           start_date: string | null
           started_at: string
           status: Database["public"]["Enums"]["import_job_status"]
+          year_stats_refresh_status: Database["public"]["Enums"]["import_job_status"]
         }
         Insert: {
           affected_dates?: string[] | null
-          biometrics_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
-          core_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
-          demographics_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          all_time_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          day_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
           end_date?: string | null
           error_message?: string | null
           finished_at?: string | null
           id?: number
+          month_squashed_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          month_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
           ringing_group_id: number
           rows_failed?: number | null
           rows_processed?: number | null
@@ -431,16 +434,18 @@ export type Database = {
           start_date?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["import_job_status"]
+          year_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
         }
         Update: {
           affected_dates?: string[] | null
-          biometrics_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
-          core_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
-          demographics_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          all_time_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          day_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
           end_date?: string | null
           error_message?: string | null
           finished_at?: string | null
           id?: number
+          month_squashed_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
+          month_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
           ringing_group_id?: number
           rows_failed?: number | null
           rows_processed?: number | null
@@ -448,6 +453,7 @@ export type Database = {
           start_date?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["import_job_status"]
+          year_stats_refresh_status?: Database["public"]["Enums"]["import_job_status"]
         }
         Relationships: [
           {
