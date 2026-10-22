@@ -272,7 +272,12 @@ function buildMetricRpcParams(
  * those must not be rewritten. A non-narrowing temporal unit full-replaces, so
  * every merged row is kept.
  */
-function filterToTouchedPeriods<Row extends { time_period: string | null }>(
+function filterToTouchedPeriods<
+	// Optional, not `string | null`: the merged-cell types are derived from the
+	// cache tables' `Insert` shapes, where a nullable column is also optional —
+	// so the real argument types carry `undefined` as well as `null`.
+	Row extends { time_period?: string | null }
+>(
 	mergedRows: Row[],
 	temporalUnit: TemporalUnit,
 	touchedPeriods: string[],
@@ -283,7 +288,8 @@ function filterToTouchedPeriods<Row extends { time_period: string | null }>(
 	}
 	return mergedRows.filter(
 		(row) =>
-			row.time_period !== null && touchedPeriods.includes(row.time_period)
+			typeof row.time_period === 'string' &&
+			touchedPeriods.includes(row.time_period)
 	);
 }
 

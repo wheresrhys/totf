@@ -5,12 +5,21 @@
 -- only ever reported to the browser — so there was nothing to recover from or even
 -- notice afterwards.
 --
--- The three `*_stats_refresh_status` columns deliberately track each stats-cache
+-- The five `*_stats_refresh_status` columns deliberately track each stats-cache
 -- refresh **independently** of `status` and of each other: "every row imported fine
--- but the biometrics cache never refreshed" has to be a distinguishable state rather
+-- but the monthly stats never refreshed" has to be a distinguishable state rather
 -- than being folded into "import succeeded". They reuse the same
 -- `import_job_status` enum as `status` (see that type's own file), defaulting to
 -- `'in_progress'` meaning "not yet attempted".
+--
+-- There is one column per **temporal unit**, not per stats type (#1154). The axis
+-- changed when the three stats-type cache tables were replaced by the
+-- temporal-unit-shaped `SimpleStatsCache`/`ComplexStatsCache` split (#1144/#1147):
+-- `refreshSimpleStatsCache`/`refreshComplexStatsCache` (#1152/#1153) each refresh
+-- exactly ONE temporal unit per call, and `lib/stats-cache-refresh-events.ts`
+-- dispatches at most one event per temporal unit touched — so a temporal unit is
+-- the finest granularity at which a refresh can actually succeed or fail, and the
+-- only one worth tracking a column for.
 CREATE SEQUENCE public."ImportJobs_id_seq";
 
 CREATE TABLE public."ImportJobs" (
@@ -40,12 +49,14 @@ CREATE TABLE public."ImportJobs" (
 	-- rather than at completion — so it is set by its own helper, independent of
 	-- the complete/fail/timeout transitions.
 	affected_dates date[],
-	core_stats_refresh_status public.import_job_status NOT NULL DEFAULT 'in_progress',
-	biometrics_stats_refresh_status public.import_job_status NOT NULL DEFAULT 'in_progress',
-	demographics_stats_refresh_status public.import_job_status NOT NULL DEFAULT 'in_progress'
+	day_stats_refresh_status public.import_job_status NOT NULL DEFAULT 'in_progress',
+	month_stats_refresh_status public.import_job_status NOT NULL DEFAULT 'in_progress',
+	year_stats_refresh_status public.import_job_status NOT NULL DEFAULT 'in_progress',
+	month_squashed_stats_refresh_status public.import_job_status NOT NULL DEFAULT 'in_progress',
+	all_time_stats_refresh_status public.import_job_status NOT NULL DEFAULT 'in_progress'
 );
 
-COMMENT ON TABLE public."ImportJobs" IS 'One row per CSV import run: row counts, start/finish, overall outcome, dates covered, and the outcome of each stats-cache refresh tracked independently';
+COMMENT ON TABLE public."ImportJobs" IS 'One row per CSV import run: row counts, start/finish, overall outcome, dates covered, and the outcome of each temporal unit''s stats-cache refresh tracked independently';
 
 CREATE INDEX idx_import_jobs_ringing_group_id ON public."ImportJobs" (ringing_group_id);
 

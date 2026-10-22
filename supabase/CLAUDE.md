@@ -17,7 +17,7 @@ Tables (PascalCase in Postgres, matching generated TypeScript types in `types/su
 | `Sessions` | A group's visit on a date — one row per `(ringing_group_id, visit_date)` |
 | `Encounters` | One bird captured once at one location on one date, with measurements |
 | `Locations` | Ringing sites, owned by a group |
-| `ImportJobs` | One row per CSV import run — counts, outcome, dates covered, per-stats-cache refresh outcomes |
+| `ImportJobs` | One row per CSV import run — counts, outcome, dates covered, per-temporal-unit stats-cache refresh outcomes |
 
 Key design notes:
 - `Birds.ringing_group_ids` is a Postgres array column (GIN-indexed) — a bird belongs to one or more groups.
@@ -614,11 +614,18 @@ operation, whereas these are six variations on the same `update(...).eq('id', �
   that an unrecognised `loc_id` makes the import a complete no-op — opening a job row first would
   both break that and leave an orphan `in_progress` row for a run that wrote nothing. So the
   `unrecognised_locations` branch has no job row to update, by construction.
-- **Each `*_stats_refresh_status` column is set on its own.** `markStatsCacheRefreshed` writes
-  exactly one column and never `status`, `affected_dates` or the other two caches' columns — "all
-  the rows imported but the biometrics cache never refreshed" has to stay a distinguishable state.
-  The unit tests assert the whole `.update()` payload rather than individual keys, specifically so
-  a transition that starts touching a neighbouring column fails.
+- **There is one `*_stats_refresh_status` column per temporal unit, and each is set on its own.**
+  The five columns (`day_` / `month_` / `year_` / `month_squashed_` / `all_time_`) replaced three
+  stats-TYPE columns (`core_` / `biometrics_` / `demographics_`) at #1154 — a change of axis, not a
+  rename: the three stats-type cache tables gave way to the temporal-unit-shaped
+  `SimpleStatsCache`/`ComplexStatsCache` split (#1144/#1147), each refreshed one temporal unit per
+  call, so a temporal unit is the finest granularity at which a refresh can succeed or fail. No
+  historical values were carried across; the old columns were simply dropped.
+  `markStatsCacheRefreshed(importJobId, temporalUnit, outcome)` writes exactly one column and never
+  `status`, `affected_dates` or the other four temporal units' columns — "all the rows imported but
+  the monthly stats never refreshed" has to stay a distinguishable state. The unit tests assert the
+  whole `.update()` payload rather than individual keys, specifically so a transition that starts
+  touching a neighbouring column fails.
 
 Both entry points run the same **location pre-flight** before any row is processed (#1079): a CSV
 naming a `loc_id` the group has no `Locations` row for aborts the whole import with zero writes
