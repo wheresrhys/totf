@@ -50,6 +50,60 @@ export type Database = {
           },
         ]
       }
+      ComplexStatsCache: {
+        Row: {
+          group_id: number
+          id: number
+          new_adult_bird_count: number
+          returning_age_1_bird_count: number
+          returning_age_2_bird_count: number
+          returning_age_3_plus_bird_count: number
+          returning_new_unknown_age_bird_count: number
+          species_id: number
+          temporal_unit: string
+          time_period: string
+        }
+        Insert: {
+          group_id: number
+          id?: number
+          new_adult_bird_count: number
+          returning_age_1_bird_count: number
+          returning_age_2_bird_count: number
+          returning_age_3_plus_bird_count: number
+          returning_new_unknown_age_bird_count: number
+          species_id: number
+          temporal_unit: string
+          time_period: string
+        }
+        Update: {
+          group_id?: number
+          id?: number
+          new_adult_bird_count?: number
+          returning_age_1_bird_count?: number
+          returning_age_2_bird_count?: number
+          returning_age_3_plus_bird_count?: number
+          returning_new_unknown_age_bird_count?: number
+          species_id?: number
+          temporal_unit?: string
+          time_period?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "complex_stats_cache_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "RingingGroups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "complex_stats_cache_species_id_fkey"
+            columns: ["species_id"]
+            isOneToOne: false
+            referencedRelation: "Species"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       DemonRecords: {
         Row: {
           created_at: string
