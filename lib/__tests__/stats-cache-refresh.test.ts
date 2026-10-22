@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Database } from '@/types/supabase.types';
 import { refreshSimpleStatsCache } from '../stats-cache-refresh';
 
@@ -117,7 +117,27 @@ function makeMockSupabaseClient({
 		}
 	}));
 
-	return { rpc };
+	// The only table this module touches through PostgREST directly rather than
+	// through an RPC is "FailedStatsCacheRefreshes" (#1167).
+	const insertResult = {
+		then: (resolve: (v: { data: null; error: null }) => unknown) =>
+			Promise.resolve({ data: null, error: null }).then(resolve)
+	};
+	// Signatures declared via vi.fn's type parameter rather than as named
+	// implementation params, so the recorded calls stay typed for assertions
+	// without either fake needing to read its own arguments.
+	const insert = vi.fn<
+		(rows: Array<Record<string, unknown>>) => typeof insertResult
+	>(() => insertResult);
+	const from = vi.fn<(table: string) => { insert: typeof insert }>(() => ({
+		insert
+	}));
+
+	return { rpc, from, insert };
+}
+
+function failedRefreshRows(client: ReturnType<typeof makeMockSupabaseClient>) {
+	return client.insert.mock.calls[0]?.[0];
 }
 
 function metricRpcCallArgs(
@@ -355,6 +375,109 @@ describe('refreshSimpleStatsCache', () => {
 					missingFromRpc: ['stats_cache_biometrics_metrics']
 				})
 			);
+		});
+	});
+
+	describe('anomaly recording', () => {
+		let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+		beforeEach(() => {
+			consoleErrorSpy = vi
+				.spyOn(console, 'error')
+				.mockImplementation(() => undefined);
+		});
+
+		afterEach(() => {
+			consoleErrorSpy.mockRestore();
+		});
+
+		/**
+		 * Species 1 is a complete cell across all four RPCs; each of
+		 * `anomalousSpeciesIds` is present everywhere except the biometrics RPC,
+		 * making it an anomaly — all four share the same spine, so a cell should
+		 * never be missing from just one.
+		 */
+		function clientWithAnomalies(anomalousSpeciesIds: number[]) {
+			const allSpeciesIds = [1, ...anomalousSpeciesIds];
+			return makeMockSupabaseClient({
+				basic: allSpeciesIds.map((species_id) => basicRow({ species_id })),
+				biometrics: [biometricsRow({ species_id: 1 })],
+				birdAge: allSpeciesIds.map((species_id) => birdAgeRow({ species_id })),
+				encounterAge: allSpeciesIds.map((species_id) =>
+					encounterAgeRow({ species_id })
+				)
+			});
+		}
+
+		it('writes a FailedStatsCacheRefreshes row for a cell missing from one metric RPC, with the missing RPC name in details', async () => {
+			const client = clientWithAnomalies([2]);
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01']
+			});
+
+			expect(client.from).toHaveBeenCalledWith('FailedStatsCacheRefreshes');
+			expect(failedRefreshRows(client)).toEqual([
+				{
+					group_id: GROUP_ID,
+					cache_table: 'SimpleStatsCache',
+					temporal_unit: 'day',
+					species_id: 2,
+					time_period: '2026-03-01',
+					reason: 'missing_from_metric_rpc',
+					details: { missingFromRpc: ['stats_cache_biometrics_metrics'] }
+				}
+			]);
+		});
+
+		it('still logs via console.error alongside the write', async () => {
+			const client = clientWithAnomalies([2]);
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01']
+			});
+
+			// The log line is for immediate visibility, the row is the durable
+			// record — the write must not have replaced the log.
+			expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+			expect(client.insert).toHaveBeenCalledTimes(1);
+		});
+
+		it('batches multiple anomalies from one refresh pass into one insert call', async () => {
+			const client = clientWithAnomalies([2, 3]);
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01']
+			});
+
+			expect(client.insert).toHaveBeenCalledTimes(1);
+			expect(failedRefreshRows(client)?.map((row) => row.species_id)).toEqual([
+				2, 3
+			]);
+		});
+
+		it('does not write a row when no anomaly occurs', async () => {
+			const client = makeMockSupabaseClient({
+				basic: [basicRow()],
+				biometrics: [biometricsRow()],
+				birdAge: [birdAgeRow()],
+				encounterAge: [encounterAgeRow()]
+			});
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01']
+			});
+
+			expect(client.from).not.toHaveBeenCalled();
+			expect(client.insert).not.toHaveBeenCalled();
 		});
 	});
 

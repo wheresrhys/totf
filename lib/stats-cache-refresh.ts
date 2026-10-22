@@ -73,6 +73,23 @@ type MergedCell = Omit<
 	'id' | 'group_id' | 'temporal_unit'
 >;
 
+/**
+ * One dead-letter row for `FailedStatsCacheRefreshes` (#1167) — a cell this
+ * refresh pass could not write. `id`/`created_at` are database-defaulted.
+ */
+type FailedRefreshRow = Omit<
+	Database['public']['Tables']['FailedStatsCacheRefreshes']['Insert'],
+	'id' | 'created_at'
+>;
+
+/**
+ * The one `FailedStatsCacheRefreshes.reason` value this module writes: the cell
+ * was present in some but not all of the `stats_cache_*_metrics` RPC results.
+ * The column is deliberately unconstrained text so a new failure kind needs no
+ * migration — see that table's own column comment.
+ */
+const MISSING_FROM_METRIC_RPC = 'missing_from_metric_rpc';
+
 const NARROW_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> = new Set([
 	'day',
 	'month',
@@ -180,6 +197,12 @@ type MergeMetricRowsParams = {
  * untouched. Every OTHER cell in the batch is unaffected — one anomalous
  * cell never drops the rest of the refresh.
  *
+ * Anomalies are *collected* and returned alongside the merged rows rather than
+ * written here (#1167): this stays a synchronous pure function with no Supabase
+ * client of its own, and `refreshSimpleStatsCache` — which already holds the
+ * client — writes the whole batch to `FailedStatsCacheRefreshes` in one insert
+ * once merging has finished.
+ *
  * Never zero-fill, NULL-fill, or otherwise invent a value for a column this
  * refresh pass has no real data for: `upsert_simple_stats_cache_rows`
  * requires a fully-populated row by design specifically so no half-written/
@@ -193,7 +216,10 @@ function mergeMetricRows({
 	biometricsRows,
 	birdAgeRows,
 	encounterAgeRows
-}: MergeMetricRowsParams): MergedCell[] {
+}: MergeMetricRowsParams): {
+	mergedRows: MergedCell[];
+	anomalies: FailedRefreshRow[];
+} {
 	const basicByCell = indexByCell(basicRows);
 	const biometricsByCell = indexByCell(biometricsRows);
 	const birdAgeByCell = indexByCell(birdAgeRows);
@@ -207,6 +233,7 @@ function mergeMetricRows({
 	]);
 
 	const mergedRows: MergedCell[] = [];
+	const anomalies: FailedRefreshRow[] = [];
 
 	for (const key of allCellKeys) {
 		const basic = basicByCell.get(key);
@@ -224,16 +251,29 @@ function mergeMetricRows({
 
 		if (!basic || !biometrics || !birdAge || !encounterAge) {
 			const [rawSpeciesId, rawTimePeriod] = key.split('::');
+			const speciesId = rawSpeciesId === 'null' ? null : Number(rawSpeciesId);
+			const timePeriod = rawTimePeriod === 'null' ? null : rawTimePeriod;
+			// The log line stays for immediate visibility; the returned anomaly is
+			// the durable record (#1167).
 			console.error(
 				'A cell is missing from one or more stats_cache_*_metrics RPC results; skipping it this refresh pass and leaving whatever is already cached for it untouched',
 				{
 					groupId,
 					temporalUnit,
-					speciesId: rawSpeciesId === 'null' ? null : Number(rawSpeciesId),
-					timePeriod: rawTimePeriod === 'null' ? null : rawTimePeriod,
+					speciesId,
+					timePeriod,
 					missingFromRpc
 				}
 			);
+			anomalies.push({
+				group_id: groupId,
+				cache_table: 'SimpleStatsCache',
+				temporal_unit: temporalUnit,
+				species_id: speciesId,
+				time_period: timePeriod,
+				reason: MISSING_FROM_METRIC_RPC,
+				details: { missingFromRpc }
+			});
 			continue;
 		}
 
@@ -283,7 +323,7 @@ function mergeMetricRows({
 		});
 	}
 
-	return mergedRows;
+	return { mergedRows, anomalies };
 }
 
 /**
@@ -304,6 +344,11 @@ function mergeMetricRows({
  * Writes go through exactly one `upsert_simple_stats_cache_rows` call — never
  * a native `.upsert()` (see that RPC's own file for why) and never more than
  * one call per metric RPC's worth of rows.
+ *
+ * Any cell `mergeMetricRows` had to skip is then dead-lettered to
+ * `FailedStatsCacheRefreshes` in one batched `.insert()` (#1167) — a plain
+ * PostgREST insert, not an RPC: that table has no uniqueness to arbitrate, so
+ * nothing needs the custom-upsert treatment the two cache tables need.
  *
  * Known-accepted limitation: a species whose *entire* history disappears
  * falls out of `stats_spine`'s species-set entirely, so it never gets a
@@ -338,7 +383,7 @@ export async function refreshSimpleStatsCache(
 				.then(catchSupabaseErrors)
 		]);
 
-	const mergedRows = mergeMetricRows({
+	const { mergedRows, anomalies } = mergeMetricRows({
 		groupId,
 		temporalUnit,
 		basicRows: (basicRows ?? []) as BasicSessionMetricsRow[],
@@ -362,4 +407,18 @@ export async function refreshSimpleStatsCache(
 			p_rows: rowsToWrite
 		})
 		.then(catchSupabaseErrors);
+
+	// Dead-letter the anomalous cells after the cache write, in one multi-row
+	// insert — a failure recording the anomaly must never cost us the rest of
+	// the refresh, which has already landed by this point. Deliberately NOT
+	// narrowed to `touchedPeriods` the way `rowsToWrite` is: a cell missing from
+	// one metric RPC is a real data anomaly whichever period it sits in, and
+	// keeping the table's contents identical to what was logged above is one
+	// fewer discrepancy to reason about when reading it back.
+	if (anomalies.length > 0) {
+		await supabaseClient
+			.from('FailedStatsCacheRefreshes')
+			.insert(anomalies)
+			.then(catchSupabaseErrors);
+	}
 }
