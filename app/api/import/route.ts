@@ -13,6 +13,7 @@ import {
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
 	CasualtyEncounterError,
+	dispatchStatsCacheRefreshEvents,
 	type DemonRow
 } from '@/lib/demon-import';
 
@@ -227,6 +228,11 @@ export async function POST(request: Request): Promise<Response> {
 						successful,
 						failed
 					});
+					await dispatchStatsCacheRefreshEvents(
+						importJobId,
+						ringingGroupId,
+						demonRecordsBatchWriter.getDistinctDates()
+					);
 					send({ type: 'complete', processed, successful, failed });
 				}
 			} catch (err) {

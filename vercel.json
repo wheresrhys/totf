@@ -1,11 +1,18 @@
 {
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "framework": "nextjs",
-  "git": {
-    "deploymentEnabled": {
-      "main": true
-    }
-  }
+	"buildCommand": "npm run build",
+	"devCommand": "npm run dev",
+	"installCommand": "npm install",
+	"framework": "nextjs",
+	"git": {
+		"deploymentEnabled": {
+			"main": true
+		}
+	},
+	"functions": {
+		"app/api/queues/stats-cache-refresh-window/route.ts": {
+			"experimentalTriggers": [
+				{ "type": "queue/v2beta", "topic": "stats-cache.refresh-window" }
+			]
+		}
+	}
 }

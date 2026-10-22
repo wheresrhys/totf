@@ -6,7 +6,8 @@ import {
 	EncounterRowBatchWriter,
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames,
-	processEncounterRow
+	processEncounterRow,
+	dispatchStatsCacheRefreshEvents
 } from '../../../lib/demon-import';
 import {
 	createRowLimiter,
@@ -102,7 +103,8 @@ vi.mock('../../../lib/demon-import', () => ({
 	processEncounterRow: vi.fn(async () => {}),
 	getDistinctLocationNames: vi.fn(() => ['Garden Trap']),
 	// Every location in the CSV is already known unless a test says otherwise.
-	findUnrecognisedLocationNames: vi.fn(async () => [] as string[])
+	findUnrecognisedLocationNames: vi.fn(async () => [] as string[]),
+	dispatchStatsCacheRefreshEvents: vi.fn(async () => {})
 }));
 
 const mockedPRateLimit = vi.mocked(pRateLimit);
@@ -138,6 +140,9 @@ beforeEach(() => {
 		visitDate: '2024-06-01'
 	});
 	mockEncounterRowBatchWriter.flushRemaining.mockResolvedValue(undefined);
+
+	vi.mocked(dispatchStatsCacheRefreshEvents).mockClear();
+	vi.mocked(dispatchStatsCacheRefreshEvents).mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -361,6 +366,34 @@ describe('importCSV chunked domain-table writing', () => {
 			'processEncounterRow',
 			'flushRemaining'
 		]);
+	});
+});
+
+describe('stats-cache-refresh dispatch', () => {
+	// Event-building, per-event dispatch and dispatch-failure handling are
+	// `dispatchStatsCacheRefreshEvents`'s own responsibility, unit-tested in
+	// `lib/__tests__/demon-import.test.ts`. This only has to prove the script
+	// calls it with the run's own ids/dates/log-context, after the job is
+	// marked complete.
+	it('calls dispatchStatsCacheRefreshEvents with the run’s ids, affected dates and CLI log context, after completeImportJob', async () => {
+		await importCSV({
+			csvFilePath: '/fake/alpha.csv',
+			ringingGroupName: 'Alpha'
+		});
+
+		expect(dispatchStatsCacheRefreshEvents).toHaveBeenCalledWith(
+			IMPORT_JOB_ID,
+			7,
+			['2024-06-01'],
+			{ csvFilePath: '/fake/alpha.csv', ringingGroupName: 'Alpha' }
+		);
+
+		// Dispatch happens only after the job is marked complete.
+		const completeOrder =
+			mockImportJobTracker.completeImportJob.mock.invocationCallOrder[0];
+		const dispatchOrder = vi.mocked(dispatchStatsCacheRefreshEvents).mock
+			.invocationCallOrder[0];
+		expect(dispatchOrder).toBeGreaterThan(completeOrder);
 	});
 });
 

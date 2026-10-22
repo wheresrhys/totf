@@ -28,6 +28,7 @@ import {
 	processEncounterRow,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
+	dispatchStatsCacheRefreshEvents,
 	type DemonRow
 } from '../../lib/demon-import';
 
@@ -282,6 +283,13 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 		successful: successfulRecords,
 		failed: failedRecords
 	});
+
+	await dispatchStatsCacheRefreshEvents(
+		importJobId,
+		ringingGroupId,
+		demonRecordsBatchWriter.getDistinctDates(),
+		{ csvFilePath, ringingGroupName }
+	);
 
 	console.log('\n✓ Import completed');
 	console.log(`Total records: ${totalRecords}`);
