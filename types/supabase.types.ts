@@ -59,9 +59,9 @@ export type Database = {
           returning_age_2_bird_count: number
           returning_age_3_plus_bird_count: number
           returning_new_unknown_age_bird_count: number
-          species_id: number
+          species_id: number | null
           temporal_unit: string
-          time_period: string
+          time_period: string | null
         }
         Insert: {
           group_id: number
@@ -71,9 +71,9 @@ export type Database = {
           returning_age_2_bird_count: number
           returning_age_3_plus_bird_count: number
           returning_new_unknown_age_bird_count: number
-          species_id: number
+          species_id?: number | null
           temporal_unit: string
-          time_period: string
+          time_period?: string | null
         }
         Update: {
           group_id?: number
@@ -83,9 +83,9 @@ export type Database = {
           returning_age_2_bird_count?: number
           returning_age_3_plus_bird_count?: number
           returning_new_unknown_age_bird_count?: number
-          species_id?: number
+          species_id?: number | null
           temporal_unit?: string
-          time_period?: string
+          time_period?: string | null
         }
         Relationships: [
           {
@@ -608,9 +608,9 @@ export type Database = {
           pullus_enc_count: number
           session_count: number
           species_count: number
-          species_id: number
+          species_id: number | null
           temporal_unit: string
-          time_period: string
+          time_period: string | null
           total_effort: string
           unknown_age_bird_count: number
           unknown_age_enc_count: number
@@ -648,9 +648,9 @@ export type Database = {
           pullus_enc_count: number
           session_count: number
           species_count: number
-          species_id: number
+          species_id?: number | null
           temporal_unit: string
-          time_period: string
+          time_period?: string | null
           total_effort: string
           unknown_age_bird_count: number
           unknown_age_enc_count: number
@@ -688,9 +688,9 @@ export type Database = {
           pullus_enc_count?: number
           session_count?: number
           species_count?: number
-          species_id?: number
+          species_id?: number | null
           temporal_unit?: string
-          time_period?: string
+          time_period?: string | null
           total_effort?: string
           unknown_age_bird_count?: number
           unknown_age_enc_count?: number
@@ -1124,6 +1124,24 @@ export type Database = {
         }[]
       }
       text_soundex: { Args: { "": string }; Returns: string }
+      upsert_complex_stats_cache_rows: {
+        Args: {
+          p_group_by_species: boolean
+          p_group_id: number
+          p_rows: Json
+          p_temporal_unit: string
+        }
+        Returns: undefined
+      }
+      upsert_simple_stats_cache_rows: {
+        Args: {
+          p_group_by_species: boolean
+          p_group_id: number
+          p_rows: Json
+          p_temporal_unit: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       import_job_status: "in_progress" | "succeeded" | "failed" | "timed_out"

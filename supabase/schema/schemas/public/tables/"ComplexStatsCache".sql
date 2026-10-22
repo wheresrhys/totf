@@ -20,27 +20,31 @@
 -- refresh CAN narrow by affected dates, and merging these five in would drag
 -- it down to this table's always-full-replace rule.
 --
--- This ticket adds the table only — no refresh function yet. The write path
--- that (re)populates it is a separate, blocked-ON-this ticket, implemented as
--- plain TypeScript calling the metric-group RPCs and a native supabase-js
--- .upsert(), not a SQL function.
+-- Rows are written exclusively through the upsert_complex_stats_cache_rows RPC
+-- (see that function's own file) — never a native supabase-js .upsert(), which
+-- cannot name a partial index's WHERE predicate as its conflict target. The
+-- orchestrator that calls it is a separate, blocked-ON-this ticket.
 CREATE SEQUENCE public."ComplexStatsCache_id_seq";
 
 CREATE TABLE public."ComplexStatsCache" (
 	id bigint DEFAULT nextval('public."ComplexStatsCache_id_seq"'::regclass) NOT NULL,
 	group_id bigint NOT NULL,
-	species_id bigint NOT NULL,
+	-- NULL means "all species combined", matching demographics_stats' own
+	-- group_by_species=false convention (and every stats_cache_*_metrics RPC,
+	-- which already emit a real NULL here). An earlier revision of this table
+	-- made both this column and time_period NOT NULL with a '0001-01-01'
+	-- sentinel for the all-time grain, so one plain UNIQUE constraint could
+	-- cover every grain and the write path could be a native supabase-js
+	-- .upsert(). That was reversed before anything wrote to the table: there
+	-- was never a defensible sentinel for "all species", and the sentinel
+	-- scheme forced every reader to translate between two conventions. Matches
+	-- "SimpleStatsCache".sql, which made the identical correction.
+	species_id bigint,
 	temporal_unit text NOT NULL,
-	-- NOT NULL with a sentinel for the 'all-time' grain (see column comment
-	-- below) rather than NULL-for-all-time (demographics_stats' own
-	-- convention) — a NOT NULL column lets this table use one plain UNIQUE
-	-- constraint instead of two partial indexes, which in turn lets the write
-	-- path (a later ticket) do a native supabase-js .upsert() with no custom
-	-- SQL function: PostgREST's upsert API can target a plain unique
-	-- constraint by column list, but has no way to express a partial index's
-	-- WHERE predicate. Matches "SimpleStatsCache".sql, which made the
-	-- identical departure.
-	time_period date NOT NULL,
+	-- NULL for the 'all-time' grain, matching demographics_stats' own
+	-- convention — see the species_id comment above for why the original
+	-- NOT NULL + '0001-01-01' sentinel was dropped.
+	time_period date,
 	-- The five lifetime-relative columns, lifted verbatim from
 	-- demographics_stats_result. NOT NULL matches that RPC's own COALESCE
 	-- contract — unlike SimpleStatsCache's biometric columns, none of these
@@ -54,9 +58,44 @@ CREATE TABLE public."ComplexStatsCache" (
 
 COMMENT ON TABLE public."ComplexStatsCache" IS 'One row per (group_id, species_id, temporal_unit, time_period): the lifetime-relative demographics_stats_result metrics (new_adult_bird_count and the four returning_age_* columns), which read a bird''s whole unwindowed history and so must be fully replaced on refresh rather than narrowed to affected dates. Period-local metrics live in the separate SimpleStatsCache table instead.';
 
-COMMENT ON COLUMN public."ComplexStatsCache".time_period IS 'Sentinel value 0001-01-01 for the all-time grain, never real data. This table uses a fixed sentinel instead of NULL (unlike demographics_stats) so a single plain UNIQUE constraint covers every grain.';
+COMMENT ON COLUMN public."ComplexStatsCache".species_id IS 'NULL means "all species combined" (the group_by_species=false shape of demographics_stats and every stats_cache_*_metrics RPC). Uniqueness across the NULL and non-NULL cases is split over four indexes — see the unique-index block in the table''s schema file.';
+
+COMMENT ON COLUMN public."ComplexStatsCache".time_period IS 'NULL for the all-time grain (the group_by_time_period IS NULL shape of demographics_stats). Uniqueness across the NULL and non-NULL cases is split over four indexes — see the unique-index block in the table''s schema file.';
 
 CREATE INDEX idx_complex_stats_cache_group_id ON public."ComplexStatsCache" (group_id);
+
+-- Uniqueness is "one row per (group_id, species_id, temporal_unit,
+-- time_period)" where a NULL species_id/time_period is a VALUE ("all species" /
+-- "all time"), not an unknown. Postgres's unique indexes treat NULLs as
+-- distinct from each other, so that rule takes four indexes rather than one —
+-- the plain UNIQUE constraint below covers the both-non-null case (it narrows
+-- to exactly that case automatically, for the same NULL-distinctness reason),
+-- and these three partial indexes cover the rest.
+--
+-- Each partial index OMITS the column its predicate pins to NULL. Keeping an
+-- always-NULL column in the key would make the index enforce nothing at all
+-- (every pair of rows would differ on it), which is precisely the trap the
+-- NULL-distinctness rule sets. The predicates are mutually exclusive and,
+-- together with the plain constraint, exhaustive: every row is policed by
+-- exactly one of the four.
+--
+-- The write path (upsert_complex_stats_cache_rows) names these column lists and
+-- predicates verbatim in its four ON CONFLICT clauses — change one and you must
+-- change the other. Mirrors "SimpleStatsCache".sql exactly.
+CREATE UNIQUE INDEX complex_stats_cache_group_period_allspecies_key ON public."ComplexStatsCache" (group_id, temporal_unit, time_period)
+WHERE
+	species_id IS NULL
+	AND time_period IS NOT NULL;
+
+CREATE UNIQUE INDEX complex_stats_cache_group_species_alltime_key ON public."ComplexStatsCache" (group_id, species_id, temporal_unit)
+WHERE
+	species_id IS NOT NULL
+	AND time_period IS NULL;
+
+CREATE UNIQUE INDEX complex_stats_cache_group_alltime_allspecies_key ON public."ComplexStatsCache" (group_id, temporal_unit)
+WHERE
+	species_id IS NULL
+	AND time_period IS NULL;
 
 -- SELECT/INSERT/UPDATE: strictly own-group only — no cross-group sharing via
 -- GroupDataSharing (this is an internal cache table, not user-facing shared
@@ -110,11 +149,9 @@ ADD CONSTRAINT complex_stats_cache_temporal_unit_check CHECK (
 	)
 );
 
--- One row per (group_id, species_id, temporal_unit, time_period). A plain
--- unique constraint (rather than two partial indexes) is correct because
--- time_period is NOT NULL (sentinel-valued for all-time, see column comment
--- above) — see this file's header comment for why that matters to the write
--- path.
+-- The per-species, per-period case of the four-index uniqueness rule described
+-- above the three partial indexes. Both columns being NULL-able is what narrows
+-- it to that case, so it needs no predicate of its own.
 ALTER TABLE public."ComplexStatsCache"
 ADD CONSTRAINT complex_stats_cache_group_species_grain_period_key UNIQUE (group_id, species_id, temporal_unit, time_period);
 
@@ -130,8 +167,10 @@ ADD CONSTRAINT complex_stats_cache_species_id_fkey FOREIGN KEY (species_id) REFE
 -- per the repo's Vercel Queues ADR mints a group-scoped authenticated client
 -- rather than using the service-role key, so it needs real INSERT/UPDATE
 -- grants and RLS policies for authenticated, scoped to the caller's own
--- group — no SECURITY DEFINER function involved. No DELETE grant for
--- authenticated: the upsert-only write pattern never needs to delete a row.
+-- group. upsert_complex_stats_cache_rows, the only thing that writes here, is
+-- deliberately SECURITY INVOKER for the same reason — a SECURITY DEFINER
+-- function would let any caller write another group's rows. No DELETE grant
+-- for authenticated: the upsert-only write pattern never needs to delete a row.
 -- Nothing reads or writes this table on behalf of an anonymous caller, so
 -- `anon` is left with no grant at all here, matching "SimpleStatsCache".sql.
 GRANT
