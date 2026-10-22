@@ -1,0 +1,1 @@
+GRANT DELETE, INSERT, SELECT, UPDATE ON public."ImportJobs" TO anon;
