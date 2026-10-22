@@ -20,13 +20,18 @@ import { catchSupabaseErrors } from './supabase';
  * rather than a native `supabase-js` `.upsert()` — PostgREST's upsert can only
  * target a plain unique constraint by column list, and this table's four
  * null-patterns need four partial indexes (see `upsert_simple_stats_cache_rows`'s
- * own file for why). The queue consumer that calls this per dispatched grain
- * event is a later ticket (T10) — this module only refreshes one grain per
- * call, it does not loop over grains itself.
+ * own file for why). The queue consumer that calls this per dispatched
+ * temporal-unit event is a later ticket (T10) — this module only refreshes
+ * one temporal unit per call, it does not loop over temporal units itself.
  */
 
-/** Matches `SimpleStatsCache.temporal_unit`'s CHECK constraint. */
-export type SimpleStatsCacheGrain =
+/**
+ * Matches `SimpleStatsCache.temporal_unit`'s CHECK constraint — same name and
+ * value set as `supabase/__tests__/stats-cache-fixtures.ts`'s own
+ * `TemporalUnit` (duplicated rather than imported: `lib/` doesn't reach into
+ * `supabase/__tests__/`, a different zone's test-only fixtures).
+ */
+export type TemporalUnit =
 	| 'day'
 	| 'month'
 	| 'year'
@@ -35,14 +40,15 @@ export type SimpleStatsCacheGrain =
 
 export type RefreshSimpleStatsCacheParams = {
 	groupId: number;
-	grain: SimpleStatsCacheGrain;
+	temporalUnit: TemporalUnit;
 	/**
 	 * The exact `time_period` values this refresh pass should write, in the
-	 * same string shape the metric RPCs return for that grain. Required
-	 * (non-empty) for the narrow grains (`day`/`month`/`year`) — see
-	 * `buildMetricRpcParams`'s early-return for what happens if it's empty
-	 * there. Ignored entirely for `month-squashed`/`all-time`, which always
-	 * full-replace the whole group history regardless of what's passed.
+	 * same string shape the metric RPCs return for that temporal unit.
+	 * Required (non-empty) for the narrow temporal units (`day`/`month`/
+	 * `year`) — see `buildMetricRpcParams`'s early-return for what happens if
+	 * it's empty there. Ignored entirely for `month-squashed`/`all-time`,
+	 * which always full-replace the whole group history regardless of what's
+	 * passed.
 	 */
 	periods?: string[];
 };
@@ -67,16 +73,16 @@ type MergedCell = Omit<
 	'id' | 'group_id' | 'temporal_unit'
 >;
 
-const NARROW_GRAINS: ReadonlySet<SimpleStatsCacheGrain> = new Set([
+const NARROW_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> = new Set([
 	'day',
 	'month',
 	'year'
 ]);
 
-function isNarrowGrain(
-	grain: SimpleStatsCacheGrain
-): grain is 'day' | 'month' | 'year' {
-	return NARROW_GRAINS.has(grain);
+function isNarrowTemporalUnit(
+	temporalUnit: TemporalUnit
+): temporalUnit is 'day' | 'month' | 'year' {
+	return NARROW_TEMPORAL_UNITS.has(temporalUnit);
 }
 
 /**
@@ -96,19 +102,19 @@ type MetricRpcParams = {
 
 /**
  * Builds the shared filter object passed to all four metric RPCs for one
- * grain invocation. Returns `null` for a narrow grain with no touched
- * periods — there is no sensible `from_date`/`to_date` window to compute in
- * that case, and nothing would be narrowed by it anyway, so
+ * temporal-unit invocation. Returns `null` for a narrow temporal unit with no
+ * touched periods — there is no sensible `from_date`/`to_date` window to
+ * compute in that case, and nothing would be narrowed by it anyway, so
  * `refreshSimpleStatsCache` treats that as "nothing to refresh" rather than
- * falling back to an unbounded, effectively all-time call under narrow-grain
+ * falling back to an unbounded, effectively all-time call under narrow
  * semantics.
  */
 function buildMetricRpcParams(
 	groupId: number,
-	grain: SimpleStatsCacheGrain,
+	temporalUnit: TemporalUnit,
 	periods: string[]
 ): MetricRpcParams | null {
-	if (isNarrowGrain(grain)) {
+	if (isNarrowTemporalUnit(temporalUnit)) {
 		if (periods.length === 0) {
 			return null;
 		}
@@ -119,7 +125,7 @@ function buildMetricRpcParams(
 		return {
 			ringing_group_filter: groupId,
 			group_by_species: true,
-			group_by_time_period: grain,
+			group_by_time_period: temporalUnit,
 			from_date: sortedPeriods[0],
 			to_date: sortedPeriods[sortedPeriods.length - 1]
 		};
@@ -134,7 +140,7 @@ function buildMetricRpcParams(
 	return {
 		ringing_group_filter: groupId,
 		group_by_species: true,
-		...(grain === 'month-squashed'
+		...(temporalUnit === 'month-squashed'
 			? { group_by_time_period: 'month-squashed' as const }
 			: {})
 	};
@@ -156,7 +162,7 @@ function indexByCell<
 
 type MergeMetricRowsParams = {
 	groupId: number;
-	grain: SimpleStatsCacheGrain;
+	temporalUnit: TemporalUnit;
 	basicRows: BasicSessionMetricsRow[];
 	biometricsRows: BiometricsMetricsRow[];
 	birdAgeRows: BirdAgeMetricsRow[];
@@ -169,8 +175,8 @@ type MergeMetricRowsParams = {
  * the same `stats_spine` call, so every cell key should appear in every RPC's
  * result — a cell key present in some but not all four is an anomaly
  * (discussed and settled on PR #1164's review): it is logged (group id,
- * grain, species_id, time_period, which RPC was missing it) and that one
- * cell is skipped entirely, leaving whatever's already cached for it
+ * temporal unit, species_id, time_period, which RPC was missing it) and that
+ * one cell is skipped entirely, leaving whatever's already cached for it
  * untouched. Every OTHER cell in the batch is unaffected — one anomalous
  * cell never drops the rest of the refresh.
  *
@@ -182,7 +188,7 @@ type MergeMetricRowsParams = {
  */
 function mergeMetricRows({
 	groupId,
-	grain,
+	temporalUnit,
 	basicRows,
 	biometricsRows,
 	birdAgeRows,
@@ -222,7 +228,7 @@ function mergeMetricRows({
 				'A cell is missing from one or more stats_cache_*_metrics RPC results; skipping it this refresh pass and leaving whatever is already cached for it untouched',
 				{
 					groupId,
-					grain,
+					temporalUnit,
 					speciesId: rawSpeciesId === 'null' ? null : Number(rawSpeciesId),
 					timePeriod: rawTimePeriod === 'null' ? null : rawTimePeriod,
 					missingFromRpc
@@ -281,9 +287,10 @@ function mergeMetricRows({
 }
 
 /**
- * Refreshes `SimpleStatsCache` for one `(groupId, grain)` combination. One
- * grain per call — a future queue consumer (T10) calls this once per
- * grain-event it receives; this function does not loop over grains itself.
+ * Refreshes `SimpleStatsCache` for one `(groupId, temporalUnit)` combination.
+ * One temporal unit per call — a future queue consumer (T10) calls this once
+ * per temporal-unit event it receives; this function does not loop over
+ * temporal units itself.
  *
  * `day`/`month`/`year` narrow by `periods`: the metric RPCs are called over
  * a `from_date`/`to_date` window spanning `min(periods)`..`max(periods)`,
@@ -305,13 +312,13 @@ function mergeMetricRows({
  */
 export async function refreshSimpleStatsCache(
 	supabaseClient: SupabaseClient,
-	{ groupId, grain, periods }: RefreshSimpleStatsCacheParams
+	{ groupId, temporalUnit, periods }: RefreshSimpleStatsCacheParams
 ): Promise<void> {
 	const touchedPeriods = periods ?? [];
 
-	const rpcParams = buildMetricRpcParams(groupId, grain, touchedPeriods);
+	const rpcParams = buildMetricRpcParams(groupId, temporalUnit, touchedPeriods);
 	if (rpcParams === null) {
-		// Narrow grain, nothing touched this pass — nothing to refresh.
+		// Narrow temporal unit, nothing touched this pass — nothing to refresh.
 		return;
 	}
 
@@ -333,14 +340,14 @@ export async function refreshSimpleStatsCache(
 
 	const mergedRows = mergeMetricRows({
 		groupId,
-		grain,
+		temporalUnit,
 		basicRows: (basicRows ?? []) as BasicSessionMetricsRow[],
 		biometricsRows: (biometricsRows ?? []) as BiometricsMetricsRow[],
 		birdAgeRows: (birdAgeRows ?? []) as BirdAgeMetricsRow[],
 		encounterAgeRows: (encounterAgeRows ?? []) as EncounterAgeMetricsRow[]
 	});
 
-	const rowsToWrite = isNarrowGrain(grain)
+	const rowsToWrite = isNarrowTemporalUnit(temporalUnit)
 		? mergedRows.filter(
 				(row) =>
 					row.time_period !== null && touchedPeriods.includes(row.time_period)
@@ -350,7 +357,7 @@ export async function refreshSimpleStatsCache(
 	await supabaseClient
 		.rpc('upsert_simple_stats_cache_rows', {
 			p_group_id: groupId,
-			p_temporal_unit: grain,
+			p_temporal_unit: temporalUnit,
 			p_group_by_species: true,
 			p_rows: rowsToWrite
 		})

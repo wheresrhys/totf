@@ -89,9 +89,7 @@ const RPC_RESULT_BY_NAME: Record<string, string> = {
 
 /**
  * A minimal fake Supabase client whose `.rpc()` resolves per-RPC-name from
- * `responses`, and records every call for assertions. `upsert` rows are
- * recorded onto `upsertCalls` separately since that RPC isn't keyed by the
- * same per-name response map (there's only ever one of it per refresh).
+ * `responses`, and records every call for assertions.
  */
 function makeMockSupabaseClient({
 	basic = [],
@@ -153,7 +151,7 @@ describe('refreshSimpleStatsCache', () => {
 		vi.clearAllMocks();
 	});
 
-	describe('day/month/year grains', () => {
+	describe('day/month/year temporal units', () => {
 		it('calls all four metric RPCs with a from_date/to_date window spanning the touched periods', async () => {
 			const client = makeMockSupabaseClient({
 				basic: [basicRow({ time_period: '2026-03-10' })],
@@ -164,7 +162,7 @@ describe('refreshSimpleStatsCache', () => {
 
 			await refreshSimpleStatsCache(client as never, {
 				groupId: GROUP_ID,
-				grain: 'day',
+				temporalUnit: 'day',
 				periods: ['2026-03-10', '2026-03-01', '2026-03-28']
 			});
 
@@ -218,7 +216,7 @@ describe('refreshSimpleStatsCache', () => {
 
 			await refreshSimpleStatsCache(client as never, {
 				groupId: GROUP_ID,
-				grain: 'day',
+				temporalUnit: 'day',
 				periods: touchedPeriods
 			});
 
@@ -231,7 +229,7 @@ describe('refreshSimpleStatsCache', () => {
 		});
 	});
 
-	describe('month-squashed/all-time grains', () => {
+	describe('month-squashed/all-time temporal units', () => {
 		it('calls all four metric RPCs with no date filter, ignoring any periods argument', async () => {
 			const client = makeMockSupabaseClient({
 				basic: [basicRow({ time_period: null })],
@@ -242,7 +240,7 @@ describe('refreshSimpleStatsCache', () => {
 
 			await refreshSimpleStatsCache(client as never, {
 				groupId: GROUP_ID,
-				grain: 'all-time',
+				temporalUnit: 'all-time',
 				periods: ['2026-03-01']
 			});
 
@@ -264,7 +262,7 @@ describe('refreshSimpleStatsCache', () => {
 			).toEqual(expectedParams);
 		});
 
-		it("writes the all-time grain's null time_period through as a real NULL", async () => {
+		it("writes the all-time temporal unit's null time_period through as a real NULL", async () => {
 			const client = makeMockSupabaseClient({
 				basic: [basicRow({ time_period: null })],
 				biometrics: [biometricsRow({ time_period: null })],
@@ -274,7 +272,7 @@ describe('refreshSimpleStatsCache', () => {
 
 			await refreshSimpleStatsCache(client as never, {
 				groupId: GROUP_ID,
-				grain: 'all-time'
+				temporalUnit: 'all-time'
 			});
 
 			const written = upsertCallArgs(client)?.p_rows as Array<{
@@ -296,7 +294,7 @@ describe('refreshSimpleStatsCache', () => {
 
 			await refreshSimpleStatsCache(client as never, {
 				groupId: GROUP_ID,
-				grain: 'day',
+				temporalUnit: 'day',
 				periods: ['2026-03-01']
 			});
 
@@ -335,7 +333,7 @@ describe('refreshSimpleStatsCache', () => {
 
 			await refreshSimpleStatsCache(client as never, {
 				groupId: GROUP_ID,
-				grain: 'day',
+				temporalUnit: 'day',
 				periods: ['2026-03-01']
 			});
 
@@ -351,7 +349,7 @@ describe('refreshSimpleStatsCache', () => {
 				expect.any(String),
 				expect.objectContaining({
 					groupId: GROUP_ID,
-					grain: 'day',
+					temporalUnit: 'day',
 					speciesId: 2,
 					timePeriod: '2026-03-01',
 					missingFromRpc: ['stats_cache_biometrics_metrics']
@@ -361,7 +359,7 @@ describe('refreshSimpleStatsCache', () => {
 	});
 
 	describe('writing', () => {
-		it('passes the grain and group_by_species to upsert_simple_stats_cache_rows as scalar parameters, with only cell columns in p_rows', async () => {
+		it('passes the temporal unit and group_by_species to upsert_simple_stats_cache_rows as scalar parameters, with only cell columns in p_rows', async () => {
 			const client = makeMockSupabaseClient({
 				basic: [basicRow()],
 				biometrics: [biometricsRow()],
@@ -371,7 +369,7 @@ describe('refreshSimpleStatsCache', () => {
 
 			await refreshSimpleStatsCache(client as never, {
 				groupId: GROUP_ID,
-				grain: 'month',
+				temporalUnit: 'month',
 				periods: ['2026-03-01']
 			});
 
@@ -384,7 +382,7 @@ describe('refreshSimpleStatsCache', () => {
 			expect(row).not.toHaveProperty('temporal_unit');
 		});
 
-		it('performs exactly one upsert RPC call per grain invocation, not one per metric RPC', async () => {
+		it('performs exactly one upsert RPC call per temporal unit invocation, not one per metric RPC', async () => {
 			const client = makeMockSupabaseClient({
 				basic: [basicRow()],
 				biometrics: [biometricsRow()],
@@ -394,7 +392,7 @@ describe('refreshSimpleStatsCache', () => {
 
 			await refreshSimpleStatsCache(client as never, {
 				groupId: GROUP_ID,
-				grain: 'month',
+				temporalUnit: 'month',
 				periods: ['2026-03-01']
 			});
 
