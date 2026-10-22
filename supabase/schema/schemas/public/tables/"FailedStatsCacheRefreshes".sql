@@ -2,11 +2,11 @@
 -- a refresh pass could not write, so the failure survives past the log line
 -- that used to be the only record of it.
 --
--- Currently written by lib/stats-cache-refresh.ts's refreshSimpleStatsCache
--- when a cell is present in some but not all of the stats_cache_*_metrics RPCs
--- it merges (reason = 'missing_from_metric_rpc'). Its ComplexStatsCache
--- counterpart doesn't exist yet — the cache_table column is here so it can
--- write to the same table rather than needing a second one.
+-- Written by both of lib/stats-cache-refresh.ts's refresh functions —
+-- refreshSimpleStatsCache and refreshComplexStatsCache — when a cell is present
+-- in some but not all of the stats_cache_*_metrics RPCs it merges
+-- (reason = 'missing_from_metric_rpc'). The cache_table column is what lets the
+-- two share one table rather than needing one each.
 --
 -- Deliberately NOT shaped like "SimpleStatsCache"/"ComplexStatsCache": this is
 -- a pure append-only log, so it has no unique constraint and no partial-index
