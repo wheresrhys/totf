@@ -977,6 +977,25 @@ export type Database = {
           time_period: string
         }[]
       }
+      stats_cache_bird_age_metrics: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          month_filter?: number
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+          year_filter?: number
+        }
+        Returns: Database["public"]["CompositeTypes"]["stats_cache_bird_age_metrics_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "stats_cache_bird_age_metrics_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       stats_cache_basic_session_metrics: {
         Args: {
           from_date?: string
@@ -1198,6 +1217,16 @@ export type Database = {
         returning_age_3_plus_bird_count: number | null
         returning_new_unknown_age_bird_count: number | null
         encounter_count: number | null
+      }
+      stats_cache_bird_age_metrics_result: {
+        species_id: number | null
+        time_period: string | null
+        pullus_bird_count: number | null
+        juv_bird_count: number | null
+        postjuv_bird_count: number | null
+        adult_bird_count: number | null
+        unknown_age_bird_count: number | null
+        new_young_bird_count: number | null
       }
       stats_cache_basic_session_metrics_result: {
         species_id: number | null
