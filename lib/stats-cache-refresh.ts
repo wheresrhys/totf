@@ -10,19 +10,34 @@ import type { Database } from '@/types/supabase.types';
 import { catchSupabaseErrors } from './supabase';
 
 /**
- * Populates `SimpleStatsCache` (#1144, retrofitted by #1162) — the
- * period-local half of the stats-cache split (see that table's own schema
- * file for the other half, `ComplexStatsCache`). This is the write side for
- * the four read-only "metric-group" RPCs #1145/#1146/#1148/#1149/#1150/#1151
- * created (`stats_cache_basic_session_metrics`, `stats_cache_biometrics_metrics`,
- * `stats_cache_bird_age_metrics`, `stats_cache_encounter_age_metrics`), merged
- * in TS and written through the dedicated `upsert_simple_stats_cache_rows` RPC
- * rather than a native `supabase-js` `.upsert()` — PostgREST's upsert can only
- * target a plain unique constraint by column list, and this table's four
- * null-patterns need four partial indexes (see `upsert_simple_stats_cache_rows`'s
- * own file for why). The queue consumer that calls this per dispatched
- * temporal-unit event is a later ticket (T10) — this module only refreshes
- * one temporal unit per call, it does not loop over temporal units itself.
+ * Populates both halves of the stats-cache split, one exported function per
+ * table:
+ *
+ * - `refreshSimpleStatsCache` → `SimpleStatsCache` (#1144, retrofitted by
+ *   #1162), the **period-local** half. Write side for the four read-only
+ *   "metric-group" RPCs #1145/#1146/#1148/#1149 created
+ *   (`stats_cache_basic_session_metrics`, `stats_cache_biometrics_metrics`,
+ *   `stats_cache_bird_age_metrics`, `stats_cache_encounter_age_metrics`).
+ * - `refreshComplexStatsCache` → `ComplexStatsCache` (#1147, retrofitted by
+ *   #1162), the **lifetime-relative** half. Write side for the two read-only
+ *   metric-group RPCs #1150/#1151 created (`stats_cache_new_adult_metrics`,
+ *   `stats_cache_returning_age_metrics`).
+ *
+ * Both share the same shape — merge their metric RPCs' per-cell rows in TS,
+ * then write through the table's dedicated `upsert_*_stats_cache_rows` RPC
+ * rather than a native `supabase-js` `.upsert()`, because PostgREST's upsert
+ * can only target a plain unique constraint by column list and each table's
+ * four null-patterns need four partial indexes (see each upsert RPC's own file
+ * for why).
+ *
+ * What differs between them is **which temporal units may narrow by affected
+ * dates**, and that difference is the entire reason the two tables and the two
+ * functions exist separately — see `SIMPLE_NARROWING_TEMPORAL_UNITS` and
+ * `COMPLEX_NARROWING_TEMPORAL_UNITS` below.
+ *
+ * The queue consumer that calls these per dispatched temporal-unit event is a
+ * later ticket (T10) — this module only refreshes one temporal unit per call,
+ * it does not loop over temporal units itself.
  */
 
 /**
@@ -53,6 +68,20 @@ export type RefreshSimpleStatsCacheParams = {
 	periods?: string[];
 };
 
+export type RefreshComplexStatsCacheParams = {
+	groupId: number;
+	temporalUnit: TemporalUnit;
+	/**
+	 * The exact `time_period` values this refresh pass should write, in the
+	 * same string shape the metric RPCs return for that temporal unit.
+	 * Required (non-empty) for `day` — the only temporal unit this cache may
+	 * narrow by. Ignored entirely for `month`/`year`/`month-squashed`/
+	 * `all-time`, which always full-replace the whole group history regardless
+	 * of what's passed (and which the caller is expected to leave `undefined`).
+	 */
+	periods?: string[];
+};
+
 type BasicSessionMetricsRow =
 	Database['public']['CompositeTypes']['stats_cache_basic_session_metrics_result'];
 type BiometricsMetricsRow =
@@ -61,6 +90,10 @@ type BirdAgeMetricsRow =
 	Database['public']['CompositeTypes']['stats_cache_bird_age_metrics_result'];
 type EncounterAgeMetricsRow =
 	Database['public']['CompositeTypes']['stats_cache_encounter_age_metrics_result'];
+type NewAdultMetricsRow =
+	Database['public']['CompositeTypes']['stats_cache_new_adult_metrics_result'];
+type ReturningAgeMetricsRow =
+	Database['public']['CompositeTypes']['stats_cache_returning_age_metrics_result'];
 
 /**
  * The jsonb row shape `upsert_simple_stats_cache_rows` expects in `p_rows` —
@@ -68,22 +101,47 @@ type EncounterAgeMetricsRow =
  * separate scalar parameters (`group_id`, `temporal_unit`) or derives itself
  * (`id`).
  */
-type MergedCell = Omit<
+type SimpleMergedCell = Omit<
 	Database['public']['Tables']['SimpleStatsCache']['Insert'],
 	'id' | 'group_id' | 'temporal_unit'
 >;
 
-const NARROW_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> = new Set([
+/** The same, for `upsert_complex_stats_cache_rows`/`ComplexStatsCache`. */
+type ComplexMergedCell = Omit<
+	Database['public']['Tables']['ComplexStatsCache']['Insert'],
+	'id' | 'group_id' | 'temporal_unit'
+>;
+
+/**
+ * The temporal units `refreshSimpleStatsCache` may narrow by affected dates.
+ * Every `SimpleStatsCache` metric is **period-local** — it reads only the
+ * encounters inside the cell's own period — so narrowing is sound wherever a
+ * cell maps onto one contiguous date window. `month-squashed` cells span every
+ * year's copy of a month and `all-time` spans everything, so neither does.
+ */
+const SIMPLE_NARROWING_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> = new Set([
 	'day',
 	'month',
 	'year'
 ]);
 
-function isNarrowTemporalUnit(
-	temporalUnit: TemporalUnit
-): temporalUnit is 'day' | 'month' | 'year' {
-	return NARROW_TEMPORAL_UNITS.has(temporalUnit);
-}
+/**
+ * The temporal units `refreshComplexStatsCache` may narrow by affected dates —
+ * `day` alone (#1153). Every `ComplexStatsCache` metric is
+ * **lifetime-relative**: it reads a bird's whole *unwindowed* encounter history
+ * to decide whether a cell's year is that bird's first-ever year, or what its
+ * period-relative proven age is. A single backdated encounter anywhere in a
+ * bird's history can therefore retroactively change a cell for some completely
+ * different period than the one actually touched, so every temporal unit
+ * coarser than `day` must always full-replace the group's whole history. `day`
+ * is the one unit that narrows because it is also the only unit the dispatcher
+ * carries an authoritative affected-date set for (see
+ * `lib/stats-cache-refresh-events.ts` — `affectedDates` is restricted to the
+ * day-range event).
+ */
+const COMPLEX_NARROWING_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> = new Set([
+	'day'
+]);
 
 /**
  * The shared 8-arg filter shape every `stats_cache_*_metrics` RPC takes
@@ -101,49 +159,78 @@ type MetricRpcParams = {
 };
 
 /**
- * Builds the shared filter object passed to all four metric RPCs for one
- * temporal-unit invocation. Returns `null` for a narrow temporal unit with no
- * touched periods — there is no sensible `from_date`/`to_date` window to
- * compute in that case, and nothing would be narrowed by it anyway, so
- * `refreshSimpleStatsCache` treats that as "nothing to refresh" rather than
- * falling back to an unbounded, effectively all-time call under narrow
- * semantics.
+ * Builds the shared filter object passed to every metric RPC of one cache's
+ * single temporal-unit invocation. `narrowingTemporalUnits` is the calling
+ * cache's own narrowing rule — `SIMPLE_NARROWING_TEMPORAL_UNITS` or
+ * `COMPLEX_NARROWING_TEMPORAL_UNITS` — which is the only thing that differs
+ * between the two callers.
+ *
+ * Returns `null` for a narrowing temporal unit with no touched periods — there
+ * is no sensible `from_date`/`to_date` window to compute in that case, and
+ * nothing would be narrowed by it anyway, so the caller treats that as
+ * "nothing to refresh" rather than falling back to an unbounded, effectively
+ * all-time call under narrow semantics.
  */
 function buildMetricRpcParams(
 	groupId: number,
 	temporalUnit: TemporalUnit,
-	periods: string[]
+	periods: string[],
+	narrowingTemporalUnits: ReadonlySet<TemporalUnit>
 ): MetricRpcParams | null {
-	if (isNarrowTemporalUnit(temporalUnit)) {
-		if (periods.length === 0) {
-			return null;
-		}
-		// `yyyy-MM-dd`-shaped period strings sort lexicographically in date
-		// order (same convention as `app/lib/supabase/temporal-filter.ts`'s
-		// `laterDateBound`/`earlierDateBound`), so min/max is a plain sort.
-		const sortedPeriods = [...periods].sort();
-		return {
-			ringing_group_filter: groupId,
-			group_by_species: true,
-			group_by_time_period: temporalUnit,
-			from_date: sortedPeriods[0],
-			to_date: sortedPeriods[sortedPeriods.length - 1]
-		};
-	}
-
-	// month-squashed/all-time: always full-replace, over the group's whole
-	// history (no from_date/to_date), and the `periods` argument is ignored
-	// entirely. For all-time, `group_by_time_period` is omitted completely
-	// rather than set to any value — the same "omit the key for all-time"
-	// convention `app/actions/summary-stats.ts`'s `fetchSummaryStats` and
-	// `lib/stats-cache-refresh-events.ts`'s all-time event use.
-	return {
+	const unwindowedParams: MetricRpcParams = {
 		ringing_group_filter: groupId,
 		group_by_species: true,
-		...(temporalUnit === 'month-squashed'
-			? { group_by_time_period: 'month-squashed' as const }
-			: {})
+		// For all-time, `group_by_time_period` is omitted completely rather than
+		// set to any value — the same "omit the key for all-time" convention
+		// `app/actions/summary-stats.ts`'s `fetchSummaryStats` and
+		// `lib/stats-cache-refresh-events.ts`'s all-time event use.
+		...(temporalUnit === 'all-time'
+			? {}
+			: { group_by_time_period: temporalUnit })
 	};
+
+	if (!narrowingTemporalUnits.has(temporalUnit)) {
+		// Always full-replace, over the group's whole history (no from_date/
+		// to_date), with the `periods` argument ignored entirely.
+		return unwindowedParams;
+	}
+
+	if (periods.length === 0) {
+		return null;
+	}
+
+	// `yyyy-MM-dd`-shaped period strings sort lexicographically in date order
+	// (same convention as `app/lib/supabase/temporal-filter.ts`'s
+	// `laterDateBound`/`earlierDateBound`), so min/max is a plain sort.
+	const sortedPeriods = [...periods].sort();
+	return {
+		...unwindowedParams,
+		from_date: sortedPeriods[0],
+		to_date: sortedPeriods[sortedPeriods.length - 1]
+	};
+}
+
+/**
+ * Cuts a merged result back to exactly the periods this pass is refreshing,
+ * for a narrowing temporal unit. The `min(periods)`..`max(periods)` window
+ * `buildMetricRpcParams` computes spans untouched gaps inside that range, so
+ * the RPCs can legitimately return cells for periods that weren't touched —
+ * those must not be rewritten. A non-narrowing temporal unit full-replaces, so
+ * every merged row is kept.
+ */
+function filterToTouchedPeriods<Row extends { time_period: string | null }>(
+	mergedRows: Row[],
+	temporalUnit: TemporalUnit,
+	touchedPeriods: string[],
+	narrowingTemporalUnits: ReadonlySet<TemporalUnit>
+): Row[] {
+	if (!narrowingTemporalUnits.has(temporalUnit)) {
+		return mergedRows;
+	}
+	return mergedRows.filter(
+		(row) =>
+			row.time_period !== null && touchedPeriods.includes(row.time_period)
+	);
 }
 
 function cellKey(speciesId: number | null, timePeriod: string | null): string {
@@ -160,6 +247,44 @@ function indexByCell<
 	return index;
 }
 
+/**
+ * Logs a cell that appeared in some but not all of a refresh's metric RPC
+ * results. Every RPC of a given cache shares the same `stats_spine` call, so a
+ * cell key present in one but absent from another is an anomaly, not an
+ * expected gap (discussed and settled on PR #1164's review) — the cell is
+ * logged with enough context to act on and then skipped entirely, leaving
+ * whatever is already cached for it untouched.
+ *
+ * Never zero-fill, NULL-fill, or otherwise invent a value for a column a
+ * refresh pass has no real data for: both `upsert_*_stats_cache_rows` RPCs
+ * require a fully-populated row by design specifically so no half-written/
+ * placeholder row can ever land in either cache table, and replicating that
+ * gap here in TS would defeat the point.
+ */
+function logMissingCellAnomaly({
+	groupId,
+	temporalUnit,
+	cellKey: key,
+	missingFromRpc
+}: {
+	groupId: number;
+	temporalUnit: TemporalUnit;
+	cellKey: string;
+	missingFromRpc: string[];
+}): void {
+	const [rawSpeciesId, rawTimePeriod] = key.split('::');
+	console.error(
+		'A cell is missing from one or more stats_cache_*_metrics RPC results; skipping it this refresh pass and leaving whatever is already cached for it untouched',
+		{
+			groupId,
+			temporalUnit,
+			speciesId: rawSpeciesId === 'null' ? null : Number(rawSpeciesId),
+			timePeriod: rawTimePeriod === 'null' ? null : rawTimePeriod,
+			missingFromRpc
+		}
+	);
+}
+
 type MergeMetricRowsParams = {
 	groupId: number;
 	temporalUnit: TemporalUnit;
@@ -170,30 +295,21 @@ type MergeMetricRowsParams = {
 };
 
 /**
- * Merges the four metric RPCs' per-cell rows, keyed by `(species_id,
- * time_period)`, into `SimpleStatsCache`'s full column set. All four share
- * the same `stats_spine` call, so every cell key should appear in every RPC's
- * result — a cell key present in some but not all four is an anomaly
- * (discussed and settled on PR #1164's review): it is logged (group id,
- * temporal unit, species_id, time_period, which RPC was missing it) and that
- * one cell is skipped entirely, leaving whatever's already cached for it
- * untouched. Every OTHER cell in the batch is unaffected — one anomalous
- * cell never drops the rest of the refresh.
- *
- * Never zero-fill, NULL-fill, or otherwise invent a value for a column this
- * refresh pass has no real data for: `upsert_simple_stats_cache_rows`
- * requires a fully-populated row by design specifically so no half-written/
- * placeholder row can ever land in `SimpleStatsCache`, and replicating that
- * gap here in TS would defeat the point.
+ * Merges the four `SimpleStatsCache` metric RPCs' per-cell rows, keyed by
+ * `(species_id, time_period)`, into that table's full column set. All four
+ * share the same `stats_spine` call, so every cell key should appear in every
+ * RPC's result — a cell key present in some but not all four is skipped and
+ * logged (see `logMissingCellAnomaly`). Every OTHER cell in the batch is
+ * unaffected — one anomalous cell never drops the rest of the refresh.
  */
-function mergeMetricRows({
+function mergeSimpleMetricRows({
 	groupId,
 	temporalUnit,
 	basicRows,
 	biometricsRows,
 	birdAgeRows,
 	encounterAgeRows
-}: MergeMetricRowsParams): MergedCell[] {
+}: MergeMetricRowsParams): SimpleMergedCell[] {
 	const basicByCell = indexByCell(basicRows);
 	const biometricsByCell = indexByCell(biometricsRows);
 	const birdAgeByCell = indexByCell(birdAgeRows);
@@ -206,7 +322,7 @@ function mergeMetricRows({
 		...encounterAgeByCell.keys()
 	]);
 
-	const mergedRows: MergedCell[] = [];
+	const mergedRows: SimpleMergedCell[] = [];
 
 	for (const key of allCellKeys) {
 		const basic = basicByCell.get(key);
@@ -214,26 +330,20 @@ function mergeMetricRows({
 		const birdAge = birdAgeByCell.get(key);
 		const encounterAge = encounterAgeByCell.get(key);
 
-		const missingFromRpc: string[] = [];
-		if (!basic) missingFromRpc.push('stats_cache_basic_session_metrics');
-		if (!biometrics) missingFromRpc.push('stats_cache_biometrics_metrics');
-		if (!birdAge) missingFromRpc.push('stats_cache_bird_age_metrics');
-		if (!encounterAge) {
-			missingFromRpc.push('stats_cache_encounter_age_metrics');
-		}
-
 		if (!basic || !biometrics || !birdAge || !encounterAge) {
-			const [rawSpeciesId, rawTimePeriod] = key.split('::');
-			console.error(
-				'A cell is missing from one or more stats_cache_*_metrics RPC results; skipping it this refresh pass and leaving whatever is already cached for it untouched',
-				{
-					groupId,
-					temporalUnit,
-					speciesId: rawSpeciesId === 'null' ? null : Number(rawSpeciesId),
-					timePeriod: rawTimePeriod === 'null' ? null : rawTimePeriod,
-					missingFromRpc
-				}
-			);
+			const missingFromRpc: string[] = [];
+			if (!basic) missingFromRpc.push('stats_cache_basic_session_metrics');
+			if (!biometrics) missingFromRpc.push('stats_cache_biometrics_metrics');
+			if (!birdAge) missingFromRpc.push('stats_cache_bird_age_metrics');
+			if (!encounterAge) {
+				missingFromRpc.push('stats_cache_encounter_age_metrics');
+			}
+			logMissingCellAnomaly({
+				groupId,
+				temporalUnit,
+				cellKey: key,
+				missingFromRpc
+			});
 			continue;
 		}
 
@@ -286,6 +396,84 @@ function mergeMetricRows({
 	return mergedRows;
 }
 
+type MergeComplexMetricRowsParams = {
+	groupId: number;
+	temporalUnit: TemporalUnit;
+	newAdultRows: NewAdultMetricsRow[];
+	returningAgeRows: ReturningAgeMetricsRow[];
+};
+
+/**
+ * Merges the two `ComplexStatsCache` metric RPCs' per-cell rows, keyed by
+ * `(species_id, time_period)`, into that table's full column set. Their data
+ * columns are disjoint — `stats_cache_new_adult_metrics` contributes
+ * `new_adult_bird_count`, `stats_cache_returning_age_metrics` the four
+ * `returning_*` columns — and both share the same `stats_spine` call, so every
+ * cell key should appear in both results. A cell key present in one but not
+ * the other is skipped and logged (see `logMissingCellAnomaly`); every OTHER
+ * cell in the batch is unaffected.
+ *
+ * `group_id` and `temporal_unit` are deliberately absent from the merged rows:
+ * `upsert_complex_stats_cache_rows` takes those as scalar parameters, and one
+ * call carries exactly one null-pattern.
+ */
+function mergeComplexMetricRows({
+	groupId,
+	temporalUnit,
+	newAdultRows,
+	returningAgeRows
+}: MergeComplexMetricRowsParams): ComplexMergedCell[] {
+	const newAdultByCell = indexByCell(newAdultRows);
+	const returningAgeByCell = indexByCell(returningAgeRows);
+
+	const allCellKeys = new Set<string>([
+		...newAdultByCell.keys(),
+		...returningAgeByCell.keys()
+	]);
+
+	const mergedRows: ComplexMergedCell[] = [];
+
+	for (const key of allCellKeys) {
+		const newAdult = newAdultByCell.get(key);
+		const returningAge = returningAgeByCell.get(key);
+
+		if (!newAdult || !returningAge) {
+			const missingFromRpc: string[] = [];
+			if (!newAdult) missingFromRpc.push('stats_cache_new_adult_metrics');
+			if (!returningAge) {
+				missingFromRpc.push('stats_cache_returning_age_metrics');
+			}
+			logMissingCellAnomaly({
+				groupId,
+				temporalUnit,
+				cellKey: key,
+				missingFromRpc
+			});
+			continue;
+		}
+
+		mergedRows.push({
+			species_id: newAdult.species_id,
+			// Passed straight through — since #1162 `time_period` is nullable and
+			// NULL *is* the all-time value, so there is no sentinel to map to.
+			time_period: newAdult.time_period,
+			// Same SQL-level guarantee the simple merge's assertions rely on: the
+			// metric RPCs' composite return types mark every column nullable
+			// (Postgres composite types carry no NOT NULL metadata), but all five
+			// of these are COALESCEd to 0 in SQL — see each RPC's own schema file.
+			new_adult_bird_count: newAdult.new_adult_bird_count!,
+			returning_age_1_bird_count: returningAge.returning_age_1_bird_count!,
+			returning_age_2_bird_count: returningAge.returning_age_2_bird_count!,
+			returning_age_3_plus_bird_count:
+				returningAge.returning_age_3_plus_bird_count!,
+			returning_new_unknown_age_bird_count:
+				returningAge.returning_new_unknown_age_bird_count!
+		});
+	}
+
+	return mergedRows;
+}
+
 /**
  * Refreshes `SimpleStatsCache` for one `(groupId, temporalUnit)` combination.
  * One temporal unit per call — a future queue consumer (T10) calls this once
@@ -316,9 +504,14 @@ export async function refreshSimpleStatsCache(
 ): Promise<void> {
 	const touchedPeriods = periods ?? [];
 
-	const rpcParams = buildMetricRpcParams(groupId, temporalUnit, touchedPeriods);
+	const rpcParams = buildMetricRpcParams(
+		groupId,
+		temporalUnit,
+		touchedPeriods,
+		SIMPLE_NARROWING_TEMPORAL_UNITS
+	);
 	if (rpcParams === null) {
-		// Narrow temporal unit, nothing touched this pass — nothing to refresh.
+		// Narrowing temporal unit, nothing touched this pass — nothing to refresh.
 		return;
 	}
 
@@ -338,7 +531,7 @@ export async function refreshSimpleStatsCache(
 				.then(catchSupabaseErrors)
 		]);
 
-	const mergedRows = mergeMetricRows({
+	const mergedRows = mergeSimpleMetricRows({
 		groupId,
 		temporalUnit,
 		basicRows: (basicRows ?? []) as BasicSessionMetricsRow[],
@@ -347,15 +540,92 @@ export async function refreshSimpleStatsCache(
 		encounterAgeRows: (encounterAgeRows ?? []) as EncounterAgeMetricsRow[]
 	});
 
-	const rowsToWrite = isNarrowTemporalUnit(temporalUnit)
-		? mergedRows.filter(
-				(row) =>
-					row.time_period !== null && touchedPeriods.includes(row.time_period)
-			)
-		: mergedRows;
+	const rowsToWrite = filterToTouchedPeriods(
+		mergedRows,
+		temporalUnit,
+		touchedPeriods,
+		SIMPLE_NARROWING_TEMPORAL_UNITS
+	);
 
 	await supabaseClient
 		.rpc('upsert_simple_stats_cache_rows', {
+			p_group_id: groupId,
+			p_temporal_unit: temporalUnit,
+			p_group_by_species: true,
+			p_rows: rowsToWrite
+		})
+		.then(catchSupabaseErrors);
+}
+
+/**
+ * Refreshes `ComplexStatsCache` for one `(groupId, temporalUnit)` combination.
+ * One temporal unit per call — a future queue consumer (T10) calls this once
+ * per temporal-unit event it receives, alongside `refreshSimpleStatsCache`;
+ * this function does not loop over temporal units itself.
+ *
+ * `day` is the only temporal unit that narrows by `periods`: the two metric
+ * RPCs are called over a `from_date`/`to_date` window spanning
+ * `min(periods)`..`max(periods)`, and the merged result is filtered down to
+ * just the periods actually touched before writing — the window call can
+ * return extra untouched periods inside that range.
+ *
+ * `month`/`year`/`month-squashed`/`all-time` always full-replace the group's
+ * whole history, ignoring `periods` entirely. That stricter rule — not shared
+ * with `refreshSimpleStatsCache`, whose metrics are period-local — is the whole
+ * reason this cache is a separate table and this a separate function; see
+ * `COMPLEX_NARROWING_TEMPORAL_UNITS`.
+ *
+ * Writes go through exactly one `upsert_complex_stats_cache_rows` call — never
+ * a native `.upsert()` (see that RPC's own file for why) and never more than
+ * one call per metric RPC's worth of rows.
+ *
+ * Known-accepted limitation (shared with `refreshSimpleStatsCache`): a species
+ * whose *entire* history disappears falls out of `stats_spine`'s species-set
+ * entirely, so it never gets a fresh row written to overwrite a stale one — an
+ * upsert can only ever refresh cells the spine still produces. Out of scope.
+ */
+export async function refreshComplexStatsCache(
+	supabaseClient: SupabaseClient,
+	{ groupId, temporalUnit, periods }: RefreshComplexStatsCacheParams
+): Promise<void> {
+	const touchedPeriods = periods ?? [];
+
+	const rpcParams = buildMetricRpcParams(
+		groupId,
+		temporalUnit,
+		touchedPeriods,
+		COMPLEX_NARROWING_TEMPORAL_UNITS
+	);
+	if (rpcParams === null) {
+		// Day temporal unit, nothing touched this pass — nothing to refresh.
+		return;
+	}
+
+	const [newAdultRows, returningAgeRows] = await Promise.all([
+		supabaseClient
+			.rpc('stats_cache_new_adult_metrics', rpcParams)
+			.then(catchSupabaseErrors),
+		supabaseClient
+			.rpc('stats_cache_returning_age_metrics', rpcParams)
+			.then(catchSupabaseErrors)
+	]);
+
+	const mergedRows = mergeComplexMetricRows({
+		groupId,
+		temporalUnit,
+		newAdultRows: (newAdultRows ?? []) as NewAdultMetricsRow[],
+		returningAgeRows: (returningAgeRows ?? []) as ReturningAgeMetricsRow[]
+	});
+
+	const rowsToWrite = filterToTouchedPeriods(
+		mergedRows,
+		temporalUnit,
+		touchedPeriods,
+		COMPLEX_NARROWING_TEMPORAL_UNITS
+	);
+
+	await supabaseClient
+		.rpc('upsert_complex_stats_cache_rows', {
 			p_group_id: groupId,
 			p_temporal_unit: temporalUnit,
 			p_group_by_species: true,
