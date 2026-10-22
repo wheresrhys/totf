@@ -961,6 +961,25 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      stats_cache_new_adult_metrics: {
+        Args: {
+          from_date?: string
+          group_by_species?: boolean
+          group_by_time_period?: string
+          month_filter?: number
+          ringing_group_filter?: number
+          species_name_filter?: string
+          to_date?: string
+          year_filter?: number
+        }
+        Returns: Database["public"]["CompositeTypes"]["stats_cache_new_adult_metrics_result"][]
+        SetofOptions: {
+          from: "*"
+          to: "stats_cache_new_adult_metrics_result"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       stats_encounter_age_classification: {
         Args: {
           from_date?: string
@@ -1152,6 +1171,11 @@ export type Database = {
         avg_wing: number | null
         min_wing: number | null
         median_wing: number | null
+      }
+      stats_cache_new_adult_metrics_result: {
+        species_id: number | null
+        time_period: string | null
+        new_adult_bird_count: number | null
       }
     }
   }
