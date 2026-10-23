@@ -618,7 +618,10 @@ operation, whereas these are six variations on the same `update(...).eq('id', �
   The five columns (`day_` / `month_` / `year_` / `month_squashed_` / `all_time_`) replaced three
   stats-TYPE columns (`core_` / `biometrics_` / `demographics_`) at #1154 — a change of axis, not a
   rename: the three stats-type cache tables gave way to the temporal-unit-shaped
-  `SimpleStatsCache`/`ComplexStatsCache` split (#1144/#1147), each refreshed one temporal unit per
+  `SimpleStatsCache`/`ComplexStatsCache` split (#1144/#1147 — since #1169 four tables, each of
+  those two halved again into an all-species and a `*BySpecies` variant so neither needs a
+  nullable `species_id`, with `time_period` NOT NULL and `0001-01-01` standing in for the all-time
+  grain), each refreshed one temporal unit per
   call, so a temporal unit is the finest granularity at which a refresh can succeed or fail. No
   historical values were carried across; the old columns were simply dropped.
   `markStatsCacheRefreshed(importJobId, temporalUnit, outcome)` writes exactly one column and never
