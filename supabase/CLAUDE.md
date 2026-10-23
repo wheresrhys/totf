@@ -132,9 +132,13 @@ it — so a `month`/`year` call with only `year_filter`/`month_filter` set (no `
 scanned every ringing group's `Sessions` rows system-wide via the non-sargable `EXTRACT(YEAR/MONTH
 FROM visit_date)` predicate, and — whenever RLS already let the caller see more than one group's
 rows (a `GroupDataSharing` grant) — could also widen/shift the spine's min/max bounds with a
-visible-but-not-requested group's dates. This is what caused prod's `processStatsCacheRefreshWindowJob`
-to hit `statement timeout` for every `TemporalUnit` except `day` (the only branch that doesn't read
-this CTE) after an import. See the "session_date_range cross-group scoping" describe block in
+visible-but-not-requested group's dates. This contributed to prod's `processStatsCacheRefreshWindowJob`
+hitting `statement timeout` on `month`/`year` refreshes after an import — the only two branches that
+read this CTE — but turned out not to be the whole story: `month-squashed` and `all-time` failed the
+same way without ever touching `session_date_range` at all, which traced to a second, independent
+cause (the `stats_cache_*_metrics` RPC family's missing `plan_cache_mode` guard — see that section
+below once it lands). Fixing this CTE's scoping was still worth doing on its own merits regardless.
+See the "session_date_range cross-group scoping" describe block in
 `stats-raw-encounters-and-spine.test.ts` for the regression tests, which use two
 `GroupDataSharing`-linked throwaway groups rather than the shared seed groups — RLS alone already
 hides an *unrelated* group's rows, so only a sharing-visible pair can actually exercise this CTE's
