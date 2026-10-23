@@ -169,6 +169,15 @@ const BY_SPECIES_CONFLICT_TARGET =
 	'group_id,temporal_unit,time_period,species_id';
 
 /**
+ * Both all-species-combined tables' sole unique constraint — the same column
+ * list for both: `simple_stats_cache_group_grain_period_key` and
+ * `complex_stats_cache_group_grain_period_key` — see either table's own
+ * schema file. One fewer column than `BY_SPECIES_CONFLICT_TARGET`: these
+ * tables have no `species_id` column at all.
+ */
+const ALL_SPECIES_CONFLICT_TARGET = 'group_id,temporal_unit,time_period';
+
+/**
  * The temporal units `refreshSimpleStatsCache` may narrow by affected dates —
  * every unit except `all-time`. Every `SimpleStatsCache` metric is
  * **period-local**: it reads only the encounters inside the cell's own period,
@@ -224,7 +233,7 @@ const COMPLEX_NARROWING_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> = new Set([
  */
 type MetricRpcParams = {
 	ringing_group_filter: number;
-	group_by_species: true;
+	group_by_species: boolean;
 	group_by_time_period?: 'day' | 'month' | 'year' | 'month-squashed';
 	from_date?: string;
 	to_date?: string;
@@ -295,15 +304,16 @@ function exactPeriodFilters(
 /**
  * The parts of a metric RPC's filter object that are the same for every
  * temporal unit and every call of one refresh pass — the group, the
- * group-by-species flag every call in this module hardcodes, and the grain.
+ * group-by-species flag the caller's pass is running under, and the grain.
  */
 function unwindowedMetricRpcParams(
 	groupId: number,
-	temporalUnit: TemporalUnit
+	temporalUnit: TemporalUnit,
+	groupBySpecies: boolean
 ): MetricRpcParams {
 	return {
 		ringing_group_filter: groupId,
-		group_by_species: true,
+		group_by_species: groupBySpecies,
 		// For all-time, `group_by_time_period` is omitted completely rather than
 		// set to any value — the same "omit the key for all-time" convention
 		// `app/actions/summary-stats.ts`'s `fetchSummaryStats` and
@@ -336,9 +346,14 @@ function buildMetricRpcParams(
 	groupId: number,
 	temporalUnit: TemporalUnit,
 	periods: string[],
-	narrowingTemporalUnits: ReadonlySet<TemporalUnit>
+	narrowingTemporalUnits: ReadonlySet<TemporalUnit>,
+	groupBySpecies: boolean
 ): MetricRpcParams | null {
-	const unwindowedParams = unwindowedMetricRpcParams(groupId, temporalUnit);
+	const unwindowedParams = unwindowedMetricRpcParams(
+		groupId,
+		temporalUnit,
+		groupBySpecies
+	);
 
 	if (!narrowingTemporalUnits.has(temporalUnit)) {
 		// Always full-replace, over the group's whole history (no from_date/
@@ -382,14 +397,16 @@ function buildMetricRpcParams(
 function buildSimpleMetricRpcParamsList(
 	groupId: number,
 	temporalUnit: TemporalUnit,
-	periods: string[]
+	periods: string[],
+	groupBySpecies: boolean
 ): MetricRpcParams[] | null {
 	if (!isExactFilterTemporalUnit(temporalUnit)) {
 		const windowedParams = buildMetricRpcParams(
 			groupId,
 			temporalUnit,
 			periods,
-			SIMPLE_NARROWING_TEMPORAL_UNITS
+			SIMPLE_NARROWING_TEMPORAL_UNITS,
+			groupBySpecies
 		);
 		return windowedParams === null ? null : [windowedParams];
 	}
@@ -406,7 +423,7 @@ function buildSimpleMetricRpcParamsList(
 	}
 
 	return distinctPeriods.map((periodString) => ({
-		...unwindowedMetricRpcParams(groupId, temporalUnit),
+		...unwindowedMetricRpcParams(groupId, temporalUnit, groupBySpecies),
 		...exactPeriodFilters(temporalUnit, periodString)
 	}));
 }
@@ -534,18 +551,19 @@ function recordMissingCellAnomaly({
 }
 
 /**
- * Writes one refresh pass's merged cells to its cache's `*BySpecies` table, in
- * a single native `.upsert()` against that table's one unique constraint.
+ * Writes one species-grouped refresh pass's merged cells to its cache's
+ * `*BySpecies` table, in a single native `.upsert()` against that table's one
+ * unique constraint.
  *
  * This is where the two `time_period` conventions are reconciled: the metric
  * RPCs emit a real NULL for the all-time grain, the cache column is NOT NULL,
  * so a null becomes `ALL_TIME_SENTINEL_DATE` here rather than in the merge —
  * which has to keep the NULL to match cells across RPC results by key.
  *
- * Only the `BySpecies` tables are ever written, and `species_id` is asserted
- * non-null for the same reason: every metric RPC call in this module hardcodes
- * `group_by_species: true`, so every cell carries a real species id. The
- * all-species-combined tables are schema-complete but have no writer.
+ * `species_id` is asserted non-null because this is only ever called with
+ * cells from a `group_by_species: true` pass, so every cell carries a real
+ * species id — see `writeAllSpeciesRows` for the sibling non-species pass's
+ * writer.
  */
 async function writeBySpeciesRows<Cell extends MergedCellKey>(
 	supabaseClient: SupabaseClient,
@@ -564,6 +582,41 @@ async function writeBySpeciesRows<Cell extends MergedCellKey>(
 				time_period: time_period ?? ALL_TIME_SENTINEL_DATE
 			})),
 			{ onConflict: BY_SPECIES_CONFLICT_TARGET }
+		)
+		.then(catchSupabaseErrors);
+}
+
+/**
+ * Writes one non-species-grouped refresh pass's merged cells to its cache's
+ * all-species-combined table (`SimpleStatsCache`/`ComplexStatsCache`), the
+ * sibling of `writeBySpeciesRows` for a `group_by_species: false` pass.
+ *
+ * These tables have no `species_id` column at all (#1169 — a nullable
+ * `species_id` meaning "all species" was tried and reverted), so `species_id`
+ * is destructured off each cell and dropped rather than written; every cell
+ * reaching here carries `species_id: null` anyway, since the RPCs collapse
+ * every species into one row per `time_period` under `group_by_species:
+ * false`. Same `ALL_TIME_SENTINEL_DATE` reconciliation as `writeBySpeciesRows`,
+ * against the narrower `(group_id, temporal_unit, time_period)` conflict
+ * target this table shape's unique constraint uses.
+ */
+async function writeAllSpeciesRows<Cell extends MergedCellKey>(
+	supabaseClient: SupabaseClient,
+	cacheTable: 'SimpleStatsCache' | 'ComplexStatsCache',
+	cells: Cell[],
+	{ groupId, temporalUnit }: { groupId: number; temporalUnit: TemporalUnit }
+): Promise<void> {
+	await supabaseClient
+		.from(cacheTable)
+		.upsert(
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude it from ...metrics; this table has no species_id column
+			cells.map(({ species_id, time_period, ...metrics }) => ({
+				...metrics,
+				group_id: groupId,
+				temporal_unit: temporalUnit,
+				time_period: time_period ?? ALL_TIME_SENTINEL_DATE
+			})),
+			{ onConflict: ALL_SPECIES_CONFLICT_TARGET }
 		)
 		.then(catchSupabaseErrors);
 }
@@ -801,10 +854,14 @@ function mergeComplexMetricRows({
 }
 
 /**
- * Refreshes `SimpleStatsCache` for one `(groupId, temporalUnit)` combination.
- * One temporal unit per call — a future queue consumer (T10) calls this once
- * per temporal-unit event it receives; this function does not loop over
- * temporal units itself.
+ * Runs one `refreshSimpleStatsCache` pass — either the species-grouped one,
+ * writing `SimpleStatsCacheBySpecies`, or the non-species-grouped one, writing
+ * the all-species-combined `SimpleStatsCache` — for one `(groupId,
+ * temporalUnit)` combination. `refreshSimpleStatsCache` runs this twice,
+ * sequentially, once per `groupBySpecies` value; the two passes are otherwise
+ * identical (same RPCs, same narrowing rule, same merge), differing only in
+ * the `group_by_species` value sent to every metric RPC and which table the
+ * merged result lands in.
  *
  * Every temporal unit but `all-time` narrows by `periods`, in two different
  * ways (see `buildSimpleMetricRpcParamsList`):
@@ -822,29 +879,34 @@ function mergeComplexMetricRows({
  * `all-time` always full-replaces the group's whole history, ignoring `periods`
  * entirely.
  *
- * Writes go through exactly one `.upsert()` against `SimpleStatsCacheBySpecies`
- * — one call per invocation, not one per metric RPC's worth of rows and not one
- * per fanned-out period. See `writeBySpeciesRows`.
+ * Writes go through exactly one `.upsert()` — one call per pass, not one per
+ * metric RPC's worth of rows and not one per fanned-out period. See
+ * `writeBySpeciesRows`/`writeAllSpeciesRows`.
  *
  * Any cell `mergeSimpleMetricRows` had to skip is then dead-lettered to
  * `FailedStatsCacheRefreshes` in one batched insert (#1167) — see
- * `deadLetterAnomalies`.
+ * `deadLetterAnomalies`. Both passes currently dead-letter under the same
+ * `cache_table: 'SimpleStatsCache'` tag (the DB's CHECK constraint doesn't yet
+ * distinguish them — see #1182), so an anomaly row can't yet tell you which
+ * pass produced it.
  *
  * Known-accepted limitation: a species whose *entire* history disappears
  * falls out of `stats_spine`'s species-set entirely, so it never gets a
  * fresh row written to overwrite a stale one — an upsert can only ever
  * refresh cells the spine still produces. Out of scope for this ticket.
  */
-export async function refreshSimpleStatsCache(
+async function runSimpleStatsCacheRefreshPass(
 	supabaseClient: SupabaseClient,
-	{ groupId, temporalUnit, periods }: RefreshSimpleStatsCacheParams
+	{ groupId, temporalUnit, periods }: RefreshSimpleStatsCacheParams,
+	groupBySpecies: boolean
 ): Promise<void> {
 	const touchedPeriods = periods ?? [];
 
 	const rpcParamsList = buildSimpleMetricRpcParamsList(
 		groupId,
 		temporalUnit,
-		touchedPeriods
+		touchedPeriods,
+		groupBySpecies
 	);
 	if (rpcParamsList === null) {
 		// Narrowing temporal unit, nothing touched this pass — nothing to refresh.
@@ -896,21 +958,57 @@ export async function refreshSimpleStatsCache(
 		SIMPLE_NARROWING_TEMPORAL_UNITS
 	);
 
-	await writeBySpeciesRows(
-		supabaseClient,
-		'SimpleStatsCacheBySpecies',
-		rowsToWrite,
-		{ groupId, temporalUnit }
-	);
+	if (groupBySpecies) {
+		await writeBySpeciesRows(
+			supabaseClient,
+			'SimpleStatsCacheBySpecies',
+			rowsToWrite,
+			{ groupId, temporalUnit }
+		);
+	} else {
+		await writeAllSpeciesRows(supabaseClient, 'SimpleStatsCache', rowsToWrite, {
+			groupId,
+			temporalUnit
+		});
+	}
 
 	await deadLetterAnomalies(supabaseClient, anomalies);
 }
 
 /**
- * Refreshes `ComplexStatsCache` for one `(groupId, temporalUnit)` combination.
- * One temporal unit per call — a future queue consumer (T10) calls this once
- * per temporal-unit event it receives, alongside `refreshSimpleStatsCache`;
- * this function does not loop over temporal units itself.
+ * Refreshes `SimpleStatsCache` for one `(groupId, temporalUnit)` combination —
+ * both its species-grouped half (`SimpleStatsCacheBySpecies`) and its
+ * all-species-combined half (`SimpleStatsCache`). One temporal unit per call —
+ * a future queue consumer (T10) calls this once per temporal-unit event it
+ * receives; this function does not loop over temporal units itself.
+ *
+ * The two passes run sequentially, not concurrently (`Promise.all`): this
+ * module shares its six underlying RPCs with an active investigation into
+ * RPC-timeout behaviour under load, so doubling concurrent calls for the same
+ * group/temporal-unit isn't the right default here. If either pass throws,
+ * this function rejects — same externally-visible failure semantics as
+ * before this split, since the queue consumer's per-cache-table `try`/`catch`
+ * and `*_stats_refresh_status` column don't distinguish which internal pass
+ * failed.
+ *
+ * See `runSimpleStatsCacheRefreshPass` for what one pass actually does.
+ */
+export async function refreshSimpleStatsCache(
+	supabaseClient: SupabaseClient,
+	params: RefreshSimpleStatsCacheParams
+): Promise<void> {
+	await runSimpleStatsCacheRefreshPass(supabaseClient, params, true);
+	await runSimpleStatsCacheRefreshPass(supabaseClient, params, false);
+}
+
+/**
+ * Runs one `refreshComplexStatsCache` pass — either the species-grouped one,
+ * writing `ComplexStatsCacheBySpecies`, or the non-species-grouped one,
+ * writing the all-species-combined `ComplexStatsCache` — for one `(groupId,
+ * temporalUnit)` combination. `refreshComplexStatsCache` runs this twice,
+ * sequentially, once per `groupBySpecies` value; the two passes are otherwise
+ * identical, differing only in the `group_by_species` value sent to both
+ * metric RPCs and which table the merged result lands in.
  *
  * `day` is the only temporal unit that narrows by `periods`: the two metric
  * RPCs are called over a `from_date`/`to_date` window spanning
@@ -924,24 +1022,25 @@ export async function refreshSimpleStatsCache(
  * reason this cache is a separate table and this a separate function; see
  * `COMPLEX_NARROWING_TEMPORAL_UNITS`.
  *
- * Writes go through exactly one `.upsert()` against
- * `ComplexStatsCacheBySpecies` — one call per invocation, not one per metric
- * RPC's worth of rows. See `writeBySpeciesRows`.
+ * Writes go through exactly one `.upsert()` — one call per pass, not one per
+ * metric RPC's worth of rows. See `writeBySpeciesRows`/`writeAllSpeciesRows`.
  *
  * Any cell `mergeComplexMetricRows` had to skip is then dead-lettered to
  * `FailedStatsCacheRefreshes` in one batched insert (#1167), with
  * `cache_table = 'ComplexStatsCache'` distinguishing it from
  * `refreshSimpleStatsCache`'s rows in the same table — see
- * `deadLetterAnomalies`.
+ * `deadLetterAnomalies`. Both passes currently dead-letter under that same
+ * tag (see #1182 for widening the CHECK constraint to tell them apart).
  *
  * Known-accepted limitation (shared with `refreshSimpleStatsCache`): a species
  * whose *entire* history disappears falls out of `stats_spine`'s species-set
  * entirely, so it never gets a fresh row written to overwrite a stale one — an
  * upsert can only ever refresh cells the spine still produces. Out of scope.
  */
-export async function refreshComplexStatsCache(
+async function runComplexStatsCacheRefreshPass(
 	supabaseClient: SupabaseClient,
-	{ groupId, temporalUnit, periods }: RefreshComplexStatsCacheParams
+	{ groupId, temporalUnit, periods }: RefreshComplexStatsCacheParams,
+	groupBySpecies: boolean
 ): Promise<void> {
 	const touchedPeriods = periods ?? [];
 
@@ -949,7 +1048,8 @@ export async function refreshComplexStatsCache(
 		groupId,
 		temporalUnit,
 		touchedPeriods,
-		COMPLEX_NARROWING_TEMPORAL_UNITS
+		COMPLEX_NARROWING_TEMPORAL_UNITS,
+		groupBySpecies
 	);
 	if (rpcParams === null) {
 		// Day temporal unit, nothing touched this pass — nothing to refresh.
@@ -979,12 +1079,42 @@ export async function refreshComplexStatsCache(
 		COMPLEX_NARROWING_TEMPORAL_UNITS
 	);
 
-	await writeBySpeciesRows(
-		supabaseClient,
-		'ComplexStatsCacheBySpecies',
-		rowsToWrite,
-		{ groupId, temporalUnit }
-	);
+	if (groupBySpecies) {
+		await writeBySpeciesRows(
+			supabaseClient,
+			'ComplexStatsCacheBySpecies',
+			rowsToWrite,
+			{ groupId, temporalUnit }
+		);
+	} else {
+		await writeAllSpeciesRows(
+			supabaseClient,
+			'ComplexStatsCache',
+			rowsToWrite,
+			{ groupId, temporalUnit }
+		);
+	}
 
 	await deadLetterAnomalies(supabaseClient, anomalies);
+}
+
+/**
+ * Refreshes `ComplexStatsCache` for one `(groupId, temporalUnit)` combination
+ * — both its species-grouped half (`ComplexStatsCacheBySpecies`) and its
+ * all-species-combined half (`ComplexStatsCache`). One temporal unit per
+ * call — a future queue consumer (T10) calls this once per temporal-unit
+ * event it receives, alongside `refreshSimpleStatsCache`; this function does
+ * not loop over temporal units itself.
+ *
+ * The two passes run sequentially, not concurrently, for the same reason
+ * `refreshSimpleStatsCache` does — see its own doc comment.
+ *
+ * See `runComplexStatsCacheRefreshPass` for what one pass actually does.
+ */
+export async function refreshComplexStatsCache(
+	supabaseClient: SupabaseClient,
+	params: RefreshComplexStatsCacheParams
+): Promise<void> {
+	await runComplexStatsCacheRefreshPass(supabaseClient, params, true);
+	await runComplexStatsCacheRefreshPass(supabaseClient, params, false);
 }
