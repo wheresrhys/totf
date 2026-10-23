@@ -96,17 +96,28 @@ CREATE FUNCTION public.stats_spine (
 
     UNION ALL
 
-    -- 'month-squashed' (#996): a dense, always-12-row spine — one row per
-    -- calendar month (Jan-Dec), independent of any actual session data —
+    -- 'month-squashed' (#996): a dense, all-12-rows-by-default spine — one row
+    -- per calendar month (Jan-Dec), independent of any actual session data —
     -- unlike the month/year branches above, which are dense only within the
-    -- group's own min..max date range. Unconditional generate_series(1, 12),
-    -- deliberately not gated on session_date_range like the branches above, so
-    -- the mode returns all 12 months even when the group's history only spans
-    -- one calendar month across every year. Dates use the same 2000-<mm>-01
+    -- group's own min..max date range. generate_series(1, 12), deliberately
+    -- not gated on session_date_range like the branches above, so the mode
+    -- returns all 12 months even when the group's history only spans one
+    -- calendar month across every year. Dates use the same 2000-<mm>-01
     -- sentinel-year convention as stats_raw_encounters.session_month_squashed.
+    --
+    -- month_filter narrows it to that one calendar month's cell (#1178). A
+    -- squashed cell IS exactly what month_filter alone — year_filter left NULL
+    -- — selects, so a caller refreshing only the calendar months an import
+    -- touched can ask for precisely those cells; without this guard the other
+    -- 11 came back as spurious all-zero rows. month_filter is applied in
+    -- session_date_range above too, but that CTE doesn't bound this branch, so
+    -- the guard has to be repeated here. The only unfiltered caller
+    -- (fetchCombinedMonthTotals, app/actions/summary-stats.ts) leaves
+    -- month_filter NULL and still gets all 12 cells.
     SELECT make_date(2000, m, 1) AS time_period
     FROM generate_series(1, 12) AS m
     WHERE group_by_time_period = 'month-squashed'
+      AND (month_filter IS NULL OR m = month_filter)
 
     UNION ALL
 
