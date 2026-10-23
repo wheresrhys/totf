@@ -70,6 +70,40 @@ export function deriveStatsCacheRefreshParams(
 }
 
 /**
+ * Runs one of the two cache refreshes, catching and logging its failure rather
+ * than letting it escape, and reporting back whether it landed. Its own helper
+ * so each refresh gets its own `try`/`catch` — see
+ * `processStatsCacheRefreshWindowJob`'s "no transaction spans the two
+ * refreshes" note for why they must not share one.
+ *
+ * `cacheTable` is in the log context so a partial failure names *which* cache
+ * went stale; without it the two are indistinguishable in the logs, which is
+ * the only place a partial failure is visible at per-cache granularity (the
+ * `ImportJobs` column records one outcome for the temporal unit as a whole).
+ */
+async function runCacheRefresh(
+	cacheTable: 'SimpleStatsCache' | 'ComplexStatsCache',
+	refreshCache: () => Promise<void>,
+	logContext: {
+		importJobId: number;
+		groupId: number;
+		temporalUnit: TemporalUnit;
+	}
+): Promise<boolean> {
+	try {
+		await refreshCache();
+		return true;
+	} catch (refreshError) {
+		console.error(
+			'Failed to refresh a stats cache for a stats-cache-refresh-window event',
+			{ ...logContext, cacheTable },
+			refreshError
+		);
+		return false;
+	}
+}
+
+/**
  * Consumer for the `stats-cache.refresh-window` topic (#1141, made real by
  * #1155): refreshes both stats caches for the one temporal unit this event
  * covers, then records the outcome on that temporal unit's own
@@ -95,6 +129,36 @@ export function deriveStatsCacheRefreshParams(
  * Same "a derived/recoverable step's failure is caught and logged, not thrown"
  * precedent `dispatchStatsCacheRefreshEvents` (`lib/demon-import.ts`) already
  * set one level up at the dispatch call site, applied one level deeper.
+ *
+ * **No transaction spans the two refreshes, and none can from here** (asked on
+ * PR #1174's review). Every write either refresh makes goes out over PostgREST
+ * as its own HTTP request, each of which Postgres runs in its own implicit
+ * transaction; `supabase-js` exposes no `BEGIN`/`COMMIT` and no way to pin a
+ * sequence of requests to one connection, so there is no client-side
+ * transaction to open. Nor is one refresh internally atomic — each makes
+ * several round trips of its own (its metric RPCs, its `.upsert()`, its
+ * dead-letter insert; see `lib/stats-cache-refresh.ts`), so "wrap the two in a
+ * transaction" would mean pushing the whole merge-and-write pipeline down into
+ * SQL. #1169 deliberately moved the *opposite* way — it deleted the
+ * `upsert_*_stats_cache_rows` RPCs in favour of native `.upsert()` — so that is
+ * a design reversal, not a tweak.
+ *
+ * **Partial application is safe, which is why that's acceptable.** Both caches
+ * are derived data, rebuildable from `Encounters` at any time; both writes are
+ * idempotent upserts keyed on `(group_id, temporal_unit, time_period,
+ * species_id)`; neither ever deletes a row. So a half-applied pass leaves one
+ * cache fresh and the other stale — never a torn or invented value — and
+ * re-running the same event converges. The staleness is recorded rather than
+ * silent: either refresh failing writes `'failed'` to the temporal unit's
+ * column below, so the unit is flagged as not-fresh for a re-refresh, and each
+ * failure is logged with the `cacheTable` that went stale.
+ *
+ * The two therefore run **independently, each with its own `try`/`catch`**
+ * (`runCacheRefresh` above) rather than sharing one: since there's no atomicity
+ * to preserve, letting a `SimpleStatsCache` failure skip the
+ * `ComplexStatsCache` refresh too would strand two stale caches where one would
+ * do. Sequentially rather than via `Promise.all`, to keep one group's refresh
+ * from opening both caches' metric RPCs at once.
  */
 export async function processStatsCacheRefreshWindowJob(
 	event: StatsCacheRefreshEvent
@@ -106,26 +170,21 @@ export async function processStatsCacheRefreshWindowJob(
 	const supabaseClient = await getAuthenticatedSupabaseClientForGroup(groupId);
 	const importJobTracker = new ImportJobTracker(supabaseClient);
 
-	let refreshOutcome: StatsCacheRefreshOutcome = 'succeeded';
-	try {
-		await refreshSimpleStatsCache(supabaseClient, {
-			groupId,
-			temporalUnit,
-			periods
-		});
-		await refreshComplexStatsCache(supabaseClient, {
-			groupId,
-			temporalUnit,
-			periods
-		});
-	} catch (refreshError) {
-		refreshOutcome = 'failed';
-		console.error(
-			'Failed to refresh stats caches for a stats-cache-refresh-window event',
-			{ importJobId, groupId, temporalUnit },
-			refreshError
-		);
-	}
+	const refreshParams = { groupId, temporalUnit, periods };
+	const logContext = { importJobId, groupId, temporalUnit };
+
+	const simpleRefreshSucceeded = await runCacheRefresh(
+		'SimpleStatsCache',
+		() => refreshSimpleStatsCache(supabaseClient, refreshParams),
+		logContext
+	);
+	const complexRefreshSucceeded = await runCacheRefresh(
+		'ComplexStatsCache',
+		() => refreshComplexStatsCache(supabaseClient, refreshParams),
+		logContext
+	);
+	const refreshOutcome: StatsCacheRefreshOutcome =
+		simpleRefreshSucceeded && complexRefreshSucceeded ? 'succeeded' : 'failed';
 
 	try {
 		await importJobTracker.markStatsCacheRefreshed(
@@ -138,7 +197,7 @@ export async function processStatsCacheRefreshWindowJob(
 		// there is nothing further this consumer could do about it.
 		console.error(
 			'Failed to record a stats-cache refresh outcome on ImportJobs',
-			{ importJobId, groupId, temporalUnit, refreshOutcome },
+			{ ...logContext, refreshOutcome },
 			trackerError
 		);
 	}

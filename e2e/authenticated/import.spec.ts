@@ -35,9 +35,12 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		// Same reason for the two stats caches (#1155): both refresh functions are
 		// upsert-only, so leftover rows from a previous run would make the
 		// "did this upload write any cache rows at all" assertions below pass
-		// without the consumer having done anything.
-		psql(`DELETE FROM "SimpleStatsCache" WHERE group_id = ${deltaId}`)
-		psql(`DELETE FROM "ComplexStatsCache" WHERE group_id = ${deltaId}`)
+		// without the consumer having done anything. The `*BySpecies` halves are
+		// the ones with a writer — every metric RPC call in
+		// lib/stats-cache-refresh.ts hardcodes group_by_species=true, so the
+		// all-species-combined siblings stay empty (#1169).
+		psql(`DELETE FROM "SimpleStatsCacheBySpecies" WHERE group_id = ${deltaId}`)
+		psql(`DELETE FROM "ComplexStatsCacheBySpecies" WHERE group_id = ${deltaId}`)
 		psql(`UPDATE "Birds" SET ringing_group_ids = array_remove(ringing_group_ids, ${deltaId}) WHERE ${deltaId} = ANY(ringing_group_ids)`)
 		psql(`DELETE FROM "Birds" WHERE ringing_group_ids = '{}'`)
 		psql(`ALTER TABLE "Encounters" ENABLE TRIGGER trigger_encounters_refresh_bird_proven_age`)
@@ -121,33 +124,30 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 	// VERCEL env var the dispatch port runs in `inline` mode — so every temporal
 	// unit's consumer call has already finished by the time the browser sees
 	// "Import complete", exactly as the ImportJobs assertions above already assume.
-	test('writes SimpleStatsCache rows for the Delta group’s imported species and temporal units', async () => {
+	test('writes SimpleStatsCacheBySpecies rows for the Delta group’s imported species and temporal units', async () => {
 		const [rowCount, temporalUnits] = psqlRow(
-			`SELECT COUNT(*), array_agg(DISTINCT temporal_unit) FROM "SimpleStatsCache" WHERE group_id = ${deltaId}`
+			`SELECT COUNT(*), array_agg(DISTINCT temporal_unit) FROM "SimpleStatsCacheBySpecies" WHERE group_id = ${deltaId}`
 		)
 
 		expect(Number(rowCount)).toBeGreaterThan(0)
-		// Three of the five dispatched temporal units, not five: `month` and `year`
-		// are missing because of a bug in `refreshSimpleStatsCache`'s narrowing
-		// window, which this E2E run is the first thing to expose — see #1173. It
-		// derives from_date/to_date as min(periods)..max(periods), but a month/year
-		// period string is the period's *first* day, so the window collapses to
-		// 2024-03-01..2024-03-01 for this import's single 2024-03-15 date and the
-		// metric RPCs return nothing. Pinned to the current behaviour rather than
-		// loosened to a bare row count, so #1173's fix is forced to tighten it to
-		// all five.
-		expect(temporalUnits).toBe('{all-time,day,month-squashed}')
+		// All five dispatched temporal units. This started out as three — `month`
+		// and `year` were missing because `buildMetricRpcParams` derived
+		// to_date as max(periods) verbatim, and a month/year period string is the
+		// period's *first* day, so the window collapsed to a single day and the
+		// metric RPCs returned nothing. This E2E run was the first thing to expose
+		// that; #1173 fixed it, and this assertion is what pins the fix.
+		expect(temporalUnits).toBe('{all-time,day,month,month-squashed,year}')
 	})
 
-	test('writes ComplexStatsCache rows for the Delta group’s imported species and temporal units', async () => {
+	test('writes ComplexStatsCacheBySpecies rows for the Delta group’s imported species and temporal units', async () => {
 		const [rowCount, temporalUnits] = psqlRow(
-			`SELECT COUNT(*), array_agg(DISTINCT temporal_unit) FROM "ComplexStatsCache" WHERE group_id = ${deltaId}`
+			`SELECT COUNT(*), array_agg(DISTINCT temporal_unit) FROM "ComplexStatsCacheBySpecies" WHERE group_id = ${deltaId}`
 		)
 
 		expect(Number(rowCount)).toBeGreaterThan(0)
-		// All five: `day` is the only temporal unit this cache narrows by period, so
-		// it alone takes the window #1173 is about, and for `day` that window is
-		// correct (a day period string *is* a date).
+		// All five here too — `day` is the only temporal unit this cache narrows by
+		// period at all, and for `day` the window was always correct (a day period
+		// string *is* a date), so #1173 never affected this one.
 		expect(temporalUnits).toBe('{all-time,day,month,month-squashed,year}')
 	})
 

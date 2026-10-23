@@ -198,7 +198,7 @@ describe('processStatsCacheRefreshWindowJob', () => {
 		);
 	});
 
-	it("marks the temporal unit's ImportJobs column failed, and logs the error with importJobId/groupId/temporalUnit, when refreshSimpleStatsCache rejects", async () => {
+	it("marks the temporal unit's ImportJobs column failed, and logs the error with importJobId/groupId/temporalUnit and the cache table that went stale, when refreshSimpleStatsCache rejects", async () => {
 		const refreshError = new Error('simple refresh blew up');
 		refreshSimpleStatsCache.mockRejectedValue(refreshError);
 
@@ -216,16 +216,29 @@ describe('processStatsCacheRefreshWindowJob', () => {
 			{
 				importJobId: IMPORT_JOB_ID,
 				groupId: GROUP_ID,
-				temporalUnit: 'month-squashed'
+				temporalUnit: 'month-squashed',
+				cacheTable: 'SimpleStatsCache'
 			},
 			refreshError
 		);
 	});
 
-	it("marks the temporal unit's ImportJobs column failed when refreshComplexStatsCache rejects, even though refreshSimpleStatsCache succeeded", async () => {
-		refreshComplexStatsCache.mockRejectedValue(
-			new Error('complex refresh blew up')
+	it("still refreshes ComplexStatsCache, and marks the temporal unit's ImportJobs column failed, when refreshSimpleStatsCache rejects", async () => {
+		refreshSimpleStatsCache.mockRejectedValue(new Error('simple'));
+
+		await processStatsCacheRefreshWindowJob(allTimeEvent());
+
+		expect(refreshComplexStatsCache).toHaveBeenCalledOnce();
+		expect(markStatsCacheRefreshedMock).toHaveBeenCalledWith(
+			IMPORT_JOB_ID,
+			'all-time',
+			'failed'
 		);
+	});
+
+	it("marks the temporal unit's ImportJobs column failed when refreshComplexStatsCache rejects, even though refreshSimpleStatsCache succeeded", async () => {
+		const refreshError = new Error('complex refresh blew up');
+		refreshComplexStatsCache.mockRejectedValue(refreshError);
 
 		await processStatsCacheRefreshWindowJob(allTimeEvent());
 
@@ -234,6 +247,11 @@ describe('processStatsCacheRefreshWindowJob', () => {
 			IMPORT_JOB_ID,
 			'all-time',
 			'failed'
+		);
+		expect(consoleErrorSpy).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.objectContaining({ cacheTable: 'ComplexStatsCache' }),
+			refreshError
 		);
 	});
 
