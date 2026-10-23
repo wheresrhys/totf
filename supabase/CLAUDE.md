@@ -111,6 +111,21 @@ and #1024 then dropped the `session_type` column itself — along with `stats_ra
 `session_type` output column and the two `session_type = 'FULL_GROWN'` filters that survived #1021
 in `core_stats`' `session_counts` / `session_effort` CTEs.
 
+**`stats_spine`'s three period branches apply `month_filter` three different ways — don't assume
+one rule.** The `month`/`year` branches are bounded by `session_date_range`, which applies
+`month_filter` itself; the `day` branch is sparse, driven straight off `raw_encounters`' own
+filtered rows. The `month-squashed` branch is bounded by neither — it is an unconditional
+`generate_series(1, 12)` of `2000-<mm>-01` sentinel cells, deliberately independent of any session
+data — so it needs (and since #1178 has) its own `AND (month_filter IS NULL OR m = month_filter)`
+guard. That guard is what makes a squashed cell individually addressable: `month_filter` alone,
+with `year_filter` left NULL, *is* the squashed-month grouping, which is what lets
+`refreshSimpleStatsCache` narrow that temporal unit to the calendar months an import actually
+touched instead of full-replacing the group's history. Before it, every narrowed call still
+returned all 12 cells with 11 spurious zeroes. Note the long-standing accepted quirk on the
+`month` branch, unchanged by this: `session_date_range`'s `month_filter` narrows min/max to
+matching dates without making the dense month `generate_series` skip the non-matching months in
+between.
+
 Two visible behaviour changes, not refactors, landed across the pair:
 - `session_count` is a plain `COUNT(DISTINCT visit_date)`, so a group/period whose history includes
   pulli-only or field-observation-only days reports a HIGHER `session_count` than before #1021.

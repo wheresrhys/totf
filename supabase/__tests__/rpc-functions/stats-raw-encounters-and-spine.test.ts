@@ -14,6 +14,10 @@
  *   exclusion was dropped in #1021 and the session_type column itself in #1024,
  *   leaving stats_raw_encounters' row-level resighting-record_type filter as the
  *   single fix point for passive data.
+ * - stats_spine's month-squashed branch emits one unconditional cell per calendar
+ *   month, narrowed to a single cell by month_filter (#1178) — a squashed cell is
+ *   exactly what month_filter alone selects, which is what lets
+ *   refreshSimpleStatsCache narrow this temporal unit by touched calendar month.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -290,6 +294,180 @@ describe('stats_spine — session date range spans every session date', () => {
 		expect(error).toBeNull();
 		const months = data!.map((r) => r.time_period);
 		expect(months).toEqual([`${yrShared}-06-01`]);
+	});
+});
+
+describe("stats_spine's month-squashed branch", () => {
+	let deltaId: number;
+	let deltaClient: SupabaseClient;
+
+	const locationIds: number[] = [];
+	const sessionIds: number[] = [];
+	const birdIds: number[] = [];
+
+	const suffix = randomTestSuffix();
+
+	// One calendar month, two well-separated years — the squash-across-years
+	// shape this branch exists for. Deliberately 2110+ rather than the
+	// 2080-2099 band every other integration suite randomises within
+	// (`test-isolation.ts`'s `randomFutureDate`, `stats-month-squashed.test.ts`,
+	// the describe block above): this block's day-branch assertion is exact, and
+	// a concurrently-running Delta/Robin fixture landing in the same calendar
+	// month would add days to it. Still far outside the e2e seed data's
+	// 2021-2024 range.
+	const targetMonth = 1 + Math.floor(Math.random() * 12);
+	const monthStr = String(targetMonth).padStart(2, '0');
+	const squashedCellDate = `2000-${monthStr}-01`;
+	const firstYear = 2110 + Math.floor(Math.random() * 10); // 2110-2119
+	const secondYear = firstYear + 5 + Math.floor(Math.random() * 5);
+
+	/**
+	 * Every call below pins `species_name_filter` to one species, which is what
+	 * makes these assertions exact: the month-squashed period spine is
+	 * unconditional (it never reads session data), so the species set is the
+	 * only thing a concurrently-running worktree's rows could perturb — and
+	 * `DISTINCT species_id` over a single pinned species can't be perturbed at
+	 * all. The window then keeps the group's own 2021-2024 seed rows out.
+	 */
+	const SPECIES_NAME = 'Robin';
+
+	function spineParams(overrides: Record<string, unknown>) {
+		return {
+			ringing_group_filter: deltaId,
+			species_name_filter: SPECIES_NAME,
+			group_by_species: true,
+			from_date: `${firstYear}-01-01`,
+			to_date: `${secondYear}-12-31`,
+			...overrides
+		};
+	}
+
+	beforeAll(async () => {
+		deltaId = await getGroupIdByName('Delta');
+		deltaClient = await getAuthenticatedSupabaseClientForGroup(deltaId);
+
+		const robinId = await getSpeciesId(SPECIES_NAME);
+
+		const locationId = await insertTestLocation(
+			deltaClient,
+			deltaId,
+			`Squashed Spine Loc ${suffix}`
+		);
+		locationIds.push(locationId);
+
+		// The same calendar month in two different years, so the squashed cell
+		// genuinely has to collapse two years' worth of data into one row.
+		let birdIndex = 0;
+		for (const year of [firstYear, secondYear]) {
+			const sessionId = await insertTestSession(
+				deltaClient,
+				locationId,
+				`${year}-${monthStr}-15`
+			);
+			sessionIds.push(sessionId);
+
+			const birdId = await insertTestBird(
+				deltaClient,
+				`SPINE-SQ-${suffix}-${birdIndex++}`,
+				robinId
+			);
+			birdIds.push(birdId);
+
+			await insertTestEncounter(deltaClient, birdId, sessionId, {
+				age_code: 4,
+				record_type: 'N',
+				weight: 18,
+				wing_length: 70
+			});
+		}
+	});
+
+	afterAll(() => {
+		execSync(
+			`psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c '` +
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+				`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+				`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
+				`DELETE FROM "Locations" WHERE id IN (${locationIds.join(', ')});'`
+		);
+	});
+
+	// Usual — the existing, unaffected caller's shape (fetchCombinedMonthTotals)
+	it('returns all 12 calendar months when month_filter is NULL', async () => {
+		const { data, error } = await deltaClient.rpc(
+			'stats_spine',
+			spineParams({ group_by_time_period: 'month-squashed' })
+		);
+		expect(error).toBeNull();
+		expect(data!.map((r) => r.time_period).sort()).toEqual(
+			Array.from(
+				{ length: 12 },
+				(_, index) => `2000-${String(index + 1).padStart(2, '0')}-01`
+			)
+		);
+	});
+
+	// Edge — the whole point of the month_filter guard (#1178)
+	it("returns exactly one calendar month's cell when month_filter is set, with no spurious rows for the other 11", async () => {
+		const { data, error } = await deltaClient.rpc(
+			'stats_spine',
+			spineParams({
+				group_by_time_period: 'month-squashed',
+				month_filter: targetMonth
+			})
+		);
+		expect(error).toBeNull();
+		expect(data!.map((r) => r.time_period)).toEqual([squashedCellDate]);
+	});
+
+	// Usual — two years of the same calendar month collapse to one cell
+	it('squashes data from every year into that one cell, matching the unfiltered result for that month exactly', async () => {
+		const { data: narrowed } = await deltaClient.rpc(
+			'stats_spine',
+			spineParams({
+				group_by_time_period: 'month-squashed',
+				month_filter: targetMonth
+			})
+		);
+		const { data: unfiltered } = await deltaClient.rpc(
+			'stats_spine',
+			spineParams({ group_by_time_period: 'month-squashed' })
+		);
+
+		// Two years of data, still a single cell — not one per year.
+		expect(narrowed).toHaveLength(1);
+		expect(narrowed).toEqual(
+			unfiltered!.filter((r) => r.time_period === squashedCellDate)
+		);
+	});
+
+	// Structure — the guard must not leak into the other branches
+	it("is unaffected by month_filter when group_by_time_period is not 'month-squashed'", async () => {
+		const { data: monthCells, error: monthError } = await deltaClient.rpc(
+			'stats_spine',
+			spineParams({ group_by_time_period: 'month', month_filter: targetMonth })
+		);
+		expect(monthError).toBeNull();
+		const monthPeriods = monthCells!.map((r) => r.time_period);
+		// The month branch is bounded by session_date_range, which applies
+		// month_filter itself — so it still spans the real years' own cells
+		// (densely between min and max, per that CTE's own comment) rather than
+		// collapsing onto the squashed branch's 2000-<mm>-01 sentinel.
+		expect(monthPeriods).toContain(`${firstYear}-${monthStr}-01`);
+		expect(monthPeriods).toContain(`${secondYear}-${monthStr}-01`);
+		expect(monthPeriods).not.toContain(squashedCellDate);
+
+		const { data: dayCells, error: dayError } = await deltaClient.rpc(
+			'stats_spine',
+			spineParams({ group_by_time_period: 'day', month_filter: targetMonth })
+		);
+		expect(dayError).toBeNull();
+		// The day branch is sparse and driven off raw_encounters' own
+		// month_filter-ed rows, so it is exactly this fixture's two dates.
+		expect(dayCells!.map((r) => r.time_period).sort()).toEqual([
+			`${firstYear}-${monthStr}-15`,
+			`${secondYear}-${monthStr}-15`
+		]);
 	});
 });
 

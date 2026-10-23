@@ -267,7 +267,7 @@ describe('refreshSimpleStatsCache', () => {
 		vi.clearAllMocks();
 	});
 
-	describe('day/month/year temporal units', () => {
+	describe('day/month/year/month-squashed temporal units', () => {
 		describe('the date window a narrowing temporal unit is refreshed over', () => {
 			it('spans the exact affected days for the day temporal unit', async () => {
 				const client = makeSimpleMockSupabaseClient({
@@ -304,12 +304,12 @@ describe('refreshSimpleStatsCache', () => {
 				).toEqual(expectedParams);
 			});
 
-			it("leaves a non-narrowing temporal unit's unwindowed params untouched (month-squashed, all-time)", async () => {
+			it("leaves the non-narrowing temporal unit's unwindowed params untouched (all-time)", async () => {
 				const client = makeSimpleMockSupabaseClient({});
 
 				await refreshSimpleStatsCache(client as never, {
 					groupId: GROUP_ID,
-					temporalUnit: 'month-squashed',
+					temporalUnit: 'all-time',
 					periods: ['2026-03-01']
 				});
 
@@ -346,17 +346,24 @@ describe('refreshSimpleStatsCache', () => {
 			});
 		});
 
-		describe('the exact-filter fan-out for month/year narrowing', () => {
+		describe('the exact-filter fan-out for month/year/month-squashed narrowing', () => {
 			/**
 			 * The inverse of the module's own `exactPeriodFilters`: the
-			 * `YYYY-MM-01`/`YYYY-01-01` period string the
-			 * `year_filter`/`month_filter` pair of one fanned-out call selects.
+			 * `YYYY-MM-01`/`YYYY-01-01`/`2000-MM-01` period string the
+			 * `year_filter`/`month_filter` pair of one fanned-out call selects. A
+			 * `month_filter` with no `year_filter` is the month-squashed case, whose
+			 * cells carry the `2000` sentinel year.
 			 */
 			function periodSelectedBy(params: RpcParams): string {
+				const month =
+					params.month_filter === undefined
+						? undefined
+						: String(params.month_filter).padStart(2, '0');
+				if (params.year_filter === undefined) {
+					return `2000-${month}-01`;
+				}
 				const year = String(params.year_filter);
-				return params.month_filter === undefined
-					? `${year}-01-01`
-					: `${year}-${String(params.month_filter).padStart(2, '0')}-01`;
+				return month === undefined ? `${year}-01-01` : `${year}-${month}-01`;
 			}
 
 			/**
@@ -373,8 +380,8 @@ describe('refreshSimpleStatsCache', () => {
 			}
 
 			function expectedParamsFor(
-				temporalUnit: 'month' | 'year',
-				exactFilters: { year_filter: number; month_filter?: number }
+				temporalUnit: 'month' | 'year' | 'month-squashed',
+				exactFilters: { year_filter?: number; month_filter?: number }
 			) {
 				return {
 					ringing_group_filter: GROUP_ID,
@@ -465,6 +472,64 @@ describe('refreshSimpleStatsCache', () => {
 				).toEqual(['2026-01-01', '2026-03-01', '2026-11-01']);
 			});
 
+			it('fans out to one exact-filtered call per distinct touched calendar month, for the month-squashed temporal unit', async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month-squashed',
+					periods: ['2000-03-01', '2000-07-01']
+				});
+
+				for (const rpcName of SIMPLE_METRIC_RPC_NAMES) {
+					expect(metricRpcCallArgsList(client, rpcName)).toEqual([
+						expectedParamsFor('month-squashed', { month_filter: 3 }),
+						expectedParamsFor('month-squashed', { month_filter: 7 })
+					]);
+				}
+			});
+
+			it('sets month_filter but not year_filter for a month-squashed call', async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month-squashed',
+					periods: ['2000-05-01']
+				});
+
+				// The defining difference from the `month` case: "every year's copy
+				// of May" is month_filter alone, so a year_filter — including one
+				// parsed out of the period string's `2000` sentinel — would wrongly
+				// narrow the cell to a single year.
+				expect(
+					metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
+				).toEqual({
+					ringing_group_filter: GROUP_ID,
+					group_by_species: true,
+					group_by_time_period: 'month-squashed',
+					month_filter: 5
+				});
+			});
+
+			it('de-duplicates repeated calendar months across periods, same as month/year', async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month-squashed',
+					periods: ['2000-03-01', '2000-07-01', '2000-03-01']
+				});
+
+				for (const rpcName of SIMPLE_METRIC_RPC_NAMES) {
+					expect(
+						metricRpcCallArgsList(client, rpcName).map((params) =>
+							periodSelectedBy(params as RpcParams)
+						)
+					).toEqual(['2000-03-01', '2000-07-01']);
+				}
+			});
+
 			it('still performs exactly one upsert per invocation, regardless of how many periods were fanned out over', async () => {
 				const client = makeSimpleMockSupabaseClient({
 					basic: rowForCalledPeriod(basicRow),
@@ -526,7 +591,9 @@ describe('refreshSimpleStatsCache', () => {
 		});
 	});
 
-	describe('month-squashed/all-time temporal units', () => {
+	// `month-squashed` used to belong here too; it narrows by month_filter as of
+	// #1178, so it is covered by the exact-filter fan-out block above instead.
+	describe('the all-time temporal unit', () => {
 		it('calls all four metric RPCs with no date filter, ignoring any periods argument', async () => {
 			const client = makeSimpleMockSupabaseClient({
 				basic: [basicRow({ time_period: null })],

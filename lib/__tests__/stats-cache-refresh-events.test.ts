@@ -111,20 +111,32 @@ describe('the month event', () => {
 });
 
 describe('the month-squashed event', () => {
-	it('emits exactly one month-squashed event, not one per calendar month touched, carrying no periods at all', () => {
+	it('emits one squashed-month period per distinct calendar month touched, as 2000-<mm>-01 strings', () => {
 		const events = build(['2024-06-01', '2024-07-15', '2025-08-02']);
 		const squashedMonthEvents = events.filter(
 			({ rpcParams }) => rpcParams.group_by_time_period === 'month-squashed'
 		);
+		// Still exactly one event — one per temporal unit, not one per period.
 		expect(squashedMonthEvents).toEqual([
 			{
 				importJobId: IMPORT_JOB_ID,
 				rpcParams: {
 					ringing_group_filter: RINGING_GROUP_ID,
-					group_by_time_period: 'month-squashed'
+					group_by_time_period: 'month-squashed',
+					periods: ['2000-06-01', '2000-07-01', '2000-08-01']
 				}
 			}
 		]);
+	});
+
+	it('collapses two affected dates in the same calendar month across different years into one period', () => {
+		const events = build(['2024-06-01', '2025-06-20']);
+		const squashedMonthEvent = events.find(
+			({ rpcParams }) => rpcParams.group_by_time_period === 'month-squashed'
+		);
+		// The squash this whole temporal unit is about: June 2024 and June 2025
+		// are the same squashed cell, so one period, not two.
+		expect(squashedMonthEvent?.rpcParams.periods).toEqual(['2000-06-01']);
 	});
 });
 

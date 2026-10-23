@@ -62,11 +62,12 @@ export type RefreshSimpleStatsCacheParams = {
 	/**
 	 * The exact `time_period` values this refresh pass should write, in the
 	 * same string shape the metric RPCs return for that temporal unit.
-	 * Required (non-empty) for the narrow temporal units (`day`/`month`/
-	 * `year`) — see `buildMetricRpcParams`'s early-return for what happens if
-	 * it's empty there. Ignored entirely for `month-squashed`/`all-time`,
-	 * which always full-replace the whole group history regardless of what's
-	 * passed.
+	 * Required (non-empty) for the narrowing temporal units — `day`, `month`,
+	 * `year` and, since #1178, `month-squashed` (whose periods are the
+	 * `2000-MM-01` sentinel-year cells its grouping emits). See
+	 * `buildSimpleMetricRpcParamsList`'s early-return for what happens if it's
+	 * empty for one of those. Ignored entirely for `all-time`, which always
+	 * full-replaces the whole group history regardless of what's passed.
 	 */
 	periods?: string[];
 };
@@ -168,31 +169,32 @@ const BY_SPECIES_CONFLICT_TARGET =
 	'group_id,temporal_unit,time_period,species_id';
 
 /**
- * The temporal units `refreshSimpleStatsCache` may narrow by affected dates.
- * Every `SimpleStatsCache` metric is **period-local** — it reads only the
- * encounters inside the cell's own period — so narrowing is sound wherever a
- * cell maps onto one contiguous date window. `month-squashed` cells span every
- * year's copy of a month and `all-time` spans everything, so neither does.
+ * The temporal units `refreshSimpleStatsCache` may narrow by affected dates —
+ * every unit except `all-time`. Every `SimpleStatsCache` metric is
+ * **period-local**: it reads only the encounters inside the cell's own period,
+ * so narrowing is sound wherever a cell is selectable by the metric RPCs' own
+ * filters. `all-time` spans everything, so it alone never narrows.
  *
- * `month-squashed`'s exclusion is a mechanical limitation rather than a
- * conceptual one, and is the one entry here that could change: a squashed cell
- * *is* exactly what `month_filter` alone (no `year_filter`) selects, verified
- * correct across all years on PR #1177. It stays out because `stats_spine`'s
- * month-squashed branch ignores `month_filter` and always emits all 12 calendar
- * cells, so the 11 untouched ones would come back as zeroes and collide across
- * `buildSimpleMetricRpcParamsList`'s fan-out — breaking the disjoint-cell-key
- * invariant `fetchMetricRows` relies on. See
- * `lib/stats-cache-refresh-events.ts`'s month-squashed event for the detail.
+ * `month-squashed` narrows too, as of #1178, even though its cells span every
+ * year's copy of a calendar month: a squashed cell *is* exactly what
+ * `month_filter` alone (no `year_filter`) selects, verified correct across all
+ * years on PR #1177. What used to block it was `stats_spine`'s month-squashed
+ * branch ignoring `month_filter` and always emitting all 12 calendar cells —
+ * so the 11 untouched ones came back as zeroes and collided across
+ * `buildSimpleMetricRpcParamsList`'s fan-out, breaking the disjoint-cell-key
+ * invariant `fetchMetricRows` relies on. #1178 added the branch's
+ * `month_filter` guard, which is what makes this entry sound.
  *
- * *How* each of the three narrows differs — `month`/`year` by exact
- * `year_filter`/`month_filter`, `day` by a date window — see
+ * *How* each of the four narrows differs — `month`/`year`/`month-squashed` by
+ * exact `year_filter`/`month_filter`, `day` by a date window — see
  * `buildSimpleMetricRpcParamsList`. This set is only about which units may
  * narrow at all.
  */
 const SIMPLE_NARROWING_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> = new Set([
 	'day',
 	'month',
-	'year'
+	'year',
+	'month-squashed'
 ]);
 
 /**
@@ -232,42 +234,62 @@ type MetricRpcParams = {
 	month_filter?: number;
 };
 
+/** The temporal units `isExactFilterTemporalUnit` is true of. */
+type ExactFilterTemporalUnit = 'month' | 'year' | 'month-squashed';
+
 /**
  * Whether `refreshSimpleStatsCache` refreshes this temporal unit by exact-match
  * `year_filter`/`month_filter` rather than by a `from_date`/`to_date` window
- * (#1176). True of `month`/`year`: each of their periods is a whole calendar
- * month or year, which is exactly what those two RPC params already select, so
+ * (#1176, extended to `month-squashed` by #1178). True of
+ * `month`/`year`/`month-squashed`: each of their periods is a whole calendar
+ * month, a whole calendar year, or one calendar month across every year, which
+ * is exactly what some combination of those two RPC params already selects — so
  * one call per distinct period is both narrower than any single window spanning
- * them and exact — no untouched gap period can come back in the result to be
+ * them and exact, with no untouched gap period coming back in the result to be
  * filtered out afterwards.
  *
  * False of `day`, the unit that keeps the window + `filterToTouchedPeriods`
  * pairing: the RPC family has no `day_filter`, and one `day` refresh pass
- * legitimately covers a non-contiguous set of days. False of
- * `month-squashed`/`all-time`, which never narrow at all. A type predicate
- * rather than a plain boolean so its caller gets `month`/`year` narrowed for
- * `exactPeriodFilters` without a cast.
+ * legitimately covers a non-contiguous set of days. False of `all-time`, which
+ * never narrows at all. A type predicate rather than a plain boolean so its
+ * caller gets the unit narrowed for `exactPeriodFilters` without a cast.
  */
 function isExactFilterTemporalUnit(
 	temporalUnit: TemporalUnit
-): temporalUnit is 'month' | 'year' {
-	return temporalUnit === 'month' || temporalUnit === 'year';
+): temporalUnit is ExactFilterTemporalUnit {
+	return (
+		temporalUnit === 'month' ||
+		temporalUnit === 'year' ||
+		temporalUnit === 'month-squashed'
+	);
 }
 
 /**
- * The exact-match RPC filters selecting precisely the period a `month`/`year`
- * period string names — `YYYY-MM-01`/`YYYY-01-01`, per
- * `lib/stats-cache-refresh-events.ts`'s `periodsTouched`. A `year` period needs
- * no `month_filter`: the year filter alone already is the whole period.
+ * The exact-match RPC filters selecting precisely the period a
+ * `month`/`year`/`month-squashed` period string names —
+ * `YYYY-MM-01`/`YYYY-01-01`/`2000-MM-01`, per
+ * `lib/stats-cache-refresh-events.ts`'s `periodsTouched`. Each unit uses the
+ * subset of the two filters that *is* its own period, and no more:
+ *
+ * - `year` needs no `month_filter` — the year filter alone is the whole period.
+ * - `month-squashed` needs no `year_filter`, and must not have one: "every
+ *   year's copy of this calendar month" is precisely `month_filter` with
+ *   `year_filter` left NULL (#1178). Its period string's year component is the
+ *   `2000` sentinel the squashed cells are labelled with, never a real year, so
+ *   it is deliberately not read.
  */
 function exactPeriodFilters(
-	temporalUnit: 'month' | 'year',
+	temporalUnit: ExactFilterTemporalUnit,
 	periodString: string
 ): Pick<MetricRpcParams, 'year_filter' | 'month_filter'> {
+	const month_filter = Number(periodString.slice(5, 7));
+	if (temporalUnit === 'month-squashed') {
+		return { month_filter };
+	}
 	const year_filter = Number(periodString.slice(0, 4));
 	return temporalUnit === 'year'
 		? { year_filter }
-		: { year_filter, month_filter: Number(periodString.slice(5, 7)) };
+		: { year_filter, month_filter };
 }
 
 /**
@@ -349,9 +371,10 @@ function buildMetricRpcParams(
 
 /**
  * Every metric-RPC filter object one `refreshSimpleStatsCache` pass needs, in
- * call order — a list because `month`/`year` fan out to one exact-filtered call
- * per distinct touched period (#1176), while `day` and the non-narrowing units
- * stay on the single object `buildMetricRpcParams` has always produced.
+ * call order — a list because `month`/`year`/`month-squashed` fan out to one
+ * exact-filtered call per distinct touched period (#1176/#1178), while `day`
+ * and `all-time` stay on the single object `buildMetricRpcParams` has always
+ * produced.
  *
  * Returns `null` on the same "nothing to refresh" condition that function does:
  * a narrowing temporal unit with no touched periods.
@@ -372,9 +395,11 @@ function buildSimpleMetricRpcParamsList(
 	}
 
 	// A period can legitimately repeat in `periods` (several affected dates
-	// inside one month collapse onto the same `YYYY-MM-01`), and calling the
-	// same exact filter twice would just merge the identical cells back over
-	// themselves — so de-duplicate, preserving first-seen order.
+	// inside one month collapse onto the same `YYYY-MM-01`, and for
+	// `month-squashed` the same calendar month in two different years collapses
+	// onto the same `2000-MM-01`), and calling the same exact filter twice would
+	// just merge the identical cells back over themselves — so de-duplicate,
+	// preserving first-seen order.
 	const distinctPeriods = [...new Set(periods)];
 	if (distinctPeriods.length === 0) {
 		return null;
@@ -389,10 +414,12 @@ function buildSimpleMetricRpcParamsList(
 /**
  * Calls one metric RPC once per filter object in `rpcParamsList`, concurrently,
  * and concatenates the rows. A single-element list is the ordinary one-call
- * case; `refreshSimpleStatsCache`'s `month`/`year` fan-out is the many-element
- * one. Concatenating before merging is safe because no two periods' results
- * ever share a `(species_id, time_period)` cell key, which is all
- * `indexByCell`/`mergeSimpleMetricRows` key on.
+ * case; `refreshSimpleStatsCache`'s `month`/`year`/`month-squashed` fan-out is
+ * the many-element one. Concatenating before merging is safe because no two
+ * periods' results ever share a `(species_id, time_period)` cell key, which is
+ * all `indexByCell`/`mergeSimpleMetricRows` key on — for `month-squashed` that
+ * holds only because `stats_spine`'s month-squashed branch honours
+ * `month_filter` (#1178); before that every call returned all 12 cells.
  */
 async function fetchMetricRows<Row>(
 	supabaseClient: SupabaseClient,
@@ -414,9 +441,9 @@ async function fetchMetricRows<Row>(
  * `buildMetricRpcParams` computes spans untouched gaps inside that range, so
  * the RPCs can legitimately return cells for periods that weren't touched —
  * those must not be rewritten. A pass-through for `refreshSimpleStatsCache`'s
- * exact-filtered `month`/`year` fan-out, whose calls cannot return an untouched
- * period in the first place (#1176). A non-narrowing temporal unit
- * full-replaces, so every merged row is kept.
+ * exact-filtered `month`/`year`/`month-squashed` fan-out, whose calls cannot
+ * return an untouched period in the first place (#1176/#1178). A non-narrowing
+ * temporal unit full-replaces, so every merged row is kept.
  */
 function filterToTouchedPeriods<Row extends MergedCellKey>(
 	mergedRows: Row[],
@@ -779,20 +806,21 @@ function mergeComplexMetricRows({
  * per temporal-unit event it receives; this function does not loop over
  * temporal units itself.
  *
- * `day`/`month`/`year` narrow by `periods`, in two different ways (see
- * `buildSimpleMetricRpcParamsList`):
+ * Every temporal unit but `all-time` narrows by `periods`, in two different
+ * ways (see `buildSimpleMetricRpcParamsList`):
  *
  * - `day` calls each metric RPC once, over a `from_date`/`to_date` window
  *   spanning `min(periods)`..`max(periods)`, and the merged result is filtered
  *   down to just the periods actually touched before writing — that window can
  *   return extra untouched days inside the range.
- * - `month`/`year` call each metric RPC once *per distinct period*, with that
- *   period's exact `year_filter`/`month_filter` and no window at all (#1176).
- *   Each call therefore returns only cells for a period this pass is
+ * - `month`/`year`/`month-squashed` call each metric RPC once *per distinct
+ *   period*, with that period's exact `year_filter`/`month_filter` and no
+ *   window at all (#1176; `month-squashed` since #1178, by `month_filter`
+ *   alone). Each call therefore returns only cells for a period this pass is
  *   refreshing, so the post-hoc filter has nothing left to drop.
  *
- * `month-squashed`/`all-time` always full-replace the group's whole history,
- * ignoring `periods` entirely.
+ * `all-time` always full-replaces the group's whole history, ignoring `periods`
+ * entirely.
  *
  * Writes go through exactly one `.upsert()` against `SimpleStatsCacheBySpecies`
  * — one call per invocation, not one per metric RPC's worth of rows and not one

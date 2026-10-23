@@ -362,6 +362,14 @@ later session shouldn't re-litigate from scratch:
 - It mints its own `authenticated` client from the payload's group id
   (`getAuthenticatedSupabaseClientForGroup`) — a queue consumer has no cookie and no service-role
   key.
+- **Where a temporal unit's touched periods come from is per-unit, and getting it wrong silently
+  skips the refresh.** `day` reads the event's top-level `affectedDates` (its `from_date`/`to_date`
+  window can span gap days); `month`, `year` and — since #1178 — `month-squashed` read
+  `rpcParams.periods`, listed in `PERIODS_FROM_RPC_PARAMS_TEMPORAL_UNITS`; `all-time` carries no
+  period data because it always full-replaces. A unit that `refreshSimpleStatsCache` treats as
+  narrowing but that this map leaves out gets `periods: undefined`, and a narrowing unit handed no
+  periods refreshes **nothing** — no error, no rows. So adding a unit to
+  `SIMPLE_NARROWING_TEMPORAL_UNITS` always means adding it here too.
 - A refresh failure is **terminal, caught and logged**, not thrown: `handleCallback` is registered
   with no `retry` callback, so a throw would just disappear. The handler writes `'failed'` to the
   temporal unit's column and resolves.
