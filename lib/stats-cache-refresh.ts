@@ -178,6 +178,27 @@ type MetricRpcParams = {
 };
 
 /**
+ * The last calendar day of the month a `month` period string (`YYYY-MM-01`)
+ * names, as a `YYYY-MM-DD` string — handles every month length, leap Februarys
+ * included, via `Date.UTC`'s day-0-of-next-month rollback rather than a
+ * hand-rolled days-per-month table.
+ */
+function lastDayOfMonthPeriod(periodString: string): string {
+	const year = Number(periodString.slice(0, 4));
+	const month = Number(periodString.slice(5, 7)); // 1-12
+	const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+	return `${periodString.slice(0, 7)}-${String(lastDay).padStart(2, '0')}`;
+}
+
+/**
+ * 31 December of the year a `year` period string (`YYYY-01-01`) names, as a
+ * `YYYY-MM-DD` string.
+ */
+function lastDayOfYearPeriod(periodString: string): string {
+	return `${periodString.slice(0, 4)}-12-31`;
+}
+
+/**
  * Builds the shared filter object passed to every metric RPC of one cache's
  * single temporal-unit invocation. `narrowingTemporalUnits` is the calling
  * cache's own narrowing rule — `SIMPLE_NARROWING_TEMPORAL_UNITS` or
@@ -222,20 +243,40 @@ function buildMetricRpcParams(
 	// (same convention as `app/lib/supabase/temporal-filter.ts`'s
 	// `laterDateBound`/`earlierDateBound`), so min/max is a plain sort.
 	const sortedPeriods = [...periods].sort();
+	const minPeriod = sortedPeriods[0];
+	const maxPeriod = sortedPeriods[sortedPeriods.length - 1];
+
+	// `from_date` is always `min(periods)` verbatim — a period string is
+	// already its own first day, for every temporal unit this function
+	// narrows by. `to_date`, however, must cover the *whole* period
+	// `max(periods)` names, not just its first day: for `day`, a period
+	// string already *is* a date, so `max(periods)` unchanged is correct; for
+	// `month`/`year`, a period string is only the period's first day
+	// (`YYYY-MM-01`/`YYYY-01-01`, per `lib/stats-cache-refresh-events.ts`'s
+	// `periodsTouched`), so using it verbatim as `to_date` collapsed the
+	// window to a single day and the metric RPCs returned zero rows for every
+	// import that didn't happen to touch the 1st of the month/year (#1173).
+	const toDate =
+		temporalUnit === 'month'
+			? lastDayOfMonthPeriod(maxPeriod)
+			: temporalUnit === 'year'
+				? lastDayOfYearPeriod(maxPeriod)
+				: maxPeriod;
+
 	return {
 		...unwindowedParams,
-		from_date: sortedPeriods[0],
-		to_date: sortedPeriods[sortedPeriods.length - 1]
+		from_date: minPeriod,
+		to_date: toDate
 	};
 }
 
 /**
  * Cuts a merged result back to exactly the periods this pass is refreshing,
- * for a narrowing temporal unit. The `min(periods)`..`max(periods)` window
- * `buildMetricRpcParams` computes spans untouched gaps inside that range, so
- * the RPCs can legitimately return cells for periods that weren't touched —
- * those must not be rewritten. A non-narrowing temporal unit full-replaces, so
- * every merged row is kept.
+ * for a narrowing temporal unit. The window `buildMetricRpcParams` computes —
+ * `min(periods)` through the end of the period `max(periods)` names — spans
+ * untouched gaps inside that range, so the RPCs can legitimately return cells
+ * for periods that weren't touched — those must not be rewritten. A
+ * non-narrowing temporal unit full-replaces, so every merged row is kept.
  */
 function filterToTouchedPeriods<
 	// Optional, not `string | null`: the merged-cell types are derived from the
@@ -570,10 +611,12 @@ function mergeComplexMetricRows({
  * temporal units itself.
  *
  * `day`/`month`/`year` narrow by `periods`: the metric RPCs are called over
- * a `from_date`/`to_date` window spanning `min(periods)`..`max(periods)`,
- * and the merged result is filtered down to just the periods actually
- * touched before writing — the window call can return extra untouched
- * periods inside that range.
+ * a `from_date`/`to_date` window spanning `min(periods)` through the end of
+ * the period `max(periods)` names (the whole last day for `day`, the whole
+ * last month for `month`, the whole last year for `year` — see
+ * `buildMetricRpcParams`), and the merged result is filtered down to just
+ * the periods actually touched before writing — the window call can return
+ * extra untouched periods inside that range.
  *
  * `month-squashed`/`all-time` always full-replace the group's whole history,
  * ignoring `periods` entirely.

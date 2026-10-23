@@ -218,39 +218,139 @@ describe('refreshSimpleStatsCache', () => {
 	});
 
 	describe('day/month/year temporal units', () => {
-		it('calls all four metric RPCs with a from_date/to_date window spanning the touched periods', async () => {
-			const client = makeSimpleMockSupabaseClient({
-				basic: [basicRow({ time_period: '2026-03-10' })],
-				biometrics: [biometricsRow({ time_period: '2026-03-10' })],
-				birdAge: [birdAgeRow({ time_period: '2026-03-10' })],
-				encounterAge: [encounterAgeRow({ time_period: '2026-03-10' })]
+		describe('the date window a narrowing temporal unit is refreshed over', () => {
+			it('spans the exact affected days for the day temporal unit', async () => {
+				const client = makeSimpleMockSupabaseClient({
+					basic: [basicRow({ time_period: '2026-03-10' })],
+					biometrics: [biometricsRow({ time_period: '2026-03-10' })],
+					birdAge: [birdAgeRow({ time_period: '2026-03-10' })],
+					encounterAge: [encounterAgeRow({ time_period: '2026-03-10' })]
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'day',
+					periods: ['2026-03-10', '2026-03-01', '2026-03-28']
+				});
+
+				const expectedParams = {
+					ringing_group_filter: GROUP_ID,
+					group_by_species: true,
+					group_by_time_period: 'day',
+					from_date: '2026-03-01',
+					to_date: '2026-03-28'
+				};
+				expect(
+					metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
+				).toEqual(expectedParams);
+				expect(
+					metricRpcCallArgs(client, 'stats_cache_biometrics_metrics')
+				).toEqual(expectedParams);
+				expect(
+					metricRpcCallArgs(client, 'stats_cache_bird_age_metrics')
+				).toEqual(expectedParams);
+				expect(
+					metricRpcCallArgs(client, 'stats_cache_encounter_age_metrics')
+				).toEqual(expectedParams);
 			});
 
-			await refreshSimpleStatsCache(client as never, {
-				groupId: GROUP_ID,
-				temporalUnit: 'day',
-				periods: ['2026-03-10', '2026-03-01', '2026-03-28']
+			it('extends to_date to the last day of the month max(periods) names, for the month temporal unit', async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-02-01', '2026-03-01']
+				});
+
+				expect(
+					metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
+				).toMatchObject({ from_date: '2026-02-01', to_date: '2026-03-31' });
 			});
 
-			const expectedParams = {
-				ringing_group_filter: GROUP_ID,
-				group_by_species: true,
-				group_by_time_period: 'day',
-				from_date: '2026-03-01',
-				to_date: '2026-03-28'
-			};
-			expect(
-				metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
-			).toEqual(expectedParams);
-			expect(
-				metricRpcCallArgs(client, 'stats_cache_biometrics_metrics')
-			).toEqual(expectedParams);
-			expect(metricRpcCallArgs(client, 'stats_cache_bird_age_metrics')).toEqual(
-				expectedParams
-			);
-			expect(
-				metricRpcCallArgs(client, 'stats_cache_encounter_age_metrics')
-			).toEqual(expectedParams);
+			it('extends to_date to 31 December of the year max(periods) names, for the year temporal unit', async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'year',
+					periods: ['2025-01-01', '2026-01-01']
+				});
+
+				expect(
+					metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
+				).toMatchObject({ from_date: '2025-01-01', to_date: '2026-12-31' });
+			});
+
+			it('handles a month-end boundary — a 30-day month, a 31-day month and a leap February', async () => {
+				const monthToExpectedLastDay = [
+					['2026-04-01', '2026-04-30'], // 30-day month
+					['2026-05-01', '2026-05-31'], // 31-day month
+					['2024-02-01', '2024-02-29'] // leap February
+				] as const;
+
+				for (const [period, expectedToDate] of monthToExpectedLastDay) {
+					const client = makeSimpleMockSupabaseClient({});
+
+					await refreshSimpleStatsCache(client as never, {
+						groupId: GROUP_ID,
+						temporalUnit: 'month',
+						periods: [period]
+					});
+
+					expect(
+						metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
+					).toMatchObject({ to_date: expectedToDate });
+				}
+			});
+
+			it('still spans min(periods) as from_date, since a period string is its own first day', async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'year',
+					periods: ['2026-01-01', '2024-01-01', '2025-01-01']
+				});
+
+				expect(
+					metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
+				).toMatchObject({ from_date: '2024-01-01' });
+			});
+
+			it("leaves a non-narrowing temporal unit's unwindowed params untouched (month-squashed, all-time)", async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month-squashed',
+					periods: ['2026-03-01']
+				});
+
+				const params = metricRpcCallArgs(
+					client,
+					'stats_cache_basic_session_metrics'
+				) as Record<string, unknown>;
+				expect(params).not.toHaveProperty('from_date');
+				expect(params).not.toHaveProperty('to_date');
+			});
+
+			it('is a no-op for refreshComplexStatsCache, whose only narrowing temporal unit is day', async () => {
+				const client = makeComplexMockSupabaseClient({});
+
+				await refreshComplexStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-02-01', '2026-03-01']
+				});
+
+				const params = metricRpcCallArgs(
+					client,
+					'stats_cache_new_adult_metrics'
+				) as Record<string, unknown>;
+				expect(params).not.toHaveProperty('from_date');
+				expect(params).not.toHaveProperty('to_date');
+			});
 		});
 
 		it('filters the merged result to just the periods actually touched, dropping extra periods the window call returned', async () => {
