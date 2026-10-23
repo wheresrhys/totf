@@ -186,13 +186,13 @@ export async function processStatsCacheRefreshWindowJob(
 		() => refreshSimpleStatsCache(supabaseClient, refreshParams),
 		logContext
 	);
-	const complexRefreshSucceeded = await runCacheRefresh(
-		'ComplexStatsCache',
-		() => refreshComplexStatsCache(supabaseClient, refreshParams),
-		logContext
-	);
+	// const complexRefreshSucceeded = await runCacheRefresh(
+	// 	'ComplexStatsCache',
+	// 	() => refreshComplexStatsCache(supabaseClient, refreshParams),
+	// 	logContext
+	// );
 	const refreshOutcome: StatsCacheRefreshOutcome =
-		simpleRefreshSucceeded && complexRefreshSucceeded ? 'succeeded' : 'failed';
+		simpleRefreshSucceeded ? 'succeeded' : 'failed';
 
 	try {
 		await importJobTracker.markStatsCacheRefreshed(

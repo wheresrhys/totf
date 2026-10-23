@@ -26,6 +26,7 @@
 		"next:dev": "dotenvx run -f .env.dev -- next dev --turbopack --inspect",
 		"next:prod": "./scripts/load-prod-env.sh next dev --turbopack",
 		"prod:run": "./scripts/load-prod-env.sh",
+		"prod:run:write": "./scripts/load-prod-write-env.sh",
 		"next:build:prod": "./scripts/load-prod-env.sh next build --turbopack --debug",
 		"next:build:dev": "dotenvx run -f .env.dev -- next build --turbopack --debug",
 		"next:start:prod": "./scripts/load-prod-env.sh next start",
