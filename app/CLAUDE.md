@@ -347,3 +347,31 @@ whichever exit branch fires: `complete` → `succeeded` with the three row count
 the browser and left no persistent trace at all), and the catch branch → `failed` with the error
 message. See `supabase/CLAUDE.md`'s "CSV data import" for the tracker helpers and why the row is
 opened after the pre-flight rather than at the top of the handler.
+
+### Stats-cache refresh queue
+
+An import's last act is to dispatch one `stats-cache.refresh-window` event per temporal unit
+(`lib/stats-cache-refresh-events.ts` decides what, `lib/queue-dispatch.ts` sends it — `inline`
+mode in local dev/the CLI importer/tests, the real Vercel queue in production). The consumer is
+`app/api/queues/stats-cache-refresh-window/route.ts`: it maps the event back onto
+`{groupId, temporalUnit, periods?}`, runs `refreshSimpleStatsCache` then
+`refreshComplexStatsCache` (`lib/stats-cache-refresh.ts`), and records the outcome on that
+temporal unit's own `ImportJobs.*_stats_refresh_status` column. Three things decided there that a
+later session shouldn't re-litigate from scratch:
+
+- It mints its own `authenticated` client from the payload's group id
+  (`getAuthenticatedSupabaseClientForGroup`) — a queue consumer has no cookie and no service-role
+  key.
+- A refresh failure is **terminal, caught and logged**, not thrown: `handleCallback` is registered
+  with no `retry` callback, so a throw would just disappear. The handler writes `'failed'` to the
+  temporal unit's column and resolves.
+- **The two refreshes are not, and cannot be, wrapped in one transaction** (asked on PR #1174).
+  Every write goes out over PostgREST as its own HTTP request in its own implicit transaction, and
+  `supabase-js` has no `BEGIN`/`COMMIT`; making them atomic would mean pushing the whole
+  merge-and-write pipeline back into SQL, which is the reverse of #1169's decision to replace the
+  `upsert_*_stats_cache_rows` RPCs with native `.upsert()`. It's acceptable because both caches
+  are derived data written by idempotent, never-deleting upserts, so a half-applied pass leaves
+  one cache stale rather than torn, and a re-run converges. Each refresh therefore gets its own
+  `try`/`catch` so one failing doesn't strand the other as stale too, and each failure logs the
+  `cacheTable` that went stale — the `ImportJobs` column only records one outcome per temporal
+  unit. See the handler's own doc comment for the full argument.

@@ -37,9 +37,10 @@ import { catchSupabaseErrors } from './supabase';
  * functions exist separately — see `SIMPLE_NARROWING_TEMPORAL_UNITS` and
  * `COMPLEX_NARROWING_TEMPORAL_UNITS` below.
  *
- * The queue consumer that calls these per dispatched temporal-unit event is a
- * later ticket (T10) — this module only refreshes one temporal unit per call,
- * it does not loop over temporal units itself.
+ * The queue consumer that calls these per dispatched temporal-unit event is
+ * `app/api/queues/stats-cache-refresh-window/route.ts` (#1155) — this module
+ * only refreshes one temporal unit per call, it does not loop over temporal
+ * units itself.
  */
 
 /**

@@ -32,6 +32,15 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		// ImportJobs.
 		psql(`DELETE FROM "DemonRecords" WHERE ringing_group_id = ${deltaId}`)
 		psql(`DELETE FROM "ImportJobs" WHERE ringing_group_id = ${deltaId}`)
+		// Same reason for the two stats caches (#1155): both refresh functions are
+		// upsert-only, so leftover rows from a previous run would make the
+		// "did this upload write any cache rows at all" assertions below pass
+		// without the consumer having done anything. The `*BySpecies` halves are
+		// the ones with a writer — every metric RPC call in
+		// lib/stats-cache-refresh.ts hardcodes group_by_species=true, so the
+		// all-species-combined siblings stay empty (#1169).
+		psql(`DELETE FROM "SimpleStatsCacheBySpecies" WHERE group_id = ${deltaId}`)
+		psql(`DELETE FROM "ComplexStatsCacheBySpecies" WHERE group_id = ${deltaId}`)
 		psql(`UPDATE "Birds" SET ringing_group_ids = array_remove(ringing_group_ids, ${deltaId}) WHERE ${deltaId} = ANY(ringing_group_ids)`)
 		psql(`DELETE FROM "Birds" WHERE ringing_group_ids = '{}'`)
 		psql(`ALTER TABLE "Encounters" ENABLE TRIGGER trigger_encounters_refresh_bird_proven_age`)
@@ -107,6 +116,53 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 
 		// Every delta.csv row is the same day, so the staged range is that one date.
 		expect(affectedDates).toBe('{2024-03-15}')
+	})
+
+	// The three tests below cover the stats-cache-refresh queue consumer end to end
+	// (#1155). No polling or retry: /api/import awaits dispatchStatsCacheRefreshEvents
+	// before streaming the `complete` message the first test waits on, and with no
+	// VERCEL env var the dispatch port runs in `inline` mode — so every temporal
+	// unit's consumer call has already finished by the time the browser sees
+	// "Import complete", exactly as the ImportJobs assertions above already assume.
+	test('writes SimpleStatsCacheBySpecies rows for the Delta group’s imported species and temporal units', async () => {
+		const [rowCount, temporalUnits] = psqlRow(
+			`SELECT COUNT(*), array_agg(DISTINCT temporal_unit) FROM "SimpleStatsCacheBySpecies" WHERE group_id = ${deltaId}`
+		)
+
+		expect(Number(rowCount)).toBeGreaterThan(0)
+		// All five dispatched temporal units. This started out as three — `month`
+		// and `year` were missing because `buildMetricRpcParams` derived
+		// to_date as max(periods) verbatim, and a month/year period string is the
+		// period's *first* day, so the window collapsed to a single day and the
+		// metric RPCs returned nothing. This E2E run was the first thing to expose
+		// that; #1173 fixed it, and this assertion is what pins the fix.
+		expect(temporalUnits).toBe('{all-time,day,month,month-squashed,year}')
+	})
+
+	test('writes ComplexStatsCacheBySpecies rows for the Delta group’s imported species and temporal units', async () => {
+		const [rowCount, temporalUnits] = psqlRow(
+			`SELECT COUNT(*), array_agg(DISTINCT temporal_unit) FROM "ComplexStatsCacheBySpecies" WHERE group_id = ${deltaId}`
+		)
+
+		expect(Number(rowCount)).toBeGreaterThan(0)
+		// All five here too — `day` is the only temporal unit this cache narrows by
+		// period at all, and for `day` the window was always correct (a day period
+		// string *is* a date), so #1173 never affected this one.
+		expect(temporalUnits).toBe('{all-time,day,month,month-squashed,year}')
+	})
+
+	test('marks all five temporal-unit refresh-status columns succeeded on the run’s ImportJobs row', async () => {
+		const [day, month, year, monthSquashed, allTime] = psqlRow(
+			`SELECT day_stats_refresh_status, month_stats_refresh_status, year_stats_refresh_status, month_squashed_stats_refresh_status, all_time_stats_refresh_status FROM "ImportJobs" WHERE ringing_group_id = ${deltaId}`
+		)
+
+		expect([day, month, year, monthSquashed, allTime]).toEqual([
+			'succeeded',
+			'succeeded',
+			'succeeded',
+			'succeeded',
+			'succeeded'
+		])
 	})
 
 	test('imported species appear on /species page', async ({ page }) => {
