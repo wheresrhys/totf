@@ -17,10 +17,30 @@
 --
 -- LANGUAGE sql STABLE, not plpgsql, like stats_spine/stats_raw_encounters
 -- themselves — this is a plain single-SELECT utility RPC, not one of the
--- plpgsql orchestrators (T8a/T8b) whose shape-parameterized join needs
--- SET plan_cache_mode TO 'force_custom_plan' to avoid the generic-plan cliff
--- (see CLAUDE.md). A pure-SQL function has no RETURN QUERY plan cache to go
--- generic on in the first place, so that mitigation does not apply here.
+-- plpgsql orchestrators (T8a/T8b). This function has no RETURN QUERY plan
+-- cache of its own, but that turned out to be beside the point: because it
+-- carries no SET config, Postgres INLINES it into the caller's query (no
+-- Function Scan node in EXPLAIN — its CTEs/joins appear flattened directly in
+-- the outer plan), which exposes its own shape-parameterized CASE/OR-guarded
+-- join (keyed on group_by_time_period) to whichever CALLER's prepared
+-- statement gets reused across requests on a pooled PostgREST connection —
+-- exactly the mechanism #953 already fixed for the plpgsql family
+-- (core_stats/biometrics_stats/demographics_stats/arrivals_stats), just
+-- arriving here via the caller's plan cache rather than a cache of this
+-- function's own. Measured on a synthetic 180-Session/8650-Encounter/
+-- 6164-Bird fixture sized to the actual failing prod group: this function ran
+-- custom-plan executions 1-5 at 81-259ms, then the pooled backend's plan
+-- cache flipped to generic on execution 6 and executions 6-10 took
+-- 645ms-7.3s (~40x); stats_cache_new_adult_metrics' sibling benchmark showed
+-- custom-plan executions at 51-76ms against generic-plan executions at
+-- 16.2s-23.1s (~400x). SET plan_cache_mode TO 'force_custom_plan' fixes this
+-- not by giving a non-existent RETURN QUERY cache a custom-plan escape hatch,
+-- but by disqualifying the function from inlining in the first place (any
+-- function carrying a SET clause is ineligible for inlining) — confirmed via
+-- EXPLAIN (COSTS OFF): before the fix this function's body is flattened into
+-- the caller's plan, after it there's a bare opaque Function Scan, and
+-- re-timed executions land flat in the 285-600ms band. See
+-- supabase/CLAUDE.md's "plpgsql generic-plan-cliff audit" section.
 --
 -- The final projection is wrapped in jsonb_populate_record rather than
 -- returned as a bare positional SELECT, for the same reason as every sibling
@@ -47,7 +67,9 @@ CREATE FUNCTION public.stats_cache_basic_session_metrics (
 	group_by_time_period text DEFAULT NULL::text,
 	year_filter smallint DEFAULT NULL::smallint,
 	month_filter smallint DEFAULT NULL::smallint
-) RETURNS SETOF public.stats_cache_basic_session_metrics_result LANGUAGE sql STABLE AS $function$
+) RETURNS SETOF public.stats_cache_basic_session_metrics_result LANGUAGE sql STABLE
+SET
+	plan_cache_mode TO 'force_custom_plan' AS $function$
   SELECT r.*
   FROM (
   WITH raw_encounters AS (

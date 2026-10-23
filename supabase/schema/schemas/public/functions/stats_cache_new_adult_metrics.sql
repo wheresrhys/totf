@@ -60,9 +60,30 @@
 --
 -- LANGUAGE sql STABLE, not plpgsql, like stats_spine/stats_bird_age_bucket
 -- themselves — this is a plain single-SELECT utility RPC, not one of the
--- plpgsql orchestrators (T8a/T8b) whose shape-parameterized join needs
--- SET plan_cache_mode TO 'force_custom_plan' to avoid the generic-plan-cliff
--- (see CLAUDE.md). That mitigation does not apply here.
+-- plpgsql orchestrators (T8a/T8b). This function has no RETURN QUERY plan
+-- cache of its own, but that turned out to be beside the point: because it
+-- carries no SET config, Postgres INLINES it into the caller's query (no
+-- Function Scan node in EXPLAIN — its CTEs/joins appear flattened directly in
+-- the outer plan), which exposes its own shape-parameterized CASE/OR-guarded
+-- join (keyed on group_by_time_period) to whichever CALLER's prepared
+-- statement gets reused across requests on a pooled PostgREST connection —
+-- exactly the mechanism #953 already fixed for the plpgsql family
+-- (core_stats/biometrics_stats/demographics_stats/arrivals_stats), just
+-- arriving here via the caller's plan cache rather than a cache of this
+-- function's own. Measured on a synthetic 180-Session/8650-Encounter/
+-- 6164-Bird fixture sized to the actual failing prod group: this function's
+-- custom-plan executions ran 51-76ms, against generic-plan executions at
+-- 16.2s-23.1s (~400x) — worse in absolute terms than #953's own
+-- 160k-encounter benchmark despite this dataset being ~18x smaller;
+-- stats_cache_basic_session_metrics' sibling benchmark showed the same cliff
+-- at ~40x (81-259ms custom vs. 645ms-7.3s generic). SET plan_cache_mode TO
+-- 'force_custom_plan' fixes this not by giving a non-existent RETURN QUERY
+-- cache a custom-plan escape hatch, but by disqualifying the function from
+-- inlining in the first place (any function carrying a SET clause is
+-- ineligible for inlining) — confirmed via EXPLAIN (COSTS OFF): before the fix
+-- this function's body is flattened into the caller's plan, after it there's
+-- a bare opaque Function Scan. See supabase/CLAUDE.md's "plpgsql
+-- generic-plan-cliff audit" section.
 --
 -- The spine is still joined, exactly as demographics_stats and every sibling
 -- in this RPC family do: a cell with no matching adult birds must appear with
@@ -94,7 +115,9 @@ CREATE FUNCTION public.stats_cache_new_adult_metrics (
 	group_by_time_period text DEFAULT NULL::text,
 	year_filter smallint DEFAULT NULL::smallint,
 	month_filter smallint DEFAULT NULL::smallint
-) RETURNS SETOF public.stats_cache_new_adult_metrics_result LANGUAGE sql STABLE AS $function$
+) RETURNS SETOF public.stats_cache_new_adult_metrics_result LANGUAGE sql STABLE
+SET
+	plan_cache_mode TO 'force_custom_plan' AS $function$
   SELECT r.*
   FROM (
   WITH spine AS (
