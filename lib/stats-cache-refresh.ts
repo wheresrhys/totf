@@ -172,6 +172,11 @@ const BY_SPECIES_CONFLICT_TARGET =
  * encounters inside the cell's own period — so narrowing is sound wherever a
  * cell maps onto one contiguous date window. `month-squashed` cells span every
  * year's copy of a month and `all-time` spans everything, so neither does.
+ *
+ * *How* each of the three narrows differs — `month`/`year` by exact
+ * `year_filter`/`month_filter`, `day` by a date window — see
+ * `buildSimpleMetricRpcParamsList`. This set is only about which units may
+ * narrow at all.
  */
 const SIMPLE_NARROWING_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> = new Set([
 	'day',
@@ -210,27 +215,70 @@ type MetricRpcParams = {
 	group_by_time_period?: 'day' | 'month' | 'year' | 'month-squashed';
 	from_date?: string;
 	to_date?: string;
+	/** Exact calendar year, matched as `EXTRACT(YEAR FROM visit_date)`. */
+	year_filter?: number;
+	/** Exact calendar month, 1-12, matched as `EXTRACT(MONTH FROM visit_date)`. */
+	month_filter?: number;
 };
 
 /**
- * The last calendar day of the month a `month` period string (`YYYY-MM-01`)
- * names, as a `YYYY-MM-DD` string — handles every month length, leap Februarys
- * included, via `Date.UTC`'s day-0-of-next-month rollback rather than a
- * hand-rolled days-per-month table.
+ * Whether `refreshSimpleStatsCache` refreshes this temporal unit by exact-match
+ * `year_filter`/`month_filter` rather than by a `from_date`/`to_date` window
+ * (#1176). True of `month`/`year`: each of their periods is a whole calendar
+ * month or year, which is exactly what those two RPC params already select, so
+ * one call per distinct period is both narrower than any single window spanning
+ * them and exact — no untouched gap period can come back in the result to be
+ * filtered out afterwards.
+ *
+ * False of `day`, the unit that keeps the window + `filterToTouchedPeriods`
+ * pairing: the RPC family has no `day_filter`, and one `day` refresh pass
+ * legitimately covers a non-contiguous set of days. False of
+ * `month-squashed`/`all-time`, which never narrow at all. A type predicate
+ * rather than a plain boolean so its caller gets `month`/`year` narrowed for
+ * `exactPeriodFilters` without a cast.
  */
-function lastDayOfMonthPeriod(periodString: string): string {
-	const year = Number(periodString.slice(0, 4));
-	const month = Number(periodString.slice(5, 7)); // 1-12
-	const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-	return `${periodString.slice(0, 7)}-${String(lastDay).padStart(2, '0')}`;
+function isExactFilterTemporalUnit(
+	temporalUnit: TemporalUnit
+): temporalUnit is 'month' | 'year' {
+	return temporalUnit === 'month' || temporalUnit === 'year';
 }
 
 /**
- * 31 December of the year a `year` period string (`YYYY-01-01`) names, as a
- * `YYYY-MM-DD` string.
+ * The exact-match RPC filters selecting precisely the period a `month`/`year`
+ * period string names — `YYYY-MM-01`/`YYYY-01-01`, per
+ * `lib/stats-cache-refresh-events.ts`'s `periodsTouched`. A `year` period needs
+ * no `month_filter`: the year filter alone already is the whole period.
  */
-function lastDayOfYearPeriod(periodString: string): string {
-	return `${periodString.slice(0, 4)}-12-31`;
+function exactPeriodFilters(
+	temporalUnit: 'month' | 'year',
+	periodString: string
+): Pick<MetricRpcParams, 'year_filter' | 'month_filter'> {
+	const year_filter = Number(periodString.slice(0, 4));
+	return temporalUnit === 'year'
+		? { year_filter }
+		: { year_filter, month_filter: Number(periodString.slice(5, 7)) };
+}
+
+/**
+ * The parts of a metric RPC's filter object that are the same for every
+ * temporal unit and every call of one refresh pass — the group, the
+ * group-by-species flag every call in this module hardcodes, and the grain.
+ */
+function unwindowedMetricRpcParams(
+	groupId: number,
+	temporalUnit: TemporalUnit
+): MetricRpcParams {
+	return {
+		ringing_group_filter: groupId,
+		group_by_species: true,
+		// For all-time, `group_by_time_period` is omitted completely rather than
+		// set to any value — the same "omit the key for all-time" convention
+		// `app/actions/summary-stats.ts`'s `fetchSummaryStats` and
+		// `lib/stats-cache-refresh-events.ts`'s all-time event use.
+		...(temporalUnit === 'all-time'
+			? {}
+			: { group_by_time_period: temporalUnit })
+	};
 }
 
 /**
@@ -245,6 +293,11 @@ function lastDayOfYearPeriod(periodString: string): string {
  * nothing would be narrowed by it anyway, so the caller treats that as
  * "nothing to refresh" rather than falling back to an unbounded, effectively
  * all-time call under narrow semantics.
+ *
+ * Only ever reached with a *window*-narrowing temporal unit — `day`, for both
+ * caches. `refreshSimpleStatsCache` peels `month`/`year` off into
+ * `buildSimpleMetricRpcParamsList`'s exact-filter fan-out before calling this
+ * (#1176), and `COMPLEX_NARROWING_TEMPORAL_UNITS` never contained them.
  */
 function buildMetricRpcParams(
 	groupId: number,
@@ -252,17 +305,7 @@ function buildMetricRpcParams(
 	periods: string[],
 	narrowingTemporalUnits: ReadonlySet<TemporalUnit>
 ): MetricRpcParams | null {
-	const unwindowedParams: MetricRpcParams = {
-		ringing_group_filter: groupId,
-		group_by_species: true,
-		// For all-time, `group_by_time_period` is omitted completely rather than
-		// set to any value — the same "omit the key for all-time" convention
-		// `app/actions/summary-stats.ts`'s `fetchSummaryStats` and
-		// `lib/stats-cache-refresh-events.ts`'s all-time event use.
-		...(temporalUnit === 'all-time'
-			? {}
-			: { group_by_time_period: temporalUnit })
-	};
+	const unwindowedParams = unwindowedMetricRpcParams(groupId, temporalUnit);
 
 	if (!narrowingTemporalUnits.has(temporalUnit)) {
 		// Always full-replace, over the group's whole history (no from_date/
@@ -281,37 +324,88 @@ function buildMetricRpcParams(
 	const minPeriod = sortedPeriods[0];
 	const maxPeriod = sortedPeriods[sortedPeriods.length - 1];
 
-	// `from_date` is always `min(periods)` verbatim — a period string is
-	// already its own first day, for every temporal unit this function
-	// narrows by. `to_date`, however, must cover the *whole* period
-	// `max(periods)` names, not just its first day: for `day`, a period
-	// string already *is* a date, so `max(periods)` unchanged is correct; for
-	// `month`/`year`, a period string is only the period's first day
-	// (`YYYY-MM-01`/`YYYY-01-01`, per `lib/stats-cache-refresh-events.ts`'s
-	// `periodsTouched`), so using it verbatim as `to_date` collapsed the
-	// window to a single day and the metric RPCs returned zero rows for every
-	// import that didn't happen to touch the 1st of the month/year (#1173).
-	const toDate =
-		temporalUnit === 'month'
-			? lastDayOfMonthPeriod(maxPeriod)
-			: temporalUnit === 'year'
-				? lastDayOfYearPeriod(maxPeriod)
-				: maxPeriod;
-
+	// Both bounds are a period string verbatim: for the one unit that still
+	// narrows by window — `day` — a period string already *is* a date, so it
+	// is both its own first and its own last day. The `month`/`year` case this
+	// used to extend to the end of `max(periods)`'s period (#1173) no longer
+	// reaches here at all; it is exact-filtered instead (#1176).
 	return {
 		...unwindowedParams,
 		from_date: minPeriod,
-		to_date: toDate
+		to_date: maxPeriod
 	};
 }
 
 /**
- * Cuts a merged result back to exactly the periods this pass is refreshing,
- * for a narrowing temporal unit. The window `buildMetricRpcParams` computes —
- * `min(periods)` through the end of the period `max(periods)` names — spans
- * untouched gaps inside that range, so the RPCs can legitimately return cells
- * for periods that weren't touched — those must not be rewritten. A
- * non-narrowing temporal unit full-replaces, so every merged row is kept.
+ * Every metric-RPC filter object one `refreshSimpleStatsCache` pass needs, in
+ * call order — a list because `month`/`year` fan out to one exact-filtered call
+ * per distinct touched period (#1176), while `day` and the non-narrowing units
+ * stay on the single object `buildMetricRpcParams` has always produced.
+ *
+ * Returns `null` on the same "nothing to refresh" condition that function does:
+ * a narrowing temporal unit with no touched periods.
+ */
+function buildSimpleMetricRpcParamsList(
+	groupId: number,
+	temporalUnit: TemporalUnit,
+	periods: string[]
+): MetricRpcParams[] | null {
+	if (!isExactFilterTemporalUnit(temporalUnit)) {
+		const windowedParams = buildMetricRpcParams(
+			groupId,
+			temporalUnit,
+			periods,
+			SIMPLE_NARROWING_TEMPORAL_UNITS
+		);
+		return windowedParams === null ? null : [windowedParams];
+	}
+
+	// A period can legitimately repeat in `periods` (several affected dates
+	// inside one month collapse onto the same `YYYY-MM-01`), and calling the
+	// same exact filter twice would just merge the identical cells back over
+	// themselves — so de-duplicate, preserving first-seen order.
+	const distinctPeriods = [...new Set(periods)];
+	if (distinctPeriods.length === 0) {
+		return null;
+	}
+
+	return distinctPeriods.map((periodString) => ({
+		...unwindowedMetricRpcParams(groupId, temporalUnit),
+		...exactPeriodFilters(temporalUnit, periodString)
+	}));
+}
+
+/**
+ * Calls one metric RPC once per filter object in `rpcParamsList`, concurrently,
+ * and concatenates the rows. A single-element list is the ordinary one-call
+ * case; `refreshSimpleStatsCache`'s `month`/`year` fan-out is the many-element
+ * one. Concatenating before merging is safe because no two periods' results
+ * ever share a `(species_id, time_period)` cell key, which is all
+ * `indexByCell`/`mergeSimpleMetricRows` key on.
+ */
+async function fetchMetricRows<Row>(
+	supabaseClient: SupabaseClient,
+	rpcName: string,
+	rpcParamsList: MetricRpcParams[]
+): Promise<Row[]> {
+	const perCallRows = await Promise.all(
+		rpcParamsList.map((rpcParams) =>
+			supabaseClient.rpc(rpcName, rpcParams).then(catchSupabaseErrors)
+		)
+	);
+	return perCallRows.flatMap((rows) => (rows ?? []) as Row[]);
+}
+
+/**
+ * Cuts a merged result back to exactly the periods this pass is refreshing, for
+ * a narrowing temporal unit. Load-bearing for the window-narrowed unit, `day`
+ * (both caches): the `min(periods)`..`max(periods)` window
+ * `buildMetricRpcParams` computes spans untouched gaps inside that range, so
+ * the RPCs can legitimately return cells for periods that weren't touched —
+ * those must not be rewritten. A pass-through for `refreshSimpleStatsCache`'s
+ * exact-filtered `month`/`year` fan-out, whose calls cannot return an untouched
+ * period in the first place (#1176). A non-narrowing temporal unit
+ * full-replaces, so every merged row is kept.
  */
 function filterToTouchedPeriods<Row extends MergedCellKey>(
 	mergedRows: Row[],
@@ -674,20 +768,24 @@ function mergeComplexMetricRows({
  * per temporal-unit event it receives; this function does not loop over
  * temporal units itself.
  *
- * `day`/`month`/`year` narrow by `periods`: the metric RPCs are called over
- * a `from_date`/`to_date` window spanning `min(periods)` through the end of
- * the period `max(periods)` names (the whole last day for `day`, the whole
- * last month for `month`, the whole last year for `year` — see
- * `buildMetricRpcParams`), and the merged result is filtered down to just
- * the periods actually touched before writing — the window call can return
- * extra untouched periods inside that range.
+ * `day`/`month`/`year` narrow by `periods`, in two different ways (see
+ * `buildSimpleMetricRpcParamsList`):
+ *
+ * - `day` calls each metric RPC once, over a `from_date`/`to_date` window
+ *   spanning `min(periods)`..`max(periods)`, and the merged result is filtered
+ *   down to just the periods actually touched before writing — that window can
+ *   return extra untouched days inside the range.
+ * - `month`/`year` call each metric RPC once *per distinct period*, with that
+ *   period's exact `year_filter`/`month_filter` and no window at all (#1176).
+ *   Each call therefore returns only cells for a period this pass is
+ *   refreshing, so the post-hoc filter has nothing left to drop.
  *
  * `month-squashed`/`all-time` always full-replace the group's whole history,
  * ignoring `periods` entirely.
  *
  * Writes go through exactly one `.upsert()` against `SimpleStatsCacheBySpecies`
- * — one call per invocation, not one per metric RPC's worth of rows. See
- * `writeBySpeciesRows`.
+ * — one call per invocation, not one per metric RPC's worth of rows and not one
+ * per fanned-out period. See `writeBySpeciesRows`.
  *
  * Any cell `mergeSimpleMetricRows` had to skip is then dead-lettered to
  * `FailedStatsCacheRefreshes` in one batched insert (#1167) — see
@@ -704,42 +802,54 @@ export async function refreshSimpleStatsCache(
 ): Promise<void> {
 	const touchedPeriods = periods ?? [];
 
-	const rpcParams = buildMetricRpcParams(
+	const rpcParamsList = buildSimpleMetricRpcParamsList(
 		groupId,
 		temporalUnit,
-		touchedPeriods,
-		SIMPLE_NARROWING_TEMPORAL_UNITS
+		touchedPeriods
 	);
-	if (rpcParams === null) {
+	if (rpcParamsList === null) {
 		// Narrowing temporal unit, nothing touched this pass — nothing to refresh.
 		return;
 	}
 
 	const [basicRows, biometricsRows, birdAgeRows, encounterAgeRows] =
 		await Promise.all([
-			supabaseClient
-				.rpc('stats_cache_basic_session_metrics', rpcParams)
-				.then(catchSupabaseErrors),
-			supabaseClient
-				.rpc('stats_cache_biometrics_metrics', rpcParams)
-				.then(catchSupabaseErrors),
-			supabaseClient
-				.rpc('stats_cache_bird_age_metrics', rpcParams)
-				.then(catchSupabaseErrors),
-			supabaseClient
-				.rpc('stats_cache_encounter_age_metrics', rpcParams)
-				.then(catchSupabaseErrors)
+			fetchMetricRows<BasicSessionMetricsRow>(
+				supabaseClient,
+				'stats_cache_basic_session_metrics',
+				rpcParamsList
+			),
+			fetchMetricRows<BiometricsMetricsRow>(
+				supabaseClient,
+				'stats_cache_biometrics_metrics',
+				rpcParamsList
+			),
+			fetchMetricRows<BirdAgeMetricsRow>(
+				supabaseClient,
+				'stats_cache_bird_age_metrics',
+				rpcParamsList
+			),
+			fetchMetricRows<EncounterAgeMetricsRow>(
+				supabaseClient,
+				'stats_cache_encounter_age_metrics',
+				rpcParamsList
+			)
 		]);
 
 	const { mergedRows, anomalies } = mergeSimpleMetricRows({
 		groupId,
 		temporalUnit,
-		basicRows: (basicRows ?? []) as BasicSessionMetricsRow[],
-		biometricsRows: (biometricsRows ?? []) as BiometricsMetricsRow[],
-		birdAgeRows: (birdAgeRows ?? []) as BirdAgeMetricsRow[],
-		encounterAgeRows: (encounterAgeRows ?? []) as EncounterAgeMetricsRow[]
+		basicRows,
+		biometricsRows,
+		birdAgeRows,
+		encounterAgeRows
 	});
 
+	// A no-op for `month`/`year` now that each of their calls is exact-filtered
+	// (#1176) — kept pointed at the full narrowing set rather than `day` alone
+	// so the invariant "a narrowing pass only ever writes periods it was asked
+	// to refresh" is enforced at the write for every narrowing unit, however
+	// its rows were fetched.
 	const rowsToWrite = filterToTouchedPeriods(
 		mergedRows,
 		temporalUnit,
