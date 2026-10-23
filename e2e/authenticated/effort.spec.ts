@@ -20,16 +20,13 @@ test('beta: shows yearly data with non-zero encounter counts', { tag: '@beta' },
 	await expect(page.getByRole('columnheader', { name: '2023' })).toBeVisible()
 })
 
-test('gamma: shows table with all-zero encounter counts (no own data)', { tag: '@gamma' }, async ({ page }) => {
+test('gamma: shows the empty state (no own data, despite a GroupDataSharing grant from Beta)', { tag: '@gamma' }, async ({ page }) => {
 	await page.goto('/effort')
-	// core_stats returns zero-count rows for all years; no Alpha/Beta data leaks
-	// via ringing_group_filter — only encounters where ringing_group_id = gammaId are counted
-	await expect(page.getByRole('rowheader', { name: 'Encounter count' })).toBeVisible()
-	const encounterRow = page.getByRole('row', { name: /^Encounter count/ })
-	// All year columns must show 0
-	const cells = encounterRow.getByRole('cell')
-	const count = await cells.count()
-	for (let i = 0; i < count; i++) {
-		await expect(cells.nth(i)).toHaveText('0')
-	}
+	// Gamma has no Sessions of its own — only a GroupDataSharing grant letting it
+	// *view* Beta's data elsewhere in the app. core_stats' ringing_group_filter
+	// scopes strictly to Gamma's own rows regardless of that grant, so its year
+	// spine is empty and the page falls back to the empty-state copy, not a
+	// table zero-filled against Beta's years.
+	await expect(page.getByText('No yearly data for this group yet.')).toBeVisible()
+	await expect(page.getByRole('table')).toHaveCount(0)
 })
