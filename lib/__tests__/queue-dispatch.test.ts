@@ -67,7 +67,7 @@ describe('dispatchStatsCacheRefreshWindow', () => {
 
 			await dispatchStatsCacheRefreshWindow(EVENT);
 
-			expect(send).toHaveBeenCalledWith('stats-cache.refresh-window', EVENT);
+			expect(send).toHaveBeenCalledWith('stats-cache-refresh-window', EVENT);
 			expect(processStatsCacheRefreshWindowJob).not.toHaveBeenCalled();
 		});
 
@@ -81,7 +81,7 @@ describe('dispatchStatsCacheRefreshWindow', () => {
 
 			await dispatchStatsCacheRefreshWindow(EVENT);
 
-			expect(send).toHaveBeenCalledWith('stats-cache.refresh-window', EVENT);
+			expect(send).toHaveBeenCalledWith('stats-cache-refresh-window', EVENT);
 			expect(processStatsCacheRefreshWindowJob).not.toHaveBeenCalled();
 		});
 	});

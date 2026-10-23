@@ -112,7 +112,7 @@ async function runCacheRefresh(
 }
 
 /**
- * Consumer for the `stats-cache.refresh-window` topic (#1141, made real by
+ * Consumer for the `stats-cache-refresh-window` topic (#1141, made real by
  * #1155): refreshes both stats caches for the one temporal unit this event
  * covers, then records the outcome on that temporal unit's own
  * `ImportJobs.*_stats_refresh_status` column (#1154).

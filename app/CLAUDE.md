@@ -350,7 +350,7 @@ opened after the pre-flight rather than at the top of the handler.
 
 ### Stats-cache refresh queue
 
-An import's last act is to dispatch one `stats-cache.refresh-window` event per temporal unit
+An import's last act is to dispatch one `stats-cache-refresh-window` event per temporal unit
 (`lib/stats-cache-refresh-events.ts` decides what, `lib/queue-dispatch.ts` sends it — `inline`
 mode in local dev/the CLI importer/tests, the real Vercel queue in production). The consumer is
 `app/api/queues/stats-cache-refresh-window/route.ts`: it maps the event back onto

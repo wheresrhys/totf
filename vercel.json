@@ -11,7 +11,7 @@
 	"functions": {
 		"app/api/queues/stats-cache-refresh-window/route.ts": {
 			"experimentalTriggers": [
-				{ "type": "queue/v2beta", "topic": "stats-cache.refresh-window" }
+				{ "type": "queue/v2beta", "topic": "stats-cache-refresh-window" }
 			]
 		}
 	}

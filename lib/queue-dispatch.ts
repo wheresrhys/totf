@@ -24,7 +24,7 @@ import type { StatsCacheRefreshEvent } from './stats-cache-refresh-events';
  */
 export type StatsCacheRefreshDispatchMode = 'queue' | 'inline';
 
-const STATS_CACHE_REFRESH_WINDOW_TOPIC = 'stats-cache.refresh-window';
+const STATS_CACHE_REFRESH_WINDOW_TOPIC = 'stats-cache-refresh-window';
 
 /**
  * Chosen by `STATS_CACHE_REFRESH_DISPATCH_MODE`, defaulting to `queue` when
