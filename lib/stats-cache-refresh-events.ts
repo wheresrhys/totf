@@ -157,8 +157,20 @@ export function buildStatsCacheRefreshEvents(
 
 		// Month-squashed: the temporal-unit marker alone. A squashed-month cell
 		// spans every year's copy of its month, so both refresh functions
-		// full-replace this temporal unit and ignore `periods` — there is
-		// nothing meaningful to narrow by.
+		// full-replace this temporal unit and ignore `periods`.
+		//
+		// Note this is a *mechanical* blocker, not a conceptual one (reviewed on
+		// PR #1177). `month_filter` alone, with `year_filter` left NULL, is
+		// exactly the squashed-month grouping and was verified to compute the
+		// bucket correctly across every year — so narrowing by touched calendar
+		// month is sound in principle. What stops it is `stats_spine`'s
+		// month-squashed branch: an unconditional `generate_series(1, 12)` that
+		// ignores `month_filter`, so a narrowed call still returns all 12
+		// calendar cells, 11 of them spurious zeroes. Those collide across
+		// `refreshSimpleStatsCache`'s per-period fan-out (every call emits the
+		// same 12 cell keys), and `indexByCell`'s last-write-wins would let one
+		// month's zero overwrite another's real value. Narrowing here therefore
+		// needs a `stats_spine` change first — see that function's SQL.
 		stamp({ group_by_time_period: 'month-squashed' }),
 
 		// Year: every distinct year touched, as first-of-year ISO dates.

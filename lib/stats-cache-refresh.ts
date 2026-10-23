@@ -174,6 +174,16 @@ const BY_SPECIES_CONFLICT_TARGET =
  * cell maps onto one contiguous date window. `month-squashed` cells span every
  * year's copy of a month and `all-time` spans everything, so neither does.
  *
+ * `month-squashed`'s exclusion is a mechanical limitation rather than a
+ * conceptual one, and is the one entry here that could change: a squashed cell
+ * *is* exactly what `month_filter` alone (no `year_filter`) selects, verified
+ * correct across all years on PR #1177. It stays out because `stats_spine`'s
+ * month-squashed branch ignores `month_filter` and always emits all 12 calendar
+ * cells, so the 11 untouched ones would come back as zeroes and collide across
+ * `buildSimpleMetricRpcParamsList`'s fan-out — breaking the disjoint-cell-key
+ * invariant `fetchMetricRows` relies on. See
+ * `lib/stats-cache-refresh-events.ts`'s month-squashed event for the detail.
+ *
  * *How* each of the three narrows differs — `month`/`year` by exact
  * `year_filter`/`month_filter`, `day` by a date window — see
  * `buildSimpleMetricRpcParamsList`. This set is only about which units may
