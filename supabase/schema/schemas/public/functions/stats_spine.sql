@@ -45,7 +45,8 @@ CREATE FUNCTION public.stats_spine (
       MIN(sess.visit_date) AS min_date,
       MAX(sess.visit_date) AS max_date
     FROM public."Sessions" as sess
-    WHERE (from_date IS NULL OR sess.visit_date >= from_date)
+    WHERE (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
+      AND (from_date IS NULL OR sess.visit_date >= from_date)
       AND (to_date IS NULL OR sess.visit_date <= to_date)
       AND (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
       -- month_filter is deliberately applied here too, for consistency with
