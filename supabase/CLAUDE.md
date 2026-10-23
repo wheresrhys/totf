@@ -275,6 +275,37 @@ planning is single-digit milliseconds against hundreds of milliseconds of execut
 restructuring the joins instead: sentinel-keyed equality joins would make the generic plan
 *tolerable*, but no single plan can be right for a query whose shape is a parameter.
 
+**The same cliff also hits the six `stats_cache_*_metrics` RPCs — via inlining, not a RETURN
+QUERY cache — and they now carry the same fix (2026-10-23).** These six (`stats_cache_basic_session_metrics`,
+`stats_cache_biometrics_metrics`, `stats_cache_bird_age_metrics`,
+`stats_cache_encounter_age_metrics`, `stats_cache_new_adult_metrics`,
+`stats_cache_returning_age_metrics` — the `SimpleStatsCache`/`ComplexStatsCache` read side,
+#1145-#1151) are `LANGUAGE sql STABLE`, not plpgsql, so each one's header originally argued "a
+pure SQL function has no RETURN QUERY plan cache to go generic on, so that mitigation does not
+apply here." That was true but irrelevant, and it was asserted, not measured, when each function
+was introduced. A `LANGUAGE sql` function with no `SET` config is a candidate for **inlining** —
+Postgres splices its body directly into the caller's query plan, with no `Function Scan` node of
+its own — and every one of these six reproduces the family's shape-parameterized `CASE`/`OR`-guarded
+join (keyed on `group_by_time_period`). Once inlined, that join is exposed to whichever *caller's*
+prepared statement is reused across requests on a pooled PostgREST connection, which is exactly this
+family's cliff arriving by a different route: a cache the *caller* owns, rather than one the
+function owns. Measured on a synthetic 180-Session/8650-Encounter/6164-Bird fixture sized to the
+actual failing prod group (`processStatsCacheRefreshWindowJob` timing out in prod for every
+`TemporalUnit` except `day`): `stats_cache_basic_session_metrics` ran custom-plan executions 1-5 at
+81-259ms, then flipped to generic on execution 6 and ran 645ms-7.3s on executions 6-10 (~40x,
+confirmed via `pg_prepared_statements`: `generic_plans=5, custom_plans=5`); `stats_cache_new_adult_metrics`
+ran custom-plan executions at 51-76ms against generic-plan executions at 16.2s-23.1s (~400x) —
+worse in absolute terms than #953's own 160k-encounter benchmark despite this dataset being ~18x
+smaller. `SET plan_cache_mode TO 'force_custom_plan'` fixes this not by giving a non-existent
+`RETURN QUERY` cache a custom-plan override, but by disqualifying the function from inlining in the
+first place (any function carrying a `SET` clause is ineligible for inlining) — confirmed via
+`EXPLAIN (COSTS OFF)`: before the fix the function's own CTEs/joins are flattened directly into the
+outer plan with no `Function Scan` node; after it there's a bare opaque `Function Scan`, and the
+10-execution timing sweep lands flat in the 285-600ms band. Don't reintroduce the old "pure-SQL
+functions are exempt" reasoning on any future `LANGUAGE sql` RPC in this family — if it reproduces
+this shape-parameterized join pattern, it needs the same `SET` clause, for the inlining reason
+above rather than the RETURN QUERY reason that applies to the plpgsql RPCs.
+
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
 two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
 counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
