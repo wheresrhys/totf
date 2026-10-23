@@ -18,6 +18,11 @@
  *   month, narrowed to a single cell by month_filter (#1178) — a squashed cell is
  *   exactly what month_filter alone selects, which is what lets
  *   refreshSimpleStatsCache narrow this temporal unit by touched calendar month.
+ * - stats_spine's session_date_range CTE now scopes by ringing_group_filter, like
+ *   every sibling CTE in this RPC family — see the "session_date_range cross-group
+ *   scoping" describe block below, covering the fix for the prod statement-timeout
+ *   root cause where month/year refreshes scanned every ringing group's Sessions
+ *   rows system-wide.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -33,6 +38,7 @@ import { supabase } from '../../../lib/supabase';
 import { addDays, randomFutureDate, randomTestSuffix } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getGroupIdByName } from './helpers/seed-lookups';
+import { createIsolatedGroup, psql } from '../db-test-helpers';
 import {
 	insertTestLocation,
 	insertTestSession,
@@ -191,8 +197,10 @@ describe('stats_spine — session date range spans every session date', () => {
 	const sessionIds: number[] = [];
 
 	// Two independent years so the two windows never overlap each other's sessions.
-	// session_date_range is not group-filtered, so tight per-year windows are what
-	// isolate each assertion from the rest of the shared Sessions table.
+	// session_date_range is scoped by ringing_group_filter (see the
+	// "session_date_range cross-group scoping" describe block below), but tight
+	// per-year windows are still what isolate each assertion from Delta's own
+	// concurrently-running test fixtures in the shared Sessions table.
 	const yrMixed = 2080 + Math.floor(Math.random() * 18); // 2080–2097
 	const yrShared = yrMixed + 1;
 
@@ -539,5 +547,127 @@ describe('stats_raw_encounters/stats_spine — no filters supplied', () => {
 		expect(data!.some((r) => r.encounter_id === resightingEncounterId)).toBe(
 			false
 		);
+	});
+});
+
+describe('stats_spine', () => {
+	describe('session_date_range cross-group scoping', () => {
+		// Two throwaway groups rather than the shared seed groups: the bug this
+		// guards (missing `ringing_group_filter` scoping on session_date_range)
+		// is only observable through a client that can see MORE THAN ONE group's
+		// Sessions rows at once — Delta/Gamma/etc have no sharing relationship
+		// with each other, so RLS alone would already hide cross-group rows
+		// regardless of whether the SQL fix is in place. A GroupDataSharing grant
+		// between two isolated groups reproduces the one real scenario where RLS
+		// legitimately exposes multiple groups' Sessions to the same caller —
+		// matching core_stats'/stats_raw_encounters' own
+		// `ringing_group_filter`-scoping rationale (narrowing to exactly the
+		// group the caller asked for, not merely "whatever RLS lets through").
+		const suffix = randomTestSuffix();
+		let targetGroupId: number;
+		let otherGroupId: number;
+		let targetClient: SupabaseClient;
+		let otherClient: SupabaseClient;
+
+		const locationIds: number[] = [];
+		const sessionIds: number[] = [];
+
+		// A single shared year: targetGroup's own session sits in March,
+		// otherGroup's (RLS-visible, but not the requested group) sits in June —
+		// both inside the same calendar year, so a from_date/to_date window
+		// spanning the year catches both, and year_filter alone catches both too.
+		const yr = 2080 + Math.floor(Math.random() * 18); // 2080-2097
+		const targetMonth = `${yr}-03-15`;
+		const otherMonth = `${yr}-06-10`;
+
+		beforeAll(async () => {
+			targetGroupId = createIsolatedGroup(`SpineScope Target ${suffix}`);
+			otherGroupId = createIsolatedGroup(`SpineScope Other ${suffix}`);
+			[targetClient, otherClient] = await Promise.all([
+				getAuthenticatedSupabaseClientForGroup(targetGroupId),
+				getAuthenticatedSupabaseClientForGroup(otherGroupId)
+			]);
+
+			// otherGroup grants targetGroup read access to its own rows — so
+			// targetGroup's authenticated client legitimately sees BOTH its own
+			// Sessions AND otherGroup's under RLS, and the explicit
+			// ringing_group_filter condition in the SQL is the only thing left to
+			// narrow session_date_range down to exactly the group the caller asked
+			// for.
+			psql(
+				`INSERT INTO "GroupDataSharing" (granter_group_id, recipient_group_id) VALUES (${otherGroupId}, ${targetGroupId});`
+			);
+
+			const targetLocationId = await insertTestLocation(
+				targetClient,
+				targetGroupId,
+				`SpineScope Target Loc ${suffix}`
+			);
+			locationIds.push(targetLocationId);
+			sessionIds.push(
+				await insertTestSession(targetClient, targetLocationId, targetMonth)
+			);
+
+			const otherLocationId = await insertTestLocation(
+				otherClient,
+				otherGroupId,
+				`SpineScope Other Loc ${suffix}`
+			);
+			locationIds.push(otherLocationId);
+			sessionIds.push(
+				await insertTestSession(otherClient, otherLocationId, otherMonth)
+			);
+		});
+
+		afterAll(() => {
+			psql(
+				`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
+					`DELETE FROM "Locations" WHERE id IN (${locationIds.join(', ')});` +
+					`DELETE FROM "GroupDataSharing" WHERE granter_group_id = ${otherGroupId} AND recipient_group_id = ${targetGroupId};` +
+					`DELETE FROM "RingingGroups" WHERE id IN (${targetGroupId}, ${otherGroupId});`
+			);
+		});
+
+		// Usual — the exact shape refreshSimpleStatsCache's month/year
+		// exact-filter fan-out calls with: year_filter/month_filter set, no
+		// from_date/to_date at all.
+		it("excludes another RLS-visible group's Sessions from session_date_range bounds when only year_filter/month_filter narrow the query", async () => {
+			const { data, error } = await targetClient.rpc('stats_spine', {
+				ringing_group_filter: targetGroupId,
+				year_filter: yr,
+				month_filter: 6,
+				group_by_time_period: 'month'
+			});
+			expect(error).toBeNull();
+			// otherGroup's June session matches year_filter/month_filter and is
+			// visible to targetClient via the GroupDataSharing grant — if
+			// session_date_range weren't scoped by ringing_group_filter, it would
+			// shift min/max to June and produce a spurious cell. targetGroup
+			// itself has no session this month, so the correctly-scoped spine
+			// must be empty.
+			expect(data).toEqual([]);
+		});
+
+		// Edge — guards the from_date/to_date-windowed callers (the shape the
+		// `day` unit's own refresh and every pre-existing month/year caller use)
+		// don't regress: the group filter must still compose (AND) correctly
+		// with an explicit date window, rather than only working when
+		// from_date/to_date are absent.
+		it("bounds the spine to only the target group's own Sessions when from_date/to_date are set alongside the group filter", async () => {
+			const { data, error } = await targetClient.rpc('stats_spine', {
+				ringing_group_filter: targetGroupId,
+				from_date: `${yr}-01-01`,
+				to_date: `${yr}-12-31`,
+				group_by_time_period: 'month'
+			});
+			expect(error).toBeNull();
+			const months = data!.map((r) => r.time_period);
+			// Both groups' sessions fall inside this from_date/to_date window, and
+			// otherGroup's June session is still RLS-visible to targetClient — but
+			// only targetGroup's own March session may bound the spine. An
+			// unscoped CTE would produce a dense March-through-June run (4 cells);
+			// the fix produces exactly one.
+			expect(months).toEqual([`${yr}-03-01`]);
+		});
 	});
 });
