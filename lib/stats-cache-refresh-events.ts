@@ -48,10 +48,14 @@
  * first-of-month (`YYYY-MM-01`) or first-of-year (`YYYY-01-01`) ISO date, since
  * `stats_spine.sql`'s period_spine CTE computes those cells as
  * `date_trunc('month'|'year', d)::date`. `refreshSimpleStatsCache`/
- * `refreshComplexStatsCache` derive their own `from_date`/`to_date` window from
- * `min(periods)`..`max(periods)` and then filter the merged rows back down to
- * `periods` by literal string membership against `time_period`, so the strings
- * have to match that shape exactly. It replaced the per-single-value
+ * `refreshComplexStatsCache` derive their own `from_date`/`to_date` window as
+ * `min(periods)` through the end of the period `max(periods)` names (not
+ * `max(periods)` verbatim — a period string is only that period's *first*
+ * day, so a literal min/max window would collapse to a single day for
+ * `month`/`year`; see `buildMetricRpcParams` in `lib/stats-cache-refresh.ts`)
+ * and then filter the merged rows back down to `periods` by literal string
+ * membership against `time_period`, so the strings have to match that shape
+ * exactly. It replaced the per-single-value
  * `year_filter`/`month_filter` pair, which no call site needs any more now that
  * every temporal unit either carries an array, carries its own date window
  * (`day`), or full-replaces (`month-squashed`/`all-time`).

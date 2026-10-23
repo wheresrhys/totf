@@ -1,0 +1,10 @@
+REVOKE SELECT, USAGE ON SEQUENCE public."ComplexStatsCacheBySpecies_id_seq" FROM anon;
+REVOKE SELECT, USAGE ON SEQUENCE public."ComplexStatsCacheBySpecies_id_seq" FROM authenticated;
+REVOKE SELECT, USAGE ON SEQUENCE public."ComplexStatsCacheBySpecies_id_seq" FROM service_role;
+REVOKE SELECT, USAGE ON SEQUENCE public."SimpleStatsCacheBySpecies_id_seq" FROM anon;
+REVOKE SELECT, USAGE ON SEQUENCE public."SimpleStatsCacheBySpecies_id_seq" FROM authenticated;
+REVOKE SELECT, USAGE ON SEQUENCE public."SimpleStatsCacheBySpecies_id_seq" FROM service_role;
+REVOKE DELETE, INSERT, SELECT, UPDATE ON public."ComplexStatsCacheBySpecies" FROM anon;
+REVOKE DELETE ON public."ComplexStatsCacheBySpecies" FROM authenticated;
+REVOKE DELETE, INSERT, SELECT, UPDATE ON public."SimpleStatsCacheBySpecies" FROM anon;
+REVOKE DELETE ON public."SimpleStatsCacheBySpecies" FROM authenticated;
