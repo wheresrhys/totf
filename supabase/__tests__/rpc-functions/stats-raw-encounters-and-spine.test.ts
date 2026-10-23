@@ -451,8 +451,8 @@ describe("stats_spine's month-squashed branch", () => {
 		const monthPeriods = monthCells!.map((r) => r.time_period);
 		// The month branch is bounded by session_date_range, which applies
 		// month_filter itself — so it still spans the real years' own cells
-		// (densely, per the edge case documented in supabase/CLAUDE.md) rather
-		// than collapsing onto the squashed branch's 2000-<mm>-01 sentinel.
+		// (densely between min and max, per that CTE's own comment) rather than
+		// collapsing onto the squashed branch's 2000-<mm>-01 sentinel.
 		expect(monthPeriods).toContain(`${firstYear}-${monthStr}-01`);
 		expect(monthPeriods).toContain(`${secondYear}-${monthStr}-01`);
 		expect(monthPeriods).not.toContain(squashedCellDate);

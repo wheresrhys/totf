@@ -31,15 +31,23 @@ type StatsCacheRefreshParams = {
 
 /**
  * The temporal units whose touched periods ride on `rpcParams.periods` (#1154's
- * collapsed month/year events). `day` carries its exact days in the event's
- * top-level `affectedDates` instead, because its `from_date`/`to_date` window
- * can span gap days with no activity; `month-squashed`/`all-time` carry no
- * period data at all, since both refresh functions full-replace those temporal
- * units and ignore `periods` outright.
+ * collapsed month/year events, joined by `month-squashed` in #1178 once
+ * `refreshSimpleStatsCache` could narrow it). `day` carries its exact days in
+ * the event's top-level `affectedDates` instead, because its
+ * `from_date`/`to_date` window can span gap days with no activity; `all-time`
+ * carries no period data at all, since both refresh functions full-replace that
+ * temporal unit and ignore `periods` outright.
+ *
+ * `month-squashed` has to be listed here for its narrowing to work at all:
+ * `refreshSimpleStatsCache` now treats it as a narrowing unit, and a narrowing
+ * unit handed no periods refreshes *nothing* (see
+ * `buildSimpleMetricRpcParamsList`'s early return). `refreshComplexStatsCache`
+ * still full-replaces it and ignores the periods, as before.
  */
 const PERIODS_FROM_RPC_PARAMS_TEMPORAL_UNITS: readonly TemporalUnit[] = [
 	'month',
-	'year'
+	'year',
+	'month-squashed'
 ];
 
 /**

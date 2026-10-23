@@ -102,7 +102,7 @@ describe('deriving groupId/temporalUnit/periods from the event', () => {
 		});
 	});
 
-	it('sources periods from rpcParams.periods for the month and year temporal units', () => {
+	it('sources periods from rpcParams.periods for the month, year and month-squashed temporal units', () => {
 		expect(
 			deriveStatsCacheRefreshParams(
 				statsCacheRefreshEvent({
@@ -123,19 +123,24 @@ describe('deriving groupId/temporalUnit/periods from the event', () => {
 				})
 			)
 		).toMatchObject({ temporalUnit: 'year', periods: ['2024-01-01'] });
-	});
 
-	it('passes undefined periods for the month-squashed and all-time temporal units', () => {
+		// Sentinel-year squashed-month periods (#1178) — a narrowing unit handed
+		// no periods refreshes nothing, so dropping these would silently stop the
+		// month-squashed cache refreshing at all.
 		expect(
 			deriveStatsCacheRefreshParams(
-				statsCacheRefreshEvent({ groupByTimePeriod: 'month-squashed' })
+				statsCacheRefreshEvent({
+					groupByTimePeriod: 'month-squashed',
+					periods: ['2000-03-01', '2000-04-01']
+				})
 			)
-		).toEqual({
-			groupId: GROUP_ID,
+		).toMatchObject({
 			temporalUnit: 'month-squashed',
-			periods: undefined
+			periods: ['2000-03-01', '2000-04-01']
 		});
+	});
 
+	it('passes undefined periods for the all-time temporal unit', () => {
 		expect(deriveStatsCacheRefreshParams(allTimeEvent())).toEqual({
 			groupId: GROUP_ID,
 			temporalUnit: 'all-time',

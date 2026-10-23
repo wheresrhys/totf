@@ -287,7 +287,9 @@ function exactPeriodFilters(
 		return { month_filter };
 	}
 	const year_filter = Number(periodString.slice(0, 4));
-	return temporalUnit === 'year' ? { year_filter } : { year_filter, month_filter };
+	return temporalUnit === 'year'
+		? { year_filter }
+		: { year_filter, month_filter };
 }
 
 /**
