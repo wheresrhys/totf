@@ -489,8 +489,9 @@ export class ImportJobTracker {
 	 * Records how one temporal unit's stats-cache refresh went, on that temporal
 	 * unit's own column and nothing else. The caller is whatever runs the
 	 * refreshes — the queue consumer that calls `refreshSimpleStatsCache`/
-	 * `refreshComplexStatsCache` per dispatched temporal-unit event (T10); this
-	 * only provides somewhere to record the outcome.
+	 * `refreshComplexStatsCache` per dispatched temporal-unit event
+	 * (`app/api/queues/stats-cache-refresh-window/route.ts`, #1155); this only
+	 * provides somewhere to record the outcome.
 	 */
 	async markStatsCacheRefreshed(
 		importJobId: number,

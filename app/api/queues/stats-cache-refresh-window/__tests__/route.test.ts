@@ -1,30 +1,282 @@
-import { describe, it, expect, vi } from 'vitest';
-import { processStatsCacheRefreshWindowJob } from '../route';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { StatsCacheRefreshEvent } from '../../../../../lib/stats-cache-refresh-events';
+
+// Named with a `Mock` suffix so the `ImportJobTracker` stand-in below can carry
+// a field of the real method's name without shadowing it in its own initializer.
+const markStatsCacheRefreshedMock = vi.fn();
+const refreshSimpleStatsCache = vi.fn();
+const refreshComplexStatsCache = vi.fn();
+const getAuthenticatedSupabaseClientForGroup = vi.fn();
+
+// Mocked for the whole file rather than per-describe: every failure path below
+// deliberately logs, and an unmocked `console.error` would spray real stack
+// traces over a passing run. `vi.clearAllMocks()` in `beforeEach` resets its
+// recorded calls without dropping the no-op implementation.
+const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+vi.mock('../../../../../lib/demon-import', () => ({
+	ImportJobTracker: class {
+		markStatsCacheRefreshed = markStatsCacheRefreshedMock;
+		constructor(public supabaseClient: unknown) {}
+	}
+}));
+
+vi.mock('../../../../../lib/stats-cache-refresh', () => ({
+	refreshSimpleStatsCache: (...args: unknown[]) =>
+		refreshSimpleStatsCache(...args),
+	refreshComplexStatsCache: (...args: unknown[]) =>
+		refreshComplexStatsCache(...args)
+}));
+
+vi.mock('../../../../lib/auth/group-auth', () => ({
+	getAuthenticatedSupabaseClientForGroup: (...args: unknown[]) =>
+		getAuthenticatedSupabaseClientForGroup(...args)
+}));
+
+const {
+	deriveStatsCacheRefreshParams,
+	processStatsCacheRefreshWindowJob
+	// Imported after the mocks above are registered — `vi.mock` is hoisted, but
+	// the mocked modules' factories only run on first import of the module
+	// under test.
+} = await import('../route');
+
+const IMPORT_JOB_ID = 42;
+const GROUP_ID = 7;
+
+/** A dispatched event, as `buildStatsCacheRefreshEvents` (#1154) stamps them. */
+function statsCacheRefreshEvent({
+	importJobId = IMPORT_JOB_ID,
+	ringingGroupId = GROUP_ID,
+	groupByTimePeriod,
+	periods,
+	affectedDates
+}: {
+	importJobId?: number;
+	ringingGroupId?: number;
+	groupByTimePeriod?: 'day' | 'month' | 'month-squashed' | 'year';
+	periods?: string[];
+	affectedDates?: string[];
+} = {}): StatsCacheRefreshEvent {
+	return {
+		importJobId,
+		rpcParams: {
+			ringing_group_filter: ringingGroupId,
+			...(groupByTimePeriod ? { group_by_time_period: groupByTimePeriod } : {}),
+			...(periods ? { periods } : {})
+		},
+		...(affectedDates ? { affectedDates } : {})
+	};
+}
+
+/** The all-time event: no `group_by_time_period` key at all (#1154). */
+const allTimeEvent = () => statsCacheRefreshEvent();
+
+const dayEvent = (affectedDates: string[]) =>
+	statsCacheRefreshEvent({ groupByTimePeriod: 'day', affectedDates });
+
+describe('deriving groupId/temporalUnit/periods from the event', () => {
+	it('reads groupId from rpcParams.ringing_group_filter', () => {
+		expect(
+			deriveStatsCacheRefreshParams(
+				statsCacheRefreshEvent({ ringingGroupId: 99 })
+			)
+		).toMatchObject({ groupId: 99 });
+	});
+
+	it('treats an event with no group_by_time_period key as the all-time temporal unit', () => {
+		expect(deriveStatsCacheRefreshParams(allTimeEvent())).toMatchObject({
+			temporalUnit: 'all-time'
+		});
+	});
+
+	it('sources periods from affectedDates for the day temporal unit, not rpcParams.periods', () => {
+		const event = dayEvent(['2024-03-15', '2024-03-28']);
+		// A day event that also (wrongly) carried rpcParams.periods must still
+		// read its exact days off affectedDates.
+		event.rpcParams.periods = ['2024-03-01'];
+
+		expect(deriveStatsCacheRefreshParams(event)).toMatchObject({
+			temporalUnit: 'day',
+			periods: ['2024-03-15', '2024-03-28']
+		});
+	});
+
+	it('sources periods from rpcParams.periods for the month and year temporal units', () => {
+		expect(
+			deriveStatsCacheRefreshParams(
+				statsCacheRefreshEvent({
+					groupByTimePeriod: 'month',
+					periods: ['2024-03-01', '2024-04-01']
+				})
+			)
+		).toMatchObject({
+			temporalUnit: 'month',
+			periods: ['2024-03-01', '2024-04-01']
+		});
+
+		expect(
+			deriveStatsCacheRefreshParams(
+				statsCacheRefreshEvent({
+					groupByTimePeriod: 'year',
+					periods: ['2024-01-01']
+				})
+			)
+		).toMatchObject({ temporalUnit: 'year', periods: ['2024-01-01'] });
+	});
+
+	it('passes undefined periods for the month-squashed and all-time temporal units', () => {
+		expect(
+			deriveStatsCacheRefreshParams(
+				statsCacheRefreshEvent({ groupByTimePeriod: 'month-squashed' })
+			)
+		).toEqual({
+			groupId: GROUP_ID,
+			temporalUnit: 'month-squashed',
+			periods: undefined
+		});
+
+		expect(deriveStatsCacheRefreshParams(allTimeEvent())).toEqual({
+			groupId: GROUP_ID,
+			temporalUnit: 'all-time',
+			periods: undefined
+		});
+	});
+});
 
 describe('processStatsCacheRefreshWindowJob', () => {
-	it("logs the event's importJobId and rpcParams and resolves without throwing", async () => {
-		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+	const supabaseClient = { id: 'group-scoped-client' };
 
-		const event = {
-			importJobId: 42,
-			rpcParams: {
-				ringing_group_filter: 7,
-				group_by_time_period: 'year' as const,
-				year_filter: 2024
-			}
-		};
+	beforeEach(() => {
+		vi.clearAllMocks();
+		getAuthenticatedSupabaseClientForGroup.mockResolvedValue(supabaseClient);
+		refreshSimpleStatsCache.mockResolvedValue(undefined);
+		refreshComplexStatsCache.mockResolvedValue(undefined);
+		markStatsCacheRefreshedMock.mockResolvedValue(undefined);
+	});
 
-		await expect(
-			processStatsCacheRefreshWindowJob(event)
-		).resolves.toBeUndefined();
-		expect(consoleLogSpy).toHaveBeenCalledWith(
-			expect.stringContaining('stats-cache-refresh-window'),
-			expect.objectContaining({
-				importJobId: 42,
-				rpcParams: event.rpcParams
+	it("mints a group-scoped client from the event's derived groupId", async () => {
+		await processStatsCacheRefreshWindowJob(
+			statsCacheRefreshEvent({ ringingGroupId: 123 })
+		);
+
+		expect(getAuthenticatedSupabaseClientForGroup).toHaveBeenCalledWith(123);
+	});
+
+	it("calls both refreshSimpleStatsCache and refreshComplexStatsCache for the event's temporal unit, passing the same derived periods to both", async () => {
+		await processStatsCacheRefreshWindowJob(
+			statsCacheRefreshEvent({
+				groupByTimePeriod: 'year',
+				periods: ['2024-01-01']
 			})
 		);
 
-		consoleLogSpy.mockRestore();
+		const expectedParams = {
+			groupId: GROUP_ID,
+			temporalUnit: 'year',
+			periods: ['2024-01-01']
+		};
+		expect(refreshSimpleStatsCache).toHaveBeenCalledWith(
+			supabaseClient,
+			expectedParams
+		);
+		expect(refreshComplexStatsCache).toHaveBeenCalledWith(
+			supabaseClient,
+			expectedParams
+		);
+	});
+
+	it("marks the temporal unit's ImportJobs column succeeded when both refreshes resolve", async () => {
+		await processStatsCacheRefreshWindowJob(
+			dayEvent(['2024-03-15', '2024-03-28'])
+		);
+
+		expect(markStatsCacheRefreshedMock).toHaveBeenCalledWith(
+			IMPORT_JOB_ID,
+			'day',
+			'succeeded'
+		);
+	});
+
+	it("marks the temporal unit's ImportJobs column failed, and logs the error with importJobId/groupId/temporalUnit, when refreshSimpleStatsCache rejects", async () => {
+		const refreshError = new Error('simple refresh blew up');
+		refreshSimpleStatsCache.mockRejectedValue(refreshError);
+
+		await processStatsCacheRefreshWindowJob(
+			statsCacheRefreshEvent({ groupByTimePeriod: 'month-squashed' })
+		);
+
+		expect(markStatsCacheRefreshedMock).toHaveBeenCalledWith(
+			IMPORT_JOB_ID,
+			'month-squashed',
+			'failed'
+		);
+		expect(consoleErrorSpy).toHaveBeenCalledWith(
+			expect.any(String),
+			{
+				importJobId: IMPORT_JOB_ID,
+				groupId: GROUP_ID,
+				temporalUnit: 'month-squashed'
+			},
+			refreshError
+		);
+	});
+
+	it("marks the temporal unit's ImportJobs column failed when refreshComplexStatsCache rejects, even though refreshSimpleStatsCache succeeded", async () => {
+		refreshComplexStatsCache.mockRejectedValue(
+			new Error('complex refresh blew up')
+		);
+
+		await processStatsCacheRefreshWindowJob(allTimeEvent());
+
+		expect(refreshSimpleStatsCache).toHaveBeenCalledOnce();
+		expect(markStatsCacheRefreshedMock).toHaveBeenCalledWith(
+			IMPORT_JOB_ID,
+			'all-time',
+			'failed'
+		);
+	});
+
+	it("does not call markStatsCacheRefreshed for a different temporal unit's column", async () => {
+		await processStatsCacheRefreshWindowJob(
+			statsCacheRefreshEvent({
+				groupByTimePeriod: 'month',
+				periods: ['2024-03-01']
+			})
+		);
+
+		expect(markStatsCacheRefreshedMock).toHaveBeenCalledExactlyOnceWith(
+			IMPORT_JOB_ID,
+			'month',
+			'succeeded'
+		);
+	});
+
+	it('resolves without throwing even when both refreshes reject', async () => {
+		refreshSimpleStatsCache.mockRejectedValue(new Error('simple'));
+		refreshComplexStatsCache.mockRejectedValue(new Error('complex'));
+
+		await expect(
+			processStatsCacheRefreshWindowJob(allTimeEvent())
+		).resolves.toBeUndefined();
+	});
+
+	it('logs and swallows an error from markStatsCacheRefreshed itself, without throwing', async () => {
+		const trackerError = new Error('ImportJobs write failed');
+		markStatsCacheRefreshedMock.mockRejectedValue(trackerError);
+
+		await expect(
+			processStatsCacheRefreshWindowJob(allTimeEvent())
+		).resolves.toBeUndefined();
+		expect(consoleErrorSpy).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.objectContaining({
+				importJobId: IMPORT_JOB_ID,
+				groupId: GROUP_ID,
+				temporalUnit: 'all-time',
+				refreshOutcome: 'succeeded'
+			}),
+			trackerError
+		);
 	});
 });
