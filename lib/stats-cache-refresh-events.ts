@@ -24,9 +24,11 @@
  * `affectedDates` rather than `periods`, for the reason set out on
  * `StatsCacheRefreshEvent` below.
  *
- * The consumer that acts on these events is deliberately a noop for now
- * (`app/api/queues/stats-cache-refresh-window/`); this module only decides
- * *what* to dispatch.
+ * The consumer that acts on these events lives in
+ * `app/api/queues/stats-cache-refresh-window/route.ts` (#1155) — it maps each
+ * event back onto `{groupId, temporalUnit, periods?}` and records the outcome
+ * on that temporal unit's `ImportJobs` column; this module only decides *what*
+ * to dispatch.
  */
 
 /**
