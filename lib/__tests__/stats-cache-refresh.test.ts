@@ -127,12 +127,17 @@ function resultThenable<Result>(result: Result) {
  * name — or a function of the params that call was given, which is what
  * `refreshSimpleStatsCache`'s month/year fan-out (#1176) needs: several calls
  * to the same RPC name, each expecting only its own exact-filtered period's
- * rows back.
+ * rows back. A flat-array response answers both of a refresh function's
+ * passes identically — real `group_by_species: false` RPC calls collapse
+ * every species into one null-keyed row, but this fake doesn't simulate that;
+ * tests asserting on the non-species pass's own shape use a params-aware
+ * function response instead.
  *
- * `.from(table)` serves both PostgREST writes either refresh function makes:
- * the `.upsert()` into the cache's own `*BySpecies` table (#1169) and the
- * `.insert()` of dead-lettered anomalies into `FailedStatsCacheRefreshes`
- * (#1167). `upsertError` lets a test make the cache write fail.
+ * `.from(table)` serves every PostgREST write either refresh function makes:
+ * the `.upsert()` into a cache table (`*BySpecies`, #1169, or the
+ * all-species-combined sibling) and the `.insert()` of dead-lettered
+ * anomalies into `FailedStatsCacheRefreshes` (#1167). `upsertError` lets a
+ * test make the cache write fail.
  */
 type RpcParams = Record<string, unknown>;
 type MockRpcResponse<Row> = Row[] | ((params: RpcParams) => Row[]);
@@ -175,8 +180,13 @@ function makeRpcMockClient(
 
 type MockSupabaseClient = ReturnType<typeof makeRpcMockClient>;
 
-function failedRefreshRows(client: MockSupabaseClient) {
-	return client.insert.mock.calls[0]?.[0];
+/**
+ * The rows one `FailedStatsCacheRefreshes` `.insert()` call was given — the
+ * species-grouped pass's call (`callIndex: 0`) by default, since that pass
+ * always runs first. Pass `callIndex: 1` for the non-species pass's call.
+ */
+function failedRefreshRows(client: MockSupabaseClient, callIndex = 0) {
+	return client.insert.mock.calls[callIndex]?.[0];
 }
 
 function makeSimpleMockSupabaseClient({
@@ -212,31 +222,60 @@ function makeComplexMockSupabaseClient({
 }
 
 /**
- * Every params object one metric RPC was called with, in call order — a list
- * because `refreshSimpleStatsCache`'s month/year narrowing fans out to one
+ * Every params object one metric RPC was called with on the species-grouped
+ * pass (`group_by_species: true`), in call order — a list because
+ * `refreshSimpleStatsCache`'s month/year narrowing fans out to one
  * exact-filtered call per touched period (#1176), rather than the single
  * windowed call every other temporal unit still makes.
+ *
+ * Both exported refresh functions now run two passes per invocation — this
+ * one (species-grouped, writing `*BySpecies`) always first, then the
+ * non-species-grouped one (writing the all-species-combined table) — so every
+ * metric RPC is actually called twice as often as it used to be. Filtering to
+ * `group_by_species: true` here keeps every test written before that split
+ * asserting exactly what it always did: the species-grouped pass's calls.
+ * Pass `groupBySpecies: false` to inspect the second pass's calls instead.
  */
-function metricRpcCallArgsList(client: MockSupabaseClient, rpcName: string) {
+function metricRpcCallArgsList(
+	client: MockSupabaseClient,
+	rpcName: string,
+	{ groupBySpecies = true }: { groupBySpecies?: boolean } = {}
+) {
 	return vi
 		.mocked(client.rpc)
-		.mock.calls.filter((call) => call[0] === rpcName)
+		.mock.calls.filter(
+			(call) =>
+				call[0] === rpcName &&
+				(call[1] as RpcParams).group_by_species === groupBySpecies
+		)
 		.map((call) => call[1]);
 }
 
-/** The params object a metric RPC's first — usually only — call was given. */
-function metricRpcCallArgs(client: MockSupabaseClient, rpcName: string) {
-	return metricRpcCallArgsList(client, rpcName)[0];
+/**
+ * The params object a metric RPC's first — usually only — call was given, on
+ * the species-grouped pass by default. See `metricRpcCallArgsList`.
+ */
+function metricRpcCallArgs(
+	client: MockSupabaseClient,
+	rpcName: string,
+	options?: { groupBySpecies?: boolean }
+) {
+	return metricRpcCallArgsList(client, rpcName, options)[0];
 }
 
-/** The rows the one cache-table `.upsert()` was called with. */
-function upsertedRows(client: MockSupabaseClient) {
-	return client.upsert.mock.calls[0]?.[0] ?? [];
+/**
+ * The rows one cache-table `.upsert()` call was given — the species-grouped
+ * pass's call (`callIndex: 0`, into the `*BySpecies` table) by default, since
+ * that pass always runs first. Pass `callIndex: 1` for the non-species pass's
+ * call (into the all-species-combined table).
+ */
+function upsertedRows(client: MockSupabaseClient, callIndex = 0) {
+	return client.upsert.mock.calls[callIndex]?.[0] ?? [];
 }
 
-/** The `{ onConflict }` options object that `.upsert()` was called with. */
-function upsertOptions(client: MockSupabaseClient) {
-	return client.upsert.mock.calls[0]?.[1];
+/** The `{ onConflict }` options object a `.upsert()` call was given — see `upsertedRows`. */
+function upsertOptions(client: MockSupabaseClient, callIndex = 0) {
+	return client.upsert.mock.calls[callIndex]?.[1];
 }
 
 const GROUP_ID = 99;
@@ -257,6 +296,13 @@ const SIMPLE_METRIC_RPC_NAMES = [
  */
 const BY_SPECIES_CONFLICT_TARGET =
 	'group_id,temporal_unit,time_period,species_id';
+
+/**
+ * The conflict target both all-species-combined tables' sole unique
+ * constraint provides — one column fewer than `BY_SPECIES_CONFLICT_TARGET`,
+ * since neither table has a `species_id` column.
+ */
+const ALL_SPECIES_CONFLICT_TARGET = 'group_id,temporal_unit,time_period';
 
 /** The sentinel `time_period` the cache tables use for the all-time grain,
  * in place of the NULL the metric RPCs emit. */
@@ -544,9 +590,10 @@ describe('refreshSimpleStatsCache', () => {
 					periods: ['2026-01-01', '2026-03-01', '2026-11-01']
 				});
 
-				// 4 metric RPCs x 3 periods fetched, still one single write.
-				expect(client.rpc).toHaveBeenCalledTimes(12);
-				expect(client.upsert).toHaveBeenCalledTimes(1);
+				// 4 metric RPCs x 3 periods fetched x 2 passes (species-grouped +
+				// non-species-grouped), still exactly one write per pass.
+				expect(client.rpc).toHaveBeenCalledTimes(24);
+				expect(client.upsert).toHaveBeenCalledTimes(2);
 			});
 		});
 
@@ -783,9 +830,11 @@ describe('refreshSimpleStatsCache', () => {
 			});
 
 			// The log line is for immediate visibility, the row is the durable
-			// record — the write must not have replaced the log.
-			expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-			expect(client.insert).toHaveBeenCalledTimes(1);
+			// record — the write must not have replaced the log. Both counts are 2
+			// (not 1): the same anomaly recurs on both the species-grouped and
+			// non-species-grouped passes, against this flat-array mock.
+			expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+			expect(client.insert).toHaveBeenCalledTimes(2);
 		});
 
 		it('batches multiple anomalies from one refresh pass into one insert call', async () => {
@@ -797,7 +846,9 @@ describe('refreshSimpleStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			expect(client.insert).toHaveBeenCalledTimes(1);
+			// One insert call per pass (2 total), each batching both anomalies —
+			// never one insert call per anomaly.
+			expect(client.insert).toHaveBeenCalledTimes(2);
 			expect(failedRefreshRows(client)?.map((row) => row.species_id)).toEqual([
 				2, 3
 			]);
@@ -877,7 +928,9 @@ describe('refreshSimpleStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			expect(client.upsert).toHaveBeenCalledTimes(1);
+			// One upsert per pass (species-grouped + non-species-grouped), never
+			// one per metric RPC.
+			expect(client.upsert).toHaveBeenCalledTimes(2);
 		});
 
 		it('propagates a write failure rather than swallowing it', async () => {
@@ -899,6 +952,81 @@ describe('refreshSimpleStatsCache', () => {
 				})
 				// The message catchSupabaseErrors wraps a PostgREST error in.
 			).rejects.toThrow('Failed to fetch data: duplicate key value');
+		});
+	});
+
+	describe('the non-species-grouped pass', () => {
+		it('calls each metric RPC a second time with group_by_species: false', async () => {
+			const client = makeSimpleMockSupabaseClient({
+				basic: [basicRow()],
+				biometrics: [biometricsRow()],
+				birdAge: [birdAgeRow()],
+				encounterAge: [encounterAgeRow()]
+			});
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'month',
+				periods: ['2026-03-01']
+			});
+
+			const expectedParams = {
+				ringing_group_filter: GROUP_ID,
+				group_by_species: false,
+				group_by_time_period: 'month',
+				year_filter: 2026,
+				month_filter: 3
+			};
+			for (const rpcName of SIMPLE_METRIC_RPC_NAMES) {
+				expect(
+					metricRpcCallArgs(client, rpcName, { groupBySpecies: false })
+				).toEqual(expectedParams);
+			}
+		});
+
+		it("upserts into SimpleStatsCache, naming that table's unique constraint as the conflict target, with no species_id key on the rows", async () => {
+			const client = makeSimpleMockSupabaseClient({
+				basic: [basicRow()],
+				biometrics: [biometricsRow()],
+				birdAge: [birdAgeRow()],
+				encounterAge: [encounterAgeRow()]
+			});
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'month',
+				periods: ['2026-03-01']
+			});
+
+			expect(client.from).toHaveBeenCalledWith('SimpleStatsCache');
+			expect(upsertOptions(client, 1)).toEqual({
+				onConflict: ALL_SPECIES_CONFLICT_TARGET
+			});
+			for (const row of upsertedRows(client, 1)) {
+				expect(row).not.toHaveProperty('species_id');
+			}
+		});
+
+		it("dead-letters an anomaly from this pass under the same 'SimpleStatsCache' tag as the species-grouped pass", async () => {
+			const client = makeSimpleMockSupabaseClient({
+				basic: [basicRow({ species_id: 1 }), basicRow({ species_id: 2 })],
+				biometrics: [biometricsRow({ species_id: 1 })],
+				birdAge: [birdAgeRow({ species_id: 1 }), birdAgeRow({ species_id: 2 })],
+				encounterAge: [
+					encounterAgeRow({ species_id: 1 }),
+					encounterAgeRow({ species_id: 2 })
+				]
+			});
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01']
+			});
+
+			expect(failedRefreshRows(client, 1)).toEqual([
+				expect.objectContaining({ cache_table: 'SimpleStatsCache' })
+			]);
 		});
 	});
 });
@@ -1164,7 +1292,9 @@ describe('refreshComplexStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			expect(client.insert).toHaveBeenCalledTimes(1);
+			// One insert call per pass (2 total), each batching both anomalies —
+			// never one insert call per anomaly.
+			expect(client.insert).toHaveBeenCalledTimes(2);
 			expect(failedRefreshRows(client)?.map((row) => row.species_id)).toEqual([
 				2, 3
 			]);
@@ -1216,7 +1346,79 @@ describe('refreshComplexStatsCache', () => {
 				temporalUnit: 'month'
 			});
 
-			expect(client.upsert).toHaveBeenCalledTimes(1);
+			// One upsert per pass (species-grouped + non-species-grouped), never
+			// one per metric RPC.
+			expect(client.upsert).toHaveBeenCalledTimes(2);
+		});
+	});
+
+	describe('the non-species-grouped pass', () => {
+		it('calls both metric RPCs a second time with group_by_species: false', async () => {
+			const client = makeComplexMockSupabaseClient({
+				newAdult: [newAdultRow()],
+				returningAge: [returningAgeRow()]
+			});
+
+			await refreshComplexStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'month'
+			});
+
+			const expectedParams = {
+				ringing_group_filter: GROUP_ID,
+				group_by_species: false,
+				group_by_time_period: 'month'
+			};
+			expect(
+				metricRpcCallArgs(client, 'stats_cache_new_adult_metrics', {
+					groupBySpecies: false
+				})
+			).toEqual(expectedParams);
+			expect(
+				metricRpcCallArgs(client, 'stats_cache_returning_age_metrics', {
+					groupBySpecies: false
+				})
+			).toEqual(expectedParams);
+		});
+
+		it("upserts into ComplexStatsCache, naming that table's unique constraint as the conflict target, with no species_id key on the rows", async () => {
+			const client = makeComplexMockSupabaseClient({
+				newAdult: [newAdultRow()],
+				returningAge: [returningAgeRow()]
+			});
+
+			await refreshComplexStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'month'
+			});
+
+			expect(client.from).toHaveBeenCalledWith('ComplexStatsCache');
+			expect(upsertOptions(client, 1)).toEqual({
+				onConflict: ALL_SPECIES_CONFLICT_TARGET
+			});
+			for (const row of upsertedRows(client, 1)) {
+				expect(row).not.toHaveProperty('species_id');
+			}
+		});
+
+		it("dead-letters an anomaly from this pass under the same 'ComplexStatsCache' tag as the species-grouped pass", async () => {
+			const client = makeRpcMockClient({
+				stats_cache_new_adult_metrics: [
+					newAdultRow({ species_id: 1 }),
+					newAdultRow({ species_id: 2 })
+				],
+				stats_cache_returning_age_metrics: [returningAgeRow({ species_id: 1 })]
+			});
+
+			await refreshComplexStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01']
+			});
+
+			expect(failedRefreshRows(client, 1)).toEqual([
+				expect.objectContaining({ cache_table: 'ComplexStatsCache' })
+			]);
 		});
 	});
 });
