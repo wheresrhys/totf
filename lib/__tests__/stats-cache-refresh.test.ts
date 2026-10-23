@@ -123,21 +123,35 @@ function resultThenable<Result>(result: Result) {
  * `responsesByRpcName`, and records every call for assertions. Shared by both
  * refresh functions' suites — they differ only in which RPC names they stub.
  *
+ * A response may be a flat array — the same rows for every call of that RPC
+ * name — or a function of the params that call was given, which is what
+ * `refreshSimpleStatsCache`'s month/year fan-out (#1176) needs: several calls
+ * to the same RPC name, each expecting only its own exact-filtered period's
+ * rows back.
+ *
  * `.from(table)` serves both PostgREST writes either refresh function makes:
  * the `.upsert()` into the cache's own `*BySpecies` table (#1169) and the
  * `.insert()` of dead-lettered anomalies into `FailedStatsCacheRefreshes`
  * (#1167). `upsertError` lets a test make the cache write fail.
  */
+type RpcParams = Record<string, unknown>;
+type MockRpcResponse<Row> = Row[] | ((params: RpcParams) => Row[]);
+
 function makeRpcMockClient(
-	responsesByRpcName: Record<string, unknown[]>,
+	responsesByRpcName: Record<string, MockRpcResponse<unknown>>,
 	{ upsertError }: { upsertError?: { message: string } } = {}
 ) {
-	const rpc = vi.fn((name: string) => ({
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({
-				data: responsesByRpcName[name] ?? null,
+	const rpc = vi.fn((name: string, params: RpcParams) => ({
+		then: (resolve: (v: { data: unknown; error: null }) => unknown) => {
+			const response = responsesByRpcName[name];
+			return Promise.resolve({
+				data:
+					typeof response === 'function'
+						? response(params)
+						: (response ?? null),
 				error: null
-			}).then(resolve)
+			}).then(resolve);
+		}
 	}));
 
 	// Signatures declared via vi.fn's type parameter rather than as named
@@ -171,10 +185,10 @@ function makeSimpleMockSupabaseClient({
 	birdAge = [],
 	encounterAge = []
 }: {
-	basic?: BasicRow[];
-	biometrics?: BiometricsRow[];
-	birdAge?: BirdAgeRow[];
-	encounterAge?: EncounterAgeRow[];
+	basic?: MockRpcResponse<BasicRow>;
+	biometrics?: MockRpcResponse<BiometricsRow>;
+	birdAge?: MockRpcResponse<BirdAgeRow>;
+	encounterAge?: MockRpcResponse<EncounterAgeRow>;
 }) {
 	return makeRpcMockClient({
 		stats_cache_basic_session_metrics: basic,
@@ -197,11 +211,22 @@ function makeComplexMockSupabaseClient({
 	});
 }
 
-function metricRpcCallArgs(client: MockSupabaseClient, rpcName: string) {
-	const call = vi
+/**
+ * Every params object one metric RPC was called with, in call order — a list
+ * because `refreshSimpleStatsCache`'s month/year narrowing fans out to one
+ * exact-filtered call per touched period (#1176), rather than the single
+ * windowed call every other temporal unit still makes.
+ */
+function metricRpcCallArgsList(client: MockSupabaseClient, rpcName: string) {
+	return vi
 		.mocked(client.rpc)
-		.mock.calls.find(([name]) => name === rpcName);
-	return call?.[1];
+		.mock.calls.filter((call) => call[0] === rpcName)
+		.map((call) => call[1]);
+}
+
+/** The params object a metric RPC's first — usually only — call was given. */
+function metricRpcCallArgs(client: MockSupabaseClient, rpcName: string) {
+	return metricRpcCallArgsList(client, rpcName)[0];
 }
 
 /** The rows the one cache-table `.upsert()` was called with. */
@@ -215,6 +240,14 @@ function upsertOptions(client: MockSupabaseClient) {
 }
 
 const GROUP_ID = 99;
+
+/** The four metric RPCs one `refreshSimpleStatsCache` pass calls. */
+const SIMPLE_METRIC_RPC_NAMES = [
+	'stats_cache_basic_session_metrics',
+	'stats_cache_biometrics_metrics',
+	'stats_cache_bird_age_metrics',
+	'stats_cache_encounter_age_metrics'
+] as const;
 
 /**
  * The conflict target both `*BySpecies` tables' sole unique constraint
@@ -271,70 +304,6 @@ describe('refreshSimpleStatsCache', () => {
 				).toEqual(expectedParams);
 			});
 
-			it('extends to_date to the last day of the month max(periods) names, for the month temporal unit', async () => {
-				const client = makeSimpleMockSupabaseClient({});
-
-				await refreshSimpleStatsCache(client as never, {
-					groupId: GROUP_ID,
-					temporalUnit: 'month',
-					periods: ['2026-02-01', '2026-03-01']
-				});
-
-				expect(
-					metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
-				).toMatchObject({ from_date: '2026-02-01', to_date: '2026-03-31' });
-			});
-
-			it('extends to_date to 31 December of the year max(periods) names, for the year temporal unit', async () => {
-				const client = makeSimpleMockSupabaseClient({});
-
-				await refreshSimpleStatsCache(client as never, {
-					groupId: GROUP_ID,
-					temporalUnit: 'year',
-					periods: ['2025-01-01', '2026-01-01']
-				});
-
-				expect(
-					metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
-				).toMatchObject({ from_date: '2025-01-01', to_date: '2026-12-31' });
-			});
-
-			it('handles a month-end boundary — a 30-day month, a 31-day month and a leap February', async () => {
-				const monthToExpectedLastDay = [
-					['2026-04-01', '2026-04-30'], // 30-day month
-					['2026-05-01', '2026-05-31'], // 31-day month
-					['2024-02-01', '2024-02-29'] // leap February
-				] as const;
-
-				for (const [period, expectedToDate] of monthToExpectedLastDay) {
-					const client = makeSimpleMockSupabaseClient({});
-
-					await refreshSimpleStatsCache(client as never, {
-						groupId: GROUP_ID,
-						temporalUnit: 'month',
-						periods: [period]
-					});
-
-					expect(
-						metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
-					).toMatchObject({ to_date: expectedToDate });
-				}
-			});
-
-			it('still spans min(periods) as from_date, since a period string is its own first day', async () => {
-				const client = makeSimpleMockSupabaseClient({});
-
-				await refreshSimpleStatsCache(client as never, {
-					groupId: GROUP_ID,
-					temporalUnit: 'year',
-					periods: ['2026-01-01', '2024-01-01', '2025-01-01']
-				});
-
-				expect(
-					metricRpcCallArgs(client, 'stats_cache_basic_session_metrics')
-				).toMatchObject({ from_date: '2024-01-01' });
-			});
-
 			it("leaves a non-narrowing temporal unit's unwindowed params untouched (month-squashed, all-time)", async () => {
 				const client = makeSimpleMockSupabaseClient({});
 
@@ -367,6 +336,152 @@ describe('refreshSimpleStatsCache', () => {
 				) as Record<string, unknown>;
 				expect(params).not.toHaveProperty('from_date');
 				expect(params).not.toHaveProperty('to_date');
+				// Nor does it pick up refreshSimpleStatsCache's exact-filter
+				// narrowing (#1176) — month full-replaces for this cache.
+				expect(params).not.toHaveProperty('year_filter');
+				expect(params).not.toHaveProperty('month_filter');
+				expect(
+					metricRpcCallArgsList(client, 'stats_cache_new_adult_metrics')
+				).toHaveLength(1);
+			});
+		});
+
+		describe('the exact-filter fan-out for month/year narrowing', () => {
+			/**
+			 * The inverse of the module's own `exactPeriodFilters`: the
+			 * `YYYY-MM-01`/`YYYY-01-01` period string the
+			 * `year_filter`/`month_filter` pair of one fanned-out call selects.
+			 */
+			function periodSelectedBy(params: RpcParams): string {
+				const year = String(params.year_filter);
+				return params.month_filter === undefined
+					? `${year}-01-01`
+					: `${year}-${String(params.month_filter).padStart(2, '0')}-01`;
+			}
+
+			/**
+			 * Answers each exact-filtered call with a single row for exactly the
+			 * period that call asked for — what the real RPC does, and the thing
+			 * a windowed call could not do.
+			 */
+			function rowForCalledPeriod<Row>(
+				makeRow: (overrides: { time_period: string }) => Row
+			) {
+				return (params: RpcParams) => [
+					makeRow({ time_period: periodSelectedBy(params) })
+				];
+			}
+
+			function expectedParamsFor(
+				temporalUnit: 'month' | 'year',
+				exactFilters: { year_filter: number; month_filter?: number }
+			) {
+				return {
+					ringing_group_filter: GROUP_ID,
+					group_by_species: true,
+					group_by_time_period: temporalUnit,
+					...exactFilters
+				};
+			}
+
+			it('calls each metric RPC once per distinct period, with year_filter set and no from_date/to_date, for the year temporal unit', async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'year',
+					periods: ['2025-01-01', '2026-01-01']
+				});
+
+				// An exhaustive `toEqual` per call, so the absence of from_date/
+				// to_date (and of a month_filter, which a year period has no use
+				// for) is asserted rather than merely not contradicted.
+				for (const rpcName of SIMPLE_METRIC_RPC_NAMES) {
+					expect(metricRpcCallArgsList(client, rpcName)).toEqual([
+						expectedParamsFor('year', { year_filter: 2025 }),
+						expectedParamsFor('year', { year_filter: 2026 })
+					]);
+				}
+			});
+
+			it('calls each metric RPC once per distinct period, with year_filter and month_filter set and no from_date/to_date, for the month temporal unit', async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-02-01', '2026-03-01']
+				});
+
+				for (const rpcName of SIMPLE_METRIC_RPC_NAMES) {
+					expect(metricRpcCallArgsList(client, rpcName)).toEqual([
+						expectedParamsFor('month', { year_filter: 2026, month_filter: 2 }),
+						expectedParamsFor('month', { year_filter: 2026, month_filter: 3 })
+					]);
+				}
+			});
+
+			it('fans out to exactly 2 calls per metric when periods holds 2 non-contiguous months, e.g. January and March', async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-01-01', '2026-03-01']
+				});
+
+				// The case the old window + filterToTouchedPeriods pairing existed
+				// to handle: the gap month is now never asked for in the first
+				// place, rather than fetched and then discarded.
+				for (const rpcName of SIMPLE_METRIC_RPC_NAMES) {
+					expect(
+						metricRpcCallArgsList(client, rpcName).map((params) =>
+							periodSelectedBy(params as RpcParams)
+						)
+					).toEqual(['2026-01-01', '2026-03-01']);
+				}
+			});
+
+			it("does not require a post-hoc filter — merges results from every period's fan-out with no gap rows to drop", async () => {
+				const client = makeSimpleMockSupabaseClient({
+					basic: rowForCalledPeriod(basicRow),
+					biometrics: rowForCalledPeriod(biometricsRow),
+					birdAge: rowForCalledPeriod(birdAgeRow),
+					encounterAge: rowForCalledPeriod(encounterAgeRow)
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-01-01', '2026-03-01', '2026-11-01']
+				});
+
+				// Every fanned-out period's row survives to the write — the filter
+				// that used to drop untouched gap periods has nothing to drop.
+				expect(
+					upsertedRows(client)
+						.map((row) => row.time_period)
+						.sort()
+				).toEqual(['2026-01-01', '2026-03-01', '2026-11-01']);
+			});
+
+			it('still performs exactly one upsert per invocation, regardless of how many periods were fanned out over', async () => {
+				const client = makeSimpleMockSupabaseClient({
+					basic: rowForCalledPeriod(basicRow),
+					biometrics: rowForCalledPeriod(biometricsRow),
+					birdAge: rowForCalledPeriod(birdAgeRow),
+					encounterAge: rowForCalledPeriod(encounterAgeRow)
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-01-01', '2026-03-01', '2026-11-01']
+				});
+
+				// 4 metric RPCs x 3 periods fetched, still one single write.
+				expect(client.rpc).toHaveBeenCalledTimes(12);
+				expect(client.upsert).toHaveBeenCalledTimes(1);
 			});
 		});
 

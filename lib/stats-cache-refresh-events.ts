@@ -47,18 +47,20 @@
  * should write, in the literal string shape the metric RPCs return it in — a
  * first-of-month (`YYYY-MM-01`) or first-of-year (`YYYY-01-01`) ISO date, since
  * `stats_spine.sql`'s period_spine CTE computes those cells as
- * `date_trunc('month'|'year', d)::date`. `refreshSimpleStatsCache`/
- * `refreshComplexStatsCache` derive their own `from_date`/`to_date` window as
- * `min(periods)` through the end of the period `max(periods)` names (not
- * `max(periods)` verbatim — a period string is only that period's *first*
- * day, so a literal min/max window would collapse to a single day for
- * `month`/`year`; see `buildMetricRpcParams` in `lib/stats-cache-refresh.ts`)
- * and then filter the merged rows back down to `periods` by literal string
- * membership against `time_period`, so the strings have to match that shape
- * exactly. It replaced the per-single-value
- * `year_filter`/`month_filter` pair, which no call site needs any more now that
- * every temporal unit either carries an array, carries its own date window
- * (`day`), or full-replaces (`month-squashed`/`all-time`).
+ * `date_trunc('month'|'year', d)::date`. `refreshSimpleStatsCache` splits
+ * `periods` back into one exact-match `year_filter`/`month_filter` metric-RPC
+ * call per distinct period (#1176 — a period string parses straight into those
+ * two numbers, so the call selects precisely that month/year with no date
+ * window involved at all; see `buildSimpleMetricRpcParamsList` in
+ * `lib/stats-cache-refresh.ts`), and `day` — the one unit that narrows by a
+ * `from_date`/`to_date` window instead — filters its merged rows back down to
+ * `periods` by literal string membership against `time_period`. Either way the
+ * strings have to match that shape exactly.
+ *
+ * It replaced a per-event, single-value `year_filter`/`month_filter` pair on
+ * this type, which no event needs any more now that every temporal unit either
+ * carries an array, carries its own date window (`day`), or full-replaces
+ * (`month-squashed`/`all-time`).
  */
 export type StatsCacheRefreshRpcParams = {
 	ringing_group_filter: number;
@@ -155,8 +157,20 @@ export function buildStatsCacheRefreshEvents(
 
 		// Month-squashed: the temporal-unit marker alone. A squashed-month cell
 		// spans every year's copy of its month, so both refresh functions
-		// full-replace this temporal unit and ignore `periods` — there is
-		// nothing meaningful to narrow by.
+		// full-replace this temporal unit and ignore `periods`.
+		//
+		// Note this is a *mechanical* blocker, not a conceptual one (reviewed on
+		// PR #1177). `month_filter` alone, with `year_filter` left NULL, is
+		// exactly the squashed-month grouping and was verified to compute the
+		// bucket correctly across every year — so narrowing by touched calendar
+		// month is sound in principle. What stops it is `stats_spine`'s
+		// month-squashed branch: an unconditional `generate_series(1, 12)` that
+		// ignores `month_filter`, so a narrowed call still returns all 12
+		// calendar cells, 11 of them spurious zeroes. Those collide across
+		// `refreshSimpleStatsCache`'s per-period fan-out (every call emits the
+		// same 12 cell keys), and `indexByCell`'s last-write-wins would let one
+		// month's zero overwrite another's real value. Narrowing here therefore
+		// needs a `stats_spine` change first — see that function's SQL.
 		stamp({ group_by_time_period: 'month-squashed' }),
 
 		// Year: every distinct year touched, as first-of-year ISO dates.
