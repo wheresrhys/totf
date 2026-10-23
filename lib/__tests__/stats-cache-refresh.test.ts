@@ -110,12 +110,28 @@ function returningAgeRow(
 	};
 }
 
+/** A PostgREST-ish thenable: what `.upsert()`/`.insert()` return. */
+function resultThenable<Result>(result: Result) {
+	return {
+		then: (resolve: (value: Result) => unknown) =>
+			Promise.resolve(result).then(resolve)
+	};
+}
+
 /**
  * A minimal fake Supabase client whose `.rpc()` resolves per-RPC-name from
  * `responsesByRpcName`, and records every call for assertions. Shared by both
  * refresh functions' suites — they differ only in which RPC names they stub.
+ *
+ * `.from(table)` serves both PostgREST writes either refresh function makes:
+ * the `.upsert()` into the cache's own `*BySpecies` table (#1169) and the
+ * `.insert()` of dead-lettered anomalies into `FailedStatsCacheRefreshes`
+ * (#1167). `upsertError` lets a test make the cache write fail.
  */
-function makeRpcMockClient(responsesByRpcName: Record<string, unknown[]>) {
+function makeRpcMockClient(
+	responsesByRpcName: Record<string, unknown[]>,
+	{ upsertError }: { upsertError?: { message: string } } = {}
+) {
 	const rpc = vi.fn((name: string) => ({
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
 			Promise.resolve({
@@ -124,23 +140,23 @@ function makeRpcMockClient(responsesByRpcName: Record<string, unknown[]>) {
 			}).then(resolve)
 	}));
 
-	// The only table either refresh function touches through PostgREST directly
-	// rather than through an RPC is "FailedStatsCacheRefreshes" (#1167).
-	const insertResult = {
-		then: (resolve: (v: { data: null; error: null }) => unknown) =>
-			Promise.resolve({ data: null, error: null }).then(resolve)
-	};
 	// Signatures declared via vi.fn's type parameter rather than as named
 	// implementation params, so the recorded calls stay typed for assertions
 	// without either fake needing to read its own arguments.
 	const insert = vi.fn<
-		(rows: Array<Record<string, unknown>>) => typeof insertResult
-	>(() => insertResult);
-	const from = vi.fn<(table: string) => { insert: typeof insert }>(() => ({
-		insert
-	}));
+		(rows: Array<Record<string, unknown>>) => ReturnType<typeof resultThenable>
+	>(() => resultThenable({ data: null, error: null }));
+	const upsert = vi.fn<
+		(
+			rows: Array<Record<string, unknown>>,
+			options: { onConflict: string }
+		) => ReturnType<typeof resultThenable>
+	>(() => resultThenable({ data: null, error: upsertError ?? null }));
+	const from = vi.fn<
+		(table: string) => { insert: typeof insert; upsert: typeof upsert }
+	>(() => ({ insert, upsert }));
 
-	return { rpc, from, insert };
+	return { rpc, from, insert, upsert };
 }
 
 type MockSupabaseClient = ReturnType<typeof makeRpcMockClient>;
@@ -188,29 +204,30 @@ function metricRpcCallArgs(client: MockSupabaseClient, rpcName: string) {
 	return call?.[1];
 }
 
-type UpsertRpcArgs = {
-	p_group_id: number;
-	p_temporal_unit: string;
-	p_group_by_species: boolean;
-	p_rows: unknown[];
-};
-
-function upsertRpcCalls(client: MockSupabaseClient, upsertRpcName: string) {
-	return vi
-		.mocked(client.rpc)
-		.mock.calls.filter(([name]) => name === upsertRpcName);
+/** The rows the one cache-table `.upsert()` was called with. */
+function upsertedRows(client: MockSupabaseClient) {
+	return client.upsert.mock.calls[0]?.[0] ?? [];
 }
 
-function upsertCallArgs(client: MockSupabaseClient, upsertRpcName: string) {
-	return upsertRpcCalls(client, upsertRpcName)[0]?.[1] as
-		| UpsertRpcArgs
-		| undefined;
+/** The `{ onConflict }` options object that `.upsert()` was called with. */
+function upsertOptions(client: MockSupabaseClient) {
+	return client.upsert.mock.calls[0]?.[1];
 }
-
-const SIMPLE_UPSERT_RPC = 'upsert_simple_stats_cache_rows';
-const COMPLEX_UPSERT_RPC = 'upsert_complex_stats_cache_rows';
 
 const GROUP_ID = 99;
+
+/**
+ * The conflict target both `*BySpecies` tables' sole unique constraint
+ * provides. Spelled out here rather than imported from the module under test,
+ * so a change to either the constraint or the constant has to be made
+ * deliberately in two places.
+ */
+const BY_SPECIES_CONFLICT_TARGET =
+	'group_id,temporal_unit,time_period,species_id';
+
+/** The sentinel `time_period` the cache tables use for the all-time grain,
+ * in place of the NULL the metric RPCs emit. */
+const ALL_TIME_SENTINEL_DATE = '0001-01-01';
 
 describe('refreshSimpleStatsCache', () => {
 	beforeEach(() => {
@@ -286,13 +303,11 @@ describe('refreshSimpleStatsCache', () => {
 				periods: touchedPeriods
 			});
 
-			const written = upsertCallArgs(client, SIMPLE_UPSERT_RPC)
-				?.p_rows as Array<{
-				time_period: string;
-			}>;
-			expect(written.map((row) => row.time_period).sort()).toEqual(
-				touchedPeriods
-			);
+			expect(
+				upsertedRows(client)
+					.map((row) => row.time_period)
+					.sort()
+			).toEqual(touchedPeriods);
 		});
 	});
 
@@ -329,7 +344,7 @@ describe('refreshSimpleStatsCache', () => {
 			).toEqual(expectedParams);
 		});
 
-		it("writes the all-time temporal unit's null time_period through as a real NULL", async () => {
+		it("writes the all-time temporal unit's null time_period as the sentinel date", async () => {
 			const client = makeSimpleMockSupabaseClient({
 				basic: [basicRow({ time_period: null })],
 				biometrics: [biometricsRow({ time_period: null })],
@@ -342,12 +357,11 @@ describe('refreshSimpleStatsCache', () => {
 				temporalUnit: 'all-time'
 			});
 
-			const written = upsertCallArgs(client, SIMPLE_UPSERT_RPC)
-				?.p_rows as Array<{
-				time_period: string | null;
-			}>;
-			expect(written).toHaveLength(1);
-			expect(written[0].time_period).toBeNull();
+			// The whole point of #1169's split: the cache column is NOT NULL, so
+			// the metric RPCs' real NULL becomes the sentinel at the write.
+			expect(upsertedRows(client)).toEqual([
+				expect.objectContaining({ time_period: ALL_TIME_SENTINEL_DATE })
+			]);
 		});
 	});
 
@@ -366,8 +380,7 @@ describe('refreshSimpleStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			const written = upsertCallArgs(client, SIMPLE_UPSERT_RPC)
-				?.p_rows as Array<Record<string, unknown>>;
+			const written = upsertedRows(client);
 			expect(written).toHaveLength(1);
 			expect(written[0]).toMatchObject({
 				species_id: 1,
@@ -404,10 +417,7 @@ describe('refreshSimpleStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			const written = upsertCallArgs(client, SIMPLE_UPSERT_RPC)
-				?.p_rows as Array<{
-				species_id: number;
-			}>;
+			const written = upsertedRows(client);
 			// The complete cell (species 1) is still written...
 			expect(written).toHaveLength(1);
 			expect(written[0].species_id).toBe(1);
@@ -525,19 +535,23 @@ describe('refreshSimpleStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			expect(client.from).not.toHaveBeenCalled();
+			expect(client.from).not.toHaveBeenCalledWith('FailedStatsCacheRefreshes');
 			expect(client.insert).not.toHaveBeenCalled();
 		});
 	});
 
-	describe('writing', () => {
-		it('passes the temporal unit and group_by_species to upsert_simple_stats_cache_rows as scalar parameters, with only cell columns in p_rows', async () => {
-			const client = makeSimpleMockSupabaseClient({
+	describe('writing to the cache', () => {
+		function completeCellClient() {
+			return makeSimpleMockSupabaseClient({
 				basic: [basicRow()],
 				biometrics: [biometricsRow()],
 				birdAge: [birdAgeRow()],
 				encounterAge: [encounterAgeRow()]
 			});
+		}
+
+		it("upserts into SimpleStatsCacheBySpecies, naming that table's unique constraint as the conflict target", async () => {
+			const client = completeCellClient();
 
 			await refreshSimpleStatsCache(client as never, {
 				groupId: GROUP_ID,
@@ -545,22 +559,14 @@ describe('refreshSimpleStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			const args = upsertCallArgs(client, SIMPLE_UPSERT_RPC);
-			expect(args?.p_group_id).toBe(GROUP_ID);
-			expect(args?.p_temporal_unit).toBe('month');
-			expect(args?.p_group_by_species).toBe(true);
-			const row = args?.p_rows[0] as Record<string, unknown>;
-			expect(row).not.toHaveProperty('group_id');
-			expect(row).not.toHaveProperty('temporal_unit');
+			expect(client.from).toHaveBeenCalledWith('SimpleStatsCacheBySpecies');
+			expect(upsertOptions(client)).toEqual({
+				onConflict: BY_SPECIES_CONFLICT_TARGET
+			});
 		});
 
-		it('performs exactly one upsert RPC call per temporal unit invocation, not one per metric RPC', async () => {
-			const client = makeSimpleMockSupabaseClient({
-				basic: [basicRow()],
-				biometrics: [biometricsRow()],
-				birdAge: [birdAgeRow()],
-				encounterAge: [encounterAgeRow()]
-			});
+		it("stamps each row with the pass's own group_id and temporal_unit, which the merged cells omit", async () => {
+			const client = completeCellClient();
 
 			await refreshSimpleStatsCache(client as never, {
 				groupId: GROUP_ID,
@@ -568,7 +574,49 @@ describe('refreshSimpleStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			expect(upsertRpcCalls(client, SIMPLE_UPSERT_RPC)).toHaveLength(1);
+			expect(upsertedRows(client)).toEqual([
+				expect.objectContaining({
+					group_id: GROUP_ID,
+					temporal_unit: 'month',
+					species_id: 1,
+					// A dated grain's own period is written through untouched — only
+					// the all-time grain's NULL becomes the sentinel.
+					time_period: '2026-03-01'
+				})
+			]);
+		});
+
+		it('performs exactly one upsert per temporal unit invocation, not one per metric RPC', async () => {
+			const client = completeCellClient();
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'month',
+				periods: ['2026-03-01']
+			});
+
+			expect(client.upsert).toHaveBeenCalledTimes(1);
+		});
+
+		it('propagates a write failure rather than swallowing it', async () => {
+			const client = makeRpcMockClient(
+				{
+					stats_cache_basic_session_metrics: [basicRow()],
+					stats_cache_biometrics_metrics: [biometricsRow()],
+					stats_cache_bird_age_metrics: [birdAgeRow()],
+					stats_cache_encounter_age_metrics: [encounterAgeRow()]
+				},
+				{ upsertError: { message: 'duplicate key value' } }
+			);
+
+			await expect(
+				refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-03-01']
+				})
+				// The message catchSupabaseErrors wraps a PostgREST error in.
+			).rejects.toThrow('Failed to fetch data: duplicate key value');
 		});
 	});
 });
@@ -636,11 +684,11 @@ describe('refreshComplexStatsCache', () => {
 				periods: touchedPeriods
 			});
 
-			const written = upsertCallArgs(client, COMPLEX_UPSERT_RPC)
-				?.p_rows as Array<{ time_period: string }>;
-			expect(written.map((row) => row.time_period).sort()).toEqual(
-				touchedPeriods
-			);
+			expect(
+				upsertedRows(client)
+					.map((row) => row.time_period)
+					.sort()
+			).toEqual(touchedPeriods);
 		});
 	});
 
@@ -677,7 +725,7 @@ describe('refreshComplexStatsCache', () => {
 			}
 		);
 
-		it("writes the all-time temporal unit's null time_period through as a real NULL", async () => {
+		it("writes the all-time temporal unit's null time_period as the sentinel date", async () => {
 			const client = makeComplexMockSupabaseClient({
 				newAdult: [newAdultRow({ time_period: null })],
 				returningAge: [returningAgeRow({ time_period: null })]
@@ -688,10 +736,9 @@ describe('refreshComplexStatsCache', () => {
 				temporalUnit: 'all-time'
 			});
 
-			const written = upsertCallArgs(client, COMPLEX_UPSERT_RPC)
-				?.p_rows as Array<{ time_period: string | null }>;
-			expect(written).toHaveLength(1);
-			expect(written[0].time_period).toBeNull();
+			expect(upsertedRows(client)).toEqual([
+				expect.objectContaining({ time_period: ALL_TIME_SENTINEL_DATE })
+			]);
 		});
 	});
 
@@ -715,10 +762,11 @@ describe('refreshComplexStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			const written = upsertCallArgs(client, COMPLEX_UPSERT_RPC)
-				?.p_rows as Array<Record<string, unknown>>;
+			const written = upsertedRows(client);
 			expect(written).toHaveLength(1);
 			expect(written[0]).toEqual({
+				group_id: GROUP_ID,
+				temporal_unit: 'day',
 				species_id: 1,
 				time_period: '2026-03-01',
 				new_adult_bird_count: 7,
@@ -751,8 +799,7 @@ describe('refreshComplexStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			const written = upsertCallArgs(client, COMPLEX_UPSERT_RPC)
-				?.p_rows as Array<{ species_id: number }>;
+			const written = upsertedRows(client);
 			// The complete cell (species 1) is still written...
 			expect(written).toHaveLength(1);
 			expect(written[0].species_id).toBe(1);
@@ -853,13 +900,13 @@ describe('refreshComplexStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
-			expect(client.from).not.toHaveBeenCalled();
+			expect(client.from).not.toHaveBeenCalledWith('FailedStatsCacheRefreshes');
 			expect(client.insert).not.toHaveBeenCalled();
 		});
 	});
 
-	describe('writing', () => {
-		it('passes the temporal unit and group_by_species to upsert_complex_stats_cache_rows as scalar parameters, with only cell columns in p_rows', async () => {
+	describe('writing to the cache', () => {
+		it("upserts into ComplexStatsCacheBySpecies, naming that table's unique constraint as the conflict target", async () => {
 			const client = makeComplexMockSupabaseClient({
 				newAdult: [newAdultRow()],
 				returningAge: [returningAgeRow()]
@@ -870,16 +917,13 @@ describe('refreshComplexStatsCache', () => {
 				temporalUnit: 'month'
 			});
 
-			const args = upsertCallArgs(client, COMPLEX_UPSERT_RPC);
-			expect(args?.p_group_id).toBe(GROUP_ID);
-			expect(args?.p_temporal_unit).toBe('month');
-			expect(args?.p_group_by_species).toBe(true);
-			const row = args?.p_rows[0] as Record<string, unknown>;
-			expect(row).not.toHaveProperty('group_id');
-			expect(row).not.toHaveProperty('temporal_unit');
+			expect(client.from).toHaveBeenCalledWith('ComplexStatsCacheBySpecies');
+			expect(upsertOptions(client)).toEqual({
+				onConflict: BY_SPECIES_CONFLICT_TARGET
+			});
 		});
 
-		it('performs exactly one upsert RPC call per temporal unit invocation, not one per metric RPC', async () => {
+		it('performs exactly one upsert per temporal unit invocation, not one per metric RPC', async () => {
 			const client = makeComplexMockSupabaseClient({
 				newAdult: [newAdultRow()],
 				returningAge: [returningAgeRow()]
@@ -890,7 +934,7 @@ describe('refreshComplexStatsCache', () => {
 				temporalUnit: 'month'
 			});
 
-			expect(upsertRpcCalls(client, COMPLEX_UPSERT_RPC)).toHaveLength(1);
+			expect(client.upsert).toHaveBeenCalledTimes(1);
 		});
 	});
 });
