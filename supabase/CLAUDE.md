@@ -704,6 +704,31 @@ import can't create its own locations any more, so `seed-e2e-data.ts` pre-create
 stay reproducible across reseeds — see #903 above), and `e2e/authenticated/import.spec.ts` re-creates
 `Delta Site` after wiping Delta's rows.
 
+### Regenerating a group's data from staged DemonRecords (#1185)
+
+`supabase/scripts/regenerate-import.ts` re-runs the whole pipeline above for an existing group
+without requiring the original CSV: it pages through that group's already-staged `DemonRecords`
+rows (keyset-paginated on `id`, `DEMON_RECORDS_PAGE_SIZE` = 1000 per page) and feeds their
+`raw_row`s through the exact same writers, location pre-flight, `ImportJobs` tracking and
+stats-cache-refresh dispatch as a CSV import. This is for when the write path itself has changed
+(a newly-modelled column, a bug fix in `lib/demon-import.ts`) and a group's existing history needs
+reinterpreting under the new logic.
+
+```sh
+npm run db:regenerate:local -- <ringing-group-id>
+npm run db:regenerate:prod -- <ringing-group-id>
+```
+
+`import-csv.ts`'s own pipeline body (location pre-flight → `ImportJobs` row → both batch writers →
+`runRows` → completion → stats-cache dispatch) is factored out into an exported `runImport({rows,
+ringingGroupId, ringingGroupName, concurrency, logContext})`, shared by both `importCSV` (rows read
+from a CSV file, group resolved by name) and `regenerateImport` (rows re-read from `DemonRecords`,
+group given directly by id — a typo-prone name lookup doesn't apply to a script that's never
+driven interactively). `logContext` is the one piece each caller still supplies itself: `importCSV`
+passes `{csvFilePath}`, `regenerateImport` passes `{source: 'regenerate'}`, both merged onto the
+`dispatchStatsCacheRefreshEvents` log base and the "locations not recognised" error message so a
+failure stays identifiable by caller.
+
 ## Setting group passwords
 
 After creating a group, set its login password with:

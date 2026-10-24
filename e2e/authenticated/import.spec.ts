@@ -139,7 +139,15 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		expect(temporalUnits).toBe('{all-time,day,month,month-squashed,year}')
 	})
 
-	test('writes ComplexStatsCacheBySpecies rows for the Delta group’s imported species and temporal units', async () => {
+	// Skipped: c36f4cc9 ("Stop updating complex stats") commented out the
+	// `refreshComplexStatsCache` call in
+	// app/api/queues/stats-cache-refresh-window/route.ts — the complex cache
+	// refresh is now a deliberate no-op while the user decides whether to keep
+	// the complex stats cache at all, so this upload writes zero
+	// ComplexStatsCacheBySpecies rows. The same commit already skipped the
+	// equivalent unit-test expectations in route.test.ts; this assertion was
+	// just missed at the time.
+	test.skip('writes ComplexStatsCacheBySpecies rows for the Delta group’s imported species and temporal units', async () => {
 		const [rowCount, temporalUnits] = psqlRow(
 			`SELECT COUNT(*), array_agg(DISTINCT temporal_unit) FROM "ComplexStatsCacheBySpecies" WHERE group_id = ${deltaId}`
 		)

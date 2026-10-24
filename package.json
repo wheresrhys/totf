@@ -19,6 +19,8 @@
 		"db:types": "supabase gen types typescript --local --schema public > ./types/supabase.types.ts",
 		"db:import:prod": "./scripts/load-prod-write-env.sh tsx supabase/scripts/import-csv.ts",
 		"db:import:local": "dotenvx run -f .env.dev -- tsx supabase/scripts/import-csv.ts",
+		"db:regenerate:prod": "./scripts/load-prod-write-env.sh tsx supabase/scripts/regenerate-import.ts",
+		"db:regenerate:local": "dotenvx run -f .env.dev -- tsx supabase/scripts/regenerate-import.ts",
 		"set-group-password:local": "dotenvx run -f .env.dev -- tsx supabase/scripts/set-group-password.ts",
 		"set-group-password:prod": "./scripts/load-prod-write-env.sh tsx supabase/scripts/set-group-password.ts",
 		"start": "next start",
