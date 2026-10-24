@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
 	transformEmptyStringsToNull,
+	isRinglessRingNo,
 	convertDateFormat,
 	createRingSequenceLookup,
 	createRingSequenceLinker,
@@ -182,6 +183,26 @@ describe('transformEmptyStringsToNull', () => {
 			b: null,
 			c: true
 		});
+	});
+});
+
+describe('isRinglessRingNo', () => {
+	it('returns true for null, undefined and empty string', () => {
+		expect(isRinglessRingNo(null)).toBe(true);
+		expect(isRinglessRingNo(undefined)).toBe(true);
+		expect(isRinglessRingNo('')).toBe(true);
+	});
+
+	it("returns true for the '-' casualty sentinel", () => {
+		expect(isRinglessRingNo('-')).toBe(true);
+	});
+
+	it("returns true for '-' with surrounding whitespace", () => {
+		expect(isRinglessRingNo(' - ')).toBe(true);
+	});
+
+	it('returns false for a real ring number', () => {
+		expect(isRinglessRingNo('A000001')).toBe(false);
 	});
 });
 
@@ -884,6 +905,27 @@ describe('DemonRecordsBatchWriter buffering', () => {
 		expect(demonRecordsClient.rowsOfBatch()).toHaveLength(2);
 	});
 
+	it("skips a row whose ring number is the '-' casualty sentinel, rather than failing its whole batch", async () => {
+		const { demonRecordsClient, writer } = makeStagingWriter(2);
+
+		const casualtyRow = trackSettlement(
+			writer.writeDemonRecord(makeDemonRow({ ring_no: '-' }))
+		);
+		const whitespaceCasualtyRow = trackSettlement(
+			writer.writeDemonRecord(makeDemonRow({ ring_no: ' - ' }))
+		);
+		await settlePendingMicrotasks();
+		expect(casualtyRow.resolved).toBe(true);
+		expect(whitespaceCasualtyRow.resolved).toBe(true);
+		expect(demonRecordsClient.upsert).not.toHaveBeenCalled();
+
+		writer.writeDemonRecord(makeDemonRow());
+		writer.writeDemonRecord(makeDemonRow({ ring_no: 'A000001' }));
+		await settlePendingMicrotasks();
+
+		expect(demonRecordsClient.rowsOfBatch()).toHaveLength(2);
+	});
+
 	it('re-staging the same rows (a simulated retry) inserts them again under ON CONFLICT DO NOTHING rather than erroring', async () => {
 		const { demonRecordsClient, writer } = makeStagingWriter(2);
 		const rows = makeDemonRows(2);
@@ -1256,6 +1298,20 @@ describe('EncounterRowBatchWriter', () => {
 			// can reach one, same as `buildDemonRecord` skips it before staging.
 			await expect(
 				writer.writeEncounterRow(makeDemonRow({ ring_no: '' }))
+			).rejects.toBeInstanceOf(CasualtyEncounterError);
+			expect(domainTablesClient.upsertCalls).toHaveLength(0);
+		});
+
+		it("rejects a '-' -ring casualty row straight away, without buffering it", async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
+
+			await expect(
+				writer.writeEncounterRow(makeDemonRow({ ring_no: '-' }))
+			).rejects.toBeInstanceOf(CasualtyEncounterError);
+			await expect(
+				writer.writeEncounterRow(makeDemonRow({ ring_no: ' - ' }))
 			).rejects.toBeInstanceOf(CasualtyEncounterError);
 			expect(domainTablesClient.upsertCalls).toHaveLength(0);
 		});
