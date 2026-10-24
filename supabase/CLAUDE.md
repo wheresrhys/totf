@@ -353,10 +353,22 @@ The authoritative schema lives in `supabase/schema/` as declarative SQL files, o
 5. You may want to use `npm run db:seed:local` to repopulate the db with test data
 6. Inspect the generated migration file before pushing.
 7. Commit the generated file(s) under `supabase/migrations/` (no longer gitignored, #862) along
-   with your PR, then deploy the schema change to production with `npm run db:migration:push`
-   (human-only). There is **no** automated CI deploy of migrations: the
-   `.github/workflows/deploy-migrations.yml` job added in #862 was exercised and then deliberately
-   removed, so `npm run db:migration:push` is once again the sole deploy path.
+   with your PR. **Deployment to production is automatic**: the Supabase GitHub integration applies
+   any new migrations to the production project on merge to `main`, reporting back as a GitHub check
+   ("Supabase Preview") on the merge commit. Nothing needs running by hand, and the same mechanism
+   is described in "Developing against production data" below. Note that this is *not* one of
+   `.github/workflows/`' own jobs — CI there is still only `lint`/`type-check`/`unit-tests`; the
+   deploy is the Supabase GitHub app's, not ours. (The short-lived
+   `.github/workflows/deploy-migrations.yml` job from #862 was exercised and then removed, since the
+   integration already covers it.)
+
+   `npm run db:migration:push` remains available as the **human-only escape hatch**, not the primary
+   path — for a migration that needs applying out of band, or a merge whose integration run failed.
+   Because migrations land on `main` merge rather than on a deliberate human action, treat a
+   schema-change PR as a production deploy at review time: the merge itself is the deploy. The
+   automatic mechanism is also what makes a CI-chained post-migration step possible — see
+   [`docs/adr/0001-vercel-queues-for-import-and-stats-backfill.md`](../docs/adr/0001-vercel-queues-for-import-and-stats-backfill.md)'s
+   Question 3 for the ordering hazards that come with chaining off it.
 
 **A brand-new table needs step 4 run TWICE (#1167).** The public schema has `ALTER DEFAULT
 PRIVILEGES ... GRANT ALL ON TABLES TO anon, authenticated, service_role`, so `CREATE TABLE` hands

@@ -45,6 +45,11 @@ anything genuinely used by all three:
 - [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — **agentic tooling**: ticket workflow, MCP tool
   inventory, hooks.
 
+Design decisions too big for a CLAUDE.md section — and decided before the code that implements them
+exists — live as numbered ADRs under [`docs/adr/`](docs/adr/). A zone doc describes how things *are*;
+an ADR records why a shape was chosen and what was rejected. Check there when a convention's
+rationale isn't obvious from the zone doc.
+
 ## Development environment
 
 ```sh
