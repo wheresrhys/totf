@@ -140,55 +140,45 @@ export async function runRows<Row>(
 	return { totalRecords, successfulRecords, failedRecords };
 }
 
-export async function importCSV(options: ImportOptions): Promise<void> {
+export interface RunImportOptions {
+	rows: DemonRow[];
+	ringingGroupId: number;
+	/** For error/log messages only — never used to look the group up. */
+	ringingGroupName: string;
+	concurrency?: number;
+	/**
+	 * Merged onto the `{importJobId, ringingGroupId}` base
+	 * `dispatchStatsCacheRefreshEvents` always logs with, so a dispatch-failure
+	 * log line stays identifiable per caller (the CLI's `csvFilePath`, the
+	 * regenerate script's own context, etc). Also used verbatim in the
+	 * "locations not recognised" error message below.
+	 */
+	logContext: Record<string, unknown>;
+}
+
+/**
+ * Runs the whole import pipeline — location pre-flight, `ImportJobs`
+ * tracking, both batch writers, row processing, stats-cache-refresh dispatch
+ * — over an already-materialized array of `DemonRow`s. Shared by `importCSV`
+ * (rows read from a CSV file) and `regenerateImport`
+ * (`supabase/scripts/regenerate-import.ts`, #1185 — rows re-read from already
+ * staged `DemonRecords`), neither of which differs from here on: both have
+ * already resolved `ringingGroupId` and materialized their rows by the time
+ * they call this.
+ */
+export async function runImport(options: RunImportOptions): Promise<void> {
 	const {
-		csvFilePath,
+		rows,
+		ringingGroupId,
 		ringingGroupName,
-		concurrency = DEFAULT_IMPORT_CONCURRENCY
+		concurrency = DEFAULT_IMPORT_CONCURRENCY,
+		logContext
 	} = options;
-
-	if (!fs.existsSync(csvFilePath)) {
-		console.error(`Error: File not found: ${csvFilePath}`);
-		process.exit(1);
-	}
-
-	console.log(`Starting import from ${csvFilePath}...`);
-
-	// 0. Look up the Ringing Group by name and get its ID. This script no longer
-	// creates a missing group on the fly (#473) — groups are created via the seed
-	// script or Supabase Studio, so an unrecognised name is almost always a typo.
-	const { data: ringingGroupData, error: ringingGroupError } = await supabase
-		.from('RingingGroups')
-		.select('id')
-		.eq('group_name', ringingGroupName)
-		.maybeSingle();
-	if (ringingGroupError) {
-		throw ringingGroupError;
-	}
-	if (!ringingGroupData) {
-		console.error(
-			`Error: Ringing group "${ringingGroupName}" not found. Create it first (e.g. via Supabase Studio) before importing — this script no longer creates groups automatically.`
-		);
-		process.exit(1);
-	}
-	const ringingGroupId: number = ringingGroupData.id;
 
 	const groupSupabaseClient =
 		await getAuthenticatedSupabaseClientForGroup(ringingGroupId);
 
 	const importJobTracker = new ImportJobTracker(groupSupabaseClient);
-
-	// The whole CSV is buffered rather than streamed straight into row
-	// processing, because the location pre-flight below has to see every row's
-	// `loc_id` before the first row is written. `runRows` still accepts a stream
-	// for other callers; an array just dispatches every row up front, which caps
-	// concurrency exactly as before via the limiter inside each row's
-	// domain-table write (and so keeps `concurrency: 1` seeding deterministic).
-	const rowStream = fs.createReadStream(csvFilePath).pipe(csvParser());
-	const rows: DemonRow[] = [];
-	for await (const row of rowStream) {
-		rows.push(row as DemonRow);
-	}
 
 	// A `loc_id` the group has no Location for is far more often a renamed site
 	// than a genuinely new one (#1048), and importing it would fork the Locations
@@ -202,7 +192,7 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 	);
 	if (unrecognisedLocations.length > 0) {
 		console.error(
-			`Error: these locations in ${csvFilePath} are not recognised for ringing group "${ringingGroupName}": ${unrecognisedLocations.join(', ')}. No rows were imported. If a site was renamed, rename its existing Location to match before importing; if it is genuinely new, create it first.`
+			`Error: these locations are not recognised for ringing group "${ringingGroupName}": ${unrecognisedLocations.join(', ')}. No rows were imported. If a site was renamed, rename its existing Location to match before importing; if it is genuinely new, create it first.`
 		);
 		process.exit(1);
 	}
@@ -270,7 +260,7 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 		} catch (failureRecordingError) {
 			console.error(
 				`Failed to mark ImportJobs row ${importJobId} as failed`,
-				{ csvFilePath, ringingGroupName, ringingGroupId },
+				{ ringingGroupName, ringingGroupId, ...logContext },
 				failureRecordingError
 			);
 		}
@@ -288,13 +278,67 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 		importJobId,
 		ringingGroupId,
 		demonRecordsBatchWriter.getDistinctDates(),
-		{ csvFilePath, ringingGroupName }
+		{ ringingGroupName, ...logContext }
 	);
 
 	console.log('\n✓ Import completed');
 	console.log(`Total records: ${totalRecords}`);
 	console.log(`Successful: ${successfulRecords}`);
 	console.log(`Failed: ${failedRecords}`);
+}
+
+export async function importCSV(options: ImportOptions): Promise<void> {
+	const {
+		csvFilePath,
+		ringingGroupName,
+		concurrency = DEFAULT_IMPORT_CONCURRENCY
+	} = options;
+
+	if (!fs.existsSync(csvFilePath)) {
+		console.error(`Error: File not found: ${csvFilePath}`);
+		process.exit(1);
+	}
+
+	console.log(`Starting import from ${csvFilePath}...`);
+
+	// Look up the Ringing Group by name and get its ID. This script no longer
+	// creates a missing group on the fly (#473) — groups are created via the seed
+	// script or Supabase Studio, so an unrecognised name is almost always a typo.
+	const { data: ringingGroupData, error: ringingGroupError } = await supabase
+		.from('RingingGroups')
+		.select('id')
+		.eq('group_name', ringingGroupName)
+		.maybeSingle();
+	if (ringingGroupError) {
+		throw ringingGroupError;
+	}
+	if (!ringingGroupData) {
+		console.error(
+			`Error: Ringing group "${ringingGroupName}" not found. Create it first (e.g. via Supabase Studio) before importing — this script no longer creates groups automatically.`
+		);
+		process.exit(1);
+	}
+	const ringingGroupId: number = ringingGroupData.id;
+
+	// The whole CSV is buffered rather than streamed straight into row
+	// processing, because `runImport`'s location pre-flight has to see every
+	// row's `loc_id` before the first row is written. `runRows` still accepts a
+	// stream for other callers; an array just dispatches every row up front,
+	// which caps concurrency exactly as before via the limiter inside each row's
+	// domain-table write (and so keeps `concurrency: 1` seeding deterministic).
+	const rowStream = fs.createReadStream(csvFilePath).pipe(csvParser());
+	const rows: DemonRow[] = [];
+	for await (const row of rowStream) {
+		rows.push(row as DemonRow);
+	}
+
+	await runImport({
+		rows,
+		ringingGroupId,
+		ringingGroupName,
+		concurrency,
+		logContext: { csvFilePath }
+	});
 }
 
 // Main execution — only when run directly (npm run db:import:{local|prod}),
