@@ -66,8 +66,8 @@ describe('group_ticks', () => {
 			});
 			expect(error).toBeNull();
 			expect(data).toEqual([
-				{ species_name: 'Chaffinch', first_encounter_date: '2023-06-01' },
-				{ species_name: 'Robin', first_encounter_date: '2023-06-01' }
+				{ species_name: 'Chaffinch', first_encounter_date: '2080-06-01' },
+				{ species_name: 'Robin', first_encounter_date: '2080-06-01' }
 			]);
 			// Alpha-only species (e.g. Kingfisher) never appear when filtered to Beta
 			expect(data!.some((r) => r.species_name === 'Kingfisher')).toBe(false);
@@ -245,7 +245,7 @@ describe('group_ticks', () => {
 		const robinRow = data!.find((r) => r.species_name === 'Robin');
 		expect(robinRow).toEqual({
 			species_name: 'Robin',
-			first_encounter_date: '2023-06-01'
+			first_encounter_date: '2080-06-01'
 		});
 	});
 });

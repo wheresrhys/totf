@@ -14,7 +14,7 @@ test('alpha: shows sessions across multiple years', { tag: '@alpha' }, async ({ 
 
 test('beta: shows sessions in a single year', { tag: '@beta' }, async ({ page }) => {
 	await page.goto('/sessions')
-	await expect(page.getByText('2023')).toBeVisible()
+	await expect(page.getByText('2080')).toBeVisible()
 	await expect(page.getByText('2021')).not.toBeVisible()
 })
 

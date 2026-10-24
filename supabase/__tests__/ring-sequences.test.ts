@@ -43,7 +43,7 @@ describe('ring sequence RPC functions', () => {
 	//
 	// ARRETRAP has 1 N encounter + 8 S encounters; it falls in the ARR sequence.
 	// AWREN001 (Wren) has 1 N (2021-06-20) + 1 S (2024-05-10); only the N counts here.
-	// Beta seed has BCH (len 8): 2 Chaffinch rings, 2023-06-01 – 2023-06-01
+	// Beta seed has BCH (len 8): 2 Chaffinch rings, 2080-06-01 – 2080-06-01
 	// Beta also has 1 S encounter for SHARED01 (Robin, originally ringed by Alpha).
 
 	describe('ring_sequence_controls', () => {
@@ -57,7 +57,7 @@ describe('ring sequence RPC functions', () => {
 			expect(data![0]).toMatchObject({
 				ring_no: 'SHARED01',
 				species_name: 'Robin',
-				first_date: '2023-06-01',
+				first_date: '2080-06-01',
 			});
 		});
 

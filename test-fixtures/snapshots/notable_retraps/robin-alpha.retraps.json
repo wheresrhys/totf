@@ -15,5 +15,14 @@
       "2024-05-10"
     ],
     "proven_age": 3
+  },
+  {
+    "species_name": "Robin",
+    "ring_no": "SHARED01",
+    "encounter_count": 1,
+    "encounter_dates": [
+      "2022-04-30"
+    ],
+    "proven_age": 58
   }
 ]

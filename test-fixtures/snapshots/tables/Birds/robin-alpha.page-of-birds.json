@@ -1,5 +1,33 @@
 [
   {
+    "id": 47,
+    "ring_no": "SHARED01",
+    "last_encountered_timestamp": "2080-06-01T06:10:00",
+    "ringing_group_ids": [
+      1,
+      2
+    ],
+    "proven_age": 58,
+    "encounters": [
+      {
+        "id": 51,
+        "sex": "M",
+        "is_juv": false,
+        "weight": 18,
+        "session": {
+          "id": 2,
+          "visit_date": "2022-04-30"
+        },
+        "age_code": 3,
+        "record_type": "N",
+        "wing_length": 74,
+        "capture_time": "07:00:00",
+        "max_hatch_year": 2022,
+        "min_hatch_year": 2022
+      }
+    ]
+  },
+  {
     "id": 30,
     "ring_no": "ARRETRAP",
     "last_encountered_timestamp": "2024-05-10T05:45:00",
@@ -148,34 +176,6 @@
         "age_code": 5,
         "record_type": "S",
         "wing_length": 80,
-        "capture_time": "07:00:00",
-        "max_hatch_year": 2022,
-        "min_hatch_year": 2022
-      }
-    ]
-  },
-  {
-    "id": 47,
-    "ring_no": "SHARED01",
-    "last_encountered_timestamp": "2023-06-01T06:10:00",
-    "ringing_group_ids": [
-      1,
-      2
-    ],
-    "proven_age": 1,
-    "encounters": [
-      {
-        "id": 51,
-        "sex": "M",
-        "is_juv": false,
-        "weight": 18,
-        "session": {
-          "id": 2,
-          "visit_date": "2022-04-30"
-        },
-        "age_code": 3,
-        "record_type": "N",
-        "wing_length": 74,
         "capture_time": "07:00:00",
         "max_hatch_year": 2022,
         "min_hatch_year": 2022

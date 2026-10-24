@@ -51,7 +51,7 @@ test.describe('/group/[betaSlug]/sessions — Beta shares with Gamma', () => {
 		await expect(
 			page.getByRole('heading', { name: 'Session history' })
 		).toBeVisible()
-		await expect(page.getByText('2023')).toBeVisible()
+		await expect(page.getByText('2080')).toBeVisible()
 	})
 
 	test('alpha: sees no Beta sessions (no reverse share)', { tag: '@alpha' }, async ({ page }) => {
@@ -84,7 +84,7 @@ test.describe('/group/[betaSlug] home — cross-group data visibility', () => {
 		await page.goto(`/group/${betaSlug}`)
 		await expect(page).not.toHaveURL('/')
 		await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible()
-		// Beta's session is 2023-06-01
+		// Beta's session is 2080-06-01
 		await expect(page.getByRole('link', { name: /1st June/ })).toBeVisible()
 	})
 
