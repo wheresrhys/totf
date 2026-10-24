@@ -45,7 +45,9 @@ CREATE TABLE public."ComplexStatsCache" (
 	returning_age_1_bird_count bigint NOT NULL,
 	returning_age_2_bird_count bigint NOT NULL,
 	returning_age_3_plus_bird_count bigint NOT NULL,
-	returning_new_unknown_age_bird_count bigint NOT NULL
+	returning_new_unknown_age_bird_count bigint NOT NULL,
+	created_at timestamptz DEFAULT NOW() NOT NULL,
+	updated_at timestamptz DEFAULT NOW() NOT NULL
 );
 
 COMMENT ON TABLE public."ComplexStatsCache" IS 'One row per (group_id, temporal_unit, time_period), for all species combined: the lifetime-relative demographics_stats_result metrics (new_adult_bird_count and the four returning_age_* columns), which read a bird''s whole unwindowed history and so must be fully replaced on refresh rather than narrowed to affected dates. Per-species rows live in "ComplexStatsCacheBySpecies"; period-local metrics live in "SimpleStatsCache".';
@@ -53,6 +55,16 @@ COMMENT ON TABLE public."ComplexStatsCache" IS 'One row per (group_id, temporal_
 COMMENT ON COLUMN public."ComplexStatsCache".time_period IS 'The cell''s period, as the first date in it. NOT NULL: the all-time grain uses the sentinel date ''0001-01-01'' rather than a NULL, so a single plain UNIQUE constraint covers every grain and a native supabase-js .upsert() can name it as a conflict target.';
 
 CREATE INDEX idx_complex_stats_cache_group_id ON public."ComplexStatsCache" (group_id);
+
+-- Keeps updated_at current on every write; see trg_set_updated_at's own
+-- comment for why this repo needs a trigger rather than a plain DEFAULT
+-- NOW() here — the write path's native supabase-js .upsert() never includes
+-- updated_at in its payload, so a DEFAULT alone would never refresh it on
+-- the ON CONFLICT DO UPDATE path.
+CREATE TRIGGER trigger_trg_set_updated_at BEFORE INSERT
+OR
+UPDATE ON public."ComplexStatsCache" FOR EACH ROW
+EXECUTE FUNCTION public.trg_set_updated_at ();
 
 -- SELECT/INSERT/UPDATE: strictly own-group only — no cross-group sharing via
 -- GroupDataSharing (this is an internal cache table, not user-facing shared

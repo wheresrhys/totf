@@ -64,7 +64,9 @@ CREATE TABLE public."SimpleStatsCacheBySpecies" (
 	unknown_age_enc_count bigint NOT NULL,
 	postjuv_juv_enc_count bigint NOT NULL,
 	new_postjuv_juv_enc_count bigint NOT NULL,
-	new_postjuv_enc_count bigint NOT NULL
+	new_postjuv_enc_count bigint NOT NULL,
+	created_at timestamptz DEFAULT NOW() NOT NULL,
+	updated_at timestamptz DEFAULT NOW() NOT NULL
 );
 
 COMMENT ON TABLE public."SimpleStatsCacheBySpecies" IS 'One row per (group_id, temporal_unit, time_period, species_id): every period-local metric shared between core_stats_result, biometrics_stats_result and demographics_stats_result, per species. All-species-combined rows live in "SimpleStatsCache"; lifetime-relative demographics columns live in "ComplexStatsCacheBySpecies".';
@@ -74,6 +76,16 @@ COMMENT ON COLUMN public."SimpleStatsCacheBySpecies".time_period IS 'The cell''s
 COMMENT ON COLUMN public."SimpleStatsCacheBySpecies".species_id IS 'NOT NULL — unlike this table''s predecessor, there is no "all species combined" sentinel or NULL here. Those rows live in the "SimpleStatsCache" table instead.';
 
 CREATE INDEX idx_simple_stats_cache_by_species_group_id ON public."SimpleStatsCacheBySpecies" (group_id);
+
+-- Keeps updated_at current on every write; see trg_set_updated_at's own
+-- comment for why this repo needs a trigger rather than a plain DEFAULT
+-- NOW() here — the write path's native supabase-js .upsert() never includes
+-- updated_at in its payload, so a DEFAULT alone would never refresh it on
+-- the ON CONFLICT DO UPDATE path.
+CREATE TRIGGER trigger_trg_set_updated_at BEFORE INSERT
+OR
+UPDATE ON public."SimpleStatsCacheBySpecies" FOR EACH ROW
+EXECUTE FUNCTION public.trg_set_updated_at ();
 
 -- SELECT/INSERT/UPDATE: strictly own-group only, mirroring "SimpleStatsCache"'s
 -- own policies. No DELETE policy: there is no DELETE grant below, so a delete
