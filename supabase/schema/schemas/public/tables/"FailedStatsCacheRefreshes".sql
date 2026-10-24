@@ -71,7 +71,12 @@ ADD CONSTRAINT "FailedStatsCacheRefreshes_pkey" PRIMARY KEY (id);
 
 ALTER TABLE public."FailedStatsCacheRefreshes"
 ADD CONSTRAINT failed_stats_cache_refreshes_cache_table_check CHECK (
-	cache_table IN ('SimpleStatsCache', 'ComplexStatsCache')
+	cache_table IN (
+		'SimpleStatsCache',
+		'SimpleStatsCacheBySpecies',
+		'ComplexStatsCache',
+		'ComplexStatsCacheBySpecies'
+	)
 );
 
 -- Same value set as simple_stats_cache_temporal_unit_check — keep the two in
