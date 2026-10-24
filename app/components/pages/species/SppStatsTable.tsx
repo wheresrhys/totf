@@ -6,13 +6,12 @@ import {
 } from '@/app/lib/species-stats';
 import type { PageData } from '@/app/(routes)/species/page';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import { useState, useEffect, useRef } from 'react';
-import { fetchSpeciesData } from '@/app/actions/spp-data';
 import {
 	SortableTable,
 	type ColumnConfig
 } from '@/app/components/shared/SortableTable';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+import { TemporalFilterControls } from '@/app/components/shared/TemporalFilterControls';
 
 function MultiSpeciesTableBody({ data }: { data: SpeciesStatsRow[] }) {
 	return (
@@ -50,149 +49,27 @@ const sortableColumnConfigs = speciesStatConfigs.reduce(
 	{} as Record<keyof SpeciesStatsRow, ColumnConfig>
 );
 
+// The species list page's filter UI (#1051/#1076) — the generic
+// `TemporalFilterControls` component, with no `navigationController` override:
+// this page has no year/month path-param routing of its own (unlike
+// Summary/species-detail), so every filter field lives in the query string on
+// `/species` via the component's default navigation. The "CES only" preset
+// this replaced is gone with no replacement — per the #1076 decision, a raw
+// date range covers that case (and any other) without a bespoke checkbox.
 export function SppStatsTable({
-	data: { speciesStats: initialSpeciesStats, years },
-	viewedGroup
+	data: { speciesStats, years, selection }
 }: {
 	data: PageData;
-	viewedGroup: ViewedGroup;
+	viewedGroup?: ViewedGroup;
 }) {
-	const formRef = useRef<HTMLFormElement>(null);
-	const [year, setYear] = useState<number | null>(null);
-	const [cesOnly, setCesOnly] = useState<boolean>(false);
-	const [fromDate, setFromDate] = useState<string | null>(null);
-	const [toDate, setToDate] = useState<string | null>(null);
-	const [speciesStats, setSpeciesStats] =
-		useState<SpeciesStatsRow[]>(initialSpeciesStats);
-	const isFirstRender = useRef(true);
-	useEffect(() => {
-		if (isFirstRender.current) {
-			isFirstRender.current = false;
-			return;
-		}
-		fetchSpeciesData(
-			viewedGroup,
-			fromDate ?? undefined,
-			toDate ?? undefined
-		).then(setSpeciesStats);
-	}, [viewedGroup, fromDate, toDate]);
-
-	function clearSettings() {
-		setYear(null);
-		setCesOnly(false);
-	}
-
-	function clearDates() {
-		setFromDate(null);
-		setToDate(null);
-	}
-
-	function setDatesFromSettings({
-		year,
-		cesOnly
-	}: {
-		year: number | null;
-		cesOnly: boolean;
-	}) {
-		if (year) {
-			setFromDate(`${year.toString()}-${cesOnly ? '04-25' : '01-01'}`);
-			setToDate(`${year.toString()}-${cesOnly ? '09-05' : '12-31'}`);
-		} else {
-			clearDates();
-		}
-	}
-
-	function handleYearSelect(event: React.ChangeEvent<HTMLSelectElement>) {
-		const year = parseInt(event.target.value) || null;
-		setYear(year);
-		setDatesFromSettings({ year, cesOnly });
-	}
-
-	function handleCesOnlyChange(event: React.ChangeEvent<HTMLInputElement>) {
-		const cesOnly = event.target.checked;
-		setCesOnly(cesOnly);
-		setDatesFromSettings({ year, cesOnly });
-	}
-
-	function handleDateChange(event: React.ChangeEvent<HTMLInputElement>) {
-		const value = event.target.value;
-		const inputType = event.target.id.split('-')[0];
-		clearSettings();
-		if (inputType === 'from') {
-			setFromDate(value);
-		} else {
-			setToDate(value);
-		}
-	}
-
 	return (
 		<>
 			<PageWrapper>
-				<form ref={formRef} className="flex gap-2 flex-wrap justify-end">
-					<div className="flex gap-2">
-						<div className="flex items-center gap-2">
-							<label htmlFor="year-select" className="shrink-0">
-								Year
-							</label>
-							<select
-								id="year-select"
-								className="select max-w-sm appearance-none"
-								aria-label="select"
-								onChange={handleYearSelect}
-								value={year ?? ''}
-							>
-								<option value="">All</option>
-								{years.map((year) => (
-									<option key={year} value={year}>
-										{year}
-									</option>
-								))}
-							</select>
-						</div>
-						<div className="flex items-center gap-2">
-							<label
-								htmlFor="ces-only-checkbox"
-								className={`shrink-0 ${!year ? 'text-gray-400' : ''}`}
-							>
-								CES only
-							</label>
-							<input
-								id="ces-only-checkbox"
-								type="checkbox"
-								className="checkbox"
-								onChange={handleCesOnlyChange}
-								checked={cesOnly}
-								disabled={!year}
-							/>
-						</div>
-					</div>
-					<div className="flex gap-2 flex-wrap justify-end">
-						<div className="flex items-center gap-2">
-							<label htmlFor="from-date-input" className="shrink-0">
-								From date
-							</label>
-							<input
-								id="from-date-input"
-								type="date"
-								className="input max-w-sm"
-								onChange={handleDateChange}
-								value={fromDate ?? ''}
-							/>
-						</div>
-						<div className="flex items-center gap-2">
-							<label htmlFor="to-date-input" className="shrink-0">
-								To date
-							</label>
-							<input
-								id="to-date-input"
-								type="date"
-								className="input max-w-sm"
-								onChange={handleDateChange}
-								value={toDate ?? ''}
-							/>
-						</div>
-					</div>
-				</form>
+				<TemporalFilterControls
+					years={years}
+					baseUrl="/species"
+					initialSelection={selection}
+				/>
 			</PageWrapper>
 			<SortableTable<SpeciesStatsRow, SpeciesStatsRow>
 				columnConfigs={sortableColumnConfigs}

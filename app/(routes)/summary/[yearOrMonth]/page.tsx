@@ -7,6 +7,7 @@ import {
 	fetchPeriodStats
 } from '@/app/actions/summary-stats';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
+import { fetchYears } from '@/app/(routes)/species/page';
 import {
 	readTabIdSearchParam,
 	resolveInitialTabId,
@@ -75,6 +76,7 @@ export type PageData =
 			monthTotals: MonthTotalsRow[];
 			fromDate: string;
 			toDate: string;
+			years: number[];
 			initialTabData?: { tabId: string; data: unknown };
 	  }
 	| {
@@ -83,6 +85,7 @@ export type PageData =
 			speciesTotalsForMonth: SpeciesStatsRow[];
 			yearTotalsForMonth: CoreStatsResult[];
 			sessionTotalsForMonth: CoreStatsResult[];
+			years: number[];
 			initialTabData?: { tabId: string; data: unknown };
 	  };
 
@@ -113,12 +116,14 @@ async function fetchSummarySquashedMonthPageContent(
 		summaryStats,
 		speciesTotalsForMonth,
 		yearTotalsForMonth,
-		sessionTotalsForMonth
+		sessionTotalsForMonth,
+		years
 	] = await Promise.all([
 		fetchSummaryStats(viewedGroup, undefined, undefined, squashedMonth),
 		fetchSpeciesData(viewedGroup, undefined, undefined, squashedMonth),
 		fetchPeriodStats(viewedGroup, 'year', undefined, undefined, squashedMonth),
-		fetchPeriodStats(viewedGroup, 'day', undefined, undefined, squashedMonth)
+		fetchPeriodStats(viewedGroup, 'day', undefined, undefined, squashedMonth),
+		fetchYears(viewedGroup)
 	]);
 	const activeTabId = resolveInitialTabId(
 		tabId,
@@ -143,6 +148,7 @@ async function fetchSummarySquashedMonthPageContent(
 		speciesTotalsForMonth,
 		yearTotalsForMonth,
 		sessionTotalsForMonth,
+		years,
 		initialTabData
 	};
 }
@@ -162,9 +168,10 @@ export async function fetchSummaryYearOrMonthPageContent(
 	const fromDate = `${yearOrMonth}-01-01`;
 	const toDate = `${yearOrMonth}-12-31`;
 	const year = Number(yearOrMonth);
-	const [summaryStats, monthlyStats] = await Promise.all([
+	const [summaryStats, monthlyStats, years] = await Promise.all([
 		fetchSummaryStats(viewedGroup, fromDate, toDate),
-		fetchPeriodStats(viewedGroup, 'month', fromDate, toDate)
+		fetchPeriodStats(viewedGroup, 'month', fromDate, toDate),
+		fetchYears(viewedGroup)
 	]);
 	const activeTabId = resolveInitialTabId(
 		tabId,
@@ -197,6 +204,7 @@ export async function fetchSummaryYearOrMonthPageContent(
 		monthTotals: buildMonthTotalsRows(year, monthlyStats),
 		fromDate,
 		toDate,
+		years,
 		initialTabData
 	};
 }
@@ -218,6 +226,7 @@ function YearOrMonthSummary({
 				speciesTotalsForMonth={data.speciesTotalsForMonth}
 				yearTotalsForMonth={data.yearTotalsForMonth}
 				sessionTotalsForMonth={data.sessionTotalsForMonth}
+				years={data.years}
 				viewedGroup={viewedGroup}
 				initialTabId={params.tabId}
 				initialTabData={data.initialTabData}
@@ -232,6 +241,7 @@ function YearOrMonthSummary({
 			viewedGroup={viewedGroup}
 			fromDate={data.fromDate}
 			toDate={data.toDate}
+			years={data.years}
 			initialTabId={params.tabId}
 			initialTabData={data.initialTabData}
 			canReportHighlights={params.canReportHighlights}

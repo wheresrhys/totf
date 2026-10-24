@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-	render,
-	screen,
-	cleanup,
-	fireEvent,
-	waitFor
-} from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import { SppStatsTable } from '../SppStatsTable';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
 import biometricsSnapshot from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
@@ -16,10 +10,6 @@ import {
 } from '@/app/lib/species-stats';
 import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
 import type { PageData } from '@/app/(routes)/species/page';
-
-vi.mock('@/app/actions/spp-data', () => ({
-	fetchSpeciesData: vi.fn()
-}));
 
 // fetchSpeciesData hands this table the merge of a core_stats by-species result
 // and its biometrics_stats sibling, so build the fixture data the same way
@@ -38,7 +28,8 @@ const speciesStats = mergeSpeciesBiometrics(
 
 const pageData: PageData = {
 	speciesStats,
-	years: [2021, 2022, 2023]
+	years: [2021, 2022, 2023],
+	selection: {}
 };
 
 describe('SppStatsTable', () => {
@@ -57,41 +48,17 @@ describe('SppStatsTable', () => {
 		});
 	});
 
-	describe('year filter', () => {
-		it('CES only checkbox is disabled when no year selected', () => {
-			render(
-				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: 'alpha' }} />
-			);
-			const cesCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
-			expect(cesCheckbox.disabled).toBe(true);
-		});
-
-		it('CES only checkbox is enabled after year is selected', async () => {
-			const { fetchSpeciesData } = await import('@/app/actions/spp-data');
-			vi.mocked(fetchSpeciesData).mockResolvedValue(speciesStats);
-			render(
-				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: 'alpha' }} />
-			);
-			const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;
-			fireEvent.change(yearSelect, { target: { value: '2022' } });
-			const cesCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
-			expect(cesCheckbox.disabled).toBe(false);
-		});
-
-		it('triggers fetchSpeciesData with correct date range when year changes', async () => {
-			const { fetchSpeciesData } = await import('@/app/actions/spp-data');
-			vi.mocked(fetchSpeciesData).mockResolvedValue(speciesStats);
-			render(
-				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: 'alpha' }} />
-			);
-			const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;
-			fireEvent.change(yearSelect, { target: { value: '2022' } });
-			await waitFor(() => {
-				expect(vi.mocked(fetchSpeciesData)).toHaveBeenCalledWith(
-					{ id: 1, slug: 'alpha' },
-					'2022-01-01',
-					'2022-12-31'
+	describe('species list page filtering', () => {
+		describe('TemporalFilterControls integration', () => {
+			it('the "CES only" checkbox no longer appears', () => {
+				render(
+					<SppStatsTable
+						data={pageData}
+						viewedGroup={{ id: 1, slug: 'alpha' }}
+					/>
 				);
+				expect(screen.queryByRole('checkbox')).toBeNull();
+				expect(screen.queryByText('CES only')).toBeNull();
 			});
 		});
 	});
@@ -112,7 +79,8 @@ describe('SppStatsTable', () => {
 			};
 			const pageDataWithMissingBiometrics: PageData = {
 				speciesStats: [speciesWithoutBiometrics, ...restSpecies],
-				years: [2021, 2022, 2023]
+				years: [2021, 2022, 2023],
+				selection: {}
 			};
 
 			render(

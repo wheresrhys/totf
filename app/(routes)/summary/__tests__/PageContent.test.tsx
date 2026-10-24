@@ -1,10 +1,34 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import {
+	render,
+	screen,
+	cleanup,
+	waitFor,
+	fireEvent
+} from '@testing-library/react';
 import { SummaryPageContent } from '../PageContent';
 import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
 import alphaSpeciesStats from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+
+// Local override of the global next/navigation mock (vitest.setup.tsx) so the
+// `TemporalFilterControls` push calls below can be asserted on directly —
+// same pattern as `TemporalFilterControls.test.tsx` itself.
+const { mockPush } = vi.hoisted(() => ({ mockPush: vi.fn() }));
+vi.mock('next/navigation', () => ({
+	useRouter: () => ({
+		push: mockPush,
+		replace: vi.fn(),
+		refresh: vi.fn(),
+		back: vi.fn(),
+		forward: vi.fn(),
+		prefetch: vi.fn()
+	}),
+	usePathname: () => '/',
+	useSearchParams: () => new URLSearchParams(),
+	redirect: vi.fn()
+}));
 
 // Both are ungrouped/species-grouped-only core_stats fixtures, so
 // species_name/time_period are genuinely null in places — CoreStatsResult's
@@ -36,6 +60,7 @@ describe('SummaryPageContent', () => {
 		cleanup();
 		fetchSpeciesDataMock.mockReset();
 		fetchPeriodTotalsMock.mockReset();
+		mockPush.mockClear();
 	});
 
 	it('renders "All time summary" when neither year nor month is given', async () => {
@@ -136,6 +161,42 @@ describe('SummaryPageContent', () => {
 			);
 			const tab = screen.getByRole('button', { name: 'Year totals' });
 			expect(tab.getAttribute('aria-current')).toBe('true');
+		});
+	});
+
+	describe('Summary page filtering', () => {
+		describe('TemporalFilterControls integration', () => {
+			it('selecting a year navigates to the year-scoped Summary route', () => {
+				render(<SummaryPageContent viewedGroup={viewedGroup} years={[2026]} />);
+				fireEvent.change(screen.getByLabelText('Year'), {
+					target: { value: '2026' }
+				});
+				expect(mockPush).toHaveBeenCalledWith('/summary/2026');
+			});
+
+			it('selecting a year and month navigates to the month-scoped Summary route', () => {
+				render(<SummaryPageContent viewedGroup={viewedGroup} years={[2026]} />);
+				fireEvent.change(screen.getByLabelText('Year'), {
+					target: { value: '2026' }
+				});
+				fireEvent.change(screen.getByLabelText('Month'), {
+					target: { value: '8' }
+				});
+				expect(mockPush).toHaveBeenLastCalledWith('/summary/2026/8');
+			});
+
+			it('clearing the selection navigates back to the all-time Summary route', () => {
+				render(
+					<SummaryPageContent viewedGroup={viewedGroup} year={2026} month={8} />
+				);
+				fireEvent.change(screen.getByLabelText('Year'), {
+					target: { value: '' }
+				});
+				fireEvent.change(screen.getByLabelText('Month'), {
+					target: { value: '' }
+				});
+				expect(mockPush).toHaveBeenLastCalledWith('/summary');
+			});
 		});
 	});
 });
