@@ -751,12 +751,15 @@ describe('refreshSimpleStatsCache', () => {
 			expect(written).toHaveLength(1);
 			expect(written[0].species_id).toBe(1);
 			// ...and the anomaly was logged with enough context to act on,
-			// rather than silently fabricating a value for species 2.
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
+			// rather than silently fabricating a value for species 2. The
+			// species-grouped pass (logged first) tags the anomaly with its own
+			// 'SimpleStatsCacheBySpecies' cache_table (#1182).
+			expect(consoleErrorSpy).toHaveBeenNthCalledWith(
+				1,
 				expect.any(String),
 				expect.objectContaining({
 					groupId: GROUP_ID,
-					cacheTable: 'SimpleStatsCache',
+					cacheTable: 'SimpleStatsCacheBySpecies',
 					temporalUnit: 'day',
 					speciesId: 2,
 					timePeriod: '2026-03-01',
@@ -797,7 +800,7 @@ describe('refreshSimpleStatsCache', () => {
 			});
 		}
 
-		it('writes a FailedStatsCacheRefreshes row for a cell missing from one metric RPC, with the missing RPC name in details', async () => {
+		it("writes a FailedStatsCacheRefreshes row for a cell missing from one metric RPC, tagged with this (species-grouped) pass's own 'SimpleStatsCacheBySpecies' cache_table, with the missing RPC name in details", async () => {
 			const client = clientWithAnomalies([2]);
 
 			await refreshSimpleStatsCache(client as never, {
@@ -810,7 +813,7 @@ describe('refreshSimpleStatsCache', () => {
 			expect(failedRefreshRows(client)).toEqual([
 				{
 					group_id: GROUP_ID,
-					cache_table: 'SimpleStatsCache',
+					cache_table: 'SimpleStatsCacheBySpecies',
 					temporal_unit: 'day',
 					species_id: 2,
 					time_period: '2026-03-01',
@@ -1007,7 +1010,7 @@ describe('refreshSimpleStatsCache', () => {
 			}
 		});
 
-		it("dead-letters an anomaly from this pass under the same 'SimpleStatsCache' tag as the species-grouped pass", async () => {
+		it("dead-letters an anomaly from this pass under its own plain 'SimpleStatsCache' tag, distinct from the species-grouped pass's 'SimpleStatsCacheBySpecies' tag", async () => {
 			const client = makeSimpleMockSupabaseClient({
 				basic: [basicRow({ species_id: 1 }), basicRow({ species_id: 2 })],
 				biometrics: [biometricsRow({ species_id: 1 })],
@@ -1024,6 +1027,9 @@ describe('refreshSimpleStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
+			expect(failedRefreshRows(client, 0)).toEqual([
+				expect.objectContaining({ cache_table: 'SimpleStatsCacheBySpecies' })
+			]);
 			expect(failedRefreshRows(client, 1)).toEqual([
 				expect.objectContaining({ cache_table: 'SimpleStatsCache' })
 			]);
@@ -1214,12 +1220,15 @@ describe('refreshComplexStatsCache', () => {
 			expect(written).toHaveLength(1);
 			expect(written[0].species_id).toBe(1);
 			// ...and the anomaly was logged with enough context to act on, rather
-			// than a value being fabricated for species 2.
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
+			// than a value being fabricated for species 2. The species-grouped
+			// pass (logged first) tags the anomaly with its own
+			// 'ComplexStatsCacheBySpecies' cache_table (#1182).
+			expect(consoleErrorSpy).toHaveBeenNthCalledWith(
+				1,
 				expect.any(String),
 				expect.objectContaining({
 					groupId: GROUP_ID,
-					cacheTable: 'ComplexStatsCache',
+					cacheTable: 'ComplexStatsCacheBySpecies',
 					temporalUnit: 'day',
 					speciesId: 2,
 					timePeriod: '2026-03-01',
@@ -1258,7 +1267,7 @@ describe('refreshComplexStatsCache', () => {
 			});
 		}
 
-		it("writes a FailedStatsCacheRefreshes row tagged with this cache's own cache_table", async () => {
+		it("writes a FailedStatsCacheRefreshes row tagged with this (species-grouped) pass's own 'ComplexStatsCacheBySpecies' cache_table", async () => {
 			const client = clientWithAnomalies([2]);
 
 			await refreshComplexStatsCache(client as never, {
@@ -1271,9 +1280,10 @@ describe('refreshComplexStatsCache', () => {
 			expect(failedRefreshRows(client)).toEqual([
 				{
 					group_id: GROUP_ID,
-					// The one column separating these rows from
-					// refreshSimpleStatsCache's in the same shared table.
-					cache_table: 'ComplexStatsCache',
+					// The column separating these rows from
+					// refreshSimpleStatsCache's in the same shared table, and the
+					// species-grouped pass's rows from its non-species sibling's.
+					cache_table: 'ComplexStatsCacheBySpecies',
 					temporal_unit: 'day',
 					species_id: 2,
 					time_period: '2026-03-01',
@@ -1401,7 +1411,7 @@ describe('refreshComplexStatsCache', () => {
 			}
 		});
 
-		it("dead-letters an anomaly from this pass under the same 'ComplexStatsCache' tag as the species-grouped pass", async () => {
+		it("dead-letters an anomaly from this pass under its own plain 'ComplexStatsCache' tag, distinct from the species-grouped pass's 'ComplexStatsCacheBySpecies' tag", async () => {
 			const client = makeRpcMockClient({
 				stats_cache_new_adult_metrics: [
 					newAdultRow({ species_id: 1 }),
@@ -1416,6 +1426,9 @@ describe('refreshComplexStatsCache', () => {
 				periods: ['2026-03-01']
 			});
 
+			expect(failedRefreshRows(client, 0)).toEqual([
+				expect.objectContaining({ cache_table: 'ComplexStatsCacheBySpecies' })
+			]);
 			expect(failedRefreshRows(client, 1)).toEqual([
 				expect.objectContaining({ cache_table: 'ComplexStatsCache' })
 			]);
