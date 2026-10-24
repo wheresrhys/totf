@@ -25,6 +25,7 @@ import {
 	DemonRecordsBatchWriter,
 	EncounterRowBatchWriter,
 	ImportJobTracker,
+	CasualtyEncounterError,
 	processEncounterRow,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
@@ -56,6 +57,7 @@ export interface ImportRowCounts {
 	totalRecords: number;
 	successfulRecords: number;
 	failedRecords: number;
+	skippedRecords: number;
 }
 
 /**
@@ -97,17 +99,26 @@ export function createRowLimiter(concurrency: number) {
  * lives inside the `processRow` the caller builds, around the domain-table write
  * alone (see `createRowLimiter`).
  *
+ * `isSkippable` tells a deliberately-skipped row (e.g. a ringless/casualty row
+ * rejecting with `CasualtyEncounterError`) apart from a genuine failure — such a
+ * row is counted in `skippedRecords`, not `failedRecords`, and logged with a
+ * plain skip message instead of the raw error. Defaults to never skipping, so a
+ * caller that doesn't pass it keeps today's behaviour of counting every
+ * rejection as a failure.
+ *
  * Extracted from `importCSV` so the dispatch behaviour is unit-testable without
  * a filesystem, a CSV parser or a database.
  */
 export async function runRows<Row>(
 	rows: Iterable<Row> | AsyncIterable<Row>,
 	processRow: (row: Row) => Promise<void>,
-	onAllRowsDispatched: () => Promise<void> = async () => {}
+	onAllRowsDispatched: () => Promise<void> = async () => {},
+	isSkippable: (err: unknown) => boolean = () => false
 ): Promise<ImportRowCounts> {
 	let totalRecords = 0;
 	let successfulRecords = 0;
 	let failedRecords = 0;
+	let skippedRecords = 0;
 	// Settled rows are nulled out rather than left in place, so a large import
 	// doesn't retain every resolved promise until the end.
 	const pendingRows: (Promise<void> | null)[] = [];
@@ -124,8 +135,15 @@ export async function runRows<Row>(
 					successfulRecords++;
 				},
 				(err) => {
-					console.log(err);
-					failedRecords++;
+					if (isSkippable(err)) {
+						skippedRecords++;
+						console.log(
+							`Skipping row ${rowIndex + 1}: casualties to unringed birds are not yet supported in totf`
+						);
+					} else {
+						console.log(err);
+						failedRecords++;
+					}
 				}
 			)
 			.then(() => {
@@ -137,7 +155,7 @@ export async function runRows<Row>(
 
 	await Promise.all(pendingRows.filter((p) => Boolean(p)));
 
-	return { totalRecords, successfulRecords, failedRecords };
+	return { totalRecords, successfulRecords, failedRecords, skippedRecords };
 }
 
 export interface RunImportOptions {
@@ -246,7 +264,8 @@ export async function runImport(options: RunImportOptions): Promise<void> {
 				// when its chunk lands, so `runRows`' own `Promise.all` over the rows
 				// would deadlock on the trailing chunk if it ran first.
 				await encounterRowBatchWriter.flushRemaining();
-			}
+			},
+			(err) => err instanceof CasualtyEncounterError
 		);
 	} catch (error) {
 		// `runRows` absorbs per-row failures into its `failedRecords`
@@ -267,11 +286,13 @@ export async function runImport(options: RunImportOptions): Promise<void> {
 		throw error;
 	}
 
-	const { totalRecords, successfulRecords, failedRecords } = rowCounts;
+	const { totalRecords, successfulRecords, failedRecords, skippedRecords } =
+		rowCounts;
 	await importJobTracker.completeImportJob(importJobId, {
 		processed: totalRecords,
 		successful: successfulRecords,
-		failed: failedRecords
+		failed: failedRecords,
+		skipped: skippedRecords
 	});
 
 	await dispatchStatsCacheRefreshEvents(
@@ -285,6 +306,7 @@ export async function runImport(options: RunImportOptions): Promise<void> {
 	console.log(`Total records: ${totalRecords}`);
 	console.log(`Successful: ${successfulRecords}`);
 	console.log(`Failed: ${failedRecords}`);
+	console.log(`Skipped: ${skippedRecords}`);
 }
 
 export async function importCSV(options: ImportOptions): Promise<void> {

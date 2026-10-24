@@ -25,6 +25,7 @@ export type ImportCompleteMessage = {
 	processed: number;
 	successful: number;
 	failed: number;
+	skipped: number;
 };
 export type ImportTimeoutMessage = {
 	type: 'timeout';
@@ -90,6 +91,7 @@ export async function POST(request: Request): Promise<Response> {
 			let processed = 0;
 			let successful = 0;
 			let failed = 0;
+			let skipped = 0;
 			let startDate: string | null = null;
 			let endDate: string | null = null;
 			let timedOut = false;
@@ -193,7 +195,11 @@ export async function POST(request: Request): Promise<Response> {
 							timedOut = true;
 							return;
 						}
-						if (!(err instanceof CasualtyEncounterError)) failed++;
+						if (err instanceof CasualtyEncounterError) {
+							skipped++;
+						} else {
+							failed++;
+						}
 					}
 					processed++;
 					if (processed % 10 === 0) send({ type: 'progress', processed });
@@ -226,14 +232,15 @@ export async function POST(request: Request): Promise<Response> {
 					await importJobTracker.completeImportJob(importJobId, {
 						processed,
 						successful,
-						failed
+						failed,
+						skipped
 					});
 					await dispatchStatsCacheRefreshEvents(
 						importJobId,
 						ringingGroupId,
 						demonRecordsBatchWriter.getDistinctDates()
 					);
-					send({ type: 'complete', processed, successful, failed });
+					send({ type: 'complete', processed, successful, failed, skipped });
 				}
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
