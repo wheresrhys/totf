@@ -18,6 +18,7 @@ type ImportState =
 			processed: number;
 			successful: number;
 			failed: number;
+			skipped: number;
 	  }
 	| {
 			status: 'timeout';
@@ -93,7 +94,8 @@ export function ImportPageContent() {
 							status: 'complete',
 							processed: message.processed,
 							successful: message.successful,
-							failed: message.failed
+							failed: message.failed,
+							skipped: message.skipped
 						});
 						break;
 					case 'timeout':
@@ -173,7 +175,10 @@ export function ImportPageContent() {
 			{state.status === 'complete' && (
 				<p className="mt-4">
 					Import complete: {state.successful} rows imported successfully
-					{state.failed > 0 && `, ${state.failed} failed`}.
+					{state.failed > 0 && `, ${state.failed} failed`}
+					{state.skipped > 0 &&
+						`, ${state.skipped} skipped (casualties to unringed birds are not yet supported)`}
+					.
 				</p>
 			)}
 

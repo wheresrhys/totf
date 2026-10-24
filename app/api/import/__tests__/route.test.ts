@@ -207,7 +207,8 @@ describe('POST /api/import', () => {
 				type: 'complete',
 				processed: 2,
 				successful: 2,
-				failed: 0
+				failed: 0,
+				skipped: 0
 			});
 		});
 
@@ -303,7 +304,8 @@ describe('POST /api/import', () => {
 				type: 'complete',
 				processed: 2,
 				successful: 2,
-				failed: 0
+				failed: 0,
+				skipped: 0
 			});
 		});
 	});
@@ -328,11 +330,12 @@ describe('POST /api/import', () => {
 				type: 'complete',
 				processed: 3,
 				successful: 2,
-				failed: 1
+				failed: 1,
+				skipped: 0
 			});
 		});
 
-		it('does not count CasualtyEncounterError rows as failed', async () => {
+		it('counts a CasualtyEncounterError row as skipped, not failed', async () => {
 			const { processEncounterRow, CasualtyEncounterError } =
 				await import('@/lib/demon-import');
 			vi.mocked(processEncounterRow)
@@ -347,7 +350,8 @@ describe('POST /api/import', () => {
 				type: 'complete',
 				processed: 2,
 				successful: 1,
-				failed: 0
+				failed: 0,
+				skipped: 1
 			});
 		});
 
@@ -478,7 +482,7 @@ describe('POST /api/import', () => {
 			expect(mockImportJobTracker.createImportJob).toHaveBeenCalledWith(1);
 			expect(mockImportJobTracker.completeImportJob).toHaveBeenCalledWith(
 				IMPORT_JOB_ID,
-				{ processed: 2, successful: 2, failed: 0 }
+				{ processed: 2, successful: 2, failed: 0, skipped: 0 }
 			);
 		});
 
@@ -692,7 +696,8 @@ describe('POST /api/import', () => {
 				type: 'complete',
 				processed: 1,
 				successful: 1,
-				failed: 0
+				failed: 0,
+				skipped: 0
 			});
 			expect(messages.some((m) => m.type === 'error')).toBe(false);
 			expect(consoleErrorSpy).toHaveBeenCalledWith(

@@ -311,16 +311,23 @@ export function createRingSequenceLinker(supabaseClient: SupabaseClient) {
 }
 
 /**
- * The three row counts both import entry points already compute, under the one set
- * of names the `ImportJobs` columns use. The web route's `ImportCompleteMessage`
- * (`{processed, successful, failed}`) matches this shape as-is; the CLI script's
- * `ImportRowCounts` (`{totalRecords, successfulRecords, failedRecords}`) is the same
- * three numbers under different names and maps onto it at the call site.
+ * The four row counts both import entry points already compute, under the one set
+ * of names the `ImportJobs` columns use for the first three. The web route's
+ * `ImportCompleteMessage` (`{processed, successful, failed, skipped}`) matches this
+ * shape as-is; the CLI script's `ImportRowCounts`
+ * (`{totalRecords, successfulRecords, failedRecords, skippedRecords}`) is the same
+ * four numbers under different names and maps onto it at the call site.
+ *
+ * `skipped` (a ringless/casualty row — see `CasualtyEncounterError`) is not
+ * persisted to `ImportJobs`: `completeImportJob` still only writes
+ * `rows_processed`/`rows_successful`/`rows_failed`, so it's in-memory for the
+ * current run only.
  */
 export type ImportJobRowCounts = {
 	processed: number;
 	successful: number;
 	failed: number;
+	skipped: number;
 };
 
 /**

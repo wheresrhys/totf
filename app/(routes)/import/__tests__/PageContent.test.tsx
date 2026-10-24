@@ -60,6 +60,67 @@ afterEach(() => {
 });
 
 describe('ImportPageContent', () => {
+	describe('complete message summary sentence', () => {
+		async function renderCompleteMessage(counts: {
+			successful: number;
+			failed: number;
+			skipped: number;
+		}): Promise<void> {
+			mockImportResponse([
+				{
+					type: 'complete',
+					processed: counts.successful + counts.failed + counts.skipped,
+					...counts
+				}
+			]);
+			render(<ImportPageContent />);
+
+			uploadCsv();
+
+			await waitFor(() => {
+				expect(screen.getByText(/^Import complete:/)).toBeTruthy();
+			});
+		}
+
+		it('renders only the successful count when failed and skipped are both zero', async () => {
+			await renderCompleteMessage({ successful: 5, failed: 0, skipped: 0 });
+
+			expect(
+				screen.getByText('Import complete: 5 rows imported successfully.')
+			).toBeTruthy();
+		});
+
+		it('appends the failed clause when failed is greater than zero', async () => {
+			await renderCompleteMessage({ successful: 5, failed: 2, skipped: 0 });
+
+			expect(
+				screen.getByText(
+					'Import complete: 5 rows imported successfully, 2 failed.'
+				)
+			).toBeTruthy();
+		});
+
+		it('appends the skipped clause with the casualties-to-unringed-birds wording when skipped is greater than zero', async () => {
+			await renderCompleteMessage({ successful: 5, failed: 0, skipped: 3 });
+
+			expect(
+				screen.getByText(
+					'Import complete: 5 rows imported successfully, 3 skipped (casualties to unringed birds are not yet supported).'
+				)
+			).toBeTruthy();
+		});
+
+		it('appends both clauses, failed then skipped, when both are greater than zero', async () => {
+			await renderCompleteMessage({ successful: 5, failed: 2, skipped: 3 });
+
+			expect(
+				screen.getByText(
+					'Import complete: 5 rows imported successfully, 2 failed, 3 skipped (casualties to unringed birds are not yet supported).'
+				)
+			).toBeTruthy();
+		});
+	});
+
 	describe('unrecognised_locations message', () => {
 		it('renders UnrecognisedLocationsReview with the reported names', async () => {
 			mockFetchGroupLocations.mockResolvedValue([]);

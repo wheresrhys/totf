@@ -4,6 +4,7 @@ import { pRateLimit } from 'p-ratelimit';
 import {
 	DemonRecordsBatchWriter,
 	EncounterRowBatchWriter,
+	CasualtyEncounterError,
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames,
 	processEncounterRow,
@@ -101,6 +102,7 @@ vi.mock('../../../lib/demon-import', () => ({
 		return mockImportJobTracker;
 	}),
 	processEncounterRow: vi.fn(async () => {}),
+	CasualtyEncounterError: class CasualtyEncounterError extends Error {},
 	getDistinctLocationNames: vi.fn(() => ['Garden Trap']),
 	// Every location in the CSV is already known unless a test says otherwise.
 	findUnrecognisedLocationNames: vi.fn(async () => [] as string[]),
@@ -251,13 +253,55 @@ describe('importCSV ImportJobs tracking', () => {
 		});
 
 		expect(mockImportJobTracker.createImportJob).toHaveBeenCalledWith(7);
-		// `runRows`' totalRecords/successfulRecords/failedRecords, renamed onto the
-		// processed/successful/failed shape the column names use.
+		// `runRows`' totalRecords/successfulRecords/failedRecords/skippedRecords,
+		// renamed onto the processed/successful/failed/skipped shape the column
+		// names (bar skipped, which isn't persisted) use.
 		expect(mockImportJobTracker.completeImportJob).toHaveBeenCalledWith(
 			IMPORT_JOB_ID,
-			{ processed: csvRows.length, successful: csvRows.length, failed: 0 }
+			{
+				processed: csvRows.length,
+				successful: csvRows.length,
+				failed: 0,
+				skipped: 0
+			}
 		);
 		expect(mockImportJobTracker.failImportJob).not.toHaveBeenCalled();
+	});
+
+	it('counts a CasualtyEncounterError row as skipped rather than failed, and logs it accordingly', async () => {
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		vi.mocked(processEncounterRow)
+			.mockResolvedValueOnce({ visitDate: '2024-06-01' })
+			.mockRejectedValueOnce(new CasualtyEncounterError());
+
+		await importCSV({
+			csvFilePath: '/fake/alpha.csv',
+			ringingGroupName: 'Alpha'
+		});
+
+		expect(mockImportJobTracker.completeImportJob).toHaveBeenCalledWith(
+			IMPORT_JOB_ID,
+			{ processed: 2, successful: 1, failed: 0, skipped: 1 }
+		);
+		expect(consoleLogSpy).toHaveBeenCalledWith(
+			expect.stringContaining(
+				'casualties to unringed birds are not yet supported in totf'
+			)
+		);
+	});
+
+	it('prints a Skipped: N line alongside the existing summary lines', async () => {
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		vi.mocked(processEncounterRow)
+			.mockResolvedValueOnce({ visitDate: '2024-06-01' })
+			.mockRejectedValueOnce(new CasualtyEncounterError());
+
+		await importCSV({
+			csvFilePath: '/fake/alpha.csv',
+			ringingGroupName: 'Alpha'
+		});
+
+		expect(consoleLogSpy).toHaveBeenCalledWith('Skipped: 1');
 	});
 
 	it('marks the job failed and re-raises when the run throws systemically', async () => {
@@ -443,7 +487,63 @@ describe('runRows', () => {
 		expect(counts).toEqual({
 			totalRecords: 5,
 			successfulRecords: 4,
-			failedRecords: 1
+			failedRecords: 1,
+			skippedRecords: 0
+		});
+	});
+
+	it('counts a row whose rejection matches isSkippable as skipped, not failed', async () => {
+		class SkippableError extends Error {}
+		const counts = await runRows(
+			[1, 2, 3],
+			async (row) => {
+				if (row === 2) throw new SkippableError();
+			},
+			undefined,
+			(err) => err instanceof SkippableError
+		);
+
+		expect(counts).toEqual({
+			totalRecords: 3,
+			successfulRecords: 2,
+			failedRecords: 0,
+			skippedRecords: 1
+		});
+	});
+
+	it('logs a skip message naming the row position, rather than the raw error, for a skippable rejection', async () => {
+		const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		class SkippableError extends Error {}
+
+		await runRows(
+			[1, 2],
+			async (row) => {
+				if (row === 2) throw new SkippableError('raw error message');
+			},
+			undefined,
+			(err) => err instanceof SkippableError
+		);
+
+		expect(consoleLogSpy).toHaveBeenCalledWith(
+			expect.stringContaining(
+				'casualties to unringed birds are not yet supported in totf'
+			)
+		);
+		expect(consoleLogSpy).not.toHaveBeenCalledWith(
+			expect.objectContaining({ message: 'raw error message' })
+		);
+	});
+
+	it('falls back to counting every rejection as failed when no isSkippable predicate is given', async () => {
+		const counts = await runRows([1, 2], async (row) => {
+			if (row === 2) throw new Error('bad row');
+		});
+
+		expect(counts).toEqual({
+			totalRecords: 2,
+			successfulRecords: 1,
+			failedRecords: 1,
+			skippedRecords: 0
 		});
 	});
 
