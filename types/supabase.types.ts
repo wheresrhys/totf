@@ -52,6 +52,7 @@ export type Database = {
       }
       ComplexStatsCache: {
         Row: {
+          created_at: string
           group_id: number
           id: number
           new_adult_bird_count: number
@@ -61,8 +62,10 @@ export type Database = {
           returning_new_unknown_age_bird_count: number
           temporal_unit: string
           time_period: string
+          updated_at: string
         }
         Insert: {
+          created_at?: string
           group_id: number
           id?: number
           new_adult_bird_count: number
@@ -72,8 +75,10 @@ export type Database = {
           returning_new_unknown_age_bird_count: number
           temporal_unit: string
           time_period: string
+          updated_at?: string
         }
         Update: {
+          created_at?: string
           group_id?: number
           id?: number
           new_adult_bird_count?: number
@@ -83,6 +88,7 @@ export type Database = {
           returning_new_unknown_age_bird_count?: number
           temporal_unit?: string
           time_period?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -96,6 +102,7 @@ export type Database = {
       }
       ComplexStatsCacheBySpecies: {
         Row: {
+          created_at: string
           group_id: number
           id: number
           new_adult_bird_count: number
@@ -106,8 +113,10 @@ export type Database = {
           species_id: number
           temporal_unit: string
           time_period: string
+          updated_at: string
         }
         Insert: {
+          created_at?: string
           group_id: number
           id?: number
           new_adult_bird_count: number
@@ -118,8 +127,10 @@ export type Database = {
           species_id: number
           temporal_unit: string
           time_period: string
+          updated_at?: string
         }
         Update: {
+          created_at?: string
           group_id?: number
           id?: number
           new_adult_bird_count?: number
@@ -130,6 +141,7 @@ export type Database = {
           species_id?: number
           temporal_unit?: string
           time_period?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -683,6 +695,7 @@ export type Database = {
           avg_weight: number | null
           avg_wing: number | null
           bird_count: number
+          created_at: string
           effort_per_encounter: string
           effort_per_session: string
           encounter_count: number
@@ -714,6 +727,7 @@ export type Database = {
           total_effort: string
           unknown_age_bird_count: number
           unknown_age_enc_count: number
+          updated_at: string
         }
         Insert: {
           adult_bird_count: number
@@ -722,6 +736,7 @@ export type Database = {
           avg_weight?: number | null
           avg_wing?: number | null
           bird_count: number
+          created_at?: string
           effort_per_encounter: string
           effort_per_session: string
           encounter_count: number
@@ -753,6 +768,7 @@ export type Database = {
           total_effort: string
           unknown_age_bird_count: number
           unknown_age_enc_count: number
+          updated_at?: string
         }
         Update: {
           adult_bird_count?: number
@@ -761,6 +777,7 @@ export type Database = {
           avg_weight?: number | null
           avg_wing?: number | null
           bird_count?: number
+          created_at?: string
           effort_per_encounter?: string
           effort_per_session?: string
           encounter_count?: number
@@ -792,6 +809,7 @@ export type Database = {
           total_effort?: string
           unknown_age_bird_count?: number
           unknown_age_enc_count?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -811,6 +829,7 @@ export type Database = {
           avg_weight: number | null
           avg_wing: number | null
           bird_count: number
+          created_at: string
           effort_per_encounter: string
           effort_per_session: string
           encounter_count: number
@@ -843,6 +862,7 @@ export type Database = {
           total_effort: string
           unknown_age_bird_count: number
           unknown_age_enc_count: number
+          updated_at: string
         }
         Insert: {
           adult_bird_count: number
@@ -851,6 +871,7 @@ export type Database = {
           avg_weight?: number | null
           avg_wing?: number | null
           bird_count: number
+          created_at?: string
           effort_per_encounter: string
           effort_per_session: string
           encounter_count: number
@@ -883,6 +904,7 @@ export type Database = {
           total_effort: string
           unknown_age_bird_count: number
           unknown_age_enc_count: number
+          updated_at?: string
         }
         Update: {
           adult_bird_count?: number
@@ -891,6 +913,7 @@ export type Database = {
           avg_weight?: number | null
           avg_wing?: number | null
           bird_count?: number
+          created_at?: string
           effort_per_encounter?: string
           effort_per_session?: string
           encounter_count?: number
@@ -923,6 +946,7 @@ export type Database = {
           total_effort?: string
           unknown_age_bird_count?: number
           unknown_age_enc_count?: number
+          updated_at?: string
         }
         Relationships: [
           {

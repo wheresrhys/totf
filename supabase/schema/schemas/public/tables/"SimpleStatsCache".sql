@@ -79,7 +79,9 @@ CREATE TABLE public."SimpleStatsCache" (
 	unknown_age_enc_count bigint NOT NULL,
 	postjuv_juv_enc_count bigint NOT NULL,
 	new_postjuv_juv_enc_count bigint NOT NULL,
-	new_postjuv_enc_count bigint NOT NULL
+	new_postjuv_enc_count bigint NOT NULL,
+	created_at timestamptz DEFAULT NOW() NOT NULL,
+	updated_at timestamptz DEFAULT NOW() NOT NULL
 );
 
 COMMENT ON TABLE public."SimpleStatsCache" IS 'One row per (group_id, temporal_unit, time_period): every period-local metric shared between core_stats_result, biometrics_stats_result and demographics_stats_result, for all species combined. Per-species rows live in "SimpleStatsCacheBySpecies"; lifetime-relative demographics columns live in "ComplexStatsCache".';
@@ -87,6 +89,16 @@ COMMENT ON TABLE public."SimpleStatsCache" IS 'One row per (group_id, temporal_u
 COMMENT ON COLUMN public."SimpleStatsCache".time_period IS 'The cell''s period, as the first date in it. NOT NULL: the all-time grain uses the sentinel date ''0001-01-01'' rather than a NULL, so a single plain UNIQUE constraint covers every grain and a native supabase-js .upsert() can name it as a conflict target.';
 
 CREATE INDEX idx_simple_stats_cache_group_id ON public."SimpleStatsCache" (group_id);
+
+-- Keeps updated_at current on every write; see the function's own comment for
+-- why this repo needs a trigger rather than a plain DEFAULT NOW() here — the
+-- write path's native supabase-js .upsert() never includes updated_at in its
+-- payload, so a DEFAULT alone would never refresh it on the ON CONFLICT DO
+-- UPDATE path.
+CREATE TRIGGER trigger_trg_set_updated_at BEFORE INSERT
+OR
+UPDATE ON public."SimpleStatsCache" FOR EACH ROW
+EXECUTE FUNCTION public.trg_set_updated_at ();
 
 -- SELECT/INSERT/UPDATE: strictly own-group only — no cross-group sharing via
 -- GroupDataSharing (nothing reads this table cross-group yet). No DELETE

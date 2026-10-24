@@ -258,6 +258,44 @@ export function testStatsCacheTableShape({
 			}
 		});
 
+		describe('timestamps', () => {
+			afterAll(deleteAllTestRows);
+
+			it('sets created_at and updated_at on insert', async () => {
+				const { data, error } = await ownerClient
+					.from(tableName)
+					.insert(ownerRow())
+					.select('created_at, updated_at')
+					.single();
+
+				expect(error).toBeNull();
+				expect(data?.created_at).not.toBeNull();
+				expect(data?.updated_at).not.toBeNull();
+			});
+
+			it('bumps updated_at but preserves created_at on update', async () => {
+				const { data: inserted, error: insertError } = await ownerClient
+					.from(tableName)
+					.insert(ownerRow())
+					.select('id, created_at, updated_at')
+					.single();
+				expect(insertError).toBeNull();
+
+				const { data: updated, error: updateError } = await ownerClient
+					.from(tableName)
+					.update({ [updatableColumn]: 999 })
+					.eq('id', inserted!.id)
+					.select('created_at, updated_at')
+					.single();
+
+				expect(updateError).toBeNull();
+				expect(updated?.created_at).toBe(inserted!.created_at);
+				expect(
+					new Date(updated!.updated_at).getTime()
+				).toBeGreaterThan(new Date(inserted!.updated_at).getTime());
+			});
+		});
+
 		describe('row level security and grants', () => {
 			afterAll(deleteAllTestRows);
 
