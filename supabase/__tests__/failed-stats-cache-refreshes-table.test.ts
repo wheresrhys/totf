@@ -124,6 +124,38 @@ describe('FailedStatsCacheRefreshes', () => {
 		});
 	});
 
+	describe('constraints', () => {
+		it.each([
+			'SimpleStatsCache',
+			'SimpleStatsCacheBySpecies',
+			'ComplexStatsCache',
+			'ComplexStatsCacheBySpecies',
+		] as const)(
+			"accepts cache_table value '%s'",
+			async (cacheTable) => {
+				const inserted = await ownerClient
+					.from('FailedStatsCacheRefreshes')
+					.insert({
+						...buildFailedRefreshRow({ groupId: ownerGroupId }),
+						cache_table: cacheTable,
+					})
+					.select('id')
+					.single();
+				expect(inserted.error).toBeNull();
+			}
+		);
+
+		it('rejects a cache_table value outside the four accepted tags', async () => {
+			const { error } = await ownerClient
+				.from('FailedStatsCacheRefreshes')
+				.insert({
+					...buildFailedRefreshRow({ groupId: ownerGroupId }),
+					cache_table: 'NotARealCacheTable',
+				});
+			expect(error?.code).toBe('23514'); // check_violation
+		});
+	});
+
 	describe('row level security', () => {
 		it('allows a group to read/insert its own rows', async () => {
 			const inserted = await ownerClient

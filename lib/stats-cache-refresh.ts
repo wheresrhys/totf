@@ -132,13 +132,29 @@ type ComplexMergedCell = Omit<
 	MergedCellKey;
 
 /**
+ * The four `cache_table` tags `FailedStatsCacheRefreshes`' CHECK constraint
+ * accepts (#1182) — one per (cache × species-grouped-or-not) combination, so
+ * an anomaly row records which of the four refresh passes produced it.
+ */
+type FailedRefreshCacheTable =
+	| 'SimpleStatsCache'
+	| 'SimpleStatsCacheBySpecies'
+	| 'ComplexStatsCache'
+	| 'ComplexStatsCacheBySpecies';
+
+/**
  * One dead-letter row for `FailedStatsCacheRefreshes` (#1167) — a cell a
  * refresh pass could not write. `id`/`created_at` are database-defaulted.
+ * `cache_table` is narrowed from the generated `Insert` type's bare `string`
+ * (the column is text + CHECK, not a Postgres enum) to the four-value union
+ * above.
  */
 type FailedRefreshRow = Omit<
 	Database['public']['Tables']['FailedStatsCacheRefreshes']['Insert'],
-	'id' | 'created_at'
->;
+	'id' | 'created_at' | 'cache_table'
+> & {
+	cache_table: FailedRefreshCacheTable;
+};
 
 /**
  * The one `FailedStatsCacheRefreshes.reason` value this module writes: the cell
@@ -520,7 +536,7 @@ function recordMissingCellAnomaly({
 	missingFromRpc
 }: {
 	groupId: number;
-	cacheTable: 'SimpleStatsCache' | 'ComplexStatsCache';
+	cacheTable: FailedRefreshCacheTable;
 	temporalUnit: TemporalUnit;
 	cellKey: string;
 	missingFromRpc: string[];
@@ -650,6 +666,7 @@ async function deadLetterAnomalies(
 type MergeMetricRowsParams = {
 	groupId: number;
 	temporalUnit: TemporalUnit;
+	groupBySpecies: boolean;
 	basicRows: BasicSessionMetricsRow[];
 	biometricsRows: BiometricsMetricsRow[];
 	birdAgeRows: BirdAgeMetricsRow[];
@@ -662,12 +679,16 @@ type MergeMetricRowsParams = {
  * share the same `stats_spine` call, so every cell key should appear in every
  * RPC's result — a cell key present in some but not all four is skipped,
  * logged, and returned as an anomaly for the caller to dead-letter (see
- * `recordMissingCellAnomaly`). Every OTHER cell in the batch is unaffected —
- * one anomalous cell never drops the rest of the refresh.
+ * `recordMissingCellAnomaly`), tagged `SimpleStatsCacheBySpecies` when
+ * `groupBySpecies` or plain `SimpleStatsCache` otherwise (#1182) — the same
+ * table `groupBySpecies` decides this pass writes its merged rows to. Every
+ * OTHER cell in the batch is unaffected — one anomalous cell never drops the
+ * rest of the refresh.
  */
 function mergeSimpleMetricRows({
 	groupId,
 	temporalUnit,
+	groupBySpecies,
 	basicRows,
 	biometricsRows,
 	birdAgeRows,
@@ -676,6 +697,9 @@ function mergeSimpleMetricRows({
 	mergedRows: SimpleMergedCell[];
 	anomalies: FailedRefreshRow[];
 } {
+	const cacheTable: FailedRefreshCacheTable = groupBySpecies
+		? 'SimpleStatsCacheBySpecies'
+		: 'SimpleStatsCache';
 	const basicByCell = indexByCell(basicRows);
 	const biometricsByCell = indexByCell(biometricsRows);
 	const birdAgeByCell = indexByCell(birdAgeRows);
@@ -708,7 +732,7 @@ function mergeSimpleMetricRows({
 			anomalies.push(
 				recordMissingCellAnomaly({
 					groupId,
-					cacheTable: 'SimpleStatsCache',
+					cacheTable,
 					temporalUnit,
 					cellKey: key,
 					missingFromRpc
@@ -769,6 +793,7 @@ function mergeSimpleMetricRows({
 type MergeComplexMetricRowsParams = {
 	groupId: number;
 	temporalUnit: TemporalUnit;
+	groupBySpecies: boolean;
 	newAdultRows: NewAdultMetricsRow[];
 	returningAgeRows: ReturningAgeMetricsRow[];
 };
@@ -781,7 +806,10 @@ type MergeComplexMetricRowsParams = {
  * `returning_*` columns — and both share the same `stats_spine` call, so every
  * cell key should appear in both results. A cell key present in one but not
  * the other is skipped, logged, and returned as an anomaly for the caller to
- * dead-letter (see `recordMissingCellAnomaly`); every OTHER cell in the batch
+ * dead-letter (see `recordMissingCellAnomaly`), tagged
+ * `ComplexStatsCacheBySpecies` when `groupBySpecies` or plain
+ * `ComplexStatsCache` otherwise (#1182) — the same table `groupBySpecies`
+ * decides this pass writes its merged rows to. Every OTHER cell in the batch
  * is unaffected.
  *
  * `group_id` and `temporal_unit` are deliberately absent from the merged rows:
@@ -791,12 +819,16 @@ type MergeComplexMetricRowsParams = {
 function mergeComplexMetricRows({
 	groupId,
 	temporalUnit,
+	groupBySpecies,
 	newAdultRows,
 	returningAgeRows
 }: MergeComplexMetricRowsParams): {
 	mergedRows: ComplexMergedCell[];
 	anomalies: FailedRefreshRow[];
 } {
+	const cacheTable: FailedRefreshCacheTable = groupBySpecies
+		? 'ComplexStatsCacheBySpecies'
+		: 'ComplexStatsCache';
 	const newAdultByCell = indexByCell(newAdultRows);
 	const returningAgeByCell = indexByCell(returningAgeRows);
 
@@ -821,7 +853,7 @@ function mergeComplexMetricRows({
 			anomalies.push(
 				recordMissingCellAnomaly({
 					groupId,
-					cacheTable: 'ComplexStatsCache',
+					cacheTable,
 					temporalUnit,
 					cellKey: key,
 					missingFromRpc
@@ -885,9 +917,9 @@ function mergeComplexMetricRows({
  *
  * Any cell `mergeSimpleMetricRows` had to skip is then dead-lettered to
  * `FailedStatsCacheRefreshes` in one batched insert (#1167) — see
- * `deadLetterAnomalies`. Both passes currently dead-letter under the same
- * `cache_table: 'SimpleStatsCache'` tag (the DB's CHECK constraint doesn't yet
- * distinguish them — see #1182), so an anomaly row can't yet tell you which
+ * `deadLetterAnomalies`. The species-grouped pass dead-letters under
+ * `cache_table: 'SimpleStatsCacheBySpecies'`, the non-species-grouped pass
+ * under plain `'SimpleStatsCache'` (#1182), so an anomaly row tells you which
  * pass produced it.
  *
  * Known-accepted limitation: a species whose *entire* history disappears
@@ -940,6 +972,7 @@ async function runSimpleStatsCacheRefreshPass(
 	const { mergedRows, anomalies } = mergeSimpleMetricRows({
 		groupId,
 		temporalUnit,
+		groupBySpecies,
 		basicRows,
 		biometricsRows,
 		birdAgeRows,
@@ -1027,10 +1060,11 @@ export async function refreshSimpleStatsCache(
  *
  * Any cell `mergeComplexMetricRows` had to skip is then dead-lettered to
  * `FailedStatsCacheRefreshes` in one batched insert (#1167), with
- * `cache_table = 'ComplexStatsCache'` distinguishing it from
- * `refreshSimpleStatsCache`'s rows in the same table — see
- * `deadLetterAnomalies`. Both passes currently dead-letter under that same
- * tag (see #1182 for widening the CHECK constraint to tell them apart).
+ * `cache_table` distinguishing both this cache from
+ * `refreshSimpleStatsCache`'s rows in the same table and this pass from its
+ * sibling: the species-grouped pass tags `'ComplexStatsCacheBySpecies'`, the
+ * non-species-grouped pass plain `'ComplexStatsCache'` (#1182) — see
+ * `deadLetterAnomalies`.
  *
  * Known-accepted limitation (shared with `refreshSimpleStatsCache`): a species
  * whose *entire* history disappears falls out of `stats_spine`'s species-set
@@ -1068,6 +1102,7 @@ async function runComplexStatsCacheRefreshPass(
 	const { mergedRows, anomalies } = mergeComplexMetricRows({
 		groupId,
 		temporalUnit,
+		groupBySpecies,
 		newAdultRows: (newAdultRows ?? []) as NewAdultMetricsRow[],
 		returningAgeRows: (returningAgeRows ?? []) as ReturningAgeMetricsRow[]
 	});
