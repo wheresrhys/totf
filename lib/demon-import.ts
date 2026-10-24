@@ -165,6 +165,14 @@ export class CasualtyEncounterError extends Error {
 	}
 }
 
+// '-' is DemOn's own sentinel for "no ring number" on a casualty row (confirmed
+// against a real export row) — not a guess, so don't extend this to other
+// placeholder values without the same kind of evidence.
+export function isRinglessRingNo(ring_no: string | null | undefined): boolean {
+	const trimmed = ring_no?.trim();
+	return !trimmed || trimmed === '-';
+}
+
 export function transformEmptyStringsToNull(
 	obj: Record<string, unknown>
 ): Record<string, unknown> {
@@ -534,9 +542,10 @@ type BufferedDemonRecord = {
  * `ring_no`/`encounter_date`/`encounter_time` are `NOT NULL` on `DemonRecords`
  * and are its dedup key, so a row missing any of them has no representable
  * staging row — most commonly a casualty record, which carries no ring number
- * and which `EncounterRowBatchWriter` rejects outright anyway. Such a row is
- * skipped here rather than failing its whole batch, and goes on to fail (or not)
- * in exactly the way it did before this staging step existed.
+ * (blank, or DemOn's `'-'` sentinel) and which `EncounterRowBatchWriter` rejects
+ * outright anyway. Such a row is skipped here rather than failing its whole
+ * batch, and goes on to fail (or not) in exactly the way it did before this
+ * staging step existed.
  *
  * `raw_row` is the untransformed row: the point of the table is a non-lossy
  * copy of what was submitted, so the empty-string-to-null normalisation the
@@ -548,7 +557,8 @@ function buildDemonRecord(
 	ringingGroupId: number
 ): DemonRecordsInsert | null {
 	const row = transformEmptyStringsToNull(rawRow) as DemonRow;
-	if (!row.ring_no || !row.visit_date || !row.capture_time) return null;
+	if (isRinglessRingNo(row.ring_no) || !row.visit_date || !row.capture_time)
+		return null;
 
 	return {
 		raw_row: rawRow,
@@ -1159,15 +1169,19 @@ export class EncounterRowBatchWriter {
 	 * Buffers `rawRow` for the next chunk of domain-table writes and resolves once
 	 * the whole chunk containing it has been written — not when it was buffered.
 	 *
-	 * A casualty record carries no ring number, so it has no representable Bird and
-	 * is filtered out before it can reach a chunk (where it would fail the whole
-	 * chunk's `Birds` upsert on a NOT NULL column). It rejects straight away with
-	 * the same `CasualtyEncounterError` the per-row writer always threw, which both
-	 * entry points already distinguish from a genuine failure.
+	 * A casualty record carries no ring number — blank, or DemOn's `'-'` sentinel —
+	 * so it has no representable Bird and is filtered out before it can reach a
+	 * chunk (where a `'-'`-ringed row would otherwise collide with every other
+	 * `'-'`-ringed row in the CSV on `Birds`' unique `ring_no`, tripping the
+	 * species-immutability trigger and failing the whole chunk). It rejects
+	 * straight away with the same `CasualtyEncounterError` the per-row writer
+	 * always threw, which both entry points already distinguish from a genuine
+	 * failure.
 	 */
 	writeEncounterRow(rawRow: DemonRow): Promise<{ visitDate: string }> {
 		const row = transformEmptyStringsToNull(rawRow) as DemonRow;
-		if (!row.ring_no) return Promise.reject(new CasualtyEncounterError());
+		if (isRinglessRingNo(row.ring_no))
+			return Promise.reject(new CasualtyEncounterError());
 
 		const rowIndex = this.rowsBuffered++;
 		// The executor runs synchronously, so the row is buffered before this
