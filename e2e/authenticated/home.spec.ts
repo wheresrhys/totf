@@ -13,7 +13,7 @@ test('alpha: shows own recent sessions by date', { tag: '@alpha' }, async ({ pag
 
 test('beta: shows own recent sessions by date', { tag: '@beta' }, async ({ page }) => {
 	await page.goto('/')
-	// Beta's only session is 2023-06-01
+	// Beta's only session is 2080-06-01
 	await expect(page.getByRole('link', { name: /1st June/ })).toBeVisible()
 })
 

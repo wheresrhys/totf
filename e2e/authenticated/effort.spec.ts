@@ -17,7 +17,7 @@ test('alpha: shows yearly data with non-zero encounter counts', { tag: '@alpha' 
 test('beta: shows yearly data with non-zero encounter counts', { tag: '@beta' }, async ({ page }) => {
 	await page.goto('/effort')
 	await expect(page.getByText('Total ringing effort')).toBeVisible()
-	await expect(page.getByRole('columnheader', { name: '2023' })).toBeVisible()
+	await expect(page.getByRole('columnheader', { name: '2080' })).toBeVisible()
 })
 
 test('gamma: shows the empty state (no own data, despite a GroupDataSharing grant from Beta)', { tag: '@gamma' }, async ({ page }) => {
