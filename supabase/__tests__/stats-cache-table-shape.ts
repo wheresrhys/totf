@@ -1,9 +1,8 @@
 /**
- * The shared table-shape contract for the four stats-cache tables (#1169) —
- * "SimpleStatsCache", "SimpleStatsCacheBySpecies", "ComplexStatsCache" and
- * "ComplexStatsCacheBySpecies".
+ * The shared table-shape contract for the stats-cache tables (#1169) —
+ * "SimpleStatsCache" and "SimpleStatsCacheBySpecies".
  *
- * All four police the same rules (one unique constraint, a NOT NULL
+ * Both police the same rules (one unique constraint, a NOT NULL
  * time_period with a sentinel for the all-time grain, a temporal_unit CHECK,
  * own-group-only RLS, and no DELETE grant) over different column sets, so the
  * assertions are identical per table while the row shape is not — the case

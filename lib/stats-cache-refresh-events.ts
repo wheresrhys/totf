@@ -11,9 +11,9 @@
  * own doc comment.
  *
  * One event per temporal unit rather than one per distinct period instance,
- * because `refreshSimpleStatsCache`/`refreshComplexStatsCache` (#1152/#1153)
- * take `{groupId, temporalUnit, periods?}` and refresh **one temporal unit per
- * call**, over however many periods are handed to them. Emitting an event per
+ * because `refreshSimpleStatsCache` (#1152) takes `{groupId, temporalUnit,
+ * periods?}` and refreshes **one temporal unit per call**, over however many
+ * periods are handed to it. Emitting an event per
  * month and per year touched (as this module originally did) would force the
  * consumer into a per-period loop, defeating the one-worker-invocation-per-
  * temporal-unit point of that design.
@@ -90,12 +90,11 @@ export type StatsCacheRefreshRpcParams = {
  * the same reason: no `stats_cache_*_metrics` RPC call ever gets narrower
  * because of it. Unlike `affectedDates`, it is carried by **every** event,
  * species-grouped: `lib/stats-cache-refresh.ts`'s species-grouped write
- * (`SimpleStatsCacheBySpecies`/`ComplexStatsCacheBySpecies`) can safely skip
- * rewriting an untouched species' cell for *any* temporal unit, including
- * `all-time` — that skip is orthogonal to how each temporal unit narrows by
- * date. The all-species-combined write
- * (`SimpleStatsCache`/`ComplexStatsCache`) never reads this field: its row
- * aggregates across every species, so it must always be rewritten in full
+ * (`SimpleStatsCacheBySpecies`) can safely skip rewriting an untouched
+ * species' cell for *any* temporal unit, including `all-time` — that skip is
+ * orthogonal to how each temporal unit narrows by date. The
+ * all-species-combined write (`SimpleStatsCache`) never reads this field: its
+ * row aggregates across every species, so it must always be rewritten in full
  * whenever a period is in scope, regardless of which species changed.
  */
 export type StatsCacheRefreshEvent = {
@@ -187,14 +186,11 @@ export function buildStatsCacheRefreshEvents(
 		// grouping, so two affected dates in the same calendar month of
 		// different years collapse onto one period here.
 		//
-		// `refreshSimpleStatsCache` narrows by these (#1178);
-		// `refreshComplexStatsCache` still full-replaces this temporal unit and
-		// ignores them, for the lifetime-relative reason set out on its
-		// `COMPLEX_NARROWING_TEMPORAL_UNITS`. Narrowing was blocked until #1178
-		// purely mechanically: `stats_spine`'s month-squashed branch used to
-		// ignore `month_filter` and emit all 12 calendar cells whatever was
-		// asked for, so 11 spurious zero cells came back per call and collided
-		// across the per-period fan-out.
+		// `refreshSimpleStatsCache` narrows by these (#1178). Narrowing was
+		// blocked until #1178 purely mechanically: `stats_spine`'s month-squashed
+		// branch used to ignore `month_filter` and emit all 12 calendar cells
+		// whatever was asked for, so 11 spurious zero cells came back per call
+		// and collided across the per-period fan-out.
 		stamp({
 			group_by_time_period: 'month-squashed',
 			periods: periodsTouched((date) => `2000-${date.slice(5, 7)}-01`)

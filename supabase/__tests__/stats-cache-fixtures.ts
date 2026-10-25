@@ -1,17 +1,16 @@
 /**
- * Shared fixtures for the four DB integration test files that write to the
- * stats-cache tables — "SimpleStatsCache"/"SimpleStatsCacheBySpecies" and
- * "ComplexStatsCache"/"ComplexStatsCacheBySpecies".
+ * Shared fixtures for the DB integration test files that write to the
+ * stats-cache tables — "SimpleStatsCache"/"SimpleStatsCacheBySpecies".
  *
  * The metric constants live here rather than being restated per file because
- * they enumerate every non-key column of their table: a column added to either
- * table family has exactly one place to be added here, instead of four that can
- * silently drift apart.
+ * they enumerate every non-key column of the table: a column added to it
+ * has exactly one place to be added here, instead of two that can silently
+ * drift apart.
  *
- * One row builder per table *family*, not per table: the species and
- * non-species halves differ only in whether a species_id is present, so each
+ * One row builder for the table family, not per table: the species and
+ * non-species halves differ only in whether a species_id is present, so the
  * builder omits the column entirely when no `speciesId` is passed. Omitting
- * rather than nulling matters — the non-species tables have no such column at
+ * rather than nulling matters — the non-species table has no such column at
  * all (#1169).
  */
 
@@ -75,17 +74,6 @@ export const DEFAULT_SIMPLE_METRICS = {
 	new_postjuv_enc_count: 1
 } as const;
 
-/** The five lifetime-relative "ComplexStatsCache"/"ComplexStatsCacheBySpecies"
- * metric columns, with a distinct representative bigint value each so a
- * round-trip test can tell them apart if any were ever mis-mapped. */
-export const DEFAULT_COMPLEX_METRICS = {
-	new_adult_bird_count: 11,
-	returning_age_1_bird_count: 22,
-	returning_age_2_bird_count: 33,
-	returning_age_3_plus_bird_count: 44,
-	returning_new_unknown_age_bird_count: 55
-} as const;
-
 /** The eight biometric columns are genuinely nullable in the schema (see
  * supabase/schema/schemas/public/tables/"SimpleStatsCache".sql) even though
  * DEFAULT_SIMPLE_METRICS gives each a representative non-null default — so the
@@ -123,9 +111,6 @@ export type SimpleStatsCacheRowParams = RowParams &
 	Partial<Omit<typeof DEFAULT_SIMPLE_METRICS, NullableBiometricColumn>> &
 	Partial<Record<NullableBiometricColumn, number | null>>;
 
-export type ComplexStatsCacheRowParams = RowParams &
-	Partial<typeof DEFAULT_COMPLEX_METRICS>;
-
 /** A full "SimpleStatsCache" row, or — given a `speciesId` — a full
  * "SimpleStatsCacheBySpecies" one. */
 export function buildSimpleStatsCacheRow({
@@ -141,25 +126,6 @@ export function buildSimpleStatsCacheRow({
 		time_period: timePeriod,
 		...(speciesId === undefined ? {} : { species_id: speciesId }),
 		...DEFAULT_SIMPLE_METRICS,
-		...metricOverrides
-	};
-}
-
-/** A full "ComplexStatsCache" row, or — given a `speciesId` — a full
- * "ComplexStatsCacheBySpecies" one. */
-export function buildComplexStatsCacheRow({
-	groupId,
-	speciesId,
-	temporalUnit = 'month',
-	timePeriod = randomFutureDate(),
-	...metricOverrides
-}: ComplexStatsCacheRowParams) {
-	return {
-		group_id: groupId,
-		temporal_unit: temporalUnit,
-		time_period: timePeriod,
-		...(speciesId === undefined ? {} : { species_id: speciesId }),
-		...DEFAULT_COMPLEX_METRICS,
 		...metricOverrides
 	};
 }

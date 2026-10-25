@@ -19,10 +19,13 @@
 -- reverted, because there is no defensible FK sentinel for "all species".
 --
 -- Deliberately excludes the lifetime-relative demographics columns
--- (new_adult_bird_count, returning_age_*) — those need a stricter
--- always-full-replace recompute policy and live in the separate
--- "ComplexStatsCache"/"ComplexStatsCacheBySpecies" tables so they don't drag
--- this table's narrowing-by-affected-dates recompute down with them.
+-- (new_adult_bird_count, returning_age_*) — those needed a stricter
+-- always-full-replace recompute policy and lived in a separate
+-- "ComplexStatsCache"/"ComplexStatsCacheBySpecies" pair so they didn't drag
+-- this table's narrowing-by-affected-dates recompute down with them. That
+-- pair's write path had already been disabled before it was removed
+-- entirely; mine the history if a lifetime-relative cache is ever needed
+-- again.
 --
 -- With exactly one unique constraint, rows are written with a native
 -- supabase-js .upsert() naming that constraint's column list as its conflict
@@ -84,7 +87,7 @@ CREATE TABLE public."SimpleStatsCache" (
 	updated_at timestamptz DEFAULT NOW() NOT NULL
 );
 
-COMMENT ON TABLE public."SimpleStatsCache" IS 'One row per (group_id, temporal_unit, time_period): every period-local metric shared between core_stats_result, biometrics_stats_result and demographics_stats_result, for all species combined. Per-species rows live in "SimpleStatsCacheBySpecies"; lifetime-relative demographics columns live in "ComplexStatsCache".';
+COMMENT ON TABLE public."SimpleStatsCache" IS 'One row per (group_id, temporal_unit, time_period): every period-local metric shared between core_stats_result, biometrics_stats_result and demographics_stats_result, for all species combined. Per-species rows live in "SimpleStatsCacheBySpecies".';
 
 COMMENT ON COLUMN public."SimpleStatsCache".time_period IS 'The cell''s period, as the first date in it. NOT NULL: the all-time grain uses the sentinel date ''0001-01-01'' rather than a NULL, so a single plain UNIQUE constraint covers every grain and a native supabase-js .upsert() can name it as a conflict target.';
 

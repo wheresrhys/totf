@@ -2,8 +2,7 @@
 -- read-only "metric-group" RPCs (see that function's header comment) whose rows
 -- a later orchestrator (T8a, refresh_simple_stats_cache) writes into the merged
 -- SimpleStatsCache table (T1a) — bird-level age-bucket counts are period-local,
--- so they land there rather than in the lifetime-relative ComplexStatsCache
--- (T1b).
+-- so they land there.
 --
 -- Keyed on species_id, not species_name, like every other stats_cache_* result
 -- type: these feed a cache-table write keyed on species id, unlike the

@@ -10,34 +10,28 @@ import type { Database } from '@/types/supabase.types';
 import { catchSupabaseErrors } from './supabase';
 
 /**
- * Populates both halves of the stats-cache split, one exported function per
- * table:
+ * Populates `SimpleStatsCache` (#1144, retrofitted by #1162), the
+ * **period-local** half of the stats-cache split — write side for the four
+ * read-only "metric-group" RPCs #1145/#1146/#1148/#1149 created
+ * (`stats_cache_basic_session_metrics`, `stats_cache_biometrics_metrics`,
+ * `stats_cache_bird_age_metrics`, `stats_cache_encounter_age_metrics`).
  *
- * - `refreshSimpleStatsCache` → `SimpleStatsCache` (#1144, retrofitted by
- *   #1162), the **period-local** half. Write side for the four read-only
- *   "metric-group" RPCs #1145/#1146/#1148/#1149 created
- *   (`stats_cache_basic_session_metrics`, `stats_cache_biometrics_metrics`,
- *   `stats_cache_bird_age_metrics`, `stats_cache_encounter_age_metrics`).
- * - `refreshComplexStatsCache` → `ComplexStatsCache` (#1147, retrofitted by
- *   #1162), the **lifetime-relative** half. Write side for the two read-only
- *   metric-group RPCs #1150/#1151 created (`stats_cache_new_adult_metrics`,
- *   `stats_cache_returning_age_metrics`).
+ * Merges the metric RPCs' per-cell rows in TS, then writes them to the
+ * cache's `*BySpecies` table with one native `supabase-js` `.upsert()` naming
+ * that table's single unique constraint as its conflict target (#1169 split
+ * the cache into a species and a non-species table precisely so there is
+ * exactly one such constraint to name; see `"SimpleStatsCache".sql`). Also
+ * dead-letters any cell it could not write to the `FailedStatsCacheRefreshes`
+ * table (#1167), tagged with the `cache_table` the refresh was targeting.
  *
- * Both share the same shape — merge their metric RPCs' per-cell rows in TS,
- * then write them to the cache's `*BySpecies` table with one native
- * `supabase-js` `.upsert()` naming that table's single unique constraint as
- * its conflict target (#1169 split each cache into a species and a non-species
- * table precisely so there is exactly one such constraint to name; see
- * `"SimpleStatsCache".sql`). Both also dead-letter any cell they could not
- * write to the shared `FailedStatsCacheRefreshes` table (#1167), tagged with
- * the `cache_table` the refresh was targeting.
+ * There used to be a sibling **lifetime-relative** half,
+ * `refreshComplexStatsCache` → `ComplexStatsCache`/`ComplexStatsCacheBySpecies`
+ * (#1147/#1150/#1151/#1169), whose production write call site had already
+ * been disabled (commit `c36f4cc9`) before the cache and both tables were
+ * removed entirely. If a lifetime-relative cache is ever needed again, mine
+ * that history rather than re-deriving the narrowing rules from scratch.
  *
- * What differs between them is **which temporal units may narrow by affected
- * dates**, and that difference is the entire reason the two tables and the two
- * functions exist separately — see `SIMPLE_NARROWING_TEMPORAL_UNITS` and
- * `COMPLEX_NARROWING_TEMPORAL_UNITS` below.
- *
- * The queue consumer that calls these per dispatched temporal-unit event is
+ * The queue consumer that calls this per dispatched temporal-unit event is
  * `app/api/queues/stats-cache-refresh-window/route.ts` (#1155) — this module
  * only refreshes one temporal unit per call, it does not loop over temporal
  * units itself.
@@ -60,10 +54,10 @@ export type TemporalUnit =
  * The species ids a refresh pass should narrow its species-grouped *write* to
  * — never its read: every metric RPC call is still made exactly as it is
  * without this field, over every species. When provided, only the
- * species-grouped write (`SimpleStatsCacheBySpecies`/`ComplexStatsCacheBySpecies`)
- * skips rewriting a cell whose `species_id` isn't in this list; the
- * all-species-combined write (`SimpleStatsCache`/`ComplexStatsCache`) ignores
- * it entirely, since that row aggregates across every species and must always
+ * species-grouped write (`SimpleStatsCacheBySpecies`) skips rewriting a cell
+ * whose `species_id` isn't in this list; the all-species-combined write
+ * (`SimpleStatsCache`) ignores it entirely, since that row aggregates across
+ * every species and must always
  * be rewritten in full whenever its period is in scope. `undefined` means "no
  * species narrowing" — every computed row is written, the pre-existing
  * behaviour. Orthogonal to `periods`/temporal-unit narrowing, and sound for
@@ -91,20 +85,6 @@ export type RefreshSimpleStatsCacheParams = RefreshSpeciesNarrowing & {
 	periods?: string[];
 };
 
-export type RefreshComplexStatsCacheParams = RefreshSpeciesNarrowing & {
-	groupId: number;
-	temporalUnit: TemporalUnit;
-	/**
-	 * The exact `time_period` values this refresh pass should write, in the
-	 * same string shape the metric RPCs return for that temporal unit.
-	 * Required (non-empty) for `day` — the only temporal unit this cache may
-	 * narrow by. Ignored entirely for `month`/`year`/`month-squashed`/
-	 * `all-time`, which always full-replace the whole group history regardless
-	 * of what's passed (and which the caller is expected to leave `undefined`).
-	 */
-	periods?: string[];
-};
-
 type BasicSessionMetricsRow =
 	Database['public']['CompositeTypes']['stats_cache_basic_session_metrics_result'];
 type BiometricsMetricsRow =
@@ -113,10 +93,6 @@ type BirdAgeMetricsRow =
 	Database['public']['CompositeTypes']['stats_cache_bird_age_metrics_result'];
 type EncounterAgeMetricsRow =
 	Database['public']['CompositeTypes']['stats_cache_encounter_age_metrics_result'];
-type NewAdultMetricsRow =
-	Database['public']['CompositeTypes']['stats_cache_new_adult_metrics_result'];
-type ReturningAgeMetricsRow =
-	Database['public']['CompositeTypes']['stats_cache_returning_age_metrics_result'];
 
 /**
  * The two columns every merged cell is keyed on, with the *metric RPCs'* own
@@ -143,23 +119,12 @@ type SimpleMergedCell = Omit<
 > &
 	MergedCellKey;
 
-/** The same, for `ComplexStatsCacheBySpecies`. */
-type ComplexMergedCell = Omit<
-	Database['public']['Tables']['ComplexStatsCacheBySpecies']['Insert'],
-	'id' | 'group_id' | 'temporal_unit' | keyof MergedCellKey
-> &
-	MergedCellKey;
-
 /**
- * The four `cache_table` tags `FailedStatsCacheRefreshes`' CHECK constraint
- * accepts (#1182) — one per (cache × species-grouped-or-not) combination, so
- * an anomaly row records which of the four refresh passes produced it.
+ * The two `cache_table` tags `FailedStatsCacheRefreshes`' CHECK constraint
+ * accepts (#1182) — one per species-grouped-or-not pass, so an anomaly row
+ * records which of the two refresh passes produced it.
  */
-type FailedRefreshCacheTable =
-	| 'SimpleStatsCache'
-	| 'SimpleStatsCacheBySpecies'
-	| 'ComplexStatsCache'
-	| 'ComplexStatsCacheBySpecies';
+type FailedRefreshCacheTable = 'SimpleStatsCache' | 'SimpleStatsCacheBySpecies';
 
 /**
  * One dead-letter row for `FailedStatsCacheRefreshes` (#1167) — a cell a
@@ -194,21 +159,19 @@ const MISSING_FROM_METRIC_RPC = 'missing_from_metric_rpc';
 const ALL_TIME_SENTINEL_DATE = '0001-01-01';
 
 /**
- * Both `*BySpecies` tables' sole unique constraint, as the bare column list
+ * `SimpleStatsCacheBySpecies`' sole unique constraint, as the bare column list
  * PostgREST's `onConflict` takes. Keep in sync **by hand** with
- * `simple_stats_cache_by_species_group_grain_period_species_key` and
- * `complex_stats_cache_by_species_grain_period_species_key` — see either
+ * `simple_stats_cache_by_species_group_grain_period_species_key` — see that
  * table's own schema file.
  */
 const BY_SPECIES_CONFLICT_TARGET =
 	'group_id,temporal_unit,time_period,species_id';
 
 /**
- * Both all-species-combined tables' sole unique constraint — the same column
- * list for both: `simple_stats_cache_group_grain_period_key` and
- * `complex_stats_cache_group_grain_period_key` — see either table's own
- * schema file. One fewer column than `BY_SPECIES_CONFLICT_TARGET`: these
- * tables have no `species_id` column at all.
+ * `SimpleStatsCache`'s sole unique constraint —
+ * `simple_stats_cache_group_grain_period_key`, see that table's own schema
+ * file. One fewer column than `BY_SPECIES_CONFLICT_TARGET`: this table has
+ * no `species_id` column at all.
  */
 const ALL_SPECIES_CONFLICT_TARGET = 'group_id,temporal_unit,time_period';
 
@@ -239,24 +202,6 @@ const SIMPLE_NARROWING_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> = new Set([
 	'month',
 	'year',
 	'month-squashed'
-]);
-
-/**
- * The temporal units `refreshComplexStatsCache` may narrow by affected dates —
- * `day` alone (#1153). Every `ComplexStatsCache` metric is
- * **lifetime-relative**: it reads a bird's whole *unwindowed* encounter history
- * to decide whether a cell's year is that bird's first-ever year, or what its
- * period-relative proven age is. A single backdated encounter anywhere in a
- * bird's history can therefore retroactively change a cell for some completely
- * different period than the one actually touched, so every temporal unit
- * coarser than `day` must always full-replace the group's whole history. `day`
- * is the one unit that narrows because it is also the only unit the dispatcher
- * carries an authoritative affected-date set for (see
- * `lib/stats-cache-refresh-events.ts` — `affectedDates` is restricted to the
- * day-range event).
- */
-const COMPLEX_NARROWING_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> = new Set([
-	'day'
 ]);
 
 /**
@@ -624,7 +569,7 @@ function recordMissingCellAnomaly({
  */
 async function writeBySpeciesRows<Cell extends MergedCellKey>(
 	supabaseClient: SupabaseClient,
-	cacheTable: 'SimpleStatsCacheBySpecies' | 'ComplexStatsCacheBySpecies',
+	cacheTable: 'SimpleStatsCacheBySpecies',
 	cells: Cell[],
 	{ groupId, temporalUnit }: { groupId: number; temporalUnit: TemporalUnit }
 ): Promise<void> {
@@ -644,11 +589,11 @@ async function writeBySpeciesRows<Cell extends MergedCellKey>(
 }
 
 /**
- * Writes one non-species-grouped refresh pass's merged cells to its cache's
- * all-species-combined table (`SimpleStatsCache`/`ComplexStatsCache`), the
- * sibling of `writeBySpeciesRows` for a `group_by_species: false` pass.
+ * Writes one non-species-grouped refresh pass's merged cells to the
+ * all-species-combined `SimpleStatsCache` table, the sibling of
+ * `writeBySpeciesRows` for a `group_by_species: false` pass.
  *
- * These tables have no `species_id` column at all (#1169 — a nullable
+ * This table has no `species_id` column at all (#1169 — a nullable
  * `species_id` meaning "all species" was tried and reverted), so `species_id`
  * is destructured off each cell and dropped rather than written; every cell
  * reaching here carries `species_id: null` anyway, since the RPCs collapse
@@ -659,7 +604,7 @@ async function writeBySpeciesRows<Cell extends MergedCellKey>(
  */
 async function writeAllSpeciesRows<Cell extends MergedCellKey>(
 	supabaseClient: SupabaseClient,
-	cacheTable: 'SimpleStatsCache' | 'ComplexStatsCache',
+	cacheTable: 'SimpleStatsCache',
 	cells: Cell[],
 	{ groupId, temporalUnit }: { groupId: number; temporalUnit: TemporalUnit }
 ): Promise<void> {
@@ -831,101 +776,6 @@ function mergeSimpleMetricRows({
 	return { mergedRows, anomalies };
 }
 
-type MergeComplexMetricRowsParams = {
-	groupId: number;
-	temporalUnit: TemporalUnit;
-	groupBySpecies: boolean;
-	newAdultRows: NewAdultMetricsRow[];
-	returningAgeRows: ReturningAgeMetricsRow[];
-};
-
-/**
- * Merges the two `ComplexStatsCache` metric RPCs' per-cell rows, keyed by
- * `(species_id, time_period)`, into that table's full column set. Their data
- * columns are disjoint — `stats_cache_new_adult_metrics` contributes
- * `new_adult_bird_count`, `stats_cache_returning_age_metrics` the four
- * `returning_*` columns — and both share the same `stats_spine` call, so every
- * cell key should appear in both results. A cell key present in one but not
- * the other is skipped, logged, and returned as an anomaly for the caller to
- * dead-letter (see `recordMissingCellAnomaly`), tagged
- * `ComplexStatsCacheBySpecies` when `groupBySpecies` or plain
- * `ComplexStatsCache` otherwise (#1182) — the same table `groupBySpecies`
- * decides this pass writes its merged rows to. Every OTHER cell in the batch
- * is unaffected.
- *
- * `group_id` and `temporal_unit` are deliberately absent from the merged rows:
- * one refresh pass covers exactly one of each, so `writeBySpeciesRows` adds
- * them once at the write rather than per cell here.
- */
-function mergeComplexMetricRows({
-	groupId,
-	temporalUnit,
-	groupBySpecies,
-	newAdultRows,
-	returningAgeRows
-}: MergeComplexMetricRowsParams): {
-	mergedRows: ComplexMergedCell[];
-	anomalies: FailedRefreshRow[];
-} {
-	const cacheTable: FailedRefreshCacheTable = groupBySpecies
-		? 'ComplexStatsCacheBySpecies'
-		: 'ComplexStatsCache';
-	const newAdultByCell = indexByCell(newAdultRows);
-	const returningAgeByCell = indexByCell(returningAgeRows);
-
-	const allCellKeys = new Set<string>([
-		...newAdultByCell.keys(),
-		...returningAgeByCell.keys()
-	]);
-
-	const mergedRows: ComplexMergedCell[] = [];
-	const anomalies: FailedRefreshRow[] = [];
-
-	for (const key of allCellKeys) {
-		const newAdult = newAdultByCell.get(key);
-		const returningAge = returningAgeByCell.get(key);
-
-		if (!newAdult || !returningAge) {
-			const missingFromRpc: string[] = [];
-			if (!newAdult) missingFromRpc.push('stats_cache_new_adult_metrics');
-			if (!returningAge) {
-				missingFromRpc.push('stats_cache_returning_age_metrics');
-			}
-			anomalies.push(
-				recordMissingCellAnomaly({
-					groupId,
-					cacheTable,
-					temporalUnit,
-					cellKey: key,
-					missingFromRpc
-				})
-			);
-			continue;
-		}
-
-		mergedRows.push({
-			species_id: newAdult.species_id,
-			// Passed straight through, NULL included — `writeBySpeciesRows` maps
-			// the all-time grain's NULL onto the table's sentinel date at the
-			// write, not here.
-			time_period: newAdult.time_period,
-			// Same SQL-level guarantee the simple merge's assertions rely on: the
-			// metric RPCs' composite return types mark every column nullable
-			// (Postgres composite types carry no NOT NULL metadata), but all five
-			// of these are COALESCEd to 0 in SQL — see each RPC's own schema file.
-			new_adult_bird_count: newAdult.new_adult_bird_count!,
-			returning_age_1_bird_count: returningAge.returning_age_1_bird_count!,
-			returning_age_2_bird_count: returningAge.returning_age_2_bird_count!,
-			returning_age_3_plus_bird_count:
-				returningAge.returning_age_3_plus_bird_count!,
-			returning_new_unknown_age_bird_count:
-				returningAge.returning_new_unknown_age_bird_count!
-		});
-	}
-
-	return { mergedRows, anomalies };
-}
-
 /**
  * Runs one `refreshSimpleStatsCache` pass — either the species-grouped one,
  * writing `SimpleStatsCacheBySpecies`, or the non-species-grouped one, writing
@@ -1080,134 +930,4 @@ export async function refreshSimpleStatsCache(
 ): Promise<void> {
 	await runSimpleStatsCacheRefreshPass(supabaseClient, params, true);
 	await runSimpleStatsCacheRefreshPass(supabaseClient, params, false);
-}
-
-/**
- * Runs one `refreshComplexStatsCache` pass — either the species-grouped one,
- * writing `ComplexStatsCacheBySpecies`, or the non-species-grouped one,
- * writing the all-species-combined `ComplexStatsCache` — for one `(groupId,
- * temporalUnit)` combination. `refreshComplexStatsCache` runs this twice,
- * sequentially, once per `groupBySpecies` value; the two passes are otherwise
- * identical, differing only in the `group_by_species` value sent to both
- * metric RPCs and which table the merged result lands in.
- *
- * `day` is the only temporal unit that narrows by `periods`: the two metric
- * RPCs are called over a `from_date`/`to_date` window spanning
- * `min(periods)`..`max(periods)`, and the merged result is filtered down to
- * just the periods actually touched before writing — the window call can
- * return extra untouched periods inside that range.
- *
- * `month`/`year`/`month-squashed`/`all-time` always full-replace the group's
- * whole history, ignoring `periods` entirely. That stricter rule — not shared
- * with `refreshSimpleStatsCache`, whose metrics are period-local — is the whole
- * reason this cache is a separate table and this a separate function; see
- * `COMPLEX_NARROWING_TEMPORAL_UNITS`.
- *
- * Independently of the above, the `groupBySpecies: true` pass also narrows by
- * `speciesIds` when given, for every temporal unit including `all-time` — see
- * `RefreshSpeciesNarrowing`'s own doc comment. The `groupBySpecies: false`
- * pass never does, for the same reason `refreshSimpleStatsCache`'s doesn't.
- *
- * Writes go through exactly one `.upsert()` — one call per pass, not one per
- * metric RPC's worth of rows. See `writeBySpeciesRows`/`writeAllSpeciesRows`.
- *
- * Any cell `mergeComplexMetricRows` had to skip is then dead-lettered to
- * `FailedStatsCacheRefreshes` in one batched insert (#1167), with
- * `cache_table` distinguishing both this cache from
- * `refreshSimpleStatsCache`'s rows in the same table and this pass from its
- * sibling: the species-grouped pass tags `'ComplexStatsCacheBySpecies'`, the
- * non-species-grouped pass plain `'ComplexStatsCache'` (#1182) — see
- * `deadLetterAnomalies`.
- *
- * Known-accepted limitation (shared with `refreshSimpleStatsCache`): a species
- * whose *entire* history disappears falls out of `stats_spine`'s species-set
- * entirely, so it never gets a fresh row written to overwrite a stale one — an
- * upsert can only ever refresh cells the spine still produces. Out of scope.
- */
-async function runComplexStatsCacheRefreshPass(
-	supabaseClient: SupabaseClient,
-	{
-		groupId,
-		temporalUnit,
-		periods,
-		speciesIds
-	}: RefreshComplexStatsCacheParams,
-	groupBySpecies: boolean
-): Promise<void> {
-	const touchedPeriods = periods ?? [];
-
-	const rpcParams = buildMetricRpcParams(
-		groupId,
-		temporalUnit,
-		touchedPeriods,
-		COMPLEX_NARROWING_TEMPORAL_UNITS,
-		groupBySpecies
-	);
-	if (rpcParams === null) {
-		// Day temporal unit, nothing touched this pass — nothing to refresh.
-		return;
-	}
-
-	const [newAdultRows, returningAgeRows] = await Promise.all([
-		supabaseClient
-			.rpc('stats_cache_new_adult_metrics', rpcParams)
-			.then(catchSupabaseErrors),
-		supabaseClient
-			.rpc('stats_cache_returning_age_metrics', rpcParams)
-			.then(catchSupabaseErrors)
-	]);
-
-	const { mergedRows, anomalies } = mergeComplexMetricRows({
-		groupId,
-		temporalUnit,
-		groupBySpecies,
-		newAdultRows: (newAdultRows ?? []) as NewAdultMetricsRow[],
-		returningAgeRows: (returningAgeRows ?? []) as ReturningAgeMetricsRow[]
-	});
-
-	const rowsToWrite = filterToTouchedPeriods(
-		mergedRows,
-		temporalUnit,
-		touchedPeriods,
-		COMPLEX_NARROWING_TEMPORAL_UNITS
-	);
-
-	if (groupBySpecies) {
-		await writeBySpeciesRows(
-			supabaseClient,
-			'ComplexStatsCacheBySpecies',
-			filterToTouchedSpecies(rowsToWrite, speciesIds),
-			{ groupId, temporalUnit }
-		);
-	} else {
-		await writeAllSpeciesRows(
-			supabaseClient,
-			'ComplexStatsCache',
-			rowsToWrite,
-			{ groupId, temporalUnit }
-		);
-	}
-
-	await deadLetterAnomalies(supabaseClient, anomalies);
-}
-
-/**
- * Refreshes `ComplexStatsCache` for one `(groupId, temporalUnit)` combination
- * — both its species-grouped half (`ComplexStatsCacheBySpecies`) and its
- * all-species-combined half (`ComplexStatsCache`). One temporal unit per
- * call — a future queue consumer (T10) calls this once per temporal-unit
- * event it receives, alongside `refreshSimpleStatsCache`; this function does
- * not loop over temporal units itself.
- *
- * The two passes run sequentially, not concurrently, for the same reason
- * `refreshSimpleStatsCache` does — see its own doc comment.
- *
- * See `runComplexStatsCacheRefreshPass` for what one pass actually does.
- */
-export async function refreshComplexStatsCache(
-	supabaseClient: SupabaseClient,
-	params: RefreshComplexStatsCacheParams
-): Promise<void> {
-	await runComplexStatsCacheRefreshPass(supabaseClient, params, true);
-	await runComplexStatsCacheRefreshPass(supabaseClient, params, false);
 }

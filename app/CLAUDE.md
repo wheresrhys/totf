@@ -354,10 +354,9 @@ An import's last act is to dispatch one `stats-cache-refresh-window` event per t
 (`lib/stats-cache-refresh-events.ts` decides what, `lib/queue-dispatch.ts` sends it — `inline`
 mode in local dev/the CLI importer/tests, the real Vercel queue in production). The consumer is
 `app/api/queues/stats-cache-refresh-window/route.ts`: it maps the event back onto
-`{groupId, temporalUnit, periods?}`, runs `refreshSimpleStatsCache` then
-`refreshComplexStatsCache` (`lib/stats-cache-refresh.ts`), and records the outcome on that
-temporal unit's own `ImportJobs.*_stats_refresh_status` column. Three things decided there that a
-later session shouldn't re-litigate from scratch:
+`{groupId, temporalUnit, periods?}`, runs `refreshSimpleStatsCache` (`lib/stats-cache-refresh.ts`),
+and records the outcome on that temporal unit's own `ImportJobs.*_stats_refresh_status` column.
+Two things decided there that a later session shouldn't re-litigate from scratch:
 
 - It mints its own `authenticated` client from the payload's group id
   (`getAuthenticatedSupabaseClientForGroup`) — a queue consumer has no cookie and no service-role
@@ -370,16 +369,15 @@ later session shouldn't re-litigate from scratch:
   narrowing but that this map leaves out gets `periods: undefined`, and a narrowing unit handed no
   periods refreshes **nothing** — no error, no rows. So adding a unit to
   `SIMPLE_NARROWING_TEMPORAL_UNITS` always means adding it here too.
-- A refresh failure is **terminal, caught and logged**, not thrown: `handleCallback` is registered
-  with no `retry` callback, so a throw would just disappear. The handler writes `'failed'` to the
-  temporal unit's column and resolves.
-- **The two refreshes are not, and cannot be, wrapped in one transaction** (asked on PR #1174).
-  Every write goes out over PostgREST as its own HTTP request in its own implicit transaction, and
-  `supabase-js` has no `BEGIN`/`COMMIT`; making them atomic would mean pushing the whole
-  merge-and-write pipeline back into SQL, which is the reverse of #1169's decision to replace the
-  `upsert_*_stats_cache_rows` RPCs with native `.upsert()`. It's acceptable because both caches
-  are derived data written by idempotent, never-deleting upserts, so a half-applied pass leaves
-  one cache stale rather than torn, and a re-run converges. Each refresh therefore gets its own
-  `try`/`catch` so one failing doesn't strand the other as stale too, and each failure logs the
-  `cacheTable` that went stale — the `ImportJobs` column only records one outcome per temporal
-  unit. See the handler's own doc comment for the full argument.
+
+A refresh failure is **terminal, caught and logged**, not thrown: `handleCallback` is registered
+with no `retry` callback, so a throw would just disappear. The handler writes `'failed'` to the
+temporal unit's column and resolves.
+
+There used to be a second refresh here, `refreshComplexStatsCache` against a sibling
+`ComplexStatsCache`, run independently of `refreshSimpleStatsCache` with its own `try`/`catch` so
+one cache's failure never stranded the other — neither could be wrapped in one transaction (asked
+on PR #1174), since every write goes out over PostgREST as its own HTTP request in its own
+implicit transaction and `supabase-js` has no `BEGIN`/`COMMIT`. That cache was removed entirely
+once its write path had been dead for a while; this consumer is back to a single refresh and a
+single outcome, so the transaction question no longer applies.

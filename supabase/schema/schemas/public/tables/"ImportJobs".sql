@@ -14,8 +14,8 @@
 --
 -- There is one column per **temporal unit**, not per stats type (#1154). The axis
 -- changed when the three stats-type cache tables were replaced by the
--- temporal-unit-shaped `SimpleStatsCache`/`ComplexStatsCache` split (#1144/#1147):
--- `refreshSimpleStatsCache`/`refreshComplexStatsCache` (#1152/#1153) each refresh
+-- temporal-unit-shaped `SimpleStatsCache` table (#1144):
+-- `refreshSimpleStatsCache` (#1152) refreshes
 -- exactly ONE temporal unit per call, and `lib/stats-cache-refresh-events.ts`
 -- dispatches at most one event per temporal unit touched — so a temporal unit is
 -- the finest granularity at which a refresh can actually succeed or fail, and the

@@ -2,16 +2,15 @@
 -- a refresh pass could not write, so the failure survives past the log line
 -- that used to be the only record of it.
 --
--- Written by both of lib/stats-cache-refresh.ts's refresh functions —
--- refreshSimpleStatsCache and refreshComplexStatsCache — when a cell is present
--- in some but not all of the stats_cache_*_metrics RPCs it merges
--- (reason = 'missing_from_metric_rpc'). The cache_table column is what lets the
--- two share one table rather than needing one each.
+-- Written by lib/stats-cache-refresh.ts's refreshSimpleStatsCache when a cell
+-- is present in some but not all of the stats_cache_*_metrics RPCs it merges
+-- (reason = 'missing_from_metric_rpc'). The cache_table column distinguishes
+-- its species-grouped pass from its all-species-combined one.
 --
--- Deliberately NOT shaped like "SimpleStatsCache"/"ComplexStatsCache": this is
--- a pure append-only log, so it has no unique constraint and no partial-index
--- scheme. The same cell can legitimately fail on every refresh pass, and each
--- of those failures is its own fact worth keeping.
+-- Deliberately NOT shaped like "SimpleStatsCache": this is a pure append-only
+-- log, so it has no unique constraint and no partial-index scheme. The same
+-- cell can legitimately fail on every refresh pass, and each of those
+-- failures is its own fact worth keeping.
 CREATE SEQUENCE public."FailedStatsCacheRefreshes_id_seq";
 
 CREATE TABLE public."FailedStatsCacheRefreshes" (
@@ -71,12 +70,7 @@ ADD CONSTRAINT "FailedStatsCacheRefreshes_pkey" PRIMARY KEY (id);
 
 ALTER TABLE public."FailedStatsCacheRefreshes"
 ADD CONSTRAINT failed_stats_cache_refreshes_cache_table_check CHECK (
-	cache_table IN (
-		'SimpleStatsCache',
-		'SimpleStatsCacheBySpecies',
-		'ComplexStatsCache',
-		'ComplexStatsCacheBySpecies'
-	)
+	cache_table IN ('SimpleStatsCache', 'SimpleStatsCacheBySpecies')
 );
 
 -- Same value set as simple_stats_cache_temporal_unit_check — keep the two in

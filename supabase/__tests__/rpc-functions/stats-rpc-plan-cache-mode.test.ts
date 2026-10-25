@@ -1,6 +1,6 @@
 /**
  * Regression guard for the `plan_cache_mode` declaration on the core_stats-family RPCs and
- * the six `stats_cache_*_metrics` RPCs.
+ * the four `stats_cache_*_metrics` RPCs.
  *
  * `PLAN_CACHE_MODE_RPCS` are all `LANGUAGE plpgsql`, so their single `RETURN QUERY` statement
  * is plan-cached per backend and switches to a GENERIC plan on the 6th execution in a session
@@ -17,8 +17,9 @@
  * `CASE`/`OR`-guarded join to whichever CALLER's prepared statement gets reused on a pooled
  * PostgREST connection. Measured on a synthetic 180-Session/8650-Encounter/6164-Bird fixture
  * sized to the real failing prod group: `stats_cache_basic_session_metrics` ran 81-259ms on
- * executions 1-5 and 645ms-7.3s on executions 6-10 (~40x); `stats_cache_new_adult_metrics` ran
- * 51-76ms vs. 16.2s-23.1s (~400x). `SET plan_cache_mode TO 'force_custom_plan'` fixes this not
+ * executions 1-5 and 645ms-7.3s on executions 6-10 (~40x) — the now-removed
+ * `stats_cache_new_adult_metrics` ran 51-76ms vs. 16.2s-23.1s (~400x), the worst measured case.
+ * `SET plan_cache_mode TO 'force_custom_plan'` fixes this not
  * by giving a non-existent `RETURN QUERY` cache a custom-plan override, but by disqualifying
  * the function from inlining in the first place (any function carrying a `SET` clause is
  * ineligible for inlining). See supabase/CLAUDE.md's "plpgsql generic-plan-cliff audit"
@@ -52,8 +53,6 @@ const INLINING_GUARD_RPCS = [
 	'stats_cache_biometrics_metrics',
 	'stats_cache_bird_age_metrics',
 	'stats_cache_encounter_age_metrics',
-	'stats_cache_new_adult_metrics',
-	'stats_cache_returning_age_metrics',
 ] as const;
 
 function readProconfig(functionName: string): string {

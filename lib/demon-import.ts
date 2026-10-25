@@ -334,16 +334,16 @@ export type ImportJobRowCounts = {
  * Which temporal unit's stats-cache refresh an outcome is being recorded for
  * (#1154). Deliberately `lib/stats-cache-refresh.ts`'s own `TemporalUnit`
  * rather than a fourth copy of the same five-value union: the column an
- * outcome lands on and the temporal unit
- * `refreshSimpleStatsCache`/`refreshComplexStatsCache` were called with are the
- * same axis by construction, so they must not be able to drift apart.
+ * outcome lands on and the temporal unit `refreshSimpleStatsCache` was called
+ * with are the same axis by construction, so they must not be able to drift
+ * apart.
  *
  * This replaced a `StatsCacheType = 'core' | 'biometrics' | 'demographics'`,
  * not as a rename but as a change of axis: the three stats-type cache tables
- * were replaced by the temporal-unit-shaped `SimpleStatsCache`/
- * `ComplexStatsCache` split (#1144/#1147), each refreshed one temporal unit per
- * call, so a temporal unit is now the finest granularity at which a refresh can
- * succeed or fail.
+ * were replaced by the temporal-unit-shaped `SimpleStatsCache` table (#1144;
+ * a sibling `ComplexStatsCache` existed alongside it from #1147 until it was
+ * removed entirely), refreshed one temporal unit per call, so a temporal unit
+ * is now the finest granularity at which a refresh can succeed or fail.
  */
 export type StatsCacheTemporalUnit = TemporalUnit;
 
@@ -503,8 +503,8 @@ export class ImportJobTracker {
 	/**
 	 * Records how one temporal unit's stats-cache refresh went, on that temporal
 	 * unit's own column and nothing else. The caller is whatever runs the
-	 * refreshes — the queue consumer that calls `refreshSimpleStatsCache`/
-	 * `refreshComplexStatsCache` per dispatched temporal-unit event
+	 * refresh — the queue consumer that calls `refreshSimpleStatsCache` per
+	 * dispatched temporal-unit event
 	 * (`app/api/queues/stats-cache-refresh-window/route.ts`, #1155); this only
 	 * provides somewhere to record the outcome.
 	 */

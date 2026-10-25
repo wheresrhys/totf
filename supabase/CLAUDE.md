@@ -275,17 +275,19 @@ planning is single-digit milliseconds against hundreds of milliseconds of execut
 restructuring the joins instead: sentinel-keyed equality joins would make the generic plan
 *tolerable*, but no single plan can be right for a query whose shape is a parameter.
 
-**The same cliff also hits the six `stats_cache_*_metrics` RPCs — via inlining, not a RETURN
-QUERY cache — and they now carry the same fix (2026-10-23).** These six (`stats_cache_basic_session_metrics`,
+**The same cliff also hits the `stats_cache_*_metrics` RPCs — via inlining, not a RETURN
+QUERY cache — and they now carry the same fix (2026-10-23).** These (`stats_cache_basic_session_metrics`,
 `stats_cache_biometrics_metrics`, `stats_cache_bird_age_metrics`,
-`stats_cache_encounter_age_metrics`, `stats_cache_new_adult_metrics`,
-`stats_cache_returning_age_metrics` — the `SimpleStatsCache`/`ComplexStatsCache` read side,
-#1145-#1151) are `LANGUAGE sql STABLE`, not plpgsql, so each one's header originally argued "a
+`stats_cache_encounter_age_metrics` — the `SimpleStatsCache` read side, #1145-#1149; two sibling
+RPCs, `stats_cache_new_adult_metrics`/`stats_cache_returning_age_metrics` from #1150/#1151, fed a
+`ComplexStatsCache` that was later removed entirely once its write path had been dead for a
+while — the measurements below predate that removal and still include their numbers) are
+`LANGUAGE sql STABLE`, not plpgsql, so each one's header originally argued "a
 pure SQL function has no RETURN QUERY plan cache to go generic on, so that mitigation does not
 apply here." That was true but irrelevant, and it was asserted, not measured, when each function
 was introduced. A `LANGUAGE sql` function with no `SET` config is a candidate for **inlining** —
 Postgres splices its body directly into the caller's query plan, with no `Function Scan` node of
-its own — and every one of these six reproduces the family's shape-parameterized `CASE`/`OR`-guarded
+its own — and every one of these reproduces the family's shape-parameterized `CASE`/`OR`-guarded
 join (keyed on `group_by_time_period`). Once inlined, that join is exposed to whichever *caller's*
 prepared statement is reused across requests on a pooled PostgREST connection, which is exactly this
 family's cliff arriving by a different route: a cache the *caller* owns, rather than one the
@@ -682,12 +684,12 @@ operation, whereas these are six variations on the same `update(...).eq('id', �
   The five columns (`day_` / `month_` / `year_` / `month_squashed_` / `all_time_`) replaced three
   stats-TYPE columns (`core_` / `biometrics_` / `demographics_`) at #1154 — a change of axis, not a
   rename: the three stats-type cache tables gave way to the temporal-unit-shaped
-  `SimpleStatsCache`/`ComplexStatsCache` split (#1144/#1147 — since #1169 four tables, each of
-  those two halved again into an all-species and a `*BySpecies` variant so neither needs a
-  nullable `species_id`, with `time_period` NOT NULL and `0001-01-01` standing in for the all-time
-  grain), each refreshed one temporal unit per
-  call, so a temporal unit is the finest granularity at which a refresh can succeed or fail. No
-  historical values were carried across; the old columns were simply dropped.
+  `SimpleStatsCache` table (#1144 — since #1169 halved into an all-species and a `*BySpecies`
+  variant so it needs no nullable `species_id`, with `time_period` NOT NULL and `0001-01-01`
+  standing in for the all-time grain; a sibling `ComplexStatsCache`/`ComplexStatsCacheBySpecies`
+  pair existed alongside it from #1147 until it was removed entirely), each refreshed one temporal
+  unit per call, so a temporal unit is the finest granularity at which a refresh can succeed or
+  fail. No historical values were carried across; the old columns were simply dropped.
   `markStatsCacheRefreshed(importJobId, temporalUnit, outcome)` writes exactly one column and never
   `status`, `affected_dates` or the other four temporal units' columns — "all the rows imported but
   the monthly stats never refreshed" has to stay a distinguishable state. The unit tests assert the

@@ -69,7 +69,7 @@ CREATE TABLE public."SimpleStatsCacheBySpecies" (
 	updated_at timestamptz DEFAULT NOW() NOT NULL
 );
 
-COMMENT ON TABLE public."SimpleStatsCacheBySpecies" IS 'One row per (group_id, temporal_unit, time_period, species_id): every period-local metric shared between core_stats_result, biometrics_stats_result and demographics_stats_result, per species. All-species-combined rows live in "SimpleStatsCache"; lifetime-relative demographics columns live in "ComplexStatsCacheBySpecies".';
+COMMENT ON TABLE public."SimpleStatsCacheBySpecies" IS 'One row per (group_id, temporal_unit, time_period, species_id): every period-local metric shared between core_stats_result, biometrics_stats_result and demographics_stats_result, per species. All-species-combined rows live in "SimpleStatsCache".';
 
 COMMENT ON COLUMN public."SimpleStatsCacheBySpecies".time_period IS 'The cell''s period, as the first date in it. NOT NULL: the all-time grain uses the sentinel date ''0001-01-01'' rather than a NULL, so a single plain UNIQUE constraint covers every grain and a native supabase-js .upsert() can name it as a conflict target.';
 
