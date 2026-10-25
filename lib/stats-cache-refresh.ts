@@ -842,30 +842,26 @@ async function runSimpleStatsCacheRefreshPass(
 		// Narrowing temporal unit, nothing touched this pass — nothing to refresh.
 		return;
 	}
-
-	const [basicRows, biometricsRows, birdAgeRows, encounterAgeRows] =
-		await Promise.all([
-			fetchMetricRows<BasicSessionMetricsRow>(
-				supabaseClient,
-				'stats_cache_basic_session_metrics',
-				rpcParamsList
-			),
-			fetchMetricRows<BiometricsMetricsRow>(
-				supabaseClient,
-				'stats_cache_biometrics_metrics',
-				rpcParamsList
-			),
-			fetchMetricRows<BirdAgeMetricsRow>(
-				supabaseClient,
-				'stats_cache_bird_age_metrics',
-				rpcParamsList
-			),
-			fetchMetricRows<EncounterAgeMetricsRow>(
-				supabaseClient,
-				'stats_cache_encounter_age_metrics',
-				rpcParamsList
-			)
-		]);
+	const basicRows = await fetchMetricRows<BasicSessionMetricsRow>(
+		supabaseClient,
+		'stats_cache_basic_session_metrics',
+		rpcParamsList
+	);
+	const biometricsRows = await fetchMetricRows<BiometricsMetricsRow>(
+		supabaseClient,
+		'stats_cache_biometrics_metrics',
+		rpcParamsList
+	);
+	const birdAgeRows = await fetchMetricRows<BirdAgeMetricsRow>(
+		supabaseClient,
+		'stats_cache_bird_age_metrics',
+		rpcParamsList
+	);
+	const encounterAgeRows = await fetchMetricRows<EncounterAgeMetricsRow>(
+		supabaseClient,
+		'stats_cache_encounter_age_metrics',
+		rpcParamsList
+	);
 
 	const { mergedRows, anomalies } = mergeSimpleMetricRows({
 		groupId,
