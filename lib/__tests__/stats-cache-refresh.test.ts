@@ -1035,6 +1035,83 @@ describe('refreshSimpleStatsCache', () => {
 			]);
 		});
 	});
+
+	describe('narrowing the species-grouped write by speciesIds', () => {
+		function twoSpeciesClient(timePeriod: string | null = '2026-03-01') {
+			return makeSimpleMockSupabaseClient({
+				basic: [
+					basicRow({ species_id: 1, time_period: timePeriod }),
+					basicRow({ species_id: 2, time_period: timePeriod })
+				],
+				biometrics: [
+					biometricsRow({ species_id: 1, time_period: timePeriod }),
+					biometricsRow({ species_id: 2, time_period: timePeriod })
+				],
+				birdAge: [
+					birdAgeRow({ species_id: 1, time_period: timePeriod }),
+					birdAgeRow({ species_id: 2, time_period: timePeriod })
+				],
+				encounterAge: [
+					encounterAgeRow({ species_id: 1, time_period: timePeriod }),
+					encounterAgeRow({ species_id: 2, time_period: timePeriod })
+				]
+			});
+		}
+
+		it('writes only the species-grouped rows named in speciesIds, leaving the rest uncached this pass', async () => {
+			const client = twoSpeciesClient();
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01'],
+				speciesIds: [1]
+			});
+
+			expect(upsertedRows(client).map((row) => row.species_id)).toEqual([1]);
+		});
+
+		it('writes every computed species-grouped row when speciesIds is omitted', async () => {
+			const client = twoSpeciesClient();
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01']
+			});
+
+			expect(
+				upsertedRows(client)
+					.map((row) => row.species_id)
+					.sort()
+			).toEqual([1, 2]);
+		});
+
+		it('never filters the non-species-grouped (all-species-combined) write, regardless of speciesIds', async () => {
+			const client = twoSpeciesClient();
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01'],
+				speciesIds: [1]
+			});
+
+			expect(upsertedRows(client, 1)).toHaveLength(2);
+		});
+
+		it('narrows the species-grouped write even for the all-time temporal unit, which never narrows by date', async () => {
+			const client = twoSpeciesClient(null);
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'all-time',
+				speciesIds: [2]
+			});
+
+			expect(upsertedRows(client).map((row) => row.species_id)).toEqual([2]);
+		});
+	});
 });
 
 describe('refreshComplexStatsCache', () => {
@@ -1432,6 +1509,59 @@ describe('refreshComplexStatsCache', () => {
 			expect(failedRefreshRows(client, 1)).toEqual([
 				expect.objectContaining({ cache_table: 'ComplexStatsCache' })
 			]);
+		});
+	});
+
+	describe('narrowing the species-grouped write by speciesIds', () => {
+		function twoSpeciesClient(timePeriod: string | null = '2026-03-01') {
+			return makeComplexMockSupabaseClient({
+				newAdult: [
+					newAdultRow({ species_id: 1, time_period: timePeriod }),
+					newAdultRow({ species_id: 2, time_period: timePeriod })
+				],
+				returningAge: [
+					returningAgeRow({ species_id: 1, time_period: timePeriod }),
+					returningAgeRow({ species_id: 2, time_period: timePeriod })
+				]
+			});
+		}
+
+		it('writes only the species-grouped rows named in speciesIds, leaving the rest uncached this pass', async () => {
+			const client = twoSpeciesClient();
+
+			await refreshComplexStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01'],
+				speciesIds: [1]
+			});
+
+			expect(upsertedRows(client).map((row) => row.species_id)).toEqual([1]);
+		});
+
+		it('never filters the non-species-grouped (all-species-combined) write, regardless of speciesIds', async () => {
+			const client = twoSpeciesClient();
+
+			await refreshComplexStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01'],
+				speciesIds: [1]
+			});
+
+			expect(upsertedRows(client, 1)).toHaveLength(2);
+		});
+
+		it('narrows the species-grouped write even for the all-time temporal unit, which never narrows by date', async () => {
+			const client = twoSpeciesClient(null);
+
+			await refreshComplexStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'all-time',
+				speciesIds: [2]
+			});
+
+			expect(upsertedRows(client).map((row) => row.species_id)).toEqual([2]);
 		});
 	});
 });

@@ -908,6 +908,12 @@ export class EncounterRowBatchWriter {
 	// id assignment (#903) depends on, and above 1 they overlap exactly as the
 	// per-row domain writes used to.
 	private readonly chunkWrites: Promise<void>[] = [];
+	// The distinct `Species.id`s actually written by a landed chunk — used to
+	// narrow the species-grouped stats-cache refresh (`dispatchStatsCacheRefreshEvents`)
+	// to the species an import actually touched, rather than every species the
+	// group has ever recorded. A row whose chunk fails, or that never reaches
+	// `writeChunk` at all (e.g. a ringless casualty), correctly never contributes.
+	private readonly touchedSpeciesIds = new Set<number>();
 
 	constructor(
 		private readonly supabaseClient: SupabaseClient,
@@ -1131,7 +1137,8 @@ export class EncounterRowBatchWriter {
 				})
 		);
 
-		for (const bufferedRow of chunk) {
+		for (const [chunkIndex, bufferedRow] of chunk.entries()) {
+			this.touchedSpeciesIds.add(speciesIdOf(chunkIndex));
 			bufferedRow.resolve({
 				visitDate: convertDateFormat(bufferedRow.row.visit_date as string)
 			});
@@ -1226,14 +1233,20 @@ export class EncounterRowBatchWriter {
 			await Promise.all(this.chunkWrites);
 		} while (this.buffer.length > 0);
 	}
+
+	/** The distinct `Species.id`s written by every chunk that has landed so far. */
+	getDistinctSpeciesIds(): number[] {
+		return [...this.touchedSpeciesIds].sort((a, b) => a - b);
+	}
 }
 
 /**
  * Builds and dispatches every stats-cache-refresh event a successful import's
- * affected dates imply (#1141), the one piece of orchestration both import
- * entry points need once `completeImportJob` has run. Since #1154 that is at
- * most five events — one per temporal unit touched — so the loop below is
- * exactly one dispatch call per temporal unit. Each writes its own
+ * affected dates (and, for the species-grouped write, affected species) imply
+ * (#1141), the one piece of orchestration both import entry points need once
+ * `completeImportJob` has run. Since #1154 that is at most five events — one
+ * per temporal unit touched — so the loop below is exactly one dispatch call
+ * per temporal unit. Each writes its own
  * `logContext` (the CLI script's `csvFilePath`/`ringingGroupName`, the web
  * route's none) onto the shared `{importJobId, ringingGroupId}` base so a
  * dispatch-failure log line is still identifiable per caller.
@@ -1249,13 +1262,15 @@ export async function dispatchStatsCacheRefreshEvents(
 	importJobId: number,
 	ringingGroupId: number,
 	affectedDates: string[],
+	affectedSpeciesIds: number[],
 	logContext: Record<string, unknown> = {}
 ): Promise<void> {
 	try {
 		const statsCacheRefreshEvents = buildStatsCacheRefreshEvents(
 			importJobId,
 			ringingGroupId,
-			affectedDates
+			affectedDates,
+			affectedSpeciesIds
 		);
 		for (const event of statsCacheRefreshEvents) {
 			await dispatchStatsCacheRefreshWindow(event);

@@ -1885,6 +1885,59 @@ describe('EncounterRowBatchWriter', () => {
 			expect(domainTablesClient.upsertCalls).toHaveLength(5);
 		});
 	});
+
+	describe('reporting the distinct species ids a run has written', () => {
+		it('is empty before any chunk has landed', () => {
+			const { writer } = makeEncounterRowWriter({ chunkSize: 2 });
+
+			expect(writer.getDistinctSpeciesIds()).toEqual([]);
+		});
+
+		it('returns the distinct Species.id values across every chunk that has landed so far', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
+
+			await writer.writeEncounterRow(
+				makeDemonRow({ ring_no: 'A000001', species_name: 'Blue Tit' })
+			);
+			await writer.writeEncounterRow(
+				makeDemonRow({ ring_no: 'A000002', species_name: 'Robin' })
+			);
+
+			expect(writer.getDistinctSpeciesIds()).toEqual(
+				[
+					domainTablesClient.idFor('Species', 'Blue Tit'),
+					domainTablesClient.idFor('Species', 'Robin')
+				].sort((a, b) => a - b)
+			);
+		});
+
+		it('dedupes two rows of the same species, landed in different chunks, down to one id', async () => {
+			const { writer } = makeEncounterRowWriter({ chunkSize: 1 });
+
+			await writer.writeEncounterRow(
+				makeDemonRow({ ring_no: 'A000001', species_name: 'Blue Tit' })
+			);
+			await writer.writeEncounterRow(
+				makeDemonRow({ ring_no: 'A000002', species_name: 'Blue Tit' })
+			);
+
+			expect(writer.getDistinctSpeciesIds()).toHaveLength(1);
+		});
+
+		it('excludes a species whose only row was a ringless casualty, which never reaches a chunk', async () => {
+			const { writer } = makeEncounterRowWriter({ chunkSize: 1 });
+
+			await expect(
+				writer.writeEncounterRow(
+					makeDemonRow({ ring_no: '', species_name: 'Casualty Species' })
+				)
+			).rejects.toBeInstanceOf(CasualtyEncounterError);
+
+			expect(writer.getDistinctSpeciesIds()).toEqual([]);
+		});
+	});
 });
 
 describe('dispatchStatsCacheRefreshEvents', () => {
@@ -1893,9 +1946,13 @@ describe('dispatchStatsCacheRefreshEvents', () => {
 		vi.mocked(dispatchStatsCacheRefreshWindow).mockReset();
 	});
 
-	it('builds events from the given ids/dates and dispatches every one, in order', async () => {
+	it('builds events from the given ids/dates/species and dispatches every one, in order', async () => {
 		const events = [
-			{ importJobId: 42, rpcParams: { ringing_group_filter: 7 } },
+			{
+				importJobId: 42,
+				rpcParams: { ringing_group_filter: 7 },
+				affectedSpeciesIds: [3]
+			},
 			{
 				importJobId: 42,
 				rpcParams: {
@@ -1903,17 +1960,21 @@ describe('dispatchStatsCacheRefreshEvents', () => {
 					group_by_time_period: 'day' as const,
 					from_date: '2024-06-01',
 					to_date: '2024-06-01'
-				}
+				},
+				affectedSpeciesIds: [3]
 			}
 		];
 		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue(events);
 		vi.mocked(dispatchStatsCacheRefreshWindow).mockResolvedValue(undefined);
 
-		await dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01']);
+		await dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], [3]);
 
-		expect(buildStatsCacheRefreshEvents).toHaveBeenCalledWith(42, 7, [
-			'2024-06-01'
-		]);
+		expect(buildStatsCacheRefreshEvents).toHaveBeenCalledWith(
+			42,
+			7,
+			['2024-06-01'],
+			[3]
+		);
 		expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
 			1,
 			events[0]
@@ -1926,7 +1987,11 @@ describe('dispatchStatsCacheRefreshEvents', () => {
 
 	it('logs and swallows a dispatch failure rather than throwing, merging logContext onto importJobId/ringingGroupId', async () => {
 		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([
-			{ importJobId: 42, rpcParams: { ringing_group_filter: 7 } }
+			{
+				importJobId: 42,
+				rpcParams: { ringing_group_filter: 7 },
+				affectedSpeciesIds: [3]
+			}
 		]);
 		vi.mocked(dispatchStatsCacheRefreshWindow).mockRejectedValueOnce(
 			new Error('queue unavailable')
@@ -1934,7 +1999,7 @@ describe('dispatchStatsCacheRefreshEvents', () => {
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
 		await expect(
-			dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], {
+			dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], [3], {
 				csvFilePath: '/fake/alpha.csv'
 			})
 		).resolves.toBeUndefined();
@@ -1948,14 +2013,18 @@ describe('dispatchStatsCacheRefreshEvents', () => {
 
 	it('defaults logContext to nothing extra when the caller passes none', async () => {
 		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([
-			{ importJobId: 42, rpcParams: { ringing_group_filter: 7 } }
+			{
+				importJobId: 42,
+				rpcParams: { ringing_group_filter: 7 },
+				affectedSpeciesIds: [3]
+			}
 		]);
 		vi.mocked(dispatchStatsCacheRefreshWindow).mockRejectedValueOnce(
 			new Error('queue unavailable')
 		);
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-		await dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01']);
+		await dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], [3]);
 
 		expect(errorSpy).toHaveBeenCalledWith(
 			'Failed to dispatch stats-cache-refresh-window events',

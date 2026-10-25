@@ -4,7 +4,11 @@
  * **At most five events** — one per temporal unit the import actually touched
  * (`all-time`, `day`, `month`, `month-squashed`, `year`) — each carrying
  * everything a worker needs to refresh that whole temporal unit in a single
- * pass, rather than recomputing a group's whole history.
+ * pass, rather than recomputing a group's whole history. Every event also
+ * carries the distinct species the import touched (`affectedSpeciesIds`), so
+ * the consumer's species-grouped write can skip rewriting an untouched
+ * species' cell regardless of temporal unit — see `StatsCacheRefreshEvent`'s
+ * own doc comment.
  *
  * One event per temporal unit rather than one per distinct period instance,
  * because `refreshSimpleStatsCache`/`refreshComplexStatsCache` (#1152/#1153)
@@ -81,11 +85,24 @@ export type StatsCacheRefreshRpcParams = {
  * by their own `periods` array (every entry of which was genuinely touched),
  * and `all-time` full-replaces — so all four omit the field entirely rather
  * than carrying it unset.
+ *
+ * `affectedSpeciesIds` is also event metadata rather than an RPC filter, for
+ * the same reason: no `stats_cache_*_metrics` RPC call ever gets narrower
+ * because of it. Unlike `affectedDates`, it is carried by **every** event,
+ * species-grouped: `lib/stats-cache-refresh.ts`'s species-grouped write
+ * (`SimpleStatsCacheBySpecies`/`ComplexStatsCacheBySpecies`) can safely skip
+ * rewriting an untouched species' cell for *any* temporal unit, including
+ * `all-time` — that skip is orthogonal to how each temporal unit narrows by
+ * date. The all-species-combined write
+ * (`SimpleStatsCache`/`ComplexStatsCache`) never reads this field: its row
+ * aggregates across every species, so it must always be rewritten in full
+ * whenever a period is in scope, regardless of which species changed.
  */
 export type StatsCacheRefreshEvent = {
 	importJobId: number;
 	rpcParams: StatsCacheRefreshRpcParams;
 	affectedDates?: string[];
+	affectedSpeciesIds: number[];
 };
 
 /**
@@ -100,20 +117,25 @@ export type StatsCacheRefreshEvent = {
 export function buildStatsCacheRefreshEvents(
 	importJobId: number,
 	ringingGroupId: number,
-	affectedDates: string[]
+	affectedDates: string[],
+	affectedSpeciesIds: number[]
 ): StatsCacheRefreshEvent[] {
 	if (affectedDates.length === 0) {
 		return [];
 	}
 
 	const sortedDates = [...new Set(affectedDates)].sort();
+	const sortedSpeciesIds = [...new Set(affectedSpeciesIds)].sort(
+		(a, b) => a - b
+	);
 
 	function stamp(
 		rpcParams: Omit<StatsCacheRefreshRpcParams, 'ringing_group_filter'>
 	): StatsCacheRefreshEvent {
 		return {
 			importJobId,
-			rpcParams: { ringing_group_filter: ringingGroupId, ...rpcParams }
+			rpcParams: { ringing_group_filter: ringingGroupId, ...rpcParams },
+			affectedSpeciesIds: sortedSpeciesIds
 		};
 	}
 

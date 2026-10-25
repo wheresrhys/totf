@@ -81,7 +81,8 @@ const {
 	},
 	mockEncounterRowBatchWriter: {
 		writeEncounterRow: vi.fn(),
-		flushRemaining: vi.fn()
+		flushRemaining: vi.fn(),
+		getDistinctSpeciesIds: vi.fn()
 	}
 }));
 
@@ -142,6 +143,7 @@ beforeEach(() => {
 		visitDate: '2024-06-01'
 	});
 	mockEncounterRowBatchWriter.flushRemaining.mockResolvedValue(undefined);
+	mockEncounterRowBatchWriter.getDistinctSpeciesIds.mockReturnValue([3]);
 
 	vi.mocked(dispatchStatsCacheRefreshEvents).mockClear();
 	vi.mocked(dispatchStatsCacheRefreshEvents).mockResolvedValue(undefined);
@@ -419,7 +421,7 @@ describe('stats-cache-refresh dispatch', () => {
 	// `lib/__tests__/demon-import.test.ts`. This only has to prove the script
 	// calls it with the run's own ids/dates/log-context, after the job is
 	// marked complete.
-	it('calls dispatchStatsCacheRefreshEvents with the run’s ids, affected dates and CLI log context, after completeImportJob', async () => {
+	it('calls dispatchStatsCacheRefreshEvents with the run’s ids, affected dates/species and CLI log context, after completeImportJob', async () => {
 		await importCSV({
 			csvFilePath: '/fake/alpha.csv',
 			ringingGroupName: 'Alpha'
@@ -429,6 +431,7 @@ describe('stats-cache-refresh dispatch', () => {
 			IMPORT_JOB_ID,
 			7,
 			['2024-06-01'],
+			[3],
 			{ csvFilePath: '/fake/alpha.csv', ringingGroupName: 'Alpha' }
 		);
 

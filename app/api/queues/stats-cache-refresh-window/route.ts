@@ -20,13 +20,14 @@ import { getAuthenticatedSupabaseClientForGroup } from '../../../lib/auth/group-
 
 /**
  * What one `StatsCacheRefreshEvent` means to the two refresh functions, which
- * take `{groupId, temporalUnit, periods?}` rather than the event's own
- * RPC-filter-shaped payload.
+ * take `{groupId, temporalUnit, periods?, speciesIds?}` rather than the
+ * event's own RPC-filter-shaped payload.
  */
 type StatsCacheRefreshParams = {
 	groupId: number;
 	temporalUnit: TemporalUnit;
 	periods?: string[];
+	speciesIds: number[];
 };
 
 /**
@@ -55,13 +56,18 @@ const PERIODS_FROM_RPC_PARAMS_TEMPORAL_UNITS: readonly TemporalUnit[] = [
  * `refreshComplexStatsCache` take. Its own named function, not inlined in the
  * handler, because the period-sourcing rule differs per temporal unit and is
  * the most error-prone part of this consumer — see
- * `__tests__/route.test.ts`'s first describe block.
+ * `__tests__/route.test.ts`'s first describe block. `speciesIds` has no such
+ * per-unit rule: every branch carries `event.affectedSpeciesIds` straight
+ * through, since narrowing the species-grouped write is sound for every
+ * temporal unit — see `RefreshSpeciesNarrowing`'s own doc comment in
+ * `lib/stats-cache-refresh.ts`.
  */
 export function deriveStatsCacheRefreshParams(
 	event: StatsCacheRefreshEvent
 ): StatsCacheRefreshParams {
 	const { ringing_group_filter: groupId, group_by_time_period } =
 		event.rpcParams;
+	const { affectedSpeciesIds: speciesIds } = event;
 
 	// The all-time event omits the key entirely (#1154) rather than carrying a
 	// literal `'all-time'`, matching `fetchSummaryStats`' own all-time
@@ -69,12 +75,22 @@ export function deriveStatsCacheRefreshParams(
 	const temporalUnit: TemporalUnit = group_by_time_period ?? 'all-time';
 
 	if (temporalUnit === 'day') {
-		return { groupId, temporalUnit, periods: event.affectedDates };
+		return {
+			groupId,
+			temporalUnit,
+			periods: event.affectedDates,
+			speciesIds
+		};
 	}
 	if (PERIODS_FROM_RPC_PARAMS_TEMPORAL_UNITS.includes(temporalUnit)) {
-		return { groupId, temporalUnit, periods: event.rpcParams.periods };
+		return {
+			groupId,
+			temporalUnit,
+			periods: event.rpcParams.periods,
+			speciesIds
+		};
 	}
-	return { groupId, temporalUnit, periods: undefined };
+	return { groupId, temporalUnit, periods: undefined, speciesIds };
 }
 
 /**
@@ -172,13 +188,13 @@ export async function processStatsCacheRefreshWindowJob(
 	event: StatsCacheRefreshEvent
 ): Promise<void> {
 	const { importJobId } = event;
-	const { groupId, temporalUnit, periods } =
+	const { groupId, temporalUnit, periods, speciesIds } =
 		deriveStatsCacheRefreshParams(event);
 
 	const supabaseClient = await getAuthenticatedSupabaseClientForGroup(groupId);
 	const importJobTracker = new ImportJobTracker(supabaseClient);
 
-	const refreshParams = { groupId, temporalUnit, periods };
+	const refreshParams = { groupId, temporalUnit, periods, speciesIds };
 	const logContext = { importJobId, groupId, temporalUnit };
 
 	const simpleRefreshSucceeded = await runCacheRefresh(

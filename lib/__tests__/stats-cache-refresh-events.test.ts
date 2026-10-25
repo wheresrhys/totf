@@ -4,11 +4,14 @@ import { buildStatsCacheRefreshEvents } from '../stats-cache-refresh-events';
 const IMPORT_JOB_ID = 42;
 const RINGING_GROUP_ID = 7;
 
-function build(affectedDates: string[]) {
+const SORTED_SPECIES_IDS = [1, 3];
+
+function build(affectedDates: string[], affectedSpeciesIds: number[] = []) {
 	return buildStatsCacheRefreshEvents(
 		IMPORT_JOB_ID,
 		RINGING_GROUP_ID,
-		affectedDates
+		affectedDates,
+		affectedSpeciesIds
 	);
 }
 
@@ -21,7 +24,8 @@ describe('the all-time event', () => {
 		expect(allTimeEvents).toHaveLength(1);
 		expect(allTimeEvents[0]).toEqual({
 			importJobId: IMPORT_JOB_ID,
-			rpcParams: { ringing_group_filter: RINGING_GROUP_ID }
+			rpcParams: { ringing_group_filter: RINGING_GROUP_ID },
+			affectedSpeciesIds: []
 		});
 	});
 
@@ -29,7 +33,8 @@ describe('the all-time event', () => {
 		const events = build(['2024-06-01']);
 		expect(events).toContainEqual({
 			importJobId: IMPORT_JOB_ID,
-			rpcParams: { ringing_group_filter: RINGING_GROUP_ID }
+			rpcParams: { ringing_group_filter: RINGING_GROUP_ID },
+			affectedSpeciesIds: []
 		});
 		expect(events).toContainEqual({
 			importJobId: IMPORT_JOB_ID,
@@ -39,7 +44,8 @@ describe('the all-time event', () => {
 				from_date: '2024-06-01',
 				to_date: '2024-06-01'
 			},
-			affectedDates: ['2024-06-01']
+			affectedDates: ['2024-06-01'],
+			affectedSpeciesIds: []
 		});
 	});
 });
@@ -55,7 +61,8 @@ describe('the day-range event', () => {
 				from_date: '2024-06-01',
 				to_date: '2024-07-15'
 			},
-			affectedDates: ['2024-06-01', '2024-06-20', '2024-07-15']
+			affectedDates: ['2024-06-01', '2024-06-20', '2024-07-15'],
+			affectedSpeciesIds: []
 		});
 	});
 
@@ -69,7 +76,8 @@ describe('the day-range event', () => {
 				from_date: '2024-06-01',
 				to_date: '2024-06-01'
 			},
-			affectedDates: ['2024-06-01']
+			affectedDates: ['2024-06-01'],
+			affectedSpeciesIds: []
 		});
 	});
 
@@ -104,7 +112,8 @@ describe('the month event', () => {
 					ringing_group_filter: RINGING_GROUP_ID,
 					group_by_time_period: 'month',
 					periods: ['2024-06-01', '2025-07-01']
-				}
+				},
+				affectedSpeciesIds: []
 			}
 		]);
 	});
@@ -124,7 +133,8 @@ describe('the month-squashed event', () => {
 					ringing_group_filter: RINGING_GROUP_ID,
 					group_by_time_period: 'month-squashed',
 					periods: ['2000-06-01', '2000-07-01', '2000-08-01']
-				}
+				},
+				affectedSpeciesIds: []
 			}
 		]);
 	});
@@ -153,7 +163,8 @@ describe('the year event', () => {
 					ringing_group_filter: RINGING_GROUP_ID,
 					group_by_time_period: 'year',
 					periods: ['2024-01-01', '2025-01-01']
-				}
+				},
+				affectedSpeciesIds: []
 			}
 		]);
 	});
@@ -183,6 +194,23 @@ describe('stamped fields', () => {
 		for (const event of events) {
 			expect(event.importJobId).toBe(IMPORT_JOB_ID);
 			expect(event.rpcParams.ringing_group_filter).toBe(RINGING_GROUP_ID);
+		}
+	});
+});
+
+describe('affectedSpeciesIds scoping', () => {
+	it('stamps the same deduped, sorted species ids onto every one of the five events, unlike affectedDates which only the day event carries', () => {
+		const events = build(['2024-06-01', '2025-07-15'], [3, 1, 3]);
+		expect(events).toHaveLength(5);
+		for (const event of events) {
+			expect(event.affectedSpeciesIds).toEqual(SORTED_SPECIES_IDS);
+		}
+	});
+
+	it('is an empty array, not omitted, when the import touched no species an event could narrow by', () => {
+		const events = build(['2024-06-01']);
+		for (const event of events) {
+			expect(event.affectedSpeciesIds).toEqual([]);
 		}
 	});
 });

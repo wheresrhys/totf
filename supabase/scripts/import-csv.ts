@@ -299,6 +299,7 @@ export async function runImport(options: RunImportOptions): Promise<void> {
 		importJobId,
 		ringingGroupId,
 		demonRecordsBatchWriter.getDistinctDates(),
+		encounterRowBatchWriter.getDistinctSpeciesIds(),
 		{ ringingGroupName, ...logContext }
 	);
 

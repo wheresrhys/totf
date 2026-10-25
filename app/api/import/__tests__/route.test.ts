@@ -30,6 +30,7 @@ vi.mock('@/lib/queue-dispatch', () => ({
 
 const IMPORT_JOB_ID = 42;
 const STAGED_DATES = ['2024-06-01'];
+const TOUCHED_SPECIES_IDS = [7];
 
 const CSV_HEADER =
 	'ring_no,species_name,visit_date,capture_time,loc_id,age,sex,sexing_method,record_type,scheme,breeding_condition,extra_text,moult_code,old_greater_coverts,weight,wing_length,entered_by,nest_link_code,validation_comments,submission_status,filename,new/subsequent,scheme2,ring_no2,pulli_ringed,pulli_alive,provisional_sex,gridref,habitat_1,habitat_2,status_code_1,status_code_2,lure_code_1,lure_code_2,date_measured,time_w,condition,alula,primary_moult,primary_covert_moult_scores,secondary_moult_scores,finding_condition,finding_circumstances,capture_method,metal_mark_info,ringer_initials,ringer_check_initials,processor_initials,extractor_initials,wing_initials,colour_mark_info,metal_mark_position,fat,pectoral_muscle,body_moult,greater_covert_moult_scores,alula_moult_scores,carpal_covert_moult,wing_point,primary_length,bill_length_method,bill_length,head_bill_length,bill_depth_method,bill_depth,tarsus_length_method,tail_moult_scores,tarsus_length,tail_length,claw_length,plumage,tail_diff,lesser_median_covert_moult,underwing_covert_moult,head_moult,upperparts_moult,underparts_moult,permit_no,pullus_stage,date_accuracy,left_leg_below,right_leg_below,left_leg_above,right_leg_above,neck_collar,left_wing_tag,right_wing_tag,nasal_saddle,sample_processed,high_tide_time,finder_name,own,own2,userc1,userc2,email,userc3,userc4,userc5,userv1,userv2,userv3,userv4,userv5,l_primary_moult_scores,l_secondary_moult_scores,l_tail_moult_scores,l_primary_covert_moult_scores,l_greater_covert_moult_scores,l_carpal_covert_moult,l_alula_moult_scores,toe_span';
@@ -114,7 +115,8 @@ describe('POST /api/import', () => {
 		} as never);
 		mockEncounterRowBatchWriter = {
 			writeEncounterRow: vi.fn().mockResolvedValue({ visitDate: '2024-06-01' }),
-			flushRemaining: vi.fn().mockResolvedValue(undefined)
+			flushRemaining: vi.fn().mockResolvedValue(undefined),
+			getDistinctSpeciesIds: vi.fn().mockReturnValue(TOUCHED_SPECIES_IDS)
 		};
 		// Newable for the same reason as the two stubs either side of it.
 		vi.mocked(EncounterRowBatchWriter).mockImplementation(function () {
@@ -399,7 +401,8 @@ describe('POST /api/import', () => {
 					EncounterRowBatchWriter: vi.fn(function () {
 						return {
 							writeEncounterRow: vi.fn(),
-							flushRemaining: vi.fn()
+							flushRemaining: vi.fn(),
+							getDistinctSpeciesIds: vi.fn(() => [])
 						};
 					}),
 					ImportJobTracker: vi.fn(function () {
@@ -558,7 +561,11 @@ describe('POST /api/import', () => {
 			const { dispatchStatsCacheRefreshWindow } =
 				await import('@/lib/queue-dispatch');
 			const fakeEvents = [
-				{ importJobId: IMPORT_JOB_ID, rpcParams: { ringing_group_filter: 1 } },
+				{
+					importJobId: IMPORT_JOB_ID,
+					rpcParams: { ringing_group_filter: 1 },
+					affectedSpeciesIds: TOUCHED_SPECIES_IDS
+				},
 				{
 					importJobId: IMPORT_JOB_ID,
 					rpcParams: {
@@ -566,7 +573,8 @@ describe('POST /api/import', () => {
 						group_by_time_period: 'day' as const,
 						from_date: '2024-06-01',
 						to_date: '2024-06-01'
-					}
+					},
+					affectedSpeciesIds: TOUCHED_SPECIES_IDS
 				}
 			];
 			vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue(fakeEvents);
@@ -578,7 +586,8 @@ describe('POST /api/import', () => {
 			expect(buildStatsCacheRefreshEvents).toHaveBeenCalledWith(
 				IMPORT_JOB_ID,
 				1,
-				STAGED_DATES
+				STAGED_DATES,
+				TOUCHED_SPECIES_IDS
 			);
 			expect(dispatchStatsCacheRefreshWindow).toHaveBeenCalledTimes(2);
 			expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
@@ -677,7 +686,8 @@ describe('POST /api/import', () => {
 			});
 			const fakeEvent = {
 				importJobId: IMPORT_JOB_ID,
-				rpcParams: { ringing_group_filter: 1 }
+				rpcParams: { ringing_group_filter: 1 },
+				affectedSpeciesIds: TOUCHED_SPECIES_IDS
 			};
 			vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([fakeEvent]);
 			vi.mocked(dispatchStatsCacheRefreshWindow).mockRejectedValueOnce(

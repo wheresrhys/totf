@@ -238,7 +238,8 @@ export async function POST(request: Request): Promise<Response> {
 					await dispatchStatsCacheRefreshEvents(
 						importJobId,
 						ringingGroupId,
-						demonRecordsBatchWriter.getDistinctDates()
+						demonRecordsBatchWriter.getDistinctDates(),
+						encounterRowBatchWriter.getDistinctSpeciesIds()
 					);
 					send({ type: 'complete', processed, successful, failed, skipped });
 				}
