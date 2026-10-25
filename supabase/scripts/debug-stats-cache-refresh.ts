@@ -1,21 +1,18 @@
 #!/usr/bin/env tsx
 /**
- * Debug helper: runs refreshSimpleStatsCache/refreshComplexStatsCache for one
- * group at temporalUnit 'month', scoped to the current calendar month, to
- * reproduce the stats-cache-refresh timeout bug outside the queue consumer.
+ * Debug helper: runs refreshSimpleStatsCache for one group at temporalUnit
+ * 'month', scoped to the current calendar month, to reproduce the
+ * stats-cache-refresh timeout bug outside the queue consumer.
  *
  * Usage: npm run prod:run -- tsx supabase/scripts/debug-stats-cache-refresh.ts <groupName>
  *
  * Note: `prod:run` signs a read-only (`app_readonly`) JWT, so the write at the
- * end of each refresh will fail with error 25006 — fine if the bug reproduces
+ * end of the refresh will fail with error 25006 — fine if the bug reproduces
  * during the metric-RPC reads themselves (before any write is attempted).
  */
 import { supabase } from '../../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
-import {
-	refreshSimpleStatsCache,
-	refreshComplexStatsCache
-} from '../../lib/stats-cache-refresh';
+import { refreshSimpleStatsCache } from '../../lib/stats-cache-refresh';
 import { waitForDebugger } from 'inspector';
 
 const [groupName] = process.argv.slice(2);
@@ -53,10 +50,3 @@ await refreshSimpleStatsCache(authedClient, {
 	periods: [currentMonthPeriod]
 });
 console.log('refreshSimpleStatsCache done.');
-
-console.log('Calling refreshComplexStatsCache...');
-await refreshComplexStatsCache(authedClient, {
-	groupId: group.id,
-	temporalUnit: 'month'
-});
-console.log('refreshComplexStatsCache done.');

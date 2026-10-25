@@ -1,7 +1,7 @@
 /**
  * DB integration tests for the `FailedStatsCacheRefreshes` table's own schema
- * (#1167) — column types/nullability and RLS. Unlike its two
- * "SimpleStatsCache"/"ComplexStatsCache" siblings this table has no uniqueness
+ * (#1167) — column types/nullability and RLS. Unlike its
+ * "SimpleStatsCache" sibling this table has no uniqueness
  * to police, so there is no unique-index block to test: it is an append-only
  * log written through a plain PostgREST `.insert()` by
  * `lib/stats-cache-refresh.ts`. See
@@ -125,12 +125,7 @@ describe('FailedStatsCacheRefreshes', () => {
 	});
 
 	describe('constraints', () => {
-		it.each([
-			'SimpleStatsCache',
-			'SimpleStatsCacheBySpecies',
-			'ComplexStatsCache',
-			'ComplexStatsCacheBySpecies',
-		] as const)(
+		it.each(['SimpleStatsCache', 'SimpleStatsCacheBySpecies'] as const)(
 			"accepts cache_table value '%s'",
 			async (cacheTable) => {
 				const inserted = await ownerClient
@@ -145,7 +140,7 @@ describe('FailedStatsCacheRefreshes', () => {
 			}
 		);
 
-		it('rejects a cache_table value outside the four accepted tags', async () => {
+		it('rejects a cache_table value outside the two accepted tags', async () => {
 			const { error } = await ownerClient
 				.from('FailedStatsCacheRefreshes')
 				.insert({

@@ -50,116 +50,6 @@ export type Database = {
           },
         ]
       }
-      ComplexStatsCache: {
-        Row: {
-          created_at: string
-          group_id: number
-          id: number
-          new_adult_bird_count: number
-          returning_age_1_bird_count: number
-          returning_age_2_bird_count: number
-          returning_age_3_plus_bird_count: number
-          returning_new_unknown_age_bird_count: number
-          temporal_unit: string
-          time_period: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          group_id: number
-          id?: number
-          new_adult_bird_count: number
-          returning_age_1_bird_count: number
-          returning_age_2_bird_count: number
-          returning_age_3_plus_bird_count: number
-          returning_new_unknown_age_bird_count: number
-          temporal_unit: string
-          time_period: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          group_id?: number
-          id?: number
-          new_adult_bird_count?: number
-          returning_age_1_bird_count?: number
-          returning_age_2_bird_count?: number
-          returning_age_3_plus_bird_count?: number
-          returning_new_unknown_age_bird_count?: number
-          temporal_unit?: string
-          time_period?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "complex_stats_cache_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "RingingGroups"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ComplexStatsCacheBySpecies: {
-        Row: {
-          created_at: string
-          group_id: number
-          id: number
-          new_adult_bird_count: number
-          returning_age_1_bird_count: number
-          returning_age_2_bird_count: number
-          returning_age_3_plus_bird_count: number
-          returning_new_unknown_age_bird_count: number
-          species_id: number
-          temporal_unit: string
-          time_period: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          group_id: number
-          id?: number
-          new_adult_bird_count: number
-          returning_age_1_bird_count: number
-          returning_age_2_bird_count: number
-          returning_age_3_plus_bird_count: number
-          returning_new_unknown_age_bird_count: number
-          species_id: number
-          temporal_unit: string
-          time_period: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          group_id?: number
-          id?: number
-          new_adult_bird_count?: number
-          returning_age_1_bird_count?: number
-          returning_age_2_bird_count?: number
-          returning_age_3_plus_bird_count?: number
-          returning_new_unknown_age_bird_count?: number
-          species_id?: number
-          temporal_unit?: string
-          time_period?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "complex_stats_cache_by_species_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "RingingGroups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "complex_stats_cache_by_species_species_id_fkey"
-            columns: ["species_id"]
-            isOneToOne: false
-            referencedRelation: "Species"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       DemonRecords: {
         Row: {
           created_at: string
@@ -1306,44 +1196,6 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      stats_cache_new_adult_metrics: {
-        Args: {
-          from_date?: string
-          group_by_species?: boolean
-          group_by_time_period?: string
-          month_filter?: number
-          ringing_group_filter?: number
-          species_name_filter?: string
-          to_date?: string
-          year_filter?: number
-        }
-        Returns: Database["public"]["CompositeTypes"]["stats_cache_new_adult_metrics_result"][]
-        SetofOptions: {
-          from: "*"
-          to: "stats_cache_new_adult_metrics_result"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
-      stats_cache_returning_age_metrics: {
-        Args: {
-          from_date?: string
-          group_by_species?: boolean
-          group_by_time_period?: string
-          month_filter?: number
-          ringing_group_filter?: number
-          species_name_filter?: string
-          to_date?: string
-          year_filter?: number
-        }
-        Returns: Database["public"]["CompositeTypes"]["stats_cache_returning_age_metrics_result"][]
-        SetofOptions: {
-          from: "*"
-          to: "stats_cache_returning_age_metrics_result"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
       stats_encounter_age_classification: {
         Args: {
           from_date?: string
@@ -1557,19 +1409,6 @@ export type Database = {
         postjuv_juv_enc_count: number | null
         new_postjuv_juv_enc_count: number | null
         new_postjuv_enc_count: number | null
-      }
-      stats_cache_new_adult_metrics_result: {
-        species_id: number | null
-        time_period: string | null
-        new_adult_bird_count: number | null
-      }
-      stats_cache_returning_age_metrics_result: {
-        species_id: number | null
-        time_period: string | null
-        returning_age_1_bird_count: number | null
-        returning_age_2_bird_count: number | null
-        returning_age_3_plus_bird_count: number | null
-        returning_new_unknown_age_bird_count: number | null
       }
     }
   }

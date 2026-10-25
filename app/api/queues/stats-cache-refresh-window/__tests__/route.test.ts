@@ -5,7 +5,6 @@ import type { StatsCacheRefreshEvent } from '../../../../../lib/stats-cache-refr
 // a field of the real method's name without shadowing it in its own initializer.
 const markStatsCacheRefreshedMock = vi.fn();
 const refreshSimpleStatsCache = vi.fn();
-const refreshComplexStatsCache = vi.fn();
 const getAuthenticatedSupabaseClientForGroup = vi.fn();
 
 // Mocked for the whole file rather than per-describe: every failure path below
@@ -23,9 +22,7 @@ vi.mock('../../../../../lib/demon-import', () => ({
 
 vi.mock('../../../../../lib/stats-cache-refresh', () => ({
 	refreshSimpleStatsCache: (...args: unknown[]) =>
-		refreshSimpleStatsCache(...args),
-	refreshComplexStatsCache: (...args: unknown[]) =>
-		refreshComplexStatsCache(...args)
+		refreshSimpleStatsCache(...args)
 }));
 
 vi.mock('../../../../lib/auth/group-auth', () => ({
@@ -186,7 +183,6 @@ describe('processStatsCacheRefreshWindowJob', () => {
 		vi.clearAllMocks();
 		getAuthenticatedSupabaseClientForGroup.mockResolvedValue(supabaseClient);
 		refreshSimpleStatsCache.mockResolvedValue(undefined);
-		refreshComplexStatsCache.mockResolvedValue(undefined);
 		markStatsCacheRefreshedMock.mockResolvedValue(undefined);
 	});
 
@@ -198,7 +194,7 @@ describe('processStatsCacheRefreshWindowJob', () => {
 		expect(getAuthenticatedSupabaseClientForGroup).toHaveBeenCalledWith(123);
 	});
 
-	it("calls both refreshSimpleStatsCache and refreshComplexStatsCache for the event's temporal unit, passing the same derived periods to both", async () => {
+	it("calls refreshSimpleStatsCache for the event's temporal unit, passing the derived periods", async () => {
 		await processStatsCacheRefreshWindowJob(
 			statsCacheRefreshEvent({
 				groupByTimePeriod: 'year',
@@ -206,23 +202,15 @@ describe('processStatsCacheRefreshWindowJob', () => {
 			})
 		);
 
-		const expectedParams = {
+		expect(refreshSimpleStatsCache).toHaveBeenCalledWith(supabaseClient, {
 			groupId: GROUP_ID,
 			temporalUnit: 'year',
 			periods: ['2024-01-01'],
 			speciesIds: []
-		};
-		expect(refreshSimpleStatsCache).toHaveBeenCalledWith(
-			supabaseClient,
-			expectedParams
-		);
-		// expect(refreshComplexStatsCache).toHaveBeenCalledWith(
-		// 	supabaseClient,
-		// 	expectedParams
-		// );
+		});
 	});
 
-	it("marks the temporal unit's ImportJobs column succeeded when both refreshes resolve", async () => {
+	it("marks the temporal unit's ImportJobs column succeeded when the refresh resolves", async () => {
 		await processStatsCacheRefreshWindowJob(
 			dayEvent(['2024-03-15', '2024-03-28'])
 		);
@@ -259,38 +247,6 @@ describe('processStatsCacheRefreshWindowJob', () => {
 		);
 	});
 
-	it.skip("still refreshes ComplexStatsCache, and marks the temporal unit's ImportJobs column failed, when refreshSimpleStatsCache rejects", async () => {
-		refreshSimpleStatsCache.mockRejectedValue(new Error('simple'));
-
-		await processStatsCacheRefreshWindowJob(allTimeEvent());
-
-		expect(refreshComplexStatsCache).toHaveBeenCalledOnce();
-		expect(markStatsCacheRefreshedMock).toHaveBeenCalledWith(
-			IMPORT_JOB_ID,
-			'all-time',
-			'failed'
-		);
-	});
-
-	it.skip("marks the temporal unit's ImportJobs column failed when refreshComplexStatsCache rejects, even though refreshSimpleStatsCache succeeded", async () => {
-		const refreshError = new Error('complex refresh blew up');
-		refreshComplexStatsCache.mockRejectedValue(refreshError);
-
-		await processStatsCacheRefreshWindowJob(allTimeEvent());
-
-		expect(refreshSimpleStatsCache).toHaveBeenCalledOnce();
-		expect(markStatsCacheRefreshedMock).toHaveBeenCalledWith(
-			IMPORT_JOB_ID,
-			'all-time',
-			'failed'
-		);
-		expect(consoleErrorSpy).toHaveBeenCalledWith(
-			expect.any(String),
-			expect.objectContaining({ cacheTable: 'ComplexStatsCache' }),
-			refreshError
-		);
-	});
-
 	it("does not call markStatsCacheRefreshed for a different temporal unit's column", async () => {
 		await processStatsCacheRefreshWindowJob(
 			statsCacheRefreshEvent({
@@ -306,9 +262,8 @@ describe('processStatsCacheRefreshWindowJob', () => {
 		);
 	});
 
-	it('resolves without throwing even when both refreshes reject', async () => {
+	it('resolves without throwing even when the refresh rejects', async () => {
 		refreshSimpleStatsCache.mockRejectedValue(new Error('simple'));
-		refreshComplexStatsCache.mockRejectedValue(new Error('complex'));
 
 		await expect(
 			processStatsCacheRefreshWindowJob(allTimeEvent())

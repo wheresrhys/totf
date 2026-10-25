@@ -11,7 +11,6 @@ import {
 	type StatsCacheRefreshOutcome
 } from '../../../../lib/demon-import';
 import {
-	refreshComplexStatsCache,
 	refreshSimpleStatsCache,
 	type TemporalUnit
 } from '../../../../lib/stats-cache-refresh';
@@ -19,8 +18,8 @@ import type { StatsCacheRefreshEvent } from '../../../../lib/stats-cache-refresh
 import { getAuthenticatedSupabaseClientForGroup } from '../../../lib/auth/group-auth';
 
 /**
- * What one `StatsCacheRefreshEvent` means to the two refresh functions, which
- * take `{groupId, temporalUnit, periods?, speciesIds?}` rather than the
+ * What one `StatsCacheRefreshEvent` means to `refreshSimpleStatsCache`, which
+ * takes `{groupId, temporalUnit, periods?, speciesIds?}` rather than the
  * event's own RPC-filter-shaped payload.
  */
 type StatsCacheRefreshParams = {
@@ -36,14 +35,13 @@ type StatsCacheRefreshParams = {
  * `refreshSimpleStatsCache` could narrow it). `day` carries its exact days in
  * the event's top-level `affectedDates` instead, because its
  * `from_date`/`to_date` window can span gap days with no activity; `all-time`
- * carries no period data at all, since both refresh functions full-replace that
- * temporal unit and ignore `periods` outright.
+ * carries no period data at all, since `refreshSimpleStatsCache` full-replaces
+ * that temporal unit and ignores `periods` outright.
  *
  * `month-squashed` has to be listed here for its narrowing to work at all:
  * `refreshSimpleStatsCache` now treats it as a narrowing unit, and a narrowing
  * unit handed no periods refreshes *nothing* (see
- * `buildSimpleMetricRpcParamsList`'s early return). `refreshComplexStatsCache`
- * still full-replaces it and ignores the periods, as before.
+ * `buildSimpleMetricRpcParamsList`'s early return).
  */
 const PERIODS_FROM_RPC_PARAMS_TEMPORAL_UNITS: readonly TemporalUnit[] = [
 	'month',
@@ -52,15 +50,14 @@ const PERIODS_FROM_RPC_PARAMS_TEMPORAL_UNITS: readonly TemporalUnit[] = [
 ];
 
 /**
- * Maps one dispatched event onto the arguments `refreshSimpleStatsCache`/
- * `refreshComplexStatsCache` take. Its own named function, not inlined in the
- * handler, because the period-sourcing rule differs per temporal unit and is
- * the most error-prone part of this consumer — see
- * `__tests__/route.test.ts`'s first describe block. `speciesIds` has no such
- * per-unit rule: every branch carries `event.affectedSpeciesIds` straight
- * through, since narrowing the species-grouped write is sound for every
- * temporal unit — see `RefreshSpeciesNarrowing`'s own doc comment in
- * `lib/stats-cache-refresh.ts`.
+ * Maps one dispatched event onto the arguments `refreshSimpleStatsCache`
+ * takes. Its own named function, not inlined in the handler, because the
+ * period-sourcing rule differs per temporal unit and is the most error-prone
+ * part of this consumer — see `__tests__/route.test.ts`'s first describe
+ * block. `speciesIds` has no such per-unit rule: every branch carries
+ * `event.affectedSpeciesIds` straight through, since narrowing the
+ * species-grouped write is sound for every temporal unit — see
+ * `RefreshSpeciesNarrowing`'s own doc comment in `lib/stats-cache-refresh.ts`.
  */
 export function deriveStatsCacheRefreshParams(
 	event: StatsCacheRefreshEvent
@@ -94,19 +91,15 @@ export function deriveStatsCacheRefreshParams(
 }
 
 /**
- * Runs one of the two cache refreshes, catching and logging its failure rather
- * than letting it escape, and reporting back whether it landed. Its own helper
- * so each refresh gets its own `try`/`catch` — see
- * `processStatsCacheRefreshWindowJob`'s "no transaction spans the two
- * refreshes" note for why they must not share one.
+ * Runs the cache refresh, catching and logging its failure rather than
+ * letting it escape, and reporting back whether it landed.
  *
- * `cacheTable` is in the log context so a partial failure names *which* cache
- * went stale; without it the two are indistinguishable in the logs, which is
- * the only place a partial failure is visible at per-cache granularity (the
- * `ImportJobs` column records one outcome for the temporal unit as a whole).
+ * `cacheTable` is in the log context so a failure names *which* cache went
+ * stale — there's only one today, but the tag stays since it's also what
+ * `FailedStatsCacheRefreshes.cache_table` uses.
  */
 async function runCacheRefresh(
-	cacheTable: 'SimpleStatsCache' | 'ComplexStatsCache',
+	cacheTable: 'SimpleStatsCache',
 	refreshCache: () => Promise<void>,
 	logContext: {
 		importJobId: number;
@@ -129,7 +122,7 @@ async function runCacheRefresh(
 
 /**
  * Consumer for the `stats-cache-refresh-window` topic (#1141, made real by
- * #1155): refreshes both stats caches for the one temporal unit this event
+ * #1155): refreshes `SimpleStatsCache` for the one temporal unit this event
  * covers, then records the outcome on that temporal unit's own
  * `ImportJobs.*_stats_refresh_status` column (#1154).
  *
@@ -154,35 +147,12 @@ async function runCacheRefresh(
  * precedent `dispatchStatsCacheRefreshEvents` (`lib/demon-import.ts`) already
  * set one level up at the dispatch call site, applied one level deeper.
  *
- * **No transaction spans the two refreshes, and none can from here** (asked on
- * PR #1174's review). Every write either refresh makes goes out over PostgREST
- * as its own HTTP request, each of which Postgres runs in its own implicit
- * transaction; `supabase-js` exposes no `BEGIN`/`COMMIT` and no way to pin a
- * sequence of requests to one connection, so there is no client-side
- * transaction to open. Nor is one refresh internally atomic — each makes
- * several round trips of its own (its metric RPCs, its `.upsert()`, its
- * dead-letter insert; see `lib/stats-cache-refresh.ts`), so "wrap the two in a
- * transaction" would mean pushing the whole merge-and-write pipeline down into
- * SQL. #1169 deliberately moved the *opposite* way — it deleted the
- * `upsert_*_stats_cache_rows` RPCs in favour of native `.upsert()` — so that is
- * a design reversal, not a tweak.
- *
- * **Partial application is safe, which is why that's acceptable.** Both caches
- * are derived data, rebuildable from `Encounters` at any time; both writes are
- * idempotent upserts keyed on `(group_id, temporal_unit, time_period,
- * species_id)`; neither ever deletes a row. So a half-applied pass leaves one
- * cache fresh and the other stale — never a torn or invented value — and
- * re-running the same event converges. The staleness is recorded rather than
- * silent: either refresh failing writes `'failed'` to the temporal unit's
- * column below, so the unit is flagged as not-fresh for a re-refresh, and each
- * failure is logged with the `cacheTable` that went stale.
- *
- * The two therefore run **independently, each with its own `try`/`catch`**
- * (`runCacheRefresh` above) rather than sharing one: since there's no atomicity
- * to preserve, letting a `SimpleStatsCache` failure skip the
- * `ComplexStatsCache` refresh too would strand two stale caches where one would
- * do. Sequentially rather than via `Promise.all`, to keep one group's refresh
- * from opening both caches' metric RPCs at once.
+ * There used to be a second refresh here, `refreshComplexStatsCache` against
+ * a sibling `ComplexStatsCache`, run independently with its own `try`/`catch`
+ * so one cache's failure never stranded the other — see PR #1174's review for
+ * why no transaction could span the two. That cache was removed entirely once
+ * its write path had been dead for a while; this consumer is back to a single
+ * refresh and a single outcome.
  */
 export async function processStatsCacheRefreshWindowJob(
 	event: StatsCacheRefreshEvent
@@ -202,11 +172,6 @@ export async function processStatsCacheRefreshWindowJob(
 		() => refreshSimpleStatsCache(supabaseClient, refreshParams),
 		logContext
 	);
-	// const complexRefreshSucceeded = await runCacheRefresh(
-	// 	'ComplexStatsCache',
-	// 	() => refreshComplexStatsCache(supabaseClient, refreshParams),
-	// 	logContext
-	// );
 	const refreshOutcome: StatsCacheRefreshOutcome = simpleRefreshSucceeded
 		? 'succeeded'
 		: 'failed';
