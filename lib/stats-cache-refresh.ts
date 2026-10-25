@@ -56,7 +56,26 @@ export type TemporalUnit =
 	| 'month-squashed'
 	| 'all-time';
 
-export type RefreshSimpleStatsCacheParams = {
+/**
+ * The species ids a refresh pass should narrow its species-grouped *write* to
+ * — never its read: every metric RPC call is still made exactly as it is
+ * without this field, over every species. When provided, only the
+ * species-grouped write (`SimpleStatsCacheBySpecies`/`ComplexStatsCacheBySpecies`)
+ * skips rewriting a cell whose `species_id` isn't in this list; the
+ * all-species-combined write (`SimpleStatsCache`/`ComplexStatsCache`) ignores
+ * it entirely, since that row aggregates across every species and must always
+ * be rewritten in full whenever its period is in scope. `undefined` means "no
+ * species narrowing" — every computed row is written, the pre-existing
+ * behaviour. Orthogonal to `periods`/temporal-unit narrowing, and sound for
+ * every temporal unit including `all-time`: an untouched species' cell for a
+ * period in scope is unchanged by this import, so skipping its write
+ * reproduces whatever is already cached for it.
+ */
+export type RefreshSpeciesNarrowing = {
+	speciesIds?: number[];
+};
+
+export type RefreshSimpleStatsCacheParams = RefreshSpeciesNarrowing & {
 	groupId: number;
 	temporalUnit: TemporalUnit;
 	/**
@@ -72,7 +91,7 @@ export type RefreshSimpleStatsCacheParams = {
 	periods?: string[];
 };
 
-export type RefreshComplexStatsCacheParams = {
+export type RefreshComplexStatsCacheParams = RefreshSpeciesNarrowing & {
 	groupId: number;
 	temporalUnit: TemporalUnit;
 	/**
@@ -490,6 +509,28 @@ function filterToTouchedPeriods<Row extends MergedCellKey>(
 	return mergedRows.filter(
 		(row) =>
 			row.time_period !== null && touchedPeriods.includes(row.time_period)
+	);
+}
+
+/**
+ * Cuts a species-grouped merged result back to exactly the species
+ * `speciesIds` names, when given. `undefined` is "no narrowing" — every row
+ * is kept, matching every call site before this field existed. Only ever
+ * called from the `groupBySpecies: true` branch of a refresh pass: the
+ * all-species-combined write has no `species_id` to filter on, and must
+ * always see the full, unfiltered result regardless of `speciesIds` — see
+ * `RefreshSpeciesNarrowing`'s own doc comment for why.
+ */
+function filterToTouchedSpecies<Row extends MergedCellKey>(
+	mergedRows: Row[],
+	speciesIds: number[] | undefined
+): Row[] {
+	if (speciesIds === undefined) {
+		return mergedRows;
+	}
+	const touchedSpeciesIds = new Set(speciesIds);
+	return mergedRows.filter(
+		(row) => row.species_id !== null && touchedSpeciesIds.has(row.species_id)
 	);
 }
 
@@ -911,6 +952,13 @@ function mergeComplexMetricRows({
  * `all-time` always full-replaces the group's whole history, ignoring `periods`
  * entirely.
  *
+ * Independently of the above, the `groupBySpecies: true` pass also narrows by
+ * `speciesIds` when given (`filterToTouchedSpecies`), for every temporal unit
+ * including `all-time` — see `RefreshSpeciesNarrowing`'s own doc comment. The
+ * `groupBySpecies: false` pass never does: its one row per period aggregates
+ * across every species, so it has to see every computed row regardless of
+ * `speciesIds`.
+ *
  * Writes go through exactly one `.upsert()` — one call per pass, not one per
  * metric RPC's worth of rows and not one per fanned-out period. See
  * `writeBySpeciesRows`/`writeAllSpeciesRows`.
@@ -929,7 +977,7 @@ function mergeComplexMetricRows({
  */
 async function runSimpleStatsCacheRefreshPass(
 	supabaseClient: SupabaseClient,
-	{ groupId, temporalUnit, periods }: RefreshSimpleStatsCacheParams,
+	{ groupId, temporalUnit, periods, speciesIds }: RefreshSimpleStatsCacheParams,
 	groupBySpecies: boolean
 ): Promise<void> {
 	const touchedPeriods = periods ?? [];
@@ -995,7 +1043,7 @@ async function runSimpleStatsCacheRefreshPass(
 		await writeBySpeciesRows(
 			supabaseClient,
 			'SimpleStatsCacheBySpecies',
-			rowsToWrite,
+			filterToTouchedSpecies(rowsToWrite, speciesIds),
 			{ groupId, temporalUnit }
 		);
 	} else {
@@ -1055,6 +1103,11 @@ export async function refreshSimpleStatsCache(
  * reason this cache is a separate table and this a separate function; see
  * `COMPLEX_NARROWING_TEMPORAL_UNITS`.
  *
+ * Independently of the above, the `groupBySpecies: true` pass also narrows by
+ * `speciesIds` when given, for every temporal unit including `all-time` — see
+ * `RefreshSpeciesNarrowing`'s own doc comment. The `groupBySpecies: false`
+ * pass never does, for the same reason `refreshSimpleStatsCache`'s doesn't.
+ *
  * Writes go through exactly one `.upsert()` — one call per pass, not one per
  * metric RPC's worth of rows. See `writeBySpeciesRows`/`writeAllSpeciesRows`.
  *
@@ -1073,7 +1126,12 @@ export async function refreshSimpleStatsCache(
  */
 async function runComplexStatsCacheRefreshPass(
 	supabaseClient: SupabaseClient,
-	{ groupId, temporalUnit, periods }: RefreshComplexStatsCacheParams,
+	{
+		groupId,
+		temporalUnit,
+		periods,
+		speciesIds
+	}: RefreshComplexStatsCacheParams,
 	groupBySpecies: boolean
 ): Promise<void> {
 	const touchedPeriods = periods ?? [];
@@ -1118,7 +1176,7 @@ async function runComplexStatsCacheRefreshPass(
 		await writeBySpeciesRows(
 			supabaseClient,
 			'ComplexStatsCacheBySpecies',
-			rowsToWrite,
+			filterToTouchedSpecies(rowsToWrite, speciesIds),
 			{ groupId, temporalUnit }
 		);
 	} else {

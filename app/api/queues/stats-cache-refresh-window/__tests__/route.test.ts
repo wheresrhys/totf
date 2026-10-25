@@ -50,13 +50,15 @@ function statsCacheRefreshEvent({
 	ringingGroupId = GROUP_ID,
 	groupByTimePeriod,
 	periods,
-	affectedDates
+	affectedDates,
+	affectedSpeciesIds = []
 }: {
 	importJobId?: number;
 	ringingGroupId?: number;
 	groupByTimePeriod?: 'day' | 'month' | 'month-squashed' | 'year';
 	periods?: string[];
 	affectedDates?: string[];
+	affectedSpeciesIds?: number[];
 } = {}): StatsCacheRefreshEvent {
 	return {
 		importJobId,
@@ -65,7 +67,8 @@ function statsCacheRefreshEvent({
 			...(groupByTimePeriod ? { group_by_time_period: groupByTimePeriod } : {}),
 			...(periods ? { periods } : {})
 		},
-		...(affectedDates ? { affectedDates } : {})
+		...(affectedDates ? { affectedDates } : {}),
+		affectedSpeciesIds
 	};
 }
 
@@ -144,8 +147,35 @@ describe('deriving groupId/temporalUnit/periods from the event', () => {
 		expect(deriveStatsCacheRefreshParams(allTimeEvent())).toEqual({
 			groupId: GROUP_ID,
 			temporalUnit: 'all-time',
-			periods: undefined
+			periods: undefined,
+			speciesIds: []
 		});
+	});
+
+	it('carries event.affectedSpeciesIds straight through regardless of temporal unit', () => {
+		expect(
+			deriveStatsCacheRefreshParams(
+				statsCacheRefreshEvent({ affectedSpeciesIds: [3, 1] })
+			)
+		).toMatchObject({ speciesIds: [3, 1] });
+		expect(
+			deriveStatsCacheRefreshParams(
+				statsCacheRefreshEvent({
+					groupByTimePeriod: 'day',
+					affectedDates: ['2024-03-15'],
+					affectedSpeciesIds: [3, 1]
+				})
+			)
+		).toMatchObject({ speciesIds: [3, 1] });
+		expect(
+			deriveStatsCacheRefreshParams(
+				statsCacheRefreshEvent({
+					groupByTimePeriod: 'month',
+					periods: ['2024-03-01'],
+					affectedSpeciesIds: [3, 1]
+				})
+			)
+		).toMatchObject({ speciesIds: [3, 1] });
 	});
 });
 
@@ -179,7 +209,8 @@ describe('processStatsCacheRefreshWindowJob', () => {
 		const expectedParams = {
 			groupId: GROUP_ID,
 			temporalUnit: 'year',
-			periods: ['2024-01-01']
+			periods: ['2024-01-01'],
+			speciesIds: []
 		};
 		expect(refreshSimpleStatsCache).toHaveBeenCalledWith(
 			supabaseClient,
