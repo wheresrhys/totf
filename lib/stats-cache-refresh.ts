@@ -616,6 +616,17 @@ async function runStatsCacheDbCall<T>(
  * (`runStatsCacheDbCall`) — a `day`-unit pass can call the same RPC name
  * several times with different `from_date`/`to_date` windows, and only
  * per-call logging tells those apart.
+ *
+ * Settled rather than raced (`Promise.allSettled`, not `Promise.all`): one
+ * batch call failing must not stop a sibling batch for a different window
+ * from also being attempted and logged — exactly the failure mode under
+ * investigation, where it matters to know whether every window is slow or
+ * just one. Concurrency is unchanged either way (same calls fire at once);
+ * `allSettled` only changes whether the function waits for every call to
+ * finish before deciding, rather than returning the instant the first one
+ * settles. Once every call has settled, the *first* failure's original error
+ * is rethrown unchanged, so `catchSupabaseErrors`'s message and any
+ * `rejects.toThrow(...)` assertion still see exactly what they did before.
  */
 async function fetchMetricRows<Row>(
 	supabaseClient: SupabaseClient,
@@ -623,7 +634,7 @@ async function fetchMetricRows<Row>(
 	rpcParamsList: MetricRpcParams[],
 	context: Record<string, unknown>
 ): Promise<Row[]> {
-	const perCallRows = await Promise.all(
+	const settled = await Promise.allSettled(
 		rpcParamsList.map((rpcParams) =>
 			runStatsCacheDbCall<Row[] | null>(
 				{ kind: 'rpc', rpcName, rpcParams },
@@ -633,7 +644,17 @@ async function fetchMetricRows<Row>(
 			)
 		)
 	);
-	return perCallRows.flatMap((rows) => (rows ?? []) as Row[]);
+
+	const firstFailure = settled.find(
+		(result): result is PromiseRejectedResult => result.status === 'rejected'
+	);
+	if (firstFailure) {
+		throw firstFailure.reason;
+	}
+
+	return (settled as PromiseFulfilledResult<Row[] | null>[]).flatMap(
+		(result) => (result.value ?? []) as Row[]
+	);
 }
 
 /**
@@ -1105,6 +1126,14 @@ function mergeSimpleMetricRows({
  * falls out of `stats_spine`'s species-set entirely, so it never gets a
  * fresh row written to overwrite a stale one — an upsert can only ever
  * refresh cells the spine still produces. Out of scope for this ticket.
+ *
+ * The 4 metric RPC reads are each attempted regardless of whether an earlier
+ * one failed, so a timeout investigation can see whether every one of them
+ * is slow or just one — but any one of them failing still blocks the whole
+ * merge/write phase for this pass; there's no such thing as a partial merge.
+ * The `Sessions.visit_date` preflight above is the one exception: it has to
+ * run and succeed *before* the 4 RPC calls' params can even be built for the
+ * `day` unit, so there's nothing left to "still attempt" if it fails.
  */
 export async function runSimpleStatsCacheRefreshPass(
 	supabaseClient: SupabaseClient,
@@ -1161,30 +1190,68 @@ export async function runSimpleStatsCacheRefreshPass(
 	// Each call below logs itself (name + its own params) inside
 	// `fetchMetricRows` — see its own docblock for why that has to be at the
 	// per-RPC-call granularity rather than wrapped once here.
-	const basicRows = await fetchMetricRows<BasicSessionMetricsRow>(
-		supabaseClient,
-		'stats_cache_basic_session_metrics',
-		rpcParamsList,
-		logContext
-	);
-	const biometricsRows = await fetchMetricRows<BiometricsMetricsRow>(
-		supabaseClient,
-		'stats_cache_biometrics_metrics',
-		rpcParamsList,
-		logContext
-	);
-	const birdAgeRows = await fetchMetricRows<BirdAgeMetricsRow>(
-		supabaseClient,
-		'stats_cache_bird_age_metrics',
-		rpcParamsList,
-		logContext
-	);
-	const encounterAgeRows = await fetchMetricRows<EncounterAgeMetricsRow>(
-		supabaseClient,
-		'stats_cache_encounter_age_metrics',
-		rpcParamsList,
-		logContext
-	);
+	//
+	// Each of the 4 metric RPCs is attempted regardless of whether an earlier
+	// one failed — sequentially, in the same order as before, so this adds no
+	// concurrent DB load — and every failure is collected rather than thrown
+	// immediately, so a timeout in `basic` doesn't hide whether `biometrics`/
+	// `birdAge`/`encounterAge` are also timing out. Once all 4 have been
+	// attempted, any failure blocks the merge/write phase entirely: there's no
+	// such thing as a partial merge when one metric's rows are missing.
+	const readFailures: unknown[] = [];
+	let basicRows: BasicSessionMetricsRow[] = [];
+	let biometricsRows: BiometricsMetricsRow[] = [];
+	let birdAgeRows: BirdAgeMetricsRow[] = [];
+	let encounterAgeRows: EncounterAgeMetricsRow[] = [];
+
+	try {
+		basicRows = await fetchMetricRows<BasicSessionMetricsRow>(
+			supabaseClient,
+			'stats_cache_basic_session_metrics',
+			rpcParamsList,
+			logContext
+		);
+	} catch (error) {
+		readFailures.push(error);
+	}
+	try {
+		biometricsRows = await fetchMetricRows<BiometricsMetricsRow>(
+			supabaseClient,
+			'stats_cache_biometrics_metrics',
+			rpcParamsList,
+			logContext
+		);
+	} catch (error) {
+		readFailures.push(error);
+	}
+	try {
+		birdAgeRows = await fetchMetricRows<BirdAgeMetricsRow>(
+			supabaseClient,
+			'stats_cache_bird_age_metrics',
+			rpcParamsList,
+			logContext
+		);
+	} catch (error) {
+		readFailures.push(error);
+	}
+	try {
+		encounterAgeRows = await fetchMetricRows<EncounterAgeMetricsRow>(
+			supabaseClient,
+			'stats_cache_encounter_age_metrics',
+			rpcParamsList,
+			logContext
+		);
+	} catch (error) {
+		readFailures.push(error);
+	}
+
+	if (readFailures.length > 0) {
+		console.error(
+			`Stats-cache refresh pass aborted: ${readFailures.length}/4 metric RPCs failed to read; blocking the cache write`,
+			logContext
+		);
+		throw readFailures[0];
+	}
 
 	const { mergedRows, anomalies } = mergeSimpleMetricRows({
 		groupId,
