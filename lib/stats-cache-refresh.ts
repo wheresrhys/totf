@@ -553,9 +553,33 @@ function recordMissingCellAnomaly({
 }
 
 /**
+ * Row-count cap for each cache-table `.upsert()` call below — same value as
+ * `lib/demon-import.ts`'s `DEFAULT_DEMON_RECORDS_BATCH_SIZE` /
+ * `DEFAULT_ENCOUNTER_ROW_CHUNK_SIZE`, kept as its own constant here rather
+ * than imported since this is a separate write path. `month`/`year`/
+ * `month-squashed`/`all-time` passes never produce more than a few dozen
+ * rows, but `day` scales with however many distinct dates an import touched
+ * (times species count for the by-species table), which is otherwise
+ * unbounded.
+ */
+export const DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE = 100;
+
+/** Splits `items` into fixed-size chunks, last one short if it doesn't divide evenly. */
+function chunkArray<T>(items: T[], chunkSize: number): T[][] {
+	const chunks: T[][] = [];
+	for (let i = 0; i < items.length; i += chunkSize) {
+		chunks.push(items.slice(i, i + chunkSize));
+	}
+	return chunks;
+}
+
+/**
  * Writes one species-grouped refresh pass's merged cells to its cache's
- * `*BySpecies` table, in a single native `.upsert()` against that table's one
- * unique constraint.
+ * `*BySpecies` table, via native `.upsert()` calls against that table's one
+ * unique constraint — chunked to at most `DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE`
+ * rows per call, issued sequentially (not `Promise.all`) since every chunk
+ * targets the same unique index, matching `demon-import.ts`'s
+ * `DemonRecordsBatchWriter` chaining precedent.
  *
  * This is where the two `time_period` conventions are reconciled: the metric
  * RPCs emit a real NULL for the all-time grain, the cache column is NOT NULL,
@@ -573,25 +597,26 @@ async function writeBySpeciesRows<Cell extends MergedCellKey>(
 	cells: Cell[],
 	{ groupId, temporalUnit }: { groupId: number; temporalUnit: TemporalUnit }
 ): Promise<void> {
-	await supabaseClient
-		.from(cacheTable)
-		.upsert(
-			cells.map(({ species_id, time_period, ...metrics }) => ({
-				...metrics,
-				group_id: groupId,
-				temporal_unit: temporalUnit,
-				species_id: species_id!,
-				time_period: time_period ?? ALL_TIME_SENTINEL_DATE
-			})),
-			{ onConflict: BY_SPECIES_CONFLICT_TARGET }
-		)
-		.then(catchSupabaseErrors);
+	const rows = cells.map(({ species_id, time_period, ...metrics }) => ({
+		...metrics,
+		group_id: groupId,
+		temporal_unit: temporalUnit,
+		species_id: species_id!,
+		time_period: time_period ?? ALL_TIME_SENTINEL_DATE
+	}));
+	for (const chunk of chunkArray(rows, DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE)) {
+		await supabaseClient
+			.from(cacheTable)
+			.upsert(chunk, { onConflict: BY_SPECIES_CONFLICT_TARGET })
+			.then(catchSupabaseErrors);
+	}
 }
 
 /**
  * Writes one non-species-grouped refresh pass's merged cells to the
  * all-species-combined `SimpleStatsCache` table, the sibling of
- * `writeBySpeciesRows` for a `group_by_species: false` pass.
+ * `writeBySpeciesRows` for a `group_by_species: false` pass. Chunked the same
+ * way — see `writeBySpeciesRows`'s docblock for why.
  *
  * This table has no `species_id` column at all (#1169 — a nullable
  * `species_id` meaning "all species" was tried and reverted), so `species_id`
@@ -608,19 +633,21 @@ async function writeAllSpeciesRows<Cell extends MergedCellKey>(
 	cells: Cell[],
 	{ groupId, temporalUnit }: { groupId: number; temporalUnit: TemporalUnit }
 ): Promise<void> {
-	await supabaseClient
-		.from(cacheTable)
-		.upsert(
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude it from ...metrics; this table has no species_id column
-			cells.map(({ species_id, time_period, ...metrics }) => ({
-				...metrics,
-				group_id: groupId,
-				temporal_unit: temporalUnit,
-				time_period: time_period ?? ALL_TIME_SENTINEL_DATE
-			})),
-			{ onConflict: ALL_SPECIES_CONFLICT_TARGET }
-		)
-		.then(catchSupabaseErrors);
+	const rows = cells.map(
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude it from ...metrics; this table has no species_id column
+		({ species_id, time_period, ...metrics }) => ({
+			...metrics,
+			group_id: groupId,
+			temporal_unit: temporalUnit,
+			time_period: time_period ?? ALL_TIME_SENTINEL_DATE
+		})
+	);
+	for (const chunk of chunkArray(rows, DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE)) {
+		await supabaseClient
+			.from(cacheTable)
+			.upsert(chunk, { onConflict: ALL_SPECIES_CONFLICT_TARGET })
+			.then(catchSupabaseErrors);
+	}
 }
 
 /**
@@ -809,8 +836,11 @@ function mergeSimpleMetricRows({
  * across every species, so it has to see every computed row regardless of
  * `speciesIds`.
  *
- * Writes go through exactly one `.upsert()` — one call per pass, not one per
- * metric RPC's worth of rows and not one per fanned-out period. See
+ * Writes go through one chunked sequence of `.upsert()` calls per pass — not
+ * one per metric RPC's worth of rows and not one per fanned-out period, but
+ * split into `DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE`-row calls when the pass's
+ * row count exceeds that cap (`day` is the temporal unit most likely to, since
+ * its row count scales with touched dates). See
  * `writeBySpeciesRows`/`writeAllSpeciesRows`.
  *
  * Any cell `mergeSimpleMetricRows` had to skip is then dead-lettered to

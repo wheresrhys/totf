@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Database } from '@/types/supabase.types';
-import { refreshSimpleStatsCache } from '../stats-cache-refresh';
+import {
+	refreshSimpleStatsCache,
+	DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE
+} from '../stats-cache-refresh';
 
 type BasicRow =
 	Database['public']['CompositeTypes']['stats_cache_basic_session_metrics_result'];
@@ -887,6 +890,52 @@ describe('refreshSimpleStatsCache', () => {
 				})
 				// The message catchSupabaseErrors wraps a PostgREST error in.
 			).rejects.toThrow('Failed to fetch data: duplicate key value');
+		});
+	});
+
+	describe('chunking large writes', () => {
+		/** A deterministic `YYYY-MM-DD` date, `dayOffset` days after 2026-01-01. */
+		function dateAtOffset(dayOffset: number): string {
+			return new Date(Date.UTC(2026, 0, 1 + dayOffset))
+				.toISOString()
+				.slice(0, 10);
+		}
+
+		it("splits the by-species write into chunk-size-capped upserts, and writes every touched day's row exactly once, when the day grain's touched-period count exceeds the chunk size", async () => {
+			// day has no exact-filter fan-out ceiling the way month/year do (see
+			// `buildSimpleMetricRpcParamsList`), so it's the temporal unit whose
+			// row count is actually likely to exceed the chunk size.
+			const dates = Array.from(
+				{ length: DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE + 1 },
+				(_, i) => dateAtOffset(i)
+			);
+			const client = makeSimpleMockSupabaseClient({
+				basic: dates.map((time_period) => basicRow({ time_period })),
+				biometrics: dates.map((time_period) => biometricsRow({ time_period })),
+				birdAge: dates.map((time_period) => birdAgeRow({ time_period })),
+				encounterAge: dates.map((time_period) =>
+					encounterAgeRow({ time_period })
+				)
+			});
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: dates
+			});
+
+			const bySpeciesUpsertCalls = client.upsert.mock.calls.filter(
+				([, options]) => options.onConflict === BY_SPECIES_CONFLICT_TARGET
+			);
+			expect(bySpeciesUpsertCalls.map(([rows]) => rows.length)).toEqual([
+				DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE,
+				1
+			]);
+
+			const writtenPeriods = bySpeciesUpsertCalls
+				.flatMap(([rows]) => rows.map((row) => row.time_period))
+				.sort();
+			expect(writtenPeriods).toEqual([...dates].sort());
 		});
 	});
 
