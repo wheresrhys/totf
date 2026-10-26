@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Database } from '@/types/supabase.types';
 import {
 	refreshSimpleStatsCache,
-	DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE
+	DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE,
+	batchPeriodsBySessionDateSpan
 } from '../stats-cache-refresh';
 
 type BasicRow =
@@ -116,7 +117,10 @@ type MockRpcResponse<Row> = Row[] | ((params: RpcParams) => Row[]);
 
 function makeRpcMockClient(
 	responsesByRpcName: Record<string, MockRpcResponse<unknown>>,
-	{ upsertError }: { upsertError?: { message: string } } = {}
+	{
+		upsertError,
+		sessionsVisitDates = []
+	}: { upsertError?: { message: string }; sessionsVisitDates?: string[] } = {}
 ) {
 	const rpc = vi.fn((name: string, params: RpcParams) => ({
 		then: (resolve: (v: { data: unknown; error: null }) => unknown) => {
@@ -143,11 +147,28 @@ function makeRpcMockClient(
 			options: { onConflict: string }
 		) => ReturnType<typeof resultThenable>
 	>(() => resultThenable({ data: null, error: upsertError ?? null }));
+	// `.from('Sessions').select('visit_date').eq(...).order(...)` —
+	// `fetchGroupSessionDates`'s own real-date preflight. Added to every
+	// `.from()` return value regardless of table name (harmless for tests
+	// that never call `.select()`) rather than branching the mock on which
+	// table was named.
+	const order = vi.fn(() =>
+		resultThenable({
+			data: sessionsVisitDates.map((visit_date) => ({ visit_date })),
+			error: null
+		})
+	);
+	const eq = vi.fn(() => ({ order }));
+	const select = vi.fn(() => ({ eq }));
 	const from = vi.fn<
-		(table: string) => { insert: typeof insert; upsert: typeof upsert }
-	>(() => ({ insert, upsert }));
+		(table: string) => {
+			insert: typeof insert;
+			upsert: typeof upsert;
+			select: typeof select;
+		}
+	>(() => ({ insert, upsert, select }));
 
-	return { rpc, from, insert, upsert };
+	return { rpc, from, insert, upsert, select, eq, order };
 }
 
 type MockSupabaseClient = ReturnType<typeof makeRpcMockClient>;
@@ -165,19 +186,24 @@ function makeSimpleMockSupabaseClient({
 	basic = [],
 	biometrics = [],
 	birdAge = [],
-	encounterAge = []
+	encounterAge = [],
+	sessionsVisitDates = []
 }: {
 	basic?: MockRpcResponse<BasicRow>;
 	biometrics?: MockRpcResponse<BiometricsRow>;
 	birdAge?: MockRpcResponse<BirdAgeRow>;
 	encounterAge?: MockRpcResponse<EncounterAgeRow>;
+	sessionsVisitDates?: string[];
 }) {
-	return makeRpcMockClient({
-		stats_cache_basic_session_metrics: basic,
-		stats_cache_biometrics_metrics: biometrics,
-		stats_cache_bird_age_metrics: birdAge,
-		stats_cache_encounter_age_metrics: encounterAge
-	});
+	return makeRpcMockClient(
+		{
+			stats_cache_basic_session_metrics: basic,
+			stats_cache_biometrics_metrics: biometrics,
+			stats_cache_bird_age_metrics: birdAge,
+			stats_cache_encounter_age_metrics: encounterAge
+		},
+		{ sessionsVisitDates }
+	);
 }
 
 /**
@@ -267,6 +293,75 @@ const ALL_SPECIES_CONFLICT_TARGET = 'group_id,temporal_unit,time_period';
  * in place of the NULL the metric RPCs emit. */
 const ALL_TIME_SENTINEL_DATE = '0001-01-01';
 
+/** `YYYY-MM-DD` `dayOffset` days after 2026-01-01, for a deterministic run of consecutive dates. */
+function dateAtOffset(dayOffset: number): string {
+	return new Date(Date.UTC(2026, 0, 1 + dayOffset)).toISOString().slice(0, 10);
+}
+
+describe('batchPeriodsBySessionDateSpan', () => {
+	it('keeps contiguous real session dates within the batch size as one batch', () => {
+		const dates = Array.from({ length: 10 }, (_, i) => dateAtOffset(i));
+
+		expect(batchPeriodsBySessionDateSpan(dates, dates, 50)).toEqual([dates]);
+	});
+
+	it('splits contiguous real session dates exceeding the batch size into successive full-size batches', () => {
+		const dates = Array.from({ length: 120 }, (_, i) => dateAtOffset(i));
+
+		const batches = batchPeriodsBySessionDateSpan(dates, dates, 50);
+
+		expect(batches.map((batch) => batch.length)).toEqual([50, 50, 20]);
+		expect(batches.flat()).toEqual(dates);
+	});
+
+	it('splits two widely-spaced touched periods into separate single-period batches', () => {
+		// The case the first (period-count) design draft got wrong: only 2
+		// touched periods, but they're the group's very first and very last
+		// session ever, with a long run of real session dates between them.
+		const allSessionDates = Array.from({ length: 1000 }, (_, i) =>
+			dateAtOffset(i)
+		);
+		const firstEverDate = allSessionDates[0];
+		const lastEverDate = allSessionDates[allSessionDates.length - 1];
+
+		const batches = batchPeriodsBySessionDateSpan(
+			[firstEverDate, lastEverDate],
+			allSessionDates,
+			50
+		);
+
+		expect(batches).toEqual([[firstEverDate], [lastEverDate]]);
+	});
+
+	it('sorts unsorted input periods before batching', () => {
+		const dates = Array.from({ length: 5 }, (_, i) => dateAtOffset(i));
+		const unsorted = [dates[3], dates[0], dates[4], dates[1], dates[2]];
+
+		expect(batchPeriodsBySessionDateSpan(unsorted, dates, 50)).toEqual([dates]);
+	});
+
+	it('gives a touched period with no matching real session date its own standalone batch', () => {
+		const dates = Array.from({ length: 5 }, (_, i) => dateAtOffset(i));
+		const unknownPeriod = dateAtOffset(999);
+
+		const batches = batchPeriodsBySessionDateSpan(
+			[...dates, unknownPeriod],
+			dates,
+			50
+		);
+
+		expect(batches).toEqual([dates, [unknownPeriod]]);
+	});
+
+	it('returns one batch per period when groupSessionDates is empty', () => {
+		const dates = Array.from({ length: 3 }, (_, i) => dateAtOffset(i));
+
+		expect(batchPeriodsBySessionDateSpan(dates, [], 50)).toEqual(
+			dates.map((date) => [date])
+		);
+	});
+});
+
 describe('refreshSimpleStatsCache', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -279,7 +374,12 @@ describe('refreshSimpleStatsCache', () => {
 					basic: [basicRow({ time_period: '2026-03-10' })],
 					biometrics: [biometricsRow({ time_period: '2026-03-10' })],
 					birdAge: [birdAgeRow({ time_period: '2026-03-10' })],
-					encounterAge: [encounterAgeRow({ time_period: '2026-03-10' })]
+					encounterAge: [encounterAgeRow({ time_period: '2026-03-10' })],
+					// Contiguous with the touched periods below so they land in a
+					// single batch — the real-date-span batching
+					// (`batchPeriodsBySessionDateSpan`) is exercised by its own
+					// dedicated describe block further down.
+					sessionsVisitDates: ['2026-03-01', '2026-03-10', '2026-03-28']
 				});
 
 				await refreshSimpleStatsCache(client as never, {
@@ -324,6 +424,236 @@ describe('refreshSimpleStatsCache', () => {
 				) as Record<string, unknown>;
 				expect(params).not.toHaveProperty('from_date');
 				expect(params).not.toHaveProperty('to_date');
+			});
+		});
+
+		describe('the real-session-date preflight and batching', () => {
+			const STATS_CACHE_REFRESH_DAY_BATCH_SIZE =
+				'STATS_CACHE_REFRESH_DAY_BATCH_SIZE';
+			const originalEnvValue = process.env[STATS_CACHE_REFRESH_DAY_BATCH_SIZE];
+
+			afterEach(() => {
+				if (originalEnvValue === undefined) {
+					delete process.env[STATS_CACHE_REFRESH_DAY_BATCH_SIZE];
+				} else {
+					process.env[STATS_CACHE_REFRESH_DAY_BATCH_SIZE] = originalEnvValue;
+				}
+			});
+
+			it("fetches the group's Sessions.visit_date rows exactly once per pass when the day unit has periods", async () => {
+				const client = makeSimpleMockSupabaseClient({
+					basic: [basicRow()],
+					biometrics: [biometricsRow()],
+					birdAge: [birdAgeRow()],
+					encounterAge: [encounterAgeRow()],
+					sessionsVisitDates: ['2026-03-01']
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'day',
+					periods: ['2026-03-01']
+				});
+
+				// Once per groupBySpecies pass — see the accepted tradeoff in
+				// runSimpleStatsCacheRefreshPass's own doc comment.
+				expect(client.select).toHaveBeenCalledTimes(2);
+				expect(client.eq).toHaveBeenCalledWith('ringing_group_id', GROUP_ID);
+				expect(client.order).toHaveBeenCalledWith('visit_date', {
+					ascending: true
+				});
+			});
+
+			it.each(['month', 'year', 'month-squashed', 'all-time'] as const)(
+				'skips the preflight entirely for the %s temporal unit',
+				async (temporalUnit) => {
+					const client = makeSimpleMockSupabaseClient({
+						basic: [basicRow()],
+						biometrics: [biometricsRow()],
+						birdAge: [birdAgeRow()],
+						encounterAge: [encounterAgeRow()]
+					});
+
+					await refreshSimpleStatsCache(client as never, {
+						groupId: GROUP_ID,
+						temporalUnit,
+						periods: ['2026-03-01']
+					});
+
+					expect(client.select).not.toHaveBeenCalled();
+				}
+			);
+
+			it('skips the preflight for the day unit when there are no periods to refresh', async () => {
+				const client = makeSimpleMockSupabaseClient({});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'day',
+					periods: []
+				});
+
+				expect(client.select).not.toHaveBeenCalled();
+			});
+
+			it('reproduces the sparse-periods case end-to-end: two widely separated touched days produce two narrow RPC calls instead of one history-spanning window', async () => {
+				const allSessionDates = Array.from({ length: 1000 }, (_, i) =>
+					dateAtOffset(i)
+				);
+				const firstEverDate = allSessionDates[0];
+				const lastEverDate = allSessionDates[allSessionDates.length - 1];
+				const client = makeSimpleMockSupabaseClient({
+					basic: (params: RpcParams) => [
+						basicRow({ time_period: params.to_date as string })
+					],
+					biometrics: (params: RpcParams) => [
+						biometricsRow({ time_period: params.to_date as string })
+					],
+					birdAge: (params: RpcParams) => [
+						birdAgeRow({ time_period: params.to_date as string })
+					],
+					encounterAge: (params: RpcParams) => [
+						encounterAgeRow({ time_period: params.to_date as string })
+					],
+					sessionsVisitDates: allSessionDates
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'day',
+					periods: [firstEverDate, lastEverDate]
+				});
+
+				const calls = metricRpcCallArgsList(
+					client,
+					'stats_cache_basic_session_metrics'
+				) as RpcParams[];
+				expect(calls).toEqual([
+					expect.objectContaining({
+						from_date: firstEverDate,
+						to_date: firstEverDate
+					}),
+					expect.objectContaining({
+						from_date: lastEverDate,
+						to_date: lastEverDate
+					})
+				]);
+			});
+
+			it('reads the species-grouped batch size from STATS_CACHE_REFRESH_DAY_BATCH_SIZE', async () => {
+				process.env[STATS_CACHE_REFRESH_DAY_BATCH_SIZE] = '10';
+				const dates = Array.from({ length: 25 }, (_, i) => dateAtOffset(i));
+				const client = makeSimpleMockSupabaseClient({
+					basic: (params: RpcParams) => [
+						basicRow({ time_period: params.to_date as string })
+					],
+					biometrics: (params: RpcParams) => [
+						biometricsRow({ time_period: params.to_date as string })
+					],
+					birdAge: (params: RpcParams) => [
+						birdAgeRow({ time_period: params.to_date as string })
+					],
+					encounterAge: (params: RpcParams) => [
+						encounterAgeRow({ time_period: params.to_date as string })
+					],
+					sessionsVisitDates: dates
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'day',
+					periods: dates
+				});
+
+				const calls = metricRpcCallArgsList(
+					client,
+					'stats_cache_basic_session_metrics'
+				) as RpcParams[];
+				expect(calls.map((c) => [c.from_date, c.to_date])).toEqual([
+					[dates[0], dates[9]],
+					[dates[10], dates[19]],
+					[dates[20], dates[24]]
+				]);
+			});
+
+			it.each([undefined, '', '0', '-5', 'abc'])(
+				'falls back to the default batch size (50) when the env var is %s',
+				async (envValue) => {
+					if (envValue === undefined) {
+						delete process.env[STATS_CACHE_REFRESH_DAY_BATCH_SIZE];
+					} else {
+						process.env[STATS_CACHE_REFRESH_DAY_BATCH_SIZE] = envValue;
+					}
+					const dates = Array.from({ length: 60 }, (_, i) => dateAtOffset(i));
+					const client = makeSimpleMockSupabaseClient({
+						basic: (params: RpcParams) => [
+							basicRow({ time_period: params.to_date as string })
+						],
+						biometrics: (params: RpcParams) => [
+							biometricsRow({ time_period: params.to_date as string })
+						],
+						birdAge: (params: RpcParams) => [
+							birdAgeRow({ time_period: params.to_date as string })
+						],
+						encounterAge: (params: RpcParams) => [
+							encounterAgeRow({ time_period: params.to_date as string })
+						],
+						sessionsVisitDates: dates
+					});
+
+					await refreshSimpleStatsCache(client as never, {
+						groupId: GROUP_ID,
+						temporalUnit: 'day',
+						periods: dates
+					});
+
+					const calls = metricRpcCallArgsList(
+						client,
+						'stats_cache_basic_session_metrics'
+					) as RpcParams[];
+					expect(calls.map((c) => [c.from_date, c.to_date])).toEqual([
+						[dates[0], dates[49]],
+						[dates[50], dates[59]]
+					]);
+				}
+			);
+
+			it('always batches the non-species-grouped pass at 200, ignoring the env var', async () => {
+				process.env[STATS_CACHE_REFRESH_DAY_BATCH_SIZE] = '5';
+				const dates = Array.from({ length: 250 }, (_, i) => dateAtOffset(i));
+				const client = makeSimpleMockSupabaseClient({
+					basic: (params: RpcParams) => [
+						basicRow({ time_period: params.to_date as string })
+					],
+					biometrics: (params: RpcParams) => [
+						biometricsRow({ time_period: params.to_date as string })
+					],
+					birdAge: (params: RpcParams) => [
+						birdAgeRow({ time_period: params.to_date as string })
+					],
+					encounterAge: (params: RpcParams) => [
+						encounterAgeRow({ time_period: params.to_date as string })
+					],
+					sessionsVisitDates: dates
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'day',
+					periods: dates
+				});
+
+				const calls = metricRpcCallArgsList(
+					client,
+					'stats_cache_basic_session_metrics',
+					{
+						groupBySpecies: false
+					}
+				) as RpcParams[];
+				expect(calls.map((c) => [c.from_date, c.to_date])).toEqual([
+					[dates[0], dates[199]],
+					[dates[200], dates[249]]
+				]);
 			});
 		});
 
@@ -934,13 +1264,6 @@ describe('refreshSimpleStatsCache', () => {
 	});
 
 	describe('chunking large writes', () => {
-		/** A deterministic `YYYY-MM-DD` date, `dayOffset` days after 2026-01-01. */
-		function dateAtOffset(dayOffset: number): string {
-			return new Date(Date.UTC(2026, 0, 1 + dayOffset))
-				.toISOString()
-				.slice(0, 10);
-		}
-
 		it("splits the by-species write into chunk-size-capped upserts, and writes every touched day's row exactly once, when the day grain's touched-period count exceeds the chunk size", async () => {
 			// day has no exact-filter fan-out ceiling the way month/year do (see
 			// `buildSimpleMetricRpcParamsList`), so it's the temporal unit whose
