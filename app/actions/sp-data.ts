@@ -14,14 +14,13 @@ import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
 import type { SexedGraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
 import {
-	mergeBiometricsFields,
 	type CoreStatsResult,
 	type CoreStatsWithBiometrics,
-	type BiometricsStatsResult,
 	type DemographicsStatsResult,
 	type ArrivalsStatsResult
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
+import type { TemporalUnit } from '@/lib/stats-cache-refresh';
 import { buildPageOfBirdsSelect } from '@/queries';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 export async function fetchPageOfBirds(
@@ -135,28 +134,157 @@ export async function fetchGraphableEncounterData(
 
 /**
  * Granularity of a species stats-history fetch. `'month'` (the default) is the
- * conventional per-month history every caller started with; `'year'` re-fetches
- * the same stats already grouped by calendar year at the RPC, which is *not*
- * the same as summing the monthly rows client-side: `core_stats`'
- * `bird_count` and `demographics_stats`' per-bird bucket counts are
- * `COUNT(DISTINCT bird_id)` within their cell, so a bird retrapped in several
- * months of one year would be counted once per month by a client-side sum but
- * exactly once by a year-grouped fetch (#852).
+ * conventional per-month history every caller started with; `'year'` fetches
+ * the same stats already grouped by calendar year, which is *not*
+ * the same as summing the monthly rows client-side: `bird_count` and the
+ * per-bird bucket counts are `COUNT(DISTINCT bird_id)` within their cell, so a
+ * bird retrapped in several months of one year would be counted once per month
+ * by a client-side sum but exactly once by a year-grouped fetch (#852). Both
+ * values are also literal `SimpleStatsCacheBySpecies.temporal_unit` values, so
+ * they are passed straight through by the cache reads below.
  */
 export type StatsHistoryInterval = 'month' | 'year';
 
+/**
+ * The `CoreStatsResult` columns `SimpleStatsCacheBySpecies` carries verbatim —
+ * i.e. every column of the `core_stats_result` composite type except
+ * `species_name`, which the cache stores as a `species_id` FK instead and
+ * which `fetchSpeciesStatsCacheRows` re-attaches from the species name it was
+ * called with.
+ */
+const CORE_STATS_CACHE_COLUMNS = [
+	'time_period',
+	'session_count',
+	'total_effort',
+	'effort_per_session',
+	'effort_per_encounter',
+	'avg_encounters_per_session',
+	'max_per_session',
+	'max_new_per_session',
+	'species_count',
+	'bird_count',
+	'encounter_count',
+	'new_bird_count',
+	'pullus_bird_count',
+	'juv_bird_count',
+	'postjuv_bird_count',
+	'adult_bird_count',
+	'unknown_age_bird_count',
+	'pullus_enc_count',
+	'juv_enc_count',
+	'postjuv_enc_count',
+	'adult_enc_count',
+	'unknown_age_enc_count'
+] as const;
+
+/**
+ * The 8 wing/weight columns `biometrics_stats` used to supply as a second RPC
+ * call merged in by `mergeBiometricsFields` — `SimpleStatsCacheBySpecies`
+ * carries them on the same row as the counts above, so the only caller that
+ * wants them (`getSpeciesStatsHistory`) just projects them too. Deliberately
+ * nullable in the cache, matching `BiometricsStatsResult`'s own nullability.
+ */
+const BIOMETRIC_CACHE_COLUMNS = [
+	'max_weight',
+	'avg_weight',
+	'min_weight',
+	'median_weight',
+	'max_wing',
+	'avg_wing',
+	'min_wing',
+	'median_wing'
+] as const;
+
+/**
+ * `time_period` is a `date` column, so PostgREST serialises it as
+ * `YYYY-MM-DD` — read the calendar month straight off the middle component
+ * rather than via `new Date(...)`, which would drag the server's timezone into
+ * a pure calendar comparison.
+ */
+function calendarMonthOf(timePeriod: string): number {
+	return Number(timePeriod.slice(5, 7));
+}
+
+/**
+ * One `SimpleStatsCacheBySpecies` read for a single species — the shared read
+ * path behind every species stats fetcher below (#1207), replacing the live
+ * `core_stats`/`biometrics_stats` aggregate queries each of them used to make
+ * with a single indexed table read.
+ *
+ * Species matching used to be the RPCs' `species_name_filter`; the cache keys
+ * on a `species_id` FK instead, so the *name* is matched in the same round
+ * trip via an `!inner` embed on `Species` — the same embed-plus-filter idiom
+ * `fetchPageOfBirds`/`fetchGraphableEncounterData` above use to filter on
+ * `session.visit_date`, rather than a second `Species` lookup. The embedded
+ * `species_name` itself is never read back: the caller already knows it, so it
+ * is re-attached to every row from the argument, which is what keeps the
+ * returned rows' `CoreStatsResult` shape intact.
+ *
+ * The rest of the old RPC args map across verbatim: `group_by_time_period`
+ * onto `temporal_unit`, `from_date`/`to_date` onto a `time_period` range. The
+ * `ORDER BY ... time_period ASC` `core_stats` applied itself becomes an
+ * explicit `.order()` here, since every consumer (the history charts, the
+ * period-totals tables) was reading an ascending series.
+ */
+async function fetchSpeciesStatsCacheRows<
+	RowType extends CoreStatsResult = CoreStatsResult
+>({
+	speciesName,
+	viewedGroup,
+	temporalUnit,
+	fromDate,
+	toDate,
+	includeBiometrics = false
+}: {
+	speciesName: string;
+	viewedGroup: ViewedGroup;
+	temporalUnit: TemporalUnit;
+	fromDate?: string;
+	toDate?: string;
+	includeBiometrics?: boolean;
+}): Promise<RowType[]> {
+	const supabase = await getAuthenticatedSupabaseClient();
+	let query = supabase
+		.from('SimpleStatsCacheBySpecies')
+		.select(
+			[
+				...CORE_STATS_CACHE_COLUMNS,
+				...(includeBiometrics ? BIOMETRIC_CACHE_COLUMNS : []),
+				'Species!inner(species_name)'
+			].join(', ')
+		)
+		.eq('group_id', viewedGroup.id)
+		.eq('temporal_unit', temporalUnit)
+		.eq('Species.species_name', speciesName)
+		.order('time_period', { ascending: true });
+	if (fromDate) {
+		query = query.gte('time_period', fromDate);
+	}
+	if (toDate) {
+		query = query.lte('time_period', toDate);
+	}
+	const cacheRows = (await query.then(catchSupabaseErrors)) as Record<
+		string,
+		unknown
+	>[];
+	return cacheRows.map(
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to drop the embed from the returned row; it exists purely to filter on `species_name`
+		({ Species, ...cacheRow }) => ({ ...cacheRow, species_name: speciesName })
+	) as RowType[];
+}
+
 // Wing/weight + count history for a single species at `interval` granularity
-// (monthly by default), merging
-// biometrics_stats' wing/weight fields onto each core_stats row (#821).
-// The two RPCs share the same species/group/date-range/group_by_time_period
-// params, so their rows are grouped identically and joined here on
-// `time_period` (rather than assumed to line up positionally) — a period
-// present on one side but not the other is handled by the merge below: an
-// core_stats row with no matching biometrics_stats row still gets all 8
-// biometric fields, coalesced to null by mergeBiometricsFields (matching the
-// null columns core_stats returned before #827 removed them), and a
-// biometrics_stats row with no matching core_stats row is simply not
-// included in the output (the output shape is driven by core_stats).
+// (monthly by default). This used to be two parallel RPC calls — `core_stats`
+// for the counts and `biometrics_stats` for the 8 wing/weight fields (#821) —
+// joined on `time_period` by `mergeBiometricsFields`, with a core row that had
+// no matching biometrics row getting all 8 fields coalesced to null.
+// `SimpleStatsCacheBySpecies` carries both halves on the same row, so there is
+// exactly one source and nothing left to join: one cache read, no merge, and
+// the per-cell nullability the biometric columns genuinely have (an empty
+// MAX/AVG/MIN/PERCENTILE_CONT) is now carried by the row itself rather than
+// synthesised from a missing sibling. `mergeBiometricsFields` is still the
+// merge for the call sites that do fetch the two halves separately
+// (`page.tsx`'s `getSpeciesStats`, `species-stats.ts`).
 export async function getSpeciesStatsHistory(
 	species: string,
 	viewedGroup: ViewedGroup,
@@ -164,31 +292,14 @@ export async function getSpeciesStatsHistory(
 	toDate?: string,
 	interval: StatsHistoryInterval = 'month'
 ): Promise<CoreStatsWithBiometrics[]> {
-	const supabase = await getAuthenticatedSupabaseClient();
-	const rpcArgs = {
-		species_name_filter: species,
-		ringing_group_filter: viewedGroup.id,
-		group_by_time_period: interval,
-		...(fromDate ? { from_date: fromDate } : {}),
-		...(toDate ? { to_date: toDate } : {})
-	};
-	const [aggregateRows, biometricsRows] = await Promise.all([
-		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
-			CoreStatsResult[]
-		>,
-		supabase
-			.rpc('biometrics_stats', rpcArgs)
-			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>
-	]);
-	const biometricsRowsByPeriod = new Map(
-		biometricsRows.map((row) => [row.time_period, row])
-	);
-	return aggregateRows.map((aggregateRow) =>
-		mergeBiometricsFields(
-			aggregateRow,
-			biometricsRowsByPeriod.get(aggregateRow.time_period)
-		)
-	);
+	return fetchSpeciesStatsCacheRows<CoreStatsWithBiometrics>({
+		speciesName: species,
+		viewedGroup,
+		temporalUnit: interval,
+		fromDate,
+		toDate,
+		includeBiometrics: true
+	});
 }
 
 /**
@@ -276,12 +387,32 @@ export async function getGroupEffortHistory(
 
 /**
  * Per-time-period totals for a single species — the species-scoped sibling of
- * `fetchPeriodTotals` (`app/actions/period-totals.ts`): same `core_stats`
- * call shape, but filtered to one species (`species_name_filter`) instead of
- * grouped across all of them (`group_by_species: false`). Feeds the species
- * page's "Year totals" (all-time page), "Month totals" (year-scoped page), and
- * "Session totals" (all-time/year-scoped pages, day-grouped) tabs via the
- * shared `PeriodTotalsTable`.
+ * `fetchPeriodTotals` (`app/actions/period-totals.ts`): the same per-period
+ * counts, filtered to one species instead of grouped across all of them.
+ * Feeds the species page's "Year totals" (all-time page), "Month totals"
+ * (year-scoped page), and "Session totals" (all-time/year-scoped pages,
+ * day-grouped) tabs via the shared `PeriodTotalsTable`.
+ *
+ * `timeInterval` is a literal `temporal_unit` value, and
+ * `fromDate`/`toDate` a plain `time_period` range, so both go straight to
+ * `fetchSpeciesStatsCacheRows`. `monthFilter` is the one argument with no
+ * single-column equivalent — `time_period` is a `date` with no separate year
+ * and month field, so "any year, this calendar month" isn't a filter
+ * PostgREST can express — and it means two different things depending on the
+ * grain it arrives with:
+ *
+ * - With `'day'` (the squashed-month route's "Session totals" tab, which can
+ *   pass a date range at the same time), it narrows the day rows to the ones
+ *   falling in that calendar month — a pure client-side filter over whatever
+ *   the range filter already returned.
+ * - With `'year'` (the squashed-month route's "Year totals" tab), `core_stats`
+ *   used to return one row *per year* computed from that year's `monthFilter`
+ *   sessions only. Scoped to a single calendar month of a single year, that
+ *   cell is exactly the cache's own `(year, monthFilter)` `'month'` cell — so
+ *   read the month grain instead and relabel each surviving row's
+ *   `time_period` back to its year start, which keeps the year-grained rows
+ *   (and the `YYYY-…` `time_period` their consumer slices the year out of)
+ *   byte-identical to what the RPC returned.
  */
 export async function fetchSpeciesPeriodTotals(
 	speciesName: string,
@@ -291,17 +422,28 @@ export async function fetchSpeciesPeriodTotals(
 	toDate?: string,
 	monthFilter?: number
 ): Promise<CoreStatsResult[]> {
-	const supabase = await getAuthenticatedSupabaseClient();
-	return supabase
-		.rpc('core_stats', {
-			...(fromDate ? { from_date: fromDate } : {}),
-			...(toDate ? { to_date: toDate } : {}),
-			...(monthFilter ? { month_filter: monthFilter } : {}),
-			ringing_group_filter: viewedGroup.id,
-			species_name_filter: speciesName,
-			group_by_time_period: timeInterval
-		})
-		.then(catchSupabaseErrors) as Promise<CoreStatsResult[]>;
+	const readsMonthGrainForYearTotals =
+		timeInterval === 'year' && Boolean(monthFilter);
+	const rows = await fetchSpeciesStatsCacheRows({
+		speciesName,
+		viewedGroup,
+		temporalUnit: readsMonthGrainForYearTotals ? 'month' : timeInterval,
+		fromDate,
+		toDate
+	});
+	if (!monthFilter) {
+		return rows;
+	}
+	const rowsInMonth = rows.filter(
+		(row) => calendarMonthOf(row.time_period) === monthFilter
+	);
+	if (!readsMonthGrainForYearTotals) {
+		return rowsInMonth;
+	}
+	return rowsInMonth.map((row) => ({
+		...row,
+		time_period: `${row.time_period.slice(0, 4)}-01-01`
+	}));
 }
 
 // The single shared `params` shape for the species page's 6 `TabSet`-managed
@@ -396,23 +538,25 @@ export async function fetchSquashedMonthYearTotalsTabData(
 
 /**
  * One row per calendar month for a single species, summed across the group's
- * entire history via `core_stats`' `'month-squashed'` `group_by_time_period`
- * mode (#996) — the species-scoped sibling of `fetchCombinedMonthTotals`
+ * entire history — the `'month-squashed'` grain (#996), and the
+ * species-scoped sibling of `fetchCombinedMonthTotals`
  * (`app/actions/summary-stats.ts`). Feeds the species page's "Month totals"
  * tab with "Combine years" on.
+ *
+ * No `time_period` range filter, since every `'month-squashed'` cache row
+ * already spans the group's whole history (the same reasoning behind
+ * `stats_spine`'s unconditional `month-squashed` branch) — the species and
+ * grain filters are the whole query.
  */
 export async function fetchSpeciesCombinedMonthTotals(
 	speciesName: string,
 	viewedGroup: ViewedGroup
 ): Promise<CoreStatsResult[]> {
-	const supabase = await getAuthenticatedSupabaseClient();
-	return supabase
-		.rpc('core_stats', {
-			ringing_group_filter: viewedGroup.id,
-			species_name_filter: speciesName,
-			group_by_time_period: 'month-squashed'
-		})
-		.then(catchSupabaseErrors) as Promise<CoreStatsResult[]>;
+	return fetchSpeciesStatsCacheRows({
+		speciesName,
+		viewedGroup,
+		temporalUnit: 'month-squashed'
+	});
 }
 
 // Data shape for the all-time species page's "Month totals" tab (#1066) —

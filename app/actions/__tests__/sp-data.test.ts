@@ -45,6 +45,24 @@ const GROUP_ID = 7;
 const viewedGroup: ViewedGroup = { id: GROUP_ID, slug: 'alpha' };
 const FROM_DATE = '2023-01-01';
 const TO_DATE = '2023-12-31';
+// `makeQueryChain` records every `.eq()` alongside the `.filter()`/`.gte()`/
+// `.lte()` calls, so the species-column equality each `Birds` query applies
+// before any date filtering shows up first in `record.filters`.
+const SPECIES_ID_FILTER = {
+	column: 'species_id',
+	operator: 'eq',
+	value: SPECIES_ID
+};
+const VISIT_DATE_FROM_FILTER = {
+	column: 'encounters.session.visit_date',
+	operator: 'gte',
+	value: FROM_DATE
+};
+const VISIT_DATE_TO_FILTER = {
+	column: 'encounters.session.visit_date',
+	operator: 'lte',
+	value: TO_DATE
+};
 
 function makeClient({
 	queryRows,
@@ -63,19 +81,22 @@ function makeClient({
 	return { client, queryRecord: query.record, rpcCalls };
 }
 
-function makeStatsHistoryClient({
-	aggregateRows,
-	biometricsRows
-}: {
-	aggregateRows: unknown[];
-	biometricsRows: unknown[];
-}) {
-	const { rpc, calls: rpcCalls } = makeRpcCallRecorder((name: string) =>
-		name === 'core_stats' ? aggregateRows : biometricsRows
-	);
-	const client = { rpc };
-	mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-	return { rpcCalls };
+const STATS_CACHE_TABLE = 'SimpleStatsCacheBySpecies';
+
+// Every `SimpleStatsCacheBySpecies` read applies the same three equality
+// filters before any `time_period` range narrowing: the group, the temporal
+// grain, and the species — matched by *name* through the `!inner` `Species`
+// embed, since the cache itself keys on a `species_id` FK.
+function cacheReadFilters(temporalUnit: string) {
+	return [
+		{ column: 'group_id', operator: 'eq', value: GROUP_ID },
+		{ column: 'temporal_unit', operator: 'eq', value: temporalUnit },
+		{ column: 'Species.species_name', operator: 'eq', value: SPECIES_NAME }
+	];
+}
+
+function timePeriodFilter(operator: 'gte' | 'lte', value: string) {
+	return { column: 'time_period', operator, value };
 }
 
 function birdRow(encounterDates: string[]) {
@@ -115,7 +136,7 @@ describe('sp-data actions', () => {
 			const result = await fetchPageOfBirds(SPECIES_ID, viewedGroup);
 
 			expect(queryRecord.select).not.toContain('!inner');
-			expect(queryRecord.filters).toHaveLength(0);
+			expect(queryRecord.filters).toEqual([SPECIES_ID_FILTER]);
 			expect(result).toHaveLength(1);
 			expect(result[0].ring_no).toBe('AR-TEST');
 		});
@@ -130,16 +151,9 @@ describe('sp-data actions', () => {
 			expect(queryRecord.select).toContain('Encounters!inner');
 			expect(queryRecord.select).toContain('Sessions!inner');
 			expect(queryRecord.filters).toEqual([
-				{
-					column: 'encounters.session.visit_date',
-					operator: 'gte',
-					value: FROM_DATE
-				},
-				{
-					column: 'encounters.session.visit_date',
-					operator: 'lte',
-					value: TO_DATE
-				}
+				SPECIES_ID_FILTER,
+				VISIT_DATE_FROM_FILTER,
+				VISIT_DATE_TO_FILTER
 			]);
 		});
 
@@ -152,11 +166,8 @@ describe('sp-data actions', () => {
 
 			expect(queryRecord.select).toContain('Encounters!inner');
 			expect(queryRecord.filters).toEqual([
-				{
-					column: 'encounters.session.visit_date',
-					operator: 'gte',
-					value: FROM_DATE
-				}
+				SPECIES_ID_FILTER,
+				VISIT_DATE_FROM_FILTER
 			]);
 		});
 	});
@@ -195,7 +206,7 @@ describe('sp-data actions', () => {
 			await fetchGraphableEncounterData(SPECIES_ID, viewedGroup);
 
 			expect(queryRecord.select).not.toContain('!inner');
-			expect(queryRecord.filters).toHaveLength(0);
+			expect(queryRecord.filters).toEqual([SPECIES_ID_FILTER]);
 		});
 
 		it('with a date range inner-joins the session and forwards both visit_date bounds', async () => {
@@ -213,23 +224,37 @@ describe('sp-data actions', () => {
 			expect(queryRecord.select).toContain('Encounters!inner');
 			expect(queryRecord.select).toContain('Sessions!inner');
 			expect(queryRecord.filters).toEqual([
-				{
-					column: 'encounters.session.visit_date',
-					operator: 'gte',
-					value: FROM_DATE
-				},
-				{
-					column: 'encounters.session.visit_date',
-					operator: 'lte',
-					value: TO_DATE
-				}
+				SPECIES_ID_FILTER,
+				VISIT_DATE_FROM_FILTER,
+				VISIT_DATE_TO_FILTER
 			]);
 		});
 	});
 
 	describe('getSpeciesStatsHistory', () => {
-		it('forwards from_date/to_date to core_stats alongside the monthly timeInterval', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
+		it('reads SimpleStatsCacheBySpecies, projecting the biometric columns alongside the counts', async () => {
+			const { client, queryRecord } = makeClient();
+
+			await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
+
+			expect(client.from).toHaveBeenCalledWith(STATS_CACHE_TABLE);
+			// One read, not two: the cache row carries both the counts and the
+			// wing/weight columns biometrics_stats used to supply separately.
+			expect(queryRecord.select).toContain('bird_count');
+			expect(queryRecord.select).toContain('median_wing');
+			expect(queryRecord.select).toContain('Species!inner(species_name)');
+		});
+
+		it('filters by group, the monthly grain and the species name, with no time_period range when none is supplied', async () => {
+			const { queryRecord } = makeClient();
+
+			await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
+
+			expect(queryRecord.filters).toEqual(cacheReadFilters('month'));
+		});
+
+		it('forwards from_date/to_date as time_period gte/lte filters', async () => {
+			const { queryRecord } = makeClient();
 
 			await getSpeciesStatsHistory(
 				SPECIES_NAME,
@@ -238,94 +263,15 @@ describe('sp-data actions', () => {
 				TO_DATE
 			);
 
-			expect(rpcCalls[0].name).toBe('core_stats');
-			expect(rpcCalls[0].args).toMatchObject({
-				species_name_filter: SPECIES_NAME,
-				ringing_group_filter: GROUP_ID,
-				group_by_time_period: 'month',
-				from_date: FROM_DATE,
-				to_date: TO_DATE
-			});
-		});
-
-		it('omits from_date/to_date when no range is supplied', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
-
-			await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
-
-			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
-			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
-		});
-
-		it('calls biometrics_stats with group_by_time_period: "month", matching the existing core_stats call', async () => {
-			const { rpcCalls } = makeStatsHistoryClient({
-				aggregateRows: [],
-				biometricsRows: []
-			});
-
-			await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
-
-			const biometricsCall = rpcCalls.find(
-				(call) => call.name === 'biometrics_stats'
-			);
-			expect(biometricsCall?.args).toMatchObject({
-				group_by_time_period: 'month'
-			});
-		});
-
-		it('merges biometrics_stats wing/weight fields onto each core_stats row, keyed by time_period', async () => {
-			makeStatsHistoryClient({
-				aggregateRows: [
-					{
-						time_period: '2023-01',
-						bird_count: 5,
-						min_weight: 1,
-						max_weight: 2
-					},
-					{
-						time_period: '2023-02',
-						bird_count: 3,
-						min_weight: 1,
-						max_weight: 2
-					}
-				],
-				biometricsRows: [
-					{ time_period: '2023-01', min_weight: 99, max_weight: 100 },
-					{ time_period: '2023-02', min_weight: 88, max_weight: 90 }
-				]
-			});
-
-			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
-
-			expect(result).toEqual([
-				expect.objectContaining({
-					time_period: '2023-01',
-					bird_count: 5,
-					min_weight: 99,
-					max_weight: 100
-				}),
-				expect.objectContaining({
-					time_period: '2023-02',
-					bird_count: 3,
-					min_weight: 88,
-					max_weight: 90
-				})
+			expect(queryRecord.filters).toEqual([
+				...cacheReadFilters('month'),
+				timePeriodFilter('gte', FROM_DATE),
+				timePeriodFilter('lte', TO_DATE)
 			]);
 		});
 
-		it('returns an empty array without erroring when neither RPC returns rows', async () => {
-			makeStatsHistoryClient({ aggregateRows: [], biometricsRows: [] });
-
-			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
-
-			expect(result).toEqual([]);
-		});
-
-		it('with interval "year" calls both RPCs with group_by_time_period: "year"', async () => {
-			const { rpcCalls } = makeStatsHistoryClient({
-				aggregateRows: [],
-				biometricsRows: []
-			});
+		it('with interval "year" filters temporal_unit "year"', async () => {
+			const { queryRecord } = makeClient();
 
 			await getSpeciesStatsHistory(
 				SPECIES_NAME,
@@ -335,17 +281,11 @@ describe('sp-data actions', () => {
 				'year'
 			);
 
-			expect(rpcCalls).toHaveLength(2);
-			for (const call of rpcCalls) {
-				expect(call.args).toMatchObject({ group_by_time_period: 'year' });
-			}
+			expect(queryRecord.filters).toEqual(cacheReadFilters('year'));
 		});
 
 		it('with interval "month" passed explicitly matches the default', async () => {
-			const { rpcCalls } = makeStatsHistoryClient({
-				aggregateRows: [],
-				biometricsRows: []
-			});
+			const { queryRecord } = makeClient();
 
 			await getSpeciesStatsHistory(
 				SPECIES_NAME,
@@ -355,25 +295,76 @@ describe('sp-data actions', () => {
 				'month'
 			);
 
-			for (const call of rpcCalls) {
-				expect(call.args).toMatchObject({ group_by_time_period: 'month' });
-			}
+			expect(queryRecord.filters).toEqual(cacheReadFilters('month'));
 		});
 
-		it('fills all 8 biometric fields with null when a time_period has no matching biometrics_stats row', async () => {
-			makeStatsHistoryClient({
-				aggregateRows: [{ time_period: '2023-03', bird_count: 2 }],
-				biometricsRows: []
+		it('returns an empty array without erroring when the table read returns no rows', async () => {
+			makeClient({ queryRows: [] });
+
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
+
+			expect(result).toEqual([]);
+		});
+
+		it("maps a cache row's biometric columns straight onto the result, re-attaching species_name and dropping the Species embed", async () => {
+			makeClient({
+				queryRows: [
+					{
+						time_period: '2023-01-01',
+						bird_count: 5,
+						min_weight: 99,
+						max_weight: 100,
+						Species: { species_name: SPECIES_NAME }
+					}
+				]
 			});
 
 			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
 
-			// core_stats no longer carries its own wing/weight columns (#827),
-			// so a period with no matching biometrics_stats row gets all 8 fields
-			// coalesced to null rather than being passed through unmerged.
+			// There is only one source now, so nothing is merged: the row's own
+			// columns are the result, with species_name re-attached from the
+			// argument (the cache stores species_id) and the embed — present
+			// purely to filter on the name — dropped.
 			expect(result).toEqual([
 				{
-					time_period: '2023-03',
+					species_name: SPECIES_NAME,
+					time_period: '2023-01-01',
+					bird_count: 5,
+					min_weight: 99,
+					max_weight: 100
+				}
+			]);
+		});
+
+		it('passes a cache row with null biometric columns through as null', async () => {
+			// The cache's biometric columns are deliberately nullable — an empty
+			// MAX/AVG/MIN/PERCENTILE_CONT cell genuinely has no value — so a
+			// species/period with no biometric-eligible encounters arrives as
+			// nulls on the row itself rather than being synthesised from a
+			// missing sibling row.
+			makeClient({
+				queryRows: [
+					{
+						time_period: '2023-03-01',
+						bird_count: 2,
+						min_weight: null,
+						max_weight: null,
+						avg_weight: null,
+						median_weight: null,
+						min_wing: null,
+						max_wing: null,
+						avg_wing: null,
+						median_wing: null
+					}
+				]
+			});
+
+			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
+
+			expect(result).toEqual([
+				{
+					species_name: SPECIES_NAME,
+					time_period: '2023-03-01',
 					bird_count: 2,
 					min_weight: null,
 					max_weight: null,
@@ -568,33 +559,34 @@ describe('sp-data actions', () => {
 	// earlier in-range encounter appear while a later out-of-range one is dropped.
 
 	describe('fetchSpeciesPeriodTotals', () => {
-		it('with timeInterval "year" calls core_stats with species_name_filter and group_by_time_period "year"', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
+		// One `'day'`-grain row per calendar month of 2023, so a month filter has
+		// something to keep and something to drop either side of it.
+		const dayRowsAcrossMonths = [
+			{ time_period: '2023-02-14', bird_count: 1 },
+			{ time_period: '2023-03-08', bird_count: 2 },
+			{ time_period: '2023-03-22', bird_count: 3 },
+			{ time_period: '2023-04-02', bird_count: 4 }
+		];
+
+		it('with timeInterval "year" reads SimpleStatsCacheBySpecies filtered to the species and temporal_unit "year"', async () => {
+			const { client, queryRecord } = makeClient();
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'year');
 
-			expect(rpcCalls[0].name).toBe('core_stats');
-			expect(rpcCalls[0].args).toMatchObject({
-				species_name_filter: SPECIES_NAME,
-				ringing_group_filter: GROUP_ID,
-				group_by_time_period: 'year'
-			});
+			expect(client.from).toHaveBeenCalledWith(STATS_CACHE_TABLE);
+			expect(queryRecord.filters).toEqual(cacheReadFilters('year'));
 		});
 
-		it('with timeInterval "month" calls core_stats with group_by_time_period "month"', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
+		it('with timeInterval "month" filters temporal_unit "month"', async () => {
+			const { queryRecord } = makeClient();
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'month');
 
-			expect(rpcCalls[0].args).toMatchObject({
-				species_name_filter: SPECIES_NAME,
-				ringing_group_filter: GROUP_ID,
-				group_by_time_period: 'month'
-			});
+			expect(queryRecord.filters).toEqual(cacheReadFilters('month'));
 		});
 
-		it('forwards from_date/to_date when supplied', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
+		it('forwards from_date/to_date as time_period range filters', async () => {
+			const { queryRecord } = makeClient();
 
 			await fetchSpeciesPeriodTotals(
 				SPECIES_NAME,
@@ -604,67 +596,136 @@ describe('sp-data actions', () => {
 				TO_DATE
 			);
 
-			expect(rpcCalls[0].args).toMatchObject({
-				from_date: FROM_DATE,
-				to_date: TO_DATE
-			});
+			expect(queryRecord.filters).toEqual([
+				...cacheReadFilters('month'),
+				timePeriodFilter('gte', FROM_DATE),
+				timePeriodFilter('lte', TO_DATE)
+			]);
 		});
 
-		it('omits from_date/to_date when no range is supplied', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
+		it('omits the time_period range filters when no range is supplied', async () => {
+			const { queryRecord } = makeClient();
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'month');
 
-			expect(rpcCalls[0].args).not.toHaveProperty('from_date');
-			expect(rpcCalls[0].args).not.toHaveProperty('to_date');
+			expect(queryRecord.filters).not.toContainEqual(
+				expect.objectContaining({ column: 'time_period' })
+			);
 		});
 
-		it('passes month_filter through when supplied', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
+		it('with timeInterval "day" and a monthFilter alongside a date range, narrows the date-ranged rows to that calendar month client-side', async () => {
+			const { queryRecord } = makeClient({ queryRows: dayRowsAcrossMonths });
 
-			await fetchSpeciesPeriodTotals(
+			const result = await fetchSpeciesPeriodTotals(
+				SPECIES_NAME,
+				viewedGroup,
+				'day',
+				FROM_DATE,
+				TO_DATE,
+				3
+			);
+
+			// The month itself can't be a query filter — `time_period` is a plain
+			// `date` with no separate month column — so only the range reaches
+			// PostgREST and the month is applied to the rows it returns.
+			expect(queryRecord.filters).toEqual([
+				...cacheReadFilters('day'),
+				timePeriodFilter('gte', FROM_DATE),
+				timePeriodFilter('lte', TO_DATE)
+			]);
+			expect(result.map((row) => row.time_period)).toEqual([
+				'2023-03-08',
+				'2023-03-22'
+			]);
+		});
+
+		it('with a monthFilter but no date range (the squashed-month route), narrows every historical "day" row to that calendar month', async () => {
+			const { queryRecord } = makeClient({ queryRows: dayRowsAcrossMonths });
+
+			const result = await fetchSpeciesPeriodTotals(
+				SPECIES_NAME,
+				viewedGroup,
+				'day',
+				undefined,
+				undefined,
+				4
+			);
+
+			expect(queryRecord.filters).toEqual(cacheReadFilters('day'));
+			expect(result.map((row) => row.time_period)).toEqual(['2023-04-02']);
+		});
+
+		it('omits the month narrowing when no monthFilter is supplied', async () => {
+			makeClient({ queryRows: dayRowsAcrossMonths });
+
+			const result = await fetchSpeciesPeriodTotals(
+				SPECIES_NAME,
+				viewedGroup,
+				'day'
+			);
+
+			expect(result.map((row) => row.time_period)).toEqual(
+				dayRowsAcrossMonths.map((row) => row.time_period)
+			);
+		});
+
+		it('with timeInterval "year" and a monthFilter reads the "month" grain, relabelling each kept row to its year start', async () => {
+			// A year's totals scoped to one calendar month *is* that (year, month)
+			// cell, so the month grain answers the question the RPC's
+			// year + month_filter combination used to — but its rows have to come
+			// back year-grained, since that's the shape the squashed-month route's
+			// "Year totals" tab reads.
+			const { queryRecord } = makeClient({
+				queryRows: [
+					{ time_period: '2022-03-01', bird_count: 7 },
+					{ time_period: '2022-04-01', bird_count: 8 },
+					{ time_period: '2023-03-01', bird_count: 9 }
+				]
+			});
+
+			const result = await fetchSpeciesPeriodTotals(
 				SPECIES_NAME,
 				viewedGroup,
 				'year',
 				undefined,
 				undefined,
-				1
+				3
 			);
 
-			expect(rpcCalls[0].args).toMatchObject({ month_filter: 1 });
-		});
-
-		it('omits month_filter when not supplied', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
-
-			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'month');
-
-			expect(rpcCalls[0].args).not.toHaveProperty('month_filter');
+			expect(queryRecord.filters).toEqual(cacheReadFilters('month'));
+			expect(result).toEqual([
+				{
+					species_name: SPECIES_NAME,
+					time_period: '2022-01-01',
+					bird_count: 7
+				},
+				{
+					species_name: SPECIES_NAME,
+					time_period: '2023-01-01',
+					bird_count: 9
+				}
+			]);
 		});
 	});
 
 	// Thin `TabConfig.dataFetcher` wrappers around `fetchSpeciesPeriodTotals`
 	// (#1065) — each just needs to confirm it delegates with the right
 	// `timeInterval`/args; `fetchSpeciesPeriodTotals`'s own describe block above
-	// already covers the underlying RPC-args behaviour in full.
+	// already covers the underlying cache-read behaviour in full.
 	describe('fetchYearTotalsTabData', () => {
 		it('delegates to fetchSpeciesPeriodTotals with timeInterval "year"', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
+			const { queryRecord } = makeClient();
 			const params: SpeciesTotalsTabParams = { speciesName: SPECIES_NAME };
 
 			await fetchYearTotalsTabData(params, viewedGroup);
 
-			expect(rpcCalls[0].args).toMatchObject({
-				species_name_filter: SPECIES_NAME,
-				ringing_group_filter: GROUP_ID,
-				group_by_time_period: 'year'
-			});
+			expect(queryRecord.filters).toEqual(cacheReadFilters('year'));
 		});
 	});
 
 	describe('fetchMonthTotalsTabData', () => {
 		it('delegates to fetchSpeciesPeriodTotals with timeInterval "month" and the given date range', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
+			const { queryRecord } = makeClient();
 			const params: SpeciesTotalsTabParams = {
 				speciesName: SPECIES_NAME,
 				year: 2026,
@@ -674,19 +735,19 @@ describe('sp-data actions', () => {
 
 			await fetchMonthTotalsTabData(params, viewedGroup);
 
-			expect(rpcCalls[0].args).toMatchObject({
-				species_name_filter: SPECIES_NAME,
-				ringing_group_filter: GROUP_ID,
-				group_by_time_period: 'month',
-				from_date: FROM_DATE,
-				to_date: TO_DATE
-			});
+			expect(queryRecord.filters).toEqual([
+				...cacheReadFilters('month'),
+				timePeriodFilter('gte', FROM_DATE),
+				timePeriodFilter('lte', TO_DATE)
+			]);
 		});
 	});
 
 	describe('fetchSessionTotalsTabData', () => {
 		it('delegates to fetchSpeciesPeriodTotals with timeInterval "day" and the given date range/monthFilter', async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
+			const { queryRecord } = makeClient({
+				queryRows: [{ time_period: '2023-03-08', bird_count: 2 }]
+			});
 			const params: SpeciesTotalsTabParams = {
 				speciesName: SPECIES_NAME,
 				fromDate: FROM_DATE,
@@ -694,43 +755,50 @@ describe('sp-data actions', () => {
 				monthFilter: 3
 			};
 
-			await fetchSessionTotalsTabData(params, viewedGroup);
+			const result = await fetchSessionTotalsTabData(params, viewedGroup);
 
-			expect(rpcCalls[0].args).toMatchObject({
-				species_name_filter: SPECIES_NAME,
-				ringing_group_filter: GROUP_ID,
-				group_by_time_period: 'day',
-				from_date: FROM_DATE,
-				to_date: TO_DATE,
-				month_filter: 3
-			});
+			expect(queryRecord.filters).toEqual([
+				...cacheReadFilters('day'),
+				timePeriodFilter('gte', FROM_DATE),
+				timePeriodFilter('lte', TO_DATE)
+			]);
+			expect(result.map((row) => row.time_period)).toEqual(['2023-03-08']);
 		});
 	});
 
 	describe('fetchSpeciesCombinedMonthTotals', () => {
-		it("calls core_stats with species_name_filter, ringing_group_filter and group_by_time_period 'month-squashed'", async () => {
-			const { rpcCalls } = makeClient({ rpcRows: [] });
+		it("reads SimpleStatsCacheBySpecies filtered to the species and temporal_unit 'month-squashed', with no time_period range", async () => {
+			const { client, queryRecord } = makeClient();
 
 			await fetchSpeciesCombinedMonthTotals(SPECIES_NAME, viewedGroup);
 
-			expect(rpcCalls[0].name).toBe('core_stats');
-			expect(rpcCalls[0].args).toMatchObject({
-				species_name_filter: SPECIES_NAME,
-				ringing_group_filter: GROUP_ID,
-				group_by_time_period: 'month-squashed'
-			});
+			expect(client.from).toHaveBeenCalledWith(STATS_CACHE_TABLE);
+			expect(queryRecord.filters).toEqual(cacheReadFilters('month-squashed'));
 		});
 
-		it('returns the rows as-is', async () => {
-			const rows = [{ time_period: '2000-01-01' } as CoreStatsResult];
-			makeClient({ rpcRows: rows });
+		it('returns the rows mapped back to the CoreStatsResult shape', async () => {
+			makeClient({
+				queryRows: [
+					{
+						time_period: '2000-01-01',
+						bird_count: 4,
+						Species: { species_name: SPECIES_NAME }
+					}
+				]
+			});
 
 			const result = await fetchSpeciesCombinedMonthTotals(
 				SPECIES_NAME,
 				viewedGroup
 			);
 
-			expect(result).toEqual(rows);
+			expect(result).toEqual([
+				{
+					species_name: SPECIES_NAME,
+					time_period: '2000-01-01',
+					bird_count: 4
+				}
+			]);
 		});
 	});
 });
