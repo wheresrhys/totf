@@ -91,36 +91,6 @@ export function deriveStatsCacheRefreshParams(
 }
 
 /**
- * Runs the cache refresh, catching and logging its failure rather than
- * letting it escape, and reporting back whether it landed.
- *
- * `cacheTable` is in the log context so a failure names *which* cache went
- * stale — there's only one today, but the tag stays since it's also what
- * `FailedStatsCacheRefreshes.cache_table` uses.
- */
-async function runCacheRefresh(
-	cacheTable: 'SimpleStatsCache',
-	refreshCache: () => Promise<void>,
-	logContext: {
-		importJobId: number;
-		groupId: number;
-		temporalUnit: TemporalUnit;
-	}
-): Promise<boolean> {
-	try {
-		await refreshCache();
-		return true;
-	} catch (refreshError) {
-		console.error(
-			'Failed to refresh a stats cache for a stats-cache-refresh-window event',
-			{ ...logContext, cacheTable },
-			refreshError
-		);
-		return false;
-	}
-}
-
-/**
  * Consumer for the `stats-cache-refresh-window` topic (#1141, made real by
  * #1155): refreshes `SimpleStatsCache` for the one temporal unit this event
  * covers, then records the outcome on that temporal unit's own
@@ -164,17 +134,23 @@ export async function processStatsCacheRefreshWindowJob(
 	const supabaseClient = await getAuthenticatedSupabaseClientForGroup(groupId);
 	const importJobTracker = new ImportJobTracker(supabaseClient);
 
-	const refreshParams = { groupId, temporalUnit, periods, speciesIds };
+	const refreshParams = {
+		groupId,
+		temporalUnit,
+		periods,
+		speciesIds,
+		importJobId
+	};
 	const logContext = { importJobId, groupId, temporalUnit };
 
-	const simpleRefreshSucceeded = await runCacheRefresh(
-		'SimpleStatsCache',
-		() => refreshSimpleStatsCache(supabaseClient, refreshParams),
-		logContext
-	);
-	const refreshOutcome: StatsCacheRefreshOutcome = simpleRefreshSucceeded
-		? 'succeeded'
-		: 'failed';
+	let refreshOutcome: StatsCacheRefreshOutcome = 'succeeded';
+	try {
+		await refreshSimpleStatsCache(supabaseClient, refreshParams);
+	} catch {
+		// Already logged with full refresh context — including which DB call
+		// failed and which pass — inside refreshSimpleStatsCache itself.
+		refreshOutcome = 'failed';
+	}
 
 	try {
 		await importJobTracker.markStatsCacheRefreshed(
