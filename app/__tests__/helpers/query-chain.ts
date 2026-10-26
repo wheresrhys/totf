@@ -21,7 +21,7 @@ export type FilterCall = { column: string; operator: string; value: unknown };
  * too — `fromRow`/`toRow` are simply ignored.
  *
  * Also records the `select` string and every filtering call — `.filter()`
- * plus the `.gte()`/`.lte()` shorthands, all normalised into the same
+ * plus the `.eq()`/`.gte()`/`.lte()` shorthands, all normalised into the same
  * `{column, operator, value}` shape — for assertions that don't want a
  * dedicated mock reference per method.
  */
@@ -38,7 +38,10 @@ export function makeQueryChain(
 			record.select = s;
 			return chain;
 		}),
-		eq: vi.fn(() => chain),
+		eq: vi.fn((column: string, value: unknown) => {
+			record.filters.push({ column, operator: 'eq', value });
+			return chain;
+		}),
 		contains: vi.fn(() => chain),
 		order: vi.fn(() => chain),
 		range: vi.fn((fromRow: number, toRow: number) => {
