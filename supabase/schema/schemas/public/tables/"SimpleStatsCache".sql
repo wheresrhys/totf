@@ -103,16 +103,52 @@ OR
 UPDATE ON public."SimpleStatsCache" FOR EACH ROW
 EXECUTE FUNCTION public.trg_set_updated_at ();
 
--- SELECT/INSERT/UPDATE: strictly own-group only — no cross-group sharing via
--- GroupDataSharing (nothing reads this table cross-group yet). No DELETE
--- policy: there is no DELETE grant below, so a delete is rejected at the
--- grant level before RLS is even evaluated.
+-- SELECT: the same three-way read gate "Encounters" uses, so the summary page's
+-- four access levels survive a repoint onto this cache (#1202) —
+--   1. the row's own group, by its JWT;
+--   2. a group the row's group has granted cross-group access to via
+--      "GroupDataSharing" (identical OR-branch to "Encounters"'
+--      group_encounters_access, with group_id in place of ringing_group_id);
+--   3. anyone at all, including an anonymous no-JWT caller, when the row's group
+--      has opted its summary area into public view ('summary' = ANY
+--      public_areas) — the same gate public_core_stats applies, enforced here by
+--      RLS directly rather than by a SECURITY DEFINER wrapper, so no new read
+--      path has to exist for it.
+-- Branch 3 is evaluable anonymously because "RingingGroups" is openly readable
+-- (ringing_groups_access is USING (TRUE), with GRANT ALL to anon), and branches
+-- 1/2 simply evaluate false for such a caller: auth.jwt() is NULL, so the
+-- ::bigint cast yields NULL rather than an error and every comparison against it
+-- is NULL. No extra anonymous guard is needed.
+--
+-- INSERT/UPDATE stay strictly own-group, authenticated-only — a widened read
+-- gate must not widen the write path. No DELETE policy: there is no DELETE grant
+-- below, so a delete is rejected at the grant level before RLS is even evaluated.
 CREATE POLICY group_simple_stats_cache_access ON public."SimpleStatsCache" FOR
 SELECT
 	USING (
 		group_id = (
 			(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
 		)::bigint
+		OR EXISTS (
+			SELECT
+				1
+			FROM
+				public."GroupDataSharing"
+			WHERE
+				granter_group_id = group_id
+				AND recipient_group_id = (
+					(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
+				)::bigint
+		)
+		OR EXISTS (
+			SELECT
+				1
+			FROM
+				public."RingingGroups" rg
+			WHERE
+				rg.id = group_id
+				AND 'summary' = ANY (rg.public_areas)
+		)
 	);
 
 CREATE POLICY group_simple_stats_cache_insert ON public."SimpleStatsCache" FOR INSERT
@@ -170,16 +206,21 @@ ADD CONSTRAINT simple_stats_cache_group_id_fkey FOREIGN KEY (group_id) REFERENCE
 -- using the service-role key, so it needs real INSERT/UPDATE grants and RLS
 -- policies for authenticated, scoped to the caller's own group. No DELETE
 -- grant for authenticated: the upsert-only write pattern never needs to delete
--- a row. Nothing reads or writes this table on behalf of an anonymous caller,
--- so `anon` is left with no grant at all here — unlike "ImportJobs".sql, which
--- explicitly grants `anon` SELECT/INSERT/UPDATE/DELETE because its own RLS
--- test suite asserts an anonymous request gets an RLS-filtered empty result
--- rather than a permission error. No such test exists for this table, so
--- there's nothing forcing the same explicit grant here.
+-- a row.
+--
+-- `anon` gets SELECT and nothing else (#1202): the public-opt-in OR-branch of
+-- the SELECT policy above is only reachable if the anon role can get as far as
+-- having RLS evaluated at all — without a grant, an anonymous read fails with
+-- 42501 before any policy runs. Deliberately not GRANT ALL: an anonymous caller
+-- has no business writing a cache row, and only the read gate was widened.
 GRANT
 SELECT
 ,
 	INSERT,
 UPDATE ON public."SimpleStatsCache" TO authenticated;
+
+GRANT
+SELECT
+	ON public."SimpleStatsCache" TO anon;
 
 GRANT ALL ON public."SimpleStatsCache" TO service_role;

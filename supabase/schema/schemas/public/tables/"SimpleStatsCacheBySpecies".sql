@@ -87,15 +87,39 @@ OR
 UPDATE ON public."SimpleStatsCacheBySpecies" FOR EACH ROW
 EXECUTE FUNCTION public.trg_set_updated_at ();
 
--- SELECT/INSERT/UPDATE: strictly own-group only, mirroring "SimpleStatsCache"'s
--- own policies. No DELETE policy: there is no DELETE grant below, so a delete
--- is rejected at the grant level before RLS is even evaluated.
+-- SELECT: own group, a "GroupDataSharing" recipient, or anyone at all once the
+-- row's group has 'summary' in public_areas — see "SimpleStatsCache".sql's own
+-- policy comment for the full rationale (#1202); these two tables' read gates
+-- are kept byte-for-byte equivalent on purpose. INSERT/UPDATE stay strictly
+-- own-group, authenticated-only. No DELETE policy: there is no DELETE grant
+-- below, so a delete is rejected at the grant level before RLS is even
+-- evaluated.
 CREATE POLICY group_simple_stats_cache_by_species_access ON public."SimpleStatsCacheBySpecies" FOR
 SELECT
 	USING (
 		group_id = (
 			(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
 		)::bigint
+		OR EXISTS (
+			SELECT
+				1
+			FROM
+				public."GroupDataSharing"
+			WHERE
+				granter_group_id = group_id
+				AND recipient_group_id = (
+					(auth.jwt () -> 'app_metadata'::text) ->> 'ringing_group_id'::text
+				)::bigint
+		)
+		OR EXISTS (
+			SELECT
+				1
+			FROM
+				public."RingingGroups" rg
+			WHERE
+				rg.id = group_id
+				AND 'summary' = ANY (rg.public_areas)
+		)
 	);
 
 CREATE POLICY group_simple_stats_cache_by_species_insert ON public."SimpleStatsCacheBySpecies" FOR INSERT
@@ -151,11 +175,16 @@ ADD CONSTRAINT simple_stats_cache_by_species_species_id_fkey FOREIGN KEY (specie
 
 -- Same grant rationale as "SimpleStatsCache".sql: authenticated-scoped
 -- SELECT/INSERT/UPDATE for the queue consumer's group-scoped client, no DELETE,
--- and no grant at all for `anon`.
+-- and SELECT-only for `anon` so the public-opt-in branch of the SELECT policy
+-- above is reachable without a 42501 (#1202).
 GRANT
 SELECT
 ,
 	INSERT,
 UPDATE ON public."SimpleStatsCacheBySpecies" TO authenticated;
+
+GRANT
+SELECT
+	ON public."SimpleStatsCacheBySpecies" TO anon;
 
 GRANT ALL ON public."SimpleStatsCacheBySpecies" TO service_role;
