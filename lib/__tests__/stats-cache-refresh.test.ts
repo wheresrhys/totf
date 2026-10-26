@@ -1522,6 +1522,167 @@ describe('refreshSimpleStatsCache', () => {
 		});
 	});
 
+	describe('resilience across DB reads', () => {
+		it('still calls biometrics, birdAge, and encounterAge RPCs after the basic RPC fails, rather than aborting immediately', async () => {
+			const client = makeRpcMockClient(
+				{
+					stats_cache_biometrics_metrics: [biometricsRow()],
+					stats_cache_bird_age_metrics: [birdAgeRow()],
+					stats_cache_encounter_age_metrics: [encounterAgeRow()]
+				},
+				{
+					rpcErrorsByName: {
+						stats_cache_basic_session_metrics: { message: 'statement timeout' }
+					}
+				}
+			);
+
+			await expect(
+				refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-03-01']
+				})
+			).rejects.toThrow();
+
+			for (const rpcName of SIMPLE_METRIC_RPC_NAMES) {
+				expect(metricRpcCallArgsList(client, rpcName)).toHaveLength(1);
+			}
+		});
+
+		it('blocks the cache write entirely when any one metric RPC fails', async () => {
+			const client = makeRpcMockClient(
+				{
+					stats_cache_biometrics_metrics: [biometricsRow()],
+					stats_cache_bird_age_metrics: [birdAgeRow()],
+					stats_cache_encounter_age_metrics: [encounterAgeRow()]
+				},
+				{
+					rpcErrorsByName: {
+						stats_cache_basic_session_metrics: { message: 'statement timeout' }
+					}
+				}
+			);
+
+			await expect(
+				refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-03-01']
+				})
+			).rejects.toThrow();
+
+			expect(client.upsert).not.toHaveBeenCalled();
+			expect(client.insert).not.toHaveBeenCalled();
+		});
+
+		it("propagates the first read failure's original error, not an aggregate", async () => {
+			const client = makeRpcMockClient(
+				{
+					stats_cache_biometrics_metrics: [biometricsRow()],
+					stats_cache_bird_age_metrics: [birdAgeRow()],
+					stats_cache_encounter_age_metrics: [encounterAgeRow()]
+				},
+				{
+					rpcErrorsByName: {
+						stats_cache_basic_session_metrics: { message: 'statement timeout' }
+					}
+				}
+			);
+
+			await expect(
+				refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-03-01']
+				})
+				// The message catchSupabaseErrors wraps a PostgREST error in.
+			).rejects.toThrow('Failed to fetch data: statement timeout');
+		});
+
+		it('still attempts every day-unit batch for one metric RPC even when an earlier batch fails', async () => {
+			const allSessionDates = Array.from({ length: 1000 }, (_, i) =>
+				dateAtOffset(i)
+			);
+			const firstEverDate = allSessionDates[0];
+			const lastEverDate = allSessionDates[allSessionDates.length - 1];
+			const client = makeRpcMockClient(
+				{
+					stats_cache_basic_session_metrics: (params: RpcParams) => [
+						basicRow({ time_period: params.to_date as string })
+					],
+					stats_cache_biometrics_metrics: (params: RpcParams) => [
+						biometricsRow({ time_period: params.to_date as string })
+					],
+					stats_cache_bird_age_metrics: (params: RpcParams) => [
+						birdAgeRow({ time_period: params.to_date as string })
+					],
+					stats_cache_encounter_age_metrics: (params: RpcParams) => [
+						encounterAgeRow({ time_period: params.to_date as string })
+					]
+				},
+				{
+					sessionsVisitDates: allSessionDates,
+					// Only the batch windowing on the very first session date fails —
+					// the batch for the last session date, a separate RPC call to the
+					// same name, must still be attempted and succeed.
+					rpcErrorsByName: {
+						stats_cache_basic_session_metrics: (params: RpcParams) =>
+							params.to_date === firstEverDate
+								? { message: 'statement timeout' }
+								: null
+					}
+				}
+			);
+
+			await expect(
+				refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'day',
+					periods: [firstEverDate, lastEverDate]
+				})
+			).rejects.toThrow();
+
+			expect(
+				metricRpcCallArgsList(client, 'stats_cache_basic_session_metrics')
+			).toHaveLength(2);
+			expect(client.upsert).not.toHaveBeenCalled();
+		});
+
+		it("does not affect the other groupBySpecies pass when one pass's reads fail", async () => {
+			const client = makeRpcMockClient(
+				{
+					stats_cache_biometrics_metrics: [biometricsRow()],
+					stats_cache_bird_age_metrics: [birdAgeRow()],
+					stats_cache_encounter_age_metrics: [encounterAgeRow()]
+				},
+				{
+					rpcErrorsByName: {
+						stats_cache_basic_session_metrics: { message: 'statement timeout' }
+					}
+				}
+			);
+
+			await expect(
+				refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-03-01']
+				})
+			).rejects.toThrow();
+
+			// `refreshSimpleStatsCache` rejects on the species-grouped pass's own
+			// failure before ever starting the non-species-grouped pass — the new
+			// per-metric-type attempt-all loop lives inside one pass, it doesn't
+			// change that the two passes themselves still run strictly in sequence.
+			expect(
+				metricRpcCallArgsList(client, 'stats_cache_biometrics_metrics', {
+					groupBySpecies: false
+				})
+			).toHaveLength(0);
+		});
+	});
+
 	describe('chunking large writes', () => {
 		it("splits the by-species write into chunk-size-capped upserts, and writes every touched day's row exactly once, when the day grain's touched-period count exceeds the chunk size", async () => {
 			// day has no exact-filter fan-out ceiling the way month/year do (see
