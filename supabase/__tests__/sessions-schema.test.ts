@@ -77,3 +77,26 @@ describe('Sessions schema — trigger function retired', () => {
 		expect(functionExists('trg_set_session_generated_fields')).toBe(false);
 	});
 });
+
+// Pins a catalog object nothing else in the suite would notice regressing — same
+// convention as supabase/__tests__/rpc-functions/stats-rpc-plan-cache-mode.test.ts's
+// proconfig check, just against pg_statistic_ext instead of pg_proc. Without this
+// object, Postgres assumes ringing_group_id and visit_date are independent, which
+// flips Sessions' access path and collapses an accurate ~12-row estimate down to 1
+// whenever a query combines an exact group filter with a visit_date range that
+// happens to cover 100% of that group's rows — see
+// supabase/schema/schemas/public/tables/"Sessions".sql's own comment on the
+// CREATE STATISTICS declaration for the full mechanism.
+function readSessionsExtendedStatsName(): string {
+	return psqlScalar(
+		`SELECT COALESCE(stxname, '(none)') FROM pg_statistic_ext WHERE stxname = 'sessions_ringing_group_id_visit_date_stats';`
+	);
+}
+
+describe('Sessions extended statistics', () => {
+	it('declares the ringing_group_id/visit_date correlation stats object', () => {
+		expect(readSessionsExtendedStatsName()).toBe(
+			'sessions_ringing_group_id_visit_date_stats'
+		);
+	});
+});

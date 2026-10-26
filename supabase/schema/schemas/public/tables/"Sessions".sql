@@ -15,6 +15,23 @@ CREATE TABLE public."Sessions" (
 
 CREATE INDEX idx_sessions_ringing_group_id ON public."Sessions" (ringing_group_id);
 
+-- Teaches the planner that ringing_group_id and visit_date are correlated: without this, a
+-- query combining an exact group filter with a visit_date range (even one that covers 100% of
+-- that group's own rows) gets its two predicates' selectivities multiplied as if independent,
+-- which both picks the wrong Sessions access path and badly underestimates the matching row
+-- count — confirmed via EXPLAIN (ANALYZE, BUFFERS): a covering from_date/to_date window flips
+-- Postgres from the accurate idx_sessions_ringing_group_id bitmap scan (est. 8, actual 12) to
+-- the Sessions_visit_date_ringing_group_id_key index (est. 1, actual 12). See
+-- supabase/CLAUDE.md's "Companion stats RPCs" section and stats_raw_encounters.sql's WHERE
+-- clause. No statistics kind restricted: dependencies alone only helps equality-equality
+-- combinations, and the relevant predicate here is a range (visit_date BETWEEN ...), which needs
+-- the mcv kind — leaving the kind list unspecified creates all three (ndistinct, dependencies,
+-- mcv) rather than guessing which one the planner will end up using.
+CREATE STATISTICS public.sessions_ringing_group_id_visit_date_stats ON ringing_group_id,
+visit_date
+FROM
+	public."Sessions";
+
 -- SELECT: grants access if the session belongs to the logged-in group, or if the session's group
 -- has granted read access to the logged-in group via GroupDataSharing
 CREATE POLICY group_sessions_access ON public."Sessions" FOR
