@@ -27,11 +27,49 @@ export function psqlScalar(sql: string): string {
 		.filter(Boolean)[0];
 }
 
-/** Creates a throwaway `RingingGroups` row and returns its id. */
-export function createIsolatedGroup(name: string): number {
+/** Every area tag `RingingGroups.public_areas` currently allows. */
+export type PublicArea = 'summary';
+
+/**
+ * Creates a throwaway `RingingGroups` row and returns its id.
+ *
+ * `publicAreas` opts the group's named areas into anonymous public view, the
+ * gate both `public_core_stats` and the stats-cache tables' SELECT RLS read
+ * (#1202). It defaults to `[]` — a group that has published nothing — so every
+ * existing single-argument call site is unaffected.
+ */
+export function createIsolatedGroup(
+	name: string,
+	publicAreas: readonly PublicArea[] = []
+): number {
+	const publicAreasLiteral =
+		publicAreas.length === 0
+			? `'{}'`
+			: `ARRAY[${publicAreas.map((area) => `'${area}'`).join(', ')}]`;
 	return Number(
 		psqlScalar(
-			`INSERT INTO "RingingGroups" (group_name, slug) VALUES ('${name}', '${name.toLowerCase().replace(/ /g, '-')}') RETURNING id;`
+			`INSERT INTO "RingingGroups" (group_name, slug, public_areas) VALUES ('${name}', '${name.toLowerCase().replace(/ /g, '-')}', ${publicAreasLiteral}) RETURNING id;`
 		)
 	);
+}
+
+/**
+ * Grants `recipientGroupId` read access to `granterGroupId`'s data, and returns
+ * a function that revokes it again.
+ *
+ * Seeded by raw SQL rather than through an authenticated client on purpose:
+ * `"GroupDataSharing"` has no INSERT policy at all, so a grantor can neither
+ * create nor even see its own grants via PostgREST (see `rls.test.ts`'s header).
+ */
+export function grantGroupDataSharing(
+	granterGroupId: number,
+	recipientGroupId: number
+): () => void {
+	psql(
+		`INSERT INTO "GroupDataSharing" (granter_group_id, recipient_group_id) VALUES (${granterGroupId}, ${recipientGroupId});`
+	);
+	return () =>
+		psql(
+			`DELETE FROM "GroupDataSharing" WHERE granter_group_id = ${granterGroupId} AND recipient_group_id = ${recipientGroupId};`
+		);
 }

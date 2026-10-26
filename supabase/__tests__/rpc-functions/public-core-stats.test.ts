@@ -19,7 +19,7 @@ import {
 	insertTestBird,
 	insertTestEncounter
 } from './helpers/encounter-fixtures';
-import { psql, psqlScalar } from '../db-test-helpers';
+import { createIsolatedGroup, psql } from '../db-test-helpers';
 
 // public_core_stats (#768) — a SECURITY DEFINER wrapper around core_stats that
 // only returns data for a group that has published its summary area ('summary' = ANY
@@ -49,19 +49,6 @@ describe('public_core_stats', () => {
 	// has two months to split across.
 	let month1Date: string;
 	let month2Date: string;
-
-	function createGroup(name: string, publicAreas: 'summary'[] = []): number {
-		const areasLiteral =
-			publicAreas.length === 0
-				? "'{}'"
-				: `ARRAY[${publicAreas.map((a) => `'${a}'`).join(', ')}]`;
-		return Number(
-			psqlScalar(
-				`INSERT INTO "RingingGroups" (group_name, slug, public_areas) ` +
-					`VALUES ('${name}', '${name.toLowerCase().replace(/ /g, '-')}', ${areasLiteral}) RETURNING id;`
-			)
-		);
-	}
 
 	async function getSpeciesId(name: string): Promise<number> {
 		const { data, error } = await supabase
@@ -125,8 +112,10 @@ describe('public_core_stats', () => {
 	}
 
 	beforeAll(async () => {
-		publicGroupId = createGroup(`PublicAggPublic-${suffix}`, ['summary']);
-		privateGroupId = createGroup(`PublicAggPrivate-${suffix}`, []);
+		publicGroupId = createIsolatedGroup(`PublicAggPublic-${suffix}`, [
+			'summary'
+		]);
+		privateGroupId = createIsolatedGroup(`PublicAggPrivate-${suffix}`);
 		publicGroupClient =
 			await getAuthenticatedSupabaseClientForGroup(publicGroupId);
 		const privateGroupClient =
