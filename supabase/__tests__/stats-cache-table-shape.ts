@@ -24,7 +24,12 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
-import { createIsolatedGroup, psql } from './db-test-helpers';
+import { supabase as anonClient } from '../../lib/supabase';
+import {
+	createIsolatedGroup,
+	grantGroupDataSharing,
+	psql
+} from './db-test-helpers';
 import { randomTestSuffix, randomFutureDate } from './test-isolation';
 import {
 	ALL_TIME_SENTINEL_DATE,
@@ -370,6 +375,89 @@ export function testStatsCacheTableShape({
 					.delete()
 					.eq('id', id);
 				expect(error?.code).toBe(INSUFFICIENT_PRIVILEGE);
+			});
+
+			// The two OR-branches #1202 added to the SELECT policy, on top of the
+			// own-group branch the cases above cover. Between them these are the
+			// four access levels the summary page's core_stats/public_core_stats
+			// read path supports, so a later repoint onto this cache keeps all of
+			// them. `anonClient` is the plain anon-key client with no JWT at all —
+			// exactly what a public summary page's server-side read uses.
+			describe('cross-group and public access', () => {
+				/** A group that has opted its summary area into public view, so the
+				 * public_areas branch can be exercised without mutating the
+				 * own-group fixtures above. */
+				let publicGroupId: number;
+				let publicGroupClient: SupabaseClient;
+				let revokeSharing: (() => void) | undefined;
+
+				beforeAll(async () => {
+					publicGroupId = createIsolatedGroup(`sc-public-${suffix}`, [
+						'summary'
+					]);
+					publicGroupClient =
+						await getAuthenticatedSupabaseClientForGroup(publicGroupId);
+				});
+
+				afterAll(() => {
+					psql(
+						`DELETE FROM "${tableName}" WHERE group_id = ${publicGroupId};` +
+							`DELETE FROM "RingingGroups" WHERE id = ${publicGroupId};`
+					);
+				});
+
+				afterEach(() => {
+					revokeSharing?.();
+					revokeSharing = undefined;
+				});
+
+				/** Inserts one row owned by the publicly-opted-in group and returns
+				 * its id. */
+				async function insertPublicGroupRow() {
+					const { data, error } = await publicGroupClient
+						.from(tableName)
+						.insert(buildRow({ groupId: publicGroupId, speciesId }))
+						.select('id')
+						.single();
+					expect(error).toBeNull();
+					return data!.id as number;
+				}
+
+				it("allows a recipient group to read a granter's rows via a GroupDataSharing grant", async () => {
+					const id = await insertOwnerRow();
+					revokeSharing = grantGroupDataSharing(ownerGroupId, otherGroupId);
+
+					const { data, error } = await otherClient
+						.from(tableName)
+						.select('id')
+						.eq('id', id);
+					expect(error).toBeNull();
+					expect(data).toHaveLength(1);
+				});
+
+				it('allows an anonymous client to read rows for a group with "summary" in public_areas', async () => {
+					const id = await insertPublicGroupRow();
+
+					const { data, error } = await anonClient
+						.from(tableName)
+						.select('id')
+						.eq('id', id);
+					expect(error).toBeNull();
+					expect(data).toHaveLength(1);
+				});
+
+				it("blocks an anonymous client's read of rows for a group with an empty public_areas", async () => {
+					const id = await insertOwnerRow();
+
+					const { data, error } = await anonClient
+						.from(tableName)
+						.select('id')
+						.eq('id', id);
+					// A grant exists for anon, so RLS filters the row out rather than
+					// the request failing with 42501.
+					expect(error).toBeNull();
+					expect(data).toEqual([]);
+				});
 			});
 		});
 	});

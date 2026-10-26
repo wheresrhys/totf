@@ -47,6 +47,19 @@ Key design notes:
   supply both; `supabase/__tests__/rpc-functions/helpers/encounter-fixtures.ts` defaults
   `visit_date` off the Sessions row (`readTestSessionDate` / `withSessionDate`) and `location_id`
   off the location its session was created for, so most fixtures need neither explicitly.
+- **The two `SimpleStatsCache*` tables are read-gated like `Encounters`, written own-group-only
+  (#1202).** Their SELECT policies carry three OR-branches — the row's own group by its JWT, a
+  `GroupDataSharing` recipient of that group (the identical branch to `Encounters`'
+  `group_encounters_access`, with `group_id` in place of `ringing_group_id`), and *anyone at all*
+  once the row's group has `'summary'` in `public_areas`. That third branch is the gate
+  `public_core_stats` applies, enforced by RLS directly rather than through a `SECURITY DEFINER`
+  wrapper, so the summary page's four access levels survive a repoint off `core_stats`/
+  `public_core_stats` onto the cache with no new read path. It is evaluable anonymously because
+  `RingingGroups` is openly readable (`USING (TRUE)` + `GRANT ALL TO anon`), and the first two
+  branches simply evaluate false for a no-JWT caller — `auth.jwt()` is NULL, so the `::bigint`
+  cast yields NULL rather than erroring. `anon` therefore has `SELECT` and nothing else on both
+  tables; INSERT/UPDATE remain own-group `authenticated` only, and neither table has any DELETE
+  grant or policy. Keep the two tables' SELECT policies equivalent to each other by hand.
 - Several fields are populated by triggers (e.g. `proven_age` on Birds, timestamps on Sessions/Encounters).
 - Complex queries are exposed as Postgres RPC functions (e.g. `core_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
