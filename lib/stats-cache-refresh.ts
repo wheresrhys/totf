@@ -531,25 +531,71 @@ async function fetchGroupSessionDates(
 }
 
 /**
- * Runs one DB call inside a `refreshSimpleStatsCache` pass, logging exactly
- * which call failed plus the whole pass's refresh context before letting the
- * original error propagate **unchanged** — same object, same message, so
- * `catchSupabaseErrors`'s own message and any `rejects.toThrow(...)` test
- * keep working untouched. A bare `catchSupabaseErrors` error on its own names
- * neither which of the 6 DB touchpoints in a pass failed nor which pass
- * (`groupBySpecies`) it was; that's the gap this closes.
+ * Identifies one DB call for logging — enough to tell two calls of the same
+ * kind apart (e.g. the same RPC name called once per `day`-unit batch window,
+ * each with its own `from_date`/`to_date`; or an upsert chunk's own row count,
+ * not the pass's total). `runStatsCacheDbCall` turns this into both the log
+ * line's label and the extra metadata merged into its context object.
+ */
+type StatsCacheDbCallDescriptor =
+	| { kind: 'select'; table: string }
+	| { kind: 'rpc'; rpcName: string; rpcParams: MetricRpcParams }
+	| { kind: 'upsert'; table: string; rowCount: number }
+	| { kind: 'insert'; table: string; rowCount: number };
+
+function describeStatsCacheDbCall(
+	descriptor: StatsCacheDbCallDescriptor
+): string {
+	switch (descriptor.kind) {
+		case 'select':
+			return `${descriptor.table} select`;
+		case 'rpc':
+			return `${descriptor.rpcName} RPC`;
+		case 'upsert':
+			return `${descriptor.table} upsert`;
+		case 'insert':
+			return `${descriptor.table} insert`;
+	}
+}
+
+function statsCacheDbCallMetadata(
+	descriptor: StatsCacheDbCallDescriptor
+): Record<string, unknown> {
+	switch (descriptor.kind) {
+		case 'select':
+			return {};
+		case 'rpc':
+			return { rpcParams: descriptor.rpcParams };
+		case 'upsert':
+		case 'insert':
+			return { rowCount: descriptor.rowCount };
+	}
+}
+
+/**
+ * Runs one DB call inside a `refreshSimpleStatsCache` pass, logging it —
+ * labelled and with call-specific metadata (an RPC's own params, or an
+ * upsert/insert's own row count) — on success as well as failure, so every
+ * one of a pass's DB touchpoints is individually visible in logs, distinct
+ * from every other. On failure, the original error still propagates
+ * **unchanged** — same object, same message, so `catchSupabaseErrors`'s own
+ * message and any `rejects.toThrow(...)` test keep working untouched.
  */
 async function runStatsCacheDbCall<T>(
-	dbCall: string,
+	descriptor: StatsCacheDbCallDescriptor,
 	context: Record<string, unknown>,
 	fn: () => Promise<T>
 ): Promise<T> {
+	const label = describeStatsCacheDbCall(descriptor);
+	const fullContext = { ...context, ...statsCacheDbCallMetadata(descriptor) };
 	try {
-		return await fn();
+		const result = await fn();
+		console.log(`Stats-cache refresh DB call succeeded: ${label}`, fullContext);
+		return result;
 	} catch (error) {
 		console.error(
-			`Stats-cache refresh DB call failed: ${dbCall}`,
-			context,
+			`Stats-cache refresh DB call failed: ${label}`,
+			fullContext,
 			error
 		);
 		throw error;
@@ -565,15 +611,26 @@ async function runStatsCacheDbCall<T>(
  * all `indexByCell`/`mergeSimpleMetricRows` key on — for `month-squashed` that
  * holds only because `stats_spine`'s month-squashed branch honours
  * `month_filter` (#1178); before that every call returned all 12 cells.
+ *
+ * Each individual call is logged on its own, with its own `rpcParams`
+ * (`runStatsCacheDbCall`) — a `day`-unit pass can call the same RPC name
+ * several times with different `from_date`/`to_date` windows, and only
+ * per-call logging tells those apart.
  */
 async function fetchMetricRows<Row>(
 	supabaseClient: SupabaseClient,
 	rpcName: string,
-	rpcParamsList: MetricRpcParams[]
+	rpcParamsList: MetricRpcParams[],
+	context: Record<string, unknown>
 ): Promise<Row[]> {
 	const perCallRows = await Promise.all(
 		rpcParamsList.map((rpcParams) =>
-			supabaseClient.rpc(rpcName, rpcParams).then(catchSupabaseErrors)
+			runStatsCacheDbCall<Row[] | null>(
+				{ kind: 'rpc', rpcName, rpcParams },
+				context,
+				async () =>
+					supabaseClient.rpc(rpcName, rpcParams).then(catchSupabaseErrors)
+			)
 		)
 	);
 	return perCallRows.flatMap((rows) => (rows ?? []) as Row[]);
@@ -738,13 +795,23 @@ function chunkArray<T>(items: T[], chunkSize: number): T[][] {
  * cells from a `group_by_species: true` pass, so every cell carries a real
  * species id — see `writeAllSpeciesRows` for the sibling non-species pass's
  * writer.
+ *
+ * Each chunk's `.upsert()` call is logged individually (`runStatsCacheDbCall`,
+ * table name + that chunk's own row count) rather than once for the whole
+ * write — a `day`-grain pass can split into several chunks, and the pass's
+ * total row count would misreport how many rows any one failing call
+ * actually sent.
  */
 async function writeBySpeciesRows<Cell extends MergedCellKey>(
 	supabaseClient: SupabaseClient,
 	cacheTable: 'SimpleStatsCacheBySpecies',
 	cells: Cell[],
-	{ groupId, temporalUnit }: { groupId: number; temporalUnit: TemporalUnit }
+	context: { groupId: number; temporalUnit: TemporalUnit } & Record<
+		string,
+		unknown
+	>
 ): Promise<void> {
+	const { groupId, temporalUnit } = context;
 	const rows = cells.map(({ species_id, time_period, ...metrics }) => ({
 		...metrics,
 		group_id: groupId,
@@ -753,10 +820,15 @@ async function writeBySpeciesRows<Cell extends MergedCellKey>(
 		time_period: time_period ?? ALL_TIME_SENTINEL_DATE
 	}));
 	for (const chunk of chunkArray(rows, DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE)) {
-		await supabaseClient
-			.from(cacheTable)
-			.upsert(chunk, { onConflict: BY_SPECIES_CONFLICT_TARGET })
-			.then(catchSupabaseErrors);
+		await runStatsCacheDbCall(
+			{ kind: 'upsert', table: cacheTable, rowCount: chunk.length },
+			context,
+			async () =>
+				supabaseClient
+					.from(cacheTable)
+					.upsert(chunk, { onConflict: BY_SPECIES_CONFLICT_TARGET })
+					.then(catchSupabaseErrors)
+		);
 	}
 }
 
@@ -774,13 +846,20 @@ async function writeBySpeciesRows<Cell extends MergedCellKey>(
  * false`. Same `ALL_TIME_SENTINEL_DATE` reconciliation as `writeBySpeciesRows`,
  * against the narrower `(group_id, temporal_unit, time_period)` conflict
  * target this table shape's unique constraint uses.
+ *
+ * Each chunk's `.upsert()` call is logged individually — see
+ * `writeBySpeciesRows`'s docblock for why.
  */
 async function writeAllSpeciesRows<Cell extends MergedCellKey>(
 	supabaseClient: SupabaseClient,
 	cacheTable: 'SimpleStatsCache',
 	cells: Cell[],
-	{ groupId, temporalUnit }: { groupId: number; temporalUnit: TemporalUnit }
+	context: { groupId: number; temporalUnit: TemporalUnit } & Record<
+		string,
+		unknown
+	>
 ): Promise<void> {
+	const { groupId, temporalUnit } = context;
 	const rows = cells.map(
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to exclude it from ...metrics; this table has no species_id column
 		({ species_id, time_period, ...metrics }) => ({
@@ -791,10 +870,15 @@ async function writeAllSpeciesRows<Cell extends MergedCellKey>(
 		})
 	);
 	for (const chunk of chunkArray(rows, DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE)) {
-		await supabaseClient
-			.from(cacheTable)
-			.upsert(chunk, { onConflict: ALL_SPECIES_CONFLICT_TARGET })
-			.then(catchSupabaseErrors);
+		await runStatsCacheDbCall(
+			{ kind: 'upsert', table: cacheTable, rowCount: chunk.length },
+			context,
+			async () =>
+				supabaseClient
+					.from(cacheTable)
+					.upsert(chunk, { onConflict: ALL_SPECIES_CONFLICT_TARGET })
+					.then(catchSupabaseErrors)
+		);
 	}
 }
 
@@ -810,18 +894,32 @@ async function writeAllSpeciesRows<Cell extends MergedCellKey>(
  * anomaly whichever period it sits in, and keeping the table's contents
  * identical to what was logged is one fewer discrepancy to reason about when
  * reading it back.
+ *
+ * Logged via `runStatsCacheDbCall` (table + row count) only when there's
+ * actually a call to make — the `anomalies.length === 0` early return isn't a
+ * DB call, so there's nothing to log.
  */
 async function deadLetterAnomalies(
 	supabaseClient: SupabaseClient,
-	anomalies: FailedRefreshRow[]
+	anomalies: FailedRefreshRow[],
+	context: Record<string, unknown>
 ): Promise<void> {
 	if (anomalies.length === 0) {
 		return;
 	}
-	await supabaseClient
-		.from('FailedStatsCacheRefreshes')
-		.insert(anomalies)
-		.then(catchSupabaseErrors);
+	await runStatsCacheDbCall(
+		{
+			kind: 'insert',
+			table: 'FailedStatsCacheRefreshes',
+			rowCount: anomalies.length
+		},
+		context,
+		async () =>
+			supabaseClient
+				.from('FailedStatsCacheRefreshes')
+				.insert(anomalies)
+				.then(catchSupabaseErrors)
+	);
 }
 
 type MergeMetricRowsParams = {
@@ -1043,7 +1141,7 @@ export async function runSimpleStatsCacheRefreshPass(
 	const groupSessionDates =
 		temporalUnit === 'day' && touchedPeriods.length > 0
 			? await runStatsCacheDbCall(
-					'Sessions visit_date preflight',
+					{ kind: 'select', table: 'Sessions' },
 					logContext,
 					() => fetchGroupSessionDates(supabaseClient, groupId)
 				)
@@ -1060,45 +1158,32 @@ export async function runSimpleStatsCacheRefreshPass(
 		// Narrowing temporal unit, nothing touched this pass — nothing to refresh.
 		return;
 	}
-	const basicRows = await runStatsCacheDbCall(
-		'stats_cache_basic_session_metrics RPC',
-		logContext,
-		() =>
-			fetchMetricRows<BasicSessionMetricsRow>(
-				supabaseClient,
-				'stats_cache_basic_session_metrics',
-				rpcParamsList
-			)
+	// Each call below logs itself (name + its own params) inside
+	// `fetchMetricRows` — see its own docblock for why that has to be at the
+	// per-RPC-call granularity rather than wrapped once here.
+	const basicRows = await fetchMetricRows<BasicSessionMetricsRow>(
+		supabaseClient,
+		'stats_cache_basic_session_metrics',
+		rpcParamsList,
+		logContext
 	);
-	const biometricsRows = await runStatsCacheDbCall(
-		'stats_cache_biometrics_metrics RPC',
-		logContext,
-		() =>
-			fetchMetricRows<BiometricsMetricsRow>(
-				supabaseClient,
-				'stats_cache_biometrics_metrics',
-				rpcParamsList
-			)
+	const biometricsRows = await fetchMetricRows<BiometricsMetricsRow>(
+		supabaseClient,
+		'stats_cache_biometrics_metrics',
+		rpcParamsList,
+		logContext
 	);
-	const birdAgeRows = await runStatsCacheDbCall(
-		'stats_cache_bird_age_metrics RPC',
-		logContext,
-		() =>
-			fetchMetricRows<BirdAgeMetricsRow>(
-				supabaseClient,
-				'stats_cache_bird_age_metrics',
-				rpcParamsList
-			)
+	const birdAgeRows = await fetchMetricRows<BirdAgeMetricsRow>(
+		supabaseClient,
+		'stats_cache_bird_age_metrics',
+		rpcParamsList,
+		logContext
 	);
-	const encounterAgeRows = await runStatsCacheDbCall(
-		'stats_cache_encounter_age_metrics RPC',
-		logContext,
-		() =>
-			fetchMetricRows<EncounterAgeMetricsRow>(
-				supabaseClient,
-				'stats_cache_encounter_age_metrics',
-				rpcParamsList
-			)
+	const encounterAgeRows = await fetchMetricRows<EncounterAgeMetricsRow>(
+		supabaseClient,
+		'stats_cache_encounter_age_metrics',
+		rpcParamsList,
+		logContext
 	);
 
 	const { mergedRows, anomalies } = mergeSimpleMetricRows({
@@ -1123,32 +1208,26 @@ export async function runSimpleStatsCacheRefreshPass(
 		SIMPLE_NARROWING_TEMPORAL_UNITS
 	);
 
+	// Each chunked `.upsert()` call logs itself (table + its own chunk's row
+	// count) inside the writer functions — see their docblocks for why that
+	// has to be at the per-chunk granularity rather than wrapped once here.
 	if (groupBySpecies) {
-		await runStatsCacheDbCall(
-			'SimpleStatsCacheBySpecies upsert',
-			logContext,
-			() =>
-				writeBySpeciesRows(
-					supabaseClient,
-					'SimpleStatsCacheBySpecies',
-					filterToTouchedSpecies(rowsToWrite, speciesIds),
-					{ groupId, temporalUnit }
-				)
+		await writeBySpeciesRows(
+			supabaseClient,
+			'SimpleStatsCacheBySpecies',
+			filterToTouchedSpecies(rowsToWrite, speciesIds),
+			logContext
 		);
 	} else {
-		await runStatsCacheDbCall('SimpleStatsCache upsert', logContext, () =>
-			writeAllSpeciesRows(supabaseClient, 'SimpleStatsCache', rowsToWrite, {
-				groupId,
-				temporalUnit
-			})
+		await writeAllSpeciesRows(
+			supabaseClient,
+			'SimpleStatsCache',
+			rowsToWrite,
+			logContext
 		);
 	}
 
-	await runStatsCacheDbCall(
-		'FailedStatsCacheRefreshes insert',
-		logContext,
-		() => deadLetterAnomalies(supabaseClient, anomalies)
-	);
+	await deadLetterAnomalies(supabaseClient, anomalies, logContext);
 }
 
 /**

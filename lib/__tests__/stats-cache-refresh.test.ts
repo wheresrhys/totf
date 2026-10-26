@@ -6,6 +6,18 @@ import {
 	batchPeriodsBySessionDateSpan
 } from '../stats-cache-refresh';
 
+// Every DB call now logs a `console.log` on success (#1198-ish — structured
+// DB-call logging). Silenced by default so the ordinary success path across
+// this whole file stays quiet; the `'DB-call logging'` describe below spies
+// on it locally (overriding this) wherever a test actually asserts on it.
+let defaultConsoleLogSpy: ReturnType<typeof vi.spyOn>;
+beforeEach(() => {
+	defaultConsoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+});
+afterEach(() => {
+	defaultConsoleLogSpy.mockRestore();
+});
+
 type BasicRow =
 	Database['public']['CompositeTypes']['stats_cache_basic_session_metrics_result'];
 type BiometricsRow =
@@ -111,26 +123,51 @@ function resultThenable<Result>(result: Result) {
  * all-species-combined sibling) and the `.insert()` of dead-lettered
  * anomalies into `FailedStatsCacheRefreshes` (#1167). `upsertError` lets a
  * test make the cache write fail.
+ *
+ * `rpcErrorsByName` lets a test make a metric RPC read fail instead — a flat
+ * error object fails every call to that RPC name, a function of the call's
+ * own params (same flat-value-or-function shape as `MockRpcResponse` above)
+ * fails only the calls it returns an error object for, leaving a sibling call
+ * to the same RPC name (e.g. a different `day`-unit batch window) to succeed.
  */
 type RpcParams = Record<string, unknown>;
 type MockRpcResponse<Row> = Row[] | ((params: RpcParams) => Row[]);
+type MockRpcError =
+	| { message: string }
+	| ((params: RpcParams) => { message: string } | null);
 
 function makeRpcMockClient(
 	responsesByRpcName: Record<string, MockRpcResponse<unknown>>,
 	{
 		upsertError,
+		rpcErrorsByName = {},
 		sessionsVisitDates = []
-	}: { upsertError?: { message: string }; sessionsVisitDates?: string[] } = {}
+	}: {
+		upsertError?: { message: string };
+		rpcErrorsByName?: Record<string, MockRpcError>;
+		sessionsVisitDates?: string[];
+	} = {}
 ) {
 	const rpc = vi.fn((name: string, params: RpcParams) => ({
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) => {
+		then: (
+			resolve: (v: {
+				data: unknown;
+				error: { message: string } | null;
+			}) => unknown
+		) => {
 			const response = responsesByRpcName[name];
+			const errorSource = rpcErrorsByName[name];
+			const error =
+				typeof errorSource === 'function'
+					? errorSource(params)
+					: (errorSource ?? null);
 			return Promise.resolve({
-				data:
-					typeof response === 'function'
+				data: error
+					? null
+					: typeof response === 'function'
 						? response(params)
 						: (response ?? null),
-				error: null
+				error
 			}).then(resolve);
 		}
 	}));
@@ -187,13 +224,15 @@ function makeSimpleMockSupabaseClient({
 	biometrics = [],
 	birdAge = [],
 	encounterAge = [],
-	sessionsVisitDates = []
+	sessionsVisitDates = [],
+	rpcErrorsByName = {}
 }: {
 	basic?: MockRpcResponse<BasicRow>;
 	biometrics?: MockRpcResponse<BiometricsRow>;
 	birdAge?: MockRpcResponse<BirdAgeRow>;
 	encounterAge?: MockRpcResponse<EncounterAgeRow>;
 	sessionsVisitDates?: string[];
+	rpcErrorsByName?: Record<string, MockRpcError>;
 }) {
 	return makeRpcMockClient(
 		{
@@ -202,7 +241,7 @@ function makeSimpleMockSupabaseClient({
 			stats_cache_bird_age_metrics: birdAge,
 			stats_cache_encounter_age_metrics: encounterAge
 		},
-		{ sessionsVisitDates }
+		{ sessionsVisitDates, rpcErrorsByName }
 	);
 }
 
@@ -1260,6 +1299,226 @@ describe('refreshSimpleStatsCache', () => {
 			);
 
 			consoleErrorSpy.mockRestore();
+		});
+	});
+
+	describe('DB-call logging', () => {
+		let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+		let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+		beforeEach(() => {
+			consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+			consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		});
+
+		afterEach(() => {
+			consoleLogSpy.mockRestore();
+			consoleErrorSpy.mockRestore();
+		});
+
+		describe('successful calls', () => {
+			it('logs the Sessions select on success, for a day-unit pass with periods', async () => {
+				const client = makeSimpleMockSupabaseClient({
+					basic: [basicRow()],
+					biometrics: [biometricsRow()],
+					birdAge: [birdAgeRow()],
+					encounterAge: [encounterAgeRow()],
+					sessionsVisitDates: ['2026-03-01']
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'day',
+					periods: ['2026-03-01']
+				});
+
+				expect(consoleLogSpy).toHaveBeenCalledWith(
+					expect.stringContaining('Sessions select'),
+					expect.objectContaining({ groupId: GROUP_ID, temporalUnit: 'day' })
+				);
+			});
+
+			it('logs each metric RPC call on success, with its own rpcParams', async () => {
+				const client = makeSimpleMockSupabaseClient({
+					basic: [basicRow()],
+					biometrics: [biometricsRow()],
+					birdAge: [birdAgeRow()],
+					encounterAge: [encounterAgeRow()]
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-03-01']
+				});
+
+				expect(consoleLogSpy).toHaveBeenCalledWith(
+					expect.stringContaining('stats_cache_basic_session_metrics RPC'),
+					expect.objectContaining({
+						rpcParams: expect.objectContaining({
+							ringing_group_filter: GROUP_ID,
+							group_by_species: true
+						})
+					})
+				);
+			});
+
+			it("logs each upsert chunk on success, with the table name and that chunk's row count", async () => {
+				const dates = Array.from(
+					{ length: DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE + 1 },
+					(_, i) => dateAtOffset(i)
+				);
+				const client = makeSimpleMockSupabaseClient({
+					basic: dates.map((time_period) => basicRow({ time_period })),
+					biometrics: dates.map((time_period) =>
+						biometricsRow({ time_period })
+					),
+					birdAge: dates.map((time_period) => birdAgeRow({ time_period })),
+					encounterAge: dates.map((time_period) =>
+						encounterAgeRow({ time_period })
+					)
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'day',
+					periods: dates
+				});
+
+				expect(consoleLogSpy).toHaveBeenCalledWith(
+					expect.stringContaining('SimpleStatsCacheBySpecies upsert'),
+					expect.objectContaining({
+						rowCount: DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE
+					})
+				);
+				expect(consoleLogSpy).toHaveBeenCalledWith(
+					expect.stringContaining('SimpleStatsCacheBySpecies upsert'),
+					expect.objectContaining({ rowCount: 1 })
+				);
+			});
+
+			it('logs the FailedStatsCacheRefreshes insert on success, with the anomaly row count', async () => {
+				const client = makeSimpleMockSupabaseClient({
+					basic: [basicRow({ species_id: 1 }), basicRow({ species_id: 2 })],
+					biometrics: [biometricsRow({ species_id: 1 })],
+					birdAge: [
+						birdAgeRow({ species_id: 1 }),
+						birdAgeRow({ species_id: 2 })
+					],
+					encounterAge: [
+						encounterAgeRow({ species_id: 1 }),
+						encounterAgeRow({ species_id: 2 })
+					]
+				});
+
+				await refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'day',
+					periods: ['2026-03-01']
+				});
+
+				expect(consoleLogSpy).toHaveBeenCalledWith(
+					expect.stringContaining('FailedStatsCacheRefreshes insert'),
+					expect.objectContaining({ rowCount: 1 })
+				);
+			});
+		});
+
+		describe('failed calls', () => {
+			it("logs an upsert chunk failure with that chunk's own row count, not the pass's total", async () => {
+				const dates = Array.from(
+					{ length: DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE + 1 },
+					(_, i) => dateAtOffset(i)
+				);
+				const client = makeRpcMockClient(
+					{
+						stats_cache_basic_session_metrics: dates.map((time_period) =>
+							basicRow({ time_period })
+						),
+						stats_cache_biometrics_metrics: dates.map((time_period) =>
+							biometricsRow({ time_period })
+						),
+						stats_cache_bird_age_metrics: dates.map((time_period) =>
+							birdAgeRow({ time_period })
+						),
+						stats_cache_encounter_age_metrics: dates.map((time_period) =>
+							encounterAgeRow({ time_period })
+						)
+					},
+					{ upsertError: { message: 'duplicate key value' } }
+				);
+
+				await expect(
+					refreshSimpleStatsCache(client as never, {
+						groupId: GROUP_ID,
+						temporalUnit: 'day',
+						periods: dates
+					})
+				).rejects.toThrow();
+
+				expect(consoleErrorSpy).toHaveBeenCalledWith(
+					expect.stringContaining('SimpleStatsCacheBySpecies upsert'),
+					expect.objectContaining({
+						rowCount: DEFAULT_STATS_CACHE_WRITE_CHUNK_SIZE
+					}),
+					expect.any(Error)
+				);
+			});
+
+			it('logs a metric RPC failure with its own rpcName and rpcParams', async () => {
+				const client = makeRpcMockClient(
+					{
+						stats_cache_biometrics_metrics: [biometricsRow()],
+						stats_cache_bird_age_metrics: [birdAgeRow()],
+						stats_cache_encounter_age_metrics: [encounterAgeRow()]
+					},
+					{
+						rpcErrorsByName: {
+							stats_cache_basic_session_metrics: {
+								message: 'statement timeout'
+							}
+						}
+					}
+				);
+
+				await expect(
+					refreshSimpleStatsCache(client as never, {
+						groupId: GROUP_ID,
+						temporalUnit: 'month',
+						periods: ['2026-03-01']
+					})
+				).rejects.toThrow('Failed to fetch data: statement timeout');
+
+				expect(consoleErrorSpy).toHaveBeenCalledWith(
+					expect.stringContaining('stats_cache_basic_session_metrics RPC'),
+					expect.objectContaining({
+						rpcParams: expect.objectContaining({
+							ringing_group_filter: GROUP_ID
+						})
+					}),
+					expect.any(Error)
+				);
+			});
+		});
+
+		it('does not log an insert call when there are no anomalies to dead-letter', async () => {
+			const client = makeSimpleMockSupabaseClient({
+				basic: [basicRow()],
+				biometrics: [biometricsRow()],
+				birdAge: [birdAgeRow()],
+				encounterAge: [encounterAgeRow()]
+			});
+
+			await refreshSimpleStatsCache(client as never, {
+				groupId: GROUP_ID,
+				temporalUnit: 'day',
+				periods: ['2026-03-01']
+			});
+
+			expect(consoleLogSpy).not.toHaveBeenCalledWith(
+				expect.stringContaining('FailedStatsCacheRefreshes insert'),
+				expect.anything()
+			);
 		});
 	});
 
