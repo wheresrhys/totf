@@ -83,6 +83,13 @@ export type RefreshSimpleStatsCacheParams = RefreshSpeciesNarrowing & {
 	 * full-replaces the whole group history regardless of what's passed.
 	 */
 	periods?: string[];
+	/**
+	 * The import job this refresh was dispatched for, carried only for
+	 * `runStatsCacheDbCall`'s failure-log context — not read by any refresh
+	 * logic itself. Optional since most callers (every test, the debug
+	 * script) have no import job at all.
+	 */
+	importJobId?: number;
 };
 
 type BasicSessionMetricsRow =
@@ -406,6 +413,32 @@ function buildSimpleMetricRpcParamsList(
 		...unwindowedMetricRpcParams(groupId, temporalUnit, groupBySpecies),
 		...exactPeriodFilters(temporalUnit, periodString)
 	}));
+}
+
+/**
+ * Runs one DB call inside a `refreshSimpleStatsCache` pass, logging exactly
+ * which call failed plus the whole pass's refresh context before letting the
+ * original error propagate **unchanged** — same object, same message, so
+ * `catchSupabaseErrors`'s own message and any `rejects.toThrow(...)` test
+ * keep working untouched. A bare `catchSupabaseErrors` error on its own names
+ * neither which of the 6 DB touchpoints in a pass failed nor which pass
+ * (`groupBySpecies`) it was; that's the gap this closes.
+ */
+async function runStatsCacheDbCall<T>(
+	dbCall: string,
+	context: Record<string, unknown>,
+	fn: () => Promise<T>
+): Promise<T> {
+	try {
+		return await fn();
+	} catch (error) {
+		console.error(
+			`Stats-cache refresh DB call failed: ${dbCall}`,
+			context,
+			error
+		);
+		throw error;
+	}
 }
 
 /**
@@ -857,10 +890,24 @@ function mergeSimpleMetricRows({
  */
 async function runSimpleStatsCacheRefreshPass(
 	supabaseClient: SupabaseClient,
-	{ groupId, temporalUnit, periods, speciesIds }: RefreshSimpleStatsCacheParams,
+	{
+		groupId,
+		temporalUnit,
+		periods,
+		speciesIds,
+		importJobId
+	}: RefreshSimpleStatsCacheParams,
 	groupBySpecies: boolean
 ): Promise<void> {
 	const touchedPeriods = periods ?? [];
+	const logContext = {
+		importJobId,
+		groupId,
+		temporalUnit,
+		groupBySpecies,
+		periods,
+		speciesIds
+	};
 
 	const rpcParamsList = buildSimpleMetricRpcParamsList(
 		groupId,
@@ -872,25 +919,45 @@ async function runSimpleStatsCacheRefreshPass(
 		// Narrowing temporal unit, nothing touched this pass — nothing to refresh.
 		return;
 	}
-	const basicRows = await fetchMetricRows<BasicSessionMetricsRow>(
-		supabaseClient,
-		'stats_cache_basic_session_metrics',
-		rpcParamsList
+	const basicRows = await runStatsCacheDbCall(
+		'stats_cache_basic_session_metrics RPC',
+		logContext,
+		() =>
+			fetchMetricRows<BasicSessionMetricsRow>(
+				supabaseClient,
+				'stats_cache_basic_session_metrics',
+				rpcParamsList
+			)
 	);
-	const biometricsRows = await fetchMetricRows<BiometricsMetricsRow>(
-		supabaseClient,
-		'stats_cache_biometrics_metrics',
-		rpcParamsList
+	const biometricsRows = await runStatsCacheDbCall(
+		'stats_cache_biometrics_metrics RPC',
+		logContext,
+		() =>
+			fetchMetricRows<BiometricsMetricsRow>(
+				supabaseClient,
+				'stats_cache_biometrics_metrics',
+				rpcParamsList
+			)
 	);
-	const birdAgeRows = await fetchMetricRows<BirdAgeMetricsRow>(
-		supabaseClient,
-		'stats_cache_bird_age_metrics',
-		rpcParamsList
+	const birdAgeRows = await runStatsCacheDbCall(
+		'stats_cache_bird_age_metrics RPC',
+		logContext,
+		() =>
+			fetchMetricRows<BirdAgeMetricsRow>(
+				supabaseClient,
+				'stats_cache_bird_age_metrics',
+				rpcParamsList
+			)
 	);
-	const encounterAgeRows = await fetchMetricRows<EncounterAgeMetricsRow>(
-		supabaseClient,
-		'stats_cache_encounter_age_metrics',
-		rpcParamsList
+	const encounterAgeRows = await runStatsCacheDbCall(
+		'stats_cache_encounter_age_metrics RPC',
+		logContext,
+		() =>
+			fetchMetricRows<EncounterAgeMetricsRow>(
+				supabaseClient,
+				'stats_cache_encounter_age_metrics',
+				rpcParamsList
+			)
 	);
 
 	const { mergedRows, anomalies } = mergeSimpleMetricRows({
@@ -916,20 +983,31 @@ async function runSimpleStatsCacheRefreshPass(
 	);
 
 	if (groupBySpecies) {
-		await writeBySpeciesRows(
-			supabaseClient,
-			'SimpleStatsCacheBySpecies',
-			filterToTouchedSpecies(rowsToWrite, speciesIds),
-			{ groupId, temporalUnit }
+		await runStatsCacheDbCall(
+			'SimpleStatsCacheBySpecies upsert',
+			logContext,
+			() =>
+				writeBySpeciesRows(
+					supabaseClient,
+					'SimpleStatsCacheBySpecies',
+					filterToTouchedSpecies(rowsToWrite, speciesIds),
+					{ groupId, temporalUnit }
+				)
 		);
 	} else {
-		await writeAllSpeciesRows(supabaseClient, 'SimpleStatsCache', rowsToWrite, {
-			groupId,
-			temporalUnit
-		});
+		await runStatsCacheDbCall('SimpleStatsCache upsert', logContext, () =>
+			writeAllSpeciesRows(supabaseClient, 'SimpleStatsCache', rowsToWrite, {
+				groupId,
+				temporalUnit
+			})
+		);
 	}
 
-	await deadLetterAnomalies(supabaseClient, anomalies);
+	await runStatsCacheDbCall(
+		'FailedStatsCacheRefreshes insert',
+		logContext,
+		() => deadLetterAnomalies(supabaseClient, anomalies)
+	);
 }
 
 /**

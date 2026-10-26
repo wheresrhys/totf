@@ -891,6 +891,46 @@ describe('refreshSimpleStatsCache', () => {
 				// The message catchSupabaseErrors wraps a PostgREST error in.
 			).rejects.toThrow('Failed to fetch data: duplicate key value');
 		});
+
+		it('logs which DB call failed alongside the whole pass context, before propagating', async () => {
+			const consoleErrorSpy = vi
+				.spyOn(console, 'error')
+				.mockImplementation(() => {});
+			const client = makeRpcMockClient(
+				{
+					stats_cache_basic_session_metrics: [basicRow()],
+					stats_cache_biometrics_metrics: [biometricsRow()],
+					stats_cache_bird_age_metrics: [birdAgeRow()],
+					stats_cache_encounter_age_metrics: [encounterAgeRow()]
+				},
+				{ upsertError: { message: 'duplicate key value' } }
+			);
+
+			await expect(
+				refreshSimpleStatsCache(client as never, {
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					periods: ['2026-03-01'],
+					importJobId: 55
+				})
+			).rejects.toThrow();
+
+			// The species-grouped pass runs first, so its upsert is the one that
+			// fails — naming it, not a generic "write failed", is the point.
+			expect(consoleErrorSpy).toHaveBeenCalledWith(
+				expect.stringContaining('SimpleStatsCacheBySpecies upsert'),
+				expect.objectContaining({
+					importJobId: 55,
+					groupId: GROUP_ID,
+					temporalUnit: 'month',
+					groupBySpecies: true,
+					periods: ['2026-03-01']
+				}),
+				expect.any(Error)
+			);
+
+			consoleErrorSpy.mockRestore();
+		});
 	});
 
 	describe('chunking large writes', () => {

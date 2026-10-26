@@ -206,7 +206,8 @@ describe('processStatsCacheRefreshWindowJob', () => {
 			groupId: GROUP_ID,
 			temporalUnit: 'year',
 			periods: ['2024-01-01'],
-			speciesIds: []
+			speciesIds: [],
+			importJobId: IMPORT_JOB_ID
 		});
 	});
 
@@ -222,9 +223,10 @@ describe('processStatsCacheRefreshWindowJob', () => {
 		);
 	});
 
-	it.skip("marks the temporal unit's ImportJobs column failed, and logs the error with importJobId/groupId/temporalUnit and the cache table that went stale, when refreshSimpleStatsCache rejects", async () => {
-		const refreshError = new Error('simple refresh blew up');
-		refreshSimpleStatsCache.mockRejectedValue(refreshError);
+	it("marks the temporal unit's ImportJobs column failed when refreshSimpleStatsCache rejects", async () => {
+		refreshSimpleStatsCache.mockRejectedValue(
+			new Error('simple refresh blew up')
+		);
 
 		await processStatsCacheRefreshWindowJob(
 			statsCacheRefreshEvent({ groupByTimePeriod: 'month-squashed' })
@@ -234,16 +236,6 @@ describe('processStatsCacheRefreshWindowJob', () => {
 			IMPORT_JOB_ID,
 			'month-squashed',
 			'failed'
-		);
-		expect(consoleErrorSpy).toHaveBeenCalledWith(
-			expect.any(String),
-			{
-				importJobId: IMPORT_JOB_ID,
-				groupId: GROUP_ID,
-				temporalUnit: 'month-squashed',
-				cacheTable: 'SimpleStatsCache'
-			},
-			refreshError
 		);
 	});
 
