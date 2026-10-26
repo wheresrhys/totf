@@ -312,9 +312,95 @@ function unwindowedMetricRpcParams(
 }
 
 /**
- * Builds the shared filter object passed to every metric RPC of one cache's
- * single temporal-unit invocation. `narrowingTemporalUnits` is the calling
- * cache's own narrowing rule — `SIMPLE_NARROWING_TEMPORAL_UNITS` or
+ * Batch-size cap for the `day` unit's `from_date`/`to_date` window(s) — see
+ * `batchPeriodsBySessionDateSpan`. Counts REAL session dates a window may
+ * span, not touched periods: a batch of 2 widely-separated touched periods
+ * (e.g. a group's very first and very last session ever) would still produce
+ * an all-history-spanning window if capped by period count alone, which is
+ * exactly the failure mode this batching exists to avoid. Only the
+ * `groupBySpecies: true` pass is tunable via env var, per the narrower
+ * writer's own request — the `false` pass is hardcoded.
+ */
+const DEFAULT_DAY_BATCH_SIZE_BY_SPECIES = 50;
+const DAY_BATCH_SIZE_NOT_BY_SPECIES = 200;
+
+function dayBatchSize(groupBySpecies: boolean): number {
+	if (!groupBySpecies) {
+		return DAY_BATCH_SIZE_NOT_BY_SPECIES;
+	}
+	const envValue = Number(process.env.STATS_CACHE_REFRESH_DAY_BATCH_SIZE);
+	// `envValue > 0` rejects unset/blank/non-numeric/zero/negative all at
+	// once — important since a zero-or-negative batch size would make the
+	// loop below never advance `batchStartIndex` past the first period.
+	return envValue > 0 ? envValue : DEFAULT_DAY_BATCH_SIZE_BY_SPECIES;
+}
+
+/**
+ * Splits `periods` into batches such that each batch's first and last period
+ * are at most `batchSize` REAL session dates apart in `groupSessionDates`
+ * (the group's full, sorted list of distinct `Sessions.visit_date` values) —
+ * not at most `batchSize` *periods* apart. This is what makes two
+ * widely-spaced touched periods (e.g. a group's very first and very last
+ * session ever) split into two separate single-period batches rather than
+ * one batch whose `from_date`/`to_date` spans the group's entire history: by
+ * period count alone they're "only 2 items", but their index-distance in the
+ * real session-date list is everything, which is exactly what this function
+ * checks instead.
+ *
+ * Sorts `periods` itself (lexicographic `yyyy-MM-dd` sort is chronological —
+ * same convention `buildMetricRpcParams` already relied on). A period with no
+ * matching entry in `groupSessionDates` gets its own standalone batch rather
+ * than crashing or being silently dropped — defensive only: every real `day`
+ * period is an import's affected date, which by construction has a matching
+ * `Sessions` row for the group (see `lib/stats-cache-refresh-events.ts`), but
+ * nothing enforces that invariant from this function's own side.
+ */
+export function batchPeriodsBySessionDateSpan(
+	periods: string[],
+	groupSessionDates: string[],
+	batchSize: number
+): string[][] {
+	const sortedPeriods = [...periods].sort();
+	const indexByDate = new Map(
+		groupSessionDates.map((date, index) => [date, index])
+	);
+
+	const batches: string[][] = [];
+	let currentBatch: string[] = [];
+	let batchStartIndex = -1;
+
+	for (const period of sortedPeriods) {
+		const index = indexByDate.get(period);
+		if (index === undefined) {
+			if (currentBatch.length > 0) {
+				batches.push(currentBatch);
+			}
+			batches.push([period]);
+			currentBatch = [];
+			batchStartIndex = -1;
+			continue;
+		}
+		if (currentBatch.length === 0) {
+			currentBatch = [period];
+			batchStartIndex = index;
+		} else if (index - batchStartIndex < batchSize) {
+			currentBatch.push(period);
+		} else {
+			batches.push(currentBatch);
+			currentBatch = [period];
+			batchStartIndex = index;
+		}
+	}
+	if (currentBatch.length > 0) {
+		batches.push(currentBatch);
+	}
+	return batches;
+}
+
+/**
+ * Builds the shared filter object(s) passed to every metric RPC of one
+ * cache's single temporal-unit invocation. `narrowingTemporalUnits` is the
+ * calling cache's own narrowing rule — `SIMPLE_NARROWING_TEMPORAL_UNITS` or
  * `COMPLEX_NARROWING_TEMPORAL_UNITS` — which is the only thing that differs
  * between the two callers.
  *
@@ -328,14 +414,22 @@ function unwindowedMetricRpcParams(
  * caches. `refreshSimpleStatsCache` peels `month`/`year` off into
  * `buildSimpleMetricRpcParamsList`'s exact-filter fan-out before calling this
  * (#1176), and `COMPLEX_NARROWING_TEMPORAL_UNITS` never contained them.
+ *
+ * Returns a LIST, one object per batch `batchPeriodsBySessionDateSpan`
+ * produces, rather than a single object spanning the whole `periods` range —
+ * see that function's own doc comment for why a single min/max window is
+ * unsafe for a sparse `periods` list. `groupSessionDates` is only consulted
+ * for a narrowing temporal unit with periods to batch; the non-narrowing
+ * (`all-time`) branch ignores it entirely.
  */
 function buildMetricRpcParams(
 	groupId: number,
 	temporalUnit: TemporalUnit,
 	periods: string[],
+	groupSessionDates: string[],
 	narrowingTemporalUnits: ReadonlySet<TemporalUnit>,
 	groupBySpecies: boolean
-): MetricRpcParams | null {
+): MetricRpcParams[] | null {
 	const unwindowedParams = unwindowedMetricRpcParams(
 		groupId,
 		temporalUnit,
@@ -345,38 +439,36 @@ function buildMetricRpcParams(
 	if (!narrowingTemporalUnits.has(temporalUnit)) {
 		// Always full-replace, over the group's whole history (no from_date/
 		// to_date), with the `periods` argument ignored entirely.
-		return unwindowedParams;
+		return [unwindowedParams];
 	}
 
 	if (periods.length === 0) {
 		return null;
 	}
 
-	// `yyyy-MM-dd`-shaped period strings sort lexicographically in date order
-	// (same convention as `app/lib/supabase/temporal-filter.ts`'s
-	// `laterDateBound`/`earlierDateBound`), so min/max is a plain sort.
-	const sortedPeriods = [...periods].sort();
-	const minPeriod = sortedPeriods[0];
-	const maxPeriod = sortedPeriods[sortedPeriods.length - 1];
+	const batches = batchPeriodsBySessionDateSpan(
+		periods,
+		groupSessionDates,
+		dayBatchSize(groupBySpecies)
+	);
 
-	// Both bounds are a period string verbatim: for the one unit that still
-	// narrows by window — `day` — a period string already *is* a date, so it
-	// is both its own first and its own last day. The `month`/`year` case this
-	// used to extend to the end of `max(periods)`'s period (#1173) no longer
-	// reaches here at all; it is exact-filtered instead (#1176).
-	return {
+	// Each batch's bounds are a period string verbatim: for the one unit that
+	// still narrows by window — `day` — a period string already *is* a date,
+	// so a single-period batch is both its own first and its own last day.
+	return batches.map((batch) => ({
 		...unwindowedParams,
-		from_date: minPeriod,
-		to_date: maxPeriod
-	};
+		from_date: batch[0],
+		to_date: batch[batch.length - 1]
+	}));
 }
 
 /**
  * Every metric-RPC filter object one `refreshSimpleStatsCache` pass needs, in
  * call order — a list because `month`/`year`/`month-squashed` fan out to one
- * exact-filtered call per distinct touched period (#1176/#1178), while `day`
- * and `all-time` stay on the single object `buildMetricRpcParams` has always
- * produced.
+ * exact-filtered call per distinct touched period (#1176/#1178), and `day`
+ * fans out to one call per real-session-date-span batch
+ * (`batchPeriodsBySessionDateSpan`). Only `all-time` stays on the single
+ * unwindowed object `buildMetricRpcParams` always produces for it.
  *
  * Returns `null` on the same "nothing to refresh" condition that function does:
  * a narrowing temporal unit with no touched periods.
@@ -385,17 +477,18 @@ function buildSimpleMetricRpcParamsList(
 	groupId: number,
 	temporalUnit: TemporalUnit,
 	periods: string[],
+	groupSessionDates: string[],
 	groupBySpecies: boolean
 ): MetricRpcParams[] | null {
 	if (!isExactFilterTemporalUnit(temporalUnit)) {
-		const windowedParams = buildMetricRpcParams(
+		return buildMetricRpcParams(
 			groupId,
 			temporalUnit,
 			periods,
+			groupSessionDates,
 			SIMPLE_NARROWING_TEMPORAL_UNITS,
 			groupBySpecies
 		);
-		return windowedParams === null ? null : [windowedParams];
 	}
 
 	// A period can legitimately repeat in `periods` (several affected dates
@@ -413,6 +506,28 @@ function buildSimpleMetricRpcParamsList(
 		...unwindowedMetricRpcParams(groupId, temporalUnit, groupBySpecies),
 		...exactPeriodFilters(temporalUnit, periodString)
 	}));
+}
+
+/**
+ * Every distinct `Sessions.visit_date` the group has, sorted ascending — the
+ * real-date domain `batchPeriodsBySessionDateSpan` indexes touched `day`
+ * periods into. Same `.from('Sessions').select('visit_date').eq(...)
+ * .order(...)` shape already used live in `app/(routes)/species/page.tsx`'s
+ * `fetchYears`. No `.distinct()` needed: `Sessions`' own
+ * `UNIQUE (visit_date, ringing_group_id)` constraint already guarantees one
+ * row per distinct date for a given group.
+ */
+async function fetchGroupSessionDates(
+	supabaseClient: SupabaseClient,
+	groupId: number
+): Promise<string[]> {
+	const rows = (await supabaseClient
+		.from('Sessions')
+		.select('visit_date')
+		.eq('ringing_group_id', groupId)
+		.order('visit_date', { ascending: true })
+		.then(catchSupabaseErrors)) as { visit_date: string }[] | null;
+	return (rows ?? []).map((row) => row.visit_date);
 }
 
 /**
@@ -849,10 +964,15 @@ function mergeSimpleMetricRows({
  * Every temporal unit but `all-time` narrows by `periods`, in two different
  * ways (see `buildSimpleMetricRpcParamsList`):
  *
- * - `day` calls each metric RPC once, over a `from_date`/`to_date` window
- *   spanning `min(periods)`..`max(periods)`, and the merged result is filtered
- *   down to just the periods actually touched before writing — that window can
- *   return extra untouched days inside the range.
+ * - `day` calls each metric RPC once per batch `batchPeriodsBySessionDateSpan`
+ *   produces — a preflight query (`fetchGroupSessionDates`) fetches the
+ *   group's real `Sessions.visit_date` list so each batch's `from_date`/
+ *   `to_date` window is bounded by real session-date span, not by touched-
+ *   period count (a sparse `periods` list — e.g. a group's very first and
+ *   very last session ever — would otherwise force one window spanning the
+ *   entire history). Each batch's window can still return extra untouched
+ *   days inside its own span, so the merged result is filtered down to just
+ *   the periods actually touched before writing.
  * - `month`/`year`/`month-squashed` call each metric RPC once *per distinct
  *   period*, with that period's exact `year_filter`/`month_filter` and no
  *   window at all (#1176; `month-squashed` since #1178, by `month_filter`
@@ -888,7 +1008,7 @@ function mergeSimpleMetricRows({
  * fresh row written to overwrite a stale one — an upsert can only ever
  * refresh cells the spine still produces. Out of scope for this ticket.
  */
-async function runSimpleStatsCacheRefreshPass(
+export async function runSimpleStatsCacheRefreshPass(
 	supabaseClient: SupabaseClient,
 	{
 		groupId,
@@ -909,10 +1029,31 @@ async function runSimpleStatsCacheRefreshPass(
 		speciesIds
 	};
 
+	// Only the `day` unit's window-narrowing batching needs the group's real
+	// session dates (see `batchPeriodsBySessionDateSpan`) — every other
+	// temporal unit ignores this list entirely, so skip the query rather than
+	// pay for it on every refresh pass. Fetched here (not in
+	// `refreshSimpleStatsCache`) so `runSimpleStatsCacheRefreshPass`'s own
+	// direct callers (e.g. `supabase/scripts/debug-stats-cache-refresh.ts`)
+	// get the same batching without going through the wrapper — at the cost
+	// of this query running twice per `refreshSimpleStatsCache` event (once
+	// per `groupBySpecies` pass) rather than once; accepted as simpler than
+	// threading a pre-fetched array through both functions' signatures for a
+	// single cheap indexed-column scan.
+	const groupSessionDates =
+		temporalUnit === 'day' && touchedPeriods.length > 0
+			? await runStatsCacheDbCall(
+					'Sessions visit_date preflight',
+					logContext,
+					() => fetchGroupSessionDates(supabaseClient, groupId)
+				)
+			: [];
+
 	const rpcParamsList = buildSimpleMetricRpcParamsList(
 		groupId,
 		temporalUnit,
 		touchedPeriods,
+		groupSessionDates,
 		groupBySpecies
 	);
 	if (rpcParamsList === null) {
