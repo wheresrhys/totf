@@ -77,6 +77,23 @@ the root layout, not a subtree one.
 - Errors from Supabase calls are handled via `catchSupabaseErrors()`.
 - RPC calls go through `.rpc('function_name', args)` on the Supabase client.
 - TypeScript types for DB rows come from `app/models/db.ts`, which re-exports from the auto-generated types. Types for a query's return shape (e.g. an embedded-relation select used by only one page) can live alongside the page/component that fetches and renders it instead, if not reused elsewhere.
+- **Period-local stats come from the cache tables, not the stats RPCs (#1208).**
+  `app/actions/stats-cache.ts` reads `SimpleStatsCache`/`SimpleStatsCacheBySpecies` — filtered by
+  `group_id` + `temporal_unit`, paginated through `fetchAllPaginatedRows` — rather than calling
+  `core_stats`/`biometrics_stats`, which redo the multi-way join the post-import refresh queue has
+  already materialized. The accepted tradeoff is a brief post-import staleness window while the
+  refresh queue catches up; there is deliberately no polling or fallback-to-live-RPC around it.
+  Three things to know before touching that file:
+  - `species_name` is a column on neither cache table. A by-species read resolves it through a
+    single embedded `.select('…, Species(species_name)')` and flattens it on; an ungrouped read
+    sets it `null`, matching what the RPCs returned for `group_by_species: false`.
+  - Ordering parent rows by that embedded name needs PostgREST's `.order('Species(species_name)')`
+    spelling. supabase-js' `.order('species_name', { referencedTable: 'Species' })` orders rows
+    _within_ the embed, which for a to-one relationship leaves the parent rows arbitrary — and both
+    pagination and the rule finders' stable tie-breaking depend on a total order.
+  - `cachedSupabaseFetch` (`app/lib/cached-supabase-fetch.ts`) survives for exactly one caller,
+    `fetchStatsSpines`: `stats_spine` has no cache-table equivalent. A table read needs no
+    version/TTL memo, so don't wrap a new one in it.
 - **Temporal filtering** of a direct `Encounters` table query goes through `applyTemporalFilter`
   (`app/lib/supabase/temporal-filter.ts`, #1075) — never hand-rolled `.gte`/`.lte` calls. It takes
   the standard `{fromDate, toDate, year, month}` filter (#1051, the same shape as the stats RPC

@@ -366,8 +366,8 @@ export async function getSpeciesArrivalsStats(
  * Group-wide (not species-filtered) monthly ringing-effort history for the
  * species page's Demographics/Biometrics tabs — effort is a property of a
  * session, not of the species caught in it, so this wraps
- * `fetchCoreStatsByMonth` (`app/actions/stats-cache.ts`, sharing its
- * `'month-core-stats'` cache namespace with `getStatsByTemporalUnit`) rather
+ * `fetchCoreStatsByMonth` (`app/actions/stats-cache.ts`, a `'month'` slice of
+ * the materialized `SimpleStatsCache` table) rather
  * than filtering by species. Shapes the raw `total_effort` interval into
  * fractional hours and pairs it with `time_period`, matching the
  * `[time_period, value]` tuple shape `YearComparisonTrendChart`'s existing
