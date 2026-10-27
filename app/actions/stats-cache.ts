@@ -32,12 +32,15 @@ export type GenericStatsCacheReadParams = {
 /**
  * Generic `SimpleStatsCache`/`SimpleStatsCacheBySpecies` row reader (#1233) —
  * the shared mechanism meant to replace every hand-rolled reader this repo
- * carries. #1236 moved every `stats-cache.ts` consumer onto it directly (or
- * via `readStatsCacheRowsForViewedGroup` below) and deleted this file's own
- * old column-subset machinery; `fetchSpeciesStatsCacheRows` in
- * `app/actions/sp-data.ts` (#1235) and `runStatsCacheRead` in
- * `app/lib/auth/group-summary-access.ts` (#1234) are each a separate
- * still-open follow-up ticket's own migration onto this function.
+ * used to carry. All three follow-up tickets that migrated onto it have now
+ * landed: `fetchSpeciesStatsCacheRows` in `app/actions/sp-data.ts` (#1235)
+ * and `runStatsCacheRead` in `app/lib/auth/group-summary-access.ts` (#1234)
+ * are each a thin adapter over this function, and #1236 moved every
+ * remaining `stats-cache.ts` consumer (the home page's summary stats, the
+ * Highlights pooled fetch via `readStatsCacheRowsForViewedGroup` below, and
+ * `SpDemographicsTab`'s effort history) onto it directly too, then deleted
+ * this file's now-dead old column-subset machinery
+ * (`getStatsCacheTableFetcher`/`getServerCachedStats`/`fetchCoreStatsByMonth`).
  *
  * Unlike a hand-picked column-subset reader, this one always `select('*')`s
  * — that's the entire point of generalising: a caller narrows the returned
