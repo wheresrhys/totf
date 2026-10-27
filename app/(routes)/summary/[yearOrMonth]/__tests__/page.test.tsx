@@ -32,6 +32,14 @@ vi.mock('@/app/actions/period-totals', () => ({
 	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
 }));
 
+// `fetchYears` (#1076) powers `TemporalFilterControls`' year dropdown on
+// every summary route depth — mocked here rather than pulling in the real
+// `getAuthenticatedSupabaseClient()` chain this page doesn't otherwise need.
+const fetchYearsMock = vi.fn().mockResolvedValue([]);
+vi.mock('@/app/(routes)/species/page', () => ({
+	fetchYears: (...args: unknown[]) => fetchYearsMock(...args)
+}));
+
 // Both branches of this route have a Highlights tab that generates highlights
 // on the client, on mount — mocked here so a `?tabId=highlights` render
 // doesn't reach the real stats pipeline.
@@ -59,6 +67,7 @@ describe('/summary/[yearOrMonth]', () => {
 		fetchPeriodTotalsMock.mockClear();
 		fetchPeriodTotalsMock.mockResolvedValue([]);
 		getHighlightsWithinTimeWindowMock.mockClear();
+		fetchYearsMock.mockClear();
 	});
 
 	it('renders "{year} summary" for a well-formed year', async () => {
