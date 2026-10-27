@@ -186,13 +186,15 @@ async function importChunkThroughWriter(
 	rows: DemonRow[],
 	groupClient: SupabaseClient,
 	lookupRingSequence: ReturnType<typeof vi.fn>,
-	groupId: number
+	groupId: number,
+	/** Defaults to one chunk holding every row; pass 1 to split them up. */
+	chunkSize: number = rows.length
 ): Promise<void> {
 	const writer = new EncounterRowBatchWriter(groupClient, {
 		ringingGroupId: groupId,
 		lookupRingSequence,
 		linkRingSequence: createRingSequenceLinker(groupClient),
-		chunkSize: rows.length
+		chunkSize
 	});
 	const written = rows.map((rowOfChunk) => writer.writeEncounterRow(rowOfChunk));
 	await writer.flushRemaining();
@@ -870,40 +872,142 @@ describe('demon-import — chunked multi-row upserts', () => {
 		).toBe(1);
 	});
 
-	it('writes one Encounters row, carrying the last row’s measurements, for a chunk holding the same bird/location/date twice', async () => {
-		const ringNo = `DEMON-TEST-${suffix}-chunk-dup`;
+	/**
+	 * The two halves of a same-run duplicate (#1219): one bird, one site, one
+	 * day, logged twice, each recording a measurement the other left blank. The
+	 * wrap-up pass in `flushRemaining` should leave a single Encounters row
+	 * holding the chronologically first row's `capture_time`/`weight` and the
+	 * later row's `wing_length`, whichever chunking the pair arrives in.
+	 */
+	function makeDuplicatePair(label: string) {
+		const ringNo = `DEMON-TEST-${suffix}-${label}`;
 		const sharedFields = {
 			ring_no: ringNo,
-			species_name: `DemonImportSpecies-${suffix}-chunk-dup`,
-			loc_id: `${locationName}-dup`,
+			species_name: `DemonImportSpecies-${suffix}-${label}`,
+			loc_id: `${locationName}-${label}`,
 			visit_date: toDemonDate(randomFutureDate())
 		};
+		return {
+			ringNo,
+			rows: [
+				makeRow({
+					...sharedFields,
+					capture_time: '08:30',
+					weight: '10.5',
+					wing_length: ''
+				}),
+				makeRow({
+					...sharedFields,
+					capture_time: '15:45',
+					weight: '12.3',
+					wing_length: '65'
+				})
+			]
+		};
+	}
 
-		// Deduped to one entry before the bulk upsert — Postgres would reject the
-		// statement outright otherwise. Last payload wins, which is what the old
-		// row-by-row upserts did when a later row updated an earlier row's key.
+	const storedEncounter = (ringNo: string) => ({
+		rowCount: psqlCount(
+			`SELECT COUNT(*) FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
+		),
+		weight: Number(
+			psqlScalar(
+				`SELECT e.weight FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
+			)
+		),
+		wingLength: Number(
+			psqlScalar(
+				`SELECT e.wing_length FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
+			)
+		),
+		captureTime: psqlScalar(
+			`SELECT e.capture_time FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
+		)
+	});
+
+	it('merges a chunk holding the same bird/location/date twice into one Encounters row', async () => {
+		const { ringNo, rows } = makeDuplicatePair('chunk-dup');
+
+		// The chunk's own bulk upsert still sees the pair deduped to the last
+		// payload — Postgres would reject the statement outright otherwise — and
+		// `flushRemaining`'s wrap-up pass then rewrites the row with the merge.
 		await importChunkThroughWriter(
-			[
-				makeRow({ ...sharedFields, weight: '10.5' }),
-				makeRow({ ...sharedFields, weight: '12.3' })
-			],
+			rows,
 			groupClient,
 			lookupRingSequence,
 			groupId
 		);
 
-		expect(
-			psqlCount(
-				`SELECT COUNT(*) FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
-			)
-		).toBe(1);
-		expect(
-			Number(
-				psqlScalar(
-					`SELECT e.weight FROM "Encounters" e JOIN "Birds" b ON b.id = e.bird_id WHERE b.ring_no = '${ringNo}';`
-				)
-			)
-		).toBeCloseTo(12.3);
+		const stored = storedEncounter(ringNo);
+		expect(stored.rowCount).toBe(1);
+		expect(stored.captureTime).toContain('08:30');
+		// The earliest row's own measurement, not the last-written one.
+		expect(stored.weight).toBeCloseTo(10.5);
+		// Filled in from the later duplicate, which recorded what the first left blank.
+		expect(stored.wingLength).toBe(65);
+	});
+
+	it('merges a duplicate pair split across two chunks to the same row as one chunk gives', async () => {
+		const { ringNo, rows } = makeDuplicatePair('cross-chunk-dup');
+
+		await importChunkThroughWriter(
+			rows,
+			groupClient,
+			lookupRingSequence,
+			groupId,
+			1
+		);
+
+		const stored = storedEncounter(ringNo);
+		expect(stored.rowCount).toBe(1);
+		expect(stored.captureTime).toContain('08:30');
+		expect(stored.weight).toBeCloseTo(10.5);
+		expect(stored.wingLength).toBe(65);
+	});
+
+	it('merges a duplicate pair split across two import runs, which only the stored row can reveal', async () => {
+		const { ringNo, rows } = makeDuplicatePair('cross-run-dup');
+
+		// A day's ringing uploaded as two CSVs, the bird's two captures landing in
+		// different halves — the second run's only sight of the first is the
+		// Encounters row already stored under the key it is about to write to.
+		for (const row of rows)
+			await importChunkThroughWriter(
+				[row],
+				groupClient,
+				lookupRingSequence,
+				groupId
+			);
+
+		const stored = storedEncounter(ringNo);
+		expect(stored.rowCount).toBe(1);
+		expect(stored.captureTime).toContain('08:30');
+		expect(stored.weight).toBeCloseTo(10.5);
+		expect(stored.wingLength).toBe(65);
+	});
+
+	it('re-importing one record with a corrected measurement overwrites it rather than merging', async () => {
+		const { ringNo, rows } = makeDuplicatePair('cross-run-correction');
+		const [originalRow] = rows;
+
+		await importChunkThroughWriter(
+			[originalRow],
+			groupClient,
+			lookupRingSequence,
+			groupId
+		);
+		// Same capture_time, so the same physical capture event rather than a
+		// second one: the corrected weight has to win over what's stored.
+		await importChunkThroughWriter(
+			[{ ...originalRow, weight: '11.8' }],
+			groupClient,
+			lookupRingSequence,
+			groupId
+		);
+
+		const stored = storedEncounter(ringNo);
+		expect(stored.rowCount).toBe(1);
+		expect(stored.weight).toBeCloseTo(11.8);
 	});
 
 	it('re-importing an identical chunk does not duplicate any row', async () => {
