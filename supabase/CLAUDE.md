@@ -433,6 +433,52 @@ Note: the deployed Vercel app gets its env directly, with
 `SUPABASE_JWT_ROLE=authenticated` set in the Vercel project settings, so production
 users are unaffected — groups can still import via the web UI.
 
+## Connection counts and client lifecycle (#1216)
+
+**A high, flat Postgres connection count after an import is expected, and app-side concurrency
+cannot change it.** This was investigated in #1216 after the #1192-#1199 stats-cache-refresh
+concurrency work appeared to leave connections open; it does not. Read this before trying to
+"fix" a connection count, and before adding a cache or a pool in front of `lib/supabase.ts`.
+
+- **App code holds no Postgres connections at all.** Every DB call in this repo goes over
+  PostgREST's HTTP API via `@supabase/supabase-js` (`lib/supabase.ts`). There is no `pg.Pool`
+  and no runtime Postgres connection string anywhere outside test/seed helpers, which shell out
+  to `psql` on port 54322 directly. So there is no app-side handle that could be left unclosed.
+- **The connections you see belong to PostgREST, and its pool is a hard ceiling.** PostgREST
+  opens its `db-pool` connections lazily under load and then **keeps them open and idle
+  indefinitely** — it has no shrink-back behaviour. Measured locally (`PGRST_DB_POOL` unset, so
+  the default 10): 4 `PostgREST` backends at rest, 11 after one refresh pass (10 pool + 1
+  `LISTEN` schema-cache connection), and still exactly 11 after bursts of 10, 40 and 120
+  concurrent RPC calls, and after 10 seconds idle. The plateau, not the climb, is what a healthy
+  system looks like. Repeating the whole import+refresh workload four times moved the total
+  client-backend count by **0**.
+- **`supabase/config.toml`'s `[db.pooler]` block is a red herring** for this question twice over:
+  it is `enabled = false`, and Supavisor only ever fronts *direct* Postgres connections (`psql`,
+  migrations), never the PostgREST API the app actually talks to.
+- **Realtime is unused** — nothing in this codebase calls `.channel()`/`.subscribe()`, and a
+  freshly minted client's realtime socket is verifiably unconnected — so a long-lived websocket
+  is ruled out as a source. The `supabase_mt_realtime` / `cluster_node_realtime` backends in
+  `pg_stat_activity` are the Supabase platform's own service, not this app's traffic.
+- **A per-request/per-queue-invocation client is cheap, by construction and by measurement.**
+  `app/lib/auth/group-auth.ts` mints a fresh client per call with no cache in front of it (an LRU
+  one existed until `b26dc8c1` removed it as redundant once the JWT came straight off the
+  cookie — `app/CLAUDE.md` described it as live for a while after that, wrongly). 200 clients
+  minted in one process added 0 DB backends. The queue consumer's "bypass" of that cache is
+  therefore irrelevant to connection counts, and reinstating a client cache would not reduce them.
+- **The one real per-client leak #1216 did find was not a DB connection.** supabase-js bundles a
+  `GoTrueClient` whose `autoRefreshToken` defaults to `true`, and on a non-browser platform that
+  unconditionally starts a 30-second `setInterval` session-refresh ticker nothing here ever
+  stops; the interval closes over the client, so each one stayed permanently reachable in a
+  long-lived server process (200 default-option clients → 200 live tickers). `lib/supabase.ts`
+  now passes `auth: { autoRefreshToken: false, persistSession: false }` on every client it
+  creates, which takes that to 0. This app never calls `.auth.*`, so keep any new `createClient`
+  call site going through `lib/supabase.ts` rather than constructing one with default options.
+
+To re-measure, correlate the structured per-DB-call log from #1198/#1199 against
+`select application_name, count(*) from pg_stat_activity where backend_type = 'client backend'
+group by 1`, sampled before, during and well after the workload — the before/after pair is what
+distinguishes a ratchet from a plateau, and a single during-the-burst reading proves nothing.
+
 ## Testing
 
 ### DB integration tests (`supabase/__tests__/`)

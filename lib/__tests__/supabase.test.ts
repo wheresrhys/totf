@@ -1,6 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { PostgrestSingleResponse } from '@supabase/supabase-js';
-import { fetchAllPaginatedRows } from '../supabase';
+import {
+	createClient,
+	type PostgrestSingleResponse
+} from '@supabase/supabase-js';
+import {
+	createSupabaseClientWithJwt,
+	fetchAllPaginatedRows
+} from '../supabase';
+
+// `createClient` is the single collaborator this module orchestrates, and the
+// only way to observe the options it hands over — a constructed client doesn't
+// expose them back.
+vi.mock('@supabase/supabase-js', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@supabase/supabase-js')>()),
+	createClient: vi.fn(() => ({}))
+}));
+const mockedCreateClient = vi.mocked(createClient);
 
 const PAGE_SIZE = 1000;
 
@@ -70,5 +85,38 @@ describe('fetchAllPaginatedRows', () => {
 		await expect(fetchAllPaginatedRows(buildPageQuery)).rejects.toThrow(
 			'Failed to fetch data: boom'
 		);
+	});
+});
+
+/**
+ * #1216: this app never calls `.auth.*` — it signs its own group JWTs — but
+ * supabase-js' bundled `GoTrueClient` defaults `autoRefreshToken` to `true`,
+ * which on a non-browser platform starts a 30-second `setInterval` nothing
+ * here ever stops. Since `createSupabaseClientWithJwt` is called per request
+ * with no cache in front of it, every client left at those defaults stays
+ * permanently reachable from its own timer. Asserted on the options rather
+ * than on a live client, because a constructed client doesn't expose them.
+ */
+describe('disabling the unused Supabase Auth session machinery', () => {
+	const noSessionAuthOptions = {
+		autoRefreshToken: false,
+		persistSession: false
+	};
+
+	it('creates the module-level anonymous client with no auto-refresh or session persistence', () => {
+		// Constructed at import time, so the recorded first call is the one.
+		expect(mockedCreateClient.mock.calls[0]?.[2]).toMatchObject({
+			auth: noSessionAuthOptions
+		});
+	});
+
+	it('creates a per-request JWT-scoped client with the same options alongside its Authorization header', () => {
+		createSupabaseClientWithJwt('a-signed-group-jwt');
+
+		const [, , options] = mockedCreateClient.mock.lastCall ?? [];
+		expect(options).toMatchObject({
+			auth: noSessionAuthOptions,
+			global: { headers: { Authorization: 'Bearer a-signed-group-jwt' } }
+		});
 	});
 });
