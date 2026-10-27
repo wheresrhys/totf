@@ -124,13 +124,29 @@ async function main() {
 	// Step 4: Import Beta CSV (GroupDataSharing must exist first so SHARED01 is accessible to Beta)
 	await seedImport('test-fixtures/csv/beta.csv', 'Beta');
 
-	// Step 5: Set group passwords
+	// Step 5: Opt Beta's summary into public, unauthenticated view (#1231).
+	// Beta rather than Alpha because Alpha is the group almost every other
+	// spec reads cross-group, and a public opt-in changes which
+	// `fetchAuthorisedCoreStats` branch serves those reads; Beta has real data
+	// of its own but is only ever read cross-group by Gamma. Delta is
+	// unsuitable — the @mutates import spec rewrites its rows.
+	//
+	// Via psql because RLS allows a group to UPDATE only its own row, and the
+	// step-1 INSERT can't carry it: that insert is skipped on a re-seed of an
+	// existing database (23505), so the opt-in would silently not apply.
+	execSync(
+		`psql "${LOCAL_DB_URL}" -c "UPDATE \\"RingingGroups\\" SET public_areas = ARRAY['summary']::TEXT[] WHERE id = ${betaId};"`,
+		{ stdio: 'inherit', cwd: ROOT }
+	);
+	console.log(`public_areas: Beta opted into public summary`);
+
+	// Step 6: Set group passwords
 	run(`npm run set-group-password:local -- "Alpha" "alphapassword"`);
 	run(`npm run set-group-password:local -- "Beta" "betapassword"`);
 	run(`npm run set-group-password:local -- "Gamma" "gammapassword"`);
 	run(`npm run set-group-password:local -- "Delta" "deltapassword"`);
 
-	// Step 6: Generate snapshot JSON fixtures
+	// Step 7: Generate snapshot JSON fixtures
 	await generateSnapshots(alphaId, betaId, gammaId);
 }
 
