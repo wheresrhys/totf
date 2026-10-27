@@ -1,10 +1,14 @@
+import { endOfMonth, endOfYear, format, parseISO } from 'date-fns';
 import {
 	BootstrapPage,
 	defaultGetParams
 } from '@/app/components/layout/BootstrapPage';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { fetchPageOfBirds } from '@/app/actions/sp-data';
+import {
+	fetchPageOfBirds,
+	fetchSpeciesStatsCacheRows
+} from '@/app/actions/sp-data';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import {
 	readTabIdSearchParam,
@@ -27,12 +31,7 @@ import {
 	buildSpeciesTotalsTabs
 } from './species-tabs';
 
-import {
-	mergeBiometricsFields,
-	type CoreStatsResult,
-	type CoreStatsWithBiometrics,
-	type BiometricsStatsResult
-} from '@/app/models/db';
+import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 type PageProps = {
@@ -53,11 +52,43 @@ async function getSpeciesPageParams(pageProps: PageProps): Promise<PageParams> {
 	return { speciesName, ...(tabId ? { tabId } : {}) };
 }
 
-// Fetches the species page's headline stats row, merging biometrics_stats'
-// wing/weight fields onto the core_stats row (#821). Both RPCs share the
-// same param shape and, called without group_by_species/group_by_time_period,
-// each return exactly one (ungrouped) row for this species/date-range/group,
-// so the two rows line up 1:1 without needing a join key.
+/**
+ * The sentinel year `stats_spine`'s `'month-squashed'` branch stamps on a
+ * squashed calendar month's `time_period` (`make_date(2000, m, 1)` — see
+ * `stats_spine.sql`), and so the year the cache tables store those cells
+ * under. `app/lib/auth/group-summary-access.ts`'s own
+ * `MONTH_SQUASHED_SENTINEL_YEAR` relies on the same convention; duplicated
+ * here rather than imported since that module is private to the group
+ * summary read path.
+ */
+const MONTH_SQUASHED_SENTINEL_YEAR = 2000;
+
+function isWholeCalendarYear(fromDate: string, toDate: string): boolean {
+	return (
+		fromDate.endsWith('-01-01') &&
+		toDate === format(endOfYear(parseISO(fromDate)), 'yyyy-MM-dd')
+	);
+}
+
+function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
+	return (
+		fromDate.endsWith('-01') &&
+		toDate === format(endOfMonth(parseISO(fromDate)), 'yyyy-MM-dd')
+	);
+}
+
+// Fetches the species page's headline stats row from the materialized
+// `SimpleStatsCacheBySpecies` table (#1222) — `fetchSpeciesStatsCacheRows`
+// (`sp-data.ts`) already returns the merged `CoreStatsWithBiometrics` shape
+// per row, so there is no separate biometrics_stats call/merge to do here any
+// more (see that file's own doc comment on `mergeBiometricsFields`'s one
+// remaining call site). `fromDate`/`toDate`/`monthFilter` are never a
+// genuinely arbitrary free-text range here — every caller of
+// `fetchSpeciesPageContentForPeriod` passes a `period` that's hardcoded per
+// route file (see `PageContent.tsx`'s `PeriodScope` doc comment): all-time (no
+// args), a whole calendar year, a whole calendar month, or a squashed-month
+// `monthFilter` with no date range — so each maps onto exactly one cache
+// grain/cell, with no arbitrary-window fallback needed.
 export async function getSpeciesStats(
 	species: string,
 	viewedGroup: ViewedGroup,
@@ -65,26 +96,45 @@ export async function getSpeciesStats(
 	toDate?: string,
 	monthFilter?: number
 ): Promise<CoreStatsWithBiometrics[]> {
-	const supabase = await getAuthenticatedSupabaseClient();
-	const rpcArgs = {
-		species_name_filter: species,
-		ringing_group_filter: viewedGroup.id,
-		...(fromDate ? { from_date: fromDate } : {}),
-		...(toDate ? { to_date: toDate } : {}),
-		...(monthFilter ? { month_filter: monthFilter } : {})
-	};
-	const [aggregateRows, biometricsRows] = await Promise.all([
-		supabase.rpc('core_stats', rpcArgs).then(catchSupabaseErrors) as Promise<
-			CoreStatsResult[]
-		>,
-		supabase
-			.rpc('biometrics_stats', rpcArgs)
-			.then(catchSupabaseErrors) as Promise<BiometricsStatsResult[]>
-	]);
-	const biometricsRow = biometricsRows[0];
-	return aggregateRows.map((aggregateRow) =>
-		mergeBiometricsFields(aggregateRow, biometricsRow)
-	);
+	if (fromDate && toDate && isWholeCalendarYear(fromDate, toDate)) {
+		return fetchSpeciesStatsCacheRows({
+			speciesName: species,
+			viewedGroup,
+			temporalUnit: 'year',
+			fromDate,
+			toDate: fromDate,
+			includeBiometrics: true
+		});
+	}
+	if (fromDate && toDate && isWholeCalendarMonth(fromDate, toDate)) {
+		return fetchSpeciesStatsCacheRows({
+			speciesName: species,
+			viewedGroup,
+			temporalUnit: 'month',
+			fromDate,
+			toDate: fromDate,
+			includeBiometrics: true
+		});
+	}
+	if (monthFilter) {
+		const squashedMonthTimePeriod = `${MONTH_SQUASHED_SENTINEL_YEAR}-${String(
+			monthFilter
+		).padStart(2, '0')}-01`;
+		return fetchSpeciesStatsCacheRows({
+			speciesName: species,
+			viewedGroup,
+			temporalUnit: 'month-squashed',
+			fromDate: squashedMonthTimePeriod,
+			toDate: squashedMonthTimePeriod,
+			includeBiometrics: true
+		});
+	}
+	return fetchSpeciesStatsCacheRows({
+		speciesName: species,
+		viewedGroup,
+		temporalUnit: 'all-time',
+		includeBiometrics: true
+	});
 }
 
 // Shared core fetcher for all three species route levels. Given a resolved

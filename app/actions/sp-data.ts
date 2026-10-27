@@ -207,9 +207,11 @@ function calendarMonthOf(timePeriod: string): number {
 
 /**
  * One `SimpleStatsCacheBySpecies` read for a single species — the shared read
- * path behind every species stats fetcher below (#1207), replacing the live
- * `core_stats`/`biometrics_stats` aggregate queries each of them used to make
- * with a single indexed table read.
+ * path behind every species stats fetcher below (#1207) plus `page.tsx`'s
+ * `getSpeciesStats` (#1222), replacing the live `core_stats`/`biometrics_stats`
+ * aggregate queries each of them used to make with a single indexed table
+ * read. Exported (rather than module-private) so `page.tsx` can call it
+ * directly, same as every fetcher in this file already does.
  *
  * Species matching used to be the RPCs' `species_name_filter`; the cache keys
  * on a `species_id` FK instead, so the *name* is matched in the same round
@@ -226,7 +228,7 @@ function calendarMonthOf(timePeriod: string): number {
  * explicit `.order()` here, since every consumer (the history charts, the
  * period-totals tables) was reading an ascending series.
  */
-async function fetchSpeciesStatsCacheRows<
+export async function fetchSpeciesStatsCacheRows<
 	RowType extends CoreStatsResult = CoreStatsResult
 >({
 	speciesName,
@@ -283,8 +285,9 @@ async function fetchSpeciesStatsCacheRows<
 // the per-cell nullability the biometric columns genuinely have (an empty
 // MAX/AVG/MIN/PERCENTILE_CONT) is now carried by the row itself rather than
 // synthesised from a missing sibling. `mergeBiometricsFields` is still the
-// merge for the call sites that do fetch the two halves separately
-// (`page.tsx`'s `getSpeciesStats`, `species-stats.ts`).
+// merge for the one remaining call site that fetches the two halves
+// separately (`species-stats.ts`) — `page.tsx`'s `getSpeciesStats` moved onto
+// this same cache read in #1222.
 export async function getSpeciesStatsHistory(
 	species: string,
 	viewedGroup: ViewedGroup,
