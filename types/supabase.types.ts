@@ -1000,15 +1000,6 @@ export type Database = {
           species_name: string
         }[]
       }
-      merge_upsert_encounters: {
-        Args: { encounter_rows: Json }
-        Returns: {
-          bird_id: number
-          id: number
-          location_id: number
-          visit_date: string
-        }[]
-      }
       most_caught_birds: {
         Args: {
           max_per_species?: number

@@ -10,6 +10,7 @@ import {
 	EncounterRowBatchWriter,
 	ImportJobTracker,
 	CasualtyEncounterError,
+	mergeDuplicateEncounters,
 	processEncounterRow,
 	dispatchStatsCacheRefreshEvents,
 	RESIGHTING_RECORD_TYPES,
@@ -1937,6 +1938,239 @@ describe('EncounterRowBatchWriter', () => {
 
 			expect(writer.getDistinctSpeciesIds()).toEqual([]);
 		});
+	});
+
+	describe('reconciling same-run duplicate Encounters on flush', () => {
+		/**
+		 * The two halves of a duplicate pair: one bird, one site, one day, logged
+		 * twice. Each carries a measurement the other left blank, so a
+		 * last-write-wins upsert would discard whichever landed first.
+		 */
+		const earlierDuplicate = makeDemonRow({
+			capture_time: '08:30',
+			record_type: 'N',
+			weight: '10.5',
+			wing_length: ''
+		});
+		const laterDuplicate = makeDemonRow({
+			capture_time: '15:45',
+			record_type: 'R',
+			weight: '',
+			wing_length: '65'
+		});
+
+		/** Every upsert into Encounters, in call order — the last is the wrap-up. */
+		const encounterUpserts = (
+			domainTablesClient: ReturnType<typeof makeDomainTablesClient>
+		) =>
+			domainTablesClient.upsertCalls.filter(
+				({ table }) => table === 'Encounters'
+			);
+
+		it('issues no extra Encounters upsert for a run in which no two rows share a natural key', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
+
+			await writer.writeEncounterRow(makeDemonRow({ ring_no: 'A000001' }));
+			await writer.writeEncounterRow(makeDemonRow({ ring_no: 'A000002' }));
+			await writer.flushRemaining();
+
+			expect(encounterUpserts(domainTablesClient)).toHaveLength(2);
+		});
+
+		it('rewrites a key two chunks both wrote to with the merge of both rows', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
+
+			await writer.writeEncounterRow(earlierDuplicate);
+			await writer.writeEncounterRow(laterDuplicate);
+			await writer.flushRemaining();
+
+			const reconciliation = encounterUpserts(domainTablesClient).at(-1);
+			expect(encounterUpserts(domainTablesClient)).toHaveLength(3);
+			expect(reconciliation?.rows).toEqual([
+				expect.objectContaining({
+					// From the chronologically first row, which recorded them.
+					capture_time: '08:30',
+					record_type: 'N',
+					weight: 10.5,
+					// Filled in from the later duplicate, which the first left blank.
+					wing_length: 65
+				})
+			]);
+		});
+
+		it('reconciles a duplicate pair that landed in one chunk, whose own upsert keeps only the last row', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 2
+			});
+
+			await Promise.all([
+				writer.writeEncounterRow(earlierDuplicate),
+				writer.writeEncounterRow(laterDuplicate)
+			]);
+			await writer.flushRemaining();
+
+			const [chunkUpsert, reconciliation] =
+				encounterUpserts(domainTablesClient);
+			// The chunk upsert saw one row, not two — `upsertChunkEntities` reduces
+			// a chunk's same-key rows to the last occurrence's payload.
+			expect(chunkUpsert.rows).toEqual([
+				expect.objectContaining({ capture_time: '15:45', weight: null })
+			]);
+			expect(reconciliation.rows).toEqual([
+				expect.objectContaining({ capture_time: '08:30', weight: 10.5 })
+			]);
+		});
+
+		it('writes the same merged row whichever order the two duplicates arrive in', async () => {
+			const mergedRowAfterArrivalOrder = async (
+				rows: ReturnType<typeof makeDemonRow>[]
+			) => {
+				const { domainTablesClient, writer } = makeEncounterRowWriter({
+					chunkSize: 1
+				});
+				for (const row of rows) await writer.writeEncounterRow(row);
+				await writer.flushRemaining();
+				return encounterUpserts(domainTablesClient).at(-1)?.rows;
+			};
+
+			expect(
+				await mergedRowAfterArrivalOrder([laterDuplicate, earlierDuplicate])
+			).toEqual(
+				await mergedRowAfterArrivalOrder([earlierDuplicate, laterDuplicate])
+			);
+		});
+
+		it('leaves out a duplicate whose chunk failed, so no row is written on a failed chunk’s behalf', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
+			domainTablesClient.failOn('Encounters', {
+				message: 'insert into Encounters denied'
+			});
+
+			const settlements = [earlierDuplicate, laterDuplicate].map((row) =>
+				trackSettlement(writer.writeEncounterRow(row))
+			);
+			await writer.flushRemaining();
+
+			// The two failed chunk upserts, and no wrap-up write after them.
+			expect(encounterUpserts(domainTablesClient)).toHaveLength(2);
+			expect(settlements.map(({ rejectedWith }) => rejectedWith)).not.toContain(
+				undefined
+			);
+		});
+
+		it('logs and swallows a failing reconciliation upsert, since every row has already been written', async () => {
+			const { domainTablesClient, writer } = makeEncounterRowWriter({
+				chunkSize: 1
+			});
+			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const reconciliationFailure = { message: 'update on Encounters denied' };
+
+			await writer.writeEncounterRow(earlierDuplicate);
+			await writer.writeEncounterRow(laterDuplicate);
+			domainTablesClient.failOn('Encounters', reconciliationFailure);
+			await expect(writer.flushRemaining()).resolves.toBeUndefined();
+
+			expect(errorSpy).toHaveBeenCalledWith(
+				expect.stringContaining('reconcile duplicate Encounters'),
+				{
+					importJobId: DOMAIN_IMPORT_JOB_ID,
+					ringingGroupId: DOMAIN_RINGING_GROUP_ID,
+					duplicateKeyCount: 1
+				},
+				reconciliationFailure
+			);
+		});
+	});
+});
+
+/**
+ * The merge rule itself, unit tested: its branches (which row's `capture_time`
+ * wins, null-filling, tie-breaking) are tedious to vary through a whole chunked
+ * run, and the writer tests above cover when the rule is applied rather than
+ * what it decides.
+ */
+describe('mergeDuplicateEncounters', () => {
+	function makeEncounterInsert(overrides: Record<string, unknown> = {}) {
+		return {
+			bird_id: 201,
+			location_id: 301,
+			session_id: 401,
+			visit_date: '2024-06-01',
+			capture_time: '08:30',
+			record_type: 'N',
+			age_code: 5,
+			is_juv: false,
+			scheme: 'BTO',
+			sex: 'M',
+			sexing_method: 'P',
+			breeding_condition: null,
+			capture_method: null,
+			extra_text: null,
+			fat: null,
+			finding_circumstances: null,
+			finding_condition: null,
+			moult_code: null,
+			old_greater_coverts: null,
+			pectoral_muscle: null,
+			primary_moult: null,
+			weight: null,
+			wing_length: null,
+			...overrides
+		} as Parameters<typeof mergeDuplicateEncounters>[0];
+	}
+
+	const morningCapture = makeEncounterInsert({
+		capture_time: '08:30',
+		record_type: 'N',
+		weight: 10.5
+	});
+	const afternoonCapture = makeEncounterInsert({
+		capture_time: '15:45',
+		record_type: 'R',
+		weight: 11.2,
+		wing_length: 65
+	});
+
+	it('keeps the earlier capture_time row’s capture_time and record_type', () => {
+		expect(mergeDuplicateEncounters(morningCapture, afternoonCapture)).toEqual(
+			expect.objectContaining({ capture_time: '08:30', record_type: 'N' })
+		);
+	});
+
+	it('keeps the earlier row’s value for a column both rows recorded', () => {
+		expect(
+			mergeDuplicateEncounters(morningCapture, afternoonCapture).weight
+		).toBe(10.5);
+	});
+
+	it('fills a column the earlier row left null from the later row', () => {
+		expect(
+			mergeDuplicateEncounters(morningCapture, afternoonCapture).wing_length
+		).toBe(65);
+	});
+
+	it('is commutative, so the fold does not depend on which duplicate arrived first', () => {
+		expect(mergeDuplicateEncounters(afternoonCapture, morningCapture)).toEqual(
+			mergeDuplicateEncounters(morningCapture, afternoonCapture)
+		);
+	});
+
+	it('breaks a capture_time tie towards the row that arrived earlier in the run', () => {
+		const tiedCapture = makeEncounterInsert({
+			capture_time: '08:30',
+			record_type: 'R',
+			weight: 11.2
+		});
+
+		expect(mergeDuplicateEncounters(morningCapture, tiedCapture)).toEqual(
+			expect.objectContaining({ record_type: 'N', weight: 10.5 })
+		);
 	});
 });
 
