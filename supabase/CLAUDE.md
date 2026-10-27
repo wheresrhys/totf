@@ -708,7 +708,7 @@ touching it:
   batching it is a separate problem), run one row at a time inside a chunk flush so a flush only
   ever has one request in flight.
 
-**Same-run duplicate Encounters are reconciled in a wrap-up pass, not in SQL (#1219).** A group
+**Duplicate Encounters are reconciled in a wrap-up pass, not in SQL (#1219).** A group
 occasionally records the same bird twice on one group-day at one site — a slip of the pen, or a
 bird logged at the start and the end of a round — so two rows collide on
 `encounters_bird_id_location_id_visit_date_unique` and the generic `.upsert()` resolves that by
@@ -716,8 +716,20 @@ setting every column to whichever row reached Postgres last, discarding whatever
 recorded and the winner didn't. `EncounterRowBatchWriter` keeps writing chunks through that
 generic upsert; it also folds every Encounters row it writes into a per-natural-key accumulator
 (`mergeDuplicateEncounters`), and `flushRemaining` ends with one extra multi-row upsert
-(`reconcileDuplicateEncounters`) rewriting just the keys more than one row of the run touched. An
+(`reconcileDuplicateEncounters`) rewriting just the keys more than one record landed on. An
 import with no duplicates issues no extra write at all.
+
+**The two halves of a pair need not come from the same import run** — a day's ringing split
+across two CSVs puts them in different runs — so each chunk also reads the Encounters rows
+already stored for the keys it is about to write (`readStoredEncounters`) and folds those in as
+further contributors. That read has to happen *before* the chunk's own upsert, which is the
+moment the stored row stops being visible. `capture_time` is what separates a second capture from
+a re-import of the same one: a stored row whose `capture_time` matches one of the run's own rows
+for that key is the same physical capture event (the granularity
+`demon_records_group_ring_date_time_unique` already encodes) and is deliberately *not* merged in,
+so a group re-uploading a corrected CSV can still overwrite — or clear — a value it had before.
+`buildEncounterInsert` normalises `capture_time` to `HH:MM:SS` for that comparison to work against
+what Postgres hands back from a `time` column.
 
 The merge rule is one uniform rule: **order the contributing rows by `capture_time` ascending and
 take the first non-null value, per column**. The chronologically first record wins every field it
@@ -731,17 +743,22 @@ Three things worth keeping straight:
   there is no concurrent writer left by `flushRemaining`'s end. Keying precedence on
   `capture_time` (ties to the earlier row of the run) also keeps the fold commutative and
   associative, so the result doesn't depend on which chunk happened to land first.
-- **Duplicates are detected from what the run wrote, not by re-reading `DemonRecords`.** Staging
-  dedups on `demon_records_group_ring_date_time_unique` with `ignoreDuplicates`, so two duplicates
-  that share a `capture_time` leave only one staging row behind while still producing two
-  colliding domain writes — a staging-table query would never see that pair. Registering the
-  inserts the run already built also costs no extra read.
+- **Duplicates are detected from the Encounters rows themselves, not by re-reading
+  `DemonRecords`.** Staging is keyed on `(ringing_group_id, ring_no, encounter_date,
+  encounter_time)`, which omits the location that the Encounters constraint includes, so a
+  staging query would have to re-resolve `bird_id`/`location_id`/`session_id` out of `raw_row`
+  just to tell a real collision from a bird legitimately caught at two sites in one day.
+- **The stored-row read is on every chunk's path**, so, like the wrap-up upsert, a failure is
+  logged and swallowed rather than thrown: an import that would otherwise have succeeded must not
+  fail because reconciliation couldn't see what came before. Its filter is the superset
+  `bird_id IN … AND location_id IN … AND visit_date IN …` (PostgREST can't filter on a list of
+  composite keys) narrowed back down client-side; `idx_encounters_bird_id` makes the bird list the
+  selective one. Still out of scope: a duplicate pair that predates the run entirely, which stays
+  as it is until one of its rows is re-imported.
 - `session_id` is equal across a duplicate set since #1024 (one Session per group-day);
   `ringing_group_id`/`max_hatch_year`/`min_hatch_year` stay with
   `trg_set_encounter_generated_fields`; `lure_code_*` is untouched because the import never writes
-  it. **Out of scope: duplicates spanning two import runs.** A failed reconciliation upsert is
-  logged and swallowed — every row is already written, so the key just keeps the last-write-wins
-  row it would have had anyway.
+  it.
 
 **Two shared constraints across both writers:**
 

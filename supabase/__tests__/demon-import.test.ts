@@ -965,6 +965,51 @@ describe('demon-import — chunked multi-row upserts', () => {
 		expect(stored.wingLength).toBe(65);
 	});
 
+	it('merges a duplicate pair split across two import runs, which only the stored row can reveal', async () => {
+		const { ringNo, rows } = makeDuplicatePair('cross-run-dup');
+
+		// A day's ringing uploaded as two CSVs, the bird's two captures landing in
+		// different halves — the second run's only sight of the first is the
+		// Encounters row already stored under the key it is about to write to.
+		for (const row of rows)
+			await importChunkThroughWriter(
+				[row],
+				groupClient,
+				lookupRingSequence,
+				groupId
+			);
+
+		const stored = storedEncounter(ringNo);
+		expect(stored.rowCount).toBe(1);
+		expect(stored.captureTime).toContain('08:30');
+		expect(stored.weight).toBeCloseTo(10.5);
+		expect(stored.wingLength).toBe(65);
+	});
+
+	it('re-importing one record with a corrected measurement overwrites it rather than merging', async () => {
+		const { ringNo, rows } = makeDuplicatePair('cross-run-correction');
+		const [originalRow] = rows;
+
+		await importChunkThroughWriter(
+			[originalRow],
+			groupClient,
+			lookupRingSequence,
+			groupId
+		);
+		// Same capture_time, so the same physical capture event rather than a
+		// second one: the corrected weight has to win over what's stored.
+		await importChunkThroughWriter(
+			[{ ...originalRow, weight: '11.8' }],
+			groupClient,
+			lookupRingSequence,
+			groupId
+		);
+
+		const stored = storedEncounter(ringNo);
+		expect(stored.rowCount).toBe(1);
+		expect(stored.weight).toBeCloseTo(11.8);
+	});
+
 	it('re-importing an identical chunk does not duplicate any row', async () => {
 		const rows = [1, 2].map((n) =>
 			makeRow({

@@ -806,6 +806,29 @@ const SESSIONS_CONFLICT_COLUMNS = [
 	'ringing_group_id'
 ] as (keyof SessionsInsert & string)[];
 
+/**
+ * `Encounters.capture_time` is a `time without time zone`, so Postgres stores
+ * `'08:30'` and hands it back as `'08:30:00'`. Both forms used to be
+ * interchangeable, because the only `capture_time`s this module ever compared
+ * came from one CSV and were therefore formatted alike. Since #1219 the
+ * reconciliation pass also compares a CSV row's `capture_time` against one read
+ * back out of Postgres — to order a merge, and to tell a genuine duplicate from
+ * a re-import of the same record — and `'08:30' < '08:30:00'` as strings, so
+ * the two have to be written in one canonical form.
+ *
+ * Anything that doesn't parse is passed through untouched, exactly as before:
+ * Postgres accepts several other time literals, and rejecting one here would
+ * fail a row the importer used to accept.
+ */
+const CAPTURE_TIME_PATTERN = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
+
+export function normaliseCaptureTime(rawCaptureTime: string): string {
+	const match = CAPTURE_TIME_PATTERN.exec(rawCaptureTime.trim());
+	if (!match) return rawCaptureTime;
+	const [, hours, minutes, seconds = '00'] = match;
+	return `${hours.padStart(2, '0')}:${minutes}:${seconds}`;
+}
+
 function buildEncounterInsert(
 	row: DemonRow,
 	{
@@ -823,7 +846,7 @@ function buildEncounterInsert(
 	return {
 		age_code: Number(String(row.age).replace('J', '')),
 		breeding_condition: row.breeding_condition as string | null,
-		capture_time: row.capture_time as string,
+		capture_time: normaliseCaptureTime(row.capture_time as string),
 		extra_text: row.extra_text as string | null,
 		fat: row.fat as string | null,
 		finding_condition: row.finding_condition as string | null,
@@ -897,6 +920,30 @@ export function mergeDuplicateEncounters(
 }
 
 /**
+ * What `EncounterRowBatchWriter` accumulates for one Encounters natural key
+ * over a whole run, so `reconcileDuplicateEncounters` can rewrite the key once
+ * at the end (#1219).
+ */
+type RunEncounterAccumulation = {
+	/** Every contributing row folded together under `mergeDuplicateEncounters`. */
+	merged: EncountersInsert;
+	/**
+	 * The `capture_time`s this run's own CSV rows carried for the key — never a
+	 * stored row's. A stored row whose `capture_time` is in here is the same
+	 * physical capture event as one of the run's rows, re-imported, so it must
+	 * *not* be folded in: the CSV is the newer version of it and a correction
+	 * (including a cleared field) has to be allowed to overwrite what's stored.
+	 */
+	captureTimesWrittenByRun: Set<string>;
+	/**
+	 * Whether more than one distinct row has contributed, i.e. whether the row
+	 * the chunk upserts left behind can differ from `merged`. False for the
+	 * overwhelming majority of keys, which one CSV row wrote once.
+	 */
+	needsRewrite: boolean;
+};
+
+/**
  * Interprets CSV rows into the domain tables — Species, Birds, Locations,
  * Sessions, Encounters — a chunk at a time (#1139), rather than five sequential
  * single-row upserts per row.
@@ -957,13 +1004,14 @@ export class EncounterRowBatchWriter {
 	// group has ever recorded. A row whose chunk fails, or that never reaches
 	// `writeChunk` at all (e.g. a ringless casualty), correctly never contributes.
 	private readonly touchedSpeciesIds = new Set<number>();
-	// Every Encounters row the run has successfully written, folded by natural
-	// key under `mergeDuplicateEncounters`, plus the subset of those keys that
-	// more than one row contributed to. Only the latter are rewritten by
-	// `reconcileDuplicateEncounters` — every other key's stored row is already
-	// the only row the run wrote for it.
-	private readonly mergedEncounterByKey = new Map<string, EncountersInsert>();
-	private readonly duplicatedEncounterKeys = new Set<string>();
+	// What the run knows about each Encounters natural key it has written to,
+	// keyed by `naturalKeyOf(ENCOUNTERS_CONFLICT_COLUMNS)`. Only the keys flagged
+	// `needsRewrite` are rewritten by `reconcileDuplicateEncounters` — every
+	// other key's stored row is already the single row that belongs there.
+	private readonly encounterAccumulationByKey = new Map<
+		string,
+		RunEncounterAccumulation
+	>();
 
 	constructor(
 		private readonly supabaseClient: SupabaseClient,
@@ -1188,6 +1236,10 @@ export class EncounterRowBatchWriter {
 			})
 		);
 
+		// Read before the upsert below overwrites them — that is the only moment a
+		// row an earlier import left behind is still visible.
+		const storedEncounters = await this.readStoredEncounters(encounterInserts);
+
 		await this.upsertChunkEntities<EncountersInsert>(
 			'Encounters',
 			ENCOUNTERS_CONFLICT_COLUMNS,
@@ -1195,7 +1247,10 @@ export class EncounterRowBatchWriter {
 			(_bufferedRow, chunkIndex) => encounterInserts[chunkIndex]
 		);
 
-		this.registerEncountersForReconciliation(encounterInserts);
+		this.registerEncountersForReconciliation(
+			encounterInserts,
+			storedEncounters
+		);
 
 		for (const [chunkIndex, bufferedRow] of chunk.entries()) {
 			this.touchedSpeciesIds.add(speciesIdOf(chunkIndex));
@@ -1206,39 +1261,129 @@ export class EncounterRowBatchWriter {
 	}
 
 	/**
-	 * Folds a landed chunk's Encounters rows into the run's per-natural-key
-	 * accumulator and notes any key more than one of the run's rows has now
-	 * contributed to (#1219).
+	 * The Encounters rows already stored for the natural keys a chunk is about
+	 * to write to — the other half of a duplicate pair split across two import
+	 * runs (#1219), e.g. a day's ringing uploaded as two CSVs with the same bird
+	 * caught at two times in different halves.
 	 *
-	 * Called only once the chunk's upsert has returned, so a chunk that failed —
-	 * none of whose rows were imported — can never make the wrap-up pass write a
-	 * row on its behalf, the same way it never contributes a `touchedSpeciesId`.
+	 * PostgREST has no way to filter on a list of composite keys, so this asks
+	 * for the superset `bird_id IN … AND location_id IN … AND visit_date IN …`
+	 * and lets `registerEncountersForReconciliation` drop the rows that don't
+	 * land on a key of this chunk. A chunk is a contiguous run of one group's
+	 * CSV, so its location/date lists are tiny and `idx_encounters_bird_id`
+	 * makes the bird list the selective one — the over-fetch is "these birds'
+	 * encounters on these few dates", not a cross product of anything large.
+	 *
+	 * A failure is logged and swallowed rather than thrown: the chunk's own rows
+	 * are written either way, and losing the read costs only the cross-run half
+	 * of a merge. This read is on every chunk's path, so it must not be able to
+	 * fail an import that would otherwise have succeeded.
 	 */
-	private registerEncountersForReconciliation(
+	private async readStoredEncounters(
 		encounterInserts: EncountersInsert[]
-	): void {
-		for (const encounterInsert of encounterInserts) {
-			const naturalKey = naturalKeyOf(
-				ENCOUNTERS_CONFLICT_COLUMNS.map((column) => encounterInsert[column])
+	): Promise<EncountersInsert[]> {
+		if (encounterInserts.length === 0) return [];
+
+		const distinct = <Value>(values: Value[]) => [...new Set(values)];
+		try {
+			const { data, error } = await this.supabaseClient
+				.from('Encounters')
+				.select<string, EncountersInsert>(
+					Object.keys(encounterInserts[0]).join(',')
+				)
+				.eq('ringing_group_id', this.ringingGroupId)
+				.in('bird_id', distinct(encounterInserts.map(({ bird_id }) => bird_id)))
+				.in(
+					'location_id',
+					distinct(encounterInserts.map(({ location_id }) => location_id))
+				)
+				.in(
+					'visit_date',
+					distinct(encounterInserts.map(({ visit_date }) => visit_date))
+				);
+
+			if (error) throw error;
+			return data ?? [];
+		} catch (error) {
+			console.error(
+				'Failed to read stored Encounters rows for duplicate reconciliation; duplicates spanning two import runs will not be merged',
+				{
+					importJobId: this.importJobId,
+					ringingGroupId: this.ringingGroupId,
+					chunkRowCount: encounterInserts.length
+				},
+				error
 			);
-			const alreadyWritten = this.mergedEncounterByKey.get(naturalKey);
-			if (!alreadyWritten) {
-				this.mergedEncounterByKey.set(naturalKey, encounterInsert);
-				continue;
-			}
-			this.duplicatedEncounterKeys.add(naturalKey);
-			this.mergedEncounterByKey.set(
-				naturalKey,
-				mergeDuplicateEncounters(alreadyWritten, encounterInsert)
-			);
+			return [];
 		}
 	}
 
 	/**
+	 * Folds a landed chunk's Encounters rows — and whatever was stored for their
+	 * keys before the chunk overwrote it — into the run's per-natural-key
+	 * accumulator, flagging any key more than one distinct row has contributed
+	 * to (#1219).
+	 *
+	 * Called only once the chunk's upsert has returned, so a chunk that failed —
+	 * none of whose rows were imported — can never make the wrap-up pass write a
+	 * row on its behalf, the same way it never contributes a `touchedSpeciesId`.
+	 * The run's own rows are folded before the stored ones so that a stored row
+	 * that is merely this chunk's own record re-imported is recognised as such.
+	 */
+	private registerEncountersForReconciliation(
+		encounterInserts: EncountersInsert[],
+		storedEncounters: EncountersInsert[]
+	): void {
+		for (const encounterInsert of encounterInserts)
+			this.foldIntoRunAccumulation(encounterInsert, { writtenByRun: true });
+		for (const storedEncounter of storedEncounters)
+			this.foldIntoRunAccumulation(storedEncounter, { writtenByRun: false });
+	}
+
+	private foldIntoRunAccumulation(
+		encounterRow: EncountersInsert,
+		{ writtenByRun }: { writtenByRun: boolean }
+	): void {
+		const naturalKey = naturalKeyOf(
+			ENCOUNTERS_CONFLICT_COLUMNS.map((column) => encounterRow[column])
+		);
+		const accumulation = this.encounterAccumulationByKey.get(naturalKey);
+
+		if (!accumulation) {
+			// A stored row on a key no row of this run wrote to is over-fetch from
+			// `readStoredEncounters`' superset filter — not this chunk's business.
+			if (!writtenByRun) return;
+			this.encounterAccumulationByKey.set(naturalKey, {
+				merged: encounterRow,
+				captureTimesWrittenByRun: new Set([encounterRow.capture_time]),
+				needsRewrite: false
+			});
+			return;
+		}
+
+		if (writtenByRun)
+			accumulation.captureTimesWrittenByRun.add(encounterRow.capture_time);
+		// The stored row is the same capture event as one of the run's own rows,
+		// imported before: this CSV is the newer version of it, so leave the chunk
+		// upsert's overwrite alone rather than merging the superseded values back in.
+		else if (
+			accumulation.captureTimesWrittenByRun.has(encounterRow.capture_time)
+		)
+			return;
+
+		accumulation.merged = mergeDuplicateEncounters(
+			accumulation.merged,
+			encounterRow
+		);
+		accumulation.needsRewrite = true;
+	}
+
+	/**
 	 * The run's wrap-up pass (#1219): one multi-row upsert that replaces each
-	 * Encounters row more than one of the run's CSV rows wrote to with the merge
-	 * of everything the run recorded for it. Keys only one row wrote to are left
-	 * alone, so a typical import with no duplicates issues no extra write at all.
+	 * Encounters row more than one distinct record landed on with the merge of
+	 * every record that did — the run's own CSV rows, and any row an earlier
+	 * import had already stored for the same key. Keys one record wrote to are
+	 * left alone, so a typical import issues no extra write at all.
 	 *
 	 * This is why the merge rule can live in plain TypeScript rather than in a
 	 * custom `ON CONFLICT DO UPDATE` inside Postgres. Chunk flushes race each
@@ -1248,11 +1393,16 @@ export class EncounterRowBatchWriter {
 	 * concurrent writer left to lose an update to and no need for the merge to be
 	 * atomic with the insert.
 	 *
-	 * Duplicates are detected from what this run actually wrote rather than by
-	 * re-reading `DemonRecords`, which cannot see all of them: staging dedups on
-	 * `demon_records_group_ring_date_time_unique` with `ignoreDuplicates`, so two
-	 * duplicates sharing a `capture_time` leave only one staging row behind while
-	 * still producing two colliding domain writes.
+	 * Duplicates are detected from the Encounters rows themselves — what this run
+	 * wrote, plus what `readStoredEncounters` found already stored for the same
+	 * key — rather than by re-reading `DemonRecords`. Staging is keyed on
+	 * `(ringing_group_id, ring_no, encounter_date, encounter_time)`, which omits
+	 * the location that `encounters_bird_id_location_id_visit_date_unique`
+	 * includes, so a staging query would have to re-resolve
+	 * `bird_id`/`location_id`/`session_id` out of `raw_row` just to tell a real
+	 * collision from a bird legitimately caught at two sites in one day. The
+	 * Encounters rows are already keyed on exactly the constraint being
+	 * reconciled.
 	 *
 	 * A failure here is logged and swallowed rather than thrown: every row of the
 	 * import has already been written, and the worst case is that a duplicated
@@ -1261,18 +1411,17 @@ export class EncounterRowBatchWriter {
 	 * the same reasoning `dispatchStatsCacheRefreshEvents` applies to its own
 	 * recoverable derived step.
 	 *
-	 * Out of scope, as for the whole of #1219: duplicates spanning two separate
-	 * import runs. Only what this run wrote is reconciled.
+	 * Only the keys this run wrote to are reconciled, so a duplicate pair that
+	 * predates the run entirely stays as it is until one of its rows is
+	 * re-imported.
 	 */
 	private async reconcileDuplicateEncounters(): Promise<void> {
-		if (this.duplicatedEncounterKeys.size === 0) return;
-
 		const mergedEncountersByKey = new Map(
-			[...this.duplicatedEncounterKeys].map((naturalKey) => [
-				naturalKey,
-				this.mergedEncounterByKey.get(naturalKey) as EncountersInsert
-			])
+			[...this.encounterAccumulationByKey]
+				.filter(([, { needsRewrite }]) => needsRewrite)
+				.map(([naturalKey, { merged }]) => [naturalKey, merged])
 		);
+		if (mergedEncountersByKey.size === 0) return;
 
 		try {
 			await this.bulkUpsert(
