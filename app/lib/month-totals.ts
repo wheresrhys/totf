@@ -123,17 +123,21 @@ export function formatMonthLabel(
 	return formatDate(new Date(2000, row.zeroIndexedMonth, 1), 'LLLL');
 }
 
-// One row per calendar month from `core_stats`' `'month-squashed'`
-// `group_by_time_period` mode (#996) — every column, including distinct-count
-// columns like `species_count`/`bird_count`, is already a true cross-year
-// aggregate computed in SQL. Unlike `buildMonthTotalsRows`/
-// `buildPerYearMonthTotalsRows`, there's nothing left to zero-fill or re-sort
-// here: `stats_spine`'s month-squashed branch is an unconditional
-// `generate_series(1, 12)` (always exactly 12 rows — `stats_spine.sql`) and
-// `core_stats`' final `SELECT` is `ORDER BY ... time_period ASC`
-// (`core_stats.sql`), both exercised by
-// `supabase/__tests__/rpc-functions/stats-month-squashed.test.ts`. This just
-// derives each row's `zeroIndexedMonth` from its sentinel `time_period`.
+// One row per calendar month at the `'month-squashed'` grain (#996) — every
+// column, including distinct-count columns like `species_count`/`bird_count`,
+// is already a true cross-year aggregate computed in SQL. Unlike
+// `buildMonthTotalsRows`/`buildPerYearMonthTotalsRows`, there's nothing to
+// zero-fill or re-sort here: the rows arrive ascending by `time_period`, and
+// each row's `zeroIndexedMonth` is derived from its sentinel `time_period`,
+// which is all this does.
+//
+// There may be fewer than 12 of them. `stats_spine`'s month-squashed branch
+// was an unconditional `generate_series(1, 12)`, so `core_stats` always
+// returned exactly 12 rows (zeros included) — but both callers now read the
+// `SimpleStatsCache` tables instead (#1207 for the species page, #1204 for the
+// summary page), and the refresh only writes cells that have data. Every
+// caller's "Empty months: hide" toggle defaults to on, so the months that go
+// missing are the ones it would have dropped anyway.
 export function buildCombinedMonthTotalsRows(
 	monthSquashedStats: CoreStatsResult[]
 ): CombinedMonthTotalsRow[] {

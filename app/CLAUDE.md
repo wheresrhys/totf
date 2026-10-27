@@ -19,22 +19,43 @@ There are no per-person logins. Authentication is group-scoped:
 ### Public pages and the group summary read-path (#770)
 
 A group can opt an area of its data into public, unauthenticated view via `RingingGroups.public_areas`
-(currently only `'summary'` is allowlisted, #768) and the SECURITY DEFINER `public_core_stats` RPC,
-which returns real data only when the target group has opted in — otherwise nothing, with no JWT
-required. `app/lib/auth/group-summary-access.ts`'s `fetchAuthorisedCoreStats` implements the resulting
-4-case access model for a `(viewedGroupId, viewerGroupId)` pair (own group, always via the normal
-authenticated client; a public grant via `public_core_stats`, checked _before_ any
-authenticated/RLS attempt — since `public_core_stats` is a pure gated pass-through to
-`core_stats` for the same params, this never shows an already-authorised cross-group viewer a
-degraded view, and it spares an anonymous visitor a wasted authenticated attempt; an existing
-`GroupDataSharing`-granted cross-group view via the normal authenticated client, only attempted once
-the target isn't public and the viewer actually has a session; or blocked), returning
-`{ accessLevel, rows }` — every summary-stats action function (`app/actions/summary-stats.ts`,
-`period-totals.ts`, `spp-data.ts`) routes through it (currently destructuring only `rows`) instead of
-calling `getAuthenticatedSupabaseClient()` + `core_stats` directly. (`core_stats`/`public_core_stats`
-are byte-identical siblings of the still-schema-resident `core_stats`/`public_aggregate_stats`
-RPCs — #830 moved every app-code call site onto the new names; a later ticket deletes the old ones.
-See `supabase/CLAUDE.md`'s "Companion stats RPCs" for the RPC-side internals.)
+(currently only `'summary'` is allowlisted, #768). `app/lib/auth/group-summary-access.ts`'s
+`fetchAuthorisedCoreStats` implements the resulting 4-case access model for a
+`(viewedGroupId, viewerGroupId)` pair, returning `{ accessLevel, rows }` — every summary-stats action
+function (`app/actions/summary-stats.ts`, `period-totals.ts`, `spp-data.ts`) routes through it
+(currently destructuring only `rows`) instead of fetching for itself. The four branches are: own group,
+always via the normal authenticated client; a public grant, checked _before_ any authenticated/RLS
+attempt (it spares an anonymous visitor a wasted authenticated attempt, and can't show an
+already-authorised cross-group viewer a degraded view because both branches read the same rows with
+the same query); an existing `GroupDataSharing`-granted cross-group view via the normal authenticated
+client, only attempted once the target isn't public and the viewer actually has a session; or blocked.
+
+**Since #1204 every branch is a plain `SimpleStatsCache`/`SimpleStatsCacheBySpecies` table read, not
+an RPC call** — three things follow from that:
+
+- **The branching no longer changes the query, only the client.** Those tables' SELECT policy carries
+  all three read gates (own JWT group, a `GroupDataSharing` grant, or a `'summary'` `public_areas`
+  opt-in) and `anon` holds a bare `GRANT SELECT` on them (#1202), so the public branch is the same
+  query issued through the plain unauthenticated `supabase` client. The SECURITY DEFINER
+  `public_core_stats` wrapper is no longer how a public read happens.
+- **`'blocked'` is now a genuinely-empty result set.** RLS filters an unauthorised cross-group read
+  down to zero rows, where `core_stats` used to return one row of COALESCEd zeros that had to be seen
+  through. As before, a `'shared'` read that is authorised but finds no data resolves to `'blocked'` —
+  nothing in either read path distinguishes the two.
+- **The old RPC params are translated into `temporal_unit`/`time_period` filters**, and the one shape
+  that can't be — an _ungrouped_ aggregate over a window that isn't itself a single cache cell, i.e.
+  the `/species` list page's "CES only" range and its two free-text date inputs — still falls back to
+  the live `core_stats`/`public_core_stats` RPCs. The cache can't answer those: the aggregate's
+  distinct-count columns (`bird_count`, the `*_bird_count` age buckets) can't be rebuilt by summing
+  finer cells. Every window the summary pages ask for (all time, a whole calendar year, a whole
+  calendar month, a squashed calendar month) _is_ a cache cell and reads from the cache. See
+  `resolveStatsCacheQueryPlan`'s own comment for the full param→filter mapping, including the
+  year-grain-for-one-calendar-month read that goes via the month grain.
+
+(`core_stats`/`public_core_stats` are byte-identical siblings of the still-schema-resident
+`core_stats`/`public_aggregate_stats` RPCs — #830 moved every app-code call site onto the new names; a
+later ticket deletes the old ones. See `supabase/CLAUDE.md`'s "Companion stats RPCs" for the RPC-side
+internals.)
 
 `lib/group-slug.ts`'s group-lookup functions (`resolveGroupIdBySlug`, `resolveGroupSlugById`,
 `resolveGroupPublicAreas`) deliberately use the plain unauthenticated `supabase` client (`lib/supabase.ts`)
