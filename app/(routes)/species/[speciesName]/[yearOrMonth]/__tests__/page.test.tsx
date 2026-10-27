@@ -11,19 +11,23 @@ import Page, { fetchSpeciesYearOrMonthPageContent } from '../page';
 import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
 import {
 	ROBIN_SPECIES_ID,
-	makeSpeciesClient
+	makeSpeciesClient,
+	robinSpeciesStats
 } from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '@/app/(routes)/species/[speciesName]/PageContent';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
-const { mockGetAuthenticatedSupabaseClient, mockFetchPageOfBirds } = vi.hoisted(
-	() => ({
-		mockGetAuthenticatedSupabaseClient: vi.fn(),
-		mockFetchPageOfBirds: vi.fn()
-	})
-);
+const {
+	mockGetAuthenticatedSupabaseClient,
+	mockFetchPageOfBirds,
+	mockFetchSpeciesStatsCacheRows
+} = vi.hoisted(() => ({
+	mockGetAuthenticatedSupabaseClient: vi.fn(),
+	mockFetchPageOfBirds: vi.fn(),
+	mockFetchSpeciesStatsCacheRows: vi.fn()
+}));
 
 vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
@@ -37,6 +41,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 // route's own `fetchSpeciesYearOrMonthPageContent` behaviour.
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchPageOfBirds: mockFetchPageOfBirds,
+	fetchSpeciesStatsCacheRows: mockFetchSpeciesStatsCacheRows,
 	fetchYearTotalsTabData: vi.fn().mockResolvedValue([]),
 	fetchMonthTotalsTabData: vi.fn().mockResolvedValue([]),
 	fetchSessionTotalsTabData: vi.fn().mockResolvedValue([]),
@@ -45,6 +50,13 @@ vi.mock('@/app/actions/sp-data', () => ({
 		.mockResolvedValue({ monthlyStats: [], monthSquashedStats: [] }),
 	fetchSquashedMonthYearTotalsTabData: vi.fn().mockResolvedValue([])
 }));
+
+// `getSpeciesStats` (the bare page's `page.tsx`, shared by every route depth)
+// now reads through this cache fetcher instead of calling the Supabase
+// client's `.rpc()` directly — stub a valid row by default so the "Usual"/
+// heading/tab-rendering tests below (which don't care about its exact
+// content) never crash on `data.speciesStats.bird_count`.
+mockFetchSpeciesStatsCacheRows.mockResolvedValue([robinSpeciesStats]);
 
 const birds = birdsSnapshot as FullFatPageData['birds'];
 
@@ -228,17 +240,15 @@ describe('/species/[speciesName]/[yearOrMonth]', () => {
 		});
 
 		it('threads the whole-year range into aggregate stats', async () => {
-			const client = makeSpeciesClient();
-			mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 			await fetchSpeciesYearOrMonthPageContent(
 				{ speciesName: 'Robin', yearOrMonth: '2026' },
 				VIEWED_GROUP
 			);
-			expect(client.rpc).toHaveBeenCalledWith(
-				'core_stats',
+			expect(mockFetchSpeciesStatsCacheRows).toHaveBeenCalledWith(
 				expect.objectContaining({
-					from_date: '2026-01-01',
-					to_date: '2026-12-31'
+					temporalUnit: 'year',
+					fromDate: '2026-01-01',
+					toDate: '2026-01-01'
 				})
 			);
 		});
