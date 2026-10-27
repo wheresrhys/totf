@@ -321,6 +321,39 @@ functions are exempt" reasoning on any future `LANGUAGE sql` RPC in this family 
 this shape-parameterized join pattern, it needs the same `SET` clause, for the inlining reason
 above rather than the RETURN QUERY reason that applies to the plpgsql RPCs.
 
+**The `stats_cache_*_metrics` family can serve any authenticated read `core_stats`/
+`biometrics_stats` can, but it can never serve a *public-summary* one (#1224).** Measured
+equivalence first, since that half is genuinely a drop-in: over an arbitrary, non-cache-aligned
+`from_date`/`to_date` window with `group_by_species = true` and `group_by_time_period` NULL,
+`stats_cache_biometrics_metrics` reproduces all eight of `biometrics_stats_result`'s metric
+columns exactly, and `stats_cache_basic_session_metrics` + `stats_cache_bird_age_metrics` +
+`stats_cache_encounter_age_metrics` between them partition `core_stats_result`'s 21 metric
+columns exactly (11 + 5 + 5, no overlap, no gap) and reproduce every one — including the
+row-count edge cases a caller may depend on (zero rows under `group_by_species`, one row of
+COALESCEd zeros ungrouped, for a group with no data in the window; that second one is what
+`group-summary-access.ts`'s `hasVisibleData` reads to tell a blocked cross-group read from an
+authorised empty one).
+
+What they cannot do is the `public_areas` gate. These RPCs are **invoker-rights** (`LANGUAGE sql
+STABLE`, no `SECURITY DEFINER`), so they read `Encounters` through `group_encounters_access`,
+whose only two branches are the caller's own JWT group and a `GroupDataSharing` grant. #1202
+deliberately added the third, `'summary' = ANY(public_areas)` branch **only** to
+`SimpleStatsCache`/`SimpleStatsCacheBySpecies` — "no base-table grant or RLS policy is widened, so
+raw Sessions/Encounters/Birds rows stay inaccessible". Verified against a group opted into
+`public_areas = {summary}`, as role `anon`: `public_core_stats` (SECURITY DEFINER) returns its
+real rows, while `core_stats` and every `stats_cache_*_metrics` RPC return **nothing at all** — no
+error, just an empty result, exactly as a bare `SELECT FROM "Encounters"` does. So the
+`public_areas` gate exists in exactly two places, and a live RPC is not one of them: the two cache
+tables' own RLS, and the `public_core_stats` wrapper. Repointing an access-gated read path onto a
+metric-group RPC silently serves an empty page to its public branch; the only ways round it are
+three new `public_*` SECURITY DEFINER wrappers (adding RPCs in order to delete RPCs) or widening
+the base tables' RLS, which is the thing #1202 was written to avoid.
+
+The practical consequence for #1205: `biometrics_stats` is repointable (its one surviving caller,
+`spp-data.ts`'s `fetchBiometricsStats`, runs only for `accessLevel` `'own'`/`'shared'`, never
+`'public'`), while `core_stats`/`public_core_stats` are not — `group-summary-access.ts`'s
+arbitrary-window fallback goes through all four access levels.
+
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
 two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
 counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of

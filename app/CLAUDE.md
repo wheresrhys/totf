@@ -51,6 +51,14 @@ an RPC call** — three things follow from that:
   calendar month, a squashed calendar month) _is_ a cache cell and reads from the cache. See
   `resolveStatsCacheQueryPlan`'s own comment for the full param→filter mapping, including the
   year-grain-for-one-calendar-month read that goes via the month grain.
+  **That fallback cannot be repointed onto the `stats_cache_*_metrics` RPCs (#1224)**, even
+  though they are column-for-column equivalent to `core_stats`/`biometrics_stats` over an
+  arbitrary window (measured, not assumed). They are invoker-rights functions reading
+  `Encounters` through RLS, which carries no `public_areas` branch, so they return nothing to the
+  `'public'` branch's anonymous client — `public_core_stats`' SECURITY DEFINER wrapper is the only
+  live-RPC path that gate exists on. `spp-data.ts`'s `fetchBiometricsStats` is the exception, and
+  only because it is never called for `'public'`. See `supabase/CLAUDE.md`'s "Companion stats
+  RPCs" for the measurements.
 
 (`core_stats`/`public_core_stats` are byte-identical siblings of the still-schema-resident
 `core_stats`/`public_aggregate_stats` RPCs — #830 moved every app-code call site onto the new names; a
