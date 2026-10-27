@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import {
 	fetchCoreStatsByMonth,
 	getServerCachedStats,
+	readStatsCacheRows,
+	type GenericStatsCacheReadParams,
 	type StatsCacheRpcName
 } from '../stats-cache';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
@@ -62,7 +64,9 @@ const BIOMETRICS_STATS_COLUMNS = [
 
 let queryChain: ReturnType<typeof makeQueryChain>;
 
-function mockStatsCacheRows(rows: unknown[]) {
+function mockStatsCacheRows(
+	rows: unknown[] | ((fromRow?: number, toRow?: number) => unknown)
+) {
 	queryChain = makeQueryChain(rows);
 	supabaseClientMock.from.mockReturnValue(queryChain.chain);
 }
@@ -206,5 +210,183 @@ describe('getServerCachedStats', () => {
 	it('returns an empty array when the table has no matching rows for the group/period', async () => {
 		mockStatsCacheRows([]);
 		expect(await readStats()).toStrictEqual([]);
+	});
+});
+
+describe('readStatsCacheRows', () => {
+	function readRows(
+		overrides: Partial<
+			Omit<GenericStatsCacheReadParams, 'client' | 'groupId'>
+		> = {}
+	) {
+		return readStatsCacheRows({
+			client: supabaseClientMock as never,
+			groupId: GROUP_ID,
+			bySpecies: false,
+			temporalUnit: 'day',
+			...overrides
+		});
+	}
+
+	describe('table choice', () => {
+		it('reads from SimpleStatsCache when bySpecies is false', async () => {
+			await readRows({ bySpecies: false });
+			expect(tableRead()).toBe('SimpleStatsCache');
+		});
+
+		it('reads from SimpleStatsCacheBySpecies when bySpecies is true', async () => {
+			await readRows({ bySpecies: true });
+			expect(tableRead()).toBe('SimpleStatsCacheBySpecies');
+		});
+	});
+
+	describe('group and temporal-unit filtering', () => {
+		it('filters by group_id and the given temporal_unit', async () => {
+			await readRows({ temporalUnit: 'year' });
+			expect(filterCalls()).toStrictEqual([
+				['group_id', GROUP_ID],
+				['temporal_unit', 'year']
+			]);
+		});
+
+		it.each(['day', 'month', 'year'] as const)(
+			'filters temporal_unit to %s',
+			async (temporalUnit) => {
+				await readRows({ temporalUnit });
+				expect(filterCalls()).toContainEqual(['temporal_unit', temporalUnit]);
+			}
+		);
+	});
+
+	describe('time filtering', () => {
+		it('filters to an exact time_period when timePeriod is given', async () => {
+			await readRows({ timePeriod: '2023-06-01' });
+			expect(filterCalls()).toContainEqual(['time_period', '2023-06-01']);
+		});
+
+		it('filters to a range via gte/lte when fromDate and toDate are given', async () => {
+			await readRows({ fromDate: '2023-01-01', toDate: '2023-12-31' });
+			expect((queryChain.chain.gte as Mock).mock.calls).toStrictEqual([
+				['time_period', '2023-01-01']
+			]);
+			expect((queryChain.chain.lte as Mock).mock.calls).toStrictEqual([
+				['time_period', '2023-12-31']
+			]);
+		});
+	});
+
+	describe('species filtering', () => {
+		it('embeds an inner Species(species_name) join and filters on it when species is given', async () => {
+			await readRows({ bySpecies: true, species: 'Wren' });
+			expect(selectedColumns()).toStrictEqual([
+				'*',
+				'Species!inner(species_name)'
+			]);
+			expect(filterCalls()).toContainEqual(['Species.species_name', 'Wren']);
+		});
+
+		it('embeds a non-inner Species(species_name) join with no filter when bySpecies is true and species is omitted', async () => {
+			await readRows({ bySpecies: true });
+			expect(selectedColumns()).toStrictEqual(['*', 'Species(species_name)']);
+			expect(filterCalls()).not.toContainEqual([
+				'Species.species_name',
+				expect.anything()
+			]);
+		});
+
+		it('adds no Species embed when bySpecies is false', async () => {
+			await readRows({ bySpecies: false });
+			expect(selectedColumns()).toStrictEqual(['*']);
+		});
+	});
+
+	describe('species_name resolution on returned rows', () => {
+		it('flattens the embedded species_name onto each row of a bySpecies read', async () => {
+			mockStatsCacheRows([
+				bySpeciesRow('Blue Tit', '2023-01-01'),
+				bySpeciesRow('Wren', '2023-02-01')
+			]);
+			expect(await readRows({ bySpecies: true })).toStrictEqual([
+				{
+					time_period: '2023-01-01',
+					bird_count: 3,
+					species_name: 'Blue Tit'
+				},
+				{ time_period: '2023-02-01', bird_count: 3, species_name: 'Wren' }
+			]);
+		});
+
+		it('sets species_name to null on each row of an all-species read', async () => {
+			mockStatsCacheRows([{ time_period: '2023-01-01', bird_count: 4 }]);
+			expect(await readRows({ bySpecies: false })).toStrictEqual([
+				{ time_period: '2023-01-01', bird_count: 4, species_name: null }
+			]);
+		});
+	});
+
+	describe('pagination', () => {
+		// One row short of two full PostgREST pages, so fetchAllPaginatedRows
+		// must issue a second request to pick up the final row.
+		const TOTAL_ROWS = 1001;
+
+		function pagedRow(index: number) {
+			return { time_period: `2023-01-01`, row_index: index };
+		}
+
+		function pagedRows(fromRow = 0, toRow = 0) {
+			const remaining = TOTAL_ROWS - fromRow;
+			const count = Math.min(toRow - fromRow + 1, Math.max(remaining, 0));
+			return Array.from({ length: count }, (_, offset) =>
+				pagedRow(fromRow + offset)
+			);
+		}
+
+		it('pages through fetchAllPaginatedRows and returns every row across multiple pages', async () => {
+			mockStatsCacheRows(pagedRows);
+			const rows = await readRows();
+			expect(rows).toHaveLength(TOTAL_ROWS);
+		});
+	});
+
+	describe('ordering', () => {
+		it('orders by time_period for an all-species read', async () => {
+			await readRows({ bySpecies: false });
+			expect(orderCalls()).toStrictEqual([['time_period']]);
+		});
+
+		it('orders by time_period then by the embedded Species(species_name) for a bySpecies read', async () => {
+			await readRows({ bySpecies: true });
+			expect(orderCalls()).toStrictEqual([
+				['time_period'],
+				['Species(species_name)']
+			]);
+		});
+	});
+
+	describe('row shape', () => {
+		it('returns full rows (select *) rather than a narrowed column subset', async () => {
+			mockStatsCacheRows([
+				{ time_period: '2023-01-01', some_arbitrary_column: 'x' }
+			]);
+			expect(await readRows()).toStrictEqual([
+				{
+					time_period: '2023-01-01',
+					some_arbitrary_column: 'x',
+					species_name: null
+				}
+			]);
+		});
+
+		it('returns an empty array when no rows match', async () => {
+			mockStatsCacheRows([]);
+			expect(await readRows()).toStrictEqual([]);
+		});
+	});
+
+	describe('client parameter', () => {
+		it('issues the query against the supplied client rather than minting its own', async () => {
+			await readRows();
+			expect(supabaseClientMock.from).toHaveBeenCalledWith('SimpleStatsCache');
+		});
 	});
 });

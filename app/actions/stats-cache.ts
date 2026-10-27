@@ -92,6 +92,125 @@ function resolveEmbeddedSpeciesName({
 	} as StatsResult;
 }
 
+// A row as PostgREST returns it for `readStatsCacheRows`'s generic
+// `select('*')` read: every column of whichever table was chosen, plus the
+// embedded Species row when a Species embed was requested (an inner-join
+// species filter, or a plain by-species resolve-only embed). Unlike
+// StatsCacheRowWithEmbeddedSpecies above, the row itself isn't typed to a
+// known result shape — that narrowing is each future caller's own job.
+type GenericStatsCacheRow = Record<string, unknown> & {
+	Species?: { species_name: string } | null;
+};
+
+export type GenericStatsCacheReadParams = {
+	client: SupabaseClient;
+	groupId: number;
+	bySpecies: boolean;
+	species?: string;
+	temporalUnit: TemporalUnit;
+	timePeriod?: string;
+	fromDate?: string;
+	toDate?: string;
+};
+
+/**
+ * Generic `SimpleStatsCache`/`SimpleStatsCacheBySpecies` row reader (#1233) —
+ * the shared mechanism behind the three hand-rolled readers this repo
+ * currently carries (`getStatsCacheTableFetcher`/`getServerCachedStats`
+ * below, `fetchSpeciesStatsCacheRows` in `app/actions/sp-data.ts`, and
+ * `runStatsCacheRead` in `app/lib/auth/group-summary-access.ts`), which three
+ * follow-up tickets (#1234/#1235/#1236) each migrate onto in turn. Deliberately
+ * additive: nothing above this point is touched, and nothing yet calls this
+ * function.
+ *
+ * Unlike every existing reader, this one always `select('*')`s rather than a
+ * hand-picked `CORE_STATS_CACHE_COLUMNS`-shaped column subset — that's the
+ * entire point of generalising: a caller narrows the returned
+ * `Record<string, unknown>[]` to whatever result type it needs (e.g.
+ * `CoreStatsResult`) itself, once it migrates onto this function, rather than
+ * this function hard-coding one caller's column list.
+ *
+ * - **Table**: `SimpleStatsCacheBySpecies` when `bySpecies`, else
+ *   `SimpleStatsCache`.
+ * - **Species embed/filter**: a `species` filter always goes through an
+ *   `!inner` embed (`fetchSpeciesStatsCacheRows`'s idiom) — the common case is
+ *   a `bySpecies` read, since the all-species-combined table carries no
+ *   species relationship to join on at all. With no `species` filter, a
+ *   `bySpecies` read still embeds `Species(species_name)` (non-inner) purely
+ *   to resolve the name onto every row (`resolveEmbeddedSpeciesName`'s
+ *   idiom); an all-species read has no embed at all.
+ * - **Group/temporal-unit filter**: always `group_id` + `temporal_unit`.
+ * - **Time filter**: exactly one of an exact `timePeriod` match, or a
+ *   `fromDate`/`toDate` range — mirrors the three existing readers.
+ * - **Pagination**: via `fetchAllPaginatedRows`, same as every existing
+ *   reader.
+ * - **Ordering**: `time_period`, then — for a `bySpecies` read — the embedded
+ *   `Species(species_name)`, via PostgREST's `order=Species(species_name)`
+ *   spelling (not supabase-js' `{referencedTable}` option, which orders rows
+ *   *within* the embed rather than the parent rows — see
+ *   `getStatsCacheTableFetcher`'s own comment on this).
+ * - **`species_name` resolution**: flattened from the embed onto every row of
+ *   a `bySpecies` read (filtered or not); `null` on an all-species read,
+ *   matching every existing reader's behaviour.
+ * - **No caching**: a plain pass-through read against an already-materialized
+ *   cache table, same as every existing reader.
+ */
+export async function readStatsCacheRows({
+	client,
+	groupId,
+	bySpecies,
+	species,
+	temporalUnit,
+	timePeriod,
+	fromDate,
+	toDate
+}: GenericStatsCacheReadParams): Promise<Record<string, unknown>[]> {
+	const tableName = bySpecies
+		? 'SimpleStatsCacheBySpecies'
+		: 'SimpleStatsCache';
+	const selectedColumns = species
+		? '*, Species!inner(species_name)'
+		: bySpecies
+			? '*, Species(species_name)'
+			: '*';
+
+	const rows = await fetchAllPaginatedRows<GenericStatsCacheRow>(
+		(fromRow, toRow) => {
+			let filtered = client
+				.from(tableName)
+				// The select string is assembled at runtime, so supabase-js
+				// can't infer the row shape from a string literal — name it
+				// explicitly, as getStatsCacheTableFetcher below does for the
+				// same reason.
+				.select<string, GenericStatsCacheRow>(selectedColumns)
+				.eq('group_id', groupId)
+				.eq('temporal_unit', temporalUnit);
+			if (species) {
+				filtered = filtered.eq('Species.species_name', species);
+			}
+			if (timePeriod) {
+				filtered = filtered.eq('time_period', timePeriod);
+			} else {
+				if (fromDate) {
+					filtered = filtered.gte('time_period', fromDate);
+				}
+				if (toDate) {
+					filtered = filtered.lte('time_period', toDate);
+				}
+			}
+			const ordered = bySpecies
+				? filtered.order('time_period').order('Species(species_name)')
+				: filtered.order('time_period');
+			return ordered.range(fromRow, toRow);
+		}
+	);
+
+	return rows.map(({ Species, ...row }) => ({
+		...row,
+		species_name: bySpecies ? (Species?.species_name ?? null) : null
+	}));
+}
+
 // Reads one (group, temporal unit) slice of the already-materialized
 // SimpleStatsCache tables, which the post-import refresh queue populates
 // (lib/stats-cache-refresh.ts). This replaces re-running the
