@@ -211,6 +211,35 @@ export async function readStatsCacheRows({
 	}));
 }
 
+export type ReadStatsCacheRowsForViewedGroupParams = Omit<
+	GenericStatsCacheReadParams,
+	'client' | 'groupId'
+> & {
+	viewedGroup: ViewedGroup;
+};
+
+/**
+ * The one `'use server'`-facing pass-through onto `readStatsCacheRows` that a
+ * `'use client'` caller can invoke directly as a Server Action (#1236) — a
+ * `SupabaseClient` instance can't cross that boundary (it isn't a plain,
+ * serializable value), so a client module that needs a cache read mints no
+ * client of its own and instead calls this, which mints one via
+ * `getAuthenticatedSupabaseClient()` and derives `groupId` from the given
+ * `ViewedGroup`. Carries zero column-subset logic of its own — every other
+ * param is forwarded to `readStatsCacheRows` unchanged.
+ */
+export async function readStatsCacheRowsForViewedGroup({
+	viewedGroup,
+	...params
+}: ReadStatsCacheRowsForViewedGroupParams): Promise<Record<string, unknown>[]> {
+	const client = await getAuthenticatedSupabaseClient();
+	return readStatsCacheRows({
+		client,
+		groupId: viewedGroup.id,
+		...params
+	});
+}
+
 // Reads one (group, temporal unit) slice of the already-materialized
 // SimpleStatsCache tables, which the post-import refresh queue populates
 // (lib/stats-cache-refresh.ts). This replaces re-running the

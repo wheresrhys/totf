@@ -4,6 +4,7 @@ import {
 	fetchCoreStatsByMonth,
 	getServerCachedStats,
 	readStatsCacheRows,
+	readStatsCacheRowsForViewedGroup,
 	type GenericStatsCacheReadParams,
 	type StatsCacheRpcName
 } from '../stats-cache';
@@ -13,8 +14,12 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const supabaseClientMock = { from: vi.fn() };
 
+const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
+	mockGetAuthenticatedSupabaseClient: vi.fn()
+}));
+
 vi.mock('@/app/lib/auth/group-auth', () => ({
-	getAuthenticatedSupabaseClient: vi.fn(async () => supabaseClientMock)
+	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
 const GROUP_ID = 1;
@@ -103,6 +108,7 @@ const bySpeciesRow = (speciesName: string, timePeriod: string) => ({
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	mockGetAuthenticatedSupabaseClient.mockResolvedValue(supabaseClientMock);
 	mockStatsCacheRows([]);
 });
 
@@ -388,5 +394,58 @@ describe('readStatsCacheRows', () => {
 			await readRows();
 			expect(supabaseClientMock.from).toHaveBeenCalledWith('SimpleStatsCache');
 		});
+	});
+});
+
+// The one `'use client'`-facing pass-through onto readStatsCacheRows (#1236)
+// — a SupabaseClient instance can't cross the server/client boundary, so a
+// 'use client' caller mints no client of its own and calls this instead.
+// readStatsCacheRows itself lives in this same module, so it can't be
+// mocked out as a black-box collaborator here (same-module spying doesn't
+// intercept Vite's SSR-transformed internal calls) — these tests instead
+// verify the delegation end to end through the already-mocked
+// `getAuthenticatedSupabaseClient` and the same query-chain helpers
+// `readStatsCacheRows`'s own tests above use, without re-asserting that
+// function's own query-building behaviour.
+describe('readStatsCacheRowsForViewedGroup', () => {
+	function readRowsForGroup(
+		overrides: Partial<
+			Omit<GenericStatsCacheReadParams, 'client' | 'groupId'>
+		> = {}
+	) {
+		return readStatsCacheRowsForViewedGroup({
+			viewedGroup,
+			bySpecies: false,
+			temporalUnit: 'day',
+			...overrides
+		});
+	}
+
+	it('mints an authenticated client and passes it to readStatsCacheRows', async () => {
+		await readRowsForGroup();
+		expect(mockGetAuthenticatedSupabaseClient).toHaveBeenCalledTimes(1);
+		expect(supabaseClientMock.from).toHaveBeenCalledWith('SimpleStatsCache');
+	});
+
+	it('derives groupId from the given viewedGroup', async () => {
+		await readRowsForGroup();
+		expect(filterCalls()).toContainEqual(['group_id', GROUP_ID]);
+	});
+
+	it('forwards bySpecies/temporalUnit and any time-filter params unchanged', async () => {
+		await readRowsForGroup({
+			bySpecies: true,
+			temporalUnit: 'year',
+			fromDate: '2023-01-01',
+			toDate: '2023-12-31'
+		});
+		expect(tableRead()).toBe('SimpleStatsCacheBySpecies');
+		expect(filterCalls()).toContainEqual(['temporal_unit', 'year']);
+		expect((queryChain.chain.gte as Mock).mock.calls).toStrictEqual([
+			['time_period', '2023-01-01']
+		]);
+		expect((queryChain.chain.lte as Mock).mock.calls).toStrictEqual([
+			['time_period', '2023-12-31']
+		]);
 	});
 });
