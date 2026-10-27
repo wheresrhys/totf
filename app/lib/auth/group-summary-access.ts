@@ -2,11 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { endOfMonth, endOfYear, format, parseISO } from 'date-fns';
 import { getAuthenticatedSupabaseClient } from './group-auth';
 import { getGroupCookie } from '@/app/actions/group-cookie';
-import {
-	supabase,
-	catchSupabaseErrors,
-	fetchAllPaginatedRows
-} from '@/lib/supabase';
+import { supabase, catchSupabaseErrors } from '@/lib/supabase';
+import { readStatsCacheRows } from '@/app/actions/stats-cache';
 import {
 	resolveGroupPublicAreasForRequest,
 	type ViewedGroup
@@ -49,43 +46,6 @@ export type AuthorisedSummaryResult = {
 	accessLevel: GroupSummaryAccessLevel;
 	rows: CoreStatsResult[];
 };
-
-/**
- * The `core_stats_result` columns, every one of which both cache tables carry
- * under the same name — `species_name` excepted, since it is a column on
- * neither (the by-species table keys on a `species_id` FK, and the
- * all-species-combined table has no species at all).
- *
- * Deliberately a third local copy of this list rather than an import:
- * `app/actions/stats-cache.ts` and `app/actions/sp-data.ts` are both
- * `'use server'` modules, every export of which must be an async function, so
- * neither can export its own copy. #1214 tracks lifting all of them into a
- * shared constants module.
- */
-const CORE_STATS_CACHE_COLUMNS = [
-	'time_period',
-	'session_count',
-	'total_effort',
-	'effort_per_session',
-	'effort_per_encounter',
-	'avg_encounters_per_session',
-	'max_per_session',
-	'species_count',
-	'bird_count',
-	'encounter_count',
-	'new_bird_count',
-	'pullus_bird_count',
-	'juv_bird_count',
-	'postjuv_bird_count',
-	'adult_bird_count',
-	'unknown_age_bird_count',
-	'pullus_enc_count',
-	'juv_enc_count',
-	'postjuv_enc_count',
-	'adult_enc_count',
-	'unknown_age_enc_count',
-	'max_new_per_session'
-];
 
 /**
  * The sentinel year `stats_spine`'s `'month-squashed'` branch stamps on a
@@ -246,16 +206,6 @@ export function resolveStatsCacheQueryPlan({
 }
 
 /**
- * A cache-table row as PostgREST returns it: the requested column subset, plus
- * the embedded `Species` row when the by-species table was read. The embed is
- * a to-one relationship, so it comes back as a single object (or null), not an
- * array.
- */
-type StatsCacheTableRow = Omit<CoreStatsResult, 'species_name'> & {
-	Species?: { species_name: string } | null;
-};
-
-/**
  * Reads the already-materialized `SimpleStatsCache`/`SimpleStatsCacheBySpecies`
  * slice `plan` names, as `client` — which is the whole access model: the
  * identical query returns the viewer's own group's rows, a
@@ -264,11 +214,23 @@ type StatsCacheTableRow = Omit<CoreStatsResult, 'species_name'> & {
  * tables' own SELECT policy (#1202). There is no per-access-level query shape
  * and no SECURITY DEFINER wrapper any more; the policy decides.
  *
- * `group_by_species` picks the *table*, never a column filter — the two grains
- * live in two tables (see `"SimpleStatsCache".sql`'s header for why).
+ * The read itself — table choice (`group_by_species` picks the *table*, never a
+ * column filter: the two grains live in two tables, see
+ * `"SimpleStatsCache".sql`'s header for why), the `group_id`/`temporal_unit`/
+ * `time_period` filters, the `(time_period, species_name)` ordering every
+ * consumer reads the series in, the `Species(species_name)` embed
+ * `mergeSpeciesBiometrics` (app/lib/species-stats.ts) joins on, and the
+ * pagination a day-grain slice of a long-running group's history needs — is
+ * `readStatsCacheRows`' job (app/actions/stats-cache.ts, #1233). This function
+ * only translates a `StatsCacheQueryPlan` into its params and applies the two
+ * row transforms PostgREST can't express:
  *
- * Paginated because a day-grain slice of a long-running group's history is
- * easily more rows than one PostgREST request returns.
+ * - `calendarMonth`: "any year, this calendar month" is not a filter on a
+ *   `date` column, so it is applied here over whatever the grain/range filters
+ *   already returned.
+ * - `relabelTimePeriodToYearStart`: the year-grained-but-month-filtered read is
+ *   served from the month grain and its rows must still be labelled as the
+ *   years they stand for.
  */
 async function runStatsCacheRead(
 	client: SupabaseClient,
@@ -276,53 +238,22 @@ async function runStatsCacheRead(
 	groupBySpecies: boolean,
 	plan: StatsCacheQueryPlan
 ): Promise<CoreStatsResult[]> {
-	const tableName = groupBySpecies
-		? 'SimpleStatsCacheBySpecies'
-		: 'SimpleStatsCache';
-	const selectedColumns = [
-		...CORE_STATS_CACHE_COLUMNS,
-		// A single embedded select over
-		// simple_stats_cache_by_species_species_id_fkey, rather than a second
-		// round-trip to Species. `mergeSpeciesBiometrics`
-		// (app/lib/species-stats.ts) joins these rows to `biometrics_stats`
-		// rows by `species_name`, so the name — not the id — is what a
-		// by-species read has to come back with.
-		...(groupBySpecies ? ['Species(species_name)'] : [])
-	].join(', ');
-
-	const rows = await fetchAllPaginatedRows<StatsCacheTableRow>(
-		(fromRow, toRow) => {
-			let filtered = client
-				.from(tableName)
-				// The select string is assembled at runtime, so supabase-js
-				// can't infer the row shape from a string literal — name it
-				// explicitly, as app/actions/stats-cache.ts does for the same
-				// reason.
-				.select<string, StatsCacheTableRow>(selectedColumns)
-				.eq('group_id', groupId)
-				.eq('temporal_unit', plan.temporalUnit);
-			if (plan.timePeriod) {
-				filtered = filtered.eq('time_period', plan.timePeriod);
-			}
-			if (plan.fromTimePeriod) {
-				filtered = filtered.gte('time_period', plan.fromTimePeriod);
-			}
-			if (plan.toTimePeriod) {
-				filtered = filtered.lte('time_period', plan.toTimePeriod);
-			}
-			// `core_stats` ordered ascending by (time_period, species_name) and
-			// every consumer reads the series in that order. Ordering parent
-			// rows by an embedded to-one column needs PostgREST's
-			// `order=Species(species_name)` spelling, NOT supabase-js'
-			// `{referencedTable}` option — see app/actions/stats-cache.ts.
-			// The `.order()` calls come after every filter because they return
-			// a transform builder, which no further filter can be chained onto.
-			const ordered = groupBySpecies
-				? filtered.order('time_period').order('Species(species_name)')
-				: filtered.order('time_period');
-			return ordered.range(fromRow, toRow);
-		}
-	);
+	// `readStatsCacheRows` select('*')s and leaves narrowing to its caller, so
+	// name the row shape this read is known to produce here. It already
+	// resolves `species_name` off the embed (`null` for an
+	// all-species-combined read, exactly as `core_stats` returned under
+	// `group_by_species: false`) and strips the embed itself.
+	const rows = (await readStatsCacheRows({
+		client,
+		groupId,
+		bySpecies: groupBySpecies,
+		temporalUnit: plan.temporalUnit,
+		// A plan carries either an exact cell or a range, never both — which is
+		// also the one-of-the-two contract `readStatsCacheRows` applies.
+		timePeriod: plan.timePeriod,
+		fromDate: plan.fromTimePeriod,
+		toDate: plan.toTimePeriod
+	})) as CoreStatsResult[];
 
 	return rows
 		.filter(
@@ -330,15 +261,11 @@ async function runStatsCacheRead(
 				plan.calendarMonth === undefined ||
 				calendarMonthOf(row.time_period) === plan.calendarMonth
 		)
-		.map(({ Species, ...row }) => ({
-			...row,
-			// `null` for an all-species-combined read, exactly as
-			// `core_stats` returned under `group_by_species: false`.
-			species_name: Species?.species_name ?? null,
-			time_period: plan.relabelTimePeriodToYearStart
-				? `${row.time_period.slice(0, 4)}-01-01`
-				: row.time_period
-		})) as CoreStatsResult[];
+		.map((row) =>
+			plan.relabelTimePeriodToYearStart
+				? { ...row, time_period: `${row.time_period.slice(0, 4)}-01-01` }
+				: row
+		);
 }
 
 async function runCoreStats(
