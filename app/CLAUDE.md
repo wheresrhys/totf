@@ -10,9 +10,9 @@ the other two zones.
 There are no per-person logins. Authentication is group-scoped:
 
 1. The selected group is stored in a `TOTFSession` HTTP-only cookie (a signed JWT, `app/actions/group-cookie.ts`).
-2. Server actions call `getAuthenticatedSupabaseClient()` (`lib/group-auth.ts`), which reads the cookie and returns a Supabase client carrying a **custom JWT** embedding `app_metadata.ringing_group_id`.
+2. Server actions call `getAuthenticatedSupabaseClient()` (`app/lib/auth/group-auth.ts`), which reads the cookie and returns a Supabase client carrying a **custom JWT** embedding `app_metadata.ringing_group_id`.
 3. All RLS policies on the database read `ringing_group_id` from this JWT — so the database itself enforces data isolation.
-4. Clients are cached in an LRU cache (100 entries, 5-minute TTL) to avoid re-signing JWTs on every request.
+4. A fresh client is minted **per call**, deliberately uncached. There was an LRU cache (100 entries, 5-minute TTL) back when the JWT was signed per request; `b26dc8c1` removed it once the JWT came straight off the cookie and there was nothing left to memoise. Don't reinstate one as a connection-count measure: a supabase-js client holds no Postgres connection of its own, which #1216 measured directly — see `supabase/CLAUDE.md`'s "Connection counts and client lifecycle".
 
 **Important:** Multi-tenancy via RLS is only partially implemented. See [issue #149](https://github.com/wheresrhys/totf/issues/149) for current status. Do not assume that all tables are fully isolated — verify before adding features that rely on group isolation.
 
