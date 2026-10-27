@@ -5,9 +5,10 @@ import { type LineChartData } from 'react-chartkick';
 import {
 	getSpeciesStatsHistory,
 	getSpeciesDemographicsStats,
-	getSpeciesArrivalsStats,
-	getGroupEffortHistory
+	getSpeciesArrivalsStats
 } from '@/app/actions/sp-data';
+import { readStatsCacheRowsForViewedGroup } from '@/app/actions/stats-cache';
+import { postgresIntervalToHours } from '@/app/lib/postgres-interval';
 import type {
 	CoreStatsResult,
 	DemographicsStatsResult,
@@ -232,11 +233,31 @@ export function SpDemographicsTab({
 		null
 	);
 	const [effortHistoryRequested, setEffortHistoryRequested] = useState(false);
+	// Group-wide (not species-filtered) monthly ringing-effort history —
+	// effort is a property of a session, not of the species caught in it, so
+	// this reads the ungrouped monthly SimpleStatsCache slice directly rather
+	// than filtering by species (#1236; previously wrapped in
+	// `getGroupEffortHistory`, app/actions/sp-data.ts). Shapes the raw
+	// `total_effort` interval into fractional hours and pairs it with
+	// `time_period`, matching the `[time_period, value]` tuple shape
+	// `YearComparisonTrendChart`'s existing series already use.
 	function loadEffortHistory() {
 		if (effortHistoryRequested) return;
 		setEffortHistoryRequested(true);
-		getGroupEffortHistory(viewedGroup)
-			.then((data) => setEffortHistory({ name: 'effort', data }))
+		readStatsCacheRowsForViewedGroup({
+			viewedGroup,
+			bySpecies: false,
+			temporalUnit: 'month'
+		})
+			.then((rows) => {
+				const data = (rows as CoreStatsResult[]).map(
+					(row): [string, number] => [
+						row.time_period,
+						postgresIntervalToHours(row.total_effort)
+					]
+				);
+				setEffortHistory({ name: 'effort', data });
+			})
 			.catch(() => setEffortHistory(null));
 	}
 

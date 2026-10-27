@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 import {
-	fetchCoreStatsByMonth,
 	getServerCachedStats,
 	readStatsCacheRows,
 	readStatsCacheRowsForViewedGroup,
@@ -110,31 +109,6 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	mockGetAuthenticatedSupabaseClient.mockResolvedValue(supabaseClientMock);
 	mockStatsCacheRows([]);
-});
-
-describe('fetchCoreStatsByMonth', () => {
-	it('queries SimpleStatsCache filtered to the group and month, ungrouped by species', async () => {
-		await fetchCoreStatsByMonth(viewedGroup);
-		expect(tableRead()).toBe('SimpleStatsCache');
-		expect(filterCalls()).toStrictEqual([
-			['group_id', GROUP_ID],
-			['temporal_unit', 'month']
-		]);
-		expect(selectedColumns()).toStrictEqual(CORE_STATS_COLUMNS);
-	});
-
-	it('returns the rows resolved from the table query', async () => {
-		mockStatsCacheRows([
-			{ time_period: '2023-01-01', total_effort: '05:30:00' }
-		]);
-		expect(await fetchCoreStatsByMonth(viewedGroup)).toStrictEqual([
-			{
-				time_period: '2023-01-01',
-				total_effort: '05:30:00',
-				species_name: null
-			}
-		]);
-	});
 });
 
 describe('getServerCachedStats', () => {

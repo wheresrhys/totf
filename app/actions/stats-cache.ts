@@ -317,18 +317,3 @@ export async function getServerCachedStats({
 		fetchDataBySpecies
 	)(supabase, viewedGroup.id);
 }
-
-// Group-wide, ungrouped-by-species monthly core stats. Kept as its own function
-// (rather than callers using getServerCachedStats directly) so a caller that
-// only needs the ungrouped monthly totals states that in one argument-free
-// call, rather than restating the same four parameters.
-export async function fetchCoreStatsByMonth(
-	viewedGroup: ViewedGroup
-): Promise<CoreStatsResult[]> {
-	return (await getServerCachedStats({
-		rpcName: 'core_stats',
-		fetchDataBySpecies: false,
-		temporalUnit: 'month',
-		viewedGroup
-	})) as CoreStatsResult[];
-}
