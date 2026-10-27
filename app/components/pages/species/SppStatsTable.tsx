@@ -14,29 +14,20 @@ import {
 } from '@/app/components/shared/SortableTable';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 
-function MultiSpeciesTableBody({ data }: { data: SpeciesStatsRow[] }) {
-	return (
-		<tbody>
-			{data.map((species) => (
-				<tr key={species.species_name}>
-					{speciesStatConfigs.map((column) =>
-						column.property === 'species_name' ? (
-							<td key={column.property}>
-								<NoPrefetchLink
-									className="link text-wrap"
-									href={`/species/${species.species_name}`}
-								>
-									{species.species_name}
-								</NoPrefetchLink>
-							</td>
-						) : (
-							<td key={column.property}>{species[column.property]}</td>
-						)
-					)}
-				</tr>
-			))}
-		</tbody>
-	);
+// Keeps a species-row link inside the group whose table it was clicked from
+// (#1231). It used to be hardcoded to the bare `/species/<name>`, which routes
+// to whichever group the *viewer* is logged in as — right only when those two
+// coincide. That already mis-routed an authenticated cross-group `'shared'`
+// viewer, and became load-bearing once the list page went anonymously
+// viewable: an anonymous visitor has no logged-in group at all, so an
+// unscoped link could only ever bounce them back to the login modal.
+//
+// `slug` is null only for a group that has none; it has no group-scoped route
+// to offer, so the bare path stays the fallback.
+function buildSpeciesHref(viewedGroup: ViewedGroup, speciesName: string) {
+	return viewedGroup.slug
+		? `/group/${viewedGroup.slug}/species/${speciesName}`
+		: `/species/${speciesName}`;
 }
 
 const sortableColumnConfigs = speciesStatConfigs.reduce(
@@ -57,6 +48,36 @@ export function SppStatsTable({
 	data: PageData;
 	viewedGroup: ViewedGroup;
 }) {
+	// Declared inside the component so it can close over `viewedGroup` —
+	// SortableTable only ever hands its TableBodyComponent `data` and
+	// `columnConfigs`. Same approach as SpeciesTotalsTable's own body
+	// component; the cell is stateless, so re-creating it per render costs
+	// identity, not behaviour.
+	function MultiSpeciesTableBody({ data }: { data: SpeciesStatsRow[] }) {
+		return (
+			<tbody>
+				{data.map((species) => (
+					<tr key={species.species_name}>
+						{speciesStatConfigs.map((column) =>
+							column.property === 'species_name' ? (
+								<td key={column.property}>
+									<NoPrefetchLink
+										className="link text-wrap"
+										href={buildSpeciesHref(viewedGroup, species.species_name)}
+									>
+										{species.species_name}
+									</NoPrefetchLink>
+								</td>
+							) : (
+								<td key={column.property}>{species[column.property]}</td>
+							)
+						)}
+					</tr>
+				))}
+			</tbody>
+		);
+	}
+
 	const formRef = useRef<HTMLFormElement>(null);
 	const [year, setYear] = useState<number | null>(null);
 	const [cesOnly, setCesOnly] = useState<boolean>(false);

@@ -54,6 +54,20 @@ function getGroupSlugs(): Record<string, string> {
 	return slugs
 }
 
+// Re-assert the one seed property added after `isAlreadySeeded()` existed:
+// Beta's `public_areas: ['summary']` opt-in (#1231), which the anonymous
+// project's specs depend on. `supabase/scripts/seed-e2e-data.ts` sets it too
+// and owns the reasoning for why it's Beta — but the seed script is skipped
+// entirely on an already-seeded database, so a developer whose local DB
+// predates that step would otherwise never get the opt-in without a full
+// `npm run db:sync:e2e`. The UPDATE is idempotent and costs one query.
+function ensurePublicSummaryOptIn(betaId: number): void {
+	execSync(
+		`psql "${LOCAL_DB_URL}" -q -c "UPDATE \\"RingingGroups\\" SET public_areas = ARRAY['summary']::TEXT[] WHERE id = ${betaId} AND NOT ('summary' = ANY(public_areas));"`,
+		{ stdio: 'inherit' }
+	)
+}
+
 const BASE_URL = process.env.TEST_BASE_URL ?? 'http://localhost:3000'
 
 // Pre-warm Next.js page compilation before parallel workers start.
@@ -91,6 +105,7 @@ export default async function globalSetup() {
 	}
 
 	const groupIds = getGroupIds()
+	ensurePublicSummaryOptIn(groupIds.beta)
 	writeFileSync(
 		path.join(ROOT, 'e2e', 'group-ids.json'),
 		JSON.stringify(groupIds, null, 2)

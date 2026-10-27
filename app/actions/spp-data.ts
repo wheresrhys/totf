@@ -135,14 +135,19 @@ async function readBiometricsFromStatsCache(
 //   approximately. The live RPC is the only correct source for them outside a
 //   cache cell.
 //
-// Either way this needs an authenticated session to be meaningful (neither the
-// RPC nor the cache tables expose /species to an anonymous caller — /species
-// sits outside the public-summary subtree, #770), so it's only called once
-// fetchAuthorisedCoreStats confirms an authenticated session actually resolved
-// data ('own' or 'shared'). A 'blocked' or 'public' accessLevel contributes no
-// biometrics rows, matching in practice today's only real caller of this
-// access pattern, but this stays defensive rather than assuming it's the only
-// one.
+// Either way this needs an authenticated session to be meaningful: both reads
+// go out as the viewer, and neither `biometrics_stats` nor the cache tables'
+// SELECT policy has a `public_areas` branch that would admit an anonymous
+// caller. So it's only called once fetchAuthorisedCoreStats confirms an
+// authenticated session actually resolved data ('own' or 'shared'); a
+// 'blocked' or 'public' accessLevel contributes no biometrics rows.
+//
+// That 'public' case is now live rather than theoretical: the /species list
+// page became anonymously viewable for a `public_areas: ['summary']` group
+// (#1231), so an anonymous visitor sees the counts half of the table with the
+// 8 wing/weight columns blank. Widening the biometrics half to match would
+// mean publishing measurement data a group only opted its *summary* into, so
+// it stays gated until `public_areas` grows a tag that says otherwise.
 async function fetchBiometricsStats(
 	viewedGroup: ViewedGroup,
 	fromDate?: string,

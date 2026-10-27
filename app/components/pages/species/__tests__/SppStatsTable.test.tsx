@@ -57,6 +57,30 @@ describe('SppStatsTable', () => {
 		});
 	});
 
+	describe('species-name links', () => {
+		const [{ species_name: speciesName }] = speciesStats;
+
+		it('scopes the link to the group whose table it was rendered for', () => {
+			render(
+				<SppStatsTable data={pageData} viewedGroup={{ id: 2, slug: 'beta' }} />
+			);
+
+			expect(
+				screen.getByRole('link', { name: speciesName }).getAttribute('href')
+			).toBe(`/group/beta/species/${speciesName}`);
+		});
+
+		it('falls back to the ungrouped link for a group with no slug', () => {
+			render(
+				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: null }} />
+			);
+
+			expect(
+				screen.getByRole('link', { name: speciesName }).getAttribute('href')
+			).toBe(`/species/${speciesName}`);
+		});
+	});
+
 	describe('year filter', () => {
 		it('CES only checkbox is disabled when no year selected', () => {
 			render(

@@ -55,6 +55,15 @@ export default defineConfig({
 			use: { storageState: 'e2e/.auth/delta.json' },
 			dependencies: ['setup'],
 		},
+		// No storageState and no `setup` dependency — this project exists
+		// precisely to exercise the no-session-cookie paths (#1231's public
+		// `/species` list page, and the login gate every other group still
+		// keeps). `@all` is deliberately NOT in the grep: an authenticated
+		// spec's assertions don't hold without a cookie.
+		{
+			name: 'anonymous',
+			grep: /@anonymous/,
+		},
 	],
 	webServer: {
 		command: 'npm run next:dev',

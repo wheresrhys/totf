@@ -5,47 +5,44 @@ import alphaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-
 import betaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/beta.by-species.json';
 import gammaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/gamma.by-species.json';
 
-const { mockGetAuthenticatedSupabaseClient, mockFetchSpeciesData } = vi.hoisted(
+const { mockFetchAuthorisedCoreStats, mockFetchSpeciesData } = vi.hoisted(
 	() => ({
-		mockGetAuthenticatedSupabaseClient: vi.fn(),
+		mockFetchAuthorisedCoreStats: vi.fn(),
 		mockFetchSpeciesData: vi.fn()
 	})
 );
 
-vi.mock('@/app/lib/auth/group-auth', () => ({
-	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
+vi.mock('@/app/lib/auth/group-summary-access', () => ({
+	fetchAuthorisedCoreStats: mockFetchAuthorisedCoreStats
 }));
 
 vi.mock('@/app/actions/spp-data', () => ({
 	fetchSpeciesData: mockFetchSpeciesData
 }));
 
-function makeYearsClient(years: number[]) {
-	const dates = years.map((y) => ({ visit_date: `${y}-06-01` }));
-	const thenable = {
-		then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-			Promise.resolve({ data: dates, error: null }).then(resolve)
-	};
-	const chain = {
-		select: vi.fn().mockReturnThis(),
-		eq: vi.fn().mockReturnThis(),
-		order: vi.fn().mockReturnThis(),
-		...thenable
-	};
-	return { from: vi.fn().mockReturnValue(chain) };
+// `fetchYears` reads the `SimpleStatsCache` year grain through
+// `fetchAuthorisedCoreStats`, so a year is represented by one cache cell —
+// `sessionCount: 0` standing for a dense-spine gap year the group never rang in.
+function mockYearCells(cells: { year: number; sessionCount?: number }[]) {
+	mockFetchAuthorisedCoreStats.mockResolvedValue({
+		accessLevel: 'own',
+		rows: cells.map(({ year, sessionCount = 1 }) => ({
+			time_period: `${year}-01-01`,
+			session_count: sessionCount
+		}))
+	});
 }
 
 describe('species list page', () => {
 	afterEach(() => {
 		cleanup();
+		vi.clearAllMocks();
 	});
 
 	describe('with full data (alpha fixture)', () => {
 		beforeEach(() => {
 			mockFetchSpeciesData.mockResolvedValue(alphaSpeciesSnapshot as unknown[]);
-			mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-				makeYearsClient([2023, 2022])
-			);
+			mockYearCells([{ year: 2022 }, { year: 2023 }]);
 		});
 
 		it('renders species rows in table', async () => {
@@ -55,7 +52,7 @@ describe('species list page', () => {
 			expect(rows.length).toBe(alphaSpeciesSnapshot.length);
 		});
 
-		it('renders year filter options matching fetched years', async () => {
+		it('renders year filter options newest-first', async () => {
 			render(await Page());
 			const yearSelect = await screen.findByLabelText('Year');
 			const options = yearSelect.querySelectorAll('option');
@@ -64,12 +61,41 @@ describe('species list page', () => {
 		});
 	});
 
+	describe('year list sourced from the stats cache', () => {
+		beforeEach(() => {
+			mockFetchSpeciesData.mockResolvedValue(alphaSpeciesSnapshot as unknown[]);
+		});
+
+		it('reads the year grain, letting the access model pick the client', async () => {
+			mockYearCells([{ year: 2023 }]);
+			render(await Page());
+			await screen.findByRole('table');
+
+			expect(mockFetchAuthorisedCoreStats).toHaveBeenCalledWith(
+				{ id: 1, slug: expect.anything() },
+				{ group_by_time_period: 'year' }
+			);
+		});
+
+		it('omits a dense-spine gap year the group never rang in', async () => {
+			mockYearCells([
+				{ year: 2021 },
+				{ year: 2022, sessionCount: 0 },
+				{ year: 2023 }
+			]);
+			render(await Page());
+			const yearSelect = await screen.findByLabelText('Year');
+
+			expect(
+				[...yearSelect.querySelectorAll('option')].map((option) => option.value)
+			).toEqual(['', '2023', '2021']);
+		});
+	});
+
 	describe('with sparse data (beta fixture)', () => {
 		beforeEach(() => {
 			mockFetchSpeciesData.mockResolvedValue(betaSpeciesSnapshot as unknown[]);
-			mockGetAuthenticatedSupabaseClient.mockResolvedValue(
-				makeYearsClient([2023])
-			);
+			mockYearCells([{ year: 2023 }]);
 		});
 
 		it('renders fewer species rows', async () => {
@@ -84,7 +110,7 @@ describe('species list page', () => {
 	describe('with no data (gamma fixture)', () => {
 		beforeEach(() => {
 			mockFetchSpeciesData.mockResolvedValue(gammaSpeciesSnapshot as unknown[]);
-			mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeYearsClient([]));
+			mockYearCells([]);
 		});
 
 		it('renders empty table', async () => {

@@ -72,8 +72,15 @@ The root layout (`app/layout.tsx`'s `AuthorisedView`) is the single auth gate fo
 route renders through it, so it's the only place that can make a page-aware, group-aware decision before
 anything else runs. A no-cookie request only ever falls through to `<LoginModal>` after
 `lib/public-group-access.ts`'s `resolvePublicPageViewedGroupId(pathname)` returns `null`; that helper
-matches the pathname against the summary-subtree pattern, resolves the target group by slug, and checks
-its `public_areas`, returning the viewed group's id (instead of a bare boolean) when all three line up.
+matches the pathname against its list of public path patterns, resolves the target group by slug, and
+checks its `public_areas`, returning the viewed group's id (instead of a bare boolean) when all three
+line up. Two patterns are in that list: the `/group/<slug>/summary` subtree (#770), and the
+`/group/<slug>/species` **list page only** (#1231) — anchored so the `/species/<name>` detail pages
+stay gated. Both are granted by the single `'summary'` `public_areas` tag; widening what that one tag
+reaches is a matter of adding a pattern here, not of adding a tag (`public_areas` still only allows
+`'summary'`, #768). An anonymous `/species` view gets the counts half of the table only: `spp-data.ts`'s
+`fetchBiometricsStats` runs as the viewer against ungated sources, so it's skipped for a `'public'`
+(or `'blocked'`) access level and the 8 wing/weight columns come back blank.
 `AuthorisedView` looks that id up in the same `groups` list it already fetched for the authenticated
 branch and renders `GlobalNav` in `readOnly` mode (branding + viewed-group name only — no group switcher,
 "Import data", "Log out", or authenticated-only nav links/search, none of which are reachable
@@ -342,6 +349,16 @@ seeded by `npm run db:seed:e2e`) and exercise app pages end to end (bird, sessio
 retraps, mistakes, etc.) — mostly read-only assertions against stable seed data. See
 `supabase/CLAUDE.md`'s "E2E `@mutates` / exclusive-resource mechanics" for how the one mutating
 spec (`e2e/authenticated/import.spec.ts`) is kept from colliding across concurrent swarm worktrees.
+
+Specs are split by who's viewing. `e2e/authenticated/**` runs in one Playwright project per seed
+group (`alpha`/`beta`/`gamma`/`delta`), each carrying that group's `storageState` and selected by an
+`@alpha`/`@beta`/… or `@all` tag. `e2e/anonymous/**` runs in the `anonymous` project, which has no
+`storageState` and no `setup` dependency at all — the absence of a session cookie is what it exists
+to test — and is selected by an `@anonymous` tag that is deliberately **not** matched by `@all`
+(an authenticated spec's assertions don't hold without a cookie). Beta is the one seed group opted
+into `public_areas: ['summary']`; `e2e/global-setup.ts` re-asserts that opt-in on every run, because
+its `isAlreadySeeded()` check skips the seed script entirely on a database seeded before the opt-in
+existed.
 
 ## Web import
 
