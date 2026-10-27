@@ -5,20 +5,29 @@ import alphaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-
 import betaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/beta.by-species.json';
 import gammaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/gamma.by-species.json';
 
-const { mockFetchAuthorisedCoreStats, mockFetchSpeciesData } = vi.hoisted(
-	() => ({
+const { mockFetchAuthorisedCoreStats, mockFetchSpeciesDataWithAccessLevel } =
+	vi.hoisted(() => ({
 		mockFetchAuthorisedCoreStats: vi.fn(),
-		mockFetchSpeciesData: vi.fn()
-	})
-);
+		mockFetchSpeciesDataWithAccessLevel: vi.fn()
+	}));
 
 vi.mock('@/app/lib/auth/group-summary-access', () => ({
 	fetchAuthorisedCoreStats: mockFetchAuthorisedCoreStats
 }));
 
 vi.mock('@/app/actions/spp-data', () => ({
-	fetchSpeciesData: mockFetchSpeciesData
+	fetchSpeciesDataWithAccessLevel: mockFetchSpeciesDataWithAccessLevel
 }));
+
+// Defaults every test to the 'own' access level (full controls visible)
+// unless a test overrides it directly — matching the pre-#1232 behaviour
+// these tests were originally written against.
+function mockSpeciesData(
+	rows: unknown[],
+	accessLevel: 'own' | 'shared' | 'public' | 'blocked' = 'own'
+) {
+	mockFetchSpeciesDataWithAccessLevel.mockResolvedValue({ accessLevel, rows });
+}
 
 // `fetchYears` reads the `SimpleStatsCache` year grain through
 // `fetchAuthorisedCoreStats`, so a year is represented by one cache cell —
@@ -41,7 +50,7 @@ describe('species list page', () => {
 
 	describe('with full data (alpha fixture)', () => {
 		beforeEach(() => {
-			mockFetchSpeciesData.mockResolvedValue(alphaSpeciesSnapshot as unknown[]);
+			mockSpeciesData(alphaSpeciesSnapshot as unknown[]);
 			mockYearCells([{ year: 2022 }, { year: 2023 }]);
 		});
 
@@ -63,7 +72,7 @@ describe('species list page', () => {
 
 	describe('year list sourced from the stats cache', () => {
 		beforeEach(() => {
-			mockFetchSpeciesData.mockResolvedValue(alphaSpeciesSnapshot as unknown[]);
+			mockSpeciesData(alphaSpeciesSnapshot as unknown[]);
 		});
 
 		it('reads the year grain, letting the access model pick the client', async () => {
@@ -94,7 +103,7 @@ describe('species list page', () => {
 
 	describe('with sparse data (beta fixture)', () => {
 		beforeEach(() => {
-			mockFetchSpeciesData.mockResolvedValue(betaSpeciesSnapshot as unknown[]);
+			mockSpeciesData(betaSpeciesSnapshot as unknown[]);
 			mockYearCells([{ year: 2023 }]);
 		});
 
@@ -109,7 +118,7 @@ describe('species list page', () => {
 
 	describe('with no data (gamma fixture)', () => {
 		beforeEach(() => {
-			mockFetchSpeciesData.mockResolvedValue(gammaSpeciesSnapshot as unknown[]);
+			mockSpeciesData(gammaSpeciesSnapshot as unknown[]);
 			mockYearCells([]);
 		});
 
@@ -118,6 +127,22 @@ describe('species list page', () => {
 			const table = await screen.findByRole('table');
 			const rows = table.querySelectorAll('tbody tr');
 			expect(rows.length).toBe(0);
+		});
+	});
+
+	// Per-accessLevel rendering of the CES-only checkbox / date inputs is
+	// unit-tested directly against SppStatsTable
+	// (components/pages/species/__tests__/SppStatsTable.test.tsx) — this just
+	// confirms the real `fetchSpeciesListPageContent` threads the accessLevel
+	// `fetchSpeciesDataWithAccessLevel` resolves all the way through to the
+	// rendered page rather than discarding it (#1232).
+	describe('accessLevel threading to the rendered controls', () => {
+		it("hides the CES only checkbox for a 'public' access level", async () => {
+			mockSpeciesData(alphaSpeciesSnapshot as unknown[], 'public');
+			mockYearCells([{ year: 2023 }]);
+			render(await Page());
+			await screen.findByRole('table');
+			expect(screen.queryByLabelText('CES only')).toBeNull();
 		});
 	});
 });

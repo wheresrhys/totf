@@ -3,8 +3,11 @@ import {
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
 import { SppStatsTable } from '@/app/components/pages/species/SppStatsTable';
-import { fetchSpeciesData } from '@/app/actions/spp-data';
-import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
+import { fetchSpeciesDataWithAccessLevel } from '@/app/actions/spp-data';
+import {
+	fetchAuthorisedCoreStats,
+	type GroupSummaryAccessLevel
+} from '@/app/lib/auth/group-summary-access';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 
@@ -13,6 +16,7 @@ import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 export type PageData = {
 	speciesStats: SpeciesStatsRow[];
 	years: number[];
+	accessLevel: GroupSummaryAccessLevel;
 };
 
 /**
@@ -60,13 +64,14 @@ export async function fetchSpeciesListPageContent(
 	_: DefaultPageParams,
 	viewedGroup: ViewedGroup
 ): Promise<PageData> {
-	const [speciesStats, years] = await Promise.all([
-		fetchSpeciesData(viewedGroup),
+	const [{ accessLevel, rows: speciesStats }, years] = await Promise.all([
+		fetchSpeciesDataWithAccessLevel(viewedGroup),
 		fetchYears(viewedGroup)
 	]);
 	return {
 		speciesStats,
-		years
+		years,
+		accessLevel
 	};
 }
 
