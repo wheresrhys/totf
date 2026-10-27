@@ -7,7 +7,7 @@ import {
 } from '@/app/models/bird';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { fetchCoreStatsByMonth } from './stats-cache';
+import { fetchCoreStatsByMonth, readStatsCacheRows } from './stats-cache';
 import { postgresIntervalToHours } from '@/app/lib/postgres-interval';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
@@ -146,56 +146,6 @@ export async function fetchGraphableEncounterData(
 export type StatsHistoryInterval = 'month' | 'year';
 
 /**
- * The `CoreStatsResult` columns `SimpleStatsCacheBySpecies` carries verbatim —
- * i.e. every column of the `core_stats_result` composite type except
- * `species_name`, which the cache stores as a `species_id` FK instead and
- * which `fetchSpeciesStatsCacheRows` re-attaches from the species name it was
- * called with.
- */
-const CORE_STATS_CACHE_COLUMNS = [
-	'time_period',
-	'session_count',
-	'total_effort',
-	'effort_per_session',
-	'effort_per_encounter',
-	'avg_encounters_per_session',
-	'max_per_session',
-	'max_new_per_session',
-	'species_count',
-	'bird_count',
-	'encounter_count',
-	'new_bird_count',
-	'pullus_bird_count',
-	'juv_bird_count',
-	'postjuv_bird_count',
-	'adult_bird_count',
-	'unknown_age_bird_count',
-	'pullus_enc_count',
-	'juv_enc_count',
-	'postjuv_enc_count',
-	'adult_enc_count',
-	'unknown_age_enc_count'
-] as const;
-
-/**
- * The 8 wing/weight columns `biometrics_stats` used to supply as a second RPC
- * call merged in by `mergeBiometricsFields` — `SimpleStatsCacheBySpecies`
- * carries them on the same row as the counts above, so the only caller that
- * wants them (`getSpeciesStatsHistory`) just projects them too. Deliberately
- * nullable in the cache, matching `BiometricsStatsResult`'s own nullability.
- */
-const BIOMETRIC_CACHE_COLUMNS = [
-	'max_weight',
-	'avg_weight',
-	'min_weight',
-	'median_weight',
-	'max_wing',
-	'avg_wing',
-	'min_wing',
-	'median_wing'
-] as const;
-
-/**
  * `time_period` is a `date` column, so PostgREST serialises it as
  * `YYYY-MM-DD` — read the calendar month straight off the middle component
  * rather than via `new Date(...)`, which would drag the server's timezone into
@@ -213,20 +163,25 @@ function calendarMonthOf(timePeriod: string): number {
  * read. Exported (rather than module-private) so `page.tsx` can call it
  * directly, same as every fetcher in this file already does.
  *
- * Species matching used to be the RPCs' `species_name_filter`; the cache keys
- * on a `species_id` FK instead, so the *name* is matched in the same round
- * trip via an `!inner` embed on `Species` — the same embed-plus-filter idiom
- * `fetchPageOfBirds`/`fetchGraphableEncounterData` above use to filter on
- * `session.visit_date`, rather than a second `Species` lookup. The embedded
- * `species_name` itself is never read back: the caller already knows it, so it
- * is re-attached to every row from the argument, which is what keeps the
- * returned rows' `CoreStatsResult` shape intact.
+ * Since #1235 this is a thin species-flavoured adapter over
+ * `readStatsCacheRows` (`app/actions/stats-cache.ts`) rather than its own
+ * hand-rolled query: it mints the authenticated client, names the by-species
+ * table via `bySpecies`, and narrows the generic reader's
+ * `Record<string, unknown>[]` to whatever row type the caller asked for.
+ * Everything the old implementation did itself now belongs to the reader —
+ * the `!inner` `Species` embed that matches the species by *name* (the cache
+ * keys on a `species_id` FK), flattening that embedded `species_name` back
+ * onto every row, the `group_id`/`temporal_unit` equality filters, the
+ * `from_date`/`to_date` → `time_period` range, and the ascending `time_period`
+ * ordering every consumer (the history charts, the period-totals tables)
+ * reads — so there is deliberately no post-processing left here.
  *
- * The rest of the old RPC args map across verbatim: `group_by_time_period`
- * onto `temporal_unit`, `from_date`/`to_date` onto a `time_period` range. The
- * `ORDER BY ... time_period ASC` `core_stats` applied itself becomes an
- * explicit `.order()` here, since every consumer (the history charts, the
- * period-totals tables) was reading an ascending series.
+ * `includeBiometrics` is kept on the signature for its call sites but is a
+ * no-op: the generic reader always `select('*')`s, so the 8 wing/weight
+ * columns ride along on every row regardless. Rows therefore also carry the
+ * raw cache columns a column-subset select used to omit (`id`, `group_id`,
+ * `species_id`, `temporal_unit`) — a superset, which no consumer reads by
+ * name.
  */
 export async function fetchSpeciesStatsCacheRows<
 	RowType extends CoreStatsResult = CoreStatsResult
@@ -235,8 +190,7 @@ export async function fetchSpeciesStatsCacheRows<
 	viewedGroup,
 	temporalUnit,
 	fromDate,
-	toDate,
-	includeBiometrics = false
+	toDate
 }: {
 	speciesName: string;
 	viewedGroup: ViewedGroup;
@@ -246,33 +200,15 @@ export async function fetchSpeciesStatsCacheRows<
 	includeBiometrics?: boolean;
 }): Promise<RowType[]> {
 	const supabase = await getAuthenticatedSupabaseClient();
-	let query = supabase
-		.from('SimpleStatsCacheBySpecies')
-		.select(
-			[
-				...CORE_STATS_CACHE_COLUMNS,
-				...(includeBiometrics ? BIOMETRIC_CACHE_COLUMNS : []),
-				'Species!inner(species_name)'
-			].join(', ')
-		)
-		.eq('group_id', viewedGroup.id)
-		.eq('temporal_unit', temporalUnit)
-		.eq('Species.species_name', speciesName)
-		.order('time_period', { ascending: true });
-	if (fromDate) {
-		query = query.gte('time_period', fromDate);
-	}
-	if (toDate) {
-		query = query.lte('time_period', toDate);
-	}
-	const cacheRows = (await query.then(catchSupabaseErrors)) as Record<
-		string,
-		unknown
-	>[];
-	return cacheRows.map(
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to drop the embed from the returned row; it exists purely to filter on `species_name`
-		({ Species, ...cacheRow }) => ({ ...cacheRow, species_name: speciesName })
-	) as RowType[];
+	return (await readStatsCacheRows({
+		client: supabase,
+		groupId: viewedGroup.id,
+		bySpecies: true,
+		species: speciesName,
+		temporalUnit,
+		fromDate,
+		toDate
+	})) as RowType[];
 }
 
 // Wing/weight + count history for a single species at `interval` granularity
