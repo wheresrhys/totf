@@ -46,6 +46,33 @@ describe('resolvePublicPageViewedGroupId', () => {
 		});
 	});
 
+	describe('the species list path to a public group', () => {
+		it('returns the viewed group id for the species list path', async () => {
+			mockResolveGroupIdBySlug.mockResolvedValue(2);
+			mockResolveGroupPublicAreasForRequest.mockResolvedValue(['summary']);
+
+			expect(await resolvePublicPageViewedGroupId('/group/alpha/species')).toBe(
+				2
+			);
+		});
+
+		it('returns the viewed group id for the species list path with a trailing slash', async () => {
+			mockResolveGroupIdBySlug.mockResolvedValue(2);
+			mockResolveGroupPublicAreasForRequest.mockResolvedValue(['summary']);
+
+			expect(
+				await resolvePublicPageViewedGroupId('/group/alpha/species/')
+			).toBe(2);
+		});
+
+		it('returns null for a species detail path, which stays out of scope', async () => {
+			expect(
+				await resolvePublicPageViewedGroupId('/group/alpha/species/Robin')
+			).toBeNull();
+			expect(mockResolveGroupIdBySlug).not.toHaveBeenCalled();
+		});
+	});
+
 	it('returns null for a summary-subtree path to a non-public group', async () => {
 		mockResolveGroupIdBySlug.mockResolvedValue(2);
 		mockResolveGroupPublicAreasForRequest.mockResolvedValue([]);
@@ -55,7 +82,25 @@ describe('resolvePublicPageViewedGroupId', () => {
 		).toBeNull();
 	});
 
-	it('returns null for a non-summary path, even to a public group', async () => {
+	it('returns null for the species list path to a non-public group', async () => {
+		mockResolveGroupIdBySlug.mockResolvedValue(2);
+		mockResolveGroupPublicAreasForRequest.mockResolvedValue([]);
+
+		expect(
+			await resolvePublicPageViewedGroupId('/group/alpha/species')
+		).toBeNull();
+	});
+
+	it('returns null for a group with a public_areas value other than summary', async () => {
+		mockResolveGroupIdBySlug.mockResolvedValue(2);
+		mockResolveGroupPublicAreasForRequest.mockResolvedValue(['something-else']);
+
+		expect(
+			await resolvePublicPageViewedGroupId('/group/alpha/species')
+		).toBeNull();
+	});
+
+	it('returns null for a path in neither public subtree, even to a public group', async () => {
 		expect(
 			await resolvePublicPageViewedGroupId('/group/alpha/effort')
 		).toBeNull();
