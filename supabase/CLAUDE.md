@@ -708,6 +708,33 @@ touching it:
   batching it is a separate problem), run one row at a time inside a chunk flush so a flush only
   ever has one request in flight.
 
+**The Encounters half of that upsert is about to move into Postgres —
+`merge_upsert_encounters` (#1219).** A group occasionally records the same bird twice on one
+group-day at one site, so two rows collide on
+`encounters_bird_id_location_id_visit_date_unique`, and the generic `.upsert()` resolves that by
+setting every column to whichever row reached Postgres last — discarding whatever the loser
+recorded and the winner didn't. The RPC does the same insert with a custom `ON CONFLICT ... DO
+UPDATE`, under a single uniform rule: **order the contributing rows by `capture_time` ascending
+and take the first non-null value, per column**. The chronologically first record therefore wins
+every field it actually recorded (`capture_time`/`record_type` included — both NOT NULL, so
+"first non-null" is just "the earliest row's value"), and a field it left blank is filled from a
+later duplicate. Three things that follow and are easy to get wrong if the rule is restated
+loosely as "existing non-null wins":
+- The rule is **commutative and associative** — ties on `capture_time` break towards the stored
+  row, and towards the earlier array position within one call's batch — which is the whole point,
+  since the web import flushes chunks at `concurrency: 30` and the two halves of a duplicate pair
+  can be in two chunks racing each other. A client-side read-merge-write would lose updates there.
+- **Same-batch duplicates are folded inside the function**, by the same expression the `ON
+  CONFLICT` clause uses, so there is no second copy of the rule to write in TypeScript (and
+  Postgres rejects a multi-row `ON CONFLICT DO UPDATE` targeting one key twice anyway).
+- `session_id` deliberately keeps last-payload-wins; `ringing_group_id`/`max_hatch_year`/
+  `min_hatch_year` stay with `trg_set_encounter_generated_fields`; `lure_code_*` is untouched
+  because the import never writes it. **Out of scope: duplicates spanning two import runs.**
+
+Nothing calls it yet — `EncounterRowBatchWriter` still goes through the generic `.upsert()`, and
+the call-site swap is its own app-layer ticket. It returns `id` plus the three natural-key columns
+precisely so that swap needs no change to `ChunkEntityIdResolver`.
+
 **Two shared constraints across both writers:**
 
 - **The rate limiter must wrap a chunk flush only, never a whole row.** Throttle
