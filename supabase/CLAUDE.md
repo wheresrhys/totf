@@ -806,6 +806,10 @@ operation, whereas these are six variations on the same `update(...).eq('id', â€
   the monthly stats never refreshed" has to stay a distinguishable state. The unit tests assert the
   whole `.update()` payload rather than individual keys, specifically so a transition that starts
   touching a neighbouring column fails.
+- **Reviving `ComplexStatsCache` is permanently off the table, not deferred (#1201).**
+  `demographics_stats` is the accepted permanent home for `new_adult_bird_count` and the four
+  `returning_age_*_bird_count` columns; `ComplexStatsCache`/`ComplexStatsCacheBySpecies` should not
+  be reintroduced.
 
 Both entry points run the same **location pre-flight** before any row is processed (#1079): a CSV
 naming a `loc_id` the group has no `Locations` row for aborts the whole import with zero writes

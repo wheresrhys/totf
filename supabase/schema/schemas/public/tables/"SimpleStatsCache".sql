@@ -24,8 +24,11 @@
 -- "ComplexStatsCache"/"ComplexStatsCacheBySpecies" pair so they didn't drag
 -- this table's narrowing-by-affected-dates recompute down with them. That
 -- pair's write path had already been disabled before it was removed
--- entirely; mine the history if a lifetime-relative cache is ever needed
--- again.
+-- entirely. This is a permanent decision, not a deferral (#1201):
+-- demographics_stats is the accepted permanent home for
+-- new_adult_bird_count and the four returning_age_*_bird_count columns, and
+-- "ComplexStatsCache"/"ComplexStatsCacheBySpecies" should not be
+-- reintroduced.
 --
 -- With exactly one unique constraint, rows are written with a native
 -- supabase-js .upsert() naming that constraint's column list as its conflict
