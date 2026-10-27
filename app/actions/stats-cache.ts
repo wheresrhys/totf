@@ -8,7 +8,7 @@ import type {
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabaseClient } from '../lib/auth/group-auth';
 import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { TemporalUnit } from '@/lib/stats-cache-refresh';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type StatsResult = CoreStatsResult | BiometricsStatsResult;

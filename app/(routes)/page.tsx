@@ -14,6 +14,7 @@ import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
 import { recentSessionsQuery, topSpeciesQuery } from '@/queries';
+import { getServerCachedStats } from '@/app/actions/stats-cache';
 
 export async function fetchRecentSessions(
 	viewedGroup: ViewedGroup
@@ -33,40 +34,44 @@ export async function fetchRecentSessions(
 	return sessions.filter((s) => recentDates.includes(s.visit_date));
 }
 
+// The all-time and year grains are both real SimpleStatsCache cells read
+// directly (#1221) — refreshSimpleStatsCache recomputes every (group,
+// temporal_unit, time_period) cell from its own raw-Encounters window on
+// every refresh, the same full aggregate core_stats itself would run, not by
+// summing finer cells. Since encounters can't be future-dated, an
+// in-progress year's `year`-grain row for the current year already *is*
+// "year to date" by construction, not an approximation of it — so no
+// from_date/to_date window-juggling is needed, just picking the right
+// time_period row out of every year the group has.
 export async function fetchHomePageSummaryStats(
 	viewedGroup: ViewedGroup
 ): Promise<HomePageSummaryStats | null> {
-	const supabase = await getAuthenticatedSupabaseClient();
 	const currentYear = new Date().getFullYear();
 	const startOfCurrentYear = `${currentYear}-01-01`;
 	const startOfLastYear = `${currentYear - 1}-01-01`;
-	const endOfLastYear = `${currentYear - 1}-12-31`;
-	const [allTime, thisYear, lastYear] = await Promise.all([
-		supabase
-			.rpc('core_stats', { ringing_group_filter: viewedGroup.id })
-			.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>,
-		supabase
-			.rpc('core_stats', {
-				ringing_group_filter: viewedGroup.id,
-				from_date: startOfCurrentYear
-			})
-			.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>,
-		supabase
-			.rpc('core_stats', {
-				ringing_group_filter: viewedGroup.id,
-				from_date: startOfLastYear,
-				to_date: endOfLastYear
-			})
-			.then(catchSupabaseErrors) as Promise<CoreStatsResult[] | null>
-	]);
-	if (allTime?.[0] == null && thisYear?.[0] == null && lastYear?.[0] == null) {
+	const [allTimeRows, yearRows] = (await Promise.all([
+		getServerCachedStats({
+			rpcName: 'core_stats',
+			fetchDataBySpecies: false,
+			temporalUnit: 'all-time',
+			viewedGroup
+		}),
+		getServerCachedStats({
+			rpcName: 'core_stats',
+			fetchDataBySpecies: false,
+			temporalUnit: 'year',
+			viewedGroup
+		})
+	])) as [CoreStatsResult[], CoreStatsResult[]];
+	const allTime = allTimeRows[0] ?? null;
+	const thisYear =
+		yearRows.find((row) => row.time_period === startOfCurrentYear) ?? null;
+	const lastYear =
+		yearRows.find((row) => row.time_period === startOfLastYear) ?? null;
+	if (allTime == null && thisYear == null && lastYear == null) {
 		return null;
 	}
-	return {
-		allTime: allTime?.[0] ?? null,
-		thisYear: thisYear?.[0] ?? null,
-		lastYear: lastYear?.[0] ?? null
-	};
+	return { allTime, thisYear, lastYear };
 }
 
 export async function fetchLastGroupTick(
