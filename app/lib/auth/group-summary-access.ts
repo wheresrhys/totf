@@ -102,7 +102,7 @@ const MONTH_SQUASHED_SENTINEL_YEAR = 2000;
  * what post-processing the rows need to come back in the shape the RPC
  * returned them.
  */
-type StatsCacheQueryPlan = {
+export type StatsCacheQueryPlan = {
 	temporalUnit: TemporalUnit;
 	/** Exactly one cell — an aggregate window that *is* a single cache cell. */
 	timePeriod?: string;
@@ -178,14 +178,22 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
  *    Returning `null` therefore means "arbitrary window": the `/species` list
  *    page's "CES only" range (`YYYY-04-25`..`YYYY-09-05`) and its two
  *    free-text date inputs are the only things that produce one. Those keep
- *    reading the live `core_stats`/`public_core_stats` RPCs, which is also
- *    what the page's biometrics half still does for the same window
- *    (`fetchBiometricsStats`, `app/actions/spp-data.ts`). The alternative was
- *    to serve them a wrong `bird_count`, so the fallback stays until either
- *    the cache gains an arbitrary-window grain or those two filters are
+ *    reading the live `core_stats`/`public_core_stats` RPCs. The alternative
+ *    was to serve them a wrong `bird_count`, so the fallback stays until
+ *    either the cache gains an arbitrary-window grain or those two filters are
  *    reshaped to cache-aligned ones.
+ *
+ * Exported because the `/species` list page's *other* half —
+ * `fetchBiometricsStats` (`app/actions/spp-data.ts`), which fetches the 8
+ * wing/weight columns for the same window — has to split exactly the same way
+ * and must stay in lockstep with this one (#1223). It has its own,
+ * independent reason for needing the same fallback: `AVG`/`MEDIAN` are not
+ * associative, so `avg_weight`/`median_weight`/`avg_wing`/`median_wing` cannot
+ * be rebuilt from finer cache cells for an arbitrary window even
+ * approximately, in the same way the distinct counts above cannot. Two call
+ * sites, one rule — don't re-derive this mapping a second time.
  */
-function resolveStatsCacheQueryPlan({
+export function resolveStatsCacheQueryPlan({
 	from_date: fromDate,
 	to_date: toDate,
 	month_filter: monthFilter,
