@@ -6,13 +6,12 @@ import Page, {
 	fetchSpeciesPageContentForPeriod
 } from '../page';
 import birdsSnapshot from '@/test-fixtures/snapshots/tables/Birds/robin-alpha.page-of-birds.json';
-import robinBiometricsHeadline from '@/test-fixtures/snapshots/biometrics_stats/robin-alpha.headline.json';
 import {
 	makeSpeciesClient,
 	robinSpeciesStats as speciesStats
 } from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '../PageContent';
-import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
+import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
@@ -20,6 +19,7 @@ const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 const {
 	mockGetAuthenticatedSupabaseClient,
 	mockFetchPageOfBirds,
+	mockFetchSpeciesStatsCacheRows,
 	mockFetchYearTotalsTabData,
 	mockFetchMonthTotalsTabData,
 	mockFetchSessionTotalsTabData,
@@ -28,6 +28,7 @@ const {
 } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn(),
 	mockFetchPageOfBirds: vi.fn(),
+	mockFetchSpeciesStatsCacheRows: vi.fn(),
 	mockFetchYearTotalsTabData: vi.fn(),
 	mockFetchMonthTotalsTabData: vi.fn(),
 	mockFetchSessionTotalsTabData: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchPageOfBirds: mockFetchPageOfBirds,
+	fetchSpeciesStatsCacheRows: mockFetchSpeciesStatsCacheRows,
 	fetchYearTotalsTabData: mockFetchYearTotalsTabData,
 	fetchMonthTotalsTabData: mockFetchMonthTotalsTabData,
 	fetchSessionTotalsTabData: mockFetchSessionTotalsTabData,
@@ -67,6 +69,9 @@ describe('species detail page', () => {
 			vi.clearAllMocks();
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeSpeciesClient());
 			mockFetchPageOfBirds.mockResolvedValue(birds);
+			mockFetchSpeciesStatsCacheRows.mockResolvedValue([
+				speciesStats as CoreStatsWithBiometrics
+			]);
 			mockFetchYearTotalsTabData.mockResolvedValue([]);
 			mockFetchMonthTotalsTabData.mockResolvedValue([]);
 			mockFetchSessionTotalsTabData.mockResolvedValue([]);
@@ -163,167 +168,84 @@ describe('species detail page', () => {
 	});
 });
 
-const BIOMETRICS_FIELD_KEYS = [
-	'min_weight',
-	'max_weight',
-	'avg_weight',
-	'median_weight',
-	'min_wing',
-	'max_wing',
-	'avg_wing',
-	'median_wing'
-] as const;
-
-function omitBiometricsFields(row: CoreStatsResult): CoreStatsResult {
-	const copy: Record<string, unknown> = { ...row };
-	for (const key of BIOMETRICS_FIELD_KEYS) delete copy[key];
-	return copy as CoreStatsResult;
-}
-
-function makeAggregateRow(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
-	return {
-		...(speciesStats as CoreStatsResult),
-		...overrides
-	};
-}
-
-// The real captured biometrics_stats row for the exact call getSpeciesStats
-// makes (Robin, Alpha, ungrouped — one headline row), rather than a
-// hand-written literal that can silently drift from the RPC's shape (#883).
-// This fixture's row has species_name/time_period null, but
-// BiometricsStatsResult declares species_name non-null (app/models/db.ts),
-// so a direct assertion doesn't compile (#895).
-const [capturedBiometricsRow] =
-	// eslint-disable-next-line no-restricted-syntax -- see comment above
-	robinBiometricsHeadline as unknown as BiometricsStatsResult[];
-
-function makeBiometricsRow(
-	overrides: Partial<BiometricsStatsResult> = {}
-): BiometricsStatsResult {
-	return {
-		...capturedBiometricsRow,
-		...overrides
-	};
-}
-
-function makeStatsClient({
-	aggregateRows,
-	biometricsRows
-}: {
-	aggregateRows: unknown[];
-	biometricsRows: unknown[];
-}) {
-	const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
-	const client = {
-		rpc: vi.fn((name: string, args: Record<string, unknown>) => {
-			rpcCalls.push({ name, args });
-			const data = name === 'core_stats' ? aggregateRows : biometricsRows;
-			return {
-				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-					Promise.resolve({ data, error: null }).then(resolve)
-			};
-		})
-	};
-	mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
-	return { rpcCalls };
-}
-
 const STATS_SPECIES_NAME = 'Robin';
 const STATS_GROUP_ID = 7;
 const STATS_VIEWED_GROUP: ViewedGroup = { id: STATS_GROUP_ID, slug: 'alpha' };
-const STATS_FROM_DATE = '2023-01-01';
-const STATS_TO_DATE = '2023-12-31';
 
 describe('getSpeciesStats', () => {
 	afterEach(() => {
 		vi.clearAllMocks();
 	});
 
-	it('merges biometrics_stats wing/weight fields onto the core_stats row when both calls succeed', async () => {
-		makeStatsClient({
-			aggregateRows: [makeAggregateRow()],
-			biometricsRows: [makeBiometricsRow({ min_weight: 99 })]
-		});
+	it('reads the all-time cache row when no period is given', async () => {
+		mockFetchSpeciesStatsCacheRows.mockResolvedValue([
+			speciesStats as CoreStatsWithBiometrics
+		]);
 
 		const result = await getSpeciesStats(
 			STATS_SPECIES_NAME,
 			STATS_VIEWED_GROUP
 		);
 
-		expect(result[0].min_weight).toBe(99);
+		expect(mockFetchSpeciesStatsCacheRows).toHaveBeenCalledWith({
+			speciesName: STATS_SPECIES_NAME,
+			viewedGroup: STATS_VIEWED_GROUP,
+			temporalUnit: 'all-time',
+			includeBiometrics: true
+		});
 		expect(result[0].bird_count).toBe(
-			(speciesStats as CoreStatsResult).bird_count
+			(speciesStats as CoreStatsWithBiometrics).bird_count
 		);
 	});
 
-	it('calls biometrics_stats with the same species_name_filter/ringing_group_filter it passes to core_stats', async () => {
-		const { rpcCalls } = makeStatsClient({
-			aggregateRows: [makeAggregateRow()],
-			biometricsRows: [makeBiometricsRow()]
-		});
-
-		await getSpeciesStats(STATS_SPECIES_NAME, STATS_VIEWED_GROUP);
-
-		const aggregateCall = rpcCalls.find((call) => call.name === 'core_stats');
-		const biometricsCall = rpcCalls.find(
-			(call) => call.name === 'biometrics_stats'
-		);
-		expect(biometricsCall?.args).toMatchObject({
-			species_name_filter: STATS_SPECIES_NAME,
-			ringing_group_filter: STATS_GROUP_ID
-		});
-		expect(biometricsCall?.args.species_name_filter).toBe(
-			aggregateCall?.args.species_name_filter
-		);
-		expect(biometricsCall?.args.ringing_group_filter).toBe(
-			aggregateCall?.args.ringing_group_filter
-		);
-	});
-
-	it('omits from_date/to_date from both calls when the page is unscoped (no date range)', async () => {
-		const { rpcCalls } = makeStatsClient({
-			aggregateRows: [makeAggregateRow()],
-			biometricsRows: [makeBiometricsRow()]
-		});
-
-		await getSpeciesStats(STATS_SPECIES_NAME, STATS_VIEWED_GROUP);
-
-		expect(rpcCalls).toHaveLength(2);
-		for (const call of rpcCalls) {
-			expect(call.args).not.toHaveProperty('from_date');
-			expect(call.args).not.toHaveProperty('to_date');
-		}
-	});
-
-	it('includes from_date/to_date in both calls when the page is date-scoped', async () => {
-		const { rpcCalls } = makeStatsClient({
-			aggregateRows: [makeAggregateRow()],
-			biometricsRows: [makeBiometricsRow()]
-		});
+	it('reads the matching year-grain row for a whole-calendar-year range', async () => {
+		mockFetchSpeciesStatsCacheRows.mockResolvedValue([
+			speciesStats as CoreStatsWithBiometrics
+		]);
 
 		await getSpeciesStats(
 			STATS_SPECIES_NAME,
 			STATS_VIEWED_GROUP,
-			STATS_FROM_DATE,
-			STATS_TO_DATE
+			'2023-01-01',
+			'2023-12-31'
 		);
 
-		expect(rpcCalls).toHaveLength(2);
-		for (const call of rpcCalls) {
-			expect(call.args).toMatchObject({
-				from_date: STATS_FROM_DATE,
-				to_date: STATS_TO_DATE
-			});
-		}
+		expect(mockFetchSpeciesStatsCacheRows).toHaveBeenCalledWith({
+			speciesName: STATS_SPECIES_NAME,
+			viewedGroup: STATS_VIEWED_GROUP,
+			temporalUnit: 'year',
+			fromDate: '2023-01-01',
+			toDate: '2023-01-01',
+			includeBiometrics: true
+		});
 	});
 
-	it('passes month_filter to both calls when monthFilter is supplied', async () => {
-		const { rpcCalls } = makeStatsClient({
-			aggregateRows: [makeAggregateRow()],
-			biometricsRows: [makeBiometricsRow()]
+	it('reads the matching month-grain row for a whole-calendar-month range', async () => {
+		mockFetchSpeciesStatsCacheRows.mockResolvedValue([
+			speciesStats as CoreStatsWithBiometrics
+		]);
+
+		await getSpeciesStats(
+			STATS_SPECIES_NAME,
+			STATS_VIEWED_GROUP,
+			'2023-08-01',
+			'2023-08-31'
+		);
+
+		expect(mockFetchSpeciesStatsCacheRows).toHaveBeenCalledWith({
+			speciesName: STATS_SPECIES_NAME,
+			viewedGroup: STATS_VIEWED_GROUP,
+			temporalUnit: 'month',
+			fromDate: '2023-08-01',
+			toDate: '2023-08-01',
+			includeBiometrics: true
 		});
+	});
+
+	it('reads the matching month-squashed row for a bare monthFilter', async () => {
+		mockFetchSpeciesStatsCacheRows.mockResolvedValue([
+			speciesStats as CoreStatsWithBiometrics
+		]);
 
 		await getSpeciesStats(
 			STATS_SPECIES_NAME,
@@ -333,41 +255,24 @@ describe('getSpeciesStats', () => {
 			1
 		);
 
-		expect(rpcCalls).toHaveLength(2);
-		for (const call of rpcCalls) {
-			expect(call.args).toMatchObject({ month_filter: 1 });
-		}
+		expect(mockFetchSpeciesStatsCacheRows).toHaveBeenCalledWith({
+			speciesName: STATS_SPECIES_NAME,
+			viewedGroup: STATS_VIEWED_GROUP,
+			temporalUnit: 'month-squashed',
+			fromDate: '2000-01-01',
+			toDate: '2000-01-01',
+			includeBiometrics: true
+		});
 	});
 
-	it('omits month_filter from both calls when no monthFilter is supplied', async () => {
-		const { rpcCalls } = makeStatsClient({
-			aggregateRows: [makeAggregateRow()],
-			biometricsRows: [makeBiometricsRow()]
-		});
-
-		await getSpeciesStats(STATS_SPECIES_NAME, STATS_VIEWED_GROUP);
-
-		expect(rpcCalls).toHaveLength(2);
-		for (const call of rpcCalls) {
-			expect(call.args).not.toHaveProperty('month_filter');
-		}
-	});
-
-	it('still returns a valid speciesStats row when core_stats happens to already omit the wing/weight columns', async () => {
-		makeStatsClient({
-			aggregateRows: [omitBiometricsFields(makeAggregateRow())],
-			biometricsRows: [makeBiometricsRow({ min_weight: 12, max_wing: 88 })]
-		});
+	it('returns an empty array when the cache has no matching row', async () => {
+		mockFetchSpeciesStatsCacheRows.mockResolvedValue([]);
 
 		const result = await getSpeciesStats(
 			STATS_SPECIES_NAME,
 			STATS_VIEWED_GROUP
 		);
 
-		expect(result[0].min_weight).toBe(12);
-		expect(result[0].max_wing).toBe(88);
-		expect(result[0].bird_count).toBe(
-			(speciesStats as CoreStatsResult).bird_count
-		);
+		expect(result).toEqual([]);
 	});
 });
