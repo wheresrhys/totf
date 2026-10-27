@@ -38,7 +38,8 @@ const speciesStats = mergeSpeciesBiometrics(
 
 const pageData: PageData = {
 	speciesStats,
-	years: [2021, 2022, 2023]
+	years: [2021, 2022, 2023],
+	accessLevel: 'own'
 };
 
 describe('SppStatsTable', () => {
@@ -120,6 +121,48 @@ describe('SppStatsTable', () => {
 		});
 	});
 
+	describe('arbitrary-window date controls (CES only checkbox + date inputs)', () => {
+		it.each(['own', 'shared'] as const)(
+			"renders the CES only checkbox and both date inputs for a '%s' access level",
+			(accessLevel) => {
+				render(
+					<SppStatsTable
+						data={{ ...pageData, accessLevel }}
+						viewedGroup={{ id: 1, slug: 'alpha' }}
+					/>
+				);
+				expect(screen.queryByLabelText('CES only')).not.toBeNull();
+				expect(screen.queryByLabelText('From date')).not.toBeNull();
+				expect(screen.queryByLabelText('To date')).not.toBeNull();
+			}
+		);
+
+		it.each(['public', 'blocked'] as const)(
+			"hides the CES only checkbox and both date inputs for a '%s' access level",
+			(accessLevel) => {
+				render(
+					<SppStatsTable
+						data={{ ...pageData, accessLevel }}
+						viewedGroup={{ id: 1, slug: 'alpha' }}
+					/>
+				);
+				expect(screen.queryByLabelText('CES only')).toBeNull();
+				expect(screen.queryByLabelText('From date')).toBeNull();
+				expect(screen.queryByLabelText('To date')).toBeNull();
+			}
+		);
+
+		it('still renders the year selector when CES only and date inputs are hidden', () => {
+			render(
+				<SppStatsTable
+					data={{ ...pageData, accessLevel: 'public' }}
+					viewedGroup={{ id: 1, slug: 'alpha' }}
+				/>
+			);
+			expect(screen.queryByLabelText('select')).not.toBeNull();
+		});
+	});
+
 	describe('biometrics data', () => {
 		it('renders a blank cell for a biometric column when that species has no biometrics_stats row', () => {
 			const [firstSpecies, ...restSpecies] = speciesStats;
@@ -136,7 +179,8 @@ describe('SppStatsTable', () => {
 			};
 			const pageDataWithMissingBiometrics: PageData = {
 				speciesStats: [speciesWithoutBiometrics, ...restSpecies],
-				years: [2021, 2022, 2023]
+				years: [2021, 2022, 2023],
+				accessLevel: 'own'
 			};
 
 			render(

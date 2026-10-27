@@ -42,12 +42,22 @@ const sortableColumnConfigs = speciesStatConfigs.reduce(
 );
 
 export function SppStatsTable({
-	data: { speciesStats: initialSpeciesStats, years },
+	data: { speciesStats: initialSpeciesStats, years, accessLevel },
 	viewedGroup
 }: {
 	data: PageData;
 	viewedGroup: ViewedGroup;
 }) {
+	// The arbitrary-window fallback (the "CES only" checkbox and the two
+	// free-text date inputs) only ever reaches the live `core_stats`/
+	// `public_core_stats` RPCs — never the `SimpleStatsCacheBySpecies` cache
+	// tables a 'public' viewer's unauthenticated client is granted against
+	// (#1232). An 'own'/'shared' viewer is the only one who can meaningfully
+	// use it; a 'public' (or 'blocked') viewer gets the year selector alone,
+	// matching #1223's existing own/shared grouping for the biometrics half of
+	// this same page.
+	const canUseArbitraryWindow =
+		accessLevel === 'own' || accessLevel === 'shared';
 	// Declared inside the component so it can close over `viewedGroup` —
 	// SortableTable only ever hands its TableBodyComponent `data` and
 	// `columnConfigs`. Same approach as SpeciesTotalsTable's own body
@@ -170,49 +180,53 @@ export function SppStatsTable({
 								))}
 							</select>
 						</div>
-						<div className="flex items-center gap-2">
-							<label
-								htmlFor="ces-only-checkbox"
-								className={`shrink-0 ${!year ? 'text-gray-400' : ''}`}
-							>
-								CES only
-							</label>
-							<input
-								id="ces-only-checkbox"
-								type="checkbox"
-								className="checkbox"
-								onChange={handleCesOnlyChange}
-								checked={cesOnly}
-								disabled={!year}
-							/>
-						</div>
+						{canUseArbitraryWindow && (
+							<div className="flex items-center gap-2">
+								<label
+									htmlFor="ces-only-checkbox"
+									className={`shrink-0 ${!year ? 'text-gray-400' : ''}`}
+								>
+									CES only
+								</label>
+								<input
+									id="ces-only-checkbox"
+									type="checkbox"
+									className="checkbox"
+									onChange={handleCesOnlyChange}
+									checked={cesOnly}
+									disabled={!year}
+								/>
+							</div>
+						)}
 					</div>
-					<div className="flex gap-2 flex-wrap justify-end">
-						<div className="flex items-center gap-2">
-							<label htmlFor="from-date-input" className="shrink-0">
-								From date
-							</label>
-							<input
-								id="from-date-input"
-								type="date"
-								className="input max-w-sm"
-								onChange={handleDateChange}
-								value={fromDate ?? ''}
-							/>
+					{canUseArbitraryWindow && (
+						<div className="flex gap-2 flex-wrap justify-end">
+							<div className="flex items-center gap-2">
+								<label htmlFor="from-date-input" className="shrink-0">
+									From date
+								</label>
+								<input
+									id="from-date-input"
+									type="date"
+									className="input max-w-sm"
+									onChange={handleDateChange}
+									value={fromDate ?? ''}
+								/>
+							</div>
+							<div className="flex items-center gap-2">
+								<label htmlFor="to-date-input" className="shrink-0">
+									To date
+								</label>
+								<input
+									id="to-date-input"
+									type="date"
+									className="input max-w-sm"
+									onChange={handleDateChange}
+									value={toDate ?? ''}
+								/>
+							</div>
 						</div>
-						<div className="flex items-center gap-2">
-							<label htmlFor="to-date-input" className="shrink-0">
-								To date
-							</label>
-							<input
-								id="to-date-input"
-								type="date"
-								className="input max-w-sm"
-								onChange={handleDateChange}
-								value={toDate ?? ''}
-							/>
-						</div>
-					</div>
+					)}
 				</form>
 			</PageWrapper>
 			<SortableTable<SpeciesStatsRow, SpeciesStatsRow>

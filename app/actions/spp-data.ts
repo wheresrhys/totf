@@ -2,6 +2,7 @@
 import {
 	fetchAuthorisedCoreStats,
 	resolveStatsCacheQueryPlan,
+	type GroupSummaryAccessLevel,
 	type StatsCacheQueryPlan
 } from '@/app/lib/auth/group-summary-access';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
@@ -177,12 +178,24 @@ async function fetchBiometricsStats(
 	return rows ?? [];
 }
 
-export async function fetchSpeciesData(
+/**
+ * `fetchSpeciesData`'s result alongside the `accessLevel` that served it —
+ * for the one caller (the `/species` list page, #1232) that needs to know
+ * whether the viewer can reach the arbitrary-window fallback (the "CES only"
+ * checkbox and its two free-text date inputs) at all. Every other caller
+ * keeps using the rows-only `fetchSpeciesData` below, unaffected.
+ */
+export type SpeciesDataWithAccessLevel = {
+	accessLevel: GroupSummaryAccessLevel;
+	rows: SpeciesStatsRow[];
+};
+
+async function resolveSpeciesData(
 	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
-): Promise<SpeciesStatsRow[]> {
+): Promise<SpeciesDataWithAccessLevel> {
 	const { accessLevel, rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		from_date: fromDate,
 		to_date: toDate,
@@ -195,5 +208,34 @@ export async function fetchSpeciesData(
 			? await fetchBiometricsStats(viewedGroup, fromDate, toDate, monthFilter)
 			: [];
 
-	return mergeSpeciesBiometrics(rows, biometricsRows);
+	return { accessLevel, rows: mergeSpeciesBiometrics(rows, biometricsRows) };
+}
+
+export async function fetchSpeciesData(
+	viewedGroup: ViewedGroup,
+	fromDate?: string,
+	toDate?: string,
+	monthFilter?: number
+): Promise<SpeciesStatsRow[]> {
+	const { rows } = await resolveSpeciesData(
+		viewedGroup,
+		fromDate,
+		toDate,
+		monthFilter
+	);
+	return rows;
+}
+
+/**
+ * Same read as `fetchSpeciesData`, but surfaces the `accessLevel` that
+ * `fetchAuthorisedCoreStats` resolved instead of discarding it — see
+ * `SpeciesDataWithAccessLevel`'s doc comment for who needs this and why.
+ */
+export async function fetchSpeciesDataWithAccessLevel(
+	viewedGroup: ViewedGroup,
+	fromDate?: string,
+	toDate?: string,
+	monthFilter?: number
+): Promise<SpeciesDataWithAccessLevel> {
+	return resolveSpeciesData(viewedGroup, fromDate, toDate, monthFilter);
 }
