@@ -112,9 +112,6 @@ the root layout, not a subtree one.
     spelling. supabase-js' `.order('species_name', { referencedTable: 'Species' })` orders rows
     _within_ the embed, which for a to-one relationship leaves the parent rows arbitrary — and both
     pagination and the rule finders' stable tie-breaking depend on a total order.
-  - `cachedSupabaseFetch` (`app/lib/cached-supabase-fetch.ts`) survives for exactly one caller,
-    `fetchStatsSpines`: `stats_spine` has no cache-table equivalent. A table read needs no
-    version/TTL memo, so don't wrap a new one in it.
 - **Temporal filtering** of a direct `Encounters` table query goes through `applyTemporalFilter`
   (`app/lib/supabase/temporal-filter.ts`, #1075) — never hand-rolled `.gte`/`.lte` calls. It takes
   the standard `{fromDate, toDate, year, month}` filter (#1051, the same shape as the stats RPC

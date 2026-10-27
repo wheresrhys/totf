@@ -1,13 +1,8 @@
 'use server';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
-import type {
-	BiometricsStatsResult,
-	CoreStatsResult,
-	StatsSpineResult
-} from '@/app/models/db';
+import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabaseClient } from '../lib/auth/group-auth';
-import { cachedSupabaseFetch } from '../lib/cached-supabase-fetch';
 import type { TemporalUnit } from '@/lib/stats-cache-refresh';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
@@ -188,33 +183,4 @@ export async function fetchCoreStatsByMonth(
 		temporalUnit: 'month',
 		viewedGroup
 	})) as CoreStatsResult[];
-}
-
-export async function fetchStatsSpines(viewedGroup: ViewedGroup): Promise<{
-	years: string[];
-	months: string[];
-	days: string[];
-}> {
-	const [years, months, days] = await Promise.all(
-		['year', 'month', 'day'].map((temporalUnit) =>
-			cachedSupabaseFetch(
-				`${temporalUnit}-stats-spine`,
-				viewedGroup,
-				async (supabase: SupabaseClient, groupId: number) => {
-					const rows = await fetchAllPaginatedRows<StatsSpineResult>(
-						(fromRow, toRow) =>
-							supabase
-								.rpc('stats_spine', {
-									ringing_group_filter: groupId,
-									group_by_time_period: temporalUnit
-								})
-								.order('time_period')
-								.range(fromRow, toRow)
-					);
-					return rows.map((row) => row.time_period);
-				}
-			)
-		)
-	);
-	return { years, months, days };
 }

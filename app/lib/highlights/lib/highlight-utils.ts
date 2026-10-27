@@ -11,7 +11,6 @@ import type {
 } from '../types';
 import { isNumericHighlightValue } from '../types';
 import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { StatsResult } from '@/app/actions/stats-cache';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 export type StatFilter = (stat: {

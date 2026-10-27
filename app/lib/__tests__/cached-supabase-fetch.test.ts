@@ -30,10 +30,7 @@ const mockFrom = vi.fn((table: string) => {
 const mockDataFetcher = vi.fn();
 
 // The module memoises each stats blob at module scope via its own cache Map,
-// so each test imports a fresh copy of the module. Its one remaining caller is
-// fetchStatsSpines (app/actions/stats-cache.ts) — the stats readers that used
-// to share this mechanism now read the SimpleStatsCache tables directly and
-// need no version/TTL memo at all.
+// so each test imports a fresh copy of the module.
 async function importCachedFetch() {
 	vi.resetModules();
 	return import('../cached-supabase-fetch');
