@@ -119,9 +119,10 @@ export type GenericStatsCacheReadParams = {
  * currently carries (`getStatsCacheTableFetcher`/`getServerCachedStats`
  * below, `fetchSpeciesStatsCacheRows` in `app/actions/sp-data.ts`, and
  * `runStatsCacheRead` in `app/lib/auth/group-summary-access.ts`), which three
- * follow-up tickets (#1234/#1235/#1236) each migrate onto in turn. Deliberately
- * additive: nothing above this point is touched, and nothing yet calls this
- * function.
+ * follow-up tickets (#1234/#1235/#1236) each migrate onto in turn.
+ * `fetchSpeciesStatsCacheRows` is the first to land (#1235) and is now a thin
+ * species-flavoured adapter over this function; the other two still carry
+ * their own hand-rolled queries.
  *
  * Unlike every existing reader, this one always `select('*')`s rather than a
  * hand-picked `CORE_STATS_CACHE_COLUMNS`-shaped column subset — that's the

@@ -3,6 +3,7 @@ import {
 	fetchPageOfBirds,
 	fetchNotableRetraps,
 	fetchGraphableEncounterData,
+	fetchSpeciesStatsCacheRows,
 	getSpeciesStatsHistory,
 	getSpeciesDemographicsStats,
 	getSpeciesArrivalsStats,
@@ -19,24 +20,36 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 import { makeRpcCallRecorder } from '@/app/__tests__/helpers/rpc-recorder';
 
-const { mockGetAuthenticatedSupabaseClient, mockFetchCoreStatsByMonth } =
-	vi.hoisted(() => ({
-		mockGetAuthenticatedSupabaseClient: vi.fn(),
-		mockFetchCoreStatsByMonth: vi.fn()
-	}));
+const {
+	mockGetAuthenticatedSupabaseClient,
+	mockFetchCoreStatsByMonth,
+	mockReadStatsCacheRows
+} = vi.hoisted(() => ({
+	mockGetAuthenticatedSupabaseClient: vi.fn(),
+	mockFetchCoreStatsByMonth: vi.fn(),
+	mockReadStatsCacheRows: vi.fn()
+}));
 
 vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
-// getGroupEffortHistory delegates the RPC call + caching to
-// fetchCoreStatsByMonth (app/actions/stats-cache.ts) — that function's own
-// RPC-args/caching behaviour is covered by the fetchCoreStatsByMonth
-// describe block in __tests__/stats-cache.test.ts, so here it's mocked
-// directly and these tests only assert the interval->hours conversion +
-// [time_period, hours] pair shaping.
+// Both of this file's collaborators in app/actions/stats-cache.ts are mocked,
+// because each is a black box with its own describe block in
+// __tests__/stats-cache.test.ts:
+//
+// - getGroupEffortHistory delegates the whole cache read to
+//   fetchCoreStatsByMonth, so its tests here only assert the interval->hours
+//   conversion + [time_period, hours] pair shaping.
+// - fetchSpeciesStatsCacheRows delegates the whole SimpleStatsCacheBySpecies
+//   query — table choice, the !inner Species embed, filtering, ordering,
+//   pagination and species_name flattening — to the generic
+//   readStatsCacheRows (#1233/#1235), whose own suite covers all of that. So
+//   these tests assert the params this file hands it and what each caller
+//   does with the rows it returns, not the query it issues.
 vi.mock('../stats-cache', () => ({
-	fetchCoreStatsByMonth: mockFetchCoreStatsByMonth
+	fetchCoreStatsByMonth: mockFetchCoreStatsByMonth,
+	readStatsCacheRows: mockReadStatsCacheRows
 }));
 
 const SPECIES_ID = 1;
@@ -81,22 +94,33 @@ function makeClient({
 	return { client, queryRecord: query.record, rpcCalls };
 }
 
-const STATS_CACHE_TABLE = 'SimpleStatsCacheBySpecies';
-
-// Every `SimpleStatsCacheBySpecies` read applies the same three equality
-// filters before any `time_period` range narrowing: the group, the temporal
-// grain, and the species — matched by *name* through the `!inner` `Species`
-// embed, since the cache itself keys on a `species_id` FK.
-function cacheReadFilters(temporalUnit: string) {
-	return [
-		{ column: 'group_id', operator: 'eq', value: GROUP_ID },
-		{ column: 'temporal_unit', operator: 'eq', value: temporalUnit },
-		{ column: 'Species.species_name', operator: 'eq', value: SPECIES_NAME }
-	];
+// Every species stats read asks the generic reader for the same thing — the
+// by-species cache table, this group, this species (matched by *name*, which
+// the reader resolves through its `!inner` `Species` embed) — varying only the
+// temporal grain and the optional `time_period` range.
+function cacheReadParams(
+	temporalUnit: string,
+	{ fromDate, toDate }: { fromDate?: string; toDate?: string } = {}
+) {
+	return {
+		client: expect.anything(),
+		groupId: GROUP_ID,
+		bySpecies: true,
+		species: SPECIES_NAME,
+		temporalUnit,
+		fromDate,
+		toDate
+	};
 }
 
-function timePeriodFilter(operator: 'gte' | 'lte', value: string) {
-	return { column: 'time_period', operator, value };
+// The rows the mocked generic reader hands back. It always resolves
+// `species_name` onto a by-species row itself (readStatsCacheRows' own
+// "species_name resolution on returned rows" tests), so every fixture here
+// carries it rather than an un-flattened `Species` embed.
+function mockCacheRows(rows: Record<string, unknown>[]) {
+	mockReadStatsCacheRows.mockResolvedValue(
+		rows.map((row) => ({ species_name: SPECIES_NAME, ...row }))
+	);
 }
 
 function birdRow(encounterDates: string[]) {
@@ -125,6 +149,7 @@ function birdRow(encounterDates: string[]) {
 describe('sp-data actions', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockCacheRows([]);
 	});
 
 	describe('fetchPageOfBirds', () => {
@@ -231,30 +256,94 @@ describe('sp-data actions', () => {
 		});
 	});
 
+	describe('fetchSpeciesStatsCacheRows', () => {
+		it('asks the generic reader for the by-species table, this group and this species, through the authenticated client', async () => {
+			const { client } = makeClient();
+
+			await fetchSpeciesStatsCacheRows({
+				speciesName: SPECIES_NAME,
+				viewedGroup,
+				temporalUnit: 'month'
+			});
+
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
+				...cacheReadParams('month'),
+				client
+			});
+		});
+
+		it('forwards fromDate/toDate to the generic reader as its time_period range', async () => {
+			makeClient();
+
+			await fetchSpeciesStatsCacheRows({
+				speciesName: SPECIES_NAME,
+				viewedGroup,
+				temporalUnit: 'day',
+				fromDate: FROM_DATE,
+				toDate: TO_DATE
+			});
+
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('day', { fromDate: FROM_DATE, toDate: TO_DATE })
+			);
+		});
+
+		it("returns the reader's rows untouched, species_name and all — the reader resolves the embed, so there is nothing left to adapt", async () => {
+			makeClient();
+			mockCacheRows([{ time_period: '2023-01-01', bird_count: 5 }]);
+
+			const result = await fetchSpeciesStatsCacheRows({
+				speciesName: SPECIES_NAME,
+				viewedGroup,
+				temporalUnit: 'month'
+			});
+
+			expect(result).toEqual([
+				{
+					species_name: SPECIES_NAME,
+					time_period: '2023-01-01',
+					bird_count: 5
+				}
+			]);
+			expect(result[0]).not.toHaveProperty('Species');
+		});
+
+		it('still returns the biometric columns when includeBiometrics is false, since the read no longer varies by column subset', async () => {
+			makeClient();
+			mockCacheRows([
+				{ time_period: '2023-01-01', bird_count: 5, median_wing: 55 }
+			]);
+
+			const [row] = await fetchSpeciesStatsCacheRows({
+				speciesName: SPECIES_NAME,
+				viewedGroup,
+				temporalUnit: 'month',
+				includeBiometrics: false
+			});
+
+			// `includeBiometrics` used to pick a wider column subset; the generic
+			// reader selects '*', so the flag is a no-op and the wing/weight
+			// columns ride along either way.
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('month')
+			);
+			expect(row).toMatchObject({ median_wing: 55 });
+		});
+	});
+
 	describe('getSpeciesStatsHistory', () => {
-		it('reads SimpleStatsCacheBySpecies, projecting the biometric columns alongside the counts', async () => {
-			const { client, queryRecord } = makeClient();
+		it('reads the monthly grain by default, with no time_period range when none is supplied', async () => {
+			makeClient();
 
 			await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
 
-			expect(client.from).toHaveBeenCalledWith(STATS_CACHE_TABLE);
-			// One read, not two: the cache row carries both the counts and the
-			// wing/weight columns biometrics_stats used to supply separately.
-			expect(queryRecord.select).toContain('bird_count');
-			expect(queryRecord.select).toContain('median_wing');
-			expect(queryRecord.select).toContain('Species!inner(species_name)');
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('month')
+			);
 		});
 
-		it('filters by group, the monthly grain and the species name, with no time_period range when none is supplied', async () => {
-			const { queryRecord } = makeClient();
-
-			await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
-
-			expect(queryRecord.filters).toEqual(cacheReadFilters('month'));
-		});
-
-		it('forwards from_date/to_date as time_period gte/lte filters', async () => {
-			const { queryRecord } = makeClient();
+		it("forwards from_date/to_date as the read's time_period range", async () => {
+			makeClient();
 
 			await getSpeciesStatsHistory(
 				SPECIES_NAME,
@@ -263,15 +352,13 @@ describe('sp-data actions', () => {
 				TO_DATE
 			);
 
-			expect(queryRecord.filters).toEqual([
-				...cacheReadFilters('month'),
-				timePeriodFilter('gte', FROM_DATE),
-				timePeriodFilter('lte', TO_DATE)
-			]);
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('month', { fromDate: FROM_DATE, toDate: TO_DATE })
+			);
 		});
 
-		it('with interval "year" filters temporal_unit "year"', async () => {
-			const { queryRecord } = makeClient();
+		it('with interval "year" reads the "year" grain', async () => {
+			makeClient();
 
 			await getSpeciesStatsHistory(
 				SPECIES_NAME,
@@ -281,11 +368,13 @@ describe('sp-data actions', () => {
 				'year'
 			);
 
-			expect(queryRecord.filters).toEqual(cacheReadFilters('year'));
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('year')
+			);
 		});
 
 		it('with interval "month" passed explicitly matches the default', async () => {
-			const { queryRecord } = makeClient();
+			makeClient();
 
 			await getSpeciesStatsHistory(
 				SPECIES_NAME,
@@ -295,36 +384,35 @@ describe('sp-data actions', () => {
 				'month'
 			);
 
-			expect(queryRecord.filters).toEqual(cacheReadFilters('month'));
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('month')
+			);
 		});
 
-		it('returns an empty array without erroring when the table read returns no rows', async () => {
-			makeClient({ queryRows: [] });
+		it('returns an empty array without erroring when the cache read returns no rows', async () => {
+			makeClient();
+			mockCacheRows([]);
 
 			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
 
 			expect(result).toEqual([]);
 		});
 
-		it("maps a cache row's biometric columns straight onto the result, re-attaching species_name and dropping the Species embed", async () => {
-			makeClient({
-				queryRows: [
-					{
-						time_period: '2023-01-01',
-						bird_count: 5,
-						min_weight: 99,
-						max_weight: 100,
-						Species: { species_name: SPECIES_NAME }
-					}
-				]
-			});
+		it("maps a cache row's biometric columns straight onto the result alongside the counts", async () => {
+			makeClient();
+			mockCacheRows([
+				{
+					time_period: '2023-01-01',
+					bird_count: 5,
+					min_weight: 99,
+					max_weight: 100
+				}
+			]);
 
 			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
 
 			// There is only one source now, so nothing is merged: the row's own
-			// columns are the result, with species_name re-attached from the
-			// argument (the cache stores species_id) and the embed — present
-			// purely to filter on the name — dropped.
+			// columns are the result.
 			expect(result).toEqual([
 				{
 					species_name: SPECIES_NAME,
@@ -342,22 +430,21 @@ describe('sp-data actions', () => {
 			// species/period with no biometric-eligible encounters arrives as
 			// nulls on the row itself rather than being synthesised from a
 			// missing sibling row.
-			makeClient({
-				queryRows: [
-					{
-						time_period: '2023-03-01',
-						bird_count: 2,
-						min_weight: null,
-						max_weight: null,
-						avg_weight: null,
-						median_weight: null,
-						min_wing: null,
-						max_wing: null,
-						avg_wing: null,
-						median_wing: null
-					}
-				]
-			});
+			makeClient();
+			mockCacheRows([
+				{
+					time_period: '2023-03-01',
+					bird_count: 2,
+					min_weight: null,
+					max_weight: null,
+					avg_weight: null,
+					median_weight: null,
+					min_wing: null,
+					max_wing: null,
+					avg_wing: null,
+					median_wing: null
+				}
+			]);
 
 			const result = await getSpeciesStatsHistory(SPECIES_NAME, viewedGroup);
 
@@ -568,25 +655,28 @@ describe('sp-data actions', () => {
 			{ time_period: '2023-04-02', bird_count: 4 }
 		];
 
-		it('with timeInterval "year" reads SimpleStatsCacheBySpecies filtered to the species and temporal_unit "year"', async () => {
-			const { client, queryRecord } = makeClient();
+		it('with timeInterval "year" reads the by-species cache at the "year" grain, filtered to the species', async () => {
+			makeClient();
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'year');
 
-			expect(client.from).toHaveBeenCalledWith(STATS_CACHE_TABLE);
-			expect(queryRecord.filters).toEqual(cacheReadFilters('year'));
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('year')
+			);
 		});
 
-		it('with timeInterval "month" filters temporal_unit "month"', async () => {
-			const { queryRecord } = makeClient();
+		it('with timeInterval "month" reads the "month" grain', async () => {
+			makeClient();
 
 			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'month');
 
-			expect(queryRecord.filters).toEqual(cacheReadFilters('month'));
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('month')
+			);
 		});
 
-		it('forwards from_date/to_date as time_period range filters', async () => {
-			const { queryRecord } = makeClient();
+		it("forwards from_date/to_date as the read's time_period range", async () => {
+			makeClient();
 
 			await fetchSpeciesPeriodTotals(
 				SPECIES_NAME,
@@ -596,25 +686,14 @@ describe('sp-data actions', () => {
 				TO_DATE
 			);
 
-			expect(queryRecord.filters).toEqual([
-				...cacheReadFilters('month'),
-				timePeriodFilter('gte', FROM_DATE),
-				timePeriodFilter('lte', TO_DATE)
-			]);
-		});
-
-		it('omits the time_period range filters when no range is supplied', async () => {
-			const { queryRecord } = makeClient();
-
-			await fetchSpeciesPeriodTotals(SPECIES_NAME, viewedGroup, 'month');
-
-			expect(queryRecord.filters).not.toContainEqual(
-				expect.objectContaining({ column: 'time_period' })
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('month', { fromDate: FROM_DATE, toDate: TO_DATE })
 			);
 		});
 
 		it('with timeInterval "day" and a monthFilter alongside a date range, narrows the date-ranged rows to that calendar month client-side', async () => {
-			const { queryRecord } = makeClient({ queryRows: dayRowsAcrossMonths });
+			makeClient();
+			mockCacheRows(dayRowsAcrossMonths);
 
 			const result = await fetchSpeciesPeriodTotals(
 				SPECIES_NAME,
@@ -627,12 +706,10 @@ describe('sp-data actions', () => {
 
 			// The month itself can't be a query filter — `time_period` is a plain
 			// `date` with no separate month column — so only the range reaches
-			// PostgREST and the month is applied to the rows it returns.
-			expect(queryRecord.filters).toEqual([
-				...cacheReadFilters('day'),
-				timePeriodFilter('gte', FROM_DATE),
-				timePeriodFilter('lte', TO_DATE)
-			]);
+			// the cache read and the month is applied to the rows it returns.
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('day', { fromDate: FROM_DATE, toDate: TO_DATE })
+			);
 			expect(result.map((row) => row.time_period)).toEqual([
 				'2023-03-08',
 				'2023-03-22'
@@ -640,7 +717,8 @@ describe('sp-data actions', () => {
 		});
 
 		it('with a monthFilter but no date range (the squashed-month route), narrows every historical "day" row to that calendar month', async () => {
-			const { queryRecord } = makeClient({ queryRows: dayRowsAcrossMonths });
+			makeClient();
+			mockCacheRows(dayRowsAcrossMonths);
 
 			const result = await fetchSpeciesPeriodTotals(
 				SPECIES_NAME,
@@ -651,12 +729,15 @@ describe('sp-data actions', () => {
 				4
 			);
 
-			expect(queryRecord.filters).toEqual(cacheReadFilters('day'));
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('day')
+			);
 			expect(result.map((row) => row.time_period)).toEqual(['2023-04-02']);
 		});
 
 		it('omits the month narrowing when no monthFilter is supplied', async () => {
-			makeClient({ queryRows: dayRowsAcrossMonths });
+			makeClient();
+			mockCacheRows(dayRowsAcrossMonths);
 
 			const result = await fetchSpeciesPeriodTotals(
 				SPECIES_NAME,
@@ -675,13 +756,12 @@ describe('sp-data actions', () => {
 			// year + month_filter combination used to — but its rows have to come
 			// back year-grained, since that's the shape the squashed-month route's
 			// "Year totals" tab reads.
-			const { queryRecord } = makeClient({
-				queryRows: [
-					{ time_period: '2022-03-01', bird_count: 7 },
-					{ time_period: '2022-04-01', bird_count: 8 },
-					{ time_period: '2023-03-01', bird_count: 9 }
-				]
-			});
+			makeClient();
+			mockCacheRows([
+				{ time_period: '2022-03-01', bird_count: 7 },
+				{ time_period: '2022-04-01', bird_count: 8 },
+				{ time_period: '2023-03-01', bird_count: 9 }
+			]);
 
 			const result = await fetchSpeciesPeriodTotals(
 				SPECIES_NAME,
@@ -692,7 +772,9 @@ describe('sp-data actions', () => {
 				3
 			);
 
-			expect(queryRecord.filters).toEqual(cacheReadFilters('month'));
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('month')
+			);
 			expect(result).toEqual([
 				{
 					species_name: SPECIES_NAME,
@@ -714,18 +796,20 @@ describe('sp-data actions', () => {
 	// already covers the underlying cache-read behaviour in full.
 	describe('fetchYearTotalsTabData', () => {
 		it('delegates to fetchSpeciesPeriodTotals with timeInterval "year"', async () => {
-			const { queryRecord } = makeClient();
+			makeClient();
 			const params: SpeciesTotalsTabParams = { speciesName: SPECIES_NAME };
 
 			await fetchYearTotalsTabData(params, viewedGroup);
 
-			expect(queryRecord.filters).toEqual(cacheReadFilters('year'));
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('year')
+			);
 		});
 	});
 
 	describe('fetchMonthTotalsTabData', () => {
 		it('delegates to fetchSpeciesPeriodTotals with timeInterval "month" and the given date range', async () => {
-			const { queryRecord } = makeClient();
+			makeClient();
 			const params: SpeciesTotalsTabParams = {
 				speciesName: SPECIES_NAME,
 				year: 2026,
@@ -735,19 +819,16 @@ describe('sp-data actions', () => {
 
 			await fetchMonthTotalsTabData(params, viewedGroup);
 
-			expect(queryRecord.filters).toEqual([
-				...cacheReadFilters('month'),
-				timePeriodFilter('gte', FROM_DATE),
-				timePeriodFilter('lte', TO_DATE)
-			]);
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('month', { fromDate: FROM_DATE, toDate: TO_DATE })
+			);
 		});
 	});
 
 	describe('fetchSessionTotalsTabData', () => {
 		it('delegates to fetchSpeciesPeriodTotals with timeInterval "day" and the given date range/monthFilter', async () => {
-			const { queryRecord } = makeClient({
-				queryRows: [{ time_period: '2023-03-08', bird_count: 2 }]
-			});
+			makeClient();
+			mockCacheRows([{ time_period: '2023-03-08', bird_count: 2 }]);
 			const params: SpeciesTotalsTabParams = {
 				speciesName: SPECIES_NAME,
 				fromDate: FROM_DATE,
@@ -757,35 +838,27 @@ describe('sp-data actions', () => {
 
 			const result = await fetchSessionTotalsTabData(params, viewedGroup);
 
-			expect(queryRecord.filters).toEqual([
-				...cacheReadFilters('day'),
-				timePeriodFilter('gte', FROM_DATE),
-				timePeriodFilter('lte', TO_DATE)
-			]);
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('day', { fromDate: FROM_DATE, toDate: TO_DATE })
+			);
 			expect(result.map((row) => row.time_period)).toEqual(['2023-03-08']);
 		});
 	});
 
 	describe('fetchSpeciesCombinedMonthTotals', () => {
-		it("reads SimpleStatsCacheBySpecies filtered to the species and temporal_unit 'month-squashed', with no time_period range", async () => {
-			const { client, queryRecord } = makeClient();
+		it("reads the by-species cache at the 'month-squashed' grain, filtered to the species, with no time_period range", async () => {
+			makeClient();
 
 			await fetchSpeciesCombinedMonthTotals(SPECIES_NAME, viewedGroup);
 
-			expect(client.from).toHaveBeenCalledWith(STATS_CACHE_TABLE);
-			expect(queryRecord.filters).toEqual(cacheReadFilters('month-squashed'));
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('month-squashed')
+			);
 		});
 
-		it('returns the rows mapped back to the CoreStatsResult shape', async () => {
-			makeClient({
-				queryRows: [
-					{
-						time_period: '2000-01-01',
-						bird_count: 4,
-						Species: { species_name: SPECIES_NAME }
-					}
-				]
-			});
+		it('returns the rows in the CoreStatsResult shape', async () => {
+			makeClient();
+			mockCacheRows([{ time_period: '2000-01-01', bird_count: 4 }]);
 
 			const result = await fetchSpeciesCombinedMonthTotals(
 				SPECIES_NAME,
