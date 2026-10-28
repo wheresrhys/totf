@@ -8,7 +8,7 @@ import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
 // of. The two `@/`-aliased imports above are `import type` only, erased before
 // either runtime sees them, so they aren't subject to the same constraint.
 import { buildStatsCacheRefreshEvents } from '../modules/stats/stats-cache-refresh-events';
-import { dispatchStatsCacheRefreshWindow } from '../modules/stats/queue-dispatch';
+import { dispatchStatsCacheRefreshEvent } from '@/modules/stats';
 import type { TemporalUnit } from '@/modules/stats/stats-cache-refresh';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
@@ -1575,7 +1575,7 @@ export async function dispatchStatsCacheRefreshEvents(
 			affectedSpeciesIds
 		);
 		for (const event of statsCacheRefreshEvents) {
-			await dispatchStatsCacheRefreshWindow(event);
+			await dispatchStatsCacheRefreshEvent(event);
 		}
 	} catch (dispatchError) {
 		console.error(

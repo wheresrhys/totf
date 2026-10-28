@@ -19,14 +19,14 @@ import {
 	type DemonRow
 } from '../demon-import';
 import { buildStatsCacheRefreshEvents } from '@/modules/stats/stats-cache-refresh-events';
-import { dispatchStatsCacheRefreshWindow } from '@/modules/stats/queue-dispatch';
+import { dispatchStatsCacheRefreshEvent } from '@/modules/stats';
 import type { ImportJobRowCounts } from '../demon-import';
 vi.mock('@/modules/stats/stats-cache-refresh-events', () => ({
 	buildStatsCacheRefreshEvents: vi.fn()
 }));
 
-vi.mock('@/modules/stats/queue-dispatch', () => ({
-	dispatchStatsCacheRefreshWindow: vi.fn()
+vi.mock('@/modules/stats', () => ({
+	dispatchStatsCacheRefreshEvent: vi.fn()
 }));
 
 function makeDemonRow(overrides: Partial<DemonRow> = {}): DemonRow {
@@ -2405,7 +2405,7 @@ describe('mergeDuplicateEncounters', () => {
 describe('dispatchStatsCacheRefreshEvents', () => {
 	beforeEach(() => {
 		vi.mocked(buildStatsCacheRefreshEvents).mockReset();
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockReset();
+		vi.mocked(dispatchStatsCacheRefreshEvent).mockReset();
 	});
 
 	it('builds events from the given ids/dates/species and dispatches every one, in order', async () => {
@@ -2427,7 +2427,7 @@ describe('dispatchStatsCacheRefreshEvents', () => {
 			}
 		];
 		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue(events);
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockResolvedValue(undefined);
+		vi.mocked(dispatchStatsCacheRefreshEvent).mockResolvedValue(undefined);
 
 		await dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], [3]);
 
@@ -2437,11 +2437,11 @@ describe('dispatchStatsCacheRefreshEvents', () => {
 			['2024-06-01'],
 			[3]
 		);
-		expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
+		expect(dispatchStatsCacheRefreshEvent).toHaveBeenNthCalledWith(
 			1,
 			events[0]
 		);
-		expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
+		expect(dispatchStatsCacheRefreshEvent).toHaveBeenNthCalledWith(
 			2,
 			events[1]
 		);
@@ -2455,7 +2455,7 @@ describe('dispatchStatsCacheRefreshEvents', () => {
 				affectedSpeciesIds: [3]
 			}
 		]);
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockRejectedValueOnce(
+		vi.mocked(dispatchStatsCacheRefreshEvent).mockRejectedValueOnce(
 			new Error('queue unavailable')
 		);
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -2481,7 +2481,7 @@ describe('dispatchStatsCacheRefreshEvents', () => {
 				affectedSpeciesIds: [3]
 			}
 		]);
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockRejectedValueOnce(
+		vi.mocked(dispatchStatsCacheRefreshEvent).mockRejectedValueOnce(
 			new Error('queue unavailable')
 		);
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
