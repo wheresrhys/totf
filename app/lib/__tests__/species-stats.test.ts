@@ -1,24 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mergeSpeciesBiometrics } from '../species-stats';
-import type { BiometricsStatsResult } from '../../models/db';
-import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
-
-// A real captured biometrics_stats row (Alpha, group_by_species — the exact
-// call fetchSpeciesData makes) rather than a hand-written literal, so the
-// column set every test builds on comes from actual RPC output and can't
-// silently drift from the RPC's shape (#883).
-const [capturedBiometricsRow] =
-	alphaBiometricsBySpecies as BiometricsStatsResult[];
-
-function buildBiometricsRow(
-	overrides: Partial<BiometricsStatsResult> = {}
-): BiometricsStatsResult {
-	return {
-		...capturedBiometricsRow,
-		...overrides
-	};
-}
+import { buildBiometricsStatsRow as buildBiometricsRow } from '@/app/__tests__/helpers/biometrics-stats-fixtures';
 
 describe('mergeSpeciesBiometrics', () => {
 	describe('Usual', () => {

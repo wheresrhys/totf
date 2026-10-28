@@ -13,27 +13,21 @@
  */
 
 import { vi } from 'vitest';
-import {
-	mergeBiometricsFields,
-	type BiometricsStatsResult,
-	type CoreStatsResult
-} from '@/app/models/db';
+import { mergeBiometricsFields, type CoreStatsResult } from '@/app/models/db';
 import robinCoreStatsHeadline from '@/test-fixtures/snapshots/core_stats/robin-alpha.headline.json';
-import robinBiometricsHeadline from '@/test-fixtures/snapshots/biometrics_stats/robin-alpha.headline.json';
+import { ROBIN_ALPHA_BIOMETRICS_HEADLINE } from '@/app/__tests__/helpers/biometrics-stats-fixtures';
 
 /**
  * The species page's headline `speciesStats` row, merged as the page merges it.
  *
- * Both fixtures are ungrouped headline rows, so species_name/time_period are
- * genuinely null — CoreStatsResult strips every column non-null and
- * BiometricsStatsResult declares species_name non-null (app/models/db.ts), so a
- * direct assertion doesn't compile (#895).
+ * Both halves are ungrouped headline rows, so species_name/time_period are
+ * genuinely null — CoreStatsResult strips every column non-null
+ * (app/models/db.ts), so a direct assertion doesn't compile (#895).
  */
 export const robinSpeciesStats = mergeBiometricsFields(
 	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	(robinCoreStatsHeadline as unknown as CoreStatsResult[])[0],
-	// eslint-disable-next-line no-restricted-syntax -- see comment above
-	(robinBiometricsHeadline as unknown as BiometricsStatsResult[])[0]
+	ROBIN_ALPHA_BIOMETRICS_HEADLINE
 );
 
 /**

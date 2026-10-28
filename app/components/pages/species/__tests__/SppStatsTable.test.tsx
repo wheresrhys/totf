@@ -8,13 +8,13 @@ import {
 } from '@testing-library/react';
 import { SppStatsTable } from '../SppStatsTable';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
-import biometricsSnapshot from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
+import { ALPHA_BIOMETRICS_BY_SPECIES } from '@/app/__tests__/helpers/biometrics-stats-fixtures';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 import {
 	mergeSpeciesBiometrics,
 	type SpeciesStatsRow
 } from '@/app/lib/species-stats';
-import type { CoreStatsResult, BiometricsStatsResult } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
 import type { PageData } from '@/app/(routes)/species/page';
 
 vi.mock('@/app/actions/spp-data', () => ({
@@ -22,10 +22,9 @@ vi.mock('@/app/actions/spp-data', () => ({
 }));
 
 // fetchSpeciesData hands this table the merge of a core_stats by-species result
-// and its biometrics_stats sibling, so build the fixture data the same way
-// rather than reading the biometric columns off the core_stats fixture —
-// core_stats stopped carrying its own copies at #827 and biometrics_stats is
-// now their only source (#883).
+// and its wing/weight sibling, so build the fixture data the same way rather
+// than reading the biometric columns off the core_stats fixture — core_stats
+// stopped carrying its own copies at #827 (#883).
 const speciesStats = mergeSpeciesBiometrics(
 	// This fixture is grouped by species only, so time_period is genuinely
 	// null — CoreStatsResult's NonNullable mapped type (app/models/db.ts)
@@ -33,7 +32,7 @@ const speciesStats = mergeSpeciesBiometrics(
 	// compile (#895).
 	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	speciesDataSnapshot as unknown as CoreStatsResult[],
-	biometricsSnapshot as BiometricsStatsResult[]
+	ALPHA_BIOMETRICS_BY_SPECIES
 );
 
 const pageData: PageData = {
@@ -164,7 +163,7 @@ describe('SppStatsTable', () => {
 	});
 
 	describe('biometrics data', () => {
-		it('renders a blank cell for a biometric column when that species has no biometrics_stats row', () => {
+		it('renders a blank cell for a biometric column when that species has no biometrics row', () => {
 			const [firstSpecies, ...restSpecies] = speciesStats;
 			const speciesWithoutBiometrics: SpeciesStatsRow = {
 				...firstSpecies,

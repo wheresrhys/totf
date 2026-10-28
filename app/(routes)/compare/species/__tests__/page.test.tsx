@@ -6,7 +6,7 @@ import { compareSpeciesBiometricsTab } from '@/app/components/pages/compare-spec
 import { compareSpeciesCoreTab } from '@/app/components/pages/compare-species/CompareSpeciesCoreTab';
 import Page, { type CompareSpeciesSearchParams } from '../page';
 import alphaCoreBySpecies from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
-import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
+import { ALPHA_BIOMETRICS_BY_SPECIES } from '@/app/__tests__/helpers/biometrics-stats-fixtures';
 
 const { mockFetchSpeciesComparisonStats } = vi.hoisted(() => ({
 	mockFetchSpeciesComparisonStats: vi.fn()
@@ -16,13 +16,12 @@ vi.mock('@/app/actions/compare-species', () => ({
 	fetchSpeciesComparisonStats: mockFetchSpeciesComparisonStats
 }));
 
-// The by-species captures are ungrouped by time, so their `time_period` is
-// literally null — CoreStatsResult strips that column non-null (app/models/db.ts),
-// so a direct assertion doesn't compile (#895). BiometricsStatsResult leaves
-// every column but species_name nullable, so it needs no such escape hatch.
+// The core_stats by-species capture is ungrouped by time, so its `time_period`
+// is literally null — CoreStatsResult strips that column non-null
+// (app/models/db.ts), so a direct assertion doesn't compile (#895).
 // eslint-disable-next-line no-restricted-syntax -- see comment above
 const coreStatsRows = alphaCoreBySpecies as unknown as CoreStatsResult[];
-const biometricsRows = alphaBiometricsBySpecies as BiometricsStatsResult[];
+const biometricsRows = ALPHA_BIOMETRICS_BY_SPECIES;
 
 // Alpha's captured by-species snapshots cover all seven species in both
 // datasets, so the "dataset has no row for a selected species" case has to be

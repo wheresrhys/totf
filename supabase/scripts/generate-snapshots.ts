@@ -7,12 +7,13 @@
  * result before writing it: a fixture that isn't a verbatim source response can't
  * be checked against any source, and quietly starts asserting the shape of the
  * merge instead of the shape of the database. Where an action joins two sources
- * (e.g. core_stats + biometrics_stats), write one fixture per source and let the
- * consuming test perform the same join the action does, with the same helper.
+ * (e.g. a core_stats row plus the wing/weight columns alongside it), write one
+ * fixture per source and let the consuming test perform the same join the
+ * action does, with the same helper.
  *
- * Reads Alpha/Beta/Gamma group data and writes 27 JSON files under
+ * Reads Alpha/Beta/Gamma group data and writes 24 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
- * the RPC name for RPC-backed fixtures (`core_stats/`, `biometrics_stats/`,
+ * the RPC name for RPC-backed fixtures (`core_stats/`,
  * `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
  * `ring_sequence_controls/`) and `tables/<TableName>/`
  * for fixtures produced by a direct PostgREST table query. The comment above
@@ -114,20 +115,6 @@ export async function generateSnapshots(
 			`core_stats/alpha.summary-totals.json`,
 			data?.[0] ?? null
 		);
-	}
-
-	// RPC: biometrics_stats (group_by_species) — powers fetchSpeciesData's
-	// biometrics half (app/actions/spp-data.ts), merged onto the core_stats
-	// by-species rows above by mergeSpeciesBiometrics (app/lib/species-stats.ts)
-	for (const [name, client, gId] of [
-		['alpha', alpha, alphaId],
-		['gamma', gamma, gammaId]
-	] as const) {
-		const { data } = await client.rpc('biometrics_stats', {
-			ringing_group_filter: gId,
-			group_by_species: true
-		});
-		await writeSnapshot(`biometrics_stats/${name}.by-species.json`, data ?? []);
 	}
 
 	// RPC: core_stats (yearly, ungrouped by species) — powers fetchPayOffStats
@@ -331,18 +318,6 @@ export async function generateSnapshots(
 			birdsPage0 ?? []
 		);
 
-		// RPC: biometrics_stats (species-filtered, ungrouped — a single headline
-		// row) — powers getSpeciesStats (app/(routes)/species/[speciesName]/page.tsx),
-		// merged onto that page's single core_stats row
-		const { data: robinBiometrics } = await alpha.rpc('biometrics_stats', {
-			species_name_filter: 'Robin',
-			ringing_group_filter: alphaId
-		});
-		await writeSnapshot(
-			`biometrics_stats/robin-alpha.headline.json`,
-			robinBiometrics ?? []
-		);
-
 		// RPC: demographics_stats (species-filtered, group_by_time_period: month) —
 		// powers getSpeciesDemographicsStats (app/actions/sp-data.ts), which backs
 		// the species page's Demographics tab. Renamed from population_stats in
@@ -372,10 +347,13 @@ export async function generateSnapshots(
 		);
 
 		// The raw source behind the species/[speciesName] page's headline
-		// stats, whose biometrics_stats sibling is
-		// `biometrics_stats/robin-alpha.headline.json` above — getSpeciesStats
-		// joins the two with mergeBiometricsFields. The page's other inputs need
-		// no fixture here: its page of Birds is already
+		// stats. It had a `biometrics_stats/robin-alpha.headline.json` sibling
+		// until #1246 deleted that RPC; the page reads the already-merged
+		// `SimpleStatsCacheBySpecies` row now (#1222), so the wing/weight half
+		// no longer has a source of its own to snapshot — the app tests that
+		// need those 8 columns build them with
+		// `app/__tests__/helpers/biometrics-stats-fixtures.ts`. The page's other
+		// inputs need no fixture here: its page of Birds is already
 		// tables/Birds/robin-alpha.page-of-birds.json, speciesId/speciesName are
 		// route-resolved props, not RPC output, and fetchGraphableEncounterData's
 		// chart data (`Birds` + embedded `Encounters`) has no consumer that reads
