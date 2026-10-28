@@ -1,4 +1,7 @@
-import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
+import type {
+	SimpleStatsCacheBySpeciesRow,
+	SimpleStatsCacheRow
+} from '@/app/models/db';
 import type {
 	TemporalUnit,
 	StatUnit
@@ -98,30 +101,19 @@ type HighlightFormatters = {
  * been deleted from the schema outright (#1246), which would have left the
  * label naming a function that does not exist.
  */
-type StatsRowShapeMap = {
-	core: CoreStatsResult;
-	biometrics: BiometricsStatsResult;
-};
 
-export type StatsRowShape = keyof StatsRowShapeMap;
-
-type HighlightsGeneratorFor<Shape extends StatsRowShape> = {
+export type HighlightsGenerator = {
 	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	limit?: number;
-	statsRowShape: Shape;
 	speciesUsed: 'none' | 'present' | 'grouped';
 	presence?: HighlightPresenceConfig;
 	generator: (
-		stats: StatsRowShapeMap[Shape][],
+		stats: (SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[],
 		scope?: HighlightScope
 	) => HighlightValue[];
 	condition?: (scope: HighlightScope) => boolean;
 };
-
-export type HighlightsGenerator = {
-	[Shape in StatsRowShape]: HighlightsGeneratorFor<Shape>;
-}[StatsRowShape];
 
 type HighlightPositionsLimit = 0 | 1 | 2 | 3;
 

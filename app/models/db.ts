@@ -12,6 +12,15 @@ export type RingSequenceRow =
 export type RingSize = Database['public']['Enums']['ring_size'];
 export type ResightingRecordType =
 	Database['public']['Enums']['resighting_record_type'];
+
+export type SimpleStatsCacheRow =
+	Database['public']['Tables']['SimpleStatsCache']['Row'] & {
+		species_name: null;
+	};
+export type SimpleStatsCacheBySpeciesRow =
+	Database['public']['Tables']['SimpleStatsCacheBySpecies']['Row'] & {
+		species_name: string;
+	};
 // Serves both an ImportJobs row's own `status` and its three
 // `*_stats_refresh_status` columns — see the enum's own schema file for why one type
 // covers both.

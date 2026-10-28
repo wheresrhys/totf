@@ -33,7 +33,6 @@ export const birdCount: HighlightsGenerator = {
 		category: 'count'
 	},
 	generator: getTopByProperty('bird_count'),
-	statsRowShape: 'core',
 	speciesUsed: 'none',
 	presence: {
 		species: null,

@@ -1,5 +1,6 @@
 import type { HighlightValue } from '../types';
 import { DEFAULT_THRESHOLD } from '../const';
+import type { StatsResult } from '@/app/actions/stats-cache';
 type HighlightFinderOptions = {
 	threshold?: number;
 	// Rarity finders only: the most periods a species can have ever appeared in
@@ -13,27 +14,19 @@ type HighlightFinderOptions = {
 	smallestWins?: boolean;
 };
 
-type RowWithIdentity = {
-	time_period: string | null;
-	species_name: string | null;
-};
-
-function sumProperties<Row extends RowWithIdentity>(
-	item: Row,
-	properties: (keyof Row)[]
-) {
+function sumProperties(item: StatsResult, properties: (keyof StatsResult)[]) {
 	return properties.reduce(
 		(sum, property) => sum + ((item[property] as number) ?? 0),
 		0
 	);
 }
 
-export function getTopByPropertiesSum<Row extends RowWithIdentity>(
-	properties: (keyof Row)[],
+export function getTopByPropertiesSum(
+	properties: (keyof StatsResult)[],
 	options?: HighlightFinderOptions
-): (stats: Row[]) => HighlightValue[] {
+): (stats: StatsResult[]) => HighlightValue[] {
 	const threshold = options?.threshold ?? DEFAULT_THRESHOLD;
-	return (stats: Row[]) => {
+	return (stats: StatsResult[]) => {
 		const potentialHighlights = stats.map((row) => ({
 			timePeriod: row.time_period as string,
 			value: sumProperties(row, properties),
@@ -48,9 +41,9 @@ export function getTopByPropertiesSum<Row extends RowWithIdentity>(
 	};
 }
 
-export function getTopByProperty<Row extends RowWithIdentity>(
-	property: keyof Row,
+export function getTopByProperty(
+	property: keyof StatsResult,
 	options?: HighlightFinderOptions
-): (stats: Row[]) => HighlightValue[] {
-	return getTopByPropertiesSum<Row>([property], options);
+): (stats: StatsResult[]) => HighlightValue[] {
+	return getTopByPropertiesSum([property], options);
 }

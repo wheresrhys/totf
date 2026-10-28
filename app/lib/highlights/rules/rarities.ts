@@ -3,12 +3,12 @@ import type {
 	HighlightScope,
 	HighlightValue
 } from '../types';
-import type { CoreStatsResult } from '@/app/models/db';
+import type { StatsResult } from '@/app/actions/stats-cache';
 import {
 	printTimeQualifier,
 	printCombinedHighlight
 } from '../lib/printer-utils';
-function getAppearances(stats: CoreStatsResult[]): CoreStatsResult[] {
+function getAppearances(stats: StatsResult[]): StatsResult[] {
 	return stats
 		.filter((row) => row.encounter_count > 0)
 		.sort((a, b) => String(a.time_period).localeCompare(String(b.time_period)));
@@ -37,7 +37,7 @@ export const rarities: HighlightsGenerator = {
 		category: 'rarity'
 	},
 	generator: (
-		stats: CoreStatsResult[],
+		stats: StatsResult[],
 		scope?: HighlightScope
 	): Omit<HighlightValue, 'descriptor'>[] => {
 		const appearances = getAppearances(stats);
@@ -84,7 +84,6 @@ export const rarities: HighlightsGenerator = {
 	// as a first record — the earliest February a species appeared in is not a
 	// first of anything.
 	condition: (scope) => !scope.parentTimeWindow?.month,
-	statsRowShape: 'core',
 	speciesUsed: 'grouped',
 	presence: {
 		species: null,

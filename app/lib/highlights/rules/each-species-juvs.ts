@@ -35,7 +35,6 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 	limit: 1,
 	condition: (scope) =>
 		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
-	statsRowShape: 'core',
 	speciesUsed: 'grouped',
 	presence: {
 		species: null,

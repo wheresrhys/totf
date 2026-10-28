@@ -1,5 +1,4 @@
 import type { HighlightsGenerator } from '../types';
-import type { BiometricsStatsResult } from '@/app/models/db';
 import {
 	printProminenceQualifier,
 	printTimeQualifier,
@@ -27,12 +26,11 @@ export const heaviestOfSpecies: HighlightsGenerator = {
 		category: 'biometrics'
 	},
 	generator: (rows) => {
-		const results = getTopByProperty<BiometricsStatsResult>('max_weight')(rows);
+		const results = getTopByProperty('max_weight')(rows);
 		// avoid generating highlights when there are actually very few birds to build a reasonable data set
 		return results.length >= 10 ? results : [];
 	},
 	condition: (scope) => scope.temporalUnit === 'day',
-	statsRowShape: 'biometrics',
 	speciesUsed: 'grouped',
 	presence: {
 		species: null,

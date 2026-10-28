@@ -6,7 +6,6 @@ import {
 	printCombinedHighlight
 } from '../lib/printer-utils';
 import { getTopByProperty } from '../lib/rule-utils';
-import { CoreStatsResult } from '@/app/models/db';
 
 export const eachSpeciesCount: HighlightsGenerator = {
 	// Highest Long- tailed Tit count of 2020, and highest ever: 5 birds
@@ -33,7 +32,7 @@ export const eachSpeciesCount: HighlightsGenerator = {
 		category: 'count'
 	},
 	generator: (rows) => {
-		const results = getTopByProperty<CoreStatsResult>('bird_count', {
+		const results = getTopByProperty('bird_count', {
 			threshold: 2
 		})(rows);
 		const max = Math.max(...results.map((result) => result.value as number));
@@ -53,7 +52,6 @@ export const eachSpeciesCount: HighlightsGenerator = {
 	},
 	condition: (scope) =>
 		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
-	statsRowShape: 'core',
 	speciesUsed: 'grouped',
 	presence: {
 		species: null,
