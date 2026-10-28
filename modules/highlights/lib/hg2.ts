@@ -18,7 +18,7 @@ import {
 	sortHighlights,
 	sortByPositionAndTimeWindow
 } from './highlight-utils';
-import { pooledStatsCacheFetch, type  StatsResult } from '@/modules/stats';
+import { globalStatsCacheFetchPool, type StatsResult } from '@/modules/stats';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { groupByColumn } from '@/app/lib/generic-utils';
@@ -52,7 +52,7 @@ async function getScopedHighlightsOfType({
 	// `Record<string, unknown>[]` rows (#1236) — narrowed here to the shape
 	// every Highlights rule already expects, same as every other
 	// `readStatsCacheRows`-family caller narrows its own result.
-	const baseData = (await pooledStatsCacheFetch({
+	const baseData = (await globalStatsCacheFetchPool.fetch({
 		viewedGroup,
 		bySpecies: Boolean(species) || rule.speciesUsed !== 'none',
 		temporalUnit
