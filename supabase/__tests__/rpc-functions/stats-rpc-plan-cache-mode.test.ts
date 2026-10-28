@@ -7,9 +7,9 @@
  * — and these RPCs are parameterized by the SHAPE of their own query (`group_by_species` /
  * `group_by_time_period` decide which columns the spine join is keyed on), so no one generic
  * plan can serve them. Measured on a 160k-encounter synthetic fixture, the cliff ranged from
- * 6x (`arrivals_stats`) to 117x (`biometrics_stats` grouped by day), with `core_stats` going
- * 437ms -> 44,205ms once a pooled backend had served five cheap calls first. See CLAUDE.md's
- * "Companion stats RPCs and shared plumbing" section.
+ * 6x (`arrivals_stats`) to 117x (the since-deleted `biometrics_stats` grouped by day), with
+ * `core_stats` going 437ms -> 44,205ms once a pooled backend had served five cheap calls
+ * first. See CLAUDE.md's "Companion stats RPCs and shared plumbing" section.
  *
  * `INLINING_GUARD_RPCS` are `LANGUAGE sql STABLE` instead, so they have no `RETURN QUERY` plan
  * cache of their own — but Postgres inlines a `SET`-config-free `LANGUAGE sql` function
@@ -45,7 +45,6 @@ const PLAN_CACHE_MODE_RPCS = [
 	'core_stats',
 	'demographics_stats',
 	'arrivals_stats',
-	'biometrics_stats',
 ] as const;
 
 const INLINING_GUARD_RPCS = [

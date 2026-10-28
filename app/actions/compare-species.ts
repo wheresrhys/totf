@@ -82,7 +82,8 @@ function toBiometricsStatsResult(
  * RPCs used to share an identical call shape, and the cache table already
  * carries both metric families' columns in one row.
  *
- * `biometrics_stats`/`demographics_stats` have no public-gated wrappers and
+ * `demographics_stats` has no public-gated wrapper (nor did `biometrics_stats`
+ * before #1246 deleted it outright) and
  * `/compare/species` sits outside the public-summary subtree (#770), so this
  * goes through the plain authenticated client rather than
  * `fetchAuthorisedCoreStats` — matching `fetchSpeciesData`'s biometrics half

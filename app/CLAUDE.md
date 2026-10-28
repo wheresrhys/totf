@@ -108,7 +108,8 @@ the root layout, not a subtree one.
 - **Period-local stats come from the cache tables, not the stats RPCs (#1208).**
   `app/actions/stats-cache.ts` reads `SimpleStatsCache`/`SimpleStatsCacheBySpecies` — filtered by
   `group_id` + `temporal_unit`, paginated through `fetchAllPaginatedRows` — rather than calling
-  `core_stats`/`biometrics_stats`, which redo the multi-way join the post-import refresh queue has
+  `core_stats` (and, until #1246 deleted it, `biometrics_stats`), which redo the multi-way join the
+  post-import refresh queue has
   already materialized. The accepted tradeoff is a brief post-import staleness window while the
   refresh queue catches up; there is deliberately no polling or fallback-to-live-RPC around it.
   Three things to know before touching that file:
