@@ -83,6 +83,12 @@ const expectedCoreStatsRow: CoreStatsResult = {
 	max_new_per_session: 3
 };
 
+// The annotation here is load-bearing, not decoration: it is what pins
+// `toBiometricsStatsResult`'s output to `BiometricsStatsResult`'s full column
+// set — `encounter_count` included, the one column the replacement
+// `stats_cache_biometrics_metrics_result` composite lacks and the reason the
+// type is standalone rather than sourced from a Postgres composite (#1245).
+// Drop a column from the type and this object literal stops compiling.
 const expectedBiometricsRow: BiometricsStatsResult = {
 	species_name: 'Blue Tit',
 	time_period: '0001-01-01',

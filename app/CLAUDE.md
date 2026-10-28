@@ -300,9 +300,11 @@ _removed_ stays assignable either way; that direction is `supabase/__tests__/sna
 job, see `supabase/CLAUDE.md`), but it does catch a newly-_added_ required column, which the double
 assertion can't. Only fall back to `as unknown as SomeType` when the fixture is a genuine
 structural mismatch — e.g. an ungrouped/species-filtered `core_stats`-family fixture with a
-literal `null` in a column the row type (`CoreStatsResult`, `DemographicsStatsResult`,
-`BiometricsStatsResult` in `app/models/db.ts`) strips non-null via `NonNullable`, or a hand-built
-object that only fills in the columns a test actually reads.
+literal `null` in a column the row type declares non-null (`CoreStatsResult` and
+`DemographicsStatsResult` in `app/models/db.ts` strip every column non-null via `NonNullable` over
+their generated composite type; `BiometricsStatsResult` is a standalone type since #1245 and
+declares only `species_name` non-null), or a hand-built object that only fills in the columns a
+test actually reads.
 
 **This is enforced, not just documented (#921).** `eslint.config.js` forbids the `x as unknown as
 T` pattern outright via a `no-restricted-syntax` selector — `npm run lint` fails on any new one. A
