@@ -28,7 +28,7 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 	condition: (scope) =>
 		scope.temporalUnit !== 'day' &&
 		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
-	rpcName: 'core_stats',
+	statsRowShape: 'core',
 	speciesUsed: 'present',
 	presence: {
 		species: null,

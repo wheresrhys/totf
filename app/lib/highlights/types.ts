@@ -89,28 +89,39 @@ type HighlightFormatters = {
 	combinedHighlightPrinter: CombinedHighlightPrinter;
 };
 
-type RpcRowMap = {
-	core_stats: CoreStatsResult;
-	biometrics_stats: BiometricsStatsResult;
+/**
+ * Which row shape a rule's `generator` reads. Every rule's stats now come from
+ * the same `SimpleStatsCache`/`SimpleStatsCacheBySpecies` read (#1208/#1236),
+ * so this is purely a *column-subset label* over that one row set — it names
+ * no RPC. It was spelled `rpcName: 'core_stats' | 'biometrics_stats'` back when
+ * a rule really did dispatch its own RPC call; `biometrics_stats` has since
+ * been deleted from the schema outright (#1246), which would have left the
+ * label naming a function that does not exist.
+ */
+type StatsRowShapeMap = {
+	core: CoreStatsResult;
+	biometrics: BiometricsStatsResult;
 };
 
-type HighlightsGeneratorFor<RpcName extends keyof RpcRowMap> = {
+export type StatsRowShape = keyof StatsRowShapeMap;
+
+type HighlightsGeneratorFor<Shape extends StatsRowShape> = {
 	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;
 	limit?: number;
-	rpcName: RpcName;
+	statsRowShape: Shape;
 	speciesUsed: 'none' | 'present' | 'grouped';
 	presence?: HighlightPresenceConfig;
 	generator: (
-		stats: RpcRowMap[RpcName][],
+		stats: StatsRowShapeMap[Shape][],
 		scope?: HighlightScope
 	) => HighlightValue[];
 	condition?: (scope: HighlightScope) => boolean;
 };
 
 export type HighlightsGenerator = {
-	[RpcName in keyof RpcRowMap]: HighlightsGeneratorFor<RpcName>;
-}[keyof RpcRowMap];
+	[Shape in StatsRowShape]: HighlightsGeneratorFor<Shape>;
+}[StatsRowShape];
 
 type HighlightPositionsLimit = 0 | 1 | 2 | 3;
 

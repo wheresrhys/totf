@@ -66,7 +66,7 @@ export function toggleSpeciesSelection(
 /**
  * A comparison table's row: one of the three by-species stats rows, but with
  * every value column optional. A species can legitimately be present in
- * `core_stats` and absent from `biometrics_stats` (nothing measurable was
+ * the core stats and absent from the biometrics stats (nothing measurable was
  * caught), and the table still owes it a row — so the missing case is a row
  * carrying only its `species_name`, rendered as a line of blank cells, rather
  * than a silently dropped row whose absence would make the three datasets

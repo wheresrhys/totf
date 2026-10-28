@@ -471,7 +471,7 @@ describe('core_stats — month-squashed composes with existing filters', () => {
 	});
 });
 
-describe('arrivals_stats / demographics_stats / biometrics_stats — month-squashed grouping', () => {
+describe('arrivals_stats / demographics_stats / stats_cache_biometrics_metrics — month-squashed grouping', () => {
 	let deltaId: number;
 	let deltaClient: SupabaseClient;
 
@@ -521,7 +521,10 @@ describe('arrivals_stats / demographics_stats / biometrics_stats — month-squas
 	});
 
 	async function monthRow(
-		rpcName: 'arrivals_stats' | 'demographics_stats' | 'biometrics_stats'
+		rpcName:
+			| 'arrivals_stats'
+			| 'demographics_stats'
+			| 'stats_cache_biometrics_metrics'
 	): Promise<Record<string, unknown>> {
 		const { data, error } = await deltaClient.rpc(rpcName, {
 			ringing_group_filter: deltaId,
@@ -550,8 +553,8 @@ describe('arrivals_stats / demographics_stats / biometrics_stats — month-squas
 	});
 
 	// Usual
-	it('biometrics_stats accepts month-squashed and returns correctly-partitioned biometric columns', async () => {
-		const row = await monthRow('biometrics_stats');
+	it('stats_cache_biometrics_metrics accepts month-squashed and returns correctly-partitioned biometric columns', async () => {
+		const row = await monthRow('stats_cache_biometrics_metrics');
 		expect(row.max_weight).toBe(12);
 	});
 });

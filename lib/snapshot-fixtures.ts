@@ -38,7 +38,7 @@
  */
 
 /**
- * The 27 fixtures `supabase/scripts/generate-snapshots.ts` produces, and therefore the
+ * The 24 fixtures `supabase/scripts/generate-snapshots.ts` produces, and therefore the
  * exact set the freshness check covers. Paths are relative to
  * `test-fixtures/snapshots/` and follow #882's source-directory layout (one
  * subdirectory per RPC, `tables/<TableName>/` for direct PostgREST reads).
@@ -60,6 +60,14 @@
  * fixtures below) — see `supabase/scripts/generate-snapshots.ts`'s per-block comments for
  * why each one is safe to skip.
  *
+ * #1246 removed the three `biometrics_stats/*` fixtures along with the RPC that
+ * produced them: every app call site now reads the already-materialized
+ * `SimpleStatsCache`/`SimpleStatsCacheBySpecies` tables (#1223/#1244), and
+ * `BiometricsStatsResult` became an app-owned TypeScript type rather than a view
+ * over a Postgres composite (#1245) — so there is no database source left for
+ * those three to be checked against. App tests build those 8 columns with
+ * `app/__tests__/helpers/biometrics-stats-fixtures.ts` instead.
+ *
  * #901 split the last two compound fixtures (each merging two RPC/table results
  * into one file) into their raw sources: `core_stats/{alpha,beta}.yearly-and-monthly-totals.json`
  * became `{alpha,beta}.monthly-totals.json` / `{alpha,beta}.yearly-totals.json`, and
@@ -68,9 +76,6 @@
  * for why every fixture is now a verbatim single-source response.
  */
 export const GENERATED_SNAPSHOT_FIXTURES = [
-	'biometrics_stats/alpha.by-species.json',
-	'biometrics_stats/gamma.by-species.json',
-	'biometrics_stats/robin-alpha.headline.json',
 	'core_stats/alpha.by-species.json',
 	'core_stats/alpha.home-page-summary.json',
 	'core_stats/alpha.monthly-totals.json',

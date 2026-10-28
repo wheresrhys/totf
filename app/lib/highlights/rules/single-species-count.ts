@@ -30,7 +30,7 @@ export const singleSpeciesCount: HighlightsGenerator = {
 	generator: getTopByProperty('bird_count', { threshold: 3 }),
 	condition: (scope) =>
 		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
-	rpcName: 'core_stats',
+	statsRowShape: 'core',
 	speciesUsed: 'present',
 	presence: {
 		species: null,

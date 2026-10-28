@@ -2,28 +2,30 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
 import type { BiometricsStatsResult } from '@/app/models/db';
 import { fetchSpeciesData } from '../spp-data';
-import alphaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
-import gammaBiometricsBySpecies from '@/test-fixtures/snapshots/biometrics_stats/gamma.by-species.json';
+import {
+	ALPHA_BIOMETRICS_BY_SPECIES,
+	GAMMA_BIOMETRICS_BY_SPECIES
+} from '@/app/__tests__/helpers/biometrics-stats-fixtures';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import { makeRpcCallRecorder } from '@/app/__tests__/helpers/rpc-recorder';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
-// Real captured biometrics_stats output for the exact call fetchSpeciesData
-// makes (group-wide, group_by_species). Both branches' row builders below are
-// derived from it rather than hand-written, including the arbitrary-window
-// fallback's (whose own RPC, stats_cache_biometrics_metrics, carries the same
-// 8 metric columns — it has no fixture of its own). Alpha's first row is the
-// Blue Tit that every bare buildCoreStatsRow({ species_name: 'Blue Tit' })
-// call below deliberately matches (buildCoreStatsRow's own default
-// `species_name` is `null`), so the two builders line up on species_name and
-// mergeSpeciesBiometrics actually joins them; Gamma's is genuinely empty —
-// that group has no biometric-eligible encounters at all — which is the
-// fixture-backed no-biometrics-anywhere edge case (#883), and an empty result
-// is shape-agnostic enough to stand in for either RPC's.
-const capturedBiometricsRows =
-	alphaBiometricsBySpecies as BiometricsStatsResult[];
-const emptyBiometricsRows = gammaBiometricsBySpecies as BiometricsStatsResult[];
+// The shared `BiometricsStatsResult` fixtures (app/__tests__/helpers) rather
+// than per-test literals. Both branches' row builders below reshape Alpha's
+// first row into the shape that branch's own source returns — the cache
+// table's embedded-species-name shape, and the arbitrary-window fallback RPC's
+// species_id-keyed one — so the 8 metric columns are defined once. Alpha's
+// first row is the Blue Tit that every bare
+// buildCoreStatsRow({ species_name: 'Blue Tit' }) call below deliberately
+// matches (buildCoreStatsRow's own default `species_name` is `null`), so the
+// two builders line up on species_name and mergeSpeciesBiometrics actually
+// joins them; Gamma's is genuinely empty — that group has no
+// biometric-eligible encounters at all — which is the no-biometrics-anywhere
+// edge case (#883), and an empty result is shape-agnostic enough to stand in
+// for either source's.
+const capturedBiometricsRows = ALPHA_BIOMETRICS_BY_SPECIES;
+const emptyBiometricsRows = GAMMA_BIOMETRICS_BY_SPECIES;
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
 	mockGetAuthenticatedSupabaseClient: vi.fn()
@@ -63,7 +65,7 @@ const BLUE_TIT_SPECIES_ID = 42;
  * A `SimpleStatsCacheBySpecies` row as PostgREST returns it for the biometrics
  * read: the 8 wing/weight columns plus `encounter_count`, with the species
  * name arriving through the embedded `Species` select rather than as a column
- * of its own. Built from the captured RPC row so the values are real.
+ * of its own. Built from the shared fixture row so the values are real.
  */
 function buildBiometricsCacheRow({
 	speciesName = 'Blue Tit',
@@ -83,8 +85,8 @@ function buildBiometricsCacheRow({
  * A `stats_cache_biometrics_metrics` row as the arbitrary-window fallback's
  * RPC returns it: the same 8 wing/weight columns, keyed on `species_id`
  * instead of `species_name` and with no `encounter_count` column at all.
- * Built from the captured `biometrics_stats` row so the values are real and a
- * column added to the shared 8 surfaces here too.
+ * Built from the same shared fixture row as the cache-table builder above, so
+ * a column added to the shared 8 surfaces on both branches at once.
  */
 function buildBiometricsMetricsRpcRow({
 	speciesId = BLUE_TIT_SPECIES_ID,

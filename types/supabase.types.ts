@@ -894,25 +894,6 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      biometrics_stats: {
-        Args: {
-          from_date?: string
-          group_by_species?: boolean
-          group_by_time_period?: string
-          month_filter?: number
-          ringing_group_filter?: number
-          species_name_filter?: string
-          to_date?: string
-          year_filter?: number
-        }
-        Returns: Database["public"]["CompositeTypes"]["biometrics_stats_result"][]
-        SetofOptions: {
-          from: "*"
-          to: "biometrics_stats_result"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
       core_stats: {
         Args: {
           from_date?: string
@@ -1304,19 +1285,6 @@ export type Database = {
         pullus_bird_count: number | null
         juv_bird_count: number | null
         postjuv_bird_count: number | null
-      }
-      biometrics_stats_result: {
-        species_name: string | null
-        time_period: string | null
-        max_weight: number | null
-        avg_weight: number | null
-        min_weight: number | null
-        median_weight: number | null
-        max_wing: number | null
-        avg_wing: number | null
-        min_wing: number | null
-        median_wing: number | null
-        encounter_count: number | null
       }
       core_stats_result: {
         species_name: string | null

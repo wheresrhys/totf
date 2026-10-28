@@ -68,8 +68,8 @@ export type ArrivalsStatsResult = {
 // over a generated Postgres composite type (#1245). It used to derive from
 // `biometrics_stats_result`, the composite returned by the biometrics_stats RPC
 // (#822/#823), but every app call site now reads the already-materialized
-// SimpleStatsCache/SimpleStatsCacheBySpecies tables instead (#1223, #1244), so
-// the RPC — and its composite — are on their way out of the schema. The
+// SimpleStatsCache/SimpleStatsCacheBySpecies tables instead (#1223, #1244), and
+// #1246 dropped that RPC and its composite from the schema outright. The
 // replacement RPC's composite (`stats_cache_biometrics_metrics_result`) is NOT a
 // drop-in substitute to re-point at: it keys on species_id rather than the
 // display-oriented species_name, and it has no encounter_count column, which
@@ -100,9 +100,9 @@ export type BiometricsStatsResult = {
 	encounter_count: number | null;
 };
 
-// The 8 wing/weight columns that biometrics_stats owns. core_stats no
+// The 8 wing/weight columns that BiometricsStatsResult owns. core_stats no
 // longer carries its own copies (#827 removed them from core_stats_result
-// now that biometrics_stats is the sole source), so callers that want the
+// once biometrics became a separate source), so callers that want the
 // biometric stats alongside an core_stats row merge them in explicitly
 // (see mergeBiometricsFields below and mergeSpeciesBiometrics in
 // species-stats.ts, which reuses this same field list).
@@ -116,7 +116,7 @@ export type BiometricFieldName =
 	| 'min_wing'
 	| 'median_wing';
 
-// An core_stats row with the 8 biometrics_stats wing/weight fields merged
+// An core_stats row with the 8 BiometricsStatsResult wing/weight fields merged
 // back on (the species detail + monthly-history read path, #821). Since
 // core_stats_result no longer declares these columns (#827), the merged
 // shape has to add them explicitly — this is the detail/history counterpart of
@@ -127,11 +127,11 @@ export type BiometricFieldName =
 export type CoreStatsWithBiometrics = CoreStatsResult &
 	Pick<BiometricsStatsResult, BiometricFieldName>;
 
-// Wing/weight fields merged from a biometrics_stats row onto an
-// core_stats row (#821 — species page migration to biometrics_stats). The
-// grouping/identity columns (species_name, time_period) are intentionally
-// excluded from the merge: they belong to the core_stats row's own
-// shape, and biometrics_stats' copies are only used by callers to find the
+// Wing/weight fields merged from a BiometricsStatsResult row onto an
+// core_stats row (#821 — species page migration onto a separate biometrics
+// source). The grouping/identity columns (species_name, time_period) are
+// intentionally excluded from the merge: they belong to the core_stats row's own
+// shape, and the biometrics row's copies are only used by callers to find the
 // matching row (e.g. joining a time series on time_period) before merging.
 // A missing biometrics row (no biometric-eligible encounters for this
 // species/period) coalesces every metric to null, so the merged row always

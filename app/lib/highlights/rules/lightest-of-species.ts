@@ -35,7 +35,7 @@ export const lightestOfSpecies: HighlightsGenerator = {
 		return results.length >= 10 ? results : [];
 	},
 	condition: (scope) => scope.temporalUnit === 'day',
-	rpcName: 'biometrics_stats',
+	statsRowShape: 'biometrics',
 	speciesUsed: 'grouped',
 	presence: {
 		species: null,

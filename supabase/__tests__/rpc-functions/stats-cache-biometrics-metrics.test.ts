@@ -4,12 +4,17 @@
  *
  * One of six small, read-only "metric-group" RPCs a later orchestrator (T8a,
  * `refresh_simple_stats_cache`) will call to populate the merged
- * `SimpleStatsCache` table (T1a). An almost-direct port of `biometrics_stats`,
- * keyed on `species_id` rather than the display-oriented `species_name`, and
- * with no `encounter_count` column. The eight metric columns and their
- * rounding mirror `biometrics_stats` exactly — MAX/AVG/MIN/PERCENTILE_CONT
- * over an empty set is NULL (not 0), so an empty cell yields NULLs for all
- * eight columns.
+ * `SimpleStatsCache` table (T1a). Originally written as an almost-direct port
+ * of the since-deleted `biometrics_stats` (#1246), keyed on `species_id`
+ * rather than the display-oriented `species_name` and with no
+ * `encounter_count` column; it is now the only owner of these eight columns in
+ * the schema. MAX/AVG/MIN/PERCENTILE_CONT over an empty set is NULL (not 0),
+ * so an empty cell yields NULLs for all eight columns.
+ *
+ * The value oracle is this file's own isolated-group fixture data (the
+ * "grouping shapes" block), not a captured snapshot of the RPC it replaced:
+ * #1224 verified the two column for column while both existed, and the
+ * `biometrics_stats/*` fixtures that comparison ran against went with the RPC.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -33,8 +38,6 @@ import {
 	insertTestEncounter,
 	createRingNoSequence
 } from './helpers/encounter-fixtures';
-import alphaBiometricsByspecies from '../../../test-fixtures/snapshots/biometrics_stats/alpha.by-species.json';
-import gammaBiometricsByspecies from '../../../test-fixtures/snapshots/biometrics_stats/gamma.by-species.json';
 
 // numeric-typed columns can come back as a JS number or a stringified numeric
 // depending on the driver; coerce before comparing.
@@ -55,61 +58,21 @@ async function getSpeciesId(speciesName: string): Promise<number> {
 
 describe('stats_cache_biometrics_metrics', () => {
 	describe('biometric aggregates', () => {
-		let alphaId: number;
-		let alphaClient: SupabaseClient;
 		let gammaId: number;
 		let gammaClient: SupabaseClient;
 
 		beforeAll(async () => {
-			alphaId = await getGroupIdByName('Alpha');
-			alphaClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
 			gammaId = await getGroupIdByName('Gamma');
 			gammaClient = await getAuthenticatedSupabaseClientForGroup(gammaId);
 		});
 
-		it("matches biometrics_stats' own max/avg/min/median weight and wing for identical filters", async () => {
-			// Same call shape biometrics_stats/alpha.by-species.json was generated
-			// with (supabase/scripts/generate-snapshots.ts) — reused here as the
-			// comparison baseline instead of hand-rolling new fixture data.
-			const { data, error } = await alphaClient.rpc(
-				'stats_cache_biometrics_metrics',
-				{ ringing_group_filter: alphaId, group_by_species: true }
-			);
-			expect(error).toBeNull();
-			expect(data).toHaveLength(alphaBiometricsByspecies.length);
-
-			for (const fixtureRow of alphaBiometricsByspecies) {
-				const speciesId = await getSpeciesId(fixtureRow.species_name);
-				const liveRow = data!.find((row) => row.species_id === speciesId);
-				expect(liveRow, `no row for species "${fixtureRow.species_name}"`).toBeDefined();
-				expect(liveRow!.time_period).toBeNull();
-				expect(num(liveRow!.max_weight)).toBeCloseTo(fixtureRow.max_weight, 1);
-				expect(num(liveRow!.avg_weight)).toBeCloseTo(fixtureRow.avg_weight, 1);
-				expect(num(liveRow!.min_weight)).toBeCloseTo(fixtureRow.min_weight, 1);
-				expect(num(liveRow!.median_weight)).toBeCloseTo(
-					fixtureRow.median_weight,
-					1
-				);
-				expect(num(liveRow!.max_wing)).toBe(fixtureRow.max_wing);
-				expect(num(liveRow!.avg_wing)).toBeCloseTo(fixtureRow.avg_wing, 1);
-				expect(num(liveRow!.min_wing)).toBe(fixtureRow.min_wing);
-				expect(num(liveRow!.median_wing)).toBeCloseTo(
-					fixtureRow.median_wing,
-					0
-				);
-			}
-		});
-
 		it('returns NULL, not 0, for a cell with zero biometric-eligible encounters', async () => {
-			// biometrics_stats/gamma.by-species.json (empty array) documents that
-			// Gamma has zero biometric-eligible encounters — under
+			// Gamma's seed data has zero biometric-eligible encounters. Under
 			// group_by_species=true that yields zero rows, since species_spine
 			// itself is built from raw_encounters. An ungrouped call's spine
 			// always yields exactly one cell regardless of whether any encounters
 			// match it, so it's the shape that actually surfaces the NULL-not-0
 			// behaviour as a row rather than an absence of rows.
-			expect(gammaBiometricsByspecies).toEqual([]);
-
 			const { data, error } = await gammaClient.rpc(
 				'stats_cache_biometrics_metrics',
 				{ ringing_group_filter: gammaId }
@@ -235,11 +198,21 @@ describe('stats_cache_biometrics_metrics', () => {
 			expect(data).toHaveLength(1);
 			expect(data![0].species_id).toBeNull();
 			expect(data![0].time_period).toBeNull();
-			// 10/20/30/40 across the whole window.
+			// Weights 10/20/30/40 and wings 50/60/70/80 across the whole window.
+			// All four aggregates are asserted here (not just the two extremes)
+			// because this block's hand-built data is now the only value oracle
+			// for avg/median — the fixture comparison against the deleted
+			// `biometrics_stats` that used to cover them went with the RPC
+			// (#1246). An even-sized set makes PERCENTILE_CONT interpolate, so
+			// median and avg coincide at 25/65 here by construction.
 			expect(num(data![0].max_weight)).toBe(40);
+			expect(num(data![0].avg_weight)).toBeCloseTo(25, 1);
 			expect(num(data![0].min_weight)).toBe(10);
+			expect(num(data![0].median_weight)).toBeCloseTo(25, 1);
 			expect(num(data![0].max_wing)).toBe(80);
+			expect(num(data![0].avg_wing)).toBeCloseTo(65, 1);
 			expect(num(data![0].min_wing)).toBe(50);
+			expect(num(data![0].median_wing)).toBeCloseTo(65, 1);
 		});
 
 		it('returns one row per species when group_by_species is true', async () => {

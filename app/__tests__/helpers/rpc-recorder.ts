@@ -10,8 +10,7 @@ export type RpcCall = { name: string; args: Record<string, unknown> };
  * `sp-data.test.ts`'s `makeClient`, `spp-data.test.ts`'s rpc setup), or a
  * `(name) => data` function evaluated per call, keyed off the rpc name — for
  * a client that calls more than one distinct rpc and needs each to resolve
- * different rows (e.g. `sp-data.test.ts`'s `makeStatsHistoryClient`,
- * dispatching `core_stats` vs `biometrics_stats`).
+ * different rows.
  */
 export function makeRpcCallRecorder(
 	rows: unknown | ((name: string) => unknown)
