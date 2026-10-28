@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { summaryHighlightsTab } from '../SummaryHighlightsTab';
 import type { SummaryHighlightsData } from '../summary-tab-prefetchers';
-import type { CombinedHighlight } from '@/app/lib/highlights/types';
+import type { CombinedHighlight } from '@/modules/highlights/types';
 import type { SummaryTabParams } from '../summary-tab-params';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 

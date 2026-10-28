@@ -7,7 +7,7 @@ import {
 } from '@/app/models/bird';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { readStatsCacheRows } from './stats-cache';
+import { readStatsCacheRows } from '@/modules/stats';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
@@ -19,7 +19,7 @@ import {
 	type ArrivalsStatsResult
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
-import type { TemporalUnit } from '@/lib/stats-cache-refresh';
+import type { TemporalUnit } from '@/modules/stats/stats-cache-refresh';
 import { buildPageOfBirdsSelect } from '@/queries';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 

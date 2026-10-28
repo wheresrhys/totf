@@ -7,7 +7,7 @@ import type { Database } from '@/types/supabase.types';
 // `include`, which `lib/` sits outside of. The `@/`-aliased import above is
 // `import type` only, erased before either runtime sees it, so it isn't
 // subject to the same constraint.
-import { catchSupabaseErrors } from './supabase';
+import { catchSupabaseErrors } from '@/lib/supabase';
 
 /**
  * Populates `SimpleStatsCache` (#1144, retrofitted by #1162), the

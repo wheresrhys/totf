@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { StatsCacheRefreshEvent } from '../../../../../lib/stats-cache-refresh-events';
+import type { StatsCacheRefreshEvent } from '../../../../../modules/stats/stats-cache-refresh-events';
 
 // Named with a `Mock` suffix so the `ImportJobTracker` stand-in below can carry
 // a field of the real method's name without shadowing it in its own initializer.
@@ -20,7 +20,7 @@ vi.mock('../../../../../lib/demon-import', () => ({
 	}
 }));
 
-vi.mock('../../../../../lib/stats-cache-refresh', () => ({
+vi.mock('../../../../../modules/stats/stats-cache-refresh', () => ({
 	refreshSimpleStatsCache: (...args: unknown[]) =>
 		refreshSimpleStatsCache(...args)
 }));

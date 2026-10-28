@@ -7,7 +7,7 @@ import {
 	within
 } from '@testing-library/react';
 import { SessionTabs, buildSessionTabs } from '../SessionTabs';
-import type { CombinedHighlight } from '@/app/lib/highlights/types';
+import type { CombinedHighlight } from '@/modules/highlights/types';
 import type { NetRound } from '@/app/lib/session-chronology';
 import type {
 	SessionEncounter,
@@ -20,7 +20,7 @@ import {
 
 // The Highlights tab fetches through this; mock it as the one collaborator it
 // is, so opening that tab in a test never reaches the real stats pipeline.
-vi.mock('@/app/lib/highlights/lib/hg2', () => ({
+vi.mock('@/modules/highlights/lib/hg2', () => ({
 	getAllHighlightsAcrossScopes: vi
 		.fn()
 		.mockResolvedValue({ inter: [], intra: [] })
@@ -737,7 +737,7 @@ describe('SessionTabs', () => {
 
 		async function mockHighlightsPipeline(highlights: CombinedHighlight[]) {
 			const { getAllHighlightsAcrossScopes } =
-				await import('@/app/lib/highlights/lib/hg2');
+				await import('@/modules/highlights/lib/hg2');
 			vi.mocked(getAllHighlightsAcrossScopes).mockResolvedValue({
 				inter: highlights,
 				intra: []

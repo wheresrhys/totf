@@ -4,7 +4,7 @@ import {
 	reportHighlight,
 	type ReportHighlightState
 } from '@/app/actions/highlight-reports';
-import type { CombinedHighlight } from '@/app/lib/highlights/types';
+import type { CombinedHighlight } from '@/modules/highlights/types';
 
 // Confirmation modal for reporting a bad highlight (#1122). Mirrors
 // CreateSequenceForRing.tsx: a useActionState-driven form with hidden inputs,

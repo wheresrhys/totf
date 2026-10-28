@@ -1,6 +1,6 @@
 import type { HighlightValue } from '../types';
 import { DEFAULT_THRESHOLD } from '../const';
-import type { StatsResult } from '@/app/actions/stats-cache';
+import type { StatsResult } from '@/modules/stats';
 type HighlightFinderOptions = {
 	threshold?: number;
 	// Rarity finders only: the most periods a species can have ever appeared in

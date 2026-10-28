@@ -7,9 +7,9 @@ import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
 // resolution is scoped to tsconfig.json's `include`, which `lib/` sits outside
 // of. The two `@/`-aliased imports above are `import type` only, erased before
 // either runtime sees them, so they aren't subject to the same constraint.
-import { buildStatsCacheRefreshEvents } from './stats-cache-refresh-events';
-import { dispatchStatsCacheRefreshWindow } from './queue-dispatch';
-import type { TemporalUnit } from './stats-cache-refresh';
+import { buildStatsCacheRefreshEvents } from '../modules/stats/stats-cache-refresh-events';
+import { dispatchStatsCacheRefreshEvent } from '@/modules/stats';
+import type { TemporalUnit } from '@/modules/stats/stats-cache-refresh';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Omit<
@@ -1575,7 +1575,7 @@ export async function dispatchStatsCacheRefreshEvents(
 			affectedSpeciesIds
 		);
 		for (const event of statsCacheRefreshEvents) {
-			await dispatchStatsCacheRefreshWindow(event);
+			await dispatchStatsCacheRefreshEvent(event);
 		}
 	} catch (dispatchError) {
 		console.error(
