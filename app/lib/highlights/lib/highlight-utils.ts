@@ -7,7 +7,8 @@ import type {
 	NumericHighlightValue,
 	HighlightsGenerator,
 	HighlightScope,
-	HighlightValueWithRanking
+	HighlightValueWithRanking,
+	StatsRowShape
 } from '../types';
 import { isNumericHighlightValue } from '../types';
 import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
@@ -47,7 +48,7 @@ export function filterStats({
 	const cache = getFilteredStatsCache(
 		viewedGroup.id,
 		scope,
-		rule.rpcName,
+		rule.statsRowShape,
 		rule.speciesUsed
 	);
 
@@ -242,19 +243,21 @@ export type FilteredStatsCache = {
 export function getFilteredStatsCache(
 	groupId: number,
 	scope: HighlightScope,
-	rpcName: string,
+	statsRowShape: StatsRowShape,
 	speciesUsed: 'none' | 'present' | 'grouped'
 ): FilteredStatsCache {
 	const cacheKey = getCacheKey(groupId, scope);
 
 	return {
-		has: () => filteredStatsCache.has(`${cacheKey}-${rpcName}-${speciesUsed}`),
+		has: () =>
+			filteredStatsCache.has(`${cacheKey}-${statsRowShape}-${speciesUsed}`),
 		set: (filteredStats: (CoreStatsResult | BiometricsStatsResult)[]) =>
 			filteredStatsCache.set(
-				`${cacheKey}-${rpcName}-${speciesUsed}`,
+				`${cacheKey}-${statsRowShape}-${speciesUsed}`,
 				filteredStats
 			),
-		get: () => filteredStatsCache.get(`${cacheKey}-${rpcName}-${speciesUsed}`)
+		get: () =>
+			filteredStatsCache.get(`${cacheKey}-${statsRowShape}-${speciesUsed}`)
 	};
 }
 

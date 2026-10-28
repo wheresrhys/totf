@@ -84,7 +84,7 @@ export const rarities: HighlightsGenerator = {
 	// as a first record — the earliest February a species appeared in is not a
 	// first of anything.
 	condition: (scope) => !scope.parentTimeWindow?.month,
-	rpcName: 'core_stats',
+	statsRowShape: 'core',
 	speciesUsed: 'grouped',
 	presence: {
 		species: null,

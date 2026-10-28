@@ -53,7 +53,7 @@ export const eachSpeciesCount: HighlightsGenerator = {
 	},
 	condition: (scope) =>
 		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
-	rpcName: 'core_stats',
+	statsRowShape: 'core',
 	speciesUsed: 'grouped',
 	presence: {
 		species: null,
