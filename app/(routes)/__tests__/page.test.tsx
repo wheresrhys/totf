@@ -14,7 +14,7 @@ import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/synthetic/zero.h
 import type { HomePageSummaryStats } from '../PageContent';
 import type { CoreStatsResult, GroupTicksResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { GenericStatsCacheReadParams } from '@/app/actions/stats-cache';
+import type { StatsCacheReadParams } from '@/app/actions/stats-cache';
 
 const { mockGetAuthenticatedSupabaseClient, mockReadStatsCacheRows } =
 	vi.hoisted(() => ({
@@ -47,7 +47,7 @@ const START_OF_LAST_YEAR = `${CURRENT_YEAR - 1}-01-01`;
 // carry `time_period: null`).
 function mockSummaryStats(stats: HomePageSummaryStats | null) {
 	mockReadStatsCacheRows.mockImplementation(
-		async ({ temporalUnit }: GenericStatsCacheReadParams) => {
+		async ({ temporalUnit }: StatsCacheReadParams) => {
 			if (stats == null) {
 				return [];
 			}
@@ -325,13 +325,13 @@ describe('home page', () => {
 			await screen.findByTestId('summary-stats-table');
 			expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
 				client: authenticatedClient,
-				groupId: 1,
+				viewedGroup: { id: 1, slug: 'alpha' },
 				bySpecies: false,
 				temporalUnit: 'all-time'
 			});
 			expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
 				client: authenticatedClient,
-				groupId: 1,
+				viewedGroup: { id: 1, slug: 'alpha' },
 				bySpecies: false,
 				temporalUnit: 'year'
 			});
@@ -449,7 +449,7 @@ describe('fetchHomePageSummaryStats', () => {
 			time_period: START_OF_LAST_YEAR
 		});
 		mockReadStatsCacheRows.mockImplementation(
-			async ({ temporalUnit }: GenericStatsCacheReadParams) =>
+			async ({ temporalUnit }: StatsCacheReadParams) =>
 				temporalUnit === 'all-time' ? [allTimeRow] : [thisYearRow, lastYearRow]
 		);
 
@@ -462,13 +462,13 @@ describe('fetchHomePageSummaryStats', () => {
 		});
 		expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
 			client,
-			groupId: viewedGroup.id,
+			viewedGroup,
 			bySpecies: false,
 			temporalUnit: 'all-time'
 		});
 		expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
 			client,
-			groupId: viewedGroup.id,
+			viewedGroup,
 			bySpecies: false,
 			temporalUnit: 'year'
 		});
@@ -486,7 +486,7 @@ describe('fetchHomePageSummaryStats', () => {
 			time_period: '1999-01-01'
 		});
 		mockReadStatsCacheRows.mockImplementation(
-			async ({ temporalUnit }: GenericStatsCacheReadParams) =>
+			async ({ temporalUnit }: StatsCacheReadParams) =>
 				temporalUnit === 'all-time' ? [] : [someOtherYearRow, thisYearRow]
 		);
 
@@ -505,7 +505,7 @@ describe('fetchHomePageSummaryStats', () => {
 			time_period: '1999-01-01'
 		});
 		mockReadStatsCacheRows.mockImplementation(
-			async ({ temporalUnit }: GenericStatsCacheReadParams) =>
+			async ({ temporalUnit }: StatsCacheReadParams) =>
 				temporalUnit === 'all-time' ? [] : [someOtherYearRow, lastYearRow]
 		);
 

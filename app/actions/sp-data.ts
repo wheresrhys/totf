@@ -22,6 +22,7 @@ import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
 import type { TemporalUnit } from '@/lib/stats-cache-refresh';
 import { buildPageOfBirdsSelect } from '@/queries';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+
 export async function fetchPageOfBirds(
 	speciesId: number,
 	viewedGroup: ViewedGroup,
@@ -198,10 +199,8 @@ export async function fetchSpeciesStatsCacheRows<
 	toDate?: string;
 	includeBiometrics?: boolean;
 }): Promise<RowType[]> {
-	const supabase = await getAuthenticatedSupabaseClient();
 	return (await readStatsCacheRows({
-		client: supabase,
-		groupId: viewedGroup.id,
+		viewedGroup,
 		bySpecies: true,
 		species: speciesName,
 		temporalUnit,

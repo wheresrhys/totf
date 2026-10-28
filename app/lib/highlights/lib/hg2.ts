@@ -49,7 +49,7 @@ async function getScopedHighlightsOfType({
 	limit
 }: HighlightsOfTypeParams): Promise<NewHighlightValue[]> {
 	const rule = getRule(highlightType);
-	// `pooledRequestForStats`/`readStatsCacheRowsForViewedGroup` return plain
+	// `pooledRequestForStats`/`readStatsCacheRows` return plain
 	// `Record<string, unknown>[]` rows (#1236) — narrowed here to the shape
 	// every Highlights rule already expects, same as every other
 	// `readStatsCacheRows`-family caller narrows its own result.

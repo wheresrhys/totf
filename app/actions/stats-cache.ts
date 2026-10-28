@@ -18,15 +18,15 @@ type GenericStatsCacheRow = Record<string, unknown> & {
 	Species?: { species_name: string } | null;
 };
 
-export type GenericStatsCacheReadParams = {
-	client: SupabaseClient;
-	groupId: number;
+export type StatsCacheReadParams = {
+	viewedGroup: ViewedGroup;
 	bySpecies: boolean;
 	species?: string;
 	temporalUnit: TemporalUnit;
 	timePeriod?: string;
 	fromDate?: string;
 	toDate?: string;
+	client?: SupabaseClient;
 };
 
 /**
@@ -37,7 +37,7 @@ export type GenericStatsCacheReadParams = {
  * and `runStatsCacheRead` in `app/lib/auth/group-summary-access.ts` (#1234)
  * are each a thin adapter over this function, and #1236 moved every
  * remaining `stats-cache.ts` consumer (the home page's summary stats, the
- * Highlights pooled fetch via `readStatsCacheRowsForViewedGroup` below, and
+ * Highlights pooled fetch via `readStatsCacheRows` below, and
  * `SpDemographicsTab`'s effort history) onto it directly too, then deleted
  * this file's now-dead old column-subset machinery
  * (`getStatsCacheTableFetcher`/`getServerCachedStats`/`fetchCoreStatsByMonth`).
@@ -72,14 +72,15 @@ export type GenericStatsCacheReadParams = {
  */
 export async function readStatsCacheRows({
 	client,
-	groupId,
+	viewedGroup,
 	bySpecies,
 	species,
 	temporalUnit,
 	timePeriod,
 	fromDate,
 	toDate
-}: GenericStatsCacheReadParams): Promise<Record<string, unknown>[]> {
+}: StatsCacheReadParams): Promise<Record<string, unknown>[]> {
+	client = client ?? (await getAuthenticatedSupabaseClient());
 	const tableName = bySpecies
 		? 'SimpleStatsCacheBySpecies'
 		: 'SimpleStatsCache';
@@ -97,7 +98,7 @@ export async function readStatsCacheRows({
 				// can't infer the row shape from a string literal — name it
 				// explicitly.
 				.select<string, GenericStatsCacheRow>(selectedColumns)
-				.eq('group_id', groupId)
+				.eq('group_id', viewedGroup.id)
 				.eq('temporal_unit', temporalUnit);
 			if (species) {
 				filtered = filtered.eq('Species.species_name', species);
@@ -123,33 +124,4 @@ export async function readStatsCacheRows({
 		...row,
 		species_name: bySpecies ? (Species?.species_name ?? null) : null
 	}));
-}
-
-export type ReadStatsCacheRowsForViewedGroupParams = Omit<
-	GenericStatsCacheReadParams,
-	'client' | 'groupId'
-> & {
-	viewedGroup: ViewedGroup;
-};
-
-/**
- * The one `'use server'`-facing pass-through onto `readStatsCacheRows` that a
- * `'use client'` caller can invoke directly as a Server Action (#1236) — a
- * `SupabaseClient` instance can't cross that boundary (it isn't a plain,
- * serializable value), so a client module that needs a cache read mints no
- * client of its own and instead calls this, which mints one via
- * `getAuthenticatedSupabaseClient()` and derives `groupId` from the given
- * `ViewedGroup`. Carries zero column-subset logic of its own — every other
- * param is forwarded to `readStatsCacheRows` unchanged.
- */
-export async function readStatsCacheRowsForViewedGroup({
-	viewedGroup,
-	...params
-}: ReadStatsCacheRowsForViewedGroupParams): Promise<Record<string, unknown>[]> {
-	const client = await getAuthenticatedSupabaseClient();
-	return readStatsCacheRows({
-		client,
-		groupId: viewedGroup.id,
-		...params
-	});
 }

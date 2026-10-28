@@ -89,8 +89,7 @@ function cacheReadParams(
 	{ fromDate, toDate }: { fromDate?: string; toDate?: string } = {}
 ) {
 	return {
-		client: expect.anything(),
-		groupId: GROUP_ID,
+		viewedGroup: { id: GROUP_ID, slug: 'alpha' },
 		bySpecies: true,
 		species: SPECIES_NAME,
 		temporalUnit,
@@ -243,19 +242,16 @@ describe('sp-data actions', () => {
 	});
 
 	describe('fetchSpeciesStatsCacheRows', () => {
-		it('asks the generic reader for the by-species table, this group and this species, through the authenticated client', async () => {
-			const { client } = makeClient();
-
+		it('asks the generic reader for the by-species table, this group and this species', async () => {
 			await fetchSpeciesStatsCacheRows({
 				speciesName: SPECIES_NAME,
 				viewedGroup,
 				temporalUnit: 'month'
 			});
 
-			expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
-				...cacheReadParams('month'),
-				client
-			});
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith(
+				cacheReadParams('month')
+			);
 		});
 
 		it('forwards fromDate/toDate to the generic reader as its time_period range', async () => {

@@ -7,7 +7,7 @@ import {
 	getSpeciesDemographicsStats,
 	getSpeciesArrivalsStats
 } from '@/app/actions/sp-data';
-import { readStatsCacheRowsForViewedGroup } from '@/app/actions/stats-cache';
+import { readStatsCacheRows } from '@/app/actions/stats-cache';
 import { postgresIntervalToHours } from '@/app/lib/postgres-interval';
 import type {
 	CoreStatsResult,
@@ -244,7 +244,7 @@ export function SpDemographicsTab({
 	function loadEffortHistory() {
 		if (effortHistoryRequested) return;
 		setEffortHistoryRequested(true);
-		readStatsCacheRowsForViewedGroup({
+		readStatsCacheRows({
 			viewedGroup,
 			bySpecies: false,
 			temporalUnit: 'month'

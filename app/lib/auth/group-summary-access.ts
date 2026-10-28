@@ -244,7 +244,7 @@ export function resolveStatsCacheQueryPlan({
  */
 async function runStatsCacheRead(
 	client: SupabaseClient,
-	groupId: number,
+	viewedGroup: ViewedGroup,
 	groupBySpecies: boolean,
 	plan: StatsCacheQueryPlan
 ): Promise<CoreStatsResult[]> {
@@ -255,7 +255,7 @@ async function runStatsCacheRead(
 	// `group_by_species: false`) and strips the embed itself.
 	const rows = (await readStatsCacheRows({
 		client,
-		groupId,
+		viewedGroup,
 		bySpecies: groupBySpecies,
 		temporalUnit: plan.temporalUnit,
 		// A plan carries either an exact cell or a range, never both — which is
@@ -281,11 +281,11 @@ async function runStatsCacheRead(
 async function runCoreStats(
 	rpcName: 'core_stats' | 'public_core_stats',
 	client: SupabaseClient,
-	groupId: number,
+	viewedGroup: ViewedGroup,
 	rpcParams: CoreStatsRpcParams
 ): Promise<CoreStatsResult[]> {
 	const rows = (await client
-		.rpc(rpcName, { ringing_group_filter: groupId, ...rpcParams })
+		.rpc(rpcName, { ringing_group_filter: viewedGroup.id, ...rpcParams })
 		.then(catchSupabaseErrors)) as CoreStatsResult[] | null;
 	return rows ?? [];
 }
@@ -371,14 +371,14 @@ export async function fetchAuthorisedCoreStats(
 		cacheQueryPlan
 			? runStatsCacheRead(
 					client,
-					viewedGroup.id,
+					viewedGroup,
 					Boolean(rpcParams.group_by_species),
 					cacheQueryPlan
 				)
 			: runCoreStats(
 					publicRead ? 'public_core_stats' : 'core_stats',
 					client,
-					viewedGroup.id,
+					viewedGroup,
 					rpcParams
 				);
 

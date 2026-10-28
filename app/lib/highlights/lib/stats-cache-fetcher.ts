@@ -1,8 +1,10 @@
 'use client';
 import {
-	readStatsCacheRowsForViewedGroup,
-	type ReadStatsCacheRowsForViewedGroupParams
+	readStatsCacheRows,
+	type StatsCacheReadParams
 } from '@/app/actions/stats-cache';
+
+type SerializableStatsCacheParams = Omit<StatsCacheReadParams, 'client'>;
 
 // `rpcName` used to be part of this key (and this file's params type) purely
 // to keep a core_stats-shaped read and a biometrics_stats-shaped read from
@@ -15,27 +17,25 @@ function getCacheKey({
 	bySpecies,
 	temporalUnit,
 	viewedGroup
-}: ReadStatsCacheRowsForViewedGroupParams): string {
+}: SerializableStatsCacheParams): string {
 	return `group(${viewedGroup.id})-${temporalUnit}${bySpecies ? '-by-species' : ''}`;
 }
 
 const requestCache: Map<
 	string,
-	ReturnType<typeof readStatsCacheRowsForViewedGroup>
+	ReturnType<typeof readStatsCacheRows>
 > = new Map();
 
 export function pooledRequestForStats(
-	params: ReadStatsCacheRowsForViewedGroupParams
-): ReturnType<typeof readStatsCacheRowsForViewedGroup> {
+	params: SerializableStatsCacheParams
+): ReturnType<typeof readStatsCacheRows> {
 	const cacheKey = getCacheKey(params);
 	if (requestCache.has(cacheKey)) {
 		console.log('hit', cacheKey);
-		return requestCache.get(cacheKey) as ReturnType<
-			typeof readStatsCacheRowsForViewedGroup
-		>;
+		return requestCache.get(cacheKey) as ReturnType<typeof readStatsCacheRows>;
 	} else {
 		console.log('miss', cacheKey);
-		const request = readStatsCacheRowsForViewedGroup(params);
+		const request = readStatsCacheRows(params);
 		requestCache.set(cacheKey, request);
 		return request;
 	}

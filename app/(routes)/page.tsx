@@ -53,13 +53,13 @@ export async function fetchHomePageSummaryStats(
 	const [allTimeRows, yearRows] = (await Promise.all([
 		readStatsCacheRows({
 			client,
-			groupId: viewedGroup.id,
+			viewedGroup,
 			bySpecies: false,
 			temporalUnit: 'all-time'
 		}),
 		readStatsCacheRows({
 			client,
-			groupId: viewedGroup.id,
+			viewedGroup,
 			bySpecies: false,
 			temporalUnit: 'year'
 		})
