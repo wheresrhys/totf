@@ -60,22 +60,44 @@ export type ArrivalsStatsResult = {
 	>;
 };
 
-// biometrics_stats is core_stats' companion RPC (#822/#823), carrying the 8
-// wing/weight summary statistics (max/avg/min/median for both) in its own
-// biometrics_stats_result composite type. Unlike CoreStatsResult above, the
-// metric columns here are deliberately NOT stripped of null — MAX/AVG/MIN/
-// PERCENTILE_CONT over an empty set genuinely returns NULL (the RPC applies no
-// COALESCE, see biometrics_stats.sql), so a real "no biometric-eligible
-// encounters for this species/period" cell must stay nullable. Only species_name
-// is stripped non-null, since every caller today calls the RPC with
-// group_by_species: true.
-export type BiometricsStatsResult = Omit<
-	Database['public']['CompositeTypes']['biometrics_stats_result'],
-	'species_name'
-> & {
-	species_name: NonNullable<
-		Database['public']['CompositeTypes']['biometrics_stats_result']['species_name']
-	>;
+// The 8 wing/weight summary statistics (max/avg/min/median for both) for one
+// (species, time_period) cell, plus the encounter count they were derived from.
+//
+// Unlike its CoreStatsResult/DemographicsStatsResult/ArrivalsStatsResult
+// siblings above, this one is a standalone TypeScript type rather than a view
+// over a generated Postgres composite type (#1245). It used to derive from
+// `biometrics_stats_result`, the composite returned by the biometrics_stats RPC
+// (#822/#823), but every app call site now reads the already-materialized
+// SimpleStatsCache/SimpleStatsCacheBySpecies tables instead (#1223, #1244), so
+// the RPC — and its composite — are on their way out of the schema. The
+// replacement RPC's composite (`stats_cache_biometrics_metrics_result`) is NOT a
+// drop-in substitute to re-point at: it keys on species_id rather than the
+// display-oriented species_name, and it has no encounter_count column, which
+// compare-species.ts's toBiometricsStatsResult populates for its own callers. So
+// the app owns this shape outright now; the columns below are the ones the
+// composite carried, unchanged.
+//
+// The nullability is deliberate and not uniform. The metric columns stay
+// nullable because MAX/AVG/MIN/PERCENTILE_CONT over an empty set genuinely
+// returns NULL — no COALESCE was ever applied — so a real "no biometric-eligible
+// encounters for this species/period" cell has to be representable.
+// species_name is non-null because every producer left in app code groups by
+// species and so always resolves a real name (spp-data.ts's two read paths and
+// compare-species.ts's toBiometricsStatsResult); the only data with a literal
+// null there is the legacy ungrouped-RPC headline fixture, which consequently
+// needs a double assertion — see app/CLAUDE.md's "App tests".
+export type BiometricsStatsResult = {
+	species_name: string;
+	time_period: string | null;
+	max_weight: number | null;
+	avg_weight: number | null;
+	min_weight: number | null;
+	median_weight: number | null;
+	max_wing: number | null;
+	avg_wing: number | null;
+	min_wing: number | null;
+	median_wing: number | null;
+	encounter_count: number | null;
 };
 
 // The 8 wing/weight columns that biometrics_stats owns. core_stats no

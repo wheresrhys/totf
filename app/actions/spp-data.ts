@@ -132,9 +132,9 @@ async function readBiometricsFromStatsCache(
 	const client = await getAuthenticatedSupabaseClient();
 	const selectedColumns = [
 		...BIOMETRIC_CACHE_COLUMNS,
-		// The ninth column of `biometrics_stats_result`, carried verbatim by the
-		// cache too. No consumer of these rows reads it, but the return shape is
-		// unchanged on both paths and the RPC supplies it.
+		// `BiometricsStatsResult`'s ninth column, carried verbatim by the cache
+		// too. No consumer of these rows reads it, but the return shape is
+		// unchanged on both paths and the cache supplies it.
 		'encounter_count',
 		'Species(species_name)'
 	].join(', ');

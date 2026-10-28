@@ -25,9 +25,9 @@ import robinBiometricsHeadline from '@/test-fixtures/snapshots/biometrics_stats/
  * The species page's headline `speciesStats` row, merged as the page merges it.
  *
  * Both fixtures are ungrouped headline rows, so species_name/time_period are
- * genuinely null — CoreStatsResult/BiometricsStatsResult's NonNullable mapped
- * types (app/models/db.ts) assume every column is always present, so a direct
- * assertion doesn't compile (#895).
+ * genuinely null — CoreStatsResult strips every column non-null and
+ * BiometricsStatsResult declares species_name non-null (app/models/db.ts), so a
+ * direct assertion doesn't compile (#895).
  */
 export const robinSpeciesStats = mergeBiometricsFields(
 	// eslint-disable-next-line no-restricted-syntax -- see comment above
