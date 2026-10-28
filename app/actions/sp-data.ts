@@ -7,7 +7,7 @@ import {
 } from '@/app/models/bird';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { readStatsCacheRows } from '../../modules/stats/stats-cache';
+import { readStatsCacheRows } from '@/modules/stats';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/pages/species/WeightAndWingChart';

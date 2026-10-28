@@ -7,7 +7,7 @@ import {
 	getSpeciesDemographicsStats,
 	getSpeciesArrivalsStats
 } from '@/app/actions/sp-data';
-import { readStatsCacheRows } from '@/modules/stats/stats-cache';
+import { readStatsCacheRows } from '@/modules/stats';
 import { postgresIntervalToHours } from '@/app/lib/postgres-interval';
 import type {
 	CoreStatsResult,

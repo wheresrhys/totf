@@ -35,7 +35,7 @@ vi.mock('@/app/actions/sp-data', () => ({
 	getSpeciesArrivalsStats: vi.fn()
 }));
 
-vi.mock('@/modules/stats/stats-cache', () => ({
+vi.mock('@/modules/stats', () => ({
 	readStatsCacheRows: vi.fn()
 }));
 
@@ -180,7 +180,7 @@ async function loadActions() {
 }
 
 async function loadStatsCacheActions() {
-	return import('@/modules/stats/stats-cache');
+	return import('@/modules/stats');
 }
 
 function renderDemographicsTab(

@@ -34,7 +34,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 // readStatsCacheRows (#1233/#1235), whose own suite covers all of that. So
 // these tests assert the params this file hands it and what each caller
 // does with the rows it returns, not the query it issues.
-vi.mock('@/modules/stats/stats-cache', () => ({
+vi.mock('@/modules/stats', () => ({
 	readStatsCacheRows: mockReadStatsCacheRows
 }));
 

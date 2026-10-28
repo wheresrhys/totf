@@ -3,7 +3,7 @@ import { endOfMonth, endOfYear, format, parseISO } from 'date-fns';
 import { getAuthenticatedSupabaseClient } from './group-auth';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
-import { readStatsCacheRows } from '@/modules/stats/stats-cache';
+import { readStatsCacheRows } from '@/modules/stats';
 import {
 	resolveGroupPublicAreasForRequest,
 	type ViewedGroup
