@@ -14,7 +14,7 @@ import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/synthetic/zero.h
 import type { HomePageSummaryStats } from '../PageContent';
 import type { CoreStatsResult, GroupTicksResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { StatsCacheReadParams } from '@/app/actions/stats-cache';
+import type { StatsCacheReadParams } from '@/modules/stats/stats-cache';
 
 const { mockGetAuthenticatedSupabaseClient, mockReadStatsCacheRows } =
 	vi.hoisted(() => ({
@@ -26,7 +26,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
-vi.mock('@/app/actions/stats-cache', () => ({
+vi.mock('@/modules/stats/stats-cache', () => ({
 	readStatsCacheRows: mockReadStatsCacheRows
 }));
 

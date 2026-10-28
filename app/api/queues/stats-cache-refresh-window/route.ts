@@ -9,13 +9,13 @@ import { handleCallback } from '@vercel/queue';
 import {
 	ImportJobTracker,
 	type StatsCacheRefreshOutcome
-} from '../../../../lib/demon-import';
+} from '@/lib/demon-import';
 import {
 	refreshSimpleStatsCache,
 	type TemporalUnit
-} from '../../../../lib/stats-cache-refresh';
-import type { StatsCacheRefreshEvent } from '../../../../lib/stats-cache-refresh-events';
-import { getAuthenticatedSupabaseClientForGroup } from '../../../lib/auth/group-auth';
+} from '@/modules/stats/stats-cache-refresh';
+import type { StatsCacheRefreshEvent } from '@/modules/stats/stats-cache-refresh-events';
+import { getAuthenticatedSupabaseClientForGroup } from '@/app/lib/auth/group-auth';
 
 /**
  * What one `StatsCacheRefreshEvent` means to `refreshSimpleStatsCache`, which

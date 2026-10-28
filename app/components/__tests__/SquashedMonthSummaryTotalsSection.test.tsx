@@ -15,7 +15,7 @@ import {
 	buildDailyStatsRow
 } from '@/app/__tests__/helpers/core-stats-fixtures';
 
-vi.mock('@/app/lib/highlights', () => ({
+vi.mock('@/modules/highlights', () => ({
 	getHighlightsWithinTimeWindow: vi.fn()
 }));
 

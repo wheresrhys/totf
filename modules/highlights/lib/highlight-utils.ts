@@ -14,7 +14,7 @@ import type {
 	SimpleStatsCacheBySpeciesRow,
 	SimpleStatsCacheRow
 } from '@/app/models/db';
-import type { StatsResult } from '@/app/actions/stats-cache';
+import type { StatsResult } from '@/modules/stats/stats-cache';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 export type StatFilter = (stat: {
 	time_period: string | null;

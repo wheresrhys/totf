@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { ReportHighlightModal } from './ReportHighlightModal';
-import type { CombinedHighlight } from '@/app/lib/highlights/types';
+import type { CombinedHighlight } from '@/modules/highlights/types';
 
 // Per-highlight "Report" action (#1122). Owns the open/closed state of its own
 // confirmation modal, mirroring PromoteControlButton.tsx, so the server-rendered

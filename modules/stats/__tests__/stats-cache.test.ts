@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
-import { readStatsCacheRows, type StatsCacheReadParams } from '../stats-cache';
+import { readStatsCacheRows, type StatsCacheReadParams } from '../../../modules/stats/stats-cache';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 

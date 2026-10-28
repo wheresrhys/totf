@@ -41,7 +41,7 @@ function parseTypeScriptOutput(output: string): FileLocation[] {
 	return locations;
 }
 
-function openFileInCursor(filePath: string): void {
+function openFileInSublime(filePath: string): void {
 	const absolutePath = path.resolve(filePath);
 
 	if (!existsSync(absolutePath)) {
@@ -50,20 +50,20 @@ function openFileInCursor(filePath: string): void {
 	}
 
 	try {
-		const result = spawnSync('cursor', [`"${absolutePath}"`], {
-			stdio: 'pipe'
-		});
-
-		if (result.status === 0) {
-			console.log(`✓ Opened using cursor`);
-			return; // Success, exit function
-		} else {
-			const errorMsg =
-				result.stderr?.toString() ||
-				result.stdout?.toString() ||
-				'Unknown error';
-			console.log(`✗ Failed ${name}: ${errorMsg.substring(0, 100)}`);
-		}
+		// console.log(`s ${absolutePath}`)
+		// const result = spawnSync('s', [`"${absolutePath}"`], {
+		// 	stdio: 'pipe'
+		// });
+		// if (result.status === 0) {
+		// 	console.log(`✓ Opened using cursor`);
+		// 	return; // Success, exit function
+		// } else {
+		// 	const errorMsg =
+		// 		result.stderr?.toString() ||
+		// 		result.stdout?.toString() ||
+		// 		'Unknown error';
+		// 	console.log(`✗ Failed ${name}: ${errorMsg.substring(0, 100)}`);
+		// }
 	} catch (error) {
 		console.error(`Error opening ${absolutePath}:`, error);
 	}
@@ -100,7 +100,7 @@ function main(): void {
 
 				for (const location of fileLocations) {
 					console.log(`Opening ${location.file}`);
-					openFileInCursor(location.file);
+					openFileInSublime(location.file);
 				}
 			} else {
 				console.log('\nNo file locations found in error output.');

@@ -14,7 +14,7 @@ import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
 import { recentSessionsQuery, topSpeciesQuery } from '@/queries';
-import { readStatsCacheRows } from '@/app/actions/stats-cache';
+import { readStatsCacheRows } from '@/modules/stats/stats-cache';
 
 export async function fetchRecentSessions(
 	viewedGroup: ViewedGroup

@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { ReportHighlightModal } from '../ReportHighlightModal';
 import type { ReportHighlightState } from '@/app/actions/highlight-reports';
-import type { CombinedHighlight } from '@/app/lib/highlights/types';
+import type { CombinedHighlight } from '@/modules/highlights/types';
 
 const { mockReportHighlight } = vi.hoisted(() => ({
 	mockReportHighlight: vi.fn()

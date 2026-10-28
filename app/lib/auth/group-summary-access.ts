@@ -3,13 +3,13 @@ import { endOfMonth, endOfYear, format, parseISO } from 'date-fns';
 import { getAuthenticatedSupabaseClient } from './group-auth';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
-import { readStatsCacheRows } from '@/app/actions/stats-cache';
+import { readStatsCacheRows } from '@/modules/stats/stats-cache';
 import {
 	resolveGroupPublicAreasForRequest,
 	type ViewedGroup
 } from '../group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
-import type { TemporalUnit } from '@/lib/stats-cache-refresh';
+import type { TemporalUnit } from '@/modules/stats/stats-cache-refresh';
 
 /**
  * Every `SimpleStatsCache.temporal_unit` value that names a repeating period,

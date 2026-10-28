@@ -2,7 +2,7 @@
 import {
 	readStatsCacheRows,
 	type StatsCacheReadParams
-} from '@/app/actions/stats-cache';
+} from '@/modules/stats/stats-cache';
 
 type SerializableStatsCacheParams = Omit<StatsCacheReadParams, 'client'>;
 

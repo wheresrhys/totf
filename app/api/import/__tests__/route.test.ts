@@ -20,11 +20,11 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 	};
 });
 
-vi.mock('@/lib/stats-cache-refresh-events', () => ({
+vi.mock('@/modules/stats/stats-cache-refresh-events', () => ({
 	buildStatsCacheRefreshEvents: vi.fn()
 }));
 
-vi.mock('@/lib/queue-dispatch', () => ({
+vi.mock('@/modules/stats/queue-dispatch', () => ({
 	dispatchStatsCacheRefreshWindow: vi.fn()
 }));
 
@@ -146,11 +146,11 @@ describe('POST /api/import', () => {
 		// No stats-cache-refresh events by default — tests in the dedicated
 		// describe block below override this.
 		const { buildStatsCacheRefreshEvents } =
-			await import('@/lib/stats-cache-refresh-events');
+			await import('@/modules/stats/stats-cache-refresh-events');
 		vi.mocked(buildStatsCacheRefreshEvents).mockClear();
 		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([]);
 		const { dispatchStatsCacheRefreshWindow } =
-			await import('@/lib/queue-dispatch');
+			await import('@/modules/stats/queue-dispatch');
 		vi.mocked(dispatchStatsCacheRefreshWindow).mockClear();
 		vi.mocked(dispatchStatsCacheRefreshWindow).mockResolvedValue(undefined);
 	});
@@ -557,9 +557,9 @@ describe('POST /api/import', () => {
 	describe('stats-cache-refresh-window dispatch', () => {
 		it("dispatches one event per distinct time window derived from the run's affected dates, after the job is marked succeeded", async () => {
 			const { buildStatsCacheRefreshEvents } =
-				await import('@/lib/stats-cache-refresh-events');
+				await import('@/modules/stats/stats-cache-refresh-events');
 			const { dispatchStatsCacheRefreshWindow } =
-				await import('@/lib/queue-dispatch');
+				await import('@/modules/stats/queue-dispatch');
 			const fakeEvents = [
 				{
 					importJobId: IMPORT_JOB_ID,
@@ -611,7 +611,7 @@ describe('POST /api/import', () => {
 			const { EncounterRowBatchWriter, processEncounterRow } =
 				await import('@/lib/demon-import');
 			const { dispatchStatsCacheRefreshWindow } =
-				await import('@/lib/queue-dispatch');
+				await import('@/modules/stats/queue-dispatch');
 
 			// Captured so the test can trigger the real (unmocked)
 			// `ImportDeadlineExceededError` the route closes over internally —
@@ -658,7 +658,7 @@ describe('POST /api/import', () => {
 		it('does not dispatch any events when the run fails before completion', async () => {
 			const { EncounterRowBatchWriter } = await import('@/lib/demon-import');
 			const { dispatchStatsCacheRefreshWindow } =
-				await import('@/lib/queue-dispatch');
+				await import('@/modules/stats/queue-dispatch');
 			vi.mocked(EncounterRowBatchWriter).mockImplementation(function () {
 				throw new Error('could not build writers');
 			} as never);
@@ -678,9 +678,9 @@ describe('POST /api/import', () => {
 		it('logs and swallows a dispatch failure rather than turning the response into an error message', async () => {
 			const { processEncounterRow } = await import('@/lib/demon-import');
 			const { buildStatsCacheRefreshEvents } =
-				await import('@/lib/stats-cache-refresh-events');
+				await import('@/modules/stats/stats-cache-refresh-events');
 			const { dispatchStatsCacheRefreshWindow } =
-				await import('@/lib/queue-dispatch');
+				await import('@/modules/stats/queue-dispatch');
 			vi.mocked(processEncounterRow).mockResolvedValue({
 				visitDate: '2024-06-01'
 			});

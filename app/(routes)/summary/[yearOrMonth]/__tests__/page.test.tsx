@@ -36,7 +36,7 @@ vi.mock('@/app/actions/period-totals', () => ({
 // on the client, on mount — mocked here so a `?tabId=highlights` render
 // doesn't reach the real stats pipeline.
 const getHighlightsWithinTimeWindowMock = vi.fn().mockResolvedValue([]);
-vi.mock('@/app/lib/highlights', () => ({
+vi.mock('@/modules/highlights', () => ({
 	getHighlightsWithinTimeWindow: (...args: unknown[]) =>
 		getHighlightsWithinTimeWindowMock(...args),
 	getCondensedHighlightsAtTimePeriod: vi.fn().mockResolvedValue([])

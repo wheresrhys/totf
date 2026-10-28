@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
+import type { StatsCacheRefreshEvent } from '@/modules/stats/stats-cache-refresh-events';
 vi.mock('@vercel/queue', () => ({
 	send: vi.fn().mockResolvedValue({ messageId: 'msg_1' })
 }));
 
-vi.mock('../../app/api/queues/stats-cache-refresh-window/route', () => ({
+vi.mock('../../../app/api/queues/stats-cache-refresh-window/route', () => ({
 	processStatsCacheRefreshWindowJob: vi.fn().mockResolvedValue(undefined)
 }));
 
 const EVENT = {
 	importJobId: 42,
 	rpcParams: { ringing_group_filter: 7 }
-};
+} as StatsCacheRefreshEvent;
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -33,7 +33,7 @@ describe('dispatchStatsCacheRefreshWindow', () => {
 			const { dispatchStatsCacheRefreshWindow } =
 				await import('../queue-dispatch');
 			const { processStatsCacheRefreshWindowJob } =
-				await import('../../app/api/queues/stats-cache-refresh-window/route');
+				await import('../../../app/api/queues/stats-cache-refresh-window/route');
 			const { send } = await import('@vercel/queue');
 
 			await dispatchStatsCacheRefreshWindow(EVENT);
@@ -46,7 +46,7 @@ describe('dispatchStatsCacheRefreshWindow', () => {
 			const { dispatchStatsCacheRefreshWindow } =
 				await import('../queue-dispatch');
 			const { processStatsCacheRefreshWindowJob } =
-				await import('../../app/api/queues/stats-cache-refresh-window/route');
+				await import('../../../app/api/queues/stats-cache-refresh-window/route');
 			const { send } = await import('@vercel/queue');
 
 			await dispatchStatsCacheRefreshWindow(EVENT);
@@ -62,7 +62,7 @@ describe('dispatchStatsCacheRefreshWindow', () => {
 			const { dispatchStatsCacheRefreshWindow } =
 				await import('../queue-dispatch');
 			const { processStatsCacheRefreshWindowJob } =
-				await import('../../app/api/queues/stats-cache-refresh-window/route');
+				await import('../../../app/api/queues/stats-cache-refresh-window/route');
 			const { send } = await import('@vercel/queue');
 
 			await dispatchStatsCacheRefreshWindow(EVENT);
@@ -76,7 +76,7 @@ describe('dispatchStatsCacheRefreshWindow', () => {
 			const { dispatchStatsCacheRefreshWindow } =
 				await import('../queue-dispatch');
 			const { processStatsCacheRefreshWindowJob } =
-				await import('../../app/api/queues/stats-cache-refresh-window/route');
+				await import('../../../app/api/queues/stats-cache-refresh-window/route');
 			const { send } = await import('@vercel/queue');
 
 			await dispatchStatsCacheRefreshWindow(EVENT);

@@ -7,7 +7,7 @@ import { send } from '@vercel/queue';
 // (Vitest, and the CLI importer's `tsx`/Node runner alike), the same reason
 // `supabase/scripts/import-csv.ts` imports `app/lib/auth/group-auth`
 // relatively rather than aliased.
-import { processStatsCacheRefreshWindowJob } from '../app/api/queues/stats-cache-refresh-window/route';
+import { processStatsCacheRefreshWindowJob } from '../../app/api/queues/stats-cache-refresh-window/route';
 import type { StatsCacheRefreshEvent } from './stats-cache-refresh-events';
 
 /**

@@ -21,8 +21,8 @@ import {
 import { pooledRequestForStats } from './stats-cache-fetcher';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { StatsResult } from '@/app/actions/stats-cache';
-import { groupByColumn } from '../../generic-utils';
+import type { StatsResult } from '@/modules/stats/stats-cache';
+import { groupByColumn } from '@/app/lib/generic-utils';
 
 type BaseHighlightsOfTypeParams = {
 	highlightType: string;
