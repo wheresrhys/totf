@@ -43,7 +43,7 @@ describe('notable_retraps', () => {
 		});
 	});
 
-	it('min_proven_age=3 returns ARRETRAP and the long-absence Wren (both proven_age=3)', async () => {
+	it('min_proven_age=3 returns ARRETRAP and the long-absence Wren (both proven_age=3), and the Robin caught by another group a long time ago', async () => {
 		// AWREN001 was ringed as a juvenile in 2021 and recaught in 2024, so it is
 		// also a proven-age-3 bird. Ordered by encounter_count DESC → ARRETRAP first.
 		const { data, error } = await alphaClient.rpc('notable_retraps', {
@@ -51,7 +51,7 @@ describe('notable_retraps', () => {
 			min_proven_age: 3
 		});
 		expect(error).toBeNull();
-		expect(data).toHaveLength(2);
+		expect(data).toHaveLength(3);
 		expect(data![0]).toMatchObject({
 			ring_no: 'ARRETRAP',
 			encounter_count: ARRETRAP_ENCOUNTERS,
@@ -62,6 +62,13 @@ describe('notable_retraps', () => {
 			species_name: 'Wren',
 			encounter_count: 2,
 			proven_age: 3
+		});
+		expect(data![2]).toMatchObject({
+			species_name: 'Robin',
+			ring_no: 'SHARED01',
+			encounter_count: 1,
+			encounter_dates: ['2022-04-30'],
+			proven_age: 58
 		});
 	});
 

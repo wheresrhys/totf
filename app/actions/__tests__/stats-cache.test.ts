@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
-import {
-	readStatsCacheRows,
-	readStatsCacheRowsForViewedGroup,
-	type GenericStatsCacheReadParams
-} from '../stats-cache';
+import { readStatsCacheRows, type StatsCacheReadParams } from '../stats-cache';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
@@ -51,13 +47,11 @@ beforeEach(() => {
 
 describe('readStatsCacheRows', () => {
 	function readRows(
-		overrides: Partial<
-			Omit<GenericStatsCacheReadParams, 'client' | 'groupId'>
-		> = {}
+		overrides: Partial<Omit<StatsCacheReadParams, 'client' | 'groupId'>> = {}
 	) {
 		return readStatsCacheRows({
 			client: supabaseClientMock as never,
-			groupId: GROUP_ID,
+			viewedGroup: { id: GROUP_ID, slug: 'a' },
 			bySpecies: false,
 			temporalUnit: 'day',
 			...overrides
@@ -225,57 +219,57 @@ describe('readStatsCacheRows', () => {
 			expect(supabaseClientMock.from).toHaveBeenCalledWith('SimpleStatsCache');
 		});
 	});
-});
 
-// The one `'use client'`-facing pass-through onto readStatsCacheRows (#1236)
-// — a SupabaseClient instance can't cross the server/client boundary, so a
-// 'use client' caller mints no client of its own and calls this instead.
-// readStatsCacheRows itself lives in this same module, so it can't be
-// mocked out as a black-box collaborator here (same-module spying doesn't
-// intercept Vite's SSR-transformed internal calls) — these tests instead
-// verify the delegation end to end through the already-mocked
-// `getAuthenticatedSupabaseClient` and the same query-chain helpers
-// `readStatsCacheRows`'s own tests above use, without re-asserting that
-// function's own query-building behaviour.
-describe('readStatsCacheRowsForViewedGroup', () => {
-	function readRowsForGroup(
-		overrides: Partial<
-			Omit<GenericStatsCacheReadParams, 'client' | 'groupId'>
-		> = {}
-	) {
-		return readStatsCacheRowsForViewedGroup({
-			viewedGroup,
-			bySpecies: false,
-			temporalUnit: 'day',
-			...overrides
+	// The one `'use client'`-facing pass-through onto readStatsCacheRows (#1236)
+	// — a SupabaseClient instance can't cross the server/client boundary, so a
+	// 'use client' caller mints no client of its own and calls this instead.
+	// readStatsCacheRows itself lives in this same module, so it can't be
+	// mocked out as a black-box collaborator here (same-module spying doesn't
+	// intercept Vite's SSR-transformed internal calls) — these tests instead
+	// verify the delegation end to end through the already-mocked
+	// `getAuthenticatedSupabaseClient` and the same query-chain helpers
+	// `readStatsCacheRows`'s own tests above use, without re-asserting that
+	// function's own query-building behaviour.
+	describe('no client provided', () => {
+		function readRowsNoClientProvided(
+			overrides: Partial<
+				Omit<StatsCacheReadParams, 'client' | 'viewedGroup'>
+			> = {}
+		) {
+			return readStatsCacheRows({
+				viewedGroup,
+				bySpecies: false,
+				temporalUnit: 'day',
+				...overrides
+			});
+		}
+
+		it('mints an authenticated client and passes it to readStatsCacheRows', async () => {
+			await readRowsNoClientProvided();
+			expect(mockGetAuthenticatedSupabaseClient).toHaveBeenCalledTimes(1);
+			expect(supabaseClientMock.from).toHaveBeenCalledWith('SimpleStatsCache');
 		});
-	}
 
-	it('mints an authenticated client and passes it to readStatsCacheRows', async () => {
-		await readRowsForGroup();
-		expect(mockGetAuthenticatedSupabaseClient).toHaveBeenCalledTimes(1);
-		expect(supabaseClientMock.from).toHaveBeenCalledWith('SimpleStatsCache');
-	});
-
-	it('derives groupId from the given viewedGroup', async () => {
-		await readRowsForGroup();
-		expect(filterCalls()).toContainEqual(['group_id', GROUP_ID]);
-	});
-
-	it('forwards bySpecies/temporalUnit and any time-filter params unchanged', async () => {
-		await readRowsForGroup({
-			bySpecies: true,
-			temporalUnit: 'year',
-			fromDate: '2023-01-01',
-			toDate: '2023-12-31'
+		it('derives groupId from the given viewedGroup', async () => {
+			await readRowsNoClientProvided();
+			expect(filterCalls()).toContainEqual(['group_id', GROUP_ID]);
 		});
-		expect(tableRead()).toBe('SimpleStatsCacheBySpecies');
-		expect(filterCalls()).toContainEqual(['temporal_unit', 'year']);
-		expect((queryChain.chain.gte as Mock).mock.calls).toStrictEqual([
-			['time_period', '2023-01-01']
-		]);
-		expect((queryChain.chain.lte as Mock).mock.calls).toStrictEqual([
-			['time_period', '2023-12-31']
-		]);
+
+		it('forwards bySpecies/temporalUnit and any time-filter params unchanged', async () => {
+			await readRowsNoClientProvided({
+				bySpecies: true,
+				temporalUnit: 'year',
+				fromDate: '2023-01-01',
+				toDate: '2023-12-31'
+			});
+			expect(tableRead()).toBe('SimpleStatsCacheBySpecies');
+			expect(filterCalls()).toContainEqual(['temporal_unit', 'year']);
+			expect((queryChain.chain.gte as Mock).mock.calls).toStrictEqual([
+				['time_period', '2023-01-01']
+			]);
+			expect((queryChain.chain.lte as Mock).mock.calls).toStrictEqual([
+				['time_period', '2023-12-31']
+			]);
+		});
 	});
 });

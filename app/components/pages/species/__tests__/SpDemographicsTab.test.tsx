@@ -36,7 +36,7 @@ vi.mock('@/app/actions/sp-data', () => ({
 }));
 
 vi.mock('@/app/actions/stats-cache', () => ({
-	readStatsCacheRowsForViewedGroup: vi.fn()
+	readStatsCacheRows: vi.fn()
 }));
 
 vi.mock('../StatsHistoryChart', () => ({
@@ -213,7 +213,7 @@ describe('SpDemographicsTab', () => {
 			getSpeciesDemographicsStats,
 			getSpeciesArrivalsStats
 		} = await loadActions();
-		const { readStatsCacheRowsForViewedGroup } = await loadStatsCacheActions();
+		const { readStatsCacheRows } = await loadStatsCacheActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
 			[] as CoreStatsWithBiometrics[]
 		);
@@ -223,7 +223,7 @@ describe('SpDemographicsTab', () => {
 		vi.mocked(getSpeciesArrivalsStats).mockResolvedValue(
 			[] as ArrivalsStatsResult[]
 		);
-		vi.mocked(readStatsCacheRowsForViewedGroup).mockResolvedValue([
+		vi.mocked(readStatsCacheRows).mockResolvedValue([
 			{ time_period: '2024-01-01', total_effort: '10:00:00' }
 		]);
 	});
@@ -867,8 +867,7 @@ describe('SpDemographicsTab', () => {
 
 	describe('Structure: effort history fetched once and passed to every tile', () => {
 		it('fetches group effort history once regardless of how many tiles expand, passing it to all four charts', async () => {
-			const { readStatsCacheRowsForViewedGroup } =
-				await loadStatsCacheActions();
+			const { readStatsCacheRows } = await loadStatsCacheActions();
 			renderDemographicsTab();
 			for (const name of [
 				/Counts/,
@@ -886,8 +885,8 @@ describe('SpDemographicsTab', () => {
 					expect(chart.dataset.hasEffort).toBe('yes');
 				}
 			});
-			expect(readStatsCacheRowsForViewedGroup).toHaveBeenCalledTimes(1);
-			expect(readStatsCacheRowsForViewedGroup).toHaveBeenCalledWith({
+			expect(readStatsCacheRows).toHaveBeenCalledTimes(1);
+			expect(readStatsCacheRows).toHaveBeenCalledWith({
 				viewedGroup: VIEWED_GROUP,
 				bySpecies: false,
 				temporalUnit: 'month'
@@ -901,9 +900,8 @@ describe('SpDemographicsTab', () => {
 		// total_effort-interval -> fractional-hours conversion it used to do
 		// now lives inline in this component's loadEffortHistory.
 		async function loadEffortHistoryRows(totalEffort: string) {
-			const { readStatsCacheRowsForViewedGroup } =
-				await loadStatsCacheActions();
-			vi.mocked(readStatsCacheRowsForViewedGroup).mockResolvedValue([
+			const { readStatsCacheRows } = await loadStatsCacheActions();
+			vi.mocked(readStatsCacheRows).mockResolvedValue([
 				{ time_period: '2024-01-01', total_effort: totalEffort }
 			]);
 			renderDemographicsTab();
