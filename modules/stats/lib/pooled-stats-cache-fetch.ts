@@ -28,6 +28,9 @@ const requestCache: Map<
   ReturnType<typeof readStatsCacheRows>
 > = new Map();
 
+// TODO - make this instantiable so that
+// - on client have a long lived, permanent one, which is passed in to every highlight generation cycle
+// - on server create a new one for every highligt generation cycle... maybe
 export function pooledStatsCacheFetch(
   params: SerializableStatsCacheParams
 ): ReturnType<typeof readStatsCacheRows> {
