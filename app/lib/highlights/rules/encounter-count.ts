@@ -35,7 +35,6 @@ export const encounterCount: HighlightsGenerator = {
 	},
 	generator: getTopByProperty('encounter_count'),
 	condition: (scope) => scope.temporalUnit !== 'day',
-	statsRowShape: 'core',
 	speciesUsed: 'none',
 	presence: {
 		species: null,

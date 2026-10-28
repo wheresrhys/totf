@@ -26,7 +26,6 @@ export const speciesCount: HighlightsGenerator = {
 	generator: getTopByProperty('species_count'),
 	condition: (scope) =>
 		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
-	statsRowShape: 'core',
 	speciesUsed: 'present',
 	presence: {
 		species: null,

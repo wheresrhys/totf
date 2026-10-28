@@ -7,11 +7,13 @@ import type {
 	NumericHighlightValue,
 	HighlightsGenerator,
 	HighlightScope,
-	HighlightValueWithRanking,
-	StatsRowShape
+	HighlightValueWithRanking
 } from '../types';
 import { isNumericHighlightValue } from '../types';
-import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
+import type {
+	SimpleStatsCacheBySpeciesRow,
+	SimpleStatsCacheRow
+} from '@/app/models/db';
 import type { StatsResult } from '@/app/actions/stats-cache';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 export type StatFilter = (stat: {
@@ -45,12 +47,7 @@ export function filterStats({
 	scope: HighlightScope;
 	baseData: StatsResult[];
 }): StatsResult[] {
-	const cache = getFilteredStatsCache(
-		viewedGroup.id,
-		scope,
-		rule.statsRowShape,
-		rule.speciesUsed
-	);
+	const cache = getFilteredStatsCache(viewedGroup.id, scope, rule.speciesUsed);
 
 	if (cache.has()) {
 		return cache.get() as StatsResult[];
@@ -173,13 +170,13 @@ export function getHighlightsOfTypeFromStatsRows({
 	scope
 }: {
 	rule: HighlightsGenerator;
-	stats: (CoreStatsResult | BiometricsStatsResult)[];
+	stats: (SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[];
 	limit: number;
 	timeWindowFilter: (timePeriod: string) => boolean;
 	scope: HighlightScope;
 }): HighlightValue[] {
 	const highlights = rule.generator(
-		stats as CoreStatsResult[] & BiometricsStatsResult[],
+		stats as SimpleStatsCacheBySpeciesRow[] & SimpleStatsCacheRow[],
 		scope
 	);
 
@@ -231,33 +228,30 @@ export function getCacheKey(
 
 const filteredStatsCache: Map<
 	string,
-	(CoreStatsResult | BiometricsStatsResult)[]
+	(SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[]
 > = new Map();
 
 export type FilteredStatsCache = {
 	has: () => boolean;
-	set: (filteredStats: (CoreStatsResult | BiometricsStatsResult)[]) => void;
-	get: () => (CoreStatsResult | BiometricsStatsResult)[] | undefined;
+	set: (
+		filteredStats: (SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[]
+	) => void;
+	get: () => (SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[] | undefined;
 };
 
 export function getFilteredStatsCache(
 	groupId: number,
 	scope: HighlightScope,
-	statsRowShape: StatsRowShape,
 	speciesUsed: 'none' | 'present' | 'grouped'
 ): FilteredStatsCache {
 	const cacheKey = getCacheKey(groupId, scope);
 
 	return {
-		has: () =>
-			filteredStatsCache.has(`${cacheKey}-${statsRowShape}-${speciesUsed}`),
-		set: (filteredStats: (CoreStatsResult | BiometricsStatsResult)[]) =>
-			filteredStatsCache.set(
-				`${cacheKey}-${statsRowShape}-${speciesUsed}`,
-				filteredStats
-			),
-		get: () =>
-			filteredStatsCache.get(`${cacheKey}-${statsRowShape}-${speciesUsed}`)
+		has: () => filteredStatsCache.has(`${cacheKey}-${speciesUsed}`),
+		set: (
+			filteredStats: (SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[]
+		) => filteredStatsCache.set(`${cacheKey}-${speciesUsed}`, filteredStats),
+		get: () => filteredStatsCache.get(`${cacheKey}-${speciesUsed}`)
 	};
 }
 

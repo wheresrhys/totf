@@ -31,7 +31,6 @@ export const newBirds: HighlightsGenerator = {
 	generator: getTopByProperty('new_bird_count'),
 	condition: (scope) =>
 		!(scope.parentTimeWindow?.month && scope.parentTimeWindow?.year),
-	statsRowShape: 'core',
 	speciesUsed: 'none',
 	presence: {
 		species: null,
