@@ -14,12 +14,12 @@ import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/synthetic/zero.h
 import type { HomePageSummaryStats } from '../PageContent';
 import type { CoreStatsResult, GroupTicksResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { ServerCachedStatsParams } from '@/app/actions/stats-cache';
+import type { GenericStatsCacheReadParams } from '@/app/actions/stats-cache';
 
-const { mockGetAuthenticatedSupabaseClient, mockGetServerCachedStats } =
+const { mockGetAuthenticatedSupabaseClient, mockReadStatsCacheRows } =
 	vi.hoisted(() => ({
 		mockGetAuthenticatedSupabaseClient: vi.fn(),
-		mockGetServerCachedStats: vi.fn()
+		mockReadStatsCacheRows: vi.fn()
 	}));
 
 vi.mock('@/app/lib/auth/group-auth', () => ({
@@ -27,7 +27,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 }));
 
 vi.mock('@/app/actions/stats-cache', () => ({
-	getServerCachedStats: mockGetServerCachedStats
+	readStatsCacheRows: mockReadStatsCacheRows
 }));
 
 const defaultLastGroupTick: GroupTicksResult[] = [
@@ -38,16 +38,16 @@ const CURRENT_YEAR = new Date().getFullYear();
 const START_OF_CURRENT_YEAR = `${CURRENT_YEAR}-01-01`;
 const START_OF_LAST_YEAR = `${CURRENT_YEAR - 1}-01-01`;
 
-// Points `getServerCachedStats` (mocked above — fetchHomePageSummaryStats'
-// one collaborator, #1221) at `stats`: the all-time grain resolves to a
+// Points `readStatsCacheRows` (mocked above — fetchHomePageSummaryStats'
+// one collaborator, #1236) at `stats`: the all-time grain resolves to a
 // single-row read, and the year grain resolves to every year row the group
 // has, tagged with the real `time_period` fetchHomePageSummaryStats matches
 // against, regardless of whatever `time_period` the source fixture carried
 // (the legacy core_stats-RPC fixtures below predate the cache tables and
 // carry `time_period: null`).
 function mockSummaryStats(stats: HomePageSummaryStats | null) {
-	mockGetServerCachedStats.mockImplementation(
-		async ({ temporalUnit }: ServerCachedStatsParams) => {
+	mockReadStatsCacheRows.mockImplementation(
+		async ({ temporalUnit }: GenericStatsCacheReadParams) => {
 			if (stats == null) {
 				return [];
 			}
@@ -114,12 +114,15 @@ function makeChainClient(
 }
 
 describe('home page', () => {
+	let authenticatedClient: ReturnType<typeof makeChainClient>;
+
 	afterEach(() => {
 		cleanup();
 	});
 
 	beforeEach(() => {
-		mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeChainClient());
+		authenticatedClient = makeChainClient();
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(authenticatedClient);
 		mockSummaryStats(defaultSummaryStats);
 	});
 
@@ -317,21 +320,20 @@ describe('home page', () => {
 			});
 		});
 
-		it('reads the all-time and year grains from the cache via getServerCachedStats', async () => {
+		it('reads the all-time and year grains from the cache via readStatsCacheRows', async () => {
 			render(await HomePage());
 			await screen.findByTestId('summary-stats-table');
-			const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
-			expect(mockGetServerCachedStats).toHaveBeenCalledWith({
-				rpcName: 'core_stats',
-				fetchDataBySpecies: false,
-				temporalUnit: 'all-time',
-				viewedGroup
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
+				client: authenticatedClient,
+				groupId: 1,
+				bySpecies: false,
+				temporalUnit: 'all-time'
 			});
-			expect(mockGetServerCachedStats).toHaveBeenCalledWith({
-				rpcName: 'core_stats',
-				fetchDataBySpecies: false,
-				temporalUnit: 'year',
-				viewedGroup
+			expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
+				client: authenticatedClient,
+				groupId: 1,
+				bySpecies: false,
+				temporalUnit: 'year'
 			});
 		});
 
@@ -394,6 +396,7 @@ describe('home page', () => {
 
 describe('fetchHomePageSummaryStats', () => {
 	const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
+	const client = { from: vi.fn() };
 
 	// Hand-built, minimal `CoreStatsResult` rows — only the columns these
 	// tests actually read (#895's "hand-built object that only fills in the
@@ -432,9 +435,10 @@ describe('fetchHomePageSummaryStats', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 	});
 
-	it('returns all-time, this-year and last-year rows read via getServerCachedStats', async () => {
+	it('returns all-time, this-year and last-year rows read via readStatsCacheRows', async () => {
 		const allTimeRow = statsRow({ session_count: 1 });
 		const thisYearRow = statsRow({
 			session_count: 2,
@@ -444,8 +448,8 @@ describe('fetchHomePageSummaryStats', () => {
 			session_count: 3,
 			time_period: START_OF_LAST_YEAR
 		});
-		mockGetServerCachedStats.mockImplementation(
-			async ({ temporalUnit }: ServerCachedStatsParams) =>
+		mockReadStatsCacheRows.mockImplementation(
+			async ({ temporalUnit }: GenericStatsCacheReadParams) =>
 				temporalUnit === 'all-time' ? [allTimeRow] : [thisYearRow, lastYearRow]
 		);
 
@@ -456,17 +460,17 @@ describe('fetchHomePageSummaryStats', () => {
 			thisYear: thisYearRow,
 			lastYear: lastYearRow
 		});
-		expect(mockGetServerCachedStats).toHaveBeenCalledWith({
-			rpcName: 'core_stats',
-			fetchDataBySpecies: false,
-			temporalUnit: 'all-time',
-			viewedGroup
+		expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
+			client,
+			groupId: viewedGroup.id,
+			bySpecies: false,
+			temporalUnit: 'all-time'
 		});
-		expect(mockGetServerCachedStats).toHaveBeenCalledWith({
-			rpcName: 'core_stats',
-			fetchDataBySpecies: false,
-			temporalUnit: 'year',
-			viewedGroup
+		expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
+			client,
+			groupId: viewedGroup.id,
+			bySpecies: false,
+			temporalUnit: 'year'
 		});
 	});
 
@@ -481,8 +485,8 @@ describe('fetchHomePageSummaryStats', () => {
 			session_count: 999,
 			time_period: '1999-01-01'
 		});
-		mockGetServerCachedStats.mockImplementation(
-			async ({ temporalUnit }: ServerCachedStatsParams) =>
+		mockReadStatsCacheRows.mockImplementation(
+			async ({ temporalUnit }: GenericStatsCacheReadParams) =>
 				temporalUnit === 'all-time' ? [] : [someOtherYearRow, thisYearRow]
 		);
 
@@ -500,8 +504,8 @@ describe('fetchHomePageSummaryStats', () => {
 			session_count: 999,
 			time_period: '1999-01-01'
 		});
-		mockGetServerCachedStats.mockImplementation(
-			async ({ temporalUnit }: ServerCachedStatsParams) =>
+		mockReadStatsCacheRows.mockImplementation(
+			async ({ temporalUnit }: GenericStatsCacheReadParams) =>
 				temporalUnit === 'all-time' ? [] : [someOtherYearRow, lastYearRow]
 		);
 
@@ -511,7 +515,7 @@ describe('fetchHomePageSummaryStats', () => {
 	});
 
 	it('returns null when all three rows are missing', async () => {
-		mockGetServerCachedStats.mockResolvedValue([]);
+		mockReadStatsCacheRows.mockResolvedValue([]);
 
 		const result = await fetchHomePageSummaryStats(viewedGroup);
 

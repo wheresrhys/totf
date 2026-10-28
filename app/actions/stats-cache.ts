@@ -8,96 +8,12 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type StatsResult = CoreStatsResult | BiometricsStatsResult;
 
-// The two stats shapes the Highlights rules ask for, named after the RPCs that
-// used to serve them (`HighlightsGenerator.rpcName`, app/lib/highlights/types.ts).
-// They are now served out of the SimpleStatsCache tables instead, so the name
-// only picks which column subset to read — see STATS_CACHE_COLUMNS_BY_RPC_NAME.
-export type StatsCacheRpcName = 'core_stats' | 'biometrics_stats';
-
-// The core_stats_result columns, every one of which the SimpleStatsCache tables
-// carry under the same name (supabase/schema/.../types/core_stats_result.sql vs
-// "SimpleStatsCache".sql). `species_name` is absent on purpose: it is not a
-// column on either cache table — the by-species table carries `species_id` and
-// resolves the name through its FK to Species, and the all-species-combined
-// table has no species at all. See resolveEmbeddedSpeciesName.
-const CORE_STATS_CACHE_COLUMNS = [
-	'time_period',
-	'session_count',
-	'total_effort',
-	'effort_per_session',
-	'effort_per_encounter',
-	'avg_encounters_per_session',
-	'max_per_session',
-	'species_count',
-	'bird_count',
-	'encounter_count',
-	'new_bird_count',
-	'pullus_bird_count',
-	'juv_bird_count',
-	'postjuv_bird_count',
-	'adult_bird_count',
-	'unknown_age_bird_count',
-	'pullus_enc_count',
-	'juv_enc_count',
-	'postjuv_enc_count',
-	'adult_enc_count',
-	'unknown_age_enc_count',
-	'max_new_per_session'
-];
-
-// The biometrics_stats_result columns: the 8 wing/weight metrics plus the
-// `encounter_count` sample size the composite type declares alongside them
-// (biometrics_stats_result.sql calls it out explicitly as the sample size
-// backing the metrics), so a biometrics read keeps the exact row shape the RPC
-// returned. Deliberately NOT the whole core-stats column set — a biometrics
-// rule never reads any of the rest.
-const BIOMETRICS_STATS_CACHE_COLUMNS = [
-	'time_period',
-	'encounter_count',
-	'max_weight',
-	'avg_weight',
-	'min_weight',
-	'median_weight',
-	'max_wing',
-	'avg_wing',
-	'min_wing',
-	'median_wing'
-];
-
-const STATS_CACHE_COLUMNS_BY_RPC_NAME: Record<StatsCacheRpcName, string[]> = {
-	core_stats: CORE_STATS_CACHE_COLUMNS,
-	biometrics_stats: BIOMETRICS_STATS_CACHE_COLUMNS
-};
-
-// A row as the cache tables return it: the requested column subset, plus the
-// embedded Species row when the by-species table was read. The embed is a
-// to-one relationship, so PostgREST returns a single object (or null), not an
-// array.
-type StatsCacheRowWithEmbeddedSpecies = StatsResult & {
-	Species?: { species_name: string } | null;
-};
-
-// `species_name` is a real column on neither cache table, so every read
-// synthesises it: from the embedded Species row for a by-species read, and as
-// `null` for an all-species-combined one — which is exactly what
-// core_stats/biometrics_stats returned when called with
-// group_by_species: false.
-function resolveEmbeddedSpeciesName({
-	Species,
-	...row
-}: StatsCacheRowWithEmbeddedSpecies): StatsResult {
-	return {
-		...row,
-		species_name: Species?.species_name ?? null
-	} as StatsResult;
-}
-
 // A row as PostgREST returns it for `readStatsCacheRows`'s generic
 // `select('*')` read: every column of whichever table was chosen, plus the
 // embedded Species row when a Species embed was requested (an inner-join
-// species filter, or a plain by-species resolve-only embed). Unlike
-// StatsCacheRowWithEmbeddedSpecies above, the row itself isn't typed to a
-// known result shape — that narrowing is each future caller's own job.
+// species filter, or a plain by-species resolve-only embed). The row itself
+// isn't typed to a known result shape — that narrowing is each caller's own
+// job.
 type GenericStatsCacheRow = Record<string, unknown> & {
 	Species?: { species_name: string } | null;
 };
@@ -115,18 +31,19 @@ export type GenericStatsCacheReadParams = {
 
 /**
  * Generic `SimpleStatsCache`/`SimpleStatsCacheBySpecies` row reader (#1233) —
- * the shared mechanism behind the three hand-rolled readers this repo
- * currently carries (`getStatsCacheTableFetcher`/`getServerCachedStats`
- * below, `fetchSpeciesStatsCacheRows` in `app/actions/sp-data.ts`, and
- * `runStatsCacheRead` in `app/lib/auth/group-summary-access.ts`), which three
- * follow-up tickets (#1234/#1235/#1236) each migrate onto in turn.
- * `fetchSpeciesStatsCacheRows` is the first to land (#1235) and is now a thin
- * species-flavoured adapter over this function; the other two still carry
- * their own hand-rolled queries.
+ * the shared mechanism meant to replace every hand-rolled reader this repo
+ * used to carry. All three follow-up tickets that migrated onto it have now
+ * landed: `fetchSpeciesStatsCacheRows` in `app/actions/sp-data.ts` (#1235)
+ * and `runStatsCacheRead` in `app/lib/auth/group-summary-access.ts` (#1234)
+ * are each a thin adapter over this function, and #1236 moved every
+ * remaining `stats-cache.ts` consumer (the home page's summary stats, the
+ * Highlights pooled fetch via `readStatsCacheRowsForViewedGroup` below, and
+ * `SpDemographicsTab`'s effort history) onto it directly too, then deleted
+ * this file's now-dead old column-subset machinery
+ * (`getStatsCacheTableFetcher`/`getServerCachedStats`/`fetchCoreStatsByMonth`).
  *
- * Unlike every existing reader, this one always `select('*')`s rather than a
- * hand-picked `CORE_STATS_CACHE_COLUMNS`-shaped column subset — that's the
- * entire point of generalising: a caller narrows the returned
+ * Unlike a hand-picked column-subset reader, this one always `select('*')`s
+ * — that's the entire point of generalising: a caller narrows the returned
  * `Record<string, unknown>[]` to whatever result type it needs (e.g.
  * `CoreStatsResult`) itself, once it migrates onto this function, rather than
  * this function hard-coding one caller's column list.
@@ -138,23 +55,20 @@ export type GenericStatsCacheReadParams = {
  *   a `bySpecies` read, since the all-species-combined table carries no
  *   species relationship to join on at all. With no `species` filter, a
  *   `bySpecies` read still embeds `Species(species_name)` (non-inner) purely
- *   to resolve the name onto every row (`resolveEmbeddedSpeciesName`'s
- *   idiom); an all-species read has no embed at all.
+ *   to resolve the name onto every row; an all-species read has no embed at
+ *   all.
  * - **Group/temporal-unit filter**: always `group_id` + `temporal_unit`.
  * - **Time filter**: exactly one of an exact `timePeriod` match, or a
- *   `fromDate`/`toDate` range — mirrors the three existing readers.
- * - **Pagination**: via `fetchAllPaginatedRows`, same as every existing
- *   reader.
+ *   `fromDate`/`toDate` range.
+ * - **Pagination**: via `fetchAllPaginatedRows`.
  * - **Ordering**: `time_period`, then — for a `bySpecies` read — the embedded
  *   `Species(species_name)`, via PostgREST's `order=Species(species_name)`
  *   spelling (not supabase-js' `{referencedTable}` option, which orders rows
- *   *within* the embed rather than the parent rows — see
- *   `getStatsCacheTableFetcher`'s own comment on this).
+ *   *within* the embed rather than the parent rows).
  * - **`species_name` resolution**: flattened from the embed onto every row of
- *   a `bySpecies` read (filtered or not); `null` on an all-species read,
- *   matching every existing reader's behaviour.
+ *   a `bySpecies` read (filtered or not); `null` on an all-species read.
  * - **No caching**: a plain pass-through read against an already-materialized
- *   cache table, same as every existing reader.
+ *   cache table.
  */
 export async function readStatsCacheRows({
 	client,
@@ -181,8 +95,7 @@ export async function readStatsCacheRows({
 				.from(tableName)
 				// The select string is assembled at runtime, so supabase-js
 				// can't infer the row shape from a string literal — name it
-				// explicitly, as getStatsCacheTableFetcher below does for the
-				// same reason.
+				// explicitly.
 				.select<string, GenericStatsCacheRow>(selectedColumns)
 				.eq('group_id', groupId)
 				.eq('temporal_unit', temporalUnit);
@@ -212,95 +125,31 @@ export async function readStatsCacheRows({
 	}));
 }
 
-// Reads one (group, temporal unit) slice of the already-materialized
-// SimpleStatsCache tables, which the post-import refresh queue populates
-// (lib/stats-cache-refresh.ts). This replaces re-running the
-// core_stats/biometrics_stats RPCs per request: the RPCs redo the same
-// multi-way join these rows already paid for once, so a plain indexed-column
-// table read needs neither the RPC nor the version/TTL memo
-// (cached-supabase-fetch.ts) that used to paper over its cost.
-//
-// Still paginated through fetchAllPaginatedRows: a day-granularity by-species
-// slice is easily more rows than one PostgREST request returns.
-function getStatsCacheTableFetcher(
-	rpcName: StatsCacheRpcName,
-	temporalUnit: TemporalUnit,
-	groupBySpecies: boolean = false
-) {
-	const tableName = groupBySpecies
-		? 'SimpleStatsCacheBySpecies'
-		: 'SimpleStatsCache';
-	const selectedColumns = [
-		...STATS_CACHE_COLUMNS_BY_RPC_NAME[rpcName],
-		// A single embedded select over
-		// simple_stats_cache_by_species_species_id_fkey, rather than a second
-		// round-trip to Species.
-		...(groupBySpecies ? ['Species(species_name)'] : [])
-	].join(', ');
-
-	return async (supabase: SupabaseClient, groupId: number) => {
-		const rows = await fetchAllPaginatedRows<StatsCacheRowWithEmbeddedSpecies>(
-			(fromRow, toRow) => {
-				const request = supabase
-					.from(tableName)
-					// The select string is assembled at runtime, so supabase-js can't
-					// infer the row shape from a string literal — name it explicitly,
-					// as lib/demon-import.ts does for the same reason.
-					.select<string, StatsCacheRowWithEmbeddedSpecies>(selectedColumns)
-					.eq('group_id', groupId)
-					.eq('temporal_unit', temporalUnit)
-					.order('time_period');
-
-				// Ordering the parent rows by an embedded to-one column needs
-				// PostgREST's `order=Species(species_name)` spelling, NOT
-				// supabase-js' `{referencedTable}` option — that one orders rows
-				// *within* the embed, which for a to-one relationship leaves the
-				// parent rows in an arbitrary order (verified against local
-				// Postgres). Pagination needs a total order to page correctly, and
-				// sort stability in the rule finders (app/lib/highlights/lib/rule-utils.ts)
-				// means ties resolve in row order, so this has to match the
-				// (time_period, species_name) order the RPC fetcher used.
-				return groupBySpecies
-					? request.order('Species(species_name)').range(fromRow, toRow)
-					: request.range(fromRow, toRow);
-			}
-		);
-		return rows.map(resolveEmbeddedSpeciesName);
-	};
-}
-
-export type ServerCachedStatsParams = {
-	rpcName: StatsCacheRpcName;
-	fetchDataBySpecies: boolean;
-	temporalUnit: TemporalUnit;
+export type ReadStatsCacheRowsForViewedGroupParams = Omit<
+	GenericStatsCacheReadParams,
+	'client' | 'groupId'
+> & {
 	viewedGroup: ViewedGroup;
 };
 
-export async function getServerCachedStats({
-	rpcName,
-	fetchDataBySpecies,
-	temporalUnit,
-	viewedGroup
-}: ServerCachedStatsParams): Promise<StatsResult[]> {
-	const supabase = await getAuthenticatedSupabaseClient();
-	return getStatsCacheTableFetcher(
-		rpcName,
-		temporalUnit,
-		fetchDataBySpecies
-	)(supabase, viewedGroup.id);
-}
-
-// Group-wide, ungrouped-by-species monthly core stats. Kept as its own function
-// (rather than callers using getServerCachedStats directly) so a caller that
-// only needs the ungrouped monthly totals states that in one argument-free
-// call, rather than restating the same four parameters.
-export async function fetchCoreStatsByMonth(
-	viewedGroup: ViewedGroup
-): Promise<CoreStatsResult[]> {
-	return (await getServerCachedStats({
-		rpcName: 'core_stats',
-		fetchDataBySpecies: false,
-		temporalUnit: 'month',
-		viewedGroup
-	})) as CoreStatsResult[];
+/**
+ * The one `'use server'`-facing pass-through onto `readStatsCacheRows` that a
+ * `'use client'` caller can invoke directly as a Server Action (#1236) — a
+ * `SupabaseClient` instance can't cross that boundary (it isn't a plain,
+ * serializable value), so a client module that needs a cache read mints no
+ * client of its own and instead calls this, which mints one via
+ * `getAuthenticatedSupabaseClient()` and derives `groupId` from the given
+ * `ViewedGroup`. Carries zero column-subset logic of its own — every other
+ * param is forwarded to `readStatsCacheRows` unchanged.
+ */
+export async function readStatsCacheRowsForViewedGroup({
+	viewedGroup,
+	...params
+}: ReadStatsCacheRowsForViewedGroupParams): Promise<Record<string, unknown>[]> {
+	const client = await getAuthenticatedSupabaseClient();
+	return readStatsCacheRows({
+		client,
+		groupId: viewedGroup.id,
+		...params
+	});
 }

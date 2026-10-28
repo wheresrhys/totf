@@ -9,46 +9,32 @@ import {
 	getSpeciesArrivalsStats,
 	fetchSpeciesPeriodTotals,
 	fetchSpeciesCombinedMonthTotals,
-	getGroupEffortHistory,
 	fetchYearTotalsTabData,
 	fetchMonthTotalsTabData,
 	fetchSessionTotalsTabData,
 	type SpeciesTotalsTabParams
 } from '../sp-data';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 import { makeRpcCallRecorder } from '@/app/__tests__/helpers/rpc-recorder';
 
-const {
-	mockGetAuthenticatedSupabaseClient,
-	mockFetchCoreStatsByMonth,
-	mockReadStatsCacheRows
-} = vi.hoisted(() => ({
-	mockGetAuthenticatedSupabaseClient: vi.fn(),
-	mockFetchCoreStatsByMonth: vi.fn(),
-	mockReadStatsCacheRows: vi.fn()
-}));
+const { mockGetAuthenticatedSupabaseClient, mockReadStatsCacheRows } =
+	vi.hoisted(() => ({
+		mockGetAuthenticatedSupabaseClient: vi.fn(),
+		mockReadStatsCacheRows: vi.fn()
+	}));
 
 vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
-// Both of this file's collaborators in app/actions/stats-cache.ts are mocked,
-// because each is a black box with its own describe block in
-// __tests__/stats-cache.test.ts:
-//
-// - getGroupEffortHistory delegates the whole cache read to
-//   fetchCoreStatsByMonth, so its tests here only assert the interval->hours
-//   conversion + [time_period, hours] pair shaping.
-// - fetchSpeciesStatsCacheRows delegates the whole SimpleStatsCacheBySpecies
-//   query — table choice, the !inner Species embed, filtering, ordering,
-//   pagination and species_name flattening — to the generic
-//   readStatsCacheRows (#1233/#1235), whose own suite covers all of that. So
-//   these tests assert the params this file hands it and what each caller
-//   does with the rows it returns, not the query it issues.
+// `fetchSpeciesStatsCacheRows` delegates the whole SimpleStatsCacheBySpecies
+// query — table choice, the !inner Species embed, filtering, ordering,
+// pagination and species_name flattening — to the generic
+// readStatsCacheRows (#1233/#1235), whose own suite covers all of that. So
+// these tests assert the params this file hands it and what each caller
+// does with the rows it returns, not the query it issues.
 vi.mock('../stats-cache', () => ({
-	fetchCoreStatsByMonth: mockFetchCoreStatsByMonth,
 	readStatsCacheRows: mockReadStatsCacheRows
 }));
 
@@ -589,53 +575,6 @@ describe('sp-data actions', () => {
 			expect(rpcCalls[0].args).toMatchObject({
 				group_by_time_period: 'month'
 			});
-		});
-	});
-
-	describe('getGroupEffortHistory', () => {
-		function effortRow(
-			time_period: string,
-			total_effort: string
-		): CoreStatsResult {
-			return {
-				time_period,
-				total_effort
-			} as CoreStatsResult;
-		}
-
-		it('converts core_stats rows into [time_period, hours] pairs in the same order', async () => {
-			mockFetchCoreStatsByMonth.mockResolvedValue([
-				effortRow('2023-01', '05:30:00'),
-				effortRow('2023-02', '02:00:00')
-			]);
-
-			const result = await getGroupEffortHistory(viewedGroup);
-
-			expect(mockFetchCoreStatsByMonth).toHaveBeenCalledWith(viewedGroup);
-			expect(result).toEqual([
-				['2023-01', 5.5],
-				['2023-02', 2]
-			]);
-		});
-
-		it('returns 0 hours for a month whose total_effort is "00:00:00"', async () => {
-			mockFetchCoreStatsByMonth.mockResolvedValue([
-				effortRow('2023-01', '00:00:00')
-			]);
-
-			const result = await getGroupEffortHistory(viewedGroup);
-
-			expect(result).toEqual([['2023-01', 0]]);
-		});
-
-		it('converts an interval spanning whole days to its total hour count', async () => {
-			mockFetchCoreStatsByMonth.mockResolvedValue([
-				effortRow('2023-01', '2 days 03:00:00')
-			]);
-
-			const result = await getGroupEffortHistory(viewedGroup);
-
-			expect(result).toEqual([['2023-01', 51]]);
 		});
 	});
 

@@ -32,8 +32,11 @@ vi.mock('chartkick/chart.js', () => ({}));
 vi.mock('@/app/actions/sp-data', () => ({
 	getSpeciesStatsHistory: vi.fn(),
 	getSpeciesDemographicsStats: vi.fn(),
-	getSpeciesArrivalsStats: vi.fn(),
-	getGroupEffortHistory: vi.fn()
+	getSpeciesArrivalsStats: vi.fn()
+}));
+
+vi.mock('@/app/actions/stats-cache', () => ({
+	readStatsCacheRowsForViewedGroup: vi.fn()
 }));
 
 vi.mock('../StatsHistoryChart', () => ({
@@ -103,7 +106,7 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 	}: {
 		series: { name: string; data: [string, number | null][] }[];
 		colors?: string[];
-		effortHistory?: unknown;
+		effortHistory?: { name: string; data: [string, number][] };
 		compareYearsUrl?: string;
 		includeTotalSeries?: boolean;
 		fetchYearSeries?: () => Promise<
@@ -133,6 +136,7 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 				data-series-count={series.length}
 				data-colors={JSON.stringify(colors ?? null)}
 				data-has-effort={effortHistory ? 'yes' : 'no'}
+				data-effort-data={JSON.stringify(effortHistory?.data ?? null)}
 				data-compare-years-url={compareYearsUrl ?? ''}
 				data-include-total-series={includeTotalSeries ? 'yes' : 'no'}
 				data-total={JSON.stringify(total)}
@@ -175,6 +179,10 @@ async function loadActions() {
 	return import('@/app/actions/sp-data');
 }
 
+async function loadStatsCacheActions() {
+	return import('@/app/actions/stats-cache');
+}
+
 function renderDemographicsTab(
 	overrides: Partial<{ fromDate: string; toDate: string }> = {}
 ) {
@@ -203,9 +211,9 @@ describe('SpDemographicsTab', () => {
 		const {
 			getSpeciesStatsHistory,
 			getSpeciesDemographicsStats,
-			getSpeciesArrivalsStats,
-			getGroupEffortHistory
+			getSpeciesArrivalsStats
 		} = await loadActions();
+		const { readStatsCacheRowsForViewedGroup } = await loadStatsCacheActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
 			[] as CoreStatsWithBiometrics[]
 		);
@@ -215,7 +223,9 @@ describe('SpDemographicsTab', () => {
 		vi.mocked(getSpeciesArrivalsStats).mockResolvedValue(
 			[] as ArrivalsStatsResult[]
 		);
-		vi.mocked(getGroupEffortHistory).mockResolvedValue([['2024-01-01', 10]]);
+		vi.mocked(readStatsCacheRowsForViewedGroup).mockResolvedValue([
+			{ time_period: '2024-01-01', total_effort: '10:00:00' }
+		]);
 	});
 
 	describe('Structure: the demographics tiles', () => {
@@ -857,7 +867,8 @@ describe('SpDemographicsTab', () => {
 
 	describe('Structure: effort history fetched once and passed to every tile', () => {
 		it('fetches group effort history once regardless of how many tiles expand, passing it to all four charts', async () => {
-			const { getGroupEffortHistory } = await loadActions();
+			const { readStatsCacheRowsForViewedGroup } =
+				await loadStatsCacheActions();
 			renderDemographicsTab();
 			for (const name of [
 				/Counts/,
@@ -875,7 +886,45 @@ describe('SpDemographicsTab', () => {
 					expect(chart.dataset.hasEffort).toBe('yes');
 				}
 			});
-			expect(getGroupEffortHistory).toHaveBeenCalledTimes(1);
+			expect(readStatsCacheRowsForViewedGroup).toHaveBeenCalledTimes(1);
+			expect(readStatsCacheRowsForViewedGroup).toHaveBeenCalledWith({
+				viewedGroup: VIEWED_GROUP,
+				bySpecies: false,
+				temporalUnit: 'month'
+			});
+		});
+	});
+
+	describe('effort history hours conversion', () => {
+		// Moved from sp-data.test.ts's old `getGroupEffortHistory` describe
+		// block (#1236): that function is gone, and the
+		// total_effort-interval -> fractional-hours conversion it used to do
+		// now lives inline in this component's loadEffortHistory.
+		async function loadEffortHistoryRows(totalEffort: string) {
+			const { readStatsCacheRowsForViewedGroup } =
+				await loadStatsCacheActions();
+			vi.mocked(readStatsCacheRowsForViewedGroup).mockResolvedValue([
+				{ time_period: '2024-01-01', total_effort: totalEffort }
+			]);
+			renderDemographicsTab();
+			const chart = await expandTile(/Counts/);
+			await waitFor(() => expect(chart.dataset.hasEffort).toBe('yes'));
+			return JSON.parse(chart.dataset.effortData!) as [string, number][];
+		}
+
+		it('converts a sub-day total_effort interval into fractional hours', async () => {
+			const data = await loadEffortHistoryRows('05:30:00');
+			expect(data).toEqual([['2024-01-01', 5.5]]);
+		});
+
+		it('returns 0 hours for a zero-length interval', async () => {
+			const data = await loadEffortHistoryRows('00:00:00');
+			expect(data).toEqual([['2024-01-01', 0]]);
+		});
+
+		it('converts a multi-day total_effort interval into its total hour count', async () => {
+			const data = await loadEffortHistoryRows('2 days 03:00:00');
+			expect(data).toEqual([['2024-01-01', 51]]);
 		});
 	});
 

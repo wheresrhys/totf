@@ -14,7 +14,7 @@ import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
 import { recentSessionsQuery, topSpeciesQuery } from '@/queries';
-import { getServerCachedStats } from '@/app/actions/stats-cache';
+import { readStatsCacheRows } from '@/app/actions/stats-cache';
 
 export async function fetchRecentSessions(
 	viewedGroup: ViewedGroup
@@ -49,18 +49,19 @@ export async function fetchHomePageSummaryStats(
 	const currentYear = new Date().getFullYear();
 	const startOfCurrentYear = `${currentYear}-01-01`;
 	const startOfLastYear = `${currentYear - 1}-01-01`;
+	const client = await getAuthenticatedSupabaseClient();
 	const [allTimeRows, yearRows] = (await Promise.all([
-		getServerCachedStats({
-			rpcName: 'core_stats',
-			fetchDataBySpecies: false,
-			temporalUnit: 'all-time',
-			viewedGroup
+		readStatsCacheRows({
+			client,
+			groupId: viewedGroup.id,
+			bySpecies: false,
+			temporalUnit: 'all-time'
 		}),
-		getServerCachedStats({
-			rpcName: 'core_stats',
-			fetchDataBySpecies: false,
-			temporalUnit: 'year',
-			viewedGroup
+		readStatsCacheRows({
+			client,
+			groupId: viewedGroup.id,
+			bySpecies: false,
+			temporalUnit: 'year'
 		})
 	])) as [CoreStatsResult[], CoreStatsResult[]];
 	const allTime = allTimeRows[0] ?? null;
