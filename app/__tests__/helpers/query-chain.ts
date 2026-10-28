@@ -3,11 +3,11 @@ import { vi } from 'vitest';
 export type FilterCall = { column: string; operator: string; value: unknown };
 
 /**
- * A chainable Supabase query-builder mock (`.select()`/`.eq()`/`.contains()`/
- * `.order()`/`.range()`/`.limit()`/`.filter()`/`.gte()`/`.lte()`, each
- * returning the same chain so calls compose in any order/number the real
- * PostgrestFilterBuilder allows) that resolves (thenable, like the real
- * builder) to `{ data, error: null }`.
+ * A chainable Supabase query-builder mock (`.select()`/`.eq()`/`.in()`/
+ * `.contains()`/`.order()`/`.range()`/`.limit()`/`.filter()`/`.gte()`/
+ * `.lte()`, each returning the same chain so calls compose in any
+ * order/number the real PostgrestFilterBuilder allows) that resolves
+ * (thenable, like the real builder) to `{ data, error: null }`.
  *
  * `rows` is either the static data to resolve with (matches every call,
  * e.g. `fetchPageOfBirds`' single non-paginated query), or a
@@ -21,9 +21,9 @@ export type FilterCall = { column: string; operator: string; value: unknown };
  * too — `fromRow`/`toRow` are simply ignored.
  *
  * Also records the `select` string and every filtering call — `.filter()`
- * plus the `.eq()`/`.gte()`/`.lte()` shorthands, all normalised into the same
- * `{column, operator, value}` shape — for assertions that don't want a
- * dedicated mock reference per method.
+ * plus the `.eq()`/`.in()`/`.gte()`/`.lte()` shorthands, all normalised into
+ * the same `{column, operator, value}` shape — for assertions that don't want
+ * a dedicated mock reference per method.
  */
 export function makeQueryChain(
 	rows: unknown | ((fromRow?: number, toRow?: number) => unknown)
@@ -40,6 +40,10 @@ export function makeQueryChain(
 		}),
 		eq: vi.fn((column: string, value: unknown) => {
 			record.filters.push({ column, operator: 'eq', value });
+			return chain;
+		}),
+		in: vi.fn((column: string, value: unknown) => {
+			record.filters.push({ column, operator: 'in', value });
 			return chain;
 		}),
 		contains: vi.fn(() => chain),

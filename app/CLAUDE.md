@@ -115,6 +115,11 @@ the root layout, not a subtree one.
   - `species_name` is a column on neither cache table. A by-species read resolves it through a
     single embedded `.select('…, Species(species_name)')` and flattens it on; an ungrouped read
     sets it `null`, matching what the RPCs returned for `group_by_species: false`.
+    The same gap arises when a `stats_cache_*_metrics` **RPC** result is consumed directly — they
+    key on `species_id` too, and an RPC result can't carry a PostgREST embed. There the fix is one
+    extra `Species` read filtered to the ids the result actually carries, folded into a
+    `Map<number, string>` and applied to the rows (`spp-data.ts`'s `readSpeciesNamesById`, #1244).
+    Reuse that shape rather than re-reading the whole table or embedding per row.
   - Ordering parent rows by that embedded name needs PostgREST's `.order('Species(species_name)')`
     spelling. supabase-js' `.order('species_name', { referencedTable: 'Species' })` orders rows
     _within_ the embed, which for a to-one relationship leaves the parent rows arbitrary — and both

@@ -137,21 +137,31 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
  *
  *    Returning `null` therefore means "arbitrary window": the `/species` list
  *    page's "CES only" range (`YYYY-04-25`..`YYYY-09-05`) and its two
- *    free-text date inputs are the only things that produce one. Those keep
- *    reading the live `core_stats`/`public_core_stats` RPCs. The alternative
- *    was to serve them a wrong `bird_count`, so the fallback stays until
- *    either the cache gains an arbitrary-window grain or those two filters are
- *    reshaped to cache-aligned ones.
+ *    free-text date inputs are the only things that produce one. For *this*
+ *    function's own caller — the counts half — those keep reading the live
+ *    `core_stats`/`public_core_stats` RPCs. The alternative was to serve them
+ *    a wrong `bird_count`, so that dependency stays until either the cache
+ *    gains an arbitrary-window grain or those two filters are reshaped to
+ *    cache-aligned ones.
  *
  * Exported because the `/species` list page's *other* half —
  * `fetchBiometricsStats` (`app/actions/spp-data.ts`), which fetches the 8
  * wing/weight columns for the same window — has to split exactly the same way
  * and must stay in lockstep with this one (#1223). It has its own,
- * independent reason for needing the same fallback: `AVG`/`MEDIAN` are not
+ * independent reason for needing the same split: `AVG`/`MEDIAN` are not
  * associative, so `avg_weight`/`median_weight`/`avg_wing`/`median_wing` cannot
  * be rebuilt from finer cache cells for an arbitrary window even
  * approximately, in the same way the distinct counts above cannot. Two call
  * sites, one rule — don't re-derive this mapping a second time.
+ *
+ * What the two halves do *with* a `null` now differs, though, and the
+ * `core_stats`/`public_core_stats` dependency above is the counts half's
+ * alone (#1244). The biometrics half recomputes an arbitrary window live from
+ * `stats_cache_biometrics_metrics` — a cache-feeding RPC that nonetheless
+ * takes the same window signature and recomputes from `Encounters` on every
+ * call, verified (#1224) to be an exact column-for-column drop-in for
+ * `biometrics_stats`, which is now called from nowhere. Don't read the
+ * paragraph above as pinning both halves to the retired live RPC pair.
  */
 export function resolveStatsCacheQueryPlan({
 	from_date: fromDate,

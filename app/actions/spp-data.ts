@@ -1,4 +1,5 @@
 'use server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
 	fetchAuthorisedCoreStats,
 	resolveStatsCacheQueryPlan,
@@ -51,6 +52,49 @@ type BiometricsCacheTableRow = Pick<
 > & {
 	Species: { species_name: string };
 };
+
+/**
+ * A `stats_cache_biometrics_metrics_result` row: the same 8 metric columns
+ * `biometrics_stats` returned, computed by the same expressions with the same
+ * rounding over the same spine (#1224 verified it column for column), but
+ * keyed on `species_id` rather than `species_name` — it was written to feed a
+ * cache-table write, which keys on the id too — and with no `encounter_count`
+ * column at all (that's `core_stats`' concern, not this RPC's).
+ */
+type BiometricsMetricsRpcRow = Pick<
+	BiometricsStatsResult,
+	BiometricFieldName | 'time_period'
+> & { species_id: number | null };
+
+/**
+ * Resolves `species_id` → `species_name` for the ids one
+ * `stats_cache_biometrics_metrics` result carries.
+ *
+ * An RPC result can't carry a PostgREST embed, so the join column the
+ * cache-aligned branch gets for free through `Species(species_name)` has to
+ * come from a second read here — `mergeSpeciesBiometrics`
+ * (`app/lib/species-stats.ts`) joins the two halves of the `/species` table on
+ * `species_name`. Only the ids actually present are requested; `Species` is
+ * global reference data (`USING (TRUE)` SELECT policy), so the authenticated
+ * client reads it unconditionally. Paginated for the same reason the cache
+ * read is: a group with more species than one PostgREST page would otherwise
+ * silently lose the names of the overflow.
+ */
+async function readSpeciesNamesById(
+	client: SupabaseClient,
+	speciesIds: number[]
+): Promise<Map<number, string>> {
+	type SpeciesNameRow = { id: number; species_name: string };
+	const rows = await fetchAllPaginatedRows<SpeciesNameRow>((fromRow, toRow) =>
+		client
+			.from('Species')
+			.select<string, SpeciesNameRow>('id, species_name')
+			.in('id', speciesIds)
+			.order('id')
+			.range(fromRow, toRow)
+	);
+	return new Map(rows.map(({ id, species_name }) => [id, species_name]));
+}
 
 /**
  * Reads the already-materialized `SimpleStatsCacheBySpecies` cell `plan`
@@ -120,6 +164,84 @@ async function readBiometricsFromStatsCache(
 	}));
 }
 
+/**
+ * The arbitrary-window fallback: one aggregate row per species over a window
+ * that is itself no single cache cell, computed live by
+ * `stats_cache_biometrics_metrics` and reshaped into the same
+ * `BiometricsStatsResult` rows `readBiometricsFromStatsCache` returns.
+ *
+ * That RPC exists to feed the `SimpleStatsCacheBySpecies` write, but nothing
+ * about it is cache-specific — it takes the same 8-arg window signature
+ * `biometrics_stats` did and recomputes from `Encounters` on every call — so
+ * it answers an uncacheable window just as correctly, and #1224 verified it as
+ * an exact column-for-column drop-in. `biometrics_stats` is consequently
+ * called nowhere in this module any more (#1244); a later ticket deletes it.
+ *
+ * `group_by_time_period` is deliberately not passed, matching what this call
+ * site always asked `biometrics_stats` for: a single aggregate per species
+ * over the whole window, with `time_period` coming back `null`.
+ */
+async function readBiometricsFromMetricsRpc(
+	viewedGroup: ViewedGroup,
+	fromDate?: string,
+	toDate?: string,
+	monthFilter?: number
+): Promise<BiometricsStatsResult[]> {
+	const client = await getAuthenticatedSupabaseClient();
+	const rows = (await client
+		.rpc('stats_cache_biometrics_metrics', {
+			ringing_group_filter: viewedGroup.id,
+			from_date: fromDate,
+			to_date: toDate,
+			group_by_species: true,
+			...(monthFilter ? { month_filter: monthFilter } : {})
+		})
+		.then(catchSupabaseErrors)) as BiometricsMetricsRpcRow[] | null;
+	if (!rows?.length) {
+		return [];
+	}
+
+	const speciesNamesById = await readSpeciesNamesById(
+		client,
+		rows.flatMap(({ species_id }) => (species_id === null ? [] : [species_id]))
+	);
+
+	return rows.flatMap(({ species_id, ...biometrics }) => {
+		const speciesName =
+			species_id === null ? undefined : speciesNamesById.get(species_id);
+		if (speciesName === undefined) {
+			// Unreachable in principle — `group_by_species: true` always emits a
+			// `species_id`, and it is an FK onto the row this map was built from.
+			// Dropping the row is still better than inventing a species name that
+			// could collide with a real one in the merge, so log and move on.
+			console.error(
+				'Dropped a stats_cache_biometrics_metrics row whose species_id resolved to no Species name',
+				{
+					viewedGroupId: viewedGroup.id,
+					speciesId: species_id,
+					fromDate,
+					toDate,
+					monthFilter
+				}
+			);
+			return [];
+		}
+		return [
+			{
+				...biometrics,
+				species_name: speciesName,
+				// `stats_cache_biometrics_metrics_result` has no `encounter_count`
+				// column, and `BiometricsStatsResult` declares it nullable, so it
+				// comes back null rather than being backfilled from a second RPC:
+				// nothing downstream of this call site reads it
+				// (`mergeSpeciesBiometrics` copies only the 8 metrics across), and
+				// the rest of the return shape is unchanged on both paths.
+				encounter_count: null
+			}
+		];
+	});
+}
+
 // The /species list page's wing/weight half, split exactly the way its counts
 // half (`fetchAuthorisedCoreStats`) is — same window, same resolver, same
 // fallback, deliberately in lockstep (#1223):
@@ -129,19 +251,21 @@ async function readBiometricsFromStatsCache(
 //   views) reads `SimpleStatsCacheBySpecies` directly, where the post-import
 //   refresh queue has already materialized these 8 columns per species.
 // - An arbitrary window (the page's "CES only" range and its two free-text
-//   date inputs) keeps calling the live `biometrics_stats` RPC. `MAX`/`MIN`
-//   would survive being recombined from finer cells, but `AVG`/`MEDIAN` are
-//   not associative: `avg_weight`/`median_weight`/`avg_wing`/`median_wing`
-//   cannot be derived from a set of narrower cache cells at all, not even
-//   approximately. The live RPC is the only correct source for them outside a
-//   cache cell.
+//   date inputs) is computed live instead, by `stats_cache_biometrics_metrics`
+//   (#1244 — it used to be `biometrics_stats`, which nothing here calls any
+//   more). `MAX`/`MIN` would survive being recombined from finer cells, but
+//   `AVG`/`MEDIAN` are not associative:
+//   `avg_weight`/`median_weight`/`avg_wing`/`median_wing` cannot be derived
+//   from a set of narrower cache cells at all, not even approximately. A live
+//   recompute is the only correct source for them outside a cache cell.
 //
 // Either way this needs an authenticated session to be meaningful: both reads
-// go out as the viewer, and neither `biometrics_stats` nor the cache tables'
-// SELECT policy has a `public_areas` branch that would admit an anonymous
-// caller. So it's only called once fetchAuthorisedCoreStats confirms an
-// authenticated session actually resolved data ('own' or 'shared'); a
-// 'blocked' or 'public' accessLevel contributes no biometrics rows.
+// go out as the viewer, and neither `stats_cache_biometrics_metrics` nor the
+// cache tables' SELECT policy has a `public_areas` branch that would admit an
+// anonymous caller. So it's only called once fetchAuthorisedCoreStats
+// confirms an authenticated session actually resolved data ('own' or
+// 'shared'); a 'blocked' or 'public' accessLevel contributes no biometrics
+// rows.
 //
 // That 'public' case is now live rather than theoretical: the /species list
 // page became anonymously viewable for a `public_areas: ['summary']` group
@@ -161,21 +285,9 @@ async function fetchBiometricsStats(
 		month_filter: monthFilter
 	});
 
-	if (cacheQueryPlan) {
-		return readBiometricsFromStatsCache(viewedGroup, cacheQueryPlan);
-	}
-
-	const client = await getAuthenticatedSupabaseClient();
-	const rows = (await client
-		.rpc('biometrics_stats', {
-			ringing_group_filter: viewedGroup.id,
-			from_date: fromDate,
-			to_date: toDate,
-			group_by_species: true,
-			...(monthFilter ? { month_filter: monthFilter } : {})
-		})
-		.then(catchSupabaseErrors)) as BiometricsStatsResult[] | null;
-	return rows ?? [];
+	return cacheQueryPlan
+		? readBiometricsFromStatsCache(viewedGroup, cacheQueryPlan)
+		: readBiometricsFromMetricsRpc(viewedGroup, fromDate, toDate, monthFilter);
 }
 
 /**

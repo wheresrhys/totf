@@ -10,13 +10,17 @@ import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // Real captured biometrics_stats output for the exact call fetchSpeciesData
-// makes (group-wide, group_by_species). Alpha's first row is the Blue Tit that
-// every bare buildCoreStatsRow({ species_name: 'Blue Tit' }) call below
-// deliberately matches (buildCoreStatsRow's own default `species_name` is
-// `null`), so the two builders line up on species_name and
+// makes (group-wide, group_by_species). Both branches' row builders below are
+// derived from it rather than hand-written, including the arbitrary-window
+// fallback's (whose own RPC, stats_cache_biometrics_metrics, carries the same
+// 8 metric columns — it has no fixture of its own). Alpha's first row is the
+// Blue Tit that every bare buildCoreStatsRow({ species_name: 'Blue Tit' })
+// call below deliberately matches (buildCoreStatsRow's own default
+// `species_name` is `null`), so the two builders line up on species_name and
 // mergeSpeciesBiometrics actually joins them; Gamma's is genuinely empty —
 // that group has no biometric-eligible encounters at all — which is the
-// fixture-backed no-biometrics-anywhere edge case (#883).
+// fixture-backed no-biometrics-anywhere edge case (#883), and an empty result
+// is shape-agnostic enough to stand in for either RPC's.
 const capturedBiometricsRows =
 	alphaBiometricsBySpecies as BiometricsStatsResult[];
 const emptyBiometricsRows = gammaBiometricsBySpecies as BiometricsStatsResult[];
@@ -49,9 +53,11 @@ const YEAR_TO_DATE = '2026-12-31';
 const MONTH_FROM_DATE = '2026-02-01';
 const MONTH_TO_DATE = '2026-02-28';
 // The /species list page's "CES only" range — the canonical arbitrary window,
-// aligned to no cache cell, so the live biometrics_stats RPC answers it.
+// aligned to no cache cell, so the live stats_cache_biometrics_metrics RPC
+// answers it.
 const CES_FROM_DATE = '2026-04-25';
 const CES_TO_DATE = '2026-09-05';
+const BLUE_TIT_SPECIES_ID = 42;
 
 /**
  * A `SimpleStatsCacheBySpecies` row as PostgREST returns it for the biometrics
@@ -73,32 +79,68 @@ function buildBiometricsCacheRow({
 	return { ...biometricColumns, Species: { species_name: speciesName } };
 }
 
-function buildBiometricsRpcRow(
-	overrides: Partial<BiometricsStatsResult> = {}
-): BiometricsStatsResult {
-	return { ...capturedBiometricsRows[0], ...overrides };
+/**
+ * A `stats_cache_biometrics_metrics` row as the arbitrary-window fallback's
+ * RPC returns it: the same 8 wing/weight columns, keyed on `species_id`
+ * instead of `species_name` and with no `encounter_count` column at all.
+ * Built from the captured `biometrics_stats` row so the values are real and a
+ * column added to the shared 8 surfaces here too.
+ */
+function buildBiometricsMetricsRpcRow({
+	speciesId = BLUE_TIT_SPECIES_ID,
+	...overrides
+}: Partial<BiometricsStatsResult> & { speciesId?: number | null } = {}) {
+	const {
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to drop the two columns stats_cache_biometrics_metrics_result doesn't have
+		species_name,
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- ditto
+		encounter_count,
+		...biometricColumns
+	} = { ...capturedBiometricsRows[0], ...overrides };
+	return { ...biometricColumns, species_id: speciesId, time_period: null };
 }
 
-let cacheRead: ReturnType<typeof makeQueryChain>;
-let readTableName: string | undefined;
+/** A `Species(id, species_name)` row, as the id→name map read returns it. */
+function buildSpeciesNameRow(
+	id = BLUE_TIT_SPECIES_ID,
+	species_name = 'Blue Tit'
+) {
+	return { id, species_name };
+}
+
+let tableReads: Map<string, ReturnType<typeof makeQueryChain>>;
+let readTableNames: string[];
 
 /**
- * The authenticated client both biometrics paths go through: `.from()` serves
- * the cache read, `.rpc()` the arbitrary-window fallback. A test sets up
- * whichever half its window shape should reach, and asserts the other was
- * left alone.
+ * The authenticated client every biometrics path goes through: `.from()`
+ * serves both the cache-aligned branch's `SimpleStatsCacheBySpecies` read and
+ * the fallback's `Species` id→name read (dispatched by table name, so each
+ * gets its own recorded chain), and `.rpc()` serves the fallback's
+ * `stats_cache_biometrics_metrics` call. A test sets up whichever reads its
+ * window shape should reach, and asserts the others were left alone.
  */
 function mockAuthenticatedClient({
 	cacheRows = [],
-	rpcRows = []
-}: { cacheRows?: unknown[]; rpcRows?: unknown[] } = {}) {
-	cacheRead = makeQueryChain(cacheRows);
-	readTableName = undefined;
+	rpcRows = [],
+	speciesRows = [buildSpeciesNameRow()]
+}: {
+	cacheRows?: unknown[];
+	rpcRows?: unknown[];
+	speciesRows?: unknown[];
+} = {}) {
+	const rowsByTable: Record<string, unknown[]> = {
+		SimpleStatsCacheBySpecies: cacheRows,
+		Species: speciesRows
+	};
+	tableReads = new Map();
+	readTableNames = [];
 	const { rpc, calls: rpcCalls } = makeRpcCallRecorder(rpcRows);
 	mockGetAuthenticatedSupabaseClient.mockResolvedValue({
 		from: vi.fn((requestedTable: string) => {
-			readTableName = requestedTable;
-			return cacheRead.chain;
+			readTableNames.push(requestedTable);
+			const read = makeQueryChain(rowsByTable[requestedTable] ?? []);
+			tableReads.set(requestedTable, read);
+			return read.chain;
 		}),
 		rpc
 	});
@@ -112,11 +154,18 @@ function mockCoreStats(
 	vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({ accessLevel, rows });
 }
 
-const cacheFilters = () => cacheRead.record.filters;
+const readOf = (table: string) => tableReads.get(table);
+const cacheFilters = () =>
+	readOf('SimpleStatsCacheBySpecies')?.record.filters ?? [];
 const cacheFilterFor = (column: string, operator: string) =>
 	cacheFilters().find((f) => f.column === column && f.operator === operator)
 		?.value;
-const selectedCacheColumns = () => cacheRead.record.select ?? '';
+const selectedCacheColumns = () =>
+	readOf('SimpleStatsCacheBySpecies')?.record.select ?? '';
+const speciesIdsRequested = () =>
+	readOf('Species')?.record.filters.find(
+		(f) => f.column === 'id' && f.operator === 'in'
+	)?.value;
 
 describe('fetchBiometricsStats', () => {
 	beforeEach(() => {
@@ -130,7 +179,7 @@ describe('fetchBiometricsStats', () => {
 
 			const [row] = await fetchSpeciesData(viewedGroup);
 
-			expect(readTableName).toBe('SimpleStatsCacheBySpecies');
+			expect(readTableNames).toEqual(['SimpleStatsCacheBySpecies']);
 			expect(cacheFilterFor('group_id', 'eq')).toBe(GROUP_ID);
 			expect(cacheFilterFor('temporal_unit', 'eq')).toBe('all-time');
 			// All-time is one cell per species, so no time_period narrowing.
@@ -183,10 +232,12 @@ describe('fetchBiometricsStats', () => {
 	});
 
 	describe('arbitrary window', () => {
-		it('falls back to the live biometrics_stats RPC for a window aligned to no cache cell', async () => {
+		it('falls back to the live stats_cache_biometrics_metrics RPC for a window aligned to no cache cell', async () => {
 			mockCoreStats();
 			const { rpcCalls } = mockAuthenticatedClient({
-				rpcRows: [buildBiometricsRpcRow({ max_weight: 20, max_wing: 70 })]
+				rpcRows: [
+					buildBiometricsMetricsRpcRow({ max_weight: 20, max_wing: 70 })
+				]
 			});
 
 			const [row] = await fetchSpeciesData(
@@ -197,7 +248,7 @@ describe('fetchBiometricsStats', () => {
 
 			expect(rpcCalls).toEqual([
 				{
-					name: 'biometrics_stats',
+					name: 'stats_cache_biometrics_metrics',
 					args: {
 						ringing_group_filter: GROUP_ID,
 						from_date: CES_FROM_DATE,
@@ -206,9 +257,76 @@ describe('fetchBiometricsStats', () => {
 					}
 				}
 			]);
-			expect(readTableName).toBeUndefined();
+			// No `group_by_time_period`, and no cache-table read at all — only
+			// the species id→name map's own `Species` read.
+			expect(readTableNames).toEqual(['Species']);
 			expect(row.max_weight).toBe(20);
 			expect(row.max_wing).toBe(70);
+		});
+
+		it("attaches each row's species_name from the Species id→name map", async () => {
+			mockCoreStats([
+				buildCoreStatsRow({ species_name: 'Blue Tit' }),
+				buildCoreStatsRow({ species_name: 'Wren' })
+			]);
+			mockAuthenticatedClient({
+				rpcRows: [
+					buildBiometricsMetricsRpcRow({ speciesId: 7, max_wing: 50 }),
+					buildBiometricsMetricsRpcRow({ speciesId: 9, max_wing: 70 })
+				],
+				speciesRows: [
+					buildSpeciesNameRow(9, 'Blue Tit'),
+					buildSpeciesNameRow(7, 'Wren')
+				]
+			});
+
+			const rows = await fetchSpeciesData(
+				viewedGroup,
+				CES_FROM_DATE,
+				CES_TO_DATE
+			);
+
+			// Only the ids the RPC actually returned are looked up.
+			expect(speciesIdsRequested()).toEqual([7, 9]);
+			expect(
+				rows.find(({ species_name }) => species_name === 'Blue Tit')?.max_wing
+			).toBe(70);
+			expect(
+				rows.find(({ species_name }) => species_name === 'Wren')?.max_wing
+			).toBe(50);
+		});
+
+		// The `encounter_count` column `stats_cache_biometrics_metrics_result`
+		// lacks is backfilled as `null`, which no test here can observe:
+		// `mergeSpeciesBiometrics` copies only the 8 metrics onto the
+		// `/species` row and lets the core-stats row's own `encounter_count`
+		// stand, and `fetchBiometricsStats` is deliberately not exported (every
+		// export of a `'use server'` module becomes a callable endpoint). The
+		// gap is instead guaranteed at compile time by the fallback's
+		// `Promise<BiometricsStatsResult[]>` return type, which `npm run qa`'s
+		// type-check step enforces — dropping the backfill fails the build.
+
+		it('drops a row whose species_id resolves to no Species name, and logs it', async () => {
+			mockCoreStats();
+			mockAuthenticatedClient({
+				rpcRows: [buildBiometricsMetricsRpcRow({ speciesId: 999 })],
+				speciesRows: []
+			});
+			const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+			const [row] = await fetchSpeciesData(
+				viewedGroup,
+				CES_FROM_DATE,
+				CES_TO_DATE
+			);
+
+			expect(row.species_name).toBe('Blue Tit');
+			expect(row.max_weight).toBeUndefined();
+			expect(logSpy).toHaveBeenCalledWith(
+				expect.stringContaining('resolved to no Species name'),
+				expect.objectContaining({ speciesId: 999 })
+			);
+			logSpy.mockRestore();
 		});
 	});
 
@@ -241,7 +359,7 @@ describe('fetchBiometricsStats', () => {
 
 			await fetchSpeciesData(viewedGroup, YEAR_FROM_DATE, YEAR_TO_DATE);
 
-			expect(readTableName).toBe('SimpleStatsCacheBySpecies');
+			expect(readTableNames).toEqual(['SimpleStatsCacheBySpecies']);
 		});
 	});
 
@@ -274,6 +392,8 @@ describe('fetchBiometricsStats', () => {
 			expect(row.species_name).toBe('Blue Tit');
 			expect(row.max_weight).toBeUndefined();
 			expect(row.median_wing).toBeUndefined();
+			// No ids to resolve, so the id→name map read is skipped entirely.
+			expect(readTableNames).toEqual([]);
 		});
 	});
 });
