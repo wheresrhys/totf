@@ -2,6 +2,7 @@ import type {
   SimpleStatsCacheBySpeciesRow,
   SimpleStatsCacheRow
 } from '@/app/models/db';
+import type { Database } from '@/types/supabase.types';
 export type StatsResult = SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow;
 
 
@@ -132,4 +133,80 @@ export type RefreshSimpleStatsCacheParams = RefreshSpeciesNarrowing & {
    * script) have no import job at all.
    */
   importJobId?: number;
+};
+
+export type BasicSessionMetricsRow =
+  Database['public']['CompositeTypes']['stats_cache_basic_session_metrics_result'];
+export type BiometricsMetricsRow =
+  Database['public']['CompositeTypes']['stats_cache_biometrics_metrics_result'];
+export type BirdAgeMetricsRow =
+  Database['public']['CompositeTypes']['stats_cache_bird_age_metrics_result'];
+export type EncounterAgeMetricsRow =
+  Database['public']['CompositeTypes']['stats_cache_encounter_age_metrics_result'];
+
+/**
+ * The two columns every merged cell is keyed on, with the *metric RPCs'* own
+ * nullability rather than the cache tables'. `cellKey`/`indexByCell` match a
+ * cell across several RPC results on this pair, and the RPCs emit a real NULL
+ * `time_period` for the all-time grain, so a merged cell has to keep that NULL
+ * — `writeBySpeciesRows` is where it becomes the tables' sentinel date.
+ */
+export type MergedCellKey = {
+  species_id: number | null;
+  time_period: string | null;
+};
+
+/**
+ * One merged `SimpleStatsCache` cell, pre-write: the `SimpleStatsCacheBySpecies`
+ * Insert shape minus the columns `writeBySpeciesRows` supplies itself
+ * (`group_id`, `temporal_unit`), the one the database derives (`id`), and the
+ * two key columns, re-added via `MergedCellKey` at the merge step's own
+ * nullability.
+ */
+export type SimpleMergedCell = Omit<
+  Database['public']['Tables']['SimpleStatsCacheBySpecies']['Insert'],
+  'id' | 'group_id' | 'temporal_unit' | keyof MergedCellKey
+> &
+  MergedCellKey;
+
+/**
+ * The two `cache_table` tags `FailedStatsCacheRefreshes`' CHECK constraint
+ * accepts (#1182) — one per species-grouped-or-not pass, so an anomaly row
+ * records which of the two refresh passes produced it.
+ */
+export type FailedRefreshCacheTable =
+  | 'SimpleStatsCache'
+  | 'SimpleStatsCacheBySpecies';
+
+/**
+ * One dead-letter row for `FailedStatsCacheRefreshes` (#1167) — a cell a
+ * refresh pass could not write. `id`/`created_at` are database-defaulted.
+ * `cache_table` is narrowed from the generated `Insert` type's bare `string`
+ * (the column is text + CHECK, not a Postgres enum) to the four-value union
+ * above.
+ */
+export type FailedRefreshRow = Omit<
+  Database['public']['Tables']['FailedStatsCacheRefreshes']['Insert'],
+  'id' | 'created_at' | 'cache_table'
+> & {
+  cache_table: FailedRefreshCacheTable;
+};
+
+/**
+ * The shared 8-arg filter shape every `stats_cache_*_metrics` RPC takes
+ * (mirrors `core_stats`'/`biometrics_stats`' own input signature — see
+ * `app/lib/auth/group-summary-access.ts`'s `CoreStatsRpcParams` and
+ * `app/lib/supabase/temporal-filter.ts`) — only the subset `lib/refresh/`
+ * ever needs to set.
+ */
+export type MetricRpcParams = {
+  ringing_group_filter: number;
+  group_by_species: boolean;
+  group_by_time_period?: 'day' | 'month' | 'year' | 'month-squashed';
+  from_date?: string;
+  to_date?: string;
+  /** Exact calendar year, matched as `EXTRACT(YEAR FROM visit_date)`. */
+  year_filter?: number;
+  /** Exact calendar month, 1-12, matched as `EXTRACT(MONTH FROM visit_date)`. */
+  month_filter?: number;
 };

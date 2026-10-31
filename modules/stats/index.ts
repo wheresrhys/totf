@@ -3,4 +3,4 @@ export { dispatchStatsCacheRefreshEvents } from './lib/dispatch-stats-cache-even
 export {
 	refreshSimpleStatsCache,
 	runSimpleStatsCacheRefreshPass
-} from './stats-cache-refresh';
+} from './lib/refresh/run-refresh-pass';
