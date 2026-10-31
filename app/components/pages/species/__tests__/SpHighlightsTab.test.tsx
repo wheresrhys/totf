@@ -16,7 +16,7 @@ import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchNotableRetraps: vi.fn()
 }));
-vi.mock('@/app/lib/highlights', () => ({
+vi.mock('@/modules/highlights', () => ({
 	getHighlightsWithinTimeWindow: vi.fn()
 }));
 

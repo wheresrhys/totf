@@ -35,8 +35,8 @@ vi.mock('@/app/actions/sp-data', () => ({
 	getSpeciesArrivalsStats: vi.fn()
 }));
 
-vi.mock('@/app/actions/stats-cache', () => ({
-	readStatsCacheRows: vi.fn()
+vi.mock('@/modules/stats/browser', () => ({
+	globalStatsCacheFetchPool: { fetch: vi.fn() }
 }));
 
 vi.mock('../StatsHistoryChart', () => ({
@@ -180,7 +180,7 @@ async function loadActions() {
 }
 
 async function loadStatsCacheActions() {
-	return import('@/app/actions/stats-cache');
+	return import('@/modules/stats/browser');
 }
 
 function renderDemographicsTab(
@@ -213,7 +213,7 @@ describe('SpDemographicsTab', () => {
 			getSpeciesDemographicsStats,
 			getSpeciesArrivalsStats
 		} = await loadActions();
-		const { readStatsCacheRows } = await loadStatsCacheActions();
+		const { globalStatsCacheFetchPool } = await loadStatsCacheActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
 			[] as CoreStatsWithBiometrics[]
 		);
@@ -223,7 +223,7 @@ describe('SpDemographicsTab', () => {
 		vi.mocked(getSpeciesArrivalsStats).mockResolvedValue(
 			[] as ArrivalsStatsResult[]
 		);
-		vi.mocked(readStatsCacheRows).mockResolvedValue([
+		vi.mocked(globalStatsCacheFetchPool.fetch).mockResolvedValue([
 			{ time_period: '2024-01-01', total_effort: '10:00:00' }
 		]);
 	});
@@ -867,7 +867,7 @@ describe('SpDemographicsTab', () => {
 
 	describe('Structure: effort history fetched once and passed to every tile', () => {
 		it('fetches group effort history once regardless of how many tiles expand, passing it to all four charts', async () => {
-			const { readStatsCacheRows } = await loadStatsCacheActions();
+			const { globalStatsCacheFetchPool } = await loadStatsCacheActions();
 			renderDemographicsTab();
 			for (const name of [
 				/Counts/,
@@ -885,8 +885,8 @@ describe('SpDemographicsTab', () => {
 					expect(chart.dataset.hasEffort).toBe('yes');
 				}
 			});
-			expect(readStatsCacheRows).toHaveBeenCalledTimes(1);
-			expect(readStatsCacheRows).toHaveBeenCalledWith({
+			expect(globalStatsCacheFetchPool.fetch).toHaveBeenCalledTimes(1);
+			expect(globalStatsCacheFetchPool.fetch).toHaveBeenCalledWith({
 				viewedGroup: VIEWED_GROUP,
 				bySpecies: false,
 				temporalUnit: 'month'
@@ -900,8 +900,8 @@ describe('SpDemographicsTab', () => {
 		// total_effort-interval -> fractional-hours conversion it used to do
 		// now lives inline in this component's loadEffortHistory.
 		async function loadEffortHistoryRows(totalEffort: string) {
-			const { readStatsCacheRows } = await loadStatsCacheActions();
-			vi.mocked(readStatsCacheRows).mockResolvedValue([
+			const { globalStatsCacheFetchPool } = await loadStatsCacheActions();
+			vi.mocked(globalStatsCacheFetchPool.fetch).mockResolvedValue([
 				{ time_period: '2024-01-01', total_effort: totalEffort }
 			]);
 			renderDemographicsTab();

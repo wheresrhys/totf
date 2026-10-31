@@ -32,7 +32,7 @@ vi.mock('@/app/lib/group-slug', () => ({
 // Mock it as the one collaborator it is; the printer is a test double returning a
 // fixed sentence, not the real formatting logic (covered by the pipeline's own
 // tests).
-vi.mock('@/app/lib/highlights/lib/hg2', () => ({
+vi.mock('@/modules/highlights/lib/hg2', () => ({
 	getAllHighlightsAcrossScopes: vi.fn().mockResolvedValue({
 		inter: [
 			{
@@ -368,7 +368,7 @@ describe('session detail page', () => {
 
 		it('?tabId=highlights does NOT prefetch the tab server-side — it is clientSideOnly, so the fetch runs once, from the browser', async () => {
 			const { getAllHighlightsAcrossScopes } =
-				await import('@/app/lib/highlights/lib/hg2');
+				await import('@/modules/highlights/lib/hg2');
 			render(await renderPage('highlights'));
 			await screen.findByTestId('session-highlights');
 			// Fetched exactly once — by `TabContent` after the tab mounted, never
@@ -379,7 +379,7 @@ describe('session detail page', () => {
 
 		it('does not prefetch anything for a tabId naming a tab that fetches nothing of its own', async () => {
 			const { getAllHighlightsAcrossScopes } =
-				await import('@/app/lib/highlights/lib/hg2');
+				await import('@/modules/highlights/lib/hg2');
 			render(await renderPage('net-rounds'));
 			await screen.findByText('Net round 1: 08:00');
 			expect(getAllHighlightsAcrossScopes).not.toHaveBeenCalled();

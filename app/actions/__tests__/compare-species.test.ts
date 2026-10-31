@@ -20,7 +20,7 @@ const viewedGroup: ViewedGroup = { id: GROUP_ID, slug: 'alpha' };
 // no cache-table snapshot fixture exists yet (see ticket #1206's "Out of
 // scope"), so this stands in for a group's cached all-time, by-species cell.
 // `time_period` is the cache tables' all-time sentinel date
-// (`lib/stats-cache-refresh.ts`'s `ALL_TIME_SENTINEL_DATE`) rather than the
+// (`modules/stats/stats-cache-refresh.ts`'s `ALL_TIME_SENTINEL_DATE`) rather than the
 // RPC's own literal `null` for this grain.
 const blueTitRow = {
 	species_id: 42,

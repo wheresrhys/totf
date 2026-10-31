@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { ReportHighlightButton } from '../ReportHighlightButton';
-import type { CombinedHighlight } from '@/app/lib/highlights/types';
+import type { CombinedHighlight } from '@/modules/highlights/types';
 
 // ReportHighlightButton renders ReportHighlightModal, which imports the
 // server action; mock it so importing the tree doesn't pull the real action.

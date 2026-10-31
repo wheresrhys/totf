@@ -36,6 +36,9 @@
     "!app/_v1/**/*.tsx",
     ".next/types/**/*.ts",
     "types/**/*.ts",
+    "modules/**/*.ts",
+    "lib/**/*.ts",
+    "scripts/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [

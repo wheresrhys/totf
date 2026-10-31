@@ -1,15 +1,9 @@
 'use server';
 import { fetchAllPaginatedRows } from '@/lib/supabase';
-import type {
-	SimpleStatsCacheBySpeciesRow,
-	SimpleStatsCacheRow
-} from '@/app/models/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getAuthenticatedSupabaseClient } from '../lib/auth/group-auth';
-import type { TemporalUnit } from '@/lib/stats-cache-refresh';
+import { getAuthenticatedSupabaseClient } from '../../../app/lib/auth/group-auth';
+import type { TemporalUnit } from '../stats-cache-refresh';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-
-export type StatsResult = SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow;
 
 // A row as PostgREST returns it for `readStatsCacheRows`'s generic
 // `select('*')` read: every column of whichever table was chosen, plus the

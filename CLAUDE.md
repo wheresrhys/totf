@@ -132,6 +132,22 @@ belong to any single scoped doc:
   `supabase/scripts/seed-e2e-data.ts`. Small enough (756 bytes) not to be worth splitting.
 - `queries/` and `types/` — typed query definitions and the generated `Database` type, consumed by
   both `app/` pages/actions and `supabase/scripts/generate-snapshots.ts`.
+- `modules/stats/` — the stats-cache event-building/read/dispatch pipeline (`buildStatsCacheRefreshEvents`,
+  `readStatsCacheRows`, `StatsCacheFetchPool`, `dispatchStatsCacheRefreshEvents`), consumed by `app/`
+  (actions, the stats-cache-refresh-window queue route) and by `supabase/scripts/import-csv.ts`'s CLI
+  importer — the same cross-zone shape as `lib/supabase.ts` above, just large enough to warrant its
+  own directory and barrel rather than living loose in `lib/`. The module is split across two entry
+  points: `modules/stats/browser.ts` re-exports only the client-safe surface (`types`,
+  `readStatsCacheRows`, `globalStatsCacheFetchPool`, `StatsCacheFetchPool`), and `index.ts` re-exports
+  everything `browser.ts` does plus `dispatchStatsCacheRefreshEvents`, which pulls in `@vercel/queue`
+  and so is server-only. Any file reachable from a Client Component must import from
+  `@/modules/stats/browser`, never the bare `@/modules/stats` barrel — `modules/highlights`'s
+  `hg2.ts` and the species page's `SpDemographicsTab.tsx` (`'use client'`) both do, after both broke
+  the dev build (`Module not found: @opentelemetry/api`) by importing the full barrel and dragging
+  the queue dependency into the browser bundle. Server-only call sites (`app/api/import/route.ts`,
+  `supabase/scripts/import-csv.ts`) keep importing the full `@/modules/stats` barrel.
+  `modules/stats/stats-cache-refresh.ts` is the one file in there not yet through this narrowing —
+  it keeps whatever it already exported before the move.
 
 ## Project structure
 

@@ -1,21 +1,21 @@
 import { handleCallback } from '@vercel/queue';
-// Relative, not `@/`-aliased, for every import below: `lib/queue-dispatch.ts`'s
+// Relative, not `@/`-aliased, for every import below: `app/lib/queue-dispatch.ts`'s
 // inline mode imports this module from `lib/`, so it is loaded by the CLI
 // importer's `tsx` runner (`supabase/scripts/import-csv.ts`) as well as by
 // Next.js. `app/lib/auth/group-auth.ts` reaches into `lib/` the same way and
-// for the same reason — see `lib/queue-dispatch.ts`'s own import comment. The
+// for the same reason — see `app/lib/queue-dispatch.ts`'s own import comment. The
 // event type was the only import here while this consumer was a noop, and
 // being type-only it was erased before resolution ever mattered.
 import {
 	ImportJobTracker,
 	type StatsCacheRefreshOutcome
-} from '../../../../lib/demon-import';
+} from '@/lib/demon-import';
 import {
 	refreshSimpleStatsCache,
 	type TemporalUnit
-} from '../../../../lib/stats-cache-refresh';
-import type { StatsCacheRefreshEvent } from '../../../../lib/stats-cache-refresh-events';
-import { getAuthenticatedSupabaseClientForGroup } from '../../../lib/auth/group-auth';
+} from '@/modules/stats/stats-cache-refresh';
+import type { StatsCacheRefreshEvent } from '@/modules/stats';
+import { getAuthenticatedSupabaseClientForGroup } from '@/app/lib/auth/group-auth';
 
 /**
  * What one `StatsCacheRefreshEvent` means to `refreshSimpleStatsCache`, which
@@ -57,7 +57,7 @@ const PERIODS_FROM_RPC_PARAMS_TEMPORAL_UNITS: readonly TemporalUnit[] = [
  * block. `speciesIds` has no such per-unit rule: every branch carries
  * `event.affectedSpeciesIds` straight through, since narrowing the
  * species-grouped write is sound for every temporal unit — see
- * `RefreshSpeciesNarrowing`'s own doc comment in `lib/stats-cache-refresh.ts`.
+ * `RefreshSpeciesNarrowing`'s own doc comment in `modules/stats/stats-cache-refresh.ts`.
  */
 export function deriveStatsCacheRefreshParams(
 	event: StatsCacheRefreshEvent
@@ -97,7 +97,7 @@ export function deriveStatsCacheRefreshParams(
  * `ImportJobs.*_stats_refresh_status` column (#1154).
  *
  * Deliberately a plain exported async function rather than inline logic in
- * `POST` below, per ADR 0001's Question 1: `lib/queue-dispatch.ts`'s inline
+ * `POST` below, per ADR 0001's Question 1: `app/lib/queue-dispatch.ts`'s inline
  * dispatch mode calls it directly, in-process, with no HTTP round trip and no
  * CloudEvent envelope to construct.
  *

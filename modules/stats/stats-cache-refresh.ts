@@ -1,13 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase.types';
 // Relative, not `@/`-aliased, for the same reason `lib/demon-import.ts` and
-// `lib/queue-dispatch.ts` import their own sibling modules relatively: these
+// `app/lib/queue-dispatch.ts` import their own sibling modules relatively: these
 // are value imports `lib/` needs at runtime (the CLI importer's `tsx` runner
 // included), and `@/` alias resolution is scoped to tsconfig.json's
 // `include`, which `lib/` sits outside of. The `@/`-aliased import above is
 // `import type` only, erased before either runtime sees it, so it isn't
 // subject to the same constraint.
-import { catchSupabaseErrors } from './supabase';
+import { catchSupabaseErrors } from '@/lib/supabase';
 
 /**
  * Populates `SimpleStatsCache` (#1144, retrofitted by #1162), the
@@ -264,7 +264,7 @@ function isExactFilterTemporalUnit(
  * The exact-match RPC filters selecting precisely the period a
  * `month`/`year`/`month-squashed` period string names —
  * `YYYY-MM-01`/`YYYY-01-01`/`2000-MM-01`, per
- * `lib/stats-cache-refresh-events.ts`'s `periodsTouched`. Each unit uses the
+ * `modules/stats/lib/stats-cache-events.ts`'s `periodsTouched`. Each unit uses the
  * subset of the two filters that *is* its own period, and no more:
  *
  * - `year` needs no `month_filter` — the year filter alone is the whole period.
@@ -304,7 +304,7 @@ function unwindowedMetricRpcParams(
 		// For all-time, `group_by_time_period` is omitted completely rather than
 		// set to any value — the same "omit the key for all-time" convention
 		// `app/actions/summary-stats.ts`'s `fetchSummaryStats` and
-		// `lib/stats-cache-refresh-events.ts`'s all-time event use.
+		// `modules/stats/lib/stats-cache-events.ts`'s all-time event use.
 		...(temporalUnit === 'all-time'
 			? {}
 			: { group_by_time_period: temporalUnit })
@@ -352,7 +352,7 @@ function dayBatchSize(groupBySpecies: boolean): number {
  * matching entry in `groupSessionDates` gets its own standalone batch rather
  * than crashing or being silently dropped — defensive only: every real `day`
  * period is an import's affected date, which by construction has a matching
- * `Sessions` row for the group (see `lib/stats-cache-refresh-events.ts`), but
+ * `Sessions` row for the group (see `modules/stats/lib/stats-cache-events.ts`), but
  * nothing enforces that invariant from this function's own side.
  */
 export function batchPeriodsBySessionDateSpan(

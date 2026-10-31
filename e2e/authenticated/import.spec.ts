@@ -37,7 +37,7 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		// "did this upload write any cache rows at all" assertions below pass
 		// without the consumer having done anything. The `*BySpecies` half is
 		// the one with a writer — every metric RPC call in
-		// lib/stats-cache-refresh.ts hardcodes group_by_species=true, so the
+		// modules/stats/stats-cache-refresh.ts hardcodes group_by_species=true, so the
 		// all-species-combined sibling stays empty (#1169).
 		psql(`DELETE FROM "SimpleStatsCacheBySpecies" WHERE group_id = ${deltaId}`)
 		psql(`UPDATE "Birds" SET ringing_group_ids = array_remove(ringing_group_ids, ${deltaId}) WHERE ${deltaId} = ANY(ringing_group_ids)`)

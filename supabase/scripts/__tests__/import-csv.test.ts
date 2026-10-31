@@ -7,9 +7,9 @@ import {
 	CasualtyEncounterError,
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames,
-	processEncounterRow,
-	dispatchStatsCacheRefreshEvents
+	processEncounterRow
 } from '../../../lib/demon-import';
+import { dispatchStatsCacheRefreshEvents } from '@/modules/stats';
 import {
 	createRowLimiter,
 	DEFAULT_IMPORT_CONCURRENCY,
@@ -106,7 +106,10 @@ vi.mock('../../../lib/demon-import', () => ({
 	CasualtyEncounterError: class CasualtyEncounterError extends Error {},
 	getDistinctLocationNames: vi.fn(() => ['Garden Trap']),
 	// Every location in the CSV is already known unless a test says otherwise.
-	findUnrecognisedLocationNames: vi.fn(async () => [] as string[]),
+	findUnrecognisedLocationNames: vi.fn(async () => [] as string[])
+}));
+
+vi.mock('@/modules/stats', () => ({
 	dispatchStatsCacheRefreshEvents: vi.fn(async () => {})
 }));
 

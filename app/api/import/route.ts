@@ -13,10 +13,9 @@ import {
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
 	CasualtyEncounterError,
-	dispatchStatsCacheRefreshEvents,
 	type DemonRow
 } from '@/lib/demon-import';
-
+import { dispatchStatsCacheRefreshEvents } from '@/modules/stats';
 export const maxDuration = 300;
 
 export type ImportProgressMessage = { type: 'progress'; processed: number };

@@ -20,12 +20,8 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 	};
 });
 
-vi.mock('@/lib/stats-cache-refresh-events', () => ({
-	buildStatsCacheRefreshEvents: vi.fn()
-}));
-
-vi.mock('@/lib/queue-dispatch', () => ({
-	dispatchStatsCacheRefreshWindow: vi.fn()
+vi.mock('@/modules/stats', () => ({
+	dispatchStatsCacheRefreshEvents: vi.fn()
 }));
 
 const IMPORT_JOB_ID = 42;
@@ -143,16 +139,9 @@ describe('POST /api/import', () => {
 			await import('@/lib/demon-import');
 		vi.mocked(findUnrecognisedLocationNames).mockResolvedValue([]);
 
-		// No stats-cache-refresh events by default — tests in the dedicated
-		// describe block below override this.
-		const { buildStatsCacheRefreshEvents } =
-			await import('@/lib/stats-cache-refresh-events');
-		vi.mocked(buildStatsCacheRefreshEvents).mockClear();
-		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([]);
-		const { dispatchStatsCacheRefreshWindow } =
-			await import('@/lib/queue-dispatch');
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockClear();
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockResolvedValue(undefined);
+		const { dispatchStatsCacheRefreshEvents } = await import('@/modules/stats');
+		vi.mocked(dispatchStatsCacheRefreshEvents).mockClear();
+		vi.mocked(dispatchStatsCacheRefreshEvents).mockResolvedValue(undefined);
 	});
 
 	describe('authentication', () => {
@@ -555,54 +544,26 @@ describe('POST /api/import', () => {
 	});
 
 	describe('stats-cache-refresh-window dispatch', () => {
-		it("dispatches one event per distinct time window derived from the run's affected dates, after the job is marked succeeded", async () => {
-			const { buildStatsCacheRefreshEvents } =
-				await import('@/lib/stats-cache-refresh-events');
-			const { dispatchStatsCacheRefreshWindow } =
-				await import('@/lib/queue-dispatch');
-			const fakeEvents = [
-				{
-					importJobId: IMPORT_JOB_ID,
-					rpcParams: { ringing_group_filter: 1 },
-					affectedSpeciesIds: TOUCHED_SPECIES_IDS
-				},
-				{
-					importJobId: IMPORT_JOB_ID,
-					rpcParams: {
-						ringing_group_filter: 1,
-						group_by_time_period: 'day' as const,
-						from_date: '2024-06-01',
-						to_date: '2024-06-01'
-					},
-					affectedSpeciesIds: TOUCHED_SPECIES_IDS
-				}
-			];
-			vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue(fakeEvents);
+		it("dispatches the run's affected dates and touched species for the group, after the job is marked succeeded", async () => {
+			const { dispatchStatsCacheRefreshEvents } =
+				await import('@/modules/stats');
 
 			const file = makeCsvFile([makeCsvRow()]);
 			await readStreamMessages(await POST(await makeRequest(file)));
 
 			// Group ID 1 — group-cookie is mocked globally in vitest.setup.tsx.
-			expect(buildStatsCacheRefreshEvents).toHaveBeenCalledWith(
+			expect(dispatchStatsCacheRefreshEvents).toHaveBeenCalledTimes(1);
+			expect(dispatchStatsCacheRefreshEvents).toHaveBeenCalledWith(
 				IMPORT_JOB_ID,
 				1,
 				STAGED_DATES,
 				TOUCHED_SPECIES_IDS
 			);
-			expect(dispatchStatsCacheRefreshWindow).toHaveBeenCalledTimes(2);
-			expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
-				1,
-				fakeEvents[0]
-			);
-			expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
-				2,
-				fakeEvents[1]
-			);
 
 			// Ordering: dispatch happens only after the job is marked succeeded.
 			const completeOrder =
 				mockImportJobTracker.completeImportJob.mock.invocationCallOrder[0];
-			const dispatchOrder = vi.mocked(dispatchStatsCacheRefreshWindow).mock
+			const dispatchOrder = vi.mocked(dispatchStatsCacheRefreshEvents).mock
 				.invocationCallOrder[0];
 			expect(dispatchOrder).toBeGreaterThan(completeOrder);
 		});
@@ -610,8 +571,8 @@ describe('POST /api/import', () => {
 		it('does not dispatch any events when the run times out', async () => {
 			const { EncounterRowBatchWriter, processEncounterRow } =
 				await import('@/lib/demon-import');
-			const { dispatchStatsCacheRefreshWindow } =
-				await import('@/lib/queue-dispatch');
+			const { dispatchStatsCacheRefreshEvents } =
+				await import('@/modules/stats');
 
 			// Captured so the test can trigger the real (unmocked)
 			// `ImportDeadlineExceededError` the route closes over internally —
@@ -652,13 +613,13 @@ describe('POST /api/import', () => {
 			vi.useRealTimers();
 
 			expect(messages.some((m) => m.type === 'timeout')).toBe(true);
-			expect(dispatchStatsCacheRefreshWindow).not.toHaveBeenCalled();
+			expect(dispatchStatsCacheRefreshEvents).not.toHaveBeenCalled();
 		});
 
 		it('does not dispatch any events when the run fails before completion', async () => {
 			const { EncounterRowBatchWriter } = await import('@/lib/demon-import');
-			const { dispatchStatsCacheRefreshWindow } =
-				await import('@/lib/queue-dispatch');
+			const { dispatchStatsCacheRefreshEvents } =
+				await import('@/modules/stats');
 			vi.mocked(EncounterRowBatchWriter).mockImplementation(function () {
 				throw new Error('could not build writers');
 			} as never);
@@ -672,51 +633,7 @@ describe('POST /api/import', () => {
 				type: 'error',
 				message: 'could not build writers'
 			});
-			expect(dispatchStatsCacheRefreshWindow).not.toHaveBeenCalled();
-		});
-
-		it('logs and swallows a dispatch failure rather than turning the response into an error message', async () => {
-			const { processEncounterRow } = await import('@/lib/demon-import');
-			const { buildStatsCacheRefreshEvents } =
-				await import('@/lib/stats-cache-refresh-events');
-			const { dispatchStatsCacheRefreshWindow } =
-				await import('@/lib/queue-dispatch');
-			vi.mocked(processEncounterRow).mockResolvedValue({
-				visitDate: '2024-06-01'
-			});
-			const fakeEvent = {
-				importJobId: IMPORT_JOB_ID,
-				rpcParams: { ringing_group_filter: 1 },
-				affectedSpeciesIds: TOUCHED_SPECIES_IDS
-			};
-			vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([fakeEvent]);
-			vi.mocked(dispatchStatsCacheRefreshWindow).mockRejectedValueOnce(
-				new Error('queue unavailable')
-			);
-			const consoleErrorSpy = vi
-				.spyOn(console, 'error')
-				.mockImplementation(() => {});
-
-			const file = makeCsvFile([makeCsvRow()]);
-			const messages = await readStreamMessages(
-				await POST(await makeRequest(file))
-			);
-
-			expect(messages.find((m) => m.type === 'complete')).toEqual({
-				type: 'complete',
-				processed: 1,
-				successful: 1,
-				failed: 0,
-				skipped: 0
-			});
-			expect(messages.some((m) => m.type === 'error')).toBe(false);
-			expect(consoleErrorSpy).toHaveBeenCalledWith(
-				'Failed to dispatch stats-cache-refresh-window events',
-				expect.objectContaining({ importJobId: IMPORT_JOB_ID }),
-				expect.any(Error)
-			);
-
-			consoleErrorSpy.mockRestore();
+			expect(dispatchStatsCacheRefreshEvents).not.toHaveBeenCalled();
 		});
 	});
 });

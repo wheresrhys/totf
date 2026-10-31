@@ -26,7 +26,7 @@ export type TemporalUnit =
 
 /**
  * The `time_period` value every stats-cache table uses for the all-time grain.
- * Duplicated from `lib/stats-cache-refresh.ts`'s own `ALL_TIME_SENTINEL_DATE`
+ * Duplicated from `modules/stats/stats-cache-refresh.ts`'s own `ALL_TIME_SENTINEL_DATE`
  * rather than imported, the same convention `TemporalUnit` above follows:
  * `lib/` doesn't reach into `supabase/__tests__/`, and a test asserting on the
  * schema's convention shouldn't be satisfied by whatever the writer happens to

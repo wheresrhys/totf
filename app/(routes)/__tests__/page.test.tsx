@@ -14,7 +14,6 @@ import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/synthetic/zero.h
 import type { HomePageSummaryStats } from '../PageContent';
 import type { CoreStatsResult, GroupTicksResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { StatsCacheReadParams } from '@/app/actions/stats-cache';
 
 const { mockGetAuthenticatedSupabaseClient, mockReadStatsCacheRows } =
 	vi.hoisted(() => ({
@@ -26,7 +25,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
 
-vi.mock('@/app/actions/stats-cache', () => ({
+vi.mock('@/modules/stats', () => ({
 	readStatsCacheRows: mockReadStatsCacheRows
 }));
 
@@ -46,27 +45,25 @@ const START_OF_LAST_YEAR = `${CURRENT_YEAR - 1}-01-01`;
 // (the legacy core_stats-RPC fixtures below predate the cache tables and
 // carry `time_period: null`).
 function mockSummaryStats(stats: HomePageSummaryStats | null) {
-	mockReadStatsCacheRows.mockImplementation(
-		async ({ temporalUnit }: StatsCacheReadParams) => {
-			if (stats == null) {
-				return [];
-			}
-			if (temporalUnit === 'all-time') {
-				return stats.allTime ? [stats.allTime] : [];
-			}
-			if (temporalUnit === 'year') {
-				return [
-					...(stats.thisYear
-						? [{ ...stats.thisYear, time_period: START_OF_CURRENT_YEAR }]
-						: []),
-					...(stats.lastYear
-						? [{ ...stats.lastYear, time_period: START_OF_LAST_YEAR }]
-						: [])
-				];
-			}
+	mockReadStatsCacheRows.mockImplementation(async ({ temporalUnit }) => {
+		if (stats == null) {
 			return [];
 		}
-	);
+		if (temporalUnit === 'all-time') {
+			return stats.allTime ? [stats.allTime] : [];
+		}
+		if (temporalUnit === 'year') {
+			return [
+				...(stats.thisYear
+					? [{ ...stats.thisYear, time_period: START_OF_CURRENT_YEAR }]
+					: []),
+				...(stats.lastYear
+					? [{ ...stats.lastYear, time_period: START_OF_LAST_YEAR }]
+					: [])
+			];
+		}
+		return [];
+	});
 }
 
 const defaultSummaryStats =
@@ -448,9 +445,8 @@ describe('fetchHomePageSummaryStats', () => {
 			session_count: 3,
 			time_period: START_OF_LAST_YEAR
 		});
-		mockReadStatsCacheRows.mockImplementation(
-			async ({ temporalUnit }: StatsCacheReadParams) =>
-				temporalUnit === 'all-time' ? [allTimeRow] : [thisYearRow, lastYearRow]
+		mockReadStatsCacheRows.mockImplementation(async ({ temporalUnit }) =>
+			temporalUnit === 'all-time' ? [allTimeRow] : [thisYearRow, lastYearRow]
 		);
 
 		const result = await fetchHomePageSummaryStats(viewedGroup);
@@ -485,9 +481,8 @@ describe('fetchHomePageSummaryStats', () => {
 			session_count: 999,
 			time_period: '1999-01-01'
 		});
-		mockReadStatsCacheRows.mockImplementation(
-			async ({ temporalUnit }: StatsCacheReadParams) =>
-				temporalUnit === 'all-time' ? [] : [someOtherYearRow, thisYearRow]
+		mockReadStatsCacheRows.mockImplementation(async ({ temporalUnit }) =>
+			temporalUnit === 'all-time' ? [] : [someOtherYearRow, thisYearRow]
 		);
 
 		const result = await fetchHomePageSummaryStats(viewedGroup);
@@ -504,9 +499,8 @@ describe('fetchHomePageSummaryStats', () => {
 			session_count: 999,
 			time_period: '1999-01-01'
 		});
-		mockReadStatsCacheRows.mockImplementation(
-			async ({ temporalUnit }: StatsCacheReadParams) =>
-				temporalUnit === 'all-time' ? [] : [someOtherYearRow, lastYearRow]
+		mockReadStatsCacheRows.mockImplementation(async ({ temporalUnit }) =>
+			temporalUnit === 'all-time' ? [] : [someOtherYearRow, lastYearRow]
 		);
 
 		const result = await fetchHomePageSummaryStats(viewedGroup);

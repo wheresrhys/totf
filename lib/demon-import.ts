@@ -1,15 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase.types';
 import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
-// Relative, not `@/`-aliased, for the same reason `lib/queue-dispatch.ts` imports
+// Relative, not `@/`-aliased, for the same reason `app/lib/queue-dispatch.ts` imports
 // its queue consumer relatively: these are value imports `lib/` needs at
 // runtime (the CLI importer's `tsx` runner included), and `@/` alias
 // resolution is scoped to tsconfig.json's `include`, which `lib/` sits outside
 // of. The two `@/`-aliased imports above are `import type` only, erased before
 // either runtime sees them, so they aren't subject to the same constraint.
-import { buildStatsCacheRefreshEvents } from './stats-cache-refresh-events';
-import { dispatchStatsCacheRefreshWindow } from './queue-dispatch';
-import type { TemporalUnit } from './stats-cache-refresh';
+import type { TemporalUnit } from '@/modules/stats/stats-cache-refresh';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Omit<
@@ -332,7 +330,7 @@ export type ImportJobRowCounts = {
 
 /**
  * Which temporal unit's stats-cache refresh an outcome is being recorded for
- * (#1154). Deliberately `lib/stats-cache-refresh.ts`'s own `TemporalUnit`
+ * (#1154). Deliberately `modules/stats/stats-cache-refresh.ts`'s own `TemporalUnit`
  * rather than a fourth copy of the same five-value union: the column an
  * outcome lands on and the temporal unit `refreshSimpleStatsCache` was called
  * with are the same axis by construction, so they must not be able to drift
@@ -1539,49 +1537,5 @@ export class EncounterRowBatchWriter {
 	/** The distinct `Species.id`s written by every chunk that has landed so far. */
 	getDistinctSpeciesIds(): number[] {
 		return [...this.touchedSpeciesIds].sort((a, b) => a - b);
-	}
-}
-
-/**
- * Builds and dispatches every stats-cache-refresh event a successful import's
- * affected dates (and, for the species-grouped write, affected species) imply
- * (#1141), the one piece of orchestration both import entry points need once
- * `completeImportJob` has run. Since #1154 that is at most five events — one
- * per temporal unit touched — so the loop below is exactly one dispatch call
- * per temporal unit. Each writes its own
- * `logContext` (the CLI script's `csvFilePath`/`ringingGroupName`, the web
- * route's none) onto the shared `{importJobId, ringingGroupId}` base so a
- * dispatch-failure log line is still identifiable per caller.
- *
- * A dispatch failure is caught and logged rather than thrown: refresh is a
- * recoverable derived step (#957's precedent), so a successful import must
- * still report success even if dispatching its follow-up events fails. This
- * is a plain function rather than a method on `ImportJobTracker` — it doesn't
- * read or write the `ImportJobs` row at all, it only consumes the id the
- * tracker already minted.
- */
-export async function dispatchStatsCacheRefreshEvents(
-	importJobId: number,
-	ringingGroupId: number,
-	affectedDates: string[],
-	affectedSpeciesIds: number[],
-	logContext: Record<string, unknown> = {}
-): Promise<void> {
-	try {
-		const statsCacheRefreshEvents = buildStatsCacheRefreshEvents(
-			importJobId,
-			ringingGroupId,
-			affectedDates,
-			affectedSpeciesIds
-		);
-		for (const event of statsCacheRefreshEvents) {
-			await dispatchStatsCacheRefreshWindow(event);
-		}
-	} catch (dispatchError) {
-		console.error(
-			'Failed to dispatch stats-cache-refresh-window events',
-			{ importJobId, ringingGroupId, ...logContext },
-			dispatchError
-		);
 	}
 }

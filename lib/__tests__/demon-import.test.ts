@@ -12,22 +12,12 @@ import {
 	CasualtyEncounterError,
 	mergeDuplicateEncounters,
 	processEncounterRow,
-	dispatchStatsCacheRefreshEvents,
 	RESIGHTING_RECORD_TYPES,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
 	type DemonRow
 } from '../demon-import';
-import { buildStatsCacheRefreshEvents } from '../stats-cache-refresh-events';
-import { dispatchStatsCacheRefreshWindow } from '../queue-dispatch';
-
-vi.mock('../stats-cache-refresh-events', () => ({
-	buildStatsCacheRefreshEvents: vi.fn()
-}));
-
-vi.mock('../queue-dispatch', () => ({
-	dispatchStatsCacheRefreshWindow: vi.fn()
-}));
+import type { ImportJobRowCounts } from '../demon-import';
 
 function makeDemonRow(overrides: Partial<DemonRow> = {}): DemonRow {
 	return {
@@ -533,7 +523,7 @@ describe('ImportJobTracker', () => {
 				processed: 10,
 				successful: 9,
 				failed: 1
-			});
+			} as ImportJobRowCounts);
 
 			expect(soleUpdatePayload()).toEqual({
 				status: 'succeeded',
@@ -648,7 +638,7 @@ describe('ImportJobTracker', () => {
 				processed: 0,
 				successful: 0,
 				failed: 0
-			});
+			} as ImportJobRowCounts);
 			expect(mockUpdate).toHaveBeenNthCalledWith(2, {
 				status: 'succeeded',
 				finished_at: ISO_TIMESTAMP,
@@ -670,7 +660,9 @@ const STAGING_RINGING_GROUP_ID = 7;
  */
 function makeDemonRecordsClient() {
 	const pendingBatches: ((result: { error: unknown }) => void)[] = [];
-	const upsert = vi.fn(
+	const upsert = vi.fn<
+		(rows: Record<string, unknown>[], options: Record<string, unknown>) => void
+	>(
 		() =>
 			new Promise<{ error: unknown }>((resolve) => {
 				pendingBatches.push(resolve);
@@ -684,11 +676,9 @@ function makeDemonRecordsClient() {
 		from,
 		upsert,
 		/** The rows handed to the `callIndex`th (0-based) batch insert. */
-		rowsOfBatch: (callIndex = 0) =>
-			upsert.mock.calls[callIndex][0] as Record<string, unknown>[],
+		rowsOfBatch: (callIndex = 0) => upsert.mock.calls[callIndex][0],
 		/** The upsert options handed to the `callIndex`th batch insert. */
-		optionsOfBatch: (callIndex = 0) =>
-			upsert.mock.calls[callIndex][1] as Record<string, unknown>,
+		optionsOfBatch: (callIndex = 0) => upsert.mock.calls[callIndex][1],
 		// Batches are chained, so the nth insert isn't even issued until the
 		// (n-1)th has landed — hence waiting for it to appear before settling it.
 		landBatch: async (callIndex = 0) => {
@@ -2398,100 +2388,6 @@ describe('mergeDuplicateEncounters', () => {
 
 		expect(mergeDuplicateEncounters(morningCapture, tiedCapture)).toEqual(
 			expect.objectContaining({ record_type: 'N', weight: 10.5 })
-		);
-	});
-});
-
-describe('dispatchStatsCacheRefreshEvents', () => {
-	beforeEach(() => {
-		vi.mocked(buildStatsCacheRefreshEvents).mockReset();
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockReset();
-	});
-
-	it('builds events from the given ids/dates/species and dispatches every one, in order', async () => {
-		const events = [
-			{
-				importJobId: 42,
-				rpcParams: { ringing_group_filter: 7 },
-				affectedSpeciesIds: [3]
-			},
-			{
-				importJobId: 42,
-				rpcParams: {
-					ringing_group_filter: 7,
-					group_by_time_period: 'day' as const,
-					from_date: '2024-06-01',
-					to_date: '2024-06-01'
-				},
-				affectedSpeciesIds: [3]
-			}
-		];
-		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue(events);
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockResolvedValue(undefined);
-
-		await dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], [3]);
-
-		expect(buildStatsCacheRefreshEvents).toHaveBeenCalledWith(
-			42,
-			7,
-			['2024-06-01'],
-			[3]
-		);
-		expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
-			1,
-			events[0]
-		);
-		expect(dispatchStatsCacheRefreshWindow).toHaveBeenNthCalledWith(
-			2,
-			events[1]
-		);
-	});
-
-	it('logs and swallows a dispatch failure rather than throwing, merging logContext onto importJobId/ringingGroupId', async () => {
-		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([
-			{
-				importJobId: 42,
-				rpcParams: { ringing_group_filter: 7 },
-				affectedSpeciesIds: [3]
-			}
-		]);
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockRejectedValueOnce(
-			new Error('queue unavailable')
-		);
-		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-		await expect(
-			dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], [3], {
-				csvFilePath: '/fake/alpha.csv'
-			})
-		).resolves.toBeUndefined();
-
-		expect(errorSpy).toHaveBeenCalledWith(
-			'Failed to dispatch stats-cache-refresh-window events',
-			{ importJobId: 42, ringingGroupId: 7, csvFilePath: '/fake/alpha.csv' },
-			expect.any(Error)
-		);
-	});
-
-	it('defaults logContext to nothing extra when the caller passes none', async () => {
-		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([
-			{
-				importJobId: 42,
-				rpcParams: { ringing_group_filter: 7 },
-				affectedSpeciesIds: [3]
-			}
-		]);
-		vi.mocked(dispatchStatsCacheRefreshWindow).mockRejectedValueOnce(
-			new Error('queue unavailable')
-		);
-		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-		await dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], [3]);
-
-		expect(errorSpy).toHaveBeenCalledWith(
-			'Failed to dispatch stats-cache-refresh-window events',
-			{ importJobId: 42, ringingGroupId: 7 },
-			expect.any(Error)
 		);
 	});
 });
