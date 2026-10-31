@@ -4,7 +4,7 @@
  * "SimpleStatsCache" sibling this table has no uniqueness
  * to police, so there is no unique-index block to test: it is an append-only
  * log written through a plain PostgREST `.insert()` by
- * `lib/stats-cache-refresh.ts`. See
+ * `modules/stats/stats-cache-refresh.ts`. See
  * supabase/schema/schemas/public/tables/"FailedStatsCacheRefreshes".sql.
  *
  * Requires local Supabase running:
