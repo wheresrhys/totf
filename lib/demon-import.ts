@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase.types';
 import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
-// Relative, not `@/`-aliased, for the same reason `lib/queue-dispatch.ts` imports
+// Relative, not `@/`-aliased, for the same reason `app/lib/queue-dispatch.ts` imports
 // its queue consumer relatively: these are value imports `lib/` needs at
 // runtime (the CLI importer's `tsx` runner included), and `@/` alias
 // resolution is scoped to tsconfig.json's `include`, which `lib/` sits outside
@@ -330,7 +330,7 @@ export type ImportJobRowCounts = {
 
 /**
  * Which temporal unit's stats-cache refresh an outcome is being recorded for
- * (#1154). Deliberately `lib/stats-cache-refresh.ts`'s own `TemporalUnit`
+ * (#1154). Deliberately `modules/stats/stats-cache-refresh.ts`'s own `TemporalUnit`
  * rather than a fourth copy of the same five-value union: the column an
  * outcome lands on and the temporal unit `refreshSimpleStatsCache` was called
  * with are the same axis by construction, so they must not be able to drift

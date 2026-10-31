@@ -1,12 +1,40 @@
 import type { StatsCacheRefreshEvent, StatsCacheRefreshRpcParams } from "../types";
 /**
- * Builds one `StatsCacheRefreshEvent` per temporal unit `affectedDates`
- * touches — five of them whenever there is anything at all to refresh, and
- * `[]` for an empty input, since then there is nothing. Every emitted event is
- * stamped with `importJobId` and `ringing_group_filter`. Dedup/order follows
- * `ImportJobTracker.recordAffectedDates`'s `[...new Set(...)].sort()`
- * convention throughout, so output is deterministic regardless of input
- * order.
+ * Builds the set of stats-cache-refresh events a successful import's affected
+ * dates imply (#1141, collapsed to one-event-per-temporal-unit by #1154).
+ * **At most five events** — one per temporal unit the import actually touched
+ * (`all-time`, `day`, `month`, `month-squashed`, `year`) — each carrying
+ * everything a worker needs to refresh that whole temporal unit in a single
+ * pass, rather than recomputing a group's whole history. Every event also
+ * carries the distinct species the import touched (`affectedSpeciesIds`), so
+ * the consumer's species-grouped write can skip rewriting an untouched
+ * species' cell regardless of temporal unit — see `StatsCacheRefreshEvent`'s
+ * own doc comment. `[]` for an empty input, since then there is nothing to
+ * refresh. Dedup/order follows `ImportJobTracker.recordAffectedDates`'s
+ * `[...new Set(...)].sort()` convention throughout, so output is
+ * deterministic regardless of input order.
+ *
+ * One event per temporal unit rather than one per distinct period instance,
+ * because `refreshSimpleStatsCache` (#1152) takes `{groupId, temporalUnit,
+ * periods?}` and refreshes **one temporal unit per call**, over however many
+ * periods are handed to it. Emitting an event per
+ * month and per year touched (as this module originally did) would force the
+ * consumer into a per-period loop, defeating the one-worker-invocation-per-
+ * temporal-unit point of that design.
+ *
+ * One of the five events carries no period data at all: `all-time` spans
+ * everything, so there is nothing to narrow by.
+ *
+ * The day event is the odd one out among the rest: it narrows via
+ * `from_date`/`to_date` plus `affectedDates` rather than `periods`, for the
+ * reason set out on `StatsCacheRefreshEvent` below.
+ *
+ * The consumer that acts on these events lives in
+ * `app/api/queues/stats-cache-refresh-window/route.ts` (#1155) — it maps each
+ * event back onto `{groupId, temporalUnit, periods?}` and records the outcome
+ * on that temporal unit's `ImportJobs` column; this module only decides *what*
+ * to dispatch — `dispatch-stats-cache-events.ts`'s `dispatchStatsCacheRefreshEvents`
+ * is what actually dispatches it.
  */
 export function buildStatsCacheRefreshEvents(
   importJobId: number,

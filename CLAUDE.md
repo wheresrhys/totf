@@ -132,6 +132,13 @@ belong to any single scoped doc:
   `supabase/scripts/seed-e2e-data.ts`. Small enough (756 bytes) not to be worth splitting.
 - `queries/` and `types/` — typed query definitions and the generated `Database` type, consumed by
   both `app/` pages/actions and `supabase/scripts/generate-snapshots.ts`.
+- `modules/stats/` — the stats-cache event-building/read/dispatch pipeline (`buildStatsCacheRefreshEvents`,
+  `readStatsCacheRows`, `StatsCacheFetchPool`, `dispatchStatsCacheRefreshEvents`, all re-exported
+  through its own `index.ts` barrel). Consumed by `app/` (actions, the stats-cache-refresh-window
+  queue route) and by `supabase/scripts/import-csv.ts`'s CLI importer — the same cross-zone shape as
+  `lib/supabase.ts` above, just large enough to warrant its own directory and barrel rather than
+  living loose in `lib/`. `modules/stats/stats-cache-refresh.ts` is the one file in there not yet
+  through this narrowing — it keeps whatever it already exported before the move.
 
 ## Project structure
 

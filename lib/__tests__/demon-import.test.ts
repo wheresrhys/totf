@@ -18,13 +18,6 @@ import {
 	type DemonRow
 } from '../demon-import';
 import type { ImportJobRowCounts } from '../demon-import';
-vi.mock('@/modules/stats/stats-cache-refresh-events', () => ({
-	buildStatsCacheRefreshEvents: vi.fn()
-}));
-
-vi.mock('@/modules/stats', () => ({
-	dispatchStatsCacheRefreshEvent: vi.fn()
-}));
 
 function makeDemonRow(overrides: Partial<DemonRow> = {}): DemonRow {
 	return {
