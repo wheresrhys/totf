@@ -14,7 +14,7 @@ import {
 	refreshSimpleStatsCache,
 	type TemporalUnit
 } from '@/modules/stats/stats-cache-refresh';
-import type { StatsCacheRefreshEvent } from '@/modules/stats/lib/stats-cache-events';
+import type { StatsCacheRefreshEvent } from '@/modules/stats/lib/dispatch-stats-cache-events';
 import { getAuthenticatedSupabaseClientForGroup } from '@/app/lib/auth/group-auth';
 
 /**

@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  dispatchStatsCacheRefreshEvents,buildStatsCacheRefreshEvents ,dispatchStatsCacheRefreshEvent } from '../stats-cache-events';
+  dispatchStatsCacheRefreshEvents, dispatchStatsCacheRefreshEvent } from '../dispatch-stats-cache-events';
+import {
+  buildStatsCacheRefreshEvents
+} from '../stats-cache-events';
 vi.mock('../stats-cache-events', () => ({
   buildStatsCacheRefreshEvents: vi.fn()
 }));

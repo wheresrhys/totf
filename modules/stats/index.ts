@@ -1,4 +1,4 @@
 export * from './types';
 export { readStatsCacheRows } from './lib/stats-cache';
 export { globalStatsCacheFetchPool, StatsCacheFetchPool } from './lib/stats-cache-fetch-pool'
-export { dispatchStatsCacheRefreshEvents } from './lib/stats-cache-events'
+export { dispatchStatsCacheRefreshEvents } from './lib/dispatch-stats-cache-events'
