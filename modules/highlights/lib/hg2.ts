@@ -18,7 +18,7 @@ import {
 	sortHighlights,
 	sortByPositionAndTimeWindow
 } from './highlight-utils';
-import { globalStatsCacheFetchPool, type StatsResult } from '@/modules/stats';
+import { globalStatsCacheFetchPool, type StatsResult } from '@/modules/stats/browser';
 import type { TemporalUnit } from '@/app/components/shared/StatOutput';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { groupByColumn } from '@/app/lib/generic-utils';

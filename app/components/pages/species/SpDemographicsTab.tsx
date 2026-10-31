@@ -7,7 +7,7 @@ import {
 	getSpeciesDemographicsStats,
 	getSpeciesArrivalsStats
 } from '@/app/actions/sp-data';
-import { readStatsCacheRows } from '@/modules/stats';
+import { globalStatsCacheFetchPool } from '@/modules/stats/browser';
 import { postgresIntervalToHours } from '@/app/lib/postgres-interval';
 import type {
 	CoreStatsResult,
@@ -240,15 +240,21 @@ export function SpDemographicsTab({
 	// `getGroupEffortHistory`, app/actions/sp-data.ts). Shapes the raw
 	// `total_effort` interval into fractional hours and pairs it with
 	// `time_period`, matching the `[time_period, value]` tuple shape
-	// `YearComparisonTrendChart`'s existing series already use.
+	// `YearComparisonTrendChart`'s existing series already use. Goes through
+	// `globalStatsCacheFetchPool` rather than calling `readStatsCacheRows`
+	// directly, so this exact (group, month, ungrouped) request is shared with
+	// any other client-side caller on the page asking for the same cache key
+	// (e.g. the Highlights pipeline's `overall` statsSelector) instead of
+	// firing a redundant one.
 	function loadEffortHistory() {
 		if (effortHistoryRequested) return;
 		setEffortHistoryRequested(true);
-		readStatsCacheRows({
-			viewedGroup,
-			bySpecies: false,
-			temporalUnit: 'month'
-		})
+		globalStatsCacheFetchPool
+			.fetch({
+				viewedGroup,
+				bySpecies: false,
+				temporalUnit: 'month'
+			})
 			.then((rows) => {
 				const data = (rows as CoreStatsResult[]).map(
 					(row): [string, number] => [
