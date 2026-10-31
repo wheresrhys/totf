@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildStatsCacheRefreshEvents } from '../stats-cache-refresh-events';
+import { buildStatsCacheRefreshEvents } from '../stats-cache-events';
 
 const IMPORT_JOB_ID = 42;
 const RINGING_GROUP_ID = 7;

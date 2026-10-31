@@ -38,6 +38,7 @@
     "types/**/*.ts",
     "modules/**/*.ts",
     "lib/**/*.ts",
+    "scripts/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [

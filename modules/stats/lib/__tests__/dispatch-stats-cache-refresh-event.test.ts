@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { StatsCacheRefreshEvent } from '@/modules/stats/stats-cache-refresh-events';
+import type { StatsCacheRefreshEvent } from '@/modules/stats/lib/stats-cache-events';
 vi.mock('@vercel/queue', () => ({
 	send: vi.fn().mockResolvedValue({ messageId: 'msg_1' }),
 
@@ -32,7 +32,7 @@ describe('dispatchStatsCacheRefreshEvent', () => {
 		it('calls the consumer handler directly when STATS_CACHE_REFRESH_DISPATCH_MODE=inline', async () => {
 			process.env.STATS_CACHE_REFRESH_DISPATCH_MODE = 'inline';
 			const { dispatchStatsCacheRefreshEvent } =
-				await import('../dispatch-stats-cache-refresh-event');
+				await import('../stats-cache-events');
 			const { processStatsCacheRefreshWindowJob } =
 				await import('../../../../app/api/queues/stats-cache-refresh-window/route');
 			const { send } = await import('@vercel/queue');
@@ -45,7 +45,7 @@ describe('dispatchStatsCacheRefreshEvent', () => {
 
 		it('defaults to inline when VERCEL and STATS_CACHE_REFRESH_DISPATCH_MODE are both unset', async () => {
 			const { dispatchStatsCacheRefreshEvent } =
-				await import('../dispatch-stats-cache-refresh-event');
+				await import('../stats-cache-events');
 			const { processStatsCacheRefreshWindowJob } =
 				await import('../../../../app/api/queues/stats-cache-refresh-window/route');
 			const { send } = await import('@vercel/queue');
@@ -61,7 +61,7 @@ describe('dispatchStatsCacheRefreshEvent', () => {
 		it("calls @vercel/queue's send with the topic and event payload when STATS_CACHE_REFRESH_DISPATCH_MODE=queue", async () => {
 			process.env.STATS_CACHE_REFRESH_DISPATCH_MODE = 'queue';
 			const { dispatchStatsCacheRefreshEvent } =
-				await import('../dispatch-stats-cache-refresh-event');
+				await import('../stats-cache-events');
 			const { processStatsCacheRefreshWindowJob } =
 				await import('../../../../app/api/queues/stats-cache-refresh-window/route');
 			const { send } = await import('@vercel/queue');
@@ -75,7 +75,7 @@ describe('dispatchStatsCacheRefreshEvent', () => {
 		it('defaults to queue when VERCEL is set and STATS_CACHE_REFRESH_DISPATCH_MODE is unset', async () => {
 			process.env.VERCEL = '1';
 			const { dispatchStatsCacheRefreshEvent } =
-				await import('../dispatch-stats-cache-refresh-event');
+				await import('../stats-cache-events');
 			const { processStatsCacheRefreshWindowJob } =
 				await import('../../../../app/api/queues/stats-cache-refresh-window/route');
 			const { send } = await import('@vercel/queue');

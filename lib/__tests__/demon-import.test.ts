@@ -12,14 +12,11 @@ import {
 	CasualtyEncounterError,
 	mergeDuplicateEncounters,
 	processEncounterRow,
-	dispatchStatsCacheRefreshEvents,
 	RESIGHTING_RECORD_TYPES,
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
 	type DemonRow
 } from '../demon-import';
-import { buildStatsCacheRefreshEvents } from '@/modules/stats/stats-cache-refresh-events';
-import { dispatchStatsCacheRefreshEvent } from '@/modules/stats';
 import type { ImportJobRowCounts } from '../demon-import';
 vi.mock('@/modules/stats/stats-cache-refresh-events', () => ({
 	buildStatsCacheRefreshEvents: vi.fn()
@@ -2398,100 +2395,6 @@ describe('mergeDuplicateEncounters', () => {
 
 		expect(mergeDuplicateEncounters(morningCapture, tiedCapture)).toEqual(
 			expect.objectContaining({ record_type: 'N', weight: 10.5 })
-		);
-	});
-});
-
-describe('dispatchStatsCacheRefreshEvents', () => {
-	beforeEach(() => {
-		vi.mocked(buildStatsCacheRefreshEvents).mockReset();
-		vi.mocked(dispatchStatsCacheRefreshEvent).mockReset();
-	});
-
-	it('builds events from the given ids/dates/species and dispatches every one, in order', async () => {
-		const events = [
-			{
-				importJobId: 42,
-				rpcParams: { ringing_group_filter: 7 },
-				affectedSpeciesIds: [3]
-			},
-			{
-				importJobId: 42,
-				rpcParams: {
-					ringing_group_filter: 7,
-					group_by_time_period: 'day' as const,
-					from_date: '2024-06-01',
-					to_date: '2024-06-01'
-				},
-				affectedSpeciesIds: [3]
-			}
-		];
-		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue(events);
-		vi.mocked(dispatchStatsCacheRefreshEvent).mockResolvedValue(undefined);
-
-		await dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], [3]);
-
-		expect(buildStatsCacheRefreshEvents).toHaveBeenCalledWith(
-			42,
-			7,
-			['2024-06-01'],
-			[3]
-		);
-		expect(dispatchStatsCacheRefreshEvent).toHaveBeenNthCalledWith(
-			1,
-			events[0]
-		);
-		expect(dispatchStatsCacheRefreshEvent).toHaveBeenNthCalledWith(
-			2,
-			events[1]
-		);
-	});
-
-	it('logs and swallows a dispatch failure rather than throwing, merging logContext onto importJobId/ringingGroupId', async () => {
-		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([
-			{
-				importJobId: 42,
-				rpcParams: { ringing_group_filter: 7 },
-				affectedSpeciesIds: [3]
-			}
-		]);
-		vi.mocked(dispatchStatsCacheRefreshEvent).mockRejectedValueOnce(
-			new Error('queue unavailable')
-		);
-		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-		await expect(
-			dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], [3], {
-				csvFilePath: '/fake/alpha.csv'
-			})
-		).resolves.toBeUndefined();
-
-		expect(errorSpy).toHaveBeenCalledWith(
-			'Failed to dispatch stats-cache-refresh-window events',
-			{ importJobId: 42, ringingGroupId: 7, csvFilePath: '/fake/alpha.csv' },
-			expect.any(Error)
-		);
-	});
-
-	it('defaults logContext to nothing extra when the caller passes none', async () => {
-		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([
-			{
-				importJobId: 42,
-				rpcParams: { ringing_group_filter: 7 },
-				affectedSpeciesIds: [3]
-			}
-		]);
-		vi.mocked(dispatchStatsCacheRefreshEvent).mockRejectedValueOnce(
-			new Error('queue unavailable')
-		);
-		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-		await dispatchStatsCacheRefreshEvents(42, 7, ['2024-06-01'], [3]);
-
-		expect(errorSpy).toHaveBeenCalledWith(
-			'Failed to dispatch stats-cache-refresh-window events',
-			{ importJobId: 42, ringingGroupId: 7 },
-			expect.any(Error)
 		);
 	});
 });

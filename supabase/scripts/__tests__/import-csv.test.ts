@@ -7,9 +7,9 @@ import {
 	CasualtyEncounterError,
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames,
-	processEncounterRow,
-	dispatchStatsCacheRefreshEvents
+	processEncounterRow
 } from '../../../lib/demon-import';
+import { dispatchStatsCacheRefreshEvents } from '@/modules/stats';
 import {
 	createRowLimiter,
 	DEFAULT_IMPORT_CONCURRENCY,

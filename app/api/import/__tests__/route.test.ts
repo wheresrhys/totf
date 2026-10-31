@@ -20,12 +20,9 @@ vi.mock('@/lib/demon-import', async (importOriginal) => {
 	};
 });
 
-vi.mock('@/modules/stats/stats-cache-refresh-events', () => ({
-	buildStatsCacheRefreshEvents: vi.fn()
-}));
-
 vi.mock('@/modules/stats', () => ({
-	dispatchStatsCacheRefreshEvent: vi.fn()
+	dispatchStatsCacheRefreshEvents: vi.fn(),
+	buildStatsCacheRefreshEvents: vi.fn()
 }));
 
 const IMPORT_JOB_ID = 42;
@@ -146,12 +143,12 @@ describe('POST /api/import', () => {
 		// No stats-cache-refresh events by default — tests in the dedicated
 		// describe block below override this.
 		const { buildStatsCacheRefreshEvents } =
-			await import('@/modules/stats/stats-cache-refresh-events');
+			await import('@/modules/stats/lib/stats-cache-events');
 		vi.mocked(buildStatsCacheRefreshEvents).mockClear();
 		vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([]);
-		const { dispatchStatsCacheRefreshEvent } = await import('@/modules/stats');
-		vi.mocked(dispatchStatsCacheRefreshEvent).mockClear();
-		vi.mocked(dispatchStatsCacheRefreshEvent).mockResolvedValue(undefined);
+		const { dispatchStatsCacheRefreshEvents } = await import('@/modules/stats');
+		vi.mocked(dispatchStatsCacheRefreshEvents).mockClear();
+		vi.mocked(dispatchStatsCacheRefreshEvents).mockResolvedValue(undefined);
 	});
 
 	describe('authentication', () => {
@@ -556,8 +553,8 @@ describe('POST /api/import', () => {
 	describe('stats-cache-refresh-window dispatch', () => {
 		it("dispatches one event per distinct time window derived from the run's affected dates, after the job is marked succeeded", async () => {
 			const { buildStatsCacheRefreshEvents } =
-				await import('@/modules/stats/stats-cache-refresh-events');
-			const { dispatchStatsCacheRefreshEvent } =
+				await import('@/modules/stats/lib/stats-cache-events');
+			const { dispatchStatsCacheRefreshEvents } =
 				await import('@/modules/stats');
 			const fakeEvents = [
 				{
@@ -588,12 +585,12 @@ describe('POST /api/import', () => {
 				STAGED_DATES,
 				TOUCHED_SPECIES_IDS
 			);
-			expect(dispatchStatsCacheRefreshEvent).toHaveBeenCalledTimes(2);
-			expect(dispatchStatsCacheRefreshEvent).toHaveBeenNthCalledWith(
+			expect(dispatchStatsCacheRefreshEvents).toHaveBeenCalledTimes(1);
+			expect(dispatchStatsCacheRefreshEvents).toHaveBeenCalledWith(
 				1,
 				fakeEvents[0]
 			);
-			expect(dispatchStatsCacheRefreshEvent).toHaveBeenNthCalledWith(
+			expect(dispatchStatsCacheRefreshEvents).toHaveBeenNthCalledWith(
 				2,
 				fakeEvents[1]
 			);
@@ -601,7 +598,7 @@ describe('POST /api/import', () => {
 			// Ordering: dispatch happens only after the job is marked succeeded.
 			const completeOrder =
 				mockImportJobTracker.completeImportJob.mock.invocationCallOrder[0];
-			const dispatchOrder = vi.mocked(dispatchStatsCacheRefreshEvent).mock
+			const dispatchOrder = vi.mocked(dispatchStatsCacheRefreshEvents).mock
 				.invocationCallOrder[0];
 			expect(dispatchOrder).toBeGreaterThan(completeOrder);
 		});
@@ -609,7 +606,7 @@ describe('POST /api/import', () => {
 		it('does not dispatch any events when the run times out', async () => {
 			const { EncounterRowBatchWriter, processEncounterRow } =
 				await import('@/lib/demon-import');
-			const { dispatchStatsCacheRefreshEvent } =
+			const { dispatchStatsCacheRefreshEvents } =
 				await import('@/modules/stats');
 
 			// Captured so the test can trigger the real (unmocked)
@@ -651,12 +648,12 @@ describe('POST /api/import', () => {
 			vi.useRealTimers();
 
 			expect(messages.some((m) => m.type === 'timeout')).toBe(true);
-			expect(dispatchStatsCacheRefreshEvent).not.toHaveBeenCalled();
+			expect(dispatchStatsCacheRefreshEvents).not.toHaveBeenCalled();
 		});
 
 		it('does not dispatch any events when the run fails before completion', async () => {
 			const { EncounterRowBatchWriter } = await import('@/lib/demon-import');
-			const { dispatchStatsCacheRefreshEvent } =
+			const { dispatchStatsCacheRefreshEvents } =
 				await import('@/modules/stats');
 			vi.mocked(EncounterRowBatchWriter).mockImplementation(function () {
 				throw new Error('could not build writers');
@@ -671,14 +668,14 @@ describe('POST /api/import', () => {
 				type: 'error',
 				message: 'could not build writers'
 			});
-			expect(dispatchStatsCacheRefreshEvent).not.toHaveBeenCalled();
+			expect(dispatchStatsCacheRefreshEvents).not.toHaveBeenCalled();
 		});
 
 		it('logs and swallows a dispatch failure rather than turning the response into an error message', async () => {
 			const { processEncounterRow } = await import('@/lib/demon-import');
 			const { buildStatsCacheRefreshEvents } =
-				await import('@/modules/stats/stats-cache-refresh-events');
-			const { dispatchStatsCacheRefreshEvent } =
+				await import('@/modules/stats/lib/stats-cache-events');
+			const { dispatchStatsCacheRefreshEvents } =
 				await import('@/modules/stats');
 			vi.mocked(processEncounterRow).mockResolvedValue({
 				visitDate: '2024-06-01'
@@ -689,7 +686,7 @@ describe('POST /api/import', () => {
 				affectedSpeciesIds: TOUCHED_SPECIES_IDS
 			};
 			vi.mocked(buildStatsCacheRefreshEvents).mockReturnValue([fakeEvent]);
-			vi.mocked(dispatchStatsCacheRefreshEvent).mockRejectedValueOnce(
+			vi.mocked(dispatchStatsCacheRefreshEvents).mockRejectedValueOnce(
 				new Error('queue unavailable')
 			);
 			const consoleErrorSpy = vi
