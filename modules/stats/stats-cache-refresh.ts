@@ -8,6 +8,11 @@ import type { Database } from '@/types/supabase.types';
 // `import type` only, erased before either runtime sees it, so it isn't
 // subject to the same constraint.
 import { catchSupabaseErrors } from '@/lib/supabase';
+import type { TemporalUnit, RefreshSimpleStatsCacheParams } from './types';
+// Re-exported from this file's old location too, for now — PR2 repoints every
+// external `@/modules/stats/stats-cache-refresh` import onto the module
+// barrel, which is when this re-export comes out again.
+export type { TemporalUnit, RefreshSimpleStatsCacheParams } from './types';
 
 /**
  * Populates `SimpleStatsCache` (#1144, retrofitted by #1162), the
@@ -36,61 +41,6 @@ import { catchSupabaseErrors } from '@/lib/supabase';
  * only refreshes one temporal unit per call, it does not loop over temporal
  * units itself.
  */
-
-/**
- * Matches `SimpleStatsCache.temporal_unit`'s CHECK constraint — same name and
- * value set as `supabase/__tests__/stats-cache-fixtures.ts`'s own
- * `TemporalUnit` (duplicated rather than imported: `lib/` doesn't reach into
- * `supabase/__tests__/`, a different zone's test-only fixtures).
- */
-export type TemporalUnit =
-	| 'day'
-	| 'month'
-	| 'year'
-	| 'month-squashed'
-	| 'all-time';
-
-/**
- * The species ids a refresh pass should narrow its species-grouped *write* to
- * — never its read: every metric RPC call is still made exactly as it is
- * without this field, over every species. When provided, only the
- * species-grouped write (`SimpleStatsCacheBySpecies`) skips rewriting a cell
- * whose `species_id` isn't in this list; the all-species-combined write
- * (`SimpleStatsCache`) ignores it entirely, since that row aggregates across
- * every species and must always
- * be rewritten in full whenever its period is in scope. `undefined` means "no
- * species narrowing" — every computed row is written, the pre-existing
- * behaviour. Orthogonal to `periods`/temporal-unit narrowing, and sound for
- * every temporal unit including `all-time`: an untouched species' cell for a
- * period in scope is unchanged by this import, so skipping its write
- * reproduces whatever is already cached for it.
- */
-export type RefreshSpeciesNarrowing = {
-	speciesIds?: number[];
-};
-
-export type RefreshSimpleStatsCacheParams = RefreshSpeciesNarrowing & {
-	groupId: number;
-	temporalUnit: TemporalUnit;
-	/**
-	 * The exact `time_period` values this refresh pass should write, in the
-	 * same string shape the metric RPCs return for that temporal unit.
-	 * Required (non-empty) for the narrowing temporal units — `day`, `month`,
-	 * `year` and, since #1178, `month-squashed` (whose periods are the
-	 * `2000-MM-01` sentinel-year cells its grouping emits). See
-	 * `buildSimpleMetricRpcParamsList`'s early-return for what happens if it's
-	 * empty for one of those. Ignored entirely for `all-time`, which always
-	 * full-replaces the whole group history regardless of what's passed.
-	 */
-	periods?: string[];
-	/**
-	 * The import job this refresh was dispatched for, carried only for
-	 * `runStatsCacheDbCall`'s failure-log context — not read by any refresh
-	 * logic itself. Optional since most callers (every test, the debug
-	 * script) have no import job at all.
-	 */
-	importJobId?: number;
-};
 
 type BasicSessionMetricsRow =
 	Database['public']['CompositeTypes']['stats_cache_basic_session_metrics_result'];
