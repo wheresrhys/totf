@@ -32,7 +32,7 @@ import {
 	type DemonRow
 } from '../../lib/demon-import';
 
-import { dispatchStatsCacheRefreshEvents } from '../../modules/stats';
+import { dispatchStatsCacheRefreshEvents } from '@/modules/stats';
 /**
  * Default max number of rows processed at once. Unchanged from the value this
  * script has always used — callers that don't pass `concurrency` keep the exact

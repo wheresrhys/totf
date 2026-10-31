@@ -9,7 +9,7 @@ import {
 	getDistinctLocationNames,
 	processEncounterRow
 } from '../../../lib/demon-import';
-import { dispatchStatsCacheRefreshEvents } from '../../../modules/stats';
+import { dispatchStatsCacheRefreshEvents } from '@/modules/stats';
 import {
 	createRowLimiter,
 	DEFAULT_IMPORT_CONCURRENCY,
@@ -109,7 +109,7 @@ vi.mock('../../../lib/demon-import', () => ({
 	findUnrecognisedLocationNames: vi.fn(async () => [] as string[])
 }));
 
-vi.mock('../../../modules/stats', () => ({
+vi.mock('@/modules/stats', () => ({
 	dispatchStatsCacheRefreshEvents: vi.fn(async () => {})
 }));
 

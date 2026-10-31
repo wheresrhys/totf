@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { StatsCacheRefreshEvent } from '../../../../../modules/stats/types';
+import type { StatsCacheRefreshEvent } from '@/modules/stats';
 
 // Named with a `Mock` suffix so the `ImportJobTracker` stand-in below can carry
 // a field of the real method's name without shadowing it in its own initializer.

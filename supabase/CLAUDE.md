@@ -5,6 +5,22 @@ See the root [`CLAUDE.md`](../CLAUDE.md) for app overview, tech stack, and cross
 (`lib/supabase.ts`, `lib/demon-import.ts`); see [`app/CLAUDE.md`](../app/CLAUDE.md) and
 [`.claude/CLAUDE.md`](../.claude/CLAUDE.md) for the other two zones.
 
+## `@/` aliases under this zone
+
+`supabase/tsconfig.json` exists solely so `vite-tsconfig-paths` (which `vitest.config.ts` uses)
+discovers `@/*` path-alias resolution for files under `supabase/` — `vite-tsconfig-paths` gates
+alias resolution on the *importing* file matching some discovered tsconfig's own `include` globs,
+and the root `tsconfig.json`'s `include` deliberately does **not** cover `supabase/` (bringing it
+in surfaces ~90 pre-existing type errors across `supabase/__tests__/` that nothing currently
+checks). This file is never passed to `tsc` — `npm run type:check` only ever runs the root
+config plus `.claude/mcp/swarm-tools/tsconfig.json` — so adding it changes zero typecheck
+behaviour, it only makes `@/modules/stats`-style imports resolve when a `supabase/scripts/**` or
+`supabase/__tests__/**` file is loaded through vitest. `tsx` (the CLI import scripts' actual
+runtime) already resolves `@/*` from anywhere regardless of either tsconfig's `include` — this
+file fixes test-time resolution only. Don't delete it as "unused" and don't fold `supabase/**/*.ts`
+into the root `tsconfig.json`'s `include` to "simplify" this — that reintroduces the ~90-error
+blast radius.
+
 ## Database schema
 
 Tables (PascalCase in Postgres, matching generated TypeScript types in `types/supabase.types.ts`):
