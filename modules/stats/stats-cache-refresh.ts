@@ -9,10 +9,6 @@ import type { Database } from '@/types/supabase.types';
 // subject to the same constraint.
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { TemporalUnit, RefreshSimpleStatsCacheParams } from './types';
-// Re-exported from this file's old location too, for now — PR2 repoints every
-// external `@/modules/stats/stats-cache-refresh` import onto the module
-// barrel, which is when this re-export comes out again.
-export type { TemporalUnit, RefreshSimpleStatsCacheParams } from './types';
 
 /**
  * Populates `SimpleStatsCache` (#1144, retrofitted by #1162), the

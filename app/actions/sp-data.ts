@@ -19,7 +19,7 @@ import {
 	type ArrivalsStatsResult
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
-import type { TemporalUnit } from '@/modules/stats/stats-cache-refresh';
+import type { TemporalUnit } from '@/modules/stats/browser';
 import { buildPageOfBirdsSelect } from '@/queries';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 

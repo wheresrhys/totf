@@ -9,7 +9,7 @@ import {
 	type ViewedGroup
 } from '../group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
-import type { TemporalUnit } from '@/modules/stats/stats-cache-refresh';
+import type { TemporalUnit } from '@/modules/stats/browser';
 
 /**
  * Every `SimpleStatsCache.temporal_unit` value that names a repeating period,

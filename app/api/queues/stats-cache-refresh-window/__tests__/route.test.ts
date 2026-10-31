@@ -20,7 +20,8 @@ vi.mock('../../../../../lib/demon-import', () => ({
 	}
 }));
 
-vi.mock('../../../../../modules/stats/stats-cache-refresh', () => ({
+vi.mock('../../../../../modules/stats', async (importOriginal) => ({
+	...(await importOriginal()),
 	refreshSimpleStatsCache: (...args: unknown[]) =>
 		refreshSimpleStatsCache(...args)
 }));
