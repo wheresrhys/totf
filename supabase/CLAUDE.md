@@ -522,7 +522,8 @@ Snapshot fixture data lives in `test-fixtures/snapshots/` and is consumed by app
 etc.) as mock return values, rather than inventing data inline. Fixtures are organised **by data
 source, not by the action function that consumes them** (#882): one subdirectory per Postgres RPC
 (`core_stats/`, `demographics_stats/`, `find_discrepencies/`,
-`notable_retraps/`, `ring_sequence_controls/`), or `tables/<TableName>/` for a fixture produced by
+`notable_retraps/`, `ring_sequence_controls/`, `stats_cache_biometrics_metrics/`), or
+`tables/<TableName>/` for a fixture produced by
 a direct PostgREST table query rather than an RPC call. This matters because an action can drift
 from the RPC/table it actually calls (#870: `getSpeciesStatsHistory.alpha.robin.json` was named
 after the `getSpeciesStatsHistory` action but generated from a raw `core_stats` call) — naming by
@@ -548,7 +549,11 @@ outright — every app call site now reads the already-materialized cache tables
 `BiometricsStatsResult` became an app-owned TypeScript type rather than a view over a Postgres
 composite (#1245), so no database source was left to regenerate or check them against. Those rows
 moved verbatim into `app/__tests__/helpers/biometrics-stats-fixtures.ts`; the data-layer coverage of
-those 8 columns is now `stats_cache_biometrics_metrics`' own DB integration test.
+those 8 columns is now `stats_cache_biometrics_metrics`' own DB integration test. #1272 reinstates a
+generated database source for the same 8 columns under `stats_cache_biometrics_metrics/` (keyed on
+`species_id`, no `encounter_count`) — purely additive, so `biometrics-stats-fixtures.ts` is still
+what app tests build those columns from until a separate, dependent ticket rewires it onto the new
+fixtures.
 
 **No compound fixtures: one fixture is the raw, unmodified return of exactly one RPC call or one
 table query.** Never merge two sources into one file, and never post-process a result before
@@ -564,7 +569,7 @@ itself, now over `core_stats/alpha.by-species.json` plus rows from
 `app/__tests__/helpers/biometrics-stats-fixtures.ts` (#1246 — the biometrics side is no longer a
 generated fixture, since the RPC that produced it is gone).
 
-**Fixture drift is caught by a pre-push, diff-gated check — but only for the 24 generated
+**Fixture drift is caught by a pre-push, diff-gated check — but only for the 27 generated
 fixtures.** Nothing in the type system notices when an RPC's return shape changes underneath a
 fixture consumed via a double assertion (see `app/CLAUDE.md`'s fixture-casting guidance) or via a
 JSON import generally, since an imported JSON module is not a fresh object literal so even a
