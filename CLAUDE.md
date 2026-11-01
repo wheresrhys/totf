@@ -151,7 +151,20 @@ example of every point below. A well-formed module:
   with some exports that must never reach a Client Component bundle (because they pull in a
   server-only dependency) splits this into two barrels instead — a client-safe `browser.ts` plus an
   `index.ts` that re-exports `browser.ts` and adds the server-only surface — rather than one barrel
-  callers have to import selectively from.
+  callers have to import selectively from. Every caller reachable from a Client Component then has
+  to spell out the `@/modules/<name>/browser` specifier, and **a `modules/<name>/package.json`
+  `exports` conditional map cannot take that burden off them.** #1257 spiked exactly that — one
+  `@/modules/<name>` specifier everywhere, a `browser` condition routing to `browser.ts` and
+  `default` to `index.ts` — and both resolvers ignore the field outright for a local,
+  non-`node_modules` directory reached through the `@/*` tsconfig path alias. TypeScript 5.9 under
+  `moduleResolution: "bundler"` treats the directory as a plain file/folder load, reading only
+  `typings`/`types`/`main` off the `package.json` before falling back to `index.ts`; `exports`
+  never appears in its `--traceResolution` output, even with `customConditions: ["browser"]` in
+  the active condition set. Turbopack behaves the same way — with `exports` mapping `.`
+  *unconditionally* to `./browser.ts`, `next build --turbopack` still resolved `index.ts` in the
+  Client Component Browser layer and reproduced the original `Module not found` failure. So it is
+  not a matter of picking a different condition name: the map has no effect at all, and the
+  explicit `/browser` specifiers stay.
 - Keeps its implementation in a `lib/` subdirectory. A module with enough files that some of them
   sensibly group together may use several appropriately-named subdirectories under `lib/` instead
   of one flat directory.
