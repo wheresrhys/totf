@@ -549,11 +549,14 @@ outright — every app call site now reads the already-materialized cache tables
 `BiometricsStatsResult` became an app-owned TypeScript type rather than a view over a Postgres
 composite (#1245), so no database source was left to regenerate or check them against. Those rows
 moved verbatim into `app/__tests__/helpers/biometrics-stats-fixtures.ts`; the data-layer coverage of
-those 8 columns is now `stats_cache_biometrics_metrics`' own DB integration test. #1272 reinstates a
+those 8 columns is now `stats_cache_biometrics_metrics`' own DB integration test. #1272 reinstated a
 generated database source for the same 8 columns under `stats_cache_biometrics_metrics/` (keyed on
-`species_id`, no `encounter_count`) — purely additive, so `biometrics-stats-fixtures.ts` is still
-what app tests build those columns from until a separate, dependent ticket rewires it onto the new
-fixtures.
+`species_id`, no `encounter_count`), and #1273 rewired `biometrics-stats-fixtures.ts` onto it: its
+three exported constants are now built by mapping those snapshots through a static
+`species_id`→`species_name` join against `tables/Species/alpha.top-species.json` — the same join
+`app/actions/spp-data.ts`'s `readBiometricsFromMetricsRpc`/`readSpeciesNamesById` do live — with
+`encounter_count` set `null` exactly as production does. So those rows drift with the database again;
+don't reintroduce a hand-written literal for them.
 
 **No compound fixtures: one fixture is the raw, unmodified return of exactly one RPC call or one
 table query.** Never merge two sources into one file, and never post-process a result before
@@ -566,8 +569,8 @@ helper the production read path uses: build a `CoreStatsWithBiometrics` row with
 fixtures (#821/#823), rather than reading wing/weight columns off a `core_stats` fixture —
 `core_stats` stopped carrying its own copies at #827. `SppStatsTable`'s test still does that merge
 itself, now over `core_stats/alpha.by-species.json` plus rows from
-`app/__tests__/helpers/biometrics-stats-fixtures.ts` (#1246 — the biometrics side is no longer a
-generated fixture, since the RPC that produced it is gone).
+`app/__tests__/helpers/biometrics-stats-fixtures.ts`, which since #1273 is itself derived from the
+generated `stats_cache_biometrics_metrics/` snapshots via that same rule's species_id→name join.
 
 **Fixture drift is caught by a pre-push, diff-gated check — but only for the 27 generated
 fixtures.** Nothing in the type system notices when an RPC's return shape changes underneath a
