@@ -38,6 +38,19 @@ browser bundle. Server-only call sites (`app/api/import/route.ts`,
 `supabase/scripts/import-csv.ts`, the stats-cache-refresh-window queue route) import the full
 `@/modules/stats` barrel.
 
+**Don't try to replace that explicit-specifier rule with a `modules/stats/package.json` `exports`
+conditional map.** #1257 spiked exactly that — one `@/modules/stats` specifier everywhere, a
+`browser` condition routing to `browser.ts` and `default` to `index.ts` — and both resolvers ignore
+the field outright for a local, non-`node_modules` directory reached through the `@/*` tsconfig
+path alias. TypeScript 5.9 under `moduleResolution: "bundler"` treats the directory as a plain
+file/folder load, reading only `typings`/`types`/`main` off the `package.json` before falling back
+to `index.ts`; `exports` never appears in its `--traceResolution` output, even with
+`customConditions: ["browser"]` in the active condition set. Turbopack behaves the same way — with
+`exports` mapping `.` *unconditionally* to `./browser.ts`, `next build --turbopack` still resolved
+`modules/stats/index.ts` in the Client Component Browser layer and reproduced the original
+`Module not found` failure. So it is not a matter of picking a different condition name: the map
+has no effect at all, and the two explicit `/browser` specifiers stay.
+
 ## Directory map
 
 ```
