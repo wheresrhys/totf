@@ -16,7 +16,7 @@ CREATE TABLE public."SimpleStatsCacheBySpecies" (
 		'public."SimpleStatsCacheBySpecies_id_seq"'::regclass
 	) NOT NULL,
 	group_id bigint NOT NULL,
-	temporal_unit text NOT NULL,
+	temporal_unit public.temporal_unit NOT NULL,
 	-- NOT NULL, with '0001-01-01' as the sentinel for the all-time grain, so one
 	-- plain UNIQUE constraint covers every grain — see "SimpleStatsCache".sql.
 	time_period date NOT NULL,
@@ -150,17 +150,6 @@ ALTER TABLE public."SimpleStatsCacheBySpecies" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public."SimpleStatsCacheBySpecies"
 ADD CONSTRAINT "SimpleStatsCacheBySpecies_pkey" PRIMARY KEY (id);
-
-ALTER TABLE public."SimpleStatsCacheBySpecies"
-ADD CONSTRAINT simple_stats_cache_by_species_temporal_unit_check CHECK (
-	temporal_unit IN (
-		'day',
-		'month',
-		'year',
-		'month-squashed',
-		'all-time'
-	)
-);
 
 -- The one and only uniqueness rule for this table, and the conflict target the
 -- write path names verbatim in its .upsert() — keep the two in sync by hand.
