@@ -390,6 +390,15 @@ export async function fetchAuthorisedCoreStats(
 
 	const publicAreas = await resolveGroupPublicAreasForRequest(viewedGroup.id);
 	if (publicAreas.includes('summary')) {
+		// An arbitrary (non-cache-aligned) window has no cache-table read to
+		// serve it, and the UI has already stopped offering a way to request
+		// one for a public/blocked viewer (#1232) — rather than falling
+		// through to the live `public_core_stats` RPC, mirror the 'blocked'
+		// branch's "no rows, no throw" convention. `core_stats` (the
+		// 'own'/'shared' arbitrary-window fallback below) is unaffected.
+		if (!cacheQueryPlan) {
+			return { accessLevel: 'public', rows: [] };
+		}
 		return { accessLevel: 'public', rows: await readStats(supabase, true) };
 	}
 
