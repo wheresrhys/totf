@@ -3,7 +3,7 @@ import { endOfMonth, endOfYear, format, parseISO } from 'date-fns';
 import { getAuthenticatedSupabaseClient } from './group-auth';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
-import { readStatsCacheRows, type TemporalUnit } from '@/modules/stats';
+import { readStatsCacheRows, type StatsTemporalUnit } from '@/modules/stats';
 import {
 	resolveGroupPublicAreasForRequest,
 	type ViewedGroup
@@ -16,7 +16,7 @@ import type { CoreStatsResult } from '@/app/models/db';
  * `'all-time'`, which is the *absence* of time-period grouping rather than a
  * grouping the caller can ask for.
  */
-type StatsCacheTemporalGrain = Exclude<TemporalUnit, 'all-time'>;
+type StatsCacheTemporalGrain = Exclude<StatsTemporalUnit, 'all-time'>;
 
 // Shared param shape for the summary read path. Still named after
 // `core_stats`/`public_core_stats`, whose params these are: those two RPCs
@@ -62,7 +62,7 @@ const MONTH_SQUASHED_SENTINEL_YEAR = 2000;
  * returned them.
  */
 export type StatsCacheQueryPlan = {
-	temporalUnit: TemporalUnit;
+	temporalUnit: StatsTemporalUnit;
 	/** Exactly one cell — an aggregate window that *is* a single cache cell. */
 	timePeriod?: string;
 	fromTimePeriod?: string;

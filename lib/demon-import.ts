@@ -7,7 +7,7 @@ import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
 // resolution is scoped to tsconfig.json's `include`, which `lib/` sits outside
 // of. The two `@/`-aliased imports above are `import type` only, erased before
 // either runtime sees them, so they aren't subject to the same constraint.
-import type { TemporalUnit } from '@/modules/stats';
+import type { StatsTemporalUnit } from '@/modules/stats';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Omit<
@@ -330,7 +330,8 @@ export type ImportJobRowCounts = {
 
 /**
  * Which temporal unit's stats-cache refresh an outcome is being recorded for
- * (#1154). Deliberately `modules/stats/stats-cache-refresh.ts`'s own `TemporalUnit`
+ * (#1154). Deliberately `@/modules/stats`'s `StatsTemporalUnit` (itself the
+ * canonical `app/models/temporal-unit.ts` type, DB-enum-backed)
  * rather than a fourth copy of the same five-value union: the column an
  * outcome lands on and the temporal unit `refreshSimpleStatsCache` was called
  * with are the same axis by construction, so they must not be able to drift
@@ -343,7 +344,7 @@ export type ImportJobRowCounts = {
  * removed entirely), refreshed one temporal unit per call, so a temporal unit
  * is now the finest granularity at which a refresh can succeed or fail.
  */
-export type StatsCacheTemporalUnit = TemporalUnit;
+export type StatsCacheTemporalUnit = StatsTemporalUnit;
 
 /**
  * The outcome a stats-cache refresh can actually be recorded as. The columns are
