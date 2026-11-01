@@ -180,7 +180,7 @@ This split is far from perfect and suggestions to improve the comprehensiveness 
 
 - ./lib is for any library files used by both scripts and the core next.js app
 - ./app/lib is for any libarry files used only by the next.js app. Where appropriate they should be grouped into subdirectories
-- ./app/models should be mainly for data structures, with only very minimal functionlaity for transforming/massaging data into related data structures. Anything more complex should live in ./app/lib.
+- ./app/models should be mainly for data structures, with only very minimal functionlaity for transforming/massaging data into related data structures. Anything more complex should live in ./app/lib. `app/models/temporal-unit.ts` is the canonical TemporalUnit vocabulary — derive new temporal-unit-related types from it rather than redefining the concept elsewhere.
 
 ## Caveman
 Use the caveman skill judiciously:

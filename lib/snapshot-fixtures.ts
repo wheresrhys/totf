@@ -38,7 +38,7 @@
  */
 
 /**
- * The 24 fixtures `supabase/scripts/generate-snapshots.ts` produces, and therefore the
+ * The 27 fixtures `supabase/scripts/generate-snapshots.ts` produces, and therefore the
  * exact set the freshness check covers. Paths are relative to
  * `test-fixtures/snapshots/` and follow #882's source-directory layout (one
  * subdirectory per RPC, `tables/<TableName>/` for direct PostgREST reads).
@@ -74,6 +74,13 @@
  * `tables/Birds/arretrap.bird-detail.json` became `tables/Birds/arretrap.bird.json` /
  * `tables/Encounters/arretrap.encounters.json` — see CLAUDE.md's "App tests" section
  * for why every fixture is now a verbatim single-source response.
+ *
+ * #1272 reinstates auto-generated biometrics fixtures (#1250) under their own
+ * `stats_cache_biometrics_metrics/` subdirectory, now that that RPC exists as
+ * the #1246-deleted `biometrics_stats`' replacement — keyed on `species_id`
+ * rather than `species_name`, with no `encounter_count` column. Purely
+ * additive: nothing reads these three yet, that's a separate, dependent
+ * ticket.
  */
 export const GENERATED_SNAPSHOT_FIXTURES = [
 	'core_stats/alpha.by-species.json',
@@ -91,6 +98,9 @@ export const GENERATED_SNAPSHOT_FIXTURES = [
 	'notable_retraps/alpha.retraps.json',
 	'notable_retraps/robin-alpha.retraps.json',
 	'ring_sequence_controls/alpha.controls.json',
+	'stats_cache_biometrics_metrics/alpha.by-species.json',
+	'stats_cache_biometrics_metrics/gamma.by-species.json',
+	'stats_cache_biometrics_metrics/robin-alpha.headline.json',
 	'tables/Birds/arretrap.bird.json',
 	'tables/Birds/robin-alpha.page-of-birds.json',
 	'tables/Encounters/alpha.pulli-encounters.json',

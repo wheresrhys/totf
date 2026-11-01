@@ -11,11 +11,12 @@
  * fixture per source and let the consuming test perform the same join the
  * action does, with the same helper.
  *
- * Reads Alpha/Beta/Gamma group data and writes 24 JSON files under
+ * Reads Alpha/Beta/Gamma group data and writes 27 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
  * the RPC name for RPC-backed fixtures (`core_stats/`,
  * `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
- * `ring_sequence_controls/`) and `tables/<TableName>/`
+ * `ring_sequence_controls/`, `stats_cache_biometrics_metrics/`) and
+ * `tables/<TableName>/`
  * for fixtures produced by a direct PostgREST table query. The comment above
  * each block below names both the RPC/table and the consuming action(s) — keep
  * this in sync when a call site's underlying RPC/table changes, so a fixture's
@@ -102,6 +103,27 @@ export async function generateSnapshots(
 			group_by_species: true
 		});
 		await writeSnapshot(`core_stats/${name}.by-species.json`, data ?? []);
+	}
+
+	// RPC: stats_cache_biometrics_metrics (group_by_species) — part of
+	// reinstating auto-generated biometrics fixtures (#1250/#1272) now that
+	// #1246 deleted the old biometrics_stats RPC these used to come from.
+	// Nothing reads this fixture yet — rewiring the app-test helper
+	// (app/__tests__/helpers/biometrics-stats-fixtures.ts) to consume it is a
+	// separate, dependent ticket. No Beta entry — the existing hand-rolled
+	// biometrics fixtures never had one.
+	for (const [name, client, gId] of [
+		['alpha', alpha, alphaId],
+		['gamma', gamma, gammaId]
+	] as const) {
+		const { data } = await client.rpc('stats_cache_biometrics_metrics', {
+			ringing_group_filter: gId,
+			group_by_species: true
+		});
+		await writeSnapshot(
+			`stats_cache_biometrics_metrics/${name}.by-species.json`,
+			data ?? []
+		);
 	}
 
 	// RPC: core_stats (ungrouped, no time period, no date range) — powers
@@ -349,10 +371,11 @@ export async function generateSnapshots(
 		// The raw source behind the species/[speciesName] page's headline
 		// stats. It had a `biometrics_stats/robin-alpha.headline.json` sibling
 		// until #1246 deleted that RPC; the page reads the already-merged
-		// `SimpleStatsCacheBySpecies` row now (#1222), so the wing/weight half
-		// no longer has a source of its own to snapshot — the app tests that
-		// need those 8 columns build them with
-		// `app/__tests__/helpers/biometrics-stats-fixtures.ts`. The page's other
+		// `SimpleStatsCacheBySpecies` row now (#1222). The wing/weight half's
+		// source is `stats_cache_biometrics_metrics/robin-alpha.headline.json`
+		// below (#1272) — nothing reads it yet, since rewiring the app-test
+		// helper (`app/__tests__/helpers/biometrics-stats-fixtures.ts`) to
+		// consume it is a separate, dependent ticket. The page's other
 		// inputs need no fixture here: its page of Birds is already
 		// tables/Birds/robin-alpha.page-of-birds.json, speciesId/speciesName are
 		// route-resolved props, not RPC output, and fetchGraphableEncounterData's
@@ -367,6 +390,21 @@ export async function generateSnapshots(
 		await writeSnapshot(
 			`core_stats/robin-alpha.headline.json`,
 			robinStats ?? []
+		);
+
+		// RPC: stats_cache_biometrics_metrics (species-filtered, ungrouped) —
+		// the wing/weight sibling of the headline stats above (#1272); see
+		// that comment for why nothing reads it yet.
+		const { data: robinBiometrics } = await alpha.rpc(
+			'stats_cache_biometrics_metrics',
+			{
+				species_name_filter: 'Robin',
+				ringing_group_filter: alphaId
+			}
+		);
+		await writeSnapshot(
+			`stats_cache_biometrics_metrics/robin-alpha.headline.json`,
+			robinBiometrics ?? []
 		);
 	}
 
