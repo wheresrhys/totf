@@ -12,7 +12,7 @@
  */
 import { supabase } from '../../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
-import { runSimpleStatsCacheRefreshPass } from '../../lib/stats-cache-refresh';
+import { runSimpleStatsCacheRefreshPass } from '@/modules/stats';
 
 const [groupName] = process.argv.slice(2);
 

@@ -12,9 +12,9 @@ import {
 } from '@/lib/demon-import';
 import {
 	refreshSimpleStatsCache,
-	type TemporalUnit
-} from '@/modules/stats/stats-cache-refresh';
-import type { StatsCacheRefreshEvent } from '@/modules/stats';
+	type TemporalUnit,
+	type StatsCacheRefreshEvent
+} from '@/modules/stats';
 import { getAuthenticatedSupabaseClientForGroup } from '@/app/lib/auth/group-auth';
 
 /**
