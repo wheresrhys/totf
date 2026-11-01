@@ -19,10 +19,11 @@ CREATE TABLE public."FailedStatsCacheRefreshes" (
 	) NOT NULL,
 	group_id bigint NOT NULL,
 	-- Which cache table the failed refresh was targeting. Text + CHECK rather
-	-- than a Postgres enum type, matching this schema's existing convention
-	-- (see temporal_unit below and "SimpleStatsCache".sql).
+	-- than a Postgres enum type: unlike temporal_unit below, this value set is
+	-- an internal implementation detail of one writer, not a domain concept
+	-- shared across the schema and the app's own types.
 	cache_table text NOT NULL,
-	temporal_unit text NOT NULL,
+	temporal_unit public.temporal_unit NOT NULL,
 	-- NULL means "all species combined", the same value-not-missing convention
 	-- "SimpleStatsCache".species_id uses.
 	species_id bigint,
@@ -71,19 +72,6 @@ ADD CONSTRAINT "FailedStatsCacheRefreshes_pkey" PRIMARY KEY (id);
 ALTER TABLE public."FailedStatsCacheRefreshes"
 ADD CONSTRAINT failed_stats_cache_refreshes_cache_table_check CHECK (
 	cache_table IN ('SimpleStatsCache', 'SimpleStatsCacheBySpecies')
-);
-
--- Same value set as simple_stats_cache_temporal_unit_check — keep the two in
--- sync by hand if a temporal unit is ever added.
-ALTER TABLE public."FailedStatsCacheRefreshes"
-ADD CONSTRAINT failed_stats_cache_refreshes_temporal_unit_check CHECK (
-	temporal_unit IN (
-		'day',
-		'month',
-		'year',
-		'month-squashed',
-		'all-time'
-	)
 );
 
 ALTER TABLE public."FailedStatsCacheRefreshes"

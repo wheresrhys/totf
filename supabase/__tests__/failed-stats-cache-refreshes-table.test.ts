@@ -149,6 +149,18 @@ describe('FailedStatsCacheRefreshes', () => {
 				});
 			expect(error?.code).toBe('23514'); // check_violation
 		});
+
+		it('rejects an unrecognised temporal_unit value', async () => {
+			const { error } = await ownerClient
+				.from('FailedStatsCacheRefreshes')
+				.insert({
+					...buildFailedRefreshRow({ groupId: ownerGroupId }),
+					temporal_unit: 'fortnight',
+				});
+			// temporal_unit is the public.temporal_unit enum, not text + CHECK, so
+			// an unknown value fails at type coercion rather than at a constraint.
+			expect(error?.code).toBe('22P02'); // invalid_text_representation
+		});
 	});
 
 	describe('row level security', () => {

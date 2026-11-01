@@ -3,8 +3,9 @@
  * "SimpleStatsCache" and "SimpleStatsCacheBySpecies".
  *
  * Both police the same rules (one unique constraint, a NOT NULL
- * time_period with a sentinel for the all-time grain, a temporal_unit CHECK,
- * own-group-only RLS, and no DELETE grant) over different column sets, so the
+ * time_period with a sentinel for the all-time grain, a public.temporal_unit
+ * enum column, own-group-only RLS, and no DELETE grant) over different column
+ * sets, so the
  * assertions are identical per table while the row shape is not — the case
  * CLAUDE.md's `parametrized-test-runner` convention covers. Each caller file
  * invokes this once, and gets its own named describe block in the reporter so
@@ -40,7 +41,11 @@ import {
 /** Postgres/PostgREST error codes these tests assert on by name. */
 const NOT_NULL_VIOLATION = '23502';
 const UNIQUE_VIOLATION = '23505';
-const CHECK_VIOLATION = '23514';
+/** invalid_text_representation — what a value outside public.temporal_unit's
+ * value set fails as, since an enum column rejects it at the type-coercion
+ * stage rather than at a CHECK constraint. Confirmed empirically against the
+ * local database, not inferred. */
+const INVALID_ENUM_VALUE = '22P02';
 const INSUFFICIENT_PRIVILEGE = '42501';
 /** PostgREST's own code for a column absent from the table's schema cache. */
 const UNDEFINED_COLUMN = 'PGRST204';
@@ -224,7 +229,7 @@ export function testStatsCacheTableShape({
 				const { error } = await ownerClient
 					.from(tableName)
 					.insert({ ...ownerRow(), temporal_unit: 'fortnight' });
-				expect(error?.code).toBe(CHECK_VIOLATION);
+				expect(error?.code).toBe(INVALID_ENUM_VALUE);
 			});
 
 			if (hasSpeciesColumn) {

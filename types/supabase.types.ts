@@ -235,7 +235,7 @@ export type Database = {
           id: number
           reason: string
           species_id: number | null
-          temporal_unit: string
+          temporal_unit: Database["public"]["Enums"]["temporal_unit"]
           time_period: string | null
         }
         Insert: {
@@ -246,7 +246,7 @@ export type Database = {
           id?: number
           reason: string
           species_id?: number | null
-          temporal_unit: string
+          temporal_unit: Database["public"]["Enums"]["temporal_unit"]
           time_period?: string | null
         }
         Update: {
@@ -257,7 +257,7 @@ export type Database = {
           id?: number
           reason?: string
           species_id?: number | null
-          temporal_unit?: string
+          temporal_unit?: Database["public"]["Enums"]["temporal_unit"]
           time_period?: string | null
         }
         Relationships: [
@@ -612,7 +612,7 @@ export type Database = {
           pullus_enc_count: number
           session_count: number
           species_count: number
-          temporal_unit: string
+          temporal_unit: Database["public"]["Enums"]["temporal_unit"]
           time_period: string
           total_effort: string
           unknown_age_bird_count: number
@@ -653,7 +653,7 @@ export type Database = {
           pullus_enc_count: number
           session_count: number
           species_count: number
-          temporal_unit: string
+          temporal_unit: Database["public"]["Enums"]["temporal_unit"]
           time_period: string
           total_effort: string
           unknown_age_bird_count: number
@@ -694,7 +694,7 @@ export type Database = {
           pullus_enc_count?: number
           session_count?: number
           species_count?: number
-          temporal_unit?: string
+          temporal_unit?: Database["public"]["Enums"]["temporal_unit"]
           time_period?: string
           total_effort?: string
           unknown_age_bird_count?: number
@@ -747,7 +747,7 @@ export type Database = {
           session_count: number
           species_count: number
           species_id: number
-          temporal_unit: string
+          temporal_unit: Database["public"]["Enums"]["temporal_unit"]
           time_period: string
           total_effort: string
           unknown_age_bird_count: number
@@ -789,7 +789,7 @@ export type Database = {
           session_count: number
           species_count: number
           species_id: number
-          temporal_unit: string
+          temporal_unit: Database["public"]["Enums"]["temporal_unit"]
           time_period: string
           total_effort: string
           unknown_age_bird_count: number
@@ -831,7 +831,7 @@ export type Database = {
           session_count?: number
           species_count?: number
           species_id?: number
-          temporal_unit?: string
+          temporal_unit?: Database["public"]["Enums"]["temporal_unit"]
           time_period?: string
           total_effort?: string
           unknown_age_bird_count?: number
@@ -1275,6 +1275,7 @@ export type Database = {
         | "L+"
         | "MI"
         | "MS"
+      temporal_unit: "day" | "month" | "year" | "month-squashed" | "all-time"
     }
     CompositeTypes: {
       arrivals_stats_result: {
@@ -1528,6 +1529,7 @@ export const Constants = {
         "MI",
         "MS",
       ],
+      temporal_unit: ["day", "month", "year", "month-squashed", "all-time"],
     },
   },
 } as const
