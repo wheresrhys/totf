@@ -67,19 +67,17 @@ Populates `SimpleStatsCache` (#1144, retrofitted by #1162) — write side for th
 "metric-group" RPCs #1145/#1146/#1148/#1149 (`stats_cache_basic_session_metrics`,
 `stats_cache_biometrics_metrics`, `stats_cache_bird_age_metrics`,
 `stats_cache_encounter_age_metrics`). `refreshSimpleStatsCache` merges their per-cell rows in TS,
-then writes them to the cache's `*BySpecies` table with one native `supabase-js` `.upsert()`
-naming that table's single unique constraint as its conflict target (#1169 split the cache into a
-species and a non-species table precisely so there is exactly one such constraint to name — see
-`"SimpleStatsCache".sql`). It also dead-letters any cell it couldn't write to
-`FailedStatsCacheRefreshes` (#1167), tagged with the `cache_table` the refresh was targeting.
+writes them via native `supabase-js` `.upsert()`s (see "Writing" below), and dead-letters any cell
+it couldn't write to `FailedStatsCacheRefreshes` (#1167), tagged with the `cache_table` the refresh
+was targeting.
 
 The queue consumer calling this per dispatched temporal-unit event is
 `app/api/queues/stats-cache-refresh-window/route.ts` (#1155) — `runSimpleStatsCacheRefreshPass`
 only refreshes one temporal unit per call, it does not loop over temporal units itself.
-`refreshSimpleStatsCache` runs that function twice per call, sequentially (not `Promise.all`,
-deliberately — see `run-refresh-pass.ts`'s own doc comment), once for the species-grouped pass
-(writes `SimpleStatsCacheBySpecies`) and once for the non-species-grouped pass (writes the
-all-species-combined `SimpleStatsCache`).
+`refreshSimpleStatsCache` runs that function twice per call — once per `groupBySpecies` value,
+writing `SimpleStatsCacheBySpecies` then the all-species-combined `SimpleStatsCache` — **sequentially,
+not via `Promise.all`**: these RPCs were under active timeout investigation under load, so doubling
+concurrent calls for the same group/temporal-unit wasn't the right default.
 
 There used to be a sibling **lifetime-relative** half, `refreshComplexStatsCache` →
 `ComplexStatsCache`/`ComplexStatsCacheBySpecies` (#1147/#1150/#1151/#1169), whose production write
@@ -91,15 +89,42 @@ functions under a different narrowing rule; that parameter was dead code by the 
 `lib/refresh/` split (nothing but `SIMPLE_NARROWING_TEMPORAL_UNITS` was ever passed), so reinstate
 it rather than assuming it's still there.
 
-**Narrowing**, i.e. only recomputing the periods an import actually touched rather than a group's
-whole history: every temporal unit but `all-time` narrows by `periods`, in two different ways (see
-`rpc-params.ts`'s `buildSimpleMetricRpcParamsList`) — `day` by a `from_date`/`to_date` window,
-batched by real session-date span (`batchPeriodsBySessionDateSpan`) so a sparse touched-period list
-(e.g. a group's very first and very last session ever) can't force one window spanning the entire
-history; `month`/`year`/`month-squashed` by one exact-filtered RPC call per distinct touched period
-(#1176/#1178). Independently, the species-grouped pass also narrows its *write* by `speciesIds` when
-given (`filterToTouchedSpecies`) — see `RefreshSpeciesNarrowing`'s own doc comment in `types.ts` for
-why that's write-only, never a read narrowing.
+**Narrowing** (`rpc-params.ts`), i.e. only recomputing the periods an import actually touched
+rather than a group's whole history: every temporal unit but `all-time` narrows by `periods`, in
+two ways — `day` by a `from_date`/`to_date` window, batched by real session-date span
+(`batchPeriodsBySessionDateSpan`) so a sparse touched-period list (e.g. a group's very first and
+very last session ever) can't force one window spanning the entire history; `month`/`year`/
+`month-squashed` by one exact-filtered RPC call per distinct touched period. `month-squashed`
+narrowing (#1178) required a `stats_spine` fix first (#1177) — before it, an unguarded
+`month_filter` branch always emitted all 12 calendar cells, so 11 spurious zero cells collided
+across the fan-out. Independently, the species-grouped pass also narrows its *write* by
+`speciesIds` when given (`filterToTouchedSpecies`), for every temporal unit including `all-time` —
+write-only, since the all-species write has no `species_id` to filter on.
+
+The day-session preflight (`fetchGroupSessionDates` in `run-refresh-pass.ts`) is fetched fresh per
+pass rather than once and threaded through both `groupBySpecies` calls — twice the queries, traded
+for simpler signatures, since it's one cheap indexed scan.
+
+**Fetching** (`fetch-metric-rows.ts`): each of the 4 metric RPCs is attempted even if an earlier one
+failed, so a timeout investigation can see whether every RPC is slow or just one — any failure still
+blocks the merge/write phase. Within one RPC, `fetchMetricRows` fires every filter-object call via
+`Promise.allSettled` rather than `Promise.all`, so one window failing doesn't stop a sibling window
+(different `day` batch) from also being attempted and logged; the first failure's error is rethrown
+once every call has settled.
+
+**Merging & anomalies** (`merge-metric-rows.ts`): rows are merged by `(species_id, time_period)` key
+across the 4 RPCs, which all share one `stats_spine` call — so a key present in some but not all 4
+is a genuine anomaly (not an expected gap, per #1164's review), dead-lettered and skipped, never
+zero/NULL-filled (every cache metric column but the 8 biometric ones is NOT NULL by design).
+
+**Writing** (`write-cache-rows.ts`): the metric RPCs emit a real NULL `time_period` for the
+all-time grain (merging has to keep that NULL to match cells by key); the write step converts it
+to the `0001-01-01` sentinel date the NOT-NULL cache columns need. Each cache table has its own
+conflict target (`SimpleStatsCacheBySpecies` includes `species_id`, `SimpleStatsCache` doesn't —
+it has no such column), and writes are chunked and issued sequentially, matching
+`demon-import.ts`'s `DemonRecordsBatchWriter` chaining precedent. Dead-lettering happens after the
+cache write (a logging failure must never cost the refresh) and is never narrowed to the touched
+periods — a missing cell is a real anomaly regardless of which period it's in.
 
 ## Testing
 
