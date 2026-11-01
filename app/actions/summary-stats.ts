@@ -2,6 +2,7 @@
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { TemporalUnit } from '@/app/models/temporal-unit';
 
 /**
  * Page-wide (ungrouped) totals for a summary period — no `group_by_species`/
@@ -29,7 +30,7 @@ export async function fetchSummaryStats(
  */
 export async function fetchPeriodStats(
 	viewedGroup: ViewedGroup,
-	timeInterval: 'year' | 'month' | 'day',
+	timeInterval: TemporalUnit,
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
