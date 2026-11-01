@@ -34,9 +34,9 @@ import {
 import { randomTestSuffix, randomFutureDate } from './test-isolation';
 import {
 	ALL_TIME_SENTINEL_DATE,
-	createIsolatedSpecies,
-	type TemporalUnit
+	createIsolatedSpecies
 } from './stats-cache-fixtures';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 
 /** Postgres/PostgREST error codes these tests assert on by name. */
 const NOT_NULL_VIOLATION = '23502';
@@ -53,7 +53,7 @@ const UNDEFINED_COLUMN = 'PGRST204';
 type BuildRowParams = {
 	groupId: number;
 	speciesId: number;
-	temporalUnit?: TemporalUnit;
+	temporalUnit?: StatsTemporalUnit;
 	timePeriod?: string;
 };
 

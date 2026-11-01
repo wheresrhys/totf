@@ -39,6 +39,7 @@ import fs from 'fs/promises';
 import { supabase } from '../../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import { RESIGHTING_RECORD_TYPES } from '../../lib/demon-import';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import {
 	allSessionsQuery,
 	recentSessionsQuery,
@@ -148,7 +149,7 @@ export async function generateSnapshots(
 		const { data: yearly } = await client.rpc('core_stats', {
 			ringing_group_filter: gId,
 			group_by_species: false,
-			group_by_time_period: 'year'
+			group_by_time_period: 'year' satisfies StatsTemporalUnit
 		});
 		await writeSnapshot(`core_stats/${name}.yearly-totals.json`, yearly ?? []);
 	}
@@ -162,7 +163,7 @@ export async function generateSnapshots(
 		const { data: monthly } = await client.rpc('core_stats', {
 			ringing_group_filter: gId,
 			group_by_species: false,
-			group_by_time_period: 'month'
+			group_by_time_period: 'month' satisfies StatsTemporalUnit
 		});
 		await writeSnapshot(
 			`core_stats/${name}.monthly-totals.json`,
@@ -347,7 +348,7 @@ export async function generateSnapshots(
 		const { data: robinDemographics } = await alpha.rpc('demographics_stats', {
 			species_name_filter: 'Robin',
 			ringing_group_filter: alphaId,
-			group_by_time_period: 'month'
+			group_by_time_period: 'month' satisfies StatsTemporalUnit
 		});
 		await writeSnapshot(
 			`demographics_stats/robin-alpha.monthly-history.json`,

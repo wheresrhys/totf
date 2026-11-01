@@ -16,21 +16,13 @@
 
 import { psqlScalar } from './db-test-helpers';
 import { randomFutureDate } from './test-isolation';
-
-export type TemporalUnit =
-	| 'day'
-	| 'month'
-	| 'year'
-	| 'month-squashed'
-	| 'all-time';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 
 /**
  * The `time_period` value every stats-cache table uses for the all-time grain.
  * Duplicated from `modules/stats/stats-cache-refresh.ts`'s own `ALL_TIME_SENTINEL_DATE`
- * rather than imported, the same convention `TemporalUnit` above follows:
- * `lib/` doesn't reach into `supabase/__tests__/`, and a test asserting on the
- * schema's convention shouldn't be satisfied by whatever the writer happens to
- * send.
+ * rather than imported: a test asserting on the schema's convention shouldn't
+ * be satisfied by whatever the writer happens to send.
  */
 export const ALL_TIME_SENTINEL_DATE = '0001-01-01';
 
@@ -103,7 +95,7 @@ type RowParams = {
 	/** Omitted entirely for the all-species-combined tables, which have no
 	 * species_id column at all. */
 	speciesId?: number;
-	temporalUnit?: TemporalUnit;
+	temporalUnit?: StatsTemporalUnit;
 	timePeriod?: string;
 };
 
