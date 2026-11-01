@@ -2,6 +2,7 @@ import type {
   SimpleStatsCacheBySpeciesRow,
   SimpleStatsCacheRow
 } from '@/app/models/db';
+import type { Database } from '@/types/supabase.types';
 export type StatsResult = SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow;
 
 
@@ -132,4 +133,52 @@ export type RefreshSimpleStatsCacheParams = RefreshSpeciesNarrowing & {
    * script) have no import job at all.
    */
   importJobId?: number;
+};
+
+export type BasicSessionMetricsRow =
+  Database['public']['CompositeTypes']['stats_cache_basic_session_metrics_result'];
+export type BiometricsMetricsRow =
+  Database['public']['CompositeTypes']['stats_cache_biometrics_metrics_result'];
+export type BirdAgeMetricsRow =
+  Database['public']['CompositeTypes']['stats_cache_bird_age_metrics_result'];
+export type EncounterAgeMetricsRow =
+  Database['public']['CompositeTypes']['stats_cache_encounter_age_metrics_result'];
+
+/** The (species_id, time_period) key pair a merged refresh cell is matched across RPC results on — see this module's CLAUDE.md for the NULL/sentinel-date nuance. */
+export type MergedCellKey = {
+  species_id: number | null;
+  time_period: string | null;
+};
+
+/** One merged `SimpleStatsCache` cell, pre-write — see this module's CLAUDE.md for the exact column provenance. */
+export type SimpleMergedCell = Omit<
+  Database['public']['Tables']['SimpleStatsCacheBySpecies']['Insert'],
+  'id' | 'group_id' | 'temporal_unit' | keyof MergedCellKey
+> &
+  MergedCellKey;
+
+/** The two `cache_table` values `FailedStatsCacheRefreshes`' CHECK constraint accepts (#1182). */
+export type FailedRefreshCacheTable =
+  | 'SimpleStatsCache'
+  | 'SimpleStatsCacheBySpecies';
+
+/** One dead-letter row for `FailedStatsCacheRefreshes` (#1167). */
+export type FailedRefreshRow = Omit<
+  Database['public']['Tables']['FailedStatsCacheRefreshes']['Insert'],
+  'id' | 'created_at' | 'cache_table'
+> & {
+  cache_table: FailedRefreshCacheTable;
+};
+
+/** The filter shape every `stats_cache_*_metrics` RPC takes — see this module's CLAUDE.md. */
+export type MetricRpcParams = {
+  ringing_group_filter: number;
+  group_by_species: boolean;
+  group_by_time_period?: 'day' | 'month' | 'year' | 'month-squashed';
+  from_date?: string;
+  to_date?: string;
+  /** Exact calendar year, matched as `EXTRACT(YEAR FROM visit_date)`. */
+  year_filter?: number;
+  /** Exact calendar month, 1-12, matched as `EXTRACT(MONTH FROM visit_date)`. */
+  month_filter?: number;
 };
