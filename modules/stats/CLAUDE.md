@@ -25,9 +25,10 @@ cache tables"). Three concerns live here:
 
 `browser.ts` re-exports only the client-safe surface (`types`, `readStatsCacheRows`,
 `globalStatsCacheFetchPool`, `StatsCacheFetchPool`); `index.ts` re-exports everything `browser.ts`
-does plus `dispatchStatsCacheRefreshEvents`/`refreshSimpleStatsCache`/
-`runSimpleStatsCacheRefreshPass`, which pull in `@vercel/queue` and the full `lib/refresh/`
-pipeline and so are server-only.
+does plus `dispatchStatsCacheRefreshEvents`/`refreshSimpleStatsCache`, which pull in
+`@vercel/queue` and the full `lib/refresh/` pipeline and so are server-only.
+`runSimpleStatsCacheRefreshPass` (the single-pass half `refreshSimpleStatsCache` calls twice) has
+no external caller and isn't re-exported from either barrel — module-internal only.
 
 **Any file reachable from a Client Component must import from `@/modules/stats/browser`, never
 the bare `@/modules/stats` barrel.** `modules/highlights`'s `hg2.ts` and the species page's
@@ -104,8 +105,9 @@ why that's write-only, never a read narrowing.
 
 `lib/refresh/__tests__/rpc-params.test.ts` covers the one pure, cleanly-separable function
 (`batchPeriodsBySessionDateSpan`) directly. Everything else about the refresh pipeline is
-exercised as a black box through `refreshSimpleStatsCache`/`runSimpleStatsCacheRefreshPass` in
-`lib/refresh/__tests__/run-refresh-pass.test.ts` — internal functions (`mergeSimpleMetricRows`,
-`buildSimpleMetricRpcParamsList`, the writers, etc.) have no test file of their own and aren't
-meant to; that one integration suite is deliberately not split further per-file, since doing so
-would force artificial mocking boundaries around a single pipeline.
+exercised as a black box through `refreshSimpleStatsCache` in
+`lib/refresh/__tests__/run-refresh-pass.test.ts` — internal functions
+(`runSimpleStatsCacheRefreshPass`, `mergeSimpleMetricRows`, `buildSimpleMetricRpcParamsList`, the
+writers, etc.) have no test file of their own and aren't meant to; that one integration suite is
+deliberately not split further per-file, since doing so would force artificial mocking boundaries
+around a single pipeline.
