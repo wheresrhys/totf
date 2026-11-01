@@ -399,26 +399,19 @@ describe('summary read-path access model', () => {
 			);
 		});
 
-		it('an arbitrary window on a public target falls back to the public_core_stats RPC', async () => {
+		it('an arbitrary window on a public target returns empty rows, never falling back to the public_core_stats RPC', async () => {
 			vi.mocked(getGroupCookie).mockResolvedValue(null);
 			vi.mocked(resolveGroupPublicAreasForRequest).mockResolvedValue([
 				'summary'
 			]);
-			mockPublicSupabaseRpc.mockReturnValue({
-				then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-					Promise.resolve({ data: [], error: null }).then(resolve)
-			});
 
 			const result = await fetchAuthorisedCoreStats(viewedGroup, {
 				from_date: '2026-04-25',
 				to_date: '2026-09-05'
 			});
 
-			expect(result.accessLevel).toBe('public');
-			expect(mockPublicSupabaseRpc).toHaveBeenCalledWith(
-				'public_core_stats',
-				expect.objectContaining({ ringing_group_filter: VIEWED_GROUP_ID })
-			);
+			expect(result).toEqual({ accessLevel: 'public', rows: [] });
+			expect(mockPublicSupabaseRpc).not.toHaveBeenCalled();
 			expect(mockPublicSupabaseFrom).not.toHaveBeenCalled();
 		});
 	});

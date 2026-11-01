@@ -45,12 +45,17 @@ an RPC call** — three things follow from that:
 - **The old RPC params are translated into `temporal_unit`/`time_period` filters**, and the one shape
   that can't be — an _ungrouped_ aggregate over a window that isn't itself a single cache cell, i.e.
   the `/species` list page's "CES only" range and its two free-text date inputs — still falls back to
-  the live `core_stats`/`public_core_stats` RPCs. The cache can't answer those: the aggregate's
-  distinct-count columns (`bird_count`, the `*_bird_count` age buckets) can't be rebuilt by summing
-  finer cells. Every window the summary pages ask for (all time, a whole calendar year, a whole
-  calendar month, a squashed calendar month) _is_ a cache cell and reads from the cache. See
+  the live `core_stats` RPC for the `'own'`/`'shared'` branches. The cache can't answer those: the
+  aggregate's distinct-count columns (`bird_count`, the `*_bird_count` age buckets) can't be rebuilt
+  by summing finer cells. Every window the summary pages ask for (all time, a whole calendar year, a
+  whole calendar month, a squashed calendar month) _is_ a cache cell and reads from the cache. See
   `resolveStatsCacheQueryPlan`'s own comment for the full param→filter mapping, including the
-  year-grain-for-one-calendar-month read that goes via the month grain.
+  year-grain-for-one-calendar-month read that goes via the month grain. **The `'public'` branch is the
+  one exception (#1274):** since the UI itself stopped offering a way to request an arbitrary window
+  as a public/blocked viewer (#1232), `fetchAuthorisedCoreStats` no longer falls through to
+  `public_core_stats` for one either — it returns `{ accessLevel: 'public', rows: [] }` directly,
+  mirroring the `'blocked'` branch's "no rows, no throw" convention, rather than silently serving a
+  live RPC call the UI no longer surfaces a route to.
 
 (`core_stats`/`public_core_stats` are byte-identical siblings of the still-schema-resident
 `core_stats`/`public_aggregate_stats` RPCs — #830 moved every app-code call site onto the new names; a
