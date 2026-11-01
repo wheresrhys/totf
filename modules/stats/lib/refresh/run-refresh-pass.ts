@@ -137,7 +137,7 @@ async function fetchGroupSessionDates(
 	return (rows ?? []).map((row) => row.visit_date);
 }
 
-export async function runSimpleStatsCacheRefreshPass(
+async function runSimpleStatsCacheRefreshPass(
 	supabaseClient: SupabaseClient,
 	{
 		groupId,
@@ -161,14 +161,12 @@ export async function runSimpleStatsCacheRefreshPass(
 	// Only the `day` unit's window-narrowing batching needs the group's real
 	// session dates (see `batchPeriodsBySessionDateSpan`) — every other
 	// temporal unit ignores this list entirely, so skip the query rather than
-	// pay for it on every refresh pass. Fetched here (not in
-	// `refreshSimpleStatsCache`) so `runSimpleStatsCacheRefreshPass`'s own
-	// direct callers (e.g. `supabase/scripts/debug-stats-cache-refresh.ts`)
-	// get the same batching without going through the wrapper — at the cost
-	// of this query running twice per `refreshSimpleStatsCache` event (once
-	// per `groupBySpecies` pass) rather than once; accepted as simpler than
-	// threading a pre-fetched array through both functions' signatures for a
-	// single cheap indexed-column scan.
+	// pay for it on every refresh pass. Fetched here rather than once in
+	// `refreshSimpleStatsCache` and threaded through, so this query runs
+	// twice per `refreshSimpleStatsCache` event (once per `groupBySpecies`
+	// pass) rather than once — accepted as simpler than threading a
+	// pre-fetched array through both functions' signatures for a single
+	// cheap indexed-column scan.
 	const groupSessionDates =
 		temporalUnit === 'day' && touchedPeriods.length > 0
 			? await runStatsCacheDbCall(
