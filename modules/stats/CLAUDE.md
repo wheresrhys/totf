@@ -50,12 +50,14 @@ modules/stats/
     dispatch-stats-cache-events.ts # dispatchStatsCacheRefreshEvents
     refresh/                       # the refresh pipeline — see below
       rpc-params.ts        # metric-RPC filter building, day-window batching, narrowing rules
-      session-dates.ts     # the one Sessions.visit_date preflight query (day-unit batching needs it)
       db-call-logging.ts   # runStatsCacheDbCall — logs every DB touchpoint of a refresh pass
       fetch-metric-rows.ts # fans one metric RPC out across a filter-object list, concurrently
       merge-metric-rows.ts # merges the 4 metric RPCs' rows by cell key; anomaly recording
       write-cache-rows.ts  # chunked upserts to both cache tables; dead-lettering
-      run-refresh-pass.ts  # runSimpleStatsCacheRefreshPass / refreshSimpleStatsCache — the orchestrator
+      run-refresh-pass.ts  # runSimpleStatsCacheRefreshPass / refreshSimpleStatsCache — the
+                            # orchestrator, including the one Sessions.visit_date preflight query
+                            # day-unit batching needs (fetchGroupSessionDates — no file of its
+                            # own, it has exactly one caller)
 ```
 
 ## The refresh pipeline (`lib/refresh/`)
