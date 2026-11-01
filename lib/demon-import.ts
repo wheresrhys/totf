@@ -7,7 +7,7 @@ import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
 // resolution is scoped to tsconfig.json's `include`, which `lib/` sits outside
 // of. The two `@/`-aliased imports above are `import type` only, erased before
 // either runtime sees them, so they aren't subject to the same constraint.
-import type { TemporalUnit } from '@/modules/stats/stats-cache-refresh';
+import type { TemporalUnit } from '@/modules/stats';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Omit<
