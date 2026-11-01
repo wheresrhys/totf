@@ -7,7 +7,7 @@ import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
 // resolution is scoped to tsconfig.json's `include`, which `lib/` sits outside
 // of. The two `@/`-aliased imports above are `import type` only, erased before
 // either runtime sees them, so they aren't subject to the same constraint.
-import type { StatsTemporalUnit } from '@/modules/stats';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 
 type SpeciesInsert = Database['public']['Tables']['Species']['Insert'];
 type BirdsInsert = Omit<
@@ -329,24 +329,6 @@ export type ImportJobRowCounts = {
 };
 
 /**
- * Which temporal unit's stats-cache refresh an outcome is being recorded for
- * (#1154). Deliberately `@/modules/stats`'s `StatsTemporalUnit` (itself the
- * canonical `app/models/temporal-unit.ts` type, DB-enum-backed)
- * rather than a fourth copy of the same five-value union: the column an
- * outcome lands on and the temporal unit `refreshSimpleStatsCache` was called
- * with are the same axis by construction, so they must not be able to drift
- * apart.
- *
- * This replaced a `StatsCacheType = 'core' | 'biometrics' | 'demographics'`,
- * not as a rename but as a change of axis: the three stats-type cache tables
- * were replaced by the temporal-unit-shaped `SimpleStatsCache` table (#1144;
- * a sibling `ComplexStatsCache` existed alongside it from #1147 until it was
- * removed entirely), refreshed one temporal unit per call, so a temporal unit
- * is now the finest granularity at which a refresh can succeed or fail.
- */
-export type StatsCacheTemporalUnit = StatsTemporalUnit;
-
-/**
  * The outcome a stats-cache refresh can actually be recorded as. The columns are
  * `import_job_status`, which also carries `'in_progress'` (their default, meaning
  * "not yet attempted") and `'timed_out'` (not reachable for a refresh) — neither of
@@ -357,10 +339,22 @@ export type StatsCacheRefreshOutcome = Extract<
 	'succeeded' | 'failed'
 >;
 
-const STATS_CACHE_REFRESH_STATUS_COLUMNS: Record<
-	StatsCacheTemporalUnit,
-	string
-> = {
+/**
+ * Which `ImportJobs` column each temporal unit's refresh outcome lands on
+ * (#1154). Keyed on the canonical, DB-enum-backed `StatsTemporalUnit` rather
+ * than a fresh copy of the same five-value union: the column an outcome lands
+ * on and the temporal unit `refreshSimpleStatsCache` was called with are the
+ * same axis by construction, so they must not be able to drift apart.
+ *
+ * This axis replaced a `StatsCacheType = 'core' | 'biometrics' |
+ * 'demographics'`, not as a rename but as a change of axis: the three
+ * stats-type cache tables were replaced by the temporal-unit-shaped
+ * `SimpleStatsCache` table (#1144; a sibling `ComplexStatsCache` existed
+ * alongside it from #1147 until it was removed entirely), refreshed one
+ * temporal unit per call, so a temporal unit is now the finest granularity at
+ * which a refresh can succeed or fail.
+ */
+const STATS_CACHE_REFRESH_STATUS_COLUMNS: Record<StatsTemporalUnit, string> = {
 	day: 'day_stats_refresh_status',
 	month: 'month_stats_refresh_status',
 	year: 'year_stats_refresh_status',
@@ -509,7 +503,7 @@ export class ImportJobTracker {
 	 */
 	async markStatsCacheRefreshed(
 		importJobId: number,
-		temporalUnit: StatsCacheTemporalUnit,
+		temporalUnit: StatsTemporalUnit,
 		refreshOutcome: StatsCacheRefreshOutcome
 	): Promise<void> {
 		await this.updateImportJob(importJobId, {

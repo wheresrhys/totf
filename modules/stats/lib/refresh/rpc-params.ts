@@ -1,5 +1,8 @@
-import type { ExactFilterTemporalUnit } from '@/app/models/temporal-unit';
-import type { StatsTemporalUnit, MetricRpcParams } from '../../types';
+import type {
+	ExactFilterTemporalUnit,
+	StatsTemporalUnit
+} from '@/app/models/temporal-unit';
+import type { MetricRpcParams } from '../../types';
 
 /** Temporal units `refreshSimpleStatsCache` may narrow by affected dates — every unit but `all-time`. See this module's CLAUDE.md for why `month-squashed` narrows too. */
 export const SIMPLE_NARROWING_TEMPORAL_UNITS: ReadonlySet<StatsTemporalUnit> =

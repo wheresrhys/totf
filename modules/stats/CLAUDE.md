@@ -21,12 +21,17 @@ cache tables"). Three concerns live here:
   `stats_cache_*_metrics` RPCs, merges their per-cell rows, and writes the result back to the cache
   tables. See "The refresh pipeline" below.
 
-`StatsTemporalUnit` — the module's 5-value temporal-unit vocabulary (`day`/`month`/`year`/
-`month-squashed`/`all-time`) — is **not** defined in `types.ts`; it is re-exported from
-[`app/models/temporal-unit.ts`](../../app/models/temporal-unit.ts), which derives it from the
-Postgres `temporal_unit` enum and also holds the narrower app-facing vocabulary it's named apart
-from: `TemporalUnit` (3 values — `day`/`month`/`year`) and `ExactFilterTemporalUnit`
-(`month`/`year`/`month-squashed`, used by `lib/refresh/rpc-params.ts`). Derive any new
+`StatsTemporalUnit` — the 5-value temporal-unit vocabulary (`day`/`month`/`year`/
+`month-squashed`/`all-time`) — is **not** this module's type and is neither defined nor
+re-exported here. It lives in [`app/models/temporal-unit.ts`](../../app/models/temporal-unit.ts),
+which derives it from the Postgres `temporal_unit` enum and also holds the narrower app-facing
+vocabulary it's named apart from: `TemporalUnit` (3 values — `day`/`month`/`year`) and
+`ExactFilterTemporalUnit` (`month`/`year`/`month-squashed`, used by `lib/refresh/rpc-params.ts`).
+**Every file that needs one of those imports it directly from `@/app/models/temporal-unit`** —
+files inside this module included, and `types.ts` is not a staging post for it. That is the one
+exception to the "types shared across more than one file live in `types.ts`" rule in the root
+`CLAUDE.md`'s "Module conventions": the rule governs types this module *owns*, and re-exporting a
+type it doesn't own just hides the canonical source behind an extra hop. Derive any new
 temporal-unit-shaped type from those rather than hand-typing the union again — `types.ts`'s
 `StatsCacheRefreshRpcParams.group_by_time_period` and `MetricRpcParams.group_by_time_period` are
 both `Exclude<StatsTemporalUnit, 'all-time'>` for exactly that reason.
@@ -54,8 +59,8 @@ browser bundle. Server-only call sites (`app/api/import/route.ts`,
 modules/stats/
   index.ts / browser.ts    # the two barrels above
   types.ts                 # every type shared across more than one file in this module
-                           # — note `StatsTemporalUnit` isn't defined here, it's a
-                           # re-export (see below)
+                           # — note `StatsTemporalUnit` is neither defined nor re-exported
+                           # here; import it from app/models/temporal-unit (see above)
   lib/
     stats-cache.ts                 # readStatsCacheRows
     stats-cache-fetch-pool.ts      # StatsCacheFetchPool

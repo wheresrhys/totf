@@ -2,7 +2,7 @@
 import { fetchAllPaginatedRows } from '@/lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabaseClient } from '../../../app/lib/auth/group-auth';
-import type { StatsTemporalUnit } from '../types';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // A row as PostgREST returns it for `readStatsCacheRows`'s generic

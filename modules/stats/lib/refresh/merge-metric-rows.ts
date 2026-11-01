@@ -1,5 +1,5 @@
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type {
-	StatsTemporalUnit,
 	MergedCellKey,
 	SimpleMergedCell,
 	FailedRefreshCacheTable,

@@ -82,13 +82,6 @@ export type StatsCacheRefreshEvent = {
 
 
 /**
- * The full 5-value temporal-unit vocabulary, sourced from the Postgres
- * `temporal_unit` enum via `app/models/temporal-unit.ts` — see this module's
- * CLAUDE.md.
- */
-export type { StatsTemporalUnit };
-
-/**
  * The species ids a refresh pass should narrow its species-grouped *write* to
  * — never its read: every metric RPC call is still made exactly as it is
  * without this field, over every species. When provided, only the
