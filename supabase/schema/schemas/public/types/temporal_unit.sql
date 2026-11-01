@@ -15,8 +15,7 @@
 -- against a recently perf-tuned RPC family.
 --
 -- Mirrors the ring_size.sql enum-file convention, and is the generated-types
--- anchor for the app-level TemporalUnit type. (Once app/models/temporal-unit.ts
--- exists, cross-reference it here.)
+-- anchor for app/models/temporal-unit.ts's StatsTemporalUnit.
 CREATE TYPE public.temporal_unit AS ENUM(
 	'day',
 	'month',
