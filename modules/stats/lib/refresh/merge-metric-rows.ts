@@ -11,17 +11,7 @@ import type {
 } from '../../types';
 import { SIMPLE_NARROWING_TEMPORAL_UNITS } from './rpc-params';
 
-/**
- * Cuts a merged result back to exactly the periods this pass is refreshing, for
- * a narrowing temporal unit. Load-bearing for the window-narrowed unit, `day`:
- * the `min(periods)`..`max(periods)` window `buildMetricRpcParams` computes
- * spans untouched gaps inside that range, so the RPCs can legitimately return
- * cells for periods that weren't touched — those must not be rewritten. A
- * pass-through for `refreshSimpleStatsCache`'s exact-filtered
- * `month`/`year`/`month-squashed` fan-out, whose calls cannot return an
- * untouched period in the first place (#1176/#1178). A non-narrowing temporal
- * unit full-replaces, so every merged row is kept.
- */
+/** Cuts a merged result back to exactly the touched periods, for a narrowing temporal unit — load-bearing for `day`'s windowed fetch, a pass-through for the exact-filtered units. See this module's CLAUDE.md. */
 export function filterToTouchedPeriods<Row extends MergedCellKey>(
 	mergedRows: Row[],
 	temporalUnit: TemporalUnit,
@@ -36,15 +26,7 @@ export function filterToTouchedPeriods<Row extends MergedCellKey>(
 	);
 }
 
-/**
- * Cuts a species-grouped merged result back to exactly the species
- * `speciesIds` names, when given. `undefined` is "no narrowing" — every row
- * is kept, matching every call site before this field existed. Only ever
- * called from the `groupBySpecies: true` branch of a refresh pass: the
- * all-species-combined write has no `species_id` to filter on, and must
- * always see the full, unfiltered result regardless of `speciesIds` — see
- * `RefreshSpeciesNarrowing`'s own doc comment for why.
- */
+/** Cuts a species-grouped merged result back to `speciesIds`, when given (`undefined` = no narrowing) — write-only, species-grouped-pass-only narrowing, see `RefreshSpeciesNarrowing`. */
 export function filterToTouchedSpecies<Row extends MergedCellKey>(
 	mergedRows: Row[],
 	speciesIds: number[] | undefined
@@ -72,35 +54,10 @@ function indexByCell<
 	return index;
 }
 
-/**
- * The one `FailedStatsCacheRefreshes.reason` value this module writes: the cell
- * was present in some but not all of the `stats_cache_*_metrics` RPC results.
- * The column is deliberately unconstrained text so a new failure kind needs no
- * migration — see that table's own column comment.
- */
+/** The one `FailedStatsCacheRefreshes.reason` value this module writes. */
 const MISSING_FROM_METRIC_RPC = 'missing_from_metric_rpc';
 
-/**
- * Records a cell that appeared in some but not all of a refresh's metric RPC
- * results. Every RPC of a given cache shares the same `stats_spine` call, so a
- * cell key present in one but absent from another is an anomaly, not an
- * expected gap (discussed and settled on PR #1164's review) — the cell is
- * logged with enough context to act on and then skipped entirely, leaving
- * whatever is already cached for it untouched.
- *
- * The `console.error` stays for immediate visibility; the returned row is the
- * durable record, dead-lettered to `FailedStatsCacheRefreshes` (#1167). It is
- * *returned* rather than written here so both merge functions stay synchronous
- * and pure, with no Supabase client of their own — each refresh function, which
- * already holds the client, writes its whole batch in one insert once merging
- * has finished.
- *
- * Never zero-fill, NULL-fill, or otherwise invent a value for a column a
- * refresh pass has no real data for: every cache-table metric column bar the
- * eight biometric ones is NOT NULL by design, specifically so no half-written/
- * placeholder row can ever land in either cache table, and faking a value here
- * in TS would defeat the point.
- */
+/** Logs and returns a dead-letter row for a cell missing from some but not all metric RPC results — a real anomaly, not an expected gap. See this module's CLAUDE.md for why it's never zero/NULL-filled instead. */
 function recordMissingCellAnomaly({
 	groupId,
 	cacheTable,
@@ -149,18 +106,7 @@ type MergeMetricRowsParams = {
 	encounterAgeRows: EncounterAgeMetricsRow[];
 };
 
-/**
- * Merges the four `SimpleStatsCache` metric RPCs' per-cell rows, keyed by
- * `(species_id, time_period)`, into that table's full column set. All four
- * share the same `stats_spine` call, so every cell key should appear in every
- * RPC's result — a cell key present in some but not all four is skipped,
- * logged, and returned as an anomaly for the caller to dead-letter (see
- * `recordMissingCellAnomaly`), tagged `SimpleStatsCacheBySpecies` when
- * `groupBySpecies` or plain `SimpleStatsCache` otherwise (#1182) — the same
- * table `groupBySpecies` decides this pass writes its merged rows to. Every
- * OTHER cell in the batch is unaffected — one anomalous cell never drops the
- * rest of the refresh.
- */
+/** Merges the four metric RPCs' per-cell rows, keyed by `(species_id, time_period)`, into the cache's full column set — one anomalous cell is skipped and dead-lettered, the rest of the batch is unaffected. */
 export function mergeSimpleMetricRows({
 	groupId,
 	temporalUnit,
@@ -220,11 +166,7 @@ export function mergeSimpleMetricRows({
 		mergedRows.push({
 			species_id: basic.species_id,
 			time_period: basic.time_period,
-			// The metric RPCs' composite return types mark every column
-			// nullable (Postgres composite types carry no NOT NULL metadata),
-			// but each of these specific columns is COALESCEd to a real value
-			// in SQL — see each RPC's own schema file. The assertions below
-			// trust that SQL-level guarantee rather than re-deriving it here.
+			// Non-null assertions trust each RPC's own SQL-level COALESCE guarantee.
 			species_count: basic.species_count!,
 			bird_count: basic.bird_count!,
 			encounter_count: basic.encounter_count!,

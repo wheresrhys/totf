@@ -132,22 +132,47 @@ belong to any single scoped doc:
   `supabase/scripts/seed-e2e-data.ts`. Small enough (756 bytes) not to be worth splitting.
 - `queries/` and `types/` — typed query definitions and the generated `Database` type, consumed by
   both `app/` pages/actions and `supabase/scripts/generate-snapshots.ts`.
-- `modules/stats/` — the stats-cache event-building/read/dispatch pipeline (`buildStatsCacheRefreshEvents`,
-  `readStatsCacheRows`, `StatsCacheFetchPool`, `dispatchStatsCacheRefreshEvents`), consumed by `app/`
-  (actions, the stats-cache-refresh-window queue route) and by `supabase/scripts/import-csv.ts`'s CLI
-  importer — the same cross-zone shape as `lib/supabase.ts` above, just large enough to warrant its
-  own directory and barrel rather than living loose in `lib/`. The module is split across two entry
-  points: `modules/stats/browser.ts` re-exports only the client-safe surface (`types`,
-  `readStatsCacheRows`, `globalStatsCacheFetchPool`, `StatsCacheFetchPool`), and `index.ts` re-exports
-  everything `browser.ts` does plus `dispatchStatsCacheRefreshEvents`, which pulls in `@vercel/queue`
-  and so is server-only. Any file reachable from a Client Component must import from
-  `@/modules/stats/browser`, never the bare `@/modules/stats` barrel — `modules/highlights`'s
-  `hg2.ts` and the species page's `SpDemographicsTab.tsx` (`'use client'`) both do, after both broke
-  the dev build (`Module not found: @opentelemetry/api`) by importing the full barrel and dragging
-  the queue dependency into the browser bundle. Server-only call sites (`app/api/import/route.ts`,
-  `supabase/scripts/import-csv.ts`) keep importing the full `@/modules/stats` barrel.
-  `modules/stats/stats-cache-refresh.ts` is the one file in there not yet through this narrowing —
-  it keeps whatever it already exported before the move.
+- `modules/stats/` — the stats-cache event-building/read/dispatch/refresh pipeline, consumed by
+  `app/` (actions, the stats-cache-refresh-window queue route) and by
+  `supabase/scripts/import-csv.ts`'s CLI importer — the same cross-zone shape as `lib/supabase.ts`
+  above, just large enough to warrant its own directory, barrel and scoped doc. See its own
+  [`modules/stats/CLAUDE.md`](modules/stats/CLAUDE.md) — the reference implementation of the
+  "Module conventions" below.
+
+## Module conventions
+
+A **module** (`modules/<name>/`) is a self-contained unit of cross-cutting logic large enough to
+warrant its own directory, barrel and scoped doc rather than living loose in `lib/`. `modules/stats/`
+is the reference implementation — see [its own `CLAUDE.md`](modules/stats/CLAUDE.md) for a worked
+example of every point below. A well-formed module:
+
+- Has exactly one top-level export file, `index.ts`/`index.tsx`, which implements no business logic
+  of its own — it only re-exports selected functions/types from the module's other files. A module
+  with some exports that must never reach a Client Component bundle (because they pull in a
+  server-only dependency) splits this into two barrels instead — a client-safe `browser.ts` plus an
+  `index.ts` that re-exports `browser.ts` and adds the server-only surface — rather than one barrel
+  callers have to import selectively from.
+- Keeps its implementation in a `lib/` subdirectory. A module with enough files that some of them
+  sensibly group together may use several appropriately-named subdirectories under `lib/` instead
+  of one flat directory.
+- Keeps every type used across more than one file *within* the module in a single `types.ts`,
+  re-exported from `index.ts`/`browser.ts` — not duplicated per file or imported file-to-file,
+  which is how type-import spaghetti starts.
+- Colocates tests next to the file they test, named after it (`foo.ts` → `foo.test.ts`, or
+  `__tests__/foo.test.ts`).
+- Draws a hard boundary at the module edge: a file (test files included) *outside* the module must
+  only import or mock what the module actually exports from `index.ts`/`browser.ts` — never reach
+  past the barrel into an internal file directly. If enforcing this means deleting a test that
+  reached past the boundary, the cases it covered move into the module's own test suite first,
+  if they aren't already covered there.
+- Has its own `CLAUDE.md`, scoped the same way the three repo-zone docs are (see "Repo zones"
+  above) — most file-level context belongs there, not loose inline comments. Keep inline comments
+  to a brief sentence on a function's purpose, or on a specific tricky/unintuitive line.
+- Keeps files to roughly 400 lines, each with one function reaching `index.ts`/`browser.ts` — a
+  file may export more than that to aid testing/mocking, but not extravagantly. Not a hard limit:
+  mechanical, repetitive restructuring (e.g. splitting one oversized file into several) is exempt
+  from the usual per-branch size heuristic, but the resulting files should still land near this
+  size.
 
 ## Project structure
 

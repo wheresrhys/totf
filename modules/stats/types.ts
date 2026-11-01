@@ -144,47 +144,25 @@ export type BirdAgeMetricsRow =
 export type EncounterAgeMetricsRow =
   Database['public']['CompositeTypes']['stats_cache_encounter_age_metrics_result'];
 
-/**
- * The two columns every merged cell is keyed on, with the *metric RPCs'* own
- * nullability rather than the cache tables'. `cellKey`/`indexByCell` match a
- * cell across several RPC results on this pair, and the RPCs emit a real NULL
- * `time_period` for the all-time grain, so a merged cell has to keep that NULL
- * — `writeBySpeciesRows` is where it becomes the tables' sentinel date.
- */
+/** The (species_id, time_period) key pair a merged refresh cell is matched across RPC results on — see this module's CLAUDE.md for the NULL/sentinel-date nuance. */
 export type MergedCellKey = {
   species_id: number | null;
   time_period: string | null;
 };
 
-/**
- * One merged `SimpleStatsCache` cell, pre-write: the `SimpleStatsCacheBySpecies`
- * Insert shape minus the columns `writeBySpeciesRows` supplies itself
- * (`group_id`, `temporal_unit`), the one the database derives (`id`), and the
- * two key columns, re-added via `MergedCellKey` at the merge step's own
- * nullability.
- */
+/** One merged `SimpleStatsCache` cell, pre-write — see this module's CLAUDE.md for the exact column provenance. */
 export type SimpleMergedCell = Omit<
   Database['public']['Tables']['SimpleStatsCacheBySpecies']['Insert'],
   'id' | 'group_id' | 'temporal_unit' | keyof MergedCellKey
 > &
   MergedCellKey;
 
-/**
- * The two `cache_table` tags `FailedStatsCacheRefreshes`' CHECK constraint
- * accepts (#1182) — one per species-grouped-or-not pass, so an anomaly row
- * records which of the two refresh passes produced it.
- */
+/** The two `cache_table` values `FailedStatsCacheRefreshes`' CHECK constraint accepts (#1182). */
 export type FailedRefreshCacheTable =
   | 'SimpleStatsCache'
   | 'SimpleStatsCacheBySpecies';
 
-/**
- * One dead-letter row for `FailedStatsCacheRefreshes` (#1167) — a cell a
- * refresh pass could not write. `id`/`created_at` are database-defaulted.
- * `cache_table` is narrowed from the generated `Insert` type's bare `string`
- * (the column is text + CHECK, not a Postgres enum) to the four-value union
- * above.
- */
+/** One dead-letter row for `FailedStatsCacheRefreshes` (#1167). */
 export type FailedRefreshRow = Omit<
   Database['public']['Tables']['FailedStatsCacheRefreshes']['Insert'],
   'id' | 'created_at' | 'cache_table'
@@ -192,13 +170,7 @@ export type FailedRefreshRow = Omit<
   cache_table: FailedRefreshCacheTable;
 };
 
-/**
- * The shared 8-arg filter shape every `stats_cache_*_metrics` RPC takes
- * (mirrors `core_stats`'/`biometrics_stats`' own input signature — see
- * `app/lib/auth/group-summary-access.ts`'s `CoreStatsRpcParams` and
- * `app/lib/supabase/temporal-filter.ts`) — only the subset `lib/refresh/`
- * ever needs to set.
- */
+/** The filter shape every `stats_cache_*_metrics` RPC takes — see this module's CLAUDE.md. */
 export type MetricRpcParams = {
   ringing_group_filter: number;
   group_by_species: boolean;
