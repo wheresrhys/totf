@@ -2,6 +2,7 @@ import type {
   SimpleStatsCacheBySpeciesRow,
   SimpleStatsCacheRow
 } from '@/app/models/db';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { Database } from '@/types/supabase.types';
 export type StatsResult = SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow;
 
@@ -40,7 +41,7 @@ export type StatsResult = SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow;
  */
 export type StatsCacheRefreshRpcParams = {
   ringing_group_filter: number;
-  group_by_time_period?: 'day' | 'month' | 'month-squashed' | 'year';
+  group_by_time_period?: Exclude<StatsTemporalUnit, 'all-time'>;
   from_date?: string;
   to_date?: string;
   periods?: string[];
@@ -81,19 +82,6 @@ export type StatsCacheRefreshEvent = {
 
 
 /**
- * Matches `SimpleStatsCache.temporal_unit`'s CHECK constraint — same name and
- * value set as `supabase/__tests__/stats-cache-fixtures.ts`'s own
- * `TemporalUnit` (duplicated rather than imported: `lib/` doesn't reach into
- * `supabase/__tests__/`, a different zone's test-only fixtures).
- */
-export type TemporalUnit =
-  | 'day'
-  | 'month'
-  | 'year'
-  | 'month-squashed'
-  | 'all-time';
-
-/**
  * The species ids a refresh pass should narrow its species-grouped *write* to
  * — never its read: every metric RPC call is still made exactly as it is
  * without this field, over every species. When provided, only the
@@ -114,7 +102,7 @@ export type RefreshSpeciesNarrowing = {
 
 export type RefreshSimpleStatsCacheParams = RefreshSpeciesNarrowing & {
   groupId: number;
-  temporalUnit: TemporalUnit;
+  temporalUnit: StatsTemporalUnit;
   /**
    * The exact `time_period` values this refresh pass should write, in the
    * same string shape the metric RPCs return for that temporal unit.
@@ -174,7 +162,7 @@ export type FailedRefreshRow = Omit<
 export type MetricRpcParams = {
   ringing_group_filter: number;
   group_by_species: boolean;
-  group_by_time_period?: 'day' | 'month' | 'year' | 'month-squashed';
+  group_by_time_period?: Exclude<StatsTemporalUnit, 'all-time'>;
   from_date?: string;
   to_date?: string;
   /** Exact calendar year, matched as `EXTRACT(YEAR FROM visit_date)`. */

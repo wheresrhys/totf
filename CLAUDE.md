@@ -170,7 +170,11 @@ example of every point below. A well-formed module:
   of one flat directory.
 - Keeps every type used across more than one file *within* the module in a single `types.ts`,
   re-exported from `index.ts`/`browser.ts` — not duplicated per file or imported file-to-file,
-  which is how type-import spaghetti starts.
+  which is how type-import spaghetti starts. This governs types the module **owns**. A type owned
+  elsewhere (e.g. `app/models/temporal-unit.ts`'s temporal-unit family) is imported directly from
+  its canonical home by every file that needs it, module-internal files included — never aliased
+  or re-exported through the module's `types.ts`/barrel, which only hides the canonical source
+  behind an extra hop.
 - Colocates tests next to the file they test, named after it (`foo.ts` → `foo.test.ts`, or
   `__tests__/foo.test.ts`).
 - Draws a hard boundary at the module edge: a file (test files included) *outside* the module must

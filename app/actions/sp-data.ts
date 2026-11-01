@@ -19,7 +19,7 @@ import {
 	type ArrivalsStatsResult
 } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
-import type { TemporalUnit } from '@/modules/stats';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import { buildPageOfBirdsSelect } from '@/queries';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
@@ -194,7 +194,7 @@ export async function fetchSpeciesStatsCacheRows<
 }: {
 	speciesName: string;
 	viewedGroup: ViewedGroup;
-	temporalUnit: TemporalUnit;
+	temporalUnit: StatsTemporalUnit;
 	fromDate?: string;
 	toDate?: string;
 	includeBiometrics?: boolean;

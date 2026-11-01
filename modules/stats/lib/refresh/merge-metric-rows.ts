@@ -1,5 +1,5 @@
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type {
-	TemporalUnit,
 	MergedCellKey,
 	SimpleMergedCell,
 	FailedRefreshCacheTable,
@@ -14,7 +14,7 @@ import { SIMPLE_NARROWING_TEMPORAL_UNITS } from './rpc-params';
 /** Cuts a merged result back to exactly the touched periods, for a narrowing temporal unit — load-bearing for `day`'s windowed fetch, a pass-through for the exact-filtered units. See this module's CLAUDE.md. */
 export function filterToTouchedPeriods<Row extends MergedCellKey>(
 	mergedRows: Row[],
-	temporalUnit: TemporalUnit,
+	temporalUnit: StatsTemporalUnit,
 	touchedPeriods: string[]
 ): Row[] {
 	if (!SIMPLE_NARROWING_TEMPORAL_UNITS.has(temporalUnit)) {
@@ -67,7 +67,7 @@ function recordMissingCellAnomaly({
 }: {
 	groupId: number;
 	cacheTable: FailedRefreshCacheTable;
-	temporalUnit: TemporalUnit;
+	temporalUnit: StatsTemporalUnit;
 	cellKey: string;
 	missingFromRpc: string[];
 }): FailedRefreshRow {
@@ -98,7 +98,7 @@ function recordMissingCellAnomaly({
 
 type MergeMetricRowsParams = {
 	groupId: number;
-	temporalUnit: TemporalUnit;
+	temporalUnit: StatsTemporalUnit;
 	groupBySpecies: boolean;
 	basicRows: BasicSessionMetricsRow[];
 	biometricsRows: BiometricsMetricsRow[];

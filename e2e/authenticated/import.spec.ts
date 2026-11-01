@@ -135,7 +135,10 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		// period's *first* day, so the window collapsed to a single day and the
 		// metric RPCs returned nothing. This E2E run was the first thing to expose
 		// that; #1173 fixed it, and this assertion is what pins the fix.
-		expect(temporalUnits).toBe('{all-time,day,month,month-squashed,year}')
+		// The order is the `temporal_unit` ENUM's declaration order, not
+		// alphabetical: `array_agg(DISTINCT …)` sorts by the column's own type, and
+		// temporal_unit became a real Postgres enum rather than text.
+		expect(temporalUnits).toBe('{day,month,year,month-squashed,all-time}')
 	})
 
 	test('marks all five temporal-unit refresh-status columns succeeded on the run’s ImportJobs row', async () => {

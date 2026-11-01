@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import type { TemporalUnit, MergedCellKey, FailedRefreshRow } from '../../types';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
+import type { MergedCellKey, FailedRefreshRow } from '../../types';
 import { runStatsCacheDbCall } from './db-call-logging';
 
 /** The `time_period` the cache tables use for the all-time grain (NOT NULL column; metric RPCs emit a real NULL instead) — see this module's CLAUDE.md. */
@@ -30,7 +31,7 @@ export async function writeBySpeciesRows<Cell extends MergedCellKey>(
 	supabaseClient: SupabaseClient,
 	cacheTable: 'SimpleStatsCacheBySpecies',
 	cells: Cell[],
-	context: { groupId: number; temporalUnit: TemporalUnit } & Record<
+	context: { groupId: number; temporalUnit: StatsTemporalUnit } & Record<
 		string,
 		unknown
 	>
@@ -61,7 +62,7 @@ export async function writeAllSpeciesRows<Cell extends MergedCellKey>(
 	supabaseClient: SupabaseClient,
 	cacheTable: 'SimpleStatsCache',
 	cells: Cell[],
-	context: { groupId: number; temporalUnit: TemporalUnit } & Record<
+	context: { groupId: number; temporalUnit: StatsTemporalUnit } & Record<
 		string,
 		unknown
 	>

@@ -12,9 +12,9 @@ import {
 } from '@/lib/demon-import';
 import {
 	refreshSimpleStatsCache,
-	type TemporalUnit,
 	type StatsCacheRefreshEvent
 } from '@/modules/stats';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import { getAuthenticatedSupabaseClientForGroup } from '@/app/lib/auth/group-auth';
 
 /**
@@ -24,7 +24,7 @@ import { getAuthenticatedSupabaseClientForGroup } from '@/app/lib/auth/group-aut
  */
 type StatsCacheRefreshParams = {
 	groupId: number;
-	temporalUnit: TemporalUnit;
+	temporalUnit: StatsTemporalUnit;
 	periods?: string[];
 	speciesIds: number[];
 };
@@ -43,7 +43,7 @@ type StatsCacheRefreshParams = {
  * unit handed no periods refreshes *nothing* (see
  * `buildSimpleMetricRpcParamsList`'s early return).
  */
-const PERIODS_FROM_RPC_PARAMS_TEMPORAL_UNITS: readonly TemporalUnit[] = [
+const PERIODS_FROM_RPC_PARAMS_TEMPORAL_UNITS: readonly StatsTemporalUnit[] = [
 	'month',
 	'year',
 	'month-squashed'
@@ -69,7 +69,7 @@ export function deriveStatsCacheRefreshParams(
 	// The all-time event omits the key entirely (#1154) rather than carrying a
 	// literal `'all-time'`, matching `fetchSummaryStats`' own all-time
 	// convention.
-	const temporalUnit: TemporalUnit = group_by_time_period ?? 'all-time';
+	const temporalUnit: StatsTemporalUnit = group_by_time_period ?? 'all-time';
 
 	if (temporalUnit === 'day') {
 		return {
