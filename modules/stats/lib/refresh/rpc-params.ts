@@ -1,15 +1,13 @@
-import type { TemporalUnit, MetricRpcParams } from '../../types';
+import type { ExactFilterTemporalUnit } from '@/app/models/temporal-unit';
+import type { StatsTemporalUnit, MetricRpcParams } from '../../types';
 
 /** Temporal units `refreshSimpleStatsCache` may narrow by affected dates — every unit but `all-time`. See this module's CLAUDE.md for why `month-squashed` narrows too. */
-export const SIMPLE_NARROWING_TEMPORAL_UNITS: ReadonlySet<TemporalUnit> =
+export const SIMPLE_NARROWING_TEMPORAL_UNITS: ReadonlySet<StatsTemporalUnit> =
 	new Set(['day', 'month', 'year', 'month-squashed']);
-
-/** The temporal units `isExactFilterTemporalUnit` is true of. */
-type ExactFilterTemporalUnit = 'month' | 'year' | 'month-squashed';
 
 /** Whether this temporal unit narrows by exact-match `year_filter`/`month_filter` rather than a `from_date`/`to_date` window — see this module's CLAUDE.md. */
 function isExactFilterTemporalUnit(
-	temporalUnit: TemporalUnit
+	temporalUnit: StatsTemporalUnit
 ): temporalUnit is ExactFilterTemporalUnit {
 	return (
 		temporalUnit === 'month' ||
@@ -36,7 +34,7 @@ function exactPeriodFilters(
 /** The parts of a metric RPC's filter object shared by every call of one refresh pass. */
 function unwindowedMetricRpcParams(
 	groupId: number,
-	temporalUnit: TemporalUnit,
+	temporalUnit: StatsTemporalUnit,
 	groupBySpecies: boolean
 ): MetricRpcParams {
 	return {
@@ -108,7 +106,7 @@ export function batchPeriodsBySessionDateSpan(
 /** Builds the `day`-unit (window-narrowing) filter object(s) for one temporal-unit invocation, one per `batchPeriodsBySessionDateSpan` batch. `null` means nothing to refresh. */
 function buildMetricRpcParams(
 	groupId: number,
-	temporalUnit: TemporalUnit,
+	temporalUnit: StatsTemporalUnit,
 	periods: string[],
 	groupSessionDates: string[],
 	groupBySpecies: boolean
@@ -145,7 +143,7 @@ function buildMetricRpcParams(
 /** Every metric-RPC filter object one refresh pass needs, in call order — see this module's CLAUDE.md for how each temporal unit fans out. `null` means nothing to refresh. */
 export function buildSimpleMetricRpcParamsList(
 	groupId: number,
-	temporalUnit: TemporalUnit,
+	temporalUnit: StatsTemporalUnit,
 	periods: string[],
 	groupSessionDates: string[],
 	groupBySpecies: boolean

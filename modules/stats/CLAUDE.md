@@ -21,6 +21,16 @@ cache tables"). Three concerns live here:
   `stats_cache_*_metrics` RPCs, merges their per-cell rows, and writes the result back to the cache
   tables. See "The refresh pipeline" below.
 
+`StatsTemporalUnit` — the module's 5-value temporal-unit vocabulary (`day`/`month`/`year`/
+`month-squashed`/`all-time`) — is **not** defined in `types.ts`; it is re-exported from
+[`app/models/temporal-unit.ts`](../../app/models/temporal-unit.ts), which derives it from the
+Postgres `temporal_unit` enum and also holds the narrower app-facing vocabulary it's named apart
+from: `TemporalUnit` (3 values — `day`/`month`/`year`) and `ExactFilterTemporalUnit`
+(`month`/`year`/`month-squashed`, used by `lib/refresh/rpc-params.ts`). Derive any new
+temporal-unit-shaped type from those rather than hand-typing the union again — `types.ts`'s
+`StatsCacheRefreshRpcParams.group_by_time_period` and `MetricRpcParams.group_by_time_period` are
+both `Exclude<StatsTemporalUnit, 'all-time'>` for exactly that reason.
+
 ## Barrel split: `index.ts` vs `browser.ts`
 
 `browser.ts` re-exports only the client-safe surface (`types`, `readStatsCacheRows`,
@@ -44,6 +54,8 @@ browser bundle. Server-only call sites (`app/api/import/route.ts`,
 modules/stats/
   index.ts / browser.ts    # the two barrels above
   types.ts                 # every type shared across more than one file in this module
+                           # — note `StatsTemporalUnit` isn't defined here, it's a
+                           # re-export (see below)
   lib/
     stats-cache.ts                 # readStatsCacheRows
     stats-cache-fetch-pool.ts      # StatsCacheFetchPool
