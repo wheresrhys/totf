@@ -4,7 +4,6 @@ import type { LocationRow } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { buildGroupSessionHref } from '@/app/lib/group-links';
 import { printLocationName } from './DesignSystem';
-export type { TemporalUnit } from '@/app/models/temporal-unit';
 import type { TemporalUnit } from '@/app/models/temporal-unit';
 export type SpeciesName = 'string';
 export type StatUnit =

@@ -19,7 +19,7 @@ import {
 	sortByPositionAndTimeWindow
 } from './highlight-utils';
 import { globalStatsCacheFetchPool, type StatsResult } from '@/modules/stats/browser';
-import type { TemporalUnit } from '@/app/components/shared/StatOutput';
+import type { TemporalUnit } from '@/app/models/temporal-unit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { groupByColumn } from '@/app/lib/generic-utils';
 

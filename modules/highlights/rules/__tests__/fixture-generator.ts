@@ -1,11 +1,11 @@
 import type {
 	HighlightScope,
 	HighlightRanking,
-	TemporalUnit,
 	CombinedHighlight,
 	HighlightsGenerator,
 	HighlightDescriptor
 } from '../../types';
+import type { TemporalUnit } from '@/app/models/temporal-unit';
 
 // call each rule set's printers with standard data input shapes
 // save as fixtures

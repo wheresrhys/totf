@@ -10,9 +10,9 @@ import { isNumericHighlightValue } from '../types';
 import {
 	getPlural,
 	getSpaceForUnit,
-	type TemporalUnit,
 	type SpeciesName
 } from '@/app/components/shared/StatOutput';
+import type { TemporalUnit } from '@/app/models/temporal-unit';
 const fullMonthNames = [
 	undefined,
 	'January',

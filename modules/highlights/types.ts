@@ -4,7 +4,6 @@ import type {
 } from '@/app/models/db';
 import type { TemporalUnit } from '@/app/models/temporal-unit';
 import type { StatUnit } from '@/app/components/shared/StatOutput';
-export type { TemporalUnit } from '@/app/models/temporal-unit';
 export type { StatUnit } from '@/app/components/shared/StatOutput';
 
 export type YearMonthRestriction = {
