@@ -5,6 +5,7 @@ import {
 	groupSpeciesByFirstLetter,
 	type SpeciesWithBirdsCount
 } from '@/app/models/species';
+import type { SimpleSpeciesRow } from '@/app/layout'
 
 const PANEL_ID = 'species-alphabet-nav-panel';
 
@@ -16,7 +17,7 @@ const PANEL_ID = 'species-alphabet-nav-panel';
 export function SpeciesAlphabetNav({
 	species
 }: {
-	species: SpeciesWithBirdsCount[];
+		species: SpeciesWithBirdsCount[] | SimpleSpeciesRow[];
 }) {
 	const [expandedLetter, setExpandedLetter] = useState<string | null>(null);
 	const groups = groupSpeciesByFirstLetter(species);

@@ -6,6 +6,9 @@ import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
 import { useSetRingingGroup } from './RingingGroupProvider';
 import { logout } from '@/app/actions/logout';
 import type { RingingGroupRow } from '@/app/models/db';
+import type { SimpleSpeciesRow } from '@/app/layout'
+import {
+	SpeciesAlphabetNav} from '@/app/components/SpeciesAlphabetNav'
 const moreLinks = [
 	{ href: '/mistakes', label: 'Mistakes' },
 	{ href: '/retraps', label: 'Retraps' },
@@ -165,10 +168,13 @@ function expanderReducer(
 export default function GlobalNav({
 	groups,
 	selectedGroupId,
-	readOnly = false
+	speciesList,
+	readOnly = false,
+	expandBirdNav = false
 }: {
 	groups: RingingGroupRow[];
 	selectedGroupId: number | null;
+		speciesList: SimpleSpeciesRow[];
 	// Set for an anonymous visitor viewing a group's public summary (#770) —
 	// there's no logged-in group at all, so this hides every nav aspect that
 	// assumes one: the group switcher, "Import data", "Log out", and the
@@ -177,12 +183,13 @@ export default function GlobalNav({
 	// Only the branding + viewed-group name remain, so a public visitor still
 	// knows whose data they're looking at.
 	readOnly?: boolean;
+		expandBirdNav: boolean;
 }) {
 	const pathname = usePathname();
 	const router = useRouter();
 	const setRingingGroup = useSetRingingGroup();
 	const [expanders, expandersDispatch] = useReducer(expanderReducer, {
-		search: false,
+		search: expandBirdNav,
 		mobileNav: false,
 		moreMenu: false,
 		userMenu: !selectedGroupId
@@ -318,6 +325,9 @@ export default function GlobalNav({
 										searchInputRef as React.RefObject<HTMLInputElement>
 									}
 								/>
+
+							</div><div className="p-4 pt-0 pb-2">
+								<SpeciesAlphabetNav species={speciesList} />
 							</div>
 						</Expander>
 						<Expander id="user-menu" isExpanded={expanders.userMenu}>
