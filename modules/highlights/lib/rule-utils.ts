@@ -6,10 +6,7 @@ type HighlightFinderOptions = {
 	// Rarity finders only: the most periods a species can have ever appeared in
 	// and still count as rare.
 	maxAppearances?: number;
-	// Rarity finders only: drop an appearance that falls in the earliest period
-	// of the working set — on the group's very first session (or first month, or
-	// first year) every species is trivially a first record, which says more
-	// about the start of the data than about the birds.
+	// Rarity finders only: drop an appearance in the working set's earliest period — see modules/highlights/CLAUDE.md.
 	suppressInEarliestPeriod?: boolean;
 	smallestWins?: boolean;
 };
@@ -25,6 +22,7 @@ export function getTopByPropertiesSum(
 	properties: (keyof StatsResult)[],
 	options?: HighlightFinderOptions
 ): (stats: StatsResult[]) => HighlightValue[] {
+	// Floor below which a finder's top value isn't distinctive enough to highlight — see modules/highlights/CLAUDE.md.
 	const threshold = options?.threshold ?? DEFAULT_THRESHOLD;
 	return (stats: StatsResult[]) => {
 		const potentialHighlights = stats.map((row) => ({

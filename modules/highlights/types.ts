@@ -88,16 +88,7 @@ type HighlightFormatters = {
 	combinedHighlightPrinter: CombinedHighlightPrinter;
 };
 
-/**
- * Which row shape a rule's `generator` reads. Every rule's stats now come from
- * the same `SimpleStatsCache`/`SimpleStatsCacheBySpecies` read (#1208/#1236),
- * so this is purely a *column-subset label* over that one row set — it names
- * no RPC. It was spelled `rpcName: 'core_stats' | 'biometrics_stats'` back when
- * a rule really did dispatch its own RPC call; `biometrics_stats` has since
- * been deleted from the schema outright (#1246), which would have left the
- * label naming a function that does not exist.
- */
-
+// Which row shape a rule's `generator` reads — see modules/highlights/CLAUDE.md for the field's history.
 export type HighlightsGenerator = {
 	formatters: HighlightFormatters;
 	descriptor: HighlightDescriptor;

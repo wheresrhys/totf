@@ -2,6 +2,8 @@ import type { CombinedHighlight, NewHighlightValue } from '../../types';
 import { getRule } from '../rule-registry';
 import { sortByPositionAndTimeWindow } from '../highlight-utils';
 
+// Drops a highlight that a broader-scoped sibling already covers for the same metric — see
+// modules/highlights/CLAUDE.md's "Pipeline phases" for the full clobbering rules.
 export function removeLessSignificantHighlights(
 	highlights: NewHighlightValue[]
 ): NewHighlightValue[] {
@@ -12,19 +14,14 @@ export function removeLessSignificantHighlights(
 
 		return !highlights.some(
 			(potentialClobber, j) =>
-				// don't compare with self
 				i !== j &&
-				// don't clobber highlights of a completely different type
 				potentialClobber.descriptor.type === highlight.descriptor.type &&
 				potentialClobber.descriptor.category ===
 					highlight.descriptor.category &&
 				potentialClobber.scope.temporalUnit === highlight.scope.temporalUnit &&
 				potentialClobber.scope.species === highlight.scope.species &&
-				// clobberer must be higher ranked than subject, e.g. can't  clobber 1st place with 2nd place
 				potentialClobber.ranking.position >= highlight.ranking.position &&
-				// only clobber with highlights that are scoped to all time
 				!potentialClobber.scope.parentTimeWindow &&
-				// don't clobbe if equal position but the more locally scoped item is not tied when the global one is tied
 				!(
 					highlight.ranking.position === potentialClobber.ranking.position &&
 					potentialClobber.ranking.isTied &&

@@ -36,10 +36,7 @@ export const eachSpeciesCount: HighlightsGenerator = {
 			threshold: 2
 		})(rows);
 		const max = Math.max(...results.map((result) => result.value as number));
-		// avoids outputting a highlight for a low count if that count is quite common
-		// e.g. we catch 2 kingfishers every now and then, but never more than 2. No need to highlight the
-		// catch of 2 every time it happens
-		// conversely, we have only ever caught a amx of 2 redpoll, but this is (maybe?) worth mentioning
+		// Suppresses a low max count that recurs often — see modules/highlights/CLAUDE.md.
 		if (max < 5) {
 			const occasionsWithMax = results.filter(
 				(result) => result.value === max
