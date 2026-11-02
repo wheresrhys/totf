@@ -8,13 +8,13 @@ import {
 import type {
 	CombinedHighlight,
 	HighlightCategory
-} from '@/modules/highlights/types';
+} from '@/modules/highlights';
 import type { SessionEncounter } from '@/app/models/session';
 
 // Rarities (#990), Counts (#989) and Vital stats all come from the v2
 // highlights pipeline's getAllHighlightsAcrossScopes — see
 // session-tab-config.ts. Mock it as the one collaborator it is.
-vi.mock('@/modules/highlights/lib/pipeline/run-highlights-pipeline', () => ({
+vi.mock('@/modules/highlights', () => ({
 	getAllHighlightsAcrossScopes: vi.fn()
 }));
 
@@ -93,7 +93,7 @@ afterEach(() => {
 describe('fetchSessionHighlights', () => {
 	async function mockPipeline(highlights: CombinedHighlight[]) {
 		const { getAllHighlightsAcrossScopes } =
-			await import('@/modules/highlights/lib/pipeline/run-highlights-pipeline');
+			await import('@/modules/highlights');
 		vi.mocked(getAllHighlightsAcrossScopes).mockResolvedValue({
 			inter: highlights,
 			intra: []

@@ -32,16 +32,6 @@ vi.mock('@/app/actions/period-totals', () => ({
 	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
 }));
 
-// Both branches of this route have a Highlights tab that generates highlights
-// on the client, on mount — mocked here so a `?tabId=highlights` render
-// doesn't reach the real stats pipeline.
-const getHighlightsWithinTimeWindowMock = vi.fn().mockResolvedValue([]);
-vi.mock('@/modules/highlights', () => ({
-	getHighlightsWithinTimeWindow: (...args: unknown[]) =>
-		getHighlightsWithinTimeWindowMock(...args),
-	getCondensedHighlightsAtTimePeriod: vi.fn().mockResolvedValue([])
-}));
-
 function renderSummaryYearPage(yearOrMonth = '2026', tabId?: string) {
 	return Page({
 		params: Promise.resolve({ yearOrMonth }),
@@ -58,7 +48,6 @@ describe('/summary/[yearOrMonth]', () => {
 		fetchSpeciesDataMock.mockResolvedValue([]);
 		fetchPeriodTotalsMock.mockClear();
 		fetchPeriodTotalsMock.mockResolvedValue([]);
-		getHighlightsWithinTimeWindowMock.mockClear();
 	});
 
 	it('renders "{year} summary" for a well-formed year', async () => {
@@ -348,7 +337,6 @@ describe('/summary/[yearOrMonth]', () => {
 				);
 				expect(data).toMatchObject({ squashedMonth: 1 });
 				expect('initialTabData' in data && data.initialTabData).toBeFalsy();
-				expect(getHighlightsWithinTimeWindowMock).not.toHaveBeenCalled();
 			});
 
 			it('falls back to the default (Species totals) tab for an unknown ?tabId= value', async () => {

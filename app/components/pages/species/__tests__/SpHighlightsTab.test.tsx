@@ -8,16 +8,13 @@ import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 
 // `SpHighlightsTab.tsx` statically imports `fetchNotableRetraps` (a real
 // server action whose module eagerly constructs a Supabase client at import
-// time) and `getHighlightsWithinTimeWindow` purely to build its
-// `fetchHighlightsTabData`/`spHighlightsTab` exports — neither is actually
-// called by these tests (they drive `TabContent` with their own stub
-// `dataFetcher` instead), but the module still needs mocking out so merely
-// importing the component doesn't throw on a missing Supabase URL.
+// time) purely to build its `fetchHighlightsTabData`/`spHighlightsTab`
+// exports — it is not actually called by these tests (they drive
+// `TabContent` with their own stub `dataFetcher` instead), but the module
+// still needs mocking out so merely importing the component doesn't throw on
+// a missing Supabase URL.
 vi.mock('@/app/actions/sp-data', () => ({
 	fetchNotableRetraps: vi.fn()
-}));
-vi.mock('@/modules/highlights', () => ({
-	getHighlightsWithinTimeWindow: vi.fn()
 }));
 
 // `SpHighlightsTab` is a pure presentational `TabConfig.TabComponent`
