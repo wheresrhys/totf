@@ -5,7 +5,7 @@ import {
 import {
 	type CombinedHighlight,
 	type HighlightCategory
-} from '@/modules/highlights/types';
+} from '@/modules/highlights';
 import { ReportHighlightButton } from '@/app/components/ReportHighlightButton';
 import type { SessionTabParams } from './session-tab-config';
 
