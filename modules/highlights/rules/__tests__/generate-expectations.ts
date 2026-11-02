@@ -1,4 +1,4 @@
-import { highlightRules } from '..';
+import { highlightRules } from '../../lib/rule-registry';
 import { getCombinedHighlightFixtures } from './fixture-generator';
 import type { CombinedHighlight } from '../../types';
 import { writeFileSync } from 'node:fs';
@@ -24,6 +24,6 @@ const fixtures = Object.fromEntries(
 );
 
 writeFileSync(
-	'./app/lib/highlights/rules/__tests__/expectations.ts',
+	'./modules/highlights/rules/__tests__/expectations.ts',
 	`export const expectations = ${JSON.stringify(fixtures, null, '\t')}`
 );
