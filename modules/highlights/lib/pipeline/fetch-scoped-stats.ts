@@ -27,10 +27,7 @@ export async function getScopedHighlightsOfType({
 	limit
 }: HighlightsOfTypeParams): Promise<NewHighlightValue[]> {
 	const rule = getRule(highlightType);
-	// `pooledStatsCacheFetch`/`readStatsCacheRows` return plain
-	// `Record<string, unknown>[]` rows (#1236) — narrowed here to the shape
-	// every Highlights rule already expects, same as every other
-	// `readStatsCacheRows`-family caller narrows its own result.
+	// Narrows the fetch pool's plain `Record<string, unknown>[]` return to the shape every rule expects — see modules/highlights/CLAUDE.md.
 	const baseData = (await globalStatsCacheFetchPool.fetch({
 		viewedGroup,
 		bySpecies: Boolean(species) || rule.speciesUsed !== 'none',

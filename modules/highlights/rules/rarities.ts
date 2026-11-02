@@ -16,11 +16,7 @@ function getAppearances(stats: StatsResult[]): StatsResult[] {
 
 export const rarities: HighlightsGenerator = {
 	formatters: {
-		// Only scopes[0] is read. Unlike a count metric, where each extra scope
-		// adds information ("busiest ever AND busiest of 2020"), every extra scope
-		// on a first record merely restates the broadest one: a species' first
-		// record ever is necessarily also its first of that year. scopes[0] is the
-		// broadest (see sortByPositionAndTimeWindow), so it is the one to print.
+		// Only scopes[0] (the broadest) is ever read — see modules/highlights/CLAUDE.md.
 		combinedHighlightPrinter: (combinedHighlight) =>
 			printCombinedHighlight(combinedHighlight, {
 				onlyBroadestScope: true,
@@ -31,8 +27,7 @@ export const rarities: HighlightsGenerator = {
 	},
 	descriptor: {
 		type: 'rarities',
-		// The value carried is the cell's encounter count, which only ever gets
-		// read as the singular/plural switch on the species name above.
+		// The carried value is only ever read for the species-name singular/plural switch — see modules/highlights/CLAUDE.md.
 		unit: 'encounter',
 		category: 'rarity'
 	},
@@ -69,20 +64,9 @@ export const rarities: HighlightsGenerator = {
 				species: appearance.species_name
 			}));
 		}
-		// if (/\/04|05|10|11\//.test(appearances[0].time_period)) {
-		// 	return [
-		// 		{
-		// 			timePeriod: appearances[0].time_period,
-		// 			value: 'first',
-		// 			species: appearances[0].species_name
-		// 		}
-		// 	];
-		// }
 		return [];
 	},
-	// A month-only window asks "of any February", which has no coherent reading
-	// as a first record — the earliest February a species appeared in is not a
-	// first of anything.
+	// A month-only window has no coherent reading as a first record — see modules/highlights/CLAUDE.md.
 	condition: (scope) => !scope.parentTimeWindow?.month,
 	speciesUsed: 'grouped',
 	presence: {

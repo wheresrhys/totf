@@ -42,10 +42,7 @@ export function printTemporalUnit(
 export function pluraliseSpecies(subject: string) {
 	return getPlural(subject as SpeciesName);
 }
-// The species name agreeing with the count the sentence is about: "Robin" for a
-// single bird, "Robins" for more. Used by the rarity rules, whose sentences name
-// the species instead of a unit ("First Robins ever" rather than "First Robin
-// records ever"), so the species name is what has to agree with the value.
+// The species name pluralised to agree with the count the sentence is about — see modules/highlights/CLAUDE.md.
 export function printSpeciesForCount(
 	species: string | undefined,
 	count: number
@@ -126,7 +123,6 @@ export function printTimeQualifier(
 	}
 	const { year, month } = timeQualifier;
 	if (year && month) {
-		// todo pretty print month
 		return year === new Date().getFullYear()
 			? `this ${month}`
 			: `${options.monthConnector ?? 'of'} ${month} ${year}`;
@@ -140,9 +136,6 @@ export function printTimeQualifier(
 }
 // todo enforce length of min 1 in the types
 function sentenceJoin(clauses: string[]): string {
-	// if (clauses.length) {
-	// 	throw new Error('combined highlight with no scopes listed');
-	// }
 	let sentence = clauses.pop() as string;
 
 	if (clauses.length) {
@@ -177,10 +170,7 @@ export function printCombinedHighlight(
 		firstLineItem?: (input: Omit<LineItemInput, 'index'>) => string;
 		lineItem: (input: LineItemInput) => string;
 		shouldPrintValue: boolean;
-		// Some metrics (first/only/rare species records) are the same fact whichever
-		// scope they were found at, so a narrower scope is discarded rather than
-		// combined into the sentence — set this instead of relying on firstLineItem,
-		// which still prints every scope.
+		// Discards every scope but the broadest instead of combining them — see modules/highlights/CLAUDE.md.
 		onlyBroadestScope?: boolean;
 	}
 ): string {
