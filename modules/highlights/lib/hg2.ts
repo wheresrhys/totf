@@ -7,93 +7,13 @@ import type {
 } from '../types';
 import { getRule, ruleTypes } from './rule-registry';
 import { getPresence, getTimeWindow } from './pipeline/scope-config';
+import { getScopedHighlightsOfType } from './pipeline/fetch-scoped-stats';
 import {
-	getHighlightsOfTypeFromStatsRows,
-	filterStats,
-	getTimePeriodSampler,
 	sortHighlights,
 	sortByPositionAndTimeWindow
 } from './highlight-utils';
-import { globalStatsCacheFetchPool, type StatsResult } from '@/modules/stats/browser';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import { groupByColumn } from '@/app/lib/generic-utils';
-
-async function getScopedHighlightsOfType({
-	highlightType,
-	viewedGroup,
-	timePeriod,
-	lakeTimeWindow,
-	samplesTimeWindow,
-	temporalUnit,
-	species,
-	limit
-}: HighlightsOfTypeParams): Promise<NewHighlightValue[]> {
-	const rule = getRule(highlightType);
-	// `pooledStatsCacheFetch`/`readStatsCacheRows` return plain
-	// `Record<string, unknown>[]` rows (#1236) — narrowed here to the shape
-	// every Highlights rule already expects, same as every other
-	// `readStatsCacheRows`-family caller narrows its own result.
-	const baseData = (await globalStatsCacheFetchPool.fetch({
-		viewedGroup,
-		bySpecies: Boolean(species) || rule.speciesUsed !== 'none',
-		temporalUnit
-	})) as StatsResult[];
-
-	const filteredStats = filterStats({
-		rule,
-		scope: {
-			temporalUnit,
-			parentTimeWindow: lakeTimeWindow,
-			species
-		},
-		viewedGroup,
-		baseData
-	});
-
-	const samplesTimeWindowFilter = getTimePeriodSampler(
-		timePeriod,
-		samplesTimeWindow
-	);
-
-	if (rule.speciesUsed === 'grouped') {
-		const dataPerSpecies = groupByColumn('species_name', filteredStats);
-		return Object.entries(dataPerSpecies).flatMap(([species, data]) => {
-			const scope = {
-				temporalUnit,
-				species,
-				parentTimeWindow: lakeTimeWindow
-			};
-			return getHighlightsOfTypeFromStatsRows({
-				rule,
-				stats: data,
-				limit,
-				timeWindowFilter: samplesTimeWindowFilter,
-				scope
-			}).map((value) => ({
-				...value,
-				scope,
-				descriptor: rule.descriptor
-			})) as NewHighlightValue[];
-		});
-	} else {
-		const scope = {
-			temporalUnit,
-			parentTimeWindow: lakeTimeWindow
-		};
-		return getHighlightsOfTypeFromStatsRows({
-			rule,
-			stats: filteredStats,
-			limit,
-			timeWindowFilter: samplesTimeWindowFilter,
-			scope
-		}).map((value) => ({
-			...value,
-			scope,
-			descriptor: rule.descriptor
-		})) as NewHighlightValue[];
-	}
-}
 
 export async function getRawHighlightsOfTypeAcrossScopes({
 	highlightType,
