@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 import {
 	getTimePeriodSampler,
@@ -6,15 +6,24 @@ import {
 	getTemporalUnitFromTimeWindow,
 	sortByPositionAndTimeWindow,
 	limitHighlights,
+	dateToYearMonth,
+	getHighlightsOfTypeFromStatsRows,
+	buildTimeWindowFilter,
+	getCacheKey,
+	getFilteredStatsCache,
+	getSpeciesFilter,
+	sortHighlights,
 	type PositionAndTimeWindow
 } from '../highlight-utils';
 import type {
 	HighlightsGenerator,
 	HighlightScope,
-	HighlightValue
+	HighlightValue,
+	CombinedHighlight
 } from '../../types';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { StatsResult } from '@/modules/stats';
+import type { SimpleStatsCacheRow } from '@/app/models/db';
 
 describe('getTimePeriodSampler', () => {
 	it('returns an always-true filter when no timePeriod is given', () => {
@@ -356,5 +365,291 @@ describe('limitHighlights', () => {
 				['2020-05-04', false]
 			]);
 		});
+	});
+});
+
+describe('dateToYearMonth', () => {
+	it('splits a YYYY-MM-DD string into numeric year and month', () => {
+		expect(dateToYearMonth('2020-05-15')).toStrictEqual({
+			year: 2020,
+			month: 5
+		});
+	});
+});
+
+describe('getHighlightsOfTypeFromStatsRows', () => {
+	const stats = [{ time_period: '2020-05-10' } as SimpleStatsCacheRow];
+	const scope: HighlightScope = { temporalUnit: 'month' };
+
+	const baseRule = (): HighlightsGenerator => ({
+		formatters: { combinedHighlightPrinter: () => '' },
+		descriptor: { category: 'count', type: 'test-highlight', unit: 'encounter' },
+		speciesUsed: 'none',
+		generator: () => []
+	});
+
+	const ruleReturning = (highlights: HighlightValue[]): HighlightsGenerator => ({
+		...baseRule(),
+		generator: () => highlights
+	});
+
+	it("calls the rule's generator with the given stats and scope", () => {
+		const generator = vi.fn().mockReturnValue([]);
+		const rule: HighlightsGenerator = { ...baseRule(), generator };
+
+		getHighlightsOfTypeFromStatsRows({
+			rule,
+			stats,
+			timeWindowFilter: () => true,
+			limit: 3,
+			scope
+		});
+
+		expect(generator).toHaveBeenCalledWith(stats, scope);
+	});
+
+	it('limits the generated highlights via limitHighlights before filtering by time window', () => {
+		const rawHighlights: HighlightValue[] = [
+			{ timePeriod: '2020-05-01', value: 50, species: null },
+			{ timePeriod: '2020-05-02', value: 40, species: null },
+			{ timePeriod: '2020-05-03', value: 30, species: null }
+		];
+
+		const result = getHighlightsOfTypeFromStatsRows({
+			rule: ruleReturning(rawHighlights),
+			stats,
+			timeWindowFilter: () => true,
+			limit: 2,
+			scope
+		});
+
+		expect(result.map(({ timePeriod }) => timePeriod)).toStrictEqual([
+			'2020-05-01',
+			'2020-05-02'
+		]);
+	});
+
+	it('drops a ranked highlight whose timePeriod fails the timeWindowFilter', () => {
+		const rawHighlights: HighlightValue[] = [
+			{ timePeriod: '2020-05-01', value: 50, species: null },
+			{ timePeriod: '2020-06-01', value: 40, species: null }
+		];
+
+		const result = getHighlightsOfTypeFromStatsRows({
+			rule: ruleReturning(rawHighlights),
+			stats,
+			timeWindowFilter: (timePeriod) => timePeriod.startsWith('2020-05'),
+			limit: 5,
+			scope
+		});
+
+		expect(result.map(({ timePeriod }) => timePeriod)).toStrictEqual([
+			'2020-05-01'
+		]);
+	});
+});
+
+describe('buildTimeWindowFilter', () => {
+	it('returns an always-true filter when no parentTimeWindow is given', () => {
+		const filter = buildTimeWindowFilter();
+
+		expect(filter('2020-05-10')).toBe(true);
+		expect(filter('anything-at-all')).toBe(true);
+	});
+
+	it('matches a year+month prefix when both are set', () => {
+		const filter = buildTimeWindowFilter({ year: 2020, month: 5 });
+
+		expect(filter('2020-05-10')).toBe(true);
+		expect(filter('2020-06-10')).toBe(false);
+	});
+
+	it('matches a year-only prefix when only year is set', () => {
+		const filter = buildTimeWindowFilter({ year: 2020 });
+
+		expect(filter('2020-05-10')).toBe(true);
+		expect(filter('2021-05-10')).toBe(false);
+	});
+
+	it('matches any month occurrence when only month is set', () => {
+		const filter = buildTimeWindowFilter({ month: 5 });
+
+		expect(filter('2020-05-10')).toBe(true);
+		expect(filter('2020-06-10')).toBe(false);
+	});
+});
+
+describe('getCacheKey', () => {
+	const scope = (
+		overrides: Partial<HighlightScope> = {}
+	): HighlightScope => ({
+		temporalUnit: 'month',
+		...overrides
+	});
+
+	it('builds a base key from groupId, temporalUnit, limit, and species', () => {
+		expect(getCacheKey(1201, scope({ species: 'Blackbird' }), 5)).toBe(
+			'1201-month-5-Blackbird'
+		);
+	});
+
+	it("falls back to 'no-limit'/'no-species' when those are omitted", () => {
+		expect(getCacheKey(1202, scope())).toBe('1202-month-no-limit-no-species');
+	});
+
+	it('appends year and/or month when parentTimeWindow is given', () => {
+		expect(
+			getCacheKey(1203, scope({ parentTimeWindow: { year: 2020, month: 5 } }))
+		).toBe('1203-month-no-limit-no-species-2020-5');
+		expect(
+			getCacheKey(1204, scope({ parentTimeWindow: { year: 2020 } }))
+		).toBe('1204-month-no-limit-no-species-2020');
+		expect(
+			getCacheKey(1205, scope({ parentTimeWindow: { month: 5 } }))
+		).toBe('1205-month-no-limit-no-species-5');
+	});
+});
+
+describe('getFilteredStatsCache', () => {
+	const scope = (
+		overrides: Partial<HighlightScope> = {}
+	): HighlightScope => ({
+		temporalUnit: 'month',
+		...overrides
+	});
+
+	it('reports has() false before anything has been set for a given key', () => {
+		const cache = getFilteredStatsCache(4101, scope(), 'present');
+
+		expect(cache.has()).toBe(false);
+	});
+
+	it('reports has() true and returns the same value after set() for that key', () => {
+		const cache = getFilteredStatsCache(4102, scope(), 'present');
+		const filteredStats = [{ time_period: '2020-05-10' } as SimpleStatsCacheRow];
+
+		cache.set(filteredStats);
+
+		expect(cache.has()).toBe(true);
+		expect(cache.get()).toStrictEqual(filteredStats);
+	});
+
+	it('keys independently by speciesUsed, even for the same groupId/scope', () => {
+		const sharedScope = scope();
+		const presentCache = getFilteredStatsCache(4103, sharedScope, 'present');
+		const groupedCache = getFilteredStatsCache(4103, sharedScope, 'grouped');
+
+		presentCache.set([{ time_period: '2020-05-10' } as SimpleStatsCacheRow]);
+
+		expect(groupedCache.has()).toBe(false);
+	});
+});
+
+describe('getSpeciesFilter', () => {
+	it('returns an always-true filter when no species is given', () => {
+		const filter = getSpeciesFilter();
+
+		expect(filter('Blackbird')).toBe(true);
+		expect(filter(null)).toBe(true);
+	});
+
+	it('returns an exact species_name match filter when species is given', () => {
+		const filter = getSpeciesFilter('Blackbird');
+
+		expect(filter('Blackbird')).toBe(true);
+		expect(filter('Robin')).toBe(false);
+	});
+});
+
+describe('sortHighlights', () => {
+	const combinedHighlight = (
+		overrides: Partial<CombinedHighlight> = {}
+	): CombinedHighlight => ({
+		formatters: { combinedHighlightPrinter: () => '' },
+		descriptor: { category: 'count', type: 'test-highlight', unit: 'encounter' },
+		value: { timePeriod: '2020-05-10', value: 10, species: null },
+		species: undefined,
+		bestPosition: 1,
+		scopes: [
+			{
+				scope: { temporalUnit: 'year', parentTimeWindow: { year: 2020 } },
+				ranking: { position: 1, isTied: false }
+			}
+		],
+		...overrides
+	});
+
+	it('orders by highlightCategoryOrder (rarity, count, biometrics, demographics) first', () => {
+		const demographics = combinedHighlight({
+			descriptor: { category: 'demographics', type: 'a', unit: 'encounter' }
+		});
+		const rarity = combinedHighlight({
+			descriptor: { category: 'rarity', type: 'b', unit: 'encounter' }
+		});
+		const biometrics = combinedHighlight({
+			descriptor: { category: 'biometrics', type: 'c', unit: 'encounter' }
+		});
+		const count = combinedHighlight({
+			descriptor: { category: 'count', type: 'd', unit: 'encounter' }
+		});
+
+		expect(
+			sortHighlights([demographics, rarity, biometrics, count]).map(
+				({ descriptor }) => descriptor.category
+			)
+		).toStrictEqual(['rarity', 'count', 'biometrics', 'demographics']);
+	});
+
+	it('places a species-scoped highlight after a non-species one within the same category', () => {
+		const speciesScoped = combinedHighlight({ species: 'Blackbird' });
+		const generalScoped = combinedHighlight({ species: undefined });
+
+		expect(
+			sortHighlights([speciesScoped, generalScoped]).map(
+				({ species }) => species
+			)
+		).toStrictEqual([undefined, 'Blackbird']);
+	});
+
+	it('falls back to sortByPositionAndTimeWindow for same-category, same-species-ness entries', () => {
+		const secondPlace = combinedHighlight({
+			bestPosition: 3,
+			scopes: [
+				{
+					scope: { temporalUnit: 'year', parentTimeWindow: { year: 2020 } },
+					ranking: { position: 3, isTied: false }
+				}
+			]
+		});
+		const firstPlace = combinedHighlight({
+			bestPosition: 1,
+			scopes: [
+				{
+					scope: { temporalUnit: 'year', parentTimeWindow: { year: 2021 } },
+					ranking: { position: 1, isTied: false }
+				}
+			]
+		});
+
+		expect(
+			sortHighlights([secondPlace, firstPlace]).map(
+				({ bestPosition }) => bestPosition
+			)
+		).toStrictEqual([1, 3]);
+	});
+
+	it('breaks a remaining tie by descending numeric value', () => {
+		const lowerValue = combinedHighlight({
+			value: { timePeriod: '2020-05-10', value: 10, species: null }
+		});
+		const higherValue = combinedHighlight({
+			value: { timePeriod: '2020-05-10', value: 20, species: null }
+		});
+
+		expect(
+			sortHighlights([lowerValue, higherValue]).map(
+				({ value }) => value.value
+			)
+		).toStrictEqual([20, 10]);
 	});
 });
