@@ -9,7 +9,7 @@ import type {
 	NewHighlightValue,
 	HighlightGenerationConfig
 } from '../types';
-import { getRule, ruleTypes } from '../rules';
+import { getRule, ruleTypes } from './rule-registry';
 import {
 	dateToYearMonth,
 	getHighlightsOfTypeFromStatsRows,
