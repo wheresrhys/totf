@@ -46,7 +46,8 @@ does plus `dispatchStatsCacheRefreshEvents`/`refreshSimpleStatsCache`, which pul
 no external caller and isn't re-exported from either barrel — module-internal only.
 
 **Any file reachable from a Client Component must import from `@/modules/stats/browser`, never
-the bare `@/modules/stats` barrel.** `modules/highlights`'s `hg2.ts` and the species page's
+the bare `@/modules/stats` barrel.** `modules/highlights`'s stats-fetching pipeline file (now
+`lib/pipeline/fetch-scoped-stats.ts`) and the species page's
 `SpDemographicsTab.tsx` (`'use client'`) both once broke the dev build (`Module not found:
 @opentelemetry/api`) by importing the full barrel and dragging the queue dependency into the
 browser bundle. Server-only call sites (`app/api/import/route.ts`,
