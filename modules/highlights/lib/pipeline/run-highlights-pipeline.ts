@@ -1,11 +1,11 @@
-import { ruleTypes } from './rule-registry';
-import { getRawHighlightsOfTypeAcrossScopes } from './pipeline/fan-out-raw-highlights';
+import { ruleTypes } from '../rule-registry';
+import { getRawHighlightsOfTypeAcrossScopes } from './fan-out-raw-highlights';
 import {
 	removeLessSignificantHighlights,
 	combineSimilarHighlights
-} from './pipeline/combine-highlights';
-import { sortHighlights } from './highlight-utils';
-import type { HighlightOutlook } from '../types';
+} from './combine-highlights';
+import { sortHighlights } from '../highlight-utils';
+import type { HighlightOutlook } from '../../types';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 

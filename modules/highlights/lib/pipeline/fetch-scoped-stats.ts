@@ -1,7 +1,4 @@
-import type {
-	NewHighlightValue,
-	HighlightsOfTypeParams
-} from '../../types';
+import type { NewHighlightValue, HighlightsOfTypeParams } from '../../types';
 import { getRule } from '../rule-registry';
 import {
 	getHighlightsOfTypeFromStatsRows,
@@ -13,7 +10,10 @@ import {
 // barrel, dragging `@opentelemetry/api` into the client bundle (see
 // `modules/stats/CLAUDE.md`). Every file here that touches stats keeps
 // importing `/browser`.
-import { globalStatsCacheFetchPool, type StatsResult } from '@/modules/stats/browser';
+import {
+	globalStatsCacheFetchPool,
+	type StatsResult
+} from '@/modules/stats/browser';
 import { groupByColumn } from '@/app/lib/generic-utils';
 
 export async function getScopedHighlightsOfType({
