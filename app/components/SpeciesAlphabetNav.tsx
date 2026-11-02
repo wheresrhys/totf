@@ -1,10 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import {
-	groupSpeciesByFirstLetter,
-	type SpeciesWithBirdsCount
-} from '@/app/models/species';
+import { groupSpeciesByFirstLetter } from '@/app/models/species';
 import type { SimpleSpeciesRow } from '@/app/lib/global-nav-data';
 
 const PANEL_ID = 'species-alphabet-nav-panel';
@@ -14,12 +11,11 @@ const PANEL_ID = 'species-alphabet-nav-panel';
 // Tapping a letter expands an absolutely-positioned panel of links to that
 // letter's species pages — absolute (not in normal flow) so opening it never
 // shifts the content below, per the ticket's explicit requirement. Renders
-// both on the home page (SpeciesWithBirdsCount, via PageContent.tsx) and in
-// GlobalNav's header search panel (the lighter SimpleSpeciesRow).
+// in GlobalNav's header search panel, fed by the viewed group's species.
 export function SpeciesAlphabetNav({
 	species
 }: {
-	species: SpeciesWithBirdsCount[] | SimpleSpeciesRow[];
+	species: SimpleSpeciesRow[];
 }) {
 	const [expandedLetter, setExpandedLetter] = useState<string | null>(null);
 	const groups = groupSpeciesByFirstLetter(species);

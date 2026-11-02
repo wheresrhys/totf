@@ -1,12 +1,3 @@
-import type { SpeciesRow } from './db';
-
-// Powers the home page's species-by-letter nav (#1025): the group's species
-// (already filtered to ones with at least one bird recorded), grouped for an
-// alphabet-button UI rather than the previous top-10-by-count badge list.
-export type SpeciesWithBirdsCount = Pick<SpeciesRow, 'id' | 'species_name'> & {
-	birds: { count: number }[];
-};
-
 export type SpeciesAlphabetGroup<T> = {
 	letter: string;
 	species: T[];
