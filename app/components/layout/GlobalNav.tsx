@@ -3,9 +3,11 @@ import { useRef, useEffect, useReducer } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
+import { SpeciesAlphabetNav } from '@/app/components/SpeciesAlphabetNav';
 import { useSetRingingGroup } from './RingingGroupProvider';
 import { logout } from '@/app/actions/logout';
 import type { RingingGroupRow } from '@/app/models/db';
+import type { SimpleSpeciesRow } from '@/app/lib/global-nav-data';
 const moreLinks = [
 	{ href: '/mistakes', label: 'Mistakes' },
 	{ href: '/retraps', label: 'Retraps' },
@@ -165,10 +167,15 @@ function expanderReducer(
 export default function GlobalNav({
 	groups,
 	selectedGroupId,
+	speciesList = [],
 	readOnly = false
 }: {
 	groups: RingingGroupRow[];
 	selectedGroupId: number | null;
+	// The viewed group's species, for the species-by-letter nav shown
+	// alongside ring-number search. Omitted (and defaulted to []) for a
+	// readOnly GlobalNav, which never renders that panel.
+	speciesList?: SimpleSpeciesRow[];
 	// Set for an anonymous visitor viewing a group's public summary (#770) —
 	// there's no logged-in group at all, so this hides every nav aspect that
 	// assumes one: the group switcher, "Import data", "Log out", and the
@@ -318,6 +325,9 @@ export default function GlobalNav({
 										searchInputRef as React.RefObject<HTMLInputElement>
 									}
 								/>
+							</div>
+							<div className="p-4 pt-0 pb-2">
+								<SpeciesAlphabetNav species={speciesList} />
 							</div>
 						</Expander>
 						<Expander id="user-menu" isExpanded={expanders.userMenu}>

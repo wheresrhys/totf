@@ -5,18 +5,21 @@ import {
 	groupSpeciesByFirstLetter,
 	type SpeciesWithBirdsCount
 } from '@/app/models/species';
+import type { SimpleSpeciesRow } from '@/app/lib/global-nav-data';
 
 const PANEL_ID = 'species-alphabet-nav-panel';
 
-// Home page species nav (#1025): one small circular button per letter that
+// Species-by-letter nav (#1025): one small circular button per letter that
 // has at least one of the group's species, wrapping onto multiple lines.
 // Tapping a letter expands an absolutely-positioned panel of links to that
 // letter's species pages — absolute (not in normal flow) so opening it never
-// shifts the content below, per the ticket's explicit requirement.
+// shifts the content below, per the ticket's explicit requirement. Renders
+// both on the home page (SpeciesWithBirdsCount, via PageContent.tsx) and in
+// GlobalNav's header search panel (the lighter SimpleSpeciesRow).
 export function SpeciesAlphabetNav({
 	species
 }: {
-	species: SpeciesWithBirdsCount[];
+	species: SpeciesWithBirdsCount[] | SimpleSpeciesRow[];
 }) {
 	const [expandedLetter, setExpandedLetter] = useState<string | null>(null);
 	const groups = groupSpeciesByFirstLetter(species);
