@@ -4,38 +4,30 @@ import { getGroupCookie } from '@/app/actions/group-cookie';
 import { AuthorisedView } from '../layout';
 
 const {
-	mockFrom,
-	mockOrder,
+	mockFetchRingingGroups,
+	mockFetchSpeciesNames,
 	mockGetRequestPathname,
-	mockResolvePublicPageViewedGroupId
-} = vi.hoisted(() => {
-	const mockOrder = vi.fn();
-	const mockSelect = vi.fn(() => ({ order: mockOrder }));
-	const mockFrom = vi.fn(() => ({ select: mockSelect }));
-	return {
-		mockFrom,
-		mockOrder,
-		mockGetRequestPathname: vi.fn(),
-		mockResolvePublicPageViewedGroupId: vi.fn()
-	};
-});
+	mockResolvePublicPageViewedGroupId,
+	mockShouldExpandBirdNavByDefault
+} = vi.hoisted(() => ({
+	mockFetchRingingGroups: vi.fn(),
+	mockFetchSpeciesNames: vi.fn(),
+	mockGetRequestPathname: vi.fn(),
+	mockResolvePublicPageViewedGroupId: vi.fn(),
+	mockShouldExpandBirdNavByDefault: vi.fn()
+}));
 
-vi.mock('@/lib/supabase', () => ({
-	supabase: { from: mockFrom },
-	catchSupabaseErrors: ({
-		data,
-		error
-	}: {
-		data: unknown;
-		error: { message: string } | null;
-	}) => {
-		if (error) throw new Error(`Supabase error: ${error.message}`);
-		return data;
-	}
+vi.mock('@/app/lib/global-nav-data', () => ({
+	fetchRingingGroups: mockFetchRingingGroups,
+	fetchSpeciesNames: mockFetchSpeciesNames
 }));
 
 vi.mock('@/app/lib/request-pathname', () => ({
 	getRequestPathname: mockGetRequestPathname
+}));
+
+vi.mock('@/app/lib/global-nav-expansion', () => ({
+	shouldExpandBirdNavByDefault: mockShouldExpandBirdNavByDefault
 }));
 
 vi.mock('@/app/lib/auth/public-group-access', () => ({
@@ -54,10 +46,12 @@ const mockGroups = [{ id: 1, group_name: 'Alpha' }];
 
 describe('root layout', () => {
 	beforeEach(() => {
-		mockOrder.mockResolvedValue({ data: mockGroups, error: null });
+		mockFetchRingingGroups.mockResolvedValue(mockGroups);
+		mockFetchSpeciesNames.mockResolvedValue([]);
 		vi.mocked(getGroupCookie).mockResolvedValue(1);
 		mockGetRequestPathname.mockResolvedValue(null);
 		mockResolvePublicPageViewedGroupId.mockResolvedValue(null);
+		mockShouldExpandBirdNavByDefault.mockReturnValue(false);
 	});
 
 	afterEach(() => {
@@ -140,10 +134,48 @@ describe('root layout', () => {
 			expect(screen.queryByRole('button', { name: 'Login' })).toBeNull();
 		});
 
-		it('does not need to resolve pathname or public-page access at all', async () => {
+		it('resolves pathname (for the nav-expansion default) but never needs public-page access', async () => {
 			await AuthorisedView({ children: <p>child content</p> });
-			expect(mockGetRequestPathname).not.toHaveBeenCalled();
+			expect(mockGetRequestPathname).toHaveBeenCalled();
 			expect(mockResolvePublicPageViewedGroupId).not.toHaveBeenCalled();
+		});
+
+		it("fetches the selected group's species and passes them through to the nav's species-by-letter panel", async () => {
+			mockFetchSpeciesNames.mockResolvedValue([
+				{ id: 1, species_name: 'Robin' }
+			]);
+			render(await AuthorisedView({ children: <p>child content</p> }));
+			expect(mockFetchSpeciesNames).toHaveBeenCalledWith(
+				mockGroups[0],
+				expect.anything()
+			);
+			expect(
+				screen.getByRole('button', { name: 'Show species starting with R' })
+			).toBeDefined();
+		});
+
+		it('expands the search/species panel when the resolved pathname wants it expanded by default', async () => {
+			mockGetRequestPathname.mockResolvedValue('/');
+			mockShouldExpandBirdNavByDefault.mockReturnValue(true);
+			const { container } = render(
+				await AuthorisedView({ children: <p>child content</p> })
+			);
+			expect(mockShouldExpandBirdNavByDefault).toHaveBeenCalledWith('/');
+			const wrapper = container.querySelector('#ring-search-form-wrapper');
+			expect(wrapper?.classList.contains('hidden')).toBe(false);
+		});
+
+		it('leaves the search/species panel collapsed otherwise', async () => {
+			mockGetRequestPathname.mockResolvedValue('/sessions');
+			mockShouldExpandBirdNavByDefault.mockReturnValue(false);
+			const { container } = render(
+				await AuthorisedView({ children: <p>child content</p> })
+			);
+			expect(mockShouldExpandBirdNavByDefault).toHaveBeenCalledWith(
+				'/sessions'
+			);
+			const wrapper = container.querySelector('#ring-search-form-wrapper');
+			expect(wrapper?.classList.contains('hidden')).toBe(true);
 		});
 	});
 });

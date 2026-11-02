@@ -1,14 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-	render,
-	screen,
-	cleanup,
-	within,
-	fireEvent
-} from '@testing-library/react';
+import { render, screen, cleanup, within } from '@testing-library/react';
 import HomePage, { fetchHomePageSummaryStats } from '../page';
 import recentSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.recent-sessions.json';
-import topSpeciesSnapshot from '@/test-fixtures/snapshots/tables/Species/alpha.top-species.json';
 import summaryStatsSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.home-page-summary.json';
 import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/synthetic/zero.home-page-summary.json';
 import type { HomePageSummaryStats } from '../PageContent';
@@ -77,13 +70,11 @@ const defaultSummaryStats =
 function makeChainClient(
 	overrides: {
 		Sessions?: unknown;
-		Species?: unknown;
 		lastGroupTick?: unknown;
 	} = {}
 ) {
 	const dataByTable: Record<string, unknown> = {
 		Sessions: recentSessionsSnapshot,
-		Species: topSpeciesSnapshot,
 		...overrides
 	};
 	const lastGroupTick = overrides.lastGroupTick ?? defaultLastGroupTick;
@@ -203,7 +194,7 @@ describe('home page', () => {
 	});
 
 	describe('last tick (last group tick)', () => {
-		it('renders "Last tick: {species} on {date}" after the species letter nav', async () => {
+		it('renders "Last tick: {species} on {date}"', async () => {
 			render(await HomePage());
 			await screen.findByRole('heading', {
 				name: 'Sessions View all'
@@ -220,48 +211,6 @@ describe('home page', () => {
 				name: 'View all ticks'
 			});
 			expect(link.getAttribute('href')).toBe('/ticks');
-		});
-	});
-
-	describe('species nav', () => {
-		it('renders one letter button per distinct first letter among species the group has actually caught', async () => {
-			render(await HomePage());
-			await screen.findByRole('button', {
-				name: 'Show species starting with B'
-			});
-			// Fixture species: Blue Tit, Reed Warbler, Fieldfare, Redwing,
-			// Kingfisher, Wren, Robin (count > 0) and Chaffinch (count 0, so its
-			// letter "C" must not appear).
-			const letterButtons = screen.getAllByRole('button');
-			expect(letterButtons.map((button) => button.textContent)).toEqual([
-				'B',
-				'F',
-				'K',
-				'R',
-				'W'
-			]);
-		});
-
-		describe('tapping a letter button', () => {
-			it('reveals links to every species page starting with that letter, sorted alphabetically', async () => {
-				render(await HomePage());
-				await screen.findByRole('button', {
-					name: 'Show species starting with B'
-				});
-				fireEvent.click(
-					screen.getByRole('button', { name: 'Show species starting with R' })
-				);
-				const links = screen.getAllByRole('link', { name: /^[A-Z]/ });
-				const speciesLinks = links.filter((link) =>
-					link.getAttribute('href')?.startsWith('/species/')
-				);
-				expect(speciesLinks.map((link) => link.textContent?.trim())).toEqual([
-					'Redwing',
-					'Reed Warbler',
-					'Robin'
-				]);
-				expect(speciesLinks[0].getAttribute('href')).toBe('/species/Redwing');
-			});
 		});
 	});
 

@@ -3,31 +3,28 @@ import './globals.css';
 import GlobalNav from './components/layout/GlobalNav';
 import LoadFlyonUI from './components/layout/LoadFlyonUI';
 import { Suspense } from 'react';
-import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import { RingingGroupProvider } from './components/layout/RingingGroupProvider';
+import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { getGroupCookie } from './actions/group-cookie';
 import { LoginModal } from './components/layout/LoginModal';
 import { getRequestPathname } from '@/app/lib/request-pathname';
 import { resolvePublicPageViewedGroupId } from '@/app/lib/auth/public-group-access';
+import {
+	fetchRingingGroups,
+	fetchSpeciesNames
+} from '@/app/lib/global-nav-data';
+import { shouldExpandBirdNavByDefault } from '@/app/lib/global-nav-expansion';
 export const metadata: Metadata = {
 	title: 'Top of the Flocks',
 	description: 'Leaderboard for bird ringing data'
 };
-import type { RingingGroupRow } from './models/db';
-
-async function fetchRingingGroups(): Promise<RingingGroupRow[]> {
-	return supabase
-		.from('RingingGroups')
-		.select('id, group_name')
-		.order('group_name')
-		.then(catchSupabaseErrors) as Promise<RingingGroupRow[]>;
-}
 
 export async function AuthorisedView({
 	children
 }: {
 	children: React.ReactNode;
 }) {
+	const pathname = await getRequestPathname();
 	const [loggedInGroupId, groups] = await Promise.all([
 		getGroupCookie(),
 		fetchRingingGroups()
@@ -35,6 +32,10 @@ export async function AuthorisedView({
 
 	if (loggedInGroupId) {
 		const selectedGroup = groups.find((g) => g.id === loggedInGroupId)!;
+		const speciesList = await fetchSpeciesNames(
+			selectedGroup,
+			await getAuthenticatedSupabaseClient()
+		);
 
 		return (
 			<Suspense>
@@ -42,6 +43,8 @@ export async function AuthorisedView({
 					<GlobalNav
 						groups={[selectedGroup]}
 						selectedGroupId={loggedInGroupId}
+						speciesList={speciesList}
+						expandBirdNav={shouldExpandBirdNavByDefault(pathname)}
 					/>
 					{children}
 				</RingingGroupProvider>
@@ -57,11 +60,12 @@ export async function AuthorisedView({
 	// data they're looking at — it hides every aspect that assumes a
 	// logged-in group (switcher, import, logout, authenticated-only nav
 	// links/search).
-	const pathname = await getRequestPathname();
 	const publicViewedGroupId = await resolvePublicPageViewedGroupId(pathname);
 	if (publicViewedGroupId !== null) {
 		const viewedGroup = groups.find((g) => g.id === publicViewedGroupId)!;
 
+		// readOnly GlobalNav never renders the species-by-letter nav, so there's
+		// no need to fetch species names for an anonymous public-summary view.
 		return (
 			<Suspense>
 				<GlobalNav

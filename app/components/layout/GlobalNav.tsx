@@ -3,9 +3,12 @@ import { useRef, useEffect, useReducer } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
+import { SpeciesAlphabetNav } from '@/app/components/SpeciesAlphabetNav';
 import { useSetRingingGroup } from './RingingGroupProvider';
 import { logout } from '@/app/actions/logout';
 import type { RingingGroupRow } from '@/app/models/db';
+import type { SimpleSpeciesRow } from '@/app/lib/global-nav-data';
+import { shouldExpandBirdNavByDefault } from '@/app/lib/global-nav-expansion';
 const moreLinks = [
 	{ href: '/mistakes', label: 'Mistakes' },
 	{ href: '/retraps', label: 'Retraps' },
@@ -165,10 +168,16 @@ function expanderReducer(
 export default function GlobalNav({
 	groups,
 	selectedGroupId,
-	readOnly = false
+	speciesList = [],
+	readOnly = false,
+	expandBirdNav = false
 }: {
 	groups: RingingGroupRow[];
 	selectedGroupId: number | null;
+	// The viewed group's species, for the species-by-letter nav shown
+	// alongside ring-number search. Omitted (and defaulted to []) for a
+	// readOnly GlobalNav, which never renders that panel.
+	speciesList?: SimpleSpeciesRow[];
 	// Set for an anonymous visitor viewing a group's public summary (#770) —
 	// there's no logged-in group at all, so this hides every nav aspect that
 	// assumes one: the group switcher, "Import data", "Log out", and the
@@ -177,12 +186,17 @@ export default function GlobalNav({
 	// Only the branding + viewed-group name remain, so a public visitor still
 	// knows whose data they're looking at.
 	readOnly?: boolean;
+	// Whether the current route wants the search/species panel open on first
+	// paint (app/lib/global-nav-expansion.ts), server-computed from the
+	// request pathname. Only seeds the reducer's initial state — the resync
+	// effect below keeps it correct across client-side navigation too.
+	expandBirdNav?: boolean;
 }) {
 	const pathname = usePathname();
 	const router = useRouter();
 	const setRingingGroup = useSetRingingGroup();
 	const [expanders, expandersDispatch] = useReducer(expanderReducer, {
-		search: false,
+		search: expandBirdNav,
 		mobileNav: false,
 		moreMenu: false,
 		userMenu: !selectedGroupId
@@ -202,6 +216,20 @@ export default function GlobalNav({
 			value: !selectedGroupId
 		});
 	}, [pathname, selectedGroupId]);
+
+	// GlobalNav lives in the root layout and never remounts on client-side
+	// navigation, so `expandBirdNav`'s server-computed value only ever seeds
+	// the reducer's initial state once. Resync against the client-side
+	// pathname too, so navigating back to a page that wants the panel open
+	// by default (e.g. `/`) re-expands it rather than leaving it as it was
+	// left on the page navigated away from.
+	useEffect(() => {
+		expandersDispatch({
+			type: 'set',
+			id: 'search',
+			value: shouldExpandBirdNavByDefault(pathname)
+		});
+	}, [pathname]);
 
 	useEffect(() => {
 		if (readOnly) {
@@ -318,6 +346,9 @@ export default function GlobalNav({
 										searchInputRef as React.RefObject<HTMLInputElement>
 									}
 								/>
+							</div>
+							<div className="p-4 pt-0 pb-2">
+								<SpeciesAlphabetNav species={speciesList} />
 							</div>
 						</Expander>
 						<Expander id="user-menu" isExpanded={expanders.userMenu}>
