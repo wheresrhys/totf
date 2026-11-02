@@ -6,6 +6,10 @@ export type ExactFilterTemporalUnit = Extract<
 	StatsTemporalUnit,
 	'month' | 'year' | 'month-squashed'
 >;
+export type CamelCaseStatsTemporalUnit =
+	| TemporalUnit
+	| 'allTime'
+	| 'monthSquashed';
 
 export const temporalUnitNameMapping: Record<StatsTemporalUnit, string> = {
 	day: 'day',

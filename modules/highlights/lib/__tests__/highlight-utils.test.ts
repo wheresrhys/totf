@@ -149,14 +149,14 @@ describe('getTemporalUnitFromTimeWindow', () => {
 		expect(getTemporalUnitFromTimeWindow({ year: 2020 })).toBe('year');
 	});
 
-	it("returns 'all time month' when only month is set", () => {
+	it("returns 'month-squashed' when only month is set", () => {
 		expect(getTemporalUnitFromTimeWindow({ month: 5 })).toBe(
-			'all time month'
+			'month-squashed'
 		);
 	});
 
-	it("returns 'all time' when neither is set", () => {
-		expect(getTemporalUnitFromTimeWindow({})).toBe('all time');
+	it("returns 'all-time' when neither is set", () => {
+		expect(getTemporalUnitFromTimeWindow({})).toBe('all-time');
 	});
 });
 

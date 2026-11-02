@@ -51,7 +51,7 @@ export const lightestOfSpecies: HighlightsGenerator = {
 			},
 			month: null,
 			year: null,
-			allTimeMonth: null,
+			monthSquashed: null,
 			allTime: null
 		}
 	}

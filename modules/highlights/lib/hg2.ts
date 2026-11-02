@@ -4,7 +4,6 @@ import type {
 	CombinedHighlight,
 	HighlightsGenerator,
 	HighlightOutlook,
-	ExtendedTemporalUnit,
 	HighlightPresenceAtScopes,
 	NewHighlightValue,
 	HighlightGenerationConfig
@@ -19,7 +18,7 @@ import {
 	sortByPositionAndTimeWindow
 } from './highlight-utils';
 import { globalStatsCacheFetchPool, type StatsResult } from '@/modules/stats/browser';
-import type { TemporalUnit } from '@/app/models/temporal-unit';
+import type { TemporalUnit, StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { groupByColumn } from '@/app/lib/generic-utils';
 
@@ -115,7 +114,7 @@ async function getScopedHighlightsOfType({
 
 function getPresence(
 	rule: HighlightsGenerator,
-	temporalUnit: ExtendedTemporalUnit,
+	temporalUnit: StatsTemporalUnit,
 	outlook: HighlightOutlook,
 	species?: string
 ): HighlightGenerationConfig[] | undefined | null {
@@ -128,7 +127,7 @@ function getPresence(
 
 function getTimeWindow(
 	timePeriod: string | null,
-	temporalUnit: ExtendedTemporalUnit
+	temporalUnit: StatsTemporalUnit
 ): YearMonthRestriction | undefined {
 	if (!timePeriod) {
 		return;
@@ -139,9 +138,9 @@ function getTimeWindow(
 		return { month, year };
 	} else if (temporalUnit === 'year') {
 		return { year };
-	} else if (temporalUnit === 'all time') {
+	} else if (temporalUnit === 'all-time') {
 		return;
-	} else if (temporalUnit === 'all time month') {
+	} else if (temporalUnit === 'month-squashed') {
 		return { month };
 	}
 }
@@ -156,7 +155,7 @@ export async function getRawHighlightsOfTypeAcrossScopes({
 }: {
 	highlightType: string;
 	timePeriod: string | null;
-	temporalUnit: ExtendedTemporalUnit;
+	temporalUnit: StatsTemporalUnit;
 	viewedGroup: ViewedGroup;
 	outlook: HighlightOutlook;
 	species?: string;
@@ -169,7 +168,7 @@ export async function getRawHighlightsOfTypeAcrossScopes({
 		.flatMap(({ sample: sampleTemporalUnit, lakes }) => {
 			return Object.entries(lakes).map(([lakeScope, limit]) => {
 				if (limit === 0) return;
-				const lakeScopeTemporalUnit = noCase(lakeScope) as ExtendedTemporalUnit;
+				const lakeScopeTemporalUnit = noCase(lakeScope) as StatsTemporalUnit;
 				return {
 					highlightType,
 					viewedGroup,
@@ -267,7 +266,7 @@ function combineSimilarHighlights(
 
 export async function getCombinedHighlightsOfTypeAcrossScopes(options: {
 	timePeriod: string | null;
-	temporalUnit: ExtendedTemporalUnit;
+	temporalUnit: StatsTemporalUnit;
 	viewedGroup: ViewedGroup;
 	outlook: HighlightOutlook;
 	species?: string;
@@ -286,7 +285,7 @@ export async function getCombinedHighlightsOfTypeAcrossScopes(options: {
 
 export async function getAllHighlightsOfOutlookAcrossScopes(options: {
 	timePeriod: string | null;
-	temporalUnit: ExtendedTemporalUnit;
+	temporalUnit: StatsTemporalUnit;
 	viewedGroup: ViewedGroup;
 	outlook: HighlightOutlook;
 	species?: string;
@@ -304,7 +303,7 @@ export async function getAllHighlightsOfOutlookAcrossScopes(options: {
 
 export async function getAllHighlightsAcrossScopes(options: {
 	timePeriod: string | null;
-	temporalUnit: ExtendedTemporalUnit;
+	temporalUnit: StatsTemporalUnit;
 	viewedGroup: ViewedGroup;
 	species?: string;
 }) {

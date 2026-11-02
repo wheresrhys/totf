@@ -62,7 +62,7 @@ export const eachSpeciesCount: HighlightsGenerator = {
 						sample: 'day',
 						lakes: {
 							allTime: 3,
-							allTimeMonth: 0,
+							monthSquashed: 0,
 							year: 1
 						}
 					}
@@ -70,7 +70,7 @@ export const eachSpeciesCount: HighlightsGenerator = {
 			},
 			month: null,
 			year: null,
-			allTimeMonth: null,
+			monthSquashed: null,
 			allTime: null
 		}
 	}
