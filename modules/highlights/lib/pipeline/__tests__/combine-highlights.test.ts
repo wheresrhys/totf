@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { removeLessSignificantHighlights } from '../combine-highlights';
+import {
+	removeLessSignificantHighlights,
+	combineSimilarHighlights
+} from '../combine-highlights';
 import type { NewHighlightValue } from '../../../types';
+import { birdCount } from '../../../rules/bird-count';
 
 function buildHighlight(
 	overrides: Partial<NewHighlightValue> = {}
@@ -188,5 +192,114 @@ describe('removeLessSignificantHighlights', () => {
 		]);
 
 		expect(result).toStrictEqual([tiedAllTimeHighlight]);
+	});
+});
+
+describe('combineSimilarHighlights', () => {
+	it('groups highlights into one CombinedHighlight per (temporalUnit, timePeriod, species) key', () => {
+		const dayGroupFirst = buildHighlight({
+			timePeriod: 'shared-period',
+			scope: { temporalUnit: 'day' }
+		});
+		const dayGroupSecond = buildHighlight({
+			timePeriod: 'shared-period',
+			scope: { temporalUnit: 'day' },
+			ranking: { position: 2, isTied: false }
+		});
+		const differentTemporalUnit = buildHighlight({
+			timePeriod: 'shared-period',
+			scope: { temporalUnit: 'year' }
+		});
+
+		const result = combineSimilarHighlights(
+			[dayGroupFirst, dayGroupSecond, differentTemporalUnit],
+			'birds'
+		);
+
+		expect(result).toHaveLength(2);
+		const groupSizes = result.map(({ scopes }) => scopes.length).sort();
+		expect(groupSizes).toStrictEqual([1, 2]);
+	});
+
+	it("takes the group's best-ranked highlight's value/species as the combined highlight's value", () => {
+		const bestRanked = buildHighlight({
+			timePeriod: 'shared-period',
+			value: 100,
+			species: 'Robin',
+			ranking: { position: 1, isTied: false }
+		});
+		const secondRanked = buildHighlight({
+			timePeriod: 'shared-period',
+			value: 50,
+			species: 'Robin',
+			ranking: { position: 2, isTied: false }
+		});
+
+		const [combined] = combineSimilarHighlights(
+			[secondRanked, bestRanked],
+			'birds'
+		);
+
+		expect(combined.value).toStrictEqual({
+			timePeriod: 'shared-period',
+			value: 100,
+			species: 'Robin'
+		});
+	});
+
+	it('sets bestPosition to the minimum ranking position across the group', () => {
+		const thirdPlace = buildHighlight({
+			timePeriod: 'shared-period',
+			ranking: { position: 3, isTied: false }
+		});
+		const firstPlace = buildHighlight({
+			timePeriod: 'shared-period',
+			ranking: { position: 1, isTied: false }
+		});
+		const secondPlace = buildHighlight({
+			timePeriod: 'shared-period',
+			ranking: { position: 2, isTied: false }
+		});
+
+		const [combined] = combineSimilarHighlights(
+			[thirdPlace, firstPlace, secondPlace],
+			'birds'
+		);
+
+		expect(combined.bestPosition).toBe(1);
+	});
+
+	it('carries every scope+ranking pair from the group onto scopes, broadest-first', () => {
+		const allTimeEntry = buildHighlight({
+			timePeriod: 'shared-period',
+			scope: { temporalUnit: 'day' },
+			ranking: { position: 2, isTied: false }
+		});
+		const yearScopedEntry = buildHighlight({
+			timePeriod: 'shared-period',
+			scope: { temporalUnit: 'day', parentTimeWindow: { year: 2020 } },
+			ranking: { position: 1, isTied: false }
+		});
+
+		// Passed in narrowest-first, to prove the combine step itself does the
+		// broadest-first sorting rather than preserving input order.
+		const [combined] = combineSimilarHighlights(
+			[yearScopedEntry, allTimeEntry],
+			'birds'
+		);
+
+		expect(combined.scopes).toStrictEqual([
+			{ scope: allTimeEntry.scope, ranking: allTimeEntry.ranking },
+			{ scope: yearScopedEntry.scope, ranking: yearScopedEntry.ranking }
+		]);
+	});
+
+	it("attaches the matching rule's formatters and descriptor", () => {
+		const highlight = buildHighlight({ timePeriod: 'shared-period' });
+
+		const [combined] = combineSimilarHighlights([highlight], 'birds');
+
+		expect(combined.formatters).toBe(birdCount.formatters);
+		expect(combined.descriptor).toBe(birdCount.descriptor);
 	});
 });
