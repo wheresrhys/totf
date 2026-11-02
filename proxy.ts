@@ -8,9 +8,11 @@ const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 // own (a layout only ever receives `params` for its own position in the
 // route tree, never a deeper static segment) — stamping it onto a request
 // header here is the standard way to make it savailable downstream via
-// `next/headers`. Scoped to `/group/**`, the only subtree that currently
-// needs a pathname-aware decision (the root layout's public summary-subtree
-// gate, `lib/public-group-access.ts`, #770).
+// `next/headers`. Matched to `/`, `/group/**` and `/_highlights` — every
+// route that currently needs a pathname-aware decision in the root layout
+// (the public summary-subtree gate, `lib/public-group-access.ts`, #770, plus
+// the `/_highlights` qa-cookie logic below). Widen this list rather than
+// reinventing the pattern per route.
 export function proxy(request: NextRequest) {
 	// Visiting the unlinked /_highlights admin page (#1122) is itself the
 	// activation step for the report-a-bad-highlight feature elsewhere in the
@@ -48,5 +50,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-	matcher: ['/group/:path*', '/_highlights']
+	matcher: ['/', '/group/:path*', '/_highlights']
 };
