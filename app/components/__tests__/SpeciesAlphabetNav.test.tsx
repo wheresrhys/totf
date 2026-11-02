@@ -1,12 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { SpeciesAlphabetNav } from '../SpeciesAlphabetNav';
-import type { SpeciesWithBirdsCount } from '@/app/models/species';
+import type { SimpleSpeciesRow } from '@/app/lib/global-nav-data';
 
-const species: SpeciesWithBirdsCount[] = [
-	{ id: 1, species_name: 'Robin', birds: [{ count: 3 }] },
-	{ id: 2, species_name: 'Raven', birds: [{ count: 1 }] },
-	{ id: 3, species_name: 'Wren', birds: [{ count: 2 }] }
+const species: SimpleSpeciesRow[] = [
+	{ id: 1, species_name: 'Robin' },
+	{ id: 2, species_name: 'Raven' },
+	{ id: 3, species_name: 'Wren' }
 ];
 
 describe('SpeciesAlphabetNav', () => {

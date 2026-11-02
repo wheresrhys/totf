@@ -9,11 +9,10 @@ import {
 	type HomePageSummaryStats
 } from './PageContent';
 import type { CoreStatsResult, GroupTicksResult } from '../models/db';
-import type { SpeciesWithBirdsCount } from '../models/species';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
-import { recentSessionsQuery, topSpeciesQuery } from '@/queries';
+import { recentSessionsQuery } from '@/queries';
 import { readStatsCacheRows } from '@/modules/stats';
 
 export async function fetchRecentSessions(
@@ -88,25 +87,12 @@ export async function fetchLastGroupTick(
 	return ticks?.[0] ?? null;
 }
 
-// Every species the group has actually recorded (birds count > 0), for the
-// home page's species-by-letter nav (#1025) — replaced the previous
-// top-10-by-count badge list, so this no longer sorts by count or slices.
-export async function fetchGroupSpecies(): Promise<SpeciesWithBirdsCount[]> {
-	const supabase = await getAuthenticatedSupabaseClient();
-	const species = (await supabase
-		.from('Species')
-		.select(topSpeciesQuery.select)
-		.then(catchSupabaseErrors)) as SpeciesWithBirdsCount[];
-	return species.filter((s) => (s.birds[0]?.count ?? 0) > 0);
-}
-
 export async function fetchHomePageContent(
 	_: DefaultPageParams,
 	viewedGroup: ViewedGroup
 ): Promise<PageModel> {
 	return {
 		recentSessions: await fetchRecentSessions(viewedGroup),
-		groupSpecies: await fetchGroupSpecies(),
 		summaryStats: await fetchHomePageSummaryStats(viewedGroup),
 		lastGroupTick: await fetchLastGroupTick(viewedGroup)
 	};

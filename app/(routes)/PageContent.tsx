@@ -7,13 +7,9 @@ import {
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '../models/session';
 import type { CoreStatsResult, GroupTicksResult } from '../models/db';
-import type { SpeciesWithBirdsCount } from '../models/species';
 import { SessionsByDay } from '../components/SessionsByDay';
-import { SpeciesAlphabetNav } from '../components/SpeciesAlphabetNav';
 import { NoPrefetchLink } from '../components/shared/NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
-
-export type { SpeciesWithBirdsCount };
 
 export type HomePageSummaryStats = {
 	allTime: CoreStatsResult | null;
@@ -23,7 +19,6 @@ export type HomePageSummaryStats = {
 
 export type PageModel = {
 	recentSessions: SessionWithEncountersCount[];
-	groupSpecies: SpeciesWithBirdsCount[];
 	summaryStats: HomePageSummaryStats | null;
 	lastGroupTick: GroupTicksResult | null;
 };
@@ -139,7 +134,6 @@ export function HomePageContent({
 }) {
 	return (
 		<PageWrapper>
-			<SpeciesAlphabetNav species={data.groupSpecies} />
 			<SummaryStatsTable data={data.summaryStats} />
 			<RecentSessions data={data.recentSessions} viewedGroup={viewedGroup} />
 			<LastGroupTick data={data.lastGroupTick} />
