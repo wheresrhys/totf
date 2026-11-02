@@ -13,6 +13,7 @@ import {
 	fetchRingingGroups,
 	fetchSpeciesNames
 } from '@/app/lib/global-nav-data';
+import { shouldExpandBirdNavByDefault } from '@/app/lib/global-nav-expansion';
 export const metadata: Metadata = {
 	title: 'Top of the Flocks',
 	description: 'Leaderboard for bird ringing data'
@@ -23,6 +24,7 @@ export async function AuthorisedView({
 }: {
 	children: React.ReactNode;
 }) {
+	const pathname = await getRequestPathname();
 	const [loggedInGroupId, groups] = await Promise.all([
 		getGroupCookie(),
 		fetchRingingGroups()
@@ -42,6 +44,7 @@ export async function AuthorisedView({
 						groups={[selectedGroup]}
 						selectedGroupId={loggedInGroupId}
 						speciesList={speciesList}
+						expandBirdNav={shouldExpandBirdNavByDefault(pathname)}
 					/>
 					{children}
 				</RingingGroupProvider>
@@ -57,7 +60,6 @@ export async function AuthorisedView({
 	// data they're looking at — it hides every aspect that assumes a
 	// logged-in group (switcher, import, logout, authenticated-only nav
 	// links/search).
-	const pathname = await getRequestPathname();
 	const publicViewedGroupId = await resolvePublicPageViewedGroupId(pathname);
 	if (publicViewedGroupId !== null) {
 		const viewedGroup = groups.find((g) => g.id === publicViewedGroupId)!;

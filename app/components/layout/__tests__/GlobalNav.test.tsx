@@ -165,6 +165,25 @@ describe('GlobalNav', () => {
 		});
 	});
 
+	describe('search/species panel default-expansion resync', () => {
+		it("resyncs the panel's expanded state to the current pathname, even when expandBirdNav only seeded a different initial value", () => {
+			// usePathname() is globally mocked to '/' (vitest.setup.tsx), which
+			// GlobalNav never remounts out of the root layout to re-seed —
+			// expandBirdNav={false} here models a stale/mismatched initial prop
+			// (e.g. from a page other than '/'); the resync effect should still
+			// expand the panel to match the (mocked) current pathname.
+			render(
+				<GlobalNav
+					groups={mockGroups}
+					selectedGroupId={1}
+					expandBirdNav={false}
+				/>
+			);
+			const wrapper = document.getElementById('ring-search-form-wrapper');
+			expect(wrapper?.classList.contains('hidden')).toBe(false);
+		});
+	});
+
 	describe('readOnly (anonymous public-summary view)', () => {
 		it('does not render the Sessions/Species nav links', () => {
 			render(<GlobalNav groups={mockGroups} selectedGroupId={1} readOnly />);
