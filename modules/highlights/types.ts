@@ -2,7 +2,7 @@ import type {
 	SimpleStatsCacheBySpeciesRow,
 	SimpleStatsCacheRow
 } from '@/app/models/db';
-import type { TemporalUnit } from '@/app/models/temporal-unit';
+import type { TemporalUnit, CamelCaseStatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { StatUnit } from '@/app/components/shared/StatOutput';
 export type { StatUnit } from '@/app/components/shared/StatOutput';
 
@@ -115,22 +115,13 @@ type HighlightPositionsLimit = 0 | 1 | 2 | 3;
 export type HighlightDataLake = {
 	allTime?: HighlightPositionsLimit;
 	year?: HighlightPositionsLimit;
-	allTimeMonth?: HighlightPositionsLimit;
+	monthSquashed?: HighlightPositionsLimit;
 	month?: HighlightPositionsLimit;
 };
 
-// 'all time' / 'all time month' intentionally match temporalUnitNameMapping's
-// 'all-time' / 'month-squashed' display strings in app/models/temporal-unit.ts — a
-// future change to those display strings should keep this type in sync.
-export type ExtendedTemporalUnit = TemporalUnit | 'all time' | 'all time month';
-export type CamelCaseExtendedTemporalUnit =
-	| TemporalUnit
-	| 'allTime'
-	| 'allTimeMonth';
-
 export type HighlightOutlook = 'inter' | 'intra';
 export type HighlightGenerationConfig = {
-	sample: CamelCaseExtendedTemporalUnit;
+	sample: CamelCaseStatsTemporalUnit;
 	lakes: HighlightDataLake;
 };
 
@@ -139,13 +130,7 @@ export type ScopeHighlightConfig = {
 	inter?: HighlightGenerationConfig[];
 };
 
-export type HighlightPresenceAtScopes = {
-	allTime: ScopeHighlightConfig | null;
-	year: ScopeHighlightConfig | null;
-	allTimeMonth: ScopeHighlightConfig | null;
-	month: ScopeHighlightConfig | null;
-	day: ScopeHighlightConfig | null;
-};
+export type HighlightPresenceAtScopes = Record<CamelCaseStatsTemporalUnit, ScopeHighlightConfig | null >
 
 type HighlightPresenceConfig = {
 	species: HighlightPresenceAtScopes | null;

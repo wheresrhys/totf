@@ -48,7 +48,7 @@ export const newBirds: HighlightsGenerator = {
 			},
 			month: null,
 			year: null,
-			allTimeMonth: null,
+			monthSquashed: null,
 			allTime: null
 		}
 	}

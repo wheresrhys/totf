@@ -13,6 +13,9 @@ import type {
 	SimpleStatsCacheBySpeciesRow,
 	SimpleStatsCacheRow
 } from '@/app/models/db';
+import type {
+	StatsTemporalUnit
+} from '@/app/models/temporal-unit';
 import type { StatsResult } from '@/modules/stats/browser';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 const highlightCategoryOrder: HighlightCategory[] = [
@@ -60,15 +63,15 @@ export function filterStats({
 	return filteredStats;
 }
 
-export function getTemporalUnitFromTimeWindow(window: YearMonthRestriction) {
+export function getTemporalUnitFromTimeWindow(window: YearMonthRestriction): StatsTemporalUnit {
 	if (window.year && window.month) {
 		return 'month';
 	} else if (window.year) {
 		return 'year';
 	} else if (window.month) {
-		return 'all time month';
+		return 'month-squashed';
 	}
-	return 'all time';
+	return 'all-time';
 }
 
 function timeWindowToNumber(

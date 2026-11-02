@@ -35,7 +35,7 @@ export const singleSpeciesEncounters: HighlightsGenerator = {
 			day: null,
 			month: null,
 			year: null,
-			allTimeMonth: null,
+			monthSquashed: null,
 			allTime: null
 		}
 	}
