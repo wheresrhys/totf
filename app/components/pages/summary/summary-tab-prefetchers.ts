@@ -23,8 +23,10 @@ import {
 	fetchPeriodStats,
 	fetchCombinedMonthTotals
 } from '@/app/actions/summary-stats';
-import { getAllHighlightsAcrossScopes } from '@/modules/highlights/lib/hg2';
-import { getTemporalUnitFromTimeWindow } from '@/modules/highlights/lib/highlight-utils';
+import {
+	getAllHighlightsAcrossScopes,
+	getTemporalUnitFromTimeWindow
+} from '@/modules/highlights';
 import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
