@@ -276,7 +276,7 @@ export default function GlobalNav({
 					<div className="flex justify-end w-full gap-2 items-center">
 						{!readOnly && (
 							<>
-								<div className="lg:hidden flex items-center gap-2">
+								<div className="flex items-center gap-2">
 									<button
 										type="button"
 										className="btn-sm btn-square"
@@ -286,7 +286,7 @@ export default function GlobalNav({
 											expandersDispatch({ type: 'toggle', id: 'search' });
 										}}
 									>
-										<span className="icon-[tabler--search] collapse-open:hidden size-7"></span>
+										<span className="icon-[boxicons--bird-alt] collapse-open:hidden size-8"></span>
 									</button>
 								</div>
 								<div className="md:hidden flex items-center gap-2">
@@ -340,7 +340,7 @@ export default function GlobalNav({
 							id="ring-search-form-wrapper"
 							isExpanded={expanders.search}
 						>
-							<div className="p-4 pt-0">
+							<div className="lg:hidden p-4 pt-0">
 								<RingSearchForm
 									searchInputRef={
 										searchInputRef as React.RefObject<HTMLInputElement>

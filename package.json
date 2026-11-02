@@ -24,7 +24,7 @@
 		"set-group-password:local": "dotenvx run -f .env.dev -- tsx supabase/scripts/set-group-password.ts",
 		"set-group-password:prod": "./scripts/load-prod-write-env.sh tsx supabase/scripts/set-group-password.ts",
 		"start": "next start",
-		"build": "next build --turbopack",
+		"build": "dotenvx run -f .env.dev -- next build --turbopack",
 		"next:dev": "dotenvx run -f .env.dev -- next dev --turbopack --inspect",
 		"next:prod": "./scripts/load-prod-env.sh next dev --turbopack",
 		"prod:run": "./scripts/load-prod-env.sh",
@@ -51,6 +51,8 @@
 		"prepare": "husky"
 	},
 	"dependencies": {
+		"@iconify-json/boxicons": "^1.2.0",
+		"@iconify-json/coolicons": "^1.2.2",
 		"@iconify-json/fluent-emoji-flat": "^1.2.5",
 		"@supabase/supabase-js": "^2.75.1",
 		"@tailwindcss/postcss": "^4.1.18",
