@@ -1,17 +1,13 @@
-import { camelCase, noCase } from 'change-case';
+import { noCase } from 'change-case';
 import type {
-	YearMonthRestriction,
 	CombinedHighlight,
-	HighlightsGenerator,
 	HighlightOutlook,
-	HighlightPresenceAtScopes,
 	NewHighlightValue,
-	HighlightGenerationConfig,
 	HighlightsOfTypeParams
 } from '../types';
 import { getRule, ruleTypes } from './rule-registry';
+import { getPresence, getTimeWindow } from './pipeline/scope-config';
 import {
-	dateToYearMonth,
 	getHighlightsOfTypeFromStatsRows,
 	filterStats,
 	getTimePeriodSampler,
@@ -96,39 +92,6 @@ async function getScopedHighlightsOfType({
 			scope,
 			descriptor: rule.descriptor
 		})) as NewHighlightValue[];
-	}
-}
-
-function getPresence(
-	rule: HighlightsGenerator,
-	temporalUnit: StatsTemporalUnit,
-	outlook: HighlightOutlook,
-	species?: string
-): HighlightGenerationConfig[] | undefined | null {
-	if (!rule.presence) return [];
-	const rulePresence = species ? rule.presence.species : rule.presence.general;
-	return rulePresence?.[
-		camelCase(temporalUnit) as keyof HighlightPresenceAtScopes
-	]?.[outlook];
-}
-
-function getTimeWindow(
-	timePeriod: string | null,
-	temporalUnit: StatsTemporalUnit
-): YearMonthRestriction | undefined {
-	if (!timePeriod) {
-		return;
-	}
-	const { year, month } = dateToYearMonth(timePeriod);
-
-	if (temporalUnit === 'month') {
-		return { month, year };
-	} else if (temporalUnit === 'year') {
-		return { year };
-	} else if (temporalUnit === 'all-time') {
-		return;
-	} else if (temporalUnit === 'month-squashed') {
-		return { month };
 	}
 }
 
