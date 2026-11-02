@@ -7,12 +7,14 @@ const {
 	mockFetchRingingGroups,
 	mockFetchSpeciesNames,
 	mockGetRequestPathname,
-	mockResolvePublicPageViewedGroupId
+	mockResolvePublicPageViewedGroupId,
+	mockShouldExpandBirdNavByDefault
 } = vi.hoisted(() => ({
 	mockFetchRingingGroups: vi.fn(),
 	mockFetchSpeciesNames: vi.fn(),
 	mockGetRequestPathname: vi.fn(),
-	mockResolvePublicPageViewedGroupId: vi.fn()
+	mockResolvePublicPageViewedGroupId: vi.fn(),
+	mockShouldExpandBirdNavByDefault: vi.fn()
 }));
 
 vi.mock('@/app/lib/global-nav-data', () => ({
@@ -22,6 +24,10 @@ vi.mock('@/app/lib/global-nav-data', () => ({
 
 vi.mock('@/app/lib/request-pathname', () => ({
 	getRequestPathname: mockGetRequestPathname
+}));
+
+vi.mock('@/app/lib/global-nav-expansion', () => ({
+	shouldExpandBirdNavByDefault: mockShouldExpandBirdNavByDefault
 }));
 
 vi.mock('@/app/lib/auth/public-group-access', () => ({
@@ -45,6 +51,7 @@ describe('root layout', () => {
 		vi.mocked(getGroupCookie).mockResolvedValue(1);
 		mockGetRequestPathname.mockResolvedValue(null);
 		mockResolvePublicPageViewedGroupId.mockResolvedValue(null);
+		mockShouldExpandBirdNavByDefault.mockReturnValue(false);
 	});
 
 	afterEach(() => {
@@ -127,9 +134,9 @@ describe('root layout', () => {
 			expect(screen.queryByRole('button', { name: 'Login' })).toBeNull();
 		});
 
-		it('does not need to resolve pathname or public-page access at all', async () => {
+		it('resolves pathname (for the nav-expansion default) but never needs public-page access', async () => {
 			await AuthorisedView({ children: <p>child content</p> });
-			expect(mockGetRequestPathname).not.toHaveBeenCalled();
+			expect(mockGetRequestPathname).toHaveBeenCalled();
 			expect(mockResolvePublicPageViewedGroupId).not.toHaveBeenCalled();
 		});
 
@@ -145,6 +152,30 @@ describe('root layout', () => {
 			expect(
 				screen.getByRole('button', { name: 'Show species starting with R' })
 			).toBeDefined();
+		});
+
+		it('expands the search/species panel when the resolved pathname wants it expanded by default', async () => {
+			mockGetRequestPathname.mockResolvedValue('/');
+			mockShouldExpandBirdNavByDefault.mockReturnValue(true);
+			const { container } = render(
+				await AuthorisedView({ children: <p>child content</p> })
+			);
+			expect(mockShouldExpandBirdNavByDefault).toHaveBeenCalledWith('/');
+			const wrapper = container.querySelector('#ring-search-form-wrapper');
+			expect(wrapper?.classList.contains('hidden')).toBe(false);
+		});
+
+		it('leaves the search/species panel collapsed otherwise', async () => {
+			mockGetRequestPathname.mockResolvedValue('/sessions');
+			mockShouldExpandBirdNavByDefault.mockReturnValue(false);
+			const { container } = render(
+				await AuthorisedView({ children: <p>child content</p> })
+			);
+			expect(mockShouldExpandBirdNavByDefault).toHaveBeenCalledWith(
+				'/sessions'
+			);
+			const wrapper = container.querySelector('#ring-search-form-wrapper');
+			expect(wrapper?.classList.contains('hidden')).toBe(true);
 		});
 	});
 });

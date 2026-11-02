@@ -8,6 +8,7 @@ import { useSetRingingGroup } from './RingingGroupProvider';
 import { logout } from '@/app/actions/logout';
 import type { RingingGroupRow } from '@/app/models/db';
 import type { SimpleSpeciesRow } from '@/app/lib/global-nav-data';
+import { shouldExpandBirdNavByDefault } from '@/app/lib/global-nav-expansion';
 const moreLinks = [
 	{ href: '/mistakes', label: 'Mistakes' },
 	{ href: '/retraps', label: 'Retraps' },
@@ -168,7 +169,8 @@ export default function GlobalNav({
 	groups,
 	selectedGroupId,
 	speciesList = [],
-	readOnly = false
+	readOnly = false,
+	expandBirdNav = false
 }: {
 	groups: RingingGroupRow[];
 	selectedGroupId: number | null;
@@ -184,12 +186,17 @@ export default function GlobalNav({
 	// Only the branding + viewed-group name remain, so a public visitor still
 	// knows whose data they're looking at.
 	readOnly?: boolean;
+	// Whether the current route wants the search/species panel open on first
+	// paint (app/lib/global-nav-expansion.ts), server-computed from the
+	// request pathname. Only seeds the reducer's initial state — the resync
+	// effect below keeps it correct across client-side navigation too.
+	expandBirdNav?: boolean;
 }) {
 	const pathname = usePathname();
 	const router = useRouter();
 	const setRingingGroup = useSetRingingGroup();
 	const [expanders, expandersDispatch] = useReducer(expanderReducer, {
-		search: false,
+		search: expandBirdNav,
 		mobileNav: false,
 		moreMenu: false,
 		userMenu: !selectedGroupId
@@ -209,6 +216,20 @@ export default function GlobalNav({
 			value: !selectedGroupId
 		});
 	}, [pathname, selectedGroupId]);
+
+	// GlobalNav lives in the root layout and never remounts on client-side
+	// navigation, so `expandBirdNav`'s server-computed value only ever seeds
+	// the reducer's initial state once. Resync against the client-side
+	// pathname too, so navigating back to a page that wants the panel open
+	// by default (e.g. `/`) re-expands it rather than leaving it as it was
+	// left on the page navigated away from.
+	useEffect(() => {
+		expandersDispatch({
+			type: 'set',
+			id: 'search',
+			value: shouldExpandBirdNavByDefault(pathname)
+		});
+	}, [pathname]);
 
 	useEffect(() => {
 		if (readOnly) {
