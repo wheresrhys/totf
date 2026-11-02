@@ -4,6 +4,7 @@ import type {
 } from '@/app/models/db';
 import type { TemporalUnit, CamelCaseStatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { StatUnit } from '@/app/components/shared/StatOutput';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 export type { StatUnit } from '@/app/components/shared/StatOutput';
 
 export type YearMonthRestriction = {
@@ -135,4 +136,23 @@ export type HighlightPresenceAtScopes = Record<CamelCaseStatsTemporalUnit, Scope
 type HighlightPresenceConfig = {
 	species: HighlightPresenceAtScopes | null;
 	general: HighlightPresenceAtScopes | null;
+};
+
+/**
+ * One fully-resolved request for highlights of a single type at a single
+ * scope. `lib/pipeline/fan-out-raw-highlights.ts` constructs these from a
+ * rule's presence config; `lib/pipeline/fetch-scoped-stats.ts` consumes them.
+ */
+export type BaseHighlightsOfTypeParams = {
+	highlightType: string;
+	timePeriod: string;
+	temporalUnit: TemporalUnit;
+	viewedGroup: ViewedGroup;
+	species?: string;
+};
+
+export type HighlightsOfTypeParams = BaseHighlightsOfTypeParams & {
+	lakeTimeWindow?: YearMonthRestriction;
+	samplesTimeWindow?: YearMonthRestriction;
+	limit: number;
 };

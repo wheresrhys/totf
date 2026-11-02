@@ -6,7 +6,8 @@ import type {
 	HighlightOutlook,
 	HighlightPresenceAtScopes,
 	NewHighlightValue,
-	HighlightGenerationConfig
+	HighlightGenerationConfig,
+	HighlightsOfTypeParams
 } from '../types';
 import { getRule, ruleTypes } from './rule-registry';
 import {
@@ -18,23 +19,9 @@ import {
 	sortByPositionAndTimeWindow
 } from './highlight-utils';
 import { globalStatsCacheFetchPool, type StatsResult } from '@/modules/stats/browser';
-import type { TemporalUnit, StatsTemporalUnit } from '@/app/models/temporal-unit';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { groupByColumn } from '@/app/lib/generic-utils';
-
-type BaseHighlightsOfTypeParams = {
-	highlightType: string;
-	timePeriod: string;
-	temporalUnit: TemporalUnit;
-	viewedGroup: ViewedGroup;
-	species?: string;
-};
-
-type HighlightsOfTypeParams = BaseHighlightsOfTypeParams & {
-	lakeTimeWindow?: YearMonthRestriction;
-	samplesTimeWindow?: YearMonthRestriction;
-	limit: number;
-};
 
 async function getScopedHighlightsOfType({
 	highlightType,
