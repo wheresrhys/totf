@@ -52,7 +52,7 @@ export const eachSpeciesJuvs: HighlightsGenerator = {
 			},
 			month: null,
 			year: null,
-			allTimeMonth: null,
+			monthSquashed: null,
 			allTime: null
 		}
 	}

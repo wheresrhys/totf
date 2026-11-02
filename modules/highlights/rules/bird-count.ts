@@ -43,7 +43,7 @@ export const birdCount: HighlightsGenerator = {
 						sample: 'day',
 						lakes: {
 							allTime: 3,
-							allTimeMonth: 3,
+							monthSquashed: 3,
 							year: 3
 						}
 					}
@@ -101,18 +101,18 @@ export const birdCount: HighlightsGenerator = {
 					}
 				]
 			},
-			allTimeMonth: {
+			monthSquashed: {
 				intra: [
 					{
 						sample: 'day',
 						lakes: {
-							allTimeMonth: 3
+							monthSquashed: 3
 						}
 					},
 					{
 						sample: 'month',
 						lakes: {
-							allTimeMonth: 3
+							monthSquashed: 3
 						}
 					}
 				],
@@ -131,7 +131,7 @@ export const birdCount: HighlightsGenerator = {
 					{
 						sample: 'month',
 						lakes: {
-							allTimeMonth: 3
+							monthSquashed: 3
 						}
 					},
 					{
@@ -143,7 +143,7 @@ export const birdCount: HighlightsGenerator = {
 					{
 						sample: 'day',
 						lakes: {
-							allTimeMonth: 3
+							monthSquashed: 3
 						}
 					},
 					{

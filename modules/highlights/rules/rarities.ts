@@ -3,7 +3,7 @@ import type {
 	HighlightScope,
 	HighlightValue
 } from '../types';
-import type { StatsResult } from '@/modules/stats';
+import type { StatsResult } from '@/modules/stats/browser';
 import {
 	printTimeQualifier,
 	printCombinedHighlight
@@ -101,7 +101,7 @@ export const rarities: HighlightsGenerator = {
 			},
 			month: null,
 			year: null,
-			allTimeMonth: null,
+			monthSquashed: null,
 			allTime: null
 		}
 	}
