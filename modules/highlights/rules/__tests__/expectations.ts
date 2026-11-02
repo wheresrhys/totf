@@ -241,29 +241,6 @@ export const expectations = {
 				'Highest juv Robin count in a month ever and highest of 2020: 12 birds'
 		}
 	},
-	rarities: {
-		printedCombinedHighlights: {
-			'global (day)': '12 Robin ever',
-			'tied global (day)': '12 Robin ever',
-			'singular global (day)': '1 Robin ever',
-			'second global (day)': '12 Robin ever',
-			'tied second global (day)': '12 Robin ever',
-			'tied second of year (day)': '12 Robin of 2020',
-			'this year (day)': '12 Robin this year',
-			'tied global and second of year (day)': '12 Robin ever',
-			'tied second of month (day)': '12 Robin in any February',
-			'global and tied second of year and third of month (day)':
-				'12 Robin ever',
-			'global (month)': '12 Robin ever',
-			'tied global (month)': '12 Robin ever',
-			'singular global (month)': '1 Robin ever',
-			'second global (month)': '12 Robin ever',
-			'tied second global (month)': '12 Robin ever',
-			'tied second of year (month)': '12 Robin of 2020',
-			'this year (month)': '12 Robin this year',
-			'tied global and second of year (month)': '12 Robin ever'
-		}
-	},
 	heaviestOfSpecies: {
 		printedCombinedHighlights: {
 			'global (day)': 'Heaviest Robin ever: 12g',
