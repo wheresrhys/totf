@@ -15,10 +15,6 @@ import {
 	buildDailyStatsRow
 } from '@/app/__tests__/helpers/core-stats-fixtures';
 
-vi.mock('@/modules/highlights', () => ({
-	getHighlightsWithinTimeWindow: vi.fn()
-}));
-
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 
 const speciesTotalsForMonth = [
