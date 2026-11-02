@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { proxy } from '../proxy';
+import { proxy, config } from '../proxy';
 import { REQUEST_PATHNAME_HEADER } from '../app/lib/request-pathname';
 
 const originalVercelEnv = process.env.VERCEL_ENV;
@@ -27,6 +27,10 @@ describe('proxy', () => {
 		expect(
 			response.headers.get(`x-middleware-request-${REQUEST_PATHNAME_HEADER}`)
 		).toBe('/group/alpha/summary');
+	});
+
+	it('matches the home page, so the root layout can make a pathname-aware decision there too', () => {
+		expect(config.matcher).toContain('/');
 	});
 
 	describe('qa cookie activation on /_highlights (#1122)', () => {
