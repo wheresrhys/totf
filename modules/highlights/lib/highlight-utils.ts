@@ -1,6 +1,5 @@
 import type {
 	YearMonthRestriction,
-	HighlightDescriptor,
 	HighlightValue,
 	CombinedHighlight,
 	HighlightCategory,
@@ -14,12 +13,8 @@ import type {
 	SimpleStatsCacheBySpeciesRow,
 	SimpleStatsCacheRow
 } from '@/app/models/db';
-import type { StatsResult } from '@/modules/stats';
+import type { StatsResult } from '@/modules/stats/browser';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-export type StatFilter = (stat: {
-	time_period: string | null;
-	species_name: string | null;
-}) => boolean;
 const highlightCategoryOrder: HighlightCategory[] = [
 	'rarity',
 	'count',
@@ -103,13 +98,6 @@ export function sortByPositionAndTimeWindow(
 	}
 }
 
-export function descriptorToString(descriptor: HighlightDescriptor): string {
-	return (Object.keys(descriptor) as (keyof HighlightDescriptor)[])
-		.sort()
-		.map((key) => String(descriptor[key]))
-		.join(':');
-}
-
 function areNumericHighlights(
 	highlights: HighlightValue[]
 ): highlights is (HighlightValue & NumericHighlightValue)[] {
@@ -180,11 +168,9 @@ export function getHighlightsOfTypeFromStatsRows({
 		scope
 	);
 
-	const b = limitHighlights(highlights, limit).filter(({ timePeriod }) =>
+	return limitHighlights(highlights, limit).filter(({ timePeriod }) =>
 		timeWindowFilter(timePeriod)
 	);
-	console.log(b);
-	return b;
 }
 
 export function buildTimeWindowFilter(parentTimeWindow?: YearMonthRestriction) {
@@ -259,32 +245,6 @@ export function getSpeciesFilter(species?: string) {
 	return species
 		? (species_name: string | null) => species_name === species
 		: () => true;
-}
-
-export function getScopedStatsFilter(scope: HighlightScope): StatFilter | null {
-	if (!scope.parentTimeWindow) {
-		return null;
-	}
-	const timeWindowFilter = buildTimeWindowFilter(scope.parentTimeWindow);
-	const { month, year } = scope.parentTimeWindow;
-	const speciesFilter = getSpeciesFilter(scope.species);
-	let filter: StatFilter | null;
-	if (year && month) {
-		filter = ({ time_period, species_name }) =>
-			timeWindowFilter(time_period as string) && speciesFilter(species_name);
-	} else if (year) {
-		filter = ({ time_period, species_name }) =>
-			timeWindowFilter(time_period as string) && speciesFilter(species_name);
-	} else if (month) {
-		filter = ({ time_period, species_name }) =>
-			timeWindowFilter(time_period as string) && speciesFilter(species_name);
-	} else if (scope.species) {
-		filter = ({ species_name }) => speciesFilter(species_name);
-	} else {
-		filter = null;
-	}
-
-	return filter;
 }
 
 export function sortHighlights(highlights: CombinedHighlight[]) {

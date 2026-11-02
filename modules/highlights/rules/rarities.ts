@@ -3,7 +3,7 @@ import type {
 	HighlightScope,
 	HighlightValue
 } from '../types';
-import type { StatsResult } from '@/modules/stats';
+import type { StatsResult } from '@/modules/stats/browser';
 import {
 	printTimeQualifier,
 	printCombinedHighlight
