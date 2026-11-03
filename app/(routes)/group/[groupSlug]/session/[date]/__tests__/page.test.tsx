@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import Page from '../page';
-import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import {
 	TEST_DATE,
 	TEST_GROUP_ID,
@@ -164,10 +163,9 @@ describe('session detail page', () => {
 		it('excludes resighting-type encounters, so totals match the summary pages', async () => {
 			const chains = await renderWithClient(makeDefaultSessionClient());
 			await screen.findByTestId('session-stats');
-			expect(chains[DAY_ENCOUNTERS_CHAIN].not).toHaveBeenCalledWith(
-				'record_type',
-				'in',
-				`(${RESIGHTING_RECORD_TYPES.join(',')})`
+			expect(chains[DAY_ENCOUNTERS_CHAIN].eq).toHaveBeenCalledWith(
+				'is_resighting',
+				false
 			);
 		});
 
@@ -192,11 +190,7 @@ describe('session detail page', () => {
 			expect(previousChain.order).toHaveBeenCalledWith('visit_date', {
 				ascending: false
 			});
-			expect(previousChain.not).toHaveBeenCalledWith(
-				'record_type',
-				'in',
-				`(${RESIGHTING_RECORD_TYPES.join(',')})`
-			);
+			expect(previousChain.eq).toHaveBeenCalledWith('is_resighting', false);
 		});
 
 		it('finds the next date from encounters strictly after this one', async () => {
@@ -207,11 +201,7 @@ describe('session detail page', () => {
 			expect(nextChain.order).toHaveBeenCalledWith('visit_date', {
 				ascending: true
 			});
-			expect(nextChain.not).toHaveBeenCalledWith(
-				'record_type',
-				'in',
-				`(${RESIGHTING_RECORD_TYPES.join(',')})`
-			);
+			expect(nextChain.eq).toHaveBeenCalledWith('is_resighting', false);
 		});
 
 		it('renders a "Previous" link pointing to the previous session date', async () => {

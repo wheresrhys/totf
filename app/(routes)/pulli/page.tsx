@@ -1,7 +1,6 @@
 import { PulliEncounter } from '@/app/models/session';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	BootstrapPage,
@@ -24,7 +23,7 @@ export async function fetchPulliPageContent(
 		.from('Encounters')
 		.select(pulliEncountersQuery.select)
 		.eq('ringing_group_id', viewedGroup.id)
-		.not('record_type', 'in', `(${RESIGHTING_RECORD_TYPES.join(',')})`)
+		.eq('is_resighting', false)
 		.eq('age_code', 1)
 		.eq('is_juv', false)
 		.then(catchSupabaseErrors) as Promise<PulliEncounter[]>;

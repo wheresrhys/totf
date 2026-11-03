@@ -3,7 +3,6 @@ import { render, screen, cleanup } from '@testing-library/react';
 import Page, { fetchPulliPageContent } from '../page';
 import pulliEncountersSnapshot from '@/test-fixtures/snapshots/tables/Encounters/alpha.pulli-encounters.json';
 import type { PulliEncounter } from '@/app/models/session';
-import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
@@ -117,11 +116,7 @@ describe('fetchPulliPageContent query building', () => {
 		const { client, chain } = makeEncountersClient(pulliEncountersSnapshot);
 		mockGetAuthenticatedSupabaseClient.mockResolvedValue(client);
 		await fetchPulliPageContent({}, VIEWED_GROUP);
-		expect(chain.not).toHaveBeenCalledWith(
-			'record_type',
-			'in',
-			`(${RESIGHTING_RECORD_TYPES.join(',')})`
-		);
+		expect(chain.eq).toHaveBeenCalledWith('is_resighting', false);
 	});
 
 	it('matches only age_code 1 in the query', async () => {

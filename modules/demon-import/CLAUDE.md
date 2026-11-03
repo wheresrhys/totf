@@ -58,17 +58,18 @@ that's `modules/stats`' `dispatchStatsCacheRefreshEvents`, called by each entry 
 
 One barrel, `index.ts`. Every caller is a server component, API route or Node script — nothing in
 this pipeline is reachable from a Client Component, so there's no client-safe subset to separate
-out the way `modules/stats` has to. Of the module's exports, only `RESIGHTING_RECORD_TYPES` and
-the `DemonRow`/`DemonColumnNames` types are read outside the import path (the sessions,
-resightings, pulli and session-detail pages, and `supabase/scripts/generate-snapshots.ts`), and
-those are a plain constant and types.
+out the way `modules/stats` has to. Of the module's exports, only the `DemonRow`/`DemonColumnNames`
+types are read outside the import path. The sessions, resightings, pulli and session-detail pages,
+and `supabase/scripts/generate-snapshots.ts` used to also read this module's
+`RESIGHTING_RECORD_TYPES` constant; they now read `Encounters.is_resighting` (a generated column,
+see `supabase/CLAUDE.md`) instead, so that constant is gone.
 
 ## Directory map
 
 ```
 modules/demon-import/
   index.ts     # the barrel — re-export only, no logic
-  types.ts     # DemonColumnNames, DemonRow, RESIGHTING_RECORD_TYPES,
+  types.ts     # DemonColumnNames, DemonRow,
                # ImportJobRowCounts, StatsCacheRefreshOutcome
   lib/
     row-validation.ts            # CasualtyEncounterError, isRinglessRingNo,
@@ -92,9 +93,8 @@ meaningful against each other's state, the same reasoning `modules/stats`'
 
 ## Testing
 
-Unit tests are colocated per source file (`lib/__tests__/*.test.ts`, plus
-`__tests__/types.test.ts` for the `RESIGHTING_RECORD_TYPES` exhaustiveness guard), with the
-Supabase client mocked entirely — none of them touch a real schema. Shared scaffolding lives in
+Unit tests are colocated per source file (`lib/__tests__/*.test.ts`), with the Supabase client
+mocked entirely — none of them touch a real schema. Shared scaffolding lives in
 `lib/__tests__/helpers/`:
 
 - `demon-rows.ts` — `makeDemonRow`/`makeDemonRows`, a full valid CSV row plus a numbered run of

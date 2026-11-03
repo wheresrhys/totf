@@ -38,7 +38,6 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import fs from 'fs/promises';
 import { supabase } from '../../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
-import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import {
 	allSessionsQuery,
@@ -225,7 +224,7 @@ export async function generateSnapshots(
 			.from('Encounters')
 			.select(pulliEncountersQuery.select)
 			.eq('ringing_group_id', alphaId)
-			.not('record_type', 'in', `(${RESIGHTING_RECORD_TYPES.join(',')})`)
+			.eq('is_resighting', false)
 			.eq('age_code', 1)
 			.eq('is_juv', false);
 		await writeSnapshot(
@@ -242,7 +241,7 @@ export async function generateSnapshots(
 			.from('Encounters')
 			.select(resightingsQuery.select)
 			.eq('ringing_group_id', alphaId)
-			.in('record_type', [...RESIGHTING_RECORD_TYPES]);
+			.eq('is_resighting', true);
 		await writeSnapshot(`tables/Encounters/alpha.resightings.json`, data ?? []);
 	}
 

@@ -1,4 +1,4 @@
-import type { ImportJobStatus, ResightingRecordType } from '@/app/models/db';
+import type { ImportJobStatus } from '@/app/models/db';
 
 export type DemonColumnNames =
 	| 'entered_by'
@@ -115,15 +115,6 @@ export type DemonColumnNames =
 	| 'toe_span';
 
 export type DemonRow = Record<DemonColumnNames, string>;
-
-// `record_type` values that indicate a passive resighting/recovery (no bird
-// in the hand) rather than a capture (see the DemOn field spec referenced in
-// CLAUDE.md for the full record_type code table).
-// Typed against the generated `resighting_record_type` enum so a DB-side
-// rename/removal fails to compile here instead of silently drifting (mirrors
-// RING_SIZE_ENUM_ORDER's pinning against the ring_size enum). Keep in sync with
-// the enum by hand — the exhaustiveness test in __tests__/types.test.ts guards it.
-export const RESIGHTING_RECORD_TYPES: ResightingRecordType[] = ['U', 'F', 'D'];
 
 /**
  * The four row counts both import entry points already compute, under the one set

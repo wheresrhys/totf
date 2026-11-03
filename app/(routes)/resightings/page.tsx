@@ -1,7 +1,6 @@
 import { ResightingEncounter } from '@/app/models/session';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	BootstrapPage,
@@ -19,7 +18,7 @@ export async function fetchResightingsPageContent(
 		.from('Encounters')
 		.select(resightingsQuery.select)
 		.eq('ringing_group_id', viewedGroup.id)
-		.in('record_type', [...RESIGHTING_RECORD_TYPES])
+		.eq('is_resighting', true)
 		.then(catchSupabaseErrors) as Promise<ResightingEncounter[]>;
 }
 

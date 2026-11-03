@@ -1,11 +1,10 @@
 /**
  * Integration tests for `Encounters.is_resighting`, a stored GENERATED column
- * (data-layer PR adding it) computing `record_type = ANY (ARRAY['U','F','D'])` —
- * the same U/F/D resighting/recovery record_type set `public.resighting_record_type`
- * names and (until removed) `modules/demon-import`'s `RESIGHTING_RECORD_TYPES`
- * constant mirrors. Kept as a hardcoded literal rather than reading the enum:
- * GENERATED columns require an IMMUTABLE expression and `enum_range()` is only
- * STABLE (see Encounters.sql's comment on the column).
+ * computing `record_type = ANY (ARRAY['U','F','D'])` — the same U/F/D
+ * resighting/recovery record_type set `public.resighting_record_type` names.
+ * Kept as a hardcoded literal rather than reading the enum: GENERATED columns
+ * require an IMMUTABLE expression and `enum_range()` is only STABLE (see
+ * Encounters.sql's comment on the column).
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local

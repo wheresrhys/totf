@@ -2,7 +2,6 @@ import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import { withGroupScope } from '@/app/components/layout/withGroupScope';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import {
 	prefetchActiveTabData,
 	readTabIdSearchParam
@@ -19,13 +18,6 @@ import {
 	type PageParams
 } from './PageContent';
 
-// PostgREST's `not.in` filter wants a parenthesised, comma-joined value list.
-// Resighting/recovery-type encounters (`record_type` in ('U','F','D')) are
-// excluded from every stats/summary page, so the session page excludes them too
-// — including them here is what made session totals disagree with the summary
-// totals (#1020).
-const RESIGHTING_RECORD_TYPES_FILTER_LIST = `(${RESIGHTING_RECORD_TYPES.join(',')})`;
-
 /**
  * An `Encounters` row as this page selects it: the shared `SessionEncounter`
  * shape plus the encounter's own embedded `Locations` row, which the page's
@@ -33,6 +25,9 @@ const RESIGHTING_RECORD_TYPES_FILTER_LIST = `(${RESIGHTING_RECORD_TYPES.join(','
  */
 type SessionPageEncounter = SessionEncounter & { location: LocationRow };
 
+// Resighting/recovery-type encounters are excluded from every stats/summary page, so the
+// session page excludes them too — including them here is what made session totals disagree
+// with the summary totals (#1020).
 async function fetchAdjacentSessionDates(
 	supabase: Awaited<ReturnType<typeof getAuthenticatedSupabaseClient>>,
 	viewedGroup: ViewedGroup,
@@ -43,7 +38,7 @@ async function fetchAdjacentSessionDates(
 			.from('Encounters')
 			.select('visit_date')
 			.eq('ringing_group_id', viewedGroup.id)
-			.not('record_type', 'in', RESIGHTING_RECORD_TYPES_FILTER_LIST)
+			.eq('is_resighting', false)
 			.lt('visit_date', date)
 			.order('visit_date', { ascending: false })
 			.limit(1)
@@ -52,7 +47,7 @@ async function fetchAdjacentSessionDates(
 			.from('Encounters')
 			.select('visit_date')
 			.eq('ringing_group_id', viewedGroup.id)
-			.not('record_type', 'in', RESIGHTING_RECORD_TYPES_FILTER_LIST)
+			.eq('is_resighting', false)
 			.gt('visit_date', date)
 			.order('visit_date', { ascending: true })
 			.limit(1)
@@ -112,7 +107,7 @@ async function fetchDayEncounters(
 		)
 		.eq('ringing_group_id', viewedGroup.id)
 		.eq('visit_date', date)
-		.not('record_type', 'in', RESIGHTING_RECORD_TYPES_FILTER_LIST)
+		.eq('is_resighting', false)
 		.order('capture_time', { ascending: true })
 		.order('bird(ring_no)', { ascending: true })
 		.then(catchSupabaseErrors)) as SessionPageEncounter[];

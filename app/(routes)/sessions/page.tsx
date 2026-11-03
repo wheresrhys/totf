@@ -4,23 +4,18 @@ import {
 } from '@/app/components/layout/BootstrapPage';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 import { allSessionsQuery } from '@/queries';
 import { SessionsPageContent } from './PageContent';
-
-// PostgREST's `not.in` filter wants a parenthesised, comma-joined value list
-// (same convention as the session page, app/(routes)/group/[groupSlug]/session/[date]/page.tsx).
-const RESIGHTING_RECORD_TYPES_FILTER_LIST = `(${RESIGHTING_RECORD_TYPES.join(',')})`;
 
 /**
  * The list used to show only FULL_GROWN-type sessions (`Sessions.session_type`),
  * excluding PULLI and FIELD_OBSERVATION sessions from the calendar. That column
  * is gone as of #1024, and this re-expresses the same bucketing rule
  * `modules/demon-import` used to assign a row's session_type with, directly off
- * `Encounters` columns: not a resighting/recovery record (`record_type` in
- * `RESIGHTING_RECORD_TYPES` — that would have made it FIELD_OBSERVATION), and
+ * `Encounters` columns: not a resighting/recovery record (`is_resighting` —
+ * that would have made it FIELD_OBSERVATION), and
  * not a pullus capture (`age_code === 1 && !is_juv` — that would have made it
  * PULLI).
  *
@@ -51,7 +46,7 @@ export async function fetchSessionsPageContent(
 		.from('Sessions')
 		.select(FULL_GROWN_EQUIVALENT_SELECT)
 		.eq('ringing_group_id', viewedGroup.id)
-		.not('qualifying.record_type', 'in', RESIGHTING_RECORD_TYPES_FILTER_LIST)
+		.eq('qualifying.is_resighting', false)
 		.or('age_code.neq.1,is_juv.eq.true', { referencedTable: 'qualifying' })
 		.order('visit_date', { ascending: false })
 		.then(catchSupabaseErrors) as Promise<SessionWithEncountersCount[]>;
