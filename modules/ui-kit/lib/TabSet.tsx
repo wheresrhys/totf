@@ -1,13 +1,9 @@
 'use client';
 
 import { TabNav } from '@/app/components/TabNav';
-import { ConditionalTabPanel } from '@/app/components/shared/ConditionalTabPanel';
-import {
-	TabContent,
-	type TabConfig,
-	type TabConfigInSet
-} from '@/app/components/shared/TabContent';
-import { useLinkableTabs } from '@/app/components/shared/useLinkableTabs';
+import { ConditionalTabPanel } from './ConditionalTabPanel';
+import { TabContent, type TabConfig, type TabConfigInSet } from './TabContent';
+import { useLinkableTabs } from './useLinkableTabs';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 /**

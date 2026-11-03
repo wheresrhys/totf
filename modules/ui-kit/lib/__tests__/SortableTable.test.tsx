@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import { SortableTable, type ColumnConfig } from '../SortableTable';
+import { SortableTable } from '../SortableTable';
+import type { ColumnConfig } from '../../types';
 
 type Row = { name: string; count: number; species: string };
 
@@ -24,7 +25,7 @@ const totalsCells = (
 	</>
 );
 
-import type { RowModelWithRawData } from '../SortableTable';
+import type { RowModelWithRawData } from '../../types';
 
 function SimpleBody({ data }: { data: RowModelWithRawData<Row, Row>[] }) {
 	return (

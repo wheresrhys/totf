@@ -6,7 +6,7 @@ import {
 	buildTotalsRowCells,
 	columnBlock
 } from '../StatsTableColumnConfigs';
-import type { ColumnConfig, RowModelWithRawData } from '../SortableTable';
+import type { ColumnConfig, RowModelWithRawData } from '../../types';
 
 afterEach(() => {
 	cleanup();
