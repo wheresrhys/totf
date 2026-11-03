@@ -20,3 +20,5 @@ export {
 	DEFAULT_IMPORT_CONCURRENCY
 } from './lib/run-demon-import';
 export type { RunDemonImportOptions } from './lib/run-demon-import';
+export { reingestGroupEncounters } from './lib/reingest-group-encounters';
+export type { ReingestGroupEncountersOptions } from './lib/reingest-group-encounters';

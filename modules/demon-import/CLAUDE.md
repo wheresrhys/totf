@@ -13,10 +13,13 @@ Both entry points delegate their whole run — CSV parsing (or, for the CLI, row
 materialized), the location pre-flight, job tracking, both batch writers, rate-limiting/deadline
 and progress reporting — to this module's own `lib/run-demon-import.ts`, via `runDemonImport` (see
 "Orchestration" below). Neither duplicates any of it any more; they differ only in what `source`
-they pass (raw CSV bytes for the web route, an already-materialized `DemonRow[]` for the CLI and
-`regenerate-import.ts`), whether they pass a `timeoutMs`, and how each turns a yielded
-`DemonImportUpdate` into its own presentation (NDJSON for the web route; `console.log`/
-`process.exit`/a rethrow for the CLI).
+they pass (raw CSV bytes for the web route, an already-materialized `DemonRow[]` for the CLI),
+whether they pass a `timeoutMs`, and how each turns a yielded `DemonImportUpdate` into its own
+presentation (NDJSON for the web route; `console.log`/`process.exit`/a rethrow for the CLI).
+
+A third caller-shaped entry point, `reingestGroupEncounters`, lives entirely inside this module
+(see "Reingestion" below) — re-running the pipeline from already-staged `DemonRecords` rather than
+a CSV or an upload.
 
 A row travels three stages, in this order:
 
@@ -89,7 +92,7 @@ to `DEFAULT_IMPORT_CONCURRENCY` = 30, passed straight into the run's `pRateLimit
 `limitChunkFlush` skips the deadline-check wrapper entirely rather than checking against a very
 distant one); `logContext?: Record<string, unknown>` (merged into the
 `dispatchStatsCacheRefreshEvents` call and the outer catch's failure log, so a caller's own context
-— a CSV file path, "regenerate", etc. — survives into both). Every field but `supabaseClient`/
+— a CSV file path, "reingest", etc. — survives into both). Every field but `supabaseClient`/
 `ringingGroupId`/`source` is optional specifically so the already-shipped web route (which passes
 a `Buffer` and a `timeoutMs`, nothing else) needed no changes when this generality was added.
 
@@ -115,6 +118,38 @@ conventions"). Dispatching the stats-cache refresh an import implies is likewise
 that's `modules/stats`' `dispatchStatsCacheRefreshEvents`, called by each entry point after
 `completeImportJob`. This module only provides somewhere to record the outcome.
 
+## Reingestion: `reingestGroupEncounters`
+
+`lib/reingest-group-encounters.ts`'s `reingestGroupEncounters(options): AsyncGenerator<DemonImportUpdate>`
+re-runs the pipeline for an existing group from its already-staged `DemonRecords` rows rather than
+a CSV or an upload — for when the write path itself has changed (a newly-modelled column, a bug
+fix in this module) and a group's existing history needs reinterpreting under the new logic
+without re-submitting anything. It's a thin wrapper around `runDemonImport`: resolve the group's
+display name (for `logContext`) → page through `DemonRecords` (`fetchDemonRows`, keyset-paginated
+on `id`, `DEMON_RECORDS_PAGE_SIZE` = 1000 per page) → `yield*` straight through to `runDemonImport`
+with `source` set to the rows it paged in.
+
+Two contract choices worth knowing:
+- **It always yields exactly one terminal update, the same guarantee `runDemonImport` makes** — a
+  group with no staged rows at all yields a synthetic `{type: 'complete', processed: 0, successful:
+  0, failed: 0, skipped: 0}` rather than ending the generator having yielded nothing, so a caller
+  never has to special-case "zero updates" separately from "an import that did nothing."
+- **A `ringingGroupId` that doesn't exist is a thrown `Error`, not a yielded update** — resolved
+  before any run starts, so it's an invalid-argument problem rather than a pipeline failure.
+
+It takes a pre-resolved `supabaseClient` rather than a bare `ringingGroupId` it authenticates
+itself — deliberately, so this module keeps its zero-`app/`-import footprint (unlike `modules/stats`,
+which already imports `getAuthenticatedSupabaseClient`, there's no precedent for `modules/demon-import`
+reaching into `app/lib/auth/` and this didn't seem worth being the first).
+
+**This function currently has zero callers** (confirmed by a repo-wide grep). It used to be exposed
+as a CLI script, `supabase/scripts/regenerate-import.ts` (`npm run db:regenerate:local`/`:prod`),
+which nothing ever actually invoked programmatically — just the two npm scripts and its own test.
+Both were deleted when this moved in, rather than kept as a thin wrapper, since it was unclear a
+CLI script was ever the right trigger for it. See the tracking ticket (referenced from
+`supabase/CLAUDE.md`'s former "Regenerating a group's data from staged DemonRecords" section) for
+deciding how/whether it should actually get invoked.
+
 ## No `browser.ts` split
 
 One barrel, `index.ts`. Every caller is a server component, API route or Node script — nothing in
@@ -123,11 +158,13 @@ out the way `modules/stats` has to. The barrel re-exports only what's actually r
 module: `DemonRow`, `StatsCacheRefreshOutcome`, `DemonImportUpdate`,
 `findUnrecognisedLocationNames`, `getDistinctLocationNames`, `createRingSequenceLinker`,
 `createRingSequenceLookup`, `ImportJobTracker`, `DemonRecordsBatchWriter`, `EncounterRowBatchWriter`,
-`processEncounterRow`, `runDemonImport`, `RunDemonImportOptions` and `DEFAULT_IMPORT_CONCURRENCY`.
+`processEncounterRow`, `runDemonImport`, `RunDemonImportOptions`, `DEFAULT_IMPORT_CONCURRENCY`,
+`reingestGroupEncounters` and `ReingestGroupEncountersOptions`.
 Everything else the module's
 files export (`DemonColumnNames`, `ImportJobRowCounts`, `convertDateFormat`, `isRinglessRingNo`,
-`normaliseCaptureTime`, `transformEmptyStringsToNull`, `CasualtyEncounterError`, the two
-`DEFAULT_*_SIZE`/`DEFAULT_*_CHUNK_SIZE` constants, `mergeDuplicateEncounters`) is reached only by
+`normaliseCaptureTime`, `transformEmptyStringsToNull`, `CasualtyEncounterError`, `fetchDemonRows`,
+`DEMON_RECORDS_PAGE_SIZE`, the two `DEFAULT_*_SIZE`/`DEFAULT_*_CHUNK_SIZE` constants,
+`mergeDuplicateEncounters`) is reached only by
 other files inside the module (or their own tests) importing it directly by path, never through
 the barrel — so it stays off `index.ts`. `CasualtyEncounterError` dropped off the barrel once the
 CLI importer stopped constructing/checking it directly (it now delegates its per-row catch to
@@ -159,6 +196,8 @@ modules/demon-import/
     process-encounter-row.ts     # processEncounterRow — the stage 1 → stage 2 join
     run-demon-import.ts          # runDemonImport — the web route's whole run as
                                  # one async generator; see "Orchestration" above
+    reingest-group-encounters.ts # reingestGroupEncounters, fetchDemonRows — see
+                                 # "Reingestion" above
 ```
 
 `lib/encounter-batch-writer.ts` is by far the largest file here and deliberately stays one file:
@@ -236,6 +275,8 @@ since it's testing the orchestration itself, it mocks every sibling file `runDem
 `./process-encounter-row`, `./locations`) directly rather than exercising the real pipeline — this
 is the inside-the-module test the module-boundary rule expects to reach past the barrel, mirroring
 what `app/api/import/__tests__/route.test.ts` used to do before this orchestration moved here.
+`lib/__tests__/reingest-group-encounters.test.ts` does the same, mocking `./run-demon-import`
+directly rather than the barrel, for the same reason.
 
 The DB integration suite stays **outside** this module, in
 [`supabase/__tests__/demon-import.test.ts`](../../supabase/__tests__/demon-import.test.ts) (#464):

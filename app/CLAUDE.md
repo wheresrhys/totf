@@ -404,10 +404,11 @@ the orchestrator decides for itself. `PageContent.tsx` imports `DemonImportUpdat
 `@/modules/demon-import` and switches on its `type` field exactly as before — none of the update
 shapes changed, only where the type is defined.
 
-`supabase/scripts/import-csv.ts` and `regenerate-import.ts` (the CLI importer and the
-regenerate-from-`DemonRecords` script, see `supabase/CLAUDE.md`'s "CSV data import") delegate to
-the exact same `runDemonImport` — there is no CLI-specific copy of this pipeline left anywhere in
-the codebase.
+`supabase/scripts/import-csv.ts` (the CLI importer, see `supabase/CLAUDE.md`'s "CSV data import")
+delegates to the exact same `runDemonImport` — there is no CLI-specific copy of this pipeline left
+anywhere in the codebase. A third caller, `reingestGroupEncounters`, lives entirely inside
+`modules/demon-import` itself rather than as a separate script — see that module's CLAUDE.md's
+"Reingestion" section.
 
 ### Stats-cache refresh queue
 

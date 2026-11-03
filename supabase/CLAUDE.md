@@ -681,6 +681,20 @@ Core import logic (types, transforms, `processEncounterRow`, both batch writers)
 `modules/demon-import` and is shared by both this CLI script and the web import route — see
 `app/CLAUDE.md`'s "Web import".
 
+The whole pipeline body (location pre-flight → `ImportJobs` row → both batch writers → row
+dispatch → completion → stats-cache dispatch) lives in `modules/demon-import`'s `runDemonImport`
+(see `app/CLAUDE.md`'s "Web import" and `modules/demon-import/CLAUDE.md`'s "Orchestration") — the
+same orchestrator the web route uses, not a CLI-specific copy. `importCSV` just materializes its
+own `DemonRow[]` (rows read from the CSV file, group resolved by name — a typo-prone lookup that's
+fine for a script someone types a group name into), calls `runDemonImport({supabaseClient,
+ringingGroupId, source: rows, concurrency, logContext: {csvFilePath, ringingGroupName}})`, and
+`for await` its yielded `DemonImportUpdate`s to decide what to print and when to exit — an
+immediate `process.exit(1)` for `unrecognised_locations` (matching the pre-flight's old
+behaviour), a rethrow for `error` (so the script's own top-level `.catch` still decides the exit
+code, unchanged), and the completion summary for `complete`. `logContext` is merged onto the
+`dispatchStatsCacheRefreshEvents` log base and `runDemonImport`'s own failure log so a failure
+stays identifiable by caller.
+
 **Both halves of a row's write are batched, and `processEncounterRow` is the two-step
 orchestrator joining them**: `await demonRecordsBatchWriter.writeDemonRecord(row)` (staging,
 #959), then `encounterRowBatchWriter.writeEncounterRow(row)` (the domain tables, #1139). Each
@@ -846,36 +860,19 @@ import can't create its own locations any more, so `seed-e2e-data.ts` pre-create
 stay reproducible across reseeds — see #903 above), and `e2e/authenticated/import.spec.ts` re-creates
 `Delta Site` after wiping Delta's rows.
 
-### Regenerating a group's data from staged DemonRecords (#1185)
+### Reingesting a group's data from staged DemonRecords
 
-`supabase/scripts/regenerate-import.ts` re-runs the whole pipeline above for an existing group
-without requiring the original CSV: it pages through that group's already-staged `DemonRecords`
-rows (keyset-paginated on `id`, `DEMON_RECORDS_PAGE_SIZE` = 1000 per page) and feeds their
-`raw_row`s through the exact same writers, location pre-flight, `ImportJobs` tracking and
-stats-cache-refresh dispatch as a CSV import. This is for when the write path itself has changed
-(a newly-modelled column, a bug fix in `modules/demon-import`) and a group's existing history needs
-reinterpreting under the new logic.
-
-```sh
-npm run db:regenerate:local -- <ringing-group-id>
-npm run db:regenerate:prod -- <ringing-group-id>
-```
-
-The whole pipeline body (location pre-flight → `ImportJobs` row → both batch writers → row
-dispatch → completion → stats-cache dispatch) lives in `modules/demon-import`'s `runDemonImport`
-(see `app/CLAUDE.md`'s "Web import" and `modules/demon-import/CLAUDE.md`'s "Orchestration") — the
-same orchestrator the web route uses, not a CLI-specific copy. `importCSV` (rows read from a CSV
-file, group resolved by name) and `regenerateImport` (rows re-read from `DemonRecords`, group
-given directly by id — a typo-prone name lookup doesn't apply to a script that's never driven
-interactively) each just materialize their own `DemonRow[]`, call `runDemonImport({supabaseClient,
-ringingGroupId, source: rows, concurrency, logContext})`, and `for await` its yielded
-`DemonImportUpdate`s to decide what to print and when to exit — an immediate `process.exit(1)` for
-`unrecognised_locations` (matching the pre-flight's old behaviour), a rethrow for `error` (so each
-script's own top-level `.catch` still decides the exit code, unchanged), and the completion summary
-for `complete`. `logContext` is the one piece each caller still supplies itself: `importCSV` passes
-`{csvFilePath, ringingGroupName}`, `regenerateImport` passes `{source: 'regenerate',
-ringingGroupName}`, both merged onto the `dispatchStatsCacheRefreshEvents` log base and
-`runDemonImport`'s own failure log so a failure stays identifiable by caller.
+There used to be a CLI script here, `supabase/scripts/regenerate-import.ts`
+(`npm run db:regenerate:local`/`:prod`), re-running the pipeline above for an existing group from
+its already-staged `DemonRecords` rows without requiring the original CSV — for when the write
+path itself has changed (a newly-modelled column, a bug fix in `modules/demon-import`) and a
+group's history needs reinterpreting under the new logic. A repo-wide grep found nothing ever
+called it programmatically — only the two npm scripts and its own test — so the actual logic moved
+into `modules/demon-import` as a library function, `reingestGroupEncounters`, and the CLI
+script/npm scripts were deleted rather than kept as a thin wrapper around it. See
+`modules/demon-import/CLAUDE.md`'s "Reingestion" section for how it works now, and
+[#1344](https://github.com/wheresrhys/totf/issues/1344) for the open decision on how/whether it
+should actually get invoked — it currently has zero callers.
 
 ## Setting group passwords
 
