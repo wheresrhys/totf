@@ -88,10 +88,15 @@ function Expander({
 	children: React.ReactNode;
 	isExpanded: boolean;
 }) {
+	// No `overflow-hidden` here deliberately — the open/closed toggle is an
+	// instant `hidden` (display:none), not an animated height transition, so
+	// nothing needs clipping mid-collapse. SpeciesAlphabetNav's letter-expansion
+	// panel is `position: absolute` and relies on being able to render outside
+	// this wrapper's content box.
 	return (
 		<div
 			id={id}
-			className={`${isExpanded ? '' : 'hidden'} collapse grow basis-full overflow-hidden w-full`}
+			className={`${isExpanded ? '' : 'hidden'} collapse grow basis-full w-full`}
 		>
 			{children}
 		</div>
