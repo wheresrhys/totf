@@ -10,19 +10,21 @@ import {
 } from '@testing-library/react';
 import type { LineChartData } from 'react-chartkick';
 import {
-	toYearOnYearSeries,
-	toThisYearSeries,
 	yearColors,
 	thisYearColors,
+	isHiddenFromLegend
+} from '../chart-color-utils';
+import {
+	toYearOnYearSeries,
+	toThisYearSeries,
 	normalizeSeriesByEffort,
 	aggregateSeriesByYear,
 	accumulateSeriesByYear,
 	buildTotalSeries,
 	toPercentStackedSeries,
-	spansMultipleYears,
-	isHiddenFromLegend,
-	YearComparisonTrendChart
-} from '../YearComparisonTrendChart';
+	spansMultipleYears
+} from '../chart-series-transforms';
+import { YearComparisonTrendChart } from '../YearComparisonTrendChart';
 
 // chartkick registers Chart.js as a side effect; the chart itself is mocked so
 // no real canvas renders. The mock surfaces its `data`/`xtitle`/`ytitle`/`colors`
