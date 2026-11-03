@@ -197,6 +197,12 @@ entrypoint, its content, and its data fetcher:
   use each one. A plain directory, deliberately _not_ a `modules/` module: no barrel, no import
   boundary, no own `CLAUDE.md` — import each file by its own path. Promotion to a real
   `modules/charts` is tracked under #1253.
+- **Stats-table components** are not under `app/components/` at all — `PeriodTotalsTable`,
+  `SpeciesTotalsTable`, `SessionSpeciesTotalsTable`, `SppStatsTable` and `SpTable`, and the
+  `period-totals`/`species-totals`/`species-stats`/`squashed-month` helpers that build their row
+  models, live in `modules/stats-view/` (#1327) and are imported from the `@/modules/stats-view`
+  barrel. Unlike `app/components/charts/` above that one _is_ a real module — barrel, import
+  boundary, own [`CLAUDE.md`](../modules/stats-view/CLAUDE.md).
 - **URL-addressable client state** (e.g. `/compare/species`' repeated `?name=` species selection,
   #115): the server `page.tsx` parses `searchParams` in its `getParams` into the shape the content
   component wants, seeds `useState` from it, and mirrors later changes back onto the URL with

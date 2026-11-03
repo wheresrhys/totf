@@ -144,6 +144,14 @@ belong to any single scoped doc:
   catalogued here purely because it's a module per the "Module conventions" below, not because
   it's cross-zone — it's `zone:app`-only. See its own
   [`modules/ui-kit/CLAUDE.md`](modules/ui-kit/CLAUDE.md).
+- `modules/stats-view/` — the 5 stats-table components (`PeriodTotalsTable`,
+  `SpeciesTotalsTable`, `SessionSpeciesTotalsTable`, `SppStatsTable`, `SpTable`) every
+  summary/species/session tab renders, plus the 4 pure helpers that reshape a `core_stats`-family
+  row into the row model each one wants, extracted from `app/components/*` and `app/lib/*`
+  (#1327). `zone:app`-only, catalogued here for the same reason `modules/ui-kit` above is, and
+  a **sibling of `modules/stats`, deliberately not nested inside it** — `modules/stats` is
+  imported by the `supabase/scripts/import-csv.ts` CLI importer and so must stay React/JSX-free.
+  See its own [`modules/stats-view/CLAUDE.md`](modules/stats-view/CLAUDE.md).
 
 ## Module conventions
 
