@@ -53,7 +53,7 @@ function parseDemonCsvBuffer(buffer: Buffer): Promise<DemonRow[]> {
 }
 
 /**
- * A `push`/`drain` queue bridging `runOneImport`'s plain callback-based
+ * A `push`/`drain` queue bridging `performImport`'s plain callback-based
  * reporting (called from inside detached per-row promises, so it can't `yield`
  * directly) and `runDemonImport`'s `async function*` surface. Pushes between
  * `drain`'s wake-ups are plain array appends — single JS thread, no race — and
@@ -86,7 +86,7 @@ function createUpdateChannel<T>() {
 	return { push, close, drain };
 }
 
-async function runOneImport(
+async function performImport(
 	options: RunDemonImportOptions,
 	push: (update: DemonImportUpdate) => void
 ): Promise<void> {
@@ -266,7 +266,7 @@ export async function* runDemonImport(
 	options: RunDemonImportOptions
 ): AsyncGenerator<DemonImportUpdate> {
 	const channel = createUpdateChannel<DemonImportUpdate>();
-	const run = runOneImport(options, channel.push).finally(channel.close);
+	const run = performImport(options, channel.push).finally(channel.close);
 	yield* channel.drain();
 	await run;
 }

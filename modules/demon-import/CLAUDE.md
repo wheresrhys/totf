@@ -85,7 +85,7 @@ line; no business logic lives in the route file any more.
 The one non-mechanical piece is bridging a `yield` (which can only fire synchronously within the
 generator's own control flow) with the run's per-row reporting (called from inside each row's
 **detached, unawaited** promise — deliberate, so a batch/chunk can fill, see "Design choices"
-below). `runOneImport` — the actual run, essentially the route's old `ReadableStream.start()` body
+below). `performImport` — the whole CSV import's run, essentially the route's old `ReadableStream.start()` body
 — takes a plain `push(update)` callback instead of `yield`ing directly; `createUpdateChannel`
 buffers what it pushes and `runDemonImport` drains that buffer via `yield*`, only returning once
 the run has signalled `close()` and the buffer is empty — so the terminal update is always
