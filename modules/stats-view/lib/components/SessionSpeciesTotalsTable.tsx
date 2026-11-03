@@ -9,7 +9,7 @@ import {
 	type ColumnConfig,
 	type RowModelWithRawData
 } from '@/modules/ui-kit';
-import { EncountersTable } from './EncountersTable';
+import { EncountersTable } from '@/app/components/pages/session/EncountersTable';
 
 const SpeciesNameCell = createNameLinkCell<SpeciesWithEncounters, RowModel>(
 	(model) => model.species,

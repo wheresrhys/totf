@@ -1,7 +1,7 @@
 'use server';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
 import type { CoreStatsResult } from '@/app/models/db';
-import type { PeriodTotalsGrouping } from '@/app/lib/period-totals';
+import type { PeriodTotalsGrouping } from '@/modules/stats-view';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 /**

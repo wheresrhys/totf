@@ -5,7 +5,7 @@ import {
 	buildGroupSquashedMonthSummaryHref,
 	buildSpeciesSquashedMonthHref
 } from '../squashed-month';
-import type { ViewedGroup } from '../group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 

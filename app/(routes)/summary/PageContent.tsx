@@ -6,7 +6,7 @@ import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';
 import { SquashedMonthSummaryTotalsSection } from '@/app/components/SquashedMonthSummaryTotalsSection';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { SpeciesStatsRow } from '@/app/lib/species-stats';
+import type { SpeciesStatsRow } from '@/modules/stats-view';
 import { formatMonthLabel, type MonthTotalsRow } from '@/app/lib/month-totals';
 
 function buildHeading(

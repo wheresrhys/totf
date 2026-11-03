@@ -4,7 +4,10 @@ import type {
 	SpeciesTotalsTabParams,
 	SpCombinedMonthTotalsData
 } from '@/app/actions/sp-data';
-import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
+import {
+	buildSpeciesSquashedMonthHref,
+	PeriodTotalsTable
+} from '@/modules/stats-view';
 import {
 	buildCombinedMonthTotalsRows,
 	buildPerYearMonthTotalsRows,
@@ -13,7 +16,6 @@ import {
 	formatMonthLabel
 } from '@/app/lib/month-totals';
 import { CombineYearsToggle, EmptyMonthsToggle } from '@/modules/ui-kit';
-import { buildSpeciesSquashedMonthHref } from '@/app/lib/squashed-month';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // Pure, presentational `TabConfig.TabComponent` (#1066) — see

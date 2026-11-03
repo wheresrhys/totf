@@ -427,7 +427,7 @@ describe('summary read-path access model', () => {
 			expect(selectedColumns()).toContain('Species(species_name)');
 			expect(rows.map((row) => row.species_name)).toEqual(['Robin', 'Wren']);
 			// The embed itself never reaches the caller — `SpeciesStatsRow`
-			// (app/lib/species-stats.ts) keys on the flattened name.
+			// (modules/stats-view/lib/species-stats.ts) keys on the flattened name.
 			expect(rows[0]).not.toHaveProperty('Species');
 		});
 

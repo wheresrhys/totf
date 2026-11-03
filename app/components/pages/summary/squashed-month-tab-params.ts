@@ -1,5 +1,5 @@
 import type { CoreStatsResult } from '@/app/models/db';
-import type { SpeciesStatsRow } from '@/app/lib/species-stats';
+import type { SpeciesStatsRow } from '@/modules/stats-view';
 
 /**
  * Tab ids for the squashed-month summary page (`/summary/jan`, #1005), in

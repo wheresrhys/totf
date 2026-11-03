@@ -229,7 +229,7 @@ export function resolveStatsCacheQueryPlan({
  * `"SimpleStatsCache".sql`'s header for why), the `group_id`/`temporal_unit`/
  * `time_period` filters, the `(time_period, species_name)` ordering every
  * consumer reads the series in, the `Species(species_name)` embed
- * `mergeSpeciesBiometrics` (app/lib/species-stats.ts) joins on, and the
+ * `mergeSpeciesBiometrics` (modules/stats-view/lib/species-stats.ts) joins on, and the
  * pagination a day-grain slice of a long-running group's history needs — is
  * `readStatsCacheRows`' job (app/actions/stats-cache.ts, #1233). This function
  * only translates a `StatsCacheQueryPlan` into its params and applies the two

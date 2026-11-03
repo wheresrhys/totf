@@ -10,7 +10,7 @@ import {
  * The four temporal filters #1051 standardises on, in the shape the UI
  * (`TemporalFilterControls`, #1073) and the stats RPC family
  * (`from_date`/`to_date`/`year_filter`/`month_filter`) both express them.
- * `month` is 1-indexed, matching `month_filter` and `app/lib/squashed-month.ts`.
+ * `month` is 1-indexed, matching `month_filter` and `modules/stats-view/lib/squashed-month.ts`.
  * All four are optional and all are intersected — an all-time query passes
  * none.
  */

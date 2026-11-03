@@ -10,10 +10,8 @@ import { SppStatsTable } from '../SppStatsTable';
 import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
 import { ALPHA_BIOMETRICS_BY_SPECIES } from '@/app/__tests__/helpers/biometrics-stats-fixtures';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
-import {
-	mergeSpeciesBiometrics,
-	type SpeciesStatsRow
-} from '@/app/lib/species-stats';
+import { mergeSpeciesBiometrics } from '../../species-stats';
+import type { SpeciesStatsRow } from '../../../types';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { PageData } from '@/app/(routes)/species/page';
 

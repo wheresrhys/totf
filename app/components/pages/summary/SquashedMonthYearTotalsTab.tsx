@@ -1,6 +1,6 @@
 'use client';
 
-import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
+import { PeriodTotalsTable } from '@/modules/stats-view';
 import { buildGroupSummaryHref } from '@/app/lib/group-links';
 import {
 	formatMonthYearLabel,

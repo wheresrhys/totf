@@ -25,11 +25,13 @@ import {
 	SQUASHED_MONTH_SPECIES_TOTALS_TAB_ID,
 	type SquashedMonthTabParams
 } from '@/app/components/pages/summary/squashed-month-tab-params';
-import { parseMonthAbbreviation } from '@/app/lib/squashed-month';
+import {
+	parseMonthAbbreviation,
+	type SpeciesStatsRow
+} from '@/modules/stats-view';
 import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
-import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 import {
 	buildMonthTotalsRows,
 	type MonthTotalsRow

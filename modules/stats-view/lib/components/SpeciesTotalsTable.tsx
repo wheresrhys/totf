@@ -3,10 +3,9 @@
 import { useState } from 'react';
 import {
 	deriveSpeciesTotalsRow,
-	deriveSpeciesTotalsRowByEncounter,
-	type SpeciesTotalsRow
-} from '@/app/lib/species-totals';
-import type { SpeciesStatsRow } from '@/app/lib/species-stats';
+	deriveSpeciesTotalsRowByEncounter
+} from '../species-totals';
+import type { SpeciesStatsRow, SpeciesTotalsRow } from '../../types';
 import {
 	type ColumnConfig,
 	SortableTable,
@@ -17,7 +16,7 @@ import {
 	AggregateByToggle,
 	type AggregateByValue
 } from '@/modules/ui-kit';
-import { buildSpeciesSquashedMonthHref } from '@/app/lib/squashed-month';
+import { buildSpeciesSquashedMonthHref } from '../squashed-month';
 
 type RowModel = {
 	speciesName: string;

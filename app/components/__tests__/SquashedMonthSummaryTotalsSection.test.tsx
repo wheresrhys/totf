@@ -9,7 +9,7 @@ import {
 } from '@testing-library/react';
 import { SquashedMonthSummaryTotalsSection } from '../SquashedMonthSummaryTotalsSection';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { SpeciesStatsRow } from '@/app/lib/species-stats';
+import type { SpeciesStatsRow } from '@/modules/stats-view';
 import {
 	buildCoreStatsRow,
 	buildDailyStatsRow

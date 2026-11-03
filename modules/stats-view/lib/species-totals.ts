@@ -1,19 +1,4 @@
-import type { SpeciesStatsRow } from './species-stats';
-
-export type SpeciesTotalsRow = {
-	speciesName: string;
-	sessionsCount: number;
-	encounterCount: number;
-	maxPerSession: number;
-	individualsCount: number;
-	newCount: number;
-	retrapsCount: number;
-	pullusCount: number;
-	juvsCount: number;
-	postjuvCount: number;
-	adultsCount: number;
-	unknownAgeCount: number;
-};
+import type { SpeciesStatsRow, SpeciesTotalsRow } from '../types';
 
 /** Every bird in the period has ≥1 'N' encounter or none — an exhaustive partition. */
 export function calculateRetraps(stat: SpeciesStatsRow): number {

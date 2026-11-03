@@ -6,7 +6,7 @@
 // than re-deriving it.
 
 // 1-indexed month -> full month name, matching the `month_filter` RPC param's
-// 1-indexing (see `app/lib/squashed-month.ts`).
+// 1-indexing (see `modules/stats-view/lib/squashed-month.ts`).
 export const MONTH_NAMES = [
 	'January',
 	'February',

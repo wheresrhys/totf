@@ -1,6 +1,6 @@
 'use client';
 
-import { SpeciesTotalsTable } from '@/app/components/SpeciesTotalsTable';
+import { SpeciesTotalsTable } from '@/modules/stats-view';
 import { type TabConfig } from '@/modules/ui-kit';
 import type { SummaryTabParams } from './summary-tab-params';
 // Id and `dataFetcher` live in the plain (non-`'use client'`) sibling module

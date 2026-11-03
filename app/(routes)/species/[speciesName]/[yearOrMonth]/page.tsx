@@ -5,7 +5,7 @@ import {
 import { SpeciesPageContent, type PageData } from '../PageContent';
 import { fetchSpeciesPageContentForPeriod } from '@/app/(routes)/species/[speciesName]/page';
 import { readTabIdSearchParam } from '@/app/lib/tab-query-param';
-import { parseMonthAbbreviation } from '@/app/lib/squashed-month';
+import { parseMonthAbbreviation } from '@/modules/stats-view';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 export type PageParams = {

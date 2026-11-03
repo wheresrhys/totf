@@ -30,7 +30,7 @@ import {
 import { type TabConfig } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
-import type { SpeciesStatsRow } from '@/app/lib/species-stats';
+import type { SpeciesStatsRow } from '@/modules/stats-view';
 import type { SummaryTabParams } from './summary-tab-params';
 
 export const YEAR_TOTALS_TAB_ID = 'year-totals';

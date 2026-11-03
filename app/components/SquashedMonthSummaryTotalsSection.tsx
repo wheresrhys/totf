@@ -6,7 +6,7 @@ import { squashedMonthSessionTotalsTab } from '@/app/components/pages/summary/Sq
 import { squashedMonthHighlightsTab } from '@/app/components/pages/summary/SquashedMonthHighlightsTab';
 import type { SquashedMonthTabParams } from '@/app/components/pages/summary/squashed-month-tab-params';
 import type { CoreStatsResult } from '@/app/models/db';
-import type { SpeciesStatsRow } from '@/app/lib/species-stats';
+import type { SpeciesStatsRow } from '@/modules/stats-view';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // Tab order for the squashed-month summary page (`/summary/jan`, #1005) is

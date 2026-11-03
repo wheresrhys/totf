@@ -1,4 +1,4 @@
-import type { ViewedGroup } from './group-slug';
+import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // The 12 lowercase 3-letter abbreviations a `[yearOrMonth]` route segment
 // accepts as a "squashed month" filter (e.g. `/summary/jan`) instead of a
