@@ -1,11 +1,9 @@
 import { handleCallback } from '@vercel/queue';
-import {
-	ImportJobTracker,
-	type StatsCacheRefreshOutcome
-} from '@/modules/demon-import';
+import { ImportJobTracker } from '@/modules/demon-import';
 import {
 	refreshSimpleStatsCache,
-	type StatsCacheRefreshEvent
+	type StatsCacheRefreshEvent,
+	type StatsCacheRefreshOutcome
 } from '@/modules/stats';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import { getAuthenticatedSupabaseClientForGroup } from '@/app/lib/auth/group-auth';

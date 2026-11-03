@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase.types';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
-import type { ImportJobRowCounts, StatsCacheRefreshOutcome } from '../types';
+import type { ImportJobRowCounts } from '../types';
+import type { StatsCacheRefreshOutcome } from '@/modules/stats';
 
 type ImportJobsInsert = Database['public']['Tables']['ImportJobs']['Insert'];
 type ImportJobsUpdate = Database['public']['Tables']['ImportJobs']['Update'];

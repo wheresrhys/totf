@@ -5,8 +5,8 @@ import {
 	SortableTable,
 	type ColumnConfig
 } from '@/modules/ui-kit';
-import { speciesStatConfigs } from '../species-stats';
-import type { SpeciesStatsRow } from '../../types';
+import { speciesStatConfigs } from '../lib/species-stats';
+import type { SpeciesStatsRow } from '../types';
 import type { PageData } from '@/app/(routes)/species/page';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { useState, useEffect, useRef } from 'react';

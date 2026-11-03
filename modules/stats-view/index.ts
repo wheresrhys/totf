@@ -21,11 +21,11 @@ export {
 	formatMonthAbbreviation,
 	parseMonthAbbreviation
 } from './lib/squashed-month';
-export { PeriodTotalsTable } from './lib/components/PeriodTotalsTable';
+export { PeriodTotalsTable } from './components/PeriodTotalsTable';
 export {
 	SpeciesTotalsTable,
 	type SpeciesPeriod
-} from './lib/components/SpeciesTotalsTable';
-export { SessionSpeciesTotalsTable } from './lib/components/SessionSpeciesTotalsTable';
-export { SppStatsTable } from './lib/components/SppStatsTable';
-export { SpTable } from './lib/components/SpTable';
+} from './components/SpeciesTotalsTable';
+export { SessionSpeciesTotalsTable } from './components/SessionSpeciesTotalsTable';
+export { SppStatsTable } from './components/SppStatsTable';
+export { SpTable } from './components/SpTable';

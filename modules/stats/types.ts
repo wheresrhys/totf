@@ -80,6 +80,12 @@ export type StatsCacheRefreshEvent = {
   affectedSpeciesIds: number[];
 };
 
+import type { ImportJobStatus } from '@/app/models/db';
+/** The outcome a stats-cache refresh can actually be recorded as. */
+export type StatsCacheRefreshOutcome = Extract<
+  ImportJobStatus,
+  'succeeded' | 'failed'
+>;
 
 /**
  * The species ids a refresh pass should narrow its species-grouped *write* to

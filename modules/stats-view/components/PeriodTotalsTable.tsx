@@ -6,8 +6,8 @@ import {
 	derivePeriodTotalsRowByBird,
 	derivePeriodTotalsRowByEncounter,
 	formatPeriodTotalsLabel
-} from '../period-totals';
-import type { PeriodTotalsGrouping, PeriodTotalsRow } from '../../types';
+} from '../lib/period-totals';
+import type { PeriodTotalsGrouping, PeriodTotalsRow } from '../types';
 import {
 	SortableTable,
 	getFormattedValue,

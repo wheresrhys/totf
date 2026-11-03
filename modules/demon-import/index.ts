@@ -1,18 +1,16 @@
 export type {
 	DemonRow,
-	StatsCacheRefreshOutcome,
 	DemonImportUpdate
 } from './types';
-export {
-	findUnrecognisedLocationNames,
-	getDistinctLocationNames
-} from './lib/locations';
+// only used in some supabase import tests
+// TODO avoid relying on exportig these
 export {
 	createRingSequenceLinker,
 	createRingSequenceLookup
 } from './lib/ring-sequences';
 export { ImportJobTracker } from './lib/import-job-tracker';
-export { DemonRecordsBatchWriter } from './lib/demon-records-batch-writer';
+// only used in some supabase import tests
+// TODO avoid relying on exportig this
 export { EncounterRowBatchWriter } from './lib/encounter-batch-writer';
 export { processEncounterRow } from './lib/process-encounter-row';
 export {

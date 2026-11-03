@@ -1,5 +1,3 @@
-import type { ImportJobStatus } from '@/app/models/db';
-
 export type DemonColumnNames =
 	| 'entered_by'
 	| 'nest_link_code'
@@ -123,12 +121,6 @@ export type ImportJobRowCounts = {
 	failed: number;
 	skipped: number;
 };
-
-/** The outcome a stats-cache refresh can actually be recorded as. */
-export type StatsCacheRefreshOutcome = Extract<
-	ImportJobStatus,
-	'succeeded' | 'failed'
->;
 
 export type DemonImportProgressUpdate = { type: 'progress'; processed: number };
 export type DemonImportCompleteUpdate = {
