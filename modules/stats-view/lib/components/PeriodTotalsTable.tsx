@@ -5,10 +5,9 @@ import type { CoreStatsResult } from '@/app/models/db';
 import {
 	derivePeriodTotalsRowByBird,
 	derivePeriodTotalsRowByEncounter,
-	formatPeriodTotalsLabel,
-	type PeriodTotalsGrouping,
-	type PeriodTotalsRow
-} from '@/app/lib/period-totals';
+	formatPeriodTotalsLabel
+} from '../period-totals';
+import type { PeriodTotalsGrouping, PeriodTotalsRow } from '../../types';
 import {
 	SortableTable,
 	getFormattedValue,
