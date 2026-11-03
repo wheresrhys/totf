@@ -16,8 +16,11 @@ import { pathToFileURL } from 'url';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import { supabase } from '../../lib/supabase';
-import type { DemonRow } from '@/modules/demon-import';
-import { DEFAULT_IMPORT_CONCURRENCY, runImport } from './import-csv';
+import {
+	runDemonImport,
+	DEFAULT_IMPORT_CONCURRENCY,
+	type DemonRow
+} from '@/modules/demon-import';
 
 /**
  * Rows fetched per page. `DemonRecords` rows are keyset-paginated on `id`
@@ -32,7 +35,7 @@ export interface RegenerateOptions {
 	/**
 	 * Max rows processed concurrently once writing starts. See
 	 * `ImportOptions.concurrency` in `./import-csv.ts` — same meaning, same
-	 * default, passed straight through to `runImport`.
+	 * default, passed straight through to `runDemonImport`.
 	 */
 	concurrency?: number;
 }
@@ -45,7 +48,7 @@ export interface RegenerateOptions {
  * would have produced from `raw_row`.
  *
  * The whole group's history is still buffered into one in-memory array,
- * same as `importCSV` buffers a whole CSV file: `runImport`'s location
+ * same as `importCSV` buffers a whole CSV file: `runDemonImport`'s location
  * pre-flight has to see every row's `loc_id` before the first write, so
  * there is no way to start writing from only a prefix of the pages.
  */
@@ -115,13 +118,34 @@ export async function regenerateImport(
 	}
 	console.log(`Fetched ${rows.length} staged row(s). Regenerating...`);
 
-	await runImport({
-		rows,
+	for await (const update of runDemonImport({
+		supabaseClient: groupSupabaseClient,
 		ringingGroupId,
-		ringingGroupName,
+		source: rows,
 		concurrency,
-		logContext: { source: 'regenerate' }
-	});
+		logContext: { source: 'regenerate', ringingGroupName }
+	})) {
+		switch (update.type) {
+			case 'progress':
+				break;
+			case 'unrecognised_locations':
+				console.error(
+					`Error: these locations are not recognised for ringing group "${ringingGroupName}": ${update.locations.join(', ')}. No rows were imported. If a site was renamed, rename its existing Location to match before importing; if it is genuinely new, create it first.`
+				);
+				process.exit(1);
+			case 'timeout':
+				break;
+			case 'error':
+				throw new Error(update.message);
+			case 'complete':
+				console.log('\n✓ Import completed');
+				console.log(`Total records: ${update.processed}`);
+				console.log(`Successful: ${update.successful}`);
+				console.log(`Failed: ${update.failed}`);
+				console.log(`Skipped: ${update.skipped}`);
+				break;
+		}
+	}
 }
 
 // Main execution — only when run directly, never when imported for

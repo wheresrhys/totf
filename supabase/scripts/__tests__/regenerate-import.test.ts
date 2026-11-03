@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DemonImportUpdate } from '@/modules/demon-import';
 import {
 	DEMON_RECORDS_PAGE_SIZE,
 	fetchDemonRows,
@@ -6,18 +7,18 @@ import {
 } from '../regenerate-import';
 
 const {
-	mockRunImport,
+	mockRunDemonImport,
 	mockRingingGroupsMaybeSingle,
 	mockGetAuthenticatedSupabaseClientForGroup
 } = vi.hoisted(() => ({
-	mockRunImport: vi.fn(async () => {}),
+	mockRunDemonImport: vi.fn(),
 	mockRingingGroupsMaybeSingle: vi.fn(),
 	mockGetAuthenticatedSupabaseClientForGroup: vi.fn()
 }));
 
-vi.mock('../import-csv', () => ({
+vi.mock('@/modules/demon-import', () => ({
 	DEFAULT_IMPORT_CONCURRENCY: 30,
-	runImport: mockRunImport
+	runDemonImport: mockRunDemonImport
 }));
 
 vi.mock('../../../lib/supabase', () => ({
@@ -61,9 +62,19 @@ function buildFakeSupabaseClient(
 	return chain;
 }
 
+async function* canned(
+	updates: DemonImportUpdate[]
+): AsyncGenerator<DemonImportUpdate> {
+	for (const update of updates) yield update;
+}
+
 beforeEach(() => {
-	mockRunImport.mockClear();
-	mockRunImport.mockResolvedValue(undefined);
+	mockRunDemonImport.mockReset();
+	mockRunDemonImport.mockReturnValue(
+		canned([
+			{ type: 'complete', processed: 1, successful: 1, failed: 0, skipped: 0 }
+		])
+	);
 	mockRingingGroupsMaybeSingle.mockReset();
 	mockRingingGroupsMaybeSingle.mockResolvedValue({
 		data: { group_name: 'Alpha' },
@@ -183,40 +194,41 @@ describe('regenerateImport group lookup', () => {
 
 		expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('999'));
 		expect(exitSpy).toHaveBeenCalledWith(1);
-		expect(mockRunImport).not.toHaveBeenCalled();
+		expect(mockRunDemonImport).not.toHaveBeenCalled();
 	});
 });
 
 describe('regenerateImport fetched rows', () => {
-	it('fetches the group’s staged rows and runs the shared import pipeline over them', async () => {
-		mockGetAuthenticatedSupabaseClientForGroup.mockResolvedValue(
-			buildFakeSupabaseClient([[{ id: 1, raw_row: { ring_no: 'AAA001' } }]])
-		);
+	it('fetches the group’s staged rows and runs the shared orchestrator over them', async () => {
+		const groupClient = buildFakeSupabaseClient([
+			[{ id: 1, raw_row: { ring_no: 'AAA001' } }]
+		]);
+		mockGetAuthenticatedSupabaseClientForGroup.mockResolvedValue(groupClient);
 
 		await regenerateImport({ ringingGroupId: 7 });
 
-		expect(mockRunImport).toHaveBeenCalledWith({
-			rows: [{ ring_no: 'AAA001' }],
+		expect(mockRunDemonImport).toHaveBeenCalledWith({
+			supabaseClient: groupClient,
 			ringingGroupId: 7,
-			ringingGroupName: 'Alpha',
+			source: [{ ring_no: 'AAA001' }],
 			concurrency: 30,
-			logContext: { source: 'regenerate' }
+			logContext: { source: 'regenerate', ringingGroupName: 'Alpha' }
 		});
 	});
 
-	it('passes a given concurrency value straight through to the shared pipeline', async () => {
+	it('passes a given concurrency value straight through to the shared orchestrator', async () => {
 		mockGetAuthenticatedSupabaseClientForGroup.mockResolvedValue(
 			buildFakeSupabaseClient([[{ id: 1, raw_row: { ring_no: 'AAA001' } }]])
 		);
 
 		await regenerateImport({ ringingGroupId: 7, concurrency: 1 });
 
-		expect(mockRunImport).toHaveBeenCalledWith(
+		expect(mockRunDemonImport).toHaveBeenCalledWith(
 			expect.objectContaining({ concurrency: 1 })
 		);
 	});
 
-	it('does not call the shared import pipeline when the group has no staged rows', async () => {
+	it('does not call the shared orchestrator when the group has no staged rows', async () => {
 		mockGetAuthenticatedSupabaseClientForGroup.mockResolvedValue(
 			buildFakeSupabaseClient([[]])
 		);
@@ -224,9 +236,58 @@ describe('regenerateImport fetched rows', () => {
 
 		await regenerateImport({ ringingGroupId: 7 });
 
-		expect(mockRunImport).not.toHaveBeenCalled();
+		expect(mockRunDemonImport).not.toHaveBeenCalled();
 		expect(logSpy).toHaveBeenCalledWith(
 			expect.stringContaining('nothing to regenerate')
 		);
+	});
+});
+
+describe('regenerateImport update handling', () => {
+	beforeEach(() => {
+		mockGetAuthenticatedSupabaseClientForGroup.mockResolvedValue(
+			buildFakeSupabaseClient([[{ id: 1, raw_row: { ring_no: 'AAA001' } }]])
+		);
+	});
+
+	it('exits non-zero and prints the unrecognised names', async () => {
+		const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
+			throw new Error(`process.exit(${code})`);
+		});
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		mockRunDemonImport.mockReturnValue(
+			canned([{ type: 'unrecognised_locations', locations: ['CES972'] }])
+		);
+
+		await expect(regenerateImport({ ringingGroupId: 7 })).rejects.toThrow(
+			'process.exit(1)'
+		);
+
+		expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('CES972'));
+		expect(exitSpy).toHaveBeenCalledWith(1);
+	});
+
+	it('rejects with the update’s message when the run yields an error update', async () => {
+		mockRunDemonImport.mockReturnValue(
+			canned([{ type: 'error', message: 'staging flush exploded' }])
+		);
+
+		await expect(regenerateImport({ ringingGroupId: 7 })).rejects.toThrow(
+			'staging flush exploded'
+		);
+	});
+
+	it('prints the completion summary', async () => {
+		const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+		mockRunDemonImport.mockReturnValue(
+			canned([
+				{ type: 'complete', processed: 1, successful: 1, failed: 0, skipped: 0 }
+			])
+		);
+
+		await regenerateImport({ ringingGroupId: 7 });
+
+		expect(logSpy).toHaveBeenCalledWith('Total records: 1');
+		expect(logSpy).toHaveBeenCalledWith('Successful: 1');
 	});
 });

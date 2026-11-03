@@ -795,11 +795,12 @@ Three things worth keeping straight:
 - **Both entry points use the same map → staging `flushRemaining` → `recordAffectedDates` →
   domain `flushRemaining` → `Promise.all` sequence.** Neither buffer can be flushed after the rows
   are awaited — a row's promise is what settles when its batch/chunk lands, so that would deadlock
-  on the trailing one. The CLI gets there via `runRows`' `onAllRowsDispatched` callback (`runRows`
-  replaced `runRowsWithConcurrency`, which owned the limiter it no longer needs); the route maps
-  without awaiting and flushes inline. `EncounterRowBatchWriter.flushRemaining` yields one
-  macrotask first, because the rows released by the final staging batch reach its buffer in
-  microtasks the staging writer's own `flushRemaining` can resume ahead of.
+  on the trailing one. Both entry points now get there via the exact same code: `runDemonImport`'s
+  single row-dispatch loop (`modules/demon-import/lib/run-demon-import.ts`) maps every row without
+  awaiting it, then runs this sequence once every row has been dispatched — there is no longer a
+  CLI-specific variant of it. `EncounterRowBatchWriter.flushRemaining` yields one macrotask first,
+  because the rows released by the final staging batch reach its buffer in microtasks the staging
+  writer's own `flushRemaining` can resume ahead of.
 
 **Every import run is tracked in `ImportJobs` (#961).** `modules/demon-import`'s
 `new ImportJobTracker(supabaseClient)` exposes the six operations both entry points share —
@@ -860,15 +861,21 @@ npm run db:regenerate:local -- <ringing-group-id>
 npm run db:regenerate:prod -- <ringing-group-id>
 ```
 
-`import-csv.ts`'s own pipeline body (location pre-flight → `ImportJobs` row → both batch writers →
-`runRows` → completion → stats-cache dispatch) is factored out into an exported `runImport({rows,
-ringingGroupId, ringingGroupName, concurrency, logContext})`, shared by both `importCSV` (rows read
-from a CSV file, group resolved by name) and `regenerateImport` (rows re-read from `DemonRecords`,
-group given directly by id — a typo-prone name lookup doesn't apply to a script that's never
-driven interactively). `logContext` is the one piece each caller still supplies itself: `importCSV`
-passes `{csvFilePath}`, `regenerateImport` passes `{source: 'regenerate'}`, both merged onto the
-`dispatchStatsCacheRefreshEvents` log base and the "locations not recognised" error message so a
-failure stays identifiable by caller.
+The whole pipeline body (location pre-flight → `ImportJobs` row → both batch writers → row
+dispatch → completion → stats-cache dispatch) lives in `modules/demon-import`'s `runDemonImport`
+(see `app/CLAUDE.md`'s "Web import" and `modules/demon-import/CLAUDE.md`'s "Orchestration") — the
+same orchestrator the web route uses, not a CLI-specific copy. `importCSV` (rows read from a CSV
+file, group resolved by name) and `regenerateImport` (rows re-read from `DemonRecords`, group
+given directly by id — a typo-prone name lookup doesn't apply to a script that's never driven
+interactively) each just materialize their own `DemonRow[]`, call `runDemonImport({supabaseClient,
+ringingGroupId, source: rows, concurrency, logContext})`, and `for await` its yielded
+`DemonImportUpdate`s to decide what to print and when to exit — an immediate `process.exit(1)` for
+`unrecognised_locations` (matching the pre-flight's old behaviour), a rethrow for `error` (so each
+script's own top-level `.catch` still decides the exit code, unchanged), and the completion summary
+for `complete`. `logContext` is the one piece each caller still supplies itself: `importCSV` passes
+`{csvFilePath, ringingGroupName}`, `regenerateImport` passes `{source: 'regenerate',
+ringingGroupName}`, both merged onto the `dispatchStatsCacheRefreshEvents` log base and
+`runDemonImport`'s own failure log so a failure stays identifiable by caller.
 
 ## Setting group passwords
 
