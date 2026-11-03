@@ -871,7 +871,7 @@ called it programmatically — only the two npm scripts and its own test — so 
 into `modules/demon-import` as a library function, `reingestGroupEncounters`, and the CLI
 script/npm scripts were deleted rather than kept as a thin wrapper around it. See
 `modules/demon-import/CLAUDE.md`'s "Reingestion" section for how it works now, and
-[#1344](https://github.com/wheresrhys/totf/issues/1344) for the open decision on how/whether it
+[#1346](https://github.com/wheresrhys/totf/issues/1346) for the open decision on how/whether it
 should actually get invoked — it currently has zero callers.
 
 ## Setting group passwords
