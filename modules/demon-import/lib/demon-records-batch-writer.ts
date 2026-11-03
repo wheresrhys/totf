@@ -10,18 +10,10 @@ import {
 type DemonRecordsInsert =
 	Database['public']['Tables']['DemonRecords']['Insert'];
 
-/**
- * Rows per `DemonRecords` insert. Big enough that a typical import is a handful
- * of multi-row inserts rather than one per row, small enough that a row doesn't
- * wait on hundreds of unrelated rows before its own domain-table write can start
- * (every row in a batch is unblocked together, when that batch lands).
- */
+/** Rows per `DemonRecords` insert. */
 export const DEFAULT_DEMON_RECORDS_BATCH_SIZE = 100;
 
-/**
- * `demon_records_group_ring_date_time_unique` (#960) — re-importing an
- * overlapping CSV targets the same staging row rather than duplicating it.
- */
+/** `demon_records_group_ring_date_time_unique` (#960). */
 const DEMON_RECORDS_CONFLICT_TARGET =
 	'ringing_group_id,ring_no,encounter_date,encounter_time';
 
@@ -34,20 +26,10 @@ type BufferedDemonRecord = {
 };
 
 /**
- * The staging row for one CSV row, or `null` when the row can't be staged at
- * all.
- *
- * `ring_no`/`encounter_date`/`encounter_time` are `NOT NULL` on `DemonRecords`
- * and are its dedup key, so a row missing any of them has no representable
- * staging row — most commonly a casualty record, which carries no ring number
- * (blank, or DemOn's `'-'` sentinel) and which `EncounterRowBatchWriter` rejects
- * outright anyway. Such a row is skipped here rather than failing its whole
- * batch, and goes on to fail (or not) in exactly the way it did before this
- * staging step existed.
- *
- * `raw_row` is the untransformed row: the point of the table is a non-lossy
- * copy of what was submitted, so the empty-string-to-null normalisation the
- * domain-table write applies is deliberately not applied to it.
+ * The staging row for one CSV row, or `null` when the row can't be staged at all
+ * (most commonly a ringless casualty record). `raw_row` is deliberately the
+ * untransformed row — the point of the table is a non-lossy copy of what was
+ * submitted.
  */
 function buildDemonRecord(
 	rawRow: DemonRow,
@@ -71,27 +53,9 @@ function buildDemonRecord(
 /**
  * Writes every imported CSV row into `DemonRecords` (#960) in batched multi-row
  * inserts, so a completeness/recovery record of what was submitted exists before
- * the row is interpreted into Species/Birds/Sessions/Encounters.
- *
- * A class rather than a `create*` closure factory like `createRingSequenceLookup`,
- * because
- * this is three operations over one piece of mutable state rather than a single
- * operation over a captured client: the shared buffer is the whole mechanism —
- * `writeDemonRecord` appends and hands back a promise, `flushRemaining` drains
- * what's left, `getDistinctDates` reports what landed. One instance per import
- * run, same as `ImportJobTracker`.
- *
- * Batching is interleaved with row processing rather than a phase of its own, so
- * the import keeps the per-row concurrency it relies on: a row's own promise
- * resolves as soon as *its* batch lands, not once the whole run is staged. The
- * ordering guarantee is per row, not per run — rows in an earlier batch may well
- * be writing to the domain tables while a later batch is still in flight.
- *
- * Note the cooperation this requires from the caller, and why
- * `writeDemonRecord` must not be inside the run's rate limiter: a batch only
- * fills if every row can reach `writeDemonRecord` promptly. Throttle that and a
- * batch larger than the concurrency cap can never fill — the rows that would
- * complete it are queued behind the rows already blocked on it.
+ * the row is interpreted into Species/Birds/Sessions/Encounters. One instance
+ * per import run. See modules/demon-import/CLAUDE.md's "Design choices" for why
+ * it's a class and why batching is interleaved with row processing.
  */
 export class DemonRecordsBatchWriter {
 	private readonly importJobId: number;
@@ -138,9 +102,7 @@ export class DemonRecordsBatchWriter {
 				}
 			);
 
-		// Resolved/rejected rather than thrown: this promise is what
-		// `flushRemaining` awaits, and the failure belongs to the rows of this
-		// batch, which each surface it through their own promise.
+		// Resolved/rejected rather than thrown: the failure belongs to this batch's rows.
 		if (error) {
 			console.error(
 				'Failed to write a DemonRecords batch; its rows will not be imported',

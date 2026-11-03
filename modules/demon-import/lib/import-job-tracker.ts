@@ -6,21 +6,7 @@ import type { ImportJobRowCounts, StatsCacheRefreshOutcome } from '../types';
 type ImportJobsInsert = Database['public']['Tables']['ImportJobs']['Insert'];
 type ImportJobsUpdate = Database['public']['Tables']['ImportJobs']['Update'];
 
-/**
- * Which `ImportJobs` column each temporal unit's refresh outcome lands on
- * (#1154). Keyed on the canonical, DB-enum-backed `StatsTemporalUnit` rather
- * than a fresh copy of the same five-value union: the column an outcome lands
- * on and the temporal unit `refreshSimpleStatsCache` was called with are the
- * same axis by construction, so they must not be able to drift apart.
- *
- * This axis replaced a `StatsCacheType = 'core' | 'biometrics' |
- * 'demographics'`, not as a rename but as a change of axis: the three
- * stats-type cache tables were replaced by the temporal-unit-shaped
- * `SimpleStatsCache` table (#1144; a sibling `ComplexStatsCache` existed
- * alongside it from #1147 until it was removed entirely), refreshed one
- * temporal unit per call, so a temporal unit is now the finest granularity at
- * which a refresh can succeed or fail.
- */
+/** Which `ImportJobs` column each temporal unit's refresh outcome lands on (#1154). */
 const STATS_CACHE_REFRESH_STATUS_COLUMNS: Record<StatsTemporalUnit, string> = {
 	day: 'day_stats_refresh_status',
 	month: 'month_stats_refresh_status',
@@ -29,26 +15,7 @@ const STATS_CACHE_REFRESH_STATUS_COLUMNS: Record<StatsTemporalUnit, string> = {
 	'all-time': 'all_time_stats_refresh_status'
 };
 
-/**
- * Reads and writes the `ImportJobs` row tracking one import run.
- *
- * A class rather than the `create*` factory that `createRingSequenceLookup`/
- * `createRingSequenceLinker` above use: those each expose
- * one operation, whereas this exposes six variations on the same two-line
- * `.update(...).eq('id', …)` against the same table, which a class groups around the
- * shared `supabaseClient` and the shared `updateImportJob` plumbing without six
- * copies of either.
- *
- * Every operation is deliberately independent: recording one temporal unit's refresh
- * outcome never touches `status`, `affected_dates` or the other four temporal units'
- * columns, and vice versa. That separation is the whole point of the table — "the rows
- * all imported but the monthly stats never refreshed" has to stay visible rather than
- * collapsing into "import succeeded".
- *
- * The import job id is a per-call argument rather than constructor state, because
- * `createImportJob` is what mints it: one tracker opens the row and then drives every
- * later transition on it.
- */
+/** Reads and writes the `ImportJobs` row tracking one import run — see modules/demon-import/CLAUDE.md's "Design choices". */
 export class ImportJobTracker {
 	constructor(private readonly supabaseClient: SupabaseClient) {}
 
@@ -63,15 +30,7 @@ export class ImportJobTracker {
 		if (error) throw error;
 	}
 
-	/**
-	 * Opens a job row for `ringingGroupId` and returns its id, for every later
-	 * transition to key on. `status`, `started_at` and the five per-temporal-unit
-	 * refresh-status columns are written explicitly even though the table defaults
-	 * all seven to the same values, so the opening state of a run is readable at the call site
-	 * (and assertable) rather than implied by the schema. `started_at` has to be
-	 * client-side anyway to stay consistent with `finished_at`, which no trigger
-	 * sets.
-	 */
+	/** Opens a job row for `ringingGroupId` and returns its id, for every later transition to key on. */
 	async createImportJob(ringingGroupId: number): Promise<number> {
 		const { data, error } = await this.supabaseClient
 			.from('ImportJobs')
@@ -93,13 +52,7 @@ export class ImportJobTracker {
 		return data.id;
 	}
 
-	/**
-	 * Records the distinct dates present in the imported batch. Written mid-run —
-	 * once the staging rows exist but before domain-table import begins (#959) —
-	 * so this is its own operation rather than part of any terminal transition,
-	 * and it leaves `status` and the refresh-status columns alone. Deduplicated
-	 * and sorted here so the caller can pass a per-row date straight through.
-	 */
+	/** Records the distinct dates present in the imported batch, written mid-run. */
 	async recordAffectedDates(
 		importJobId: number,
 		affectedDates: string[]
@@ -123,10 +76,7 @@ export class ImportJobTracker {
 		});
 	}
 
-	/**
-	 * Terminal: the run threw. Row counts are deliberately not recorded — an
-	 * unhandled error leaves them unknown rather than merely incomplete.
-	 */
+	/** Terminal: the run threw. Row counts are deliberately not recorded. */
 	async failImportJob(
 		importJobId: number,
 		errorMessage: string
@@ -138,11 +88,7 @@ export class ImportJobTracker {
 		});
 	}
 
-	/**
-	 * Terminal: the web route's 280s abort fired. Records exactly the partial
-	 * progress the route already reports to the browser in its
-	 * `ImportTimeoutMessage`, which until now was the only place it went.
-	 */
+	/** Terminal: the web route's 280s abort fired. */
 	async markImportJobTimedOut(
 		importJobId: number,
 		partialProgress: {
@@ -160,14 +106,7 @@ export class ImportJobTracker {
 		});
 	}
 
-	/**
-	 * Records how one temporal unit's stats-cache refresh went, on that temporal
-	 * unit's own column and nothing else. The caller is whatever runs the
-	 * refresh — the queue consumer that calls `refreshSimpleStatsCache` per
-	 * dispatched temporal-unit event
-	 * (`app/api/queues/stats-cache-refresh-window/route.ts`, #1155); this only
-	 * provides somewhere to record the outcome.
-	 */
+	/** Records how one temporal unit's stats-cache refresh went, on that temporal unit's own column only. */
 	async markStatsCacheRefreshed(
 		importJobId: number,
 		temporalUnit: StatsTemporalUnit,
