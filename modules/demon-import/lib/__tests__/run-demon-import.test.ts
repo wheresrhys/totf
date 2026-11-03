@@ -1,10 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Transform } from 'node:stream';
-import type { DemonImportUpdate } from '../../types';
+import type { DemonImportUpdate, DemonRow } from '../../types';
+import type { RunDemonImportOptions } from '../run-demon-import';
+import { makeDemonRow } from './helpers/demon-rows';
 
 vi.mock('@/modules/stats', () => ({
 	dispatchStatsCacheRefreshEvents: vi.fn()
 }));
+
+// Wraps the real `pRateLimit` rather than replacing it, so every other test's
+// actual rate-limiting behaviour (the timeout test below included) is
+// unaffected — this only lets tests assert what `concurrency` it was built
+// with.
+vi.mock('p-ratelimit', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('p-ratelimit')>();
+	return { ...actual, pRateLimit: vi.fn(actual.pRateLimit) };
+});
 
 vi.mock('../demon-records-batch-writer', () => ({
 	DemonRecordsBatchWriter: vi.fn()
@@ -57,8 +68,11 @@ function makeCsvBuffer(rows: string[]): Buffer {
 }
 
 async function collectUpdates(
-	source: Buffer,
-	supabaseClient: unknown = {}
+	source: Buffer | DemonRow[],
+	supabaseClient: unknown = {},
+	overrides: Partial<
+		Pick<RunDemonImportOptions, 'concurrency' | 'timeoutMs' | 'logContext'>
+	> = {}
 ): Promise<DemonImportUpdate[]> {
 	const { runDemonImport } = await import('../run-demon-import');
 	const updates: DemonImportUpdate[] = [];
@@ -66,7 +80,8 @@ async function collectUpdates(
 		supabaseClient: supabaseClient as never,
 		ringingGroupId: RINGING_GROUP_ID,
 		source,
-		timeoutMs: 280_000
+		timeoutMs: 280_000,
+		...overrides
 	})) {
 		updates.push(update);
 	}
@@ -442,7 +457,8 @@ describe('runDemonImport', () => {
 				IMPORT_JOB_ID,
 				RINGING_GROUP_ID,
 				STAGED_DATES,
-				TOUCHED_SPECIES_IDS
+				TOUCHED_SPECIES_IDS,
+				{}
 			);
 
 			// Ordering: dispatch happens only after the job is marked succeeded.
@@ -516,6 +532,107 @@ describe('runDemonImport', () => {
 				message: 'could not build writers'
 			});
 			expect(dispatchStatsCacheRefreshEvents).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('generalized options (CLI reuse)', () => {
+		it('accepts an already-materialized DemonRow[] source, skipping CSV parsing entirely', async () => {
+			const { processEncounterRow } = await import('../process-encounter-row');
+			// The shared module mock isn't auto-reset between tests (see the
+			// "unrecognised location names" describe block above) — clear the
+			// call history this exact-count assertion depends on.
+			vi.mocked(processEncounterRow).mockClear();
+			vi.mocked(processEncounterRow).mockResolvedValue({
+				visitDate: '2024-06-01'
+			});
+
+			const rows = [makeDemonRow(), makeDemonRow({ ring_no: 'B654321' })];
+			const updates = await collectUpdates(rows);
+
+			expect(vi.mocked(processEncounterRow)).toHaveBeenCalledTimes(2);
+			expect(updates.find((u) => u.type === 'complete')).toEqual({
+				type: 'complete',
+				processed: 2,
+				successful: 2,
+				failed: 0,
+				skipped: 0
+			});
+		});
+
+		it('never times out when timeoutMs is omitted, even long after a passed deadline would have fired', async () => {
+			const { EncounterRowBatchWriter } =
+				await import('../encounter-batch-writer');
+			let capturedLimitChunkFlush:
+				| ((flushChunk: () => Promise<void>) => Promise<unknown>)
+				| undefined;
+			vi.mocked(EncounterRowBatchWriter).mockImplementation(function (
+				_client: unknown,
+				options: { limitChunkFlush: typeof capturedLimitChunkFlush }
+			) {
+				capturedLimitChunkFlush = options.limitChunkFlush;
+				return mockEncounterRowBatchWriter as never;
+			} as never);
+
+			vi.useFakeTimers();
+			const { processEncounterRow } = await import('../process-encounter-row');
+			vi.mocked(processEncounterRow).mockImplementation(async () => {
+				vi.setSystemTime(Date.now() + 10_000_000);
+				await capturedLimitChunkFlush!(async () => {});
+				return { visitDate: '2024-06-01' };
+			});
+
+			const updates = await collectUpdates(
+				makeCsvBuffer([makeCsvRow()]),
+				{},
+				{ timeoutMs: undefined }
+			);
+			vi.useRealTimers();
+
+			expect(updates.some((u) => u.type === 'timeout')).toBe(false);
+			expect(updates.find((u) => u.type === 'complete')).toBeTruthy();
+		});
+
+		it('builds the rate limiter with the default concurrency when none is given', async () => {
+			const { pRateLimit } = await import('p-ratelimit');
+
+			await collectUpdates(makeCsvBuffer([makeCsvRow()]));
+
+			expect(vi.mocked(pRateLimit)).toHaveBeenCalledWith(
+				expect.objectContaining({ concurrency: 30 })
+			);
+		});
+
+		it('builds the rate limiter with a given concurrency value', async () => {
+			const { pRateLimit } = await import('p-ratelimit');
+
+			await collectUpdates(
+				makeCsvBuffer([makeCsvRow()]),
+				{},
+				{ concurrency: 1 }
+			);
+
+			expect(vi.mocked(pRateLimit)).toHaveBeenCalledWith(
+				expect.objectContaining({ concurrency: 1 })
+			);
+		});
+
+		it('merges logContext into the stats-cache-refresh dispatch call', async () => {
+			const { dispatchStatsCacheRefreshEvents } =
+				await import('@/modules/stats');
+
+			await collectUpdates(
+				makeCsvBuffer([makeCsvRow()]),
+				{},
+				{ logContext: { csvFilePath: 'data.csv' } }
+			);
+
+			expect(dispatchStatsCacheRefreshEvents).toHaveBeenCalledWith(
+				IMPORT_JOB_ID,
+				RINGING_GROUP_ID,
+				STAGED_DATES,
+				TOUCHED_SPECIES_IDS,
+				{ csvFilePath: 'data.csv' }
+			);
 		});
 	});
 });

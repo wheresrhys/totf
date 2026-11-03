@@ -18,13 +18,20 @@ import { DemonRecordsBatchWriter } from './demon-records-batch-writer';
 import { EncounterRowBatchWriter } from './encounter-batch-writer';
 import { processEncounterRow } from './process-encounter-row';
 
+/** Rows processed concurrently when a run doesn't override it. */
+export const DEFAULT_IMPORT_CONCURRENCY = 30;
+
 export interface RunDemonImportOptions {
 	supabaseClient: SupabaseClient;
 	ringingGroupId: number;
-	/** Raw CSV bytes, as uploaded to the web import route. */
-	source: Buffer;
-	/** Wall-clock budget from the moment the run starts. */
-	timeoutMs: number;
+	/** Raw CSV bytes (web route) or already-materialized rows (CLI / regenerate-import). */
+	source: Buffer | DemonRow[];
+	/** Max rows processed concurrently. Defaults to {@link DEFAULT_IMPORT_CONCURRENCY}. */
+	concurrency?: number;
+	/** Wall-clock budget from the moment the run starts. Omit to never time out. */
+	timeoutMs?: number;
+	/** Merged into dispatchStatsCacheRefreshEvents's log context and this run's own failure log. */
+	logContext?: Record<string, unknown>;
 }
 
 /**
@@ -110,8 +117,15 @@ async function performImport(
 	options: RunDemonImportOptions,
 	push: (update: DemonImportUpdate) => void
 ): Promise<void> {
-	const { supabaseClient, ringingGroupId, source, timeoutMs } = options;
-	const deadline = Date.now() + timeoutMs;
+	const {
+		supabaseClient,
+		ringingGroupId,
+		source,
+		concurrency = DEFAULT_IMPORT_CONCURRENCY,
+		timeoutMs,
+		logContext
+	} = options;
+	const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
 
 	let processed = 0;
 	let successful = 0;
@@ -127,7 +141,9 @@ async function performImport(
 	const importJobTracker = new ImportJobTracker(supabaseClient);
 
 	try {
-		const rows = await parseDemonCsvBuffer(source);
+		const rows = Buffer.isBuffer(source)
+			? await parseDemonCsvBuffer(source)
+			: source;
 
 		// Pre-flight: a `loc_id` the group has no Location for is far more
 		// often a renamed site than a genuinely new one (#1048), and
@@ -168,8 +184,19 @@ async function performImport(
 		const limit = pRateLimit({
 			interval: 1000,
 			rate: 30,
-			concurrency: 30
+			concurrency
 		}) as <T>(fn: () => Promise<T>) => Promise<T>;
+		// No deadline (CLI callers) means no deadline check at all, not a very
+		// long one — matches `createRowLimiter`'s old CLI-only behaviour exactly.
+		const limitChunkFlush =
+			deadline === undefined
+				? (flushChunk: () => Promise<void>) => limit(flushChunk)
+				: (flushChunk: () => Promise<void>) =>
+						limit(() => {
+							if (Date.now() > deadline)
+								throw new ImportDeadlineExceededError();
+							return flushChunk();
+						});
 		const encounterRowBatchWriter = new EncounterRowBatchWriter(
 			supabaseClient,
 			{
@@ -177,11 +204,7 @@ async function performImport(
 				importJobId,
 				lookupRingSequence: createRingSequenceLookup(supabaseClient),
 				linkRingSequence: createRingSequenceLinker(supabaseClient),
-				limitChunkFlush: (flushChunk) =>
-					limit(() => {
-						if (Date.now() > deadline) throw new ImportDeadlineExceededError();
-						return flushChunk();
-					})
+				limitChunkFlush
 			}
 		);
 
@@ -250,7 +273,8 @@ async function performImport(
 				importJobId,
 				ringingGroupId,
 				demonRecordsBatchWriter.getDistinctDates(),
-				encounterRowBatchWriter.getDistinctSpeciesIds()
+				encounterRowBatchWriter.getDistinctSpeciesIds(),
+				logContext ?? {}
 			);
 			push({ type: 'complete', processed, successful, failed, skipped });
 		}
@@ -261,7 +285,7 @@ async function performImport(
 		// metadata — a stack trace can never reach the NDJSON consumer.
 		console.error(
 			'runDemonImport: row processing failed',
-			{ ringingGroupId },
+			{ ringingGroupId, ...logContext },
 			err
 		);
 		// `importJobId` is still null if the throw came from CSV parsing or the

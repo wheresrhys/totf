@@ -9,15 +9,14 @@ The whole DemOn CSV-import pipeline — everything that turns one uploaded CSV r
 domain-table rows — shared verbatim by both import entry points: the web route
 (`app/api/import/route.ts`) and the CLI importer (`supabase/scripts/import-csv.ts`).
 
-The web route also delegates its whole run — CSV parsing, the location pre-flight, job tracking,
-both batch writers, rate-limiting/deadline and progress reporting — to this module's own
-`lib/run-demon-import.ts`, via `runDemonImport` (see "Orchestration" below). **The CLI importer
-does not** — it still has its own separate orchestrator, `runImport`/`runRows` in
-`supabase/scripts/import-csv.ts`, duplicating most of what `runDemonImport` does. Unifying the two
-is a known, deliberately deferred follow-up, not an oversight — `runDemonImport`'s current
-signature (`source: Buffer`, a required `timeoutMs`) is shaped only around the web route's needs
-and would need generalising (an already-parsed-`DemonRow[]` source, optional deadline) before the
-CLI could use it too.
+The web route delegates its whole run — CSV parsing, the location pre-flight, job tracking, both
+batch writers, rate-limiting/deadline and progress reporting — to this module's own
+`lib/run-demon-import.ts`, via `runDemonImport` (see "Orchestration" below). `runDemonImport`'s
+signature is generalized to also cover the CLI's needs (`source: Buffer | DemonRow[]`, optional
+`concurrency`/`timeoutMs`/`logContext`) — **the CLI importer doesn't use it yet**, though: it
+still has its own separate orchestrator, `runImport`/`runRows`/`createRowLimiter` in
+`supabase/scripts/import-csv.ts`, duplicating most of what `runDemonImport` does. Switching the CLI
+over and deleting that duplicate is the next step, not done here.
 
 A row travels three stages, in this order:
 
@@ -76,11 +75,23 @@ Two lookup helpers sit alongside the pipeline:
 ## Orchestration: `runDemonImport`
 
 `lib/run-demon-import.ts`'s `runDemonImport(options): AsyncGenerator<DemonImportUpdate>` is the
-whole web-route run as one `async function*`, yielding a `DemonImportUpdate` (`types.ts`) as it
-progresses: `progress` every 10 rows, then exactly one of `complete`/`timeout`/`error`, or — if
-the pre-flight finds an unrecognised `loc_id` — a single `unrecognised_locations` and nothing
-else. `app/api/import/route.ts` just `for await`s this and turns each update into one NDJSON
-line; no business logic lives in the route file any more.
+whole run as one `async function*`, yielding a `DemonImportUpdate` (`types.ts`) as it progresses:
+`progress` every 10 rows, then exactly one of `complete`/`timeout`/`error`, or — if the pre-flight
+finds an unrecognised `loc_id` — a single `unrecognised_locations` and nothing else.
+`app/api/import/route.ts` just `for await`s this and turns each update into one NDJSON line; no
+business logic lives in the route file any more.
+
+`RunDemonImportOptions` is deliberately generic across both potential callers, not web-route-only:
+`source: Buffer | DemonRow[]` (raw CSV bytes, or rows a caller has already materialized —
+`parseDemonCsvBuffer` runs only when `Buffer.isBuffer(source)`); `concurrency?: number` (defaults
+to `DEFAULT_IMPORT_CONCURRENCY` = 30, passed straight into the run's `pRateLimit` call);
+`timeoutMs?: number` (omit to never time out — `deadline` stays `undefined` and
+`limitChunkFlush` skips the deadline-check wrapper entirely rather than checking against a very
+distant one); `logContext?: Record<string, unknown>` (merged into the
+`dispatchStatsCacheRefreshEvents` call and the outer catch's failure log, so a caller's own context
+— a CSV file path, "regenerate", etc. — survives into both). Every field but `supabaseClient`/
+`ringingGroupId`/`source` is optional specifically so the already-shipped web route (which passes
+a `Buffer` and a `timeoutMs`, nothing else) needed no changes when this generality was added.
 
 The one non-mechanical piece is bridging a `yield` (which can only fire synchronously within the
 generator's own control flow) with the run's per-row reporting (called from inside each row's
@@ -112,7 +123,8 @@ out the way `modules/stats` has to. The barrel re-exports only what's actually r
 module: `DemonRow`, `StatsCacheRefreshOutcome`, `DemonImportUpdate`, `CasualtyEncounterError`,
 `findUnrecognisedLocationNames`, `getDistinctLocationNames`, `createRingSequenceLinker`,
 `createRingSequenceLookup`, `ImportJobTracker`, `DemonRecordsBatchWriter`, `EncounterRowBatchWriter`,
-`processEncounterRow`, `runDemonImport` and `RunDemonImportOptions`. Everything else the module's
+`processEncounterRow`, `runDemonImport`, `RunDemonImportOptions` and `DEFAULT_IMPORT_CONCURRENCY`.
+Everything else the module's
 files export (`DemonColumnNames`, `ImportJobRowCounts`, `convertDateFormat`, `isRinglessRingNo`,
 `normaliseCaptureTime`, `transformEmptyStringsToNull`, the two
 `DEFAULT_*_SIZE`/`DEFAULT_*_CHUNK_SIZE` constants, `mergeDuplicateEncounters`) is reached only by
