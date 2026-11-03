@@ -24,7 +24,7 @@ export const DEFAULT_IMPORT_CONCURRENCY = 30;
 export interface RunDemonImportOptions {
 	supabaseClient: SupabaseClient;
 	ringingGroupId: number;
-	/** Raw CSV bytes (web route) or already-materialized rows (CLI / regenerate-import). */
+	/** Raw CSV bytes (web route) or already-materialized rows (CLI / reingestGroupEncounters). */
 	source: Buffer | DemonRow[];
 	/** Max rows processed concurrently. Defaults to {@link DEFAULT_IMPORT_CONCURRENCY}. */
 	concurrency?: number;
