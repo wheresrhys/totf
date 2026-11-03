@@ -1,30 +1,7 @@
 import { format as formatDate } from 'date-fns';
-import type { CoreStatsResult } from '../models/db';
+import type { CoreStatsResult } from '@/app/models/db';
+import type { PeriodTotalsGrouping, PeriodTotalsRow } from '../types';
 import { calculateEncounterRetraps, calculateRetraps } from './species-totals';
-
-export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
-
-// Field names for the age-class/capture-type block (`new`/`retraps`/`pullus`/
-// `juvs`/`postjuv`/`adults`/`unknownAge`) deliberately match
-// `StatsTableColumnConfigs`'s `StandardField` union rather than following
-// `SpeciesTotalsRow`'s `*Count`-suffixed convention, so `PeriodTotalsRow` can
-// be used directly as `PeriodTotalsTable`'s `SortableTable` row model without
-// a remapping step — see `buildStandardColumnConfigs`.
-export type PeriodTotalsRow = {
-	timePeriod: string;
-	sessionsCount: number;
-	speciesCount: number;
-	encounterCount: number;
-	maxPerSession: number;
-	individualsCount: number;
-	new: number;
-	retraps: number;
-	pullus: number;
-	juvs: number;
-	postjuv: number;
-	adults: number;
-	unknownAge: number;
-};
 
 export function derivePeriodTotalsRowByBird(
 	stat: CoreStatsResult

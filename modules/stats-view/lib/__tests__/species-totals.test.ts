@@ -3,10 +3,10 @@ import {
 	calculateEncounterRetraps,
 	calculateRetraps,
 	deriveSpeciesTotalsRow,
-	deriveSpeciesTotalsRowByEncounter,
-	type SpeciesTotalsRow
+	deriveSpeciesTotalsRowByEncounter
 } from '../species-totals';
-import type { CoreStatsResult } from '../../models/db';
+import type { SpeciesTotalsRow } from '../../types';
+import type { CoreStatsResult } from '@/app/models/db';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 // This file's tests assert against a specific full row shape (not just the

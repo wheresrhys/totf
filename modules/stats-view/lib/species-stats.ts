@@ -2,22 +2,13 @@ import type {
 	CoreStatsResult,
 	BiometricFieldName,
 	BiometricsStatsResult
-} from '../models/db';
+} from '@/app/models/db';
+import type { SpeciesStatConfig, SpeciesStatsRow } from '../types';
 
 // Re-exported for existing importers; the canonical definition (the 8 wing/weight
 // columns BiometricsStatsResult owns) now lives in db.ts alongside the other merge
 // plumbing (#827).
 export type { BiometricFieldName };
-
-// The /species list page's row shape (#823): every non-biometric column from
-// core_stats, plus the 8 biometric columns sourced from a BiometricsStatsResult
-// row. core_stats no longer carries its own copies (#827 removed them), so the
-// biometrics row is the sole source. A species with no matching biometrics row
-// leaves the 8 fields undefined, which
-// MultiSpeciesTableBody's generic `<td>{species[column.property]}</td>` already
-// renders as a blank cell — no special-casing needed.
-export type SpeciesStatsRow = Omit<CoreStatsResult, BiometricFieldName> &
-	Partial<Pick<BiometricsStatsResult, BiometricFieldName>>;
 
 // Joins core_stats rows (species_name, bird_count, encounter_count, etc.)
 // with BiometricsStatsResult rows (the 8 wing/weight metrics) by species_name,
@@ -55,15 +46,6 @@ export function mergeSpeciesBiometrics(
 		};
 	});
 }
-
-export type SpeciesStatConfig = {
-	label: string;
-	property: keyof SpeciesStatsRow;
-	suffix?: string;
-	category?: string;
-	prefix?: string;
-	preferSortAscending?: boolean;
-};
 
 export const speciesStatConfigs: SpeciesStatConfig[] = [
 	{

@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
 	derivePeriodTotalsRowByBird,
 	derivePeriodTotalsRowByEncounter,
-	formatPeriodTotalsLabel,
-	type PeriodTotalsGrouping
+	formatPeriodTotalsLabel
 } from '../period-totals';
-import type { CoreStatsResult } from '../../models/db';
+import type { PeriodTotalsGrouping } from '../../types';
+import type { CoreStatsResult } from '@/app/models/db';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 // This file's tests assert against a specific full row shape (not just the
