@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { PageWrapper, PrimaryHeading } from '@/modules/ui-kit';
 import { useRingingGroup } from '@/app/components/layout/RingingGroupProvider';
 import { UnrecognisedLocationsReview } from '@/app/components/pages/import/UnrecognisedLocationsReview';
-import type { ImportMessage } from '@/app/api/import/route';
+import type { DemonImportUpdate } from '@/modules/demon-import';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 type ImportState =
@@ -81,7 +81,7 @@ export function ImportPageContent() {
 			buffer = lines.pop()!;
 			for (const line of lines) {
 				if (!line.trim()) continue;
-				const message = JSON.parse(line) as ImportMessage;
+				const message = JSON.parse(line) as DemonImportUpdate;
 				switch (message.type) {
 					case 'progress':
 						setState({ status: 'processing', processed: message.processed });
