@@ -2,7 +2,7 @@
 
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { buildGroupSessionHref } from '@/app/lib/group-links';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import type { SummaryTabParams } from './summary-tab-params';
 // Id and `dataFetcher` live in the plain (non-`'use client'`) sibling module
 // so `summary/**/page.tsx` can read them server-side — see its header comment

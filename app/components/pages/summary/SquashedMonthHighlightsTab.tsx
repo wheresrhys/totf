@@ -2,7 +2,7 @@
 
 // Imported from its own file rather than from `SummaryTotalsSection.tsx`
 // (which only re-exports it) — see `HighlightsByTimePeriod.tsx`'s doc comment.
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	SQUASHED_MONTH_HIGHLIGHTS_TAB_ID,

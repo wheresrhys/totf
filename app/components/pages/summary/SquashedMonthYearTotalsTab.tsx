@@ -7,7 +7,7 @@ import {
 	type MonthTotalsRow
 } from '@/app/lib/month-totals';
 import type { CoreStatsResult } from '@/app/models/db';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import {
 	SQUASHED_MONTH_YEAR_TOTALS_TAB_ID,
 	type SquashedMonthTabParams

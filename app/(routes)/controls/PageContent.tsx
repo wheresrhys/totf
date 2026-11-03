@@ -2,10 +2,10 @@ import type { RingSequenceControlRow } from '@/app/actions/ring-sequences';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	InlineTable,
+	NoPrefetchLink,
 	PageWrapper,
 	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+} from '@/modules/ui-kit';
 import { PromoteControlButton } from '@/app/components/PromoteControlButton';
 
 export function ControlsPageContent({

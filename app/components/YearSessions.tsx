@@ -1,11 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { type SessionWithEncountersCount } from '@/app/models/session';
-import { AccordionItem } from '@/app/components/shared/Accordion';
-import {
-	BoxyList,
-	SecondaryHeading
-} from '@/app/components/shared/DesignSystem';
+import { AccordionItem, BoxyList, SecondaryHeading } from '@/modules/ui-kit';
 import { format as formatDate } from 'date-fns';
 import { MonthSessionsHeading, MonthSessionsContent } from './MonthSessions';
 import type { ViewedGroup } from '@/app/lib/group-slug';

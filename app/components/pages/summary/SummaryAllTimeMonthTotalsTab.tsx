@@ -1,8 +1,11 @@
 'use client';
 import { useState } from 'react';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
-import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
-import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
+import {
+	CombineYearsToggle,
+	EmptyMonthsToggle,
+	type TabConfig
+} from '@/modules/ui-kit';
 import {
 	buildCombinedMonthTotalsRows,
 	buildPerYearMonthTotalsRows,
@@ -14,7 +17,6 @@ import { buildGroupSummaryHref } from '@/app/lib/group-links';
 import { buildGroupSquashedMonthSummaryHref } from '@/app/lib/squashed-month';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { SummaryTabParams } from './summary-tab-params';
 // Id and `dataFetcher` live in the plain (non-`'use client'`) sibling module
 // so `summary/**/page.tsx` can read them server-side — see its header comment

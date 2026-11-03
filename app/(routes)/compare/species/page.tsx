@@ -3,7 +3,7 @@ import {
 	type SpeciesComparisonStats
 } from '@/app/actions/compare-species';
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import {
 	COMPARE_SPECIES_TAB_IDS,
 	CORE_DATASET_TAB_ID,

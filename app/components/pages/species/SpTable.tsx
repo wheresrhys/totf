@@ -7,14 +7,14 @@ import {
 } from '@/app/lib/measurement-range';
 import { SingleBirdTable } from '@/app/components/SingleBirdTable';
 import { MeasurementRangeCell } from '@/app/components/pages/species/MeasurementRangeCell';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { AccordionTableBody } from '@/app/components/shared/AccordionTableBody';
 import {
+	AccordionTableBody,
+	NoPrefetchLink,
 	SortableTable,
+	getFormattedValue,
 	type ColumnConfig,
-	type RowModelWithRawData,
-	getFormattedValue
-} from '@/app/components/shared/SortableTable';
+	type RowModelWithRawData
+} from '@/modules/ui-kit';
 
 type RowModel = {
 	ringNo: string;

@@ -1,10 +1,10 @@
 'use client';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import {
-	type ColumnConfig,
+	NoPrefetchLink,
 	SortableTable,
+	type ColumnConfig,
 	type RowModelWithRawData
-} from '@/app/components/shared/SortableTable';
+} from '@/modules/ui-kit';
 import { NotableRetrapsResult } from '@/app/models/db';
 import { EncountersTimeline } from './EncountersTimeline';
 

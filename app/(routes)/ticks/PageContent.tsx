@@ -1,9 +1,5 @@
 import { GroupTicksResult } from '@/app/models/db';
-import {
-	BoxyList,
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
+import { BoxyList, PageWrapper, PrimaryHeading } from '@/modules/ui-kit';
 import { format as formatDate } from 'date-fns';
 
 export function TicksPageContent({ data }: { data: GroupTicksResult[] }) {

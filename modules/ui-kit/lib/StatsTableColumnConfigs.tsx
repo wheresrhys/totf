@@ -1,5 +1,5 @@
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { type ColumnConfig, type RowModelWithRawData } from './SortableTable';
+import { NoPrefetchLink } from './NoPrefetchLink';
+import { type ColumnConfig, type RowModelWithRawData } from '../types';
 
 // A thicker border marks where the "age class" block of columns
 // (Pulli/Juv/Postjuv/Adult/Unaged) starts and ends, visually separating it

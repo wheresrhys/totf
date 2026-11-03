@@ -7,13 +7,13 @@ import {
 	type UnassignedImportPrefix
 } from '@/app/models/ring-sequences';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import { AccordionItem } from '@/app/components/shared/Accordion';
 import {
+	AccordionItem,
 	BoxyList,
 	PageWrapper,
 	PrimaryHeading,
 	SecondaryHeading
-} from '@/app/components/shared/DesignSystem';
+} from '@/modules/ui-kit';
 import { RingSequenceDetail } from '@/app/components/pages/ring-sequences/RingSequenceDetail';
 import { RingSequenceEditModal } from '@/app/components/RingSequenceEditModal';
 import { CreateSequenceFromPrefix } from '@/app/components/pages/ring-sequences/CreateSequenceFromPrefix';

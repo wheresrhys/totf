@@ -1,5 +1,5 @@
 'use client';
-import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
+import { SecondaryHeading } from '@/modules/ui-kit';
 
 // One chart on the species "Demographics" tab. Collapsed it is a fixed-height text
 // tile (heading + description) that sits ~300px wide in the reflowing grid;

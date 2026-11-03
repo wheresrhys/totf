@@ -11,7 +11,7 @@ import {
 	getAllHighlightsAcrossScopes,
 	type CombinedHighlight
 } from '@/modules/highlights';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { NetRound } from '@/app/lib/session-chronology';
 import type {

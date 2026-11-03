@@ -1,17 +1,15 @@
 'use client';
 import { PulliEncounter } from '@/app/models/session';
 import {
+	NoPrefetchLink,
 	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
-import { format as formatDate } from 'date-fns';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import {
+	PrimaryHeading,
 	SortableTable,
+	getFormattedValue,
 	type ColumnConfig,
-	type RowModelWithRawData,
-	getFormattedValue
-} from '@/app/components/shared/SortableTable';
+	type RowModelWithRawData
+} from '@/modules/ui-kit';
+import { format as formatDate } from 'date-fns';
 
 type PulliRowModel = {
 	ringNo: string;

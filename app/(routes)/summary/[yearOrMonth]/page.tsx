@@ -12,7 +12,7 @@ import {
 	resolveInitialTabId,
 	prefetchActiveTabData
 } from '@/app/lib/tab-query-param';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 // From the plain (non-`'use client'`) prefetcher module, never by dotting into
 // a tab's `'use client'` `TabConfig` — see that module's header comment (#1096).
 import {

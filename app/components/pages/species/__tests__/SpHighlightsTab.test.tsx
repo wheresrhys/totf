@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
-import { TabContent } from '@/app/components/shared/TabContent';
+import { TabContent } from '@/modules/ui-kit';
 import { SpHighlightsTab, type SpHighlightsTabData } from '../SpHighlightsTab';
 import notableRetrapsSnapshot from '@/test-fixtures/snapshots/notable_retraps/robin-alpha.retraps.json';
 import type { NotableRetrapsResult } from '@/app/models/db';

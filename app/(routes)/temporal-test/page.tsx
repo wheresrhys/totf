@@ -7,7 +7,7 @@
 // a real page.
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
-import { TemporalFilterControls } from '@/app/components/shared/TemporalFilterControls';
+import { TemporalFilterControls } from '@/modules/ui-kit';
 import {
 	computeEffectiveDateRange,
 	type TemporalSelection

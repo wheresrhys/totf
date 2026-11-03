@@ -3,9 +3,9 @@ import type {
 	SimpleStatsCacheRow
 } from '@/app/models/db';
 import type { TemporalUnit, CamelCaseStatsTemporalUnit } from '@/app/models/temporal-unit';
-import type { StatUnit } from '@/app/components/shared/StatOutput';
+import type { StatUnit } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-export type { StatUnit } from '@/app/components/shared/StatOutput';
+export type { StatUnit } from '@/modules/ui-kit';
 
 export type YearMonthRestriction = {
 	year?: number;

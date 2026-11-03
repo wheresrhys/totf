@@ -2,11 +2,11 @@ import { SingleBirdTable } from '@/app/components/SingleBirdTable';
 import { format as formatDate } from 'date-fns';
 import {
 	BadgeList,
+	NoPrefetchLink,
 	PageWrapper,
 	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
+} from '@/modules/ui-kit';
 import { enrichBird, type StandaloneBird } from '@/app/models/bird';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import { EncountersTimeline } from '@/app/components/EncountersTimeline';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 

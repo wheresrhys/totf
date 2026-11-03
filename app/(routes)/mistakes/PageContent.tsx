@@ -2,21 +2,19 @@
 import { useState, useEffect } from 'react';
 import { format as formatDate } from 'date-fns';
 import {
+	AccordionTableBody,
+	NoPrefetchLink,
 	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { AccordionTableBody } from '@/app/components/shared/AccordionTableBody';
+	PrimaryHeading,
+	SortableTable,
+	getFormattedValue,
+	type ColumnConfig,
+	type RowModelWithRawData
+} from '@/modules/ui-kit';
 import { SingleBirdTable } from '@/app/components/SingleBirdTable';
 import { fetchBirdEncounters } from '@/app/actions/bird-encounters';
 import type { EncounterOfBird } from '@/app/models/bird';
 import type { DiscrepenciesResult } from '@/app/models/db';
-import {
-	SortableTable,
-	type ColumnConfig,
-	type RowModelWithRawData,
-	getFormattedValue
-} from '@/app/components/shared/SortableTable';
 import { TabNav } from '@/app/components/TabNav';
 
 type MistakesRowModel = {

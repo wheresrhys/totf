@@ -1,24 +1,7 @@
 'use client';
-import { Table } from '@/app/components/shared/DesignSystem';
+import { Table } from './DesignSystem';
 import { useState } from 'react';
-
-export type ColumnConfig = {
-	label: string;
-	tooltip?: string;
-	preferSortAscending?: boolean;
-	formatter?: (value: unknown) => string;
-	// Applied to the column's <th>, letting callers group/emphasise columns
-	// (background colour, thicker borders, etc.) via the same config object
-	// used to describe the column, rather than a parallel styling mechanism.
-	headerClassName?: string;
-	// Applied to each <td> a TableBodyComponent renders for this column (the
-	// component receives columnConfigs alongside data so it can look this up).
-	cellClassName?: string;
-};
-
-export type RowModelWithRawData<RawRowData, RowModel> = RowModel & {
-	_rawRowData: RawRowData;
-};
+import type { ColumnConfig, RowModelWithRawData } from '../types';
 
 export function getFormattedValue<RowModel>(
 	columnConfigs: Partial<Record<keyof RowModel, ColumnConfig>>

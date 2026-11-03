@@ -1,4 +1,4 @@
-import { type ColumnConfig, type RowModelWithRawData } from './SortableTable';
+import { type ColumnConfig, type RowModelWithRawData } from '../types';
 import { AccordionTableBody } from './AccordionTableBody';
 
 // A component rendering a single row's model — used for the first-column cell

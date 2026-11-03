@@ -1,7 +1,4 @@
-import {
-	BoxyList,
-	SecondaryHeading
-} from '@/app/components/shared/DesignSystem';
+import { BoxyList, SecondaryHeading } from '@/modules/ui-kit';
 import {
 	type CombinedHighlight,
 	type HighlightCategory

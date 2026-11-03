@@ -1,9 +1,9 @@
-import type { ColumnConfig } from '@/app/components/shared/SortableTable';
 import {
 	ageBlockEndBorder,
 	ageBlockStartBorder,
-	columnBlock
-} from '@/app/components/shared/StatsTableColumnConfigs';
+	columnBlock,
+	type ColumnConfig
+} from '@/modules/ui-kit';
 import type { ComparisonRow } from '@/app/lib/compare-species';
 import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 

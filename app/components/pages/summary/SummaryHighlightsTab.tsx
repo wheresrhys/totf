@@ -1,6 +1,6 @@
 'use client';
 
-import { BoxyList, PrimaryHeading } from '@/app/components/shared/DesignSystem';
+import { BoxyList, PrimaryHeading, type TabConfig } from '@/modules/ui-kit';
 // Imported from its own file (not from `SummaryTotalsSection.tsx`, which
 // re-exports it for its other two consumers) to avoid a circular import:
 // `SummaryTotalsSection.tsx` itself imports `summaryHighlightsTab` from this
@@ -8,7 +8,6 @@ import { BoxyList, PrimaryHeading } from '@/app/components/shared/DesignSystem';
 // consumers already importing it from its current location
 // (`SpHighlightsTab.tsx`), so moving it here would break that import path.
 import { renderCombinedHighlights } from '@/app/components/pages/session/SessionHighlights';
-import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { SummaryTabParams } from './summary-tab-params';
 // Id and `dataFetcher` live in the plain (non-`'use client'`) sibling module
 // so `summary/**/page.tsx` can read them server-side — see its header comment

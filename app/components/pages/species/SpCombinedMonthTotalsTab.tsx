@@ -12,8 +12,7 @@ import {
 	formatMonthYearLabel,
 	formatMonthLabel
 } from '@/app/lib/month-totals';
-import { CombineYearsToggle } from '@/app/components/shared/CombineYearsToggle';
-import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
+import { CombineYearsToggle, EmptyMonthsToggle } from '@/modules/ui-kit';
 import { buildSpeciesSquashedMonthHref } from '@/app/lib/squashed-month';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 

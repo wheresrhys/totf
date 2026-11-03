@@ -1,7 +1,7 @@
 'use client';
 
 import { SpeciesTotalsTable } from '@/app/components/SpeciesTotalsTable';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import {
 	SQUASHED_MONTH_SPECIES_TOTALS_TAB_ID,
 	type SquashedMonthTabParams

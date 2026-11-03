@@ -2,11 +2,7 @@ import { notFound } from 'next/navigation';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { canReportHighlights } from '@/app/lib/qa-reporting';
-import {
-	PageWrapper,
-	PrimaryHeading,
-	BoxyList
-} from '@/app/components/shared/DesignSystem';
+import { BoxyList, PageWrapper, PrimaryHeading } from '@/modules/ui-kit';
 import { HighlightReportBody } from '@/app/components/HighlightReportBody';
 import { DismissHighlightReportButton } from '@/app/components/DismissHighlightReportButton';
 import type { Database } from '@/types/supabase.types';

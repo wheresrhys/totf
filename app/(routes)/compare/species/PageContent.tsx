@@ -4,9 +4,9 @@ import { usePathname } from 'next/navigation';
 import {
 	PageWrapper,
 	PrimaryHeading,
-	Standfirst
-} from '@/app/components/shared/DesignSystem';
-import { TabSet } from '@/app/components/shared/TabSet';
+	Standfirst,
+	TabSet
+} from '@/modules/ui-kit';
 import { compareSpeciesBiometricsTab } from '@/app/components/pages/compare-species/CompareSpeciesBiometricsTab';
 import { compareSpeciesCoreTab } from '@/app/components/pages/compare-species/CompareSpeciesCoreTab';
 import type { CompareSpeciesTabParams } from '@/app/components/pages/compare-species/compare-species-tab-params';

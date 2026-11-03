@@ -9,7 +9,7 @@ import type { MonthTotalsRow } from '@/app/lib/month-totals';
  * `TabSet` call (Year totals, year-page Month totals, the eager variant of
  * Session totals).
  *
- * `TabConfig`/`TabContent` (`app/components/shared/TabContent.tsx`) and
+ * `TabConfig`/`TabContent` (`modules/ui-kit/lib/TabContent.tsx`) and
  * `prefetchActiveTabData` (`app/lib/tab-query-param.ts`) are each generic
  * over exactly ONE `ParamsType` per call — a reviewer comment on the PR that
  * landed `TabSet` (#1084, closing #1058) asked for each `TabConfig` to carry

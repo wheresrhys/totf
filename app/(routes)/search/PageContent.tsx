@@ -2,11 +2,11 @@
 import { useState } from 'react';
 import {
 	BoxyList,
+	NoPrefetchLink,
 	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
+	PrimaryHeading,
+	RingSearchForm
+} from '@/modules/ui-kit';
 
 export type SearchResult = {
 	ring_no: string;

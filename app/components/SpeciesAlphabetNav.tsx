@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+import { NoPrefetchLink } from '@/modules/ui-kit';
 import { groupSpeciesByFirstLetter } from '@/app/models/species';
 import type { SimpleSpeciesRow } from '@/app/lib/global-nav-data';
 

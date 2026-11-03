@@ -193,7 +193,7 @@ export function getNewYoungCounts(
 // flat zero line, whenever nothing in the fetched range ever had a nonzero
 // pullus count — mirrors the `hasPulli` convention
 // `SpeciesTotalsTable`/`PeriodTotalsTable` already use to hide their own
-// all-zero Pulli column (`app/components/shared/StatsTableColumnConfigs.tsx`).
+// all-zero Pulli column (`modules/ui-kit/lib/StatsTableColumnConfigs.tsx`).
 export function getArrivals(
 	arrivalsStats: ArrivalsStatsResult[]
 ): LineChartData[] {

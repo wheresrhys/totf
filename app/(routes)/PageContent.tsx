@@ -1,14 +1,14 @@
 import {
 	BoxyList,
+	NoPrefetchLink,
 	PageWrapper,
 	SecondaryHeading,
 	Table
-} from '../components/shared/DesignSystem';
+} from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '../models/session';
 import type { CoreStatsResult, GroupTicksResult } from '../models/db';
 import { SessionsByDay } from '../components/SessionsByDay';
-import { NoPrefetchLink } from '../components/shared/NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
 
 export type HomePageSummaryStats = {

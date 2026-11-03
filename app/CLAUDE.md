@@ -207,10 +207,10 @@ entrypoint, its content, and its data fetcher:
   than `pushState` keeps a run of toggling out of the back button. Reach for `router.replace` only
   when the new URL genuinely needs a different server render.
   Tab selection follows the same convention and needs no per-page wiring: `useLinkableTabs`
-  (`app/components/shared/useLinkableTabs.ts`) reads `?tabId=` on load via
+  (`modules/ui-kit/lib/useLinkableTabs.ts`) reads `?tabId=` on load via
   `app/lib/tab-query-param.ts`'s `resolveInitialTabId` and writes the selected tab back via its
   `setTabIdSearchParam` (#1013), so every page that takes its tab state from that hook — directly,
-  or through the shared `TabSet` component (`app/components/shared/TabSet.tsx`) — gets
+  or through the shared `TabSet` component (`modules/ui-kit/lib/TabSet.tsx`) — gets
   reload-survivable, copy-pasteable tab links for free. A `TabSet`-based page can go one step
   further and resolve its initial tab _server-side_, prefetching that one tab's data before first
   paint instead of flashing `TabContent`'s own loading spinner on a deep `?tabId=` link — the
@@ -229,7 +229,7 @@ entrypoint, its content, and its data fetcher:
 - **Per-tab params on a `TabSet`:** `TabSet`'s `params` prop is only the _default_. Each entry in
   its `tabs` array carries its own independent params type, inferred from that tab's own
   `dataFetcher`/`TabComponent`, and any tab can override the shared params with its own `params`
-  property. `TabConfigInSet` (`app/components/shared/TabContent.tsx`) is the single rule both
+  property. `TabConfigInSet` (`modules/ui-kit/lib/TabContent.tsx`) is the single rule both
   consumers of a tabs array apply — `TabSet` and, server-side, `prefetchActiveTabData`
   (`app/lib/tab-query-param.ts`) — so a tab whose params the shared ones _can't_ satisfy is
   obliged by the compiler to declare its own, in both the client and prefetch paths. One

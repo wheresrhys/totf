@@ -1,4 +1,4 @@
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+import { NoPrefetchLink } from './NoPrefetchLink';
 import { format as formatDate } from 'date-fns';
 import type { LocationRow } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';

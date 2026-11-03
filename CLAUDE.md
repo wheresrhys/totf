@@ -138,6 +138,12 @@ belong to any single scoped doc:
   above, just large enough to warrant its own directory, barrel and scoped doc. See its own
   [`modules/stats/CLAUDE.md`](modules/stats/CLAUDE.md) — the reference implementation of the
   "Module conventions" below.
+- `modules/ui-kit/` — the 17 UI-primitive components/hooks (toggles, sortable/accordion table
+  plumbing, tab plumbing, design-system primitives) every page family in `app/` imports from,
+  extracted from `app/components/shared/*` (#1326). Unlike `modules/stats/` above, this one is
+  catalogued here purely because it's a module per the "Module conventions" below, not because
+  it's cross-zone — it's `zone:app`-only. See its own
+  [`modules/ui-kit/CLAUDE.md`](modules/ui-kit/CLAUDE.md).
 
 ## Module conventions
 

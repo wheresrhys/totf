@@ -27,7 +27,7 @@ import {
 	getAllHighlightsAcrossScopes,
 	getTemporalUnitFromTimeWindow
 } from '@/modules/highlights';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesStatsRow } from '@/app/lib/species-stats';
