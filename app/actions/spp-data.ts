@@ -73,7 +73,7 @@ type BiometricsMetricsRpcRow = Pick<
  * An RPC result can't carry a PostgREST embed, so the join column the
  * cache-aligned branch gets for free through `Species(species_name)` has to
  * come from a second read here — `mergeSpeciesBiometrics`
- * (`app/lib/species-stats.ts`) joins the two halves of the `/species` table on
+ * (`modules/stats-view/lib/species-stats.ts`) joins the two halves of the `/species` table on
  * `species_name`. Only the ids actually present are requested; `Species` is
  * global reference data (`USING (TRUE)` SELECT policy), so the authenticated
  * client reads it unconditionally. Paginated for the same reason the cache
@@ -114,7 +114,7 @@ async function readSpeciesNamesById(
  * `time_period` comes back `null` rather than the cell's own date, because
  * that is what the ungrouped RPC returned and the return shape is unchanged
  * on both paths. Nothing downstream reads it: `mergeSpeciesBiometrics`
- * (`app/lib/species-stats.ts`) joins on `species_name` and copies only the 8
+ * (`modules/stats-view/lib/species-stats.ts`) joins on `species_name` and copies only the 8
  * metrics across.
  *
  * Paginated and ordered by the embedded species name — a group with more
