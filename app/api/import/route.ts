@@ -14,7 +14,7 @@ import {
 	findUnrecognisedLocationNames,
 	CasualtyEncounterError,
 	type DemonRow
-} from '@/lib/demon-import';
+} from '@/modules/demon-import';
 import { dispatchStatsCacheRefreshEvents } from '@/modules/stats';
 export const maxDuration = 300;
 

@@ -20,7 +20,7 @@ import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { randomTestSuffix } from './test-isolation';
 import { psql, createIsolatedGroup } from './db-test-helpers';
-import { createRingSequenceLookup } from '../../lib/demon-import';
+import { createRingSequenceLookup } from '@/modules/demon-import';
 
 describe('RingSequences table', () => {
 	describe('column defaults and nullability', () => {

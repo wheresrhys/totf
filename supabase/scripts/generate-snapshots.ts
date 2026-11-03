@@ -38,7 +38,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import fs from 'fs/promises';
 import { supabase } from '../../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
-import { RESIGHTING_RECORD_TYPES } from '../../lib/demon-import';
+import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import {
 	allSessionsQuery,

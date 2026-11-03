@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import Page from '../page';
-import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
+import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import {
 	TEST_DATE,
 	TEST_GROUP_ID,

@@ -26,7 +26,7 @@ A leaderboard/statistics dashboard for bird ringing data. Bird ringing groups (o
 **Standard terminology/enum reference:** imported CSV data follows the DemOn ringing-software
 field spec — [`demon-ringing-data-entry-fields.xls`](https://app.bto.org/static/files/demon/demon-ringing-data-entry-fields.xls),
 published by the BTO. It's the authoritative source for what each `DemonColumnNames` field
-(`lib/demon-import.ts`) means and, for most coded fields (`record_type`, age codes, etc.), the
+(`modules/demon-import/types.ts`) means and, for most coded fields (`record_type`, age codes, etc.), the
 full code→meaning table. Consult it before guessing at what a raw code value means. Note:
 `finding_condition`/`finding_circumstances` are **not** covered by this spec — treat their values
 as opaque codes (store/display/filter on them as-is) rather than inventing a decode mapping.

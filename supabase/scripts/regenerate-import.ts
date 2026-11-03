@@ -5,7 +5,7 @@
  * pipeline (Species/Birds/Locations/Sessions/Encounters) from the rows
  * already staged in `DemonRecords`, rather than requiring the original CSV
  * file. Useful once the write path has changed (a new column modelled, a bug
- * fix in `lib/demon-import.ts`) and a group's existing history needs
+ * fix in `modules/demon-import`) and a group's existing history needs
  * reinterpreting under the new logic without re-uploading anything.
  *
  * Usage: npm run prod:run:write -- tsx supabase/scripts/regenerate-import.ts <ringing-group-id>
@@ -16,7 +16,7 @@ import { pathToFileURL } from 'url';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import { supabase } from '../../lib/supabase';
-import type { DemonRow } from '../../lib/demon-import';
+import type { DemonRow } from '@/modules/demon-import';
 import { DEFAULT_IMPORT_CONCURRENCY, runImport } from './import-csv';
 
 /**

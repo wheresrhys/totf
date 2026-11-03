@@ -30,7 +30,7 @@ import {
 	getDistinctLocationNames,
 	findUnrecognisedLocationNames,
 	type DemonRow
-} from '../../lib/demon-import';
+} from '@/modules/demon-import';
 
 import { dispatchStatsCacheRefreshEvents } from '@/modules/stats';
 /**

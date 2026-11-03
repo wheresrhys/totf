@@ -140,7 +140,7 @@ all-time grain (merging has to keep that NULL to match cells by key); the write 
 to the `0001-01-01` sentinel date the NOT-NULL cache columns need. Each cache table has its own
 conflict target (`SimpleStatsCacheBySpecies` includes `species_id`, `SimpleStatsCache` doesn't —
 it has no such column), and writes are chunked and issued sequentially, matching
-`demon-import.ts`'s `DemonRecordsBatchWriter` chaining precedent. Dead-lettering happens after the
+`modules/demon-import`'s `DemonRecordsBatchWriter` chaining precedent. Dead-lettering happens after the
 cache write (a logging failure must never cost the refresh) and is never narrowed to the touched
 periods — a missing cell is a real anomaly regardless of which period it's in.
 

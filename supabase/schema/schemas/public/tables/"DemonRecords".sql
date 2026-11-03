@@ -5,7 +5,7 @@
 -- `raw_row` without every group re-uploading their original files.
 --
 -- This ticket adds the table/constraints/RLS only — nothing in the import
--- write path (lib/demon-import.ts, supabase/scripts/import-csv.ts,
+-- write path (modules/demon-import, supabase/scripts/import-csv.ts,
 -- app/api/import/route.ts) writes a row here yet. See sibling ticket D2
 -- (#959).
 CREATE SEQUENCE public."DemonRecords_id_seq";
@@ -13,7 +13,7 @@ CREATE SEQUENCE public."DemonRecords_id_seq";
 CREATE TABLE public."DemonRecords" (
 	id bigint DEFAULT nextval('public."DemonRecords_id_seq"'::regclass) NOT NULL,
 	-- The entire CSV row, essentially verbatim, keyed by the full
-	-- DemonColumnNames column set (lib/demon-import.ts) — not just the subset
+	-- DemonColumnNames column set (modules/demon-import) — not just the subset
 	-- the current importer models into Species/Birds/Sessions/Encounters.
 	-- This non-lossy capture is the whole point of the table.
 	raw_row jsonb NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE public."DemonRecords" (
 	ring_no text NOT NULL,
 	-- Sourced from the CSV's visit_date column, converted via the same
 	-- DD/MM/YYYY -> YYYY-MM-DD transform convertDateFormat already applies
-	-- (lib/demon-import.ts), stored as a real date matching Sessions.visit_date.
+	-- (modules/demon-import), stored as a real date matching Sessions.visit_date.
 	encounter_date date NOT NULL,
 	-- Sourced from the CSV's capture_time column, matching
 	-- Encounters.capture_time's type.

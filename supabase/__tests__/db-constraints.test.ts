@@ -3,12 +3,12 @@
  * application code path (#467).
  *
  * PR #466 originally included a "raw duplicate insert rejected with 23505" test in
- * each uniqueness describe block of demon-import.test.ts — bypassing demon-import.ts's
+ * each uniqueness describe block of demon-import.test.ts — bypassing modules/demon-import's
  * upsert logic and inserting directly via `.insert()` to assert the underlying
  * Postgres unique constraint itself rejects a literal duplicate. Review feedback
- * flagged that as scope creep for a suite meant to exercise demon-import.ts's upsert
+ * flagged that as scope creep for a suite meant to exercise modules/demon-import's upsert
  * behaviour, not the schema's constraints directly, so those tests live here instead —
- * this suite never imports demon-import.ts and asserts the constraints directly
+ * this suite never imports modules/demon-import and asserts the constraints directly
  * against each table's schema (see supabase/schema/schemas/public/tables/).
  *
  * Requires local Supabase running and e2e seed data loaded:

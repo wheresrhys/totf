@@ -24,7 +24,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
-import { ImportJobTracker } from '../../lib/demon-import';
+import { ImportJobTracker } from '@/modules/demon-import';
 import { createIsolatedGroup, psql, psqlScalar } from './db-test-helpers';
 import { randomTestSuffix } from './test-isolation';
 

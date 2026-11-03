@@ -2,7 +2,7 @@ import type { TableQueryDefinition } from '../types';
 
 /**
  * Encounters whose record type is a resighting/recovery/finding
- * (`RESIGHTING_RECORD_TYPES`, `lib/demon-import.ts`), with their bird/species
+ * (`RESIGHTING_RECORD_TYPES`, `modules/demon-import`), with their bird/species
  * and visit date/location — powers `fetchResightingsPageContent`
  * (`app/(routes)/resightings/page.tsx`). Reads `visit_date`/`location_id`
  * directly off `Encounters` (#1015) rather than through the `Sessions` embed,
