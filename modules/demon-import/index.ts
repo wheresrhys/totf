@@ -1,11 +1,5 @@
-export * from './types';
-export {
-	CasualtyEncounterError,
-	convertDateFormat,
-	isRinglessRingNo,
-	normaliseCaptureTime,
-	transformEmptyStringsToNull
-} from './lib/row-validation';
+export type { DemonRow, StatsCacheRefreshOutcome } from './types';
+export { CasualtyEncounterError } from './lib/row-validation';
 export {
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames
@@ -15,13 +9,6 @@ export {
 	createRingSequenceLookup
 } from './lib/ring-sequences';
 export { ImportJobTracker } from './lib/import-job-tracker';
-export {
-	DEFAULT_DEMON_RECORDS_BATCH_SIZE,
-	DemonRecordsBatchWriter
-} from './lib/demon-records-batch-writer';
-export {
-	DEFAULT_ENCOUNTER_ROW_CHUNK_SIZE,
-	EncounterRowBatchWriter,
-	mergeDuplicateEncounters
-} from './lib/encounter-batch-writer';
+export { DemonRecordsBatchWriter } from './lib/demon-records-batch-writer';
+export { EncounterRowBatchWriter } from './lib/encounter-batch-writer';
 export { processEncounterRow } from './lib/process-encounter-row';

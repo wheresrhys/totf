@@ -58,8 +58,16 @@ that's `modules/stats`' `dispatchStatsCacheRefreshEvents`, called by each entry 
 
 One barrel, `index.ts`. Every caller is a server component, API route or Node script — nothing in
 this pipeline is reachable from a Client Component, so there's no client-safe subset to separate
-out the way `modules/stats` has to. Of the module's exports, only the `DemonRow`/`DemonColumnNames`
-types are read outside the import path. The sessions, resightings, pulli and session-detail pages,
+out the way `modules/stats` has to. The barrel re-exports only what's actually read outside the
+module: `DemonRow`, `StatsCacheRefreshOutcome`, `CasualtyEncounterError`,
+`findUnrecognisedLocationNames`, `getDistinctLocationNames`, `createRingSequenceLinker`,
+`createRingSequenceLookup`, `ImportJobTracker`, `DemonRecordsBatchWriter`, `EncounterRowBatchWriter`
+and `processEncounterRow`. Everything else the module's files export (`DemonColumnNames`,
+`ImportJobRowCounts`, `convertDateFormat`, `isRinglessRingNo`, `normaliseCaptureTime`,
+`transformEmptyStringsToNull`, the two `DEFAULT_*_SIZE`/`DEFAULT_*_CHUNK_SIZE` constants,
+`mergeDuplicateEncounters`) is reached only by other files inside the module (or their own tests)
+importing it directly by path, never through the barrel — so it stays off `index.ts`. The sessions,
+resightings, pulli and session-detail pages,
 and `supabase/scripts/generate-snapshots.ts` used to also read this module's
 `RESIGHTING_RECORD_TYPES` constant; they now read `Encounters.is_resighting` (a generated column,
 see `supabase/CLAUDE.md`) instead, so that constant is gone.
