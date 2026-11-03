@@ -7,11 +7,7 @@ import type {
 	HighlightScope
 } from '../types';
 import { isNumericHighlightValue } from '../types';
-import {
-	getPlural,
-	getSpaceForUnit,
-	type SpeciesName
-} from '@/app/components/shared/StatOutput';
+import { getPlural, getSpaceForUnit, type SpeciesName } from '@/modules/ui-kit';
 import type { TemporalUnit } from '@/app/models/temporal-unit';
 const fullMonthNames = [
 	undefined,

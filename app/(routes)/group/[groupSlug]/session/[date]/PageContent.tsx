@@ -8,9 +8,9 @@ import type { LocationRow } from '@/app/models/db';
 import {
 	PageWrapper,
 	PrimaryHeading,
-	printLocationName,
-	Standfirst
-} from '@/app/components/shared/DesignSystem';
+	Standfirst,
+	printLocationName
+} from '@/modules/ui-kit';
 import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
 import { calculateSessionChronology } from '@/app/lib/session-chronology';

@@ -1,4 +1,4 @@
-import { Table } from '@/app/components/shared/DesignSystem';
+import { Table } from '@/modules/ui-kit';
 import type { CoreStatsResult } from '@/app/models/db';
 import { calculateRetraps } from '@/app/lib/species-totals';
 

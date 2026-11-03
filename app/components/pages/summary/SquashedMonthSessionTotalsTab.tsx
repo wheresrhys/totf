@@ -2,7 +2,7 @@
 
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { buildGroupSessionHref } from '@/app/lib/group-links';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import {
 	SQUASHED_MONTH_SESSION_TOTALS_TAB_ID,
 	type SquashedMonthTabParams

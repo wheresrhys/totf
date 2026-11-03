@@ -1,6 +1,5 @@
 'use client';
-import { TabSet } from '@/app/components/shared/TabSet';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { TabSet, type TabConfig } from '@/modules/ui-kit';
 import { summarySpeciesTotalsTab } from '@/app/components/pages/summary/SummarySpeciesTotalsTab';
 import { summaryHighlightsTab } from '@/app/components/pages/summary/SummaryHighlightsTab';
 import { summaryAllTimeMonthTotalsTab } from '@/app/components/pages/summary/SummaryAllTimeMonthTotalsTab';

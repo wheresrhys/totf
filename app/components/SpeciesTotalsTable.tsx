@@ -10,17 +10,13 @@ import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 import {
 	type ColumnConfig,
 	SortableTable,
-	type RowModelWithRawData
-} from './shared/SortableTable';
-import {
+	type RowModelWithRawData,
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
-	createNameLinkCell
-} from './shared/StatsTableColumnConfigs';
-import {
+	createNameLinkCell,
 	AggregateByToggle,
 	type AggregateByValue
-} from './shared/AggregateByToggle';
+} from '@/modules/ui-kit';
 import { buildSpeciesSquashedMonthHref } from '@/app/lib/squashed-month';
 
 type RowModel = {

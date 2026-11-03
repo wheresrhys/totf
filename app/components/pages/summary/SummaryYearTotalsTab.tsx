@@ -2,7 +2,7 @@
 
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
 import { buildGroupSummaryHref } from '@/app/lib/group-links';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import type { SummaryTabParams } from './summary-tab-params';
 
 // From the plain sibling module, where every summary tab id lives so the

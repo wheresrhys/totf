@@ -26,10 +26,7 @@
 // graph. `setTabIdSearchParam` is the one export that only means anything in a
 // browser — it guards on `typeof window` rather than forcing the whole module
 // client-side, so the server-side helpers above can keep living next to it.
-import type {
-	TabConfig,
-	TabConfigInSet
-} from '@/app/components/shared/TabContent';
+import { type TabConfig, type TabConfigInSet } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 /**

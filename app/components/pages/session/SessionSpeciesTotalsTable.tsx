@@ -1,16 +1,14 @@
 import { getAgeClass } from '@/app/models/encounter';
 import type { SpeciesWithEncounters } from '@/app/models/session';
 import {
-	type ColumnConfig,
 	SortableTable,
-	type RowModelWithRawData
-} from '@/app/components/shared/SortableTable';
-import {
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
-	createNameLinkCell
-} from '@/app/components/shared/StatsTableColumnConfigs';
-import { createStatsTableBody } from '@/app/components/shared/StatsTableBody';
+	createNameLinkCell,
+	createStatsTableBody,
+	type ColumnConfig,
+	type RowModelWithRawData
+} from '@/modules/ui-kit';
 import { EncountersTable } from './EncountersTable';
 
 const SpeciesNameCell = createNameLinkCell<SpeciesWithEncounters, RowModel>(

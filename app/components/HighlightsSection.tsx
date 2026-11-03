@@ -1,4 +1,4 @@
-import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
+import { SecondaryHeading } from '@/modules/ui-kit';
 
 export function HighlightsSection() {
 	return (

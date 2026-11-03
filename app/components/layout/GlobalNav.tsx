@@ -1,8 +1,7 @@
 'use client';
 import { useRef, useEffect, useReducer } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import { RingSearchForm } from '@/app/components/shared/RingSearchForm';
+import { NoPrefetchLink, RingSearchForm } from '@/modules/ui-kit';
 import { SpeciesAlphabetNav } from '@/app/components/SpeciesAlphabetNav';
 import { useSetRingingGroup } from './RingingGroupProvider';
 import { logout } from '@/app/actions/logout';

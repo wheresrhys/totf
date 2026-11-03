@@ -1,10 +1,7 @@
 'use client';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '@/app/models/session';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
+import { PageWrapper, PrimaryHeading } from '@/modules/ui-kit';
 import { useState, useEffect } from 'react';
 import { YearSessions } from '@/app/components/YearSessions';
 

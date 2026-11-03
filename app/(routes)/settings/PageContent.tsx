@@ -1,9 +1,6 @@
 'use client';
 import { useState, useTransition } from 'react';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
+import { PageWrapper, PrimaryHeading } from '@/modules/ui-kit';
 import { updatePublicSummaryEnabled } from '@/app/actions/settings';
 
 export type SettingsPageData = {

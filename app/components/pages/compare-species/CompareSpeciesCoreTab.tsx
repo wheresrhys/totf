@@ -1,7 +1,7 @@
 'use client';
 
 import { selectComparisonRows } from '@/app/lib/compare-species';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import { coreStatsComparisonColumns } from './comparison-columns';
 import { SpeciesComparisonTable } from './SpeciesComparisonTable';
 import {

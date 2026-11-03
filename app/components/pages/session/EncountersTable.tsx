@@ -1,12 +1,12 @@
 'use client';
 
 import { type SessionEncounter } from '@/app/models/session';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import {
+	NoPrefetchLink,
 	SortableTable,
 	type ColumnConfig,
 	type RowModelWithRawData
-} from '../../shared/SortableTable';
+} from '@/modules/ui-kit';
 
 // Renders the per-bird encounter rows shared by the session page's expanded
 // species rows and its net-rounds tab. Both tables render the same 15 core

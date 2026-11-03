@@ -1,18 +1,16 @@
 'use client';
 import { useState } from 'react';
 import { format as formatDate } from 'date-fns';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
-import type { ResightingEncounter } from '@/app/models/session';
 import {
+	NoPrefetchLink,
 	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
-import {
+	PrimaryHeading,
 	SortableTable,
+	getFormattedValue,
 	type ColumnConfig,
-	type RowModelWithRawData,
-	getFormattedValue
-} from '@/app/components/shared/SortableTable';
+	type RowModelWithRawData
+} from '@/modules/ui-kit';
+import type { ResightingEncounter } from '@/app/models/session';
 import { TabNav } from '@/app/components/TabNav';
 
 const ALL_TAB = 'All';

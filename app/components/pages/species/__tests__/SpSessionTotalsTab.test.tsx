@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
-import { TabContent } from '@/app/components/shared/TabContent';
+import { TabContent } from '@/modules/ui-kit';
 import { SpSessionTotalsTab } from '../SpSessionTotalsTab';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';

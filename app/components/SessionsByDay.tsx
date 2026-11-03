@@ -1,5 +1,5 @@
 import { type SessionWithEncountersCount } from '@/app/models/session';
-import { StatOutput } from './shared/StatOutput';
+import { StatOutput } from '@/modules/ui-kit';
 
 import type { ViewedGroup } from '@/app/lib/group-slug';
 

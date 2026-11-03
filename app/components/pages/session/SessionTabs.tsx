@@ -1,7 +1,6 @@
 'use client';
 
-import { TabSet } from '@/app/components/shared/TabSet';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { TabSet, type TabConfig } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	fetchSessionHighlights,

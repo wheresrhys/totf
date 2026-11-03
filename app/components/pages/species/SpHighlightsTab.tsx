@@ -1,8 +1,9 @@
 'use client';
 import {
+	PrimaryHeading,
 	SecondaryHeading,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
+	type TabConfig
+} from '@/modules/ui-kit';
 import {
 	fetchNotableRetraps,
 	type SpeciesTotalsTabParams
@@ -10,7 +11,6 @@ import {
 import { NotableRetrapsTable } from '@/app/components/NotableRetrapsTable';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { TabConfig } from '@/app/components/shared/TabContent';
 
 // Data shape for the species page's Highlights tab (#1066) — the combined
 // result of the two previously-separate fetches (`getHighlightsWithinTimeWindow`

@@ -1,5 +1,5 @@
 'use client';
-import { TabSet } from '@/app/components/shared/TabSet';
+import { TabSet } from '@/modules/ui-kit';
 import { squashedMonthSpeciesTotalsTab } from '@/app/components/pages/summary/SquashedMonthSpeciesTotalsTab';
 import { squashedMonthYearTotalsTab } from '@/app/components/pages/summary/SquashedMonthYearTotalsTab';
 import { squashedMonthSessionTotalsTab } from '@/app/components/pages/summary/SquashedMonthSessionTotalsTab';

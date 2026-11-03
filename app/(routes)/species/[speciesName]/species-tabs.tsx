@@ -33,7 +33,7 @@ import {
 	fetchSquashedMonthYearTotalsTabData,
 	type SpeciesTotalsTabParams
 } from '@/app/actions/sp-data';
-import type { TabConfig } from '@/app/components/shared/TabContent';
+import { type TabConfig } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { EnrichedBirdOfSpecies } from '@/app/models/bird';

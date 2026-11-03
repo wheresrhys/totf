@@ -1,8 +1,4 @@
-import {
-	PageWrapper,
-	PrimaryHeading,
-	Table
-} from '@/app/components/shared/DesignSystem';
+import { PageWrapper, PrimaryHeading, Table } from '@/modules/ui-kit';
 import { format as formatDate } from 'date-fns';
 import type { PayOffStatsData } from '@/app/actions/pay-off-stats';
 import type { CoreStatsResult } from '@/app/models/db';

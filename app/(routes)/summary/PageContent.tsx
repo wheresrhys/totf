@@ -1,8 +1,5 @@
 import { format } from 'date-fns';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
+import { PageWrapper, PrimaryHeading } from '@/modules/ui-kit';
 import { SummaryStatsSection } from '@/app/components/SummaryStatsSection';
 import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';

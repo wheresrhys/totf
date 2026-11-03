@@ -1,11 +1,11 @@
 'use client';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 import {
+	NoPrefetchLink,
 	SortableTable,
 	getFormattedValue,
 	type ColumnConfig,
 	type RowModelWithRawData
-} from '@/app/components/shared/SortableTable';
+} from '@/modules/ui-kit';
 
 /**
  * One species per row, one stat per column (#115) — the rendering half of the

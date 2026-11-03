@@ -1,10 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import {
-	PageWrapper,
-	PrimaryHeading
-} from '@/app/components/shared/DesignSystem';
+import { PageWrapper, PrimaryHeading } from '@/modules/ui-kit';
 import { useRingingGroup } from '@/app/components/layout/RingingGroupProvider';
 import { UnrecognisedLocationsReview } from '@/app/components/pages/import/UnrecognisedLocationsReview';
 import type { ImportMessage } from '@/app/api/import/route';

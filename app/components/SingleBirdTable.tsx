@@ -1,13 +1,13 @@
 'use client';
 import { format as formatDate } from 'date-fns';
 import type { EncounterOfBird } from '@/app/models/bird';
-import { InlineTable } from './shared/DesignSystem';
 import {
+	InlineTable,
 	SortableTable,
 	type ColumnConfig,
 	type RowModelWithRawData,
 	getFormattedValue
-} from './shared/SortableTable';
+} from '@/modules/ui-kit';
 
 type RowModel = {
 	visit_date: Date;

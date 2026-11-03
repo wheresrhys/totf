@@ -1,14 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
-import { EmptyMonthsToggle } from '@/app/components/shared/EmptyMonthsToggle';
+import { EmptyMonthsToggle, type TabConfig } from '@/modules/ui-kit';
 import {
 	filterEmptyMonthTotalsRows,
 	formatMonthYearLabel
 } from '@/app/lib/month-totals';
 import { buildGroupSummaryHref } from '@/app/lib/group-links';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { TabConfig } from '@/app/components/shared/TabContent';
 import type { SummaryTabParams } from './summary-tab-params';
 
 // From the plain sibling module, where every summary tab id lives so the

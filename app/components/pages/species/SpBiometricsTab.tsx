@@ -6,7 +6,7 @@ import {
 	fetchGraphableEncounterData
 } from '@/app/actions/sp-data';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
-import { BoxyList } from '@/app/components/shared/DesignSystem';
+import { BoxyList } from '@/modules/ui-kit';
 import { getSizes } from '@/app/components/pages/species/StatsHistoryChart';
 import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
 import {

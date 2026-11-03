@@ -1,17 +1,17 @@
 'use client';
 import { format } from 'date-fns';
 import {
+	NoPrefetchLink,
 	PageWrapper,
 	PrimaryHeading,
-	Standfirst
-} from '@/app/components/shared/DesignSystem';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
+	Standfirst,
+	TabSet
+} from '@/modules/ui-kit';
 import { formatMonthLabel } from '@/app/lib/month-totals';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { type SpeciesTotalsTabParams } from '@/app/actions/sp-data';
-import { TabSet } from '@/app/components/shared/TabSet';
 // Imported (and re-exported below) rather than defined here — see
 // `species-tabs.tsx`'s doc comment for why these helpers live outside this
 // `'use client'` file (`page.tsx` imports them directly from there instead,

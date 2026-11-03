@@ -3,7 +3,7 @@ import { useId, useState } from 'react';
 import Link from 'next/link';
 import { AreaChart, LineChart, type LineChartData } from 'react-chartkick';
 import 'chartkick/chart.js';
-import { SecondaryHeading } from '@/app/components/shared/DesignSystem';
+import { SecondaryHeading } from '@/modules/ui-kit';
 
 const MONTH_LABELS = [
 	'Jan',

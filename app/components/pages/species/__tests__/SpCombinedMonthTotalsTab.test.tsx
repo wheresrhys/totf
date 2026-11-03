@@ -6,7 +6,7 @@ import {
 	waitFor,
 	fireEvent
 } from '@testing-library/react';
-import { TabContent } from '@/app/components/shared/TabContent';
+import { TabContent } from '@/modules/ui-kit';
 import { SpCombinedMonthTotalsTab } from '../SpCombinedMonthTotalsTab';
 import type { CoreStatsResult } from '@/app/models/db';
 import type {

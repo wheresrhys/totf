@@ -1,5 +1,10 @@
 'use client';
-import { PageWrapper } from '@/app/components/shared/DesignSystem';
+import {
+	NoPrefetchLink,
+	PageWrapper,
+	SortableTable,
+	type ColumnConfig
+} from '@/modules/ui-kit';
 import {
 	speciesStatConfigs,
 	type SpeciesStatsRow
@@ -8,11 +13,6 @@ import type { PageData } from '@/app/(routes)/species/page';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { useState, useEffect, useRef } from 'react';
 import { fetchSpeciesData } from '@/app/actions/spp-data';
-import {
-	SortableTable,
-	type ColumnConfig
-} from '@/app/components/shared/SortableTable';
-import { NoPrefetchLink } from '@/app/components/shared/NoPrefetchLink';
 
 // Keeps a species-row link inside the group whose table it was clicked from
 // (#1231). It used to be hardcoded to the bare `/species/<name>`, which routes
