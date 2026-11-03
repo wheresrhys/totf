@@ -57,9 +57,9 @@ an RPC call** — three things follow from that:
   mirroring the `'blocked'` branch's "no rows, no throw" convention, rather than silently serving a
   live RPC call the UI no longer surfaces a route to.
 
-(`core_stats`/`public_core_stats` are byte-identical siblings of the still-schema-resident
-`core_stats`/`public_aggregate_stats` RPCs — #830 moved every app-code call site onto the new names; a
-later ticket deletes the old ones. See `supabase/CLAUDE.md`'s "Companion stats RPCs" for the RPC-side
+(`core_stats`/`public_core_stats` are themselves the already-renamed pair #830 moved every app-code
+call site onto — the old `aggregate_stats`/`public_aggregate_stats` names are already gone from the
+schema, not pending deletion. See `supabase/CLAUDE.md`'s "Companion stats RPCs" for the RPC-side
 internals.)
 
 `lib/group-slug.ts`'s group-lookup functions (`resolveGroupIdBySlug`, `resolveGroupSlugById`,

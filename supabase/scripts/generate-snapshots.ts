@@ -140,34 +140,27 @@ export async function generateSnapshots(
 	}
 
 	// RPC: core_stats (yearly, ungrouped by species) — powers fetchPayOffStats
-	// (app/actions/pay-off-stats.ts)
-	for (const [name, client, gId] of [
-		['alpha', alpha, alphaId],
-		['beta', beta, betaId]
-	] as const) {
-		const { data: yearly } = await client.rpc('core_stats', {
-			ringing_group_filter: gId,
+	// (app/actions/pay-off-stats.ts). Alpha only — the beta.yearly-totals.json
+	// counterpart was a fully unconsumed orphan (confirmed by grep), removed
+	// alongside beta.monthly-totals.json below.
+	{
+		const { data: yearly } = await alpha.rpc('core_stats', {
+			ringing_group_filter: alphaId,
 			group_by_species: false,
 			group_by_time_period: 'year' satisfies StatsTemporalUnit
 		});
-		await writeSnapshot(`core_stats/${name}.yearly-totals.json`, yearly ?? []);
+		await writeSnapshot(`core_stats/alpha.yearly-totals.json`, yearly ?? []);
 	}
 
 	// RPC: core_stats (monthly, ungrouped by species) — powers fetchPayOffStats
-	// (app/actions/pay-off-stats.ts)
-	for (const [name, client, gId] of [
-		['alpha', alpha, alphaId],
-		['beta', beta, betaId]
-	] as const) {
-		const { data: monthly } = await client.rpc('core_stats', {
-			ringing_group_filter: gId,
+	// (app/actions/pay-off-stats.ts). Alpha only — see yearly-totals above.
+	{
+		const { data: monthly } = await alpha.rpc('core_stats', {
+			ringing_group_filter: alphaId,
 			group_by_species: false,
 			group_by_time_period: 'month' satisfies StatsTemporalUnit
 		});
-		await writeSnapshot(
-			`core_stats/${name}.monthly-totals.json`,
-			monthly ?? []
-		);
+		await writeSnapshot(`core_stats/alpha.monthly-totals.json`, monthly ?? []);
 	}
 
 	// Table: Sessions (embedded Locations + Encounters count) — powers

@@ -246,8 +246,8 @@ describe('formatSnapshotDrift', () => {
 });
 
 describe('fixture coverage lists', () => {
-	it('covers the 27 generator-produced fixtures', () => {
-		expect(GENERATED_SNAPSHOT_FIXTURES).toHaveLength(27);
+	it('covers the 25 generator-produced fixtures', () => {
+		expect(GENERATED_SNAPSHOT_FIXTURES).toHaveLength(25);
 	});
 
 	it('leaves only the 2 permanently hand-authored synthetic fixtures uncovered (issue #894)', () => {
