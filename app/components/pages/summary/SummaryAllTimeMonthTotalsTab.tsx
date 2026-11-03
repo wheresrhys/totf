@@ -1,6 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
+import {
+	buildGroupSquashedMonthSummaryHref,
+	PeriodTotalsTable
+} from '@/modules/stats-view';
 import {
 	CombineYearsToggle,
 	EmptyMonthsToggle,
@@ -14,7 +17,6 @@ import {
 	formatMonthLabel
 } from '@/app/lib/month-totals';
 import { buildGroupSummaryHref } from '@/app/lib/group-links';
-import { buildGroupSquashedMonthSummaryHref } from '@/app/lib/squashed-month';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SummaryTabParams } from './summary-tab-params';

@@ -1,5 +1,5 @@
 'use client';
-import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
+import { PeriodTotalsTable } from '@/modules/stats-view';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import type { ViewedGroup } from '@/app/lib/group-slug';

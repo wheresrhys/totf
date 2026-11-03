@@ -1,5 +1,5 @@
 'use client';
-import { SpTable } from '@/app/components/pages/species/SpTable';
+import { SpTable } from '@/modules/stats-view';
 import { useState } from 'react';
 import { fetchPageOfBirds } from '@/app/actions/sp-data';
 import { useOnInView } from 'react-intersection-observer';

@@ -1,6 +1,6 @@
 import { Table } from '@/modules/ui-kit';
 import type { CoreStatsResult } from '@/app/models/db';
-import { calculateRetraps } from '@/app/lib/species-totals';
+import { calculateRetraps } from '@/modules/stats-view';
 
 export function SummaryStatsSection({
 	stats

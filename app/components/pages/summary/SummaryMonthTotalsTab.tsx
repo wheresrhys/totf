@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
+import { PeriodTotalsTable } from '@/modules/stats-view';
 import { EmptyMonthsToggle, type TabConfig } from '@/modules/ui-kit';
 import {
 	filterEmptyMonthTotalsRows,

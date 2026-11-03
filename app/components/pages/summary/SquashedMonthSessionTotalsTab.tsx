@@ -1,6 +1,6 @@
 'use client';
 
-import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
+import { PeriodTotalsTable } from '@/modules/stats-view';
 import { buildGroupSessionHref } from '@/app/lib/group-links';
 import { type TabConfig } from '@/modules/ui-kit';
 import {

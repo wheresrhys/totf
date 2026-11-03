@@ -15,7 +15,7 @@ import type {
 import {
 	mergeSpeciesBiometrics,
 	type SpeciesStatsRow
-} from '@/app/lib/species-stats';
+} from '@/modules/stats-view';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 /**

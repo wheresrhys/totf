@@ -2,14 +2,13 @@ import {
 	BootstrapPage,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import { SppStatsTable } from '@/app/components/pages/species/SppStatsTable';
+import { SppStatsTable, type SpeciesStatsRow } from '@/modules/stats-view';
 import { fetchSpeciesDataWithAccessLevel } from '@/app/actions/spp-data';
 import {
 	fetchAuthorisedCoreStats,
 	type GroupSummaryAccessLevel
 } from '@/app/lib/auth/group-summary-access';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { SpeciesStatsRow } from '@/app/lib/species-stats';
 
 //TODO get year/date range from URL params
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { SpeciesTotalsTable } from '@/app/components/SpeciesTotalsTable';
+import { SpeciesTotalsTable } from '@/modules/stats-view';
 import { type TabConfig } from '@/modules/ui-kit';
 import {
 	SQUASHED_MONTH_SPECIES_TOTALS_TAB_ID,

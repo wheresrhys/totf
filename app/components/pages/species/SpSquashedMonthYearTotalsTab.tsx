@@ -1,5 +1,5 @@
 'use client';
-import { PeriodTotalsTable } from '@/app/components/PeriodTotalsTable';
+import { PeriodTotalsTable } from '@/modules/stats-view';
 import {
 	formatMonthYearLabel,
 	type MonthTotalsRow

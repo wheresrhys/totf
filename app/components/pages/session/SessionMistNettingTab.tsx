@@ -1,4 +1,4 @@
-import { SessionSpeciesTotalsTable } from './SessionSpeciesTotalsTable';
+import { SessionSpeciesTotalsTable } from '@/modules/stats-view';
 import type { SessionTabParams } from './session-tab-config';
 
 export function SessionMistNettingTab({

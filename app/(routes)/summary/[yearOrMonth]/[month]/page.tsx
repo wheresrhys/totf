@@ -18,7 +18,7 @@ import {
 	SESSION_TOTALS_TAB_ID
 } from '@/app/components/pages/summary/summary-tab-prefetchers';
 import type { SummaryTabParams } from '@/app/components/pages/summary/summary-tab-params';
-import { parseMonthAbbreviation } from '@/app/lib/squashed-month';
+import { parseMonthAbbreviation } from '@/modules/stats-view';
 import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
