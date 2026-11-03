@@ -62,25 +62,45 @@ function parseDemonCsvBuffer(buffer: Buffer): Promise<DemonRow[]> {
  */
 function createUpdateChannel<T>() {
 	const buffered: T[] = [];
-	let notify: (() => void) | null = null;
+	// Holds the resolve function of the Promise `drain` is currently
+	// suspended on, or null when nothing is suspended (`drain` is mid-`yield`,
+	// or hasn't needed to wait yet). `push`/`close` call it to resume `drain`
+	// without polling the buffer.
+	let wakeUp: (() => void) | null = null;
 	let closed = false;
 
 	function push(item: T): void {
 		buffered.push(item);
-		notify?.();
+		// No-op if `drain` isn't currently suspended — the item just sits in
+		// `buffered` for `drain`'s next loop iteration to pick up.
+		wakeUp?.();
 	}
 	function close(): void {
 		closed = true;
-		notify?.();
+		wakeUp?.();
 	}
 	async function* drain(): AsyncGenerator<T> {
 		while (true) {
 			while (buffered.length > 0) yield buffered.shift()!;
 			if (closed) return;
+			// A Promise executor runs synchronously the instant the Promise is
+			// constructed, so `wakeUp = resolve` happens immediately — before
+			// `await` suspends anything below. That's what makes this safe
+			// despite `push`/`close` running from separate call stacks: JS is
+			// single-threaded, so either a `push` lands entirely before this
+			// point (the item's already in `buffered`, the `while` above
+			// already caught it, we never even get here) or entirely after
+			// `wakeUp` has been assigned (it resolves this exact Promise).
+			// There's no gap where `drain` is "about to wait" but `wakeUp`
+			// isn't registered yet, so no wakeup can be lost.
 			await new Promise<void>((resolve) => {
-				notify = resolve;
+				wakeUp = resolve;
 			});
-			notify = null;
+			// Cleared so `wakeUp?.()` above correctly reflects "nothing is
+			// waiting right now" — calling an already-resolved `resolve`
+			// again is harmless, but a stale non-null `wakeUp` would make
+			// that short-circuit a lie.
+			wakeUp = null;
 		}
 	}
 	return { push, close, drain };
