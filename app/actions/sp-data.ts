@@ -10,8 +10,8 @@ import { catchSupabaseErrors } from '@/lib/supabase';
 import { readStatsCacheRows } from '@/modules/stats';
 import type { NotableRetrapsResult } from '@/app/models/db';
 import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
-import type { GraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
-import type { SexedGraphableBird } from '@/app/components/pages/species/WeightAndWingChart';
+import type { GraphableBird } from '@/app/components/charts/WeightAndWingChart';
+import type { SexedGraphableBird } from '@/app/components/charts/WeightAndWingChart';
 import {
 	type CoreStatsResult,
 	type CoreStatsWithBiometrics,

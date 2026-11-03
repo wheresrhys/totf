@@ -9,7 +9,7 @@ import {
 import { SpBiometricsTab } from '../SpBiometricsTab';
 import { robinSpeciesStats as speciesStatsWithBiometrics } from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
-import type { SexedGraphableBird } from '../WeightAndWingChart';
+import type { SexedGraphableBird } from '@/app/components/charts/WeightAndWingChart';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
@@ -23,11 +23,11 @@ vi.mock('@/app/actions/sp-data', () => ({
 	fetchGraphableEncounterData: vi.fn()
 }));
 
-vi.mock('../StatsHistoryChart', () => ({
+vi.mock('@/app/components/charts/StatsHistoryChart', () => ({
 	getSizes: () => [{ name: 'sizes', data: [] }]
 }));
 
-vi.mock('@/app/components/YearComparisonTrendChart', () => ({
+vi.mock('@/app/components/charts/YearComparisonTrendChart', () => ({
 	YearComparisonTrendChart: ({
 		series,
 		effortHistory,
@@ -49,7 +49,7 @@ vi.mock('@/app/components/YearComparisonTrendChart', () => ({
 	)
 }));
 
-vi.mock('../WeightAndWingChart', () => ({
+vi.mock('@/app/components/charts/WeightAndWingChart', () => ({
 	WingWeightScatterChart: () => <div data-testid="scatter-chart" />
 }));
 

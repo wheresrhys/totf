@@ -190,6 +190,13 @@ entrypoint, its content, and its data fetcher:
   `app/components/pages/{route-name}/` (e.g. `components/pages/session/`,
   `components/pages/species/`). Components used by more than one page family stay in top-level
   `app/components/`.
+- **Chart components** all live in `app/components/charts/` (#1325) — the Chart.js/`react-chartkick`
+  stack (`YearComparisonTrendChart`, `StatsHistoryChart`, `WeightAndWingChart`, `ChartTile`,
+  `PayOffEffortChart`, plus `YearComparisonTrendChart`'s extracted `chart-color-utils.ts`,
+  `chart-series-transforms.ts` and `chart-config.ts` helpers), regardless of how many page families
+  use each one. A plain directory, deliberately _not_ a `modules/` module: no barrel, no import
+  boundary, no own `CLAUDE.md` — import each file by its own path. Promotion to a real
+  `modules/charts` is tracked under #1253.
 - **URL-addressable client state** (e.g. `/compare/species`' repeated `?name=` species selection,
   #115): the server `page.tsx` parses `searchParams` in its `getParams` into the shape the content
   component wants, seeds `useState` from it, and mirrors later changes back onto the URL with
