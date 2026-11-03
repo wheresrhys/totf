@@ -383,9 +383,9 @@ describe('summary read-path access model', () => {
 				client as never
 			);
 
-			// The /species list page's "CES only" range — no cache cell spans
-			// it, and its distinct-count columns can't be rebuilt from finer
-			// cells.
+			// A shape the /species list page's free-text date inputs can
+			// produce — no cache cell spans it, and its distinct-count columns
+			// can't be rebuilt from finer cells.
 			const result = await fetchAuthorisedCoreStats(viewedGroup, {
 				group_by_species: true,
 				from_date: '2026-04-25',

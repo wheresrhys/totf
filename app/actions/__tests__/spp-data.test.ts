@@ -54,11 +54,12 @@ const YEAR_FROM_DATE = '2026-01-01';
 const YEAR_TO_DATE = '2026-12-31';
 const MONTH_FROM_DATE = '2026-02-01';
 const MONTH_TO_DATE = '2026-02-28';
-// The /species list page's "CES only" range — the canonical arbitrary window,
+// The /species list page's free-text date inputs' canonical arbitrary window
+// (the shape the until-recently-live "CES only" preset also produced),
 // aligned to no cache cell, so the live stats_cache_biometrics_metrics RPC
 // answers it.
-const CES_FROM_DATE = '2026-04-25';
-const CES_TO_DATE = '2026-09-05';
+const ARBITRARY_WINDOW_FROM_DATE = '2026-04-25';
+const ARBITRARY_WINDOW_TO_DATE = '2026-09-05';
 const BLUE_TIT_SPECIES_ID = 42;
 
 /**
@@ -244,8 +245,8 @@ describe('fetchBiometricsStats', () => {
 
 			const [row] = await fetchSpeciesData(
 				viewedGroup,
-				CES_FROM_DATE,
-				CES_TO_DATE
+				ARBITRARY_WINDOW_FROM_DATE,
+				ARBITRARY_WINDOW_TO_DATE
 			);
 
 			expect(rpcCalls).toEqual([
@@ -253,8 +254,8 @@ describe('fetchBiometricsStats', () => {
 					name: 'stats_cache_biometrics_metrics',
 					args: {
 						ringing_group_filter: GROUP_ID,
-						from_date: CES_FROM_DATE,
-						to_date: CES_TO_DATE,
+						from_date: ARBITRARY_WINDOW_FROM_DATE,
+						to_date: ARBITRARY_WINDOW_TO_DATE,
 						group_by_species: true
 					}
 				}
@@ -284,8 +285,8 @@ describe('fetchBiometricsStats', () => {
 
 			const rows = await fetchSpeciesData(
 				viewedGroup,
-				CES_FROM_DATE,
-				CES_TO_DATE
+				ARBITRARY_WINDOW_FROM_DATE,
+				ARBITRARY_WINDOW_TO_DATE
 			);
 
 			// Only the ids the RPC actually returned are looked up.
@@ -318,8 +319,8 @@ describe('fetchBiometricsStats', () => {
 
 			const [row] = await fetchSpeciesData(
 				viewedGroup,
-				CES_FROM_DATE,
-				CES_TO_DATE
+				ARBITRARY_WINDOW_FROM_DATE,
+				ARBITRARY_WINDOW_TO_DATE
 			);
 
 			expect(row.species_name).toBe('Blue Tit');
@@ -387,8 +388,8 @@ describe('fetchBiometricsStats', () => {
 
 			const [row] = await fetchSpeciesData(
 				viewedGroup,
-				CES_FROM_DATE,
-				CES_TO_DATE
+				ARBITRARY_WINDOW_FROM_DATE,
+				ARBITRARY_WINDOW_TO_DATE
 			);
 
 			expect(row.species_name).toBe('Blue Tit');

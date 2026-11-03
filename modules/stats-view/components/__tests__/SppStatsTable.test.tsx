@@ -80,26 +80,6 @@ describe('SppStatsTable', () => {
 	});
 
 	describe('year filter', () => {
-		it('CES only checkbox is disabled when no year selected', () => {
-			render(
-				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: 'alpha' }} />
-			);
-			const cesCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
-			expect(cesCheckbox.disabled).toBe(true);
-		});
-
-		it('CES only checkbox is enabled after year is selected', async () => {
-			const { fetchSpeciesData } = await import('@/app/actions/spp-data');
-			vi.mocked(fetchSpeciesData).mockResolvedValue(speciesStats);
-			render(
-				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: 'alpha' }} />
-			);
-			const yearSelect = screen.getByLabelText('select') as HTMLSelectElement;
-			fireEvent.change(yearSelect, { target: { value: '2022' } });
-			const cesCheckbox = screen.getByRole('checkbox') as HTMLInputElement;
-			expect(cesCheckbox.disabled).toBe(false);
-		});
-
 		it('triggers fetchSpeciesData with correct date range when year changes', async () => {
 			const { fetchSpeciesData } = await import('@/app/actions/spp-data');
 			vi.mocked(fetchSpeciesData).mockResolvedValue(speciesStats);
@@ -118,9 +98,9 @@ describe('SppStatsTable', () => {
 		});
 	});
 
-	describe('arbitrary-window date controls (CES only checkbox + date inputs)', () => {
+	describe('arbitrary-window date controls (the free-text date inputs)', () => {
 		it.each(['own', 'shared'] as const)(
-			"renders the CES only checkbox and both date inputs for a '%s' access level",
+			"renders both date inputs for a '%s' access level",
 			(accessLevel) => {
 				render(
 					<SppStatsTable
@@ -128,14 +108,13 @@ describe('SppStatsTable', () => {
 						viewedGroup={{ id: 1, slug: 'alpha' }}
 					/>
 				);
-				expect(screen.queryByLabelText('CES only')).not.toBeNull();
 				expect(screen.queryByLabelText('From date')).not.toBeNull();
 				expect(screen.queryByLabelText('To date')).not.toBeNull();
 			}
 		);
 
 		it.each(['public', 'blocked'] as const)(
-			"hides the CES only checkbox and both date inputs for a '%s' access level",
+			"hides both date inputs for a '%s' access level",
 			(accessLevel) => {
 				render(
 					<SppStatsTable
@@ -143,13 +122,12 @@ describe('SppStatsTable', () => {
 						viewedGroup={{ id: 1, slug: 'alpha' }}
 					/>
 				);
-				expect(screen.queryByLabelText('CES only')).toBeNull();
 				expect(screen.queryByLabelText('From date')).toBeNull();
 				expect(screen.queryByLabelText('To date')).toBeNull();
 			}
 		);
 
-		it('still renders the year selector when CES only and date inputs are hidden', () => {
+		it('still renders the year selector when the date inputs are hidden', () => {
 			render(
 				<SppStatsTable
 					data={{ ...pageData, accessLevel: 'public' }}
