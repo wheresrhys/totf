@@ -4,6 +4,7 @@ import { getAuthenticatedSupabaseClient } from './group-auth';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
 import { readStatsCacheRows } from '@/modules/stats';
+import { readSpeciesNamesById } from '@/app/lib/species-names';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import {
 	resolveGroupPublicAreasForRequest,
@@ -19,12 +20,12 @@ import type { CoreStatsResult } from '@/app/models/db';
  */
 type StatsCacheTemporalGrain = Exclude<StatsTemporalUnit, 'all-time'>;
 
-// Shared param shape for the summary read path. Still named after
-// `core_stats`/`public_core_stats`, whose params these are: those two RPCs
-// remain the fallback for the one window shape the cache tables cannot express
-// (see `resolveStatsCacheQueryPlan`). `ringing_group_filter` is supplied
-// separately by the resolver below, since every caller of this module always
-// scopes to one `viewedGroup`.
+// Shared param shape for the summary read path: the window a caller wants,
+// translated below either into a cache-table read or (for the one window
+// shape the cache can't express) a live `stats_cache_basic_session_metrics`
+// recompute — see `resolveStatsCacheQueryPlan`. `ringing_group_filter` is
+// supplied separately by the resolver below, since every caller of this
+// module always scopes to one `viewedGroup`.
 //
 // `species_name_filter` and `year_filter` used to be declared here and were
 // never set by any of this module's three callers (#1204 grep-verified) —
@@ -32,7 +33,7 @@ type StatsCacheTemporalGrain = Exclude<StatsTemporalUnit, 'all-time'>;
 // its own species-filtered cache read path that never routes through here. They
 // are dropped outright rather than left for the cache translation below to
 // silently ignore.
-export type CoreStatsRpcParams = {
+export type StatsWindowParams = {
 	from_date?: string;
 	to_date?: string;
 	group_by_species?: boolean;
@@ -57,7 +58,7 @@ export type AuthorisedSummaryResult = {
 const MONTH_SQUASHED_SENTINEL_YEAR = 2000;
 
 /**
- * How one `CoreStatsRpcParams` shape reads out of the cache tables: which
+ * How one `StatsWindowParams` shape reads out of the cache tables: which
  * `temporal_unit` slice to read, how to narrow it to the requested window, and
  * what post-processing the rows need to come back in the shape the RPC
  * returned them.
@@ -109,7 +110,7 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
 }
 
 /**
- * Translates one `CoreStatsRpcParams` into the cache-table read that answers
+ * Translates one `StatsWindowParams` into the cache-table read that answers
  * it, or `null` when no cache read can.
  *
  * Two fundamentally different request shapes arrive here:
@@ -138,10 +139,11 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
  *    Returning `null` therefore means "arbitrary window": the `/species` list
  *    page's two free-text date inputs are the only thing that produces one.
  *    For *this* function's own caller — the counts half — that keeps reading
- *    the live `core_stats`/`public_core_stats` RPCs. The alternative was to
- *    serve a wrong `bird_count`, so that dependency stays until either the
- *    cache gains an arbitrary-window grain or those two inputs are reshaped to
- *    cache-aligned ones.
+ *    a live `stats_cache_basic_session_metrics` recompute (#1244 — it used to
+ *    be `core_stats`/`public_core_stats`, which nothing here calls any more).
+ *    The alternative was to serve a wrong `bird_count`, so that dependency
+ *    stays until either the cache gains an arbitrary-window grain or those
+ *    two inputs are reshaped to cache-aligned ones.
  *
  * Exported because the `/species` list page's *other* half —
  * `fetchBiometricsStats` (`app/actions/spp-data.ts`), which fetches the 8
@@ -154,7 +156,7 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
  * sites, one rule — don't re-derive this mapping a second time.
  *
  * What the two halves do *with* a `null` now differs, though, and the
- * `core_stats`/`public_core_stats` dependency above is the counts half's
+ * `stats_cache_basic_session_metrics` dependency above is the counts half's
  * alone (#1244). The biometrics half recomputes an arbitrary window live from
  * `stats_cache_biometrics_metrics` — a cache-feeding RPC that nonetheless
  * takes the same window signature and recomputes from `Encounters` on every
@@ -167,7 +169,7 @@ export function resolveStatsCacheQueryPlan({
 	to_date: toDate,
 	month_filter: monthFilter,
 	group_by_time_period: groupByTimePeriod
-}: CoreStatsRpcParams): StatsCacheQueryPlan | null {
+}: StatsWindowParams): StatsCacheQueryPlan | null {
 	if (groupByTimePeriod) {
 		if (groupByTimePeriod === 'year' && monthFilter) {
 			return {
@@ -277,16 +279,120 @@ async function runStatsCacheRead(
 		);
 }
 
-async function runCoreStats(
-	rpcName: 'core_stats' | 'public_core_stats',
+/**
+ * A `stats_cache_basic_session_metrics_result` row: the basic-count and
+ * session/effort columns `core_stats` shares with it, keyed on `species_id`
+ * rather than `species_name` — it was written to feed a cache-table write,
+ * which keys on the id too.
+ */
+type BasicSessionMetricsRpcRow = Pick<
+	CoreStatsResult,
+	| 'time_period'
+	| 'species_count'
+	| 'bird_count'
+	| 'encounter_count'
+	| 'new_bird_count'
+	| 'session_count'
+	| 'total_effort'
+	| 'effort_per_session'
+	| 'effort_per_encounter'
+	| 'avg_encounters_per_session'
+	| 'max_per_session'
+	| 'max_new_per_session'
+> & { species_id: number | null };
+
+/**
+ * The 10 `core_stats_result` age-bucket columns (5 bird, 5 encounter)
+ * `stats_cache_basic_session_metrics` does not produce — it carries none of
+ * `core_stats`' age-dimension columns, only the basic-count and
+ * session/effort ones (see that RPC's own file header). Filled with a
+ * placeholder `0` below rather than omitted, because `CoreStatsResult`
+ * requires every column to be present — but nothing on this call path ever
+ * reads them: the `/species` list page's rendered column set
+ * (`speciesStatConfigs`, `modules/stats-view/lib/species-stats.ts`) is only
+ * `species_name`/`bird_count`/`encounter_count`/`session_count`/
+ * `max_per_session` plus the separately-sourced biometric columns, and
+ * `hasVisibleData` below reads only `encounter_count`. If a future caller
+ * ever needs a real age-bucket value for an arbitrary (non-cache-aligned)
+ * window, this placeholder has to be replaced with two more RPC calls
+ * (`stats_cache_bird_age_metrics`/`stats_cache_encounter_age_metrics`, merged
+ * by `species_id` the way `modules/stats/lib/refresh/merge-metric-rows.ts`
+ * does for the cache write) — don't start reading a real value out of these
+ * columns on this path without doing that first.
+ */
+const UNAVAILABLE_AGE_BUCKET_COLUMNS = {
+	pullus_bird_count: 0,
+	juv_bird_count: 0,
+	postjuv_bird_count: 0,
+	adult_bird_count: 0,
+	unknown_age_bird_count: 0,
+	pullus_enc_count: 0,
+	juv_enc_count: 0,
+	postjuv_enc_count: 0,
+	adult_enc_count: 0,
+	unknown_age_enc_count: 0
+} satisfies Pick<
+	CoreStatsResult,
+	| 'pullus_bird_count'
+	| 'juv_bird_count'
+	| 'postjuv_bird_count'
+	| 'adult_bird_count'
+	| 'unknown_age_bird_count'
+	| 'pullus_enc_count'
+	| 'juv_enc_count'
+	| 'postjuv_enc_count'
+	| 'adult_enc_count'
+	| 'unknown_age_enc_count'
+>;
+
+/**
+ * The arbitrary-window fallback for the counts half of the `/species` list
+ * page: a live recompute by `stats_cache_basic_session_metrics` instead of
+ * the retired `core_stats`/`public_core_stats` RPC pair (#1244), following
+ * the exact precedent `app/actions/spp-data.ts`'s
+ * `readBiometricsFromMetricsRpc` already set for the biometrics half. That
+ * RPC exists to feed the `SimpleStatsCacheBySpecies`/`SimpleStatsCache`
+ * write, but nothing about it is cache-specific — it takes the same 8-arg
+ * window signature `core_stats` did and recomputes from `Encounters` on every
+ * call, verified equivalent for this exact arbitrary-window shape by
+ * `stats-cache-basic-session-metrics.test.ts`'s own cross-RPC assertions —
+ * so it answers an uncacheable window just as correctly.
+ *
+ * `species_name` isn't a column either RPC in this family returns when
+ * keyed on `species_id` — it comes back through the same
+ * `readSpeciesNamesById` join `readBiometricsFromMetricsRpc` uses, `null`
+ * when `group_by_species` wasn't set, matching `core_stats`' own behaviour.
+ */
+async function runLiveMetricsRecompute(
 	client: SupabaseClient,
 	viewedGroup: ViewedGroup,
-	rpcParams: CoreStatsRpcParams
+	rpcParams: StatsWindowParams
 ): Promise<CoreStatsResult[]> {
 	const rows = (await client
-		.rpc(rpcName, { ringing_group_filter: viewedGroup.id, ...rpcParams })
-		.then(catchSupabaseErrors)) as CoreStatsResult[] | null;
-	return rows ?? [];
+		.rpc('stats_cache_basic_session_metrics', {
+			ringing_group_filter: viewedGroup.id,
+			...rpcParams
+		})
+		.then(catchSupabaseErrors)) as BasicSessionMetricsRpcRow[] | null;
+	if (!rows?.length) {
+		return [];
+	}
+
+	const speciesNamesById = rpcParams.group_by_species
+		? await readSpeciesNamesById(
+				client,
+				rows.flatMap(({ species_id }) =>
+					species_id === null ? [] : [species_id]
+				)
+			)
+		: new Map<number, string>();
+
+	return rows.map(({ species_id, ...basicMetrics }) => ({
+		...basicMetrics,
+		...UNAVAILABLE_AGE_BUCKET_COLUMNS,
+		species_name:
+			species_id === null ? null : (speciesNamesById.get(species_id) ?? null)
+	})) as CoreStatsResult[];
 }
 
 /**
@@ -295,12 +401,13 @@ async function runCoreStats(
  * an RLS-blocked read apart from an authorised one.
  *
  * A cache-table read makes this a plain emptiness check: RLS filters a blocked
- * caller's rows out entirely, so the result set is genuinely empty. The RPC
- * fallback can't use that, because `core_stats` always emits at least one row
- * for an ungrouped query (its spine is a 1x1 cross join, independent of
- * RLS-visible data) — a blocked cross-group call comes back as a single row of
- * COALESCEd zeros rather than an empty array, so there the zeros have to be
- * recognised too.
+ * caller's rows out entirely, so the result set is genuinely empty. The live
+ * recompute fallback can't use that, because `stats_cache_basic_session_metrics`
+ * shares `core_stats`' spine and so inherits the same quirk: it always emits
+ * at least one row for an ungrouped query (the spine is a 1x1 cross join,
+ * independent of RLS-visible data) — a blocked cross-group call comes back as
+ * a single row of COALESCEd zeros rather than an empty array, so there the
+ * zeros have to be recognised too.
  *
  * Both rules resolve a genuinely-empty-but-authorised `'shared'` read to
  * `'blocked'`, which is the pre-existing behaviour: nothing in either read
@@ -363,10 +470,10 @@ function hasVisibleData(
  */
 export async function fetchAuthorisedCoreStats(
 	viewedGroup: ViewedGroup,
-	rpcParams: CoreStatsRpcParams = {}
+	rpcParams: StatsWindowParams = {}
 ): Promise<AuthorisedSummaryResult> {
 	const cacheQueryPlan = resolveStatsCacheQueryPlan(rpcParams);
-	const readStats = (client: SupabaseClient, publicRead: boolean) =>
+	const readStats = (client: SupabaseClient) =>
 		cacheQueryPlan
 			? runStatsCacheRead(
 					client,
@@ -374,18 +481,13 @@ export async function fetchAuthorisedCoreStats(
 					Boolean(rpcParams.group_by_species),
 					cacheQueryPlan
 				)
-			: runCoreStats(
-					publicRead ? 'public_core_stats' : 'core_stats',
-					client,
-					viewedGroup,
-					rpcParams
-				);
+			: runLiveMetricsRecompute(client, viewedGroup, rpcParams);
 
 	const viewerGroupId = await getGroupCookie();
 
 	if (viewerGroupId === viewedGroup.id) {
 		const client = await getAuthenticatedSupabaseClient();
-		return { accessLevel: 'own', rows: await readStats(client, false) };
+		return { accessLevel: 'own', rows: await readStats(client) };
 	}
 
 	const publicAreas = await resolveGroupPublicAreasForRequest(viewedGroup.id);
@@ -393,13 +495,15 @@ export async function fetchAuthorisedCoreStats(
 		// An arbitrary (non-cache-aligned) window has no cache-table read to
 		// serve it, and the UI has already stopped offering a way to request
 		// one for a public/blocked viewer (#1232) — rather than falling
-		// through to the live `public_core_stats` RPC, mirror the 'blocked'
-		// branch's "no rows, no throw" convention. `core_stats` (the
-		// 'own'/'shared' arbitrary-window fallback below) is unaffected.
+		// through to a live metrics recompute, mirror the 'blocked' branch's
+		// "no rows, no throw" convention. The 'own'/'shared' arbitrary-window
+		// fallback below is unaffected — this gate is deliberate policy (an
+		// anonymous/cross-group viewer never reaches the live-recompute path
+		// at all), not dead code.
 		if (!cacheQueryPlan) {
 			return { accessLevel: 'public', rows: [] };
 		}
-		return { accessLevel: 'public', rows: await readStats(supabase, true) };
+		return { accessLevel: 'public', rows: await readStats(supabase) };
 	}
 
 	if (!viewerGroupId) {
@@ -407,7 +511,7 @@ export async function fetchAuthorisedCoreStats(
 	}
 
 	const client = await getAuthenticatedSupabaseClient();
-	const sharedRows = await readStats(client, false);
+	const sharedRows = await readStats(client);
 
 	if (hasVisibleData(sharedRows, Boolean(cacheQueryPlan))) {
 		return { accessLevel: 'shared', rows: sharedRows };
