@@ -39,7 +39,7 @@ vi.mock('@/modules/stats/browser', () => ({
 	globalStatsCacheFetchPool: { fetch: vi.fn() }
 }));
 
-vi.mock('../StatsHistoryChart', () => ({
+vi.mock('@/app/components/charts/StatsHistoryChart', () => ({
 	getCounts: () => [{ name: 'birds', data: [] }],
 	getReturningVsNew: () => [
 		{ name: 'New adults', data: [] },
@@ -93,7 +93,7 @@ vi.mock('../StatsHistoryChart', () => ({
 	])
 }));
 
-vi.mock('@/app/components/YearComparisonTrendChart', () => ({
+vi.mock('@/app/components/charts/YearComparisonTrendChart', () => ({
 	YearComparisonTrendChart: ({
 		series,
 		colors,
@@ -486,7 +486,8 @@ describe('SpDemographicsTab', () => {
 		});
 
 		it('drops the Pulli colour (rather than misaligning the rest) when getArrivals omits the Pulli series', async () => {
-			const { getArrivals } = await import('../StatsHistoryChart');
+			const { getArrivals } =
+				await import('@/app/components/charts/StatsHistoryChart');
 			vi.mocked(getArrivals).mockReturnValueOnce([
 				{ name: 'New adults', data: [] },
 				{ name: 'Returning adults', data: [] },

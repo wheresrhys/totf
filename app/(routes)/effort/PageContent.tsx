@@ -4,7 +4,7 @@ import type { PayOffStatsData } from '@/app/actions/pay-off-stats';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { formatPostgresIntervalForDisplay } from '@/app/lib/postgres-interval';
-import { PayOffEffortChart } from '@/app/components/pages/effort/PayOffEffortChart';
+import { PayOffEffortChart } from '@/app/components/charts/PayOffEffortChart';
 
 function formatAvgEncounters(n: number | null | undefined): string {
 	if (n == null || Number.isNaN(n)) return '—';

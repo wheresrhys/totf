@@ -7,13 +7,13 @@ import {
 } from '@/app/actions/sp-data';
 import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import { BoxyList } from '@/modules/ui-kit';
-import { getSizes } from '@/app/components/pages/species/StatsHistoryChart';
-import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
+import { getSizes } from '@/app/components/charts/StatsHistoryChart';
+import { YearComparisonTrendChart } from '@/app/components/charts/YearComparisonTrendChart';
 import {
 	WingWeightScatterChart,
 	type SexedGraphableBird
-} from '@/app/components/pages/species/WeightAndWingChart';
-import { ChartTile } from '@/app/components/pages/species/ChartTile';
+} from '@/app/components/charts/WeightAndWingChart';
+import { ChartTile } from '@/app/components/charts/ChartTile';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 function Spinner() {

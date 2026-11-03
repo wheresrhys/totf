@@ -21,9 +21,9 @@ import {
 	getYoungCounts,
 	getNewYoungCounts,
 	getArrivals
-} from '@/app/components/pages/species/StatsHistoryChart';
-import { YearComparisonTrendChart } from '@/app/components/YearComparisonTrendChart';
-import { ChartTile } from '@/app/components/pages/species/ChartTile';
+} from '@/app/components/charts/StatsHistoryChart';
+import { YearComparisonTrendChart } from '@/app/components/charts/YearComparisonTrendChart';
+import { ChartTile } from '@/app/components/charts/ChartTile';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // Returning vs new (#854): three plain categorical colours — unlike Young
