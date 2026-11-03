@@ -7,9 +7,17 @@ stack, and the "Module conventions" section this module follows.
 
 The whole DemOn CSV-import pipeline — everything that turns one uploaded CSV row into staging and
 domain-table rows — shared verbatim by both import entry points: the web route
-(`app/api/import/route.ts`) and the CLI importer (`supabase/scripts/import-csv.ts`). Neither entry
-point duplicates any of it; they differ only in how they read the CSV, how they rate-limit, and
-how they report progress.
+(`app/api/import/route.ts`) and the CLI importer (`supabase/scripts/import-csv.ts`).
+
+The web route also delegates its whole run — CSV parsing, the location pre-flight, job tracking,
+both batch writers, rate-limiting/deadline and progress reporting — to this module's own
+`lib/run-demon-import.ts`, via `runDemonImport` (see "Orchestration" below). **The CLI importer
+does not** — it still has its own separate orchestrator, `runImport`/`runRows` in
+`supabase/scripts/import-csv.ts`, duplicating most of what `runDemonImport` does. Unifying the two
+is a known, deliberately deferred follow-up, not an oversight — `runDemonImport`'s current
+signature (`source: Buffer`, a required `timeoutMs`) is shaped only around the web route's needs
+and would need generalising (an already-parsed-`DemonRow[]` source, optional deadline) before the
+CLI could use it too.
 
 A row travels three stages, in this order:
 
@@ -65,6 +73,29 @@ Two lookup helpers sit alongside the pipeline:
   `CES972`, which would silently fork a second Locations row and re-import every encounter under
   it) than a genuine new site, and the caller can't tell which.
 
+## Orchestration: `runDemonImport`
+
+`lib/run-demon-import.ts`'s `runDemonImport(options): AsyncGenerator<DemonImportUpdate>` is the
+whole web-route run as one `async function*`, yielding a `DemonImportUpdate` (`types.ts`) as it
+progresses: `progress` every 10 rows, then exactly one of `complete`/`timeout`/`error`, or — if
+the pre-flight finds an unrecognised `loc_id` — a single `unrecognised_locations` and nothing
+else. `app/api/import/route.ts` just `for await`s this and turns each update into one NDJSON
+line; no business logic lives in the route file any more.
+
+The one non-mechanical piece is bridging a `yield` (which can only fire synchronously within the
+generator's own control flow) with the run's per-row reporting (called from inside each row's
+**detached, unawaited** promise — deliberate, so a batch/chunk can fill, see "Design choices"
+below). `performImport` — the whole CSV import's run, essentially the route's old `ReadableStream.start()` body
+— takes a plain `push(update)` callback instead of `yield`ing directly; `createUpdateChannel`
+buffers what it pushes and `runDemonImport` drains that buffer via `yield*`, only returning once
+the run has signalled `close()` and the buffer is empty — so the terminal update is always
+yielded before the generator ends, and a push between drains is just an array append (single JS
+thread, no race).
+
+`ImportDeadlineExceededError` (the 280s-abort signal `limitChunkFlush` throws once a chunk's slot
+comes up past the deadline) lives here now and is never exported — same "never leaves this file"
+rule the route used to apply to itself.
+
 `StatsTemporalUnit` is **not** this module's type: it lives in
 [`app/models/temporal-unit.ts`](../../app/models/temporal-unit.ts) and
 `lib/import-job-tracker.ts` imports it directly from there rather than through this module's
@@ -78,14 +109,15 @@ that's `modules/stats`' `dispatchStatsCacheRefreshEvents`, called by each entry 
 One barrel, `index.ts`. Every caller is a server component, API route or Node script — nothing in
 this pipeline is reachable from a Client Component, so there's no client-safe subset to separate
 out the way `modules/stats` has to. The barrel re-exports only what's actually read outside the
-module: `DemonRow`, `StatsCacheRefreshOutcome`, `CasualtyEncounterError`,
+module: `DemonRow`, `StatsCacheRefreshOutcome`, `DemonImportUpdate`, `CasualtyEncounterError`,
 `findUnrecognisedLocationNames`, `getDistinctLocationNames`, `createRingSequenceLinker`,
-`createRingSequenceLookup`, `ImportJobTracker`, `DemonRecordsBatchWriter`, `EncounterRowBatchWriter`
-and `processEncounterRow`. Everything else the module's files export (`DemonColumnNames`,
-`ImportJobRowCounts`, `convertDateFormat`, `isRinglessRingNo`, `normaliseCaptureTime`,
-`transformEmptyStringsToNull`, the two `DEFAULT_*_SIZE`/`DEFAULT_*_CHUNK_SIZE` constants,
-`mergeDuplicateEncounters`) is reached only by other files inside the module (or their own tests)
-importing it directly by path, never through the barrel — so it stays off `index.ts`. The sessions,
+`createRingSequenceLookup`, `ImportJobTracker`, `DemonRecordsBatchWriter`, `EncounterRowBatchWriter`,
+`processEncounterRow`, `runDemonImport` and `RunDemonImportOptions`. Everything else the module's
+files export (`DemonColumnNames`, `ImportJobRowCounts`, `convertDateFormat`, `isRinglessRingNo`,
+`normaliseCaptureTime`, `transformEmptyStringsToNull`, the two
+`DEFAULT_*_SIZE`/`DEFAULT_*_CHUNK_SIZE` constants, `mergeDuplicateEncounters`) is reached only by
+other files inside the module (or their own tests) importing it directly by path, never through
+the barrel — so it stays off `index.ts`. The sessions,
 resightings, pulli and session-detail pages,
 and `supabase/scripts/generate-snapshots.ts` used to also read this module's
 `RESIGHTING_RECORD_TYPES` constant; they now read `Encounters.is_resighting` (a generated column,
@@ -110,6 +142,8 @@ modules/demon-import/
     encounter-batch-writer.ts    # EncounterRowBatchWriter, mergeDuplicateEncounters,
                                  # buildEncounterInsert, naturalKeyOf (stage 2)
     process-encounter-row.ts     # processEncounterRow — the stage 1 → stage 2 join
+    run-demon-import.ts          # runDemonImport — the web route's whole run as
+                                 # one async generator; see "Orchestration" above
 ```
 
 `lib/encounter-batch-writer.ts` is by far the largest file here and deliberately stays one file:
@@ -180,6 +214,13 @@ mocked entirely — none of them touch a real schema. Shared scaffolding lives i
 - `encounter-row-writer.ts` — a domain-tables mock client that answers each bulk upsert with the
   natural-key columns it selected plus a table-scoped id, exactly as PostgREST would, plus
   `makeEncounterRowWriter` and `neverRunningChunkLimiter`.
+
+`lib/__tests__/run-demon-import.test.ts` is the one exception to "mock only the Supabase client":
+since it's testing the orchestration itself, it mocks every sibling file `runDemonImport` calls
+(`./demon-records-batch-writer`, `./encounter-batch-writer`, `./import-job-tracker`,
+`./process-encounter-row`, `./locations`) directly rather than exercising the real pipeline — this
+is the inside-the-module test the module-boundary rule expects to reach past the barrel, mirroring
+what `app/api/import/__tests__/route.test.ts` used to do before this orchestration moved here.
 
 The DB integration suite stays **outside** this module, in
 [`supabase/__tests__/demon-import.test.ts`](../../supabase/__tests__/demon-import.test.ts) (#464):

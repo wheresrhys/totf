@@ -129,3 +129,31 @@ export type StatsCacheRefreshOutcome = Extract<
 	ImportJobStatus,
 	'succeeded' | 'failed'
 >;
+
+export type DemonImportProgressUpdate = { type: 'progress'; processed: number };
+export type DemonImportCompleteUpdate = {
+	type: 'complete';
+	processed: number;
+	successful: number;
+	failed: number;
+	skipped: number;
+};
+export type DemonImportTimeoutUpdate = {
+	type: 'timeout';
+	processed: number;
+	startDate: string | null;
+	endDate: string | null;
+};
+export type DemonImportErrorUpdate = { type: 'error'; message: string };
+/** See `getDistinctLocationNames`/`findUnrecognisedLocationNames` — #1079. */
+export type DemonImportUnrecognisedLocationsUpdate = {
+	type: 'unrecognised_locations';
+	locations: string[];
+};
+/** One update yielded by `runDemonImport` as an import progresses. */
+export type DemonImportUpdate =
+	| DemonImportProgressUpdate
+	| DemonImportCompleteUpdate
+	| DemonImportTimeoutUpdate
+	| DemonImportErrorUpdate
+	| DemonImportUnrecognisedLocationsUpdate;

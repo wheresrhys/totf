@@ -1,4 +1,8 @@
-export type { DemonRow, StatsCacheRefreshOutcome } from './types';
+export type {
+	DemonRow,
+	StatsCacheRefreshOutcome,
+	DemonImportUpdate
+} from './types';
 export { CasualtyEncounterError } from './lib/row-validation';
 export {
 	findUnrecognisedLocationNames,
@@ -12,3 +16,5 @@ export { ImportJobTracker } from './lib/import-job-tracker';
 export { DemonRecordsBatchWriter } from './lib/demon-records-batch-writer';
 export { EncounterRowBatchWriter } from './lib/encounter-batch-writer';
 export { processEncounterRow } from './lib/process-encounter-row';
+export { runDemonImport } from './lib/run-demon-import';
+export type { RunDemonImportOptions } from './lib/run-demon-import';
