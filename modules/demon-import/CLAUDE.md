@@ -9,14 +9,14 @@ The whole DemOn CSV-import pipeline — everything that turns one uploaded CSV r
 domain-table rows — shared verbatim by both import entry points: the web route
 (`app/api/import/route.ts`) and the CLI importer (`supabase/scripts/import-csv.ts`).
 
-The web route delegates its whole run — CSV parsing, the location pre-flight, job tracking, both
-batch writers, rate-limiting/deadline and progress reporting — to this module's own
-`lib/run-demon-import.ts`, via `runDemonImport` (see "Orchestration" below). `runDemonImport`'s
-signature is generalized to also cover the CLI's needs (`source: Buffer | DemonRow[]`, optional
-`concurrency`/`timeoutMs`/`logContext`) — **the CLI importer doesn't use it yet**, though: it
-still has its own separate orchestrator, `runImport`/`runRows`/`createRowLimiter` in
-`supabase/scripts/import-csv.ts`, duplicating most of what `runDemonImport` does. Switching the CLI
-over and deleting that duplicate is the next step, not done here.
+Both entry points delegate their whole run — CSV parsing (or, for the CLI, rows it has already
+materialized), the location pre-flight, job tracking, both batch writers, rate-limiting/deadline
+and progress reporting — to this module's own `lib/run-demon-import.ts`, via `runDemonImport` (see
+"Orchestration" below). Neither duplicates any of it any more; they differ only in what `source`
+they pass (raw CSV bytes for the web route, an already-materialized `DemonRow[]` for the CLI and
+`regenerate-import.ts`), whether they pass a `timeoutMs`, and how each turns a yielded
+`DemonImportUpdate` into its own presentation (NDJSON for the web route; `console.log`/
+`process.exit`/a rethrow for the CLI).
 
 A row travels three stages, in this order:
 
@@ -120,16 +120,19 @@ that's `modules/stats`' `dispatchStatsCacheRefreshEvents`, called by each entry 
 One barrel, `index.ts`. Every caller is a server component, API route or Node script — nothing in
 this pipeline is reachable from a Client Component, so there's no client-safe subset to separate
 out the way `modules/stats` has to. The barrel re-exports only what's actually read outside the
-module: `DemonRow`, `StatsCacheRefreshOutcome`, `DemonImportUpdate`, `CasualtyEncounterError`,
+module: `DemonRow`, `StatsCacheRefreshOutcome`, `DemonImportUpdate`,
 `findUnrecognisedLocationNames`, `getDistinctLocationNames`, `createRingSequenceLinker`,
 `createRingSequenceLookup`, `ImportJobTracker`, `DemonRecordsBatchWriter`, `EncounterRowBatchWriter`,
 `processEncounterRow`, `runDemonImport`, `RunDemonImportOptions` and `DEFAULT_IMPORT_CONCURRENCY`.
 Everything else the module's
 files export (`DemonColumnNames`, `ImportJobRowCounts`, `convertDateFormat`, `isRinglessRingNo`,
-`normaliseCaptureTime`, `transformEmptyStringsToNull`, the two
+`normaliseCaptureTime`, `transformEmptyStringsToNull`, `CasualtyEncounterError`, the two
 `DEFAULT_*_SIZE`/`DEFAULT_*_CHUNK_SIZE` constants, `mergeDuplicateEncounters`) is reached only by
 other files inside the module (or their own tests) importing it directly by path, never through
-the barrel — so it stays off `index.ts`. The sessions,
+the barrel — so it stays off `index.ts`. `CasualtyEncounterError` dropped off the barrel once the
+CLI importer stopped constructing/checking it directly (it now delegates its per-row catch to
+`runDemonImport` like the web route already did) — only this module's own tests still import it,
+from `./lib/row-validation` directly. The sessions,
 resightings, pulli and session-detail pages,
 and `supabase/scripts/generate-snapshots.ts` used to also read this module's
 `RESIGHTING_RECORD_TYPES` constant; they now read `Encounters.is_resighting` (a generated column,

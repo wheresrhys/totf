@@ -3,7 +3,6 @@ export type {
 	StatsCacheRefreshOutcome,
 	DemonImportUpdate
 } from './types';
-export { CasualtyEncounterError } from './lib/row-validation';
 export {
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames

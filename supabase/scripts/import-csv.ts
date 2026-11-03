@@ -12,7 +12,6 @@
  * which makes row processing (and therefore `nextval`-assigned row ids)
  * deterministic — see #903.
  */
-import { pRateLimit } from 'p-ratelimit';
 import { getAuthenticatedSupabaseClientForGroup } from '../../app/lib/auth/group-auth';
 import { supabase } from '../../lib/supabase';
 import fs from 'fs';
@@ -20,25 +19,10 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import csvParser from 'csv-parser';
 import {
-	createRingSequenceLookup,
-	createRingSequenceLinker,
-	DemonRecordsBatchWriter,
-	EncounterRowBatchWriter,
-	ImportJobTracker,
-	CasualtyEncounterError,
-	processEncounterRow,
-	getDistinctLocationNames,
-	findUnrecognisedLocationNames,
+	runDemonImport,
+	DEFAULT_IMPORT_CONCURRENCY,
 	type DemonRow
 } from '@/modules/demon-import';
-
-import { dispatchStatsCacheRefreshEvents } from '@/modules/stats';
-/**
- * Default max number of rows processed at once. Unchanged from the value this
- * script has always used — callers that don't pass `concurrency` keep the exact
- * previous behaviour.
- */
-export const DEFAULT_IMPORT_CONCURRENCY = 30;
 
 export interface ImportOptions {
 	csvFilePath: string;
@@ -51,263 +35,6 @@ export interface ImportOptions {
 	 * gets depends on I/O timing.
 	 */
 	concurrency?: number;
-}
-
-export interface ImportRowCounts {
-	totalRecords: number;
-	successfulRecords: number;
-	failedRecords: number;
-	skippedRecords: number;
-}
-
-/**
- * Rate limiter: up to 30 API calls per second, with at most `concurrency`
- * running at once.
- *
- * Built once per run and wrapped around **a whole chunk flush** of the
- * domain-table writer — never around a whole row's `processEncounterRow` call
- * (#959). Until #1139 it wrapped one row's five sequential domain-table upserts;
- * it now wraps one chunk's five bulk upserts, so `concurrency` caps concurrent
- * chunk flushes rather than concurrent rows. Each chunk flush issues one request
- * at a time, so that still caps in-flight requests at roughly `concurrency`.
- *
- * Throttling the whole row would throttle its `DemonRecords` staging write too,
- * and a batch bigger than `concurrency` could then never fill: the rows needed to
- * complete it would be queued behind the rows already waiting on it. Exported for
- * its own unit test.
- */
-export function createRowLimiter(concurrency: number) {
-	return pRateLimit({
-		interval: 1000, // 1000 ms == 1 second
-		rate: 30, // 30 API calls per interval
-		concurrency
-		// maxDelay: 2000              // an API call delayed > 2 sec is rejected
-	}) as <T>(fn: () => Promise<T>) => Promise<T>;
-}
-
-/**
- * Run `processRow` over every row and count the outcomes. Rows are dispatched as
- * they arrive, so a streaming source doesn't have to be buffered in full.
- *
- * `onAllRowsDispatched` runs once every row has been handed to `processRow` but
- * before any row's promise is awaited. That is the only point at which the
- * `DemonRecords` buffer is known to hold exactly the run's trailing partial
- * batch, so it's where `flushRemaining` (and the `affected_dates` write that
- * depends on it) belongs.
- *
- * Concurrency is deliberately not this function's business: the rate limiter
- * lives inside the `processRow` the caller builds, around the domain-table write
- * alone (see `createRowLimiter`).
- *
- * `isSkippable` tells a deliberately-skipped row (e.g. a ringless/casualty row
- * rejecting with `CasualtyEncounterError`) apart from a genuine failure — such a
- * row is counted in `skippedRecords`, not `failedRecords`, and logged with a
- * plain skip message instead of the raw error. Defaults to never skipping, so a
- * caller that doesn't pass it keeps today's behaviour of counting every
- * rejection as a failure.
- *
- * Extracted from `importCSV` so the dispatch behaviour is unit-testable without
- * a filesystem, a CSV parser or a database.
- */
-export async function runRows<Row>(
-	rows: Iterable<Row> | AsyncIterable<Row>,
-	processRow: (row: Row) => Promise<void>,
-	onAllRowsDispatched: () => Promise<void> = async () => {},
-	isSkippable: (err: unknown) => boolean = () => false
-): Promise<ImportRowCounts> {
-	let totalRecords = 0;
-	let successfulRecords = 0;
-	let failedRecords = 0;
-	let skippedRecords = 0;
-	// Settled rows are nulled out rather than left in place, so a large import
-	// doesn't retain every resolved promise until the end.
-	const pendingRows: (Promise<void> | null)[] = [];
-
-	for await (const row of rows) {
-		const rowIndex = totalRecords;
-		totalRecords++;
-		// The counting handlers are attached at dispatch time, so a row that
-		// rejects can never surface as an unhandled rejection even if
-		// `onAllRowsDispatched` throws before the `Promise.all` below is reached.
-		pendingRows[rowIndex] = processRow(row)
-			.then(
-				() => {
-					successfulRecords++;
-				},
-				(err) => {
-					if (isSkippable(err)) {
-						skippedRecords++;
-						console.log(
-							`Skipping row ${rowIndex + 1}: casualties to unringed birds are not yet supported in totf`
-						);
-					} else {
-						console.log(err);
-						failedRecords++;
-					}
-				}
-			)
-			.then(() => {
-				pendingRows[rowIndex] = null;
-			});
-	}
-
-	await onAllRowsDispatched();
-
-	await Promise.all(pendingRows.filter((p) => Boolean(p)));
-
-	return { totalRecords, successfulRecords, failedRecords, skippedRecords };
-}
-
-export interface RunImportOptions {
-	rows: DemonRow[];
-	ringingGroupId: number;
-	/** For error/log messages only — never used to look the group up. */
-	ringingGroupName: string;
-	concurrency?: number;
-	/**
-	 * Merged onto the `{importJobId, ringingGroupId}` base
-	 * `dispatchStatsCacheRefreshEvents` always logs with, so a dispatch-failure
-	 * log line stays identifiable per caller (the CLI's `csvFilePath`, the
-	 * regenerate script's own context, etc). Also used verbatim in the
-	 * "locations not recognised" error message below.
-	 */
-	logContext: Record<string, unknown>;
-}
-
-/**
- * Runs the whole import pipeline — location pre-flight, `ImportJobs`
- * tracking, both batch writers, row processing, stats-cache-refresh dispatch
- * — over an already-materialized array of `DemonRow`s. Shared by `importCSV`
- * (rows read from a CSV file) and `regenerateImport`
- * (`supabase/scripts/regenerate-import.ts`, #1185 — rows re-read from already
- * staged `DemonRecords`), neither of which differs from here on: both have
- * already resolved `ringingGroupId` and materialized their rows by the time
- * they call this.
- */
-export async function runImport(options: RunImportOptions): Promise<void> {
-	const {
-		rows,
-		ringingGroupId,
-		ringingGroupName,
-		concurrency = DEFAULT_IMPORT_CONCURRENCY,
-		logContext
-	} = options;
-
-	const groupSupabaseClient =
-		await getAuthenticatedSupabaseClientForGroup(ringingGroupId);
-
-	const importJobTracker = new ImportJobTracker(groupSupabaseClient);
-
-	// A `loc_id` the group has no Location for is far more often a renamed site
-	// than a genuinely new one (#1048), and importing it would fork the Locations
-	// row and duplicate every encounter under it. Abort before the first write,
-	// so the whole import is a no-op and a plain re-run is safe once the name has
-	// been resolved.
-	const unrecognisedLocations = await findUnrecognisedLocationNames(
-		groupSupabaseClient,
-		getDistinctLocationNames(rows),
-		ringingGroupId
-	);
-	if (unrecognisedLocations.length > 0) {
-		console.error(
-			`Error: these locations are not recognised for ringing group "${ringingGroupName}": ${unrecognisedLocations.join(', ')}. No rows were imported. If a site was renamed, rename its existing Location to match before importing; if it is genuinely new, create it first.`
-		);
-		process.exit(1);
-	}
-
-	// Opened only once the pre-flight above has passed, so an aborted import stays
-	// the complete no-op #1079 made it — rather than leaving an orphan
-	// `in_progress` row behind for a run that never wrote anything.
-	const importJobId = await importJobTracker.createImportJob(ringingGroupId);
-
-	// Every row is staged into DemonRecords before it is interpreted into the
-	// domain tables (#959), batched so the per-row concurrency above survives.
-	const demonRecordsBatchWriter = new DemonRecordsBatchWriter(
-		groupSupabaseClient,
-		{ importJobId, ringingGroupId }
-	);
-	// The domain-table write is chunked too (#1139): rows are buffered and each
-	// entity type written by one bulk upsert per chunk, with the limiter above now
-	// capping concurrent chunk flushes.
-	const encounterRowBatchWriter = new EncounterRowBatchWriter(
-		groupSupabaseClient,
-		{
-			ringingGroupId,
-			importJobId,
-			lookupRingSequence: createRingSequenceLookup(groupSupabaseClient),
-			linkRingSequence: createRingSequenceLinker(groupSupabaseClient),
-			limitChunkFlush: createRowLimiter(concurrency)
-		}
-	);
-
-	let rowCounts: ImportRowCounts;
-	try {
-		rowCounts = await runRows(
-			rows,
-			(row) =>
-				processEncounterRow(
-					row,
-					demonRecordsBatchWriter,
-					encounterRowBatchWriter
-				),
-			async () => {
-				await demonRecordsBatchWriter.flushRemaining();
-				// Recorded once every staging batch has landed, and before the
-				// still-pending domain-table writes are awaited: `affected_dates`
-				// describes what is durably staged, independent of how the
-				// domain-table import then goes.
-				await importJobTracker.recordAffectedDates(
-					importJobId,
-					demonRecordsBatchWriter.getDistinctDates()
-				);
-				// Flushed here for the same reason: a row's promise is what settles
-				// when its chunk lands, so `runRows`' own `Promise.all` over the rows
-				// would deadlock on the trailing chunk if it ran first.
-				await encounterRowBatchWriter.flushRemaining();
-			},
-			(err) => err instanceof CasualtyEncounterError
-		);
-	} catch (error) {
-		// `runRows` absorbs per-row failures into its `failedRecords`
-		// count, so anything thrown here is systemic. Record it against the job and
-		// re-raise the original error — never let the bookkeeping write mask it.
-		try {
-			await importJobTracker.failImportJob(
-				importJobId,
-				error instanceof Error ? error.message : String(error)
-			);
-		} catch (failureRecordingError) {
-			console.error(
-				`Failed to mark ImportJobs row ${importJobId} as failed`,
-				{ ringingGroupName, ringingGroupId, ...logContext },
-				failureRecordingError
-			);
-		}
-		throw error;
-	}
-
-	const { totalRecords, successfulRecords, failedRecords, skippedRecords } =
-		rowCounts;
-	await importJobTracker.completeImportJob(importJobId, {
-		processed: totalRecords,
-		successful: successfulRecords,
-		failed: failedRecords,
-		skipped: skippedRecords
-	});
-
-	await dispatchStatsCacheRefreshEvents(
-		importJobId,
-		ringingGroupId,
-		demonRecordsBatchWriter.getDistinctDates(),
-		encounterRowBatchWriter.getDistinctSpeciesIds(),
-		{ ringingGroupName, ...logContext }
-	);
-
-	console.log('\n✓ Import completed');
-	console.log(`Total records: ${totalRecords}`);
-	console.log(`Successful: ${successfulRecords}`);
-	console.log(`Failed: ${failedRecords}`);
-	console.log(`Skipped: ${skippedRecords}`);
 }
 
 export async function importCSV(options: ImportOptions): Promise<void> {
@@ -344,24 +71,45 @@ export async function importCSV(options: ImportOptions): Promise<void> {
 	const ringingGroupId: number = ringingGroupData.id;
 
 	// The whole CSV is buffered rather than streamed straight into row
-	// processing, because `runImport`'s location pre-flight has to see every
-	// row's `loc_id` before the first row is written. `runRows` still accepts a
-	// stream for other callers; an array just dispatches every row up front,
-	// which caps concurrency exactly as before via the limiter inside each row's
-	// domain-table write (and so keeps `concurrency: 1` seeding deterministic).
+	// processing, because the location pre-flight has to see every row's
+	// `loc_id` before the first row is written.
 	const rowStream = fs.createReadStream(csvFilePath).pipe(csvParser());
 	const rows: DemonRow[] = [];
 	for await (const row of rowStream) {
 		rows.push(row as DemonRow);
 	}
 
-	await runImport({
-		rows,
+	const groupSupabaseClient =
+		await getAuthenticatedSupabaseClientForGroup(ringingGroupId);
+
+	for await (const update of runDemonImport({
+		supabaseClient: groupSupabaseClient,
 		ringingGroupId,
-		ringingGroupName,
+		source: rows,
 		concurrency,
-		logContext: { csvFilePath }
-	});
+		logContext: { csvFilePath, ringingGroupName }
+	})) {
+		switch (update.type) {
+			case 'progress':
+				break;
+			case 'unrecognised_locations':
+				console.error(
+					`Error: these locations are not recognised for ringing group "${ringingGroupName}": ${update.locations.join(', ')}. No rows were imported. If a site was renamed, rename its existing Location to match before importing; if it is genuinely new, create it first.`
+				);
+				process.exit(1);
+			case 'timeout':
+				break;
+			case 'error':
+				throw new Error(update.message);
+			case 'complete':
+				console.log('\n✓ Import completed');
+				console.log(`Total records: ${update.processed}`);
+				console.log(`Successful: ${update.successful}`);
+				console.log(`Failed: ${update.failed}`);
+				console.log(`Skipped: ${update.skipped}`);
+				break;
+		}
+	}
 }
 
 // Main execution — only when run directly (npm run db:import:{local|prod}),
