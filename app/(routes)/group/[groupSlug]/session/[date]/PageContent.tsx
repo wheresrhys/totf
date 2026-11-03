@@ -157,7 +157,7 @@ export function SessionPageContent({
 	const speciesList = groupBySpecies(dayData.encounters);
 	// Mist-netting vs Other catches (#1022): anything else non-resighting
 	// (already excluded by this page's own fetch, see
-	// RESIGHTING_RECORD_TYPES_FILTER_LIST in page.tsx) that isn't mist-netted
+	// .eq('is_resighting', false) in page.tsx) that isn't mist-netted
 	// — see isMistNetEncounter — counts as an "other catch": hand-caught, box
 	// trap, etc.
 	const mistNetSpeciesList = groupBySpecies(

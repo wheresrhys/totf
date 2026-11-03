@@ -127,10 +127,11 @@ type by adding `NOT e.is_resighting` to its `LEFT JOIN ... ON` clause rather tha
 bird whose only encounters are resightings still surfaces as a NULL-`encounter_id` row instead of
 disappearing from the result entirely. `Encounters.is_resighting` is a stored generated column
 (`Encounters.sql`) computing `record_type = ANY (ARRAY['U','F','D'])` — a hardcoded literal kept in
-sync **by hand** with `public.resighting_record_type` (and, until removed, `modules/demon-import`'s
-`RESIGHTING_RECORD_TYPES` constant) if either ever changes, the same convention as the age-bucket
-definitions above. It can't be derived from the enum directly: `GENERATED ALWAYS AS (...) STORED`
-requires an IMMUTABLE expression, and `enum_range()` is only STABLE.
+sync **by hand** with `public.resighting_record_type` if either ever changes, the same convention
+as the age-bucket definitions above. It can't be derived from the enum directly: `GENERATED ALWAYS
+AS (...) STORED` requires an IMMUTABLE expression, and `enum_range()` is only STABLE.
+`modules/demon-import`'s `RESIGHTING_RECORD_TYPES` constant used to be a third hand-synced mirror
+of the same U/F/D set; it's gone (#1333/#1334) now every consumer reads `is_resighting` directly.
 
 **That record_type filter is now the ONLY thing deciding what is "real" data in any stats RPC
 (#1021, completed by #1024).** `stats_spine`'s `session_date_range` used to exclude

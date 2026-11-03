@@ -49,11 +49,7 @@ describe('sessions page', () => {
 		await screen.findByRole('heading', { level: 1 });
 		const chain = client.from.mock.results[0].value;
 		// FIELD_OBSERVATION-equivalent: a resighting/recovery record_type.
-		expect(chain.not).toHaveBeenCalledWith(
-			'qualifying.record_type',
-			'in',
-			'(U,F,D)'
-		);
+		expect(chain.eq).toHaveBeenCalledWith('qualifying.is_resighting', false);
 		// PULLI-equivalent: a pullus-age, non-juvenile capture.
 		expect(chain.or).toHaveBeenCalledWith('age_code.neq.1,is_juv.eq.true', {
 			referencedTable: 'qualifying'
