@@ -1,6 +1,6 @@
 // Shared vocabulary for the `{year, month, fromDate, toDate}` temporal filter
 // (#1051). `TemporalFilterControls`
-// (`app/components/shared/TemporalFilterControls.tsx`) is the UI over it; the
+// (`modules/ui-kit/lib/TemporalFilterControls.tsx`) is the UI over it; the
 // pure derivation below lives here so later data-layer work (RPC params, a
 // Supabase query wrapper) can reuse the same type and intersection rule rather
 // than re-deriving it.

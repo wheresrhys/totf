@@ -363,7 +363,7 @@ export async function fetchSpeciesPeriodTotals(
 // The single shared `params` shape for the species page's 6 `TabSet`-managed
 // totals tabs (#1065 landed the first 3; #1066 appended the remaining 3) —
 // `TabSet` forces one `ParamsType` across every tab in its array
-// (app/components/shared/TabSet.tsx; a per-tab `ParamsType` was requested on
+// (modules/ui-kit/lib/TabSet.tsx; a per-tab `ParamsType` was requested on
 // #1058's PR review but never implemented), so this is a superset of
 // whatever each dataFetcher below actually reads: `year` matters to
 // `fetchMonthTotalsTabData`/`SpMonthTotalsTab` and the Highlights

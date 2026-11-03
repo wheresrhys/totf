@@ -4,7 +4,7 @@
 @import 'flyonui/variants.css';
 @source "./node_modules/flyonui/flyonui.js";
 
-/* `columnBlock` (app/components/shared/StatsTableColumnConfigs.tsx) composes
+/* `columnBlock` (modules/ui-kit/lib/StatsTableColumnConfigs.tsx) composes
    `bg-<color>-50 dark:bg-<color>-950` from a base colour name at runtime, so
    the concrete class names never appear as literal text anywhere in the
    source for Tailwind's file scanner to pick up. `@source inline(...)`
