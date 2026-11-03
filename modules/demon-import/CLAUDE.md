@@ -20,11 +20,30 @@ A row travels three stages, in this order:
 2. **Domain-table writes** (`lib/encounter-batch-writer.ts`) — `EncounterRowBatchWriter`
    interprets a chunk of rows into Species, Birds, Locations, Sessions and Encounters with one
    multi-row upsert per entity type in FK dependency order (#1139), then reconciles duplicate
-   Encounters once at the end of the run (#1219).
+   Encounters once at the end of the run (#1219): rows that collide on
+   `encounters_bird_id_location_id_visit_date_unique` — most often the same bird logged twice in
+   one day, a slip of the pen or a bird seen at the start and end of a round — are folded into a
+   single row by ordering the colliding records by `capture_time` ascending and taking the first
+   non-null value per column, so the chronologically first record keeps everything it actually
+   recorded and any blank field is filled in from the later duplicate. Keying the precedence on
+   `capture_time` rather than on arrival order is what makes the rule commutative and associative:
+   a set of duplicates folded pairwise gives the same result whatever order they're folded in,
+   independent of which chunk happened to land first. This is also why `capture_time` has to be
+   written in one canonical form (`normaliseCaptureTime` in `lib/row-validation.ts`) — Postgres
+   hands a `time without time zone` back as `'08:30:00'`, and `'08:30' < '08:30:00'` as strings, so
+   comparing a CSV row's time against one read back out of the database needs both sides
+   normalised the same way.
 3. **Job tracking** (`lib/import-job-tracker.ts`) — `ImportJobTracker` opens the run's
    `ImportJobs` row and drives every later transition on it (#961): affected dates mid-run,
    then one terminal transition, plus one column per temporal unit for the stats-cache refresh
-   outcome (#1154).
+   outcome (#1154). `ImportJobRowCounts` (`types.ts`) names its four fields after the
+   `ImportJobs` columns the web route's `ImportCompleteMessage` already uses one-for-one; the CLI
+   importer's `ImportRowCounts` carries the same four numbers under different names and maps onto
+   this shape at the call site. A skipped (ringless/casualty) row is deliberately not persisted —
+   `completeImportJob` only writes `rows_processed`/`rows_successful`/`rows_failed` — so `skipped`
+   is in-memory for the current run only. `StatsCacheRefreshOutcome` narrows `ImportJobStatus` to
+   just `'succeeded'`/`'failed'`, since a refresh setter should never be asked to write the table's
+   `'in_progress'` default or the unreachable `'timed_out'`.
 
 `lib/process-encounter-row.ts`'s `processEncounterRow` is the join between stages 1 and 2 — it
 awaits a row's staging batch before handing the row to the domain-table writer, which is the point
@@ -98,6 +117,52 @@ it is a single chunked write pipeline whose dedup, id-resolution and reconciliat
 meaningful against each other's state, the same reasoning `modules/stats`'
 `lib/refresh/run-refresh-pass.ts` applies to itself. `buildEncounterInsert`/`naturalKeyOf`/
 `buildDemonRecord` are module-private — exported from neither the barrel nor their own files.
+Chunking forces three correctness requirements, not just an optimisation: entity-type dedup per
+chunk (Postgres rejects a multi-row `ON CONFLICT DO UPDATE` that targets the same key twice), id
+resolution by natural key rather than array position (a multi-row upsert's returned row order
+isn't guaranteed to match the request), and chunk-level failure (a failed bulk upsert fails every
+row buffered in that chunk, the same granularity `DemonRecordsBatchWriter` uses for its own
+batches, #959).
+
+## Design choices
+
+A few decisions here aren't obvious from the code alone:
+
+- **`ImportJobTracker` is a class, not a `create*` factory** like `createRingSequenceLookup`/
+  `createRingSequenceLinker` above. Those each expose one operation; `ImportJobTracker` exposes
+  six variations on the same two-line `.update(...).eq('id', …)` against the same `ImportJobs`
+  table, which a class groups around the shared Supabase client and shared `updateImportJob`
+  plumbing without six copies of either. Every operation is deliberately independent — recording
+  one temporal unit's stats-cache refresh outcome never touches `status`, `affected_dates` or the
+  other four temporal units' columns, and vice versa — because the whole point of the table is
+  that "the rows all imported but the monthly stats never refreshed" has to stay visible rather
+  than collapsing into "import succeeded".
+
+- **`DemonRecordsBatchWriter` batches interleaved with row processing, not as a phase of its
+  own.** A row's own promise resolves as soon as *its* batch lands, not once the whole run is
+  staged, so the import keeps the per-row concurrency it relies on — rows in an earlier batch may
+  well be writing to the domain tables while a later batch is still in flight. This is also why
+  `writeDemonRecord` must never sit behind the run's rate limiter: a batch only fills if every row
+  can reach it promptly, and throttling that means a batch larger than the concurrency cap can
+  never fill. `EncounterRowBatchWriter` is the same shape one level up — its rate limiter wraps
+  each *chunk flush*, never `writeEncounterRow` itself, for the identical reason.
+
+- **`reconcileDuplicateEncounters` runs in plain TypeScript, once, after every chunk has landed —
+  not as a Postgres `ON CONFLICT DO UPDATE`.** During the run, chunk flushes race each other
+  (`concurrency: 30` on the web route), so the stored row for a duplicated key is simply whichever
+  chunk landed last; the reconciliation pass runs only after `flushRemaining` has awaited every
+  chunk, so there's no concurrent writer left to lose an update to and no need for the merge to be
+  atomic with the insert. Duplicates are detected from the Encounters rows themselves — what the
+  run wrote, plus whatever `readStoredEncounters` found already stored for the same key — rather
+  than by re-reading `DemonRecords`: staging is keyed on
+  `(ringing_group_id, ring_no, encounter_date, encounter_time)`, which omits the location that
+  `encounters_bird_id_location_id_visit_date_unique` includes, so a staging-based query would have
+  to re-resolve `bird_id`/`location_id`/`session_id` out of `raw_row` just to tell a real collision
+  from a bird legitimately caught at two sites in one day — the Encounters rows are already keyed
+  on exactly the constraint being reconciled. A failure here is logged and swallowed rather than
+  thrown: every row of the import has already been written, and the worst case is that a
+  duplicated key keeps the last-write-wins row it would have had anyway — failing the whole import
+  job over it would misreport a run that did import everything.
 
 ## Testing
 
