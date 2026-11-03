@@ -485,4 +485,42 @@ describe('stats_cache_basic_session_metrics', () => {
 			expect(cells).toHaveLength(12);
 		});
 	});
+
+	// `core_stats` carries one extra `LEFT JOIN stats_per_species_period agg_sta`
+	// in its final GROUP BY list that this RPC lacks (it only ever fed
+	// commented-out columns there) — every case above exercises a
+	// cache-aligned window (whole year/month/month-squashed, or no window at
+	// all), none of which is the shape that actually round-trips through that
+	// join on the app's one remaining `core_stats`-RPC call site: the
+	// `/species` list page's free-text date inputs, an ungrouped-by-time,
+	// grouped-by-species, arbitrary (non-calendar-aligned) `from_date`/`to_date`
+	// window. This closes that gap before anything relies on the two RPCs
+	// being equivalent for it.
+	describe('arbitrary (non-cache-aligned) date window — the one shape the port had no regression test for', () => {
+		// Alpha's real session dates span 2021-06-20..2024-05-10; this mirrors
+		// the exact shape of the app's own "CES only" arbitrary-window preset
+		// (the until-recently-live one, `${year}-04-25`..`${year}-09-05`) rather
+		// than a synthetic range, and the 2022 slice of Alpha's seed data
+		// catches three real sessions (04-30, 06-15, 08-10) neither a whole
+		// calendar year nor a whole calendar month would isolate.
+		const ARBITRARY_WINDOW = { from_date: '2022-04-25', to_date: '2022-09-05' };
+
+		it("matches core_stats' own basic counts and session/effort metrics for an arbitrary, non-calendar-aligned date range, grouped by species", async () => {
+			await expectColumnsMatchCoreStats(
+				{ ...ARBITRARY_WINDOW, group_by_species: true },
+				[...BASIC_COUNT_COLUMNS, ...SESSION_EFFORT_COLUMNS]
+			);
+		});
+
+		it('produces exactly the same set of species cells as core_stats for that same arbitrary window', async () => {
+			const { coreByCell, cacheByCell } = await callBothKeyedByCell({
+				...ARBITRARY_WINDOW,
+				group_by_species: true
+			});
+			expect([...cacheByCell.keys()].sort()).toEqual(
+				[...coreByCell.keys()].sort()
+			);
+			expect(cacheByCell.size).toBeGreaterThan(0);
+		});
+	});
 });
