@@ -1,4 +1,12 @@
-import type { CoreStatsResult } from '@/app/models/db';
+import type { CoreStatsResult, CoreStatsWithBiometrics } from '@/app/models/db';
+import alphaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/alpha.by-species.json';
+import betaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/beta.by-species.json';
+import gammaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/gamma.by-species.json';
+import alphaSummaryTotalsSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCache/alpha.summary-totals.json';
+import alphaYearlyTotalsSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCache/alpha.yearly-totals.json';
+import alphaMonthlyTotalsSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCache/alpha.monthly-totals.json';
+import alphaHomePageSummarySnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCache/alpha.home-page-summary.json';
+import robinAlphaHeadlineSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/robin-alpha.headline.json';
 
 /**
  * A `CoreStatsResult` row fixture: flat overrides merged over sensible
@@ -121,3 +129,115 @@ export function buildMonthSquashedFixture(
 		});
 	});
 }
+
+/**
+ * Snapshot-backed `CoreStatsResult`/`CoreStatsWithBiometrics` row fixtures,
+ * built from the generated `tables/SimpleStatsCache{,BySpecies}` snapshots
+ * (#1244 — the real current source for every row that used to come from a
+ * live `core_stats` RPC call, which has no remaining app call site). Follows
+ * the same pattern `biometrics-stats-fixtures.ts` already established: the
+ * generator writes the raw, verbatim table row (`Species` embed intact on a
+ * by-species read, per the "no compound fixtures" rule — the join lives
+ * here, not in the generator), and this module resolves it into the shape
+ * production code actually works with.
+ *
+ * Unlike the old `core_stats`-RPC fixtures, a by-species row here already
+ * carries the 8 biometric columns (`SimpleStatsCacheBySpecies` has them on
+ * every row, #1222) — no separate merge against a biometrics fixture is
+ * needed for these exports.
+ */
+
+/**
+ * Resolves a raw `SimpleStatsCacheBySpecies` snapshot row (with its `Species`
+ * embed intact) into a `CoreStatsWithBiometrics` row — the embed's
+ * `species_name` flattened on, matching what `readStatsCacheRows` does for a
+ * real by-species read. The row's extra cache-only columns (`id`, `group_id`,
+ * `species_id`, `temporal_unit`, `created_at`, `updated_at`, and the
+ * demographics-only bucket columns `core_stats_result` never declared) ride
+ * along unread, the same superset `fetchSpeciesStatsCacheRows`' own doc
+ * comment describes for the real read path.
+ */
+function resolveBySpeciesRow(
+	row: { Species: { species_name: string } } & Record<string, unknown>
+): CoreStatsWithBiometrics {
+	const { Species, ...rest } = row;
+	return {
+		...rest,
+		species_name: Species.species_name
+	} as CoreStatsWithBiometrics;
+}
+
+/**
+ * Resolves a raw `SimpleStatsCache` (all-species-combined) snapshot row into
+ * a `CoreStatsResult` — `species_name: null`, matching what the real
+ * all-species read path returns (the table carries no species relationship
+ * to flatten at all).
+ */
+function resolveAllSpeciesRow(row: Record<string, unknown>): CoreStatsResult {
+	// `row`'s only known shape is an index signature, which doesn't carry
+	// enough named properties for a single `as CoreStatsResult` to pass
+	// TypeScript's "sufficient overlap" check — it genuinely has every
+	// CoreStatsResult column at runtime (the raw SimpleStatsCache row), just
+	// not expressible in `row`'s own type.
+	// eslint-disable-next-line no-restricted-syntax -- see comment above
+	return { ...row, species_name: null } as unknown as CoreStatsResult;
+}
+
+/**
+ * Alpha/Beta/Gamma's whole by-species result, one row per species — powers
+ * `fetchSpeciesData`'s cache-aligned windows (the `/species` list page's
+ * default and year-select views).
+ */
+export const ALPHA_CORE_STATS_BY_SPECIES: CoreStatsWithBiometrics[] =
+	alphaBySpeciesSnapshot.map(resolveBySpeciesRow);
+export const BETA_CORE_STATS_BY_SPECIES: CoreStatsWithBiometrics[] =
+	betaBySpeciesSnapshot.map(resolveBySpeciesRow);
+export const GAMMA_CORE_STATS_BY_SPECIES: CoreStatsWithBiometrics[] =
+	gammaBySpeciesSnapshot.map(resolveBySpeciesRow);
+
+/** Alpha's all-time, ungrouped totals row — powers `fetchSummaryStats` called with no date window (the base `/summary` route). */
+export const ALPHA_CORE_STATS_SUMMARY_TOTALS: CoreStatsResult | null =
+	alphaSummaryTotalsSnapshot
+		? resolveAllSpeciesRow(alphaSummaryTotalsSnapshot)
+		: null;
+
+/** Alpha's year-grain totals, one row per year — powers `fetchPayOffStats`'s yearly table/chart. */
+export const ALPHA_CORE_STATS_YEARLY_TOTALS: CoreStatsResult[] =
+	alphaYearlyTotalsSnapshot.map(resolveAllSpeciesRow);
+
+/** Alpha's month-grain totals, one row per month — powers `fetchPayOffStats`'s monthly table/chart. */
+export const ALPHA_CORE_STATS_MONTHLY_TOTALS: CoreStatsResult[] =
+	alphaMonthlyTotalsSnapshot.map(resolveAllSpeciesRow);
+
+/**
+ * Alpha's home-page summary — the all-time cell plus whichever of the
+ * current/previous calendar year cells the seed data actually has (`null`
+ * for a year with no sessions, exactly as `fetchHomePageSummaryStats` itself
+ * returns). Powers `fetchHomePageSummaryStats` (`app/(routes)/page.tsx`).
+ */
+export const ALPHA_HOME_PAGE_SUMMARY_STATS: {
+	allTime: CoreStatsResult | null;
+	thisYear: CoreStatsResult | null;
+	lastYear: CoreStatsResult | null;
+} = {
+	allTime: alphaHomePageSummarySnapshot.allTime
+		? resolveAllSpeciesRow(alphaHomePageSummarySnapshot.allTime)
+		: null,
+	thisYear: alphaHomePageSummarySnapshot.thisYear
+		? resolveAllSpeciesRow(alphaHomePageSummarySnapshot.thisYear)
+		: null,
+	lastYear: alphaHomePageSummarySnapshot.lastYear
+		? resolveAllSpeciesRow(alphaHomePageSummarySnapshot.lastYear)
+		: null
+};
+
+/**
+ * The Robin/Alpha *headline* row — a single aggregate over every Robin
+ * encounter at the all-time grain, already carrying its own biometric
+ * columns (unlike `biometrics-stats-fixtures.ts`'s
+ * `ROBIN_ALPHA_BIOMETRICS_HEADLINE`, which exists for the one call site that
+ * still fetches the two halves separately — see `species-stats.ts`). Powers
+ * the species detail page's headline stats (#1222).
+ */
+export const ROBIN_ALPHA_HEADLINE: CoreStatsWithBiometrics =
+	resolveBySpeciesRow(robinAlphaHeadlineSnapshot[0]);

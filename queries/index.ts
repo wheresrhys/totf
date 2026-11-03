@@ -8,6 +8,12 @@ export { arretrapEncountersQuery } from './Encounters/arretrap-encounters';
 export { topSpeciesQuery } from './Species/top-species';
 export { pageOfBirdsQuery, buildPageOfBirdsSelect } from './Birds/page-of-birds';
 export { birdDetailQuery } from './Birds/bird-detail';
+export { simpleStatsCacheSummaryTotalsQuery } from './SimpleStatsCache/summary-totals';
+export { simpleStatsCacheYearlyTotalsQuery } from './SimpleStatsCache/yearly-totals';
+export { simpleStatsCacheMonthlyTotalsQuery } from './SimpleStatsCache/monthly-totals';
+export { simpleStatsCacheHomePageSummaryQuery } from './SimpleStatsCache/home-page-summary';
+export { simpleStatsCacheBySpeciesByQuery } from './SimpleStatsCacheBySpecies/by-species';
+export { simpleStatsCacheBySpeciesHeadlineQuery } from './SimpleStatsCacheBySpecies/headline';
 
 import { allSessionsQuery } from './Sessions/all-sessions';
 import { recentSessionsQuery } from './Sessions/recent-sessions';
@@ -17,6 +23,12 @@ import { arretrapEncountersQuery } from './Encounters/arretrap-encounters';
 import { topSpeciesQuery } from './Species/top-species';
 import { pageOfBirdsQuery } from './Birds/page-of-birds';
 import { birdDetailQuery } from './Birds/bird-detail';
+import { simpleStatsCacheSummaryTotalsQuery } from './SimpleStatsCache/summary-totals';
+import { simpleStatsCacheYearlyTotalsQuery } from './SimpleStatsCache/yearly-totals';
+import { simpleStatsCacheMonthlyTotalsQuery } from './SimpleStatsCache/monthly-totals';
+import { simpleStatsCacheHomePageSummaryQuery } from './SimpleStatsCache/home-page-summary';
+import { simpleStatsCacheBySpeciesByQuery } from './SimpleStatsCacheBySpecies/by-species';
+import { simpleStatsCacheBySpeciesHeadlineQuery } from './SimpleStatsCacheBySpecies/headline';
 import type { TableQueryDefinition } from './types';
 
 /**
@@ -33,5 +45,11 @@ export const TABLE_QUERIES: readonly TableQueryDefinition[] = [
 	arretrapEncountersQuery,
 	topSpeciesQuery,
 	pageOfBirdsQuery,
-	birdDetailQuery
+	birdDetailQuery,
+	simpleStatsCacheSummaryTotalsQuery,
+	simpleStatsCacheYearlyTotalsQuery,
+	simpleStatsCacheMonthlyTotalsQuery,
+	simpleStatsCacheHomePageSummaryQuery,
+	simpleStatsCacheBySpeciesByQuery,
+	simpleStatsCacheBySpeciesHeadlineQuery
 ];

@@ -82,21 +82,16 @@
  * additive: nothing reads these three yet, that's a separate, dependent
  * ticket.
  *
- * `core_stats-removal/0` dropped `core_stats/beta.monthly-totals.json` and
- * `core_stats/beta.yearly-totals.json` — both fully unconsumed orphans
- * (confirmed by grep: nothing outside this file's own inventory referenced
- * either), matching the #894 precedent above rather than anything to do with
- * the RPC's eventual removal.
+ * `core-stats-removal/4a` migrated every `core_stats/*` fixture onto its real
+ * current source (#1244 — that RPC has no remaining app call site) rather
+ * than deleting them: `tables/SimpleStatsCacheBySpecies/` for the
+ * by-species/headline fixtures, `tables/SimpleStatsCache/` for the
+ * ungrouped/time-grouped ones. Two of the ten — `beta.monthly-totals.json`/
+ * `beta.yearly-totals.json` — were dropped outright rather than migrated,
+ * confirmed fully unconsumed by any test (the same `#894` orphan rule
+ * above), bringing the total from 27 to 25.
  */
 export const GENERATED_SNAPSHOT_FIXTURES = [
-	'core_stats/alpha.by-species.json',
-	'core_stats/alpha.home-page-summary.json',
-	'core_stats/alpha.monthly-totals.json',
-	'core_stats/alpha.summary-totals.json',
-	'core_stats/alpha.yearly-totals.json',
-	'core_stats/beta.by-species.json',
-	'core_stats/gamma.by-species.json',
-	'core_stats/robin-alpha.headline.json',
 	'demographics_stats/robin-alpha.monthly-history.json',
 	'find_discrepencies/alpha.discrepancies.json',
 	'notable_retraps/alpha.retraps.json',
@@ -113,7 +108,15 @@ export const GENERATED_SNAPSHOT_FIXTURES = [
 	'tables/Sessions/alpha.all-sessions.json',
 	'tables/Sessions/alpha.recent-sessions.json',
 	'tables/Sessions/beta.all-sessions.json',
-	'tables/Species/alpha.top-species.json'
+	'tables/Species/alpha.top-species.json',
+	'tables/SimpleStatsCache/alpha.home-page-summary.json',
+	'tables/SimpleStatsCache/alpha.monthly-totals.json',
+	'tables/SimpleStatsCache/alpha.summary-totals.json',
+	'tables/SimpleStatsCache/alpha.yearly-totals.json',
+	'tables/SimpleStatsCacheBySpecies/alpha.by-species.json',
+	'tables/SimpleStatsCacheBySpecies/beta.by-species.json',
+	'tables/SimpleStatsCacheBySpecies/gamma.by-species.json',
+	'tables/SimpleStatsCacheBySpecies/robin-alpha.headline.json'
 ] as const;
 
 /**

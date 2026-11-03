@@ -1,18 +1,14 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { SpeciesTotalsTable } from '../SpeciesTotalsTable';
-import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
+import { ALPHA_CORE_STATS_BY_SPECIES } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { CoreStatsResult } from '@/app/models/db';
 import {
 	getCellByHeading,
 	getCellTextByHeading
 } from '@/app/__tests__/helpers/table';
 
-// This fixture is grouped by species only, so time_period is genuinely null —
-// CoreStatsResult's NonNullable mapped type (app/models/db.ts) assumes every
-// column is always present, so a direct assertion doesn't compile (#895).
-// eslint-disable-next-line no-restricted-syntax -- see comment above
-const speciesStats = speciesDataSnapshot as unknown as CoreStatsResult[];
+const speciesStats = ALPHA_CORE_STATS_BY_SPECIES;
 
 // The real header <th>s live in the `<thead>` row without a `data-testid` —
 // `above-header-row` (the "Aggregate by" toggle row) and `totals-row` are

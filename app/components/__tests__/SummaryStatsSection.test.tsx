@@ -1,16 +1,18 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { SummaryStatsSection } from '../SummaryStatsSection';
-import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
+import { ALPHA_CORE_STATS_SUMMARY_TOTALS } from '@/app/__tests__/helpers/core-stats-fixtures';
 import zeroStats from '@/test-fixtures/snapshots/synthetic/zero.summary-totals.json';
 import type { CoreStatsResult } from '@/app/models/db';
 
-// Both are ungrouped core_stats fixtures, so species_name/time_period are
-// genuinely null — CoreStatsResult's NonNullable mapped type
+// Alpha's seed data always has an all-time cell, so this is never actually
+// null — the type is nullable only because the real all-time read can
+// legitimately return none for a group with no data at all.
+const populatedStats = ALPHA_CORE_STATS_SUMMARY_TOTALS!;
+// This hand-authored synthetic fixture is ungrouped, so species_name/
+// time_period are genuinely null — CoreStatsResult's NonNullable mapped type
 // (app/models/db.ts) assumes every column is always present, so a direct
 // assertion doesn't compile (#895).
-// eslint-disable-next-line no-restricted-syntax -- see comment above
-const populatedStats = alphaStats as unknown as CoreStatsResult;
 // eslint-disable-next-line no-restricted-syntax -- see comment above
 const zeroActivityStats = zeroStats as unknown as CoreStatsResult;
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, within } from '@testing-library/react';
 import HomePage, { fetchHomePageSummaryStats } from '../page';
 import recentSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/alpha.recent-sessions.json';
-import summaryStatsSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.home-page-summary.json';
+import { ALPHA_HOME_PAGE_SUMMARY_STATS as summaryStatsSnapshot } from '@/app/__tests__/helpers/core-stats-fixtures';
 import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/synthetic/zero.home-page-summary.json';
 import type { HomePageSummaryStats } from '../PageContent';
 import type { CoreStatsResult, GroupTicksResult } from '@/app/models/db';
@@ -34,9 +34,9 @@ const START_OF_LAST_YEAR = `${CURRENT_YEAR - 1}-01-01`;
 // one collaborator, #1236) at `stats`: the all-time grain resolves to a
 // single-row read, and the year grain resolves to every year row the group
 // has, tagged with the real `time_period` fetchHomePageSummaryStats matches
-// against, regardless of whatever `time_period` the source fixture carried
-// (the legacy core_stats-RPC fixtures below predate the cache tables and
-// carry `time_period: null`).
+// against — a `thisYear`/`lastYear` row's own `time_period` doesn't matter
+// here, since in production it's a real cache cell's own date that always
+// already equals the year it's keyed under.
 function mockSummaryStats(stats: HomePageSummaryStats | null) {
 	mockReadStatsCacheRows.mockImplementation(async ({ temporalUnit }) => {
 		if (stats == null) {
@@ -59,13 +59,7 @@ function mockSummaryStats(stats: HomePageSummaryStats | null) {
 	});
 }
 
-const defaultSummaryStats =
-	// This is an ungrouped core_stats fixture, so species_name/time_period
-	// are genuinely null; HomePageSummaryStats' NonNullable mapped type
-	// (app/models/db.ts) assumes every column is always present, so a
-	// direct assertion doesn't compile (#895).
-	// eslint-disable-next-line no-restricted-syntax -- see comment above
-	summaryStatsSnapshot as unknown as HomePageSummaryStats;
+const defaultSummaryStats: HomePageSummaryStats = summaryStatsSnapshot;
 
 function makeChainClient(
 	overrides: {
@@ -217,7 +211,7 @@ describe('home page', () => {
 	describe('summary stats table', () => {
 		const summaryStatsRows: {
 			label: string;
-			field: keyof typeof summaryStatsSnapshot.allTime;
+			field: keyof CoreStatsResult;
 		}[] = [
 			{ label: 'Sessions', field: 'session_count' },
 			{ label: 'Birds', field: 'bird_count' },
@@ -250,9 +244,35 @@ describe('home page', () => {
 		});
 
 		it('renders a row per metric with values from core_stats for each period', async () => {
+			// Alpha's seed data has no session in the real current/last calendar
+			// year, so the default fixture's thisYear/lastYear are genuinely
+			// null (matching production: a yearless year has no cache row at
+			// all, never a zero-filled one) — this test needs all three periods
+			// actually populated with distinguishable values to verify each
+			// column reads from the right one, so it builds its own scaled-up
+			// variants of the real all-time row rather than relying on
+			// coincidental seed-data timing.
+			const allTime = summaryStatsSnapshot.allTime!;
+			const thisYear = {
+				...allTime,
+				session_count: allTime.session_count * 2,
+				bird_count: allTime.bird_count * 2,
+				new_bird_count: allTime.new_bird_count * 2,
+				encounter_count: allTime.encounter_count * 2,
+				species_count: allTime.species_count * 2
+			};
+			const lastYear = {
+				...allTime,
+				session_count: allTime.session_count * 3,
+				bird_count: allTime.bird_count * 3,
+				new_bird_count: allTime.new_bird_count * 3,
+				encounter_count: allTime.encounter_count * 3,
+				species_count: allTime.species_count * 3
+			};
+			mockSummaryStats({ allTime, thisYear, lastYear });
+
 			render(await HomePage());
 			const table = await screen.findByTestId('summary-stats-table');
-			const { allTime, thisYear, lastYear } = summaryStatsSnapshot;
 			summaryStatsRows.forEach(({ label, field }) => {
 				const row = getRow(table, label);
 				const cells = within(row)
@@ -303,14 +323,10 @@ describe('home page', () => {
 
 		describe('with only all-time data (this-year and last-year missing)', () => {
 			it('renders a dash for the missing periods and values for all time', async () => {
-				mockSummaryStats({
-					// species_name/time_period are genuinely null on this ungrouped
-					// core_stats fixture (#895, see comment above defaultSummaryStats).
-					// eslint-disable-next-line no-restricted-syntax -- see comment above
-					allTime: summaryStatsSnapshot.allTime as unknown as CoreStatsResult,
-					thisYear: null,
-					lastYear: null
-				});
+				// Alpha's seed data genuinely has no session in the real
+				// current/last calendar year, so the shared default fixture
+				// (set up in the outer beforeEach) already is this exact
+				// scenario — no override needed.
 				render(await HomePage());
 				const table = await screen.findByTestId('summary-stats-table');
 				const row = getRow(table, 'Sessions');
@@ -320,7 +336,7 @@ describe('home page', () => {
 				expect(cells).toEqual([
 					'–',
 					'–',
-					String(summaryStatsSnapshot.allTime.session_count)
+					String(summaryStatsSnapshot.allTime!.session_count)
 				]);
 			});
 		});

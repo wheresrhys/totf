@@ -11,13 +11,16 @@
  * fixture per source and let the consuming test perform the same join the
  * action does, with the same helper.
  *
- * Reads Alpha/Beta/Gamma group data and writes 27 JSON files under
+ * Reads Alpha/Beta/Gamma group data and writes 25 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
- * the RPC name for RPC-backed fixtures (`core_stats/`,
- * `demographics_stats/`, `find_discrepencies/`, `notable_retraps/`,
- * `ring_sequence_controls/`, `stats_cache_biometrics_metrics/`) and
- * `tables/<TableName>/`
- * for fixtures produced by a direct PostgREST table query. The comment above
+ * the RPC name for RPC-backed fixtures (`demographics_stats/`,
+ * `find_discrepencies/`, `notable_retraps/`, `ring_sequence_controls/`,
+ * `stats_cache_biometrics_metrics/`) and `tables/<TableName>/`
+ * for fixtures produced by a direct PostgREST table query — including
+ * `tables/SimpleStatsCache/` and `tables/SimpleStatsCacheBySpecies/`, the
+ * real current source for every fixture that used to come from a live
+ * `core_stats` RPC call (#1244 — that RPC has no remaining app call site).
+ * The comment above
  * each block below names both the RPC/table and the consuming action(s) — keep
  * this in sync when a call site's underlying RPC/table changes, so a fixture's
  * location never silently drifts from what it actually tests (see #870, #882).
@@ -47,7 +50,13 @@ import {
 	topSpeciesQuery,
 	pageOfBirdsQuery,
 	birdDetailQuery,
-	arretrapEncountersQuery
+	arretrapEncountersQuery,
+	simpleStatsCacheSummaryTotalsQuery,
+	simpleStatsCacheYearlyTotalsQuery,
+	simpleStatsCacheMonthlyTotalsQuery,
+	simpleStatsCacheHomePageSummaryQuery,
+	simpleStatsCacheBySpeciesByQuery,
+	simpleStatsCacheBySpeciesHeadlineQuery
 } from '../../queries';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,6 +75,64 @@ async function getGroupId(name: string): Promise<number> {
 	return data.id;
 }
 
+type GroupSupabaseClient = Awaited<
+	ReturnType<typeof getAuthenticatedSupabaseClientForGroup>
+>;
+
+/**
+ * A raw `SimpleStatsCache`/`SimpleStatsCacheBySpecies` read, mirroring the
+ * real app read path (`readStatsCacheRows`, `modules/stats/lib/stats-cache.ts`)
+ * exactly — same table choice, same embed shape, same filters, same
+ * ordering — but deliberately NOT calling that function: it flattens
+ * `species_name` off the `Species` embed and strips the embed itself, and
+ * per this file's own "no compound fixtures" rule a fixture must be the
+ * verbatim response of one query. Keeping the raw embedded `Species` object
+ * intact here means a consuming test can do that same flattening itself
+ * (`app/__tests__/helpers/core-stats-fixtures.ts`), the same way the species
+ * page's own production code does. `select` comes from the matching
+ * `queries/SimpleStatsCache{,BySpecies}/` definition, per this file's own
+ * "every select string comes from a named query definition" rule.
+ */
+async function readRawStatsCacheRows({
+	client,
+	groupId,
+	bySpecies,
+	select,
+	speciesName,
+	temporalUnit,
+	timePeriod
+}: {
+	client: GroupSupabaseClient;
+	groupId: number;
+	bySpecies: boolean;
+	select: string;
+	speciesName?: string;
+	temporalUnit: StatsTemporalUnit;
+	timePeriod?: string;
+}) {
+	const tableName = bySpecies
+		? 'SimpleStatsCacheBySpecies'
+		: 'SimpleStatsCache';
+
+	let filtered = client
+		.from(tableName)
+		.select(select)
+		.eq('group_id', groupId)
+		.eq('temporal_unit', temporalUnit);
+	if (speciesName) {
+		filtered = filtered.eq('Species.species_name', speciesName);
+	}
+	if (timePeriod) {
+		filtered = filtered.eq('time_period', timePeriod);
+	}
+	const ordered = bySpecies
+		? filtered.order('time_period').order('Species(species_name)')
+		: filtered.order('time_period');
+
+	const { data } = await ordered;
+	return data ?? [];
+}
+
 export async function generateSnapshots(
 	alphaId: number,
 	betaId: number,
@@ -76,7 +143,7 @@ export async function generateSnapshots(
 	outputDir: string = SNAPSHOTS_DIR
 ) {
 	// `relativePath` is a source-directory-relative path, e.g.
-	// `core_stats/alpha.by-species.json` or
+	// `demographics_stats/robin-alpha.monthly-history.json` or
 	// `tables/Birds/arretrap.bird.json`.
 	const writeSnapshot = async (relativePath: string, data: unknown) => {
 		const target = path.join(outputDir, relativePath);
@@ -91,18 +158,27 @@ export async function generateSnapshots(
 	const beta = await getAuthenticatedSupabaseClientForGroup(betaId);
 	const gamma = await getAuthenticatedSupabaseClientForGroup(gammaId);
 
-	// RPC: core_stats (group_by_species) — powers fetchSpeciesData
-	// (app/actions/spp-data.ts)
+	// Table: SimpleStatsCacheBySpecies (all-time grain, every species) —
+	// powers fetchSpeciesData (app/actions/spp-data.ts)'s cache-aligned
+	// windows (the page's default and year-select views). Raw embed intact
+	// (see readRawStatsCacheRows' own comment) — core-stats-fixtures.ts does
+	// the species_name flattening a consuming test needs.
 	for (const [name, client, gId] of [
 		['alpha', alpha, alphaId],
 		['beta', beta, betaId],
 		['gamma', gamma, gammaId]
 	] as const) {
-		const { data } = await client.rpc('core_stats', {
-			ringing_group_filter: gId,
-			group_by_species: true
+		const data = await readRawStatsCacheRows({
+			client,
+			groupId: gId,
+			bySpecies: true,
+			select: simpleStatsCacheBySpeciesByQuery.select,
+			temporalUnit: 'all-time'
 		});
-		await writeSnapshot(`core_stats/${name}.by-species.json`, data ?? []);
+		await writeSnapshot(
+			`tables/SimpleStatsCacheBySpecies/${name}.by-species.json`,
+			data
+		);
 	}
 
 	// RPC: stats_cache_biometrics_metrics (group_by_species) — part of
@@ -126,41 +202,59 @@ export async function generateSnapshots(
 		);
 	}
 
-	// RPC: core_stats (ungrouped, no time period, no date range) — powers
-	// fetchSummaryStats (app/actions/summary-stats.ts) called with no
-	// fromDate/toDate, i.e. the base /summary route's all-time totals.
+	// Table: SimpleStatsCache (all-time grain) — powers fetchSummaryStats
+	// (app/actions/summary-stats.ts) called with no fromDate/toDate, i.e. the
+	// base /summary route's all-time totals. A single row (or none), matching
+	// what the old ungrouped core_stats call returned as its one array
+	// element.
 	{
-		const { data } = await alpha.rpc('core_stats', {
-			ringing_group_filter: alphaId
+		const data = await readRawStatsCacheRows({
+			client: alpha,
+			groupId: alphaId,
+			bySpecies: false,
+			select: simpleStatsCacheSummaryTotalsQuery.select,
+			temporalUnit: 'all-time'
 		});
 		await writeSnapshot(
-			`core_stats/alpha.summary-totals.json`,
-			data?.[0] ?? null
+			`tables/SimpleStatsCache/alpha.summary-totals.json`,
+			data[0] ?? null
 		);
 	}
 
-	// RPC: core_stats (yearly, ungrouped by species) — powers fetchPayOffStats
-	// (app/actions/pay-off-stats.ts). Alpha only — the beta.yearly-totals.json
-	// counterpart was a fully unconsumed orphan (confirmed by grep), removed
-	// alongside beta.monthly-totals.json below.
+	// Table: SimpleStatsCache (year grain, every year) — powers
+	// fetchPayOffStats (app/actions/pay-off-stats.ts)'s yearly table/chart.
+	// Alpha only — the beta.yearly-totals.json counterpart was a fully
+	// unconsumed orphan (confirmed by grep), dropped here rather than
+	// migrated.
 	{
-		const { data: yearly } = await alpha.rpc('core_stats', {
-			ringing_group_filter: alphaId,
-			group_by_species: false,
-			group_by_time_period: 'year' satisfies StatsTemporalUnit
+		const data = await readRawStatsCacheRows({
+			client: alpha,
+			groupId: alphaId,
+			bySpecies: false,
+			select: simpleStatsCacheYearlyTotalsQuery.select,
+			temporalUnit: 'year'
 		});
-		await writeSnapshot(`core_stats/alpha.yearly-totals.json`, yearly ?? []);
+		await writeSnapshot(
+			`tables/SimpleStatsCache/alpha.yearly-totals.json`,
+			data
+		);
 	}
 
-	// RPC: core_stats (monthly, ungrouped by species) — powers fetchPayOffStats
-	// (app/actions/pay-off-stats.ts). Alpha only — see yearly-totals above.
+	// Table: SimpleStatsCache (month grain, every month) — powers
+	// fetchPayOffStats (app/actions/pay-off-stats.ts)'s monthly table/chart.
+	// Alpha only — see yearly-totals above.
 	{
-		const { data: monthly } = await alpha.rpc('core_stats', {
-			ringing_group_filter: alphaId,
-			group_by_species: false,
-			group_by_time_period: 'month' satisfies StatsTemporalUnit
+		const data = await readRawStatsCacheRows({
+			client: alpha,
+			groupId: alphaId,
+			bySpecies: false,
+			select: simpleStatsCacheMonthlyTotalsQuery.select,
+			temporalUnit: 'month'
 		});
-		await writeSnapshot(`core_stats/alpha.monthly-totals.json`, monthly ?? []);
+		await writeSnapshot(
+			`tables/SimpleStatsCache/alpha.monthly-totals.json`,
+			data
+		);
 	}
 
 	// Table: Sessions (embedded Locations + Encounters count) — powers
@@ -281,31 +375,46 @@ export async function generateSnapshots(
 		);
 	}
 
-	// RPC: core_stats (allTime/thisYear/lastYear composite, ungrouped) — powers
-	// fetchHomePageSummaryStats (app/(routes)/page.tsx)
+	// Table: SimpleStatsCache (the all-time cell, plus two picked rows out of
+	// the year grain) — powers fetchHomePageSummaryStats
+	// (app/(routes)/page.tsx), mirroring that function's own logic exactly
+	// (#1221 moved it onto real SimpleStatsCache cells rather than core_stats'
+	// from_date/to_date window-juggling — an in-progress year's year-grain row
+	// already *is* "year to date" by construction). One source table, three
+	// of its own rows picked out the same way the real action does — not a
+	// cross-source merge, so this stays within the "no compound fixtures"
+	// rule.
 	{
 		const currentYear = new Date().getFullYear();
 		const startOfCurrentYear = `${currentYear}-01-01`;
 		const startOfLastYear = `${currentYear - 1}-01-01`;
-		const endOfLastYear = `${currentYear - 1}-12-31`;
-		const [{ data: allTime }, { data: thisYear }, { data: lastYear }] =
-			await Promise.all([
-				alpha.rpc('core_stats', { ringing_group_filter: alphaId }),
-				alpha.rpc('core_stats', {
-					ringing_group_filter: alphaId,
-					from_date: startOfCurrentYear
-				}),
-				alpha.rpc('core_stats', {
-					ringing_group_filter: alphaId,
-					from_date: startOfLastYear,
-					to_date: endOfLastYear
-				})
-			]);
-		await writeSnapshot(`core_stats/alpha.home-page-summary.json`, {
-			allTime: allTime?.[0] ?? null,
-			thisYear: thisYear?.[0] ?? null,
-			lastYear: lastYear?.[0] ?? null
-		});
+		const [allTimeRows, yearRows] = await Promise.all([
+			readRawStatsCacheRows({
+				client: alpha,
+				groupId: alphaId,
+				bySpecies: false,
+				select: simpleStatsCacheHomePageSummaryQuery.select,
+				temporalUnit: 'all-time'
+			}),
+			readRawStatsCacheRows({
+				client: alpha,
+				groupId: alphaId,
+				bySpecies: false,
+				select: simpleStatsCacheHomePageSummaryQuery.select,
+				temporalUnit: 'year'
+			})
+		]);
+		await writeSnapshot(
+			`tables/SimpleStatsCache/alpha.home-page-summary.json`,
+			{
+				allTime: allTimeRows[0] ?? null,
+				thisYear:
+					yearRows.find((row) => row.time_period === startOfCurrentYear) ??
+					null,
+				lastYear:
+					yearRows.find((row) => row.time_period === startOfLastYear) ?? null
+			}
+		);
 	}
 
 	// Robin species ID (needed for species-specific snapshots)
@@ -362,9 +471,10 @@ export async function generateSnapshots(
 		);
 
 		// The raw source behind the species/[speciesName] page's headline
-		// stats. It had a `biometrics_stats/robin-alpha.headline.json` sibling
-		// until #1246 deleted that RPC; the page reads the already-merged
-		// `SimpleStatsCacheBySpecies` row now (#1222). The wing/weight half's
+		// stats: Robin's own `SimpleStatsCacheBySpecies` row at the all-time
+		// grain, the page's actual current read path (#1222,
+		// `fetchSpeciesStatsCacheRows` in app/actions/sp-data.ts). Raw embed
+		// intact, same as the by-species block above. The wing/weight half's
 		// source is `stats_cache_biometrics_metrics/robin-alpha.headline.json`
 		// below (#1272) — nothing reads it yet, since rewiring the app-test
 		// helper (`app/__tests__/helpers/biometrics-stats-fixtures.ts`) to
@@ -376,13 +486,17 @@ export async function generateSnapshots(
 		// it from a fixture — the one test exercising it mocks the action
 		// directly with a small inline array, so a generated fixture here would
 		// just be dead weight (#894).
-		const { data: robinStats } = await alpha.rpc('core_stats', {
-			species_name_filter: 'Robin',
-			ringing_group_filter: alphaId
+		const robinStats = await readRawStatsCacheRows({
+			client: alpha,
+			groupId: alphaId,
+			bySpecies: true,
+			select: simpleStatsCacheBySpeciesHeadlineQuery.select,
+			speciesName: 'Robin',
+			temporalUnit: 'all-time'
 		});
 		await writeSnapshot(
-			`core_stats/robin-alpha.headline.json`,
-			robinStats ?? []
+			`tables/SimpleStatsCacheBySpecies/robin-alpha.headline.json`,
+			robinStats
 		);
 
 		// RPC: stats_cache_biometrics_metrics (species-filtered, ungrouped) —
