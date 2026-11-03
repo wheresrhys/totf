@@ -1,6 +1,6 @@
 {
 	"@mutates": [
-		"lib/demon-import.ts",
+		"modules/demon-import/",
 		"app/api/import/",
 		"app/api/queues/",
 		"lib/queue-dispatch.ts",
