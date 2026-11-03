@@ -387,43 +387,26 @@ existed.
 
 ## Web import
 
-Logged-in groups can also upload CSVs via the UI at `/import`. The page POSTs to `POST /api/import` (`app/api/import/route.ts`), which streams NDJSON progress back to the browser.
+Logged-in groups can also upload CSVs via the UI at `/import`. The page POSTs to `POST /api/import`
+(`app/api/import/route.ts`), which streams NDJSON progress back to the browser.
 
-Before processing any row, the route runs a **location pre-flight** (#1079): every distinct
-`loc_id` in the CSV is checked against the group's existing `Locations`
-(`getDistinctLocationNames` / `findUnrecognisedLocationNames` in `modules/demon-import`), and if any
-name is unrecognised the route streams an `unrecognised_locations` message and closes the stream
-without a single write — not even for the rows whose location _was_ known. The guard exists because
-`processEncounterRow` upserts Locations on raw `(location_name, ringing_group_id)`, so a group
-re-coding an existing site (#1048: `972` → `CES972`) silently forks the Locations row and
-re-imports every encounter under it. `PageContent.tsx` renders that message as a plain notice for
-now; a follow-up ticket replaces it with a review screen letting the group say "new site" vs
-"renamed site". Because the guard is unconditional, a group's **first** import can no longer
-bootstrap its own locations — they must exist first (which is why `supabase/scripts/seed-e2e-data.ts`
-and `e2e/authenticated/import.spec.ts` pre-create theirs).
+The route itself is now pure plumbing: it extracts the uploaded file into a `Buffer`, resolves
+the group's authenticated Supabase client, then `for await`s `modules/demon-import`'s
+`runDemonImport` and turns each
+`DemonImportUpdate` it yields into one NDJSON line, closing the stream once the generator
+finishes. Every decision that used to live in the route file — the location pre-flight, CSV
+parsing, `ImportJobTracker` lifecycle, both batch writers, the rate-limiter/280s-deadline check —
+now lives in `modules/demon-import/lib/run-demon-import.ts`; see
+[`modules/demon-import/CLAUDE.md`](../modules/demon-import/CLAUDE.md)'s "Orchestration" section
+for how all of that works, including why the deadline is a `timeoutMs` the route passes in
+(`TIMEOUT_MS = 280_000`, comfortably inside Vercel's `maxDuration = 300`) rather than something
+the orchestrator decides for itself. `PageContent.tsx` imports `DemonImportUpdate` straight from
+`@/modules/demon-import` and switches on its `type` field exactly as before — none of the update
+shapes changed, only where the type is defined.
 
-The route aborts with a date-range summary after 280 seconds. Vercel `maxDuration` is set to 300s.
-Core import logic is shared with the CLI script — see `supabase/CLAUDE.md`'s "CSV data import".
-
-Each row is staged into `DemonRecords` before it is interpreted into the domain tables (#959), the
-run's `ImportJobs.affected_dates` is written once every staging batch has landed, and the
-domain-table write itself is chunked (#1139) — see `supabase/CLAUDE.md`'s "CSV data import" for
-both batch writers and the rate-limiter constraint they impose. Two route-specific consequences:
-
-- The route's `pRateLimit` (30/s, concurrency 30) is passed in as `EncounterRowBatchWriter`'s
-  `limitChunkFlush`, so it caps concurrent **chunk flushes** rather than concurrent per-row domain
-  writes.
-- The 280s deadline check lives **inside** that limited callback (surfacing as a module-private
-  `ImportDeadlineExceededError`) rather than at row dispatch, because every row is dispatched at
-  t≈0 and a check there would never fire for a large upload. Since the callback is now a whole
-  chunk flush, a fired deadline abandons that chunk's rows together rather than one row.
-
-Once the pre-flight has passed, the route opens an `ImportJobs` row (#961) and updates it at
-whichever exit branch fires: `complete` → `succeeded` with the three row counts, `timeout` →
-`timed_out` with the partial `start_date`/`end_date` (previously the 280s abort reported _only_ to
-the browser and left no persistent trace at all), and the catch branch → `failed` with the error
-message. See `supabase/CLAUDE.md`'s "CSV data import" for the tracker helpers and why the row is
-opened after the pre-flight rather than at the top of the handler.
+**`supabase/scripts/import-csv.ts` still has its own separate, overlapping orchestrator** —
+unifying the CLI importer onto `runDemonImport` too was considered and deliberately deferred, not
+forgotten; see that module's CLAUDE.md for the current state of that gap.
 
 ### Stats-cache refresh queue
 

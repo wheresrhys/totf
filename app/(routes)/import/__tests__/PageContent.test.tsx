@@ -7,7 +7,7 @@ import {
 	cleanup
 } from '@testing-library/react';
 import { ImportPageContent } from '../PageContent';
-import type { ImportMessage } from '@/app/api/import/route';
+import type { DemonImportUpdate } from '@/modules/demon-import';
 
 // `UnrecognisedLocationsReview` (#1080) fetches/resolves via these actions on
 // mount/submit — mocked here since this suite renders the full `ImportPageContent`
@@ -27,7 +27,7 @@ vi.mock('@/app/actions/locations', () => ({
 
 // Stands in for `POST /api/import`, streaming back the NDJSON messages the real
 // route would send for this upload.
-function mockImportResponse(messages: ImportMessage[]): void {
+function mockImportResponse(messages: DemonImportUpdate[]): void {
 	const body = new ReadableStream<Uint8Array>({
 		start(controller) {
 			const encoder = new TextEncoder();
