@@ -98,7 +98,7 @@ ADD CONSTRAINT "Sessions_pkey" PRIMARY KEY (id);
 
 -- One Session per group per date (#1024), replacing the old
 -- (visit_date, location_id, session_type) triple. `ringing_group_id` is written
--- directly by lib/demon-import.ts now that trg_set_session_generated_fields is
+-- directly by modules/demon-import now that trg_set_session_generated_fields is
 -- retired, and this is the key its Sessions upsert conflict-targets.
 ALTER TABLE public."Sessions"
 ADD CONSTRAINT "Sessions_visit_date_ringing_group_id_key" UNIQUE (visit_date, ringing_group_id);

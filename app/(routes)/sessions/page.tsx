@@ -4,7 +4,7 @@ import {
 } from '@/app/components/layout/BootstrapPage';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
+import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '@/app/models/session';
 import { allSessionsQuery } from '@/queries';
@@ -18,7 +18,7 @@ const RESIGHTING_RECORD_TYPES_FILTER_LIST = `(${RESIGHTING_RECORD_TYPES.join(','
  * The list used to show only FULL_GROWN-type sessions (`Sessions.session_type`),
  * excluding PULLI and FIELD_OBSERVATION sessions from the calendar. That column
  * is gone as of #1024, and this re-expresses the same bucketing rule
- * `lib/demon-import.ts` used to assign a row's session_type with, directly off
+ * `modules/demon-import` used to assign a row's session_type with, directly off
  * `Encounters` columns: not a resighting/recovery record (`record_type` in
  * `RESIGHTING_RECORD_TYPES` — that would have made it FIELD_OBSERVATION), and
  * not a pullus capture (`age_code === 1 && !is_juv` — that would have made it

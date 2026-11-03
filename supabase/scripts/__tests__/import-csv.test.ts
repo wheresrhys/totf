@@ -8,7 +8,7 @@ import {
 	findUnrecognisedLocationNames,
 	getDistinctLocationNames,
 	processEncounterRow
-} from '../../../lib/demon-import';
+} from '@/modules/demon-import';
 import { dispatchStatsCacheRefreshEvents } from '@/modules/stats';
 import {
 	createRowLimiter,
@@ -86,7 +86,7 @@ const {
 	}
 }));
 
-vi.mock('../../../lib/demon-import', () => ({
+vi.mock('@/modules/demon-import', () => ({
 	createRingSequenceLookup: vi.fn(() => vi.fn()),
 	createRingSequenceLinker: vi.fn(() => vi.fn()),
 	// `function`, not an arrow, for all three of these: the script does `new
@@ -421,7 +421,7 @@ describe('importCSV chunked domain-table writing', () => {
 describe('stats-cache-refresh dispatch', () => {
 	// Event-building, per-event dispatch and dispatch-failure handling are
 	// `dispatchStatsCacheRefreshEvents`'s own responsibility, unit-tested in
-	// `lib/__tests__/demon-import.test.ts`. This only has to prove the script
+	// `modules/demon-import`'s own colocated tests. This only has to prove the script
 	// calls it with the run's own ids/dates/log-context, after the job is
 	// marked complete.
 	it('calls dispatchStatsCacheRefreshEvents with the run’s ids, affected dates/species and CLI log context, after completeImportJob', async () => {

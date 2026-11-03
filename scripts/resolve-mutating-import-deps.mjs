@@ -2,7 +2,7 @@
  * Resolves the direct (one-level, not transitive) local import dependencies
  * of the `@mutates` trigger paths in e2e/mutating-spec-triggers.json.
  *
- * Why: a change to a file that e.g. lib/demon-import.ts imports from — but
+ * Why: a change to a file that e.g. modules/demon-import imports from — but
  * which isn't itself listed as a trigger path — could change import
  * behaviour just as much as editing the trigger file directly. This script
  * finds those one-hop dependencies so scripts/e2e-select-suite.sh can treat

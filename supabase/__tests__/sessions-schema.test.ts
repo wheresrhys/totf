@@ -71,7 +71,7 @@ describe('Sessions schema — columns deliberately removed', () => {
 describe('Sessions schema — trigger function retired', () => {
 	// trg_set_session_generated_fields derived Sessions.ringing_group_id by looking
 	// the owning group up from Sessions.location_id. With that column gone it had
-	// nothing to look up, so #1024 dropped it and lib/demon-import.ts writes
+	// nothing to look up, so #1024 dropped it and modules/demon-import writes
 	// ringing_group_id directly instead.
 	it('has no trg_set_session_generated_fields function', () => {
 		expect(functionExists('trg_set_session_generated_fields')).toBe(false);

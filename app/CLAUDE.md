@@ -1,7 +1,7 @@
 # App — Claude context
 
 Scoped doc for everything under `app/`. See the root [`CLAUDE.md`](../CLAUDE.md) for app overview,
-tech stack, and cross-zone shared code (`lib/supabase.ts`, `lib/demon-import.ts`); see
+tech stack, and cross-zone shared code (`lib/supabase.ts`, `modules/demon-import/`); see
 [`supabase/CLAUDE.md`](../supabase/CLAUDE.md) and [`.claude/CLAUDE.md`](../.claude/CLAUDE.md) for
 the other two zones.
 
@@ -385,7 +385,7 @@ Logged-in groups can also upload CSVs via the UI at `/import`. The page POSTs to
 
 Before processing any row, the route runs a **location pre-flight** (#1079): every distinct
 `loc_id` in the CSV is checked against the group's existing `Locations`
-(`getDistinctLocationNames` / `findUnrecognisedLocationNames` in `lib/demon-import.ts`), and if any
+(`getDistinctLocationNames` / `findUnrecognisedLocationNames` in `modules/demon-import`), and if any
 name is unrecognised the route streams an `unrecognised_locations` message and closes the stream
 without a single write — not even for the rows whose location _was_ known. The guard exists because
 `processEncounterRow` upserts Locations on raw `(location_name, ringing_group_id)`, so a group

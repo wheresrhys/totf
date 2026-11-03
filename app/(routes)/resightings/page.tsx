@@ -1,7 +1,7 @@
 import { ResightingEncounter } from '@/app/models/session';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
-import { RESIGHTING_RECORD_TYPES } from '@/lib/demon-import';
+import { RESIGHTING_RECORD_TYPES } from '@/modules/demon-import';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	BootstrapPage,

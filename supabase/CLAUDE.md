@@ -2,7 +2,7 @@
 
 Scoped doc for everything under `supabase/` plus the data-layer scripts in `supabase/scripts/`.
 See the root [`CLAUDE.md`](../CLAUDE.md) for app overview, tech stack, and cross-zone shared code
-(`lib/supabase.ts`, `lib/demon-import.ts`); see [`app/CLAUDE.md`](../app/CLAUDE.md) and
+(`lib/supabase.ts`, `modules/demon-import/`); see [`app/CLAUDE.md`](../app/CLAUDE.md) and
 [`.claude/CLAUDE.md`](../.claude/CLAUDE.md) for the other two zones.
 
 ## `@/` aliases under this zone
@@ -49,7 +49,7 @@ Key design notes:
     wherever it's still wanted — see `app/(routes)/sessions/page.tsx` (the FULL_GROWN-equivalent
     filter) and `queries/Encounters/pulli-encounters.ts`. No stats RPC buckets on it at all any more
     (see the `record_type`-filter note below).
-  - `ringing_group_id` is written directly by `lib/demon-import.ts`. The
+  - `ringing_group_id` is written directly by `modules/demon-import`. The
     `trg_set_session_generated_fields` trigger that used to derive it from `Sessions.location_id` is
     retired, and `supabase/__tests__/sessions-schema.test.ts` pins both columns and the trigger as
     gone.
@@ -58,7 +58,7 @@ Key design notes:
   happened. They are also what its uniqueness keys on —
   `encounters_bird_id_location_id_visit_date_unique`, repointed off `(bird_id, session_id)`: with a
   Session covering a whole group-day, a `session_id` key would have meant "one encounter per bird
-  per group per day" and silently merged a bird caught at two sites on one day. `lib/demon-import.ts`
+  per group per day" and silently merged a bird caught at two sites on one day. `modules/demon-import`
   conflict-targets the same three columns. Any new `Encounters` row (test fixtures included) must
   supply both; `supabase/__tests__/rpc-functions/helpers/encounter-fixtures.ts` defaults
   `visit_date` off the Sessions row (`readTestSessionDate` / `withSessionDate`) and `location_id`
@@ -127,7 +127,7 @@ type — `public.resighting_record_type` (`U`/`F`/`D` — see the DemOn field sp
 condition to its `LEFT JOIN ... ON` clause rather than a `WHERE`, so a bird whose only encounters
 are resightings still surfaces as a NULL-`encounter_id` row instead of disappearing from the result
 entirely. `app/models/db.ts` exports `ResightingRecordType` from the generated enum, and
-`lib/demon-import.ts`'s `RESIGHTING_RECORD_TYPES` constant is typed against it — keep that constant
+`modules/demon-import`'s `RESIGHTING_RECORD_TYPES` constant is typed against it — keep that constant
 in sync **by hand** if the enum ever changes, the same convention as the age-bucket definitions
 above.
 
@@ -652,7 +652,7 @@ global-fixture writes, not isolable per-worktree rows), the pre-push hook avoids
 the branch's diff actually touches the spec or the source it exercises:
 
 - `e2e/mutating-spec-triggers.json` maps the `@mutates` tag to the paths that make it relevant
-  (e.g. `lib/demon-import.ts`, `app/api/import/`).
+  (e.g. `modules/demon-import/`, `app/api/import/`).
 - `scripts/e2e-select-suite.sh` diffs the branch against `origin/main`; if any changed file matches
   a trigger path it runs the full `npm run test:e2e`, otherwise `npm run test:e2e:safe`
   (`--grep-invert @mutates`) — so most branches never execute the mutating spec at all, and don't
@@ -682,7 +682,7 @@ npm run db:import:prod ./path/to/data.csv "Group Name"
 The import script (`supabase/scripts/import-csv.ts`) upserts Species, Birds, Locations, Sessions, and Encounters in dependency order, rate-limited to 30 req/s.
 
 Core import logic (types, transforms, `processEncounterRow`, both batch writers) lives in
-`lib/demon-import.ts` and is shared by both this CLI script and the web import route — see
+`modules/demon-import` and is shared by both this CLI script and the web import route — see
 `app/CLAUDE.md`'s "Web import".
 
 **Both halves of a row's write are batched, and `processEncounterRow` is the two-step
@@ -805,7 +805,7 @@ Three things worth keeping straight:
   macrotask first, because the rows released by the final staging batch reach its buffer in
   microtasks the staging writer's own `flushRemaining` can resume ahead of.
 
-**Every import run is tracked in `ImportJobs` (#961).** `lib/demon-import.ts`'s
+**Every import run is tracked in `ImportJobs` (#961).** `modules/demon-import`'s
 `new ImportJobTracker(supabaseClient)` exposes the six operations both entry points share —
 `createImportJob` / `recordAffectedDates` / `completeImportJob` / `failImportJob` /
 `markImportJobTimedOut` / `markStatsCacheRefreshed`. It's a class rather than a `create*` factory
@@ -856,7 +856,7 @@ without requiring the original CSV: it pages through that group's already-staged
 rows (keyset-paginated on `id`, `DEMON_RECORDS_PAGE_SIZE` = 1000 per page) and feeds their
 `raw_row`s through the exact same writers, location pre-flight, `ImportJobs` tracking and
 stats-cache-refresh dispatch as a CSV import. This is for when the write path itself has changed
-(a newly-modelled column, a bug fix in `lib/demon-import.ts`) and a group's existing history needs
+(a newly-modelled column, a bug fix in `modules/demon-import`) and a group's existing history needs
 reinterpreting under the new logic.
 
 ```sh

@@ -1,14 +1,14 @@
 /**
- * Integration tests for lib/demon-import.ts against the real Postgres schema (#464).
+ * Integration tests for modules/demon-import against the real Postgres schema (#464).
  *
- * demon-import.ts leans entirely on the DB's unique constraints to decide whether a
+ * modules/demon-import leans entirely on the DB's unique constraints to decide whether a
  * given upsert reuses an existing row or creates a new one (see
  * `EncounterRowBatchWriter`'s per-entity-type `uniqueColumns`, matched against each
  * table's `ON CONFLICT` target). These tests exercise `EncounterRowBatchWriter`
  * against the real schema so a change to a table's unique constraints (or a mismatch
- * between demon-import.ts and the schema) fails loudly here rather than being caught
+ * between modules/demon-import and the schema) fails loudly here rather than being caught
  * only at import time in production. The existing unit tests in
- * lib/__tests__/demon-import.test.ts mock the Supabase client entirely, so none of
+ * modules/demon-import's own colocated unit tests mock the Supabase client entirely, so none of
  * this DB-level behaviour is covered there.
  *
  * Requires local Supabase running and e2e seed data loaded:
@@ -28,7 +28,7 @@ import {
 	createRingSequenceLinker,
 	EncounterRowBatchWriter,
 	type DemonRow
-} from '../../lib/demon-import';
+} from '@/modules/demon-import';
 import { randomTestSuffix, randomFutureDate, addDays } from './test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { psql, psqlScalar, createIsolatedGroup } from './db-test-helpers';
@@ -37,7 +37,7 @@ function psqlCount(sql: string): number {
 	return Number(psqlScalar(sql));
 }
 
-/** Converts an ISO `YYYY-MM-DD` date into the DD/MM/YYYY format demon-import.ts expects. */
+/** Converts an ISO `YYYY-MM-DD` date into the DD/MM/YYYY format modules/demon-import expects. */
 function toDemonDate(isoDate: string): string {
 	return isoDate.split('-').reverse().join('/');
 }
@@ -167,7 +167,7 @@ function makeRow(overrides: Partial<DemonRow> = {}): DemonRow {
  *
  * Stands in for the per-row writer this file used to call. The writer's own
  * per-chunk deduplication is unit-tested against a mocked client in
- * lib/__tests__/demon-import.test.ts; what this file exists for is the DB's unique
+ * modules/demon-import's own colocated unit tests; what this file exists for is the DB's unique
  * constraints deciding whether each upsert reuses a row, which a chunk of one
  * exercises exactly as the old per-row path did. `importChunkThroughWriter` below
  * covers the multi-row case against the same real constraints.

@@ -8,8 +8,9 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: vi.fn()
 }));
 
-vi.mock('@/lib/demon-import', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('@/lib/demon-import')>();
+vi.mock('@/modules/demon-import', async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import('@/modules/demon-import')>();
 	return {
 		...actual,
 		DemonRecordsBatchWriter: vi.fn(),
@@ -99,7 +100,7 @@ describe('POST /api/import', () => {
 			DemonRecordsBatchWriter,
 			EncounterRowBatchWriter,
 			ImportJobTracker
-		} = await import('@/lib/demon-import');
+		} = await import('@/modules/demon-import');
 		mockDemonRecordsBatchWriter = {
 			writeDemonRecord: vi.fn().mockResolvedValue(undefined),
 			flushRemaining: vi.fn().mockResolvedValue(undefined),
@@ -136,7 +137,7 @@ describe('POST /api/import', () => {
 
 		// Every location in the CSV is already known unless a test says otherwise.
 		const { findUnrecognisedLocationNames } =
-			await import('@/lib/demon-import');
+			await import('@/modules/demon-import');
 		vi.mocked(findUnrecognisedLocationNames).mockResolvedValue([]);
 
 		const { dispatchStatsCacheRefreshEvents } = await import('@/modules/stats');
@@ -169,14 +170,14 @@ describe('POST /api/import', () => {
 
 	describe('successful import', () => {
 		beforeEach(async () => {
-			const { processEncounterRow } = await import('@/lib/demon-import');
+			const { processEncounterRow } = await import('@/modules/demon-import');
 			vi.mocked(processEncounterRow).mockResolvedValue({
 				visitDate: '2024-06-01'
 			});
 		});
 
 		it('calls processEncounterRow for each CSV row', async () => {
-			const { processEncounterRow } = await import('@/lib/demon-import');
+			const { processEncounterRow } = await import('@/modules/demon-import');
 			const file = makeCsvFile([
 				makeCsvRow(),
 				makeCsvRow({ ring_no: 'B654321' })
@@ -229,7 +230,7 @@ describe('POST /api/import', () => {
 			// The shared module mock isn't auto-reset between tests, so clear the
 			// call history these tests assert on.
 			const { processEncounterRow, EncounterRowBatchWriter } =
-				await import('@/lib/demon-import');
+				await import('@/modules/demon-import');
 			vi.mocked(EncounterRowBatchWriter).mockClear();
 			vi.mocked(processEncounterRow).mockClear();
 			vi.mocked(processEncounterRow).mockResolvedValue({
@@ -239,7 +240,7 @@ describe('POST /api/import', () => {
 
 		it('streams an unrecognised_locations message listing the names, instead of processing any rows', async () => {
 			const { findUnrecognisedLocationNames } =
-				await import('@/lib/demon-import');
+				await import('@/modules/demon-import');
 			vi.mocked(findUnrecognisedLocationNames).mockResolvedValue([
 				'CES972',
 				'Reedbed'
@@ -262,7 +263,7 @@ describe('POST /api/import', () => {
 				findUnrecognisedLocationNames,
 				EncounterRowBatchWriter,
 				processEncounterRow
-			} = await import('@/lib/demon-import');
+			} = await import('@/modules/demon-import');
 			vi.mocked(findUnrecognisedLocationNames).mockResolvedValue(['CES972']);
 
 			const response = await POST(
@@ -276,7 +277,7 @@ describe('POST /api/import', () => {
 
 		it('proceeds with normal row processing when every loc_id already matches an existing Location', async () => {
 			const { findUnrecognisedLocationNames, processEncounterRow } =
-				await import('@/lib/demon-import');
+				await import('@/modules/demon-import');
 
 			const file = makeCsvFile([
 				makeCsvRow(),
@@ -303,7 +304,7 @@ describe('POST /api/import', () => {
 
 	describe('error handling', () => {
 		it('counts rows where processEncounterRow throws as failed', async () => {
-			const { processEncounterRow } = await import('@/lib/demon-import');
+			const { processEncounterRow } = await import('@/modules/demon-import');
 			vi.mocked(processEncounterRow)
 				.mockResolvedValueOnce({ visitDate: '2024-06-01' })
 				.mockRejectedValueOnce(new Error('DB error'))
@@ -328,7 +329,7 @@ describe('POST /api/import', () => {
 
 		it('counts a CasualtyEncounterError row as skipped, not failed', async () => {
 			const { processEncounterRow, CasualtyEncounterError } =
-				await import('@/lib/demon-import');
+				await import('@/modules/demon-import');
 			vi.mocked(processEncounterRow)
 				.mockResolvedValueOnce({ visitDate: '2024-06-01' })
 				.mockRejectedValueOnce(new CasualtyEncounterError());
@@ -375,9 +376,9 @@ describe('POST /api/import', () => {
 			// later import too, so it has to mock the same exports — otherwise the
 			// tests after this one get the real ones back and the beforeEach above
 			// fails trying to stub them.
-			vi.doMock('@/lib/demon-import', async (importOriginal) => {
+			vi.doMock('@/modules/demon-import', async (importOriginal) => {
 				const actual =
-					await importOriginal<typeof import('@/lib/demon-import')>();
+					await importOriginal<typeof import('@/modules/demon-import')>();
 				return {
 					...actual,
 					DemonRecordsBatchWriter: vi.fn(function () {
@@ -426,7 +427,7 @@ describe('POST /api/import', () => {
 	describe('chunked domain-table writing', () => {
 		it('builds the domain-table writer for the run’s group and job, and flushes its trailing chunk', async () => {
 			const { EncounterRowBatchWriter, processEncounterRow } =
-				await import('@/lib/demon-import');
+				await import('@/modules/demon-import');
 			vi.mocked(processEncounterRow).mockResolvedValue({
 				visitDate: '2024-06-01'
 			});
@@ -459,7 +460,7 @@ describe('POST /api/import', () => {
 	// lib/__tests__/demon-import.test.ts.
 	describe('ImportJobs tracking', () => {
 		it('opens a job for the group and completes it with the counts it reported', async () => {
-			const { processEncounterRow } = await import('@/lib/demon-import');
+			const { processEncounterRow } = await import('@/modules/demon-import');
 			vi.mocked(processEncounterRow).mockResolvedValue({
 				visitDate: '2024-06-01'
 			});
@@ -480,7 +481,7 @@ describe('POST /api/import', () => {
 
 		it('records the staged dates once every DemonRecords batch has landed', async () => {
 			const { DemonRecordsBatchWriter, processEncounterRow } =
-				await import('@/lib/demon-import');
+				await import('@/modules/demon-import');
 			vi.mocked(processEncounterRow).mockResolvedValue({
 				visitDate: '2024-06-01'
 			});
@@ -507,7 +508,7 @@ describe('POST /api/import', () => {
 
 		it('opens no job at all when aborting for unrecognised locations', async () => {
 			const { findUnrecognisedLocationNames } =
-				await import('@/lib/demon-import');
+				await import('@/modules/demon-import');
 			vi.mocked(findUnrecognisedLocationNames).mockResolvedValue(['CES972']);
 
 			const file = makeCsvFile([makeCsvRow({ loc_id: 'CES972' })]);
@@ -519,7 +520,8 @@ describe('POST /api/import', () => {
 		});
 
 		it('marks the job failed with the error message when the run throws', async () => {
-			const { EncounterRowBatchWriter } = await import('@/lib/demon-import');
+			const { EncounterRowBatchWriter } =
+				await import('@/modules/demon-import');
 			// Thrown after the job row has been opened — unlike a CSV parse error,
 			// which happens before there is anything to mark.
 			vi.mocked(EncounterRowBatchWriter).mockImplementation(function () {
@@ -570,7 +572,7 @@ describe('POST /api/import', () => {
 
 		it('does not dispatch any events when the run times out', async () => {
 			const { EncounterRowBatchWriter, processEncounterRow } =
-				await import('@/lib/demon-import');
+				await import('@/modules/demon-import');
 			const { dispatchStatsCacheRefreshEvents } =
 				await import('@/modules/stats');
 
@@ -617,7 +619,8 @@ describe('POST /api/import', () => {
 		});
 
 		it('does not dispatch any events when the run fails before completion', async () => {
-			const { EncounterRowBatchWriter } = await import('@/lib/demon-import');
+			const { EncounterRowBatchWriter } =
+				await import('@/modules/demon-import');
 			const { dispatchStatsCacheRefreshEvents } =
 				await import('@/modules/stats');
 			vi.mocked(EncounterRowBatchWriter).mockImplementation(function () {

@@ -1,15 +1,8 @@
 import { handleCallback } from '@vercel/queue';
-// Relative, not `@/`-aliased, for every import below: `app/lib/queue-dispatch.ts`'s
-// inline mode imports this module from `lib/`, so it is loaded by the CLI
-// importer's `tsx` runner (`supabase/scripts/import-csv.ts`) as well as by
-// Next.js. `app/lib/auth/group-auth.ts` reaches into `lib/` the same way and
-// for the same reason — see `app/lib/queue-dispatch.ts`'s own import comment. The
-// event type was the only import here while this consumer was a noop, and
-// being type-only it was erased before resolution ever mattered.
 import {
 	ImportJobTracker,
 	type StatsCacheRefreshOutcome
-} from '@/lib/demon-import';
+} from '@/modules/demon-import';
 import {
 	refreshSimpleStatsCache,
 	type StatsCacheRefreshEvent
@@ -114,7 +107,7 @@ export function deriveStatsCacheRefreshParams(
  * itself, logs it, writes `'failed'` to the temporal unit's column and resolves
  * normally — simpler and sufficient for a job that is not chunked or resumable.
  * Same "a derived/recoverable step's failure is caught and logged, not thrown"
- * precedent `dispatchStatsCacheRefreshEvents` (`lib/demon-import.ts`) already
+ * precedent `dispatchStatsCacheRefreshEvents` (`modules/stats`) already
  * set one level up at the dispatch call site, applied one level deeper.
  *
  * There used to be a second refresh here, `refreshComplexStatsCache` against

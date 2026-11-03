@@ -13,7 +13,7 @@ const getAuthenticatedSupabaseClientForGroup = vi.fn();
 // recorded calls without dropping the no-op implementation.
 const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-vi.mock('../../../../../lib/demon-import', () => ({
+vi.mock('@/modules/demon-import', () => ({
 	ImportJobTracker: class {
 		markStatsCacheRefreshed = markStatsCacheRefreshedMock;
 		constructor(public supabaseClient: unknown) {}

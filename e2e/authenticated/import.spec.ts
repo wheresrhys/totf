@@ -67,7 +67,7 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 
 	// The timeout branch is deliberately not covered here: the route's abort fires at
 	// 280s, and no amount of fixture data makes that practical to provoke in a
-	// browser test. lib/__tests__/demon-import.test.ts covers the transition instead.
+	// browser test. modules/demon-import's own colocated tests cover the transition instead.
 	test('records a succeeded ImportJobs row with the reported row counts', async () => {
 		const [status, rowsProcessed, rowsSuccessful, rowsFailed, finishedAt] = psqlRow(
 			`SELECT status, rows_processed, rows_successful, rows_failed, finished_at IS NOT NULL FROM "ImportJobs" WHERE ringing_group_id = ${deltaId}`

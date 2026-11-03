@@ -1,6 +1,6 @@
 -- One row per CSV import run, written by both import entry points
 -- (supabase/scripts/import-csv.ts and app/api/import/route.ts) via
--- lib/demon-import.ts's `createImportJobTracker`. A failed or partially-applied
+-- modules/demon-import's `createImportJobTracker`. A failed or partially-applied
 -- import used to leave no trace at all — the web route's 280s abort in particular
 -- only ever reported to the browser — so there was nothing to recover from or even
 -- notice afterwards.
