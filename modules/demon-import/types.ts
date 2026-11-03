@@ -116,19 +116,7 @@ export type DemonColumnNames =
 
 export type DemonRow = Record<DemonColumnNames, string>;
 
-/**
- * The four row counts both import entry points already compute, under the one set
- * of names the `ImportJobs` columns use for the first three. The web route's
- * `ImportCompleteMessage` (`{processed, successful, failed, skipped}`) matches this
- * shape as-is; the CLI script's `ImportRowCounts`
- * (`{totalRecords, successfulRecords, failedRecords, skippedRecords}`) is the same
- * four numbers under different names and maps onto it at the call site.
- *
- * `skipped` (a ringless/casualty row — see `CasualtyEncounterError`) is not
- * persisted to `ImportJobs`: `completeImportJob` still only writes
- * `rows_processed`/`rows_successful`/`rows_failed`, so it's in-memory for the
- * current run only.
- */
+/** The four row counts both import entry points compute, see modules/demon-import/CLAUDE.md. */
 export type ImportJobRowCounts = {
 	processed: number;
 	successful: number;
@@ -136,12 +124,7 @@ export type ImportJobRowCounts = {
 	skipped: number;
 };
 
-/**
- * The outcome a stats-cache refresh can actually be recorded as. The columns are
- * `import_job_status`, which also carries `'in_progress'` (their default, meaning
- * "not yet attempted") and `'timed_out'` (not reachable for a refresh) — neither of
- * which a setter should ever be asked to write.
- */
+/** The outcome a stats-cache refresh can actually be recorded as. */
 export type StatsCacheRefreshOutcome = Extract<
 	ImportJobStatus,
 	'succeeded' | 'failed'

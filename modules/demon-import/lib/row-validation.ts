@@ -31,20 +31,7 @@ export function convertDateFormat(dateString: string): string {
 	return dateString.split('/').reverse().join('-');
 }
 
-/**
- * `Encounters.capture_time` is a `time without time zone`, so Postgres stores
- * `'08:30'` and hands it back as `'08:30:00'`. Both forms used to be
- * interchangeable, because the only `capture_time`s this module ever compared
- * came from one CSV and were therefore formatted alike. Since #1219 the
- * reconciliation pass also compares a CSV row's `capture_time` against one read
- * back out of Postgres — to order a merge, and to tell a genuine duplicate from
- * a re-import of the same record — and `'08:30' < '08:30:00'` as strings, so
- * the two have to be written in one canonical form.
- *
- * Anything that doesn't parse is passed through untouched, exactly as before:
- * Postgres accepts several other time literals, and rejecting one here would
- * fail a row the importer used to accept.
- */
+// Matches 'H:MM' or 'H:MM:SS'. Anything else is passed through unchanged.
 const CAPTURE_TIME_PATTERN = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
 
 export function normaliseCaptureTime(rawCaptureTime: string): string {
