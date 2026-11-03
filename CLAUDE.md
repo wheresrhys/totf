@@ -125,9 +125,9 @@ Local values are in `.env.dev`. Production values are managed via 1Password (see
 A handful of root-level directories are genuinely used across two or all three zones and don't
 belong to any single scoped doc:
 
-- `lib/supabase.ts` and `lib/demon-import.ts` — imported by `app/`, data-layer scripts
-  (`supabase/scripts/`), and `supabase/__tests__/` alike. True 3-zone dependencies; keep them here
-  rather than duplicating or picking one zone to own them.
+- `lib/supabase.ts` — imported by `app/`, data-layer scripts (`supabase/scripts/`), and
+  `supabase/__tests__/` alike. A true 3-zone dependency; keep it here rather than duplicating it
+  or picking one zone to own it.
 - `lib/slugify.ts` — used by the agentic-tooling `derive_branch_name` MCP tool and the data-layer
   `supabase/scripts/seed-e2e-data.ts`. Small enough (756 bytes) not to be worth splitting.
 - `queries/` and `types/` — typed query definitions and the generated `Database` type, consumed by
@@ -138,6 +138,12 @@ belong to any single scoped doc:
   above, just large enough to warrant its own directory, barrel and scoped doc. See its own
   [`modules/stats/CLAUDE.md`](modules/stats/CLAUDE.md) — the reference implementation of the
   "Module conventions" below.
+- `modules/demon-import/` — the whole DemOn CSV-import pipeline (staging into `DemonRecords` →
+  domain-table chunk writes → `ImportJobs` tracking, plus the ring-sequence and location-lookup
+  helpers), extracted from a 1536-line `lib/demon-import.ts` (#1324). Shared verbatim by the web
+  import route in `app/`, `supabase/scripts/import-csv.ts` and `supabase/__tests__/`, so the same
+  3-zone shape as `lib/supabase.ts` above. See its own
+  [`modules/demon-import/CLAUDE.md`](modules/demon-import/CLAUDE.md).
 - `modules/ui-kit/` — the 17 UI-primitive components/hooks (toggles, sortable/accordion table
   plumbing, tab plumbing, design-system primitives) every page family in `app/` imports from,
   extracted from `app/components/shared/*` (#1326). Unlike `modules/stats/` above, this one is
