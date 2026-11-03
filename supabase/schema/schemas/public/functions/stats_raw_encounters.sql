@@ -80,20 +80,10 @@ CREATE FUNCTION public.stats_raw_encounters (
   -- NULL-preserving semantics: a bird whose only encounters are resightings still
   -- appears with encounter_id IS NULL rather than being dropped entirely.
   --
-  -- The exclusion list is spelled as an `IN (SELECT unnest(...))` sublink rather than
-  -- the equivalent `= ANY (enum_range(...)::text[])` array expression on purpose.
-  -- enum_range() is STABLE, not IMMUTABLE, so Postgres cannot constant-fold it at plan
-  -- time; written inline as an array it is re-evaluated (catalog lookups and all) once
-  -- PER ROW of Encounters. Measured on a 40k-row Encounters table that cost 81,782
-  -- shared buffer hits and ~36-56ms for the scan, versus 1,601 hits and ~7ms with the
-  -- value resolved once. The sublink form plans as a single hashed SubPlan evaluated
-  -- once per query instead. Because every stats RPC derives this row source (and
-  -- core_stats derives it 4x via its utility-RPC layering), that per-row cost was ~29%
-  -- of core_stats' total runtime. Do NOT "simplify" this back to the array form, and
-  -- keep the enum itself as the source of truth — don't inline a literal 'U'/'F'/'D'
-  -- list here (see CLAUDE.md on keeping RESIGHTING_RECORD_TYPES in sync by hand).
+  -- is_resighting is a stored generated column (Encounters.sql), so this is a plain
+  -- boolean read with no per-row enum_range() evaluation to hoist.
   LEFT JOIN public."Encounters" e ON b.id = e.bird_id
-    AND NOT (e.record_type IN (SELECT unnest(enum_range(NULL::public.resighting_record_type)::text[])))
+    AND NOT e.is_resighting
   LEFT JOIN public."Sessions" sess ON e.session_id = sess.id
   WHERE (from_date IS NULL OR sess.visit_date >= from_date)
    AND (to_date IS NULL OR sess.visit_date <= to_date)

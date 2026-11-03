@@ -19,6 +19,11 @@ CREATE TABLE public."Encounters" (
 	finding_condition text,
 	finding_circumstances text,
 	is_juv boolean DEFAULT FALSE NOT NULL,
+	-- Mirrors public.resighting_record_type enum (and, until removed, RESIGHTING_RECORD_TYPES
+	-- in modules/demon-import/types.ts) — keep this literal in sync by hand. enum_range() can't
+	-- be used here: GENERATED columns require an IMMUTABLE expression and enum_range() is only
+	-- STABLE.
+	is_resighting boolean GENERATED ALWAYS AS (record_type = ANY (ARRAY['U', 'F', 'D'])) STORED,
 	id bigint DEFAULT nextval('public."Encounters_id_seq"'::regclass) NOT NULL,
 	bird_id bigint NOT NULL,
 	session_id bigint NOT NULL,
@@ -39,6 +44,12 @@ CREATE INDEX idx_encounters_ringing_group_id ON public."Encounters" (ringing_gro
 CREATE INDEX idx_encounters_ringing_group_id_visit_date ON public."Encounters" (ringing_group_id, visit_date);
 
 CREATE INDEX idx_encounters_session_id ON public."Encounters" (session_id);
+
+-- Partial: most consumers filter is_resighting = false (sessions/pulli/day pages); only
+-- the resightings page filters = true.
+CREATE INDEX idx_encounters_not_resighting ON public."Encounters" (id)
+WHERE
+	(is_resighting = FALSE);
 
 CREATE TRIGGER trigger_trg_add_bird_ringing_group_id
 AFTER INSERT ON public."Encounters" FOR EACH ROW

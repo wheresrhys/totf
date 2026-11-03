@@ -123,13 +123,14 @@ reintroduce either column or the majority-vote heuristic; `arrivals_stats`' `new
 
 `stats_raw_encounters` excludes passive, no-bird-in-hand data so it never leaks into any stats RPC
 built on it (#874): it filters out any `Encounters` row whose `record_type` is a resighting/recovery
-type — `public.resighting_record_type` (`U`/`F`/`D` — see the DemOn field spec) — by adding the
-condition to its `LEFT JOIN ... ON` clause rather than a `WHERE`, so a bird whose only encounters
-are resightings still surfaces as a NULL-`encounter_id` row instead of disappearing from the result
-entirely. `app/models/db.ts` exports `ResightingRecordType` from the generated enum, and
-`modules/demon-import`'s `RESIGHTING_RECORD_TYPES` constant is typed against it — keep that constant
-in sync **by hand** if the enum ever changes, the same convention as the age-bucket definitions
-above.
+type by adding `NOT e.is_resighting` to its `LEFT JOIN ... ON` clause rather than a `WHERE`, so a
+bird whose only encounters are resightings still surfaces as a NULL-`encounter_id` row instead of
+disappearing from the result entirely. `Encounters.is_resighting` is a stored generated column
+(`Encounters.sql`) computing `record_type = ANY (ARRAY['U','F','D'])` — a hardcoded literal kept in
+sync **by hand** with `public.resighting_record_type` (and, until removed, `modules/demon-import`'s
+`RESIGHTING_RECORD_TYPES` constant) if either ever changes, the same convention as the age-bucket
+definitions above. It can't be derived from the enum directly: `GENERATED ALWAYS AS (...) STORED`
+requires an IMMUTABLE expression, and `enum_range()` is only STABLE.
 
 **That record_type filter is now the ONLY thing deciding what is "real" data in any stats RPC
 (#1021, completed by #1024).** `stats_spine`'s `session_date_range` used to exclude
@@ -196,16 +197,10 @@ unchanged. `session_effort`/`effort_per_period` have always been species-blind, 
 `effort_per_session` are not species-split even under `group_by_species` — a known asymmetry with
 `avg_encounters_per_session`, left as-is.
 
-**Two per-row evaluation traps in `stats_raw_encounters`, both fixed in #947 — don't reintroduce
-either.** Because every stats RPC derives this row source (and `core_stats` derives it 4x through
-its utility-RPC layering), anything evaluated per row here is paid several times over:
+**One per-row evaluation trap in `stats_raw_encounters`, fixed in #947 — don't reintroduce it.**
+Because every stats RPC derives this row source (and `core_stats` derives it 4x through its
+utility-RPC layering), anything evaluated per row here is paid several times over:
 
-- **`enum_range()` is STABLE, not IMMUTABLE**, so Postgres cannot constant-fold it at plan time.
-  Written inline as `= ANY (enum_range(...)::text[])` it was re-evaluated, catalog lookups and
-  all, once per `Encounters` row — 81,782 shared buffer hits and ~36-56ms for a 40k-row scan
-  versus 1,601 hits and ~7ms once hoisted. It is now spelled `IN (SELECT unnest(enum_range(...)))`,
-  which plans as a single hashed SubPlan evaluated once per query. Keep the enum as the source of
-  truth — don't "fix" this by inlining a literal `'U'/'F'/'D'` list.
 - **There is no `date_trunc(text, date)` overload**, so `date_trunc('month', sess.visit_date)`
   silently resolved to `date_trunc(text, timestamptz)` — STABLE and timezone-dependent. The casts
   to `::timestamp` on `session_month`/`session_year` pick the IMMUTABLE overload, and `session_day`

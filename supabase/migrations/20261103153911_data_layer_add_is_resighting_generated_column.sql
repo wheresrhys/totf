@@ -1,0 +1,64 @@
+SET check_function_bodies = false;
+CREATE OR REPLACE FUNCTION public.stats_raw_encounters(species_name_filter text DEFAULT NULL::text, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, ringing_group_filter bigint DEFAULT NULL::bigint, year_filter smallint DEFAULT NULL::smallint, month_filter smallint DEFAULT NULL::smallint)
+ RETURNS TABLE(species_id bigint, species_name text, bird_id bigint, ring_no text, encounter_id bigint, weight real, wing_length smallint, record_type text, age_code smallint, is_juv boolean, session_id bigint, visit_date date, max_hatch_year smallint, capture_time time without time zone, session_day date, session_month date, session_year date, session_month_squashed date)
+ LANGUAGE sql
+ STABLE
+AS $function$
+  SELECT
+    sp.id AS species_id,
+    sp.species_name,
+    b.id AS bird_id,
+    b.ring_no,
+    e.id AS encounter_id,
+    e.weight,
+    e.wing_length,
+    e.record_type,
+    e.age_code,
+    e.is_juv,
+    sess.id AS session_id,
+    sess.visit_date,
+    e.max_hatch_year,
+    e.capture_time,
+    -- visit_date is already a DATE, so truncating it to a day is the identity — and
+    -- the ::timestamp casts on month/year are load-bearing, not cosmetic. Postgres has
+    -- no date_trunc(text, date) overload, so a bare `date_trunc('month', sess.visit_date)`
+    -- resolves to date_trunc(text, timestamptz), which is STABLE (timezone-dependent)
+    -- rather than IMMUTABLE and measurably slower to evaluate per row. Casting to
+    -- timestamp picks the IMMUTABLE overload. Verified identical output for every
+    -- session date in the seed data; it is also strictly more deterministic, since the
+    -- timestamptz form would depend on the connection's TimeZone setting.
+    sess.visit_date AS session_day,
+    date_trunc('month', sess.visit_date::timestamp)::DATE AS session_month,
+    date_trunc('year', sess.visit_date::timestamp)::DATE AS session_year,
+    -- Year-agnostic join key for the 'month-squashed' group_by_time_period mode
+    -- (#996): buckets a row by calendar month alone, using the same 2000-<mm>-01
+    -- sentinel-year convention app/lib/month-totals.ts's synthesizeZeroStats
+    -- already established, so spine rows and raw-encounter rows join on equal
+    -- dates. make_date() and EXTRACT(MONTH FROM date) are both IMMUTABLE (unlike
+    -- date_trunc(text, timestamptz) above), so this needs no timestamp cast.
+    CASE
+      WHEN sess.visit_date IS NULL THEN NULL
+      ELSE make_date(2000, EXTRACT(MONTH FROM sess.visit_date)::int, 1)
+    END AS session_month_squashed
+  FROM public."Species" sp
+  JOIN public."Birds" b ON sp.id = b.species_id
+  -- Resighting/recovery record_types (public.resighting_record_type: U/F/D) are
+  -- passive encounters with no bird in the hand, and must not surface in any stats
+  -- RPC (#874). Filtering in the LEFT JOIN's ON clause (not the WHERE) preserves the
+  -- NULL-preserving semantics: a bird whose only encounters are resightings still
+  -- appears with encounter_id IS NULL rather than being dropped entirely.
+  --
+  -- is_resighting is a stored generated column (Encounters.sql), so this is a plain
+  -- boolean read with no per-row enum_range() evaluation to hoist.
+  LEFT JOIN public."Encounters" e ON b.id = e.bird_id
+    AND NOT e.is_resighting
+  LEFT JOIN public."Sessions" sess ON e.session_id = sess.id
+  WHERE (from_date IS NULL OR sess.visit_date >= from_date)
+   AND (to_date IS NULL OR sess.visit_date <= to_date)
+   AND (species_name_filter IS NULL OR sp.species_name = species_name_filter)
+   AND (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
+   AND (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
+   AND (month_filter IS NULL OR EXTRACT(MONTH FROM sess.visit_date) = month_filter);
+$function$;
+ALTER TABLE public."Encounters" ADD COLUMN is_resighting boolean GENERATED ALWAYS AS ((record_type = ANY (ARRAY['U'::text, 'F'::text, 'D'::text]))) STORED;
+CREATE INDEX idx_encounters_not_resighting ON public."Encounters" (id) WHERE is_resighting = false;

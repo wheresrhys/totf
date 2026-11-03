@@ -114,6 +114,7 @@ export type Database = {
           finding_condition: string | null
           id: number
           is_juv: boolean
+          is_resighting: boolean | null
           location_id: number
           lure_code_1: string | null
           lure_code_2: string | null
@@ -145,6 +146,7 @@ export type Database = {
           finding_condition?: string | null
           id?: number
           is_juv?: boolean
+          is_resighting?: boolean | null
           location_id: number
           lure_code_1?: string | null
           lure_code_2?: string | null
@@ -176,6 +178,7 @@ export type Database = {
           finding_condition?: string | null
           id?: number
           is_juv?: boolean
+          is_resighting?: boolean | null
           location_id?: number
           lure_code_1?: string | null
           lure_code_2?: string | null
