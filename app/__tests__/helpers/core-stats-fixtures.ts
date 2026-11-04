@@ -10,12 +10,13 @@ import robinAlphaHeadlineSnapshot from '@/test-fixtures/snapshots/tables/SimpleS
 
 /**
  * A `CoreStatsResult` row fixture: flat overrides merged over sensible
- * defaults, covering every column `core_stats` returns (see
- * `core_stats_result` in `types/supabase.types.ts`) plus the 8
+ * defaults, covering every column the now-deleted `core_stats` RPC
+ * returned (`CoreStatsResult` in `app/models/db.ts` is the app-owned
+ * standalone type that shape now lives in, #1244) plus the 8
  * `max_weight`/`avg_weight`/`min_weight`/`median_weight`/`max_wing`/
  * `avg_wing`/`min_wing`/`median_wing` fields several call sites still
- * override even though `core_stats_result` no longer declares them (#827
- * moved biometrics onto `biometrics_stats`) — kept here as harmless extras
+ * override even though `CoreStatsResult` doesn't declare them (#827
+ * moved biometrics onto a separate source) — kept here as harmless extras
  * so every pre-existing override site keeps working unchanged. Coerced via
  * `as CoreStatsResult` rather than constructing a full-fat instance, per this
  * repo's fixture-builder convention.
