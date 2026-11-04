@@ -5,10 +5,10 @@
  * One of six small, read-only "metric-group" RPCs a later orchestrator (T8a,
  * `refresh_simple_stats_cache`) will call to populate the merged
  * `SimpleStatsCache` table (T1a). It collapses into one place the bird-level
- * age-bucket projection `core_stats` (the five mutually-exclusive, exhaustive
- * buckets) and `demographics_stats` (`new_young_bird_count`) each derive
- * independently today — both off the one shared `stats_bird_age_bucket` utility
- * RPC, which owns the precedence rules this RPC must not reimplement.
+ * age-bucket projection the now-deleted `core_stats` (the five mutually-exclusive,
+ * exhaustive buckets) and `demographics_stats` (`new_young_bird_count`) each
+ * derive independently today — both off the one shared `stats_bird_age_bucket`
+ * utility RPC, which owns the precedence rules this RPC must not reimplement.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -49,7 +49,7 @@ async function getSpeciesId(speciesName: string): Promise<number> {
 	return data.id;
 }
 
-/** The five mutually-exclusive, exhaustive bird-level buckets, in core_stats' order. */
+/** The five mutually-exclusive, exhaustive bird-level buckets, in the order the now-deleted core_stats used. */
 const BUCKET_COLUMNS = [
 	'pullus_bird_count',
 	'juv_bird_count',
@@ -158,43 +158,10 @@ describe('stats_cache_bird_age_metrics', () => {
 	describe('bird-level age buckets', () => {
 		let alphaId: number;
 		let alphaClient: SupabaseClient;
-		let speciesNameById: Map<number, string>;
 
 		beforeAll(async () => {
 			alphaId = await getGroupIdByName('Alpha');
 			alphaClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
-			const { data } = await supabase.from('Species').select('id, species_name');
-			speciesNameById = new Map(
-				data!.map((species) => [species.id, species.species_name])
-			);
-		});
-
-		it("matches core_stats' own pullus/juv/postjuv/adult/unknown_age_bird_count for identical filters", async () => {
-			const filters = { ringing_group_filter: alphaId, group_by_species: true };
-			const { data, error } = await alphaClient.rpc(
-				'stats_cache_bird_age_metrics',
-				filters
-			);
-			expect(error).toBeNull();
-			const coreResult = await alphaClient.rpc('core_stats', filters);
-			expect(coreResult.error).toBeNull();
-			// Spine-driven on both sides, so the cell sets line up row-for-row.
-			expect(data).toHaveLength(coreResult.data!.length);
-			expect(data!.length).toBeGreaterThan(0);
-
-			for (const row of data!) {
-				const speciesName = speciesNameById.get(row.species_id!);
-				const coreRow = coreResult.data!.find(
-					(candidate) => candidate.species_name === speciesName
-				);
-				expect(coreRow, `no core_stats row for "${speciesName}"`).toBeDefined();
-				for (const column of BUCKET_COLUMNS) {
-					expect(
-						num(row[column]),
-						`${column} for "${speciesName}"`
-					).toBe(num(coreRow![column]));
-				}
-			}
 		});
 
 		it("the 5 bucket counts sum to the cell's total bird_count", async () => {
@@ -210,21 +177,27 @@ describe('stats_cache_bird_age_metrics', () => {
 				filters
 			);
 			expect(error).toBeNull();
-			const coreResult = await alphaClient.rpc('core_stats', filters);
-			expect(coreResult.error).toBeNull();
+			const basicResult = await alphaClient.rpc(
+				'stats_cache_basic_session_metrics',
+				filters
+			);
+			expect(basicResult.error).toBeNull();
 			expect(data!.length).toBeGreaterThan(0);
 
 			for (const row of data!) {
-				const coreRow = coreResult.data!.find(
+				const basicRow = basicResult.data!.find(
 					(candidate) => candidate.time_period === row.time_period
 				);
-				expect(coreRow, `no core_stats row for ${row.time_period}`).toBeDefined();
+				expect(
+					basicRow,
+					`no stats_cache_basic_session_metrics row for ${row.time_period}`
+				).toBeDefined();
 				const bucketSum = BUCKET_COLUMNS.reduce(
 					(total, column) => total + num(row[column]),
 					0
 				);
 				expect(bucketSum, `bucket sum for ${row.time_period}`).toBe(
-					num(coreRow!.bird_count)
+					num(basicRow!.bird_count)
 				);
 			}
 		});
