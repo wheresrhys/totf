@@ -46,14 +46,13 @@ export function SppStatsTable({
 	data: PageData;
 	viewedGroup: ViewedGroup;
 }) {
-	// The arbitrary-window fallback (the "CES only" checkbox and the two
-	// free-text date inputs) only ever reaches the live `core_stats`/
-	// `public_core_stats` RPCs — never the `SimpleStatsCacheBySpecies` cache
-	// tables a 'public' viewer's unauthenticated client is granted against
-	// (#1232). An 'own'/'shared' viewer is the only one who can meaningfully
-	// use it; a 'public' (or 'blocked') viewer gets the year selector alone,
-	// matching #1223's existing own/shared grouping for the biometrics half of
-	// this same page.
+	// The arbitrary-window fallback (the two free-text date inputs) only ever
+	// reaches the live `core_stats`/`public_core_stats` RPCs — never the
+	// `SimpleStatsCacheBySpecies` cache tables a 'public' viewer's
+	// unauthenticated client is granted against (#1232). An 'own'/'shared'
+	// viewer is the only one who can meaningfully use it; a 'public' (or
+	// 'blocked') viewer gets the year selector alone, matching #1223's existing
+	// own/shared grouping for the biometrics half of this same page.
 	const canUseArbitraryWindow =
 		accessLevel === 'own' || accessLevel === 'shared';
 	// Declared inside the component so it can close over `viewedGroup` —
@@ -88,7 +87,6 @@ export function SppStatsTable({
 
 	const formRef = useRef<HTMLFormElement>(null);
 	const [year, setYear] = useState<number | null>(null);
-	const [cesOnly, setCesOnly] = useState<boolean>(false);
 	const [fromDate, setFromDate] = useState<string | null>(null);
 	const [toDate, setToDate] = useState<string | null>(null);
 	const [speciesStats, setSpeciesStats] =
@@ -108,7 +106,6 @@ export function SppStatsTable({
 
 	function clearSettings() {
 		setYear(null);
-		setCesOnly(false);
 	}
 
 	function clearDates() {
@@ -116,16 +113,10 @@ export function SppStatsTable({
 		setToDate(null);
 	}
 
-	function setDatesFromSettings({
-		year,
-		cesOnly
-	}: {
-		year: number | null;
-		cesOnly: boolean;
-	}) {
+	function setDatesFromSettings({ year }: { year: number | null }) {
 		if (year) {
-			setFromDate(`${year.toString()}-${cesOnly ? '04-25' : '01-01'}`);
-			setToDate(`${year.toString()}-${cesOnly ? '09-05' : '12-31'}`);
+			setFromDate(`${year.toString()}-01-01`);
+			setToDate(`${year.toString()}-12-31`);
 		} else {
 			clearDates();
 		}
@@ -134,13 +125,7 @@ export function SppStatsTable({
 	function handleYearSelect(event: React.ChangeEvent<HTMLSelectElement>) {
 		const year = parseInt(event.target.value) || null;
 		setYear(year);
-		setDatesFromSettings({ year, cesOnly });
-	}
-
-	function handleCesOnlyChange(event: React.ChangeEvent<HTMLInputElement>) {
-		const cesOnly = event.target.checked;
-		setCesOnly(cesOnly);
-		setDatesFromSettings({ year, cesOnly });
+		setDatesFromSettings({ year });
 	}
 
 	function handleDateChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -178,24 +163,6 @@ export function SppStatsTable({
 								))}
 							</select>
 						</div>
-						{canUseArbitraryWindow && (
-							<div className="flex items-center gap-2">
-								<label
-									htmlFor="ces-only-checkbox"
-									className={`shrink-0 ${!year ? 'text-gray-400' : ''}`}
-								>
-									CES only
-								</label>
-								<input
-									id="ces-only-checkbox"
-									type="checkbox"
-									className="checkbox"
-									onChange={handleCesOnlyChange}
-									checked={cesOnly}
-									disabled={!year}
-								/>
-							</div>
-						)}
 					</div>
 					{canUseArbitraryWindow && (
 						<div className="flex gap-2 flex-wrap justify-end">

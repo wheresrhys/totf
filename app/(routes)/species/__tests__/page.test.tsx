@@ -130,19 +130,19 @@ describe('species list page', () => {
 		});
 	});
 
-	// Per-accessLevel rendering of the CES-only checkbox / date inputs is
-	// unit-tested directly against SppStatsTable
+	// Per-accessLevel rendering of the free-text date inputs is unit-tested
+	// directly against SppStatsTable
 	// (components/pages/species/__tests__/SppStatsTable.test.tsx) — this just
 	// confirms the real `fetchSpeciesListPageContent` threads the accessLevel
 	// `fetchSpeciesDataWithAccessLevel` resolves all the way through to the
 	// rendered page rather than discarding it (#1232).
 	describe('accessLevel threading to the rendered controls', () => {
-		it("hides the CES only checkbox for a 'public' access level", async () => {
+		it("hides the free-text date inputs for a 'public' access level", async () => {
 			mockSpeciesData(alphaSpeciesSnapshot as unknown[], 'public');
 			mockYearCells([{ year: 2023 }]);
 			render(await Page());
 			await screen.findByRole('table');
-			expect(screen.queryByLabelText('CES only')).toBeNull();
+			expect(screen.queryByLabelText('From date')).toBeNull();
 		});
 	});
 });

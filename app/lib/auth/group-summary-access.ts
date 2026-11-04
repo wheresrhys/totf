@@ -136,12 +136,11 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
  *    `/species` list page's default and year-select views too.
  *
  *    Returning `null` therefore means "arbitrary window": the `/species` list
- *    page's "CES only" range (`YYYY-04-25`..`YYYY-09-05`) and its two
- *    free-text date inputs are the only things that produce one. For *this*
- *    function's own caller — the counts half — those keep reading the live
- *    `core_stats`/`public_core_stats` RPCs. The alternative was to serve them
- *    a wrong `bird_count`, so that dependency stays until either the cache
- *    gains an arbitrary-window grain or those two filters are reshaped to
+ *    page's two free-text date inputs are the only thing that produces one.
+ *    For *this* function's own caller — the counts half — that keeps reading
+ *    the live `core_stats`/`public_core_stats` RPCs. The alternative was to
+ *    serve a wrong `bird_count`, so that dependency stays until either the
+ *    cache gains an arbitrary-window grain or those two inputs are reshaped to
  *    cache-aligned ones.
  *
  * Exported because the `/species` list page's *other* half —

@@ -250,8 +250,8 @@ async function readBiometricsFromMetricsRpc(
 //   month, a squashed calendar month — i.e. the page's default and year-select
 //   views) reads `SimpleStatsCacheBySpecies` directly, where the post-import
 //   refresh queue has already materialized these 8 columns per species.
-// - An arbitrary window (the page's "CES only" range and its two free-text
-//   date inputs) is computed live instead, by `stats_cache_biometrics_metrics`
+// - An arbitrary window (the page's two free-text date inputs) is computed
+//   live instead, by `stats_cache_biometrics_metrics`
 //   (#1244 — it used to be `biometrics_stats`, which nothing here calls any
 //   more). `MAX`/`MIN` would survive being recombined from finer cells, but
 //   `AVG`/`MEDIAN` are not associative:
@@ -293,8 +293,8 @@ async function fetchBiometricsStats(
 /**
  * `fetchSpeciesData`'s result alongside the `accessLevel` that served it —
  * for the one caller (the `/species` list page, #1232) that needs to know
- * whether the viewer can reach the arbitrary-window fallback (the "CES only"
- * checkbox and its two free-text date inputs) at all. Every other caller
+ * whether the viewer can reach the arbitrary-window fallback (the two
+ * free-text date inputs) at all. Every other caller
  * keeps using the rows-only `fetchSpeciesData` below, unaffected.
  */
 export type SpeciesDataWithAccessLevel = {
