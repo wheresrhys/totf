@@ -26,22 +26,46 @@ export type SimpleStatsCacheBySpeciesRow =
 // covers both.
 export type ImportJobStatus = Database['public']['Enums']['import_job_status'];
 
-// core_stats and its public wrapper public_core_stats share the
-// core_stats_result composite type (#772). A Postgres composite type's
-// attributes can never be NOT NULL, so `supabase gen types` marks every column
-// nullable — but the RPC COALESCEs its count columns and only ever emits whole
-// rows, and the app relied on the all-non-null contract the previous RETURNS TABLE
-// signature generated. Strip the null back off here, in the one place the row type
-// is defined, so every consumer keeps the same shape it had before the refactor.
-// Post-#815-item-4 (the core_stats -> core_stats rename), the app's own call
-// sites all call core_stats/public_core_stats instead (#830), so this type now
-// sources from the byte-identical core_stats_result composite type rather than
-// core_stats_result, and is itself renamed CoreStatsResult (from
-// AggregateStatsResult) to match — same shape, just following the RPC rename.
+// Unlike its DemographicsStatsResult/ArrivalsStatsResult siblings below, this
+// one is a standalone TypeScript type rather than a view over a generated
+// Postgres composite type (#1245-style precedent, applied here at #1244's
+// removal of core_stats). It used to derive from `core_stats_result`, the
+// composite both core_stats and its public wrapper public_core_stats
+// returned — a Postgres composite type's attributes can never be NOT NULL,
+// so `supabase gen types` marked every column nullable, which this type
+// stripped back off via a NonNullable mapped type, since the RPC COALESCEd
+// its count columns and only ever emitted whole rows. Every app call site
+// now reads the already-materialized SimpleStatsCache/SimpleStatsCacheBySpecies
+// tables instead (#1234/#1244), and the RPC pair (plus core_stats_result)
+// was dropped from the schema outright once nothing called them. The app
+// owns this shape now; the columns below are the ones the composite
+// carried, unchanged — still all non-null, since every cache-table row
+// still carries a real value for each of them (NOT NULL columns on both
+// tables, see "SimpleStatsCache".sql).
 export type CoreStatsResult = {
-	[K in keyof Database['public']['CompositeTypes']['core_stats_result']]-?: NonNullable<
-		Database['public']['CompositeTypes']['core_stats_result'][K]
-	>;
+	species_name: string;
+	time_period: string;
+	session_count: number;
+	total_effort: string;
+	effort_per_session: string;
+	effort_per_encounter: string;
+	avg_encounters_per_session: number;
+	max_per_session: number;
+	species_count: number;
+	bird_count: number;
+	encounter_count: number;
+	new_bird_count: number;
+	pullus_bird_count: number;
+	juv_bird_count: number;
+	postjuv_bird_count: number;
+	adult_bird_count: number;
+	unknown_age_bird_count: number;
+	pullus_enc_count: number;
+	juv_enc_count: number;
+	postjuv_enc_count: number;
+	adult_enc_count: number;
+	unknown_age_enc_count: number;
+	max_new_per_session: number;
 };
 
 // demographics_stats is core_stats' companion RPC (#800, renamed from

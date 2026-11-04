@@ -9,7 +9,6 @@ import {
 } from '@testing-library/react';
 import { SummaryTotalsSection } from '../SummaryTotalsSection';
 import { buildMonthTotalsRows } from '@/app/lib/month-totals';
-import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
@@ -19,7 +18,8 @@ import {
 import {
 	buildCoreStatsRow,
 	buildDailyStatsRow,
-	buildMonthSquashedFixture
+	buildMonthSquashedFixture,
+	ALPHA_CORE_STATS_BY_SPECIES
 } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 const fetchSpeciesDataMock = vi.fn();
@@ -40,11 +40,7 @@ vi.mock('@/app/actions/period-totals', () => ({
 	fetchPeriodTotals: (...args: unknown[]) => fetchPeriodTotalsMock(...args)
 }));
 
-// This fixture is grouped by species only, so time_period is genuinely null —
-// CoreStatsResult's NonNullable mapped type (app/models/db.ts) assumes every
-// column is always present, so a direct assertion doesn't compile (#895).
-// eslint-disable-next-line no-restricted-syntax -- see comment above
-const speciesStats = speciesDataSnapshot as unknown as CoreStatsResult[];
+const speciesStats = ALPHA_CORE_STATS_BY_SPECIES;
 const monthTotals = buildMonthTotalsRows(2026, []);
 
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };

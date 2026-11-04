@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
-import alphaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
-import betaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/beta.by-species.json';
-import gammaSpeciesSnapshot from '@/test-fixtures/snapshots/core_stats/gamma.by-species.json';
+import {
+	ALPHA_CORE_STATS_BY_SPECIES as alphaSpeciesSnapshot,
+	BETA_CORE_STATS_BY_SPECIES as betaSpeciesSnapshot,
+	GAMMA_CORE_STATS_BY_SPECIES as gammaSpeciesSnapshot
+} from '@/app/__tests__/helpers/core-stats-fixtures';
 
 const { mockFetchAuthorisedCoreStats, mockFetchSpeciesDataWithAccessLevel } =
 	vi.hoisted(() => ({

@@ -9,7 +9,12 @@ import {
 	waitFor
 } from '@testing-library/react';
 import Page, { fetchSummaryYearOrMonthPageContent } from '../page';
-import alphaStats from '@/test-fixtures/snapshots/core_stats/alpha.summary-totals.json';
+import { ALPHA_CORE_STATS_SUMMARY_TOTALS } from '@/app/__tests__/helpers/core-stats-fixtures';
+
+// Alpha's seed data always has an all-time cell, so this is never actually
+// null — the type is nullable only because the real all-time read can
+// legitimately return none for a group with no data at all.
+const alphaStats = ALPHA_CORE_STATS_SUMMARY_TOTALS!;
 import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 

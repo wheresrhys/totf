@@ -34,7 +34,7 @@ vi.mock('@/lib/supabase', async (importOriginal) => {
 
 import {
 	fetchAuthorisedCoreStats,
-	type CoreStatsRpcParams
+	type StatsWindowParams
 } from '../group-summary-access';
 
 /**
@@ -83,13 +83,63 @@ function mockPublicTableRead(rows: unknown[]) {
 	mockPublicSupabaseFrom.mockImplementation(client.from);
 }
 
-/** A client that only answers `.rpc()` — the non-cache-alignable fallback. */
-function makeRpcClient(rows: CoreStatsResult[] | null) {
+/**
+ * A client that answers `.rpc()` with `rpcRows` — the non-cache-alignable
+ * fallback — and `.from()` with `speciesRows`, for the `readSpeciesNamesById`
+ * join `runLiveMetricsRecompute` makes when the arbitrary-window RPC result
+ * is keyed on `species_id`.
+ */
+function makeRpcClient(
+	rpcRows: unknown[] | null,
+	speciesRows: { id: number; species_name: string }[] = []
+) {
+	const speciesChain = makeQueryChain(speciesRows);
 	return {
 		rpc: vi.fn().mockReturnValue({
 			then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
-				Promise.resolve({ data: rows, error: null }).then(resolve)
-		})
+				Promise.resolve({ data: rpcRows, error: null }).then(resolve)
+		}),
+		from: vi.fn(() => speciesChain.chain)
+	};
+}
+
+/**
+ * A `stats_cache_basic_session_metrics` row: the basic-count and
+ * session/effort columns `core_stats` shares with it, keyed on `species_id`
+ * rather than `species_name`.
+ */
+function buildBasicSessionMetricsRow(
+	overrides: Partial<{
+		species_id: number | null;
+		time_period: string | null;
+		species_count: number;
+		bird_count: number;
+		encounter_count: number;
+		new_bird_count: number;
+		session_count: number;
+		total_effort: string;
+		effort_per_session: string;
+		effort_per_encounter: string;
+		avg_encounters_per_session: number;
+		max_per_session: number;
+		max_new_per_session: number;
+	}> = {}
+) {
+	return {
+		species_id: null,
+		time_period: null,
+		species_count: 12,
+		bird_count: 40,
+		encounter_count: 55,
+		new_bird_count: 30,
+		session_count: 4,
+		total_effort: '18:00:00',
+		effort_per_session: '02:00:00',
+		effort_per_encounter: '02:34:17',
+		avg_encounters_per_session: 1.75,
+		max_per_session: 3,
+		max_new_per_session: 3,
+		...overrides
 	};
 }
 
@@ -108,7 +158,7 @@ const viewedGroup: ViewedGroup = { id: VIEWED_GROUP_ID, slug: 'alpha' };
  * without consulting `public_areas` at all.
  */
 async function readOwnGroupStats(
-	rpcParams: CoreStatsRpcParams,
+	rpcParams: StatsWindowParams,
 	rows: unknown[] = [buildCacheRow()]
 ) {
 	vi.mocked(getGroupCookie).mockResolvedValue(VIEWED_GROUP_ID);
@@ -375,9 +425,9 @@ describe('summary read-path access model', () => {
 			expect(rows.map((row) => row.time_period)).toEqual(['2025-06-04']);
 		});
 
-		it('an arbitrary (non-cell-aligned) window falls back to the core_stats RPC', async () => {
+		it('an arbitrary (non-cell-aligned) window falls back to a live stats_cache_basic_session_metrics recompute', async () => {
 			vi.mocked(getGroupCookie).mockResolvedValue(VIEWED_GROUP_ID);
-			const rpcRows = [buildCoreStatsRow({ encounter_count: 7 })];
+			const rpcRows = [buildBasicSessionMetricsRow({ encounter_count: 7 })];
 			const client = makeRpcClient(rpcRows);
 			vi.mocked(getAuthenticatedSupabaseClient).mockResolvedValue(
 				client as never
@@ -385,21 +435,56 @@ describe('summary read-path access model', () => {
 
 			// A shape the /species list page's free-text date inputs can
 			// produce — no cache cell spans it, and its distinct-count columns
-			// can't be rebuilt from finer cells.
+			// can't be rebuilt from finer cells. Ungrouped by species here, so
+			// no Species join is needed — species_name comes back null.
+			const result = await fetchAuthorisedCoreStats(viewedGroup, {
+				group_by_species: false,
+				from_date: '2026-04-25',
+				to_date: '2026-09-05'
+			});
+
+			expect(result.accessLevel).toBe('own');
+			expect(result.rows).toHaveLength(1);
+			expect(result.rows[0].encounter_count).toBe(7);
+			expect(result.rows[0].species_name).toBeNull();
+			expect(client.rpc).toHaveBeenCalledWith(
+				'stats_cache_basic_session_metrics',
+				expect.objectContaining({ ringing_group_filter: VIEWED_GROUP_ID })
+			);
+			expect(client.from).not.toHaveBeenCalled();
+		});
+
+		it('resolves species_name via the shared species-id join when an arbitrary window is grouped by species', async () => {
+			vi.mocked(getGroupCookie).mockResolvedValue(VIEWED_GROUP_ID);
+			const rpcRows = [
+				buildBasicSessionMetricsRow({ species_id: 7, encounter_count: 7 }),
+				buildBasicSessionMetricsRow({ species_id: 9, encounter_count: 3 })
+			];
+			const client = makeRpcClient(rpcRows, [
+				{ id: 7, species_name: 'Robin' },
+				{ id: 9, species_name: 'Wren' }
+			]);
+			vi.mocked(getAuthenticatedSupabaseClient).mockResolvedValue(
+				client as never
+			);
+
 			const result = await fetchAuthorisedCoreStats(viewedGroup, {
 				group_by_species: true,
 				from_date: '2026-04-25',
 				to_date: '2026-09-05'
 			});
 
-			expect(result).toEqual({ accessLevel: 'own', rows: rpcRows });
-			expect(client.rpc).toHaveBeenCalledWith(
-				'core_stats',
-				expect.objectContaining({ ringing_group_filter: VIEWED_GROUP_ID })
-			);
+			expect(result.accessLevel).toBe('own');
+			expect(
+				result.rows.map((row) => [row.species_name, row.encounter_count])
+			).toEqual([
+				['Robin', 7],
+				['Wren', 3]
+			]);
+			expect(client.from).toHaveBeenCalledWith('Species');
 		});
 
-		it('an arbitrary window on a public target returns empty rows, never falling back to the public_core_stats RPC', async () => {
+		it('an arbitrary window on a public target returns empty rows, never falling back to a live metrics recompute', async () => {
 			vi.mocked(getGroupCookie).mockResolvedValue(null);
 			vi.mocked(resolveGroupPublicAreasForRequest).mockResolvedValue([
 				'summary'

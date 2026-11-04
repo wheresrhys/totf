@@ -5,12 +5,13 @@
  * One of six small, read-only "metric-group" RPCs a later orchestrator (T8a,
  * `refresh_simple_stats_cache`) will call to populate the merged
  * `SimpleStatsCache` table (T1a). It collapses into one place the
- * ENCOUNTER-level age-bucket projection `core_stats` (the five
- * mutually-exclusive, exhaustive buckets) and `demographics_stats` (the
- * young-trends slices) each derive independently today, in a near-identical
+ * ENCOUNTER-level age-bucket projection the now-deleted `core_stats` (the
+ * five mutually-exclusive, exhaustive buckets) and `demographics_stats` (the
+ * young-trends slices) each derived independently, in a near-identical
  * `encounter_age_bucket_counts` CTE apiece — `juv_enc_count` and
  * `postjuv_enc_count` appear in BOTH with byte-identical definitions, so the
- * comparisons below against each caller are what actually verify the dedup.
+ * comparisons below against demographics_stats are what actually verify the
+ * dedup.
  *
  * Requires local Supabase running and e2e seed data loaded:
  *   npm run db:start:local
@@ -51,7 +52,7 @@ async function getSpeciesId(speciesName: string): Promise<number> {
 	return data.id;
 }
 
-/** The five mutually-exclusive, exhaustive encounter-level buckets, in core_stats' order. */
+/** The five mutually-exclusive, exhaustive encounter-level buckets, in the order the now-deleted core_stats used. */
 const BUCKET_COLUMNS = [
 	'pullus_enc_count',
 	'juv_enc_count',
@@ -60,7 +61,7 @@ const BUCKET_COLUMNS = [
 	'unknown_age_enc_count'
 ] as const;
 
-/** The three young-trends columns demographics_stats owns, plus the two it shares with core_stats. */
+/** The three young-trends columns demographics_stats owns, plus the two it shared with the now-deleted core_stats. */
 const DEMOGRAPHICS_COLUMNS = [
 	'juv_enc_count',
 	'postjuv_enc_count',
@@ -182,42 +183,10 @@ describe('stats_cache_encounter_age_metrics', () => {
 	describe('core-shaped encounter age buckets', () => {
 		let alphaId: number;
 		let alphaClient: SupabaseClient;
-		let speciesNameById: Map<number, string>;
 
 		beforeAll(async () => {
 			alphaId = await getGroupIdByName('Alpha');
 			alphaClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
-			const { data } = await supabase.from('Species').select('id, species_name');
-			speciesNameById = new Map(
-				data!.map((species) => [species.id, species.species_name])
-			);
-		});
-
-		it("matches core_stats' own pullus/juv/postjuv/adult/unknown_age_enc_count for identical filters", async () => {
-			const filters = { ringing_group_filter: alphaId, group_by_species: true };
-			const { data, error } = await alphaClient.rpc(
-				'stats_cache_encounter_age_metrics',
-				filters
-			);
-			expect(error).toBeNull();
-			const coreResult = await alphaClient.rpc('core_stats', filters);
-			expect(coreResult.error).toBeNull();
-			// Spine-driven on both sides, so the cell sets line up row-for-row.
-			expect(data).toHaveLength(coreResult.data!.length);
-			expect(data!.length).toBeGreaterThan(0);
-
-			for (const row of data!) {
-				const speciesName = speciesNameById.get(row.species_id!);
-				const coreRow = coreResult.data!.find(
-					(candidate) => candidate.species_name === speciesName
-				);
-				expect(coreRow, `no core_stats row for "${speciesName}"`).toBeDefined();
-				for (const column of BUCKET_COLUMNS) {
-					expect(num(row[column]), `${column} for "${speciesName}"`).toBe(
-						num(coreRow![column])
-					);
-				}
-			}
 		});
 
 		it("the 5 bucket counts sum to the cell's total encounter_count", async () => {
@@ -233,24 +202,27 @@ describe('stats_cache_encounter_age_metrics', () => {
 				filters
 			);
 			expect(error).toBeNull();
-			const coreResult = await alphaClient.rpc('core_stats', filters);
-			expect(coreResult.error).toBeNull();
+			const basicResult = await alphaClient.rpc(
+				'stats_cache_basic_session_metrics',
+				filters
+			);
+			expect(basicResult.error).toBeNull();
 			expect(data!.length).toBeGreaterThan(0);
 
 			for (const row of data!) {
-				const coreRow = coreResult.data!.find(
+				const basicRow = basicResult.data!.find(
 					(candidate) => candidate.time_period === row.time_period
 				);
 				expect(
-					coreRow,
-					`no core_stats row for ${row.time_period}`
+					basicRow,
+					`no stats_cache_basic_session_metrics row for ${row.time_period}`
 				).toBeDefined();
 				const bucketSum = BUCKET_COLUMNS.reduce(
 					(total, column) => total + num(row[column]),
 					0
 				);
 				expect(bucketSum, `bucket sum for ${row.time_period}`).toBe(
-					num(coreRow!.encounter_count)
+					num(basicRow!.encounter_count)
 				);
 			}
 		});

@@ -7,29 +7,25 @@ import {
 	waitFor
 } from '@testing-library/react';
 import { SppStatsTable } from '../SppStatsTable';
-import speciesDataSnapshot from '@/test-fixtures/snapshots/core_stats/alpha.by-species.json';
+import { ALPHA_CORE_STATS_BY_SPECIES } from '@/app/__tests__/helpers/core-stats-fixtures';
 import { ALPHA_BIOMETRICS_BY_SPECIES } from '@/app/__tests__/helpers/biometrics-stats-fixtures';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 import { mergeSpeciesBiometrics } from '../../lib/species-stats';
 import type { SpeciesStatsRow } from '../../types';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { PageData } from '@/app/(routes)/species/page';
 
 vi.mock('@/app/actions/spp-data', () => ({
 	fetchSpeciesData: vi.fn()
 }));
 
-// fetchSpeciesData hands this table the merge of a core_stats by-species result
-// and its wing/weight sibling, so build the fixture data the same way rather
-// than reading the biometric columns off the core_stats fixture — core_stats
-// stopped carrying its own copies at #827 (#883).
+// fetchSpeciesData hands this table the merge of a core_stats-family by-species
+// result and its wing/weight sibling, so build the fixture data the same way
+// rather than reading the biometric columns off the by-species fixture
+// directly — ALPHA_CORE_STATS_BY_SPECIES already carries them too
+// (SimpleStatsCacheBySpecies has them on every row), but ALPHA_BIOMETRICS_BY_SPECIES
+// is the real separate source production merges in (#883).
 const speciesStats = mergeSpeciesBiometrics(
-	// This fixture is grouped by species only, so time_period is genuinely
-	// null — CoreStatsResult's NonNullable mapped type (app/models/db.ts)
-	// assumes every column is always present, so a direct assertion doesn't
-	// compile (#895).
-	// eslint-disable-next-line no-restricted-syntax -- see comment above
-	speciesDataSnapshot as unknown as CoreStatsResult[],
+	ALPHA_CORE_STATS_BY_SPECIES,
 	ALPHA_BIOMETRICS_BY_SPECIES
 );
 
@@ -51,7 +47,7 @@ describe('SppStatsTable', () => {
 				<SppStatsTable data={pageData} viewedGroup={{ id: 1, slug: 'alpha' }} />
 			);
 			const rows = document.querySelectorAll('tbody tr');
-			expect(rows.length).toBe(speciesDataSnapshot.length);
+			expect(rows.length).toBe(ALPHA_CORE_STATS_BY_SPECIES.length);
 		});
 	});
 

@@ -44,22 +44,22 @@ an RPC call** — three things follow from that:
   nothing in either read path distinguishes the two.
 - **The old RPC params are translated into `temporal_unit`/`time_period` filters**, and the one shape
   that can't be — an _ungrouped_ aggregate over a window that isn't itself a single cache cell, i.e.
-  the `/species` list page's "CES only" range and its two free-text date inputs — still falls back to
-  the live `core_stats` RPC for the `'own'`/`'shared'` branches. The cache can't answer those: the
+  the `/species` list page's two free-text date inputs — still falls back to a live
+  `stats_cache_basic_session_metrics` recompute for the `'own'`/`'shared'` branches (#1244 — it used
+  to be the `core_stats` RPC, which nothing here calls any more). The cache can't answer those: the
   aggregate's distinct-count columns (`bird_count`, the `*_bird_count` age buckets) can't be rebuilt
   by summing finer cells. Every window the summary pages ask for (all time, a whole calendar year, a
   whole calendar month, a squashed calendar month) _is_ a cache cell and reads from the cache. See
   `resolveStatsCacheQueryPlan`'s own comment for the full param→filter mapping, including the
   year-grain-for-one-calendar-month read that goes via the month grain. **The `'public'` branch is the
   one exception (#1274):** since the UI itself stopped offering a way to request an arbitrary window
-  as a public/blocked viewer (#1232), `fetchAuthorisedCoreStats` no longer falls through to
-  `public_core_stats` for one either — it returns `{ accessLevel: 'public', rows: [] }` directly,
-  mirroring the `'blocked'` branch's "no rows, no throw" convention, rather than silently serving a
-  live RPC call the UI no longer surfaces a route to.
+  as a public/blocked viewer (#1232), `fetchAuthorisedCoreStats` no longer falls through to a live
+  recompute for one either — it returns `{ accessLevel: 'public', rows: [] }` directly, mirroring the
+  `'blocked'` branch's "no rows, no throw" convention, rather than silently serving a live call the UI
+  no longer surfaces a route to.
 
-(`core_stats`/`public_core_stats` are themselves the already-renamed pair #830 moved every app-code
-call site onto — the old `aggregate_stats`/`public_aggregate_stats` names are already gone from the
-schema, not pending deletion. See `supabase/CLAUDE.md`'s "Companion stats RPCs" for the RPC-side
+(`core_stats`/`public_core_stats` are already gone from app code reachability — a later ticket drops
+them from the schema too. See `supabase/CLAUDE.md`'s "Companion stats RPCs" for the RPC-side
 internals.)
 
 `lib/group-slug.ts`'s group-lookup functions (`resolveGroupIdBySlug`, `resolveGroupSlugById`,
@@ -125,7 +125,8 @@ the root layout, not a subtree one.
     The same gap arises when a `stats_cache_*_metrics` **RPC** result is consumed directly — they
     key on `species_id` too, and an RPC result can't carry a PostgREST embed. There the fix is one
     extra `Species` read filtered to the ids the result actually carries, folded into a
-    `Map<number, string>` and applied to the rows (`spp-data.ts`'s `readSpeciesNamesById`, #1244).
+    `Map<number, string>` and applied to the rows (`app/lib/species-names.ts`'s
+    `readSpeciesNamesById`, #1244, shared by `spp-data.ts` and `group-summary-access.ts`).
     Reuse that shape rather than re-reading the whole table or embedding per row.
   - Ordering parent rows by that embedded name needs PostgREST's `.order('Species(species_name)')`
     spelling. supabase-js' `.order('species_name', { referencedTable: 'Species' })` orders rows

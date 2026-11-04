@@ -67,47 +67,49 @@ Key design notes:
   (#1202).** Their SELECT policies carry three OR-branches — the row's own group by its JWT, a
   `GroupDataSharing` recipient of that group (the identical branch to `Encounters`'
   `group_encounters_access`, with `group_id` in place of `ringing_group_id`), and *anyone at all*
-  once the row's group has `'summary'` in `public_areas`. That third branch is the gate
-  `public_core_stats` applies, enforced by RLS directly rather than through a `SECURITY DEFINER`
-  wrapper, so the summary page's four access levels survive a repoint off `core_stats`/
-  `public_core_stats` onto the cache with no new read path. It is evaluable anonymously because
+  once the row's group has `'summary'` in `public_areas`. That third branch is the gate the
+  now-deleted `public_core_stats` used to apply, enforced by RLS directly rather than through a
+  `SECURITY DEFINER` wrapper, so the summary page's four access levels survived the repoint off
+  `core_stats`/`public_core_stats` onto the cache with no new read path. It is evaluable anonymously because
   `RingingGroups` is openly readable (`USING (TRUE)` + `GRANT ALL TO anon`), and the first two
   branches simply evaluate false for a no-JWT caller — `auth.jwt()` is NULL, so the `::bigint`
   cast yields NULL rather than erroring. `anon` therefore has `SELECT` and nothing else on both
   tables; INSERT/UPDATE remain own-group `authenticated` only, and neither table has any DELETE
   grant or policy. Keep the two tables' SELECT policies equivalent to each other by hand.
 - Several fields are populated by triggers (e.g. `proven_age` on Birds, timestamps on Sessions/Encounters).
-- Complex queries are exposed as Postgres RPC functions (e.g. `core_stats`, `notable_retraps`, `find_discrepencies`).
+- Complex queries are exposed as Postgres RPC functions (e.g. `demographics_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
 
-### Companion stats RPCs and shared plumbing (`core_stats` / `demographics_stats`, #800/#877)
+### Companion stats RPCs and shared plumbing (`demographics_stats` / `arrivals_stats`, #800/#877, formerly also `core_stats`)
 
-`core_stats` and `demographics_stats` (a new-adult count, young-trends derivations and #843's
-returning-age buckets, split into its own RPC rather than folded into `core_stats`' already-large
-single query — for query-plan simplicity and to leave `core_stats`' existing columns untouched)
-share the same input
-signature (`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
-group_by_time_period`) and both build on the same underlying logic via `stats_raw_encounters` /
+`demographics_stats` (a new-adult count, young-trends derivations and #843's returning-age
+buckets) and `arrivals_stats` build on the same underlying logic via `stats_raw_encounters` /
 `stats_spine` / `stats_encounter_age_classification` / `stats_bird_age_bucket` — internal utility
 RPCs holding the windowed-row-source / grouping-spine / per-encounter-classification /
-per-bird-bucket-resolution logic previously duplicated inline in `core_stats`. Each top-level
-RPC calls every utility it needs exactly once and materializes the result into a local CTE (reused
-by every downstream reference in that RPC), so the base tables aren't rescanned once per downstream
-CTE — but a utility RPC that itself depends on another (e.g. `stats_bird_age_bucket` →
-`stats_encounter_age_classification` → `stats_raw_encounters`) does re-derive that dependency
-independently per call site, so a top-level RPC needing several layers (e.g. `demographics_stats`
-needing `stats_spine` + `stats_encounter_age_classification` + `stats_bird_age_bucket`) re-scans the
-base tables a small constant number of times rather than once — accepted as a reasonable tradeoff at
-this app's data scale; keep an eye on it if a future RPC stacks many more utility layers. Keep the
-utility RPCs' bucket/precedence definitions in sync **by hand** with `app/models/encounter.ts`'s
-`getAgeClass()` if either changes. `demographics_stats` was originally named `population_stats`
-(#800); #877 created the renamed `demographics_stats`/`demographics_stats_result` pair as
-byte-identical siblings, #878 migrated every app-code call site onto the new names, and #879
-dropped the old `population_stats` function and `population_stats_result` type entirely — the
-same three-step pattern used for `core_stats`/`public_core_stats` (#830, see `app/CLAUDE.md`'s
-"Public pages and the group summary read-path"). `demographics_stats.new_young_bird_count` was
-originally a duplicate of a same-named column on `core_stats` (#800); #824 removed `core_stats`'s
-copy (and the corresponding UI series, #817) as unused, so `demographics_stats` now holds the only
+per-bird-bucket-resolution logic. This shared-utility pattern, and the whole input signature
+(`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
+group_by_time_period`) both RPCs still take, originated with a now-deleted third sibling,
+`core_stats` (#1244 — zero remaining app call sites once the `/species` list page's arbitrary-window
+counts rerouted onto `stats_cache_basic_session_metrics`; dropped from the schema entirely by a
+later ticket). Each top-level RPC calls every utility it needs exactly once and materializes the
+result into a local CTE (reused by every downstream reference in that RPC), so the base tables
+aren't rescanned once per downstream CTE — but a utility RPC that itself depends on another (e.g.
+`stats_bird_age_bucket` → `stats_encounter_age_classification` → `stats_raw_encounters`) does
+re-derive that dependency independently per call site, so a top-level RPC needing several layers
+(e.g. `demographics_stats` needing `stats_spine` + `stats_encounter_age_classification` +
+`stats_bird_age_bucket`) re-scans the base tables a small constant number of times rather than once
+— accepted as a reasonable tradeoff at this app's data scale; keep an eye on it if a future RPC
+stacks many more utility layers. Keep the utility RPCs' bucket/precedence definitions in sync **by
+hand** with `app/models/encounter.ts`'s `getAgeClass()` if either changes. `demographics_stats` was
+originally named `population_stats` (#800); #877 created the renamed
+`demographics_stats`/`demographics_stats_result` pair as byte-identical siblings, #878 migrated
+every app-code call site onto the new names, and #879 dropped the old `population_stats` function
+and `population_stats_result` type entirely — the same three-step pattern later used to retire
+`core_stats`/`public_core_stats` (#830 renamed them from `aggregate_stats`/`public_aggregate_stats`;
+#1244 removed the renamed pair's last app call site; a later ticket drops them from the schema —
+see `app/CLAUDE.md`'s "Public pages and the group summary read-path"). `demographics_stats.new_young_bird_count`
+was originally a duplicate of a same-named column on `core_stats` (#800); #824 removed `core_stats`'s
+copy (and the corresponding UI series, #817) as unused, so `demographics_stats` holds the only
 `new_young_bird_count` column in the schema.
 
 **"Old timers" no longer exists at any layer (#837).** `demographics_stats` originally carried a

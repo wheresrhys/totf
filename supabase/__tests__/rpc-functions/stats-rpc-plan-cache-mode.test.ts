@@ -42,7 +42,6 @@ import { describe, it, expect } from 'vitest';
 import { psqlScalar } from '../db-test-helpers';
 
 const PLAN_CACHE_MODE_RPCS = [
-	'core_stats',
 	'demographics_stats',
 	'arrivals_stats',
 ] as const;

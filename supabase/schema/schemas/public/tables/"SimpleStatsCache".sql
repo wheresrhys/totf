@@ -115,9 +115,9 @@ EXECUTE FUNCTION public.trg_set_updated_at ();
 --      group_encounters_access, with group_id in place of ringing_group_id);
 --   3. anyone at all, including an anonymous no-JWT caller, when the row's group
 --      has opted its summary area into public view ('summary' = ANY
---      public_areas) — the same gate public_core_stats applies, enforced here by
---      RLS directly rather than by a SECURITY DEFINER wrapper, so no new read
---      path has to exist for it.
+--      public_areas) — the same gate the now-deleted public_core_stats used to
+--      apply, enforced here by RLS directly rather than by a SECURITY DEFINER
+--      wrapper, so no new read path has to exist for it.
 -- Branch 3 is evaluable anonymously because "RingingGroups" is openly readable
 -- (ringing_groups_access is USING (TRUE), with GRANT ALL to anon), and branches
 -- 1/2 simply evaluate false for such a caller: auth.jwt() is NULL, so the

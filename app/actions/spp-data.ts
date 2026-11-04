@@ -1,5 +1,4 @@
 'use server';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
 	fetchAuthorisedCoreStats,
 	resolveStatsCacheQueryPlan,
@@ -8,6 +7,7 @@ import {
 } from '@/app/lib/auth/group-summary-access';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors, fetchAllPaginatedRows } from '@/lib/supabase';
+import { readSpeciesNamesById } from '@/app/lib/species-names';
 import type {
 	BiometricFieldName,
 	BiometricsStatsResult
@@ -65,36 +65,6 @@ type BiometricsMetricsRpcRow = Pick<
 	BiometricsStatsResult,
 	BiometricFieldName | 'time_period'
 > & { species_id: number | null };
-
-/**
- * Resolves `species_id` → `species_name` for the ids one
- * `stats_cache_biometrics_metrics` result carries.
- *
- * An RPC result can't carry a PostgREST embed, so the join column the
- * cache-aligned branch gets for free through `Species(species_name)` has to
- * come from a second read here — `mergeSpeciesBiometrics`
- * (`modules/stats-view/lib/species-stats.ts`) joins the two halves of the `/species` table on
- * `species_name`. Only the ids actually present are requested; `Species` is
- * global reference data (`USING (TRUE)` SELECT policy), so the authenticated
- * client reads it unconditionally. Paginated for the same reason the cache
- * read is: a group with more species than one PostgREST page would otherwise
- * silently lose the names of the overflow.
- */
-async function readSpeciesNamesById(
-	client: SupabaseClient,
-	speciesIds: number[]
-): Promise<Map<number, string>> {
-	type SpeciesNameRow = { id: number; species_name: string };
-	const rows = await fetchAllPaginatedRows<SpeciesNameRow>((fromRow, toRow) =>
-		client
-			.from('Species')
-			.select<string, SpeciesNameRow>('id, species_name')
-			.in('id', speciesIds)
-			.order('id')
-			.range(fromRow, toRow)
-	);
-	return new Map(rows.map(({ id, species_name }) => [id, species_name]));
-}
 
 /**
  * Reads the already-materialized `SimpleStatsCacheBySpecies` cell `plan`
