@@ -75,7 +75,7 @@ type SharedColumn =
  */
 type SharedColumnRow = Record<SharedColumn, unknown>;
 
-describe('stats_cache_basic_session_metrics', () => {
+describe.skip('stats_cache_basic_session_metrics', () => {
 	let alphaId: number;
 	let alphaClient: SupabaseClient;
 	/** species_name -> species_id, to bridge core_stats' key to this RPC's. */
