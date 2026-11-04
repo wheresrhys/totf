@@ -32,9 +32,10 @@
 --
 -- With exactly one unique constraint, rows are written with a native
 -- supabase-js .upsert() naming that constraint's column list as its conflict
--- target — see lib/stats-cache-refresh.ts. (The non-species half has no writer
--- yet: both refresh functions hardcode group_by_species=true and so only ever
--- write the BySpecies tables.)
+-- target — see modules/stats/lib/refresh/write-cache-rows.ts.
+-- refreshSimpleStatsCache (modules/stats/lib/refresh/run-refresh-pass.ts) runs
+-- both group_by_species passes, so this table and its BySpecies sibling are
+-- both written on every refresh.
 CREATE SEQUENCE public."SimpleStatsCache_id_seq";
 
 CREATE TABLE public."SimpleStatsCache" (

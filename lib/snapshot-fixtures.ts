@@ -38,7 +38,7 @@
  */
 
 /**
- * The 27 fixtures `supabase/scripts/generate-snapshots.ts` produces, and therefore the
+ * The 25 fixtures `supabase/scripts/generate-snapshots.ts` produces, and therefore the
  * exact set the freshness check covers. Paths are relative to
  * `test-fixtures/snapshots/` and follow #882's source-directory layout (one
  * subdirectory per RPC, `tables/<TableName>/` for direct PostgREST reads).
@@ -81,6 +81,12 @@
  * rather than `species_name`, with no `encounter_count` column. Purely
  * additive: nothing reads these three yet, that's a separate, dependent
  * ticket.
+ *
+ * `core_stats-removal/0` dropped `core_stats/beta.monthly-totals.json` and
+ * `core_stats/beta.yearly-totals.json` — both fully unconsumed orphans
+ * (confirmed by grep: nothing outside this file's own inventory referenced
+ * either), matching the #894 precedent above rather than anything to do with
+ * the RPC's eventual removal.
  */
 export const GENERATED_SNAPSHOT_FIXTURES = [
 	'core_stats/alpha.by-species.json',
@@ -89,8 +95,6 @@ export const GENERATED_SNAPSHOT_FIXTURES = [
 	'core_stats/alpha.summary-totals.json',
 	'core_stats/alpha.yearly-totals.json',
 	'core_stats/beta.by-species.json',
-	'core_stats/beta.monthly-totals.json',
-	'core_stats/beta.yearly-totals.json',
 	'core_stats/gamma.by-species.json',
 	'core_stats/robin-alpha.headline.json',
 	'demographics_stats/robin-alpha.monthly-history.json',
