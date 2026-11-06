@@ -33,17 +33,36 @@ as opaque codes (store/display/filter on them as-is) rather than inventing a dec
 
 ## Repo zones
 
-This repo is split into three scoped `CLAUDE.md` files so a session working in one area doesn't
-load context for the other two. This root doc holds the cross-cutting overview, shared code, and
-anything genuinely used by all three:
+A **zone** is a directory of this repo with its own scoped `CLAUDE.md`, so a session working in
+one area doesn't load context for the others. This root doc holds the cross-cutting overview,
+shared code, and anything genuinely used across zones.
 
-- [`supabase/CLAUDE.md`](supabase/CLAUDE.md) — **data layer**: schema, migrations, RPC internals
-  and performance notes, data-layer scripts (`supabase/scripts/`), fixture generation, DB
-  integration tests, the `@mutates`/exclusive-resource mechanics.
-- [`app/CLAUDE.md`](app/CLAUDE.md) — **app**: auth model, data-fetching and route/page/content
-  conventions, code conventions, app/HTTP/E2E test conventions.
-- [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — **agentic tooling**: ticket workflow, MCP tool
-  inventory, hooks.
+**This list is canonical.** It is the one place the zone set is enumerated in prose — every other
+doc and skill that needs it links here rather than restating it. The sole unavoidable duplicate is
+`.claude/mcp/swarm-tools/tools/create-ticket.ts`'s `ZONE_LABEL_DESCRIPTIONS` map and `zoneLabels`
+zod enum, which need static literals; they must be kept in step with this table (see "Module
+conventions" below).
+
+The zone set is an explicit, maintained list — deliberately *not* derived from the folder
+structure at runtime. Three top-level zones, plus one zone per `modules/<name>/` directory:
+
+| Zone label | Directory | Scoped doc |
+|---|---|---|
+| `zone:app` | `app/` | [`app/CLAUDE.md`](app/CLAUDE.md) — auth model, data-fetching and route/page/content conventions, code conventions, app/HTTP/E2E test conventions |
+| `zone:supabase` | `supabase/` | [`supabase/CLAUDE.md`](supabase/CLAUDE.md) — schema, migrations, RPC internals and performance notes, data-layer scripts (`supabase/scripts/`), fixture generation, DB integration tests, the `@mutates`/exclusive-resource mechanics |
+| `zone:agentic-tooling` | `.claude/` | [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — ticket workflow, MCP tool inventory, hooks |
+| `zone:modules/stats` | `modules/stats/` | [`modules/stats/CLAUDE.md`](modules/stats/CLAUDE.md) — the stats-cache event-building/read/dispatch/refresh pipeline; cross-zone (consumed by `app/` and by `supabase/scripts/import-csv.ts`) |
+| `zone:modules/demon-import` | `modules/demon-import/` | [`modules/demon-import/CLAUDE.md`](modules/demon-import/CLAUDE.md) — the DemOn CSV-import pipeline; cross-zone (consumed by `app/`, `supabase/scripts/` and `supabase/__tests__/`) |
+| `zone:modules/ui-kit` | `modules/ui-kit/` | [`modules/ui-kit/CLAUDE.md`](modules/ui-kit/CLAUDE.md) — the UI-primitive components/hooks every page family imports; consumed only by `app/` |
+| `zone:modules/stats-view` | `modules/stats-view/` | [`modules/stats-view/CLAUDE.md`](modules/stats-view/CLAUDE.md) — the stats-table components and row-model helpers every summary/species/session tab renders; consumed only by `app/` |
+
+A module zone is the **narrowest** zone covering its directory, and it wins over the broader zone
+of whatever consumes it: work confined to `modules/ui-kit/` is `zone:modules/ui-kit`, not
+`zone:app`, even though only `app/` imports it. Reach for a broader zone — or several zones — only
+when the work genuinely spans outside the module's own directory.
+
+See "Shared code" below for why each `modules/<name>/` directory exists and what it holds, and
+`.claude/CLAUDE.md`'s "Ticket workflow" for how these labels drive ticket scoping.
 
 ## Development environment
 
@@ -60,7 +79,7 @@ access model (`npm run next:prod`, `npm run prod:run`) and the human-only prod-w
 
 ### Test suites
 
-Four separate test configs, spanning all three zones:
+Four separate test configs, spanning every zone:
 
 | Suite | Config | Command | Runs in |
 |---|---|---|---|
@@ -122,8 +141,8 @@ Local values are in `.env.dev`. Production values are managed via 1Password (see
 
 ## Shared code
 
-A handful of root-level directories are genuinely used across two or all three zones and don't
-belong to any single scoped doc:
+A handful of root-level directories are genuinely used across two or all three of the top-level
+zones and don't belong to any single scoped doc:
 
 - `lib/supabase.ts` — imported by `app/`, data-layer scripts (`supabase/scripts/`), and
   `supabase/__tests__/` alike. A true 3-zone dependency; keep it here rather than duplicating it
@@ -148,15 +167,15 @@ belong to any single scoped doc:
   plumbing, tab plumbing, design-system primitives) every page family in `app/` imports from,
   extracted from `app/components/shared/*` (#1326). Unlike `modules/stats/` above, this one is
   catalogued here purely because it's a module per the "Module conventions" below, not because
-  it's cross-zone — it's `zone:app`-only. See its own
+  it's used outside `app/` — nothing else consumes it. See its own
   [`modules/ui-kit/CLAUDE.md`](modules/ui-kit/CLAUDE.md).
 - `modules/stats-view/` — the 5 stats-table components (`PeriodTotalsTable`,
   `SpeciesTotalsTable`, `SessionSpeciesTotalsTable`, `SppStatsTable`, `SpTable`) every
   summary/species/session tab renders, plus the 4 pure helpers that reshape a
   `stats_cache_*_metrics`/`SimpleStatsCache` row into the row model each one wants, extracted from
-  `app/components/*` and `app/lib/*` (#1327). `zone:app`-only, catalogued here for the same reason
-  `modules/ui-kit` above is, and
-  a **sibling of `modules/stats`, deliberately not nested inside it** — `modules/stats` is
+  `app/components/*` and `app/lib/*` (#1327). Consumed only by `app/`, catalogued here for the same
+  reason `modules/ui-kit` above
+  is, and a **sibling of `modules/stats`, deliberately not nested inside it** — `modules/stats` is
   imported by the `supabase/scripts/import-csv.ts` CLI importer and so must stay React/JSX-free.
   See its own [`modules/stats-view/CLAUDE.md`](modules/stats-view/CLAUDE.md).
 
@@ -203,9 +222,18 @@ example of every point below. A well-formed module:
   past the barrel into an internal file directly. If enforcing this means deleting a test that
   reached past the boundary, the cases it covered move into the module's own test suite first,
   if they aren't already covered there.
-- Has its own `CLAUDE.md`, scoped the same way the three repo-zone docs are (see "Repo zones"
+- Has its own `CLAUDE.md`, scoped the same way the top-level repo-zone docs are (see "Repo zones"
   above) — most file-level context belongs there, not loose inline comments. Keep inline comments
   to a brief sentence on a function's purpose, or on a specific tricky/unintuitive line.
+- Is its own **zone**, so creating a new `modules/<name>/` directory is not finished until its
+  `zone:modules/<name>` label exists in all three places that have to agree: a row in "Repo
+  zones" above, an entry in `.claude/mcp/swarm-tools/tools/create-ticket.ts`'s
+  `ZONE_LABEL_DESCRIPTIONS` **and** its `zoneLabels` zod enum (the zod enum needs static
+  literals, so this is the one list that can't just link to the doc), and the GitHub label itself
+  (`gh label create "zone:modules/<name>" --color 1d76db --description "Touches only
+  modules/<name>/ — safe to scope investigation/context to that subtree"`; `create_ticket` also
+  creates it on first use). Skipping any of the three is how `zone:agentic-tooling` ended up
+  documented in six places but absent from GitHub for months (#1364).
 - Keeps files to roughly 400 lines, each with one function reaching `index.ts`/`browser.ts` — a
   file may export more than that to aid testing/mocking, but not extravagantly. Not a hard limit:
   mechanical, repetitive restructuring (e.g. splitting one oversized file into several) is exempt

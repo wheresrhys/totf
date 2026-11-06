@@ -58,15 +58,18 @@ Read the issue body carefully. Identify:
   unmerged, stop and report rather than building on top of it.
 
 **Zone-scoped investigation.** Check the issue's `zone:*` label(s) (`gh issue view <number>
---json labels`, or reuse the labels already read in step 1). If it carries exactly one —
-`zone:app`, `zone:data-layer`, or `zone:agentic-tooling` — scope initial
-exploration/investigation (Explore agents, Grep/Glob) to that zone's subtree (`app/`,
-`supabase/`, or `.claude/` respectively) by default, per `CLAUDE.md`'s "Repo zones": load that
-zone's scoped `CLAUDE.md` instead of pulling in the other two, and don't `Explore` the whole repo
-when the ticket's own label says it doesn't need to. This is a default, not a wall — if the work
-turns out to need another zone (e.g. a UI ticket that also needs a data-layer type), cross into it
-as normal rather than forcing an artificial boundary. An issue with more than one `zone:*` label,
-or none (pre-dates this convention), gets no scoping — investigate normally.
+--json labels`, or reuse the labels already read in step 1). If it carries exactly one, scope
+initial exploration/investigation (Explore agents, Grep/Glob) to that zone's subtree by default,
+per `CLAUDE.md`'s canonical "Repo zones" table — which maps each label to its directory and its
+scoped doc, including a `zone:modules/<name>` per `modules/<name>/` directory. Load that zone's
+scoped `CLAUDE.md` instead of pulling in the others, and don't `Explore` the whole repo when the
+ticket's own label says it doesn't need to. A module-zone label scopes exactly as tightly as a
+top-level one: a lone `zone:modules/ui-kit` means `modules/ui-kit/` plus
+`modules/ui-kit/CLAUDE.md`, not all of `app/`. This is a default, not a wall — if the work turns
+out to need another zone (e.g. a UI ticket that also needs a data-layer type, or a module ticket
+whose caller in `app/` must change too), cross into it as normal rather than forcing an artificial
+boundary. An issue with more than one `zone:*` label, or none (pre-dates this convention), gets no
+scoping — investigate normally.
 
 If there are ambiguities, and the ticket has a parent issue, read the parent too (including comments) — parents of tracking sequences carry shared design decisions, sentence copy, and plan links that the child bodies
 assume:
@@ -232,4 +235,5 @@ tracks the whole piece of work — it stays open until all increments are merged
 - RLS policies must be considered for any new table or query — check issue #149 for current
   isolation status.
 - A single-`zone:*`-labelled issue scopes step 2's investigation to that zone's subtree by
-  default (not a hard boundary — cross into another zone if the work genuinely needs it).
+  default — the subtree `CLAUDE.md`'s "Repo zones" table maps that label to, module zones
+  included (not a hard boundary — cross into another zone if the work genuinely needs it).

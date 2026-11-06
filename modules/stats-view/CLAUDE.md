@@ -14,8 +14,9 @@ previously scattered across `app/components/`, `app/components/pages/species/`,
 the import path moved.
 
 Like `modules/ui-kit` (which this module builds directly on top of) and unlike `modules/stats`,
-this is a `zone:app`-only module — nothing outside `app/` consumes it. It's catalogued as a module
-because it's large enough to warrant its own directory/barrel/doc, not because it's cross-zone, and
+this module is consumed only by `app/` — nothing else imports it. It's catalogued as a module
+because it's large enough to warrant its own directory/barrel/doc (and its own
+`zone:modules/stats-view` label), not because it's cross-zone, and
 it has no `browser.ts`/`index.ts` split: four of the five components are `'use client'` and the
 fifth (`SessionSpeciesTotalsTable`) is a plain Server Component, but none of the nine files imports
 a server-only dependency, so the single barrel is safe from either side of the boundary.

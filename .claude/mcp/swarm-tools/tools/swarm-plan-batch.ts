@@ -71,16 +71,21 @@ function isSwarmCreatedPr(body: string | undefined): boolean {
 	return Boolean(body?.includes(SWARM_CREATED_PR_MARKER));
 }
 
-interface ReviewLike {
+export interface ReviewLike {
 	author?: { login?: string };
 	state?: string;
 	body?: string;
 	submittedAt?: string;
 }
 
-/** CHANGES_REQUESTED always counts; otherwise a non-empty human review newer than the head commit does. */
-export function hasOutstandingReviewFeedback(reviews: ReviewLike[], headCommitDate: string): boolean {
-	return reviews.some((review) => {
+/**
+ * The reviews that still need addressing: CHANGES_REQUESTED always counts; otherwise a non-empty
+ * human review newer than the head commit does. Returning the matches rather than just a boolean
+ * lets `swarm_triage_pr` hand a maintenance worker the actual review content off the same
+ * filtering `findMaintenanceCandidates` uses for its yes/no decision (#1361).
+ */
+export function findOutstandingReviews(reviews: ReviewLike[], headCommitDate: string): ReviewLike[] {
+	return reviews.filter((review) => {
 		if (isBotLogin(review.author?.login)) return false;
 		if (review.state === 'CHANGES_REQUESTED') return true;
 		if (!review.body || isMermaidDiffComment(review.body)) return false;
@@ -88,7 +93,11 @@ export function hasOutstandingReviewFeedback(reviews: ReviewLike[], headCommitDa
 	});
 }
 
-interface InlineCommentLike {
+export function hasOutstandingReviewFeedback(reviews: ReviewLike[], headCommitDate: string): boolean {
+	return findOutstandingReviews(reviews, headCommitDate).length > 0;
+}
+
+export interface InlineCommentLike {
 	id?: number;
 	in_reply_to_id?: number;
 	user?: { login?: string };
@@ -98,11 +107,16 @@ interface InlineCommentLike {
 
 /**
  * Groups inline review comments into threads (by in_reply_to_id, falling back to the comment's
- * own id for a thread root) and flags a thread as outstanding if its most recent comment is
- * human-authored, not a mermaid-diff comment, not a swarm worker's own marked reply, and newer
- * than the PR's head commit — i.e. nobody has posted anything since, human or otherwise.
+ * own id for a thread root) and returns every thread that is outstanding — i.e. whose most recent
+ * comment is human-authored, not a mermaid-diff comment, not a swarm worker's own marked reply,
+ * and newer than the PR's head commit, meaning nobody has posted anything since, human or
+ * otherwise. Each returned thread is the whole comment list, in fetch order, so a maintenance
+ * worker gets the full conversation rather than just the triggering comment (#1361).
  */
-export function hasOutstandingInlineFeedback(comments: InlineCommentLike[], headCommitDate: string): boolean {
+export function findOutstandingInlineThreads(
+	comments: InlineCommentLike[],
+	headCommitDate: string
+): InlineCommentLike[][] {
 	const threads = new Map<number, InlineCommentLike[]>();
 	for (const comment of comments) {
 		const rootId = comment.in_reply_to_id ?? comment.id ?? -1;
@@ -110,37 +124,47 @@ export function hasOutstandingInlineFeedback(comments: InlineCommentLike[], head
 		thread.push(comment);
 		threads.set(rootId, thread);
 	}
-	for (const thread of threads.values()) {
+	return [...threads.values()].filter((thread) => {
 		const latest = thread.reduce((a, b) => ((a.created_at ?? '') > (b.created_at ?? '') ? a : b));
-		if (isBotLogin(latest.user?.login)) continue;
-		if (isMermaidDiffComment(latest.body)) continue;
-		if (isSwarmWorkerReply(latest.body)) continue;
-		if (latest.created_at && latest.created_at > headCommitDate) return true;
-	}
-	return false;
+		if (isBotLogin(latest.user?.login)) return false;
+		if (isMermaidDiffComment(latest.body)) return false;
+		if (isSwarmWorkerReply(latest.body)) return false;
+		return Boolean(latest.created_at && latest.created_at > headCommitDate);
+	});
 }
 
-interface IssueCommentLike {
+export function hasOutstandingInlineFeedback(comments: InlineCommentLike[], headCommitDate: string): boolean {
+	return findOutstandingInlineThreads(comments, headCommitDate).length > 0;
+}
+
+export interface IssueCommentLike {
 	user?: { login?: string };
 	body?: string;
 	created_at?: string;
 }
 
 /**
- * Flags a top-level PR conversation comment (`GET /issues/{n}/comments` — what both `gh pr
- * comment` and the `mermaid-diff` skill write to) as outstanding feedback if it's human-authored,
- * not a mermaid-diff comment, not a swarm worker's own marked reply, and newer than the PR's head
+ * The top-level PR conversation comments (`GET /issues/{n}/comments` — what both `gh pr comment`
+ * and the `mermaid-diff` skill write to) that count as outstanding feedback: human-authored, not a
+ * mermaid-diff comment, not a swarm worker's own marked reply, and newer than the PR's head
  * commit. Issue comments are a flat list, not threaded like review comments, so unlike
- * `hasOutstandingInlineFeedback` there's no reply-threading step — each comment is evaluated on
+ * `findOutstandingInlineThreads` there's no reply-threading step — each comment is evaluated on
  * its own.
  */
-export function hasOutstandingIssueCommentFeedback(comments: IssueCommentLike[], headCommitDate: string): boolean {
-	return comments.some((comment) => {
+export function findOutstandingIssueComments(
+	comments: IssueCommentLike[],
+	headCommitDate: string
+): IssueCommentLike[] {
+	return comments.filter((comment) => {
 		if (isBotLogin(comment.user?.login)) return false;
 		if (!comment.body || isMermaidDiffComment(comment.body)) return false;
 		if (isSwarmWorkerReply(comment.body)) return false;
 		return Boolean(comment.created_at && comment.created_at > headCommitDate);
 	});
+}
+
+export function hasOutstandingIssueCommentFeedback(comments: IssueCommentLike[], headCommitDate: string): boolean {
+	return findOutstandingIssueComments(comments, headCommitDate).length > 0;
 }
 
 export interface MaintenanceCandidate {
