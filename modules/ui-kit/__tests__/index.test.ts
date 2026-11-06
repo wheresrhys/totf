@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
 	AccordionItem,
 	AccordionTableBody,
-	AggregateByToggle,
-	CombineYearsToggle,
 	ConditionalTabPanel,
 	PageWrapper,
 	PrimaryHeading,
@@ -16,7 +14,6 @@ import {
 	BadgeList,
 	UnwrappedBadgeList,
 	printLocationName,
-	EmptyMonthsToggle,
 	NoPrefetchLink,
 	RingSearchForm,
 	getFormattedValue,
@@ -24,13 +21,6 @@ import {
 	getPlural,
 	getSpaceForUnit,
 	StatOutput,
-	createStatsTableBody,
-	ageBlockStartBorder,
-	ageBlockEndBorder,
-	columnBlock,
-	createNameLinkCell,
-	buildStandardColumnConfigs,
-	buildTotalsRowCells,
 	TabContent,
 	TabSet,
 	TemporalFilterControls,
@@ -41,12 +31,9 @@ import {
 // (tsc's program follows this import), the same regression this test guards
 // against for the value exports below.
 import type {
-	AggregateByValue,
 	SpeciesName,
 	StatUnit,
 	StatOutputModel,
-	StatsTableBodyConfig,
-	TotalsRowCellsInput,
 	TabConfig,
 	TabConfigInSet,
 	TabSetTabConfig,
@@ -57,15 +44,15 @@ import type {
 
 // Regression guard for the barrel itself (#1326): every name previously
 // importable from some `app/components/shared/<File>` must stay importable
-// from the single `@/modules/ui-kit` barrel. This matters beyond this
-// ticket — `modules/stats-view` (a follow-up module) builds directly on
-// `SortableTable`/`StatsTableColumnConfigs`'s exports from here.
+// from the single `@/modules/ui-kit` barrel. `AggregateByToggle`,
+// `CombineYearsToggle`, `EmptyMonthsToggle`, `StatsTableBody` and
+// `StatsTableColumnConfigs` moved on to `modules/stats-view` (#1353) —
+// `modules/stats-view/__tests__/index.test.ts` carries the equivalent
+// regression coverage for those now.
 describe('modules/ui-kit barrel', () => {
 	it('re-exports every component, hook, type, and constant previously importable from app/components/shared/*', () => {
 		expect(AccordionItem).toBeDefined();
 		expect(AccordionTableBody).toBeDefined();
-		expect(AggregateByToggle).toBeDefined();
-		expect(CombineYearsToggle).toBeDefined();
 		expect(ConditionalTabPanel).toBeDefined();
 		expect(PageWrapper).toBeDefined();
 		expect(PrimaryHeading).toBeDefined();
@@ -78,7 +65,6 @@ describe('modules/ui-kit barrel', () => {
 		expect(BadgeList).toBeDefined();
 		expect(UnwrappedBadgeList).toBeDefined();
 		expect(printLocationName).toBeDefined();
-		expect(EmptyMonthsToggle).toBeDefined();
 		expect(NoPrefetchLink).toBeDefined();
 		expect(RingSearchForm).toBeDefined();
 		expect(getFormattedValue).toBeDefined();
@@ -86,13 +72,6 @@ describe('modules/ui-kit barrel', () => {
 		expect(getPlural).toBeDefined();
 		expect(getSpaceForUnit).toBeDefined();
 		expect(StatOutput).toBeDefined();
-		expect(createStatsTableBody).toBeDefined();
-		expect(ageBlockStartBorder).toBeDefined();
-		expect(ageBlockEndBorder).toBeDefined();
-		expect(columnBlock).toBeDefined();
-		expect(createNameLinkCell).toBeDefined();
-		expect(buildStandardColumnConfigs).toBeDefined();
-		expect(buildTotalsRowCells).toBeDefined();
 		expect(TabContent).toBeDefined();
 		expect(TabSet).toBeDefined();
 		expect(TemporalFilterControls).toBeDefined();
@@ -106,12 +85,9 @@ describe('modules/ui-kit barrel', () => {
 	// whether the type is referenced afterwards. This alias exists only to
 	// give that import a reference, satisfying the unused-import lint rule.
 	type BarrelTypeExistenceCheck = [
-		AggregateByValue,
 		SpeciesName,
 		StatUnit,
 		StatOutputModel,
-		StatsTableBodyConfig<unknown, unknown>,
-		TotalsRowCellsInput<{ total: number }>,
 		TabConfig<unknown, unknown>,
 		TabConfigInSet<unknown, unknown, TabConfig<unknown, unknown>>,
 		TabSetTabConfig<unknown, unknown>,

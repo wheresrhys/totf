@@ -1,5 +1,8 @@
-import { NoPrefetchLink } from './NoPrefetchLink';
-import { type ColumnConfig, type RowModelWithRawData } from '../types';
+import {
+	NoPrefetchLink,
+	type ColumnConfig,
+	type RowModelWithRawData
+} from '@/modules/ui-kit';
 
 // A thicker border marks where the "age class" block of columns
 // (Pulli/Juv/Postjuv/Adult/Unaged) starts and ends, visually separating it

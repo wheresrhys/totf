@@ -6,7 +6,9 @@ import type {
 } from '@/app/actions/sp-data';
 import {
 	buildSpeciesSquashedMonthHref,
-	PeriodTotalsTable
+	PeriodTotalsTable,
+	CombineYearsToggle,
+	EmptyMonthsToggle
 } from '@/modules/stats-view';
 import {
 	buildCombinedMonthTotalsRows,
@@ -15,7 +17,6 @@ import {
 	formatMonthYearLabel,
 	formatMonthLabel
 } from '@/app/lib/month-totals';
-import { CombineYearsToggle, EmptyMonthsToggle } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // Pure, presentational `TabConfig.TabComponent` (#1066) — see

@@ -163,7 +163,7 @@ zones and don't belong to any single scoped doc:
   import route in `app/`, `supabase/scripts/import-csv.ts` and `supabase/__tests__/`, so the same
   3-zone shape as `lib/supabase.ts` above. See its own
   [`modules/demon-import/CLAUDE.md`](modules/demon-import/CLAUDE.md).
-- `modules/ui-kit/` — the 17 UI-primitive components/hooks (toggles, sortable/accordion table
+- `modules/ui-kit/` — the 12 UI-primitive components/hooks (sortable/accordion table
   plumbing, tab plumbing, design-system primitives) every page family in `app/` imports from,
   extracted from `app/components/shared/*` (#1326). Unlike `modules/stats/` above, this one is
   catalogued here purely because it's a module per the "Module conventions" below, not because
@@ -171,9 +171,13 @@ zones and don't belong to any single scoped doc:
   [`modules/ui-kit/CLAUDE.md`](modules/ui-kit/CLAUDE.md).
 - `modules/stats-view/` — the 5 stats-table components (`PeriodTotalsTable`,
   `SpeciesTotalsTable`, `SessionSpeciesTotalsTable`, `SppStatsTable`, `SpTable`) every
-  summary/species/session tab renders, plus the 4 pure helpers that reshape a `core_stats`-family
+  summary/species/session tab renders, the 4 pure helpers that reshape a `core_stats`-family
   row into the row model each one wants, extracted from `app/components/*` and `app/lib/*`
-  (#1327). Consumed only by `app/`, catalogued here for the same reason `modules/ui-kit` above
+  (#1327), and (since #1353) the stats-table-specific primitives those components build on —
+  the three two-option toggles (`AggregateByToggle`, `CombineYearsToggle`, `EmptyMonthsToggle`)
+  and the age-bucketed column-set/table-body factories (`StatsTableColumnConfigs`,
+  `StatsTableBody`) that moved here from `modules/ui-kit`, since nothing outside this module
+  used them. Consumed only by `app/`, catalogued here for the same reason `modules/ui-kit` above
   is, and a **sibling of `modules/stats`, deliberately not nested inside it** — `modules/stats` is
   imported by the `supabase/scripts/import-csv.ts` CLI importer and so must stay React/JSX-free.
   See its own [`modules/stats-view/CLAUDE.md`](modules/stats-view/CLAUDE.md).

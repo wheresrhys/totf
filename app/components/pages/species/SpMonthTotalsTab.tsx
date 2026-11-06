@@ -1,12 +1,11 @@
 'use client';
 import { useState } from 'react';
-import { PeriodTotalsTable } from '@/modules/stats-view';
+import { PeriodTotalsTable, EmptyMonthsToggle } from '@/modules/stats-view';
 import {
 	buildMonthTotalsRows,
 	filterEmptyMonthTotalsRows,
 	formatMonthYearLabel
 } from '@/app/lib/month-totals';
-import { EmptyMonthsToggle } from '@/modules/ui-kit';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import type { ViewedGroup } from '@/app/lib/group-slug';

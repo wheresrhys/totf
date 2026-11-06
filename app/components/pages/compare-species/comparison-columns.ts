@@ -1,9 +1,9 @@
 import {
 	ageBlockEndBorder,
 	ageBlockStartBorder,
-	columnBlock,
-	type ColumnConfig
-} from '@/modules/ui-kit';
+	columnBlock
+} from '@/modules/stats-view';
+import { type ColumnConfig } from '@/modules/ui-kit';
 import type { ComparisonRow } from '@/app/lib/compare-species';
 import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
 
