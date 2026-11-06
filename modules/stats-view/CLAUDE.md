@@ -6,9 +6,10 @@ stack, and the "Module conventions" section this module follows.
 ## What this module does
 
 The "stats table" UI — the sortable, age-bucketed totals tables every summary/species/session tab
-is built out of — plus the pure functions that reshape a `core_stats`-family row into the row
-model each table renders. Five components and four data-shaping helpers, previously scattered
-across `app/components/`, `app/components/pages/species/`, `app/components/pages/session/` and
+is built out of — plus the pure functions that reshape a `stats_cache_*_metrics`/`SimpleStatsCache`
+row into the row model each table renders. Five components and four data-shaping helpers,
+previously scattered across `app/components/`, `app/components/pages/species/`,
+`app/components/pages/session/` and
 `app/lib/` with no single owned location. Pure relocation (#1327): behaviour is unchanged, only
 the import path moved.
 
@@ -48,7 +49,7 @@ modules/stats-view/
                         # calculateRetraps / calculateEncounterRetraps (the
                         # bird-count-minus-new-count derivation both tables and
                         # SummaryStatsSection use)
-    species-stats.ts    # mergeSpeciesBiometrics — joins a core_stats by-species
+    species-stats.ts    # mergeSpeciesBiometrics — joins a stats_cache_*_metrics by-species
                         # result to its wing/weight sibling by species_name;
                         # speciesStatConfigs — the /species list page's column set
     squashed-month.ts   # the 12 month abbreviations a `[yearOrMonth]` route segment

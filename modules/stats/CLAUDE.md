@@ -7,7 +7,7 @@ stack, and the "Module conventions" section this module follows.
 
 Everything to do with `SimpleStatsCache`/`SimpleStatsCacheBySpecies` — the materialized,
 period-local stats cache every summary/species/session page reads from instead of calling the
-live `core_stats`-family RPCs directly (see `app/CLAUDE.md`'s "Period-local stats come from the
+live `stats_cache_*_metrics`-family RPCs directly (see `app/CLAUDE.md`'s "Period-local stats come from the
 cache tables"). Three concerns live here:
 
 - **Read** (`lib/stats-cache.ts`, `lib/stats-cache-fetch-pool.ts`) — `readStatsCacheRows` is the
