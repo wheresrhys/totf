@@ -53,6 +53,7 @@ incrementally; current inventory:
 | `swarm_state_append` / `_remove` / `_list` | Read/mutate `.claude/swarm-state.json` (locked, atomic — never hand-write it) |
 | `swarm_state_release_db_lock` | Let an exclusive-resource worker release the shared-local-Postgres lock early (by `agentId`), once its migration/`@mutates` work is applied and verified and only push/PR steps remain — other non-exclusive tickets can then start, while a *new* exclusive-resource worker still waits for it to finish. One-way |
 | `swarm_plan_batch` | Pre-filtered, pre-ranked PR-maintenance + ready-ticket lists for `swarm` |
+| `swarm_triage_pr` | One PR's full maintenance picture: conflict status plus the *content* of every outstanding review, inline-comment thread and top-level issue comment, filtered through the same bot/mermaid-diff/`swarm-worker-reply`-marker/head-commit-date rules `swarm_plan_batch` uses for its yes/no decision, plus the same `reason` vocabulary (`conflict` \| `feedback` \| `conflict+feedback` \| `none`). Saves a maintenance worker re-deriving all of it from raw `gh api` responses. Not gated on the `<!-- swarm-created-pr -->` marker — naming a PR here is the user-directed path that gate exempts |
 | `derive_branch_name` | Ticket branch naming (wraps `lib/slugify.ts`) + collision check |
 | `create_ticket` | `gh issue create` with labels + sub-issue linking, no shell-escaping/tempfile dance |
 | `link_ticket_dependencies` | Apply GitHub blocked-by links to an issue (one comma-joined `gh issue edit --add-blocked-by` call) — ticketify's dependency wiring |
