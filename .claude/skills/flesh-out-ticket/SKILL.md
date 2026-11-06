@@ -6,8 +6,8 @@ description: >-
   commits, enumerates describe blocks and test titles (USE algorithm), identifies which stack
   layers it touches (tagging `db-migration` if it touches `supabase/schema/`, or `e2e-exclusive`
   if it touches a path listed in `e2e/mutating-spec-triggers.json`) and which repo zone(s) it
-  touches (`zone:app` / `zone:data-layer` / `zone:agentic-tooling`, multi-label only when the
-  ticket genuinely spans more than one), picks the
+  touches (a `zone:*` label per `CLAUDE.md`'s canonical "Repo zones" table, multi-label only when
+  the ticket genuinely spans more than one), picks the
   cheapest Claude model that can do it accurately (fable/sonnet/opus label), ALWAYS asks for
   confirmation, then runs `gh issue create` with the model label plus `ready`. Can optionally
   file the ticket as a GitHub sub-issue of a named tracking issue. Operates on a single task
@@ -60,12 +60,26 @@ Using the same categories `implement-ticket` scopes against: database schema / R
 server actions / components / pages / tests. This is for labelling only (drives step 7's
 `db-migration`/`e2e-exclusive` extra labels) — it is not written into the ticket body.
 
-Also identify which repo zone(s) the ticket touches, per `CLAUDE.md`'s "Repo zones" — `zone:app`
-(`app/`), `zone:data-layer` (`supabase/`, including its schema/scripts/tests), `zone:agentic-tooling`
-(`.claude/`). Most tickets are single-zone; label all that genuinely apply (a schema change plus
-the UI that consumes it is legitimately both `zone:data-layer` and `zone:app`) rather than
-guessing one. This drives step 7's `zoneLabels` and lets `implement-ticket`/`swarm` scope a
-worker's investigation to the relevant subtree instead of the whole repo.
+Also identify which repo zone(s) the ticket touches. **Read the label set off `CLAUDE.md`'s "Repo
+zones" table — that is the canonical list; never work from a zone list hardcoded here.** It covers
+the three top-level zones (`app/`, `supabase/`, `.claude/`) plus one `zone:modules/<name>` per
+`modules/<name>/` directory.
+
+Pick the **narrowest** zone(s) whose directories actually cover the work:
+
+- Work confined entirely to one `modules/<name>/` directory gets that module's own
+  `zone:modules/<name>` label, *not* the broader `zone:app`/`zone:supabase` label of whatever
+  imports it. A change living only in `modules/ui-kit/` is `zone:modules/ui-kit`, even though only
+  `app/` consumes it.
+- Fall back to a broader zone, or to several zones, only when the work genuinely reaches outside
+  the module's own directory — e.g. a new `modules/stats-view/` component *plus* the `app/` page
+  that renders it is both `zone:modules/stats-view` and `zone:app`; a schema change plus the UI
+  consuming it is both `zone:supabase` and `zone:app`.
+
+Most tickets are single-zone; label all that genuinely apply rather than guessing one. This drives
+step 7's `zoneLabels` and lets `implement-ticket`/`swarm` scope a worker's investigation to the
+relevant subtree instead of the whole repo — so an over-broad label costs the worker context it
+didn't need.
 
 ### 3. Break into small commits
 Ordered list of shippable subtasks. Each aims for <400 LOC (per `CLAUDE.md`). One line each:
@@ -110,8 +124,9 @@ Only after confirmation, call `mcp__swarm-tools__create_ticket` with:
 - `extraLabels` — `["db-migration"]` and/or `["e2e-exclusive"]` per step 2 (the tool ensures
   these two exclusive-resource labels exist, creating them with the standard description if
   missing; `ready`/`opus`/`sonnet`/`fable` already exist in this repo)
-- `zoneLabels` — the zone(s) identified in step 2 (e.g. `["zone:app"]`, or `["zone:data-layer",
-  "zone:app"]` for a genuinely cross-zone ticket); the tool ensures these labels exist too
+- `zoneLabels` — the zone(s) identified in step 2 (e.g. `["zone:app"]`,
+  `["zone:modules/ui-kit"]`, or `["zone:supabase", "zone:app"]` for a genuinely cross-zone
+  ticket); the tool ensures these labels exist too
 - `parentIssue` — the tracking issue's number, if the task came from one (see Input); the tool
   links the new issue as its sub-issue
 
@@ -122,6 +137,7 @@ the returned `url` back to the user.
 - Single task per run. Never batch — that's `ticketify`.
 - Every issue gets exactly two labels (model + `ready`), plus `db-migration` when it touches
   `supabase/schema/` and/or `e2e-exclusive` when it touches a path in
-  `e2e/mutating-spec-triggers.json`, plus one or more `zone:*` labels (step 2) — never zero.
+  `e2e/mutating-spec-triggers.json`, plus one or more `zone:*` labels (step 2) — never zero, and
+  drawn from `CLAUDE.md`'s "Repo zones" table rather than any list restated in this skill.
 - Confirmation gate in step 6 is mandatory — no issue without an explicit yes.
 - Sub-issue linking only happens when the task's source was a named tracking issue.
