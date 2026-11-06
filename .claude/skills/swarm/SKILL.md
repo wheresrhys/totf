@@ -468,8 +468,12 @@ For each selected issue, launch an Agent (default background, so they run in par
   **If (and only if) this ticket carries exactly one `zone:*` label** (already present in
   `swarm_plan_batch`'s `ticketsToImplement[].labels` — no extra `gh` call needed), add one further
   instruction to the prompt: scope `implement-ticket` step 2's initial investigation to that zone's
-  subtree (`app/`, `supabase/`, or `.claude/`) by default, per `CLAUDE.md`'s "Repo zones" — a
-  default, not a wall; cross into another zone if the work genuinely needs it.
+  subtree by default, per `CLAUDE.md`'s canonical "Repo zones" table, which maps each label to its
+  directory — the three top-level zones (`app/`, `supabase/`, `.claude/`) plus one
+  `zone:modules/<name>` per `modules/<name>/`. Name the subtree explicitly in the prompt, read off
+  that table; a module-zone label is passed through exactly like a top-level one (a lone
+  `zone:modules/ui-kit` scopes the worker to `modules/ui-kit/`). A default, not a wall; the worker
+  crosses into another zone if the work genuinely needs it.
 
   **If (and only if) this ticket is labelled `db-migration` or `e2e-exclusive`**, add one further
   instruction to the prompt: partway through `implement-ticket` — once the migration is applied and
@@ -653,8 +657,10 @@ Confirm each removal; report anything skipped (e.g. a worktree with unpushed cha
   if already atomic). That subagent must never block on `AskUserQuestion` directly — it posts
   questions up to the parent orchestrator and waits for the answer to come back down.
 - A ticket carrying exactly one `zone:*` label gets a worker-prompt instruction (§3) to scope its
-  investigation to that zone's subtree by default — a hint the worker can override if the work
-  turns out to need another zone, never a hard constraint enforced by `swarm` itself.
+  investigation to that zone's subtree by default — the subtree `CLAUDE.md`'s "Repo zones" table
+  maps that label to, module zones (`zone:modules/<name>`) treated identically to top-level ones.
+  A hint the worker can override if the work turns out to need another zone, never a hard
+  constraint enforced by `swarm` itself.
 - **Exclusive-resource work (`db-migration` or `e2e-exclusive`) runs completely solo** — across
   both tracks, not just within §2. Don't spawn it alongside any other worker, and don't spawn any
   other worker while it's running. A `db-migration`/`e2e-exclusive` PR being maintained (§1) is the
