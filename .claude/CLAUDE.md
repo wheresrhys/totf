@@ -43,7 +43,12 @@ that zone's subtree by default, and `swarm` passes the same instruction into a t
 spawn prompt when `swarm_plan_batch` surfaces exactly one `zone:*` label for it — a default that
 narrows context loaded for a single-zone task, not a hard boundary either skill enforces. Module
 zone labels are treated exactly like top-level ones throughout: a lone `zone:modules/ui-kit`
-scopes a worker to `modules/ui-kit/` the same way a lone `zone:app` scopes it to `app/`.
+scopes a worker to `modules/ui-kit/` the same way a lone `zone:app` scopes it to `app/`. The
+`ZONE_LABEL_DESCRIPTIONS` map and `zoneLabels` zod enum that `create_ticket` (below) validates
+labels against live in this zone, at `.claude/mcp/swarm-tools/tools/create-ticket.ts` — so when a
+new `modules/<name>/` zone is added, keeping that file's enum and map in sync is this zone's half
+of the job; root `CLAUDE.md`'s "Module conventions" has the other two (the "Repo zones" row and
+the GitHub label itself).
 
 ### MCP tools for skills
 
