@@ -1,11 +1,13 @@
 import { getAgeClass } from '@/app/models/encounter';
 import type { SpeciesWithEncounters } from '@/app/models/session';
 import {
-	SortableTable,
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
-	createNameLinkCell,
-	createStatsTableBody,
+	createNameLinkCell
+} from '../lib/StatsTableColumnConfigs';
+import { createStatsTableBody } from '../lib/StatsTableBody';
+import {
+	SortableTable,
 	type ColumnConfig,
 	type RowModelWithRawData
 } from '@/modules/ui-kit';

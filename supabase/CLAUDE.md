@@ -68,9 +68,10 @@ Key design notes:
   `GroupDataSharing` recipient of that group (the identical branch to `Encounters`'
   `group_encounters_access`, with `group_id` in place of `ringing_group_id`), and *anyone at all*
   once the row's group has `'summary'` in `public_areas`. That third branch is the gate the
-  now-deleted `public_core_stats` used to apply, enforced by RLS directly rather than through a
-  `SECURITY DEFINER` wrapper, so the summary page's four access levels survived the repoint off
-  `core_stats`/`public_core_stats` onto the cache with no new read path. It is evaluable anonymously because
+  now-deleted public `SECURITY DEFINER` wrapper over the group-wide aggregate RPC used to apply —
+  now enforced by RLS directly rather than inside a wrapper function of its own, so the summary
+  page's four access levels survived the repoint off that RPC pair onto the cache with no new read
+  path. It is evaluable anonymously because
   `RingingGroups` is openly readable (`USING (TRUE)` + `GRANT ALL TO anon`), and the first two
   branches simply evaluate false for a no-JWT caller — `auth.jwt()` is NULL, so the `::bigint`
   cast yields NULL rather than erroring. `anon` therefore has `SELECT` and nothing else on both
@@ -80,7 +81,7 @@ Key design notes:
 - Complex queries are exposed as Postgres RPC functions (e.g. `demographics_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
 
-### Companion stats RPCs and shared plumbing (`demographics_stats` / `arrivals_stats`, #800/#877, formerly also `core_stats`)
+### Companion stats RPCs and shared plumbing (`demographics_stats` / `arrivals_stats`, #800/#877, formerly also a group-wide aggregate sibling)
 
 `demographics_stats` (a new-adult count, young-trends derivations and #843's returning-age
 buckets) and `arrivals_stats` build on the same underlying logic via `stats_raw_encounters` /
@@ -88,10 +89,12 @@ buckets) and `arrivals_stats` build on the same underlying logic via `stats_raw_
 RPCs holding the windowed-row-source / grouping-spine / per-encounter-classification /
 per-bird-bucket-resolution logic. This shared-utility pattern, and the whole input signature
 (`species_name_filter, from_date, to_date, ringing_group_filter, group_by_species,
-group_by_time_period`) both RPCs still take, originated with a now-deleted third sibling,
-`core_stats` (#1244 — zero remaining app call sites once the `/species` list page's arbitrary-window
-counts rerouted onto `stats_cache_basic_session_metrics`; dropped from the schema entirely by a
-later ticket). Each top-level RPC calls every utility it needs exactly once and materializes the
+group_by_time_period`) both RPCs still take, originated with a now-deleted third sibling: **the
+group-wide aggregate RPC** this family grew out of — referred to that way throughout this doc,
+since the name itself is gone (#1244 — zero remaining app call sites once the `/species` list
+page's arbitrary-window counts rerouted onto `stats_cache_basic_session_metrics`; #1359 dropped it
+and its public `SECURITY DEFINER` wrapper from the schema entirely). Each top-level RPC calls every
+utility it needs exactly once and materializes the
 result into a local CTE (reused by every downstream reference in that RPC), so the base tables
 aren't rescanned once per downstream CTE — but a utility RPC that itself depends on another (e.g.
 `stats_bird_age_bucket` → `stats_encounter_age_classification` → `stats_raw_encounters`) does
@@ -104,12 +107,12 @@ hand** with `app/models/encounter.ts`'s `getAgeClass()` if either changes. `demo
 originally named `population_stats` (#800); #877 created the renamed
 `demographics_stats`/`demographics_stats_result` pair as byte-identical siblings, #878 migrated
 every app-code call site onto the new names, and #879 dropped the old `population_stats` function
-and `population_stats_result` type entirely — the same three-step pattern later used to retire
-`core_stats`/`public_core_stats` (#830 renamed them from `aggregate_stats`/`public_aggregate_stats`;
-#1244 removed the renamed pair's last app call site; a later ticket drops them from the schema —
+and `population_stats_result` type entirely — the same three-step pattern later used to retire the
+group-wide aggregate RPC and its public wrapper (#830 renamed that pair off their original names;
+#1244 removed the renamed pair's last app call site; #1359 dropped them from the schema —
 see `app/CLAUDE.md`'s "Public pages and the group summary read-path"). `demographics_stats.new_young_bird_count`
-was originally a duplicate of a same-named column on `core_stats` (#800); #824 removed `core_stats`'s
-copy (and the corresponding UI series, #817) as unused, so `demographics_stats` holds the only
+was originally a duplicate of a same-named column on the aggregate RPC (#800); #824 removed that
+RPC's copy (and the corresponding UI series, #817) as unused, so `demographics_stats` holds the only
 `new_young_bird_count` column in the schema.
 
 **"Old timers" no longer exists at any layer (#837).** `demographics_stats` originally carried a
@@ -138,11 +141,11 @@ of the same U/F/D set; it's gone (#1333/#1334) now every consumer reads `is_resi
 **That record_type filter is now the ONLY thing deciding what is "real" data in any stats RPC
 (#1021, completed by #1024).** `stats_spine`'s `session_date_range` used to exclude
 `FIELD_OBSERVATION` sessions (so a field-observation-only date couldn't stretch the month/year
-spine past the range of `FULL_GROWN`/`PULLI` sessions), and `core_stats.session_count` used to be
-`COUNT(DISTINCT CASE WHEN session_type = 'FULL_GROWN' THEN visit_date END)`. #1021 removed both,
+spine past the range of `FULL_GROWN`/`PULLI` sessions), and the aggregate RPC's `session_count` used
+to be `COUNT(DISTINCT CASE WHEN session_type = 'FULL_GROWN' THEN visit_date END)`. #1021 removed both,
 and #1024 then dropped the `session_type` column itself — along with `stats_raw_encounters`'
 `session_type` output column and the two `session_type = 'FULL_GROWN'` filters that survived #1021
-in `core_stats`' `session_counts` / `session_effort` CTEs.
+in that RPC's `session_counts` / `session_effort` CTEs.
 
 **`stats_spine`'s three period branches apply `month_filter` three different ways — don't assume
 one rule.** The `month`/`year` branches are bounded by `session_date_range`, which applies
@@ -188,7 +191,7 @@ Two visible behaviour changes, not refactors, landed across the pair:
   `species_count`/`bird_count`/`encounter_count`, which always counted encounters from any
   `session_type`.
 
-**`session_counts` honours `group_by_species`, like every other CTE in `core_stats` (#1049).** It
+**`session_counts` honours `group_by_species`, like every other CTE in the aggregate RPC (#1049).** It
 used to group by a bare `species_id` whatever the caller asked for, so a group-wide call got one row
 per `(species, session)` pair rather than one per session — and `max_per_session` ("Busiest
 session"), `max_new_per_session` and `avg_encounters_per_session`, all built on top of it, described
@@ -201,7 +204,7 @@ unchanged. `session_effort`/`effort_per_period` have always been species-blind, 
 `avg_encounters_per_session`, left as-is.
 
 **One per-row evaluation trap in `stats_raw_encounters`, fixed in #947 — don't reintroduce it.**
-Because every stats RPC derives this row source (and `core_stats` derives it 4x through its
+Because every stats RPC derives this row source (and the aggregate RPC derived it 4x through its
 utility-RPC layering), anything evaluated per row here is paid several times over:
 
 - **There is no `date_trunc(text, date)` overload**, so `date_trunc('month', sess.visit_date)`
@@ -210,15 +213,15 @@ utility-RPC layering), anything evaluated per row here is paid several times ove
   is now just `sess.visit_date` (truncating a `DATE` to a day is the identity). Same values, and
   strictly more deterministic since the result no longer depends on the connection's `TimeZone`.
 
-`core_stats` likewise reads `session_day`/`session_month`/`session_year` straight off its
+The aggregate RPC likewise read `session_day`/`session_month`/`session_year` straight off its
 `raw_encounters` CTE instead of re-deriving them from `visit_date` in `session_counts` /
-`effort_per_period`. Together these took `core_stats` from a ~976ms to a ~643ms median on a
+`effort_per_period`. Together these took it from a ~976ms to a ~643ms median on a
 40k-encounter / 15,000-output-row benchmark, with shared buffer traffic down from ~325k to ~2.2k.
 
 Note also what #947 ruled **out**: `stats_spine`'s internal `raw_encounters` CTE is **not**
 duplicated. It has two textual references, so Postgres's `cterefcount > 1` rule always materializes
 it — confirmed at every parameterization. What looks like two derivations in an `EXPLAIN ANALYZE`
-is the *first* `CTE Scan` on each of two different CTEs (`core_stats`' own and `stats_spine`'s)
+is the *first* `CTE Scan` on each of two different CTEs (the calling RPC's own and `stats_spine`'s)
 carrying its CTE's population cost inclusively. Adding `AS MATERIALIZED` there produces a
 byte-identical plan; don't spend time on it again.
 
@@ -285,17 +288,18 @@ parameterized by the **shape** of their own query, not just by filter values —
 and `group_by_time_period` decide which columns the spine join is keyed on — so the join condition
 that constant-folds into a hashable/mergeable equality under a custom plan degrades, under a generic
 plan, into an OR of parameter-guarded equalities the planner can only run as a **nested-loop join
-filter**. Worse, the generic plan *costs less on paper* (measured on `biometrics_stats`: generic
+filter**. Worse, the generic plan *costs less on paper* (measured on the since-deleted biometrics
+RPC — the per-species wing/weight sibling of this family, dropped in #1246: generic
 cost 20,910 / actual 32,112ms, custom cost 7,788,010 / actual 313ms, with 282,674,732 rows removed
 by the join filter), because `stats_spine` is a non-inlinable SQL SRF the planner estimates at its
 1,000-row default — so `plan_cache_mode = auto` adopts it eagerly. Measured on a 160k-encounter /
 4-group / 4,000-bird / 60-species synthetic fixture, executions 1-5 vs 6-8 of the same call in one
-session: `biometrics_stats` group-wide monthly 157ms → **10,335ms**, group-wide daily 193ms →
+session: the biometrics RPC group-wide monthly 157ms → **10,335ms**, group-wide daily 193ms →
 **22,676ms**; `arrivals_stats` group-wide monthly 155ms → 945ms; `demographics_stats` group-wide
-monthly ~10,200ms → **~53,400ms** *after* #952's rewrite. `core_stats` does not cliff under
-homogeneous group-wide traffic (its generic plan happens to price above the custom average for that
-shape) but does through the most ordinary route there is: five cheap ungrouped calls on one pooled
-backend flip the cache to generic, and the next group-wide monthly call then takes **44,205ms
+monthly ~10,200ms → **~53,400ms** *after* #952's rewrite. The group-wide aggregate RPC did not cliff
+under homogeneous group-wide traffic (its generic plan happened to price above the custom average
+for that shape) but did through the most ordinary route there is: five cheap ungrouped calls on one
+pooled backend flip the cache to generic, and the next group-wide monthly call then took **44,205ms
 instead of 437ms**, for the life of the connection. Forcing custom plans costs nothing measurable —
 planning is single-digit milliseconds against hundreds of milliseconds of execution, and executions
 1-5 were always custom plans anyway. Don't "optimise" it away, and don't try to fix this by
@@ -336,9 +340,10 @@ this shape-parameterized join pattern, it needs the same `SET` clause, for the i
 above rather than the RETURN QUERY reason that applies to the plpgsql RPCs.
 
 `arrivals_stats` (#858) is a third RPC on the same input signature, answering a question the other
-two structurally can't: **arrivals**. `core_stats`/`demographics_stats` compute their bucket
-counts per (species, time_period) cell *independently*, so a bird encountered in Jan, Mar and Jun of
-one year is counted again in each monthly cell. `arrivals_stats` instead counts each bird exactly
+two structurally can't: **arrivals**. `demographics_stats` (and the group-wide aggregate RPC before
+it was removed) computes its bucket counts per (species, time_period) cell *independently*, so a
+bird encountered in Jan, Mar and Jun of one year is counted again in each monthly cell.
+`arrivals_stats` instead counts each bird exactly
 once per calendar year, at whichever cell holds its **first classifiable encounter of that year**,
 bucketed by what the bird was at that encounter — `new_adult` / `returning_adult` / `pullus` / `juv`
 / `postjuv` (mutually exclusive and exhaustive, so the five counts sum to the cell's distinct
@@ -362,9 +367,9 @@ type — confirmed empirically while building `demographics_stats` (as `populati
 schema-diff runs against the identical schema files produced two *different* physical attribute
 orders for a composite type's columns (one matching the file's declared order, one alphabetical),
 silently scrambling values into the wrong named output columns with no error either way.
-`demographics_stats` and `core_stats`
-(the latter retrofitted in #824, the first time `aggregate_stats_result` changed shape since this
-note was written) guard against this by wrapping their final projection — `SELECT
+`demographics_stats` — and the group-wide aggregate RPC before its removal, retrofitted in #824, the
+first time that RPC's result type had changed shape since this note was written — guards against
+this by wrapping its final projection — `SELECT
 (jsonb_populate_record(NULL::the_result_type, to_jsonb(agg))).* FROM (...) AS agg` — which binds
 every column by **name** instead, independent of the type's physical attribute order. Use this
 wrapper for any new/future `RETURNS SETOF <composite type>` RPC in this codebase.
@@ -503,8 +508,8 @@ Tests can run concurrently in separate git worktrees (see `swarm`) against the s
 Supabase instance. Any row a write test creates (ring numbers, group names, session/location
 names, etc.) must use a random or ticket/branch-specific identifier — never a fixed literal —
 so parallel runs never collide on the same row, and so date-based rows never collide in a
-group-wide aggregate RPC's results (e.g. `core_stats`) even without a unique
-constraint. Use the shared helpers in `supabase/__tests__/test-isolation.ts`
+group-wide aggregate RPC's results even without a unique constraint. Use the shared helpers in
+`supabase/__tests__/test-isolation.ts`
 (`randomTestSuffix`, `randomFutureDate`, `addDays`) rather than inventing a new isolation
 mechanism per file; extend an existing prefix convention (e.g. `TRIG-TEST-`) with the suffix.
 
@@ -519,30 +524,33 @@ Snapshot fixture data lives in `test-fixtures/snapshots/` and is consumed by app
 (`app/CLAUDE.md`'s "App tests" covers the consumer side — mocks, the table-cell assertion helper,
 etc.) as mock return values, rather than inventing data inline. Fixtures are organised **by data
 source, not by the action function that consumes them** (#882): one subdirectory per Postgres RPC
-(`core_stats/`, `demographics_stats/`, `find_discrepencies/`,
-`notable_retraps/`, `ring_sequence_controls/`, `stats_cache_biometrics_metrics/`), or
-`tables/<TableName>/` for a fixture produced by
+(`demographics_stats/`, `find_discrepencies/`, `notable_retraps/`, `ring_sequence_controls/`,
+`stats_cache_biometrics_metrics/`), or `tables/<TableName>/` for a fixture produced by
 a direct PostgREST table query rather than an RPC call. This matters because an action can drift
 from the RPC/table it actually calls (#870: `getSpeciesStatsHistory.alpha.robin.json` was named
-after the `getSpeciesStatsHistory` action but generated from a raw `core_stats` call) — naming by
-source instead of by consumer means a fixture's location can never overstate what it verifies.
+after the `getSpeciesStatsHistory` action but generated from a raw call to the group-wide aggregate
+RPC of the day) — naming by source instead of by consumer means a fixture's location can never
+overstate what it verifies.
 Within each directory, filenames follow `<callingGroupOrParams>.<intent>.json` (e.g.
-`core_stats/alpha.by-species.json`, `core_stats/alpha.home-page-summary.json`). See the comment
-above the relevant block in `supabase/scripts/generate-snapshots.ts`, which documents every
+`tables/SimpleStatsCacheBySpecies/alpha.by-species.json`,
+`tables/SimpleStatsCache/alpha.home-page-summary.json`). The summary/species fixtures sit under
+`tables/SimpleStatsCache*/` rather than an RPC subdirectory precisely because of that rule: #1359
+dropped the aggregate RPC they used to be captured from, and the app's read path now goes straight
+at the two cache tables. See the comment above the relevant block in
+`supabase/scripts/generate-snapshots.ts`, which documents every
 fixture's actual RPC/table and consuming action(s), keeping a fixture's location from silently
 drifting from what it actually tests. Regenerate every fixture here with
 `npm run db:generate-snapshots` — the sole exception is `synthetic/` (#894), two hand-authored
 all-zero/null edge-case fixtures that no real query can ever produce (see that directory's own
 `README.md`), which the generator deliberately never touches.
 
-`core_stats`' companion stats RPC `demographics_stats` (see "Companion stats RPCs and shared
-plumbing" above) went uncovered until #883, so every test of its row shape hand-rolled its own
-literal. It now has a fixture for the one call shape its real call sites use (Robin/Alpha
-`monthly-history`). **Don't reintroduce a hand-written literal for its row shape:** base a test's
+`demographics_stats` (see "Companion stats RPCs and shared plumbing" above) went uncovered until
+#883, so every test of its row shape hand-rolled its own literal. It now has a fixture for the one
+call shape its real call sites use (Robin/Alpha `monthly-history`). **Don't reintroduce a hand-written literal for its row shape:** base a test's
 row builder on a fixture row (spread it, override only the columns the test asserts on) so a column
 added or removed at the RPC surfaces in the fixture rather than drifting silently.
 
-`biometrics_stats` had three fixtures of its own under the same rule until #1246 deleted the RPC
+The biometrics RPC had three fixtures of its own under the same rule until #1246 deleted it
 outright — every app call site now reads the already-materialized cache tables (#1223/#1244) and
 `BiometricsStatsResult` became an app-owned TypeScript type rather than a view over a Postgres
 composite (#1245), so no database source was left to regenerate or check them against. Those rows
@@ -564,13 +572,15 @@ the same class of silent drift #870/#890 were about. Where an action joins two s
 fixture per source and let the **consuming test** do the same join the action does, with the same
 helper the production read path uses: build a `CoreStatsWithBiometrics` row with
 `mergeBiometricsFields` and a `SpeciesStatsRow` with `mergeSpeciesBiometrics` over the two source
-fixtures (#821/#823), rather than reading wing/weight columns off a `core_stats` fixture —
-`core_stats` stopped carrying its own copies at #827. `SppStatsTable`'s test still does that merge
-itself, now over `core_stats/alpha.by-species.json` plus rows from
+fixtures (#821/#823), rather than reading wing/weight columns off the basic-counts fixture — the
+group-wide aggregate RPC stopped carrying its own copies at #827, and although the
+`SimpleStatsCacheBySpecies` rows that replaced it do carry them, the production read path still
+merges them in from the separate biometrics source. `SppStatsTable`'s test still does that merge
+itself, now over `tables/SimpleStatsCacheBySpecies/alpha.by-species.json` plus rows from
 `app/__tests__/helpers/biometrics-stats-fixtures.ts`, which since #1273 is itself derived from the
 generated `stats_cache_biometrics_metrics/` snapshots via that same rule's species_id→name join.
 
-**Fixture drift is caught by a pre-push, diff-gated check — but only for the 27 generated
+**Fixture drift is caught by a pre-push, diff-gated check — but only for the 25 generated
 fixtures.** Nothing in the type system notices when an RPC's return shape changes underneath a
 fixture consumed via a double assertion (see `app/CLAUDE.md`'s fixture-casting guidance) or via a
 JSON import generally, since an imported JSON module is not a fresh object literal so even a
@@ -590,16 +600,17 @@ That's how #870's column removal reached `main` with every check green (full inv
   column/row vocabulary when touching this code: it's uniform across the module, its tests and its
   failure messages. The comparison helpers and the two fixture inventories live in
   `lib/snapshot-fixtures.ts` (pure, no I/O, unit-tested in the app suite).
-- **What it covers.** Exactly the 27 fixtures `supabase/scripts/generate-snapshots.ts` writes
+- **What it covers.** Exactly the 25 fixtures `supabase/scripts/generate-snapshots.ts` writes
   (`GENERATED_SNAPSHOT_FIXTURES`). It asserts the generator still produces precisely that set, so a
   fixture silently dropping out of the generator fails rather than quietly stopping being checked.
 - **What it doesn't.** The 2 permanently hand-authored `synthetic/` fixtures
   (`UNGENERATED_SNAPSHOT_FIXTURES`) — all-zero/null edge cases no real query can ever produce, see
   above. #894 brought every other previously-hand-maintained fixture
-  (`core_stats/*.summary-totals.json` / `*.home-page-summary.json`, `ring_sequence_controls/`,
+  (the aggregate RPC's `*.summary-totals.json` / `*.home-page-summary.json`, since moved to
+  `tables/SimpleStatsCache/`, plus `ring_sequence_controls/`,
   `tables/Encounters/`, `tables/Species/`) under the generator and deleted four generated-but-
   unconsumed orphans, and #901 split the last two compound fixtures
-  (`core_stats/*.yearly-and-monthly-totals.json`, `tables/Birds/arretrap.bird-detail.json`) into
+  (that RPC's `*.yearly-and-monthly-totals.json`, `tables/Birds/arretrap.bird-detail.json`) into
   their raw sources, so this list is now just the two `synthetic/` fixtures rather than an
   open-ended gap. A second coverage test pins the on-disk file list to generated + ungenerated, so
   any future hand-added fixture stays visible rather than implied-covered.

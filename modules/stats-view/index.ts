@@ -14,13 +14,35 @@ export {
 	deriveSpeciesTotalsRow,
 	deriveSpeciesTotalsRowByEncounter
 } from './lib/species-totals';
-export { mergeSpeciesBiometrics, speciesStatConfigs } from './lib/species-stats';
+export {
+	mergeSpeciesBiometrics,
+	speciesStatConfigs
+} from './lib/species-stats';
 export {
 	buildGroupSquashedMonthSummaryHref,
 	buildSpeciesSquashedMonthHref,
 	formatMonthAbbreviation,
 	parseMonthAbbreviation
 } from './lib/squashed-month';
+export {
+	AggregateByToggle,
+	type AggregateByValue
+} from './lib/AggregateByToggle';
+export { CombineYearsToggle } from './lib/CombineYearsToggle';
+export { EmptyMonthsToggle } from './lib/EmptyMonthsToggle';
+export {
+	createStatsTableBody,
+	type StatsTableBodyConfig
+} from './lib/StatsTableBody';
+export {
+	ageBlockStartBorder,
+	ageBlockEndBorder,
+	columnBlock,
+	createNameLinkCell,
+	buildStandardColumnConfigs,
+	buildTotalsRowCells,
+	type TotalsRowCellsInput
+} from './lib/StatsTableColumnConfigs';
 export { PeriodTotalsTable } from './components/PeriodTotalsTable';
 export {
 	SpeciesTotalsTable,
