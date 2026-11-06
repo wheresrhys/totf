@@ -171,8 +171,9 @@ zones and don't belong to any single scoped doc:
   [`modules/ui-kit/CLAUDE.md`](modules/ui-kit/CLAUDE.md).
 - `modules/stats-view/` — the 5 stats-table components (`PeriodTotalsTable`,
   `SpeciesTotalsTable`, `SessionSpeciesTotalsTable`, `SppStatsTable`, `SpTable`) every
-  summary/species/session tab renders, the 4 pure helpers that reshape a `core_stats`-family
-  row into the row model each one wants, extracted from `app/components/*` and `app/lib/*`
+  summary/species/session tab renders, plus the 4 pure helpers that reshape a
+  `stats_cache_*_metrics`/`SimpleStatsCache` row into the row model each one wants, 
+  extracted from `app/components/*` and `app/lib/*`
   (#1327), and (since #1353) the stats-table-specific primitives those components build on —
   the three two-option toggles (`AggregateByToggle`, `CombineYearsToggle`, `EmptyMonthsToggle`)
   and the age-bucketed column-set/table-body factories (`StatsTableColumnConfigs`,
