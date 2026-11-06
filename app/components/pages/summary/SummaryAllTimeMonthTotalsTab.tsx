@@ -2,13 +2,11 @@
 import { useState } from 'react';
 import {
 	buildGroupSquashedMonthSummaryHref,
-	PeriodTotalsTable
-} from '@/modules/stats-view';
-import {
+	PeriodTotalsTable,
 	CombineYearsToggle,
-	EmptyMonthsToggle,
-	type TabConfig
-} from '@/modules/ui-kit';
+	EmptyMonthsToggle
+} from '@/modules/stats-view';
+import { type TabConfig } from '@/modules/ui-kit';
 import {
 	buildCombinedMonthTotalsRows,
 	buildPerYearMonthTotalsRows,

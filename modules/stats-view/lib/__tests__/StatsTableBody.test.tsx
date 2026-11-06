@@ -7,7 +7,7 @@ import {
 	within
 } from '@testing-library/react';
 import { createStatsTableBody } from '../StatsTableBody';
-import type { ColumnConfig, RowModelWithRawData } from '../../types';
+import type { ColumnConfig, RowModelWithRawData } from '@/modules/ui-kit';
 import { getRowByText } from '@/app/__tests__/helpers/table';
 
 afterEach(() => {
