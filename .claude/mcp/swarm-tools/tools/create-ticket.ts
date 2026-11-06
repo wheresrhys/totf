@@ -9,12 +9,25 @@ const EXCLUSIVE_LABEL_DESCRIPTIONS: Record<string, string> = {
 		'Touches a @mutates E2E spec\'s trigger path — swarm runs at most one exclusive-resource ticket at a time',
 };
 
+// Mirrors the canonical zone list in CLAUDE.md's "Repo zones" section — three top-level zones
+// plus one per modules/<name>/ directory. A zod enum needs static literals, so this is the one
+// place that can't just link to the doc: adding a new module means adding it here (both this map
+// and the `zoneLabels` enum below) as well as to that table. GitHub caps a label description at
+// 100 characters, so keep each string under that.
 const ZONE_LABEL_DESCRIPTIONS: Record<string, string> = {
 	'zone:app': 'Touches only app/ — safe to scope investigation/context to that subtree',
-	'zone:data-layer':
-		'Touches only supabase/ (schema, scripts, tests) — safe to scope investigation/context to that subtree',
+	'zone:supabase':
+		'Touches only supabase/ (schema/scripts/tests) — safe to scope investigation/context to that subtree',
 	'zone:agentic-tooling':
 		'Touches only .claude/ (skills, MCP, hooks) — safe to scope investigation/context to that subtree',
+	'zone:modules/stats':
+		'Touches only modules/stats/ — safe to scope investigation/context to that subtree',
+	'zone:modules/demon-import':
+		'Touches only modules/demon-import/ — safe to scope investigation/context to that subtree',
+	'zone:modules/ui-kit':
+		'Touches only modules/ui-kit/ — safe to scope investigation/context to that subtree',
+	'zone:modules/stats-view':
+		'Touches only modules/stats-view/ — safe to scope investigation/context to that subtree',
 };
 
 async function ensureLabelsExist(labels: string[], cwd?: string): Promise<void> {
@@ -48,8 +61,19 @@ export function registerCreateTicketTool(server: McpServer) {
 				body: z.string(),
 				modelLabel: z.enum(['opus', 'sonnet', 'fable']),
 				extraLabels: z.array(z.enum(['db-migration', 'e2e-exclusive'])).optional(),
+				// Keep in step with ZONE_LABEL_DESCRIPTIONS above and CLAUDE.md's "Repo zones" table.
 				zoneLabels: z
-					.array(z.enum(['zone:app', 'zone:data-layer', 'zone:agentic-tooling']))
+					.array(
+						z.enum([
+							'zone:app',
+							'zone:supabase',
+							'zone:agentic-tooling',
+							'zone:modules/stats',
+							'zone:modules/demon-import',
+							'zone:modules/ui-kit',
+							'zone:modules/stats-view',
+						])
+					)
 					.min(1)
 					.optional(),
 				parentIssue: z.number().optional(),

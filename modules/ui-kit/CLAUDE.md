@@ -9,8 +9,9 @@ The 17 UI-primitive components, hooks, and design-system building blocks previou
 in `app/components/shared/` — toggles, sortable/accordion table plumbing, tab plumbing, and
 design-system primitives, reused across most page families in `app/`. Pure relocation (#1326):
 behaviour is unchanged, only the import path moved. Unlike `modules/stats/`, this module is
-`zone:app`-only — it's catalogued here as a module because it's large enough to warrant its own
-directory/barrel/doc, not because anything outside `app/` consumes it, so it has no
+consumed only by `app/` — it's catalogued as a module because it's large enough to warrant its own
+directory/barrel/doc (and its own `zone:modules/ui-kit` label), not because anything outside
+`app/` consumes it, so it has no
 `browser.ts`/`index.ts` split (none of its files import `next/headers`, `server-only`,
 `supabase/server`, or use `'use server'`).
 
