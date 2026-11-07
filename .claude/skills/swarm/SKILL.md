@@ -255,18 +255,29 @@ both concerns for that PR:
      when a shared marker shows the DB is already caught up, so it's cheap on every PR; only when
      behind does it run `npx supabase migration up --local`, and that apply case is safe because a
      `db-migration` unit already runs solo (the exclusive-resource rule).
-  4. **Then feedback** — on top of the now-current branch, summarise outstanding feedback, make
-     the changes, run tests, reply to the reviewer via `gh pr comment <n>` (or `gh api
+  4. **Fetch full triage detail, then act on it directly** — call
+     `mcp__swarm-tools__swarm_triage_pr` with `{ prNumber: <n> }` to get this PR's full
+     maintenance picture in one call: `hasConflict`, `outstandingReviews`,
+     `outstandingInlineThreads` (each entry is a whole comment thread, grouped by
+     `in_reply_to_id`, in fetch order — reply at the comment id the relevant thread names),
+     `outstandingIssueComments`, and `reason` (`'conflict'` | `'feedback'` | `'conflict+feedback'`
+     | `'none'`) — all already filtered through the same bot-login/mermaid-diff/
+     `swarm-worker-reply`-marker/head-commit-date rules `swarm_plan_batch` uses for its own
+     yes/no decision. There is no need to re-derive any of this by hand from raw `gh pr
+     view`/`gh api` calls. On top of the now-current branch (step 2's merge above already
+     resolved anything `hasConflict` flagged), address each item in `outstandingReviews` /
+     `outstandingInlineThreads` / `outstandingIssueComments` directly, make the changes, run
+     tests, reply to the reviewer via `gh pr comment <n>` (or `gh api
      repos/{owner}/{repo}/pulls/<n>/comments` for an inline-thread reply). **Every reply a
      maintenance worker posts must end with the marker line `<!-- swarm-worker-reply -->`**, on its
      own line after the reply text. There is no bot identity for swarm workers — `gh` authenticates
-     as the same human account a real reviewer uses — so without the marker `swarm_plan_batch`
-     cannot tell a worker's own reply from genuine unaddressed feedback, and re-flags the PR as
-     `reason: "feedback"` on the very next call, looping it through maintenance spawns indefinitely
-     (#904). The marker is an HTML comment, so it's invisible in GitHub's rendered view;
-     `swarm_plan_batch`'s feedback checks skip any comment/thread-head carrying it, exactly as they
-     already skip mermaid-diff comments. Never add the marker to a comment that is genuine new
-     feedback rather than a worker's reply.
+     as the same human account a real reviewer uses — so without the marker neither
+     `swarm_plan_batch` nor `swarm_triage_pr` can tell a worker's own reply from genuine
+     unaddressed feedback, and the PR gets re-flagged as `reason: "feedback"` on the very next
+     call, looping it through maintenance spawns indefinitely (#904). The marker is an HTML
+     comment, so it's invisible in GitHub's rendered view; both tools' feedback checks skip any
+     comment/thread-head carrying it, exactly as they already skip mermaid-diff comments. Never
+     add the marker to a comment that is genuine new feedback rather than a worker's reply.
   5. **Release the shared-DB lock early, if this PR is `db-migration`/`e2e-exclusive`** — once the
      migration is applied and verified against the shared local Postgres (or the `@mutates` E2E run
      has completed) and every remaining step is non-shared-resource (lint fixes, retests needing no
