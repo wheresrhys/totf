@@ -9,15 +9,19 @@ import {
 } from '../lib/period-totals';
 import type { PeriodTotalsGrouping, PeriodTotalsRow } from '../types';
 import {
+	buildStandardColumnConfigs,
+	buildTotalsRowCells,
+	createNameLinkCell
+} from '../lib/StatsTableColumnConfigs';
+import {
+	AggregateByToggle,
+	type AggregateByValue
+} from '../lib/AggregateByToggle';
+import {
 	SortableTable,
 	getFormattedValue,
 	type ColumnConfig,
-	type RowModelWithRawData,
-	buildStandardColumnConfigs,
-	buildTotalsRowCells,
-	createNameLinkCell,
-	AggregateByToggle,
-	type AggregateByValue
+	type RowModelWithRawData
 } from '@/modules/ui-kit';
 
 function buildColumnConfigs({

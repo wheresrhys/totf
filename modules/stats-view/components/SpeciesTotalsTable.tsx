@@ -7,14 +7,18 @@ import {
 } from '../lib/species-totals';
 import type { SpeciesStatsRow, SpeciesTotalsRow } from '../types';
 import {
-	type ColumnConfig,
-	SortableTable,
-	type RowModelWithRawData,
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
-	createNameLinkCell,
+	createNameLinkCell
+} from '../lib/StatsTableColumnConfigs';
+import {
 	AggregateByToggle,
 	type AggregateByValue
+} from '../lib/AggregateByToggle';
+import {
+	type ColumnConfig,
+	SortableTable,
+	type RowModelWithRawData
 } from '@/modules/ui-kit';
 import { buildSpeciesSquashedMonthHref } from '../lib/squashed-month';
 

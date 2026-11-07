@@ -6,7 +6,7 @@ import {
 	buildTotalsRowCells,
 	columnBlock
 } from '../StatsTableColumnConfigs';
-import type { ColumnConfig, RowModelWithRawData } from '../../types';
+import type { ColumnConfig, RowModelWithRawData } from '@/modules/ui-kit';
 
 afterEach(() => {
 	cleanup();

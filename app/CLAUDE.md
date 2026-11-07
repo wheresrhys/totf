@@ -46,8 +46,8 @@ an RPC call** — three things follow from that:
   that can't be — an _ungrouped_ aggregate over a window that isn't itself a single cache cell, i.e.
   the `/species` list page's two free-text date inputs — still falls back to a live
   `stats_cache_basic_session_metrics` recompute for the `'own'`/`'shared'` branches (#1244 — it used
-  to be the `core_stats` RPC, which nothing here calls any more). The cache can't answer those: the
-  aggregate's distinct-count columns (`bird_count`, the `*_bird_count` age buckets) can't be rebuilt
+  to be the `core_stats` RPC, since dropped from the schema outright, #1359). The cache can't
+  answer those: the aggregate's distinct-count columns (`bird_count`, the `*_bird_count` age buckets) can't be rebuilt
   by summing finer cells. Every window the summary pages ask for (all time, a whole calendar year, a
   whole calendar month, a squashed calendar month) _is_ a cache cell and reads from the cache. See
   `resolveStatsCacheQueryPlan`'s own comment for the full param→filter mapping, including the
@@ -58,8 +58,8 @@ an RPC call** — three things follow from that:
   `'blocked'` branch's "no rows, no throw" convention, rather than silently serving a live call the UI
   no longer surfaces a route to.
 
-(`core_stats`/`public_core_stats` are already gone from app code reachability — a later ticket drops
-them from the schema too. See `supabase/CLAUDE.md`'s "Companion stats RPCs" for the RPC-side
+(`core_stats`/`public_core_stats` are gone from app code reachability, and — as of #1359 — from the
+schema too. See `supabase/CLAUDE.md`'s "Companion stats RPCs" for the historical RPC-side
 internals.)
 
 `lib/group-slug.ts`'s group-lookup functions (`resolveGroupIdBySlug`, `resolveGroupSlugById`,
@@ -113,10 +113,10 @@ the root layout, not a subtree one.
 - **Period-local stats come from the cache tables, not the stats RPCs (#1208).**
   `modules/stats/lib/stats-cache.ts`'s `readStatsCacheRows` (re-exported via the `@/modules/stats`
   barrel) reads `SimpleStatsCache`/`SimpleStatsCacheBySpecies` — filtered by
-  `group_id` + `temporal_unit`, paginated through `fetchAllPaginatedRows` — rather than calling
-  `core_stats` (and, until #1246 deleted it, `biometrics_stats`), which redo the multi-way join the
-  post-import refresh queue has
-  already materialized. The accepted tradeoff is a brief post-import staleness window while the
+  `group_id` + `temporal_unit`, paginated through `fetchAllPaginatedRows` — rather than calling the
+  live `core_stats`/`biometrics_stats` RPCs directly (both now deleted from the schema outright —
+  `biometrics_stats` by #1246, `core_stats` by #1359), which redo the multi-way join the
+  post-import refresh queue has already materialized. The accepted tradeoff is a brief post-import staleness window while the
   refresh queue catches up; there is deliberately no polling or fallback-to-live-RPC around it.
   Three things to know before touching that file:
   - `species_name` is a column on neither cache table. A by-species read resolves it through a
@@ -318,7 +318,7 @@ excess-property check never applies to it — a fixture carrying a column the ty
 _removed_ stays assignable either way; that direction is `supabase/__tests__/snapshot-fixture-freshness.test.ts`'s
 job, see `supabase/CLAUDE.md`), but it does catch a newly-_added_ required column, which the double
 assertion can't. Only fall back to `as unknown as SomeType` when the fixture is a genuine
-structural mismatch — e.g. an ungrouped/species-filtered `core_stats`-family fixture with a
+structural mismatch — e.g. an ungrouped/species-filtered `stats_cache_*_metrics`-family fixture with a
 literal `null` in a column the row type declares non-null (`CoreStatsResult` and
 `DemographicsStatsResult` in `app/models/db.ts` strip every column non-null via `NonNullable` over
 their generated composite type; `BiometricsStatsResult` is a standalone type since #1245 and

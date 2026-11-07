@@ -1,5 +1,8 @@
-import { type ColumnConfig, type RowModelWithRawData } from '../types';
-import { AccordionTableBody } from './AccordionTableBody';
+import {
+	type ColumnConfig,
+	type RowModelWithRawData,
+	AccordionTableBody
+} from '@/modules/ui-kit';
 
 // A component rendering a single row's model — used for the first-column cell
 // and (optionally) the expandable drill-down content.

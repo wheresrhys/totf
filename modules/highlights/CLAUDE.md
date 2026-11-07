@@ -154,8 +154,9 @@ Two sanctioned extension points: new shared finders in `lib/rule-utils.ts`, and 
   'biometrics_stats'`, naming the RPC a rule's stats came from, back when a rule really did
   dispatch its own RPC call. Every rule's stats now come from the same
   `SimpleStatsCache`/`SimpleStatsCacheBySpecies` read, so the field is now purely a column-subset
-  label over that one row set — and `biometrics_stats` has since been deleted from the schema
-  outright, which would have left the old name pointing at a function that no longer exists.
+  label over that one row set — and both `core_stats` and `biometrics_stats` have since been
+  deleted from the schema outright, which would have left the old name pointing at functions that
+  no longer exist.
 
 ## Testing
 
