@@ -17,6 +17,8 @@ cache tables"). Three concerns live here:
   — after an import, `buildStatsCacheRefreshEvents` turns the import's affected dates/species into
   up to 5 `StatsCacheRefreshEvent`s (one per temporal unit), and `dispatchStatsCacheRefreshEvents`
   sends them to the queue (`app/lib/queue-dispatch.ts`'s `inline`/Vercel-queue split).
+  `dispatchManualStatsCacheRegenerateEvent` is the import-less counterpart — see
+  "Manual regenerate events" below.
 - **Refresh** (`lib/refresh/`) — the queue consumer side: `refreshSimpleStatsCache` reads the four
   `stats_cache_*_metrics` RPCs, merges their per-cell rows, and writes the result back to the cache
   tables. See "The refresh pipeline" below.
@@ -40,7 +42,8 @@ both `Exclude<StatsTemporalUnit, 'all-time'>` for exactly that reason.
 
 `browser.ts` re-exports only the client-safe surface (`types`, `readStatsCacheRows`,
 `globalStatsCacheFetchPool`, `StatsCacheFetchPool`); `index.ts` re-exports everything `browser.ts`
-does plus `dispatchStatsCacheRefreshEvents`/`refreshSimpleStatsCache`, which pull in
+does plus `dispatchStatsCacheRefreshEvents`/`dispatchManualStatsCacheRegenerateEvent`/
+`refreshSimpleStatsCache`, which pull in
 `@vercel/queue` and the full `lib/refresh/` pipeline and so are server-only.
 `runSimpleStatsCacheRefreshPass` (the single-pass half `refreshSimpleStatsCache` calls twice) has
 no external caller and isn't re-exported from either barrel — module-internal only.
@@ -66,7 +69,8 @@ modules/stats/
     stats-cache.ts                 # readStatsCacheRows
     stats-cache-fetch-pool.ts      # StatsCacheFetchPool
     stats-cache-events.ts          # buildStatsCacheRefreshEvents
-    dispatch-stats-cache-events.ts # dispatchStatsCacheRefreshEvents
+    dispatch-stats-cache-events.ts # dispatchStatsCacheRefreshEvents +
+                                   # dispatchManualStatsCacheRegenerateEvent
     refresh/                       # the refresh pipeline — see below
       rpc-params.ts        # metric-RPC filter building, day-window batching, narrowing rules
       db-call-logging.ts   # runStatsCacheDbCall — logs every DB touchpoint of a refresh pass
@@ -78,6 +82,38 @@ modules/stats/
                             # day-unit batching needs (fetchGroupSessionDates — no file of its
                             # own, it has exactly one caller)
 ```
+
+## Manual regenerate events (#1379)
+
+Not every refresh event comes from an import. `dispatchManualStatsCacheRegenerateEvent`
+(`lib/dispatch-stats-cache-events.ts`) takes a `ManualStatsCacheRegenerateParams` —
+`{groupId, temporalUnit, periods?, speciesIds?}`, a scope the caller has already decided — and
+dispatches **exactly one** `StatsCacheRefreshEvent` through the same topic/dispatcher the import
+path uses. That's for a human- or UI-triggered regenerate of a particular corner of the cache
+(#1374's consistency checker), where there is no `ImportJobs` row and no "dates this import
+touched" to derive anything from. Four things it's worth knowing before touching it:
+
+- **It deliberately doesn't call `buildStatsCacheRefreshEvents`.** That function derives its whole
+  scope from an import's affected dates and always emits up to five events, one per temporal unit.
+  A manual caller wants one temporal unit with a scope it names itself, so the event is built
+  directly.
+- **`periods` is stamped onto `rpcParams.periods` *and* the top-level `affectedDates`.** The
+  consumer's `deriveStatsCacheRefreshParams` reads the former for `month`/`year`/`month-squashed`
+  and the latter for `day`; stamping both means its per-temporal-unit branching needs no
+  manual-event special case at all. Omit `periods` entirely for a full-width regenerate of that
+  temporal unit (which, for a narrowing unit, refreshes *nothing* — see "Narrowing" below, same
+  trap the import path has).
+- **`StatsCacheRefreshEvent.importJobId` and `.affectedSpeciesIds` are both optional** because of
+  this path. A manual event omits `importJobId`, and the consumer
+  (`app/api/queues/stats-cache-refresh-window/route.ts`) returns after the refresh rather than
+  calling `markStatsCacheRefreshed` — there is no row to write to. It omits
+  `affectedSpeciesIds` when the caller wants every species, which flows straight through to
+  `RefreshSpeciesNarrowing.speciesIds`' existing "`undefined` = no narrowing" convention rather
+  than a new one. Every import-derived event still carries both.
+- **A dispatch failure is caught and logged, not thrown**, matching
+  `dispatchStatsCacheRefreshEvents`' precedent — so a caller gets no signal that the regenerate
+  didn't happen. If a future app-facing endpoint needs to report that to a user, the rethrow
+  belongs here rather than being worked around at the call site.
 
 ## The refresh pipeline (`lib/refresh/`)
 

@@ -434,9 +434,19 @@ Two things decided there that a later session shouldn't re-litigate from scratch
   periods refreshes **nothing** — no error, no rows. So adding a unit to
   `SIMPLE_NARROWING_TEMPORAL_UNITS` always means adding it here too.
 
+- **An event need not come from an import at all (#1379).** `StatsCacheRefreshEvent.importJobId`
+  is optional, and an event carrying none — a manual, arbitrarily-scoped regenerate dispatched by
+  `modules/stats`' `dispatchManualStatsCacheRegenerateEvent` rather than by an import — is
+  refreshed identically and then simply returns, with no `markStatsCacheRefreshed` call, because
+  there is no `ImportJobs` row to record an outcome on. `affectedSpeciesIds` is optional for the
+  same reason, and `undefined` reaches `refreshSimpleStatsCache` as "no species narrowing". See
+  [`modules/stats/CLAUDE.md`](../modules/stats/CLAUDE.md)'s "Manual regenerate events" for the
+  producer side.
+
 A refresh failure is **terminal, caught and logged**, not thrown: `handleCallback` is registered
 with no `retry` callback, so a throw would just disappear. The handler writes `'failed'` to the
-temporal unit's column and resolves.
+temporal unit's column and resolves (or, for an import-less event, just resolves — the failure is
+still logged inside `refreshSimpleStatsCache` itself either way).
 
 There used to be a second refresh here, `refreshComplexStatsCache` against a sibling
 `ComplexStatsCache`, run independently of `refreshSimpleStatsCache` with its own `try`/`catch` so

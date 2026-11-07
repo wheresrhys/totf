@@ -12,12 +12,19 @@ import { getAuthenticatedSupabaseClientForGroup } from '@/app/lib/auth/group-aut
  * What one `StatsCacheRefreshEvent` means to `refreshSimpleStatsCache`, which
  * takes `{groupId, temporalUnit, periods?, speciesIds?}` rather than the
  * event's own RPC-filter-shaped payload.
+ *
+ * `speciesIds` is `number[] | undefined` rather than required, because an
+ * import-less manual regenerate event (#1379) may carry no
+ * `affectedSpeciesIds` at all — which `refreshSimpleStatsCache` reads as "no
+ * species narrowing", per `RefreshSpeciesNarrowing`. Spelled as an explicit
+ * `| undefined` rather than an optional `?`, so every branch below is still
+ * obliged to state what it passes.
  */
 type StatsCacheRefreshParams = {
 	groupId: number;
 	temporalUnit: StatsTemporalUnit;
 	periods?: string[];
-	speciesIds: number[];
+	speciesIds: number[] | undefined;
 };
 
 /**
@@ -46,9 +53,11 @@ const PERIODS_FROM_RPC_PARAMS_TEMPORAL_UNITS: readonly StatsTemporalUnit[] = [
  * period-sourcing rule differs per temporal unit and is the most error-prone
  * part of this consumer — see `__tests__/route.test.ts`'s first describe
  * block. `speciesIds` has no such per-unit rule: every branch carries
- * `event.affectedSpeciesIds` straight through, since narrowing the
- * species-grouped write is sound for every temporal unit — see
- * `RefreshSpeciesNarrowing`'s own doc comment in `modules/stats/stats-cache-refresh.ts`.
+ * `event.affectedSpeciesIds` straight through — including when it's absent, as
+ * on a manual import-less regenerate event (#1379), which
+ * `refreshSimpleStatsCache` reads as "no species narrowing" — since narrowing
+ * the species-grouped write is sound for every temporal unit; see
+ * `RefreshSpeciesNarrowing`'s own doc comment in `modules/stats/types.ts`.
  */
 export function deriveStatsCacheRefreshParams(
 	event: StatsCacheRefreshEvent
@@ -87,6 +96,14 @@ export function deriveStatsCacheRefreshParams(
  * covers, then records the outcome on that temporal unit's own
  * `ImportJobs.*_stats_refresh_status` column (#1154).
  *
+ * **That last step only applies to an import-driven event.** Since #1379 an
+ * event may carry no `importJobId` — a manual, arbitrarily-scoped regenerate
+ * dispatched by `dispatchManualStatsCacheRegenerateEvent` rather than by an
+ * import — in which case there is no `ImportJobs` row to write to and the
+ * handler returns after the refresh instead of tracking an outcome. The
+ * refresh itself, and the logging of any failure in it, is identical either
+ * way.
+ *
  * Deliberately a plain exported async function rather than inline logic in
  * `POST` below, per ADR 0001's Question 1: `app/lib/queue-dispatch.ts`'s inline
  * dispatch mode calls it directly, in-process, with no HTTP round trip and no
@@ -123,7 +140,6 @@ export async function processStatsCacheRefreshWindowJob(
 		deriveStatsCacheRefreshParams(event);
 
 	const supabaseClient = await getAuthenticatedSupabaseClientForGroup(groupId);
-	const importJobTracker = new ImportJobTracker(supabaseClient);
 
 	const refreshParams = {
 		groupId,
@@ -143,6 +159,15 @@ export async function processStatsCacheRefreshWindowJob(
 		refreshOutcome = 'failed';
 	}
 
+	// An import-less manual regenerate (#1379) has no `ImportJobs` row to record
+	// an outcome on, so there is nothing to track — the refresh itself has
+	// already been run and, on failure, already logged by
+	// `refreshSimpleStatsCache`. Only an import-driven event reaches the tracker.
+	if (importJobId === undefined) {
+		return;
+	}
+
+	const importJobTracker = new ImportJobTracker(supabaseClient);
 	try {
 		await importJobTracker.markStatsCacheRefreshed(
 			importJobId,
