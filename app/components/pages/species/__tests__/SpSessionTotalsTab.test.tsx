@@ -108,4 +108,23 @@ describe('SpSessionTotalsTab', () => {
 			});
 		});
 	});
+
+	describe('hiding empty sessions', () => {
+		it('always hides zero-count session rows, with no toggle to show them', () => {
+			renderSessionTotalsTab({
+				initialData: [
+					buildDailyStatsRow({ time_period: '2026-03-14', session_count: 2 }),
+					buildDailyStatsRow({ time_period: '2026-03-21', session_count: 0 })
+				]
+			});
+			expect(document.querySelectorAll('tbody tr').length).toBe(1);
+			expect(
+				screen.getByRole('link', { name: '14th March 2026' })
+			).toBeTruthy();
+			expect(
+				screen.queryByText((text) => text.includes('21st March 2026'))
+			).toBeNull();
+			expect(screen.queryByText('Empty sessions:')).toBeNull();
+		});
+	});
 });

@@ -1,5 +1,6 @@
 'use client';
 import { PeriodTotalsTable } from '@/modules/stats-view';
+import { filterEmptySessionRows } from '@/app/lib/month-totals';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import type { ViewedGroup } from '@/app/lib/group-slug';
@@ -17,11 +18,16 @@ export function SpSessionTotalsTab({
 	viewedGroup: ViewedGroup;
 }) {
 	const sessionTotals = (data as CoreStatsResult[] | null) ?? [];
+	// Always hidden, no toggle — per review feedback on #1382, a zero-count
+	// session row (`SimpleStatsCacheBySpecies`'s day-grain spine zero-filling a
+	// row for every session day the filtered species wasn't encountered) is
+	// never worth showing, so there's no "Show" state to offer.
+	const visibleRows = filterEmptySessionRows(sessionTotals);
 
 	return (
 		<PeriodTotalsTable
 			timeInterval="day"
-			rows={sessionTotals}
+			rows={visibleRows}
 			firstColumnHeader="Session"
 			buildHref={(timePeriod) =>
 				`/group/${viewedGroup.slug}/session/${timePeriod}`
