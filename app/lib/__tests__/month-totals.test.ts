@@ -4,6 +4,7 @@ import {
 	buildCombinedMonthTotalsRows,
 	buildPerYearMonthTotalsRows,
 	filterEmptyMonthTotalsRows,
+	filterEmptySessionRows,
 	formatMonthYearLabel,
 	formatMonthLabel
 } from '../month-totals';
@@ -311,6 +312,58 @@ describe('filterEmptyMonthTotalsRows', () => {
 			]);
 			const filtered = filterEmptyMonthTotalsRows(combinedRows, true);
 			expect(filtered.map((row) => row.zeroIndexedMonth)).toEqual([0, 7]);
+		});
+	});
+});
+
+describe('filterEmptySessionRows', () => {
+	describe('Usual', () => {
+		it('hide=true keeps only rows with session_count !== 0 among mixed zero/non-zero rows', () => {
+			const rows = [
+				buildCoreStatsRow({ time_period: '2026-03-14', session_count: 3 }),
+				buildCoreStatsRow({ time_period: '2026-03-15', session_count: 0 }),
+				buildCoreStatsRow({ time_period: '2026-03-16', session_count: 1 })
+			];
+			const filtered = filterEmptySessionRows(rows, true);
+			expect(filtered.map((row) => row.time_period)).toEqual([
+				'2026-03-14',
+				'2026-03-16'
+			]);
+		});
+	});
+
+	describe('Structure', () => {
+		it('hide=false returns all rows unchanged', () => {
+			const rows = [
+				buildCoreStatsRow({ time_period: '2026-03-14', session_count: 3 }),
+				buildCoreStatsRow({ time_period: '2026-03-15', session_count: 0 })
+			];
+			expect(filterEmptySessionRows(rows, false)).toEqual(rows);
+		});
+
+		it('does not mutate the input array', () => {
+			const rows = [
+				buildCoreStatsRow({ time_period: '2026-03-14', session_count: 3 }),
+				buildCoreStatsRow({ time_period: '2026-03-15', session_count: 0 })
+			];
+			const originalLength = rows.length;
+			filterEmptySessionRows(rows, true);
+			expect(rows).toHaveLength(originalLength);
+		});
+	});
+
+	describe('Edge', () => {
+		it('returns an empty array when given no rows, regardless of hideEmptySessions', () => {
+			expect(filterEmptySessionRows([], true)).toEqual([]);
+			expect(filterEmptySessionRows([], false)).toEqual([]);
+		});
+
+		it('returns an empty array when every row is zero-count and hideEmptySessions is true', () => {
+			const rows = [
+				buildCoreStatsRow({ time_period: '2026-03-14', session_count: 0 }),
+				buildCoreStatsRow({ time_period: '2026-03-15', session_count: 0 })
+			];
+			expect(filterEmptySessionRows(rows, true)).toEqual([]);
 		});
 	});
 });

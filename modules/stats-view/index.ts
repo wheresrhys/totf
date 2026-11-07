@@ -30,6 +30,7 @@ export {
 } from './lib/AggregateByToggle';
 export { CombineYearsToggle } from './lib/CombineYearsToggle';
 export { EmptyMonthsToggle } from './lib/EmptyMonthsToggle';
+export { EmptySessionsToggle } from './lib/EmptySessionsToggle';
 export {
 	createStatsTableBody,
 	type StatsTableBodyConfig
