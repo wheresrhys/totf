@@ -72,12 +72,47 @@ export type StatsCacheRefreshRpcParams = {
  * all-species-combined write (`SimpleStatsCache`) never reads this field: its
  * row aggregates across every species, so it must always be rewritten in full
  * whenever a period is in scope, regardless of which species changed.
+ *
+ * Both `importJobId` and `affectedSpeciesIds` are optional because an event
+ * need not come from an import at all (#1379). A manual, arbitrarily-scoped
+ * regenerate — built by `dispatchManualStatsCacheRegenerateEvent` from
+ * `ManualStatsCacheRegenerateParams` rather than derived from an import's
+ * affected dates — has no `ImportJobs` row to record its outcome on, so it
+ * omits `importJobId` and the consumer skips tracking entirely; and it may
+ * want every species rather than a touched subset, so it omits
+ * `affectedSpeciesIds`. Omitted means exactly what it means on
+ * `RefreshSpeciesNarrowing.speciesIds`, which this field feeds straight
+ * through to: "no species narrowing — write every computed row". Every
+ * import-derived event still carries both.
  */
 export type StatsCacheRefreshEvent = {
-  importJobId: number;
+  importJobId?: number;
   rpcParams: StatsCacheRefreshRpcParams;
   affectedDates?: string[];
-  affectedSpeciesIds: number[];
+  affectedSpeciesIds?: number[];
+};
+
+/**
+ * The scope a manual, import-less stats-cache regenerate is requested with
+ * (#1379) — one temporal unit, optionally narrowed to specific periods and/or
+ * species. Deliberately *not* the `StatsCacheRefreshEvent` shape: a caller
+ * asking for a regenerate has no `rpcParams` to build, no import's
+ * `affectedDates` to derive anything from, and no `importJobId`, so it supplies
+ * the scope directly and `dispatchManualStatsCacheRegenerateEvent` does the
+ * one-event translation.
+ *
+ * `periods` are the same exact `time_period` strings
+ * `StatsCacheRefreshRpcParams.periods` documents (first-of-month, first-of-year,
+ * `2000-MM-01` squashed-month, or a literal day), and `undefined` means
+ * "the whole temporal unit". `speciesIds` follows
+ * `RefreshSpeciesNarrowing`'s convention — `undefined` is no species
+ * narrowing.
+ */
+export type ManualStatsCacheRegenerateParams = {
+  groupId: number;
+  temporalUnit: StatsTemporalUnit;
+  periods?: string[];
+  speciesIds?: number[];
 };
 
 import type { ImportJobStatus } from '@/app/models/db';
