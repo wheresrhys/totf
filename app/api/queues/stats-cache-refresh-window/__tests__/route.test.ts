@@ -70,6 +70,29 @@ function statsCacheRefreshEvent({
 	};
 }
 
+/**
+ * A manual, import-less regenerate event, as
+ * `dispatchManualStatsCacheRegenerateEvent` (#1379) stamps them: no
+ * `importJobId`, and no `affectedSpeciesIds` unless the caller narrowed by
+ * species.
+ */
+function manualRegenerateEvent({
+	groupByTimePeriod,
+	periods
+}: {
+	groupByTimePeriod?: 'day' | 'month' | 'month-squashed' | 'year';
+	periods?: string[];
+} = {}): StatsCacheRefreshEvent {
+	return {
+		rpcParams: {
+			ringing_group_filter: GROUP_ID,
+			...(groupByTimePeriod ? { group_by_time_period: groupByTimePeriod } : {}),
+			...(periods ? { periods } : {})
+		},
+		...(periods ? { affectedDates: periods } : {})
+	};
+}
+
 /** The all-time event: no `group_by_time_period` key at all (#1154). */
 const allTimeEvent = () => statsCacheRefreshEvent();
 
@@ -174,6 +197,24 @@ describe('deriving groupId/temporalUnit/periods from the event', () => {
 				})
 			)
 		).toMatchObject({ speciesIds: [3, 1] });
+	});
+
+	it('derives speciesIds: undefined when the event carries no affectedSpeciesIds', () => {
+		// A manual regenerate asking for every species (#1379) —
+		// `refreshSimpleStatsCache` reads `undefined` as "no species narrowing".
+		expect(
+			deriveStatsCacheRefreshParams(
+				manualRegenerateEvent({
+					groupByTimePeriod: 'month',
+					periods: ['2024-03-01']
+				})
+			)
+		).toEqual({
+			groupId: GROUP_ID,
+			temporalUnit: 'month',
+			periods: ['2024-03-01'],
+			speciesIds: undefined
+		});
 	});
 });
 
@@ -280,5 +321,44 @@ describe('processStatsCacheRefreshWindowJob', () => {
 			}),
 			trackerError
 		);
+	});
+
+	describe('when the event has no importJobId', () => {
+		it('still runs refreshSimpleStatsCache with the derived params', async () => {
+			await processStatsCacheRefreshWindowJob(
+				manualRegenerateEvent({
+					groupByTimePeriod: 'year',
+					periods: ['2024-01-01']
+				})
+			);
+
+			expect(refreshSimpleStatsCache).toHaveBeenCalledWith(supabaseClient, {
+				groupId: GROUP_ID,
+				temporalUnit: 'year',
+				periods: ['2024-01-01'],
+				speciesIds: undefined,
+				importJobId: undefined
+			});
+		});
+
+		it('does not call markStatsCacheRefreshed', async () => {
+			await processStatsCacheRefreshWindowJob(manualRegenerateEvent());
+
+			expect(markStatsCacheRefreshedMock).not.toHaveBeenCalled();
+		});
+
+		it('does not throw, and logs the failure the same way an import-driven event does, if refreshSimpleStatsCache rejects', async () => {
+			refreshSimpleStatsCache.mockRejectedValue(new Error('simple'));
+
+			await expect(
+				processStatsCacheRefreshWindowJob(manualRegenerateEvent())
+			).resolves.toBeUndefined();
+
+			// Same as the import-driven path: the failure is logged inside
+			// `refreshSimpleStatsCache` itself, so this handler adds no log line of
+			// its own — it just has no ImportJobs column to also record it on.
+			expect(markStatsCacheRefreshedMock).not.toHaveBeenCalled();
+			expect(consoleErrorSpy).not.toHaveBeenCalled();
+		});
 	});
 });
