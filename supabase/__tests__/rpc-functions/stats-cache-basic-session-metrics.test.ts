@@ -43,6 +43,147 @@ import {
 // depending on the driver; coerce before comparing.
 const num = (value: unknown): number => Number(value);
 
+/** The twelve result columns these tests assert on. */
+type MetricsRow = {
+	species_id: number | null;
+	time_period: string | null;
+	species_count: unknown;
+	bird_count: unknown;
+	encounter_count: unknown;
+	new_bird_count: unknown;
+	session_count: unknown;
+	total_effort: string;
+	effort_per_session: string;
+	effort_per_encounter: string;
+	avg_encounters_per_session: unknown;
+	max_per_session: unknown;
+	max_new_per_session: unknown;
+};
+
+/** Fields an `addBird`/`addEncounter` call may set on the Encounters row it writes. */
+type FixtureEncounterFields = {
+	record_type: string;
+	capture_time?: string;
+};
+
+/**
+ * A throwaway group with one location, an `addBird`/`addEncounter` pair for
+ * writing its entire encounter history by hand, a `callMetrics` bound to it, and
+ * the teardown for everything it wrote.
+ *
+ * Every block below wants exactly this shape: an isolated group holding nothing
+ * but the rows the block's arrange step lists, so each expected number can be
+ * read straight off that list rather than off shared seed data. A dedicated
+ * group rather than one of the `Alpha`..`Delta` seed groups because a Sessions
+ * row is keyed on `(visit_date, ringing_group_id)`, and the dates below are
+ * drawn from the same narrow random-year band several other RPC integration
+ * files draw from — an isolated group's id is unique, so no collision with a
+ * concurrent worktree's run is possible.
+ */
+async function createFixtureGroup(label: string): Promise<{
+	groupId: number;
+	groupClient: SupabaseClient;
+	addBird: (
+		speciesId: number,
+		date: string,
+		fields: FixtureEncounterFields
+	) => Promise<number>;
+	addEncounter: (
+		birdId: number,
+		date: string,
+		fields: FixtureEncounterFields
+	) => Promise<void>;
+	callMetrics: (args: Record<string, unknown>) => Promise<MetricsRow[]>;
+	cleanUp: () => void;
+}> {
+	const testSuffix = randomTestSuffix();
+	const groupId = createIsolatedGroup(
+		`StatsCacheBasicSession ${label} ${testSuffix}`
+	);
+	const groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
+	const locationId = await insertTestLocation(
+		groupClient,
+		groupId,
+		`StatsCacheBasicSession ${label} Loc ${testSuffix}`
+	);
+
+	const sessionIds: number[] = [];
+	const birdIds: number[] = [];
+	const getSession = createSessionResolver();
+	const nextRing = createRingNoSequence(`SCBS${label.toUpperCase()}-${testSuffix}`);
+
+	/** Adds one encounter for an existing bird, on that group-day's shared session. */
+	async function addEncounter(
+		birdId: number,
+		date: string,
+		fields: FixtureEncounterFields
+	): Promise<void> {
+		const sessionId = await getSession(
+			groupClient,
+			date,
+			locationId,
+			sessionIds
+		);
+		// age_code 4 (adult) throughout: this RPC carries no age dimension at all,
+		// so the fixtures never need to vary it.
+		await insertTestEncounter(groupClient, birdId, sessionId, {
+			age_code: 4,
+			...fields
+		});
+	}
+
+	return {
+		groupId,
+		groupClient,
+		async addBird(speciesId, date, fields) {
+			const birdId = await insertTestBird(groupClient, nextRing(), speciesId);
+			birdIds.push(birdId);
+			await addEncounter(birdId, date, fields);
+			return birdId;
+		},
+		addEncounter,
+		async callMetrics(args) {
+			const { data, error } = await groupClient.rpc(
+				'stats_cache_basic_session_metrics',
+				{ ringing_group_filter: groupId, ...args }
+			);
+			expect(error).toBeNull();
+			return data!;
+		},
+		cleanUp() {
+			psql(
+				`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});` +
+					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});` +
+					`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});` +
+					`DELETE FROM "Locations" WHERE id = ${locationId};` +
+					`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
+			);
+		}
+	};
+}
+
+type FixtureGroup = Awaited<ReturnType<typeof createFixtureGroup>>;
+
+/** Keys a result on the `(species_id, time_period)` cell identity it reports. */
+function byCell(rows: MetricsRow[]): Map<string, MetricsRow> {
+	return new Map(
+		rows.map((row) => [
+			`${row.species_id ?? 'all'}|${row.time_period ?? 'all'}`,
+			row
+		])
+	);
+}
+
+/** The cells a result covers, sorted so an expected list can be written in any order. */
+function cellsOf(rows: MetricsRow[]): string[] {
+	return [...byCell(rows).keys()].sort();
+}
+
+/** A random year well clear of the 2021–2024 seed range, with room for `yr + 1`. */
+function randomFixtureYear(): number {
+	return 2080 + Math.floor(Math.random() * 18);
+}
+
 /** The four basic-count columns both RPCs share, by name. */
 const BASIC_COUNT_COLUMNS = [
 	'species_count',
@@ -171,15 +312,120 @@ describe.skip('stats_cache_basic_session_metrics', () => {
 		}
 	}
 
+	// Two species over three calendar months, with encounters in only the first
+	// and last of them — so the middle month exercises the spine's
+	// COALESCE-to-0 path (an in-range cell with nothing joined to it must report
+	// zeroes, not vanish). Every count is known by construction: one Robin is
+	// caught twice in March (so bird_count < encounter_count there) and another
+	// returns in May as a retrap (so bird_count > new_bird_count there).
 	describe('basic counts', () => {
-		it("matches core_stats' own species_count/bird_count/encounter_count/new_bird_count for identical filters", async () => {
-			// Grouped per species AND per month — the shape that exercises both the
-			// spine join and the COALESCE-to-0 path for empty cells, since Alpha's
-			// dense monthly spine carries far more cells than it has encounters.
-			await expectColumnsMatchCoreStats(
-				{ group_by_species: true, group_by_time_period: 'month' },
-				BASIC_COUNT_COLUMNS
+		let fixture: FixtureGroup;
+		let robinId: number;
+		let wrenId: number;
+		let yr: number;
+		/** March: Robin A (new) + Robin B (new). */
+		let marFirst: string;
+		/** March, 7 days later: Robin A again, as a retrap. */
+		let marSecond: string;
+		/** May: Wren C (new) + Robin B again, as a retrap. The April between is empty. */
+		let may: string;
+
+		beforeAll(async () => {
+			fixture = await createFixtureGroup('Counts');
+			robinId = speciesIdByName.get('Robin')!;
+			wrenId = speciesIdByName.get('Wren')!;
+
+			yr = randomFixtureYear();
+			marFirst = `${yr}-03-05`;
+			marSecond = `${yr}-03-12`;
+			may = `${yr}-05-08`;
+
+			const robinA = await fixture.addBird(robinId, marFirst, {
+				record_type: 'N'
+			});
+			const robinB = await fixture.addBird(robinId, marFirst, {
+				record_type: 'N'
+			});
+			await fixture.addEncounter(robinA, marSecond, { record_type: 'R' });
+			await fixture.addBird(wrenId, may, { record_type: 'N' });
+			await fixture.addEncounter(robinB, may, { record_type: 'R' });
+		});
+
+		afterAll(() => fixture.cleanUp());
+
+		/** The six (species, month) cells the March–May window's dense spine covers. */
+		async function callGroupedBySpeciesAndMonth(): Promise<
+			Map<string, MetricsRow>
+		> {
+			return byCell(
+				await fixture.callMetrics({
+					from_date: `${yr}-03-01`,
+					to_date: `${yr}-05-31`,
+					group_by_species: true,
+					group_by_time_period: 'month'
+				})
 			);
+		}
+
+		it('reports species_count/bird_count/encounter_count/new_bird_count matching a known small fixture, grouped by species and month', async () => {
+			const cells = await callGroupedBySpeciesAndMonth();
+
+			// Robin in March: 3 encounters of 2 birds (A twice, B once), both first
+			// ringed there — so encounter_count exceeds bird_count, which equals
+			// new_bird_count.
+			const robinMarch = cells.get(`${robinId}|${yr}-03-01`)!;
+			expect(num(robinMarch.species_count)).toBe(1);
+			expect(num(robinMarch.bird_count)).toBe(2);
+			expect(num(robinMarch.encounter_count)).toBe(3);
+			expect(num(robinMarch.new_bird_count)).toBe(2);
+			// Two distinct March dates carried those 3 encounters.
+			expect(num(robinMarch.session_count)).toBe(2);
+
+			// Robin in May: B's retrap alone — a bird that counts towards
+			// bird_count but not new_bird_count.
+			const robinMay = cells.get(`${robinId}|${yr}-05-01`)!;
+			expect(num(robinMay.bird_count)).toBe(1);
+			expect(num(robinMay.encounter_count)).toBe(1);
+			expect(num(robinMay.new_bird_count)).toBe(0);
+
+			// Wren in May: its single newly-ringed bird.
+			const wrenMay = cells.get(`${wrenId}|${yr}-05-01`)!;
+			expect(num(wrenMay.species_count)).toBe(1);
+			expect(num(wrenMay.bird_count)).toBe(1);
+			expect(num(wrenMay.encounter_count)).toBe(1);
+			expect(num(wrenMay.new_bird_count)).toBe(1);
+
+			// The Wren was never caught in March, so its March cell is empty even
+			// though the month itself is not.
+			const wrenMarch = cells.get(`${wrenId}|${yr}-03-01`)!;
+			expect(num(wrenMarch.species_count)).toBe(0);
+			expect(num(wrenMarch.encounter_count)).toBe(0);
+		});
+
+		it('reports zeroes, not a missing row, for a month with no encounters at all', async () => {
+			const cells = await callGroupedBySpeciesAndMonth();
+
+			// The month spine is dense between the fixture's first and last session
+			// date, so April appears for both species despite holding nothing.
+			expect(cellsOf([...cells.values()])).toEqual(
+				[
+					`${robinId}|${yr}-03-01`,
+					`${robinId}|${yr}-04-01`,
+					`${robinId}|${yr}-05-01`,
+					`${wrenId}|${yr}-03-01`,
+					`${wrenId}|${yr}-04-01`,
+					`${wrenId}|${yr}-05-01`
+				].sort()
+			);
+
+			for (const speciesId of [robinId, wrenId]) {
+				const april = cells.get(`${speciesId}|${yr}-04-01`)!;
+				expect(num(april.species_count)).toBe(0);
+				expect(num(april.bird_count)).toBe(0);
+				expect(num(april.encounter_count)).toBe(0);
+				expect(num(april.new_bird_count)).toBe(0);
+				expect(num(april.session_count)).toBe(0);
+			}
 		});
 	});
 
