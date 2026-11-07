@@ -744,60 +744,103 @@ describe.skip('stats_cache_basic_session_metrics', () => {
 		});
 	});
 
-	// Thin shape-level smoke tests: the heavy per-column logic is already pinned
-	// against core_stats above, so these assert only that each grouping mode
-	// produces the SAME SET OF CELLS core_stats produces — i.e. that the
-	// species_id/time_period projection and the spine join are wired up per mode.
+	// One dataset, two species, four group-days spread over two calendar years
+	// with a gap month between the first two — enough for every grouping mode's
+	// cell set to be a short, explicit list. These assert cell shape only: which
+	// (species_id, time_period) cells a mode's species_id/time_period projection
+	// and spine join produce. The per-column values in those cells are pinned by
+	// the two blocks above.
 	describe('grouping shapes', () => {
-		async function expectSameCellsAsCoreStats(
-			args: Record<string, unknown>
-		): Promise<string[]> {
-			const { coreByCell, cacheByCell } = await callBothKeyedByCell(args);
-			expect([...cacheByCell.keys()].sort()).toEqual(
-				[...coreByCell.keys()].sort()
-			);
-			return [...cacheByCell.keys()];
-		}
+		let fixture: FixtureGroup;
+		let robinId: number;
+		let wrenId: number;
+		let yr: number;
+		let robinMar: string;
+		let wrenMar: string;
+		/** The April between this and `robinMar` is the month spine's empty cell. */
+		let robinMay: string;
+		/** The following January, so the year spine spans two cells. */
+		let robinNextJan: string;
+
+		beforeAll(async () => {
+			fixture = await createFixtureGroup('Shapes');
+			robinId = speciesIdByName.get('Robin')!;
+			wrenId = speciesIdByName.get('Wren')!;
+
+			yr = randomFixtureYear();
+			robinMar = `${yr}-03-10`;
+			wrenMar = `${yr}-03-15`;
+			robinMay = `${yr}-05-10`;
+			robinNextJan = `${yr + 1}-01-20`;
+
+			await fixture.addBird(robinId, robinMar, { record_type: 'N' });
+			await fixture.addBird(wrenId, wrenMar, { record_type: 'N' });
+			await fixture.addBird(robinId, robinMay, { record_type: 'N' });
+			await fixture.addBird(robinId, robinNextJan, { record_type: 'N' });
+		});
+
+		afterAll(() => fixture.cleanUp());
 
 		it('ungrouped', async () => {
-			const cells = await expectSameCellsAsCoreStats({});
-			expect(cells).toEqual(['all|all']);
+			const rows = await fixture.callMetrics({});
+			expect(cellsOf(rows)).toEqual(['all|all']);
 		});
 
 		it('grouped per species', async () => {
-			const cells = await expectSameCellsAsCoreStats({
-				group_by_species: true
-			});
-			expect(cells.every((cell) => cell.endsWith('|all'))).toBe(true);
-			expect(cells.length).toBeGreaterThan(1);
+			// species_spine is built from the encounters themselves, so only the two
+			// species the group actually caught appear.
+			const rows = await fixture.callMetrics({ group_by_species: true });
+			expect(cellsOf(rows)).toEqual([`${robinId}|all`, `${wrenId}|all`].sort());
 		});
 
 		it('grouped per day', async () => {
-			const cells = await expectSameCellsAsCoreStats({
-				group_by_time_period: 'day'
-			});
-			expect(cells.every((cell) => cell.startsWith('all|'))).toBe(true);
+			// The day spine is sparse: one cell per date that actually has an
+			// encounter, never the empty days between them.
+			const rows = await fixture.callMetrics({ group_by_time_period: 'day' });
+			expect(cellsOf(rows)).toEqual(
+				[
+					`all|${robinMar}`,
+					`all|${wrenMar}`,
+					`all|${robinMay}`,
+					`all|${robinNextJan}`
+				].sort()
+			);
 		});
 
 		it('grouped per month', async () => {
-			const cells = await expectSameCellsAsCoreStats({
+			// The month spine is dense between the window's first and last session
+			// date, so the encounter-free April appears between March and May.
+			const rows = await fixture.callMetrics({
+				from_date: `${yr}-03-01`,
+				to_date: `${yr}-05-31`,
 				group_by_time_period: 'month'
 			});
-			// The month spine is dense, so it carries more cells than the sparse day
-			// spine does.
-			expect(cells.length).toBeGreaterThan(1);
+			expect(cellsOf(rows)).toEqual(
+				[`all|${yr}-03-01`, `all|${yr}-04-01`, `all|${yr}-05-01`].sort()
+			);
 		});
 
 		it('grouped per year', async () => {
-			await expectSameCellsAsCoreStats({ group_by_time_period: 'year' });
+			const rows = await fixture.callMetrics({ group_by_time_period: 'year' });
+			expect(cellsOf(rows)).toEqual(
+				[`all|${yr}-01-01`, `all|${yr + 1}-01-01`].sort()
+			);
 		});
 
 		it('grouped per month-squashed', async () => {
-			const cells = await expectSameCellsAsCoreStats({
+			const rows = await fixture.callMetrics({
 				group_by_time_period: 'month-squashed'
 			});
-			// Always exactly twelve year-agnostic month buckets (#996).
-			expect(cells).toHaveLength(12);
+			// Always exactly twelve year-agnostic month buckets (#996), on the
+			// 2000-<mm>-01 sentinel-year convention — independent of the four
+			// calendar months this fixture's dates actually touch.
+			expect(cellsOf(rows)).toEqual(
+				Array.from(
+					{ length: 12 },
+					(_, index) => `all|2000-${String(index + 1).padStart(2, '0')}-01`
+				).sort()
+			);
+			expect(rows).toHaveLength(12);
 		});
 	});
 
