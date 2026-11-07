@@ -430,11 +430,80 @@ describe.skip('stats_cache_basic_session_metrics', () => {
 	});
 
 	describe('session/effort metrics', () => {
-		it("matches core_stats' own session_count/total_effort/effort_per_session/effort_per_encounter/avg_encounters_per_session/max_per_session/max_new_per_session for identical filters", async () => {
-			await expectColumnsMatchCoreStats(
-				{ group_by_species: true, group_by_time_period: 'month' },
-				SESSION_EFFORT_COLUMNS
-			);
+		// Two consecutive group-days with deliberately different capture-time
+		// spreads, so every effort column lands on a value arithmetic alone
+		// reaches: a 4-hour first day, and a half-hour second day that the
+		// two-hour minimum-effort floor rounds up. The encounter mix also keeps
+		// max_per_session and max_new_per_session apart.
+		describe('across a two-session window', () => {
+			let fixture: FixtureGroup;
+			let yr: number;
+			/** 3 encounters, 08:00–12:00 (a 4-hour span), 2 of them new. */
+			let busyDay: string;
+			/** 2 encounters, 10:00–10:30 (floored to 2 hours), both new. */
+			let briefDay: string;
+
+			beforeAll(async () => {
+				fixture = await createFixtureGroup('Effort');
+				const robinId = speciesIdByName.get('Robin')!;
+
+				yr = randomFixtureYear();
+				busyDay = `${yr}-06-10`;
+				briefDay = `${yr}-06-11`;
+
+				await fixture.addBird(robinId, busyDay, {
+					record_type: 'N',
+					capture_time: '08:00:00'
+				});
+				await fixture.addBird(robinId, busyDay, {
+					record_type: 'N',
+					capture_time: '09:30:00'
+				});
+				await fixture.addBird(robinId, busyDay, {
+					record_type: 'R',
+					capture_time: '12:00:00'
+				});
+				await fixture.addBird(robinId, briefDay, {
+					record_type: 'N',
+					capture_time: '10:00:00'
+				});
+				await fixture.addBird(robinId, briefDay, {
+					record_type: 'N',
+					capture_time: '10:30:00'
+				});
+			});
+
+			afterAll(() => fixture.cleanUp());
+
+			it('reports session_count/total_effort/effort_per_session/effort_per_encounter/avg_encounters_per_session/max_per_session/max_new_per_session matching a known small fixture', async () => {
+				const rows = await fixture.callMetrics({
+					from_date: busyDay,
+					to_date: briefDay
+				});
+				expect(rows).toHaveLength(1);
+				const row = rows[0];
+				expect(row.species_id).toBeNull();
+				expect(row.time_period).toBeNull();
+
+				// Two distinct dates carried the window's 5 encounters.
+				expect(num(row.session_count)).toBe(2);
+				expect(num(row.encounter_count)).toBe(5);
+
+				// 12:00 − 08:00 = 4h, plus a 10:00–10:30 day the
+				// GREATEST(..., '02:00:00') floor lifts to 2h.
+				expect(row.total_effort).toBe('06:00:00');
+				// 6h over 2 sessions.
+				expect(row.effort_per_session).toBe('03:00:00');
+				// 6h over 5 encounters.
+				expect(row.effort_per_encounter).toBe('01:12:00');
+
+				// (3 + 2) / 2 encounters per session.
+				expect(num(row.avg_encounters_per_session)).toBeCloseTo(2.5, 6);
+				// The busy day's 3 encounters...
+				expect(num(row.max_per_session)).toBe(3);
+				// ...of which only 2 were new, the same as the brief day's total.
+				expect(num(row.max_new_per_session)).toBe(2);
+			});
 		});
 
 		// The `session_counts` CTE must group by species only when the caller asked
