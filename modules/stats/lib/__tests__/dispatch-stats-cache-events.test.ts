@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import {
 	dispatchManualStatsCacheRegenerateEvent,
-	dispatchStatsCacheRefreshEvents
+	dispatchStatsCacheRefreshEvents,
+	requestManualStatsCacheRegenerate
 } from '../dispatch-stats-cache-events';
 import { buildStatsCacheRefreshEvents } from '../stats-cache-events';
 import { getEventDispatcher } from '@/app/lib/queue-dispatch';
@@ -240,5 +241,85 @@ describe('dispatchManualStatsCacheRegenerateEvent', () => {
 			},
 			expect.any(Error)
 		);
+	});
+});
+
+describe('requestManualStatsCacheRegenerate', () => {
+	let dispatchMock: Mock<(event: unknown) => Promise<void>>;
+
+	beforeEach(() => {
+		vi.mocked(buildStatsCacheRefreshEvents).mockReset();
+		vi.mocked(getEventDispatcher).mockReset();
+		dispatchMock = vi.fn(async () => {});
+		vi.mocked(getEventDispatcher).mockReturnValue(dispatchMock);
+	});
+
+	/** The single event the call under test dispatched. */
+	const dispatchedEvent = () =>
+		dispatchMock.mock.calls[0][0] as StatsCacheRefreshEvent;
+
+	describe('validating the requested scope', () => {
+		it('rejects an invalid temporalUnit without dispatching', async () => {
+			const result = await requestManualStatsCacheRegenerate(7, {
+				// eslint-disable-next-line no-restricted-syntax -- deliberately invalid input under test
+				temporalUnit: 'decade' as unknown as 'month'
+			});
+
+			expect(result).toEqual({ success: false, error: expect.any(String) });
+			expect(dispatchMock).not.toHaveBeenCalled();
+		});
+
+		it('rejects an empty periods array without dispatching', async () => {
+			const result = await requestManualStatsCacheRegenerate(7, {
+				temporalUnit: 'month',
+				periods: []
+			});
+
+			expect(result).toEqual({ success: false, error: expect.any(String) });
+			expect(dispatchMock).not.toHaveBeenCalled();
+		});
+
+		it('rejects an empty speciesIds array without dispatching', async () => {
+			const result = await requestManualStatsCacheRegenerate(7, {
+				temporalUnit: 'month',
+				speciesIds: []
+			});
+
+			expect(result).toEqual({ success: false, error: expect.any(String) });
+			expect(dispatchMock).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('dispatching a valid request', () => {
+		it('dispatches with the given groupId merged onto the validated temporalUnit/periods/speciesIds', async () => {
+			await requestManualStatsCacheRegenerate(7, {
+				temporalUnit: 'year',
+				periods: ['2024-01-01'],
+				speciesIds: [101]
+			});
+
+			expect(dispatchMock).toHaveBeenCalledTimes(1);
+			expect(dispatchedEvent().rpcParams).toMatchObject({
+				ringing_group_filter: 7,
+				group_by_time_period: 'year',
+				periods: ['2024-01-01']
+			});
+			expect(dispatchedEvent().affectedSpeciesIds).toEqual([101]);
+		});
+
+		it('omits periods/speciesIds from the dispatched params when none are given', async () => {
+			await requestManualStatsCacheRegenerate(7, { temporalUnit: 'year' });
+
+			expect(dispatchedEvent().rpcParams).not.toHaveProperty('periods');
+			expect(dispatchedEvent()).not.toHaveProperty('affectedSpeciesIds');
+		});
+
+		it('returns a success result once dispatch resolves', async () => {
+			const result = await requestManualStatsCacheRegenerate(7, {
+				temporalUnit: 'all-time'
+			});
+
+			expect(result).toEqual({ success: true });
+		});
 	});
 });

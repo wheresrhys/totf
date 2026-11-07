@@ -2,111 +2,67 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { regenerateStatsCache } from '../regenerate-stats-cache';
 import { getGroupCookie } from '../group-cookie';
 
-const { mockDispatchManualStatsCacheRegenerateEvent } = vi.hoisted(() => ({
-	mockDispatchManualStatsCacheRegenerateEvent: vi.fn()
+const { mockRequestManualStatsCacheRegenerate } = vi.hoisted(() => ({
+	mockRequestManualStatsCacheRegenerate: vi.fn()
 }));
 
 vi.mock('@/modules/stats', () => ({
-	dispatchManualStatsCacheRegenerateEvent:
-		mockDispatchManualStatsCacheRegenerateEvent
+	requestManualStatsCacheRegenerate: mockRequestManualStatsCacheRegenerate
 }));
 
 describe('regenerateStatsCache', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockDispatchManualStatsCacheRegenerateEvent.mockResolvedValue(undefined);
+		mockRequestManualStatsCacheRegenerate.mockResolvedValue({ success: true });
 	});
 
-	it('resolves the group id from the session cookie, never from an input param', async () => {
+	it('resolves the group id from the session cookie, never from an input param, and passes it to requestManualStatsCacheRegenerate', async () => {
 		vi.mocked(getGroupCookie).mockResolvedValueOnce(42);
 
 		await regenerateStatsCache({ temporalUnit: 'month' });
 
 		expect(getGroupCookie).toHaveBeenCalled();
-		expect(mockDispatchManualStatsCacheRegenerateEvent).toHaveBeenCalledWith(
-			expect.objectContaining({ groupId: 42 })
+		expect(mockRequestManualStatsCacheRegenerate).toHaveBeenCalledWith(42, {
+			temporalUnit: 'month'
+		});
+	});
+
+	it('forwards the given params unchanged alongside the resolved groupId', async () => {
+		vi.mocked(getGroupCookie).mockResolvedValueOnce(7);
+		const params = {
+			temporalUnit: 'year' as const,
+			periods: ['2024-01-01'],
+			speciesIds: [101]
+		};
+
+		await regenerateStatsCache(params);
+
+		expect(mockRequestManualStatsCacheRegenerate).toHaveBeenCalledWith(
+			7,
+			params
 		);
 	});
 
-	it('calls dispatchManualStatsCacheRegenerateEvent with the resolved groupId and the given temporalUnit/periods/speciesIds', async () => {
-		vi.mocked(getGroupCookie).mockResolvedValueOnce(7);
-
-		await regenerateStatsCache({
-			temporalUnit: 'year',
-			periods: ['2024-01-01'],
-			speciesIds: [101]
-		});
-
-		expect(mockDispatchManualStatsCacheRegenerateEvent).toHaveBeenCalledWith({
-			groupId: 7,
-			temporalUnit: 'year',
-			periods: ['2024-01-01'],
-			speciesIds: [101]
-		});
-	});
-
-	it('omits periods from the dispatched params when none are given', async () => {
-		await regenerateStatsCache({ temporalUnit: 'year', speciesIds: [101] });
-
-		const dispatchedParams =
-			mockDispatchManualStatsCacheRegenerateEvent.mock.calls[0][0];
-		expect(dispatchedParams).not.toHaveProperty('periods');
-	});
-
-	it('omits speciesIds from the dispatched params when none are given', async () => {
-		await regenerateStatsCache({
-			temporalUnit: 'year',
-			periods: ['2024-01-01']
-		});
-
-		const dispatchedParams =
-			mockDispatchManualStatsCacheRegenerateEvent.mock.calls[0][0];
-		expect(dispatchedParams).not.toHaveProperty('speciesIds');
-	});
-
-	it('returns a failure result without calling dispatchManualStatsCacheRegenerateEvent for an invalid temporalUnit', async () => {
-		const result = await regenerateStatsCache({
-			// eslint-disable-next-line no-restricted-syntax -- deliberately invalid input under test
-			temporalUnit: 'decade' as unknown as 'month'
-		});
-
-		expect(result).toEqual({ success: false, error: expect.any(String) });
-		expect(mockDispatchManualStatsCacheRegenerateEvent).not.toHaveBeenCalled();
-	});
-
-	it('returns a failure result for an empty periods/speciesIds array', async () => {
-		const emptyPeriodsResult = await regenerateStatsCache({
-			temporalUnit: 'month',
-			periods: []
-		});
-		const emptySpeciesIdsResult = await regenerateStatsCache({
-			temporalUnit: 'month',
-			speciesIds: []
-		});
-
-		expect(emptyPeriodsResult).toEqual({
+	it('returns whatever result requestManualStatsCacheRegenerate resolves with', async () => {
+		mockRequestManualStatsCacheRegenerate.mockResolvedValueOnce({
 			success: false,
-			error: expect.any(String)
+			error: 'Invalid temporal unit'
 		});
-		expect(emptySpeciesIdsResult).toEqual({
+
+		const result = await regenerateStatsCache({ temporalUnit: 'month' });
+
+		expect(result).toEqual({
 			success: false,
-			error: expect.any(String)
+			error: 'Invalid temporal unit'
 		});
-		expect(mockDispatchManualStatsCacheRegenerateEvent).not.toHaveBeenCalled();
 	});
 
-	it('returns a success result once dispatch resolves', async () => {
-		const result = await regenerateStatsCache({ temporalUnit: 'all-time' });
-
-		expect(result).toEqual({ success: true });
-	});
-
-	it('returns a failure result, not a throw, if no group is selected', async () => {
+	it('returns a failure result, not a throw, if no group is selected, without calling requestManualStatsCacheRegenerate', async () => {
 		vi.mocked(getGroupCookie).mockResolvedValueOnce(null);
 
 		const result = await regenerateStatsCache({ temporalUnit: 'month' });
 
-		expect(result).toEqual({ success: false, error: expect.any(String) });
-		expect(mockDispatchManualStatsCacheRegenerateEvent).not.toHaveBeenCalled();
+		expect(result).toEqual({ success: false, error: 'No group selected' });
+		expect(mockRequestManualStatsCacheRegenerate).not.toHaveBeenCalled();
 	});
 });
