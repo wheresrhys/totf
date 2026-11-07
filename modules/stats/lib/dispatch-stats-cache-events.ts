@@ -1,8 +1,11 @@
 import { processStatsCacheRefreshWindowJob } from '@/app/api/queues/stats-cache-refresh-window/route';
 import { getEventDispatcher } from '@/app/lib/queue-dispatch';
 import { buildStatsCacheRefreshEvents } from './stats-cache-events';
+import { temporalUnitNameMapping, type StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type {
 	ManualStatsCacheRegenerateParams,
+	ManualStatsCacheRegenerateRequest,
+	ManualStatsCacheRegenerateRequestResult,
 	StatsCacheRefreshEvent
 } from '../types';
 const STATS_CACHE_REFRESH_WINDOW_TOPIC = 'stats-cache-refresh-window';
@@ -118,5 +121,100 @@ export async function dispatchManualStatsCacheRegenerateEvent(
 			{ groupId, temporalUnit, ...logContext },
 			dispatchError
 		);
+	}
+}
+
+const VALID_TEMPORAL_UNITS: readonly string[] = Object.keys(
+	temporalUnitNameMapping
+);
+
+function isValidTemporalUnit(value: unknown): value is StatsTemporalUnit {
+	return typeof value === 'string' && VALID_TEMPORAL_UNITS.includes(value);
+}
+
+/** `undefined` passes (it means "no narrowing") — only a given-but-malformed value is rejected. */
+function isUndefinedOrNonEmptyArrayOf(
+	value: unknown,
+	itemIsValid: (item: unknown) => boolean
+): boolean {
+	return (
+		value === undefined ||
+		(Array.isArray(value) && value.length > 0 && value.every(itemIsValid))
+	);
+}
+
+/**
+ * Validates a group-facing, arbitrarily-scoped manual stats-cache regenerate
+ * request (#1374's consistency checker) and, once valid, dispatches it via
+ * `dispatchManualStatsCacheRegenerateEvent` above (#1384's PR review: this
+ * logic started out living directly in `app/actions/regenerate-stats-cache.ts`,
+ * which should stay a thin wrapper — resolving the caller's own `groupId`
+ * off the session cookie and delegating everything else here).
+ *
+ * Takes `groupId` as an explicit, separate argument rather than a field of
+ * `request` — the caller resolves it itself (e.g. from the session cookie,
+ * the same `updatePublicSummaryEnabled` convention follows) and this
+ * function has no way to regenerate a group's cache on another group's
+ * behalf.
+ *
+ * `request`'s fields are typed as `ManualStatsCacheRegenerateRequest`
+ * declares them, but this function re-validates them at runtime regardless
+ * — it sits behind a Next.js Server Action, a wire boundary TypeScript's
+ * compile-time types don't police, so a malformed call (or a future
+ * non-TS caller) is still caught here rather than crashing deeper in the
+ * dispatch pipeline.
+ *
+ * A dispatch failure is caught and logged, not thrown — see
+ * `dispatchManualStatsCacheRegenerateEvent`'s own doc comment — so a
+ * `success: true` result here means "the request was accepted and queued",
+ * not "the regenerate finished".
+ */
+export async function requestManualStatsCacheRegenerate(
+	groupId: number,
+	{ temporalUnit, periods, speciesIds }: ManualStatsCacheRegenerateRequest
+): Promise<ManualStatsCacheRegenerateRequestResult> {
+	try {
+		if (!isValidTemporalUnit(temporalUnit)) {
+			return { success: false, error: 'Invalid temporal unit' };
+		}
+		if (
+			!isUndefinedOrNonEmptyArrayOf(
+				periods,
+				(period) => typeof period === 'string'
+			)
+		) {
+			return {
+				success: false,
+				error: 'periods must be a non-empty array of strings when given'
+			};
+		}
+		if (
+			!isUndefinedOrNonEmptyArrayOf(
+				speciesIds,
+				(speciesId) => typeof speciesId === 'number'
+			)
+		) {
+			return {
+				success: false,
+				error: 'speciesIds must be a non-empty array of numbers when given'
+			};
+		}
+
+		await dispatchManualStatsCacheRegenerateEvent({
+			groupId,
+			temporalUnit,
+			...(periods ? { periods } : {}),
+			...(speciesIds ? { speciesIds } : {})
+		});
+
+		return { success: true };
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error.message
+					: 'Failed to regenerate stats cache'
+		};
 	}
 }

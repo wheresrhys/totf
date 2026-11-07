@@ -115,6 +115,38 @@ export type ManualStatsCacheRegenerateParams = {
   speciesIds?: number[];
 };
 
+/**
+ * The same scope `ManualStatsCacheRegenerateParams` names, minus `groupId`
+ * (#1384) — the shape a group-facing caller supplies to
+ * `requestManualStatsCacheRegenerate`. `groupId` is deliberately not a field
+ * here: the caller (e.g. `app/actions/regenerate-stats-cache.ts`) resolves
+ * its own group id separately (from the session cookie, never from request
+ * input) and passes it as that function's own argument, so this type can
+ * never be used to name another group's id.
+ */
+export type ManualStatsCacheRegenerateRequest = {
+  temporalUnit: StatsTemporalUnit;
+  /** Omit for every period of `temporalUnit` — see #1379's "omitted means all" convention. */
+  periods?: string[];
+  /** Omit for every species. */
+  speciesIds?: number[];
+};
+
+/**
+ * The outcome of a validated `requestManualStatsCacheRegenerate` call — a
+ * rejected/malformed request and a request accepted onto the refresh queue
+ * are both `success: false`/`true` respectively, with no distinction between
+ * "validation failed" and "dispatch threw", matching the action-result
+ * convention the rest of `app/actions/` already follows (e.g.
+ * `UpdatePublicSummaryEnabledResult`). `success: true` here means "the
+ * request was accepted and queued", not "the regenerate finished" — dispatch
+ * is fire-and-forget (see `dispatchManualStatsCacheRegenerateEvent`'s own
+ * doc comment).
+ */
+export type ManualStatsCacheRegenerateRequestResult =
+  | { success: true }
+  | { success: false; error: string };
+
 import type { ImportJobStatus } from '@/app/models/db';
 /** The outcome a stats-cache refresh can actually be recorded as. */
 export type StatsCacheRefreshOutcome = Extract<
