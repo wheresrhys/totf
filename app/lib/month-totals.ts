@@ -164,19 +164,18 @@ export function filterEmptyMonthTotalsRows<
 	return rows.filter((row) => row.stats.session_count !== 0);
 }
 
-// The Session-totals tab's "Empty sessions: hide/show" toggle, applied
-// directly over the raw `CoreStatsResult[]` the day-grain cache read returns
-// — unlike `filterEmptyMonthTotalsRows` above, there's no `{ stats }`-wrapped
-// row shape here to force callers into (#1381). When `hideEmptySessions` is
-// true it drops every zero-count row — the ones `SimpleStatsCacheBySpecies`'s
-// day-grain spine zero-fills in for a session day the filtered species wasn't
-// encountered; when false it returns the rows untouched. Pure — never
-// mutates the input array.
+// The Session-totals tab's zero-count row filter, applied directly over the
+// raw `CoreStatsResult[]` the day-grain cache read returns — unlike
+// `filterEmptyMonthTotalsRows` above, there's no `{ stats }`-wrapped row
+// shape here to force callers into (#1381). Always drops every zero-count
+// row — the ones `SimpleStatsCacheBySpecies`'s day-grain spine zero-fills in
+// for a session day the filtered species wasn't encountered; unlike the
+// month-totals toggle above, there's no show-empty-rows mode to offer here
+// (per review feedback on #1382, an empty session row is never worth
+// showing). Pure — never mutates the input array.
 export function filterEmptySessionRows(
-	rows: CoreStatsResult[],
-	hideEmptySessions: boolean
+	rows: CoreStatsResult[]
 ): CoreStatsResult[] {
-	if (!hideEmptySessions) return rows;
 	return rows.filter((row) => row.session_count !== 0);
 }
 

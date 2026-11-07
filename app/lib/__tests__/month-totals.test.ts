@@ -318,13 +318,13 @@ describe('filterEmptyMonthTotalsRows', () => {
 
 describe('filterEmptySessionRows', () => {
 	describe('Usual', () => {
-		it('hide=true keeps only rows with session_count !== 0 among mixed zero/non-zero rows', () => {
+		it('keeps only rows with session_count !== 0 among mixed zero/non-zero rows', () => {
 			const rows = [
 				buildCoreStatsRow({ time_period: '2026-03-14', session_count: 3 }),
 				buildCoreStatsRow({ time_period: '2026-03-15', session_count: 0 }),
 				buildCoreStatsRow({ time_period: '2026-03-16', session_count: 1 })
 			];
-			const filtered = filterEmptySessionRows(rows, true);
+			const filtered = filterEmptySessionRows(rows);
 			expect(filtered.map((row) => row.time_period)).toEqual([
 				'2026-03-14',
 				'2026-03-16'
@@ -333,37 +333,28 @@ describe('filterEmptySessionRows', () => {
 	});
 
 	describe('Structure', () => {
-		it('hide=false returns all rows unchanged', () => {
-			const rows = [
-				buildCoreStatsRow({ time_period: '2026-03-14', session_count: 3 }),
-				buildCoreStatsRow({ time_period: '2026-03-15', session_count: 0 })
-			];
-			expect(filterEmptySessionRows(rows, false)).toEqual(rows);
-		});
-
 		it('does not mutate the input array', () => {
 			const rows = [
 				buildCoreStatsRow({ time_period: '2026-03-14', session_count: 3 }),
 				buildCoreStatsRow({ time_period: '2026-03-15', session_count: 0 })
 			];
 			const originalLength = rows.length;
-			filterEmptySessionRows(rows, true);
+			filterEmptySessionRows(rows);
 			expect(rows).toHaveLength(originalLength);
 		});
 	});
 
 	describe('Edge', () => {
-		it('returns an empty array when given no rows, regardless of hideEmptySessions', () => {
-			expect(filterEmptySessionRows([], true)).toEqual([]);
-			expect(filterEmptySessionRows([], false)).toEqual([]);
+		it('returns an empty array when given no rows', () => {
+			expect(filterEmptySessionRows([])).toEqual([]);
 		});
 
-		it('returns an empty array when every row is zero-count and hideEmptySessions is true', () => {
+		it('returns an empty array when every row is zero-count', () => {
 			const rows = [
 				buildCoreStatsRow({ time_period: '2026-03-14', session_count: 0 }),
 				buildCoreStatsRow({ time_period: '2026-03-15', session_count: 0 })
 			];
-			expect(filterEmptySessionRows(rows, true)).toEqual([]);
+			expect(filterEmptySessionRows(rows)).toEqual([]);
 		});
 	});
 });

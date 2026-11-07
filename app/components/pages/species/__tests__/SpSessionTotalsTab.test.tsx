@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-	render,
-	screen,
-	cleanup,
-	waitFor,
-	fireEvent
-} from '@testing-library/react';
+import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { TabContent } from '@/modules/ui-kit';
 import { SpSessionTotalsTab } from '../SpSessionTotalsTab';
 import type { CoreStatsResult } from '@/app/models/db';
@@ -115,18 +109,14 @@ describe('SpSessionTotalsTab', () => {
 		});
 	});
 
-	describe('empty-sessions toggle', () => {
-		function renderWithOneEmptyAndOneRealSession() {
-			return renderSessionTotalsTab({
+	describe('hiding empty sessions', () => {
+		it('always hides zero-count session rows, with no toggle to show them', () => {
+			renderSessionTotalsTab({
 				initialData: [
 					buildDailyStatsRow({ time_period: '2026-03-14', session_count: 2 }),
 					buildDailyStatsRow({ time_period: '2026-03-21', session_count: 0 })
 				]
 			});
-		}
-
-		it('hides zero-count session rows by default', () => {
-			renderWithOneEmptyAndOneRealSession();
 			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			expect(
 				screen.getByRole('link', { name: '14th March 2026' })
@@ -134,29 +124,7 @@ describe('SpSessionTotalsTab', () => {
 			expect(
 				screen.queryByText((text) => text.includes('21st March 2026'))
 			).toBeNull();
-		});
-
-		it('shows the "Empty sessions:" control, defaulting to Hide', () => {
-			renderWithOneEmptyAndOneRealSession();
-			expect(screen.getByText('Empty sessions:')).not.toBeNull();
-			expect(
-				(screen.getByRole('radio', { name: 'Hide' }) as HTMLInputElement)
-					.checked
-			).toBe(true);
-		});
-
-		it('reveals the zero-count row after switching to Show', () => {
-			renderWithOneEmptyAndOneRealSession();
-			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(2);
-		});
-
-		it('hides the zero-count row again after switching back to Hide', () => {
-			renderWithOneEmptyAndOneRealSession();
-			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(2);
-			fireEvent.click(screen.getByRole('radio', { name: 'Hide' }));
-			expect(document.querySelectorAll('tbody tr').length).toBe(1);
+			expect(screen.queryByText('Empty sessions:')).toBeNull();
 		});
 	});
 });

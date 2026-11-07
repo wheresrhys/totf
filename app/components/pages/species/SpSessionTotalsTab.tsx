@@ -1,6 +1,5 @@
 'use client';
-import { useState } from 'react';
-import { PeriodTotalsTable, EmptySessionsToggle } from '@/modules/stats-view';
+import { PeriodTotalsTable } from '@/modules/stats-view';
 import { filterEmptySessionRows } from '@/app/lib/month-totals';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
@@ -19,12 +18,11 @@ export function SpSessionTotalsTab({
 	viewedGroup: ViewedGroup;
 }) {
 	const sessionTotals = (data as CoreStatsResult[] | null) ?? [];
-	// Plain local state, unrelated to the data-loading change above — `TabSet`'s
-	// `ConditionalTabPanel` unmounts this tab on every tab switch, so the toggle
-	// naturally resets to Hide (`true`) each time the tab is revisited, with no
-	// extra code needed. Mirrors `SpMonthTotalsTab`'s `hideEmptyMonths` state.
-	const [hideEmptySessions, setHideEmptySessions] = useState(true);
-	const visibleRows = filterEmptySessionRows(sessionTotals, hideEmptySessions);
+	// Always hidden, no toggle — per review feedback on #1382, a zero-count
+	// session row (`SimpleStatsCacheBySpecies`'s day-grain spine zero-filling a
+	// row for every session day the filtered species wasn't encountered) is
+	// never worth showing, so there's no "Show" state to offer.
+	const visibleRows = filterEmptySessionRows(sessionTotals);
 
 	return (
 		<PeriodTotalsTable
@@ -35,12 +33,6 @@ export function SpSessionTotalsTab({
 				`/group/${viewedGroup.slug}/session/${timePeriod}`
 			}
 			showBusiestSession={false}
-			extraControls={
-				<EmptySessionsToggle
-					value={hideEmptySessions}
-					onChange={setHideEmptySessions}
-				/>
-			}
 		/>
 	);
 }
