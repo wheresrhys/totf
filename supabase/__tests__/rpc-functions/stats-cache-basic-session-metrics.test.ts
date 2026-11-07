@@ -2,22 +2,24 @@
  * Integration tests for the `stats_cache_basic_session_metrics` Postgres RPC
  * function (#1146).
  *
- * One of six small, read-only "metric-group" RPCs a later orchestrator (T8a,
- * `refresh_simple_stats_cache`) will call to populate the merged
- * `SimpleStatsCache` table (T1a). A direct port of `core_stats`' basic-count
- * and session/effort CTE chain, keyed on `species_id` rather than the
- * display-oriented `species_name` and carrying none of `core_stats`'
- * age-dimension columns.
+ * One of the small, read-only "metric-group" RPCs the stats-cache refresh
+ * pipeline calls to populate the `SimpleStatsCache` tables. Originally written
+ * as a direct port of the since-deleted group-wide aggregate RPC's basic-count
+ * and session/effort CTE chain, keyed on `species_id` rather than that RPC's
+ * display-oriented `species_name` and carrying none of its age-dimension
+ * columns.
  *
- * Because it is a port, the first two describe blocks assert equivalence
- * against the real `core_stats` RPC rather than hand-rolled literal expected
- * rows: the seed data is already the baseline `core_stats`' own suite is
- * pinned against, and any divergence is by definition a port bug. The two
- * regression tests that follow do use purpose-built datasets, because the
- * behaviours they pin (#1049, #1021/#1024) are precisely the ones a careless
- * port silently loses.
+ * Because it was a port, this suite used to establish its expectations by
+ * calling that RPC alongside this one and comparing the two cell for cell — a
+ * reasonable oracle while it was the trusted baseline. It was dropped from the
+ * schema in #1359, so every block below now derives its expectations from its
+ * own purpose-built fixture instead (#1363): an isolated group whose entire
+ * encounter history is the handful of rows the block's arrange step lists, and
+ * literal expected numbers a reader can check straight off that list. This file
+ * is now the only value oracle these twelve columns have.
  *
- * Requires local Supabase running and e2e seed data loaded:
+ * Requires local Supabase running and e2e seed data loaded (for the `Species`
+ * reference rows the fixtures below look species ids up in):
  *   npm run db:start:local
  *   npm run db:seed:e2e
  *
@@ -29,7 +31,6 @@ import { getAuthenticatedSupabaseClientForGroup } from '../../../app/lib/auth/gr
 import { supabase } from '../../../lib/supabase';
 import { randomTestSuffix, randomFutureDate, addDays } from '../test-isolation';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getGroupIdByName } from './helpers/seed-lookups';
 import { createIsolatedGroup, psql } from '../db-test-helpers';
 import {
 	insertTestLocation,
@@ -184,48 +185,11 @@ function randomFixtureYear(): number {
 	return 2080 + Math.floor(Math.random() * 18);
 }
 
-/** The four basic-count columns both RPCs share, by name. */
-const BASIC_COUNT_COLUMNS = [
-	'species_count',
-	'bird_count',
-	'encounter_count',
-	'new_bird_count'
-] as const;
-
-/** The seven session/effort columns both RPCs share, by name. */
-const SESSION_EFFORT_COLUMNS = [
-	'session_count',
-	'total_effort',
-	'effort_per_session',
-	'effort_per_encounter',
-	'avg_encounters_per_session',
-	'max_per_session',
-	'max_new_per_session'
-] as const;
-
-type SharedColumn =
-	| (typeof BASIC_COUNT_COLUMNS)[number]
-	| (typeof SESSION_EFFORT_COLUMNS)[number];
-
-/**
- * The slice of a `core_stats` / `stats_cache_basic_session_metrics` row the
- * cross-RPC comparison below reads. Both generated row types carry every
- * `SharedColumn`, so each widens to this directly — no double cast needed, and
- * the two differing identity columns (`species_name` vs `species_id`) are
- * resolved to a common cell key before a row is ever stored as one of these.
- */
-type SharedColumnRow = Record<SharedColumn, unknown>;
-
-describe.skip('stats_cache_basic_session_metrics', () => {
-	let alphaId: number;
-	let alphaClient: SupabaseClient;
-	/** species_name -> species_id, to bridge core_stats' key to this RPC's. */
+describe('stats_cache_basic_session_metrics', () => {
+	/** species_name -> species_id, for the fixtures below to hang encounters off. */
 	let speciesIdByName: Map<string, number>;
 
 	beforeAll(async () => {
-		alphaId = await getGroupIdByName('Alpha');
-		alphaClient = await getAuthenticatedSupabaseClientForGroup(alphaId);
-
 		const { data, error } = await supabase
 			.from('Species')
 			.select('id, species_name');
@@ -234,83 +198,6 @@ describe.skip('stats_cache_basic_session_metrics', () => {
 			data!.map((species) => [species.species_name, species.id])
 		);
 	});
-
-	/**
-	 * Calls `core_stats` and `stats_cache_basic_session_metrics` with one
-	 * identical argument set and returns both results keyed on the same
-	 * `(species_id, time_period)` cell identity — core_stats' `species_name`
-	 * resolved to its id so the two key spaces line up.
-	 */
-	async function callBothKeyedByCell(
-		args: Record<string, unknown>
-	): Promise<{
-		coreByCell: Map<string, SharedColumnRow>;
-		cacheByCell: Map<string, SharedColumnRow>;
-	}> {
-		const [coreResult, cacheResult] = await Promise.all([
-			alphaClient.rpc('core_stats', { ringing_group_filter: alphaId, ...args }),
-			alphaClient.rpc('stats_cache_basic_session_metrics', {
-				ringing_group_filter: alphaId,
-				...args
-			})
-		]);
-		expect(coreResult.error).toBeNull();
-		expect(cacheResult.error).toBeNull();
-
-		const cellKey = (speciesId: number | null, timePeriod: string | null) =>
-			`${speciesId ?? 'all'}|${timePeriod ?? 'all'}`;
-
-		const coreByCell = new Map(
-			coreResult.data!.map((row) => {
-				let speciesId: number | null = null;
-				if (row.species_name !== null) {
-					speciesId = speciesIdByName.get(row.species_name) ?? null;
-					expect(
-						speciesId,
-						`core_stats returned unknown species "${row.species_name}"`
-					).not.toBeNull();
-				}
-				return [
-					cellKey(speciesId, row.time_period),
-					row as SharedColumnRow
-				] as const;
-			})
-		);
-		const cacheByCell = new Map(
-			cacheResult.data!.map(
-				(row) =>
-					[cellKey(row.species_id, row.time_period), row as SharedColumnRow] as const
-			)
-		);
-		return { coreByCell, cacheByCell };
-	}
-
-	/** Asserts the named columns agree cell-for-cell between the two RPCs. */
-	async function expectColumnsMatchCoreStats(
-		args: Record<string, unknown>,
-		columns: readonly SharedColumn[]
-	): Promise<void> {
-		const { coreByCell, cacheByCell } = await callBothKeyedByCell(args);
-		expect(cacheByCell.size).toBe(coreByCell.size);
-		expect(cacheByCell.size).toBeGreaterThan(0);
-
-		for (const [cell, coreRow] of coreByCell) {
-			const cacheRow = cacheByCell.get(cell);
-			expect(cacheRow, `no stats_cache row for cell ${cell}`).toBeDefined();
-			for (const column of columns) {
-				const coreValue = coreRow[column];
-				const cacheValue = cacheRow![column];
-				if (typeof coreValue === 'string') {
-					expect(cacheValue, `${column} @ ${cell}`).toBe(coreValue);
-				} else {
-					expect(num(cacheValue), `${column} @ ${cell}`).toBeCloseTo(
-						num(coreValue),
-						6
-					);
-				}
-			}
-		}
-	}
 
 	// Two species over three calendar months, with encounters in only the first
 	// and last of them — so the middle month exercises the spine's
@@ -844,41 +731,141 @@ describe.skip('stats_cache_basic_session_metrics', () => {
 		});
 	});
 
-	// `core_stats` carries one extra `LEFT JOIN stats_per_species_period agg_sta`
-	// in its final GROUP BY list that this RPC lacks (it only ever fed
-	// commented-out columns there) — every case above exercises a
-	// cache-aligned window (whole year/month/month-squashed, or no window at
-	// all), none of which is the shape that actually round-trips through that
-	// join on the app's one remaining `core_stats`-RPC call site: the
-	// `/species` list page's free-text date inputs, an ungrouped-by-time,
-	// grouped-by-species, arbitrary (non-calendar-aligned) `from_date`/`to_date`
-	// window. This closes that gap before anything relies on the two RPCs
-	// being equivalent for it.
-	describe('arbitrary (non-cache-aligned) date window — the one shape the port had no regression test for', () => {
-		// Alpha's real session dates span 2021-06-20..2024-05-10; this mirrors
-		// the exact shape of the app's own "CES only" arbitrary-window preset
-		// (the until-recently-live one, `${year}-04-25`..`${year}-09-05`) rather
-		// than a synthetic range, and the 2022 slice of Alpha's seed data
-		// catches three real sessions (04-30, 06-15, 08-10) neither a whole
-		// calendar year nor a whole calendar month would isolate.
-		const ARBITRARY_WINDOW = { from_date: '2022-04-25', to_date: '2022-09-05' };
+	// Every block above exercises a cache-aligned window (a whole year/month/
+	// month-squashed, or no window at all). An ungrouped-by-time, grouped-by-
+	// species, arbitrary (non-calendar-aligned) from_date/to_date window is the
+	// shape the /species list page's free-text date inputs actually ask for, so
+	// it gets its own fixture: five group-days straddling the window, two of them
+	// landing exactly on its boundaries and two a single day outside.
+	describe('arbitrary (non-cache-aligned) date window', () => {
+		let fixture: FixtureGroup;
+		let robinId: number;
+		let wrenId: number;
+		let yr: number;
+		/** One day before `fromDate` — a Robin that must not be counted. */
+		let dayBefore: string;
+		/** Exactly `fromDate` — one newly-ringed Robin at 10:00. */
+		let fromDate: string;
+		/** Mid-window: 2 Robins (one new, one retrap) and a Wren, 09:00–12:00. */
+		let midWindow: string;
+		/** Exactly `toDate` — one newly-ringed Wren at 10:00. */
+		let toDate: string;
+		/** One day after `toDate` — a Wren that must not be counted. */
+		let dayAfter: string;
 
-		it("matches core_stats' own basic counts and session/effort metrics for an arbitrary, non-calendar-aligned date range, grouped by species", async () => {
-			await expectColumnsMatchCoreStats(
-				{ ...ARBITRARY_WINDOW, group_by_species: true },
-				[...BASIC_COUNT_COLUMNS, ...SESSION_EFFORT_COLUMNS]
-			);
+		beforeAll(async () => {
+			fixture = await createFixtureGroup('Window');
+			robinId = speciesIdByName.get('Robin')!;
+			wrenId = speciesIdByName.get('Wren')!;
+
+			yr = randomFixtureYear();
+			// The same non-calendar-aligned shape the app's old "CES only" preset
+			// used (`${year}-04-25`..`${year}-09-05`): neither bound is a month
+			// boundary, so no whole-month or whole-year cache cell can stand in for
+			// this window.
+			fromDate = `${yr}-04-25`;
+			toDate = `${yr}-09-05`;
+			dayBefore = addDays(fromDate, -1);
+			dayAfter = addDays(toDate, 1);
+			midWindow = `${yr}-06-15`;
+
+			await fixture.addBird(robinId, dayBefore, { record_type: 'N' });
+			await fixture.addBird(robinId, fromDate, { record_type: 'N' });
+			await fixture.addBird(robinId, midWindow, {
+				record_type: 'N',
+				capture_time: '09:00:00'
+			});
+			await fixture.addBird(robinId, midWindow, {
+				record_type: 'R',
+				capture_time: '11:00:00'
+			});
+			await fixture.addBird(wrenId, midWindow, {
+				record_type: 'N',
+				capture_time: '12:00:00'
+			});
+			await fixture.addBird(wrenId, toDate, { record_type: 'N' });
+			await fixture.addBird(wrenId, dayAfter, { record_type: 'N' });
 		});
 
-		it('produces exactly the same set of species cells as core_stats for that same arbitrary window', async () => {
-			const { coreByCell, cacheByCell } = await callBothKeyedByCell({
-				...ARBITRARY_WINDOW,
+		afterAll(() => fixture.cleanUp());
+
+		it('reports basic counts and session/effort metrics matching a known fixture for a non-calendar-aligned date range, grouped by species', async () => {
+			const rows = await fixture.callMetrics({
+				from_date: fromDate,
+				to_date: toDate,
 				group_by_species: true
 			});
-			expect([...cacheByCell.keys()].sort()).toEqual(
-				[...coreByCell.keys()].sort()
+			const bySpecies = new Map(rows.map((row) => [row.species_id, row]));
+			expect([...bySpecies.keys()].sort()).toEqual([robinId, wrenId].sort());
+
+			// Robin in window: the fromDate bird plus the two mid-window ones — the
+			// day-before bird is excluded.
+			const robin = bySpecies.get(robinId)!;
+			expect(num(robin.species_count)).toBe(1);
+			expect(num(robin.bird_count)).toBe(3);
+			expect(num(robin.encounter_count)).toBe(3);
+			// Two of those three were newly ringed; the third is a retrap.
+			expect(num(robin.new_bird_count)).toBe(2);
+			expect(num(robin.session_count)).toBe(2);
+			// Per-species session counts: 1 on fromDate, 2 mid-window.
+			expect(num(robin.max_per_session)).toBe(2);
+			// Only one of the mid-window pair was new, matching fromDate's single one.
+			expect(num(robin.max_new_per_session)).toBe(1);
+			expect(num(robin.avg_encounters_per_session)).toBeCloseTo(1.5, 6);
+
+			// Wren in window: one mid-window bird and one on toDate — the day-after
+			// bird is excluded.
+			const wren = bySpecies.get(wrenId)!;
+			expect(num(wren.bird_count)).toBe(2);
+			expect(num(wren.encounter_count)).toBe(2);
+			expect(num(wren.new_bird_count)).toBe(2);
+			expect(num(wren.session_count)).toBe(2);
+			expect(num(wren.max_per_session)).toBe(1);
+			expect(num(wren.max_new_per_session)).toBe(1);
+			expect(num(wren.avg_encounters_per_session)).toBeCloseTo(1, 6);
+
+			// effort_per_period is species-blind even under group_by_species, so both
+			// cells report the window's whole effort: the floored 2h of each
+			// single-encounter boundary day plus the mid-window day's 09:00–12:00.
+			for (const row of [robin, wren]) {
+				expect(row.total_effort).toBe('07:00:00');
+				// 7h over the window's 3 sessions.
+				expect(row.effort_per_session).toBe('02:20:00');
+			}
+			// effort_per_encounter divides that species-blind total by the cell's own
+			// encounter count, so it does differ per species: 7h/3 vs 7h/2.
+			expect(robin.effort_per_encounter).toBe('02:20:00');
+			expect(wren.effort_per_encounter).toBe('03:30:00');
+		});
+
+		it('includes a session landing exactly on a boundary date and excludes one a day outside it', async () => {
+			const withinBoundaries = new Map(
+				(
+					await fixture.callMetrics({
+						from_date: fromDate,
+						to_date: toDate,
+						group_by_species: true
+					})
+				).map((row) => [row.species_id, row])
 			);
-			expect(cacheByCell.size).toBeGreaterThan(0);
+			// Robin: fromDate + mid-window. Wren: mid-window + toDate. Both bounds
+			// are inclusive, and nothing outside them is reachable.
+			expect(num(withinBoundaries.get(robinId)!.session_count)).toBe(2);
+			expect(num(withinBoundaries.get(wrenId)!.session_count)).toBe(2);
+
+			const oneDayWider = new Map(
+				(
+					await fixture.callMetrics({
+						from_date: dayBefore,
+						to_date: dayAfter,
+						group_by_species: true
+					})
+				).map((row) => [row.species_id, row])
+			);
+			// Widening by a single day at each end brings in exactly the two
+			// just-outside group-days, one per species.
+			expect(num(oneDayWider.get(robinId)!.session_count)).toBe(3);
+			expect(num(oneDayWider.get(wrenId)!.session_count)).toBe(3);
 		});
 	});
 });
