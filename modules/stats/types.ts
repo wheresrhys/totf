@@ -196,6 +196,49 @@ export type RefreshSimpleStatsCacheParams = RefreshSpeciesNarrowing & {
   importJobId?: number;
 };
 
+/**
+ * The scope one `findSimpleStatsCacheDiscrepancies` comparison covers (#1389)
+ * — deliberately the same `periods`/`speciesIds` contract
+ * `RefreshSimpleStatsCacheParams` above already defines for the write path
+ * (required and non-empty for every narrowing temporal unit —
+ * `day`/`month`/`year`/`month-squashed` — ignored entirely for `all-time`),
+ * plus the explicit `groupBySpecies` flag `runSimpleStatsCacheRefreshPass`
+ * takes as a separate argument: one discrepancy check always targets exactly
+ * one of `SimpleStatsCache`/`SimpleStatsCacheBySpecies`.
+ *
+ * There is deliberately no "every period that exists" mode. Working out the
+ * full set of periods a whole-history report should check is the orchestrating
+ * caller's concern; this function only ever compares the exact scope it is
+ * given, exactly as the write path does.
+ */
+export type FindStatsCacheDiscrepanciesParams = RefreshSpeciesNarrowing & {
+  groupId: number;
+  temporalUnit: StatsTemporalUnit;
+  groupBySpecies: boolean;
+  periods?: string[];
+};
+
+/**
+ * One cell whose materialized cache row disagrees with what the live
+ * `stats_cache_*_metrics` RPCs compute for it (#1389). A cell present and
+ * identical on both sides is never reported — this type only ever describes a
+ * genuine discrepancy.
+ *
+ * Exactly one of `cachedRow`/`liveRow` is `null` for a presence mismatch (a
+ * cell one side has and the other doesn't), in which case
+ * `mismatchedFields` is empty — there is nothing to field-diff against, but
+ * the presence mismatch is itself the discrepancy. When both sides are
+ * present, `mismatchedFields` names every differing metric column, derived
+ * from the live row's own keys (minus the two `MergedCellKey` columns) rather
+ * than a hand-maintained list, so it can't drift from
+ * `mergeSimpleMetricRows`' column set.
+ */
+export type StatsCacheDiscrepancy = MergedCellKey & {
+  cachedRow: Record<string, unknown> | null;
+  liveRow: SimpleMergedCell | null;
+  mismatchedFields: string[];
+};
+
 export type BasicSessionMetricsRow =
   Database['public']['CompositeTypes']['stats_cache_basic_session_metrics_result'];
 export type BiometricsMetricsRow =
