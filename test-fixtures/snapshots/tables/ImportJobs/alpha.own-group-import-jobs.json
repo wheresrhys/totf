@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "status": "succeeded",
+    "started_at": "2026-11-04T11:01:59.241+00:00",
+    "finished_at": "2026-11-04T11:01:59.513+00:00",
+    "rows_processed": 61,
+    "rows_successful": 61,
+    "rows_failed": 0,
+    "day_stats_refresh_status": "succeeded",
+    "month_stats_refresh_status": "succeeded",
+    "year_stats_refresh_status": "succeeded",
+    "month_squashed_stats_refresh_status": "succeeded",
+    "all_time_stats_refresh_status": "succeeded"
+  }
+]

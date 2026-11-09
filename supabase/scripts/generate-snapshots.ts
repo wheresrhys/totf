@@ -11,7 +11,7 @@
  * fixture per source and let the consuming test perform the same join the
  * action does, with the same helper.
  *
- * Reads Alpha/Beta/Gamma group data and writes 25 JSON files under
+ * Reads Alpha/Beta/Gamma group data and writes 26 JSON files under
  * test-fixtures/snapshots/, organised into one subdirectory per data source —
  * the RPC name for RPC-backed fixtures (`demographics_stats/`,
  * `find_discrepencies/`, `notable_retraps/`, `ring_sequence_controls/`,
@@ -56,7 +56,8 @@ import {
 	simpleStatsCacheMonthlyTotalsQuery,
 	simpleStatsCacheHomePageSummaryQuery,
 	simpleStatsCacheBySpeciesByQuery,
-	simpleStatsCacheBySpeciesHeadlineQuery
+	simpleStatsCacheBySpeciesHeadlineQuery,
+	ownGroupImportJobsQuery
 } from '../../queries';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -357,6 +358,23 @@ export async function generateSnapshots(
 		`tables/Sessions/alpha.recent-sessions.json`,
 		recentSessions ?? []
 	);
+
+	// Table: ImportJobs (most recent 20, Alpha only) — powers
+	// fetchOwnGroupImportJobs (app/actions/import-jobs.ts), which backs the
+	// /stats-consistency page's import-jobs table (#1388). Query:
+	// queries/ImportJobs/own-group-import-jobs.ts
+	{
+		const { data: importJobs } = await alpha
+			.from('ImportJobs')
+			.select(ownGroupImportJobsQuery.select)
+			.eq('ringing_group_id', alphaId)
+			.order('started_at', { ascending: false })
+			.limit(20);
+		await writeSnapshot(
+			`tables/ImportJobs/alpha.own-group-import-jobs.json`,
+			importJobs ?? []
+		);
+	}
 
 	// Table: Species (embedded Birds count, unfiltered/unsliced) — powers
 	// fetchGroupSpecies (app/(routes)/page.tsx), which filters to birds count

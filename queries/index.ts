@@ -14,6 +14,7 @@ export { simpleStatsCacheMonthlyTotalsQuery } from './SimpleStatsCache/monthly-t
 export { simpleStatsCacheHomePageSummaryQuery } from './SimpleStatsCache/home-page-summary';
 export { simpleStatsCacheBySpeciesByQuery } from './SimpleStatsCacheBySpecies/by-species';
 export { simpleStatsCacheBySpeciesHeadlineQuery } from './SimpleStatsCacheBySpecies/headline';
+export { ownGroupImportJobsQuery } from './ImportJobs/own-group-import-jobs';
 
 import { allSessionsQuery } from './Sessions/all-sessions';
 import { recentSessionsQuery } from './Sessions/recent-sessions';
@@ -29,6 +30,7 @@ import { simpleStatsCacheMonthlyTotalsQuery } from './SimpleStatsCache/monthly-t
 import { simpleStatsCacheHomePageSummaryQuery } from './SimpleStatsCache/home-page-summary';
 import { simpleStatsCacheBySpeciesByQuery } from './SimpleStatsCacheBySpecies/by-species';
 import { simpleStatsCacheBySpeciesHeadlineQuery } from './SimpleStatsCacheBySpecies/headline';
+import { ownGroupImportJobsQuery } from './ImportJobs/own-group-import-jobs';
 import type { TableQueryDefinition } from './types';
 
 /**
@@ -51,5 +53,6 @@ export const TABLE_QUERIES: readonly TableQueryDefinition[] = [
 	simpleStatsCacheMonthlyTotalsQuery,
 	simpleStatsCacheHomePageSummaryQuery,
 	simpleStatsCacheBySpeciesByQuery,
-	simpleStatsCacheBySpeciesHeadlineQuery
+	simpleStatsCacheBySpeciesHeadlineQuery,
+	ownGroupImportJobsQuery
 ];

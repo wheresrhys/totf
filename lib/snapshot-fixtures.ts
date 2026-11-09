@@ -38,7 +38,7 @@
  */
 
 /**
- * The 25 fixtures `supabase/scripts/generate-snapshots.ts` produces, and therefore the
+ * The 26 fixtures `supabase/scripts/generate-snapshots.ts` produces, and therefore the
  * exact set the freshness check covers. Paths are relative to
  * `test-fixtures/snapshots/` and follow #882's source-directory layout (one
  * subdirectory per RPC, `tables/<TableName>/` for direct PostgREST reads).
@@ -90,6 +90,10 @@
  * `beta.yearly-totals.json` — were dropped outright rather than migrated,
  * confirmed fully unconsumed by any test (the same `#894` orphan rule
  * above), bringing the total from 27 to 25.
+ *
+ * #1388 adds `tables/ImportJobs/alpha.own-group-import-jobs.json`, the raw
+ * source behind `fetchOwnGroupImportJobs` (`app/actions/import-jobs.ts`) —
+ * bringing the total to 26.
  */
 export const GENERATED_SNAPSHOT_FIXTURES = [
 	'demographics_stats/robin-alpha.monthly-history.json',
@@ -105,6 +109,7 @@ export const GENERATED_SNAPSHOT_FIXTURES = [
 	'tables/Encounters/alpha.pulli-encounters.json',
 	'tables/Encounters/alpha.resightings.json',
 	'tables/Encounters/arretrap.encounters.json',
+	'tables/ImportJobs/alpha.own-group-import-jobs.json',
 	'tables/Sessions/alpha.all-sessions.json',
 	'tables/Sessions/alpha.recent-sessions.json',
 	'tables/Sessions/beta.all-sessions.json',
