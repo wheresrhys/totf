@@ -13,7 +13,10 @@ import {
 	getCellTextByHeading
 } from '@/app/__tests__/helpers/table';
 import { StatsConsistencyPageContent } from '../PageContent';
+import type { StatsConsistencyPageData } from '../PageContent';
 import { regenerateStatsCache } from '@/app/actions/regenerate-stats-cache';
+import { fetchStatsCacheDiscrepancies } from '@/app/actions/stats-cache-discrepancies';
+import { EAGER_DISCREPANCY_SCOPES } from '@/app/components/pages/stats-consistency/discrepancy-scopes';
 import type { OwnGroupImportJobRow } from '@/app/actions/import-jobs';
 
 vi.mock('@/app/actions/regenerate-stats-cache', () => ({
@@ -44,9 +47,35 @@ function buildImportJob(
 	};
 }
 
+/**
+ * Renders the content component, then waits for `StatsCacheDiscrepanciesReport`'s
+ * own eager-scope fetches (unconditionally kicked off on mount) to finish —
+ * none of these tests care about their result, but letting the chain settle
+ * inside `waitFor`'s act()-wrapped polling, rather than leaving it to resolve
+ * after the test body returns, is what keeps React from warning about a
+ * state update outside `act(...)`.
+ */
+async function renderPageContent(data: StatsConsistencyPageData) {
+	const result = render(<StatsConsistencyPageContent data={data} />);
+	await waitFor(() => {
+		expect(fetchStatsCacheDiscrepancies).toHaveBeenCalledTimes(
+			EAGER_DISCREPANCY_SCOPES.length
+		);
+	});
+	return result;
+}
+
 describe('StatsConsistencyPageContent', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		// `StatsCacheDiscrepanciesReport` (rendered by every test here) kicks off
+		// its own eager-scope fetches on mount — give them a resolved default so
+		// mounting doesn't leave a dangling unmocked promise none of these tests
+		// care about.
+		vi.mocked(fetchStatsCacheDiscrepancies).mockResolvedValue({
+			success: true,
+			discrepancies: []
+		});
 	});
 
 	afterEach(() => {
@@ -54,31 +83,22 @@ describe('StatsConsistencyPageContent', () => {
 	});
 
 	describe('rendering the import jobs list', () => {
-		it('renders one row per import job, in the given order', () => {
+		it('renders one row per import job, in the given order', async () => {
 			const importJobs = [
 				buildImportJob({ id: 1, status: 'succeeded' }),
 				buildImportJob({ id: 2, status: 'failed' })
 			];
-			render(
-				<StatsConsistencyPageContent
-					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
-				/>
-			);
+			await renderPageContent({ importJobs, speciesNamesById: {} });
 
 			expect(getCellTextByHeading('Status', 0)).toBe('succeeded');
 			expect(getCellTextByHeading('Status', 1)).toBe('failed');
 		});
 
-		it('shows an empty-state message, not an empty table, when there are no import jobs', () => {
-			render(
-				<StatsConsistencyPageContent
-					data={{
-						importJobs: [],
-						eagerDiscrepancies: {},
-						speciesNamesById: {}
-					}}
-				/>
-			);
+		it('shows an empty-state message, not an empty table, when there are no import jobs', async () => {
+			await renderPageContent({
+				importJobs: [],
+				speciesNamesById: {}
+			});
 
 			expect(screen.queryByRole('table')).toBeNull();
 			expect(screen.getByText('No import jobs yet.').textContent).toBe(
@@ -88,30 +108,22 @@ describe('StatsConsistencyPageContent', () => {
 	});
 
 	describe('per-temporal-unit refresh status', () => {
-		it('shows status only, with no retrigger button, for a refresh column already succeeded', () => {
+		it('shows status only, with no retrigger button, for a refresh column already succeeded', async () => {
 			const importJobs = [
 				buildImportJob({ day_stats_refresh_status: 'succeeded' })
 			];
-			render(
-				<StatsConsistencyPageContent
-					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
-				/>
-			);
+			await renderPageContent({ importJobs, speciesNamesById: {} });
 
 			const cell = getCellByHeading('day', 0);
 			expect(within(cell).queryByRole('button')).toBeNull();
 			expect(cell.textContent).toBe('succeeded');
 		});
 
-		it('shows a retrigger button for a refresh column that failed', () => {
+		it('shows a retrigger button for a refresh column that failed', async () => {
 			const importJobs = [
 				buildImportJob({ day_stats_refresh_status: 'failed' })
 			];
-			render(
-				<StatsConsistencyPageContent
-					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
-				/>
-			);
+			await renderPageContent({ importJobs, speciesNamesById: {} });
 
 			const cell = getCellByHeading('day', 0);
 			expect(
@@ -119,15 +131,11 @@ describe('StatsConsistencyPageContent', () => {
 			).toBe('Retrigger');
 		});
 
-		it('shows a retrigger button for a refresh column stuck in_progress', () => {
+		it('shows a retrigger button for a refresh column stuck in_progress', async () => {
 			const importJobs = [
 				buildImportJob({ month_stats_refresh_status: 'in_progress' })
 			];
-			render(
-				<StatsConsistencyPageContent
-					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
-				/>
-			);
+			await renderPageContent({ importJobs, speciesNamesById: {} });
 
 			const cell = getCellByHeading('month', 0);
 			expect(
@@ -135,15 +143,11 @@ describe('StatsConsistencyPageContent', () => {
 			).toBe('Retrigger');
 		});
 
-		it('shows a retrigger button for a refresh column that timed out', () => {
+		it('shows a retrigger button for a refresh column that timed out', async () => {
 			const importJobs = [
 				buildImportJob({ year_stats_refresh_status: 'timed_out' })
 			];
-			render(
-				<StatsConsistencyPageContent
-					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
-				/>
-			);
+			await renderPageContent({ importJobs, speciesNamesById: {} });
 
 			const cell = getCellByHeading('year', 0);
 			expect(
@@ -158,11 +162,7 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ month_stats_refresh_status: 'failed' })
 			];
-			render(
-				<StatsConsistencyPageContent
-					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
-				/>
-			);
+			await renderPageContent({ importJobs, speciesNamesById: {} });
 
 			const cell = getCellByHeading('month', 0);
 			fireEvent.click(within(cell).getByRole('button', { name: 'Retrigger' }));
@@ -184,11 +184,7 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ day_stats_refresh_status: 'failed' })
 			];
-			render(
-				<StatsConsistencyPageContent
-					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
-				/>
-			);
+			await renderPageContent({ importJobs, speciesNamesById: {} });
 			const cell = getCellByHeading('day', 0);
 			const button = within(cell).getByRole('button') as HTMLButtonElement;
 
@@ -209,11 +205,7 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ day_stats_refresh_status: 'failed' })
 			];
-			render(
-				<StatsConsistencyPageContent
-					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
-				/>
-			);
+			await renderPageContent({ importJobs, speciesNamesById: {} });
 			const cell = getCellByHeading('day', 0);
 			const button = within(cell).getByRole('button') as HTMLButtonElement;
 
@@ -235,11 +227,7 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ day_stats_refresh_status: 'failed' })
 			];
-			render(
-				<StatsConsistencyPageContent
-					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
-				/>
-			);
+			await renderPageContent({ importJobs, speciesNamesById: {} });
 			const cell = getCellByHeading('day', 0);
 			const button = within(cell).getByRole('button') as HTMLButtonElement;
 
@@ -267,11 +255,7 @@ describe('StatsConsistencyPageContent', () => {
 				}),
 				buildImportJob({ id: 2, day_stats_refresh_status: 'failed' })
 			];
-			render(
-				<StatsConsistencyPageContent
-					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
-				/>
-			);
+			await renderPageContent({ importJobs, speciesNamesById: {} });
 
 			const dayCellRow0 = getCellByHeading('day', 0);
 			const monthCellRow0 = getCellByHeading('month', 0);

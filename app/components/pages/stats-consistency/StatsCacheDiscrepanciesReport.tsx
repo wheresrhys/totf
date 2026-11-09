@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AccordionItem, BoxyList, SecondaryHeading } from '@/modules/ui-kit';
 import {
 	fetchStatsCacheDiscrepancies,
@@ -8,6 +8,7 @@ import {
 import type { StatsCacheDiscrepancy } from '@/modules/stats';
 import {
 	DISCREPANCY_SCOPES,
+	EAGER_DISCREPANCY_SCOPES,
 	isEagerScope,
 	discrepancyScopeKey,
 	discrepancyScopeHeading,
@@ -199,6 +200,51 @@ function LazyDiscrepancyScopeSection({
 	);
 }
 
+/**
+ * Runs every `EAGER_DISCREPANCY_SCOPES` entry automatically, one at a time,
+ * starting once this component mounts (i.e. after the page itself has
+ * already rendered) — never in parallel, and never blocking the initial
+ * render, per PR #1393 review: each comparison is a real set of DB round
+ * trips, so firing all 6 at once would still be an expensive thundering
+ * herd even though these 3 temporal units are individually bounded.
+ * A scope not yet reached in the queue is indistinguishable from one
+ * currently in flight — both read as `undefined` here and render the same
+ * "Checking…" state as a lazy scope's own in-flight state.
+ */
+function useEagerDiscrepancyScopeResults(): DiscrepancyScopeResults {
+	const [results, setResults] = useState<DiscrepancyScopeResults>({});
+
+	useEffect(() => {
+		let cancelled = false;
+
+		async function runEagerScopesInSeries() {
+			for (const scope of EAGER_DISCREPANCY_SCOPES) {
+				if (cancelled) {
+					return;
+				}
+				const result = await fetchStatsCacheDiscrepancies({
+					temporalUnit: scope.temporalUnit,
+					bySpecies: scope.bySpecies
+				});
+				if (cancelled) {
+					return;
+				}
+				setResults((previous) => ({
+					...previous,
+					[discrepancyScopeKey(scope)]: result
+				}));
+			}
+		}
+
+		runEagerScopesInSeries();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	return results;
+}
+
 function EagerDiscrepancyScopeSection({
 	scope,
 	result,
@@ -209,7 +255,7 @@ function EagerDiscrepancyScopeSection({
 	speciesNamesById: Record<number, string>;
 }) {
 	if (!result) {
-		return null;
+		return <p>Checking…</p>;
 	}
 	if (!result.success) {
 		return (
@@ -260,19 +306,20 @@ function DiscrepancyScopeSection({
 /**
  * The read-only stats-cache discrepancy report (#1387) — one section per
  * `DISCREPANCY_SCOPES` entry, in that fixed order. The `all-time`/`year`/
- * `month-squashed` scopes render whatever the page's own data fetcher
- * already resolved (`eagerDiscrepancies`, keyed by `discrepancyScopeKey`);
- * the `month`/`day` scopes render a "Run check" trigger instead, deferring
- * their own comparison call until clicked — see this ticket's
- * "Performance-scoping design" for why.
+ * `month-squashed` scopes run automatically, one at a time, starting after
+ * this component mounts (`useEagerDiscrepancyScopeResults`) — never
+ * blocking the page's own initial render and never firing all 6 in
+ * parallel (per PR #1393 review). The `month`/`day` scopes still render a
+ * manual "Run check" trigger, deferring their own comparison call until
+ * clicked — see this ticket's "Performance-scoping design" for why those
+ * two stay opt-in rather than automatic.
  */
 export function StatsCacheDiscrepanciesReport({
-	eagerDiscrepancies,
 	speciesNamesById
 }: {
-	eagerDiscrepancies: DiscrepancyScopeResults;
 	speciesNamesById: Record<number, string>;
 }) {
+	const eagerResults = useEagerDiscrepancyScopeResults();
 	return (
 		<div>
 			<SecondaryHeading>Stats cache discrepancies</SecondaryHeading>
@@ -280,7 +327,7 @@ export function StatsCacheDiscrepanciesReport({
 				<DiscrepancyScopeSection
 					key={discrepancyScopeKey(scope)}
 					scope={scope}
-					eagerResult={eagerDiscrepancies[discrepancyScopeKey(scope)]}
+					eagerResult={eagerResults[discrepancyScopeKey(scope)]}
 					speciesNamesById={speciesNamesById}
 				/>
 			))}

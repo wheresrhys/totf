@@ -9,14 +9,17 @@ import {
 	act
 } from '@testing-library/react';
 import { StatsCacheDiscrepanciesReport } from '../StatsCacheDiscrepanciesReport';
-import { fetchStatsCacheDiscrepancies } from '@/app/actions/stats-cache-discrepancies';
+import {
+	fetchStatsCacheDiscrepancies,
+	type FetchStatsCacheDiscrepanciesParams
+} from '@/app/actions/stats-cache-discrepancies';
 import type { FetchStatsCacheDiscrepanciesResult } from '@/app/actions/stats-cache-discrepancies';
 import {
 	DISCREPANCY_SCOPES,
+	EAGER_DISCREPANCY_SCOPES,
 	discrepancyScopeKey,
 	discrepancyScopeHeading,
-	type DiscrepancyScope,
-	type DiscrepancyScopeResults
+	type DiscrepancyScope
 } from '../discrepancy-scopes';
 import type { StatsCacheDiscrepancy } from '@/modules/stats';
 
@@ -49,27 +52,36 @@ function buildDiscrepancy(
 	} as unknown as StatsCacheDiscrepancy;
 }
 
-// Every eager scope defaults to "no discrepancies" so a test only has to
-// override the one scope it cares about.
-function emptyEagerDiscrepancies(): DiscrepancyScopeResults {
-	const results: DiscrepancyScopeResults = {};
-	DISCREPANCY_SCOPES.forEach((scope) => {
-		results[discrepancyScopeKey(scope)] = { success: true, discrepancies: [] };
-	});
-	return results;
+/**
+ * Routes the mocked `fetchStatsCacheDiscrepancies` to a per-scope result,
+ * keyed by `discrepancyScopeKey` — every scope not named in `overrides`
+ * defaults to "no discrepancies found". The report now resolves its own
+ * eager scopes by calling this same action client-side (one at a time,
+ * after mount) rather than taking a pre-fetched prop, so every test that
+ * cares about a specific scope's result routes it through here instead of
+ * building a `DiscrepancyScopeResults` object to pass as a prop.
+ */
+function mockScopedResults(
+	overrides: Partial<Record<string, FetchStatsCacheDiscrepanciesResult>> = {}
+) {
+	vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+		async (params: FetchStatsCacheDiscrepanciesParams) => {
+			const key = discrepancyScopeKey({
+				temporalUnit: params.temporalUnit,
+				bySpecies: params.bySpecies
+			});
+			return overrides[key] ?? { success: true, discrepancies: [] };
+		}
+	);
 }
 
 function renderReport(
 	overrides: {
-		eagerDiscrepancies?: DiscrepancyScopeResults;
 		speciesNamesById?: Record<number, string>;
 	} = {}
 ) {
 	return render(
 		<StatsCacheDiscrepanciesReport
-			eagerDiscrepancies={
-				overrides.eagerDiscrepancies ?? emptyEagerDiscrepancies()
-			}
 			speciesNamesById={overrides.speciesNamesById ?? {}}
 		/>
 	);
@@ -82,23 +94,38 @@ function getScopeSection(scope: DiscrepancyScope) {
 function withResult(
 	scope: DiscrepancyScope,
 	result: FetchStatsCacheDiscrepanciesResult
-): DiscrepancyScopeResults {
-	const eagerDiscrepancies = emptyEagerDiscrepancies();
-	eagerDiscrepancies[discrepancyScopeKey(scope)] = result;
-	return eagerDiscrepancies;
+): Partial<Record<string, FetchStatsCacheDiscrepanciesResult>> {
+	return { [discrepancyScopeKey(scope)]: result };
 }
 
 describe('StatsCacheDiscrepanciesReport', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockScopedResults();
 	});
 
 	afterEach(() => {
 		cleanup();
 	});
 
+	// Every test below mounts the full report, which unconditionally kicks off
+	// its 6 eager-scope fetches on mount. A test asserting pre-resolution state
+	// (e.g. the "Checking…" loading text) has to check that *before* letting
+	// the chain settle; `flushEagerFetches` drains it afterwards so the
+	// resulting state updates happen inside `waitFor`'s act()-wrapped polling
+	// rather than leaking out after the test body returns (which is what
+	// produces a "not wrapped in act(...)" warning for an update React can
+	// genuinely no longer attribute to anything the test is still watching).
+	async function flushEagerFetches() {
+		await waitFor(() => {
+			expect(fetchStatsCacheDiscrepancies).toHaveBeenCalledTimes(
+				EAGER_DISCREPANCY_SCOPES.length
+			);
+		});
+	}
+
 	describe('scope ordering', () => {
-		it('renders the 10 scopes in all-time, year, month-squashed, month, day order, combined pass then by-species pass', () => {
+		it('renders the 10 scopes in all-time, year, month-squashed, month, day order, combined pass then by-species pass', async () => {
 			renderReport();
 
 			const headings = screen
@@ -106,46 +133,114 @@ describe('StatsCacheDiscrepanciesReport', () => {
 				.map((heading) => heading.textContent);
 
 			expect(headings).toEqual(DISCREPANCY_SCOPES.map(discrepancyScopeHeading));
+
+			await flushEagerFetches();
 		});
 	});
 
 	describe('eager scopes (all-time, year, month-squashed)', () => {
-		it('renders their discrepancies immediately from the page-fetched data, with no trigger button', () => {
+		it('shows a loading state before the client-side check resolves', async () => {
 			const scope: DiscrepancyScope = {
 				temporalUnit: 'year',
 				bySpecies: false
 			};
-			renderReport({
-				eagerDiscrepancies: withResult(scope, {
+			renderReport();
+
+			expect(
+				within(getScopeSection(scope)).getByText('Checking…')
+			).toBeTruthy();
+
+			await flushEagerFetches();
+		});
+
+		it('renders their discrepancies once the client-side check resolves, with no trigger button', async () => {
+			const scope: DiscrepancyScope = {
+				temporalUnit: 'year',
+				bySpecies: false
+			};
+			mockScopedResults(
+				withResult(scope, {
 					success: true,
 					discrepancies: [buildDiscrepancy({ time_period: '2026-01-01' })]
 				})
-			});
+			);
+			renderReport();
 
 			const section = getScopeSection(scope);
+			await waitFor(() => {
+				expect(
+					within(section).getByText('discrepancies found for year stats 2026')
+				).toBeTruthy();
+			});
 			expect(
 				within(section).queryByRole('button', { name: 'Run check' })
 			).toBeNull();
-			expect(
-				within(section).getByText('discrepancies found for year stats 2026')
-			).toBeTruthy();
 		});
 
-		it('renders "no discrepancies found" for a scope with none', () => {
+		it('renders "no discrepancies found" for a scope with none', async () => {
 			const scope: DiscrepancyScope = {
 				temporalUnit: 'all-time',
 				bySpecies: false
 			};
 			renderReport();
 
-			expect(
-				within(getScopeSection(scope)).getByText('No discrepancies found')
-			).toBeTruthy();
+			await waitFor(() => {
+				expect(
+					within(getScopeSection(scope)).getByText('No discrepancies found')
+				).toBeTruthy();
+			});
+		});
+
+		it('runs the 6 eager scopes one at a time, never firing the next before the previous resolves', async () => {
+			const resolvers: Array<
+				(result: FetchStatsCacheDiscrepanciesResult) => void
+			> = [];
+			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+				() =>
+					new Promise((resolve) => {
+						resolvers.push(resolve);
+					})
+			);
+
+			renderReport();
+
+			for (
+				let expectedCalls = 1;
+				expectedCalls <= EAGER_DISCREPANCY_SCOPES.length;
+				expectedCalls++
+			) {
+				await waitFor(() => {
+					expect(fetchStatsCacheDiscrepancies).toHaveBeenCalledTimes(
+						expectedCalls
+					);
+				});
+				// No call beyond this one has fired yet — proves series, not parallel.
+				expect(resolvers).toHaveLength(expectedCalls);
+				await act(async () => {
+					resolvers[expectedCalls - 1]({ success: true, discrepancies: [] });
+				});
+			}
+		});
+
+		it('calls each eager scope with only its temporalUnit/bySpecies, no periods/speciesIds', async () => {
+			renderReport();
+
+			await waitFor(() => {
+				expect(fetchStatsCacheDiscrepancies).toHaveBeenCalledTimes(
+					EAGER_DISCREPANCY_SCOPES.length
+				);
+			});
+			EAGER_DISCREPANCY_SCOPES.forEach((scope) => {
+				expect(fetchStatsCacheDiscrepancies).toHaveBeenCalledWith({
+					temporalUnit: scope.temporalUnit,
+					bySpecies: scope.bySpecies
+				});
+			});
 		});
 	});
 
 	describe('lazy scopes (month, day)', () => {
-		it('renders a "Run check" trigger instead of discrepancies on first render', () => {
+		it('renders a "Run check" trigger instead of discrepancies on first render', async () => {
 			const scope: DiscrepancyScope = {
 				temporalUnit: 'month',
 				bySpecies: false
@@ -157,13 +252,11 @@ describe('StatsCacheDiscrepanciesReport', () => {
 				within(section).getByRole('button', { name: 'Run check' })
 			).toBeTruthy();
 			expect(within(section).queryByText('No discrepancies found')).toBeNull();
+
+			await flushEagerFetches();
 		});
 
 		it('calls the discrepancy-check action when the trigger is clicked', async () => {
-			vi.mocked(fetchStatsCacheDiscrepancies).mockResolvedValue({
-				success: true,
-				discrepancies: []
-			});
 			const scope: DiscrepancyScope = { temporalUnit: 'day', bySpecies: false };
 			renderReport();
 
@@ -183,10 +276,15 @@ describe('StatsCacheDiscrepanciesReport', () => {
 
 		it('shows a loading state while the action is in flight, then renders its result', async () => {
 			let resolveFetch!: (result: FetchStatsCacheDiscrepanciesResult) => void;
-			vi.mocked(fetchStatsCacheDiscrepancies).mockReturnValue(
-				new Promise((resolve) => {
-					resolveFetch = resolve;
-				})
+			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+				(params: FetchStatsCacheDiscrepanciesParams) => {
+					if (params.temporalUnit === 'month' && params.bySpecies) {
+						return new Promise((resolve) => {
+							resolveFetch = resolve;
+						});
+					}
+					return Promise.resolve({ success: true, discrepancies: [] });
+				}
 			);
 			const scope: DiscrepancyScope = {
 				temporalUnit: 'month',
@@ -217,16 +315,26 @@ describe('StatsCacheDiscrepanciesReport', () => {
 
 	describe('discrepancy list item labelling', () => {
 		it('labels a combined-scope item with its temporal unit and period, no species suffix', async () => {
-			vi.mocked(fetchStatsCacheDiscrepancies).mockResolvedValue({
-				success: true,
-				discrepancies: [
-					buildDiscrepancy({ time_period: '2026-01-01', species_id: null })
-				]
-			});
 			const scope: DiscrepancyScope = {
 				temporalUnit: 'month',
 				bySpecies: false
 			};
+			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+				(params: FetchStatsCacheDiscrepanciesParams) => {
+					if (params.temporalUnit === 'month' && !params.bySpecies) {
+						return Promise.resolve({
+							success: true,
+							discrepancies: [
+								buildDiscrepancy({
+									time_period: '2026-01-01',
+									species_id: null
+								})
+							]
+						});
+					}
+					return Promise.resolve({ success: true, discrepancies: [] });
+				}
+			);
 			renderReport();
 			const section = getScopeSection(scope);
 
@@ -244,16 +352,23 @@ describe('StatsCacheDiscrepanciesReport', () => {
 		});
 
 		it('labels a by-species-scope item with a "for species <name>" suffix', async () => {
-			vi.mocked(fetchStatsCacheDiscrepancies).mockResolvedValue({
-				success: true,
-				discrepancies: [
-					buildDiscrepancy({ time_period: '2026-01-01', species_id: 42 })
-				]
-			});
 			const scope: DiscrepancyScope = {
 				temporalUnit: 'month',
 				bySpecies: true
 			};
+			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+				(params: FetchStatsCacheDiscrepanciesParams) => {
+					if (params.temporalUnit === 'month' && params.bySpecies) {
+						return Promise.resolve({
+							success: true,
+							discrepancies: [
+								buildDiscrepancy({ time_period: '2026-01-01', species_id: 42 })
+							]
+						});
+					}
+					return Promise.resolve({ success: true, discrepancies: [] });
+				}
+			);
 			renderReport({ speciesNamesById: { 42: 'Blackcap' } });
 			const section = getScopeSection(scope);
 
@@ -283,27 +398,28 @@ describe('StatsCacheDiscrepanciesReport', () => {
 			mismatchedFields: ['session_count']
 		});
 
-		function renderExpanded() {
-			renderReport({
-				eagerDiscrepancies: withResult(scope, {
-					success: true,
-					discrepancies: [discrepancy]
-				})
-			});
+		async function renderExpanded() {
+			mockScopedResults(
+				withResult(scope, { success: true, discrepancies: [discrepancy] })
+			);
+			renderReport();
 			const section = getScopeSection(scope);
+			await waitFor(() => {
+				expect(within(section).getByRole('button')).toBeTruthy();
+			});
 			fireEvent.click(within(section).getByRole('button'));
 			return section;
 		}
 
-		it('renders one row for the cached value and one row for the live-computed value', () => {
-			const section = renderExpanded();
+		it('renders one row for the cached value and one row for the live-computed value', async () => {
+			const section = await renderExpanded();
 
 			expect(within(section).getByRole('row', { name: /Cached/ })).toBeTruthy();
 			expect(within(section).getByRole('row', { name: /Live/ })).toBeTruthy();
 		});
 
-		it('applies the mismatch style only to columns where the two rows actually differ', () => {
-			const section = renderExpanded();
+		it('applies the mismatch style only to columns where the two rows actually differ', async () => {
+			const section = await renderExpanded();
 
 			const cachedCells = within(
 				within(section).getByRole('row', { name: /Cached/ })

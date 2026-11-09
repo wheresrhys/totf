@@ -39,9 +39,13 @@ export const DISCREPANCY_SCOPES: DiscrepancyScope[] = [
 ];
 
 // `all-time`/`year`/`month-squashed` are bounded independent of a group's
-// session-history length (see #1387's acceptance criteria), so the page's
-// own data fetcher runs them eagerly. `month`/`day` scale with a group's
-// history and render a "Run check" trigger instead.
+// session-history length (see #1387's acceptance criteria), so the report
+// runs them automatically rather than behind a "Run check" click — but each
+// comparison still costs a real set of DB round trips, so (per PR #1393
+// review) they run one at a time, client-side, after the page has already
+// rendered, never in parallel and never blocking the initial page load.
+// `month`/`day` scale with a group's history and keep the manual
+// "Run check" trigger instead.
 const EAGER_TEMPORAL_UNITS: ReadonlySet<StatsTemporalUnit> = new Set([
 	'all-time',
 	'year',
@@ -52,16 +56,16 @@ export function isEagerScope(scope: DiscrepancyScope): boolean {
 	return EAGER_TEMPORAL_UNITS.has(scope.temporalUnit);
 }
 
-/** The 6 scopes (3 temporal units × combined/by-species) the page's data fetcher runs eagerly. */
+/** The 6 scopes (3 temporal units × combined/by-species) the report runs automatically, in series, after mount. */
 export const EAGER_DISCREPANCY_SCOPES: DiscrepancyScope[] =
 	DISCREPANCY_SCOPES.filter(isEagerScope);
 
-/** Stable string key for one scope — used both as a React list key and to index `DiscrepancyScopeResults`. */
+/** Stable string key for one scope — used both as a React list key and to index a `DiscrepancyScopeResults`-shaped result map. */
 export function discrepancyScopeKey(scope: DiscrepancyScope): string {
 	return `${scope.temporalUnit}:${scope.bySpecies ? 'by-species' : 'combined'}`;
 }
 
-/** The eager half of the report's data, keyed by `discrepancyScopeKey`. */
+/** One scope's resolved result, keyed by `discrepancyScopeKey` — the shape both the report's own eager-run state and tests build. */
 export type DiscrepancyScopeResults = Record<
 	string,
 	FetchStatsCacheDiscrepanciesResult
