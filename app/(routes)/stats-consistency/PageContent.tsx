@@ -9,9 +9,13 @@ import {
 	temporalUnitNameMapping,
 	type StatsTemporalUnit
 } from '@/app/models/temporal-unit';
+import { StatsCacheDiscrepanciesReport } from '@/app/components/pages/stats-consistency/StatsCacheDiscrepanciesReport';
+import type { DiscrepancyScopeResults } from '@/app/components/pages/stats-consistency/discrepancy-scopes';
 
 export type StatsConsistencyPageData = {
 	importJobs: OwnGroupImportJobRow[];
+	eagerDiscrepancies: DiscrepancyScopeResults;
+	speciesNamesById: Record<number, string>;
 };
 
 // One entry per ImportJobs.*_stats_refresh_status column, naming the
@@ -157,6 +161,10 @@ export function StatsConsistencyPageContent({
 					</tbody>
 				</Table>
 			)}
+			<StatsCacheDiscrepanciesReport
+				eagerDiscrepancies={data.eagerDiscrepancies}
+				speciesNamesById={data.speciesNamesById}
+			/>
 		</PageWrapper>
 	);
 }

@@ -20,6 +20,10 @@ vi.mock('@/app/actions/regenerate-stats-cache', () => ({
 	regenerateStatsCache: vi.fn()
 }));
 
+vi.mock('@/app/actions/stats-cache-discrepancies', () => ({
+	fetchStatsCacheDiscrepancies: vi.fn()
+}));
+
 function buildImportJob(
 	overrides: Partial<OwnGroupImportJobRow> = {}
 ): OwnGroupImportJobRow {
@@ -55,14 +59,26 @@ describe('StatsConsistencyPageContent', () => {
 				buildImportJob({ id: 1, status: 'succeeded' }),
 				buildImportJob({ id: 2, status: 'failed' })
 			];
-			render(<StatsConsistencyPageContent data={{ importJobs }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
+				/>
+			);
 
 			expect(getCellTextByHeading('Status', 0)).toBe('succeeded');
 			expect(getCellTextByHeading('Status', 1)).toBe('failed');
 		});
 
 		it('shows an empty-state message, not an empty table, when there are no import jobs', () => {
-			render(<StatsConsistencyPageContent data={{ importJobs: [] }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{
+						importJobs: [],
+						eagerDiscrepancies: {},
+						speciesNamesById: {}
+					}}
+				/>
+			);
 
 			expect(screen.queryByRole('table')).toBeNull();
 			expect(screen.getByText('No import jobs yet.').textContent).toBe(
@@ -76,7 +92,11 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ day_stats_refresh_status: 'succeeded' })
 			];
-			render(<StatsConsistencyPageContent data={{ importJobs }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
+				/>
+			);
 
 			const cell = getCellByHeading('day', 0);
 			expect(within(cell).queryByRole('button')).toBeNull();
@@ -87,7 +107,11 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ day_stats_refresh_status: 'failed' })
 			];
-			render(<StatsConsistencyPageContent data={{ importJobs }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
+				/>
+			);
 
 			const cell = getCellByHeading('day', 0);
 			expect(
@@ -99,7 +123,11 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ month_stats_refresh_status: 'in_progress' })
 			];
-			render(<StatsConsistencyPageContent data={{ importJobs }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
+				/>
+			);
 
 			const cell = getCellByHeading('month', 0);
 			expect(
@@ -111,7 +139,11 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ year_stats_refresh_status: 'timed_out' })
 			];
-			render(<StatsConsistencyPageContent data={{ importJobs }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
+				/>
+			);
 
 			const cell = getCellByHeading('year', 0);
 			expect(
@@ -126,7 +158,11 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ month_stats_refresh_status: 'failed' })
 			];
-			render(<StatsConsistencyPageContent data={{ importJobs }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
+				/>
+			);
 
 			const cell = getCellByHeading('month', 0);
 			fireEvent.click(within(cell).getByRole('button', { name: 'Retrigger' }));
@@ -148,7 +184,11 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ day_stats_refresh_status: 'failed' })
 			];
-			render(<StatsConsistencyPageContent data={{ importJobs }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
+				/>
+			);
 			const cell = getCellByHeading('day', 0);
 			const button = within(cell).getByRole('button') as HTMLButtonElement;
 
@@ -169,7 +209,11 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ day_stats_refresh_status: 'failed' })
 			];
-			render(<StatsConsistencyPageContent data={{ importJobs }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
+				/>
+			);
 			const cell = getCellByHeading('day', 0);
 			const button = within(cell).getByRole('button') as HTMLButtonElement;
 
@@ -191,7 +235,11 @@ describe('StatsConsistencyPageContent', () => {
 			const importJobs = [
 				buildImportJob({ day_stats_refresh_status: 'failed' })
 			];
-			render(<StatsConsistencyPageContent data={{ importJobs }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
+				/>
+			);
 			const cell = getCellByHeading('day', 0);
 			const button = within(cell).getByRole('button') as HTMLButtonElement;
 
@@ -219,7 +267,11 @@ describe('StatsConsistencyPageContent', () => {
 				}),
 				buildImportJob({ id: 2, day_stats_refresh_status: 'failed' })
 			];
-			render(<StatsConsistencyPageContent data={{ importJobs }} />);
+			render(
+				<StatsConsistencyPageContent
+					data={{ importJobs, eagerDiscrepancies: {}, speciesNamesById: {} }}
+				/>
+			);
 
 			const dayCellRow0 = getCellByHeading('day', 0);
 			const monthCellRow0 = getCellByHeading('month', 0);
