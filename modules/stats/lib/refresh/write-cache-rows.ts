@@ -4,8 +4,8 @@ import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { MergedCellKey, FailedRefreshRow } from '../../types';
 import { runStatsCacheDbCall } from './db-call-logging';
 
-/** The `time_period` the cache tables use for the all-time grain (NOT NULL column; metric RPCs emit a real NULL instead) — see this module's CLAUDE.md. */
-const ALL_TIME_SENTINEL_DATE = '0001-01-01';
+/** The `time_period` the cache tables use for the all-time grain (NOT NULL column; metric RPCs emit a real NULL instead) — see this module's CLAUDE.md. Exported so `findSimpleStatsCacheDiscrepancies` can reverse the conversion rather than re-guessing the literal. */
+export const ALL_TIME_SENTINEL_DATE = '0001-01-01';
 
 /** `SimpleStatsCacheBySpecies`' sole unique constraint — keep in sync **by hand** with its schema file. */
 const BY_SPECIES_CONFLICT_TARGET =

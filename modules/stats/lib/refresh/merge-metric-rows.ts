@@ -40,11 +40,13 @@ export function filterToTouchedSpecies<Row extends MergedCellKey>(
 	);
 }
 
+/** The `(species_id, time_period)` key convention every cell lookup in this module shares. */
 function cellKey(speciesId: number | null, timePeriod: string | null): string {
 	return `${speciesId ?? 'null'}::${timePeriod ?? 'null'}`;
 }
 
-function indexByCell<
+/** Indexes rows by `cellKey`. Exported so `findSimpleStatsCacheDiscrepancies` matches live against cached rows on exactly this convention rather than re-deriving it. */
+export function indexByCell<
 	Row extends { species_id: number | null; time_period: string | null }
 >(rows: Row[]): Map<string, Row> {
 	const index = new Map<string, Row>();
