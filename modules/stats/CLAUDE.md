@@ -21,7 +21,9 @@ cache tables"). Three concerns live here:
   "Manual regenerate events" below.
 - **Refresh** (`lib/refresh/`) — the queue consumer side: `refreshSimpleStatsCache` reads the four
   `stats_cache_*_metrics` RPCs, merges their per-cell rows, and writes the result back to the cache
-  tables. See "The refresh pipeline" below.
+  tables. See "The refresh pipeline" below. Its read-only sibling,
+  `findSimpleStatsCacheDiscrepancies`, reuses the same building blocks to *compare* rather than
+  write — see "Finding cache discrepancies" below.
 
 `StatsTemporalUnit` — the 5-value temporal-unit vocabulary (`day`/`month`/`year`/
 `month-squashed`/`all-time`) — is **not** this module's type and is neither defined nor
@@ -43,7 +45,7 @@ both `Exclude<StatsTemporalUnit, 'all-time'>` for exactly that reason.
 `browser.ts` re-exports only the client-safe surface (`types`, `readStatsCacheRows`,
 `globalStatsCacheFetchPool`, `StatsCacheFetchPool`); `index.ts` re-exports everything `browser.ts`
 does plus `dispatchStatsCacheRefreshEvents`/`dispatchManualStatsCacheRegenerateEvent`/
-`refreshSimpleStatsCache`, which pull in
+`refreshSimpleStatsCache`/`findSimpleStatsCacheDiscrepancies`, which pull in
 `@vercel/queue` and the full `lib/refresh/` pipeline and so are server-only.
 `runSimpleStatsCacheRefreshPass` (the single-pass half `refreshSimpleStatsCache` calls twice) has
 no external caller and isn't re-exported from either barrel — module-internal only.
@@ -80,7 +82,9 @@ modules/stats/
       run-refresh-pass.ts  # runSimpleStatsCacheRefreshPass / refreshSimpleStatsCache — the
                             # orchestrator, including the one Sessions.visit_date preflight query
                             # day-unit batching needs (fetchGroupSessionDates — no file of its
-                            # own, it has exactly one caller)
+                            # own, exported for the discrepancy finder's identical preflight)
+      find-cache-discrepancies.ts  # findSimpleStatsCacheDiscrepancies — the read-only
+                                   # comparator sibling of run-refresh-pass.ts; see below
 ```
 
 ## Manual regenerate events (#1379)
@@ -179,6 +183,45 @@ it has no such column), and writes are chunked and issued sequentially, matching
 `modules/demon-import`'s `DemonRecordsBatchWriter` chaining precedent. Dead-lettering happens after the
 cache write (a logging failure must never cost the refresh) and is never narrowed to the touched
 periods — a missing cell is a real anomaly regardless of which period it's in.
+
+## Finding cache discrepancies (#1389)
+
+`findSimpleStatsCacheDiscrepancies` (`lib/refresh/find-cache-discrepancies.ts`) is the refresh
+pipeline's **read-only sibling**: same scope in, same four metric RPCs, same merge — but instead
+of writing the merged cells it reads the materialized cache back via `readStatsCacheRows` and
+diffs the two sides, returning only the cells that actually disagree (a
+`StatsCacheDiscrepancy[]`). It writes nothing: no cache rows, no `FailedStatsCacheRefreshes`
+dead-letters. Its body is deliberately `runSimpleStatsCacheRefreshPass`'s body shape with the
+write swapped for a second read, so the two stay easy to diff against each other by eye. Four
+things worth knowing:
+
+- **The sentinel-date reversal is the one piece of real logic here.** The metric RPCs emit a real
+  `NULL` `time_period` for the `all-time` grain, and `write-cache-rows.ts` converts it to the
+  `0001-01-01` `ALL_TIME_SENTINEL_DATE` the NOT-NULL cache columns need. Reading the cache back
+  therefore has to convert it *back* to `null` before keying, or every `all-time` cell would
+  spuriously fail to match its live counterpart (`null` vs `'0001-01-01'`) and the function would
+  report the entire grain as discrepant. The all-species table's absent `species_id` column is
+  normalized the same way, to the explicit `null` its non-species-grouped RPC calls return.
+- **It does not invent a "give me every period that exists" mode.** Like
+  `RefreshSimpleStatsCacheParams`, `FindStatsCacheDiscrepanciesParams`' `periods` is
+  required/non-empty for every narrowing temporal unit and ignored entirely for `all-time`; an
+  empty `periods` for a narrowing unit short-circuits to `[]` with no RPC calls at all. Working
+  out the full set of periods a whole-history report should walk is the orchestrating caller's
+  concern (e.g. reading distinct `time_period`s already cached, or driving it off the same
+  `periods` an import would have touched) — keeping it out of here avoids guessing at a UI
+  concern.
+- **Both sides are narrowed with the same two helpers** (`filterToTouchedPeriods`,
+  `filterToTouchedSpecies`) so live and cached rows match on identical semantics, and matching
+  itself reuses `merge-metric-rows.ts`' own `indexByCell` (and so its private `cellKey`) rather
+  than re-deriving the `${species_id}::${time_period}` format. Species narrowing applies only to the
+  species-grouped comparison, exactly as the write path does it — the all-species-combined table
+  has no `species_id` to narrow on (see `RefreshSpeciesNarrowing`), so applying it there would
+  silently filter *both* sides to empty and report no discrepancies at all.
+- **`mismatchedFields` is derived from the live row's own keys**, minus the two `MergedCellKey`
+  columns — never a hand-maintained field list, so it can't drift from
+  `mergeSimpleMetricRows`' column set. It's empty for a presence mismatch (one side `null`),
+  which is still reported as a discrepancy rather than dropped; a cell present and identical on
+  both sides is never in the result.
 
 ## Testing
 
