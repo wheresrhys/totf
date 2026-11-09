@@ -418,7 +418,7 @@ describe('StatsCacheDiscrepanciesReport', () => {
 			expect(within(section).getByRole('row', { name: /Live/ })).toBeTruthy();
 		});
 
-		it('applies the mismatch style only to columns where the two rows actually differ', async () => {
+		it('applies the mismatch style to the one mismatched column it renders', async () => {
 			const section = await renderExpanded();
 
 			const cachedCells = within(
@@ -428,11 +428,30 @@ describe('StatsCacheDiscrepanciesReport', () => {
 				within(section).getByRole('row', { name: /Live/ })
 			).getAllByRole('cell');
 
-			// session_count is the first (mismatched) column, bird_count the second (matching) one.
+			// bird_count tallies (10 on both sides) and is dropped entirely, so
+			// session_count is the only rendered column.
+			expect(cachedCells).toHaveLength(1);
+			expect(liveCells).toHaveLength(1);
 			expect(cachedCells[0].className).toContain('text-error');
 			expect(liveCells[0].className).toContain('text-error');
-			expect(cachedCells[1].className).not.toContain('text-error');
-			expect(liveCells[1].className).not.toContain('text-error');
+		});
+
+		it('omits a column from the table entirely when its cached and live values tally', async () => {
+			const section = await renderExpanded();
+
+			expect(
+				within(section).queryByRole('columnheader', { name: 'bird_count' })
+			).toBeNull();
+			expect(
+				within(section).getByRole('columnheader', { name: 'session_count' })
+			).toBeTruthy();
+		});
+
+		it('wraps the comparison table in a horizontally-scrollable container', async () => {
+			const section = await renderExpanded();
+
+			const table = within(section).getByRole('table');
+			expect(table.parentElement?.className).toContain('overflow-x-auto');
 		});
 	});
 });

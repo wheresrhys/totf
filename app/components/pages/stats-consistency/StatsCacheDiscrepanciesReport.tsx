@@ -1,6 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AccordionItem, BoxyList, SecondaryHeading } from '@/modules/ui-kit';
+import {
+	AccordionItem,
+	BoxyList,
+	SecondaryHeading,
+	Table
+} from '@/modules/ui-kit';
 import {
 	fetchStatsCacheDiscrepancies,
 	type FetchStatsCacheDiscrepanciesResult
@@ -26,17 +31,6 @@ function DiscrepancyItemHeading({ model }: { model: DiscrepancyItemModel }) {
 	return <span>{model.label}</span>;
 }
 
-function discrepancyFieldNames(discrepancy: StatsCacheDiscrepancy): string[] {
-	const { cachedRow, liveRow } = discrepancy;
-	const keys = new Set([
-		...Object.keys(cachedRow ?? {}),
-		...Object.keys(liveRow ?? {})
-	]);
-	keys.delete('species_id');
-	keys.delete('time_period');
-	return [...keys];
-}
-
 function formatCellValue(
 	row: Record<string, unknown> | null,
 	field: string
@@ -48,12 +42,39 @@ function formatCellValue(
 	return value === null || value === undefined ? '—' : String(value);
 }
 
+// Only the columns where the two displayed values actually differ are worth
+// showing (per PR #1393 review) — a column where cached and live tally is
+// dropped from this row's table entirely, rather than rendered unstyled.
+// Comparing the *formatted* values (not the raw ones `mismatchedFields`
+// diffs) also gives a sensible answer for a presence mismatch (one side
+// `null`, `mismatchedFields` empty by construction — see
+// `StatsCacheDiscrepancy`'s own doc comment): every field the present side
+// actually has a value for differs from the other side's blank '—', so it
+// stays; a field blank on both sides is dropped like any other tallying one.
+function discrepancyFieldNames(discrepancy: StatsCacheDiscrepancy): string[] {
+	const { cachedRow, liveRow } = discrepancy;
+	const keys = new Set([
+		...Object.keys(cachedRow ?? {}),
+		...Object.keys(liveRow ?? {})
+	]);
+	keys.delete('species_id');
+	keys.delete('time_period');
+	return [...keys].filter(
+		(field) =>
+			formatCellValue(cachedRow, field) !== formatCellValue(liveRow, field)
+	);
+}
+
 // One row for the cached value, one for the live-computed value — the
 // mismatch style (this app's existing `text-error` anomaly convention, e.g.
 // `TemporalFilterControls.tsx`/`TabContent.tsx`) applies only to a column
 // `mismatchedFields` actually names, not to every column of a presence
 // mismatch (whose `mismatchedFields` is empty by construction — see
-// `StatsCacheDiscrepancy`'s own doc comment).
+// `StatsCacheDiscrepancy`'s own doc comment). The table itself wraps in
+// `modules/ui-kit`'s `Table`, which scrolls horizontally
+// (`overflow-x-auto`) instead of overflowing the page — this repo's
+// existing wide-table convention (also used by `DesignSystem.tsx`'s other
+// callers).
 function DiscrepancyItemContent({ model }: { model: DiscrepancyItemModel }) {
 	const { cachedRow, liveRow, mismatchedFields } = model.discrepancy;
 	const fieldNames = discrepancyFieldNames(model.discrepancy);
@@ -76,8 +97,12 @@ function DiscrepancyItemContent({ model }: { model: DiscrepancyItemModel }) {
 		);
 	}
 
+	if (fieldNames.length === 0) {
+		return <p>No column-level differences to show.</p>;
+	}
+
 	return (
-		<table className="table table-xs sm:table-md">
+		<Table>
 			<thead>
 				<tr>
 					<th scope="col"></th>
@@ -92,7 +117,7 @@ function DiscrepancyItemContent({ model }: { model: DiscrepancyItemModel }) {
 				{row('Cached', cachedRow)}
 				{row('Live', liveRow)}
 			</tbody>
-		</table>
+		</Table>
 	);
 }
 
