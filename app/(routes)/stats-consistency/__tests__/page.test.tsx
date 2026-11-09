@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import Page from '../page';
 import { fetchOwnGroupImportJobs } from '@/app/actions/import-jobs';
+import { fetchStatsCacheDiscrepancies } from '@/app/actions/stats-cache-discrepancies';
+import { fetchSpeciesNames } from '@/app/lib/global-nav-data';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 import type { OwnGroupImportJobRow } from '@/app/actions/import-jobs';
 
@@ -9,9 +11,26 @@ vi.mock('@/app/actions/import-jobs', () => ({
 	fetchOwnGroupImportJobs: vi.fn()
 }));
 
+vi.mock('@/app/actions/stats-cache-discrepancies', () => ({
+	fetchStatsCacheDiscrepancies: vi.fn()
+}));
+
+vi.mock('@/app/lib/global-nav-data', () => ({
+	fetchSpeciesNames: vi.fn()
+}));
+
+vi.mock('@/app/lib/auth/group-auth', () => ({
+	getAuthenticatedSupabaseClient: vi.fn().mockResolvedValue({})
+}));
+
 describe('stats consistency page', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(fetchStatsCacheDiscrepancies).mockResolvedValue({
+			success: true,
+			discrepancies: []
+		});
+		vi.mocked(fetchSpeciesNames).mockResolvedValue([]);
 	});
 
 	afterEach(() => {

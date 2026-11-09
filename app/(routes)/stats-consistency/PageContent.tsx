@@ -9,9 +9,11 @@ import {
 	temporalUnitNameMapping,
 	type StatsTemporalUnit
 } from '@/app/models/temporal-unit';
+import { StatsCacheDiscrepanciesReport } from '@/app/components/pages/stats-consistency/StatsCacheDiscrepanciesReport';
 
 export type StatsConsistencyPageData = {
 	importJobs: OwnGroupImportJobRow[];
+	speciesNamesById: Record<number, string>;
 };
 
 // One entry per ImportJobs.*_stats_refresh_status column, naming the
@@ -157,6 +159,7 @@ export function StatsConsistencyPageContent({
 					</tbody>
 				</Table>
 			)}
+			<StatsCacheDiscrepanciesReport speciesNamesById={data.speciesNamesById} />
 		</PageWrapper>
 	);
 }

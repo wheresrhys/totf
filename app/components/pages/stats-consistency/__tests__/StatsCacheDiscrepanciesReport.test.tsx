@@ -1,0 +1,457 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+	render,
+	screen,
+	cleanup,
+	fireEvent,
+	waitFor,
+	within,
+	act
+} from '@testing-library/react';
+import { StatsCacheDiscrepanciesReport } from '../StatsCacheDiscrepanciesReport';
+import {
+	fetchStatsCacheDiscrepancies,
+	type FetchStatsCacheDiscrepanciesParams
+} from '@/app/actions/stats-cache-discrepancies';
+import type { FetchStatsCacheDiscrepanciesResult } from '@/app/actions/stats-cache-discrepancies';
+import {
+	DISCREPANCY_SCOPES,
+	EAGER_DISCREPANCY_SCOPES,
+	discrepancyScopeKey,
+	discrepancyScopeHeading,
+	type DiscrepancyScope
+} from '../discrepancy-scopes';
+import type { StatsCacheDiscrepancy } from '@/modules/stats';
+
+vi.mock('@/app/actions/stats-cache-discrepancies', () => ({
+	fetchStatsCacheDiscrepancies: vi.fn()
+}));
+
+// A hand-built discrepancy fixture filling in only the columns these tests
+// actually read, not a full `SimpleMergedCell` — the documented exception to
+// the "try `as Type` first" rule (see app/CLAUDE.md's testing conventions).
+type DiscrepancyFixtureOverrides = {
+	species_id?: number | null;
+	time_period?: string | null;
+	cachedRow?: Record<string, unknown> | null;
+	liveRow?: Record<string, unknown> | null;
+	mismatchedFields?: string[];
+};
+
+function buildDiscrepancy(
+	overrides: DiscrepancyFixtureOverrides = {}
+): StatsCacheDiscrepancy {
+	// eslint-disable-next-line no-restricted-syntax -- hand-built fixture filling in only the columns these tests read
+	return {
+		species_id: null,
+		time_period: '2026-01-01',
+		cachedRow: { session_count: 5 },
+		liveRow: { session_count: 7 },
+		mismatchedFields: ['session_count'],
+		...overrides
+	} as unknown as StatsCacheDiscrepancy;
+}
+
+/**
+ * Routes the mocked `fetchStatsCacheDiscrepancies` to a per-scope result,
+ * keyed by `discrepancyScopeKey` — every scope not named in `overrides`
+ * defaults to "no discrepancies found". The report now resolves its own
+ * eager scopes by calling this same action client-side (one at a time,
+ * after mount) rather than taking a pre-fetched prop, so every test that
+ * cares about a specific scope's result routes it through here instead of
+ * building a `DiscrepancyScopeResults` object to pass as a prop.
+ */
+function mockScopedResults(
+	overrides: Partial<Record<string, FetchStatsCacheDiscrepanciesResult>> = {}
+) {
+	vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+		async (params: FetchStatsCacheDiscrepanciesParams) => {
+			const key = discrepancyScopeKey({
+				temporalUnit: params.temporalUnit,
+				bySpecies: params.bySpecies
+			});
+			return overrides[key] ?? { success: true, discrepancies: [] };
+		}
+	);
+}
+
+function renderReport(
+	overrides: {
+		speciesNamesById?: Record<number, string>;
+	} = {}
+) {
+	return render(
+		<StatsCacheDiscrepanciesReport
+			speciesNamesById={overrides.speciesNamesById ?? {}}
+		/>
+	);
+}
+
+function getScopeSection(scope: DiscrepancyScope) {
+	return screen.getByTestId(`discrepancy-scope-${discrepancyScopeKey(scope)}`);
+}
+
+function withResult(
+	scope: DiscrepancyScope,
+	result: FetchStatsCacheDiscrepanciesResult
+): Partial<Record<string, FetchStatsCacheDiscrepanciesResult>> {
+	return { [discrepancyScopeKey(scope)]: result };
+}
+
+describe('StatsCacheDiscrepanciesReport', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockScopedResults();
+	});
+
+	afterEach(() => {
+		cleanup();
+	});
+
+	// Every test below mounts the full report, which unconditionally kicks off
+	// its 6 eager-scope fetches on mount. A test asserting pre-resolution state
+	// (e.g. the "Checking…" loading text) has to check that *before* letting
+	// the chain settle; `flushEagerFetches` drains it afterwards so the
+	// resulting state updates happen inside `waitFor`'s act()-wrapped polling
+	// rather than leaking out after the test body returns (which is what
+	// produces a "not wrapped in act(...)" warning for an update React can
+	// genuinely no longer attribute to anything the test is still watching).
+	async function flushEagerFetches() {
+		await waitFor(() => {
+			expect(fetchStatsCacheDiscrepancies).toHaveBeenCalledTimes(
+				EAGER_DISCREPANCY_SCOPES.length
+			);
+		});
+	}
+
+	describe('scope ordering', () => {
+		it('renders the 10 scopes in all-time, year, month-squashed, month, day order, combined pass then by-species pass', async () => {
+			renderReport();
+
+			const headings = screen
+				.getAllByRole('heading', { level: 3 })
+				.map((heading) => heading.textContent);
+
+			expect(headings).toEqual(DISCREPANCY_SCOPES.map(discrepancyScopeHeading));
+
+			await flushEagerFetches();
+		});
+	});
+
+	describe('eager scopes (all-time, year, month-squashed)', () => {
+		it('shows a loading state before the client-side check resolves', async () => {
+			const scope: DiscrepancyScope = {
+				temporalUnit: 'year',
+				bySpecies: false
+			};
+			renderReport();
+
+			expect(
+				within(getScopeSection(scope)).getByText('Checking…')
+			).toBeTruthy();
+
+			await flushEagerFetches();
+		});
+
+		it('renders their discrepancies once the client-side check resolves, with no trigger button', async () => {
+			const scope: DiscrepancyScope = {
+				temporalUnit: 'year',
+				bySpecies: false
+			};
+			mockScopedResults(
+				withResult(scope, {
+					success: true,
+					discrepancies: [buildDiscrepancy({ time_period: '2026-01-01' })]
+				})
+			);
+			renderReport();
+
+			const section = getScopeSection(scope);
+			await waitFor(() => {
+				expect(
+					within(section).getByText('discrepancies found for year stats 2026')
+				).toBeTruthy();
+			});
+			expect(
+				within(section).queryByRole('button', { name: 'Run check' })
+			).toBeNull();
+		});
+
+		it('renders "no discrepancies found" for a scope with none', async () => {
+			const scope: DiscrepancyScope = {
+				temporalUnit: 'all-time',
+				bySpecies: false
+			};
+			renderReport();
+
+			await waitFor(() => {
+				expect(
+					within(getScopeSection(scope)).getByText('No discrepancies found')
+				).toBeTruthy();
+			});
+		});
+
+		it('runs the 6 eager scopes one at a time, never firing the next before the previous resolves', async () => {
+			const resolvers: Array<
+				(result: FetchStatsCacheDiscrepanciesResult) => void
+			> = [];
+			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+				() =>
+					new Promise((resolve) => {
+						resolvers.push(resolve);
+					})
+			);
+
+			renderReport();
+
+			for (
+				let expectedCalls = 1;
+				expectedCalls <= EAGER_DISCREPANCY_SCOPES.length;
+				expectedCalls++
+			) {
+				await waitFor(() => {
+					expect(fetchStatsCacheDiscrepancies).toHaveBeenCalledTimes(
+						expectedCalls
+					);
+				});
+				// No call beyond this one has fired yet — proves series, not parallel.
+				expect(resolvers).toHaveLength(expectedCalls);
+				await act(async () => {
+					resolvers[expectedCalls - 1]({ success: true, discrepancies: [] });
+				});
+			}
+		});
+
+		it('calls each eager scope with only its temporalUnit/bySpecies, no periods/speciesIds', async () => {
+			renderReport();
+
+			await waitFor(() => {
+				expect(fetchStatsCacheDiscrepancies).toHaveBeenCalledTimes(
+					EAGER_DISCREPANCY_SCOPES.length
+				);
+			});
+			EAGER_DISCREPANCY_SCOPES.forEach((scope) => {
+				expect(fetchStatsCacheDiscrepancies).toHaveBeenCalledWith({
+					temporalUnit: scope.temporalUnit,
+					bySpecies: scope.bySpecies
+				});
+			});
+		});
+	});
+
+	describe('lazy scopes (month, day)', () => {
+		it('renders a "Run check" trigger instead of discrepancies on first render', async () => {
+			const scope: DiscrepancyScope = {
+				temporalUnit: 'month',
+				bySpecies: false
+			};
+			renderReport();
+
+			const section = getScopeSection(scope);
+			expect(
+				within(section).getByRole('button', { name: 'Run check' })
+			).toBeTruthy();
+			expect(within(section).queryByText('No discrepancies found')).toBeNull();
+
+			await flushEagerFetches();
+		});
+
+		it('calls the discrepancy-check action when the trigger is clicked', async () => {
+			const scope: DiscrepancyScope = { temporalUnit: 'day', bySpecies: false };
+			renderReport();
+
+			fireEvent.click(
+				within(getScopeSection(scope)).getByRole('button', {
+					name: 'Run check'
+				})
+			);
+
+			await waitFor(() => {
+				expect(fetchStatsCacheDiscrepancies).toHaveBeenCalledWith({
+					temporalUnit: 'day',
+					bySpecies: false
+				});
+			});
+		});
+
+		it('shows a loading state while the action is in flight, then renders its result', async () => {
+			let resolveFetch!: (result: FetchStatsCacheDiscrepanciesResult) => void;
+			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+				(params: FetchStatsCacheDiscrepanciesParams) => {
+					if (params.temporalUnit === 'month' && params.bySpecies) {
+						return new Promise((resolve) => {
+							resolveFetch = resolve;
+						});
+					}
+					return Promise.resolve({ success: true, discrepancies: [] });
+				}
+			);
+			const scope: DiscrepancyScope = {
+				temporalUnit: 'month',
+				bySpecies: true
+			};
+			renderReport();
+			const section = getScopeSection(scope);
+
+			fireEvent.click(
+				within(section).getByRole('button', { name: 'Run check' })
+			);
+
+			await waitFor(() => {
+				expect(within(section).getByText('Checking…')).toBeTruthy();
+			});
+
+			await act(async () => {
+				resolveFetch({ success: true, discrepancies: [] });
+			});
+
+			await waitFor(() => {
+				expect(
+					within(section).getByText('No discrepancies found')
+				).toBeTruthy();
+			});
+		});
+	});
+
+	describe('discrepancy list item labelling', () => {
+		it('labels a combined-scope item with its temporal unit and period, no species suffix', async () => {
+			const scope: DiscrepancyScope = {
+				temporalUnit: 'month',
+				bySpecies: false
+			};
+			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+				(params: FetchStatsCacheDiscrepanciesParams) => {
+					if (params.temporalUnit === 'month' && !params.bySpecies) {
+						return Promise.resolve({
+							success: true,
+							discrepancies: [
+								buildDiscrepancy({
+									time_period: '2026-01-01',
+									species_id: null
+								})
+							]
+						});
+					}
+					return Promise.resolve({ success: true, discrepancies: [] });
+				}
+			);
+			renderReport();
+			const section = getScopeSection(scope);
+
+			fireEvent.click(
+				within(section).getByRole('button', { name: 'Run check' })
+			);
+
+			await waitFor(() => {
+				expect(
+					within(section).getByText(
+						'discrepancies found for month stats January 2026'
+					)
+				).toBeTruthy();
+			});
+		});
+
+		it('labels a by-species-scope item with a "for species <name>" suffix', async () => {
+			const scope: DiscrepancyScope = {
+				temporalUnit: 'month',
+				bySpecies: true
+			};
+			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+				(params: FetchStatsCacheDiscrepanciesParams) => {
+					if (params.temporalUnit === 'month' && params.bySpecies) {
+						return Promise.resolve({
+							success: true,
+							discrepancies: [
+								buildDiscrepancy({ time_period: '2026-01-01', species_id: 42 })
+							]
+						});
+					}
+					return Promise.resolve({ success: true, discrepancies: [] });
+				}
+			);
+			renderReport({ speciesNamesById: { 42: 'Blackcap' } });
+			const section = getScopeSection(scope);
+
+			fireEvent.click(
+				within(section).getByRole('button', { name: 'Run check' })
+			);
+
+			await waitFor(() => {
+				expect(
+					within(section).getByText(
+						'discrepancies found for month stats January 2026 for species Blackcap'
+					)
+				).toBeTruthy();
+			});
+		});
+	});
+
+	describe('expanded discrepancy detail', () => {
+		const scope: DiscrepancyScope = {
+			temporalUnit: 'all-time',
+			bySpecies: false
+		};
+		const discrepancy = buildDiscrepancy({
+			time_period: null,
+			cachedRow: { session_count: 5, bird_count: 10 },
+			liveRow: { session_count: 7, bird_count: 10 },
+			mismatchedFields: ['session_count']
+		});
+
+		async function renderExpanded() {
+			mockScopedResults(
+				withResult(scope, { success: true, discrepancies: [discrepancy] })
+			);
+			renderReport();
+			const section = getScopeSection(scope);
+			await waitFor(() => {
+				expect(within(section).getByRole('button')).toBeTruthy();
+			});
+			fireEvent.click(within(section).getByRole('button'));
+			return section;
+		}
+
+		it('renders one row for the cached value and one row for the live-computed value', async () => {
+			const section = await renderExpanded();
+
+			expect(within(section).getByRole('row', { name: /Cached/ })).toBeTruthy();
+			expect(within(section).getByRole('row', { name: /Live/ })).toBeTruthy();
+		});
+
+		it('applies the mismatch style to the one mismatched column it renders', async () => {
+			const section = await renderExpanded();
+
+			const cachedCells = within(
+				within(section).getByRole('row', { name: /Cached/ })
+			).getAllByRole('cell');
+			const liveCells = within(
+				within(section).getByRole('row', { name: /Live/ })
+			).getAllByRole('cell');
+
+			// bird_count tallies (10 on both sides) and is dropped entirely, so
+			// session_count is the only rendered column.
+			expect(cachedCells).toHaveLength(1);
+			expect(liveCells).toHaveLength(1);
+			expect(cachedCells[0].className).toContain('text-error');
+			expect(liveCells[0].className).toContain('text-error');
+		});
+
+		it('omits a column from the table entirely when its cached and live values tally', async () => {
+			const section = await renderExpanded();
+
+			expect(
+				within(section).queryByRole('columnheader', { name: 'bird_count' })
+			).toBeNull();
+			expect(
+				within(section).getByRole('columnheader', { name: 'session_count' })
+			).toBeTruthy();
+		});
+
+		it('wraps the comparison table in a horizontally-scrollable container', async () => {
+			const section = await renderExpanded();
+
+			const table = within(section).getByRole('table');
+			expect(table.parentElement?.className).toContain('overflow-x-auto');
+		});
+	});
+});
