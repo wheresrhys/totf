@@ -27,8 +27,8 @@ import {
  * design (narrowing rules, merge/anomaly handling, write mechanics).
  */
 
-/** Every distinct `Sessions.visit_date` the group has, sorted ascending — the real-date domain `batchPeriodsBySessionDateSpan` indexes `day` periods into. */
-async function fetchGroupSessionDates(
+/** Every distinct `Sessions.visit_date` the group has, sorted ascending — the real-date domain `batchPeriodsBySessionDateSpan` indexes `day` periods into. Also the `day` preflight `findSimpleStatsCacheDiscrepancies` needs. */
+export async function fetchGroupSessionDates(
 	supabaseClient: SupabaseClient,
 	groupId: number
 ): Promise<string[]> {

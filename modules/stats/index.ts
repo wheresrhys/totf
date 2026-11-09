@@ -5,3 +5,4 @@ export {
 	requestManualStatsCacheRegenerate
 } from './lib/dispatch-stats-cache-events';
 export { refreshSimpleStatsCache } from './lib/refresh/run-refresh-pass';
+export { findSimpleStatsCacheDiscrepancies } from './lib/refresh/find-cache-discrepancies';
