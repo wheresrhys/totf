@@ -32,7 +32,11 @@ modules/ui-kit/
               # modules/stats-view's StatsTableBody.tsx/StatsTableColumnConfigs.tsx, which
               # import them directly from this module's barrel rather than redefining them
   lib/
-    Accordion.tsx                 # AccordionItem — single collapsible row, expand/collapse only
+    Accordion.tsx                 # AccordionItem — single collapsible row; its optional
+                                   # `actions` node renders as a *sibling* of the
+                                   # expand/collapse button (interactive content can't nest
+                                   # inside a button), for per-row controls that must stay
+                                   # clickable without toggling the row (#1390)
     AccordionTableBody.tsx        # AccordionTableBody — <tbody> wiring an AccordionItem per row
     ConditionalTabPanel.tsx       # ConditionalTabPanel — lazy-mounts a tab's content once loaded
     DesignSystem.tsx              # Page/heading/list/table primitives (PageWrapper,

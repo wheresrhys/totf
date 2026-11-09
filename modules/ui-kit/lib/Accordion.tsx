@@ -17,7 +17,8 @@ export function AccordionItem<ItemModel>({
 	HeadingComponent,
 	ContentComponent,
 	testId,
-	icon
+	icon,
+	actions
 }: {
 	id: string;
 	model: ItemModel;
@@ -27,6 +28,13 @@ export function AccordionItem<ItemModel>({
 	ContentComponent: ContentComponent<ItemModel>;
 	testId?: string;
 	icon?: string;
+	/**
+	 * Optional per-row controls rendered as a *sibling* of the expand/collapse
+	 * button rather than inside it — interactive content can't be nested in a
+	 * button, and these must stay clickable without toggling the row (#1390's
+	 * per-row "fix" buttons are the first caller).
+	 */
+	actions?: React.ReactNode;
 }) {
 	async function onClick(isAlreadyExpanded: boolean) {
 		if (isAlreadyExpanded) {
@@ -41,7 +49,7 @@ export function AccordionItem<ItemModel>({
 		: `icon-[tabler--chevron-left] ${isExpanded ? '-rotate-90' : ''} transition-transform duration-300 rtl:-rotate-180`;
 	return (
 		<li data-testid={testId}>
-			<div className="flex basis-full">
+			<div className="flex basis-full items-center gap-2">
 				<button
 					onClick={() => onClick(isExpanded)}
 					aria-controls={`${id}-content`}
@@ -52,6 +60,7 @@ export function AccordionItem<ItemModel>({
 					<HeadingComponent model={model} expandedId={expandedId} />
 					<span className={`size-5 shrink-0 ${iconStyles}`}></span>
 				</button>
+				{actions && <div className="shrink-0">{actions}</div>}
 			</div>
 			<div
 				id={`${id}-content`}
