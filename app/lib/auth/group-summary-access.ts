@@ -3,7 +3,7 @@ import { endOfMonth, endOfYear, format, parseISO } from 'date-fns';
 import { getAuthenticatedSupabaseClient } from './group-auth';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
-import { readStatsCacheRows } from '@/modules/stats';
+import { readStatsCacheRows, type StatsCacheResult } from '@/modules/stats';
 import { readSpeciesNamesById } from '@/app/lib/species-names';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import {
@@ -320,25 +320,53 @@ type BasicSessionMetricsRpcRow = Pick<
 > & { species_id: number | null };
 
 /**
- * The 10 `core_stats_result` age-bucket columns (5 bird, 5 encounter)
- * `stats_cache_basic_session_metrics` does not produce — it carries none of
- * `core_stats`' age-dimension columns, only the basic-count and
- * session ones (see that RPC's own file header). Filled with a
- * placeholder `0` below rather than omitted, because `CoreStatsResult`
- * requires every column to be present — but nothing on this call path ever
- * reads them: the `/species` list page's rendered column set
- * (`speciesStatConfigs`, `modules/stats-view/lib/species-stats.ts`) is only
+ * Every cache-row column `stats_cache_basic_session_metrics` does not produce,
+ * with the placeholder this path fills it with. The RPC carries only the
+ * basic-count and session columns (see its own file header), so 22 of a cache
+ * row's 32 columns have to come from somewhere — they are filled rather than
+ * omitted, because a stats-result row requires every column to be present and
+ * `Partial<>`-ing them would push `undefined` handling into every deriver,
+ * table and chart that reads them unconditionally.
+ *
+ * Three groups, with two different placeholder values (#1372):
+ *
+ * - **The 10 age buckets** (5 bird, 5 encounter) → `0`. Recovering a real value
+ *   means two more RPC calls, `stats_cache_bird_age_metrics` and
+ *   `stats_cache_encounter_age_metrics`, merged by `species_id` the way
+ *   `modules/stats/lib/refresh/merge-metric-rows.ts` does for the cache write.
+ * - **The 4 young/postjuv transition counts** (`new_young_bird_count`,
+ *   `new_postjuv_enc_count`, `new_postjuv_juv_enc_count`,
+ *   `postjuv_juv_enc_count`) → `0`, recoverable from the same two age-metric
+ *   RPCs as the buckets above, since that is where the cache refresh sources
+ *   them.
+ * - **The 8 wing/weight columns** → `null`, not `0`. These are the only
+ *   nullable columns on either cache table, precisely so "nothing
+ *   biometric-eligible was measured for this cell" is representable, and a `0`
+ *   would read as a bird that weighed nothing. Recovering a real value means a
+ *   `stats_cache_biometrics_metrics` call for the same window — exactly what
+ *   `app/actions/spp-data.ts`'s arbitrary-window fallback already does for the
+ *   biometrics half of the `/species` list page, merged onto these rows by
+ *   `species_id` (#1415). It is deliberately not done *here*: this function
+ *   serves every `fetchAuthorisedCoreStats` caller, most of which never render
+ *   a wing/weight column, and issuing the extra RPC for all of them would make
+ *   every arbitrary-window read pay for one page's columns.
+ *
+ * **Nothing on this call path reads any of the 22 today.** The `/species` list
+ * page's rendered column set (`speciesStatConfigs`,
+ * `modules/stats-view/lib/species-stats.ts`) is only
  * `species_name`/`bird_count`/`encounter_count`/`session_count`/
  * `max_per_session` plus the separately-sourced biometric columns, and
- * `hasVisibleData` below reads only `encounter_count`. If a future caller
- * ever needs a real age-bucket value for an arbitrary (non-cache-aligned)
- * window, this placeholder has to be replaced with two more RPC calls
- * (`stats_cache_bird_age_metrics`/`stats_cache_encounter_age_metrics`, merged
- * by `species_id` the way `modules/stats/lib/refresh/merge-metric-rows.ts`
- * does for the cache write) — don't start reading a real value out of these
- * columns on this path without doing that first.
+ * `hasVisibleData` below reads only `encounter_count` — a column the RPC
+ * genuinely produces, so its zero-check is unaffected by any of this. Don't
+ * start reading a real value out of one of these columns on this path without
+ * making the corresponding call above first.
+ *
+ * The `satisfies` target is derived rather than a hand-listed column union, so
+ * this const cannot silently fall behind the cache tables: a column added to
+ * `SimpleStatsCache` that the RPC doesn't produce fails to compile here until a
+ * placeholder is chosen for it.
  */
-const UNAVAILABLE_AGE_BUCKET_COLUMNS = {
+const UNAVAILABLE_COLUMN_PLACEHOLDERS = {
 	pullus_bird_count: 0,
 	juv_bird_count: 0,
 	postjuv_bird_count: 0,
@@ -348,19 +376,22 @@ const UNAVAILABLE_AGE_BUCKET_COLUMNS = {
 	juv_enc_count: 0,
 	postjuv_enc_count: 0,
 	adult_enc_count: 0,
-	unknown_age_enc_count: 0
-} satisfies Pick<
-	CoreStatsResult,
-	| 'pullus_bird_count'
-	| 'juv_bird_count'
-	| 'postjuv_bird_count'
-	| 'adult_bird_count'
-	| 'unknown_age_bird_count'
-	| 'pullus_enc_count'
-	| 'juv_enc_count'
-	| 'postjuv_enc_count'
-	| 'adult_enc_count'
-	| 'unknown_age_enc_count'
+	unknown_age_enc_count: 0,
+	new_young_bird_count: 0,
+	new_postjuv_enc_count: 0,
+	new_postjuv_juv_enc_count: 0,
+	postjuv_juv_enc_count: 0,
+	max_weight: null,
+	avg_weight: null,
+	min_weight: null,
+	median_weight: null,
+	max_wing: null,
+	avg_wing: null,
+	min_wing: null,
+	median_wing: null
+} satisfies Omit<
+	StatsCacheResult,
+	keyof BasicSessionMetricsRpcRow | 'species_name'
 >;
 
 /**
@@ -382,6 +413,12 @@ const UNAVAILABLE_AGE_BUCKET_COLUMNS = {
  * `null` when `group_by_species` wasn't set, matching `core_stats`' own
  * behaviour. The `species_id` it was resolved from is kept on the row rather
  * than discarded — see `AuthorisedStatsRow`.
+ *
+ * Every other column a cache row carries is filled from
+ * `UNAVAILABLE_COLUMN_PLACEHOLDERS` above, so a row off this path has the same
+ * key set as one off `runStatsCacheRead` — see that const for which columns
+ * those are, what each placeholder is, and what a caller must do before reading
+ * a real value out of one.
  */
 async function runLiveMetricsRecompute(
 	client: SupabaseClient,
@@ -409,7 +446,7 @@ async function runLiveMetricsRecompute(
 
 	return rows.map(({ species_id, ...basicMetrics }) => ({
 		...basicMetrics,
-		...UNAVAILABLE_AGE_BUCKET_COLUMNS,
+		...UNAVAILABLE_COLUMN_PLACEHOLDERS,
 		species_id,
 		species_name:
 			species_id === null ? null : (speciesNamesById.get(species_id) ?? null)
