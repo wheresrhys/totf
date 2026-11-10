@@ -8,7 +8,7 @@
 // before anything renders, and anything imported from a `'use client'` module
 // into a server module is a client reference rather than a plain value (see
 // `app/CLAUDE.md`'s "Where a page's tab ids live").
-import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 export const CORE_DATASET_TAB_ID = 'core';
 export const BIOMETRICS_DATASET_TAB_ID = 'biometrics';
@@ -27,14 +27,14 @@ export const COMPARISON_TABLE_TEST_ID = 'species-comparison-table';
 
 /**
  * The one `params` object `TabSet` hands to both dataset tabs. Neither tab has
- * a `dataFetcher`: `fetchSpeciesComparisonStats` already fetches both datasets
- * page-wide in a single call (see its own "fetched up front rather than per
- * dataset-toggle" rationale), so there is nothing left to fetch per tab and the
- * rows are threaded through here instead. `selectedSpecies` is the live
- * client-side pill selection, so switching tab keeps the current comparison.
+ * a `dataFetcher`: `fetchSpeciesComparisonStats` already fetches the page's
+ * whole dataset in a single call, so there is nothing left to fetch per tab and
+ * the rows are threaded through here instead. One `speciesStats` array serves
+ * both tabs (#1412) — they differ only in which columns of these same rows
+ * they render. `selectedSpecies` is the live client-side pill selection, so
+ * switching tab keeps the current comparison.
  */
 export type CompareSpeciesTabParams = {
-	coreStats: CoreStatsResult[];
-	biometricsStats: BiometricsStatsResult[];
+	speciesStats: StatsCacheBySpeciesResult[];
 	selectedSpecies: string[];
 };

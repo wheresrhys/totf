@@ -1,152 +1,67 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { BiometricsStatsResult, CoreStatsResult } from '@/app/models/db';
-import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
+import { ALPHA_CORE_STATS_BY_SPECIES } from '@/app/__tests__/helpers/core-stats-fixtures';
 import { fetchSpeciesComparisonStats } from '../compare-species';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
-const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
-	mockGetAuthenticatedSupabaseClient: vi.fn()
+const { mockReadStatsCacheRows } = vi.hoisted(() => ({
+	mockReadStatsCacheRows: vi.fn()
 }));
 
-vi.mock('@/app/lib/auth/group-auth', () => ({
-	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
+// `readStatsCacheRows` is the action's one collaborator, mocked at the module
+// barrel rather than reached past it (see `CLAUDE.md`'s module-boundary rule).
+vi.mock('@/modules/stats', () => ({
+	readStatsCacheRows: mockReadStatsCacheRows
 }));
 
 const GROUP_ID = 7;
 const viewedGroup: ViewedGroup = { id: GROUP_ID, slug: 'alpha' };
 
-// Hand-built `SimpleStatsCacheBySpecies` row, matching the retired
-// core_stats/biometrics_stats by-species fixtures' Blue Tit values (#1206) —
-// no cache-table snapshot fixture exists yet (see ticket #1206's "Out of
-// scope"), so this stands in for a group's cached all-time, by-species cell.
-// `time_period` is the cache tables' all-time sentinel date
-// (`modules/stats/stats-cache-refresh.ts`'s `ALL_TIME_SENTINEL_DATE`) rather than the
-// RPC's own literal `null` for this grain.
-const blueTitRow = {
-	species_id: 42,
-	time_period: '0001-01-01',
-	species: { species_name: 'Blue Tit' },
-	session_count: 4,
-	avg_encounters_per_session: 1.75,
-	max_per_session: 3,
-	species_count: 1,
-	bird_count: 6,
-	encounter_count: 7,
-	new_bird_count: 6,
-	pullus_bird_count: 0,
-	juv_bird_count: 0,
-	postjuv_bird_count: 5,
-	adult_bird_count: 0,
-	unknown_age_bird_count: 1,
-	pullus_enc_count: 0,
-	juv_enc_count: 0,
-	postjuv_enc_count: 6,
-	adult_enc_count: 1,
-	unknown_age_enc_count: 0,
-	max_new_per_session: 3,
-	max_weight: 13.1,
-	avg_weight: 11.2,
-	min_weight: 9.8,
-	median_weight: 10.8,
-	max_wing: 68,
-	avg_wing: 66.6,
-	min_wing: 65,
-	median_wing: 67
-};
+// Alpha's captured all-time by-species cache rows, which already carry both
+// metric families' columns (counts *and* the 8 wing/weight ones) on every row
+// — the shape the reader really returns.
+const [blueTitRow, fieldfareRow] = ALPHA_CORE_STATS_BY_SPECIES;
 
-const expectedCoreStatsRow: CoreStatsResult = {
-	species_name: 'Blue Tit',
-	time_period: '0001-01-01',
-	session_count: 4,
-	avg_encounters_per_session: 1.75,
-	max_per_session: 3,
-	species_count: 1,
-	bird_count: 6,
-	encounter_count: 7,
-	new_bird_count: 6,
-	pullus_bird_count: 0,
-	juv_bird_count: 0,
-	postjuv_bird_count: 5,
-	adult_bird_count: 0,
-	unknown_age_bird_count: 1,
-	pullus_enc_count: 0,
-	juv_enc_count: 0,
-	postjuv_enc_count: 6,
-	adult_enc_count: 1,
-	unknown_age_enc_count: 0,
-	max_new_per_session: 3
-};
-
-// The annotation here is load-bearing, not decoration: it is what pins
-// `toBiometricsStatsResult`'s output to `BiometricsStatsResult`'s full column
-// set — `encounter_count` included, the one column the replacement
-// `stats_cache_biometrics_metrics_result` composite lacks and the reason the
-// type is standalone rather than sourced from a Postgres composite (#1245).
-// Drop a column from the type and this object literal stops compiling.
-const expectedBiometricsRow: BiometricsStatsResult = {
-	species_name: 'Blue Tit',
-	time_period: '0001-01-01',
-	max_weight: 13.1,
-	avg_weight: 11.2,
-	min_weight: 9.8,
-	median_weight: 10.8,
-	max_wing: 68,
-	avg_wing: 66.6,
-	min_wing: 65,
-	median_wing: 67,
-	encounter_count: 7
-};
-
-function makeClient(rows: unknown[]) {
-	const { chain, record } = makeQueryChain(rows);
-	const from = vi.fn(() => chain);
-	mockGetAuthenticatedSupabaseClient.mockResolvedValue({ from });
-	return { chain, record, from };
-}
-
-describe('fetchSpeciesComparisonStats — fetches all three by-species datasets at once', () => {
+describe('fetchSpeciesComparisonStats', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mockReadStatsCacheRows.mockResolvedValue([]);
 	});
 
-	it('queries SimpleStatsCacheBySpecies filtered to the viewed group and the all-time temporal unit', async () => {
-		const { chain, from } = makeClient([blueTitRow]);
-
+	it('reads the by-species cache at the all-time grain for the viewed group', async () => {
 		await fetchSpeciesComparisonStats(viewedGroup);
 
-		expect(from).toHaveBeenCalledWith('SimpleStatsCacheBySpecies');
-		expect(chain.eq).toHaveBeenCalledWith('group_id', GROUP_ID);
-		expect(chain.eq).toHaveBeenCalledWith('temporal_unit', 'all-time');
-	});
-
-	it('returns each dataset under its own key, mapped from the same cache rows', async () => {
-		makeClient([blueTitRow]);
-
-		const stats = await fetchSpeciesComparisonStats(viewedGroup);
-
-		expect(stats).toEqual({
-			coreStats: [expectedCoreStatsRow],
-			biometricsStats: [expectedBiometricsRow]
+		expect(mockReadStatsCacheRows).toHaveBeenCalledTimes(1);
+		expect(mockReadStatsCacheRows).toHaveBeenCalledWith({
+			viewedGroup,
+			bySpecies: true,
+			temporalUnit: 'all-time'
 		});
 	});
 
-	it("resolves each row's species_name from the joined Species relation", async () => {
-		const fieldfareRow = {
-			...blueTitRow,
-			species_id: 99,
-			species: { species_name: 'Fieldfare' }
-		};
-		makeClient([blueTitRow, fieldfareRow]);
+	it('returns each cache row whole, with both metric families on it', async () => {
+		mockReadStatsCacheRows.mockResolvedValue([blueTitRow]);
 
-		const stats = await fetchSpeciesComparisonStats(viewedGroup);
+		const speciesStats = await fetchSpeciesComparisonStats(viewedGroup);
 
-		expect(stats.coreStats.map((row) => row.species_name)).toEqual([
-			'Blue Tit',
-			'Fieldfare'
+		expect(Array.isArray(speciesStats)).toBe(true);
+		expect(speciesStats).toHaveLength(1);
+		expect(speciesStats[0].species_name).toBe(blueTitRow.species_name);
+		expect(speciesStats[0].encounter_count).toBe(blueTitRow.encounter_count);
+		expect(speciesStats[0].avg_weight).toBe(blueTitRow.avg_weight);
+	});
+
+	it('returns every row the reader paginated, in the order it returned them', async () => {
+		mockReadStatsCacheRows.mockResolvedValue([fieldfareRow, blueTitRow]);
+
+		const speciesStats = await fetchSpeciesComparisonStats(viewedGroup);
+
+		expect(speciesStats.map((row) => row.species_name)).toEqual([
+			fieldfareRow.species_name,
+			blueTitRow.species_name
 		]);
-		expect(stats.biometricsStats.map((row) => row.species_name)).toEqual([
-			'Blue Tit',
-			'Fieldfare'
-		]);
+	});
+
+	it('returns an empty list when the group has no cached by-species rows', async () => {
+		expect(await fetchSpeciesComparisonStats(viewedGroup)).toEqual([]);
 	});
 });
