@@ -358,39 +358,10 @@ describe('StatsCacheDiscrepanciesReport', () => {
 			});
 		});
 
-		it('labels a by-species-scope item with a "for species <name>" suffix', async () => {
-			const scope: DiscrepancyScope = {
-				temporalUnit: 'month',
-				bySpecies: true
-			};
-			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
-				(params: FetchStatsCacheDiscrepanciesParams) => {
-					if (params.temporalUnit === 'month' && params.bySpecies) {
-						return Promise.resolve({
-							success: true,
-							discrepancies: [
-								buildDiscrepancy({ time_period: '2026-01-01', species_id: 42 })
-							]
-						});
-					}
-					return Promise.resolve({ success: true, discrepancies: [] });
-				}
-			);
-			renderReport({ speciesNamesById: { 42: 'Blackcap' } });
-			const section = getScopeSection(scope);
-
-			fireEvent.click(
-				within(section).getByRole('button', { name: 'Run check' })
-			);
-
-			await waitFor(() => {
-				expect(
-					within(section).getByText(
-						'discrepancies found for month stats January 2026 for species Blackcap'
-					)
-				).toBeTruthy();
-			});
-		});
+		// A by-species scope's own item labelling (species heading, suffix-free
+		// nested label) is covered by the 'hierarchical by-species grouping'
+		// describe block below, now that those items render nested under a
+		// species group rather than flat in this section.
 	});
 
 	describe('expanded discrepancy detail', () => {
@@ -469,8 +440,207 @@ describe('StatsCacheDiscrepanciesReport', () => {
 		});
 	});
 
+	describe('hierarchical by-species grouping', () => {
+		const scope: DiscrepancyScope = { temporalUnit: 'month', bySpecies: true };
+		const speciesNamesById: Record<number, string> = {
+			42: 'Blackcap',
+			43: 'Chiffchaff'
+		};
+
+		/** A species-group heading button's accessible name starts with its species label, followed by a "(<count>)" suffix — distinct from any nested period row's label, which never ends that way. */
+		const SPECIES_GROUP_HEADING_PATTERN = /\(\d+\)$/;
+
+		async function renderWithDiscrepancies(
+			discrepancies: StatsCacheDiscrepancy[]
+		) {
+			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+				(params: FetchStatsCacheDiscrepanciesParams) =>
+					Promise.resolve(
+						params.temporalUnit === scope.temporalUnit &&
+							params.bySpecies === scope.bySpecies
+							? { success: true, discrepancies }
+							: { success: true, discrepancies: [] }
+					)
+			);
+			renderReport({ speciesNamesById });
+			const section = getScopeSection(scope);
+			fireEvent.click(
+				within(section).getByRole('button', { name: 'Run check' })
+			);
+			await waitFor(() => {
+				expect(
+					within(section).getAllByRole('button', {
+						name: SPECIES_GROUP_HEADING_PATTERN
+					}).length
+				).toBeGreaterThan(0);
+			});
+			return section;
+		}
+
+		function speciesGroupButton(section: HTMLElement, speciesLabelPrefix: string) {
+			return within(section).getByRole('button', {
+				name: (accessibleName) => accessibleName.startsWith(speciesLabelPrefix)
+			});
+		}
+
+		it('renders one top-level item per distinct species, not one per discrepant cell', async () => {
+			const section = await renderWithDiscrepancies([
+				buildDiscrepancy({ time_period: '2026-01-01', species_id: 42 }),
+				buildDiscrepancy({ time_period: '2026-02-01', species_id: 42 }),
+				buildDiscrepancy({ time_period: '2026-01-01', species_id: 43 })
+			]);
+
+			expect(
+				within(section).getAllByRole('button', {
+					name: SPECIES_GROUP_HEADING_PATTERN
+				})
+			).toHaveLength(2);
+		});
+
+		it('labels each species group with its name and discrepancy count', async () => {
+			const section = await renderWithDiscrepancies([
+				buildDiscrepancy({ time_period: '2026-01-01', species_id: 42 }),
+				buildDiscrepancy({ time_period: '2026-02-01', species_id: 42 })
+			]);
+
+			expect(within(section).getByText('Blackcap (2)')).toBeTruthy();
+		});
+
+		it("falls back to 'species #<id>' when the id isn't in speciesNamesById", async () => {
+			const section = await renderWithDiscrepancies([
+				buildDiscrepancy({ time_period: '2026-01-01', species_id: 99 })
+			]);
+
+			expect(within(section).getByText('species #99 (1)')).toBeTruthy();
+		});
+
+		it('is collapsed by default, and its nested period rows start collapsed too once expanded', async () => {
+			const section = await renderWithDiscrepancies([
+				buildDiscrepancy({ time_period: '2026-01-01', species_id: 42 })
+			]);
+			const groupButton = speciesGroupButton(section, 'Blackcap');
+			const periodLabel = discrepancyItemLabel(
+				{ ...scope, bySpecies: false },
+				'2026-01-01',
+				null,
+				speciesNamesById
+			);
+
+			expect(groupButton.getAttribute('aria-expanded')).toBe('false');
+
+			fireEvent.click(groupButton);
+
+			// The nested level starts collapsed too — expanding the species group
+			// only reveals the period list, not that row's own detail.
+			expect(groupButton.getAttribute('aria-expanded')).toBe('true');
+			expect(
+				within(section)
+					.getByRole('button', { name: periodLabel })
+					.getAttribute('aria-expanded')
+			).toBe('false');
+		});
+
+		it('resets a species group’s nested expansion when a sibling species group is expanded instead', async () => {
+			const section = await renderWithDiscrepancies([
+				buildDiscrepancy({ time_period: '2026-01-01', species_id: 42 }),
+				buildDiscrepancy({ time_period: '2026-01-01', species_id: 43 })
+			]);
+			// Both species share the same period, so the nested row's own label
+			// is identical in each group — every lookup below is scoped to the
+			// owning species group's own `<li>`, not the whole section, to tell
+			// the two apart.
+			const periodLabel = discrepancyItemLabel(
+				{ ...scope, bySpecies: false },
+				'2026-01-01',
+				null,
+				speciesNamesById
+			);
+			function blackcapGroupItem() {
+				const item = speciesGroupButton(section, 'Blackcap').closest('li');
+				if (!item) {
+					throw new Error('No Blackcap group item rendered');
+				}
+				return item;
+			}
+
+			fireEvent.click(speciesGroupButton(section, 'Blackcap'));
+			fireEvent.click(
+				within(blackcapGroupItem()).getByRole('button', { name: periodLabel })
+			);
+			expect(
+				within(blackcapGroupItem())
+					.getByRole('button', { name: periodLabel })
+					.getAttribute('aria-expanded')
+			).toBe('true');
+
+			// Expanding Chiffchaff's group collapses Blackcap's (single-expand
+			// across species).
+			fireEvent.click(speciesGroupButton(section, 'Chiffchaff'));
+			expect(speciesGroupButton(section, 'Blackcap').getAttribute('aria-expanded')).toBe(
+				'false'
+			);
+
+			// Re-expanding Blackcap shows its nested row collapsed again, not
+			// still expanded from before.
+			fireEvent.click(speciesGroupButton(section, 'Blackcap'));
+			expect(
+				within(blackcapGroupItem())
+					.getByRole('button', { name: periodLabel })
+					.getAttribute('aria-expanded')
+			).toBe('false');
+		});
+
+		it('leaves a combined-scope (non-by-species) section rendering its flat per-cell list unchanged', async () => {
+			const combinedScope: DiscrepancyScope = {
+				temporalUnit: 'month',
+				bySpecies: false
+			};
+			vi.mocked(fetchStatsCacheDiscrepancies).mockImplementation(
+				(params: FetchStatsCacheDiscrepanciesParams) =>
+					Promise.resolve(
+						params.temporalUnit === 'month' && !params.bySpecies
+							? {
+									success: true,
+									discrepancies: [
+										buildDiscrepancy({
+											time_period: '2026-01-01',
+											species_id: null
+										})
+									]
+								}
+							: { success: true, discrepancies: [] }
+					)
+			);
+			renderReport({ speciesNamesById });
+			const section = getScopeSection(combinedScope);
+			fireEvent.click(
+				within(section).getByRole('button', { name: 'Run check' })
+			);
+
+			const label = discrepancyItemLabel(
+				combinedScope,
+				'2026-01-01',
+				null,
+				speciesNamesById
+			);
+			await waitFor(() => {
+				expect(within(section).getByText(label)).toBeTruthy();
+			});
+			// No species-group heading of any kind — the row is a direct child
+			// of the flat list, exactly as before this scope type ever existed.
+			expect(
+				within(section).queryAllByRole('button', {
+					name: SPECIES_GROUP_HEADING_PATTERN
+				})
+			).toHaveLength(0);
+		});
+	});
+
 	describe('fix-request state propagation across rows', () => {
-		const speciesNamesById = { 42: 'Blackcap', 43: 'Chiffchaff' };
+		const speciesNamesById: Record<number, string> = {
+			42: 'Blackcap',
+			43: 'Chiffchaff'
+		};
 		const yearCombinedScope: DiscrepancyScope = {
 			temporalUnit: 'year',
 			bySpecies: false
@@ -486,19 +656,50 @@ describe('StatsCacheDiscrepanciesReport', () => {
 			bySpecies: true
 		};
 
-		/** One rendered row's `<li>`, located via its expand/collapse button's label. */
+		/**
+		 * One rendered row's `<li>`, located via its expand/collapse button's
+		 * label. A by-species scope's rows render nested under a collapsed
+		 * species group (#1409's hierarchical grouping) — their content, fix
+		 * buttons included, is hidden until that group is expanded — so this
+		 * expands the owning species group first when `speciesId` is given,
+		 * then locates the nested, suffix-free label inside it.
+		 */
 		function getRow(
 			scope: DiscrepancyScope,
 			timePeriod: string | null,
 			speciesId: number | null
 		) {
-			const label = discrepancyItemLabel(
+			const section = getScopeSection(scope);
+			let searchWithin = section;
+			let label = discrepancyItemLabel(
 				scope,
 				timePeriod,
 				speciesId,
 				speciesNamesById
 			);
-			const row = within(getScopeSection(scope))
+
+			if (scope.bySpecies && speciesId !== null) {
+				const speciesLabel = speciesNamesById[speciesId] ?? `species #${speciesId}`;
+				const groupButton = within(section).getByRole('button', {
+					name: (accessibleName) => accessibleName.startsWith(speciesLabel)
+				});
+				if (groupButton.getAttribute('aria-expanded') !== 'true') {
+					fireEvent.click(groupButton);
+				}
+				const groupItem = groupButton.closest('li');
+				if (!groupItem) {
+					throw new Error(`No species group rendered for "${speciesLabel}"`);
+				}
+				searchWithin = groupItem;
+				label = discrepancyItemLabel(
+					{ ...scope, bySpecies: false },
+					timePeriod,
+					null,
+					speciesNamesById
+				);
+			}
+
+			const row = within(searchWithin)
 				.getByRole('button', { name: label })
 				.closest('li');
 			if (!row) {

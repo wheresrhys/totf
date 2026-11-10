@@ -161,6 +161,199 @@ function discrepancyItemId(
 	return `${discrepancyScopeKey(scope)}:${discrepancy.species_id ?? 'all'}:${discrepancy.time_period ?? 'all-time'}`;
 }
 
+/**
+ * One per-cell row, shared by the flat (combined-scope) list below and each
+ * species group's nested list — the only difference between the two call
+ * sites is the label: a nested row drops the by-species scope's own
+ * "for species <name>" suffix (the species is already the group's own
+ * heading), by asking `discrepancyItemLabel` for the combined-scope label
+ * shape instead.
+ */
+function DiscrepancyRow({
+	scope,
+	discrepancy,
+	speciesNamesById,
+	fixRequests,
+	expandedId,
+	onToggle,
+	labelScope = scope
+}: {
+	scope: DiscrepancyScope;
+	discrepancy: StatsCacheDiscrepancy;
+	speciesNamesById: Record<number, string>;
+	fixRequests: FixRequestState;
+	expandedId: string | false;
+	onToggle: (id: string | false) => void;
+	labelScope?: DiscrepancyScope;
+}) {
+	const id = discrepancyItemId(scope, discrepancy);
+	const row = discrepancyRowScope(scope, discrepancy);
+	return (
+		<AccordionItem<DiscrepancyItemModel>
+			id={id}
+			actions={
+				<DiscrepancyRowFixButtons
+					row={row}
+					isFixRequested={fixRequests.dispatches.some((dispatch) =>
+						isDiscrepancyRowCoveredByFixDispatch(row, dispatch)
+					)}
+					onFixRequested={fixRequests.onFixRequested}
+				/>
+			}
+			HeadingComponent={DiscrepancyItemHeading}
+			ContentComponent={DiscrepancyItemContent}
+			model={{
+				label: discrepancyItemLabel(
+					labelScope,
+					discrepancy.time_period,
+					discrepancy.species_id,
+					speciesNamesById
+				),
+				discrepancy
+			}}
+			onToggle={onToggle}
+			expandedId={expandedId}
+		/>
+	);
+}
+
+type SpeciesDiscrepancyGroupModel = {
+	id: string;
+	speciesLabel: string;
+	scope: DiscrepancyScope;
+	discrepancies: StatsCacheDiscrepancy[];
+	speciesNamesById: Record<number, string>;
+	fixRequests: FixRequestState;
+};
+
+function SpeciesGroupHeading({
+	model
+}: {
+	model: SpeciesDiscrepancyGroupModel;
+}) {
+	return (
+		<span>
+			{model.speciesLabel} ({model.discrepancies.length})
+		</span>
+	);
+}
+
+/**
+ * One species group's nested per-period list — collapsed by default, and
+ * reset to collapsed whenever this group itself stops being the expanded one
+ * (a sibling species expands, or this one collapses), the same
+ * `expandedId`-vs-own-`id` pattern `YearSessions`/`MonthSessions` use for
+ * their year→month nesting: `AccordionItem` always mounts its
+ * `ContentComponent` (just CSS-hides it while collapsed) and passes it the
+ * *species*-level `expandedId`, so comparing that against this group's own
+ * `model.id` is exactly "am I the expanded species right now".
+ */
+function SpeciesGroupContent({
+	model,
+	expandedId
+}: {
+	model: SpeciesDiscrepancyGroupModel;
+	expandedId: string | false;
+}) {
+	const [expandedPeriodId, setExpandedPeriodId] = useState<string | false>(
+		false
+	);
+
+	useEffect(() => {
+		if (expandedId !== model.id) {
+			setExpandedPeriodId(false);
+		}
+	}, [expandedId, model.id]);
+
+	return (
+		<BoxyList>
+			{model.discrepancies.map((discrepancy) => (
+				<DiscrepancyRow
+					key={discrepancyItemId(model.scope, discrepancy)}
+					scope={model.scope}
+					labelScope={{ ...model.scope, bySpecies: false }}
+					discrepancy={discrepancy}
+					speciesNamesById={model.speciesNamesById}
+					fixRequests={model.fixRequests}
+					expandedId={expandedPeriodId}
+					onToggle={setExpandedPeriodId}
+				/>
+			))}
+		</BoxyList>
+	);
+}
+
+/** Every discrepancy for one `species_id`, in the order `discrepancies` arrived in. */
+function groupDiscrepanciesBySpecies(
+	discrepancies: StatsCacheDiscrepancy[]
+): Map<number, StatsCacheDiscrepancy[]> {
+	const groups = new Map<number, StatsCacheDiscrepancy[]>();
+	for (const discrepancy of discrepancies) {
+		// Always non-null here — a by-species scope's cells all carry a real
+		// species_id (SimpleStatsCacheBySpecies' species_id column is NOT NULL,
+		// and the species-grouped metric RPCs never emit a null one either).
+		const speciesId = discrepancy.species_id as number;
+		const group = groups.get(speciesId) ?? [];
+		group.push(discrepancy);
+		groups.set(speciesId, group);
+	}
+	return groups;
+}
+
+/**
+ * The by-species report, grouped: species at the top level (collapsed by
+ * default, single-expand across species), that species' discrepant
+ * days/months/etc. nested underneath. See `SpeciesGroupContent` for the
+ * nested list's own collapse-on-switch behaviour.
+ */
+function SpeciesGroupedDiscrepancyList({
+	scope,
+	discrepancies,
+	speciesNamesById,
+	fixRequests
+}: {
+	scope: DiscrepancyScope;
+	discrepancies: StatsCacheDiscrepancy[];
+	speciesNamesById: Record<number, string>;
+	fixRequests: FixRequestState;
+}) {
+	const [expandedSpeciesId, setExpandedSpeciesId] = useState<string | false>(
+		false
+	);
+	const groups = groupDiscrepanciesBySpecies(discrepancies);
+	const sortedSpeciesIds = [...groups.keys()].sort((a, b) =>
+		(speciesNamesById[a] ?? `species #${a}`).localeCompare(
+			speciesNamesById[b] ?? `species #${b}`
+		)
+	);
+
+	return (
+		<BoxyList>
+			{sortedSpeciesIds.map((speciesId) => {
+				const id = `${discrepancyScopeKey(scope)}:species:${speciesId}`;
+				return (
+					<AccordionItem<SpeciesDiscrepancyGroupModel>
+						key={id}
+						id={id}
+						HeadingComponent={SpeciesGroupHeading}
+						ContentComponent={SpeciesGroupContent}
+						model={{
+							id,
+							speciesLabel: speciesNamesById[speciesId] ?? `species #${speciesId}`,
+							scope,
+							discrepancies: groups.get(speciesId) as StatsCacheDiscrepancy[],
+							speciesNamesById,
+							fixRequests
+						}}
+						onToggle={setExpandedSpeciesId}
+						expandedId={expandedSpeciesId}
+					/>
+				);
+			})}
+		</BoxyList>
+	);
+}
+
 function DiscrepancyList({
 	scope,
 	discrepancies,
@@ -178,40 +371,30 @@ function DiscrepancyList({
 		return <p>No discrepancies found</p>;
 	}
 
+	if (scope.bySpecies) {
+		return (
+			<SpeciesGroupedDiscrepancyList
+				scope={scope}
+				discrepancies={discrepancies}
+				speciesNamesById={speciesNamesById}
+				fixRequests={fixRequests}
+			/>
+		);
+	}
+
 	return (
 		<BoxyList>
-			{discrepancies.map((discrepancy) => {
-				const id = discrepancyItemId(scope, discrepancy);
-				const row = discrepancyRowScope(scope, discrepancy);
-				return (
-					<AccordionItem<DiscrepancyItemModel>
-						key={id}
-						id={id}
-						actions={
-							<DiscrepancyRowFixButtons
-								row={row}
-								isFixRequested={fixRequests.dispatches.some((dispatch) =>
-									isDiscrepancyRowCoveredByFixDispatch(row, dispatch)
-								)}
-								onFixRequested={fixRequests.onFixRequested}
-							/>
-						}
-						HeadingComponent={DiscrepancyItemHeading}
-						ContentComponent={DiscrepancyItemContent}
-						model={{
-							label: discrepancyItemLabel(
-								scope,
-								discrepancy.time_period,
-								discrepancy.species_id,
-								speciesNamesById
-							),
-							discrepancy
-						}}
-						onToggle={setExpandedId}
-						expandedId={expandedId}
-					/>
-				);
-			})}
+			{discrepancies.map((discrepancy) => (
+				<DiscrepancyRow
+					key={discrepancyItemId(scope, discrepancy)}
+					scope={scope}
+					discrepancy={discrepancy}
+					speciesNamesById={speciesNamesById}
+					fixRequests={fixRequests}
+					expandedId={expandedId}
+					onToggle={setExpandedId}
+				/>
+			))}
 		</BoxyList>
 	);
 }
