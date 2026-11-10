@@ -589,5 +589,136 @@ describe('findSimpleStatsCacheDiscrepancies', () => {
 			});
 			expect(discrepancies[0].cachedRow).toMatchObject({ species_id: 2 });
 		});
+
+		describe('presence mismatches against an effectively-empty row', () => {
+			/** Every non-effort metric field zeroed/nulled out, as a touched-but-otherwise-empty cell's four RPC rows would report it. */
+			function allZeroExceptEffortRpcRows() {
+				return {
+					basic: [
+						basicRow({
+							species_count: 0,
+							bird_count: 0,
+							encounter_count: 0,
+							new_bird_count: 0,
+							session_count: 0,
+							avg_encounters_per_session: 0,
+							max_per_session: 0,
+							max_new_per_session: 0
+						})
+					],
+					biometrics: [
+						biometricsRow({
+							max_weight: null,
+							avg_weight: null,
+							min_weight: null,
+							median_weight: null,
+							max_wing: null,
+							avg_wing: null,
+							min_wing: null,
+							median_wing: null
+						})
+					],
+					birdAge: [
+						birdAgeRow({
+							pullus_bird_count: 0,
+							juv_bird_count: 0,
+							postjuv_bird_count: 0,
+							adult_bird_count: 0,
+							unknown_age_bird_count: 0,
+							new_young_bird_count: 0
+						})
+					],
+					encounterAge: [
+						encounterAgeRow({
+							pullus_enc_count: 0,
+							juv_enc_count: 0,
+							postjuv_enc_count: 0,
+							adult_enc_count: 0,
+							unknown_age_enc_count: 0,
+							postjuv_juv_enc_count: 0,
+							new_postjuv_juv_enc_count: 0,
+							new_postjuv_enc_count: 0
+						})
+					]
+				};
+			}
+
+			it('is not reported when a live-only cell has every non-effort metric at zero, even with a non-zero effort value', async () => {
+				const client = makeMockSupabaseClient({
+					...allZeroExceptEffortRpcRows(),
+					sessionsVisitDates: [PERIOD]
+				});
+
+				const discrepancies = await findDiscrepancies(client);
+
+				expect(discrepancies).toEqual([]);
+			});
+
+			it('is not reported when a cached-only row has every non-effort metric at zero/null', async () => {
+				const client = makeMockSupabaseClient({
+					sessionsVisitDates: [PERIOD]
+				});
+				vi.mocked(readStatsCacheRows).mockResolvedValue([
+					cachedRowFor(
+						{},
+						{
+							species_count: 0,
+							bird_count: 0,
+							encounter_count: 0,
+							new_bird_count: 0,
+							session_count: 0,
+							avg_encounters_per_session: 0,
+							max_per_session: 0,
+							max_new_per_session: 0,
+							max_weight: null,
+							avg_weight: null,
+							min_weight: null,
+							median_weight: null,
+							max_wing: null,
+							avg_wing: null,
+							min_wing: null,
+							median_wing: null,
+							pullus_bird_count: 0,
+							juv_bird_count: 0,
+							postjuv_bird_count: 0,
+							adult_bird_count: 0,
+							unknown_age_bird_count: 0,
+							new_young_bird_count: 0,
+							pullus_enc_count: 0,
+							juv_enc_count: 0,
+							postjuv_enc_count: 0,
+							adult_enc_count: 0,
+							unknown_age_enc_count: 0,
+							postjuv_juv_enc_count: 0,
+							new_postjuv_juv_enc_count: 0,
+							new_postjuv_enc_count: 0
+						}
+					)
+				]);
+
+				const discrepancies = await findDiscrepancies(client);
+
+				expect(discrepancies).toEqual([]);
+			});
+
+			it('is still reported when a live-only cell has at least one non-effort metric non-zero', async () => {
+				const rpcRows = allZeroExceptEffortRpcRows();
+				const client = makeMockSupabaseClient({
+					...rpcRows,
+					basic: [basicRow({ species_count: 0, bird_count: 1 })],
+					sessionsVisitDates: [PERIOD]
+				});
+
+				const discrepancies = await findDiscrepancies(client);
+
+				expect(discrepancies).toHaveLength(1);
+				expect(discrepancies[0]).toMatchObject({
+					species_id: 1,
+					time_period: PERIOD,
+					cachedRow: null,
+					mismatchedFields: []
+				});
+			});
+		});
 	});
 });
