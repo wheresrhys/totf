@@ -142,29 +142,42 @@ function makeRpcMockClient(
 		sessionsVisitDates?: string[];
 	} = {}
 ) {
-	const rpc = vi.fn((name: string, params: RpcParams) => ({
-		then: (
-			resolve: (v: {
-				data: unknown;
-				error: { message: string } | null;
-			}) => unknown
-		) => {
-			const response = responsesByRpcName[name];
-			const errorSource = rpcErrorsByName[name];
-			const error =
-				typeof errorSource === 'function'
-					? errorSource(params)
-					: (errorSource ?? null);
-			return Promise.resolve({
-				data: error
-					? null
-					: typeof response === 'function'
-						? response(params)
-						: (response ?? null),
-				error
-			}).then(resolve);
-		}
-	}));
+	// `fetchMetricRows` always chains `.range()` off `.rpc()` now (so
+	// PostgREST's Range-based pagination is honoured) — this fake mirrors
+	// that shape with a real slice, which is also harmless/transparent for
+	// every existing fixture here (all well under one page).
+	const rpc = vi.fn<
+		(
+			name: string,
+			params: RpcParams,
+			options?: { get?: boolean }
+		) => { range: (fromRow: number, toRow: number) => unknown }
+	>((name, params) => {
+		const response = responsesByRpcName[name];
+		const errorSource = rpcErrorsByName[name];
+		const error =
+			typeof errorSource === 'function'
+				? errorSource(params)
+				: (errorSource ?? null);
+		const fullRows = (): unknown[] =>
+			(typeof response === 'function'
+				? response(params)
+				: response ?? []) as unknown[];
+		return {
+			range: (fromRow: number, toRow: number) => ({
+				then: (
+					resolve: (v: {
+						data: unknown;
+						error: { message: string } | null;
+					}) => unknown
+				) =>
+					Promise.resolve({
+						data: error ? null : fullRows().slice(fromRow, toRow + 1),
+						error
+					}).then(resolve)
+			})
+		};
+	});
 
 	// Signatures declared via vi.fn's type parameter rather than as named
 	// implementation params, so the recorded calls stay typed for assertions

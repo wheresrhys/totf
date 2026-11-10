@@ -1,9 +1,22 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { catchSupabaseErrors } from '@/lib/supabase';
+import { fetchAllPaginatedRows } from '@/lib/supabase';
 import type { MetricRpcParams } from '../../types';
 import { runStatsCacheDbCall } from './db-call-logging';
 
-/** Calls one metric RPC once per filter object in `rpcParamsList`, concurrently and individually logged, concatenating the rows — see this module's CLAUDE.md for why `allSettled` rather than `Promise.all`. */
+/**
+ * Calls one metric RPC once per filter object in `rpcParamsList`, concurrently
+ * and individually logged, concatenating the rows — see this module's
+ * CLAUDE.md for why `allSettled` rather than `Promise.all`.
+ *
+ * Each call is paginated via `fetchAllPaginatedRows`, the same mechanism
+ * `readStatsCacheRows` uses for the cache-table side of this comparison —
+ * without it, a filter window whose result exceeds PostgREST's 1000-row cap
+ * would silently truncate. Pagination via `.range()` only takes effect on a
+ * **GET** request, not the client's default POST, so every call also passes
+ * `{ get: true }`: safe here since all four `stats_cache_*_metrics` RPCs are
+ * `STABLE` with purely scalar `MetricRpcParams` fields — exactly what
+ * postgrest-js's GET path serializes to query params.
+ */
 export async function fetchMetricRows<Row>(
 	supabaseClient: SupabaseClient,
 	rpcName: string,
@@ -12,11 +25,15 @@ export async function fetchMetricRows<Row>(
 ): Promise<Row[]> {
 	const settled = await Promise.allSettled(
 		rpcParamsList.map((rpcParams) =>
-			runStatsCacheDbCall<Row[] | null>(
+			runStatsCacheDbCall<Row[]>(
 				{ kind: 'rpc', rpcName, rpcParams },
 				context,
-				async () =>
-					supabaseClient.rpc(rpcName, rpcParams).then(catchSupabaseErrors)
+				() =>
+					fetchAllPaginatedRows<Row>((fromRow, toRow) =>
+						supabaseClient
+							.rpc(rpcName, rpcParams, { get: true })
+							.range(fromRow, toRow)
+					)
 			)
 		)
 	);
@@ -28,7 +45,7 @@ export async function fetchMetricRows<Row>(
 		throw firstFailure.reason;
 	}
 
-	return (settled as PromiseFulfilledResult<Row[] | null>[]).flatMap(
-		(result) => (result.value ?? []) as Row[]
+	return (settled as PromiseFulfilledResult<Row[]>[]).flatMap(
+		(result) => result.value
 	);
 }
