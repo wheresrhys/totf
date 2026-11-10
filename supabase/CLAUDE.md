@@ -76,7 +76,10 @@ Key design notes:
   branches simply evaluate false for a no-JWT caller — `auth.jwt()` is NULL, so the `::bigint`
   cast yields NULL rather than erroring. `anon` therefore has `SELECT` and nothing else on both
   tables; INSERT/UPDATE remain own-group `authenticated` only, and neither table has any DELETE
-  grant or policy. Keep the two tables' SELECT policies equivalent to each other by hand.
+  grant for `authenticated`/`anon` and no DELETE policy at all (`service_role` keeps its blanket
+  `GRANT ALL`, and the table owner is unaffected by either — which is what lets a migration's
+  backfill DML prune rows the app itself can't, as #1385's did).
+  Keep the two tables' SELECT policies equivalent to each other by hand.
 - Several fields are populated by triggers (e.g. `proven_age` on Birds, timestamps on Sessions/Encounters).
 - Complex queries are exposed as Postgres RPC functions (e.g. `demographics_stats`, `notable_retraps`, `find_discrepencies`).
 - Database types are auto-generated: run `npm run db:types` after schema changes. Never edit `types/supabase.types.ts` by hand.
@@ -147,10 +150,11 @@ and #1024 then dropped the `session_type` column itself — along with `stats_ra
 `session_type` output column and the two `session_type = 'FULL_GROWN'` filters that survived #1021
 in that RPC's `session_counts` / `session_effort` CTEs.
 
-**`stats_spine`'s three period branches apply `month_filter` three different ways — don't assume
+**`stats_spine`'s four period branches apply `month_filter` three different ways — don't assume
 one rule.** The `month`/`year` branches are bounded by `session_date_range`, which applies
 `month_filter` itself; the `day` branch is sparse, driven straight off `raw_encounters`' own
-filtered rows. The `month-squashed` branch is bounded by neither — it is an unconditional
+filtered rows (as is the separate sparse species×day arm below, for the same reason). The
+`month-squashed` branch is bounded by neither — it is an unconditional
 `generate_series(1, 12)` of `2000-<mm>-01` sentinel cells, deliberately independent of any session
 data — so it needs (and since #1178 has) its own `AND (month_filter IS NULL OR m = month_filter)`
 guard. That guard is what makes a squashed cell individually addressable: `month_filter` alone,
@@ -161,6 +165,43 @@ returned all 12 cells with 11 spurious zeroes. Note the long-standing accepted q
 `month` branch, unchanged by this: `session_date_range`'s `month_filter` narrows min/max to
 matching dates without making the dense month `generate_series` skip the non-matching months in
 between.
+
+**The species axis is sparse for exactly one parameterisation: `group_by_species` together with
+`group_by_time_period = 'day'` (#1385).** `stats_spine` is otherwise a plain `species_spine CROSS
+JOIN period_spine`, so every species in range gets a cell in every period in range. At the day
+grain that meant a species got a cell for every session day the group ever ran — one zero-count
+`SimpleStatsCacheBySpecies` row per (species, day) pair the species was never caught on, which is
+what the species page's Session totals tab was full of (#1381/#1382 hid them at display level
+first). The final `SELECT` is therefore two `UNION ALL` arms: the cross join, guarded `WHERE NOT
+(group_by_species AND group_by_time_period IS NOT DISTINCT FROM 'day')`, plus a sparse `SELECT
+DISTINCT re.species_id, re.species_name, re.session_day` off `raw_encounters` gated on exactly that
+combination. Three things to keep straight:
+- **The guard has to be NULL-safe.** `group_by_time_period` is NULL for the all-time shape, where a
+  plain `= 'day'` makes the whole predicate NULL rather than TRUE and silently drops every row of
+  the all-time by-species spine. `IS NOT DISTINCT FROM` still constant-folds, so the branch prunes
+  to a `One-Time Filter: false` under a custom plan exactly as `= 'day'` would.
+- **The sparse arm repeats `species_spine`'s own `species_name_filter` guard**, because it reads
+  `raw_encounters` directly and never touches `species_spine` — the same "this branch is bounded by
+  neither sibling CTE, so it carries its own guard" shape as the `month-squashed` branch above.
+  It projects `species_name` as well as `species_id`: `demographics_stats` reads `spine.species_name`.
+- **No surviving row's values change.** All six callers consume the spine as `FROM spine LEFT JOIN
+  <per-cell aggregates> … GROUP BY <spine key>`, with no window function and no cross-cell
+  aggregate, so removing a spine row removes exactly that output row and nothing else.
+
+**Only the day grain is narrowed.** The `month`/`year` spines are bloated the same way under
+`group_by_species`, but their density is load-bearing in a way the day grain's is not:
+`app/lib/month-totals.ts`'s `synthesizeZeroStats` only gap-fills months *outside* the RPC's min..max
+range, and the Month totals tab plus `StatsHistoryChart`/`YearComparisonTrendChart` all read dense
+month rows. `month-squashed` is dense by construction (all 12 calendar cells), and the all-time
+shape is one cell per species. Narrowing any of those needs its own ticket with its own chart-level
+analysis.
+
+One nuance worth knowing before reasoning about a resighting-only species here: it reaches
+`species_spine` via `stats_raw_encounters`' NULL-`encounter_id` row **only on a wholly unfiltered
+call**. That row's `sess.*` columns are all NULL, so it cannot satisfy
+`ringing_group_filter`/`from_date`/`to_date`/`year_filter`/`month_filter` — and every real caller
+passes at least `ringing_group_filter`. So such a species is absent from a filtered spine at every
+grain, not just the day grain.
 
 **`session_date_range` is scoped by `ringing_group_filter`, like every sibling CTE in this RPC
 family (2026-10-23).** It was missing that condition entirely — the only CTE in the family without
@@ -226,8 +267,12 @@ The aggregate RPC likewise read `session_day`/`session_month`/`session_year` str
 40k-encounter / 15,000-output-row benchmark, with shared buffer traffic down from ~325k to ~2.2k.
 
 Note also what #947 ruled **out**: `stats_spine`'s internal `raw_encounters` CTE is **not**
-duplicated. It has two textual references, so Postgres's `cterefcount > 1` rule always materializes
-it — confirmed at every parameterization. What looks like two derivations in an `EXPLAIN ANALYZE`
+duplicated. It has three textual references since #1385 added the sparse species×day arm (two
+before), so Postgres's `cterefcount > 1` rule always materializes
+it — confirmed at every parameterization. That count is taken at rewrite time, before the planner
+constant-folds the parameter guards, so it still holds on a day-grain by-species call where the
+cross-join arm (and with it two of the three references) prunes away entirely.
+What looks like two derivations in an `EXPLAIN ANALYZE`
 is the *first* `CTE Scan` on each of two different CTEs (the calling RPC's own and `stats_spine`'s)
 carrying its CTE's population cost inclusively. Adding `AS MATERIALIZED` there produces a
 byte-identical plan; don't spend time on it again.

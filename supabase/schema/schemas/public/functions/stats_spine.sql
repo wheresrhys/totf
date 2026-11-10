@@ -6,6 +6,10 @@
 -- species_spine/session_date_range/period_spine/spine CTEs — see
 -- stats_raw_encounters.sql's header for why the two functions don't literally share
 -- SQL text with core_stats itself.
+--
+-- One parameterisation is NOT a (species × period) cross join: group_by_species
+-- together with group_by_time_period = 'day' is sparse on BOTH axes (#1385) —
+-- see the final SELECT's two UNION ALL arms.
 CREATE FUNCTION public.stats_spine (
 	species_name_filter text DEFAULT NULL::text,
 	from_date date DEFAULT NULL::date,
@@ -125,9 +129,48 @@ CREATE FUNCTION public.stats_spine (
     SELECT NULL::date
     WHERE group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day', 'month-squashed')
   )
+  -- The dense (species × period) cross join — every parameterisation EXCEPT
+  -- group_by_species together with 'day', which the sparse arm below owns
+  -- instead. That one combination is excluded here rather than produced and then
+  -- discarded, so the planner can prune this branch to a One-Time Filter
+  -- (#1385). It used to give a species a cell for every session day the group
+  -- ever ran: one zero-count (species, day) row per day the species was never
+  -- caught on, which is what the Session totals tab's empty rows were.
+  --
+  -- The guard is NULL-safe (`IS NOT DISTINCT FROM`, not a plain `=`) on purpose.
+  -- group_by_time_period is NULL for the all-time shape, where
+  -- `NOT (group_by_species AND group_by_time_period = 'day')` evaluates to NULL
+  -- rather than TRUE and would silently drop every row of the all-time
+  -- by-species spine.
   SELECT s.species_id, s.species_name, p.time_period
   FROM species_spine s
-  CROSS JOIN period_spine p;
+  CROSS JOIN period_spine p
+  WHERE NOT (group_by_species AND group_by_time_period IS NOT DISTINCT FROM 'day')
+
+  UNION ALL
+
+  -- The sparse species×day spine (#1385): one cell per (species, session day)
+  -- pair the species was actually encountered in-hand on, rather than one per
+  -- (species, every session day in range). Structurally the same shape as
+  -- period_spine's own 'day' branch above — driven straight off raw_encounters'
+  -- already-filtered rows, so from_date/to_date/year_filter/month_filter narrow
+  -- it exactly as they narrow that branch — plus the two species columns and
+  -- species_spine's own species_name_filter guard, which has to be repeated here
+  -- because this arm reads raw_encounters directly and never touches
+  -- species_spine.
+  --
+  -- demographics_stats reads spine.species_name, so the arm must project it and
+  -- not just species_id.
+  --
+  -- A species whose only encounters are resightings survives in raw_encounters
+  -- as a NULL-encounter_id row (stats_raw_encounters' LEFT JOIN semantics, #874)
+  -- whose session_day is NULL, so it gets no day cell at all here.
+  SELECT DISTINCT re.species_id, re.species_name, re.session_day AS time_period
+  FROM raw_encounters re
+  WHERE group_by_species
+    AND group_by_time_period = 'day'
+    AND re.session_day IS NOT NULL
+    AND (species_name_filter IS NULL OR re.species_name = species_name_filter);
 $function$;
 
 GRANT ALL ON FUNCTION public.stats_spine (

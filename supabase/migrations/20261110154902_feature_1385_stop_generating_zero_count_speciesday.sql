@@ -1,0 +1,181 @@
+SET check_function_bodies = false;
+CREATE OR REPLACE FUNCTION public.stats_spine(species_name_filter text DEFAULT NULL::text, from_date date DEFAULT NULL::date, to_date date DEFAULT NULL::date, ringing_group_filter bigint DEFAULT NULL::bigint, group_by_species boolean DEFAULT false, group_by_time_period text DEFAULT NULL::text, year_filter smallint DEFAULT NULL::smallint, month_filter smallint DEFAULT NULL::smallint)
+ RETURNS TABLE(species_id bigint, species_name text, time_period date)
+ LANGUAGE sql
+ STABLE
+AS $function$
+  WITH raw_encounters AS (
+    SELECT * FROM public.stats_raw_encounters(species_name_filter, from_date, to_date, ringing_group_filter, year_filter, month_filter)
+  ), species_spine AS (
+    SELECT
+      DISTINCT re.species_id, re.species_name
+    FROM raw_encounters as re
+    WHERE (species_name_filter IS NULL OR re.species_name = species_name_filter)
+    AND group_by_species
+
+    UNION ALL
+
+    SELECT NULL::bigint, NULL::text
+    WHERE NOT group_by_species
+  ), session_date_range AS (
+    -- Every session date in the query window bounds the spine. This used to
+    -- exclude 'FIELD_OBSERVATION' sessions (#874) so a passive-resighting-only
+    -- date couldn't stretch the month/year range past the real sessions; the
+    -- exclusion went in #1021 and the session_type column it read is gone
+    -- altogether as of #1024. Passive encounters are excluded at the row level
+    -- by stats_raw_encounters' resighting-record_type filter, which is the
+    -- single durable fix point.
+    SELECT
+      MIN(sess.visit_date) AS min_date,
+      MAX(sess.visit_date) AS max_date
+    FROM public."Sessions" as sess
+    WHERE (ringing_group_filter IS NULL OR sess.ringing_group_id = ringing_group_filter)
+      AND (from_date IS NULL OR sess.visit_date >= from_date)
+      AND (to_date IS NULL OR sess.visit_date <= to_date)
+      AND (year_filter IS NULL OR EXTRACT(YEAR FROM sess.visit_date) = year_filter)
+      -- month_filter is deliberately applied here too, for consistency with
+      -- from_date/to_date/year_filter's treatment above — but note the accepted
+      -- edge case documented in CLAUDE.md: combined with group_by_time_period =
+      -- 'month' this narrows min/max to month_filter-matching dates without making
+      -- the dense month generate_series below skip non-matching months in between.
+      -- Combining year-grouping with month_filter is unaffected (year-truncation
+      -- smooths over the narrowing); day-grouping is unaffected (sparse, driven off
+      -- raw_encounters' actual distinct days).
+      AND (month_filter IS NULL OR EXTRACT(MONTH FROM sess.visit_date) = month_filter)
+  ), period_spine AS (
+    SELECT date_trunc('month', d)::date AS time_period
+    FROM session_date_range sdr,
+    LATERAL generate_series(
+      date_trunc('month', COALESCE(sdr.min_date, from_date, CURRENT_DATE))::timestamp,
+      date_trunc('month', COALESCE(sdr.max_date, to_date, CURRENT_DATE))::timestamp,
+      '1 month'::interval
+    ) d
+    WHERE group_by_time_period = 'month'
+      AND sdr.min_date IS NOT NULL
+      AND sdr.max_date IS NOT NULL
+
+    UNION ALL
+
+    SELECT date_trunc('year', d)::date AS time_period
+    FROM session_date_range sdr,
+    LATERAL generate_series(
+      date_trunc('year', COALESCE(sdr.min_date, from_date, CURRENT_DATE))::timestamp,
+      date_trunc('year', COALESCE(sdr.max_date, to_date, CURRENT_DATE))::timestamp,
+      '1 year'::interval
+    ) d
+    WHERE group_by_time_period = 'year'
+      AND sdr.min_date IS NOT NULL
+      AND sdr.max_date IS NOT NULL
+
+    UNION ALL
+
+    -- The 'day' spine is sparse: one row per distinct session date actually present
+    -- in the filtered data, unlike the dense month/year spines (which span every
+    -- period in the min..max range, including empty ones). A dense day spine would
+    -- emit a row for every calendar day in range — thousands of mostly-empty rows —
+    -- so we key off the encounter data instead, and days with no session never appear.
+    SELECT DISTINCT re.session_day AS time_period
+    FROM raw_encounters re
+    WHERE group_by_time_period = 'day'
+      AND re.session_day IS NOT NULL
+
+    UNION ALL
+
+    -- 'month-squashed' (#996): a dense, all-12-rows-by-default spine — one row
+    -- per calendar month (Jan-Dec), independent of any actual session data —
+    -- unlike the month/year branches above, which are dense only within the
+    -- group's own min..max date range. generate_series(1, 12), deliberately
+    -- not gated on session_date_range like the branches above, so the mode
+    -- returns all 12 months even when the group's history only spans one
+    -- calendar month across every year. Dates use the same 2000-<mm>-01
+    -- sentinel-year convention as stats_raw_encounters.session_month_squashed.
+    --
+    -- month_filter narrows it to that one calendar month's cell (#1178). A
+    -- squashed cell IS exactly what month_filter alone — year_filter left NULL
+    -- — selects, so a caller refreshing only the calendar months an import
+    -- touched can ask for precisely those cells; without this guard the other
+    -- 11 came back as spurious all-zero rows. month_filter is applied in
+    -- session_date_range above too, but that CTE doesn't bound this branch, so
+    -- the guard has to be repeated here. The only unfiltered caller
+    -- (fetchCombinedMonthTotals, app/actions/summary-stats.ts) leaves
+    -- month_filter NULL and still gets all 12 cells.
+    SELECT make_date(2000, m, 1) AS time_period
+    FROM generate_series(1, 12) AS m
+    WHERE group_by_time_period = 'month-squashed'
+      AND (month_filter IS NULL OR m = month_filter)
+
+    UNION ALL
+
+    SELECT NULL::date
+    WHERE group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day', 'month-squashed')
+  )
+  -- The dense (species × period) cross join — every parameterisation EXCEPT
+  -- group_by_species together with 'day', which the sparse arm below owns
+  -- instead. That one combination is excluded here rather than produced and then
+  -- discarded, so the planner can prune this branch to a One-Time Filter
+  -- (#1385). It used to give a species a cell for every session day the group
+  -- ever ran: one zero-count (species, day) row per day the species was never
+  -- caught on, which is what the Session totals tab's empty rows were.
+  --
+  -- The guard is NULL-safe (`IS NOT DISTINCT FROM`, not a plain `=`) on purpose.
+  -- group_by_time_period is NULL for the all-time shape, where
+  -- `NOT (group_by_species AND group_by_time_period = 'day')` evaluates to NULL
+  -- rather than TRUE and would silently drop every row of the all-time
+  -- by-species spine.
+  SELECT s.species_id, s.species_name, p.time_period
+  FROM species_spine s
+  CROSS JOIN period_spine p
+  WHERE NOT (group_by_species AND group_by_time_period IS NOT DISTINCT FROM 'day')
+
+  UNION ALL
+
+  -- The sparse species×day spine (#1385): one cell per (species, session day)
+  -- pair the species was actually encountered in-hand on, rather than one per
+  -- (species, every session day in range). Structurally the same shape as
+  -- period_spine's own 'day' branch above — driven straight off raw_encounters'
+  -- already-filtered rows, so from_date/to_date/year_filter/month_filter narrow
+  -- it exactly as they narrow that branch — plus the two species columns and
+  -- species_spine's own species_name_filter guard, which has to be repeated here
+  -- because this arm reads raw_encounters directly and never touches
+  -- species_spine.
+  --
+  -- demographics_stats reads spine.species_name, so the arm must project it and
+  -- not just species_id.
+  --
+  -- A species whose only encounters are resightings survives in raw_encounters
+  -- as a NULL-encounter_id row (stats_raw_encounters' LEFT JOIN semantics, #874)
+  -- whose session_day is NULL, so it gets no day cell at all here.
+  SELECT DISTINCT re.species_id, re.species_name, re.session_day AS time_period
+  FROM raw_encounters re
+  WHERE group_by_species
+    AND group_by_time_period = 'day'
+    AND re.session_day IS NOT NULL
+    AND (species_name_filter IS NULL OR re.species_name = species_name_filter);
+$function$;
+
+-- ############################################################################
+-- BACKFILL (hand-written DML — declarative sync only ever emits DDL, so this is
+-- appended after the generated DDL above and never interleaved with it. See
+-- supabase/CLAUDE.md's "Schema files").
+--
+-- Deletes exactly the set the narrowed spine no longer produces: a day-grain
+-- by-species cell with a zero encounter_count. A cell the narrowed spine DOES
+-- produce always derives from a raw_encounters row with a non-NULL session_day,
+-- so it always has encounter_count >= 1; and a NULL-encounter_id row (a
+-- resighting-only species) has a NULL session_day that can never match a day
+-- cell. So the predicate is neither wider nor narrower than the change.
+--
+-- There is no equivalent backfill for the all-species SimpleStatsCache: its day
+-- rows come from period_spine's already-sparse day branch and are never zero.
+--
+-- The predicate scans — the table's only index is
+-- UNIQUE (group_id, temporal_unit, time_period, species_id) and temporal_unit is
+-- not its leading column — which is fine for a one-off.
+--
+-- SimpleStatsCacheBySpecies has no DELETE grant and no DELETE policy (#1202);
+-- the migration runs as the table owner, so RLS and grants do not apply to it.
+-- Verified locally: this statement deleted 52 rows against the e2e-seeded
+-- database with no 42501.
+-- ############################################################################
+
+DELETE FROM public."SimpleStatsCacheBySpecies" WHERE temporal_unit = 'day' AND encounter_count = 0;
