@@ -222,6 +222,15 @@ things worth knowing:
   `mergeSimpleMetricRows`' column set. It's empty for a presence mismatch (one side `null`),
   which is still reported as a discrepancy rather than dropped; a cell present and identical on
   both sides is never in the result.
+- **A presence mismatch against an effectively-empty row is suppressed, not reported.**
+  `isEffectivelyEmptyRow` treats a row as empty when every field but
+  `CACHE_ROW_BOOKKEEPING_FIELD_NAMES` (`id`/`group_id`/`temporal_unit`/`created_at`/`updated_at`/
+  `species_name` — the columns a raw cached row carries that a merged live row never does) is
+  `0`/`null`. A materialized cache legitimately omits a touched-but-otherwise-empty period/species
+  cell, so a presence mismatch against one isn't a real discrepancy; without excluding all six of
+  those bookkeeping columns, a cached row that's genuinely all-zero would still fail the
+  every-field-falsy check (a non-null `created_at`/`updated_at` timestamp or `species_name` string
+  trips it) and get reported anyway.
 
 ## Testing
 

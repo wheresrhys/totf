@@ -66,11 +66,14 @@ function metricFieldNames(liveRow: SimpleMergedCell): string[] {
 	);
 }
 
-/** Bookkeeping columns a raw cache-table row carries that a merged live row never does — the one set of fields `isEffectivelyEmptyRow` excludes, so a cached-only presence mismatch isn't polluted by its own `id`/`group_id`/`temporal_unit` columns. */
+/** Bookkeeping columns a raw cache-table row carries that a merged live row never does — the one set of fields `isEffectivelyEmptyRow` excludes, so a cached-only presence mismatch isn't polluted by its own `id`/`group_id`/`temporal_unit`/`created_at`/`updated_at`/`species_name` columns. */
 const CACHE_ROW_BOOKKEEPING_FIELD_NAMES = new Set([
 	'id',
 	'group_id',
-	'temporal_unit'
+	'temporal_unit',
+	'created_at',
+	'updated_at',
+	'species_name'
 ]);
 
 /**

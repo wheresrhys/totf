@@ -118,7 +118,10 @@ function encounterAgeRow(
  * The merged cache row the four fixture builders above agree on, for one
  * `(species_id, time_period)` cell — i.e. what the comparator computes as the
  * live side, in the shape a cached row comes back in. `overrides` make it
- * diverge, which is the whole point of the matching tests.
+ * diverge, which is the whole point of the matching tests. Carries the
+ * bookkeeping columns `readStatsCacheRows` actually returns on every row
+ * (`created_at`/`updated_at`/`species_name`) — not just the metric columns —
+ * since those are exactly the fields `isEffectivelyEmptyRow` has to look past.
  */
 function cachedRowFor(
 	{ species_id = 1, time_period = PERIOD as string | null } = {},
@@ -128,6 +131,9 @@ function cachedRowFor(
 		id: 1,
 		group_id: GROUP_ID,
 		temporal_unit: 'day',
+		created_at: '2026-01-01T00:00:00Z',
+		updated_at: '2026-01-01T00:00:00Z',
+		species_name: 'Blackcap',
 		species_id,
 		time_period,
 		species_count: 1,
@@ -648,7 +654,7 @@ describe('findSimpleStatsCacheDiscrepancies', () => {
 				expect(discrepancies).toEqual([]);
 			});
 
-			it('is not reported when a cached-only row has every metric at zero/null', async () => {
+			it('is not reported when a cached-only row has every metric at zero/null, even though it also carries non-null created_at/updated_at/species_name bookkeeping columns', async () => {
 				const client = makeMockSupabaseClient({
 					sessionsVisitDates: [PERIOD]
 				});
