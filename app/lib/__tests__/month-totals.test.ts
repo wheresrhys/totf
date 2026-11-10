@@ -9,6 +9,7 @@ import {
 	formatMonthLabel
 } from '../month-totals';
 import type { CoreStatsResult } from '@/app/models/db';
+import { BiometricStatNames } from '@/modules/stats/browser';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 // A monthly stat row as `core_stats` returns it: `time_period` is the first
@@ -98,6 +99,24 @@ describe('buildMonthTotalsRows', () => {
 				expect(row.stats.session_count).toBe(0);
 				expect(row.stats.encounter_count).toBe(0);
 				expect(row.stats.bird_count).toBe(0);
+			});
+		});
+	});
+
+	// The two assertions here were unassertable before #1417: the synthesized
+	// row was cast `as unknown as CoreStatsResult`, whose `species_name` was
+	// `string`, so nothing in the type system or the suite pinned what it
+	// actually put in these columns.
+	describe('zero-filling a month with no sessions', () => {
+		it('gives the synthesized row a null species_name', () => {
+			const [january] = buildMonthTotalsRows(2026, []);
+			expect(january.stats.species_name).toBeNull();
+		});
+
+		it('gives the synthesized row null biometric metrics rather than zero', () => {
+			const [january] = buildMonthTotalsRows(2026, []);
+			BiometricStatNames.forEach((name) => {
+				expect(january.stats[name]).toBeNull();
 			});
 		});
 	});
@@ -303,6 +322,18 @@ describe('filterEmptyMonthTotalsRows', () => {
 			]);
 			const filtered = filterEmptyMonthTotalsRows(combinedRows, true);
 			expect(filtered.map((row) => row.zeroIndexedMonth)).toEqual([0, 7]);
+		});
+
+		// `buildCombinedMonthTotalsRows` never synthesizes, so a zero-session
+		// squashed-month row here is one the cache genuinely holds — the other
+		// half of what this toggle has to drop.
+		it('drops a genuine zero-session squashed-month row when hiding is on', () => {
+			const combinedRows = buildCombinedMonthTotalsRows([
+				monthStat(2000, 1, { session_count: 4 }),
+				monthStat(2000, 2, { session_count: 0 })
+			]);
+			const filtered = filterEmptyMonthTotalsRows(combinedRows, true);
+			expect(filtered.map((row) => row.zeroIndexedMonth)).toEqual([0]);
 		});
 	});
 });
