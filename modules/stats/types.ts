@@ -1,11 +1,87 @@
-import type {
-  SimpleStatsCacheBySpeciesRow,
-  SimpleStatsCacheRow
-} from '@/app/models/db';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { Database } from '@/types/supabase.types';
-export type StatsResult = SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow;
 
+/**
+ * The columns a cache row carries that are bookkeeping rather than results
+ * (#1372) — a result type has no use for them, and the non-cache stats paths
+ * (live-metrics fallbacks, zero-fills) have no honest value to put in them.
+ *
+ * Deliberately **not** unified with `lib/refresh/find-cache-discrepancies.ts`'
+ * `CACHE_ROW_BOOKKEEPING_FIELD_NAMES`, which is a near-identical but
+ * genuinely different set: that one also excludes `species_name` (its
+ * every-field-falsy check runs over a *raw cached row*, where a non-null
+ * `species_name` string would trip the check), whereas `species_name` is the
+ * one column the result types below deliberately keep — it is what
+ * discriminates the union. Being a runtime `Set<string>` rather than a column
+ * union of a generated `Row` also makes it the wrong shape to derive from.
+ */
+export type BookkeepingColumn =
+	| 'id'
+	| 'group_id'
+	| 'created_at'
+	| 'updated_at'
+	| 'temporal_unit';
+
+/**
+ * One all-species-combined stats cell as a consumer sees it: the generated
+ * `SimpleStatsCache` row minus bookkeeping, plus the `species_name: null`
+ * `lib/stats-cache.ts`'s `readStatsCacheRows` flattens onto every row of an
+ * all-species read. Neither cache table has a `species_name` column of its
+ * own, so the name is intersected on rather than read off the table.
+ */
+export type StatsCacheResult = Omit<
+	Database['public']['Tables']['SimpleStatsCache']['Row'],
+	BookkeepingColumn
+> & { species_name: null };
+
+/**
+ * One per-species stats cell as a consumer sees it. `species_id` is omitted
+ * alongside the bookkeeping columns: it is the pre-resolution form of
+ * `species_name` — which `readStatsCacheRows` resolves through a
+ * `Species(species_name)` embed — and no consumer reads both, so keeping it
+ * would make the type carry two spellings of the same thing.
+ */
+export type StatsCacheBySpeciesResult = Omit<
+	Database['public']['Tables']['SimpleStatsCacheBySpecies']['Row'],
+	BookkeepingColumn | 'species_id'
+> & { species_name: string };
+
+/**
+ * Any stats cell, from either cache table. Discriminated on `species_name`
+ * (`null` vs `string`), so a consumer can narrow to the by-species member
+ * without a cast.
+ */
+export type StatsResult = StatsCacheResult | StatsCacheBySpeciesResult;
+
+/**
+ * The exact `StatsResult` member a statically-known `bySpecies`/
+ * `group_by_species` argument implies, so a call site that knows which it
+ * asked for gets the precise member with no narrowing — for the generic
+ * fetchers #1372 puts on top of the union.
+ */
+export type StatsResultFor<BySpecies extends boolean> = BySpecies extends true
+	? StatsCacheBySpeciesResult
+	: StatsCacheResult;
+
+/**
+ * The 8 wing/weight columns of a stats cell (#1214, #1372) — the shared,
+ * iterable home for the field list `app/models/db.ts`'s `BiometricFieldName`
+ * and `app/actions/spp-data.ts`'s `BIOMETRIC_CACHE_COLUMNS` each spell out
+ * separately today. The const is the single source of truth and
+ * `BiometricStatName` derives from it, so the two can't drift apart.
+ */
+export const BiometricStatNames = [
+	'max_weight',
+	'avg_weight',
+	'min_weight',
+	'median_weight',
+	'max_wing',
+	'avg_wing',
+	'min_wing',
+	'median_wing'
+] as const;
+
+export type BiometricStatName = (typeof BiometricStatNames)[number];
 
 /**
  * Matches the existing stats-RPC filter convention
@@ -40,13 +116,12 @@ export type StatsResult = SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow;
  * (`all-time`).
  */
 export type StatsCacheRefreshRpcParams = {
-  ringing_group_filter: number;
-  group_by_time_period?: Exclude<StatsTemporalUnit, 'all-time'>;
-  from_date?: string;
-  to_date?: string;
-  periods?: string[];
+	ringing_group_filter: number;
+	group_by_time_period?: Exclude<StatsTemporalUnit, 'all-time'>;
+	from_date?: string;
+	to_date?: string;
+	periods?: string[];
 };
-
 
 /**
  * `affectedDates` is event metadata, not an RPC filter — it lives top-level
@@ -86,10 +161,10 @@ export type StatsCacheRefreshRpcParams = {
  * import-derived event still carries both.
  */
 export type StatsCacheRefreshEvent = {
-  importJobId?: number;
-  rpcParams: StatsCacheRefreshRpcParams;
-  affectedDates?: string[];
-  affectedSpeciesIds?: number[];
+	importJobId?: number;
+	rpcParams: StatsCacheRefreshRpcParams;
+	affectedDates?: string[];
+	affectedSpeciesIds?: number[];
 };
 
 /**
@@ -109,10 +184,10 @@ export type StatsCacheRefreshEvent = {
  * narrowing.
  */
 export type ManualStatsCacheRegenerateParams = {
-  groupId: number;
-  temporalUnit: StatsTemporalUnit;
-  periods?: string[];
-  speciesIds?: number[];
+	groupId: number;
+	temporalUnit: StatsTemporalUnit;
+	periods?: string[];
+	speciesIds?: number[];
 };
 
 /**
@@ -125,11 +200,11 @@ export type ManualStatsCacheRegenerateParams = {
  * never be used to name another group's id.
  */
 export type ManualStatsCacheRegenerateRequest = {
-  temporalUnit: StatsTemporalUnit;
-  /** Omit for every period of `temporalUnit` — see #1379's "omitted means all" convention. */
-  periods?: string[];
-  /** Omit for every species. */
-  speciesIds?: number[];
+	temporalUnit: StatsTemporalUnit;
+	/** Omit for every period of `temporalUnit` — see #1379's "omitted means all" convention. */
+	periods?: string[];
+	/** Omit for every species. */
+	speciesIds?: number[];
 };
 
 /**
@@ -144,14 +219,14 @@ export type ManualStatsCacheRegenerateRequest = {
  * doc comment).
  */
 export type ManualStatsCacheRegenerateRequestResult =
-  | { success: true }
-  | { success: false; error: string };
+	| { success: true }
+	| { success: false; error: string };
 
 import type { ImportJobStatus } from '@/app/models/db';
 /** The outcome a stats-cache refresh can actually be recorded as. */
 export type StatsCacheRefreshOutcome = Extract<
-  ImportJobStatus,
-  'succeeded' | 'failed'
+	ImportJobStatus,
+	'succeeded' | 'failed'
 >;
 
 /**
@@ -170,30 +245,30 @@ export type StatsCacheRefreshOutcome = Extract<
  * reproduces whatever is already cached for it.
  */
 export type RefreshSpeciesNarrowing = {
-  speciesIds?: number[];
+	speciesIds?: number[];
 };
 
 export type RefreshSimpleStatsCacheParams = RefreshSpeciesNarrowing & {
-  groupId: number;
-  temporalUnit: StatsTemporalUnit;
-  /**
-   * The exact `time_period` values this refresh pass should write, in the
-   * same string shape the metric RPCs return for that temporal unit.
-   * Required (non-empty) for the narrowing temporal units — `day`, `month`,
-   * `year` and, since #1178, `month-squashed` (whose periods are the
-   * `2000-MM-01` sentinel-year cells its grouping emits). See
-   * `buildSimpleMetricRpcParamsList`'s early-return for what happens if it's
-   * empty for one of those. Ignored entirely for `all-time`, which always
-   * full-replaces the whole group history regardless of what's passed.
-   */
-  periods?: string[];
-  /**
-   * The import job this refresh was dispatched for, carried only for
-   * `runStatsCacheDbCall`'s failure-log context — not read by any refresh
-   * logic itself. Optional since most callers (every test, the debug
-   * script) have no import job at all.
-   */
-  importJobId?: number;
+	groupId: number;
+	temporalUnit: StatsTemporalUnit;
+	/**
+	 * The exact `time_period` values this refresh pass should write, in the
+	 * same string shape the metric RPCs return for that temporal unit.
+	 * Required (non-empty) for the narrowing temporal units — `day`, `month`,
+	 * `year` and, since #1178, `month-squashed` (whose periods are the
+	 * `2000-MM-01` sentinel-year cells its grouping emits). See
+	 * `buildSimpleMetricRpcParamsList`'s early-return for what happens if it's
+	 * empty for one of those. Ignored entirely for `all-time`, which always
+	 * full-replaces the whole group history regardless of what's passed.
+	 */
+	periods?: string[];
+	/**
+	 * The import job this refresh was dispatched for, carried only for
+	 * `runStatsCacheDbCall`'s failure-log context — not read by any refresh
+	 * logic itself. Optional since most callers (every test, the debug
+	 * script) have no import job at all.
+	 */
+	importJobId?: number;
 };
 
 /**
@@ -212,10 +287,10 @@ export type RefreshSimpleStatsCacheParams = RefreshSpeciesNarrowing & {
  * given, exactly as the write path does.
  */
 export type FindStatsCacheDiscrepanciesParams = RefreshSpeciesNarrowing & {
-  groupId: number;
-  temporalUnit: StatsTemporalUnit;
-  groupBySpecies: boolean;
-  periods?: string[];
+	groupId: number;
+	temporalUnit: StatsTemporalUnit;
+	groupBySpecies: boolean;
+	periods?: string[];
 };
 
 /**
@@ -234,55 +309,55 @@ export type FindStatsCacheDiscrepanciesParams = RefreshSpeciesNarrowing & {
  * `mergeSimpleMetricRows`' column set.
  */
 export type StatsCacheDiscrepancy = MergedCellKey & {
-  cachedRow: Record<string, unknown> | null;
-  liveRow: SimpleMergedCell | null;
-  mismatchedFields: string[];
+	cachedRow: Record<string, unknown> | null;
+	liveRow: SimpleMergedCell | null;
+	mismatchedFields: string[];
 };
 
 export type BasicSessionMetricsRow =
-  Database['public']['CompositeTypes']['stats_cache_basic_session_metrics_result'];
+	Database['public']['CompositeTypes']['stats_cache_basic_session_metrics_result'];
 export type BiometricsMetricsRow =
-  Database['public']['CompositeTypes']['stats_cache_biometrics_metrics_result'];
+	Database['public']['CompositeTypes']['stats_cache_biometrics_metrics_result'];
 export type BirdAgeMetricsRow =
-  Database['public']['CompositeTypes']['stats_cache_bird_age_metrics_result'];
+	Database['public']['CompositeTypes']['stats_cache_bird_age_metrics_result'];
 export type EncounterAgeMetricsRow =
-  Database['public']['CompositeTypes']['stats_cache_encounter_age_metrics_result'];
+	Database['public']['CompositeTypes']['stats_cache_encounter_age_metrics_result'];
 
 /** The (species_id, time_period) key pair a merged refresh cell is matched across RPC results on — see this module's CLAUDE.md for the NULL/sentinel-date nuance. */
 export type MergedCellKey = {
-  species_id: number | null;
-  time_period: string | null;
+	species_id: number | null;
+	time_period: string | null;
 };
 
 /** One merged `SimpleStatsCache` cell, pre-write — see this module's CLAUDE.md for the exact column provenance. */
 export type SimpleMergedCell = Omit<
-  Database['public']['Tables']['SimpleStatsCacheBySpecies']['Insert'],
-  'id' | 'group_id' | 'temporal_unit' | keyof MergedCellKey
+	Database['public']['Tables']['SimpleStatsCacheBySpecies']['Insert'],
+	'id' | 'group_id' | 'temporal_unit' | keyof MergedCellKey
 > &
-  MergedCellKey;
+	MergedCellKey;
 
 /** The two `cache_table` values `FailedStatsCacheRefreshes`' CHECK constraint accepts (#1182). */
 export type FailedRefreshCacheTable =
-  | 'SimpleStatsCache'
-  | 'SimpleStatsCacheBySpecies';
+	| 'SimpleStatsCache'
+	| 'SimpleStatsCacheBySpecies';
 
 /** One dead-letter row for `FailedStatsCacheRefreshes` (#1167). */
 export type FailedRefreshRow = Omit<
-  Database['public']['Tables']['FailedStatsCacheRefreshes']['Insert'],
-  'id' | 'created_at' | 'cache_table'
+	Database['public']['Tables']['FailedStatsCacheRefreshes']['Insert'],
+	'id' | 'created_at' | 'cache_table'
 > & {
-  cache_table: FailedRefreshCacheTable;
+	cache_table: FailedRefreshCacheTable;
 };
 
 /** The filter shape every `stats_cache_*_metrics` RPC takes — see this module's CLAUDE.md. */
 export type MetricRpcParams = {
-  ringing_group_filter: number;
-  group_by_species: boolean;
-  group_by_time_period?: Exclude<StatsTemporalUnit, 'all-time'>;
-  from_date?: string;
-  to_date?: string;
-  /** Exact calendar year, matched as `EXTRACT(YEAR FROM visit_date)`. */
-  year_filter?: number;
-  /** Exact calendar month, 1-12, matched as `EXTRACT(MONTH FROM visit_date)`. */
-  month_filter?: number;
+	ringing_group_filter: number;
+	group_by_species: boolean;
+	group_by_time_period?: Exclude<StatsTemporalUnit, 'all-time'>;
+	from_date?: string;
+	to_date?: string;
+	/** Exact calendar year, matched as `EXTRACT(YEAR FROM visit_date)`. */
+	year_filter?: number;
+	/** Exact calendar month, 1-12, matched as `EXTRACT(MONTH FROM visit_date)`. */
+	month_filter?: number;
 };

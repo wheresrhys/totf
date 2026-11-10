@@ -19,6 +19,9 @@ cache tables"). Three concerns live here:
   sends them to the queue (`app/lib/queue-dispatch.ts`'s `inline`/Vercel-queue split).
   `dispatchManualStatsCacheRegenerateEvent` is the import-less counterpart — see
   "Manual regenerate events" below.
+- **Result types** (`types.ts`) — the canonical shape a consumer reads a stats cell as. See
+  "The stats-result types" below; this is the one part of the module's surface that is types
+  (plus one const) rather than functions.
 - **Refresh** (`lib/refresh/`) — the queue consumer side: `refreshSimpleStatsCache` reads the four
   `stats_cache_*_metrics` RPCs, merges their per-cell rows, and writes the result back to the cache
   tables. See "The refresh pipeline" below. Its read-only sibling,
@@ -42,8 +45,10 @@ both `Exclude<StatsTemporalUnit, 'all-time'>` for exactly that reason.
 
 ## Barrel split: `index.ts` vs `browser.ts`
 
-`browser.ts` re-exports only the client-safe surface (`types`, `readStatsCacheRows`,
-`globalStatsCacheFetchPool`, `StatsCacheFetchPool`); `index.ts` re-exports everything `browser.ts`
+`browser.ts` re-exports only the client-safe surface — `export * from './types'`, so every type
+*and* the one runtime const in `types.ts` (`BiometricStatNames`) is on the client-safe barrel
+automatically, plus `readStatsCacheRows`,
+`globalStatsCacheFetchPool`, `StatsCacheFetchPool`; `index.ts` re-exports everything `browser.ts`
 does plus `dispatchStatsCacheRefreshEvents`/`dispatchManualStatsCacheRegenerateEvent`/
 `refreshSimpleStatsCache`/`findSimpleStatsCacheDiscrepancies`, which pull in
 `@vercel/queue` and the full `lib/refresh/` pipeline and so are server-only.
@@ -64,9 +69,12 @@ browser bundle. Server-only call sites (`app/api/import/route.ts`,
 ```
 modules/stats/
   index.ts / browser.ts    # the two barrels above
-  types.ts                 # every type shared across more than one file in this module
+  types.ts                 # every type shared across more than one file in this module, plus
+                           # the module-owned stats-result types + BiometricStatNames consumers
+                           # read cache rows as (see "The stats-result types" below)
                            # — note `StatsTemporalUnit` is neither defined nor re-exported
                            # here; import it from app/models/temporal-unit (see above)
+  __tests__/types.test.ts  # only the drift guards types.ts needs beyond tsc — see "Testing"
   lib/
     stats-cache.ts                 # readStatsCacheRows
     stats-cache-fetch-pool.ts      # StatsCacheFetchPool
@@ -86,6 +94,51 @@ modules/stats/
       find-cache-discrepancies.ts  # findSimpleStatsCacheDiscrepancies — the read-only
                                    # comparator sibling of run-refresh-pass.ts; see below
 ```
+
+## The stats-result types (#1413)
+
+The canonical shape a consumer reads a stats cell as. These types **this module owns** — unlike
+`StatsTemporalUnit` above, they are defined here and re-exported from both barrels, which is
+exactly what the root `CLAUDE.md`'s "Module conventions" prescribes for an owned type. They
+replace the hand-maintained `CoreStatsResult`/`BiometricsStatsResult` column literals in
+`app/models/db.ts` (#1372), which used to mirror real RPC composite types; both RPCs are gone from
+the schema and every call site now reads the materialized cache tables.
+
+```
+BookkeepingColumn            # 'id' | 'group_id' | 'created_at' | 'updated_at' | 'temporal_unit'
+StatsCacheResult             # SimpleStatsCache Row          − bookkeeping + { species_name: null }
+StatsCacheBySpeciesResult    # SimpleStatsCacheBySpecies Row − bookkeeping − species_id
+                             #                               + { species_name: string }
+StatsResult                  # the union of the two
+StatsResultFor<BySpecies>    # the one member a statically-known bySpecies flag implies
+BiometricStatNames           # the 8 *_weight/*_wing column names, as const
+BiometricStatName            # (typeof BiometricStatNames)[number]
+```
+
+Four things worth knowing before touching them:
+
+- **They derive from the generated table `Row`s, not from hand-written column lists.** That is
+  the whole point: a column added to or removed from either cache table flows through
+  automatically. The only hand-written member is `BiometricStatNames`, and
+  `__tests__/types.test.ts` exists to stop *that* drifting from the generated row (see "Testing").
+- **`species_name` is intersected on, not read off the table.** Neither cache table has such a
+  column — `SimpleStatsCacheBySpecies` keys on a `species_id` FK and `SimpleStatsCache` has
+  neither. `readStatsCacheRows` resolves the name through a PostgREST `Species(species_name)`
+  embed and flattens it onto every row (`null` for an all-species read), so the intersection
+  models what the reader actually returns. `null` vs `string` is also what discriminates the
+  union, which is why `species_name` is deliberately *not* treated as a bookkeeping column.
+- **`species_id` is omitted from the by-species member** even though `readStatsCacheRows` returns
+  it: it is the pre-resolution form of `species_name`, and no consumer reads both. A future
+  consumer that genuinely needs the id (e.g. a live-RPC merge keyed on it) should add it back
+  deliberately rather than rely on it being there.
+- **`BookkeepingColumn` is deliberately not unified with
+  `lib/refresh/find-cache-discrepancies.ts`' `CACHE_ROW_BOOKKEEPING_FIELD_NAMES`**, which looks
+  near-identical but is a genuinely different set — it also excludes `species_name`, because its
+  every-field-falsy check runs over a *raw cached row* where a non-null `species_name` string
+  would trip the check. It is also a runtime `Set<string>` rather than a column union of a
+  generated `Row`, so it is the wrong shape to derive from. The reasoning is restated at the
+  `BookkeepingColumn` declaration itself; keep the two in step by hand if a bookkeeping column is
+  ever added.
 
 ## Manual regenerate events (#1379)
 
@@ -266,6 +319,14 @@ things worth knowing:
   trips it) and get reported anyway.
 
 ## Testing
+
+`__tests__/types.test.ts` is deliberately tiny, and only covers the one thing in `types.ts` that
+`tsc` can't already prove: that `BiometricStatNames` — the single hand-written member of the
+stats-result family — still names exactly the generated by-species row's `*_weight`/`*_wing`
+columns. The assertion itself is a compile-time mutual-assignability check that the `it` body only
+reads back, since a runtime test can't see a type. Don't add `it`s restating the other
+declarations: they are `Omit`/conditional types over generated input, so `tsc` already proves
+every property of them a test could assert.
 
 `lib/refresh/__tests__/rpc-params.test.ts` covers the one pure, cleanly-separable function
 (`batchPeriodsBySessionDateSpan`) directly. Everything else about the refresh pipeline is
