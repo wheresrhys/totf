@@ -159,6 +159,25 @@ across the fan-out. Independently, the species-grouped pass also narrows its *wr
 `speciesIds` when given (`filterToTouchedSpecies`), for every temporal unit including `all-time` —
 write-only, since the all-species write has no `species_id` to filter on.
 
+**A day-grain by-species pass no longer writes zero cells (#1385).** `stats_spine` used to cross
+every species in range against every session day in range, so the `groupBySpecies` half of a `day`
+refresh wrote one zero-count `SimpleStatsCacheBySpecies` row per (species, day) pair the species
+was never actually caught on. Its day-grain spine is now sparse on both axes, so the pass writes
+only the cells a species was encountered in — fewer rows per window, same values for every row it
+still writes. Nothing in this module changed for it; `filterToTouchedPeriods`/`filterToTouchedSpecies`
+simply operate on a smaller input, and `mergeSimpleMetricRows`' "a key present in some but not all
+4 RPCs is a genuine anomaly" rule still holds because all four metric RPCs share one `stats_spine`
+call per filter object and therefore narrow identically. See `supabase/CLAUDE.md`'s "The species
+axis is sparse for exactly one parameterisation" for the SQL.
+
+**The caveat that comes with it: this pipeline is upsert-only, so it can never prune a cell that
+has already been written.** Neither cache table has a DELETE grant or policy (#1202), by design,
+and `write-cache-rows.ts` only ever upserts. A pre-#1385 group's stale zero rows were removed by
+that ticket's one-off backfill DML, not by a refresh. That's safe rather than merely tolerated: the
+import path only ever accumulates encounters, and `trg_prevent_bird_species_id_change` blocks
+species reassignment, so a cell cannot transition non-zero → zero in production. Don't add a DELETE
+path here to "fix" a hypothetical that can't arise.
+
 The day-session preflight (`fetchGroupSessionDates` in `run-refresh-pass.ts`) is fetched fresh per
 pass rather than once and threaded through both `groupBySpecies` calls — twice the queries, traded
 for simpler signatures, since it's one cheap indexed scan.

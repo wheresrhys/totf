@@ -18,6 +18,12 @@
  *   month, narrowed to a single cell by month_filter (#1178) — a squashed cell is
  *   exactly what month_filter alone selects, which is what lets
  *   refreshSimpleStatsCache narrow this temporal unit by touched calendar month.
+ * - stats_spine's (species × period) cross join has one exception, added in
+ *   #1385: group_by_species together with group_by_time_period = 'day' is sparse
+ *   on BOTH axes, emitting a cell only for the (species, session day) pairs a
+ *   species was actually encountered in-hand on. See the "sparse species×day
+ *   spine" / "every other parameterisation is unchanged" / "day-grain consumers"
+ *   describe blocks at the bottom of this file.
  * - stats_spine's session_date_range CTE now scopes by ringing_group_filter, like
  *   every sibling CTE in this RPC family — see the "session_date_range cross-group
  *   scoping" describe block below, covering the fix for the prod statement-timeout
@@ -669,5 +675,541 @@ describe('stats_spine', () => {
 			// the fix produces exactly one.
 			expect(months).toEqual([`${yr}-03-01`]);
 		});
+	});
+});
+
+/**
+ * A throwaway group plus the Locations/Sessions/Birds/Encounters bookkeeping the
+ * three #1385 describe blocks below all need, with one `cleanup()` that tears
+ * the whole lot down in FK order. An isolated group per describe (rather than a
+ * window into shared Delta) is what makes these assertions exact: every call
+ * below passes `ringing_group_filter`, so no concurrently-running worktree's
+ * rows can perturb a cell set.
+ */
+async function createSpineFixtureGroup(groupLabel: string) {
+	const groupId = createIsolatedGroup(groupLabel);
+	const client = await getAuthenticatedSupabaseClientForGroup(groupId);
+	const locationId = await insertTestLocation(
+		client,
+		groupId,
+		`${groupLabel} Loc`
+	);
+	const sessionIds: number[] = [];
+	const birdIds: number[] = [];
+
+	return {
+		groupId,
+		client,
+		async addSession(visitDate: string): Promise<number> {
+			const sessionId = await insertTestSession(client, locationId, visitDate);
+			sessionIds.push(sessionId);
+			return sessionId;
+		},
+		/**
+		 * One bird of `speciesId`, caught once in each of `sessionsCaughtIn`.
+		 * `recordType` is what separates in-hand data from a resighting the spine
+		 * must ignore ('U'/'F'/'D'); `age_code: 4` puts every encounter in the
+		 * adult bucket, which is what lets the day-grain consumer block assert a
+		 * non-zero adult count per metric group.
+		 */
+		async addBird(
+			ringNo: string,
+			speciesId: number,
+			sessionsCaughtIn: number[],
+			recordType = 'N'
+		): Promise<number> {
+			const birdId = await insertTestBird(client, ringNo, speciesId);
+			birdIds.push(birdId);
+			for (const sessionId of sessionsCaughtIn) {
+				await insertTestEncounter(client, birdId, sessionId, {
+					age_code: 4,
+					record_type: recordType,
+					weight: 18,
+					wing_length: 70
+				});
+			}
+			return birdId;
+		},
+		cleanup() {
+			const statements = [
+				birdIds.length &&
+					`DELETE FROM "Encounters" WHERE bird_id IN (${birdIds.join(', ')});`,
+				birdIds.length &&
+					`DELETE FROM "Birds" WHERE id IN (${birdIds.join(', ')});`,
+				sessionIds.length &&
+					`DELETE FROM "Sessions" WHERE id IN (${sessionIds.join(', ')});`,
+				`DELETE FROM "Locations" WHERE id = ${locationId};`,
+				`DELETE FROM "RingingGroups" WHERE id = ${groupId};`
+			].filter(Boolean) as string[];
+			psql(statements.join(''));
+		}
+	};
+}
+
+/** `(species_id, time_period)` cell keys, sorted — the spine's own grain. */
+function cellKeys(
+	rows: { species_id: number | null; time_period: string | null }[]
+): string[] {
+	return rows.map((row) => `${row.species_id}|${row.time_period}`).sort();
+}
+
+/**
+ * `(species_name, time_period)` cell keys, sorted — demographics_stats and
+ * arrivals_stats are keyed on species_name rather than species_id, so their
+ * cell sets are compared on that axis and mapped onto it from species ids
+ * where the two families are compared against each other.
+ */
+function namedCellKeys(
+	rows: { species_name: string | null; time_period: string | null }[]
+): string[] {
+	return rows.map((row) => `${row.species_name}|${row.time_period}`).sort();
+}
+
+describe('stats_spine — sparse species×day spine', () => {
+	let fixture: Awaited<ReturnType<typeof createSpineFixtureGroup>>;
+	let emptyFixture: Awaited<ReturnType<typeof createSpineFixtureGroup>>;
+
+	let robinSpeciesId: number;
+	let wrenSpeciesId: number;
+	let blueTitSpeciesId: number;
+
+	const suffix = randomTestSuffix();
+
+	// Well outside both the 2021-2024 seed range and the 2080-2119 bands the
+	// other blocks in this file randomise within.
+	const yr = 2140 + Math.floor(Math.random() * 20);
+	const robinDay = `${yr}-03-10`;
+	const wrenDay = `${yr}-03-11`;
+	// A second Robin day in a different month, deliberately OUTSIDE the
+	// robinDay..wrenDay window the two-species × two-days assertions use, so it
+	// can't perturb them.
+	const robinSecondDay = `${yr}-04-20`;
+
+	beforeAll(async () => {
+		[robinSpeciesId, wrenSpeciesId, blueTitSpeciesId] = await Promise.all([
+			getSpeciesId('Robin'),
+			getSpeciesId('Wren'),
+			getSpeciesId('Blue Tit')
+		]);
+
+		fixture = await createSpineFixtureGroup(`SparseDay ${suffix}`);
+		const robinSession = await fixture.addSession(robinDay);
+		const wrenSession = await fixture.addSession(wrenDay);
+		const robinSecondSession = await fixture.addSession(robinSecondDay);
+
+		await fixture.addBird(`SPARSE-ROB-${suffix}`, robinSpeciesId, [
+			robinSession,
+			robinSecondSession
+		]);
+		await fixture.addBird(`SPARSE-WRE-${suffix}`, wrenSpeciesId, [wrenSession]);
+		// Resighting-only: a 'U' record on a day another species WAS caught on.
+		await fixture.addBird(
+			`SPARSE-BLU-${suffix}`,
+			blueTitSpeciesId,
+			[robinSession],
+			'U'
+		);
+
+		// A group with a session but nothing caught in-hand at all.
+		emptyFixture = await createSpineFixtureGroup(`SparseDayEmpty ${suffix}`);
+		await emptyFixture.addSession(robinDay);
+	});
+
+	afterAll(() => {
+		fixture.cleanup();
+		emptyFixture.cleanup();
+	});
+
+	function spineParams(overrides: Record<string, unknown>) {
+		return {
+			ringing_group_filter: fixture.groupId,
+			group_by_species: true,
+			group_by_time_period: 'day',
+			...overrides
+		};
+	}
+
+	// Usual — the 2-of-4 shape this whole ticket is about
+	it('emits a cell only for the (species, day) pairs that were actually encountered', async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({ from_date: robinDay, to_date: wrenDay })
+		);
+		expect(error).toBeNull();
+		// Two species, two session days: the dense cross join gave all four
+		// pairs (six, counting the resighting-only Blue Tit), the narrowed spine
+		// gives exactly the two that happened.
+		expect(cellKeys(data!)).toEqual(
+			[`${robinSpeciesId}|${robinDay}`, `${wrenSpeciesId}|${wrenDay}`].sort()
+		);
+	});
+
+	// Usual
+	it('emits one cell per encountered day for a species caught on several days', async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({
+				species_name_filter: 'Robin',
+				from_date: `${yr}-01-01`,
+				to_date: `${yr}-12-31`
+			})
+		);
+		expect(error).toBeNull();
+		expect(cellKeys(data!)).toEqual(
+			[
+				`${robinSpeciesId}|${robinDay}`,
+				`${robinSpeciesId}|${robinSecondDay}`
+			].sort()
+		);
+	});
+
+	// Edge
+	it('emits no day cell for a species whose only encounters are resightings', async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({ from_date: `${yr}-01-01`, to_date: `${yr}-12-31` })
+		);
+		expect(error).toBeNull();
+		expect(data!.map((r) => r.species_id)).not.toContain(blueTitSpeciesId);
+
+		// Note the nuance the ticket's wording glosses over: a resighting-only
+		// species reaches species_spine via stats_raw_encounters' NULL-encounter_id
+		// row only on a wholly UNFILTERED call. Every real caller (and every
+		// assertion here) passes ringing_group_filter, and that row's NULL
+		// sess.ringing_group_id can't satisfy the filter — so the species is absent
+		// from the filtered spine at every grain, not just the day grain. Asserting
+		// the month grain too pins that, rather than implying the day branch is
+		// what excludes it.
+		const { data: monthCells } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({
+				group_by_time_period: 'month',
+				from_date: `${yr}-01-01`,
+				to_date: `${yr}-12-31`
+			})
+		);
+		expect(monthCells!.map((r) => r.species_id)).not.toContain(
+			blueTitSpeciesId
+		);
+	});
+
+	// Edge
+	it("honours species_name_filter, returning only the filtered species' own encountered days", async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({
+				species_name_filter: 'Wren',
+				from_date: `${yr}-01-01`,
+				to_date: `${yr}-12-31`
+			})
+		);
+		expect(error).toBeNull();
+		expect(cellKeys(data!)).toEqual([`${wrenSpeciesId}|${wrenDay}`]);
+	});
+
+	// Edge
+	it('honours from_date/to_date, dropping an encountered pair outside the window', async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({ from_date: robinDay, to_date: robinDay })
+		);
+		expect(error).toBeNull();
+		// Wren's own encountered pair is a day later and is gone entirely — not
+		// retained as an empty cell.
+		expect(cellKeys(data!)).toEqual([`${robinSpeciesId}|${robinDay}`]);
+	});
+
+	// Edge
+	it('honours year_filter/month_filter on the sparse branch', async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({ year_filter: yr, month_filter: 4 })
+		);
+		expect(error).toBeNull();
+		expect(cellKeys(data!)).toEqual([`${robinSpeciesId}|${robinSecondDay}`]);
+
+		const { data: wrongYear } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({ year_filter: yr + 1 })
+		);
+		expect(wrongYear).toEqual([]);
+	});
+
+	// Edge
+	it('returns no rows for a group with sessions but no in-hand encounters at all', async () => {
+		const { data, error } = await emptyFixture.client.rpc('stats_spine', {
+			ringing_group_filter: emptyFixture.groupId,
+			group_by_species: true,
+			group_by_time_period: 'day'
+		});
+		expect(error).toBeNull();
+		expect(data).toEqual([]);
+	});
+});
+
+describe('stats_spine — every other parameterisation is unchanged', () => {
+	let fixture: Awaited<ReturnType<typeof createSpineFixtureGroup>>;
+
+	let robinSpeciesId: number;
+	let wrenSpeciesId: number;
+
+	const suffix = randomTestSuffix();
+
+	const yr = 2160 + Math.floor(Math.random() * 20);
+	const robinDay = `${yr}-03-10`;
+	const wrenDay = `${yr}-03-11`;
+	// A session in a LATER year with nothing caught at all. session_date_range
+	// reads Sessions directly, so it still stretches the dense month/year spines
+	// out to its own period — which is exactly the density these tests pin.
+	const emptySessionDay = `${yr + 1}-06-20`;
+
+	const windowFrom = `${yr}-01-01`;
+	const windowTo = `${yr + 1}-12-31`;
+
+	beforeAll(async () => {
+		[robinSpeciesId, wrenSpeciesId] = await Promise.all([
+			getSpeciesId('Robin'),
+			getSpeciesId('Wren')
+		]);
+
+		fixture = await createSpineFixtureGroup(`DenseSpine ${suffix}`);
+		const robinSession = await fixture.addSession(robinDay);
+		const wrenSession = await fixture.addSession(wrenDay);
+		await fixture.addSession(emptySessionDay);
+
+		await fixture.addBird(`DENSE-ROB-${suffix}`, robinSpeciesId, [
+			robinSession
+		]);
+		await fixture.addBird(`DENSE-WRE-${suffix}`, wrenSpeciesId, [wrenSession]);
+	});
+
+	afterAll(() => {
+		fixture.cleanup();
+	});
+
+	function spineParams(overrides: Record<string, unknown>) {
+		return {
+			ringing_group_filter: fixture.groupId,
+			group_by_species: true,
+			from_date: windowFrom,
+			to_date: windowTo,
+			...overrides
+		};
+	}
+
+	// Structure
+	it('the group-wide (group_by_species = false) day spine still returns one cell per session date', async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({ group_by_species: false, group_by_time_period: 'day' })
+		);
+		expect(error).toBeNull();
+		// One cell per session date with in-hand data, species_id NULL — and the
+		// nothing-caught-in-hand date absent exactly as it was before #1385, since
+		// period_spine's day branch has always been driven off raw_encounters.
+		expect(cellKeys(data!)).toEqual(
+			[`null|${robinDay}`, `null|${wrenDay}`].sort()
+		);
+		expect(data!.map((r) => r.time_period)).not.toContain(emptySessionDay);
+	});
+
+	// Structure
+	it("the month spine stays dense per species across session_date_range's min..max", async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({ group_by_time_period: 'month' })
+		);
+		expect(error).toBeNull();
+		// March of yr through June of yr+1 is 16 months, dense, for each of the
+		// two species in species_spine.
+		expect(data).toHaveLength(32);
+		const robinMonths = data!
+			.filter((r) => r.species_id === robinSpeciesId)
+			.map((r) => r.time_period);
+		expect(robinMonths).toContain(`${yr}-03-01`);
+		expect(robinMonths).toContain(`${yr + 1}-06-01`);
+		// A month Robin was never caught in still gets its cell.
+		expect(robinMonths).toContain(`${yr}-05-01`);
+	});
+
+	// Structure
+	it('the year spine stays dense per species', async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({ group_by_time_period: 'year' })
+		);
+		expect(error).toBeNull();
+		// Wren was only ever caught in yr, but the empty yr+1 session stretches
+		// session_date_range into that year, so both species get both cells.
+		expect(cellKeys(data!)).toEqual(
+			[
+				`${robinSpeciesId}|${yr}-01-01`,
+				`${robinSpeciesId}|${yr + 1}-01-01`,
+				`${wrenSpeciesId}|${yr}-01-01`,
+				`${wrenSpeciesId}|${yr + 1}-01-01`
+			].sort()
+		);
+	});
+
+	// Structure
+	it('month-squashed still returns all 12 cells per species, and exactly one when month_filter is set', async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({ group_by_time_period: 'month-squashed' })
+		);
+		expect(error).toBeNull();
+		expect(data).toHaveLength(24);
+
+		const { data: narrowed } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({
+				group_by_time_period: 'month-squashed',
+				month_filter: 3
+			})
+		);
+		expect(cellKeys(narrowed!)).toEqual(
+			[`${robinSpeciesId}|2000-03-01`, `${wrenSpeciesId}|2000-03-01`].sort()
+		);
+	});
+
+	// Structure — the all-time shape is where a naive `= 'day'` guard would have
+	// broken: group_by_time_period is NULL there, so a non-NULL-safe comparison
+	// filters the whole cross join out.
+	it('the all-time shape (group_by_time_period NULL) still returns one cell per species', async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_spine',
+			spineParams({ group_by_time_period: null })
+		);
+		expect(error).toBeNull();
+		expect(cellKeys(data!)).toEqual(
+			[`${robinSpeciesId}|null`, `${wrenSpeciesId}|null`].sort()
+		);
+	});
+});
+
+describe('stats_spine — day-grain consumers', () => {
+	let fixture: Awaited<ReturnType<typeof createSpineFixtureGroup>>;
+
+	let robinSpeciesId: number;
+	let wrenSpeciesId: number;
+
+	const suffix = randomTestSuffix();
+
+	const yr = 2180 + Math.floor(Math.random() * 15);
+	const robinDay = `${yr}-03-10`;
+	const wrenDay = `${yr}-03-11`;
+
+	/**
+	 * The four `stats_cache_*_metrics` RPCs, each with one metric column that
+	 * must be non-zero/non-null for a cell the narrowed spine kept. Every
+	 * encounter in the fixture is `age_code: 4` (adult) with a weight, so the
+	 * adult counts and the biometrics are the natural per-metric-group
+	 * equivalents of basic-session's `encounter_count`.
+	 */
+	const METRIC_RPCS = [
+		{ rpc: 'stats_cache_basic_session_metrics', metric: 'encounter_count' },
+		{ rpc: 'stats_cache_bird_age_metrics', metric: 'adult_bird_count' },
+		{ rpc: 'stats_cache_encounter_age_metrics', metric: 'adult_enc_count' },
+		{ rpc: 'stats_cache_biometrics_metrics', metric: 'max_weight' }
+	] as const;
+
+	beforeAll(async () => {
+		[robinSpeciesId, wrenSpeciesId] = await Promise.all([
+			getSpeciesId('Robin'),
+			getSpeciesId('Wren')
+		]);
+
+		fixture = await createSpineFixtureGroup(`DayConsumers ${suffix}`);
+		const robinSession = await fixture.addSession(robinDay);
+		const wrenSession = await fixture.addSession(wrenDay);
+
+		await fixture.addBird(`DAYC-ROB-${suffix}`, robinSpeciesId, [robinSession]);
+		await fixture.addBird(`DAYC-WRE-${suffix}`, wrenSpeciesId, [wrenSession]);
+	});
+
+	afterAll(() => {
+		fixture.cleanup();
+	});
+
+	function dayGrainParams() {
+		return {
+			ringing_group_filter: fixture.groupId,
+			group_by_species: true,
+			group_by_time_period: 'day',
+			from_date: robinDay,
+			to_date: wrenDay
+		};
+	}
+
+	const expectedCellKeys = () =>
+		[`${robinSpeciesId}|${robinDay}`, `${wrenSpeciesId}|${wrenDay}`].sort();
+
+	// Usual
+	it.each(METRIC_RPCS)(
+		'$rpc returns exactly the encountered (species, day) cells, each with a non-zero $metric',
+		async ({ rpc, metric }) => {
+			const { data, error } = await fixture.client.rpc(rpc, dayGrainParams());
+			expect(error).toBeNull();
+			expect(cellKeys(data!)).toEqual(expectedCellKeys());
+			for (const row of data!) {
+				expect(Number(row[metric])).toBeGreaterThan(0);
+			}
+		}
+	);
+
+	// Usual
+	it('demographics_stats and arrivals_stats return the same narrowed cell set for the same parameters', async () => {
+		const [{ data: demographics }, { data: arrivals }] = await Promise.all([
+			fixture.client.rpc('demographics_stats', dayGrainParams()),
+			fixture.client.rpc('arrivals_stats', dayGrainParams())
+		]);
+		const expected = [`Robin|${robinDay}`, `Wren|${wrenDay}`].sort();
+		expect(namedCellKeys(demographics!)).toEqual(expected);
+		expect(namedCellKeys(arrivals!)).toEqual(expected);
+	});
+
+	// Structure — guards against a regression that CHANGES a surviving row
+	// rather than merely dropping rows, which a cell-set assertion alone would
+	// pass. The literals are the hand-derived values for this fixture's single
+	// Robin encounter (one adult 'N' capture at 10:00:00, weight 18, wing 70):
+	// one of everything. Compared with toMatchObject so a column added to the
+	// result type doesn't fail the test spuriously.
+	it('a cell surviving the narrowing carries identical values to the pre-change output', async () => {
+		const { data, error } = await fixture.client.rpc(
+			'stats_cache_basic_session_metrics',
+			dayGrainParams()
+		);
+		expect(error).toBeNull();
+		const robinCell = data!.find(
+			(row) => row.species_id === robinSpeciesId && row.time_period === robinDay
+		);
+		expect(robinCell).toMatchObject({
+			species_id: robinSpeciesId,
+			time_period: robinDay,
+			species_count: 1,
+			bird_count: 1,
+			encounter_count: 1,
+			new_bird_count: 1,
+			session_count: 1,
+			avg_encounters_per_session: 1,
+			max_per_session: 1,
+			max_new_per_session: 1
+		});
+	});
+
+	// Edge — the precondition mergeSimpleMetricRows' anomaly dead-lettering
+	// depends on: a key present in some but not all of the metric RPCs is
+	// treated as a real anomaly and skipped, so a divergence here would
+	// dead-letter every cell rather than caching it.
+	it('the four metric RPCs agree on the narrowed cell set', async () => {
+		const metricKeySets = await Promise.all(
+			METRIC_RPCS.map(async ({ rpc }) => {
+				const { data } = await fixture.client.rpc(rpc, dayGrainParams());
+				return cellKeys(data!);
+			})
+		);
+		for (const keys of metricKeySets) {
+			expect(keys).toEqual(metricKeySets[0]);
+		}
 	});
 });
