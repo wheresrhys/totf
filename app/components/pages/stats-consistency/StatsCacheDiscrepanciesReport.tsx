@@ -21,6 +21,39 @@ import {
 	type DiscrepancyScope,
 	type DiscrepancyScopeResults
 } from './discrepancy-scopes';
+import { DiscrepancyRowFixButtons } from './DiscrepancyRowFixButtons';
+import {
+	isDiscrepancyRowCoveredByFixDispatch,
+	type DiscrepancyRowScope,
+	type StatsCacheFixDispatch
+} from './discrepancy-row-fix-scope';
+
+/**
+ * The fix-request state #1390 lifts above every row of the whole report —
+ * deliberately not per scope section. A dispatch from a by-species row covers
+ * the matching overall row too (and vice versa), and those two rows live in
+ * different sections, so anything narrower than report-wide would leave half
+ * the covered rows looking untouched.
+ */
+type FixRequestState = {
+	dispatches: StatsCacheFixDispatch[];
+	onFixRequested: (dispatch: StatsCacheFixDispatch) => void;
+};
+
+/** The three fields the fix buttons read, pulled off a scope + one of its discrepant cells — a cell's `null` period/species becomes an absent field. */
+function discrepancyRowScope(
+	scope: DiscrepancyScope,
+	discrepancy: StatsCacheDiscrepancy
+): DiscrepancyRowScope {
+	const row: DiscrepancyRowScope = { temporalUnit: scope.temporalUnit };
+	if (discrepancy.time_period !== null) {
+		row.period = discrepancy.time_period;
+	}
+	if (discrepancy.species_id !== null) {
+		row.speciesId = discrepancy.species_id;
+	}
+	return row;
+}
 
 type DiscrepancyItemModel = {
 	label: string;
@@ -131,11 +164,13 @@ function discrepancyItemId(
 function DiscrepancyList({
 	scope,
 	discrepancies,
-	speciesNamesById
+	speciesNamesById,
+	fixRequests
 }: {
 	scope: DiscrepancyScope;
 	discrepancies: StatsCacheDiscrepancy[];
 	speciesNamesById: Record<number, string>;
+	fixRequests: FixRequestState;
 }) {
 	const [expandedId, setExpandedId] = useState<string | false>(false);
 
@@ -147,10 +182,20 @@ function DiscrepancyList({
 		<BoxyList>
 			{discrepancies.map((discrepancy) => {
 				const id = discrepancyItemId(scope, discrepancy);
+				const row = discrepancyRowScope(scope, discrepancy);
 				return (
 					<AccordionItem<DiscrepancyItemModel>
 						key={id}
 						id={id}
+						actions={
+							<DiscrepancyRowFixButtons
+								row={row}
+								isFixRequested={fixRequests.dispatches.some((dispatch) =>
+									isDiscrepancyRowCoveredByFixDispatch(row, dispatch)
+								)}
+								onFixRequested={fixRequests.onFixRequested}
+							/>
+						}
 						HeadingComponent={DiscrepancyItemHeading}
 						ContentComponent={DiscrepancyItemContent}
 						model={{
@@ -179,10 +224,12 @@ type LazyScopeState =
 
 function LazyDiscrepancyScopeSection({
 	scope,
-	speciesNamesById
+	speciesNamesById,
+	fixRequests
 }: {
 	scope: DiscrepancyScope;
 	speciesNamesById: Record<number, string>;
+	fixRequests: FixRequestState;
 }) {
 	const [state, setState] = useState<LazyScopeState>({ kind: 'idle' });
 
@@ -221,6 +268,7 @@ function LazyDiscrepancyScopeSection({
 			scope={scope}
 			discrepancies={state.discrepancies}
 			speciesNamesById={speciesNamesById}
+			fixRequests={fixRequests}
 		/>
 	);
 }
@@ -273,11 +321,13 @@ function useEagerDiscrepancyScopeResults(): DiscrepancyScopeResults {
 function EagerDiscrepancyScopeSection({
 	scope,
 	result,
-	speciesNamesById
+	speciesNamesById,
+	fixRequests
 }: {
 	scope: DiscrepancyScope;
 	result: FetchStatsCacheDiscrepanciesResult | undefined;
 	speciesNamesById: Record<number, string>;
+	fixRequests: FixRequestState;
 }) {
 	if (!result) {
 		return <p>Checking…</p>;
@@ -294,6 +344,7 @@ function EagerDiscrepancyScopeSection({
 			scope={scope}
 			discrepancies={result.discrepancies}
 			speciesNamesById={speciesNamesById}
+			fixRequests={fixRequests}
 		/>
 	);
 }
@@ -301,11 +352,13 @@ function EagerDiscrepancyScopeSection({
 function DiscrepancyScopeSection({
 	scope,
 	eagerResult,
-	speciesNamesById
+	speciesNamesById,
+	fixRequests
 }: {
 	scope: DiscrepancyScope;
 	eagerResult: FetchStatsCacheDiscrepanciesResult | undefined;
 	speciesNamesById: Record<number, string>;
+	fixRequests: FixRequestState;
 }) {
 	return (
 		<section data-testid={`discrepancy-scope-${discrepancyScopeKey(scope)}`}>
@@ -317,11 +370,13 @@ function DiscrepancyScopeSection({
 					scope={scope}
 					result={eagerResult}
 					speciesNamesById={speciesNamesById}
+					fixRequests={fixRequests}
 				/>
 			) : (
 				<LazyDiscrepancyScopeSection
 					scope={scope}
 					speciesNamesById={speciesNamesById}
+					fixRequests={fixRequests}
 				/>
 			)}
 		</section>
@@ -338,6 +393,12 @@ function DiscrepancyScopeSection({
  * manual "Run check" trigger, deferring their own comparison call until
  * clicked — see this ticket's "Performance-scoping design" for why those
  * two stay opt-in rather than automatic.
+ *
+ * Each row also carries #1390's `DiscrepancyRowFixButtons`, and this
+ * component owns the list of successfully-dispatched fix scopes they flip
+ * rows on — see `FixRequestState` for why that state is report-wide rather
+ * than per section, and `DiscrepancyRowFixButtons`' own doc comment for why
+ * a "fix requested" row is never re-checked or removed without a reload.
  */
 export function StatsCacheDiscrepanciesReport({
 	speciesNamesById
@@ -345,6 +406,14 @@ export function StatsCacheDiscrepanciesReport({
 	speciesNamesById: Record<number, string>;
 }) {
 	const eagerResults = useEagerDiscrepancyScopeResults();
+	const [fixRequestedDispatches, setFixRequestedDispatches] = useState<
+		StatsCacheFixDispatch[]
+	>([]);
+	const fixRequests: FixRequestState = {
+		dispatches: fixRequestedDispatches,
+		onFixRequested: (dispatch) =>
+			setFixRequestedDispatches((previous) => [...previous, dispatch])
+	};
 	return (
 		<div>
 			<SecondaryHeading>Stats cache discrepancies</SecondaryHeading>
@@ -354,6 +423,7 @@ export function StatsCacheDiscrepanciesReport({
 					scope={scope}
 					eagerResult={eagerResults[discrepancyScopeKey(scope)]}
 					speciesNamesById={speciesNamesById}
+					fixRequests={fixRequests}
 				/>
 			))}
 		</div>

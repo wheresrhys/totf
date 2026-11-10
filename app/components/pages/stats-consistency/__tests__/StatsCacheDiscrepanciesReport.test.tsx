@@ -19,12 +19,18 @@ import {
 	EAGER_DISCREPANCY_SCOPES,
 	discrepancyScopeKey,
 	discrepancyScopeHeading,
+	discrepancyItemLabel,
 	type DiscrepancyScope
 } from '../discrepancy-scopes';
+import { regenerateStatsCache } from '@/app/actions/regenerate-stats-cache';
 import type { StatsCacheDiscrepancy } from '@/modules/stats';
 
 vi.mock('@/app/actions/stats-cache-discrepancies', () => ({
 	fetchStatsCacheDiscrepancies: vi.fn()
+}));
+
+vi.mock('@/app/actions/regenerate-stats-cache', () => ({
+	regenerateStatsCache: vi.fn()
 }));
 
 // A hand-built discrepancy fixture filling in only the columns these tests
@@ -102,6 +108,7 @@ describe('StatsCacheDiscrepanciesReport', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockScopedResults();
+		vi.mocked(regenerateStatsCache).mockResolvedValue({ success: true });
 	});
 
 	afterEach(() => {
@@ -404,10 +411,17 @@ describe('StatsCacheDiscrepanciesReport', () => {
 			);
 			renderReport();
 			const section = getScopeSection(scope);
+			// The row's own expand/collapse button, addressed by its label rather
+			// than as "the only button in the section" — since #1390 every row
+			// also carries its sibling "fix" buttons.
 			await waitFor(() => {
-				expect(within(section).getByRole('button')).toBeTruthy();
+				expect(
+					within(section).getByRole('button', { name: /^discrepancies found/ })
+				).toBeTruthy();
 			});
-			fireEvent.click(within(section).getByRole('button'));
+			fireEvent.click(
+				within(section).getByRole('button', { name: /^discrepancies found/ })
+			);
 			return section;
 		}
 
@@ -452,6 +466,139 @@ describe('StatsCacheDiscrepanciesReport', () => {
 
 			const table = within(section).getByRole('table');
 			expect(table.parentElement?.className).toContain('overflow-x-auto');
+		});
+	});
+
+	describe('fix-request state propagation across rows', () => {
+		const speciesNamesById = { 42: 'Blackcap', 43: 'Chiffchaff' };
+		const yearCombinedScope: DiscrepancyScope = {
+			temporalUnit: 'year',
+			bySpecies: false
+		};
+		const yearBySpeciesScope: DiscrepancyScope = {
+			temporalUnit: 'year',
+			bySpecies: true
+		};
+		// A different temporal unit entirely, so no dispatch from a `year` row
+		// can ever cover it.
+		const squashedMonthBySpeciesScope: DiscrepancyScope = {
+			temporalUnit: 'month-squashed',
+			bySpecies: true
+		};
+
+		/** One rendered row's `<li>`, located via its expand/collapse button's label. */
+		function getRow(
+			scope: DiscrepancyScope,
+			timePeriod: string | null,
+			speciesId: number | null
+		) {
+			const label = discrepancyItemLabel(
+				scope,
+				timePeriod,
+				speciesId,
+				speciesNamesById
+			);
+			const row = within(getScopeSection(scope))
+				.getByRole('button', { name: label })
+				.closest('li');
+			if (!row) {
+				throw new Error(`No discrepancy row rendered for "${label}"`);
+			}
+			return row;
+		}
+
+		function getFixButton(row: HTMLElement | Element, name: string) {
+			return within(row as HTMLElement).getByRole('button', { name });
+		}
+
+		/**
+		 * Renders three `year`/`month-squashed` discrepancy rows and clicks "Fix
+		 * just this issue" on the by-species one for Blackcap/2026 — dispatching
+		 * `{temporalUnit: 'year', periods: ['2026-01-01'], speciesIds: [42]}`.
+		 */
+		async function renderAndFixBlackcap2026() {
+			mockScopedResults({
+				...withResult(yearCombinedScope, {
+					success: true,
+					discrepancies: [
+						buildDiscrepancy({ time_period: '2026-01-01', species_id: null })
+					]
+				}),
+				...withResult(yearBySpeciesScope, {
+					success: true,
+					discrepancies: [
+						buildDiscrepancy({ time_period: '2026-01-01', species_id: 42 }),
+						buildDiscrepancy({ time_period: '2027-01-01', species_id: 43 })
+					]
+				}),
+				...withResult(squashedMonthBySpeciesScope, {
+					success: true,
+					discrepancies: [
+						buildDiscrepancy({ time_period: '2026-01-01', species_id: 42 })
+					]
+				})
+			});
+			renderReport({ speciesNamesById });
+			await flushEagerFetches();
+
+			fireEvent.click(
+				getFixButton(
+					getRow(yearBySpeciesScope, '2026-01-01', 42),
+					'Fix just this issue'
+				)
+			);
+
+			await waitFor(() => {
+				expect(regenerateStatsCache).toHaveBeenCalledWith({
+					temporalUnit: 'year',
+					periods: ['2026-01-01'],
+					speciesIds: [42]
+				});
+			});
+		}
+
+		it('flips every other rendered row covered by the dispatched scope into the disabled "fix requested" state', async () => {
+			await renderAndFixBlackcap2026();
+
+			// The combined `year` 2026 row was never clicked, but the overall write
+			// pass is never speciesIds-narrowed, so the Blackcap dispatch rewrites
+			// it too.
+			const coveredRow = getRow(yearCombinedScope, '2026-01-01', null);
+			await waitFor(() => {
+				expect(
+					within(coveredRow as HTMLElement).getByText('Fix requested')
+				).toBeTruthy();
+			});
+			expect(
+				getFixButton(coveredRow, 'Fix for all time periods')
+			).toHaveProperty('disabled', true);
+		});
+
+		it('leaves rows not covered by the dispatched scope untouched', async () => {
+			await renderAndFixBlackcap2026();
+
+			await waitFor(() => {
+				expect(
+					within(
+						getRow(yearCombinedScope, '2026-01-01', null) as HTMLElement
+					).getByText('Fix requested')
+				).toBeTruthy();
+			});
+
+			// A different period of the same temporal unit, and the same species in
+			// a different temporal unit — neither is covered.
+			[
+				getRow(yearBySpeciesScope, '2027-01-01', 43),
+				getRow(squashedMonthBySpeciesScope, '2026-01-01', 42)
+			].forEach((row) => {
+				expect(
+					within(row as HTMLElement).queryByText('Fix requested')
+				).toBeNull();
+				expect(getFixButton(row, 'Fix just this issue')).toHaveProperty(
+					'disabled',
+					false
+				);
+			});
 		});
 	});
 });
