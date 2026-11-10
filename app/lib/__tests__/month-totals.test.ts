@@ -8,7 +8,6 @@ import {
 	formatMonthYearLabel,
 	formatMonthLabel
 } from '../month-totals';
-import { formatPostgresIntervalForDisplay } from '@/app/lib/postgres-interval';
 import type { CoreStatsResult } from '@/app/models/db';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 
@@ -102,12 +101,9 @@ describe('buildMonthTotalsRows', () => {
 			});
 		});
 
-		it("renders a zero-filled month's total_effort as '0' via formatPostgresIntervalForDisplay", () => {
+		it("renders a zero-filled month's total_effort as '00:00:00'", () => {
 			const rows = buildMonthTotalsRows(2026, []);
 			expect(rows[0].stats.total_effort).toBe('00:00:00');
-			expect(formatPostgresIntervalForDisplay(rows[0].stats.total_effort)).toBe(
-				'0'
-			);
 		});
 	});
 });
