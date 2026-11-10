@@ -477,7 +477,10 @@ describe('StatsCacheDiscrepanciesReport', () => {
 			return section;
 		}
 
-		function speciesGroupButton(section: HTMLElement, speciesLabelPrefix: string) {
+		function speciesGroupButton(
+			section: HTMLElement,
+			speciesLabelPrefix: string
+		) {
 			return within(section).getByRole('button', {
 				name: (accessibleName) => accessibleName.startsWith(speciesLabelPrefix)
 			});
@@ -576,9 +579,9 @@ describe('StatsCacheDiscrepanciesReport', () => {
 			// Expanding Chiffchaff's group collapses Blackcap's (single-expand
 			// across species).
 			fireEvent.click(speciesGroupButton(section, 'Chiffchaff'));
-			expect(speciesGroupButton(section, 'Blackcap').getAttribute('aria-expanded')).toBe(
-				'false'
-			);
+			expect(
+				speciesGroupButton(section, 'Blackcap').getAttribute('aria-expanded')
+			).toBe('false');
 
 			// Re-expanding Blackcap shows its nested row collapsed again, not
 			// still expanded from before.
@@ -679,7 +682,8 @@ describe('StatsCacheDiscrepanciesReport', () => {
 			);
 
 			if (scope.bySpecies && speciesId !== null) {
-				const speciesLabel = speciesNamesById[speciesId] ?? `species #${speciesId}`;
+				const speciesLabel =
+					speciesNamesById[speciesId] ?? `species #${speciesId}`;
 				const groupButton = within(section).getByRole('button', {
 					name: (accessibleName) => accessibleName.startsWith(speciesLabel)
 				});

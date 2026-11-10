@@ -339,7 +339,8 @@ function SpeciesGroupedDiscrepancyList({
 						ContentComponent={SpeciesGroupContent}
 						model={{
 							id,
-							speciesLabel: speciesNamesById[speciesId] ?? `species #${speciesId}`,
+							speciesLabel:
+								speciesNamesById[speciesId] ?? `species #${speciesId}`,
 							scope,
 							discrepancies: groups.get(speciesId) as StatsCacheDiscrepancy[],
 							speciesNamesById,
