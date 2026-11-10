@@ -37,19 +37,6 @@ test.describe('cross-group pages (beta user viewing alpha data)', { tag: '@beta'
 		})
 	})
 
-	test.describe('/group/[alphaSlug]/effort', () => {
-		test('shows Effort and Pay-off heading', async ({ page }) => {
-			await page.goto(`/group/${alphaSlug}/effort`)
-			await expect(page.getByRole('heading', { name: 'Effort and Pay-off' })).toBeVisible()
-		})
-
-		test('shows data rows with non-zero values', async ({ page }) => {
-			await page.goto(`/group/${alphaSlug}/effort`)
-			await expect(page.getByRole('columnheader', { name: '2021' })).toBeVisible()
-			await expect(page.getByRole('columnheader', { name: '2024' })).toBeVisible()
-		})
-	})
-
 	test.describe('/group/[alphaSlug]/mistakes', () => {
 		test('shows Mistakes heading', async ({ page }) => {
 			await page.goto(`/group/${alphaSlug}/mistakes`)

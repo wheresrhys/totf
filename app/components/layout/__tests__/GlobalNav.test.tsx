@@ -40,7 +40,6 @@ describe('DesktopNavItems', () => {
 		expect(screen.getByRole('link', { name: 'Resightings' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Pulli' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Ticks' })).toBeDefined();
-		expect(screen.getByRole('link', { name: 'Effort' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Compare Species' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Ring Sequences' })).toBeDefined();
 		expect(screen.getByRole('link', { name: 'Controls' })).toBeDefined();
@@ -78,10 +77,10 @@ describe('DesktopNavItems', () => {
 describe('MobileNavItems', () => {
 	afterEach(cleanup);
 
-	it('renders all 11 links in a flat list', () => {
+	it('renders all 10 links in a flat list', () => {
 		render(<MobileNavItems classes="" />);
 		const links = screen.getAllByRole('link');
-		expect(links).toHaveLength(11);
+		expect(links).toHaveLength(10);
 	});
 
 	it('includes Resightings link', () => {

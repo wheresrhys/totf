@@ -14,7 +14,6 @@ const moreLinks = [
 	{ href: '/resightings', label: 'Resightings' },
 	{ href: '/pulli', label: 'Pulli' },
 	{ href: '/ticks', label: 'Ticks' },
-	{ href: '/effort', label: 'Effort' },
 	{ href: '/compare/species', label: 'Compare Species' },
 	{ href: '/ring-sequences', label: 'Ring Sequences' },
 	{ href: '/controls', label: 'Controls' }

@@ -102,7 +102,7 @@ describe('SummaryStatsSection', () => {
 	});
 
 	describe('Edge', () => {
-		it('renders 0 for every stat, including Retraps and Effort, in a zero-activity period', () => {
+		it('renders 0 for every stat, including the derived Retraps value, in a zero-activity period', () => {
 			render(<SummaryStatsSection stats={zeroActivityStats} />);
 			expect(screen.getByText('Sessions').nextSibling?.textContent).toBe('0');
 			expect(screen.getByText('Species').nextSibling?.textContent).toBe('0');
