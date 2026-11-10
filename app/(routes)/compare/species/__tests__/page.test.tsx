@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { BiometricsStatsResult } from '@/app/models/db';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 import { compareSpeciesBiometricsTab } from '@/app/components/pages/compare-species/CompareSpeciesBiometricsTab';
 import { compareSpeciesCoreTab } from '@/app/components/pages/compare-species/CompareSpeciesCoreTab';
+import {
+	BiometricStatNames,
+	type BiometricStatName
+} from '@/modules/stats/browser';
 import Page, { type CompareSpeciesSearchParams } from '../page';
 import { ALPHA_CORE_STATS_BY_SPECIES } from '@/app/__tests__/helpers/core-stats-fixtures';
-import { ALPHA_BIOMETRICS_BY_SPECIES } from '@/app/__tests__/helpers/biometrics-stats-fixtures';
 
 const { mockFetchSpeciesComparisonStats } = vi.hoisted(() => ({
 	mockFetchSpeciesComparisonStats: vi.fn()
@@ -16,21 +18,28 @@ vi.mock('@/app/actions/compare-species', () => ({
 	fetchSpeciesComparisonStats: mockFetchSpeciesComparisonStats
 }));
 
-const coreStatsRows = ALPHA_CORE_STATS_BY_SPECIES;
-const biometricsRows = ALPHA_BIOMETRICS_BY_SPECIES;
+// Alpha's captured all-time by-species cache rows — one row per species,
+// each already carrying both metric families' columns, which is exactly what
+// `fetchSpeciesComparisonStats` now returns (#1412). Both tabs read these same
+// rows.
+const speciesStatsRows = ALPHA_CORE_STATS_BY_SPECIES;
 
-// Alpha's captured by-species snapshots cover all seven species in both
-// datasets, so the "dataset has no row for a selected species" case has to be
-// built by withholding one — see the Biometrics describe below.
-const ALPHA_SPECIES = coreStatsRows.map((row) => row.species_name);
+const ALPHA_SPECIES = speciesStatsRows.map((row) => row.species_name);
 
-function mockStats({
-	biometricsStats = biometricsRows
-}: { biometricsStats?: BiometricsStatsResult[] } = {}) {
-	mockFetchSpeciesComparisonStats.mockResolvedValue({
-		coreStats: coreStatsRows,
-		biometricsStats
-	});
+const robinRow = speciesStatsRows.find((row) => row.species_name === 'Robin')!;
+
+/**
+ * The real "no biometric-eligible encounters" shape: a cache row present for
+ * the species, with all 8 wing/weight columns null. Withholding the row
+ * entirely isn't an option any more — that would drop the species from both
+ * tabs *and* from the pill list.
+ */
+const NO_BIOMETRIC_MEASUREMENTS = Object.fromEntries(
+	BiometricStatNames.map((name) => [name, null] as const)
+) as Record<BiometricStatName, null>;
+
+function mockStats(rows: unknown[] = speciesStatsRows) {
+	mockFetchSpeciesComparisonStats.mockResolvedValue(rows);
 }
 
 async function renderComparePage(searchParams?: CompareSpeciesSearchParams) {
@@ -58,6 +67,17 @@ function visibleTable() {
 
 function dataRowCount() {
 	return visibleTable().querySelectorAll('tbody tr').length;
+}
+
+/** The active table's column headings, left to right. */
+function visibleColumnHeadings() {
+	return [...visibleTable().querySelectorAll('thead tr:first-child th')].map(
+		(heading) => heading.textContent?.trim()
+	);
+}
+
+function showBiometricsTab() {
+	fireEvent.click(screen.getByRole('button', { name: 'Biometrics' }));
 }
 
 describe('compare species page', () => {
@@ -97,10 +117,7 @@ describe('compare species page', () => {
 		});
 
 		it('renders a message instead of pills when the group has no species at all', async () => {
-			mockFetchSpeciesComparisonStats.mockResolvedValue({
-				coreStats: [],
-				biometricsStats: []
-			});
+			mockStats([]);
 
 			render(await Page({ searchParams: Promise.resolve({}) }));
 
@@ -201,18 +218,18 @@ describe('compare species page', () => {
 			expect(
 				screen.getByRole('columnheader', { name: 'Encounters' })
 			).toBeTruthy();
+			expect(
+				screen.queryByRole('columnheader', { name: 'Avg weight (g)' })
+			).toBe(null);
 			expect(getCellTextByHeading('Encounters', 'Robin')).toBe(
-				String(
-					coreStatsRows.find((row) => row.species_name === 'Robin')
-						?.encounter_count
-				)
+				String(robinRow.encounter_count)
 			);
 		});
 
 		it('shows the biometrics columns when the Biometrics tab is selected', async () => {
 			await renderComparePage({ name: ['Robin'] });
 
-			fireEvent.click(screen.getByRole('button', { name: 'Biometrics' }));
+			showBiometricsTab();
 
 			expect(
 				screen.getByRole('columnheader', { name: 'Avg weight (g)' })
@@ -222,26 +239,93 @@ describe('compare species page', () => {
 			);
 		});
 
+		it('renders the core dataset column headings in their existing order', async () => {
+			await renderComparePage({ name: ['Robin'] });
+
+			expect(visibleColumnHeadings()).toEqual([
+				'Species',
+				'Sessions',
+				'Birds',
+				'Encounters',
+				'New',
+				'Busiest session',
+				'Most new in a session',
+				'Pulli',
+				'Juv',
+				'Postjuv',
+				'Adult',
+				'Not aged',
+				'Pulli encounters',
+				'Juv encounters',
+				'Postjuv encounters',
+				'Adult encounters',
+				'Not aged encounters'
+			]);
+		});
+
+		it('renders the biometrics dataset column headings in their existing order', async () => {
+			await renderComparePage({ name: ['Robin'] });
+
+			showBiometricsTab();
+
+			expect(visibleColumnHeadings()).toEqual([
+				'Species',
+				'Min weight (g)',
+				'Avg weight (g)',
+				'Median weight (g)',
+				'Max weight (g)',
+				'Min wing (mm)',
+				'Avg wing (mm)',
+				'Median wing (mm)',
+				'Max wing (mm)'
+			]);
+		});
+
+		it('reads both tabs cells off the same row', async () => {
+			await renderComparePage({ name: ['Robin'] });
+
+			expect(getCellTextByHeading('Encounters', 'Robin')).toBe(
+				String(robinRow.encounter_count)
+			);
+
+			showBiometricsTab();
+
+			expect(getCellTextByHeading('Avg weight (g)', 'Robin')).toBe(
+				String(Number(robinRow.avg_weight!.toFixed(1)))
+			);
+		});
+
 		it('keeps the selected species when switching dataset', async () => {
 			await renderComparePage({ name: ['Robin', 'Wren'] });
 
-			fireEvent.click(screen.getByRole('button', { name: 'Biometrics' }));
+			showBiometricsTab();
 
 			expect(dataRowCount()).toBe(2);
 		});
 
-		it('renders blank cells for a selected species the dataset has no row for', async () => {
-			mockStats({
-				biometricsStats: biometricsRows.filter(
-					(row) => row.species_name !== 'Robin'
+		it('renders an em dash where a species has no biometric measurements', async () => {
+			mockStats(
+				speciesStatsRows.map((row) =>
+					row.species_name === 'Robin'
+						? { ...row, ...NO_BIOMETRIC_MEASUREMENTS }
+						: row
 				)
-			});
+			);
 			await renderComparePage({ name: ['Robin', 'Wren'] });
 
-			fireEvent.click(screen.getByRole('button', { name: 'Biometrics' }));
+			showBiometricsTab();
 
 			expect(dataRowCount()).toBe(2);
 			expect(getCellTextByHeading('Avg weight (g)', 'Robin')).toBe('—');
+			expect(getCellTextByHeading('Avg weight (g)', 'Wren')).toBe(
+				String(
+					Number(
+						speciesStatsRows
+							.find((row) => row.species_name === 'Wren')!
+							.avg_weight!.toFixed(1)
+					)
+				)
+			);
 		});
 	});
 
@@ -285,10 +369,7 @@ describe('compare species page', () => {
 			).toBe('true');
 			expect(dataRowCount()).toBe(1);
 			expect(getCellTextByHeading('Encounters', 'Robin')).toBe(
-				String(
-					coreStatsRows.find((row) => row.species_name === 'Robin')
-						?.encounter_count
-				)
+				String(robinRow.encounter_count)
 			);
 		});
 	});

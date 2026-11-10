@@ -36,9 +36,9 @@ export function CompareSpeciesPageContent({
 	viewedGroup: ViewedGroup;
 }) {
 	const pathname = usePathname();
-	const availableSpecies = listAvailableSpecies(data.coreStats);
+	const availableSpecies = listAvailableSpecies(data.speciesStats);
 	// A `?name=` the group has no data for (stale bookmark, hand-edited URL)
-	// would otherwise contribute a row of blank cells to every dataset, so it's
+	// would otherwise contribute a row of blank cells to either tab, so it's
 	// dropped rather than shown as an empty comparison.
 	const [selectedSpecies, setSelectedSpecies] = useState<string[]>(() =>
 		params.selectedSpecies.filter((speciesName) =>
@@ -66,8 +66,7 @@ export function CompareSpeciesPageContent({
 	// showing with the new selection — neither tab fetches, both read their
 	// rows straight off here (see `CompareSpeciesTabParams`).
 	const tabParams: CompareSpeciesTabParams = {
-		coreStats: data.coreStats,
-		biometricsStats: data.biometricsStats,
+		speciesStats: data.speciesStats,
 		selectedSpecies
 	};
 

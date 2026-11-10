@@ -1,8 +1,6 @@
-import {
-	fetchSpeciesComparisonStats,
-	type SpeciesComparisonStats
-} from '@/app/actions/compare-species';
+import { fetchSpeciesComparisonStats } from '@/app/actions/compare-species';
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import { type TabConfig } from '@/modules/ui-kit';
 import {
 	COMPARE_SPECIES_TAB_IDS,
@@ -33,7 +31,8 @@ export type CompareSpeciesParams = {
 	activeTabId: string;
 };
 
-export type CompareSpeciesPageData = SpeciesComparisonStats & {
+export type CompareSpeciesPageData = {
+	speciesStats: StatsCacheBySpeciesResult[];
 	initialTabData?: { tabId: string; data: unknown };
 };
 
@@ -42,8 +41,9 @@ type PageProps = { searchParams?: Promise<CompareSpeciesSearchParams> };
 /**
  * What `prefetchActiveTabData` is pointed at. Both dataset tabs are prop-fed
  * and declare no `dataFetcher` at all (the page's single
- * `fetchSpeciesComparisonStats` call already returns both datasets), so this is
- * id-only and the prefetch resolves to `undefined` every time — which is the
+ * `fetchSpeciesComparisonStats` call already returns every row either tab
+ * renders), so this is id-only and the prefetch resolves to `undefined` every
+ * time — which is the
  * point: the list is the page's *declaration* of what each tab's fetch story
  * is, and a future dataset tab that does want a server-side prefetch only has
  * to say so here rather than re-touching the wiring below.
@@ -55,7 +55,7 @@ const compareSpeciesTabPrefetchers: Pick<
 
 /**
  * The page's data doesn't depend on the selection at all — the selection is a
- * client-side filter over both by-species datasets (see
+ * client-side filter over the one by-species dataset (see
  * `fetchSpeciesComparisonStats`) — so `params` is only read for the already
  * resolved `activeTabId`.
  */
@@ -63,17 +63,17 @@ export async function fetchCompareSpeciesPageContent(
 	params: CompareSpeciesParams,
 	viewedGroup: ViewedGroup
 ): Promise<CompareSpeciesPageData> {
-	const comparisonStats = await fetchSpeciesComparisonStats(viewedGroup);
+	const speciesStats = await fetchSpeciesComparisonStats(viewedGroup);
 	const initialTabData = await prefetchActiveTabData<
 		CompareSpeciesTabParams,
 		CompareSpeciesTabParams[]
 	>(
 		compareSpeciesTabPrefetchers,
 		params.activeTabId,
-		{ ...comparisonStats, selectedSpecies: params.selectedSpecies },
+		{ speciesStats, selectedSpecies: params.selectedSpecies },
 		viewedGroup
 	);
-	return { ...comparisonStats, initialTabData };
+	return { speciesStats, initialTabData };
 }
 
 export default async function CompareSpeciesPage(

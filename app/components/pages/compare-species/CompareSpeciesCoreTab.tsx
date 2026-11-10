@@ -14,7 +14,9 @@ import {
  * The species-comparison page's "Core stats" dataset tab — prop-fed, no
  * `dataFetcher`: its rows arrive already-resolved on the shared `params`
  * (see `CompareSpeciesTabParams`), so `TabContent` renders it straight away
- * with `data: null`, which this tab never reads.
+ * with `data: null`, which this tab never reads. It reads the same
+ * `params.speciesStats` rows its Biometrics sibling does and differs from it
+ * only in `columnConfigs` (#1412).
  *
  * `DataType` is `unknown` rather than `null` purely so the config slots
  * straight into a `TabSet`'s tabs array (`TabSetTabConfig` fixes it at
@@ -29,7 +31,7 @@ export const compareSpeciesCoreTab: TabConfig<
 	label: 'Core stats',
 	TabComponent: ({ params }) => (
 		<SpeciesComparisonTable
-			rows={selectComparisonRows(params.coreStats, params.selectedSpecies)}
+			rows={selectComparisonRows(params.speciesStats, params.selectedSpecies)}
 			columnConfigs={coreStatsComparisonColumns}
 			testId={COMPARISON_TABLE_TEST_ID}
 		/>

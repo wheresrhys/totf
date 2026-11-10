@@ -64,26 +64,29 @@ export function toggleSpeciesSelection(
 }
 
 /**
- * A comparison table's row: one of the three by-species stats rows, but with
- * every value column optional. A species can legitimately be present in
- * the core stats and absent from the biometrics stats (nothing measurable was
- * caught), and the table still owes it a row — so the missing case is a row
- * carrying only its `species_name`, rendered as a line of blank cells, rather
- * than a silently dropped row whose absence would make the three datasets
- * disagree about how many species are being compared.
+ * A comparison table's row: a by-species stats row with every value column
+ * optional, so a dataset with no row at all for a selected species can still
+ * be given one carrying only its `species_name` — a line of blank cells rather
+ * than a silently dropped row whose absence would make the table disagree with
+ * the selection about how many species are being compared.
+ *
+ * Since #1412 the comparison page itself can't reach that case (both tabs read
+ * the one row array the pill list is derived from, so a selected species always
+ * has a row), but it remains part of this helper's contract for any caller
+ * whose rows and selection come from different places.
  */
 export type ComparisonRow<Row extends { species_name: string }> =
 	Partial<Row> & { species_name: string };
 
 /**
  * The species a group has any data for at all, alphabetically — the pill list.
- * Sourced from the `core_stats` rows (the only one of the three datasets that
- * emits a row for every species, regardless of measurements or age coding).
+ * Sourced from the page's single by-species cache-row array (#1412), which
+ * carries a row per species regardless of measurements or age coding.
  */
 export function listAvailableSpecies(
-	coreStatsRows: { species_name: string }[]
+	speciesStatsRows: { species_name: string }[]
 ): string[] {
-	return [...new Set(coreStatsRows.map((row) => row.species_name))].sort(
+	return [...new Set(speciesStatsRows.map((row) => row.species_name))].sort(
 		(oneName, otherName) => oneName.localeCompare(otherName)
 	);
 }
