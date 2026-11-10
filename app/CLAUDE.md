@@ -84,8 +84,10 @@ line up. Two patterns are in that list: the `/group/<slug>/summary` subtree (#77
 stay gated. Both are granted by the single `'summary'` `public_areas` tag; widening what that one tag
 reaches is a matter of adding a pattern here, not of adding a tag (`public_areas` still only allows
 `'summary'`, #768). An anonymous `/species` view gets the counts half of the table only: `spp-data.ts`'s
-`fetchBiometricsStats` runs as the viewer against ungated sources, so it's skipped for a `'public'`
-(or `'blocked'`) access level and the 8 wing/weight columns come back blank.
+`fetchSpeciesRowsWithBiometrics` runs as the viewer against ungated sources, so it's skipped for a
+`'public'` (or `'blocked'`) access level and the 8 wing/weight columns are explicitly blanked
+(`buildSpeciesRow`, #1415) rather than left to whatever the counts rows happen to carry — a
+cache-served counts row is a `select('*')`, so it has real wing/weight values on it at runtime.
 `AuthorisedView` looks that id up in the same `groups` list it already fetched for the authenticated
 branch and renders `GlobalNav` in `readOnly` mode (branding + viewed-group name only — no group switcher,
 "Import data", "Log out", or authenticated-only nav links/search, none of which are reachable

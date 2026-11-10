@@ -60,7 +60,8 @@ modules/stats-view/
                         # bird-count-minus-new-count derivation both tables and
                         # SummaryStatsSection use)
     species-stats.ts    # mergeSpeciesBiometrics — joins a stats_cache_*_metrics by-species
-                        # result to its wing/weight sibling by species_name;
+                        # result to its wing/weight sibling by species_name. No caller
+                        # since #1415; #1418 deletes it along with SpeciesStatsRow.
                         # speciesStatConfigs — the /species list page's column set
     squashed-month.ts   # the 12 month abbreviations a `[yearOrMonth]` route segment
                         # accepts as a squashed-month filter, their parse/format
@@ -129,14 +130,16 @@ modules/stats-view/
   `MeasurementRangeCell`/`EncountersTable` are page-family-specific rather than stats-table
   primitives.
 
-**One of those edges closes a cycle through the barrel, deliberately.**
-`app/actions/spp-data.ts` imports `mergeSpeciesBiometrics` from `@/modules/stats-view`, and the
-barrel re-exports `SppStatsTable`, which imports `fetchSpeciesData` back out of
+**One of those edges used to close a cycle through the barrel; #1415 broke it.**
+`app/actions/spp-data.ts` imported `mergeSpeciesBiometrics` from `@/modules/stats-view` while the
+barrel re-exported `SppStatsTable`, which imports `fetchSpeciesData` back out of
 `app/actions/spp-data.ts`. The module-boundary rule (root `CLAUDE.md`'s "Module conventions")
-forbids the obvious escape — an outside file reaching past the barrel into
-`lib/species-stats.ts` directly — so the cycle stays. `next build --turbopack` and the full app
-suite both pass with it (verified on #1327); if that ever changes, break it by lifting the fetch
-out of `SppStatsTable` into a prop, not by reaching past the barrel.
+forbade the obvious escape — an outside file reaching past the barrel into `lib/species-stats.ts`
+directly — so the cycle stood (`next build --turbopack` and the full app suite both passed with
+it, verified on #1327). It is gone now that `spp-data.ts` reads whole cache rows and merges its own
+arbitrary-window fallback, so it imports nothing from this module at all. `SppStatsTable`'s inbound
+`fetchSpeciesData` import is the only edge left; if a future change needs a second one in the
+other direction, lift that fetch into a prop rather than reintroducing the cycle.
 
 ## Testing
 

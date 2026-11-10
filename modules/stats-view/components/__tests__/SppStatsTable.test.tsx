@@ -8,26 +8,22 @@ import {
 } from '@testing-library/react';
 import { SppStatsTable } from '../SppStatsTable';
 import { ALPHA_CORE_STATS_BY_SPECIES } from '@/app/__tests__/helpers/core-stats-fixtures';
-import { ALPHA_BIOMETRICS_BY_SPECIES } from '@/app/__tests__/helpers/biometrics-stats-fixtures';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
-import { mergeSpeciesBiometrics } from '../../lib/species-stats';
-import type { SpeciesStatsRow } from '../../types';
 import type { PageData } from '@/app/(routes)/species/page';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 vi.mock('@/app/actions/spp-data', () => ({
 	fetchSpeciesData: vi.fn()
 }));
 
-// fetchSpeciesData hands this table the merge of a core_stats-family by-species
-// result and its wing/weight sibling, so build the fixture data the same way
-// rather than reading the biometric columns off the by-species fixture
-// directly — ALPHA_CORE_STATS_BY_SPECIES already carries them too
-// (SimpleStatsCacheBySpecies has them on every row), but ALPHA_BIOMETRICS_BY_SPECIES
-// is the real separate source production merges in (#883).
-const speciesStats = mergeSpeciesBiometrics(
-	ALPHA_CORE_STATS_BY_SPECIES,
-	ALPHA_BIOMETRICS_BY_SPECIES
-);
+// `fetchSpeciesData` hands this table whole `SimpleStatsCacheBySpecies` rows,
+// counts and wing/weight columns together on one row (#1415) — so the
+// by-species snapshot fixture *is* the shape under test, with no merge against
+// a separate biometrics fixture in between. It used to be built by
+// `mergeSpeciesBiometrics` over `ALPHA_BIOMETRICS_BY_SPECIES`, back when
+// production fetched the two halves separately and rejoined them by
+// `species_name`.
+const speciesStats = ALPHA_CORE_STATS_BY_SPECIES;
 
 const pageData: PageData = {
 	speciesStats,
@@ -134,19 +130,24 @@ describe('SppStatsTable', () => {
 		});
 	});
 
-	describe('biometrics data', () => {
-		it('renders a blank cell for a biometric column when that species has no biometrics row', () => {
+	describe('rendering a species with no biometric data', () => {
+		// `null` rather than `undefined` since #1415: a species with no
+		// biometric-eligible encounters carries a real `null` in all 8 columns
+		// (an empty `MAX`/`AVG`/`MIN`/`PERCENTILE_CONT`), where the old
+		// `mergeSpeciesBiometrics` left them absent. Both render as a blank cell
+		// through `MultiSpeciesTableBody`'s generic `<td>{species[property]}</td>`.
+		it('renders a blank cell for a null metric', () => {
 			const [firstSpecies, ...restSpecies] = speciesStats;
-			const speciesWithoutBiometrics: SpeciesStatsRow = {
+			const speciesWithoutBiometrics: StatsCacheBySpeciesResult = {
 				...firstSpecies,
-				max_weight: undefined,
-				avg_weight: undefined,
-				min_weight: undefined,
-				median_weight: undefined,
-				max_wing: undefined,
-				avg_wing: undefined,
-				min_wing: undefined,
-				median_wing: undefined
+				max_weight: null,
+				avg_weight: null,
+				min_weight: null,
+				median_weight: null,
+				max_wing: null,
+				avg_wing: null,
+				min_wing: null,
+				median_wing: null
 			};
 			const pageDataWithMissingBiometrics: PageData = {
 				speciesStats: [speciesWithoutBiometrics, ...restSpecies],
