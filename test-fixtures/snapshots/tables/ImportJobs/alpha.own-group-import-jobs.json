@@ -2,8 +2,8 @@
   {
     "id": 1,
     "status": "succeeded",
-    "started_at": "2026-11-04T11:01:59.241+00:00",
-    "finished_at": "2026-11-04T11:01:59.513+00:00",
+    "started_at": "2026-11-10T13:01:31.163+00:00",
+    "finished_at": "2026-11-10T13:01:31.453+00:00",
     "rows_processed": 61,
     "rows_successful": 61,
     "rows_failed": 0,

@@ -5,7 +5,7 @@
 -- superseded). This RPC only returns rows; writing into SimpleStatsCache is
 -- T8a's job.
 --
--- A direct port of core_stats.sql's basic-count and session/effort CTE chain,
+-- A direct port of core_stats.sql's basic-count and session CTE chain,
 -- keyed on species_id rather than species_name (this RPC feeds a cache-table
 -- write keyed on species id, unlike core_stats_result's display-oriented
 -- species_name) and carrying none of core_stats' age-dimension columns — those
@@ -137,50 +137,6 @@ SET
       WHEN group_by_time_period = 'month-squashed' THEN sc.session_month_squashed
       ELSE NULL::date
     END
-  ), session_effort AS (
-    -- Deliberately NOT filtered on any session-type-equivalent condition (#1021/#1024):
-    -- pulli-only and field-observation-only sessions contribute to total_effort on the
-    -- same basis as any other session. The Sessions.session_type column is gone, and
-    -- stats_raw_encounters' record_type exclusion (#874) is the only thing deciding
-    -- what counts as real data here.
-    SELECT
-      re.session_id,
-      -- realistically the minimum effort per session is 2 hours
-      GREATEST(MAX(re.capture_time) - MIN(re.capture_time), '02:00:00'::interval) AS total_effort
-    FROM raw_encounters re
-    GROUP BY re.session_id
-  ), effort_per_period AS (
-    -- Species-blind, exactly like core_stats' own effort_per_period: total_effort and
-    -- effort_per_session are not split per species even under group_by_species. A
-    -- known asymmetry with avg_encounters_per_session, carried over deliberately so
-    -- this RPC reproduces core_stats' numbers rather than improving on them.
-    SELECT
-      CASE
-        WHEN group_by_time_period = 'day' THEN re.session_day
-        WHEN group_by_time_period = 'month' THEN re.session_month
-        WHEN group_by_time_period = 'year' THEN re.session_year
-        WHEN group_by_time_period = 'month-squashed' THEN re.session_month_squashed
-        ELSE NULL::date
-      END AS time_period,
-      SUM(sess_effort.total_effort) AS total_effort,
-      SUM(sess_effort.total_effort) / COUNT(DISTINCT re.session_id) AS effort_per_session
-    FROM (
-      SELECT DISTINCT re.session_id,
-            re.session_day,
-            re.session_month,
-            re.session_year,
-            re.session_month_squashed
-      FROM raw_encounters as re
-    ) re
-    JOIN session_effort sess_effort ON re.session_id = sess_effort.session_id
-    GROUP BY
-      CASE
-        WHEN group_by_time_period = 'day' THEN re.session_day
-        WHEN group_by_time_period = 'month' THEN re.session_month
-        WHEN group_by_time_period = 'year' THEN re.session_year
-        WHEN group_by_time_period = 'month-squashed' THEN re.session_month_squashed
-        ELSE NULL::date
-      END
   )
   SELECT
     CASE WHEN group_by_species THEN spine.species_id ELSE NULL::bigint END AS "species_id",
@@ -202,11 +158,8 @@ SET
 
     -- One count per distinct date with at least one in-hand encounter in the cell —
     -- a plain COUNT(DISTINCT visit_date) since #1021, on the same session_type-blind
-    -- basis as the four counts above and as the effort columns that follow.
+    -- basis as the four counts above.
     COALESCE(COUNT(DISTINCT raw_enc.visit_date), 0) AS "session_count",
-    COALESCE(effort.total_effort, '00:00:00'::interval) AS "total_effort",
-    COALESCE(effort.effort_per_session, '00:00:00'::interval) AS "effort_per_session",
-    COALESCE(effort.total_effort / NULLIF(COUNT(DISTINCT raw_enc.encounter_id), 0), '00:00:00'::interval) AS "effort_per_encounter",
     COALESCE(agg_sess.avg_encounters_per_session, 0) AS "avg_encounters_per_session",
     COALESCE(agg_sess.max_per_session, 0) AS "max_per_session",
     COALESCE(agg_sess.max_new_per_session, 0) AS "max_new_per_session"
@@ -221,14 +174,6 @@ SET
     OR (group_by_time_period = 'month-squashed' AND spine.time_period = raw_enc.session_month_squashed)
     OR (group_by_time_period IS NULL OR group_by_time_period NOT IN ('month', 'year', 'day', 'month-squashed'))
   )
-  LEFT JOIN effort_per_period effort ON
-  CASE
-    WHEN group_by_time_period = 'day' THEN spine.time_period = effort.time_period
-    WHEN group_by_time_period = 'month' THEN spine.time_period = effort.time_period
-    WHEN group_by_time_period = 'year' THEN spine.time_period = effort.time_period
-    WHEN group_by_time_period = 'month-squashed' THEN spine.time_period = effort.time_period
-    ELSE true
-  END
   LEFT JOIN aggregated_session_counts agg_sess ON CASE WHEN group_by_species THEN spine.species_id = agg_sess.species_id ELSE true END
   AND CASE
     WHEN group_by_time_period = 'day' THEN spine.time_period = agg_sess.time_period
@@ -246,8 +191,7 @@ SET
     WHEN group_by_time_period = 'year' THEN spine.time_period
     WHEN group_by_time_period = 'month-squashed' THEN spine.time_period
     ELSE NULL::date
-  END, agg_sess.max_per_session, agg_sess.max_new_per_session, agg_sess.avg_encounters_per_session,
-  effort.total_effort, effort.effort_per_session
+  END, agg_sess.max_per_session, agg_sess.max_new_per_session, agg_sess.avg_encounters_per_session
   ) AS agg
   CROSS JOIN LATERAL jsonb_populate_record(NULL::public.stats_cache_basic_session_metrics_result, to_jsonb(agg)) AS r
   ORDER BY r.species_id ASC, r.time_period ASC;

@@ -59,9 +59,6 @@ function basicRow(overrides: Partial<BasicRow> = {}): BasicRow {
 		encounter_count: 1,
 		new_bird_count: 0,
 		session_count: 1,
-		total_effort: '02:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:00:00',
 		avg_encounters_per_session: 1,
 		max_per_session: 1,
 		max_new_per_session: 0,
@@ -138,9 +135,6 @@ function cachedRowFor(
 		encounter_count: 1,
 		new_bird_count: 0,
 		session_count: 1,
-		total_effort: '02:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:00:00',
 		avg_encounters_per_session: 1,
 		max_per_session: 1,
 		max_new_per_session: 0,
@@ -591,8 +585,8 @@ describe('findSimpleStatsCacheDiscrepancies', () => {
 		});
 
 		describe('presence mismatches against an effectively-empty row', () => {
-			/** Every non-effort metric field zeroed/nulled out, as a touched-but-otherwise-empty cell's four RPC rows would report it. */
-			function allZeroExceptEffortRpcRows() {
+			/** Every metric field zeroed/nulled out, as a touched-but-otherwise-empty cell's four RPC rows would report it. */
+			function allZeroRpcRows() {
 				return {
 					basic: [
 						basicRow({
@@ -643,9 +637,9 @@ describe('findSimpleStatsCacheDiscrepancies', () => {
 				};
 			}
 
-			it('is not reported when a live-only cell has every non-effort metric at zero, even with a non-zero effort value', async () => {
+			it('is not reported when a live-only cell has every metric at zero', async () => {
 				const client = makeMockSupabaseClient({
-					...allZeroExceptEffortRpcRows(),
+					...allZeroRpcRows(),
 					sessionsVisitDates: [PERIOD]
 				});
 
@@ -654,7 +648,7 @@ describe('findSimpleStatsCacheDiscrepancies', () => {
 				expect(discrepancies).toEqual([]);
 			});
 
-			it('is not reported when a cached-only row has every non-effort metric at zero/null', async () => {
+			it('is not reported when a cached-only row has every metric at zero/null', async () => {
 				const client = makeMockSupabaseClient({
 					sessionsVisitDates: [PERIOD]
 				});
@@ -701,8 +695,8 @@ describe('findSimpleStatsCacheDiscrepancies', () => {
 				expect(discrepancies).toEqual([]);
 			});
 
-			it('is still reported when a live-only cell has at least one non-effort metric non-zero', async () => {
-				const rpcRows = allZeroExceptEffortRpcRows();
+			it('is still reported when a live-only cell has at least one metric non-zero', async () => {
+				const rpcRows = allZeroRpcRows();
 				const client = makeMockSupabaseClient({
 					...rpcRows,
 					basic: [basicRow({ species_count: 0, bird_count: 1 })],

@@ -66,14 +66,7 @@ function metricFieldNames(liveRow: SimpleMergedCell): string[] {
 	);
 }
 
-/** `SimpleMergedCell`'s 3 effort columns (`merge-metric-rows.ts`) — the one set of metric fields `isEffectivelyEmptyRow` excludes, since a touched-but-otherwise-empty period/species combo can still have ringing effort logged against it. */
-const EFFORT_FIELD_NAMES = new Set([
-	'total_effort',
-	'effort_per_session',
-	'effort_per_encounter'
-]);
-
-/** Bookkeeping columns a raw cache-table row carries that a merged live row never does — excluded from `isEffectivelyEmptyRow` too, alongside the effort fields, so a cached-only presence mismatch isn't polluted by its own `id`/`group_id`/`temporal_unit` columns. */
+/** Bookkeeping columns a raw cache-table row carries that a merged live row never does — the one set of fields `isEffectivelyEmptyRow` excludes, so a cached-only presence mismatch isn't polluted by its own `id`/`group_id`/`temporal_unit` columns. */
 const CACHE_ROW_BOOKKEEPING_FIELD_NAMES = new Set([
 	'id',
 	'group_id',
@@ -81,9 +74,9 @@ const CACHE_ROW_BOOKKEEPING_FIELD_NAMES = new Set([
 ]);
 
 /**
- * True when every metric field except the 3 effort fields is falsy/empty — `0`
- * for a NOT-NULL count, `null` for a nullable biometric. Such a row describes
- * a touched-but-otherwise-empty period/species combo, which a materialized
+ * True when every metric field is falsy/empty — `0` for a NOT-NULL count,
+ * `null` for a nullable biometric. Such a row describes a
+ * touched-but-otherwise-empty period/species combo, which a materialized
  * cache legitimately omits; a presence mismatch against a row like this is
  * therefore not a real discrepancy. See this module's CLAUDE.md "Finding
  * cache discrepancies".
@@ -92,11 +85,7 @@ function isEffectivelyEmptyRow(
 	row: SimpleMergedCell | KeyedCachedRow
 ): boolean {
 	return metricFieldNames(row as SimpleMergedCell)
-		.filter(
-			(field) =>
-				!EFFORT_FIELD_NAMES.has(field) &&
-				!CACHE_ROW_BOOKKEEPING_FIELD_NAMES.has(field)
-		)
+		.filter((field) => !CACHE_ROW_BOOKKEEPING_FIELD_NAMES.has(field))
 		.every((field) => {
 			const value = (row as Record<string, unknown>)[field];
 			return value === 0 || value === null;

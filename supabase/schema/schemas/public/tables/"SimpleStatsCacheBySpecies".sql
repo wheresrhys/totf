@@ -28,11 +28,8 @@ CREATE TABLE public."SimpleStatsCacheBySpecies" (
 	bird_count bigint NOT NULL,
 	encounter_count bigint NOT NULL,
 	new_bird_count bigint NOT NULL,
-	-- Session/effort metrics, from core_stats_result.
+	-- Session metrics, from core_stats_result.
 	session_count bigint NOT NULL,
-	total_effort interval NOT NULL,
-	effort_per_session interval NOT NULL,
-	effort_per_encounter interval NOT NULL,
 	avg_encounters_per_session numeric NOT NULL,
 	max_per_session bigint NOT NULL,
 	max_new_per_session bigint NOT NULL,
