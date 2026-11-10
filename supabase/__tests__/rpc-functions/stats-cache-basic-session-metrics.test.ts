@@ -5,7 +5,7 @@
  * One of the small, read-only "metric-group" RPCs the stats-cache refresh
  * pipeline calls to populate the `SimpleStatsCache` tables. Originally written
  * as a direct port of the since-deleted group-wide aggregate RPC's basic-count
- * and session/effort CTE chain, keyed on `species_id` rather than that RPC's
+ * and session CTE chain, keyed on `species_id` rather than that RPC's
  * display-oriented `species_name` and carrying none of its age-dimension
  * columns.
  *
@@ -16,7 +16,7 @@
  * own purpose-built fixture instead (#1363): an isolated group whose entire
  * encounter history is the handful of rows the block's arrange step lists, and
  * literal expected numbers a reader can check straight off that list. This file
- * is now the only value oracle these twelve columns have.
+ * is now the only value oracle these ten columns have.
  *
  * Requires local Supabase running and e2e seed data loaded (for the `Species`
  * reference rows the fixtures below look species ids up in):
@@ -44,7 +44,7 @@ import {
 // depending on the driver; coerce before comparing.
 const num = (value: unknown): number => Number(value);
 
-/** The twelve result columns these tests assert on. */
+/** The ten result columns these tests assert on. */
 type MetricsRow = {
 	species_id: number | null;
 	time_period: string | null;
@@ -53,9 +53,6 @@ type MetricsRow = {
 	encounter_count: unknown;
 	new_bird_count: unknown;
 	session_count: unknown;
-	total_effort: string;
-	effort_per_session: string;
-	effort_per_encounter: string;
 	avg_encounters_per_session: unknown;
 	max_per_session: unknown;
 	max_new_per_session: unknown;
@@ -316,22 +313,20 @@ describe('stats_cache_basic_session_metrics', () => {
 		});
 	});
 
-	describe('session/effort metrics', () => {
-		// Two consecutive group-days with deliberately different capture-time
-		// spreads, so every effort column lands on a value arithmetic alone
-		// reaches: a 4-hour first day, and a half-hour second day that the
-		// two-hour minimum-effort floor rounds up. The encounter mix also keeps
-		// max_per_session and max_new_per_session apart.
+	describe('session metrics', () => {
+		// Two consecutive group-days whose encounter mix keeps every session
+		// metric on a distinct value arithmetic alone reaches — in particular
+		// holding max_per_session and max_new_per_session apart.
 		describe('across a two-session window', () => {
 			let fixture: FixtureGroup;
 			let yr: number;
-			/** 3 encounters, 08:00–12:00 (a 4-hour span), 2 of them new. */
+			/** 3 encounters, 2 of them new. */
 			let busyDay: string;
-			/** 2 encounters, 10:00–10:30 (floored to 2 hours), both new. */
+			/** 2 encounters, both new. */
 			let briefDay: string;
 
 			beforeAll(async () => {
-				fixture = await createFixtureGroup('Effort');
+				fixture = await createFixtureGroup('SessionMetrics');
 				const robinId = speciesIdByName.get('Robin')!;
 
 				yr = randomFixtureYear();
@@ -362,7 +357,7 @@ describe('stats_cache_basic_session_metrics', () => {
 
 			afterAll(() => fixture.cleanUp());
 
-			it('reports session_count/total_effort/effort_per_session/effort_per_encounter/avg_encounters_per_session/max_per_session/max_new_per_session matching a known small fixture', async () => {
+			it('reports session_count/avg_encounters_per_session/max_per_session/max_new_per_session matching a known small fixture', async () => {
 				const rows = await fixture.callMetrics({
 					from_date: busyDay,
 					to_date: briefDay
@@ -375,14 +370,6 @@ describe('stats_cache_basic_session_metrics', () => {
 				// Two distinct dates carried the window's 5 encounters.
 				expect(num(row.session_count)).toBe(2);
 				expect(num(row.encounter_count)).toBe(5);
-
-				// 12:00 − 08:00 = 4h, plus a 10:00–10:30 day the
-				// GREATEST(..., '02:00:00') floor lifts to 2h.
-				expect(row.total_effort).toBe('06:00:00');
-				// 6h over 2 sessions.
-				expect(row.effort_per_session).toBe('03:00:00');
-				// 6h over 5 encounters.
-				expect(row.effort_per_encounter).toBe('01:12:00');
 
 				// (3 + 2) / 2 encounters per session.
 				expect(num(row.avg_encounters_per_session)).toBeCloseTo(2.5, 6);
@@ -523,19 +510,19 @@ describe('stats_cache_basic_session_metrics', () => {
 			});
 		});
 
-		// session_effort/effort_per_period carry no session-type-equivalent filter
-		// (#1021/#1024): Sessions.session_type is gone, and stats_raw_encounters'
-		// record_type exclusion (#874) is the only thing deciding what counts as
-		// real data. So a nestling-only group-day contributes its real effort span
-		// like any other session, while a resighting-only date contributes nothing
-		// at all — for the row-level #874 reason, not a session-type one.
-		describe('session-type-blind effort (the #1021/#1024 behaviour)', () => {
+		// No CTE here carries a session-type-equivalent filter (#1021/#1024):
+		// Sessions.session_type is gone, and stats_raw_encounters' record_type
+		// exclusion (#874) is the only thing deciding what counts as real data.
+		// So a nestling-only group-day counts as a session like any other, while
+		// a resighting-only date contributes nothing at all — for the row-level
+		// #874 reason, not a session-type one.
+		describe('session-type-blind session counting (the #1021/#1024 behaviour)', () => {
 			let groupId: number;
 			let groupClient: SupabaseClient;
 			const locationIds: number[] = [];
 			const sessionIds: number[] = [];
 			const birdIds: number[] = [];
-			// Two nestling (age_code 1) captures, 09:00 and 13:00.
+			// Two nestling (age_code 1) captures.
 			let pulliOnlyDate: string;
 			// One resighting-record_type encounter and nothing else.
 			let fieldObservationOnlyDate: string;
@@ -543,7 +530,7 @@ describe('stats_cache_basic_session_metrics', () => {
 			beforeAll(async () => {
 				const testSuffix = randomTestSuffix();
 				groupId = createIsolatedGroup(
-					`StatsCacheBasicSession Effort ${testSuffix}`
+					`StatsCacheBasicSession SessionTypeBlind ${testSuffix}`
 				);
 				groupClient = await getAuthenticatedSupabaseClientForGroup(groupId);
 
@@ -555,7 +542,7 @@ describe('stats_cache_basic_session_metrics', () => {
 				const locationId = await insertTestLocation(
 					groupClient,
 					groupId,
-					`StatsCacheBasicSession Effort Loc ${testSuffix}`
+					`StatsCacheBasicSession SessionTypeBlind Loc ${testSuffix}`
 				);
 				locationIds.push(locationId);
 
@@ -603,7 +590,7 @@ describe('stats_cache_basic_session_metrics', () => {
 				);
 			});
 
-			it('gives a pulli-only session its real effort span, and leaves a field-observation-only date out entirely', async () => {
+			it('counts a pulli-only session like any other, and leaves a field-observation-only date out entirely', async () => {
 				const { data, error } = await groupClient.rpc(
 					'stats_cache_basic_session_metrics',
 					{
@@ -619,11 +606,7 @@ describe('stats_cache_basic_session_metrics', () => {
 				// in-hand encounter for stats_raw_encounters to surface (#874).
 				expect(num(row.session_count)).toBe(1);
 				expect(num(row.encounter_count)).toBe(2);
-				// 09:00 to 13:00, well above the two-hour minimum-effort floor. Before
-				// #1021/#1024 this date would have reported zero effort.
-				expect(row.total_effort).toBe('04:00:00');
-				expect(row.effort_per_session).toBe('04:00:00');
-				expect(row.effort_per_encounter).toBe('02:00:00');
+				// Before #1021/#1024 a pulli-only date contributed to none of these.
 				expect(num(row.max_per_session)).toBe(2);
 				expect(num(row.max_new_per_session)).toBe(2);
 				expect(num(row.avg_encounters_per_session)).toBe(2);
@@ -789,7 +772,7 @@ describe('stats_cache_basic_session_metrics', () => {
 
 		afterAll(() => fixture.cleanUp());
 
-		it('reports basic counts and session/effort metrics matching a known fixture for a non-calendar-aligned date range, grouped by species', async () => {
+		it('reports basic counts and session metrics matching a known fixture for a non-calendar-aligned date range, grouped by species', async () => {
 			const rows = await fixture.callMetrics({
 				from_date: fromDate,
 				to_date: toDate,
@@ -823,19 +806,6 @@ describe('stats_cache_basic_session_metrics', () => {
 			expect(num(wren.max_per_session)).toBe(1);
 			expect(num(wren.max_new_per_session)).toBe(1);
 			expect(num(wren.avg_encounters_per_session)).toBeCloseTo(1, 6);
-
-			// effort_per_period is species-blind even under group_by_species, so both
-			// cells report the window's whole effort: the floored 2h of each
-			// single-encounter boundary day plus the mid-window day's 09:00–12:00.
-			for (const row of [robin, wren]) {
-				expect(row.total_effort).toBe('07:00:00');
-				// 7h over the window's 3 sessions.
-				expect(row.effort_per_session).toBe('02:20:00');
-			}
-			// effort_per_encounter divides that species-blind total by the cell's own
-			// encounter count, so it does differ per species: 7h/3 vs 7h/2.
-			expect(robin.effort_per_encounter).toBe('02:20:00');
-			expect(wren.effort_per_encounter).toBe('03:30:00');
 		});
 
 		it('includes a session landing exactly on a boundary date and excludes one a day outside it', async () => {

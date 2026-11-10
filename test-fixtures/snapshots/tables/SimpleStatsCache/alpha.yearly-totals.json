@@ -9,9 +9,6 @@
     "encounter_count": 2,
     "new_bird_count": 2,
     "session_count": 1,
-    "total_effort": "02:00:00",
-    "effort_per_session": "02:00:00",
-    "effort_per_encounter": "01:00:00",
     "avg_encounters_per_session": 2,
     "max_per_session": 2,
     "max_new_per_session": 2,
@@ -37,8 +34,8 @@
     "postjuv_juv_enc_count": 0,
     "new_postjuv_juv_enc_count": 0,
     "new_postjuv_enc_count": 2,
-    "created_at": "2026-11-04T10:45:42.366598+00:00",
-    "updated_at": "2026-11-04T10:45:42.366598+00:00"
+    "created_at": "2026-11-10T13:01:32.283724+00:00",
+    "updated_at": "2026-11-10T13:01:32.283724+00:00"
   },
   {
     "id": 32,
@@ -50,9 +47,6 @@
     "encounter_count": 35,
     "new_bird_count": 30,
     "session_count": 4,
-    "total_effort": "08:00:00",
-    "effort_per_session": "02:00:00",
-    "effort_per_encounter": "00:13:42.857143",
     "avg_encounters_per_session": 8.75,
     "max_per_session": 11,
     "max_new_per_session": 10,
@@ -78,8 +72,8 @@
     "postjuv_juv_enc_count": 0,
     "new_postjuv_juv_enc_count": 0,
     "new_postjuv_enc_count": 20,
-    "created_at": "2026-11-04T10:45:42.366598+00:00",
-    "updated_at": "2026-11-04T10:45:42.366598+00:00"
+    "created_at": "2026-11-10T13:01:32.283724+00:00",
+    "updated_at": "2026-11-10T13:01:32.283724+00:00"
   },
   {
     "id": 33,
@@ -91,9 +85,6 @@
     "encounter_count": 17,
     "new_bird_count": 11,
     "session_count": 5,
-    "total_effort": "10:00:00",
-    "effort_per_session": "02:00:00",
-    "effort_per_encounter": "00:35:17.647059",
     "avg_encounters_per_session": 3.4,
     "max_per_session": 10,
     "max_new_per_session": 9,
@@ -119,8 +110,8 @@
     "postjuv_juv_enc_count": 0,
     "new_postjuv_juv_enc_count": 0,
     "new_postjuv_enc_count": 8,
-    "created_at": "2026-11-04T10:45:42.366598+00:00",
-    "updated_at": "2026-11-04T10:45:42.366598+00:00"
+    "created_at": "2026-11-10T13:01:32.283724+00:00",
+    "updated_at": "2026-11-10T13:01:32.283724+00:00"
   },
   {
     "id": 34,
@@ -132,9 +123,6 @@
     "encounter_count": 5,
     "new_bird_count": 3,
     "session_count": 1,
-    "total_effort": "02:00:00",
-    "effort_per_session": "02:00:00",
-    "effort_per_encounter": "00:24:00",
     "avg_encounters_per_session": 5,
     "max_per_session": 5,
     "max_new_per_session": 3,
@@ -160,7 +148,7 @@
     "postjuv_juv_enc_count": 0,
     "new_postjuv_juv_enc_count": 0,
     "new_postjuv_enc_count": 2,
-    "created_at": "2026-11-04T10:45:42.366598+00:00",
-    "updated_at": "2026-11-04T10:45:42.366598+00:00"
+    "created_at": "2026-11-10T13:01:32.283724+00:00",
+    "updated_at": "2026-11-10T13:01:32.283724+00:00"
   }
 ]

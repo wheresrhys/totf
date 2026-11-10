@@ -589,8 +589,6 @@ export type Database = {
           avg_wing: number | null
           bird_count: number
           created_at: string
-          effort_per_encounter: string
-          effort_per_session: string
           encounter_count: number
           group_id: number
           id: number
@@ -617,7 +615,6 @@ export type Database = {
           species_count: number
           temporal_unit: Database["public"]["Enums"]["temporal_unit"]
           time_period: string
-          total_effort: string
           unknown_age_bird_count: number
           unknown_age_enc_count: number
           updated_at: string
@@ -630,8 +627,6 @@ export type Database = {
           avg_wing?: number | null
           bird_count: number
           created_at?: string
-          effort_per_encounter: string
-          effort_per_session: string
           encounter_count: number
           group_id: number
           id?: number
@@ -658,7 +653,6 @@ export type Database = {
           species_count: number
           temporal_unit: Database["public"]["Enums"]["temporal_unit"]
           time_period: string
-          total_effort: string
           unknown_age_bird_count: number
           unknown_age_enc_count: number
           updated_at?: string
@@ -671,8 +665,6 @@ export type Database = {
           avg_wing?: number | null
           bird_count?: number
           created_at?: string
-          effort_per_encounter?: string
-          effort_per_session?: string
           encounter_count?: number
           group_id?: number
           id?: number
@@ -699,7 +691,6 @@ export type Database = {
           species_count?: number
           temporal_unit?: Database["public"]["Enums"]["temporal_unit"]
           time_period?: string
-          total_effort?: string
           unknown_age_bird_count?: number
           unknown_age_enc_count?: number
           updated_at?: string
@@ -723,8 +714,6 @@ export type Database = {
           avg_wing: number | null
           bird_count: number
           created_at: string
-          effort_per_encounter: string
-          effort_per_session: string
           encounter_count: number
           group_id: number
           id: number
@@ -752,7 +741,6 @@ export type Database = {
           species_id: number
           temporal_unit: Database["public"]["Enums"]["temporal_unit"]
           time_period: string
-          total_effort: string
           unknown_age_bird_count: number
           unknown_age_enc_count: number
           updated_at: string
@@ -765,8 +753,6 @@ export type Database = {
           avg_wing?: number | null
           bird_count: number
           created_at?: string
-          effort_per_encounter: string
-          effort_per_session: string
           encounter_count: number
           group_id: number
           id?: number
@@ -794,7 +780,6 @@ export type Database = {
           species_id: number
           temporal_unit: Database["public"]["Enums"]["temporal_unit"]
           time_period: string
-          total_effort: string
           unknown_age_bird_count: number
           unknown_age_enc_count: number
           updated_at?: string
@@ -807,8 +792,6 @@ export type Database = {
           avg_wing?: number | null
           bird_count?: number
           created_at?: string
-          effort_per_encounter?: string
-          effort_per_session?: string
           encounter_count?: number
           group_id?: number
           id?: number
@@ -836,7 +819,6 @@ export type Database = {
           species_id?: number
           temporal_unit?: Database["public"]["Enums"]["temporal_unit"]
           time_period?: string
-          total_effort?: string
           unknown_age_bird_count?: number
           unknown_age_enc_count?: number
           updated_at?: string
@@ -1278,9 +1260,6 @@ export type Database = {
         encounter_count: number | null
         new_bird_count: number | null
         session_count: number | null
-        total_effort: string | null
-        effort_per_session: string | null
-        effort_per_encounter: string | null
         avg_encounters_per_session: number | null
         max_per_session: number | null
         max_new_per_session: number | null

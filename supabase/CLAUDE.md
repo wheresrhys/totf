@@ -183,13 +183,12 @@ own scoping independent of RLS.
 Two visible behaviour changes, not refactors, landed across the pair:
 - `session_count` is a plain `COUNT(DISTINCT visit_date)`, so a group/period whose history includes
   pulli-only or field-observation-only days reports a HIGHER `session_count` than before #1021.
-- `total_effort` / `effort_per_session` / `avg_encounters_per_session` / `max_per_session` /
-  `max_new_per_session` now cover every session in a cell (#1024). A pulli-only date used to report
-  `session_count = 1` against zero effort; it now reports real effort, and a day's nestling
-  captures count toward its effort span and per-session maxima like any other capture. All these
-  columns are finally on the same session_type-blind basis as
+- `avg_encounters_per_session` / `max_per_session` / `max_new_per_session` now cover every session
+  in a cell (#1024) — a day's nestling captures count toward the per-session maxima like any other
+  capture. All these columns are finally on the same session_type-blind basis as
   `species_count`/`bird_count`/`encounter_count`, which always counted encounters from any
-  `session_type`.
+  `session_type`. The three `total_effort`/`effort_per_session`/`effort_per_encounter` interval
+  columns this change also covered are gone since #1400 (see "Effort columns removed" below).
 
 **`session_counts` honours `group_by_species`, like every other CTE in the aggregate RPC (#1049).** It
 used to group by a bare `species_id` whatever the caller asked for, so a group-wide call got one row
@@ -199,9 +198,17 @@ the busiest/average *species within* a session rather than the session itself. P
 reported 39 (its biggest single species) for a 2026 whose busiest session held 62 birds.
 `session_count`/`species_count`/`bird_count`/`encounter_count` read `raw_encounters` directly and
 were never affected. When `group_by_species` IS true the per-species reading is the wanted one and is
-unchanged. `session_effort`/`effort_per_period` have always been species-blind, so `total_effort` and
-`effort_per_session` are not species-split even under `group_by_species` — a known asymmetry with
-`avg_encounters_per_session`, left as-is.
+unchanged.
+
+**The three effort columns are gone (#1400, completing #1394).** `stats_cache_basic_session_metrics`
+used to carry a `session_effort` CTE (a `GREATEST(MAX(capture_time) - MIN(capture_time),
+'02:00:00')` span per session) and an `effort_per_period` rollup on top of it, projecting
+`total_effort`/`effort_per_session`/`effort_per_encounter` into
+`stats_cache_basic_session_metrics_result` and both `SimpleStatsCache`/`SimpleStatsCacheBySpecies`.
+All of it — SQL, composite-type attributes, cache columns — was removed when the "effort" concept
+was dropped from the app; `Encounters.capture_time` itself stays, no longer read by any stats RPC.
+Those two CTEs were always species-blind, so the surviving `avg_encounters_per_session` no longer
+has an asymmetric sibling under `group_by_species`.
 
 **One per-row evaluation trap in `stats_raw_encounters`, fixed in #947 — don't reintroduce it.**
 Because every stats RPC derives this row source (and the aggregate RPC derived it 4x through its

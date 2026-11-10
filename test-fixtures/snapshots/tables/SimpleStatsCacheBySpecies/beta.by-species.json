@@ -10,9 +10,6 @@
     "encounter_count": 2,
     "new_bird_count": 2,
     "session_count": 1,
-    "total_effort": "02:00:00",
-    "effort_per_session": "02:00:00",
-    "effort_per_encounter": "01:00:00",
     "avg_encounters_per_session": 2,
     "max_per_session": 2,
     "max_new_per_session": 2,
@@ -38,8 +35,8 @@
     "postjuv_juv_enc_count": 0,
     "new_postjuv_juv_enc_count": 0,
     "new_postjuv_enc_count": 2,
-    "created_at": "2026-11-04T10:45:42.592596+00:00",
-    "updated_at": "2026-11-04T10:45:42.592596+00:00",
+    "created_at": "2026-11-10T13:01:32.516391+00:00",
+    "updated_at": "2026-11-10T13:01:32.516391+00:00",
     "Species": {
       "species_name": "Chaffinch"
     }
@@ -55,9 +52,6 @@
     "encounter_count": 1,
     "new_bird_count": 0,
     "session_count": 1,
-    "total_effort": "02:00:00",
-    "effort_per_session": "02:00:00",
-    "effort_per_encounter": "02:00:00",
     "avg_encounters_per_session": 1,
     "max_per_session": 1,
     "max_new_per_session": 0,
@@ -83,8 +77,8 @@
     "postjuv_juv_enc_count": 0,
     "new_postjuv_juv_enc_count": 0,
     "new_postjuv_enc_count": 0,
-    "created_at": "2026-11-04T10:45:42.592596+00:00",
-    "updated_at": "2026-11-04T10:45:42.592596+00:00",
+    "created_at": "2026-11-10T13:01:32.516391+00:00",
+    "updated_at": "2026-11-10T13:01:32.516391+00:00",
     "Species": {
       "species_name": "Robin"
     }
