@@ -28,6 +28,8 @@ const ZONE_LABEL_DESCRIPTIONS: Record<string, string> = {
 		'Touches only modules/ui-kit/ — safe to scope investigation/context to that subtree',
 	'zone:modules/stats-view':
 		'Touches only modules/stats-view/ — safe to scope investigation/context to that subtree',
+	'zone:modules/highlights':
+		'Touches only modules/highlights/ — safe to scope investigation/context to that subtree',
 };
 
 async function ensureLabelsExist(labels: string[], cwd?: string): Promise<void> {
@@ -72,6 +74,7 @@ export function registerCreateTicketTool(server: McpServer) {
 							'zone:modules/demon-import',
 							'zone:modules/ui-kit',
 							'zone:modules/stats-view',
+							'zone:modules/highlights',
 						])
 					)
 					.min(1)

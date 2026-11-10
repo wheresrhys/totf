@@ -55,6 +55,7 @@ structure at runtime. Three top-level zones, plus one zone per `modules/<name>/`
 | `zone:modules/demon-import` | `modules/demon-import/` | [`modules/demon-import/CLAUDE.md`](modules/demon-import/CLAUDE.md) — the DemOn CSV-import pipeline; cross-zone (consumed by `app/`, `supabase/scripts/` and `supabase/__tests__/`) |
 | `zone:modules/ui-kit` | `modules/ui-kit/` | [`modules/ui-kit/CLAUDE.md`](modules/ui-kit/CLAUDE.md) — the UI-primitive components/hooks every page family imports; consumed only by `app/` |
 | `zone:modules/stats-view` | `modules/stats-view/` | [`modules/stats-view/CLAUDE.md`](modules/stats-view/CLAUDE.md) — the stats-table components and row-model helpers every summary/species/session tab renders; consumed only by `app/` |
+| `zone:modules/highlights` | `modules/highlights/` | [`modules/highlights/CLAUDE.md`](modules/highlights/CLAUDE.md) — the rule-based highlights pipeline that powers the session/summary pages' Highlights tabs; consumed only by `app/` |
 
 A module zone is the **narrowest** zone covering its directory, and it wins over the broader zone
 of whatever consumes it: work confined to `modules/ui-kit/` is `zone:modules/ui-kit`, not
@@ -182,6 +183,11 @@ zones and don't belong to any single scoped doc:
   is, and a **sibling of `modules/stats`, deliberately not nested inside it** — `modules/stats` is
   imported by the `supabase/scripts/import-csv.ts` CLI importer and so must stay React/JSX-free.
   See its own [`modules/stats-view/CLAUDE.md`](modules/stats-view/CLAUDE.md).
+- `modules/highlights/` — the rule-based highlights pipeline (fetch/fan-out/combine/sort phases
+  over a registered catalogue of `HighlightsGenerator` rules) that powers the session/summary
+  pages' Highlights tabs. Consumed only by `app/`, catalogued here for the same reason
+  `modules/ui-kit` above is. See its own
+  [`modules/highlights/CLAUDE.md`](modules/highlights/CLAUDE.md).
 
 ## Module conventions
 
