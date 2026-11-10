@@ -170,6 +170,20 @@ blocks the merge/write phase. Within one RPC, `fetchMetricRows` fires every filt
 (different `day` batch) from also being attempted and logged; the first failure's error is rethrown
 once every call has settled.
 
+Each call is paginated via `fetchAllPaginatedRows` (`lib/supabase.ts`) — the same mechanism
+`readStatsCacheRows` uses for the cache-table side — looping `.range()` until a short page comes
+back, rather than one unbounded call. Without this, any filter window whose live result exceeds
+PostgREST's 1000-row cap (e.g. a `day`-unit, `bySpecies`-grouped window spanning many dates ×
+many species) would silently truncate, and every row past the cap would look like a cached-only
+presence mismatch to `findSimpleStatsCacheDiscrepancies`. **Pagination via `.range()` only takes
+effect on a GET request** — PostgREST ignores the `Range` header on the client's default POST
+call entirely (verified empirically: an unranged and a `Range: 0-0` POST call to the same RPC both
+returned every row, HTTP 200, unchanged `Content-Range`; the same call via GET correctly truncated,
+HTTP 206) — so every call also passes `{ get: true }`, switching postgrest-js onto GET. That's safe
+here because all four `stats_cache_*_metrics` RPCs are `LANGUAGE sql STABLE` with purely scalar
+`MetricRpcParams` fields (no arrays/objects), exactly what postgrest-js's GET path serializes to
+query params.
+
 **Merging & anomalies** (`merge-metric-rows.ts`): rows are merged by `(species_id, time_period)` key
 across the 4 RPCs, which all share one `stats_spine` call — so a key present in some but not all 4
 is a genuine anomaly (not an expected gap, per #1164's review), dead-lettered and skipped, never

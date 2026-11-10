@@ -201,26 +201,48 @@ function makeMockSupabaseClient({
 		stats_cache_bird_age_metrics: birdAge,
 		stats_cache_encounter_age_metrics: encounterAge
 	};
+	// Every `.range()` call any RPC made, in call order — `fetchMetricRows`
+	// now always pages through `fetchAllPaginatedRows`, so a real PostgREST
+	// Range slice (rather than ignoring the bounds and returning everything)
+	// is what lets a >1000-row fixture exercise the real second-page call.
+	const rangeCalls: Array<{ rpcName: string; fromRow: number; toRow: number }> =
+		[];
 
-	const rpc = vi.fn((name: string, params: RpcParams) => ({
-		then: (
-			resolve: (v: {
-				data: unknown;
-				error: { message: string } | null;
-			}) => unknown
-		) => {
-			const response = responsesByRpcName[name];
-			const error = rpcErrorsByName[name] ?? null;
-			return Promise.resolve({
-				data: error
-					? null
-					: typeof response === 'function'
-						? response(params)
-						: (response ?? null),
-				error
-			}).then(resolve);
-		}
-	}));
+	// Typed via `vi.fn`'s type parameter (the `insert`/`upsert` fakes
+	// elsewhere in this file use the same pattern) so a call's 3rd
+	// (`{ get: true }`) argument stays assertable even though the
+	// implementation itself never reads it.
+	const rpc = vi.fn<
+		(
+			name: string,
+			params: RpcParams,
+			options?: { get?: boolean }
+		) => { range: (fromRow: number, toRow: number) => unknown }
+	>((name, params) => {
+		const response = responsesByRpcName[name];
+		const error = rpcErrorsByName[name] ?? null;
+		const fullRows = (): unknown[] =>
+			(typeof response === 'function'
+				? response(params)
+				: response ?? []) as unknown[];
+		return {
+			range: (fromRow: number, toRow: number) => {
+				rangeCalls.push({ rpcName: name, fromRow, toRow });
+				return {
+					then: (
+						resolve: (v: {
+							data: unknown;
+							error: { message: string } | null;
+						}) => unknown
+					) =>
+						Promise.resolve({
+							data: error ? null : fullRows().slice(fromRow, toRow + 1),
+							error
+						}).then(resolve)
+				};
+			}
+		};
+	});
 
 	const order = vi.fn(() => ({
 		then: (
@@ -235,7 +257,7 @@ function makeMockSupabaseClient({
 	const select = vi.fn(() => ({ eq }));
 	const from = vi.fn(() => ({ select }));
 
-	return { rpc, from, select, eq, order };
+	return { rpc, from, select, eq, order, rangeCalls };
 }
 
 type MockSupabaseClient = ReturnType<typeof makeMockSupabaseClient>;
@@ -259,6 +281,21 @@ function metricRpcCallArgsList(client: MockSupabaseClient, rpcName: string) {
 		.mocked(client.rpc)
 		.mock.calls.filter((call) => call[0] === rpcName)
 		.map((call) => call[1]);
+}
+
+/** Every `rpc(...)` call's 3rd (options) argument, for one RPC name, in call order. */
+function metricRpcCallOptionsList(client: MockSupabaseClient, rpcName: string) {
+	return vi
+		.mocked(client.rpc)
+		.mock.calls.filter((call) => call[0] === rpcName)
+		.map((call) => call[2]);
+}
+
+/** Every `.range(fromRow, toRow)` call one metric RPC's result chained, in call order. */
+function metricRpcRangeCallsList(client: MockSupabaseClient, rpcName: string) {
+	return client.rangeCalls
+		.filter((call) => call.rpcName === rpcName)
+		.map(({ fromRow, toRow }) => ({ fromRow, toRow }));
 }
 
 /** The scope the cached-side read was asked for. */
@@ -383,6 +420,56 @@ describe('findSimpleStatsCacheDiscrepancies', () => {
 			expect(readStatsCacheRows).not.toHaveBeenCalled();
 
 			consoleErrorSpy.mockRestore();
+		});
+
+		it('calls each metric RPC via GET and requests its first page via range(0, 999), so PostgREST Range-based pagination is honoured', async () => {
+			const client = completeCellClient({ sessionsVisitDates: [PERIOD] });
+
+			await findDiscrepancies(client);
+
+			for (const rpcName of SIMPLE_METRIC_RPC_NAMES) {
+				expect(metricRpcCallOptionsList(client, rpcName)).toEqual([
+					{ get: true }
+				]);
+				expect(metricRpcRangeCallsList(client, rpcName)).toEqual([
+					{ fromRow: 0, toRow: 999 }
+				]);
+			}
+		});
+
+		it("fetches a second page and concatenates it when a filter window's live result exceeds PostgREST's 1000-row cap", async () => {
+			const totalSpecies = 1100;
+			const speciesIds = Array.from(
+				{ length: totalSpecies },
+				(_, i) => i + 1
+			);
+			const client = makeMockSupabaseClient({
+				basic: speciesIds.map((species_id) => basicRow({ species_id })),
+				biometrics: speciesIds.map((species_id) =>
+					biometricsRow({ species_id })
+				),
+				birdAge: speciesIds.map((species_id) => birdAgeRow({ species_id })),
+				encounterAge: speciesIds.map((species_id) =>
+					encounterAgeRow({ species_id })
+				),
+				sessionsVisitDates: [PERIOD]
+			});
+
+			const discrepancies = await findDiscrepancies(client);
+
+			// The cache is empty, so every live cell is a presence-mismatch
+			// discrepancy — including the species past the old single-page cap,
+			// which a non-paginating fetch would have silently dropped.
+			const discrepantSpeciesIds = discrepancies.map((d) => d.species_id);
+			expect(discrepantSpeciesIds).toHaveLength(totalSpecies);
+			expect(discrepantSpeciesIds).toContain(1);
+			expect(discrepantSpeciesIds).toContain(totalSpecies);
+			expect(
+				metricRpcRangeCallsList(client, 'stats_cache_basic_session_metrics')
+			).toEqual([
+				{ fromRow: 0, toRow: 999 },
+				{ fromRow: 1000, toRow: 1999 }
+			]);
 		});
 	});
 
