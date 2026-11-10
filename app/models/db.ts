@@ -46,9 +46,6 @@ export type CoreStatsResult = {
 	species_name: string;
 	time_period: string;
 	session_count: number;
-	total_effort: string;
-	effort_per_session: string;
-	effort_per_encounter: string;
 	avg_encounters_per_session: number;
 	max_per_session: number;
 	species_count: number;

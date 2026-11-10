@@ -133,15 +133,14 @@ describe('PeriodTotalsTable', () => {
 			expect(document.querySelectorAll('table').length).toBe(0);
 		});
 
-		it('renders zero-session/zero-effort rows as "0" for both columns', () => {
+		it('renders a zero-session row as "0"', () => {
 			render(
 				<PeriodTotalsTable
 					timeInterval="year"
 					rows={[
 						buildCoreStatsRow({
 							time_period: '2026-01-01',
-							session_count: 0,
-							total_effort: '00:00:00'
+							session_count: 0
 						})
 					]}
 					firstColumnHeader="Year"
@@ -160,7 +159,6 @@ describe('PeriodTotalsTable', () => {
 		const totalsStats = buildCoreStatsRow({
 			time_period: '2026-01-01',
 			session_count: 7,
-			total_effort: '36:00:00',
 			species_count: 15,
 			bird_count: 80,
 			encounter_count: 110,
@@ -228,15 +226,14 @@ describe('PeriodTotalsTable', () => {
 	});
 
 	describe('Sessions column', () => {
-		it('renders session_count and formatted total_effort for each timeInterval', () => {
+		it('renders session_count for each timeInterval', () => {
 			render(
 				<PeriodTotalsTable
 					timeInterval="month"
 					rows={[
 						buildCoreStatsRow({
 							time_period: '2026-08-01',
-							session_count: 4,
-							total_effort: '18:00:00'
+							session_count: 4
 						})
 					]}
 					firstColumnHeader="Month"

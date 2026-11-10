@@ -100,11 +100,6 @@ describe('buildMonthTotalsRows', () => {
 				expect(row.stats.bird_count).toBe(0);
 			});
 		});
-
-		it("renders a zero-filled month's total_effort as '00:00:00'", () => {
-			const rows = buildMonthTotalsRows(2026, []);
-			expect(rows[0].stats.total_effort).toBe('00:00:00');
-		});
 	});
 });
 
