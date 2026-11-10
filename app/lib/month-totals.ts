@@ -29,12 +29,6 @@ export function formatMonthYearLabel(
 	return formatDate(new Date(row.year, row.zeroIndexedMonth, 1), 'LLLL yyyy');
 }
 
-// `core_stats` returns `'00:00:00'` for an interval with no recorded
-// effort; mirror that convention for synthesized (zero-session) months so the
-// shared table's interval formatting renders them identically to a real empty
-// period.
-const ZERO_INTERVAL = '00:00:00';
-
 // A zero-valued `core_stats` row for a month the RPC omitted (no sessions).
 // The RPC's `period_spine` only spans min→max actual session dates, so a year
 // with e.g. only Mar–Oct sessions comes back missing the other months entirely;
@@ -47,9 +41,6 @@ function synthesizeZeroStats(timePeriod: string): CoreStatsResult {
 		species_name: null,
 		time_period: timePeriod,
 		session_count: 0,
-		total_effort: ZERO_INTERVAL,
-		effort_per_session: ZERO_INTERVAL,
-		effort_per_encounter: ZERO_INTERVAL,
 		avg_encounters_per_session: 0,
 		max_per_session: 0,
 		species_count: 0,

@@ -281,7 +281,7 @@ async function runStatsCacheRead(
 
 /**
  * A `stats_cache_basic_session_metrics_result` row: the basic-count and
- * session/effort columns `core_stats` shares with it, keyed on `species_id`
+ * session columns `core_stats` shares with it, keyed on `species_id`
  * rather than `species_name` — it was written to feed a cache-table write,
  * which keys on the id too.
  */
@@ -293,9 +293,6 @@ type BasicSessionMetricsRpcRow = Pick<
 	| 'encounter_count'
 	| 'new_bird_count'
 	| 'session_count'
-	| 'total_effort'
-	| 'effort_per_session'
-	| 'effort_per_encounter'
 	| 'avg_encounters_per_session'
 	| 'max_per_session'
 	| 'max_new_per_session'
@@ -305,7 +302,7 @@ type BasicSessionMetricsRpcRow = Pick<
  * The 10 `core_stats_result` age-bucket columns (5 bird, 5 encounter)
  * `stats_cache_basic_session_metrics` does not produce — it carries none of
  * `core_stats`' age-dimension columns, only the basic-count and
- * session/effort ones (see that RPC's own file header). Filled with a
+ * session ones (see that RPC's own file header). Filled with a
  * placeholder `0` below rather than omitted, because `CoreStatsResult`
  * requires every column to be present — but nothing on this call path ever
  * reads them: the `/species` list page's rendered column set
