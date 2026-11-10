@@ -64,6 +64,26 @@ export type StatsResultFor<BySpecies extends boolean> = BySpecies extends true
 	: StatsCacheResult;
 
 /**
+ * The 8 wing/weight columns of a stats cell (#1214, #1372) — the shared,
+ * iterable home for the field list `app/models/db.ts`'s `BiometricFieldName`
+ * and `app/actions/spp-data.ts`'s `BIOMETRIC_CACHE_COLUMNS` each spell out
+ * separately today. The const is the single source of truth and
+ * `BiometricStatName` derives from it, so the two can't drift apart.
+ */
+export const BiometricStatNames = [
+	'max_weight',
+	'avg_weight',
+	'min_weight',
+	'median_weight',
+	'max_wing',
+	'avg_wing',
+	'min_wing',
+	'median_wing'
+] as const;
+
+export type BiometricStatName = (typeof BiometricStatNames)[number];
+
+/**
  * Matches the existing stats-RPC filter convention
  * (`app/lib/auth/group-summary-access.ts`'s `CoreStatsRpcParams`,
  * `app/lib/supabase/temporal-filter.ts`) — except `ringing_group_filter` is
