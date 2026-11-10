@@ -115,8 +115,21 @@ BiometricStatNames           # the 8 *_weight/*_wing column names, as const
 BiometricStatName            # (typeof BiometricStatNames)[number]
 ```
 
-Four things worth knowing before touching them:
+Five things worth knowing before touching them:
 
+- **The nullability is non-uniform, and that is a real property of the cache tables rather than a
+  historical accident.** Every metric column but the 8 wing/weight ones is NOT NULL on both tables;
+  the wing/weight columns are nullable because `MAX`/`AVG`/`MIN`/`PERCENTILE_CONT` over an empty set
+  genuinely returns `NULL` and no `COALESCE` is ever applied, so a real "no biometric-eligible
+  encounters for this cell" row has to be representable. Deriving from the generated `Row`s means
+  that distinction comes through for free. The two types these replaced
+  (`app/models/db.ts`'s `CoreStatsResult`/`BiometricsStatsResult`, deprecated aliases since #1417
+  and deleted by #1419) had to restate it by hand — and before that, when they were views over the
+  `core_stats_result`/`biometrics_stats_result` composites, had to strip *every* column back to
+  non-null via a `NonNullable` mapped type, because a Postgres composite type's attributes can never
+  be NOT NULL and so `supabase gen types` marked them all nullable. Neither composite (nor its RPC)
+  exists any more — `biometrics_stats` went at #1246, `core_stats`/`public_core_stats` at #1359 — so
+  none of that null-stripping machinery is needed or wanted here.
 - **They derive from the generated table `Row`s, not from hand-written column lists.** That is
   the whole point: a column added to or removed from either cache table flows through
   automatically. The only hand-written member is `BiometricStatNames`, and

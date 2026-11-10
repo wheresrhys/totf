@@ -1,44 +1,44 @@
-import type { BiometricsStatsResult } from '@/app/models/db';
+import type {
+	BiometricsMetricsRow,
+	BiometricStatName,
+	StatsCacheBySpeciesResult
+} from '@/modules/stats/browser';
+import type { CoreStatsResult } from '@/app/models/db';
+import { buildCoreStatsRow } from './core-stats-fixtures';
 import alphaBiometricsSnapshot from '@/test-fixtures/snapshots/stats_cache_biometrics_metrics/alpha.by-species.json';
-import gammaBiometricsSnapshot from '@/test-fixtures/snapshots/stats_cache_biometrics_metrics/gamma.by-species.json';
-import robinAlphaBiometricsHeadlineSnapshot from '@/test-fixtures/snapshots/stats_cache_biometrics_metrics/robin-alpha.headline.json';
 import alphaSpeciesSnapshot from '@/test-fixtures/snapshots/tables/Species/alpha.top-species.json';
 
 /**
- * `BiometricsStatsResult` row fixtures — the 8 wing/weight summary statistics
- * plus `species_name`/`time_period`/`encounter_count`.
+ * Wing/weight fixtures sourced from the live `stats_cache_biometrics_metrics`
+ * RPC's generated snapshots (#1272) — the verbatim return of that RPC, which
+ * keys on `species_id` rather than the display-oriented `species_name` a cache
+ * row carries. Resolving the one against the other is the same join
+ * `app/actions/spp-data.ts`'s arbitrary-window fallback performs in production,
+ * done statically here against the already-committed
+ * `tables/Species/alpha.top-species.json` fixture instead of issuing a live
+ * `Species` read, per `supabase/CLAUDE.md`'s "No compound fixtures" rule.
  *
- * Built from the generated `stats_cache_biometrics_metrics` snapshots (#1272),
- * which are the verbatim return of that RPC and so key on `species_id` rather
- * than the display-oriented `species_name` `BiometricsStatsResult` carries.
- * Resolving the one against the other is the same join
- * `app/actions/spp-data.ts`'s `readBiometricsFromMetricsRpc` /
- * `readSpeciesNamesById` perform in production — done statically here against
- * the already-committed `tables/Species/alpha.top-species.json` fixture
- * instead of issuing a live `Species` read, per `supabase/CLAUDE.md`'s "No
- * compound fixtures" rule ("let the consuming test do the same join the action
- * does").
- *
- * `encounter_count` comes out `null` on every row for the same reason it does
- * in production: the RPC's result type has no such column, and nothing
- * downstream reads it (`mergeSpeciesBiometrics`/`mergeBiometricsFields` copy
- * only the 8 metrics across).
+ * These are deliberately *not* whole-cache-row fixtures — that is
+ * `core-stats-fixtures.ts`' job, and a cache row carries its own wing/weight
+ * columns (#1222). This file exists for the one path that still reads the 8
+ * metrics from the live RPC rather than off a cache row.
  *
  * The drift guard is twofold: the snapshots themselves are checked against the
  * database by `supabase/__tests__/snapshot-fixture-freshness.test.ts`, and the
- * `as BiometricsStatsResult` coercion below (never `as unknown as`, see
- * `app/CLAUDE.md`'s "App tests") still fails on a newly added required column.
+ * `BiometricsMetricsRow` annotation below is the generated composite type for
+ * the RPC's own result, so a column added to or removed from it fails here.
  */
 
 /**
- * A `stats_cache_biometrics_metrics_result` row as the snapshots carry it: the
- * 8 metric columns plus `time_period`, keyed on `species_id` and with no
- * `encounter_count`.
+ * The 8 wing/weight columns of one stats cell plus the `species_name` they were
+ * resolved against — all any consumer of this file reads. Spelled as a `Pick` of
+ * the canonical cache-row result type so the column names and value types can't
+ * drift from the rows production code actually merges these into.
  */
-type BiometricsMetricsFixtureRow = Omit<
-	BiometricsStatsResult,
-	'species_name' | 'encounter_count'
-> & { species_id: number | null };
+export type BiometricsFixtureRow = Pick<
+	StatsCacheBySpeciesResult,
+	'species_name' | BiometricStatName
+>;
 
 const SPECIES_NAMES_BY_ID = new Map(
 	alphaSpeciesSnapshot.map(({ id, species_name }): [number, string] => [
@@ -46,24 +46,6 @@ const SPECIES_NAMES_BY_ID = new Map(
 		species_name
 	])
 );
-
-/**
- * Resolves one raw snapshot row into a `BiometricsStatsResult`. A `null`
- * `species_id` (the ungrouped headline call, which groups by nothing and so
- * sets no grouping column) passes straight through as a `null` species_name —
- * `BiometricsStatsResult`'s one documented nullable-`species_name` case —
- * rather than attempting a lookup.
- */
-function resolveBiometricsMetricsRow({
-	species_id,
-	...metrics
-}: BiometricsMetricsFixtureRow): BiometricsStatsResult {
-	return {
-		...metrics,
-		species_name: species_id === null ? null : resolveSpeciesName(species_id),
-		encounter_count: null
-	} as BiometricsStatsResult;
-}
 
 function resolveSpeciesName(speciesId: number): string {
 	const speciesName = SPECIES_NAMES_BY_ID.get(speciesId);
@@ -76,37 +58,51 @@ function resolveSpeciesName(speciesId: number): string {
 }
 
 /**
- * Alpha's whole by-species biometrics result — one row per species, in the
- * same species order as `core_stats/alpha.by-species.json`, so the two line up
- * under `mergeSpeciesBiometrics`/`fetchSpeciesData`. Several tests assert on
- * specific cells of specific species here, so the per-species values matter
- * and are not interchangeable with the builder's defaults.
+ * Resolves one raw by-species snapshot row into a `BiometricsFixtureRow`. Only
+ * the by-species snapshots are read here, so `species_id` is always a real id —
+ * the ungrouped headline call's `null` shape has had no consumer since #1415.
  */
-export const ALPHA_BIOMETRICS_BY_SPECIES: BiometricsStatsResult[] =
+function resolveBiometricsMetricsRow({
+	species_id: speciesId,
+	max_weight,
+	avg_weight,
+	min_weight,
+	median_weight,
+	max_wing,
+	avg_wing,
+	min_wing,
+	median_wing
+}: BiometricsMetricsRow): BiometricsFixtureRow {
+	if (speciesId === null) {
+		throw new Error(
+			'stats_cache_biometrics_metrics/alpha.by-species.json carries a null species_id — it is no longer a by-species snapshot'
+		);
+	}
+	return {
+		species_name: resolveSpeciesName(speciesId),
+		max_weight,
+		avg_weight,
+		min_weight,
+		median_weight,
+		max_wing,
+		avg_wing,
+		min_wing,
+		median_wing
+	};
+}
+
+/**
+ * Alpha's whole by-species biometrics result — one row per species, in the
+ * same species order as the `SimpleStatsCacheBySpecies` snapshots, so the two
+ * line up under a merge. Several tests assert on specific cells of specific
+ * species here, so the per-species values matter and are not interchangeable
+ * with the builder's defaults.
+ */
+export const ALPHA_BIOMETRICS_BY_SPECIES: BiometricsFixtureRow[] =
 	alphaBiometricsSnapshot.map(resolveBiometricsMetricsRow);
 
-/**
- * Gamma's by-species biometrics result: genuinely empty, because Gamma's seed
- * data has no biometric-eligible encounters at all. The no-rows edge case for
- * the biometrics half of a `/species` read.
- */
-export const GAMMA_BIOMETRICS_BY_SPECIES: BiometricsStatsResult[] =
-	gammaBiometricsSnapshot.map(resolveBiometricsMetricsRow);
-
-/**
- * The Robin/Alpha *headline* row — a single aggregate over every Robin
- * encounter, captured from an ungrouped, species-filtered call, so its
- * `species_id` is `null` in the raw snapshot and `species_name` resolves to
- * `null` here. `BiometricsStatsResult` declares `species_name` non-null (every
- * producer left in app code groups by species), which is why the row is
- * coerced on the way out.
- */
-export const ROBIN_ALPHA_BIOMETRICS_HEADLINE: BiometricsStatsResult =
-	resolveBiometricsMetricsRow(robinAlphaBiometricsHeadlineSnapshot[0]);
-
 // Alpha's Blue Tit row backs `buildBiometricsStatsRow`'s defaults: it is the
-// species `buildCoreStatsRow`'s callers pair these rows with most often when
-// exercising `mergeSpeciesBiometrics`.
+// species `buildCoreStatsRow`'s callers pair these rows with most often.
 const BLUE_TIT_BIOMETRICS = ALPHA_BIOMETRICS_BY_SPECIES.find(
 	({ species_name }) => species_name === 'Blue Tit'
 );
@@ -117,23 +113,14 @@ if (!BLUE_TIT_BIOMETRICS) {
 }
 
 /**
- * One `BiometricsStatsResult` row: flat overrides merged over the Blue
- * Tit/Alpha defaults above, per this repo's fixture-builder convention.
+ * A whole stats-cell row whose 8 wing/weight columns come from the real
+ * biometrics snapshot above, over `buildCoreStatsRow`'s own defaults for every
+ * other column — the shape a cache row genuinely has since #1222, rather than a
+ * biometrics-only partial. Flat overrides merged on top, per this repo's
+ * fixture-builder convention.
  */
 export function buildBiometricsStatsRow(
-	// `species_name` is widened to allow an explicit `null`, which
-	// `Partial<BiometricsStatsResult>` would reject: the type declares it
-	// non-null because every producer left in app code groups by species, and
-	// the one shape that doesn't is `ROBIN_ALPHA_BIOMETRICS_HEADLINE` above.
-	// Widening it here keeps a caller wanting that shape from needing a
-	// `as unknown as` escape hatch at the call site (see `app/CLAUDE.md`'s
-	// "App tests").
-	overrides: Partial<Omit<BiometricsStatsResult, 'species_name'>> & {
-		species_name?: string | null;
-	} = {}
-): BiometricsStatsResult {
-	return {
-		...BLUE_TIT_BIOMETRICS,
-		...overrides
-	} as BiometricsStatsResult;
+	overrides: Partial<CoreStatsResult> = {}
+): CoreStatsResult {
+	return buildCoreStatsRow({ ...BLUE_TIT_BIOMETRICS, ...overrides });
 }
