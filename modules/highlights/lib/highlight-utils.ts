@@ -9,13 +9,7 @@ import type {
 	HighlightValueWithRanking
 } from '../types';
 import { isNumericHighlightValue } from '../types';
-import type {
-	SimpleStatsCacheBySpeciesRow,
-	SimpleStatsCacheRow
-} from '@/app/models/db';
-import type {
-	StatsTemporalUnit
-} from '@/app/models/temporal-unit';
+import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import type { StatsResult } from '@/modules/stats/browser';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 const highlightCategoryOrder: HighlightCategory[] = [
@@ -63,7 +57,9 @@ export function filterStats({
 	return filteredStats;
 }
 
-export function getTemporalUnitFromTimeWindow(window: YearMonthRestriction): StatsTemporalUnit {
+export function getTemporalUnitFromTimeWindow(
+	window: YearMonthRestriction
+): StatsTemporalUnit {
 	if (window.year && window.month) {
 		return 'month';
 	} else if (window.year) {
@@ -161,15 +157,12 @@ export function getHighlightsOfTypeFromStatsRows({
 	scope
 }: {
 	rule: HighlightsGenerator;
-	stats: (SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[];
+	stats: StatsResult[];
 	limit: number;
 	timeWindowFilter: (timePeriod: string) => boolean;
 	scope: HighlightScope;
 }): HighlightValue[] {
-	const highlights = rule.generator(
-		stats as SimpleStatsCacheBySpeciesRow[] & SimpleStatsCacheRow[],
-		scope
-	);
+	const highlights = rule.generator(stats, scope);
 
 	return limitHighlights(highlights, limit).filter(({ timePeriod }) =>
 		timeWindowFilter(timePeriod)
@@ -215,17 +208,12 @@ export function getCacheKey(
 	return cacheKey;
 }
 
-const filteredStatsCache: Map<
-	string,
-	(SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[]
-> = new Map();
+const filteredStatsCache: Map<string, StatsResult[]> = new Map();
 
 export type FilteredStatsCache = {
 	has: () => boolean;
-	set: (
-		filteredStats: (SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[]
-	) => void;
-	get: () => (SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[] | undefined;
+	set: (filteredStats: StatsResult[]) => void;
+	get: () => StatsResult[] | undefined;
 };
 
 export function getFilteredStatsCache(
@@ -237,9 +225,8 @@ export function getFilteredStatsCache(
 
 	return {
 		has: () => filteredStatsCache.has(`${cacheKey}-${speciesUsed}`),
-		set: (
-			filteredStats: (SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[]
-		) => filteredStatsCache.set(`${cacheKey}-${speciesUsed}`, filteredStats),
+		set: (filteredStats: StatsResult[]) =>
+			filteredStatsCache.set(`${cacheKey}-${speciesUsed}`, filteredStats),
 		get: () => filteredStatsCache.get(`${cacheKey}-${speciesUsed}`)
 	};
 }

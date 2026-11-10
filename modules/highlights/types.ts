@@ -1,8 +1,8 @@
+import type { StatsResult } from '@/modules/stats/browser';
 import type {
-	SimpleStatsCacheBySpeciesRow,
-	SimpleStatsCacheRow
-} from '@/app/models/db';
-import type { TemporalUnit, CamelCaseStatsTemporalUnit } from '@/app/models/temporal-unit';
+	TemporalUnit,
+	CamelCaseStatsTemporalUnit
+} from '@/app/models/temporal-unit';
 import type { StatUnit } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 export type { StatUnit } from '@/modules/ui-kit';
@@ -95,10 +95,7 @@ export type HighlightsGenerator = {
 	limit?: number;
 	speciesUsed: 'none' | 'present' | 'grouped';
 	presence?: HighlightPresenceConfig;
-	generator: (
-		stats: (SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow)[],
-		scope?: HighlightScope
-	) => HighlightValue[];
+	generator: (stats: StatsResult[], scope?: HighlightScope) => HighlightValue[];
 	condition?: (scope: HighlightScope) => boolean;
 };
 
@@ -122,7 +119,10 @@ export type ScopeHighlightConfig = {
 	inter?: HighlightGenerationConfig[];
 };
 
-export type HighlightPresenceAtScopes = Record<CamelCaseStatsTemporalUnit, ScopeHighlightConfig | null >
+export type HighlightPresenceAtScopes = Record<
+	CamelCaseStatsTemporalUnit,
+	ScopeHighlightConfig | null
+>;
 
 type HighlightPresenceConfig = {
 	species: HighlightPresenceAtScopes | null;
