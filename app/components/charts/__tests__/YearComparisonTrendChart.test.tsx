@@ -1569,7 +1569,7 @@ describe('YearComparisonTrendChart', () => {
 				]
 			]);
 			const [chart] = screen.getAllByTestId('line-chart');
-			expect(chart.dataset.ytitle).toBe('Count per hour');
+			expect(chart.dataset.ytitle).toBe('Count per effort');
 		});
 
 		it('appends the Total series to a fetched year series when includeTotalSeries is set', async () => {
@@ -1789,7 +1789,7 @@ describe('YearComparisonTrendChart', () => {
 					['2024-02-01', 0.75]
 				]
 			]);
-			expect(chart.dataset.ytitle).toBe('Value per hour');
+			expect(chart.dataset.ytitle).toBe('Value per effort');
 		});
 
 		it('sums the Total series from the already-accumulated metrics when includeTotalSeries is set', () => {
@@ -2239,7 +2239,7 @@ describe('YearComparisonTrendChart', () => {
 					['2024-01-01', 2]
 				]
 			]);
-			expect(chart.dataset.ytitle).toBe('Count per hour');
+			expect(chart.dataset.ytitle).toBe('Count per effort');
 		});
 
 		it('compare-years mode, normalize off: per-year series values match raw series', () => {
@@ -2268,7 +2268,7 @@ describe('YearComparisonTrendChart', () => {
 			const [chart] = screen.getAllByTestId('line-chart');
 			const [year2023] = JSON.parse(chart.dataset.values!);
 			expect(year2023[0]).toEqual(['Jan', 2]);
-			expect(chart.dataset.ytitle).toBe('Count per hour');
+			expect(chart.dataset.ytitle).toBe('Count per effort');
 		});
 
 		it('this-year mode, normalize off: current-year/median/band values match raw series', () => {
@@ -2301,7 +2301,7 @@ describe('YearComparisonTrendChart', () => {
 			expect(max[0]).toEqual(['Jan', 2]);
 			expect(min[0]).toEqual(['Jan', 2]);
 			expect(median[0]).toEqual(['Jan', 2]);
-			expect(chart.dataset.ytitle).toBe('Count per hour');
+			expect(chart.dataset.ytitle).toBe('Count per effort');
 		});
 	});
 
@@ -2387,7 +2387,7 @@ describe('YearComparisonTrendChart', () => {
 					['2024-01-01', 2]
 				]
 			]);
-			expect(charts[0].dataset.ytitle).toBe('Count per hour');
+			expect(charts[0].dataset.ytitle).toBe('Count per effort');
 		});
 	});
 });

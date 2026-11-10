@@ -8,7 +8,6 @@ import {
 	getSpeciesArrivalsStats
 } from '@/app/actions/sp-data';
 import { globalStatsCacheFetchPool } from '@/modules/stats/browser';
-import { postgresIntervalToHours } from '@/app/lib/postgres-interval';
 import type {
 	CoreStatsResult,
 	DemographicsStatsResult,
@@ -237,15 +236,14 @@ export function SpDemographicsTab({
 	// effort is a property of a session, not of the species caught in it, so
 	// this reads the ungrouped monthly SimpleStatsCache slice directly rather
 	// than filtering by species (#1236; previously wrapped in
-	// `getGroupEffortHistory`, app/actions/sp-data.ts). Shapes the raw
-	// `total_effort` interval into fractional hours and pairs it with
-	// `time_period`, matching the `[time_period, value]` tuple shape
-	// `YearComparisonTrendChart`'s existing series already use. Goes through
-	// `globalStatsCacheFetchPool` rather than calling `readStatsCacheRows`
-	// directly, so this exact (group, month, ungrouped) request is shared with
-	// any other client-side caller on the page asking for the same cache key
-	// (e.g. the Highlights pipeline's `overall` statsSelector) instead of
-	// firing a redundant one.
+	// `getGroupEffortHistory`, app/actions/sp-data.ts). Passes `session_count`
+	// straight through (no conversion) paired with `time_period`, matching the
+	// `[time_period, value]` tuple shape `YearComparisonTrendChart`'s existing
+	// series already use. Goes through `globalStatsCacheFetchPool` rather than
+	// calling `readStatsCacheRows` directly, so this exact (group, month,
+	// ungrouped) request is shared with any other client-side caller on the
+	// page asking for the same cache key (e.g. the Highlights pipeline's
+	// `overall` statsSelector) instead of firing a redundant one.
 	function loadEffortHistory() {
 		if (effortHistoryRequested) return;
 		setEffortHistoryRequested(true);
@@ -257,10 +255,7 @@ export function SpDemographicsTab({
 			})
 			.then((rows) => {
 				const data = (rows as CoreStatsResult[]).map(
-					(row): [string, number] => [
-						row.time_period,
-						postgresIntervalToHours(row.total_effort)
-					]
+					(row): [string, number] => [row.time_period, row.session_count]
 				);
 				setEffortHistory({ name: 'effort', data });
 			})

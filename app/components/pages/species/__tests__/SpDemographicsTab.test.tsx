@@ -224,7 +224,7 @@ describe('SpDemographicsTab', () => {
 			[] as ArrivalsStatsResult[]
 		);
 		vi.mocked(globalStatsCacheFetchPool.fetch).mockResolvedValue([
-			{ time_period: '2024-01-01', total_effort: '10:00:00' }
+			{ time_period: '2024-01-01', session_count: 10 }
 		]);
 	});
 
@@ -895,15 +895,11 @@ describe('SpDemographicsTab', () => {
 		});
 	});
 
-	describe('effort history hours conversion', () => {
-		// Moved from sp-data.test.ts's old `getGroupEffortHistory` describe
-		// block (#1236): that function is gone, and the
-		// total_effort-interval -> fractional-hours conversion it used to do
-		// now lives inline in this component's loadEffortHistory.
-		async function loadEffortHistoryRows(totalEffort: string) {
+	describe('effort history: session_count passes through unconverted', () => {
+		async function loadEffortHistoryRows(sessionCount: number) {
 			const { globalStatsCacheFetchPool } = await loadStatsCacheActions();
 			vi.mocked(globalStatsCacheFetchPool.fetch).mockResolvedValue([
-				{ time_period: '2024-01-01', total_effort: totalEffort }
+				{ time_period: '2024-01-01', session_count: sessionCount }
 			]);
 			renderDemographicsTab();
 			const chart = await expandTile(/Counts/);
@@ -911,19 +907,14 @@ describe('SpDemographicsTab', () => {
 			return JSON.parse(chart.dataset.effortData!) as [string, number][];
 		}
 
-		it('converts a sub-day total_effort interval into fractional hours', async () => {
-			const data = await loadEffortHistoryRows('05:30:00');
-			expect(data).toEqual([['2024-01-01', 5.5]]);
+		it('passes a session_count value straight through to effortData with no conversion', async () => {
+			const data = await loadEffortHistoryRows(7);
+			expect(data).toEqual([['2024-01-01', 7]]);
 		});
 
-		it('returns 0 hours for a zero-length interval', async () => {
-			const data = await loadEffortHistoryRows('00:00:00');
+		it('passes a session_count of 0 straight through to effortData', async () => {
+			const data = await loadEffortHistoryRows(0);
 			expect(data).toEqual([['2024-01-01', 0]]);
-		});
-
-		it('converts a multi-day total_effort interval into its total hour count', async () => {
-			const data = await loadEffortHistoryRows('2 days 03:00:00');
-			expect(data).toEqual([['2024-01-01', 51]]);
 		});
 	});
 

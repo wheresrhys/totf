@@ -96,9 +96,9 @@ export function YearComparisonTrendChart({
 	xtitle?: string;
 	ytitle?: string;
 	min?: number | null;
-	// A single, species-agnostic series of `[date, effortHours]` pairs, keyed
+	// A single, species-agnostic series of `[date, effort]` pairs, keyed
 	// with the same date convention as `series`. When passed, a "Normalize"
-	// toggle appears that divides every metric's values by effort hours.
+	// toggle appears that divides every metric's values by that effort figure.
 	effortHistory?: LineChartData;
 	// When passed, replaces the all-time/compare-years/this-year mode
 	// switcher with a single "Compare years" link to a dedicated page, and the
@@ -123,7 +123,7 @@ export function YearComparisonTrendChart({
 	yearlyAggregators?: Record<string, YearlyAggregator>;
 	// When `true`, appends one extra `Total` series — the per-period sum of
 	// every other currently-plotted series (computed downstream of the
-	// Normalize toggle, so it stays a valid per-hour rate when normalized) —
+	// Normalize toggle, so it stays a valid per-effort rate when normalized) —
 	// to every mode/interval. Omitting it (or passing `false`) leaves
 	// rendering byte-for-byte identical to not having the prop at all.
 	includeTotalSeries?: boolean;
@@ -199,11 +199,11 @@ export function YearComparisonTrendChart({
 	const accumulating =
 		!!allowYearAccumulation && accumulate && mode === 'all-time';
 	const effectiveYtitle =
-		normalize && effortHistory ? `${ytitle} per hour` : ytitle;
+		normalize && effortHistory ? `${ytitle} per effort` : ytitle;
 	// Applies the Normalize toggle and then the optional `Total` series to one
 	// set of metric series, against whichever effort series matches that set's
 	// granularity. The total is appended post-normalize (so it's summed from
-	// already effort-normalized values and stays a valid per-hour rate) and —
+	// already effort-normalized values and stays a valid per-effort rate) and —
 	// on the monthly path — pre-interval-aggregation, so it flows through every
 	// mode/interval for free: the total is simply the next metric index, so it
 	// gets its own base colour, its own compare-years/this-year sub-chart, and
@@ -224,7 +224,7 @@ export function YearComparisonTrendChart({
 	}
 	// The accumulate path *replaces* the Normalize step rather than composing on
 	// top of it: summing already-normalized per-month rates is meaningless, so
-	// when Normalize is also on the raw counts and the effort hours are
+	// when Normalize is also on the raw counts and the effort figures are
 	// accumulated separately and divided once per month (inside
 	// `accumulateSeriesByYear`). The Total is still appended last, so it sums
 	// the already-accumulated metrics into a cumulative total.
@@ -255,7 +255,7 @@ export function YearComparisonTrendChart({
 	// The Year interval is served from `fetchYearSeries` when the caller
 	// supplied one and the fetch has landed — the fetched series are already
 	// year-granular, so they only need Normalize + Total applied (against the
-	// monthly effort series collapsed to yearly totals: summing hours across a
+	// monthly effort series collapsed to yearly totals: summing effort across a
 	// year is exact, effort being additive, unlike the bird-distinct counts
 	// this fetch exists to fix). Otherwise — no fetcher, or the fetch rejected
 	// — the Year view falls back to aggregating the monthly points client-side,
