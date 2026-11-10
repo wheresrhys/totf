@@ -3,8 +3,6 @@ import alphaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStats
 import betaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/beta.by-species.json';
 import gammaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/gamma.by-species.json';
 import alphaSummaryTotalsSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCache/alpha.summary-totals.json';
-import alphaYearlyTotalsSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCache/alpha.yearly-totals.json';
-import alphaMonthlyTotalsSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCache/alpha.monthly-totals.json';
 import alphaHomePageSummarySnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCache/alpha.home-page-summary.json';
 import robinAlphaHeadlineSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/robin-alpha.headline.json';
 
@@ -201,14 +199,6 @@ export const ALPHA_CORE_STATS_SUMMARY_TOTALS: CoreStatsResult | null =
 	alphaSummaryTotalsSnapshot
 		? resolveAllSpeciesRow(alphaSummaryTotalsSnapshot)
 		: null;
-
-/** Alpha's year-grain totals, one row per year — powers `fetchPayOffStats`'s yearly table/chart. */
-export const ALPHA_CORE_STATS_YEARLY_TOTALS: CoreStatsResult[] =
-	alphaYearlyTotalsSnapshot.map(resolveAllSpeciesRow);
-
-/** Alpha's month-grain totals, one row per month — powers `fetchPayOffStats`'s monthly table/chart. */
-export const ALPHA_CORE_STATS_MONTHLY_TOTALS: CoreStatsResult[] =
-	alphaMonthlyTotalsSnapshot.map(resolveAllSpeciesRow);
 
 /**
  * Alpha's home-page summary — the all-time cell plus whichever of the
