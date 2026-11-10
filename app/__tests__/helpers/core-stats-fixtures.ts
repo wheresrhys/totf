@@ -34,9 +34,6 @@ export function buildCoreStatsRow(
 		species_name: null,
 		time_period: '2026-01-01',
 		session_count: 4,
-		total_effort: '18:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:34:17',
 		avg_encounters_per_session: 1.75,
 		max_per_session: 3,
 		species_count: 12,
@@ -82,9 +79,6 @@ export function buildDailyStatsRow(
 // `group_by_time_period` (#996) row has for such a month.
 const ZERO_MONTH_SQUASHED_STATS: Partial<CoreStatsResult> = {
 	session_count: 0,
-	total_effort: '00:00:00',
-	effort_per_session: '00:00:00',
-	effort_per_encounter: '00:00:00',
 	avg_encounters_per_session: 0,
 	max_per_session: 0,
 	species_count: 0,

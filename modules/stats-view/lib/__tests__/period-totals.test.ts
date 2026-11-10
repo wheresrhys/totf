@@ -47,8 +47,7 @@ describe('derivePeriodTotalsRowByBird', () => {
 
 	it('maps session_count to sessionsCount', () => {
 		const stat = buildCoreStatsRow({
-			session_count: 11,
-			total_effort: '01:00:00'
+			session_count: 11
 		});
 		const row = derivePeriodTotalsRowByBird(stat);
 		expect(row.sessionsCount).toBe(11);
@@ -63,7 +62,6 @@ describe('derivePeriodTotalsRowByBird', () => {
 		const stat = buildCoreStatsRow({
 			time_period: '2026-08-16',
 			session_count: 0,
-			total_effort: '00:00:00',
 			species_count: 0,
 			bird_count: 0,
 			encounter_count: 0,

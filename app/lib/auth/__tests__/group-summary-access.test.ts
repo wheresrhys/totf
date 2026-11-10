@@ -105,7 +105,7 @@ function makeRpcClient(
 
 /**
  * A `stats_cache_basic_session_metrics` row: the basic-count and
- * session/effort columns `core_stats` shares with it, keyed on `species_id`
+ * session columns `core_stats` shares with it, keyed on `species_id`
  * rather than `species_name`.
  */
 function buildBasicSessionMetricsRow(
@@ -117,9 +117,6 @@ function buildBasicSessionMetricsRow(
 		encounter_count: number;
 		new_bird_count: number;
 		session_count: number;
-		total_effort: string;
-		effort_per_session: string;
-		effort_per_encounter: string;
 		avg_encounters_per_session: number;
 		max_per_session: number;
 		max_new_per_session: number;
@@ -133,9 +130,6 @@ function buildBasicSessionMetricsRow(
 		encounter_count: 55,
 		new_bird_count: 30,
 		session_count: 4,
-		total_effort: '18:00:00',
-		effort_per_session: '02:00:00',
-		effort_per_encounter: '02:34:17',
 		avg_encounters_per_session: 1.75,
 		max_per_session: 3,
 		max_new_per_session: 3,
