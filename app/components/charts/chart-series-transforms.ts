@@ -60,10 +60,10 @@ function median(values: number[]): number {
 }
 
 // Divides each metric's `[date, value]` point by that date's ringing-effort
-// hours from `effortHistory` (a single, species-agnostic series keyed by the
+// figure from `effortHistory` (a single, species-agnostic series keyed by the
 // same date convention as `series`), turning a raw count/measurement into an
-// effort-normalized rate (e.g. "encounters per hour"). A `null` value is left
-// as a gap rather than manufactured into a `0`. A date whose effort-hours
+// effort-normalized rate (e.g. "encounters per unit effort"). A `null` value
+// is left as a gap rather than manufactured into a `0`. A date whose effort
 // lookup is `0`, missing, or otherwise falsy maps to an explicit `0` — never
 // `NaN`/`Infinity`.
 export function normalizeSeriesByEffort(
@@ -194,8 +194,8 @@ export function aggregateSeriesByYear(
 //
 // When `effortHistory` is supplied (the Normalize composition), summing
 // already-normalized per-month rates would be meaningless, so instead the raw
-// counts and the effort-hours denominator are each accumulated separately
-// across the year-to-date and divided once per month:
+// counts and the effort denominator are each accumulated separately across
+// the year-to-date and divided once per month:
 // `cumulative_raw_count[month] / cumulative_effort_hours[month]`. A month whose
 // cumulative effort is `0`/missing divides to an explicit `0` (never
 // `NaN`/`Infinity`), matching `normalizeSeriesByEffort`.
