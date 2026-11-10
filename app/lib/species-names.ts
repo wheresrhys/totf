@@ -12,13 +12,15 @@ import { fetchAllPaginatedRows } from '@/lib/supabase';
  * `fetchAllPaginatedRows` read is: a group with more species than one
  * PostgREST page would otherwise silently lose the names of the overflow.
  *
- * Shared by `app/actions/spp-data.ts` (`readBiometricsFromMetricsRpc`) and
- * `app/lib/auth/group-summary-access.ts` (`runLiveMetricsRecompute`) — both
- * read a `stats_cache_*_metrics` RPC's `species_id`-keyed rows and need the
- * same join back to a display name. Lives outside both of those files'
- * modules rather than in either one, since `group-summary-access.ts` (under
- * `app/lib/auth/`) importing from `app/actions/` would be a backwards
- * layering dependency.
+ * `app/lib/auth/group-summary-access.ts`'s `runLiveMetricsRecompute` is the
+ * one remaining caller: it reads `stats_cache_basic_session_metrics`'
+ * `species_id`-keyed rows and needs the join back to a display name.
+ * `app/actions/spp-data.ts` was the second until #1415 — its arbitrary-window
+ * biometrics half now merges onto those already-named rows by `species_id`
+ * instead of resolving names of its own. The function stays here rather than
+ * moving into `group-summary-access.ts`: it is a generic
+ * `stats_cache_*_metrics` adapter, and any future consumer of one of those
+ * four RPCs needs it for the same reason.
  */
 export async function readSpeciesNamesById(
 	client: SupabaseClient,

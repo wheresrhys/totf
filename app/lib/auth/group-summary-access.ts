@@ -43,9 +43,27 @@ export type StatsWindowParams = {
 
 export type GroupSummaryAccessLevel = 'own' | 'shared' | 'public' | 'blocked';
 
+/**
+ * One row of an authorised summary read. `species_id` rides along on a
+ * by-species row (#1415) because `app/actions/spp-data.ts`'s arbitrary-window
+ * path merges this row with a second `stats_cache_*_metrics` result and keys
+ * that merge on the integer FK rather than the display-oriented
+ * `species_name` — a merge that was only ever possible on the name because
+ * this function used to discard the id once the name was resolved.
+ *
+ * Optional rather than required because only a by-species read has one: the
+ * all-species-combined cache table carries no `species_id` column at all, and
+ * an ungrouped live recompute returns a literal `null` for it. Nothing but the
+ * `/species` list page's merge reads it; every other consumer of these rows
+ * reads `species_name`.
+ */
+export type AuthorisedStatsRow = CoreStatsResult & {
+	species_id?: number | null;
+};
+
 export type AuthorisedSummaryResult = {
 	accessLevel: GroupSummaryAccessLevel;
-	rows: CoreStatsResult[];
+	rows: AuthorisedStatsRow[];
 };
 
 /**
@@ -146,8 +164,8 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
  *    two inputs are reshaped to cache-aligned ones.
  *
  * Exported because the `/species` list page's *other* half —
- * `fetchBiometricsStats` (`app/actions/spp-data.ts`), which fetches the 8
- * wing/weight columns for the same window — has to split exactly the same way
+ * `fetchSpeciesRowsWithBiometrics` (`app/actions/spp-data.ts`), which sources
+ * the 8 wing/weight columns for the same window — has to split exactly the same way
  * and must stay in lockstep with this one (#1223). It has its own,
  * independent reason for needing the same split: `AVG`/`MEDIAN` are not
  * associative, so `avg_weight`/`median_weight`/`avg_wing`/`median_wing` cannot
@@ -229,8 +247,8 @@ export function resolveStatsCacheQueryPlan({
  * column filter: the two grains live in two tables, see
  * `"SimpleStatsCache".sql`'s header for why), the `group_id`/`temporal_unit`/
  * `time_period` filters, the `(time_period, species_name)` ordering every
- * consumer reads the series in, the `Species(species_name)` embed
- * `mergeSpeciesBiometrics` (modules/stats-view/lib/species-stats.ts) joins on, and the
+ * consumer reads the series in, the `Species(species_name)` embed every
+ * by-species consumer reads the name off, and the
  * pagination a day-grain slice of a long-running group's history needs — is
  * `readStatsCacheRows`' job (app/actions/stats-cache.ts, #1233). This function
  * only translates a `StatsCacheQueryPlan` into its params and applies the two
@@ -248,12 +266,15 @@ async function runStatsCacheRead(
 	viewedGroup: ViewedGroup,
 	groupBySpecies: boolean,
 	plan: StatsCacheQueryPlan
-): Promise<CoreStatsResult[]> {
+): Promise<AuthorisedStatsRow[]> {
 	// `readStatsCacheRows` select('*')s and leaves narrowing to its caller, so
 	// name the row shape this read is known to produce here. It already
 	// resolves `species_name` off the embed (`null` for an
 	// all-species-combined read, exactly as `core_stats` returned under
-	// `group_by_species: false`) and strips the embed itself.
+	// `group_by_species: false`) and strips the embed itself. `species_id` is
+	// among the columns `select('*')` brings back on a by-species read, which
+	// is why `AuthorisedStatsRow` can declare it without this branch doing
+	// anything to put it there.
 	const rows = (await readStatsCacheRows({
 		client,
 		viewedGroup,
@@ -264,7 +285,7 @@ async function runStatsCacheRead(
 		timePeriod: plan.timePeriod,
 		fromDate: plan.fromTimePeriod,
 		toDate: plan.toTimePeriod
-	})) as CoreStatsResult[];
+	})) as AuthorisedStatsRow[];
 
 	return rows
 		.filter(
@@ -347,7 +368,7 @@ const UNAVAILABLE_AGE_BUCKET_COLUMNS = {
  * page: a live recompute by `stats_cache_basic_session_metrics` instead of
  * the retired `core_stats`/`public_core_stats` RPC pair (#1244), following
  * the exact precedent `app/actions/spp-data.ts`'s
- * `readBiometricsFromMetricsRpc` already set for the biometrics half. That
+ * `mergeLiveBiometricsIntoCountsRows` already set for the biometrics half. That
  * RPC exists to feed the `SimpleStatsCacheBySpecies`/`SimpleStatsCache`
  * write, but nothing about it is cache-specific — it takes the same 8-arg
  * window signature `core_stats` did and recomputes from `Encounters` on every
@@ -357,14 +378,16 @@ const UNAVAILABLE_AGE_BUCKET_COLUMNS = {
  *
  * `species_name` isn't a column either RPC in this family returns when
  * keyed on `species_id` — it comes back through the same
- * `readSpeciesNamesById` join `readBiometricsFromMetricsRpc` uses, `null`
- * when `group_by_species` wasn't set, matching `core_stats`' own behaviour.
+ * `readSpeciesNamesById` join `spp-data.ts`'s own live path used to use,
+ * `null` when `group_by_species` wasn't set, matching `core_stats`' own
+ * behaviour. The `species_id` it was resolved from is kept on the row rather
+ * than discarded — see `AuthorisedStatsRow`.
  */
 async function runLiveMetricsRecompute(
 	client: SupabaseClient,
 	viewedGroup: ViewedGroup,
 	rpcParams: StatsWindowParams
-): Promise<CoreStatsResult[]> {
+): Promise<AuthorisedStatsRow[]> {
 	const rows = (await client
 		.rpc('stats_cache_basic_session_metrics', {
 			ringing_group_filter: viewedGroup.id,
@@ -387,9 +410,10 @@ async function runLiveMetricsRecompute(
 	return rows.map(({ species_id, ...basicMetrics }) => ({
 		...basicMetrics,
 		...UNAVAILABLE_AGE_BUCKET_COLUMNS,
+		species_id,
 		species_name:
 			species_id === null ? null : (speciesNamesById.get(species_id) ?? null)
-	})) as CoreStatsResult[];
+	})) as AuthorisedStatsRow[];
 }
 
 /**
@@ -414,7 +438,7 @@ async function runLiveMetricsRecompute(
  * any rows came back.)
  */
 function hasVisibleData(
-	rows: CoreStatsResult[],
+	rows: AuthorisedStatsRow[],
 	servedFromCache: boolean
 ): boolean {
 	if (servedFromCache) {

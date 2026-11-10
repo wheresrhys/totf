@@ -1,4 +1,5 @@
-import type { CoreStatsResult, CoreStatsWithBiometrics } from '@/app/models/db';
+import type { CoreStatsResult } from '@/app/models/db';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import alphaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/alpha.by-species.json';
 import betaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/beta.by-species.json';
 import gammaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/gamma.by-species.json';
@@ -142,22 +143,28 @@ export function buildMonthSquashedFixture(
 
 /**
  * Resolves a raw `SimpleStatsCacheBySpecies` snapshot row (with its `Species`
- * embed intact) into a `CoreStatsWithBiometrics` row — the embed's
+ * embed intact) into a `StatsCacheBySpeciesResult` row — the embed's
  * `species_name` flattened on, matching what `readStatsCacheRows` does for a
  * real by-species read. The row's extra cache-only columns (`id`, `group_id`,
- * `species_id`, `temporal_unit`, `created_at`, `updated_at`, and the
- * demographics-only bucket columns `core_stats_result` never declared) ride
- * along unread, the same superset `fetchSpeciesStatsCacheRows`' own doc
- * comment describes for the real read path.
+ * `species_id`, `temporal_unit`, `created_at`, `updated_at`) ride along
+ * unread, the same superset `fetchSpeciesStatsCacheRows`' own doc comment
+ * describes for the real read path.
+ *
+ * `StatsCacheBySpeciesResult` (`modules/stats`) rather than the narrower
+ * `CoreStatsWithBiometrics` since #1415: the snapshot is a verbatim cache row,
+ * so it genuinely carries the four `new_young_bird_count`/`new_postjuv_*`/
+ * `postjuv_juv_enc_count` columns that type omits, and `fetchSpeciesData` now
+ * returns whole rows. The richer type is assignable to the narrower one, so
+ * every pre-existing consumer of the exports below is unaffected.
  */
 function resolveBySpeciesRow(
 	row: { Species: { species_name: string } } & Record<string, unknown>
-): CoreStatsWithBiometrics {
+): StatsCacheBySpeciesResult {
 	const { Species, ...rest } = row;
 	return {
 		...rest,
 		species_name: Species.species_name
-	} as CoreStatsWithBiometrics;
+	} as StatsCacheBySpeciesResult;
 }
 
 /**
@@ -181,11 +188,11 @@ function resolveAllSpeciesRow(row: Record<string, unknown>): CoreStatsResult {
  * `fetchSpeciesData`'s cache-aligned windows (the `/species` list page's
  * default and year-select views).
  */
-export const ALPHA_CORE_STATS_BY_SPECIES: CoreStatsWithBiometrics[] =
+export const ALPHA_CORE_STATS_BY_SPECIES: StatsCacheBySpeciesResult[] =
 	alphaBySpeciesSnapshot.map(resolveBySpeciesRow);
-export const BETA_CORE_STATS_BY_SPECIES: CoreStatsWithBiometrics[] =
+export const BETA_CORE_STATS_BY_SPECIES: StatsCacheBySpeciesResult[] =
 	betaBySpeciesSnapshot.map(resolveBySpeciesRow);
-export const GAMMA_CORE_STATS_BY_SPECIES: CoreStatsWithBiometrics[] =
+export const GAMMA_CORE_STATS_BY_SPECIES: StatsCacheBySpeciesResult[] =
 	gammaBySpeciesSnapshot.map(resolveBySpeciesRow);
 
 /** Alpha's all-time, ungrouped totals row — powers `fetchSummaryStats` called with no date window (the base `/summary` route). */
@@ -224,5 +231,5 @@ export const ALPHA_HOME_PAGE_SUMMARY_STATS: {
  * still fetches the two halves separately — see `species-stats.ts`). Powers
  * the species detail page's headline stats (#1222).
  */
-export const ROBIN_ALPHA_HEADLINE: CoreStatsWithBiometrics =
+export const ROBIN_ALPHA_HEADLINE: StatsCacheBySpeciesResult =
 	resolveBySpeciesRow(robinAlphaHeadlineSnapshot[0]);
