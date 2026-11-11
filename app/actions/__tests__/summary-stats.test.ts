@@ -7,13 +7,13 @@ import {
 	fetchYearlyTotals,
 	fetchCombinedMonthTotals
 } from '../summary-stats';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats';
+import type { StatsCacheResult } from '@/modules/stats';
 
 vi.mock('@/app/lib/auth/group-summary-access', () => ({
 	fetchAuthorisedCoreStats: vi.fn()
 }));
 
-const ROW = { encounter_count: 5 } as StatsCacheBySpeciesResult;
+const ROW = { encounter_count: 5 } as StatsCacheResult;
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 
 describe('summary-stats actions — route through the group-summary access helper', () => {

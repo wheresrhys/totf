@@ -6,7 +6,7 @@ import {
 	deriveSpeciesTotalsRowByEncounter
 } from '../species-totals';
 import type { SpeciesTotalsRow } from '../../types';
-import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import { buildBySpeciesStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // This file's tests assert against a specific full row shape (not just the
@@ -34,24 +34,24 @@ const fullRowOverrides = {
 
 describe('calculateRetraps', () => {
 	it('computes bird_count minus new_bird_count for a typical row', () => {
-		const stat = buildCoreStatsRow({ bird_count: 10, new_bird_count: 3 });
+		const stat = buildBySpeciesStatsRow({ bird_count: 10, new_bird_count: 3 });
 		expect(calculateRetraps(stat)).toBe(7);
 	});
 
 	it('returns 0 when every bird is new (bird_count === new_bird_count)', () => {
-		const stat = buildCoreStatsRow({ bird_count: 5, new_bird_count: 5 });
+		const stat = buildBySpeciesStatsRow({ bird_count: 5, new_bird_count: 5 });
 		expect(calculateRetraps(stat)).toBe(0);
 	});
 
 	it('returns bird_count when new_bird_count is 0 (no new birds)', () => {
-		const stat = buildCoreStatsRow({ bird_count: 8, new_bird_count: 0 });
+		const stat = buildBySpeciesStatsRow({ bird_count: 8, new_bird_count: 0 });
 		expect(calculateRetraps(stat)).toBe(8);
 	});
 });
 
 describe('deriveSpeciesTotalsRow', () => {
 	it('maps every StatsCacheBySpeciesResult bucket field to its SpeciesTotalsRow counterpart', () => {
-		const stat = buildCoreStatsRow(fullRowOverrides);
+		const stat = buildBySpeciesStatsRow(fullRowOverrides);
 		expect(deriveSpeciesTotalsRow(stat)).toEqual({
 			speciesName: 'Blue Tit',
 			sessionsCount: 4,
@@ -69,36 +69,45 @@ describe('deriveSpeciesTotalsRow', () => {
 	});
 
 	it('computes retrapsCount via the shared calculateRetraps helper', () => {
-		const stat = buildCoreStatsRow({ bird_count: 10, new_bird_count: 3 });
+		const stat = buildBySpeciesStatsRow({ bird_count: 10, new_bird_count: 3 });
 		expect(deriveSpeciesTotalsRow(stat).retrapsCount).toBe(7);
 	});
 
 	it('maps max_per_session to maxPerSession', () => {
-		const stat = buildCoreStatsRow({ max_per_session: 9 });
+		const stat = buildBySpeciesStatsRow({ max_per_session: 9 });
 		expect(deriveSpeciesTotalsRow(stat).maxPerSession).toBe(9);
 	});
 });
 
 describe('calculateEncounterRetraps', () => {
 	it('computes encounter_count minus new_bird_count for a typical row', () => {
-		const stat = buildCoreStatsRow({ encounter_count: 10, new_bird_count: 3 });
+		const stat = buildBySpeciesStatsRow({
+			encounter_count: 10,
+			new_bird_count: 3
+		});
 		expect(calculateEncounterRetraps(stat)).toBe(7);
 	});
 
 	it('returns 0 when every encounter is new (encounter_count === new_bird_count)', () => {
-		const stat = buildCoreStatsRow({ encounter_count: 5, new_bird_count: 5 });
+		const stat = buildBySpeciesStatsRow({
+			encounter_count: 5,
+			new_bird_count: 5
+		});
 		expect(calculateEncounterRetraps(stat)).toBe(0);
 	});
 
 	it('returns encounter_count when new_bird_count is 0 (all retraps)', () => {
-		const stat = buildCoreStatsRow({ encounter_count: 8, new_bird_count: 0 });
+		const stat = buildBySpeciesStatsRow({
+			encounter_count: 8,
+			new_bird_count: 0
+		});
 		expect(calculateEncounterRetraps(stat)).toBe(8);
 	});
 });
 
 describe('deriveSpeciesTotalsRowByEncounter', () => {
 	it('maps each age-bucket *_enc_count field to the correct SpeciesTotalsRow property', () => {
-		const stat = buildCoreStatsRow(fullRowOverrides);
+		const stat = buildBySpeciesStatsRow(fullRowOverrides);
 		expect(deriveSpeciesTotalsRowByEncounter(stat)).toEqual({
 			speciesName: 'Blue Tit',
 			sessionsCount: 4,
@@ -127,7 +136,7 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 	])(
 		'sources $resultField from $sourceField',
 		({ sourceField, resultField }) => {
-			const stat = buildCoreStatsRow({
+			const stat = buildBySpeciesStatsRow({
 				[sourceField]: 9
 			} as Partial<StatsCacheBySpeciesResult>);
 			expect(deriveSpeciesTotalsRowByEncounter(stat)[resultField]).toBe(9);
@@ -135,7 +144,7 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 	);
 
 	it('sources newCount from new_bird_count, not any *_enc_count field', () => {
-		const stat = buildCoreStatsRow({
+		const stat = buildBySpeciesStatsRow({
 			new_bird_count: 4
 		});
 		const row = deriveSpeciesTotalsRowByEncounter(stat);
@@ -143,7 +152,7 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 	});
 
 	it('maps max_per_session to maxPerSession', () => {
-		const stat = buildCoreStatsRow({ max_per_session: 9 });
+		const stat = buildBySpeciesStatsRow({ max_per_session: 9 });
 		expect(deriveSpeciesTotalsRowByEncounter(stat).maxPerSession).toBe(9);
 	});
 });

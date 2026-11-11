@@ -3,20 +3,21 @@ import { render, screen, cleanup } from '@testing-library/react';
 import { SummaryStatsSection } from '../SummaryStatsSection';
 import { ALPHA_CORE_STATS_SUMMARY_TOTALS } from '@/app/__tests__/helpers/core-stats-fixtures';
 import zeroStats from '@/test-fixtures/snapshots/synthetic/zero.summary-totals.json';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type { StatsCacheResult } from '@/modules/stats/browser';
 
 // Alpha's seed data always has an all-time cell, so this is never actually
 // null — the type is nullable only because the real all-time read can
 // legitimately return none for a group with no data at all.
 const populatedStats = ALPHA_CORE_STATS_SUMMARY_TOTALS!;
-// This hand-authored synthetic fixture is ungrouped, so species_name/
-// time_period are genuinely null, and it also predates 8 of the cache tables'
-// age-bucket encounter columns. `StatsCacheBySpeciesResult` (`modules/stats`)
-// inherits `SimpleStatsCacheBySpecies`' NOT NULL constraints on all of those,
-// so a direct assertion doesn't compile on either count (#895) — re-probed in
-// #1419.
+// This hand-authored synthetic fixture is ungrouped, so `time_period` is
+// genuinely null, and it also predates 8 of the cache tables' age-bucket
+// encounter columns. `StatsCacheResult` (`modules/stats`) inherits
+// `SimpleStatsCache`' NOT NULL constraints on all of those, so a direct
+// assertion doesn't compile on either count (#895) — re-probed in #1419. (Its
+// null `species_name` no longer contributes: #1424 retargeted this section
+// onto the combined grain, which declares exactly that.)
 // eslint-disable-next-line no-restricted-syntax -- see comment above
-const zeroActivityStats = zeroStats as unknown as StatsCacheBySpeciesResult;
+const zeroActivityStats = zeroStats as unknown as StatsCacheResult;
 
 afterEach(() => {
 	cleanup();
@@ -66,7 +67,7 @@ describe('SummaryStatsSection', () => {
 			// (real Alpha seed data has no retraps yet, #894), which wouldn't
 			// exercise the subtraction meaningfully — this asserts it against a
 			// row with a genuine gap between the two instead.
-			const statsWithRetraps: StatsCacheBySpeciesResult = {
+			const statsWithRetraps: StatsCacheResult = {
 				...populatedStats,
 				bird_count: 60,
 				new_bird_count: 40
@@ -122,7 +123,7 @@ describe('SummaryStatsSection', () => {
 		});
 
 		it('renders Retraps as 0 when every bird in the period is new (new_bird_count === bird_count)', () => {
-			const allNewStats: StatsCacheBySpeciesResult = {
+			const allNewStats: StatsCacheResult = {
 				...populatedStats,
 				bird_count: 40,
 				new_bird_count: 40
@@ -132,7 +133,7 @@ describe('SummaryStatsSection', () => {
 		});
 
 		it('renders Retraps equal to bird_count when new_bird_count is 0 (no new birds)', () => {
-			const noNewStats: StatsCacheBySpeciesResult = {
+			const noNewStats: StatsCacheResult = {
 				...populatedStats,
 				bird_count: 60,
 				new_bird_count: 0

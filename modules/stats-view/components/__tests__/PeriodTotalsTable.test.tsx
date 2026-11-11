@@ -3,7 +3,7 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { PeriodTotalsTable } from '../PeriodTotalsTable';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type { StatsCacheResult } from '@/modules/stats/browser';
 
 // The real header <th>s live in the `<thead>` row without a `data-testid` —
 // `above-header-row` (the "Aggregate by" toggle row) and `totals-row` are
@@ -356,7 +356,7 @@ describe('PeriodTotalsTable', () => {
 						postjuv_enc_count: 2,
 						adult_enc_count: 4,
 						unknown_age_enc_count: 1
-					} as Partial<StatsCacheBySpeciesResult>)
+					} as Partial<StatsCacheResult>)
 				});
 
 				render(

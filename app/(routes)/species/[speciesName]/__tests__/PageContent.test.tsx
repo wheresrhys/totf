@@ -15,7 +15,7 @@ import {
 	type FullFatPageData,
 	type PageData
 } from '../PageContent';
-import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import { buildBySpeciesStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 const {
@@ -47,7 +47,7 @@ function buildFullFatPageData(
 ): Extract<PageData, FullFatPageData> {
 	return {
 		birds: [],
-		speciesStats: buildCoreStatsRow() as StatsCacheBySpeciesResult,
+		speciesStats: buildBySpeciesStatsRow(),
 		speciesId: 1,
 		speciesName: 'Robin',
 		...overrides
@@ -366,7 +366,7 @@ describe('TabSet-based totals tabs', () => {
 					initialTabId: 'year-totals',
 					initialTabData: {
 						tabId: 'year-totals',
-						data: [buildCoreStatsRow({ time_period: '2026-01-01' })]
+						data: [buildBySpeciesStatsRow({ time_period: '2026-01-01' })]
 					}
 				})}
 				viewedGroup={viewedGroup}
@@ -557,7 +557,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 
 	describe('Biometrics tab', () => {
 		it('renders SpBiometricsTab with data: null routed through the adapter, with speciesStats/speciesName/speciesId/fromDate/toDate/viewedGroup mapped correctly from params/viewedGroup', async () => {
-			const speciesStats = buildCoreStatsRow() as StatsCacheBySpeciesResult;
+			const speciesStats = buildBySpeciesStatsRow();
 			render(
 				<SpeciesPageContent
 					params={{ speciesName: 'Robin' }}
@@ -613,9 +613,9 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 					data={buildFullFatPageData({
 						birds,
 						speciesId: 7,
-						speciesStats: buildCoreStatsRow({
+						speciesStats: buildBySpeciesStatsRow({
 							bird_count: 12
-						}) as StatsCacheBySpeciesResult,
+						}),
 						fromDate: '2026-01-01',
 						toDate: '2026-12-31',
 						initialTabId: 'bird-list'
@@ -641,7 +641,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 			// `as unknown as` escape hatch (app/CLAUDE.md).
 			// eslint-disable-next-line no-restricted-syntax -- see comment above
 			const speciesStats = {
-				...buildCoreStatsRow(),
+				...buildBySpeciesStatsRow(),
 				bird_count: null
 			} as unknown as StatsCacheBySpeciesResult;
 			render(

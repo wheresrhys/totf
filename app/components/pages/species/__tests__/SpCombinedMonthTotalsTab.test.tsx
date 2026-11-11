@@ -17,8 +17,8 @@ import {
 	getColumnIndex
 } from '@/app/__tests__/helpers/table';
 import {
-	buildCoreStatsRow,
-	buildMonthSquashedFixture
+	buildBySpeciesStatsRow,
+	buildBySpeciesMonthSquashedFixture
 } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
@@ -51,8 +51,8 @@ function buildData(
 	overrides: Partial<SpCombinedMonthTotalsData> = {}
 ): SpCombinedMonthTotalsData {
 	return {
-		monthlyStats: [buildCoreStatsRow({ time_period: '2020-01-01' })],
-		monthSquashedStats: [buildCoreStatsRow({ time_period: '2000-01-01' })],
+		monthlyStats: [buildBySpeciesStatsRow({ time_period: '2020-01-01' })],
+		monthSquashedStats: [buildBySpeciesStatsRow({ time_period: '2000-01-01' })],
 		...overrides
 	};
 }
@@ -99,17 +99,17 @@ describe('SpCombinedMonthTotalsTab', () => {
 			renderTab({
 				initialData: buildData({
 					monthlyStats: [
-						buildCoreStatsRow({
+						buildBySpeciesStatsRow({
 							time_period: '2020-01-01',
 							encounter_count: 30
 						}),
-						buildCoreStatsRow({
+						buildBySpeciesStatsRow({
 							time_period: '2021-01-01',
 							encounter_count: 45
 						})
 					],
 					monthSquashedStats: [
-						buildCoreStatsRow({
+						buildBySpeciesStatsRow({
 							time_period: '2000-01-01',
 							encounter_count: 75
 						})
@@ -158,7 +158,10 @@ describe('SpCombinedMonthTotalsTab', () => {
 			renderTab({
 				initialData: buildData({
 					monthSquashedStats: [
-						buildCoreStatsRow({ time_period: '2000-01-01', bird_count: 40 })
+						buildBySpeciesStatsRow({
+							time_period: '2000-01-01',
+							bird_count: 40
+						})
 					]
 				})
 			});
@@ -186,12 +189,12 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 	// exactly the double-count the fix removes).
 	const toggleData = buildData({
 		monthlyStats: [
-			buildCoreStatsRow({ time_period: '2020-01-01' }),
-			buildCoreStatsRow({ time_period: '2021-01-01' }),
-			buildCoreStatsRow({ time_period: '2020-08-01' })
+			buildBySpeciesStatsRow({ time_period: '2020-01-01' }),
+			buildBySpeciesStatsRow({ time_period: '2021-01-01' }),
+			buildBySpeciesStatsRow({ time_period: '2020-08-01' })
 		],
 		monthSquashedStats: [
-			buildCoreStatsRow({
+			buildBySpeciesStatsRow({
 				time_period: '2000-01-01',
 				session_count: 10,
 				encounter_count: 75,
@@ -199,7 +202,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 				pullus_bird_count: 2,
 				...({ pullus_enc_count: 5 } as Partial<StatsCacheBySpeciesResult>)
 			}),
-			buildCoreStatsRow({
+			buildBySpeciesStatsRow({
 				time_period: '2000-08-01',
 				session_count: 2,
 				encounter_count: 11,
@@ -248,7 +251,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 			renderTab({
 				initialData: buildData({
 					monthlyStats: [
-						buildCoreStatsRow({
+						buildBySpeciesStatsRow({
 							time_period: '2020-01-01',
 							pullus_bird_count: 2,
 							...({ pullus_enc_count: 5 } as Partial<StatsCacheBySpeciesResult>)
@@ -340,13 +343,13 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 			renderTab({
 				initialData: buildData({
 					monthlyStats: [
-						buildCoreStatsRow({
+						buildBySpeciesStatsRow({
 							time_period: '2020-01-01',
 							encounter_count: 30
 						})
 					],
 					monthSquashedStats: [
-						buildCoreStatsRow({
+						buildBySpeciesStatsRow({
 							time_period: '2000-01-01',
 							encounter_count: 30
 						})
@@ -376,9 +379,9 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 	// except January.
 	const emptyMonthsData = buildData({
 		monthlyStats: [
-			buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 })
+			buildBySpeciesStatsRow({ time_period: '2020-01-01', session_count: 4 })
 		],
-		monthSquashedStats: buildMonthSquashedFixture({
+		monthSquashedStats: buildBySpeciesMonthSquashedFixture({
 			1: { session_count: 4 }
 		})
 	});
@@ -409,8 +412,14 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 			renderTab({
 				initialData: buildData({
 					monthlyStats: [
-						buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 }),
-						buildCoreStatsRow({ time_period: '2020-08-01', session_count: 0 })
+						buildBySpeciesStatsRow({
+							time_period: '2020-01-01',
+							session_count: 4
+						}),
+						buildBySpeciesStatsRow({
+							time_period: '2020-08-01',
+							session_count: 0
+						})
 					],
 					monthSquashedStats: emptyMonthsData.monthSquashedStats
 				})
@@ -434,7 +443,7 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 			renderTab({
 				initialData: buildData({
 					monthSquashedStats: Array.from({ length: 12 }, (_unused, index) =>
-						buildCoreStatsRow({
+						buildBySpeciesStatsRow({
 							time_period: `2000-${String(index + 1).padStart(2, '0')}-01`,
 							session_count: 3
 						})
@@ -451,7 +460,10 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 			renderTab({
 				initialData: buildData({
 					monthSquashedStats: [
-						buildCoreStatsRow({ time_period: '2000-08-01', session_count: 7 })
+						buildBySpeciesStatsRow({
+							time_period: '2000-08-01',
+							session_count: 7
+						})
 					]
 				})
 			});
@@ -463,7 +475,10 @@ describe('SpCombinedMonthTotalsTab — empty months toggle', () => {
 			renderTab({
 				initialData: buildData({
 					monthlyStats: [
-						buildCoreStatsRow({ time_period: '2020-01-01', session_count: 4 })
+						buildBySpeciesStatsRow({
+							time_period: '2020-01-01',
+							session_count: 4
+						})
 					],
 					monthSquashedStats: emptyMonthsData.monthSquashedStats
 				})

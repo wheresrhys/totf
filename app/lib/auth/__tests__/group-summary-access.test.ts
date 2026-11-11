@@ -9,7 +9,7 @@ import {
 	buildCoreStatsRow
 } from '@/app/__tests__/helpers/core-stats-fixtures';
 import { BiometricStatNames } from '@/modules/stats/browser';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type { StatsCacheResult } from '@/modules/stats/browser';
 
 const { mockPublicSupabaseFrom, mockPublicSupabaseRpc } = vi.hoisted(() => ({
 	mockPublicSupabaseFrom: vi.fn(),
@@ -50,7 +50,7 @@ import {
 function buildCacheRow({
 	speciesName,
 	...overrides
-}: Partial<StatsCacheBySpeciesResult> & { speciesName?: string } = {}) {
+}: Partial<StatsCacheResult> & { speciesName?: string } = {}) {
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to drop the column the cache tables don't have
 	const { species_name, ...cacheColumns } = buildCoreStatsRow(overrides);
 	return {
@@ -58,6 +58,18 @@ function buildCacheRow({
 		...(speciesName ? { Species: { species_name: speciesName } } : {})
 	};
 }
+
+/** Mutual assignability — `true` only when the two types are the same set. */
+type IsExactly<Actual, Expected> = [Actual] extends [Expected]
+	? [Expected] extends [Actual]
+		? true
+		: false
+	: false;
+
+/** The row type `fetchAuthorisedCoreStats` resolves for one params literal. */
+type RowOf<Params extends StatsWindowParams> = Awaited<
+	ReturnType<typeof fetchAuthorisedCoreStats<Params>>
+>['rows'][number];
 
 let tableRead: ReturnType<typeof makeQueryChain>;
 let tableName: string | undefined;
@@ -638,6 +650,30 @@ describe('summary read-path access model', () => {
 			expect(tableName).toBe('SimpleStatsCache');
 			expect(selectedColumns()).not.toContain('Species');
 			expect(rows[0].species_name).toBeNull();
+		});
+	});
+
+	// The compile-time half of the two tests above (#1424): the *runtime*
+	// `species_name` has always been `null` for an ungrouped read, but the row
+	// type used to say `string` for both grains, so nothing stopped a consumer
+	// reading a name that was never there. `tsc` is the real assertion in both
+	// tests below — each annotation only typechecks while the grain still
+	// resolves from the params literal, and the `it` body just reads it back.
+	describe('resolving the row type from group_by_species', () => {
+		it('a group_by_species: false read resolves a null species_name without a cast', () => {
+			const combinedGrainResolved: IsExactly<
+				RowOf<{ group_by_species: false }>['species_name'],
+				null
+			> = true;
+			expect(combinedGrainResolved).toBe(true);
+		});
+
+		it('a group_by_species: true read resolves a string species_name without a cast', () => {
+			const bySpeciesGrainResolved: IsExactly<
+				RowOf<{ group_by_species: true }>['species_name'],
+				string
+			> = true;
+			expect(bySpeciesGrainResolved).toBe(true);
 		});
 	});
 });

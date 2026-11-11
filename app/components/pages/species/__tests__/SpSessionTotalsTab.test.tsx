@@ -3,7 +3,7 @@ import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { TabContent } from '@/modules/ui-kit';
 import { SpSessionTotalsTab } from '../SpSessionTotalsTab';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
-import { buildDailyStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import { buildBySpeciesStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // `SpSessionTotalsTab` is a pure presentational `TabConfig.TabComponent`
@@ -39,7 +39,7 @@ describe('SpSessionTotalsTab', () => {
 	describe('rendering with server-prefetched data', () => {
 		it('renders the totals table immediately when `data` is supplied as a prop, with no loading spinner', () => {
 			renderSessionTotalsTab({
-				initialData: [buildDailyStatsRow({ time_period: '2026-03-14' })]
+				initialData: [buildBySpeciesStatsRow({ time_period: '2026-03-14' })]
 			});
 			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
 			expect(document.querySelector('.loading')).toBeNull();
@@ -48,8 +48,8 @@ describe('SpSessionTotalsTab', () => {
 		it('renders the correct rows/columns for the supplied data', () => {
 			renderSessionTotalsTab({
 				initialData: [
-					buildDailyStatsRow({ time_period: '2026-03-14' }),
-					buildDailyStatsRow({ time_period: '2026-03-21' })
+					buildBySpeciesStatsRow({ time_period: '2026-03-14' }),
+					buildBySpeciesStatsRow({ time_period: '2026-03-21' })
 				]
 			});
 			expect(document.querySelectorAll('tbody tr').length).toBe(2);
@@ -84,7 +84,9 @@ describe('SpSessionTotalsTab', () => {
 		it('renders the totals table once the dataFetcher resolves', async () => {
 			const dataFetcher = vi
 				.fn()
-				.mockResolvedValue([buildDailyStatsRow({ time_period: '2026-03-14' })]);
+				.mockResolvedValue([
+					buildBySpeciesStatsRow({ time_period: '2026-03-14' })
+				]);
 			const params: SpeciesTotalsTabParams = {
 				speciesName: 'Robin',
 				fromDate: '2026-01-01',
@@ -113,8 +115,14 @@ describe('SpSessionTotalsTab', () => {
 		it('always hides zero-count session rows, with no toggle to show them', () => {
 			renderSessionTotalsTab({
 				initialData: [
-					buildDailyStatsRow({ time_period: '2026-03-14', session_count: 2 }),
-					buildDailyStatsRow({ time_period: '2026-03-21', session_count: 0 })
+					buildBySpeciesStatsRow({
+						time_period: '2026-03-14',
+						session_count: 2
+					}),
+					buildBySpeciesStatsRow({
+						time_period: '2026-03-21',
+						session_count: 0
+					})
 				]
 			});
 			expect(document.querySelectorAll('tbody tr').length).toBe(1);

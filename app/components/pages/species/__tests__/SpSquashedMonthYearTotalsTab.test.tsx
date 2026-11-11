@@ -3,7 +3,7 @@ import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { TabContent } from '@/modules/ui-kit';
 import { SpSquashedMonthYearTotalsTab } from '../SpSquashedMonthYearTotalsTab';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
-import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import { buildBySpeciesStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // `SpSquashedMonthYearTotalsTab` is a pure presentational
@@ -41,8 +41,8 @@ describe('SpSquashedMonthYearTotalsTab', () => {
 		it('renders the totals table immediately when `data` is supplied as a prop, with no loading spinner', () => {
 			renderTab({
 				initialData: [
-					buildCoreStatsRow({ time_period: '2024-01-01' }),
-					buildCoreStatsRow({ time_period: '2025-01-01' })
+					buildBySpeciesStatsRow({ time_period: '2024-01-01' }),
+					buildBySpeciesStatsRow({ time_period: '2025-01-01' })
 				]
 			});
 			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
@@ -52,8 +52,8 @@ describe('SpSquashedMonthYearTotalsTab', () => {
 		it('labels each row "{month name} {year}" and links to /species/{name}/{year}/{month}', () => {
 			renderTab({
 				initialData: [
-					buildCoreStatsRow({ time_period: '2024-01-01' }),
-					buildCoreStatsRow({ time_period: '2025-01-01' })
+					buildBySpeciesStatsRow({ time_period: '2024-01-01' }),
+					buildBySpeciesStatsRow({ time_period: '2025-01-01' })
 				]
 			});
 			expect(document.querySelectorAll('tbody tr').length).toBe(2);
@@ -66,7 +66,7 @@ describe('SpSquashedMonthYearTotalsTab', () => {
 		it('uses the requested squashed month (monthFilter) for every row regardless of its own bucket month', () => {
 			renderTab({
 				params: { speciesName: 'Robin', monthFilter: 12 },
-				initialData: [buildCoreStatsRow({ time_period: '2024-12-01' })]
+				initialData: [buildBySpeciesStatsRow({ time_period: '2024-12-01' })]
 			});
 			expect(screen.getByText('December 2024')).toBeTruthy();
 			expect(
@@ -101,7 +101,9 @@ describe('SpSquashedMonthYearTotalsTab', () => {
 			};
 			const dataFetcher = vi
 				.fn()
-				.mockResolvedValue([buildCoreStatsRow({ time_period: '2024-01-01' })]);
+				.mockResolvedValue([
+					buildBySpeciesStatsRow({ time_period: '2024-01-01' })
+				]);
 			renderTab({ params, dataFetcher });
 			await waitFor(() => {
 				expect(screen.getByTestId('period-totals-table')).toBeTruthy();
