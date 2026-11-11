@@ -14,10 +14,7 @@ export {
 	deriveSpeciesTotalsRow,
 	deriveSpeciesTotalsRowByEncounter
 } from './lib/species-totals';
-export {
-	mergeSpeciesBiometrics,
-	speciesStatConfigs
-} from './lib/species-stats';
+export { speciesStatConfigs } from './lib/species-stats';
 export {
 	buildGroupSquashedMonthSummaryHref,
 	buildSpeciesSquashedMonthHref,

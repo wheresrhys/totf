@@ -627,8 +627,8 @@ describe('summary read-path access model', () => {
 			expect(tableName).toBe('SimpleStatsCacheBySpecies');
 			expect(selectedColumns()).toContain('Species(species_name)');
 			expect(rows.map((row) => row.species_name)).toEqual(['Robin', 'Wren']);
-			// The embed itself never reaches the caller — `SpeciesStatsRow`
-			// (modules/stats-view/lib/species-stats.ts) keys on the flattened name.
+			// The embed itself never reaches the caller — `StatsCacheBySpeciesResult`
+			// (modules/stats/types.ts) carries the flattened name, not the embed.
 			expect(rows[0]).not.toHaveProperty('Species');
 		});
 

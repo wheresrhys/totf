@@ -30,7 +30,7 @@ import {
 import { type TabConfig } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
-import type { SpeciesStatsRow } from '@/modules/stats-view';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import type { SummaryTabParams } from './summary-tab-params';
 
 export const YEAR_TOTALS_TAB_ID = 'year-totals';
@@ -40,7 +40,7 @@ export const SESSION_TOTALS_TAB_ID = 'session-totals';
 export const SPECIES_TOTALS_TAB_ID = 'species-totals';
 export const HIGHLIGHTS_TAB_ID = 'highlights';
 
-export type SummarySpeciesTotalsData = SpeciesStatsRow[];
+export type SummarySpeciesTotalsData = StatsCacheBySpeciesResult[];
 
 export function fetchSummarySpeciesTotalsData(
 	params: SummaryTabParams,

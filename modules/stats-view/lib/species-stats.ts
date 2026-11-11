@@ -1,52 +1,8 @@
-import type {
-	CoreStatsResult,
-	BiometricFieldName,
-	BiometricsStatsResult
-} from '@/app/models/db';
-import type { SpeciesStatConfig, SpeciesStatsRow } from '../types';
+import type { SpeciesStatConfig } from '../types';
 
-// Re-exported for existing importers; the canonical definition (the 8 wing/weight
-// columns BiometricsStatsResult owns) now lives in db.ts alongside the other merge
-// plumbing (#827).
-export type { BiometricFieldName };
-
-// Joins core_stats rows (species_name, bird_count, encounter_count, etc.)
-// with BiometricsStatsResult rows (the 8 wing/weight metrics) by species_name,
-// keyed off the union of species present in either result set. The biometrics
-// rows are the sole source for the 8 biometric fields (#827 removed core_stats'
-// own copies).
-export function mergeSpeciesBiometrics(
-	aggregateRows: CoreStatsResult[],
-	biometricsRows: BiometricsStatsResult[]
-): SpeciesStatsRow[] {
-	const aggregateByName = new Map(
-		aggregateRows.map((row) => [row.species_name, row])
-	);
-	const biometricsByName = new Map(
-		biometricsRows.map((row) => [row.species_name, row])
-	);
-	const speciesNames = [
-		...new Set([...aggregateByName.keys(), ...biometricsByName.keys()])
-	];
-
-	return speciesNames.map((speciesName) => {
-		const aggregateRow = aggregateByName.get(speciesName);
-		const biometricsRow = biometricsByName.get(speciesName);
-		return {
-			...(aggregateRow ?? ({} as CoreStatsResult)),
-			species_name: speciesName,
-			max_weight: biometricsRow?.max_weight,
-			avg_weight: biometricsRow?.avg_weight,
-			min_weight: biometricsRow?.min_weight,
-			median_weight: biometricsRow?.median_weight,
-			max_wing: biometricsRow?.max_wing,
-			avg_wing: biometricsRow?.avg_wing,
-			min_wing: biometricsRow?.min_wing,
-			median_wing: biometricsRow?.median_wing
-		};
-	});
-}
-
+// The /species list page's column set, in render order. Every `property` is a
+// column of one whole `StatsCacheBySpeciesResult` cache row — counts and
+// wing/weight metrics alike, since #1415 made both halves ride on one row.
 export const speciesStatConfigs: SpeciesStatConfig[] = [
 	{
 		label: 'Species',

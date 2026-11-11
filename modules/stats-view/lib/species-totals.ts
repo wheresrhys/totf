@@ -1,10 +1,13 @@
-import type { StatsResult } from '@/modules/stats/browser';
-import type { SpeciesStatsRow, SpeciesTotalsRow } from '../types';
+import type {
+	StatsCacheBySpeciesResult,
+	StatsResult
+} from '@/modules/stats/browser';
+import type { SpeciesTotalsRow } from '../types';
 
 // The two retrap derivations below read three count columns and nothing else,
 // so they are typed on just those rather than on a whole row — which is what
-// lets both the `SpeciesStatsRow` callers here and `period-totals.ts`'
-// either-grain `StatsResult` ones use them unchanged.
+// lets both the by-species callers here and `period-totals.ts`' either-grain
+// `StatsResult` ones use them unchanged.
 type RetrapCountColumns = Pick<
 	StatsResult,
 	'bird_count' | 'new_bird_count' | 'encounter_count'
@@ -26,7 +29,7 @@ export function calculateEncounterRetraps(stat: RetrapCountColumns): number {
 }
 
 export function deriveSpeciesTotalsRow(
-	stat: SpeciesStatsRow
+	stat: StatsCacheBySpeciesResult
 ): SpeciesTotalsRow {
 	return {
 		speciesName: stat.species_name,
@@ -52,7 +55,7 @@ export function deriveSpeciesTotalsRow(
  * bird-based count by construction (see #601).
  */
 export function deriveSpeciesTotalsRowByEncounter(
-	stat: SpeciesStatsRow
+	stat: StatsCacheBySpeciesResult
 ): SpeciesTotalsRow {
 	return {
 		speciesName: stat.species_name,

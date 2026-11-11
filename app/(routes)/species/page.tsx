@@ -2,7 +2,8 @@ import {
 	BootstrapPage,
 	DefaultPageParams
 } from '@/app/components/layout/BootstrapPage';
-import { SppStatsTable, type SpeciesStatsRow } from '@/modules/stats-view';
+import { SppStatsTable } from '@/modules/stats-view';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import { fetchSpeciesDataWithAccessLevel } from '@/app/actions/spp-data';
 import {
 	fetchAuthorisedCoreStats,
@@ -13,7 +14,7 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 //TODO get year/date range from URL params
 
 export type PageData = {
-	speciesStats: SpeciesStatsRow[];
+	speciesStats: StatsCacheBySpeciesResult[];
 	years: number[];
 	accessLevel: GroupSummaryAccessLevel;
 };
