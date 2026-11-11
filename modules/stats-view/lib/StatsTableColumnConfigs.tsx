@@ -3,6 +3,7 @@ import {
 	type ColumnConfig,
 	type RowModelWithRawData
 } from '@/modules/ui-kit';
+import { BiometricStatNames, type BiometricStatName } from '@/modules/stats/browser';
 
 // A thicker border marks where the "age class" block of columns
 // (Pulli/Juv/Postjuv/Adult/Unaged) starts and ends, visually separating it
@@ -201,5 +202,63 @@ export function buildTotalsRowCells<RowModel>(
 					: valueFor(property)}
 			</td>
 		)
+	);
+}
+
+// Em dash placeholder for a biometric cell with no value — a species/period
+// with no biometric-eligible encounters, or any non-numeric input. Mirrors
+// `app/components/pages/compare-species/comparison-columns.ts`'s
+// `MISSING_VALUE` convention exactly, so the two tables read the same way.
+const MISSING_BIOMETRIC_VALUE = '—';
+
+// Formats a biometric cell value to 1 decimal place, matching
+// `comparison-columns.ts`'s `formatMeasurement` exactly (including its
+// round-trip through `Number()`, which drops a trailing ".0"). Anything that
+// isn't a `number` (including `null`, the genuine "no biometric-eligible
+// encounters" case) renders as an em dash.
+function formatBiometricValue(value: unknown): string {
+	return typeof value === 'number'
+		? String(Number(value.toFixed(1)))
+		: MISSING_BIOMETRIC_VALUE;
+}
+
+// `max`/`avg`/`min`/`median` phrasing, keyed off the first segment of each
+// `BiometricStatName` (e.g. `max_weight` -> `max`).
+const BIOMETRIC_STAT_PREFIX_LABELS: Record<string, string> = {
+	max: 'Max',
+	avg: 'Avg',
+	min: 'Min',
+	median: 'Median'
+};
+
+// Unit suffix for each measurement, keyed off the second segment of each
+// `BiometricStatName` (e.g. `max_weight` -> `weight`).
+const BIOMETRIC_MEASUREMENT_UNITS: Record<string, string> = {
+	weight: 'g',
+	wing: 'mm'
+};
+
+// Builds the 8 wing/weight biometric column configs (#1433) — the shared
+// foundation the Counts/Biometrics toggle switches a stats table's
+// per-species breakdown block onto, mirroring `buildStandardColumnConfigs`'s
+// shape for the existing age-bucket block. Reduces over the canonical
+// `BiometricStatNames` array (`@/modules/stats/browser`) rather than a
+// hand-typed key list, so the config's key set can never drift from it.
+// Label/formatting copies `comparison-columns.ts`'s `biometricsComparisonColumns`/
+// `formatMeasurement` convention exactly, for consistency between the two
+// tables that now render the same 8 columns.
+export function buildBiometricColumnConfigs(): Partial<
+	Record<BiometricStatName, ColumnConfig>
+> {
+	return BiometricStatNames.reduce<Partial<Record<BiometricStatName, ColumnConfig>>>(
+		(configs, statName) => {
+			const [prefix, measurement] = statName.split('_');
+			configs[statName] = {
+				label: `${BIOMETRIC_STAT_PREFIX_LABELS[prefix]} ${measurement} (${BIOMETRIC_MEASUREMENT_UNITS[measurement]})`,
+				formatter: formatBiometricValue
+			};
+			return configs;
+		},
+		{}
 	);
 }

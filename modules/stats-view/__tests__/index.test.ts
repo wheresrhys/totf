@@ -3,12 +3,14 @@ import {
 	AggregateByToggle,
 	CombineYearsToggle,
 	EmptyMonthsToggle,
+	CountsBiometricsToggle,
 	createStatsTableBody,
 	ageBlockStartBorder,
 	ageBlockEndBorder,
 	columnBlock,
 	createNameLinkCell,
 	buildStandardColumnConfigs,
+	buildBiometricColumnConfigs,
 	buildTotalsRowCells
 } from '@/modules/stats-view';
 // Type-only exports have no runtime presence to assert on — importing them
@@ -57,5 +59,16 @@ describe('modules/stats-view barrel (widened scope)', () => {
 	it('type-checks every type-only export referenced above', () => {
 		const check: BarrelTypeExistenceCheck | undefined = undefined;
 		expect(check).toBeUndefined();
+	});
+});
+
+// Regression guard for #1433's new shared foundation: `CountsBiometricsToggle`
+// and `buildBiometricColumnConfigs`, added directly to this module rather than
+// moved in from `modules/ui-kit`, so kept as a sibling check instead of mixing
+// into the "moved from ui-kit" framing above.
+describe('modules/stats-view barrel (Counts/Biometrics toggle foundation)', () => {
+	it('re-exports CountsBiometricsToggle and buildBiometricColumnConfigs', () => {
+		expect(CountsBiometricsToggle).toBeDefined();
+		expect(buildBiometricColumnConfigs).toBeDefined();
 	});
 });

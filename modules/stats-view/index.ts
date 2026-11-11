@@ -27,6 +27,7 @@ export {
 } from './lib/AggregateByToggle';
 export { CombineYearsToggle } from './lib/CombineYearsToggle';
 export { EmptyMonthsToggle } from './lib/EmptyMonthsToggle';
+export { CountsBiometricsToggle } from './lib/CountsBiometricsToggle';
 export {
 	createStatsTableBody,
 	type StatsTableBodyConfig
@@ -37,6 +38,7 @@ export {
 	columnBlock,
 	createNameLinkCell,
 	buildStandardColumnConfigs,
+	buildBiometricColumnConfigs,
 	buildTotalsRowCells,
 	type TotalsRowCellsInput
 } from './lib/StatsTableColumnConfigs';

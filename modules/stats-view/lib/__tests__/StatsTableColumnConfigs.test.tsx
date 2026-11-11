@@ -3,9 +3,11 @@ import { render, screen, cleanup } from '@testing-library/react';
 import {
 	createNameLinkCell,
 	buildStandardColumnConfigs,
+	buildBiometricColumnConfigs,
 	buildTotalsRowCells,
 	columnBlock
 } from '../StatsTableColumnConfigs';
+import { BiometricStatNames } from '@/modules/stats/browser';
 import type { ColumnConfig, RowModelWithRawData } from '@/modules/ui-kit';
 
 afterEach(() => {
@@ -269,5 +271,43 @@ describe('buildTotalsRowCells', () => {
 			totalsRowModel
 		});
 		expect(cells).toHaveLength(0);
+	});
+});
+
+describe('buildBiometricColumnConfigs', () => {
+	describe('column set', () => {
+		it('returns one ColumnConfig for each of the 8 BiometricStatName values', () => {
+			const configs = buildBiometricColumnConfigs();
+			expect(Object.keys(configs)).toEqual([...BiometricStatNames]);
+		});
+
+		it('labels each column with its stat name, Max/Avg/Min/Median phrasing and unit, e.g. "Max weight (g)" / "Median wing (mm)"', () => {
+			const configs = buildBiometricColumnConfigs();
+			expect(configs.max_weight?.label).toBe('Max weight (g)');
+			expect(configs.avg_weight?.label).toBe('Avg weight (g)');
+			expect(configs.min_weight?.label).toBe('Min weight (g)');
+			expect(configs.median_weight?.label).toBe('Median weight (g)');
+			expect(configs.max_wing?.label).toBe('Max wing (mm)');
+			expect(configs.avg_wing?.label).toBe('Avg wing (mm)');
+			expect(configs.min_wing?.label).toBe('Min wing (mm)');
+			expect(configs.median_wing?.label).toBe('Median wing (mm)');
+		});
+	});
+
+	describe('value formatting', () => {
+		const format = (value: unknown) =>
+			buildBiometricColumnConfigs().max_weight?.formatter?.(value);
+
+		it('formats a numeric value to 1 decimal place', () => {
+			expect(format(21.37)).toBe('21.4');
+		});
+
+		it('renders a null value as an em dash', () => {
+			expect(format(null)).toBe('—');
+		});
+
+		it('renders a non-numeric value as an em dash', () => {
+			expect(format('not a number')).toBe('—');
+		});
 	});
 });
