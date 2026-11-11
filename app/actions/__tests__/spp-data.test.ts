@@ -15,7 +15,6 @@ import { ALPHA_CORE_STATS_BY_SPECIES } from '@/app/__tests__/helpers/core-stats-
 import { ALPHA_BIOMETRICS_BY_SPECIES } from '@/app/__tests__/helpers/biometrics-stats-fixtures';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import { makeRpcCallRecorder } from '@/app/__tests__/helpers/rpc-recorder';
-import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 const { mockGetAuthenticatedSupabaseClient } = vi.hoisted(() => ({
@@ -33,10 +32,6 @@ vi.mock('@/app/lib/auth/group-summary-access', async (importOriginal) => {
 	return { ...actual, fetchAuthorisedCoreStats: vi.fn() };
 });
 
-// `readStatsCacheRows` (`@/modules/stats`) is deliberately left real: it reads
-// through this same mocked client, so the cache-aligned path's filters,
-// `Species` embed, ordering and pagination are all exercised for real here
-// rather than asserted as params handed to a mock.
 vi.mock('@/app/lib/auth/group-auth', () => ({
 	getAuthenticatedSupabaseClient: mockGetAuthenticatedSupabaseClient
 }));
@@ -44,7 +39,7 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 const GROUP_ID = 1;
 const viewedGroup: ViewedGroup = { id: GROUP_ID, slug: 'alpha' };
 // A whole calendar year and a whole calendar month: both exactly one cache
-// cell, so both read SimpleStatsCacheBySpecies.
+// cell, so both resolve to the cache-aligned path.
 const YEAR_FROM_DATE = '2026-01-01';
 const YEAR_TO_DATE = '2026-12-31';
 const MONTH_FROM_DATE = '2026-02-01';
@@ -76,24 +71,6 @@ const ALPHA_BIOMETRIC_METRICS = Object.fromEntries(
 ) as Pick<StatsCacheBySpeciesResult, BiometricStatName>;
 
 /**
- * A whole `SimpleStatsCacheBySpecies` row as PostgREST returns it for the
- * cache-aligned read: every column of the table, with `species_name` arriving
- * through the embedded `Species` select rather than as a column of its own.
- * Built from the snapshot fixture, so the values are real.
- */
-function buildSpeciesCacheTableRow({
-	speciesName = BLUE_TIT_SPECIES_NAME,
-	...overrides
-}: Partial<StatsCacheBySpeciesResult> & { speciesName?: string } = {}) {
-	const {
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to drop the one column the cache table doesn't return as a column
-		species_name,
-		...columns
-	} = { ...ALPHA_FIRST_SPECIES_CACHE_ROW, ...overrides };
-	return { ...columns, Species: { species_name: speciesName } };
-}
-
-/**
  * One counts row as the arbitrary-window *live recompute* resolves it: the
  * columns `stats_cache_basic_session_metrics` produces, plus every column it
  * doesn't, filled from `group-summary-access.ts`'
@@ -115,9 +92,12 @@ function buildCountsRow(
 /**
  * One counts row as a *cache-aligned* read resolves it: a whole
  * `SimpleStatsCacheBySpecies` row, wing/weight columns included, because
- * `readStatsCacheRows` `select('*')`s. That is what makes the access-level
- * tests below meaningful — a `'public'`/`'blocked'` viewer's counts rows
- * genuinely carry biometric data they are not entitled to see.
+ * `fetchAuthorisedCoreStats`' own cache-table read is a `select('*')`
+ * against that exact table for that exact window (#1421 — `spp-data.ts`
+ * reuses these columns rather than re-reading them). That is also what makes
+ * the access-level tests below meaningful — a `'public'`/`'blocked'`
+ * viewer's counts rows genuinely carry biometric data they are not entitled
+ * to see.
  */
 function buildCachedCountsRow(
 	overrides: Partial<AuthorisedStatsRow> = {}
@@ -149,37 +129,19 @@ function buildBiometricsMetricsRpcRow({
 	};
 }
 
-let tableReads: Map<string, ReturnType<typeof makeQueryChain>>;
-let readTableNames: string[];
-
 /**
- * The authenticated client both biometric sources go through: `.from()` serves
- * the cache-aligned branch's `SimpleStatsCacheBySpecies` read, and `.rpc()`
- * the arbitrary-window branch's `stats_cache_biometrics_metrics` call. A test
- * sets up whichever its window shape should reach, and asserts the other was
- * left alone.
+ * The authenticated client the arbitrary-window branch's `.rpc()` call goes
+ * through. Nothing in this module calls `.from()` any more — the
+ * cache-aligned branch reuses the counts row it was already handed (#1421)
+ * instead of issuing its own `SimpleStatsCacheBySpecies` read, and the
+ * arbitrary-window merge keys on `species_id`, which the counts rows already
+ * carry, so it needs no `Species` name lookup either.
  */
 function mockAuthenticatedClient({
-	cacheRows = [],
 	rpcRows = []
-}: {
-	cacheRows?: unknown[] | ((fromRow?: number, toRow?: number) => unknown);
-	rpcRows?: unknown[];
-} = {}) {
-	tableReads = new Map();
-	readTableNames = [];
+}: { rpcRows?: unknown[] } = {}) {
 	const { rpc, calls: rpcCalls } = makeRpcCallRecorder(rpcRows);
-	mockGetAuthenticatedSupabaseClient.mockResolvedValue({
-		from: vi.fn((requestedTable: string) => {
-			readTableNames.push(requestedTable);
-			const read = makeQueryChain(
-				requestedTable === 'SimpleStatsCacheBySpecies' ? cacheRows : []
-			);
-			tableReads.set(requestedTable, read);
-			return read.chain;
-		}),
-		rpc
-	});
+	mockGetAuthenticatedSupabaseClient.mockResolvedValue({ rpc });
 	return { rpcCalls };
 }
 
@@ -190,11 +152,6 @@ function mockCoreStats(
 	vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({ accessLevel, rows });
 }
 
-const cacheFilters = () =>
-	tableReads.get('SimpleStatsCacheBySpecies')?.record.filters ?? [];
-const cacheFilterFor = (column: string, operator: string) =>
-	cacheFilters().find((f) => f.column === column && f.operator === operator)
-		?.value;
 const rowFor = (rows: StatsCacheBySpeciesResult[], speciesName: string) =>
 	rows.find((row) => row.species_name === speciesName)!;
 
@@ -203,49 +160,27 @@ beforeEach(() => {
 });
 
 describe('choosing a read path for the requested window', () => {
-	it('reads the cache for an all-time window', async () => {
-		mockCoreStats();
-		const { rpcCalls } = mockAuthenticatedClient({
-			cacheRows: [buildSpeciesCacheTableRow()]
-		});
+	it.each`
+		label                       | fromDate           | toDate
+		${'an all-time window'}     | ${undefined}       | ${undefined}
+		${'a whole calendar year'}  | ${YEAR_FROM_DATE}  | ${YEAR_TO_DATE}
+		${'a whole calendar month'} | ${MONTH_FROM_DATE} | ${MONTH_TO_DATE}
+	`(
+		'answers $label straight from the counts read, with no further Supabase call',
+		async ({ fromDate, toDate }) => {
+			mockCoreStats([buildCachedCountsRow({ max_weight: 20 })]);
+			mockAuthenticatedClient();
 
-		await fetchSpeciesData(viewedGroup);
+			const [row] = await fetchSpeciesData(viewedGroup, fromDate, toDate);
 
-		expect(readTableNames).toEqual(['SimpleStatsCacheBySpecies']);
-		expect(cacheFilterFor('group_id', 'eq')).toBe(GROUP_ID);
-		expect(cacheFilterFor('temporal_unit', 'eq')).toBe('all-time');
-		// All-time is one cell per species, so no time_period narrowing.
-		expect(cacheFilters().filter((f) => f.column === 'time_period')).toEqual(
-			[]
-		);
-		expect(rpcCalls).toEqual([]);
-	});
+			expect(row.max_weight).toBe(20);
+			expect(mockGetAuthenticatedSupabaseClient).not.toHaveBeenCalled();
+		}
+	);
 
-	it('reads the cache for a whole calendar year', async () => {
-		mockCoreStats();
-		mockAuthenticatedClient({ cacheRows: [buildSpeciesCacheTableRow()] });
-
-		await fetchSpeciesData(viewedGroup, YEAR_FROM_DATE, YEAR_TO_DATE);
-
-		expect(cacheFilterFor('temporal_unit', 'eq')).toBe('year');
-		expect(cacheFilterFor('time_period', 'eq')).toBe(YEAR_FROM_DATE);
-	});
-
-	it('reads the cache for a whole calendar month', async () => {
-		mockCoreStats();
-		mockAuthenticatedClient({ cacheRows: [buildSpeciesCacheTableRow()] });
-
-		await fetchSpeciesData(viewedGroup, MONTH_FROM_DATE, MONTH_TO_DATE);
-
-		expect(cacheFilterFor('temporal_unit', 'eq')).toBe('month');
-		expect(cacheFilterFor('time_period', 'eq')).toBe(MONTH_FROM_DATE);
-	});
-
-	it('reads the cache for a squashed calendar month', async () => {
-		mockCoreStats();
-		const { rpcCalls } = mockAuthenticatedClient({
-			cacheRows: [buildSpeciesCacheTableRow()]
-		});
+	it('answers a squashed-month window the same way, forwarding month_filter to the counts read', async () => {
+		mockCoreStats([buildCachedCountsRow()]);
+		mockAuthenticatedClient();
 
 		await fetchSpeciesData(viewedGroup, undefined, undefined, 3);
 
@@ -255,9 +190,7 @@ describe('choosing a read path for the requested window', () => {
 			group_by_species: true,
 			month_filter: 3
 		});
-		expect(cacheFilterFor('temporal_unit', 'eq')).toBe('month-squashed');
-		expect(cacheFilterFor('time_period', 'eq')).toBe('2000-03-01');
-		expect(rpcCalls).toEqual([]);
+		expect(mockGetAuthenticatedSupabaseClient).not.toHaveBeenCalled();
 	});
 
 	it('recomputes live for an arbitrary date range', async () => {
@@ -283,21 +216,28 @@ describe('choosing a read path for the requested window', () => {
 				}
 			}
 		]);
-		// No `group_by_time_period`, and no table read of any kind — the
-		// species_id-keyed merge needs no Species id→name lookup.
-		expect(readTableNames).toEqual([]);
 	});
 });
 
-describe('the cache read', () => {
-	it('returns one whole row per species, counts and biometrics together', async () => {
-		// A counts row the cache read's own row deliberately disagrees with, so
-		// the assertion can only pass if the returned row is the whole cache
-		// row rather than the counts row with biometrics merged onto it.
-		mockCoreStats([buildCountsRow({ bird_count: 999 })]);
-		mockAuthenticatedClient({
-			cacheRows: [buildSpeciesCacheTableRow({ bird_count: 12, max_weight: 20 })]
-		});
+describe('the cache-aligned path reuses the counts read', () => {
+	it('issues no second SimpleStatsCacheBySpecies read for a cache-aligned window', async () => {
+		mockCoreStats([buildCachedCountsRow()]);
+		mockAuthenticatedClient();
+
+		await fetchSpeciesData(viewedGroup, YEAR_FROM_DATE, YEAR_TO_DATE);
+
+		// The counts read (`fetchAuthorisedCoreStats`, mocked above) is the
+		// *only* Supabase call a cache-aligned window makes — #1421 collapses
+		// what used to be a second, byte-identical `SimpleStatsCacheBySpecies`
+		// query here into nothing at all.
+		expect(mockGetAuthenticatedSupabaseClient).not.toHaveBeenCalled();
+	});
+
+	it("returns the counts row's own biometric columns unchanged", async () => {
+		mockCoreStats([
+			buildCachedCountsRow({ bird_count: 12, max_weight: 20, max_wing: 70 })
+		]);
+		mockAuthenticatedClient();
 
 		const [row] = await fetchSpeciesData(
 			viewedGroup,
@@ -307,14 +247,13 @@ describe('the cache read', () => {
 
 		expect(row.bird_count).toBe(12);
 		expect(row.max_weight).toBe(20);
+		expect(row.max_wing).toBe(70);
 		expect(row.median_wing).toBe(ALPHA_FIRST_SPECIES_CACHE_ROW.median_wing);
 	});
 
-	it('resolves species_name from the embedded Species row', async () => {
-		mockCoreStats();
-		mockAuthenticatedClient({
-			cacheRows: [buildSpeciesCacheTableRow({ speciesName: WREN_SPECIES_NAME })]
-		});
+	it('passes species_name through from the counts row unchanged', async () => {
+		mockCoreStats([buildCachedCountsRow({ species_name: WREN_SPECIES_NAME })]);
+		mockAuthenticatedClient();
 
 		const [row] = await fetchSpeciesData(
 			viewedGroup,
@@ -326,12 +265,10 @@ describe('the cache read', () => {
 	});
 
 	it('preserves a null biometric metric for a species with no measurable encounters', async () => {
-		mockCoreStats();
-		mockAuthenticatedClient({
-			cacheRows: [
-				buildSpeciesCacheTableRow({ max_weight: null, median_wing: null })
-			]
-		});
+		mockCoreStats([
+			buildCachedCountsRow({ max_weight: null, median_wing: null })
+		]);
+		mockAuthenticatedClient();
 
 		const [row] = await fetchSpeciesData(
 			viewedGroup,
@@ -341,36 +278,6 @@ describe('the cache read', () => {
 
 		expect(row.max_weight).toBeNull();
 		expect(row.median_wing).toBeNull();
-	});
-
-	it("pages through every species rather than stopping at PostgREST's first page", async () => {
-		// One row short of two full PostgREST pages, so the read must issue a
-		// second request to pick up the final species.
-		const TOTAL_SPECIES = 1001;
-		mockCoreStats();
-		mockAuthenticatedClient({
-			cacheRows: (fromRow = 0, toRow = 0) =>
-				Array.from(
-					{
-						length: Math.min(
-							toRow - fromRow + 1,
-							Math.max(TOTAL_SPECIES - fromRow, 0)
-						)
-					},
-					(_unused, offset) =>
-						buildSpeciesCacheTableRow({
-							speciesName: `Species ${fromRow + offset}`
-						})
-				)
-		});
-
-		const rows = await fetchSpeciesData(
-			viewedGroup,
-			YEAR_FROM_DATE,
-			YEAR_TO_DATE
-		);
-
-		expect(rows).toHaveLength(TOTAL_SPECIES);
 	});
 });
 
@@ -471,22 +378,32 @@ describe('merging the live recompute', () => {
 });
 
 describe('gating biometrics on access level', () => {
-	it("fetches biometrics for the viewer's own group", async () => {
-		mockCoreStats(undefined, 'own');
-		mockAuthenticatedClient({ cacheRows: [buildSpeciesCacheTableRow()] });
+	it("reuses the counts read for the viewer's own group, with no further Supabase call", async () => {
+		mockCoreStats([buildCachedCountsRow()], 'own');
+		mockAuthenticatedClient();
 
-		await fetchSpeciesData(viewedGroup, YEAR_FROM_DATE, YEAR_TO_DATE);
+		const [row] = await fetchSpeciesData(
+			viewedGroup,
+			YEAR_FROM_DATE,
+			YEAR_TO_DATE
+		);
 
-		expect(readTableNames).toEqual(['SimpleStatsCacheBySpecies']);
+		expect(row.max_weight).toBe(ALPHA_FIRST_SPECIES_CACHE_ROW.max_weight);
+		expect(mockGetAuthenticatedSupabaseClient).not.toHaveBeenCalled();
 	});
 
-	it('fetches biometrics for a group shared with the viewer', async () => {
-		mockCoreStats(undefined, 'shared');
-		mockAuthenticatedClient({ cacheRows: [buildSpeciesCacheTableRow()] });
+	it('reuses the counts read for a group shared with the viewer, with no further Supabase call', async () => {
+		mockCoreStats([buildCachedCountsRow()], 'shared');
+		mockAuthenticatedClient();
 
-		await fetchSpeciesData(viewedGroup, YEAR_FROM_DATE, YEAR_TO_DATE);
+		const [row] = await fetchSpeciesData(
+			viewedGroup,
+			YEAR_FROM_DATE,
+			YEAR_TO_DATE
+		);
 
-		expect(readTableNames).toEqual(['SimpleStatsCacheBySpecies']);
+		expect(row.max_weight).toBe(ALPHA_FIRST_SPECIES_CACHE_ROW.max_weight);
+		expect(mockGetAuthenticatedSupabaseClient).not.toHaveBeenCalled();
 	});
 
 	// The #1231 guarantee. The counts rows a 'public'/'blocked' viewer's read
