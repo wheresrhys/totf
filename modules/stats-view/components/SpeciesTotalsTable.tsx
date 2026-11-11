@@ -5,9 +5,14 @@ import {
 	deriveSpeciesTotalsRow,
 	deriveSpeciesTotalsRowByEncounter
 } from '../lib/species-totals';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import {
+	BiometricStatNames,
+	type BiometricStatName,
+	type StatsCacheBySpeciesResult
+} from '@/modules/stats/browser';
 import type { SpeciesTotalsRow } from '../types';
 import {
+	buildBiometricColumnConfigs,
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
 	createNameLinkCell
@@ -16,13 +21,17 @@ import {
 	AggregateByToggle,
 	type AggregateByValue
 } from '../lib/AggregateByToggle';
+import { CountsBiometricsToggle } from '../lib/CountsBiometricsToggle';
 import {
 	type ColumnConfig,
+	getFormattedValue,
 	SortableTable,
 	type RowModelWithRawData
 } from '@/modules/ui-kit';
 import { buildSpeciesSquashedMonthHref } from '../lib/squashed-month';
 
+// The 8 `BiometricStatName` fields are intersected on rather than listed by
+// hand, matching `SpeciesTotalsRow` (`../types`) — see its comment for why.
 type RowModel = {
 	speciesName: string;
 	sessionsCount: number;
@@ -36,7 +45,7 @@ type RowModel = {
 	postjuv: number;
 	adults: number;
 	unknownAge: number;
-};
+} & Record<BiometricStatName, number | null>;
 
 // The period a summary page's species table is scoped to — mirrors the
 // `/species/{name}[/{year}[/{month}]]` route depth. Undefined (the all-time
@@ -73,7 +82,18 @@ function toRowModel(row: SpeciesTotalsRow): RowModel {
 		juvs: row.juvsCount,
 		postjuv: row.postjuvCount,
 		adults: row.adultsCount,
-		unknownAge: row.unknownAgeCount
+		unknownAge: row.unknownAgeCount,
+		// `SpeciesTotalsRow` and `RowModel` share the same 8 biometric field
+		// names (#1430) — reducing over the canonical list rather than listing
+		// them by hand keeps this in step with `extractBiometricFields`
+		// (`../lib/species-totals.ts`) and `buildBiometricColumnConfigs`.
+		...BiometricStatNames.reduce<Record<BiometricStatName, number | null>>(
+			(fields, name) => {
+				fields[name] = row[name];
+				return fields;
+			},
+			{} as Record<BiometricStatName, number | null>
+		)
 	};
 }
 
@@ -89,9 +109,14 @@ function deriveRow(
 		: deriveSpeciesTotalsRowByEncounter;
 }
 
+// `showBiometrics` switches the block after Individuals between the
+// existing age-bucket columns and the 8 biometric columns (#1430) — the
+// Species/Sessions/Encounters/Busiest session/Individuals columns before it
+// are unaffected by either toggle.
 function buildColumnConfigs(
 	hasPulli: boolean,
-	aggregateBy: string
+	aggregateBy: string,
+	showBiometrics: boolean
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
 	return {
 		speciesName: {
@@ -110,7 +135,9 @@ function buildColumnConfigs(
 		individualsCount: {
 			label: 'Individuals'
 		},
-		...buildStandardColumnConfigs<RowModel>(hasPulli, true, aggregateBy)
+		...(showBiometrics
+			? buildBiometricColumnConfigs()
+			: buildStandardColumnConfigs<RowModel>(hasPulli, true, aggregateBy))
 	};
 }
 
@@ -129,6 +156,10 @@ export function SpeciesTotalsTable({
 	// 'bird' whenever `SpeciesTotalsSection` remounts this table for a
 	// different tab, per #604.
 	const [aggregateBy, setAggregateBy] = useState<AggregateByValue>('bird');
+	// Independent of `aggregateBy` — the Counts/Biometrics toggle (#1430)
+	// switches the post-Individuals column block, defaulting to counts (the
+	// existing behaviour everywhere today).
+	const [showBiometrics, setShowBiometrics] = useState(false);
 
 	if (speciesStats.length === 0) {
 		return <p>No species recorded.</p>;
@@ -152,6 +183,7 @@ export function SpeciesTotalsTable({
 		const orderedColumnProperties = Object.keys(columnConfigs ?? {}).filter(
 			(property) => property !== 'speciesName'
 		) as (keyof RowModel)[];
+		const cellFormatter = getFormattedValue<RowModel>(columnConfigs ?? {});
 
 		return (
 			<tbody>
@@ -165,7 +197,7 @@ export function SpeciesTotalsTable({
 								key={property}
 								className={columnConfigs?.[property]?.cellClassName}
 							>
-								{row[property]}
+								{cellFormatter(row[property], property)}
 							</td>
 						))}
 					</tr>
@@ -180,7 +212,11 @@ export function SpeciesTotalsTable({
 	const hasPulli = speciesStats.some(
 		(stat) => activeDeriveRow(stat).pullusCount > 0
 	);
-	const columnConfigs = buildColumnConfigs(hasPulli, aggregateBy);
+	const columnConfigs = buildColumnConfigs(
+		hasPulli,
+		aggregateBy,
+		showBiometrics
+	);
 
 	const totalsRow = totalsStats
 		? buildTotalsRowCells<RowModel>({
@@ -192,7 +228,20 @@ export function SpeciesTotalsTable({
 	return (
 		<>
 			<div data-test-id="above-header-row" className="m-2 flex gap-4">
-				<AggregateByToggle value={aggregateBy} onChange={setAggregateBy} />
+				{/* Biometrics mode has no age-bucket columns for "Aggregate by" to
+				affect, so the toggle is disabled (not hidden) while it's active —
+				it stays visible with its last-selected value, same pattern
+				`AggregateByToggle`'s own `disabled` prop already supports for a
+				fixed-aggregation tab. */}
+				<AggregateByToggle
+					value={aggregateBy}
+					onChange={setAggregateBy}
+					disabled={showBiometrics}
+				/>
+				<CountsBiometricsToggle
+					value={showBiometrics}
+					onChange={setShowBiometrics}
+				/>
 			</div>
 			<SortableTable<StatsCacheBySpeciesResult, RowModel>
 				columnConfigs={columnConfigs}

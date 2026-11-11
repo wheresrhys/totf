@@ -7,7 +7,10 @@
 // file that needs it imports it directly from `@/modules/stats/browser` rather
 // than through this module.
 
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	BiometricStatName,
+	StatsCacheBySpeciesResult
+} from '@/modules/stats/browser';
 
 export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
 
@@ -33,6 +36,13 @@ export type PeriodTotalsRow = {
 	unknownAge: number;
 };
 
+// The 8 `BiometricStatName` fields are intersected on rather than listed by
+// hand, so they can never drift from the canonical field list — same
+// `buildBiometricColumnConfigs` reduces over to build the Counts/Biometrics
+// toggle's biometrics-mode columns (#1430). Both derivers read them straight
+// off the input `StatsCacheBySpeciesResult` row with no bird/encounter
+// aggregation distinction, since the cache row doesn't distinguish them
+// either.
 export type SpeciesTotalsRow = {
 	speciesName: string;
 	sessionsCount: number;
@@ -46,7 +56,7 @@ export type SpeciesTotalsRow = {
 	postjuvCount: number;
 	adultsCount: number;
 	unknownAgeCount: number;
-};
+} & Record<BiometricStatName, number | null>;
 
 // A column of one whole by-species cache row — counts or wing/weight metric
 // alike. A species with no biometric-eligible encounters carries a real `null`
