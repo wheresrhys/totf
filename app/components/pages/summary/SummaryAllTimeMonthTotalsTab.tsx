@@ -15,7 +15,6 @@ import {
 	formatMonthLabel
 } from '@/app/lib/month-totals';
 import { buildGroupSummaryHref } from '@/app/lib/group-links';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SummaryTabParams } from './summary-tab-params';
 // Id and `dataFetcher` live in the plain (non-`'use client'`) sibling module
@@ -26,6 +25,7 @@ import {
 	fetchAllTimeMonthTotalsData,
 	type SummaryAllTimeMonthTotalsData
 } from './summary-tab-prefetchers';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 export {
 	ALL_TIME_MONTH_TOTALS_TAB_ID,
@@ -48,9 +48,9 @@ function AllTimeMonthTotalsTab({
 	totalsStats,
 	viewedGroup
 }: {
-	periodStats: CoreStatsResult[];
-	monthSquashedStats: CoreStatsResult[];
-	totalsStats?: CoreStatsResult;
+	periodStats: StatsCacheBySpeciesResult[];
+	monthSquashedStats: StatsCacheBySpeciesResult[];
+	totalsStats?: StatsCacheBySpeciesResult;
 	viewedGroup?: ViewedGroup;
 }) {
 	const [combineYears, setCombineYears] = useState(true);

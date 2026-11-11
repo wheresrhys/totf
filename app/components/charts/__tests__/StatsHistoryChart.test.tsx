@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import type {
-	CoreStatsResult,
-	CoreStatsWithBiometrics,
 	DemographicsStatsResult,
 	ArrivalsStatsResult
 } from '@/app/models/db';
@@ -15,17 +13,20 @@ import {
 	getSizes
 } from '../StatsHistoryChart';
 import robinDemographicsHistory from '@/test-fixtures/snapshots/demographics_stats/robin-alpha.monthly-history.json';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // Minimal fixture builders — only the columns each mapper reads matter; the rest
 // are filled with 0 so a full composite-type row satisfies the (null-stripped)
 // result types without inventing meaningless values inline per test.
-function aggregateRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
+function aggregateRow(
+	overrides: Partial<StatsCacheBySpeciesResult>
+): StatsCacheBySpeciesResult {
 	return {
 		time_period: '2024-01-01',
 		bird_count: 0,
 		encounter_count: 0,
 		...overrides
-	} as CoreStatsResult;
+	} as StatsCacheBySpeciesResult;
 }
 
 // The demographics builder's *column set* comes from a real captured
@@ -64,7 +65,7 @@ describe('getCounts', () => {
 		it('maps encounter_count and bird_count against time_period', () => {
 			const result = getCounts([
 				{ ...aggregateRow({}), encounter_count: 12, bird_count: 9 }
-			] as CoreStatsResult[]);
+			] as StatsCacheBySpeciesResult[]);
 			expect(result.map((series) => series.name)).toEqual([
 				'encounters',
 				'birds'
@@ -104,7 +105,7 @@ describe('getReturningVsNew', () => {
 					juv_bird_count: 0,
 					postjuv_bird_count: 1
 				}
-			] as CoreStatsResult[];
+			] as StatsCacheBySpeciesResult[];
 			const demographicsStats = [
 				demographicsRow({
 					time_period: '2024-01-01',
@@ -162,7 +163,7 @@ describe('getReturningVsNew', () => {
 					juv_bird_count: 5,
 					postjuv_bird_count: 3
 				}
-			] as CoreStatsResult[];
+			] as StatsCacheBySpeciesResult[];
 			const demographicsStats = [
 				demographicsRow({ time_period: '2024-01-01' })
 			];
@@ -200,7 +201,7 @@ describe('getReturningVsNew', () => {
 					juv_bird_count: 1,
 					postjuv_bird_count: 1
 				}
-			] as CoreStatsResult[];
+			] as StatsCacheBySpeciesResult[];
 			const demographicsStats = [
 				demographicsRow({
 					time_period: '2024-01-01',
@@ -436,7 +437,7 @@ describe('getArrivals', () => {
 
 describe('getSizes', () => {
 	// #821 merges biometrics_stats' wing/weight fields onto each core_stats
-	// row before getSizes ever sees it — the merged CoreStatsWithBiometrics
+	// row before getSizes ever sees it — the merged StatsCacheBySpeciesResult
 	// shape (#827) is what getSizes reads its wing/weight columns from now that
 	// core_stats itself no longer carries them. This checks getSizes maps
 	// those merged columns onto the expected six series.
@@ -453,7 +454,7 @@ describe('getSizes', () => {
 					median_wing: 74,
 					min_wing: 72
 				}
-			] as CoreStatsWithBiometrics[];
+			] as StatsCacheBySpeciesResult[];
 
 			const result = getSizes(rows);
 

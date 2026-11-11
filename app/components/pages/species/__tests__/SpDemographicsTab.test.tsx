@@ -17,11 +17,11 @@ import {
 	ARRIVALS_COLORS_BY_NAME
 } from '../SpDemographicsTab';
 import type {
-	CoreStatsWithBiometrics,
 	DemographicsStatsResult,
 	ArrivalsStatsResult
 } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
@@ -215,7 +215,7 @@ describe('SpDemographicsTab', () => {
 		} = await loadActions();
 		const { globalStatsCacheFetchPool } = await loadStatsCacheActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
-			[] as CoreStatsWithBiometrics[]
+			[] as StatsCacheBySpeciesResult[]
 		);
 		vi.mocked(getSpeciesDemographicsStats).mockResolvedValue(
 			[] as DemographicsStatsResult[]
@@ -335,7 +335,7 @@ describe('SpDemographicsTab', () => {
 		it('shows a spinner until both fetches have resolved, not just one', async () => {
 			const { getSpeciesStatsHistory, getSpeciesDemographicsStats } =
 				await loadActions();
-			let resolveStatsHistory!: (value: CoreStatsWithBiometrics[]) => void;
+			let resolveStatsHistory!: (value: StatsCacheBySpeciesResult[]) => void;
 			vi.mocked(getSpeciesStatsHistory).mockReturnValue(
 				new Promise((resolve) => {
 					resolveStatsHistory = resolve;

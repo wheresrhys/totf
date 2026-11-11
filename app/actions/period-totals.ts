@@ -1,8 +1,8 @@
 'use server';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { PeriodTotalsGrouping } from '@/modules/stats-view';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats';
 
 /**
  * Per-time-period totals for a summary period — `core_stats` grouped by
@@ -17,7 +17,7 @@ export async function fetchPeriodTotals(
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
-): Promise<CoreStatsResult[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {}),

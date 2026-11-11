@@ -100,9 +100,9 @@ modules/stats/
 The canonical shape a consumer reads a stats cell as. These types **this module owns** — unlike
 `StatsTemporalUnit` above, they are defined here and re-exported from both barrels, which is
 exactly what the root `CLAUDE.md`'s "Module conventions" prescribes for an owned type. They
-replace the hand-maintained `CoreStatsResult`/`BiometricsStatsResult` column literals in
-`app/models/db.ts` (#1372), which used to mirror real RPC composite types; both RPCs are gone from
-the schema and every call site now reads the materialized cache tables.
+replace a family of hand-maintained column literals that used to live in `app/models/db.ts` and
+mirror real RPC composite types (#1372); both RPCs are gone from the schema, every call site now
+reads the materialized cache tables, and #1419 deleted the last of those types outright.
 
 ```
 BookkeepingColumn            # 'id' | 'group_id' | 'created_at' | 'updated_at' | 'temporal_unit'
@@ -122,9 +122,9 @@ Five things worth knowing before touching them:
   the wing/weight columns are nullable because `MAX`/`AVG`/`MIN`/`PERCENTILE_CONT` over an empty set
   genuinely returns `NULL` and no `COALESCE` is ever applied, so a real "no biometric-eligible
   encounters for this cell" row has to be representable. Deriving from the generated `Row`s means
-  that distinction comes through for free. The two types these replaced
-  (`app/models/db.ts`'s `CoreStatsResult`/`BiometricsStatsResult`, deprecated aliases since #1417
-  and deleted by #1419) had to restate it by hand — and before that, when they were views over the
+  that distinction comes through for free. The two `app/models/db.ts` types these replaced
+  (deprecated aliases from #1417, deleted outright by #1419) had to restate it by hand — and
+  before that, when they were views over the
   `core_stats_result`/`biometrics_stats_result` composites, had to strip *every* column back to
   non-null via a `NonNullable` mapped type, because a Postgres composite type's attributes can never
   be NOT NULL and so `supabase gen types` marked them all nullable. Neither composite (nor its RPC)

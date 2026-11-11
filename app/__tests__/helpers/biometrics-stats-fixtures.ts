@@ -1,9 +1,8 @@
 import type {
-	BiometricsMetricsRow,
 	BiometricStatName,
+	BiometricsMetricsRow,
 	StatsCacheBySpeciesResult
 } from '@/modules/stats/browser';
-import type { CoreStatsResult } from '@/app/models/db';
 import { buildCoreStatsRow } from './core-stats-fixtures';
 import alphaBiometricsSnapshot from '@/test-fixtures/snapshots/stats_cache_biometrics_metrics/alpha.by-species.json';
 import alphaSpeciesSnapshot from '@/test-fixtures/snapshots/tables/Species/alpha.top-species.json';
@@ -120,7 +119,7 @@ if (!BLUE_TIT_BIOMETRICS) {
  * fixture-builder convention.
  */
 export function buildBiometricsStatsRow(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
+	overrides: Partial<StatsCacheBySpeciesResult> = {}
+): StatsCacheBySpeciesResult {
 	return buildCoreStatsRow({ ...BLUE_TIT_BIOMETRICS, ...overrides });
 }

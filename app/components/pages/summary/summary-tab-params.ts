@@ -1,5 +1,5 @@
-import type { CoreStatsResult } from '@/app/models/db';
 import type { MonthTotalsRow } from '@/app/lib/month-totals';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 /**
  * Shared `params` shape for every one of summary's tabs — the original 4
@@ -31,14 +31,14 @@ export type SummaryTabParams = {
 	// totals row for this tab", not "not yet computed". Never read by any
 	// `dataFetcher` below (display-only), so its value during server-side
 	// prefetch is irrelevant to fetch correctness.
-	totalsStats?: CoreStatsResult;
+	totalsStats?: StatsCacheBySpeciesResult;
 	// The 3 prop-fed tabs' own rows (#1067) — each arrives already-resolved
 	// from `SummaryTotalsSection`'s own props, so there's no `dataFetcher` to
 	// fetch it; it's threaded through here instead. Each is `undefined` on
 	// every page shape that doesn't have that tab at all.
-	yearlyTotals?: CoreStatsResult[];
+	yearlyTotals?: StatsCacheBySpeciesResult[];
 	monthTotals?: MonthTotalsRow[];
-	sessionTotals?: CoreStatsResult[];
+	sessionTotals?: StatsCacheBySpeciesResult[];
 	// Per-tab totals-row gating (`SummaryTotalsSection`'s `tabsWithTotalsRow`
 	// map, carried over unchanged by #1067) — a prop-fed tab's own
 	// `TabComponent` looks itself up here by id to decide whether to show

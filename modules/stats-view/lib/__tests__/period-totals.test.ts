@@ -5,14 +5,14 @@ import {
 	formatPeriodTotalsLabel
 } from '../period-totals';
 import type { PeriodTotalsGrouping } from '../../types';
-import type { CoreStatsResult } from '@/app/models/db';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // This file's tests assert against a specific full row shape (not just the
 // field(s) each test overrides), so the shared builder's own defaults don't
 // apply here — these are the exact values the file's original local
 // `buildStat` defaulted to.
-const fullRowOverrides: Partial<CoreStatsResult> = {
+const fullRowOverrides: Partial<StatsCacheBySpeciesResult> = {
 	time_period: '2026-08-16',
 	species_count: 5,
 	bird_count: 6,
@@ -26,7 +26,7 @@ const fullRowOverrides: Partial<CoreStatsResult> = {
 };
 
 describe('derivePeriodTotalsRowByBird', () => {
-	it('maps every CoreStatsResult bucket field to its PeriodTotalsRow counterpart', () => {
+	it('maps every StatsCacheBySpeciesResult bucket field to its PeriodTotalsRow counterpart', () => {
 		const stat = buildCoreStatsRow(fullRowOverrides);
 		expect(derivePeriodTotalsRowByBird(stat)).toEqual({
 			timePeriod: '2026-08-16',

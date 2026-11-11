@@ -791,7 +791,7 @@ describe('sp-data actions', () => {
 			);
 		});
 
-		it('returns the rows in the CoreStatsResult shape', async () => {
+		it('returns the rows in the StatsCacheBySpeciesResult shape', async () => {
 			makeClient();
 			mockCacheRows([{ time_period: '2000-01-01', bird_count: 4 }]);
 

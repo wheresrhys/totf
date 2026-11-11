@@ -1,4 +1,3 @@
-import type { CoreStatsResult } from '@/app/models/db';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 /**
@@ -39,8 +38,8 @@ export type SquashedMonthTabParams = {
 	// The page's aggregate stats, used as each period table's pinned totals
 	// row. `undefined` means "no totals row" (the Species totals tab passes
 	// `undefined` through regardless — it has never shown one).
-	totalsStats?: CoreStatsResult;
+	totalsStats?: StatsCacheBySpeciesResult;
 	speciesTotalsForMonth: StatsCacheBySpeciesResult[];
-	yearTotalsForMonth: CoreStatsResult[];
-	sessionTotalsForMonth: CoreStatsResult[];
+	yearTotalsForMonth: StatsCacheBySpeciesResult[];
+	sessionTotalsForMonth: StatsCacheBySpeciesResult[];
 };

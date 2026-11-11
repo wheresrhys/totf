@@ -9,7 +9,6 @@ import {
 } from '@/app/actions/sp-data';
 import { globalStatsCacheFetchPool } from '@/modules/stats/browser';
 import type {
-	CoreStatsResult,
 	DemographicsStatsResult,
 	ArrivalsStatsResult
 } from '@/app/models/db';
@@ -24,6 +23,7 @@ import {
 import { YearComparisonTrendChart } from '@/app/components/charts/YearComparisonTrendChart';
 import { ChartTile } from '@/app/components/charts/ChartTile';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // Returning vs new (#854): three plain categorical colours — unlike Young
 // counts below, these three series ("New adults", "Returning adults",
@@ -152,9 +152,9 @@ export function SpDemographicsTab({
 }) {
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-	const [statsHistory, setStatsHistory] = useState<CoreStatsResult[] | null>(
-		null
-	);
+	const [statsHistory, setStatsHistory] = useState<
+		StatsCacheBySpeciesResult[] | null
+	>(null);
 	const [statsRequested, setStatsRequested] = useState(false);
 	function loadStatsHistory() {
 		if (statsRequested) return;
@@ -188,9 +188,9 @@ export function SpDemographicsTab({
 	// tiles ask for the same year data and each `YearComparisonTrendChart`
 	// keeps its own copy once resolved — the ref only needs to guarantee one
 	// RPC round-trip per interval per tab, not to drive a re-render.
-	const yearStatsHistoryPromise = useRef<Promise<CoreStatsResult[]> | null>(
-		null
-	);
+	const yearStatsHistoryPromise = useRef<Promise<
+		StatsCacheBySpeciesResult[]
+	> | null>(null);
 	function fetchYearStatsHistory() {
 		yearStatsHistoryPromise.current ??= getSpeciesStatsHistory(
 			speciesName,
@@ -254,7 +254,7 @@ export function SpDemographicsTab({
 				temporalUnit: 'month'
 			})
 			.then((rows) => {
-				const data = (rows as CoreStatsResult[]).map(
+				const data = (rows as StatsCacheBySpeciesResult[]).map(
 					(row): [string, number] => [row.time_period, row.session_count]
 				);
 				setEffortHistory({ name: 'effort', data });

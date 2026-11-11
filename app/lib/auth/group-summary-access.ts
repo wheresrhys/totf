@@ -10,7 +10,7 @@ import {
 	resolveGroupPublicAreasForRequest,
 	type ViewedGroup
 } from '../group-slug';
-import type { CoreStatsResult } from '@/app/models/db';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats';
 
 /**
  * Every `SimpleStatsCache.temporal_unit` value that names a repeating period,
@@ -57,7 +57,7 @@ export type GroupSummaryAccessLevel = 'own' | 'shared' | 'public' | 'blocked';
  * `/species` list page's merge reads it; every other consumer of these rows
  * reads `species_name`.
  */
-export type AuthorisedStatsRow = CoreStatsResult & {
+export type AuthorisedStatsRow = StatsCacheBySpeciesResult & {
 	species_id?: number | null;
 };
 
@@ -307,7 +307,7 @@ async function runStatsCacheRead(
  * which keys on the id too.
  */
 type BasicSessionMetricsRpcRow = Pick<
-	CoreStatsResult,
+	StatsCacheBySpeciesResult,
 	| 'time_period'
 	| 'species_count'
 	| 'bird_count'

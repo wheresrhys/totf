@@ -8,10 +8,10 @@ import {
 } from '@testing-library/react';
 import { TabContent } from '@/modules/ui-kit';
 import { SpMonthTotalsTab } from '../SpMonthTotalsTab';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import { getColumnIndex } from '@/app/__tests__/helpers/table';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // `SpMonthTotalsTab` is a pure presentational `TabConfig.TabComponent` (#1065)
 // — fetching/loading/error state lives in `TabContent` (#1057), so these
@@ -24,8 +24,8 @@ function renderMonthTotalsTab({
 	dataFetcher = vi.fn()
 }: {
 	params?: SpeciesTotalsTabParams;
-	initialData?: CoreStatsResult[] | null;
-	dataFetcher?: () => Promise<CoreStatsResult[]>;
+	initialData?: StatsCacheBySpeciesResult[] | null;
+	dataFetcher?: () => Promise<StatsCacheBySpeciesResult[]>;
 }) {
 	return render(
 		<TabContent
@@ -71,10 +71,10 @@ describe('SpMonthTotalsTab', () => {
 
 	describe('rendering without prefetched data', () => {
 		it('shows a loading state before data arrives', () => {
-			let resolveData!: (v: CoreStatsResult[]) => void;
+			let resolveData!: (v: StatsCacheBySpeciesResult[]) => void;
 			const dataFetcher = vi.fn(
 				() =>
-					new Promise<CoreStatsResult[]>((resolve) => {
+					new Promise<StatsCacheBySpeciesResult[]>((resolve) => {
 						resolveData = resolve;
 					})
 			);

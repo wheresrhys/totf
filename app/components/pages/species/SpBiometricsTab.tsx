@@ -5,7 +5,6 @@ import {
 	getSpeciesStatsHistory,
 	fetchGraphableEncounterData
 } from '@/app/actions/sp-data';
-import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import { BoxyList } from '@/modules/ui-kit';
 import { getSizes } from '@/app/components/charts/StatsHistoryChart';
 import { YearComparisonTrendChart } from '@/app/components/charts/YearComparisonTrendChart';
@@ -15,6 +14,7 @@ import {
 } from '@/app/components/charts/WeightAndWingChart';
 import { ChartTile } from '@/app/components/charts/ChartTile';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 function Spinner() {
 	return (
@@ -66,7 +66,7 @@ export function SpBiometricsTab({
 	fromDate,
 	toDate
 }: {
-	speciesStats: CoreStatsWithBiometrics;
+	speciesStats: StatsCacheBySpeciesResult;
 	speciesName: string;
 	speciesId: number;
 	viewedGroup: ViewedGroup;
@@ -76,7 +76,7 @@ export function SpBiometricsTab({
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
 	const [statsHistory, setStatsHistory] = useState<
-		CoreStatsWithBiometrics[] | null
+		StatsCacheBySpeciesResult[] | null
 	>(null);
 	const [statsRequested, setStatsRequested] = useState(false);
 	function loadStatsHistory() {

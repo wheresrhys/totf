@@ -8,7 +8,6 @@ import {
 } from '@testing-library/react';
 import { TabContent } from '@/modules/ui-kit';
 import { SpCombinedMonthTotalsTab } from '../SpCombinedMonthTotalsTab';
-import type { CoreStatsResult } from '@/app/models/db';
 import type {
 	SpeciesTotalsTabParams,
 	SpCombinedMonthTotalsData
@@ -21,6 +20,7 @@ import {
 	buildCoreStatsRow,
 	buildMonthSquashedFixture
 } from '@/app/__tests__/helpers/core-stats-fixtures';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // `SpCombinedMonthTotalsTab` is a pure presentational `TabConfig.TabComponent`
 // (#1066) — fetching/loading/error state lives in `TabContent` (#1057), so
@@ -197,7 +197,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 				encounter_count: 75,
 				bird_count: 50,
 				pullus_bird_count: 2,
-				...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
+				...({ pullus_enc_count: 5 } as Partial<StatsCacheBySpeciesResult>)
 			}),
 			buildCoreStatsRow({
 				time_period: '2000-08-01',
@@ -251,7 +251,7 @@ describe('species all-time Month totals tab — Combine years toggle', () => {
 						buildCoreStatsRow({
 							time_period: '2020-01-01',
 							pullus_bird_count: 2,
-							...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
+							...({ pullus_enc_count: 5 } as Partial<StatsCacheBySpeciesResult>)
 						})
 					],
 					monthSquashedStats: toggleData.monthSquashedStats

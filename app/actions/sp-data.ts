@@ -13,8 +13,6 @@ import { getSexOfBird, type EncounterOfBird } from '@/app/models/bird';
 import type { GraphableBird } from '@/app/components/charts/WeightAndWingChart';
 import type { SexedGraphableBird } from '@/app/components/charts/WeightAndWingChart';
 import {
-	type CoreStatsResult,
-	type CoreStatsWithBiometrics,
 	type DemographicsStatsResult,
 	type ArrivalsStatsResult
 } from '@/app/models/db';
@@ -22,6 +20,7 @@ import type { PeriodTotalsGrouping } from '@/modules/stats-view';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import { buildPageOfBirdsSelect } from '@/queries';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats';
 
 export async function fetchPageOfBirds(
 	speciesId: number,
@@ -184,7 +183,7 @@ function calendarMonthOf(timePeriod: string): number {
  * name.
  */
 export async function fetchSpeciesStatsCacheRows<
-	RowType extends CoreStatsResult = CoreStatsResult
+	RowType extends StatsCacheBySpeciesResult = StatsCacheBySpeciesResult
 >({
 	speciesName,
 	viewedGroup,
@@ -212,24 +211,22 @@ export async function fetchSpeciesStatsCacheRows<
 // Wing/weight + count history for a single species at `interval` granularity
 // (monthly by default). This used to be two parallel RPC calls — `core_stats`
 // for the counts and `biometrics_stats` for the 8 wing/weight fields (#821) —
-// joined on `time_period` by `mergeBiometricsFields`, with a core row that had
-// no matching biometrics row getting all 8 fields coalesced to null.
+// joined on `time_period` by a dedicated merge helper, with a core row that
+// had no matching biometrics row getting all 8 fields coalesced to null.
 // `SimpleStatsCacheBySpecies` carries both halves on the same row, so there is
 // exactly one source and nothing left to join: one cache read, no merge, and
 // the per-cell nullability the biometric columns genuinely have (an empty
 // MAX/AVG/MIN/PERCENTILE_CONT) is now carried by the row itself rather than
-// synthesised from a missing sibling. `mergeBiometricsFields` is still the
-// merge for the one remaining call site that fetches the two halves
-// separately (`species-stats.ts`) — `page.tsx`'s `getSpeciesStats` moved onto
-// this same cache read in #1222.
+// synthesised from a missing sibling. Every call site had moved onto this same
+// cache read by #1418, so #1419 deleted that merge helper outright.
 export async function getSpeciesStatsHistory(
 	species: string,
 	viewedGroup: ViewedGroup,
 	fromDate?: string,
 	toDate?: string,
 	interval: StatsHistoryInterval = 'month'
-): Promise<CoreStatsWithBiometrics[]> {
-	return fetchSpeciesStatsCacheRows<CoreStatsWithBiometrics>({
+): Promise<StatsCacheBySpeciesResult[]> {
+	return fetchSpeciesStatsCacheRows<StatsCacheBySpeciesResult>({
 		speciesName: species,
 		viewedGroup,
 		temporalUnit: interval,
@@ -335,7 +332,7 @@ export async function fetchSpeciesPeriodTotals(
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
-): Promise<CoreStatsResult[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	const readsMonthGrainForYearTotals =
 		timeInterval === 'year' && Boolean(monthFilter);
 	const rows = await fetchSpeciesStatsCacheRows({
@@ -394,14 +391,14 @@ export type SpeciesTotalsTabParams = {
 export async function fetchYearTotalsTabData(
 	params: SpeciesTotalsTabParams,
 	viewedGroup: ViewedGroup
-): Promise<CoreStatsResult[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	return fetchSpeciesPeriodTotals(params.speciesName, viewedGroup, 'year');
 }
 
 export async function fetchMonthTotalsTabData(
 	params: SpeciesTotalsTabParams,
 	viewedGroup: ViewedGroup
-): Promise<CoreStatsResult[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	return fetchSpeciesPeriodTotals(
 		params.speciesName,
 		viewedGroup,
@@ -414,7 +411,7 @@ export async function fetchMonthTotalsTabData(
 export async function fetchSessionTotalsTabData(
 	params: SpeciesTotalsTabParams,
 	viewedGroup: ViewedGroup
-): Promise<CoreStatsResult[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	return fetchSpeciesPeriodTotals(
 		params.speciesName,
 		viewedGroup,
@@ -439,7 +436,7 @@ export async function fetchSessionTotalsTabData(
 export async function fetchSquashedMonthYearTotalsTabData(
 	params: SpeciesTotalsTabParams,
 	viewedGroup: ViewedGroup
-): Promise<CoreStatsResult[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	return fetchSpeciesPeriodTotals(
 		params.speciesName,
 		viewedGroup,
@@ -465,7 +462,7 @@ export async function fetchSquashedMonthYearTotalsTabData(
 export async function fetchSpeciesCombinedMonthTotals(
 	speciesName: string,
 	viewedGroup: ViewedGroup
-): Promise<CoreStatsResult[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	return fetchSpeciesStatsCacheRows({
 		speciesName,
 		viewedGroup,
@@ -479,8 +476,8 @@ export async function fetchSpeciesCombinedMonthTotals(
 // `SpCombinedMonthTotalsTab`'s own `useLazyTabData` call did before this
 // migration.
 export type SpCombinedMonthTotalsData = {
-	monthlyStats: CoreStatsResult[];
-	monthSquashedStats: CoreStatsResult[];
+	monthlyStats: StatsCacheBySpeciesResult[];
+	monthSquashedStats: StatsCacheBySpeciesResult[];
 };
 
 /**

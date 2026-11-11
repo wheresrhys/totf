@@ -9,7 +9,6 @@ import {
 } from '@/modules/ui-kit';
 import { formatMonthLabel } from '@/app/lib/month-totals';
 import { type EnrichedBirdOfSpecies } from '@/app/models/bird';
-import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { type SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 // Imported (and re-exported below) rather than defined here — see
@@ -25,6 +24,7 @@ import {
 	buildSpeciesDetailTabs,
 	type SpeciesDetailTabParams
 } from './species-tabs';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 export {
 	getDefaultSpeciesTabId,
 	getSpeciesKnownTabIds,
@@ -63,7 +63,7 @@ export type PeriodScope = {
 
 export type FullFatPageData = {
 	birds: EnrichedBirdOfSpecies[];
-	speciesStats: CoreStatsWithBiometrics;
+	speciesStats: StatsCacheBySpeciesResult;
 	speciesId: number;
 	speciesName: string;
 } & PeriodScope;
@@ -99,7 +99,7 @@ export function buildSpeciesHeadingText(
 }
 
 // Counts sentence rendered under the heading when species stats are available
-// (#784). `null` counts (a possible shape for `CoreStatsResult`'s count
+// (#784). `null` counts (a possible shape for `StatsCacheBySpeciesResult`'s count
 // columns) are treated as 0 for both the number shown and the singular/plural
 // check, following the `${n} ${n === 1 ? 'singular' : 'plural'}` idiom used by
 // `buildYearsAgoCopy` (app/components/highlights/counts/renderers.tsx).

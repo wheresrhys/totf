@@ -327,6 +327,30 @@ the 8 wing/weight ones, and `app/models/db.ts`'s `DemographicsStatsResult`/`Arri
 strip every column non-null via `NonNullable` over their generated composite type), or a
 hand-built object that only fills in the columns a test actually reads.
 
+**#1419 re-probed every stats-fixture double assertion in the repo and none of them could be
+downgraded — don't spend another pass trying.** The ticket deleted the old hand-maintained
+core-stats/biometrics-stats row types from `app/models/db.ts`, which was expected to make a
+`species_name: null` row honestly representable (`StatsCacheResult` declares exactly that) and so
+retire the exception above. It didn't, and the five remaining sites each fail a single assertion
+for a reason the rename can't touch:
+
+- `app/__tests__/helpers/core-stats-fixtures.ts`' `resolveAllSpeciesRow` — spreading a bare
+  `Record<string, unknown>` contributes no named properties, so `tsc` sees `{ species_name: null }`
+  and reports all 31 row columns missing, even though every one is there at runtime.
+- `app/components/__tests__/SummaryStatsSection.test.tsx` — `test-fixtures/snapshots/synthetic/`'s
+  hand-maintained `zero.summary-totals.json` is 8 age-bucket encounter columns behind the cache
+  tables _and_ carries a null `species_name`/`time_period` (see that directory's README).
+- `app/(routes)/species/[speciesName]/__tests__/PageContent.test.tsx` and
+  `modules/stats-view/lib/__tests__/species-totals.test.ts` — a deliberate literal `null` in
+  `bird_count`/`time_period`, both NOT NULL on the cache tables in either grain, so
+  `StatsCacheResult` rejects them exactly as `StatsCacheBySpeciesResult` does.
+- `app/(routes)/__tests__/page.test.tsx`' `statsRow` — the pre-existing "hand-built object that
+  only fills in the columns a test actually reads" exception, which no rename affects.
+
+The `species_name: null` half of the problem stays until #1424 makes `fetchAuthorisedCoreStats`
+generic on `group_by_species`: until the read path can _return_ the combined-grain member, the
+fixtures feeding it have to borrow the by-species type whatever their own shape honestly is.
+
 **This is enforced, not just documented (#921).** `eslint.config.js` forbids the `x as unknown as
 T` pattern outright via a `no-restricted-syntax` selector — `npm run lint` fails on any new one. A
 genuine exception still needs a one-line `// eslint-disable-next-line no-restricted-syntax --

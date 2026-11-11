@@ -152,8 +152,9 @@ Two sanctioned extension points: new shared finders in `lib/rule-utils.ts`, and 
 - **`types.ts`**'s `HighlightsGenerator.generator` reads `modules/stats`' `StatsResult` — either
   member of that discriminated union, i.e. an all-species-combined or a per-species cache cell
   (#1413 retargeted this and `lib/highlight-utils.ts` onto it; they used to spell the union out
-  by hand as `SimpleStatsCacheBySpeciesRow | SimpleStatsCacheRow`, which also forced an
-  `as A[] & B[]` cast to get past this very signature) — historically the field was spelled `rpcName: 'core_stats' |
+  by hand as a union of the two full cache-table `Row` types, which also forced an
+  `as A[] & B[]` cast to get past this very signature; #1419 deleted the last of those
+  aliases) — historically the field was spelled `rpcName: 'core_stats' |
   'biometrics_stats'`, naming the RPC a rule's stats came from, back when a rule really did
   dispatch its own RPC call. Every rule's stats now come from the same
   `SimpleStatsCache`/`SimpleStatsCacheBySpecies` read, so the field is now purely a column-subset

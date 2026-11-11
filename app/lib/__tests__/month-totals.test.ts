@@ -8,17 +8,17 @@ import {
 	formatMonthYearLabel,
 	formatMonthLabel
 } from '../month-totals';
-import type { CoreStatsResult } from '@/app/models/db';
 import { BiometricStatNames } from '@/modules/stats/browser';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // A monthly stat row as `core_stats` returns it: `time_period` is the first
 // of the month.
 function monthStat(
 	year: number,
 	month: number,
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
+	overrides: Partial<StatsCacheBySpeciesResult> = {}
+): StatsCacheBySpeciesResult {
 	const timePeriod = `${year}-${String(month).padStart(2, '0')}-01`;
 	return buildCoreStatsRow({ time_period: timePeriod, ...overrides });
 }
@@ -104,8 +104,8 @@ describe('buildMonthTotalsRows', () => {
 	});
 
 	// The two assertions here were unassertable before #1417: the synthesized
-	// row was cast `as unknown as CoreStatsResult`, whose `species_name` was
-	// `string`, so nothing in the type system or the suite pinned what it
+	// row was double-asserted onto the by-species row type, whose `species_name`
+	// is `string`, so nothing in the type system or the suite pinned what it
 	// actually put in these columns.
 	describe('zero-filling a month with no sessions', () => {
 		it('gives the synthesized row a null species_name', () => {
@@ -129,8 +129,8 @@ describe('buildCombinedMonthTotalsRows', () => {
 	// (`2000-<mm>-01`), not by full `YYYY-MM`.
 	function monthSquashedStat(
 		month: number,
-		overrides: Partial<CoreStatsResult> = {}
-	): CoreStatsResult {
+		overrides: Partial<StatsCacheBySpeciesResult> = {}
+	): StatsCacheBySpeciesResult {
 		return buildCoreStatsRow({
 			time_period: `2000-${String(month).padStart(2, '0')}-01`,
 			...overrides

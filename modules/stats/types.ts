@@ -65,10 +65,11 @@ export type StatsResultFor<BySpecies extends boolean> = BySpecies extends true
 
 /**
  * The 8 wing/weight columns of a stats cell (#1214, #1372) — the shared,
- * iterable home for the field list `app/models/db.ts`'s `BiometricFieldName`
- * and `app/actions/spp-data.ts`'s `BIOMETRIC_CACHE_COLUMNS` each spell out
- * separately today. The const is the single source of truth and
- * `BiometricStatName` derives from it, so the two can't drift apart.
+ * iterable home for the field list a type in `app/models/db.ts` and
+ * `app/actions/spp-data.ts`'s `BIOMETRIC_CACHE_COLUMNS` each used to spell out
+ * separately (both retargeted onto this one by #1415/#1419). The const is the
+ * single source of truth and `BiometricStatName` derives from it, so the two
+ * can't drift apart.
  */
 export const BiometricStatNames = [
 	'max_weight',

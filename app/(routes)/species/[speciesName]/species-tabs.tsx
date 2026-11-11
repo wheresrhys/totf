@@ -35,8 +35,8 @@ import {
 } from '@/app/actions/sp-data';
 import { type TabConfig } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { EnrichedBirdOfSpecies } from '@/app/models/bird';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // The tab eagerly mounted (and initially active) at each route depth: the
 // first totals tab shown for that depth. Mirrors the route-depth cascade the
@@ -171,7 +171,7 @@ export function buildSpeciesTotalsTabs(
 // `birds` in hand at the point it builds `totalsTabParams` (they're fetched
 // concurrently, in the same `Promise.all`, as the prefetch call itself).
 export type SpeciesDetailTabParams = {
-	speciesStats: CoreStatsWithBiometrics;
+	speciesStats: StatsCacheBySpeciesResult;
 	speciesName: string;
 	speciesId: number;
 	birds: EnrichedBirdOfSpecies[];

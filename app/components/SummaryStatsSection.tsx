@@ -1,11 +1,11 @@
 import { Table } from '@/modules/ui-kit';
-import type { CoreStatsResult } from '@/app/models/db';
 import { calculateRetraps } from '@/modules/stats-view';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 export function SummaryStatsSection({
 	stats
 }: {
-	stats: CoreStatsResult | null;
+	stats: StatsCacheBySpeciesResult | null;
 }) {
 	if (!stats) {
 		return null;

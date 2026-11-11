@@ -22,8 +22,7 @@ import type {
 	CombinedHighlight
 } from '../../types';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { StatsResult } from '@/modules/stats';
-import type { SimpleStatsCacheRow } from '@/app/models/db';
+import type { StatsCacheResult, StatsResult } from '@/modules/stats';
 
 describe('getTimePeriodSampler', () => {
 	it('returns an always-true filter when no timePeriod is given', () => {
@@ -63,9 +62,7 @@ describe('filterStats', () => {
 
 	const viewedGroup = (id: number): ViewedGroup => ({ id, slug: null });
 
-	const scope = (
-		overrides: Partial<HighlightScope> = {}
-	): HighlightScope => ({
+	const scope = (overrides: Partial<HighlightScope> = {}): HighlightScope => ({
 		temporalUnit: 'month',
 		...overrides
 	});
@@ -159,9 +156,7 @@ describe('getTemporalUnitFromTimeWindow', () => {
 	});
 
 	it("returns 'month-squashed' when only month is set", () => {
-		expect(getTemporalUnitFromTimeWindow({ month: 5 })).toBe(
-			'month-squashed'
-		);
+		expect(getTemporalUnitFromTimeWindow({ month: 5 })).toBe('month-squashed');
 	});
 
 	it("returns 'all-time' when neither is set", () => {
@@ -232,7 +227,10 @@ describe('sortByPositionAndTimeWindow', () => {
 });
 
 describe('limitHighlights', () => {
-	const textualHighlight = (timePeriod: string, value: string): HighlightValue => ({
+	const textualHighlight = (
+		timePeriod: string,
+		value: string
+	): HighlightValue => ({
 		timePeriod,
 		value,
 		species: null
@@ -331,10 +329,7 @@ describe('limitHighlights', () => {
 			const result = limitHighlights(highlights, 4);
 
 			expect(
-				result.map(({ timePeriod, ranking }) => [
-					timePeriod,
-					ranking.position
-				])
+				result.map(({ timePeriod, ranking }) => [timePeriod, ranking.position])
 			).toStrictEqual([
 				['2020-05-01', 1],
 				['2020-05-02', 2],
@@ -354,10 +349,7 @@ describe('limitHighlights', () => {
 			const result = limitHighlights(highlights, 4);
 
 			expect(
-				result.map(({ timePeriod, ranking }) => [
-					timePeriod,
-					ranking.isTied
-				])
+				result.map(({ timePeriod, ranking }) => [timePeriod, ranking.isTied])
 			).toStrictEqual([
 				['2020-05-01', false],
 				['2020-05-02', true],
@@ -378,17 +370,23 @@ describe('dateToYearMonth', () => {
 });
 
 describe('getHighlightsOfTypeFromStatsRows', () => {
-	const stats = [{ time_period: '2020-05-10' } as SimpleStatsCacheRow];
+	const stats = [{ time_period: '2020-05-10' } as StatsCacheResult];
 	const scope: HighlightScope = { temporalUnit: 'month' };
 
 	const baseRule = (): HighlightsGenerator => ({
 		formatters: { combinedHighlightPrinter: () => '' },
-		descriptor: { category: 'count', type: 'test-highlight', unit: 'encounter' },
+		descriptor: {
+			category: 'count',
+			type: 'test-highlight',
+			unit: 'encounter'
+		},
 		speciesUsed: 'none',
 		generator: () => []
 	});
 
-	const ruleReturning = (highlights: HighlightValue[]): HighlightsGenerator => ({
+	const ruleReturning = (
+		highlights: HighlightValue[]
+	): HighlightsGenerator => ({
 		...baseRule(),
 		generator: () => highlights
 	});
@@ -480,9 +478,7 @@ describe('buildTimeWindowFilter', () => {
 });
 
 describe('getCacheKey', () => {
-	const scope = (
-		overrides: Partial<HighlightScope> = {}
-	): HighlightScope => ({
+	const scope = (overrides: Partial<HighlightScope> = {}): HighlightScope => ({
 		temporalUnit: 'month',
 		...overrides
 	});
@@ -501,19 +497,17 @@ describe('getCacheKey', () => {
 		expect(
 			getCacheKey(1203, scope({ parentTimeWindow: { year: 2020, month: 5 } }))
 		).toBe('1203-month-no-limit-no-species-2020-5');
-		expect(
-			getCacheKey(1204, scope({ parentTimeWindow: { year: 2020 } }))
-		).toBe('1204-month-no-limit-no-species-2020');
-		expect(
-			getCacheKey(1205, scope({ parentTimeWindow: { month: 5 } }))
-		).toBe('1205-month-no-limit-no-species-5');
+		expect(getCacheKey(1204, scope({ parentTimeWindow: { year: 2020 } }))).toBe(
+			'1204-month-no-limit-no-species-2020'
+		);
+		expect(getCacheKey(1205, scope({ parentTimeWindow: { month: 5 } }))).toBe(
+			'1205-month-no-limit-no-species-5'
+		);
 	});
 });
 
 describe('getFilteredStatsCache', () => {
-	const scope = (
-		overrides: Partial<HighlightScope> = {}
-	): HighlightScope => ({
+	const scope = (overrides: Partial<HighlightScope> = {}): HighlightScope => ({
 		temporalUnit: 'month',
 		...overrides
 	});
@@ -526,7 +520,7 @@ describe('getFilteredStatsCache', () => {
 
 	it('reports has() true and returns the same value after set() for that key', () => {
 		const cache = getFilteredStatsCache(4102, scope(), 'present');
-		const filteredStats = [{ time_period: '2020-05-10' } as SimpleStatsCacheRow];
+		const filteredStats = [{ time_period: '2020-05-10' } as StatsCacheResult];
 
 		cache.set(filteredStats);
 
@@ -539,7 +533,7 @@ describe('getFilteredStatsCache', () => {
 		const presentCache = getFilteredStatsCache(4103, sharedScope, 'present');
 		const groupedCache = getFilteredStatsCache(4103, sharedScope, 'grouped');
 
-		presentCache.set([{ time_period: '2020-05-10' } as SimpleStatsCacheRow]);
+		presentCache.set([{ time_period: '2020-05-10' } as StatsCacheResult]);
 
 		expect(groupedCache.has()).toBe(false);
 	});
@@ -566,7 +560,11 @@ describe('sortHighlights', () => {
 		overrides: Partial<CombinedHighlight> = {}
 	): CombinedHighlight => ({
 		formatters: { combinedHighlightPrinter: () => '' },
-		descriptor: { category: 'count', type: 'test-highlight', unit: 'encounter' },
+		descriptor: {
+			category: 'count',
+			type: 'test-highlight',
+			unit: 'encounter'
+		},
 		value: { timePeriod: '2020-05-10', value: 10, species: null },
 		species: undefined,
 		bestPosition: 1,
@@ -647,9 +645,7 @@ describe('sortHighlights', () => {
 		});
 
 		expect(
-			sortHighlights([lowerValue, higherValue]).map(
-				({ value }) => value.value
-			)
+			sortHighlights([lowerValue, higherValue]).map(({ value }) => value.value)
 		).toStrictEqual([20, 10]);
 	});
 });

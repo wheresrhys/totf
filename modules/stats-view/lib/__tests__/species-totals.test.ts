@@ -6,17 +6,17 @@ import {
 	deriveSpeciesTotalsRowByEncounter
 } from '../species-totals';
 import type { SpeciesTotalsRow } from '../../types';
-import type { CoreStatsResult } from '@/app/models/db';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // This file's tests assert against a specific full row shape (not just the
 // field(s) each test overrides), so the shared builder's own defaults don't
 // apply here — these are the exact values the file's original local
 // `buildStat` defaulted to. `time_period` is genuinely null here (a
-// species-grouped, ungrouped-by-time row), but CoreStatsResult's
-// NonNullable mapped type (app/models/db.ts) assumes every column is always
-// present, so a direct `Partial<CoreStatsResult>` assertion doesn't compile
-// (#895).
+// species-grouped, ungrouped-by-time row), but `StatsCacheBySpeciesResult`
+// (`modules/stats`) inherits `SimpleStatsCacheBySpecies`' NOT NULL constraint on
+// that column, so even a direct `Partial<StatsCacheBySpeciesResult>` assertion
+// doesn't compile (#895) — re-probed in #1419.
 // eslint-disable-next-line no-restricted-syntax -- see comment above
 const fullRowOverrides = {
 	species_name: 'Blue Tit',
@@ -30,7 +30,7 @@ const fullRowOverrides = {
 	postjuv_bird_count: 1,
 	adult_bird_count: 1,
 	unknown_age_bird_count: 1
-} as unknown as Partial<CoreStatsResult>;
+} as unknown as Partial<StatsCacheBySpeciesResult>;
 
 describe('calculateRetraps', () => {
 	it('computes bird_count minus new_bird_count for a typical row', () => {
@@ -50,7 +50,7 @@ describe('calculateRetraps', () => {
 });
 
 describe('deriveSpeciesTotalsRow', () => {
-	it('maps every CoreStatsResult bucket field to its SpeciesTotalsRow counterpart', () => {
+	it('maps every StatsCacheBySpeciesResult bucket field to its SpeciesTotalsRow counterpart', () => {
 		const stat = buildCoreStatsRow(fullRowOverrides);
 		expect(deriveSpeciesTotalsRow(stat)).toEqual({
 			speciesName: 'Blue Tit',
@@ -116,7 +116,7 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 	});
 
 	it.each<{
-		sourceField: keyof CoreStatsResult;
+		sourceField: keyof StatsCacheBySpeciesResult;
 		resultField: keyof SpeciesTotalsRow;
 	}>([
 		{ sourceField: 'pullus_enc_count', resultField: 'pullusCount' },
@@ -129,7 +129,7 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 		({ sourceField, resultField }) => {
 			const stat = buildCoreStatsRow({
 				[sourceField]: 9
-			} as Partial<CoreStatsResult>);
+			} as Partial<StatsCacheBySpeciesResult>);
 			expect(deriveSpeciesTotalsRowByEncounter(stat)[resultField]).toBe(9);
 		}
 	);

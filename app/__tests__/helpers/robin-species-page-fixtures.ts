@@ -9,7 +9,7 @@
  * the pre-#1222 `core_stats` + `biometrics_stats` RPC pair this is no longer
  * a two-source join — `ROBIN_ALPHA_HEADLINE`
  * (`app/__tests__/helpers/core-stats-fixtures.ts`) is already the complete
- * `CoreStatsWithBiometrics` row.
+ * `StatsCacheBySpeciesResult` row.
  */
 
 import { vi } from 'vitest';
