@@ -13,10 +13,10 @@ import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 // field(s) each test overrides), so the shared builder's own defaults don't
 // apply here — these are the exact values the file's original local
 // `buildStat` defaulted to. `time_period` is genuinely null here (a
-// species-grouped, ungrouped-by-time row), but StatsCacheBySpeciesResult's
-// NonNullable mapped type (app/models/db.ts) assumes every column is always
-// present, so a direct `Partial<StatsCacheBySpeciesResult>` assertion doesn't compile
-// (#895).
+// species-grouped, ungrouped-by-time row), but `StatsCacheBySpeciesResult`
+// (`modules/stats`) inherits `SimpleStatsCacheBySpecies`' NOT NULL constraint on
+// that column, so even a direct `Partial<StatsCacheBySpeciesResult>` assertion
+// doesn't compile (#895) — re-probed in #1419.
 // eslint-disable-next-line no-restricted-syntax -- see comment above
 const fullRowOverrides = {
 	species_name: 'Blue Tit',

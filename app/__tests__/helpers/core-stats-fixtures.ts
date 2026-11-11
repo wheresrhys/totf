@@ -9,13 +9,13 @@ import robinAlphaHeadlineSnapshot from '@/test-fixtures/snapshots/tables/SimpleS
 /**
  * A `StatsCacheBySpeciesResult` row fixture: flat overrides merged over sensible
  * defaults, covering every column the now-deleted `core_stats` RPC
- * returned (`StatsCacheBySpeciesResult` in `app/models/db.ts` is the app-owned
- * standalone type that shape now lives in, #1244) plus the 8
+ * returned (`modules/stats`' `StatsCacheBySpeciesResult` — the
+ * `SimpleStatsCacheBySpecies` row minus bookkeeping — is the type that shape
+ * now lives in, #1244/#1372) plus the 8
  * `max_weight`/`avg_weight`/`min_weight`/`median_weight`/`max_wing`/
- * `avg_wing`/`min_wing`/`median_wing` fields several call sites still
- * override even though `StatsCacheBySpeciesResult` doesn't declare them (#827
- * moved biometrics onto a separate source) — kept here as harmless extras
- * so every pre-existing override site keeps working unchanged. Coerced via
+ * `avg_wing`/`min_wing`/`median_wing` fields several call sites override,
+ * which that type carries on the same row (#1372 — they used to come from a
+ * separate `biometrics_stats` source, #827). Coerced via
  * `as StatsCacheBySpeciesResult` rather than constructing a full-fat instance, per this
  * repo's fixture-builder convention.
  *
@@ -159,12 +159,11 @@ export function buildMonthSquashedFixture(
  * unread, the same superset `fetchSpeciesStatsCacheRows`' own doc comment
  * describes for the real read path.
  *
- * `StatsCacheBySpeciesResult` (`modules/stats`) rather than the narrower
- * `StatsCacheBySpeciesResult` since #1415: the snapshot is a verbatim cache row,
- * so it genuinely carries the four `new_young_bird_count`/`new_postjuv_*`/
- * `postjuv_juv_enc_count` columns that type omits, and `fetchSpeciesData` now
- * returns whole rows. The richer type is assignable to the narrower one, so
- * every pre-existing consumer of the exports below is unaffected.
+ * `modules/stats`' whole-cache-row `StatsCacheBySpeciesResult` since #1415,
+ * rather than the narrower merged-row type this used to return: the snapshot is
+ * a verbatim cache row, so it genuinely carries the four
+ * `new_young_bird_count`/`new_postjuv_*`/`postjuv_juv_enc_count` columns that
+ * narrower type omitted, and `fetchSpeciesData` now returns whole rows.
  */
 function resolveBySpeciesRow(
 	row: { Species: { species_name: string } } & Record<string, unknown>
@@ -185,11 +184,17 @@ function resolveBySpeciesRow(
 function resolveAllSpeciesRow(
 	row: Record<string, unknown>
 ): StatsCacheBySpeciesResult {
-	// `row`'s only known shape is an index signature, which doesn't carry
-	// enough named properties for a single `as StatsCacheBySpeciesResult` to pass
-	// TypeScript's "sufficient overlap" check — it genuinely has every
-	// StatsCacheBySpeciesResult column at runtime (the raw SimpleStatsCache row), just
-	// not expressible in `row`'s own type.
+	// Two independent reasons the double assertion can't be downgraded here
+	// (both re-probed in #1419, which deleted the last of the stale aliases):
+	// spreading a bare index signature contributes no named properties at all,
+	// so the literal is `{ species_name: null }` as far as `tsc` is concerned
+	// and fails the "sufficient overlap" check against all 31 of the row type's
+	// columns — even though every one of them is there at runtime; and the
+	// honest `species_name: null` contradicts this type's `species_name: string`
+	// anyway. The second half is the compiler-invisible grain lie #1424 fixes by
+	// making the read path generic on `group_by_species`; until then these
+	// all-species-combined exports have to borrow the by-species type, because
+	// that is what `fetchAuthorisedCoreStats` still declares it returns.
 	// eslint-disable-next-line no-restricted-syntax -- see comment above
 	return { ...row, species_name: null } as unknown as StatsCacheBySpeciesResult;
 }

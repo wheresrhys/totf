@@ -81,8 +81,8 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
 // `SimpleStatsCacheBySpecies` table (#1222) — `fetchSpeciesStatsCacheRows`
 // (`sp-data.ts`) already returns the merged `StatsCacheBySpeciesResult` shape
 // per row, so there is no separate biometrics_stats call/merge to do here any
-// more (see that file's own doc comment on `mergeBiometricsFields`'s one
-// remaining call site). `fromDate`/`toDate`/`monthFilter` are never a
+// more (see that file's own doc comment on `getSpeciesStatsHistory` for the
+// two-RPC history this replaced). `fromDate`/`toDate`/`monthFilter` are never a
 // genuinely arbitrary free-text range here — every caller of
 // `fetchSpeciesPageContentForPeriod` passes a `period` that's hardcoded per
 // route file (see `PageContent.tsx`'s `PeriodScope` doc comment): all-time (no

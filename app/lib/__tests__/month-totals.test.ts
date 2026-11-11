@@ -104,8 +104,8 @@ describe('buildMonthTotalsRows', () => {
 	});
 
 	// The two assertions here were unassertable before #1417: the synthesized
-	// row was cast `as unknown as StatsCacheBySpeciesResult`, whose `species_name` was
-	// `string`, so nothing in the type system or the suite pinned what it
+	// row was double-asserted onto the by-species row type, whose `species_name`
+	// is `string`, so nothing in the type system or the suite pinned what it
 	// actually put in these columns.
 	describe('zero-filling a month with no sessions', () => {
 		it('gives the synthesized row a null species_name', () => {

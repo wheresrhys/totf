@@ -211,16 +211,14 @@ export async function fetchSpeciesStatsCacheRows<
 // Wing/weight + count history for a single species at `interval` granularity
 // (monthly by default). This used to be two parallel RPC calls — `core_stats`
 // for the counts and `biometrics_stats` for the 8 wing/weight fields (#821) —
-// joined on `time_period` by `mergeBiometricsFields`, with a core row that had
-// no matching biometrics row getting all 8 fields coalesced to null.
+// joined on `time_period` by a `mergeBiometricsFields` helper, with a core row
+// that had no matching biometrics row getting all 8 fields coalesced to null.
 // `SimpleStatsCacheBySpecies` carries both halves on the same row, so there is
 // exactly one source and nothing left to join: one cache read, no merge, and
 // the per-cell nullability the biometric columns genuinely have (an empty
 // MAX/AVG/MIN/PERCENTILE_CONT) is now carried by the row itself rather than
-// synthesised from a missing sibling. `mergeBiometricsFields` is still the
-// merge for the one remaining call site that fetches the two halves
-// separately (`species-stats.ts`) — `page.tsx`'s `getSpeciesStats` moved onto
-// this same cache read in #1222.
+// synthesised from a missing sibling. Every call site had moved onto this same
+// cache read by #1418, so #1419 deleted that merge helper outright.
 export async function getSpeciesStatsHistory(
 	species: string,
 	viewedGroup: ViewedGroup,

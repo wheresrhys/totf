@@ -634,10 +634,11 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 		});
 
 		it('derives birdCount from params.speciesStats.bird_count, defaulting to 0 when null', async () => {
-			// `StatsCacheBySpeciesResult.bird_count` is non-null (`NonNullable`-stripped,
-			// app/models/db.ts) even though the underlying RPC can return `null`
-			// for an ungrouped row with zero birds — a literal `null` override
-			// needs the documented `as unknown as` escape hatch (app/CLAUDE.md).
+			// `StatsCacheBySpeciesResult.bird_count` is non-null (`modules/stats`,
+			// inheriting `SimpleStatsCacheBySpecies`' NOT NULL constraint) even
+			// though the underlying RPC can return `null` for an ungrouped row
+			// with zero birds — a literal `null` override needs the documented
+			// `as unknown as` escape hatch (app/CLAUDE.md).
 			// eslint-disable-next-line no-restricted-syntax -- see comment above
 			const speciesStats = {
 				...buildCoreStatsRow(),

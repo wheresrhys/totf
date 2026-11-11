@@ -1,9 +1,4 @@
 import { Database } from '@/types/supabase.types';
-import type {
-	BiometricStatName,
-	StatsCacheBySpeciesResult,
-	StatsCacheResult
-} from '@/modules/stats/browser';
 
 export type SpeciesRow = Database['public']['Tables']['Species']['Row'];
 export type SessionRow = Database['public']['Tables']['Sessions']['Row'];
@@ -18,17 +13,10 @@ export type RingSize = Database['public']['Enums']['ring_size'];
 export type ResightingRecordType =
 	Database['public']['Enums']['resighting_record_type'];
 
-/** @deprecated Use `StatsCacheResult` from `@/modules/stats` instead (#1372). */
-export type SimpleStatsCacheRow = StatsCacheResult;
-/** @deprecated Use `StatsCacheBySpeciesResult` from `@/modules/stats` instead (#1372). */
-export type SimpleStatsCacheBySpeciesRow = StatsCacheBySpeciesResult;
 // Serves both an ImportJobs row's own `status` and its three
 // `*_stats_refresh_status` columns — see the enum's own schema file for why one type
 // covers both.
 export type ImportJobStatus = Database['public']['Enums']['import_job_status'];
-
-/** @deprecated Use `StatsCacheBySpeciesResult` from `@/modules/stats` instead (#1372). */
-export type CoreStatsResult = StatsCacheBySpeciesResult;
 
 // demographics_stats is a companion RPC of the long-since-dropped core_stats
 // (#800, renamed from population_stats in #878), carrying the new-adult count,
@@ -53,36 +41,6 @@ export type ArrivalsStatsResult = {
 		Database['public']['CompositeTypes']['arrivals_stats_result'][K]
 	>;
 };
-
-/** @deprecated Use `StatsCacheBySpeciesResult` from `@/modules/stats` instead (#1372). */
-export type BiometricsStatsResult = StatsCacheBySpeciesResult;
-
-/** @deprecated Use `BiometricStatName` from `@/modules/stats` instead (#1372). */
-export type BiometricFieldName = BiometricStatName;
-
-/** @deprecated Use `StatsCacheBySpeciesResult` from `@/modules/stats` instead (#1372). */
-export type CoreStatsWithBiometrics = StatsCacheBySpeciesResult;
-
-// Copies the 8 wing/weight columns of one stats cell onto another row, or nulls
-// them out when there is no matching cell. Vestigial now that both halves of a
-// stats cell are read off one cache row (#1372) — #1419 deletes it; nothing
-// outside this file should start calling it.
-export function mergeBiometricsFields<T extends CoreStatsResult>(
-	aggregateRow: T,
-	biometricsRow: BiometricsStatsResult | undefined
-): T & Pick<BiometricsStatsResult, BiometricFieldName> {
-	return {
-		...aggregateRow,
-		min_weight: biometricsRow?.min_weight ?? null,
-		max_weight: biometricsRow?.max_weight ?? null,
-		avg_weight: biometricsRow?.avg_weight ?? null,
-		median_weight: biometricsRow?.median_weight ?? null,
-		min_wing: biometricsRow?.min_wing ?? null,
-		max_wing: biometricsRow?.max_wing ?? null,
-		avg_wing: biometricsRow?.avg_wing ?? null,
-		median_wing: biometricsRow?.median_wing ?? null
-	};
-}
 
 export type DiscrepenciesResult =
 	Database['public']['Functions']['find_discrepencies']['Returns'][number];

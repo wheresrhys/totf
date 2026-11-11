@@ -10,9 +10,11 @@ import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 // legitimately return none for a group with no data at all.
 const populatedStats = ALPHA_CORE_STATS_SUMMARY_TOTALS!;
 // This hand-authored synthetic fixture is ungrouped, so species_name/
-// time_period are genuinely null — StatsCacheBySpeciesResult's NonNullable mapped type
-// (app/models/db.ts) assumes every column is always present, so a direct
-// assertion doesn't compile (#895).
+// time_period are genuinely null, and it also predates 8 of the cache tables'
+// age-bucket encounter columns. `StatsCacheBySpeciesResult` (`modules/stats`)
+// inherits `SimpleStatsCacheBySpecies`' NOT NULL constraints on all of those,
+// so a direct assertion doesn't compile on either count (#895) — re-probed in
+// #1419.
 // eslint-disable-next-line no-restricted-syntax -- see comment above
 const zeroActivityStats = zeroStats as unknown as StatsCacheBySpeciesResult;
 
