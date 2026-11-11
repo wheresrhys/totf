@@ -31,6 +31,54 @@ const pageData: PageData = {
 	accessLevel: 'own'
 };
 
+const BIOMETRIC_COLUMN_HEADINGS = [
+	'Max weight',
+	'Avg weight',
+	'Min weight',
+	'Median weight',
+	'Max wing',
+	'Avg wing',
+	'Min wing',
+	'Median wing'
+] as const;
+
+const SPECIES_WITHOUT_BIOMETRICS = 'Unmeasured Species';
+
+/**
+ * Three hand-built rows for the null-biometrics and biometric-sort cases: one
+ * species with all 8 wing/weight columns `null` (a cell whose encounters were
+ * all biometric-ineligible) and two with values either side of each other, so
+ * a sort has something unambiguous to order the null against.
+ */
+function buildSpeciesRow(
+	overrides: Partial<StatsCacheBySpeciesResult> & { species_name: string }
+): StatsCacheBySpeciesResult {
+	const [template] = speciesStats;
+	return { ...template, ...overrides };
+}
+
+const pageDataWithMissingBiometrics: PageData = {
+	speciesStats: [
+		buildSpeciesRow({
+			species_name: SPECIES_WITHOUT_BIOMETRICS,
+			bird_count: 7,
+			encounter_count: 9,
+			max_weight: null,
+			avg_weight: null,
+			min_weight: null,
+			median_weight: null,
+			max_wing: null,
+			avg_wing: null,
+			min_wing: null,
+			median_wing: null
+		}),
+		buildSpeciesRow({ species_name: 'Lightest Species', max_weight: 9 }),
+		buildSpeciesRow({ species_name: 'Heaviest Species', max_weight: 31 })
+	],
+	years: [2021, 2022, 2023],
+	accessLevel: 'own'
+};
+
 describe('SppStatsTable', () => {
 	afterEach(() => {
 		cleanup();
@@ -136,25 +184,7 @@ describe('SppStatsTable', () => {
 		// (an empty `MAX`/`AVG`/`MIN`/`PERCENTILE_CONT`), where the old
 		// `mergeSpeciesBiometrics` left them absent. Both render as a blank cell
 		// through `MultiSpeciesTableBody`'s generic `<td>{species[property]}</td>`.
-		it('renders a blank cell for a null metric', () => {
-			const [firstSpecies, ...restSpecies] = speciesStats;
-			const speciesWithoutBiometrics: StatsCacheBySpeciesResult = {
-				...firstSpecies,
-				max_weight: null,
-				avg_weight: null,
-				min_weight: null,
-				median_weight: null,
-				max_wing: null,
-				avg_wing: null,
-				min_wing: null,
-				median_wing: null
-			};
-			const pageDataWithMissingBiometrics: PageData = {
-				speciesStats: [speciesWithoutBiometrics, ...restSpecies],
-				years: [2021, 2022, 2023],
-				accessLevel: 'own'
-			};
-
+		it('renders a blank cell for each null biometric metric', () => {
 			render(
 				<SppStatsTable
 					data={pageDataWithMissingBiometrics}
@@ -162,9 +192,74 @@ describe('SppStatsTable', () => {
 				/>
 			);
 
+			for (const heading of BIOMETRIC_COLUMN_HEADINGS) {
+				expect(getCellTextByHeading(heading, SPECIES_WITHOUT_BIOMETRICS)).toBe(
+					''
+				);
+			}
+		});
+
+		it("still renders the species' counts columns", () => {
+			render(
+				<SppStatsTable
+					data={pageDataWithMissingBiometrics}
+					viewedGroup={{ id: 1, slug: 'alpha' }}
+				/>
+			);
+
+			expect(getCellTextByHeading('Birds', SPECIES_WITHOUT_BIOMETRICS)).toBe(
+				'7'
+			);
 			expect(
-				getCellTextByHeading('Max weight', firstSpecies.species_name)
-			).toBe('');
+				getCellTextByHeading('Encounters', SPECIES_WITHOUT_BIOMETRICS)
+			).toBe('9');
+		});
+	});
+
+	// `SortableTable`'s comparator falls through to `(a as number) > (b as
+	// number)` for anything non-string, so what a missing metric compares as is
+	// a property of the value, not of the table: `null` coerces to `0` and
+	// orders consistently either way round, where the `undefined` the deleted
+	// `mergeSpeciesBiometrics` left behind coerced to `NaN` and compared
+	// `false` in *both* directions — a non-transitive comparator whose output
+	// depended on the input order. Pinned here because the shape change from
+	// `Partial` to nullable is what makes the ordering well-defined (#1418).
+	describe('sorting by a biometric column', () => {
+		function renderAndSortByMaxWeight() {
+			render(
+				<SppStatsTable
+					data={pageDataWithMissingBiometrics}
+					viewedGroup={{ id: 1, slug: 'alpha' }}
+				/>
+			);
+			fireEvent.click(screen.getByText('Max weight'));
+			return [...document.querySelectorAll('tbody tr')].map(
+				(row) => row.querySelector('td')?.textContent?.trim()
+			);
+		}
+
+		it('orders a species with a null metric consistently against those with a value', () => {
+			const orderedDescending = renderAndSortByMaxWeight();
+
+			// Descending on the first click, so the null sorts last rather than
+			// landing somewhere arbitrary in the middle.
+			expect(orderedDescending.at(-1)).toBe(SPECIES_WITHOUT_BIOMETRICS);
+
+			fireEvent.click(screen.getByText('Max weight'));
+			const orderedAscending = [...document.querySelectorAll('tbody tr')].map(
+				(row) => row.querySelector('td')?.textContent?.trim()
+			);
+
+			expect(orderedAscending.at(0)).toBe(SPECIES_WITHOUT_BIOMETRICS);
+		});
+
+		it('sorts species with values in the expected order', () => {
+			const orderedDescending = renderAndSortByMaxWeight();
+
+			expect(orderedDescending.slice(0, 2)).toEqual([
+				'Heaviest Species',
+				'Lightest Species'
+			]);
 		});
 	});
 });
