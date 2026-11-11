@@ -5,7 +5,10 @@ import { squashedMonthYearTotalsTab } from '@/app/components/pages/summary/Squas
 import { squashedMonthSessionTotalsTab } from '@/app/components/pages/summary/SquashedMonthSessionTotalsTab';
 import { squashedMonthHighlightsTab } from '@/app/components/pages/summary/SquashedMonthHighlightsTab';
 import type { SquashedMonthTabParams } from '@/app/components/pages/summary/squashed-month-tab-params';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	StatsCacheBySpeciesResult,
+	StatsCacheResult
+} from '@/modules/stats/browser';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 // Tab order for the squashed-month summary page (`/summary/jan`, #1005) is
@@ -30,10 +33,10 @@ export function SquashedMonthSummaryTotalsSection({
 	initialTabData
 }: {
 	squashedMonth: number;
-	summaryStats?: StatsCacheBySpeciesResult | null;
+	summaryStats?: StatsCacheResult | null;
 	speciesTotalsForMonth: StatsCacheBySpeciesResult[];
-	yearTotalsForMonth: StatsCacheBySpeciesResult[];
-	sessionTotalsForMonth: StatsCacheBySpeciesResult[];
+	yearTotalsForMonth: StatsCacheResult[];
+	sessionTotalsForMonth: StatsCacheResult[];
 	viewedGroup?: ViewedGroup;
 	// The resolved `?tabId=` search param (#804) — wins over the first tab as
 	// the initial active tab when it names one of the 4 above; an

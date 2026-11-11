@@ -3,7 +3,11 @@ import { endOfMonth, endOfYear, format, parseISO } from 'date-fns';
 import { getAuthenticatedSupabaseClient } from './group-auth';
 import { getGroupCookie } from '@/app/actions/group-cookie';
 import { supabase, catchSupabaseErrors } from '@/lib/supabase';
-import { readStatsCacheRows, type StatsCacheResult } from '@/modules/stats';
+import {
+	readStatsCacheRows,
+	type StatsCacheResult,
+	type StatsResultFor
+} from '@/modules/stats';
 import { readSpeciesNamesById } from '@/app/lib/species-names';
 import type { StatsTemporalUnit } from '@/app/models/temporal-unit';
 import {
@@ -44,12 +48,21 @@ export type StatsWindowParams = {
 export type GroupSummaryAccessLevel = 'own' | 'shared' | 'public' | 'blocked';
 
 /**
- * One row of an authorised summary read. `species_id` rides along on a
- * by-species row (#1415) because `app/actions/spp-data.ts`'s arbitrary-window
- * path merges this row with a second `stats_cache_*_metrics` result and keys
- * that merge on the integer FK rather than the display-oriented
- * `species_name` — a merge that was only ever possible on the name because
- * this function used to discard the id once the name was resolved.
+ * One row of an authorised summary read, at whichever grain the read asked for
+ * (#1424): `AuthorisedStatsRow<true>` is the by-species member,
+ * `AuthorisedStatsRow<false>` the all-species-combined one, and the default
+ * `boolean` resolves — `StatsResultFor` being distributive over its naked type
+ * parameter — to the union of the two, for a consumer that handles either.
+ * This is what replaced a non-generic alias of the *by-species* member alone,
+ * which left the ungrouped read path typed as if it always had a species name
+ * when `species_name` is genuinely `null` there.
+ *
+ * `species_id` rides along on a by-species row (#1415) because
+ * `app/actions/spp-data.ts`'s arbitrary-window path merges this row with a
+ * second `stats_cache_*_metrics` result and keys that merge on the integer FK
+ * rather than the display-oriented `species_name` — a merge that was only ever
+ * possible on the name because this function used to discard the id once the
+ * name was resolved.
  *
  * Optional rather than required because only a by-species read has one: the
  * all-species-combined cache table carries no `species_id` column at all, and
@@ -57,14 +70,31 @@ export type GroupSummaryAccessLevel = 'own' | 'shared' | 'public' | 'blocked';
  * `/species` list page's merge reads it; every other consumer of these rows
  * reads `species_name`.
  */
-export type AuthorisedStatsRow = StatsCacheBySpeciesResult & {
-	species_id?: number | null;
+export type AuthorisedStatsRow<BySpecies extends boolean = boolean> =
+	StatsResultFor<BySpecies> & {
+		species_id?: number | null;
+	};
+
+export type AuthorisedSummaryResult<BySpecies extends boolean = boolean> = {
+	accessLevel: GroupSummaryAccessLevel;
+	rows: AuthorisedStatsRow<BySpecies>[];
 };
 
-export type AuthorisedSummaryResult = {
-	accessLevel: GroupSummaryAccessLevel;
-	rows: AuthorisedStatsRow[];
-};
+/**
+ * The `AuthorisedStatsRow` grain a statically-known `StatsWindowParams` shape
+ * implies — `true` only when the params literal sets `group_by_species: true`,
+ * so an omitted key, an explicit `false` and a non-literal `boolean` all
+ * resolve to the all-species-combined member. The `boolean` case is the one
+ * imprecision, and it is deliberate: no call site passes a computed
+ * `group_by_species` today, and resolving it to the *union* instead would
+ * oblige every statically-known caller to narrow a row it already knows the
+ * grain of.
+ */
+type GroupedBySpecies<Params extends StatsWindowParams> = Params extends {
+	group_by_species: true;
+}
+	? true
+	: false;
 
 /**
  * The sentinel year `stats_spine`'s `'month-squashed'` branch stamps on a
@@ -261,20 +291,23 @@ export function resolveStatsCacheQueryPlan({
  *   served from the month grain and its rows must still be labelled as the
  *   years they stand for.
  */
-async function runStatsCacheRead(
+async function runStatsCacheRead<BySpecies extends boolean>(
 	client: SupabaseClient,
 	viewedGroup: ViewedGroup,
-	groupBySpecies: boolean,
+	groupBySpecies: BySpecies,
 	plan: StatsCacheQueryPlan
-): Promise<AuthorisedStatsRow[]> {
-	// `readStatsCacheRows` select('*')s and leaves narrowing to its caller, so
-	// name the row shape this read is known to produce here. It already
-	// resolves `species_name` off the embed (`null` for an
-	// all-species-combined read, exactly as `core_stats` returned under
-	// `group_by_species: false`) and strips the embed itself. `species_id` is
-	// among the columns `select('*')` brings back on a by-species read, which
-	// is why `AuthorisedStatsRow` can declare it without this branch doing
-	// anything to put it there.
+): Promise<AuthorisedStatsRow<BySpecies>[]> {
+	// `readStatsCacheRows` select('*')s and returns `Record<string, unknown>[]`,
+	// leaving narrowing to its caller, so name the row shape this read is known
+	// to produce here. The assertion tracks `groupBySpecies` rather than naming
+	// one grain (#1424): it already resolves `species_name` off the embed
+	// (`null` for an all-species-combined read, exactly as `core_stats` returned
+	// under `group_by_species: false`) and strips the embed itself, so which
+	// `StatsResult` member the rows are is decided entirely by the argument this
+	// function forwards as `bySpecies`. `species_id` is among the columns
+	// `select('*')` brings back on a by-species read, which is why
+	// `AuthorisedStatsRow` can declare it without this branch doing anything to
+	// put it there.
 	const rows = (await readStatsCacheRows({
 		client,
 		viewedGroup,
@@ -285,7 +318,7 @@ async function runStatsCacheRead(
 		timePeriod: plan.timePeriod,
 		fromDate: plan.fromTimePeriod,
 		toDate: plan.toTimePeriod
-	})) as AuthorisedStatsRow[];
+	})) as AuthorisedStatsRow<BySpecies>[];
 
 	return rows
 		.filter(
@@ -414,6 +447,16 @@ const UNAVAILABLE_COLUMN_PLACEHOLDERS = {
  * behaviour. The `species_id` it was resolved from is kept on the row rather
  * than discarded — see `AuthorisedStatsRow`.
  *
+ * Which is why this path returns the *either-grain* `AuthorisedStatsRow` union
+ * and builds each row inside a branch on the resolved name (#1424), rather
+ * than asserting the by-species member over rows whose `species_name` it just
+ * set to `null`. An ungrouped recompute resolves every name to `null`, and
+ * even a grouped one can: `readSpeciesNamesById` is a lookup that may miss. So
+ * the grain genuinely isn't a function of the argument here the way it is for
+ * `runStatsCacheRead` above — each branch instead builds a concrete
+ * `StatsResult` member the compiler checks column-for-column, with no cast at
+ * all.
+ *
  * Every other column a cache row carries is filled from
  * `UNAVAILABLE_COLUMN_PLACEHOLDERS` above, so a row off this path has the same
  * key set as one off `runStatsCacheRead` — see that const for which columns
@@ -444,13 +487,18 @@ async function runLiveMetricsRecompute(
 			)
 		: new Map<number, string>();
 
-	return rows.map(({ species_id, ...basicMetrics }) => ({
-		...basicMetrics,
-		...UNAVAILABLE_COLUMN_PLACEHOLDERS,
-		species_id,
-		species_name:
-			species_id === null ? null : (speciesNamesById.get(species_id) ?? null)
-	})) as AuthorisedStatsRow[];
+	return rows.map(({ species_id, ...basicMetrics }) => {
+		const speciesName =
+			species_id === null ? null : (speciesNamesById.get(species_id) ?? null);
+		const columns = {
+			...basicMetrics,
+			...UNAVAILABLE_COLUMN_PLACEHOLDERS,
+			species_id
+		};
+		return speciesName === null
+			? { ...columns, species_name: null }
+			: { ...columns, species_name: speciesName };
+	});
 }
 
 /**
@@ -525,7 +573,27 @@ function hasVisibleData(
  * Returns the access decision alongside the rows (not just the rows) so a
  * caller that cares which path served the data can destructure `accessLevel`
  * — every existing action function currently only destructures `rows`.
+ *
+ * **The row type resolves from the params literal** (#1424): a call site that
+ * statically asks for `group_by_species: true` gets
+ * `StatsCacheBySpeciesResult` rows, and one that asks for `false` — or omits
+ * the key, or passes no params at all — gets the all-species-combined
+ * `StatsCacheResult`, whose `species_name` is honestly `null`. See
+ * `GroupedBySpecies` for how the grain is read off the literal.
+ *
+ * The generic lives on an overload signature rather than on the implementation
+ * because the implementation legitimately works in the either-grain union:
+ * `runStatsCacheRead` resolves its own grain from the same argument, while
+ * `runLiveMetricsRecompute` returns whichever member each row's resolved
+ * `species_name` makes it (see its doc comment). Declaring the resolution here
+ * is what lets *both* read paths stay free of a cast to a `StatsResult` member.
  */
+export function fetchAuthorisedCoreStats<
+	const Params extends StatsWindowParams = StatsWindowParams
+>(
+	viewedGroup: ViewedGroup,
+	rpcParams?: Params
+): Promise<AuthorisedSummaryResult<GroupedBySpecies<Params>>>;
 export async function fetchAuthorisedCoreStats(
 	viewedGroup: ViewedGroup,
 	rpcParams: StatsWindowParams = {}

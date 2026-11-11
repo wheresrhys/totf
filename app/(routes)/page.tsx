@@ -14,7 +14,7 @@ import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
 import { recentSessionsQuery } from '@/queries';
 import { readStatsCacheRows } from '@/modules/stats';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats';
+import type { StatsCacheResult } from '@/modules/stats';
 
 export async function fetchRecentSessions(
 	viewedGroup: ViewedGroup
@@ -63,7 +63,7 @@ export async function fetchHomePageSummaryStats(
 			bySpecies: false,
 			temporalUnit: 'year'
 		})
-	])) as [StatsCacheBySpeciesResult[], StatsCacheBySpeciesResult[]];
+	])) as [StatsCacheResult[], StatsCacheResult[]];
 	const allTime = allTimeRows[0] ?? null;
 	const thisYear =
 		yearRows.find((row) => row.time_period === startOfCurrentYear) ?? null;

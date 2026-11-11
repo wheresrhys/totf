@@ -1,4 +1,7 @@
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	StatsCacheBySpeciesResult,
+	StatsCacheResult
+} from '@/modules/stats/browser';
 
 /**
  * Tab ids for the squashed-month summary page (`/summary/jan`, #1005), in
@@ -38,8 +41,8 @@ export type SquashedMonthTabParams = {
 	// The page's aggregate stats, used as each period table's pinned totals
 	// row. `undefined` means "no totals row" (the Species totals tab passes
 	// `undefined` through regardless — it has never shown one).
-	totalsStats?: StatsCacheBySpeciesResult;
+	totalsStats?: StatsCacheResult;
 	speciesTotalsForMonth: StatsCacheBySpeciesResult[];
-	yearTotalsForMonth: StatsCacheBySpeciesResult[];
-	sessionTotalsForMonth: StatsCacheBySpeciesResult[];
+	yearTotalsForMonth: StatsCacheResult[];
+	sessionTotalsForMonth: StatsCacheResult[];
 };

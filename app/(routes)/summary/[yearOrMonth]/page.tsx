@@ -26,7 +26,10 @@ import {
 	type SquashedMonthTabParams
 } from '@/app/components/pages/summary/squashed-month-tab-params';
 import { parseMonthAbbreviation } from '@/modules/stats-view';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	StatsCacheBySpeciesResult,
+	StatsCacheResult
+} from '@/modules/stats/browser';
 import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
@@ -70,7 +73,7 @@ async function getSummaryYearOrMonthPageParams(
 export type PageData =
 	| {
 			year: number;
-			summaryStats: StatsCacheBySpeciesResult | null;
+			summaryStats: StatsCacheResult | null;
 			monthTotals: MonthTotalsRow[];
 			fromDate: string;
 			toDate: string;
@@ -78,10 +81,10 @@ export type PageData =
 	  }
 	| {
 			squashedMonth: number;
-			summaryStats: StatsCacheBySpeciesResult | null;
+			summaryStats: StatsCacheResult | null;
 			speciesTotalsForMonth: StatsCacheBySpeciesResult[];
-			yearTotalsForMonth: StatsCacheBySpeciesResult[];
-			sessionTotalsForMonth: StatsCacheBySpeciesResult[];
+			yearTotalsForMonth: StatsCacheResult[];
+			sessionTotalsForMonth: StatsCacheResult[];
 			initialTabData?: { tabId: string; data: unknown };
 	  };
 

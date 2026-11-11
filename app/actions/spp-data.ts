@@ -67,7 +67,7 @@ function pickBiometricStats(
  * one owner for the placeholder set is the point.
  */
 function buildSpeciesRow(
-	countsRow: AuthorisedStatsRow,
+	countsRow: AuthorisedStatsRow<true>,
 	biometrics: Partial<BiometricStats> | undefined
 ): StatsCacheBySpeciesResult {
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to drop species_id
@@ -111,7 +111,7 @@ function buildSpeciesRow(
  */
 async function mergeLiveBiometricsIntoCountsRows(
 	viewedGroup: ViewedGroup,
-	countsRows: AuthorisedStatsRow[],
+	countsRows: AuthorisedStatsRow<true>[],
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
@@ -209,7 +209,7 @@ async function mergeLiveBiometricsIntoCountsRows(
 // it stays gated until `public_areas` grows a tag that says otherwise.
 async function fetchSpeciesRowsWithBiometrics(
 	viewedGroup: ViewedGroup,
-	countsRows: AuthorisedStatsRow[],
+	countsRows: AuthorisedStatsRow<true>[],
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number

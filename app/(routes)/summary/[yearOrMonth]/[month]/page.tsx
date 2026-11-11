@@ -22,7 +22,7 @@ import { parseMonthAbbreviation } from '@/modules/stats-view';
 import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { SummaryPageContent } from '../../PageContent';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats';
+import type { StatsCacheResult } from '@/modules/stats';
 
 // `tabId` (#804, reusing #803's mechanism) is the optional `?tabId=` search
 // param, merged alongside the route's `yearOrMonth`/`month` params — it never
@@ -58,8 +58,8 @@ async function getSummaryYearMonthPageParams(
 export type PageData = {
 	year: number;
 	month: number;
-	summaryStats: StatsCacheBySpeciesResult | null;
-	sessionTotals: StatsCacheBySpeciesResult[];
+	summaryStats: StatsCacheResult | null;
+	sessionTotals: StatsCacheResult[];
 	fromDate: string;
 	toDate: string;
 	initialTabData?: { tabId: string; data: unknown };

@@ -5,7 +5,10 @@ import { HighlightsSection } from '@/app/components/HighlightsSection';
 import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';
 import { SquashedMonthSummaryTotalsSection } from '@/app/components/SquashedMonthSummaryTotalsSection';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	StatsCacheBySpeciesResult,
+	StatsCacheResult
+} from '@/modules/stats/browser';
 import { formatMonthLabel, type MonthTotalsRow } from '@/app/lib/month-totals';
 
 function buildHeading(
@@ -52,18 +55,18 @@ export function SummaryPageContent({
 	// history, rather than a single real year. Mutually exclusive with
 	// `year`/`month`.
 	squashedMonth?: number;
-	summaryStats?: StatsCacheBySpeciesResult | null;
+	summaryStats?: StatsCacheResult | null;
 	monthTotals?: MonthTotalsRow[];
-	yearlyTotals?: StatsCacheBySpeciesResult[];
-	sessionTotals?: StatsCacheBySpeciesResult[];
+	yearlyTotals?: StatsCacheResult[];
+	sessionTotals?: StatsCacheResult[];
 	// Only the all-time page sets this — enables the combine-years "Month totals"
 	// tab (data fetched lazily on select, not passed in).
 	showAllTimeMonthTotals?: boolean;
 	// The squashed-month page's 3 tabs' data — fetched eagerly (cheap, no
 	// zero-filling/lazy loading needed), unlike every other tab on this page.
 	speciesTotalsForMonth?: StatsCacheBySpeciesResult[];
-	yearTotalsForMonth?: StatsCacheBySpeciesResult[];
-	sessionTotalsForMonth?: StatsCacheBySpeciesResult[];
+	yearTotalsForMonth?: StatsCacheResult[];
+	sessionTotalsForMonth?: StatsCacheResult[];
 	viewedGroup?: ViewedGroup;
 	// Date bounds for the lazily-fetched Species totals tab — undefined on the
 	// all-time page (unscoped species totals).

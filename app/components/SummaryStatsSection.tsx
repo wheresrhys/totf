@@ -1,11 +1,14 @@
 import { Table } from '@/modules/ui-kit';
 import { calculateRetraps } from '@/modules/stats-view';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type { StatsCacheResult } from '@/modules/stats/browser';
 
 export function SummaryStatsSection({
 	stats
 }: {
-	stats: StatsCacheBySpeciesResult | null;
+	// The all-species-combined grain (#1424) — every summary page's page-wide
+	// aggregate comes from an ungrouped read, so `species_name` is honestly
+	// `null` here and this section never renders it.
+	stats: StatsCacheResult | null;
 }) {
 	if (!stats) {
 		return null;
