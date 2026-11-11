@@ -29,7 +29,10 @@ import {
 } from '@/modules/highlights';
 import { type TabConfig } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	StatsCacheBySpeciesResult,
+	StatsCacheResult
+} from '@/modules/stats/browser';
 import type { SummaryTabParams } from './summary-tab-params';
 
 export const YEAR_TOTALS_TAB_ID = 'year-totals';
@@ -48,7 +51,7 @@ export function fetchSummarySpeciesTotalsData(
 	return fetchSpeciesData(viewedGroup, params.fromDate, params.toDate);
 }
 
-export type SummarySessionTotalsData = StatsCacheBySpeciesResult[];
+export type SummarySessionTotalsData = StatsCacheResult[];
 
 export function fetchSummarySessionTotalsData(
 	params: SummaryTabParams,

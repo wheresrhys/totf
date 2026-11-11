@@ -10,7 +10,7 @@ import { TabContent } from '@/modules/ui-kit';
 import { SpMonthTotalsTab } from '../SpMonthTotalsTab';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import { getColumnIndex } from '@/app/__tests__/helpers/table';
-import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import { buildBySpeciesStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // `SpMonthTotalsTab` is a pure presentational `TabConfig.TabComponent` (#1065)
@@ -46,7 +46,7 @@ describe('SpMonthTotalsTab', () => {
 	describe('rendering with server-prefetched data', () => {
 		it('renders the totals table immediately when `data` is supplied as a prop, with no loading spinner', () => {
 			renderMonthTotalsTab({
-				initialData: [buildCoreStatsRow({ time_period: '2026-03-01' })]
+				initialData: [buildBySpeciesStatsRow({ time_period: '2026-03-01' })]
 			});
 			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
 			expect(document.querySelector('.loading')).toBeNull();
@@ -54,7 +54,7 @@ describe('SpMonthTotalsTab', () => {
 
 		it('renders the correct rows/columns for the supplied data', () => {
 			renderMonthTotalsTab({
-				initialData: [buildCoreStatsRow({ time_period: '2026-03-01' })]
+				initialData: [buildBySpeciesStatsRow({ time_period: '2026-03-01' })]
 			});
 			// Only March has sessions in the supplied data; the rest are
 			// zero-filled and hidden by default.
@@ -86,7 +86,9 @@ describe('SpMonthTotalsTab', () => {
 		it('renders the totals table once the dataFetcher resolves', async () => {
 			const dataFetcher = vi
 				.fn()
-				.mockResolvedValue([buildCoreStatsRow({ time_period: '2026-03-01' })]);
+				.mockResolvedValue([
+					buildBySpeciesStatsRow({ time_period: '2026-03-01' })
+				]);
 			const params: SpeciesTotalsTabParams = {
 				speciesName: 'Robin',
 				year: 2026,
@@ -105,7 +107,7 @@ describe('SpMonthTotalsTab', () => {
 	describe('empty months toggle', () => {
 		it('renders only months with data by default (Hide)', () => {
 			renderMonthTotalsTab({
-				initialData: [buildCoreStatsRow({ time_period: '2026-03-01' })]
+				initialData: [buildBySpeciesStatsRow({ time_period: '2026-03-01' })]
 			});
 			expect(document.querySelectorAll('tbody tr').length).toBe(1);
 			expect(
@@ -117,7 +119,7 @@ describe('SpMonthTotalsTab', () => {
 
 		it('shows all 12 months when toggled to Show', () => {
 			renderMonthTotalsTab({
-				initialData: [buildCoreStatsRow({ time_period: '2026-03-01' })]
+				initialData: [buildBySpeciesStatsRow({ time_period: '2026-03-01' })]
 			});
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
 			expect(document.querySelectorAll('tbody tr').length).toBe(12);
@@ -129,7 +131,7 @@ describe('SpMonthTotalsTab', () => {
 
 		it('restores hidden months when toggled back to Hide', () => {
 			renderMonthTotalsTab({
-				initialData: [buildCoreStatsRow({ time_period: '2026-03-01' })]
+				initialData: [buildBySpeciesStatsRow({ time_period: '2026-03-01' })]
 			});
 			fireEvent.click(screen.getByRole('radio', { name: 'Show' }));
 			expect(document.querySelectorAll('tbody tr').length).toBe(12);
@@ -140,7 +142,7 @@ describe('SpMonthTotalsTab', () => {
 		it('has no visible effect for a year with no empty months', () => {
 			renderMonthTotalsTab({
 				initialData: Array.from({ length: 12 }, (_unused, index) =>
-					buildCoreStatsRow({
+					buildBySpeciesStatsRow({
 						time_period: `2026-${String(index + 1).padStart(2, '0')}-01`,
 						session_count: 2
 					})
@@ -154,7 +156,10 @@ describe('SpMonthTotalsTab', () => {
 		it('shows exactly one month for a year that is empty except one', () => {
 			renderMonthTotalsTab({
 				initialData: [
-					buildCoreStatsRow({ time_period: '2026-08-01', session_count: 3 })
+					buildBySpeciesStatsRow({
+						time_period: '2026-08-01',
+						session_count: 3
+					})
 				]
 			});
 			expect(document.querySelectorAll('tbody tr').length).toBe(1);

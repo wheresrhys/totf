@@ -11,14 +11,14 @@ import {
 	SQUASHED_MONTH_YEAR_TOTALS_TAB_ID,
 	type SquashedMonthTabParams
 } from './squashed-month-tab-params';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type { StatsCacheResult } from '@/modules/stats/browser';
 
 // `fetchPeriodStats(..., 'year', ..., squashedMonth)` returns one row per
 // year (bucketed by year, but every column already computed only from that
 // year's `squashedMonth` sessions) — reshape into `MonthTotalsRow` so
 // `formatMonthYearLabel` can print "January 2026" rather than plain "2026".
 function toYearTotalsRows(
-	rows: StatsCacheBySpeciesResult[],
+	rows: StatsCacheResult[],
 	squashedMonth: number
 ): MonthTotalsRow[] {
 	return rows.map((stats) => ({

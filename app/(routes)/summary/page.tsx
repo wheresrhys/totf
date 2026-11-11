@@ -18,7 +18,7 @@ import type { SummaryTabParams } from '@/app/components/pages/summary/summary-ta
 import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { SummaryPageContent } from './PageContent';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats';
+import type { StatsCacheResult } from '@/modules/stats';
 
 // `tabId` (#804, reusing #803's mechanism) is the optional `?tabId=` search
 // param — it never affects `getCacheKeys`, only which tab
@@ -27,8 +27,8 @@ export type PageParams = { tabId?: string; canReportHighlights?: boolean };
 type PageProps = { searchParams?: Promise<{ tabId?: string }> };
 
 export type PageData = {
-	summaryStats: StatsCacheBySpeciesResult | null;
-	yearlyTotals: StatsCacheBySpeciesResult[];
+	summaryStats: StatsCacheResult | null;
+	yearlyTotals: StatsCacheResult[];
 	initialTabData?: { tabId: string; data: unknown };
 };
 

@@ -20,7 +20,10 @@ import {
 	buildMonthSquashedFixture,
 	ALPHA_CORE_STATS_BY_SPECIES
 } from '@/app/__tests__/helpers/core-stats-fixtures';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	StatsCacheBySpeciesResult,
+	StatsCacheResult
+} from '@/modules/stats/browser';
 
 const fetchSpeciesDataMock = vi.fn();
 vi.mock('@/app/actions/spp-data', () => ({
@@ -45,16 +48,21 @@ const monthTotals = buildMonthTotalsRows(2026, []);
 
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 
-const summaryStats = {
+// The page-wide totals row, which every summary page reads at the
+// all-species-combined grain — so the snapshot row it borrows its columns from
+// has its `species_name` dropped back to the `null` that grain carries (#1424),
+// rather than the whole row being asserted to a grain it isn't.
+const summaryStats: StatsCacheResult = {
 	...speciesStats[0],
+	species_name: null,
 	session_count: 9,
 	bird_count: 99
-} as StatsCacheBySpeciesResult;
+};
 
 // Monthly (year, month) stats as `fetchPeriodStats(_, 'month')` returns them —
 // two Januaries and one August. Feeds only the all-time Month-totals tab's "By
 // year" (Combine years OFF) view.
-const monthlyPeriodStats: StatsCacheBySpeciesResult[] = [
+const monthlyPeriodStats: StatsCacheResult[] = [
 	buildCoreStatsRow({
 		time_period: '2020-01-01',
 		session_count: 4,
@@ -81,23 +89,22 @@ const monthlyPeriodStats: StatsCacheBySpeciesResult[] = [
 // deliberately NOT the sum of `monthlyPeriodStats`' two January rows (which
 // would be 58/24) — that's exactly the double-count the fix removes. Feeds
 // only the all-time Month-totals tab's "Combined" (Combine years ON) view.
-const monthSquashedTotals: StatsCacheBySpeciesResult[] =
-	buildMonthSquashedFixture({
-		1: {
-			session_count: 10,
-			encounter_count: 75,
-			bird_count: 50,
-			species_count: 7,
-			pullus_bird_count: 2,
-			...({ pullus_enc_count: 5 } as Partial<StatsCacheBySpeciesResult>)
-		},
-		8: {
-			session_count: 2,
-			encounter_count: 11,
-			bird_count: 9,
-			species_count: 3
-		}
-	});
+const monthSquashedTotals: StatsCacheResult[] = buildMonthSquashedFixture({
+	1: {
+		session_count: 10,
+		encounter_count: 75,
+		bird_count: 50,
+		species_count: 7,
+		pullus_bird_count: 2,
+		...({ pullus_enc_count: 5 } as Partial<StatsCacheResult>)
+	},
+	8: {
+		session_count: 2,
+		encounter_count: 11,
+		bird_count: 9,
+		species_count: 3
+	}
+});
 
 describe('SummaryTotalsSection', () => {
 	beforeEach(() => {
@@ -758,7 +765,7 @@ describe('SummaryTotalsSection', () => {
 						buildCoreStatsRow({
 							time_period: '2020-01-01',
 							pullus_bird_count: 2,
-							...({ pullus_enc_count: 5 } as Partial<StatsCacheBySpeciesResult>)
+							...({ pullus_enc_count: 5 } as Partial<StatsCacheResult>)
 						})
 					]);
 					render(<SummaryTotalsSection {...allTimeProps} />);

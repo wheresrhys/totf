@@ -10,12 +10,15 @@ import type { SessionWithEncountersCount } from '../models/session';
 import type { GroupTicksResult } from '../models/db';
 import { SessionsByDay } from '../components/SessionsByDay';
 import { format as formatDate } from 'date-fns';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type { StatsCacheResult } from '@/modules/stats/browser';
 
+// The all-species-combined grain (#1424) — each cell is a whole-group
+// aggregate read straight off `SimpleStatsCache`, so `species_name` is
+// honestly `null` and this page renders only count columns.
 export type HomePageSummaryStats = {
-	allTime: StatsCacheBySpeciesResult | null;
-	thisYear: StatsCacheBySpeciesResult | null;
-	lastYear: StatsCacheBySpeciesResult | null;
+	allTime: StatsCacheResult | null;
+	thisYear: StatsCacheResult | null;
+	lastYear: StatsCacheResult | null;
 };
 
 export type PageModel = {
@@ -54,7 +57,7 @@ function RecentSessions({
 }
 const SUMMARY_STATS_ROWS: {
 	label: string;
-	field: keyof StatsCacheBySpeciesResult;
+	field: keyof StatsCacheResult;
 }[] = [
 	{ label: 'Sessions', field: 'session_count' },
 	{ label: 'Birds', field: 'bird_count' },

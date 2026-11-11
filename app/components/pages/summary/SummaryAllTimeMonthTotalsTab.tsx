@@ -25,7 +25,7 @@ import {
 	fetchAllTimeMonthTotalsData,
 	type SummaryAllTimeMonthTotalsData
 } from './summary-tab-prefetchers';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type { StatsCacheResult } from '@/modules/stats/browser';
 
 export {
 	ALL_TIME_MONTH_TOTALS_TAB_ID,
@@ -48,9 +48,9 @@ function AllTimeMonthTotalsTab({
 	totalsStats,
 	viewedGroup
 }: {
-	periodStats: StatsCacheBySpeciesResult[];
-	monthSquashedStats: StatsCacheBySpeciesResult[];
-	totalsStats?: StatsCacheBySpeciesResult;
+	periodStats: StatsCacheResult[];
+	monthSquashedStats: StatsCacheResult[];
+	totalsStats?: StatsCacheResult;
 	viewedGroup?: ViewedGroup;
 }) {
 	const [combineYears, setCombineYears] = useState(true);

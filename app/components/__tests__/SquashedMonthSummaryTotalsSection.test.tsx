@@ -11,16 +11,15 @@ import { SquashedMonthSummaryTotalsSection } from '../SquashedMonthSummaryTotals
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import {
+	buildBySpeciesStatsRow,
 	buildCoreStatsRow,
 	buildDailyStatsRow
 } from '@/app/__tests__/helpers/core-stats-fixtures';
 
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 
-const speciesTotalsForMonth = [
-	{
-		...buildCoreStatsRow({ species_name: 'Robin' })
-	} as StatsCacheBySpeciesResult
+const speciesTotalsForMonth: StatsCacheBySpeciesResult[] = [
+	buildBySpeciesStatsRow({ species_name: 'Robin' })
 ];
 
 const yearTotalsForMonth = [

@@ -3,7 +3,7 @@ import type {
 	BiometricsMetricsRow,
 	StatsCacheBySpeciesResult
 } from '@/modules/stats/browser';
-import { buildCoreStatsRow } from './core-stats-fixtures';
+import { buildBySpeciesStatsRow } from './core-stats-fixtures';
 import alphaBiometricsSnapshot from '@/test-fixtures/snapshots/stats_cache_biometrics_metrics/alpha.by-species.json';
 import alphaSpeciesSnapshot from '@/test-fixtures/snapshots/tables/Species/alpha.top-species.json';
 
@@ -101,7 +101,7 @@ export const ALPHA_BIOMETRICS_BY_SPECIES: BiometricsFixtureRow[] =
 	alphaBiometricsSnapshot.map(resolveBiometricsMetricsRow);
 
 // Alpha's Blue Tit row backs `buildBiometricsStatsRow`'s defaults: it is the
-// species `buildCoreStatsRow`'s callers pair these rows with most often.
+// species `buildBySpeciesStatsRow`'s callers pair these rows with most often.
 const BLUE_TIT_BIOMETRICS = ALPHA_BIOMETRICS_BY_SPECIES.find(
 	({ species_name }) => species_name === 'Blue Tit'
 );
@@ -113,7 +113,7 @@ if (!BLUE_TIT_BIOMETRICS) {
 
 /**
  * A whole stats-cell row whose 8 wing/weight columns come from the real
- * biometrics snapshot above, over `buildCoreStatsRow`'s own defaults for every
+ * biometrics snapshot above, over `buildBySpeciesStatsRow`'s own defaults for every
  * other column — the shape a cache row genuinely has since #1222, rather than a
  * biometrics-only partial. Flat overrides merged on top, per this repo's
  * fixture-builder convention.
@@ -121,5 +121,5 @@ if (!BLUE_TIT_BIOMETRICS) {
 export function buildBiometricsStatsRow(
 	overrides: Partial<StatsCacheBySpeciesResult> = {}
 ): StatsCacheBySpeciesResult {
-	return buildCoreStatsRow({ ...BLUE_TIT_BIOMETRICS, ...overrides });
+	return buildBySpeciesStatsRow({ ...BLUE_TIT_BIOMETRICS, ...overrides });
 }

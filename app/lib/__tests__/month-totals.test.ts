@@ -10,15 +10,15 @@ import {
 } from '../month-totals';
 import { BiometricStatNames } from '@/modules/stats/browser';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type { StatsCacheResult } from '@/modules/stats/browser';
 
 // A monthly stat row as `core_stats` returns it: `time_period` is the first
 // of the month.
 function monthStat(
 	year: number,
 	month: number,
-	overrides: Partial<StatsCacheBySpeciesResult> = {}
-): StatsCacheBySpeciesResult {
+	overrides: Partial<StatsCacheResult> = {}
+): StatsCacheResult {
 	const timePeriod = `${year}-${String(month).padStart(2, '0')}-01`;
 	return buildCoreStatsRow({ time_period: timePeriod, ...overrides });
 }
@@ -129,8 +129,8 @@ describe('buildCombinedMonthTotalsRows', () => {
 	// (`2000-<mm>-01`), not by full `YYYY-MM`.
 	function monthSquashedStat(
 		month: number,
-		overrides: Partial<StatsCacheBySpeciesResult> = {}
-	): StatsCacheBySpeciesResult {
+		overrides: Partial<StatsCacheResult> = {}
+	): StatsCacheResult {
 		return buildCoreStatsRow({
 			time_period: `2000-${String(month).padStart(2, '0')}-01`,
 			...overrides

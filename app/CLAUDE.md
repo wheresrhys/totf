@@ -30,6 +30,19 @@ already-authorised cross-group viewer a degraded view because both branches read
 the same query); an existing `GroupDataSharing`-granted cross-group view via the normal authenticated
 client, only attempted once the target isn't public and the viewer actually has a session; or blocked.
 
+**`rows` is typed at the grain the call asked for (#1424).** The signature is generic on the params
+literal — `group_by_species: true` resolves `rows` to `modules/stats`' `StatsCacheBySpeciesResult`,
+and `false`/an omitted key/no params at all to the all-species-combined `StatsCacheResult`, whose
+`species_name` is honestly `null` (see `AuthorisedStatsRow`/`GroupedBySpecies` in that file). So a
+caller gets the exact `StatsResult` member with no narrowing and no cast, and the four thin
+ungrouped wrappers (`fetchSummaryStats`, `fetchPeriodStats`, `fetchCombinedMonthTotals`,
+`fetchYearlyTotals`, plus `period-totals.ts`' `fetchPeriodTotals`) declare `StatsCacheResult`
+rather than the by-species member they all used to borrow. **Annotate a summary-stats prop at the
+grain its data actually has** — a page-wide totals row or a period-totals series is
+`StatsCacheResult`; only a by-species read's rows (`fetchSpeciesData`, a species-filtered cache
+read) are `StatsCacheBySpeciesResult`; `modules/stats-view`'s `PeriodTotalsTable` takes the
+either-grain `StatsResult` union because it reads only count columns.
+
 **Since #1204 every branch is a plain `SimpleStatsCache`/`SimpleStatsCacheBySpecies` table read, not
 an RPC call** — three things follow from that:
 
@@ -339,7 +352,8 @@ for a reason the rename can't touch:
   and reports all 31 row columns missing, even though every one is there at runtime.
 - `app/components/__tests__/SummaryStatsSection.test.tsx` — `test-fixtures/snapshots/synthetic/`'s
   hand-maintained `zero.summary-totals.json` is 8 age-bucket encounter columns behind the cache
-  tables _and_ carries a null `species_name`/`time_period` (see that directory's README).
+  tables _and_ carries a null `time_period` (see that directory's README). Its null `species_name`
+  used to count too, until #1424 below.
 - `app/(routes)/species/[speciesName]/__tests__/PageContent.test.tsx` and
   `modules/stats-view/lib/__tests__/species-totals.test.ts` — a deliberate literal `null` in
   `bird_count`/`time_period`, both NOT NULL on the cache tables in either grain, so
@@ -347,9 +361,18 @@ for a reason the rename can't touch:
 - `app/(routes)/__tests__/page.test.tsx`' `statsRow` — the pre-existing "hand-built object that
   only fills in the columns a test actually reads" exception, which no rename affects.
 
-The `species_name: null` half of the problem stays until #1424 makes `fetchAuthorisedCoreStats`
-generic on `group_by_species`: until the read path can _return_ the combined-grain member, the
-fixtures feeding it have to borrow the by-species type whatever their own shape honestly is.
+#1424 then made `fetchAuthorisedCoreStats` generic on `group_by_species`, so the read path can
+_return_ the combined-grain member and the fixtures feeding it no longer borrow the by-species
+type: `buildCoreStatsRow`/`buildDailyStatsRow`/`buildMonthSquashedFixture`
+(`app/__tests__/helpers/core-stats-fixtures.ts`) build `StatsCacheResult` rows, matching their own
+`species_name: null` default, and `buildBySpeciesStatsRow`/`buildBySpeciesMonthSquashedFixture`
+are their by-species siblings for a species-filtered read's rows. That retired the
+`species_name: null` half of two of the five sites above (`resolveAllSpeciesRow` and
+`SummaryStatsSection.test.tsx`) — **both still need the double assertion for their other reason**,
+which is why the list is unchanged in length. Four `as StatsCacheBySpeciesResult` single
+assertions did go, in `species/[speciesName]/__tests__/PageContent.test.tsx` and
+`SquashedMonthSummaryTotalsSection.test.tsx`: a row that names its species typechecks into the
+by-species member outright.
 
 **This is enforced, not just documented (#921).** `eslint.config.js` forbids the `x as unknown as
 T` pattern outright via a `no-restricted-syntax` selector — `npm run lint` fails on any new one. A

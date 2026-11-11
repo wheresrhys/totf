@@ -4,7 +4,7 @@ import { TabContent } from '@/modules/ui-kit';
 import { SpYearTotalsTab } from '../SpYearTotalsTab';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import { getColumnIndex } from '@/app/__tests__/helpers/table';
-import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import { buildBySpeciesStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // `SpYearTotalsTab` is a pure presentational `TabConfig.TabComponent` (#1065)
@@ -40,7 +40,7 @@ describe('SpYearTotalsTab', () => {
 	describe('rendering with server-prefetched data', () => {
 		it('renders the totals table immediately when `data` is supplied as a prop, with no loading spinner', () => {
 			renderYearTotalsTab({
-				initialData: [buildCoreStatsRow({ time_period: '2026-01-01' })]
+				initialData: [buildBySpeciesStatsRow({ time_period: '2026-01-01' })]
 			});
 			expect(screen.getByTestId('period-totals-table')).toBeTruthy();
 			expect(document.querySelector('.loading')).toBeNull();
@@ -49,8 +49,8 @@ describe('SpYearTotalsTab', () => {
 		it('renders the correct rows/columns for the supplied data', () => {
 			renderYearTotalsTab({
 				initialData: [
-					buildCoreStatsRow({ time_period: '2025-01-01' }),
-					buildCoreStatsRow({ time_period: '2026-01-01' })
+					buildBySpeciesStatsRow({ time_period: '2025-01-01' }),
+					buildBySpeciesStatsRow({ time_period: '2026-01-01' })
 				]
 			});
 			expect(document.querySelectorAll('tbody tr').length).toBe(2);
@@ -83,7 +83,9 @@ describe('SpYearTotalsTab', () => {
 		it('renders the totals table once the dataFetcher resolves', async () => {
 			const dataFetcher = vi
 				.fn()
-				.mockResolvedValue([buildCoreStatsRow({ time_period: '2026-01-01' })]);
+				.mockResolvedValue([
+					buildBySpeciesStatsRow({ time_period: '2026-01-01' })
+				]);
 			renderYearTotalsTab({ dataFetcher });
 			await waitFor(() => {
 				expect(screen.getByTestId('period-totals-table')).toBeTruthy();

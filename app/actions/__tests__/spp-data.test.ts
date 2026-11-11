@@ -79,8 +79,8 @@ const ALPHA_BIOMETRIC_METRICS = Object.fromEntries(
  * to the Blue Tit.
  */
 function buildCountsRow(
-	overrides: Partial<AuthorisedStatsRow> = {}
-): AuthorisedStatsRow {
+	overrides: Partial<AuthorisedStatsRow<true>> = {}
+): AuthorisedStatsRow<true> {
 	return {
 		...buildCoreStatsRow(),
 		species_id: BLUE_TIT_SPECIES_ID,
@@ -100,8 +100,8 @@ function buildCountsRow(
  * to see.
  */
 function buildCachedCountsRow(
-	overrides: Partial<AuthorisedStatsRow> = {}
-): AuthorisedStatsRow {
+	overrides: Partial<AuthorisedStatsRow<true>> = {}
+): AuthorisedStatsRow<true> {
 	return {
 		...ALPHA_FIRST_SPECIES_CACHE_ROW,
 		species_id: BLUE_TIT_SPECIES_ID,
@@ -146,10 +146,17 @@ function mockAuthenticatedClient({
 }
 
 function mockCoreStats(
-	rows: AuthorisedStatsRow[] = [buildCountsRow()],
+	rows: AuthorisedStatsRow<true>[] = [buildCountsRow()],
 	accessLevel: GroupSummaryAccessLevel = 'own'
 ) {
-	vi.mocked(fetchAuthorisedCoreStats).mockResolvedValue({ accessLevel, rows });
+	// `fetchAuthorisedCoreStats` resolves its row type from the params literal
+	// (#1424), so the mock is typed through the same `group_by_species: true`
+	// instantiation `spp-data.ts`'s own call site uses — without the explicit
+	// type argument, `vi.mocked` would only see the signature's default
+	// (all-species-combined) instantiation and reject these by-species rows.
+	vi.mocked(
+		fetchAuthorisedCoreStats<{ group_by_species: true }>
+	).mockResolvedValue({ accessLevel, rows });
 }
 
 const rowFor = (rows: StatsCacheBySpeciesResult[], speciesName: string) =>

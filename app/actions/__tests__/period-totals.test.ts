@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { fetchPeriodTotals } from '../period-totals';
-import type { StatsCacheBySpeciesResult } from '@/modules/stats';
+import type { StatsCacheResult } from '@/modules/stats';
 
 vi.mock('@/app/lib/auth/group-summary-access', () => ({
 	fetchAuthorisedCoreStats: vi.fn()
 }));
 
-const ROW = { encounter_count: 5 } as StatsCacheBySpeciesResult;
+const ROW = { encounter_count: 5 } as StatsCacheResult;
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 
 describe('fetchPeriodTotals — routes through the group-summary access helper', () => {

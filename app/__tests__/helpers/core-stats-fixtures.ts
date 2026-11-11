@@ -1,4 +1,7 @@
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	StatsCacheBySpeciesResult,
+	StatsCacheResult
+} from '@/modules/stats/browser';
 import alphaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/alpha.by-species.json';
 import betaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/beta.by-species.json';
 import gammaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/gamma.by-species.json';
@@ -7,17 +10,24 @@ import alphaHomePageSummarySnapshot from '@/test-fixtures/snapshots/tables/Simpl
 import robinAlphaHeadlineSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/robin-alpha.headline.json';
 
 /**
- * A `StatsCacheBySpeciesResult` row fixture: flat overrides merged over sensible
- * defaults, covering every column the now-deleted `core_stats` RPC
- * returned (`modules/stats`' `StatsCacheBySpeciesResult` — the
- * `SimpleStatsCacheBySpecies` row minus bookkeeping — is the type that shape
+ * An all-species-combined (`StatsCacheResult`) row fixture: flat overrides
+ * merged over sensible defaults, covering every column the now-deleted
+ * `core_stats` RPC returned (`modules/stats`' `StatsCacheResult` — the
+ * `SimpleStatsCache` row minus bookkeeping — is the type that shape
  * now lives in, #1244/#1372) plus the 8
  * `max_weight`/`avg_weight`/`min_weight`/`median_weight`/`max_wing`/
  * `avg_wing`/`min_wing`/`median_wing` fields several call sites override,
  * which that type carries on the same row (#1372 — they used to come from a
- * separate `biometrics_stats` source, #827). Coerced via
- * `as StatsCacheBySpeciesResult` rather than constructing a full-fat instance, per this
- * repo's fixture-builder convention.
+ * separate `biometrics_stats` source, #827).
+ *
+ * The combined grain, not the by-species one (#1424): the default
+ * `species_name` is `null`, which is exactly what the all-species-combined
+ * member declares and what every ungrouped read path actually returns — this
+ * builder only ever borrowed the by-species type because
+ * `fetchAuthorisedCoreStats` used to declare that for both grains. A test that
+ * wants a *by-species* row spreads one of these and names the species, which
+ * typechecks into `StatsCacheBySpeciesResult` with no cast:
+ * `{ ...buildCoreStatsRow(), species_name: 'Robin' }`.
  *
  * Was independently hand-rolled ~13 times across test files
  * (`buildStat`/`buildAggregateRow`/`buildDayStat`/`buildYearlyStat`/
@@ -28,8 +38,8 @@ import robinAlphaHeadlineSnapshot from '@/test-fixtures/snapshots/tables/SimpleS
  * an override here instead of forking this builder.
  */
 export function buildCoreStatsRow(
-	overrides: Partial<StatsCacheBySpeciesResult> = {}
-): StatsCacheBySpeciesResult {
+	overrides: Partial<StatsCacheResult> = {}
+): StatsCacheResult {
 	return {
 		species_name: null,
 		time_period: '2026-01-01',
@@ -60,7 +70,7 @@ export function buildCoreStatsRow(
 		adult_enc_count: 1,
 		unknown_age_enc_count: 0,
 		// The four young/postjuv transition counts both cache tables carry
-		// (#1417) — absent from this literal for as long as `StatsCacheBySpeciesResult` was
+		// (#1417) — absent from this literal for as long as the stats row type was
 		// a hand-maintained 21-column type that didn't declare them, so a
 		// "whole row" fixture was in fact four columns short at runtime.
 		new_young_bird_count: 8,
@@ -68,7 +78,25 @@ export function buildCoreStatsRow(
 		new_postjuv_juv_enc_count: 1,
 		postjuv_juv_enc_count: 3,
 		...overrides
-	} as StatsCacheBySpeciesResult;
+	};
+}
+
+/**
+ * The by-species grain of `buildCoreStatsRow` (#1424): the same columns with a
+ * real `species_name`, for a test feeding a `StatsCacheBySpeciesResult` slot —
+ * a species-filtered cache read, the `/species` list page's rows, or anything
+ * `deriveSpeciesTotalsRow` consumes. Named for the grain rather than for a
+ * species, since `species_name` is just another override; the default is a
+ * species that exists in the seed data so a rendered name is recognisable.
+ */
+export function buildBySpeciesStatsRow(
+	overrides: Partial<StatsCacheBySpeciesResult> = {}
+): StatsCacheBySpeciesResult {
+	const { species_name: speciesName, ...countOverrides } = overrides;
+	return {
+		...buildCoreStatsRow(countOverrides),
+		species_name: speciesName ?? 'Robin'
+	};
 }
 
 /**
@@ -77,15 +105,19 @@ export function buildCoreStatsRow(
  * exact date — pass `time_period` as an override to set a specific date.
  */
 export function buildDailyStatsRow(
-	overrides: Partial<StatsCacheBySpeciesResult> = {}
-): StatsCacheBySpeciesResult {
+	overrides: Partial<StatsCacheResult> = {}
+): StatsCacheResult {
 	return buildCoreStatsRow({ time_period: '2026-08-16', ...overrides });
 }
 
 // Every count/effort column zeroed out, for a calendar month with no sessions
 // in any year of a group's history — the shape a real `'month-squashed'`
 // `group_by_time_period` (#996) row has for such a month.
-const ZERO_MONTH_SQUASHED_STATS: Partial<StatsCacheBySpeciesResult> = {
+// Typed without `species_name` so it can be spread into either grain's
+// builder — it sets no species name of its own either way.
+const ZERO_MONTH_SQUASHED_STATS: Partial<
+	Omit<StatsCacheResult, 'species_name'>
+> = {
 	session_count: 0,
 	avg_encounters_per_session: 0,
 	max_per_session: 0,
@@ -99,13 +131,11 @@ const ZERO_MONTH_SQUASHED_STATS: Partial<StatsCacheBySpeciesResult> = {
 	postjuv_bird_count: 0,
 	adult_bird_count: 0,
 	unknown_age_bird_count: 0,
-	...({
-		pullus_enc_count: 0,
-		juv_enc_count: 0,
-		postjuv_enc_count: 0,
-		adult_enc_count: 0,
-		unknown_age_enc_count: 0
-	} as Partial<StatsCacheBySpeciesResult>)
+	pullus_enc_count: 0,
+	juv_enc_count: 0,
+	postjuv_enc_count: 0,
+	adult_enc_count: 0,
+	unknown_age_enc_count: 0
 };
 
 /**
@@ -119,13 +149,31 @@ const ZERO_MONTH_SQUASHED_STATS: Partial<StatsCacheBySpeciesResult> = {
  * return 12 rows just like the real one does.
  */
 export function buildMonthSquashedFixture(
+	overridesByMonth: Partial<Record<number, Partial<StatsCacheResult>>> = {}
+): StatsCacheResult[] {
+	return Array.from({ length: 12 }, (_unused, index) => {
+		const month = index + 1;
+		return buildCoreStatsRow({
+			time_period: `2000-${String(month).padStart(2, '0')}-01`,
+			...ZERO_MONTH_SQUASHED_STATS,
+			...overridesByMonth[month]
+		});
+	});
+}
+
+/**
+ * The by-species grain of `buildMonthSquashedFixture` (#1424) — same 12 dense
+ * sentinel-year rows, for the species detail page's combined-month tab, whose
+ * rows come from a species-filtered cache read.
+ */
+export function buildBySpeciesMonthSquashedFixture(
 	overridesByMonth: Partial<
 		Record<number, Partial<StatsCacheBySpeciesResult>>
 	> = {}
 ): StatsCacheBySpeciesResult[] {
 	return Array.from({ length: 12 }, (_unused, index) => {
 		const month = index + 1;
-		return buildCoreStatsRow({
+		return buildBySpeciesStatsRow({
 			time_period: `2000-${String(month).padStart(2, '0')}-01`,
 			...ZERO_MONTH_SQUASHED_STATS,
 			...overridesByMonth[month]
@@ -178,26 +226,22 @@ function resolveBySpeciesRow(
 
 /**
  * Resolves a raw `SimpleStatsCache` (all-species-combined) snapshot row into
- * a `StatsCacheBySpeciesResult` — `species_name: null`, matching what the real
+ * a `StatsCacheResult` — `species_name: null`, matching what the real
  * all-species read path returns (the table carries no species relationship
- * to flatten at all).
+ * to flatten at all), and now typed as the grain it actually is rather than
+ * borrowing the by-species member (#1424).
  */
-function resolveAllSpeciesRow(
-	row: Record<string, unknown>
-): StatsCacheBySpeciesResult {
-	// Two independent reasons the double assertion can't be downgraded here
-	// (both re-probed in #1419, which deleted the last of the stale aliases):
-	// spreading a bare index signature contributes no named properties at all,
-	// so the literal is `{ species_name: null }` as far as `tsc` is concerned
-	// and fails the "sufficient overlap" check against all 31 of the row type's
-	// columns — even though every one of them is there at runtime; and the
-	// honest `species_name: null` contradicts this type's `species_name: string`
-	// anyway. The second half is the compiler-invisible grain lie #1424 fixes by
-	// making the read path generic on `group_by_species`; until then these
-	// all-species-combined exports have to borrow the by-species type, because
-	// that is what `fetchAuthorisedCoreStats` still declares it returns.
+function resolveAllSpeciesRow(row: Record<string, unknown>): StatsCacheResult {
+	// The double assertion survives the #1424 retyping, for the one of its two
+	// original reasons the grain had nothing to do with: spreading a bare index
+	// signature contributes no named properties at all, so the literal is
+	// `{ species_name: null }` as far as `tsc` is concerned and fails the
+	// "sufficient overlap" check against all 31 of the row type's columns — even
+	// though every one of them is there at runtime. (The other reason — the
+	// honest `species_name: null` contradicting a `species_name: string` — is
+	// gone: the target type declares the `null`.)
 	// eslint-disable-next-line no-restricted-syntax -- see comment above
-	return { ...row, species_name: null } as unknown as StatsCacheBySpeciesResult;
+	return { ...row, species_name: null } as unknown as StatsCacheResult;
 }
 
 /**
@@ -213,7 +257,7 @@ export const GAMMA_CORE_STATS_BY_SPECIES: StatsCacheBySpeciesResult[] =
 	gammaBySpeciesSnapshot.map(resolveBySpeciesRow);
 
 /** Alpha's all-time, ungrouped totals row — powers `fetchSummaryStats` called with no date window (the base `/summary` route). */
-export const ALPHA_CORE_STATS_SUMMARY_TOTALS: StatsCacheBySpeciesResult | null =
+export const ALPHA_CORE_STATS_SUMMARY_TOTALS: StatsCacheResult | null =
 	alphaSummaryTotalsSnapshot
 		? resolveAllSpeciesRow(alphaSummaryTotalsSnapshot)
 		: null;
@@ -225,9 +269,9 @@ export const ALPHA_CORE_STATS_SUMMARY_TOTALS: StatsCacheBySpeciesResult | null =
  * returns). Powers `fetchHomePageSummaryStats` (`app/(routes)/page.tsx`).
  */
 export const ALPHA_HOME_PAGE_SUMMARY_STATS: {
-	allTime: StatsCacheBySpeciesResult | null;
-	thisYear: StatsCacheBySpeciesResult | null;
-	lastYear: StatsCacheBySpeciesResult | null;
+	allTime: StatsCacheResult | null;
+	thisYear: StatsCacheResult | null;
+	lastYear: StatsCacheResult | null;
 } = {
 	allTime: alphaHomePageSummarySnapshot.allTime
 		? resolveAllSpeciesRow(alphaHomePageSummarySnapshot.allTime)
