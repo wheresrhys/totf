@@ -1,9 +1,15 @@
+import { useState } from 'react';
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { PeriodTotalsTable } from '../PeriodTotalsTable';
+import { EmptyMonthsToggle } from '../../lib/EmptyMonthsToggle';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
 import type { StatsCacheResult } from '@/modules/stats/browser';
+
+function switchToBiometrics() {
+	fireEvent.click(screen.getByRole('radio', { name: 'Biometrics' }));
+}
 
 // The real header <th>s live in the `<thead>` row without a `data-testid` —
 // `above-header-row` (the "Aggregate by" toggle row) and `totals-row` are
@@ -395,6 +401,200 @@ describe('PeriodTotalsTable', () => {
 				expect(cell('Adult')).toBe('4'); // adult_enc_count
 				expect(cell('Not aged')).toBe('1'); // unknown_age_enc_count
 			});
+		});
+	});
+
+	describe('breakdown column block', () => {
+		const stat = buildCoreStatsRow({
+			time_period: '2026-01-01',
+			max_weight: 20.1,
+			max_wing: 90
+		});
+
+		it('renders the counts breakdown columns by default', () => {
+			render(
+				<PeriodTotalsTable
+					timeInterval="year"
+					rows={[stat]}
+					firstColumnHeader="Year"
+					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
+				/>
+			);
+			const headers = getColumnHeaders().map((header) => header.textContent);
+			expect(headers).toEqual(
+				expect.arrayContaining([
+					'New',
+					'Retrap',
+					'Pulli',
+					'Juv',
+					'Postjuv',
+					'Adult',
+					'Not aged'
+				])
+			);
+			expect(headers).not.toContain('Max weight (g)');
+		});
+
+		it('renders the biometric breakdown columns when CountsBiometricsToggle is switched to biometrics', () => {
+			render(
+				<PeriodTotalsTable
+					timeInterval="year"
+					rows={[stat]}
+					firstColumnHeader="Year"
+					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
+				/>
+			);
+			switchToBiometrics();
+
+			const headers = getColumnHeaders().map((header) => header.textContent);
+			expect(headers).toEqual(
+				expect.arrayContaining([
+					'Max weight (g)',
+					'Avg weight (g)',
+					'Min weight (g)',
+					'Median weight (g)',
+					'Max wing (mm)',
+					'Avg wing (mm)',
+					'Min wing (mm)',
+					'Median wing (mm)'
+				])
+			);
+			expect(headers).not.toContain('New');
+			expect(getCellTextByHeading('Max weight (g)', 0)).toBe('20.1');
+			expect(getCellTextByHeading('Max wing (mm)', 0)).toBe('90');
+		});
+
+		it('always renders every column up to and including the "Birds" column in both modes', () => {
+			render(
+				<PeriodTotalsTable
+					timeInterval="year"
+					rows={[stat]}
+					firstColumnHeader="Year"
+					buildHref={(timePeriod) => `/summary/${timePeriod.slice(0, 4)}`}
+				/>
+			);
+			const sharedHeaders = [
+				'Year',
+				'Sessions',
+				'Species',
+				'Encounters',
+				'Busiest session',
+				'Birds'
+			];
+			expect(getColumnHeaders().map((header) => header.textContent)).toEqual(
+				expect.arrayContaining(sharedHeaders)
+			);
+
+			switchToBiometrics();
+
+			expect(getColumnHeaders().map((header) => header.textContent)).toEqual(
+				expect.arrayContaining(sharedHeaders)
+			);
+		});
+	});
+
+	describe('CountsBiometricsToggle visibility', () => {
+		it('renders the toggle on the Year totals tab (timeInterval: "year")', () => {
+			render(
+				<PeriodTotalsTable
+					timeInterval="year"
+					rows={[buildCoreStatsRow()]}
+					firstColumnHeader="Year"
+					buildHref={() => '/summary'}
+				/>
+			);
+			expect(screen.getByRole('radio', { name: 'Counts' })).toBeDefined();
+			expect(screen.getByRole('radio', { name: 'Biometrics' })).toBeDefined();
+		});
+
+		it('renders the toggle on the Month totals tab (timeInterval: "month")', () => {
+			render(
+				<PeriodTotalsTable
+					timeInterval="month"
+					rows={[buildCoreStatsRow({ time_period: '2026-08-01' })]}
+					firstColumnHeader="Month"
+					buildHref={() => '/summary'}
+				/>
+			);
+			expect(screen.getByRole('radio', { name: 'Counts' })).toBeDefined();
+			expect(screen.getByRole('radio', { name: 'Biometrics' })).toBeDefined();
+		});
+
+		it('renders the toggle on the Session totals tab (timeInterval: "day"), unlike AggregateByToggle which is hidden there', () => {
+			render(
+				<PeriodTotalsTable
+					timeInterval="day"
+					rows={[buildCoreStatsRow()]}
+					firstColumnHeader="Session"
+					buildHref={() => ''}
+				/>
+			);
+			expect(screen.getByRole('radio', { name: 'Counts' })).toBeDefined();
+			expect(screen.getByRole('radio', { name: 'Biometrics' })).toBeDefined();
+			expect(screen.queryByRole('radio', { name: 'Bird' })).toBeNull();
+			expect(screen.queryByRole('radio', { name: 'Encounter' })).toBeNull();
+		});
+	});
+
+	describe('interaction with AggregateByToggle', () => {
+		// Design decision (#1432): `AggregateByToggle` is hidden while biometrics
+		// mode is active, since its bird/encounter distinction has no effect on
+		// the biometric columns (they carry the same value either way) — see
+		// the comment at the decision point in `PeriodTotalsTable.tsx`.
+		it('hides AggregateByToggle once biometrics mode is switched on, and restores it when switched back to counts', () => {
+			render(
+				<PeriodTotalsTable
+					timeInterval="year"
+					rows={[buildCoreStatsRow()]}
+					firstColumnHeader="Year"
+					buildHref={() => '/summary'}
+				/>
+			);
+			expect(screen.getByRole('radio', { name: 'Bird' })).toBeDefined();
+			expect(screen.getByRole('radio', { name: 'Encounter' })).toBeDefined();
+
+			switchToBiometrics();
+
+			expect(screen.queryByRole('radio', { name: 'Bird' })).toBeNull();
+			expect(screen.queryByRole('radio', { name: 'Encounter' })).toBeNull();
+			// The Counts/Biometrics toggle itself stays rendered and usable.
+			expect(screen.getByRole('radio', { name: 'Counts' })).toBeDefined();
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Counts' }));
+
+			expect(screen.getByRole('radio', { name: 'Bird' })).toBeDefined();
+			expect(screen.getByRole('radio', { name: 'Encounter' })).toBeDefined();
+		});
+	});
+
+	describe('multi-toggle layout (Month totals tab)', () => {
+		function MonthTotalsTableWithEmptyMonthsToggle() {
+			const [hideEmptyMonths, setHideEmptyMonths] = useState(true);
+			return (
+				<PeriodTotalsTable
+					timeInterval="month"
+					rows={[buildCoreStatsRow({ time_period: '2026-08-01' })]}
+					firstColumnHeader="Month"
+					buildHref={() => '/summary'}
+					extraControls={
+						<EmptyMonthsToggle
+							value={hideEmptyMonths}
+							onChange={setHideEmptyMonths}
+						/>
+					}
+				/>
+			);
+		}
+
+		it('renders AggregateByToggle, CountsBiometricsToggle and EmptyMonthsToggle together without one replacing another', () => {
+			render(<MonthTotalsTableWithEmptyMonthsToggle />);
+
+			expect(screen.getByRole('radio', { name: 'Bird' })).toBeDefined();
+			expect(screen.getByRole('radio', { name: 'Encounter' })).toBeDefined();
+			expect(screen.getByRole('radio', { name: 'Counts' })).toBeDefined();
+			expect(screen.getByRole('radio', { name: 'Biometrics' })).toBeDefined();
+			expect(screen.getByRole('radio', { name: 'Show' })).toBeDefined();
+			expect(screen.getByRole('radio', { name: 'Hide' })).toBeDefined();
 		});
 	});
 });

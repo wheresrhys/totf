@@ -7,7 +7,10 @@
 // file that needs it imports it directly from `@/modules/stats/browser` rather
 // than through this module.
 
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	BiometricStatName,
+	StatsCacheBySpeciesResult
+} from '@/modules/stats/browser';
 
 export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
 
@@ -16,7 +19,10 @@ export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
 // `StatsTableColumnConfigs`'s `StandardField` union rather than following
 // `SpeciesTotalsRow`'s `*Count`-suffixed convention, so `PeriodTotalsRow` can
 // be used directly as `PeriodTotalsTable`'s `SortableTable` row model without
-// a remapping step — see `buildStandardColumnConfigs`.
+// a remapping step — see `buildStandardColumnConfigs`. The 8 `BiometricStatName`
+// fields (#1432) are intersected on rather than renamed, so they line up
+// directly with `buildBiometricColumnConfigs`'s own `BiometricStatName` keys
+// with no remapping step either — same reasoning, same shape.
 export type PeriodTotalsRow = {
 	timePeriod: string;
 	sessionsCount: number;
@@ -31,7 +37,7 @@ export type PeriodTotalsRow = {
 	postjuv: number;
 	adults: number;
 	unknownAge: number;
-};
+} & Record<BiometricStatName, number | null>;
 
 export type SpeciesTotalsRow = {
 	speciesName: string;

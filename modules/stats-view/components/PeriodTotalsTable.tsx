@@ -9,6 +9,7 @@ import {
 } from '../lib/period-totals';
 import type { PeriodTotalsGrouping, PeriodTotalsRow } from '../types';
 import {
+	buildBiometricColumnConfigs,
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
 	createNameLinkCell
@@ -17,6 +18,7 @@ import {
 	AggregateByToggle,
 	type AggregateByValue
 } from '../lib/AggregateByToggle';
+import { CountsBiometricsToggle } from '../lib/CountsBiometricsToggle';
 import {
 	SortableTable,
 	getFormattedValue,
@@ -30,7 +32,8 @@ function buildColumnConfigs({
 	hasPulli,
 	aggregateBy,
 	showSpeciesColumn,
-	showBusiestSession
+	showBusiestSession,
+	showBiometrics
 }: {
 	timeInterval: PeriodTotalsGrouping;
 	firstColumnHeader: string;
@@ -38,6 +41,7 @@ function buildColumnConfigs({
 	aggregateBy: string;
 	showSpeciesColumn: boolean;
 	showBusiestSession: boolean;
+	showBiometrics: boolean;
 }): Partial<Record<keyof PeriodTotalsRow, ColumnConfig>> {
 	return {
 		timePeriod: {
@@ -57,7 +61,17 @@ function buildColumnConfigs({
 			? { maxPerSession: { label: 'Busiest session' } }
 			: {}),
 		individualsCount: { label: 'Birds' },
-		...buildStandardColumnConfigs<PeriodTotalsRow>(hasPulli, true, aggregateBy)
+		// The breakdown block after "Birds" (#1432) — either the age-bucket
+		// counts (today's default) or the 8 wing/weight biometric columns,
+		// switched by `CountsBiometricsToggle`. Every column above is
+		// unaffected by either mode.
+		...(showBiometrics
+			? buildBiometricColumnConfigs()
+			: buildStandardColumnConfigs<PeriodTotalsRow>(
+					hasPulli,
+					true,
+					aggregateBy
+				))
 	};
 }
 
@@ -91,6 +105,9 @@ export function PeriodTotalsTable({
 	// 'bird' whenever `SummaryTotalsSection` remounts this table for a
 	// different tab, per #604.
 	const [aggregateBy, setAggregateBy] = useState<AggregateByValue>('bird');
+	// Counts vs biometrics breakdown block (#1432) — same reset-on-remount
+	// behaviour as `aggregateBy` above, defaulting to counts (`false`).
+	const [showBiometrics, setShowBiometrics] = useState(false);
 
 	if (rows.length === 0) {
 		return <p>No data recorded.</p>;
@@ -112,7 +129,8 @@ export function PeriodTotalsTable({
 		aggregateBy,
 		showSpeciesColumn,
 		showBusiestSession,
-		timeInterval
+		timeInterval,
+		showBiometrics
 	});
 
 	const totalsRow = totalsStats
@@ -167,9 +185,20 @@ export function PeriodTotalsTable({
 	return (
 		<>
 			<div data-test-id="above-header-row" className="m-2 flex gap-4">
-				{timeInterval !== 'day' && (
+				{/* Design decision (#1432): `AggregateByToggle`'s bird/encounter
+				    distinction only affects the counts breakdown block, which
+				    biometrics mode replaces with the 8 wing/weight columns —
+				    identical regardless of aggregation. Hidden while biometrics
+				    mode is active for the same reason it's already hidden for
+				    "day": left visible, it would have no effect on anything
+				    rendered. */}
+				{timeInterval !== 'day' && !showBiometrics && (
 					<AggregateByToggle value={aggregateBy} onChange={setAggregateBy} />
 				)}
+				<CountsBiometricsToggle
+					value={showBiometrics}
+					onChange={setShowBiometrics}
+				/>
 				{extraControls ?? null}
 			</div>
 			<SortableTable<StatsResult, PeriodTotalsRow>
