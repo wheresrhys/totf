@@ -29,7 +29,6 @@ import { parseMonthAbbreviation } from '@/modules/stats-view';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { CoreStatsResult } from '@/app/models/db';
 import {
 	buildMonthTotalsRows,
 	type MonthTotalsRow
@@ -71,7 +70,7 @@ async function getSummaryYearOrMonthPageParams(
 export type PageData =
 	| {
 			year: number;
-			summaryStats: CoreStatsResult | null;
+			summaryStats: StatsCacheBySpeciesResult | null;
 			monthTotals: MonthTotalsRow[];
 			fromDate: string;
 			toDate: string;
@@ -79,10 +78,10 @@ export type PageData =
 	  }
 	| {
 			squashedMonth: number;
-			summaryStats: CoreStatsResult | null;
+			summaryStats: StatsCacheBySpeciesResult | null;
 			speciesTotalsForMonth: StatsCacheBySpeciesResult[];
-			yearTotalsForMonth: CoreStatsResult[];
-			sessionTotalsForMonth: CoreStatsResult[];
+			yearTotalsForMonth: StatsCacheBySpeciesResult[];
+			sessionTotalsForMonth: StatsCacheBySpeciesResult[];
 			initialTabData?: { tabId: string; data: unknown };
 	  };
 

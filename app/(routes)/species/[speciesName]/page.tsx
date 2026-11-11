@@ -30,8 +30,8 @@ import {
 	getSpeciesKnownTabIds,
 	buildSpeciesTotalsTabs
 } from './species-tabs';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats';
 
-import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
 type PageProps = {
@@ -79,7 +79,7 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
 
 // Fetches the species page's headline stats row from the materialized
 // `SimpleStatsCacheBySpecies` table (#1222) — `fetchSpeciesStatsCacheRows`
-// (`sp-data.ts`) already returns the merged `CoreStatsWithBiometrics` shape
+// (`sp-data.ts`) already returns the merged `StatsCacheBySpeciesResult` shape
 // per row, so there is no separate biometrics_stats call/merge to do here any
 // more (see that file's own doc comment on `mergeBiometricsFields`'s one
 // remaining call site). `fromDate`/`toDate`/`monthFilter` are never a
@@ -95,7 +95,7 @@ export async function getSpeciesStats(
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
-): Promise<CoreStatsWithBiometrics[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	if (fromDate && toDate && isWholeCalendarYear(fromDate, toDate)) {
 		return fetchSpeciesStatsCacheRows({
 			speciesName: species,

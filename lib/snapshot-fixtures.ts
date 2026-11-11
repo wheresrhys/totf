@@ -63,7 +63,7 @@
  * #1246 removed the three `biometrics_stats/*` fixtures along with the RPC that
  * produced them: every app call site now reads the already-materialized
  * `SimpleStatsCache`/`SimpleStatsCacheBySpecies` tables (#1223/#1244), and
- * `BiometricsStatsResult` became an app-owned TypeScript type rather than a view
+ * `StatsCacheBySpeciesResult` became an app-owned TypeScript type rather than a view
  * over a Postgres composite (#1245) — so there is no database source left for
  * those three to be checked against. App tests build those 8 columns with
  * `app/__tests__/helpers/biometrics-stats-fixtures.ts` instead.

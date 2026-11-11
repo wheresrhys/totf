@@ -45,7 +45,7 @@ export function formatMonthYearLabel(
 // what this row honestly is: `species_name` is `null`, and a month with no
 // sessions has no species to attribute the zeros to. That is also what removes
 // the `as unknown as` double assertion this used to need (and its
-// `no-restricted-syntax` disable): the old `CoreStatsResult` declared
+// `no-restricted-syntax` disable): the old `StatsCacheBySpeciesResult` declared
 // `species_name: string`, so the honest `null` could only be forced past `tsc`
 // with assignability checking switched off entirely.
 //

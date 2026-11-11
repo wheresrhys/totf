@@ -42,7 +42,7 @@ export type StatsCacheReadParams = {
  * Unlike a hand-picked column-subset reader, this one always `select('*')`s
  * — that's the entire point of generalising: a caller narrows the returned
  * `Record<string, unknown>[]` to whatever result type it needs (e.g.
- * `CoreStatsResult`) itself, once it migrates onto this function, rather than
+ * `StatsCacheBySpeciesResult`) itself, once it migrates onto this function, rather than
  * this function hard-coding one caller's column list.
  *
  * - **Table**: `SimpleStatsCacheBySpecies` when `bySpecies`, else

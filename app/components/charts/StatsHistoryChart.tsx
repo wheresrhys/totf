@@ -1,13 +1,14 @@
 'use client';
 import { type LineChartData } from 'react-chartkick';
 import type {
-	CoreStatsResult,
-	CoreStatsWithBiometrics,
 	DemographicsStatsResult,
 	ArrivalsStatsResult
 } from '@/app/models/db';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
-export function getCounts(statsHistory: CoreStatsResult[]): LineChartData[] {
+export function getCounts(
+	statsHistory: StatsCacheBySpeciesResult[]
+): LineChartData[] {
 	return [
 		{
 			name: 'encounters',
@@ -38,7 +39,7 @@ export function getCounts(statsHistory: CoreStatsResult[]): LineChartData[] {
 // for identical filter args. `demographicsStats`' row order drives the output
 // order for all three series.
 export function getReturningVsNew(
-	statsHistory: CoreStatsResult[],
+	statsHistory: StatsCacheBySpeciesResult[],
 	demographicsStats: DemographicsStatsResult[]
 ): LineChartData[] {
 	const statsHistoryByPeriod = new Map(
@@ -233,7 +234,7 @@ export function getArrivals(
 }
 
 export function getSizes(
-	statsHistory: CoreStatsWithBiometrics[]
+	statsHistory: StatsCacheBySpeciesResult[]
 ): LineChartData[] {
 	return [
 		{

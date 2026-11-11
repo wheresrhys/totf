@@ -29,7 +29,6 @@ import {
 } from '@/modules/highlights';
 import { type TabConfig } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import type { SummaryTabParams } from './summary-tab-params';
 
@@ -49,7 +48,7 @@ export function fetchSummarySpeciesTotalsData(
 	return fetchSpeciesData(viewedGroup, params.fromDate, params.toDate);
 }
 
-export type SummarySessionTotalsData = CoreStatsResult[];
+export type SummarySessionTotalsData = StatsCacheBySpeciesResult[];
 
 export function fetchSummarySessionTotalsData(
 	params: SummaryTabParams,

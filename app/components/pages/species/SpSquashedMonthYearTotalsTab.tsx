@@ -4,9 +4,9 @@ import {
 	formatMonthYearLabel,
 	type MonthTotalsRow
 } from '@/app/lib/month-totals';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // `fetchSquashedMonthYearTotalsTabData(..., 'year', ..., squashedMonth)`
 // returns one row per year (bucketed by year, but every column already
@@ -14,7 +14,7 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 // `MonthTotalsRow` so `formatMonthYearLabel` can print "January 2026" rather
 // than plain "2026" (explicit spec).
 function toYearTotalsRows(
-	rows: CoreStatsResult[],
+	rows: StatsCacheBySpeciesResult[],
 	squashedMonth: number
 ): MonthTotalsRow[] {
 	return rows.map((stats) => ({
@@ -49,7 +49,7 @@ export function SpSquashedMonthYearTotalsTab({
 	// route is squashed-month-scoped, which is also what supplies
 	// `monthFilter` on the shared `totalsTabParams`.
 	const squashedMonth = params.monthFilter as number;
-	const yearTotals = (data as CoreStatsResult[] | null) ?? [];
+	const yearTotals = (data as StatsCacheBySpeciesResult[] | null) ?? [];
 
 	const yearTotalsRows = toYearTotalsRows(yearTotals, squashedMonth);
 	const yearTotalsRowByTimePeriod = new Map(

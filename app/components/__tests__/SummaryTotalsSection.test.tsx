@@ -9,7 +9,6 @@ import {
 } from '@testing-library/react';
 import { SummaryTotalsSection } from '../SummaryTotalsSection';
 import { buildMonthTotalsRows } from '@/app/lib/month-totals';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import {
 	getCellTextByHeading,
@@ -21,6 +20,7 @@ import {
 	buildMonthSquashedFixture,
 	ALPHA_CORE_STATS_BY_SPECIES
 } from '@/app/__tests__/helpers/core-stats-fixtures';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 const fetchSpeciesDataMock = vi.fn();
 vi.mock('@/app/actions/spp-data', () => ({
@@ -49,12 +49,12 @@ const summaryStats = {
 	...speciesStats[0],
 	session_count: 9,
 	bird_count: 99
-} as CoreStatsResult;
+} as StatsCacheBySpeciesResult;
 
 // Monthly (year, month) stats as `fetchPeriodStats(_, 'month')` returns them —
 // two Januaries and one August. Feeds only the all-time Month-totals tab's "By
 // year" (Combine years OFF) view.
-const monthlyPeriodStats: CoreStatsResult[] = [
+const monthlyPeriodStats: StatsCacheBySpeciesResult[] = [
 	buildCoreStatsRow({
 		time_period: '2020-01-01',
 		session_count: 4,
@@ -81,22 +81,23 @@ const monthlyPeriodStats: CoreStatsResult[] = [
 // deliberately NOT the sum of `monthlyPeriodStats`' two January rows (which
 // would be 58/24) — that's exactly the double-count the fix removes. Feeds
 // only the all-time Month-totals tab's "Combined" (Combine years ON) view.
-const monthSquashedTotals: CoreStatsResult[] = buildMonthSquashedFixture({
-	1: {
-		session_count: 10,
-		encounter_count: 75,
-		bird_count: 50,
-		species_count: 7,
-		pullus_bird_count: 2,
-		...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
-	},
-	8: {
-		session_count: 2,
-		encounter_count: 11,
-		bird_count: 9,
-		species_count: 3
-	}
-});
+const monthSquashedTotals: StatsCacheBySpeciesResult[] =
+	buildMonthSquashedFixture({
+		1: {
+			session_count: 10,
+			encounter_count: 75,
+			bird_count: 50,
+			species_count: 7,
+			pullus_bird_count: 2,
+			...({ pullus_enc_count: 5 } as Partial<StatsCacheBySpeciesResult>)
+		},
+		8: {
+			session_count: 2,
+			encounter_count: 11,
+			bird_count: 9,
+			species_count: 3
+		}
+	});
 
 describe('SummaryTotalsSection', () => {
 	beforeEach(() => {
@@ -757,7 +758,7 @@ describe('SummaryTotalsSection', () => {
 						buildCoreStatsRow({
 							time_period: '2020-01-01',
 							pullus_bird_count: 2,
-							...({ pullus_enc_count: 5 } as Partial<CoreStatsResult>)
+							...({ pullus_enc_count: 5 } as Partial<StatsCacheBySpeciesResult>)
 						})
 					]);
 					render(<SummaryTotalsSection {...allTimeProps} />);
@@ -851,9 +852,9 @@ describe('SummaryTotalsSection', () => {
 
 	describe('lazy Species totals fetch', () => {
 		it('shows a loading indicator immediately after the Species tab is selected, before the fetch resolves', async () => {
-			let resolveFetch: (value: CoreStatsResult[]) => void = () => {};
+			let resolveFetch: (value: StatsCacheBySpeciesResult[]) => void = () => {};
 			fetchSpeciesDataMock.mockReturnValue(
-				new Promise<CoreStatsResult[]>((resolve) => {
+				new Promise<StatsCacheBySpeciesResult[]>((resolve) => {
 					resolveFetch = resolve;
 				})
 			);

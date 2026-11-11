@@ -1,8 +1,8 @@
 'use client';
 import { PeriodTotalsTable } from '@/modules/stats-view';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // Pure presentational `TabConfig.TabComponent` (#1065) — fetching/loading/error
 // state now lives in `TabContent` (#1057), driven by `fetchYearTotalsTabData`
@@ -20,7 +20,7 @@ export function SpYearTotalsTab({
 	data: unknown;
 	viewedGroup: ViewedGroup;
 }) {
-	const yearTotals = data as CoreStatsResult[] | null;
+	const yearTotals = data as StatsCacheBySpeciesResult[] | null;
 
 	return (
 		<PeriodTotalsTable

@@ -1,8 +1,8 @@
 'use server';
 import { fetchAuthorisedCoreStats } from '@/app/lib/auth/group-summary-access';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { TemporalUnit } from '@/app/models/temporal-unit';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats';
 
 /**
  * Page-wide (ungrouped) totals for a summary period — no `group_by_species`/
@@ -13,7 +13,7 @@ export async function fetchSummaryStats(
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
-): Promise<CoreStatsResult | null> {
+): Promise<StatsCacheBySpeciesResult | null> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		...(fromDate ? { from_date: fromDate } : {}),
 		...(toDate ? { to_date: toDate } : {}),
@@ -34,7 +34,7 @@ export async function fetchPeriodStats(
 	fromDate?: string,
 	toDate?: string,
 	monthFilter?: number
-): Promise<CoreStatsResult[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		group_by_species: false,
 		group_by_time_period: timeInterval,
@@ -58,7 +58,7 @@ export async function fetchPeriodStats(
  */
 export async function fetchCombinedMonthTotals(
 	viewedGroup: ViewedGroup
-): Promise<CoreStatsResult[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		group_by_species: false,
 		group_by_time_period: 'month-squashed'
@@ -74,7 +74,7 @@ export async function fetchCombinedMonthTotals(
  */
 export async function fetchYearlyTotals(
 	viewedGroup: ViewedGroup
-): Promise<CoreStatsResult[]> {
+): Promise<StatsCacheBySpeciesResult[]> {
 	const { rows } = await fetchAuthorisedCoreStats(viewedGroup, {
 		group_by_species: false,
 		group_by_time_period: 'year'

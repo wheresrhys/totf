@@ -5,8 +5,9 @@ import recentSessionsSnapshot from '@/test-fixtures/snapshots/tables/Sessions/al
 import { ALPHA_HOME_PAGE_SUMMARY_STATS as summaryStatsSnapshot } from '@/app/__tests__/helpers/core-stats-fixtures';
 import summaryStatsZeroSnapshot from '@/test-fixtures/snapshots/synthetic/zero.home-page-summary.json';
 import type { HomePageSummaryStats } from '../PageContent';
-import type { CoreStatsResult, GroupTicksResult } from '@/app/models/db';
+import type { GroupTicksResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats';
 
 const { mockGetAuthenticatedSupabaseClient, mockReadStatsCacheRows } =
 	vi.hoisted(() => ({
@@ -211,7 +212,7 @@ describe('home page', () => {
 	describe('summary stats table', () => {
 		const summaryStatsRows: {
 			label: string;
-			field: keyof CoreStatsResult;
+			field: keyof StatsCacheBySpeciesResult;
 		}[] = [
 			{ label: 'Sessions', field: 'session_count' },
 			{ label: 'Birds', field: 'bird_count' },
@@ -360,12 +361,14 @@ describe('fetchHomePageSummaryStats', () => {
 	const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 	const client = { from: vi.fn() };
 
-	// Hand-built, minimal `CoreStatsResult` rows — only the columns these
+	// Hand-built, minimal `StatsCacheBySpeciesResult` rows — only the columns these
 	// tests actually read (#895's "hand-built object that only fills in the
 	// columns a test actually reads" exception), tagged with distinguishing
 	// `session_count` values so a wrong-row bug (e.g. this-year/last-year
 	// swapped) would show up as a wrong number rather than passing by luck.
-	function statsRow(overrides: Partial<CoreStatsResult>): CoreStatsResult {
+	function statsRow(
+		overrides: Partial<StatsCacheBySpeciesResult>
+	): StatsCacheBySpeciesResult {
 		// eslint-disable-next-line no-restricted-syntax -- hand-built partial row with null species_name/time_period (#895)
 		return {
 			species_name: null,
@@ -389,7 +392,7 @@ describe('fetchHomePageSummaryStats', () => {
 			unknown_age_enc_count: 0,
 			max_new_per_session: 0,
 			...overrides
-		} as unknown as CoreStatsResult;
+		} as unknown as StatsCacheBySpeciesResult;
 	}
 
 	beforeEach(() => {

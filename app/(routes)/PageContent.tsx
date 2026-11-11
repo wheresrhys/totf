@@ -7,14 +7,15 @@ import {
 } from '@/modules/ui-kit';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { SessionWithEncountersCount } from '../models/session';
-import type { CoreStatsResult, GroupTicksResult } from '../models/db';
+import type { GroupTicksResult } from '../models/db';
 import { SessionsByDay } from '../components/SessionsByDay';
 import { format as formatDate } from 'date-fns';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 export type HomePageSummaryStats = {
-	allTime: CoreStatsResult | null;
-	thisYear: CoreStatsResult | null;
-	lastYear: CoreStatsResult | null;
+	allTime: StatsCacheBySpeciesResult | null;
+	thisYear: StatsCacheBySpeciesResult | null;
+	lastYear: StatsCacheBySpeciesResult | null;
 };
 
 export type PageModel = {
@@ -53,7 +54,7 @@ function RecentSessions({
 }
 const SUMMARY_STATS_ROWS: {
 	label: string;
-	field: keyof CoreStatsResult;
+	field: keyof StatsCacheBySpeciesResult;
 }[] = [
 	{ label: 'Sessions', field: 'session_count' },
 	{ label: 'Birds', field: 'bird_count' },

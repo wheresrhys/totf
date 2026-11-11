@@ -1,9 +1,9 @@
 'use client';
 import { PeriodTotalsTable } from '@/modules/stats-view';
 import { filterEmptySessionRows } from '@/app/lib/month-totals';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { SpeciesTotalsTabParams } from '@/app/actions/sp-data';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 // Pure presentational `TabConfig.TabComponent` (#1065) — see `SpYearTotalsTab`'s
 // comment on `data: unknown` for why the cast below is needed; fetching/
@@ -17,7 +17,7 @@ export function SpSessionTotalsTab({
 	data: unknown;
 	viewedGroup: ViewedGroup;
 }) {
-	const sessionTotals = (data as CoreStatsResult[] | null) ?? [];
+	const sessionTotals = (data as StatsCacheBySpeciesResult[] | null) ?? [];
 	// Always hidden, no toggle — per review feedback on #1382, a zero-count
 	// session row (`SimpleStatsCacheBySpecies`'s day-grain spine zero-filling a
 	// row for every session day the filtered species wasn't encountered) is

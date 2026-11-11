@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getGroupCookie } from '../../../actions/group-cookie';
 import { getAuthenticatedSupabaseClient } from '../group-auth';
 import { resolveGroupPublicAreasForRequest } from '../../group-slug';
-import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
 import {
@@ -10,6 +9,7 @@ import {
 	buildCoreStatsRow
 } from '@/app/__tests__/helpers/core-stats-fixtures';
 import { BiometricStatNames } from '@/modules/stats/browser';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 const { mockPublicSupabaseFrom, mockPublicSupabaseRpc } = vi.hoisted(() => ({
 	mockPublicSupabaseFrom: vi.fn(),
@@ -50,7 +50,7 @@ import {
 function buildCacheRow({
 	speciesName,
 	...overrides
-}: Partial<CoreStatsResult> & { speciesName?: string } = {}) {
+}: Partial<StatsCacheBySpeciesResult> & { speciesName?: string } = {}) {
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to drop the column the cache tables don't have
 	const { species_name, ...cacheColumns } = buildCoreStatsRow(overrides);
 	return {

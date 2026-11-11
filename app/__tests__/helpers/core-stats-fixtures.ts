@@ -1,4 +1,3 @@
-import type { CoreStatsResult } from '@/app/models/db';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import alphaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/alpha.by-species.json';
 import betaBySpeciesSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/beta.by-species.json';
@@ -8,29 +7,29 @@ import alphaHomePageSummarySnapshot from '@/test-fixtures/snapshots/tables/Simpl
 import robinAlphaHeadlineSnapshot from '@/test-fixtures/snapshots/tables/SimpleStatsCacheBySpecies/robin-alpha.headline.json';
 
 /**
- * A `CoreStatsResult` row fixture: flat overrides merged over sensible
+ * A `StatsCacheBySpeciesResult` row fixture: flat overrides merged over sensible
  * defaults, covering every column the now-deleted `core_stats` RPC
- * returned (`CoreStatsResult` in `app/models/db.ts` is the app-owned
+ * returned (`StatsCacheBySpeciesResult` in `app/models/db.ts` is the app-owned
  * standalone type that shape now lives in, #1244) plus the 8
  * `max_weight`/`avg_weight`/`min_weight`/`median_weight`/`max_wing`/
  * `avg_wing`/`min_wing`/`median_wing` fields several call sites still
- * override even though `CoreStatsResult` doesn't declare them (#827
+ * override even though `StatsCacheBySpeciesResult` doesn't declare them (#827
  * moved biometrics onto a separate source) — kept here as harmless extras
  * so every pre-existing override site keeps working unchanged. Coerced via
- * `as CoreStatsResult` rather than constructing a full-fat instance, per this
+ * `as StatsCacheBySpeciesResult` rather than constructing a full-fat instance, per this
  * repo's fixture-builder convention.
  *
  * Was independently hand-rolled ~13 times across test files
  * (`buildStat`/`buildAggregateRow`/`buildDayStat`/`buildYearlyStat`/
  * `buildMonthlyStat`/`buildDailyStat`) — see `reports/test-quality.md`,
- * "Duplicated `CoreStatsResult` row-fixture builders". A caller relying on a
+ * "Duplicated `StatsCacheBySpeciesResult` row-fixture builders". A caller relying on a
  * specific default value from one of those local builders (rather than just
  * overriding the field it cares about) should pass that value explicitly as
  * an override here instead of forking this builder.
  */
 export function buildCoreStatsRow(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
+	overrides: Partial<StatsCacheBySpeciesResult> = {}
+): StatsCacheBySpeciesResult {
 	return {
 		species_name: null,
 		time_period: '2026-01-01',
@@ -61,7 +60,7 @@ export function buildCoreStatsRow(
 		adult_enc_count: 1,
 		unknown_age_enc_count: 0,
 		// The four young/postjuv transition counts both cache tables carry
-		// (#1417) — absent from this literal for as long as `CoreStatsResult` was
+		// (#1417) — absent from this literal for as long as `StatsCacheBySpeciesResult` was
 		// a hand-maintained 21-column type that didn't declare them, so a
 		// "whole row" fixture was in fact four columns short at runtime.
 		new_young_bird_count: 8,
@@ -69,7 +68,7 @@ export function buildCoreStatsRow(
 		new_postjuv_juv_enc_count: 1,
 		postjuv_juv_enc_count: 3,
 		...overrides
-	} as CoreStatsResult;
+	} as StatsCacheBySpeciesResult;
 }
 
 /**
@@ -78,15 +77,15 @@ export function buildCoreStatsRow(
  * exact date — pass `time_period` as an override to set a specific date.
  */
 export function buildDailyStatsRow(
-	overrides: Partial<CoreStatsResult> = {}
-): CoreStatsResult {
+	overrides: Partial<StatsCacheBySpeciesResult> = {}
+): StatsCacheBySpeciesResult {
 	return buildCoreStatsRow({ time_period: '2026-08-16', ...overrides });
 }
 
 // Every count/effort column zeroed out, for a calendar month with no sessions
 // in any year of a group's history — the shape a real `'month-squashed'`
 // `group_by_time_period` (#996) row has for such a month.
-const ZERO_MONTH_SQUASHED_STATS: Partial<CoreStatsResult> = {
+const ZERO_MONTH_SQUASHED_STATS: Partial<StatsCacheBySpeciesResult> = {
 	session_count: 0,
 	avg_encounters_per_session: 0,
 	max_per_session: 0,
@@ -106,7 +105,7 @@ const ZERO_MONTH_SQUASHED_STATS: Partial<CoreStatsResult> = {
 		postjuv_enc_count: 0,
 		adult_enc_count: 0,
 		unknown_age_enc_count: 0
-	} as Partial<CoreStatsResult>)
+	} as Partial<StatsCacheBySpeciesResult>)
 };
 
 /**
@@ -120,8 +119,10 @@ const ZERO_MONTH_SQUASHED_STATS: Partial<CoreStatsResult> = {
  * return 12 rows just like the real one does.
  */
 export function buildMonthSquashedFixture(
-	overridesByMonth: Partial<Record<number, Partial<CoreStatsResult>>> = {}
-): CoreStatsResult[] {
+	overridesByMonth: Partial<
+		Record<number, Partial<StatsCacheBySpeciesResult>>
+	> = {}
+): StatsCacheBySpeciesResult[] {
 	return Array.from({ length: 12 }, (_unused, index) => {
 		const month = index + 1;
 		return buildCoreStatsRow({
@@ -133,7 +134,7 @@ export function buildMonthSquashedFixture(
 }
 
 /**
- * Snapshot-backed `CoreStatsResult`/`CoreStatsWithBiometrics` row fixtures,
+ * Snapshot-backed `StatsCacheBySpeciesResult`/`StatsCacheBySpeciesResult` row fixtures,
  * built from the generated `tables/SimpleStatsCache{,BySpecies}` snapshots
  * (#1244 — the real current source for every row that used to come from a
  * live `core_stats` RPC call, which has no remaining app call site). Follows
@@ -159,7 +160,7 @@ export function buildMonthSquashedFixture(
  * describes for the real read path.
  *
  * `StatsCacheBySpeciesResult` (`modules/stats`) rather than the narrower
- * `CoreStatsWithBiometrics` since #1415: the snapshot is a verbatim cache row,
+ * `StatsCacheBySpeciesResult` since #1415: the snapshot is a verbatim cache row,
  * so it genuinely carries the four `new_young_bird_count`/`new_postjuv_*`/
  * `postjuv_juv_enc_count` columns that type omits, and `fetchSpeciesData` now
  * returns whole rows. The richer type is assignable to the narrower one, so
@@ -177,18 +178,20 @@ function resolveBySpeciesRow(
 
 /**
  * Resolves a raw `SimpleStatsCache` (all-species-combined) snapshot row into
- * a `CoreStatsResult` — `species_name: null`, matching what the real
+ * a `StatsCacheBySpeciesResult` — `species_name: null`, matching what the real
  * all-species read path returns (the table carries no species relationship
  * to flatten at all).
  */
-function resolveAllSpeciesRow(row: Record<string, unknown>): CoreStatsResult {
+function resolveAllSpeciesRow(
+	row: Record<string, unknown>
+): StatsCacheBySpeciesResult {
 	// `row`'s only known shape is an index signature, which doesn't carry
-	// enough named properties for a single `as CoreStatsResult` to pass
+	// enough named properties for a single `as StatsCacheBySpeciesResult` to pass
 	// TypeScript's "sufficient overlap" check — it genuinely has every
-	// CoreStatsResult column at runtime (the raw SimpleStatsCache row), just
+	// StatsCacheBySpeciesResult column at runtime (the raw SimpleStatsCache row), just
 	// not expressible in `row`'s own type.
 	// eslint-disable-next-line no-restricted-syntax -- see comment above
-	return { ...row, species_name: null } as unknown as CoreStatsResult;
+	return { ...row, species_name: null } as unknown as StatsCacheBySpeciesResult;
 }
 
 /**
@@ -204,7 +207,7 @@ export const GAMMA_CORE_STATS_BY_SPECIES: StatsCacheBySpeciesResult[] =
 	gammaBySpeciesSnapshot.map(resolveBySpeciesRow);
 
 /** Alpha's all-time, ungrouped totals row — powers `fetchSummaryStats` called with no date window (the base `/summary` route). */
-export const ALPHA_CORE_STATS_SUMMARY_TOTALS: CoreStatsResult | null =
+export const ALPHA_CORE_STATS_SUMMARY_TOTALS: StatsCacheBySpeciesResult | null =
 	alphaSummaryTotalsSnapshot
 		? resolveAllSpeciesRow(alphaSummaryTotalsSnapshot)
 		: null;
@@ -216,9 +219,9 @@ export const ALPHA_CORE_STATS_SUMMARY_TOTALS: CoreStatsResult | null =
  * returns). Powers `fetchHomePageSummaryStats` (`app/(routes)/page.tsx`).
  */
 export const ALPHA_HOME_PAGE_SUMMARY_STATS: {
-	allTime: CoreStatsResult | null;
-	thisYear: CoreStatsResult | null;
-	lastYear: CoreStatsResult | null;
+	allTime: StatsCacheBySpeciesResult | null;
+	thisYear: StatsCacheBySpeciesResult | null;
+	lastYear: StatsCacheBySpeciesResult | null;
 } = {
 	allTime: alphaHomePageSummarySnapshot.allTime
 		? resolveAllSpeciesRow(alphaHomePageSummarySnapshot.allTime)

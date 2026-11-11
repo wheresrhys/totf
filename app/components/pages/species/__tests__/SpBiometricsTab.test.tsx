@@ -8,9 +8,9 @@ import {
 } from '@testing-library/react';
 import { SpBiometricsTab } from '../SpBiometricsTab';
 import { robinSpeciesStats as speciesStatsWithBiometrics } from '@/app/__tests__/helpers/robin-species-page-fixtures';
-import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { SexedGraphableBird } from '@/app/components/charts/WeightAndWingChart';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
@@ -90,7 +90,7 @@ describe('SpBiometricsTab', () => {
 		const { getSpeciesStatsHistory, fetchGraphableEncounterData } =
 			await loadActions();
 		vi.mocked(getSpeciesStatsHistory).mockResolvedValue(
-			[] as CoreStatsWithBiometrics[]
+			[] as StatsCacheBySpeciesResult[]
 		);
 		vi.mocked(fetchGraphableEncounterData).mockResolvedValue(
 			[] as SexedGraphableBird[]

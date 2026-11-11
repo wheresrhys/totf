@@ -16,7 +16,7 @@ import {
 	type PageData
 } from '../PageContent';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
-import type { CoreStatsWithBiometrics } from '@/app/models/db';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 const {
 	mockFetchYearTotalsTabData,
@@ -47,7 +47,7 @@ function buildFullFatPageData(
 ): Extract<PageData, FullFatPageData> {
 	return {
 		birds: [],
-		speciesStats: buildCoreStatsRow() as CoreStatsWithBiometrics,
+		speciesStats: buildCoreStatsRow() as StatsCacheBySpeciesResult,
 		speciesId: 1,
 		speciesName: 'Robin',
 		...overrides
@@ -557,7 +557,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 
 	describe('Biometrics tab', () => {
 		it('renders SpBiometricsTab with data: null routed through the adapter, with speciesStats/speciesName/speciesId/fromDate/toDate/viewedGroup mapped correctly from params/viewedGroup', async () => {
-			const speciesStats = buildCoreStatsRow() as CoreStatsWithBiometrics;
+			const speciesStats = buildCoreStatsRow() as StatsCacheBySpeciesResult;
 			render(
 				<SpeciesPageContent
 					params={{ speciesName: 'Robin' }}
@@ -615,7 +615,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 						speciesId: 7,
 						speciesStats: buildCoreStatsRow({
 							bird_count: 12
-						}) as CoreStatsWithBiometrics,
+						}) as StatsCacheBySpeciesResult,
 						fromDate: '2026-01-01',
 						toDate: '2026-12-31',
 						initialTabId: 'bird-list'
@@ -634,7 +634,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 		});
 
 		it('derives birdCount from params.speciesStats.bird_count, defaulting to 0 when null', async () => {
-			// `CoreStatsResult.bird_count` is non-null (`NonNullable`-stripped,
+			// `StatsCacheBySpeciesResult.bird_count` is non-null (`NonNullable`-stripped,
 			// app/models/db.ts) even though the underlying RPC can return `null`
 			// for an ungrouped row with zero birds — a literal `null` override
 			// needs the documented `as unknown as` escape hatch (app/CLAUDE.md).
@@ -642,7 +642,7 @@ describe('species detail tabs (dataFetcher: undefined)', () => {
 			const speciesStats = {
 				...buildCoreStatsRow(),
 				bird_count: null
-			} as unknown as CoreStatsWithBiometrics;
+			} as unknown as StatsCacheBySpeciesResult;
 			render(
 				<SpeciesPageContent
 					params={{ speciesName: 'Robin' }}

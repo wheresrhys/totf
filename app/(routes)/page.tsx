@@ -8,12 +8,13 @@ import {
 	type PageModel,
 	type HomePageSummaryStats
 } from './PageContent';
-import type { CoreStatsResult, GroupTicksResult } from '../models/db';
+import type { GroupTicksResult } from '../models/db';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import type { SessionWithEncountersCount } from '../models/session';
 import { recentSessionsQuery } from '@/queries';
 import { readStatsCacheRows } from '@/modules/stats';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats';
 
 export async function fetchRecentSessions(
 	viewedGroup: ViewedGroup
@@ -62,7 +63,7 @@ export async function fetchHomePageSummaryStats(
 			bySpecies: false,
 			temporalUnit: 'year'
 		})
-	])) as [CoreStatsResult[], CoreStatsResult[]];
+	])) as [StatsCacheBySpeciesResult[], StatsCacheBySpeciesResult[]];
 	const allTime = allTimeRows[0] ?? null;
 	const thisYear =
 		yearRows.find((row) => row.time_period === startOfCurrentYear) ?? null;

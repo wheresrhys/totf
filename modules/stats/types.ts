@@ -65,7 +65,7 @@ export type StatsResultFor<BySpecies extends boolean> = BySpecies extends true
 
 /**
  * The 8 wing/weight columns of a stats cell (#1214, #1372) — the shared,
- * iterable home for the field list `app/models/db.ts`'s `BiometricFieldName`
+ * iterable home for the field list `app/models/db.ts`'s `BiometricStatName`
  * and `app/actions/spp-data.ts`'s `BIOMETRIC_CACHE_COLUMNS` each spell out
  * separately today. The const is the single source of truth and
  * `BiometricStatName` derives from it, so the two can't drift apart.

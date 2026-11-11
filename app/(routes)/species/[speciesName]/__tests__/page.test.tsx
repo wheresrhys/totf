@@ -11,8 +11,8 @@ import {
 	robinSpeciesStats as speciesStats
 } from '@/app/__tests__/helpers/robin-species-page-fixtures';
 import type { FullFatPageData } from '../PageContent';
-import type { CoreStatsWithBiometrics } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats';
 
 const VIEWED_GROUP: ViewedGroup = { id: 1, slug: 'alpha' };
 
@@ -70,7 +70,7 @@ describe('species detail page', () => {
 			mockGetAuthenticatedSupabaseClient.mockResolvedValue(makeSpeciesClient());
 			mockFetchPageOfBirds.mockResolvedValue(birds);
 			mockFetchSpeciesStatsCacheRows.mockResolvedValue([
-				speciesStats as CoreStatsWithBiometrics
+				speciesStats as StatsCacheBySpeciesResult
 			]);
 			mockFetchYearTotalsTabData.mockResolvedValue([]);
 			mockFetchMonthTotalsTabData.mockResolvedValue([]);
@@ -179,7 +179,7 @@ describe('getSpeciesStats', () => {
 
 	it('reads the all-time cache row when no period is given', async () => {
 		mockFetchSpeciesStatsCacheRows.mockResolvedValue([
-			speciesStats as CoreStatsWithBiometrics
+			speciesStats as StatsCacheBySpeciesResult
 		]);
 
 		const result = await getSpeciesStats(
@@ -194,13 +194,13 @@ describe('getSpeciesStats', () => {
 			includeBiometrics: true
 		});
 		expect(result[0].bird_count).toBe(
-			(speciesStats as CoreStatsWithBiometrics).bird_count
+			(speciesStats as StatsCacheBySpeciesResult).bird_count
 		);
 	});
 
 	it('reads the matching year-grain row for a whole-calendar-year range', async () => {
 		mockFetchSpeciesStatsCacheRows.mockResolvedValue([
-			speciesStats as CoreStatsWithBiometrics
+			speciesStats as StatsCacheBySpeciesResult
 		]);
 
 		await getSpeciesStats(
@@ -222,7 +222,7 @@ describe('getSpeciesStats', () => {
 
 	it('reads the matching month-grain row for a whole-calendar-month range', async () => {
 		mockFetchSpeciesStatsCacheRows.mockResolvedValue([
-			speciesStats as CoreStatsWithBiometrics
+			speciesStats as StatsCacheBySpeciesResult
 		]);
 
 		await getSpeciesStats(
@@ -244,7 +244,7 @@ describe('getSpeciesStats', () => {
 
 	it('reads the matching month-squashed row for a bare monthFilter', async () => {
 		mockFetchSpeciesStatsCacheRows.mockResolvedValue([
-			speciesStats as CoreStatsWithBiometrics
+			speciesStats as StatsCacheBySpeciesResult
 		]);
 
 		await getSpeciesStats(
