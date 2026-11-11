@@ -21,8 +21,8 @@ import robinAlphaHeadlineSnapshot from '@/test-fixtures/snapshots/tables/SimpleS
  *
  * Was independently hand-rolled ~13 times across test files
  * (`buildStat`/`buildAggregateRow`/`buildDayStat`/`buildYearlyStat`/
- * `buildMonthlyStat`/`buildDailyStat`) — see `reports/test-quality.md`,
- * "Duplicated `StatsCacheBySpeciesResult` row-fixture builders". A caller relying on a
+ * `buildMonthlyStat`/`buildDailyStat`) — see `reports/test-quality.md`'s
+ * duplicated-stats-row-fixture-builders finding. A caller relying on a
  * specific default value from one of those local builders (rather than just
  * overriding the field it cares about) should pass that value explicitly as
  * an override here instead of forking this builder.
@@ -134,7 +134,8 @@ export function buildMonthSquashedFixture(
 }
 
 /**
- * Snapshot-backed `StatsCacheBySpeciesResult`/`StatsCacheBySpeciesResult` row fixtures,
+ * Snapshot-backed `StatsCacheBySpeciesResult` row fixtures — one type now covers
+ * both the count and the wing/weight halves these used to need two types for —
  * built from the generated `tables/SimpleStatsCache{,BySpecies}` snapshots
  * (#1244 — the real current source for every row that used to come from a
  * live `core_stats` RPC call, which has no remaining app call site). Follows

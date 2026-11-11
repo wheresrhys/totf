@@ -211,8 +211,8 @@ export async function fetchSpeciesStatsCacheRows<
 // Wing/weight + count history for a single species at `interval` granularity
 // (monthly by default). This used to be two parallel RPC calls — `core_stats`
 // for the counts and `biometrics_stats` for the 8 wing/weight fields (#821) —
-// joined on `time_period` by a `mergeBiometricsFields` helper, with a core row
-// that had no matching biometrics row getting all 8 fields coalesced to null.
+// joined on `time_period` by a dedicated merge helper, with a core row that
+// had no matching biometrics row getting all 8 fields coalesced to null.
 // `SimpleStatsCacheBySpecies` carries both halves on the same row, so there is
 // exactly one source and nothing left to join: one cache read, no merge, and
 // the per-cell nullability the biometric columns genuinely have (an empty

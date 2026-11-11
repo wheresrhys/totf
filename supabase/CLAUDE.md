@@ -604,8 +604,9 @@ added or removed at the RPC surfaces in the fixture rather than drifting silentl
 
 The biometrics RPC had three fixtures of its own under the same rule until #1246 deleted it
 outright — every app call site now reads the already-materialized cache tables (#1223/#1244) and
-`BiometricsStatsResult` became an app-owned TypeScript type rather than a view over a Postgres
-composite (#1245), so no database source was left to regenerate or check them against. Those rows
+the 8 wing/weight columns became part of an app-owned TypeScript row type rather than a view over a
+Postgres composite (#1245; `modules/stats`' `StatsCacheBySpeciesResult` since #1372), so no database
+source was left to regenerate or check them against. Those rows
 moved verbatim into `app/__tests__/helpers/biometrics-stats-fixtures.ts`; the data-layer coverage of
 those 8 columns is now `stats_cache_biometrics_metrics`' own DB integration test. #1272 reinstated a
 generated database source for the same 8 columns under `stats_cache_biometrics_metrics/` (keyed on

@@ -134,11 +134,10 @@ modules/stats-view/
   `modules/stats` applies to `StatsTemporalUnit`). Type-only and one-directional; see "Sibling of
   `modules/stats`" above for why that edge is fine and why it must always be the `/browser` barrel.
 - **`@/app/models/{bird,encounter,session}`** — `EnrichedBirdOfSpecies`, `SpeciesWithEncounters`,
-  `getAgeClass`. No **source** file here imports `app/models/db.ts` any more: #1418 retargeted the
-  last two (`types.ts`, `lib/species-stats.ts`) off its `@deprecated` `CoreStatsResult`/
-  `BiometricsStatsResult`/`BiometricFieldName` aliases onto the canonical `modules/stats` names
-  above. Four test files still name `CoreStatsResult`; #1419 sweeps those as it deletes the
-  aliases.
+  `getAgeClass`. **No file here imports `app/models/db.ts` at all any more** — source or test:
+  #1418 retargeted the last two source files (`types.ts`, `lib/species-stats.ts`) off that file's
+  `@deprecated` stats aliases onto the canonical `modules/stats` names above, and #1419 swept the
+  four test files that still named them as it deleted the aliases outright.
 - **A handful of `app/` leaves** — `@/app/lib/group-slug` (`ViewedGroup`),
   `@/app/lib/measurement-range`, `@/app/actions/spp-data` (`SppStatsTable`'s own refetch on filter
   change), `@/app/components/SingleBirdTable`,
