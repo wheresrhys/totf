@@ -7,9 +7,20 @@
 // file that needs it imports it directly from `@/modules/stats/browser` rather
 // than through this module.
 
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	BiometricStatName,
+	StatsCacheBySpeciesResult
+} from '@/modules/stats/browser';
 
 export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
+
+// The 8 wing/weight stats `lib/session-species-biometrics.ts` derives
+// client-side from a session's raw encounters (#1431), keyed by the same
+// canonical `BiometricStatName`s the cached columns use so one
+// `buildBiometricColumnConfigs()` config set addresses either source. `null`
+// is the genuine "nothing measured" value for a stat, never zero — see that
+// file.
+export type SessionSpeciesBiometrics = Record<BiometricStatName, number | null>;
 
 // Field names for the age-class/capture-type block (`new`/`retraps`/`pullus`/
 // `juvs`/`postjuv`/`adults`/`unknownAge`) deliberately match
