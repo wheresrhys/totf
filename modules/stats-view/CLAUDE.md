@@ -37,7 +37,17 @@ a server-only dependency, so the single barrel is safe from either side of the b
 by `app/`, so it has to stay React/JSX-free — a `tsx` component anywhere under it would drag React
 into a plain `tsx`-run CLI script's module graph. The name pairing (`stats` → the cache
 read/dispatch/refresh pipeline; `stats-view` → the UI that renders what those stats say) is the
-whole relationship: there is no import between the two modules in either direction.
+whole relationship.
+
+The one edge between them is **type-only and one-directional**: since #1417 three source files here
+(`lib/period-totals.ts`, `lib/species-totals.ts`, `components/PeriodTotalsTable.tsx`) import
+`StatsResult` from `@/modules/stats/browser` — the canonical shape of the cache cells these tables
+render, which `modules/stats` owns — joining `components/__tests__/SppStatsTable.test.tsx`, which
+already took `StatsCacheBySpeciesResult` that way. `modules/stats` imports nothing from here and never will;
+the direction is what matters, since the React/JSX constraint above is entirely about what ends up
+in `modules/stats`' module graph. Always the `/browser` barrel, never the bare `@/modules/stats`
+one — four of the five components here are `'use client'` (see this module's own header, and
+`modules/stats/CLAUDE.md`'s "Barrel split").
 
 ## Directory map
 
@@ -53,8 +63,8 @@ modules/stats-view/
               # whichever helper derived it and was imported file-to-file from there
   lib/
     period-totals.ts    # derivePeriodTotalsRowByBird / ...ByEncounter — one
-                        # CoreStatsResult -> one PeriodTotalsRow, per the "Aggregate
-                        # by" toggle; formatPeriodTotalsLabel for the first column
+                        # StatsResult (either grain) -> one PeriodTotalsRow, per the
+                        # "Aggregate by" toggle; formatPeriodTotalsLabel for the first column
     species-totals.ts   # deriveSpeciesTotalsRow / ...ByEncounter, plus
                         # calculateRetraps / calculateEncounterRetraps (the
                         # bird-count-minus-new-count derivation both tables and
@@ -113,11 +123,16 @@ modules/stats-view/
   component here now imports those via a relative `../lib/*` path rather than `@/modules/ui-kit`.
   This module owns the _stats-specific_ row models, column sets and toggles; `ui-kit` owns only
   the generic table machinery underneath them.
+- **`@/modules/stats/browser`** — `StatsResult`, the canonical cache-cell shape. Type-only and
+  one-directional; see "Sibling of `modules/stats`" above for why that edge is fine and why it must
+  always be the `/browser` barrel.
 - **`@/app/models/{db,bird,encounter,session}`** — `CoreStatsResult`,
   `BiometricsStatsResult`/`BiometricFieldName`, `EnrichedBirdOfSpecies`, `SpeciesWithEncounters`,
   `getAgeClass`. `app/models/db.ts` **owns** the first three, so `types.ts` imports them directly
   rather than re-exporting them — the same rule `modules/stats` applies to `StatsTemporalUnit`
-  (see the root `CLAUDE.md`'s "Module conventions"). `lib/species-stats.ts` does still carry a
+  (see the root `CLAUDE.md`'s "Module conventions"). All three are `@deprecated` one-line aliases
+  of `modules/stats` types since #1417 and are deleted by #1419, which sweeps the remaining
+  references here onto the canonical names. `lib/species-stats.ts` does still carry a
   `export type { BiometricFieldName }` inherited from its `app/lib` days; it has no consumer and
   is deliberately not on the barrel, pending a separate tidy-up.
 - **A handful of `app/` leaves** — `@/app/lib/group-slug` (`ViewedGroup`),
