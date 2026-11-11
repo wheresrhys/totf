@@ -39,11 +39,13 @@ into a plain `tsx`-run CLI script's module graph. The name pairing (`stats` → 
 read/dispatch/refresh pipeline; `stats-view` → the UI that renders what those stats say) is the
 whole relationship.
 
-The one edge between them is **type-only and one-directional**: since #1417 three source files here
-(`lib/period-totals.ts`, `lib/species-totals.ts`, `components/PeriodTotalsTable.tsx`) import
-`StatsResult` from `@/modules/stats/browser` — the canonical shape of the cache cells these tables
-render, which `modules/stats` owns — joining `components/__tests__/SppStatsTable.test.tsx`, which
-already took `StatsCacheBySpeciesResult` that way. `modules/stats` imports nothing from here and never will;
+The one edge between them is **type-only and one-directional**: every file here that handles a whole
+cache cell imports its shape from `@/modules/stats/browser` — `StatsResult` (the either-grain union)
+in `lib/period-totals.ts`, `lib/species-totals.ts` and `components/PeriodTotalsTable.tsx` since
+#1417, and `StatsCacheBySpeciesResult` (the by-species member) in `types.ts`,
+`lib/species-totals.ts`, `components/SpeciesTotalsTable.tsx` and `components/SppStatsTable.tsx`
+since #1418 retargeted them off the deleted `SpeciesStatsRow`.
+`modules/stats` imports nothing from here and never will;
 the direction is what matters, since the React/JSX constraint above is entirely about what ends up
 in `modules/stats`' module graph. Always the `/browser` barrel, never the bare `@/modules/stats`
 one — four of the five components here are `'use client'` (see this module's own header, and
@@ -57,9 +59,9 @@ modules/stats-view/
               # (lib/squashed-month.ts) is deliberately not on it: no caller outside
               # the module, the same treatment modules/stats gives
               # runSimpleStatsCacheRefreshPass
-  types.ts    # the 5 types shared across more than one file in this module —
+  types.ts    # the 4 types shared across more than one file in this module —
               # PeriodTotalsGrouping, PeriodTotalsRow, SpeciesTotalsRow,
-              # SpeciesStatsRow, SpeciesStatConfig. Before #1327 each lived in
+              # SpeciesStatConfig. Before #1327 each lived in
               # whichever helper derived it and was imported file-to-file from there
   lib/
     period-totals.ts    # derivePeriodTotalsRowByBird / ...ByEncounter — one
@@ -69,10 +71,10 @@ modules/stats-view/
                         # calculateRetraps / calculateEncounterRetraps (the
                         # bird-count-minus-new-count derivation both tables and
                         # SummaryStatsSection use)
-    species-stats.ts    # mergeSpeciesBiometrics — joins a stats_cache_*_metrics by-species
-                        # result to its wing/weight sibling by species_name. No caller
-                        # since #1415; #1418 deletes it along with SpeciesStatsRow.
-                        # speciesStatConfigs — the /species list page's column set
+    species-stats.ts    # speciesStatConfigs — the /species list page's column set, the
+                        # file's only export since #1418 deleted mergeSpeciesBiometrics
+                        # (the counts/wing-weight rejoin, callerless since #1415) and the
+                        # SpeciesStatsRow it returned
     squashed-month.ts   # the 12 month abbreviations a `[yearOrMonth]` route segment
                         # accepts as a squashed-month filter, their parse/format
                         # helpers, and the two squashed-month href builders
@@ -91,7 +93,9 @@ modules/stats-view/
                                  # Juv/Postjuv/Adult/Unaged) and its colour-blocking
                                  # (columnBlock) and totals row (moved from
                                  # modules/ui-kit, #1353)
-    __tests__/          # one test per helper above, plus helpers/two-option-toggle.tsx
+    __tests__/          # one test per helper above except species-stats.ts (whose only
+                        # export is a column-config list tsc already proves, #1418),
+                        # plus helpers/two-option-toggle.tsx
                         # (the toggle components' shared test runner, also moved
                         # from modules/ui-kit, #1353)
     components/
@@ -123,18 +127,18 @@ modules/stats-view/
   component here now imports those via a relative `../lib/*` path rather than `@/modules/ui-kit`.
   This module owns the _stats-specific_ row models, column sets and toggles; `ui-kit` owns only
   the generic table machinery underneath them.
-- **`@/modules/stats/browser`** — `StatsResult`, the canonical cache-cell shape. Type-only and
-  one-directional; see "Sibling of `modules/stats`" above for why that edge is fine and why it must
-  always be the `/browser` barrel.
-- **`@/app/models/{db,bird,encounter,session}`** — `CoreStatsResult`,
-  `BiometricsStatsResult`/`BiometricFieldName`, `EnrichedBirdOfSpecies`, `SpeciesWithEncounters`,
-  `getAgeClass`. `app/models/db.ts` **owns** the first three, so `types.ts` imports them directly
-  rather than re-exporting them — the same rule `modules/stats` applies to `StatsTemporalUnit`
-  (see the root `CLAUDE.md`'s "Module conventions"). All three are `@deprecated` one-line aliases
-  of `modules/stats` types since #1417 and are deleted by #1419, which sweeps the remaining
-  references here onto the canonical names. `lib/species-stats.ts` does still carry a
-  `export type { BiometricFieldName }` inherited from its `app/lib` days; it has no consumer and
-  is deliberately not on the barrel, pending a separate tidy-up.
+- **`@/modules/stats/browser`** — `StatsResult` and `StatsCacheBySpeciesResult`, the canonical
+  cache-cell shapes, imported directly from their owning module by every file here that needs one
+  rather than aliased or re-exported through this module's `types.ts`/barrel (the root
+  `CLAUDE.md`'s "a type owned elsewhere is imported from its canonical home" rule — the same one
+  `modules/stats` applies to `StatsTemporalUnit`). Type-only and one-directional; see "Sibling of
+  `modules/stats`" above for why that edge is fine and why it must always be the `/browser` barrel.
+- **`@/app/models/{bird,encounter,session}`** — `EnrichedBirdOfSpecies`, `SpeciesWithEncounters`,
+  `getAgeClass`. No **source** file here imports `app/models/db.ts` any more: #1418 retargeted the
+  last two (`types.ts`, `lib/species-stats.ts`) off its `@deprecated` `CoreStatsResult`/
+  `BiometricsStatsResult`/`BiometricFieldName` aliases onto the canonical `modules/stats` names
+  above. Four test files still name `CoreStatsResult`; #1419 sweeps those as it deletes the
+  aliases.
 - **A handful of `app/` leaves** — `@/app/lib/group-slug` (`ViewedGroup`),
   `@/app/lib/measurement-range`, `@/app/actions/spp-data` (`SppStatsTable`'s own refetch on filter
   change), `@/app/components/SingleBirdTable`,
@@ -152,7 +156,8 @@ barrel re-exported `SppStatsTable`, which imports `fetchSpeciesData` back out of
 forbade the obvious escape — an outside file reaching past the barrel into `lib/species-stats.ts`
 directly — so the cycle stood (`next build --turbopack` and the full app suite both passed with
 it, verified on #1327). It is gone now that `spp-data.ts` reads whole cache rows and merges its own
-arbitrary-window fallback, so it imports nothing from this module at all. `SppStatsTable`'s inbound
+arbitrary-window fallback, so it imports nothing from this module at all — and the function it used
+to reach for no longer exists, deleted outright by #1418. `SppStatsTable`'s inbound
 `fetchSpeciesData` import is the only edge left; if a future change needs a second one in the
 other direction, lift that fetch into a prop rather than reintroducing the cycle.
 

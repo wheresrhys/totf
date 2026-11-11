@@ -622,14 +622,16 @@ writing it. A fixture that isn't a verbatim source response can't be checked aga
 it quietly starts asserting the shape of the merge instead of the shape of the database, which is
 the same class of silent drift #870/#890 were about. Where an action joins two sources, write one
 fixture per source and let the **consuming test** do the same join the action does, with the same
-helper the production read path uses: build a `CoreStatsWithBiometrics` row with
-`mergeBiometricsFields` and a `SpeciesStatsRow` with `mergeSpeciesBiometrics` over the two source
-fixtures (#821/#823), rather than reading wing/weight columns off the basic-counts fixture — the
-group-wide aggregate RPC stopped carrying its own copies at #827, and although the
-`SimpleStatsCacheBySpecies` rows that replaced it do carry them, the production read path still
-merges them in from the separate biometrics source. `SppStatsTable`'s test still does that merge
-itself, now over `tables/SimpleStatsCacheBySpecies/alpha.by-species.json` plus rows from
-`app/__tests__/helpers/biometrics-stats-fixtures.ts`, which since #1273 is itself derived from the
+helper the production read path uses, rather than post-processing one fixture into the other's
+shape.
+
+**The counts/biometrics split this rule's worked example used to be about is gone.** Both halves of
+a stats cell have ridden on one `SimpleStatsCacheBySpecies` row since #1415, and #1418 deleted the
+last of the rejoining machinery (`modules/stats-view`'s `mergeSpeciesBiometrics` and
+`SpeciesStatsRow`). `SppStatsTable`'s test accordingly consumes
+`tables/SimpleStatsCacheBySpecies/alpha.by-species.json` as-is — one verbatim source fixture, no
+merge — and the rule above now only bites where an action genuinely still joins two sources.
+`app/__tests__/helpers/biometrics-stats-fixtures.ts` remains, derived since #1273 from the
 generated `stats_cache_biometrics_metrics/` snapshots via that same rule's species_id→name join.
 
 **Fixture drift is caught by a pre-push, diff-gated check — but only for the 25 generated
