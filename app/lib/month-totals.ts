@@ -1,5 +1,5 @@
 import { format as formatDate } from 'date-fns';
-import type { CoreStatsResult } from '../models/db';
+import type { StatsCacheResult, StatsResult } from '@/modules/stats/browser';
 
 // A single month's row for the year summary page's "Month totals" tab, and
 // (reused as-is) for the all-time page's "Combine years" OFF state — same
@@ -7,10 +7,17 @@ import type { CoreStatsResult } from '../models/db';
 // data only — no label/href here; callers derive those via `formatMonthYearLabel`
 // below and, for hrefs, `lib/group-links.ts` (which needs the viewing context
 // this model has no business knowing about).
+//
+// `stats` is the `StatsResult` union rather than one member of it because both
+// grains genuinely arrive here: the summary pages' month totals are
+// all-species-combined cells, the species page's are by-species ones, and
+// `synthesizeZeroStats` below contributes combined-grain zero-fills to either.
+// Nothing in this file reads `species_name`, which is the only column the two
+// members differ on.
 export type MonthTotalsRow = {
 	year: number;
 	zeroIndexedMonth: number;
-	stats: CoreStatsResult;
+	stats: StatsResult;
 };
 
 // The month name is built from integer year/zeroIndexedMonth via a *local*
@@ -29,14 +36,26 @@ export function formatMonthYearLabel(
 	return formatDate(new Date(row.year, row.zeroIndexedMonth, 1), 'LLLL yyyy');
 }
 
-// A zero-valued `core_stats` row for a month the RPC omitted (no sessions).
-// The RPC's `period_spine` only spans min→max actual session dates, so a year
-// with e.g. only Mar–Oct sessions comes back missing the other months entirely;
-// these are filled in client-side rather than by touching the RPC.
-function synthesizeZeroStats(timePeriod: string): CoreStatsResult {
-	// `species_name` is nullable in the RPC's real output but typed `string`
-	// in the generated types; cast through `unknown` to keep the honest null.
-	// eslint-disable-next-line no-restricted-syntax -- see comment above
+// A zero-valued stats cell for a month the cache omitted (no sessions). The
+// cache only holds cells with data, so a year with e.g. only Mar–Oct sessions
+// comes back missing the other months entirely; these are filled in client-side
+// rather than by widening the read.
+//
+// Typed `StatsCacheResult` — the all-species-combined member — because that is
+// what this row honestly is: `species_name` is `null`, and a month with no
+// sessions has no species to attribute the zeros to. That is also what removes
+// the `as unknown as` double assertion this used to need (and its
+// `no-restricted-syntax` disable): the old `CoreStatsResult` declared
+// `species_name: string`, so the honest `null` could only be forced past `tsc`
+// with assignability checking switched off entirely.
+//
+// Every count column is `0` and every wing/weight column is `null`. The nulls
+// are deliberate: those 8 are the only nullable columns on the cache tables,
+// precisely so "nothing biometric-eligible was measured here" is representable
+// (see `modules/stats/CLAUDE.md`'s "The stats-result types"), and a `0` would be
+// a fabricated measurement rather than an absent one. No consumer of a
+// month-totals row reads them — `PeriodTotalsTable` renders count columns only.
+function synthesizeZeroStats(timePeriod: string): StatsCacheResult {
 	return {
 		species_name: null,
 		time_period: timePeriod,
@@ -48,19 +67,20 @@ function synthesizeZeroStats(timePeriod: string): CoreStatsResult {
 		encounter_count: 0,
 		new_bird_count: 0,
 		max_new_per_session: 0,
-		max_weight: 0,
-		avg_weight: 0,
-		min_weight: 0,
-		median_weight: 0,
-		max_wing: 0,
-		avg_wing: 0,
-		min_wing: 0,
-		median_wing: 0,
+		max_weight: null,
+		avg_weight: null,
+		min_weight: null,
+		median_weight: null,
+		max_wing: null,
+		avg_wing: null,
+		min_wing: null,
+		median_wing: null,
 		pullus_bird_count: 0,
 		juv_bird_count: 0,
 		postjuv_bird_count: 0,
 		adult_bird_count: 0,
 		unknown_age_bird_count: 0,
+		new_young_bird_count: 0,
 		// Encounter-based age buckets (read by `derivePeriodTotalsRowByEncounter`)
 		// are zero for a month with no sessions too — included so a zero-filled
 		// row toggled to encounter mode reads `0`, not `undefined`.
@@ -68,8 +88,11 @@ function synthesizeZeroStats(timePeriod: string): CoreStatsResult {
 		juv_enc_count: 0,
 		postjuv_enc_count: 0,
 		adult_enc_count: 0,
-		unknown_age_enc_count: 0
-	} as unknown as CoreStatsResult;
+		unknown_age_enc_count: 0,
+		new_postjuv_enc_count: 0,
+		new_postjuv_juv_enc_count: 0,
+		postjuv_juv_enc_count: 0
+	};
 }
 
 // Build all 12 calendar months for `year`, in Jan→Dec order regardless of the
@@ -78,7 +101,7 @@ function synthesizeZeroStats(timePeriod: string): CoreStatsResult {
 // timezone pitfalls).
 export function buildMonthTotalsRows(
 	year: number,
-	periodStats: CoreStatsResult[]
+	periodStats: StatsResult[]
 ): MonthTotalsRow[] {
 	return Array.from({ length: 12 }, (_unused, zeroIndexedMonth) => {
 		const month = zeroIndexedMonth + 1;
@@ -100,7 +123,7 @@ export function buildMonthTotalsRows(
 // and no year field — pure raw data, same as `MonthTotalsRow`.
 export type CombinedMonthTotalsRow = {
 	zeroIndexedMonth: number;
-	stats: CoreStatsResult;
+	stats: StatsResult;
 };
 
 // Month name only (no year) — these rows span every year at once. `row` is
@@ -130,7 +153,7 @@ export function formatMonthLabel(
 // caller's "Empty months: hide" toggle defaults to on, so the months that go
 // missing are the ones it would have dropped anyway.
 export function buildCombinedMonthTotalsRows(
-	monthSquashedStats: CoreStatsResult[]
+	monthSquashedStats: StatsResult[]
 ): CombinedMonthTotalsRow[] {
 	return monthSquashedStats.map((stats) => ({
 		zeroIndexedMonth: Number(stats.time_period.slice(5, 7)) - 1,
@@ -149,34 +172,35 @@ export function buildCombinedMonthTotalsRows(
 // `stats.session_count`. Pure — never mutates the input array. Callers apply it
 // after building rows; the builders themselves stay unaware of the toggle.
 export function filterEmptyMonthTotalsRows<
-	T extends { stats: Pick<CoreStatsResult, 'session_count'> }
+	T extends { stats: Pick<StatsResult, 'session_count'> }
 >(rows: T[], hideEmptyMonths: boolean): T[] {
 	if (!hideEmptyMonths) return rows;
 	return rows.filter((row) => row.stats.session_count !== 0);
 }
 
 // The Session-totals tab's zero-count row filter, applied directly over the
-// raw `CoreStatsResult[]` the day-grain cache read returns — unlike
-// `filterEmptyMonthTotalsRows` above, there's no `{ stats }`-wrapped row
-// shape here to force callers into (#1381). Always drops every zero-count
-// row — the ones `SimpleStatsCacheBySpecies`'s day-grain spine zero-fills in
-// for a session day the filtered species wasn't encountered; unlike the
-// month-totals toggle above, there's no show-empty-rows mode to offer here
-// (per review feedback on #1382, an empty session row is never worth
-// showing). Pure — never mutates the input array.
-export function filterEmptySessionRows(
-	rows: CoreStatsResult[]
-): CoreStatsResult[] {
+// raw day-grain cache rows the read returns — unlike `filterEmptyMonthTotalsRows`
+// above, there's no `{ stats }`-wrapped row shape here to force callers into
+// (#1381). Always drops every zero-count row — the ones
+// `SimpleStatsCacheBySpecies`'s day-grain spine zero-fills in for a session day
+// the filtered species wasn't encountered; unlike the month-totals toggle above,
+// there's no show-empty-rows mode to offer here (per review feedback on #1382,
+// an empty session row is never worth showing). Generic on the row type, like
+// `filterEmptyMonthTotalsRows`, so a caller gets its own row type back rather
+// than the widened union. Pure — never mutates the input array.
+export function filterEmptySessionRows<
+	T extends Pick<StatsResult, 'session_count'>
+>(rows: T[]): T[] {
 	return rows.filter((row) => row.session_count !== 0);
 }
 
 // The "Combine years" toggle's OFF state for the all-time "Month totals" tab:
 // one row per real `(year, month)` combination in the group's history, with no
-// combining/summing — the raw `core_stats` month array (the same array
+// combining/summing — the raw month-grain cache rows (the same array
 // `buildCombinedMonthTotalsRows` folds into 12 buckets), reshaped into pure
 // `MonthTotalsRow`s and sorted chronologically regardless of input order.
 export function buildPerYearMonthTotalsRows(
-	periodStats: CoreStatsResult[]
+	periodStats: StatsResult[]
 ): MonthTotalsRow[] {
 	return periodStats
 		.map((stat) => ({

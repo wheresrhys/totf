@@ -1,7 +1,17 @@
+import type { StatsResult } from '@/modules/stats/browser';
 import type { SpeciesStatsRow, SpeciesTotalsRow } from '../types';
 
+// The two retrap derivations below read three count columns and nothing else,
+// so they are typed on just those rather than on a whole row — which is what
+// lets both the `SpeciesStatsRow` callers here and `period-totals.ts`'
+// either-grain `StatsResult` ones use them unchanged.
+type RetrapCountColumns = Pick<
+	StatsResult,
+	'bird_count' | 'new_bird_count' | 'encounter_count'
+>;
+
 /** Every bird in the period has ≥1 'N' encounter or none — an exhaustive partition. */
-export function calculateRetraps(stat: SpeciesStatsRow): number {
+export function calculateRetraps(stat: RetrapCountColumns): number {
 	return stat.bird_count - stat.new_bird_count;
 }
 
@@ -11,7 +21,7 @@ export function calculateRetraps(stat: SpeciesStatsRow): number {
  * identical by construction — there's no separate `new_enc_count` to
  * subtract, so this reuses `new_bird_count` directly.
  */
-export function calculateEncounterRetraps(stat: SpeciesStatsRow): number {
+export function calculateEncounterRetraps(stat: RetrapCountColumns): number {
 	return stat.encounter_count - stat.new_bird_count;
 }
 

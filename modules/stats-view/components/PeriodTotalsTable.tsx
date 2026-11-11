@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { CoreStatsResult } from '@/app/models/db';
+import type { StatsResult } from '@/modules/stats/browser';
 import {
 	derivePeriodTotalsRowByBird,
 	derivePeriodTotalsRowByEncounter,
@@ -73,14 +73,14 @@ export function PeriodTotalsTable({
 	showBusiestSession = true
 }: {
 	timeInterval: PeriodTotalsGrouping;
-	rows: CoreStatsResult[];
+	rows: StatsResult[];
 	firstColumnHeader: string;
 	buildHref: (timePeriod: string) => string;
 	// Overrides the default `formatPeriodTotalsLabel(timeInterval, ...)` first-column
 	// text — e.g. the month-totals caller supplies a timezone-safe label built
 	// from integer year/month rather than parsing the `time_period` string.
 	buildLabel?: (timePeriod: string) => string;
-	totalsStats?: CoreStatsResult;
+	totalsStats?: StatsResult;
 	// Optional extra controls rendered above the table, e.g. a toggle to switch
 	// between combined-months and per-year-months views.
 	extraControls?: React.ReactNode;
@@ -125,7 +125,7 @@ export function PeriodTotalsTable({
 	// Recreated each render since `timeInterval`/`buildHref` are props, not static
 	// — the cell itself is stateless, so this only costs identity, not
 	// behaviour.
-	const PeriodLabelCell = createNameLinkCell<CoreStatsResult, PeriodTotalsRow>(
+	const PeriodLabelCell = createNameLinkCell<StatsResult, PeriodTotalsRow>(
 		(model) => resolveLabel(model.timePeriod),
 		(model) => (model.sessionsCount ? buildHref(model.timePeriod) : undefined)
 	);
@@ -134,7 +134,7 @@ export function PeriodTotalsTable({
 		data,
 		columnConfigs
 	}: {
-		data: RowModelWithRawData<CoreStatsResult, PeriodTotalsRow>[];
+		data: RowModelWithRawData<StatsResult, PeriodTotalsRow>[];
 		columnConfigs?: Partial<Record<keyof PeriodTotalsRow, ColumnConfig>>;
 	}) {
 		const restColumnProperties = Object.keys(columnConfigs ?? {}).filter(
@@ -172,7 +172,7 @@ export function PeriodTotalsTable({
 				)}
 				{extraControls ?? null}
 			</div>
-			<SortableTable<CoreStatsResult, PeriodTotalsRow>
+			<SortableTable<StatsResult, PeriodTotalsRow>
 				columnConfigs={columnConfigs}
 				data={rows}
 				testId="period-totals-table"

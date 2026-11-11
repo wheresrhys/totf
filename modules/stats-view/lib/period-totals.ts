@@ -1,10 +1,14 @@
 import { format as formatDate } from 'date-fns';
-import type { CoreStatsResult } from '@/app/models/db';
+// `StatsResult` (the union of both cache grains) rather than one member of it:
+// the summary pages' period totals are all-species-combined cells and the
+// species page's are by-species ones, and neither deriver reads `species_name`
+// — the one column the two members differ on.
+import type { StatsResult } from '@/modules/stats/browser';
 import type { PeriodTotalsGrouping, PeriodTotalsRow } from '../types';
 import { calculateEncounterRetraps, calculateRetraps } from './species-totals';
 
 export function derivePeriodTotalsRowByBird(
-	stat: CoreStatsResult
+	stat: StatsResult
 ): PeriodTotalsRow {
 	return {
 		timePeriod: stat.time_period,
@@ -31,7 +35,7 @@ export function derivePeriodTotalsRowByBird(
  * bird-based count by construction (see #601).
  */
 export function derivePeriodTotalsRowByEncounter(
-	stat: CoreStatsResult
+	stat: StatsResult
 ): PeriodTotalsRow {
 	return {
 		timePeriod: stat.time_period,

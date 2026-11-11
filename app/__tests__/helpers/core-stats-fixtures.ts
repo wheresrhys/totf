@@ -60,6 +60,14 @@ export function buildCoreStatsRow(
 		postjuv_enc_count: 1,
 		adult_enc_count: 1,
 		unknown_age_enc_count: 0,
+		// The four young/postjuv transition counts both cache tables carry
+		// (#1417) — absent from this literal for as long as `CoreStatsResult` was
+		// a hand-maintained 21-column type that didn't declare them, so a
+		// "whole row" fixture was in fact four columns short at runtime.
+		new_young_bird_count: 8,
+		new_postjuv_enc_count: 2,
+		new_postjuv_juv_enc_count: 1,
+		postjuv_juv_enc_count: 3,
 		...overrides
 	} as CoreStatsResult;
 }

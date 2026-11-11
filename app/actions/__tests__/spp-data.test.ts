@@ -94,11 +94,12 @@ function buildSpeciesCacheTableRow({
 }
 
 /**
- * One counts row as the arbitrary-window *live recompute* resolves it: only
- * the columns `stats_cache_basic_session_metrics` produces (plus
- * `group-summary-access.ts`' own age-bucket placeholders), carrying the
- * `species_id` the merge keys on (`AuthorisedStatsRow`). Defaults to the Blue
- * Tit.
+ * One counts row as the arbitrary-window *live recompute* resolves it: the
+ * columns `stats_cache_basic_session_metrics` produces, plus every column it
+ * doesn't, filled from `group-summary-access.ts`'
+ * `UNAVAILABLE_COLUMN_PLACEHOLDERS` (#1417) — so a whole cache row's key set,
+ * carrying the `species_id` the merge keys on (`AuthorisedStatsRow`). Defaults
+ * to the Blue Tit.
  */
 function buildCountsRow(
 	overrides: Partial<AuthorisedStatsRow> = {}
@@ -410,25 +411,15 @@ describe('merging the live recompute', () => {
 		expect(rowFor(rows, BLUE_TIT_SPECIES_NAME).max_wing).toBe(70);
 	});
 
-	it('fills the columns neither RPC returns with the documented placeholders', async () => {
-		mockCoreStats();
-		mockAuthenticatedClient({ rpcRows: [buildBiometricsMetricsRpcRow()] });
-
-		const [row] = await fetchSpeciesData(
-			viewedGroup,
-			ARBITRARY_WINDOW_FROM_DATE,
-			ARBITRARY_WINDOW_TO_DATE
-		);
-
-		// The 4 count columns `stats_cache_basic_session_metrics` doesn't
-		// produce.
-		expect(row.new_young_bird_count).toBe(0);
-		expect(row.new_postjuv_enc_count).toBe(0);
-		expect(row.new_postjuv_juv_enc_count).toBe(0);
-		expect(row.postjuv_juv_enc_count).toBe(0);
-		// ...and the biometric half really did come from the RPC.
-		expect(row.max_wing).toBe(ALPHA_BIOMETRIC_METRICS.max_wing);
-	});
+	// There was a test here asserting the 4 `new_young_bird_count`/
+	// `new_postjuv_*`/`postjuv_juv_enc_count` placeholders this module used to
+	// fill in itself. #1417 moved them onto `group-summary-access.ts`'
+	// `UNAVAILABLE_COLUMN_PLACEHOLDERS`, which `fetchAuthorisedCoreStats` applies
+	// before the counts rows ever reach here — and that function is mocked in
+	// this file, so the assertions would only have been re-reading the mock's own
+	// fixture. They live in
+	// `app/lib/auth/__tests__/group-summary-access.test.ts` now, alongside the
+	// const that fills them.
 
 	it('keeps a species present in the counts result but absent from the biometrics result', async () => {
 		mockCoreStats([

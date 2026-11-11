@@ -5,7 +5,11 @@ import { resolveGroupPublicAreasForRequest } from '../../group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { makeQueryChain } from '@/app/__tests__/helpers/query-chain';
-import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
+import {
+	ALPHA_CORE_STATS_BY_SPECIES,
+	buildCoreStatsRow
+} from '@/app/__tests__/helpers/core-stats-fixtures';
+import { BiometricStatNames } from '@/modules/stats/browser';
 
 const { mockPublicSupabaseFrom, mockPublicSupabaseRpc } = vi.hoisted(() => ({
 	mockPublicSupabaseFrom: vi.fn(),
@@ -141,6 +145,22 @@ const filters = () => tableRead.record.filters;
 const selectedColumns = () => tableRead.record.select ?? '';
 const filterFor = (column: string, operator: string) =>
 	filters().find((f) => f.column === column && f.operator === operator)?.value;
+
+/**
+ * The columns a raw cache-table row carries that a stats-result row does not —
+ * `modules/stats`' `BookkeepingColumn`, plus the `species_id` a by-species row
+ * resolves `species_name` from. Spelled out because a type's keys aren't
+ * readable at runtime, and the key-set comparison below needs them removed from
+ * the snapshot row it compares against.
+ */
+const CACHE_ROW_BOOKKEEPING_COLUMNS = [
+	'id',
+	'group_id',
+	'created_at',
+	'updated_at',
+	'temporal_unit',
+	'species_id'
+];
 
 const VIEWED_GROUP_ID = 10;
 const VIEWER_GROUP_ID = 99;
@@ -492,6 +512,108 @@ describe('summary read-path access model', () => {
 			expect(result).toEqual({ accessLevel: 'public', rows: [] });
 			expect(mockPublicSupabaseRpc).not.toHaveBeenCalled();
 			expect(mockPublicSupabaseFrom).not.toHaveBeenCalled();
+		});
+	});
+
+	// `stats_cache_basic_session_metrics` produces only 9 of a cache row's 32
+	// columns, so the other 22 are placeholders this module fabricates
+	// (`UNAVAILABLE_COLUMN_PLACEHOLDERS`). Nothing on this path reads them, which
+	// is exactly why they need pinning here: a wrong placeholder is invisible to
+	// both `tsc` and every other test in this file.
+	describe('the arbitrary-window live recompute', () => {
+		// The one window shape no cache cell spans — the /species list page's
+		// free-text date inputs.
+		const ARBITRARY_WINDOW: StatsWindowParams = {
+			group_by_species: false,
+			from_date: '2026-04-25',
+			to_date: '2026-09-05'
+		};
+
+		async function readLiveRecomputedRow() {
+			vi.mocked(getGroupCookie).mockResolvedValue(VIEWED_GROUP_ID);
+			const client = makeRpcClient([buildBasicSessionMetricsRow()]);
+			vi.mocked(getAuthenticatedSupabaseClient).mockResolvedValue(
+				client as never
+			);
+			const { rows } = await fetchAuthorisedCoreStats(
+				viewedGroup,
+				ARBITRARY_WINDOW
+			);
+			return rows[0];
+		}
+
+		it('fills the eight biometric columns with null', async () => {
+			const row = await readLiveRecomputedRow();
+
+			// `null`, never `0`: these 8 are the only nullable columns on either
+			// cache table, precisely so "nothing biometric-eligible was measured"
+			// is representable, and a `0` would read as a real measurement.
+			BiometricStatNames.forEach((columnName) => {
+				expect(row[columnName]).toBeNull();
+			});
+		});
+
+		it('fills the four cache-only count columns with zero', async () => {
+			const row = await readLiveRecomputedRow();
+
+			expect({
+				new_young_bird_count: row.new_young_bird_count,
+				new_postjuv_enc_count: row.new_postjuv_enc_count,
+				new_postjuv_juv_enc_count: row.new_postjuv_juv_enc_count,
+				postjuv_juv_enc_count: row.postjuv_juv_enc_count
+			}).toEqual({
+				new_young_bird_count: 0,
+				new_postjuv_enc_count: 0,
+				new_postjuv_juv_enc_count: 0,
+				postjuv_juv_enc_count: 0
+			});
+		});
+
+		it('fills the ten age-bucket columns with zero', async () => {
+			const row = await readLiveRecomputedRow();
+
+			expect({
+				pullus_bird_count: row.pullus_bird_count,
+				juv_bird_count: row.juv_bird_count,
+				postjuv_bird_count: row.postjuv_bird_count,
+				adult_bird_count: row.adult_bird_count,
+				unknown_age_bird_count: row.unknown_age_bird_count,
+				pullus_enc_count: row.pullus_enc_count,
+				juv_enc_count: row.juv_enc_count,
+				postjuv_enc_count: row.postjuv_enc_count,
+				adult_enc_count: row.adult_enc_count,
+				unknown_age_enc_count: row.unknown_age_enc_count
+			}).toEqual({
+				pullus_bird_count: 0,
+				juv_bird_count: 0,
+				postjuv_bird_count: 0,
+				adult_bird_count: 0,
+				unknown_age_bird_count: 0,
+				pullus_enc_count: 0,
+				juv_enc_count: 0,
+				postjuv_enc_count: 0,
+				adult_enc_count: 0,
+				unknown_age_enc_count: 0
+			});
+		});
+
+		// The drift guard: a column added to the cache tables shows up in the
+		// snapshot (`supabase/__tests__/snapshot-fixture-freshness.test.ts` keeps
+		// that honest against the live database), so comparing key sets here is
+		// what stops this path silently going back to being short a column.
+		it('carries every column the cache-read path carries', async () => {
+			const liveRow = await readLiveRecomputedRow();
+			const cacheResultColumns = Object.keys(
+				ALPHA_CORE_STATS_BY_SPECIES[0]
+			).filter(
+				(columnName) => !CACHE_ROW_BOOKKEEPING_COLUMNS.includes(columnName)
+			);
+
+			// `species_id` rides along on a live row (the /species merge keys on
+			// it, see `AuthorisedStatsRow`) but is bookkeeping on a cache row.
+			expect(Object.keys(liveRow).sort()).toEqual(
+				[...cacheResultColumns, 'species_id'].sort()
+			);
 		});
 	});
 

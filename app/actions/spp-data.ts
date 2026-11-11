@@ -32,42 +32,6 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
 type BiometricStats = Pick<StatsCacheBySpeciesResult, BiometricStatName>;
 
 /**
- * The 4 count columns a cache row carries that
- * `stats_cache_basic_session_metrics` — the live-recompute source behind the
- * counts half of this page's arbitrary-window path — does not produce. Filled
- * with a placeholder `0` on that path only, for the same reason
- * `group-summary-access.ts`' `UNAVAILABLE_AGE_BUCKET_COLUMNS` fills the 10
- * age-bucket columns with one: `StatsCacheBySpeciesResult` requires every
- * column to be present, and nothing on this call path reads them — the
- * `/species` list page renders only `species_name`/`bird_count`/
- * `encounter_count`/`session_count`/`max_per_session` plus the 8 biometric
- * columns (`speciesStatConfigs`, `modules/stats-view/lib/species-stats.ts`).
- *
- * Deliberately a separate const from `UNAVAILABLE_AGE_BUCKET_COLUMNS` rather
- * than an extension of it: that one is owned by `group-summary-access.ts` and
- * is being extended by #1417. A future caller wanting a real value for any of
- * these four on an arbitrary window has the same obligation its doc comment
- * spells out — fetch the missing metric RPCs and merge them by `species_id` the
- * way `modules/stats/lib/refresh/merge-metric-rows.ts` does — rather than
- * reading the placeholder.
- *
- * Spread *before* the counts row below, so a cache-served row's own real
- * values win and the placeholder only fills a genuine gap.
- */
-const UNAVAILABLE_NEW_YOUNG_COUNT_COLUMNS = {
-	new_young_bird_count: 0,
-	new_postjuv_enc_count: 0,
-	new_postjuv_juv_enc_count: 0,
-	postjuv_juv_enc_count: 0
-} satisfies Pick<
-	StatsCacheBySpeciesResult,
-	| 'new_young_bird_count'
-	| 'new_postjuv_enc_count'
-	| 'new_postjuv_juv_enc_count'
-	| 'postjuv_juv_enc_count'
->;
-
-/**
  * The 8 biometric columns of one species' row, read off whatever source has
  * them — or all `null` when nothing does. `null` rather than absent because
  * `StatsCacheBySpeciesResult` declares all 8 present-but-nullable, which is
@@ -95,6 +59,14 @@ function pickBiometricStats(
  * see them. Blanking them used to happen as a side effect of
  * `mergeSpeciesBiometrics` copying only its biometrics half's 8 columns across;
  * with that merge gone it has to be explicit.
+ *
+ * The counts row carries every non-biometric column outright, whichever path
+ * produced it: a cache read is a `select('*')`, and the arbitrary-window live
+ * recompute fills the columns its RPC can't produce from
+ * `group-summary-access.ts`' `UNAVAILABLE_COLUMN_PLACEHOLDERS` (#1417). This
+ * function used to spread a local 4-column placeholder const of its own before
+ * `counts` to cover the gap that const left; there is no gap to cover now, and
+ * one owner for the placeholder set is the point.
  */
 function buildSpeciesRow(
 	countsRow: AuthorisedStatsRow,
@@ -103,7 +75,6 @@ function buildSpeciesRow(
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to drop species_id
 	const { species_id, ...counts } = countsRow;
 	return {
-		...UNAVAILABLE_NEW_YOUNG_COUNT_COLUMNS,
 		...counts,
 		...pickBiometricStats(biometrics)
 	};
