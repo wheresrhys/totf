@@ -3,14 +3,12 @@ import {
 	fetchAuthorisedCoreStats,
 	resolveStatsCacheQueryPlan,
 	type AuthorisedStatsRow,
-	type GroupSummaryAccessLevel,
-	type StatsCacheQueryPlan
+	type GroupSummaryAccessLevel
 } from '@/app/lib/auth/group-summary-access';
 import { getAuthenticatedSupabaseClient } from '@/app/lib/auth/group-auth';
 import { catchSupabaseErrors } from '@/lib/supabase';
 import {
 	BiometricStatNames,
-	readStatsCacheRows,
 	type BiometricsMetricsRow,
 	type BiometricStatName,
 	type StatsCacheBySpeciesResult
@@ -78,64 +76,6 @@ function buildSpeciesRow(
 		...counts,
 		...pickBiometricStats(biometrics)
 	};
-}
-
-/**
- * Reads the already-materialized `SimpleStatsCacheBySpecies` cell `plan`
- * names — one whole row per species, counts and biometrics together, which is
- * the whole point: on this path both halves of the `/species` table are
- * columns of the same row and were never apart (#1372).
- *
- * **This is the second read of the same cache cell**, and knowingly so: on a
- * cache-aligned window `fetchAuthorisedCoreStats` has already issued the
- * identical `SimpleStatsCacheBySpecies` query for the counts half, and only
- * its `accessLevel` is used here. Collapsing the two means changing that
- * function's contract, which #1417 is already doing for other reasons, so
- * #1421 does the collapse afterwards rather than two tickets editing one
- * signature at once. Don't "fix" it by trusting the counts rows
- * unconditionally — see `buildSpeciesRow` on why the 8 biometric columns have
- * to be blanked for a `'public'`/`'blocked'` viewer.
- *
- * Everything the read needs — the `Species(species_name)` embed, flattening
- * that name back onto each row, the `group_id`/`temporal_unit`/`time_period`
- * filters, the `order=Species(species_name)` spelling an embedded to-one
- * ordering needs, and the pagination a group with more species than one
- * PostgREST page would otherwise be silently truncated by — belongs to
- * `readStatsCacheRows` (`modules/stats`), exactly as it does for
- * `app/actions/sp-data.ts`'s `fetchSpeciesStatsCacheRows` and
- * `group-summary-access.ts`' own `runStatsCacheRead`.
- *
- * Only `plan.temporalUnit`/`plan.timePeriod` can be set on a plan reaching
- * here, which is why `runStatsCacheRead`'s two row transforms have no
- * counterpart below: `fetchSpeciesRowsWithBiometrics` never passes
- * `group_by_time_period`, so `resolveStatsCacheQueryPlan` can only take one of
- * its *ungrouped* branches — all-time, a squashed calendar month, a whole
- * calendar year, or a whole calendar month — each of which is exactly one
- * cache cell per species. The range/`calendarMonth`/relabel fields belong to
- * the grouped-by-time-period branches alone; the range pair is still forwarded
- * so this read stays a faithful translation of any plan, but if this call site
- * ever starts grouping by time period, `calendarMonth` and
- * `relabelTimePeriodToYearStart` have to be handled here too.
- */
-async function readWholeRowsFromStatsCache(
-	viewedGroup: ViewedGroup,
-	plan: StatsCacheQueryPlan
-): Promise<StatsCacheBySpeciesResult[]> {
-	// `readStatsCacheRows` select('*')s and leaves narrowing to its caller, so
-	// name the row shape this read is known to produce here. A whole
-	// `SimpleStatsCacheBySpecies` row is a structural superset of
-	// `StatsCacheBySpeciesResult` — it also carries the bookkeeping columns the
-	// result type omits, which no consumer reads by name.
-	return (await readStatsCacheRows({
-		viewedGroup,
-		bySpecies: true,
-		temporalUnit: plan.temporalUnit,
-		// A plan carries either an exact cell or a range, never both — which is
-		// also the one-of-the-two contract `readStatsCacheRows` applies.
-		timePeriod: plan.timePeriod,
-		fromDate: plan.fromTimePeriod,
-		toDate: plan.toTimePeriod
-	})) as StatsCacheBySpeciesResult[];
 }
 
 /**
@@ -233,9 +173,17 @@ async function mergeLiveBiometricsIntoCountsRows(
 //
 // - A cache-aligned window (all time, a whole calendar year, a whole calendar
 //   month, a squashed calendar month — i.e. the page's default and year-select
-//   views) reads whole `SimpleStatsCacheBySpecies` rows directly, where the
-//   post-import refresh queue has already materialized the counts and the 8
-//   wing/weight columns side by side on one row.
+//   views) needs no second read at all (#1421): `countsRows` already *are*
+//   whole `SimpleStatsCacheBySpecies` rows — `fetchAuthorisedCoreStats`'s own
+//   cache-table read (`runStatsCacheRead` → `readStatsCacheRows`) is a
+//   `select('*')` against this exact table for this exact window — so the 8
+//   wing/weight columns the post-import refresh queue materialized alongside
+//   the counts are already sitting on each row, real values and all. Issuing
+//   a second, byte-identical `SimpleStatsCacheBySpecies` query to fetch what's
+//   already in hand was the whole duplicate read this ticket collapses; see
+//   `buildSpeciesRow` on why the 8 columns still have to be explicitly
+//   re-picked (and blanked for a `'public'`/`'blocked'` viewer) rather than
+//   trusted onto the result unconditionally.
 // - An arbitrary window (the page's two free-text date inputs) has its
 //   biometric half computed live instead, by `stats_cache_biometrics_metrics`
 //   (#1244 — it used to be `biometrics_stats`, which nothing here calls any
@@ -245,12 +193,13 @@ async function mergeLiveBiometricsIntoCountsRows(
 //   from a set of narrower cache cells at all, not even approximately. A live
 //   recompute is the only correct source for them outside a cache cell.
 //
-// Either way this needs an authenticated session to be meaningful: both reads
-// go out as the viewer, and neither `stats_cache_biometrics_metrics` nor the
-// cache tables' SELECT policy has a `public_areas` branch that would admit an
-// anonymous caller. So it's only called once fetchAuthorisedCoreStats confirms
-// an authenticated session actually resolved data ('own' or 'shared'); a
-// 'blocked' or 'public' accessLevel contributes no biometrics.
+// Either way this needs an authenticated session to be meaningful: both
+// sources answer as the viewer, and neither `stats_cache_biometrics_metrics`
+// nor the cache tables' SELECT policy has a `public_areas` branch that would
+// admit an anonymous caller. So biometrics are only ever applied once
+// `fetchAuthorisedCoreStats` confirms an authenticated session actually
+// resolved data ('own' or 'shared'); a 'blocked' or 'public' accessLevel
+// contributes none.
 //
 // That 'public' case is now live rather than theoretical: the /species list
 // page became anonymously viewable for a `public_areas: ['summary']` group
@@ -271,15 +220,21 @@ async function fetchSpeciesRowsWithBiometrics(
 		month_filter: monthFilter
 	});
 
-	return cacheQueryPlan
-		? readWholeRowsFromStatsCache(viewedGroup, cacheQueryPlan)
-		: mergeLiveBiometricsIntoCountsRows(
-				viewedGroup,
-				countsRows,
-				fromDate,
-				toDate,
-				monthFilter
-			);
+	if (cacheQueryPlan) {
+		// Each `countsRow` is already a whole `SimpleStatsCacheBySpecies` row
+		// for this exact cache cell, so it doubles as its own biometrics
+		// source — no second read, no merge, just re-picking the 8 columns
+		// already on it.
+		return countsRows.map((countsRow) => buildSpeciesRow(countsRow, countsRow));
+	}
+
+	return mergeLiveBiometricsIntoCountsRows(
+		viewedGroup,
+		countsRows,
+		fromDate,
+		toDate,
+		monthFilter
+	);
 }
 
 /**
