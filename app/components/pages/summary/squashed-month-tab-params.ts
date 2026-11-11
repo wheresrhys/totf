@@ -1,5 +1,5 @@
 import type { CoreStatsResult } from '@/app/models/db';
-import type { SpeciesStatsRow } from '@/modules/stats-view';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 /**
  * Tab ids for the squashed-month summary page (`/summary/jan`, #1005), in
@@ -40,7 +40,7 @@ export type SquashedMonthTabParams = {
 	// row. `undefined` means "no totals row" (the Species totals tab passes
 	// `undefined` through regardless — it has never shown one).
 	totalsStats?: CoreStatsResult;
-	speciesTotalsForMonth: SpeciesStatsRow[];
+	speciesTotalsForMonth: StatsCacheBySpeciesResult[];
 	yearTotalsForMonth: CoreStatsResult[];
 	sessionTotalsForMonth: CoreStatsResult[];
 };

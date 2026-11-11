@@ -6,7 +6,7 @@ import {
 	type ColumnConfig
 } from '@/modules/ui-kit';
 import { speciesStatConfigs } from '../lib/species-stats';
-import type { SpeciesStatsRow } from '../types';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import type { PageData } from '@/app/(routes)/species/page';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { useState, useEffect, useRef } from 'react';
@@ -36,7 +36,7 @@ const sortableColumnConfigs = speciesStatConfigs.reduce(
 			preferSortAscending: column.preferSortAscending
 		}
 	}),
-	{} as Record<keyof SpeciesStatsRow, ColumnConfig>
+	{} as Record<keyof StatsCacheBySpeciesResult, ColumnConfig>
 );
 
 export function SppStatsTable({
@@ -60,7 +60,7 @@ export function SppStatsTable({
 	// `columnConfigs`. Same approach as SpeciesTotalsTable's own body
 	// component; the cell is stateless, so re-creating it per render costs
 	// identity, not behaviour.
-	function MultiSpeciesTableBody({ data }: { data: SpeciesStatsRow[] }) {
+	function MultiSpeciesTableBody({ data }: { data: StatsCacheBySpeciesResult[] }) {
 		return (
 			<tbody>
 				{data.map((species) => (
@@ -90,7 +90,7 @@ export function SppStatsTable({
 	const [fromDate, setFromDate] = useState<string | null>(null);
 	const [toDate, setToDate] = useState<string | null>(null);
 	const [speciesStats, setSpeciesStats] =
-		useState<SpeciesStatsRow[]>(initialSpeciesStats);
+		useState<StatsCacheBySpeciesResult[]>(initialSpeciesStats);
 	const isFirstRender = useRef(true);
 	useEffect(() => {
 		if (isFirstRender.current) {
@@ -194,7 +194,7 @@ export function SppStatsTable({
 					)}
 				</form>
 			</PageWrapper>
-			<SortableTable<SpeciesStatsRow, SpeciesStatsRow>
+			<SortableTable<StatsCacheBySpeciesResult, StatsCacheBySpeciesResult>
 				columnConfigs={sortableColumnConfigs}
 				data={speciesStats}
 				rowDataTransform={(data) => data}

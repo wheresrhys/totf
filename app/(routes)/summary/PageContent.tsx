@@ -6,7 +6,7 @@ import { SummaryTotalsSection } from '@/app/components/SummaryTotalsSection';
 import { SquashedMonthSummaryTotalsSection } from '@/app/components/SquashedMonthSummaryTotalsSection';
 import type { CoreStatsResult } from '@/app/models/db';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { SpeciesStatsRow } from '@/modules/stats-view';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import { formatMonthLabel, type MonthTotalsRow } from '@/app/lib/month-totals';
 
 function buildHeading(
@@ -62,7 +62,7 @@ export function SummaryPageContent({
 	showAllTimeMonthTotals?: boolean;
 	// The squashed-month page's 3 tabs' data — fetched eagerly (cheap, no
 	// zero-filling/lazy loading needed), unlike every other tab on this page.
-	speciesTotalsForMonth?: SpeciesStatsRow[];
+	speciesTotalsForMonth?: StatsCacheBySpeciesResult[];
 	yearTotalsForMonth?: CoreStatsResult[];
 	sessionTotalsForMonth?: CoreStatsResult[];
 	viewedGroup?: ViewedGroup;

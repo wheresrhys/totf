@@ -25,10 +25,8 @@ import {
 	SQUASHED_MONTH_SPECIES_TOTALS_TAB_ID,
 	type SquashedMonthTabParams
 } from '@/app/components/pages/summary/squashed-month-tab-params';
-import {
-	parseMonthAbbreviation,
-	type SpeciesStatsRow
-} from '@/modules/stats-view';
+import { parseMonthAbbreviation } from '@/modules/stats-view';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import { canReportHighlights } from '@/app/lib/qa-reporting';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CoreStatsResult } from '@/app/models/db';
@@ -82,7 +80,7 @@ export type PageData =
 	| {
 			squashedMonth: number;
 			summaryStats: CoreStatsResult | null;
-			speciesTotalsForMonth: SpeciesStatsRow[];
+			speciesTotalsForMonth: StatsCacheBySpeciesResult[];
 			yearTotalsForMonth: CoreStatsResult[];
 			sessionTotalsForMonth: CoreStatsResult[];
 			initialTabData?: { tabId: string; data: unknown };

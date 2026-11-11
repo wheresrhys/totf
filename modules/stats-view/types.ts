@@ -1,18 +1,13 @@
 // Types shared across more than one file in this module. Owned here per root
 // CLAUDE.md's "Module conventions" — before #1327 each of these lived in the
 // helper file that happened to derive it and was imported file-to-file from
-// there (`species-totals.ts` reached into `species-stats.ts` for
-// `SpeciesStatsRow`; every table component reached into both).
+// there, rather than from one owned location.
 //
-// `CoreStatsResult`/`BiometricsStatsResult`/`BiometricFieldName` are *not*
-// here: `app/models/db.ts` owns them, so every file that needs one imports it
-// directly from there rather than through this module.
+// `StatsCacheBySpeciesResult` is *not* here: `modules/stats` owns it, so every
+// file that needs it imports it directly from `@/modules/stats/browser` rather
+// than through this module.
 
-import type {
-	CoreStatsResult,
-	BiometricFieldName,
-	BiometricsStatsResult
-} from '@/app/models/db';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 
 export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
 
@@ -53,19 +48,14 @@ export type SpeciesTotalsRow = {
 	unknownAgeCount: number;
 };
 
-// The /species list page's row shape (#823): every non-biometric column from
-// core_stats, plus the 8 biometric columns sourced from a BiometricsStatsResult
-// row. core_stats no longer carries its own copies (#827 removed them), so the
-// biometrics row is the sole source. A species with no matching biometrics row
-// leaves the 8 fields undefined, which
-// MultiSpeciesTableBody's generic `<td>{species[column.property]}</td>` already
-// renders as a blank cell — no special-casing needed.
-export type SpeciesStatsRow = Omit<CoreStatsResult, BiometricFieldName> &
-	Partial<Pick<BiometricsStatsResult, BiometricFieldName>>;
-
+// A column of one whole by-species cache row — counts or wing/weight metric
+// alike. A species with no biometric-eligible encounters carries a real `null`
+// in the 8 wing/weight columns, which `MultiSpeciesTableBody`'s generic
+// `<td>{species[column.property]}</td>` renders as a blank cell — no
+// special-casing needed.
 export type SpeciesStatConfig = {
 	label: string;
-	property: keyof SpeciesStatsRow;
+	property: keyof StatsCacheBySpeciesResult;
 	suffix?: string;
 	category?: string;
 	prefix?: string;

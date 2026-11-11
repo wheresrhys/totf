@@ -9,7 +9,7 @@ import {
 } from '@testing-library/react';
 import { SquashedMonthSummaryTotalsSection } from '../SquashedMonthSummaryTotalsSection';
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import type { SpeciesStatsRow } from '@/modules/stats-view';
+import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
 import {
 	buildCoreStatsRow,
 	buildDailyStatsRow
@@ -18,7 +18,9 @@ import {
 const viewedGroup: ViewedGroup = { id: 1, slug: 'alpha' };
 
 const speciesTotalsForMonth = [
-	{ ...buildCoreStatsRow({ species_name: 'Robin' }) } as SpeciesStatsRow
+	{
+		...buildCoreStatsRow({ species_name: 'Robin' })
+	} as StatsCacheBySpeciesResult
 ];
 
 const yearTotalsForMonth = [
@@ -39,7 +41,7 @@ function renderSection({
 	initialTabData
 }: {
 	squashedMonth?: number;
-	speciesTotals?: SpeciesStatsRow[];
+	speciesTotals?: StatsCacheBySpeciesResult[];
 	yearTotals?: typeof yearTotalsForMonth;
 	sessionTotals?: typeof sessionTotalsForMonth;
 	initialTabId?: string;
