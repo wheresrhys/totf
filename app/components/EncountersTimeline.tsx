@@ -40,38 +40,40 @@ export function EncountersTimeline({
 	});
 
 	return (
-		<div className="relative flex">
-			{years.map((year) => (
-				<div key={year} className="flex-1">
-					<div className="">{year}</div>
-					<div className="flex flex-1 w-full h-8 border border-gray-500 border-width-2">
-						{['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'].map(
-							(month, index) => (
-								<span
-									key={index}
-									className={`h-8 flex-1 text-center ${index % 2 === 1 ? 'bg-gray-300' : 'bg-gray-100'}`}
-								>
-									{month}
-								</span>
-							)
-						)}
+		<div className="overflow-x-auto">
+			<div className="relative flex min-w-max">
+				{years.map((year) => (
+					<div key={year} className="flex-1">
+						<div className="">{year}</div>
+						<div className="flex flex-1 w-full h-8 border border-gray-500 border-width-2">
+							{['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'].map(
+								(month, index) => (
+									<span
+										key={index}
+										className={`h-8 flex-1 text-center ${index % 2 === 1 ? 'bg-gray-300' : 'bg-gray-100'}`}
+									>
+										{month}
+									</span>
+								)
+							)}
+						</div>
 					</div>
-				</div>
-			))}
+				))}
 
-			{points.map(({ position, encounter }) => (
-				<div
-					key={position.toString()}
-					className={`absolute ${encounter ? 'bottom-2' : 'bottom-1'}`}
-					style={{ left: `${position}%` }}
-				>
+				{points.map(({ position, encounter }) => (
 					<div
-						className={`${encounter ? 'w-4 h-4 outline outline-2 outline-black' : 'w-2 h-2'} rounded-full text-center text-xs ${encounter?.is_juv ? 'bg-white text-black ' : 'bg-black text-white'}`}
+						key={position.toString()}
+						className={`absolute ${encounter ? 'bottom-2' : 'bottom-1'}`}
+						style={{ left: `${position}%` }}
 					>
-						{encounter?.age_code ?? ''}
+						<div
+							className={`${encounter ? 'w-4 h-4 outline outline-2 outline-black' : 'w-2 h-2'} rounded-full text-center text-xs ${encounter?.is_juv ? 'bg-white text-black ' : 'bg-black text-white'}`}
+						>
+							{encounter?.age_code ?? ''}
+						</div>
 					</div>
-				</div>
-			))}
+				))}
+			</div>
 		</div>
 	);
 }
