@@ -1,16 +1,20 @@
 'use client';
 
 import { useId } from 'react';
+import type { StatsClass } from '../types';
 
-const OPTIONS: { value: boolean; label: string }[] = [
-	{ value: false, label: 'Counts' },
-	{ value: true, label: 'Biometrics' }
+const OPTIONS: { value: StatsClass; label: string }[] = [
+	{ value: 'counts', label: 'Counts' },
+	{ value: 'biometrics', label: 'Biometrics' }
 ];
 
 // Shared control for switching a stats table's per-species breakdown block
-// between age-bucket counts (`false`, today's default everywhere) and
-// wing/weight biometrics (`true`). Stateless — the caller owns
-// `value`/`onChange`, same as `CombineYearsToggle`/`EmptyMonthsToggle`. Scoped
+// between age-bucket counts (`'counts'`, today's default everywhere) and
+// wing/weight biometrics (`'biometrics'`). Its value is the `StatsClass` union
+// rather than a `showBiometrics` boolean, so a caller's own state and the
+// functions it feeds name the stat class outright (#1431 review). Stateless —
+// the caller owns `value`/`onChange`, same as
+// `CombineYearsToggle`/`EmptyMonthsToggle`. Scoped
 // with useId() like `AggregateByToggle` rather than a static id: every table
 // this wires into (the sibling wiring tickets for SpeciesTotalsTable,
 // SessionSpeciesTotalsTable and PeriodTotalsTable) can have multiple
@@ -20,8 +24,8 @@ export function CountsBiometricsToggle({
 	value,
 	onChange
 }: {
-	value: boolean;
-	onChange: (value: boolean) => void;
+	value: StatsClass;
+	onChange: (value: StatsClass) => void;
 }) {
 	const instanceId = useId();
 	return (
@@ -30,7 +34,7 @@ export function CountsBiometricsToggle({
 			<div className="border-base-content/20 flex gap-0.5 rounded-field border p-0.5">
 				{OPTIONS.map((option) => (
 					<label
-						key={String(option.value)}
+						key={option.value}
 						htmlFor={`${instanceId}-counts-biometrics-toggle-${option.value}`}
 						className="btn btn-sm btn-text has-checked:btn-active"
 					>

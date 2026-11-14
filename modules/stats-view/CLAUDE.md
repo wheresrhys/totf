@@ -61,10 +61,11 @@ modules/stats-view/
               # (lib/session-species-biometrics.ts) are deliberately not on it: no
               # caller outside the module, the same treatment modules/stats gives
               # runSimpleStatsCacheRefreshPass
-  types.ts    # the 5 types shared across more than one file in this module —
+  types.ts    # the 6 types shared across more than one file in this module —
               # PeriodTotalsGrouping, PeriodTotalsRow, SpeciesTotalsRow,
-              # SpeciesStatConfig, SessionSpeciesBiometrics. Before #1327 each lived in
-              # whichever helper derived it and was imported file-to-file from there
+              # SpeciesStatConfig, SessionSpeciesBiometrics, StatsClass. Before #1327
+              # each lived in whichever helper derived it and was imported
+              # file-to-file from there
   lib/
     period-totals.ts    # derivePeriodTotalsRowByBird / ...ByEncounter — one
                         # StatsResult (either grain) -> one PeriodTotalsRow, per the
@@ -95,7 +96,11 @@ modules/stats-view/
                                  # toggle (moved from modules/ui-kit, #1353)
     CountsBiometricsToggle.tsx  # CountsBiometricsToggle — age-bucket counts vs
                                  # wing/weight biometrics toggle for a stats table's
-                                 # breakdown block (#1433)
+                                 # breakdown block (#1433). Its value is the
+                                 # `StatsClass` union ('counts' | 'biometrics'), not a
+                                 # `showBiometrics` boolean, so a caller's state and
+                                 # the column-building functions it feeds all name the
+                                 # stat class outright (#1431 review)
     StatsTableBody.tsx          # createStatsTableBody — factory for a SortableTable
                                  # TableBodyComponent, flat or accordion depending on
                                  # whether an ExpandedContentComponent is supplied

@@ -12,7 +12,7 @@ import {
 import { createStatsTableBody } from '../lib/StatsTableBody';
 import { CountsBiometricsToggle } from '../lib/CountsBiometricsToggle';
 import { deriveSessionSpeciesBiometrics } from '../lib/session-species-biometrics';
-import type { SessionSpeciesBiometrics } from '../types';
+import type { SessionSpeciesBiometrics, StatsClass } from '../types';
 import {
 	SortableTable,
 	type ColumnConfig,
@@ -97,7 +97,7 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 // belongs with the per-age-class breakdown rather than alongside wing/weight.
 function buildColumnConfigs(
 	hasPulli: boolean,
-	showBiometrics: boolean
+	statsClass: StatsClass
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
 	const leadingColumns = {
 		species: {
@@ -109,7 +109,7 @@ function buildColumnConfigs(
 			cellClassName: 'font-bold'
 		}
 	};
-	return showBiometrics
+	return statsClass === 'biometrics'
 		? {
 				...leadingColumns,
 				...buildBiometricColumnConfigs()
@@ -131,9 +131,9 @@ function buildColumnConfigs(
 function buildTotalsCellOverrides(
 	speciesList: SpeciesWithEncounters[],
 	rowModels: RowModel[],
-	showBiometrics: boolean
+	statsClass: StatsClass
 ): Partial<Record<keyof RowModel, React.ReactNode>> {
-	return showBiometrics
+	return statsClass === 'biometrics'
 		? deriveSessionSpeciesBiometrics(
 				speciesList.flatMap(
 					(speciesWithEncounters) => speciesWithEncounters.encounters
@@ -167,30 +167,26 @@ export function SessionSpeciesTotalsTable({
 }) {
 	// Local to this table, like `SpeciesTotalsTable`'s own "Aggregate by" state
 	// (#604) — each tab's instance toggles independently and resets on remount.
-	const [showBiometrics, setShowBiometrics] = useState(false);
+	const [statsClass, setStatsClass] = useState<StatsClass>('counts');
 	const hasPulli = speciesList.some((speciesWithEncounters) =>
 		speciesWithEncounters.encounters.some(
 			(encounter) => getAgeClass(encounter) === 'pullus'
 		)
 	);
-	const columnConfigs = buildColumnConfigs(hasPulli, showBiometrics);
+	const columnConfigs = buildColumnConfigs(hasPulli, statsClass);
 	const rowModels = speciesList.map(rowDataTransform);
 	const totalsRow = buildTotalsRowCells<RowModel>({
 		columnConfigs,
 		rowModels,
-		cellOverrides: buildTotalsCellOverrides(
-			speciesList,
-			rowModels,
-			showBiometrics
-		)
+		cellOverrides: buildTotalsCellOverrides(speciesList, rowModels, statsClass)
 	});
 
 	return (
 		<>
 			<div data-test-id="above-header-row" className="m-2 flex gap-4">
 				<CountsBiometricsToggle
-					value={showBiometrics}
-					onChange={setShowBiometrics}
+					value={statsClass}
+					onChange={setStatsClass}
 				/>
 			</div>
 			<SortableTable<SpeciesWithEncounters, RowModel>
