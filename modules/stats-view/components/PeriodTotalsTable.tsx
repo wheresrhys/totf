@@ -7,7 +7,11 @@ import {
 	derivePeriodTotalsRowByEncounter,
 	formatPeriodTotalsLabel
 } from '../lib/period-totals';
-import type { PeriodTotalsGrouping, PeriodTotalsRow } from '../types';
+import type {
+	PeriodTotalsGrouping,
+	PeriodTotalsRow,
+	StatsClass
+} from '../types';
 import {
 	buildBiometricColumnConfigs,
 	buildStandardColumnConfigs,
@@ -33,7 +37,7 @@ function buildColumnConfigs({
 	aggregateBy,
 	showSpeciesColumn,
 	showBusiestSession,
-	showBiometrics
+	statsClass
 }: {
 	timeInterval: PeriodTotalsGrouping;
 	firstColumnHeader: string;
@@ -41,7 +45,7 @@ function buildColumnConfigs({
 	aggregateBy: string;
 	showSpeciesColumn: boolean;
 	showBusiestSession: boolean;
-	showBiometrics: boolean;
+	statsClass: StatsClass;
 }): Partial<Record<keyof PeriodTotalsRow, ColumnConfig>> {
 	return {
 		timePeriod: {
@@ -65,7 +69,7 @@ function buildColumnConfigs({
 		// counts (today's default) or the 8 wing/weight biometric columns,
 		// switched by `CountsBiometricsToggle`. Every column above is
 		// unaffected by either mode.
-		...(showBiometrics
+		...(statsClass === 'biometrics'
 			? buildBiometricColumnConfigs()
 			: buildStandardColumnConfigs<PeriodTotalsRow>(
 					hasPulli,
@@ -106,8 +110,8 @@ export function PeriodTotalsTable({
 	// different tab, per #604.
 	const [aggregateBy, setAggregateBy] = useState<AggregateByValue>('bird');
 	// Counts vs biometrics breakdown block (#1432) — same reset-on-remount
-	// behaviour as `aggregateBy` above, defaulting to counts (`false`).
-	const [showBiometrics, setShowBiometrics] = useState(false);
+	// behaviour as `aggregateBy` above, defaulting to counts.
+	const [statsClass, setStatsClass] = useState<StatsClass>('counts');
 
 	if (rows.length === 0) {
 		return <p>No data recorded.</p>;
@@ -130,7 +134,7 @@ export function PeriodTotalsTable({
 		showSpeciesColumn,
 		showBusiestSession,
 		timeInterval,
-		showBiometrics
+		statsClass
 	});
 
 	const totalsRow = totalsStats
@@ -192,13 +196,10 @@ export function PeriodTotalsTable({
 				    mode is active for the same reason it's already hidden for
 				    "day": left visible, it would have no effect on anything
 				    rendered. */}
-				{timeInterval !== 'day' && !showBiometrics && (
+				{timeInterval !== 'day' && statsClass !== 'biometrics' && (
 					<AggregateByToggle value={aggregateBy} onChange={setAggregateBy} />
 				)}
-				<CountsBiometricsToggle
-					value={showBiometrics}
-					onChange={setShowBiometrics}
-				/>
+				<CountsBiometricsToggle value={statsClass} onChange={setStatsClass} />
 				{extraControls ?? null}
 			</div>
 			<SortableTable<StatsResult, PeriodTotalsRow>
