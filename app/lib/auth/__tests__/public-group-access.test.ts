@@ -47,25 +47,23 @@ describe('resolvePublicPageViewedGroupId', () => {
 	});
 
 	describe('the species list path to a public group', () => {
-		it('returns the viewed group id for the species list path', async () => {
-			mockResolveGroupIdBySlug.mockResolvedValue(2);
-			mockResolveGroupPublicAreasForRequest.mockResolvedValue(['summary']);
-
-			expect(await resolvePublicPageViewedGroupId('/group/alpha/species')).toBe(
-				2
-			);
-		});
-
-		it('returns the viewed group id for the species list path with a trailing slash', async () => {
+		// The route itself is gone (#1434) — the summary page's Species tab
+		// replaced it — so the pathname matches no pattern and falls through to
+		// the same bare `null` any unmatched path gets, without even resolving
+		// the slug.
+		it('no longer resolves a public group id for the former group-scoped species list path', async () => {
 			mockResolveGroupIdBySlug.mockResolvedValue(2);
 			mockResolveGroupPublicAreasForRequest.mockResolvedValue(['summary']);
 
 			expect(
-				await resolvePublicPageViewedGroupId('/group/alpha/species/')
-			).toBe(2);
+				await resolvePublicPageViewedGroupId('/group/alpha/species')
+			).toBeNull();
+			expect(mockResolveGroupIdBySlug).not.toHaveBeenCalled();
 		});
+	});
 
-		it('returns null for a species detail path, which stays out of scope', async () => {
+	describe('the species detail path', () => {
+		it('still returns null for a species detail path, which stays out of scope', async () => {
 			expect(
 				await resolvePublicPageViewedGroupId('/group/alpha/species/Robin')
 			).toBeNull();
@@ -82,21 +80,12 @@ describe('resolvePublicPageViewedGroupId', () => {
 		).toBeNull();
 	});
 
-	it('returns null for the species list path to a non-public group', async () => {
-		mockResolveGroupIdBySlug.mockResolvedValue(2);
-		mockResolveGroupPublicAreasForRequest.mockResolvedValue([]);
-
-		expect(
-			await resolvePublicPageViewedGroupId('/group/alpha/species')
-		).toBeNull();
-	});
-
 	it('returns null for a group with a public_areas value other than summary', async () => {
 		mockResolveGroupIdBySlug.mockResolvedValue(2);
 		mockResolveGroupPublicAreasForRequest.mockResolvedValue(['something-else']);
 
 		expect(
-			await resolvePublicPageViewedGroupId('/group/alpha/species')
+			await resolvePublicPageViewedGroupId('/group/alpha/summary')
 		).toBeNull();
 	});
 

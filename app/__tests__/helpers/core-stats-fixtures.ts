@@ -84,7 +84,7 @@ export function buildCoreStatsRow(
 /**
  * The by-species grain of `buildCoreStatsRow` (#1424): the same columns with a
  * real `species_name`, for a test feeding a `StatsCacheBySpeciesResult` slot —
- * a species-filtered cache read, the `/species` list page's rows, or anything
+ * a species-filtered cache read, the summary Species tab's rows, or anything
  * `deriveSpeciesTotalsRow` consumes. Named for the grain rather than for a
  * species, since `species_name` is just another override; the default is a
  * species that exists in the seed data so a rendered name is recognisable.
@@ -246,8 +246,8 @@ function resolveAllSpeciesRow(row: Record<string, unknown>): StatsCacheResult {
 
 /**
  * Alpha/Beta/Gamma's whole by-species result, one row per species — powers
- * `fetchSpeciesData`'s cache-aligned windows (the `/species` list page's
- * default and year-select views).
+ * `fetchSpeciesData`'s cache-aligned windows (every window the summary pages'
+ * Species tab asks for).
  */
 export const ALPHA_CORE_STATS_BY_SPECIES: StatsCacheBySpeciesResult[] =
 	alphaBySpeciesSnapshot.map(resolveBySpeciesRow);
@@ -289,7 +289,7 @@ export const ALPHA_HOME_PAGE_SUMMARY_STATS: {
  * encounter at the all-time grain, already carrying its own biometric
  * columns (unlike `biometrics-stats-fixtures.ts`'s
  * `ROBIN_ALPHA_BIOMETRICS_HEADLINE`, which exists for the one call site that
- * still fetches the two halves separately — see `species-stats.ts`). Powers
+ * still fetches the two halves separately). Powers
  * the species detail page's headline stats (#1222).
  */
 export const ROBIN_ALPHA_HEADLINE: StatsCacheBySpeciesResult =
